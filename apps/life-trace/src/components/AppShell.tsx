@@ -151,7 +151,7 @@ function PwaActionBanner({ hidden }: { hidden: boolean }) {
 
   return (
     <div className="safe-x pointer-events-none fixed inset-x-0 bottom-[calc(6.9rem+env(safe-area-inset-bottom))] z-40 w-full">
-      <div className="pointer-events-auto rounded-[1.35rem] border border-life-ai/20 bg-card/95 p-3 shadow-[0_-18px_54px_rgba(45,41,35,0.14)] backdrop-blur-2xl">
+      <div className="pointer-events-auto rounded-[1.25rem] border border-life-ai/20 bg-card/95 p-3 shadow-[0_-18px_54px_rgba(45,41,35,0.14)] backdrop-blur-2xl">
         <div className="flex items-start gap-3">
           <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
             {updateAvailable ? <RefreshCw className="size-5" /> : <Download className="size-5" />}

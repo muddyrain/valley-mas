@@ -19,6 +19,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { EmptyState } from '@/components/EmptyState';
 import { ImagePreview } from '@/components/ImagePreview';
+import { LifeFilterBar, LifeList } from '@/components/LifeLayout';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { PlanDetailContent } from '@/components/PlanDetailDrawer';
 import { SoftHeader, SoftPage, SoftPanel, SoftSectionTitle } from '@/components/SoftDiary';
@@ -468,7 +469,7 @@ export function PlansPage() {
   }
 
   return (
-    <SoftPage ref={pageRef} className="space-y-5 pb-32">
+    <SoftPage ref={pageRef} className="pb-32">
       <SoftHeader
         title="计划"
         subtitle={new Intl.DateTimeFormat('zh-CN', {
@@ -480,7 +481,7 @@ export function PlansPage() {
           <Button
             type="button"
             variant="ai"
-            className="h-14 rounded-[1.15rem] px-4 text-base"
+            className="h-14 rounded-[1.25rem] px-4 text-base"
             disabled={planCreating}
             onClick={() => {
               setEditingPlan(null);
@@ -538,7 +539,7 @@ export function PlansPage() {
         </button>
       ) : null}
 
-      <div className="grid grid-cols-3 rounded-[1.35rem] border border-border/70 bg-card/70 p-1 text-sm font-semibold text-muted-foreground">
+      <div className="grid grid-cols-3 rounded-[1.25rem] border border-border/70 bg-card/70 p-1 text-sm font-semibold text-muted-foreground">
         {primaryPlanFilters.map((filter) => {
           const active = activeFilter === filter.id;
 
@@ -616,7 +617,7 @@ export function PlansPage() {
               </Button>
             )}
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <LifeFilterBar>
             {quickFilterOptions.map((filter) => {
               const active = quickFilter === filter.id;
               return (
@@ -635,8 +636,8 @@ export function PlansPage() {
                 </button>
               );
             })}
-          </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          </LifeFilterBar>
+          <LifeFilterBar className="items-center">
             <div className="flex shrink-0 items-center gap-1 text-xs font-semibold text-muted-foreground">
               类型
             </div>
@@ -658,7 +659,7 @@ export function PlansPage() {
                 </button>
               );
             })}
-          </div>
+          </LifeFilterBar>
         </Card>
       ) : null}
 
@@ -785,7 +786,7 @@ export function PlansPage() {
               <h2 className={cn('text-lg font-semibold', group.tone)}>{group.title}</h2>
               <span className="text-xs text-muted-foreground">{group.plans.length} 个</span>
             </div>
-            <div className="space-y-4">{group.plans.map(renderPlanCard)}</div>
+            <LifeList>{group.plans.map(renderPlanCard)}</LifeList>
           </section>
         ))}
         {showPlansSyncFallback ? (

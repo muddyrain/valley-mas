@@ -11,6 +11,7 @@ import {
   SheetSelectButton,
   SheetSelectField,
 } from '@/components/FormItem';
+import { LifeFilterBar, LifeList } from '@/components/LifeLayout';
 import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
@@ -265,7 +266,7 @@ export function LedgerPage() {
       }
     >
       <section className="grid gap-3 md:grid-cols-[1.35fr_1fr]">
-        <Card className="relative overflow-hidden border-life-health/20 p-5">
+        <Card className="relative overflow-hidden border-life-health/20 p-4">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-health/70 to-transparent"
@@ -304,7 +305,7 @@ export function LedgerPage() {
           </div>
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold">分类占比</p>
@@ -347,7 +348,7 @@ export function LedgerPage() {
             onChange={(event) => setMonth(event.target.value || getDefaultLedgerMonth())}
             className="h-10 rounded-xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
           />
-          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <LifeFilterBar>
             {(['all', ...ledgerCategories] as LedgerFilter[]).map((category) => (
               <button
                 key={category}
@@ -363,7 +364,7 @@ export function LedgerPage() {
                 {category === 'all' ? '全部' : category}
               </button>
             ))}
-          </div>
+          </LifeFilterBar>
           <SheetSelectButton
             value={directionFilter}
             options={ledgerDirectionFilterOptions}
@@ -396,7 +397,7 @@ export function LedgerPage() {
             }
           />
         ) : (
-          <div className="relative grid gap-3">
+          <LifeList className="relative">
             {ledgerRefreshing ? <InlineRefreshStatus tone="health" /> : null}
             {ledgerEntries.map((entry) => {
               const deleting = Boolean(ledgerDeletingById[entry.id]);
@@ -458,7 +459,7 @@ export function LedgerPage() {
                 </Card>
               );
             })}
-          </div>
+          </LifeList>
         )}
 
         {ledgerPagination.hasMore ? (

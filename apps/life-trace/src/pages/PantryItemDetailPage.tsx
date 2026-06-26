@@ -305,7 +305,7 @@ export function PantryItemDetailPage() {
         />
       ) : item ? (
         <div className="space-y-5 pb-4">
-          <section className="overflow-hidden rounded-[1.35rem] border border-border bg-card">
+          <section className="overflow-hidden rounded-[1.25rem] border border-border bg-card">
             <div className="grid min-h-64 place-items-center bg-secondary/60">
               {coverUrl ? (
                 <ImagePreview

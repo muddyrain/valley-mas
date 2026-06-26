@@ -49,6 +49,7 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { EmptyState } from '@/components/EmptyState';
+import { LifePage } from '@/components/LifeLayout';
 import { LifeTraceBrandMark } from '@/components/LifeTraceBrandMark';
 import { SectionHeader } from '@/components/SectionHeader';
 import { SubPageShell } from '@/components/SubPageShell';
@@ -423,7 +424,7 @@ function WeeklyReviewsArchive({
   addingActionKey: string | null;
 }) {
   return (
-    <SubPageShell title="历史周报" eyebrow="周报归档" onBack={onBack} contentClassName="space-y-6">
+    <SubPageShell title="历史周报" eyebrow="周报归档" onBack={onBack}>
       {loading ? (
         <SyncState
           title="正在同步历史周报"
@@ -532,7 +533,6 @@ function AssistantHistoryPage({
       title="对话历史"
       eyebrow="Life AI"
       onBack={onBack}
-      contentClassName="space-y-6"
       action={
         <button
           type="button"
@@ -651,12 +651,7 @@ function AiActionsArchive({ actions, onBack }: { actions: AiAction[]; onBack: ()
   const hasKeyword = keyword.trim().length > 0;
 
   return (
-    <SubPageShell
-      title="AI 操作历史"
-      eyebrow="Life AI"
-      onBack={onBack}
-      contentClassName="space-y-6"
-    >
+    <SubPageShell title="AI 操作历史" eyebrow="Life AI" onBack={onBack}>
       <section className="space-y-3">
         <SectionHeader title="动作追踪" meta={`${filteredActions.length} 条`} />
         <label className="flex min-h-11 items-center gap-2 rounded-2xl border border-border bg-card px-3 text-sm text-muted-foreground focus-within:border-life-ai/50 focus-within:text-life-ai">
@@ -721,7 +716,6 @@ function PhotoItemHistoryArchive({
       title="最近商品识别"
       eyebrow="Life AI"
       onBack={onBack}
-      contentClassName="space-y-6"
       action={
         <button
           type="button"
@@ -1010,7 +1004,7 @@ function RecentRecipeHistory({
           <button
             type="button"
             key={recipe.id}
-            className="flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-[1.15rem] border border-life-health/20 bg-card/80 px-3 py-2.5 text-left shadow-[0_10px_30px_rgba(71,58,42,0.055)] transition hover:border-life-health/35 hover:bg-life-health/5"
+            className="flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-[1.25rem] border border-life-health/20 bg-card/80 px-3 py-2.5 text-left shadow-[0_10px_30px_rgba(71,58,42,0.055)] transition hover:border-life-health/35 hover:bg-life-health/5"
             onClick={onOpenRecipes}
           >
             <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
@@ -1105,13 +1099,7 @@ function AssistantToolsSheet({
   };
 
   return (
-    <BottomSheet
-      open={open}
-      onOpenChange={onOpenChange}
-      overlayLabel="关闭 AI 工具"
-      contentClassName="space-y-6"
-      portal
-    >
+    <BottomSheet open={open} onOpenChange={onOpenChange} overlayLabel="关闭 AI 工具" portal>
       <div className="px-1 pb-1">
         <p className="text-2xl font-semibold tracking-normal">AI 工具</p>
         <p className="mt-2 text-sm leading-5 text-muted-foreground">计划、Pantry 与回顾</p>
@@ -1122,7 +1110,7 @@ function AssistantToolsSheet({
           <p className="text-sm font-semibold">生活动作</p>
           <span className="text-xs text-muted-foreground">5 个动作</span>
         </div>
-        <div className="space-y-2 rounded-[1.35rem] border border-border/80 bg-secondary/15 p-2.5">
+        <div className="space-y-2 rounded-[1.25rem] border border-border/80 bg-secondary/15 p-2.5">
           <AssistantToolRow
             icon={Sun}
             label="今天安排"
@@ -1167,7 +1155,7 @@ function AssistantToolsSheet({
           <p className="text-sm font-semibold">Pantry 智能</p>
           <span className="text-xs text-muted-foreground">5 个入口</span>
         </div>
-        <div className="space-y-2 rounded-[1.35rem] border border-border/80 bg-secondary/15 p-2.5">
+        <div className="space-y-2 rounded-[1.25rem] border border-border/80 bg-secondary/15 p-2.5">
           <AssistantToolRow
             icon={Camera}
             label="拍照分析商品"
@@ -1326,7 +1314,12 @@ function AgentConversationPanel({
   });
 
   return (
-    <div className="flex h-[calc(100dvh_-_5.35rem_-_env(safe-area-inset-bottom))] min-h-0 flex-col overflow-hidden px-4 pt-2 max-[360px]:px-3">
+    <LifePage
+      variant="immersive"
+      spacing="compact"
+      withBottomInset={false}
+      className="flex h-[calc(100dvh_-_5.35rem_-_env(safe-area-inset-bottom))] min-h-0 flex-col overflow-hidden"
+    >
       <div className="grid shrink-0 grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-start gap-2 pb-2">
         <button
           type="button"
@@ -1375,7 +1368,7 @@ function AgentConversationPanel({
           <div className="min-h-0 flex-1 overflow-y-auto pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {!hasChatActivity ? (
               <div className="mb-5 space-y-4">
-                <div className="rounded-[1.35rem] border border-border/75 bg-card/82 p-3.5 shadow-[0_14px_42px_rgba(71,58,42,0.065)] backdrop-blur">
+                <div className="rounded-[1.25rem] border border-border/75 bg-card/82 p-3.5 shadow-[0_14px_42px_rgba(71,58,42,0.065)] backdrop-blur">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-lg font-semibold">今日状态</p>
@@ -1481,7 +1474,7 @@ function AgentConversationPanel({
                     <p className="text-xl font-semibold">快速提问</p>
                     {streaming ? <Badge tone="ai">处理中</Badge> : null}
                   </div>
-                  <div className="overflow-hidden rounded-[1.35rem] border border-border/75 bg-card/82 shadow-[0_14px_42px_rgba(71,58,42,0.065)]">
+                  <div className="overflow-hidden rounded-[1.25rem] border border-border/75 bg-card/82 shadow-[0_14px_42px_rgba(71,58,42,0.065)]">
                     {landingPromptCards.map((prompt) => {
                       const Icon = prompt.icon;
 
@@ -1699,7 +1692,7 @@ function AgentConversationPanel({
         onOpenPhotoItemDraft={onOpenPhotoItemDraft}
         onQuickAction={onQuickAction}
       />
-    </div>
+    </LifePage>
   );
 }
 

@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import { ChevronRight, Leaf } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { forwardRef } from 'react';
+import { LifePage } from '@/components/LifeLayout';
 import { cn } from '@/lib/utils';
 
 type SoftTone = 'trace' | 'plan' | 'ai' | 'health' | 'weather' | 'alert' | 'muted';
@@ -19,12 +20,9 @@ const toneClass: Record<SoftTone, string> = {
 export const SoftPage = forwardRef<HTMLDivElement, { children: ReactNode; className?: string }>(
   function SoftPage({ children, className }, ref) {
     return (
-      <div
-        ref={ref}
-        className={cn('min-w-0 space-y-6 overflow-x-hidden px-5 pt-4 max-[360px]:px-4', className)}
-      >
+      <LifePage ref={ref} variant="tab" spacing="default" className={className}>
         {children}
-      </div>
+      </LifePage>
     );
   },
 );
@@ -62,7 +60,7 @@ export function SoftPanel({ children, className }: { children: ReactNode; classN
   return (
     <section
       className={cn(
-        'rounded-[1.45rem] border border-border/80 bg-card/85 p-5 shadow-[0_18px_48px_rgba(71,58,42,0.065)] backdrop-blur',
+        'rounded-[1.5rem] border border-border/80 bg-card/85 p-4 shadow-[0_14px_36px_rgba(71,58,42,0.055)] backdrop-blur',
         className,
       )}
     >
@@ -82,7 +80,7 @@ export function SoftSectionTitle({
 }) {
   return (
     <div className={cn('flex items-center justify-between gap-3 px-1', className)}>
-      <h2 className="text-[1.22rem] font-semibold leading-tight text-foreground">{title}</h2>
+      <h2 className="text-[1.12rem] font-semibold leading-tight text-foreground">{title}</h2>
       {meta ? (
         <span className="text-[0.8rem] font-medium text-muted-foreground">{meta}</span>
       ) : null}
@@ -106,7 +104,7 @@ export function SoftStatGrid({
   return (
     <div
       className={cn(
-        'grid overflow-hidden rounded-[1.45rem] border border-border/75 bg-card/85 shadow-[0_16px_44px_rgba(71,58,42,0.055)]',
+        'grid overflow-hidden rounded-[1.5rem] border border-border/75 bg-card/85 shadow-[0_16px_44px_rgba(71,58,42,0.055)]',
         columns === 4 ? 'grid-cols-4' : 'grid-cols-3',
       )}
     >

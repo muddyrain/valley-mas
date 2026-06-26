@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { type ReactNode, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { LifePage } from '@/components/LifeLayout';
 import { Button } from '@/components/ui/button';
 import { gsap, useGSAP } from '@/lib/gsap';
 import { cn } from '@/lib/utils';
@@ -136,7 +137,14 @@ export function SubPageShell({
           <div className="flex size-10 shrink-0 items-center justify-end">{action}</div>
         </div>
       </header>
-      <div className={contentClassName}>{children}</div>
+      <LifePage
+        variant="sub"
+        spacing="default"
+        withBottomInset={false}
+        className={contentClassName}
+      >
+        {children}
+      </LifePage>
     </div>
   );
 }

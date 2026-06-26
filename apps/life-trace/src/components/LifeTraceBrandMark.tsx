@@ -17,7 +17,7 @@ export function LifeTraceBrandMark({
   return (
     <span
       className={cn(
-        'inline-grid shrink-0 place-items-center overflow-hidden rounded-[1.15rem] shadow-[0_16px_48px_rgba(6,182,212,0.18)]',
+        'inline-grid shrink-0 place-items-center overflow-hidden rounded-[1.25rem] shadow-[0_16px_48px_rgba(6,182,212,0.18)]',
         className,
       )}
     >

@@ -61,7 +61,7 @@ export function AchievementsPage() {
       }
     >
       <div className="space-y-5">
-        <Card className="relative overflow-hidden border-life-ai/20 p-5">
+        <Card className="relative overflow-hidden border-life-ai/20 p-4">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-x-5 top-0 h-px bg-life-ai/70"

@@ -47,7 +47,7 @@ export function SettingInput({
   return (
     <label
       className={cn(
-        'group block rounded-[1.35rem] border border-border bg-card/80 p-4 transition duration-300',
+        'group block rounded-[1.25rem] border border-border bg-card/80 p-4 transition duration-300',
         'hover:border-foreground/20 hover:bg-card',
         toneClasses[tone].border,
       )}
@@ -110,7 +110,7 @@ export function SettingToggle({
       type="button"
       aria-pressed={active}
       className={cn(
-        'group flex w-full items-center justify-between gap-4 rounded-[1.35rem] border p-4 text-left transition duration-300',
+        'group flex w-full items-center justify-between gap-4 rounded-[1.25rem] border p-4 text-left transition duration-300',
         active
           ? 'border-life-trace/35 bg-life-trace/10 shadow-[0_18px_52px_rgba(16,185,129,0.08)]'
           : 'border-border bg-card/80 hover:border-foreground/20 hover:bg-card',

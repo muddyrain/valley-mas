@@ -165,12 +165,7 @@ export function AiRecipesPage() {
   };
 
   return (
-    <SubPageShell
-      title="智能菜谱"
-      eyebrow="Life AI"
-      fallbackBackTo="/ai"
-      contentClassName="space-y-5"
-    >
+    <SubPageShell title="智能菜谱" eyebrow="Life AI" fallbackBackTo="/ai">
       <Card className="overflow-hidden border-life-health/20 bg-card/84 p-0 shadow-[0_18px_54px_rgba(71,58,42,0.08)]">
         <div className="border-b border-border/70 bg-life-health/6 p-4">
           <div className="flex items-start gap-3">

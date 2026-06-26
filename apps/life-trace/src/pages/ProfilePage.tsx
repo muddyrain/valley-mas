@@ -33,6 +33,7 @@ import { useNavigate } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { EntryCard } from '@/components/EntryCard';
 import { FeedbackSheet } from '@/components/FeedbackSheet';
+import { LifePage } from '@/components/LifeLayout';
 import { LocationPicker } from '@/components/LocationPicker';
 import { PantryHouseholdDetailSheet } from '@/components/PantryHouseholdDetailSheet';
 import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
@@ -277,10 +278,10 @@ export function ProfilePage() {
   };
 
   return (
-    <div ref={pageRef} className="space-y-6 px-5 pt-4 max-[360px]:px-4">
+    <LifePage ref={pageRef} variant="tab" spacing="default">
       <section
         data-profile-hero
-        className="relative overflow-hidden rounded-[1.65rem] border border-border/70 bg-card/80 p-5 shadow-[0_18px_54px_rgba(71,58,42,0.075)] backdrop-blur max-[360px]:p-4"
+        className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-card/80 p-4 shadow-[0_18px_54px_rgba(71,58,42,0.075)] backdrop-blur max-[360px]:p-4"
       >
         <div
           aria-hidden="true"
@@ -327,10 +328,10 @@ export function ProfilePage() {
                 <img
                   src={user.avatar}
                   alt={profileName}
-                  className="size-[4.6rem] rounded-[1.45rem] border border-foreground/10 object-cover shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition duration-300 group-hover:scale-[1.03] max-[360px]:size-16"
+                  className="size-[4.6rem] rounded-[1.5rem] border border-foreground/10 object-cover shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition duration-300 group-hover:scale-[1.03] max-[360px]:size-16"
                 />
               ) : (
-                <div className="grid size-[4.6rem] place-items-center rounded-[1.45rem] border border-life-ai/20 bg-life-ai text-2xl font-bold text-primary-foreground shadow-[0_16px_40px_rgba(95,146,112,0.18)] transition duration-300 group-hover:scale-[1.03] max-[360px]:size-16">
+                <div className="grid size-[4.6rem] place-items-center rounded-[1.5rem] border border-life-ai/20 bg-life-ai text-2xl font-bold text-primary-foreground shadow-[0_16px_40px_rgba(95,146,112,0.18)] transition duration-300 group-hover:scale-[1.03] max-[360px]:size-16">
                   {profileName.slice(0, 1).toUpperCase()}
                 </div>
               )}
@@ -366,7 +367,7 @@ export function ProfilePage() {
           </div>
 
           <div className="grid grid-cols-[1fr_1.4fr] gap-3 max-[360px]:grid-cols-1">
-            <div className="group relative overflow-hidden rounded-[1.35rem] border border-border/60 bg-card/80 p-4 shadow-[0_4px_18px_rgba(71,58,42,0.06)] transition duration-300 hover:border-foreground/15 hover:shadow-[0_8px_28px_rgba(71,58,42,0.1)] backdrop-blur">
+            <div className="group relative overflow-hidden rounded-[1.25rem] border border-border/60 bg-card/80 p-4 shadow-[0_4px_18px_rgba(71,58,42,0.06)] transition duration-300 hover:border-foreground/15 hover:shadow-[0_8px_28px_rgba(71,58,42,0.1)] backdrop-blur">
               <div className="mb-3 grid size-10 place-items-center rounded-xl bg-life-plan/10 text-life-plan transition duration-200 group-hover:bg-life-plan/15">
                 <Clock className="size-5" />
               </div>
@@ -376,7 +377,7 @@ export function ProfilePage() {
               <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">工作时段</p>
             </div>
             <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-              <div className="group relative overflow-hidden rounded-[1.35rem] border border-border/60 bg-card/80 p-4 shadow-[0_4px_18px_rgba(71,58,42,0.06)] transition duration-300 hover:border-foreground/15 hover:shadow-[0_8px_28px_rgba(71,58,42,0.1)] backdrop-blur">
+              <div className="group relative overflow-hidden rounded-[1.25rem] border border-border/60 bg-card/80 p-4 shadow-[0_4px_18px_rgba(71,58,42,0.06)] transition duration-300 hover:border-foreground/15 hover:shadow-[0_8px_28px_rgba(71,58,42,0.1)] backdrop-blur">
                 <div className="mb-3 grid size-10 place-items-center rounded-xl bg-life-ai/10 text-life-ai transition duration-200 group-hover:bg-life-ai/15">
                   <ActiveCommuteIcon className="size-5" />
                 </div>
@@ -385,7 +386,7 @@ export function ProfilePage() {
                 </p>
                 <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">通勤方式</p>
               </div>
-              <div className="group relative overflow-hidden rounded-[1.35rem] border border-border/60 bg-card/80 p-4 shadow-[0_4px_18px_rgba(71,58,42,0.06)] transition duration-300 hover:border-foreground/15 hover:shadow-[0_8px_28px_rgba(71,58,42,0.1)] backdrop-blur">
+              <div className="group relative overflow-hidden rounded-[1.25rem] border border-border/60 bg-card/80 p-4 shadow-[0_4px_18px_rgba(71,58,42,0.06)] transition duration-300 hover:border-foreground/15 hover:shadow-[0_8px_28px_rgba(71,58,42,0.1)] backdrop-blur">
                 <div className="mb-3 grid size-10 place-items-center rounded-xl bg-life-trace/10 text-life-trace transition duration-200 group-hover:bg-life-trace/15">
                   <Heart className="size-5" />
                 </div>
@@ -416,7 +417,7 @@ export function ProfilePage() {
             <button
               type="button"
               className={cn(
-                'group flex w-full items-center justify-between gap-3 rounded-[1.35rem] border border-border bg-card/80 p-4 text-left transition duration-300',
+                'group flex w-full items-center justify-between gap-3 rounded-[1.25rem] border border-border bg-card/80 p-4 text-left transition duration-300',
                 'hover:border-foreground/20 hover:bg-card',
               )}
               onClick={openPicker}
@@ -508,17 +509,17 @@ export function ProfilePage() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-            <div className="rounded-[1.15rem] border border-border bg-secondary/55 p-3">
+            <div className="rounded-[1.25rem] border border-border bg-secondary/55 p-3">
               <p className="text-xs font-semibold text-muted-foreground">计划提醒</p>
               <p className="mt-2 text-sm font-semibold text-foreground">
                 {settings.planReminders ? planReminderMeta : '已关闭'}
               </p>
             </div>
-            <div className="rounded-[1.15rem] border border-border bg-secondary/55 p-3">
+            <div className="rounded-[1.25rem] border border-border bg-secondary/55 p-3">
               <p className="text-xs font-semibold text-muted-foreground">提醒节奏</p>
               <p className="mt-2 text-sm font-semibold text-foreground">{workdayMeta}</p>
             </div>
-            <div className="rounded-[1.15rem] border border-border bg-secondary/55 p-3 max-[360px]:col-span-1 sm:col-span-2">
+            <div className="rounded-[1.25rem] border border-border bg-secondary/55 p-3 max-[360px]:col-span-1 sm:col-span-2">
               <p className="text-xs font-semibold text-muted-foreground">库存默认提醒</p>
               <p className="mt-2 text-sm font-semibold text-foreground">{pantryReminderMeta}</p>
             </div>
@@ -728,7 +729,7 @@ export function ProfilePage() {
             </div>
           </div>
 
-          <div className="rounded-[1.35rem] border border-life-ai/20 bg-life-ai/5 p-4">
+          <div className="rounded-[1.25rem] border border-life-ai/20 bg-life-ai/5 p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-life-ai">当前激活空间</p>
@@ -994,6 +995,6 @@ export function ProfilePage() {
         onDissolveHousehold={handleDissolveHousehold}
       />
       <FeedbackSheet open={feedbackSheetOpen} onOpenChange={setFeedbackSheetOpen} />
-    </div>
+    </LifePage>
   );
 }

@@ -403,7 +403,7 @@ function PlacesListView() {
         </Button>
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-5">
         <Card className="p-4">
           <div className="flex items-start gap-3">
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-trace/10 text-life-trace">

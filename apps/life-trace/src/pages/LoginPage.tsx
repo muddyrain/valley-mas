@@ -74,7 +74,7 @@ export function LoginPage() {
           </div>
         </header>
 
-        <Card className="space-y-5 p-5" data-login-entrance>
+        <Card className="space-y-5 p-4" data-login-entrance>
           <div>
             <h3 className="text-lg font-semibold">账号登录</h3>
             <p className="mt-1 text-sm text-muted-foreground">当前先使用邮箱和密码登录。</p>

@@ -5,6 +5,7 @@ import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetHeader, SheetSelectField } from '@/components/FormItem';
+import { LifeList } from '@/components/LifeLayout';
 import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
@@ -312,7 +313,7 @@ export function RecurringPaymentsPage() {
       }
     >
       <section className="grid gap-3 md:grid-cols-[1.35fr_1fr]">
-        <Card className="relative overflow-hidden border-life-health/20 p-5">
+        <Card className="relative overflow-hidden border-life-health/20 p-4">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-health/70 to-transparent"
@@ -343,7 +344,7 @@ export function RecurringPaymentsPage() {
           </div>
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold">订阅清单</p>
@@ -400,7 +401,7 @@ export function RecurringPaymentsPage() {
             }
           />
         ) : (
-          <div className="relative grid gap-3">
+          <LifeList className="relative">
             {recurringPaymentsRefreshing ? <InlineRefreshStatus tone="health" /> : null}
             {sortedPayments.map((item) => {
               const updating = Boolean(recurringPaymentUpdatingById[item.id]);
@@ -487,7 +488,7 @@ export function RecurringPaymentsPage() {
                 </Card>
               );
             })}
-          </div>
+          </LifeList>
         )}
       </section>
 

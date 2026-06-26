@@ -17,6 +17,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EditTraceDrawer } from '@/components/EditTraceDrawer';
 import { EmptyState } from '@/components/EmptyState';
 import { ImagePreview } from '@/components/ImagePreview';
+import { LifeFilterBar } from '@/components/LifeLayout';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import {
   SoftHeader,
@@ -466,7 +467,7 @@ export function TracesPage() {
             type="button"
             variant="secondary"
             size="icon"
-            className="size-14 rounded-[1.15rem]"
+            className="size-14 rounded-[1.25rem]"
             aria-label="新建踪迹"
             onClick={() => setCreateOpen(true)}
           >
@@ -485,7 +486,7 @@ export function TracesPage() {
 
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-3 rounded-[1.35rem] border border-life-trace/20 bg-card/85 p-4 text-left shadow-[0_18px_54px_rgba(71,58,42,0.075)] transition hover:border-life-trace/40 hover:bg-card"
+        className="flex w-full items-center justify-between gap-3 rounded-[1.25rem] border border-life-trace/20 bg-card/85 p-4 text-left shadow-[0_18px_54px_rgba(71,58,42,0.075)] transition hover:border-life-trace/40 hover:bg-card"
         onClick={() => navigate('/media-diary')}
       >
         <span className="flex min-w-0 items-center gap-3">
@@ -500,8 +501,8 @@ export function TracesPage() {
         <Badge tone="trace">进入</Badge>
       </button>
 
-      <div className="rounded-[1.35rem] border border-border/70 bg-card/80 p-1">
-        <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="rounded-[1.25rem] border border-border/70 bg-card/80 p-1">
+        <LifeFilterBar className="gap-1 pb-0">
           {traceFilters.map((filter) => {
             const active = activeFilter === filter.id;
 
@@ -522,7 +523,7 @@ export function TracesPage() {
               </button>
             );
           })}
-        </div>
+        </LifeFilterBar>
       </div>
 
       <SoftPanel className="p-3">
@@ -594,7 +595,7 @@ export function TracesPage() {
         </Card>
       ) : null}
 
-      <div className="relative space-y-7">
+      <div className="relative space-y-5">
         {tracesRefreshing ? <InlineRefreshStatus tone="trace" /> : null}
         {initialTracesLoading ? <ListCardSkeleton media rows={3} /> : null}
         {filteredTraces.length > 0 ? (
@@ -626,7 +627,7 @@ export function TracesPage() {
                   </span>
                   <Card
                     className={cn(
-                      'cursor-pointer overflow-hidden rounded-[1.35rem] border-border/80 bg-card/85 shadow-[0_18px_54px_rgba(71,58,42,0.065)] transition hover:border-life-trace/40 hover:shadow-[0_18px_56px_rgba(16,185,129,0.08)]',
+                      'cursor-pointer overflow-hidden rounded-[1.25rem] border-border/80 bg-card/85 shadow-[0_18px_54px_rgba(71,58,42,0.065)] transition hover:border-life-trace/40 hover:shadow-[0_18px_56px_rgba(16,185,129,0.08)]',
                       trace.source === '库存' &&
                         'border-life-ai/15 bg-[linear-gradient(180deg,rgba(6,182,212,0.04),rgba(16,185,129,0.03))]',
                     )}

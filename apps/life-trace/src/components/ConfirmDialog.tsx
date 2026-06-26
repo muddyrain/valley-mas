@@ -65,7 +65,7 @@ export function ConfirmDialog({
         className="w-full max-w-[360px] overflow-hidden border-life-alert/30 bg-card p-0 shadow-[0_24px_90px_rgba(249,115,22,0.16)]"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="relative p-5">
+        <div className="relative p-4">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-alert/80 to-transparent"

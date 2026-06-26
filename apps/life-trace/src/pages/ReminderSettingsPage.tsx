@@ -174,7 +174,7 @@ export function ReminderSettingsPage() {
 
   return (
     <SubPageShell title="提醒设置" eyebrow="通知 / 节奏 / Pantry" backTo="/profile">
-      <div className="space-y-6 pb-2">
+      <div className="space-y-5 pb-2">
         <section className="space-y-3">
           <Card className="relative space-y-4 overflow-hidden border-life-ai/20 bg-card/90 p-4">
             <div

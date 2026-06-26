@@ -32,6 +32,7 @@ import {
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AnimatedWeatherIcon } from '@/components/AnimatedWeatherIcon';
 import { ActionTile, EntryCard } from '@/components/EntryCard';
+import { LifePage } from '@/components/LifeLayout';
 import { QuickLedgerSheet } from '@/components/QuickLedgerSheet';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -245,7 +246,7 @@ function TodayAchievementSkeleton() {
 function TodayPantrySkeleton() {
   return (
     <div
-      className="rounded-[1.15rem] border border-life-health/15 bg-life-health/5 px-4 py-4"
+      className="rounded-[1.25rem] border border-life-health/15 bg-life-health/5 px-4 py-4"
       aria-busy="true"
     >
       <span className="sr-only">正在加载库存摘要，卡片高度保持稳定</span>
@@ -587,7 +588,10 @@ export function TodayPage() {
     if (!token || !settingsLoaded) {
       return;
     }
-    void loadShoppingList({ status: 'open' });
+    void loadShoppingList({
+      householdId: preferredPantryHouseholdId || undefined,
+      status: 'open',
+    });
   }, [loadShoppingList, preferredPantryHouseholdId, settingsLoaded, token]);
 
   const pantryPageHref = '/pantry';
@@ -617,10 +621,7 @@ export function TodayPage() {
   };
 
   return (
-    <div
-      ref={pageRef}
-      className="min-w-0 space-y-5 overflow-x-hidden px-5 pt-7 max-[360px]:px-4 max-[360px]:pt-6"
-    >
+    <LifePage ref={pageRef} variant="tab" spacing="default" className="pb-6">
       <section
         className="relative overflow-hidden px-0.5 pb-1 pt-0"
         data-scroll-anchor="today:hero"
@@ -715,7 +716,7 @@ export function TodayPage() {
       </section>
 
       <section
-        className="mt-2 rounded-[1.15rem] bg-life-trace px-4 py-2.5 text-primary-foreground shadow-[0_12px_24px_rgba(78,143,104,0.2)]"
+        className="mt-2 rounded-[1.25rem] bg-life-trace px-4 py-2.5 text-primary-foreground shadow-[0_12px_24px_rgba(78,143,104,0.2)]"
         data-scroll-anchor="today:quick-entry"
         data-today-entrance
       >
@@ -765,7 +766,7 @@ export function TodayPage() {
       </section>
 
       <Card
-        className="overflow-hidden rounded-[1.45rem] p-4 shadow-[0_10px_30px_rgba(45,41,35,0.05)]"
+        className="overflow-hidden rounded-[1.5rem] p-4 shadow-[0_10px_30px_rgba(45,41,35,0.05)]"
         data-scroll-anchor="today:plans"
         data-today-entrance
       >
@@ -842,7 +843,7 @@ export function TodayPage() {
       <div className="grid gap-3" data-scroll-anchor="today:daily-links" data-today-entrance>
         <button
           type="button"
-          className="flex items-center gap-3 rounded-[1.35rem] border border-border bg-card/85 px-4 py-3 text-left shadow-[0_8px_24px_rgba(45,41,35,0.04)]"
+          className="flex items-center gap-3 rounded-[1.25rem] border border-border bg-card/85 px-4 py-3 text-left shadow-[0_8px_24px_rgba(45,41,35,0.04)]"
           data-scroll-anchor="today:pantry-link"
           onClick={() => navigate('/pantry')}
         >
@@ -881,7 +882,7 @@ export function TodayPage() {
         {shoppingListLoaded && shoppingListItems.some((entry) => !entry.checkedAt) ? (
           <button
             type="button"
-            className="flex items-center gap-3 rounded-[1.35rem] border border-border bg-card/85 px-4 py-3 text-left shadow-[0_8px_24px_rgba(45,41,35,0.04)]"
+            className="flex items-center gap-3 rounded-[1.25rem] border border-border bg-card/85 px-4 py-3 text-left shadow-[0_8px_24px_rgba(45,41,35,0.04)]"
             data-scroll-anchor="today:shopping"
             onClick={() => navigate('/shopping')}
           >
@@ -900,7 +901,7 @@ export function TodayPage() {
 
         <button
           type="button"
-          className="flex items-center gap-3 rounded-[1.35rem] border border-border bg-card/85 px-4 py-3 text-left shadow-[0_8px_24px_rgba(45,41,35,0.04)]"
+          className="flex items-center gap-3 rounded-[1.25rem] border border-border bg-card/85 px-4 py-3 text-left shadow-[0_8px_24px_rgba(45,41,35,0.04)]"
           data-scroll-anchor="today:closet-link"
           onClick={() => navigate('/closet')}
         >
@@ -918,7 +919,7 @@ export function TodayPage() {
       </div>
 
       <Card
-        className="rounded-[1.35rem] border-border/70 bg-card/88 p-4 shadow-[0_8px_22px_rgba(71,58,42,0.035)]"
+        className="rounded-[1.25rem] border-border/70 bg-card/88 p-4 shadow-[0_8px_22px_rgba(71,58,42,0.035)]"
         data-scroll-anchor="today:summary"
         data-today-entrance
       >
@@ -954,7 +955,7 @@ export function TodayPage() {
       </Card>
 
       <div className="hidden" aria-hidden="true">
-        <Card className="min-w-0 overflow-hidden p-5 max-[360px]:p-4" data-today-entrance>
+        <Card className="min-w-0 overflow-hidden p-4 max-[360px]:p-4" data-today-entrance>
           {showWeatherSkeleton ? (
             <div className="space-y-0">
               <div className="mb-7 flex items-center justify-between gap-3 max-[360px]:items-start">
@@ -1482,7 +1483,7 @@ export function TodayPage() {
               })}
             </div>
           ) : (
-            <div className="rounded-[1.15rem] border border-dashed border-life-health/25 bg-life-health/5 px-4 py-4">
+            <div className="rounded-[1.25rem] border border-dashed border-life-health/25 bg-life-health/5 px-4 py-4">
               <div className="flex items-start gap-3">
                 <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-health/12 text-life-health">
                   <PackageCheck className="size-5" />
@@ -1618,6 +1619,6 @@ export function TodayPage() {
         </Card>
       </div>
       <QuickLedgerSheet open={quickLedgerOpen} onOpenChange={setQuickLedgerOpen} />
-    </div>
+    </LifePage>
   );
 }

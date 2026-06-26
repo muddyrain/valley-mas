@@ -22,7 +22,7 @@ const sizeClassMap: Record<
 > = {
   sm: { shell: 'size-10 rounded-2xl', glyph: 'size-7', notch: 'inset-1.5 rounded-[0.9rem]' },
   md: { shell: 'size-12 rounded-2xl', glyph: 'size-8', notch: 'inset-2 rounded-[1rem]' },
-  lg: { shell: 'size-16 rounded-[1.35rem]', glyph: 'size-11', notch: 'inset-2.5 rounded-[1.1rem]' },
+  lg: { shell: 'size-16 rounded-[1.25rem]', glyph: 'size-11', notch: 'inset-2.5 rounded-[1.1rem]' },
 };
 
 const categoryClassMap: Record<AchievementCategory, string> = {

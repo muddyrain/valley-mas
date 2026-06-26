@@ -24,6 +24,7 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetHeader } from '@/components/FormItem';
+import { LifeFilterBar, LifeList } from '@/components/LifeLayout';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { PantryHouseholdDetailSheet } from '@/components/PantryHouseholdDetailSheet';
 import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
@@ -654,13 +655,13 @@ export function PantryPage() {
       }
     >
       <div className="space-y-5">
-        <div className="relative overflow-hidden rounded-[1.45rem] border border-border/75 bg-[radial-gradient(circle_at_top_right,rgba(95,146,112,0.18),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(189,138,36,0.08),transparent_34%),linear-gradient(180deg,rgba(255,253,248,0.94),rgba(250,246,238,0.9))] p-3 shadow-[0_18px_54px_rgba(71,58,42,0.075)] backdrop-blur">
+        <div className="relative overflow-hidden rounded-[1.5rem] border border-border/75 bg-[radial-gradient(circle_at_top_right,rgba(95,146,112,0.18),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(189,138,36,0.08),transparent_34%),linear-gradient(180deg,rgba(255,253,248,0.94),rgba(250,246,238,0.9))] p-3 shadow-[0_18px_54px_rgba(71,58,42,0.075)] backdrop-blur">
           <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-life-trace/45 to-transparent" />
           <div className="absolute -right-8 -top-8 size-24 rounded-full bg-life-trace/12 blur-2xl" />
           <div className="relative flex flex-col gap-3">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-1 items-start gap-3">
-                <div className="grid size-12 shrink-0 place-items-center rounded-[1.15rem] border border-life-trace/20 bg-life-trace/10 text-life-trace shadow-[0_12px_28px_rgba(95,146,112,0.12)]">
+                <div className="grid size-12 shrink-0 place-items-center rounded-[1.25rem] border border-life-trace/20 bg-life-trace/10 text-life-trace shadow-[0_12px_28px_rgba(95,146,112,0.12)]">
                   {currentHousehold?.kind === 'shared' ? (
                     <Users className="size-5" />
                   ) : (
@@ -845,7 +846,7 @@ export function PantryPage() {
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <LifeFilterBar className="items-center">
               <span className="shrink-0 text-xs font-semibold text-muted-foreground">状态</span>
               {statusFilters.map((filter) => {
                 const active = statusFilter === filter.id;
@@ -870,8 +871,8 @@ export function PantryPage() {
                   </button>
                 );
               })}
-            </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            </LifeFilterBar>
+            <LifeFilterBar className="items-center">
               <span className="shrink-0 text-xs font-semibold text-muted-foreground">分类</span>
               {categoryFilters.map((category) => {
                 const active = categoryFilter === category;
@@ -896,8 +897,8 @@ export function PantryPage() {
                   </button>
                 );
               })}
-            </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            </LifeFilterBar>
+            <LifeFilterBar className="items-center">
               <span className="shrink-0 text-xs font-semibold text-muted-foreground">排序</span>
               {sortOptions.map((option) => {
                 const active = sortMode === option.id;
@@ -922,7 +923,7 @@ export function PantryPage() {
                   </button>
                 );
               })}
-            </div>
+            </LifeFilterBar>
           </div>
         </Card>
 
@@ -1020,9 +1021,9 @@ export function PantryPage() {
               }
             />
           ) : (
-            <div
+            <LifeList
               className={cn(
-                'relative space-y-3 transition-opacity duration-200',
+                'relative transition-opacity duration-200',
                 listRefreshing && 'opacity-95',
               )}
             >
@@ -1280,7 +1281,7 @@ export function PantryPage() {
                   已展示全部 {pantryPagination.total} 条库存
                 </p>
               ) : null}
-            </div>
+            </LifeList>
           )}
         </section>
 

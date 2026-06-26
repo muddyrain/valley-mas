@@ -317,7 +317,7 @@ function MediaDiaryDetail({
             imageClassName="max-h-[24rem] w-full object-cover"
           />
         ) : null}
-        <div className="space-y-4 p-5">
+        <div className="space-y-4 p-4">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={getTypeTone(entry.mediaType)}>
               <span className="inline-flex items-center gap-1.5">

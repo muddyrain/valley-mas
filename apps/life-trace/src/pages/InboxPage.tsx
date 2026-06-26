@@ -30,6 +30,7 @@ import {
   SheetSelectField,
 } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
+import { LifeList } from '@/components/LifeLayout';
 import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
@@ -454,7 +455,7 @@ export function InboxPage() {
             tone="ai"
           />
         ) : (
-          <div className="relative grid gap-3">
+          <LifeList className="relative">
             {inboxRefreshing ? <InlineRefreshStatus tone="ai" /> : null}
             {inboxItems.map((item) => {
               const updating = Boolean(inboxUpdatingById[item.id]);
@@ -706,7 +707,7 @@ export function InboxPage() {
                 </Card>
               );
             })}
-          </div>
+          </LifeList>
         )}
 
         {inboxPagination.hasMore ? (

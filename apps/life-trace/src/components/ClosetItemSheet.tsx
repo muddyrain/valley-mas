@@ -255,7 +255,7 @@ export function ClosetItemSheet({
       open={open}
       onOpenChange={onOpenChange}
       overlayLabel="关闭衣物编辑"
-      contentClassName="space-y-5 pb-6"
+      contentClassName="pb-6"
       portal
     >
       <SheetHeader

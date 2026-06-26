@@ -70,7 +70,7 @@ export function EmptyState({
   return (
     <Card
       className={cn(
-        'relative overflow-hidden p-5 text-sm leading-6 text-muted-foreground shadow-sm',
+        'relative overflow-hidden p-4 text-sm leading-6 text-muted-foreground shadow-sm',
         toneClass.card,
         centered && 'text-center',
         className,

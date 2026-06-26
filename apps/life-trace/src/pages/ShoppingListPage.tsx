@@ -13,6 +13,7 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetHeader, SheetSelectField } from '@/components/FormItem';
+import { LifeList } from '@/components/LifeLayout';
 import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
@@ -206,7 +207,7 @@ export function ShoppingListPage() {
   }, []);
 
   useEffect(() => {
-    void loadShoppingList();
+    void loadShoppingList({ householdId: householdId || undefined });
   }, [householdId, loadShoppingList]);
 
   const { openItems, checkedGroups } = useMemo(() => {
@@ -456,7 +457,7 @@ export function ShoppingListPage() {
         </Button>
       }
     >
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-24 sm:px-6">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 pb-24">
         {householdName ? (
           <p className="text-xs text-muted-foreground">当前空间：{householdName}</p>
         ) : null}
@@ -509,7 +510,7 @@ export function ShoppingListPage() {
               {openItems.length === 0 ? (
                 <Card className="p-4 text-sm text-muted-foreground">暂无待买项。</Card>
               ) : (
-                <div className="grid gap-3">{openItems.map(renderItem)}</div>
+                <LifeList>{openItems.map(renderItem)}</LifeList>
               )}
             </section>
 
@@ -530,7 +531,7 @@ export function ShoppingListPage() {
                           {group.items.length} 项
                         </span>
                       </div>
-                      <div className="grid gap-3">{group.items.map(renderItem)}</div>
+                      <LifeList>{group.items.map(renderItem)}</LifeList>
                     </div>
                   ))}
                 </div>

@@ -1664,7 +1664,7 @@ export function PhotoItemAnalysisPage() {
       title="拍照分析商品"
       eyebrow="Life AI"
       onBack={handleBackToAi}
-      contentClassName="space-y-6 pb-2"
+      contentClassName="pb-2"
     >
       {latestDraft ? (
         <Card className="border-life-ai/25 bg-life-ai/5 p-4">
@@ -1701,7 +1701,7 @@ export function PhotoItemAnalysisPage() {
         </Card>
       ) : null}
 
-      <section className="relative overflow-hidden rounded-[1.75rem] border border-life-trace/18 bg-card p-4 shadow-[0_18px_52px_rgba(78,63,42,0.08)]">
+      <section className="relative overflow-hidden rounded-[1.5rem] border border-life-trace/18 bg-card p-4 shadow-[0_18px_52px_rgba(78,63,42,0.08)]">
         <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(6,182,212,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.1)_1px,transparent_1px)] [background-size:28px_28px]" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-ai/80 to-transparent" />
         <div className="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-gradient-to-r from-transparent via-life-trace/45 to-transparent" />
@@ -1725,7 +1725,7 @@ export function PhotoItemAnalysisPage() {
             </Badge>
           </div>
 
-          <div className="rounded-[1.15rem] border border-white/[0.06] bg-background/35 px-3 py-2.5 backdrop-blur">
+          <div className="rounded-[1.25rem] border border-white/[0.06] bg-background/35 px-3 py-2.5 backdrop-blur">
             <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 text-[11px] font-semibold text-muted-foreground">
               <span className="inline-flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap text-life-ai">
                 <span className="size-1.5 shrink-0 rounded-full bg-life-ai shadow-[0_0_12px_rgba(6,182,212,0.9)]" />
@@ -1782,7 +1782,7 @@ export function PhotoItemAnalysisPage() {
             ) : null}
           </div>
 
-          <div className="relative overflow-hidden rounded-[1.45rem] border border-life-ai/25 bg-background/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
+          <div className="relative overflow-hidden rounded-[1.5rem] border border-life-ai/25 bg-background/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
             <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(180deg,transparent,rgba(6,182,212,0.08),transparent)] opacity-70" />
             <div
               className={`pointer-events-none absolute inset-x-8 z-20 h-px bg-life-ai/80 motion-reduce:animate-none ${
@@ -1829,11 +1829,11 @@ export function PhotoItemAnalysisPage() {
               </>
             ) : (
               <div className="grid aspect-[4/3] place-items-center px-5 py-10 text-center sm:aspect-[16/10]">
-                <div className="max-w-xs space-y-6">
+                <div className="max-w-xs space-y-5">
                   <div className="relative mx-auto grid size-24 place-items-center">
                     <span className="absolute inset-0 rounded-full border border-life-ai/20 bg-life-ai/5 animate-[life-vision-pulse_3.2s_ease-in-out_infinite] motion-reduce:animate-none" />
                     <span className="absolute inset-3 rounded-full border border-life-trace/20 bg-life-trace/5 animate-[life-vision-pulse_3.2s_ease-in-out_infinite] [animation-delay:420ms] motion-reduce:animate-none" />
-                    <div className="relative grid size-16 place-items-center rounded-[1.35rem] border border-life-ai/25 bg-background/70 text-life-ai shadow-[0_0_42px_rgba(6,182,212,0.24)] backdrop-blur">
+                    <div className="relative grid size-16 place-items-center rounded-[1.25rem] border border-life-ai/25 bg-background/70 text-life-ai shadow-[0_0_42px_rgba(6,182,212,0.24)] backdrop-blur">
                       <Camera className="size-8" />
                     </div>
                   </div>

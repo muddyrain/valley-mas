@@ -23,7 +23,7 @@ export function LoadErrorState({
   return (
     <Card
       className={cn(
-        'relative overflow-hidden border-life-alert/20 bg-life-alert/10 p-5 text-sm shadow-sm',
+        'relative overflow-hidden border-life-alert/20 bg-life-alert/10 p-4 text-sm shadow-sm',
         className,
       )}
     >
