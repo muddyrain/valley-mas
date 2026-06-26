@@ -1,0 +1,4411 @@
+apps/world-sim/src/components/ui/tooltip.tsx
+  s_6a6fa50d278a26::t_b4b9b3a113420c 1-51 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e227e58b7ed80d54bd68e","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Range":[1,51]}]}]}
+apps/world-sim/package.json
+  s_6a6fa50d278a26::t_a985dc9059cb57 36,42 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1e4d58b7ed80d54bd5ef","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Single":36},{"Single":42}]}]}
+  s_6a6fa50d278a26::t_2eaf081beffa81 20-22,24,26,29,31-32 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1ea158b7ed80d54bd601","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Range":[20,22]},{"Single":24},{"Single":26},{"Single":29},{"Range":[31,32]}]}]}
+apps/world-sim/src/ui/topbar/TopBar.tsx
+  s_6a6fa50d278a26::t_b4b9b3a113420c 2-3,108,118 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e227e58b7ed80d54bd68e","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Range":[2,3]},{"Single":108},{"Single":118}]}]}
+  s_6a6fa50d278a26::t_9de2e4fbfe0d94 1,77,79,81,96,98-104,110,117,120,123-131,133-134,136-137,140,142 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e218558b7ed80d54bd672","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":1},{"Single":77},{"Single":79},{"Single":81},{"Single":96},{"Range":[98,104]},{"Single":110},{"Single":117},{"Single":120},{"Range":[123,131]},{"Range":[133,134]},{"Range":[136,137]},{"Single":140},{"Single":142}]}]}
+  s_6a6fa50d278a26::t_bd80213de77bab 8-17,106-107,109,111-115,138-139,141,143-147 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1f4258b7ed80d54bd61c","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[8,17]},{"Range":[106,107]},{"Single":109},{"Range":[111,115]},{"Range":[138,139]},{"Single":141},{"Range":[143,147]}]}]}
+apps/world-sim/src/App.tsx
+  s_6a6fa50d278a26::t_b4b9b3a113420c 2 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e227e58b7ed80d54bd68e","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Single":2}]}]}
+  s_6a6fa50d278a26::t_21ad91cd840d98 85-89 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1eef58b7ed80d54bd613","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[85,89]}]}]}
+apps/world-sim/src/ui/layout/AppLayout.tsx
+  s_6a6fa50d278a26::t_5b7749702daa6b 18,20-23 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e20d758b7ed80d54bd656","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":18},{"Range":[20,23]}]}]}
+  s_6a6fa50d278a26::t_bab26b67aeb872 55 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e203f58b7ed80d54bd640","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":55}]}]}
+  s_6a6fa50d278a26::t_30efc74e9116eb 1,12-17,19,24-54,56,66,68-72 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1f1058b7ed80d54bd616","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":1},{"Range":[12,17]},{"Single":19},{"Range":[24,54]},{"Single":56},{"Single":66},{"Range":[68,72]}]}]}
+apps/world-sim/vite.config.ts
+  s_6a6fa50d278a26::t_a0a7bb9aaca13d 2,7 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1e7458b7ed80d54bd5fb","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":2},{"Single":7}]}]}
+apps/world-sim/src/lib/utils.ts
+  s_6a6fa50d278a26::t_b4b9b3a113420c 1-2,5 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e227e58b7ed80d54bd68e","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Range":[1,2]},{"Single":5}]}]}
+  s_6a6fa50d278a26::t_2eaf081beffa81 3-4,6 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1ea158b7ed80d54bd601","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Range":[3,4]},{"Single":6}]}]}
+apps/world-sim/src/components/ui/toggle-group.tsx
+  s_6a6fa50d278a26::t_b4b9b3a113420c 1-85 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e227e58b7ed80d54bd68e","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Range":[1,85]}]}]}
+apps/world-sim/src/ui/topbar/TopBar.module.css
+  s_6a6fa50d278a26::t_9d98ca8ad35f03 100,112-113,120-121 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e21d458b7ed80d54bd678","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":100},{"Range":[112,113]},{"Range":[120,121]}]}]}
+  s_6a6fa50d278a26::t_f6b27d088dcb7d 62,73-74,81-82 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e21c558b7ed80d54bd675","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":62},{"Range":[73,74]},{"Range":[81,82]}]}]}
+  s_6a6fa50d278a26::t_35815a6bf00cab 206-232 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1fab58b7ed80d54bd622","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[206,232]}]}]}
+apps/world-sim/src/components/ui/toggle.tsx
+  s_6a6fa50d278a26::t_b4b9b3a113420c 1-44 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e227e58b7ed80d54bd68e","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Range":[1,44]}]}]}
+apps/world-sim/src/components/ui/button.tsx
+  s_6a6fa50d278a26::t_b4b9b3a113420c 1-67 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e227e58b7ed80d54bd68e","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Range":[1,67]}]}]}
+apps/world-sim/src/styles/global.css
+  s_6a6fa50d278a26::t_b4b9b3a113420c 126,211 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e227e58b7ed80d54bd68e","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Single":126},{"Single":211}]}]}
+  s_6a6fa50d278a26::t_be8805b7055290 1-2,5-7,39,56-58 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1e8258b7ed80d54bd5fe","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[1,2]},{"Range":[5,7]},{"Single":39},{"Range":[56,58]}]}]}
+  s_6a6fa50d278a26::t_2eaf081beffa81 3-4,24-38,40-55,59,123-125,127-210 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1ea158b7ed80d54bd601","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Range":[3,4]},{"Range":[24,38]},{"Range":[40,55]},{"Single":59},{"Range":[123,125]},{"Range":[127,210]}]}]}
+apps/world-sim/src/ui/canvas/MapCanvas.tsx
+  s_6a6fa50d278a26::t_f3725112c88e9f 448-453,456,460-461,463-468 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1fd758b7ed80d54bd628","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[448,453]},{"Single":456},{"Range":[460,461]},{"Range":[463,468]}]}]}
+  s_6a6fa50d278a26::t_9f09770efbd5b1 457-459 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e203658b7ed80d54bd63d","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[457,459]}]}]}
+  s_6a6fa50d278a26::t_967737ef195e43 454-455,462 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1ff758b7ed80d54bd62e","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[454,455]},{"Single":462}]}]}
+apps/world-sim/src/ui/layout/AppLayout.module.css
+  s_6a6fa50d278a26::t_7ff068d2d85bcc 34-35,39-66 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1f2a58b7ed80d54bd619","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[34,35]},{"Range":[39,66]}]}]}
+pnpm-lock.yaml
+  s_6a6fa50d278a26::t_b4b9b3a113420c 163,178,285,294,297,359,365,474,486,490-498,502-504,508-510,517-519,523-528,533-535,550-553,559,562,568,577,586,599,618,2231-2232,2234-2235,2237-2238,2240-2248,2250-2251,2253-2261,2263-2264,2266-2274,2276-2277,2279-2287,2289-2290,2292-2300,2302-2303,2305-2313,2315-2316,2318-2326,2328-2329,2331-2339,2341-2342,2344-2352,2354-2355,2357-2361,2363-2364,2366-2374,2376-2377,2379-2383,2385-2386,2388-2396,2398-2399,2401-2405,2407-2408,2410-2418,2420-2421,2423-2431,2433-2434,2436-2440,2442-2443,2445-2453,2455-2456,2458-2461,2463,2465,2467-2476,2478,2481-2482,2484-2488,2490-2491,2493-2501,2503-2504,2506-2514,2516-2517,2519-2527,2529-2530,2532-2540,2542-2543,2545-2553,2555-2556,2558-2566,2568-2569,2571-2579,2581-2582,2584-2592,2594-2595,2597-2605,2607-2608,2610-2618,2620-2621,2623-2631,2633-2634,2636-2644,2646-2647,2649-2657,2659-2660,2662-2670,2672-2673,2675-2683,2685-2686,2688-2696,2698-2699,2701-2709,2711-2712,2714-2722,2724-2725,2727-2731,2733-2734,2736-2744,2746-2747,2749-2752,2754,2756,2759-2770,2772-2783,2785-2796,2798-2809,2811-2822,2824-2831,2833-2840,2842-2849,2851-2858,2860-2867,2869-3273,3451-3453,3460-3465,3472-3477,3484-3489,3496-3501,3508-3513,3521-3527,3535-3541,3549-3555,3563-3569,3582-3593,3600-3605,3612-3617,3622-3625,3629-3633,4046-4049,4544-4546,4612-4615,4882-4885,4924,5237-5240,5376-5381,5388-5393,5400-5405,5412-5417,5424-5429,5437-5443,5451-5457,5465-5471,5479-5485,5492-5497,5504-5509,5514-5517,5581-5585,6243-6255,6327-6346,6364-6373,6615-6618,6837-6839,6844-6847,7098-7117,7965,7980,8122,8130,9296-9438,9440,9442,9444,9446,9448,9450,9452,9454,9456,9458-9482,9484-9495,9497-9504,9506,9508-9513,9515-9558,9560,9562-9570,9572-9576,9578,9580-9589,9591-9595,9597-9617,9619,9621-9623,9625-9636,9638-9651,9653-9657,9659-9668,9670-9699,9701-9706,9708-9840,9842-9858,9860-9868,9870-9877,9879-9886,9888-9978,9980-10064,10066-10079,10081,10083-10087,10089-10090,10092-10125,10127-10131,10133-10139,10141-10146,10148-10153,10155-10159,10161,10163-10165,10167-10171,10173-10178,10180-10185,10187-10194,10196,10705-10714,10718-10720,10724-10726,10730-10732,10736-10738,10742-10744,10748-10750,10754-10756,10760-10762,10766-10768,10772-10774,10778-10780,10784-10786,10802-10816,10825-10831,11040,11043,11056,11063,11356-11359,11797-11798,11855-11859,12187-12188,12575-12576,12708-12710,12714-12716,12720-12722,12726-12728,12732-12734,12738-12740,12744-12746,12750-12752,12756-12758,12762-12764,12768-12770,12787-12802,12856-12859,13611,13615,13800-13862,13954-13972,13987-13994,14406-14446,14711-14712,14715-14716,14815,14826,14962-14976,15023,15034,15036,15042,15045,15062,15116,15127 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e227e58b7ed80d54bd68e","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Single":163},{"Single":178},{"Single":285},{"Single":294},{"Single":297},{"Single":359},{"Single":365},{"Single":474},{"Single":486},{"Range":[490,498]},{"Range":[502,504]},{"Range":[508,510]},{"Range":[517,519]},{"Range":[523,528]},{"Range":[533,535]},{"Range":[550,553]},{"Single":559},{"Single":562},{"Single":568},{"Single":577},{"Single":586},{"Single":599},{"Single":618},{"Range":[2231,2232]},{"Range":[2234,2235]},{"Range":[2237,2238]},{"Range":[2240,2248]},{"Range":[2250,2251]},{"Range":[2253,2261]},{"Range":[2263,2264]},{"Range":[2266,2274]},{"Range":[2276,2277]},{"Range":[2279,2287]},{"Range":[2289,2290]},{"Range":[2292,2300]},{"Range":[2302,2303]},{"Range":[2305,2313]},{"Range":[2315,2316]},{"Range":[2318,2326]},{"Range":[2328,2329]},{"Range":[2331,2339]},{"Range":[2341,2342]},{"Range":[2344,2352]},{"Range":[2354,2355]},{"Range":[2357,2361]},{"Range":[2363,2364]},{"Range":[2366,2374]},{"Range":[2376,2377]},{"Range":[2379,2383]},{"Range":[2385,2386]},{"Range":[2388,2396]},{"Range":[2398,2399]},{"Range":[2401,2405]},{"Range":[2407,2408]},{"Range":[2410,2418]},{"Range":[2420,2421]},{"Range":[2423,2431]},{"Range":[2433,2434]},{"Range":[2436,2440]},{"Range":[2442,2443]},{"Range":[2445,2453]},{"Range":[2455,2456]},{"Range":[2458,2461]},{"Single":2463},{"Single":2465},{"Range":[2467,2476]},{"Single":2478},{"Range":[2481,2482]},{"Range":[2484,2488]},{"Range":[2490,2491]},{"Range":[2493,2501]},{"Range":[2503,2504]},{"Range":[2506,2514]},{"Range":[2516,2517]},{"Range":[2519,2527]},{"Range":[2529,2530]},{"Range":[2532,2540]},{"Range":[2542,2543]},{"Range":[2545,2553]},{"Range":[2555,2556]},{"Range":[2558,2566]},{"Range":[2568,2569]},{"Range":[2571,2579]},{"Range":[2581,2582]},{"Range":[2584,2592]},{"Range":[2594,2595]},{"Range":[2597,2605]},{"Range":[2607,2608]},{"Range":[2610,2618]},{"Range":[2620,2621]},{"Range":[2623,2631]},{"Range":[2633,2634]},{"Range":[2636,2644]},{"Range":[2646,2647]},{"Range":[2649,2657]},{"Range":[2659,2660]},{"Range":[2662,2670]},{"Range":[2672,2673]},{"Range":[2675,2683]},{"Range":[2685,2686]},{"Range":[2688,2696]},{"Range":[2698,2699]},{"Range":[2701,2709]},{"Range":[2711,2712]},{"Range":[2714,2722]},{"Range":[2724,2725]},{"Range":[2727,2731]},{"Range":[2733,2734]},{"Range":[2736,2744]},{"Range":[2746,2747]},{"Range":[2749,2752]},{"Single":2754},{"Single":2756},{"Range":[2759,2770]},{"Range":[2772,2783]},{"Range":[2785,2796]},{"Range":[2798,2809]},{"Range":[2811,2822]},{"Range":[2824,2831]},{"Range":[2833,2840]},{"Range":[2842,2849]},{"Range":[2851,2858]},{"Range":[2860,2867]},{"Range":[2869,3273]},{"Range":[3451,3453]},{"Range":[3460,3465]},{"Range":[3472,3477]},{"Range":[3484,3489]},{"Range":[3496,3501]},{"Range":[3508,3513]},{"Range":[3521,3527]},{"Range":[3535,3541]},{"Range":[3549,3555]},{"Range":[3563,3569]},{"Range":[3582,3593]},{"Range":[3600,3605]},{"Range":[3612,3617]},{"Range":[3622,3625]},{"Range":[3629,3633]},{"Range":[4046,4049]},{"Range":[4544,4546]},{"Range":[4612,4615]},{"Range":[4882,4885]},{"Single":4924},{"Range":[5237,5240]},{"Range":[5376,5381]},{"Range":[5388,5393]},{"Range":[5400,5405]},{"Range":[5412,5417]},{"Range":[5424,5429]},{"Range":[5437,5443]},{"Range":[5451,5457]},{"Range":[5465,5471]},{"Range":[5479,5485]},{"Range":[5492,5497]},{"Range":[5504,5509]},{"Range":[5514,5517]},{"Range":[5581,5585]},{"Range":[6243,6255]},{"Range":[6327,6346]},{"Range":[6364,6373]},{"Range":[6615,6618]},{"Range":[6837,6839]},{"Range":[6844,6847]},{"Range":[7098,7117]},{"Single":7965},{"Single":7980},{"Single":8122},{"Single":8130},{"Range":[9296,9438]},{"Single":9440},{"Single":9442},{"Single":9444},{"Single":9446},{"Single":9448},{"Single":9450},{"Single":9452},{"Single":9454},{"Single":9456},{"Range":[9458,9482]},{"Range":[9484,9495]},{"Range":[9497,9504]},{"Single":9506},{"Range":[9508,9513]},{"Range":[9515,9558]},{"Single":9560},{"Range":[9562,9570]},{"Range":[9572,9576]},{"Single":9578},{"Range":[9580,9589]},{"Range":[9591,9595]},{"Range":[9597,9617]},{"Single":9619},{"Range":[9621,9623]},{"Range":[9625,9636]},{"Range":[9638,9651]},{"Range":[9653,9657]},{"Range":[9659,9668]},{"Range":[9670,9699]},{"Range":[9701,9706]},{"Range":[9708,9840]},{"Range":[9842,9858]},{"Range":[9860,9868]},{"Range":[9870,9877]},{"Range":[9879,9886]},{"Range":[9888,9978]},{"Range":[9980,10064]},{"Range":[10066,10079]},{"Single":10081},{"Range":[10083,10087]},{"Range":[10089,10090]},{"Range":[10092,10125]},{"Range":[10127,10131]},{"Range":[10133,10139]},{"Range":[10141,10146]},{"Range":[10148,10153]},{"Range":[10155,10159]},{"Single":10161},{"Range":[10163,10165]},{"Range":[10167,10171]},{"Range":[10173,10178]},{"Range":[10180,10185]},{"Range":[10187,10194]},{"Single":10196},{"Range":[10705,10714]},{"Range":[10718,10720]},{"Range":[10724,10726]},{"Range":[10730,10732]},{"Range":[10736,10738]},{"Range":[10742,10744]},{"Range":[10748,10750]},{"Range":[10754,10756]},{"Range":[10760,10762]},{"Range":[10766,10768]},{"Range":[10772,10774]},{"Range":[10778,10780]},{"Range":[10784,10786]},{"Range":[10802,10816]},{"Range":[10825,10831]},{"Single":11040},{"Single":11043},{"Single":11056},{"Single":11063},{"Range":[11356,11359]},{"Range":[11797,11798]},{"Range":[11855,11859]},{"Range":[12187,12188]},{"Range":[12575,12576]},{"Range":[12708,12710]},{"Range":[12714,12716]},{"Range":[12720,12722]},{"Range":[12726,12728]},{"Range":[12732,12734]},{"Range":[12738,12740]},{"Range":[12744,12746]},{"Range":[12750,12752]},{"Range":[12756,12758]},{"Range":[12762,12764]},{"Range":[12768,12770]},{"Range":[12787,12802]},{"Range":[12856,12859]},{"Single":13611},{"Single":13615},{"Range":[13800,13862]},{"Range":[13954,13972]},{"Range":[13987,13994]},{"Range":[14406,14446]},{"Range":[14711,14712]},{"Range":[14715,14716]},{"Single":14815},{"Single":14826},{"Range":[14962,14976]},{"Single":15023},{"Single":15034},{"Single":15036},{"Single":15042},{"Single":15045},{"Single":15062},{"Single":15116},{"Single":15127}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "2b0c028c102da0436320dbb07985378cf28ec2ca",
+  "prompts": {},
+  "sessions": {
+    "s_6a6fa50d278a26": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a3df1a258b7ed80d54bd298",
+        "model": "qwen-3.6-plus__dev",
+        "display_model_name": "Qwen3.6-Plus"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {
+    "apps/world-sim/package.json": [
+      {
+        "hash": "s_6a6fa50d278a26::t_a985dc9059cb57",
+        "line_ranges": [
+          {
+            "Single": 36
+          },
+          {
+            "Single": 42
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1e4d58b7ed80d54bd5ef",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Single": 36
+              },
+              {
+                "Single": 42
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_2eaf081beffa81",
+        "line_ranges": [
+          {
+            "Range": [
+              20,
+              22
+            ]
+          },
+          {
+            "Single": 24
+          },
+          {
+            "Single": 26
+          },
+          {
+            "Single": 29
+          },
+          {
+            "Range": [
+              31,
+              32
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1ea158b7ed80d54bd601",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Range": [
+                  20,
+                  22
+                ]
+              },
+              {
+                "Single": 24
+              },
+              {
+                "Single": 26
+              },
+              {
+                "Single": 29
+              },
+              {
+                "Range": [
+                  31,
+                  32
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/App.tsx": [
+      {
+        "hash": "s_6a6fa50d278a26::t_b4b9b3a113420c",
+        "line_ranges": [
+          {
+            "Single": 2
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e227e58b7ed80d54bd68e",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Single": 2
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_21ad91cd840d98",
+        "line_ranges": [
+          {
+            "Range": [
+              85,
+              89
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1eef58b7ed80d54bd613",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  85,
+                  89
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/components/ui/button.tsx": [
+      {
+        "hash": "s_6a6fa50d278a26::t_b4b9b3a113420c",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              67
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e227e58b7ed80d54bd68e",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Range": [
+                  1,
+                  67
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/components/ui/toggle-group.tsx": [
+      {
+        "hash": "s_6a6fa50d278a26::t_b4b9b3a113420c",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              85
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e227e58b7ed80d54bd68e",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Range": [
+                  1,
+                  85
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/components/ui/toggle.tsx": [
+      {
+        "hash": "s_6a6fa50d278a26::t_b4b9b3a113420c",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              44
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e227e58b7ed80d54bd68e",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Range": [
+                  1,
+                  44
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/components/ui/tooltip.tsx": [
+      {
+        "hash": "s_6a6fa50d278a26::t_b4b9b3a113420c",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              51
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e227e58b7ed80d54bd68e",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Range": [
+                  1,
+                  51
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/lib/utils.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_b4b9b3a113420c",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              2
+            ]
+          },
+          {
+            "Single": 5
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e227e58b7ed80d54bd68e",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Range": [
+                  1,
+                  2
+                ]
+              },
+              {
+                "Single": 5
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_2eaf081beffa81",
+        "line_ranges": [
+          {
+            "Range": [
+              3,
+              4
+            ]
+          },
+          {
+            "Single": 6
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1ea158b7ed80d54bd601",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Range": [
+                  3,
+                  4
+                ]
+              },
+              {
+                "Single": 6
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/styles/global.css": [
+      {
+        "hash": "s_6a6fa50d278a26::t_b4b9b3a113420c",
+        "line_ranges": [
+          {
+            "Single": 126
+          },
+          {
+            "Single": 211
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e227e58b7ed80d54bd68e",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Single": 126
+              },
+              {
+                "Single": 211
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_be8805b7055290",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              2
+            ]
+          },
+          {
+            "Range": [
+              5,
+              7
+            ]
+          },
+          {
+            "Single": 39
+          },
+          {
+            "Range": [
+              56,
+              58
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1e8258b7ed80d54bd5fe",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  1,
+                  2
+                ]
+              },
+              {
+                "Range": [
+                  5,
+                  7
+                ]
+              },
+              {
+                "Single": 39
+              },
+              {
+                "Range": [
+                  56,
+                  58
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_2eaf081beffa81",
+        "line_ranges": [
+          {
+            "Range": [
+              3,
+              4
+            ]
+          },
+          {
+            "Range": [
+              24,
+              38
+            ]
+          },
+          {
+            "Range": [
+              40,
+              55
+            ]
+          },
+          {
+            "Single": 59
+          },
+          {
+            "Range": [
+              123,
+              125
+            ]
+          },
+          {
+            "Range": [
+              127,
+              210
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1ea158b7ed80d54bd601",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Range": [
+                  3,
+                  4
+                ]
+              },
+              {
+                "Range": [
+                  24,
+                  38
+                ]
+              },
+              {
+                "Range": [
+                  40,
+                  55
+                ]
+              },
+              {
+                "Single": 59
+              },
+              {
+                "Range": [
+                  123,
+                  125
+                ]
+              },
+              {
+                "Range": [
+                  127,
+                  210
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/ui/canvas/MapCanvas.tsx": [
+      {
+        "hash": "s_6a6fa50d278a26::t_f3725112c88e9f",
+        "line_ranges": [
+          {
+            "Range": [
+              448,
+              453
+            ]
+          },
+          {
+            "Single": 456
+          },
+          {
+            "Range": [
+              460,
+              461
+            ]
+          },
+          {
+            "Range": [
+              463,
+              468
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1fd758b7ed80d54bd628",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  448,
+                  453
+                ]
+              },
+              {
+                "Single": 456
+              },
+              {
+                "Range": [
+                  460,
+                  461
+                ]
+              },
+              {
+                "Range": [
+                  463,
+                  468
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_9f09770efbd5b1",
+        "line_ranges": [
+          {
+            "Range": [
+              457,
+              459
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e203658b7ed80d54bd63d",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  457,
+                  459
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_967737ef195e43",
+        "line_ranges": [
+          {
+            "Range": [
+              454,
+              455
+            ]
+          },
+          {
+            "Single": 462
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1ff758b7ed80d54bd62e",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  454,
+                  455
+                ]
+              },
+              {
+                "Single": 462
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/ui/layout/AppLayout.module.css": [
+      {
+        "hash": "s_6a6fa50d278a26::t_7ff068d2d85bcc",
+        "line_ranges": [
+          {
+            "Range": [
+              34,
+              35
+            ]
+          },
+          {
+            "Range": [
+              39,
+              66
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1f2a58b7ed80d54bd619",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  34,
+                  35
+                ]
+              },
+              {
+                "Range": [
+                  39,
+                  66
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/ui/layout/AppLayout.tsx": [
+      {
+        "hash": "s_6a6fa50d278a26::t_5b7749702daa6b",
+        "line_ranges": [
+          {
+            "Single": 18
+          },
+          {
+            "Range": [
+              20,
+              23
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e20d758b7ed80d54bd656",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 18
+              },
+              {
+                "Range": [
+                  20,
+                  23
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_bab26b67aeb872",
+        "line_ranges": [
+          {
+            "Single": 55
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e203f58b7ed80d54bd640",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 55
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_30efc74e9116eb",
+        "line_ranges": [
+          {
+            "Single": 1
+          },
+          {
+            "Range": [
+              12,
+              17
+            ]
+          },
+          {
+            "Single": 19
+          },
+          {
+            "Range": [
+              24,
+              54
+            ]
+          },
+          {
+            "Single": 56
+          },
+          {
+            "Single": 66
+          },
+          {
+            "Range": [
+              68,
+              72
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1f1058b7ed80d54bd616",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 1
+              },
+              {
+                "Range": [
+                  12,
+                  17
+                ]
+              },
+              {
+                "Single": 19
+              },
+              {
+                "Range": [
+                  24,
+                  54
+                ]
+              },
+              {
+                "Single": 56
+              },
+              {
+                "Single": 66
+              },
+              {
+                "Range": [
+                  68,
+                  72
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/ui/topbar/TopBar.module.css": [
+      {
+        "hash": "s_6a6fa50d278a26::t_9d98ca8ad35f03",
+        "line_ranges": [
+          {
+            "Single": 100
+          },
+          {
+            "Range": [
+              112,
+              113
+            ]
+          },
+          {
+            "Range": [
+              120,
+              121
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e21d458b7ed80d54bd678",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 100
+              },
+              {
+                "Range": [
+                  112,
+                  113
+                ]
+              },
+              {
+                "Range": [
+                  120,
+                  121
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_f6b27d088dcb7d",
+        "line_ranges": [
+          {
+            "Single": 62
+          },
+          {
+            "Range": [
+              73,
+              74
+            ]
+          },
+          {
+            "Range": [
+              81,
+              82
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e21c558b7ed80d54bd675",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 62
+              },
+              {
+                "Range": [
+                  73,
+                  74
+                ]
+              },
+              {
+                "Range": [
+                  81,
+                  82
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_35815a6bf00cab",
+        "line_ranges": [
+          {
+            "Range": [
+              206,
+              232
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1fab58b7ed80d54bd622",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  206,
+                  232
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/ui/topbar/TopBar.tsx": [
+      {
+        "hash": "s_6a6fa50d278a26::t_b4b9b3a113420c",
+        "line_ranges": [
+          {
+            "Range": [
+              2,
+              3
+            ]
+          },
+          {
+            "Single": 108
+          },
+          {
+            "Single": 118
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e227e58b7ed80d54bd68e",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Range": [
+                  2,
+                  3
+                ]
+              },
+              {
+                "Single": 108
+              },
+              {
+                "Single": 118
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_9de2e4fbfe0d94",
+        "line_ranges": [
+          {
+            "Single": 1
+          },
+          {
+            "Single": 77
+          },
+          {
+            "Single": 79
+          },
+          {
+            "Single": 81
+          },
+          {
+            "Single": 96
+          },
+          {
+            "Range": [
+              98,
+              104
+            ]
+          },
+          {
+            "Single": 110
+          },
+          {
+            "Single": 117
+          },
+          {
+            "Single": 120
+          },
+          {
+            "Range": [
+              123,
+              131
+            ]
+          },
+          {
+            "Range": [
+              133,
+              134
+            ]
+          },
+          {
+            "Range": [
+              136,
+              137
+            ]
+          },
+          {
+            "Single": 140
+          },
+          {
+            "Single": 142
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e218558b7ed80d54bd672",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 1
+              },
+              {
+                "Single": 77
+              },
+              {
+                "Single": 79
+              },
+              {
+                "Single": 81
+              },
+              {
+                "Single": 96
+              },
+              {
+                "Range": [
+                  98,
+                  104
+                ]
+              },
+              {
+                "Single": 110
+              },
+              {
+                "Single": 117
+              },
+              {
+                "Single": 120
+              },
+              {
+                "Range": [
+                  123,
+                  131
+                ]
+              },
+              {
+                "Range": [
+                  133,
+                  134
+                ]
+              },
+              {
+                "Range": [
+                  136,
+                  137
+                ]
+              },
+              {
+                "Single": 140
+              },
+              {
+                "Single": 142
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_bd80213de77bab",
+        "line_ranges": [
+          {
+            "Range": [
+              8,
+              17
+            ]
+          },
+          {
+            "Range": [
+              106,
+              107
+            ]
+          },
+          {
+            "Single": 109
+          },
+          {
+            "Range": [
+              111,
+              115
+            ]
+          },
+          {
+            "Range": [
+              138,
+              139
+            ]
+          },
+          {
+            "Single": 141
+          },
+          {
+            "Range": [
+              143,
+              147
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1f4258b7ed80d54bd61c",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  8,
+                  17
+                ]
+              },
+              {
+                "Range": [
+                  106,
+                  107
+                ]
+              },
+              {
+                "Single": 109
+              },
+              {
+                "Range": [
+                  111,
+                  115
+                ]
+              },
+              {
+                "Range": [
+                  138,
+                  139
+                ]
+              },
+              {
+                "Single": 141
+              },
+              {
+                "Range": [
+                  143,
+                  147
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/vite.config.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_a0a7bb9aaca13d",
+        "line_ranges": [
+          {
+            "Single": 2
+          },
+          {
+            "Single": 7
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1e7458b7ed80d54bd5fb",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 2
+              },
+              {
+                "Single": 7
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "pnpm-lock.yaml": [
+      {
+        "hash": "s_6a6fa50d278a26::t_b4b9b3a113420c",
+        "line_ranges": [
+          {
+            "Single": 163
+          },
+          {
+            "Single": 178
+          },
+          {
+            "Single": 285
+          },
+          {
+            "Single": 294
+          },
+          {
+            "Single": 297
+          },
+          {
+            "Single": 359
+          },
+          {
+            "Single": 365
+          },
+          {
+            "Single": 474
+          },
+          {
+            "Single": 486
+          },
+          {
+            "Range": [
+              490,
+              498
+            ]
+          },
+          {
+            "Range": [
+              502,
+              504
+            ]
+          },
+          {
+            "Range": [
+              508,
+              510
+            ]
+          },
+          {
+            "Range": [
+              517,
+              519
+            ]
+          },
+          {
+            "Range": [
+              523,
+              528
+            ]
+          },
+          {
+            "Range": [
+              533,
+              535
+            ]
+          },
+          {
+            "Range": [
+              550,
+              553
+            ]
+          },
+          {
+            "Single": 559
+          },
+          {
+            "Single": 562
+          },
+          {
+            "Single": 568
+          },
+          {
+            "Single": 577
+          },
+          {
+            "Single": 586
+          },
+          {
+            "Single": 599
+          },
+          {
+            "Single": 618
+          },
+          {
+            "Range": [
+              2231,
+              2232
+            ]
+          },
+          {
+            "Range": [
+              2234,
+              2235
+            ]
+          },
+          {
+            "Range": [
+              2237,
+              2238
+            ]
+          },
+          {
+            "Range": [
+              2240,
+              2248
+            ]
+          },
+          {
+            "Range": [
+              2250,
+              2251
+            ]
+          },
+          {
+            "Range": [
+              2253,
+              2261
+            ]
+          },
+          {
+            "Range": [
+              2263,
+              2264
+            ]
+          },
+          {
+            "Range": [
+              2266,
+              2274
+            ]
+          },
+          {
+            "Range": [
+              2276,
+              2277
+            ]
+          },
+          {
+            "Range": [
+              2279,
+              2287
+            ]
+          },
+          {
+            "Range": [
+              2289,
+              2290
+            ]
+          },
+          {
+            "Range": [
+              2292,
+              2300
+            ]
+          },
+          {
+            "Range": [
+              2302,
+              2303
+            ]
+          },
+          {
+            "Range": [
+              2305,
+              2313
+            ]
+          },
+          {
+            "Range": [
+              2315,
+              2316
+            ]
+          },
+          {
+            "Range": [
+              2318,
+              2326
+            ]
+          },
+          {
+            "Range": [
+              2328,
+              2329
+            ]
+          },
+          {
+            "Range": [
+              2331,
+              2339
+            ]
+          },
+          {
+            "Range": [
+              2341,
+              2342
+            ]
+          },
+          {
+            "Range": [
+              2344,
+              2352
+            ]
+          },
+          {
+            "Range": [
+              2354,
+              2355
+            ]
+          },
+          {
+            "Range": [
+              2357,
+              2361
+            ]
+          },
+          {
+            "Range": [
+              2363,
+              2364
+            ]
+          },
+          {
+            "Range": [
+              2366,
+              2374
+            ]
+          },
+          {
+            "Range": [
+              2376,
+              2377
+            ]
+          },
+          {
+            "Range": [
+              2379,
+              2383
+            ]
+          },
+          {
+            "Range": [
+              2385,
+              2386
+            ]
+          },
+          {
+            "Range": [
+              2388,
+              2396
+            ]
+          },
+          {
+            "Range": [
+              2398,
+              2399
+            ]
+          },
+          {
+            "Range": [
+              2401,
+              2405
+            ]
+          },
+          {
+            "Range": [
+              2407,
+              2408
+            ]
+          },
+          {
+            "Range": [
+              2410,
+              2418
+            ]
+          },
+          {
+            "Range": [
+              2420,
+              2421
+            ]
+          },
+          {
+            "Range": [
+              2423,
+              2431
+            ]
+          },
+          {
+            "Range": [
+              2433,
+              2434
+            ]
+          },
+          {
+            "Range": [
+              2436,
+              2440
+            ]
+          },
+          {
+            "Range": [
+              2442,
+              2443
+            ]
+          },
+          {
+            "Range": [
+              2445,
+              2453
+            ]
+          },
+          {
+            "Range": [
+              2455,
+              2456
+            ]
+          },
+          {
+            "Range": [
+              2458,
+              2461
+            ]
+          },
+          {
+            "Single": 2463
+          },
+          {
+            "Single": 2465
+          },
+          {
+            "Range": [
+              2467,
+              2476
+            ]
+          },
+          {
+            "Single": 2478
+          },
+          {
+            "Range": [
+              2481,
+              2482
+            ]
+          },
+          {
+            "Range": [
+              2484,
+              2488
+            ]
+          },
+          {
+            "Range": [
+              2490,
+              2491
+            ]
+          },
+          {
+            "Range": [
+              2493,
+              2501
+            ]
+          },
+          {
+            "Range": [
+              2503,
+              2504
+            ]
+          },
+          {
+            "Range": [
+              2506,
+              2514
+            ]
+          },
+          {
+            "Range": [
+              2516,
+              2517
+            ]
+          },
+          {
+            "Range": [
+              2519,
+              2527
+            ]
+          },
+          {
+            "Range": [
+              2529,
+              2530
+            ]
+          },
+          {
+            "Range": [
+              2532,
+              2540
+            ]
+          },
+          {
+            "Range": [
+              2542,
+              2543
+            ]
+          },
+          {
+            "Range": [
+              2545,
+              2553
+            ]
+          },
+          {
+            "Range": [
+              2555,
+              2556
+            ]
+          },
+          {
+            "Range": [
+              2558,
+              2566
+            ]
+          },
+          {
+            "Range": [
+              2568,
+              2569
+            ]
+          },
+          {
+            "Range": [
+              2571,
+              2579
+            ]
+          },
+          {
+            "Range": [
+              2581,
+              2582
+            ]
+          },
+          {
+            "Range": [
+              2584,
+              2592
+            ]
+          },
+          {
+            "Range": [
+              2594,
+              2595
+            ]
+          },
+          {
+            "Range": [
+              2597,
+              2605
+            ]
+          },
+          {
+            "Range": [
+              2607,
+              2608
+            ]
+          },
+          {
+            "Range": [
+              2610,
+              2618
+            ]
+          },
+          {
+            "Range": [
+              2620,
+              2621
+            ]
+          },
+          {
+            "Range": [
+              2623,
+              2631
+            ]
+          },
+          {
+            "Range": [
+              2633,
+              2634
+            ]
+          },
+          {
+            "Range": [
+              2636,
+              2644
+            ]
+          },
+          {
+            "Range": [
+              2646,
+              2647
+            ]
+          },
+          {
+            "Range": [
+              2649,
+              2657
+            ]
+          },
+          {
+            "Range": [
+              2659,
+              2660
+            ]
+          },
+          {
+            "Range": [
+              2662,
+              2670
+            ]
+          },
+          {
+            "Range": [
+              2672,
+              2673
+            ]
+          },
+          {
+            "Range": [
+              2675,
+              2683
+            ]
+          },
+          {
+            "Range": [
+              2685,
+              2686
+            ]
+          },
+          {
+            "Range": [
+              2688,
+              2696
+            ]
+          },
+          {
+            "Range": [
+              2698,
+              2699
+            ]
+          },
+          {
+            "Range": [
+              2701,
+              2709
+            ]
+          },
+          {
+            "Range": [
+              2711,
+              2712
+            ]
+          },
+          {
+            "Range": [
+              2714,
+              2722
+            ]
+          },
+          {
+            "Range": [
+              2724,
+              2725
+            ]
+          },
+          {
+            "Range": [
+              2727,
+              2731
+            ]
+          },
+          {
+            "Range": [
+              2733,
+              2734
+            ]
+          },
+          {
+            "Range": [
+              2736,
+              2744
+            ]
+          },
+          {
+            "Range": [
+              2746,
+              2747
+            ]
+          },
+          {
+            "Range": [
+              2749,
+              2752
+            ]
+          },
+          {
+            "Single": 2754
+          },
+          {
+            "Single": 2756
+          },
+          {
+            "Range": [
+              2759,
+              2770
+            ]
+          },
+          {
+            "Range": [
+              2772,
+              2783
+            ]
+          },
+          {
+            "Range": [
+              2785,
+              2796
+            ]
+          },
+          {
+            "Range": [
+              2798,
+              2809
+            ]
+          },
+          {
+            "Range": [
+              2811,
+              2822
+            ]
+          },
+          {
+            "Range": [
+              2824,
+              2831
+            ]
+          },
+          {
+            "Range": [
+              2833,
+              2840
+            ]
+          },
+          {
+            "Range": [
+              2842,
+              2849
+            ]
+          },
+          {
+            "Range": [
+              2851,
+              2858
+            ]
+          },
+          {
+            "Range": [
+              2860,
+              2867
+            ]
+          },
+          {
+            "Range": [
+              2869,
+              3273
+            ]
+          },
+          {
+            "Range": [
+              3451,
+              3453
+            ]
+          },
+          {
+            "Range": [
+              3460,
+              3465
+            ]
+          },
+          {
+            "Range": [
+              3472,
+              3477
+            ]
+          },
+          {
+            "Range": [
+              3484,
+              3489
+            ]
+          },
+          {
+            "Range": [
+              3496,
+              3501
+            ]
+          },
+          {
+            "Range": [
+              3508,
+              3513
+            ]
+          },
+          {
+            "Range": [
+              3521,
+              3527
+            ]
+          },
+          {
+            "Range": [
+              3535,
+              3541
+            ]
+          },
+          {
+            "Range": [
+              3549,
+              3555
+            ]
+          },
+          {
+            "Range": [
+              3563,
+              3569
+            ]
+          },
+          {
+            "Range": [
+              3582,
+              3593
+            ]
+          },
+          {
+            "Range": [
+              3600,
+              3605
+            ]
+          },
+          {
+            "Range": [
+              3612,
+              3617
+            ]
+          },
+          {
+            "Range": [
+              3622,
+              3625
+            ]
+          },
+          {
+            "Range": [
+              3629,
+              3633
+            ]
+          },
+          {
+            "Range": [
+              4046,
+              4049
+            ]
+          },
+          {
+            "Range": [
+              4544,
+              4546
+            ]
+          },
+          {
+            "Range": [
+              4612,
+              4615
+            ]
+          },
+          {
+            "Range": [
+              4882,
+              4885
+            ]
+          },
+          {
+            "Single": 4924
+          },
+          {
+            "Range": [
+              5237,
+              5240
+            ]
+          },
+          {
+            "Range": [
+              5376,
+              5381
+            ]
+          },
+          {
+            "Range": [
+              5388,
+              5393
+            ]
+          },
+          {
+            "Range": [
+              5400,
+              5405
+            ]
+          },
+          {
+            "Range": [
+              5412,
+              5417
+            ]
+          },
+          {
+            "Range": [
+              5424,
+              5429
+            ]
+          },
+          {
+            "Range": [
+              5437,
+              5443
+            ]
+          },
+          {
+            "Range": [
+              5451,
+              5457
+            ]
+          },
+          {
+            "Range": [
+              5465,
+              5471
+            ]
+          },
+          {
+            "Range": [
+              5479,
+              5485
+            ]
+          },
+          {
+            "Range": [
+              5492,
+              5497
+            ]
+          },
+          {
+            "Range": [
+              5504,
+              5509
+            ]
+          },
+          {
+            "Range": [
+              5514,
+              5517
+            ]
+          },
+          {
+            "Range": [
+              5581,
+              5585
+            ]
+          },
+          {
+            "Range": [
+              6243,
+              6255
+            ]
+          },
+          {
+            "Range": [
+              6327,
+              6346
+            ]
+          },
+          {
+            "Range": [
+              6364,
+              6373
+            ]
+          },
+          {
+            "Range": [
+              6615,
+              6618
+            ]
+          },
+          {
+            "Range": [
+              6837,
+              6839
+            ]
+          },
+          {
+            "Range": [
+              6844,
+              6847
+            ]
+          },
+          {
+            "Range": [
+              7098,
+              7117
+            ]
+          },
+          {
+            "Single": 7965
+          },
+          {
+            "Single": 7980
+          },
+          {
+            "Single": 8122
+          },
+          {
+            "Single": 8130
+          },
+          {
+            "Range": [
+              9296,
+              9438
+            ]
+          },
+          {
+            "Single": 9440
+          },
+          {
+            "Single": 9442
+          },
+          {
+            "Single": 9444
+          },
+          {
+            "Single": 9446
+          },
+          {
+            "Single": 9448
+          },
+          {
+            "Single": 9450
+          },
+          {
+            "Single": 9452
+          },
+          {
+            "Single": 9454
+          },
+          {
+            "Single": 9456
+          },
+          {
+            "Range": [
+              9458,
+              9482
+            ]
+          },
+          {
+            "Range": [
+              9484,
+              9495
+            ]
+          },
+          {
+            "Range": [
+              9497,
+              9504
+            ]
+          },
+          {
+            "Single": 9506
+          },
+          {
+            "Range": [
+              9508,
+              9513
+            ]
+          },
+          {
+            "Range": [
+              9515,
+              9558
+            ]
+          },
+          {
+            "Single": 9560
+          },
+          {
+            "Range": [
+              9562,
+              9570
+            ]
+          },
+          {
+            "Range": [
+              9572,
+              9576
+            ]
+          },
+          {
+            "Single": 9578
+          },
+          {
+            "Range": [
+              9580,
+              9589
+            ]
+          },
+          {
+            "Range": [
+              9591,
+              9595
+            ]
+          },
+          {
+            "Range": [
+              9597,
+              9617
+            ]
+          },
+          {
+            "Single": 9619
+          },
+          {
+            "Range": [
+              9621,
+              9623
+            ]
+          },
+          {
+            "Range": [
+              9625,
+              9636
+            ]
+          },
+          {
+            "Range": [
+              9638,
+              9651
+            ]
+          },
+          {
+            "Range": [
+              9653,
+              9657
+            ]
+          },
+          {
+            "Range": [
+              9659,
+              9668
+            ]
+          },
+          {
+            "Range": [
+              9670,
+              9699
+            ]
+          },
+          {
+            "Range": [
+              9701,
+              9706
+            ]
+          },
+          {
+            "Range": [
+              9708,
+              9840
+            ]
+          },
+          {
+            "Range": [
+              9842,
+              9858
+            ]
+          },
+          {
+            "Range": [
+              9860,
+              9868
+            ]
+          },
+          {
+            "Range": [
+              9870,
+              9877
+            ]
+          },
+          {
+            "Range": [
+              9879,
+              9886
+            ]
+          },
+          {
+            "Range": [
+              9888,
+              9978
+            ]
+          },
+          {
+            "Range": [
+              9980,
+              10064
+            ]
+          },
+          {
+            "Range": [
+              10066,
+              10079
+            ]
+          },
+          {
+            "Single": 10081
+          },
+          {
+            "Range": [
+              10083,
+              10087
+            ]
+          },
+          {
+            "Range": [
+              10089,
+              10090
+            ]
+          },
+          {
+            "Range": [
+              10092,
+              10125
+            ]
+          },
+          {
+            "Range": [
+              10127,
+              10131
+            ]
+          },
+          {
+            "Range": [
+              10133,
+              10139
+            ]
+          },
+          {
+            "Range": [
+              10141,
+              10146
+            ]
+          },
+          {
+            "Range": [
+              10148,
+              10153
+            ]
+          },
+          {
+            "Range": [
+              10155,
+              10159
+            ]
+          },
+          {
+            "Single": 10161
+          },
+          {
+            "Range": [
+              10163,
+              10165
+            ]
+          },
+          {
+            "Range": [
+              10167,
+              10171
+            ]
+          },
+          {
+            "Range": [
+              10173,
+              10178
+            ]
+          },
+          {
+            "Range": [
+              10180,
+              10185
+            ]
+          },
+          {
+            "Range": [
+              10187,
+              10194
+            ]
+          },
+          {
+            "Single": 10196
+          },
+          {
+            "Range": [
+              10705,
+              10714
+            ]
+          },
+          {
+            "Range": [
+              10718,
+              10720
+            ]
+          },
+          {
+            "Range": [
+              10724,
+              10726
+            ]
+          },
+          {
+            "Range": [
+              10730,
+              10732
+            ]
+          },
+          {
+            "Range": [
+              10736,
+              10738
+            ]
+          },
+          {
+            "Range": [
+              10742,
+              10744
+            ]
+          },
+          {
+            "Range": [
+              10748,
+              10750
+            ]
+          },
+          {
+            "Range": [
+              10754,
+              10756
+            ]
+          },
+          {
+            "Range": [
+              10760,
+              10762
+            ]
+          },
+          {
+            "Range": [
+              10766,
+              10768
+            ]
+          },
+          {
+            "Range": [
+              10772,
+              10774
+            ]
+          },
+          {
+            "Range": [
+              10778,
+              10780
+            ]
+          },
+          {
+            "Range": [
+              10784,
+              10786
+            ]
+          },
+          {
+            "Range": [
+              10802,
+              10816
+            ]
+          },
+          {
+            "Range": [
+              10825,
+              10831
+            ]
+          },
+          {
+            "Single": 11040
+          },
+          {
+            "Single": 11043
+          },
+          {
+            "Single": 11056
+          },
+          {
+            "Single": 11063
+          },
+          {
+            "Range": [
+              11356,
+              11359
+            ]
+          },
+          {
+            "Range": [
+              11797,
+              11798
+            ]
+          },
+          {
+            "Range": [
+              11855,
+              11859
+            ]
+          },
+          {
+            "Range": [
+              12187,
+              12188
+            ]
+          },
+          {
+            "Range": [
+              12575,
+              12576
+            ]
+          },
+          {
+            "Range": [
+              12708,
+              12710
+            ]
+          },
+          {
+            "Range": [
+              12714,
+              12716
+            ]
+          },
+          {
+            "Range": [
+              12720,
+              12722
+            ]
+          },
+          {
+            "Range": [
+              12726,
+              12728
+            ]
+          },
+          {
+            "Range": [
+              12732,
+              12734
+            ]
+          },
+          {
+            "Range": [
+              12738,
+              12740
+            ]
+          },
+          {
+            "Range": [
+              12744,
+              12746
+            ]
+          },
+          {
+            "Range": [
+              12750,
+              12752
+            ]
+          },
+          {
+            "Range": [
+              12756,
+              12758
+            ]
+          },
+          {
+            "Range": [
+              12762,
+              12764
+            ]
+          },
+          {
+            "Range": [
+              12768,
+              12770
+            ]
+          },
+          {
+            "Range": [
+              12787,
+              12802
+            ]
+          },
+          {
+            "Range": [
+              12856,
+              12859
+            ]
+          },
+          {
+            "Single": 13611
+          },
+          {
+            "Single": 13615
+          },
+          {
+            "Range": [
+              13800,
+              13862
+            ]
+          },
+          {
+            "Range": [
+              13954,
+              13972
+            ]
+          },
+          {
+            "Range": [
+              13987,
+              13994
+            ]
+          },
+          {
+            "Range": [
+              14406,
+              14446
+            ]
+          },
+          {
+            "Range": [
+              14711,
+              14712
+            ]
+          },
+          {
+            "Range": [
+              14715,
+              14716
+            ]
+          },
+          {
+            "Single": 14815
+          },
+          {
+            "Single": 14826
+          },
+          {
+            "Range": [
+              14962,
+              14976
+            ]
+          },
+          {
+            "Single": 15023
+          },
+          {
+            "Single": 15034
+          },
+          {
+            "Single": 15036
+          },
+          {
+            "Single": 15042
+          },
+          {
+            "Single": 15045
+          },
+          {
+            "Single": 15062
+          },
+          {
+            "Single": 15116
+          },
+          {
+            "Single": 15127
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e227e58b7ed80d54bd68e",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Single": 163
+              },
+              {
+                "Single": 178
+              },
+              {
+                "Single": 285
+              },
+              {
+                "Single": 294
+              },
+              {
+                "Single": 297
+              },
+              {
+                "Single": 359
+              },
+              {
+                "Single": 365
+              },
+              {
+                "Single": 474
+              },
+              {
+                "Single": 486
+              },
+              {
+                "Range": [
+                  490,
+                  498
+                ]
+              },
+              {
+                "Range": [
+                  502,
+                  504
+                ]
+              },
+              {
+                "Range": [
+                  508,
+                  510
+                ]
+              },
+              {
+                "Range": [
+                  517,
+                  519
+                ]
+              },
+              {
+                "Range": [
+                  523,
+                  528
+                ]
+              },
+              {
+                "Range": [
+                  533,
+                  535
+                ]
+              },
+              {
+                "Range": [
+                  550,
+                  553
+                ]
+              },
+              {
+                "Single": 559
+              },
+              {
+                "Single": 562
+              },
+              {
+                "Single": 568
+              },
+              {
+                "Single": 577
+              },
+              {
+                "Single": 586
+              },
+              {
+                "Single": 599
+              },
+              {
+                "Single": 618
+              },
+              {
+                "Range": [
+                  2231,
+                  2232
+                ]
+              },
+              {
+                "Range": [
+                  2234,
+                  2235
+                ]
+              },
+              {
+                "Range": [
+                  2237,
+                  2238
+                ]
+              },
+              {
+                "Range": [
+                  2240,
+                  2248
+                ]
+              },
+              {
+                "Range": [
+                  2250,
+                  2251
+                ]
+              },
+              {
+                "Range": [
+                  2253,
+                  2261
+                ]
+              },
+              {
+                "Range": [
+                  2263,
+                  2264
+                ]
+              },
+              {
+                "Range": [
+                  2266,
+                  2274
+                ]
+              },
+              {
+                "Range": [
+                  2276,
+                  2277
+                ]
+              },
+              {
+                "Range": [
+                  2279,
+                  2287
+                ]
+              },
+              {
+                "Range": [
+                  2289,
+                  2290
+                ]
+              },
+              {
+                "Range": [
+                  2292,
+                  2300
+                ]
+              },
+              {
+                "Range": [
+                  2302,
+                  2303
+                ]
+              },
+              {
+                "Range": [
+                  2305,
+                  2313
+                ]
+              },
+              {
+                "Range": [
+                  2315,
+                  2316
+                ]
+              },
+              {
+                "Range": [
+                  2318,
+                  2326
+                ]
+              },
+              {
+                "Range": [
+                  2328,
+                  2329
+                ]
+              },
+              {
+                "Range": [
+                  2331,
+                  2339
+                ]
+              },
+              {
+                "Range": [
+                  2341,
+                  2342
+                ]
+              },
+              {
+                "Range": [
+                  2344,
+                  2352
+                ]
+              },
+              {
+                "Range": [
+                  2354,
+                  2355
+                ]
+              },
+              {
+                "Range": [
+                  2357,
+                  2361
+                ]
+              },
+              {
+                "Range": [
+                  2363,
+                  2364
+                ]
+              },
+              {
+                "Range": [
+                  2366,
+                  2374
+                ]
+              },
+              {
+                "Range": [
+                  2376,
+                  2377
+                ]
+              },
+              {
+                "Range": [
+                  2379,
+                  2383
+                ]
+              },
+              {
+                "Range": [
+                  2385,
+                  2386
+                ]
+              },
+              {
+                "Range": [
+                  2388,
+                  2396
+                ]
+              },
+              {
+                "Range": [
+                  2398,
+                  2399
+                ]
+              },
+              {
+                "Range": [
+                  2401,
+                  2405
+                ]
+              },
+              {
+                "Range": [
+                  2407,
+                  2408
+                ]
+              },
+              {
+                "Range": [
+                  2410,
+                  2418
+                ]
+              },
+              {
+                "Range": [
+                  2420,
+                  2421
+                ]
+              },
+              {
+                "Range": [
+                  2423,
+                  2431
+                ]
+              },
+              {
+                "Range": [
+                  2433,
+                  2434
+                ]
+              },
+              {
+                "Range": [
+                  2436,
+                  2440
+                ]
+              },
+              {
+                "Range": [
+                  2442,
+                  2443
+                ]
+              },
+              {
+                "Range": [
+                  2445,
+                  2453
+                ]
+              },
+              {
+                "Range": [
+                  2455,
+                  2456
+                ]
+              },
+              {
+                "Range": [
+                  2458,
+                  2461
+                ]
+              },
+              {
+                "Single": 2463
+              },
+              {
+                "Single": 2465
+              },
+              {
+                "Range": [
+                  2467,
+                  2476
+                ]
+              },
+              {
+                "Single": 2478
+              },
+              {
+                "Range": [
+                  2481,
+                  2482
+                ]
+              },
+              {
+                "Range": [
+                  2484,
+                  2488
+                ]
+              },
+              {
+                "Range": [
+                  2490,
+                  2491
+                ]
+              },
+              {
+                "Range": [
+                  2493,
+                  2501
+                ]
+              },
+              {
+                "Range": [
+                  2503,
+                  2504
+                ]
+              },
+              {
+                "Range": [
+                  2506,
+                  2514
+                ]
+              },
+              {
+                "Range": [
+                  2516,
+                  2517
+                ]
+              },
+              {
+                "Range": [
+                  2519,
+                  2527
+                ]
+              },
+              {
+                "Range": [
+                  2529,
+                  2530
+                ]
+              },
+              {
+                "Range": [
+                  2532,
+                  2540
+                ]
+              },
+              {
+                "Range": [
+                  2542,
+                  2543
+                ]
+              },
+              {
+                "Range": [
+                  2545,
+                  2553
+                ]
+              },
+              {
+                "Range": [
+                  2555,
+                  2556
+                ]
+              },
+              {
+                "Range": [
+                  2558,
+                  2566
+                ]
+              },
+              {
+                "Range": [
+                  2568,
+                  2569
+                ]
+              },
+              {
+                "Range": [
+                  2571,
+                  2579
+                ]
+              },
+              {
+                "Range": [
+                  2581,
+                  2582
+                ]
+              },
+              {
+                "Range": [
+                  2584,
+                  2592
+                ]
+              },
+              {
+                "Range": [
+                  2594,
+                  2595
+                ]
+              },
+              {
+                "Range": [
+                  2597,
+                  2605
+                ]
+              },
+              {
+                "Range": [
+                  2607,
+                  2608
+                ]
+              },
+              {
+                "Range": [
+                  2610,
+                  2618
+                ]
+              },
+              {
+                "Range": [
+                  2620,
+                  2621
+                ]
+              },
+              {
+                "Range": [
+                  2623,
+                  2631
+                ]
+              },
+              {
+                "Range": [
+                  2633,
+                  2634
+                ]
+              },
+              {
+                "Range": [
+                  2636,
+                  2644
+                ]
+              },
+              {
+                "Range": [
+                  2646,
+                  2647
+                ]
+              },
+              {
+                "Range": [
+                  2649,
+                  2657
+                ]
+              },
+              {
+                "Range": [
+                  2659,
+                  2660
+                ]
+              },
+              {
+                "Range": [
+                  2662,
+                  2670
+                ]
+              },
+              {
+                "Range": [
+                  2672,
+                  2673
+                ]
+              },
+              {
+                "Range": [
+                  2675,
+                  2683
+                ]
+              },
+              {
+                "Range": [
+                  2685,
+                  2686
+                ]
+              },
+              {
+                "Range": [
+                  2688,
+                  2696
+                ]
+              },
+              {
+                "Range": [
+                  2698,
+                  2699
+                ]
+              },
+              {
+                "Range": [
+                  2701,
+                  2709
+                ]
+              },
+              {
+                "Range": [
+                  2711,
+                  2712
+                ]
+              },
+              {
+                "Range": [
+                  2714,
+                  2722
+                ]
+              },
+              {
+                "Range": [
+                  2724,
+                  2725
+                ]
+              },
+              {
+                "Range": [
+                  2727,
+                  2731
+                ]
+              },
+              {
+                "Range": [
+                  2733,
+                  2734
+                ]
+              },
+              {
+                "Range": [
+                  2736,
+                  2744
+                ]
+              },
+              {
+                "Range": [
+                  2746,
+                  2747
+                ]
+              },
+              {
+                "Range": [
+                  2749,
+                  2752
+                ]
+              },
+              {
+                "Single": 2754
+              },
+              {
+                "Single": 2756
+              },
+              {
+                "Range": [
+                  2759,
+                  2770
+                ]
+              },
+              {
+                "Range": [
+                  2772,
+                  2783
+                ]
+              },
+              {
+                "Range": [
+                  2785,
+                  2796
+                ]
+              },
+              {
+                "Range": [
+                  2798,
+                  2809
+                ]
+              },
+              {
+                "Range": [
+                  2811,
+                  2822
+                ]
+              },
+              {
+                "Range": [
+                  2824,
+                  2831
+                ]
+              },
+              {
+                "Range": [
+                  2833,
+                  2840
+                ]
+              },
+              {
+                "Range": [
+                  2842,
+                  2849
+                ]
+              },
+              {
+                "Range": [
+                  2851,
+                  2858
+                ]
+              },
+              {
+                "Range": [
+                  2860,
+                  2867
+                ]
+              },
+              {
+                "Range": [
+                  2869,
+                  3273
+                ]
+              },
+              {
+                "Range": [
+                  3451,
+                  3453
+                ]
+              },
+              {
+                "Range": [
+                  3460,
+                  3465
+                ]
+              },
+              {
+                "Range": [
+                  3472,
+                  3477
+                ]
+              },
+              {
+                "Range": [
+                  3484,
+                  3489
+                ]
+              },
+              {
+                "Range": [
+                  3496,
+                  3501
+                ]
+              },
+              {
+                "Range": [
+                  3508,
+                  3513
+                ]
+              },
+              {
+                "Range": [
+                  3521,
+                  3527
+                ]
+              },
+              {
+                "Range": [
+                  3535,
+                  3541
+                ]
+              },
+              {
+                "Range": [
+                  3549,
+                  3555
+                ]
+              },
+              {
+                "Range": [
+                  3563,
+                  3569
+                ]
+              },
+              {
+                "Range": [
+                  3582,
+                  3593
+                ]
+              },
+              {
+                "Range": [
+                  3600,
+                  3605
+                ]
+              },
+              {
+                "Range": [
+                  3612,
+                  3617
+                ]
+              },
+              {
+                "Range": [
+                  3622,
+                  3625
+                ]
+              },
+              {
+                "Range": [
+                  3629,
+                  3633
+                ]
+              },
+              {
+                "Range": [
+                  4046,
+                  4049
+                ]
+              },
+              {
+                "Range": [
+                  4544,
+                  4546
+                ]
+              },
+              {
+                "Range": [
+                  4612,
+                  4615
+                ]
+              },
+              {
+                "Range": [
+                  4882,
+                  4885
+                ]
+              },
+              {
+                "Single": 4924
+              },
+              {
+                "Range": [
+                  5237,
+                  5240
+                ]
+              },
+              {
+                "Range": [
+                  5376,
+                  5381
+                ]
+              },
+              {
+                "Range": [
+                  5388,
+                  5393
+                ]
+              },
+              {
+                "Range": [
+                  5400,
+                  5405
+                ]
+              },
+              {
+                "Range": [
+                  5412,
+                  5417
+                ]
+              },
+              {
+                "Range": [
+                  5424,
+                  5429
+                ]
+              },
+              {
+                "Range": [
+                  5437,
+                  5443
+                ]
+              },
+              {
+                "Range": [
+                  5451,
+                  5457
+                ]
+              },
+              {
+                "Range": [
+                  5465,
+                  5471
+                ]
+              },
+              {
+                "Range": [
+                  5479,
+                  5485
+                ]
+              },
+              {
+                "Range": [
+                  5492,
+                  5497
+                ]
+              },
+              {
+                "Range": [
+                  5504,
+                  5509
+                ]
+              },
+              {
+                "Range": [
+                  5514,
+                  5517
+                ]
+              },
+              {
+                "Range": [
+                  5581,
+                  5585
+                ]
+              },
+              {
+                "Range": [
+                  6243,
+                  6255
+                ]
+              },
+              {
+                "Range": [
+                  6327,
+                  6346
+                ]
+              },
+              {
+                "Range": [
+                  6364,
+                  6373
+                ]
+              },
+              {
+                "Range": [
+                  6615,
+                  6618
+                ]
+              },
+              {
+                "Range": [
+                  6837,
+                  6839
+                ]
+              },
+              {
+                "Range": [
+                  6844,
+                  6847
+                ]
+              },
+              {
+                "Range": [
+                  7098,
+                  7117
+                ]
+              },
+              {
+                "Single": 7965
+              },
+              {
+                "Single": 7980
+              },
+              {
+                "Single": 8122
+              },
+              {
+                "Single": 8130
+              },
+              {
+                "Range": [
+                  9296,
+                  9438
+                ]
+              },
+              {
+                "Single": 9440
+              },
+              {
+                "Single": 9442
+              },
+              {
+                "Single": 9444
+              },
+              {
+                "Single": 9446
+              },
+              {
+                "Single": 9448
+              },
+              {
+                "Single": 9450
+              },
+              {
+                "Single": 9452
+              },
+              {
+                "Single": 9454
+              },
+              {
+                "Single": 9456
+              },
+              {
+                "Range": [
+                  9458,
+                  9482
+                ]
+              },
+              {
+                "Range": [
+                  9484,
+                  9495
+                ]
+              },
+              {
+                "Range": [
+                  9497,
+                  9504
+                ]
+              },
+              {
+                "Single": 9506
+              },
+              {
+                "Range": [
+                  9508,
+                  9513
+                ]
+              },
+              {
+                "Range": [
+                  9515,
+                  9558
+                ]
+              },
+              {
+                "Single": 9560
+              },
+              {
+                "Range": [
+                  9562,
+                  9570
+                ]
+              },
+              {
+                "Range": [
+                  9572,
+                  9576
+                ]
+              },
+              {
+                "Single": 9578
+              },
+              {
+                "Range": [
+                  9580,
+                  9589
+                ]
+              },
+              {
+                "Range": [
+                  9591,
+                  9595
+                ]
+              },
+              {
+                "Range": [
+                  9597,
+                  9617
+                ]
+              },
+              {
+                "Single": 9619
+              },
+              {
+                "Range": [
+                  9621,
+                  9623
+                ]
+              },
+              {
+                "Range": [
+                  9625,
+                  9636
+                ]
+              },
+              {
+                "Range": [
+                  9638,
+                  9651
+                ]
+              },
+              {
+                "Range": [
+                  9653,
+                  9657
+                ]
+              },
+              {
+                "Range": [
+                  9659,
+                  9668
+                ]
+              },
+              {
+                "Range": [
+                  9670,
+                  9699
+                ]
+              },
+              {
+                "Range": [
+                  9701,
+                  9706
+                ]
+              },
+              {
+                "Range": [
+                  9708,
+                  9840
+                ]
+              },
+              {
+                "Range": [
+                  9842,
+                  9858
+                ]
+              },
+              {
+                "Range": [
+                  9860,
+                  9868
+                ]
+              },
+              {
+                "Range": [
+                  9870,
+                  9877
+                ]
+              },
+              {
+                "Range": [
+                  9879,
+                  9886
+                ]
+              },
+              {
+                "Range": [
+                  9888,
+                  9978
+                ]
+              },
+              {
+                "Range": [
+                  9980,
+                  10064
+                ]
+              },
+              {
+                "Range": [
+                  10066,
+                  10079
+                ]
+              },
+              {
+                "Single": 10081
+              },
+              {
+                "Range": [
+                  10083,
+                  10087
+                ]
+              },
+              {
+                "Range": [
+                  10089,
+                  10090
+                ]
+              },
+              {
+                "Range": [
+                  10092,
+                  10125
+                ]
+              },
+              {
+                "Range": [
+                  10127,
+                  10131
+                ]
+              },
+              {
+                "Range": [
+                  10133,
+                  10139
+                ]
+              },
+              {
+                "Range": [
+                  10141,
+                  10146
+                ]
+              },
+              {
+                "Range": [
+                  10148,
+                  10153
+                ]
+              },
+              {
+                "Range": [
+                  10155,
+                  10159
+                ]
+              },
+              {
+                "Single": 10161
+              },
+              {
+                "Range": [
+                  10163,
+                  10165
+                ]
+              },
+              {
+                "Range": [
+                  10167,
+                  10171
+                ]
+              },
+              {
+                "Range": [
+                  10173,
+                  10178
+                ]
+              },
+              {
+                "Range": [
+                  10180,
+                  10185
+                ]
+              },
+              {
+                "Range": [
+                  10187,
+                  10194
+                ]
+              },
+              {
+                "Single": 10196
+              },
+              {
+                "Range": [
+                  10705,
+                  10714
+                ]
+              },
+              {
+                "Range": [
+                  10718,
+                  10720
+                ]
+              },
+              {
+                "Range": [
+                  10724,
+                  10726
+                ]
+              },
+              {
+                "Range": [
+                  10730,
+                  10732
+                ]
+              },
+              {
+                "Range": [
+                  10736,
+                  10738
+                ]
+              },
+              {
+                "Range": [
+                  10742,
+                  10744
+                ]
+              },
+              {
+                "Range": [
+                  10748,
+                  10750
+                ]
+              },
+              {
+                "Range": [
+                  10754,
+                  10756
+                ]
+              },
+              {
+                "Range": [
+                  10760,
+                  10762
+                ]
+              },
+              {
+                "Range": [
+                  10766,
+                  10768
+                ]
+              },
+              {
+                "Range": [
+                  10772,
+                  10774
+                ]
+              },
+              {
+                "Range": [
+                  10778,
+                  10780
+                ]
+              },
+              {
+                "Range": [
+                  10784,
+                  10786
+                ]
+              },
+              {
+                "Range": [
+                  10802,
+                  10816
+                ]
+              },
+              {
+                "Range": [
+                  10825,
+                  10831
+                ]
+              },
+              {
+                "Single": 11040
+              },
+              {
+                "Single": 11043
+              },
+              {
+                "Single": 11056
+              },
+              {
+                "Single": 11063
+              },
+              {
+                "Range": [
+                  11356,
+                  11359
+                ]
+              },
+              {
+                "Range": [
+                  11797,
+                  11798
+                ]
+              },
+              {
+                "Range": [
+                  11855,
+                  11859
+                ]
+              },
+              {
+                "Range": [
+                  12187,
+                  12188
+                ]
+              },
+              {
+                "Range": [
+                  12575,
+                  12576
+                ]
+              },
+              {
+                "Range": [
+                  12708,
+                  12710
+                ]
+              },
+              {
+                "Range": [
+                  12714,
+                  12716
+                ]
+              },
+              {
+                "Range": [
+                  12720,
+                  12722
+                ]
+              },
+              {
+                "Range": [
+                  12726,
+                  12728
+                ]
+              },
+              {
+                "Range": [
+                  12732,
+                  12734
+                ]
+              },
+              {
+                "Range": [
+                  12738,
+                  12740
+                ]
+              },
+              {
+                "Range": [
+                  12744,
+                  12746
+                ]
+              },
+              {
+                "Range": [
+                  12750,
+                  12752
+                ]
+              },
+              {
+                "Range": [
+                  12756,
+                  12758
+                ]
+              },
+              {
+                "Range": [
+                  12762,
+                  12764
+                ]
+              },
+              {
+                "Range": [
+                  12768,
+                  12770
+                ]
+              },
+              {
+                "Range": [
+                  12787,
+                  12802
+                ]
+              },
+              {
+                "Range": [
+                  12856,
+                  12859
+                ]
+              },
+              {
+                "Single": 13611
+              },
+              {
+                "Single": 13615
+              },
+              {
+                "Range": [
+                  13800,
+                  13862
+                ]
+              },
+              {
+                "Range": [
+                  13954,
+                  13972
+                ]
+              },
+              {
+                "Range": [
+                  13987,
+                  13994
+                ]
+              },
+              {
+                "Range": [
+                  14406,
+                  14446
+                ]
+              },
+              {
+                "Range": [
+                  14711,
+                  14712
+                ]
+              },
+              {
+                "Range": [
+                  14715,
+                  14716
+                ]
+              },
+              {
+                "Single": 14815
+              },
+              {
+                "Single": 14826
+              },
+              {
+                "Range": [
+                  14962,
+                  14976
+                ]
+              },
+              {
+                "Single": 15023
+              },
+              {
+                "Single": 15034
+              },
+              {
+                "Single": 15036
+              },
+              {
+                "Single": 15042
+              },
+              {
+                "Single": 15045
+              },
+              {
+                "Single": 15062
+              },
+              {
+                "Single": 15116
+              },
+              {
+                "Single": 15127
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "s_6a6fa50d278a26": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_21ad91cd840d98": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_2eaf081beffa81": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_30efc74e9116eb": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_35815a6bf00cab": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_5b7749702daa6b": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_719be94de8b004": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_7ff068d2d85bcc": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_967737ef195e43": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_9d98ca8ad35f03": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_9de2e4fbfe0d94": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_9f09770efbd5b1": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_a0a7bb9aaca13d": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_a985dc9059cb57": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_b4b9b3a113420c": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_bab26b67aeb872": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_bd80213de77bab": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_be8805b7055290": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_f3725112c88e9f": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_f6b27d088dcb7d": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
