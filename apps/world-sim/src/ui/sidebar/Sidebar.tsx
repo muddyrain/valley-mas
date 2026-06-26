@@ -30,7 +30,6 @@ export function Sidebar() {
   const recolorFaction = useWorldSimStore((s) => s.recolorFaction);
   const respawnFaction = useWorldSimStore((s) => s.respawnFaction);
   const resetFactions = useWorldSimStore((s) => s.resetFactions);
-  const mode = useWorldSimStore((s) => s.mode);
 
   const map = useWorldSimStore((s) => s.map);
   const seed = useWorldSimStore((s) => s.seed);
@@ -278,24 +277,6 @@ export function Sidebar() {
             ))}
           </div>
         </div>
-        {map && (
-          <div className={styles.metaList}>
-            <div>
-              <span className={styles.metaLabel}>边界数</span>
-              <span className={styles.metaValue}>{map.borders.length}</span>
-            </div>
-            <div>
-              <span className={styles.metaLabel}>松弛轮次</span>
-              <span className={styles.metaValue}>{map.meta.relaxIterations}</span>
-            </div>
-            <div>
-              <span className={styles.metaLabel}>地图尺寸</span>
-              <span className={styles.metaValue}>
-                {map.meta.bounds.width}×{map.meta.bounds.height}
-              </span>
-            </div>
-          </div>
-        )}
         {map && (
           <div className={styles.metaList}>
             {TERRAIN_KINDS.map((kind) => (
@@ -619,13 +600,6 @@ export function Sidebar() {
             ))}
           </ol>
         )}
-      </section>
-
-      <section className={styles.section}>
-        <header className={styles.sectionHeader}>
-          <span>模式</span>
-        </header>
-        <p className={styles.empty}>当前：{mode === 'live' ? '实时推演' : '回放模式'}</p>
       </section>
     </div>
   );

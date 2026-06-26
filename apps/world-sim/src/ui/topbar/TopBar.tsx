@@ -11,7 +11,6 @@ export function TopBar() {
   const factions = useWorldSimStore((s) => s.factions);
   const setSpeed = useWorldSimStore((s) => s.setSpeed);
   const togglePaused = useWorldSimStore((s) => s.togglePaused);
-  const advanceTick = useWorldSimStore((s) => s.advanceTick);
   const resetBattle = useWorldSimStore((s) => s.resetBattle);
   const toggleHud = useWorldSimStore((s) => s.toggleHud);
   const worldMode = useWorldSimStore((s) => s.worldMode);
@@ -97,14 +96,6 @@ export function TopBar() {
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => advanceTick(1)}
-          disabled={ended || !canStart}
-          title="手动推进 1 季（调试）"
-        >
-          +1 季
-        </button>
         <button
           type="button"
           onClick={resetBattle}
