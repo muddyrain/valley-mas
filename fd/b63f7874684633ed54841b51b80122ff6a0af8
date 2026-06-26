@@ -1,0 +1,131 @@
+apps/world-sim/tests/uiCleanupRegression.test.ts
+  s_6a6fa50d278a26::t_5e7535f894321b 1-11,13-15,23-112 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1b3558b7ed80d54bd568","tool_type":"agent","tool_id":"Write","line_ranges":[{"Range":[1,11]},{"Range":[13,15]},{"Range":[23,112]}]}]}
+  s_6a6fa50d278a26::t_a809cadadb0e85 12,16-22 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e1b5758b7ed80d54bd56e","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":12},{"Range":[16,22]}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "fdb63f7874684633ed54841b51b80122ff6a0af8",
+  "prompts": {},
+  "sessions": {
+    "s_6a6fa50d278a26": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a3df1a258b7ed80d54bd298",
+        "model": "qwen-3.6-plus__dev"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {
+    "apps/world-sim/tests/uiCleanupRegression.test.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_5e7535f894321b",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              11
+            ]
+          },
+          {
+            "Range": [
+              13,
+              15
+            ]
+          },
+          {
+            "Range": [
+              23,
+              112
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1b3558b7ed80d54bd568",
+            "tool_type": "agent",
+            "tool_id": "Write",
+            "line_ranges": [
+              {
+                "Range": [
+                  1,
+                  11
+                ]
+              },
+              {
+                "Range": [
+                  13,
+                  15
+                ]
+              },
+              {
+                "Range": [
+                  23,
+                  112
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_a809cadadb0e85",
+        "line_ranges": [
+          {
+            "Single": 12
+          },
+          {
+            "Range": [
+              16,
+              22
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e1b5758b7ed80d54bd56e",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 12
+              },
+              {
+                "Range": [
+                  16,
+                  22
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "s_6a6fa50d278a26": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_5e7535f894321b": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_a809cadadb0e85": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
