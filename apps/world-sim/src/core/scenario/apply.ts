@@ -131,6 +131,7 @@ function pickRegionForDirective(
   const candidates: Province[] = [];
   for (const province of map.provinces) {
     if (province.ownerFactionId != null) continue;
+    if (province.terrain === 'ocean') continue; // 海洋州不可出生
     const idx = province.id as unknown as number;
     if (occupied.has(idx)) continue;
     if (directive.kind === 'random-terrain' && province.terrain !== directive.terrain) continue;
@@ -147,6 +148,7 @@ function pickRegionForDirective(
   if (candidates.length === 0 && directive.kind !== 'random') {
     for (const province of map.provinces) {
       if (province.ownerFactionId != null) continue;
+      if (province.terrain === 'ocean') continue;
       const idx = province.id as unknown as number;
       if (occupied.has(idx)) continue;
       candidates.push(province);

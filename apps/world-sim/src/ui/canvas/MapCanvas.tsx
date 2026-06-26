@@ -328,9 +328,12 @@ export function MapCanvas() {
         return;
       }
       const id = findProvinceAt(map, w.x, w.y);
+      // 海洋州不参与 hover
+      const hoveredId =
+        id != null && map.provinces[id as unknown as number]?.terrain === 'ocean' ? null : id;
       const current = useWorldSimStore.getState().hoveredRegionId;
-      if (id !== current) {
-        setHoveredRegion(id);
+      if (hoveredId !== current) {
+        setHoveredRegion(hoveredId);
       }
     };
 
@@ -369,6 +372,11 @@ export function MapCanvas() {
         return;
       }
       const id = findProvinceAt(map, w.x, w.y);
+      // 海洋州不参与点击
+      if (id != null && map.provinces[id as unknown as number]?.terrain === 'ocean') {
+        setSelectedRegion(null);
+        return;
+      }
       const current = useWorldSimStore.getState().selectedRegionId;
       setSelectedRegion(current === id ? null : id);
     };

@@ -8,6 +8,7 @@ import type { TerrainKind } from '@/core/map';
  * - 森林视野受限，进退两难 → 0.50
  * - 河流水面阻隔 → 0.40
  * - 山脉防御工事，最难啃 → 0.32
+ * - 海洋不可进攻 → 0（扩张逻辑已跳过海洋州，此处仅为类型完整）
  */
 export const TERRAIN_ATTACK_PROB: Record<TerrainKind, number> = {
   plain: 0.55,
@@ -15,6 +16,7 @@ export const TERRAIN_ATTACK_PROB: Record<TerrainKind, number> = {
   forest: 0.5,
   river: 0.4,
   mountain: 0.32,
+  ocean: 0,
 };
 
 /**

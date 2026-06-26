@@ -50,7 +50,8 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
   }
 
   const occupied = liveRuntimes.reduce((sum, r) => sum + r.totalRegions, 0);
-  if (liveRuntimes.length === 1 && occupied === map.provinces.length) {
+  const landProvinces = map.provinces.filter((p) => p.terrain !== 'ocean');
+  if (liveRuntimes.length === 1 && occupied >= landProvinces.length) {
     const champion = liveRuntimes[0];
     result.events.push({
       tick,
@@ -110,6 +111,10 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
     const enemyNeighbors: RegionId[] = [];
     const ownedEnemyNeighbors: Array<{ region: RegionId; weight: number }> = [];
     for (const nid of sourceProvince.neighbors) {
+      const targetNum = nid as unknown as number;
+      const targetProv = map.provinces[targetNum];
+      // 海洋州不可扩张
+      if (targetProv?.terrain === 'ocean') continue;
       const owner = ownerOf(nid);
       if (owner === attacker.id) continue;
       enemyNeighbors.push(nid);
@@ -162,6 +167,8 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
     const defender = runtimeById.get(defenderId);
     const defenderRegions = defender?.totalRegions ?? 1;
     const baseProb = TERRAIN_ATTACK_PROB[targetProvince.terrain];
+    // 河流跨越惩罚：如果源州和目标州之间的边界边是河流州，则降低胜率
+    const riverCrossingPenalty = computeRiverCrossingPenalty(map, sourceRegionNum, targetRegionNum);
     const pressure = resolveFrontBattlePressure({
       state: frontPressure,
       map,
@@ -176,7 +183,8 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
         pressure.frontBias +
         pressure.localSurroundBias +
         collapseBias -
-        pressure.multiFrontPenalty,
+        pressure.multiFrontPenalty -
+        riverCrossingPenalty,
     );
     const combatDetail = formatCombatDetail({
       terrain: targetProvince.terrain,
@@ -234,7 +242,7 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
   // 终局检测
   const aliveAfter = Array.from(runtimeById.values()).filter((r) => r.totalRegions > 0);
   const occupiedFinal = aliveAfter.reduce((s, r) => s + r.totalRegions, 0);
-  if (aliveAfter.length === 1 && occupiedFinal === map.provinces.length) {
+  if (aliveAfter.length === 1 && occupiedFinal >= landProvinces.length) {
     result.events.push({
       tick,
       type: 'victory',
@@ -545,4 +553,26 @@ function clamp01(v: number): number {
   if (v < 0.02) return 0.02;
   if (v > 0.98) return 0.98;
   return v;
+}
+
+/**
+ * 河流跨越惩罚：检查源州和目标州之间的共享边界边，
+ * 如果任一侧的州是 river 地形，则返回惩罚值（降低进攻胜率）。
+ * 模拟渡河作战的难度。
+ */
+function computeRiverCrossingPenalty(map: MapData, sourceId: number, targetId: number): number {
+  const source = map.provinces[sourceId];
+  const target = map.provinces[targetId];
+  if (!source || !target) return 0;
+
+  // 检查源州和目标州是否都是 river 地形
+  const sourceIsRiver = source.terrain === 'river';
+  const targetIsRiver = target.terrain === 'river';
+
+  // 跨越河流边界时施加惩罚
+  if (sourceIsRiver || targetIsRiver) {
+    return 0.12; // 渡河作战，攻方胜率降低 12%
+  }
+
+  return 0;
 }

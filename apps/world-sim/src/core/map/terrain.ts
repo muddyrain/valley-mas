@@ -181,6 +181,7 @@ function carveRivers(
     const b = provinces[rightId];
     if (!a || !b) continue;
     if (a.terrain === 'mountain' && b.terrain === 'mountain') continue;
+    if (a.terrain === 'ocean' || b.terrain === 'ocean') continue;
 
     const meanElev = (a.elevation + b.elevation) * 0.5;
     if (meanElev < seaLevel * 0.6) continue; // 太低（接近海平面）跳过
@@ -219,6 +220,7 @@ export const TERRAIN_COLOR: Record<TerrainKind, number> = {
   mountain: 0x7d6a5b,
   desert: 0xc9a86a,
   river: 0x3a76a8,
+  ocean: 0x1a3a5c,
 };
 
 /** 用于 Sidebar / Legend 文字 */
@@ -228,4 +230,5 @@ export const TERRAIN_LABEL: Record<TerrainKind, string> = {
   mountain: '山脉',
   desert: '沙漠',
   river: '河流',
+  ocean: '海洋',
 };

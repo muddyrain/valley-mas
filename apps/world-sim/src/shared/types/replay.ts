@@ -82,7 +82,7 @@ export interface ReplayDoc {
   meta: {
     seed: string;
     provinceCount: number;
-    mapSource: string;
+    mapMode: string;
     scenarioId: string | null;
     totalTicks: number;
   };

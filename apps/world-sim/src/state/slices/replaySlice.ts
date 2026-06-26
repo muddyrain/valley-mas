@@ -21,7 +21,7 @@ import type { SimSlice } from './simSlice';
  * Phase 11 Replay System。
  *
  * 录制：每 sim tick 完成后，simSlice 调用 recordFrame 把当帧的 patches/events/rankings/status
- * 追加到 replayFrames。新一局（loadScenario / regenerateMap / loadGeoMap / resetBattle）会
+ * 追加到 replayFrames。新一局（loadScenario / regenerateMap / setMapMode / resetBattle）会
  * 调用 captureBaseline，把当时的 ownership + factions 落成 baseline，frames 清零。
  *
  * 回放：
@@ -200,7 +200,7 @@ export const createReplaySlice: StateCreator<Deps, [], [], ReplaySlice> = (set, 
       meta: {
         seed: map.meta.seed,
         provinceCount: map.meta.provinceCount,
-        mapSource: state.mapSource,
+        mapMode: state.mapMode,
         scenarioId: state.baselineScenarioId,
         totalTicks: state.replayFrames.length,
       },

@@ -16,7 +16,7 @@ export {
   DEFAULT_FACTION_NAME_POOL,
   DEFAULT_LEADER_POOL,
 } from './slices/factionSlice';
-export type { LoadGeoMapOptions, MapSourceId, ProvincePreset } from './slices/mapSlice';
+export type { MapModeId, ProvincePreset } from './slices/mapSlice';
 export { DEFAULT_MAP_BOUNDS, PROVINCE_PRESETS } from './slices/mapSlice';
 export type { ReplayMode, ReplaySlice } from './slices/replaySlice';
 export type { ScenarioSlice } from './slices/scenarioSlice';

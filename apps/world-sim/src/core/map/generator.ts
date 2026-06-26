@@ -1,4 +1,5 @@
 import { Delaunay, type Voronoi } from 'd3-delaunay';
+import { createNoise2D } from 'simplex-noise';
 import type { RandomSource } from '@/shared/math';
 import { createPrngFromSeed } from '@/shared/math';
 import { asRegionId, type RegionId } from '@/shared/types';
@@ -48,6 +49,9 @@ export function generateMap(options: MapGenerationOptions): MapData {
 
   // Phase 3：用同一个 seed 字符串派生噪声，给每个州赋地形属性
   assignTerrains(provinces, borders, { seed, bounds });
+
+  // Phase 1：用陆地掩膜将边缘州标记为 ocean，形成不规则海岸线
+  applyLandMask(provinces, bounds, seed);
 
   return {
     meta: {
@@ -286,4 +290,73 @@ function attachBorderEdgesToProvinces(provinces: Province[], borders: BorderEdge
       provinces[edge.right].borderEdgeIds.push(i);
     }
   }
+}
+
+/**
+ * 陆地掩膜：用 simplex 噪声生成不规则陆地轮廓，掩膜外的州标记为 ocean。
+ *
+ * 逻辑：
+ * 1. 用 seed 派生独立 PRNG 生成噪声函数。
+ * 2. 对每个州的 centroid 采样噪声值，归一化到 [0,1]。
+ * 3. 噪声值 < landThreshold 的州标记为 ocean。
+ * 4. 用多倍频 fBm 让海岸线更自然。
+ */
+function applyLandMask(provinces: Province[], bounds: MapBounds, seed: string): void {
+  const maskRng = createPrngFromSeed(seed + ':landmask');
+  const maskNoise = createNoise2D(() => maskRng.next());
+
+  const baseScale = 1 / Math.max(1, Math.min(bounds.width, bounds.height) / 3);
+  const landThreshold = 0.42;
+
+  for (const province of provinces) {
+    const cx = province.centroid.x;
+    const cy = province.centroid.y;
+
+    // 多倍频 fBm 采样
+    const maskValue = fbm(maskNoise, cx * baseScale, cy * baseScale, 4, 2.1, 0.5);
+    // [-1,1] → [0,1]
+    const normalized = clamp01(maskValue * 0.5 + 0.5);
+
+    // 边缘衰减：靠近图框的州更可能成为海洋
+    const edgeFalloff = computeEdgeFalloff(cx, cy, bounds);
+    const finalValue = normalized * 0.7 + 0.3 * (1 - edgeFalloff);
+
+    if (finalValue < landThreshold) {
+      province.terrain = 'ocean';
+    }
+  }
+}
+
+function fbm(
+  noise: (x: number, y: number) => number,
+  x: number,
+  y: number,
+  octaves: number,
+  lacunarity: number,
+  gain: number,
+): number {
+  let amp = 1;
+  let freq = 1;
+  let sum = 0;
+  let norm = 0;
+  for (let i = 0; i < octaves; i++) {
+    sum += noise(x * freq, y * freq) * amp;
+    norm += amp;
+    amp *= gain;
+    freq *= lacunarity;
+  }
+  return sum / norm;
+}
+
+function clamp01(v: number): number {
+  if (v < 0) return 0;
+  if (v > 1) return 1;
+  return v;
+}
+
+function computeEdgeFalloff(x: number, y: number, bounds: MapBounds): number {
+  const nx = (x / bounds.width) * 2 - 1;
+  const ny = (y / bounds.height) * 2 - 1;
+  const d = Math.min(1, Math.sqrt(nx * nx + ny * ny));
+  return 1 - d * d;
 }

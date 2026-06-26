@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { GeoMapId, TerrainKind } from '@/core/map';
-import { GEO_MAP_IDS, GEO_MAP_REGISTRY, TERRAIN_KINDS, TERRAIN_LABEL } from '@/core/map';
+import type { MapModeId, TerrainKind } from '@/core/map';
+import { MAP_MODE_IDS, MAP_MODE_REGISTRY, TERRAIN_KINDS, TERRAIN_LABEL } from '@/core/map';
 import {
   buildFrontPressureState,
   type FactionFrontPressureSummary,
@@ -41,11 +41,8 @@ export function Sidebar() {
   const setSeed = useWorldSimStore((s) => s.setSeed);
   const setProvinceCount = useWorldSimStore((s) => s.setProvinceCount);
   const regenerateMap = useWorldSimStore((s) => s.regenerateMap);
-  const mapSource = useWorldSimStore((s) => s.mapSource);
-  const geoRegionNames = useWorldSimStore((s) => s.geoRegionNames);
-  const geoLoadStatus = useWorldSimStore((s) => s.geoLoadStatus);
-  const geoLoadError = useWorldSimStore((s) => s.geoLoadError);
-  const loadGeoMap = useWorldSimStore((s) => s.loadGeoMap);
+  const mapMode = useWorldSimStore((s) => s.mapMode);
+  const setMapMode = useWorldSimStore((s) => s.setMapMode);
   const frontPressureOverlayVisible = useWorldSimStore((s) => s.frontPressureOverlayVisible);
   const toggleFrontPressureOverlay = useWorldSimStore((s) => s.toggleFrontPressureOverlay);
 
@@ -137,15 +134,11 @@ export function Sidebar() {
     [currentScenarioId, loadScenario],
   );
 
-  const handlePickRandomSource = useCallback(() => {
-    regenerateMap();
-  }, [regenerateMap]);
-
-  const handlePickGeoSource = useCallback(
-    (id: GeoMapId) => {
-      void loadGeoMap(id);
+  const handlePickMapMode = useCallback(
+    (id: MapModeId) => {
+      setMapMode(id);
     },
-    [loadGeoMap],
+    [setMapMode],
   );
 
   const handleCreateFaction = useCallback(() => {
@@ -198,8 +191,8 @@ export function Sidebar() {
   );
 
   const inspector = useMemo(
-    () => buildInspectorText(map, selectedRegionId, hoveredRegionId, factions, geoRegionNames),
-    [map, selectedRegionId, hoveredRegionId, factions, geoRegionNames],
+    () => buildInspectorText(map, selectedRegionId, hoveredRegionId, factions),
+    [map, selectedRegionId, hoveredRegionId, factions],
   );
 
   const terrainCounts = useMemo(() => buildTerrainCounts(map), [map]);
@@ -208,45 +201,27 @@ export function Sidebar() {
     <div className={styles.root}>
       <section className={styles.section}>
         <header className={styles.sectionHeader}>
-          <span>地图来源</span>
-          {geoLoadStatus === 'loading' && <span className={styles.muted}>加载中…</span>}
-          {geoLoadStatus === 'ok' && mapSource !== 'random' && (
-            <span className={styles.muted}>{GEO_MAP_REGISTRY[mapSource as GeoMapId].name}</span>
-          )}
+          <span>地图模式</span>
         </header>
         <div className={styles.sourceGroup}>
-          <button
-            type="button"
-            className={styles.sourceBtn}
-            data-active={mapSource === 'random'}
-            disabled={geoLoadStatus === 'loading'}
-            onClick={handlePickRandomSource}
-            title="使用 Voronoi 随机生成"
-          >
-            <span className={styles.sourceName}>随机生成</span>
-            <span className={styles.sourceMeta}>Voronoi · {provinceCount} 州</span>
-          </button>
-          {GEO_MAP_IDS.map((id) => {
-            const src = GEO_MAP_REGISTRY[id];
-            const active = mapSource === id;
-            const loading = active && geoLoadStatus === 'loading';
+          {MAP_MODE_IDS.map((id) => {
+            const src = MAP_MODE_REGISTRY[id];
+            const active = mapMode === id;
             return (
               <button
                 key={id}
                 type="button"
                 className={styles.sourceBtn}
                 data-active={active}
-                disabled={geoLoadStatus === 'loading'}
-                onClick={() => handlePickGeoSource(id)}
+                onClick={() => handlePickMapMode(id)}
                 title={src.description}
               >
                 <span className={styles.sourceName}>{src.name}</span>
-                <span className={styles.sourceMeta}>{loading ? '加载中…' : src.description}</span>
+                <span className={styles.sourceMeta}>{src.description}</span>
               </button>
             );
           })}
         </div>
-        {geoLoadError && <p className={styles.editMessage}>{geoLoadError}</p>}
       </section>
 
       <section className={styles.section}>
@@ -731,7 +706,6 @@ function buildInspectorText(
   selectedRegionId: RegionId | null,
   hoveredRegionId: RegionId | null,
   factions: FactionSummary[],
-  geoRegionNames: string[] | null,
 ): string {
   if (!map) {
     return '尚未生成地图。';
@@ -744,9 +718,7 @@ function buildInspectorText(
   if (!province) return '州不存在。';
   const role = selectedRegionId === target ? '已选中' : '悬停中';
   const ownerLabel = ownerLabelOf(province.ownerFactionId, factions);
-  const provinceIdNum = province.id as unknown as number;
-  const geoName = geoRegionNames?.[provinceIdNum];
-  const headLabel = geoName ? `${geoName}（#${province.id}）` : `州 #${province.id}`;
+  const headLabel = `州 #${province.id}`;
   return [
     `${role}：${headLabel}`,
     `地形：${TERRAIN_LABEL[province.terrain]}`,
@@ -776,6 +748,7 @@ function buildTerrainCounts(
     mountain: 0,
     desert: 0,
     river: 0,
+    ocean: 0,
   };
   if (!map) return counts;
   for (const province of map.provinces) {

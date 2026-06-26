@@ -29,6 +29,7 @@ const EMPTY_TERRAIN_BREAKDOWN: Record<TerrainKind, number> = {
   mountain: 0,
   desert: 0,
   river: 0,
+  ocean: 0,
 };
 
 function emptyBreakdown(): Record<TerrainKind, number> {

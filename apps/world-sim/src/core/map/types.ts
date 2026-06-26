@@ -1,11 +1,18 @@
 import type { FactionId, RegionId } from '@/shared/types';
 
 /**
- * 地形类型。Phase 3 仅枚举 5 种基础地形；后续若加水域/雪原再扩展。
+ * 地形类型。5 种基础地形 + ocean（陆地掩膜外的不可通行区域）。
  */
-export type TerrainKind = 'plain' | 'forest' | 'mountain' | 'desert' | 'river';
+export type TerrainKind = 'plain' | 'forest' | 'mountain' | 'desert' | 'river' | 'ocean';
 
-export const TERRAIN_KINDS: TerrainKind[] = ['plain', 'forest', 'mountain', 'desert', 'river'];
+export const TERRAIN_KINDS: TerrainKind[] = [
+  'plain',
+  'forest',
+  'mountain',
+  'desert',
+  'river',
+  'ocean',
+];
 
 /**
  * 单个州（Province / Voronoi Cell）。
