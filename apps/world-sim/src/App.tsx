@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { REPLAY_SPEED_MULTIPLIER, SIM_SPEED_MULTIPLIER } from '@/shared/types';
 import { useWorldSimStore } from '@/state';
 import { AppLayout } from '@/ui/layout/AppLayout';
@@ -81,5 +82,9 @@ export default function App() {
     return () => cancelAnimationFrame(rafId);
   }, []);
 
-  return <AppLayout />;
+  return (
+    <TooltipProvider delayDuration={300}>
+      <AppLayout />
+    </TooltipProvider>
+  );
 }

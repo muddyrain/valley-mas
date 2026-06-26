@@ -445,6 +445,27 @@ export function MapCanvas() {
     };
   }, [ready]);
 
+  // 当容器尺寸变化时，手动触发 resize 以确保 PixiJS 适应新的容器大小
+  useEffect(() => {
+    if (!ready) return;
+    const r = refs.current;
+    if (!r) return;
+
+    if (!hostRef.current) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      const host = hostRef.current;
+      if (!host) return;
+      r.app.renderer.resize(host.clientWidth, host.clientHeight);
+    });
+
+    resizeObserver.observe(hostRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [ready]);
+
   return (
     <div className={styles.root}>
       <div ref={hostRef} className={styles.canvasHost} />

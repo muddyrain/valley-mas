@@ -1,6 +1,19 @@
+import { Button } from '@/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatGameTime, SIM_SPEED_TIERS, type SimSpeedTier } from '@/shared/types';
 import { useWorldSimStore } from '@/state';
 import styles from './TopBar.module.css';
+
+const SPEED_SHORTCUTS: Record<SimSpeedTier, string> = {
+  paused: '暂停',
+  '0.5x': '0.5x (数字键2)',
+  '1x': '1x (数字键3)',
+  '2x': '2x (数字键4)',
+  '4x': '4x (数字键5)',
+  '8x': '8x (数字键6)',
+  '16x': '16x (数字键7)',
+};
 
 export function TopBar() {
   const tick = useWorldSimStore((s) => s.tick);
@@ -61,12 +74,11 @@ export function TopBar() {
           </span>
         )}
         {ended ? (
-          <button type="button" onClick={resetBattle} className={styles.primaryBtn}>
+          <Button onClick={resetBattle} className={styles.primaryBtn}>
             重新开局
-          </button>
+          </Button>
         ) : (
-          <button
-            type="button"
+          <Button
             onClick={togglePaused}
             disabled={!canStart}
             className={styles.primaryBtn}
@@ -81,52 +93,58 @@ export function TopBar() {
             }
           >
             {paused ? (status === 'idle' ? '▶ 开始' : '▶ 继续') : '⏸ 暂停'}
-          </button>
+          </Button>
         )}
-        <div className={styles.speedGroup}>
-          {SIM_SPEED_TIERS.map((tier: SimSpeedTier) => (
-            <button
-              key={tier}
-              type="button"
-              data-active={speed === tier}
-              className={styles.speedBtn}
-              onClick={() => setSpeed(tier)}
-            >
-              {tier === 'paused' ? '||' : tier}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={resetBattle}
-          className={styles.dangerBtn}
-          title="清空占领并回到 idle"
+        <ToggleGroup
+          type="single"
+          value={speed}
+          onValueChange={(v) => v && setSpeed(v as SimSpeedTier)}
+          className={styles.speedGroup}
+          spacing={0}
         >
+          {SIM_SPEED_TIERS.map((tier: SimSpeedTier) => (
+            <Tooltip key={tier}>
+              <TooltipTrigger asChild>
+                <ToggleGroupItem value={tier} className={styles.speedBtn}>
+                  {tier === 'paused' ? '||' : tier}
+                </ToggleGroupItem>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className={styles.tooltip}>
+                {SPEED_SHORTCUTS[tier]}
+              </TooltipContent>
+            </Tooltip>
+          ))}
+        </ToggleGroup>
+        <Button onClick={resetBattle} className={styles.dangerBtn} title="清空占领并回到 idle">
           重置战局
-        </button>
+        </Button>
       </div>
       <div className={styles.right}>
-        <div className={styles.modeGroup} title="切换 Edit / Simulation 模式">
-          <button
-            type="button"
-            className={styles.modeBtn}
-            data-active={worldMode === 'edit'}
-            onClick={() => setWorldMode('edit')}
-          >
+        <ToggleGroup
+          type="single"
+          value={worldMode}
+          onValueChange={(v) => v && setWorldMode(v as 'edit' | 'simulation')}
+          className={styles.modeGroup}
+          title="切换 Edit / Simulation 模式"
+          spacing={0}
+        >
+          <ToggleGroupItem value="edit" className={styles.modeBtn}>
             Edit
-          </button>
-          <button
-            type="button"
-            className={styles.modeBtn}
-            data-active={worldMode === 'simulation'}
-            onClick={() => setWorldMode('simulation')}
-          >
+          </ToggleGroupItem>
+          <ToggleGroupItem value="simulation" className={styles.modeBtn}>
             Simulation
-          </button>
-        </div>
-        <button type="button" onClick={toggleHud} title="按 H 隐藏 HUD（录屏模式预留）">
-          隐藏 HUD
-        </button>
+          </ToggleGroupItem>
+        </ToggleGroup>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="sm" onClick={toggleHud}>
+              隐藏 HUD
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className={styles.tooltip}>
+            录屏模式（按 H 切换）
+          </TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );
