@@ -9,7 +9,6 @@ import {
   Download,
   Heart,
   Leaf,
-  Lightbulb,
   LogOut,
   MapPin,
   MessageSquareText,
@@ -546,28 +545,11 @@ export function ProfilePage() {
       </section>
 
       <section data-profile-card className="space-y-3">
-        <SectionHeader title="个人工具" meta="灵感 / 轻账本 / 订阅 / 采购" />
+        <SectionHeader title="个人工具" meta="轻账本 / 订阅 / 采购" />
         <Card className="grid gap-3 p-4">
           <button
             type="button"
             className="flex w-full items-center gap-3 text-left"
-            data-scroll-anchor="profile:inbox"
-            onClick={() => navigate('/inbox')}
-          >
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
-              <Lightbulb className="size-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold">灵感</h3>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                写下一闪而过的想法、段落和链接。
-              </p>
-            </div>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </button>
-          <button
-            type="button"
-            className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
             data-scroll-anchor="profile:places"
             onClick={() => navigate('/places')}
           >

@@ -49,7 +49,6 @@ function AppContent() {
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
   const loadPlaces = useLifeTraceStore((state) => state.loadPlaces);
   const loadTraces = useLifeTraceStore((state) => state.loadTraces);
-  const loadInboxItems = useLifeTraceStore((state) => state.loadInboxItems);
   const loadLedgerEntries = useLifeTraceStore((state) => state.loadLedgerEntries);
   const loadAchievements = useLifeTraceStore((state) => state.loadAchievements);
   const { status, token, verifySession } = useAuthStore();
@@ -69,13 +68,11 @@ function AppContent() {
       void loadPlans();
       void loadPlaces();
       void loadTraces();
-      void loadInboxItems();
       void loadLedgerEntries();
       void loadAchievements();
     }
   }, [
     loadAchievements,
-    loadInboxItems,
     loadLedgerEntries,
     loadPantry,
     loadPlaces,

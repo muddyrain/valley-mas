@@ -7,7 +7,6 @@ import {
   Cloud,
   Droplets,
   Leaf,
-  Lightbulb,
   PackageCheck,
   PackageOpen,
   PenLine,
@@ -724,17 +723,17 @@ export function TodayPage() {
           <button
             type="button"
             className="grid size-[2.65rem] shrink-0 place-items-center rounded-[0.82rem] bg-background text-life-trace shadow-[0_6px_14px_rgba(45,41,35,0.13)]"
-            onClick={() => navigate('/inbox')}
-            aria-label="写下灵感"
+            onClick={() => navigate('/plans')}
+            aria-label="添加今日计划"
           >
-            <Lightbulb className="size-[1.45rem] stroke-[2.15]" />
+            <PenLine className="size-[1.45rem] stroke-[2.15]" />
           </button>
           <button
             type="button"
             className="min-w-0 flex-1 whitespace-nowrap text-left text-[0.9rem] font-medium leading-none"
-            onClick={() => navigate('/inbox')}
+            onClick={() => navigate('/plans')}
           >
-            写下灵感 / 记一下
+            添加今日计划
           </button>
           <div className="flex shrink-0 items-center gap-2.5 text-[0.68rem] font-medium leading-none text-primary-foreground/88 max-[360px]:gap-1.5 max-[360px]:text-[0.63rem]">
             <button
@@ -1349,18 +1348,6 @@ export function TodayPage() {
             />
           </div>
         </Card>
-
-        <EntryCard
-          icon={Lightbulb}
-          badge="灵感"
-          meta="一闪而过的想法"
-          title="写下你刚才想到的事"
-          description="先记下来，链接和段落都行。"
-          tone="ai"
-          onClick={() => navigate('/inbox')}
-          data-scroll-anchor="today:inbox"
-          data-today-entrance
-        />
 
         <EntryCard
           icon={ReceiptText}
