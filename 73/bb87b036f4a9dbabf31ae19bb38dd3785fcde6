@@ -1,0 +1,1957 @@
+apps/world-sim/src/shared/types/replay.ts
+  s_6a6fa50d278a26::t_ef484d945c6917 85 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df7f458b7ed80d54bd4a9","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":85}]}]}
+apps/world-sim/src/ui/sidebar/Sidebar.tsx
+  s_6a6fa50d278a26::t_c65235198142ad 721 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df7b558b7ed80d54bd494","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":721}]}]}
+  s_6a6fa50d278a26::t_0bd4dd9c9c17f3 44-45 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df78b58b7ed80d54bd47f","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[44,45]}]}]}
+  s_6a6fa50d278a26::t_af09bd3faf5b20 2-3 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df78758b7ed80d54bd47c","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[2,3]}]}]}
+  s_6a6fa50d278a26::t_f3500cc65ba76c 194-195 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df79c58b7ed80d54bd485","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[194,195]}]}]}
+  s_6a6fa50d278a26::t_453eb4fd4eb202 204,207-209,216,220 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df7c958b7ed80d54bd497","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":204},{"Range":[207,209]},{"Single":216},{"Single":220}]}]}
+  s_6a6fa50d278a26::t_f9d931148a139e 751 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df5a358b7ed80d54bd41c","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":751}]}]}
+  s_6a6fa50d278a26::t_7d7ba1599617bf 137-139,141 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df79458b7ed80d54bd482","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[137,139]},{"Single":141}]}]}
+apps/world-sim/src/core/sim/terrainCombat.ts
+  s_6a6fa50d278a26::t_57801c93780339 11,19 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df51f58b7ed80d54bd3e8","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":11},{"Single":19}]}]}
+apps/world-sim/src/core/scenario/apply.ts
+  s_6a6fa50d278a26::t_1cf8dd1c148fbe 134 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df44e58b7ed80d54bd3a6","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":134}]}]}
+  s_6a6fa50d278a26::t_c59cb7c8c0d159 151 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df45958b7ed80d54bd3a9","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":151}]}]}
+apps/world-sim/src/core/scenario/defaults.ts
+  s_6a6fa50d278a26::t_ad2597642fadb7 54-58 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df4f658b7ed80d54bd3dc","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[54,58]}]}]}
+  s_6a6fa50d278a26::t_a0eb90d5f00bac 83-87 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df50358b7ed80d54bd3df","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[83,87]}]}]}
+  s_6a6fa50d278a26::t_3c445a48ccd490 19-23 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df4e958b7ed80d54bd3d9","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[19,23]}]}]}
+apps/world-sim/src/core/scenario/index.ts
+  s_6a6fa50d278a26::t_3d06c33a987c33 20 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df59158b7ed80d54bd416","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":20}]}]}
+apps/world-sim/src/state/slices/replaySlice.ts
+  s_6a6fa50d278a26::t_f3d38d6c3ea8ef 24 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df81058b7ed80d54bd4b8","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":24}]}]}
+  s_6a6fa50d278a26::t_8043b6961a28e1 203 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df80158b7ed80d54bd4af","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":203}]}]}
+apps/world-sim/src/core/map/terrain.ts
+  s_6a6fa50d278a26::t_4b5ceef1eee74c 184 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df41258b7ed80d54bd391","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":184}]}]}
+  s_6a6fa50d278a26::t_778c7c361f00d3 223,233 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df40458b7ed80d54bd38e","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":223},{"Single":233}]}]}
+apps/world-sim/src/state/index.ts
+  s_6a6fa50d278a26::t_62c0cb674da019 19 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df83158b7ed80d54bd4c7","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":19}]}]}
+apps/world-sim/src/core/sim/expansion.ts
+  s_6a6fa50d278a26::t_b466f1516392db 557-578 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df54758b7ed80d54bd3f7","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[557,578]}]}]}
+  s_6a6fa50d278a26::t_3f966de8b84ba0 114-117 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df47d58b7ed80d54bd3b5","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[114,117]}]}]}
+  s_6a6fa50d278a26::t_ab9f71dda6874e 170-171 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df53058b7ed80d54bd3ee","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[170,171]}]}]}
+  s_6a6fa50d278a26::t_63417f011ff124 53-54 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df47458b7ed80d54bd3b2","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[53,54]}]}]}
+  s_6a6fa50d278a26::t_84f5b38199e828 245 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df48958b7ed80d54bd3b8","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":245}]}]}
+  s_6a6fa50d278a26::t_5f76ffd1d747fb 186-187 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df53958b7ed80d54bd3f1","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[186,187]}]}]}
+.trae/documents/重新设计剧本与三国地图.md
+  s_6a6fa50d278a26::t_418dfd7c6b0f46 1-224 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e193458b7ed80d54bd4e9","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Range":[1,224]}]}]}
+apps/world-sim/src/core/scenario/presets/three-kingdoms.ts
+  s_6a6fa50d278a26::t_127b184fb85aa3 6-9,14,36-41 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df63658b7ed80d54bd43e","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[6,9]},{"Single":14},{"Range":[36,41]}]}]}
+  s_6a6fa50d278a26::t_a525ad23d43470 5,20,26,32 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df4a258b7ed80d54bd3c7","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":5},{"Single":20},{"Single":26},{"Single":32}]}]}
+apps/world-sim/src/core/map/sources.ts
+  s_6a6fa50d278a26::t_bae72ae379a33e 2,4-5,8,10-11,16,20-24,27-32,35,37-38,40,45-52 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df72b58b7ed80d54bd461","tool_type":"agent","tool_id":"Write","line_ranges":[{"Single":2},{"Range":[4,5]},{"Single":8},{"Range":[10,11]},{"Single":16},{"Range":[20,24]},{"Range":[27,32]},{"Single":35},{"Range":[37,38]},{"Single":40},{"Range":[45,52]}]}]}
+apps/world-sim/src/core/map/types.ts
+  s_6a6fa50d278a26::t_758deb0f3d63c3 4,6 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df3b158b7ed80d54bd37c","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":4},{"Single":6}]}]}
+  s_6a6fa50d278a26::t_418dfd7c6b0f46 8-15 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e193458b7ed80d54bd4e9","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Range":[8,15]}]}]}
+apps/world-sim/src/state/slices/mapSlice.ts
+  s_6a6fa50d278a26::t_baac048995e1d6 10-12 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df83658b7ed80d54bd4ca","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[10,12]}]}]}
+  s_6a6fa50d278a26::t_cafb60fce48a47 2-3,20,24,26-27,37-38,66-74,80-92,97,104-124,128-129,138 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df75158b7ed80d54bd46d","tool_type":"agent","tool_id":"Write","line_ranges":[{"Range":[2,3]},{"Single":20},{"Single":24},{"Range":[26,27]},{"Range":[37,38]},{"Range":[66,74]},{"Range":[80,92]},{"Single":97},{"Range":[104,124]},{"Range":[128,129]},{"Single":138}]}]}
+  s_6a6fa50d278a26::t_418dfd7c6b0f46 75-79 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3e193458b7ed80d54bd4e9","tool_type":"agent","tool_id":"RunCommand","line_ranges":[{"Range":[75,79]}]}]}
+apps/world-sim/src/core/map/generator.ts
+  s_6a6fa50d278a26::t_e8975b2bc56db8 294-362 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df3df58b7ed80d54bd388","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[294,362]}]}]}
+  s_6a6fa50d278a26::t_47b8c1e7a7b54c 2 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df3cd58b7ed80d54bd382","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":2}]}]}
+  s_6a6fa50d278a26::t_2ae2be3d891408 53-55 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df3d858b7ed80d54bd385","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[53,55]}]}]}
+apps/world-sim/src/core/scenario/presets/warlords.ts
+  s_6a6fa50d278a26::t_c6d519afbf27b5 4-5,7-10,13-16,19-22,25-28,31-34,37-40,43-45,48-59 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df4b358b7ed80d54bd3ca","tool_type":"agent","tool_id":"Write","line_ranges":[{"Range":[4,5]},{"Range":[7,10]},{"Range":[13,16]},{"Range":[19,22]},{"Range":[25,28]},{"Range":[31,34]},{"Range":[37,40]},{"Range":[43,45]},{"Range":[48,59]}]}]}
+apps/world-sim/src/core/scenario/presets/index.ts
+  s_6a6fa50d278a26::t_a5ea662211711f 5,14,20 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df4cf58b7ed80d54bd3d0","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":5},{"Single":14},{"Single":20}]}]}
+apps/world-sim/docs/TDD.md
+  s_6a6fa50d278a26::t_604402175bbec0 437 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df56d58b7ed80d54bd403","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":437}]}]}
+  s_6a6fa50d278a26::t_af7d52689cf1a2 551-553 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df56058b7ed80d54bd400","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[551,553]}]}]}
+apps/world-sim/src/ui/canvas/MapCanvas.tsx
+  s_6a6fa50d278a26::t_3ff3da9d8f0ce4 331,335-336 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df42c58b7ed80d54bd39a","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":331},{"Range":[335,336]}]}]}
+  s_6a6fa50d278a26::t_89fc896cc95ce9 332-333,375-379 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df43558b7ed80d54bd39d","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[332,333]},{"Range":[375,379]}]}]}
+apps/world-sim/src/state/selectors.ts
+  s_6a6fa50d278a26::t_f157428b4462fb 32 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a3df59b58b7ed80d54bd419","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":32}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "73bb87b036f4a9dbabf31ae19bb38dd3785fcde6",
+  "prompts": {},
+  "sessions": {
+    "s_6a6fa50d278a26": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a3df1a258b7ed80d54bd298",
+        "model": "qwen-3.6-plus__dev",
+        "display_model_name": "Qwen3.6-Plus"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {
+    ".trae/documents/重新设计剧本与三国地图.md": [
+      {
+        "hash": "s_6a6fa50d278a26::t_418dfd7c6b0f46",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              224
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e193458b7ed80d54bd4e9",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Range": [
+                  1,
+                  224
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/docs/TDD.md": [
+      {
+        "hash": "s_6a6fa50d278a26::t_604402175bbec0",
+        "line_ranges": [
+          {
+            "Single": 437
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df56d58b7ed80d54bd403",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 437
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_af7d52689cf1a2",
+        "line_ranges": [
+          {
+            "Range": [
+              551,
+              553
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df56058b7ed80d54bd400",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  551,
+                  553
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/core/map/generator.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_e8975b2bc56db8",
+        "line_ranges": [
+          {
+            "Range": [
+              294,
+              362
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df3df58b7ed80d54bd388",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  294,
+                  362
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_47b8c1e7a7b54c",
+        "line_ranges": [
+          {
+            "Single": 2
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df3cd58b7ed80d54bd382",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 2
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_2ae2be3d891408",
+        "line_ranges": [
+          {
+            "Range": [
+              53,
+              55
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df3d858b7ed80d54bd385",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  53,
+                  55
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/core/map/sources.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_bae72ae379a33e",
+        "line_ranges": [
+          {
+            "Single": 2
+          },
+          {
+            "Range": [
+              4,
+              5
+            ]
+          },
+          {
+            "Single": 8
+          },
+          {
+            "Range": [
+              10,
+              11
+            ]
+          },
+          {
+            "Single": 16
+          },
+          {
+            "Range": [
+              20,
+              24
+            ]
+          },
+          {
+            "Range": [
+              27,
+              32
+            ]
+          },
+          {
+            "Single": 35
+          },
+          {
+            "Range": [
+              37,
+              38
+            ]
+          },
+          {
+            "Single": 40
+          },
+          {
+            "Range": [
+              45,
+              52
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df72b58b7ed80d54bd461",
+            "tool_type": "agent",
+            "tool_id": "Write",
+            "line_ranges": [
+              {
+                "Single": 2
+              },
+              {
+                "Range": [
+                  4,
+                  5
+                ]
+              },
+              {
+                "Single": 8
+              },
+              {
+                "Range": [
+                  10,
+                  11
+                ]
+              },
+              {
+                "Single": 16
+              },
+              {
+                "Range": [
+                  20,
+                  24
+                ]
+              },
+              {
+                "Range": [
+                  27,
+                  32
+                ]
+              },
+              {
+                "Single": 35
+              },
+              {
+                "Range": [
+                  37,
+                  38
+                ]
+              },
+              {
+                "Single": 40
+              },
+              {
+                "Range": [
+                  45,
+                  52
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/core/map/terrain.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_4b5ceef1eee74c",
+        "line_ranges": [
+          {
+            "Single": 184
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df41258b7ed80d54bd391",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 184
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_778c7c361f00d3",
+        "line_ranges": [
+          {
+            "Single": 223
+          },
+          {
+            "Single": 233
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df40458b7ed80d54bd38e",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 223
+              },
+              {
+                "Single": 233
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/core/map/types.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_758deb0f3d63c3",
+        "line_ranges": [
+          {
+            "Single": 4
+          },
+          {
+            "Single": 6
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df3b158b7ed80d54bd37c",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 4
+              },
+              {
+                "Single": 6
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_418dfd7c6b0f46",
+        "line_ranges": [
+          {
+            "Range": [
+              8,
+              15
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e193458b7ed80d54bd4e9",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Range": [
+                  8,
+                  15
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/core/scenario/apply.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_1cf8dd1c148fbe",
+        "line_ranges": [
+          {
+            "Single": 134
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df44e58b7ed80d54bd3a6",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 134
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_c59cb7c8c0d159",
+        "line_ranges": [
+          {
+            "Single": 151
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df45958b7ed80d54bd3a9",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 151
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/core/scenario/defaults.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_ad2597642fadb7",
+        "line_ranges": [
+          {
+            "Range": [
+              54,
+              58
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df4f658b7ed80d54bd3dc",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  54,
+                  58
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_a0eb90d5f00bac",
+        "line_ranges": [
+          {
+            "Range": [
+              83,
+              87
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df50358b7ed80d54bd3df",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  83,
+                  87
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_3c445a48ccd490",
+        "line_ranges": [
+          {
+            "Range": [
+              19,
+              23
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df4e958b7ed80d54bd3d9",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  19,
+                  23
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/core/scenario/index.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_3d06c33a987c33",
+        "line_ranges": [
+          {
+            "Single": 20
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df59158b7ed80d54bd416",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 20
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/core/scenario/presets/index.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_a5ea662211711f",
+        "line_ranges": [
+          {
+            "Single": 5
+          },
+          {
+            "Single": 14
+          },
+          {
+            "Single": 20
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df4cf58b7ed80d54bd3d0",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 5
+              },
+              {
+                "Single": 14
+              },
+              {
+                "Single": 20
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/core/scenario/presets/three-kingdoms.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_127b184fb85aa3",
+        "line_ranges": [
+          {
+            "Range": [
+              6,
+              9
+            ]
+          },
+          {
+            "Single": 14
+          },
+          {
+            "Range": [
+              36,
+              41
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df63658b7ed80d54bd43e",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  6,
+                  9
+                ]
+              },
+              {
+                "Single": 14
+              },
+              {
+                "Range": [
+                  36,
+                  41
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_a525ad23d43470",
+        "line_ranges": [
+          {
+            "Single": 5
+          },
+          {
+            "Single": 20
+          },
+          {
+            "Single": 26
+          },
+          {
+            "Single": 32
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df4a258b7ed80d54bd3c7",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 5
+              },
+              {
+                "Single": 20
+              },
+              {
+                "Single": 26
+              },
+              {
+                "Single": 32
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/core/scenario/presets/warlords.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_c6d519afbf27b5",
+        "line_ranges": [
+          {
+            "Range": [
+              4,
+              5
+            ]
+          },
+          {
+            "Range": [
+              7,
+              10
+            ]
+          },
+          {
+            "Range": [
+              13,
+              16
+            ]
+          },
+          {
+            "Range": [
+              19,
+              22
+            ]
+          },
+          {
+            "Range": [
+              25,
+              28
+            ]
+          },
+          {
+            "Range": [
+              31,
+              34
+            ]
+          },
+          {
+            "Range": [
+              37,
+              40
+            ]
+          },
+          {
+            "Range": [
+              43,
+              45
+            ]
+          },
+          {
+            "Range": [
+              48,
+              59
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df4b358b7ed80d54bd3ca",
+            "tool_type": "agent",
+            "tool_id": "Write",
+            "line_ranges": [
+              {
+                "Range": [
+                  4,
+                  5
+                ]
+              },
+              {
+                "Range": [
+                  7,
+                  10
+                ]
+              },
+              {
+                "Range": [
+                  13,
+                  16
+                ]
+              },
+              {
+                "Range": [
+                  19,
+                  22
+                ]
+              },
+              {
+                "Range": [
+                  25,
+                  28
+                ]
+              },
+              {
+                "Range": [
+                  31,
+                  34
+                ]
+              },
+              {
+                "Range": [
+                  37,
+                  40
+                ]
+              },
+              {
+                "Range": [
+                  43,
+                  45
+                ]
+              },
+              {
+                "Range": [
+                  48,
+                  59
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/core/sim/expansion.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_b466f1516392db",
+        "line_ranges": [
+          {
+            "Range": [
+              557,
+              578
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df54758b7ed80d54bd3f7",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  557,
+                  578
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_3f966de8b84ba0",
+        "line_ranges": [
+          {
+            "Range": [
+              114,
+              117
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df47d58b7ed80d54bd3b5",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  114,
+                  117
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_ab9f71dda6874e",
+        "line_ranges": [
+          {
+            "Range": [
+              170,
+              171
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df53058b7ed80d54bd3ee",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  170,
+                  171
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_63417f011ff124",
+        "line_ranges": [
+          {
+            "Range": [
+              53,
+              54
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df47458b7ed80d54bd3b2",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  53,
+                  54
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_84f5b38199e828",
+        "line_ranges": [
+          {
+            "Single": 245
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df48958b7ed80d54bd3b8",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 245
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_5f76ffd1d747fb",
+        "line_ranges": [
+          {
+            "Range": [
+              186,
+              187
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df53958b7ed80d54bd3f1",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  186,
+                  187
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/core/sim/terrainCombat.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_57801c93780339",
+        "line_ranges": [
+          {
+            "Single": 11
+          },
+          {
+            "Single": 19
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df51f58b7ed80d54bd3e8",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 11
+              },
+              {
+                "Single": 19
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/shared/types/replay.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_ef484d945c6917",
+        "line_ranges": [
+          {
+            "Single": 85
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df7f458b7ed80d54bd4a9",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 85
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/state/index.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_62c0cb674da019",
+        "line_ranges": [
+          {
+            "Single": 19
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df83158b7ed80d54bd4c7",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 19
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/state/selectors.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_f157428b4462fb",
+        "line_ranges": [
+          {
+            "Single": 32
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df59b58b7ed80d54bd419",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 32
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/state/slices/mapSlice.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_baac048995e1d6",
+        "line_ranges": [
+          {
+            "Range": [
+              10,
+              12
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df83658b7ed80d54bd4ca",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  10,
+                  12
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_cafb60fce48a47",
+        "line_ranges": [
+          {
+            "Range": [
+              2,
+              3
+            ]
+          },
+          {
+            "Single": 20
+          },
+          {
+            "Single": 24
+          },
+          {
+            "Range": [
+              26,
+              27
+            ]
+          },
+          {
+            "Range": [
+              37,
+              38
+            ]
+          },
+          {
+            "Range": [
+              66,
+              74
+            ]
+          },
+          {
+            "Range": [
+              80,
+              92
+            ]
+          },
+          {
+            "Single": 97
+          },
+          {
+            "Range": [
+              104,
+              124
+            ]
+          },
+          {
+            "Range": [
+              128,
+              129
+            ]
+          },
+          {
+            "Single": 138
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df75158b7ed80d54bd46d",
+            "tool_type": "agent",
+            "tool_id": "Write",
+            "line_ranges": [
+              {
+                "Range": [
+                  2,
+                  3
+                ]
+              },
+              {
+                "Single": 20
+              },
+              {
+                "Single": 24
+              },
+              {
+                "Range": [
+                  26,
+                  27
+                ]
+              },
+              {
+                "Range": [
+                  37,
+                  38
+                ]
+              },
+              {
+                "Range": [
+                  66,
+                  74
+                ]
+              },
+              {
+                "Range": [
+                  80,
+                  92
+                ]
+              },
+              {
+                "Single": 97
+              },
+              {
+                "Range": [
+                  104,
+                  124
+                ]
+              },
+              {
+                "Range": [
+                  128,
+                  129
+                ]
+              },
+              {
+                "Single": 138
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_418dfd7c6b0f46",
+        "line_ranges": [
+          {
+            "Range": [
+              75,
+              79
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3e193458b7ed80d54bd4e9",
+            "tool_type": "agent",
+            "tool_id": "RunCommand",
+            "line_ranges": [
+              {
+                "Range": [
+                  75,
+                  79
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/state/slices/replaySlice.ts": [
+      {
+        "hash": "s_6a6fa50d278a26::t_f3d38d6c3ea8ef",
+        "line_ranges": [
+          {
+            "Single": 24
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df81058b7ed80d54bd4b8",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 24
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_8043b6961a28e1",
+        "line_ranges": [
+          {
+            "Single": 203
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df80158b7ed80d54bd4af",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 203
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/ui/canvas/MapCanvas.tsx": [
+      {
+        "hash": "s_6a6fa50d278a26::t_3ff3da9d8f0ce4",
+        "line_ranges": [
+          {
+            "Single": 331
+          },
+          {
+            "Range": [
+              335,
+              336
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df42c58b7ed80d54bd39a",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 331
+              },
+              {
+                "Range": [
+                  335,
+                  336
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_89fc896cc95ce9",
+        "line_ranges": [
+          {
+            "Range": [
+              332,
+              333
+            ]
+          },
+          {
+            "Range": [
+              375,
+              379
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df43558b7ed80d54bd39d",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  332,
+                  333
+                ]
+              },
+              {
+                "Range": [
+                  375,
+                  379
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "apps/world-sim/src/ui/sidebar/Sidebar.tsx": [
+      {
+        "hash": "s_6a6fa50d278a26::t_c65235198142ad",
+        "line_ranges": [
+          {
+            "Single": 721
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df7b558b7ed80d54bd494",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 721
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_0bd4dd9c9c17f3",
+        "line_ranges": [
+          {
+            "Range": [
+              44,
+              45
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df78b58b7ed80d54bd47f",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  44,
+                  45
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_af09bd3faf5b20",
+        "line_ranges": [
+          {
+            "Range": [
+              2,
+              3
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df78758b7ed80d54bd47c",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  2,
+                  3
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_f3500cc65ba76c",
+        "line_ranges": [
+          {
+            "Range": [
+              194,
+              195
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df79c58b7ed80d54bd485",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  194,
+                  195
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_453eb4fd4eb202",
+        "line_ranges": [
+          {
+            "Single": 204
+          },
+          {
+            "Range": [
+              207,
+              209
+            ]
+          },
+          {
+            "Single": 216
+          },
+          {
+            "Single": 220
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df7c958b7ed80d54bd497",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 204
+              },
+              {
+                "Range": [
+                  207,
+                  209
+                ]
+              },
+              {
+                "Single": 216
+              },
+              {
+                "Single": 220
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_f9d931148a139e",
+        "line_ranges": [
+          {
+            "Single": 751
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df5a358b7ed80d54bd41c",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 751
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_6a6fa50d278a26::t_7d7ba1599617bf",
+        "line_ranges": [
+          {
+            "Range": [
+              137,
+              139
+            ]
+          },
+          {
+            "Single": 141
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a3df79458b7ed80d54bd482",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  137,
+                  139
+                ]
+              },
+              {
+                "Single": 141
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "s_6a6fa50d278a26": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_0bd4dd9c9c17f3": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_127b184fb85aa3": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_1cf8dd1c148fbe": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_2ae2be3d891408": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_3c445a48ccd490": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_3d06c33a987c33": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_3f966de8b84ba0": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_3ff3da9d8f0ce4": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_418dfd7c6b0f46": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_453eb4fd4eb202": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_47b8c1e7a7b54c": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_4b5ceef1eee74c": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_57801c93780339": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_5f76ffd1d747fb": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_604402175bbec0": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_62c0cb674da019": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_63417f011ff124": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_758deb0f3d63c3": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_778c7c361f00d3": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_7d7ba1599617bf": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_8043b6961a28e1": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_84f5b38199e828": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_88fb3720bc1091": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_89fc896cc95ce9": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_a0eb90d5f00bac": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_a525ad23d43470": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_a5ea662211711f": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_a88b7c35b3e971": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_ab9f71dda6874e": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_ad2597642fadb7": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_af09bd3faf5b20": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_af7d52689cf1a2": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_b466f1516392db": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_baac048995e1d6": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_bae72ae379a33e": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_c59cb7c8c0d159": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_c65235198142ad": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_c6d519afbf27b5": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_cafb60fce48a47": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_ce0558eac4b014": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_e69cb66e409b92": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_e8975b2bc56db8": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_ef484d945c6917": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_f157428b4462fb": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_f3500cc65ba76c": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_f3d38d6c3ea8ef": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_6a6fa50d278a26::t_f9d931148a139e": {
+      "tool": "trae",
+      "conversation_id": "6a3df1a258b7ed80d54bd298",
+      "session_id": "6a3df1a258b7ed80d54bd298",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
