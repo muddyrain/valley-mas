@@ -1,19 +1,11 @@
-import {
-  Archive,
-  CalendarClock,
-  CircleDollarSign,
-  LoaderCircle,
-  Pencil,
-  Play,
-  Plus,
-  Repeat,
-} from 'lucide-react';
+import { Archive, CalendarClock, CircleDollarSign, Pencil, Play, Plus, Repeat } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetHeader, SheetSelectField } from '@/components/FormItem';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -195,6 +187,8 @@ export function RecurringPaymentsPage() {
     startedAt: formatDateLocal(),
   });
   const [formErrors, setFormErrors] = useState<RecurringFormErrors>({});
+  const initialRecurringPaymentsLoading = recurringPaymentsLoading && !recurringPaymentsLoaded;
+  const recurringPaymentsRefreshing = recurringPaymentsLoading && recurringPaymentsLoaded;
 
   useEffect(() => {
     void loadRecurringPayments({ status: statusFilter });
@@ -389,11 +383,8 @@ export function RecurringPaymentsPage() {
           </Card>
         ) : null}
 
-        {recurringPaymentsLoading && !recurringPaymentsLoaded ? (
-          <Card className="grid min-h-44 place-items-center p-6 text-sm text-muted-foreground">
-            <LoaderCircle className="mb-3 size-6 animate-spin text-life-health motion-reduce:animate-none" />
-            正在同步订阅
-          </Card>
+        {initialRecurringPaymentsLoading ? (
+          <ListCardSkeleton rows={3} />
         ) : sortedPayments.length === 0 ? (
           <EmptyState
             title="还没有订阅"
@@ -409,7 +400,8 @@ export function RecurringPaymentsPage() {
             }
           />
         ) : (
-          <div className="grid gap-3">
+          <div className="relative grid gap-3">
+            {recurringPaymentsRefreshing ? <InlineRefreshStatus tone="health" /> : null}
             {sortedPayments.map((item) => {
               const updating = Boolean(recurringPaymentUpdatingById[item.id]);
               const archiving = Boolean(recurringPaymentArchivingById[item.id]);
@@ -423,7 +415,11 @@ export function RecurringPaymentsPage() {
                     ? '今日到期'
                     : `${days} 天后到期`;
               return (
-                <Card key={item.id} className="p-4">
+                <Card
+                  key={item.id}
+                  className="p-4"
+                  data-scroll-anchor={`recurring-payments:${item.id}`}
+                >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="mb-2 flex flex-wrap items-center gap-2">

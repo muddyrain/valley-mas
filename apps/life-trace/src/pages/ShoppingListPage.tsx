@@ -13,6 +13,7 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetHeader, SheetSelectField } from '@/components/FormItem';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -194,6 +195,8 @@ export function ShoppingListPage() {
   const [ledgerPromptEnabled, setLedgerPromptEnabled] = useState<boolean>(() =>
     readLedgerPromptEnabled(),
   );
+  const initialShoppingLoading = loading && !loaded;
+  const shoppingRefreshing = loading && loaded;
 
   const todayIso = useMemo(() => getLocalISODate(new Date()), []);
   const yesterdayIso = useMemo(() => {
@@ -380,7 +383,7 @@ export function ShoppingListPage() {
     const toggling = pendingActionId === `${item.id}:toggle`;
     const isChecked = Boolean(item.checkedAt);
     return (
-      <Card key={item.id} className="p-4">
+      <Card key={item.id} className="p-4" data-scroll-anchor={`shopping:${item.id}`}>
         <div className="flex items-start gap-3">
           <button
             type="button"
@@ -479,11 +482,8 @@ export function ShoppingListPage() {
           </Card>
         ) : null}
 
-        {loading && !loaded ? (
-          <Card className="grid min-h-44 place-items-center p-6 text-sm text-muted-foreground">
-            <LoaderCircle className="mb-3 size-6 animate-spin text-life-health motion-reduce:animate-none" />
-            正在同步采购清单
-          </Card>
+        {initialShoppingLoading ? (
+          <ListCardSkeleton rows={3} />
         ) : items.length === 0 ? (
           <EmptyState
             title="清单空空如也"
@@ -499,7 +499,8 @@ export function ShoppingListPage() {
             }
           />
         ) : (
-          <>
+          <div className="relative">
+            {shoppingRefreshing ? <InlineRefreshStatus tone="health" /> : null}
             <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold">待买</h2>
@@ -535,7 +536,7 @@ export function ShoppingListPage() {
                 </div>
               </section>
             ) : null}
-          </>
+          </div>
         )}
       </div>
 

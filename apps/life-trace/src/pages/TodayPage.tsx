@@ -621,7 +621,11 @@ export function TodayPage() {
       ref={pageRef}
       className="min-w-0 space-y-5 overflow-x-hidden px-5 pt-7 max-[360px]:px-4 max-[360px]:pt-6"
     >
-      <section className="relative overflow-hidden px-0.5 pb-1 pt-0" data-today-entrance>
+      <section
+        className="relative overflow-hidden px-0.5 pb-1 pt-0"
+        data-scroll-anchor="today:hero"
+        data-today-entrance
+      >
         <div className="relative flex min-w-0 items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="flex max-w-[15.8rem] items-center gap-2 truncate text-[1.6rem] font-semibold leading-none text-foreground max-[360px]:max-w-[12.5rem] max-[360px]:text-[1.42rem]">
@@ -683,6 +687,7 @@ export function TodayPage() {
           <button
             type="button"
             className="min-w-0 px-2 text-center"
+            data-scroll-anchor={firstPreviewPlan ? `today:plan:${firstPreviewPlan.id}` : undefined}
             onClick={() => navigate(firstPreviewPlan ? `/plans/${firstPreviewPlan.id}` : '/plans')}
           >
             <div className="mx-auto grid size-12 place-items-center text-life-trace">
@@ -711,6 +716,7 @@ export function TodayPage() {
 
       <section
         className="mt-2 rounded-[1.15rem] bg-life-trace px-4 py-2.5 text-primary-foreground shadow-[0_12px_24px_rgba(78,143,104,0.2)]"
+        data-scroll-anchor="today:quick-entry"
         data-today-entrance
       >
         <div className="flex min-h-[3.1rem] items-center gap-3">
@@ -760,6 +766,7 @@ export function TodayPage() {
 
       <Card
         className="overflow-hidden rounded-[1.45rem] p-4 shadow-[0_10px_30px_rgba(45,41,35,0.05)]"
+        data-scroll-anchor="today:plans"
         data-today-entrance
       >
         <div className="mb-4 flex items-center justify-between gap-3">
@@ -786,6 +793,7 @@ export function TodayPage() {
                   type="button"
                   key={plan.id}
                   className="grid w-full grid-cols-[4.4rem_1fr_auto] items-center gap-3 py-3.5 text-left first:pt-0 last:pb-0"
+                  data-scroll-anchor={`today:plan:${plan.id}`}
                   onClick={() => navigate(`/plans/${plan.id}`)}
                 >
                   <span
@@ -831,10 +839,11 @@ export function TodayPage() {
         )}
       </Card>
 
-      <div className="grid gap-3" data-today-entrance>
+      <div className="grid gap-3" data-scroll-anchor="today:daily-links" data-today-entrance>
         <button
           type="button"
           className="flex items-center gap-3 rounded-[1.35rem] border border-border bg-card/85 px-4 py-3 text-left shadow-[0_8px_24px_rgba(45,41,35,0.04)]"
+          data-scroll-anchor="today:pantry-link"
           onClick={() => navigate('/pantry')}
         >
           <span className="grid size-[3.1rem] shrink-0 place-items-center rounded-[1.08rem] bg-life-health/10 text-life-health">
@@ -873,6 +882,7 @@ export function TodayPage() {
           <button
             type="button"
             className="flex items-center gap-3 rounded-[1.35rem] border border-border bg-card/85 px-4 py-3 text-left shadow-[0_8px_24px_rgba(45,41,35,0.04)]"
+            data-scroll-anchor="today:shopping"
             onClick={() => navigate('/shopping')}
           >
             <span className="grid size-[3.1rem] shrink-0 place-items-center rounded-[1.08rem] bg-life-health/10 text-life-health">
@@ -891,6 +901,7 @@ export function TodayPage() {
         <button
           type="button"
           className="flex items-center gap-3 rounded-[1.35rem] border border-border bg-card/85 px-4 py-3 text-left shadow-[0_8px_24px_rgba(45,41,35,0.04)]"
+          data-scroll-anchor="today:closet-link"
           onClick={() => navigate('/closet')}
         >
           <span className="grid size-[3.1rem] shrink-0 place-items-center rounded-[1.08rem] bg-life-weather/10 text-life-weather">
@@ -908,6 +919,7 @@ export function TodayPage() {
 
       <Card
         className="rounded-[1.35rem] border-border/70 bg-card/88 p-4 shadow-[0_8px_22px_rgba(71,58,42,0.035)]"
+        data-scroll-anchor="today:summary"
         data-today-entrance
       >
         <div className="mb-2 flex items-center justify-between">
@@ -1298,6 +1310,7 @@ export function TodayPage() {
 
         <Card
           className="relative overflow-hidden border-life-ai/20 bg-life-ai/5 p-4 shadow-[0_18px_54px_rgba(6,182,212,0.08)]"
+          data-scroll-anchor="today:outfit"
           data-today-entrance
         >
           <div className="flex items-start justify-between gap-4">
@@ -1344,6 +1357,7 @@ export function TodayPage() {
           description="先记下来，链接和段落都行。"
           tone="ai"
           onClick={() => navigate('/inbox')}
+          data-scroll-anchor="today:inbox"
           data-today-entrance
         />
 
@@ -1355,6 +1369,7 @@ export function TodayPage() {
           description="回看吃饭、交通和日常花费。"
           tone="health"
           onClick={() => navigate('/ledger')}
+          data-scroll-anchor="today:ledger"
           data-today-entrance
         />
 
@@ -1369,6 +1384,7 @@ export function TodayPage() {
             description={latestAchievement.description}
             tone="ai"
             onClick={() => navigate('/achievements')}
+            data-scroll-anchor="today:achievements"
             data-today-entrance
           >
             <div
@@ -1380,6 +1396,7 @@ export function TodayPage() {
 
         <Card
           className="relative overflow-hidden border-life-health/20 p-4 shadow-[0_18px_64px_rgba(34,197,94,0.08)]"
+          data-scroll-anchor="today:pantry-card"
           data-today-entrance
         >
           <div
@@ -1434,6 +1451,7 @@ export function TodayPage() {
                     key={item.id}
                     type="button"
                     className="flex w-full items-center gap-3 rounded-2xl border border-border bg-secondary px-3 py-3 text-left transition hover:border-foreground/20"
+                    data-scroll-anchor={`today:pantry:${item.id}`}
                     onClick={() => navigate(pantryPageHref)}
                   >
                     {coverUrl ? (
@@ -1504,7 +1522,7 @@ export function TodayPage() {
           )}
         </Card>
 
-        <Card className="p-4" data-today-entrance>
+        <Card className="p-4" data-scroll-anchor="today:reminders" data-today-entrance>
           <div className="mb-4 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <Badge tone={!planCardLoading && overduePlans.length > 0 ? 'alert' : 'plan'}>
@@ -1531,6 +1549,7 @@ export function TodayPage() {
             <button
               type="button"
               className="mb-3 flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-secondary px-3 py-3 text-left transition hover:bg-secondary/80"
+              data-scroll-anchor={`today:plan:${nextReminder.plan.id}`}
               onClick={() => navigate(`/plans/${nextReminder.plan.id}`)}
             >
               <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-life-health/10 text-life-health">
@@ -1568,6 +1587,7 @@ export function TodayPage() {
                         ? 'border-life-alert/30 bg-life-alert/10'
                         : 'border-border bg-secondary',
                     )}
+                    data-scroll-anchor={`today:plan:${plan.id}`}
                     onClick={() => navigate(`/plans/${plan.id}`)}
                   >
                     <div className="min-w-0">

@@ -26,6 +26,7 @@ import {
   SoftSectionTitle,
   SoftStatGrid,
 } from '@/components/SoftDiary';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
@@ -326,6 +327,7 @@ function TraceDetailContent({
 
 export function TracesPage() {
   const traces = useLifeTraceStore((state) => state.traces);
+  const tracesLoaded = useLifeTraceStore((state) => state.tracesLoaded);
   const tracesLoading = useLifeTraceStore((state) => state.tracesLoading);
   const tracesLoadingMore = useLifeTraceStore((state) => state.tracesLoadingMore);
   const tracesPagination = useLifeTraceStore((state) => state.tracesPagination);
@@ -367,6 +369,8 @@ export function TracesPage() {
   }, [activeFilter, activeTag, traces]);
   const showTracesErrorFallback =
     Boolean(tracesError) && !tracesLoading && filteredTraces.length === 0;
+  const initialTracesLoading = tracesLoading && !tracesLoaded;
+  const tracesRefreshing = tracesLoading && tracesLoaded;
   const monthGroups = useMemo(() => groupTracesByMonth(filteredTraces), [filteredTraces]);
   const selectedTrace = traceId ? (traces.find((trace) => trace.id === traceId) ?? null) : null;
   const activeFilterConfig =
@@ -590,11 +594,9 @@ export function TracesPage() {
         </Card>
       ) : null}
 
-      {tracesLoading ? (
-        <SyncState title="正在同步生活踪迹" tone="trace" variant="skeleton-list" />
-      ) : null}
-
-      <div className="space-y-7">
+      <div className="relative space-y-7">
+        {tracesRefreshing ? <InlineRefreshStatus tone="trace" /> : null}
+        {initialTracesLoading ? <ListCardSkeleton media rows={3} /> : null}
         {filteredTraces.length > 0 ? (
           <SoftSectionTitle title={currentMonthLabel} meta={`${filteredTraces.length} 条记录`} />
         ) : null}
@@ -617,6 +619,7 @@ export function TracesPage() {
                 <article
                   key={trace.id}
                   className="relative grid grid-cols-[2rem_minmax(0,1fr)] gap-3"
+                  data-scroll-anchor={`traces:${trace.id}`}
                 >
                   <span className="relative z-10 mt-5 grid size-5 self-start justify-self-center rounded-full border border-life-trace/40 bg-background shadow-[0_0_0_5px_rgba(16,185,129,0.06)]">
                     <span className="m-auto size-2 rounded-full bg-life-trace" />

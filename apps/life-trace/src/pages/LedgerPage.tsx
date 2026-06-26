@@ -1,4 +1,4 @@
-import { CircleDollarSign, LoaderCircle, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react';
+import { CircleDollarSign, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
@@ -11,6 +11,7 @@ import {
   SheetSelectButton,
   SheetSelectField,
 } from '@/components/FormItem';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -147,6 +148,8 @@ export function LedgerPage() {
     occurredAt: formatDateTimeLocal(),
   });
   const [formErrors, setFormErrors] = useState<LedgerFormErrors>({});
+  const initialLedgerLoading = ledgerLoading && !ledgerLoaded;
+  const ledgerRefreshing = ledgerLoading && ledgerLoaded;
 
   useEffect(() => {
     void loadLedgerEntries({
@@ -376,11 +379,8 @@ export function LedgerPage() {
           </Card>
         ) : null}
 
-        {ledgerLoading && !ledgerLoaded ? (
-          <Card className="grid min-h-44 place-items-center p-6 text-sm text-muted-foreground">
-            <LoaderCircle className="mb-3 size-6 animate-spin text-life-health motion-reduce:animate-none" />
-            正在同步账目
-          </Card>
+        {initialLedgerLoading ? (
+          <ListCardSkeleton rows={3} />
         ) : ledgerEntries.length === 0 ? (
           <EmptyState
             title="还没有账目"
@@ -396,13 +396,14 @@ export function LedgerPage() {
             }
           />
         ) : (
-          <div className="grid gap-3">
+          <div className="relative grid gap-3">
+            {ledgerRefreshing ? <InlineRefreshStatus tone="health" /> : null}
             {ledgerEntries.map((entry) => {
               const deleting = Boolean(ledgerDeletingById[entry.id]);
               const updating = Boolean(ledgerUpdatingById[entry.id]);
               const disabled = deleting || updating;
               return (
-                <Card key={entry.id} className="p-4">
+                <Card key={entry.id} className="p-4" data-scroll-anchor={`ledger:${entry.id}`}>
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="mb-2 flex flex-wrap items-center gap-2">

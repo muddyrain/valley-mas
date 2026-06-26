@@ -26,6 +26,37 @@ export function canNavigateBackFromState(historyState: unknown) {
   return typeof idx === 'number' && idx > 0;
 }
 
+export type SubPageBackTarget =
+  | { type: 'custom' }
+  | { type: 'history' }
+  | { type: 'path'; path: string };
+
+export function resolveSubPageBackTarget({
+  backTo,
+  fallbackBackTo,
+  hasOnBack,
+  historyState,
+}: {
+  backTo?: string;
+  fallbackBackTo?: string;
+  hasOnBack: boolean;
+  historyState: unknown;
+}): SubPageBackTarget {
+  if (hasOnBack) {
+    return { type: 'custom' };
+  }
+  if (canNavigateBackFromState(historyState)) {
+    return { type: 'history' };
+  }
+  if (backTo) {
+    return { type: 'path', path: backTo };
+  }
+  if (fallbackBackTo) {
+    return { type: 'path', path: fallbackBackTo };
+  }
+  return { type: 'history' };
+}
+
 export function SubPageShell({
   title,
   eyebrow,
@@ -64,23 +95,22 @@ export function SubPageShell({
   );
 
   const handleBack = () => {
-    if (onBack) {
-      onBack();
+    const target = resolveSubPageBackTarget({
+      backTo,
+      fallbackBackTo,
+      hasOnBack: Boolean(onBack),
+      historyState: window.history.state,
+    });
+
+    if (target.type === 'custom') {
+      onBack?.();
       return;
     }
-    if (backTo) {
-      navigate(backTo);
-      return;
-    }
-    if (canNavigateBackFromState(window.history.state)) {
+    if (target.type === 'history') {
       navigate(-1);
       return;
     }
-    if (fallbackBackTo) {
-      navigate(fallbackBackTo);
-      return;
-    }
-    navigate(-1);
+    navigate(target.path);
   };
 
   return (

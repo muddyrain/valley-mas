@@ -6,7 +6,6 @@ import {
   ExternalLink,
   FileText,
   Lightbulb,
-  LoaderCircle,
   MapPin,
   MoreHorizontal,
   Pencil,
@@ -31,6 +30,7 @@ import {
   SheetSelectField,
 } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -184,6 +184,8 @@ export function InboxPage() {
   const [planDraftItem, setPlanDraftItem] = useState<InboxItem | null>(null);
   const [traceDraftItem, setTraceDraftItem] = useState<InboxItem | null>(null);
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
+  const initialInboxLoading = inboxLoading && !inboxLoaded;
+  const inboxRefreshing = inboxLoading && inboxLoaded;
 
   useEffect(() => {
     void loadInboxItems({ status: filter, type: typeFilter, q: query });
@@ -441,11 +443,8 @@ export function InboxPage() {
           </Card>
         ) : null}
 
-        {inboxLoading && !inboxLoaded ? (
-          <Card className="grid min-h-44 place-items-center p-6 text-sm text-muted-foreground">
-            <LoaderCircle className="mb-3 size-6 animate-spin text-life-ai motion-reduce:animate-none" />
-            正在同步灵感
-          </Card>
+        {initialInboxLoading ? (
+          <ListCardSkeleton media rows={3} />
         ) : inboxItems.length === 0 ? (
           <EmptyState
             title="还没有灵感记下"
@@ -455,14 +454,15 @@ export function InboxPage() {
             tone="ai"
           />
         ) : (
-          <div className="grid gap-3">
+          <div className="relative grid gap-3">
+            {inboxRefreshing ? <InlineRefreshStatus tone="ai" /> : null}
             {inboxItems.map((item) => {
               const updating = Boolean(inboxUpdatingById[item.id]);
               const deleting = Boolean(inboxDeletingById[item.id]);
               const disabled = updating || deleting;
 
               return (
-                <Card key={item.id} className="p-4">
+                <Card key={item.id} className="p-4" data-scroll-anchor={`inbox:${item.id}`}>
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="mb-2 flex flex-wrap items-center gap-2">

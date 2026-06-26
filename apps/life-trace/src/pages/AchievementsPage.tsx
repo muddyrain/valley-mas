@@ -157,7 +157,9 @@ export function AchievementsPage() {
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {filteredAchievements.map((achievement) => (
-                <AchievementCard key={achievement.code} achievement={achievement} />
+                <div key={achievement.code} data-scroll-anchor={`achievements:${achievement.code}`}>
+                  <AchievementCard achievement={achievement} />
+                </div>
               ))}
             </div>
           )}

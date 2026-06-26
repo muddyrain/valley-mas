@@ -88,26 +88,25 @@ describe('SubPageShell component source', () => {
 });
 
 describe('SubPageShell handleBack priority chain', () => {
-  it('checks onBack first', () => {
-    const handlerStart = componentSource.indexOf('const handleBack');
-    const onBackCheck = componentSource.indexOf('if (onBack)', handlerStart);
-    expect(onBackCheck).toBeGreaterThan(handlerStart);
+  it('keeps custom onBack first in the resolved target', () => {
+    const resolverStart = componentSource.indexOf('export function resolveSubPageBackTarget');
+    const onBackCheck = componentSource.indexOf('if (hasOnBack)', resolverStart);
+    expect(onBackCheck).toBeGreaterThan(resolverStart);
   });
 
-  it('checks backTo before canNavigateBackFromState', () => {
-    const handlerStart = componentSource.indexOf('const handleBack');
-    const backToCheck = componentSource.indexOf('if (backTo)', handlerStart);
-    const historyCheck = componentSource.indexOf('canNavigateBackFromState', handlerStart);
-    expect(backToCheck).toBeGreaterThan(handlerStart);
-    expect(historyCheck).toBeGreaterThan(backToCheck);
+  it('checks browser history before static back paths', () => {
+    const resolverStart = componentSource.indexOf('export function resolveSubPageBackTarget');
+    const historyCheck = componentSource.indexOf('canNavigateBackFromState', resolverStart);
+    const backToCheck = componentSource.indexOf('if (backTo)', resolverStart);
+    expect(historyCheck).toBeGreaterThan(resolverStart);
+    expect(backToCheck).toBeGreaterThan(historyCheck);
   });
 
-  it('checks fallbackBackTo last', () => {
-    const handlerStart = componentSource.indexOf('const handleBack');
-    const fallbackCheck = componentSource.indexOf('if (fallbackBackTo)', handlerStart);
-    const lastNavigate = componentSource.lastIndexOf('navigate(-1)');
-    expect(fallbackCheck).toBeGreaterThan(handlerStart);
-    expect(lastNavigate).toBeGreaterThan(fallbackCheck);
+  it('keeps fallbackBackTo after backTo for directly opened subpages', () => {
+    const resolverStart = componentSource.indexOf('export function resolveSubPageBackTarget');
+    const backToCheck = componentSource.indexOf('if (backTo)', resolverStart);
+    const fallbackCheck = componentSource.indexOf('if (fallbackBackTo)', resolverStart);
+    expect(fallbackCheck).toBeGreaterThan(backToCheck);
   });
 });
 

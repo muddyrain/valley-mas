@@ -49,7 +49,10 @@ function RecipeCard({
   onAddPlan: (recipe: StoredRecipeSuggestion) => void;
 }) {
   return (
-    <Card className="overflow-hidden border-life-health/15 bg-card/82 p-0 shadow-[0_18px_48px_rgba(71,58,42,0.07)]">
+    <Card
+      className="overflow-hidden border-life-health/15 bg-card/82 p-0 shadow-[0_18px_48px_rgba(71,58,42,0.07)]"
+      data-scroll-anchor={`recipes:${recipe.id}`}
+    >
       <button
         type="button"
         className="block w-full cursor-pointer p-4 text-left transition hover:bg-life-health/5"

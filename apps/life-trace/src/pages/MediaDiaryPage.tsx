@@ -32,6 +32,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetHeader, SheetSelectField } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
 import { LoadErrorState } from '@/components/LoadErrorState';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
@@ -688,6 +689,8 @@ export function MediaDiaryPage() {
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<MediaDiaryEntry | null>(null);
+  const initialMediaDiaryLoading = loading && entries.length === 0;
+  const mediaDiaryRefreshing = loading && entries.length > 0;
   const [deleting, setDeleting] = useState(false);
 
   const selectedEntry = entryId ? (entries.find((entry) => entry.id === entryId) ?? null) : null;
@@ -1032,18 +1035,20 @@ export function MediaDiaryPage() {
           </Card>
         ) : null}
 
-        {loading ? (
-          <SyncState title="正在同步书影音日记" tone="trace" variant="skeleton-list" />
+        {initialMediaDiaryLoading ? (
+          <ListCardSkeleton media rows={3} />
         ) : entries.length > 0 ? (
-          <div className="space-y-3">
+          <div className="relative space-y-3">
+            {mediaDiaryRefreshing ? <InlineRefreshStatus tone="trace" /> : null}
             {entries.map((entry) => (
-              <MediaDiaryCard
-                key={entry.id}
-                entry={entry}
-                onOpen={() => navigate(`/media-diary/${entry.id}`)}
-                onEdit={() => openEditor(entry)}
-                onDelete={() => setDeleteTarget(entry)}
-              />
+              <div key={entry.id} data-scroll-anchor={`media-diary:${entry.id}`}>
+                <MediaDiaryCard
+                  entry={entry}
+                  onOpen={() => navigate(`/media-diary/${entry.id}`)}
+                  onEdit={() => openEditor(entry)}
+                  onDelete={() => setDeleteTarget(entry)}
+                />
+              </div>
             ))}
           </div>
         ) : (

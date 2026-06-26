@@ -22,6 +22,7 @@ import { ImagePreview } from '@/components/ImagePreview';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { PlanDetailContent } from '@/components/PlanDetailDrawer';
 import { SoftHeader, SoftPage, SoftPanel, SoftSectionTitle } from '@/components/SoftDiary';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
@@ -94,6 +95,7 @@ export function PlansPage() {
   const {
     plans,
     plansError,
+    plansLoaded,
     plansLoading,
     plansLoadingMore,
     plansPagination,
@@ -184,6 +186,9 @@ export function PlansPage() {
   const showPlansErrorCard = Boolean(plansError) && !plansSyncIssue;
   const showPlansSyncFallback = Boolean(plansSyncIssue) && !plansLoading && plans.length === 0;
   const showPlansErrorFallback = showPlansErrorCard && !plansLoading && plans.length === 0;
+  // 初次加载占位，刷新保留旧列表，避免返回后布局跳动。
+  const initialPlansLoading = plansLoading && !plansLoaded;
+  const plansRefreshing = plansLoading && plansLoaded;
   const weekDays = useMemo(() => {
     const base = new Date();
     const monday = new Date(base);
@@ -285,6 +290,7 @@ export function PlansPage() {
         role="button"
         tabIndex={0}
         data-plan-card
+        data-scroll-anchor={`plans:${plan.id}`}
         onClick={() => navigate(`/plans/${plan.id}`)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -676,14 +682,13 @@ export function PlansPage() {
         </Card>
       ) : null}
 
-      {plansLoading ? (
-        <SyncState title="正在同步你的计划" description="正在从云端刷新计划列表。" tone="plan" />
-      ) : null}
-
-      <div className="space-y-5">
+      <div className="relative space-y-5">
+        {plansRefreshing ? <InlineRefreshStatus tone="plan" /> : null}
         <SoftSectionTitle title="今天的安排" meta={`${todayTimelinePlans.length} 个`} />
         <SoftPanel className="px-4 py-2">
-          {todayTimelinePlans.length > 0 ? (
+          {initialPlansLoading ? (
+            <ListCardSkeleton rows={2} />
+          ) : todayTimelinePlans.length > 0 ? (
             <div className="relative py-2 pl-[5.25rem]">
               <div className="absolute left-[4.55rem] top-7 bottom-7 w-px bg-border" />
               {todayTimelinePlans.map((plan, index) => {
@@ -701,6 +706,7 @@ export function PlansPage() {
                     key={plan.id}
                     type="button"
                     className="relative flex min-h-[5rem] w-full items-center gap-3.5 border-b border-border/70 py-3 text-left last:border-b-0"
+                    data-scroll-anchor={`plans:${plan.id}`}
                     onClick={() => navigate(`/plans/${plan.id}`)}
                   >
                     <span className="absolute -left-[4.85rem] w-14 text-[1.05rem] font-semibold text-life-trace">
@@ -735,7 +741,9 @@ export function PlansPage() {
 
         <SoftSectionTitle title="即将到来" meta={`${upcomingPreviewPlans.length} 个`} />
         <SoftPanel className="px-4 py-2">
-          {upcomingPreviewPlans.length > 0 ? (
+          {initialPlansLoading ? (
+            <ListCardSkeleton rows={2} />
+          ) : upcomingPreviewPlans.length > 0 ? (
             upcomingPreviewPlans.map((plan) => {
               const { dateText, timeText } = getPlanDisplayTimeParts(plan);
               return (
@@ -743,6 +751,7 @@ export function PlansPage() {
                   key={plan.id}
                   type="button"
                   className="flex min-h-[4.8rem] w-full items-center gap-4 border-b border-border/70 py-3 text-left last:border-b-0"
+                  data-scroll-anchor={`plans:${plan.id}`}
                   onClick={() => navigate(`/plans/${plan.id}`)}
                 >
                   <span className="w-20 shrink-0 text-sm font-semibold text-life-trace">
@@ -769,6 +778,7 @@ export function PlansPage() {
           )}
         </SoftPanel>
 
+        {initialPlansLoading && planGroups.length === 0 ? <ListCardSkeleton rows={3} /> : null}
         {planGroups.map((group) => (
           <section key={group.title} className="space-y-3">
             <div className="flex items-center justify-between gap-3">

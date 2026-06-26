@@ -29,6 +29,7 @@ import { PantryHouseholdDetailSheet } from '@/components/PantryHouseholdDetailSh
 import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
 import { PantryItemDrawer } from '@/components/PantryItemDrawer';
 import { PantryTransferSheet } from '@/components/PantryTransferSheet';
+import { InlineRefreshStatus } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -953,13 +954,6 @@ export function PantryPage() {
             </Card>
           ) : null}
 
-          {listRefreshing ? (
-            <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
-              <ActionLoadingIcon className="size-3.5" tone="ai" />
-              刷新中
-            </div>
-          ) : null}
-
           {initialPantryLoading ? (
             <PantryListSkeleton />
           ) : showPantryErrorFallback ? (
@@ -1028,10 +1022,11 @@ export function PantryPage() {
           ) : (
             <div
               className={cn(
-                'space-y-3 transition-opacity duration-200',
+                'relative space-y-3 transition-opacity duration-200',
                 listRefreshing && 'opacity-95',
               )}
             >
+              {listRefreshing ? <InlineRefreshStatus tone="ai" /> : null}
               {pantryList.map((item) => {
                 const status = resolvePantryStatus(item);
                 const coverUrl = getPantryCoverUrl(item);
@@ -1051,6 +1046,7 @@ export function PantryPage() {
                 return (
                   <Card
                     key={item.id}
+                    data-scroll-anchor={`pantry:${item.id}`}
                     className={cn(
                       'overflow-hidden rounded-[1.6rem] border-border/80 bg-card/95 p-0 shadow-sm shadow-background/25 transition hover:border-life-health/25 hover:shadow-[0_14px_36px_rgba(71,58,42,0.08)]',
                       status === 'discarded' && 'border-border/70 bg-secondary/20',

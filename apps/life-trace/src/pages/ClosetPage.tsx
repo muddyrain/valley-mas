@@ -25,6 +25,7 @@ import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { ClosetItemSheet, clothingAnalysisToClosetDraft } from '@/components/ClosetItemSheet';
 import { EmptyState } from '@/components/EmptyState';
 import { SectionHeader } from '@/components/SectionHeader';
+import { ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -872,7 +873,7 @@ export function ClosetPage() {
             </div>
           ) : null}
           {loading ? (
-            <Card className="p-5 text-sm text-muted-foreground">正在读取衣橱</Card>
+            <ListCardSkeleton media rows={4} />
           ) : filteredItems.length === 0 ? (
             <EmptyState
               icon={Shirt}
@@ -904,16 +905,17 @@ export function ClosetPage() {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {filteredItems.map((item) => (
-                <ClosetItemCard
-                  key={item.id}
-                  item={item}
-                  onEdit={() => {
-                    setEditingItem(item);
-                    setSheetOpen(true);
-                  }}
-                  onOpen={() => navigate(`/closet/items/${item.id}`)}
-                  onDelete={() => void handleDeleteItem(item)}
-                />
+                <div key={item.id} data-scroll-anchor={`closet:item:${item.id}`}>
+                  <ClosetItemCard
+                    item={item}
+                    onEdit={() => {
+                      setEditingItem(item);
+                      setSheetOpen(true);
+                    }}
+                    onOpen={() => navigate(`/closet/items/${item.id}`)}
+                    onDelete={() => void handleDeleteItem(item)}
+                  />
+                </div>
               ))}
             </div>
           )}
@@ -921,7 +923,9 @@ export function ClosetPage() {
 
         <section>
           <SectionHeader title="穿搭" meta={outfitsLoading ? '同步中' : `${outfits.length} 套`} />
-          {outfits.length === 0 ? (
+          {outfitsLoading && outfits.length === 0 ? (
+            <ListCardSkeleton rows={2} />
+          ) : outfits.length === 0 ? (
             <Card className="p-4 text-sm text-muted-foreground">保存穿搭后会出现在这里。</Card>
           ) : (
             <div className="space-y-3">
@@ -930,6 +934,7 @@ export function ClosetPage() {
                   key={outfit.id}
                   type="button"
                   className="flex w-full items-center justify-between gap-4 rounded-[1.25rem] border border-border bg-card p-4 text-left transition hover:bg-secondary/60"
+                  data-scroll-anchor={`closet:outfit:${outfit.id}`}
                   onClick={() => navigate(`/closet/outfits/${outfit.id}`)}
                 >
                   <span className="min-w-0">

@@ -535,6 +535,7 @@ export function ProfilePage() {
             type="button"
             variant="outline"
             className="w-full sm:w-auto"
+            data-scroll-anchor="profile:reminders"
             onClick={() => navigate('/profile/reminders')}
           >
             打开提醒设置
@@ -549,6 +550,7 @@ export function ProfilePage() {
           <button
             type="button"
             className="flex w-full items-center gap-3 text-left"
+            data-scroll-anchor="profile:inbox"
             onClick={() => navigate('/inbox')}
           >
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
@@ -565,6 +567,7 @@ export function ProfilePage() {
           <button
             type="button"
             className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
+            data-scroll-anchor="profile:places"
             onClick={() => navigate('/places')}
           >
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-trace/10 text-life-trace">
@@ -581,6 +584,7 @@ export function ProfilePage() {
           <button
             type="button"
             className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
+            data-scroll-anchor="profile:ledger"
             onClick={() => navigate('/ledger')}
           >
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
@@ -595,6 +599,7 @@ export function ProfilePage() {
           <button
             type="button"
             className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
+            data-scroll-anchor="profile:recurring-payments"
             onClick={() => navigate('/recurring-payments')}
           >
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
@@ -611,6 +616,7 @@ export function ProfilePage() {
           <button
             type="button"
             className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
+            data-scroll-anchor="profile:shopping"
             onClick={() => navigate('/shopping')}
           >
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
@@ -686,6 +692,7 @@ export function ProfilePage() {
               type="button"
               variant="outline"
               className="w-full sm:w-auto"
+              data-scroll-anchor="profile:achievements"
               onClick={() => navigate('/achievements')}
             >
               打开生活成就
@@ -763,7 +770,12 @@ export function ProfilePage() {
                 查看空间详情
               </Button>
             ) : null}
-            <Button type="button" variant="outline" onClick={() => navigate('/pantry')}>
+            <Button
+              type="button"
+              variant="outline"
+              data-scroll-anchor="profile:pantry"
+              onClick={() => navigate('/pantry')}
+            >
               查看当前库存
             </Button>
           </div>
@@ -775,6 +787,7 @@ export function ProfilePage() {
         <button
           type="button"
           className="flex w-full items-center justify-between gap-4 rounded-[1.25rem] border border-life-ai/20 bg-card p-4 text-left transition hover:border-life-ai/35 hover:bg-card/95"
+          data-scroll-anchor="profile:closet"
           onClick={() => navigate('/closet')}
         >
           <span className="flex min-w-0 items-center gap-3">
@@ -800,6 +813,7 @@ export function ProfilePage() {
           title="书影音日记"
           description="书籍、电影、剧集、动漫和音乐"
           tone="trace"
+          data-scroll-anchor="profile:media-diary"
           onClick={() => navigate('/media-diary')}
         />
       </section>

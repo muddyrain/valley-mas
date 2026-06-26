@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 type ActionLoadingIconProps = {
   className?: string;
-  tone?: 'ai' | 'trace' | 'health' | 'alert';
+  tone?: 'ai' | 'trace' | 'health' | 'alert' | 'plan';
 };
 
 const toneClasses: Record<NonNullable<ActionLoadingIconProps['tone']>, string> = {
@@ -11,6 +11,7 @@ const toneClasses: Record<NonNullable<ActionLoadingIconProps['tone']>, string> =
   trace: 'text-life-trace',
   health: 'text-life-health',
   alert: 'text-life-alert',
+  plan: 'text-life-plan',
 };
 
 export function ActionLoadingIcon({ className, tone = 'ai' }: ActionLoadingIconProps) {

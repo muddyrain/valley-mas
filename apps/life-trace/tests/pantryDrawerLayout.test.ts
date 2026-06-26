@@ -148,10 +148,11 @@ describe('pantry drawer mobile layout guards', () => {
     expect(aiPageSource).toContain('onRemovePhotoItemDraft(item.id)');
   });
 
-  it('shows an immediate smart recipe loading state in the main chat area', () => {
-    expect(aiPageSource).toContain("title: '正在生成智能菜谱'");
-    expect(aiPageSource).toContain("quickActionLoading === '智能菜谱'");
-    expect(aiPageSource).toContain('RecipeLoadingState');
+  it('routes smart recipes to the dedicated recipe page', () => {
+    expect(appSource).toContain('AiRecipesPage');
+    expect(appSource).toContain('path="/ai/recipes"');
+    expect(aiPageSource).toContain("navigate('/ai/recipes')");
+    expect(aiPageSource).toContain("onQuickAction('智能菜谱')");
   });
 
   it('does not stack large conversation sync skeletons under the recent recognition summary', () => {

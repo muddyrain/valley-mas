@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetSelectField } from '@/components/FormItem';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { SectionHeader } from '@/components/SectionHeader';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -120,6 +121,7 @@ function PlaceCard({ place }: { place: Place }) {
     <button
       type="button"
       className="block w-full text-left"
+      data-scroll-anchor={`places:${place.id}`}
       onClick={() => navigate(`/places/${place.id}`)}
     >
       <Card className="p-4 transition hover:border-life-trace/35 hover:bg-life-trace/5">
@@ -318,6 +320,8 @@ function PlacesListView() {
   const exportPlaces = useLifeTraceStore((state) => state.exportPlaces);
   const convertInbox = useLifeTraceStore((state) => state.convertInbox);
   const groups = useMemo(() => groupPlaces(places), [places]);
+  const initialPlacesLoading = placesLoading && !placesLoaded;
+  const placesRefreshing = placesLoading && placesLoaded;
   const location = useLocation();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
@@ -440,6 +444,8 @@ function PlacesListView() {
 
         {placesError ? <LoadErrorState error={placesError} onRetry={() => loadPlaces()} /> : null}
 
+        {initialPlacesLoading ? <ListCardSkeleton rows={3} /> : null}
+
         {!placesLoading && placesLoaded && places.length === 0 ? (
           <EmptyState
             icon={MapPin}
@@ -448,10 +454,13 @@ function PlacesListView() {
           />
         ) : null}
 
-        <PlaceGroup title="收藏地点" places={groups.favorites} />
-        <PlaceGroup title="想去地点" places={groups.wantPlaces} />
-        <PlaceGroup title="常去地点" places={groups.frequent} />
-        <PlaceGroup title="最近出现" places={groups.recent} />
+        <div className="relative space-y-5">
+          {placesRefreshing ? <InlineRefreshStatus tone="trace" /> : null}
+          <PlaceGroup title="收藏地点" places={groups.favorites} />
+          <PlaceGroup title="想去地点" places={groups.wantPlaces} />
+          <PlaceGroup title="常去地点" places={groups.frequent} />
+          <PlaceGroup title="最近出现" places={groups.recent} />
+        </div>
 
         {placesPagination.hasMore ? (
           <Button

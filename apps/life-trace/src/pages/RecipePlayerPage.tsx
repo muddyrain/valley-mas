@@ -2,6 +2,7 @@ import { ChevronLeft, Timer, Video } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { RecipeSuggestionItem } from '@/api/advice';
+import { canNavigateBackFromState } from '@/components/SubPageShell';
 import { Button } from '@/components/ui/button';
 import { gsap, useGSAP } from '@/lib/gsap';
 import { readRecipeHistoryItem } from '@/lib/recipeHistory';
@@ -36,6 +37,14 @@ export function RecipePlayerPage() {
   const [timerRunning, setTimerRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  const handleBack = () => {
+    if (canNavigateBackFromState(window.history.state)) {
+      navigate(-1);
+      return;
+    }
+    navigate('/ai/recipes', { replace: true });
+  };
+
   // Page entrance animation
   useGSAP(
     () => {
@@ -57,7 +66,7 @@ export function RecipePlayerPage() {
         <header className="flex items-center justify-between border-b border-[#27272a] px-4 py-3">
           <button
             type="button"
-            onClick={() => navigate('/ai', { replace: true })}
+            onClick={handleBack}
             className="flex items-center gap-1.5 text-sm text-[#a1a1aa] transition hover:text-[#fafafa]"
           >
             <ChevronLeft className="size-5" />
@@ -115,7 +124,7 @@ export function RecipePlayerPage() {
         <header className="flex items-center justify-between px-4 py-3 border-b border-[#27272a]">
           <button
             type="button"
-            onClick={() => navigate('/ai', { replace: true })}
+            onClick={handleBack}
             className="flex items-center gap-1.5 text-sm text-[#a1a1aa] hover:text-[#fafafa] transition"
           >
             <ChevronLeft className="size-5" />
@@ -206,7 +215,7 @@ export function RecipePlayerPage() {
       <header className="flex items-center justify-between px-4 py-3 border-b border-[#27272a]">
         <button
           type="button"
-          onClick={() => navigate('/ai', { replace: true })}
+          onClick={handleBack}
           className="flex items-center gap-1.5 text-sm text-[#a1a1aa] hover:text-[#fafafa] transition"
         >
           <ChevronLeft className="size-5" />
