@@ -271,7 +271,7 @@ export function ReminderSettingsPage() {
           <SectionHeader title="每日简报" meta={`${settings.dailyBriefTime} 推送`} />
           <Card className="space-y-4 p-4">
             <p className="text-sm leading-6 text-muted-foreground">
-              这条通知会组合天气城市和今天计划来生成。现在就可以按当前设置发一条出来，看实际长什么样。
+              早上先看天气，需要出门或有计划时会顺手提醒。现在可以按当前设置发一条预览。
             </p>
             <div className="flex flex-wrap gap-2">
               <Badge tone="weather">天气城市：{settings.city}</Badge>

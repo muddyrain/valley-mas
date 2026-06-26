@@ -1,9 +1,17 @@
 import {
+  addCalendarDays,
+  formatDateKey,
+  getCalendarWeekDays,
+  getLunarDateInfo,
+  toCalendarDate,
+} from '@valley/calendar';
+import {
   AlertTriangle,
   Bell,
   BellOff,
   CalendarPlus,
   Check,
+  ChevronLeft,
   ChevronRight,
   Filter,
   Plus,
@@ -122,7 +130,25 @@ export function PlansPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Plan | null>(null);
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(() =>
+    formatDateKey(new Date()),
+  );
+  const [weekCursorKey, setWeekCursorKey] = useState(() => formatDateKey(new Date()));
   const now = useMemo(() => new Date(), []);
+  const todayKey = useMemo(() => formatDateKey(now), [now]);
+  const dateScoped = activeFilter !== 'upcoming' && Boolean(selectedDateKey);
+  const selectedDateLabel = useMemo(() => {
+    if (!selectedDateKey) return '';
+    return new Intl.DateTimeFormat('zh-CN', {
+      month: 'numeric',
+      day: 'numeric',
+      weekday: 'short',
+    }).format(toCalendarDate(selectedDateKey));
+  }, [selectedDateKey]);
+  const timelineBaseDate = useMemo(
+    () => (dateScoped && selectedDateKey ? toCalendarDate(selectedDateKey) : now),
+    [dateScoped, now, selectedDateKey],
+  );
   const listOptions = useMemo(
     () => ({
       pageSize: 20,
@@ -130,8 +156,10 @@ export function PlansPage() {
       q: searchQuery,
       type: typeFilter,
       reminder: quickFilter === 'reminded' ? true : undefined,
+      dateFrom: dateScoped ? selectedDateKey || undefined : undefined,
+      dateTo: dateScoped ? selectedDateKey || undefined : undefined,
     }),
-    [activeFilter, quickFilter, searchQuery, typeFilter],
+    [activeFilter, dateScoped, quickFilter, searchQuery, selectedDateKey, typeFilter],
   );
   const visibleBasePlans = useMemo(() => {
     let nextPlans = plans;
@@ -160,15 +188,25 @@ export function PlansPage() {
           ? filterPlans(visibleBasePlans, 'completed')
           : filterPlans(visibleBasePlans, activeFilter);
   const filteredPlans = filterPlansByKeywordAndType(viewPlans, searchQuery, typeFilter);
-  const timelineGroups = splitPlansByTimeline(filteredPlans, now);
+  const timelineGroups = splitPlansByTimeline(filteredPlans, timelineBaseDate);
   const overdueCount = splitPlansByTimeline(plans, now).overduePlans.length;
   const activeFilterConfig =
     primaryPlanFilters.find((filter) => filter.id === activeFilter) ?? primaryPlanFilters[0];
+  const activeEmptyText =
+    activeFilter === 'today' && selectedDateKey !== todayKey
+      ? '这一天还没有计划。可以先添加一个轻量安排。'
+      : activeFilter === 'completed' && selectedDateKey
+        ? '这一天还没有完成的计划。'
+        : activeFilterConfig.emptyText;
   const planGroups = [
     ...(activeFilter === 'today'
       ? [
           { title: '已逾期', plans: timelineGroups.overduePlans, tone: 'text-life-alert' },
-          { title: '今日计划', plans: timelineGroups.todayPlans, tone: '' },
+          {
+            title: selectedDateKey === todayKey ? '今日计划' : '当日计划',
+            plans: timelineGroups.todayPlans,
+            tone: '',
+          },
           {
             title: '未排期',
             plans: timelineGroups.unscheduledPlans,
@@ -191,27 +229,50 @@ export function PlansPage() {
   const initialPlansLoading = plansLoading && !plansLoaded;
   const plansRefreshing = plansLoading && plansLoaded;
   const weekDays = useMemo(() => {
-    const base = new Date();
-    const monday = new Date(base);
-    const day = monday.getDay() || 7;
-    monday.setDate(base.getDate() - day + 1);
-
-    return Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(monday);
-      date.setDate(monday.getDate() + index);
-      const dateKey = date.toISOString().slice(0, 10);
-      const hasPlan = plans.some((plan) => plan.scheduledDate === dateKey && !plan.completed);
+    return getCalendarWeekDays(weekCursorKey, {
+      selectedDate: selectedDateKey ?? undefined,
+      today: now,
+    }).map((day) => {
+      const lunar = getLunarDateInfo(day.dateKey);
+      const hasPlan = plans.some((plan) => plan.scheduledDate === day.dateKey && !plan.completed);
       return {
-        key: dateKey,
-        weekday: ['一', '二', '三', '四', '五', '六', '日'][index],
-        day: date.getDate(),
-        active: date.toDateString() === base.toDateString(),
+        ...day,
         hasPlan,
+        lunarText: lunar?.text ?? '',
       };
     });
-  }, [plans]);
+  }, [now, plans, selectedDateKey, weekCursorKey]);
   const todayTimelinePlans = timelineGroups.todayPlans.slice(0, 5);
   const upcomingPreviewPlans = timelineGroups.upcomingPlans.slice(0, 2);
+  const selectedDayTitle = selectedDateKey === todayKey ? '今天的安排' : '当日安排';
+
+  const moveWeek = (days: -7 | 7) => {
+    setWeekCursorKey(formatDateKey(addCalendarDays(toCalendarDate(weekCursorKey), days)));
+  };
+
+  const selectCalendarDate = (dateKey: string) => {
+    setSelectedDateKey(dateKey);
+    setWeekCursorKey(dateKey);
+    setActiveFilter('today');
+  };
+
+  const goCalendarToday = () => {
+    const nextTodayKey = formatDateKey(new Date());
+    setSelectedDateKey(nextTodayKey);
+    setWeekCursorKey(nextTodayKey);
+    setActiveFilter('today');
+  };
+
+  const switchPrimaryFilter = (filter: PlanFilter) => {
+    if (filter === 'upcoming') {
+      setSelectedDateKey(null);
+    } else if (!selectedDateKey) {
+      const nextTodayKey = formatDateKey(new Date());
+      setSelectedDateKey(nextTodayKey);
+      setWeekCursorKey(nextTodayKey);
+    }
+    setActiveFilter(filter);
+  };
 
   const handleAddToCalendar = (plan: Plan) => {
     const opened = openPlanInNativeCalendar(plan, {
@@ -472,11 +533,7 @@ export function PlansPage() {
     <SoftPage ref={pageRef} className="pb-32">
       <SoftHeader
         title="计划"
-        subtitle={new Intl.DateTimeFormat('zh-CN', {
-          month: 'numeric',
-          day: 'numeric',
-          weekday: 'short',
-        }).format(new Date())}
+        subtitle={selectedDateLabel || '未来安排'}
         action={
           <Button
             type="button"
@@ -495,25 +552,62 @@ export function PlansPage() {
       />
 
       <SoftPanel className="px-3.5 py-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-9 rounded-full"
+            onClick={() => moveWeek(-7)}
+            aria-label="上一周"
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <Button
+            type="button"
+            variant={selectedDateKey === todayKey ? 'secondary' : 'outline'}
+            size="sm"
+            className="rounded-full"
+            onClick={goCalendarToday}
+          >
+            今天
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-9 rounded-full"
+            onClick={() => moveWeek(7)}
+            aria-label="下一周"
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
         <div className="grid grid-cols-7 gap-1.5 text-center">
           {weekDays.map((item) => (
             <button
-              key={item.key}
+              key={item.dateKey}
               type="button"
               className={cn(
-                'grid min-h-[4.35rem] place-items-center rounded-[1.05rem] text-sm transition',
-                item.active
+                'grid min-h-[4.75rem] place-items-center rounded-[1.05rem] px-1 text-sm transition',
+                item.isSelected
                   ? 'bg-life-trace text-primary-foreground shadow-[0_12px_28px_rgba(95,146,112,0.24)]'
-                  : 'text-muted-foreground hover:bg-secondary',
+                  : item.isToday
+                    ? 'bg-life-trace/10 text-life-trace hover:bg-life-trace/15'
+                    : 'text-muted-foreground hover:bg-secondary',
               )}
-              onClick={() => setActiveFilter('today')}
+              onClick={() => selectCalendarDate(item.dateKey)}
+              aria-pressed={item.isSelected}
             >
-              <span className="text-[0.8rem] font-semibold">{item.weekday}</span>
-              <span className="text-[1.15rem] font-semibold leading-none">{item.day}</span>
+              <span className="text-[0.8rem] font-semibold">周{item.weekdayLabel}</span>
+              <span className="text-[1.15rem] font-semibold leading-none">{item.dayOfMonth}</span>
+              <span className="min-h-4 max-w-full truncate text-[0.68rem] leading-none opacity-80">
+                {item.lunarText}
+              </span>
               <span
                 className={cn(
                   'size-1.5 rounded-full',
-                  item.active
+                  item.isSelected
                     ? 'bg-primary-foreground/80'
                     : item.hasPlan
                       ? 'bg-life-trace'
@@ -550,7 +644,7 @@ export function PlansPage() {
               className={`min-h-11 rounded-xl px-1 py-3 transition ${
                 active ? 'bg-secondary text-foreground shadow-sm' : 'hover:text-foreground'
               }`}
-              onClick={() => setActiveFilter(filter.id)}
+              onClick={() => switchPrimaryFilter(filter.id)}
               aria-pressed={active}
             >
               {filter.label}
@@ -685,7 +779,7 @@ export function PlansPage() {
 
       <div className="relative space-y-5">
         {plansRefreshing ? <InlineRefreshStatus tone="plan" /> : null}
-        <SoftSectionTitle title="今天的安排" meta={`${todayTimelinePlans.length} 个`} />
+        <SoftSectionTitle title={selectedDayTitle} meta={`${todayTimelinePlans.length} 个`} />
         <SoftPanel className="px-4 py-2">
           {initialPlansLoading ? (
             <ListCardSkeleton rows={2} />
@@ -735,7 +829,9 @@ export function PlansPage() {
             </div>
           ) : (
             <div className="py-7 text-center text-sm text-muted-foreground">
-              今天还没有安排，可以先添加一个轻量计划。
+              {selectedDateKey === todayKey
+                ? '今天还没有安排，可以先添加一个轻量计划。'
+                : '这一天还没有安排，可以先添加一个轻量计划。'}
             </div>
           )}
         </SoftPanel>
@@ -821,18 +917,13 @@ export function PlansPage() {
         !showPlansErrorFallback ? (
           <EmptyState
             title={activeFilter === 'all' ? '还没有计划' : '暂无匹配计划'}
-            description={activeFilterConfig.emptyText}
+            description={activeEmptyText}
             eyebrow={activeFilterConfig.label}
             icon={Plus}
             tone="plan"
             action={
               activeFilter !== 'all' && plans.length > 0 ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setActiveFilter('today')}
-                >
+                <Button type="button" variant="outline" size="sm" onClick={goCalendarToday}>
                   查看今日计划
                 </Button>
               ) : null

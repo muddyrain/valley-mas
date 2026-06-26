@@ -57,3 +57,32 @@ export interface CalendarHolidayInfo {
   kind: 'holiday' | 'weekend' | 'workday';
   sourceName: string;
 }
+
+export interface CalendarDayCell {
+  date: Date;
+  dateKey: string;
+  weekday: number;
+  weekdayLabel: string;
+  dayOfMonth: number;
+  isToday: boolean;
+  isSelected: boolean;
+  isCurrentMonth: boolean;
+}
+
+export type CalendarWeekStartsOn = 0 | 1;
+
+export interface CalendarWeekOptions {
+  selectedDate?: Date | string;
+  today?: Date | string;
+  weekStartsOn?: CalendarWeekStartsOn;
+}
+
+export interface LunarDateInfo {
+  year: number;
+  month: number;
+  day: number;
+  isLeapMonth: boolean;
+  monthName: string;
+  dayName: string;
+  text: string;
+}

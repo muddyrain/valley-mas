@@ -449,27 +449,35 @@ func buildDailyBriefPushPayload(
 	dueAt time.Time,
 ) PushPayload {
 	intro := buildDailyBriefIntro(settings, weather, dueAt)
-	planText := buildDailyBriefPlanText(plans)
+	planText := buildDailyBriefPlanText(plans, weather)
 
 	parts := []string{intro, planText}
 	body := strings.Join(compactStrings(parts), "；")
 	if body == "" {
-		body = "看看今天的天气和计划。"
+		body = "看看今天的天气，再决定怎么安排出门。"
 	}
 
 	return PushPayload{
-		Title: buildDailyBriefTitle(settings, weather, dueAt),
+		Title: buildDailyBriefTitle(settings, weather, plans, dueAt),
 		Body:  body,
 		URL:   "/today",
 		Tag:   fmt.Sprintf("life-trace-daily-brief-%s", dueAt.Format("2006-01-02")),
 	}
 }
 
-func buildDailyBriefTitle(settings model.LifeTraceSettings, weather WeatherResponse, dueAt time.Time) string {
+func buildDailyBriefTitle(
+	settings model.LifeTraceSettings,
+	weather WeatherResponse,
+	plans []model.LifeTracePlan,
+	dueAt time.Time,
+) string {
 	if settings.WeatherAlerts {
 		if riskTitle := buildDailyBriefRiskTitle(weather); riskTitle != "" {
 			return riskTitle
 		}
+	}
+	if len(plans) > 0 {
+		return "Life Trace 今日计划"
 	}
 	if isRestDay(settings, dueAt) {
 		return "Life Trace 周末天气"
@@ -501,30 +509,88 @@ func buildDailyBriefIntro(settings model.LifeTraceSettings, weather WeatherRespo
 
 	if isRestDay(settings, dueAt) {
 		if len(base) > 0 {
-			return strings.Join(base, " ") + "，今天把节奏放松一点也没关系"
+			return strings.Join(base, " ") + "，适合按自己的节奏出门走走"
 		}
 		return "今天适合按自己的节奏慢慢展开"
 	}
 
 	if len(base) > 0 {
-		return strings.Join(base, " ") + "，今天先把最重要的一件事处理掉"
+		return strings.Join(base, " ") + buildDailyBriefWeatherSuggestion(skyText)
 	}
-	return "新的一天开始了，先把节奏稳住"
+	return "早上好，看看今天的天气，再决定怎么安排出门"
 }
 
-func buildDailyBriefPlanText(plans []model.LifeTracePlan) string {
+func buildDailyBriefWeatherSuggestion(skyText string) string {
+	skyText = strings.TrimSpace(skyText)
+	switch {
+	case strings.Contains(skyText, "晴"):
+		return "，天气不错，适合出门走走"
+	case strings.Contains(skyText, "多云"):
+		return "，云量不重，可以安排一段轻松出门"
+	case strings.Contains(skyText, "阴"):
+		return "，光线柔和，适合慢一点出门"
+	default:
+		return "，出门前看一眼气温就好"
+	}
+}
+
+func buildDailyBriefPlanText(plans []model.LifeTracePlan, weather WeatherResponse) string {
 	if len(plans) == 0 {
-		return "今天计划比较轻，先完成一件最重要的事"
+		return ""
 	}
 
 	nextPlanText := "今天有 1 个计划待处理"
 	if len(plans) > 1 {
 		nextPlanText = fmt.Sprintf("今天有 %d 个计划待处理", len(plans))
 	}
-	if nextPlan := findNextPlanWithTime(plans); nextPlan != nil && strings.TrimSpace(nextPlan.ScheduledTime) != "" {
-		nextPlanText = fmt.Sprintf("%s，下一项 %s %s", nextPlanText, nextPlan.ScheduledTime, nextPlan.Title)
+	if nextPlan := findNextPlanWithTime(plans); nextPlan != nil {
+		if strings.TrimSpace(nextPlan.ScheduledTime) != "" {
+			nextPlanText = fmt.Sprintf("%s，下一项 %s %s", nextPlanText, nextPlan.ScheduledTime, nextPlan.Title)
+		} else {
+			nextPlanText = fmt.Sprintf("%s，记得留意 %s", nextPlanText, nextPlan.Title)
+		}
+		if advice := buildOutdoorPlanWeatherAdvice(*nextPlan, weather); advice != "" {
+			nextPlanText = fmt.Sprintf("%s，%s", nextPlanText, advice)
+		}
 	}
 	return nextPlanText
+}
+
+func buildOutdoorPlanWeatherAdvice(plan model.LifeTracePlan, weather WeatherResponse) string {
+	if !isOutdoorPlan(plan) {
+		return ""
+	}
+
+	switch detectDailyBriefRisk(weather) {
+	case "rain":
+		return "出门安排记得带伞，路上多留一点缓冲"
+	case "heat":
+		return "外出尽量避开午后暴晒，记得补水"
+	case "wind":
+		return "出门注意防风，骑行或步行别太赶"
+	case "gap":
+		return "早晚温差明显，晚归带件外套"
+	case "uv":
+		return "户外时间长的话记得补防晒"
+	default:
+		return ""
+	}
+}
+
+func isOutdoorPlan(plan model.LifeTracePlan) bool {
+	text := strings.TrimSpace(plan.Title + " " + plan.Note + " " + plan.Location)
+	if text == "" {
+		return false
+	}
+	for _, keyword := range []string{
+		"出门", "出去", "外出", "散步", "跑步", "骑行", "运动", "通勤", "聚会", "约", "见",
+		"玩", "旅行", "公园", "逛", "拍照", "露营", "爬山", "徒步", "西湖",
+	} {
+		if strings.Contains(text, keyword) {
+			return true
+		}
+	}
+	return false
 }
 
 func buildDailyBriefRiskTitle(weather WeatherResponse) string {

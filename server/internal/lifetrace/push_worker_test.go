@@ -534,6 +534,57 @@ func TestBuildDailyBriefPushPayloadKeepsDailyWeatherWhenRiskAlertsDisabled(t *te
 	}
 }
 
+func TestBuildDailyBriefPushPayloadSkipsPlanFillerWhenNoPlans(t *testing.T) {
+	settings := model.LifeTraceSettings{
+		City:          "杭州",
+		WorkdayMode:   "daily",
+		WeatherAlerts: true,
+	}
+	weather := WeatherResponse{}
+	weather.Now.Temp = "24"
+	weather.Now.High = "27"
+	weather.Now.Low = "19"
+	weather.Now.Text = "多云"
+	dueAt := time.Date(2026, 6, 2, 8, 10, 0, 0, time.Local)
+
+	payload := buildDailyBriefPushPayload(settings, weather, nil, dueAt)
+	if !containsAny(payload.Body, []string{"杭州", "24°", "多云", "适合出门"}) {
+		t.Fatalf("expected useful weather brief, got %+v", payload)
+	}
+	if containsAny(payload.Body, []string{"计划比较轻", "最重要"}) {
+		t.Fatalf("expected no filler plan wording when there are no plans, got %+v", payload)
+	}
+}
+
+func TestBuildDailyBriefPushPayloadLinksRainToOutdoorPlan(t *testing.T) {
+	settings := model.LifeTraceSettings{
+		City:          "杭州",
+		WorkdayMode:   "daily",
+		WeatherAlerts: true,
+	}
+	weather := WeatherResponse{}
+	weather.Now.Temp = "21"
+	weather.Now.High = "23"
+	weather.Now.Low = "18"
+	weather.Now.Text = "小雨"
+	dueAt := time.Date(2026, 6, 2, 8, 10, 0, 0, time.Local)
+
+	payload := buildDailyBriefPushPayload(settings, weather, []model.LifeTracePlan{
+		{
+			Title:         "下午出去玩",
+			ScheduledDate: "2026-06-02",
+			ScheduledTime: "15:00",
+			Note:          "西湖边散步",
+		},
+	}, dueAt)
+	if !containsAny(payload.Body, []string{"出门安排", "带伞", "留缓冲"}) {
+		t.Fatalf("expected rain to link with outdoor plan, got %+v", payload)
+	}
+	if !strings.Contains(payload.Body, "15:00") || !strings.Contains(payload.Body, "下午出去玩") {
+		t.Fatalf("expected next plan details in body, got %+v", payload)
+	}
+}
+
 func containsAny(text string, candidates []string) bool {
 	for _, candidate := range candidates {
 		if candidate != "" && strings.Contains(text, candidate) {

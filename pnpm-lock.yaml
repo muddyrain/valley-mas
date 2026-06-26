@@ -334,6 +334,9 @@ importers:
       '@valley/browser-media':
         specifier: workspace:*
         version: link:../../packages/browser-media
+      '@valley/calendar':
+        specifier: workspace:*
+        version: link:../../packages/calendar
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
