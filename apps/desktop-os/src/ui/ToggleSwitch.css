@@ -1,0 +1,37 @@
+.toggle-switch {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(90, 74, 58, 0.18);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.18s var(--ease-out);
+  flex-shrink: 0;
+}
+
+.toggle-switch.is-on {
+  background: var(--plush-sage);
+}
+
+.toggle-switch:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.toggle-switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(40, 32, 24, 0.25);
+  transition: transform 0.2s var(--ease-spring);
+}
+
+.toggle-switch.is-on .toggle-switch__knob {
+  transform: translateX(14px);
+}

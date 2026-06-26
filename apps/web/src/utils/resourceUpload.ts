@@ -1,3 +1,4 @@
+import { createUploadKey as createBrowserUploadKey } from '@valley/browser-media';
 import type { AxiosError } from 'axios';
 import { getUploadResourceStatus, type MyResource } from '@/api/resource';
 
@@ -9,11 +10,7 @@ export type UploadConfirmationResult =
   | { status: 'confirming' };
 
 export function createUploadKey() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-
-  return `upload-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+  return createBrowserUploadKey();
 }
 
 export function shouldConfirmUploadResult(error: unknown) {

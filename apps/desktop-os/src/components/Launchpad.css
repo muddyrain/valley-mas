@@ -1,0 +1,469 @@
+.launchpad {
+  position: absolute;
+  inset: 28px 0 0;
+  z-index: 850;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: clamp(22px, 5vh, 56px) clamp(16px, 4vw, 56px) 112px;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(244, 217, 122, 0.34), transparent 28%),
+    radial-gradient(circle at 82% 16%, rgba(168, 212, 234, 0.36), transparent 30%),
+    rgba(248, 245, 236, 0.44);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+}
+
+.launchpad__surface {
+  position: relative;
+  display: flex;
+  width: min(1040px, 100%);
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 22px;
+  transform-origin: 50% 100%;
+}
+
+.launchpad__close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: 0 8px 18px rgba(90, 74, 58, 0.1);
+  color: rgba(90, 74, 58, 0.7);
+  font-size: 22px;
+  line-height: 1;
+  transition:
+    background 0.16s var(--ease-out),
+    box-shadow 0.16s var(--ease-out),
+    color 0.16s var(--ease-out),
+    transform 0.18s var(--ease-spring);
+}
+
+.launchpad__close:hover {
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 10px 22px rgba(90, 74, 58, 0.13);
+  color: rgba(64, 54, 43, 0.92);
+  transform: translateY(-1px);
+}
+
+.launchpad__close:focus-visible {
+  outline: 3px solid rgba(168, 212, 234, 0.58);
+  outline-offset: 2px;
+}
+
+.launchpad__search {
+  display: grid;
+  width: min(420px, 100%);
+  height: 42px;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  align-self: center;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: 0 10px 26px rgba(90, 74, 58, 0.1);
+  transform-origin: 50% 100%;
+}
+
+.launchpad__search img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 4px rgba(90, 74, 58, 0.16));
+}
+
+.launchpad__search input {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--plush-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  outline: none;
+}
+
+.launchpad__search input::placeholder {
+  color: rgba(90, 74, 58, 0.52);
+}
+
+.launchpad__groups {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 24px;
+  overflow: auto;
+  padding: 0 4px 6px;
+  scrollbar-gutter: stable;
+}
+
+.launchpad__stage {
+  position: relative;
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  place-items: center;
+  overflow: hidden;
+  cursor: default;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.launchpad__stage.is-swipe-pressing {
+  cursor: grabbing;
+}
+
+.launchpad__stage.is-swipe-pressing .launchpad-app,
+.launchpad__stage.is-swipe-pressing .launchpad__nav {
+  cursor: grabbing;
+}
+
+.launchpad__page {
+  width: min(820px, 100%);
+}
+
+.launchpad__nav {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  display: grid;
+  width: 42px;
+  height: 56px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 10px 24px rgba(90, 74, 58, 0.1);
+  color: rgba(90, 74, 58, 0.62);
+  cursor: pointer;
+  font-size: 36px;
+  line-height: 1;
+  transform: translateY(-50%);
+  transition:
+    background 0.16s var(--ease-out),
+    color 0.16s var(--ease-out),
+    transform 0.18s var(--ease-spring);
+}
+
+.launchpad__nav svg {
+  width: 24px;
+  height: 24px;
+}
+
+.launchpad__nav:hover {
+  background: rgba(255, 255, 255, 0.58);
+  color: rgba(64, 54, 43, 0.88);
+  transform: translateY(-50%) scale(1.04);
+}
+
+.launchpad__nav:focus-visible {
+  outline: 3px solid rgba(168, 212, 234, 0.58);
+  outline-offset: 2px;
+}
+
+.launchpad__nav--prev {
+  left: clamp(0px, 2vw, 28px);
+}
+
+.launchpad__nav--next {
+  right: clamp(0px, 2vw, 28px);
+}
+
+.launchpad__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 22px;
+}
+
+.launchpad__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(90, 74, 58, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  cursor: pointer;
+  transition:
+    background 0.16s var(--ease-out),
+    transform 0.18s var(--ease-spring),
+    width 0.18s var(--ease-spring);
+}
+
+.launchpad__dot:hover,
+.launchpad__dot.is-active {
+  background: rgba(90, 74, 58, 0.58);
+}
+
+.launchpad__dot.is-active {
+  width: 20px;
+}
+
+.launchpad__group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.launchpad__group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(90, 74, 58, 0.68);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.launchpad__group-title span:last-child {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.46);
+  color: rgba(90, 74, 58, 0.58);
+  font-size: 11px;
+  line-height: 22px;
+  text-align: center;
+}
+
+.launchpad__grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(92px, 1fr));
+  grid-auto-rows: 128px;
+  gap: 18px 18px;
+}
+
+.launchpad-app {
+  display: grid;
+  min-width: 0;
+  height: 128px;
+  min-height: 128px;
+  grid-template-rows: 74px minmax(32px, auto);
+  justify-items: center;
+  align-content: start;
+  gap: 8px;
+  padding: 9px 8px 8px;
+  border-radius: 18px;
+  color: var(--plush-text);
+  cursor: pointer;
+  text-align: center;
+  transition:
+    background 0.16s var(--ease-out),
+    outline-color 0.16s var(--ease-out),
+    transform 0.18s var(--ease-spring);
+  transform-origin: 50% 82%;
+}
+
+.launchpad-app:hover {
+  background: transparent;
+}
+
+.launchpad-app:hover .launchpad-app__icon {
+  filter: drop-shadow(0 7px 10px rgba(90, 74, 58, 0.14));
+  transform: translateY(-2px) scale(1.03);
+}
+
+.launchpad-app:hover .launchpad-app__title {
+  color: rgba(64, 54, 43, 0.96);
+}
+
+.launchpad-app.is-keyboard-active {
+  background: rgba(255, 255, 255, 0.22);
+  outline: 1px solid rgba(255, 255, 255, 0.34);
+  transform: translateY(-1px);
+}
+
+.launchpad-app:focus-visible {
+  outline: 3px solid rgba(168, 212, 234, 0.58);
+  outline-offset: 2px;
+}
+
+.launchpad-app__icon-wrap {
+  position: relative;
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+}
+
+.launchpad-app__icon {
+  display: block;
+  width: 68px;
+  height: 68px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 4px rgba(90, 74, 58, 0.1));
+  transition:
+    filter 0.18s var(--ease-out),
+    transform 0.18s var(--ease-spring);
+}
+
+.launchpad-app__dot {
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: transparent;
+  transform: translateX(-50%);
+}
+
+.launchpad-app__dot.is-on {
+  background: rgba(90, 74, 58, 0.58);
+}
+
+.launchpad-app__title {
+  max-width: 100%;
+  overflow: hidden;
+  color: rgba(64, 54, 43, 0.9);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.28;
+  text-overflow: ellipsis;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.launchpad__empty {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  place-items: center;
+  border: 1px dashed rgba(90, 74, 58, 0.16);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.32);
+  color: rgba(90, 74, 58, 0.62);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+@media (max-width: 640px) {
+  .launchpad {
+    padding: 18px 14px 104px;
+  }
+
+  .launchpad__surface {
+    gap: 18px;
+  }
+
+  .launchpad__page {
+    width: 100%;
+  }
+
+  .launchpad__grid {
+    grid-template-columns: repeat(4, minmax(68px, 1fr));
+    grid-auto-rows: 116px;
+    gap: 12px 8px;
+  }
+
+  .launchpad__nav {
+    top: auto;
+    bottom: -76px;
+    width: 36px;
+    height: 42px;
+    font-size: 30px;
+    transform: none;
+  }
+
+  .launchpad__nav:hover {
+    transform: scale(1.04);
+  }
+
+  .launchpad__nav--prev {
+    left: calc(50% - 74px);
+  }
+
+  .launchpad__nav--next {
+    right: calc(50% - 74px);
+  }
+
+  .launchpad-app {
+    height: 116px;
+    min-height: 116px;
+    grid-template-rows: 64px minmax(32px, auto);
+    border-radius: 16px;
+  }
+
+  .launchpad-app__icon-wrap {
+    width: 64px;
+    height: 64px;
+  }
+
+  .launchpad-app__icon {
+    width: 60px;
+    height: 60px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launchpad__page,
+  .launchpad__nav,
+  .launchpad__dot,
+  .launchpad-app {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Storybook Design System v1 */
+.launchpad {
+  background:
+    radial-gradient(circle at 18% 16%, rgba(244, 217, 122, 0.44), transparent 18%),
+    radial-gradient(circle at 80% 14%, rgba(168, 212, 234, 0.48), transparent 22%),
+    radial-gradient(ellipse at 50% 110%, rgba(143, 180, 94, 0.48), transparent 52%),
+    rgba(248, 245, 236, 0.46);
+}
+
+.launchpad__search,
+.launchpad__close {
+  border-color: rgba(255, 255, 255, 0.74);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 248, 232, 0.7)), var(--plush-field);
+  box-shadow: var(--shadow-soft);
+}
+
+.launchpad__group-title span:last-child {
+  background: var(--plush-sticker);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.66);
+}
+
+.launchpad-app {
+  border-radius: var(--shape-squircle-md);
+}
+
+.launchpad-app.is-keyboard-active {
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.62), transparent 28%),
+    rgba(255, 250, 236, 0.44);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.54);
+}
+
+.launchpad-app:hover {
+  background: transparent;
+  box-shadow: none;
+}
+
+.launchpad-app__dot.is-on {
+  background: var(--plush-terracotta);
+  box-shadow: 0 0 0 3px rgba(217, 122, 79, 0.12);
+}
+
+.launchpad__empty {
+  border-color: rgba(126, 105, 70, 0.18);
+  border-radius: var(--shape-squircle-lg);
+  background: rgba(255, 250, 236, 0.42);
+}

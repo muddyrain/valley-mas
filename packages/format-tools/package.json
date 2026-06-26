@@ -15,6 +15,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "test": "vitest run",
     "lint": "biome lint src/",
     "check": "biome check src/",
     "clean": "rm -rf dist",
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "tsup": "catalog:ts-tooling",
-    "typescript": "catalog:ts-tooling"
+    "typescript": "catalog:ts-tooling",
+    "vitest": "catalog:test"
   }
 }

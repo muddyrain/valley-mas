@@ -1,0 +1,2 @@
+ALTER TABLE mail_messages
+ADD COLUMN IF NOT EXISTS html_body TEXT NOT NULL DEFAULT '';

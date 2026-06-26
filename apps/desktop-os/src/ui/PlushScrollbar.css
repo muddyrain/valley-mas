@@ -1,0 +1,58 @@
+.plush-scrollbar-frame {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.plush-scrollbar-frame > .plush-scrollbar {
+  width: 100%;
+  height: 100%;
+}
+
+.plush-scrollbar__content {
+  min-width: 0;
+}
+
+.os-theme-plush {
+  --os-size: 10px;
+  --os-padding-perpendicular: 3px;
+  --os-padding-axis: 10px;
+  --os-track-border-radius: 999px;
+  --os-handle-border-radius: 999px;
+  --os-handle-bg: rgba(126, 105, 70, 0.34);
+  --os-handle-bg-hover: rgba(126, 105, 70, 0.48);
+  --os-handle-bg-active: rgba(103, 82, 47, 0.58);
+}
+
+.os-theme-plush.os-scrollbar {
+  pointer-events: none;
+}
+
+.os-theme-plush .os-scrollbar-track {
+  background: transparent;
+}
+
+.os-theme-plush .os-scrollbar-handle {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent), var(--os-handle-bg);
+  box-shadow:
+    0 2px 8px rgba(90, 74, 58, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42);
+}
+
+.os-theme-plush .os-scrollbar-handle:hover {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent), var(--os-handle-bg-hover);
+}
+
+.os-theme-plush .os-scrollbar-handle:active {
+  background: var(--os-handle-bg-active);
+}
+
+.os-theme-plush.os-scrollbar-horizontal {
+  padding-inline: 12px;
+}
+
+.os-theme-plush.os-scrollbar-vertical {
+  padding-block: 12px;
+}

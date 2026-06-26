@@ -279,11 +279,17 @@ func migrationModelsByName(names []string) ([]any, []string, error) {
 func autoMigrateModelsByName() map[string]any {
 	return map[string]any{
 		"user":                               &model.User{},
+		"user_preference":                    &model.UserPreference{},
+		"mail_account":                       &model.MailAccount{},
+		"mail_message":                       &model.MailMessage{},
 		"household":                          &model.Household{},
 		"household_member":                   &model.HouseholdMember{},
 		"household_invite":                   &model.HouseholdInvite{},
 		"operation_log":                      &model.OperationLog{},
 		"ai_usage_log":                       &model.AIUsageLog{},
+		"ai_agent":                           &model.AIAgent{},
+		"ai_conversation":                    &model.AIConversation{},
+		"ai_message":                         &model.AIMessage{},
 		"creator":                            &model.Creator{},
 		"creator_space":                      &model.CreatorSpace{},
 		"resource":                           &model.Resource{},
@@ -335,8 +341,19 @@ func autoMigrateModelsByName() map[string]any {
 func autoMigrateModelAliases() map[string]string {
 	return map[string]string{
 		"users":                    "user",
+		"user_preferences":         "user_preference",
+		"preferences":              "user_preference",
+		"preference":               "user_preference",
+		"mail_accounts":            "mail_account",
+		"mail_account":             "mail_account",
+		"mail_messages":            "mail_message",
+		"mail_message":             "mail_message",
 		"ai_usage":                 "ai_usage_log",
 		"ai_usage_logs":            "ai_usage_log",
+		"ai_agents":                "ai_agent",
+		"agents":                   "ai_agent",
+		"ai_conversations":         "ai_conversation",
+		"ai_messages":              "ai_message",
 		"places":                   "lifetrace_place",
 		"place":                    "lifetrace_place",
 		"plans":                    "lifetrace_plan",
@@ -377,11 +394,17 @@ func autoMigrateModelAliases() map[string]string {
 func coreMigrationModels() []any {
 	return []any{
 		&model.User{},
+		&model.UserPreference{},
+		&model.MailAccount{},
+		&model.MailMessage{},
 		&model.Household{},
 		&model.HouseholdMember{},
 		&model.HouseholdInvite{},
 		&model.OperationLog{},
 		&model.AIUsageLog{},
+		&model.AIAgent{},
+		&model.AIConversation{},
+		&model.AIMessage{},
 	}
 }
 

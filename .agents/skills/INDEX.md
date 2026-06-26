@@ -26,7 +26,7 @@
 - 每个任务先选 1 个主技能；主技能负责当前任务的主要流程和完成标准。
 - 可再选最多 2 个业务辅助技能；只有触发条件明确时才叠加。
 - `skill-usage-disclosure` 和 `encoding-guard` 是横切技能，不计入 2 个业务辅助技能上限。
-- `task-completion-guard` 只在多步骤、计划后实施、跨文件或需要验证闭环时启用；不要因为“改了文件”本身自动启用。
+- `task-completion-guard` 只在多步骤、计划后实施、跨文件或需要验证闭环时启用；不要因为"改了文件"本身自动启用。
 - `delivery-reporting` 只在用户要求详细汇报，或改动可能影响计划文档、长期文档、功能状态、接口、依赖、数据模型、产品方向或验收标准时启用。
 - 普通 UI 改动的业务技能上限为 3 个：通常以 `web-ui-consistency-guard` 或子项目 UI 规则为主技能；涉及用户可见文案时叠加 `ui-copy-boundary-guard`；发现重复 UI 或处理器时再叠加 `component-reuse-guard`。其余需求优先靠主技能清单收敛，不继续扩散。
 
@@ -36,8 +36,8 @@
 | `encoding-guard` | 日常启用 | 修改中文、Markdown、技能、配置示例或任何非 ASCII 文本前后必须使用，防止乱码和文本丢失。 |
 | `task-completion-guard` | 日常启用 | 多步骤任务、计划后实施、跨文件改动、需要验证闭环或容易停在口头承诺的任务。 |
 | `component-reuse-guard` | 日常启用 | 发现重复 JSX、重复处理器、重复弹窗/表单/上传/列表逻辑时，先复用或抽取。 |
-| `conventional-commit-guard` | 日常启用 | 生成提交信息、执行 `git commit`，或用户说“提交/提交吧/提交代码/帮我提交”。 |
-| `delivery-reporting` | 日常启用 | 用户要求分阶段汇报“本次完成、影响范围、已验证、下一步”，或改动可能影响计划文档、长期文档、功能状态、接口、依赖、数据模型、产品方向或验收标准时。 |
+| `conventional-commit-guard` | 日常启用 | 生成提交信息、执行 `git commit`，或用户说"提交/提交吧/提交代码/帮我提交"。 |
+| `delivery-reporting` | 日常启用 | 用户要求分阶段汇报"本次完成、影响范围、已验证、下一步"，或改动可能影响计划文档、长期文档、功能状态、接口、依赖、数据模型、产品方向或验收标准时。 |
 | `ui-copy-boundary-guard` | 日常启用 | 修改用户可见 UI 文案、设置说明、按钮、副标题、空状态或总览描述时，防止把开发者分析、实现解释或页面说明写进界面。 |
 | `ai-capability-orchestration` | 范围限定 | 涉及 Go 服务端火山 ARK AI 能力、模型环境变量、提示词、多模态输入、响应解析、降级和错误映射时。 |
 | `web-ui-consistency-guard` | 范围限定 | Web 页面、共享组件、用户可见文案或页面样式变化时，检查主题 token、品牌色、loading 态、URL query 状态同步和列表刷新一致性。 |
@@ -51,8 +51,8 @@
 | `gsap-utils` | 范围限定 | 使用 `gsap.utils` 做 clamp、mapRange、random、snap、toArray、wrap 等动画辅助计算时。 |
 | `gsap-plugins` | 范围限定 | 使用 GSAP 插件，例如 Flip、Draggable、ScrollTo、SplitText、MorphSVG、CustomEase 等时。 |
 | `gsap-frameworks` | 范围限定 | 在 Vue、Svelte、Astro 或非 React 框架中接入 GSAP 动画时。 |
-| `grill-me` | 手动触发 | 用户手动通过 `/grill-me` 触发的反复追问会话，用于打磨计划或设计；AI 不自动调用。 |
-| `grill-with-docs` | 手动触发，依赖未完全落地 | 用户手动触发的 `/grill-me` 会话，并同步产出 ADR 与术语表等文档；当前引用的 `/domain-modeling` 技能未落地，启用前需确认文档产出方式。 |
+| `grill-me` | 手动触发 | 用户主动触发（说出 `Use Skill: grill-me` 或 `/grilling`）时，对当前计划/设计做高强度追问，逼出隐含假设和未覆盖分支。`disable-model-invocation: true`，禁止自动启用。 |
+| `grill-with-docs` | 手动触发 | 与 `grill-me` 同源，但在追问过程中同步生成 ADR、术语表等文档产物。`disable-model-invocation: true`，仅用户显式触发。 |
 | `setup-matt-pocock-skills` | 一次性配置 | 初始化 Matt Pocock 工程技能依赖的问题追踪、分诊标签和领域文档配置；普通开发不默认启用。 |
 | `web-design-engineer` | 外部/实验 | 仅在用户明确要求视觉原型、完整页面设计、dashboard、slide、动效 demo 或 UI mockup 时启用；普通现有页面开发优先使用 `web-ui-consistency-guard`。 |
 | `ui-ux-pro-max` | 外部/实验，需用户确认 | 仅在用户明确要求设计建议、风格方案、配色字体或 UX 评审时启用；不因普通 `fix`、`improve`、页面小修自动触发，也不替代项目现有设计系统和实现约束。 |

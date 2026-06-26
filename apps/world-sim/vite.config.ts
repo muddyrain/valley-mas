@@ -1,13 +1,24 @@
-import { defineConfig } from 'vitest/config';
+import path from 'node:path';
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react-swc';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
-  server: {
-    port: 5177,
-    strictPort: true,
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
   },
-  test: {
-    environment: 'jsdom',
-    include: ['src/**/*.test.ts'],
-    setupFiles: ['src/test/vitest.setup.ts'],
+  server: {
+    port: 5179,
+  },
+  preview: {
+    port: 4179,
+  },
+  build: {
+    outDir: 'dist',
+    target: 'es2022',
+    sourcemap: true,
   },
 });

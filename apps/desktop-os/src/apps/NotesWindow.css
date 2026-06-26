@@ -1,0 +1,212 @@
+.notes-window {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+  gap: 12px;
+  color: var(--plush-text);
+}
+
+.notes-window--center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notes-window__sidebar,
+.notes-window__editor {
+  min-height: 0;
+  border: 1px solid rgba(90, 74, 58, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 10px 24px rgba(90, 74, 58, 0.08);
+}
+
+.notes-window__sidebar {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.notes-window__sidebar-head,
+.notes-window__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+}
+
+.notes-window__sidebar-head {
+  border-bottom: 1px solid rgba(90, 74, 58, 0.08);
+}
+
+.notes-window__sidebar-head strong,
+.notes-window__toolbar span {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.notes-window__sidebar-head button,
+.notes-window__actions button,
+.notes-window__primary {
+  min-height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  color: rgba(90, 74, 58, 0.72);
+  font-size: 12px;
+  font-weight: 800;
+  transition:
+    background 0.16s var(--ease-out),
+    transform 0.18s var(--ease-spring);
+}
+
+.notes-window__sidebar-head button:hover,
+.notes-window__actions button:hover,
+.notes-window__primary:hover {
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.notes-window__sidebar-head button:disabled,
+.notes-window__actions button:disabled,
+.notes-window__primary:disabled {
+  cursor: default;
+  opacity: 0.56;
+  transform: none;
+}
+
+.notes-window__primary {
+  background: var(--plush-sky);
+  color: #fff;
+}
+
+.notes-window__primary:hover {
+  background: var(--plush-sky-deep);
+}
+
+.notes-window__list {
+  flex: 1;
+  min-height: 0;
+}
+
+.notes-window__list-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.notes-window__note {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid rgba(90, 74, 58, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.48);
+  color: var(--plush-text);
+  text-align: left;
+  transition:
+    border-color 0.16s var(--ease-out),
+    background 0.16s var(--ease-out),
+    transform 0.18s var(--ease-spring);
+}
+
+.notes-window__note:hover,
+.notes-window__note.is-active {
+  border-color: rgba(143, 180, 94, 0.34);
+  background: rgba(255, 255, 255, 0.76);
+  transform: translateY(-1px);
+}
+
+.notes-window__note span,
+.notes-window__note small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notes-window__note span {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.notes-window__note small {
+  color: rgba(90, 74, 58, 0.58);
+  font-size: 11px;
+}
+
+.notes-window__loading {
+  margin: 8px;
+}
+
+.notes-window__empty {
+  flex-direction: column;
+  min-height: 150px;
+  text-align: center;
+}
+
+.notes-window__editor {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.notes-window__toolbar {
+  border-bottom: 1px solid rgba(90, 74, 58, 0.08);
+}
+
+.notes-window__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notes-window__error {
+  margin: 10px 12px 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(217, 122, 79, 0.12);
+  color: var(--plush-terracotta);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.notes-window__title,
+.notes-window__content {
+  width: auto;
+  border: 0;
+  background: transparent;
+  color: var(--plush-text);
+  font: inherit;
+  outline: none;
+}
+
+.notes-window__title {
+  margin: 12px 14px 0;
+  padding: 0 0 10px;
+  border-bottom: 1px solid rgba(90, 74, 58, 0.08);
+  font-size: 20px;
+  font-weight: 850;
+}
+
+.notes-window__content {
+  min-height: 0;
+  flex: 1;
+  margin: 0;
+  padding: 14px;
+  resize: none;
+  color: rgba(90, 74, 58, 0.78);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.notes-window__title::placeholder,
+.notes-window__content::placeholder {
+  color: rgba(90, 74, 58, 0.38);
+}

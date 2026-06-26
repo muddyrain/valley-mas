@@ -50,6 +50,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			public.POST("/resource/:id/download", middleware.OptionalAuth(cfg), handler.DownloadResource)
 			public.GET("/hot-creators", handler.GetHotCreators)
 			public.GET("/creators", handler.SearchCreators)
+			public.GET("/holiday-calendars/china/:year", handler.GetChinaHolidayCalendar)
 
 			public.GET("/blog/posts", middleware.OptionalAuth(cfg), handler.GetPosts)
 			public.GET("/blog/posts/id/:id", middleware.OptionalAuth(cfg), handler.GetPostDetailByID)
@@ -82,6 +83,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 		api.POST("/login", handler.Login(cfg))
 		api.POST("/register", handler.Register(cfg))
 		api.POST("/email-code/send", handler.SendEmailVerificationCode(cfg))
+		api.GET("/user/mail/accounts/gmail/callback", handler.GmailOAuthCallback(cfg))
 		api.POST("/code/verify", handler.VerifyCode)
 		api.GET("/creator/:code/resources", middleware.OptionalAuth(cfg), handler.GetCreatorResources)
 
@@ -90,6 +92,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 		{
 			user.GET("/downloads", handler.GetMyDownloads)
 			user.GET("/info", handler.GetUserInfo)
+			user.GET("/preferences/:namespace", handler.GetUserPreference)
+			user.PUT("/preferences/:namespace", handler.UpsertUserPreference)
+			handler.RegisterUserMailRoutes(user, cfg)
 			user.POST("/refresh-token", handler.RefreshToken(cfg))
 			user.PUT("/profile", handler.UpdateMyProfile)
 			user.PUT("/password", handler.ChangePassword)
@@ -132,6 +137,16 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/creator/application", handler.SubmitCreatorApplication)
 			auth.GET("/creator/application/my", handler.GetMyApplication)
 			auth.POST("/ai/chat", handler.ChatWithAI)
+			auth.GET("/ai/agents", handler.ListAIAgents)
+			auth.POST("/ai/agents", handler.CreateAIAgent)
+			auth.GET("/ai/agents/:agentId", handler.GetAIAgent)
+			auth.PATCH("/ai/agents/:agentId", handler.UpdateAIAgent)
+			auth.DELETE("/ai/agents/:agentId", handler.DeleteAIAgent)
+			auth.GET("/ai/agents/:agentId/conversations", handler.ListAIConversations)
+			auth.POST("/ai/agents/:agentId/conversations", handler.CreateAIConversation)
+			auth.GET("/ai/agents/:agentId/conversations/:conversationId", handler.GetAIConversation)
+			auth.DELETE("/ai/agents/:agentId/conversations/:conversationId", handler.DeleteAIConversation)
+			auth.POST("/ai/agents/:agentId/conversations/:conversationId/chat", handler.ChatWithAIAgent)
 			auth.POST("/blog/posts/:id/comments", handler.CreatePostComment)
 			auth.DELETE("/blog/comments/:commentId", handler.DeletePostComment)
 		}
