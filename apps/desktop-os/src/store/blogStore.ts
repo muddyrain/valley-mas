@@ -6,6 +6,8 @@ import {
   type BlogPostDetail,
   type BlogPostSort,
   type BlogTag,
+  type CreateBlogPostInput,
+  createBlogPost,
   getBlogPostDetail,
   listBlogCategories,
   listBlogGroups,
@@ -42,14 +44,17 @@ interface BlogStore {
   loading: boolean;
   loadingMore: boolean;
   detailLoading: boolean;
+  saving: boolean;
   hasMore: boolean;
   error: string | null;
   detailError: string | null;
+  saveError: string | null;
   lastLoadedAt: number | null;
   loadPosts: () => Promise<void>;
   refreshPosts: () => Promise<void>;
   loadMorePosts: () => Promise<void>;
   selectPost: (postId: string | null) => Promise<void>;
+  createPost: (input: CreateBlogPostInput, token: string) => Promise<BlogPost | null>;
   setKeyword: (keyword: string) => Promise<void>;
   setGroupId: (groupId: string | null) => Promise<void>;
   setCategory: (category: string | null) => Promise<void>;
@@ -76,9 +81,11 @@ export const useBlogStore = create<BlogStore>((set, get) => ({
   loading: false,
   loadingMore: false,
   detailLoading: false,
+  saving: false,
   hasMore: true,
   error: null,
   detailError: null,
+  saveError: null,
   lastLoadedAt: null,
 
   loadPosts: async () => {
@@ -190,6 +197,47 @@ export const useBlogStore = create<BlogStore>((set, get) => ({
         detailLoading: false,
         detailError: error instanceof Error ? error.message : '博客详情加载失败',
       });
+    }
+  },
+
+  createPost: async (input, token) => {
+    if (get().saving) return null;
+    set({ saving: true, saveError: null });
+    try {
+      const post = await createBlogPost(input, token);
+      set((state) => ({
+        saving: false,
+        posts:
+          post.status === 'published' && post.visibility === 'public'
+            ? [post, ...state.posts]
+            : state.posts,
+        total:
+          post.status === 'published' && post.visibility === 'public'
+            ? state.total + 1
+            : state.total,
+        selectedPostId:
+          post.status === 'published' && post.visibility === 'public'
+            ? post.id
+            : state.selectedPostId,
+        selectedPostDetail:
+          post.status === 'published' && post.visibility === 'public'
+            ? ({ ...post, content: input.content } as BlogPostDetail)
+            : state.selectedPostDetail,
+        detailCache:
+          post.status === 'published' && post.visibility === 'public'
+            ? {
+                ...state.detailCache,
+                [post.id]: { ...post, content: input.content } as BlogPostDetail,
+              }
+            : state.detailCache,
+      }));
+      return post;
+    } catch (error) {
+      set({
+        saving: false,
+        saveError: error instanceof Error ? error.message : '博客保存失败',
+      });
+      return null;
     }
   },
 

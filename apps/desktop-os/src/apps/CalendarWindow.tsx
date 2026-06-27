@@ -4,7 +4,9 @@ import {
   type CalendarEventInput,
   type CalendarHolidayInfo,
   type CalendarReminderMinutes,
+  getChineseLunarDate,
   getHolidayInfoForDate,
+  type LunarDateInfo,
   useCalendarStore,
 } from '@valley/calendar';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -76,6 +78,7 @@ export default function CalendarWindow() {
   const remindedKeys = useRef(new Set<string>());
 
   const selectedEvents = useMemo(() => eventsForDate(events, selectedDate), [events, selectedDate]);
+  const selectedLunar = useMemo(() => getChineseLunarDate(selectedDate.toDate()), [selectedDate]);
   const selectedHoliday = getHolidayInfoForDate(
     holidayCalendars,
     selectedDate.format('YYYY-MM-DD'),
@@ -265,6 +268,7 @@ export default function CalendarWindow() {
               date={selectedDate}
               events={selectedEvents}
               holiday={selectedHoliday}
+              lunar={selectedLunar}
               onEditEvent={editEvent}
             />
           ) : null}
@@ -277,6 +281,7 @@ export default function CalendarWindow() {
         >
           <section className="calendar-window__panel">
             <div className="calendar-window__panel-title">{selectedDate.format('M月D日')}</div>
+            <LunarDetail lunar={selectedLunar} />
             {selectedHoliday ? <HolidayPill holiday={selectedHoliday} /> : null}
             {selectedHoliday ? <HolidayDetail holiday={selectedHoliday} /> : null}
             {selectedEvents.length === 0 ? (
@@ -459,6 +464,7 @@ function MonthView({
         {days.map((date) => {
           const dayEvents = eventsForDate(events, date);
           const holiday = getHolidayInfoForDate(holidayCalendars, date.format('YYYY-MM-DD'));
+          const lunar = getChineseLunarDate(date.toDate());
           return (
             <button
               key={date.format('YYYY-MM-DD')}
@@ -481,6 +487,12 @@ function MonthView({
             >
               <span className="calendar-day-cell__head">
                 <span className="calendar-day-cell__num">{date.date()}</span>
+                <span
+                  className={`calendar-day-cell__lunar ${lunar.festivalName ? 'is-festival' : ''}`}
+                  title={lunar.detailLabel}
+                >
+                  {lunar.displayName}
+                </span>
                 {holiday ? <HolidayBadge holiday={holiday} /> : null}
               </span>
               <span className="calendar-day-cell__holiday" title={holiday?.name}>
@@ -533,17 +545,21 @@ function WeekView({
     <div className="calendar-week">
       <div className="calendar-week__header">
         <div className="calendar-week__corner" />
-        {days.map((date, index) => (
-          <button
-            key={date.format('YYYY-MM-DD')}
-            type="button"
-            className={`calendar-week__date ${date.isSame(selectedDate, 'day') ? 'is-selected' : ''}`}
-            onClick={() => onSelectDate(date)}
-          >
-            <span>{WEEK_DAYS[index]}</span>
-            <strong>{date.date()}</strong>
-          </button>
-        ))}
+        {days.map((date, index) => {
+          const lunar = getChineseLunarDate(date.toDate());
+          return (
+            <button
+              key={date.format('YYYY-MM-DD')}
+              type="button"
+              className={`calendar-week__date ${date.isSame(selectedDate, 'day') ? 'is-selected' : ''}`}
+              onClick={() => onSelectDate(date)}
+            >
+              <span>{WEEK_DAYS[index]}</span>
+              <strong>{date.date()}</strong>
+              <em title={lunar.detailLabel}>{lunar.displayName}</em>
+            </button>
+          );
+        })}
       </div>
 
       <div className="calendar-week__all-day">
@@ -627,11 +643,13 @@ function DayView({
   date,
   events,
   holiday,
+  lunar,
   onEditEvent,
 }: {
   date: Dayjs;
   events: CalendarEvent[];
   holiday: CalendarHolidayInfo | null;
+  lunar: LunarDateInfo;
   onEditEvent: (event: CalendarEvent) => void;
 }) {
   return (
@@ -639,6 +657,7 @@ function DayView({
       <div className="calendar-day__date">
         <span>{WEEK_DAYS[(date.day() + 6) % 7]}</span>
         <strong>{date.format('M月D日')}</strong>
+        <LunarPill lunar={lunar} />
         {holiday ? <HolidayPill holiday={holiday} /> : null}
       </div>
       <div className="calendar-day__timeline">
@@ -663,6 +682,24 @@ function HolidayBadge({ holiday }: { holiday: CalendarHolidayInfo }) {
     <span className={`calendar-holiday-badge calendar-holiday-badge--${holiday.kind}`}>
       {holiday.kind === 'workday' ? '班' : '休'}
     </span>
+  );
+}
+
+function LunarPill({ lunar }: { lunar: LunarDateInfo }) {
+  return (
+    <div className={`calendar-lunar-pill ${lunar.festivalName ? 'is-festival' : ''}`}>
+      <span>农历</span>
+      <strong>{lunar.displayName}</strong>
+    </div>
+  );
+}
+
+function LunarDetail({ lunar }: { lunar: LunarDateInfo }) {
+  return (
+    <div className="calendar-window__lunar-detail" title={lunar.detailLabel}>
+      <strong>{lunar.festivalName ?? lunar.displayName}</strong>
+      <span>{lunar.detailLabel}</span>
+    </div>
   );
 }
 

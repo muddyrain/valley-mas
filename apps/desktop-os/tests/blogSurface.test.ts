@@ -37,7 +37,7 @@ describe('blog desktop surface', () => {
     });
   });
 
-  it('adds a read-only public blog window without editing or unsafe html rendering', () => {
+  it('adds a public blog reader and creator workflow without unsafe html or admin deletes', () => {
     const blogWindow = readSource('src/apps/BlogWindow.tsx');
     const blogApi = readSource('src/api/blog.ts');
     const blogStore = readSource('src/store/blogStore.ts');
@@ -48,13 +48,48 @@ describe('blog desktop surface', () => {
     const desktopPackage = readSource('package.json');
 
     expect(blogApi).toContain('/public/blog/posts');
+    expect(blogApi).toContain('/admin/blog/posts');
+    expect(blogApi).toContain('/admin/blog/cover/upload');
     expect(blogApi).toContain('postType');
+    expect(blogApi).toContain('createBlogPost');
+    expect(blogApi).toContain('uploadBlogCover');
     expect(blogStore).toContain('listBlogPosts');
+    expect(blogStore).toContain('createPost');
+    expect(blogStore).toContain('saving');
     expect(desktopPackage).toContain('"react-markdown"');
     expect(desktopPackage).toContain('"remark-gfm"');
     expect(blogWindow).toContain("from 'react-markdown'");
     expect(blogWindow).toContain("from 'remark-gfm'");
-    expect(blogWindow).toContain('公开博客');
+    expect(blogWindow).toContain('Public journal');
+    expect(blogWindow).toContain('BlogHero');
+    expect(blogWindow).toContain('BlogFilters');
+    expect(blogWindow).toContain('BlogComposer');
+    expect(blogWindow).toContain('accept=".md,.markdown,text/markdown,text/plain"');
+    expect(blogWindow).toContain('accept="image/*"');
+    expect(blogWindow).toContain('selectedTagIds');
+    expect(blogWindow).toContain('toggleComposerTag');
+    expect(blogWindow).toContain('uploadBlogCover');
+    expect(blogWindow).toContain('onSaveDraft');
+    expect(blogWindow).toContain('onPublish');
+    expect(blogWindow).toContain('composerView');
+    expect(blogWindow).toContain('fontScale');
+    expect(blogWindow).toContain('isListCollapsed');
+    expect(blogWindow).toContain('PanelLeftClose');
+    expect(blogWindow).toContain('PanelLeftOpen');
+    expect(blogWindow).toContain('blog-window__list-floating-toggle');
+    expect(blogWindow).toContain('aria-expanded={!isListCollapsed}');
+    expect(blogWindow).toContain('blog-window__hero-panel');
+    expect(blogWindow).toContain('blog-window__mode-switch');
+    expect(blogWindow).toContain('blog-window__layout--list-collapsed');
+    expect(blogWindow).toContain('blog-reader__masthead');
+    expect(blogWindow).toContain('blog-reader__shell');
+    expect(blogWindow).toContain('blog-reader__aside');
+    expect(blogWindow).toContain('blog-reader__paper');
+    expect(blogWindow).toContain('blog-reader__outline');
+    expect(blogWindow).toContain('getBlogToc');
+    expect(blogWindow).toContain('大纲');
+    expect(blogWindow).toContain('blog-reader__cover-frame');
+    expect(blogWindow).toContain('fit="contain"');
     expect(blogWindow).toContain('PlushLoadMore');
     expect(blogWindow).toContain('blog-window__reader-loading');
     expect(blogWindow).toContain('blog-reader__markdown-image');
@@ -75,6 +110,25 @@ describe('blog desktop surface', () => {
     expect(blogStyles).toContain(
       '.blog-window__reader-content:has(> .blog-window__reader-loading)',
     );
+    expect(blogStyles).toContain('.blog-window__hero');
+    expect(blogStyles).toContain('.blog-window__filter-strip');
+    expect(blogStyles).toContain('.blog-window__layout--list-collapsed');
+    expect(blogStyles).toContain('.blog-window__list-toggle');
+    expect(blogStyles).toContain('.blog-window__list-floating-toggle');
+    expect(blogStyles).toContain('.blog-window__list-body');
+    expect(blogStyles).toContain('.blog-composer');
+    expect(blogStyles).toContain('.blog-composer__side');
+    expect(blogStyles).toContain('.blog-composer__workspace');
+    expect(blogStyles).toContain('.blog-composer__editor');
+    expect(blogStyles).toContain('.blog-composer__preview');
+    expect(blogStyles).toContain('.blog-composer__tags button.is-active');
+    expect(blogStyles).toContain('.blog-window__list-head');
+    expect(blogStyles).toContain('.blog-reader__masthead');
+    expect(blogStyles).toContain('.blog-reader__shell');
+    expect(blogStyles).toContain('.blog-reader__paper');
+    expect(blogStyles).toContain('.blog-reader__outline-panel');
+    expect(blogStyles).toContain('.blog-reader__toc');
+    expect(blogStyles).toContain('.blog-reader__cover-frame');
     expect(blogStyles).toContain('.window__body:has(.blog-window)');
     expect(blogStyles).toContain('display: flex');
     expect(blogStyles).toContain('width: 100%');
@@ -98,7 +152,6 @@ describe('blog desktop surface', () => {
     expect(blogStyles).toContain('section[data-footnotes]');
     expect(blogStyles).toContain('place-items: center');
     expect(blogWindow).not.toContain('dangerouslySetInnerHTML');
-    expect(blogWindow).not.toContain('createPost');
     expect(blogWindow).not.toContain('deletePost');
     expect(blogWindow).not.toContain('updatePost');
   });

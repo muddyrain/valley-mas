@@ -1,4 +1,4 @@
-import { apiRequest } from './client';
+import { ApiError, type ApiResponse, apiRequest, getApiBaseUrl } from './client';
 
 export type BlogPostSort = 'newest' | 'oldest';
 export type BlogPostType = 'blog' | 'image_text';
@@ -46,6 +46,7 @@ export interface BlogPost {
   visibility?: BlogVisibility;
   excerpt?: string;
   cover?: string;
+  coverStorageKey?: string;
   groupId?: string;
   group?: BlogGroup;
   categoryId?: string;
@@ -86,6 +87,33 @@ export interface BlogPostListResponse {
   pageSize: number;
 }
 
+export interface CreateBlogPostInput {
+  title: string;
+  postType?: BlogPostType;
+  visibility?: BlogVisibility;
+  content: string;
+  excerpt?: string;
+  cover?: string;
+  coverStorageKey?: string;
+  groupId?: string;
+  categoryId?: string;
+  tagIds?: string[];
+  status?: 'draft' | 'published' | 'archived';
+  isTop?: boolean;
+  publishNow?: boolean;
+}
+
+export interface BlogCoverUploadResponse {
+  url: string;
+  storageKey: string;
+  fileName: string;
+  size: number;
+  width: number;
+  height: number;
+  extension: string;
+  contentType: string;
+}
+
 export function listBlogPosts(params: BlogPostListParams = {}) {
   const query = new URLSearchParams({
     page: String(params.page ?? 1),
@@ -114,4 +142,46 @@ export function listBlogCategories() {
 
 export function listBlogTags() {
   return apiRequest<BlogTag[]>('/public/blog/tags');
+}
+
+export function createBlogPost(input: CreateBlogPostInput, token: string) {
+  return apiRequest<BlogPost>('/admin/blog/posts', {
+    method: 'POST',
+    body: input,
+    token,
+  });
+}
+
+export async function uploadBlogCover(file: File, token: string) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}/admin/blog/cover/upload`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      credentials: 'include',
+      body: formData,
+    });
+  } catch {
+    throw new ApiError('无法连接到服务器');
+  }
+
+  let payload: Partial<ApiResponse<BlogCoverUploadResponse>> | null = null;
+  try {
+    payload = (await response.json()) as Partial<ApiResponse<BlogCoverUploadResponse>>;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    throw new ApiError(payload?.message || '封面上传失败', response.status);
+  }
+  if (payload?.code !== 0) {
+    throw new ApiError(payload?.message || '封面上传失败', payload?.code);
+  }
+  return payload.data as BlogCoverUploadResponse;
 }
