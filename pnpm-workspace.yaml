@@ -13,6 +13,9 @@ allowBuilds:
 
 autoInstallPeers: true
 
+overrides:
+  "@ant-design/icons-svg": 4.5.0
+
 catalogs:
   react-19:
     react: ^19.0.0
