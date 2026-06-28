@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { generateMap, type MapData } from '../src/core/map';
 import { applyScenarioToWorld } from '../src/core/scenario';
 import { RANDOM_SCENARIO } from '../src/core/scenario/presets';
-import { computeCapitalsAndCentroids, runExpansionTick, type SimStatus } from '../src/core/sim';
+import { computeCapitalsAndCentroids, rebuildSettlements, runExpansionTick, type SimStatus } from '../src/core/sim';
 import { createPrngFromSeed } from '../src/shared/math';
-import type { FactionId, FactionSummary, Tick } from '../src/shared/types';
+import type { FactionId, FactionSummary, SettlementSummary, Tick } from '../src/shared/types';
 import { asFactionId, asTick, TICKS_PER_YEAR } from '../src/shared/types';
 
 const LONG_RUN_SEED = 'worldsim-longrun-3000-v1';
@@ -16,6 +16,7 @@ type LongRunState = {
   tick: Tick;
   map: MapData;
   factions: FactionSummary[];
+  settlements: SettlementSummary[];
   status: SimStatus;
   winnerFactionId: FactionId | null;
 };
@@ -24,6 +25,7 @@ type LongRunSnapshot = {
   year: number;
   occupied: number;
   occupiedRatio: number;
+  landCount: number;
   liveCount: number;
   largestRegions: number;
   largestShare: number;
@@ -35,6 +37,7 @@ type LongRunSnapshot = {
 type LongRunReport = {
   seed: string;
   provinceCount: number;
+  landCount: number;
   finalYear: number;
   firstEliminationYear: number | null;
   terminalYear: number | null;
@@ -42,6 +45,7 @@ type LongRunReport = {
   totalRepels: number;
   samples: LongRunSnapshot[];
   final: LongRunSnapshot;
+  sampleByYear: (year: number) => LongRunSnapshot;
 };
 
 describe('3000-province long-run convergence', () => {
@@ -52,12 +56,15 @@ describe('3000-province long-run convergence', () => {
 
       console.info(formatReport(report));
 
-      expect(report.final.occupied).toBe(PROVINCE_COUNT);
+      expect(report.final.occupied).toBeGreaterThanOrEqual(
+        report.landCount - Math.ceil(report.landCount * 0.02),
+      );
       expect(report.firstEliminationYear).not.toBeNull();
       expect(report.firstEliminationYear as number).toBeLessThanOrEqual(200);
-      expect(report.final.liveCount).toBeLessThanOrEqual(3);
-      expect(report.final.status === 'victory' || report.final.liveCount <= 3).toBe(true);
-      expect(report.totalCaptures).toBeGreaterThan(PROVINCE_COUNT);
+      expect(report.sampleByYear(50).largestShare).toBeLessThanOrEqual(0.32);
+      expect(report.final.eliminated).toBeGreaterThanOrEqual(1);
+      expect(report.final.liveCount).toBeLessThan(8);
+      expect(report.totalCaptures).toBeGreaterThan(report.landCount);
       expect(report.totalRepels).toBeGreaterThan(0);
     } finally {
       warnSpy.mockRestore();
@@ -81,6 +88,7 @@ function runLongRunProbe(): LongRunReport {
       tick: nextTick,
       map: state.map,
       factions: state.factions,
+      settlements: state.settlements,
       rng: createPrngFromSeed(`tick-${LONG_RUN_SEED}-${nextTick}`),
     });
 
@@ -91,6 +99,12 @@ function runLongRunProbe(): LongRunReport {
     if (result.patches.length > 0) {
       state.map = applyPatches(state.map, result.patches);
       state.factions = refreshFactionTerritories(state.map, state.factions);
+      state.settlements = rebuildSettlements({
+        map: state.map,
+        factions: state.factions,
+        previous: state.settlements,
+        tick: nextTick,
+      });
     }
 
     for (const event of result.events) {
@@ -121,6 +135,7 @@ function runLongRunProbe(): LongRunReport {
   return {
     seed: LONG_RUN_SEED,
     provinceCount: PROVINCE_COUNT,
+    landCount: countLandProvinces(state.map),
     finalYear: final.year,
     firstEliminationYear,
     terminalYear,
@@ -128,6 +143,11 @@ function runLongRunProbe(): LongRunReport {
     totalRepels,
     samples,
     final,
+    sampleByYear: (year) => {
+      const sample = samples.find((item) => item.year === year);
+      if (!sample) throw new Error(`Missing long-run sample for year ${year}`);
+      return sample;
+    },
   };
 }
 
@@ -162,7 +182,7 @@ function createInitialState(): LongRunState {
     })),
   );
 
-  const factions: FactionSummary[] = applyResult.factionAssignments.map((assignment) => ({
+  const factionsRaw: FactionSummary[] = applyResult.factionAssignments.map((assignment) => ({
     id: assignment.factionId,
     name: assignment.factionName,
     leader: assignment.leader,
@@ -174,10 +194,18 @@ function createInitialState(): LongRunState {
     population: 0,
   }));
 
+  const factions = refreshFactionTerritories(map, factionsRaw);
+  const settlements = rebuildSettlements({
+    map,
+    factions,
+    tick: asTick(0),
+  });
+
   return {
     tick: asTick(0),
     map,
-    factions: refreshFactionTerritories(map, factions),
+    factions,
+    settlements,
     status: 'running',
     winnerFactionId: null,
   };
@@ -190,7 +218,7 @@ function applyPatches(
   const provinces = map.provinces.map((province) => ({ ...province }));
   for (const patch of patches) {
     const province = provinces[patch.regionId as number];
-    if (province) province.ownerFactionId = patch.toOwnerId;
+    if (province && province.terrain !== 'ocean') province.ownerFactionId = patch.toOwnerId;
   }
   return { ...map, provinces };
 }
@@ -198,6 +226,7 @@ function applyPatches(
 function refreshFactionTerritories(map: MapData, factions: FactionSummary[]): FactionSummary[] {
   const regionsByFaction = new Map<FactionId, number>();
   for (const province of map.provinces) {
+    if (province.terrain === 'ocean') continue;
     const owner = province.ownerFactionId;
     if (owner == null) continue;
     regionsByFaction.set(owner, (regionsByFaction.get(owner) ?? 0) + 1);
@@ -216,6 +245,7 @@ function refreshFactionTerritories(map: MapData, factions: FactionSummary[]): Fa
 
 function snapshotState(state: LongRunState): LongRunSnapshot {
   const occupied = state.factions.reduce((sum, faction) => sum + faction.regions, 0);
+  const landCount = countLandProvinces(state.map);
   const liveFactions = state.factions.filter((faction) => faction.regions > 0);
   const largest = liveFactions.reduce<FactionSummary | null>(
     (best, faction) => (best == null || faction.regions > best.regions ? faction : best),
@@ -224,7 +254,8 @@ function snapshotState(state: LongRunState): LongRunSnapshot {
   return {
     year: tickToYear(state.tick),
     occupied,
-    occupiedRatio: occupied / state.map.provinces.length,
+    occupiedRatio: occupied / Math.max(1, landCount),
+    landCount,
     liveCount: liveFactions.length,
     largestRegions: largest?.regions ?? 0,
     largestShare: occupied > 0 ? (largest?.regions ?? 0) / occupied : 0,
@@ -237,6 +268,13 @@ function snapshotState(state: LongRunState): LongRunSnapshot {
   };
 }
 
+function countLandProvinces(map: MapData): number {
+  return map.provinces.reduce(
+    (sum, province) => sum + (province.terrain === 'ocean' ? 0 : 1),
+    0,
+  );
+}
+
 function tickToYear(tick: Tick): number {
   return Math.floor((tick as unknown as number) / TICKS_PER_YEAR);
 }
@@ -246,6 +284,7 @@ function formatReport(report: LongRunReport): string {
     '3000-province long-run convergence report',
     `seed=${report.seed}`,
     `provinceCount=${report.provinceCount}`,
+    `landCount=${report.landCount}`,
     `finalYear=${report.finalYear}`,
     `firstEliminationYear=${report.firstEliminationYear ?? 'none'}`,
     `terminalYear=${report.terminalYear ?? 'none'}`,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useWorldSimStore } from '@/state';
 import { MapCanvas } from '@/ui/canvas/MapCanvas';
 import { LogPanel } from '@/ui/logpanel/LogPanel';
@@ -10,7 +10,6 @@ import styles from './AppLayout.module.css';
 export function AppLayout() {
   const hudVisible = useWorldSimStore((s) => s.hudVisible);
   const toggleHud = useWorldSimStore((s) => s.toggleHud);
-  const canvasRef = useRef<HTMLDivElement>(null);
 
   // 快捷键：H 切换 HUD，1-7 切换速度
   const handleKeyDown = useCallback(
@@ -42,19 +41,6 @@ export function AppLayout() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // hudVisible 变化时强制触发 canvas resize
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    const el = canvasRef.current;
-    // 强制触发 ResizeObserver：短暂改变尺寸再恢复
-    const orig = el.style.width;
-    el.style.width = 'calc(100% - 1px)';
-    requestAnimationFrame(() => {
-      el.style.width = orig;
-    });
-    // biome-ignore lint/correctness/useExhaustiveDependencies: 需要 hudVisible 变化时触发
-  }, [hudVisible]);
-
   return (
     <div className={styles.root} data-hud-visible={hudVisible}>
       {hudVisible && (
@@ -63,7 +49,7 @@ export function AppLayout() {
         </header>
       )}
       <main className={styles.main}>
-        <div ref={canvasRef} className={styles.canvas}>
+        <div className={styles.canvas}>
           <MapCanvas />
           {!hudVisible && (
             <div className={styles.hudHint}>

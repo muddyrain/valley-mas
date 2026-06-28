@@ -63,10 +63,13 @@ const FOREIGN_POLITY_RATIO = 0.3;
 export const RANDOM_SCENARIO: Scenario = {
   id: 'random',
   name: '随机剧本',
-  description: `从中外历史政体中随机抽 ${RANDOM_FACTION_COUNT} 家势力，出生地随机分布。`,
+  description: `从中外历史政体中随机抽 ${RANDOM_FACTION_COUNT} 家势力，出生地按软平衡分布。`,
   factions: [],
+  preferredMapMode: 'random',
+  mapSeedSuffix: '',
+  factoryOptions: { includeChinese: true, includeForeign: true },
   factionsFactory: (rng, options) => {
-    // 默认两边都开；用户在 Sidebar 单独勾选时由 scenarioSlice 透传 options。
+    // 默认两边都开；若剧本通过 factoryOptions 覆盖，则按剧本固定偏好执行。
     // 极端情况下（用户两边都关）兜底为只开中文，避免 0 家势力。
     let useChinese = options?.includeChinese ?? true;
     const useForeign = options?.includeForeign ?? true;

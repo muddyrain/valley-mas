@@ -1,20 +1,31 @@
 import type { StateCreator } from 'zustand';
-import { computeCapitalsAndCentroids, resetContiguityWatch } from '@/core/sim';
+import {
+  computeCapitalsAndCentroids,
+  pruneRecentConquests,
+  rebuildCapitalSettlements,
+  resetContiguityWatch,
+} from '@/core/sim';
 import type {
   FactionId,
   FactionSummary,
   LogEvent,
+  ReplayCapitalUpdate,
   ReplayDoc,
   ReplayFrame,
   ReplayInitialFaction,
+  ReplaySettlementUpdate,
   ReplaySpeed,
   ReplayStatus,
+  SettlementSummary,
+  WarSummary,
 } from '@/shared/types';
 import { asFactionId, asRegionId, asTick, REPLAY_DOC_VERSION } from '@/shared/types';
+import { computeReplayHistorySummary } from '../selectors';
 import type { FactionSlice } from './factionSlice';
 import type { LogSlice } from './logSlice';
 import type { MapSlice } from './mapSlice';
 import type { ScenarioSlice } from './scenarioSlice';
+import type { SettlementSlice } from './settlementSlice';
 import type { SimSlice } from './simSlice';
 
 /**
@@ -74,11 +85,18 @@ export interface ReplaySlice {
 
   /** 导出 ReplayDoc JSON */
   exportReplayToJson: () => string;
+  exportReplaySummaryToJson: () => string;
   /** 导入 ReplayDoc：替换当前 map ownership / factions / logs / cursor，并切到 replaying 模式 */
   importReplayFromJson: (json: string) => { ok: boolean; message: string };
 }
 
-type Deps = ReplaySlice & MapSlice & FactionSlice & SimSlice & LogSlice & ScenarioSlice;
+type Deps = ReplaySlice &
+  MapSlice &
+  FactionSlice &
+  SimSlice &
+  LogSlice &
+  ScenarioSlice &
+  SettlementSlice;
 
 export const createReplaySlice: StateCreator<Deps, [], [], ReplaySlice> = (set, get) => ({
   replayMode: 'recording',
@@ -104,11 +122,16 @@ export const createReplaySlice: StateCreator<Deps, [], [], ReplaySlice> = (set, 
         replayFrames: [],
         initialOwnership: [],
         initialFactions: [],
+        settlements: [],
+        recentConquests: new Map(),
+        activeWars: [],
         baselineScenarioId: state.currentScenarioId ?? null,
       });
       return;
     }
-    const initialOwnership: Array<FactionId | null> = map.provinces.map((p) => p.ownerFactionId);
+    const initialOwnership: Array<FactionId | null> = map.provinces.map((p) =>
+      p.terrain === 'ocean' ? null : p.ownerFactionId,
+    );
     const initialFactions: ReplayInitialFaction[] = state.factions.map((f) => ({
       id: f.id,
       name: f.name,
@@ -125,6 +148,8 @@ export const createReplaySlice: StateCreator<Deps, [], [], ReplaySlice> = (set, 
       replayFrames: [],
       initialOwnership,
       initialFactions,
+      recentConquests: new Map(),
+      activeWars: [],
       baselineScenarioId: state.currentScenarioId ?? null,
     });
   },
@@ -221,6 +246,25 @@ export const createReplaySlice: StateCreator<Deps, [], [], ReplaySlice> = (set, 
     return JSON.stringify(doc, null, 2);
   },
 
+  exportReplaySummaryToJson: () => {
+    const state = get();
+    const map = state.map;
+    if (!map) return '';
+    const summary = computeReplayHistorySummary({
+      meta: {
+        seed: map.meta.seed,
+        provinceCount: map.meta.provinceCount,
+        mapMode: state.mapMode,
+        scenarioId: state.baselineScenarioId,
+        totalTicks: state.replayFrames.length,
+      },
+      initialOwnership: state.initialOwnership,
+      initialFactions: state.initialFactions,
+      frames: state.replayFrames,
+    });
+    return JSON.stringify(summary, null, 2);
+  },
+
   importReplayFromJson: (json) => {
     let parsed: unknown;
     try {
@@ -251,8 +295,8 @@ export const createReplaySlice: StateCreator<Deps, [], [], ReplaySlice> = (set, 
     }
 
     // 应用 baseline + frames，置入 store
-    const initialOwnership = doc.initialOwnership.map((v) =>
-      v == null ? null : asFactionId(v),
+    const initialOwnership = doc.initialOwnership.map((v, index) =>
+      v == null || map.provinces[index]?.terrain === 'ocean' ? null : asFactionId(v),
     ) as Array<FactionId | null>;
     const initialFactions: ReplayInitialFaction[] = doc.initialFactions.map((f) => {
       const birth =
@@ -279,6 +323,7 @@ export const createReplaySlice: StateCreator<Deps, [], [], ReplaySlice> = (set, 
       replayFrames: doc.frames as ReplayFrame[],
       initialOwnership,
       initialFactions,
+      activeWars: [],
       baselineScenarioId: doc.meta.scenarioId,
       replayMessage: `已导入 Replay：${doc.frames.length} tick`,
       mode: 'replay',
@@ -301,19 +346,60 @@ function rebuildWorldUpToCursor(get: Get, set: Set, cursor: number): void {
   const map = state.map;
   if (!map) return;
 
-  const ownership: Array<FactionId | null> = state.initialOwnership.slice();
+  const ownership: Array<FactionId | null> = state.initialOwnership.map((owner, index) =>
+    map.provinces[index]?.terrain === 'ocean' ? null : owner,
+  );
+  const terrainByRegion = map.provinces.map((province) => province.terrain);
   let status: ReplayStatus = 'idle';
   let winnerFactionId: FactionId | null = null;
   const aggregatedLogs: LogEvent[] = [];
+  const recentConquests = new Map<number, ReturnType<typeof asTick>>();
+  const activeWarById = new Map<number, WarSummary>();
+  const capitalUpdateByFaction = new Map<number, ReplayCapitalUpdate>();
+  const settlementUpdateById = new Map<number, ReplaySettlementUpdate>();
+  const replayFactionById = new Map<number, ReplayInitialFaction>(
+    state.initialFactions.map((faction) => [faction.id as unknown as number, faction]),
+  );
   let lastTickEventCount = 0;
 
   for (let i = 0; i < cursor; i++) {
     const frame = state.replayFrames[i];
     if (!frame) break;
+    for (const faction of frame.newFactions ?? []) {
+      replayFactionById.set(faction.id as unknown as number, faction);
+    }
+    for (const war of frame.newWars ?? []) {
+      activeWarById.set(war.id as unknown as number, war);
+    }
+    for (const war of frame.updatedWars ?? []) {
+      activeWarById.set(war.id as unknown as number, war);
+    }
+    for (const warId of frame.endedWarIds ?? []) {
+      activeWarById.delete(warId as unknown as number);
+    }
+    const capitalUpdates = frame.capitalUpdates;
+    if (capitalUpdates) {
+      for (const update of capitalUpdates) {
+        capitalUpdateByFaction.set(update.factionId as unknown as number, update);
+      }
+    }
+    for (const update of frame.settlementUpdates ?? []) {
+      settlementUpdateById.set(update.settlementId as unknown as number, update);
+    }
+    for (const update of frame.terrainUpdates ?? []) {
+      const idx = update.regionId as unknown as number;
+      terrainByRegion[idx] = update.to;
+      if (update.to === 'ocean') ownership[idx] = null;
+    }
     for (const patch of frame.patches) {
       const idx = patch.regionId;
       const to = patch.to == null ? null : asFactionId(patch.to);
-      ownership[idx] = to;
+      ownership[idx] = terrainByRegion[idx] === 'ocean' ? null : to;
+      if (to == null) {
+        recentConquests.delete(idx);
+      } else {
+        recentConquests.set(idx, frame.tick);
+      }
     }
     aggregatedLogs.push(...frame.events);
     status = frame.status;
@@ -328,57 +414,107 @@ function rebuildWorldUpToCursor(get: Get, set: Set, cursor: number): void {
   }
 
   // 还原 provinces
-  const nextProvinces = map.provinces.map((p, i) => ({
-    ...p,
-    ownerFactionId: ownership[i] ?? null,
-  }));
+  const nextProvinces = map.provinces.map((p, i) => {
+    const terrain = terrainByRegion[i] ?? p.terrain;
+    return {
+      ...p,
+      terrain,
+      ownerFactionId: terrain === 'ocean' ? null : (ownership[i] ?? null),
+    };
+  });
   const nextMap = { ...map, provinces: nextProvinces };
 
   // 重新统计 regions
   const regionsByFaction = new Map<number, number>();
-  for (const owner of ownership) {
+  for (const province of nextProvinces) {
+    const owner = province.terrain === 'ocean' ? null : province.ownerFactionId;
     if (owner == null) continue;
     const k = owner as unknown as number;
     regionsByFaction.set(k, (regionsByFaction.get(k) ?? 0) + 1);
   }
   // P0：基于重建后的 ownership 重新计算每势力的首都/重心，
   // 与 simSlice live tick 保持一致；否则回放下首都永远停在 baseline。
-  // 输入用 initialFactions 的 capitalRegionId 作为「上一帧首都」；computeCapitalsAndCentroids
+  const replayFactions = Array.from(replayFactionById.values());
+  // 输入用 recorded factions 的 capitalRegionId 作为「上一帧首都」；computeCapitalsAndCentroids
   // 在 capital 不再 self-owned 时会自动迁都至 centroid，等价于把整段历史一次性追上。
+  const capitalCandidatesByFaction = new Map<FactionId, SettlementSummary[]>();
+  for (const settlement of state.settlements) {
+    const candidates = capitalCandidatesByFaction.get(settlement.factionId) ?? [];
+    candidates.push(settlement);
+    capitalCandidatesByFaction.set(settlement.factionId, candidates);
+  }
   const capitalsByFaction = computeCapitalsAndCentroids(
     nextMap,
-    state.initialFactions.map((f) => ({
+    replayFactions.map((f) => ({
       id: f.id,
       capitalRegionId: f.capitalRegionId ?? f.birthRegionId,
+      capitalCandidates: capitalCandidatesByFaction.get(f.id),
     })),
   );
-  // 优先用 initialFactions 重建（保证 baseline 时的颜色/名字稳定）；当前 store 里多余的势力丢弃
-  const factionsNext: FactionSummary[] = state.initialFactions.map((f) => {
+  const factionsNext: FactionSummary[] = replayFactions.map((f) => {
     const cap = capitalsByFaction.get(f.id);
     const fallback = f.capitalRegionId ?? f.birthRegionId;
+    const capitalUpdate = capitalUpdateByFaction.get(f.id as unknown as number);
+    let capitalRegionId = fallback;
+    let centroidRegionId = fallback;
+    if (cap) {
+      capitalRegionId = cap.capital;
+      centroidRegionId = cap.centroid;
+    }
+    if (capitalUpdate) {
+      capitalRegionId = capitalUpdate.capitalRegionId;
+      centroidRegionId = capitalUpdate.centroidRegionId;
+    }
     return {
       id: f.id,
       name: f.name,
       leader: f.leader,
       colorHex: f.colorHex,
       birthRegionId: f.birthRegionId,
-      capitalRegionId: cap ? cap.capital : fallback,
-      centroidRegionId: cap ? cap.centroid : fallback,
+      capitalRegionId,
+      centroidRegionId,
       regions: regionsByFaction.get(f.id as unknown as number) ?? 0,
       population: f.population,
     };
   });
+  // tick 等于 cursor（baseline 后的 frame 索引数）
+  const tickNumber = cursor;
+  const recentConquestsNext = pruneRecentConquests(recentConquests, asTick(tickNumber));
+  const rebuiltSettlements = rebuildCapitalSettlements({
+    map: nextMap,
+    factions: factionsNext,
+    previous: state.settlements,
+    tick: asTick(tickNumber),
+    recentConquests: recentConquestsNext,
+  });
+  const settlementsNext =
+    settlementUpdateById.size === 0
+      ? rebuiltSettlements
+      : rebuiltSettlements.map((settlement) => {
+          // 神力不会产生 ownership patch；回放时必须在重建聚落后覆盖稳定字段，避免聚落神力只剩日志。
+          const update = settlementUpdateById.get(settlement.id as unknown as number);
+          return update
+            ? {
+                ...settlement,
+                population: update.population ?? settlement.population,
+                development: update.development ?? settlement.development,
+                loyalty: update.loyalty,
+                unrest: update.unrest,
+                revoltProgress: update.revoltProgress,
+              }
+            : settlement;
+        });
 
   // 截断 logs：MAX_LOG_ENTRIES 由 logSlice 管控，这里直接全量写入并取末尾
   const MAX = 1000;
   const logsNext = aggregatedLogs.length <= MAX ? aggregatedLogs : aggregatedLogs.slice(-MAX);
 
-  // tick 等于 cursor（baseline 后的 frame 索引数）
-  const tickNumber = cursor;
-
   set({
     map: nextMap,
     factions: factionsNext,
+    settlements: settlementsNext,
+    recentConquests: recentConquestsNext,
+    activeWars: Array.from(activeWarById.values()),
     logs: logsNext,
     tick: asTick(tickNumber),
     status,

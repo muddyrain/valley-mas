@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand';
 import type { MapData, TerrainKind } from '@/core/map';
 import { TERRAIN_KINDS } from '@/core/map';
+import { rebuildCapitalSettlements } from '@/core/sim';
 import type { FactionId, FactionSummary, RegionId } from '@/shared/types';
 import { asFactionId, asRegionId, asTick } from '@/shared/types';
 import type { FactionSlice } from './factionSlice';
@@ -8,6 +9,7 @@ import { ensureFactionIdSeqAtLeast } from './factionSlice';
 import type { MapSlice, ProvincePreset } from './mapSlice';
 import { PROVINCE_PRESETS } from './mapSlice';
 import type { ScenarioSlice } from './scenarioSlice';
+import type { SettlementSlice } from './settlementSlice';
 import type { SimSlice } from './simSlice';
 import type { UiSlice } from './uiSlice';
 
@@ -91,7 +93,13 @@ export interface EditSlice {
   importMapFromJson: (json: string) => ImportMapResult;
 }
 
-type Deps = EditSlice & MapSlice & FactionSlice & SimSlice & ScenarioSlice & UiSlice;
+type Deps = EditSlice &
+  MapSlice &
+  FactionSlice &
+  SimSlice &
+  ScenarioSlice &
+  UiSlice &
+  SettlementSlice;
 
 export const createEditSlice: StateCreator<Deps, [], [], EditSlice> = (set, get) => ({
   worldMode: 'simulation',
@@ -148,9 +156,24 @@ export const createEditSlice: StateCreator<Deps, [], [], EditSlice> = (set, get)
     if (tool === 'paint-terrain') {
       if (province.terrain === state.editTerrain) return false;
       const nextProvinces = map.provinces.map((p) => ({ ...p }));
-      nextProvinces[idx] = { ...nextProvinces[idx], terrain: state.editTerrain };
+      nextProvinces[idx] = {
+        ...nextProvinces[idx],
+        terrain: state.editTerrain,
+        ownerFactionId: state.editTerrain === 'ocean' ? null : nextProvinces[idx].ownerFactionId,
+      };
+      const factionsNext =
+        state.editTerrain === 'ocean' ? recountFactionsByLand(state.factions, nextProvinces) : state.factions;
       set({
         map: { ...map, provinces: nextProvinces },
+        factions: factionsNext,
+        recentConquests: new Map(),
+        activeWars: [],
+        settlements: rebuildCapitalSettlements({
+          map: { ...map, provinces: nextProvinces },
+          factions: factionsNext,
+          previous: state.settlements,
+          tick: state.tick,
+        }),
         snapshotVersion: state.snapshotVersion + 1,
       });
       return true;
@@ -176,6 +199,14 @@ export const createEditSlice: StateCreator<Deps, [], [], EditSlice> = (set, get)
       set({
         map: { ...map, provinces: nextProvinces },
         factions: factionsNext,
+        recentConquests: new Map(),
+        activeWars: [],
+        settlements: rebuildCapitalSettlements({
+          map: { ...map, provinces: nextProvinces },
+          factions: factionsNext,
+          previous: state.settlements,
+          tick: state.tick,
+        }),
         snapshotVersion: state.snapshotVersion + 1,
       });
       return true;
@@ -186,6 +217,7 @@ export const createEditSlice: StateCreator<Deps, [], [], EditSlice> = (set, get)
     if (editFactionId == null) return false;
     const editFaction = state.factions.find((f) => f.id === editFactionId);
     if (!editFaction) return false;
+    if (province.terrain === 'ocean') return false;
 
     if (tool === 'paint-owner') {
       if (province.ownerFactionId === editFactionId) return false;
@@ -209,6 +241,14 @@ export const createEditSlice: StateCreator<Deps, [], [], EditSlice> = (set, get)
       set({
         map: { ...map, provinces: nextProvinces },
         factions: factionsNext,
+        recentConquests: new Map(),
+        activeWars: [],
+        settlements: rebuildCapitalSettlements({
+          map: { ...map, provinces: nextProvinces },
+          factions: factionsNext,
+          previous: state.settlements,
+          tick: state.tick,
+        }),
         snapshotVersion: state.snapshotVersion + 1,
       });
       return true;
@@ -243,20 +283,18 @@ export const createEditSlice: StateCreator<Deps, [], [], EditSlice> = (set, get)
         }
         return f;
       });
-      // 重新统计每势力 regions
-      const counts = new Map<number, number>();
-      for (const p of nextProvinces) {
-        if (p.ownerFactionId == null) continue;
-        const k = p.ownerFactionId as unknown as number;
-        counts.set(k, (counts.get(k) ?? 0) + 1);
-      }
-      const factionsCounted = factionsNext.map((f) => ({
-        ...f,
-        regions: counts.get(f.id as unknown as number) ?? 0,
-      }));
+      const factionsCounted = recountFactionsByLand(factionsNext, nextProvinces);
       set({
         map: { ...map, provinces: nextProvinces },
         factions: factionsCounted,
+        recentConquests: new Map(),
+        activeWars: [],
+        settlements: rebuildCapitalSettlements({
+          map: { ...map, provinces: nextProvinces },
+          factions: factionsCounted,
+          previous: state.settlements,
+          tick: state.tick,
+        }),
         snapshotVersion: state.snapshotVersion + 1,
       });
       return true;
@@ -320,15 +358,22 @@ export const createEditSlice: StateCreator<Deps, [], [], EditSlice> = (set, get)
       terrain: p.terrain,
       elevation: p.elevation,
       moisture: p.moisture,
-      ownerFactionId: p.ownerFactionId == null ? null : asFactionId(p.ownerFactionId),
+      ownerFactionId:
+        p.terrain === 'ocean' || p.ownerFactionId == null ? null : asFactionId(p.ownerFactionId),
     }));
 
-    const factions: FactionSummary[] = doc.factions.map((f) => ({
+    const factionsRaw: FactionSummary[] = doc.factions.map((f) => ({
       ...f,
       id: asFactionId(f.id as unknown as number),
       birthRegionId:
         f.birthRegionId == null ? null : asRegionId(f.birthRegionId as unknown as number),
     }));
+    const factions = recountFactionsByLand(factionsRaw, provinces);
+    const nextMap = {
+      meta: doc.meta,
+      provinces,
+      borders: doc.borders,
+    };
 
     // 把 mint 序列推过最大已有 ID
     let maxId = 0;
@@ -336,12 +381,16 @@ export const createEditSlice: StateCreator<Deps, [], [], EditSlice> = (set, get)
     ensureFactionIdSeqAtLeast(maxId + 1);
 
     set({
-      map: {
-        meta: doc.meta,
-        provinces,
-        borders: doc.borders,
-      },
+      map: nextMap,
       factions,
+      recentConquests: new Map(),
+      activeWars: [],
+      settlements: rebuildCapitalSettlements({
+        map: nextMap,
+        factions,
+        previous: get().settlements,
+        tick: asTick(0),
+      }),
       seed: doc.meta.seed,
       provinceCount: ((): ProvincePreset => {
         const c = doc.meta.provinceCount;
@@ -362,6 +411,44 @@ export const createEditSlice: StateCreator<Deps, [], [], EditSlice> = (set, get)
     return { ok: true, message: `已导入 ${provinces.length} 州` };
   },
 });
+
+function recountFactionsByLand(
+  factions: FactionSummary[],
+  provinces: Array<{ terrain: TerrainKind; ownerFactionId: FactionId | null }>,
+): FactionSummary[] {
+  const counts = new Map<FactionId, number>();
+  for (const p of provinces) {
+    if (p.terrain === 'ocean' || p.ownerFactionId == null) continue;
+    counts.set(p.ownerFactionId, (counts.get(p.ownerFactionId) ?? 0) + 1);
+  }
+
+  return factions.map((f) => {
+    const regions = counts.get(f.id) ?? 0;
+    return {
+      ...f,
+      regions,
+      birthRegionId: isOwnedLandBy(provinces, f.birthRegionId, f.id) ? f.birthRegionId : null,
+      capitalRegionId:
+        regions > 0 && isOwnedLandBy(provinces, f.capitalRegionId, f.id)
+          ? f.capitalRegionId
+          : null,
+      centroidRegionId:
+        regions > 0 && isOwnedLandBy(provinces, f.centroidRegionId, f.id)
+          ? f.centroidRegionId
+          : null,
+    };
+  });
+}
+
+function isOwnedLandBy(
+  provinces: Array<{ terrain: TerrainKind; ownerFactionId: FactionId | null }>,
+  regionId: RegionId | null,
+  factionId: FactionId,
+): boolean {
+  if (regionId == null) return false;
+  const province = provinces[regionId as unknown as number];
+  return province?.terrain !== 'ocean' && province?.ownerFactionId === factionId;
+}
 
 /* ------------------------------------------------------------------ */
 /* 校验                                                                */

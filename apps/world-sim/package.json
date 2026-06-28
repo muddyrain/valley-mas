@@ -8,6 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test:balance": "vitest run tests/balancePacing.test.ts",
+    "test:balance-report": "vitest run tests/balanceReport.test.ts",
+    "test:settlements": "vitest run tests/settlementRegression.test.ts",
     "test:stability": "vitest run tests/runtimeStability.test.ts",
     "test:longrun": "vitest run tests/longRunConvergence.test.ts",
     "typecheck": "tsc --noEmit",

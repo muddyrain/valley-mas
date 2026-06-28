@@ -1,13 +1,15 @@
 import type { Scenario } from '../types';
 
 /**
- * 群雄逐鹿剧本：东汉末年八大诸侯。
+ * 三国剧本：东汉末年八大诸侯。
  * 用九宫格方位分配出生区域，模拟汉末群雄割据局面。
  */
 export const WARLORDS_SCENARIO: Scenario = {
   id: 'warlords',
-  name: '群雄逐鹿',
+  name: '三国剧本',
   description: '东汉末年八大诸侯割据：曹操、刘备、孙权、袁绍、吕布、董卓、马腾、刘表。',
+  preferredMapMode: 'three-kingdoms',
+  mapSeedSuffix: '-tk',
   factions: [
     {
       factionName: '曹魏',

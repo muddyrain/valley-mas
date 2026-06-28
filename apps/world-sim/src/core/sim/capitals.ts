@@ -1,5 +1,5 @@
 import type { MapData } from '@/core/map';
-import type { FactionId, RegionId } from '@/shared/types';
+import type { FactionId, RegionId, SettlementTier } from '@/shared/types';
 
 export interface CapitalInfo {
   capital: RegionId | null;
@@ -13,11 +13,27 @@ export interface CapitalInfo {
 export interface FactionCapitalInput {
   id: FactionId;
   capitalRegionId: RegionId | null;
+  capitalCandidates?: readonly CapitalRelocationCandidate[];
 }
+
+export interface CapitalRelocationCandidate {
+  regionId: RegionId;
+  tier: SettlementTier;
+  population: number;
+  development: number;
+}
+
+const CAPITAL_RELOCATION_TIER_SCORE: Record<SettlementTier, number> = {
+  capital: 4000,
+  city: 3000,
+  town: 2000,
+  village: 1000,
+};
 
 /**
  * Phase 8.5：在所有 ownership 变更应用后，重新计算每势力的领土重心州；
- * 若当前 capital 不在己方掌控，则迁都至 centroid。无领土的势力 capital/centroid 均为 null。
+ * 若当前 capital 不在己方掌控，则优先迁都至幸存聚落；没有可用聚落时回退至 centroid。
+ * 无领土的势力 capital/centroid 均为 null。
  *
  * 纯函数：不读 store、不写 store；simSlice live tick 与 replaySlice rebuild 共用，
  * 保证录制态与回放态的首都/重心始终一致。
@@ -30,6 +46,7 @@ export function computeCapitalsAndCentroids(
   const sumByFaction = new Map<FactionId, { x: number; y: number; count: number }>();
   const ownedByFaction = new Map<FactionId, number[]>();
   for (const province of map.provinces) {
+    if (province.terrain === 'ocean') continue;
     const owner = province.ownerFactionId;
     if (owner == null) continue;
     let agg = sumByFaction.get(owner);
@@ -73,14 +90,44 @@ export function computeCapitalsAndCentroids(
 
     let capitalId = f.capitalRegionId;
     if (capitalId == null) {
-      capitalId = centroidId;
+      capitalId = pickRelocationCapital(map, f.id, f.capitalCandidates, avgX, avgY) ?? centroidId;
     } else {
       const capProvince = map.provinces[capitalId as unknown as number];
-      if (!capProvince || capProvince.ownerFactionId !== f.id) {
-        capitalId = centroidId;
+      if (!capProvince || capProvince.terrain === 'ocean' || capProvince.ownerFactionId !== f.id) {
+        capitalId = pickRelocationCapital(map, f.id, f.capitalCandidates, avgX, avgY) ?? centroidId;
       }
     }
     out.set(f.id, { capital: capitalId, centroid: centroidId });
   }
   return out;
+}
+
+function pickRelocationCapital(
+  map: MapData,
+  factionId: FactionId,
+  candidates: readonly CapitalRelocationCandidate[] | undefined,
+  avgX: number,
+  avgY: number,
+): RegionId | null {
+  let best: { regionId: RegionId; score: number } | null = null;
+
+  for (const candidate of candidates ?? []) {
+    const province = map.provinces[candidate.regionId as unknown as number];
+    if (!province || province.terrain === 'ocean' || province.ownerFactionId !== factionId) continue;
+
+    const dx = province.centroid.x - avgX;
+    const dy = province.centroid.y - avgY;
+    const distancePenalty = Math.sqrt(dx * dx + dy * dy) * 0.1;
+    const score =
+      CAPITAL_RELOCATION_TIER_SCORE[candidate.tier] +
+      Math.min(candidate.population, 20_000) * 0.02 +
+      candidate.development * 120 -
+      distancePenalty;
+
+    if (!best || score > best.score) {
+      best = { regionId: candidate.regionId, score };
+    }
+  }
+
+  return best?.regionId ?? null;
 }

@@ -1,10 +1,12 @@
 import type { StateCreator } from 'zustand';
 import type { MapBounds, MapData } from '@/core/map';
-import { generateMap, getMapModeSource, type MapModeId } from '@/core/map';
+import { defaultSeedSuffix, generateMap, getMapModeSource, type MapModeId } from '@/core/map';
+import { rebuildCapitalSettlements } from '@/core/sim';
 import type { RegionId } from '@/shared/types';
 import { asTick } from '@/shared/types';
 import type { FactionSlice } from './factionSlice';
 import type { ScenarioSlice } from './scenarioSlice';
+import type { SettlementSlice } from './settlementSlice';
 import type { SimSlice } from './simSlice';
 
 // Re-export MapModeId for state layer consumers
@@ -25,6 +27,8 @@ export interface MapSlice {
   provinceCount: ProvincePreset;
   /** 当前地图模式 */
   mapMode: MapModeId;
+  /** 当前地图的剧本级 seed 后缀 */
+  mapSeedSuffix: string;
   /** 命中测试得到的悬停州 */
   hoveredRegionId: RegionId | null;
   /** 用户点击选中的州 */
@@ -34,23 +38,28 @@ export interface MapSlice {
 
   setSeed: (seed: string) => void;
   setProvinceCount: (count: ProvincePreset) => void;
-  setMapMode: (mode: MapModeId) => void;
+  setMapMode: (
+    mode: MapModeId,
+    options?: { seedSuffix?: string; skipScenarioLoad?: boolean },
+  ) => void;
   /** 重建地图 */
   regenerateMap: (overrides?: { seed?: string; provinceCount?: ProvincePreset }) => void;
   setHoveredRegion: (id: RegionId | null) => void;
   setSelectedRegion: (id: RegionId | null) => void;
 }
 
-type Deps = MapSlice & FactionSlice & SimSlice & ScenarioSlice;
+type Deps = MapSlice & FactionSlice & SimSlice & ScenarioSlice & SettlementSlice;
 
-const SIM_RESET = {
+const buildSimReset = () => ({
   tick: asTick(0),
   status: 'idle' as const,
   winnerFactionId: null,
   lastTickEventCount: 0,
   snapshotVersion: 0,
+  recentConquests: new Map<number, ReturnType<typeof asTick>>(),
+  activeWars: [],
   paused: true,
-};
+});
 
 /** 首次加载时生成随机 seed，保证每次进入页面地图和剧本都不同 */
 function generateInitialSeed(): string {
@@ -67,18 +76,18 @@ function getBoundsForMode(mode: MapModeId): MapBounds {
   return getMapModeSource(mode).bounds;
 }
 
-function getSeedForMode(mode: MapModeId, baseSeed: string): string {
-  const suffix = mode === 'three-kingdoms' ? '-tk' : '';
-  return baseSeed + suffix;
+function getSeedForMode(mode: MapModeId, baseSeed: string, seedSuffix?: string): string {
+  return baseSeed + (seedSuffix ?? defaultSeedSuffix(mode));
 }
 
 function buildMap(
   mode: MapModeId,
   seed: string,
   provinceCount: ProvincePreset,
+  seedSuffix?: string,
 ): { map: MapData; elapsed: number } {
   const bounds = getBoundsForMode(mode);
-  const effectiveSeed = getSeedForMode(mode, seed);
+  const effectiveSeed = getSeedForMode(mode, seed, seedSuffix);
   const start = performance.now();
   const next = generateMap({
     seed: effectiveSeed,
@@ -95,15 +104,17 @@ export const createMapSlice: StateCreator<Deps, [], [], MapSlice> = (set, get) =
   seed: generateInitialSeed(),
   provinceCount: 3000,
   mapMode: 'random',
+  mapSeedSuffix: defaultSeedSuffix('random'),
   hoveredRegionId: null,
   selectedRegionId: null,
   lastGenerateMs: 0,
 
   setSeed: (seed) => set({ seed }),
   setProvinceCount: (count) => set({ provinceCount: count }),
-  setMapMode: (mode) => {
+  setMapMode: (mode, options) => {
     const { seed, provinceCount } = get();
-    const { map, elapsed } = buildMap(mode, seed, provinceCount);
+    const seedSuffix = options?.seedSuffix ?? defaultSeedSuffix(mode);
+    const { map, elapsed } = buildMap(mode, seed, provinceCount, seedSuffix);
     const factionsReset = get().factions.map((f) => ({
       ...f,
       birthRegionId: null,
@@ -111,22 +122,33 @@ export const createMapSlice: StateCreator<Deps, [], [], MapSlice> = (set, get) =
       centroidRegionId: null,
       regions: 0,
     }));
+    const settlementsReset = rebuildCapitalSettlements({
+      map,
+      factions: factionsReset,
+      previous: get().settlements,
+      tick: asTick(0),
+    });
     set({
       map,
       mapMode: mode,
+      mapSeedSuffix: seedSuffix,
       hoveredRegionId: null,
       selectedRegionId: null,
       lastGenerateMs: elapsed,
       factions: factionsReset,
-      ...SIM_RESET,
+      settlements: settlementsReset,
+      ...buildSimReset(),
     });
-    get().loadScenario(get().currentScenarioId);
+    if (!options?.skipScenarioLoad) {
+      get().loadScenario(get().currentScenarioId);
+    }
   },
   regenerateMap: (overrides) => {
     const seed = overrides?.seed ?? get().seed;
     const provinceCount = overrides?.provinceCount ?? get().provinceCount;
     const mode = get().mapMode;
-    const { map, elapsed } = buildMap(mode, seed, provinceCount);
+    const seedSuffix = get().mapSeedSuffix;
+    const { map, elapsed } = buildMap(mode, seed, provinceCount, seedSuffix);
     const factionsReset = get().factions.map((f) => ({
       ...f,
       birthRegionId: null,
@@ -134,6 +156,12 @@ export const createMapSlice: StateCreator<Deps, [], [], MapSlice> = (set, get) =
       centroidRegionId: null,
       regions: 0,
     }));
+    const settlementsReset = rebuildCapitalSettlements({
+      map,
+      factions: factionsReset,
+      previous: get().settlements,
+      tick: asTick(0),
+    });
     set({
       map,
       seed,
@@ -142,7 +170,8 @@ export const createMapSlice: StateCreator<Deps, [], [], MapSlice> = (set, get) =
       selectedRegionId: null,
       lastGenerateMs: elapsed,
       factions: factionsReset,
-      ...SIM_RESET,
+      settlements: settlementsReset,
+      ...buildSimReset(),
     });
     // 地图生成完成后自动加载当前剧本：写入新的 factions 与 ownership。
     get().loadScenario(get().currentScenarioId);

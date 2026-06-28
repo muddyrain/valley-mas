@@ -1,6 +1,18 @@
 import type { StateCreator } from 'zustand';
-import type { SimEventType, SimStatus } from '@/core/sim';
-import { computeCapitalsAndCentroids, runExpansionTick } from '@/core/sim';
+import type { SimEventType, SimPatch, SimStatus } from '@/core/sim';
+import {
+  advanceSettlementSieges,
+  advanceWarStates,
+  applyCapitalFallWarShocks,
+  applyRecentConquestPatches,
+  collectRevoltRegionIds,
+  computeCapitalsAndCentroids,
+  getSettlementRevoltOutbreaks,
+  getSettlementRevoltWarnings,
+  rebuildCapitalSettlements,
+  runExpansionTick,
+  selectBorderWarDeclarations,
+} from '@/core/sim';
 import { createPrngFromSeed, type RandomSource } from '@/shared/math';
 import type {
   FactionId,
@@ -8,18 +20,23 @@ import type {
   LogEvent,
   LogEventCategory,
   LogEventLevel,
+  ReplayCapitalUpdate,
   ReplayFrame,
   ReplayPatch,
   ReplayRankingRow,
+  SettlementSummary,
   SimMode,
   SimSpeedTier,
   Tick,
+  WarSummary,
 } from '@/shared/types';
-import { asEventId, asTick } from '@/shared/types';
+import { asEventId, asTick, asWarId } from '@/shared/types';
 import type { FactionSlice } from './factionSlice';
+import { mintFactionId } from './factionSlice';
 import { type LogSlice, MAX_LOG_ENTRIES } from './logSlice';
 import type { MapSlice } from './mapSlice';
 import type { ReplaySlice } from './replaySlice';
+import type { SettlementSlice } from './settlementSlice';
 
 const SIM_LOG_LEVEL_BY_TYPE: Record<SimEventType, LogEventLevel> = {
   capture: 'battle',
@@ -27,6 +44,7 @@ const SIM_LOG_LEVEL_BY_TYPE: Record<SimEventType, LogEventLevel> = {
   eliminate: 'system',
   victory: 'system',
   stalemate: 'system',
+  revolt_warning: 'warn',
 };
 
 const SIM_LOG_CATEGORY_BY_TYPE: Record<SimEventType, LogEventCategory> = {
@@ -35,7 +53,12 @@ const SIM_LOG_CATEGORY_BY_TYPE: Record<SimEventType, LogEventCategory> = {
   eliminate: 'eliminate',
   victory: 'victory',
   stalemate: 'stalemate',
+  revolt_warning: 'revolt',
 };
+
+const MAX_ACTIVE_REVOLT_WARS = 2;
+const REVOLT_OUTBREAK_COOLDOWN_TICKS = 80;
+const MAX_REGIONS_PER_REVOLT = 2;
 
 export interface SimSlice {
   /** 当前 tick（占位/驱动器共用） */
@@ -54,6 +77,10 @@ export interface SimSlice {
   lastTickEventCount: number;
   /** 最近一次发布的快照版本号；Phase 5 用于通知渲染层「数据已变」 */
   snapshotVersion: number;
+  /** 每个州最近一次被占领的 tick；用于治理、忠诚和叛乱的短期记忆。 */
+  recentConquests: Map<number, Tick>;
+  /** 当前仍在持续的最小战争关系：普通边境战争、叛乱战争与停战。 */
+  activeWars: WarSummary[];
 
   setSpeed: (speed: SimSpeedTier) => void;
   setPaused: (paused: boolean) => void;
@@ -69,7 +96,7 @@ export interface SimSlice {
   resetBattle: () => void;
 }
 
-type Deps = SimSlice & MapSlice & FactionSlice & LogSlice & ReplaySlice;
+type Deps = SimSlice & MapSlice & FactionSlice & LogSlice & ReplaySlice & SettlementSlice;
 
 export const createSimSlice: StateCreator<Deps, [], [], SimSlice> = (set, get) => {
   let logSeq = 1;
@@ -85,10 +112,32 @@ export const createSimSlice: StateCreator<Deps, [], [], SimSlice> = (set, get) =
     const nextTick = asTick(state.tick + 1);
 
     const rng: RandomSource = createPrngFromSeed(`tick-${state.seed}-${nextTick}`);
+    const declaredWars: WarSummary[] = [];
+    for (const candidate of selectBorderWarDeclarations({
+      map,
+      factions,
+      wars: state.activeWars,
+    })) {
+      declaredWars.push({
+        id: mintWarId(state.activeWars, declaredWars),
+        kind: 'border',
+        status: 'active',
+        attackerFactionId: candidate.attackerFactionId,
+        defenderFactionId: candidate.defenderFactionId,
+        startedTick: nextTick,
+        lastContactTick: nextTick,
+        fatigue: 0,
+        attackerStartRegions: factions.find((faction) => faction.id === candidate.attackerFactionId)?.regions ?? 0,
+        defenderStartRegions: factions.find((faction) => faction.id === candidate.defenderFactionId)?.regions ?? 0,
+      });
+    }
+    const warsForTick = declaredWars.length > 0 ? state.activeWars.concat(declaredWars) : state.activeWars;
     const result = runExpansionTick({
       tick: nextTick,
       map,
       factions,
+      settlements: state.settlements,
+      activeWars: warsForTick,
       rng,
     });
 
@@ -96,6 +145,9 @@ export const createSimSlice: StateCreator<Deps, [], [], SimSlice> = (set, get) =
     let nextStatus: SimStatus = state.status === 'idle' ? 'idle' : 'running';
     let winnerFactionId: FactionId | null = state.winnerFactionId;
 
+    const factionById = new Map<FactionId, FactionSummary>(
+      factions.map((f: FactionSummary) => [f.id, f]),
+    );
     const factionNameById = new Map<FactionId, string>(
       factions.map((f: FactionSummary) => [f.id, f.name]),
     );
@@ -115,6 +167,17 @@ export const createSimSlice: StateCreator<Deps, [], [], SimSlice> = (set, get) =
         factionId: factionId ?? undefined,
       });
     };
+
+    for (const war of declaredWars) {
+      const attackerName = factionNameById.get(war.attackerFactionId) ?? '一方';
+      const defenderName = factionNameById.get(war.defenderFactionId) ?? '另一方';
+      pushLog(
+        'diplomacy',
+        'diplomacy',
+        `${attackerName} 对 ${defenderName} 宣战`,
+        war.attackerFactionId,
+      );
+    }
 
     for (const event of result.events) {
       const level = SIM_LOG_LEVEL_BY_TYPE[event.type];
@@ -147,53 +210,275 @@ export const createSimSlice: StateCreator<Deps, [], [], SimSlice> = (set, get) =
     }
 
     let nextMap = map;
+    const ensureNextMapMutable = () => {
+      if (nextMap === map) {
+        nextMap = {
+          ...map,
+          provinces: map.provinces.map((p) => ({ ...p })),
+        };
+      }
+      return nextMap;
+    };
     if (result.patches.length > 0) {
-      nextMap = {
-        ...map,
-        provinces: map.provinces.map((p) => ({ ...p })),
-      };
+      ensureNextMapMutable();
       for (const patch of result.patches) {
         const idx = patch.regionId as unknown as number;
         const province = nextMap.provinces[idx];
-        if (province) province.ownerFactionId = patch.toOwnerId;
+        if (province && province.terrain !== 'ocean') province.ownerFactionId = patch.toOwnerId;
       }
     }
 
-    // 重新统计每势力 region 数（在 patch 应用后）
-    const regionsByFaction = new Map<FactionId, number>();
-    for (const province of nextMap.provinces) {
-      const owner = province.ownerFactionId;
-      if (owner == null) continue;
-      regionsByFaction.set(owner, (regionsByFaction.get(owner) ?? 0) + 1);
-    }
-    // Phase 8.5：刷新每势力的领土重心 + 必要时迁都
-    const capitalsByFaction = computeCapitalsAndCentroids(nextMap, factions);
-    const factionsNext = factions.map((f) => {
-      const capInfo = capitalsByFaction.get(f.id);
-      return {
-        ...f,
-        regions: regionsByFaction.get(f.id) ?? 0,
-        capitalRegionId: capInfo ? capInfo.capital : f.capitalRegionId,
-        centroidRegionId: capInfo ? capInfo.centroid : f.centroidRegionId,
-      };
-    });
+    let factionsNext = refreshFactionsFromMap(nextMap, factions, state.settlements);
+    const factionNextById = new Map<FactionId, FactionSummary>(
+      factionsNext.map((f: FactionSummary) => [f.id, f]),
+    );
+    let capitalFallCount = 0;
+    const reportedCapitalFalls = new Set<FactionId>();
+    const capitalFallShockFactionIds = new Set<FactionId>();
+    for (const patch of result.patches) {
+      if (patch.fromOwnerId == null || patch.toOwnerId == null || patch.fromOwnerId === patch.toOwnerId) {
+        continue;
+      }
+      if (reportedCapitalFalls.has(patch.fromOwnerId)) continue;
+      const previousFaction = factionById.get(patch.fromOwnerId);
+      if (previousFaction?.capitalRegionId !== patch.regionId) continue;
 
+      const defenderName = factionNameById.get(patch.fromOwnerId) ?? '守方';
+      const attackerName = factionNameById.get(patch.toOwnerId) ?? '攻方';
+      const relocatedCapital = factionNextById.get(patch.fromOwnerId)?.capitalRegionId ?? null;
+      const relocationText =
+        relocatedCapital == null
+          ? '，已无可迁都之地'
+          : `，迁都 #${relocatedCapital as unknown as number}`;
+      pushLog(
+        'system',
+        'capital',
+        `${defenderName} 都城 #${patch.regionId as unknown as number} 陷落${relocationText}（被 ${attackerName} 攻陷）`,
+        patch.fromOwnerId,
+      );
+      reportedCapitalFalls.add(patch.fromOwnerId);
+      capitalFallShockFactionIds.add(patch.fromOwnerId);
+      capitalFallCount++;
+    }
+    let recentConquestsNext = applyRecentConquestPatches({
+      previous: state.recentConquests,
+      patches: result.patches,
+      currentTick: nextTick,
+    });
+    let settlementsNext = rebuildCapitalSettlements({
+      map: nextMap,
+      factions: factionsNext,
+      previous: state.settlements,
+      tick: nextTick,
+      recentConquests: recentConquestsNext,
+      capitalFallShockFactionIds,
+    });
+    const revoltWarnings = getSettlementRevoltWarnings({
+      previous: state.settlements,
+      current: settlementsNext,
+    });
+    const factionNameByNextId = new Map<FactionId, string>(
+      factionsNext.map((f: FactionSummary) => [f.id, f.name]),
+    );
+    for (const warning of revoltWarnings) {
+      const settlement = warning.settlement;
+      const factionName = factionNameByNextId.get(settlement.factionId) ?? '未知势力';
+      pushLog(
+        'warn',
+        'revolt',
+        `${factionName} 的 ${settlement.name} 叛乱酝酿（忠诚=${formatPercent(settlement.loyalty)}，动荡=${formatPercent(settlement.unrest)}，进度=${formatPercent(settlement.revoltProgress)}）`,
+        settlement.factionId,
+      );
+    }
+    const revoltPatches: SimPatch[] = [];
+    const rebelFactions: FactionSummary[] = [];
+    const newWars: WarSummary[] = [...declaredWars];
+    const revoltOutbreaks = getSettlementRevoltOutbreaks({
+      previous: state.settlements,
+      current: settlementsNext,
+    });
+    let remainingRevoltSlots = Math.max(0, MAX_ACTIVE_REVOLT_WARS - countActiveRevoltWars(warsForTick));
+    if (hasRecentRevoltOutbreak(warsForTick, nextTick)) {
+      remainingRevoltSlots = 0;
+    }
+    for (const outbreak of revoltOutbreaks) {
+      if (remainingRevoltSlots <= 0) break;
+      const settlement = outbreak.settlement;
+      const regionIndex = settlement.regionId as unknown as number;
+      const province = nextMap.provinces[regionIndex];
+      if (!province || province.terrain === 'ocean' || province.ownerFactionId !== settlement.factionId) {
+        continue;
+      }
+      const parent = factionsNext.find((faction) => faction.id === settlement.factionId);
+      if (!parent || parent.regions <= 1) continue;
+      const revoltRegionIds = collectRevoltRegionIds({
+        map: nextMap,
+        rootRegionId: settlement.regionId,
+        parentFactionId: settlement.factionId,
+        parentCapitalRegionId: parent.capitalRegionId,
+        currentTick: nextTick,
+        recentConquests: recentConquestsNext,
+        maxRegions: Math.min(MAX_REGIONS_PER_REVOLT, Math.max(1, parent.regions - 1)),
+      });
+      if (revoltRegionIds.length === 0) continue;
+
+      const rebelId = mintFactionId();
+      const rebelFaction: FactionSummary = {
+        id: rebelId,
+        name: `${settlement.name}义军`,
+        leader: `${settlement.name}首领`,
+        colorHex: pickRebelColor(rebelId),
+        birthRegionId: settlement.regionId,
+        capitalRegionId: settlement.regionId,
+        centroidRegionId: settlement.regionId,
+        regions: revoltRegionIds.length,
+        population: Math.max(0, Math.floor(settlement.population * (0.55 + revoltRegionIds.length * 0.08))),
+      };
+
+      ensureNextMapMutable();
+      for (const regionId of revoltRegionIds) {
+        const idx = regionId as unknown as number;
+        nextMap.provinces[idx] = {
+          ...nextMap.provinces[idx],
+          ownerFactionId: rebelId,
+        };
+        revoltPatches.push({
+          regionId,
+          fromOwnerId: settlement.factionId,
+          toOwnerId: rebelId,
+          tick: nextTick,
+        });
+      }
+      rebelFactions.push(rebelFaction);
+      const revoltWar: WarSummary = {
+        id: mintWarId(state.activeWars, newWars),
+        kind: 'revolt',
+        status: 'active',
+        attackerFactionId: rebelId,
+        defenderFactionId: settlement.factionId,
+        startedTick: nextTick,
+        lastContactTick: nextTick,
+        fatigue: 0,
+        attackerStartRegions: rebelFaction.regions,
+        defenderStartRegions: Math.max(0, parent.regions - revoltRegionIds.length),
+        sourceSettlementId: settlement.id,
+      };
+      newWars.push(revoltWar);
+      pushLog(
+        'system',
+        'revolt',
+        `${settlement.name} 举旗叛乱，脱离 ${parent.name}（响应州=${revoltRegionIds.length}，忠诚=${formatPercent(settlement.loyalty)}，动荡=${formatPercent(settlement.unrest)}，进度=${formatPercent(settlement.revoltProgress)}）`,
+        rebelId,
+      );
+      pushLog(
+        'diplomacy',
+        'diplomacy',
+        `${rebelFaction.name} 与 ${parent.name} 爆发叛乱战争`,
+        rebelId,
+      );
+      remainingRevoltSlots--;
+    }
+
+    if (revoltPatches.length > 0) {
+      const factionsWithRebels = [...factionsNext, ...rebelFactions];
+      recentConquestsNext = applyRecentConquestPatches({
+        previous: recentConquestsNext,
+        patches: revoltPatches,
+        currentTick: nextTick,
+      });
+      factionsNext = refreshFactionsFromMap(nextMap, factionsWithRebels, settlementsNext);
+      settlementsNext = rebuildCapitalSettlements({
+        map: nextMap,
+        factions: factionsNext,
+        previous: settlementsNext,
+        tick: nextTick,
+        recentConquests: recentConquestsNext,
+      });
+    }
+
+    const allPatches = result.patches.concat(revoltPatches);
+    const warsBeforeProgress = newWars.length > 0 ? state.activeWars.concat(newWars) : state.activeWars;
+    const siegeProgress = advanceSettlementSieges({
+      wars: warsBeforeProgress,
+      settlements: state.settlements,
+      events: result.events,
+      tick: nextTick,
+      map: nextMap,
+    });
+    const warProgress = advanceWarStates({
+      map: nextMap,
+      factions: factionsNext,
+      wars: siegeProgress.wars,
+      tick: nextTick,
+    });
+    const capitalShockProgress = applyCapitalFallWarShocks({
+      wars: warProgress.wars,
+      fallenFactionIds: capitalFallShockFactionIds,
+      tick: nextTick,
+    });
+    const updatedWars = mergeUpdatedWars(
+      siegeProgress.updatedWars,
+      warProgress.updatedWars,
+      capitalShockProgress.updatedWars,
+    );
+    for (const transition of warProgress.transitions) {
+      const attackerName = factionNameByNextId.get(transition.war.attackerFactionId) ?? '一方';
+      const defenderName = factionNameByNextId.get(transition.war.defenderFactionId) ?? '另一方';
+      if (transition.type === 'truce') {
+        const reasonText = transition.reason === 'fatigue' ? '因战事疲惫' : '';
+        pushLog(
+          'diplomacy',
+          'diplomacy',
+          `${attackerName} 与 ${defenderName} ${reasonText}停战`,
+          transition.war.attackerFactionId,
+        );
+      } else if (transition.type === 'ended') {
+        const winnerName =
+          transition.winnerFactionId == null ? '无人' : (factionNameByNextId.get(transition.winnerFactionId) ?? '胜方');
+        const loserName =
+          transition.loserFactionId == null ? '一方' : (factionNameByNextId.get(transition.loserFactionId) ?? '败方');
+        pushLog(
+          'diplomacy',
+          'diplomacy',
+          `${winnerName} 结束与 ${loserName} 的战争`,
+          transition.winnerFactionId ?? transition.war.attackerFactionId,
+        );
+      } else {
+        pushLog(
+          'diplomacy',
+          'diplomacy',
+          `${attackerName} 与 ${defenderName} 停战期结束`,
+          transition.war.attackerFactionId,
+        );
+      }
+    }
     const logsNext = newLogs.length > 0 ? appendLogs(state.logs, newLogs) : state.logs;
 
     set({
       tick: nextTick,
       map: nextMap,
       factions: factionsNext,
+      settlements: settlementsNext,
+      recentConquests: recentConquestsNext,
+      activeWars: capitalShockProgress.wars,
       logs: logsNext,
       status: nextStatus,
       winnerFactionId,
-      lastTickEventCount: result.events.length,
+      lastTickEventCount:
+        result.events.length +
+        capitalFallCount +
+        revoltWarnings.length +
+        revoltPatches.length +
+        newWars.length +
+        siegeProgress.updatedWars.length +
+        capitalShockProgress.updatedWars.length +
+        warProgress.transitions.length,
       snapshotVersion: state.snapshotVersion + 1,
     });
 
     // Phase 11：把本 tick 录入 replay。仅在录制模式下追加；回放模式期间 sim 已被外层暂停，不会进来。
     if (state.replayMode === 'recording') {
-      const patches: ReplayPatch[] = result.patches.map((p) => ({
+      const patches: ReplayPatch[] = allPatches.map((p) => ({
         regionId: p.regionId as unknown as number,
         from: p.fromOwnerId == null ? null : (p.fromOwnerId as unknown as number),
         to: p.toOwnerId == null ? null : (p.toOwnerId as unknown as number),
@@ -202,11 +487,28 @@ export const createSimSlice: StateCreator<Deps, [], [], SimSlice> = (set, get) =
         factionId: f.id as unknown as number,
         regions: f.regions ?? 0,
       }));
+      const capitalUpdates = getCapitalUpdates(factions, factionsNext);
       const frame: ReplayFrame = {
         tick: nextTick,
         patches,
         events: newLogs,
         rankings,
+        capitalUpdates: capitalUpdates.length === 0 ? undefined : capitalUpdates,
+        newFactions:
+          rebelFactions.length === 0
+            ? undefined
+            : rebelFactions.map((f) => ({
+                id: f.id,
+                name: f.name,
+                leader: f.leader,
+                colorHex: f.colorHex,
+                birthRegionId: f.birthRegionId,
+                capitalRegionId: f.capitalRegionId ?? f.birthRegionId,
+                population: f.population,
+              })),
+        newWars: newWars.length === 0 ? undefined : newWars,
+        updatedWars: updatedWars.length === 0 ? undefined : updatedWars,
+        endedWarIds: warProgress.endedWarIds.length === 0 ? undefined : warProgress.endedWarIds,
         status: nextStatus,
         winnerFactionId,
       };
@@ -223,6 +525,8 @@ export const createSimSlice: StateCreator<Deps, [], [], SimSlice> = (set, get) =
     winnerFactionId: null,
     lastTickEventCount: 0,
     snapshotVersion: 0,
+    recentConquests: new Map(),
+    activeWars: [],
 
     setSpeed: (speed) =>
       set((s) => ({
@@ -269,6 +573,8 @@ export const createSimSlice: StateCreator<Deps, [], [], SimSlice> = (set, get) =
         winnerFactionId: null,
         lastTickEventCount: 0,
         snapshotVersion: 0,
+        recentConquests: new Map(),
+        activeWars: [],
       }),
 
     resetBattle: () => {
@@ -291,6 +597,9 @@ export const createSimSlice: StateCreator<Deps, [], [], SimSlice> = (set, get) =
       set({
         ...(nextMap ? { map: nextMap } : {}),
         factions: factionsNext,
+        settlements: [],
+        recentConquests: new Map(),
+        activeWars: [],
         tick: asTick(0),
         speed: '1x',
         paused: true,
@@ -317,6 +626,123 @@ function appendLogs(prev: LogEvent[], next: LogEvent[]): LogEvent[] {
   });
 }
 
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
 function isMilestoneLog(log: LogEvent): boolean {
-  return log.category === 'eliminate' || log.category === 'victory' || log.category === 'stalemate';
+  return (
+    log.category === 'capital' ||
+    log.category === 'eliminate' ||
+    log.category === 'victory' ||
+    log.category === 'stalemate'
+  );
+}
+
+function mergeUpdatedWars(
+  ...groups: Array<readonly WarSummary[]>
+): WarSummary[] {
+  const byId = new Map<number, WarSummary>();
+  for (const group of groups) {
+    for (const war of group) {
+      byId.set(war.id as unknown as number, war);
+    }
+  }
+  return Array.from(byId.values());
+}
+
+function countActiveRevoltWars(wars: readonly WarSummary[]): number {
+  return wars.filter((war) => war.kind === 'revolt' && war.status === 'active').length;
+}
+
+function hasRecentRevoltOutbreak(wars: readonly WarSummary[], currentTick: Tick): boolean {
+  return wars.some(
+    (war) =>
+      war.kind === 'revolt' &&
+      Number(currentTick) - Number(war.startedTick) < REVOLT_OUTBREAK_COOLDOWN_TICKS,
+  );
+}
+
+function refreshFactionsFromMap(
+  map: NonNullable<MapSlice['map']>,
+  factions: FactionSummary[],
+  settlements: readonly SettlementSummary[] = [],
+): FactionSummary[] {
+  const regionsByFaction = new Map<FactionId, number>();
+  for (const province of map.provinces) {
+    if (province.terrain === 'ocean') continue;
+    const owner = province.ownerFactionId;
+    if (owner == null) continue;
+    regionsByFaction.set(owner, (regionsByFaction.get(owner) ?? 0) + 1);
+  }
+
+  const capitalCandidatesByFaction = new Map<FactionId, SettlementSummary[]>();
+  for (const settlement of settlements) {
+    const candidates = capitalCandidatesByFaction.get(settlement.factionId) ?? [];
+    candidates.push(settlement);
+    capitalCandidatesByFaction.set(settlement.factionId, candidates);
+  }
+
+  const capitalsByFaction = computeCapitalsAndCentroids(
+    map,
+    factions.map((f) => ({
+      id: f.id,
+      capitalRegionId: f.capitalRegionId,
+      capitalCandidates: capitalCandidatesByFaction.get(f.id),
+    })),
+  );
+  return factions.map((f) => {
+    const capInfo = capitalsByFaction.get(f.id);
+    return {
+      ...f,
+      regions: regionsByFaction.get(f.id) ?? 0,
+      capitalRegionId: capInfo ? capInfo.capital : f.capitalRegionId,
+      centroidRegionId: capInfo ? capInfo.centroid : f.centroidRegionId,
+    };
+  });
+}
+
+function getCapitalUpdates(
+  previous: readonly FactionSummary[],
+  current: readonly FactionSummary[],
+): ReplayCapitalUpdate[] {
+  const previousById = new Map(previous.map((faction) => [faction.id, faction]));
+  const updates: ReplayCapitalUpdate[] = [];
+  for (const faction of current) {
+    const previousFaction = previousById.get(faction.id);
+    if (!previousFaction) continue;
+    if (previousFaction.capitalRegionId === faction.capitalRegionId) continue;
+    updates.push({
+      factionId: faction.id,
+      capitalRegionId: faction.capitalRegionId,
+      centroidRegionId: faction.centroidRegionId,
+    });
+  }
+  return updates;
+}
+
+function pickRebelColor(id: FactionId): string {
+  const hue = 18 + (((id as unknown as number) * 37) % 36);
+  return hslToHex(hue, 78, 56);
+}
+
+function mintWarId(existing: readonly WarSummary[], pending: readonly WarSummary[]): WarSummary['id'] {
+  const maxId = existing.concat(pending).reduce((max, war) => {
+    return Math.max(max, war.id as unknown as number);
+  }, 0);
+  return asWarId(maxId + 1);
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const sNorm = s / 100;
+  const lNorm = l / 100;
+  const a = sNorm * Math.min(lNorm, 1 - lNorm);
+  const k = (n: number) => (n + h / 30) % 12;
+  const channel = (n: number) => {
+    const v = lNorm - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return Math.round(255 * v)
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${channel(0)}${channel(8)}${channel(4)}`;
 }

@@ -1,4 +1,4 @@
-import type { TerrainKind } from '@/core/map';
+import type { MapModeId, TerrainKind } from '@/core/map';
 import type { RandomSource } from '@/shared/math';
 import type { FactionId, RegionId } from '@/shared/types';
 
@@ -15,10 +15,16 @@ export interface Scenario {
   description?: string;
   /** 静态势力清单。若需要每次加载抖动，请改用 factionsFactory。 */
   factions: ScenarioFaction[];
+  /** 剧本推荐的地图形态；状态层会在应用剧本前同步切换。 */
+  preferredMapMode?: MapModeId;
+  /** 同一地图形态下的稳定 seed 后缀，用于让不同剧本拥有不同地图。 */
+  mapSeedSuffix?: string;
+  /** 传给 factionsFactory 的固定偏好，避免 UI 另挂一组来源开关。 */
+  factoryOptions?: ScenarioFactoryOptions;
   /**
    * 动态势力工厂：当存在时，scenarioSlice.loadScenario 会用 rng 生成的结果替换 factions。
    * 用于 random 剧本「每次抽不同朝代名 + 自动配君主」这种语义。
-   * options 由调用方传入剧本相关偏好（如 includeChinese / includeForeign）。
+   * options 由剧本元数据传入偏好（如 includeChinese / includeForeign）。
    */
   factionsFactory?: (rng: RandomSource, options?: ScenarioFactoryOptions) => ScenarioFaction[];
 }
@@ -26,8 +32,8 @@ export interface Scenario {
 /**
  * 动态剧本工厂的可选偏好。
  *
- * 目前仅 random 剧本消费：UI 让用户独立勾选「中文朝代池」「国外政体池」。
- * 两者都关闭时由调用方负责兜底（默认开启中文）。
+ * 目前由 random / foreign-polities 两个剧本消费。
+ * 两者都关闭时由工厂负责兜底（默认开启中文）。
  */
 export interface ScenarioFactoryOptions {
   /** 是否启用中文朝代池（DEFAULT_FACTION_NAME_POOL）。默认 true */

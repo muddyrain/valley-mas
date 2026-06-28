@@ -104,6 +104,18 @@
   background: var(--ws-bg-elev-2);
 }
 
+.category[data-category="revolt"] {
+  color: #ffd7a8;
+  background: rgba(249, 115, 22, 0.18);
+  border-color: rgba(249, 115, 22, 0.45);
+}
+
+.category[data-category="diplomacy"] {
+  color: #bfdbfe;
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
 .message {
   color: var(--ws-text);
   white-space: pre-wrap;

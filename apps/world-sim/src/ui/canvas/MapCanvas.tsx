@@ -3,13 +3,23 @@ import { useEffect, useRef, useState } from 'react';
 import type { MapData, Province } from '@/core/map';
 import { findProvinceAt, TERRAIN_COLOR, TERRAIN_KINDS, TERRAIN_LABEL } from '@/core/map';
 import {
+  buildAdminDistanceState,
   buildFrontPressureState,
   type FrontPressureOverlaySegment,
   getFrontPressureOverlaySegments,
+  getSettlementSiegeOverlayRegions,
+  getStrategicValueOverlayRegions,
+  getWarStatusOverlaySegments,
+  type SettlementSiegeOverlayRegion,
+  type StrategicValueOverlayRegion,
+  type WarStatusOverlaySegment,
 } from '@/core/sim';
-import type { FactionId, FactionSummary, RegionId } from '@/shared/types';
+import type { FactionId, FactionSummary, RegionId, SettlementSummary, WarSummary } from '@/shared/types';
 import { useWorldSimStore } from '@/state';
+import { type BorderLayerChunkTracker, createBorderLayerChunkTracker } from './borderRenderCache';
+import { computeFactionLabelAnchors } from './labelLayout';
 import styles from './MapCanvas.module.css';
+import { createOwnerLayerChunkTracker, type OwnerLayerChunkTracker } from './ownerRenderCache';
 
 const MIN_SCALE = 0.4;
 const MAX_SCALE = 6;
@@ -17,6 +27,9 @@ const ZOOM_FACTOR = 1.15;
 const CLICK_PIXEL_THRESHOLD = 4;
 /** 占领过渡时长（毫秒）。约等于 sim tick 间隔，让"势力扩张"看起来是流动的色块。 */
 const OWNER_TRANSITION_MS = 600;
+const DIVINE_FEEDBACK_MS = 720;
+const OWNER_CHUNK_SIZE = 384;
+const BORDER_CHUNK_SIZE = 384;
 
 /** 一个州的 owner 颜色动画状态（颜色与不透明度同时插值）。 */
 interface OwnerAnimState {
@@ -28,14 +41,25 @@ interface OwnerAnimState {
   dur: number;
 }
 
+type SettlementStabilityOverlayMode = ReturnType<
+  typeof useWorldSimStore.getState
+>['settlementStabilityOverlayMode'];
+type DivineFeedbackState = ReturnType<typeof useWorldSimStore.getState>['divineFeedback'];
+
 interface RenderRefs {
   app: Application;
   world: Container;
   baseLayer: Graphics;
-  ownerLayer: Graphics;
-  borderLayer: Graphics;
+  ownerLayer: Container;
+  borderLayer: Container;
+  strategicValueLayer: Graphics;
+  adminDistanceLayer: Graphics;
+  settlementStabilityLayer: Graphics;
   frontPressureLayer: Graphics;
+  warStatusLayer: Graphics;
+  siegeProgressLayer: Graphics;
   highlightLayer: Graphics;
+  divineFeedbackLayer: Graphics;
   /** 势力名标签层（Text 容器，跟随 world 一起缩放） */
   labelLayer: Container;
   /** 首都金色菱形标记层（Graphics 容器，介于 owner 与 label 之间） */
@@ -45,10 +69,17 @@ interface RenderRefs {
   ownerAnims: Map<number, OwnerAnimState>;
   /** 当前已经显示出来的颜色/alpha，作为下一次插值的起点 */
   displayedOwner: Map<number, { color: number; alpha: number }>;
+  ownerChunkGraphics: Map<number, Graphics>;
+  borderChunkGraphics: Map<number, Graphics>;
   /** 每势力一个 Text 实例，复用并按首都/版图重心定位 */
   factionLabels: Map<number, PixiText>;
   /** 每势力一个 Graphics（金色菱形首都标记） */
   factionCapitalMarkers: Map<number, Graphics>;
+  /** owner layer chunk cache; only dirty chunks redraw when ownership changes. */
+  ownerChunkTracker: OwnerLayerChunkTracker;
+  borderChunkTracker: BorderLayerChunkTracker;
+  /** 用户是否主动平移/缩放过相机。未动过时，容器尺寸变化可继续自动 fit。 */
+  cameraTouched: boolean;
 }
 
 /**
@@ -80,6 +111,14 @@ export function MapCanvas() {
   const selectedRegionId = useWorldSimStore((s) => s.selectedRegionId);
   const selectedFactionId = useWorldSimStore((s) => s.selectedFactionId);
   const frontPressureOverlayVisible = useWorldSimStore((s) => s.frontPressureOverlayVisible);
+  const adminDistanceOverlayVisible = useWorldSimStore((s) => s.adminDistanceOverlayVisible);
+  const strategicValueOverlayVisible = useWorldSimStore((s) => s.strategicValueOverlayVisible);
+  const warStatusOverlayVisible = useWorldSimStore((s) => s.warStatusOverlayVisible);
+  const siegeProgressOverlayVisible = useWorldSimStore((s) => s.siegeProgressOverlayVisible);
+  const settlementStabilityOverlayMode = useWorldSimStore((s) => s.settlementStabilityOverlayMode);
+  const settlements = useWorldSimStore((s) => s.settlements);
+  const activeWars = useWorldSimStore((s) => s.activeWars);
+  const divineFeedback = useWorldSimStore((s) => s.divineFeedback);
   const setHoveredRegion = useWorldSimStore((s) => s.setHoveredRegion);
   const setSelectedRegion = useWorldSimStore((s) => s.setSelectedRegion);
   const tick = useWorldSimStore((s) => s.tick);
@@ -93,27 +132,43 @@ export function MapCanvas() {
     const app = new Application();
     const world = new Container();
     const baseLayer = new Graphics();
-    const ownerLayer = new Graphics();
-    const borderLayer = new Graphics();
+    const ownerLayer = new Container();
+    const borderLayer = new Container();
+    const strategicValueLayer = new Graphics();
+    const adminDistanceLayer = new Graphics();
+    const settlementStabilityLayer = new Graphics();
     const frontPressureLayer = new Graphics();
+    const warStatusLayer = new Graphics();
+    const siegeProgressLayer = new Graphics();
     const highlightLayer = new Graphics();
+    const divineFeedbackLayer = new Graphics();
     const labelLayer = new Container();
     const markerLayer = new Container();
+    const initialSize = getHostCssSize(host) ?? { width: 1, height: 1 };
     labelLayer.eventMode = 'none';
     markerLayer.eventMode = 'none';
+    ownerLayer.eventMode = 'none';
+    borderLayer.eventMode = 'none';
 
     world.addChild(baseLayer);
     world.addChild(ownerLayer);
+    world.addChild(strategicValueLayer);
     world.addChild(borderLayer);
+    world.addChild(adminDistanceLayer);
+    world.addChild(settlementStabilityLayer);
     world.addChild(frontPressureLayer);
-    world.addChild(highlightLayer);
+    world.addChild(warStatusLayer);
+        world.addChild(siegeProgressLayer);
+        world.addChild(highlightLayer);
+        world.addChild(divineFeedbackLayer);
     world.addChild(markerLayer);
     world.addChild(labelLayer);
 
     app
       .init({
         background: '#0a0d12',
-        resizeTo: host,
+        width: initialSize.width,
+        height: initialSize.height,
         antialias: true,
         autoDensity: true,
         resolution: Math.min(window.devicePixelRatio || 1, 2),
@@ -133,24 +188,36 @@ export function MapCanvas() {
           baseLayer,
           ownerLayer,
           borderLayer,
+          strategicValueLayer,
+          adminDistanceLayer,
+          settlementStabilityLayer,
           frontPressureLayer,
+          warStatusLayer,
+          siegeProgressLayer,
           highlightLayer,
+          divineFeedbackLayer,
           labelLayer,
           markerLayer,
           currentMap: null,
           ownerAnims: new Map(),
           displayedOwner: new Map(),
+          ownerChunkGraphics: new Map(),
+          borderChunkGraphics: new Map(),
           factionLabels: new Map(),
           factionCapitalMarkers: new Map(),
+          ownerChunkTracker: createOwnerLayerChunkTracker({ chunkSize: OWNER_CHUNK_SIZE }),
+          borderChunkTracker: createBorderLayerChunkTracker({ chunkSize: BORDER_CHUNK_SIZE }),
+          cameraTouched: false,
         };
+        syncViewportSize(refs.current, host, { fitMapWhenPristine: false });
         // 把动画推进挂在 Pixi 自带的 ticker 上：有 anim 时才重画 ownerLayer
         app.ticker.add(() => {
           const r = refs.current;
           if (!r || r.ownerAnims.size === 0) return;
           const map = r.currentMap;
           if (!map) return;
-          tickOwnerAnims(r, performance.now());
-          redrawOwnerLayer(r, map, []);
+          const animatedRegionIds = tickOwnerAnims(r, performance.now());
+          redrawOwnerLayer(r, map, [], r.ownerChunkTracker.getChunkIdsForRegions(animatedRegionIds));
         });
         setReady(true);
       })
@@ -176,14 +243,30 @@ export function MapCanvas() {
   useEffect(() => {
     const r = refs.current;
     if (!ready || !r || !map) return;
+    r.borderChunkTracker.reset();
+    clearBorderChunks(r);
     drawBaseAndBorders(r, map, factions);
     fitMapToView(r, map);
+    r.cameraTouched = false;
     r.currentMap = map;
     // 地图整体替换 → 重置动画状态、瞬切 owner，避免从老地图色淡入到新地图色
     r.ownerAnims.clear();
     r.displayedOwner.clear();
+    r.ownerChunkTracker.reset();
+    clearOwnerChunks(r);
     drawOwnerOverlay(r, map, factions, { animate: false });
+    drawStrategicValueOverlay(r, map, strategicValueOverlayVisible);
+    drawAdminDistanceOverlay(r, map, factions, settlements, selectedFactionId, adminDistanceOverlayVisible);
+    drawSettlementStabilityOverlay(
+      r,
+      map,
+      settlements,
+      selectedFactionId,
+      settlementStabilityOverlayMode,
+    );
     drawFrontPressureOverlay(r, map, factions, frontPressureOverlayVisible);
+    drawWarStatusOverlay(r, map, activeWars, warStatusOverlayVisible);
+    drawSiegeProgressOverlay(r, map, activeWars, selectedFactionId, siegeProgressOverlayVisible);
     drawHighlight(r, map, hoveredRegionId, selectedRegionId, factions, selectedFactionId);
   }, [ready, map]);
 
@@ -199,16 +282,62 @@ export function MapCanvas() {
     const replayMode = useWorldSimStore.getState().replayMode;
     drawOwnerOverlay(r, map, factions, { animate: replayMode !== 'replaying' });
     redrawBorders(r, map, factions);
+    drawStrategicValueOverlay(r, map, strategicValueOverlayVisible);
+    drawAdminDistanceOverlay(r, map, factions, settlements, selectedFactionId, adminDistanceOverlayVisible);
+    drawSettlementStabilityOverlay(
+      r,
+      map,
+      settlements,
+      selectedFactionId,
+      settlementStabilityOverlayMode,
+    );
     drawFrontPressureOverlay(r, map, factions, frontPressureOverlayVisible);
+    drawWarStatusOverlay(r, map, activeWars, warStatusOverlayVisible);
+    drawSiegeProgressOverlay(r, map, activeWars, selectedFactionId, siegeProgressOverlayVisible);
     drawHighlight(r, map, hoveredRegionId, selectedRegionId, factions, selectedFactionId);
-  }, [ready, factions]);
+  }, [
+    ready,
+    factions,
+    settlements,
+    selectedFactionId,
+    strategicValueOverlayVisible,
+    adminDistanceOverlayVisible,
+    settlementStabilityOverlayMode,
+    activeWars,
+    warStatusOverlayVisible,
+    siegeProgressOverlayVisible,
+  ]);
 
-  /* -------- 前线压力开关变化时仅重绘 overlay 层 -------- */
+  /* -------- Overlay 开关变化时仅重绘 overlay 层 -------- */
   useEffect(() => {
     const r = refs.current;
     if (!ready || !r || !map) return;
+    drawStrategicValueOverlay(r, map, strategicValueOverlayVisible);
+    drawAdminDistanceOverlay(r, map, factions, settlements, selectedFactionId, adminDistanceOverlayVisible);
+    drawSettlementStabilityOverlay(
+      r,
+      map,
+      settlements,
+      selectedFactionId,
+      settlementStabilityOverlayMode,
+    );
     drawFrontPressureOverlay(r, map, factions, frontPressureOverlayVisible);
-  }, [ready, map, factions, frontPressureOverlayVisible]);
+    drawWarStatusOverlay(r, map, activeWars, warStatusOverlayVisible);
+    drawSiegeProgressOverlay(r, map, activeWars, selectedFactionId, siegeProgressOverlayVisible);
+  }, [
+    ready,
+    map,
+    factions,
+    settlements,
+    selectedFactionId,
+    strategicValueOverlayVisible,
+    adminDistanceOverlayVisible,
+    settlementStabilityOverlayMode,
+    frontPressureOverlayVisible,
+    activeWars,
+    warStatusOverlayVisible,
+    siegeProgressOverlayVisible,
+  ]);
 
   /* -------- Hover/Select 变化时仅重绘 highlight 层 -------- */
   useEffect(() => {
@@ -216,6 +345,20 @@ export function MapCanvas() {
     if (!ready || !r || !map) return;
     drawHighlight(r, map, hoveredRegionId, selectedRegionId, factions, selectedFactionId);
   }, [ready, map, hoveredRegionId, selectedRegionId, factions, selectedFactionId]);
+
+  useEffect(() => {
+    const r = refs.current;
+    if (!ready || !r || !map) return;
+    drawDivineFeedback(r, map, divineFeedback);
+    if (!divineFeedback) return;
+    const sequence = divineFeedback.sequence;
+    const timer = window.setTimeout(() => {
+      const current = useWorldSimStore.getState().divineFeedback;
+      if (current?.sequence !== sequence) return;
+      refs.current?.divineFeedbackLayer.clear();
+    }, DIVINE_FEEDBACK_MS);
+    return () => window.clearTimeout(timer);
+  }, [ready, map, divineFeedback]);
 
   /* -------- DOM 事件：拖拽 / 缩放 / 点击 / 悬停 -------- */
   useEffect(() => {
@@ -311,6 +454,9 @@ export function MapCanvas() {
         if (!dragMoved && Math.abs(dx) + Math.abs(dy) > CLICK_PIXEL_THRESHOLD) {
           dragMoved = true;
         }
+        if (dx !== 0 || dy !== 0) {
+          r.cameraTouched = true;
+        }
         r.world.position.set(dragStartWorldX + dx, dragStartWorldY + dy);
         return;
       }
@@ -372,12 +518,17 @@ export function MapCanvas() {
         return;
       }
       const id = findProvinceAt(map, w.x, w.y);
-      // 海洋州不参与点击
-      if (id != null && map.provinces[id as unknown as number]?.terrain === 'ocean') {
+      if (id == null) {
         setSelectedRegion(null);
         return;
       }
-      const current = useWorldSimStore.getState().selectedRegionId;
+      // 海洋州不参与点击
+      if (map.provinces[id as unknown as number]?.terrain === 'ocean') {
+        setSelectedRegion(null);
+        return;
+      }
+      const state = useWorldSimStore.getState();
+      const current = state.selectedRegionId;
       setSelectedRegion(current === id ? null : id);
     };
 
@@ -402,6 +553,8 @@ export function MapCanvas() {
       const wy = (my - r.world.position.y) / oldScale;
       r.world.scale.set(newScale);
       r.world.position.set(mx - wx * newScale, my - wy * newScale);
+      r.cameraTouched = true;
+      syncLabelScale(r);
     };
 
     const onContextMenu = (e: MouseEvent) => {
@@ -428,40 +581,31 @@ export function MapCanvas() {
     };
   }, [ready, setHoveredRegion, setSelectedRegion]);
 
-  /* -------- 视口尺寸变化时维持 fit（仅当无明显手动平移/缩放） -------- */
+  // 当容器尺寸变化时，手动触发 resize。Pixi 的 resizeTo 只监听 window resize，
+  // 不覆盖 HUD 展开/收起这类纯布局变化，所以这里以宿主元素尺寸为唯一来源。
   useEffect(() => {
     if (!ready) return;
-    const r = refs.current;
-    if (!r) return;
-    const onResize = () => {
-      if (r.currentMap) {
-        // 不强制重置用户视角，只保证地图仍在视口内：用 hitArea 跟随尺寸更新
-        r.app.stage.hitArea = new Rectangle(0, 0, r.app.renderer.width, r.app.renderer.height);
-      }
+    if (!refs.current || !hostRef.current) return;
+
+    let frameId: number | null = null;
+    const scheduleResize = () => {
+      if (frameId != null) cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => {
+        frameId = null;
+        const r = refs.current;
+        if (!r) return;
+        syncViewportSize(r, hostRef.current, { fitMapWhenPristine: true });
+      });
     };
-    r.app.renderer.on('resize', onResize);
-    return () => {
-      r.app.renderer.off('resize', onResize);
-    };
-  }, [ready]);
 
-  // 当容器尺寸变化时，手动触发 resize 以确保 PixiJS 适应新的容器大小
-  useEffect(() => {
-    if (!ready) return;
-    const r = refs.current;
-    if (!r) return;
-
-    if (!hostRef.current) return;
-
-    const resizeObserver = new ResizeObserver(() => {
-      const host = hostRef.current;
-      if (!host) return;
-      r.app.renderer.resize(host.clientWidth, host.clientHeight);
-    });
-
+    scheduleResize();
+    const resizeObserver = new ResizeObserver(scheduleResize);
     resizeObserver.observe(hostRef.current);
+    window.addEventListener('resize', scheduleResize);
 
     return () => {
+      if (frameId != null) cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', scheduleResize);
       resizeObserver.disconnect();
     };
   }, [ready]);
@@ -498,6 +642,49 @@ export function MapCanvas() {
 /* 渲染辅助                                                            */
 /* ------------------------------------------------------------------ */
 
+function syncViewportSize(
+  r: RenderRefs,
+  host: HTMLDivElement | null,
+  options: { fitMapWhenPristine: boolean },
+) {
+  if (!host) return;
+  const size = getHostCssSize(host);
+  if (!size) return;
+
+  const sizeChanged = r.app.screen.width !== size.width || r.app.screen.height !== size.height;
+  if (sizeChanged) {
+    r.app.renderer.resize(size.width, size.height);
+  }
+
+  r.app.stage.hitArea = new Rectangle(0, 0, size.width, size.height);
+  if (options.fitMapWhenPristine && !r.cameraTouched && r.currentMap) {
+    fitMapToView(r, r.currentMap);
+    syncLabelScale(r);
+  }
+  if (sizeChanged) {
+    r.app.render();
+  }
+}
+
+function getHostCssSize(host: HTMLDivElement): { width: number; height: number } | null {
+  const rect = host.getBoundingClientRect();
+  const width = Math.floor(rect.width || host.clientWidth);
+  const height = Math.floor(rect.height || host.clientHeight);
+  if (width <= 0 || height <= 0) return null;
+  return { width, height };
+}
+
+function syncLabelScale(refs: RenderRefs) {
+  const worldScale = refs.world.scale.x || 1;
+  const labelScale = 1 / Math.max(worldScale, 0.5);
+  for (const text of refs.factionLabels.values()) {
+    text.scale.set(labelScale);
+  }
+  for (const marker of refs.factionCapitalMarkers.values()) {
+    marker.scale.set(labelScale);
+  }
+}
+
 function drawBaseAndBorders(refs: RenderRefs, map: MapData, factions: FactionSummary[]) {
   const { baseLayer } = refs;
   baseLayer.clear();
@@ -527,49 +714,159 @@ function drawBaseAndBorders(refs: RenderRefs, map: MapData, factions: FactionSum
  *    用其中一方势力色 darken 后的暗调，让"邻国之间的国境线"明显
  *  - 双边都无主：画一根更细更暗的内部网格线 */
 function redrawBorders(refs: RenderRefs, map: MapData, factions: FactionSummary[]) {
-  const { borderLayer } = refs;
-  borderLayer.clear();
+  const chunkUpdate = refs.borderChunkTracker.update(map, factions);
+  if (!chunkUpdate.changed) return;
 
   const colorByFaction = new Map<FactionId, number>();
   for (const f of factions) {
     colorByFaction.set(f.id, parseHex(f.colorHex));
   }
 
-  const outerColor = 0x0a0d12;
-  const noOwnerColor = 0x2a3548;
-
-  for (const edge of map.borders) {
-    const isOuter = edge.right == null;
-    let strokeWidth: number;
-    let strokeColor: number;
-    let strokeAlpha: number;
-
-    if (isOuter) {
-      strokeWidth = 1.8;
-      strokeColor = outerColor;
-      strokeAlpha = 0.95;
-    } else {
-      const leftOwner = map.provinces[edge.left as unknown as number]?.ownerFactionId ?? null;
-      const rightOwner = map.provinces[edge.right as unknown as number]?.ownerFactionId ?? null;
-      // 同势力内部：完全跳过
-      if (leftOwner != null && rightOwner != null && leftOwner === rightOwner) continue;
-      if (leftOwner == null && rightOwner == null) {
-        // 双边无主：保留细网格线
-        strokeWidth = 0.5;
-        strokeColor = noOwnerColor;
-        strokeAlpha = 0.5;
-      } else {
-        // 跨势力 / 半占领：EU4 风格加粗暗色边线
-        const refOwner = leftOwner ?? rightOwner;
-        const ownerColor = refOwner != null ? (colorByFaction.get(refOwner) ?? 0x1f2a3a) : 0x1f2a3a;
-        strokeWidth = 1.6;
-        strokeColor = darkenColor(ownerColor, 0.55);
-        strokeAlpha = 0.92;
-      }
+  for (const chunkId of chunkUpdate.dirtyChunkIds) {
+    const chunk = getBorderChunkGraphics(refs, chunkId);
+    chunk.clear();
+    for (const edgeId of refs.borderChunkTracker.getEdgeIdsForChunk(chunkId)) {
+      drawBorderEdge(chunk, map, edgeId, colorByFaction);
     }
+  }
+}
 
-    borderLayer.moveTo(edge.a.x, edge.a.y).lineTo(edge.b.x, edge.b.y);
-    borderLayer.stroke({ width: strokeWidth, color: strokeColor, alpha: strokeAlpha });
+function drawBorderEdge(
+  layer: Graphics,
+  map: MapData,
+  edgeId: number,
+  colorByFaction: ReadonlyMap<FactionId, number>,
+) {
+  const edge = map.borders[edgeId];
+  if (!edge) return;
+  const isOuter = edge.right == null;
+  let strokeWidth: number;
+  let strokeColor: number;
+  let strokeAlpha: number;
+
+  if (isOuter) {
+    // 地图外边界始终绘制，保证陆地轮廓清晰。
+    strokeWidth = 1.8;
+    strokeColor = 0x0a0d12;
+    strokeAlpha = 0.95;
+  } else {
+    const leftProvince = map.provinces[edge.left as unknown as number];
+    const rightProvince = edge.right == null ? null : map.provinces[edge.right as unknown as number];
+    const leftOwner = provinceDrawableOwner(leftProvince);
+    const rightOwner = rightProvince == null ? null : provinceDrawableOwner(rightProvince);
+    // 同势力内部边界不绘制，让同一势力领土融合成完整色块。
+    if (leftOwner != null && rightOwner != null && leftOwner === rightOwner) return;
+    if (leftOwner == null && rightOwner == null) {
+      // 双边无主保留细网格线，避免无主地完全失去州界。
+      strokeWidth = 0.5;
+      strokeColor = 0x2a3548;
+      strokeAlpha = 0.5;
+    } else {
+      // 跨势力或半占领边界使用势力色加深后的粗线。
+      const refOwner = leftOwner ?? rightOwner;
+      const ownerColor = refOwner != null ? (colorByFaction.get(refOwner) ?? 0x1f2a3a) : 0x1f2a3a;
+      strokeWidth = 1.6;
+      strokeColor = darkenColor(ownerColor, 0.55);
+      strokeAlpha = 0.92;
+    }
+  }
+
+  layer.moveTo(edge.a.x, edge.a.y).lineTo(edge.b.x, edge.b.y);
+  layer.stroke({ width: strokeWidth, color: strokeColor, alpha: strokeAlpha });
+}
+
+function drawAdminDistanceOverlay(
+  refs: RenderRefs,
+  map: MapData,
+  factions: FactionSummary[],
+  settlements: SettlementSummary[],
+  selectedFactionId: FactionId | null,
+  visible: boolean,
+) {
+  const { adminDistanceLayer } = refs;
+  adminDistanceLayer.clear();
+  if (!visible) return;
+
+  const liveFactions = factions.filter((f) => (f.regions ?? 0) > 0);
+  if (liveFactions.length === 0) return;
+  const liveFactionIds = new Set(liveFactions.map((f) => f.id));
+  const state = buildAdminDistanceState({ map, factions: liveFactions, settlements });
+
+  for (const province of map.provinces) {
+    if (province.polygon.length < 3 || province.terrain === 'ocean') continue;
+    const owner = province.ownerFactionId;
+    if (owner == null || !liveFactionIds.has(owner)) continue;
+    if (selectedFactionId != null && owner !== selectedFactionId) continue;
+
+    const distance = state.distanceByFaction.get(owner)?.get(province.id as unknown as number);
+    if (distance == null) continue;
+    const intensity = clamp((distance - 4) / 14, 0, 1);
+    if (intensity <= 0.02) continue;
+
+    adminDistanceLayer.poly(toFlatPolygon(province.polygon)).fill({
+      color: 0xff6b4a,
+      alpha: 0.08 + intensity * 0.34,
+    });
+  }
+}
+
+function drawStrategicValueOverlay(refs: RenderRefs, map: MapData, visible: boolean) {
+  const { strategicValueLayer } = refs;
+  strategicValueLayer.clear();
+  if (!visible) return;
+
+  const regions = getStrategicValueOverlayRegions(map);
+  drawStrategicValueRegions(strategicValueLayer, map, regions);
+}
+
+function drawStrategicValueRegions(
+  layer: Graphics,
+  map: MapData,
+  regions: StrategicValueOverlayRegion[],
+) {
+  for (const region of regions) {
+    const province = map.provinces[region.regionId as unknown as number];
+    if (!province || province.polygon.length < 3) continue;
+    const intensity = clamp(region.strategicValue, 0, 1);
+    layer.poly(toFlatPolygon(province.polygon)).fill({
+      color: lerpColor(0x2c6fd6, 0xf2c94c, intensity),
+      alpha: 0.1 + intensity * 0.28,
+    });
+  }
+}
+
+function drawSettlementStabilityOverlay(
+  refs: RenderRefs,
+  map: MapData,
+  settlements: readonly SettlementSummary[],
+  selectedFactionId: FactionId | null,
+  mode: SettlementStabilityOverlayMode,
+) {
+  const { settlementStabilityLayer } = refs;
+  settlementStabilityLayer.clear();
+  if (mode === 'none' || settlements.length === 0) return;
+
+  for (const settlement of settlements) {
+    if (selectedFactionId != null && settlement.factionId !== selectedFactionId) continue;
+    const province = map.provinces[settlement.regionId as unknown as number];
+    if (!province || province.polygon.length < 3 || province.terrain === 'ocean') continue;
+    if (province.ownerFactionId !== settlement.factionId) continue;
+
+    const intensity =
+      mode === 'loyalty'
+        ? clamp((0.82 - settlement.loyalty) / 0.6, 0, 1)
+        : clamp(Math.max(settlement.unrest, settlement.revoltProgress * 0.85), 0, 1);
+    if (intensity <= 0.03) continue;
+
+    settlementStabilityLayer.poly(toFlatPolygon(province.polygon)).fill({
+      color: mode === 'loyalty' ? 0xff5656 : 0xffa13d,
+      alpha: 0.12 + intensity * 0.42,
+    });
+    settlementStabilityLayer.poly(toFlatPolygon(province.polygon)).stroke({
+      width: 1.4 + intensity * 1.8,
+      color: mode === 'loyalty' ? 0xffd0d0 : 0xffd166,
+      alpha: 0.18 + intensity * 0.42,
+    });
   }
 }
 
@@ -607,6 +904,74 @@ function drawFrontPressureSegments(layer: Graphics, segments: FrontPressureOverl
       width: segment.width,
       color: 0xffd166,
       alpha,
+    });
+  }
+}
+
+function drawWarStatusOverlay(
+  refs: RenderRefs,
+  map: MapData,
+  activeWars: readonly WarSummary[],
+  visible: boolean,
+) {
+  const { warStatusLayer } = refs;
+  warStatusLayer.clear();
+  if (!visible || activeWars.length === 0) return;
+
+  const segments = getWarStatusOverlaySegments({ map, wars: activeWars });
+  drawWarStatusSegments(warStatusLayer, segments);
+}
+
+function drawWarStatusSegments(layer: Graphics, segments: WarStatusOverlaySegment[]) {
+  for (const segment of segments) {
+    const active = segment.status === 'active';
+    const color = active ? 0xff5a5f : 0x7aa2ff;
+    const alpha = active ? 0.62 + segment.fatigue * 0.26 : 0.48;
+    layer.moveTo(segment.a.x, segment.a.y).lineTo(segment.b.x, segment.b.y);
+    layer.stroke({
+      width: segment.width,
+      color,
+      alpha,
+    });
+  }
+}
+
+function drawSiegeProgressOverlay(
+  refs: RenderRefs,
+  map: MapData,
+  activeWars: readonly WarSummary[],
+  selectedFactionId: FactionId | null,
+  visible: boolean,
+) {
+  const { siegeProgressLayer } = refs;
+  siegeProgressLayer.clear();
+  if (!visible || activeWars.length === 0) return;
+
+  const regions = getSettlementSiegeOverlayRegions({
+    map,
+    wars: activeWars,
+    selectedFactionId,
+  });
+  drawSiegeProgressRegions(siegeProgressLayer, map, regions);
+}
+
+function drawSiegeProgressRegions(
+  layer: Graphics,
+  map: MapData,
+  regions: SettlementSiegeOverlayRegion[],
+) {
+  for (const region of regions) {
+    const province = map.provinces[region.regionId as unknown as number];
+    if (!province || province.polygon.length < 3) continue;
+    const intensity = clamp(region.progress, 0, 1);
+    layer.poly(toFlatPolygon(province.polygon)).fill({
+      color: 0xff4f3d,
+      alpha: 0.12 + intensity * 0.36,
+    });
+    layer.poly(toFlatPolygon(province.polygon)).stroke({
+      width: 1.8 + intensity * 2.2,
+      color: 0xffd166,
+      alpha: 0.36 + intensity * 0.48,
     });
   }
 }
@@ -651,10 +1016,29 @@ function drawHighlight(
     if (selectedFactionId != null && selectedFactionId !== faction.id) continue;
     const province = map.provinces[faction.birthRegionId as unknown as number];
     if (!province || province.polygon.length < 3) continue;
+    if (province.terrain === 'ocean') continue;
     if (province.ownerFactionId !== faction.id) continue;
     const color = parseHex(faction.colorHex);
     highlightLayer.poly(toFlatPolygon(province.polygon)).stroke({ width: 2.4, color, alpha: 1 });
   }
+}
+
+function drawDivineFeedback(refs: RenderRefs, map: MapData, feedback: DivineFeedbackState): void {
+  const { divineFeedbackLayer } = refs;
+  divineFeedbackLayer.clear();
+  if (!feedback) return;
+  const province = map.provinces[feedback.regionId as unknown as number];
+  if (!province || province.terrain === 'ocean' || province.polygon.length < 3) return;
+  const color =
+    feedback.tool === 'freeze-war'
+      ? 0x7db7ff
+      : feedback.tool === 'terraform-region'
+        ? 0x7fd879
+        : 0xf6c453;
+  divineFeedbackLayer
+    .poly(toFlatPolygon(province.polygon))
+    .fill({ color, alpha: 0.2 })
+    .stroke({ width: 3, color, alpha: 0.95 });
 }
 
 function drawOwnerOverlay(
@@ -663,11 +1047,13 @@ function drawOwnerOverlay(
   factions: FactionSummary[],
   options: { animate: boolean },
 ) {
+  const chunkUpdate = refs.ownerChunkTracker.update(map, factions);
+  if (!chunkUpdate.changed) return;
+
   if (factions.length === 0) {
-    refs.ownerLayer.clear();
+    clearOwnerChunks(refs);
     refs.ownerAnims.clear();
     refs.displayedOwner.clear();
-    redrawOwnerLayer(refs, map, factions);
     drawFactionLabels(refs, map, factions);
     return;
   }
@@ -684,7 +1070,7 @@ function drawOwnerOverlay(
   for (const province of map.provinces) {
     if (province.polygon.length < 3) continue;
     const idNum = province.id as unknown as number;
-    const ownerId = province.ownerFactionId;
+    const ownerId = provinceDrawableOwner(province);
     const targetColor = ownerId == null ? 0x000000 : (colorByFaction.get(ownerId) ?? 0x000000);
     const targetA = ownerId == null ? 0 : targetAlpha;
 
@@ -716,29 +1102,74 @@ function drawOwnerOverlay(
     }
   }
 
-  redrawOwnerLayer(refs, map, factions);
+  redrawOwnerLayer(refs, map, factions, chunkUpdate.dirtyChunkIds);
   drawFactionLabels(refs, map, factions);
 }
 
 /** 按 displayedOwner 当前值整层重画。borderLayer 已经为每条边画过线，
  *  这里 ownerLayer 只填色，避免再描一圈深色 stroke 把势力色压暗、产生"棕黑色奇怪边框"。 */
-function redrawOwnerLayer(refs: RenderRefs, map: MapData, _factions: FactionSummary[]) {
-  const { ownerLayer } = refs;
-  ownerLayer.clear();
+function redrawOwnerLayer(
+  refs: RenderRefs,
+  map: MapData,
+  _factions: FactionSummary[],
+  chunkIds: readonly number[] = refs.ownerChunkTracker.getAllChunkIds(),
+) {
   if (map.provinces.length === 0) return;
 
-  for (const province of map.provinces) {
-    if (province.polygon.length < 3) continue;
-    const idNum = province.id as unknown as number;
-    const cur = refs.displayedOwner.get(idNum);
-    if (!cur || cur.alpha <= 0) continue;
-    ownerLayer.poly(toFlatPolygon(province.polygon)).fill({ color: cur.color, alpha: cur.alpha });
+  for (const chunkId of chunkIds) {
+    const chunk = getOwnerChunkGraphics(refs, chunkId);
+    chunk.clear();
+    const regionIds = refs.ownerChunkTracker.getRegionIdsForChunk(chunkId);
+    for (const regionId of regionIds) {
+      const province = map.provinces[regionId];
+      if (!province || province.polygon.length < 3) continue;
+      const cur = refs.displayedOwner.get(regionId);
+      if (!cur || cur.alpha <= 0) continue;
+      chunk.poly(toFlatPolygon(province.polygon)).fill({ color: cur.color, alpha: cur.alpha });
+    }
   }
 }
 
+function getOwnerChunkGraphics(refs: RenderRefs, chunkId: number): Graphics {
+  const existing = refs.ownerChunkGraphics.get(chunkId);
+  if (existing) return existing;
+  const next = new Graphics();
+  next.eventMode = 'none';
+  refs.ownerLayer.addChild(next);
+  refs.ownerChunkGraphics.set(chunkId, next);
+  return next;
+}
+
+function clearOwnerChunks(refs: RenderRefs): void {
+  for (const chunk of refs.ownerChunkGraphics.values()) {
+    refs.ownerLayer.removeChild(chunk);
+    chunk.destroy();
+  }
+  refs.ownerChunkGraphics.clear();
+}
+
+function getBorderChunkGraphics(refs: RenderRefs, chunkId: number): Graphics {
+  const existing = refs.borderChunkGraphics.get(chunkId);
+  if (existing) return existing;
+  const next = new Graphics();
+  next.eventMode = 'none';
+  refs.borderLayer.addChild(next);
+  refs.borderChunkGraphics.set(chunkId, next);
+  return next;
+}
+
+function clearBorderChunks(refs: RenderRefs): void {
+  for (const chunk of refs.borderChunkGraphics.values()) {
+    refs.borderLayer.removeChild(chunk);
+    chunk.destroy();
+  }
+  refs.borderChunkGraphics.clear();
+}
+
 /** 推进 ownerAnims；返回是否仍有进行中的动画。 */
-function tickOwnerAnims(refs: RenderRefs, now: number): boolean {
-  if (refs.ownerAnims.size === 0) return false;
+function tickOwnerAnims(refs: RenderRefs, now: number): number[] {
+  if (refs.ownerAnims.size === 0) return [];
+  const animatedRegionIds: number[] = [];
   const finished: number[] = [];
   for (const [id, anim] of refs.ownerAnims) {
     const t = Math.min(1, (now - anim.start) / anim.dur);
@@ -746,96 +1177,62 @@ function tickOwnerAnims(refs: RenderRefs, now: number): boolean {
     const color = lerpColor(anim.fromColor, anim.toColor, eased);
     const alpha = anim.fromAlpha + (anim.toAlpha - anim.fromAlpha) * eased;
     refs.displayedOwner.set(id, { color, alpha });
+    animatedRegionIds.push(id);
     if (t >= 1) finished.push(id);
   }
   for (const id of finished) refs.ownerAnims.delete(id);
-  return refs.ownerAnims.size > 0;
+  return animatedRegionIds;
 }
 
 function drawFactionLabels(refs: RenderRefs, map: MapData, factions: FactionSummary[]) {
   const { labelLayer, factionLabels, markerLayer, factionCapitalMarkers } = refs;
-
-  // 1) 仍然按 region 归属聚合一遍，作为 centroidRegionId 缺失时的兜底
-  const aggregate = new Map<number, { sx: number; sy: number; n: number }>();
-  for (const province of map.provinces) {
-    if (province.ownerFactionId == null) continue;
-    const key = province.ownerFactionId as unknown as number;
-    const acc = aggregate.get(key);
-    if (acc) {
-      acc.sx += province.centroid.x;
-      acc.sy += province.centroid.y;
-      acc.n += 1;
-    } else {
-      aggregate.set(key, { sx: province.centroid.x, sy: province.centroid.y, n: 1 });
-    }
-  }
+  // 标签定位优先走势力已维护的重心/首都锚点，避免每次版图变化都全图聚合。
+  const factionsById = new Map(factions.map((faction) => [faction.id as unknown as number, faction]));
+  const anchors = computeFactionLabelAnchors(map, factions);
 
   const stillUsedLabels = new Set<number>();
   const stillUsedMarkers = new Set<number>();
 
-  for (const f of factions) {
-    const key = f.id as unknown as number;
-    const owned = aggregate.get(key);
-    // regions === 0 / 没有任何州 → 视为灭国，不画标签也不画首都
-    if (!owned || owned.n === 0) continue;
+  for (const anchor of anchors) {
+    const key = anchor.factionId as unknown as number;
+    const f = factionsById.get(key);
+    if (!f) continue;
+    // regions 为 0 或锚点完全失效的势力不会出现在 anchors 中，视为灭国不绘制标签。
 
-    // 标签钉位：优先 centroidRegionId（领土重心州的中心），否则用聚合 centroid
-    let labelX = owned.sx / owned.n;
-    let labelY = owned.sy / owned.n;
-    if (f.centroidRegionId != null) {
-      const p = map.provinces[f.centroidRegionId as unknown as number];
-      if (p && p.ownerFactionId === f.id) {
-        labelX = p.centroid.x;
-        labelY = p.centroid.y;
-      }
-    }
-
-    stillUsedLabels.add(key);
-    let text = factionLabels.get(key);
-    const labelText = factionLabelText(f);
-    if (!text) {
-      text = new PixiText({
-        text: labelText,
-        style: {
-          // EU4 风格 serif：优先 Garamond / Times，没有再 fallback 系统中文
-          fontFamily: 'Garamond, "Times New Roman", "STSong", "Songti SC", serif',
-          fontSize: 16,
-          fontWeight: '700',
-          fontStyle: 'italic',
-          letterSpacing: 1.5,
-          fill: 0xf6e7c1,
-          stroke: { color: 0x0a0d12, width: 4, join: 'round' },
-          align: 'center',
-        },
-      });
-      text.eventMode = 'none';
-      text.anchor.set(0.5, 0.5);
-      labelLayer.addChild(text);
-      factionLabels.set(key, text);
-    } else if (text.text !== labelText) {
-      text.text = labelText;
-    }
-    text.position.set(labelX, labelY);
     // 让 label 在地图缩放下保持视觉大小可读：对 world.scale 取倒数缩放
     const worldScale = refs.world.scale.x || 1;
     const labelScale = 1 / Math.max(worldScale, 0.5);
-    text.scale.set(labelScale);
-
-    // 首都金色菱形：钉在 capitalRegionId 上，落空时用 centroid 替代
-    let capX: number | null = null;
-    let capY: number | null = null;
-    if (f.capitalRegionId != null) {
-      const p = map.provinces[f.capitalRegionId as unknown as number];
-      if (p && p.ownerFactionId === f.id) {
-        capX = p.centroid.x;
-        capY = p.centroid.y;
+    if (!isRebelFaction(f)) {
+      stillUsedLabels.add(key);
+      let text = factionLabels.get(key);
+      const labelText = factionLabelText(f);
+      if (!text) {
+        text = new PixiText({
+          text: labelText,
+          style: {
+            // EU4 风格 serif：优先 Garamond / Times，没有再 fallback 系统中文
+            fontFamily: 'Garamond, "Times New Roman", "STSong", "Songti SC", serif',
+            fontSize: 16,
+            fontWeight: '700',
+            fontStyle: 'italic',
+            letterSpacing: 1.5,
+            fill: 0xf6e7c1,
+            stroke: { color: 0x0a0d12, width: 4, join: 'round' },
+            align: 'center',
+          },
+        });
+        text.eventMode = 'none';
+        text.anchor.set(0.5, 0.5);
+        labelLayer.addChild(text);
+        factionLabels.set(key, text);
+      } else if (text.text !== labelText) {
+        text.text = labelText;
       }
-    }
-    if (capX == null || capY == null) {
-      capX = labelX;
-      capY = labelY;
+      text.position.set(anchor.labelX, anchor.labelY);
+      text.scale.set(labelScale);
     }
 
+    // 首都金色菱形钉在 capitalRegionId 上；首都失效时由锚点函数回退到标签位置。
     stillUsedMarkers.add(key);
     let marker = factionCapitalMarkers.get(key);
     if (!marker) {
@@ -845,7 +1242,7 @@ function drawFactionLabels(refs: RenderRefs, map: MapData, factions: FactionSumm
       factionCapitalMarkers.set(key, marker);
     }
     drawCapitalDiamond(marker);
-    marker.position.set(capX, capY);
+    marker.position.set(anchor.capitalX, anchor.capitalY);
     marker.scale.set(labelScale);
   }
 
@@ -881,6 +1278,10 @@ function factionLabelText(f: FactionSummary): string {
   return f.name;
 }
 
+function isRebelFaction(f: FactionSummary): boolean {
+  return f.name.endsWith('义军') || f.leader.endsWith('首领');
+}
+
 /** ease-out cubic：开头快、收尾慢，让占领看起来"扑过去再缓缓贴住"。 */
 function easeOutCubic(t: number): number {
   const c = 1 - t;
@@ -910,8 +1311,8 @@ function darkenColor(hex: number, t: number): number {
 
 function fitMapToView(refs: RenderRefs, map: MapData) {
   const { app, world } = refs;
-  const vw = app.renderer.width;
-  const vh = app.renderer.height;
+  const vw = app.screen.width;
+  const vh = app.screen.height;
   if (vw <= 0 || vh <= 0) return;
   const mw = map.meta.bounds.width;
   const mh = map.meta.bounds.height;
@@ -923,6 +1324,11 @@ function fitMapToView(refs: RenderRefs, map: MapData) {
 function provinceFillColor(province: Province): number {
   // Phase 3：直接按地形上色；后续势力着色将作为附加层叠加
   return TERRAIN_COLOR[province.terrain];
+}
+
+function provinceDrawableOwner(province: Province | null | undefined): FactionId | null {
+  if (!province || province.terrain === 'ocean') return null;
+  return province.ownerFactionId ?? null;
 }
 
 function toFlatPolygon(polygon: Array<{ x: number; y: number }>): number[] {

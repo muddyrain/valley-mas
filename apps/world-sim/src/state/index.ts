@@ -1,7 +1,28 @@
-export type { FactionRankingEntry } from './selectors';
+export type {
+  DebugBalanceSummary,
+  DiplomacyOverview,
+  DiplomacyOverviewStatus,
+  FactionRankingEntry,
+  FactionWarSummary,
+  ReplayEventAnchor,
+  ReplayEventCount,
+  ReplayFactionFate,
+  ReplayHistorySummary,
+  ReplayHistorySummaryMeta,
+  SelectedSettlementDetail,
+  SelectedSettlementSiegeDetail,
+  WarListEntry,
+} from './selectors';
 export {
   blankTerrainBreakdown,
+  computeDebugBalanceSummary,
+  computeDiplomacyOverview,
   computeFactionRankings,
+  computeFactionWarSummary,
+  computeReplayEventAnchors,
+  computeReplayHistorySummary,
+  computeSelectedSettlementDetail,
+  computeWarListEntries,
   selectFactionRankings,
 } from './selectors';
 export type {
@@ -20,6 +41,7 @@ export type { MapModeId, ProvincePreset } from './slices/mapSlice';
 export { DEFAULT_MAP_BOUNDS, PROVINCE_PRESETS } from './slices/mapSlice';
 export type { ReplayMode, ReplaySlice } from './slices/replaySlice';
 export type { ScenarioSlice } from './slices/scenarioSlice';
-export type { PanelKey } from './slices/uiSlice';
+export type { SettlementSlice } from './slices/settlementSlice';
+export type { DivineTerrainKind, DivineTool, PanelKey } from './slices/uiSlice';
 export type { WorldSimStore } from './store';
 export { useWorldSimStore } from './store';

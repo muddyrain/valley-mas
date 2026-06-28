@@ -6,7 +6,13 @@ import type { FactionId, RegionId, Tick } from '@/shared/types';
  */
 export type SimStatus = 'idle' | 'running' | 'victory' | 'stalemate';
 
-export type SimEventType = 'capture' | 'repel' | 'eliminate' | 'victory' | 'stalemate';
+export type SimEventType =
+  | 'capture'
+  | 'repel'
+  | 'eliminate'
+  | 'victory'
+  | 'stalemate'
+  | 'revolt_warning';
 
 /**
  * 单 tick 内核产出的语义事件。状态层会转成 LogEvent 写入日志面板。
@@ -28,6 +34,7 @@ export interface SimPatch {
   regionId: RegionId;
   fromOwnerId: FactionId | null;
   toOwnerId: FactionId | null;
+  tick: Tick;
 }
 
 export interface SimTickResult {

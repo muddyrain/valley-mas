@@ -49,9 +49,13 @@ export function generateMap(options: MapGenerationOptions): MapData {
 
   // Phase 3：用同一个 seed 字符串派生噪声，给每个州赋地形属性
   assignTerrains(provinces, borders, { seed, bounds });
+  const terrainBeforeMask = provinces.map((province) => province.terrain);
 
   // Phase 1：用陆地掩膜将边缘州标记为 ocean，形成不规则海岸线
   applyLandMask(provinces, bounds, seed);
+  applyEdgeSea(provinces, borders);
+  keepLargestLandmass(provinces);
+  limitLargeInteriorWater(provinces, borders, terrainBeforeMask);
 
   return {
     meta: {
@@ -319,12 +323,114 @@ function applyLandMask(provinces: Province[], bounds: MapBounds, seed: string): 
 
     // 边缘衰减：靠近图框的州更可能成为海洋
     const edgeFalloff = computeEdgeFalloff(cx, cy, bounds);
-    const finalValue = normalized * 0.7 + 0.3 * (1 - edgeFalloff);
+    const finalValue = normalized * 0.7 + 0.3 * edgeFalloff;
 
     if (finalValue < landThreshold) {
       province.terrain = 'ocean';
     }
   }
+}
+
+function applyEdgeSea(provinces: Province[], borders: BorderEdge[]): void {
+  for (const province of provinces) {
+    if (isProvinceOnOuterBorder(province, borders)) {
+      province.terrain = 'ocean';
+    }
+  }
+}
+
+function keepLargestLandmass(provinces: Province[]): void {
+  const seen = new Uint8Array(provinces.length);
+  let largestComponent: number[] = [];
+
+  for (const province of provinces) {
+    const start = province.id as unknown as number;
+    if (seen[start] || province.terrain === 'ocean') continue;
+
+    const component: number[] = [];
+    const stack = [start];
+    seen[start] = 1;
+
+    while (stack.length > 0) {
+      const current = stack.pop() as number;
+      component.push(current);
+      const currentProvince = provinces[current];
+      if (!currentProvince) continue;
+
+      for (const neighborId of currentProvince.neighbors) {
+        const neighbor = neighborId as unknown as number;
+        const neighborProvince = provinces[neighbor];
+        if (!neighborProvince || seen[neighbor] || neighborProvince.terrain === 'ocean') {
+          continue;
+        }
+        seen[neighbor] = 1;
+        stack.push(neighbor);
+      }
+    }
+
+    if (component.length > largestComponent.length) {
+      largestComponent = component;
+    }
+  }
+
+  if (largestComponent.length === 0) return;
+
+  const keep = new Set(largestComponent);
+  for (const province of provinces) {
+    const id = province.id as unknown as number;
+    if (!keep.has(id)) {
+      province.terrain = 'ocean';
+    }
+  }
+}
+
+function limitLargeInteriorWater(
+  provinces: Province[],
+  borders: BorderEdge[],
+  terrainBeforeMask: Province['terrain'][],
+): void {
+  const maxInteriorWaterSize = Math.max(6, Math.floor(provinces.length * 0.015));
+  const seen = new Uint8Array(provinces.length);
+
+  for (const province of provinces) {
+    const start = province.id as unknown as number;
+    if (seen[start] || province.terrain !== 'ocean') continue;
+
+    const component: number[] = [];
+    let touchesEdge = false;
+    const stack = [start];
+    seen[start] = 1;
+
+    while (stack.length > 0) {
+      const current = stack.pop() as number;
+      component.push(current);
+      const currentProvince = provinces[current];
+      if (!currentProvince) continue;
+      if (isProvinceOnOuterBorder(currentProvince, borders)) {
+        touchesEdge = true;
+      }
+
+      for (const neighborId of currentProvince.neighbors) {
+        const neighbor = neighborId as unknown as number;
+        const neighborProvince = provinces[neighbor];
+        if (!neighborProvince || seen[neighbor] || neighborProvince.terrain !== 'ocean') {
+          continue;
+        }
+        seen[neighbor] = 1;
+        stack.push(neighbor);
+      }
+    }
+
+    if (!touchesEdge && component.length > maxInteriorWaterSize) {
+      for (const id of component) {
+        provinces[id].terrain = terrainBeforeMask[id] ?? 'plain';
+      }
+    }
+  }
+}
+
+function isProvinceOnOuterBorder(province: Province, borders: BorderEdge[]): boolean {
+  return province.borderEdgeIds.some((edgeId) => borders[edgeId]?.right == null);
 }
 
 function fbm(

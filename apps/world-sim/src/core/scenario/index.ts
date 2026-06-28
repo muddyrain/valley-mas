@@ -13,10 +13,9 @@ export {
 export { parseSpawnDirective } from './parse';
 export {
   BUILTIN_SCENARIOS,
-  CUSTOM_SCENARIO,
   DEFAULT_SCENARIO_ID,
+  FOREIGN_POLITIES_SCENARIO,
   RANDOM_SCENARIO,
-  THREE_KINGDOMS_SCENARIO,
   WARLORDS_SCENARIO,
 } from './presets';
 export type {

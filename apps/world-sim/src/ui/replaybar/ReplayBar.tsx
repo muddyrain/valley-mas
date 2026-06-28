@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useRef } from 'react';
-import { REPLAY_SPEED_TIERS, type ReplaySpeed } from '@/shared/types';
-import { useWorldSimStore } from '@/state';
+import { formatGameTime, REPLAY_SPEED_TIERS, type ReplaySpeed } from '@/shared/types';
+import { computeReplayEventAnchors, type ReplayEventAnchor, useWorldSimStore } from '@/state';
 import styles from './ReplayBar.module.css';
+
+const REPLAY_EVENT_ANCHOR_LIMIT = 8;
 
 export function ReplayBar() {
   const replayMode = useWorldSimStore((s) => s.replayMode);
@@ -17,6 +19,7 @@ export function ReplayBar() {
   const stepReplay = useWorldSimStore((s) => s.stepReplay);
   const seekReplay = useWorldSimStore((s) => s.seekReplay);
   const exportReplayToJson = useWorldSimStore((s) => s.exportReplayToJson);
+  const exportReplaySummaryToJson = useWorldSimStore((s) => s.exportReplaySummaryToJson);
   const importReplayFromJson = useWorldSimStore((s) => s.importReplayFromJson);
   const status = useWorldSimStore((s) => s.status);
 
@@ -25,6 +28,10 @@ export function ReplayBar() {
   const total = replayFrames.length;
   const isReplay = replayMode === 'replaying';
   const atEnd = isReplay && replayCursor >= total;
+  const eventAnchors = useMemo(
+    () => computeReplayEventAnchors(replayFrames, REPLAY_EVENT_ANCHOR_LIMIT),
+    [replayFrames],
+  );
 
   const onSeek = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,21 +42,19 @@ export function ReplayBar() {
   );
 
   const onPickSpeed = useCallback((s: ReplaySpeed) => () => setReplaySpeed(s), [setReplaySpeed]);
+  const onPickEventAnchor = useCallback((cursor: number) => () => seekReplay(cursor), [seekReplay]);
 
   const handleExport = useCallback(() => {
     const json = exportReplayToJson();
     if (!json) return;
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    a.href = url;
-    a.download = `worldsim-replay-${stamp}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadJsonFile(json, 'worldsim-replay');
   }, [exportReplayToJson]);
+
+  const handleExportSummary = useCallback(() => {
+    const json = exportReplaySummaryToJson();
+    if (!json) return;
+    downloadJsonFile(json, 'worldsim-summary');
+  }, [exportReplaySummaryToJson]);
 
   const handleImportPick = useCallback(() => {
     fileInputRef.current?.click();
@@ -123,6 +128,22 @@ export function ReplayBar() {
               className={styles.timeline}
               aria-label="回放时间轴"
             />
+            {eventAnchors.length > 0 && (
+              <div className={styles.eventJumps}>
+                {eventAnchors.map((anchor) => (
+                  <button
+                    key={`${anchor.cursor}-${anchor.category}-${anchor.message}`}
+                    type="button"
+                    className={styles.eventJumpBtn}
+                    data-active={replayCursor === anchor.cursor}
+                    title={anchor.message}
+                    onClick={onPickEventAnchor(anchor.cursor)}
+                  >
+                    {formatReplayAnchor(anchor)}
+                  </button>
+                ))}
+              </div>
+            )}
           </>
         ) : (
           <span className={styles.hint}>{recordingHint}</span>
@@ -162,6 +183,14 @@ export function ReplayBar() {
         )}
         <button
           type="button"
+          onClick={handleExportSummary}
+          disabled={total === 0}
+          title="导出摘要 JSON"
+        >
+          摘要
+        </button>
+        <button
+          type="button"
           onClick={handleExport}
           disabled={total === 0}
           title="导出 Replay JSON"
@@ -183,4 +212,42 @@ export function ReplayBar() {
       {replayMessage && <div className={styles.message}>{replayMessage}</div>}
     </div>
   );
+}
+
+function downloadJsonFile(json: string, prefix: string): void {
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  a.href = url;
+  a.download = `${prefix}-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function formatReplayAnchor(anchor: ReplayEventAnchor): string {
+  return `${formatGameTime(anchor.tick)} ${replayAnchorLabel(anchor.category)}`;
+}
+
+function replayAnchorLabel(category: ReplayEventAnchor['category']): string {
+  switch (category) {
+    case 'capital':
+      return '都城';
+    case 'eliminate':
+      return '灭国';
+    case 'victory':
+      return '统一';
+    case 'stalemate':
+      return '僵局';
+    case 'revolt':
+      return '叛乱';
+    case 'divine':
+      return '神力';
+    case 'diplomacy':
+      return '战争';
+    default:
+      return '事件';
+  }
 }

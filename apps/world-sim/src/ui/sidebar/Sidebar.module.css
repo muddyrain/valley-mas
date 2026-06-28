@@ -561,6 +561,17 @@
   color: #ff9a9a;
 }
 
+.settlementTitle {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.settlementTitle .colorDot {
+  flex: none;
+}
+
 .frontPressureGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -596,6 +607,75 @@
   border-radius: var(--ws-radius-sm);
   color: var(--ws-text-mute);
   font-size: 12px;
+}
+
+.warList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.warListItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--ws-border);
+  border-radius: var(--ws-radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.warListItem[data-status="active"] {
+  border-color: rgba(224, 86, 86, 0.5);
+}
+
+.warListItem[data-status="truce"] {
+  border-color: rgba(122, 162, 255, 0.42);
+}
+
+.warListHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.warListName {
+  color: var(--ws-text);
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.warListBadge {
+  flex: none;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--ws-border);
+  color: var(--ws-text-dim);
+  font-size: 11px;
+}
+
+.warListBadge[data-status="active"] {
+  border-color: rgba(224, 86, 86, 0.55);
+  color: #ff9a9a;
+}
+
+.warListBadge[data-status="truce"] {
+  border-color: rgba(122, 162, 255, 0.5);
+  color: #a9c3ff;
+}
+
+.warListMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  color: var(--ws-text-mute);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .inspector {

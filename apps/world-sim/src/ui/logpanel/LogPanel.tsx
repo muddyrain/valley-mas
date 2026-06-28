@@ -10,6 +10,9 @@ const FILTERS: Array<{ key: CategoryFilter; label: string }> = [
   { key: 'all', label: '全部' },
   { key: 'occupy', label: '占领' },
   { key: 'lose', label: '失地' },
+  { key: 'capital', label: '都城' },
+  { key: 'revolt', label: '叛乱' },
+  { key: 'diplomacy', label: '战争' },
   { key: 'eliminate', label: '灭国' },
   { key: 'victory', label: '统一' },
 ];

@@ -3,6 +3,7 @@ import type { RandomSource } from '@/shared/math';
 import type { FactionId, RegionId } from '@/shared/types';
 import { DEFAULT_LEADER_POOL, NAME_LEADER_PRESET } from './defaults';
 import { parseSpawnDirective } from './parse';
+import { selectBalancedSpawnRegions } from './spawnBalance';
 import type {
   Scenario,
   ScenarioApplyResult,
@@ -51,6 +52,14 @@ export function applyScenarioToWorld(opts: ApplyScenarioOptions): ScenarioApplyR
   const assignments: ScenarioFactionAssignment[] = [];
   const ownership: Array<{ regionId: RegionId; factionId: FactionId }> = [];
   const usedLeaders = new Set<string>();
+  const balancedRandomSpawns = shouldUseBalancedRandomSpawns(scenario)
+    ? selectBalancedSpawnRegions({
+        map,
+        count: scenario.factions.length,
+        occupied,
+        rng,
+      }).map((item) => item.regionId)
+    : [];
   let unresolvedCount = 0;
 
   scenario.factions.forEach((faction, factionIdx) => {
@@ -62,16 +71,28 @@ export function applyScenarioToWorld(opts: ApplyScenarioOptions): ScenarioApplyR
     const tokens = faction.spawnProvinceIds.length > 0 ? faction.spawnProvinceIds : ['random'];
     const spawnRegionIds: RegionId[] = [];
 
-    for (const token of tokens) {
-      const directive = parseSpawnDirective(token) ?? { kind: 'random' };
-      const picked = pickRegionForDirective(map, directive, occupied, rng);
-      if (picked == null) {
+    const balancedSpawn = balancedRandomSpawns[factionIdx];
+    if (balancedSpawn != null) {
+      const idx = balancedSpawn as unknown as number;
+      if (canUseProvinceAsSpawn(map, idx, occupied)) {
+        occupied.add(idx);
+        spawnRegionIds.push(balancedSpawn);
+        ownership.push({ regionId: balancedSpawn, factionId });
+      } else {
         unresolvedCount += 1;
-        continue;
       }
-      occupied.add(picked as unknown as number);
-      spawnRegionIds.push(picked);
-      ownership.push({ regionId: picked, factionId });
+    } else {
+      for (const token of tokens) {
+        const directive = parseSpawnDirective(token) ?? { kind: 'random' };
+        const picked = pickRegionForDirective(map, directive, occupied, rng);
+        if (picked == null) {
+          unresolvedCount += 1;
+          continue;
+        }
+        occupied.add(picked as unknown as number);
+        spawnRegionIds.push(picked);
+        ownership.push({ regionId: picked, factionId });
+      }
     }
 
     assignments.push({
@@ -113,6 +134,16 @@ function pickLeader(
   return fallback[index % fallback.length] ?? '佚名君主';
 }
 
+function shouldUseBalancedRandomSpawns(scenario: Scenario): boolean {
+  if (scenario.factions.length <= 1) return false;
+  return scenario.factions.every((faction) => {
+    const tokens = faction.spawnProvinceIds.length > 0 ? faction.spawnProvinceIds : ['random'];
+    if (tokens.length !== 1) return false;
+    const directive = parseSpawnDirective(tokens[0]) ?? { kind: 'random' };
+    return directive.kind === 'random';
+  });
+}
+
 function pickRegionForDirective(
   map: MapData,
   directive: SpawnDirective,
@@ -121,11 +152,8 @@ function pickRegionForDirective(
 ): RegionId | null {
   if (directive.kind === 'fixed') {
     const idx = directive.regionId as unknown as number;
-    const province = map.provinces[idx];
-    if (!province) return null;
-    if (occupied.has(idx)) return null;
-    if (province.ownerFactionId != null) return null;
-    return province.id;
+    if (!canUseProvinceAsSpawn(map, idx, occupied)) return null;
+    return map.provinces[idx].id;
   }
 
   const candidates: Province[] = [];
@@ -158,6 +186,15 @@ function pickRegionForDirective(
   if (candidates.length === 0) return null;
   const pickIdx = Math.floor(rng.next() * candidates.length);
   return candidates[Math.min(pickIdx, candidates.length - 1)].id;
+}
+
+function canUseProvinceAsSpawn(map: MapData, idx: number, occupied: Set<number>): boolean {
+  const province = map.provinces[idx];
+  if (!province) return false;
+  if (province.terrain === 'ocean') return false;
+  if (occupied.has(idx)) return false;
+  if (province.ownerFactionId != null) return false;
+  return true;
 }
 
 function isInQuadrant(province: Province, quadrant: SpawnQuadrant, bounds: MapBounds): boolean {

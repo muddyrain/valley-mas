@@ -63,6 +63,36 @@
   accent-color: var(--ws-accent);
 }
 
+.eventJumps {
+  display: flex;
+  flex: 0 1 360px;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.eventJumpBtn {
+  flex: 0 0 auto;
+  max-width: 116px;
+  padding: 3px 7px;
+  border: 1px solid var(--ws-border);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-bg-elev-2);
+  color: var(--ws-text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eventJumpBtn[data-active="true"] {
+  border-color: var(--ws-accent);
+  color: #1a1410;
+  background: var(--ws-accent);
+}
+
 .hint {
   font-size: 12px;
   color: var(--ws-text-mute);
@@ -99,6 +129,10 @@
   background: var(--ws-accent);
   color: #1a1410;
   border-color: var(--ws-accent);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 245, 210, 0.55),
+    0 0 0 1px rgba(245, 185, 66, 0.35);
+  font-weight: 700;
 }
 
 .primaryBtn {

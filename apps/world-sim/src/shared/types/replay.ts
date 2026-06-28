@@ -1,5 +1,6 @@
+import type { WarSummary } from './conflict';
 import type { LogEvent } from './event';
-import type { FactionId, RegionId, Tick } from './ids';
+import type { FactionId, RegionId, SettlementId, Tick, WarId } from './ids';
 
 /**
  * Phase 11 回放状态机镜像。与 core/sim 的 SimStatus 同义，
@@ -50,6 +51,29 @@ export interface ReplayRankingRow {
   regions: number;
 }
 
+export interface ReplayCapitalUpdate {
+  factionId: FactionId;
+  capitalRegionId: RegionId | null;
+  centroidRegionId: RegionId | null;
+}
+
+export interface ReplaySettlementUpdate {
+  settlementId: SettlementId;
+  population?: number;
+  development?: number;
+  loyalty: number;
+  unrest: number;
+  revoltProgress: number;
+}
+
+export type ReplayTerrainKind = 'plain' | 'forest' | 'mountain' | 'desert' | 'river' | 'ocean';
+
+export interface ReplayTerrainUpdate {
+  regionId: RegionId;
+  from: ReplayTerrainKind;
+  to: ReplayTerrainKind;
+}
+
 export interface ReplayFrame {
   /** 该帧应用后的 tick 序号（与 simSlice.tick 同序）。 */
   tick: Tick;
@@ -59,6 +83,20 @@ export interface ReplayFrame {
   events: LogEvent[];
   /** 本 tick 结束后的排行榜快照（仅 regions，名字/颜色用 initialFactions 索引）。 */
   rankings: ReplayRankingRow[];
+  /** 本 tick 中发生变化的首都/重心，用于回放精确还原迁都。 */
+  capitalUpdates?: ReplayCapitalUpdate[];
+  /** 本 tick 中被神力或事件直接改写的聚落状态。 */
+  settlementUpdates?: ReplaySettlementUpdate[];
+  /** 本 tick 中被神力或事件直接改写的地形。 */
+  terrainUpdates?: ReplayTerrainUpdate[];
+  /** 本 tick 中新创建的势力，例如叛乱义军。 */
+  newFactions?: ReplayInitialFaction[];
+  /** 本 tick 中新创建的战争，例如叛乱战争。 */
+  newWars?: WarSummary[];
+  /** 本 tick 中状态变化的战争，例如进入停战。 */
+  updatedWars?: WarSummary[];
+  /** 本 tick 中从当前战争列表移除的战争。 */
+  endedWarIds?: WarId[];
   /** 本 tick 结束后的 sim 状态机；通常是 running，胜负终局会切到 victory / stalemate。 */
   status: ReplayStatus;
   /** 胜利 / 终局存活势力；非 victory / stalemate 时为 null。 */

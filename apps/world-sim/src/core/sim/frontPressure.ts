@@ -196,8 +196,12 @@ export function getFrontPressureOverlaySegments(input: {
 
   for (const edge of input.map.borders) {
     if (edge.right == null) continue;
-    const leftOwner = input.map.provinces[edge.left as unknown as number]?.ownerFactionId ?? null;
-    const rightOwner = input.map.provinces[edge.right as unknown as number]?.ownerFactionId ?? null;
+    const leftProvince = input.map.provinces[edge.left as unknown as number];
+    const rightProvince = input.map.provinces[edge.right as unknown as number];
+    if (!leftProvince || !rightProvince) continue;
+    if (leftProvince.terrain === 'ocean' || rightProvince.terrain === 'ocean') continue;
+    const leftOwner = leftProvince.ownerFactionId ?? null;
+    const rightOwner = rightProvince.ownerFactionId ?? null;
     if (leftOwner == null || rightOwner == null || leftOwner === rightOwner) continue;
 
     const key = frontKey(leftOwner, rightOwner);
@@ -260,6 +264,7 @@ function buildFronts(map: MapData): Map<string, Front> {
   const fronts = new Map<string, Front>();
 
   for (const province of map.provinces) {
+    if (province.terrain === 'ocean') continue;
     const owner = province.ownerFactionId;
     if (owner == null) continue;
 
@@ -269,6 +274,7 @@ function buildFronts(map: MapData): Map<string, Front> {
       if (provinceNum > neighborNum) continue;
 
       const neighbor = map.provinces[neighborId as unknown as number];
+      if (!neighbor || neighbor.terrain === 'ocean') continue;
       const neighborOwner = neighbor?.ownerFactionId ?? null;
       if (neighborOwner == null || neighborOwner === owner) continue;
 
@@ -390,6 +396,8 @@ function getLocalSurroundBias(input: {
   let attackerNeighbors = 0;
   let defenderNeighbors = 0;
   for (const neighborId of target.neighbors) {
+    const neighbor = input.map.provinces[neighborId as unknown as number];
+    if (!neighbor || neighbor.terrain === 'ocean') continue;
     const owner = input.ownerOf(neighborId);
     if (owner === input.attackerId) attackerNeighbors += 1;
     else if (owner === input.defenderId) defenderNeighbors += 1;

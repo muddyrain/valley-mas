@@ -1,15 +1,31 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { MapModeId, TerrainKind } from '@/core/map';
-import { MAP_MODE_IDS, MAP_MODE_REGISTRY, TERRAIN_KINDS, TERRAIN_LABEL } from '@/core/map';
+import { TERRAIN_KINDS, TERRAIN_LABEL, type TerrainKind } from '@/core/map';
 import {
+  type AdminPressureLevel,
+  buildAdminDistanceState,
   buildFrontPressureState,
+  type FactionAdminSummary,
   type FactionFrontPressureSummary,
+  type FactionSettlementStabilitySummary,
   type FrontPressureLevel,
+  summarizeFactionAdminPressure,
   summarizeFactionFrontPressure,
+  summarizeFactionSettlementStability,
 } from '@/core/sim';
 import type { FactionId, FactionSummary, RegionId } from '@/shared/types';
 import type { EditTool, ProvincePreset } from '@/state';
-import { computeFactionRankings, PROVINCE_PRESETS, useWorldSimStore } from '@/state';
+import {
+  computeDiplomacyOverview,
+  computeFactionRankings,
+  computeFactionWarSummary,
+  computeSelectedSettlementDetail,
+  computeWarListEntries,
+  type DiplomacyOverview,
+  PROVINCE_PRESETS,
+  type SelectedSettlementDetail,
+  useWorldSimStore,
+  type WarListEntry,
+} from '@/state';
 import styles from './Sidebar.module.css';
 
 const EDIT_TOOLS: Array<{ id: EditTool; label: string; hint: string }> = [
@@ -30,8 +46,11 @@ export function Sidebar() {
   const recolorFaction = useWorldSimStore((s) => s.recolorFaction);
   const respawnFaction = useWorldSimStore((s) => s.respawnFaction);
   const resetFactions = useWorldSimStore((s) => s.resetFactions);
-
+  const settlements = useWorldSimStore((s) => s.settlements);
+  const recentConquests = useWorldSimStore((s) => s.recentConquests);
+  const activeWars = useWorldSimStore((s) => s.activeWars);
   const map = useWorldSimStore((s) => s.map);
+  const tick = useWorldSimStore((s) => s.tick);
   const seed = useWorldSimStore((s) => s.seed);
   const provinceCount = useWorldSimStore((s) => s.provinceCount);
   const lastGenerateMs = useWorldSimStore((s) => s.lastGenerateMs);
@@ -40,17 +59,10 @@ export function Sidebar() {
   const setSeed = useWorldSimStore((s) => s.setSeed);
   const setProvinceCount = useWorldSimStore((s) => s.setProvinceCount);
   const regenerateMap = useWorldSimStore((s) => s.regenerateMap);
-  const mapMode = useWorldSimStore((s) => s.mapMode);
-  const setMapMode = useWorldSimStore((s) => s.setMapMode);
-  const frontPressureOverlayVisible = useWorldSimStore((s) => s.frontPressureOverlayVisible);
-  const toggleFrontPressureOverlay = useWorldSimStore((s) => s.toggleFrontPressureOverlay);
-
   const currentScenarioId = useWorldSimStore((s) => s.currentScenarioId);
   const scenarioUnresolvedCount = useWorldSimStore((s) => s.scenarioUnresolvedCount);
   const loadScenario = useWorldSimStore((s) => s.loadScenario);
   const listAvailableScenarios = useWorldSimStore((s) => s.listAvailableScenarios);
-  const randomScenarioOptions = useWorldSimStore((s) => s.randomScenarioOptions);
-  const setRandomScenarioOptions = useWorldSimStore((s) => s.setRandomScenarioOptions);
   const scenarios = useMemo(() => listAvailableScenarios(), [listAvailableScenarios]);
 
   const worldMode = useWorldSimStore((s) => s.worldMode);
@@ -93,7 +105,54 @@ export function Sidebar() {
       ]),
     );
   }, [factions, map]);
+  const adminSummaries = useMemo(() => {
+    if (!map) return new Map<FactionId, FactionAdminSummary>();
+    const liveFactions = factions.filter((f) => (f.regions ?? 0) > 0);
+    const adminState = buildAdminDistanceState({
+      map,
+      factions: liveFactions,
+      settlements,
+    });
+    return new Map(
+      liveFactions.map((f) => [
+        f.id,
+        summarizeFactionAdminPressure({
+          state: adminState,
+          faction: f,
+          recentConquests,
+          currentTick: tick,
+        }),
+      ]),
+    );
+  }, [factions, map, settlements, recentConquests, tick]);
   const factionNameById = useMemo(() => new Map(factions.map((f) => [f.id, f.name])), [factions]);
+  const warSummaries = useMemo(
+    () =>
+      new Map(
+        factions.map((faction) => [
+          faction.id,
+          computeFactionWarSummary({ factionId: faction.id, factions, wars: activeWars }),
+        ]),
+      ),
+    [factions, activeWars],
+  );
+  const warListEntries = useMemo(
+    () => computeWarListEntries({ factions, wars: activeWars, currentTick: tick }),
+    [factions, activeWars, tick],
+  );
+  const diplomacyOverview = useMemo(
+    () => computeDiplomacyOverview({ factions, wars: activeWars }),
+    [factions, activeWars],
+  );
+  const settlementStabilitySummaries = useMemo(() => {
+    const byFaction = new Map<FactionId, FactionSettlementStabilitySummary>();
+    for (const faction of factions) {
+      const ownedSettlements = settlements.filter((settlement) => settlement.factionId === faction.id);
+      if (ownedSettlements.length === 0) continue;
+      byFaction.set(faction.id, summarizeFactionSettlementStability(ownedSettlements));
+    }
+    return byFaction;
+  }, [factions, settlements]);
 
   const [seedDraft, setSeedDraft] = useState(seed);
   const [newFactionName, setNewFactionName] = useState('');
@@ -131,13 +190,6 @@ export function Sidebar() {
       loadScenario(id);
     },
     [currentScenarioId, loadScenario],
-  );
-
-  const handlePickMapMode = useCallback(
-    (id: MapModeId) => {
-      setMapMode(id);
-    },
-    [setMapMode],
   );
 
   const handleCreateFaction = useCallback(() => {
@@ -193,36 +245,23 @@ export function Sidebar() {
     () => buildInspectorText(map, selectedRegionId, hoveredRegionId, factions),
     [map, selectedRegionId, hoveredRegionId, factions],
   );
+  const selectedSettlementDetail = useMemo(
+    () =>
+      computeSelectedSettlementDetail({
+        selectedRegionId,
+        map,
+        factions,
+        settlements,
+        recentConquests,
+        wars: activeWars,
+        currentTick: tick,
+      }),
+    [selectedRegionId, map, factions, settlements, recentConquests, activeWars, tick],
+  );
 
   const terrainCounts = useMemo(() => buildTerrainCounts(map), [map]);
-
   return (
     <div className={styles.root}>
-      <section className={styles.section}>
-        <header className={styles.sectionHeader}>
-          <span>地图模式</span>
-        </header>
-        <div className={styles.sourceGroup}>
-          {MAP_MODE_IDS.map((id) => {
-            const src = MAP_MODE_REGISTRY[id];
-            const active = mapMode === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                className={styles.sourceBtn}
-                data-active={active}
-                onClick={() => handlePickMapMode(id)}
-                title={src.description}
-              >
-                <span className={styles.sourceName}>{src.name}</span>
-                <span className={styles.sourceMeta}>{src.description}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
       <section className={styles.section}>
         <header className={styles.sectionHeader}>
           <span>地图</span>
@@ -232,15 +271,6 @@ export function Sidebar() {
             </span>
           )}
         </header>
-        <button
-          type="button"
-          className={styles.overlayToggle}
-          data-active={frontPressureOverlayVisible}
-          disabled={!map}
-          onClick={toggleFrontPressureOverlay}
-        >
-          前线压力
-        </button>
         <div className={styles.controlGroup}>
           <label className={styles.fieldLabel}>种子</label>
           <div className={styles.seedRow}>
@@ -314,50 +344,7 @@ export function Sidebar() {
             </button>
           ))}
         </div>
-        {currentScenarioId === 'random' && (
-          <div className={styles.scenarioOptions}>
-            <span className={styles.scenarioOptionsTitle}>随机剧本来源</span>
-            <label
-              className={styles.scenarioOptionRow}
-              data-disabled={
-                randomScenarioOptions.includeChinese && !randomScenarioOptions.includeForeign
-                  ? 'true'
-                  : undefined
-              }
-            >
-              <input
-                type="checkbox"
-                checked={randomScenarioOptions.includeChinese}
-                onChange={(e) => setRandomScenarioOptions({ includeChinese: e.target.checked })}
-                disabled={
-                  randomScenarioOptions.includeChinese && !randomScenarioOptions.includeForeign
-                }
-              />
-              中国朝代（蜀汉 / 大唐 / 大明 …）
-            </label>
-            <label
-              className={styles.scenarioOptionRow}
-              data-disabled={
-                randomScenarioOptions.includeForeign && !randomScenarioOptions.includeChinese
-                  ? 'true'
-                  : undefined
-              }
-            >
-              <input
-                type="checkbox"
-                checked={randomScenarioOptions.includeForeign}
-                onChange={(e) => setRandomScenarioOptions({ includeForeign: e.target.checked })}
-                disabled={
-                  randomScenarioOptions.includeForeign && !randomScenarioOptions.includeChinese
-                }
-              />
-              国外政体（法兰西帝国 / 罗马帝国 …）
-            </label>
-          </div>
-        )}
-        <p className={styles.empty}>
-          点击切换剧本，或再次点击当前剧本以重新随机出生。地图刷新时会自动应用当前剧本。
-        </p>
+        <p className={styles.empty}>再次点击当前剧本可重置开局。</p>
       </section>
 
       <section className={styles.section}>
@@ -453,6 +440,7 @@ export function Sidebar() {
         <div className={styles.inspector}>
           <pre className={styles.inspectorText}>{inspector}</pre>
         </div>
+        {selectedSettlementDetail && <SelectedSettlementCard detail={selectedSettlementDetail} />}
       </section>
 
       <section className={styles.section}>
@@ -491,6 +479,9 @@ export function Sidebar() {
               const isRenaming = renameDraft?.id === f.id;
               const isDead = (f.regions ?? 0) === 0;
               const frontPressureSummary = frontPressureSummaries.get(f.id);
+              const adminSummary = adminSummaries.get(f.id);
+              const stabilitySummary = settlementStabilitySummaries.get(f.id);
+              const warSummary = warSummaries.get(f.id);
               return (
                 <li
                   key={f.id}
@@ -564,17 +555,41 @@ export function Sidebar() {
                     )}
                   </div>
                   {isActive && (
-                    <FrontPressureCard
-                      summary={frontPressureSummary}
-                      factionNameById={factionNameById}
-                      isDead={isDead}
-                    />
+                    <>
+                      <AdminPressureCard
+                        summary={adminSummary}
+                        stability={stabilitySummary}
+                        isDead={isDead}
+                      />
+                      <WarStatusCard summary={warSummary} isDead={isDead} />
+                      <FrontPressureCard
+                        summary={frontPressureSummary}
+                        factionNameById={factionNameById}
+                        isDead={isDead}
+                      />
+                    </>
                   )}
                 </li>
               );
             })}
           </ul>
         )}
+      </section>
+
+      <section className={styles.section}>
+        <header className={styles.sectionHeader}>
+          <span>关系</span>
+          <span className={styles.muted}>{DIPLOMACY_STATUS_LABEL[diplomacyOverview.status]}</span>
+        </header>
+        <DiplomacyOverviewCard overview={diplomacyOverview} />
+      </section>
+
+      <section className={styles.section}>
+        <header className={styles.sectionHeader}>
+          <span>战争</span>
+          <span className={styles.muted}>{warListEntries.length}</span>
+        </header>
+        <WarList entries={warListEntries} />
       </section>
 
       <section className={styles.section}>
@@ -601,6 +616,127 @@ export function Sidebar() {
           </ol>
         )}
       </section>
+    </div>
+  );
+}
+
+function WarList({ entries }: { entries: readonly WarListEntry[] }) {
+  if (entries.length === 0) {
+    return <p className={styles.frontPressureEmpty}>暂无战争</p>;
+  }
+
+  return (
+    <ul className={styles.warList}>
+      {entries.slice(0, 8).map((entry) => (
+        <li key={entry.id as unknown as number} className={styles.warListItem} data-status={entry.status}>
+          <div className={styles.warListHead}>
+            <span className={styles.warListName}>
+              {entry.attackerName} vs {entry.defenderName}
+            </span>
+            <span className={styles.warListBadge} data-status={entry.status}>
+              {WAR_STATUS_LABEL[entry.status]}
+            </span>
+          </div>
+          <div className={styles.warListMeta}>
+            <span>{WAR_KIND_LABEL[entry.kind]}</span>
+            <span>{entry.elapsedTicks} tick</span>
+            <span>疲劳 {formatPercent(entry.fatigue)}</span>
+            {entry.truceRemainingTicks != null && <span>剩余 {entry.truceRemainingTicks}</span>}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function DiplomacyOverviewCard({ overview }: { overview: DiplomacyOverview }) {
+  return (
+    <div className={styles.frontPressureCard}>
+      <div className={styles.frontPressureHead}>
+        <span>外交</span>
+        <span data-level={DIPLOMACY_STATUS_LEVEL[overview.status]}>
+          {overview.livingFactionCount} 家
+        </span>
+      </div>
+      <div className={styles.frontPressureGrid}>
+        <div>
+          <span className={styles.frontPressureLabel}>和平</span>
+          <span className={styles.frontPressureValue}>{overview.peaceCount}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>交战</span>
+          <span className={styles.frontPressureValue}>{overview.borderWarCount}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>内战</span>
+          <span className={styles.frontPressureValue}>{overview.revoltWarCount}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>停战</span>
+          <span className={styles.frontPressureValue}>{overview.truceCount}</span>
+        </div>
+      </div>
+      <div className={styles.frontPressureRisk}>
+        <span className={styles.frontPressureLabel}>关系</span>
+        <span className={styles.frontPressureValue}>{overview.pairCount}</span>
+      </div>
+    </div>
+  );
+}
+
+function SelectedSettlementCard({ detail }: { detail: SelectedSettlementDetail }) {
+  const level = getSelectedSettlementRiskLevel(detail);
+  return (
+    <div className={styles.frontPressureCard}>
+      <div className={styles.frontPressureHead}>
+        <span className={styles.settlementTitle}>
+          {detail.ownerColorHex && (
+            <span className={styles.colorDot} style={{ backgroundColor: detail.ownerColorHex }} />
+          )}
+          {detail.settlementName}
+        </span>
+        <span data-level={level}>{SETTLEMENT_TIER_LABEL[detail.tier]}</span>
+      </div>
+      <div className={styles.frontPressureGrid}>
+        <div>
+          <span className={styles.frontPressureLabel}>所属</span>
+          <span className={styles.frontPressureValue}>{detail.ownerName}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>地形</span>
+          <span className={styles.frontPressureValue}>{TERRAIN_LABEL[detail.terrain]}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>人口</span>
+          <span className={styles.frontPressureValue}>{Math.round(detail.population)}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>发展</span>
+          <span className={styles.frontPressureValue}>{formatPercent(detail.development)}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>忠诚</span>
+          <span className={styles.frontPressureValue}>{formatPercent(detail.loyalty)}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>动荡</span>
+          <span className={styles.frontPressureValue}>{formatPercent(detail.unrest)}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>叛乱</span>
+          <span className={styles.frontPressureValue}>{formatPercent(detail.revoltProgress)}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>新占</span>
+          <span className={styles.frontPressureValue}>
+            {detail.recentlyConquered ? `第 ${detail.conqueredTick as unknown as number}` : '-'}
+          </span>
+        </div>
+      </div>
+      <div className={styles.frontPressureRisk}>
+        <span className={styles.frontPressureLabel}>围城</span>
+        <span className={styles.frontPressureValue}>{formatSelectedSettlementSiege(detail)}</span>
+      </div>
     </div>
   );
 }
@@ -664,6 +800,146 @@ function FrontPressureCard({
   );
 }
 
+function AdminPressureCard({
+  summary,
+  stability,
+  isDead,
+}: {
+  summary: FactionAdminSummary | undefined;
+  stability: FactionSettlementStabilitySummary | undefined;
+  isDead: boolean;
+}) {
+  if (isDead) {
+    return <p className={styles.frontPressureEmpty}>势力已灭</p>;
+  }
+  if (!summary) {
+    return <p className={styles.frontPressureEmpty}>暂无治理数据</p>;
+  }
+
+  return (
+    <div className={styles.frontPressureCard}>
+      <div className={styles.frontPressureHead}>
+        <span>治理</span>
+        <span data-level={ADMIN_LEVEL_TO_DATA_LEVEL[summary.pressureLevel]}>
+          {ADMIN_LEVEL_LABEL[summary.pressureLevel]}
+        </span>
+      </div>
+      <div className={styles.frontPressureGrid}>
+        <div>
+          <span className={styles.frontPressureLabel}>聚落</span>
+          <span className={styles.frontPressureValue}>{summary.settlementCount}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>距城</span>
+          <span className={styles.frontPressureValue}>
+            {summary.averageDistance == null ? '断' : summary.averageDistance.toFixed(1)}
+          </span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>远疆</span>
+          <span className={styles.frontPressureValue}>{formatPercent(summary.farRegionShare)}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>负荷</span>
+          <span className={styles.frontPressureValue}>{summary.regionsPerSettlement.toFixed(0)}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>质量</span>
+          <span className={styles.frontPressureValue}>{formatPercent(summary.averageQuality)}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>新占</span>
+          <span className={styles.frontPressureValue}>
+            {formatPercent(summary.recentConquestShare)}
+          </span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>忠诚</span>
+          <span className={styles.frontPressureValue}>
+            {stability ? formatPercent(stability.averageLoyalty) : '-'}
+          </span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>动荡</span>
+          <span className={styles.frontPressureValue}>
+            {stability ? formatPercent(stability.averageUnrest) : '-'}
+          </span>
+        </div>
+      </div>
+      <div className={styles.frontPressureRisk}>
+        <span className={styles.frontPressureLabel}>叛乱</span>
+        <span className={styles.frontPressureValue}>
+          {stability ? formatPercent(stability.maxRevoltProgress) : '0%'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function WarStatusCard({
+  summary,
+  isDead,
+}: {
+  summary: ReturnType<typeof computeFactionWarSummary> | undefined;
+  isDead: boolean;
+}) {
+  if (isDead) {
+    return <p className={styles.frontPressureEmpty}>势力已灭</p>;
+  }
+  if (!summary || summary.status === 'none') {
+    return <p className={styles.frontPressureEmpty}>暂无战争</p>;
+  }
+
+  const opponents = summary.activeOpponents.length > 0 ? summary.activeOpponents : summary.truceOpponents;
+
+  return (
+    <div className={styles.frontPressureCard}>
+      <div className={styles.frontPressureHead}>
+        <span>战争</span>
+        <span data-level={WAR_STATUS_TO_DATA_LEVEL[summary.status]}>
+          {WAR_STATUS_LABEL[summary.status]}
+        </span>
+      </div>
+      <div className={styles.frontPressureGrid}>
+        <div>
+          <span className={styles.frontPressureLabel}>交战</span>
+          <span className={styles.frontPressureValue}>{summary.activeCount}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>停战</span>
+          <span className={styles.frontPressureValue}>{summary.truceCount}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>围城</span>
+          <span className={styles.frontPressureValue}>{summary.siegeCount}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>进度</span>
+          <span className={styles.frontPressureValue}>{formatPercent(summary.maxSiegeProgress)}</span>
+        </div>
+      </div>
+      <div className={styles.frontPressureRisk}>
+        <span className={styles.frontPressureLabel}>对手</span>
+        <span className={styles.frontPressureValue}>{formatOpponentList(opponents)}</span>
+      </div>
+    </div>
+  );
+}
+
+const ADMIN_LEVEL_LABEL: Record<AdminPressureLevel, string> = {
+  none: '无',
+  stable: '稳固',
+  strained: '吃紧',
+  overextended: '过伸',
+};
+
+const ADMIN_LEVEL_TO_DATA_LEVEL: Record<AdminPressureLevel, FrontPressureLevel> = {
+  none: 'none',
+  stable: 'low',
+  strained: 'medium',
+  overextended: 'high',
+};
+
 const PRESSURE_LEVEL_LABEL: Record<FrontPressureLevel, string> = {
   none: '无',
   low: '边境稳定',
@@ -671,8 +947,61 @@ const PRESSURE_LEVEL_LABEL: Record<FrontPressureLevel, string> = {
   high: '腹背受敌',
 };
 
+const WAR_STATUS_LABEL: Record<ReturnType<typeof computeFactionWarSummary>['status'], string> = {
+  none: '无',
+  active: '交战',
+  truce: '停战',
+};
+
+const WAR_KIND_LABEL: Record<WarListEntry['kind'], string> = {
+  border: '边境',
+  revolt: '叛乱',
+};
+
+const WAR_STATUS_TO_DATA_LEVEL: Record<ReturnType<typeof computeFactionWarSummary>['status'], FrontPressureLevel> = {
+  none: 'none',
+  active: 'high',
+  truce: 'medium',
+};
+
+const DIPLOMACY_STATUS_LABEL: Record<DiplomacyOverview['status'], string> = {
+  peace: '和平',
+  truce: '停战',
+  war: '交战',
+};
+
+const DIPLOMACY_STATUS_LEVEL: Record<DiplomacyOverview['status'], FrontPressureLevel> = {
+  peace: 'low',
+  truce: 'medium',
+  war: 'high',
+};
+
+const SETTLEMENT_TIER_LABEL: Record<SelectedSettlementDetail['tier'], string> = {
+  capital: '都城',
+  city: '城市',
+  town: '城镇',
+  village: '村庄',
+};
+
 function formatPercent(value: number): string {
   return `${(value * 100).toFixed(0)}%`;
+}
+
+function getSelectedSettlementRiskLevel(detail: SelectedSettlementDetail): FrontPressureLevel {
+  if ((detail.siege?.progress ?? 0) >= 0.6 || detail.revoltProgress >= 0.6) return 'high';
+  if (detail.siege || detail.unrest >= 0.35 || detail.recentlyConquered) return 'medium';
+  return 'low';
+}
+
+function formatSelectedSettlementSiege(detail: SelectedSettlementDetail): string {
+  if (!detail.siege) return '-';
+  return `${detail.siege.attackerName}→${detail.siege.defenderName} · ${formatPercent(detail.siege.progress)}`;
+}
+
+function formatOpponentList(opponents: readonly string[]): string {
+  if (opponents.length === 0) return '-';
+  if (opponents.length <= 2) return opponents.join('、');
+  return `${opponents.slice(0, 2).join('、')} 等 ${opponents.length} 家`;
 }
 
 function buildInspectorText(

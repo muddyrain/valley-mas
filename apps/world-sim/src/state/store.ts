@@ -5,6 +5,7 @@ import { createLogSlice, type LogSlice } from './slices/logSlice';
 import { createMapSlice, type MapSlice } from './slices/mapSlice';
 import { createReplaySlice, type ReplaySlice } from './slices/replaySlice';
 import { createScenarioSlice, type ScenarioSlice } from './slices/scenarioSlice';
+import { createSettlementSlice, type SettlementSlice } from './slices/settlementSlice';
 import { createSimSlice, type SimSlice } from './slices/simSlice';
 import { createUiSlice, type UiSlice } from './slices/uiSlice';
 
@@ -14,6 +15,7 @@ export type WorldSimStore = SimSlice &
   LogSlice &
   MapSlice &
   ScenarioSlice &
+  SettlementSlice &
   EditSlice &
   ReplaySlice;
 
@@ -28,6 +30,7 @@ export const useWorldSimStore = create<WorldSimStore>()((...a) => ({
   ...createLogSlice(...a),
   ...createMapSlice(...a),
   ...createScenarioSlice(...a),
+  ...createSettlementSlice(...a),
   ...createEditSlice(...a),
   ...createReplaySlice(...a),
 }));

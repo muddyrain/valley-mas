@@ -5,10 +5,12 @@ import {
   DEFAULT_LEADER_POOL,
   NAME_LEADER_PRESET,
 } from '@/core/scenario';
+import { rebuildCapitalSettlements } from '@/core/sim';
 import { createPrngFromSeed } from '@/shared/math';
 import type { FactionId, FactionSummary, RegionId } from '@/shared/types';
 import { asFactionId, asTick } from '@/shared/types';
 import type { MapSlice } from './mapSlice';
+import type { SettlementSlice } from './settlementSlice';
 import type { SimSlice } from './simSlice';
 import type { UiSlice } from './uiSlice';
 
@@ -201,6 +203,7 @@ function pickLeaderForName(name: string, used: Set<string>): string {
 function pickFreeRegion(provinces: Province[]): RegionId | null {
   const free: RegionId[] = [];
   for (const p of provinces) {
+    if (p.terrain === 'ocean') continue;
     if (p.ownerFactionId == null) free.push(p.id);
   }
   if (free.length === 0) return null;
@@ -225,6 +228,7 @@ function buildInitialFactions(): FactionSummary[] {
 function recountRegions(factions: FactionSummary[], provinces: Province[]): FactionSummary[] {
   const counts = new Map<FactionId, number>();
   for (const p of provinces) {
+    if (p.terrain === 'ocean') continue;
     if (p.ownerFactionId != null) {
       counts.set(p.ownerFactionId, (counts.get(p.ownerFactionId) ?? 0) + 1);
     }
@@ -232,7 +236,7 @@ function recountRegions(factions: FactionSummary[], provinces: Province[]): Fact
   return factions.map((f) => ({ ...f, regions: counts.get(f.id) ?? 0 }));
 }
 
-type Deps = FactionSlice & MapSlice & UiSlice & SimSlice;
+type Deps = FactionSlice & MapSlice & UiSlice & SimSlice & SettlementSlice;
 
 export const createFactionSlice: StateCreator<Deps, [], [], FactionSlice> = (set, get) => {
   const cloneMap = () => {
@@ -268,7 +272,11 @@ export const createFactionSlice: StateCreator<Deps, [], [], FactionSlice> = (set
       if (cloned && birthRegionId != null) {
         const idx = birthRegionId as unknown as number;
         const province = cloned.provinces[idx];
-        if (province) province.ownerFactionId = id;
+        if (province && province.terrain !== 'ocean') {
+          province.ownerFactionId = id;
+        } else {
+          birthRegionId = null;
+        }
       }
 
       const newFaction: FactionSummary = {
@@ -284,7 +292,19 @@ export const createFactionSlice: StateCreator<Deps, [], [], FactionSlice> = (set
       };
 
       if (cloned) {
-        set({ factions: [...factions, newFaction], map: cloned });
+        const factionsNext = [...factions, newFaction];
+        set({
+          factions: factionsNext,
+          map: cloned,
+          recentConquests: new Map(),
+          activeWars: [],
+          settlements: rebuildCapitalSettlements({
+            map: cloned,
+            factions: factionsNext,
+            previous: get().settlements,
+            tick: get().tick,
+          }),
+        });
       } else {
         set({ factions: [...factions, newFaction] });
       }
@@ -304,9 +324,18 @@ export const createFactionSlice: StateCreator<Deps, [], [], FactionSlice> = (set
       const factionsNext = factions.filter((f) => f.id !== id);
 
       if (cloned) {
-        set({ factions: factionsNext, map: cloned });
+        set({
+          factions: factionsNext,
+          map: cloned,
+          settlements: rebuildCapitalSettlements({
+            map: cloned,
+            factions: factionsNext,
+            previous: get().settlements,
+            tick: get().tick,
+          }),
+        });
       } else {
-        set({ factions: factionsNext });
+        set({ factions: factionsNext, settlements: [] });
       }
       if (get().selectedFactionId === id) {
         set({ selectedFactionId: null });
@@ -317,7 +346,15 @@ export const createFactionSlice: StateCreator<Deps, [], [], FactionSlice> = (set
       const trimmed = name.trim();
       if (trimmed.length === 0) return;
       const factionsNext = get().factions.map((f) => (f.id === id ? { ...f, name: trimmed } : f));
-      set({ factions: factionsNext });
+      set({
+        factions: factionsNext,
+        settlements: rebuildCapitalSettlements({
+          map: get().map,
+          factions: factionsNext,
+          previous: get().settlements,
+          tick: get().tick,
+        }),
+      });
     },
 
     recolorFaction: (id, colorHex) => {
@@ -345,7 +382,11 @@ export const createFactionSlice: StateCreator<Deps, [], [], FactionSlice> = (set
       if (target != null) {
         const idx = target as unknown as number;
         const province = cloned.provinces[idx];
-        if (province) province.ownerFactionId = id;
+        if (province && province.terrain !== 'ocean') {
+          province.ownerFactionId = id;
+        } else {
+          target = null;
+        }
       }
 
       const factionsRaw = get().factions.map((f) =>
@@ -360,7 +401,18 @@ export const createFactionSlice: StateCreator<Deps, [], [], FactionSlice> = (set
           : f,
       );
       const factionsNext = recountRegions(factionsRaw, cloned.provinces);
-      set({ factions: factionsNext, map: cloned });
+      set({
+        factions: factionsNext,
+        map: cloned,
+        recentConquests: new Map(),
+        activeWars: [],
+        settlements: rebuildCapitalSettlements({
+          map: cloned,
+          factions: factionsNext,
+          previous: get().settlements,
+          tick: get().tick,
+        }),
+      });
     },
 
     resetFactions: () => {
@@ -371,6 +423,12 @@ export const createFactionSlice: StateCreator<Deps, [], [], FactionSlice> = (set
         }
       }
       const factionsNext = buildInitialFactions();
+      const settlementsNext = rebuildCapitalSettlements({
+        map: cloned,
+        factions: factionsNext,
+        previous: get().settlements,
+        tick: asTick(0),
+      });
       const simReset = {
         tick: asTick(0),
         status: 'idle' as const,
@@ -380,9 +438,24 @@ export const createFactionSlice: StateCreator<Deps, [], [], FactionSlice> = (set
         paused: true,
       };
       if (cloned) {
-        set({ factions: factionsNext, map: cloned, selectedFactionId: null, ...simReset });
+        set({
+          factions: factionsNext,
+          settlements: settlementsNext,
+          map: cloned,
+          recentConquests: new Map(),
+          activeWars: [],
+          selectedFactionId: null,
+          ...simReset,
+        });
       } else {
-        set({ factions: factionsNext, selectedFactionId: null, ...simReset });
+        set({
+          factions: factionsNext,
+          settlements: [],
+          recentConquests: new Map(),
+          activeWars: [],
+          selectedFactionId: null,
+          ...simReset,
+        });
       }
     },
   };
