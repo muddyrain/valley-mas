@@ -1,15 +1,18 @@
+.launchpad__motion {
+  position: absolute;
+  inset: 0;
+  z-index: 850;
+  transform-origin: 50% 100%;
+}
+
 .launchpad {
   position: absolute;
   inset: 28px 0 0;
-  z-index: 850;
   display: flex;
   align-items: stretch;
   justify-content: center;
   padding: clamp(22px, 5vh, 56px) clamp(16px, 4vw, 56px) 112px;
-  background:
-    radial-gradient(circle at 18% 18%, rgba(244, 217, 122, 0.34), transparent 28%),
-    radial-gradient(circle at 82% 16%, rgba(168, 212, 234, 0.36), transparent 30%),
-    rgba(248, 245, 236, 0.44);
+  background: rgba(250, 250, 250, 0.52);
   backdrop-filter: blur(24px) saturate(150%);
   -webkit-backdrop-filter: blur(24px) saturate(150%);
 }
@@ -57,7 +60,7 @@
 }
 
 .launchpad__close:focus-visible {
-  outline: 3px solid rgba(168, 212, 234, 0.58);
+  outline: 3px solid var(--system-ring);
   outline-offset: 2px;
 }
 
@@ -169,7 +172,7 @@
 }
 
 .launchpad__nav:focus-visible {
-  outline: 3px solid rgba(168, 212, 234, 0.58);
+  outline: 3px solid var(--system-ring);
   outline-offset: 2px;
 }
 
@@ -286,7 +289,7 @@
 }
 
 .launchpad-app:focus-visible {
-  outline: 3px solid rgba(168, 212, 234, 0.58);
+  outline: 3px solid var(--system-ring);
   outline-offset: 2px;
 }
 
@@ -421,18 +424,13 @@
 
 /* Storybook Design System v1 */
 .launchpad {
-  background:
-    radial-gradient(circle at 18% 16%, rgba(244, 217, 122, 0.44), transparent 18%),
-    radial-gradient(circle at 80% 14%, rgba(168, 212, 234, 0.48), transparent 22%),
-    radial-gradient(ellipse at 50% 110%, rgba(143, 180, 94, 0.48), transparent 52%),
-    rgba(248, 245, 236, 0.46);
+  background: rgba(250, 250, 250, 0.58);
 }
 
 .launchpad__search,
 .launchpad__close {
-  border-color: rgba(255, 255, 255, 0.74);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 248, 232, 0.7)), var(--plush-field);
+  border-color: var(--system-border);
+  background: var(--system-field-strong);
   box-shadow: var(--shadow-soft);
 }
 
@@ -446,9 +444,7 @@
 }
 
 .launchpad-app.is-keyboard-active {
-  background:
-    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.62), transparent 28%),
-    rgba(255, 250, 236, 0.44);
+  background: var(--system-hover);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.54);
 }
 
@@ -458,12 +454,12 @@
 }
 
 .launchpad-app__dot.is-on {
-  background: var(--plush-terracotta);
-  box-shadow: 0 0 0 3px rgba(217, 122, 79, 0.12);
+  background: var(--system-text);
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.1);
 }
 
 .launchpad__empty {
   border-color: rgba(126, 105, 70, 0.18);
   border-radius: var(--shape-squircle-lg);
-  background: rgba(255, 250, 236, 0.42);
+  background: rgba(255, 255, 255, 0.52);
 }

@@ -1,9 +1,8 @@
 .plush-segmented {
   display: inline-flex;
-  border: 1px solid var(--plush-outline);
+  border: 1px solid var(--app-border);
   border-radius: var(--shape-capsule);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 248, 232, 0.5)), var(--plush-field);
+  background: var(--app-panel-soft);
   padding: 4px;
   gap: 4px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
@@ -13,7 +12,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: var(--plush-text-soft, rgba(90, 74, 58, 0.78));
+  color: var(--app-muted);
   font-size: 12px;
   font-weight: 600;
   padding: 6px 12px;
@@ -26,18 +25,16 @@
 }
 
 .plush-segmented__option:hover:not([data-state="on"]) {
-  background: rgba(255, 255, 255, 0.5);
-  color: var(--plush-text);
+  background: var(--app-hover);
+  color: var(--app-text);
 }
 
 .plush-segmented__option[data-state="on"] {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 232, 157, 0.78)),
-    var(--plush-highlight);
-  color: var(--plush-text);
+  background: var(--app-surface);
+  color: var(--app-text);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.86),
-    0 6px 12px rgba(90, 74, 58, 0.08);
+    0 6px 12px rgba(15, 23, 42, 0.08);
 }
 
 .plush-segmented__option:disabled {
@@ -46,6 +43,6 @@
 }
 
 .plush-segmented__option:focus-visible {
-  outline: 2px solid var(--plush-focus);
+  outline: 2px solid var(--app-ring);
   outline-offset: 2px;
 }

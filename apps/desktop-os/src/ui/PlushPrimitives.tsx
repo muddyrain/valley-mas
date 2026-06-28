@@ -43,7 +43,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import './PlushPrimitives.css';
 
-export type PlushTone = 'primary' | 'neutral' | 'accent' | 'danger';
+export type PlushTone = 'primary' | 'neutral' | 'accent' | 'info' | 'danger';
 
 export type PlushButtonProps = React.ComponentProps<typeof Button> & {
   tone?: PlushTone;
@@ -111,6 +111,52 @@ export function PlushButton({
 
 export function PlushCard({ className, ...props }: React.ComponentProps<typeof Card>) {
   return <Card className={cn('plush-card', className)} {...props} />;
+}
+
+export function PlushPanel({ className, ...props }: React.ComponentProps<'section'>) {
+  return <section className={cn('plush-panel', className)} {...props} />;
+}
+
+type PlushToolbarDivProps = { as?: 'div' } & React.ComponentProps<'div'>;
+type PlushToolbarFormProps = { as: 'form' } & React.ComponentProps<'form'>;
+type PlushToolbarHeaderProps = { as: 'header' } & React.ComponentProps<'header'>;
+type PlushToolbarProps = PlushToolbarDivProps | PlushToolbarFormProps | PlushToolbarHeaderProps;
+
+export function PlushToolbar(props: PlushToolbarFormProps): React.ReactElement;
+export function PlushToolbar(props: PlushToolbarHeaderProps): React.ReactElement;
+export function PlushToolbar(props: PlushToolbarDivProps): React.ReactElement;
+export function PlushToolbar({ as = 'div', className, ...props }: PlushToolbarProps) {
+  if (as === 'form') {
+    return (
+      <form
+        className={cn('plush-toolbar', className)}
+        {...(props as React.ComponentProps<'form'>)}
+      />
+    );
+  }
+
+  if (as === 'header') {
+    return (
+      <header
+        className={cn('plush-toolbar', className)}
+        {...(props as React.ComponentProps<'header'>)}
+      />
+    );
+  }
+
+  return (
+    <div className={cn('plush-toolbar', className)} {...(props as React.ComponentProps<'div'>)} />
+  );
+}
+
+export function PlushBadge({
+  className,
+  tone = 'neutral',
+  ...props
+}: React.ComponentProps<'span'> & {
+  tone?: PlushTone;
+}) {
+  return <span data-tone={tone} className={cn('plush-badge', className)} {...props} />;
 }
 
 export function PlushDialogContent({

@@ -8,16 +8,14 @@
   min-height: 34px;
   min-width: 170px;
   max-width: 100%;
-  border: 1px solid rgba(126, 105, 70, 0.12);
+  border: 1px solid var(--app-border);
   border-radius: 999px;
   padding: 6px 11px 6px 12px;
-  color: rgba(74, 66, 54, 0.72);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 244, 218, 0.62)),
-    rgba(255, 250, 239, 0.82);
+  color: var(--app-muted);
+  background: var(--app-card);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.84),
-    0 9px 18px rgba(90, 74, 58, 0.06);
+    0 9px 18px rgba(15, 23, 42, 0.06);
   font: inherit;
   font-size: 12px;
   font-weight: 800;
@@ -31,14 +29,12 @@ button.plush-load-more {
 }
 
 button.plush-load-more:hover {
-  border-color: rgba(197, 139, 40, 0.22);
-  color: #4c3b24;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 237, 186, 0.74)),
-    rgba(255, 250, 239, 0.9);
+  border-color: var(--app-border-strong);
+  color: var(--app-text);
+  background: var(--app-field-hover);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 11px 20px rgba(130, 96, 39, 0.1);
+    0 11px 20px rgba(15, 23, 42, 0.08);
 }
 
 .plush-load-more__beads {
@@ -51,8 +47,8 @@ button.plush-load-more:hover {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: rgba(217, 122, 79, 0.42);
-  box-shadow: 0 0 0 3px rgba(217, 122, 79, 0.08);
+  background: var(--app-primary);
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.08);
 }
 
 .plush-load-more__label {
@@ -65,7 +61,7 @@ button.plush-load-more:hover {
   height: 6px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(126, 105, 70, 0.08);
+  background: var(--app-hover);
 }
 
 .plush-load-more__trail::after {
@@ -73,13 +69,13 @@ button.plush-load-more:hover {
   inset: 1px auto 1px 1px;
   width: 42%;
   border-radius: inherit;
-  background: rgba(244, 217, 122, 0.72);
+  background: var(--app-primary);
   content: "";
   opacity: 0.72;
 }
 
 .plush-load-more--loading {
-  color: #5a4a3a;
+  color: var(--app-text);
 }
 
 .plush-load-more--loading .plush-load-more__beads span {
@@ -99,19 +95,19 @@ button.plush-load-more:hover {
 }
 
 .plush-load-more--done {
-  color: rgba(74, 66, 54, 0.5);
-  background: rgba(255, 250, 239, 0.48);
+  color: var(--app-muted-soft);
+  background: var(--app-panel-soft);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68);
 }
 
 .plush-load-more--done .plush-load-more__beads span {
-  background: rgba(143, 180, 94, 0.44);
-  box-shadow: 0 0 0 3px rgba(143, 180, 94, 0.08);
+  background: var(--app-success);
+  box-shadow: 0 0 0 3px var(--app-success-soft);
 }
 
 .plush-load-more--done .plush-load-more__trail::after {
   width: calc(100% - 2px);
-  background: rgba(143, 180, 94, 0.34);
+  background: var(--app-success);
 }
 
 @keyframes plush-load-more-bead {

@@ -673,3 +673,74 @@
     font-size: 48px;
   }
 }
+
+/* Neutral Light app surface consolidation */
+.weather-sidebar,
+.weather-city,
+.weather-city-settings,
+.weather-city-settings__row,
+.weather-window__hero,
+.weather-window__source,
+.weather-window__status span,
+.weather-metric,
+.weather-hour,
+.weather-day,
+.weather-index,
+.weather-empty {
+  border-color: var(--app-border);
+  background: var(--app-card);
+  color: var(--app-text);
+  box-shadow: var(--app-shadow);
+}
+
+.weather-search input,
+.weather-search button,
+.weather-actions button,
+.weather-city-settings-button,
+.weather-city-settings__header button,
+.weather-city-settings__locate,
+.weather-city-settings__search input,
+.weather-city-settings__search button {
+  border-color: var(--app-border);
+  background: var(--app-field);
+  color: var(--app-text);
+}
+
+.weather-search input:focus,
+.weather-city-settings__search input:focus {
+  border-color: var(--app-ring);
+  box-shadow: 0 0 0 3px var(--app-ring);
+}
+
+.weather-city:hover,
+.weather-city.is-active,
+.weather-city--current,
+.weather-hour.is-active,
+.weather-city-settings-button:hover,
+.weather-search button:hover,
+.weather-actions button:hover:not(:disabled),
+.weather-city-settings__locate:hover:not(:disabled) {
+  border-color: var(--app-border-strong);
+  background: var(--app-hover);
+  color: var(--app-text);
+}
+
+.weather-window__notice,
+.weather-metric--alert,
+.weather-city-settings__delete {
+  background: var(--app-danger-soft);
+  color: var(--app-danger-strong);
+}
+
+.weather-city-settings__delete:hover {
+  background: rgba(217, 122, 79, 0.18);
+}
+
+.weather-window__eyebrow,
+.weather-window__section-title,
+.weather-city__select em,
+.weather-city-settings__row em,
+.weather-index p,
+.weather-empty {
+  color: var(--app-muted);
+}

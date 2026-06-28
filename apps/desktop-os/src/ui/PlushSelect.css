@@ -2,7 +2,7 @@
   position: relative;
   display: inline-grid;
   min-width: 96px;
-  color: var(--plush-text);
+  color: var(--app-text);
   font: inherit;
 }
 
@@ -13,17 +13,15 @@
   gap: 7px;
   width: 100%;
   min-height: 34px;
-  border: 1px solid var(--plush-field-outline);
+  border: 1px solid var(--app-border);
   border-radius: 13px 16px 14px 17px;
   padding: 0 10px;
   color: inherit;
   text-align: left;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 248, 232, 0.76)),
-    var(--plush-field);
+  background: var(--app-field);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 5px 13px rgba(101, 79, 38, 0.06);
+    0 5px 13px rgba(15, 23, 42, 0.05);
   cursor: default;
   transition:
     border-color 0.16s ease,
@@ -44,7 +42,7 @@
   width: 14px;
   height: 14px;
   flex: 0 0 auto;
-  color: rgba(74, 59, 37, 0.64);
+  color: var(--app-muted);
   transition: transform 0.16s ease;
 }
 
@@ -54,14 +52,12 @@
 
 .plush-select__button:hover,
 .plush-select.is-open .plush-select__button {
-  border-color: rgba(197, 139, 40, 0.28);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 240, 198, 0.8)),
-    var(--plush-highlight);
+  border-color: var(--app-border-strong);
+  background: var(--app-field-hover);
 }
 
 .plush-select__button:focus-visible {
-  outline: 2px solid rgba(217, 122, 79, 0.34);
+  outline: 2px solid var(--app-ring);
   outline-offset: 2px;
 }
 
@@ -78,14 +74,12 @@
   width: max(100%, 128px);
   max-height: min(260px, 48vh);
   padding: 6px;
-  border: 1px solid var(--plush-outline);
+  border: 1px solid var(--app-border);
   border-radius: var(--shape-squircle-md);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 247, 225, 0.9)),
-    var(--plush-popover);
+  background: var(--system-popover);
   box-shadow: var(--shadow-popover);
   overflow: auto;
-  scrollbar-color: rgba(126, 105, 70, 0.22) transparent;
+  scrollbar-color: rgba(23, 23, 23, 0.22) transparent;
   scrollbar-width: thin;
   transform-origin: 50% 0;
   animation: plush-select-pop 0.14s ease-out;
@@ -102,7 +96,7 @@
 .plush-select__menu::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
-  background-color: rgba(126, 105, 70, 0.22);
+  background-color: rgba(23, 23, 23, 0.22);
   background-clip: padding-box;
 }
 
@@ -112,7 +106,7 @@
   border: 0;
   border-radius: 9px;
   padding: 0 9px;
-  color: #4d3d25;
+  color: var(--app-text);
   text-align: left;
   background: transparent;
   cursor: default;
@@ -123,12 +117,12 @@
 
 .plush-select__menu button:hover,
 .plush-select__menu button.is-highlighted {
-  background: var(--plush-hover);
+  background: var(--app-hover);
 }
 
 .plush-select__menu button[aria-selected="true"] {
-  color: #3c2b13;
-  background: linear-gradient(180deg, rgba(255, 226, 144, 0.94), rgba(244, 205, 105, 0.8)), #f4d97a;
+  color: var(--app-primary-foreground);
+  background: var(--app-primary);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.54);
 }
 

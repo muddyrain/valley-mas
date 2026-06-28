@@ -210,3 +210,47 @@
 .notes-window__content::placeholder {
   color: rgba(90, 74, 58, 0.38);
 }
+
+/* Neutral Light app surface consolidation */
+.notes-window__sidebar,
+.notes-window__editor {
+  background: var(--app-panel-soft);
+}
+
+.notes-window__sidebar-head,
+.notes-window__toolbar,
+.notes-window__title {
+  border-color: var(--app-border);
+}
+
+.notes-window__note,
+.notes-window__sidebar-head button,
+.notes-window__actions button,
+.notes-window__primary {
+  background: var(--app-field);
+  color: var(--app-text);
+}
+
+.notes-window__note:hover,
+.notes-window__note.is-active,
+.notes-window__sidebar-head button:hover,
+.notes-window__actions button:hover,
+.notes-window__primary:hover {
+  background: var(--app-hover);
+}
+
+.notes-window__error {
+  background: var(--app-danger-soft);
+  color: var(--app-danger-strong);
+}
+
+.notes-window__title,
+.notes-window__content {
+  color: var(--app-text);
+}
+
+.notes-window__note small,
+.notes-window__title::placeholder,
+.notes-window__content::placeholder {
+  color: var(--app-muted);
+}

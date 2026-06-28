@@ -470,3 +470,46 @@
   background: rgba(217, 122, 79, 0.16);
   color: var(--plush-terracotta);
 }
+
+/* Neutral Light app surface consolidation */
+.safari-browser,
+.safari-browser__toolbar,
+.safari-browser__address,
+.safari-browser__home,
+.safari-section,
+.safari-card,
+.safari-browser__empty {
+  border-color: var(--app-border);
+  background: var(--app-card);
+  color: var(--app-text);
+}
+
+.safari-browser__nav,
+.safari-browser__go,
+.safari-tab,
+.safari-section__toggle,
+.safari-card__action {
+  background: var(--app-field);
+  color: var(--app-text);
+}
+
+.safari-browser__nav:hover,
+.safari-browser__go:hover,
+.safari-tab:hover,
+.safari-tab.is-active,
+.safari-section__toggle:hover,
+.safari-card:hover,
+.safari-card__action:hover {
+  background: var(--app-hover);
+  color: var(--app-text);
+}
+
+.safari-card__chip {
+  background: var(--app-hover);
+  color: var(--app-text);
+}
+
+.safari-browser__address:focus-within {
+  border-color: var(--app-ring);
+  box-shadow: 0 0 0 3px var(--app-ring);
+}

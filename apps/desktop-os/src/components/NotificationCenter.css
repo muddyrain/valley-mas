@@ -7,14 +7,14 @@
   max-height: calc(100vh - 60px);
   display: flex;
   flex-direction: column;
-  background: rgba(248, 245, 236, 0.78);
+  background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(22px) saturate(160%);
   -webkit-backdrop-filter: blur(22px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--system-border);
   border-radius: var(--radius-lg);
   box-shadow:
-    0 8px 24px rgba(40, 32, 24, 0.16),
-    0 24px 60px rgba(40, 32, 24, 0.18);
+    0 8px 24px rgba(15, 23, 42, 0.12),
+    0 24px 60px rgba(15, 23, 42, 0.14);
   overflow: hidden;
 }
 
@@ -97,7 +97,7 @@
   position: relative;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--system-border);
   border-radius: 14px;
   display: flex;
   flex-direction: column;
@@ -161,7 +161,7 @@
   padding: 12px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--system-border);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -361,7 +361,7 @@
   font-weight: 700;
 }
 .widget-music__actions button:hover {
-  background: rgba(143, 180, 94, 0.18);
+  background: var(--system-hover);
 }
 
 @keyframes widget-music-spin {
@@ -374,19 +374,15 @@
 .notification-center {
   border: 1px solid var(--plush-outline);
   border-radius: var(--shape-squircle-lg);
-  background:
-    radial-gradient(circle at 16% 12%, rgba(255, 255, 255, 0.82), transparent 28%),
-    var(--plush-popover);
+  background: var(--system-popover);
   box-shadow: var(--shadow-popover);
 }
 
 .nc__card,
 .widget {
-  border-color: rgba(255, 255, 255, 0.68);
+  border-color: var(--system-border);
   border-radius: var(--shape-squircle-md);
-  background:
-    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.62), transparent 28%),
-    rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.78);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
 }
 

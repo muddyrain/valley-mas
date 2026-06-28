@@ -55,12 +55,22 @@ describe('Launchpad AnimatePresence', () => {
     expect(src).toContain("from '../ui/PlushMotion'");
     expect(src).toMatch(/PlushPresence/);
     expect(src).toMatch(/PlushPop/);
+    expect(src).toContain('className="launchpad__motion"');
     // 不再有 CLOSE_ANIMATION_MS
     expect(src).not.toContain('CLOSE_ANIMATION_MS');
     // 不再有 isClosing state
     expect(src).not.toContain('isClosing');
     // 不再有 shouldRender state
     expect(src).not.toContain('shouldRender');
+  });
+
+  it('Launchpad motion wrapper owns fullscreen layout during enter and exit animation', () => {
+    const css = readFileSync(path.resolve(__dirname, '../src/components/Launchpad.css'), 'utf8');
+
+    expect(css).toContain('.launchpad__motion');
+    expect(css).toContain('position: absolute;');
+    expect(css).toContain('inset: 0;');
+    expect(css).toContain('z-index: 850;');
   });
 
   it('isOpen=false 时 Launchpad SSR 不输出任何 DOM', () => {

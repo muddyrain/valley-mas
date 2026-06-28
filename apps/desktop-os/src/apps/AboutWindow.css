@@ -82,3 +82,33 @@
 .about__btn--primary:hover {
   background: var(--plush-sky-deep);
 }
+
+/* Neutral Light app surface consolidation */
+.about__hero {
+  background: var(--app-card);
+  filter: drop-shadow(0 10px 16px rgba(15, 23, 42, 0.12));
+}
+
+.about__sub,
+.about__meta dt {
+  color: var(--app-muted);
+}
+
+.about__meta dd,
+.about__btn {
+  color: var(--app-text);
+}
+
+.about__btn {
+  background: var(--app-field);
+}
+
+.about__btn:hover {
+  background: var(--app-hover);
+}
+
+.about__btn--primary,
+.about__btn--primary:hover {
+  background: var(--app-primary);
+  color: var(--app-primary-foreground);
+}

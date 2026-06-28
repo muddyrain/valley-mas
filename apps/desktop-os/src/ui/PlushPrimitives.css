@@ -1,13 +1,12 @@
 .plush-button {
-  border-color: var(--plush-outline);
+  border-color: var(--app-border);
   border-radius: var(--shape-capsule);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 241, 201, 0.68)),
-    var(--plush-field-strong);
-  color: var(--plush-text);
+  min-height: var(--plush-control-h);
+  background: var(--app-field);
+  color: var(--app-text);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.82),
-    0 8px 16px rgba(90, 74, 58, 0.08);
+    0 8px 16px rgba(15, 23, 42, 0.06);
   transition:
     transform var(--motion-pop-fast),
     box-shadow 0.16s var(--ease-out),
@@ -15,12 +14,10 @@
 }
 
 .plush-button:hover {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 232, 157, 0.74)),
-    var(--plush-highlight);
+  background: var(--app-field-hover);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 10px 18px rgba(90, 74, 58, 0.12);
+    0 10px 18px rgba(15, 23, 42, 0.08);
   transform: translateY(-1px);
 }
 
@@ -107,41 +104,96 @@
 }
 
 .plush-button[data-tone="primary"] {
-  border-color: rgba(92, 128, 54, 0.22);
-  background:
-    linear-gradient(180deg, rgba(184, 217, 144, 0.96), rgba(143, 180, 94, 0.92)), var(--plush-sage);
-  color: #fffdf5;
+  border-color: var(--app-primary);
+  background: var(--app-primary);
+  color: var(--app-primary-foreground);
 }
 
 .plush-button[data-tone="accent"] {
-  border-color: rgba(191, 139, 41, 0.2);
-  background:
-    linear-gradient(180deg, rgba(255, 239, 173, 0.98), rgba(244, 217, 122, 0.94)),
-    var(--plush-butter);
-  color: #4a3516;
+  border-color: var(--app-border-strong);
+  background: var(--app-active);
+  color: var(--app-text);
+}
+
+.plush-button[data-tone="info"] {
+  border-color: rgba(58, 166, 201, 0.24);
+  background: var(--app-info-soft);
+  color: var(--app-info-strong);
 }
 
 .plush-button[data-tone="danger"] {
-  border-color: rgba(194, 82, 58, 0.22);
-  background:
-    linear-gradient(180deg, rgba(242, 178, 141, 0.96), rgba(217, 122, 79, 0.92)),
-    var(--plush-terracotta);
-  color: #fffdf5;
+  border-color: rgba(217, 122, 79, 0.24);
+  background: var(--app-danger-soft);
+  color: var(--app-danger-strong);
 }
 
 .plush-card,
+.plush-panel,
 .plush-dialog-content,
 .plush-menu-content {
-  border: 1px solid var(--plush-outline);
-  background:
-    radial-gradient(circle at 16% 12%, rgba(255, 255, 255, 0.78), transparent 28%),
-    var(--plush-surface);
-  color: var(--plush-text);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-text);
   box-shadow: var(--shadow-popover);
 }
 
 .plush-card {
   border-radius: var(--shape-squircle-md);
+}
+
+.plush-panel {
+  border-radius: 18px 20px 17px 19px;
+  background: var(--app-panel);
+}
+
+.plush-toolbar {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--app-border);
+  border-radius: 15px 17px 14px 16px;
+  background: var(--app-panel-soft);
+  color: var(--app-text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+}
+
+.plush-badge {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--shape-capsule);
+  padding: 3px 9px;
+  color: var(--app-muted);
+  background: var(--app-card);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.plush-badge[data-tone="primary"] {
+  border-color: var(--app-border-strong);
+  color: var(--app-text);
+  background: var(--app-active);
+}
+
+.plush-badge[data-tone="accent"] {
+  border-color: var(--app-border-strong);
+  color: var(--app-text);
+  background: var(--app-hover);
+}
+
+.plush-badge[data-tone="info"] {
+  border-color: rgba(58, 166, 201, 0.22);
+  color: var(--app-info-strong);
+  background: var(--app-info-soft);
+}
+
+.plush-badge[data-tone="danger"] {
+  border-color: rgba(217, 122, 79, 0.22);
+  color: var(--app-danger-strong);
+  background: var(--app-danger-soft);
 }
 
 .plush-dialog-content {
@@ -154,26 +206,76 @@
 }
 
 .plush-field {
-  border-color: var(--plush-field-outline);
+  border-color: var(--app-border);
   border-radius: 14px 17px 15px 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 248, 232, 0.62)),
-    var(--plush-field);
-  color: var(--plush-text);
+  background: var(--app-field);
+  color: var(--app-text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .plush-field:focus-visible {
-  border-color: var(--plush-focus);
+  border-color: var(--app-ring);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    0 0 0 3px rgba(217, 122, 79, 0.16);
+    0 0 0 3px var(--app-ring);
+}
+
+.plush-app-panel,
+.plush-app-card,
+.plush-app-toolbar,
+.plush-app-field,
+.plush-app-action {
+  color: var(--app-text);
+}
+
+.plush-app-panel,
+.plush-app-card {
+  border: 1px solid var(--app-border);
+  background: var(--app-card);
+  box-shadow: var(--app-shadow);
+}
+
+.plush-app-panel {
+  border-radius: 18px 20px 17px 19px;
+}
+
+.plush-app-card {
+  border-radius: 14px 16px 15px 17px;
+}
+
+.plush-app-toolbar {
+  border: 1px solid var(--app-border);
+  border-radius: 15px 17px 14px 16px;
+  background: var(--app-panel-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+}
+
+.plush-app-field {
+  border: 1px solid var(--app-border);
+  border-radius: 13px 15px 14px 16px;
+  background: var(--app-field);
+}
+
+.plush-app-field:focus-within,
+.plush-app-field:focus-visible {
+  border-color: var(--app-ring);
+  box-shadow: 0 0 0 3px var(--app-ring);
+}
+
+.plush-app-action {
+  border-radius: var(--shape-capsule);
+  background: var(--app-field);
+  font-weight: 800;
+}
+
+.plush-app-action:hover {
+  background: var(--app-hover);
 }
 
 .plush-skeleton {
   background:
     linear-gradient(110deg, transparent 0 34%, rgba(255, 255, 255, 0.62) 45%, transparent 56%),
-    rgba(244, 217, 122, 0.28);
+    var(--app-hover);
   background-size:
     220% 100%,
     auto;

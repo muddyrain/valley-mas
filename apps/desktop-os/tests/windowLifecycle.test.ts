@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { shouldRunFocusTimerRuntime } from '../src/components/runtimeGatePolicy';
 import {
   deriveActiveAppIds,
   deriveRunningAppIds,
@@ -90,6 +91,44 @@ describe('desktop window lifecycle', () => {
     expect(useWindowStore.getState().windows.find((w) => w.id === finderId)?.lifecycleState).toBe(
       'active',
     );
+  });
+
+  it('keeps focus timer runtime mounted only for an open window or active countdown', () => {
+    expect(
+      shouldRunFocusTimerRuntime({
+        isFocusWindowRunning: false,
+        focusStatus: 'idle',
+        hasPendingCompletion: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRunFocusTimerRuntime({
+        isFocusWindowRunning: true,
+        focusStatus: 'idle',
+        hasPendingCompletion: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldRunFocusTimerRuntime({
+        isFocusWindowRunning: false,
+        focusStatus: 'running',
+        hasPendingCompletion: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldRunFocusTimerRuntime({
+        isFocusWindowRunning: false,
+        focusStatus: 'paused',
+        hasPendingCompletion: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRunFocusTimerRuntime({
+        isFocusWindowRunning: false,
+        focusStatus: 'idle',
+        hasPendingCompletion: true,
+      }),
+    ).toBe(true);
   });
 });
 

@@ -1405,3 +1405,103 @@
   left: -4px;
   cursor: nesw-resize;
 }
+
+/* Neutral Light app surface consolidation */
+.finder__sidebar,
+.finder__toolbar,
+.finder__content,
+.finder__detail,
+.finder-card,
+.finder__preview,
+.finder__metadata dl,
+.finder__reference,
+.finder__action,
+.finder-context-menu,
+.finder__batch-bar,
+.image-preview__panel,
+.image-preview__bar {
+  border-color: var(--app-border);
+  background: var(--app-card);
+  color: var(--app-text);
+  box-shadow: var(--app-shadow);
+}
+
+.finder__search,
+.finder__nav button,
+.finder__search button,
+.finder__refresh,
+.finder__collection-actions button,
+.finder__view-switch button,
+.finder__batch-bar button,
+.finder__open,
+.finder__filters button,
+.finder__open-with button,
+.finder-card__quick-actions button,
+.finder-context-menu button,
+.image-preview__tools button,
+.image-preview__reset {
+  border-color: var(--app-border);
+  background: var(--app-field);
+  color: var(--app-text);
+}
+
+.finder__side-item:hover,
+.finder__side-item.is-active,
+.finder__side-row:hover .finder__side-item,
+.finder__side-row.is-active .finder__side-item,
+.finder__side-row:focus-within .finder__side-item,
+.finder-card:hover,
+.finder-card.is-selected,
+.finder__view-switch button.is-active,
+.finder__filters button:hover,
+.finder__filters button.is-active,
+.finder__nav button:hover,
+.finder__search button:hover,
+.finder__refresh:hover:not(:disabled),
+.finder__collection-actions button:hover:not(:disabled),
+.finder__batch-bar button:hover,
+.finder__open-with button:hover,
+.finder-card__quick-actions button:hover,
+.finder-context-menu button:hover,
+.image-preview__tools button:hover {
+  border-color: var(--app-border-strong);
+  background: var(--app-hover);
+  color: var(--app-text);
+}
+
+.finder__search:focus-within {
+  border-color: var(--app-ring);
+  box-shadow: 0 0 0 3px var(--app-ring);
+}
+
+.finder__open--primary {
+  background: var(--app-primary);
+  color: var(--app-primary-foreground);
+}
+
+.finder__open--secondary,
+.finder-card__badges span,
+.finder__tags span,
+.finder__detail-kind {
+  background: var(--app-hover);
+  color: var(--app-text);
+}
+
+.finder__side-delete:hover,
+.finder__side-delete:focus-visible {
+  background: var(--app-danger-soft);
+  color: var(--app-danger-strong);
+}
+
+.finder__crumb,
+.finder__count,
+.finder__status,
+.finder-card__subtitle,
+.finder-card__meta,
+.finder__detail p,
+.finder__metadata dt,
+.finder__reference span,
+.finder__action code,
+.finder__open-with small {
+  color: var(--app-muted);
+}

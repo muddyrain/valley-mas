@@ -4,9 +4,9 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background: var(--plush-cream);
+  background: var(--system-surface);
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(90, 74, 58, 0.08);
+  border: 1px solid var(--system-border);
   box-shadow: var(--shadow-window);
   overflow: visible;
   outline: none;
@@ -25,7 +25,7 @@
 }
 
 .window.is-blurred {
-  box-shadow: 0 8px 24px rgba(90, 74, 58, 0.12);
+  box-shadow: var(--shadow-soft);
 }
 
 .window.is-minimized {
@@ -46,8 +46,8 @@
   justify-content: space-between;
   height: 36px;
   padding: 0 12px;
-  background: linear-gradient(180deg, #fffaf0 0%, #f1ead6 100%);
-  border-bottom: 1px solid rgba(90, 74, 58, 0.08);
+  background: var(--system-titlebar);
+  border-bottom: 1px solid var(--system-border);
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
   cursor: grab;
@@ -58,7 +58,7 @@
 }
 
 .window.is-blurred .window__titlebar {
-  background: linear-gradient(180deg, #f5f1e6 0%, #ebe4d2 100%);
+  background: var(--system-titlebar-blurred);
 }
 
 .window__titlebar-spacer {
@@ -89,7 +89,7 @@
 .window__body {
   overflow: hidden;
   scrollbar-gutter: auto;
-  background: var(--plush-cream-soft);
+  background: var(--system-panel-strong);
 }
 
 .window__body-content {
@@ -124,14 +124,12 @@
 /* Storybook Design System v1 */
 .window {
   border: 1px solid var(--plush-outline);
-  border-color: rgba(126, 105, 70, 0.16);
+  border-color: var(--system-border);
   border-radius: 24px 28px 22px 26px;
-  background:
-    radial-gradient(circle at 18% 10%, rgba(255, 255, 255, 0.72), transparent 26%),
-    var(--plush-surface);
+  background: var(--system-surface);
   box-shadow:
-    0 20px 54px rgba(64, 49, 30, 0.16),
-    0 7px 18px rgba(64, 49, 30, 0.1);
+    0 20px 52px rgba(15, 23, 42, 0.16),
+    0 3px 12px rgba(15, 23, 42, 0.1);
 }
 
 .window::before {
@@ -140,53 +138,46 @@
   z-index: 3;
   border-radius: inherit;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.78),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.42);
   content: "";
   pointer-events: none;
 }
 
 .window.is-focused {
-  filter: saturate(1.03);
+  filter: none;
   box-shadow:
-    0 24px 68px rgba(64, 49, 30, 0.18),
-    0 8px 22px rgba(64, 49, 30, 0.12),
-    0 0 0 4px rgba(168, 212, 234, 0.11);
+    0 24px 68px rgba(15, 23, 42, 0.18),
+    0 4px 16px rgba(15, 23, 42, 0.12),
+    0 0 0 1px rgba(23, 23, 23, 0.08);
 }
 
 .window.is-blurred {
   box-shadow: var(--shadow-soft);
-  filter: saturate(0.92);
+  filter: none;
 }
 
 .window__titlebar {
   height: 38px;
-  border-bottom: 1px solid rgba(126, 105, 70, 0.12);
+  border-bottom: 1px solid var(--system-border);
   border-top-left-radius: 23px;
   border-top-right-radius: 27px;
-  background:
-    linear-gradient(180deg, rgba(255, 248, 223, 0.96), rgba(239, 213, 156, 0.82)),
-    var(--plush-butter);
+  background: var(--system-titlebar);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .window.is-blurred .window__titlebar {
-  background:
-    linear-gradient(180deg, rgba(255, 250, 235, 0.78), rgba(237, 225, 196, 0.72)),
-    var(--plush-cream-deep);
+  background: var(--system-titlebar-blurred);
 }
 
 .window__title {
   font-size: 12px;
   font-weight: 800;
-  color: #4a3924;
+  color: var(--system-text);
 }
 
 .window__body {
-  background:
-    radial-gradient(circle at 100% 0%, rgba(168, 212, 234, 0.12), transparent 28%),
-    radial-gradient(circle at 0% 100%, rgba(143, 180, 94, 0.1), transparent 26%),
-    var(--plush-panel-strong);
+  background: var(--system-panel-strong);
 }
 
 .window__body-content {

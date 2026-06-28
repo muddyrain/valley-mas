@@ -853,3 +853,54 @@
   background: rgba(217, 122, 79, 0.14);
   color: var(--plush-terracotta);
 }
+
+/* Neutral Light app surface consolidation */
+.calendar-window__toolbar,
+.calendar-window__sidebar,
+.calendar-window__panel,
+.calendar-event,
+.calendar-day,
+.calendar-window__empty {
+  border-color: var(--app-border);
+  background: var(--app-card);
+  color: var(--app-text);
+  box-shadow: var(--app-shadow);
+}
+
+.calendar-window__nav,
+.calendar-window__today,
+.calendar-window__ghost,
+.calendar-view button,
+.calendar-field input,
+.calendar-field textarea {
+  border-color: var(--app-border);
+  background: var(--app-field);
+  color: var(--app-text);
+}
+
+.calendar-window__nav:hover,
+.calendar-window__today:hover,
+.calendar-window__ghost:hover,
+.calendar-view button:hover,
+.calendar-view button.is-active,
+.calendar-day:hover,
+.calendar-day.is-selected,
+.calendar-day.is-today {
+  background: var(--app-hover);
+  color: var(--app-text);
+}
+
+.calendar-field input:focus,
+.calendar-field textarea:focus {
+  border-color: var(--app-ring);
+  box-shadow: 0 0 0 3px var(--app-ring);
+}
+
+.calendar-check input {
+  accent-color: var(--app-primary);
+}
+
+.calendar-window__delete {
+  background: var(--app-danger-soft);
+  color: var(--app-danger-strong);
+}

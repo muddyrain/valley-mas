@@ -6,12 +6,16 @@ import { getMusicTrack } from '../music/catalog';
 import { formatDuration, getActiveLyricIndex, parseLyrics } from '../music/lyrics';
 import { useMusicStore } from '../store/musicStore';
 import { useWindowStore } from '../store/windowStore';
+import { shouldRunMusicRuntime } from './runtimeGatePolicy';
 
 export default function MusicMenuItemGate() {
   const runtimeEnabled = useMusicStore((s) => s.runtimeEnabled);
+  const isMusicWindowRunning = useWindowStore((s) => s.runningAppIds.includes('music'));
+  const isPlaying = useMusicStore((s) => s.isPlaying);
+  const isBuffering = useMusicStore((s) => s.isBuffering);
   const togglePlay = useMusicStore((s) => s.togglePlay);
 
-  if (!runtimeEnabled) {
+  if (!shouldRunMusicRuntime({ runtimeEnabled, isMusicWindowRunning, isPlaying, isBuffering })) {
     return (
       <button
         type="button"

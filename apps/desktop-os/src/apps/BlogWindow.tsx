@@ -7,7 +7,6 @@ import {
   List,
   PanelLeftClose,
   PanelLeftOpen,
-  PenLine,
   RefreshCw,
   Save,
   Search,
@@ -34,7 +33,15 @@ import EmptyState from '../ui/EmptyState';
 import PlushImage from '../ui/PlushImage';
 import PlushLoading from '../ui/PlushLoading';
 import PlushLoadMore from '../ui/PlushLoadMore';
-import { PlushButton } from '../ui/PlushPrimitives';
+import {
+  PlushBadge,
+  PlushButton,
+  PlushInput,
+  PlushPanel,
+  PlushSegmented,
+  PlushTextarea,
+  PlushToolbar,
+} from '../ui/PlushPrimitives';
 import PlushScrollbar from '../ui/PlushScrollbar';
 import PlushSelect, { type PlushSelectOption } from '../ui/PlushSelect';
 import './BlogWindow.css';
@@ -51,6 +58,12 @@ const FONT_SCALE_LABEL: Record<ComposerFontScale, string> = {
   comfortable: '舒适',
   large: '大字',
 };
+
+const VISIBILITY_OPTIONS: PlushSelectOption<BlogVisibility>[] = [
+  { value: 'private', label: '私密' },
+  { value: 'shared', label: '分享可见' },
+  { value: 'public', label: '公开' },
+];
 
 interface BlogTocItem {
   id: string;
@@ -495,12 +508,12 @@ function BlogHero({
   const categoryLabel = selectedPost?.group?.name || selectedPost?.category?.name || '公开博客';
 
   return (
-    <header className="blog-window__hero">
+    <PlushToolbar as="header" className="blog-window__hero">
       <div className="blog-window__hero-copy">
-        <span className="blog-window__kicker">
+        <PlushBadge tone="primary" className="blog-window__kicker">
           <BookOpen size={14} aria-hidden />
           Public journal
-        </span>
+        </PlushBadge>
         <h2>博客</h2>
         <p>{selectedPost?.title || '把公开发布的想法整理成一张安静、好读的桌面报纸。'}</p>
       </div>
@@ -508,31 +521,22 @@ function BlogHero({
         <div className="blog-window__hero-orb" aria-hidden>
           <Sparkles size={18} />
         </div>
-        <fieldset className="blog-window__mode-switch">
-          <legend>博客模式</legend>
-          <button
-            type="button"
-            className={mode === 'read' ? 'is-active' : ''}
-            onClick={() => onModeChange('read')}
-          >
-            <BookOpen size={13} aria-hidden />
-            阅读
-          </button>
-          <button
-            type="button"
-            className={mode === 'write' ? 'is-active' : ''}
-            onClick={() => onModeChange('write')}
-          >
-            <PenLine size={13} aria-hidden />
-            创作
-          </button>
-        </fieldset>
+        <PlushSegmented
+          className="blog-window__mode-switch"
+          value={mode}
+          options={[
+            { value: 'read', label: '阅读' },
+            { value: 'write', label: '创作' },
+          ]}
+          onValueChange={onModeChange}
+          ariaLabel="博客模式"
+        />
         <BlogMetric label="全部文章" value={formatCount(total || visibleCount)} />
         <BlogMetric label="当前筛选" value={`${activeFilterCount || 0}`} />
         <BlogMetric label="正在阅读" value={categoryLabel} />
         <PlushButton
           type="button"
-          unstyled
+          tone="info"
           className="blog-window__refresh"
           onClick={onRefresh}
           loading={loading}
@@ -542,16 +546,16 @@ function BlogHero({
           <span>刷新</span>
         </PlushButton>
       </section>
-    </header>
+    </PlushToolbar>
   );
 }
 
 function BlogMetric({ label, value }: { label: string; value: string }) {
   return (
-    <span className="blog-window__metric">
+    <PlushBadge tone="neutral" className="blog-window__metric">
       <span>{label}</span>
       <strong>{value}</strong>
-    </span>
+    </PlushBadge>
   );
 }
 
@@ -589,10 +593,10 @@ function BlogFilters({
   setSort: (value: BlogPostSort) => Promise<void>;
 }) {
   return (
-    <form className="blog-window__toolbar" onSubmit={submitSearch}>
+    <PlushToolbar as="form" className="blog-window__toolbar" onSubmit={submitSearch}>
       <label className="blog-window__search">
         <Search size={15} aria-hidden />
-        <input
+        <PlushInput
           value={searchDraft}
           onChange={(event) => setSearchDraft(event.target.value)}
           placeholder="搜索标题、摘要或正文"
@@ -624,11 +628,11 @@ function BlogFilters({
           onChange={(value) => void setSort(value)}
           ariaLabel="排序"
         />
-        <button type="submit" className="blog-window__search-button">
+        <PlushButton type="submit" tone="info" className="blog-window__search-button">
           搜索
-        </button>
+        </PlushButton>
       </div>
-    </form>
+    </PlushToolbar>
   );
 }
 
@@ -706,7 +710,7 @@ function BlogComposer({
   return (
     <div className="blog-composer">
       <PlushScrollbar as="aside" className="blog-composer__side" aria-label="博客创作设置">
-        <section className="blog-composer__card">
+        <PlushPanel className="blog-composer__card">
           <div className="blog-composer__card-title">
             <FileUp size={16} aria-hidden />
             <span>导入 Markdown</span>
@@ -718,16 +722,17 @@ function BlogComposer({
             accept=".md,.markdown,text/markdown,text/plain"
             onChange={onMarkdownPick}
           />
-          <button
+          <PlushButton
             type="button"
+            tone="neutral"
             className="blog-composer__ghost-button"
             onClick={() => markdownInputRef.current?.click()}
           >
             选择 md 文件
-          </button>
-        </section>
+          </PlushButton>
+        </PlushPanel>
 
-        <section className="blog-composer__card">
+        <PlushPanel className="blog-composer__card">
           <div className="blog-composer__card-title">
             <ImagePlus size={16} aria-hidden />
             <span>封面</span>
@@ -754,14 +759,19 @@ function BlogComposer({
             )}
           </button>
           {coverPreview ? (
-            <button type="button" className="blog-composer__remove" onClick={clearCover}>
+            <PlushButton
+              type="button"
+              tone="danger"
+              className="blog-composer__remove"
+              onClick={clearCover}
+            >
               <X size={13} aria-hidden />
               移除封面
-            </button>
+            </PlushButton>
           ) : null}
-        </section>
+        </PlushPanel>
 
-        <section className="blog-composer__card">
+        <PlushPanel className="blog-composer__card">
           <div className="blog-composer__card-title">
             <Sparkles size={16} aria-hidden />
             <span>标签</span>
@@ -769,36 +779,35 @@ function BlogComposer({
           <div className="blog-composer__tags">
             {tags.length ? (
               tags.map((item) => (
-                <button
+                <PlushButton
                   key={item.id}
                   type="button"
+                  tone={selectedTagIds.includes(item.id) ? 'primary' : 'neutral'}
                   className={selectedTagIds.includes(item.id) ? 'is-active' : ''}
                   onClick={() => toggleTag(item.id)}
                 >
                   {item.name}
-                </button>
+                </PlushButton>
               ))
             ) : (
               <span className="blog-composer__hint">暂无可选标签</span>
             )}
           </div>
-        </section>
+        </PlushPanel>
 
-        <section className="blog-composer__card">
+        <PlushPanel className="blog-composer__card">
           <div className="blog-composer__card-title">
             <Settings2 size={16} aria-hidden />
             <span>发布设置</span>
           </div>
           <label className="blog-composer__select-line">
             <span>可见性</span>
-            <select
+            <PlushSelect
               value={visibility}
-              onChange={(event) => setVisibility(event.target.value as BlogVisibility)}
-            >
-              <option value="private">私密</option>
-              <option value="shared">分享可见</option>
-              <option value="public">公开</option>
-            </select>
+              options={VISIBILITY_OPTIONS}
+              onChange={setVisibility}
+              ariaLabel="选择博客可见性"
+            />
           </label>
           <label className="blog-composer__check-line">
             <input
@@ -816,7 +825,7 @@ function BlogComposer({
             />
             编辑器自动换行
           </label>
-        </section>
+        </PlushPanel>
       </PlushScrollbar>
 
       <main className="blog-composer__workspace">
@@ -826,14 +835,24 @@ function BlogComposer({
             <strong>{wordCount ? `${wordCount} 字` : '准备写作'}</strong>
           </div>
           <div className="blog-composer__actions">
-            <button type="button" onClick={onSaveDraft} disabled={!canCreateBlog || saving}>
+            <PlushButton
+              type="button"
+              tone="neutral"
+              onClick={onSaveDraft}
+              disabled={!canCreateBlog || saving}
+            >
               <Save size={14} aria-hidden />
               存草稿
-            </button>
-            <button type="button" onClick={onPublish} disabled={!canCreateBlog || saving}>
+            </PlushButton>
+            <PlushButton
+              type="button"
+              tone="info"
+              onClick={onPublish}
+              disabled={!canCreateBlog || saving}
+            >
               <Send size={14} aria-hidden />
               发布
-            </button>
+            </PlushButton>
           </div>
         </section>
 
@@ -844,13 +863,13 @@ function BlogComposer({
         ) : null}
 
         <section className="blog-composer__paper">
-          <input
+          <PlushInput
             className="blog-composer__title"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             placeholder="博客标题"
           />
-          <textarea
+          <PlushTextarea
             className="blog-composer__excerpt"
             value={excerpt}
             onChange={(event) => setExcerpt(event.target.value)}
@@ -859,33 +878,30 @@ function BlogComposer({
           />
 
           <div className="blog-composer__config">
-            <fieldset className="blog-composer__segmented">
-              <legend>编辑器视图</legend>
-              {(['split', 'edit', 'preview'] as ComposerView[]).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={composerView === item ? 'is-active' : ''}
-                  onClick={() => setComposerView(item)}
-                >
-                  {item === 'split' ? '分屏' : item === 'edit' ? '编辑' : '预览'}
-                </button>
-              ))}
-            </fieldset>
-            <fieldset className="blog-composer__font-pick">
-              <legend>编辑器字号</legend>
+            <PlushSegmented
+              className="blog-composer__segmented"
+              value={composerView}
+              options={[
+                { value: 'split', label: '分屏' },
+                { value: 'edit', label: '编辑' },
+                { value: 'preview', label: '预览' },
+              ]}
+              onValueChange={setComposerView}
+              ariaLabel="编辑器视图"
+            />
+            <div className="blog-composer__font-pick">
               <Type size={14} aria-hidden />
-              {(['compact', 'comfortable', 'large'] as ComposerFontScale[]).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={fontScale === item ? 'is-active' : ''}
-                  onClick={() => setFontScale(item)}
-                >
-                  {FONT_SCALE_LABEL[item]}
-                </button>
-              ))}
-            </fieldset>
+              <PlushSegmented
+                value={fontScale}
+                options={[
+                  { value: 'compact', label: FONT_SCALE_LABEL.compact },
+                  { value: 'comfortable', label: FONT_SCALE_LABEL.comfortable },
+                  { value: 'large', label: FONT_SCALE_LABEL.large },
+                ]}
+                onValueChange={setFontScale}
+                ariaLabel="编辑器字号"
+              />
+            </div>
           </div>
 
           <div
@@ -894,7 +910,7 @@ function BlogComposer({
             }`}
           >
             {composerView !== 'preview' ? (
-              <textarea
+              <PlushTextarea
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
                 placeholder="支持 Markdown 和 GFM 表格、任务列表、链接、代码块"
@@ -1006,7 +1022,9 @@ function BlogReader({ post }: { post: BlogPostDetail | null }) {
               {tags.length ? (
                 <div className="blog-reader__tags blog-reader__tags--inline">
                   {tags.map((item) => (
-                    <span key={item.id}>{item.name}</span>
+                    <PlushBadge key={item.id} tone="primary">
+                      {item.name}
+                    </PlushBadge>
                   ))}
                 </div>
               ) : null}
@@ -1032,7 +1050,7 @@ function BlogReader({ post }: { post: BlogPostDetail | null }) {
             <div className="blog-reader__side-title">
               <List size={14} aria-hidden />
               <strong>大纲</strong>
-              <span>{readingMinutes} 分钟</span>
+              <PlushBadge tone="info">{readingMinutes} 分钟</PlushBadge>
             </div>
             {toc.length ? (
               <nav className="blog-reader__toc">

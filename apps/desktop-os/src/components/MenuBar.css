@@ -9,12 +9,12 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 14px;
-  background: rgba(248, 245, 236, 0.72);
+  background: rgba(255, 255, 255, 0.76);
   backdrop-filter: saturate(140%) blur(18px);
   -webkit-backdrop-filter: saturate(140%) blur(18px);
-  border-bottom: 1px solid rgba(90, 74, 58, 0.08);
+  border-bottom: 1px solid var(--system-border);
   font-size: 13px;
-  color: var(--plush-text);
+  color: var(--system-text);
 }
 
 .menu-bar__left,
@@ -77,7 +77,7 @@
 }
 
 .apple-menu button:hover {
-  background: rgba(143, 180, 94, 0.18);
+  background: var(--system-hover);
 }
 .menu-bar__app {
   width: 72px;
@@ -130,7 +130,7 @@
   background: rgba(90, 74, 58, 0.08);
 }
 .menu-bar__btn.is-active {
-  background: rgba(143, 180, 94, 0.18);
+  background: var(--system-active);
 }
 .menu-bar__btn--launchpad {
   display: grid;
@@ -210,7 +210,7 @@
 }
 
 .menu-dropdown__item:hover:not(:disabled) {
-  background: rgba(143, 180, 94, 0.18);
+  background: var(--system-hover);
 }
 
 .menu-dropdown__item:disabled {
@@ -387,7 +387,7 @@
 
 .menu-music-panel input[type="range"] {
   width: 100%;
-  accent-color: var(--plush-sage);
+  accent-color: var(--system-text);
 }
 
 .menu-music-panel__progress div,
@@ -434,11 +434,11 @@
 .menu-music-panel__controls button:hover,
 .menu-music-panel__footer button:hover,
 .menu-music-panel__lyric:hover {
-  background: rgba(143, 180, 94, 0.16);
+  background: var(--system-hover);
 }
 
 .menu-music-panel__controls .is-primary {
-  background: var(--plush-sage);
+  background: var(--system-text);
   color: #fff;
 }
 
@@ -451,13 +451,13 @@
 
 .menu-music-panel__lyric {
   width: 100%;
-  border: 1px solid rgba(143, 180, 94, 0.18);
+  border: 1px solid var(--plush-outline);
   color: rgba(90, 74, 58, 0.62);
   text-align: center;
 }
 
 .menu-music-panel__lyric.is-active {
-  color: var(--plush-sage-deep);
+  color: var(--system-text);
 }
 
 .menu-music-panel__footer span {
@@ -473,13 +473,11 @@
 /* Storybook Design System v1 */
 .menu-bar {
   height: 30px;
-  border-bottom: 1px solid rgba(126, 105, 70, 0.12);
-  background:
-    linear-gradient(180deg, rgba(255, 250, 236, 0.86), rgba(248, 232, 194, 0.72)),
-    rgba(255, 249, 232, 0.76);
+  border-bottom: 1px solid var(--system-border);
+  background: rgba(255, 255, 255, 0.82);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.68),
-    0 8px 22px rgba(90, 74, 58, 0.08);
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 8px 22px rgba(15, 23, 42, 0.06);
 }
 
 .menu-bar__logo,
@@ -513,9 +511,7 @@
 .menu-music-panel {
   border: 1px solid var(--plush-outline);
   border-radius: var(--shape-squircle-md);
-  background:
-    radial-gradient(circle at 16% 12%, rgba(255, 255, 255, 0.82), transparent 26%),
-    var(--plush-popover);
+  background: var(--system-popover);
   box-shadow: var(--shadow-popover);
 }
 
@@ -536,6 +532,6 @@
 }
 
 .menu-music-panel__controls .is-primary {
-  background: linear-gradient(180deg, var(--plush-sage-soft), var(--plush-sage));
+  background: var(--system-text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.54);
 }

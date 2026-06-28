@@ -5,13 +5,11 @@
   gap: 12px;
   min-width: 0;
   padding: 18px;
-  border: 1px solid rgba(90, 74, 58, 0.08);
+  border: 1px solid var(--app-border);
   border-radius: 18px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.64), rgba(248, 245, 236, 0.48)),
-    rgba(255, 255, 255, 0.46);
-  box-shadow: 0 10px 26px rgba(90, 74, 58, 0.08);
-  color: var(--plush-text);
+  background: var(--app-card);
+  box-shadow: var(--app-shadow);
+  color: var(--app-text);
 }
 
 .empty-state--has-action {
@@ -25,15 +23,15 @@
   flex-shrink: 0;
   place-items: center;
   border-radius: 14px;
-  background: rgba(143, 180, 94, 0.18);
-  color: var(--plush-sage-deep);
+  background: var(--app-hover);
+  color: var(--app-text);
   font-size: 18px;
   font-weight: 800;
 }
 
 .empty-state--danger .empty-state__icon {
-  background: rgba(217, 122, 79, 0.14);
-  color: var(--plush-terracotta);
+  background: var(--app-danger-soft);
+  color: var(--app-danger-strong);
 }
 
 .empty-state__text {
@@ -49,7 +47,7 @@
 }
 
 .empty-state__description {
-  color: rgba(90, 74, 58, 0.62);
+  color: var(--app-muted);
   font-size: 12px;
   line-height: 1.45;
 }

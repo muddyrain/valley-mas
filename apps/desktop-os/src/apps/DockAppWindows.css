@@ -2124,3 +2124,161 @@ button.settings-card:disabled:hover {
     transform: rotate(360deg);
   }
 }
+
+/* Neutral Light app surface consolidation */
+.dock-app-window__bar,
+.settings-slider,
+.safari-window__preview,
+.music-window__direct,
+.music-window__external,
+.mail-window__search,
+.mail-body-text,
+.mail-body-text__empty {
+  border: 1px solid var(--app-border);
+  background: var(--app-panel-soft);
+  color: var(--app-muted);
+}
+
+.dock-app-window__address,
+.account-window__field input,
+.mail-window__search,
+.mail-window__search input {
+  background: var(--app-field);
+  color: var(--app-text);
+}
+
+.safari-card,
+.download-row,
+.settings-card,
+.wallpaper-choice,
+.dock-item-toggle,
+.account-window__form,
+.account-window__panel,
+.account-window__summary-item,
+.account-window__mail-empty,
+.account-window__mail-account,
+.mail-window__account-card,
+.mail-message,
+.mail-window__reader,
+.mail-html-frame,
+.music-channel,
+.music-playlist,
+.music-window__now,
+.music-window__direct,
+.music-window__embed,
+.music-window__transport,
+.music-window__queue,
+.music-window__lyrics {
+  border-color: var(--app-border);
+  background: var(--app-card);
+  box-shadow: var(--app-shadow);
+}
+
+.safari-card:hover,
+.safari-card.is-active,
+button.settings-card:hover,
+.wallpaper-choice:hover,
+.wallpaper-choice.is-active,
+.music-channel:hover,
+.music-channel.is-active,
+.music-playlist:hover,
+.music-playlist.is-active,
+.mail-message:hover,
+.mail-message.is-active {
+  border-color: var(--app-border-strong);
+  background: var(--app-field-hover);
+  box-shadow: var(--app-shadow-lifted);
+}
+
+.dock-app-window__button,
+.music-window__controls button.is-primary {
+  background: var(--app-primary);
+  color: var(--app-primary-foreground);
+}
+
+.dock-app-window__button:hover,
+.music-window__controls button.is-primary:hover {
+  background: var(--app-primary);
+}
+
+.settings-card__icon,
+.dock-app-window__badge,
+.dock-app-window__tags span,
+.account-window__role-badge,
+.account-window__summary-item--wide,
+.mail-message__provider,
+.music-window__provider,
+.music-window__time .is-loading,
+.calendar-window__day.is-today {
+  background: var(--app-hover);
+  color: var(--app-text);
+}
+
+.account-window__field input:focus,
+.account-window__avatar-button:focus-visible {
+  border-color: var(--app-ring);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.86),
+    0 0 0 3px var(--app-ring);
+}
+
+.account-window__hero,
+.account-window__header {
+  border-color: var(--app-border);
+  background: var(--app-card);
+  box-shadow: var(--app-shadow-lifted);
+}
+
+.account-window__hero::after {
+  background: var(--app-hover);
+}
+
+.account-window__avatar-button {
+  border-color: var(--app-border);
+  background: var(--app-field);
+  box-shadow: var(--app-shadow);
+}
+
+.account-window__success {
+  background: var(--app-success-soft);
+  color: var(--app-success-strong);
+}
+
+.account-window__avatar-status,
+.mail-message__provider.is-qq {
+  background: var(--app-info-soft);
+  color: var(--app-info-strong);
+}
+
+.account-window__error,
+.safari-card__status,
+.safari-window__status,
+.mail-message__provider.is-gmail,
+.dock-app-window__badge.is-danger,
+.music-window__error,
+.music-window__plain,
+.settings-window__plain-action {
+  background: var(--app-danger-soft);
+  color: var(--app-danger-strong);
+}
+
+.mail-message.is-unread .mail-message__dot {
+  background: var(--app-primary);
+}
+
+.mail-window__sender-avatar,
+.music-window__track:hover,
+.music-window__track.is-active,
+.music-window__lyric-lines div.is-active,
+.music-window__controls button:hover,
+.music-window__lyrics header button:hover,
+.music-window__lyric-offset button:hover,
+.music-window__controls button.is-active,
+.music-window__lyrics header button.is-active {
+  background: var(--app-hover);
+  color: var(--app-text);
+}
+
+.music-window__transport input[type="range"] {
+  accent-color: var(--app-primary);
+}

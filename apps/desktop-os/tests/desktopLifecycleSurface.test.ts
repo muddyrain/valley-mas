@@ -36,7 +36,19 @@ describe('desktop runtime lifecycle surface', () => {
 
     expect(existsSync('src/ai-pet/AIPetRuntimeGate.tsx')).toBe(false);
     expect(musicGateSource).toContain('runtimeEnabled');
+    expect(musicGateSource).toContain('runningAppIds.includes');
+    expect(musicGateSource).toContain('shouldRunMusicRuntime');
     expect(musicGateSource).toContain('MusicRuntime');
+  });
+
+  it('keeps focus timer runtime behind window and pending-work gates', () => {
+    const focusRuntimeSource = readSource('src/components/FocusTimerRuntime.tsx');
+    const policySource = readSource('src/components/runtimeGatePolicy.ts');
+
+    expect(focusRuntimeSource).toContain('runningAppIds.includes');
+    expect(focusRuntimeSource).toContain('focusNotifiedCompletionId');
+    expect(focusRuntimeSource).toContain('markFocusCompletionNotified');
+    expect(policySource).toContain('hasPendingCompletion');
   });
 
   it('syncs the store with real audio playback events', () => {
@@ -78,6 +90,15 @@ describe('desktop runtime lifecycle surface', () => {
     expect(managerSource).toContain('appId={w.appId}');
     expect(windowSource).toContain('DesktopAppHost');
     expect(windowSource).toContain('renderDesktopApp');
+  });
+
+  it('loads window apps through lazy renderers instead of the desktop entry bundle', () => {
+    const renderersSource = readSource('src/apps/appRenderers.tsx');
+
+    expect(renderersSource).toContain('lazy(() => import');
+    expect(renderersSource).toContain('Suspense');
+    expect(renderersSource).not.toContain("import FinderWindow from './FinderWindow'");
+    expect(renderersSource).not.toContain("import DiceCupWindow from './DiceCupWindow'");
   });
 
   it('keeps Launchpad heavy subscriptions behind an open gate', () => {
@@ -180,5 +201,50 @@ describe('desktop runtime lifecycle surface', () => {
 
     expect(plushImageSource).toContain("loading = 'lazy'");
     expect(plushImageSource).toContain("decoding = 'async'");
+  });
+
+  it('keeps the system shell on neutral light theme tokens', () => {
+    const themeSource = readSource('src/styles/theme.css');
+    const windowSource = readSource('src/components/window/Window.css');
+    const menuSource = readSource('src/components/MenuBar.css');
+    const dockSource = readSource('src/components/Dock.css');
+    const launchpadSource = readSource('src/components/Launchpad.css');
+    const spotlightSource = readSource('src/spotlight/Spotlight.css');
+
+    expect(themeSource).toContain('--system-bg: #fafafa');
+    expect(themeSource).toContain('--system-titlebar');
+    expect(themeSource).toContain('--background: var(--system-bg)');
+    expect(themeSource).toContain('--popover: var(--system-popover)');
+    expect(themeSource).toContain('--ring: var(--system-ring)');
+    expect(windowSource).toContain('background: var(--system-titlebar)');
+    expect(windowSource).toContain('background: var(--system-panel-strong)');
+    expect(menuSource).toContain('background: var(--system-popover)');
+    expect(dockSource).toContain('background: var(--system-popover)');
+    expect(launchpadSource).toContain('outline: 3px solid var(--system-ring)');
+    expect(spotlightSource).toContain('background: var(--system-popover)');
+  });
+
+  it('keeps app window surfaces on shared neutral app tokens', () => {
+    const themeSource = readSource('src/styles/theme.css');
+    const primitivesSource = readSource('src/ui/PlushPrimitives.css');
+    const finderSource = readSource('src/apps/FinderWindow.css');
+    const blogSource = readSource('src/apps/BlogWindow.css');
+    const dockAppsSource = readSource('src/apps/DockAppWindows.css');
+    const miniAppsSource = readSource('src/apps/MiniApps.css');
+
+    expect(themeSource).toContain('--app-panel');
+    expect(themeSource).toContain('--app-card');
+    expect(themeSource).toContain('--app-field');
+    expect(themeSource).toContain('--app-primary: var(--system-text)');
+    expect(primitivesSource).toContain('.plush-app-panel');
+    expect(primitivesSource).toContain('.plush-app-card');
+    expect(primitivesSource).toContain('.plush-app-toolbar');
+    expect(primitivesSource).toContain('.plush-app-field');
+    expect(finderSource).toContain('Neutral Light app surface consolidation');
+    expect(blogSource).toContain('Neutral Light app surface consolidation');
+    expect(dockAppsSource).toContain('Neutral Light app surface consolidation');
+    expect(miniAppsSource).toContain('Neutral Light app surface consolidation');
+    expect(dockAppsSource).toContain('background: var(--app-card)');
+    expect(miniAppsSource).toContain('background: var(--app-card)');
   });
 });

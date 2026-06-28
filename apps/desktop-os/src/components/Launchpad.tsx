@@ -28,7 +28,7 @@ export default function Launchpad() {
   return (
     <PlushPresence>
       {isOpen ? (
-        <PlushPop key="launchpad">
+        <PlushPop key="launchpad" className="launchpad__motion">
           <LaunchpadPanel />
         </PlushPop>
       ) : null}

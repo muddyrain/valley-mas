@@ -4,7 +4,7 @@
   height: 18px;
   border: none;
   border-radius: 999px;
-  background: rgba(90, 74, 58, 0.18);
+  background: var(--app-hover);
   cursor: pointer;
   padding: 0;
   transition: background 0.18s var(--ease-out);
@@ -12,7 +12,7 @@
 }
 
 .toggle-switch.is-on {
-  background: var(--plush-sage);
+  background: var(--app-primary);
 }
 
 .toggle-switch:disabled {
@@ -28,7 +28,7 @@
   height: 14px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(40, 32, 24, 0.25);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
   transition: transform 0.2s var(--ease-spring);
 }
 

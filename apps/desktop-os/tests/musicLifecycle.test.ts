@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { shouldRunMusicRuntime } from '../src/components/runtimeGatePolicy';
 import { useMusicStore } from '../src/store/musicStore';
 
 const initialMusicState = {
@@ -28,5 +29,43 @@ describe('music runtime lifecycle', () => {
     useMusicStore.getState().play();
 
     expect(useMusicStore.getState().runtimeEnabled).toBe(true);
+  });
+
+  it('runs the audio runtime only while the music window or playback is active', () => {
+    expect(
+      shouldRunMusicRuntime({
+        runtimeEnabled: false,
+        isMusicWindowRunning: true,
+        isPlaying: false,
+        isBuffering: false,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldRunMusicRuntime({
+        runtimeEnabled: true,
+        isMusicWindowRunning: true,
+        isPlaying: false,
+        isBuffering: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldRunMusicRuntime({
+        runtimeEnabled: true,
+        isMusicWindowRunning: false,
+        isPlaying: true,
+        isBuffering: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldRunMusicRuntime({
+        runtimeEnabled: true,
+        isMusicWindowRunning: false,
+        isPlaying: false,
+        isBuffering: false,
+      }),
+    ).toBe(false);
   });
 });

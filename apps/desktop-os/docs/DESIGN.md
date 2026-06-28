@@ -6,7 +6,7 @@
 
 ## 一句话总纲
 
-**任天堂 first-party 气质的桌面壳层。** 主基调沿用 Animal Crossing 的 storybook miniature(圆润、柔和、低饱和、长投影);系统级控件参考 Nintendo Switch 系统 UI 的安静质感(干净 list、明确选中态、底部 hint 条、tip 风格反馈);角色化、加载、徽章、装饰与点缀使用宝可梦风格的画面语言。
+**任天堂 first-party 气质的桌面壳层。** 主基调沿用 Animal Crossing 的 storybook miniature(圆润、柔和、低饱和、长投影);当前 System 层皮肤收敛为 shadcn neutral light 方向的白、灰、黑、细边框和轻阴影;系统级控件参考 Nintendo Switch 系统 UI 的安静质感(干净 list、明确选中态、底部 hint 条、tip 风格反馈);角色化、加载、徽章、装饰与点缀使用宝可梦风格的画面语言。
 **不是真实毛毡摄影,不是 SaaS 扁平,不是 macOS Big Sur 仿写。**
 
 ## 三层结构
@@ -21,13 +21,44 @@
 
 > 边界:Identity 层风格不能侵入 System 层。也就是说,按钮、输入框、菜单不可以套黑边漫画轮廓;系统控件永远是 Plush。
 
+## 组件主干
+
+Desktop OS 的组件主干使用 shadcn/ui 源码组件和 `@base-ui/react` 交互底座;视觉人格由 `src/ui/PlushPrimitives.tsx` 与 `src/styles/theme.css` 承接。当前壳层采用 **shadcn neutral light + Desktop OS Plush 包装层**:shadcn 负责语义 token 与可访问交互底座,Plush 负责圆角、体积、动效、状态点缀和业务出口。
+
+- 业务窗口优先使用 `PlushButton`、`PlushPanel`、`PlushToolbar`、`PlushBadge`、`PlushInput`、`PlushTextarea`、`PlushSegmented`、`PlushSelect` 等 Plush 出口。
+- `src/components/ui/*` 保持为 shadcn 源码层,不在业务窗口直接消费默认外观。
+- 业务 CSS 只负责布局、局部尺寸和内容排版;颜色、圆角、阴影、控件高度和主状态色应从 Plush token 取得。
+- Window、MenuBar、Dock、Launchpad、Spotlight、Control Center、Notification Center 等 System 层优先消费 `--system-*` neutral token,避免私有黄/绿/蓝大面积底色重新进入壳层。
+- App 内部的面板、卡片、工具栏、字段和动作按钮优先消费 `--app-*` neutral token 或 `.plush-app-*` 公共类;不再为每个窗口重复编写浅暖色 panel/card/button/input 配方。
+
 ## 色彩
 
 ### 基础色板(沿用)
 
-来自 `apps/desktop-os/AGENTS.md`,继续作为 Scene 与 System 层底色:
+来自 `apps/desktop-os/AGENTS.md`,继续作为 Scene 层与 Identity 点缀底色:
 
 - cream `#f8f5ec`、sage `#8fb45e`、sky `#a8d4ea`、terracotta `#d97a4f`、butter `#f4d97a`、pink `#f4a8b8`。
+
+### System neutral light
+
+壳层大面积底色使用 `--system-*` 语义 token,并映射到 shadcn 的 `--background`、`--foreground`、`--card`、`--popover`、`--primary`、`--muted`、`--accent`、`--border`、`--input`、`--ring`。目标是浅色中性、低干扰、对比清晰:
+
+- background/surface:白与近白;
+- titlebar/panel/popover:neutral-50 到 neutral-100 的浅灰层级;
+- text:neutral-900;
+- border/hover/ring:低透明 neutral-900。
+
+Plush 原色仍保留给 Scene 层、壁纸、图标、状态点缀和特殊业务窗口,不再作为 Window 标题栏、菜单 hover、Dock 背板或 Launchpad overlay 的主色。
+
+### App neutral surface
+
+业务窗口内部使用 `--app-*` 语义 token 承接 neutral light:
+
+- `--app-panel` / `--app-card` / `--app-field` 负责工具栏、侧栏、卡片、输入框和普通按钮;
+- `--app-hover` / `--app-active` / `--app-ring` 负责 hover、选中和 focus;
+- `--app-info-*` / `--app-success-*` / `--app-danger-*` 只用于小面积状态反馈。
+
+公共 CSS 类 `.plush-app-panel`、`.plush-app-card`、`.plush-app-toolbar`、`.plush-app-field`、`.plush-app-action` 是业务窗口迁移的默认入口;新增 App 不应复制旧窗口里的 rgba 面板公式。
 
 ### 能量 accent(宝可梦点缀)
 
@@ -82,6 +113,7 @@
 ### Plush 控件(System 层)
 - 所有 shadcn/base-ui 源码组件必须经 `PlushPrimitives` 包装层后再进入页面;直接暴露默认 SaaS 视觉视为违规。
 - 公共控件清单见 `apps/desktop-os/AGENTS.md`「设计系统约束」章节。
+- 控件高度统一使用 `--plush-control-h` / `--plush-control-h-sm`;信息态使用 `--plush-info` / `--plush-info-deep`,对应 lagoon 语义。
 - 危险按钮以暖红 + 二次确认为主,不用宝可梦 ember。
 
 ### AI Command Center(Identity 层重点)

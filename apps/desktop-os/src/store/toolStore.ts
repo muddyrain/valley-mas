@@ -86,11 +86,13 @@ interface ToolStore {
   focusStartedAt: number | null;
   focusCompletedCount: number;
   lastFocusCompletion: FocusCompletion | null;
+  focusNotifiedCompletionId: string | null;
   setFocusMode: (mode: FocusMode) => void;
   startFocusTimer: () => void;
   pauseFocusTimer: (now?: number) => void;
   resetFocusTimer: (mode?: FocusMode) => void;
   syncFocusTimer: (now?: number) => void;
+  markFocusCompletionNotified: (id: string) => void;
 
   plushMatchBest: GameBest | null;
   deskTidyBest: GameBest | null;
@@ -208,6 +210,7 @@ export const useToolStore = create<ToolStore>()(
       focusStartedAt: null,
       focusCompletedCount: 0,
       lastFocusCompletion: null,
+      focusNotifiedCompletionId: null,
       setFocusMode: (mode) =>
         set({
           focusMode: mode,
@@ -265,6 +268,7 @@ export const useToolStore = create<ToolStore>()(
           },
         });
       },
+      markFocusCompletionNotified: (id) => set({ focusNotifiedCompletionId: id }),
 
       plushMatchBest: null,
       deskTidyBest: null,
@@ -458,6 +462,7 @@ export const useToolStore = create<ToolStore>()(
         focusStartedAt: state.focusStartedAt,
         focusCompletedCount: state.focusCompletedCount,
         lastFocusCompletion: state.lastFocusCompletion,
+        focusNotifiedCompletionId: state.focusNotifiedCompletionId,
         plushMatchBest: state.plushMatchBest,
         deskTidyBest: state.deskTidyBest,
         beadSortBest: state.beadSortBest,
