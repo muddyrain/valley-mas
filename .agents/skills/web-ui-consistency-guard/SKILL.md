@@ -19,7 +19,7 @@ description: Web 页面改动时使用，统一检查主题 token、品牌色、
 2. 检查是否存在可复用组件、hook、utils 或页面模式。
 3. 检查主题、loading、URL 状态是否触及本 skill 红线。
 4. 如果发现重复 JSX、handler 或列表逻辑，使用 `component-reuse-guard`。
-5. 如果涉及中文或非 ASCII 文案，使用 `encoding-guard`。
+5. 如果实际修改 CJK/非 ASCII 文案，使用 `encoding-guard` 做定向检查。
 6. 按最终 Checklist 收尾。
 
 ## 必须
@@ -92,7 +92,7 @@ const page = Math.max(1, Number(searchParams.get("page") ?? 1));
 - [ ] 是否没有复制 spinner / overlay JSX。
 - [ ] 列表页搜索、筛选、分页是否支持刷新和回退一致性。
 - [ ] 是否检查组件复用；发现重复时是否使用 `component-reuse-guard`。
-- [ ] 涉及中文或非 ASCII 文案时，是否运行 encoding 检查。
+- [ ] 实际修改 CJK/非 ASCII 文案时，是否运行定向 encoding 检查。
 - [ ] 是否运行适用 Web 校验，或说明未运行原因。
 
 ## 违规处理

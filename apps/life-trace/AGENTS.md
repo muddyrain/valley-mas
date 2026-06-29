@@ -37,4 +37,4 @@ pnpm --filter @valley/life-trace exec vitest run
 
 - 仅类型或逻辑改动：至少运行 `pnpm --filter @valley/life-trace exec tsc --noEmit`。
 - 页面或文案改动：补充相关测试，并运行针对性 vitest。
-- 中文文案、Markdown、协作规则或 skill 改动：运行 `encoding-guard`。
+- 实际修改 CJK/非 ASCII 文案、Markdown、协作规则或 skill 时：运行定向 `encoding-guard`。

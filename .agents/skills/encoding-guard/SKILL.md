@@ -5,7 +5,14 @@ description: Prevent text encoding corruption and suspicious text-loss regressio
 
 # Encoding Guard
 
-Use this skill before and after editing source files that contain Chinese, Japanese, Korean, or other non-ASCII text.
+Use this skill only when an edit has real encoding risk:
+
+- Editing CJK or other non-ASCII user-visible text
+- Editing Markdown, skill files, or configuration examples that contain CJK or other non-ASCII text
+- Running script-based rewrites, bulk replacements, formatters, or generators over files that may contain CJK or other non-ASCII text
+- Doing a final pre-commit check when the current diff contains CJK or other non-ASCII text
+
+Do not use it for read-only analysis, pure ASCII code changes, or files that are not being edited.
 
 This skill now protects against two failure modes:
 
@@ -16,22 +23,24 @@ This skill now protects against two failure modes:
 
 ## Standard Workflow
 
-Run this from the repo root before editing:
+Prefer targeted checks for the files you will edit.
+
+Run this from the repo root before editing risky files:
+
+```bash
+python .agents/skills/encoding-guard/scripts/check_mojibake.py path/to/file1.ts path/to/file2.tsx
+```
+
+Run it again after editing the same files:
+
+```bash
+python .agents/skills/encoding-guard/scripts/check_mojibake.py path/to/file1.ts path/to/file2.tsx
+```
+
+When no paths are provided, the script scans changed files from git. Use this mainly as a pre-commit fallback:
 
 ```bash
 python .agents/skills/encoding-guard/scripts/check_mojibake.py
-```
-
-Run it again after editing:
-
-```bash
-python .agents/skills/encoding-guard/scripts/check_mojibake.py
-```
-
-You can also target specific files:
-
-```bash
-python .agents/skills/encoding-guard/scripts/check_mojibake.py path\to\file1.ts path\to\file2.tsx
 ```
 
 ## What The Script Checks

@@ -57,4 +57,4 @@ cd server && air
 - Go 代码改动：运行 `cd server && go test ./...`。
 - 路由、handler、模型、配置或中间件改动：检查对应前端 API 调用和 `.env.example` 是否需要同步。
 - AI/Mind Arena 服务端改动：补充或运行相关 `internal/ai`、`internal/mindarena` 测试，并说明真实模型调用是否未验证。
-- 仅改服务端协作文档时，至少运行根目录 encoding 检查；不需要跑 Go 编译时在最终回复说明原因。
+- 仅改服务端协作文档且包含 CJK/非 ASCII 文本时，运行定向 encoding 检查；不需要跑 Go 编译时在最终回复说明原因。

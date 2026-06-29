@@ -30,6 +30,8 @@
 | Desktop OS | `apps/desktop-os/AGENTS.md` | macOS Plush 毛毡桌面、Dock/Launchpad/Spotlight、Finder/Safari/Mail/Blog/Music/AI Command Center 等窗口与 Mini Apps。 |
 | AI Mind Arena | `apps/ai-mind-arena/AGENTS.md` | 脑内会议室 Next.js 前端、多人格辩论 UI、SSE 对战流和分享体验。 |
 | WorldSim | `apps/world-sim/AGENTS.md` | 沙盒文明模拟游戏、游戏设计文档、Phaser/Vite 子项目规则。 |
+| Scratch Legend | `apps/scratch-legend/AGENTS.md` | 刮刮卡成长游戏，按设计文档和阶段任务逐步实现。 |
+| Toy Climb Arena | `apps/toy-climb-arena/AGENTS.md` | Three.js 玩具世界攀爬游戏、关卡、模型资源和物理验证。 |
 | Go 服务端 | `server/AGENTS.md` | Gin/GORM API、认证中间件、业务处理器、数据模型、AI 与 Mind Arena 服务端能力。 |
 
 ## 计划文档同步
@@ -56,33 +58,33 @@
 
 ## 全局工作流分级
 
-本仓库的 `.agents/skills/` 只声明项目级 skill。开发机上常装的全局 skill 体系（`superpowers`、`andrej-karpathy-skills`、`grill-me` 等）不在仓库内登记，但 AI 进入任务前必须按下表判断走哪一档。用户已显式指定档位时，以用户指令为准。
+本仓库的 `.agents/skills/` 只声明项目级 skill。开发机上常装的全局 skill（如 `brainstorming`、`writing-plans`、`karpathy-coder`、`systematic-debugging` 等）不在仓库内登记，但 AI 进入任务前必须按下表判断走哪一档。用户已显式指定档位时，以用户指令为准。
 
 | 档 | 触发条件 | 执行流程 |
 |---|---|---|
 | A · Vibe | 单文件 ≤ 30 行的 typo、文案微调、注释修订、纯解释/复述代码；或用户明确要求"快点干、不要 plan" | 直接动手，不写 plan，收尾按本仓库正常的最终回复格式说明改动。 |
-| B · Vibe + Karpathy | 多文件或单文件 > 30 行的 bugfix、组件抽取、重复逻辑收敛、纯重构、不改变产品计划的优化 | 直接动手；落地后调用 `andrej-karpathy-skills:karpathy-coder` 按 4 原则自检（surface assumptions / keep it simple / surgical changes / verifiable goals），并在收尾说明自检结论。 |
-| C · Superpowers 全流程 | 新功能 / 新页面 / 新接口 / 新数据模型 / 新依赖 / 跨子项目重构 / 修改产品方向或视觉验收标准 / 用户明确要求"先写计划再做" | 顺序：`grill-me` 拷打需求 → `superpowers:brainstorming` → `superpowers:writing-plans` → `superpowers:executing-plans` 或 `superpowers:subagent-driven-development` → `andrej-karpathy-skills:karpathy-coder` 自检 → `superpowers:verification-before-completion` → 必要时 `superpowers:finishing-a-development-branch`。plan / spec 产物允许沉淀在 `docs/superpowers/plans/<date>-*.md` 与 `docs/superpowers/specs/<date>-*.md`，作为临时工作产物，任务关闭后可由 owner 决定是否清理；不要写进子项目长期 `PLAN.md`，长期能力状态仍按"计划文档同步"规则单独同步。 |
-| D · Systematic Debugging | 复杂运行时 bug、间歇性失败、单靠静态分析无法定位的问题 | 启用 `superpowers:systematic-debugging`；需要收集运行时证据时叠加 `TRAE-debugger`。修复完成后回到 B 或 C 档继续走收尾流程。 |
+| B · Vibe + Karpathy | 多文件或单文件 > 30 行的 bugfix、组件抽取、重复逻辑收敛、纯重构、不改变产品计划的优化 | 直接动手；落地后使用 `karpathy-coder`（若当前环境可用）按 4 原则自检（surface assumptions / keep it simple / surgical changes / verifiable goals），并在收尾说明自检结论。 |
+| C · 结构化计划 | 大型新功能 / 新页面族 / 新接口族 / 新数据模型 / 新依赖 / 跨子项目重构 / 修改产品方向或视觉验收标准 / 用户明确要求"先写计划再做" | 顺序：`brainstorming` → `writing-plans` → `executing-plans` 或 `subagent-driven-development` → `karpathy-coder` 自检 → `verification-before-completion` → 必要时 `finishing-a-development-branch`。plan / spec 产物允许沉淀在 `docs/superpowers/plans/<date>-*.md` 与 `docs/superpowers/specs/<date>-*.md`，作为临时工作产物，任务关闭后可由 owner 决定是否清理；不要写进子项目长期 `PLAN.md`，长期能力状态仍按"计划文档同步"规则单独同步。小型单点功能默认按 B 档执行，除非用户要求先写计划。 |
+| D · Systematic Debugging | 复杂运行时 bug、间歇性失败、单靠静态分析无法定位的问题 | 启用 `systematic-debugging`；需要收集运行时证据时使用当前环境可用的调试工具。修复完成后回到 B 或 C 档继续走收尾流程。 |
 
-需求模糊触发条件：当用户描述不完整、目标不清晰或同一回合内出现互相矛盾的诉求时，无论计划走哪一档，**先用 `grill-me` 把需求问清楚再继续**，不要一边猜一边动手。
+需求模糊触发条件：当用户描述不完整、目标不清晰或同一回合内出现互相矛盾的诉求时，先用普通澄清问题把最小必要信息问清楚；只有用户明确要求"拷打需求"、`grill-me` 或 `/grilling` 时，才启用 `grill-me`。
 
 档位升降：执行中发现真实改动范围超出当前档位（例如 B 档发现要新增接口），先停手并向用户说明，再决定是否升到 C 档；不能一边按低档执行一边偷偷扩张范围。
 
 ## Skill 选择路由
 
-- IF 用户需求描述不完整、目标不明或自相矛盾 → 先用 `grill-me` 拷打需求，再决定档位。
+- IF 用户需求描述不完整、目标不明或自相矛盾 → 先用普通澄清问题确认最小必要信息；用户明确要求时才启用 `grill-me`。
 - IF 改动属于 A 档（单文件 ≤ 30 行 / typo / 文案 / 仅解释）或用户明确要求 vibe → 直接做，不必启动 superpowers 全流程。
-- IF 改动属于 B 档（多文件 / >30 行 / bugfix / 重构 / 复用收敛）→ 直接做，收尾启用 `andrej-karpathy-skills:karpathy-coder` 4 原则自检。
-- IF 改动属于 C 档（新功能 / 新接口 / 新依赖 / 新数据模型 / 跨子项目重构 / 产品方向或视觉验收标准变化）→ 走 superpowers 全流程，plan / spec 落到 `docs/superpowers/plans|specs/`。
-- IF 命中复杂运行时 bug 且静态分析无法诊断 → 启用 `superpowers:systematic-debugging`，必要时叠加 `TRAE-debugger`。
+- IF 改动属于 B 档（多文件 / >30 行 / bugfix / 重构 / 复用收敛）→ 直接做，收尾使用 `karpathy-coder` 4 原则自检（若当前环境可用）。
+- IF 改动属于 C 档（大型新功能 / 新接口族 / 新依赖 / 新数据模型 / 跨子项目重构 / 产品方向或视觉验收标准变化）→ 走结构化计划流程，plan / spec 落到 `docs/superpowers/plans|specs/`。
+- IF 命中复杂运行时 bug 且静态分析无法诊断 → 启用 `systematic-debugging`。
 - IF 出现重复 JSX、重复 handler、重复弹窗/表单/上传/列表逻辑 → `component-reuse-guard`。
 - IF 生成 commit message、执行 `git commit`，或用户要求提交 → `conventional-commit-guard`。
 - IF 用户要求"每次告诉我改了什么 / 下一步做什么 / 详细汇报阶段进展 / 每次更新要同步计划" → `delivery-reporting`。
-- IF 新增、删除或调整产品功能、页面、接口、依赖、数据模型、长期文档或验收标准 → `delivery-reporting`。
+- IF 改动会影响计划文档、长期文档、功能状态、接口路径、依赖策略、数据模型、产品方向或验收标准 → `delivery-reporting`。
 - IF 修改用户可见 UI 文案、设置说明、按钮、副标题、空状态或入口摘要 → `ui-copy-boundary-guard`。
-- IF 修改中文、Markdown、skill、配置示例或非 ASCII 文本 → `encoding-guard`。
-- IF 任务包含多步骤执行、计划后实施或需要验证 → `task-completion-guard`。
+- IF 实际修改 CJK/非 ASCII 用户可见文本、Markdown、skill、配置示例，或进行批量文本改写 / 提交前 diff 含非 ASCII 文本 → `encoding-guard`；只读分析、纯 ASCII 代码改动不启用。
+- IF 任务跨 3 个以上文件 / 多轮实施 / 计划文档驱动 / 容易把计划误报为完成 → `task-completion-guard`；普通单轮改动不因"需要验证"自动启用。
 - IF 本回合启用了任何 skill → 按 `skill-usage-disclosure` 做简短披露。
 - IF 没有匹配 skill → 说明未发现必须启用的项目 skill，并按本文件继续执行。
 
@@ -111,6 +113,8 @@
 | Desktop OS | `apps/desktop-os` | 入口看 `apps/desktop-os/src/App.tsx`，窗口编排看 `src/apps/desktopApps.ts` 与 `src/store/windowStore.ts`，API 看 `src/api`，计划看 `apps/desktop-os/docs/PLAN.md`。 |
 | AI Mind Arena | `apps/ai-mind-arena` | 页面看 `app`，组件看 `components`，接口看 `lib/api.ts`。 |
 | WorldSim | `apps/world-sim` | 协作入口看 `apps/world-sim/AGENTS.md`，设计文档看 `apps/world-sim/docs`。 |
+| Scratch Legend | `apps/scratch-legend` | 协作入口看 `apps/scratch-legend/AGENTS.md`，玩法和阶段任务看 `apps/scratch-legend/docs`。 |
+| Toy Climb Arena | `apps/toy-climb-arena` | 协作入口看 `apps/toy-climb-arena/AGENTS.md`，关卡、资源和任务文档看 `apps/toy-climb-arena/docs`。 |
 | Go 服务端 | `server` | 路由看 `server/internal/router/router.go`，配置看 `server/internal/config/config.go`。 |
 | 服务端模型 | `server/internal/model` | 数据结构和 GORM 模型入口。 |
 | 服务端处理器 | `server/internal/handler` | API 处理器和业务入口。 |
@@ -179,8 +183,8 @@ cd server && go run ./cmd/server
 - [ ] Desktop OS 测试覆盖范围内的改动：`pnpm --filter @valley/desktop-os exec vitest run`
 - [ ] WorldSim 改动：`pnpm --filter @valley/world-sim typecheck`
 - [ ] 共享包改动：对应包的 `pnpm --filter <package> typecheck` 或 `pnpm --filter <package> build`
-- [ ] 中文文案、Markdown、技能或配置示例改动：`python3 .agents/skills/encoding-guard/scripts/check_mojibake.py <相关文件>`
-- [ ] 只改协作规则或文档：至少运行编码检查，并说明未运行应用级编译的原因
+- [ ] CJK/非 ASCII 文案、Markdown、技能或配置示例改动：`python3 .agents/skills/encoding-guard/scripts/check_mojibake.py <相关文件>`
+- [ ] 只改协作规则或文档：若改动含 CJK/非 ASCII 文本，至少运行定向编码检查，并说明未运行应用级编译的原因
 - [ ] 无法运行必要校验：说明原因、影响范围和剩余风险
 
 ## Git 规则
@@ -196,6 +200,6 @@ cd server && go run ./cmd/server
 - 核心改动已落地。
 - 引用、入口和文档没有指向已删除技能、过期路径或旧模块名。
 - 已判断是否计划内，并同步更新对应计划文档；如果未更新，最终回复说明无需更新的原因。
-- 已按"全局工作流分级"判定的档位完成对应流程：B / C 档需在最终回复中说明 `karpathy-coder` 自检结论；C 档若产出 plan / spec md，需在最终回复中给出文件路径，方便 owner 后续清理。
+- 已按"全局工作流分级"判定的档位完成对应流程：B / C 档若启用了 `karpathy-coder`，需在最终回复中说明自检结论；C 档若产出 plan / spec md，需在最终回复中给出文件路径，方便 owner 后续清理。
 - 适用校验已运行并读取结果。
 - 最终回复说明：改了什么、验证了什么、哪些未验证或有残留风险。

@@ -1,4 +1,4 @@
 interface:
   display_name: "encoding-guard"
   short_description: "Detect mojibake and suspicious text-loss regressions"
-  default_prompt: "Run encoding-guard before and after edits. Block completion if mojibake or suspicious question-mark text loss is detected."
+  default_prompt: "Run encoding-guard only for edits with real CJK/non-ASCII text risk, preferably on targeted files. Block completion if mojibake or suspicious question-mark text loss is detected."
