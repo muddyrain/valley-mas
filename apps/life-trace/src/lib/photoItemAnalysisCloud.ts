@@ -29,7 +29,7 @@ export async function loadPhotoItemAnalysisHistory(token?: OptionalAuthToken) {
     }
     const data = await listPhotoItemAnalysisDrafts(token);
     writePhotoItemAnalysisHistory(data.list);
-    return data.list;
+    return readPhotoItemAnalysisHistory();
   } catch {
     return readPhotoItemAnalysisHistory();
   }

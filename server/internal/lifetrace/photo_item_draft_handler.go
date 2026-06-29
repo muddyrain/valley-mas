@@ -38,6 +38,18 @@ func photoItemDraftString(payload map[string]interface{}, key string) string {
 	return strings.TrimSpace(value)
 }
 
+func photoItemDraftTime(payload map[string]interface{}, key string, fallback time.Time) time.Time {
+	value := photoItemDraftString(payload, key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
 func buildPhotoItemDraftRecord(
 	userID model.Int64String,
 	draftID string,
@@ -58,6 +70,8 @@ func buildPhotoItemDraftRecord(
 	}
 
 	now := time.Now()
+	createdAt := photoItemDraftTime(payload, "createdAt", now)
+	updatedAt := photoItemDraftTime(payload, "updatedAt", createdAt)
 	return model.LifeTracePhotoItemDraft{
 		ID:          model.Int64String(utils.GenerateID()),
 		UserID:      userID,
@@ -66,8 +80,8 @@ func buildPhotoItemDraftRecord(
 		Status:      normalizePhotoItemDraftStatus(photoItemDraftString(payload, "status")),
 		SavedItemID: photoItemDraftString(payload, "savedItemId"),
 		Payload:     string(raw),
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		CreatedAt:   createdAt,
+		UpdatedAt:   updatedAt,
 	}, true
 }
 
@@ -89,6 +103,7 @@ func trimPhotoItemDraftHistory(userID model.Int64String) {
 	if err := database.GetDB().
 		Where("user_id = ?", userID).
 		Order("updated_at DESC").
+		Order("created_at DESC").
 		Find(&records).Error; err != nil {
 		return
 	}
@@ -111,6 +126,7 @@ func (h *Handler) ListPhotoItemDrafts(c *gin.Context) {
 	if err := database.GetDB().
 		Where("user_id = ?", userID).
 		Order("updated_at DESC").
+		Order("created_at DESC").
 		Limit(maxPhotoItemDraftHistory).
 		Find(&records).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "获取库存草稿失败")

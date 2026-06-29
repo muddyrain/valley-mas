@@ -28,6 +28,15 @@ func TestPhotoItemDraftCloudSyncAndList(t *testing.T) {
 
 	body := []byte(`{
 		"items": [
+                        {
+                                "id": "photo-item-local-2",
+                                "imageUrl": "https://example.test/new.jpg",
+                                "analysis": {"name": "新商品"},
+                                "form": {"name": "新商品"},
+                                "status": "draft",
+                                "createdAt": "2026-06-29T00:00:00.000Z",
+                                "updatedAt": "2026-06-29T00:01:00.000Z"
+                        },
 			{
 				"id": "photo-item-local-1",
 				"imageUrl": "https://example.test/bottle.jpg",
@@ -46,8 +55,8 @@ func TestPhotoItemDraftCloudSyncAndList(t *testing.T) {
 	payload := decodePhotoItemDraftPayload(t, recorder)
 
 	data := payload["data"].(map[string]interface{})
-	if data["synced"].(float64) != 1 {
-		t.Fatalf("expected one synced draft, got %+v", data)
+	if data["synced"].(float64) != 2 {
+		t.Fatalf("expected two synced drafts, got %+v", data)
 	}
 
 	recorder = httptest.NewRecorder()
@@ -57,11 +66,11 @@ func TestPhotoItemDraftCloudSyncAndList(t *testing.T) {
 
 	data = payload["data"].(map[string]interface{})
 	list := data["list"].([]interface{})
-	if len(list) != 1 {
-		t.Fatalf("expected one draft, got %d", len(list))
+	if len(list) != 2 {
+		t.Fatalf("expected two drafts, got %d", len(list))
 	}
 	item := list[0].(map[string]interface{})
-	if item["id"] != "photo-item-local-1" || item["imageUrl"] != "https://example.test/bottle.jpg" {
+	if item["id"] != "photo-item-local-2" || item["imageUrl"] != "https://example.test/new.jpg" {
 		t.Fatalf("unexpected draft payload: %+v", item)
 	}
 }

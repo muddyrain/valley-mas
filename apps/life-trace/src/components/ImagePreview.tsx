@@ -133,12 +133,10 @@ export function ImagePreview({
               onMouseDown={() => setOpen(false)}
             >
               <div className="safe-top pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 px-5 pt-5">
-                <div className="min-w-0 pt-1">
-                  <p className="truncate text-sm font-semibold drop-shadow-[0_2px_14px_rgba(0,0,0,0.7)]">
-                    {title}
-                  </p>
+                <div className="min-w-0 rounded-2xl border border-white/10 bg-card/75 px-3 py-2 shadow-[0_14px_36px_rgba(0,0,0,0.24)] backdrop-blur-xl">
+                  <p className="truncate text-sm font-semibold text-foreground">{title}</p>
                   {subtitle ? (
-                    <p className="mt-1 truncate text-xs text-muted-foreground drop-shadow-[0_2px_14px_rgba(0,0,0,0.7)]">
+                    <p className="mt-1 truncate text-xs font-medium text-foreground/75">
                       {subtitle}
                     </p>
                   ) : null}
