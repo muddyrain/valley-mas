@@ -365,12 +365,12 @@ export function ProfilePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-[1fr_1.4fr] gap-3 max-[360px]:grid-cols-1">
+          <div className="grid grid-cols-[1fr_1.4fr] gap-3 max-[430px]:grid-cols-1">
             <div className="group relative overflow-hidden rounded-[1.25rem] border border-border/60 bg-card/80 p-4 shadow-[0_4px_18px_rgba(71,58,42,0.06)] transition duration-300 hover:border-foreground/15 hover:shadow-[0_8px_28px_rgba(71,58,42,0.1)] backdrop-blur">
               <div className="mb-3 grid size-10 place-items-center rounded-xl bg-life-plan/10 text-life-plan transition duration-200 group-hover:bg-life-plan/15">
                 <Clock className="size-5" />
               </div>
-              <p className="truncate text-base font-semibold leading-tight">
+              <p className="whitespace-nowrap text-base font-semibold leading-tight">
                 {settings.workStart} - {settings.workEnd}
               </p>
               <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">工作时段</p>
@@ -438,7 +438,7 @@ export function ProfilePage() {
             </button>
           )}
         </LocationPicker>
-        <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+        <div className="grid grid-cols-2 gap-3 max-[430px]:grid-cols-1">
           <SettingInput
             label="上班时间"
             value={settings.workStart}

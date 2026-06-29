@@ -61,11 +61,11 @@ export function SettingInput({
         >
           <Icon className="size-5" />
         </span>
-        <span className="min-w-0">
+        <span className="min-w-0 flex-1">
           <span className="block text-xs font-semibold text-muted-foreground">{label}</span>
           {type === 'time' ? (
             <span className="relative mt-1 block h-7">
-              <span className="block h-7 truncate text-base font-semibold text-foreground">
+              <span className="block h-7 whitespace-nowrap text-base font-semibold text-foreground">
                 {value || placeholder}
               </span>
               <Input
