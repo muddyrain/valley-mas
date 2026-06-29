@@ -224,6 +224,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const contentRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
   const scrollMemoryRef = useRef(new Map<string, ScrollMemoryEntry>());
+  const activeScrollRouteKeyRef = useRef(scrollRouteKey);
+  activeScrollRouteKeyRef.current = scrollRouteKey;
 
   useLifeTraceEntrance(contentRef, {
     dependencies: [scrollRouteKey],
@@ -246,9 +248,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!element) {
       return;
     }
+    const currentScrollRouteKey = activeScrollRouteKeyRef.current;
     scrollMemoryRef.current.set(
-      scrollRouteKey,
-      captureScrollMemory(element, scrollRouteKey, getEventScrollAnchor(event?.target ?? null)),
+      currentScrollRouteKey,
+      captureScrollMemory(
+        element,
+        currentScrollRouteKey,
+        getEventScrollAnchor(event?.target ?? null),
+      ),
     );
   };
 
@@ -293,12 +300,22 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
 
     let frame = 0;
+    const scrollListenerRouteKey = scrollRouteKey;
     const remember = () => {
+      if (activeScrollRouteKeyRef.current !== scrollListenerRouteKey) {
+        return;
+      }
       if (frame) {
         window.cancelAnimationFrame(frame);
       }
       frame = window.requestAnimationFrame(() => {
-        scrollMemoryRef.current.set(scrollRouteKey, captureScrollMemory(element, scrollRouteKey));
+        if (activeScrollRouteKeyRef.current !== scrollListenerRouteKey) {
+          return;
+        }
+        scrollMemoryRef.current.set(
+          scrollListenerRouteKey,
+          captureScrollMemory(element, scrollListenerRouteKey),
+        );
       });
     };
 
