@@ -1,0 +1,75 @@
+apps/life-trace/src/App.tsx
+  s_0ec408ff5900a6::t_052ea9952598fa 111-117
+  s_0ec408ff5900a6::t_daba386dd358a4 30
+apps/life-trace/src/pages/LoginPage.tsx
+  s_0ec408ff5900a6::t_979aa3a5436e1b 127-136
+  s_0ec408ff5900a6::t_f9356606fadfc7 3
+apps/life-trace/src/api/auth.ts
+  s_0ec408ff5900a6::t_e2b2393ea9f9f9 105-131 gitai:{"mixed_line_ranges":[{"Single":122}],"operations":[]}
+apps/life-trace/src/pages/RegisterPage.tsx
+  s_0ec408ff5900a6::t_3e8e72b44404ad 1-350 gitai:{"mixed_line_ranges":[{"Single":21},{"Single":33}],"operations":[]}
+apps/life-trace/src/store/useAuthStore.ts
+  s_0ec408ff5900a6::t_2bec651e8ff568 24-29
+  s_0ec408ff5900a6::t_557833e2f13f8e 68-79
+  s_0ec408ff5900a6::t_b82a40dc862dee 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f7819f1e9b0c6381063b70fb725e6192405c8c8f",
+  "prompts": {},
+  "sessions": {
+    "s_0ec408ff5900a6": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a4335343d04e5906f69a107",
+        "model": "openrouter-2o__dev"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {
+    "apps/life-trace/src/api/auth.ts": [
+      {
+        "hash": "s_0ec408ff5900a6::t_e2b2393ea9f9f9",
+        "line_ranges": [
+          {
+            "Range": [
+              105,
+              131
+            ]
+          }
+        ],
+        "mixed_line_ranges": [
+          {
+            "Single": 122
+          }
+        ],
+        "operations": []
+      }
+    ],
+    "apps/life-trace/src/pages/RegisterPage.tsx": [
+      {
+        "hash": "s_0ec408ff5900a6::t_3e8e72b44404ad",
+        "line_ranges": [
+          {
+            "Range": [
+              1,
+              350
+            ]
+          }
+        ],
+        "mixed_line_ranges": [
+          {
+            "Single": 21
+          },
+          {
+            "Single": 33
+          }
+        ],
+        "operations": []
+      }
+    ]
+  },
+  "remote_transcripts": {}
+}
