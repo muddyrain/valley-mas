@@ -1,4 +1,4 @@
-import { Calendar, X } from 'lucide-react';
+import { AlertTriangle, Calendar, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { FormItem } from '@/components/FormItem';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ type PantryExpiryDateFieldProps = {
   disabled?: boolean;
   initialBaseDate?: string;
   className?: string;
+  warning?: { message: string } | null;
   onBaseDateChange?: (value: string) => void;
   onExpiresAtChange: (value: string) => void;
 };
@@ -97,6 +98,7 @@ export function PantryExpiryDateField({
   disabled = false,
   initialBaseDate = '',
   className,
+  warning,
   onBaseDateChange,
   onExpiresAtChange,
 }: PantryExpiryDateFieldProps) {
@@ -210,6 +212,13 @@ export function PantryExpiryDateField({
         <p className="text-xs leading-5 text-muted-foreground">
           不知道生产/购买日期时，可以直接在过期日期里手动选择。
         </p>
+      ) : null}
+
+      {warning ? (
+        <div className="flex items-start gap-2 rounded-2xl border border-life-health/40 bg-life-health/10 p-3 text-xs leading-5 text-life-health">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <p className="min-w-0 break-words">{warning.message}</p>
+        </div>
       ) : null}
     </div>
   );

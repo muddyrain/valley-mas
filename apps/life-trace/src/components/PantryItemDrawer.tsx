@@ -27,6 +27,7 @@ import {
   getPantryPersistedStatus,
   type PantryAiFieldKey,
   type PantryAiFieldSuggestion,
+  validatePantryShelfLife,
 } from '@/lib/pantry';
 import { formatPantryTagText, parsePantryTagText } from '@/lib/pantryTags';
 import {
@@ -232,6 +233,16 @@ export function PantryItemDrawer({
           : form.reminder,
       ),
     [form.reminder, pantryPreferences],
+  );
+
+  const shelfLifeWarning = useMemo(
+    () =>
+      validatePantryShelfLife({
+        name: form.name,
+        category: form.category,
+        expiresAt: form.expiresAt ?? '',
+      }),
+    [form.name, form.category, form.expiresAt],
   );
 
   const buildSubmitPayload = (): NewPantryItemInput | null => {
@@ -614,6 +625,7 @@ export function PantryItemDrawer({
               idPrefix="pantry-item"
               expiresAt={form.expiresAt || ''}
               disabled={submitting}
+              warning={shelfLifeWarning}
               onExpiresAtChange={(value) => updateField('expiresAt', value)}
             />
           </div>

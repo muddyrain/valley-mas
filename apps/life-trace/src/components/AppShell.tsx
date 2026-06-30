@@ -24,7 +24,7 @@ import { usePwaStatus } from '@/hooks/usePwaStatus';
 import {
   captureScrollMemory,
   getActiveLifeTraceTab,
-  getLifeTraceScrollKey,
+  getLifeTraceScrollMemoryKey,
   isLifeTraceTabRoute,
   restoreScrollMemory,
   type ScrollMemoryEntry,
@@ -217,18 +217,19 @@ function PwaActionBanner({ hidden }: { hidden: boolean }) {
 export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const activeTab = getActiveLifeTraceTab(location.pathname);
-  const scrollRouteKey = getLifeTraceScrollKey(location.pathname, location.search);
+  const scrollMemoryKey = getLifeTraceScrollMemoryKey(location.pathname);
+  const routeViewKey = scrollMemoryKey ?? location.pathname;
   const isAgentChatRoute = location.pathname === '/ai';
   const showBottomNavigation = isLifeTraceTabRoute(location.pathname);
   const showBottomOverlay = showBottomNavigation && !isAgentChatRoute;
   const contentRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
   const scrollMemoryRef = useRef(new Map<string, ScrollMemoryEntry>());
-  const activeScrollRouteKeyRef = useRef(scrollRouteKey);
-  activeScrollRouteKeyRef.current = scrollRouteKey;
+  const activeScrollMemoryKeyRef = useRef(scrollMemoryKey);
+  activeScrollMemoryKeyRef.current = scrollMemoryKey;
 
   useLifeTraceEntrance(contentRef, {
-    dependencies: [scrollRouteKey],
+    dependencies: [routeViewKey],
     selector: '[data-page-entrance]',
     y: 10,
     stagger: 0.035,
@@ -248,12 +249,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!element) {
       return;
     }
-    const currentScrollRouteKey = activeScrollRouteKeyRef.current;
+    const currentScrollMemoryKey = activeScrollMemoryKeyRef.current;
+    if (!currentScrollMemoryKey) {
+      return;
+    }
     scrollMemoryRef.current.set(
-      currentScrollRouteKey,
+      currentScrollMemoryKey,
       captureScrollMemory(
         element,
-        currentScrollRouteKey,
+        currentScrollMemoryKey,
         getEventScrollAnchor(event?.target ?? null),
       ),
     );
@@ -265,12 +269,19 @@ export function AppShell({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (!scrollMemoryKey) {
+      if (routeViewKey) {
+        element.scrollTo({ top: 0, behavior: 'instant' });
+      }
+      return;
+    }
+
     let cancelled = false;
     const restore = () => {
       if (cancelled) {
         return true;
       }
-      return restoreScrollMemory(element, scrollMemoryRef.current.get(scrollRouteKey));
+      return restoreScrollMemory(element, scrollMemoryRef.current.get(scrollMemoryKey));
     };
 
     restore();
@@ -291,30 +302,30 @@ export function AppShell({ children }: { children: ReactNode }) {
         window.clearTimeout(timeout);
       }
     };
-  }, [scrollRouteKey]);
+  }, [routeViewKey, scrollMemoryKey]);
 
   useEffect(() => {
     const element = contentRef.current;
-    if (!element) {
+    if (!element || !scrollMemoryKey) {
       return;
     }
 
     let frame = 0;
-    const scrollListenerRouteKey = scrollRouteKey;
+    const scrollListenerMemoryKey = scrollMemoryKey;
     const remember = () => {
-      if (activeScrollRouteKeyRef.current !== scrollListenerRouteKey) {
+      if (activeScrollMemoryKeyRef.current !== scrollListenerMemoryKey) {
         return;
       }
       if (frame) {
         window.cancelAnimationFrame(frame);
       }
       frame = window.requestAnimationFrame(() => {
-        if (activeScrollRouteKeyRef.current !== scrollListenerRouteKey) {
+        if (activeScrollMemoryKeyRef.current !== scrollListenerMemoryKey) {
           return;
         }
         scrollMemoryRef.current.set(
-          scrollListenerRouteKey,
-          captureScrollMemory(element, scrollListenerRouteKey),
+          scrollListenerMemoryKey,
+          captureScrollMemory(element, scrollListenerMemoryKey),
         );
       });
     };
@@ -327,7 +338,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         window.cancelAnimationFrame(frame);
       }
     };
-  }, [scrollRouteKey]);
+  }, [scrollMemoryKey]);
 
   const handleTabReselect = () => {
     const element = contentRef.current;
@@ -335,12 +346,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       return;
     }
     element.scrollTo({ top: 0, behavior: 'smooth' });
-    scrollMemoryRef.current.set(scrollRouteKey, {
-      key: scrollRouteKey,
-      scrollTop: 0,
-      anchorId: '',
-      anchorOffsetTop: 0,
-    });
+    if (scrollMemoryKey) {
+      scrollMemoryRef.current.set(scrollMemoryKey, {
+        key: scrollMemoryKey,
+        scrollTop: 0,
+        anchorId: '',
+        anchorOffsetTop: 0,
+      });
+    }
   };
 
   return (

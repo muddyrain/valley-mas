@@ -21,11 +21,17 @@ describe('AppShell scroll memory surface', () => {
   });
 
   it('guards passive scroll listeners from overwriting memory after route changes', () => {
-    expect(appShellSource).toContain('const activeScrollRouteKeyRef = useRef(scrollRouteKey)');
-    expect(appShellSource).toContain('activeScrollRouteKeyRef.current = scrollRouteKey');
-    expect(appShellSource).toContain('const scrollListenerRouteKey = scrollRouteKey');
-    expect(appShellSource).toContain('activeScrollRouteKeyRef.current !== scrollListenerRouteKey');
+    expect(appShellSource).toContain('const activeScrollMemoryKeyRef = useRef(scrollMemoryKey)');
+    expect(appShellSource).toContain('activeScrollMemoryKeyRef.current = scrollMemoryKey');
+    expect(appShellSource).toContain('const scrollListenerMemoryKey = scrollMemoryKey');
+    expect(appShellSource).toContain(
+      'activeScrollMemoryKeyRef.current !== scrollListenerMemoryKey',
+    );
     expect(appShellSource).toContain('scrollMemoryRef.current.set(');
-    expect(appShellSource).toContain('scrollListenerRouteKey,');
+    expect(appShellSource).toContain('scrollListenerMemoryKey,');
+  });
+
+  it('only wires passive scroll listeners when scroll memory is enabled', () => {
+    expect(appShellSource).toContain('if (!element || !scrollMemoryKey)');
   });
 });

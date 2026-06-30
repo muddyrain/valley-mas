@@ -32,7 +32,6 @@ import { PantryHouseholdDetailSheet } from '@/components/PantryHouseholdDetailSh
 import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
 import { PantryItemDrawer } from '@/components/PantryItemDrawer';
 import { PantryTransferSheet } from '@/components/PantryTransferSheet';
-import { InlineRefreshStatus } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -653,11 +652,11 @@ export function PantryPage() {
     })();
   }, [householdSheetOpen, loadHouseholdMembersFor, loadHouseholds]);
 
-  const initialPantryLoading = pantryLoading && !pantryLoaded;
-  const listRefreshing = pantryLoading && pantryLoaded;
+  const pantrySummaryLoading = !pantryLoaded || (pantryLoading && pantryList.length === 0);
+  const pantryListSkeletonLoading = !pantryLoaded || pantryLoading;
   const activePantryError = pantryListError;
   const showPantryErrorFallback =
-    Boolean(activePantryError) && !listRefreshing && !pantryLoading && pantryList.length === 0;
+    Boolean(activePantryError) && !pantryLoading && pantryList.length === 0;
 
   const handleRetryPantryLoad = useCallback(() => {
     void loadPantryList({
@@ -715,7 +714,7 @@ export function PantryPage() {
                     {currentHouseholdName}
                   </p>
                   <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    {initialPantryLoading ? (
+                    {pantrySummaryLoading ? (
                       <>
                         <ActionLoadingIcon className="size-3.5" tone="ai" />
                         同步中
@@ -762,7 +761,7 @@ export function PantryPage() {
               <span className="rounded-full border border-border/70 bg-card/72 px-2.5 py-1 text-[11px] font-medium text-foreground/88">
                 在库{' '}
                 <PantrySummaryValue
-                  loading={initialPantryLoading}
+                  loading={pantrySummaryLoading}
                   value={pantrySummary.total}
                   skeletonClassName="w-4"
                 />
@@ -770,7 +769,7 @@ export function PantryPage() {
               <span className="rounded-full border border-life-health/24 bg-life-health/12 px-2.5 py-1 text-[11px] font-medium text-life-health">
                 临期{' '}
                 <PantrySummaryValue
-                  loading={initialPantryLoading}
+                  loading={pantrySummaryLoading}
                   value={pantrySummary.expiring}
                   skeletonClassName="w-4"
                 />
@@ -778,7 +777,7 @@ export function PantryPage() {
               <span className="rounded-full border border-life-alert/24 bg-life-alert/12 px-2.5 py-1 text-[11px] font-medium text-life-alert">
                 风险{' '}
                 <PantrySummaryValue
-                  loading={initialPantryLoading}
+                  loading={pantrySummaryLoading}
                   value={pantrySummary.expired}
                   skeletonClassName="w-4"
                 />
@@ -790,7 +789,7 @@ export function PantryPage() {
                 <p className="text-[11px] font-semibold text-muted-foreground">在库</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">
                   <PantrySummaryValue
-                    loading={initialPantryLoading}
+                    loading={pantrySummaryLoading}
                     value={`${pantrySummary.total} 件`}
                     skeletonClassName="w-12"
                   />
@@ -800,7 +799,7 @@ export function PantryPage() {
                 <p className="text-[11px] font-semibold text-muted-foreground">临期</p>
                 <p className="mt-1 text-sm font-semibold text-life-health">
                   <PantrySummaryValue
-                    loading={initialPantryLoading}
+                    loading={pantrySummaryLoading}
                     value={`${pantrySummary.expiring} 件待处理`}
                     skeletonClassName="w-16"
                   />
@@ -810,7 +809,7 @@ export function PantryPage() {
                 <p className="text-[11px] font-semibold text-muted-foreground">风险</p>
                 <p className="mt-1 text-sm font-semibold text-life-alert">
                   <PantrySummaryValue
-                    loading={initialPantryLoading}
+                    loading={pantrySummaryLoading}
                     value={`${pantrySummary.expired} 件已过期`}
                     skeletonClassName="w-16"
                   />
@@ -842,6 +841,9 @@ export function PantryPage() {
               className="h-11 w-full rounded-2xl border border-border bg-secondary pr-4 pl-10 text-sm outline-none transition focus:border-ring"
             />
           </label>
+        </Card>
+
+        <Card className="sticky top-[72px] z-10 space-y-4 bg-card/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/85">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-semibold">筛选</p>
@@ -979,7 +981,7 @@ export function PantryPage() {
                 onClick={() => void refreshPantryList()}
                 className="size-9 rounded-full"
               >
-                {listRefreshing ? (
+                {pantryLoading ? (
                   <ActionLoadingIcon className="size-4" tone="ai" />
                 ) : (
                   <RefreshCcw className="size-4" />
@@ -988,7 +990,7 @@ export function PantryPage() {
               <div className="inline-flex min-w-[4.5rem] items-center justify-center rounded-full bg-secondary px-3 py-2 text-sm font-semibold whitespace-nowrap text-foreground">
                 <span>
                   <PantrySummaryValue
-                    loading={initialPantryLoading}
+                    loading={pantrySummaryLoading}
                     value={pantryPagination.total}
                     skeletonClassName="w-5"
                   />
@@ -1004,7 +1006,7 @@ export function PantryPage() {
             </Card>
           ) : null}
 
-          {initialPantryLoading ? (
+          {pantryListSkeletonLoading ? (
             <PantryListSkeleton />
           ) : showPantryErrorFallback ? (
             <LoadErrorState
@@ -1070,13 +1072,7 @@ export function PantryPage() {
               }
             />
           ) : (
-            <LifeList
-              className={cn(
-                'relative transition-opacity duration-200',
-                listRefreshing && 'opacity-95',
-              )}
-            >
-              {listRefreshing ? <InlineRefreshStatus tone="ai" /> : null}
+            <LifeList>
               {pantryList.map((item) => {
                 const status = resolvePantryStatus(item);
                 const coverUrl = getPantryCoverUrl(item);

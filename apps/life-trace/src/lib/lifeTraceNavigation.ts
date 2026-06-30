@@ -15,14 +15,7 @@ const tabRootPaths: Record<AppTab, string> = {
   profile: '/profile',
 };
 
-const listRouteSearchKeys: Record<string, string[]> = {
-  '/pantry': ['householdId', 'status', 'category', 'q', 'sort'],
-  '/ledger': ['month', 'category', 'direction'],
-  '/shopping': ['status'],
-  '/recurring-payments': ['status'],
-  '/places': ['new', 'inboxItemId'],
-  '/media-diary': ['status', 'new', 'inboxItemId'],
-};
+const scrollMemoryTabPaths = new Set(['/today', '/plans', '/traces', '/profile']);
 
 export function getActiveLifeTraceTab(pathname: string): AppTab {
   if (pathname === '/plans' || pathname.startsWith('/plans/')) {
@@ -44,27 +37,12 @@ export function isLifeTraceTabRoute(pathname: string) {
   return Object.values(tabRootPaths).includes(pathname);
 }
 
-export function getLifeTraceScrollKey(pathname: string, search = '') {
-  if (isLifeTraceTabRoute(pathname)) {
+export function getLifeTraceScrollMemoryKey(pathname: string) {
+  if (scrollMemoryTabPaths.has(pathname)) {
     return `tab:${getActiveLifeTraceTab(pathname)}`;
   }
 
-  const searchKeys = listRouteSearchKeys[pathname];
-  if (!searchKeys?.length || !search) {
-    return pathname;
-  }
-
-  const searchParams = new URLSearchParams(search);
-  const stableSearch = new URLSearchParams();
-  for (const key of searchKeys) {
-    const value = searchParams.get(key);
-    if (value) {
-      stableSearch.set(key, value);
-    }
-  }
-
-  const stableSearchText = stableSearch.toString();
-  return stableSearchText ? `${pathname}?${stableSearchText}` : pathname;
+  return null;
 }
 
 export function captureNearestScrollAnchor(container: HTMLElement) {

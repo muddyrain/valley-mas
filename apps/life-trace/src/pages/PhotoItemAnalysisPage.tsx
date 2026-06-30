@@ -36,6 +36,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { validatePantryShelfLife } from '@/lib/pantry';
 import { formatPantryTagText, parsePantryTagText } from '@/lib/pantryTags';
 import {
   generatePantryTransparentCoverWithFallback,
@@ -618,6 +619,16 @@ export function PhotoItemAnalysisPage() {
       '共享空间'
     );
   }, [form.householdId, households, preferredPantryHouseholdId, preferredPantryHouseholdName]);
+
+  const shelfLifeWarning = useMemo(
+    () =>
+      validatePantryShelfLife({
+        name: form.name,
+        category: form.category,
+        expiresAt: form.expiresAt,
+      }),
+    [form.name, form.category, form.expiresAt],
+  );
 
   const persistHistoryItem = useCallback(
     (item: PhotoItemAnalysisHistoryItem) => {
@@ -2621,6 +2632,7 @@ export function PhotoItemAnalysisPage() {
               expiresAt={form.expiresAt}
               initialBaseDate={expiryBaseDate}
               disabled={state === 'saving'}
+              warning={shelfLifeWarning}
               onBaseDateChange={setExpiryBaseDate}
               onExpiresAtChange={(value) =>
                 setForm((current) => ({

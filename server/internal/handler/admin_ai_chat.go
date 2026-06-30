@@ -2,14 +2,13 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+	"valley-server/internal/aiclient"
 	"valley-server/internal/aiusage"
 
 	"github.com/gin-gonic/gin"
@@ -76,36 +75,10 @@ func buildARKChatMessages(req aiChatRequest) []*model.ChatCompletionMessage {
 	return messages
 }
 
-func extractARKMessageText(message *model.ChatCompletionMessage) string {
-	if message == nil || message.Content == nil {
-		return ""
-	}
-	if message.Content.StringValue != nil {
-		return strings.TrimSpace(*message.Content.StringValue)
-	}
-	if len(message.Content.ListValue) == 0 {
-		return ""
-	}
-
-	parts := make([]string, 0, len(message.Content.ListValue))
-	for _, item := range message.Content.ListValue {
-		if item == nil || strings.TrimSpace(item.Text) == "" {
-			continue
-		}
-		parts = append(parts, strings.TrimSpace(item.Text))
-	}
-	return strings.TrimSpace(strings.Join(parts, "\n"))
-}
-
+// arkChatRequest 是 handler 内部 shim，转调 aiclient.NewARKChatRequest，
+// 保留同名函数让 ai_agent.go 等旧调用点不变。
 func arkChatRequest(modelID string, messages []*model.ChatCompletionMessage) model.CreateChatCompletionRequest {
-	maxTokens := 900
-	temperature := float32(0.7)
-	return model.CreateChatCompletionRequest{
-		Model:       modelID,
-		Messages:    messages,
-		MaxTokens:   &maxTokens,
-		Temperature: &temperature,
-	}
+	return aiclient.NewARKChatRequest(modelID, messages)
 }
 
 // ChatWithAI AI 对话（使用 ARK_TEXT_MODEL）
@@ -123,33 +96,38 @@ func ChatWithAI(c *gin.Context) {
 		return
 	}
 
-	apiKey, arkBaseURL, textModel, errMsg := readArkTextModelConfig()
+	cfg, errMsg := aiclient.ReadARKTextConfig()
 	if errMsg != "" {
-		recordValleyAIChatUsage(c, req, "", textModel, aiusage.Since(start), errMsg)
+		recordValleyAIChatUsage(c, req, "", cfg.Model, aiusage.Since(start), errMsg)
 		Error(c, 503, errMsg)
 		return
 	}
 
-	client := ensureSharedArkClient(apiKey, arkBaseURL)
+	client := aiclient.ARKClient(90 * time.Second)
+	if client == nil {
+		recordValleyAIChatUsage(c, req, "", cfg.Model, aiusage.Since(start), "AI 未配置：缺少 ARK_API_KEY")
+		Error(c, 503, "AI 未配置：缺少 ARK_API_KEY")
+		return
+	}
 	messages := buildARKChatMessages(req)
 
 	if req.Stream {
-		streamChatWithARK(c, client, textModel, messages, req, start)
+		streamChatWithARK(c, client, cfg.Model, messages, req, start)
 		return
 	}
 
-	reply, modelName, err := chatWithARK(c.Request.Context(), client, textModel, messages)
+	reply, modelName, err := chatWithARK(c.Request.Context(), client, cfg.Model, messages)
 	if err != nil {
-		recordValleyAIChatUsage(c, req, "", modelNameOrFallback(modelName, textModel), aiusage.Since(start), err.Error())
+		recordValleyAIChatUsage(c, req, "", modelNameOrFallback(modelName, cfg.Model), aiusage.Since(start), err.Error())
 		Error(c, 502, "AI upstream error: "+err.Error())
 		return
 	}
 	if strings.TrimSpace(reply) == "" {
-		recordValleyAIChatUsage(c, req, "", modelNameOrFallback(modelName, textModel), aiusage.Since(start), "AI upstream returned empty content")
+		recordValleyAIChatUsage(c, req, "", modelNameOrFallback(modelName, cfg.Model), aiusage.Since(start), "AI upstream returned empty content")
 		Error(c, 502, "AI upstream returned empty content")
 		return
 	}
-	recordValleyAIChatUsage(c, req, reply, modelNameOrFallback(modelName, textModel), aiusage.Since(start), "")
+	recordValleyAIChatUsage(c, req, reply, modelNameOrFallback(modelName, cfg.Model), aiusage.Since(start), "")
 
 	Success(c, gin.H{
 		"reply":    strings.TrimSpace(reply),
@@ -179,7 +157,7 @@ func recordValleyAIChatUsage(c *gin.Context, req aiChatRequest, reply string, mo
 		promptChars += aiusage.CharCount(item.Content)
 	}
 	aiusage.Record(aiusage.Entry{
-		Feature:       "valley-ai-chat",
+		Feature:       aiclient.FeatureValleyAIChat,
 		Provider:      "ark",
 		Model:         modelName,
 		UserID:        userID,
@@ -198,7 +176,7 @@ func chatWithARK(
 	modelID string,
 	messages []*model.ChatCompletionMessage,
 ) (string, string, error) {
-	req := arkChatRequest(modelID, messages)
+	req := aiclient.NewARKChatRequest(modelID, messages)
 	resp, err := client.CreateChatCompletion(ctx, req)
 	if err != nil {
 		return "", "", err
@@ -206,8 +184,7 @@ func chatWithARK(
 	if len(resp.Choices) == 0 {
 		return "", resp.Model, errors.New("empty AI response")
 	}
-
-	reply := extractARKMessageText(&resp.Choices[0].Message)
+	reply := aiclient.ExtractARKMessageText(&resp.Choices[0].Message)
 	return reply, resp.Model, nil
 }
 
@@ -219,7 +196,7 @@ func streamChatWithARK(
 	req aiChatRequest,
 	start time.Time,
 ) {
-	stream, err := client.CreateChatCompletionStream(c.Request.Context(), arkChatRequest(modelID, messages))
+	stream, err := client.CreateChatCompletionStream(c.Request.Context(), aiclient.NewARKChatRequest(modelID, messages))
 	if err != nil {
 		recordValleyAIChatUsage(c, req, "", modelID, aiusage.Since(start), err.Error())
 		Error(c, 502, "AI upstream error: "+err.Error())
@@ -227,23 +204,14 @@ func streamChatWithARK(
 	}
 	defer stream.Close()
 
-	c.Writer.Header().Set("Content-Type", "text/event-stream")
-	c.Writer.Header().Set("Cache-Control", "no-cache")
-	c.Writer.Header().Set("Connection", "keep-alive")
-	c.Writer.Header().Set("X-Accel-Buffering", "no")
-
-	flusher, ok := c.Writer.(http.Flusher)
-	if !ok {
+	writer, err := aiclient.NewSSEWriter(c)
+	if err != nil {
 		Error(c, 500, "streaming not supported")
 		return
 	}
 
 	send := func(payload gin.H) {
-		b, _ := json.Marshal(payload)
-		_, _ = c.Writer.Write([]byte("data: "))
-		_, _ = c.Writer.Write(b)
-		_, _ = c.Writer.Write([]byte("\n\n"))
-		flusher.Flush()
+		_ = writer.Send(payload)
 	}
 
 	send(gin.H{"model": modelID, "chunk": "", "done": false})

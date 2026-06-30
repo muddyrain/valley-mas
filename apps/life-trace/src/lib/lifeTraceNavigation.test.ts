@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   captureNearestScrollAnchor,
   getActiveLifeTraceTab,
-  getLifeTraceScrollKey,
+  getLifeTraceScrollMemoryKey,
   restoreScrollMemory,
 } from './lifeTraceNavigation';
 
@@ -81,13 +81,15 @@ describe('life trace navigation helpers', () => {
     expect(getActiveLifeTraceTab('/pantry')).toBe('today');
   });
 
-  it('uses stable scroll keys for tabs and list filters', () => {
-    expect(getLifeTraceScrollKey('/plans')).toBe('tab:plans');
-    expect(getLifeTraceScrollKey('/today')).toBe('tab:today');
-    expect(getLifeTraceScrollKey('/ledger', '?month=2026-06&ignored=1&category=食品')).toBe(
-      '/ledger?month=2026-06&category=%E9%A3%9F%E5%93%81',
-    );
-    expect(getLifeTraceScrollKey('/pantry/abc')).toBe('/pantry/abc');
+  it('only enables scroll memory for stable tab roots', () => {
+    expect(getLifeTraceScrollMemoryKey('/plans')).toBe('tab:plans');
+    expect(getLifeTraceScrollMemoryKey('/today')).toBe('tab:today');
+    expect(getLifeTraceScrollMemoryKey('/traces')).toBe('tab:traces');
+    expect(getLifeTraceScrollMemoryKey('/profile')).toBe('tab:profile');
+    expect(getLifeTraceScrollMemoryKey('/ai')).toBeNull();
+    expect(getLifeTraceScrollMemoryKey('/ledger')).toBeNull();
+    expect(getLifeTraceScrollMemoryKey('/pantry')).toBeNull();
+    expect(getLifeTraceScrollMemoryKey('/pantry/abc')).toBeNull();
   });
 
   it('captures the nearest visible scroll anchor', () => {

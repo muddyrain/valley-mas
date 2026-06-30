@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+
+	"valley-server/internal/aiclient"
 )
 
 type PromptContract[I any, O any] struct {
@@ -51,18 +53,4 @@ func (c PromptContract[I, O]) Generate(ctx context.Context, client Client, cfg T
 	return parsed, result, nil
 }
 
-func extractJSONObject(raw string) string {
-	text := strings.TrimSpace(raw)
-	if strings.HasPrefix(text, "```") {
-		text = strings.TrimPrefix(text, "```json")
-		text = strings.TrimPrefix(text, "```")
-		text = strings.TrimSuffix(text, "```")
-		text = strings.TrimSpace(text)
-	}
-	start := strings.Index(text, "{")
-	end := strings.LastIndex(text, "}")
-	if start >= 0 && end >= start {
-		return text[start : end+1]
-	}
-	return text
-}
+func extractJSONObject(raw string) string { return aiclient.ExtractJSONObject(raw) }

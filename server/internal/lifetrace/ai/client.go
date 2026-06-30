@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
+	"valley-server/internal/aiclient"
 	"valley-server/internal/aiusage"
 
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
@@ -42,30 +42,16 @@ type Result struct {
 
 type Client struct{}
 
-var (
-	arkClientOnce sync.Once
-	arkClient     *arkruntime.Client
-)
-
 func NewClient() Client {
 	return Client{}
 }
 
-func EnsureARKClient(apiKey, baseURL string) *arkruntime.Client {
-	arkClientOnce.Do(func() {
-		arkClient = arkruntime.NewClientWithApiKey(
-			apiKey,
-			arkruntime.WithBaseUrl(baseURL),
-			arkruntime.WithTimeout(35*time.Second),
-		)
-	})
-	return arkClient
+// EnsureARKClient 维持原签名以兼容外部调用；apiKey/baseURL 已统一从 env 读，参数忽略。
+func EnsureARKClient(_, _ string) *arkruntime.Client {
+	return aiclient.ARKClient(35 * time.Second)
 }
 
-func ResetARKClientForTest() {
-	arkClient = nil
-	arkClientOnce = sync.Once{}
-}
+func ResetARKClientForTest() { aiclient.ResetForTest() }
 
 func (Client) GenerateJSON(ctx context.Context, cfg TextConfig, req TextRequest) (Result, error) {
 	if req.MaxTokens <= 0 {
@@ -380,30 +366,7 @@ func generateARKText(ctx context.Context, cfg TextConfig, req TextRequest) (Resu
 }
 
 func extractARKContent(resp arkmodel.ChatCompletionResponse) (string, error) {
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == nil {
-		return "", errors.New("empty AI response")
-	}
-
-	contentValue := resp.Choices[0].Message.Content
-	if contentValue.StringValue != nil {
-		raw := strings.TrimSpace(*contentValue.StringValue)
-		if raw == "" {
-			return "", errors.New("empty AI content")
-		}
-		return raw, nil
-	}
-
-	parts := make([]string, 0, len(contentValue.ListValue))
-	for _, part := range contentValue.ListValue {
-		if part != nil && strings.TrimSpace(part.Text) != "" {
-			parts = append(parts, strings.TrimSpace(part.Text))
-		}
-	}
-	raw := strings.TrimSpace(strings.Join(parts, "\n"))
-	if raw == "" {
-		return "", errors.New("empty AI content")
-	}
-	return raw, nil
+	return aiclient.ExtractARKContent(resp)
 }
 
 type openAIRequest struct {
@@ -503,46 +466,10 @@ func generateOpenAIText(ctx context.Context, cfg TextConfig, req TextRequest) (R
 	return Result{Content: content, Model: parsed.Model, Source: "openai"}, nil
 }
 
-func NormalizeImageInput(raw string) string {
-	imageURL := strings.TrimSpace(raw)
-	lower := strings.ToLower(imageURL)
-	if strings.HasPrefix(lower, "http://") ||
-		strings.HasPrefix(lower, "https://") ||
-		strings.HasPrefix(lower, "data:") {
-		return imageURL
-	}
-	return "data:image/jpeg;base64," + imageURL
-}
+func NormalizeImageInput(raw string) string { return aiclient.NormalizeImageInput(raw) }
 
 func recordUsage(ctx context.Context, provider string, modelName string, prompt string, response string, latencyMs int64, err error) {
-	audit := aiusage.FromContext(ctx)
-	status := aiusage.StatusSuccess
-	errMessage := ""
-	if err != nil {
-		status = aiusage.StatusFailed
-		errMessage = err.Error()
-	}
-	aiusage.Record(aiusage.Entry{
-		Feature:       audit.Feature,
-		Provider:      provider,
-		Model:         modelName,
-		UserID:        audit.UserID,
-		Status:        status,
-		PromptChars:   aiusage.CharCount(prompt),
-		ResponseChars: aiusage.CharCount(response),
-		LatencyMs:     latencyMs,
-		ErrorMessage:  errMessage,
-	})
+	aiclient.RecordCallFromContext(ctx, provider, modelName, prompt, response, latencyMs, err)
 }
 
-func trimRunes(raw string, max int) string {
-	text := strings.TrimSpace(raw)
-	if max <= 0 {
-		return text
-	}
-	runes := []rune(text)
-	if len(runes) <= max {
-		return text
-	}
-	return string(runes[:max])
-}
+func trimRunes(raw string, max int) string { return aiclient.TrimRunes(raw, max) }

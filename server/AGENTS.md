@@ -21,6 +21,7 @@
 - 业务 handler：`internal/handler`。
 - 数据模型：`internal/model`。
 - 通用工具：`internal/utils`。
+- 通用 AI 客户端：`internal/aiclient`（封装 ARK / OpenAI / Gemini client、SSE writer、JSON / 文本工具）。
 - AI 能力：`internal/ai`。
 - AI Mind Arena：`internal/mindarena`。
 - 上传服务：`internal/service/upload_service.go`。
@@ -31,6 +32,7 @@
 - 权限逻辑优先放在中间件或明确的服务端判断中，前端隐藏入口不能作为权限依据。
 - GORM model 改动要考虑迁移、默认值、索引、生产 `DB_AUTO_MIGRATE=false` 的约束，以及现有数据兼容。
 - AI/火山 ARK/多模态/模型配置/降级/响应解析相关改动必须启用 `ai-capability-orchestration`。
+- 新增 AI 接入应优先复用 `internal/aiclient`；不在 handler 里直接 `os.Getenv("ARK_*")` 或 `arkruntime.NewClientWithApiKey(...)`。
 - Mind Arena 接口改动要同步检查前端 `apps/ai-mind-arena/lib/api.ts`、`lib/types.ts` 和 SSE 事件处理。
 - 不在源码、日志、测试或示例配置中写真实密钥、真实 token、真实 SMTP 密码或云资源凭据。
 

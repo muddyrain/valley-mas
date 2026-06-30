@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"valley-server/internal/aiclient"
 	"valley-server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -136,30 +137,13 @@ func imageModelCandidates(primary string) []string {
 }
 
 func readArkTextModelConfig() (apiKey, arkBaseURL, textModel string, errMsg string) {
-	apiKey = strings.TrimSpace(os.Getenv("ARK_API_KEY"))
-	textModel = strings.TrimSpace(os.Getenv("ARK_TEXT_MODEL"))
-	arkBaseURL = strings.TrimSpace(os.Getenv("ARK_BASE_URL"))
-	if arkBaseURL == "" {
-		arkBaseURL = "https://ark.cn-beijing.volces.com/api/v3"
-	}
-	if apiKey == "" {
-		return "", "", "", "AI is not configured: missing ARK_API_KEY"
-	}
-	if !strings.HasPrefix(textModel, "ep-") {
-		return "", "", "", "AI is not configured: ARK_TEXT_MODEL must start with ep-"
-	}
-	return apiKey, arkBaseURL, textModel, ""
+	cfg, msg := aiclient.ReadARKTextConfig()
+	return cfg.APIKey, cfg.BaseURL, cfg.Model, msg
 }
 
-func ensureSharedArkClient(apiKey, arkBaseURL string) *arkruntime.Client {
-	arkClientOnce.Do(func() {
-		arkClient = arkruntime.NewClientWithApiKey(
-			apiKey,
-			arkruntime.WithBaseUrl(arkBaseURL),
-			arkruntime.WithTimeout(90*time.Second),
-		)
-	})
-	return arkClient
+// shim: 历史调用点已传相同 env，参数留作兼容；底层走 aiclient.ARKClient(90s)。
+func ensureSharedArkClient(_, _ string) *arkruntime.Client {
+	return aiclient.ARKClient(90 * time.Second)
 }
 
 func fetchRemoteImageAsBase64(imageURL string, maxBytes int64) (base64Image string, mimeType string, err error) {

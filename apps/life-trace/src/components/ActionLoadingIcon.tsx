@@ -1,4 +1,4 @@
-import { LoaderCircle, Sparkles } from 'lucide-react';
+import { LoaderCircle, Sparkle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type ActionLoadingIconProps = {
@@ -19,13 +19,13 @@ export function ActionLoadingIcon({ className, tone = 'ai' }: ActionLoadingIconP
     <span
       aria-hidden="true"
       className={cn(
-        'action-loading-icon relative inline-grid size-4 place-items-center',
+        'action-loading-icon relative inline-grid size-4 shrink-0 place-items-center align-middle leading-none',
         toneClasses[tone],
         className,
       )}
     >
-      <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" />
-      <Sparkles className="absolute inset-0 m-auto size-2.5 animate-pulse motion-reduce:animate-none" />
+      <LoaderCircle className="h-full w-full animate-spin motion-reduce:animate-none" />
+      <Sparkle className="absolute top-1/2 left-1/2 h-[62.5%] w-[62.5%] -translate-x-1/2 -translate-y-1/2 animate-pulse motion-reduce:animate-none" />
     </span>
   );
 }

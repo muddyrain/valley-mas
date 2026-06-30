@@ -146,7 +146,7 @@ export function RegisterPage() {
   const codeButtonLabel = sendingCode
     ? '发送中'
     : codeCountdown > 0
-      ? `${codeCountdown}s 后重发`
+      ? `${codeCountdown}s`
       : '发送验证码';
 
   const passwordMismatch = Boolean(confirmPassword) && password !== confirmPassword;
@@ -210,16 +210,16 @@ export function RegisterPage() {
 
             <label className="block space-y-2">
               <span className="text-sm font-medium text-muted-foreground">邮箱验证码</span>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <span className="flex h-12 flex-1 items-center gap-3 rounded-2xl border border-border bg-secondary px-4 transition focus-within:border-ring">
+              <div className="flex items-stretch gap-2">
+                <span className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl border border-border bg-secondary px-4 transition focus-within:border-ring">
                   <input
                     value={verificationCode}
                     type="text"
                     inputMode="numeric"
                     autoComplete="one-time-code"
-                    placeholder="输入 6 位验证码"
+                    placeholder="6 位验证码"
                     maxLength={6}
-                    className="min-w-0 flex-1 bg-transparent text-center text-base font-semibold tracking-[0.32em] outline-none placeholder:text-muted-foreground placeholder:tracking-normal placeholder:font-normal"
+                    className="min-w-0 flex-1 bg-transparent text-base font-semibold tracking-[0.32em] outline-none placeholder:text-muted-foreground placeholder:tracking-normal placeholder:font-normal"
                     onChange={(event) =>
                       setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))
                     }
@@ -228,7 +228,7 @@ export function RegisterPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-12 shrink-0 px-4 sm:min-w-[132px]"
+                  className="h-12 shrink-0 whitespace-nowrap px-3 text-sm"
                   onClick={handleSendCode}
                   disabled={sendingCode || codeCountdown > 0}
                 >

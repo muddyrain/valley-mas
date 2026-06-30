@@ -501,3 +501,83 @@ export function applyPantryAiFieldSuggestions(
     return suggestion.apply(current);
   }, form);
 }
+
+type PantryShelfLifeRule = {
+  keywords: string[];
+  category?: PantryCategory;
+  maxDays: number;
+  label: string;
+};
+
+const pantryShelfLifeRules: PantryShelfLifeRule[] = [
+  { keywords: ['鲜奶', '低温奶', '巴氏奶'], category: '食品', maxDays: 30, label: '鲜奶' },
+  { keywords: ['酸奶', '老酸奶'], category: '食品', maxDays: 45, label: '酸奶' },
+  { keywords: ['鸡蛋', '鸭蛋', '鹅蛋'], category: '食品', maxDays: 60, label: '鲜蛋' },
+  { keywords: ['豆腐', '豆浆'], category: '食品', maxDays: 14, label: '豆制品' },
+  { keywords: ['面包', '吐司', '蛋糕'], category: '食品', maxDays: 30, label: '烘焙食品' },
+  { keywords: ['卤味', '熟食', '凉拌'], category: '食品', maxDays: 7, label: '熟食/卤味' },
+  { keywords: ['鲜肉', '冷鲜肉'], category: '食品', maxDays: 7, label: '冷鲜肉' },
+  { keywords: ['冷冻肉', '速冻'], category: '食品', maxDays: 365, label: '冷冻食品' },
+  { keywords: ['绿叶菜', '青菜', '生菜', '菠菜'], category: '食品', maxDays: 14, label: '叶菜' },
+  { keywords: ['草莓', '蓝莓', '樱桃'], category: '食品', maxDays: 14, label: '浆果' },
+];
+
+const pantryCategoryFallbackMaxDays: Record<PantryCategory, number> = {
+  食品: 730,
+  日用品: 1825,
+  药品: 1095,
+  宠物: 1095,
+  其他: 1825,
+};
+
+export type PantryShelfLifeWarning = {
+  severity: 'warning';
+  message: string;
+};
+
+export function validatePantryShelfLife(input: {
+  name: string;
+  category: PantryCategory;
+  expiresAt: string;
+  now?: Date;
+}): PantryShelfLifeWarning | null {
+  const trimmedName = input.name?.trim();
+  if (!trimmedName) {
+    return null;
+  }
+  const expiry = parsePantryDate(input.expiresAt);
+  if (!expiry) {
+    return null;
+  }
+  const now = input.now ?? new Date();
+  const today = startOfDay(now);
+  const days = Math.round((expiry.getTime() - today.getTime()) / DAY_IN_MS);
+  if (days <= 0) {
+    return null;
+  }
+
+  const matchedRule = pantryShelfLifeRules.find(
+    (rule) =>
+      (!rule.category || rule.category === input.category) &&
+      rule.keywords.some((keyword) => trimmedName.includes(keyword)),
+  );
+
+  if (matchedRule) {
+    if (days <= matchedRule.maxDays) {
+      return null;
+    }
+    return {
+      severity: 'warning',
+      message: `${matchedRule.label}通常保质期不超过 ${matchedRule.maxDays} 天,当前填写为 ${days} 天,请确认日期是否正确。`,
+    };
+  }
+
+  const fallbackMax = pantryCategoryFallbackMaxDays[input.category];
+  if (days <= fallbackMax) {
+    return null;
+  }
+  return {
+    severity: 'warning',
+    message: `${input.category}类商品保质期通常不超过 ${fallbackMax} 天,当前填写为 ${days} 天,请确认日期是否正确。`,
+  };
+}
