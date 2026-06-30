@@ -31,6 +31,7 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			ai.POST("/transparent-cover", handler.GenerateTransparentCover)
 			ai.POST("/pantry-thumbnail", handler.GeneratePantryThumbnail)
 			ai.POST("/recipes", handler.GenerateRecipeSuggestions)
+			ai.POST("/pantry-description", handler.GeneratePantryDescription)
 			ai.POST("/recipes/render-video", handler.RenderRecipeVideo)
 			ai.GET("/actions", handler.ListAIActions)
 			ai.POST("/actions", handler.CreateAIAction)
