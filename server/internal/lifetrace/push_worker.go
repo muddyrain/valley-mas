@@ -154,7 +154,7 @@ func sendDuePantryPushRemindersAt(
 
 	var items []model.LifeTracePantryItem
 	if err := database.GetDB().
-		Where("status <> ? AND status <> ?", "used-up", "discarded").
+		Where("status NOT IN ?", []string{"used-up", "discarded", "kept"}).
 		Find(&items).Error; err != nil {
 		return err
 	}

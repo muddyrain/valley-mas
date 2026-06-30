@@ -215,6 +215,7 @@ var validPantryListStatusFilters = map[string]bool{
 	"expiring":  true,
 	"expired":   true,
 	"no-expiry": true,
+	"kept":      true,
 	"used-up":   true,
 	"discarded": true,
 }

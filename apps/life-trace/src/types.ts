@@ -82,6 +82,7 @@ export type PantryListStatusFilter =
   | 'expiring'
   | 'expired'
   | 'no-expiry'
+  | 'kept'
   | 'used-up'
   | 'discarded';
 
@@ -93,7 +94,7 @@ export type PantryLocation = '冷藏' | '冷冻' | '厨房' | '储物柜' | '卫
 
 export type PantryReminderRule = '7d' | '3d' | 'same-day' | 'expired';
 
-export type PantryItemStatus = 'normal' | 'expiring' | 'expired' | 'used-up' | 'discarded';
+export type PantryItemStatus = 'normal' | 'expiring' | 'expired' | 'kept' | 'used-up' | 'discarded';
 
 export type PantrySortMode = 'expiry-asc' | 'created-desc' | 'expiry-desc';
 

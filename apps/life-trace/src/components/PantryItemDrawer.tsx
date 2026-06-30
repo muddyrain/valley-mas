@@ -1,4 +1,4 @@
-import { ArrowRightLeft, Camera, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Camera, PackageCheck, Sparkles, Trash2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { generatePantryThumbnail } from '@/api/pantry';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
@@ -585,6 +585,20 @@ export function PantryItemDrawer({
             ) : null}
             {thumbnailError ? <p className="text-xs text-destructive">{thumbnailError}</p> : null}
           </TonePanel>
+
+          <TonePanel
+            tone="plan"
+            icon={PackageCheck}
+            title="仍在使用"
+            description="开启后这件商品退出风险列表，不再推送过期提醒。"
+            action={
+              <Switch
+                size="sm"
+                checked={form.status === 'kept'}
+                onCheckedChange={(checked) => updateField('status', checked ? 'kept' : 'normal')}
+              />
+            }
+          />
 
           <TonePanel
             tone="health"

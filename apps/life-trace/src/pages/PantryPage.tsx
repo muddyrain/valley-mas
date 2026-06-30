@@ -8,9 +8,11 @@ import {
   ClipboardList,
   Home,
   Milk,
+  PackageCheck,
   PackagePlus,
   Pill,
   ReceiptText,
+  RefreshCcw,
   Search,
   Settings2,
   Sparkles,
@@ -59,6 +61,7 @@ const statusFilters: Array<{ id: PantryListStatusFilter; label: string }> = [
   { id: 'expiring', label: '临期' },
   { id: 'expired', label: '已过期' },
   { id: 'no-expiry', label: '未设过期' },
+  { id: 'kept', label: '仍在使用' },
   { id: 'used-up', label: '已用完' },
   { id: 'discarded', label: '已丢弃' },
 ];
@@ -260,6 +263,7 @@ export function PantryPage() {
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const loadMorePantryList = useLifeTraceStore((state) => state.loadMorePantryList);
   const consumePantryItem = useLifeTraceStore((state) => state.consumePantryItem);
+  const updatePantryItemStatus = useLifeTraceStore((state) => state.updatePantryItemStatus);
   const addShoppingItem = useLifeTraceStore((state) => state.addShoppingItem);
   const settings = useLifeTraceStore((state) => state.settings);
   const updateSettings = useLifeTraceStore((state) => state.updateSettings);
@@ -492,6 +496,34 @@ export function PantryPage() {
   const openConsumeSheet = (item: PantryItem) => {
     setConsumeItem(item);
     setConsumeQuantity('1');
+  };
+
+  const handleMarkPantryKept = async (item: PantryItem) => {
+    const actionKey = `${item.id}:mark-kept`;
+    if (pendingActionId || statusActionInFlightRef.current.has(item.id)) {
+      return;
+    }
+
+    statusActionInFlightRef.current.add(item.id);
+    setPendingActionId(actionKey);
+    try {
+      const updated = await updatePantryItemStatus(
+        item.id,
+        'kept',
+        effectiveHouseholdId || undefined,
+      );
+      if (updated) {
+        showToast(`已标记「${item.name}」仍在使用`, 'success');
+      }
+    } finally {
+      statusActionInFlightRef.current.delete(item.id);
+      setPendingActionId((current) => {
+        if (current === actionKey) {
+          return null;
+        }
+        return current;
+      });
+    }
   };
 
   const refreshPantryList = useCallback(async () => {
@@ -937,15 +969,32 @@ export function PantryPage() {
                 </p>
               ) : null}
             </div>
-            <div className="inline-flex min-w-[4.5rem] shrink-0 items-center justify-center rounded-full bg-secondary px-3 py-2 text-sm font-semibold whitespace-nowrap text-foreground">
-              <span>
-                <PantrySummaryValue
-                  loading={initialPantryLoading}
-                  value={pantryPagination.total}
-                  skeletonClassName="w-5"
-                />
-              </span>
-              <span className="ml-1 text-muted-foreground">条</span>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="刷新库存"
+                disabled={pantryLoading}
+                onClick={() => void refreshPantryList()}
+                className="size-9 rounded-full"
+              >
+                {listRefreshing ? (
+                  <ActionLoadingIcon className="size-4" tone="ai" />
+                ) : (
+                  <RefreshCcw className="size-4" />
+                )}
+              </Button>
+              <div className="inline-flex min-w-[4.5rem] items-center justify-center rounded-full bg-secondary px-3 py-2 text-sm font-semibold whitespace-nowrap text-foreground">
+                <span>
+                  <PantrySummaryValue
+                    loading={initialPantryLoading}
+                    value={pantryPagination.total}
+                    skeletonClassName="w-5"
+                  />
+                </span>
+                <span className="ml-1 text-muted-foreground">条</span>
+              </div>
             </div>
           </div>
 
@@ -1040,9 +1089,11 @@ export function PantryPage() {
                 const discardedDisabled = actionPending || terminalStatus;
                 const StatusActionIcon = BadgeAlert;
                 const consumePending = pendingActionId === `${item.id}:consume-used`;
+                const keepPending = pendingActionId === `${item.id}:mark-kept`;
                 const processPending =
                   pendingActionId === `${item.id}:consume-discarded` || consumePending;
                 const consumeDisabled = actionPending || processPending || terminalStatus;
+                const showKeepAction = status === 'expired' || status === 'kept';
 
                 return (
                   <Card
@@ -1177,32 +1228,61 @@ export function PantryPage() {
                       </div>
                     ) : (
                       <div className="grid grid-cols-4 border-t border-border/70 bg-card/80">
-                        <button
-                          type="button"
-                          disabled={consumeDisabled}
-                          className={cn(
-                            'flex h-12 items-center justify-center gap-1.5 border-r border-border/60 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-55',
-                            status === 'used-up'
-                              ? 'text-muted-foreground'
-                              : 'text-life-trace hover:bg-life-trace/8',
-                          )}
-                          onClick={() => {
-                            if (item.quantity <= 1) {
-                              setUsedUpConfirm({ item, quantity: 1, fromSheet: false });
-                              return;
-                            }
-                            void handleConsumeAction(item, 'used', 1);
-                          }}
-                        >
-                          {consumePending ? (
-                            <ActionLoadingIcon className="size-4" tone="trace" />
-                          ) : (
-                            <StatusActionIcon className="size-4" />
-                          )}
-                          <span className="whitespace-nowrap">
-                            {status === 'used-up' ? '已用完' : item.quantity > 1 ? '用 1' : '用完'}
-                          </span>
-                        </button>
+                        {showKeepAction ? (
+                          <button
+                            type="button"
+                            disabled={actionPending || status === 'kept'}
+                            className={cn(
+                              'flex h-12 items-center justify-center gap-1.5 border-r border-border/60 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-55',
+                              status === 'kept'
+                                ? 'text-muted-foreground'
+                                : 'text-life-trace hover:bg-life-trace/8',
+                            )}
+                            onClick={() => {
+                              void handleMarkPantryKept(item);
+                            }}
+                          >
+                            {keepPending ? (
+                              <ActionLoadingIcon className="size-4" tone="trace" />
+                            ) : (
+                              <PackageCheck className="size-4" />
+                            )}
+                            <span className="whitespace-nowrap">
+                              {status === 'kept' ? '已确认' : '仍在使用'}
+                            </span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={consumeDisabled}
+                            className={cn(
+                              'flex h-12 items-center justify-center gap-1.5 border-r border-border/60 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-55',
+                              status === 'used-up'
+                                ? 'text-muted-foreground'
+                                : 'text-life-trace hover:bg-life-trace/8',
+                            )}
+                            onClick={() => {
+                              if (item.quantity <= 1) {
+                                setUsedUpConfirm({ item, quantity: 1, fromSheet: false });
+                                return;
+                              }
+                              void handleConsumeAction(item, 'used', 1);
+                            }}
+                          >
+                            {consumePending ? (
+                              <ActionLoadingIcon className="size-4" tone="trace" />
+                            ) : (
+                              <StatusActionIcon className="size-4" />
+                            )}
+                            <span className="whitespace-nowrap">
+                              {status === 'used-up'
+                                ? '已用完'
+                                : item.quantity > 1
+                                  ? '用 1'
+                                  : '用完'}
+                            </span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           disabled={discardedDisabled || processPending}

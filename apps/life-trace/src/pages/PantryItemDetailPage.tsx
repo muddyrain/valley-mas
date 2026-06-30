@@ -134,6 +134,7 @@ export function PantryItemDetailPage() {
   const navigate = useNavigate();
   const token = useAuthStore((state) => state.token);
   const consumePantryItem = useLifeTraceStore((state) => state.consumePantryItem);
+  const updatePantryItemStatus = useLifeTraceStore((state) => state.updatePantryItemStatus);
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const preferredPantryHouseholdId = useLifeTraceStore((state) => state.preferredPantryHouseholdId);
   const showToast = useFeedbackToastStore((state) => state.showToast);
@@ -235,6 +236,27 @@ export function PantryItemDetailPage() {
             : `已丢弃 ${normalizedQuantity}${item.unit}`,
           'success',
         );
+        await refreshTimeline();
+        await loadPantryList({
+          householdId: preferredPantryHouseholdId || undefined,
+        });
+      }
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const runMarkKept = async (next: 'kept' | 'normal') => {
+    if (!item || actionId || terminalStatus) {
+      return;
+    }
+    const actionKey = next === 'kept' ? 'mark-kept' : 'restore-normal';
+    setActionId(actionKey);
+    try {
+      const updated = await updatePantryItemStatus(item.id, next, actionHouseholdId);
+      if (updated) {
+        setItem(updated);
+        showToast(next === 'kept' ? `已标记「${item.name}」仍在使用` : '已恢复提醒', 'success');
         await refreshTimeline();
         await loadPantryList({
           householdId: preferredPantryHouseholdId || undefined,
@@ -363,6 +385,30 @@ export function PantryItemDetailPage() {
                   {getPantryExpiryText(item)}
                 </p>
               </div>
+              {status === 'expired' || status === 'kept' ? (
+                <Card className="flex flex-wrap items-center justify-between gap-2 border-border/70 bg-secondary/40 p-3 text-xs">
+                  <span className="text-muted-foreground">
+                    {status === 'kept'
+                      ? '已确认仍在使用，不再标红或推送提醒。'
+                      : '过期但仍可使用？标记后退出风险列表。'}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="border-life-trace/30 bg-life-trace/10 text-life-trace hover:bg-life-trace/15"
+                    disabled={Boolean(actionId)}
+                    onClick={() => void runMarkKept(status === 'kept' ? 'normal' : 'kept')}
+                  >
+                    {actionId === 'mark-kept' || actionId === 'restore-normal' ? (
+                      <ActionLoadingIcon className="size-4" tone="trace" />
+                    ) : (
+                      <PackageCheck className="size-4" />
+                    )}
+                    {status === 'kept' ? '恢复提醒' : '仍在使用'}
+                  </Button>
+                </Card>
+              ) : null}
               <div className="grid grid-cols-2 gap-2 max-[360px]:grid-cols-1">
                 <Button
                   type="button"

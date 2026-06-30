@@ -97,6 +97,7 @@ var validPantryStatuses = map[string]bool{
 	"normal":    true,
 	"expiring":  true,
 	"expired":   true,
+	"kept":      true,
 	"used-up":   true,
 	"discarded": true,
 }
@@ -376,19 +377,19 @@ func applyPantryListFilters(query *gorm.DB, c *gin.Context) *gorm.DB {
 	} else if validPantryStatuses[status] {
 		today, expiringDeadline := pantryDerivedDateBounds(time.Now())
 		switch status {
-		case "used-up", "discarded":
+		case "used-up", "discarded", "kept":
 			query = query.Where("status = ?", status)
 		case "expired":
 			query = query.
-				Where("status NOT IN ?", []string{"used-up", "discarded"}).
+				Where("status NOT IN ?", []string{"used-up", "discarded", "kept"}).
 				Where("expires_at <> '' AND expires_at < ?", today)
 		case "expiring":
 			query = query.
-				Where("status NOT IN ?", []string{"used-up", "discarded"}).
+				Where("status NOT IN ?", []string{"used-up", "discarded", "kept"}).
 				Where("expires_at <> '' AND expires_at >= ? AND expires_at <= ?", today, expiringDeadline)
 		default:
 			query = query.
-				Where("status NOT IN ?", []string{"used-up", "discarded"}).
+				Where("status NOT IN ?", []string{"used-up", "discarded", "kept"}).
 				Where("(expires_at = '' OR expires_at IS NULL OR expires_at > ?)", expiringDeadline)
 		}
 	}
@@ -427,6 +428,7 @@ func applyPantryListOrdering(query *gorm.DB, now time.Time, sort string) *gorm.D
 CASE
 	WHEN status = 'used-up' THEN 3
 	WHEN status = 'discarded' THEN 4
+	WHEN status = 'kept' THEN 2
 	WHEN expires_at <> '' AND expires_at < ? THEN 0
 	WHEN expires_at <> '' AND expires_at >= ? AND expires_at <= ? THEN 1
 	ELSE 2
@@ -451,8 +453,8 @@ func buildPantryListSummary(householdID model.Int64String, now time.Time) (pantr
 		Where("household_id = ?", householdID).
 		Select(`
 COUNT(CASE WHEN status NOT IN ('used-up', 'discarded') THEN 1 END) AS total,
-COUNT(CASE WHEN status NOT IN ('used-up', 'discarded') AND expires_at <> '' AND expires_at >= ? AND expires_at <= ? THEN 1 END) AS expiring,
-COUNT(CASE WHEN status NOT IN ('used-up', 'discarded') AND expires_at <> '' AND expires_at < ? THEN 1 END) AS expired
+COUNT(CASE WHEN status NOT IN ('used-up', 'discarded', 'kept') AND expires_at <> '' AND expires_at >= ? AND expires_at <= ? THEN 1 END) AS expiring,
+COUNT(CASE WHEN status NOT IN ('used-up', 'discarded', 'kept') AND expires_at <> '' AND expires_at < ? THEN 1 END) AS expired
 `, today, expiringDeadline, today).
 		Scan(&summary).Error
 	if err != nil {

@@ -1783,6 +1783,10 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             pantryItems: targetHouseholdId
               ? state.pantryItems
               : state.pantryItems.map((item) => (item.id === itemId ? updatedItem : item)),
+            pantryListItems:
+              activeHouseholdId === targetHouseholdId
+                ? state.pantryListItems.map((item) => (item.id === itemId ? updatedItem : item))
+                : state.pantryListItems,
             pantryError: '',
             aiActions: [
               {
@@ -1792,7 +1796,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
                     ? '记录了一件已用完'
                     : status === 'discarded'
                       ? '记录了一件已丢弃'
-                      : '更新了库存状态',
+                      : status === 'kept'
+                        ? '标记了仍在使用'
+                        : '更新了库存状态',
                 timeLabel: '刚刚',
               },
               ...getAiActions(state),
@@ -1836,6 +1842,10 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             pantryItems: targetHouseholdId
               ? state.pantryItems
               : state.pantryItems.map((item) => (item.id === itemId ? updatedItem : item)),
+            pantryListItems:
+              activeHouseholdId === targetHouseholdId
+                ? state.pantryListItems.map((item) => (item.id === itemId ? updatedItem : item))
+                : state.pantryListItems,
             pantryError: '',
             aiActions: [
               {

@@ -73,7 +73,7 @@ function formatCalendarDuration(fromDate: Date, toDate: Date) {
 }
 
 export function resolvePantryStatus(item: PantryItem, now = new Date()): PantryItemStatus {
-  if (item.status === 'used-up' || item.status === 'discarded') {
+  if (item.status === 'used-up' || item.status === 'discarded' || item.status === 'kept') {
     return item.status;
   }
 
@@ -91,7 +91,10 @@ export function resolvePantryStatus(item: PantryItem, now = new Date()): PantryI
 }
 
 export function getPantryPersistedStatus(status: PantryItemStatus): PantryItemStatus {
-  return status === 'used-up' || status === 'discarded' ? status : 'normal';
+  if (status === 'used-up' || status === 'discarded' || status === 'kept') {
+    return status;
+  }
+  return 'normal';
 }
 
 export function getPantryStatusLabel(status: PantryItemStatus) {
@@ -100,6 +103,8 @@ export function getPantryStatusLabel(status: PantryItemStatus) {
       return '临期';
     case 'expired':
       return '已过期';
+    case 'kept':
+      return '仍在使用';
     case 'used-up':
       return '已用完';
     case 'discarded':
@@ -115,6 +120,8 @@ export function getPantryStatusTone(status: PantryItemStatus) {
       return 'health';
     case 'expired':
       return 'alert';
+    case 'kept':
+      return 'plan';
     case 'used-up':
       return 'trace';
     case 'discarded':
@@ -173,6 +180,7 @@ export function sortPantryItems(items: PantryItem[], now = new Date()) {
     expired: 0,
     expiring: 1,
     normal: 2,
+    kept: 2,
     'used-up': 3,
     discarded: 4,
   } satisfies Record<PantryItemStatus, number>;
@@ -200,7 +208,9 @@ export function getPantryOverview(items: PantryItem[], now = new Date()) {
     total: items.length,
     expiring: statuses.filter((status) => status === 'expiring').length,
     expired: statuses.filter((status) => status === 'expired').length,
-    active: statuses.filter((status) => status === 'normal' || status === 'expiring').length,
+    active: statuses.filter(
+      (status) => status === 'normal' || status === 'expiring' || status === 'kept',
+    ).length,
   };
 }
 
