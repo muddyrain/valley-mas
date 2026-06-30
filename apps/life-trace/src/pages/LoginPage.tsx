@@ -1,5 +1,6 @@
 import { ArrowRight, CloudSun, LockKeyhole, Mail } from 'lucide-react';
 import { type FormEvent, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { LifeTraceBrandMark } from '@/components/LifeTraceBrandMark';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -123,6 +124,16 @@ export function LoginPage() {
               <ArrowRight className="size-4" />
             </Button>
           </form>
+
+          <p className="text-center text-sm text-muted-foreground">
+            还没有账号？
+            <Link
+              to="/register"
+              className="ml-1 font-semibold text-life-ai transition hover:text-life-ai/80"
+            >
+              去注册
+            </Link>
+          </p>
         </Card>
       </div>
     </main>

@@ -102,6 +102,33 @@ export function loginWithPassword(input: { email: string; password: string }) {
   });
 }
 
+export function registerWithEmail(input: {
+  email: string;
+  password: string;
+  verificationCode: string;
+  nickname?: string;
+}) {
+  return request<LoginResponse>('/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: input.email,
+      password: input.password,
+      verificationCode: input.verificationCode,
+      nickname: input.nickname ?? '',
+    }),
+  });
+}
+
+export function sendEmailVerificationCode(input: { email: string; purpose: 'login' | 'register' }) {
+  return request<{ message: string }>('/email-code/send', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: input.email,
+      purpose: input.purpose,
+    }),
+  });
+}
+
 export function getCurrentUser(token: string) {
   return request<LifeTraceUser>('/user/current', undefined, { token });
 }

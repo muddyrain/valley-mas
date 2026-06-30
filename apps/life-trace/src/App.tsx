@@ -27,6 +27,7 @@ import { PlansPage } from '@/pages/PlansPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { RecipePlayerPage } from '@/pages/RecipePlayerPage';
 import { RecurringPaymentsPage } from '@/pages/RecurringPaymentsPage';
+import { RegisterPage } from '@/pages/RegisterPage';
 import { ReminderSettingsPage } from '@/pages/ReminderSettingsPage';
 import { ShoppingListPage } from '@/pages/ShoppingListPage';
 import { TodayPage } from '@/pages/TodayPage';
@@ -107,7 +108,13 @@ function AppContent() {
   }
 
   if (!token || status !== 'authenticated') {
-    return <LoginPage />;
+    return (
+      <Routes location={location}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
   }
 
   return (

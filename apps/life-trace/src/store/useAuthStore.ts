@@ -5,6 +5,7 @@ import {
   getCurrentUser,
   isConfirmedAuthFailure,
   loginWithPassword,
+  registerWithEmail,
   logout as requestLogout,
 } from '@/api/auth';
 
@@ -20,6 +21,12 @@ type AuthState = {
     updater: Partial<LifeTraceUser> | ((current: LifeTraceUser | null) => LifeTraceUser | null),
   ) => void;
   signIn: (input: { email: string; password: string }) => Promise<void>;
+  signUp: (input: {
+    email: string;
+    password: string;
+    verificationCode: string;
+    nickname?: string;
+  }) => Promise<void>;
   verifySession: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -54,6 +61,18 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             status: get().token ? 'idle' : 'unauthenticated',
             error: error instanceof Error ? error.message : '登录失败',
+          });
+          throw error;
+        }
+      },
+      signUp: async (input) => {
+        set({ error: '' });
+        try {
+          const { token, userInfo } = await registerWithEmail(input);
+          set({ token, user: userInfo, status: 'authenticated', error: '' });
+        } catch (error) {
+          set({
+            error: error instanceof Error ? error.message : '注册失败',
           });
           throw error;
         }
