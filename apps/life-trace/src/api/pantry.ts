@@ -43,6 +43,24 @@ export type PantryThumbnailResponse = {
   modelTag?: string;
 };
 
+export type PantryDescriptionRequest = {
+  name: string;
+  category?: PantryItem['category'];
+  location?: PantryItem['location'];
+  expiresAt?: string;
+  openedAt?: string;
+  tags?: string[];
+  note?: string;
+};
+
+export type PantryDescriptionResponse = {
+  note: string;
+  tips: string[];
+  source: 'ark' | 'gemini';
+  model?: string;
+  modelTag?: string;
+};
+
 export type PantryTransparentCoverRequest = {
   imageUrl: string;
 };
@@ -422,6 +440,23 @@ export function generatePantryThumbnail(
   options.signal?.addEventListener('abort', () => controller.abort(), { once: true });
 
   return apiRequest<PantryThumbnailResponse>('/life-trace/ai/pantry-thumbnail', token, {
+    method: 'POST',
+    body: JSON.stringify(input),
+    signal: controller.signal,
+    suppressErrorToast: true,
+  }).finally(() => globalThis.clearTimeout(timeout));
+}
+
+export function generatePantryDescription(
+  token: string,
+  input: PantryDescriptionRequest,
+  options: { signal?: AbortSignal } = {},
+) {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), 45000);
+  options.signal?.addEventListener('abort', () => controller.abort(), { once: true });
+
+  return apiRequest<PantryDescriptionResponse>('/life-trace/ai/pantry-description', token, {
     method: 'POST',
     body: JSON.stringify(input),
     signal: controller.signal,

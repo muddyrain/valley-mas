@@ -1,6 +1,10 @@
-import { ArrowRightLeft, Camera, PackageCheck, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Camera, PackageCheck, Sparkles, Trash2, Wand2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { generatePantryThumbnail } from '@/api/pantry';
+import {
+  analyzePantryPhoto,
+  generatePantryDescription,
+  generatePantryThumbnail,
+} from '@/api/pantry';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
@@ -8,6 +12,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { FormItem, PickerFieldButton, SheetHeader } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
 import { OptionPickerSheet } from '@/components/OptionPickerSheet';
+import { PantryAiSuggestionsSheet } from '@/components/PantryAiSuggestionsSheet';
 import { DateInputWithClear, PantryExpiryDateField } from '@/components/PantryExpiryDateField';
 import { TonePanel } from '@/components/TonePanel';
 import { Button } from '@/components/ui/button';
@@ -15,7 +20,14 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { getLifeTraceErrorMessage } from '@/lib/error';
-import { formatPantryReminderSummary, getPantryPersistedStatus } from '@/lib/pantry';
+import {
+  applyPantryAiFieldSuggestions,
+  buildPantryAiFieldDiff,
+  formatPantryReminderSummary,
+  getPantryPersistedStatus,
+  type PantryAiFieldKey,
+  type PantryAiFieldSuggestion,
+} from '@/lib/pantry';
 import { formatPantryTagText, parsePantryTagText } from '@/lib/pantryTags';
 import {
   generatePantryTransparentCoverWithFallback,
@@ -111,6 +123,15 @@ export function PantryItemDrawer({
   const [tagText, setTagText] = useState('');
   const [activePicker, setActivePicker] = useState<'category' | 'location' | null>(null);
   const [expiryFieldResetKey, setExpiryFieldResetKey] = useState(0);
+  const [aiAugmentLoading, setAiAugmentLoading] = useState(false);
+  const [aiAugmentError, setAiAugmentError] = useState('');
+  const [aiAugmentModelTag, setAiAugmentModelTag] = useState('');
+  const [aiSuggestions, setAiSuggestions] = useState<PantryAiFieldSuggestion[]>([]);
+  const [aiSuggestionsOpen, setAiSuggestionsOpen] = useState(false);
+  const [aiPolishLoading, setAiPolishLoading] = useState(false);
+  const [aiPolishError, setAiPolishError] = useState('');
+  const [aiPolishTips, setAiPolishTips] = useState<string[]>([]);
+  const [aiPolishModelTag, setAiPolishModelTag] = useState('');
   const queuedPayloadRef = useRef<NewPantryItemInput | null>(null);
   const editing = Boolean(item);
 
@@ -128,6 +149,15 @@ export function PantryItemDrawer({
     queuedPayloadRef.current = null;
     setActivePicker(null);
     setExpiryFieldResetKey((current) => current + 1);
+    setAiAugmentLoading(false);
+    setAiAugmentError('');
+    setAiAugmentModelTag('');
+    setAiSuggestions([]);
+    setAiSuggestionsOpen(false);
+    setAiPolishLoading(false);
+    setAiPolishError('');
+    setAiPolishTips([]);
+    setAiPolishModelTag('');
   }, [pantryPreferences]);
 
   useEffect(() => {
@@ -171,6 +201,15 @@ export function PantryItemDrawer({
     setSaveQueuedAfterThumbnail(false);
     queuedPayloadRef.current = null;
     setActivePicker(null);
+    setAiAugmentLoading(false);
+    setAiAugmentError('');
+    setAiAugmentModelTag('');
+    setAiSuggestions([]);
+    setAiSuggestionsOpen(false);
+    setAiPolishLoading(false);
+    setAiPolishError('');
+    setAiPolishTips([]);
+    setAiPolishModelTag('');
   }, [item, open, pantryPreferences, resetNewItemDraft]);
 
   const updateField = <K extends keyof NewPantryItemInput>(
@@ -348,6 +387,101 @@ export function PantryItemDrawer({
     }
   };
 
+  const handleAugmentFromAI = async () => {
+    if (!token) {
+      setAiAugmentError('请先登录后再使用 AI 字段补全。');
+      setAiSuggestionsOpen(true);
+      return;
+    }
+    if (aiAugmentLoading) {
+      return;
+    }
+    const imageInput = form.imageUrl?.trim() || form.thumbnailUrl?.trim();
+    if (!imageInput) {
+      setAiAugmentError('请先添加封面图，AI 才能识别商品信息。');
+      setAiSuggestionsOpen(true);
+      return;
+    }
+
+    setAiAugmentLoading(true);
+    setAiAugmentError('');
+    setAiSuggestions([]);
+    setAiSuggestionsOpen(true);
+    try {
+      const result = await analyzePantryPhoto(token, {
+        imageUrl: imageInput,
+        householdId,
+        hint: form.name.trim() || undefined,
+      });
+      const formForDiff: NewPantryItemInput = {
+        ...form,
+        tags: parsePantryTagText(tagText),
+      };
+      const suggestions = buildPantryAiFieldDiff(formForDiff, result);
+      setAiSuggestions(suggestions);
+      setAiAugmentModelTag(result.modelTag || '');
+    } catch (error) {
+      setAiAugmentError(getLifeTraceErrorMessage(error, 'AI 字段补全失败，请稍后再试。'));
+    } finally {
+      setAiAugmentLoading(false);
+    }
+  };
+
+  const handleApplyAiSuggestions = (selectedKeys: ReadonlySet<PantryAiFieldKey>) => {
+    if (selectedKeys.size === 0) {
+      setAiSuggestionsOpen(false);
+      return;
+    }
+    const formForApply: NewPantryItemInput = {
+      ...form,
+      tags: parsePantryTagText(tagText),
+    };
+    const next = applyPantryAiFieldSuggestions(formForApply, aiSuggestions, selectedKeys);
+    setForm(next);
+    setTagText(formatPantryTagText(next.tags ?? []));
+    if (selectedKeys.has('expiresAt') || selectedKeys.has('openedAt')) {
+      setExpiryFieldResetKey((current) => current + 1);
+    }
+    setErrors({});
+    setAiSuggestionsOpen(false);
+  };
+
+  const handlePolishDescription = async () => {
+    if (!token) {
+      setAiPolishError('请先登录后再润色备注。');
+      return;
+    }
+    if (!form.name.trim()) {
+      setAiPolishError('请先填写名称，AI 才能给出建议。');
+      return;
+    }
+    if (aiPolishLoading) {
+      return;
+    }
+
+    setAiPolishLoading(true);
+    setAiPolishError('');
+    setAiPolishTips([]);
+    try {
+      const result = await generatePantryDescription(token, {
+        name: form.name.trim(),
+        category: form.category,
+        location: form.location,
+        expiresAt: form.expiresAt || undefined,
+        openedAt: form.openedAt || undefined,
+        tags: parsePantryTagText(tagText),
+        note: form.note.trim() || undefined,
+      });
+      updateField('note', result.note);
+      setAiPolishTips(result.tips ?? []);
+      setAiPolishModelTag(result.modelTag || '');
+    } catch (error) {
+      setAiPolishError(getLifeTraceErrorMessage(error, 'AI 润色失败，请稍后再试。'));
+    } finally {
+      setAiPolishLoading(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!item || deleting) {
       return;
@@ -493,6 +627,37 @@ export function PantryItemDrawer({
             description="给这件库存留一张更好辨认的照片。"
             previewFit="contain"
           />
+
+          <TonePanel
+            tone="ai"
+            icon={Wand2}
+            title="AI 字段补全"
+            description="读取封面图与名称，补齐分类、规格、保质期等空白字段。"
+          >
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={
+                aiAugmentLoading ||
+                imageUploading ||
+                thumbnailGenerating ||
+                submitting ||
+                (!form.imageUrl?.trim() && !form.thumbnailUrl?.trim())
+              }
+              onClick={() => void handleAugmentFromAI()}
+            >
+              {aiAugmentLoading ? (
+                <ActionLoadingIcon className="size-4" tone="ai" />
+              ) : (
+                <Wand2 className="size-4" />
+              )}
+              {aiAugmentLoading ? '识别中...' : '一键 AI 补全'}
+            </Button>
+            {!form.imageUrl?.trim() && !form.thumbnailUrl?.trim() ? (
+              <p className="text-xs text-muted-foreground">添加一张实拍图后即可启用。</p>
+            ) : null}
+          </TonePanel>
 
           <TonePanel
             tone="ai"
@@ -693,12 +858,52 @@ export function PantryItemDrawer({
           </TonePanel>
 
           <FormItem label="备注">
-            <Textarea
-              value={form.note}
-              onChange={(event) => updateField('note', event.target.value)}
-              rows={3}
-              placeholder="例如：周末早餐要先喝掉。"
-            />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                  写下储存或食用提示，AI 也能帮你润色一版。
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={aiPolishLoading || submitting || !form.name.trim()}
+                  onClick={() => void handlePolishDescription()}
+                >
+                  {aiPolishLoading ? (
+                    <ActionLoadingIcon className="size-4" tone="ai" />
+                  ) : (
+                    <Sparkles className="size-4" />
+                  )}
+                  {aiPolishLoading ? '润色中...' : 'AI 润色'}
+                </Button>
+              </div>
+              <Textarea
+                value={form.note}
+                onChange={(event) => updateField('note', event.target.value)}
+                rows={3}
+                placeholder="例如：周末早餐要先喝掉。"
+              />
+              {aiPolishTips.length > 0 ? (
+                <div className="rounded-2xl border border-life-ai/30 bg-life-ai/5 px-3 py-2 text-xs text-muted-foreground">
+                  <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold text-life-ai">
+                    <Sparkles className="size-3.5" />
+                    储存与食用建议
+                    {aiPolishModelTag ? (
+                      <span className="rounded-full bg-life-ai/10 px-2 py-0.5 text-[10px] font-medium text-life-ai">
+                        {aiPolishModelTag}
+                      </span>
+                    ) : null}
+                  </div>
+                  <ul className="space-y-1 pl-4 text-[12px] leading-5 marker:text-life-ai/60 list-disc">
+                    {aiPolishTips.map((tip, index) => (
+                      <li key={index}>{tip}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {aiPolishError ? <p className="text-xs text-destructive">{aiPolishError}</p> : null}
+            </div>
           </FormItem>
 
           {editing && showTransferAction && item && onRequestTransfer ? (
@@ -810,6 +1015,16 @@ export function PantryItemDrawer({
           }
         }}
         onConfirm={() => void handleDelete()}
+      />
+      <PantryAiSuggestionsSheet
+        open={aiSuggestionsOpen}
+        loading={aiAugmentLoading}
+        errorMessage={aiAugmentError}
+        modelTag={aiAugmentModelTag}
+        suggestions={aiSuggestions}
+        onOpenChange={setAiSuggestionsOpen}
+        onApply={handleApplyAiSuggestions}
+        onRetry={() => void handleAugmentFromAI()}
       />
     </>
   );

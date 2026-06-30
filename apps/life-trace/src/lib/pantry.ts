@@ -1,11 +1,15 @@
 import type {
+  NewPantryItemInput,
   NewTraceInput,
+  PantryCategory,
   PantryItem,
   PantryItemStatus,
+  PantryLocation,
   PantryPreferences,
   PantryReminderConfig,
   PantryReminderRule,
 } from '@/types';
+import { formatPantryTagText, normalizePantryTags } from './pantryTags';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -289,4 +293,211 @@ export function buildPantryCreatedTraceInput(item: PantryItem, now = new Date())
     tags: [item.category, ...item.tags, '家庭库存', '新增库存'],
     source: '库存',
   };
+}
+
+const pantryCategoryAllowList: readonly PantryCategory[] = [
+  '食品',
+  '日用品',
+  '药品',
+  '宠物',
+  '其他',
+];
+const pantryLocationAllowList: readonly PantryLocation[] = [
+  '冷藏',
+  '冷冻',
+  '厨房',
+  '储物柜',
+  '卫生间',
+  '玄关',
+  '其他',
+];
+
+export type PantryAiFieldKey =
+  | 'name'
+  | 'category'
+  | 'location'
+  | 'quantity'
+  | 'unit'
+  | 'expiresAt'
+  | 'openedAt'
+  | 'tags'
+  | 'note';
+
+const pantryAiFieldLabels: Record<PantryAiFieldKey, string> = {
+  name: '名称',
+  category: '分类',
+  location: '位置',
+  quantity: '数量',
+  unit: '单位',
+  expiresAt: '过期日期',
+  openedAt: '开封日期',
+  tags: '标签',
+  note: '备注',
+};
+
+export type PantryAiFieldSuggestion = {
+  key: PantryAiFieldKey;
+  label: string;
+  currentDisplay: string;
+  suggestionDisplay: string;
+  defaultChecked: boolean;
+  apply: (form: NewPantryItemInput) => NewPantryItemInput;
+};
+
+type PantryAiSource = {
+  name?: string;
+  category?: string;
+  brand?: string;
+  spec?: string;
+  quantity?: number;
+  unit?: string;
+  storageLocation?: string;
+  expiresAt?: string;
+  productionDate?: string;
+  purchaseDate?: string;
+  tags?: string[];
+  summary?: string;
+};
+
+function isEmptyText(value?: string) {
+  return !value || !value.trim();
+}
+
+function pickEnumValue<T extends string>(allowList: readonly T[], raw?: string): T | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return (allowList as readonly string[]).includes(trimmed) ? (trimmed as T) : null;
+}
+
+export function buildPantryAiFieldDiff(
+  form: NewPantryItemInput,
+  ai: PantryAiSource,
+): PantryAiFieldSuggestion[] {
+  const suggestions: PantryAiFieldSuggestion[] = [];
+
+  const aiName = ai.name?.trim();
+  if (aiName && aiName !== form.name.trim()) {
+    suggestions.push({
+      key: 'name',
+      label: pantryAiFieldLabels.name,
+      currentDisplay: form.name.trim() || '未填写',
+      suggestionDisplay: aiName,
+      defaultChecked: isEmptyText(form.name),
+      apply: (current) => ({ ...current, name: aiName }),
+    });
+  }
+
+  const aiCategory = pickEnumValue(pantryCategoryAllowList, ai.category);
+  if (aiCategory && aiCategory !== form.category) {
+    suggestions.push({
+      key: 'category',
+      label: pantryAiFieldLabels.category,
+      currentDisplay: form.category,
+      suggestionDisplay: aiCategory,
+      defaultChecked: false,
+      apply: (current) => ({ ...current, category: aiCategory }),
+    });
+  }
+
+  const aiLocation = pickEnumValue(pantryLocationAllowList, ai.storageLocation);
+  if (aiLocation && aiLocation !== form.location) {
+    suggestions.push({
+      key: 'location',
+      label: pantryAiFieldLabels.location,
+      currentDisplay: form.location,
+      suggestionDisplay: aiLocation,
+      defaultChecked: false,
+      apply: (current) => ({ ...current, location: aiLocation }),
+    });
+  }
+
+  if (typeof ai.quantity === 'number' && ai.quantity > 0 && ai.quantity !== form.quantity) {
+    const aiQuantity = ai.quantity;
+    suggestions.push({
+      key: 'quantity',
+      label: pantryAiFieldLabels.quantity,
+      currentDisplay: String(form.quantity),
+      suggestionDisplay: String(aiQuantity),
+      defaultChecked: form.quantity <= 1,
+      apply: (current) => ({ ...current, quantity: aiQuantity }),
+    });
+  }
+
+  const aiUnit = ai.unit?.trim();
+  if (aiUnit && aiUnit !== form.unit.trim()) {
+    suggestions.push({
+      key: 'unit',
+      label: pantryAiFieldLabels.unit,
+      currentDisplay: form.unit || '未填写',
+      suggestionDisplay: aiUnit,
+      defaultChecked: !form.unit || form.unit === '件',
+      apply: (current) => ({ ...current, unit: aiUnit }),
+    });
+  }
+
+  const aiExpires = ai.expiresAt?.trim();
+  if (aiExpires && aiExpires !== (form.expiresAt || '')) {
+    suggestions.push({
+      key: 'expiresAt',
+      label: pantryAiFieldLabels.expiresAt,
+      currentDisplay: form.expiresAt || '未填写',
+      suggestionDisplay: aiExpires,
+      defaultChecked: isEmptyText(form.expiresAt),
+      apply: (current) => ({ ...current, expiresAt: aiExpires }),
+    });
+  }
+
+  const aiOpenedAt = ai.purchaseDate?.trim();
+  if (aiOpenedAt && aiOpenedAt !== (form.openedAt || '')) {
+    suggestions.push({
+      key: 'openedAt',
+      label: pantryAiFieldLabels.openedAt,
+      currentDisplay: form.openedAt || '未填写',
+      suggestionDisplay: aiOpenedAt,
+      defaultChecked: isEmptyText(form.openedAt),
+      apply: (current) => ({ ...current, openedAt: aiOpenedAt }),
+    });
+  }
+
+  const aiTags = normalizePantryTags(Array.isArray(ai.tags) ? ai.tags : []);
+  const currentTags = normalizePantryTags(form.tags ?? []);
+  if (aiTags.length > 0 && formatPantryTagText(aiTags) !== formatPantryTagText(currentTags)) {
+    suggestions.push({
+      key: 'tags',
+      label: pantryAiFieldLabels.tags,
+      currentDisplay: formatPantryTagText(currentTags) || '未填写',
+      suggestionDisplay: formatPantryTagText(aiTags),
+      defaultChecked: currentTags.length === 0,
+      apply: (current) => ({ ...current, tags: aiTags }),
+    });
+  }
+
+  const aiNote = ai.summary?.trim();
+  if (aiNote && aiNote !== form.note.trim()) {
+    suggestions.push({
+      key: 'note',
+      label: pantryAiFieldLabels.note,
+      currentDisplay: form.note.trim() || '未填写',
+      suggestionDisplay: aiNote,
+      defaultChecked: isEmptyText(form.note),
+      apply: (current) => ({ ...current, note: aiNote }),
+    });
+  }
+
+  return suggestions;
+}
+
+export function applyPantryAiFieldSuggestions(
+  form: NewPantryItemInput,
+  suggestions: PantryAiFieldSuggestion[],
+  selectedKeys: ReadonlySet<PantryAiFieldKey>,
+): NewPantryItemInput {
+  return suggestions.reduce<NewPantryItemInput>((current, suggestion) => {
+    if (!selectedKeys.has(suggestion.key)) {
+      return current;
+    }
+    return suggestion.apply(current);
+  }, form);
 }
