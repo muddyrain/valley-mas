@@ -369,7 +369,9 @@ func pantryDerivedDateBounds(now time.Time) (string, string) {
 func applyPantryListFilters(query *gorm.DB, c *gin.Context) *gorm.DB {
 	status := strings.TrimSpace(c.Query("status"))
 	if status == "" || status == "all" {
-		query = query.Where("status NOT IN ?", []string{"used-up", "discarded"})
+		query = query.
+			Where("status NOT IN ?", []string{"used-up", "discarded"}).
+			Where("expires_at <> ''")
 	} else if status == "no-expiry" {
 		query = query.
 			Where("status NOT IN ?", []string{"used-up", "discarded"}).

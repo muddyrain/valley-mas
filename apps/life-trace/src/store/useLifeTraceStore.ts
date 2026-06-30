@@ -71,6 +71,7 @@ import { findNewlyUnlockedAchievements, normalizeAchievement } from '@/lib/achie
 import { normalizeAiActionRecord } from '@/lib/aiHistory';
 import { getLifeTraceErrorMessage } from '@/lib/error';
 import { getDefaultLedgerMonth } from '@/lib/ledger';
+import { withMinimumLoadingTime } from '@/lib/loading';
 import { resolvePantryStatus } from '@/lib/pantry';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
@@ -979,10 +980,8 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           pantryListOptions: nextOptions,
         });
         try {
-          const { householdId, householdName, list, pagination, summary } = await listPantry(
-            token,
-            nextOptions,
-          );
+          const { householdId, householdName, list, pagination, summary } =
+            await withMinimumLoadingTime(() => listPantry(token, nextOptions));
           if (requestId !== pantryListRequestId) {
             return;
           }

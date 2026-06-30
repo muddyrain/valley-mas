@@ -365,6 +365,7 @@ func TestPantrySupportsSharedHouseholdSelection(t *testing.T) {
 		Quantity:           2,
 		Unit:               "份",
 		Location:           "冷冻",
+		ExpiresAt:          time.Now().AddDate(0, 0, 30).Format("2006-01-02"),
 		Status:             "normal",
 		ReminderEnabled:    true,
 		ReminderUseDefault: true,
@@ -626,6 +627,22 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 			CreatedAt:          baseCreatedAt.Add(3 * time.Hour),
 			UpdatedAt:          baseCreatedAt.Add(3 * time.Hour),
 		},
+		{
+			UserID:             101,
+			Name:               "未设过期纸巾",
+			Category:           "日用品",
+			Quantity:           1,
+			Unit:               "包",
+			Location:           "储物柜",
+			ExpiresAt:          "",
+			Status:             "normal",
+			ReminderEnabled:    false,
+			ReminderUseDefault: true,
+			ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+			ReminderTime:       "09:00",
+			CreatedAt:          baseCreatedAt.Add(4 * time.Hour),
+			UpdatedAt:          baseCreatedAt.Add(4 * time.Hour),
+		},
 	}
 	for _, item := range seedItems {
 		if err := database.GetDB().Create(&item).Error; err != nil {
@@ -651,6 +668,16 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 	discardedList := discardedData["list"].([]interface{})
 	if len(discardedList) != 1 || discardedList[0].(map[string]interface{})["name"] != "已丢弃牛奶" {
 		t.Fatalf("expected discarded filter to return only discarded item, got %+v", discardedList)
+	}
+
+	noExpiryReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?status=no-expiry&page=1&pageSize=10", nil)
+	noExpiryResp := httptest.NewRecorder()
+	router.ServeHTTP(noExpiryResp, noExpiryReq)
+
+	noExpiryData := decodeTracePayload(t, noExpiryResp)["data"].(map[string]interface{})
+	noExpiryList := noExpiryData["list"].([]interface{})
+	if len(noExpiryList) != 1 || noExpiryList[0].(map[string]interface{})["name"] != "未设过期纸巾" {
+		t.Fatalf("expected no-expiry filter to return only items without expiry, got %+v", noExpiryList)
 	}
 
 	pageReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?page=1&pageSize=2", nil)
@@ -697,7 +724,7 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 		t.Fatalf("expected pagination metadata for remaining items, got %+v", pagination)
 	}
 	summary := pageData["summary"].(map[string]interface{})
-	if summary["total"] != float64(3) || summary["expiring"] != float64(1) || summary["expired"] != float64(1) || summary["active"] != float64(2) {
+	if summary["total"] != float64(4) || summary["expiring"] != float64(1) || summary["expired"] != float64(1) || summary["active"] != float64(3) {
 		t.Fatalf("expected consolidated pantry summary, got %+v", summary)
 	}
 }
