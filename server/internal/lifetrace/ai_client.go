@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"valley-server/internal/aiclient"
 	"valley-server/internal/aiusage"
 	lifeai "valley-server/internal/lifetrace/ai"
 
@@ -660,73 +661,27 @@ func callLifeTraceAIWithMaxTokens(ctx context.Context, cfg lifeTraceAIConfig, pr
 	return result.Content, result.Model, err
 }
 
-type lifeTraceOpenAIRequest struct {
-	Model             string                   `json:"model"`
-	Messages          []lifeTraceOpenAIMessage `json:"messages"`
-	Temperature       float64                  `json:"temperature,omitempty"`
-	MaxTokens         int                      `json:"max_tokens,omitempty"`
-	ResponseFormat    *lifeTraceResponseFormat `json:"response_format,omitempty"`
-	Stream            bool                     `json:"stream,omitempty"`
-	Tools             []lifeTraceOpenAITool    `json:"tools,omitempty"`
-	ToolChoice        interface{}              `json:"tool_choice,omitempty"`
-	ParallelToolCalls *bool                    `json:"parallel_tool_calls,omitempty"`
-}
+type lifeTraceOpenAIRequest = aiclient.OpenAIRequest
 
-type lifeTraceOpenAIMessage struct {
-	Role      string                    `json:"role"`
-	Content   string                    `json:"content"`
-	ToolCalls []lifeTraceOpenAIToolCall `json:"tool_calls,omitempty"`
-}
+type lifeTraceOpenAIMessage = aiclient.OpenAIMessage
 
-type lifeTraceOpenAITool struct {
-	Type     string                             `json:"type"`
-	Function *lifeTraceOpenAIFunctionDefinition `json:"function,omitempty"`
-}
+type lifeTraceOpenAITool = aiclient.OpenAITool
 
-type lifeTraceOpenAIFunctionDefinition struct {
-	Name        string      `json:"name"`
-	Description string      `json:"description,omitempty"`
-	Parameters  interface{} `json:"parameters"`
-}
+type lifeTraceOpenAIFunctionDefinition = aiclient.OpenAIFunctionDefinition
 
-type lifeTraceOpenAIToolChoice struct {
-	Type     string                            `json:"type"`
-	Function lifeTraceOpenAIToolChoiceFunction `json:"function"`
-}
+type lifeTraceOpenAIToolChoice = aiclient.OpenAIToolChoice
 
-type lifeTraceOpenAIToolChoiceFunction struct {
-	Name string `json:"name"`
-}
+type lifeTraceOpenAIToolChoiceFunction = aiclient.OpenAIToolChoiceFunction
 
-type lifeTraceOpenAIToolCall struct {
-	ID       string                      `json:"id,omitempty"`
-	Type     string                      `json:"type,omitempty"`
-	Function lifeTraceOpenAIFunctionCall `json:"function"`
-}
+type lifeTraceOpenAIToolCall = aiclient.OpenAIToolCall
 
-type lifeTraceOpenAIFunctionCall struct {
-	Name      string `json:"name,omitempty"`
-	Arguments string `json:"arguments,omitempty"`
-}
+type lifeTraceOpenAIFunctionCall = aiclient.OpenAIFunctionCall
 
-type lifeTraceResponseFormat struct {
-	Type string `json:"type"`
-}
+type lifeTraceResponseFormat = aiclient.OpenAIResponseFormat
 
-type lifeTraceOpenAIResponse struct {
-	Model   string `json:"model"`
-	Choices []struct {
-		Message lifeTraceOpenAIMessage `json:"message"`
-	} `json:"choices"`
-}
+type lifeTraceOpenAIResponse = aiclient.OpenAIResponse
 
-type lifeTraceOpenAIStreamResponse struct {
-	Model   string `json:"model"`
-	Choices []struct {
-		Delta        lifeTraceOpenAIMessage `json:"delta"`
-		FinishReason string                 `json:"finish_reason"`
-	} `json:"choices"`
-}
+type lifeTraceOpenAIStreamResponse = aiclient.OpenAIStreamResponse
 
 func streamLifeTraceAssistantOpenAI(
 	c *gin.Context,
