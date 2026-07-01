@@ -231,14 +231,7 @@ func parseLifeTraceAssistantOpenAIToolCalls(toolCalls []lifeTraceOpenAIToolCall)
 }
 
 func isLifeTraceAssistantToolUnsupported(statusCode int, respBody []byte) bool {
-	if statusCode != http.StatusBadRequest {
-		return false
-	}
-	body := strings.ToLower(string(respBody))
-	if !(strings.Contains(body, "tools") || strings.Contains(body, "tool_choice") || strings.Contains(body, "tool_calls")) {
-		return false
-	}
-	return strings.Contains(body, "not supported") || strings.Contains(body, "invalid")
+	return aiclient.IsOpenAIToolUnsupported(statusCode, respBody)
 }
 
 func callLifeTraceAssistantToolARK(
@@ -277,8 +270,7 @@ func callLifeTraceAssistantToolARK(
 		ParallelToolCalls: &parallelToolCalls,
 	})
 	if err != nil {
-		lower := strings.ToLower(err.Error())
-		if strings.Contains(lower, "tools") || strings.Contains(lower, "tool_choice") || strings.Contains(lower, "tool_calls") {
+		if aiclient.IsARKToolUnsupportedError(err) {
 			return lifeTraceAssistantStructuredResponse{}, "", fmt.Errorf("%w: %v", errLifeTraceAssistantToolUnsupported, err)
 		}
 		return lifeTraceAssistantStructuredResponse{}, "", err
