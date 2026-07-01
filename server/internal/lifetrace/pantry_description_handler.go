@@ -2,19 +2,17 @@ package lifetrace
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"valley-server/internal/aiusage"
+	prompts "valley-server/internal/lifetrace/ai/prompts"
 	"valley-server/internal/logger"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
-const lifeTracePantryDescriptionMaxTokens = 480
+const lifeTracePantryDescriptionMaxTokens = prompts.PantryDescriptionMaxTokens
 
 type pantryDescriptionRequest struct {
 	Name      string   `json:"name"`
@@ -26,10 +24,7 @@ type pantryDescriptionRequest struct {
 	Note      string   `json:"note"`
 }
 
-type pantryDescriptionAIResponse struct {
-	Note string   `json:"note"`
-	Tips []string `json:"tips"`
-}
+type pantryDescriptionAIResponse = prompts.PantryDescriptionOutput
 
 func (h *Handler) GeneratePantryDescription(c *gin.Context) {
 	userID, ok := currentUserID(c)
@@ -93,62 +88,21 @@ func (h *Handler) GeneratePantryDescription(c *gin.Context) {
 }
 
 func buildPantryDescriptionPrompt(req pantryDescriptionRequest) string {
-	var b strings.Builder
-	b.WriteString("你是 Life Trace 的家庭库存助手，任务是为一件库存写一段简短实用的中文备注。\n")
-	b.WriteString("输出严格 JSON，字段：note(string, 30-80 字，以储存方式/最佳食用期/常见注意事项为主，语气克制不夸张)，tips(string[], 2-3 条短建议，每条不超过 14 字)。\n\n")
-	b.WriteString(fmt.Sprintf("商品名称：%s\n", strings.TrimSpace(req.Name)))
-	if v := strings.TrimSpace(req.Category); v != "" {
-		b.WriteString(fmt.Sprintf("分类：%s\n", v))
-	}
-	if v := strings.TrimSpace(req.Location); v != "" {
-		b.WriteString(fmt.Sprintf("存放位置：%s\n", v))
-	}
-	if v := strings.TrimSpace(req.ExpiresAt); v != "" {
-		b.WriteString(fmt.Sprintf("过期日：%s\n", v))
-	}
-	if v := strings.TrimSpace(req.OpenedAt); v != "" {
-		b.WriteString(fmt.Sprintf("开封日：%s\n", v))
-	}
-	if len(req.Tags) > 0 {
-		b.WriteString(fmt.Sprintf("标签：%s\n", strings.Join(req.Tags, "、")))
-	}
-	if v := strings.TrimSpace(req.Note); v != "" {
-		b.WriteString(fmt.Sprintf("现有备注（可改写）：%s\n", v))
-	}
-	b.WriteString("\n只输出 JSON，不要 markdown，不要多余文本。")
-	return b.String()
+	return prompts.BuildPantryDescriptionPrompt(prompts.PantryDescriptionInput{
+		Name:      req.Name,
+		Category:  req.Category,
+		Location:  req.Location,
+		Tags:      req.Tags,
+		ExpiresAt: req.ExpiresAt,
+		OpenedAt:  req.OpenedAt,
+		Note:      req.Note,
+	})
 }
 
 func parsePantryDescriptionAIResponse(raw string) (pantryDescriptionAIResponse, error) {
-	start := strings.Index(raw, "{")
-	end := strings.LastIndex(raw, "}")
-	if start < 0 || end <= start {
-		return pantryDescriptionAIResponse{}, errors.New("missing JSON object")
-	}
-	var parsed pantryDescriptionAIResponse
-	if err := json.Unmarshal([]byte(raw[start:end+1]), &parsed); err != nil {
-		return pantryDescriptionAIResponse{}, err
-	}
-	if strings.TrimSpace(parsed.Note) == "" && len(parsed.Tips) == 0 {
-		return pantryDescriptionAIResponse{}, errors.New("empty AI output")
-	}
-	return parsed, nil
+	return prompts.ParsePantryDescriptionOutput(raw)
 }
 
 func normalizeDescriptionTips(tips []string) []string {
-	result := make([]string, 0, len(tips))
-	for _, t := range tips {
-		t = strings.TrimSpace(t)
-		if t == "" {
-			continue
-		}
-		if len([]rune(t)) > 24 {
-			t = string([]rune(t)[:24])
-		}
-		result = append(result, t)
-		if len(result) >= 4 {
-			break
-		}
-	}
-	return result
+	return prompts.NormalizePantryDescriptionTips(tips)
 }

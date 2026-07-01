@@ -12,6 +12,7 @@ import (
 	"time"
 	"valley-server/internal/aiusage"
 	"valley-server/internal/database"
+	prompts "valley-server/internal/lifetrace/ai/prompts"
 	"valley-server/internal/logger"
 	"valley-server/internal/model"
 
@@ -85,18 +86,7 @@ type outfitSuggestionsRequest struct {
 	PreferShared bool     `json:"preferShared"`
 }
 
-type clothingPhotoAnalysisAIResponse struct {
-	Name        string   `json:"name"`
-	Category    string   `json:"category"`
-	Color       string   `json:"color"`
-	Material    string   `json:"material"`
-	WarmthLevel string   `json:"warmthLevel"`
-	Seasons     []string `json:"seasons"`
-	SceneTags   []string `json:"sceneTags"`
-	Summary     string   `json:"summary"`
-	Confidence  float64  `json:"confidence"`
-	Warnings    []string `json:"warnings"`
-}
+type clothingPhotoAnalysisAIResponse = prompts.ClothingPhotoAnalysisOutput
 
 type outfitSuggestion struct {
 	Title       string                      `json:"title"`
@@ -944,31 +934,16 @@ func (h *Handler) AnalyzeClothingPhoto(c *gin.Context) {
 }
 
 func buildClothingPhotoAnalysisPrompt(hint string, householdName string, useVision bool) string {
-	imageInstruction := "请直接观察图片中的衣物主体。"
-	if !useVision {
-		imageInstruction = "如果无法看到图片，只根据用户提示生成保守草稿。"
-	}
-	return strings.Join([]string{
-		"你是 Life Trace 的衣橱识别 AI，只输出一个 JSON 对象，不要 Markdown，不要解释。",
-		"JSON 格式：{\"name\":\"衣物名称，24字以内\",\"category\":\"上装|下装|外套|鞋履|配饰|包袋|套装|其他\",\"color\":\"主色，12字以内\",\"material\":\"材质或面料，20字以内\",\"warmthLevel\":\"轻薄|常规|保暖|厚重\",\"seasons\":[\"春\"],\"sceneTags\":[\"通勤\"],\"summary\":\"识别摘要，60字以内\",\"confidence\":0.7,\"warnings\":[\"提醒\"]}",
-		imageInstruction,
-		"seasons 只能从 春、夏、秋、冬、四季 中选择 1-4 个；sceneTags 输出 1-4 个简体中文短标签。",
-		"不要编造品牌、价格、尺码或用户没有提供的信息。",
-		"",
-		fmt.Sprintf("当前空间：%s", householdName),
-		fmt.Sprintf("用户提示：%s", emptyInboxPromptText(hint)),
-	}, "\n")
+	return prompts.BuildClothingPhotoAnalysisPrompt(prompts.ClothingPhotoAnalysisInput{
+		HouseholdName: householdName,
+		Hint:          emptyInboxPromptText(hint),
+		UseVision:     useVision,
+	})
 }
 
 func parseClothingPhotoAnalysisAIResponse(raw string) (clothingPhotoAnalysisAIResponse, error) {
-	raw = strings.TrimSpace(raw)
-	start := strings.Index(raw, "{")
-	end := strings.LastIndex(raw, "}")
-	if start < 0 || end <= start {
-		return clothingPhotoAnalysisAIResponse{}, errors.New("missing JSON object")
-	}
-	var parsed clothingPhotoAnalysisAIResponse
-	if err := json.Unmarshal([]byte(raw[start:end+1]), &parsed); err != nil {
+	parsed, err := prompts.ParseClothingPhotoAnalysisOutput(raw)
+	if err != nil {
 		return clothingPhotoAnalysisAIResponse{}, err
 	}
 	parsed.Name = trimRunes(strings.TrimSpace(parsed.Name), 24)
@@ -1226,18 +1201,17 @@ func buildOutfitSuggestionPrompt(items []model.LifeTraceClosetItem, req outfitSu
 	for _, item := range items {
 		lines = append(lines, fmt.Sprintf("- id=%s｜%s｜%s｜%s｜%s｜%s｜%s", item.ID.String(), item.Name, item.Category, item.Color, item.WarmthLevel, strings.Join(item.Seasons, "、"), strings.Join(item.SceneTags, "、")))
 	}
-	return strings.Join([]string{
-		"你是 Life Trace 的穿搭建议 AI，只输出一个 JSON 对象，不要 Markdown，不要解释。",
-		"JSON 格式：{\"suggestions\":[{\"title\":\"标题，18字以内\",\"summary\":\"建议，60字以内\",\"itemIds\":[\"衣物id\"]}]}",
-		"只从给定衣物 id 中选择；输出 1-3 套；每套 1-5 件。",
-		"优先结合天气、温度、降水、计划类型和场景；不要编造新衣物。",
-		"",
-		fmt.Sprintf("天气：%s；温度：%d；低温：%d；高温：%d；降水：%s。", req.WeatherText, req.Temperature, req.LowTemp, req.HighTemp, req.Precip),
-		fmt.Sprintf("计划：%s；场景：%s；标题：%s。", req.PlanType, req.Scene, req.PlanTitle),
-		"",
-		"衣物：",
-		strings.Join(lines, "\n"),
-	}, "\n")
+	return prompts.BuildOutfitSuggestionPrompt(prompts.OutfitSuggestionInput{
+		ItemLines:   lines,
+		WeatherText: req.WeatherText,
+		Temperature: req.Temperature,
+		LowTemp:     req.LowTemp,
+		HighTemp:    req.HighTemp,
+		Precip:      req.Precip,
+		PlanType:    req.PlanType,
+		Scene:       req.Scene,
+		PlanTitle:   req.PlanTitle,
+	})
 }
 
 func parseOutfitSuggestionAIResponse(raw string, items []model.LifeTraceClosetItem, req outfitSuggestionsRequest, modelName string) ([]outfitSuggestion, error) {

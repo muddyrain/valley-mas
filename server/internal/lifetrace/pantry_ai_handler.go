@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 	lifeai "valley-server/internal/lifetrace/ai"
+	prompts "valley-server/internal/lifetrace/ai/prompts"
 	"valley-server/internal/service"
 	"valley-server/internal/utils"
 
@@ -125,26 +126,12 @@ func readLifeTracePantryThumbnailConfig() (lifeTracePantryThumbnailConfig, strin
 }
 
 func buildPantryThumbnailPrompt(req pantryThumbnailRequest) string {
-	name := strings.TrimSpace(req.Name)
-	if name == "" {
-		name = "家庭库存商品"
-	}
-	category := normalizePantryCategory(req.Category)
-	location := normalizePantryLocation(req.Location)
-	note := trimRunes(strings.TrimSpace(req.Note), 60)
-	if note == "" {
-		note = "适合放进 Life Trace 家庭库存列表的封面图。"
-	}
-
-	return strings.Join([]string{
-		"为 Life Trace 家庭库存生成一张小尺寸缩略图，优先保证生成速度。",
-		"主体必须清晰、居中、单一，不要拼贴，不要多件堆叠，不要人物，不要文字，不要水印，不要 logo。",
-		"画面适合手机端库存列表封面，背景简洁，细节不用过多，像干净的商品小图。",
-		fmt.Sprintf("商品名称：%s。", name),
-		fmt.Sprintf("分类：%s。", category),
-		fmt.Sprintf("存放位置：%s。", location),
-		fmt.Sprintf("补充说明：%s", note),
-	}, "\n")
+	return prompts.BuildPantryThumbnailPrompt(prompts.PantryThumbnailInput{
+		Name:     req.Name,
+		Category: normalizePantryCategory(req.Category),
+		Location: normalizePantryLocation(req.Location),
+		Note:     req.Note,
+	})
 }
 
 func generatePantryThumbnail(
