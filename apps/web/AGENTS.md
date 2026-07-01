@@ -5,7 +5,7 @@
 ## 功能定位
 
 - `apps/web` 是 Valley MAS 的用户侧前台，负责首页展示、创作者空间、资源库、博客/图文、访客留言、个人空间、收藏关注、下载记录、通知、个人资料和登录注册。
-- 技术栈为 React 19 + Vite 6 + React Router 7 + Tailwind 4，并复用 workspace 包如 `@valley/shared`、`@valley/shared-request`、`@valley/shared-router`、`@valley/shared-format`。
+- 技术栈为 React 19 + Vite 6 + React Router 7 + Tailwind 4，并复用 workspace 包如 `@valley/shared-request`、`@valley/shared-router`、`@valley/shared-format`。
 - Web/Admin API 地址来自 `VITE_API_BASE_URL`，示例见 `.env.example`。
 
 ## 路由与代码入口

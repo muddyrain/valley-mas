@@ -29,7 +29,7 @@
 | Admin 后台 | `apps/admin/AGENTS.md` | 管理后台页面、审核与管理流程、Ant Design 管理端组件和 Admin API 封装。 |
 | Desktop OS | `apps/desktop-os/AGENTS.md` | macOS Plush 毛毡桌面、Dock/Launchpad/Spotlight、Finder/Safari/Mail/Blog/Music/AI Command Center 等窗口与 Mini Apps。 |
 | AI Mind Arena | `apps/ai-mind-arena/AGENTS.md` | 脑内会议室 Next.js 前端、多人格辩论 UI、SSE 对战流和分享体验。 |
-| WorldSim | `apps/world-sim/AGENTS.md` | 沙盒文明模拟游戏、游戏设计文档、Phaser/Vite 子项目规则。 |
+| WorldSim | `apps/world-sim/AGENTS.md` | 沙盒文明模拟游戏、游戏设计文档、React/Vite/Pixi.js 子项目规则。 |
 | Scratch Legend | `apps/scratch-legend/AGENTS.md` | 刮刮卡成长游戏，按设计文档和阶段任务逐步实现。 |
 | Toy Climb Arena | `apps/toy-climb-arena/AGENTS.md` | Three.js 玩具世界攀爬游戏、关卡、模型资源和物理验证。 |
 | Go 服务端 | `server/AGENTS.md` | Gin/GORM API、认证中间件、业务处理器、数据模型、AI 与 Mind Arena 服务端能力。 |

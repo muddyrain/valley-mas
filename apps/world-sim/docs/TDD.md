@@ -460,22 +460,19 @@ apps/world-sim/
 - v3+：内置"剧本编辑器"页面，可在浏览器内拖拽配置势力/地图/事件，导出 JSON 剧本，零代码扩展。
 
 ### 9.6 兼容根项目协作约定
-- `apps/world-sim/AGENTS.md`：后续补 WorldSim 子项目协作入口（路由、命名、规则）。
-- `apps/world-sim/docs/PLAN.md`：作为唯一计划文档，受 `game-doc-sync-guard` 约束。
-- 任何玩法/参数/架构改动需要同步本 TDD、PLAN 与对应剧本设计文档（受 `game-doc-sync-guard` 与根 `AGENTS.md` 红线约束）。
+- `apps/world-sim/AGENTS.md`：WorldSim 子项目协作入口，记录路由、命名、地图模式和验证规则。
+- 当前没有单独的 `apps/world-sim/docs/PLAN.md`；长期设计基线以本 TDD 为主，平衡专项记录放在 `docs/BALANCE_FIX_PLAN.md`。
+- 任何玩法/参数/架构改动需要同步本 TDD 与对应设计文档（受 `game-doc-sync-guard` 与根 `AGENTS.md` 红线约束）。
 - 由于本项目定位与既有"WorldBox 式沙盒"略有不同，后续根级文档（`docs/PROJECT_GUIDE.md` 与根 `AGENTS.md` 的 WorldSim 描述）需要在确认后同步更新；TDD 仅描述设计，不改动这些文档。
 
-### 9.7 GeoJSON 地图源（Phase 10 新增）
-- **定位**：地图来源由"随机生成"扩展为"随机 + 真实地理 GeoJSON"，模拟内核（争夺/地形权重/事件/剧本）保持不变；只替换 `MapData` 的产出方。
-- **核心入口**：`core/map/geojson.ts` 提供 `buildMapFromGeoJSON(raw, options)`，负责 `FeatureCollection → MapData` 的转换：
-  - 仅接受 `Polygon`/`MultiPolygon`；MultiPolygon 取面积最大的 outer ring 作为渲染主多边形，所有 ring 仍参与邻接推导。
-  - equirectangular 投影到目标 `bounds`（保纵横比、居中），不使用 mercator，避免高纬变形。
-  - 通过 quantize 后的有向边 hash 推导邻接：同一条边出现在 2+ feature 即邻居，仅一次即外边界。
-  - 调用既有 `assignTerrains` 给每个 region 分配 elevation/moisture/terrain，与 random 地图共用同一套地形模型。
-- **地图源注册表**：`core/map/sources.ts` 声明 `GeoMapId = 'china-province' | 'china-city' | 'world-country' | 'us-state'`，每个 source 提供 `defaultUrl`、`nameProperty`、`bounds` 与稳定 seed（`defaultSeedFor`）。运行期通过 `fetch` 加载，不打包 GeoJSON 数据；用户可在 `apps/world-sim/public/geo/<id>.json` 放离线副本，或通过 `loadGeoMap({ url })` 替换 CDN。
-- **状态层**：`mapSlice` 引入 `mapSource: 'random' | GeoMapId`、`geoRegionNames`、`geoLoadStatus`（idle/loading/ok/error）、`geoLoadError`，新增 `loadGeoMap(id, options)` 异步动作。加载完成后会复用 `loadScenario(currentScenarioId)`，确保剧本（势力/出生点）在新地图上重新落地。
-- **UI 入口**：Sidebar 新增"地图来源"面板，提供"随机生成 / 中国省份 / 中国地级市 / 世界国家 / 美国州"5 个按钮；加载中禁用、出错时展示 `geoLoadError`。Inspector 在 GeoJSON 模式下展示中文行政区名（`{name}（#id）`）。
-- **不变量**：`Province / BorderEdge / MapData` 结构、Phase 5 模拟内核、Phase 6 日志、Phase 8 剧本系统、Phase 9 编辑模式均零改动；GeoJSON 地图与 random 地图在下游一视同仁。
+### 9.7 地图模式现状
+- **定位**：当前运行时地图来源只保留程序化生成模式，不再保留 GeoJSON 资源或 `/public/geo` 离线地图入口。
+- **地图源注册表**：`core/map/sources.ts` 声明 `MapModeId = 'random' | 'three-kingdoms'`，每个模式提供 UI 名称、简介和推荐渲染框尺寸。
+- **随机生成**：`random` 使用 Voronoi 随机生成 + 陆地掩膜，适合作为默认沙盒地图。
+- **三国地图**：`three-kingdoms` 仍使用同一套生成器，但切换到更宽的地图框，并给 seed 增加稳定后缀，适配三国剧本开局。
+- **状态层**：`mapSlice` 维护 `mapMode`、`seed`、`provinceCount` 和生成耗时；`setMapMode` / `regenerateMap` 完成后复用 `loadScenario(currentScenarioId)`，确保势力和出生点在新地图上重新落地。
+- **UI 入口**：Sidebar 的"地图模式"面板只展示注册表中的运行时模式，不展示外部地图文件加载。
+- **后续扩展**：如需恢复 GeoJSON 或其他真实地理地图，应另开设计任务，补齐转换器、加载状态、许可说明、测试和本节文档后再加入运行时入口。
 
 ### 9.8 Replay System（Phase 11 新增）
 - **定位**：在不动模拟内核与渲染层的前提下，把每个 sim tick 的副作用结构化记录下来，支持暂停/快进/慢放/拖动时间轴/导出 JSON/导入 JSON 与重新观看完整历史。
@@ -483,13 +480,13 @@ apps/world-sim/
   - `ReplayPatch { regionId, from, to }`：本 tick 内州归属变化（plain number，便于 JSON 化）。
   - `ReplayRankingRow { factionId, regions }`：本 tick 结束后排行榜行（仅 regions，名字/颜色由 baseline 索引）。
   - `ReplayFrame { tick, patches, events, rankings, status, winnerFactionId }`：单 tick 帧。
-  - `ReplayDoc { version, exportedAt, meta, initialOwnership, initialFactions, frames }`：完整可导出文档；`meta` 含 seed / provinceCount / mapSource / scenarioId / totalTicks。
+  - `ReplayDoc { version, exportedAt, meta, initialOwnership, initialFactions, frames }`：完整可导出文档；`meta` 含 seed / provinceCount / mapMode / scenarioId / totalTicks。
   - `ReplaySpeed = '0.25x'|'0.5x'|'1x'|'2x'|'4x'|'8x'` + `REPLAY_SPEED_MULTIPLIER`。
 - **状态层**：新增 `state/slices/replaySlice.ts`，挂到 `WorldSimStore`。
   - 字段：`replayMode`（recording / replaying）、`replayPlaying`、`replaySpeed`、`replayCursor`、`replayFrames`、`initialOwnership`、`initialFactions`、`baselineScenarioId`、`replayMessage`。
   - 动作：`captureBaseline / recordFrame / enterReplayMode / exitReplayMode / toggleReplayPlay / setReplaySpeed / stepReplay / seekReplay / exportReplayToJson / importReplayFromJson`。
   - 内部 `rebuildWorldUpToCursor`：从 `initialOwnership` 复制，按 `frames[0..cursor)` 应用 patches；同时聚合 events、重建 factions（regions 重新统计、name/leader/color 用 initialFactions 还原）、写回 `map/factions/logs/tick/status/winnerFactionId/snapshotVersion`。logs 末端按 `MAX = 1000` 截断。
-- **录制时机**：`captureBaseline()` 由 `loadScenario` / `resetBattle` 在结束设置后立即调用；`mapSlice.regenerateMap` / `loadGeoMap` 通过末尾的 `loadScenario(currentScenarioId)` 间接触发。`simSlice.driveOneTick` 写完 `set` 后，仅当 `replayMode === 'recording'` 时把 `patches/events/rankings/status/winnerFactionId` 打包成 `ReplayFrame` 调 `recordFrame`，cursor++。
+- **录制时机**：`captureBaseline()` 由 `loadScenario` / `resetBattle` 在结束设置后立即调用；`mapSlice.regenerateMap` / `setMapMode` 通过末尾的 `loadScenario(currentScenarioId)` 间接触发。`simSlice.driveOneTick` 写完 `set` 后，仅当 `replayMode === 'recording'` 时把 `patches/events/rankings/status/winnerFactionId` 打包成 `ReplayFrame` 调 `recordFrame`，cursor++。
 - **回放驱动**：`App.tsx` 主 RAF 在 `replayMode === 'replaying'` 时优先：累积 `dt * REPLAY_SPEED_MULTIPLIER * BASE_TICKS_PER_SECOND`，每帧最多 `stepReplay(8)`；到达末尾自动暂停。`replayMode === 'recording'` 时走原有 sim 推进逻辑，互不交叉。
 - **UI**：`ui/replaybar/ReplayBar.tsx` 居于 LogPanel 之上的 HUD 中。
   - 左：title + 模式 chip（录制中 / 回放中）+ `cursor / total`。
@@ -497,7 +494,7 @@ apps/world-sim/
   - 右：6 档倍速（仅回放可见）、进入回放 / 退出回放、导出 JSON、导入 JSON（隐藏 file input）。
   - 导出：`Blob` + `URL.createObjectURL` 触发下载，文件名 `worldsim-replay-<ISO>.json`。
 - **导入兼容**：`importReplayFromJson` 校验 version、provinceCount 与当前地图一致，落地后切到 `replayMode = 'replaying'`、`replayPlaying = false`、`cursor = 0`，并立即 `rebuildWorldUpToCursor(0)`。
-- **不变量**：模拟内核（`core/sim`）、地图层（`core/map`）、剧本系统（`core/scenario`）、编辑模式（`editSlice`）、Phase 10 GeoJSON 加载链路均零改动；Replay 仅依赖 `RegionId / FactionId` 索引，与地图来源无关，random / GeoJSON / 编辑后导入的地图均可录制与回放。
+- **不变量**：模拟内核（`core/sim`）、地图层（`core/map`）、剧本系统（`core/scenario`）和编辑模式（`editSlice`）均零改动；Replay 仅依赖 `RegionId / FactionId` 索引，与地图模式无关，随机 / 三国 / 编辑后导入的地图均可录制与回放。
 
 ### 9.9 Territory Warfare Refactor（Phase 8.5 新增）
 

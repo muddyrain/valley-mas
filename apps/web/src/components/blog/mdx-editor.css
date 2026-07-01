@@ -52,8 +52,8 @@
   --crepe-color-hover: color-mix(in srgb, var(--theme-primary-soft) 72%, white);
   --crepe-color-selected: var(--editor-selection-bg);
   --crepe-color-inline-area: color-mix(in srgb, var(--theme-primary-soft) 48%, white);
-  --crepe-font-title: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
-  --crepe-font-default: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --crepe-font-title: ui-sans-serif, system-ui, sans-serif;
+  --crepe-font-default: ui-sans-serif, system-ui, sans-serif;
   --crepe-font-code:
     "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, monospace;

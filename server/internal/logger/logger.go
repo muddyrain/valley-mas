@@ -34,8 +34,8 @@ func InitLogger() {
 	// 设置日志级别
 	Log.SetLevel(logrus.InfoLevel)
 
-	// Vercel/Serverless 环境建议只输出 stdout，避免文件系统写入问题。
-	if os.Getenv("VERCEL") != "" || os.Getenv("DISABLE_FILE_LOG") == "1" {
+	// 允许在只读或临时运行环境中关闭文件日志。
+	if os.Getenv("DISABLE_FILE_LOG") == "1" {
 		if gin.Mode() == gin.DebugMode {
 			Log.SetOutput(os.Stdout)
 		} else {

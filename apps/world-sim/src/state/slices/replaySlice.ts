@@ -29,8 +29,8 @@ import type { SimSlice } from './simSlice';
  * - replayMode === 'replaying'：sim 暂停，由 App.tsx 的 RAF 按 replaySpeed 调用 stepReplay 前进；
  *   拖动时间轴或后退时调用 seekReplay，重建 ownership / factions / logs / status / tick。
  *
- * 不感知地图来源（random / GeoJSON 都一样），仅依赖 RegionId / FactionId 索引；
- * 因此 GeoJSON 地图 + 编辑后导入的地图都能录回放。
+ * 不感知地图模式（random / three-kingdoms 都一样），仅依赖 RegionId / FactionId 索引；
+ * 因此程序化地图 + 编辑后导入的地图都能录回放。
  */
 export type ReplayMode = 'recording' | 'replaying';
 
