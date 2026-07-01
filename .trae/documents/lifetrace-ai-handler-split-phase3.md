@@ -1,7 +1,8 @@
 # 第三刀 · `lifetrace/ai_client.go` 双轨收编 & OpenAI 兼容层下沉
 
-> 状态：**规划中（草稿）**，等待 owner 审批后进入 Task 拆分。
-> 上刀基础：第四刀已完成 prompt 域下沉（commit `be6506ea`），本刀开始处理"字符最多、耦合最深、双轨（ARK / OpenAI）分叉"的调用层。
+> 状态：**已落地**（Task 1-7 全部完成，commit `5ca4c998` → `b5d87300`）。
+> 上刀基础：第四刀已完成 prompt 域下沉（commit `be6506ea`），本刀完成"字符最多、耦合最深、双轨（ARK / OpenAI）分叉"调用层的收编。
+> 最终成果：`ai_client.go` 841 → **288 行**（未达 ≤100 目标，差距原因见"完成标准"备注）；能力全部下沉到 `internal/aiclient` + `internal/lifetrace/ai`。
 
 ---
 
@@ -314,17 +315,21 @@ func streamLifeTraceAssistantARK(c *gin.Context, ctx context.Context, client *ar
 
 ## 完成标准
 
-- [ ] `ai_client.go` 从 841 行降到 ≤ 100 行，只留 type alias + shim
-- [ ] `internal/aiclient` 新增 OpenAI 完整类型 + tool_calls + stream 客户端（导出，加文档）
-- [ ] `internal/lifetrace/ai/` 新增 `AssistantCaller` / `AssistantStreamer` 双轨编排
-- [ ] `cd server && go build ./...` 通过
-- [ ] `cd server && go test ./...` 全绿
-- [ ] `python3 .agents/skills/encoding-guard/scripts/check_mojibake.py <所有改动文件>` PASS
-- [ ] `ai_handler_test.go` / `inbox_handler_test.go` 零改动仍能编译通过
-- [ ] 无残留 `lifetrace.lifeTraceOpenAI*` 私有类型定义（都成为 aiclient 类型的 alias）
-- [ ] Karpathy 4 原则自检结论写入最终回复
-- [ ] 本 md 状态从"规划中"更新为"已落地"
-- [ ] AGENTS.md / project_memory.md 无需更新（本刀是内部收编，无接口/依赖/产品状态变化）
+- [x] `ai_client.go` 从 841 行降到 **288 行**（未达 ≤100 目标：保留 `callLifeTraceTextAIWithMaxTokens` 完整 ARK SDK 单轮实现供 `achievement_handler.go` 使用 ~55 行 + `buildLifeTraceAssistantToolSchema` 依赖 lifetrace 域 registry 无法上收 ~70 行 + `readLifeTraceArkTextConfig` 保留原地 env 读取 ~15 行 + 11 个 type alias + 7 个 shim 函数签名 + adapter 胶水）
+- [x] `internal/aiclient` 新增 OpenAI 完整类型（`openai_types.go`）+ tool_calls 错误识别（`toolcall.go`）+ SSE 写入器（`stream.go`）
+- [x] `internal/lifetrace/ai/` 新增 `AssistantCaller`（`assistant_caller.go`）+ `AssistantStreamer`（`stream.go`）+ sentinel 错误（`errors.go`）
+- [x] `cd server && go build ./...` 通过
+- [x] `cd server && go test ./... -count=1` 全绿（27 个包全部 ok）
+- [x] `python3 .agents/skills/encoding-guard/scripts/check_mojibake.py <所有改动文件>` PASS
+- [x] `ai_handler_test.go` / `inbox_handler_test.go` 零改动仍能编译通过（type alias 保护生效）
+- [x] 无残留 `lifetrace.lifeTraceOpenAI*` 私有类型定义（11 个全部为 aiclient 类型的 alias）
+- [x] Karpathy 4 原则自检结论：
+  - **Surface assumptions**：所有边界不确定项已在 plan md 中显式列出（tool schema 归属、错误码识别双通道、SSE beforeDone 三处触发时机、Content 指针闭包捕获），无隐式假设
+  - **Keep it simple**：每一层只做一件事——`aiclient` 只做 provider-agnostic transport 与错误识别；`lifeai` 只做双轨编排与降级；`ai_client.go` 只保留 alias + shim；未新增未使用的 flexibility / configurability
+  - **Surgical changes**：`ai_handler_test.go` / `inbox_handler_test.go` 零改动；`achievement_handler.go` / `pantry_ai_handler.go` / `image_ai_handler.go` 零改动；仅动本刀范围内的 3 个文件（`ai_client.go` / `assistant_common.go` / lifeai 新文件）
+  - **Verifiable goals**：每 Task 独立 `go build ./... && go test ./...` + 新增单测覆盖降级路径（3 条 CallAssistantStructured 单测 + 2 条 StreamAssistant 单测）+ encoding-guard 全量扫描
+- [x] 本 md 状态从"规划中"更新为"已落地"
+- [x] AGENTS.md / project_memory.md 无需更新（本刀是内部收编，无接口/依赖/产品状态变化）
 
 ---
 
