@@ -1,4 +1,4 @@
-﻿import {
+import {
   Calendar,
   Eye,
   FileText,
@@ -7,6 +7,7 @@
   Image as ImageIcon,
   Lock,
   type LucideIcon,
+  Tag,
   User,
   Users,
 } from 'lucide-react';
@@ -115,6 +116,12 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
                 <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs text-theme-primary backdrop-blur">
                   <FolderTree className="h-3.5 w-3.5" />
                   {post.group.name}
+                </span>
+              ) : null}
+              {mode === 'public' && post.category?.name ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-theme-primary px-2.5 py-1 text-xs font-medium text-white shadow-[0_2px_8px_rgba(var(--theme-primary-rgb),0.25)] backdrop-blur">
+                  <Tag className="h-3.5 w-3.5" />
+                  {post.category.name}
                 </span>
               ) : null}
               {mode === 'creator' ? (

@@ -7,16 +7,17 @@ import (
 )
 
 type Config struct {
-	Env      string // development, production
-	Port     string
-	Database DatabaseConfig
-	TOS      TOSConfig
-	JWT      JWTConfig
-	SMTP     SMTPConfig
-	Mail     MailConfig
-	QWeather QWeatherConfig
-	WebPush  WebPushConfig
-	Holiday  HolidaySyncConfig
+	Env            string // development, production
+	Port           string
+	Database       DatabaseConfig
+	TOS            TOSConfig
+	JWT            JWTConfig
+	SMTP           SMTPConfig
+	Mail           MailConfig
+	QWeather       QWeatherConfig
+	WebPush        WebPushConfig
+	Holiday        HolidaySyncConfig
+	ExternalImages ExternalImagesConfig
 }
 
 type DatabaseConfig struct {
@@ -91,6 +92,12 @@ type HolidaySyncConfig struct {
 	APIURLTemplate    string
 	SyncIntervalHours int
 	FutureYears       int
+	TimeoutSeconds    int
+}
+
+type ExternalImagesConfig struct {
+	UnsplashAccessKey string
+	PexelsAPIKey      string
 	TimeoutSeconds    int
 }
 
@@ -170,6 +177,11 @@ func Load() *Config {
 			SyncIntervalHours: getEnvInt("HOLIDAY_SYNC_INTERVAL_HOURS", 168),
 			FutureYears:       getEnvInt("HOLIDAY_SYNC_FUTURE_YEARS", 1),
 			TimeoutSeconds:    getEnvInt("HOLIDAY_SYNC_TIMEOUT_SECONDS", 8),
+		},
+		ExternalImages: ExternalImagesConfig{
+			UnsplashAccessKey: strings.TrimSpace(getEnv("UNSPLASH_ACCESS_KEY", "")),
+			PexelsAPIKey:      strings.TrimSpace(getEnv("PEXELS_API_KEY", "")),
+			TimeoutSeconds:    getEnvInt("EXTERNAL_IMAGES_TIMEOUT_SECONDS", 8),
 		},
 	}
 }

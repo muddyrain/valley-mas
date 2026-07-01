@@ -68,6 +68,10 @@ func isAllowedRemoteCoverHost(host string) bool {
 	if host == "" {
 		return false
 	}
+	switch host {
+	case "images.unsplash.com", "plus.unsplash.com", "images.pexels.com":
+		return true
+	}
 	return strings.HasSuffix(host, ".volces.com") || strings.HasSuffix(host, ".volces.com.cn")
 }
 

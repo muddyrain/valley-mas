@@ -1,4 +1,4 @@
-﻿import {
+import {
   Calendar,
   Eye,
   Heart,
@@ -6,6 +6,7 @@
   Lock,
   type LucideIcon,
   Sparkles,
+  Tag,
   User,
   Users,
 } from 'lucide-react';
@@ -151,6 +152,12 @@ export function ImageTextPostCard({
                 <Images className="h-3.5 w-3.5" />
                 图文创作
               </span>
+              {mode === 'public' && post.category?.name ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-theme-primary px-3 py-1 text-xs font-medium text-white shadow-[0_2px_8px_rgba(var(--theme-primary-rgb),0.25)] backdrop-blur">
+                  <Tag className="h-3.5 w-3.5" />
+                  {post.category.name}
+                </span>
+              ) : null}
               {mode === 'creator' ? (
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${visibilityMeta.className}`}

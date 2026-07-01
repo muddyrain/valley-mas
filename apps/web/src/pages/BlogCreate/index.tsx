@@ -9,6 +9,7 @@ import {
   Save,
   Send,
   Sparkles,
+  Wand2,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -16,11 +17,14 @@ import { toast } from 'sonner';
 import {
   createGroup,
   createPost,
+  type ExternalCoverImage,
   type Group,
   generateBlogCover,
   generateBlogExcerpt,
   getAdminGroups,
   getAdminPostDetail,
+  pickBlogCoverFromResources,
+  triggerUnsplashDownload,
   updatePost,
   uploadBlogCover,
   uploadBlogCoverByUrl,
@@ -34,8 +38,8 @@ import {
 } from '@/components/blog';
 import { BatchMarkdownImportDialog } from '@/components/blog/BatchMarkdownImportDialog';
 import { CoverCropDialog } from '@/components/blog/CoverCropDialog';
+import { CoverPickerDialog } from '@/components/blog/CoverPickerDialog';
 import { MdxMarkdownEditor } from '@/components/blog/MdxMarkdownEditor';
-import { PublicWallpaperPickerDialog } from '@/components/blog/PublicWallpaperPickerDialog';
 import { Button } from '@/components/ui/button';
 import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Input } from '@/components/ui/input';
@@ -106,6 +110,9 @@ export default function BlogCreate() {
   const [pendingCropFile, setPendingCropFile] = useState<File | null>(null);
   const [pendingCropUrl, setPendingCropUrl] = useState('');
   const [wallpaperPickerOpen, setWallpaperPickerOpen] = useState(false);
+  const [aiPickLoading, setAiPickLoading] = useState(false);
+  const [aiPickExcludedIds, setAiPickExcludedIds] = useState<string[]>([]);
+  const [pendingUnsplashDownloadLocation, setPendingUnsplashDownloadLocation] = useState('');
   const currentEditingIdRef = useRef<string | undefined>(editingId);
 
   const coverViewportRef = useRef<HTMLDivElement | null>(null);
@@ -142,6 +149,8 @@ export default function BlogCreate() {
       setCover(detail.cover || '');
       setCoverStorageKey(detail.coverStorageKey || '');
       setPendingCoverRemoteUrl('');
+      setPendingUnsplashDownloadLocation('');
+      setAiPickExcludedIds([]);
       setContent(detail.content || '');
       setGroupId(detail.groupId || '');
       setVisibility(detail.visibility || 'private');
@@ -274,6 +283,8 @@ export default function BlogCreate() {
     setCover('');
     setCoverStorageKey('');
     setPendingCoverRemoteUrl('');
+    setPendingUnsplashDownloadLocation('');
+    setAiPickExcludedIds([]);
     setContent('');
     setVisibility('private');
     setGroupId('');
@@ -552,7 +563,14 @@ export default function BlogCreate() {
     try {
       setSubmitIntent(status);
       setSubmitting(true);
+      const shouldTriggerUnsplashDownload =
+        status === 'published' && !!pendingUnsplashDownloadLocation;
+      const unsplashDownloadLocation = pendingUnsplashDownloadLocation;
       const resolvedCover = await uploadCoverIfNeeded(status === 'published');
+      if (shouldTriggerUnsplashDownload && resolvedCover.coverStorageKey) {
+        void triggerUnsplashDownload(unsplashDownloadLocation).catch(() => undefined);
+        setPendingUnsplashDownloadLocation('');
+      }
       const resolvedExcerpt =
         status === 'published' ? createAutoExcerpt(excerpt, trimmedContent) : excerpt.trim();
       if (isEditMode && editingId) {
@@ -676,8 +694,71 @@ export default function BlogCreate() {
     setCover(selectedUrl);
     setCoverStorageKey('');
     setPendingCoverRemoteUrl(selectedUrl);
+    setPendingUnsplashDownloadLocation('');
+    setAiPickExcludedIds((prev) => (prev.includes(resource.id) ? prev : [...prev, resource.id]));
     setWallpaperPickerOpen(false);
     toast.success('已选择公用壁纸，发布时会自动转存为你的博客封面');
+  };
+
+  const handleSelectExternalCoverImage = (image: ExternalCoverImage) => {
+    if (coverFile || coverObjectUrl) {
+      resetLocalCoverEditing();
+    }
+    const selectedUrl = (image.previewUrl || image.fullUrl || '').trim();
+    if (!selectedUrl) {
+      toast.error('该图片没有可用的地址，请换一张');
+      return;
+    }
+    setCover(selectedUrl);
+    setCoverStorageKey('');
+    setPendingCoverRemoteUrl(selectedUrl);
+    if (image.attribution.provider === 'unsplash' && image.downloadLocation) {
+      setPendingUnsplashDownloadLocation(image.downloadLocation);
+    } else {
+      setPendingUnsplashDownloadLocation('');
+    }
+    setWallpaperPickerOpen(false);
+    toast.success('已选择外部图源封面，发布时会自动转存到你的博客');
+  };
+
+  const handleAIPickCover = async () => {
+    const trimmedContent = content.trim();
+    if (!trimmedContent) {
+      toast.error('请先输入正文内容');
+      return;
+    }
+    try {
+      setAiPickLoading(true);
+      const result = await pickBlogCoverFromResources({
+        title: title.trim() || undefined,
+        excerpt: excerpt.trim() || undefined,
+        content: trimmedContent,
+        excludedIds: aiPickExcludedIds,
+      });
+      const resource = result.resource;
+      if (!resource || !resource.url) {
+        toast.error('未找到合适的封面资源，稍后再试');
+        return;
+      }
+      if (coverFile || coverObjectUrl) {
+        resetLocalCoverEditing();
+      }
+      const selectedUrl = (resource.url || '').trim();
+      setCover(selectedUrl);
+      setCoverStorageKey('');
+      setPendingCoverRemoteUrl(selectedUrl);
+      setPendingUnsplashDownloadLocation('');
+      setAiPickExcludedIds((prev) => (prev.includes(resource.id) ? prev : [...prev, resource.id]));
+      if (result.matchedKeywords && result.matchedKeywords.length > 0) {
+        toast.success(`已按关键词「${result.matchedKeywords.join('、')}」选择封面`);
+      } else {
+        toast.success('已从资源池随机挑选一张封面');
+      }
+    } catch {
+      // 请求层已统一处理并展示后端错误信息
+    } finally {
+      setAiPickLoading(false);
+    }
   };
 
   const handleCreateGroup = async () => {
@@ -911,20 +992,52 @@ export default function BlogCreate() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs text-slate-500">封面 URL（可选）</span>
-                    <button
-                      type="button"
-                      onClick={() => void handleAIGenerateCover()}
-                      disabled={isContentEmpty || aiCoverLoading || coverUploading || submitting}
-                      className="inline-flex h-6 items-center gap-1 rounded-lg border border-theme-primary/30 bg-theme-soft px-1.5 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/75 disabled:cursor-not-allowed disabled:opacity-45"
-                      title={isContentEmpty ? '请先输入正文内容' : 'AI 自动配图为封面'}
-                    >
-                      {aiCoverLoading ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <ImagePlus className="h-3.5 w-3.5" />
-                      )}
-                      {aiCoverLoading ? '配图中' : 'AI配图封面'}
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => void handleAIPickCover()}
+                        disabled={
+                          isContentEmpty ||
+                          aiPickLoading ||
+                          aiCoverLoading ||
+                          coverUploading ||
+                          submitting
+                        }
+                        className="inline-flex h-6 items-center gap-1 rounded-lg border border-theme-primary/30 bg-theme-soft px-1.5 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/75 disabled:cursor-not-allowed disabled:opacity-45"
+                        title={
+                          isContentEmpty
+                            ? '请先输入正文内容'
+                            : aiPickExcludedIds.length > 0
+                              ? '换一张：从资源池再挑一张不重复的封面'
+                              : 'AI 从我的资源池挑一张封面'
+                        }
+                      >
+                        {aiPickLoading ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Wand2 className="h-3.5 w-3.5" />
+                        )}
+                        {aiPickLoading
+                          ? '选图中'
+                          : aiPickExcludedIds.length > 0
+                            ? '换一张'
+                            : 'AI 选图'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleAIGenerateCover()}
+                        disabled={isContentEmpty || aiCoverLoading || coverUploading || submitting}
+                        className="inline-flex h-6 items-center gap-1 rounded-lg border border-theme-primary/30 bg-theme-soft px-1.5 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/75 disabled:cursor-not-allowed disabled:opacity-45"
+                        title={isContentEmpty ? '请先输入正文内容' : 'AI 自动配图为封面'}
+                      >
+                        {aiCoverLoading ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <ImagePlus className="h-3.5 w-3.5" />
+                        )}
+                        {aiCoverLoading ? '配图中' : 'AI配图封面'}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <Input
@@ -934,6 +1047,7 @@ export default function BlogCreate() {
                         setCover(e.target.value);
                         setCoverStorageKey('');
                         setPendingCoverRemoteUrl('');
+                        setPendingUnsplashDownloadLocation('');
                       }}
                       placeholder="https://..."
                       maxLength={500}
@@ -958,7 +1072,7 @@ export default function BlogCreate() {
                       onClick={() => setWallpaperPickerOpen(true)}
                     >
                       <ImagePlus className="mr-1 h-4 w-4" />
-                      选择壁纸
+                      选择封面
                     </Button>
                   </div>
                   {aiCoverLoading && (
@@ -1156,11 +1270,12 @@ export default function BlogCreate() {
           onConfirm={(file) => void handleCropConfirm(file)}
         />
       )}
-      <PublicWallpaperPickerDialog
+      <CoverPickerDialog
         open={wallpaperPickerOpen}
         onOpenChange={handleWallpaperPickerOpenChange}
         currentCoverUrl={cover}
-        onSelect={handleSelectPublicWallpaperCover}
+        onSelectResource={handleSelectPublicWallpaperCover}
+        onSelectExternalImage={handleSelectExternalCoverImage}
       />
       <BatchMarkdownImportDialog
         open={batchImportDialogOpen}

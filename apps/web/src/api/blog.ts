@@ -1,3 +1,4 @@
+import type { Resource } from '@/api/resource';
 import { useAuthStore } from '@/stores/useAuthStore';
 import request, { type RequestConfig } from '@/utils/request';
 
@@ -476,4 +477,64 @@ export function updateGroup(
 
 export function deleteGroup(id: string) {
   return request.delete<unknown, null>(`/admin/blog/groups/${id}`);
+}
+
+// ========== 博客封面：AI 从资源池选图 + 外部图源 ==========
+
+export interface AIPickBlogCoverResponse {
+  resource: Resource;
+  matchedKeywords: string[];
+  model?: string;
+}
+
+export function pickBlogCoverFromResources(data: {
+  title?: string;
+  excerpt?: string;
+  content: string;
+  excludedIds?: string[];
+}) {
+  return request.post<unknown, AIPickBlogCoverResponse>('/admin/blog/ai/cover/pick', data);
+}
+
+export type ExternalImageProvider = 'unsplash' | 'pexels' | 'pixabay' | 'wallhaven';
+
+export interface ExternalCoverImage {
+  id: string;
+  thumbnailUrl: string;
+  previewUrl: string;
+  fullUrl: string;
+  downloadLocation?: string;
+  width: number;
+  height: number;
+  attribution: {
+    name: string;
+    profileUrl?: string;
+    provider: ExternalImageProvider;
+  };
+}
+
+export interface ExternalImagesSearchResponse {
+  list: ExternalCoverImage[];
+  total: number;
+  page: number;
+  perPage: number;
+  provider: ExternalImageProvider;
+}
+
+export function searchExternalCoverImages(params: {
+  provider: 'unsplash' | 'pexels';
+  query: string;
+  page?: number;
+  perPage?: number;
+}) {
+  return request.get<unknown, ExternalImagesSearchResponse>('/admin/blog/external-images/search', {
+    params,
+  });
+}
+
+export function triggerUnsplashDownload(downloadLocation: string) {
+  return request.post<unknown, { ok: boolean }>(
+    '/admin/blog/external-images/unsplash/trigger-download',
+    { downloadLocation },
+  );
 }
