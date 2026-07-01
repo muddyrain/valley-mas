@@ -1,7 +1,6 @@
 package lifetrace
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -9,14 +8,15 @@ import (
 	"time"
 
 	lifeagent "valley-server/internal/lifetrace/agent"
+	lifeai "valley-server/internal/lifetrace/ai"
 	prompts "valley-server/internal/lifetrace/ai/prompts"
 )
 
 const lifeTraceAssistantToolName = prompts.AssistantToolName
 
 var (
-	errLifeTraceAssistantToolUnsupported = errors.New("assistant tool calling unsupported")
-	errLifeTraceAssistantToolInvalid     = errors.New("assistant tool calling invalid")
+	errLifeTraceAssistantToolUnsupported = lifeai.ErrAssistantToolUnsupported
+	errLifeTraceAssistantToolInvalid     = lifeai.ErrAssistantToolInvalid
 )
 
 var lifeTraceAssistantActionRegistry = lifeagent.NewRegistry(
