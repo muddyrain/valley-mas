@@ -1,5 +1,7 @@
 # Phase 2 收尾 — aiclient 迁移最后两步
 
+> **状态：已落地**。Task 7 Step 6 + Task 8 均已完成；`internal/aiclient` 后续被第三刀（[phase3.md](file:///Users/bytedance/Desktop/study/valley-mas/.trae/documents/lifetrace-ai-handler-split-phase3.md)）继续扩容出 OpenAI 完整类型 + tool_calls + SSE 写入器。
+>
 > 接续 [server-aiclient-phase2.md](file:///Users/bytedance/Desktop/study/valley-mas/.trae/documents/server-aiclient-phase2.md)。原 plan 描述完整 8-Task 设计与上下文，本文件只列**仍需执行**的两段：Task 7 Step 6 测试验证 + Task 8 文档同步与最终校验。所有代码改动已落地，剩余只跑命令、改 1 个文档、做 grep 比对。
 
 ---

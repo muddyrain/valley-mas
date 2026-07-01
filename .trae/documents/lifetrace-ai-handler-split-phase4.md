@@ -1,6 +1,6 @@
 # 第四刀 · lifetrace 剩余 prompt 下沉到 `lifetrace/ai/prompts/`
 
-> 状态：**已落地（Task A-H 全部完成）**。基于 [第二刀](file:///Users/bytedance/Desktop/study/valley-mas/.trae/documents/lifetrace-ai-handler-split-phase2.md) 落地结果自然延伸。第三刀（ai_client.go 双轨统一到共享 `internal/aiclient`）仍然 pending，本文件不涉及。
+> 状态：**已落地（Task A-H 全部完成）**。基于 [第二刀](file:///Users/bytedance/Desktop/study/valley-mas/.trae/documents/lifetrace-ai-handler-split-phase2.md) 落地结果自然延伸。第三刀（ai_client.go 双轨统一到共享 `internal/aiclient`）已在 [phase3.md](file:///Users/bytedance/Desktop/study/valley-mas/.trae/documents/lifetrace-ai-handler-split-phase3.md) 独立落地（commit `5ca4c998` → `b5d87300`），本文件仍不涉及。
 
 ---
 

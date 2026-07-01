@@ -1,5 +1,7 @@
 # Phase 2 — 新建 internal/aiclient 包并完成首批迁移
 
+> **状态：已落地**。Task 1-8 全部完成，`internal/aiclient` 包已建立并被后续第三刀（[lifetrace-ai-handler-split-phase3.md](file:///Users/bytedance/Desktop/study/valley-mas/.trae/documents/lifetrace-ai-handler-split-phase3.md)）扩容为通用 AI 基础层。收尾细节见 [server-aiclient-phase2-resume.md](file:///Users/bytedance/Desktop/study/valley-mas/.trae/documents/server-aiclient-phase2-resume.md)。
+>
 > Plan 文件，仅作记录与执行参考。本次执行严格限制在 Phase 2，不动任何旧 handler 的业务逻辑，不拆任何巨型文件。
 
 ---

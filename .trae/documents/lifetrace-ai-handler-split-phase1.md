@@ -1,6 +1,6 @@
 # 第一刀 · lifetrace/ai_handler.go 同包物理拆分 + dead code 清理
 
-> 状态：**待批准实施**。基于 [lifetrace-ai-handler-split-plan-draft.md](file:///Users/bytedance/Desktop/study/valley-mas/.trae/documents/lifetrace-ai-handler-split-plan-draft.md) 草稿第二节"第一刀"展开。owner 已批准推荐方案：**先做第一刀物理拆分，同时清理 dead code**。
+> 状态：**已落地**。`ai_handler.go` 从 3156 → 92 行，同包物理拆出 9 个域文件；后续第二/三/四刀均基于本刀成果继续推进。
 
 ---
 

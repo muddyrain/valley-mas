@@ -1,6 +1,12 @@
 # lifetrace/ai_handler.go 拆分计划 · 现状速览 + 草案
 
-> 状态：**草稿**。基于 Explore agent 对 [server/internal/lifetrace/ai_handler.go](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/lifetrace/ai_handler.go) 的完整扫描，由你 review 后再决定是否进入实施。本草稿仅做现状速览 + 拆分方向，不固化具体步骤。
+> 状态：**已归档（作为四刀的起点草稿）**。本草稿的拆分方向后来分解为 4 个 phase 独立落地：
+> - [phase1.md](file:///Users/bytedance/Desktop/study/valley-mas/.trae/documents/lifetrace-ai-handler-split-phase1.md) · 同包物理拆分 + dead code 清理（已落地）
+> - [phase2.md](file:///Users/bytedance/Desktop/study/valley-mas/.trae/documents/lifetrace-ai-handler-split-phase2.md) · 3 个核心 handler prompt 下沉（已落地）
+> - [phase3.md](file:///Users/bytedance/Desktop/study/valley-mas/.trae/documents/lifetrace-ai-handler-split-phase3.md) · ai_client.go 双轨收编 & OpenAI 兼容层下沉（已落地）
+> - [phase4.md](file:///Users/bytedance/Desktop/study/valley-mas/.trae/documents/lifetrace-ai-handler-split-phase4.md) · 剩余 prompt 下沉（已落地）
+>
+> 本草稿保留只作历史参考，实际实施以 4 个 phase md 为准。
 
 ---
 
