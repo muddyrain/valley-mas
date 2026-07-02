@@ -39,7 +39,7 @@ export interface ResourceCardItem {
   creatorName?: string;
   creatorAvatar?: string;
   isFavorited?: boolean;
-  tags?: Array<{ id: string; name: string }>;
+  tags?: string[];
 }
 
 interface ResourceCardProps<T extends ResourceCardItem = ResourceCardItem> {
@@ -98,7 +98,7 @@ function formatSize(bytes?: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function ResourceTagCloud({ tags }: { tags: Array<{ id: string; name: string }> }) {
+function ResourceTagCloud({ tags }: { tags: string[] }) {
   const visibleTags = tags.slice(0, 3);
   const hiddenCount = Math.max(tags.length - visibleTags.length, 0);
 
@@ -106,11 +106,11 @@ function ResourceTagCloud({ tags }: { tags: Array<{ id: string; name: string }> 
     <div className="flex flex-wrap items-center gap-1.5">
       {visibleTags.map((tag) => (
         <span
-          key={tag.id}
+          key={tag}
           className="inline-flex items-center gap-1 rounded-full border border-white/18 bg-white/14 px-2.5 py-1 text-[11px] font-medium text-white/92 backdrop-blur-md"
         >
           <Hash className="h-3 w-3 opacity-80" />
-          {tag.name}
+          {tag}
         </span>
       ))}
       {hiddenCount > 0 ? (

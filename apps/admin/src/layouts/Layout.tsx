@@ -59,7 +59,7 @@ const adminMenuItems = [
       { key: '/creator-applications', icon: <AuditOutlined />, label: '创作者申请审核' },
       { key: '/creator-albums', icon: <ProfileOutlined />, label: '创作者专辑' },
       { key: '/resources', icon: <PictureOutlined />, label: '资源管理' },
-      { key: '/resource-tags', icon: <TagsOutlined />, label: '资源标签' },
+      { key: '/resource-tags', icon: <TagsOutlined />, label: '资源标签统计' },
     ],
   },
   {

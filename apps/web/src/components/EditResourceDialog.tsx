@@ -6,13 +6,7 @@
 import { Image as ImageIcon, Loader2, Pencil } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import {
-  getResourceTagsById,
-  type ResourceTag,
-  type ResourceVisibility,
-  setResourceTags,
-  updateResource,
-} from '@/api/resource';
+import { type ResourceVisibility, updateResource } from '@/api/resource';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import ImagePreviewDialog from '@/components/ImagePreviewDialog';
 import ResourceTagSelector from '@/components/ResourceTagSelector';
@@ -31,6 +25,7 @@ export interface EditableResource {
   visibility?: ResourceVisibility;
   size: number;
   downloadCount: number;
+  tags?: string[];
 }
 
 export interface EditResourceDialogProps {
@@ -43,6 +38,7 @@ export interface EditResourceDialogProps {
     description: string;
     type: string;
     visibility: ResourceVisibility;
+    tags: string[];
   }) => void;
 }
 
@@ -83,7 +79,6 @@ export default function EditResourceDialog({
   const [type, setType] = useState('');
   const [visibility, setVisibility] = useState<ResourceVisibility>('private');
   const [saving, setSaving] = useState(false);
-  const [loadingTags, setLoadingTags] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const closeConfirmToastIdRef = useRef<string | number | null>(null);
   const closeConfirmTimeoutRef = useRef<number | null>(null);
@@ -96,13 +91,12 @@ export default function EditResourceDialog({
     }
   };
 
-  // 标签状态（由 ResourceTagSelector 管理内部逻辑，这里只保存已选列表）
-  const [tags, setTags] = useState<ResourceTag[]>([]);
+  // 标签状态（字符串数组，随 resource 变化重置）
+  const [tags, setTags] = useState<string[]>([]);
 
   // resource 变化时重置表单
   useEffect(() => {
     if (!resource) {
-      setLoadingTags(false);
       setPreviewOpen(false);
       return;
     }
@@ -110,26 +104,8 @@ export default function EditResourceDialog({
     setDesc(resource.description ?? '');
     setType(resource.type);
     setVisibility(resource.visibility ?? 'private');
-    setTags([]);
+    setTags(resource.tags ?? []);
     setSaving(false);
-    setLoadingTags(true);
-
-    let active = true;
-
-    getResourceTagsById(resource.id)
-      .then((t) => {
-        if (active) setTags(t);
-      })
-      .catch(() => {
-        /* 静默失败 */
-      })
-      .finally(() => {
-        if (active) setLoadingTags(false);
-      });
-
-    return () => {
-      active = false;
-    };
   }, [resource]);
 
   // 提交保存
@@ -137,18 +113,13 @@ export default function EditResourceDialog({
     if (!resource) return;
     try {
       setSaving(true);
-      await Promise.all([
-        updateResource(resource.id, {
-          title: title.trim() || undefined,
-          description: desc.trim() || undefined,
-          type: type || undefined,
-          visibility,
-        }),
-        setResourceTags(
-          resource.id,
-          tags.map((t) => t.id),
-        ),
-      ]);
+      await updateResource(resource.id, {
+        title: title.trim() || undefined,
+        description: desc.trim() || undefined,
+        type: type || undefined,
+        visibility,
+        tags,
+      });
       toast.success('修改成功');
       onSuccess?.({
         id: resource.id,
@@ -156,6 +127,7 @@ export default function EditResourceDialog({
         description: desc.trim() || resource.description || '',
         type: type || resource.type,
         visibility,
+        tags,
       });
       onOpenChange(false);
     } catch {
@@ -166,7 +138,7 @@ export default function EditResourceDialog({
   };
 
   const requestDialogClose = () => {
-    if (saving || loadingTags) return;
+    if (saving) return;
     if (closeConfirmToastIdRef.current !== null) return;
     closeConfirmToastIdRef.current = openConfirmToast({
       title: '确认关闭编辑弹窗？',
@@ -355,8 +327,11 @@ export default function EditResourceDialog({
               <ResourceTagSelector
                 value={tags}
                 onChange={setTags}
-                resourceId={resource?.id}
-                allowCreateTag
+                aiPreUpload={{
+                  type: type || resource?.type || 'wallpaper',
+                  title,
+                  description: desc,
+                }}
               />
             </div>
 
@@ -366,13 +341,13 @@ export default function EditResourceDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
                 className="flex-1 rounded-xl"
-                disabled={saving || loadingTags}
+                disabled={saving}
               >
                 取消
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={saving || loadingTags}
+                disabled={saving}
                 className="flex-2 rounded-xl theme-btn-primary font-semibold shadow-[0_4px_16px_rgba(var(--theme-primary-rgb),0.28)] disabled:shadow-none transition-all"
               >
                 {saving ? (
@@ -389,9 +364,9 @@ export default function EditResourceDialog({
               </Button>
             </div>
             <BoxLoadingOverlay
-              show={loadingTags || saving}
-              title={saving ? '正在保存资源信息...' : '正在同步资源标签...'}
-              hint={saving ? '保存后会自动刷新当前资源状态' : '加载完成后即可继续编辑'}
+              show={saving}
+              title="正在保存资源信息..."
+              hint="保存后会自动刷新当前资源状态"
               className="rounded-none"
             />
           </div>

@@ -2,72 +2,47 @@ package handler
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
+	"unicode"
 
-	"valley-server/internal/database"
-	"valley-server/internal/model"
-	"valley-server/internal/utils"
+	"valley-server/internal/aiclient"
 
 	"github.com/gin-gonic/gin"
-	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
 )
 
-// SuggestResourceTags 根据图片 base64 + 类型 + 标题，使用 AI 推荐标签并自动创建不存在的标签
+// SuggestResourceTags 根据图片 base64 + 类型 + 标题在线生成候选标签
 // POST /creator/ai/suggest-tags
-// Body: { "imageBase64": "data:image/jpeg;base64,...", "type": "wallpaper", "title": "童年小悟空" }
+// Body: { "imageBase64": "data:image/jpeg;base64,...", "type": "wallpaper", "title": "童年小悟空", "description": "" }
+// Response: { "tags": ["国风", "水墨"], "model": "ep-xxx" }
+//
+// 不再依赖 resource_tags 表：AI 直接生成 5-8 个候选标签名交给前端，由用户勾选后写入 resources.tags。
 func SuggestResourceTags(c *gin.Context) {
 	var req struct {
 		ImageBase64 string `json:"imageBase64"` // 可选：有图时用视觉模型
 		Type        string `json:"type"`        // wallpaper / avatar
-		Title       string `json:"title"`       // 资源标题，辅助 AI 判断
-		Description string `json:"description"` // 可选描述
+		Title       string `json:"title"`
+		Description string `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Error(c, 400, "参数错误："+err.Error())
 		return
 	}
 
-	apiKey := strings.TrimSpace(os.Getenv("ARK_API_KEY"))
-	if apiKey == "" {
-		Error(c, 503, "AI 功能未配置（缺少 ARK_API_KEY）")
+	visionCfg, errMsg := aiclient.ReadARKVisionConfig()
+	if errMsg != "" {
+		Error(c, 503, errMsg)
 		return
 	}
-	visionModel := strings.TrimSpace(os.Getenv("ARK_VISION_MODEL"))
-	textModel := strings.TrimSpace(os.Getenv("ARK_TEXT_MODEL"))
-	hasImage := strings.HasPrefix(req.ImageBase64, "data:") || req.ImageBase64 != ""
-	useVision := hasImage && strings.HasPrefix(visionModel, "ep-")
-	useText := !useVision && strings.HasPrefix(textModel, "ep-")
-	if !useVision && !useText {
-		Error(c, 503, "AI 功能未配置（ARK_VISION_MODEL 或 ARK_TEXT_MODEL 须以 ep- 开头）")
-		return
-	}
-	activeModel := visionModel
-	if !useVision {
-		activeModel = textModel
-	}
-
-	db := database.GetDB()
-
-	// 读取系统全量标签
-	var allTags []model.ResourceTag
-	if err := db.Where("deleted_at IS NULL").Order("resource_count DESC").Find(&allTags).Error; err != nil {
-		Error(c, 500, "获取标签列表失败")
-		return
-	}
-
-	tagNames := make([]string, 0, len(allTags))
-	for _, t := range allTags {
-		tagNames = append(tagNames, t.Name)
-	}
+	hasImage := strings.HasPrefix(req.ImageBase64, "data:") || strings.TrimSpace(req.ImageBase64) != ""
+	useVision := hasImage && visionCfg.UseVision
 
 	resourceType := map[string]string{
 		"wallpaper": "壁纸",
 		"avatar":    "头像",
 	}[req.Type]
 	if resourceType == "" {
-		resourceType = req.Type
+		resourceType = strings.TrimSpace(req.Type)
 		if resourceType == "" {
 			resourceType = "图片"
 		}
@@ -82,79 +57,98 @@ func SuggestResourceTags(c *gin.Context) {
 		descHint = fmt.Sprintf("描述：%s。", d)
 	}
 
-	var prompt string
-	if len(tagNames) > 0 {
-		candidateStr := strings.Join(tagNames, "\n")
-		prompt = fmt.Sprintf(
-			"你是图片标签专家。%s%s类型：%s。\n"+
-				"优先从以下候选标签中选 1-5 个最匹配的；若候选标签不够准确，可额外补充 1-2 个新标签（每个不超过 6 字）。\n"+
-				"只输出标签名，每行一个，不要编号，不要解释，不要输出候选列表以外的多余文字。\n"+
-				"候选标签（每行一个）：\n%s",
-			titleHint, descHint, resourceType, candidateStr,
-		)
-	} else {
-		prompt = fmt.Sprintf(
-			"你是图片标签专家。%s%s类型：%s。\n"+
-				"为该资源生成 1-5 个最合适的标签（每个不超过 6 字）。\n"+
-				"只输出标签名，每行一个，不要编号，不要解释。",
-			titleHint, descHint, resourceType,
-		)
-	}
+	prompt := fmt.Sprintf(
+		"你是图片标签专家。%s%s类型：%s。\n"+
+			"请为该资源生成 5-8 个最合适的中文标签，覆盖题材/风格/情绪/画面元素。\n"+
+			"每个标签不超过 6 个字，禁止英文、禁止标点符号、禁止重复。\n"+
+			"只输出标签名，每行一个，不要编号，不要解释。",
+		titleHint, descHint, resourceType,
+	)
 
-	// 准备图片 URL（base64 或空）
 	imageURL := ""
-	if hasImage {
+	if useVision {
 		imageURL = req.ImageBase64
 		if !strings.HasPrefix(imageURL, "data:") {
 			imageURL = "data:image/jpeg;base64," + imageURL
 		}
 	}
 
-	// 初始化 ARK 客户端（复用单例）
-	arkBaseURL := strings.TrimSpace(os.Getenv("ARK_BASE_URL"))
-	if arkBaseURL == "" {
-		arkBaseURL = "https://ark.cn-beijing.volces.com/api/v3"
+	client := aiclient.ARKClient(60 * time.Second)
+	if client == nil {
+		Error(c, 503, "AI 未配置：缺少 ARK_API_KEY")
+		return
 	}
-	arkClientOnce.Do(func() {
-		arkClient = arkruntime.NewClientWithApiKey(
-			apiKey,
-			arkruntime.WithBaseUrl(arkBaseURL),
-			arkruntime.WithTimeout(60*time.Second),
-		)
-	})
 
-	rawText, aiErr := callChatStream(arkClient, activeModel, imageURL, prompt, useVision)
+	rawText, aiErr := callChatStream(client, visionCfg.Config.Model, imageURL, prompt, useVision)
 	if aiErr != nil {
 		Error(c, 502, "AI 服务请求失败："+aiErr.Error())
 		return
 	}
 
-	// 解析 AI 返回：匹配已有 + 自动创建不存在的
-	matchedTags, newTagNames := parseAndMatchTagsWithNew(rawText, allTags)
-
-	for _, name := range newTagNames {
-		newTag := model.ResourceTag{
-			ID:   model.Int64String(utils.GenerateID()),
-			Name: name,
-		}
-		if err := db.Create(&newTag).Error; err != nil {
-			// 并发重名时回退查已有记录
-			var existing model.ResourceTag
-			if db.Where("name = ? AND deleted_at IS NULL", name).First(&existing).Error == nil {
-				matchedTags = append(matchedTags, existing)
-			}
-		} else {
-			matchedTags = append(matchedTags, newTag)
-		}
-	}
-
-	if len(matchedTags) == 0 {
-		Error(c, 200, "AI 未能匹配或生成合适的标签，请手动选择")
+	tags := parseAIGeneratedTagNames(rawText, 8)
+	if len(tags) == 0 {
+		Error(c, 200, "AI 未能生成合适的标签，请手动输入")
 		return
 	}
 
 	Success(c, gin.H{
-		"tags":  matchedTags,
-		"model": activeModel,
+		"tags":  tags,
+		"model": visionCfg.Config.Model,
 	})
+}
+
+// parseAIGeneratedTagNames 解析 AI 输出的每行标签名并做基础清洗，最多返回 max 个。
+// 清洗规则：
+//   - 去掉行首序号/项目符号
+//   - 去掉括号内注释
+//   - 去掉两端引号
+//   - 长度超过 10 字（大概率是废话）直接丢弃
+//   - 大小写去重（保留首次出现的原始大小写）
+func parseAIGeneratedTagNames(rawText string, max int) []string {
+	if max <= 0 {
+		max = 8
+	}
+	lines := strings.Split(rawText, "\n")
+	seen := make(map[string]bool, len(lines))
+	tags := make([]string, 0, max)
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		runes := []rune(line)
+		start := 0
+		for start < len(runes) {
+			r := runes[start]
+			if unicode.IsDigit(r) || r == '.' || r == '、' || r == '·' || r == '•' || r == '-' || r == '*' || r == ' ' || r == '\t' {
+				start++
+				continue
+			}
+			break
+		}
+		line = strings.TrimSpace(string(runes[start:]))
+		for _, sep := range []string{"（", "(", "【", " -", " —"} {
+			if idx := strings.Index(line, sep); idx > 0 {
+				line = strings.TrimSpace(line[:idx])
+			}
+		}
+		line = strings.Trim(line, "\"'“”'")
+		if line == "" {
+			continue
+		}
+		if len([]rune(line)) > 10 {
+			continue
+		}
+		key := strings.ToLower(line)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		tags = append(tags, line)
+		if len(tags) >= max {
+			break
+		}
+	}
+	return tags
 }

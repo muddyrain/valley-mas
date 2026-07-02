@@ -702,6 +702,7 @@ export default function MyResources() {
                     description: updated.description,
                     type: updated.type as MyResource['type'],
                     visibility: updated.visibility,
+                    tags: updated.tags,
                   }
                 : r,
             ),

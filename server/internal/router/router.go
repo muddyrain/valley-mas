@@ -2,6 +2,7 @@ package router
 
 import (
 	"valley-server/internal/ai"
+	"valley-server/internal/ai/tools"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
 	"valley-server/internal/handler"
@@ -38,9 +39,11 @@ func Setup(cfg *config.Config) *gin.Engine {
 		mindarena.RegisterMindArenaRoutes(api, mindarena.NewHandler(mindArenaService))
 
 		lifeTraceWeatherService := lifetrace.NewWeatherService(cfg.QWeather)
+		lifeTraceHandler := lifetrace.NewHandler(lifeTraceWeatherService, cfg.WebPush)
+		lifeTraceHandler.RegisterAgentTools(tools.DefaultRegistry)
 		lifetrace.RegisterRoutes(
 			api,
-			lifetrace.NewHandler(lifeTraceWeatherService, cfg.WebPush),
+			lifeTraceHandler,
 			middleware.Auth(cfg),
 		)
 
@@ -73,9 +76,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 			)
 			public.GET("/resources/:id", middleware.OptionalAuth(cfg), handler.GetResourceDetail)
 
-			// 资源标签（公开）
-			public.GET("/resource-tags", handler.ListResourceTags)
-			public.GET("/resource-tags/:slug/resources", handler.GetResourcesByTag)
 			public.GET("/guestbook/messages", handler.ListGuestbookMessages)
 			public.POST("/guestbook/messages", middleware.OptionalAuth(cfg), handler.CreateGuestbookMessage)
 		}
@@ -155,7 +155,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 		creator.Use(middleware.Auth(cfg))
 		creator.Use(middleware.CreatorOrAdmin())
 		{
-			creator.POST("/resource-tags", handler.CreateResourceTag)
 			creator.GET("/resources", handler.ListResources)
 			creator.POST("/resources/upload", handler.UploadResource)
 			creator.GET("/resources/upload-status", handler.GetUploadResourceStatus)
@@ -164,18 +163,12 @@ func Setup(cfg *config.Config) *gin.Engine {
 			creator.PATCH("/resources/:id", handler.UpdateResource)
 			creator.DELETE("/resources/:id", handler.DeleteResource)
 
-			// 资源标签绑定（创作者端）
-			creator.GET("/resources/:id/tags", handler.GetResourceTags)
-			creator.PUT("/resources/:id/tags", handler.SetResourceTags)
-			creator.POST("/resources/:id/tags/ai-match", handler.AIMatchResourceTags)
-
 			creator.GET("/albums", handler.ListMyCreatorAlbums)
 			creator.POST("/albums", handler.CreateCreatorAlbum)
 			creator.PUT("/albums/:id", handler.UpdateCreatorAlbum)
 			creator.DELETE("/albums/:id", handler.DeleteCreatorAlbum)
 			creator.POST("/ai/suggest-title", handler.SuggestResourceTitle)
-			creator.POST("/ai/suggest-tags", handler.SuggestResourceTags)
-			creator.POST("/ai/suggest-tag-description", handler.SuggestResourceTagDescription)
+			creator.POST("/ai/resource-tags/suggest", handler.SuggestResourceTags)
 		}
 
 		admin := api.Group("/admin")
@@ -221,10 +214,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.GET("/audit/storage-assets", handler.AdminListStorageAssets)
 				adminOnly.GET("/ai/usage-logs", handler.AdminListAIUsageLogs)
 				adminOnly.GET("/ai/usage-summary", handler.AdminGetAIUsageSummary)
-				// 资源标签增删改（仅管理员）
-				adminOnly.POST("/resource-tags", handler.CreateResourceTag)
-				adminOnly.PATCH("/resource-tags/:id", handler.UpdateResourceTag)
-				adminOnly.DELETE("/resource-tags/:id", handler.DeleteResourceTag)
+				// 资源标签统计（只读）
+				adminOnly.GET("/resource-tags/stats", handler.AdminGetResourceTagStats)
 				adminOnly.GET("/blog/categories", handler.AdminListBlogCategories)
 				adminOnly.POST("/blog/categories", handler.AdminCreateBlogCategory)
 				adminOnly.PUT("/blog/categories/:id", handler.AdminUpdateBlogCategory)
@@ -300,13 +291,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.PATCH("/resources/:id", handler.UpdateResource)
 				content.PUT("/resources/:id/creator", handler.UpdateResourceCreator)
 				content.DELETE("/resources/:id", handler.DeleteResource)
-
-				// 资源标签管理（查询：创作者+管理员；增删改已移至 adminOnly 组）
-				content.GET("/resource-tags", handler.ListResourceTags)
-				// 资源标签绑定（管理端复用创作者端接口路径前缀不同，单独注册）
-				content.GET("/resources/:id/tags", handler.GetResourceTags)
-				content.PUT("/resources/:id/tags", handler.SetResourceTags)
-				content.POST("/resources/:id/tags/ai-match", handler.AIMatchResourceTags)
 			}
 		}
 	}

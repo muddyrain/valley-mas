@@ -1,4 +1,4 @@
-﻿import {
+import {
   Crown,
   FolderOpen,
   ImageIcon,
@@ -260,10 +260,10 @@ function ResourcePicker({
                       <div className="mt-1.5 flex flex-wrap items-center gap-1">
                         {resource.tags.slice(0, 2).map((tag) => (
                           <span
-                            key={tag.id}
+                            key={tag}
                             className="rounded-full border border-white/35 bg-white/20 px-1.5 py-0.5 text-[10px] text-white/92 backdrop-blur-sm"
                           >
-                            #{tag.name}
+                            #{tag}
                           </span>
                         ))}
                         {resource.tags.length > 2 && (

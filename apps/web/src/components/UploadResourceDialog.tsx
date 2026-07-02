@@ -13,10 +13,9 @@ import { Image as ImageIcon, Loader2, Sparkles, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  type ResourceTag,
   type ResourceVisibility,
-  setResourceTags,
   suggestResourceTitle,
+  updateResource,
   uploadResource,
 } from '@/api/resource';
 import ResourceTagSelector from '@/components/ResourceTagSelector';
@@ -98,7 +97,7 @@ export default function UploadResourceDialog({
   const [aiNaming, setAiNaming] = useState(false);
   const [aiTitles, setAiTitles] = useState<string[]>([]);
   // 标签预选（上传前选好，上传成功后立即绑定）
-  const [selectedTags, setSelectedTags] = useState<ResourceTag[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   // 压缩后的 base64（AI 起名和 AI 标签共用）
   const [previewBase64, setPreviewBase64] = useState<string>('');
   const [uploadKey, setUploadKey] = useState(() => createUploadKey());
@@ -195,10 +194,7 @@ export default function UploadResourceDialog({
   // 统一收口成功后的资源绑定、提示与重置逻辑。
   const finishUploadSuccess = async (resource?: { id?: string }) => {
     if (selectedTags.length > 0 && resource?.id) {
-      setResourceTags(
-        resource.id,
-        selectedTags.map((t) => t.id),
-      ).catch(() => {
+      updateResource(resource.id, { tags: selectedTags }).catch(() => {
         /* 静默 */
       });
     }
@@ -525,7 +521,6 @@ export default function UploadResourceDialog({
               <ResourceTagSelector
                 value={selectedTags}
                 onChange={setSelectedTags}
-                allowCreateTag
                 aiPreUpload={{
                   imageBase64: previewBase64,
                   type: uploadType,

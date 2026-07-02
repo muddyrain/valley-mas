@@ -587,7 +587,7 @@ export default function Resources() {
               <Descriptions.Item label="标签">
                 <Space wrap>
                   {resourceOperations.tags.length
-                    ? resourceOperations.tags.map((tag) => <Tag key={tag.id}>{tag.name}</Tag>)
+                    ? resourceOperations.tags.map((tag) => <Tag key={tag}>{tag}</Tag>)
                     : '-'}
                 </Space>
               </Descriptions.Item>

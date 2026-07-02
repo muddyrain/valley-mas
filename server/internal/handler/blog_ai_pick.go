@@ -150,15 +150,12 @@ func pickBlogCoverResource(
 		likeQ := db.Session(&gorm.Session{NewDB: true})
 		for i, k := range cleaned {
 			like := "%" + k + "%"
-			expr := "resources.title ILIKE ? OR EXISTS (" +
-				"SELECT 1 FROM resource_tag_relations rtr " +
-				"JOIN resource_tags rt ON rt.id = rtr.tag_id " +
-				"WHERE rtr.resource_id = resources.id AND rt.name ILIKE ?" +
-				")"
+			tagLike := "%\"" + strings.ReplaceAll(k, "\"", "\\\"") + "\"%"
+			expr := "resources.title ILIKE ? OR resources.tags LIKE ?"
 			if i == 0 {
-				likeQ = likeQ.Where(expr, like, like)
+				likeQ = likeQ.Where(expr, like, tagLike)
 			} else {
-				likeQ = likeQ.Or(expr, like, like)
+				likeQ = likeQ.Or(expr, like, tagLike)
 			}
 		}
 		q = q.Where(likeQ)

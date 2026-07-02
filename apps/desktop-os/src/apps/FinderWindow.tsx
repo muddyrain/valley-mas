@@ -73,7 +73,7 @@ export default function FinderWindow() {
   const currentPath = useFinderStore((s) => s.currentPath);
   const selectedId = useFinderStore((s) => s.selectedId);
   const selectedIds = useFinderStore((s) => s.selectedIds);
-  const activeTagId = useFinderStore((s) => s.activeTagId);
+  const activeTag = useFinderStore((s) => s.activeTag);
   const viewMode = useFinderStore((s) => s.viewMode);
   const history = useFinderStore((s) => s.history);
   const future = useFinderStore((s) => s.future);
@@ -100,10 +100,9 @@ export default function FinderWindow() {
   const goForward = useFinderStore((s) => s.goForward);
   const goUp = useFinderStore((s) => s.goUp);
   const resources = useResourceStore((s) => s.resources);
-  const tags = useResourceStore((s) => s.tags);
   const total = useResourceStore((s) => s.total);
   const keyword = useResourceStore((s) => s.keyword);
-  const resourceTagId = useResourceStore((s) => s.tagId);
+  const resourceTag = useResourceStore((s) => s.tag);
   const sort = useResourceStore((s) => s.sort);
   const loading = useResourceStore((s) => s.loading);
   const loadingMore = useResourceStore((s) => s.loadingMore);
@@ -113,7 +112,7 @@ export default function FinderWindow() {
   const loadMoreResources = useResourceStore((s) => s.loadMoreResources);
   const refreshResources = useResourceStore((s) => s.refreshResources);
   const setKeyword = useResourceStore((s) => s.setKeyword);
-  const setTagId = useResourceStore((s) => s.setTagId);
+  const setTag = useResourceStore((s) => s.setTag);
   const setSort = useResourceStore((s) => s.setSort);
   const setActiveSmartView = useResourceStore((s) => s.setActiveSmartView);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -146,10 +145,23 @@ export default function FinderWindow() {
   const restoringViewRef = useRef(false);
   const restoredViewKeyRef = useRef<string | null>(null);
 
-  const activeTag = tags.find((tag) => tag.id === activeTagId) ?? null;
   const isResourceBrowser = isServerResourcePath(currentPath);
   const activePackage = resourcePackages.find((item) => item.id === activePackageId) ?? null;
   const activeSavedSearch = savedSearches.find((item) => item.id === activeSavedSearchId) ?? null;
+
+  const tagOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const resource of resources) {
+      for (const tag of resource.tags ?? []) {
+        const name = tag.trim();
+        if (!name) continue;
+        counts.set(name, (counts.get(name) ?? 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'zh-Hans-CN'));
+  }, [resources]);
 
   const pathItems = useMemo(() => {
     if (activePackage) {
@@ -189,7 +201,7 @@ export default function FinderWindow() {
   const hasBatchSelection = selectedItems.length > 1;
   const previewableItems = useMemo(() => items.filter(isImagePreviewItem), [items]);
   const locationTitle =
-    activePackage?.name ?? activeSavedSearch?.name ?? activeTag?.name ?? PATH_LABEL[currentPath];
+    activePackage?.name ?? activeSavedSearch?.name ?? activeTag ?? PATH_LABEL[currentPath];
   const resultCount = activePackage
     ? `${items.length}/${activePackage.resourceIds.length} 项`
     : activeTypeFilter === 'all'
@@ -200,17 +212,17 @@ export default function FinderWindow() {
   const activeTypeLabel = TYPE_FILTERS.find((filter) => filter.id === activeTypeFilter)?.label;
   const activeFiltersLabel = buildSavedSearchName({
     keyword,
-    tagName: activeTag?.name ?? null,
+    tagName: activeTag ?? null,
     typeLabel: activeTypeFilter === 'all' ? null : (activeTypeLabel ?? null),
   });
-  const canSaveSearch = Boolean(keyword.trim() || activeTagId || activeTypeFilter !== 'all');
+  const canSaveSearch = Boolean(keyword.trim() || activeTag || activeTypeFilter !== 'all');
   const packageableItems =
     selectedItems.length > 0 ? selectedItems : detailItem ? [detailItem] : [];
   const packageableResourceIds = packageableItems.flatMap((item) =>
     item.resourceId ? [item.resourceId] : [],
   );
   const canCreatePackage = packageableResourceIds.length > 0;
-  const viewKey = getFinderViewKey(currentPath, activeTagId);
+  const viewKey = getFinderViewKey(currentPath, activeTag);
   const emptyDescription =
     currentPath === 'recent'
       ? '预览或打开资源后会出现在这里'
@@ -243,8 +255,8 @@ export default function FinderWindow() {
   }, [keyword, searchInput, setKeyword]);
 
   useEffect(() => {
-    if (resourceTagId !== activeTagId) void setTagId(activeTagId);
-  }, [activeTagId, resourceTagId, setTagId]);
+    if (resourceTag !== activeTag) void setTag(activeTag);
+  }, [activeTag, resourceTag, setTag]);
 
   useEffect(() => {
     setActiveSmartView(currentPath);
@@ -363,10 +375,10 @@ export default function FinderWindow() {
     };
   }, []);
 
-  function openPath(path: FinderPath, tagId: string | null = null) {
+  function openPath(path: FinderPath, tag: string | null = null) {
     setActivePackageId(null);
     setActiveSavedSearchId(null);
-    setPath(path, null, tagId);
+    setPath(path, null, tag);
   }
 
   function openPackage(resourcePackage: FinderResourcePackage) {
@@ -380,7 +392,7 @@ export default function FinderWindow() {
     setActiveSavedSearchId(savedSearch.id);
     setActiveTypeFilter(savedSearch.typeFilter);
     setSearchInput(savedSearch.keyword);
-    setPath('all', null, savedSearch.tagId);
+    setPath('all', null, savedSearch.tag);
     if (keyword !== savedSearch.keyword) void setKeyword(savedSearch.keyword);
     if (sort !== savedSearch.sort) void setSort(savedSearch.sort);
   }
@@ -390,7 +402,7 @@ export default function FinderWindow() {
     saveSearch({
       name: activeFiltersLabel,
       keyword,
-      tagId: activeTagId,
+      tag: activeTag,
       sort,
       typeFilter: activeTypeFilter,
     });
@@ -762,7 +774,7 @@ export default function FinderWindow() {
           title="资源库"
           sections={groupedSections.library}
           currentPath={currentPath}
-          activeTagId={activeTagId}
+          activeTag={activeTag}
           suppressActive={Boolean(activePackage || activeSavedSearch)}
           onOpenPath={openPath}
         />
@@ -770,7 +782,7 @@ export default function FinderWindow() {
           title="智能分类"
           sections={groupedSections.smart}
           currentPath={currentPath}
-          activeTagId={activeTagId}
+          activeTag={activeTag}
           suppressActive={Boolean(activePackage || activeSavedSearch)}
           onOpenPath={openPath}
         />
@@ -839,20 +851,20 @@ export default function FinderWindow() {
             ))}
           </div>
         )}
-        {tags.length > 0 && (
+        {tagOptions.length > 0 && (
           <div className="finder__sidebar-group">
             <div className="finder__sidebar-title">标签</div>
-            {tags.map((tag) => (
+            {tagOptions.map((tag) => (
               <button
                 type="button"
-                key={tag.id}
-                className={`finder__side-item ${activeTagId === tag.id ? 'is-active' : ''}`}
-                onClick={() => openPath('all', tag.id)}
-                title={tag.description || tag.name}
+                key={tag.name}
+                className={`finder__side-item ${activeTag === tag.name ? 'is-active' : ''}`}
+                onClick={() => openPath('all', tag.name)}
+                title={tag.name}
               >
-                <span className="finder__tag-dot" style={{ background: tag.color ?? undefined }} />
+                <span className="finder__tag-dot" />
                 <span>{tag.name}</span>
-                {tag.resourceCount !== undefined && <small>{tag.resourceCount}</small>}
+                <small>{tag.count}</small>
               </button>
             ))}
           </div>
@@ -882,7 +894,7 @@ export default function FinderWindow() {
               <button
                 type="button"
                 onClick={goUp}
-                disabled={currentPath === 'all' && !activeTagId}
+                disabled={currentPath === 'all' && !activeTag}
                 aria-label="上一级"
               >
                 ⌂
@@ -999,7 +1011,7 @@ export default function FinderWindow() {
               )}
               {activeTag && (
                 <button type="button" onClick={clearTag}>
-                  标签：{activeTag.name}
+                  标签：{activeTag}
                   <span aria-hidden>×</span>
                 </button>
               )}
@@ -1210,7 +1222,7 @@ interface FinderSidebarGroupProps {
   title: string;
   sections: typeof FINDER_SECTIONS;
   currentPath: FinderPath;
-  activeTagId: string | null;
+  activeTag: string | null;
   suppressActive?: boolean;
   onOpenPath: (path: FinderPath) => void;
 }
@@ -1219,7 +1231,7 @@ function FinderSidebarGroup({
   title,
   sections,
   currentPath,
-  activeTagId,
+  activeTag,
   suppressActive = false,
   onOpenPath,
 }: FinderSidebarGroupProps) {
@@ -1231,7 +1243,7 @@ function FinderSidebarGroup({
           type="button"
           key={section.path}
           className={`finder__side-item ${
-            section.path === currentPath && !activeTagId && !suppressActive ? 'is-active' : ''
+            section.path === currentPath && !activeTag && !suppressActive ? 'is-active' : ''
           }`}
           onClick={() => onOpenPath(section.path)}
           title={section.description}

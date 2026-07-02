@@ -5,7 +5,7 @@ import "gorm.io/gorm"
 const resourceListSelectColumns = "" +
 	"resources.id, resources.user_id, resources.type, resources.title, resources.url, " +
 	"resources.width, resources.height, resources.size, resources.extension, " +
-	"resources.download_count, resources.favorite_count, resources.created_at"
+	"resources.download_count, resources.favorite_count, resources.created_at, resources.tags"
 
 const postListSelectColumns = "" +
 	"posts.id, posts.title, posts.slug, posts.post_type, posts.visibility, " +
@@ -14,18 +14,12 @@ const postListSelectColumns = "" +
 	"posts.category_id, posts.status, posts.view_count, posts.like_count, posts.is_top, " +
 	"posts.sort_order, posts.group_sort_order, posts.published_at, posts.created_at"
 
-func applyResourceListQueryShape(query *gorm.DB, includeTags bool) *gorm.DB {
-	query = query.
+func applyResourceListQueryShape(query *gorm.DB, _ bool) *gorm.DB {
+	return query.
 		Select(resourceListSelectColumns).
 		Preload("User", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, nickname, avatar")
 		})
-	if !includeTags {
-		return query
-	}
-	return query.Preload("Tags", func(db *gorm.DB) *gorm.DB {
-		return db.Select("resource_tags.id, resource_tags.name")
-	})
 }
 
 func applyPostListQueryShape(query *gorm.DB) *gorm.DB {

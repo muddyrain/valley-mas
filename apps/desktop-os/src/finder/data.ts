@@ -369,7 +369,7 @@ export function isServerResourcePath(path: FinderPath) {
 }
 
 export function resourceToFinderItem(resource: ServerResource): FinderItem {
-  const tags = resource.tags?.map((tag) => tag.name).filter(Boolean) ?? [];
+  const tags = resource.tags?.map((tag) => tag.trim()).filter(Boolean) ?? [];
   const isImage = isImageResource(resource);
   return {
     id: finderIdForResource(resource.id),
@@ -427,12 +427,7 @@ export function filterResourcesForPath(
   const keywords = PATH_KEYWORDS[path];
   if (!keywords) return resources;
   return resources.filter((resource) => {
-    const text = [
-      resource.title,
-      resource.description,
-      resource.type,
-      ...(resource.tags?.map((tag) => tag.name) ?? []),
-    ]
+    const text = [resource.title, resource.description, resource.type, ...(resource.tags ?? [])]
       .join(' ')
       .toLowerCase();
     return keywords.some((keyword) => text.includes(keyword.toLowerCase()));

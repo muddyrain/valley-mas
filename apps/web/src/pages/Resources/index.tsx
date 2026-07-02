@@ -1,22 +1,11 @@
-﻿import {
-  ExternalLink,
-  Hash,
-  ImageIcon,
-  Loader2,
-  RefreshCw,
-  Search,
-  Sparkles,
-  X,
-} from 'lucide-react';
+import { ExternalLink, Hash, ImageIcon, RefreshCw, Search, Sparkles, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   favoriteResource,
   getAllResources,
-  getPublicResourceTags,
   type Resource,
-  type ResourceTag,
   unfavoriteResource,
 } from '@/api/resource';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
@@ -57,8 +46,7 @@ const RESOURCE_QUERY_SCHEMA = {
   page: numberParam(1, { min: 1 }),
   keyword: stringParam('', { resetPageOnChange: true }),
   type: enumParam(['', 'wallpaper', 'avatar'] as const, '', { resetPageOnChange: true }),
-  tagId: stringParam('', { resetPageOnChange: true }),
-  tagName: stringParam(''),
+  tag: stringParam('', { resetPageOnChange: true }),
 };
 
 export default function Resources() {
@@ -68,9 +56,8 @@ export default function Resources() {
   const { user, profile, fetchProfile } = useAuthStore();
   const isCreator = user?.role === 'creator';
   const {
-    values: { page: currentPage, keyword: currentKeyword, type: activeType, tagId, tagName },
+    values: { page: currentPage, keyword: currentKeyword, type: activeType, tag: currentTag },
     setValue,
-    setValues,
   } = useUrlQueryState(RESOURCE_QUERY_SCHEMA, { pageKey: 'page' });
 
   const [resources, setResources] = useState<Resource[]>([]);
@@ -79,10 +66,8 @@ export default function Resources() {
   const [inputValue, setInputValue] = useState(currentKeyword);
   const [favoritedMap, setFavoritedMap] = useState<Record<string, boolean>>({});
 
-  // 标签筛选
-  const [tagKeyword, setTagKeyword] = useState('');
-  const [tagResults, setTagResults] = useState<ResourceTag[]>([]);
-  const [tagSearching, setTagSearching] = useState(false);
+  // 标签筛选：改为直接输入标签名（不再有标签实体表）
+  const [tagInput, setTagInput] = useState('');
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
   const firstLoadRef = useRef(true);
@@ -91,8 +76,8 @@ export default function Resources() {
   // 刷新
   const [refreshing, setRefreshing] = useState(false);
   const listCacheKey = useMemo(
-    () => `${currentPage}|${activeType || ''}|${currentKeyword || ''}|${tagId || ''}`,
-    [activeType, currentKeyword, currentPage, tagId],
+    () => `${currentPage}|${activeType || ''}|${currentKeyword || ''}|${currentTag || ''}`,
+    [activeType, currentKeyword, currentPage, currentTag],
   );
   const scrollStorageKey = useMemo(
     () => `${RESOURCE_LIST_SCROLL_STORAGE_PREFIX}:${location.pathname}${location.search}`,
@@ -145,7 +130,7 @@ export default function Resources() {
       pageSize: PAGE_SIZE,
       type: activeType || undefined,
       keyword: currentKeyword || undefined,
-      tagId: tagId || undefined,
+      tag: currentTag || undefined,
       includeTags: true,
     })
       .then((data) => {
@@ -179,27 +164,17 @@ export default function Resources() {
     return () => {
       cancelled = true;
     };
-  }, [currentPage, activeType, currentKeyword, listCacheKey, tagId]);
+  }, [currentPage, activeType, currentKeyword, listCacheKey, currentTag]);
   const handleSearch = () => {
     setValue('keyword', inputValue);
   };
 
-  // 标签关键词搜索（防抖 300ms）
-  useEffect(() => {
-    if (!tagDropdownOpen) return;
-    const timer = setTimeout(async () => {
-      setTagSearching(true);
-      try {
-        const data = await getPublicResourceTags({ keyword: tagKeyword, pageSize: 30 });
-        setTagResults(data.list ?? []);
-      } catch {
-        // 静默
-      } finally {
-        setTagSearching(false);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [tagKeyword, tagDropdownOpen]);
+  const applyTagFilter = (nextTag: string) => {
+    const trimmed = nextTag.trim();
+    setValue('tag', trimmed);
+    setTagDropdownOpen(false);
+    setTagInput('');
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -209,7 +184,7 @@ export default function Resources() {
         pageSize: PAGE_SIZE,
         type: activeType || undefined,
         keyword: currentKeyword || undefined,
-        tagId: tagId || undefined,
+        tag: currentTag || undefined,
         includeTags: true,
       });
       const list = data.list ?? [];
@@ -291,7 +266,6 @@ export default function Resources() {
   };
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const activeTagName = tagName.trim();
   const wallpaperCount = useMemo(
     () =>
       resources.filter((item) => item.type === 'wallpaper' || item.type === 'background').length,
@@ -404,17 +378,15 @@ export default function Resources() {
                 className="flex-1"
               />
 
-              {/* 标签筛选 */}
+              {/* 标签筛选：直接输入标签名 */}
               <div className="relative">
-                {tagId ? (
+                {currentTag ? (
                   <div className="flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 pl-3 pr-1.5 py-1.5 text-sm text-purple-700">
                     <Hash className="h-3.5 w-3.5" />
-                    <span className="font-medium">{activeTagName || '已选标签'}</span>
+                    <span className="font-medium">{currentTag}</span>
                     <button
                       type="button"
-                      onClick={() => {
-                        setValues({ tagId: '', tagName: '' });
-                      }}
+                      onClick={() => setValue('tag', '')}
                       className="ml-0.5 rounded-full p-0.5 hover:bg-purple-200 transition-colors"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -425,7 +397,7 @@ export default function Resources() {
                     type="button"
                     onClick={() => {
                       setTagDropdownOpen(true);
-                      setTagKeyword('');
+                      setTagInput('');
                       setTimeout(() => tagInputRef.current?.focus(), 50);
                     }}
                     className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/82 px-3 py-1.5 text-sm text-slate-500 hover:border-purple-200 hover:text-purple-600 transition-colors"
@@ -439,47 +411,28 @@ export default function Resources() {
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setTagDropdownOpen(false)} />
                     <div className="absolute right-0 top-full z-20 mt-1.5 w-64 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
-                      <div className="p-2 border-b border-slate-100">
+                      <div className="p-2">
                         <div className="relative">
-                          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                          <Hash className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                           <input
                             ref={tagInputRef}
-                            value={tagKeyword}
-                            onChange={(e) => setTagKeyword(e.target.value)}
-                            placeholder="搜索标签…"
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (tagInput.trim()) applyTagFilter(tagInput);
+                              } else if (e.key === 'Escape') {
+                                setTagDropdownOpen(false);
+                              }
+                            }}
+                            placeholder="输入标签名后回车"
                             className="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 pl-7 pr-3 text-sm outline-none focus:border-purple-300 focus:ring-1 focus:ring-purple-100"
                           />
                         </div>
-                      </div>
-                      <div className="max-h-52 overflow-y-auto py-1">
-                        {tagSearching ? (
-                          <div className="flex items-center justify-center py-6 text-slate-400">
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            搜索中…
-                          </div>
-                        ) : tagResults.length === 0 ? (
-                          <p className="py-6 text-center text-sm text-slate-400">
-                            {tagKeyword ? '未找到匹配标签' : '输入关键词搜索标签'}
-                          </p>
-                        ) : (
-                          tagResults.map((tag) => (
-                            <button
-                              key={tag.id}
-                              type="button"
-                              onClick={() => {
-                                setValues({ tagId: tag.id, tagName: tag.name });
-                                setTagDropdownOpen(false);
-                              }}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors"
-                            >
-                              <Hash className="h-3.5 w-3.5 shrink-0 text-purple-400" />
-                              <span className="flex-1 truncate">{tag.name}</span>
-                              <span className="shrink-0 text-xs text-slate-400">
-                                {tag.resourceCount}
-                              </span>
-                            </button>
-                          ))
-                        )}
+                        <p className="mt-2 px-1 text-xs text-slate-400">
+                          按标签名精确筛选资源，回车确认。
+                        </p>
                       </div>
                     </div>
                   </>
@@ -518,21 +471,19 @@ export default function Resources() {
                     description={
                       currentKeyword
                         ? `没有找到包含"${currentKeyword}"的资源`
-                        : tagId
-                          ? `标签"${activeTagName || '当前标签'}"下暂无资源`
+                        : currentTag
+                          ? `标签"${currentTag}"下暂无资源`
                           : '这个分类下还没有资源内容'
                     }
-                    actionLabel={currentKeyword ? '清除搜索' : tagId ? '清除标签' : undefined}
+                    actionLabel={currentKeyword ? '清除搜索' : currentTag ? '清除标签' : undefined}
                     onAction={
                       currentKeyword
                         ? () => {
                             setValue('keyword', '');
                             setInputValue('');
                           }
-                        : tagId
-                          ? () => {
-                              setValues({ tagId: '', tagName: '' });
-                            }
+                        : currentTag
+                          ? () => setValue('tag', '')
                           : undefined
                     }
                   />

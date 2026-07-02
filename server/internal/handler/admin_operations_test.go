@@ -43,8 +43,6 @@ func setupAdminOperationsTestDB(t *testing.T) *gin.Engine {
 		&model.Creator{},
 		&model.CreatorAlbum{},
 		&model.Resource{},
-		&model.ResourceTag{},
-		&model.ResourceTagRelation{},
 		&model.DownloadRecord{},
 		&model.UserFavorite{},
 		&model.UserFollow{},
@@ -388,8 +386,8 @@ func TestAdminGetResourceOperationsReturnsTagsAlbumsAndCounters(t *testing.T) {
 	resource := model.Resource{
 		ID: 83, UserID: uploader.ID, Title: "Wallpaper", URL: "https://example.com/w.png",
 		StorageKey: "resources/w.png", DownloadCount: 7, FavoriteCount: 3,
+		Tags: model.StringList{"运营"},
 	}
-	tag := model.ResourceTag{ID: 84, Name: "运营", Description: "ops"}
 	album := model.CreatorAlbum{ID: 85, CreatorID: creator.ID, Name: "精选"}
 	favUser := model.User{ID: 86, Nickname: "Fan", OpenID: "fan", Username: "fan", Role: "user", IsActive: true}
 	if err := database.DB.Create(&[]model.User{uploader, favUser}).Error; err != nil {
@@ -401,14 +399,8 @@ func TestAdminGetResourceOperationsReturnsTagsAlbumsAndCounters(t *testing.T) {
 	if err := database.DB.Create(&resource).Error; err != nil {
 		t.Fatalf("seed resource: %v", err)
 	}
-	if err := database.DB.Create(&tag).Error; err != nil {
-		t.Fatalf("seed tag: %v", err)
-	}
 	if err := database.DB.Create(&album).Error; err != nil {
 		t.Fatalf("seed album: %v", err)
-	}
-	if err := database.DB.Model(&resource).Association("Tags").Append(&tag); err != nil {
-		t.Fatalf("append tag: %v", err)
 	}
 	if err := database.DB.Model(&album).Association("Resources").Append(&resource); err != nil {
 		t.Fatalf("append album resource: %v", err)
@@ -436,7 +428,7 @@ func TestAdminGetResourceOperationsReturnsTagsAlbumsAndCounters(t *testing.T) {
 	}
 	tags := data["tags"].([]interface{})
 	albums := data["albums"].([]interface{})
-	if tags[0].(map[string]interface{})["name"] != "运营" || albums[0].(map[string]interface{})["name"] != "精选" {
+	if len(tags) == 0 || tags[0].(string) != "运营" || albums[0].(map[string]interface{})["name"] != "精选" {
 		t.Fatalf("unexpected tags/albums: tags=%#v albums=%#v", tags, albums)
 	}
 }

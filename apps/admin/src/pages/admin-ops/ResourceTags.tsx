@@ -1,107 +1,60 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
-import {
-  Button,
-  Card,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  message,
-  Popconfirm,
-  Space,
-  Table,
-} from 'antd';
+import { Card, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useCallback, useMemo, useState } from 'react';
-import {
-  createResourceTag,
-  deleteResourceTag,
-  listResourceTags,
-  type ResourceTag,
-  updateResourceTag,
-} from '@/api/operations';
-import { formatDateTime, useAdminList } from './shared';
+import { useMemo } from 'react';
+import { listResourceTagStats, type ResourceTagStat } from '@/api/operations';
+import type { AdminListParams, AdminListResponse } from '@/types/api';
+import { useAdminList } from './shared';
+
+const listResourceTagStatsAdapter = async (
+  params: AdminListParams,
+): Promise<AdminListResponse<ResourceTagStat>> => {
+  const result = await listResourceTagStats({
+    keyword: params.keyword,
+    limit: params.pageSize && params.pageSize > 0 ? params.pageSize * 10 : 200,
+  });
+  const page = params.page ?? 1;
+  const pageSize = params.pageSize ?? 20;
+  const list = result.list ?? [];
+  const start = (page - 1) * pageSize;
+  const paged = list.slice(start, start + pageSize);
+  return {
+    list: paged,
+    total: result.total ?? list.length,
+    page,
+    pageSize,
+  };
+};
 
 export default function ResourceTags() {
-  const [form] = Form.useForm();
-  const [editing, setEditing] = useState<ResourceTag | null>(null);
-  const [open, setOpen] = useState(false);
-  const ops = useAdminList<ResourceTag>(listResourceTags);
+  const ops = useAdminList<ResourceTagStat>(listResourceTagStatsAdapter);
 
-  const handleSubmit = useCallback(async () => {
-    const values = await form.validateFields();
-    if (editing) await updateResourceTag(editing.id, values);
-    else await createResourceTag(values);
-    message.success(editing ? '已更新' : '已创建');
-    setOpen(false);
-    void ops.fetchData();
-  }, [editing, form, ops.fetchData]);
-
-  const openEdit = useCallback(
-    (record: ResourceTag) => {
-      setEditing(record);
-      form.setFieldsValue(record);
-      setOpen(true);
-    },
-    [form],
-  );
-
-  const handleDelete = useCallback(
-    async (id: string) => {
-      await deleteResourceTag(id);
-      message.success('已删除');
-      void ops.fetchData();
-    },
-    [ops.fetchData],
-  );
-
-  const columns: ColumnsType<ResourceTag> = useMemo(
+  const columns: ColumnsType<ResourceTagStat> = useMemo(
     () => [
-      { title: '名称', dataIndex: 'name' },
-      { title: '说明', dataIndex: 'description', render: (value?: string) => value || '-' },
-      { title: '资源数', dataIndex: 'resourceCount', width: 100 },
-      { title: '创建时间', dataIndex: 'createdAt', width: 180, render: formatDateTime },
+      { title: '标签名', dataIndex: 'name' },
       {
-        title: '操作',
-        key: 'action',
-        width: 180,
-        render: (_, record) => (
-          <Space>
-            <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-              编辑
-            </Button>
-            <Popconfirm title="确认删除这个标签？" onConfirm={() => handleDelete(record.id)}>
-              <Button type="link" danger icon={<DeleteOutlined />}>
-                删除
-              </Button>
-            </Popconfirm>
-          </Space>
-        ),
+        title: '资源数',
+        dataIndex: 'resourceCount',
+        width: 160,
+        sorter: (a, b) => a.resourceCount - b.resourceCount,
       },
     ],
-    [handleDelete, openEdit],
+    [],
   );
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="mb-0 text-2xl font-bold">资源标签</h2>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => {
-            setEditing(null);
-            form.resetFields();
-            setOpen(true);
-          }}
-        >
-          新建标签
-        </Button>
+        <div>
+          <h2 className="mb-1 text-2xl font-bold">资源标签统计</h2>
+          <p className="mb-0 text-sm text-gray-500">
+            汇总当前资源实际使用的标签名及数量，仅用于查看，不再维护标签库。
+          </p>
+        </div>
       </div>
       <Card>
         <div className="mb-4">{ops.searchTools}</div>
         <Table
-          rowKey="id"
+          rowKey="name"
           columns={columns}
           dataSource={ops.data}
           loading={ops.loading}
@@ -110,31 +63,11 @@ export default function ResourceTags() {
             pageSize: ops.pageSize,
             total: ops.total,
             showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 条`,
+            showTotal: (total) => `共 ${total} 个标签`,
           }}
           onChange={ops.handleTableChange}
         />
       </Card>
-      <Modal
-        title={editing ? '编辑标签' : '新建标签'}
-        open={open}
-        onOk={handleSubmit}
-        onCancel={() => setOpen(false)}
-        okText="保存"
-        cancelText="取消"
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
-            <Input maxLength={30} />
-          </Form.Item>
-          <Form.Item name="description" label="说明">
-            <Input.TextArea rows={3} maxLength={100} />
-          </Form.Item>
-          <Form.Item name="resourceCount" label="资源数">
-            <InputNumber className="w-full" disabled />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   );
 }

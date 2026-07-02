@@ -1,15 +1,5 @@
 import { apiRequest } from './client';
 
-export interface ServerResourceTag {
-  id: string;
-  name: string;
-  slug?: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  resourceCount?: number;
-}
-
 export interface ServerResource {
   id: string;
   title: string;
@@ -25,7 +15,7 @@ export interface ServerResource {
   creatorName?: string;
   creatorAvatar?: string;
   creatorCode?: string;
-  tags?: ServerResourceTag[];
+  tags?: string[];
   createdAt?: string;
   size?: number;
   width?: number;
@@ -36,13 +26,6 @@ export interface ServerResource {
 
 export interface ResourceListResponse {
   list: ServerResource[];
-  total: number;
-  page?: number;
-  pageSize?: number;
-}
-
-export interface ResourceTagListResponse {
-  list: ServerResourceTag[];
   total: number;
   page?: number;
   pageSize?: number;
@@ -65,7 +48,7 @@ export function listResources(
     page?: number;
     pageSize?: number;
     keyword?: string;
-    tagId?: string;
+    tag?: string;
     sort?: ServerResourceSort;
     includeTags?: boolean;
   } = {},
@@ -76,14 +59,10 @@ export function listResources(
     pageSize: String(params.pageSize ?? 30),
   });
   if (params.keyword) query.set('keyword', params.keyword);
-  if (params.tagId) query.set('tagId', params.tagId);
+  if (params.tag) query.set('tag', params.tag);
   if (params.sort) query.set('sort', params.sort);
   if (params.includeTags ?? true) query.set('includeTags', 'true');
   return apiRequest<ResourceListResponse>(`/public/resources?${query.toString()}`, { token });
-}
-
-export function listResourceTags() {
-  return apiRequest<ResourceTagListResponse>('/public/resource-tags');
 }
 
 export function getResourceDetail(id: string, token?: string | null) {

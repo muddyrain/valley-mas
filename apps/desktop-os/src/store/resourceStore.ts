@@ -3,10 +3,8 @@ import {
   downloadResource,
   favoriteResource,
   listResources,
-  listResourceTags,
   type ServerResource,
   type ServerResourceSort,
-  type ServerResourceTag,
   unfavoriteResource,
 } from '../api/resources';
 import type { FinderPath } from '../finder/data';
@@ -16,15 +14,14 @@ const RESOURCE_PAGE_SIZE = 30;
 
 interface ResourceQuery {
   keyword: string;
-  tagId: string | null;
+  tag: string | null;
   sort: ServerResourceSort;
 }
 
 interface ResourceStore {
   resources: ServerResource[];
-  tags: ServerResourceTag[];
   keyword: string;
-  tagId: string | null;
+  tag: string | null;
   sort: ServerResourceSort;
   activeSmartView: FinderPath;
   total: number;
@@ -39,7 +36,7 @@ interface ResourceStore {
   loadMoreResources: () => Promise<void>;
   refreshResources: () => Promise<void>;
   setKeyword: (keyword: string) => Promise<void>;
-  setTagId: (tagId: string | null) => Promise<void>;
+  setTag: (tag: string | null) => Promise<void>;
   setSort: (sort: ServerResourceSort) => Promise<void>;
   setActiveSmartView: (view: FinderPath) => void;
   toggleFavorite: (resourceId: string) => Promise<void>;
@@ -48,9 +45,8 @@ interface ResourceStore {
 
 export const useResourceStore = create<ResourceStore>((set, get) => ({
   resources: [],
-  tags: [],
   keyword: '',
-  tagId: null,
+  tag: null,
   sort: 'newest',
   activeSmartView: 'all',
   total: 0,
@@ -68,23 +64,19 @@ export const useResourceStore = create<ResourceStore>((set, get) => ({
     try {
       const token = useAuthStore.getState().token;
       const query = getResourceQuery(get());
-      const [resourceData, tagData] = await Promise.all([
-        listResources(
-          {
-            includeTags: true,
-            page: 1,
-            pageSize: get().pageSize,
-            keyword: query.keyword,
-            tagId: query.tagId ?? undefined,
-            sort: query.sort,
-          },
-          token,
-        ),
-        listResourceTags(),
-      ]);
+      const resourceData = await listResources(
+        {
+          includeTags: true,
+          page: 1,
+          pageSize: get().pageSize,
+          keyword: query.keyword,
+          tag: query.tag ?? undefined,
+          sort: query.sort,
+        },
+        token,
+      );
       set({
         resources: resourceData.list,
-        tags: tagData.list,
         total: resourceData.total,
         page: resourceData.page ?? 1,
         hasMore: resourceData.list.length < resourceData.total,
@@ -114,7 +106,7 @@ export const useResourceStore = create<ResourceStore>((set, get) => ({
           page: nextPage,
           pageSize: state.pageSize,
           keyword: query.keyword,
-          tagId: query.tagId ?? undefined,
+          tag: query.tag ?? undefined,
           sort: query.sort,
         },
         token,
@@ -148,8 +140,8 @@ export const useResourceStore = create<ResourceStore>((set, get) => ({
     await get().loadResources();
   },
 
-  setTagId: async (tagId) => {
-    set({ tagId, page: 0, hasMore: true, lastLoadedAt: null, resources: [] });
+  setTag: async (tag) => {
+    set({ tag, page: 0, hasMore: true, lastLoadedAt: null, resources: [] });
     await get().loadResources();
   },
 
@@ -205,10 +197,10 @@ export const useResourceStore = create<ResourceStore>((set, get) => ({
   },
 }));
 
-function getResourceQuery(state: Pick<ResourceStore, 'keyword' | 'tagId' | 'sort'>): ResourceQuery {
+function getResourceQuery(state: Pick<ResourceStore, 'keyword' | 'tag' | 'sort'>): ResourceQuery {
   return {
     keyword: state.keyword.trim(),
-    tagId: state.tagId,
+    tag: state.tag,
     sort: state.sort,
   };
 }

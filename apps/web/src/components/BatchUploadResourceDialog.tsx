@@ -24,10 +24,9 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   aiSuggestResourceTags,
-  type ResourceTag,
   type ResourceVisibility,
-  setResourceTags,
   suggestResourceTitle,
+  updateResource,
   uploadResource,
 } from '@/api/resource';
 import { Button } from '@/components/ui/button';
@@ -70,7 +69,7 @@ type BatchResourceItem = {
   base64: string;
   uploadKey: string;
   title: string;
-  tags: ResourceTag[];
+  tags: string[];
   status: 'pending' | 'running' | 'confirming' | 'success' | 'error';
   error?: string;
   aiNaming?: boolean;
@@ -267,10 +266,7 @@ export default function BatchUploadResourceDialog({
 
     const bindResourceTags = async (resourceId?: string) => {
       if (item.tags.length > 0 && resourceId) {
-        await setResourceTags(
-          resourceId,
-          item.tags.map((tag) => tag.id),
-        ).catch(() => {
+        await updateResource(resourceId, { tags: item.tags }).catch(() => {
           /* 静默 */
         });
       }
@@ -784,17 +780,17 @@ export default function BatchUploadResourceDialog({
                         ) : item.tags.length > 0 ? (
                           item.tags.map((tag) => (
                             <span
-                              key={tag.id}
+                              key={tag}
                               className="group inline-flex items-center gap-1 rounded-full border border-theme-primary/20 bg-theme-soft/60 px-2 py-0.5 text-xs font-medium text-theme-primary"
                             >
                               <Hash className="h-2.5 w-2.5 opacity-60" />
-                              {tag.name}
+                              {tag}
                               {item.status === 'pending' && !uploading && (
                                 <button
                                   type="button"
                                   onClick={() =>
                                     updateItem(index, {
-                                      tags: item.tags.filter((t) => t.id !== tag.id),
+                                      tags: item.tags.filter((t) => t !== tag),
                                     })
                                   }
                                   className="ml-0.5 rounded-full opacity-50 hover:opacity-100 transition"

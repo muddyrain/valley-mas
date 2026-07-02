@@ -102,7 +102,7 @@ export function searchSpotlight(
     title: resource.title,
     subtitle: resource.description || resource.creatorName || '在线资源',
     icon: resource.thumbnailUrl || '/folders/cloud.png',
-    keywords: resource.tags?.map((tag) => tag.name) ?? [],
+    keywords: resource.tags ?? [],
     action: {
       type: 'open-finder' as const,
       path: 'all' as FinderPath,

@@ -18,7 +18,7 @@ export interface FinderSavedSearch {
   id: string;
   name: string;
   keyword: string;
-  tagId: string | null;
+  tag: string | null;
   sort: ServerResourceSort;
   typeFilter: FinderSavedTypeFilter;
   createdAt: number;
@@ -27,7 +27,7 @@ export interface FinderSavedSearch {
 interface FinderLocation {
   path: FinderPath;
   selectedId: string | null;
-  tagId: string | null;
+  tag: string | null;
 }
 
 interface FinderViewState {
@@ -49,7 +49,7 @@ interface FinderStore {
   currentPath: FinderPath;
   selectedId: string | null;
   selectedIds: string[];
-  activeTagId: string | null;
+  activeTag: string | null;
   viewMode: FinderViewMode;
   recentResourceIds: string[];
   downloadedResourceIds: string[];
@@ -58,7 +58,7 @@ interface FinderStore {
   savedSearches: FinderSavedSearch[];
   history: FinderLocation[];
   future: FinderLocation[];
-  setPath: (path: FinderPath, selectedId?: string | null, tagId?: string | null) => void;
+  setPath: (path: FinderPath, selectedId?: string | null, tag?: string | null) => void;
   selectItem: (id: string | null) => void;
   toggleSelected: (id: string, mode: FinderSelectionMode) => void;
   selectRange: (id: string, orderedIds: string[]) => void;
@@ -83,8 +83,8 @@ const MAX_ACTIVITY_ITEMS = 80;
 const MAX_RESOURCE_PACKAGES = 18;
 const MAX_SAVED_SEARCHES = 18;
 
-export function getFinderViewKey(path: FinderPath, tagId: string | null) {
-  return `${path}:${tagId ?? 'none'}`;
+export function getFinderViewKey(path: FinderPath, tag: string | null) {
+  return `${path}:${tag ?? 'none'}`;
 }
 
 function loadStoredState(): FinderStoredState {
@@ -176,7 +176,7 @@ function currentLocation(state: FinderStore): FinderLocation {
   return {
     path: state.currentPath,
     selectedId: state.selectedId,
-    tagId: state.activeTagId,
+    tag: state.activeTag,
   };
 }
 
@@ -185,7 +185,7 @@ function applyLocation(location: FinderLocation) {
     currentPath: location.path,
     selectedId: location.selectedId,
     selectedIds: selectionFor(location.selectedId),
-    activeTagId: location.tagId,
+    activeTag: location.tag,
   };
 }
 
@@ -216,19 +216,19 @@ export const useFinderStore = create<FinderStore>((set) => ({
   currentPath: 'all',
   selectedId: null,
   selectedIds: [],
-  activeTagId: null,
+  activeTag: null,
   viewMode: 'grid',
   history: [],
   future: [],
 
-  setPath: (path, selectedId = null, tagId = null) =>
+  setPath: (path, selectedId = null, tag = null) =>
     set((state) => {
-      const next = { path, selectedId, tagId };
+      const next = { path, selectedId, tag };
       const current = currentLocation(state);
       if (
         current.path === next.path &&
         current.selectedId === next.selectedId &&
-        current.tagId === next.tagId
+        current.tag === next.tag
       ) {
         return {};
       }
@@ -273,7 +273,7 @@ export const useFinderStore = create<FinderStore>((set) => ({
   clearSelection: () => set({ selectedId: null, selectedIds: [] }),
   setViewMode: (mode) =>
     set((state) => {
-      const key = getFinderViewKey(state.currentPath, state.activeTagId);
+      const key = getFinderViewKey(state.currentPath, state.activeTag);
       const next = {
         viewMode: mode,
         viewStates: {
@@ -286,7 +286,7 @@ export const useFinderStore = create<FinderStore>((set) => ({
     }),
   rememberViewState: (patch) =>
     set((state) => {
-      const key = getFinderViewKey(state.currentPath, state.activeTagId);
+      const key = getFinderViewKey(state.currentPath, state.activeTag);
       const next = {
         viewStates: {
           ...state.viewStates,
@@ -402,12 +402,12 @@ export const useFinderStore = create<FinderStore>((set) => ({
     }),
   goUp: () =>
     set((state) => {
-      if (state.currentPath === 'all' && !state.activeTagId) return {};
+      if (state.currentPath === 'all' && !state.activeTag) return {};
       return {
         currentPath: 'all',
         selectedId: null,
         selectedIds: [],
-        activeTagId: null,
+        activeTag: null,
         history: [...state.history, currentLocation(state)].slice(-40),
         future: [],
       };
@@ -417,7 +417,7 @@ export const useFinderStore = create<FinderStore>((set) => ({
       currentPath: path,
       selectedId,
       selectedIds: selectionFor(selectedId),
-      activeTagId: null,
+      activeTag: null,
       history: [...state.history, currentLocation(state)].slice(-40),
       future: [],
     })),

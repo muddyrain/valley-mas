@@ -891,7 +891,7 @@ func AdminGetResourceOperations(c *gin.Context) {
 	db := database.GetDB()
 
 	var resource model.Resource
-	if err := db.Preload("User").Preload("Tags").Where("id = ? AND deleted_at IS NULL", resourceID).First(&resource).Error; err != nil {
+	if err := db.Preload("User").Where("id = ? AND deleted_at IS NULL", resourceID).First(&resource).Error; err != nil {
 		Error(c, http.StatusNotFound, "资源不存在")
 		return
 	}

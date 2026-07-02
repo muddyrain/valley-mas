@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -18,6 +19,51 @@ import (
 )
 
 const resourceUploadHashDedupWindow = 10 * time.Minute
+
+const maxResourceTagCount = 12
+const maxResourceTagRunes = 20
+
+// normalizeResourceTagNames 清理用户提交的标签数组：去空、去重、截断、限制个数。
+func normalizeResourceTagNames(raw []string) model.StringList {
+	if len(raw) == 0 {
+		return model.StringList{}
+	}
+	seen := make(map[string]struct{}, len(raw))
+	result := make(model.StringList, 0, len(raw))
+	for _, item := range raw {
+		name := truncateRunes(item, maxResourceTagRunes)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		result = append(result, name)
+		if len(result) >= maxResourceTagCount {
+			break
+		}
+	}
+	return result
+}
+
+// parseUploadTags 从 multipart form 中解析 tags：兼容 JSON 字符串、tags[] 数组、CSV。
+func parseUploadTags(c *gin.Context) model.StringList {
+	if raw := strings.TrimSpace(c.PostForm("tags")); raw != "" {
+		if strings.HasPrefix(raw, "[") {
+			var names []string
+			if err := json.Unmarshal([]byte(raw), &names); err == nil {
+				return normalizeResourceTagNames(names)
+			}
+		}
+		parts := strings.Split(raw, ",")
+		return normalizeResourceTagNames(parts)
+	}
+	if names := c.PostFormArray("tags[]"); len(names) > 0 {
+		return normalizeResourceTagNames(names)
+	}
+	return model.StringList{}
+}
 
 func truncateRunes(s string, max int) string {
 	if max <= 0 || s == "" {
@@ -184,7 +230,7 @@ func ListResources(c *gin.Context) {
 
 	countQuery := query
 	countQuery.Count(&total)
-	query.Preload("User").Preload("Tags").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&resources)
+	query.Preload("User").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&resources)
 	fillResourceThumbnails(resources)
 
 	Success(c, gin.H{
@@ -300,6 +346,7 @@ func UploadResource(c *gin.Context) {
 		Height:      result.Height,
 		Extension:   truncateRunes(strings.TrimPrefix(result.Ext, "."), 20), // 去掉前导点，并限制长度
 		UserID:      model.Int64String(userIDInt64),
+		Tags:        parseUploadTags(c),
 	}
 
 	existingByHash, err := findRecentResourceByFileHash(db, userIDInt64, result.FileHash)
@@ -636,10 +683,11 @@ func UpdateResource(c *gin.Context) {
 	id := c.Param("id")
 
 	var req struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		Type        string `json:"type"`
-		Visibility  string `json:"visibility"`
+		Title       string    `json:"title"`
+		Description string    `json:"description"`
+		Type        string    `json:"type"`
+		Visibility  string    `json:"visibility"`
+		Tags        *[]string `json:"tags"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Error(c, 400, "参数错误："+err.Error())
@@ -680,6 +728,9 @@ func UpdateResource(c *gin.Context) {
 	if req.Visibility != "" {
 		updates["visibility"] = normalizeResourceVisibility(req.Visibility)
 	}
+	if req.Tags != nil {
+		updates["tags"] = normalizeResourceTagNames(*req.Tags)
+	}
 
 	if len(updates) == 0 {
 		Error(c, 400, "没有可更新的字段")
@@ -692,7 +743,7 @@ func UpdateResource(c *gin.Context) {
 	}
 
 	// 返回最新数据
-	db.Preload("Tags").First(&resource, "id = ?", id)
+	db.First(&resource, "id = ?", id)
 	resource.FillThumbnailURL()
 	invalidatePublicResourceListCache()
 	Success(c, gin.H{

@@ -37,7 +37,7 @@ func buildPublicResourceListCacheKey(
 	pageSize int,
 	resourceType string,
 	keyword string,
-	tagID string,
+	tag string,
 	sort string,
 	includeTags bool,
 ) string {
@@ -51,7 +51,7 @@ func buildPublicResourceListCacheKey(
 			strconv.Itoa(pageSize),
 			resourceType,
 			keyword,
-			tagID,
+			tag,
 			sort,
 			includeTagsFlag,
 		},
@@ -257,11 +257,11 @@ func GetHotCreators(c *gin.Context) {
 			COALESCE(resource_stats.resource_count, 0) as resource_count,
 			COALESCE(resource_stats.download_count, 0) as download_count`).
 		Joins(`LEFT JOIN (
-			SELECT 
-				user_id, 
+			SELECT
+				user_id,
 				COUNT(*) as resource_count,
 				SUM(download_count) as download_count
-			FROM resources 
+			FROM resources
 			WHERE deleted_at IS NULL
 			GROUP BY user_id
 		) as resource_stats ON creators.user_id = resource_stats.user_id`).
@@ -350,7 +350,7 @@ func GetResourceDetail(c *gin.Context) {
 	db := database.GetDB()
 
 	var resource model.Resource
-	if err := db.Where("id = ? AND deleted_at IS NULL", id).Preload("Tags").First(&resource).Error; err != nil {
+	if err := db.Where("id = ? AND deleted_at IS NULL", id).First(&resource).Error; err != nil {
 		Error(c, 404, "资源不存在")
 		return
 	}
@@ -429,30 +429,25 @@ func GetResourceDetail(c *gin.Context) {
 	})
 }
 
-type resourceTagLite struct {
-	ID   model.Int64String `json:"id"`
-	Name string            `json:"name"`
-}
-
 // HotResourceResponse 热门资源响应
 type HotResourceResponse struct {
-	ID            string            `json:"id"`
-	Title         string            `json:"title"`
-	Type          string            `json:"type"`
-	URL           string            `json:"url"`
-	ThumbnailURL  string            `json:"thumbnailUrl"`
-	Size          int64             `json:"size"`
-	Width         int               `json:"width"`
-	Height        int               `json:"height"`
-	Extension     string            `json:"extension"`
-	DownloadCount int64             `json:"downloadCount"`
-	FavoriteCount int               `json:"favoriteCount"`
-	UserId        string            `json:"userId"`
-	CreatorName   string            `json:"creatorName"`
-	CreatorAvatar string            `json:"creatorAvatar"`
-	CreatedAt     string            `json:"createdAt"`
-	IsFavorited   bool              `json:"isFavorited"`
-	Tags          []resourceTagLite `json:"tags,omitempty"`
+	ID            string   `json:"id"`
+	Title         string   `json:"title"`
+	Type          string   `json:"type"`
+	URL           string   `json:"url"`
+	ThumbnailURL  string   `json:"thumbnailUrl"`
+	Size          int64    `json:"size"`
+	Width         int      `json:"width"`
+	Height        int      `json:"height"`
+	Extension     string   `json:"extension"`
+	DownloadCount int64    `json:"downloadCount"`
+	FavoriteCount int      `json:"favoriteCount"`
+	UserId        string   `json:"userId"`
+	CreatorName   string   `json:"creatorName"`
+	CreatorAvatar string   `json:"creatorAvatar"`
+	CreatedAt     string   `json:"createdAt"`
+	IsFavorited   bool     `json:"isFavorited"`
+	Tags          []string `json:"tags,omitempty"`
 }
 
 func collectResourceIDs(resources []model.Resource) []model.Int64String {
@@ -505,15 +500,9 @@ func buildHotResourceResponseList(
 			creatorAvatar = resource.User.Avatar
 		}
 
-		var tags []resourceTagLite
+		var tags []string
 		if includeTags && len(resource.Tags) > 0 {
-			tags = make([]resourceTagLite, len(resource.Tags))
-			for i, tag := range resource.Tags {
-				tags[i] = resourceTagLite{
-					ID:   tag.ID,
-					Name: tag.Name,
-				}
-			}
+			tags = append([]string(nil), resource.Tags...)
 		}
 
 		response = append(response, HotResourceResponse{
@@ -634,7 +623,7 @@ func GetAllResources(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
 	resourceType := c.Query("type")
 	keyword := c.Query("keyword")
-	tagID := strings.TrimSpace(c.Query("tagId"))
+	tagName := strings.TrimSpace(c.Query("tag"))
 	sort := strings.TrimSpace(c.Query("sort"))
 	includeTags := strings.EqualFold(strings.TrimSpace(c.DefaultQuery("includeTags", "false")), "true")
 
@@ -645,7 +634,7 @@ func GetAllResources(c *gin.Context) {
 		pageSize = 20
 	}
 	offset := (page - 1) * pageSize
-	cacheKey := buildPublicResourceListCacheKey(page, pageSize, resourceType, keyword, tagID, sort, includeTags)
+	cacheKey := buildPublicResourceListCacheKey(page, pageSize, resourceType, keyword, tagName, sort, includeTags)
 
 	if cachedResponse, cachedTotal, cachedPage, cachedPageSize, ok := getCachedPublicResourceList(cacheKey); ok {
 		resourceIDs := make([]model.Int64String, 0, len(cachedResponse))
@@ -677,10 +666,10 @@ func GetAllResources(c *gin.Context) {
 		like := "%" + keyword + "%"
 		query = query.Where("title LIKE ? OR description LIKE ?", like, like)
 	}
-	if tagID != "" {
-		query = query.
-			Joins("JOIN resource_tag_relations ON resource_tag_relations.resource_id = resources.id").
-			Where("resource_tag_relations.tag_id = ?", tagID)
+	if tagName != "" {
+		// resources.tags 是 JSON 字符串数组，用 LIKE 匹配 "标签名"
+		// 用 JSON 分隔符 " 包裹，避免 "国风" 误匹配到 "复古国风纸感"
+		query = query.Where("resources.tags LIKE ?", "%\""+tagName+"\"%")
 	}
 
 	var total int64

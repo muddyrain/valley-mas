@@ -53,12 +53,9 @@ export interface GuestbookMessage {
   createdAt: string;
 }
 
-export interface ResourceTag {
-  id: string;
+export interface ResourceTagStat {
   name: string;
-  description?: string;
   resourceCount: number;
-  createdAt: string;
 }
 
 export interface CreatorAlbum {
@@ -230,7 +227,7 @@ export interface AdminUserOperations {
 
 export interface AdminResourceOperations {
   resource: Record<string, unknown>;
-  tags: ResourceTag[];
+  tags: string[];
   albums: CreatorAlbum[];
   downloads: Array<Record<string, unknown>>;
   favorites: Array<Record<string, unknown>>;
@@ -344,20 +341,10 @@ export function deleteGuestbookMessage(id: string) {
   return http.delete<unknown, { deleted: boolean }>(`/admin/guestbook/messages/${id}`);
 }
 
-export function listResourceTags(params: AdminListParams) {
-  return http.get<unknown, AdminListResponse<ResourceTag>>('/admin/resource-tags', { params });
-}
-
-export function createResourceTag(data: Partial<ResourceTag>) {
-  return http.post<unknown, ResourceTag>('/admin/resource-tags', data);
-}
-
-export function updateResourceTag(id: string, data: Partial<ResourceTag>) {
-  return http.patch<unknown, ResourceTag>(`/admin/resource-tags/${id}`, data);
-}
-
-export function deleteResourceTag(id: string) {
-  return http.delete<unknown, null>(`/admin/resource-tags/${id}`);
+export function listResourceTagStats(params: { keyword?: string; limit?: number }) {
+  return http.get<unknown, AdminListResponse<ResourceTagStat>>('/admin/resource-tags/stats', {
+    params,
+  });
 }
 
 export function listCreatorAlbums(params: AdminListParams) {
