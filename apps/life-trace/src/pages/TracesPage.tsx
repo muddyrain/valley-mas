@@ -24,7 +24,6 @@ import {
   SoftIconBadge,
   SoftPage,
   SoftPanel,
-  SoftSectionTitle,
   SoftStatGrid,
 } from '@/components/SoftDiary';
 import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
@@ -378,10 +377,6 @@ export function TracesPage() {
     traceFilters.find((filter) => filter.id === activeFilter) ?? traceFilters[0];
   const imageTraceCount = filteredTraces.filter((trace) => trace.imageUrl).length;
   const locationTraceCount = filteredTraces.filter((trace) => trace.location).length;
-  const currentMonthLabel = new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-  }).format(new Date());
 
   useEffect(() => {
     if (traceId && !tracesLoading && traces.length > 0 && !selectedTrace) {
@@ -598,9 +593,6 @@ export function TracesPage() {
       <div className="relative space-y-5">
         {tracesRefreshing ? <InlineRefreshStatus tone="trace" /> : null}
         {initialTracesLoading ? <ListCardSkeleton media rows={3} /> : null}
-        {filteredTraces.length > 0 ? (
-          <SoftSectionTitle title={currentMonthLabel} meta={`${filteredTraces.length} 条记录`} />
-        ) : null}
 
         {monthGroups.map((group) => (
           <section key={group.key} className="space-y-3">
