@@ -23,6 +23,7 @@
 - 通用工具：`internal/utils`。
 - 通用 AI 客户端：`internal/aiclient`（封装 ARK / OpenAI / Gemini client、SSE writer、JSON / 文本工具）。
 - AI 能力：`internal/ai`。
+- AI Agent 运行时：`internal/ai/agent`（领域中性 tool loop 抽象）+ `internal/ai/tools`（Tool 接口与 Registry）。
 - AI Mind Arena：`internal/mindarena`。
 - 上传服务：`internal/service/upload_service.go`。
 
@@ -33,6 +34,7 @@
 - GORM model 改动要考虑迁移、默认值、索引、生产 `DB_AUTO_MIGRATE=false` 的约束，以及现有数据兼容。
 - AI/火山 ARK/多模态/模型配置/降级/响应解析相关改动必须启用 `ai-capability-orchestration`。
 - 新增 AI 接入应优先复用 `internal/aiclient`；不在 handler 里直接 `os.Getenv("ARK_*")` 或 `arkruntime.NewClientWithApiKey(...)`。
+- 需要多轮推理、追问、按需查询数据的 AI 场景优先落成 `internal/ai/tools/<domain>` 下的 Tool，通过 `internal/ai/agent.AgentRuntime` 驱动;只有单次 prompt 就能收敛的场景（摘要 / 翻译 / 单图分析）才继续走现有 `PromptContract` 直调路径。
 - Mind Arena 接口改动要同步检查前端 `apps/ai-mind-arena/lib/api.ts`、`lib/types.ts` 和 SSE 事件处理。
 - 不在源码、日志、测试或示例配置中写真实密钥、真实 token、真实 SMTP 密码或云资源凭据。
 
@@ -43,6 +45,7 @@
 - Valley/Blog/Creator 默认 ARK 能力：`ARK_API_KEY`、`ARK_BASE_URL`、`ARK_TEXT_MODEL`、`ARK_VISION_MODEL`、`ARK_IMAGE_MODEL`。
 - Life Trace Pantry AI 拍照分析优先使用 Gemini：`GEMINI_API_KEY`、`GEMINI_API_BASE_URL`、`GEMINI_VISION_MODEL`、`LIFE_TRACE_PANTRY_PHOTO_AI_PROVIDER`、`LIFE_TRACE_PANTRY_PHOTO_AI_TIMEOUT_SECONDS`；未配置时回退 ARK 图片/文本模型。
 - Life Trace 文本 AI 可选覆盖：`LIFE_TRACE_AI_API_KEY`、`LIFE_TRACE_AI_BASE_URL`、`LIFE_TRACE_AI_MODEL`、`LIFE_TRACE_AI_TIMEOUT_SECONDS`；配置后优先于 `ARK_TEXT_MODEL`，旧 `OPENAI_API_*` 仅作兼容。
+- Life Trace 生活助理 Agent 灰度：`LIFE_TRACE_ASSISTANT_USE_AGENT`（默认 false）。设为 `true`/`1`/`yes`/`on` 时走 `internal/ai/agent` 手写 tool loop（可自主调 5 个 life-trace tool）;其他值一律回退旧的结构化 tool-call 单次调用 + fallback 路径。
 - AI Mind Arena：`MIND_ARENA_AI_PROVIDER`、`MIND_ARENA_AI_BASE_URL`、`MIND_ARENA_AI_API_KEY`；默认复用 `ARK_TEXT_MODEL`，只有需要单独切换脑内会议室模型时才配置 `MIND_ARENA_AI_MODEL`。缺失或调用失败时应能回退 mock，旧 `AI_*` 仅作兼容。
 
 ## 常用命令

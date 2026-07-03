@@ -18,10 +18,13 @@ type OpenAIRequest struct {
 }
 
 // OpenAIMessage 表示一条对话消息，兼容 request/response/stream delta 三种场景。
+// 兼容 role="tool" 时的 tool_call_id 与 name 字段（供 agent tool loop 使用）。
 type OpenAIMessage struct {
-	Role      string             `json:"role"`
-	Content   string             `json:"content"`
-	ToolCalls []OpenAIToolCall   `json:"tool_calls,omitempty"`
+	Role       string           `json:"role"`
+	Content    string           `json:"content"`
+	Name       string           `json:"name,omitempty"`
+	ToolCallID string           `json:"tool_call_id,omitempty"`
+	ToolCalls  []OpenAIToolCall `json:"tool_calls,omitempty"`
 }
 
 // OpenAITool 描述 tools 数组中的单个工具定义。

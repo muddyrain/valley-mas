@@ -40,6 +40,7 @@ import {
   type LifeAssistantActionEvent,
   type LifeAssistantConversation,
   type LifeAssistantMessage,
+  type LifeAssistantThinkingStep,
   listLifeAssistantConversations,
   saveLifeAssistantMessage,
 } from '@/api/assistant';
@@ -114,6 +115,7 @@ type WeeklyReviewDisplay = Pick<
 type AssistantMessage = LifeAssistantMessage & {
   id: string;
   createdAt?: string;
+  thinkingSteps?: LifeAssistantThinkingStep[];
 };
 
 type AssistantSpeechResult = {
@@ -2523,6 +2525,15 @@ function useAiPageState() {
           hasAssistantAction = true;
           actionReply = formatAssistantActionMessage(event);
           handleAssistantActionEvent(event);
+        },
+        onThinking: (step) => {
+          setAssistantMessages((items) =>
+            items.map((item) =>
+              item.id === assistantId
+                ? { ...item, thinkingSteps: [...(item.thinkingSteps ?? []), step] }
+                : item,
+            ),
+          );
         },
       });
       setAssistantStreaming(false);

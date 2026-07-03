@@ -23,12 +23,25 @@ type lifeTraceAssistantRequest struct {
 }
 
 type lifeTraceAssistantStreamChunk struct {
-	Chunk  string                           `json:"chunk,omitempty"`
-	Done   bool                             `json:"done,omitempty"`
-	Error  string                           `json:"error,omitempty"`
-	Source string                           `json:"source,omitempty"`
-	Model  string                           `json:"model,omitempty"`
-	Action *lifeTraceAssistantActionPayload `json:"action,omitempty"`
+	Chunk    string                           `json:"chunk,omitempty"`
+	Done     bool                             `json:"done,omitempty"`
+	Error    string                           `json:"error,omitempty"`
+	Source   string                           `json:"source,omitempty"`
+	Model    string                           `json:"model,omitempty"`
+	Action   *lifeTraceAssistantActionPayload `json:"action,omitempty"`
+	Thinking *lifeTraceAssistantThinkingStep  `json:"thinking,omitempty"`
+}
+
+// lifeTraceAssistantThinkingStep 是 agent tool loop 里一次 tool 调用的可视化步骤。
+// phase="call" 表示模型宣布要调 tool；phase="result" 表示 tool 已经执行完。
+// 前端据此渲染类似 Coze 的“思考过程”折叠面板。
+type lifeTraceAssistantThinkingStep struct {
+	Step    int    `json:"step"`
+	Phase   string `json:"phase"`
+	Tool    string `json:"tool"`
+	Label   string `json:"label,omitempty"`
+	Summary string `json:"summary,omitempty"`
+	OK      *bool  `json:"ok,omitempty"`
 }
 
 type lifeTraceAIConfig = lifeai.TextConfig

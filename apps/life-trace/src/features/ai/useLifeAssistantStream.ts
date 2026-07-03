@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import {
   type LifeAssistantActionEvent,
   type LifeAssistantMessage,
+  type LifeAssistantThinkingStep,
   streamLifeAssistant,
 } from '@/api/assistant';
 
@@ -12,6 +13,7 @@ type LifeAssistantStreamArgs = {
   onChunk: (chunk: string) => void;
   onMeta?: (meta: { source?: 'ark' | 'openai'; model?: string }) => void;
   onAction?: (event: LifeAssistantActionEvent) => void;
+  onThinking?: (step: LifeAssistantThinkingStep) => void;
 };
 
 type UseLifeAssistantStreamOptions = {
@@ -21,7 +23,15 @@ type UseLifeAssistantStreamOptions = {
 
 export function useLifeAssistantStream({ token, householdId }: UseLifeAssistantStreamOptions) {
   const stream = useCallback(
-    async ({ message, history, signal, onChunk, onMeta, onAction }: LifeAssistantStreamArgs) => {
+    async ({
+      message,
+      history,
+      signal,
+      onChunk,
+      onMeta,
+      onAction,
+      onThinking,
+    }: LifeAssistantStreamArgs) => {
       if (!token) {
         throw new Error('请先登录');
       }
@@ -34,6 +44,7 @@ export function useLifeAssistantStream({ token, householdId }: UseLifeAssistantS
         onChunk,
         onMeta,
         onAction,
+        onThinking,
       });
     },
     [householdId, token],

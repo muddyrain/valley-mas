@@ -109,6 +109,12 @@ func (h *Handler) StreamAssistant(c *gin.Context) {
 	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
 	defer cancel()
 
+	if lifeTraceAssistantUseAgent() {
+		if err := h.streamLifeTraceAssistantAgent(c, aiCtx, aiCfg, systemPrompt, req, userID); err == nil {
+			return
+		}
+	}
+
 	if err := h.streamLifeTraceAssistantStructured(c, aiCtx, aiCfg, systemPrompt, structuredPrompt, userID, now, planDraft, pantryDraft, ledgerDraft); err == nil {
 		return
 	}

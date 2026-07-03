@@ -34,6 +34,16 @@ export type AssistantStreamChunk = {
   source?: 'ark' | 'openai';
   model?: string;
   action?: LifeAssistantActionEvent;
+  thinking?: LifeAssistantThinkingStep;
+};
+
+export type LifeAssistantThinkingStep = {
+  step: number;
+  phase: 'call' | 'result';
+  tool: string;
+  label?: string;
+  summary?: string;
+  ok?: boolean;
 };
 
 type LifeAssistantActionBase = {
@@ -77,6 +87,7 @@ type StreamOptions = {
   onChunk: (chunk: string) => void;
   onMeta?: (meta: { source?: 'ark' | 'openai'; model?: string }) => void;
   onAction?: (event: LifeAssistantActionEvent) => void;
+  onThinking?: (step: LifeAssistantThinkingStep) => void;
 };
 
 export async function streamLifeAssistant(token: string, options: StreamOptions) {
@@ -133,6 +144,9 @@ export async function streamLifeAssistant(token: string, options: StreamOptions)
       }
       if (payload.action) {
         options.onAction?.(payload.action);
+      }
+      if (payload.thinking) {
+        options.onThinking?.(payload.thinking);
       }
     }
   };
