@@ -31,6 +31,7 @@ import {
   type Visibility,
 } from '@/api/blog';
 import type { Resource } from '@/api/resource';
+import AiImageLoading from '@/components/AiImageLoading';
 import {
   BLOG_COVER_ASPECT_CLASS,
   BLOG_COVER_OUTPUT_HEIGHT,
@@ -41,7 +42,6 @@ import { CoverCropDialog } from '@/components/blog/CoverCropDialog';
 import { CoverPickerDialog } from '@/components/blog/CoverPickerDialog';
 import { MdxMarkdownEditor } from '@/components/blog/MdxMarkdownEditor';
 import { Button } from '@/components/ui/button';
-import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -520,23 +520,9 @@ export default function BlogCreate() {
       setCoverStorageKey('');
       setPendingCoverRemoteUrl('');
 
-      // 先让标题和正文完成一次渲染，再弹出 AI 配图确认。
       await waitNextPaint();
       toast.success('MD 导入成功');
       setImportingMarkdown(false);
-      openConfirmToast({
-        title: '是否立即生成 AI 封面？',
-        description: '你也可以稍后手动点击「AI配图封面」。',
-        confirmText: '立即生成',
-        cancelText: '稍后再说',
-        onConfirm: () =>
-          handleAIGenerateCover({
-            title: parsed.title,
-            excerpt: '',
-            content: parsed.content,
-            source: 'import',
-          }),
-      });
     } catch {
       toast.error('MD 导入失败，请检查文件后重试');
     } finally {
@@ -1075,36 +1061,19 @@ export default function BlogCreate() {
                       选择封面
                     </Button>
                   </div>
-                  {aiCoverLoading && (
-                    <div className="border-theme-panel-border bg-theme-soft/55 relative mt-3 overflow-hidden rounded-xl border p-3">
-                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/20 via-transparent to-white/20 animate-pulse" />
-                      <div className="relative flex items-center gap-3">
-                        <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-theme-primary/25 bg-white/80">
-                          <div className="absolute inset-0 animate-ping rounded-xl bg-theme-primary/12" />
-                          <Sparkles className="text-theme-primary relative h-5 w-5" />
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-slate-700">
-                            {aiCoverSource === 'import'
-                              ? '正在根据导入内容生成封面图...'
-                              : 'AI 正在生成封面图...'}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            你可以继续编辑正文，完成后会自动更新封面预览。
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-3 grid grid-cols-3 gap-2">
-                        {[0, 1, 2].map((item) => (
-                          <span
-                            key={`ai-cover-loading-${item}`}
-                            className="bg-theme-primary/20 h-1.5 rounded-full animate-pulse"
-                            style={{ animationDelay: `${item * 180}ms` }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <AiImageLoading
+                    show={aiPickLoading}
+                    title="AI 正在从资源池挑选封面..."
+                    hint="你可以继续编辑正文，选图完成后会自动更新预览。"
+                  />
+                  <AiImageLoading
+                    show={aiCoverLoading}
+                    title={
+                      aiCoverSource === 'import'
+                        ? '正在根据导入内容生成封面图...'
+                        : 'AI 正在生成封面图...'
+                    }
+                  />
                   {(!!cover || !!coverObjectUrl) && (
                     <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                       <div
