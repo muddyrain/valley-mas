@@ -37,7 +37,7 @@
 | `encoding-guard` | 风险触发 | 实际修改 CJK/非 ASCII 用户可见文本、Markdown、技能、配置示例，或进行批量文本改写 / 提交前 diff 含非 ASCII 文本时启用；优先传入具体文件路径，防止乱码和文本丢失。 |
 | `task-completion-guard` | 风险触发 | 任务跨 3 个以上文件、多轮实施、计划文档驱动，或容易把计划误报为完成时启用；普通单轮改动不因"需要验证"自动启用。 |
 | `component-reuse-guard` | 日常启用 | 发现重复 JSX、重复处理器、重复弹窗/表单/上传/列表逻辑时，先复用或抽取。 |
-| `conventional-commit-guard` | 日常启用 | 生成提交信息、执行 `git commit`，或用户说"提交/提交吧/提交代码/帮我提交"。 |
+| `conventional-commit-guard` | 日常启用 | 分析代码变更，以合适粒度创建 emoji + Conventional Commit 提交；支持暂存判断、diff 分析和 commit 拆分。适用于执行 `git commit`，或用户说"提交/提交吧/提交代码/帮我提交"。 |
 | `delivery-reporting` | 风险触发 | 用户要求分阶段汇报，或改动会影响计划文档、长期文档、功能状态、接口路径、依赖策略、数据模型、产品方向或验收标准时。 |
 | `ui-copy-boundary-guard` | 日常启用 | 修改用户可见 UI 文案、设置说明、按钮、副标题、空状态或总览描述时，防止把开发者分析、实现解释或页面说明写进界面。 |
 | `ai-capability-orchestration` | 范围限定 | 涉及 Go 服务端火山 ARK AI 能力、模型环境变量、提示词、多模态输入、响应解析、降级和错误映射时。 |

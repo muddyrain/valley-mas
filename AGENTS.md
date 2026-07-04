@@ -191,8 +191,8 @@ cd server && go run ./cmd/server
 
 - 不自动提交；只有用户明确要求提交时才进入 commit 流程。
 - 提交前查看最近 5 条提交风格。
-- 提交信息使用 `conventional-commit-guard`。
-- 默认使用一行简短中文 Conventional Commit。
+- 提交信息使用 `conventional-commit-guard`，按 emoji + Conventional Commit 格式生成。
+- 默认使用一行简短中文 summary，带 emoji 前缀，如 `✨ feat: 添加用户认证`。
 - 不自动扩写长正文或 trailers，除非用户明确要求。
 
 ## 完成标准
