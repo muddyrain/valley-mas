@@ -36,8 +36,8 @@ function ConfirmToastCard({
 
   const confirmClassName =
     confirmVariant === 'danger'
-      ? 'border-red-300 bg-red-50 text-red-600 hover:bg-red-100'
-      : 'border-theme-soft-strong bg-theme-soft text-theme-primary hover:bg-theme-soft/80';
+      ? 'border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20'
+      : 'border-accent bg-accent text-primary hover:bg-accent';
 
   const handleCancel = () => {
     if (pending) return;
@@ -57,15 +57,15 @@ function ConfirmToastCard({
   };
 
   return (
-    <div className="w-[320px] rounded-2xl border border-theme-soft-strong bg-white/95 p-4 shadow-[0_20px_40px_rgba(var(--theme-primary-rgb),0.20)] backdrop-blur-xl outline-hidden">
-      <div className="text-sm font-semibold text-slate-900">{title}</div>
-      {description ? <div className="mt-1 text-xs text-slate-500">{description}</div> : null}
+    <div className="w-[320px] rounded-2xl border border-accent bg-card/95 p-4 shadow-[0_20px_40px_hsl(var(--primary) / 0.20)] backdrop-blur-xl outline-hidden">
+      <div className="text-sm font-semibold text-foreground">{title}</div>
+      {description ? <div className="mt-1 text-xs text-muted-foreground">{description}</div> : null}
       <div className="mt-3 flex items-center justify-end gap-2">
         <button
           type="button"
           onClick={handleCancel}
           disabled={pending}
-          className="rounded-lg border border-theme-border bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
         >
           {cancelText ?? 'Cancel'}
         </button>

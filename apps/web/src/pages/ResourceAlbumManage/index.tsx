@@ -35,7 +35,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_BACKGROUND = {
   background:
-    'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-primary-soft) 28%, white) 44%, var(--theme-page-cool) 100%)',
+    'linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, hsl(var(--primary) / 0.15) 28%, hsl(var(--background))) 44%, var(--background) 100%)',
 };
 
 const TYPE_OPTIONS = [
@@ -136,12 +136,12 @@ function ResourcePicker({
       {/* 搜索 + 类型筛选 */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={inputValue}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="搜索资源标题…"
-            className="theme-input-border h-8 pl-8 text-sm"
+            className="h-8 pl-8 text-sm"
           />
         </div>
         <div className="flex gap-1">
@@ -152,8 +152,8 @@ function ResourcePicker({
               onClick={() => handleType(opt.value)}
               className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                 type === opt.value
-                  ? 'bg-(--theme-primary) text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-muted text-muted-foreground hover:bg-muted'
               }`}
             >
               {opt.label}
@@ -163,7 +163,7 @@ function ResourcePicker({
       </div>
 
       {/* 资源网格 */}
-      <div className="relative min-h-0 flex-1 overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/60 p-2">
+      <div className="relative min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border bg-muted/60 p-2">
         {fetching && resources.length === 0 ? (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -171,7 +171,7 @@ function ResourcePicker({
             ))}
           </div>
         ) : resources.length === 0 ? (
-          <div className="flex h-40 flex-col items-center justify-center gap-2 text-slate-400">
+          <div className="flex h-40 flex-col items-center justify-center gap-2 text-muted-foreground">
             <ImageIcon className="h-8 w-8 opacity-40" />
             <span className="text-sm">{currentKeyword ? '没有匹配的资源' : '暂无资源'}</span>
           </div>
@@ -186,11 +186,11 @@ function ResourcePicker({
                   onClick={() => onToggle(resource)}
                   className={`group relative cursor-pointer overflow-hidden rounded-xl border-2 transition-all ${
                     selected
-                      ? 'border-(--theme-primary) shadow-[0_0_0_3px_rgba(var(--theme-primary-rgb),0.15)]'
-                      : 'border-transparent hover:border-slate-200'
+                      ? 'border-primary shadow-[0_0_0_3px_hsl(var(--primary) / 0.15)]'
+                      : 'border-transparent hover:border-border'
                   }`}
                 >
-                  <div className="aspect-square bg-slate-100">
+                  <div className="aspect-square bg-muted">
                     {resource.url ? (
                       <img
                         src={resource.thumbnailUrl || resource.url}
@@ -199,15 +199,19 @@ function ResourcePicker({
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
-                        <ImageIcon className="h-6 w-6 text-slate-300" />
+                        <ImageIcon className="h-6 w-6 text-muted-foreground/60" />
                       </div>
                     )}
                   </div>
 
                   {/* 选中角标 */}
                   {selected && (
-                    <div className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-(--theme-primary) shadow">
-                      <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
+                    <div className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary shadow">
+                      <svg
+                        className="h-3 w-3 text-primary-foreground"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                      >
                         <path
                           d="M2 6l3 3 5-5"
                           stroke="currentColor"
@@ -221,7 +225,7 @@ function ResourcePicker({
 
                   {/* 封面标记 */}
                   {isCover && (
-                    <div className="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
+                    <div className="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground shadow">
                       <Crown className="h-2.5 w-2.5" />
                       封面
                     </div>
@@ -229,29 +233,29 @@ function ResourcePicker({
 
                   {/* hover 悬浮信息 */}
                   <div className="absolute inset-x-0 bottom-0 translate-y-full bg-linear-to-t from-black/80 to-transparent px-2.5 pb-2.5 pt-8 transition-transform group-hover:translate-y-0">
-                    <p className="truncate text-[11px] font-semibold text-white">
+                    <p className="truncate text-[11px] font-semibold text-foreground">
                       {resource.title}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       {/* 分类 */}
-                      <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] text-white/90">
+                      <span className="rounded-full bg-foreground/10 px-1.5 py-0.5 text-[10px] text-foreground/90">
                         {resource.type === 'wallpaper' ? '壁纸' : '头像'}
                       </span>
                       {/* 扩展名 */}
                       {resource.extension && (
-                        <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] uppercase text-white/90">
+                        <span className="rounded-full bg-foreground/10 px-1.5 py-0.5 text-[10px] uppercase text-foreground/90">
                           {resource.extension}
                         </span>
                       )}
                       {/* 分辨率 */}
                       {resource.width > 0 && resource.height > 0 && (
-                        <span className="text-[10px] text-white/75">
+                        <span className="text-[10px] text-foreground/75">
                           {formatResolution(resource.width, resource.height)}
                         </span>
                       )}
                       {/* 文件大小 */}
                       {resource.size > 0 && (
-                        <span className="text-[10px] text-white/75">
+                        <span className="text-[10px] text-foreground/75">
                           {formatSize(resource.size)}
                         </span>
                       )}
@@ -261,13 +265,13 @@ function ResourcePicker({
                         {resource.tags.slice(0, 2).map((tag) => (
                           <span
                             key={tag}
-                            className="rounded-full border border-white/35 bg-white/20 px-1.5 py-0.5 text-[10px] text-white/92 backdrop-blur-sm"
+                            className="rounded-full border border-foreground/18 bg-foreground/10 px-1.5 py-0.5 text-[10px] text-foreground/92 backdrop-blur-sm"
                           >
                             #{tag}
                           </span>
                         ))}
                         {resource.tags.length > 2 && (
-                          <span className="text-[10px] text-white/75">
+                          <span className="text-[10px] text-foreground/75">
                             +{resource.tags.length - 2}
                           </span>
                         )}
@@ -280,7 +284,7 @@ function ResourcePicker({
                           e.stopPropagation();
                           onSetCover(resource.id);
                         }}
-                        className="mt-1.5 rounded-full bg-white/20 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm hover:bg-white/40"
+                        className="mt-1.5 rounded-full bg-foreground/10 px-2 py-0.5 text-[10px] text-foreground backdrop-blur-sm hover:bg-foreground/20"
                       >
                         设为封面
                       </button>
@@ -295,7 +299,7 @@ function ResourcePicker({
 
       {/* 分页 */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
             第 {currentPage} / {totalPages} 页，共 {total} 项
           </span>
@@ -304,7 +308,7 @@ function ResourcePicker({
               type="button"
               disabled={currentPage <= 1 || fetching}
               onClick={() => setPage(Math.max(1, currentPage - 1))}
-              className="rounded-lg px-2.5 py-1 hover:bg-slate-100 disabled:opacity-40"
+              className="rounded-lg px-2.5 py-1 hover:bg-accent disabled:opacity-40"
             >
               上一页
             </button>
@@ -312,7 +316,7 @@ function ResourcePicker({
               type="button"
               disabled={currentPage >= totalPages || fetching}
               onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-              className="rounded-lg px-2.5 py-1 hover:bg-slate-100 disabled:opacity-40"
+              className="rounded-lg px-2.5 py-1 hover:bg-accent disabled:opacity-40"
             >
               下一页
             </button>
@@ -348,7 +352,7 @@ function SelectedList({
 
   if (selectedIds.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 text-slate-400">
+      <div className="flex h-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-muted/50 text-muted-foreground">
         <FolderOpen className="h-8 w-8 opacity-40" />
         <p className="text-sm">从左侧点击资源加入专辑</p>
       </div>
@@ -356,15 +360,15 @@ function SelectedList({
   }
 
   return (
-    <div className="flex h-full flex-col gap-2 overflow-y-auto rounded-2xl border border-theme-shell-border bg-white/70 p-2">
+    <div className="flex h-full flex-col gap-2 overflow-y-auto rounded-2xl border border-border bg-card/70 p-2">
       {selected.map((resource) => {
         const isCover = coverResourceId === resource.id;
         return (
           <div
             key={resource.id}
-            className="group flex items-center gap-2.5 rounded-xl border border-slate-100 bg-white p-2 shadow-sm transition hover:border-theme-shell-border"
+            className="group flex items-center gap-2.5 rounded-xl border border-border bg-card p-2 shadow-sm transition hover:border-border"
           >
-            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
               {resource.url ? (
                 <img
                   src={resource.thumbnailUrl || resource.url}
@@ -372,36 +376,36 @@ function SelectedList({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <ImageIcon className="m-auto h-5 w-5 text-slate-300" />
+                <ImageIcon className="m-auto h-5 w-5 text-muted-foreground/60" />
               )}
               {isCover && (
-                <div className="absolute inset-0 flex items-center justify-center bg-amber-400/80">
-                  <Crown className="h-4 w-4 text-white" />
+                <div className="absolute inset-0 flex items-center justify-center bg-primary/80">
+                  <Crown className="h-4 w-4 text-primary-foreground" />
                 </div>
               )}
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-slate-800">{resource.title}</p>
-              <p className="text-[11px] text-slate-400">
+              <p className="truncate text-xs font-medium text-foreground">{resource.title}</p>
+              <p className="text-[11px] text-muted-foreground">
                 {resource.type === 'wallpaper' ? '壁纸' : '头像'}
               </p>
               {!isCover && (
                 <button
                   type="button"
                   onClick={() => onSetCover(resource.id)}
-                  className="mt-0.5 text-[10px] text-(--theme-primary) hover:underline"
+                  className="mt-0.5 text-[10px] text-primary hover:underline"
                 >
                   设为封面
                 </button>
               )}
-              {isCover && <span className="text-[10px] font-medium text-amber-500">当前封面</span>}
+              {isCover && <span className="text-[10px] font-medium text-primary">当前封面</span>}
             </div>
 
             <button
               type="button"
               onClick={() => onRemove(resource.id)}
-              className="shrink-0 rounded-lg p-1 text-slate-300 transition hover:bg-rose-50 hover:text-rose-400"
+              className="shrink-0 rounded-lg p-1 text-muted-foreground/60 transition hover:bg-destructive/10 hover:text-destructive"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -415,7 +419,7 @@ function SelectedList({
 // ─── 主页面 ──────────────────────────────────────────────────────────────────
 export default function ResourceAlbumManage() {
   const navigate = useNavigate();
-  const { hasHydrated, isAuthenticated, user } = useAuthStore();
+  const { hasHydrated, isAuthenticated } = useAuthStore();
 
   const [albums, setAlbums] = useState<Album[]>([]);
   const [allResources, setAllResources] = useState<MyResource[]>([]);
@@ -464,12 +468,8 @@ export default function ResourceAlbumManage() {
       navigate('/login');
       return;
     }
-    if (user?.role !== 'creator') {
-      navigate('/');
-      return;
-    }
     void loadData();
-  }, [hasHydrated, isAuthenticated, navigate, user?.role, loadData]);
+  }, [hasHydrated, isAuthenticated, navigate, loadData]);
 
   const resetForm = () => {
     setEditingAlbum(null);
@@ -590,12 +590,12 @@ export default function ResourceAlbumManage() {
       <PageBanner padding="py-10" maxWidth="max-w-6xl">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
-            <div className="rounded-2xl border border-white/30 bg-white/18 p-3 shadow-lg backdrop-blur-md">
-              <FolderOpen className="h-7 w-7 text-white" />
+            <div className="rounded-2xl border border-foreground/15 bg-foreground/10 p-3 shadow-lg backdrop-blur-md">
+              <FolderOpen className="h-7 w-7 text-primary-foreground" />
             </div>
-            <div className="text-white">
+            <div className="text-primary-foreground">
               <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">资源专辑管理</h1>
-              <p className="mt-1 text-sm text-white/82">
+              <p className="mt-1 text-sm text-primary-foreground/82">
                 把作品整理成主题合集，创作者详情页会自动展示这些专辑入口。
               </p>
             </div>
@@ -603,7 +603,7 @@ export default function ResourceAlbumManage() {
           <Button
             type="button"
             onClick={openCreateDialog}
-            className="rounded-2xl bg-white px-5 font-semibold text-theme-primary shadow-lg hover:bg-white/92"
+            className="rounded-2xl bg-card px-5 font-semibold text-primary shadow-lg hover:bg-card/92"
           >
             <Plus className="mr-2 h-4 w-4" />
             新建专辑
@@ -617,7 +617,7 @@ export default function ResourceAlbumManage() {
             {Array.from({ length: 6 }).map((_, index) => (
               <Card
                 key={index}
-                className="overflow-hidden rounded-2xl border border-theme-shell-border bg-white/86 shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm"
+                className="overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm"
               >
                 <Skeleton className="h-44 w-full" />
                 <CardContent className="space-y-3 p-5">
@@ -629,7 +629,7 @@ export default function ResourceAlbumManage() {
             ))}
           </div>
         ) : albums.length === 0 ? (
-          <div className="rounded-[28px] border border-theme-shell-border bg-white/72 px-6 shadow-[0_20px_50px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm">
+          <div className="rounded-[28px] border border-border bg-card/72 px-6 shadow-[0_20px_50px_hsl(var(--primary) / 0.10)] backdrop-blur-sm">
             <EmptyState
               icon={FolderOpen}
               title="还没有资源专辑"
@@ -643,9 +643,9 @@ export default function ResourceAlbumManage() {
             {albums.map((album) => (
               <Card
                 key={album.id}
-                className="overflow-hidden rounded-2xl border border-theme-shell-border bg-white/86 shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_rgba(var(--theme-primary-rgb),0.16)]"
+                className="overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_hsl(var(--primary) / 0.16)]"
               >
-                <div className="relative h-44 overflow-hidden bg-theme-soft">
+                <div className="relative h-44 overflow-hidden bg-accent">
                   {album.coverUrl ? (
                     <img
                       src={album.coverUrl}
@@ -654,17 +654,17 @@ export default function ResourceAlbumManage() {
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center">
-                      <ImageIcon className="h-12 w-12 text-theme-primary/50" />
+                      <ImageIcon className="h-12 w-12 text-primary/50" />
                     </div>
                   )}
-                  <div className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-theme-primary shadow-sm">
+                  <div className="absolute left-4 top-4 rounded-full bg-card/90 px-3 py-1 text-xs font-medium text-primary shadow-sm">
                     {album.resourceCount} 项资源
                   </div>
                 </div>
                 <CardContent className="p-5">
                   <div className="min-w-0">
-                    <h2 className="truncate text-lg font-semibold text-slate-900">{album.name}</h2>
-                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
+                    <h2 className="truncate text-lg font-semibold text-foreground">{album.name}</h2>
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
                       {album.description || '暂未填写专辑说明'}
                     </p>
                   </div>
@@ -674,7 +674,7 @@ export default function ResourceAlbumManage() {
                       variant="outline"
                       size="sm"
                       onClick={() => openEditDialog(album)}
-                      className="rounded-xl border-theme-soft-strong bg-white/75 text-theme-primary hover:bg-theme-soft"
+                      className="rounded-xl border-accent bg-card/75 text-primary hover:bg-accent"
                     >
                       <Pencil className="mr-1.5 h-3.5 w-3.5" />
                       编辑
@@ -684,7 +684,7 @@ export default function ResourceAlbumManage() {
                       variant="outline"
                       size="sm"
                       onClick={() => openDeleteConfirm(album)}
-                      className="rounded-xl border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100"
+                      className="rounded-xl border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20"
                     >
                       <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                       删除
@@ -706,7 +706,7 @@ export default function ResourceAlbumManage() {
         }}
       >
         <DialogContent className="flex h-[90vh] w-[90vw] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl">
-          <DialogHeader className="shrink-0 border-b border-slate-100 px-6 py-4">
+          <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
             <DialogTitle className="text-base font-semibold">
               {editingAlbum ? '编辑资源专辑' : '新建资源专辑'}
             </DialogTitle>
@@ -714,47 +714,47 @@ export default function ResourceAlbumManage() {
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {/* 基本信息栏 */}
-            <div className="shrink-0 border-b border-slate-100 bg-slate-50/60 px-6 py-4">
+            <div className="shrink-0 border-b border-border bg-muted/60 px-6 py-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-600">专辑名称 *</label>
+                  <label className="text-xs font-medium text-muted-foreground">专辑名称 *</label>
                   <Input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="例如：奶油风头像合集"
-                    className="theme-input-border h-9 text-sm"
+                    className="border-input h-9 text-sm"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-600">专辑说明</label>
+                  <label className="text-xs font-medium text-muted-foreground">专辑说明</label>
                   <Input
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="给访客一句简短说明（可选）"
-                    className="theme-input-border h-9 text-sm"
+                    className="border-input h-9 text-sm"
                   />
                 </div>
               </div>
             </div>
 
             {/* 左右双栏 */}
-            <div className="flex min-h-0 flex-1 divide-x divide-slate-100 overflow-hidden">
+            <div className="flex min-h-0 flex-1 divide-x divide-border overflow-hidden">
               {/* 左：资源库 */}
               <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden p-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-slate-700">资源库</p>
+                  <p className="text-xs font-semibold text-foreground">资源库</p>
                   <div className="flex items-center gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       onClick={() => setAlbumUploadOpen(true)}
-                      className="h-7 rounded-lg border-theme-soft-strong bg-white/80 px-2.5 text-xs text-theme-primary hover:bg-theme-soft"
+                      className="h-7 rounded-lg border-accent bg-card/80 px-2.5 text-xs text-primary hover:bg-accent"
                     >
                       <Plus className="mr-1 h-3.5 w-3.5" />
                       新增资源
                     </Button>
-                    <span className="text-xs text-slate-400">点击资源即可添加 / 移除</span>
+                    <span className="text-xs text-muted-foreground">点击资源即可添加 / 移除</span>
                   </div>
                 </div>
                 <div className="min-h-0 flex-1 overflow-hidden">
@@ -771,8 +771,8 @@ export default function ResourceAlbumManage() {
               {/* 右：已选 */}
               <div className="flex w-56 shrink-0 flex-col gap-3 p-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-slate-700">已选资源</p>
-                  <span className="rounded-full bg-theme-soft px-2 py-0.5 text-xs font-medium text-theme-primary">
+                  <p className="text-xs font-semibold text-foreground">已选资源</p>
+                  <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-primary">
                     {selectedResourceIds.length} 项
                   </span>
                 </div>
@@ -790,8 +790,8 @@ export default function ResourceAlbumManage() {
           </div>
 
           {/* 底部操作栏 */}
-          <div className="flex shrink-0 items-center justify-between border-t border-slate-100 px-6 py-4">
-            <p className="text-xs text-slate-400">
+          <div className="flex shrink-0 items-center justify-between border-t border-border px-6 py-4">
+            <p className="text-xs text-muted-foreground">
               {coverResourceId ? `封面：${coverTitle}` : '未设置封面，将自动使用第一项资源'}
             </p>
             <div className="flex gap-3">

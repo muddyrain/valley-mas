@@ -1,4 +1,4 @@
-﻿import {
+import {
   ArrowLeft,
   Calendar,
   Download,
@@ -114,7 +114,7 @@ export default function ResourceDetail() {
         try {
           data = await getResourceDetail(id, { suppressErrorToast: true });
         } catch (error) {
-          if (user?.role !== 'creator') throw error;
+          if (!user) throw error; // creator gate removed: any logged-in user can fallback to admin API
           const mine = await getMyResources(
             { page: 1, pageSize: 1000 },
             { suppressErrorToast: true },
@@ -197,7 +197,7 @@ export default function ResourceDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-50 via-purple-50/30 to-indigo-50/30">
+      <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-muted via-primary/5 to-accent/5">
         <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
           <Skeleton className="mb-6 h-8 w-24" />
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
@@ -225,8 +225,8 @@ export default function ResourceDetail() {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
         <div className="text-center">
-          <FileImage className="mx-auto mb-4 h-16 w-16 text-gray-300" />
-          <h2 className="text-xl font-semibold text-gray-500">
+          <FileImage className="mx-auto mb-4 h-16 w-16 text-muted-foreground" />
+          <h2 className="text-xl font-semibold text-muted-foreground">
             资源不存在，或当前账号没有权限访问
           </h2>
           <Button variant="outline" onClick={handleReturn} className="mt-4">
@@ -242,14 +242,14 @@ export default function ResourceDetail() {
       className="min-h-[calc(100vh-4rem)]"
       style={{
         background:
-          'linear-gradient(135deg, var(--theme-page-start), var(--theme-primary-soft) 50%, var(--theme-page-cool))',
+          'linear-gradient(135deg, var(--background), hsl(var(--primary) / 0.15) 50%, var(--background))',
       }}
     >
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={handleReturn}
-          className="group mb-6 flex items-center gap-2 text-sm text-gray-500 transition-colors hover:text-theme-primary"
+          className="group mb-6 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
         >
           <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
           {returnLabel}
@@ -275,11 +275,11 @@ export default function ResourceDetail() {
               />
               {!imgLoaded && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-white/60" />
+                  <Loader2 className="h-8 w-8 animate-spin text-foreground/60" />
                 </div>
               )}
               <div className="absolute left-3 top-3">
-                <Badge className="border-0 bg-black/60 px-2.5 py-1 text-xs text-white backdrop-blur-sm">
+                <Badge className="border-0 bg-black/60 px-2.5 py-1 text-xs text-foreground backdrop-blur-sm">
                   {TYPE_LABEL[resource.type] ?? resource.type}
                 </Badge>
               </div>
@@ -288,11 +288,13 @@ export default function ResourceDetail() {
 
           <div className="flex flex-col gap-5 lg:col-span-2">
             <div>
-              <h1 className="mb-2 text-2xl font-bold leading-tight text-gray-900">
+              <h1 className="mb-2 text-2xl font-bold leading-tight text-foreground">
                 {resource.title}
               </h1>
               {resource.description && (
-                <p className="text-sm leading-relaxed text-gray-500">{resource.description}</p>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {resource.description}
+                </p>
               )}
             </div>
 
@@ -301,72 +303,74 @@ export default function ResourceDetail() {
               onClick={() =>
                 resource.creatorCode ? navigate(`/creator/${resource.creatorCode}`) : undefined
               }
-              className="flex w-full items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 text-left shadow-sm transition-all hover:border-theme-shell-border hover:shadow-md"
+              className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left shadow-sm transition-all hover:border-border hover:shadow-md"
             >
-              <Avatar className="h-10 w-10 border-2 border-theme-soft-strong">
+              <Avatar className="h-10 w-10 border-2 border-accent">
                 <AvatarImage src={resource.creatorAvatar} className="object-cover" />
-                <AvatarFallback className="theme-avatar-fallback text-sm font-bold text-white">
+                <AvatarFallback className="bg-primary text-primary-foreground text-sm font-bold">
                   {resource.creatorName?.[0]?.toUpperCase() || 'C'}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <p className="mb-0.5 text-xs text-gray-400">创作者</p>
-                <p className="truncate text-sm font-semibold text-gray-800">
+                <p className="mb-0.5 text-xs text-muted-foreground">创作者</p>
+                <p className="truncate text-sm font-semibold text-foreground">
                   {resource.creatorName || '未知创作者'}
                 </p>
               </div>
-              <User className="h-4 w-4 shrink-0 text-theme-primary" />
+              <User className="h-4 w-4 shrink-0 text-primary" />
             </button>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
-                <div className="rounded-lg bg-theme-soft p-1.5">
-                  <Download className="h-4 w-4 text-theme-primary" />
+              <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
+                <div className="rounded-lg bg-accent p-1.5">
+                  <Download className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400">下载次数</p>
-                  <p className="text-base font-bold text-gray-800">{resource.downloadCount}</p>
+                  <p className="text-xs text-muted-foreground">下载次数</p>
+                  <p className="text-base font-bold text-foreground">{resource.downloadCount}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
-                <div className="rounded-lg bg-pink-50 p-1.5">
+              <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
+                <div className="rounded-lg bg-accent p-1.5">
                   <Heart className="h-4 w-4 text-pink-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400">收藏次数</p>
-                  <p className="text-base font-bold text-gray-800">{resource.favoriteCount ?? 0}</p>
+                  <p className="text-xs text-muted-foreground">收藏次数</p>
+                  <p className="text-base font-bold text-foreground">
+                    {resource.favoriteCount ?? 0}
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
-                <div className="rounded-lg bg-theme-soft p-1.5">
-                  <FileImage className="h-4 w-4 text-theme-primary" />
+              <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
+                <div className="rounded-lg bg-accent p-1.5">
+                  <FileImage className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400">文件大小</p>
-                  <p className="text-base font-bold text-gray-800">{formatSize(resource.size)}</p>
+                  <p className="text-xs text-muted-foreground">文件大小</p>
+                  <p className="text-base font-bold text-foreground">{formatSize(resource.size)}</p>
                 </div>
               </div>
               {resource.width && resource.height ? (
-                <div className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
-                  <div className="rounded-lg bg-theme-soft p-1.5">
-                    <MonitorSmartphone className="h-4 w-4 text-theme-primary" />
+                <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
+                  <div className="rounded-lg bg-accent p-1.5">
+                    <MonitorSmartphone className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400">分辨率</p>
-                    <p className="text-base font-bold text-gray-800">
+                    <p className="text-xs text-muted-foreground">分辨率</p>
+                    <p className="text-base font-bold text-foreground">
                       {resource.width} × {resource.height}
                     </p>
                   </div>
                 </div>
               ) : null}
               {resource.extension ? (
-                <div className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
-                  <div className="rounded-lg bg-emerald-50 p-1.5">
-                    <FileImage className="h-4 w-4 text-emerald-500" />
+                <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
+                  <div className="rounded-lg bg-accent p-1.5">
+                    <FileImage className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400">文件格式</p>
-                    <p className="text-base font-bold uppercase text-gray-800">
+                    <p className="text-xs text-muted-foreground">文件格式</p>
+                    <p className="text-base font-bold uppercase text-foreground">
                       {resource.extension}
                     </p>
                   </div>
@@ -374,7 +378,7 @@ export default function ResourceDetail() {
               ) : null}
             </div>
 
-            <div className="flex items-center gap-2 px-1 text-sm text-gray-400">
+            <div className="flex items-center gap-2 px-1 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4 shrink-0" />
               <span>上传于 {formatDate(resource.createdAt)}</span>
             </div>
@@ -383,7 +387,7 @@ export default function ResourceDetail() {
               <Button
                 onClick={handleDownload}
                 disabled={downloading}
-                className="theme-btn-primary h-11 flex-1 rounded-xl font-semibold text-white shadow-md transition-all hover:shadow-lg"
+                className="h-11 flex-1 rounded-xl font-semibold text-primary-foreground shadow-md transition-all hover:shadow-lg"
               >
                 {downloading ? (
                   <>
@@ -407,7 +411,7 @@ export default function ResourceDetail() {
                       state: { editResourceId: resource.id },
                     })
                   }
-                  className="h-11 w-11 rounded-xl border-2 border-gray-200 transition-all hover:border-theme-shell-border hover:text-theme-primary"
+                  className="h-11 w-11 rounded-xl border-2 border-border transition-all hover:border-border hover:text-primary"
                   title="编辑资源"
                 >
                   <Pencil className="h-4 w-4" />
@@ -421,15 +425,15 @@ export default function ResourceDetail() {
                 disabled={favoriteLoading}
                 className={`h-11 w-11 rounded-xl border-2 transition-all ${
                   favorited
-                    ? 'border-pink-400 bg-pink-50 text-pink-500 hover:bg-pink-100'
-                    : 'border-gray-200 hover:border-pink-300 hover:text-pink-400'
+                    ? 'border-primary bg-primary/10 text-primary hover:bg-primary/20'
+                    : 'border-border hover:border-primary/40 hover:text-primary'
                 }`}
                 title={favorited ? '取消收藏' : '收藏'}
               >
                 {favoriteLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Heart className={`h-4 w-4 ${favorited ? 'fill-pink-500' : ''}`} />
+                  <Heart className={`h-4 w-4 ${favorited ? 'fill-primary' : ''}`} />
                 )}
               </Button>
 
@@ -437,7 +441,7 @@ export default function ResourceDetail() {
                 variant="outline"
                 size="icon"
                 onClick={handleShare}
-                className="h-11 w-11 rounded-xl border-2 border-gray-200 transition-all hover:border-theme-shell-border hover:text-theme-primary"
+                className="h-11 w-11 rounded-xl border-2 border-border transition-all hover:border-border hover:text-primary"
                 title="复制链接"
               >
                 <Share2 className="h-4 w-4" />

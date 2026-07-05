@@ -22,7 +22,6 @@ import {
   updateMyProfile,
   uploadAvatar,
 } from '@/api/auth';
-import ApplyCreatorBanner from '@/components/ApplyCreatorBanner';
 import PageBanner from '@/components/PageBanner';
 import AvatarBeadEditorDialog from '@/components/profile/AvatarBeadEditorDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -38,27 +37,27 @@ import { createRandomCnNickname } from '@/utils/randomNickname';
 // 个人中心主页需要和全局主题联动，因此背景、Banner、卡片头和主按钮
 // 都统一走 theme token，而不是继续保留紫色、橙色这类固定配色。
 const ROLE_MAP: Record<string, { label: string; badgeClass: string }> = {
-  admin: { label: '管理员', badgeClass: 'bg-rose-100 text-rose-600' },
-  creator: { label: '创作者', badgeClass: 'bg-theme-soft text-theme-primary' },
-  user: { label: '普通用户', badgeClass: 'bg-slate-100 text-slate-600' },
+  admin: { label: '管理员', badgeClass: 'bg-destructive/15 text-destructive' },
+  creator: { label: '创作者', badgeClass: 'bg-accent text-primary' },
+  user: { label: '普通用户', badgeClass: 'bg-muted text-muted-foreground' },
 };
 
 const PAGE_BACKGROUND = {
   background:
-    'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-primary-soft) 28%, white) 42%, var(--theme-page-cool) 100%)',
+    'linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, hsl(var(--primary) / 0.15) 28%, hsl(var(--background))) 42%, var(--background) 100%)',
 };
 
 const sectionCardClass =
-  'overflow-hidden rounded-2xl border border-theme-shell-border bg-white/84 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm';
+  'overflow-hidden rounded-2xl border border-border bg-card/84 shadow-[0_18px_44px_hsl(var(--primary) / 0.10)] backdrop-blur-sm';
 
 const sectionHeaderClass =
-  'border-b border-theme-shell-border bg-[linear-gradient(90deg,color-mix(in_srgb,var(--theme-primary-soft)_72%,white),rgba(255,255,255,0.92))] px-6 py-4';
+  'border-b border-border bg-[linear-gradient(90deg,color-mix(in_srgb,hsl(var(--primary) / 0.15)_72%,hsl(var(--background))),hsl(var(--background)/0.92))] px-6 py-4';
 
 const statPanelClass =
-  'rounded-xl border border-white/24 bg-white/12 px-5 py-3 backdrop-blur-md shadow-[0_14px_30px_rgba(15,23,42,0.10)]';
+  'rounded-xl border border-border/24 bg-card/12 px-5 py-3 backdrop-blur-md shadow-[0_14px_30px_hsl(var(--foreground) / 0.05)]';
 
 const inputClassName =
-  'h-10 theme-input-border bg-white/82 focus-visible:border-theme-primary focus-visible:ring-theme-primary/20';
+  'h-10 border-input bg-card/82 focus-visible:border-primary focus-visible:ring-primary/20';
 
 function extractEmailName(email?: string) {
   return (email || '').split('@')[0]?.trim() || '';
@@ -223,11 +222,11 @@ export default function Profile() {
               className="absolute -inset-2 rounded-full opacity-80 blur-xl"
               style={{
                 background:
-                  'linear-gradient(135deg, rgba(var(--theme-tertiary-rgb),0.50), rgba(var(--theme-secondary-rgb),0.34), rgba(var(--theme-primary-rgb),0.58))',
+                  'linear-gradient(135deg, hsl(var(--primary) / 0.50), hsl(var(--primary) / 0.34), hsl(var(--primary) / 0.58))',
               }}
             />
             {loading ? (
-              <Skeleton className="relative h-24 w-24 rounded-full bg-white/20" />
+              <Skeleton className="relative h-24 w-24 rounded-full bg-card/20" />
             ) : (
               <button
                 type="button"
@@ -236,28 +235,28 @@ export default function Profile() {
                 title="点击更换头像"
                 disabled={avatarUploading}
               >
-                <Avatar className="h-24 w-24 border-4 border-white/30 shadow-2xl ring-4 ring-white/15">
+                <Avatar className="h-24 w-24 border-4 border-border/30 shadow-2xl ring-4 ring-foreground/15">
                   <AvatarImage src={profile?.avatar} className="object-cover" />
-                  <AvatarFallback className="theme-avatar-fallback text-3xl font-bold text-white">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-3xl font-bold text-primary-foreground">
                     {avatarFallbackText}
                   </AvatarFallback>
                 </Avatar>
-                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                   {avatarUploading ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-white" />
+                    <Loader2 className="h-6 w-6 animate-spin text-foreground" />
                   ) : (
-                    <Camera className="h-6 w-6 text-white" />
+                    <Camera className="h-6 w-6 text-foreground" />
                   )}
                 </div>
               </button>
             )}
           </div>
 
-          <div className="min-w-0 flex-1 text-white">
+          <div className="min-w-0 flex-1 text-foreground">
             {loading ? (
               <div className="space-y-2">
-                <Skeleton className="h-8 w-40 bg-white/20" />
-                <Skeleton className="h-4 w-28 bg-white/20" />
+                <Skeleton className="h-8 w-40 bg-card/20" />
+                <Skeleton className="h-4 w-28 bg-card/20" />
               </div>
             ) : (
               <>
@@ -267,13 +266,13 @@ export default function Profile() {
                     {roleInfo.label}
                   </Badge>
                 </div>
-                <p className="mb-4 text-sm text-white/78">
+                <p className="mb-4 text-sm text-foreground/78">
                   <Mail className="mr-1 inline h-3.5 w-3.5" />
                   {profile?.email || '未绑定邮箱'}
                 </p>
                 <div className="flex flex-wrap gap-4">
                   <div className={statPanelClass}>
-                    <div className="mb-1 flex items-center gap-2 text-xs font-medium text-white/76">
+                    <div className="mb-1 flex items-center gap-2 text-xs font-medium text-foreground/76">
                       <Download className="h-3.5 w-3.5" />
                       <span>累计下载</span>
                     </div>
@@ -291,10 +290,10 @@ export default function Profile() {
         <Card className={sectionCardClass}>
           <div className={sectionHeaderClass}>
             <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-theme-soft p-2">
-                <User className="h-4 w-4 text-theme-primary" />
+              <div className="rounded-lg bg-accent p-2">
+                <User className="h-4 w-4 text-primary" />
               </div>
-              <h2 className="font-bold text-slate-900">基本信息</h2>
+              <h2 className="font-bold text-foreground">基本信息</h2>
             </div>
           </div>
           <CardContent className="p-6">
@@ -311,13 +310,13 @@ export default function Profile() {
               <div className="space-y-5">
                 <div>
                   <div className="mb-1.5 flex items-center justify-between">
-                    <Label className="block text-sm font-medium text-slate-700">
-                      昵称 <span className="text-rose-500">*</span>
+                    <Label className="block text-sm font-medium text-foreground">
+                      昵称 <span className="text-destructive">*</span>
                     </Label>
                     <Button
                       size="sm"
                       variant="link"
-                      className="px-0 text-theme-primary hover:text-theme-primary-hover"
+                      className="px-0 text-primary hover:text-primary"
                       onClick={() => {
                         setInfoForm((form) => ({ ...form, nickname: createRandomCnNickname() }));
                       }}
@@ -337,9 +336,9 @@ export default function Profile() {
                 </div>
 
                 <div>
-                  <Label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  <Label className="mb-1.5 block text-sm font-medium text-foreground">
                     <Mail className="mr-1 inline h-3.5 w-3.5" />
-                    邮箱 <span className="text-rose-500">*</span>
+                    邮箱 <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     type="email"
@@ -351,11 +350,11 @@ export default function Profile() {
                     placeholder="请输入登录邮箱"
                     className={inputClassName}
                   />
-                  <p className="mt-1 text-xs text-slate-400">该邮箱用于登录与接收验证码</p>
+                  <p className="mt-1 text-xs text-muted-foreground">该邮箱用于登录与接收验证码</p>
                 </div>
 
                 <div>
-                  <Label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  <Label className="mb-1.5 block text-sm font-medium text-foreground">
                     <Phone className="mr-1 inline h-3.5 w-3.5" />
                     手机号
                   </Label>
@@ -375,7 +374,7 @@ export default function Profile() {
                   <Button
                     onClick={handleInfoSave}
                     disabled={infoSaving}
-                    className="theme-btn-primary px-8 font-semibold"
+                    className="px-8 font-semibold"
                   >
                     {infoSaving ? (
                       <>
@@ -399,16 +398,16 @@ export default function Profile() {
         <Card className={sectionCardClass}>
           <div className={sectionHeaderClass}>
             <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-theme-soft p-2">
-                <KeyRound className="h-4 w-4 text-theme-primary" />
+              <div className="rounded-lg bg-accent p-2">
+                <KeyRound className="h-4 w-4 text-primary" />
               </div>
-              <h2 className="font-bold text-slate-900">修改密码</h2>
+              <h2 className="font-bold text-foreground">修改密码</h2>
             </div>
           </div>
           <CardContent className="p-6">
             <div className="space-y-5">
               <div>
-                <Label className="mb-1.5 block text-sm font-medium text-slate-700">原密码</Label>
+                <Label className="mb-1.5 block text-sm font-medium text-foreground">原密码</Label>
                 <div className="relative">
                   <Input
                     type={showOld ? 'text' : 'password'}
@@ -422,7 +421,7 @@ export default function Profile() {
                   <button
                     type="button"
                     onClick={() => setShowOld((value) => !value)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-theme-primary"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary"
                   >
                     {showOld ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -430,8 +429,9 @@ export default function Profile() {
               </div>
 
               <div>
-                <Label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  新密码<span className="ml-1 font-normal text-slate-400">（至少 6 位）</span>
+                <Label className="mb-1.5 block text-sm font-medium text-foreground">
+                  新密码
+                  <span className="ml-1 font-normal text-muted-foreground">（至少 6 位）</span>
                 </Label>
                 <div className="relative">
                   <Input
@@ -446,7 +446,7 @@ export default function Profile() {
                   <button
                     type="button"
                     onClick={() => setShowNew((value) => !value)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-theme-primary"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary"
                   >
                     {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -454,7 +454,7 @@ export default function Profile() {
               </div>
 
               <div>
-                <Label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <Label className="mb-1.5 block text-sm font-medium text-foreground">
                   确认新密码
                 </Label>
                 <div className="relative">
@@ -467,20 +467,20 @@ export default function Profile() {
                     placeholder="请再次输入新密码"
                     className={`${inputClassName} pr-12 ${
                       pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword
-                        ? 'border-rose-400 focus-visible:border-rose-400 focus-visible:ring-rose-200'
+                        ? 'border-destructive/40 focus-visible:border-destructive/40 focus-visible:ring-destructive/30'
                         : ''
                     }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirm((value) => !value)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-theme-primary"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary"
                   >
                     {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
                 {pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword ? (
-                  <p className="mt-1 text-xs text-rose-500">两次输入的密码不一致</p>
+                  <p className="mt-1 text-xs text-destructive">两次输入的密码不一致</p>
                 ) : null}
               </div>
 
@@ -488,7 +488,7 @@ export default function Profile() {
                 <Button
                   onClick={handlePasswordSave}
                   disabled={pwdSaving}
-                  className="theme-btn-primary px-8 font-semibold"
+                  className="px-8 font-semibold"
                 >
                   {pwdSaving ? (
                     <>
@@ -512,29 +512,29 @@ export default function Profile() {
           <Card className={sectionCardClass}>
             <div className={sectionHeaderClass}>
               <div className="flex items-center gap-2">
-                <div className="rounded-lg bg-theme-soft p-2">
-                  <Shield className="h-4 w-4 text-theme-primary" />
+                <div className="rounded-lg bg-accent p-2">
+                  <Shield className="h-4 w-4 text-primary" />
                 </div>
-                <h2 className="font-bold text-slate-900">账号信息</h2>
+                <h2 className="font-bold text-foreground">账号信息</h2>
               </div>
             </div>
             <CardContent className="p-6">
               <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-                <div className="flex items-center justify-between rounded-xl bg-theme-soft/72 p-3 sm:col-span-2">
-                  <span className="text-slate-500">登录邮箱</span>
-                  <span className="font-medium text-slate-900">{profile.email || '-'}</span>
+                <div className="flex items-center justify-between rounded-xl bg-accent/72 p-3 sm:col-span-2">
+                  <span className="text-muted-foreground">登录邮箱</span>
+                  <span className="font-medium text-foreground">{profile.email || '-'}</span>
                 </div>
-                <div className="flex items-center justify-between rounded-xl bg-theme-soft/72 p-3">
-                  <span className="text-slate-500">账号角色</span>
+                <div className="flex items-center justify-between rounded-xl bg-accent/72 p-3">
+                  <span className="text-muted-foreground">账号角色</span>
                   <Badge className={`${roleInfo.badgeClass} border-0`}>{roleInfo.label}</Badge>
                 </div>
-                <div className="flex items-center justify-between rounded-xl bg-theme-soft/72 p-3">
-                  <span className="text-slate-500">累计下载</span>
-                  <span className="font-semibold text-slate-900">{profile.downloadCount} 次</span>
+                <div className="flex items-center justify-between rounded-xl bg-accent/72 p-3">
+                  <span className="text-muted-foreground">累计下载</span>
+                  <span className="font-semibold text-foreground">{profile.downloadCount} 次</span>
                 </div>
-                <div className="flex items-center justify-between rounded-xl bg-theme-soft/72 p-3 sm:col-span-2">
-                  <span className="text-slate-500">注册时间</span>
-                  <span className="font-medium text-slate-900">
+                <div className="flex items-center justify-between rounded-xl bg-accent/72 p-3 sm:col-span-2">
+                  <span className="text-muted-foreground">注册时间</span>
+                  <span className="font-medium text-foreground">
                     {profile.createdAt
                       ? new Date(profile.createdAt).toLocaleDateString('zh-CN', {
                           year: 'numeric',
@@ -549,8 +549,7 @@ export default function Profile() {
           </Card>
         ) : null}
 
-        {/* 普通用户的申请入口也要跟随主题，避免在个人中心末尾突然出现另一套紫色卡片 */}
-        {!loading ? <ApplyCreatorBanner /> : null}
+        {/* 普通用户的申请入口已移除，所有登录用户均可创作 */}
       </div>
 
       <AvatarBeadEditorDialog

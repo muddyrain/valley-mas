@@ -1,4 +1,4 @@
-import {
+﻿import {
   ArrowLeft,
   Award,
   Copy,
@@ -53,26 +53,26 @@ const categories = [
 
 const PAGE_BACKGROUND = {
   background:
-    'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-primary-soft) 30%, white) 44%, var(--theme-page-cool) 100%)',
+    'linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, hsl(var(--primary) / 0.15) 30%, hsl(var(--background))) 44%, var(--background) 100%)',
 };
 
 const glassStatClass =
-  'group relative overflow-hidden rounded-2xl border border-white/78 bg-white/62 p-3.5 backdrop-blur-2xl shadow-[0_14px_30px_rgba(var(--theme-primary-rgb),0.10)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/82 hover:shadow-[0_20px_40px_rgba(var(--theme-primary-rgb),0.14)]';
+  'group relative overflow-hidden rounded-2xl border border-border/78 bg-card/62 p-3.5 backdrop-blur-2xl shadow-[0_14px_30px_hsl(var(--primary) / 0.10)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-card/82 hover:shadow-[0_20px_40px_hsl(var(--primary) / 0.14)]';
 
 const creatorHeroInnerClass =
-  'relative overflow-hidden rounded-[26px] border border-white/76 bg-white/62 p-4 shadow-[0_24px_62px_rgba(var(--theme-primary-rgb),0.13)] backdrop-blur-2xl sm:rounded-[30px] md:p-6';
+  'relative overflow-hidden rounded-[26px] border border-border/76 bg-card/62 p-4 shadow-[0_24px_62px_hsl(var(--primary) / 0.13)] backdrop-blur-2xl sm:rounded-[30px] md:p-6';
 
 const creatorHeroActionCardClass =
-  'rounded-2xl border border-white/78 bg-white/72 p-3.5 shadow-[0_14px_34px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-2xl';
+  'rounded-2xl border border-border/78 bg-card/72 p-3.5 shadow-[0_14px_34px_hsl(var(--primary) / 0.10)] backdrop-blur-2xl';
 
 const sectionCardClass =
-  'rounded-[28px] border border-theme-shell-border bg-white/88 p-4 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-xl sm:rounded-3xl sm:p-5 md:p-6';
+  'rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_44px_hsl(var(--primary) / 0.10)] backdrop-blur-xl sm:rounded-3xl sm:p-5 md:p-6';
 
 const sectionSubCardClass =
-  'rounded-2xl border border-theme-shell-border bg-white/84 p-3.5 shadow-[0_10px_24px_rgba(148,163,184,0.09)] backdrop-blur-sm sm:p-4';
+  'rounded-2xl border border-border bg-card/84 p-3.5 shadow-[0_10px_24px_hsl(var(--muted-foreground) / 0.09)] backdrop-blur-sm sm:p-4';
 
 const triggerClassName =
-  'flex min-w-[140px] flex-1 items-center justify-center rounded-xl px-4 py-2.5 font-semibold transition-all hover:bg-theme-soft data-[state=active]:bg-[var(--theme-primary)] data-[state=active]:text-white data-[state=active]:shadow-[0_14px_26px_rgba(var(--theme-primary-rgb),0.22)] sm:flex-none sm:px-5';
+  'flex min-w-[140px] flex-1 items-center justify-center rounded-xl px-4 py-2.5 font-semibold transition-all hover:bg-accent data-[state=active]:bg-[var(--primary)] data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_14px_26px_hsl(var(--primary) / 0.22)] sm:flex-none sm:px-5';
 
 const WORKS_PAGE_SIZE = 20;
 const CREATOR_PROFILE_QUERY_SCHEMA = {
@@ -206,7 +206,7 @@ export default function CreatorProfile() {
   useEffect(() => {
     if (!creator) return;
     void loadWorks(creator.id, buildWorksParams());
-  }, [creator, currentKeyword, currentPage, activeCategory, activeAlbumId]);
+  }, [creator, buildWorksParams, loadWorks]);
 
   const handleFollow = async () => {
     if (!creator || followLoading) return;
@@ -297,43 +297,43 @@ export default function CreatorProfile() {
     return (
       <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
         <PageBanner padding="py-6 md:py-8" maxWidth="max-w-6xl" tone="soft">
-          <div className="overflow-hidden rounded-[30px] border border-white/76 bg-white/62 p-4 shadow-[0_24px_58px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-2xl md:p-6">
+          <div className="overflow-hidden rounded-[30px] border border-border/76 bg-card/62 p-4 shadow-[0_24px_58px_hsl(var(--primary) / 0.10)] backdrop-blur-2xl md:p-6">
             <div className="mb-5 flex items-center justify-between gap-3">
-              <Skeleton className="h-9 w-[5.5rem] rounded-xl bg-white/75" />
+              <Skeleton className="h-9 w-[5.5rem] rounded-xl bg-card/75" />
               <div className="flex items-center gap-2">
-                <Skeleton className="h-8 w-24 rounded-full bg-white/75" />
-                <Skeleton className="h-8 w-[5.5rem] rounded-full bg-white/75" />
+                <Skeleton className="h-8 w-24 rounded-full bg-card/75" />
+                <Skeleton className="h-8 w-[5.5rem] rounded-full bg-card/75" />
               </div>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[280px,1fr]">
-              <div className="rounded-2xl border border-white/78 bg-white/72 p-4 shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.10)]">
-                <Skeleton className="mx-auto h-24 w-24 rounded-full bg-white/80 md:h-28 md:w-28" />
-                <Skeleton className="mx-auto mt-3 h-6 w-[8.5rem] rounded-lg bg-white/80" />
-                <Skeleton className="mx-auto mt-2 h-4 w-24 rounded-md bg-white/80" />
+              <div className="rounded-2xl border border-border/78 bg-card/72 p-4 shadow-[0_12px_28px_hsl(var(--primary) / 0.10)]">
+                <Skeleton className="mx-auto h-24 w-24 rounded-full bg-card/80 md:h-28 md:w-28" />
+                <Skeleton className="mx-auto mt-3 h-6 w-[8.5rem] rounded-lg bg-card/80" />
+                <Skeleton className="mx-auto mt-2 h-4 w-24 rounded-md bg-card/80" />
                 <div className="mt-4 grid grid-cols-2 gap-2">
-                  <Skeleton className="h-14 rounded-xl bg-white/80" />
-                  <Skeleton className="h-14 rounded-xl bg-white/80" />
-                  <Skeleton className="h-14 rounded-xl bg-white/80" />
-                  <Skeleton className="h-14 rounded-xl bg-white/80" />
+                  <Skeleton className="h-14 rounded-xl bg-card/80" />
+                  <Skeleton className="h-14 rounded-xl bg-card/80" />
+                  <Skeleton className="h-14 rounded-xl bg-card/80" />
+                  <Skeleton className="h-14 rounded-xl bg-card/80" />
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/76 bg-white/68 p-4 shadow-[0_12px_30px_rgba(var(--theme-primary-rgb),0.10)]">
+              <div className="rounded-2xl border border-border/76 bg-card/68 p-4 shadow-[0_12px_30px_hsl(var(--primary) / 0.10)]">
                 <div className="space-y-3">
-                  <Skeleton className="h-9 w-2/3 rounded-xl bg-white/80" />
-                  <Skeleton className="h-4 w-full rounded-md bg-white/80" />
-                  <Skeleton className="h-4 w-5/6 rounded-md bg-white/80" />
+                  <Skeleton className="h-9 w-2/3 rounded-xl bg-card/80" />
+                  <Skeleton className="h-4 w-full rounded-md bg-card/80" />
+                  <Skeleton className="h-4 w-5/6 rounded-md bg-card/80" />
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <Skeleton className="h-[4.5rem] rounded-2xl bg-white/80" />
-                  <Skeleton className="h-[4.5rem] rounded-2xl bg-white/80" />
-                  <Skeleton className="h-[4.5rem] rounded-2xl bg-white/80" />
+                  <Skeleton className="h-[4.5rem] rounded-2xl bg-card/80" />
+                  <Skeleton className="h-[4.5rem] rounded-2xl bg-card/80" />
+                  <Skeleton className="h-[4.5rem] rounded-2xl bg-card/80" />
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Skeleton className="h-9 w-32 rounded-xl bg-white/80" />
-                  <Skeleton className="h-9 w-28 rounded-xl bg-white/80" />
-                  <Skeleton className="h-9 w-[6.5rem] rounded-xl bg-white/80" />
+                  <Skeleton className="h-9 w-32 rounded-xl bg-card/80" />
+                  <Skeleton className="h-9 w-28 rounded-xl bg-card/80" />
+                  <Skeleton className="h-9 w-[6.5rem] rounded-xl bg-card/80" />
                 </div>
               </div>
             </div>
@@ -349,9 +349,9 @@ export default function CreatorProfile() {
         className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4"
         style={PAGE_BACKGROUND}
       >
-        <div className="rounded-2xl border border-theme-shell-border bg-white/88 px-8 py-10 text-center shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.10)]">
-          <div className="mb-2 text-lg font-semibold text-slate-700">创作者不存在</div>
-          <p className="mb-5 text-sm text-slate-500">可能已停用，或者链接已经失效。</p>
+        <div className="rounded-2xl border border-border bg-card/88 px-8 py-10 text-center shadow-[0_18px_44px_hsl(var(--primary) / 0.10)]">
+          <div className="mb-2 text-lg font-semibold text-foreground">创作者不存在</div>
+          <p className="mb-5 text-sm text-muted-foreground">可能已停用，或者链接已经失效。</p>
           <Button variant="outline" onClick={() => window.history.back()} className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             返回
@@ -366,10 +366,10 @@ export default function CreatorProfile() {
       {/* 创作者页也跟随当前主题背景，避免继续保留独立紫色专题风格 */}
       <PageBanner padding="py-6 md:py-8" maxWidth="max-w-6xl" tone="soft">
         <div className={creatorHeroInnerClass}>
-          <div className="pointer-events-none absolute -left-14 -top-14 h-44 w-44 rounded-full bg-white/70 blur-3xl" />
-          <div className="pointer-events-none absolute right-10 top-8 h-36 w-36 rounded-full bg-[rgba(var(--theme-secondary-rgb),0.22)] blur-3xl" />
-          <div className="pointer-events-none absolute bottom-0 left-1/2 h-28 w-56 -translate-x-1/2 rounded-full bg-[rgba(var(--theme-tertiary-rgb),0.12)] blur-3xl" />
-          <div className="pointer-events-none absolute -right-8 bottom-1 text-[58px] leading-none font-black tracking-[0.14em] text-white/24">
+          <div className="pointer-events-none absolute -left-14 -top-14 h-44 w-44 rounded-full bg-card/70 blur-3xl" />
+          <div className="pointer-events-none absolute right-10 top-8 h-36 w-36 rounded-full bg-[hsl(var(--secondary) / 0.22)] blur-3xl" />
+          <div className="pointer-events-none absolute bottom-0 left-1/2 h-28 w-56 -translate-x-1/2 rounded-full bg-[hsl(var(--accent) / 0.12)] blur-3xl" />
+          <div className="pointer-events-none absolute -right-8 bottom-1 text-[58px] leading-none font-black tracking-[0.14em] text-primary-foreground/24">
             CREATOR
           </div>
 
@@ -377,17 +377,17 @@ export default function CreatorProfile() {
             <Button
               variant="ghost"
               onClick={() => window.history.back()}
-              className="h-10 gap-2 rounded-xl border border-white/84 bg-white/72 px-4 text-slate-700 backdrop-blur-xl shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.10)] hover:bg-white"
+              className="h-10 gap-2 rounded-xl border border-border/84 bg-card/72 px-4 text-foreground backdrop-blur-xl shadow-[0_10px_24px_hsl(var(--primary) / 0.10)] hover:bg-accent"
             >
               <ArrowLeft className="h-4 w-4" />
               返回
             </Button>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge className="h-8 border border-white/84 bg-white/72 px-3 text-theme-primary shadow-[0_10px_20px_rgba(var(--theme-primary-rgb),0.10)]">
+              <Badge className="h-8 border border-border/84 bg-card/72 px-3 text-primary shadow-[0_10px_20px_hsl(var(--primary) / 0.10)]">
                 <Sparkles className="mr-1 h-3.5 w-3.5" />
                 创作者主页
               </Badge>
-              <Badge className="h-8 border border-white/84 bg-white/72 px-3 text-theme-primary shadow-[0_10px_20px_rgba(var(--theme-primary-rgb),0.10)]">
+              <Badge className="h-8 border border-border/84 bg-card/72 px-3 text-primary shadow-[0_10px_20px_hsl(var(--primary) / 0.10)]">
                 <Award className="mr-1 h-3.5 w-3.5" />
                 品牌创作者
               </Badge>
@@ -397,46 +397,46 @@ export default function CreatorProfile() {
           <div className="relative z-10 mt-5 grid gap-4 lg:grid-cols-[280px,1fr]">
             <aside className={`${creatorHeroActionCardClass} space-y-3`}>
               <div className="relative mx-auto w-fit">
-                <div className="absolute -inset-4 rounded-full bg-[radial-gradient(circle,rgba(var(--theme-primary-rgb),0.2)_0%,transparent_72%)] blur-2xl" />
-                <Avatar className="relative h-24 w-24 border-4 border-white/90 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.16)]">
+                <div className="absolute -inset-4 rounded-full bg-[radial-gradient(circle,hsl(var(--primary) / 0.2)_0%,transparent_72%)] blur-2xl" />
+                <Avatar className="relative h-24 w-24 border-4 border-border/90 shadow-[0_18px_44px_hsl(var(--primary) / 0.16)]">
                   <AvatarImage src={creator.avatar} className="object-cover" />
-                  <AvatarFallback className="theme-avatar-fallback text-3xl font-bold text-white">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-3xl font-bold text-primary-foreground">
                     {creator.name[0]}
                   </AvatarFallback>
                 </Avatar>
-                <div className="absolute -bottom-1 -right-1 inline-flex items-center gap-1 rounded-full border border-white/90 bg-white/92 px-2.5 py-1 text-[11px] font-medium text-theme-primary shadow-md">
+                <div className="absolute -bottom-1 -right-1 inline-flex items-center gap-1 rounded-full border border-border/90 bg-card/92 px-2.5 py-1 text-[11px] font-medium text-primary shadow-md">
                   <Award className="h-3 w-3" />
                   认证
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/85 bg-white/78 px-3 py-2 text-center">
-                <div className="text-sm font-medium text-slate-700">
+              <div className="rounded-xl border border-border/85 bg-card/78 px-3 py-2 text-center">
+                <div className="text-sm font-medium text-foreground">
                   {isSelf ? '我的创作空间' : '创作者空间'}
                 </div>
                 {creator.code ? (
                   <button
                     type="button"
                     onClick={() => void handleCopyCreatorCode()}
-                    className="mt-1 inline-flex items-center gap-1 rounded-full border border-theme-primary/24 bg-theme-soft px-2.5 py-1 text-xs font-medium text-theme-primary transition-colors hover:bg-theme-primary hover:text-white"
+                    className="mt-1 inline-flex items-center gap-1 rounded-full border border-primary/24 bg-accent px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
                   >
                     <Copy className="h-3 w-3" />@{creator.code}
                   </button>
                 ) : (
-                  <div className="mt-1 text-xs text-slate-500">公开创作者主页</div>
+                  <div className="mt-1 text-xs text-muted-foreground">公开创作者主页</div>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl border border-white/85 bg-white/80 px-2.5 py-2 text-center">
-                  <div className="text-sm font-medium text-slate-600">作品</div>
-                  <div className="text-sm font-semibold text-slate-800">
+                <div className="rounded-xl border border-border/85 bg-card/80 px-2.5 py-2 text-center">
+                  <div className="text-sm font-medium text-foreground">作品</div>
+                  <div className="text-sm font-semibold text-foreground">
                     {creator.resourceCount}
                   </div>
                 </div>
-                <div className="rounded-xl border border-white/85 bg-white/80 px-2.5 py-2 text-center">
-                  <div className="text-sm font-medium text-slate-600">粉丝</div>
-                  <div className="text-sm font-semibold text-slate-800">{followerCount}</div>
+                <div className="rounded-xl border border-border/85 bg-card/80 px-2.5 py-2 text-center">
+                  <div className="text-sm font-medium text-foreground">粉丝</div>
+                  <div className="text-sm font-semibold text-foreground">{followerCount}</div>
                 </div>
               </div>
 
@@ -447,8 +447,8 @@ export default function CreatorProfile() {
                     disabled={followLoading}
                     className={
                       isFollowing
-                        ? 'h-9 border border-white/82 bg-white/72 text-slate-700 shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.10)] hover:bg-white'
-                        : 'h-9 bg-gradient-to-r from-theme-primary to-theme-primary-deep text-white shadow-[0_14px_30px_rgba(var(--theme-primary-rgb),0.24)] hover:from-theme-primary-hover hover:to-theme-primary-deep'
+                        ? 'h-9 border border-border/82 bg-card/72 text-foreground shadow-[0_10px_24px_hsl(var(--primary) / 0.10)] hover:bg-accent'
+                        : 'h-9 bg-gradient-to-r from-primary to-primary text-primary-foreground shadow-[0_14px_30px_hsl(var(--primary) / 0.24)] hover:from-primary hover:to-primary'
                     }
                     variant={isFollowing ? 'outline' : 'default'}
                   >
@@ -468,7 +468,7 @@ export default function CreatorProfile() {
                 <Button
                   variant="outline"
                   onClick={() => void handleShareProfile()}
-                  className="h-9 border-theme-primary/50 duration-300 bg-theme-primary/15 text-theme-primary hover:bg-theme-primary/50 hover:text-white"
+                  className="h-9 border-primary/50 duration-300 bg-primary/15 text-primary hover:bg-primary/50 hover:text-primary-foreground"
                 >
                   <Share2 className="mr-1.5 h-4 w-4" />
                   分享主页
@@ -477,56 +477,56 @@ export default function CreatorProfile() {
             </aside>
 
             <section className="space-y-4">
-              <div className="rounded-2xl border border-white/78 bg-white/72 p-4 shadow-[0_14px_34px_rgba(var(--theme-primary-rgb),0.10)]">
+              <div className="rounded-2xl border border-border/78 bg-card/72 p-4 shadow-[0_14px_34px_hsl(var(--primary) / 0.10)]">
                 <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
-                  <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">{creator.name}</h1>
-                  <Badge className="border border-white/84 bg-white/82 text-theme-primary">
+                  <h1 className="text-2xl font-bold text-foreground md:text-3xl">{creator.name}</h1>
+                  <Badge className="border border-border/84 bg-card/82 text-primary">
                     活跃创作者
                   </Badge>
                 </div>
-                <p className="text-sm leading-7 text-slate-600">
+                <p className="text-sm leading-7 text-foreground">
                   {creator.description || '这个创作者暂未填写个人介绍。'}
                 </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className={glassStatClass}>
-                  <div className="mb-1 flex items-center gap-1.5 text-xs text-slate-500">
-                    <ImageIcon className="h-3.5 w-3.5 text-theme-primary" />
+                  <div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <ImageIcon className="h-3.5 w-3.5 text-primary" />
                     作品
                   </div>
-                  <div className="text-xl font-semibold text-slate-900 md:text-2xl">
+                  <div className="text-xl font-semibold text-foreground md:text-2xl">
                     {creator.resourceCount}
                   </div>
                 </div>
                 <div className={glassStatClass}>
-                  <div className="mb-1 flex items-center gap-1.5 text-xs text-slate-500">
-                    <Download className="h-3.5 w-3.5 text-theme-primary" />
+                  <div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Download className="h-3.5 w-3.5 text-primary" />
                     下载
                   </div>
-                  <div className="text-xl font-semibold text-slate-900 md:text-2xl">
+                  <div className="text-xl font-semibold text-foreground md:text-2xl">
                     {creator.downloadCount}
                   </div>
                 </div>
                 <div className={glassStatClass}>
-                  <div className="mb-1 flex items-center gap-1.5 text-xs text-slate-500">
-                    <Users className="h-3.5 w-3.5 text-theme-primary" />
+                  <div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Users className="h-3.5 w-3.5 text-primary" />
                     粉丝
                   </div>
-                  <div className="text-xl font-semibold text-slate-900 md:text-2xl">
+                  <div className="text-xl font-semibold text-foreground md:text-2xl">
                     {followerCount}
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/76 bg-white/68 p-3 shadow-[0_12px_26px_rgba(var(--theme-primary-rgb),0.09)]">
-                <span className="rounded-full border border-white/90 bg-white/82 px-3 py-1 text-xs text-slate-600">
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/76 bg-card/68 p-3 shadow-[0_12px_26px_hsl(var(--primary) / 0.09)]">
+                <span className="rounded-full border border-border/90 bg-card/82 px-3 py-1 text-xs text-foreground">
                   创作者编号 · {creator.code || '未设置'}
                 </span>
-                <span className="rounded-full border border-white/90 bg-white/82 px-3 py-1 text-xs text-slate-600">
+                <span className="rounded-full border border-border/90 bg-card/82 px-3 py-1 text-xs text-foreground">
                   当前展示 · {worksTotal} 个资源
                 </span>
-                <span className="rounded-full border border-white/90 bg-white/82 px-3 py-1 text-xs text-slate-600">
+                <span className="rounded-full border border-border/90 bg-card/82 px-3 py-1 text-xs text-foreground">
                   可见专辑 · {albums.length} 个
                 </span>
               </div>
@@ -546,14 +546,14 @@ export default function CreatorProfile() {
               <TabsTrigger value="works" className={triggerClassName}>
                 <ImageIcon className="mr-2 h-5 w-5" />
                 作品集
-                <Badge className="ml-2 border-0 bg-theme-soft text-theme-primary data-[state=active]:bg-white/18 data-[state=active]:text-white">
+                <Badge className="ml-2 border-0 bg-accent text-primary data-[state=active]:bg-primary-foreground/18 data-[state=active]:text-primary-foreground">
                   {worksTotal}
                 </Badge>
               </TabsTrigger>
               <TabsTrigger value="albums" className={triggerClassName}>
                 <FolderOpen className="mr-2 h-5 w-5" />
                 专辑
-                <Badge className="ml-2 border-0 bg-theme-soft text-theme-primary data-[state=active]:bg-white/18 data-[state=active]:text-white">
+                <Badge className="ml-2 border-0 bg-accent text-primary data-[state=active]:bg-primary-foreground/18 data-[state=active]:text-primary-foreground">
                   {albums.length}
                 </Badge>
               </TabsTrigger>
@@ -566,12 +566,12 @@ export default function CreatorProfile() {
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className={sectionSubCardClass}>
                     <div className="mb-3 flex items-center justify-between gap-3">
-                      <h3 className="text-base font-semibold text-slate-900">分类筛选</h3>
+                      <h3 className="text-base font-semibold text-foreground">分类筛选</h3>
                       {activeAlbumId ? (
                         <button
                           type="button"
                           onClick={() => void handleClearAlbumFilter()}
-                          className="rounded-full border border-theme-shell-border bg-white px-3 py-1 text-xs text-theme-primary hover:bg-theme-soft"
+                          className="rounded-full border border-border bg-white px-3 py-1 text-xs text-primary hover:bg-accent"
                         >
                           当前专辑：
                           {albums.find((album) => album.id === activeAlbumId)?.name || '已选专辑'}
@@ -588,8 +588,8 @@ export default function CreatorProfile() {
 
                   <div className={sectionSubCardClass}>
                     <div className="mb-3 flex items-center gap-2">
-                      <Search className="h-4 w-4 text-theme-primary" />
-                      <h3 className="text-base font-semibold text-slate-900">搜索作品</h3>
+                      <Search className="h-4 w-4 text-primary" />
+                      <h3 className="text-base font-semibold text-foreground">搜索作品</h3>
                     </div>
                     <div className="relative flex flex-col gap-2 sm:block">
                       <Input
@@ -598,11 +598,11 @@ export default function CreatorProfile() {
                         value={searchKeyword}
                         onChange={(e) => setSearchKeyword(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && void handleSearch()}
-                        className="theme-input-border h-12 rounded-xl border-2 bg-white pr-4 text-base focus-visible:border-theme-primary focus-visible:ring-theme-primary/20 sm:pr-24"
+                        className="h-12 rounded-xl border-2 bg-card pr-4 text-base focus-visible:border-primary focus-visible:ring-primary/20 sm:pr-24"
                       />
                       <Button
                         onClick={() => void handleSearch()}
-                        className="theme-btn-primary h-10 rounded-lg px-5 text-sm sm:absolute sm:right-1.5 sm:top-1/2 sm:h-9 sm:-translate-y-1/2"
+                        className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 rounded-lg px-5 text-sm sm:absolute sm:right-1.5 sm:top-1/2 sm:h-9 sm:-translate-y-1/2"
                       >
                         搜索
                       </Button>
@@ -617,12 +617,12 @@ export default function CreatorProfile() {
                     ))}
                   </div>
                 ) : works.length === 0 ? (
-                  <div className="rounded-2xl border border-theme-shell-border bg-white/82 px-6 py-16 text-center shadow-[0_14px_34px_rgba(var(--theme-primary-rgb),0.08)]">
-                    <div className="mb-5 inline-flex h-20 w-20 items-center justify-center rounded-full bg-theme-soft">
-                      <ImageIcon className="h-10 w-10 text-theme-primary" />
+                  <div className="rounded-2xl border border-border bg-card/82 px-6 py-16 text-center shadow-[0_14px_34px_hsl(var(--primary) / 0.08)]">
+                    <div className="mb-5 inline-flex h-20 w-20 items-center justify-center rounded-full bg-accent">
+                      <ImageIcon className="h-10 w-10 text-primary" />
                     </div>
-                    <h3 className="mb-2 text-xl font-semibold text-slate-900">暂无作品</h3>
-                    <p className="text-slate-500">该创作者还没有上传任何作品。</p>
+                    <h3 className="mb-2 text-xl font-semibold text-foreground">暂无作品</h3>
+                    <p className="text-muted-foreground">该创作者还没有上传任何作品。</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-4">
@@ -645,18 +645,18 @@ export default function CreatorProfile() {
                       variant="outline"
                       onClick={() => void handleWorksPageChange(currentPage - 1)}
                       disabled={currentPage <= 1 || worksLoading}
-                      className="rounded-xl border-theme-shell-border bg-white/84 px-6 text-slate-700 hover:bg-theme-soft sm:w-auto"
+                      className="rounded-xl border-border bg-card/84 px-6 text-foreground hover:bg-accent sm:w-auto"
                     >
                       上一页
                     </Button>
-                    <div className="rounded-xl border border-theme-shell-border bg-white/84 px-5 py-2 text-center text-sm text-slate-600">
+                    <div className="rounded-xl border border-border bg-card/84 px-5 py-2 text-center text-sm text-foreground">
                       第 {currentPage} / {worksTotalPages} 页，共 {worksTotal} 个作品
                     </div>
                     <Button
                       variant="outline"
                       onClick={() => void handleWorksPageChange(currentPage + 1)}
                       disabled={currentPage >= worksTotalPages || worksLoading}
-                      className="rounded-xl border-theme-shell-border bg-white/84 px-6 text-slate-700 hover:bg-theme-soft sm:w-auto"
+                      className="rounded-xl border-border bg-card/84 px-6 text-foreground hover:bg-accent sm:w-auto"
                     >
                       下一页
                     </Button>
@@ -668,21 +668,23 @@ export default function CreatorProfile() {
             <TabsContent value="albums" className="mt-0">
               <div className={sectionCardClass}>
                 {albums.length === 0 ? (
-                  <div className="rounded-2xl border border-theme-shell-border bg-white/82 px-6 py-16 text-center shadow-[0_14px_34px_rgba(var(--theme-primary-rgb),0.08)]">
-                    <div className="mb-5 inline-flex h-20 w-20 items-center justify-center rounded-full bg-theme-soft">
-                      <FolderOpen className="h-10 w-10 text-theme-primary" />
+                  <div className="rounded-2xl border border-border bg-card/82 px-6 py-16 text-center shadow-[0_14px_34px_hsl(var(--primary) / 0.08)]">
+                    <div className="mb-5 inline-flex h-20 w-20 items-center justify-center rounded-full bg-accent">
+                      <FolderOpen className="h-10 w-10 text-primary" />
                     </div>
-                    <h3 className="mb-2 text-xl font-semibold text-slate-900">还没有公开专辑</h3>
-                    <p className="text-slate-500">这个创作者暂时还没有整理出可浏览的资源专辑。</p>
+                    <h3 className="mb-2 text-xl font-semibold text-foreground">还没有公开专辑</h3>
+                    <p className="text-muted-foreground">
+                      这个创作者暂时还没有整理出可浏览的资源专辑。
+                    </p>
                   </div>
                 ) : (
                   <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                     {albums.map((album) => (
                       <div
                         key={album.id}
-                        className="overflow-hidden rounded-2xl border border-theme-shell-border bg-white/84 shadow-[0_16px_36px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(var(--theme-primary-rgb),0.16)]"
+                        className="overflow-hidden rounded-2xl border border-border bg-card/84 shadow-[0_16px_36px_hsl(var(--primary) / 0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_50px_hsl(var(--primary) / 0.16)]"
                       >
-                        <div className="h-44 overflow-hidden bg-theme-soft">
+                        <div className="h-44 overflow-hidden bg-accent">
                           {album.coverUrl ? (
                             <img
                               src={album.coverUrl}
@@ -691,7 +693,7 @@ export default function CreatorProfile() {
                             />
                           ) : (
                             <div className="flex h-full items-center justify-center">
-                              <FolderOpen className="h-12 w-12 text-theme-primary/50" />
+                              <FolderOpen className="h-12 w-12 text-primary/50" />
                             </div>
                           )}
                         </div>
@@ -699,14 +701,14 @@ export default function CreatorProfile() {
                         <div className="p-5">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <h3 className="truncate text-lg font-semibold text-slate-900">
+                              <h3 className="truncate text-lg font-semibold text-foreground">
                                 {album.name}
                               </h3>
-                              <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
+                              <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
                                 {album.description || '这个专辑暂时还没有补充更多说明。'}
                               </p>
                             </div>
-                            <span className="rounded-full bg-theme-soft px-3 py-1 text-xs font-medium text-theme-primary">
+                            <span className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-primary">
                               {album.resourceCount} 项
                             </span>
                           </div>
@@ -715,7 +717,7 @@ export default function CreatorProfile() {
                             type="button"
                             variant="outline"
                             onClick={() => void handleAlbumOpen(album.id)}
-                            className="mt-4 w-full rounded-xl border-theme-soft-strong bg-white/80 text-theme-primary hover:bg-theme-soft"
+                            className="mt-4 w-full rounded-xl border-accent bg-card/80 text-primary hover:bg-accent"
                           >
                             查看专辑作品
                           </Button>

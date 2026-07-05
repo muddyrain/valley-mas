@@ -1,34 +1,37 @@
 import { CircleCheck, Info, ShieldAlert, TriangleAlert } from 'lucide-react';
 import { Toaster as Sonner } from 'sonner';
+import { useThemeStore } from '@/stores/useThemeStore';
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  const theme = useThemeStore((s) => s.mode);
+
   return (
     <Sonner
-      theme="light"
+      theme={theme as 'light' | 'dark' | 'system'}
       className="toaster group"
       position="top-center"
       icons={{
-        success: <CircleCheck className="h-5 w-5 font-bold text-green-400" />,
-        error: <ShieldAlert className="h-5 w-5 font-bold text-red-400" />,
-        warning: <TriangleAlert className="h-5 w-5 font-bold text-yellow-400" />,
-        info: <Info className="h-5 w-5 font-bold text-blue-400" />,
+        success: <CircleCheck className="h-5 w-5 font-bold text-primary" />,
+        error: <ShieldAlert className="h-5 w-5 font-bold text-destructive" />,
+        warning: <TriangleAlert className="h-5 w-5 font-bold text-primary" />,
+        info: <Info className="h-5 w-5 font-bold text-primary" />,
       }}
       toastOptions={{
         classNames: {
           toast:
-            'group toast group-[.toaster]:bg-white group-[.toaster]:text-gray-950 group-[.toaster]:border-gray-200 group-[.toaster]:shadow-lg',
-          description: 'group-[.toast]:text-gray-500',
-          actionButton: 'group-[.toast]:bg-gray-900 group-[.toast]:text-gray-50',
-          cancelButton: 'group-[.toast]:bg-gray-100 group-[.toast]:text-gray-500',
+            'group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg',
+          description: 'group-[.toast]:text-muted-foreground',
+          actionButton: 'group-[.toast]:bg-foreground group-[.toast]:text-primary-foreground',
+          cancelButton: 'group-[.toast]:bg-muted group-[.toast]:text-muted-foreground',
           error:
-            'group-[.toast]:bg-red-50 group-[.toast]:text-red-900 group-[.toast]:border-red-200',
+            'group-[.toast]:bg-destructive/10 group-[.toast]:text-destructive group-[.toast]:border-destructive/30',
           success:
-            'group-[.toast]:bg-green-50 group-[.toast]:text-green-900 group-[.toast]:border-green-200',
+            'group-[.toast]:bg-accent group-[.toast]:text-primary group-[.toast]:border-primary/30',
           warning:
-            'group-[.toast]:bg-yellow-50 group-[.toast]:text-yellow-900 group-[.toast]:border-yellow-200',
-          info: 'group-[.toast]:bg-blue-50 group-[.toast]:text-blue-900 group-[.toast]:border-blue-200',
+            'group-[.toast]:bg-accent group-[.toast]:text-primary group-[.toast]:border-primary/30',
+          info: 'group-[.toast]:bg-accent group-[.toast]:text-primary group-[.toast]:border-primary/30',
         },
       }}
       {...props}

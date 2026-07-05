@@ -152,24 +152,23 @@ func Setup(cfg *config.Config) *gin.Engine {
 		}
 
 		creator := api.Group("/creator")
-		creator.Use(middleware.Auth(cfg))
-		creator.Use(middleware.CreatorOrAdmin())
-		{
-			creator.GET("/resources", handler.ListResources)
-			creator.POST("/resources/upload", handler.UploadResource)
-			creator.GET("/resources/upload-status", handler.GetUploadResourceStatus)
-			creator.DELETE("/resources/batch", handler.BatchDeleteResources)
-			creator.POST("/resources/batch-visibility", handler.BatchUpdateVisibility)
-			creator.PATCH("/resources/:id", handler.UpdateResource)
-			creator.DELETE("/resources/:id", handler.DeleteResource)
+			creator.Use(middleware.Auth(cfg))
+			{
+				creator.GET("/resources", handler.ListResources)
+				creator.POST("/resources/upload", handler.UploadResource)
+				creator.GET("/resources/upload-status", handler.GetUploadResourceStatus)
+				creator.DELETE("/resources/batch", handler.BatchDeleteResources)
+				creator.POST("/resources/batch-visibility", handler.BatchUpdateVisibility)
+				creator.PATCH("/resources/:id", handler.UpdateResource)
+				creator.DELETE("/resources/:id", handler.DeleteResource)
 
-			creator.GET("/albums", handler.ListMyCreatorAlbums)
-			creator.POST("/albums", handler.CreateCreatorAlbum)
-			creator.PUT("/albums/:id", handler.UpdateCreatorAlbum)
-			creator.DELETE("/albums/:id", handler.DeleteCreatorAlbum)
-			creator.POST("/ai/suggest-title", handler.SuggestResourceTitle)
-			creator.POST("/ai/resource-tags/suggest", handler.SuggestResourceTags)
-		}
+				creator.GET("/albums", handler.ListMyCreatorAlbums)
+				creator.POST("/albums", handler.CreateCreatorAlbum)
+				creator.PUT("/albums/:id", handler.UpdateCreatorAlbum)
+				creator.DELETE("/albums/:id", handler.DeleteCreatorAlbum)
+				creator.POST("/ai/suggest-title", handler.SuggestResourceTitle)
+				creator.POST("/ai/resource-tags/suggest", handler.SuggestResourceTags)
+			}
 
 		admin := api.Group("/admin")
 		admin.Use(middleware.Auth(cfg))
@@ -250,7 +249,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			}
 
 			content := admin.Group("")
-			content.Use(middleware.CreatorOrAdmin())
+				// creator gate removed: any authenticated user can manage their own content
 			{
 				content.GET("/creator/stats", handler.GetCreatorStats)
 

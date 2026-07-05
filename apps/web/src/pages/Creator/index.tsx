@@ -1,4 +1,4 @@
-﻿import { Download, Search, Sparkles, Users, X } from 'lucide-react';
+import { Download, Search, Sparkles, Users, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -40,7 +40,7 @@ export default function Creator() {
   const [creators, setCreators] = useState<CreatorType[]>([]);
   const [total, setTotal] = useState(0);
   const [inputKeyword, setInputKeyword] = useState(currentKeyword);
-  const [retryTick, setRetryTick] = useState(0);
+  const [_retryTick, setRetryTick] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const firstLoadRef = useRef(true);
@@ -123,7 +123,7 @@ export default function Creator() {
     return () => {
       cancelled = true;
     };
-  }, [currentKeyword, currentPage, listCacheKey, retryTick]);
+  }, [currentKeyword, currentPage, listCacheKey]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -148,7 +148,7 @@ export default function Creator() {
 
   useEffect(() => {
     scrollRestoredRef.current = false;
-  }, [scrollStorageKey]);
+  }, []);
 
   useEffect(() => {
     if (navigationType !== 'POP') return;
@@ -185,10 +185,10 @@ export default function Creator() {
   );
 
   return (
-    <div className="min-h-screen bg-transparent text-slate-900">
+    <div className="min-h-screen bg-transparent text-foreground">
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8 md:px-8 lg:px-10">
-        <section className="theme-hero-shell relative overflow-hidden rounded-[32px] border px-4 py-6 sm:px-6 sm:py-8 md:rounded-[40px] md:px-10 md:py-10">
-          <div className="theme-hero-glow absolute inset-0" />
+        <section className="relative overflow-hidden rounded-[32px] border px-4 py-6 sm:px-6 sm:py-8 md:rounded-[40px] md:px-10 md:py-10">
+          <div className="absolute inset-0" />
           <div className="relative grid gap-5 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
             <div className="space-y-6">
               <HeroSectionTitle
@@ -198,28 +198,28 @@ export default function Creator() {
               />
 
               <div className="flex flex-wrap gap-3">
-                <HeroStatChip icon={<Users className="text-theme-primary h-4 w-4" />}>
+                <HeroStatChip icon={<Users className="text-primary h-4 w-4" />}>
                   {loading ? '...' : creators.length} 位创作者
                 </HeroStatChip>
-                <HeroStatChip icon={<Sparkles className="h-4 w-4 text-sky-500" />}>
+                <HeroStatChip icon={<Sparkles className="h-4 w-4 text-primary" />}>
                   {loading ? '...' : totalResources} 项内容
                 </HeroStatChip>
-                <HeroStatChip icon={<Download className="h-4 w-4 text-emerald-500" />}>
+                <HeroStatChip icon={<Download className="h-4 w-4 text-primary" />}>
                   {loading ? '...' : totalDownloads} 次下载
                 </HeroStatChip>
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-white/80 bg-white/82 p-4 shadow-[0_20px_48px_rgba(148,163,184,0.08)] backdrop-blur sm:rounded-[32px] sm:p-5">
-              <div className="bg-theme-soft text-theme-primary mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
+            <div className="rounded-[28px] border border-foreground/10 bg-card/82 p-4 shadow-[0_20px_48px_rgba(148,163,184,0.08)] backdrop-blur sm:rounded-[32px] sm:p-5">
+              <div className="bg-accent text-primary mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
                 <Users className="h-3.5 w-3.5" />
                 创作者入口
               </div>
 
               <div className="space-y-4">
-                <div className="rounded-[22px] border border-white/80 bg-[#fcfaf6] p-4">
-                  <div className="text-base font-semibold text-slate-900">发现喜欢的创作者</div>
-                  <p className="mt-2 text-sm leading-7 text-slate-500">
+                <div className="rounded-[22px] border border-foreground/10 bg-card p-4">
+                  <div className="text-base font-semibold text-foreground">发现喜欢的创作者</div>
+                  <p className="mt-2 text-sm leading-7 text-muted-foreground">
                     从这里进入创作者空间，继续看 TA 的资源、分组和最近更新。
                   </p>
                 </div>
@@ -228,30 +228,30 @@ export default function Creator() {
                   <button
                     type="button"
                     onClick={() => navigate('/resources')}
-                    className="rounded-[22px] border border-white/80 bg-[#f8fbff] px-4 py-4 text-left shadow-[0_12px_28px_rgba(148,163,184,0.06)] transition hover:bg-white"
+                    className="rounded-[22px] border border-foreground/10 bg-card px-4 py-4 text-left shadow-[0_12px_28px_rgba(148,163,184,0.06)] transition hover:bg-card"
                   >
-                    <div className="text-sm font-medium text-slate-900">去看资源页</div>
-                    <div className="mt-1 text-sm leading-6 text-slate-500">
+                    <div className="text-sm font-medium text-foreground">去看资源页</div>
+                    <div className="mt-1 text-sm leading-6 text-muted-foreground">
                       继续浏览最新整理的资源内容。
                     </div>
                   </button>
                   <button
                     type="button"
-                    onClick={() => navigate('/apply-creator')}
-                    className="bg-theme-soft text-theme-primary rounded-[22px] border border-white/80 px-4 py-4 text-left shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.08)] transition hover:bg-white"
+                    onClick={() => navigate('/my-space')}
+                    className="bg-accent text-primary rounded-[22px] border border-foreground/10 px-4 py-4 text-left shadow-[0_12px_28px_hsl(var(--primary) / 0.08)] transition hover:bg-card"
                   >
-                    <div className="text-sm font-medium text-slate-900">申请成为创作者</div>
-                    <div className="mt-1 text-sm leading-6 text-slate-500">
+                    <div className="text-sm font-medium text-foreground">进入创作空间</div>
+                    <div className="mt-1 text-sm leading-6 text-muted-foreground">
                       整理自己的资源与内容，展示新的创作空间。
                     </div>
                   </button>
                 </div>
 
-                <div className="rounded-[22px] border border-white/80 bg-white/80 p-4">
-                  <div className="mb-3 text-xs text-slate-500">创作者检索</div>
+                <div className="rounded-[22px] border border-border/40 bg-card/80 p-4">
+                  <div className="mb-3 text-xs text-muted-foreground">创作者检索</div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <div className="relative min-w-[220px] grow">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         value={inputKeyword}
                         onChange={(event) => setInputKeyword(event.target.value)}
@@ -259,12 +259,12 @@ export default function Creator() {
                           if (event.key === 'Enter') handleSearch();
                         }}
                         placeholder="搜索创作者昵称、口令或简介"
-                        className="h-10 rounded-xl border-white/90 bg-white pl-9"
+                        className="h-10 rounded-xl border-border/90 bg-card pl-9"
                       />
                     </div>
                     <Button
                       onClick={handleSearch}
-                      className="w-full rounded-full bg-theme-primary px-4 text-white hover:bg-theme-primary-hover sm:w-auto"
+                      className="w-full rounded-full bg-primary px-4 text-primary-foreground hover:bg-primary-hover sm:w-auto"
                     >
                       搜索
                     </Button>
@@ -272,7 +272,7 @@ export default function Creator() {
                       <Button
                         variant="ghost"
                         onClick={clearSearch}
-                        className="w-full rounded-full px-4 text-slate-500 hover:bg-white hover:text-slate-900 sm:w-auto"
+                        className="w-full rounded-full px-4 text-muted-foreground hover:bg-card hover:text-foreground sm:w-auto"
                       >
                         <X className="mr-1 h-4 w-4" />
                         清除
@@ -286,12 +286,12 @@ export default function Creator() {
         </section>
 
         <section className="mt-16 sm:mt-20 md:mt-24">
-          <div className="theme-panel-shell rounded-[32px] border p-4 sm:p-5 md:rounded-[36px] md:p-6">
+          <div className="rounded-[32px] border p-4 sm:p-5 md:rounded-[36px] md:p-6">
             {loading ? (
               <>
                 <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-                  <div className="h-8 w-40 rounded-full bg-white/75" />
-                  <div className="h-10 w-28 rounded-full bg-white/75" />
+                  <div className="h-8 w-40 rounded-full bg-card/75" />
+                  <div className="h-10 w-28 rounded-full bg-card/75" />
                 </div>
                 <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                   {Array.from({ length: 6 }).map((_, index) => (
@@ -300,7 +300,7 @@ export default function Creator() {
                 </div>
               </>
             ) : error ? (
-              <div className="rounded-[32px] bg-white/66 p-4">
+              <div className="rounded-[32px] bg-card/66 p-4">
                 <EmptyState
                   icon={Users}
                   title="创作者暂时没有加载出来"
@@ -313,7 +313,7 @@ export default function Creator() {
                 />
               </div>
             ) : creators.length === 0 ? (
-              <div className="rounded-[32px] bg-white/66 p-4">
+              <div className="rounded-[32px] bg-card/66 p-4">
                 <EmptyState
                   icon={Users}
                   title="还没有展示中的创作者"
@@ -322,19 +322,19 @@ export default function Creator() {
                       ? `没有找到包含“${currentKeyword}”的创作者，换个关键词试试。`
                       : '新的创作者加入后，会先出现在这里。'
                   }
-                  actionLabel="去申请创作者"
-                  onAction={() => navigate('/apply-creator')}
+                  actionLabel="进入创作空间"
+                  onAction={() => navigate('/my-space')}
                 />
               </div>
             ) : (
               <>
                 <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-                  <div className="text-sm text-slate-500">
+                  <div className="text-sm text-muted-foreground">
                     {currentKeyword
                       ? `当前按关键词“${currentKeyword}”筛选创作者。`
                       : '当前展示最近活跃的创作者内容入口。'}
                   </div>
-                  <div className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
+                  <div className="rounded-full bg-card/82 px-4 py-2 text-sm text-muted-foreground shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
                     本页 {creators.length} / 共 {total} 位
                   </div>
                 </div>
@@ -343,7 +343,7 @@ export default function Creator() {
                   {creators.map((creator) => (
                     <div
                       key={creator.id}
-                      className="rounded-[30px] bg-white/68 p-2 shadow-[0_14px_40px_rgba(148,163,184,0.08)]"
+                      className="rounded-[30px] bg-card/68 p-2 shadow-[0_14px_40px_rgba(148,163,184,0.08)]"
                     >
                       <CreatorCard creator={creator} />
                     </div>
@@ -355,18 +355,18 @@ export default function Creator() {
                     <div className="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                       <Button
                         variant="outline"
-                        className="border-theme-soft-strong rounded-full border bg-white/82 px-5 sm:w-auto"
+                        className="border-accent rounded-full border bg-card/82 px-5 sm:w-auto"
                         disabled={currentPage <= 1}
                         onClick={() => setValue('page', Math.max(1, currentPage - 1))}
                       >
                         上一页
                       </Button>
-                      <span className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-500 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
+                      <span className="rounded-full bg-card/82 px-4 py-2 text-sm text-muted-foreground shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
                         第 {currentPage} / {totalPages} 页
                       </span>
                       <Button
                         variant="outline"
-                        className="border-theme-soft-strong rounded-full border bg-white/82 px-5 sm:w-auto"
+                        className="border-accent rounded-full border bg-card/82 px-5 sm:w-auto"
                         disabled={currentPage >= totalPages}
                         onClick={() => setValue('page', Math.min(totalPages, currentPage + 1))}
                       >
@@ -376,10 +376,10 @@ export default function Creator() {
                   ) : (
                     <Button
                       variant="outline"
-                      onClick={() => navigate('/apply-creator')}
-                      className="border-theme-soft-strong rounded-full border bg-white/82 px-8 text-slate-700"
+                      onClick={() => navigate('/my-space')}
+                      className="border-accent rounded-full border bg-card/82 px-8 text-foreground"
                     >
-                      成为下一位创作者
+                      进入创作空间
                     </Button>
                   )}
                 </div>

@@ -50,7 +50,7 @@ export function CoverPickerDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[90vh] w-[90vw] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl">
-        <DialogHeader className="shrink-0 border-b border-slate-100 px-6 py-4">
+        <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
           <DialogTitle>选择博客封面</DialogTitle>
         </DialogHeader>
 
@@ -212,18 +212,18 @@ function ExternalImagesPickerBody({
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/45 p-3.5">
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border bg-muted/45 p-3.5">
         {loading ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {Array.from({ length: EXTERNAL_PAGE_SIZE }).map((_, index) => (
               <div
                 key={`external-loading-${provider}-${index}`}
-                className="aspect-[4/3] w-full animate-pulse rounded-xl bg-slate-200/70"
+                className="aspect-[4/3] w-full animate-pulse rounded-xl bg-muted/70"
               />
             ))}
           </div>
         ) : errorMessage ? (
-          <div className="rounded-xl border border-dashed border-rose-300 bg-rose-50/60 p-6 text-center text-sm text-rose-600">
+          <div className="rounded-xl border border-dashed border-destructive/30 bg-destructive/10 p-6 text-center text-sm text-destructive">
             {errorMessage}
           </div>
         ) : images.length > 0 ? (
@@ -238,13 +238,11 @@ function ExternalImagesPickerBody({
                   key={image.id}
                   type="button"
                   onClick={() => onSelect(image)}
-                  className={`group relative overflow-hidden rounded-xl border bg-white text-left transition hover:shadow-md ${
-                    selected
-                      ? 'border-theme-primary ring-2 ring-theme-primary/40'
-                      : 'border-slate-200'
+                  className={`group relative overflow-hidden rounded-xl border bg-card text-left transition hover:shadow-md ${
+                    selected ? 'border-primary ring-2 ring-primary/40' : 'border-border'
                   }`}
                 >
-                  <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100">
+                  <div className="aspect-[4/3] w-full overflow-hidden bg-muted">
                     <img
                       src={image.thumbnailUrl}
                       alt={image.attribution.name || 'cover'}
@@ -252,11 +250,11 @@ function ExternalImagesPickerBody({
                       className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                     />
                   </div>
-                  <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-2.5 py-1.5 text-xs">
-                    <span className="truncate text-slate-600">
+                  <div className="flex items-center justify-between gap-2 border-t border-border px-2.5 py-1.5 text-xs">
+                    <span className="truncate text-foreground">
                       {image.attribution.name || '匿名'}
                     </span>
-                    <span className="shrink-0 text-slate-400">
+                    <span className="shrink-0 text-muted-foreground">
                       {image.width}×{image.height}
                     </span>
                   </div>
@@ -265,18 +263,18 @@ function ExternalImagesPickerBody({
             })}
           </div>
         ) : initialized ? (
-          <div className="rounded-xl border border-dashed border-slate-300 py-10 text-center text-sm text-slate-500">
+          <div className="rounded-xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
             没有找到匹配的图片，换个关键词试试
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-slate-300 py-10 text-center text-sm text-slate-500">
+          <div className="rounded-xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
             输入关键词开始搜索
           </div>
         )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted-foreground">
           {provider === 'unsplash' ? 'Powered by Unsplash' : 'Powered by Pexels'} · 共 {total} 张，
           第 {Math.min(page, totalPages)} / {totalPages} 页
         </p>
@@ -309,9 +307,9 @@ function ExternalImagesPickerBody({
 function ProviderComingSoon({ provider }: { provider: string }) {
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center">
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 px-8 py-12 text-center">
-        <p className="text-sm font-medium text-slate-700">{provider} 接入即将上线</p>
-        <p className="mt-2 text-xs text-slate-500">
+      <div className="rounded-2xl border border-dashed border-border bg-muted/60 px-8 py-12 text-center">
+        <p className="text-sm font-medium text-foreground">{provider} 接入即将上线</p>
+        <p className="mt-2 text-xs text-muted-foreground">
           暂时先用 Unsplash / Pexels，或从我的资源池挑一张封面。
         </p>
       </div>

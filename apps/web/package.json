@@ -30,6 +30,7 @@
     "axios": "catalog:shared-runtime",
     "class-variance-authority": "^0.7.1",
     "clsx": "catalog:shared-runtime",
+    "cmdk": "^1.1.1",
     "dagre": "^0.8.5",
     "lucide-react": "catalog:shared-runtime",
     "marked": "^17.0.4",

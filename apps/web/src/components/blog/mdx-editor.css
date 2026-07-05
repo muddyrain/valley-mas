@@ -2,65 +2,59 @@
 @import "@milkdown/crepe/theme/classic.css";
 
 .valley-md-editor-shell {
-  --editor-inline-code-bg: color-mix(in srgb, var(--theme-primary-soft) 58%, white);
-  --editor-inline-code-border: color-mix(in srgb, var(--theme-primary) 24%, white);
+  --editor-inline-code-bg: hsl(var(--accent));
+  --editor-inline-code-border: hsl(var(--primary) / 0.24);
   --editor-code-bg: #101827;
   --editor-code-surface: #0f172a;
-  --editor-code-border: color-mix(in srgb, var(--theme-primary) 22%, #22324a);
+  --editor-code-border: hsl(var(--primary) / 0.22);
   --editor-code-muted: #8fa1b8;
   --editor-code-text: #e5edf7;
-  --editor-code-accent: color-mix(in srgb, var(--theme-primary) 48%, #8fd3ff);
+  --editor-code-accent: hsl(var(--primary) / 0.48);
   --editor-code-gutter-bg: #0b1220;
-  --editor-selection-bg: rgba(var(--theme-primary-rgb), 0.24);
-  --editor-selection-block-bg: rgba(var(--theme-primary-rgb), 0.12);
-  --editor-selection-ring: rgba(var(--theme-primary-rgb), 0.42);
-  --editor-selection-shadow: rgba(var(--theme-primary-rgb), 0.16);
+  --editor-selection-bg: hsl(var(--primary) / 0.24);
+  --editor-selection-block-bg: hsl(var(--primary) / 0.12);
+  --editor-selection-ring: hsl(var(--primary) / 0.42);
+  --editor-selection-shadow: hsl(var(--primary) / 0.16);
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--theme-panel-border);
+  border: 1px solid var(--border);
   border-radius: 18px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--theme-primary-soft) 38%, white),
-    rgba(255, 255, 255, 0.94)
-  );
-  box-shadow: 0 18px 42px rgba(var(--theme-primary-rgb), 0.12);
+  background: linear-gradient(180deg, hsl(var(--accent)), hsl(var(--background) / 0.94));
+  box-shadow: 0 18px 42px hsl(var(--primary) / 0.12);
 }
 
 .valley-md-editor-shell:has(.ProseMirror-focused) {
-  border-color: color-mix(in srgb, var(--theme-primary) 38%, white);
+  border-color: hsl(var(--primary) / 0.38);
   box-shadow:
-    0 18px 42px rgba(var(--theme-primary-rgb), 0.14),
-    0 0 0 3px rgba(var(--theme-primary-rgb), 0.1);
+    0 18px 42px hsl(var(--primary) / 0.14),
+    0 0 0 3px hsl(var(--primary) / 0.1);
 }
 
 .valley-md-editor-shell .milkdown {
   --crepe-color-background: transparent;
-  --crepe-color-on-background: #1f2937;
-  --crepe-color-surface: color-mix(in srgb, var(--theme-primary-soft) 44%, white);
-  --crepe-color-surface-low: #fff8ef;
-  --crepe-color-on-surface: #1f2937;
-  --crepe-color-on-surface-variant: #5b6472;
-  --crepe-color-outline: color-mix(in srgb, var(--theme-primary) 30%, #94a3b8);
-  --crepe-color-primary: var(--theme-primary);
-  --crepe-color-secondary: color-mix(in srgb, var(--theme-primary-soft) 58%, white);
-  --crepe-color-on-secondary: var(--theme-primary-deep);
-  --crepe-color-inverse: #172033;
-  --crepe-color-on-inverse: #f8fafc;
-  --crepe-color-inline-code: var(--theme-primary-deep);
-  --crepe-color-error: #dc2626;
-  --crepe-color-hover: color-mix(in srgb, var(--theme-primary-soft) 72%, white);
+  --crepe-color-on-background: hsl(var(--foreground));
+  --crepe-color-surface: hsl(var(--accent));
+  --crepe-color-surface-low: hsl(var(--card));
+  --crepe-color-on-surface: hsl(var(--foreground));
+  --crepe-color-on-surface-variant: hsl(var(--muted-foreground));
+  --crepe-color-outline: hsl(var(--primary) / 0.3);
+  --crepe-color-primary: var(--primary);
+  --crepe-color-secondary: hsl(var(--accent));
+  --crepe-color-on-secondary: var(--primary);
+  --crepe-color-inverse: hsl(var(--foreground));
+  --crepe-color-on-inverse: hsl(var(--background));
+  --crepe-color-inline-code: var(--primary);
+  --crepe-color-error: hsl(var(--destructive));
+  --crepe-color-hover: hsl(var(--accent));
   --crepe-color-selected: var(--editor-selection-bg);
-  --crepe-color-inline-area: color-mix(in srgb, var(--theme-primary-soft) 48%, white);
+  --crepe-color-inline-area: hsl(var(--accent));
   --crepe-font-title: ui-sans-serif, system-ui, sans-serif;
   --crepe-font-default: ui-sans-serif, system-ui, sans-serif;
   --crepe-font-code:
     "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, monospace;
-  --crepe-shadow-1:
-    0 12px 26px rgba(var(--theme-primary-rgb), 0.12), 0 0 0 1px rgba(var(--theme-primary-rgb), 0.08);
-  --crepe-shadow-2:
-    0 18px 32px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(var(--theme-primary-rgb), 0.08);
+  --crepe-shadow-1: 0 12px 26px hsl(var(--primary) / 0.12), 0 0 0 1px hsl(var(--primary) / 0.08);
+  --crepe-shadow-2: 0 18px 32px hsl(var(--foreground) / 0.07), 0 0 0 1px hsl(var(--primary) / 0.08);
   min-height: 620px;
   background: transparent;
   overflow: visible;
@@ -69,8 +63,8 @@
 .valley-md-editor-shell .milkdown .milkdown-top-bar {
   gap: 2px;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--theme-panel-border);
-  background: color-mix(in srgb, var(--theme-primary-soft) 52%, white);
+  border-bottom: 1px solid var(--border);
+  background: hsl(var(--accent));
   backdrop-filter: blur(10px);
 }
 
@@ -83,13 +77,13 @@
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-heading-button:hover,
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-item:hover,
 .valley-md-editor-shell .milkdown .milkdown-toolbar .toolbar-item:hover {
-  background: color-mix(in srgb, var(--theme-primary-soft) 68%, white);
+  background: hsl(var(--accent));
 }
 
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-item.active svg,
 .valley-md-editor-shell .milkdown .milkdown-toolbar .toolbar-item.active svg {
-  color: var(--theme-primary);
-  fill: var(--theme-primary);
+  color: var(--primary);
+  fill: var(--primary);
 }
 
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-heading-dropdown,
@@ -97,8 +91,8 @@
 .valley-md-editor-shell .milkdown .milkdown-link-preview > .link-preview,
 .valley-md-editor-shell .milkdown .milkdown-link-edit > .link-edit,
 .valley-md-editor-shell .milkdown .milkdown-code-block .list-wrapper {
-  border: 1px solid color-mix(in srgb, var(--theme-primary) 16%, var(--theme-border));
-  background: rgba(255, 250, 243, 0.98);
+  border: 1px solid hsl(var(--primary) / 0.16);
+  background: hsl(var(--card) / 0.98);
   backdrop-filter: blur(14px);
 }
 
@@ -107,8 +101,8 @@
   padding: 28px 40px 36px 80px;
   font-size: 15px;
   line-height: 1.95;
-  color: #1f2937;
-  caret-color: var(--theme-primary);
+  color: hsl(var(--foreground));
+  caret-color: var(--primary);
 }
 
 .valley-md-editor-shell .milkdown .ProseMirror *::selection {
@@ -138,12 +132,12 @@
 }
 
 .valley-md-editor-shell .milkdown .ProseMirror .selectedCell::after {
-  background: rgba(var(--theme-primary-rgb), 0.14);
-  border-color: rgba(var(--theme-primary-rgb), 0.3);
+  background: hsl(var(--primary) / 0.14);
+  border-color: hsl(var(--primary) / 0.3);
 }
 
 .valley-md-editor-shell .milkdown .crepe-placeholder::before {
-  color: #94a3b8;
+  color: hsl(var(--muted-foreground));
 }
 
 .valley-md-editor-shell .milkdown .milkdown-block-handle {
@@ -159,7 +153,7 @@
 .valley-md-editor-shell .milkdown .ProseMirror h3,
 .valley-md-editor-shell .milkdown .ProseMirror h4 {
   letter-spacing: -0.02em;
-  color: #0f172a;
+  color: hsl(var(--foreground));
 }
 
 .valley-md-editor-shell .milkdown .ProseMirror h1 {
@@ -203,7 +197,7 @@
   width: 28px;
   min-width: 28px;
   padding-top: 0.12rem;
-  color: color-mix(in srgb, var(--theme-primary) 70%, #9ca3af);
+  color: hsl(var(--primary) / 0.7);
 }
 
 .valley-md-editor-shell .milkdown .milkdown-list-item-block li .label-wrapper .label,
@@ -217,25 +211,21 @@
   margin: 0.95rem 0;
   padding: 0.8rem 1rem 0.8rem 1.5rem;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--theme-primary-soft) 64%, white);
+  background: hsl(var(--accent));
 }
 
 .valley-md-editor-shell .milkdown .ProseMirror blockquote::before {
   left: 12px;
   top: 12px;
   bottom: 12px;
-  background: color-mix(in srgb, var(--theme-primary) 55%, white);
+  background: hsl(var(--primary) / 0.55);
 }
 
 .valley-md-editor-shell .milkdown .ProseMirror code {
   border: 1px solid var(--editor-inline-code-border);
   border-radius: 7px;
-  background: linear-gradient(
-    180deg,
-    var(--editor-inline-code-bg),
-    color-mix(in srgb, var(--theme-primary-soft) 72%, white)
-  );
-  color: var(--theme-primary-deep);
+  background: linear-gradient(180deg, var(--editor-inline-code-bg), hsl(var(--accent)));
+  color: var(--primary);
   padding: 0.12rem 0.42rem;
   letter-spacing: 0.01em;
 }
@@ -331,12 +321,12 @@
 
 .valley-md-editor-shell .milkdown .milkdown-code-block .list-wrapper,
 .valley-md-editor-shell .milkdown .milkdown-code-block .language-list-item {
-  color: #1f2937;
+  color: hsl(var(--foreground));
 }
 
 .valley-md-editor-shell .milkdown .milkdown-code-block .language-list-item:hover,
 .valley-md-editor-shell .milkdown .milkdown-code-block .language-list-item:focus-visible {
-  background: color-mix(in srgb, var(--theme-primary-soft) 66%, white);
+  background: hsl(var(--accent));
 }
 
 .valley-md-editor-shell .milkdown .milkdown-link-preview > .link-preview,
@@ -345,13 +335,13 @@
 }
 
 .valley-md-preview-body {
-  --editor-inline-code-bg: color-mix(in srgb, var(--theme-primary-soft) 58%, white);
-  --editor-inline-code-border: color-mix(in srgb, var(--theme-primary) 24%, white);
+  --editor-inline-code-bg: hsl(var(--accent));
+  --editor-inline-code-border: hsl(var(--primary) / 0.24);
   --editor-code-bg: #101827;
   --editor-code-surface: #0f172a;
-  --editor-code-border: color-mix(in srgb, var(--theme-primary) 22%, #22324a);
+  --editor-code-border: hsl(var(--primary) / 0.22);
   --editor-code-text: #e5edf7;
-  color: #1f2937;
+  color: hsl(var(--foreground));
 }
 
 .valley-md-preview-body h1,
@@ -361,7 +351,7 @@
 .valley-md-preview-body h5,
 .valley-md-preview-body h6 {
   letter-spacing: -0.02em;
-  color: #0f172a;
+  color: hsl(var(--foreground));
   border-bottom: 0;
 }
 
@@ -402,7 +392,7 @@
   font-size: 0.92rem;
   line-height: 1.6;
   font-weight: 650;
-  color: #475569;
+  color: hsl(var(--muted-foreground));
 }
 
 .valley-md-preview-body ul,
@@ -416,26 +406,22 @@
 }
 
 .valley-md-preview-body li::marker {
-  color: color-mix(in srgb, var(--theme-primary) 70%, #9ca3af);
+  color: hsl(var(--primary) / 0.7);
 }
 
 .valley-md-preview-body blockquote {
   margin: 0.95rem 0;
   padding: 0.8rem 1rem 0.8rem 1.1rem;
-  border-left: 4px solid color-mix(in srgb, var(--theme-primary) 55%, white);
+  border-left: 4px solid hsl(var(--primary) / 0.55);
   border-radius: 14px;
-  background: color-mix(in srgb, var(--theme-primary-soft) 64%, white);
+  background: hsl(var(--accent));
 }
 
 .valley-md-preview-body code {
   border: 1px solid var(--editor-inline-code-border);
   border-radius: 7px;
-  background: linear-gradient(
-    180deg,
-    var(--editor-inline-code-bg),
-    color-mix(in srgb, var(--theme-primary-soft) 72%, white)
-  );
-  color: var(--theme-primary-deep);
+  background: linear-gradient(180deg, var(--editor-inline-code-bg), hsl(var(--accent)));
+  color: var(--primary);
   padding: 0.12rem 0.42rem;
   letter-spacing: 0.01em;
 }
@@ -463,12 +449,12 @@
 }
 
 .valley-md-preview-body a {
-  color: var(--theme-primary);
+  color: var(--primary);
 }
 
 .valley-md-preview-body table {
   border-radius: 14px;
-  box-shadow: 0 10px 28px rgba(var(--theme-primary-rgb), 0.08);
+  box-shadow: 0 10px 28px hsl(var(--primary) / 0.08);
 }
 
 @media (max-width: 768px) {

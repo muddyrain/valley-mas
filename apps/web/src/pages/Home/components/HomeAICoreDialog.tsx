@@ -63,7 +63,7 @@ export default function HomeAICoreDialog({
 
   useEffect(() => {
     scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, open]);
+  }, []);
 
   useEffect(() => {
     if (!open || !promptSeed || promptSeedVersion <= 0) return;
@@ -75,7 +75,7 @@ export default function HomeAICoreDialog({
     if (isAuthenticated) {
       void submitPrompt(promptSeed);
     }
-  }, [isAuthenticated, open, promptSeed, promptSeedVersion]);
+  }, [isAuthenticated, open, promptSeed, promptSeedVersion, submitPrompt]);
 
   const resetConversation = () => {
     setMessages(INITIAL_MESSAGES);
@@ -182,20 +182,20 @@ export default function HomeAICoreDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-[calc(100vw-1rem)] max-h-[calc(100vh-1rem)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-[28px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),color-mix(in_srgb,var(--theme-primary-soft)_56%,white))] p-0 shadow-[0_32px_90px_rgba(var(--theme-primary-rgb),0.18)] sm:max-h-[calc(100vh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-2rem)] lg:max-w-[1120px] xl:max-w-[1280px]"
+        className="w-[calc(100vw-1rem)] max-h-[calc(100vh-1rem)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-[28px] border border-border/80 bg-[linear-gradient(180deg,hsl(var(--card)/0.98),color-mix(in_srgb,hsl(var(--primary) / 0.15)_56%,hsl(var(--card))))] p-0 shadow-[0_32px_90px_hsl(var(--primary) / 0.18)] sm:max-h-[calc(100vh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-2rem)] lg:max-w-[1120px] xl:max-w-[1280px]"
         showCloseButton={false}
       >
-        <DialogHeader className="border-b border-theme-shell-border/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),color-mix(in_srgb,var(--theme-primary-soft)_74%,white))] px-5 py-5 sm:px-6 lg:px-7">
+        <DialogHeader className="border-b border-border/80 bg-[linear-gradient(135deg,hsl(var(--card)/0.94),color-mix(in_srgb,hsl(var(--primary) / 0.15)_74%,hsl(var(--card))))] px-5 py-5 sm:px-6 lg:px-7">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-theme-shell-border bg-white/86 px-3 py-1 text-[11px] tracking-[0.18em] text-theme-primary uppercase">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/86 px-3 py-1 text-[11px] tracking-[0.18em] text-primary uppercase">
                 <Orbit className="h-3.5 w-3.5" />
                 Valley AI Core
               </div>
-              <DialogTitle className="text-xl font-semibold tracking-[-0.03em] text-slate-900 sm:text-2xl">
+              <DialogTitle className="text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-2xl">
                 让中枢帮你组织下一步路线
               </DialogTitle>
-              <DialogDescription className="max-w-2xl text-sm leading-7 text-slate-600">
+              <DialogDescription className="max-w-2xl text-sm leading-7 text-muted-foreground">
                 {isAuthenticated
                   ? '你可以直接问它看什么、找什么、先去哪个入口，它会按 Valley 当前内容结构给你建议。'
                   : '当前对话需要登录后使用。你也可以先看看这些入口示例，登录后再继续提问。'}
@@ -204,7 +204,7 @@ export default function HomeAICoreDialog({
 
             <div className="flex items-center gap-2">
               {activeModel ? (
-                <span className="hidden rounded-full border border-theme-shell-border bg-white/90 px-3 py-1 text-[11px] text-slate-500 sm:inline-flex">
+                <span className="hidden rounded-full border border-border bg-card/90 px-3 py-1 text-[11px] text-muted-foreground sm:inline-flex">
                   {activeModel}
                 </span>
               ) : null}
@@ -212,7 +212,7 @@ export default function HomeAICoreDialog({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="rounded-full px-3 text-slate-500 hover:bg-white/90 hover:text-slate-900"
+                className="rounded-full px-3 text-muted-foreground hover:bg-card/90 hover:text-foreground"
                 onClick={resetConversation}
                 disabled={loading}
               >
@@ -222,7 +222,7 @@ export default function HomeAICoreDialog({
                 <Button
                   type="button"
                   size="sm"
-                  className="theme-btn-primary rounded-full px-4 text-white"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-4"
                   onClick={() => navigate('/login')}
                 >
                   <LogIn className="h-3.5 w-3.5" />
@@ -242,7 +242,7 @@ export default function HomeAICoreDialog({
                   if (isAuthenticated) void submitPrompt(prompt);
                 }}
                 disabled={loading}
-                className="rounded-full border border-theme-shell-border bg-white/90 px-3 py-1.5 text-xs text-slate-600 transition hover:-translate-y-0.5 hover:border-white hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs text-muted-foreground transition hover:-translate-y-0.5 hover:border-border hover:bg-card disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {prompt}
               </button>
@@ -251,28 +251,28 @@ export default function HomeAICoreDialog({
         </DialogHeader>
 
         <div className="grid h-[min(78vh,760px)] min-h-0 gap-0 xl:grid-cols-[340px_minmax(0,1fr)]">
-          <aside className="overflow-y-auto border-b border-theme-shell-border/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.7),color-mix(in_srgb,var(--theme-primary-soft)_68%,white))] p-5 lg:p-6 xl:border-b-0 xl:border-r xl:p-7">
-            <div className="rounded-[24px] border border-white/85 bg-white/72 p-4 shadow-[0_14px_30px_rgba(var(--theme-primary-rgb),0.08)]">
-              <div className="inline-flex items-center gap-2 rounded-full bg-theme-soft px-3 py-1 text-[11px] tracking-[0.14em] text-theme-primary uppercase">
+          <aside className="overflow-y-auto border-b border-border/70 bg-[linear-gradient(180deg,hsl(var(--card)/0.7),color-mix(in_srgb,hsl(var(--primary) / 0.15)_68%,hsl(var(--card))))] p-5 lg:p-6 xl:border-b-0 xl:border-r xl:p-7">
+            <div className="rounded-[24px] border border-border/85 bg-card/72 p-4 shadow-[0_14px_30px_hsl(var(--primary) / 0.08)]">
+              <div className="inline-flex items-center gap-2 rounded-full bg-accent px-3 py-1 text-[11px] tracking-[0.14em] text-primary uppercase">
                 <Sparkles className="h-3.5 w-3.5" />
                 Core Ready
               </div>
-              <div className="mt-3 text-base font-medium leading-7 text-slate-900">
+              <div className="mt-3 text-base font-medium leading-7 text-foreground">
                 它更适合做这些事
               </div>
-              <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-600">
+              <ul className="mt-3 space-y-2 text-sm leading-7 text-muted-foreground">
                 <li>帮你从首页内容里挑一个最值得先点开的入口。</li>
                 <li>按你的兴趣，把资源、内容、创作者串成一条浏览路线。</li>
                 <li>在你准备创作时，先告诉你最短的一步应该去哪里。</li>
               </ul>
             </div>
 
-            <div className="mt-4 rounded-[24px] border border-theme-shell-border bg-[linear-gradient(180deg,rgba(255,255,255,0.82),color-mix(in_srgb,var(--theme-primary-soft)_62%,white))] p-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
-                <WandSparkles className="h-4 w-4 text-theme-primary" />
+            <div className="mt-4 rounded-[24px] border border-border bg-[linear-gradient(180deg,hsl(var(--card)/0.82),color-mix(in_srgb,hsl(var(--primary) / 0.15)_62%,hsl(var(--card))))] p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <WandSparkles className="h-4 w-4 text-primary" />
                 提问建议
               </div>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
+              <p className="mt-2 text-sm leading-7 text-muted-foreground">
                 越像真实需求越好，比如“我想先看偏前端的内容，再顺手找一套头像资源”。
               </p>
             </div>
@@ -286,10 +286,10 @@ export default function HomeAICoreDialog({
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[92%] rounded-[24px] px-4 py-3 text-sm leading-7 shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.08)] xl:max-w-[84%] ${
+                    className={`max-w-[92%] rounded-[24px] px-4 py-3 text-sm leading-7 shadow-[0_10px_26px_hsl(var(--primary) / 0.08)] xl:max-w-[84%] ${
                       message.role === 'user'
-                        ? 'bg-theme-primary text-white'
-                        : 'border border-theme-shell-border bg-white/88 text-slate-700'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'border border-border bg-card/88 text-foreground'
                     }`}
                   >
                     <div className="mb-1 text-[11px] tracking-[0.12em] uppercase opacity-70">
@@ -302,7 +302,7 @@ export default function HomeAICoreDialog({
               <div ref={scrollAnchorRef} />
             </div>
 
-            <div className="border-t border-theme-shell-border/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.86),color-mix(in_srgb,var(--theme-primary-soft)_40%,white))] px-5 py-4 sm:px-6 lg:px-7">
+            <div className="border-t border-border/80 bg-[linear-gradient(180deg,hsl(var(--card)/0.86),color-mix(in_srgb,hsl(var(--primary) / 0.15)_40%,hsl(var(--card))))] px-5 py-4 sm:px-6 lg:px-7">
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Input
                   value={input}
@@ -314,13 +314,13 @@ export default function HomeAICoreDialog({
                     }
                   }}
                   placeholder="例如：帮我先挑一个值得看的内容入口，再给我一条浏览路线"
-                  className="h-12 rounded-full border-white/90 bg-white/92 px-4 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]"
+                  className="h-12 rounded-full border-border/90 bg-card/92 px-4 text-sm shadow-[inset_0_1px_0_hsl(var(--background)/0.75)]"
                   disabled={loading}
                 />
                 <Button
                   type="button"
                   size="lg"
-                  className="theme-btn-primary h-12 rounded-full px-6 text-white"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 h-12 rounded-full px-6"
                   onClick={() => void submitPrompt()}
                   disabled={loading}
                 >

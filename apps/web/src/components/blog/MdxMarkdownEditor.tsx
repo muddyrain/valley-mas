@@ -397,7 +397,7 @@ export function MdxMarkdownEditor({
             left: floatingToolbarState.left,
           }}
         >
-          <div className="relative flex items-center gap-1.5 rounded-2xl border border-theme-soft-strong bg-white/96 px-2 py-2 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur">
+          <div className="relative flex items-center gap-1.5 rounded-2xl border border-accent bg-card/96 px-2 py-2 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur">
             <button
               type="button"
               title="加粗"
@@ -406,8 +406,8 @@ export function MdxMarkdownEditor({
               className={cn(
                 'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
                 floatingToolbarState.isBold
-                  ? 'bg-theme-soft text-theme-primary shadow-[inset_0_0_0_1px_rgba(var(--theme-primary-rgb),0.22)]'
-                  : 'text-slate-500 hover:bg-theme-soft/70 hover:text-slate-900',
+                  ? 'bg-accent text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary) / 0.22)]'
+                  : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
               )}
             >
               <Bold className="h-4 w-4" />
@@ -420,28 +420,28 @@ export function MdxMarkdownEditor({
               className={cn(
                 'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
                 floatingToolbarState.isItalic
-                  ? 'bg-theme-soft text-theme-primary shadow-[inset_0_0_0_1px_rgba(var(--theme-primary-rgb),0.22)]'
-                  : 'text-slate-500 hover:bg-theme-soft/70 hover:text-slate-900',
+                  ? 'bg-accent text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary) / 0.22)]'
+                  : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
               )}
             >
               <Italic className="h-4 w-4" />
             </button>
-            <span className="h-6 w-px bg-theme-soft-strong/80" />
+            <span className="h-6 w-px bg-accent/80" />
             <button
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => setHeadingMenuOpen((prev) => !prev)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-theme-soft px-3 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/80"
+              className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-accent px-3 text-xs font-medium text-primary transition hover:bg-accent"
             >
               <span>{floatingToolbarState.activeLabel}</span>
               <ChevronDown
                 className={cn(
-                  'h-3.5 w-3.5 text-theme-primary/70 transition-transform',
+                  'h-3.5 w-3.5 text-primary/70 transition-transform',
                   headingMenuOpen && 'rotate-180',
                 )}
               />
             </button>
-            <span className="h-6 w-px bg-theme-soft-strong/80" />
+            <span className="h-6 w-px bg-accent/80" />
             <button
               type="button"
               title="行内代码"
@@ -450,8 +450,8 @@ export function MdxMarkdownEditor({
               className={cn(
                 'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
                 floatingToolbarState.isInlineCode
-                  ? 'bg-theme-soft text-theme-primary shadow-[inset_0_0_0_1px_rgba(var(--theme-primary-rgb),0.22)]'
-                  : 'text-slate-500 hover:bg-theme-soft/70 hover:text-slate-900',
+                  ? 'bg-accent text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary) / 0.22)]'
+                  : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
               )}
             >
               <Code2 className="h-4 w-4" />
@@ -464,15 +464,15 @@ export function MdxMarkdownEditor({
               className={cn(
                 'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
                 floatingToolbarState.hasLink
-                  ? 'bg-theme-soft text-theme-primary shadow-[inset_0_0_0_1px_rgba(var(--theme-primary-rgb),0.22)]'
-                  : 'text-slate-500 hover:bg-theme-soft/70 hover:text-slate-900',
+                  ? 'bg-accent text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary) / 0.22)]'
+                  : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
               )}
             >
               <Link2 className="h-4 w-4" />
             </button>
 
             {headingMenuOpen ? (
-              <div className="absolute left-0 top-[calc(100%+8px)] min-w-[150px] overflow-hidden rounded-2xl border border-theme-soft-strong bg-white shadow-[0_20px_40px_rgba(15,23,42,0.18)]">
+              <div className="absolute left-0 top-[calc(100%+8px)] min-w-[150px] overflow-hidden rounded-2xl border border-accent bg-popover shadow-[0_20px_40px_rgba(15,23,42,0.18)]">
                 {headingOptions.map((option) => {
                   const active = option.label === floatingToolbarState.activeLabel;
                   return (
@@ -484,8 +484,8 @@ export function MdxMarkdownEditor({
                       className={cn(
                         'flex w-full items-center justify-between px-3 py-2 text-left text-sm transition',
                         active
-                          ? 'bg-theme-soft text-theme-primary'
-                          : 'text-slate-600 hover:bg-theme-soft/60 hover:text-slate-900',
+                          ? 'bg-accent text-primary'
+                          : 'text-foreground hover:bg-accent/60 hover:text-foreground',
                       )}
                     >
                       <span>{option.label}</span>

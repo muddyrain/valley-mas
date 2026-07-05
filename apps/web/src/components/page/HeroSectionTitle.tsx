@@ -23,7 +23,7 @@ export default function HeroSectionTitle({
     <div className={cn('space-y-3', className)}>
       <div
         className={cn(
-          'border-theme-soft-strong inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] text-theme-primary uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur',
+          'border-accent inline-flex items-center rounded-full border bg-card/82 px-4 py-1.5 text-[11px] tracking-[0.32em] text-primary uppercase shadow-[0_10px_24px_hsl(var(--primary) / 0.08)] backdrop-blur',
           eyebrowClassName,
         )}
       >
@@ -32,7 +32,7 @@ export default function HeroSectionTitle({
       <div className="space-y-2">
         <h2
           className={cn(
-            'text-[36px] font-semibold tracking-[-0.04em] text-slate-950 md:text-[42px]',
+            'text-[36px] font-semibold tracking-[-0.04em] text-foreground md:text-[42px]',
             titleClassName,
           )}
         >
@@ -40,7 +40,7 @@ export default function HeroSectionTitle({
         </h2>
         <p
           className={cn(
-            'max-w-2xl text-[15px] leading-8 text-slate-500 md:text-base',
+            'max-w-2xl text-[15px] leading-8 text-muted-foreground md:text-base',
             descriptionClassName,
           )}
         >

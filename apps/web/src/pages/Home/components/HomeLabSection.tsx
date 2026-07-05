@@ -106,9 +106,9 @@ const colorMap: Record<
     tag: 'bg-purple-500/18 text-purple-300 border-purple-400/28',
     tagDot: 'bg-purple-400',
     accent: 'from-purple-500/70 to-indigo-500/70',
-    liveDot: 'bg-emerald-400',
-    liveBg: 'bg-emerald-500/16 border-emerald-400/28',
-    liveText: 'text-emerald-300',
+    liveDot: 'bg-primary',
+    liveBg: 'bg-primary/16 border-primary/28',
+    liveText: 'text-primary',
   },
   emerald: {
     card: 'bg-[linear-gradient(148deg,rgba(10,25,20,0.96),rgba(6,78,59,0.52),rgba(16,185,129,0.16))]',
@@ -118,21 +118,21 @@ const colorMap: Record<
     tag: 'bg-emerald-500/16 text-emerald-300 border-emerald-400/26',
     tagDot: 'bg-emerald-400',
     accent: 'from-emerald-500/70 to-teal-500/70',
-    liveDot: 'bg-amber-400',
-    liveBg: 'bg-amber-500/16 border-amber-400/28',
-    liveText: 'text-amber-300',
+    liveDot: 'bg-primary',
+    liveBg: 'bg-primary/16 border-primary/28',
+    liveText: 'text-primary',
   },
   amber: {
     card: 'bg-[linear-gradient(148deg,rgba(20,15,5,0.96),rgba(120,53,15,0.50),rgba(245,158,11,0.16))]',
     glow: 'bg-[radial-gradient(circle_at_80%_20%,rgba(245,158,11,0.26),transparent_55%)]',
-    iconBg: 'bg-amber-500/18 border-amber-400/26',
-    iconText: 'text-amber-300',
-    tag: 'bg-amber-500/16 text-amber-300 border-amber-400/24',
-    tagDot: 'bg-amber-400',
+    iconBg: 'bg-primary/18 border-primary/26',
+    iconText: 'text-primary',
+    tag: 'bg-primary/16 text-primary border-primary/24',
+    tagDot: 'bg-primary',
     accent: 'from-amber-500/70 to-orange-500/70',
-    liveDot: 'bg-emerald-400',
-    liveBg: 'bg-emerald-500/16 border-emerald-400/28',
-    liveText: 'text-emerald-300',
+    liveDot: 'bg-primary',
+    liveBg: 'bg-primary/16 border-primary/28',
+    liveText: 'text-primary',
   },
   sky: {
     card: 'bg-[linear-gradient(148deg,rgba(5,18,30,0.96),rgba(7,89,133,0.52),rgba(14,165,233,0.16))]',
@@ -142,9 +142,9 @@ const colorMap: Record<
     tag: 'bg-sky-500/16 text-sky-300 border-sky-400/26',
     tagDot: 'bg-sky-400',
     accent: 'from-sky-500/70 to-cyan-500/70',
-    liveDot: 'bg-amber-400',
-    liveBg: 'bg-amber-500/16 border-amber-400/28',
-    liveText: 'text-amber-300',
+    liveDot: 'bg-primary',
+    liveBg: 'bg-primary/16 border-primary/28',
+    liveText: 'text-primary',
   },
 };
 
@@ -171,7 +171,7 @@ function LabCard({ entry }: { entry: LabEntry }) {
     <button
       type="button"
       onClick={handleClick}
-      className={`group relative flex flex-col overflow-hidden rounded-[28px] border border-white/10 p-5 text-left shadow-[0_20px_52px_rgba(0,0,0,0.32)] transition-all duration-300 hover:-translate-y-1.5 hover:border-white/18 hover:shadow-[0_28px_64px_rgba(0,0,0,0.42)] ${c.card}`}
+      className={`group relative flex flex-col overflow-hidden rounded-[28px] border border-border/10 p-5 text-left shadow-[0_20px_52px_rgba(0,0,0,0.32)] transition-all duration-300 hover:-translate-y-1.5 hover:border-border/18 hover:shadow-[0_28px_64px_rgba(0,0,0,0.42)] ${c.card}`}
     >
       {/* 光晕 */}
       <div className={`pointer-events-none absolute inset-0 ${c.glow}`} />
@@ -180,7 +180,7 @@ function LabCard({ entry }: { entry: LabEntry }) {
         className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent ${c.accent} to-transparent opacity-60`}
       />
       {/* 悬停扫光 */}
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,transparent_16%,rgba(255,255,255,0.06)_52%,transparent_88%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,transparent_16%,hsl(var(--foreground) / 0.06)_52%,transparent_88%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
 
       {/* 头部：图标 + 分类标签 */}
       <div className="relative mb-4 flex items-start justify-between gap-3">
@@ -210,12 +210,12 @@ function LabCard({ entry }: { entry: LabEntry }) {
 
       {/* 内容 */}
       <div className="relative flex-1">
-        <div className="text-[17px] font-semibold leading-snug text-white">{entry.title}</div>
-        <div className="mt-2 text-sm leading-7 text-white/55">{entry.description}</div>
+        <div className="text-[17px] font-semibold leading-snug text-foreground">{entry.title}</div>
+        <div className="mt-2 text-sm leading-7 text-muted-foreground/55">{entry.description}</div>
       </div>
 
       {/* 底部跳转提示 */}
-      <div className="relative mt-5 flex items-center gap-1.5 text-xs text-white/40 transition-colors duration-300 group-hover:text-white/70">
+      <div className="relative mt-5 flex items-center gap-1.5 text-xs text-muted-foreground/40 transition-colors duration-300 group-hover:text-muted-foreground/70">
         <span>{entry.external ? '前往体验' : '立即进入'}</span>
         <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
       </div>
@@ -231,14 +231,14 @@ export default function HomeLabSection() {
       {/* 标题栏 */}
       <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="space-y-3">
-          <div className="theme-eyebrow inline-flex items-center rounded-full border bg-white/88 px-4 py-1.5 text-[11px] tracking-[0.24em] uppercase shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur sm:tracking-[0.3em]">
+          <div className="inline-flex items-center rounded-full border border-accent bg-accent/50 px-4 py-1.5 text-[11px] tracking-[0.24em] text-primary uppercase shadow-sm backdrop-blur sm:tracking-[0.3em]">
             LABS & TOOLS
           </div>
           <div className="space-y-2">
-            <h2 className="text-[30px] font-semibold tracking-[-0.045em] text-slate-950 sm:text-[34px] md:text-[46px]">
+            <h2 className="text-[30px] font-semibold tracking-[-0.045em] text-foreground sm:text-[34px] md:text-[46px]">
               互动实验场
             </h2>
-            <p className="max-w-2xl text-[15px] leading-8 text-slate-500 md:text-base">
+            <p className="max-w-2xl text-[15px] leading-8 text-muted-foreground md:text-base">
               这里是各种实验性项目的聚集地，包含 AI 对战、小游戏和实用工具。后续还有更多在路上。
             </p>
           </div>
@@ -246,15 +246,15 @@ export default function HomeLabSection() {
       </div>
 
       {/* 卡片网格 */}
-      <div className="relative overflow-hidden rounded-[30px] border border-slate-900/12 bg-[linear-gradient(160deg,rgba(15,12,36,0.96),rgba(22,18,50,0.98))] p-4 shadow-[0_28px_72px_rgba(0,0,0,0.28)] sm:rounded-[38px] sm:p-5 md:p-6">
+      <div className="relative overflow-hidden rounded-[30px] border border-border/12 bg-card p-4 shadow-[0_28px_72px_rgba(0,0,0,0.28)] sm:rounded-[38px] sm:p-5 md:p-6">
         {/* 背景光晕装饰 */}
-        <div className="pointer-events-none absolute -left-24 -top-24 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(168,85,247,0.14),transparent_60%)]" />
-        <div className="pointer-events-none absolute -bottom-20 -right-20 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.10),transparent_60%)]" />
+        <div className="pointer-events-none absolute -left-24 -top-24 h-80 w-80 rounded-full bg-[radial-gradient(circle,hsl(var(--primary) / 0.14),transparent_60%)]" />
+        <div className="pointer-events-none absolute -bottom-20 -right-20 h-72 w-72 rounded-full bg-[radial-gradient(circle,hsl(var(--primary) / 0.10),transparent_60%)]" />
 
         {/* 顶部小标签 */}
         <div className="relative mb-5 flex items-center gap-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-[11px] tracking-[0.18em] text-white/50 uppercase">
-            <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
+          <div className="inline-flex items-center gap-2 rounded-full border border-border/10 bg-card/6 px-3 py-1.5 text-[11px] tracking-[0.18em] text-muted-foreground/50 uppercase">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
             {labEntries.filter((e) => e.status === 'live').length} 个已上线 · {labEntries.length}{' '}
             个项目
           </div>

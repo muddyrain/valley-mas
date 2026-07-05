@@ -168,29 +168,3 @@ func AdminOnly() gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-// CreatorOrAdmin 创作者或管理员权限中间件
-func CreatorOrAdmin() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		role, exists := c.Get("userRole")
-		if !exists || (role != "admin" && role != "creator") {
-			c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "需要创作者或管理员权限"})
-			c.Abort()
-			return
-		}
-		c.Next()
-	}
-}
-
-// CreatorOnly 创作者权限中间件
-func CreatorOnly() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		role, exists := c.Get("userRole")
-		if !exists || role != "creator" {
-			c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "需要创作者权限"})
-			c.Abort()
-			return
-		}
-		c.Next()
-	}
-}

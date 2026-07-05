@@ -89,7 +89,7 @@ export function PublicWallpaperPickerBody({
           <Search className="mr-1 h-4 w-4" />
           搜索
         </Button>
-        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
+        <div className="inline-flex items-center rounded-lg border border-border bg-card p-0.5">
           <button
             type="button"
             onClick={() => {
@@ -98,8 +98,8 @@ export function PublicWallpaperPickerBody({
             }}
             className={`rounded-md px-2.5 py-1 text-xs transition ${
               sort === 'newest'
-                ? 'bg-theme-primary text-white'
-                : 'text-slate-600 hover:bg-slate-100'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-foreground hover:bg-muted'
             }`}
           >
             新到旧
@@ -112,8 +112,8 @@ export function PublicWallpaperPickerBody({
             }}
             className={`rounded-md px-2.5 py-1 text-xs transition ${
               sort === 'oldest'
-                ? 'bg-theme-primary text-white'
-                : 'text-slate-600 hover:bg-slate-100'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-foreground hover:bg-muted'
             }`}
           >
             旧到新
@@ -121,7 +121,7 @@ export function PublicWallpaperPickerBody({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/45 p-3.5">
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-border bg-muted/45 p-3.5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
           {loading ? (
             Array.from({ length: PAGE_SIZE }).map((_, index) => (
@@ -148,7 +148,7 @@ export function PublicWallpaperPickerBody({
               );
             })
           ) : (
-            <div className="col-span-full rounded-xl border border-dashed border-slate-300 py-10 text-center text-sm text-slate-500">
+            <div className="col-span-full rounded-xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
               暂无可用公用壁纸
             </div>
           )}
@@ -156,7 +156,7 @@ export function PublicWallpaperPickerBody({
       </div>
 
       <div className="flex items-center justify-between pt-1">
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted-foreground">
           共 {total} 张公用壁纸，第 {Math.min(page, totalPages)} / {totalPages} 页
         </p>
         <div className="flex gap-2">
@@ -201,7 +201,7 @@ export function PublicWallpaperPickerDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[90vh] w-[90vw] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl">
-        <DialogHeader className="shrink-0 border-b border-slate-100 px-6 py-4">
+        <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
           <DialogTitle>选择公用壁纸作为封面</DialogTitle>
         </DialogHeader>
 

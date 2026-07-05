@@ -36,13 +36,13 @@ import TypeFilterBar from '@/components/TypeFilterBar';
 import UploadResourceDialog from '@/components/UploadResourceDialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
 import {
   enumParam,
   numberParam,
   stringParam,
   useUrlQueryState,
 } from '@/hooks/useUrlPaginationQuery';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const RESOURCE_TYPES = [
   { label: '全部', value: '' },
@@ -69,10 +69,7 @@ export default function MyResources() {
     values: { page: currentPage, type: activeType, albumId: activeAlbumId },
     setValue,
   } = useUrlQueryState(MY_RESOURCES_QUERY_SCHEMA, { pageKey: 'page' });
-  const { canAccess } = usePageRoleGuard({
-    allowRoles: ['creator'],
-    unauthorizedMessage: '该页面仅创作者可访问',
-  });
+  const { isAuthenticated } = useAuthStore();
 
   const [resources, setResources] = useState<MyResource[]>([]);
   const [total, setTotal] = useState(0);
@@ -144,16 +141,16 @@ export default function MyResources() {
   }, [activeAlbumId, activeType, loadResources, currentPage]);
 
   useEffect(() => {
-    if (canAccess) {
+    if (isAuthenticated) {
       void loadAlbums();
     }
-  }, [canAccess, loadAlbums]);
+  }, [isAuthenticated, loadAlbums]);
 
   useEffect(() => {
-    if (canAccess) {
+    if (isAuthenticated) {
       void loadResources(activeType, activeAlbumId, currentPage);
     }
-  }, [activeAlbumId, activeType, canAccess, loadResources, currentPage]);
+  }, [activeAlbumId, activeType, isAuthenticated, loadResources, currentPage]);
 
   // 从详情页跳转过来时自动打开编辑弹框
   useEffect(() => {
@@ -256,7 +253,7 @@ export default function MyResources() {
     setEditTarget(resource);
   };
 
-  if (!canAccess) return null;
+  if (!isAuthenticated) return null;
 
   const selectedCount = selectedIds.size;
   const allSelected = resources.length > 0 && selectedIds.size === resources.length;
@@ -269,7 +266,7 @@ export default function MyResources() {
   };
 
   return (
-    <div className="min-h-screen bg-transparent text-slate-900">
+    <div className="min-h-screen bg-transparent text-foreground">
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8 md:px-8 lg:px-10">
         {/* 页头 */}
         <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:flex-wrap sm:items-center">
@@ -277,12 +274,12 @@ export default function MyResources() {
             <button
               type="button"
               onClick={() => navigate('/my-space')}
-              className="mb-2 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-theme-primary transition-colors"
+              className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
             >
               ← 返回创作空间
             </button>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">资源管理</h1>
-            <p className="mt-1 text-sm text-slate-500">管理你上传的全部壁纸与头像资源</p>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">资源管理</h1>
+            <p className="mt-1 text-sm text-muted-foreground">管理你上传的全部壁纸与头像资源</p>
           </div>
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             {!batchMode ? (
@@ -293,7 +290,7 @@ export default function MyResources() {
                     loadResource();
                   }}
                   disabled={refreshing || loading}
-                  className="w-full gap-2 border-slate-200 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary sm:w-auto"
+                  className="w-full gap-2 border-border text-muted-foreground hover:border-accent hover:text-primary sm:w-auto"
                 >
                   <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                   刷新
@@ -301,7 +298,7 @@ export default function MyResources() {
                 <Button
                   variant="outline"
                   onClick={() => setBatchMode(true)}
-                  className="w-full gap-2 border-slate-200 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary sm:w-auto"
+                  className="w-full gap-2 border-border text-muted-foreground hover:border-accent hover:text-primary sm:w-auto"
                   disabled={resources.length === 0}
                 >
                   <CheckSquare className="h-4 w-4" />
@@ -309,7 +306,7 @@ export default function MyResources() {
                 </Button>
                 <Button
                   onClick={() => setUploadOpen(true)}
-                  className="theme-btn-primary w-full gap-2 font-semibold shadow-md sm:w-auto"
+                  className="w-full gap-2 font-semibold shadow-md sm:w-auto"
                 >
                   <Plus className="h-4 w-4" />
                   上传新资源
@@ -317,7 +314,7 @@ export default function MyResources() {
                 <Button
                   variant="outline"
                   onClick={() => setBatchUploadOpen(true)}
-                  className="w-full gap-2 border-slate-200 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary sm:w-auto"
+                  className="w-full gap-2 border-border text-muted-foreground hover:border-accent hover:text-primary sm:w-auto"
                 >
                   <Layers className="h-4 w-4" />
                   批量上传
@@ -327,7 +324,7 @@ export default function MyResources() {
               <Button
                 variant="outline"
                 onClick={handleExitBatch}
-                className="w-full gap-2 border-slate-200 text-slate-500 sm:w-auto"
+                className="w-full gap-2 border-border text-muted-foreground sm:w-auto"
               >
                 <X className="h-4 w-4" />
                 退出批量
@@ -340,16 +337,16 @@ export default function MyResources() {
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
           {/* ── 左侧专辑侧边栏 ── */}
           <aside className="w-full xl:sticky xl:top-6 xl:w-52 xl:shrink-0">
-            <div className="rounded-[28px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.98),rgba(255,255,255,0.92))] p-3 shadow-[0_18px_48px_rgba(148,163,184,0.10)]">
+            <div className="rounded-[28px] border border-border bg-[linear-gradient(180deg,hsl(var(--background)/0.98),hsl(var(--background)/0.92))] p-3 shadow-[0_18px_48px_rgba(148,163,184,0.10)]">
               {/* 侧边栏头 */}
               <div className="mb-2 flex items-center justify-between px-1 py-1">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   专辑分类
                 </span>
                 <button
                   type="button"
                   onClick={() => navigate('/my-space/albums')}
-                  className="text-[11px] text-theme-primary hover:underline"
+                  className="text-[11px] text-primary hover:underline"
                 >
                   管理
                 </button>
@@ -361,14 +358,14 @@ export default function MyResources() {
                 onClick={() => handleAlbumClick('')}
                 className={`mb-1 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition-all ${
                   activeAlbumId === ''
-                    ? 'bg-theme-primary text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-muted'
                 }`}
               >
                 <Layers className="h-3.5 w-3.5 shrink-0" />
                 <span className="flex-1 truncate font-medium">全部资源</span>
                 {activeAlbumId === '' && (
-                  <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-medium">
+                  <span className="rounded-full bg-primary-foreground/25 px-1.5 py-0.5 text-[10px] font-medium">
                     {total}
                   </span>
                 )}
@@ -378,13 +375,15 @@ export default function MyResources() {
               {albumsLoading ? (
                 <div className="space-y-1.5 px-1 py-1">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-9 animate-pulse rounded-xl bg-slate-100" />
+                    <div key={i} className="h-9 animate-pulse rounded-xl bg-muted" />
                   ))}
                 </div>
               ) : albums.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 px-2 py-5 text-center">
-                  <FolderOpen className="h-7 w-7 text-slate-300" />
-                  <p className="text-xs text-slate-400 leading-relaxed">暂无专辑，去管理页创建吧</p>
+                  <FolderOpen className="h-7 w-7 text-muted-foreground/60" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    暂无专辑，去管理页创建吧
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-0.5">
@@ -395,11 +394,11 @@ export default function MyResources() {
                       onClick={() => handleAlbumClick(album.id)}
                       className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition-all ${
                         activeAlbumId === album.id
-                          ? 'bg-theme-primary text-white shadow-sm'
-                          : 'text-slate-600 hover:bg-slate-100'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted'
                       }`}
                     >
-                      <div className="h-6 w-6 shrink-0 overflow-hidden rounded-md bg-slate-200">
+                      <div className="h-6 w-6 shrink-0 overflow-hidden rounded-md bg-muted">
                         {album.coverUrl ? (
                           <img
                             src={album.coverUrl}
@@ -408,7 +407,7 @@ export default function MyResources() {
                           />
                         ) : (
                           <FolderOpen
-                            className={`h-full w-full p-1 ${activeAlbumId === album.id ? 'text-white/70' : 'text-slate-400'}`}
+                            className={`h-full w-full p-1 ${activeAlbumId === album.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}
                           />
                         )}
                       </div>
@@ -416,8 +415,8 @@ export default function MyResources() {
                       <span
                         className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
                           activeAlbumId === album.id
-                            ? 'bg-white/25 text-white'
-                            : 'bg-slate-100 text-slate-500'
+                            ? 'bg-primary-foreground/25 text-primary-foreground'
+                            : 'bg-muted text-muted-foreground'
                         }`}
                       >
                         {album.resourceCount}
@@ -431,17 +430,15 @@ export default function MyResources() {
 
           {/* ── 右侧资源区 ── */}
           <div className="min-w-0 flex-1">
-            <div className="rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
+            <div className="rounded-[36px] border border-border bg-[linear-gradient(180deg,hsl(var(--background)/0.96),hsl(var(--background)/0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
               {/* 专辑标题提示 */}
               {activeAlbum && (
                 <div className="mb-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-                  <div className="flex items-center gap-2 rounded-2xl border border-theme-soft-strong bg-theme-soft/50 px-4 py-2">
-                    <FolderOpen className="h-4 w-4 text-theme-primary" />
-                    <span className="text-sm font-semibold text-theme-primary">
-                      {activeAlbum.name}
-                    </span>
+                  <div className="flex items-center gap-2 rounded-2xl border border-accent bg-accent/50 px-4 py-2">
+                    <FolderOpen className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold text-primary">{activeAlbum.name}</span>
                     {activeAlbum.description && (
-                      <span className="hidden text-xs text-slate-400 sm:inline">
+                      <span className="hidden text-xs text-muted-foreground sm:inline">
                         · {activeAlbum.description}
                       </span>
                     )}
@@ -449,7 +446,7 @@ export default function MyResources() {
                   <button
                     type="button"
                     onClick={() => handleAlbumClick('')}
-                    className="text-xs text-slate-400 transition-colors hover:text-slate-600"
+                    className="text-xs text-muted-foreground transition-colors hover:text-foreground"
                   >
                     × 清除
                   </button>
@@ -464,7 +461,7 @@ export default function MyResources() {
                   if (batchMode) handleExitBatch();
                 }}
                 prefix="资源类型："
-                extra={<span className="text-sm text-slate-400">共 {total} 个资源</span>}
+                extra={<span className="text-sm text-muted-foreground">共 {total} 个资源</span>}
                 className="mb-6"
               />
 
@@ -476,7 +473,7 @@ export default function MyResources() {
                     ))}
                   </div>
                 ) : resources.length === 0 ? (
-                  <div className="rounded-4xl bg-white/60 p-4">
+                  <div className="rounded-4xl bg-card/60 p-4">
                     <EmptyState
                       icon={activeAlbum ? FolderOpen : ImageIcon}
                       title={
@@ -497,22 +494,21 @@ export default function MyResources() {
                   <>
                     {/* 批量操作工具栏 */}
                     {batchMode && (
-                      <div className="mb-4 flex flex-col items-start gap-3 rounded-2xl border border-theme-soft-strong bg-theme-soft/40 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center">
+                      <div className="mb-4 flex flex-col items-start gap-3 rounded-2xl border border-accent bg-accent/40 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center">
                         <button
                           type="button"
                           onClick={handleSelectAll}
-                          className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-theme-primary transition-colors"
+                          className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
                         >
                           {allSelected ? (
-                            <CheckSquare className="h-4 w-4 text-theme-primary" />
+                            <CheckSquare className="h-4 w-4 text-primary" />
                           ) : (
                             <Square className="h-4 w-4" />
                           )}
                           {allSelected ? '取消全选' : '全选'}
                         </button>
-                        <span className="text-sm text-slate-400">
-                          已选{' '}
-                          <span className="font-semibold text-theme-primary">{selectedCount}</span>{' '}
+                        <span className="text-sm text-muted-foreground">
+                          已选 <span className="font-semibold text-primary">{selectedCount}</span>{' '}
                           个
                         </span>
                         <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
@@ -521,7 +517,7 @@ export default function MyResources() {
                             variant="outline"
                             disabled={selectedCount === 0 || batchUpdatingVisibility}
                             onClick={() => setBatchVisibilityOpen(true)}
-                            className="gap-1.5 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary"
+                            className="gap-1.5 text-muted-foreground hover:border-accent hover:text-primary"
                           >
                             <Globe className="h-3.5 w-3.5" />
                             设置访问范围
@@ -530,7 +526,7 @@ export default function MyResources() {
                             size="sm"
                             disabled={selectedCount === 0 || batchDeleting}
                             onClick={handleBatchDelete}
-                            className="gap-1.5 bg-red-500 text-white hover:bg-red-600"
+                            className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive"
                           >
                             {batchDeleting ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -576,7 +572,7 @@ export default function MyResources() {
                           <ChevronLeft className="h-4 w-4" />
                           上一页
                         </Button>
-                        <span className="text-sm text-slate-500">
+                        <span className="text-sm text-muted-foreground">
                           第 {currentPage} / {totalPages} 页，共 {total} 项
                         </span>
                         <Button
@@ -629,30 +625,30 @@ export default function MyResources() {
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
+            <DialogTitle className="flex items-center gap-2 text-destructive">
               <Trash2 className="h-5 w-5" />
               确认删除
             </DialogTitle>
           </DialogHeader>
           <div className="py-3">
             {deleteTarget && (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 mb-4">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 mb-4">
                 <img
                   src={deleteTarget.thumbnailUrl ?? deleteTarget.url}
                   alt={deleteTarget.title}
                   className="h-14 w-14 rounded-lg object-cover"
                 />
                 <div>
-                  <p className="font-medium text-gray-900 text-sm truncate max-w-45">
+                  <p className="font-medium text-foreground text-sm truncate max-w-45">
                     {deleteTarget.title}
                   </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {deleteTarget.downloadCount} 次下载 · {formatSize(deleteTarget.size)}
                   </p>
                 </div>
               </div>
             )}
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               删除后将无法恢复，同时会从存储中永久移除。确认继续？
             </p>
           </div>
@@ -668,7 +664,7 @@ export default function MyResources() {
             <Button
               onClick={handleDelete}
               disabled={deleting}
-              className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold"
+              className="flex-1 bg-destructive text-destructive-foreground hover:bg-destructive font-semibold"
             >
               {deleting ? (
                 <>
@@ -716,13 +712,13 @@ export default function MyResources() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <Globe className="h-5 w-5 text-theme-primary" />
+              <Globe className="h-5 w-5 text-primary" />
               批量设置访问范围
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <p className="text-sm text-slate-500">
-              将以下 <span className="font-semibold text-slate-700">{selectedCount}</span>{' '}
+            <p className="text-sm text-muted-foreground">
+              将以下 <span className="font-semibold text-foreground">{selectedCount}</span>{' '}
               个资源统一设为：
             </p>
             <div className="flex flex-col gap-2.5">
@@ -732,22 +728,21 @@ export default function MyResources() {
                   icon: Globe,
                   label: '🌐 公开',
                   desc: '所有人可见，出现在资源广场',
-                  color:
-                    'text-emerald-600 border-emerald-200 bg-emerald-50 hover:border-emerald-400',
+                  color: 'text-primary border-primary/30 bg-accent hover:border-primary/50',
                 },
                 {
                   value: 'shared' as const,
                   icon: Users,
                   label: '🔗 共享',
                   desc: '有链接或口令才可访问',
-                  color: 'text-sky-600 border-sky-200 bg-sky-50 hover:border-sky-400',
+                  color: 'text-primary border-accent bg-accent hover:border-primary',
                 },
                 {
                   value: 'private' as const,
                   icon: Lock,
                   label: '🔒 私密',
                   desc: '仅自己可见',
-                  color: 'text-slate-600 border-slate-200 bg-slate-50 hover:border-slate-400',
+                  color: 'text-muted-foreground border-border bg-muted hover:border-foreground/40',
                 },
               ].map((opt) => (
                 <button

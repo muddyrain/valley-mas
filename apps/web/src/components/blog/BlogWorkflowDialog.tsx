@@ -78,12 +78,11 @@ const STEP_CONFIG = [
 ] as const;
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'border-theme-panel-border bg-theme-soft/30 text-slate-500',
-  running:
-    'border-theme-primary bg-theme-primary/10 text-theme-primary ring-2 ring-theme-primary/30',
+  pending: 'border-border bg-accent/30 text-muted-foreground',
+  running: 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30',
   success: 'border-emerald-400 bg-emerald-50 text-emerald-700',
-  skipped: 'border-theme-panel-border bg-slate-100 text-slate-400',
-  error: 'border-red-400 bg-red-50 text-red-700',
+  skipped: 'border-border bg-muted text-muted-foreground',
+  error: 'border-destructive/30 bg-destructive/10 text-destructive',
 };
 
 // --- Workflow Node Component ---
@@ -110,7 +109,7 @@ function WorkflowNode({ data }: NodeProps) {
 
   return (
     <>
-      <Handle type="target" position={Position.Left} className="!bg-theme-primary/60 !w-2 !h-2" />
+      <Handle type="target" position={Position.Left} className="!bg-primary/50 !w-2 !h-2" />
       <div
         className={cn(
           'flex items-center gap-2 rounded-xl border-2 px-4 py-3 shadow-sm transition-all duration-300 min-w-[180px]',
@@ -123,7 +122,7 @@ function WorkflowNode({ data }: NodeProps) {
           {message && status !== 'pending' && <span className="text-xs opacity-70">{message}</span>}
         </div>
       </div>
-      <Handle type="source" position={Position.Right} className="!bg-theme-primary/60 !w-2 !h-2" />
+      <Handle type="source" position={Position.Right} className="!bg-primary/50 !w-2 !h-2" />
     </>
   );
 }
@@ -167,11 +166,11 @@ function buildDagreLayout(steps: StepStatus[]): { nodes: Node[]; edges: Edge[] }
       style: isSkipped
         ? { stroke: '#e2e8f0', strokeDasharray: '5 5' }
         : isRunning
-          ? { stroke: 'var(--theme-primary)' }
+          ? { stroke: 'var(--primary)' }
           : { stroke: '#cbd5e1' },
       markerEnd: {
         type: MarkerType.ArrowClosed,
-        color: isSkipped ? '#e2e8f0' : isRunning ? 'var(--theme-primary)' : '#cbd5e1',
+        color: isSkipped ? '#e2e8f0' : isRunning ? 'var(--primary)' : '#cbd5e1',
       },
     });
   }
@@ -402,7 +401,7 @@ function BlogWorkflowDialogInner({
       <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-theme-primary" />
+            <Sparkles className="h-5 w-5 text-primary" />
             AI 工作流导入
           </DialogTitle>
           <DialogDescription>
@@ -415,19 +414,15 @@ function BlogWorkflowDialogInner({
           {phase === 'upload' && (
             <div className="flex flex-col gap-4 py-4">
               <div className="flex flex-col gap-3">
-                <label className="text-sm font-medium text-slate-700">选择 Markdown 文件</label>
+                <label className="text-sm font-medium text-foreground">选择 Markdown 文件</label>
                 <input
                   type="file"
                   accept=".md,.markdown"
                   onChange={handleFileSelect}
-                  className="block w-full text-sm text-slate-500
-                    file:mr-4 file:rounded-lg file:border-0
-                    file:bg-theme-primary/10 file:px-4 file:py-2
-                    file:text-sm file:font-medium file:text-theme-primary
-                    hover:file:bg-theme-primary/20"
+                  className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-lg file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/20"
                 />
                 {selectedFile && (
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted-foreground">
                     已选择: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
                   </p>
                 )}
@@ -435,15 +430,15 @@ function BlogWorkflowDialogInner({
 
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <div className="mb-2 text-xs text-slate-500">文章分组</div>
-                  <div className="border-theme-panel-border bg-theme-soft/45 flex flex-wrap gap-2 rounded-xl border p-2">
+                  <div className="mb-2 text-xs text-muted-foreground">文章分组</div>
+                  <div className="border-border bg-accent/50 flex flex-wrap gap-2 rounded-xl border p-2">
                     <button
                       type="button"
                       onClick={() => setGroupId('')}
                       className={`rounded-full px-3 py-1.5 text-sm transition ${
                         !groupId
-                          ? 'bg-theme-primary text-white shadow-sm'
-                          : 'bg-white text-slate-600 hover:bg-slate-100'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'bg-card text-muted-foreground hover:bg-accent'
                       }`}
                     >
                       未分组
@@ -455,8 +450,8 @@ function BlogWorkflowDialogInner({
                         onClick={() => setGroupId(item.id)}
                         className={`rounded-full px-3 py-1.5 text-sm transition ${
                           groupId === item.id
-                            ? 'bg-theme-primary text-white shadow-sm'
-                            : 'bg-white text-slate-600 hover:bg-slate-100'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'bg-card text-muted-foreground hover:bg-accent'
                         }`}
                       >
                         {item.name}
@@ -465,8 +460,8 @@ function BlogWorkflowDialogInner({
                   </div>
                 </div>
                 <div className="flex-1">
-                  <div className="mb-2 text-xs text-slate-500">可见范围</div>
-                  <div className="border-theme-panel-border bg-theme-soft/45 flex flex-wrap gap-2 rounded-xl border p-2">
+                  <div className="mb-2 text-xs text-muted-foreground">可见范围</div>
+                  <div className="border-border bg-accent/50 flex flex-wrap gap-2 rounded-xl border p-2">
                     {[
                       { label: '私密', value: 'private' as const },
                       { label: '共享', value: 'shared' as const },
@@ -478,8 +473,8 @@ function BlogWorkflowDialogInner({
                         onClick={() => setVisibility(item.value)}
                         className={`rounded-full px-3 py-1.5 text-sm transition ${
                           visibility === item.value
-                            ? 'bg-theme-primary text-white shadow-sm'
-                            : 'bg-white text-slate-600 hover:bg-slate-100'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'bg-card text-muted-foreground hover:bg-accent'
                         }`}
                       >
                         {item.label}
@@ -490,7 +485,7 @@ function BlogWorkflowDialogInner({
               </div>
 
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive">
                   {error}
                 </div>
               )}
@@ -498,7 +493,7 @@ function BlogWorkflowDialogInner({
               <Button
                 onClick={handleStart}
                 disabled={!selectedFile}
-                className="w-full bg-theme-primary hover:bg-theme-primary-hover text-white"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 <Play className="mr-2 h-4 w-4" />
                 开始工作流
@@ -529,19 +524,19 @@ function BlogWorkflowDialogInner({
           {/* Preview Phase */}
           {phase === 'preview' && preview && (
             <div className="flex flex-col gap-4 py-4">
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              <div className="rounded-xl border border-primary/30 bg-accent px-4 py-3 text-sm text-primary">
                 工作流完成！文章已创建为草稿，请确认后发布。
               </div>
 
               <div className="grid gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">标题</label>
-                  <p className="mt-1 text-sm text-gray-900">{preview.title}</p>
+                  <label className="text-sm font-medium text-foreground">标题</label>
+                  <p className="mt-1 text-sm text-foreground">{preview.title}</p>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-700">摘要</label>
-                  <p className="mt-1 text-sm text-gray-600">{preview.excerpt || '(无)'}</p>
+                  <label className="text-sm font-medium text-foreground">摘要</label>
+                  <p className="mt-1 text-sm text-muted-foreground">{preview.excerpt || '(无)'}</p>
                 </div>
 
                 {preview.coverUrl && (
@@ -553,7 +548,7 @@ function BlogWorkflowDialogInner({
                         alt="封面"
                         className="h-24 w-auto rounded-lg object-cover"
                       />
-                      <span className="mt-1 text-xs text-gray-400">
+                      <span className="mt-1 text-xs text-muted-foreground">
                         来源: {preview.coverSource}
                       </span>
                     </div>
@@ -567,7 +562,7 @@ function BlogWorkflowDialogInner({
                       {preview.tagNames.map((tag) => (
                         <span
                           key={tag}
-                          className="rounded-full bg-theme-primary/10 px-3 py-1 text-xs text-theme-primary"
+                          className="rounded-full bg-primary/10 px-3 py-1 text-xs text-primary"
                         >
                           {tag}
                         </span>
@@ -584,7 +579,7 @@ function BlogWorkflowDialogInner({
                 <Button
                   onClick={handlePublish}
                   disabled={publishing}
-                  className="flex-1 bg-theme-primary hover:bg-theme-primary-hover text-white"
+                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   {publishing ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -600,8 +595,8 @@ function BlogWorkflowDialogInner({
           {/* Done Phase */}
           {phase === 'done' && (
             <div className="flex flex-col items-center gap-4 py-8">
-              <CheckCircle2 className="h-12 w-12 text-emerald-500" />
-              <p className="text-lg font-medium text-gray-900">文章已发布！</p>
+              <CheckCircle2 className="h-12 w-12 text-primary" />
+              <p className="text-lg font-medium text-foreground">文章已发布！</p>
               <Button onClick={handleClose}>关闭</Button>
             </div>
           )}

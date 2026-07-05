@@ -15,18 +15,18 @@ const PALETTE: Record<
   { badge: string; ring: string; mountain: string; water: string; text: string }
 > = {
   dark: {
-    badge: 'var(--theme-primary-soft)',
-    ring: 'var(--theme-border)',
-    mountain: 'var(--theme-primary-deep, #1f4f85)',
-    water: 'var(--theme-primary, #3b82f6)',
-    text: 'var(--theme-primary-deep, #1f4f85)',
+    badge: 'hsl(var(--primary) / 0.15)',
+    ring: 'hsl(var(--border))',
+    mountain: 'hsl(var(--primary))',
+    water: 'hsl(var(--primary))',
+    text: 'hsl(var(--primary))',
   },
   light: {
-    badge: 'var(--theme-primary)',
-    ring: 'rgba(255,255,255,0.35)',
-    mountain: 'rgba(255,255,255,0.95)',
-    water: 'rgba(255,255,255,0.8)',
-    text: 'rgba(255,255,255,0.96)',
+    badge: 'hsl(var(--primary))',
+    ring: 'hsl(var(--card) / 0.35)',
+    mountain: 'hsl(var(--card) / 0.95)',
+    water: 'hsl(var(--card) / 0.8)',
+    text: 'hsl(var(--card) / 0.96)',
   },
 };
 

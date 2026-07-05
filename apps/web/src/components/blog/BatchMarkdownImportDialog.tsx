@@ -93,7 +93,7 @@ export function BatchMarkdownImportDialog({
     resetDialogState();
     setBatchGroupId(defaultGroupId);
     setBatchVisibility(defaultVisibility);
-  }, [defaultGroupId, defaultVisibility, open]);
+  }, [defaultGroupId, defaultVisibility, open, resetDialogState]);
 
   const batchHasUploadedFiles = batchItems.length > 0;
   const currentBatchGroupName = useMemo(
@@ -398,7 +398,7 @@ export function BatchMarkdownImportDialog({
         <DialogContent className="w-[96vw] max-w-[96vw] overflow-hidden lg:max-w-[1320px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileStack className="text-theme-primary h-4 w-4" />
+              <FileStack className="text-primary h-4 w-4" />
               批量导入博客 MD
             </DialogTitle>
             <DialogDescription>
@@ -407,19 +407,19 @@ export function BatchMarkdownImportDialog({
           </DialogHeader>
 
           <div className="space-y-4 py-1">
-            <div className="rounded-2xl border border-theme-primary/20 bg-theme-soft/60 p-3.5">
-              <div className="mb-2 text-xs font-medium text-theme-primary">批量发布设置</div>
+            <div className="rounded-2xl border border-primary/20 bg-accent/60 p-3.5">
+              <div className="mb-2 text-xs font-medium text-primary">批量发布设置</div>
               <div className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(240px,0.85fr)]">
-                <div className="rounded-2xl border border-theme-panel-border bg-white/70 p-3">
-                  <div className="mb-1.5 text-xs text-slate-500">目标分组</div>
-                  <div className="border-theme-panel-border bg-theme-soft/45 flex min-h-24 max-h-36 flex-wrap content-start gap-2 overflow-y-auto rounded-xl border p-2.5">
+                <div className="rounded-2xl border border-border bg-card/70 p-3">
+                  <div className="mb-1.5 text-xs text-muted-foreground">目标分组</div>
+                  <div className="border-border bg-accent/50 flex min-h-24 max-h-36 flex-wrap content-start gap-2 overflow-y-auto rounded-xl border p-2.5">
                     <button
                       type="button"
                       onClick={() => setBatchGroupId('')}
                       className={`rounded-full px-3 py-1.5 text-sm transition ${
                         !batchGroupId
-                          ? 'bg-theme-primary text-white shadow-sm'
-                          : 'bg-white text-slate-600 hover:bg-slate-100'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'bg-card text-muted-foreground hover:bg-accent'
                       }`}
                     >
                       未分组
@@ -431,8 +431,8 @@ export function BatchMarkdownImportDialog({
                         onClick={() => setBatchGroupId(item.id)}
                         className={`rounded-full px-3 py-1.5 text-sm transition ${
                           batchGroupId === item.id
-                            ? 'bg-theme-primary text-white shadow-sm'
-                            : 'bg-white text-slate-600 hover:bg-slate-100'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'bg-card text-muted-foreground hover:bg-accent'
                         }`}
                       >
                         {item.name}
@@ -440,9 +440,9 @@ export function BatchMarkdownImportDialog({
                     ))}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-theme-panel-border bg-white/70 p-3">
-                  <div className="mb-1.5 text-xs text-slate-500">可见范围</div>
-                  <div className="border-theme-panel-border bg-theme-soft/45 flex min-h-24 flex-wrap content-start gap-2 rounded-xl border p-2.5">
+                <div className="rounded-2xl border border-border bg-card/70 p-3">
+                  <div className="mb-1.5 text-xs text-muted-foreground">可见范围</div>
+                  <div className="border-border bg-accent/50 flex min-h-24 flex-wrap content-start gap-2 rounded-xl border p-2.5">
                     {[
                       { label: '私密', value: 'private' as const },
                       { label: '共享', value: 'shared' as const },
@@ -454,8 +454,8 @@ export function BatchMarkdownImportDialog({
                         onClick={() => setBatchVisibility(item.value)}
                         className={`rounded-full px-3 py-1.5 text-sm transition ${
                           batchVisibility === item.value
-                            ? 'bg-theme-primary text-white shadow-sm'
-                            : 'bg-white text-slate-600 hover:bg-slate-100'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'bg-card text-muted-foreground hover:bg-accent'
                         }`}
                       >
                         {item.label}
@@ -464,7 +464,7 @@ export function BatchMarkdownImportDialog({
                   </div>
                 </div>
               </div>
-              <p className="mt-3 rounded-xl bg-white/65 px-3 py-2 text-xs text-slate-500">
+              <p className="mt-3 rounded-xl bg-card/65 px-3 py-2 text-xs text-muted-foreground">
                 当前将发布到：{currentBatchGroupName || '未分组'}，
                 {batchVisibility === 'public'
                   ? '公开'
@@ -475,15 +475,15 @@ export function BatchMarkdownImportDialog({
             </div>
 
             {!batchHasUploadedFiles && (
-              <div className="flex min-h-60 flex-col items-center justify-center rounded-2xl border border-dashed border-theme-primary/35 bg-theme-soft/35 px-6 text-center">
-                <FileUp className="text-theme-primary mb-3 h-10 w-10" />
-                <p className="mb-1 text-sm font-medium text-slate-700">上传 Markdown 文件</p>
-                <p className="mb-4 text-xs text-slate-500">
+              <div className="flex min-h-60 flex-col items-center justify-center rounded-2xl border border-dashed border-primary/35 bg-accent/35 px-6 text-center">
+                <FileUp className="text-primary mb-3 h-10 w-10" />
+                <p className="mb-1 text-sm font-medium text-foreground">上传 Markdown 文件</p>
+                <p className="mb-4 text-xs text-muted-foreground">
                   支持一次导入多个 `.md` 文件，默认用文件名作标题并完整保留正文。
                 </p>
                 <Button
                   type="button"
-                  className="theme-btn-primary"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
                   onClick={() => markdownBatchInputRef.current?.click()}
                   disabled={batchPreparing || batchRunning}
                 >
@@ -505,43 +505,43 @@ export function BatchMarkdownImportDialog({
             {batchHasUploadedFiles && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-slate-600">
+                  <label className="text-xs font-medium text-muted-foreground">
                     识别结果（共 {batchItems.length} 篇）
                   </label>
                   {!batchRunning && (
                     <button
                       type="button"
-                      className="text-xs text-slate-400 transition hover:text-slate-600"
+                      className="text-xs text-muted-foreground transition hover:text-foreground"
                       onClick={() => markdownBatchInputRef.current?.click()}
                     >
                       上传文件
                     </button>
                   )}
                 </div>
-                <div className="max-h-84 space-y-1.5 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/60 p-2">
+                <div className="max-h-84 space-y-1.5 overflow-y-auto rounded-xl border border-border bg-muted/60 p-2">
                   {batchItems.map((item, index) => (
                     <div
                       key={`${item.fileName}-${index}`}
                       className={`rounded-lg border px-3 py-2 text-sm transition ${
                         item.status === 'success'
-                          ? 'border-emerald-100 bg-emerald-50'
+                          ? 'border-border bg-muted'
                           : item.status === 'error'
-                            ? 'border-rose-100 bg-rose-50'
+                            ? 'border-destructive/20 bg-destructive/10'
                             : item.status === 'running'
-                              ? 'border-theme-primary/30 bg-theme-soft/50'
-                              : 'border-slate-100 bg-white'
+                              ? 'border-primary/30 bg-accent/50'
+                              : 'border-border bg-card'
                       }`}
                     >
                       <div className="flex items-start gap-2.5">
                         <div className="mt-0.5 shrink-0">
                           {item.status === 'running' ? (
-                            <Loader2 className="text-theme-primary h-3.5 w-3.5 animate-spin" />
+                            <Loader2 className="text-primary h-3.5 w-3.5 animate-spin" />
                           ) : item.status === 'success' ? (
-                            <span className="inline-block h-3.5 w-3.5 rounded-full bg-emerald-500" />
+                            <span className="inline-block h-3.5 w-3.5 rounded-full bg-primary" />
                           ) : item.status === 'error' ? (
-                            <span className="inline-block h-3.5 w-3.5 rounded-full bg-rose-500" />
+                            <span className="inline-block h-3.5 w-3.5 rounded-full bg-destructive" />
                           ) : (
-                            <span className="inline-block h-3.5 w-3.5 rounded-full border-2 border-slate-300" />
+                            <span className="inline-block h-3.5 w-3.5 rounded-full border-2 border-border" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -554,9 +554,9 @@ export function BatchMarkdownImportDialog({
                                 }
                                 placeholder="请输入博客标题"
                                 disabled={batchRunning || item.status === 'running'}
-                                className="h-9 rounded-xl border-theme-primary/20 bg-white"
+                                className="h-9 rounded-xl border-primary/20 bg-background"
                               />
-                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                 <span className="truncate">文件名：{item.fileName}</span>
                                 <span>正文 {item.content.trim().length} 字符</span>
                               </div>
@@ -564,7 +564,7 @@ export function BatchMarkdownImportDialog({
                             {!batchRunning && item.status !== 'success' && (
                               <button
                                 type="button"
-                                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground"
                                 onClick={() => handleRemoveBatchItem(index)}
                                 aria-label={`移除 ${item.fileName}`}
                                 title="移除此条"
@@ -573,11 +573,11 @@ export function BatchMarkdownImportDialog({
                               </button>
                             )}
                           </div>
-                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                             {item.error || item.content.slice(0, 120) || '未识别到正文内容'}
                           </p>
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                            <label className="inline-flex cursor-pointer items-center gap-1.5 text-slate-600">
+                            <label className="inline-flex cursor-pointer items-center gap-1.5 text-muted-foreground">
                               <input
                                 type="checkbox"
                                 checked={Boolean(item.applyCover)}
@@ -631,7 +631,7 @@ export function BatchMarkdownImportDialog({
                                 >
                                   选择资源壁纸
                                 </Button>
-                                <span className="text-slate-400">
+                                <span className="text-muted-foreground">
                                   {item.cover ? '已设置封面' : '尚未选择图片'}
                                 </span>
                               </>
@@ -645,11 +645,11 @@ export function BatchMarkdownImportDialog({
 
                 {batchDone && (
                   <div className="flex gap-3 text-xs">
-                    <span className="text-emerald-600">
+                    <span className="text-primary">
                       成功 {batchItems.filter((item) => item.status === 'success').length}
                     </span>
                     {batchItems.filter((item) => item.status === 'error').length > 0 && (
-                      <span className="text-rose-500">
+                      <span className="text-destructive">
                         失败 {batchItems.filter((item) => item.status === 'error').length}
                       </span>
                     )}
@@ -680,7 +680,7 @@ export function BatchMarkdownImportDialog({
               {!batchDone && batchHasUploadedFiles && (
                 <Button
                   type="button"
-                  className="theme-btn-primary"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
                   disabled={batchRunning || batchItems.every((item) => item.status !== 'pending')}
                   onClick={() => void handleBatchImport()}
                 >

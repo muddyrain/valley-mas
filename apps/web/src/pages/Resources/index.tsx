@@ -10,11 +10,10 @@ import {
 } from '@/api/resource';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import EmptyState from '@/components/EmptyState';
-import HeroSectionTitle from '@/components/page/HeroSectionTitle';
-import HeroStatChip from '@/components/page/HeroStatChip';
 import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
 import TypeFilterBar from '@/components/TypeFilterBar';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   enumParam,
@@ -53,8 +52,8 @@ export default function Resources() {
   const navigate = useNavigate();
   const location = useLocation();
   const navigationType = useNavigationType();
-  const { user, profile, fetchProfile } = useAuthStore();
-  const isCreator = user?.role === 'creator';
+  const { user } = useAuthStore();
+  const isCreator = !!user;
   const {
     values: { page: currentPage, keyword: currentKeyword, type: activeType, tag: currentTag },
     setValue,
@@ -66,14 +65,12 @@ export default function Resources() {
   const [inputValue, setInputValue] = useState(currentKeyword);
   const [favoritedMap, setFavoritedMap] = useState<Record<string, boolean>>({});
 
-  // 标签筛选：改为直接输入标签名（不再有标签实体表）
   const [tagInput, setTagInput] = useState('');
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
   const firstLoadRef = useRef(true);
   const scrollRestoredRef = useRef(false);
 
-  // 刷新
   const [refreshing, setRefreshing] = useState(false);
   const listCacheKey = useMemo(
     () => `${currentPage}|${activeType || ''}|${currentKeyword || ''}|${currentTag || ''}`,
@@ -83,11 +80,6 @@ export default function Resources() {
     () => `${RESOURCE_LIST_SCROLL_STORAGE_PREFIX}:${location.pathname}${location.search}`,
     [location.pathname, location.search],
   );
-
-  // 若是创作者，预加载 profile 以获取 creatorCode
-  useEffect(() => {
-    if (isCreator) void fetchProfile();
-  }, [isCreator, fetchProfile]);
 
   useEffect(() => {
     setInputValue(currentKeyword);
@@ -165,6 +157,7 @@ export default function Resources() {
       cancelled = true;
     };
   }, [currentPage, activeType, currentKeyword, listCacheKey, currentTag]);
+
   const handleSearch = () => {
     setValue('keyword', inputValue);
   };
@@ -277,80 +270,79 @@ export default function Resources() {
   );
 
   return (
-    <div className="min-h-screen bg-transparent text-slate-900">
-      <div className="mx-auto max-w-7xl px-6 pb-20 pt-8 md:px-8 lg:px-10">
-        <section className="theme-hero-shell relative overflow-hidden rounded-[40px] border px-6 py-8 md:px-10 md:py-10">
-          <div className="theme-hero-glow absolute inset-0" />
-          <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
-            <div className="space-y-6">
-              <HeroSectionTitle
-                eyebrow="RESOURCES"
-                title="资源整理"
-                description="壁纸、头像和最近整理出的图像资源都会先汇在这里，方便继续浏览、筛选和收藏。"
-              />
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 md:px-8 lg:px-10">
+        <Card className="border-border/50 overflow-hidden">
+          <CardContent className="p-6 sm:p-8 md:p-10">
+            <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
+              <div className="space-y-6">
+                <CardHeader>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-accent bg-accent/50 px-3 py-1 text-xs text-primary mb-2">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    RESOURCES
+                  </div>
+                  <CardTitle className="text-3xl md:text-4xl">资源整理</CardTitle>
+                </CardHeader>
+                <p className="text-sm text-muted-foreground">
+                  壁纸、头像和最近整理出的图像资源都会先汇在这里，方便继续浏览、筛选和收藏。
+                </p>
 
-              <div className="flex flex-wrap gap-3">
-                <HeroStatChip icon={<ImageIcon className="text-theme-primary h-4 w-4" />}>
-                  共 {loading ? '...' : total} 项资源
-                </HeroStatChip>
-                <HeroStatChip icon={<Sparkles className="h-4 w-4 text-theme-primary" />}>
-                  {wallpaperCount} 张壁纸
-                </HeroStatChip>
-                <HeroStatChip icon={<Sparkles className="h-4 w-4 text-theme-primary" />}>
-                  {avatarCount} 个头像
-                </HeroStatChip>
-              </div>
+                <div className="flex flex-wrap gap-3">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground">
+                    <ImageIcon className="h-4 w-4 text-primary" />共 {loading ? '...' : total}{' '}
+                    项资源
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    {wallpaperCount} 张壁纸
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    {avatarCount} 个头像
+                  </span>
+                </div>
 
-              {/* 创作者快捷入口 */}
-              {isCreator && profile?.creatorCode && (
-                <div>
-                  <Button
-                    onClick={() => navigate(`/my-space/resources`)}
-                    className="theme-btn-primary gap-2 rounded-full px-5 font-semibold shadow-md"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    前往我的创作者空间
+                {isCreator && (
+                  <Button onClick={() => navigate(`/my-space/resources`)}>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    前往我的创作空间
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
+
+              <Card className="border-border/50">
+                <CardContent className="p-5">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-accent/50 px-3 py-1 text-xs text-primary mb-4">
+                    <Search className="h-3.5 w-3.5" />
+                    资源检索
+                  </div>
+
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                        placeholder="搜索资源标题"
+                        className="pl-9"
+                      />
+                    </div>
+                    <Button onClick={handleSearch}>搜索</Button>
+                  </div>
+
+                  <div className="mt-4 rounded-lg bg-accent/50 p-4 text-sm text-muted-foreground">
+                    当前可以按类型筛选，也可以直接搜索资源标题。
+                  </div>
+                </CardContent>
+              </Card>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="rounded-4xl border border-white/80 bg-white/82 p-5 shadow-[0_20px_48px_rgba(148,163,184,0.08)] backdrop-blur">
-              <div className="bg-theme-soft text-theme-primary mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
-                <Search className="h-3.5 w-3.5" />
-                资源检索
-              </div>
-
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <Input
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    placeholder="搜索资源标题"
-                    className="h-11 rounded-full border-theme-border bg-theme-soft pl-9"
-                  />
-                </div>
-                <Button
-                  onClick={handleSearch}
-                  className="h-11 rounded-full bg-theme-primary px-5 text-white hover:bg-theme-primary-hover"
-                >
-                  搜索
-                </Button>
-              </div>
-
-              <div className="mt-4 rounded-[22px] border border-theme-shell-border bg-theme-soft p-4 text-sm leading-7 text-slate-500">
-                当前可以按类型筛选，也可以直接搜索资源标题。
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-24">
-          <div className="theme-panel-shell rounded-[36px] border p-5 md:p-6">
-            {/* 筛选栏：类型 + 标签 + 刷新 */}
-            <div className="mb-6 flex flex-wrap items-center gap-3">
+        <Card className="border-border/50 mt-6">
+          <CardContent className="p-5">
+            <div className="flex flex-wrap items-center gap-3 mb-6">
               <TypeFilterBar
                 options={RESOURCE_TYPES}
                 value={activeType}
@@ -360,7 +352,7 @@ export default function Resources() {
                 prefix="类型："
                 extra={
                   currentKeyword ? (
-                    <span className="text-sm text-slate-400">
+                    <span className="text-sm text-muted-foreground">
                       搜索"{currentKeyword}"
                       <button
                         type="button"
@@ -368,7 +360,7 @@ export default function Resources() {
                           setValue('keyword', '');
                           setInputValue('');
                         }}
-                        className="text-theme-primary ml-1.5 underline hover:opacity-80"
+                        className="text-primary ml-1.5 underline hover:opacity-80"
                       >
                         清除
                       </button>
@@ -378,16 +370,15 @@ export default function Resources() {
                 className="flex-1"
               />
 
-              {/* 标签筛选：直接输入标签名 */}
               <div className="relative">
                 {currentTag ? (
-                  <div className="flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 pl-3 pr-1.5 py-1.5 text-sm text-purple-700">
+                  <div className="flex items-center gap-1.5 rounded-full border border-accent bg-accent/50 px-3 py-1.5 text-sm text-primary">
                     <Hash className="h-3.5 w-3.5" />
                     <span className="font-medium">{currentTag}</span>
                     <button
                       type="button"
                       onClick={() => setValue('tag', '')}
-                      className="ml-0.5 rounded-full p-0.5 hover:bg-purple-200 transition-colors"
+                      className="ml-0.5 rounded-full p-0.5 hover:bg-primary/20 transition-colors"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -400,7 +391,7 @@ export default function Resources() {
                       setTagInput('');
                       setTimeout(() => tagInputRef.current?.focus(), 50);
                     }}
-                    className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/82 px-3 py-1.5 text-sm text-slate-500 hover:border-purple-200 hover:text-purple-600 transition-colors"
+                    className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground hover:border-accent hover:text-primary transition-colors"
                   >
                     <Hash className="h-3.5 w-3.5" />
                     按标签筛选
@@ -410,10 +401,10 @@ export default function Resources() {
                 {tagDropdownOpen && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setTagDropdownOpen(false)} />
-                    <div className="absolute right-0 top-full z-20 mt-1.5 w-64 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
+                    <div className="absolute right-0 top-full z-20 mt-1.5 w-64 rounded-lg border border-border bg-background shadow-lg overflow-hidden">
                       <div className="p-2">
                         <div className="relative">
-                          <Hash className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                          <Hash className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                           <input
                             ref={tagInputRef}
                             value={tagInput}
@@ -427,10 +418,10 @@ export default function Resources() {
                               }
                             }}
                             placeholder="输入标签名后回车"
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 pl-7 pr-3 text-sm outline-none focus:border-purple-300 focus:ring-1 focus:ring-purple-100"
+                            className="w-full rounded-lg border border-border bg-card py-1.5 pl-7 pr-3 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                           />
                         </div>
-                        <p className="mt-2 px-1 text-xs text-slate-400">
+                        <p className="mt-2 px-1 text-xs text-muted-foreground">
                           按标签名精确筛选资源，回车确认。
                         </p>
                       </div>
@@ -439,13 +430,12 @@ export default function Resources() {
                 )}
               </div>
 
-              {/* 刷新按钮 */}
               <button
                 type="button"
                 onClick={handleRefresh}
                 disabled={refreshing || loading}
                 title="刷新"
-                className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/82 px-3 py-1.5 text-sm text-slate-500 hover:border-theme-soft-strong hover:text-theme-primary transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground hover:border-accent hover:text-primary transition-colors disabled:opacity-50"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
                 刷新
@@ -464,35 +454,41 @@ export default function Resources() {
                   ))}
                 </div>
               ) : resources.length === 0 ? (
-                <div className="rounded-4xl bg-white/66 p-4">
-                  <EmptyState
-                    icon={ImageIcon}
-                    title="暂无资源"
-                    description={
-                      currentKeyword
-                        ? `没有找到包含"${currentKeyword}"的资源`
-                        : currentTag
-                          ? `标签"${currentTag}"下暂无资源`
-                          : '这个分类下还没有资源内容'
-                    }
-                    actionLabel={currentKeyword ? '清除搜索' : currentTag ? '清除标签' : undefined}
-                    onAction={
-                      currentKeyword
-                        ? () => {
-                            setValue('keyword', '');
-                            setInputValue('');
-                          }
-                        : currentTag
-                          ? () => setValue('tag', '')
-                          : undefined
-                    }
-                  />
-                </div>
+                <Card className="border-dashed border-border">
+                  <CardContent className="p-4">
+                    <EmptyState
+                      icon={ImageIcon}
+                      title="暂无资源"
+                      description={
+                        currentKeyword
+                          ? `没有找到包含"${currentKeyword}"的资源`
+                          : currentTag
+                            ? `标签"${currentTag}"下暂无资源`
+                            : '这个分类下还没有资源内容'
+                      }
+                      actionLabel={
+                        currentKeyword ? '清除搜索' : currentTag ? '清除标签' : undefined
+                      }
+                      onAction={
+                        currentKeyword
+                          ? () => {
+                              setValue('keyword', '');
+                              setInputValue('');
+                            }
+                          : currentTag
+                            ? () => setValue('tag', '')
+                            : undefined
+                      }
+                    />
+                  </CardContent>
+                </Card>
               ) : (
                 <>
-                  <div className="mb-6 flex items-center justify-between gap-4">
-                    <div className="text-sm text-slate-500">当前展示最近整理出的资源内容。</div>
-                    <div className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
+                  <div className="flex items-center justify-between gap-4 mb-6">
+                    <div className="text-sm text-muted-foreground">
+                      当前展示最近整理出的资源内容。
+                    </div>
+                    <div className="rounded-full bg-card px-4 py-2 text-sm text-muted-foreground">
                       已显示 {resources.length} / {total}
                     </div>
                   </div>
@@ -520,7 +516,8 @@ export default function Resources() {
                 hint={refreshing ? '最新内容同步中' : '筛选结果更新中'}
               />
             </div>
-            {totalPages > 1 ? (
+
+            {totalPages > 1 && (
               <div className="mt-10 flex items-center justify-center gap-3">
                 <Button
                   variant="outline"
@@ -528,27 +525,25 @@ export default function Resources() {
                     setValue('page', Math.max(1, currentPage - 1));
                   }}
                   disabled={currentPage <= 1 || loading}
-                  className="border-theme-soft-strong rounded-full border bg-white/82 px-5 text-slate-700"
                 >
                   上一页
                 </Button>
-                <div className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
+                <span className="rounded-full bg-card px-4 py-2 text-sm text-muted-foreground">
                   {currentPage} / {totalPages}
-                </div>
+                </span>
                 <Button
                   variant="outline"
                   onClick={() => {
                     setValue('page', Math.min(totalPages, currentPage + 1));
                   }}
                   disabled={currentPage >= totalPages || loading}
-                  className="border-theme-soft-strong rounded-full border bg-white/82 px-5 text-slate-700"
                 >
                   下一页
                 </Button>
               </div>
-            ) : null}
-          </div>
-        </section>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

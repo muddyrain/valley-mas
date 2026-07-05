@@ -41,21 +41,21 @@ export const getNotificationVisual = (type: string, content: string): Notificati
     if (rejected) {
       return {
         icon: XCircle,
-        iconClass: 'text-rose-600',
-        iconBgClass: 'bg-rose-100',
+        iconClass: 'text-destructive',
+        iconBgClass: 'bg-destructive/10',
       };
     }
     return {
       icon: BadgeCheck,
-      iconClass: 'text-emerald-600',
-      iconBgClass: 'bg-emerald-100',
+      iconClass: 'text-primary',
+      iconBgClass: 'bg-accent',
     };
   }
 
   return {
     icon: BellRing,
-    iconClass: 'text-amber-700',
-    iconBgClass: 'bg-amber-100',
+    iconClass: 'text-primary',
+    iconBgClass: 'bg-accent',
   };
 };
 
@@ -117,7 +117,7 @@ export const resolveNotificationTarget = (notification: NotificationNavigationIn
   }
 
   if (notification.type === 'creator_application_review') {
-    return '/apply-creator';
+    return '/my-space';
   }
 
   return '';

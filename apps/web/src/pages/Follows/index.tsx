@@ -15,7 +15,7 @@ const PAGE_SIZE = 20;
 
 const PAGE_BACKGROUND = {
   background:
-    'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-primary-soft) 34%, white) 48%, var(--theme-page-cool) 100%)',
+    'linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, hsl(var(--primary) / 0.15) 34%, hsl(var(--background))) 48%, var(--background) 100%)',
 };
 
 export default function Follows() {
@@ -53,7 +53,7 @@ export default function Follows() {
       return;
     }
     void loadFollowsToPage(currentPage);
-  }, [hasHydrated, isAuthenticated, navigate, currentPage]);
+  }, [hasHydrated, isAuthenticated, navigate, currentPage, loadFollowsToPage]);
 
   const hasMore = items.length < total;
 
@@ -61,12 +61,12 @@ export default function Follows() {
     <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
       <PageBanner padding="py-10" maxWidth="max-w-5xl">
         <div className="flex items-center gap-4">
-          <div className="rounded-2xl border border-white/30 bg-white/18 p-3 shadow-lg backdrop-blur-md">
-            <Users className="h-7 w-7 text-white" />
+          <div className="rounded-2xl border border-foreground/15 bg-foreground/10 p-3 shadow-lg backdrop-blur-md">
+            <Users className="h-7 w-7 text-foreground" />
           </div>
-          <div className="text-white">
+          <div className="text-foreground">
             <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">我的关注</h1>
-            <p className="mt-1 text-sm text-white/82">
+            <p className="mt-1 text-sm text-foreground/82">
               {loading ? '正在整理你关注的创作者...' : `已关注 ${total} 位创作者`}
             </p>
           </div>
@@ -79,7 +79,7 @@ export default function Follows() {
             {Array.from({ length: 6 }).map((_, index) => (
               <Card
                 key={index}
-                className="overflow-hidden rounded-2xl border border-theme-shell-border bg-white/86 shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm"
+                className="overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm"
               >
                 <CardContent className="space-y-4 p-5">
                   <div className="flex items-center gap-3">
@@ -96,7 +96,7 @@ export default function Follows() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="rounded-[28px] border border-theme-shell-border bg-white/72 px-6 shadow-[0_20px_50px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm">
+          <div className="rounded-[28px] border border-border bg-card/72 px-6 shadow-[0_20px_50px_hsl(var(--primary) / 0.10)] backdrop-blur-sm">
             <EmptyState
               icon={Users}
               title="还没有关注任何创作者"
@@ -117,13 +117,13 @@ export default function Follows() {
                 return (
                   <Card
                     key={item.id}
-                    className="overflow-hidden rounded-2xl border border-theme-shell-border bg-white/86 shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_rgba(var(--theme-primary-rgb),0.16)]"
+                    className="overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_hsl(var(--primary) / 0.16)]"
                   >
                     <CardContent className="p-5">
                       <div className="flex items-start gap-4">
-                        <Avatar className="h-14 w-14 border border-theme-soft-strong shadow-sm">
+                        <Avatar className="h-14 w-14 border border-accent shadow-sm">
                           <AvatarImage src={profile?.avatar} alt={name} />
-                          <AvatarFallback className="bg-theme-soft font-semibold text-theme-primary">
+                          <AvatarFallback className="bg-accent font-semibold text-primary">
                             {name[0]?.toUpperCase() || 'C'}
                           </AvatarFallback>
                         </Avatar>
@@ -131,17 +131,17 @@ export default function Follows() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="truncate text-base font-semibold text-slate-900">
+                              <div className="truncate text-base font-semibold text-foreground">
                                 {name}
                               </div>
-                              <div className="mt-1 text-xs text-theme-primary">
+                              <div className="mt-1 text-xs text-primary">
                                 {code ? `主页口令：${code}` : '创作者主页待完善'}
                               </div>
                             </div>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="shrink-0 rounded-xl border-theme-soft-strong bg-white/70 text-theme-primary hover:bg-theme-soft"
+                              className="shrink-0 rounded-xl border-accent bg-card/70 text-primary hover:bg-accent"
                               onClick={() => code && navigate(`/creator/${code}`)}
                               disabled={!code}
                             >
@@ -150,11 +150,11 @@ export default function Follows() {
                             </Button>
                           </div>
 
-                          <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">
+                          <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">
                             {creator?.description?.trim() || '这个创作者还没有留下更多介绍。'}
                           </p>
 
-                          <div className="mt-4 text-xs text-slate-400">
+                          <div className="mt-4 text-xs text-muted-foreground">
                             关注于{' '}
                             {new Date(item.createdAt).toLocaleDateString('zh-CN', {
                               year: 'numeric',
@@ -176,7 +176,7 @@ export default function Follows() {
                   variant="outline"
                   onClick={() => setPage(currentPage + 1)}
                   disabled={loading}
-                  className="rounded-xl border-theme-soft-strong bg-white/80 px-10 text-theme-primary hover:bg-theme-soft"
+                  className="rounded-xl border-accent bg-card/80 px-10 text-primary hover:bg-accent"
                 >
                   {loading ? (
                     <>

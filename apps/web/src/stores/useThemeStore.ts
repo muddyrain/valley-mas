@@ -1,62 +1,47 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-export type ThemePreset = 'amber' | 'rose' | 'ocean' | 'forest';
-
-export const THEME_OPTIONS: Array<{
-  value: ThemePreset;
-  label: string;
-  description: string;
-  preview: [string, string];
-}> = [
-  {
-    value: 'rose',
-    label: '雾粉',
-    description: '更柔和，也更偏轻盈',
-    preview: ['#c87485', '#fff1f4'],
-  },
-  {
-    value: 'amber',
-    label: '暖金',
-    description: '温润、干净、适合内容型页面',
-    preview: ['#cb8b3c', '#fff5e9'],
-  },
-  {
-    value: 'ocean',
-    label: '海蓝',
-    description: '更清爽，适合偏工具感的浏览',
-    preview: ['#3d7eb5', '#edf6ff'],
-  },
-  {
-    value: 'forest',
-    label: '苔绿',
-    description: '更安静，适合长时间阅读',
-    preview: ['#5b8d6c', '#eff8f1'],
-  },
-];
+export type ThemeMode = 'dark' | 'light';
 
 interface ThemeState {
-  theme: ThemePreset;
-  setTheme: (theme: ThemePreset) => void;
+  mode: ThemeMode;
+  setMode: (mode: ThemeMode) => void;
+  toggleMode: () => void;
 }
 
-export const applyThemeToDocument = (theme: ThemePreset) => {
+export const applyThemeToDocument = (mode: ThemeMode) => {
   if (typeof document === 'undefined') return;
-  document.documentElement.dataset.theme = theme;
+  document.documentElement.classList.toggle('dark', mode === 'dark');
 };
 
 export const useThemeStore = create<ThemeState>()(
   persist(
-    (set) => ({
-      theme: 'rose',
-      setTheme: (theme) => {
-        applyThemeToDocument(theme);
-        set({ theme });
+    (set, get) => ({
+      mode: 'dark',
+      setMode: (mode) => {
+        applyThemeToDocument(mode);
+        set({ mode });
+      },
+      toggleMode: () => {
+        const next = get().mode === 'dark' ? 'light' : 'dark';
+        applyThemeToDocument(next);
+        set({ mode: next });
       },
     }),
     {
       name: 'valley_theme',
       storage: typeof window !== 'undefined' ? createJSONStorage(() => localStorage) : undefined,
+      migrate: (persisted: unknown) => {
+        const p = persisted as Record<string, unknown>;
+        if (p && typeof p === 'object' && 'mode' in p) {
+          return { mode: p.mode as ThemeMode };
+        }
+        // Migrate from old theme/accent system
+        if (p && typeof p === 'object') {
+          return { mode: 'dark' as ThemeMode };
+        }
+        return { mode: 'dark' as ThemeMode };
+      },
     },
   ),
 );

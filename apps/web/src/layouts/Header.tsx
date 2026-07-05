@@ -9,9 +9,10 @@ import {
   LogOut,
   Menu,
   MessageCircleHeart,
-  Palette,
+  Moon,
   RefreshCw,
   Sparkles,
+  Sun,
   User,
   Users,
 } from 'lucide-react';
@@ -37,7 +38,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { THEME_OPTIONS, useThemeStore } from '@/stores/useThemeStore';
+import { useThemeStore } from '@/stores/useThemeStore';
 import {
   emitNotificationStateChanged,
   formatNotificationTime,
@@ -57,8 +58,8 @@ export default function Header() {
     refreshUserState,
     profileLoading,
   } = useAuthStore();
-  const currentTheme = useThemeStore((state) => state.theme);
-  const setTheme = useThemeStore((state) => state.setTheme);
+  const toggleMode = useThemeStore((state) => state.toggleMode);
+  const mode = useThemeStore((state) => state.mode);
   const navItems = [
     { to: '/', label: '首页', icon: Home, active: location.pathname === '/' },
     {
@@ -217,13 +218,6 @@ export default function Header() {
     }
   };
 
-  const handleThemeChange = (theme: (typeof THEME_OPTIONS)[number]['value']) => {
-    if (theme === currentTheme) return;
-    setTheme(theme);
-    const option = THEME_OPTIONS.find((item) => item.value === theme);
-    toast.success(`已切换为${option?.label || '新主题'}`);
-  };
-
   const actionArea = (
     <>
       <button
@@ -231,8 +225,8 @@ export default function Header() {
         onClick={() => setMobileNavOpen((value) => !value)}
         className={`relative flex h-10 w-10 items-center justify-center rounded-full transition-colors md:hidden ${
           mobileNavOpen
-            ? 'bg-theme-soft text-theme-primary'
-            : 'hover:bg-theme-soft hover:text-theme-primary'
+            ? 'bg-accent text-accent-foreground'
+            : 'hover:bg-accent hover:text-accent-foreground'
         }`}
         aria-label={mobileNavOpen ? '关闭导航菜单' : '打开导航菜单'}
         aria-expanded={mobileNavOpen}
@@ -240,94 +234,46 @@ export default function Header() {
         <Menu className="h-5 w-5" />
       </button>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-theme-soft hover:text-theme-primary">
-          <Palette className="h-5 w-5" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          className="w-72 border-theme-border bg-white/95 p-2 shadow-xl backdrop-blur-xl"
-          align="end"
-        >
-          <div className="px-2 py-1.5">
-            <p className="text-sm font-semibold text-slate-900">主题切换</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              选择你更喜欢的页面色调，切换后会保留到下次打开。
-            </p>
-          </div>
-          <DropdownMenuSeparator className="bg-theme-border" />
-          <div className="grid gap-1 p-1">
-            {THEME_OPTIONS.map((option) => {
-              const active = option.value === currentTheme;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => handleThemeChange(option.value)}
-                  className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${
-                    active
-                      ? 'border-theme-soft-strong bg-theme-soft shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.12)]'
-                      : 'border-transparent hover:border-theme-border hover:bg-theme-soft'
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-2 shadow-sm">
-                    {option.preview.map((color) => (
-                      <span
-                        key={color}
-                        className="h-3 w-3 rounded-full border border-white/80 shadow-sm"
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-slate-900">{option.label}</span>
-                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">
-                      {option.description}
-                    </span>
-                  </span>
-                  {active ? (
-                    <span className="rounded-full bg-theme-primary px-2.5 py-1 text-[11px] text-white">
-                      当前
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <button
+        type="button"
+        onClick={toggleMode}
+        className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-accent hover:text-accent-foreground"
+      >
+        {mode === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+      </button>
 
       {isAuthenticated && (
         <DropdownMenu onOpenChange={(open) => open && loadNotifications()}>
-          <DropdownMenuTrigger className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-theme-soft hover:text-theme-primary">
+          <DropdownMenuTrigger className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-accent hover:text-primary">
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-rose-500 px-1.5 text-center text-[10px] font-semibold leading-4 text-white">
+              <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-destructive px-1.5 text-center text-[10px] font-semibold leading-4 text-destructive-foreground">
                 {unreadLabel}
               </span>
             )}
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-86 border-theme-border bg-white/95 p-2 shadow-xl backdrop-blur-xl"
+            className="w-86 border-border bg-popover/95 p-2 shadow-xl backdrop-blur-xl"
             align="end"
           >
             <div className="mb-1 flex items-center justify-between px-2 py-1">
-              <p className="text-sm font-semibold text-gray-900">通知</p>
+              <p className="text-sm font-semibold text-foreground">通知</p>
               <button
                 type="button"
                 onClick={handleMarkAllRead}
-                className="text-theme-primary inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-theme-soft"
+                className="text-primary inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-accent"
               >
                 <CheckCheck className="h-3.5 w-3.5" />
                 全部已读
               </button>
             </div>
-            <DropdownMenuSeparator className="bg-theme-border" />
+            <DropdownMenuSeparator className="bg-border" />
 
             <div className="max-h-88 overflow-auto">
               {notifyLoading ? (
-                <div className="px-3 py-6 text-center text-sm text-gray-500">加载中...</div>
+                <div className="px-3 py-6 text-center text-sm text-muted-foreground">加载中...</div>
               ) : notifications.length === 0 ? (
-                <div className="px-3 py-8 text-center text-sm text-gray-500">暂无通知</div>
+                <div className="px-3 py-8 text-center text-sm text-muted-foreground">暂无通知</div>
               ) : (
                 notifications.map((item) => (
                   <DropdownMenuItem
@@ -335,8 +281,8 @@ export default function Header() {
                     onClick={() => handleMarkOneRead(item)}
                     className={`cursor-pointer rounded-xl border px-3 py-3 ${
                       item.isRead
-                        ? 'border-slate-200 bg-slate-50/65'
-                        : 'border-theme-shell-border bg-theme-soft/70 shadow-[0_6px_16px_rgba(var(--theme-primary-rgb),0.12)]'
+                        ? 'border-border bg-card/65'
+                        : 'border-border bg-accent/70 shadow-md'
                     }`}
                   >
                     {(() => {
@@ -352,23 +298,23 @@ export default function Header() {
 
                           <div className="min-w-0 flex-1">
                             <div className="flex items-start justify-between gap-2">
-                              <p className="line-clamp-1 text-sm font-medium text-slate-900">
+                              <p className="line-clamp-1 text-sm font-medium text-foreground">
                                 {item.title}
                               </p>
                               {item.isRead ? (
-                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600">
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                                   已读
                                 </span>
                               ) : (
-                                <span className="rounded-full bg-theme-primary px-2 py-0.5 text-[10px] text-white">
+                                <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] text-primary-foreground">
                                   未读
                                 </span>
                               )}
                             </div>
-                            <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600">
+                            <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
                               {item.content}
                             </p>
-                            <p className="mt-1 text-[11px] text-slate-400">
+                            <p className="mt-1 text-[11px] text-muted-foreground/70">
                               {formatNotificationTime(item.createdAt)}
                             </p>
                           </div>
@@ -379,10 +325,10 @@ export default function Header() {
                 ))
               )}
             </div>
-            <DropdownMenuSeparator className="bg-theme-border" />
+            <DropdownMenuSeparator className="bg-border" />
             <DropdownMenuItem
               onClick={() => navigate('/notifications')}
-              className="hover:bg-theme-soft cursor-pointer justify-center rounded-xl py-2.5 text-sm font-medium text-theme-primary transition-colors"
+              className="hover:bg-accent cursor-pointer justify-center rounded-xl py-2.5 text-sm font-medium text-primary transition-colors"
             >
               查看全部通知
             </DropdownMenuItem>
@@ -392,79 +338,77 @@ export default function Header() {
 
       {isAuthenticated ? (
         <DropdownMenu>
-          <DropdownMenuTrigger className="relative h-10 w-10 rounded-full outline-none transition-all hover:ring-2 hover:ring-theme-soft-strong">
-            <Avatar className="h-10 w-10 border-2 shadow-sm border-theme-primary/50">
+          <DropdownMenuTrigger className="relative h-10 w-10 rounded-full outline-none transition-all hover:ring-2 hover:ring-accent">
+            <Avatar className="h-10 w-10 border-2 shadow-sm border-primary/50">
               <AvatarImage src={user?.avatar} alt={user?.nickname || user?.username} />
-              <AvatarFallback className="theme-avatar-fallback font-semibold text-white">
+              <AvatarFallback className="bg-primary font-semibold text-primary-foreground">
                 {(user?.nickname?.[0] || user?.username?.[0] || 'U').toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500" />
+            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-card bg-primary" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-64 border-theme-border bg-white/95 p-2 shadow-xl backdrop-blur-xl"
+            className="w-64 border-border bg-popover/95 p-2 shadow-xl backdrop-blur-xl"
             align="end"
           >
-            <div className="bg-theme-soft mb-2 rounded-lg px-3 py-3">
+            <div className="bg-accent mb-2 rounded-lg px-3 py-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-gray-900">
+                  <p className="truncate text-sm font-semibold text-foreground">
                     {user?.nickname || user?.username}
                   </p>
-                  <p className="mt-1 text-xs text-gray-600">@{user?.username}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">@{user?.username}</p>
                 </div>
                 <button
                   type="button"
                   onClick={handleRefreshUser}
-                  className="text-theme-primary inline-flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-white/70"
+                  className="text-primary inline-flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-card/70"
                   title="刷新用户状态"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${profileLoading ? 'animate-spin' : ''}`} />
                 </button>
               </div>
             </div>
-            <DropdownMenuSeparator className="bg-theme-border" />
+            <DropdownMenuSeparator className="bg-border" />
             <DropdownMenuItem
               onClick={() => navigate('/profile')}
-              className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+              className="hover:bg-accent cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
             >
-              <User className="text-theme-primary h-4 w-4" />
+              <User className="text-primary h-4 w-4" />
               <span className="font-medium">个人中心</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => navigate('/favorites')}
-              className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+              className="hover:bg-accent cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
             >
               <Heart className="h-4 w-4 text-pink-500" />
               <span className="font-medium">我的收藏</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => navigate('/follows')}
-              className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+              className="hover:bg-accent cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
             >
-              <Users className="text-theme-primary h-4 w-4" />
+              <Users className="text-primary h-4 w-4" />
               <span className="font-medium">我的关注</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => navigate('/downloads')}
-              className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+              className="hover:bg-accent cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
             >
-              <Download className="h-4 w-4 text-sky-500" />
+              <Download className="h-4 w-4 text-primary" />
               <span className="font-medium">下载记录</span>
             </DropdownMenuItem>
-            {user?.role === 'creator' && (
-              <DropdownMenuItem
-                onClick={() => navigate('/my-space')}
-                className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
-              >
-                <Sparkles className="text-theme-primary h-4 w-4" />
-                <span className="font-medium">我的创作空间</span>
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator className="bg-theme-border" />
+            <DropdownMenuItem
+              onClick={() => navigate('/my-space')}
+              className="hover:bg-accent cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+            >
+              <Sparkles className="text-primary h-4 w-4" />
+              <span className="font-medium">我的创作空间</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-border" />
             <DropdownMenuItem
               onClick={handleLogout}
-              className="cursor-pointer gap-3 rounded-lg py-2.5 text-red-600 transition-colors hover:bg-red-50"
+              className="cursor-pointer gap-3 rounded-lg py-2.5 text-destructive transition-colors hover:bg-destructive/10"
             >
               <LogOut className="h-4 w-4" />
               <span className="font-medium">退出登录</span>
@@ -473,7 +417,7 @@ export default function Header() {
         </DropdownMenu>
       ) : (
         <Link to="/login">
-          <Button className="theme-btn-primary h-10 rounded-xl px-4 text-sm font-medium transition-all sm:px-6">
+          <Button className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 rounded-xl px-4 text-sm font-medium transition-all sm:px-6">
             登录 / 注册
           </Button>
         </Link>
@@ -484,7 +428,7 @@ export default function Header() {
   return (
     <header
       data-global-header
-      className="theme-header sticky top-0 z-50 w-full border-b bg-white/82 backdrop-blur-xl"
+      className="border-b border-border sticky top-0 z-50 w-full border-b bg-card/82 backdrop-blur-xl"
     >
       <div className="mx-auto max-w-7xl px-3 py-3 sm:px-4 md:px-8 md:py-0">
         <div className="flex items-center justify-between gap-4 md:h-16">
@@ -504,9 +448,7 @@ export default function Header() {
                   <Button
                     variant="ghost"
                     className={`gap-2 transition-colors ${
-                      item.active
-                        ? 'bg-theme-soft text-theme-primary-hover'
-                        : 'hover:bg-theme-soft hover:text-theme-primary-hover'
+                      item.active ? 'bg-accent text-primary' : 'hover:bg-accent hover:text-primary'
                     }`}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
@@ -521,15 +463,13 @@ export default function Header() {
         </div>
 
         {mobileNavOpen ? (
-          <div className="mt-3 rounded-[28px] border border-theme-shell-border bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(255,250,251,0.94))] p-3 shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.14)] md:hidden">
+          <div className="mt-3 rounded-[28px] border border-border bg-card p-3 shadow-lg md:hidden">
             <div className="mb-2 flex items-center justify-between px-2">
-              <div className="text-xs tracking-[0.18em] text-theme-primary uppercase">
-                Navigation
-              </div>
+              <div className="text-xs tracking-[0.18em] text-primary uppercase">Navigation</div>
               <button
                 type="button"
                 onClick={() => setMobileNavOpen(false)}
-                className="rounded-full px-2 py-1 text-xs text-slate-500 transition-colors hover:bg-theme-soft hover:text-theme-primary"
+                className="rounded-full px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-primary"
               >
                 收起
               </button>
@@ -543,11 +483,11 @@ export default function Header() {
                       type="button"
                       className={`flex min-h-11 w-full items-center gap-2 rounded-2xl border px-3 py-3 text-left text-sm transition-colors ${
                         item.active
-                          ? 'border-theme-soft-strong bg-theme-soft text-theme-primary shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.12)]'
-                          : 'border-white/80 bg-white/88 text-slate-700 hover:border-theme-shell-border hover:bg-theme-soft/70'
+                          ? 'border-accent bg-accent text-primary shadow-lg'
+                          : 'border-border/80 bg-card/88 text-foreground hover:border-border hover:bg-accent/70'
                       }`}
                     >
-                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/88 shadow-sm">
+                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-card/88 shadow-sm">
                         <Icon className="h-4 w-4" />
                       </span>
                       <span className="leading-5">{item.label}</span>

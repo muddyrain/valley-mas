@@ -43,8 +43,8 @@ import { PublicWallpaperPickerDialog } from '@/components/blog/PublicWallpaperPi
 import PanelLoadingOverlay from '@/components/PanelLoadingOverlay';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
 import { numberParam, stringParam, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const BLOG_PAGE_SIZE = 12;
 const IMAGE_TEXT_PAGE_SIZE = 4;
@@ -80,10 +80,7 @@ export default function MyPosts() {
     },
     setValue,
   } = useUrlQueryState(MY_POSTS_QUERY_SCHEMA);
-  const { canAccess } = usePageRoleGuard({
-    allowRoles: ['creator'],
-    unauthorizedMessage: '该页面仅创作者可访问',
-  });
+  const { isAuthenticated } = useAuthStore();
 
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [blogTotal, setBlogTotal] = useState(0);
@@ -181,27 +178,34 @@ export default function MyPosts() {
   }, [loadBlogPostsPage, loadImageTextPostsPage]);
 
   useEffect(() => {
-    if (!canAccess) return;
+    if (!isAuthenticated) return;
     void loadGroups();
-  }, [canAccess, loadGroups]);
+  }, [isAuthenticated, loadGroups]);
 
   useEffect(() => {
-    if (!canAccess) return;
+    if (!isAuthenticated) return;
     void loadBlogPostsPage();
-  }, [canAccess, loadBlogPostsPage]);
+  }, [isAuthenticated, loadBlogPostsPage]);
 
   useEffect(() => {
-    if (!canAccess) return;
+    if (!isAuthenticated) return;
     void loadImageTextPostsPage();
-  }, [canAccess, loadImageTextPostsPage]);
+  }, [isAuthenticated, loadImageTextPostsPage]);
 
   useEffect(() => {
     const refreshPostsAt = (location.state as { refreshPostsAt?: number } | null)?.refreshPostsAt;
-    if (!refreshPostsAt || !canAccess) return;
+    if (!refreshPostsAt || !isAuthenticated) return;
 
     void loadAllPostsPage();
     navigate(location.pathname + location.search, { replace: true, state: {} });
-  }, [canAccess, loadAllPostsPage, location.pathname, location.search, location.state, navigate]);
+  }, [
+    isAuthenticated,
+    loadAllPostsPage,
+    location.pathname,
+    location.search,
+    location.state,
+    navigate,
+  ]);
 
   useEffect(() => {
     if (loadingBlogPosts) return;
@@ -545,7 +549,7 @@ export default function MyPosts() {
           <Button
             size="sm"
             variant={selected ? 'default' : 'outline'}
-            className={`h-8 rounded-lg ${selected ? 'theme-btn-primary' : ''}`}
+            className={`h-8 rounded-lg ${selected ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}`}
             onClick={() => handleToggleSelect(post.id)}
           >
             {selected ? (
@@ -616,22 +620,22 @@ export default function MyPosts() {
     );
   };
 
-  if (!canAccess) return null;
+  if (!isAuthenticated) return null;
 
   return (
-    <div className="min-h-screen bg-transparent text-slate-900">
+    <div className="min-h-screen bg-transparent text-foreground">
       <div className="mx-auto max-w-7xl px-6 pb-20 pt-8 md:px-8 lg:px-10">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <button
               type="button"
               onClick={() => navigate('/my-space')}
-              className="mb-2 inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-theme-primary"
+              className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-primary"
             >
               ← 返回创作空间
             </button>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">内容管理</h1>
-            <p className="mt-1 text-sm text-slate-500">管理你的全部博客与图文内容</p>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">内容管理</h1>
+            <p className="mt-1 text-sm text-muted-foreground">管理你的全部博客与图文内容</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -648,7 +652,7 @@ export default function MyPosts() {
                 <Button
                   variant="outline"
                   onClick={() => setWorkflowDialogOpen(true)}
-                  className="rounded-xl border-theme-primary text-theme-primary hover:bg-theme-primary/10"
+                  className="rounded-xl border-primary text-primary hover:bg-primary/10"
                 >
                   <Sparkles className="mr-1.5 h-4 w-4" />
                   AI 工作流
@@ -713,33 +717,33 @@ export default function MyPosts() {
           </div>
         </div>
 
-        <div className="relative space-y-10 rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
+        <div className="relative space-y-10 rounded-[36px] border border-border bg-[linear-gradient(180deg,hsl(var(--background)_/_0.96),hsl(var(--background)_/_0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
           {batchMode && (
-            <div className="rounded-2xl border border-theme-soft-strong bg-theme-soft/45 px-4 py-3">
+            <div className="rounded-2xl border border-accent bg-accent/50 px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
                   onClick={handleSelectAllVisible}
-                  className="h-8 rounded-lg border-theme-soft-strong text-slate-700"
+                  className="h-8 rounded-lg border-accent text-foreground"
                 >
                   {allVisibleSelected ? (
-                    <CheckSquare className="mr-1 h-3.5 w-3.5 text-theme-primary" />
+                    <CheckSquare className="mr-1 h-3.5 w-3.5 text-primary" />
                   ) : (
                     <Square className="mr-1 h-3.5 w-3.5" />
                   )}
                   {allVisibleSelected ? '取消全选' : '全选当前页'}
                 </Button>
-                <span className="text-sm text-slate-500">
-                  已选 <span className="font-semibold text-theme-primary">{selectedCount}</span> 篇
+                <span className="text-sm text-muted-foreground">
+                  已选 <span className="font-semibold text-primary">{selectedCount}</span> 篇
                 </span>
                 <Button
                   type="button"
                   size="sm"
                   disabled={batchUpdatingVisibility || batchCoverRunning}
                   onClick={() => setBatchSettingsOpen(true)}
-                  className="theme-btn-primary ml-auto h-8 rounded-lg"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 ml-auto h-8 rounded-lg"
                 >
                   <ImagePlus className="mr-1 h-3.5 w-3.5" />
                   批量设置博客
@@ -752,10 +756,10 @@ export default function MyPosts() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-theme-primary" />
-                  <h2 className="text-xl font-semibold text-slate-900">博客列表</h2>
+                  <FileText className="h-5 w-5 text-primary" />
+                  <h2 className="text-xl font-semibold text-foreground">博客列表</h2>
                 </div>
-                <span className="rounded-full bg-theme-soft px-3 py-1 text-sm text-theme-primary">
+                <span className="rounded-full bg-accent px-3 py-1 text-sm text-primary">
                   {blogTotal} 篇
                 </span>
               </div>
@@ -771,11 +775,11 @@ export default function MyPosts() {
             {loadingBlogPosts && blogPosts.length === 0 ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: BLOG_PAGE_SIZE }).map((_, i) => (
-                  <div key={i} className="h-44 animate-pulse rounded-2xl bg-theme-soft" />
+                  <div key={i} className="h-44 animate-pulse rounded-2xl bg-accent" />
                 ))}
               </div>
             ) : blogPosts.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-sm text-slate-500">
+              <div className="rounded-2xl border border-dashed border-border bg-muted p-10 text-center text-sm text-muted-foreground">
                 当前筛选下还没有博客内容，先去发布一篇吧。
               </div>
             ) : (
@@ -802,7 +806,7 @@ export default function MyPosts() {
                       <ChevronLeft className="h-4 w-4" />
                       上一页
                     </Button>
-                    <span className="text-sm text-slate-500">
+                    <span className="text-sm text-muted-foreground">
                       第 {blogPage} / {blogTotalPages} 页
                     </span>
                     <Button
@@ -821,16 +825,16 @@ export default function MyPosts() {
             )}
           </div>
 
-          <div className="h-px bg-slate-100" />
+          <div className="h-px bg-muted" />
 
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-theme-primary" />
-                  <h2 className="text-xl font-semibold text-slate-900">图文展示列表</h2>
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  <h2 className="text-xl font-semibold text-foreground">图文展示列表</h2>
                 </div>
-                <span className="rounded-full bg-theme-soft px-3 py-1 text-sm text-theme-primary-hover">
+                <span className="rounded-full bg-accent px-3 py-1 text-sm text-primary">
                   {imageTextTotal} 篇
                 </span>
               </div>
@@ -846,11 +850,11 @@ export default function MyPosts() {
             {loadingImageTextPosts && imageTextPosts.length === 0 ? (
               <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                 {Array.from({ length: IMAGE_TEXT_PAGE_SIZE }).map((_, i) => (
-                  <div key={i} className="h-44 animate-pulse rounded-2xl bg-theme-soft" />
+                  <div key={i} className="h-44 animate-pulse rounded-2xl bg-accent" />
                 ))}
               </div>
             ) : imageTextPosts.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-theme-shell-border bg-theme-soft p-10 text-center text-sm text-theme-primary-hover">
+              <div className="rounded-2xl border border-dashed border-border bg-accent p-10 text-center text-sm text-primary">
                 当前筛选下还没有图文内容。
               </div>
             ) : (
@@ -877,7 +881,7 @@ export default function MyPosts() {
                       <ChevronLeft className="h-4 w-4" />
                       上一页
                     </Button>
-                    <span className="text-sm text-slate-500">
+                    <span className="text-sm text-muted-foreground">
                       第 {imageTextPage} / {imageTextTotalPages} 页
                     </span>
                     <Button
@@ -960,13 +964,13 @@ export default function MyPosts() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <CheckSquare className="h-5 w-5 text-theme-primary" />
+              <CheckSquare className="h-5 w-5 text-primary" />
               批量设置博客
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <p className="text-sm text-slate-500">
-              已选 <span className="font-semibold text-theme-primary">{selectedCount}</span> 篇内容
+            <p className="text-sm text-muted-foreground">
+              已选 <span className="font-semibold text-primary">{selectedCount}</span> 篇内容
             </p>
             <Button
               type="button"
@@ -995,7 +999,7 @@ export default function MyPosts() {
               在线批量设置封面
             </Button>
             {selectedCount === 0 && (
-              <p className="text-xs text-slate-400">请先在列表中勾选要批量处理的内容。</p>
+              <p className="text-xs text-muted-foreground">请先在列表中勾选要批量处理的内容。</p>
             )}
           </div>
           <Button
@@ -1019,51 +1023,51 @@ export default function MyPosts() {
         <DialogContent className="w-[92vw] max-w-[92vw] overflow-hidden sm:max-w-[1120px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <ImagePlus className="h-5 w-5 text-theme-primary" />
+              <ImagePlus className="h-5 w-5 text-primary" />
               在线批量设置封面
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-1">
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted-foreground">
               参考批量导入识别结果流程：逐条确认要设置封面的内容，然后统一保存。
             </p>
-            <div className="max-h-[60vh] space-y-2 overflow-x-hidden overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/50 p-2">
+            <div className="max-h-[60vh] space-y-2 overflow-x-hidden overflow-y-auto rounded-xl border border-border bg-muted/60 p-2">
               {batchCoverItems.map((item, index) => (
                 <div
                   key={`${item.id}-${index}`}
                   className={`rounded-lg border px-3 py-2 text-sm ${
                     item.status === 'success'
-                      ? 'border-emerald-100 bg-emerald-50'
+                      ? 'border-primary/30 bg-accent'
                       : item.status === 'error'
-                        ? 'border-rose-100 bg-rose-50'
+                        ? 'border-destructive/30 bg-destructive/10'
                         : item.status === 'running'
-                          ? 'border-theme-primary/30 bg-theme-soft/45'
-                          : 'border-slate-100 bg-white'
+                          ? 'border-primary/30 bg-accent/50'
+                          : 'border-border bg-card'
                   }`}
                 >
                   <div className="flex items-start gap-2.5">
                     <div className="mt-0.5 shrink-0">
                       {item.status === 'running' ? (
-                        <Loader2 className="text-theme-primary h-3.5 w-3.5 animate-spin" />
+                        <Loader2 className="text-primary h-3.5 w-3.5 animate-spin" />
                       ) : item.status === 'success' ? (
-                        <span className="inline-block h-3.5 w-3.5 rounded-full bg-emerald-500" />
+                        <span className="inline-block h-3.5 w-3.5 rounded-full bg-primary" />
                       ) : item.status === 'error' ? (
-                        <span className="inline-block h-3.5 w-3.5 rounded-full bg-rose-500" />
+                        <span className="inline-block h-3.5 w-3.5 rounded-full bg-destructive" />
                       ) : (
-                        <span className="inline-block h-3.5 w-3.5 rounded-full border-2 border-slate-300" />
+                        <span className="inline-block h-3.5 w-3.5 rounded-full border-2 border-border" />
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border border-theme-primary/20 bg-theme-soft px-2 py-0.5 text-xs font-semibold text-theme-primary">
+                        <span className="rounded-full border border-primary/20 bg-accent px-2 py-0.5 text-xs font-semibold text-primary">
                           {item.title}
                         </span>
-                        <span className="text-xs text-slate-400">
+                        <span className="text-xs text-muted-foreground">
                           {item.postType === 'blog' ? '博客' : '图文'}
                         </span>
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                        <label className="inline-flex cursor-pointer items-center gap-1.5 text-slate-600">
+                        <label className="inline-flex cursor-pointer items-center gap-1.5 text-foreground">
                           <input
                             type="checkbox"
                             checked={item.applyCover}
@@ -1103,14 +1107,14 @@ export default function MyPosts() {
                             >
                               选择资源壁纸
                             </Button>
-                            <span className="text-slate-400">
+                            <span className="text-muted-foreground">
                               {item.cover ? '已选择封面' : '尚未选择封面'}
                             </span>
                           </>
                         )}
                       </div>
                       {(item.error || item.cover) && (
-                        <p className="mt-1 break-all text-xs text-slate-500">
+                        <p className="mt-1 break-all text-xs text-muted-foreground">
                           {item.error || `封面地址：${item.cover}`}
                         </p>
                       )}
@@ -1121,11 +1125,11 @@ export default function MyPosts() {
             </div>
             {batchCoverDone && (
               <div className="flex gap-3 text-xs">
-                <span className="text-emerald-600">
+                <span className="text-primary">
                   成功 {batchCoverItems.filter((item) => item.status === 'success').length}
                 </span>
                 {batchCoverItems.filter((item) => item.status === 'error').length > 0 && (
-                  <span className="text-rose-500">
+                  <span className="text-destructive">
                     失败 {batchCoverItems.filter((item) => item.status === 'error').length}
                   </span>
                 )}
@@ -1152,7 +1156,7 @@ export default function MyPosts() {
               )}
               <Button
                 type="button"
-                className="theme-btn-primary"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
                 disabled={batchCoverRunning}
                 onClick={() => void handleBatchCoverSave()}
               >
@@ -1184,13 +1188,13 @@ export default function MyPosts() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <Globe className="h-5 w-5 text-theme-primary" />
+              <Globe className="h-5 w-5 text-primary" />
               批量设置访问状态
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <p className="text-sm text-slate-500">
-              将以下 <span className="font-semibold text-slate-700">{selectedCount}</span>{' '}
+            <p className="text-sm text-muted-foreground">
+              将以下 <span className="font-semibold text-foreground">{selectedCount}</span>{' '}
               篇内容统一设为：
             </p>
             <div className="flex flex-col gap-2.5">
@@ -1200,22 +1204,21 @@ export default function MyPosts() {
                   icon: Globe,
                   label: '公开',
                   desc: '所有用户可见',
-                  color:
-                    'text-emerald-600 border-emerald-200 bg-emerald-50 hover:border-emerald-400',
+                  color: 'text-primary border-primary/30 bg-accent hover:border-primary/50',
                 },
                 {
                   value: 'shared' as const,
                   icon: Users,
                   label: '共享',
                   desc: '有链接或口令才可访问',
-                  color: 'text-sky-600 border-sky-200 bg-sky-50 hover:border-sky-400',
+                  color: 'text-primary border-accent bg-accent hover:border-primary/50',
                 },
                 {
                   value: 'private' as const,
                   icon: Lock,
                   label: '私密',
                   desc: '仅自己可见',
-                  color: 'text-slate-600 border-slate-200 bg-slate-50 hover:border-slate-400',
+                  color: 'text-foreground border-border bg-muted hover:border-foreground/40',
                 },
               ].map((opt) => (
                 <button
@@ -1254,23 +1257,23 @@ export default function MyPosts() {
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
+            <DialogTitle className="flex items-center gap-2 text-destructive">
               <Trash2 className="h-5 w-5" />
               确认删除内容
             </DialogTitle>
           </DialogHeader>
           <div className="py-3">
             {deletePostTarget && (
-              <div className="mb-4 rounded-xl bg-gray-50 p-3">
-                <p className="line-clamp-2 text-sm font-medium text-gray-900">
+              <div className="mb-4 rounded-xl bg-muted p-3">
+                <p className="line-clamp-2 text-sm font-medium text-foreground">
                   {deletePostTarget.title}
                 </p>
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {deletePostTarget.postType === 'image_text' ? '图文创作' : '博客'}
                 </p>
               </div>
             )}
-            <p className="text-sm text-gray-600">删除后将无法恢复，确认继续？</p>
+            <p className="text-sm text-muted-foreground">删除后将无法恢复，确认继续？</p>
           </div>
           <div className="flex gap-3">
             <Button
@@ -1284,7 +1287,7 @@ export default function MyPosts() {
             <Button
               onClick={() => void handleDeletePost()}
               disabled={deletingPost}
-              className="flex-1 bg-red-500 font-semibold text-white hover:bg-red-600"
+              className="flex-1 bg-destructive font-semibold text-primary-foreground hover:bg-destructive/90"
             >
               {deletingPost ? (
                 <>

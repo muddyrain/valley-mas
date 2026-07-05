@@ -1,4 +1,4 @@
-﻿import {
+import {
   ArrowUpDown,
   BookOpen,
   ExternalLink,
@@ -17,6 +17,8 @@ import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import { BlogFeedCard } from '@/components/blog';
 import { BLOG_COVER_ASPECT_CLASS } from '@/components/blog/BlogCoverMedia';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   enumParam,
@@ -37,15 +39,13 @@ const BLOG_LIST_QUERY_SCHEMA = {
 
 function BlogFeedCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-[30px] border border-theme-soft-strong bg-white/80 p-2 shadow-[0_14px_40px_rgba(148,163,184,0.08)]">
-      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
-        <div
-          className={`relative border-b border-slate-100 bg-theme-soft ${BLOG_COVER_ASPECT_CLASS}`}
-        >
+    <Card className="border-border/50">
+      <CardContent className="p-0">
+        <div className={`relative border-b border-border bg-muted ${BLOG_COVER_ASPECT_CLASS}`}>
           <Skeleton className="absolute inset-0 rounded-none" />
           <div className="absolute left-3 top-3 flex gap-2">
-            <Skeleton className="h-6 w-20 rounded-full bg-white/80" />
-            <Skeleton className="h-6 w-16 rounded-full bg-white/80" />
+            <Skeleton className="h-6 w-20 rounded-full bg-card/80" />
+            <Skeleton className="h-6 w-16 rounded-full bg-card/80" />
           </div>
         </div>
         <div className="space-y-3 p-4">
@@ -62,8 +62,8 @@ function BlogFeedCardSkeleton() {
             <Skeleton className="h-4 w-20 rounded-md" />
           </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -71,8 +71,8 @@ export default function BlogList() {
   const navigate = useNavigate();
   const location = useLocation();
   const navigationType = useNavigationType();
-  const { user, profile, fetchProfile } = useAuthStore();
-  const isCreator = user?.role === 'creator';
+  const { user } = useAuthStore();
+  const isCreator = !!user;
 
   const {
     searchParams,
@@ -234,10 +234,6 @@ export default function BlogList() {
     return () => window.cancelAnimationFrame(rafId);
   }, [loading, navigationType, scrollStorageKey]);
 
-  useEffect(() => {
-    if (isCreator) void fetchProfile();
-  }, [fetchProfile, isCreator]);
-
   const handleGroupClick = (targetGroupId: string) => {
     if (!targetGroupId) return;
     if (selectedGroupId === targetGroupId) {
@@ -345,254 +341,234 @@ export default function BlogList() {
   }, [aiRecommendOpen]);
 
   return (
-    <div className="min-h-screen bg-transparent text-slate-900">
-      <div className="mx-auto max-w-[1500px] px-6 pb-20 pt-8 md:px-8 lg:px-10">
-        <section className="relative overflow-hidden rounded-[42px] border border-white/75 bg-white/80 px-6 py-8 shadow-[0_30px_85px_rgba(77,53,26,0.12)] md:px-9 md:py-10">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_18%,rgba(var(--theme-primary-rgb),0.18),transparent_38%),radial-gradient(circle_at_86%_12%,rgba(var(--theme-primary-rgb),0.12),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.95),rgba(var(--theme-primary-rgb),0.05))]" />
-          <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <span
-              className="absolute -left-10 top-8 h-28 w-28 rounded-full bg-theme-soft/55 blur-2xl animate-pulse"
-              style={{ animationDuration: '9s' }}
-            />
-            <span
-              className="absolute right-14 top-4 h-20 w-20 rounded-[28px] border border-theme-soft-strong/70 bg-white/45 rotate-12 animate-pulse"
-              style={{ animationDuration: '11s', animationDelay: '1.2s' }}
-            />
-            <span
-              className="absolute -bottom-8 right-28 h-36 w-36 rounded-full border border-theme-soft-strong/70 bg-theme-soft/45 blur-xl animate-pulse"
-              style={{ animationDuration: '12s', animationDelay: '0.6s' }}
-            />
-          </div>
-          <div className="relative grid gap-6 lg:grid-cols-[1.12fr_0.88fr]">
-            <div className="space-y-5">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/88 px-4 py-1.5 text-[11px] font-semibold tracking-[0.2em] uppercase text-theme-primary shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.16)]">
-                <Orbit className="h-3.5 w-3.5" />
-                Valley Blogs
-              </span>
-              <h1 className="text-[42px] font-semibold leading-[1.08] tracking-[-0.045em] text-slate-950 md:text-[54px]">
-                博客主题深读中心
-              </h1>
-              <p className="max-w-3xl text-sm leading-8 text-slate-600 md:text-base">
-                先选分组，再深读内容。我们把博客按主题聚合，让阅读路径更清晰、更高效、更有沉浸感。
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/92 px-4 py-2 text-sm text-slate-700">
-                  <BookOpen className="h-4 w-4 text-theme-primary" />
-                  {total} 篇博客
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/92 px-4 py-2 text-sm text-slate-700">
-                  <FolderTree className="h-4 w-4 text-theme-primary" />
-                  {groups.length} 个分组
-                </span>
-                {selectedGroupName && (
-                  <span className="inline-flex items-center gap-2 rounded-full border border-theme-soft-strong bg-theme-soft px-4 py-2 text-sm text-theme-primary">
-                    <Sparkles className="h-4 w-4" />
-                    当前：{selectedGroupName}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="rounded-[28px] border border-white/85 bg-white/92 p-4 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
-                <div className="mb-2 text-sm font-medium text-slate-700">搜索博客</div>
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-[1500px] px-4 pb-16 pt-6 sm:px-6 md:px-8 lg:px-10">
+        <Card className="border-border/50 overflow-hidden">
+          <CardContent className="p-6 sm:p-8 md:p-10">
+            <div className="grid gap-6 lg:grid-cols-[1.12fr_0.88fr]">
+              <div className="space-y-5">
+                <div className="inline-flex items-center gap-2 rounded-full border border-accent bg-accent/50 px-4 py-1.5 text-[11px] font-semibold tracking-[0.2em] uppercase text-primary">
+                  <Orbit className="h-3.5 w-3.5" />
+                  Valley Blogs
+                </div>
+                <h1 className="text-3xl font-semibold text-foreground md:text-4xl">
+                  博客主题深读中心
+                </h1>
+                <p className="max-w-3xl text-sm leading-8 text-muted-foreground md:text-base">
+                  先选分组，再深读内容。我们把博客按主题聚合，让阅读路径更清晰、更高效、更有沉浸感。
+                </p>
                 <div className="flex flex-wrap gap-2">
-                  <div className="relative min-w-[220px] grow">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      value={postKeywordInput}
-                      onChange={(event) => setPostKeywordInput(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') handlePostKeywordSearch();
-                      }}
-                      placeholder="搜索标题、摘要、关键词"
-                      className="theme-input-border h-11 w-full rounded-2xl border bg-white pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-theme-soft"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={handlePostKeywordSearch}
-                    className="theme-btn-primary h-11 rounded-2xl px-5"
-                  >
-                    搜索
-                  </Button>
-                  {currentKeyword ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={clearPostKeyword}
-                      className="h-11 rounded-2xl px-4 text-slate-500 hover:bg-theme-soft hover:text-slate-900"
-                    >
-                      清除
-                    </Button>
-                  ) : null}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="border-theme-soft-strong h-11 rounded-2xl px-4 text-theme-primary"
-                    onClick={() => setAIRecommendOpen(true)}
-                  >
-                    <Sparkles className="mr-1.5 h-4 w-4" />
-                    AI 推荐读哪篇
-                  </Button>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground">
+                    <BookOpen className="h-4 w-4 text-primary" />
+                    {total} 篇博客
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground">
+                    <FolderTree className="h-4 w-4 text-primary" />
+                    {groups.length} 个分组
+                  </span>
+                  {selectedGroupName && (
+                    <span className="inline-flex items-center gap-2 rounded-full border border-accent bg-accent/50 px-4 py-2 text-sm text-primary">
+                      <Sparkles className="h-4 w-4" />
+                      当前：{selectedGroupName}
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-white/85 bg-white/92 p-4 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <ArrowUpDown className="h-4 w-4 text-theme-primary" />
-                  排序方式
-                </div>
-                <div className="inline-flex items-center gap-1 rounded-full border border-theme-soft-strong bg-white p-1">
-                  <button
-                    type="button"
-                    onClick={() => handleSortChange('newest')}
-                    className={`rounded-full px-4 py-2 text-sm transition ${
-                      currentSort === 'newest'
-                        ? 'bg-theme-primary text-white'
-                        : 'text-slate-600 hover:bg-theme-soft'
-                    }`}
-                  >
-                    最新优先
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSortChange('oldest')}
-                    className={`rounded-full px-4 py-2 text-sm transition ${
-                      currentSort === 'oldest'
-                        ? 'bg-theme-primary text-white'
-                        : 'text-slate-600 hover:bg-theme-soft'
-                    }`}
-                  >
-                    最早优先
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+              <div className="space-y-4">
+                <Card className="border-border/50">
+                  <CardContent className="p-4">
+                    <div className="mb-2 text-sm font-medium text-foreground">搜索博客</div>
+                    <div className="flex flex-wrap gap-2">
+                      <div className="relative min-w-[220px] grow">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={postKeywordInput}
+                          onChange={(event) => setPostKeywordInput(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') handlePostKeywordSearch();
+                          }}
+                          placeholder="搜索标题、摘要、关键词"
+                          className="pl-10"
+                        />
+                      </div>
+                      <Button onClick={handlePostKeywordSearch}>搜索</Button>
+                      {currentKeyword && (
+                        <Button
+                          variant="ghost"
+                          onClick={clearPostKeyword}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          清除
+                        </Button>
+                      )}
+                      <Button variant="outline" onClick={() => setAIRecommendOpen(true)}>
+                        <Sparkles className="mr-1.5 h-4 w-4" />
+                        AI 推荐读哪篇
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
 
-        <section className="mt-8 rounded-[30px] border border-white/80 bg-white/84 p-4 shadow-[0_22px_52px_rgba(148,163,184,0.12)]">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-              <FolderTree className="h-4 w-4 text-theme-primary" />
-              分组优先导航
-            </div>
-            {(selectedGroupId || currentKeyword) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="rounded-full px-3 text-slate-500 hover:bg-theme-soft hover:text-slate-900"
-              >
-                <X className="mr-1 h-3.5 w-3.5" />
-                清空筛选
-              </Button>
-            )}
-          </div>
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-            <button
-              type="button"
-              onClick={() => setValue('groupId', '')}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm transition ${
-                !selectedGroupId
-                  ? 'bg-theme-primary text-white shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.28)]'
-                  : 'bg-[#fbfaf8] text-slate-600 hover:bg-white hover:text-slate-950'
-              }`}
-            >
-              全部分组
-              <span className="ml-1.5 text-xs opacity-70">{allPostsTotal}</span>
-            </button>
-            {topGroups.map((group) => (
-              <button
-                type="button"
-                key={group.id}
-                onClick={() => handleGroupClick(group.id)}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm transition ${
-                  selectedGroupId === group.id
-                    ? 'bg-theme-primary text-white shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.28)]'
-                    : 'bg-[#fbfaf8] text-slate-600 hover:bg-white hover:text-slate-950'
-                }`}
-              >
-                {group.name}
-                <span className="ml-1.5 text-xs opacity-70">{group.count}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-8 grid gap-7 xl:grid-cols-[330px_minmax(0,1fr)]">
-          <aside className="space-y-4 xl:sticky xl:top-20 xl:self-start">
-            <div className="rounded-[28px] border border-white/80 bg-white/88 p-5 shadow-[0_18px_44px_rgba(148,163,184,0.12)]">
-              <div className="mb-3 flex items-center gap-2 text-slate-900">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-theme-soft text-theme-primary">
-                  <FolderTree className="h-4 w-4" />
-                </span>
-                <span className="text-base font-semibold">分组矩阵</span>
-              </div>
-
-              {metaLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 6 }).map((_, index) => (
-                    <Skeleton key={index} className="h-11 rounded-[14px]" />
-                  ))}
-                </div>
-              ) : groupData.length === 0 ? (
-                <p className="text-sm leading-7 text-slate-500">还没有可用分组。</p>
-              ) : (
-                <div className="space-y-3">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      value={groupKeyword}
-                      onChange={(event) => setGroupKeyword(event.target.value)}
-                      placeholder="搜索分组"
-                      className="theme-input-border h-10 w-full rounded-xl border bg-white pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-theme-soft"
-                    />
-                  </div>
-
-                  <div className="max-h-[440px] space-y-2 overflow-auto pr-1">
-                    {visibleGroupData.map((group) => (
+                <Card className="border-border/50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2 text-sm font-medium text-foreground">
+                      <ArrowUpDown className="h-4 w-4 text-primary" />
+                      排序方式
+                    </div>
+                    <div className="inline-flex items-center gap-1 rounded-full border border-accent bg-card p-1">
                       <button
                         type="button"
-                        key={group.id}
-                        onClick={() => handleGroupClick(group.id)}
-                        className={`flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left text-sm transition ${
-                          selectedGroupId === group.id
-                            ? 'bg-theme-primary text-white shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.28)]'
-                            : 'bg-[#fbfaf8] text-slate-600 hover:bg-white hover:text-slate-950'
+                        onClick={() => handleSortChange('newest')}
+                        className={`rounded-full px-4 py-2 text-sm transition ${
+                          currentSort === 'newest'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-accent'
                         }`}
                       >
-                        <span className="min-w-0 truncate pr-2 font-medium">{group.name}</span>
-                        <span className="text-xs opacity-70">{group.count}</span>
+                        最新优先
                       </button>
-                    ))}
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSortChange('oldest')}
+                        className={`rounded-full px-4 py-2 text-sm transition ${
+                          currentSort === 'oldest'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-accent'
+                        }`}
+                      >
+                        最早优先
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                  {filteredGroupData.length === 0 ? (
-                    <p className="text-sm text-slate-500">未找到匹配分组。</p>
-                  ) : filteredGroupData.length > 14 ? (
-                    <Button
-                      variant="outline"
-                      className="border-theme-soft-strong w-full rounded-full bg-white text-theme-primary"
-                      onClick={() => setShowAllGroups((prev) => !prev)}
-                    >
-                      {showAllGroups
-                        ? '收起分组列表'
-                        : `查看更多分组${hiddenGroupCount > 0 ? `（+${hiddenGroupCount}）` : ''}`}
-                    </Button>
-                  ) : null}
-                </div>
+        <Card className="border-border/50 mt-6">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <FolderTree className="h-4 w-4 text-primary" />
+                分组优先导航
+              </div>
+              {(selectedGroupId || currentKeyword) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="mr-1 h-3.5 w-3.5" />
+                  清空筛选
+                </Button>
               )}
             </div>
-
-            {isCreator && profile?.creatorCode && (
-              <Button
-                onClick={() => navigate('/my-space/posts')}
-                className="theme-btn-primary h-11 w-full gap-2 rounded-2xl"
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              <button
+                type="button"
+                onClick={() => setValue('groupId', '')}
+                className={`shrink-0 rounded-full px-4 py-2 text-sm transition ${
+                  !selectedGroupId
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary text-muted-foreground hover:bg-accent'
+                }`}
               >
-                <ExternalLink className="h-4 w-4" />
-                前往我的创作者空间
+                全部分组
+                <span className="ml-1.5 text-xs opacity-70">{allPostsTotal}</span>
+              </button>
+              {topGroups.map((group) => (
+                <button
+                  type="button"
+                  key={group.id}
+                  onClick={() => handleGroupClick(group.id)}
+                  className={`shrink-0 rounded-full px-4 py-2 text-sm transition ${
+                    selectedGroupId === group.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-muted-foreground hover:bg-accent'
+                  }`}
+                >
+                  {group.name}
+                  <span className="ml-1.5 text-xs opacity-70">{group.count}</span>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="mt-6 grid gap-7 xl:grid-cols-[330px_minmax(0,1fr)]">
+          <aside className="space-y-4 xl:sticky xl:top-20 xl:self-start">
+            <Card className="border-border/50">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 mb-3 text-foreground">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-accent/50 text-primary">
+                    <FolderTree className="h-4 w-4" />
+                  </span>
+                  <span className="text-base font-semibold">分组矩阵</span>
+                </div>
+
+                {metaLoading ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 6 }).map((_, index) => (
+                      <Skeleton key={index} className="h-11 rounded-lg" />
+                    ))}
+                  </div>
+                ) : groupData.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">还没有可用分组。</p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={groupKeyword}
+                        onChange={(event) => setGroupKeyword(event.target.value)}
+                        placeholder="搜索分组"
+                        className="h-10 pl-9"
+                      />
+                    </div>
+
+                    <div className="max-h-[440px] space-y-2 overflow-auto pr-1">
+                      {visibleGroupData.map((group) => (
+                        <button
+                          type="button"
+                          key={group.id}
+                          onClick={() => handleGroupClick(group.id)}
+                          className={`flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm transition ${
+                            selectedGroupId === group.id
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-secondary text-muted-foreground hover:bg-accent'
+                          }`}
+                        >
+                          <span className="min-w-0 truncate pr-2 font-medium">{group.name}</span>
+                          <span className="text-xs opacity-70">{group.count}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {filteredGroupData.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">未找到匹配分组。</p>
+                    ) : filteredGroupData.length > 14 ? (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => setShowAllGroups((prev) => !prev)}
+                      >
+                        {showAllGroups
+                          ? '收起分组列表'
+                          : `查看更多分组${hiddenGroupCount > 0 ? `（+${hiddenGroupCount}）` : ''}`}
+                      </Button>
+                    ) : null}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {isCreator && (
+              <Button onClick={() => navigate('/my-space/posts')} className="w-full">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                前往我的创作空间
               </Button>
             )}
           </aside>
@@ -605,61 +581,56 @@ export default function BlogList() {
                 ))}
               </div>
             ) : showEmptyRefreshingState ? (
-              <div className="rounded-[34px] border border-dashed border-theme-soft-strong bg-white/82 px-8 py-16 text-center shadow-[0_24px_56px_rgba(148,163,184,0.1)]">
-                <div className="mx-auto flex max-w-xl flex-col items-center gap-3 text-slate-500">
-                  <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-theme-soft text-theme-primary shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.18)]">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                  </span>
-                  <h3 className="text-2xl font-semibold text-slate-900">正在切换分组结果</h3>
-                  <p className="text-sm leading-8 text-slate-500">
-                    {selectedGroupName
-                      ? `正在读取分组「${selectedGroupName}」的博客内容，请稍候。`
-                      : '正在刷新当前筛选结果，请稍候。'}
-                  </p>
-                </div>
-              </div>
+              <Card className="border-dashed border-border">
+                <CardContent className="px-8 py-16 text-center">
+                  <div className="mx-auto flex max-w-xl flex-col items-center gap-3 text-muted-foreground">
+                    <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-accent/50 text-primary">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </span>
+                    <h3 className="text-xl font-semibold text-foreground">正在切换分组结果</h3>
+                    <p className="text-sm">
+                      {selectedGroupName
+                        ? `正在读取分组「${selectedGroupName}」的博客内容，请稍候。`
+                        : '正在刷新当前筛选结果，请稍候。'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
             ) : posts.length === 0 ? (
-              <div className="rounded-[34px] border border-dashed border-theme-soft-strong bg-white/76 px-8 py-16 text-center shadow-[0_24px_56px_rgba(148,163,184,0.1)]">
-                <div className="mx-auto max-w-xl space-y-3">
-                  <h3 className="text-2xl font-semibold text-slate-900">当前筛选下暂无博客</h3>
-                  <p className="text-sm leading-8 text-slate-500">
-                    {currentKeyword
-                      ? `没有找到包含“${currentKeyword}”的博客，试试其他关键词。`
-                      : selectedGroupName
-                        ? `当前分组「${selectedGroupName}」暂无博客，可以切换分组继续阅读。`
-                        : '新的博客发布后会优先展示在这里。'}
-                  </p>
-                </div>
-              </div>
+              <Card className="border-dashed border-border">
+                <CardContent className="px-8 py-16 text-center">
+                  <div className="mx-auto max-w-xl space-y-3">
+                    <h3 className="text-xl font-semibold text-foreground">当前筛选下暂无博客</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {currentKeyword
+                        ? `没有找到包含"${currentKeyword}"的博客，试试其他关键词。`
+                        : selectedGroupName
+                          ? `当前分组「${selectedGroupName}」暂无博客，可以切换分组继续阅读。`
+                          : '新的博客发布后会优先展示在这里。'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
             ) : (
               <>
                 <div className="relative">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <div className="text-sm text-slate-500">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div className="text-sm text-muted-foreground">
                       {selectedGroupName
                         ? `当前分组：${selectedGroupName} · 第 ${currentPage} / ${totalPages} 页`
                         : `第 ${currentPage} / ${totalPages} 页 · 共 ${total} 篇博客`}
                     </div>
-                    {currentKeyword ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-theme-soft px-3 py-1 text-xs text-theme-primary">
+                    {currentKeyword && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-accent/50 px-3 py-1 text-xs text-primary">
                         <Search className="h-3.5 w-3.5" />
                         关键词：{currentKeyword}
                       </span>
-                    ) : null}
+                    )}
                   </div>
 
-                  <div
-                    className={`grid gap-5 transition-opacity duration-200 md:grid-cols-2 xl:grid-cols-3 ${
-                      refreshing ? 'opacity-75' : 'opacity-100'
-                    }`}
-                  >
+                  <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                     {posts.map((post) => (
-                      <div
-                        key={post.id}
-                        className="rounded-[30px] bg-white/68 p-2 shadow-[0_14px_40px_rgba(148,163,184,0.08)]"
-                      >
-                        <BlogFeedCard post={post} />
-                      </div>
+                      <BlogFeedCard key={post.id} post={post} />
                     ))}
                   </div>
                   <BoxLoadingOverlay
@@ -669,33 +640,31 @@ export default function BlogList() {
                   />
                 </div>
 
-                {total > PAGE_SIZE ? (
+                {total > PAGE_SIZE && (
                   <div className="flex flex-wrap items-center justify-center gap-3">
                     <Button
                       variant="outline"
-                      className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
                       disabled={currentPage <= 1 || refreshing}
                       onClick={() => setValue('page', currentPage - 1)}
                     >
                       上一页
                     </Button>
-                    <span className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-500 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
+                    <span className="rounded-full bg-card px-4 py-2 text-sm text-muted-foreground">
                       第 {currentPage} / {totalPages} 页
                     </span>
                     <Button
                       variant="outline"
-                      className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
                       disabled={currentPage >= totalPages || refreshing}
                       onClick={() => setValue('page', currentPage + 1)}
                     >
                       下一页
                     </Button>
                   </div>
-                ) : null}
+                )}
               </>
             )}
           </div>
-        </section>
+        </div>
       </div>
 
       <div
@@ -705,22 +674,22 @@ export default function BlogList() {
           type="button"
           aria-label="关闭 AI 推荐抽屉"
           onClick={() => setAIRecommendOpen(false)}
-          className={`absolute inset-0 bg-slate-900/28 transition-opacity duration-200 ${aiRecommendOpen ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 bg-foreground/15 transition-opacity duration-200 ${aiRecommendOpen ? 'opacity-100' : 'opacity-0'}`}
         />
         <aside
-          className={`absolute right-0 top-0 h-full w-[min(92vw,560px)] border-l border-theme-soft-strong bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,252,247,0.95))] shadow-[-24px_0_60px_rgba(66,42,18,0.2)] transition-transform duration-300 ease-out ${aiRecommendOpen ? 'translate-x-0' : 'translate-x-full'}`}
+          className={`absolute right-0 top-0 h-full w-[min(92vw,560px)] border-l border-border bg-background shadow-lg transition-transform duration-300 ease-out ${aiRecommendOpen ? 'translate-x-0' : 'translate-x-full'}`}
         >
           <div className="flex h-full flex-col">
-            <div className="border-b border-theme-soft-strong px-5 py-4">
+            <div className="border-b border-border px-5 py-4">
               <div className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <Sparkles className="h-4 w-4 text-theme-primary animate-pulse" />
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Sparkles className="h-4 w-4 text-primary animate-pulse" />
                   AI 阅读路线
                 </span>
                 <button
                   type="button"
                   onClick={() => setAIRecommendOpen(false)}
-                  className="rounded-full bg-white/90 px-2.5 py-1 text-[11px] text-slate-500 transition hover:text-slate-800"
+                  className="rounded-full bg-card px-2.5 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
                 >
                   关闭
                 </button>
@@ -729,24 +698,20 @@ export default function BlogList() {
 
             <div className="flex-1 space-y-3 overflow-y-auto px-5 pb-5 pt-4">
               <div className="flex gap-2">
-                <input
+                <Input
                   value={aiPrompt}
                   onChange={(event) => setAIPrompt(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') {
                       event.preventDefault();
                       void handleAIRecommend();
+                    } else if (event.key === 'Escape') {
+                      setAIRecommendOpen(false);
                     }
                   }}
                   placeholder="例如：想看 JS 异步、CSS 布局、React 性能优化"
-                  className="theme-input-border h-10 min-w-0 flex-1 rounded-xl border bg-white px-3 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-theme-soft"
                 />
-                <Button
-                  type="button"
-                  className="theme-btn-primary h-10 rounded-xl px-4"
-                  onClick={() => void handleAIRecommend()}
-                  disabled={aiRecommendLoading}
-                >
+                <Button onClick={() => void handleAIRecommend()} disabled={aiRecommendLoading}>
                   {aiRecommendLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '生成推荐'}
                 </Button>
               </div>
@@ -760,16 +725,14 @@ export default function BlogList() {
                       setAIPrompt(intent);
                       setAIRecommendError('');
                     }}
-                    className="rounded-full border border-theme-soft-strong bg-white/90 px-2.5 py-1 text-[11px] text-slate-600 transition hover:bg-theme-soft hover:text-theme-primary"
+                    className="rounded-full border border-accent bg-card px-2.5 py-1 text-[11px] text-muted-foreground transition hover:bg-accent hover:text-primary"
                   >
                     {intent}
                   </button>
                 ))}
               </div>
 
-              {aiRecommendError ? (
-                <p className="text-xs text-rose-600">{aiRecommendError}</p>
-              ) : null}
+              {aiRecommendError && <p className="text-xs text-destructive">{aiRecommendError}</p>}
 
               {aiRecommendResult?.items?.length ? (
                 <div className="space-y-2">
@@ -787,34 +750,34 @@ export default function BlogList() {
                           },
                         });
                       }}
-                      className="w-full rounded-xl border border-theme-soft-strong bg-theme-soft/35 px-3 py-2 text-left transition hover:-translate-y-0.5 hover:bg-theme-soft/70 hover:shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.2)]"
+                      className="w-full rounded-lg border border-accent bg-accent/35 px-3 py-2 text-left transition hover:bg-accent/70"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="line-clamp-2 text-sm font-medium text-slate-800">
+                        <div className="line-clamp-2 text-sm font-medium text-foreground">
                           {index + 1}. {item.title}
                         </div>
-                        <span className="shrink-0 rounded-full bg-white/90 px-2 py-0.5 text-[10px] text-slate-500">
+                        <span className="shrink-0 rounded-full bg-card px-2 py-0.5 text-[10px] text-muted-foreground">
                           约 {item.readMinutes} 分钟
                         </span>
                       </div>
-                      {item.excerpt ? (
-                        <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-slate-500">
+                      {item.excerpt && (
+                        <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
                           {item.excerpt}
                         </p>
-                      ) : null}
+                      )}
                       <div className="mt-1.5 flex items-center gap-2 text-[11px]">
-                        {item.groupName ? (
-                          <span className="rounded-full bg-white/90 px-2 py-0.5 text-theme-primary">
+                        {item.groupName && (
+                          <span className="rounded-full bg-card px-2 py-0.5 text-primary">
                             {item.groupName}
                           </span>
-                        ) : null}
-                        <span className="text-slate-600">{item.reason}</span>
+                        )}
+                        <span className="text-muted-foreground">{item.reason}</span>
                       </div>
                     </button>
                   ))}
                 </div>
               ) : aiPrompt && !aiRecommendLoading && !aiRecommendError ? (
-                <p className="rounded-xl bg-white/90 px-3 py-2 text-xs text-slate-500">
+                <p className="rounded-lg bg-card px-3 py-2 text-xs text-muted-foreground">
                   这次没有推荐结果，可以换个更具体的意图再试试。
                 </p>
               ) : null}

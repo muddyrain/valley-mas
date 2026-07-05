@@ -25,10 +25,10 @@ export default function EmptyState({
   description,
   actionLabel,
   onAction,
-  iconBg = 'bg-theme-soft',
-  iconColor = 'text-theme-primary',
+  iconBg = 'bg-accent',
+  iconColor = 'text-primary',
   padding = 'py-24',
-  actionClassName = 'theme-btn-primary rounded-xl px-8 font-semibold',
+  actionClassName = 'bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl px-8 font-semibold',
 }: EmptyStateProps) {
   return (
     <div className={`flex flex-col items-center justify-center text-center ${padding}`}>
@@ -38,9 +38,9 @@ export default function EmptyState({
       >
         <Icon className={`h-12 w-12 ${iconColor}`} />
       </div>
-      <h3 className="mb-2 text-xl font-semibold text-slate-700">{title}</h3>
+      <h3 className="mb-2 text-xl font-semibold text-foreground">{title}</h3>
       {description ? (
-        <p className="mb-6 max-w-xs leading-relaxed text-slate-500">{description}</p>
+        <p className="mb-6 max-w-xs leading-relaxed text-muted-foreground">{description}</p>
       ) : null}
       {actionLabel && onAction ? (
         <Button onClick={onAction} className={actionClassName}>

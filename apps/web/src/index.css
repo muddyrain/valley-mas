@@ -4,49 +4,95 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  /* ─── Tailwind 内置色板 ─── */
-  --color-purple-50: #faf5ff;
-  --color-purple-100: #f3e8ff;
-  --color-purple-200: #e9d5ff;
-  --color-purple-300: #d8b4fe;
-  --color-purple-400: #c084fc;
-  --color-purple-500: #a855f7;
-  --color-purple-600: #9333ea;
-  --color-purple-700: #7e22ce;
-  --color-purple-800: #6b21a8;
-  --color-purple-900: #581c87;
-  --color-purple-950: #3b0764;
+  --color-background: #ffffff;
+  --color-foreground: #0d0b0a;
+  --color-card: #ffffff;
+  --color-card-foreground: #0d0b0a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0d0b0a;
+  --color-primary: #f8c52a;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #fef3c7;
+  --color-secondary-foreground: #78350f;
+  --color-muted: #fefce8;
+  --color-muted-foreground: #57534e;
+  --color-accent: #fef3c7;
+  --color-accent-foreground: #78350f;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e7e5e4;
+  --color-input: #e7e5e4;
+  --color-ring: #f8c52a;
+  --radius-sm: 0.6rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 0.9rem;
+  --radius-xl: 1.125rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 1.875rem;
+}
 
-  --color-indigo-50: #eef2ff;
-  --color-indigo-100: #e0e7ff;
-  --color-indigo-200: #c7d2fe;
-  --color-indigo-300: #a5b4fc;
-  --color-indigo-400: #818cf8;
-  --color-indigo-500: #6366f1;
-  --color-indigo-600: #4f46e5;
-  --color-indigo-700: #4338ca;
-  --color-indigo-800: #3730a3;
-  --color-indigo-900: #312e81;
-  --color-indigo-950: #1e1b4b;
+:root {
+  --background: #ffffff;
+  --foreground: #0d0b0a;
+  --card: #ffffff;
+  --card-foreground: #0d0b0a;
+  --popover: #ffffff;
+  --popover-foreground: #0d0b0a;
+  --primary: #f8c52a;
+  --primary-foreground: #ffffff;
+  --secondary: #fef3c7;
+  --secondary-foreground: #78350f;
+  --muted: #fefce8;
+  --muted-foreground: #57534e;
+  --accent: #fef3c7;
+  --accent-foreground: #78350f;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e7e5e4;
+  --input: #e7e5e4;
+  --ring: #f8c52a;
+}
 
-  /* ─── 主题色 Token → 映射到运行时 CSS 变量 ─── */
-  /* 直接颜色 */
-  --color-theme-primary: var(--theme-primary);
-  --color-theme-primary-hover: var(--theme-primary-hover);
-  --color-theme-primary-deep: var(--theme-primary-deep);
-  /* 柔和背景色 */
-  --color-theme-soft: var(--theme-primary-soft);
-  --color-theme-soft-strong: var(--theme-primary-soft-strong);
-  --color-theme-surface-alt: var(--theme-surface-alt);
-  /* 边框色 */
-  --color-theme-shell-border: var(--theme-shell-border);
-  --color-theme-border: var(--theme-border);
-  --color-theme-panel-border: var(--theme-panel-border);
-  /* 页面背景分段色 */
-  --color-theme-page-start: var(--theme-page-start);
-  --color-theme-page-mid: var(--theme-page-mid);
-  --color-theme-page-cool: var(--theme-page-cool);
-  --color-theme-page-end: var(--theme-page-end);
+.dark {
+  --color-background: #1b1918;
+  --color-foreground: #fafafa;
+  --color-card: #1a1514;
+  --color-card-foreground: #fafafa;
+  --color-popover: #1a1514;
+  --color-popover-foreground: #fafafa;
+  --color-primary: #fcd34d;
+  --color-primary-foreground: #1c1917;
+  --color-secondary: #292524;
+  --color-secondary-foreground: #fafafa;
+  --color-muted: #292524;
+  --color-muted-foreground: #a8a29e;
+  --color-accent: #292524;
+  --color-accent-foreground: #fcd34d;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #292524;
+  --color-input: #292524;
+  --color-ring: #fcd34d;
+
+  --background: #1b1918;
+  --foreground: #fafafa;
+  --card: #1a1514;
+  --card-foreground: #fafafa;
+  --popover: #1a1514;
+  --popover-foreground: #fafafa;
+  --primary: #fcd34d;
+  --primary-foreground: #1c1917;
+  --secondary: #292524;
+  --secondary-foreground: #fafafa;
+  --muted: #292524;
+  --muted-foreground: #a8a29e;
+  --accent: #292524;
+  --accent-foreground: #fcd34d;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #292524;
+  --input: #292524;
+  --ring: #fcd34d;
 }
 
 @layer base {
@@ -61,22 +107,17 @@
     }
   }
 
-  * {
-    @apply box-border;
-  }
-
   body {
-    @apply text-gray-900 antialiased min-h-screen;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     width: 100%;
     margin: 0;
     overflow-x: hidden;
-    background: linear-gradient(
-      180deg,
-      var(--theme-page-start) 0%,
-      var(--theme-page-mid) 24%,
-      var(--theme-page-cool) 56%,
-      var(--theme-page-end) 100%
-    );
+    min-height: 100vh;
   }
 
   #root {
@@ -85,376 +126,26 @@
     overflow-x: clip;
   }
 
-  /* 滚动条样式 */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-gray-100 rounded-full;
+    background-color: var(--muted);
+    border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 rounded-full hover:bg-gray-400;
+    background-color: var(--border);
+    border-radius: 9999px;
   }
 
-  /* 自定义动画 */
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--muted-foreground), transparent 70%);
+  }
 }
 
-/* ════════════════════════════════════════════════
-   主题 CSS 变量（运行时，通过 data-theme 切换）
-   Tailwind token 在 @theme 中已映射到这些变量，
-   因此所有 bg-theme-* / text-theme-* 工具类会
-   随主题自动变色。
-   ════════════════════════════════════════════════ */
-
-:root {
-  /* —— 默认主题 = rose —— */
-  --theme-page-start: #fff8f9;
-  --theme-page-mid: #fffdfd;
-  --theme-page-cool: #fbf7ff;
-  --theme-page-end: #fff7f8;
-  --theme-primary: #c87485;
-  --theme-primary-hover: #b86476;
-  --theme-primary-deep: #9a4c5e;
-  --theme-primary-soft: #fff0f4;
-  --theme-primary-soft-strong: #f6d7df;
-  --theme-surface-alt: #f3f3ff;
-  --theme-shell-border: #f0d6dc;
-  --theme-border: #ead5db;
-  --theme-primary-rgb: 200, 116, 133;
-  --theme-secondary-rgb: 168, 139, 250;
-  --theme-tertiary-rgb: 244, 114, 182;
-  --theme-hero-background: radial-gradient(
-    circle at top left,
-    rgba(255, 255, 255, 0.96),
-    rgba(255, 241, 245, 0.95) 42%,
-    rgba(248, 243, 255, 0.95) 100%
-  );
-  --theme-panel-background: linear-gradient(
-    180deg,
-    rgba(255, 243, 246, 0.95),
-    rgba(255, 255, 255, 0.9)
-  );
-  --theme-panel-border: #edd5db;
-
-  /* —— shadcn/ui 语义 token（指向主题变量）—— */
-  --background: #ffffff;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: var(--theme-primary);
-  --primary-foreground: #ffffff;
-  --secondary: var(--theme-primary-soft);
-  --secondary-foreground: #0f172a;
-  --muted: var(--theme-primary-soft);
-  --muted-foreground: #64748b;
-  --accent: var(--theme-primary-soft);
-  --accent-foreground: var(--theme-primary);
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: var(--theme-border);
-  --input: var(--theme-border);
-  --ring: var(--theme-primary-hover);
-  --radius: 0.75rem;
-}
-
-:root[data-theme="amber"] {
-  --theme-page-start: #fffaf5;
-  --theme-page-mid: #fffefc;
-  --theme-page-cool: #f7fbff;
-  --theme-page-end: #fffaf6;
-  --theme-primary: #b87731;
-  --theme-primary-hover: #a56827;
-  --theme-primary-deep: #8f5c22;
-  --theme-primary-soft: #fff5e9;
-  --theme-primary-soft-strong: #f3dcc0;
-  --theme-surface-alt: #edf6ff;
-  --theme-shell-border: #eedcc8;
-  --theme-border: #e7d8c6;
-  --theme-primary-rgb: 184, 119, 49;
-  --theme-secondary-rgb: 96, 165, 250;
-  --theme-tertiary-rgb: 251, 191, 36;
-  --theme-hero-background: radial-gradient(
-    circle at top left,
-    rgba(255, 255, 255, 0.96),
-    rgba(255, 246, 231, 0.96) 42%,
-    rgba(255, 248, 238, 0.94) 100%
-  );
-  --theme-panel-background: linear-gradient(
-    180deg,
-    rgba(255, 248, 238, 0.95),
-    rgba(255, 255, 255, 0.9)
-  );
-  --theme-panel-border: #ead7c2;
-}
-
-:root[data-theme="rose"] {
-  --theme-page-start: #fff8f9;
-  --theme-page-mid: #fffdfd;
-  --theme-page-cool: #fbf7ff;
-  --theme-page-end: #fff7f8;
-  --theme-primary: #c87485;
-  --theme-primary-hover: #b86476;
-  --theme-primary-deep: #9a4c5e;
-  --theme-primary-soft: #fff0f4;
-  --theme-primary-soft-strong: #f6d7df;
-  --theme-surface-alt: #f3f3ff;
-  --theme-shell-border: #f0d6dc;
-  --theme-border: #ead5db;
-  --theme-primary-rgb: 200, 116, 133;
-  --theme-secondary-rgb: 168, 139, 250;
-  --theme-tertiary-rgb: 244, 114, 182;
-  --theme-hero-background: radial-gradient(
-    circle at top left,
-    rgba(255, 255, 255, 0.96),
-    rgba(255, 241, 245, 0.95) 42%,
-    rgba(248, 243, 255, 0.95) 100%
-  );
-  --theme-panel-background: linear-gradient(
-    180deg,
-    rgba(255, 243, 246, 0.95),
-    rgba(255, 255, 255, 0.9)
-  );
-  --theme-panel-border: #edd5db;
-}
-
-:root[data-theme="ocean"] {
-  --theme-page-start: #f6fbff;
-  --theme-page-mid: #fcfeff;
-  --theme-page-cool: #eff7ff;
-  --theme-page-end: #f7fbff;
-  --theme-primary: #3d7eb5;
-  --theme-primary-hover: #336f9f;
-  --theme-primary-deep: #24557f;
-  --theme-primary-soft: #edf6ff;
-  --theme-primary-soft-strong: #d5e8fb;
-  --theme-surface-alt: #eefaf7;
-  --theme-shell-border: #d7e5f1;
-  --theme-border: #cfe0ee;
-  --theme-primary-rgb: 61, 126, 181;
-  --theme-secondary-rgb: 45, 212, 191;
-  --theme-tertiary-rgb: 96, 165, 250;
-  --theme-hero-background: radial-gradient(
-    circle at top left,
-    rgba(255, 255, 255, 0.96),
-    rgba(237, 246, 255, 0.96) 42%,
-    rgba(240, 251, 248, 0.94) 100%
-  );
-  --theme-panel-background: linear-gradient(
-    180deg,
-    rgba(239, 247, 255, 0.96),
-    rgba(255, 255, 255, 0.9)
-  );
-  --theme-panel-border: #d2e4f3;
-}
-
-:root[data-theme="forest"] {
-  --theme-page-start: #f8fcf8;
-  --theme-page-mid: #fcfffc;
-  --theme-page-cool: #f3faf6;
-  --theme-page-end: #f8fcf8;
-  --theme-primary: #5b8d6c;
-  --theme-primary-hover: #4c7a5d;
-  --theme-primary-deep: #355743;
-  --theme-primary-soft: #eff8f1;
-  --theme-primary-soft-strong: #d9eadf;
-  --theme-surface-alt: #eef7ff;
-  --theme-shell-border: #dbe7de;
-  --theme-border: #d4e3d8;
-  --theme-primary-rgb: 91, 141, 108;
-  --theme-secondary-rgb: 96, 165, 250;
-  --theme-tertiary-rgb: 74, 222, 128;
-  --theme-hero-background: radial-gradient(
-    circle at top left,
-    rgba(255, 255, 255, 0.96),
-    rgba(239, 248, 241, 0.96) 42%,
-    rgba(243, 250, 246, 0.94) 100%
-  );
-  --theme-panel-background: linear-gradient(
-    180deg,
-    rgba(241, 249, 243, 0.96),
-    rgba(255, 255, 255, 0.9)
-  );
-  --theme-panel-border: #d7e5da;
-}
-
-.dark {
-  --background: #0f172a;
-  --foreground: #f8fafc;
-  --card: #1e293b;
-  --card-foreground: #f8fafc;
-  --popover: #1e293b;
-  --popover-foreground: #f8fafc;
-  --primary: #a855f7;
-  --primary-foreground: #ffffff;
-  --secondary: #334155;
-  --secondary-foreground: #f8fafc;
-  --muted: #334155;
-  --muted-foreground: #94a3b8;
-  --accent: #581c87;
-  --accent-foreground: #e9d5ff;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: #334155;
-  --input: #334155;
-  --ring: #a855f7;
-}
-
-/* ════════════════════════════════════════════════
-   @theme inline：将 shadcn/ui 语义 token 注入
-   Tailwind 颜色系统，使 bg-primary / text-muted 等
-   工具类生效。
-   ════════════════════════════════════════════════ */
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) * 0.8);
-  --radius-md: var(--radius);
-  --radius-lg: calc(var(--radius) * 1.2);
-  --radius-xl: calc(var(--radius) * 1.5);
-  --radius-2xl: calc(var(--radius) * 2);
-  --radius-3xl: calc(var(--radius) * 2.5);
-}
-
-/* ════ 通用语义工具类 ════ */
-
-/* ——— Header ——— */
-.theme-header {
-  border-color: color-mix(in srgb, var(--theme-shell-border) 80%, transparent);
-  box-shadow: 0 10px 30px rgba(var(--theme-primary-rgb), 0.08);
-}
-
-/* Logo 图标渐变 */
-.theme-logo-icon {
-  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-deep));
-  box-shadow: 0 12px 24px rgba(var(--theme-primary-rgb), 0.22);
-}
-.theme-logo-icon:hover {
-  box-shadow: 0 16px 30px rgba(var(--theme-primary-rgb), 0.28);
-}
-
-/* Logo 文字渐变 */
-.theme-logo-text {
-  @apply bg-clip-text text-transparent;
-  background-image: linear-gradient(
-    90deg,
-    var(--theme-primary) 0%,
-    var(--theme-primary-hover) 50%,
-    var(--theme-primary-deep) 100%
-  );
-}
-
-/* Avatar fallback 渐变 */
-.theme-avatar-fallback {
-  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-deep));
-}
-
-/* ——— 主操作按钮 ——— */
-.theme-btn-primary {
-  @apply text-white transition-all duration-200;
-  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-deep));
-  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.22);
-}
-.theme-btn-primary:hover {
-  background: linear-gradient(135deg, var(--theme-primary-hover), var(--theme-primary-deep));
-  box-shadow: 0 16px 30px rgba(var(--theme-primary-rgb), 0.28);
-  transform: scale(1.05);
-}
-
-/* ——— Eyebrow badge ——— */
-.theme-eyebrow {
-  @apply border text-theme-primary;
-  border-color: var(--theme-shell-border);
-  box-shadow: 0 10px 24px rgba(var(--theme-primary-rgb), 0.08);
-}
-
-/* ——— Hero shell ——— */
-.theme-hero-shell {
-  @apply border;
-  border-color: var(--theme-shell-border);
-  background: var(--theme-hero-background);
-  box-shadow: 0 24px 80px rgba(var(--theme-primary-rgb), 0.18);
-}
-
-/* ——— Hero glow overlay ——— */
-.theme-hero-glow {
-  background:
-    radial-gradient(circle at 12% 18%, rgba(var(--theme-tertiary-rgb), 0.18), transparent 24%),
-    radial-gradient(circle at 88% 20%, rgba(var(--theme-secondary-rgb), 0.16), transparent 22%),
-    radial-gradient(circle at 80% 72%, rgba(var(--theme-primary-rgb), 0.12), transparent 28%);
-}
-
-/* ——— Panel shell ——— */
-.theme-panel-shell {
-  @apply border;
-  border-color: var(--theme-panel-border);
-  background: var(--theme-panel-background);
-  box-shadow: 0 22px 56px rgba(var(--theme-primary-rgb), 0.1);
-}
-
-/* ——— Section shell ——— */
-.theme-section-shell {
-  @apply border;
-  border-color: var(--theme-shell-border);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--theme-primary-soft) 60%, white),
-    rgba(255, 255, 255, 0.88)
-  );
-  box-shadow: 0 22px 56px rgba(var(--theme-primary-rgb), 0.08);
-}
-
-/* ——— Card accent row ——— */
-.theme-card-accent-row {
-  @apply border;
-  border-color: var(--theme-shell-border);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--theme-primary-soft) 40%, white),
-    rgba(255, 255, 255, 0.9)
-  );
-  box-shadow: 0 22px 56px rgba(var(--theme-primary-rgb), 0.08);
-}
-
-/* ——— 渐变文字 ——— */
-.text-gradient {
-  @apply bg-clip-text text-transparent;
-  background-image: linear-gradient(
-    90deg,
-    var(--theme-primary) 0%,
-    var(--theme-primary-hover) 48%,
-    var(--theme-primary-deep) 100%
-  );
-}
-
-/* ——— Input border ——— */
-.theme-input-border {
-  @apply border-theme-border;
-  background-color: color-mix(in srgb, var(--theme-primary-soft) 30%, white);
-}
-
-/* 背景动画 - Blob效果 */
 @keyframes blob {
   0% {
     transform: translate(0px, 0px) scale(1);
@@ -486,46 +177,19 @@ button {
   cursor: pointer;
 }
 
-/* MotivationalFooter 专用动画 keyframes */
-@keyframes poem-glow {
-  0%,
-  100% {
-    box-shadow:
-      0 10px 26px rgba(var(--theme-primary-rgb), 0.2),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-  }
-  50% {
-    box-shadow:
-      0 12px 30px rgba(var(--theme-primary-rgb), 0.35),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-  }
-}
-
-@keyframes poem-breathe {
-  0%,
-  100% {
-    opacity: 0.92;
-  }
-  50% {
-    opacity: 1;
-    text-shadow: 0 0 12px rgba(255, 255, 255, 0.22);
-  }
-}
-
-/* ——— PlayCaptcha 主题定制 ——— */
 .clawcap {
   box-shadow:
-    0 0 0 0.5px rgba(var(--theme-primary-rgb), 0.12),
-    0 2px 8px rgba(var(--theme-primary-rgb), 0.06),
-    0 32px 80px -28px rgba(var(--theme-primary-rgb), 0.2);
+    0 0 0 0.5px color-mix(in srgb, var(--primary), transparent 88%),
+    0 2px 8px color-mix(in srgb, var(--primary), transparent 94%),
+    0 32px 80px -28px color-mix(in srgb, var(--primary), transparent 80%);
 }
 
 .clawcap-title {
-  color: var(--theme-primary-deep);
+  color: var(--primary);
 }
 
 .clawcap-sub {
-  color: var(--theme-primary);
+  color: var(--primary);
   opacity: 0.85;
   display: flex;
   flex-direction: column;
@@ -559,44 +223,52 @@ button {
 }
 
 .clawcap-steps li.is-active {
-  color: var(--theme-primary-deep);
+  color: var(--primary);
 }
 
 .clawcap-steps li.is-active .clawcap-step-n {
-  background: var(--theme-primary);
+  background: var(--primary);
 }
 
 .clawcap-steps-pill {
-  background: rgba(var(--theme-primary-rgb), 0.12);
+  background: color-mix(in srgb, var(--primary), transparent 88%);
   box-shadow:
-    0 0 0 0.5px rgba(var(--theme-primary-rgb), 0.15),
-    0 1.5px 4px rgba(var(--theme-primary-rgb), 0.08);
+    0 0 0 0.5px color-mix(in srgb, var(--primary), transparent 85%),
+    0 1.5px 4px color-mix(in srgb, var(--primary), transparent 92%);
 }
 
 .clawcap-case {
   background: linear-gradient(
     180deg,
-    rgba(var(--theme-primary-rgb), 0.06),
-    rgba(var(--theme-primary-rgb), 0.02)
+    color-mix(in srgb, var(--primary), transparent 94%),
+    color-mix(in srgb, var(--primary), transparent 98%)
   );
 }
 
 .clawcap-glass {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 250, 245, 0.88));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--card), transparent 5%),
+    color-mix(in srgb, var(--card), transparent 12%)
+  );
 }
 
 .clawcap-panel {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 254, 252, 0.94));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--card), transparent 2%),
+    color-mix(in srgb, var(--card), transparent 6%)
+  );
 }
 
 .cc-tray--hot::before,
 .cc-tray--win::before {
-  box-shadow: inset 0 0 0 1.5px rgba(var(--theme-primary-rgb), 0.45);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--primary), transparent 55%);
 }
 
 .cc-tray--hot .cc-tray-label,
 .cc-tray--win .cc-tray-label {
-  color: var(--theme-primary-deep);
+  color: var(--primary);
 }
 
 .cc-tray--hot .cc-tray-door,
@@ -605,8 +277,8 @@ button {
 .cc-tray--win .cc-tray-skin {
   background: linear-gradient(
     180deg,
-    rgba(var(--theme-primary-rgb), 0.06),
-    rgba(var(--theme-primary-rgb), 0.02)
+    color-mix(in srgb, var(--primary), transparent 94%),
+    color-mix(in srgb, var(--primary), transparent 98%)
   );
 }
 
@@ -617,18 +289,18 @@ button {
 @keyframes cc-ring-valley {
   0% {
     box-shadow:
-      0 0 0 0 rgba(var(--theme-primary-rgb), 0.4),
-      0 0 0 0 rgba(var(--theme-primary-rgb), 0.25);
+      0 0 0 0 color-mix(in srgb, var(--primary), transparent 60%),
+      0 0 0 0 color-mix(in srgb, var(--primary), transparent 75%);
   }
   45% {
     box-shadow:
-      0 0 0 9px rgba(var(--theme-primary-rgb), 0.1),
-      0 0 0 3px rgba(var(--theme-primary-rgb), 0.2);
+      0 0 0 9px color-mix(in srgb, var(--primary), transparent 90%),
+      0 0 0 3px color-mix(in srgb, var(--primary), transparent 80%);
   }
   100% {
     box-shadow:
-      0 0 0 15px rgba(var(--theme-primary-rgb), 0),
-      0 0 0 10px rgba(var(--theme-primary-rgb), 0);
+      0 0 0 15px color-mix(in srgb, var(--primary), transparent 100%),
+      0 0 0 10px color-mix(in srgb, var(--primary), transparent 100%);
   }
 }
 
@@ -650,10 +322,10 @@ button {
 }
 
 .captcha-chinese .cc-tray--hot .cc-tray-label {
-  background: rgba(var(--theme-primary-rgb), 0.12);
-  color: var(--theme-primary-deep);
+  background: color-mix(in srgb, var(--primary), transparent 88%);
+  color: var(--primary);
 }
 
 .captcha-chinese .cc-tray--hot.cc-tray--hot {
-  background: rgba(var(--theme-primary-rgb), 0.06);
+  background: color-mix(in srgb, var(--primary), transparent 94%);
 }

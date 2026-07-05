@@ -38,19 +38,19 @@ function getVisibilityMeta(visibility?: Post['visibility']): {
   icon: LucideIcon;
 } {
   if (visibility === 'public') {
-    return { label: '公开可见', className: 'bg-theme-primary text-white', icon: Eye };
+    return { label: '公开可见', className: 'bg-primary text-primary-foreground', icon: Eye };
   }
   if (visibility === 'shared') {
-    return { label: '口令访问', className: 'bg-sky-500/90 text-white', icon: Users };
+    return { label: '口令访问', className: 'bg-primary/90 text-primary-foreground', icon: Users };
   }
-  return { label: '仅自己可见', className: 'bg-slate-900/80 text-white', icon: Lock };
+  return { label: '仅自己可见', className: 'bg-foreground/80 text-primary-foreground', icon: Lock };
 }
 
 function getStatusMeta(status?: string) {
-  if (status === 'published')
-    return { label: '已发布', className: 'bg-theme-soft text-theme-primary' };
-  if (status === 'archived') return { label: '已归档', className: 'bg-slate-200 text-slate-700' };
-  return { label: '草稿', className: 'bg-amber-100 text-amber-700' };
+  if (status === 'published') return { label: '已发布', className: 'bg-accent text-primary' };
+  if (status === 'archived')
+    return { label: '已归档', className: 'bg-muted text-muted-foreground' };
+  return { label: '草稿', className: 'bg-primary/10 text-primary' };
 }
 
 function getPageText(payload: ImageTextPayload | null) {
@@ -80,14 +80,14 @@ function PreviewSheet({
 }) {
   if (imageUrl) {
     return (
-      <div className="relative flex h-[220px] items-center justify-center overflow-hidden rounded-[28px] border border-theme-soft-strong bg-[linear-gradient(180deg,var(--theme-primary-soft)_0%,white_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+      <div className="relative flex h-[220px] items-center justify-center overflow-hidden rounded-[28px] border border-border bg-[linear-gradient(180deg,hsl(var(--primary) / 0.15)_0%,hsl(var(--background))_100%)] p-3 shadow-[inset_0_1px_0_hsl(var(--background)_/_0.8)]">
         <img
           src={imageUrl}
           alt="图文预览"
           className="h-full w-full rounded-[22px] object-contain"
         />
         {stickerEmoji ? (
-          <div className="absolute right-4 top-4 rounded-full bg-white/88 px-3 py-1 text-xl shadow-sm backdrop-blur">
+          <div className="absolute right-4 top-4 rounded-full bg-card/88 px-3 py-1 text-xl shadow-sm backdrop-blur">
             {stickerEmoji}
           </div>
         ) : null}
@@ -96,13 +96,13 @@ function PreviewSheet({
   }
 
   return (
-    <div className="relative h-[220px] rounded-[28px] border border-theme-soft-strong bg-[linear-gradient(180deg,var(--theme-primary-soft)_0%,white_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-      <div className="absolute left-4 top-4 text-[10px] text-slate-400">图文预览</div>
+    <div className="relative h-[220px] rounded-[28px] border border-border bg-[linear-gradient(180deg,hsl(var(--primary) / 0.15)_0%,hsl(var(--background))_100%)] p-4 shadow-[inset_0_1px_0_hsl(var(--background)/0.8)]">
+      <div className="absolute left-4 top-4 text-[10px] text-muted-foreground">图文预览</div>
       {stickerEmoji ? <div className="absolute right-4 top-4 text-xl">{stickerEmoji}</div> : null}
-      <div className="mt-7 h-[150px] overflow-hidden whitespace-pre-wrap text-[15px] font-semibold leading-7 text-[#45372c]">
+      <div className="mt-7 h-[150px] overflow-hidden whitespace-pre-wrap text-[15px] font-semibold leading-7 text-foreground">
         {text}
       </div>
-      <div className="absolute bottom-4 right-4 rounded-full bg-slate-900/70 px-3 py-1 text-[11px] text-white backdrop-blur">
+      <div className="absolute bottom-4 right-4 rounded-full bg-foreground/70 px-3 py-1 text-[11px] text-primary-foreground backdrop-blur">
         图文卡片
       </div>
     </div>
@@ -137,23 +137,23 @@ export function ImageTextPostCard({
 
   return (
     <article
-      className={`group overflow-hidden rounded-[30px] border border-theme-soft-strong bg-[linear-gradient(180deg,color-mix(in_srgb,var(--theme-primary-soft)_60%,white)_0%,color-mix(in_srgb,var(--theme-primary-soft)_90%,white)_100%)] shadow-[0_18px_46px_rgba(var(--theme-primary-rgb),0.12)] transition-all duration-300 hover:-translate-y-1 hover:border-theme-primary hover:shadow-[0_22px_56px_rgba(var(--theme-primary-rgb),0.18)] ${className}`}
+      className={`group overflow-hidden rounded-[30px] border border-border bg-[linear-gradient(180deg,color-mix(in_srgb,hsl(var(--primary) / 0.15)_60%,hsl(var(--background)))_0%,color-mix(in_srgb,hsl(var(--primary) / 0.15)_90%,hsl(var(--background)))_100%)] shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-xl ${className}`}
     >
       <Link
         to={`/blog/${post.id}`}
         state={{ returnTo, returnLabel, source: mode === 'creator' ? 'my-space' : 'blog-list' }}
         className="block"
       >
-        <div className="relative overflow-hidden border-b border-theme-soft-strong px-5 pb-5 pt-4">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(var(--theme-primary-rgb),0.18),transparent_42%),radial-gradient(circle_at_bottom_left,rgba(var(--theme-primary-rgb),0.1),transparent_40%)]" />
+        <div className="relative overflow-hidden border-b border-border px-5 pb-5 pt-4">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary) / 0.18),transparent_42%),radial-gradient(circle_at_bottom_left,hsl(var(--primary) / 0.1),transparent_40%)]" />
           <div className="relative mb-4 flex items-start justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-theme-primary backdrop-blur">
+              <span className="inline-flex items-center gap-1 rounded-full bg-card/80 px-3 py-1 text-xs font-medium text-primary backdrop-blur">
                 <Images className="h-3.5 w-3.5" />
                 图文创作
               </span>
               {mode === 'public' && post.category?.name ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-theme-primary px-3 py-1 text-xs font-medium text-white shadow-[0_2px_8px_rgba(var(--theme-primary-rgb),0.25)] backdrop-blur">
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground shadow-sm backdrop-blur">
                   <Tag className="h-3.5 w-3.5" />
                   {post.category.name}
                 </span>
@@ -170,7 +170,7 @@ export function ImageTextPostCard({
 
             <div className="flex items-center gap-2">
               {!!payload?.stickerEmoji && (
-                <span className="rounded-full bg-white/80 px-3 py-1 text-lg shadow-sm backdrop-blur">
+                <span className="rounded-full bg-card/80 px-3 py-1 text-lg shadow-sm backdrop-blur">
                   {payload.stickerEmoji}
                 </span>
               )}
@@ -185,20 +185,20 @@ export function ImageTextPostCard({
           </div>
 
           <div className="relative grid gap-4 lg:grid-cols-[1.08fr_0.82fr]">
-            <div className="flex min-h-[220px] flex-col rounded-[26px] border border-white/75 bg-white/78 p-5 backdrop-blur">
-              <div className="mb-3 inline-flex w-fit items-center gap-1 rounded-full bg-theme-soft px-2.5 py-1 text-[11px] font-medium text-theme-primary">
+            <div className="flex min-h-[220px] flex-col rounded-[26px] border border-border bg-card/78 p-5 backdrop-blur">
+              <div className="mb-3 inline-flex w-fit items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-[11px] font-medium text-primary">
                 <Sparkles className="h-3.5 w-3.5" />
                 {pages.length || 1} 页图文
               </div>
-              <h3 className="line-clamp-2 text-[24px] font-semibold leading-9 text-slate-900 transition-colors group-hover:text-theme-primary">
+              <h3 className="line-clamp-2 text-[24px] font-semibold leading-9 text-foreground transition-colors group-hover:text-primary">
                 {post.title}
               </h3>
-              <p className="mt-4 line-clamp-5 whitespace-pre-wrap text-sm leading-7 text-slate-600">
+              <p className="mt-4 line-clamp-5 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
                 {previewText}
               </p>
             </div>
 
-            <div className="rounded-[26px] border border-white/80 bg-white/76 p-3 backdrop-blur">
+            <div className="rounded-[26px] border border-border bg-card/76 p-3 backdrop-blur">
               <PreviewSheet
                 imageUrl={previewImage}
                 text={pages[0] || previewText}
@@ -209,7 +209,7 @@ export function ImageTextPostCard({
         </div>
 
         <div className="space-y-3 p-4">
-          <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
             <div className="inline-flex min-w-0 flex-1 items-center gap-1.5">
               {post.author?.avatar ? (
                 <img
@@ -218,25 +218,25 @@ export function ImageTextPostCard({
                   className="h-5 w-5 shrink-0 rounded-full object-cover"
                 />
               ) : (
-                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100">
-                  <User className="h-3 w-3 text-slate-500" />
+                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <User className="h-3 w-3 text-muted-foreground" />
                 </span>
               )}
-              <span className="truncate font-medium text-slate-600">{authorName}</span>
+              <span className="truncate font-medium text-muted-foreground">{authorName}</span>
             </div>
 
-            <span className="inline-flex max-w-[46%] shrink-0 items-center rounded-full bg-theme-soft px-2.5 py-1 text-theme-primary">
+            <span className="inline-flex max-w-[46%] shrink-0 items-center rounded-full bg-accent px-2.5 py-1 text-primary">
               <span className="truncate">{groupName}</span>
             </span>
           </div>
 
-          <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
             <div className="inline-flex items-center gap-1">
               <Calendar className="h-3.5 w-3.5" />
               {formatDate(post.publishedAt || post.createdAt)}
             </div>
 
-            <div className="flex items-center gap-3 text-slate-400">
+            <div className="flex items-center gap-3 text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 <Eye className="h-3.5 w-3.5" />
                 {post.viewCount || 0}
@@ -250,7 +250,7 @@ export function ImageTextPostCard({
         </div>
       </Link>
 
-      {footer ? <div className="border-t border-theme-soft-strong p-4 pt-3">{footer}</div> : null}
+      {footer ? <div className="border-t border-border p-4 pt-3">{footer}</div> : null}
     </article>
   );
 }

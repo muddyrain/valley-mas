@@ -72,17 +72,17 @@ const TYPE_LABEL: Record<string, string> = {
 const VISIBILITY_META = {
   public: {
     label: '公开可访问',
-    className: 'bg-theme-primary text-white',
+    className: 'bg-primary text-primary-foreground',
     icon: Globe,
   },
   shared: {
     label: '口令访问',
-    className: 'bg-theme-soft text-theme-primary',
+    className: 'bg-accent text-primary',
     icon: Users,
   },
   private: {
     label: '仅自己可见',
-    className: 'bg-slate-900/78 text-white',
+    className: 'bg-muted text-muted-foreground',
     icon: Lock,
   },
 } as const;
@@ -107,14 +107,14 @@ function ResourceTagCloud({ tags }: { tags: string[] }) {
       {visibleTags.map((tag) => (
         <span
           key={tag}
-          className="inline-flex items-center gap-1 rounded-full border border-white/18 bg-white/14 px-2.5 py-1 text-[11px] font-medium text-white/92 backdrop-blur-md"
+          className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--color-foreground)/0.18)] bg-[hsl(var(--color-foreground)/0.14)] px-2.5 py-1 text-[11px] font-medium text-[hsl(var(--color-foreground)/0.92)] backdrop-blur-md"
         >
           <Hash className="h-3 w-3 opacity-80" />
           {tag}
         </span>
       ))}
       {hiddenCount > 0 ? (
-        <span className="inline-flex items-center rounded-full border border-white/14 bg-black/18 px-2.5 py-1 text-[11px] text-white/78 backdrop-blur-md">
+        <span className="inline-flex items-center rounded-full border border-[hsl(var(--color-foreground)/0.14)] bg-[hsl(var(--color-background)/0.18)] px-2.5 py-1 text-[11px] text-[hsl(var(--color-foreground)/0.78)] backdrop-blur-md">
           +{hiddenCount}
         </span>
       ) : null}
@@ -175,7 +175,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
     const observer = new ResizeObserver(refreshTitleOverflow);
     observer.observe(titleNode);
     return () => observer.disconnect();
-  }, [resource.title, refreshTitleOverflow]);
+  }, [refreshTitleOverflow]);
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -209,16 +209,16 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
 
   return (
     <Card
-      className={`group h-60 py-0 cursor-pointer overflow-hidden rounded-[26px] border bg-white/84 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_26px_54px_rgba(var(--theme-primary-rgb),0.18)] ${
+      className={`group h-60 py-0 cursor-pointer overflow-hidden rounded-[26px] border bg-card/84 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg ${
         selected
-          ? 'border-theme-primary shadow-[0_0_0_2px_rgba(var(--theme-primary-rgb),0.16)]'
-          : 'border-theme-shell-border hover:border-theme-soft-strong'
+          ? 'border-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.16)]'
+          : 'border-border hover:border-accent'
       }`}
       onClick={handleCardClick}
       style={animationDelay !== undefined ? { animationDelay: `${animationDelay}ms` } : undefined}
     >
       <div
-        className={`relative h-full ${mediaAspectClass} overflow-hidden bg-slate-950`}
+        className={`relative h-full ${mediaAspectClass} overflow-hidden bg-[hsl(var(--color-card))]`}
         onClick={(e) => {
           if (selectable) return;
           if (!enablePreview) return;
@@ -242,7 +242,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
           loading="lazy"
         />
 
-        <div className="absolute inset-0 bg-linear-to-t from-black/72 via-black/14 to-black/8 opacity-88 transition-opacity duration-300 group-hover:opacity-100" />
+        <div className="absolute inset-0 bg-linear-to-t from-[hsl(var(--color-background)/0.72)] via-[hsl(var(--color-background)/0.14)] to-[hsl(var(--color-background)/0.8)] opacity-88 transition-opacity duration-300 group-hover:opacity-100" />
 
         <div className="absolute left-3 top-3 flex items-start gap-2">
           {selectable ? (
@@ -254,14 +254,14 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
               }}
               className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border shadow-sm transition-all ${
                 selected
-                  ? 'border-theme-primary bg-theme-primary text-white'
-                  : 'border-white/72 bg-black/28 text-white/90 backdrop-blur-md hover:border-white'
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-[hsl(var(--color-foreground)/0.72)] bg-[hsl(var(--color-background)/0.28)] text-[hsl(var(--color-foreground)/0.9)] backdrop-blur-md hover:border-[hsl(var(--color-foreground))]'
               }`}
             >
               {selected ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
             </button>
           ) : (
-            <span className="inline-flex items-center rounded-full border border-white/14 bg-black/26 px-3 py-1 text-[11px] font-medium text-white/92 backdrop-blur-md">
+            <span className="inline-flex items-center rounded-full border border-[hsl(var(--color-foreground)/0.14)] bg-[hsl(var(--color-background)/0.26)] px-3 py-1 text-[11px] font-medium text-[hsl(var(--color-foreground)/0.92)] backdrop-blur-md">
               {TYPE_LABEL[resource.type] ?? resource.type}
             </span>
           )}
@@ -282,7 +282,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
               size="xs"
               className={`h-8 rounded-full border px-2.5 backdrop-blur-md transition-all ${
                 favored
-                  ? 'border-rose-300/40 bg-rose-500/82 text-white hover:bg-rose-500'
+                  ? 'border-destructive/30 bg-destructive/82 text-destructive-foreground hover:bg-destructive'
                   : 'border-white/18 bg-black/24 text-white hover:bg-black/34'
               }`}
               onClick={(e) => {
@@ -290,7 +290,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
                 onFavorite(e, resource);
               }}
             >
-              <Heart className={`h-3.5 w-3.5 ${favored ? 'fill-white' : ''}`} />
+              <Heart className={`h-3.5 w-3.5 ${favored ? 'fill-destructive-foreground' : ''}`} />
             </Button>
           ) : null}
           {onEdit ? (
@@ -300,7 +300,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
                 e.stopPropagation();
                 onEdit(resource);
               }}
-              className="rounded-full border border-white/18 bg-white/16 p-2 text-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:bg-white/24"
+              className="rounded-full border border-foreground/10 bg-foreground/16 p-2 text-foreground shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:bg-foreground/24"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
@@ -312,7 +312,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
                 e.stopPropagation();
                 onDelete(resource);
               }}
-              className="rounded-full border border-white/18 bg-black/32 p-2 text-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:bg-red-500/82"
+              className="rounded-full border border-[hsl(var(--color-foreground)/0.18)] bg-[hsl(var(--color-background)/0.32)] p-2 text-[hsl(var(--color-foreground))] shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:bg-destructive/82"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -321,7 +321,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
 
         <div className="absolute inset-x-0 bottom-2 px-3">
           <div
-            className={`overflow-hidden rounded-[22px] border border-white/12 bg-linear-to-b from-black/6 to-black/12 backdrop-blur-xs transition-all duration-300 ${
+            className={`overflow-hidden rounded-[22px] border border-[hsl(var(--color-foreground)/0.12)] bg-linear-to-b from-[hsl(var(--color-background)/0.6)] to-[hsl(var(--color-background)/0.12)] backdrop-blur-xs transition-all duration-300 ${
               infoLayerVisible ? 'translate-y-0 group-hover:translate-y-0' : 'translate-y-0'
             }`}
           >
@@ -332,11 +332,11 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
                     ref={titleRef}
                     title={titleOverflow ? resource.title : undefined}
                     onMouseEnter={refreshTitleOverflow}
-                    className="truncate text-sm font-semibold text-white sm:text-[15px]"
+                    className="truncate text-sm font-semibold text-foreground sm:text-[15px]"
                   >
                     {resource.title}
                   </h3>
-                  <div className="mt-1 flex items-center gap-3 text-[11px] text-white/74 sm:hidden">
+                  <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground sm:hidden">
                     <span className="inline-flex items-center gap-1">
                       <Download className="h-3 w-3" />
                       {resource.downloadCount}
@@ -349,13 +349,13 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
                     ) : null}
                   </div>
                 </div>
-                <span className="hidden rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-[10px] text-white/76 backdrop-blur-sm sm:inline-flex hover:bg-theme-primary duration-300">
+                <span className="hidden rounded-full border border-[hsl(var(--color-foreground)/0.12)] bg-[hsl(var(--color-foreground)/0.1)] px-2.5 py-1 text-[10px] text-muted-foreground backdrop-blur-sm sm:inline-flex hover:bg-primary duration-300">
                   <Eye className="mr-1 h-3 w-3" />
                   预览
                 </span>
                 <button
                   type="button"
-                  className="hidden rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-[10px] text-white/76 backdrop-blur-sm sm:inline-flex hover:bg-theme-primary duration-300"
+                  className="hidden rounded-full border border-[hsl(var(--color-foreground)/0.12)] bg-[hsl(var(--color-foreground)/0.1)] px-2.5 py-1 text-[10px] text-muted-foreground backdrop-blur-sm sm:inline-flex hover:bg-primary duration-300"
                   onClick={(e) => {
                     e.stopPropagation();
                     navigate(`/resource/${resource.id}`);
@@ -374,10 +374,10 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
                 }`}
               >
                 {showCreator ? (
-                  <div className="flex items-center gap-2 text-xs text-white/82">
-                    <Avatar className="h-5 w-5 shrink-0 border border-white/14">
+                  <div className="flex items-center gap-2 text-xs text-foreground">
+                    <Avatar className="h-5 w-5 shrink-0 border border-[hsl(var(--color-foreground)/0.14)]">
                       <AvatarImage src={resource.creatorAvatar} />
-                      <AvatarFallback className="bg-white/16 text-[10px] text-white">
+                      <AvatarFallback className="bg-[hsl(var(--color-foreground)/0.16)] text-[10px] text-foreground">
                         {resource.creatorName?.[0] || 'U'}
                       </AvatarFallback>
                     </Avatar>
@@ -388,7 +388,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
                 {(showDate && resource.createdAt) ||
                 (showEngagement && (resource.viewCount || resource.likeCount)) ||
                 showSize ? (
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-white/72">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                     {showDate && resource.createdAt ? (
                       <span className="inline-flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
@@ -425,7 +425,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
           </div>
 
           {footerMetaVisible ? (
-            <div className="mt-2 hidden items-center justify-between px-1 text-[11px] text-white/72 sm:flex">
+            <div className="mt-2 hidden items-center justify-between px-1 text-[11px] text-muted-foreground sm:flex">
               <div className="flex min-w-0 items-center gap-3">
                 {showCreator ? (
                   <span className="truncate">{resource.creatorName || '未知创作者'}</span>
@@ -442,7 +442,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
               ) : (
                 <Badge
                   variant="outline"
-                  className="border-white/14 bg-white/10 px-2 py-0 text-[10px] text-white/78 backdrop-blur-sm"
+                  className="border-[hsl(var(--color-foreground)/0.14)] bg-[hsl(var(--color-foreground)/0.1)] px-2 py-0 text-[10px] text-muted-foreground backdrop-blur-sm"
                 >
                   {resource.type === 'wallpaper' ? '壁纸' : '头像'}
                 </Badge>
@@ -478,12 +478,12 @@ export function ResourceCardSkeleton({
       : getAspectClass(type ?? '', wideWallpaperOnDesktop);
 
   return (
-    <div className="h-80 overflow-hidden rounded-[26px] border border-theme-shell-border bg-white/86 shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.08)]">
+    <div className="h-80 overflow-hidden rounded-[26px] border border-border bg-card/86 shadow-md">
       <Skeleton className={`${mediaAspectClass} h-full w-full`} />
       <div
         className={`-mt-20 px-4 ${contentPadding.includes('px-') || contentPadding.includes('py-') ? contentPadding : ''}`}
       >
-        <div className="rounded-[20px] border border-white/40 bg-white/55 p-4 backdrop-blur-md">
+        <div className="rounded-[20px] border border-[hsl(var(--color-foreground)/0.4)] bg-card/55 p-4 backdrop-blur-md">
           <Skeleton className="h-4 w-3/4" />
           <Skeleton className="mt-2 h-3 w-1/2" />
         </div>

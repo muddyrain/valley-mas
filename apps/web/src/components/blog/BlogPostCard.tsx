@@ -40,12 +40,12 @@ function getPostPreviewText(post: Post) {
 
 function getPostStatusMeta(status?: string) {
   if (status === 'published') {
-    return { label: '已发布', className: 'bg-theme-soft text-theme-primary' };
+    return { label: '已发布', className: 'bg-accent text-primary' };
   }
   if (status === 'archived') {
-    return { label: '已归档', className: 'bg-slate-200 text-slate-700' };
+    return { label: '已归档', className: 'bg-muted text-muted-foreground' };
   }
-  return { label: '草稿', className: 'bg-amber-100 text-amber-700' };
+  return { label: '草稿', className: 'bg-accent text-primary' };
 }
 
 function getVisibilityMeta(visibility?: Post['visibility']): {
@@ -54,16 +54,16 @@ function getVisibilityMeta(visibility?: Post['visibility']): {
   icon: LucideIcon;
 } {
   if (visibility === 'public') {
-    return { label: '公开', className: 'bg-theme-primary text-white', icon: Eye };
+    return { label: '公开', className: 'bg-primary text-primary-foreground', icon: Eye };
   }
   if (visibility === 'shared') {
     return {
       label: '口令访问',
-      className: 'bg-sky-500/85 text-white',
+      className: 'bg-secondary text-secondary-foreground',
       icon: Users,
     };
   }
-  return { label: '私密', className: 'bg-slate-900/75 text-white', icon: Lock };
+  return { label: '私密', className: 'bg-muted text-muted-foreground', icon: Lock };
 }
 
 interface BlogPostCardProps {
@@ -88,38 +88,38 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
 
   return (
     <article
-      className={`group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_28px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:border-theme-soft-strong hover:shadow-[0_16px_38px_rgba(var(--theme-primary-rgb),0.16)] ${className}`}
+      className={`group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-accent hover:shadow-md ${className}`}
     >
       <Link
         to={`/blog/${post.id}`}
         state={{ returnTo, returnLabel, source: mode === 'creator' ? 'my-space' : 'blog-list' }}
         className="block"
       >
-        <div className="relative overflow-hidden border-b border-slate-100 bg-theme-soft">
+        <div className="relative overflow-hidden border-b border-border bg-accent">
           <BlogCoverMedia
             src={post.cover}
             alt={post.title}
             hoverZoom
             fallback={
-              <div className="relative flex h-full w-full items-center justify-center text-slate-500">
+              <div className="relative flex h-full w-full items-center justify-center text-muted-foreground">
                 <TypeIcon className="h-12 w-12" />
               </div>
             }
           />
           <div className="absolute left-3 right-3 top-3 z-20 flex items-start justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2.5 py-1 text-xs text-white backdrop-blur">
+              <span className="inline-flex items-center gap-1 rounded-full bg-foreground/45 px-2.5 py-1 text-xs text-foreground backdrop-blur">
                 <TypeIcon className="h-3.5 w-3.5" />
                 {typeLabel}
               </span>
               {mode === 'public' && post.group?.name ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs text-theme-primary backdrop-blur">
+                <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-2.5 py-1 text-xs text-primary backdrop-blur">
                   <FolderTree className="h-3.5 w-3.5" />
                   {post.group.name}
                 </span>
               ) : null}
               {mode === 'public' && post.category?.name ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-theme-primary px-2.5 py-1 text-xs font-medium text-white shadow-[0_2px_8px_rgba(var(--theme-primary-rgb),0.25)] backdrop-blur">
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm backdrop-blur">
                   <Tag className="h-3.5 w-3.5" />
                   {post.category.name}
                 </span>
@@ -145,15 +145,15 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
         </div>
 
         <div className="space-y-3 p-4">
-          <h3 className="line-clamp-2 text-lg font-semibold text-slate-900 transition-colors group-hover:text-theme-primary">
+          <h3 className="line-clamp-2 text-lg font-semibold text-foreground transition-colors group-hover:text-primary">
             {post.title}
           </h3>
 
-          <p className="line-clamp-3 min-h-[66px] text-sm leading-6 text-slate-600">
+          <p className="line-clamp-3 min-h-[66px] text-sm leading-6 text-muted-foreground">
             {previewText || '这篇内容暂时没有摘要，点击查看完整正文。'}
           </p>
 
-          <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
             <div className="inline-flex min-w-0 flex-1 items-center gap-1.5">
               {post.author?.avatar ? (
                 <img
@@ -162,25 +162,25 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
                   className="h-5 w-5 shrink-0 rounded-full object-cover"
                 />
               ) : (
-                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100">
-                  <User className="h-3 w-3 text-slate-500" />
+                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <User className="h-3 w-3 text-muted-foreground" />
                 </span>
               )}
-              <span className="truncate font-medium text-slate-600">{authorName}</span>
+              <span className="truncate font-medium text-muted-foreground">{authorName}</span>
             </div>
 
-            <span className="inline-flex max-w-[46%] shrink-0 items-center rounded-full bg-theme-soft px-2 py-0.5 text-theme-primary">
+            <span className="inline-flex max-w-[46%] shrink-0 items-center rounded-full bg-accent px-2 py-0.5 text-primary">
               <span className="truncate">{groupName}</span>
             </span>
           </div>
 
-          <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
             <div className="inline-flex items-center gap-1">
               <Calendar className="h-3.5 w-3.5" />
               {formatDate(post.publishedAt || post.createdAt)}
             </div>
 
-            <div className="flex items-center gap-3 text-slate-400">
+            <div className="flex items-center gap-3 text-muted-foreground/70">
               <span className="inline-flex items-center gap-1">
                 <Eye className="h-3.5 w-3.5" />
                 {post.viewCount || 0}
@@ -194,7 +194,7 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
         </div>
       </Link>
 
-      {footer ? <div className="border-t border-slate-100 p-4 pt-3">{footer}</div> : null}
+      {footer ? <div className="border-t border-border p-4 pt-3">{footer}</div> : null}
     </article>
   );
 }

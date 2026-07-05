@@ -50,8 +50,7 @@ export default function CaptchaDialog({ open, onOpenChange, onVerify }: CaptchaD
                 'linear-gradient(180deg, rgba(255,250,245,0.98), rgba(255,254,252,0.96))',
               '--clawcap-ink': '#0f172a',
               '--clawcap-muted': '#64748b',
-              '--clawcap-accent': 'var(--theme-primary)',
-              '--clawcap-action': 'var(--theme-primary)',
+              '--primary': 'var(--primary)',
             } as React.CSSProperties
           }
         >

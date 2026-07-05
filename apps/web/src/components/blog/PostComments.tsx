@@ -60,33 +60,35 @@ export function PostComments({
 
   return (
     <section
-      className={`theme-panel-shell rounded-[28px] border bg-white/92 ${compact ? 'p-5' : 'p-6 sm:p-7'}`}
+      className={`border border-border rounded-[28px] bg-card shadow-lg ${compact ? 'p-5' : 'p-6 sm:p-7'}`}
     >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full theme-panel-shell px-3 py-1 text-xs font-medium text-theme-primary">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-primary">
             <MessageCircle className="h-3.5 w-3.5" />
             {title}
           </div>
-          <h3 className="mt-3 text-lg font-semibold text-slate-900">{total} 条评论</h3>
+          <h3 className="mt-3 text-lg font-semibold text-foreground">{total} 条评论</h3>
         </div>
       </div>
 
-      <div className="mt-5 rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-3">
+      <div className="mt-5 rounded-[24px] border border-border bg-muted/70 p-3">
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={isAuthenticated ? '写下你的想法...' : '登录后可以参与评论'}
           disabled={!isAuthenticated || submitting}
-          className="min-h-27 w-full resize-none border-0 bg-transparent text-sm leading-7 text-slate-700 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed"
+          className="min-h-27 w-full resize-none border-0 bg-transparent text-sm leading-7 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
         />
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-200/80 pt-3">
-          <span className="text-xs text-slate-400">支持纯文本评论，适合记录想法和交流反馈。</span>
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+          <span className="text-xs text-muted-foreground">
+            支持纯文本评论，适合记录想法和交流反馈。
+          </span>
           <Button
             type="button"
             onClick={handleSubmit}
             disabled={!isAuthenticated || !canPublish}
-            className="rounded-full theme-panel-shell px-5 duration-300 text-primary hover:bg-theme-primary/75!"
+            className="rounded-full px-5 duration-300 text-primary hover:bg-primary/75!"
           >
             {submitting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -100,7 +102,7 @@ export function PostComments({
 
       <div className="mt-6 space-y-4">
         {comments.length === 0 ? (
-          <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center text-sm text-slate-500">
+          <div className="rounded-[22px] border border-dashed border-border bg-muted/70 px-4 py-8 text-center text-sm text-muted-foreground">
             {emptyLabel}
           </div>
         ) : (
@@ -112,11 +114,11 @@ export function PostComments({
             return (
               <article
                 key={comment.id}
-                className="rounded-[24px] border border-slate-200/80 bg-white px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+                className="rounded-[24px] border border-border bg-card px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 items-start gap-3">
-                    <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-200">
+                    <div className="h-10 w-10 overflow-hidden rounded-full bg-muted">
                       {comment.author?.avatar ? (
                         <img
                           src={comment.author.avatar}
@@ -127,14 +129,14 @@ export function PostComments({
                     </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="text-sm font-semibold text-slate-900">
+                        <span className="text-sm font-semibold text-foreground">
                           {comment.author?.nickname || '匿名用户'}
                         </span>
-                        <span className="text-xs text-slate-400">
+                        <span className="text-xs text-muted-foreground">
                           {formatDate(comment.createdAt)}
                         </span>
                       </div>
-                      <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">
+                      <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-foreground">
                         {comment.content}
                       </p>
                     </div>
@@ -145,7 +147,7 @@ export function PostComments({
                       type="button"
                       onClick={() => handleDelete(comment.id)}
                       disabled={deletingId === comment.id}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs text-slate-400 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-60"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive disabled:opacity-60"
                     >
                       {deletingId === comment.id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />

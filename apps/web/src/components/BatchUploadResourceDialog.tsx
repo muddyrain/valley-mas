@@ -3,11 +3,11 @@
  * 批量上传资源弹窗
  *
  * 操作流程：
- *   1. 选择多张图片文件
- *   2. 统一设置资源类型和可见范围
- *   3. 可对每项单独编辑标题，也可点「AI 批量起名」一键生成
- *   4. 可对每项单独 AI 识别标签，也可点「AI 批量识别标签」批量处理
- *   5. 点「开始批量上传」逐项上传，实时展示进度
+ * 1. 选择多张图片文件
+ * 2. 统一设置资源类型和可见范围
+ * 3. 可对每项单独编辑标题，也可点「AI 批量起名」一键生成
+ * 4. 可对每项单独 AI 识别标签，也可点「AI 批量识别标签」批量处理
+ * 5. 点「开始批量上传」逐项上传，实时展示进度
  */
 import {
   FileStack,
@@ -517,23 +517,23 @@ export default function BatchUploadResourceDialog({
     >
       <DialogContent className="max-w-3xl! max-h-[90vh] flex flex-col gap-0 overflow-hidden p-0">
         {/* 标题栏 */}
-        <DialogHeader className="shrink-0 border-b border-slate-100 bg-[linear-gradient(135deg,rgba(var(--theme-primary-rgb),0.10)_0%,rgba(var(--theme-primary-rgb),0.03)_100%)] px-6 py-4">
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
-            <FileStack className="h-4 w-4 text-theme-primary" />
+        <DialogHeader className="shrink-0 border-b border-border bg-[linear-gradient(135deg,hsl(var(--primary) / 0.10)_0%,hsl(var(--primary) / 0.03)_100%)] px-6 py-4">
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+            <FileStack className="h-4 w-4 text-primary" />
             批量上传资源
           </DialogTitle>
-          <DialogDescription className="mt-0.5 text-xs text-slate-500">
+          <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
             一次最多选择 {MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张图片，可批量设置 AI
             名称和标签后统一上传。
           </DialogDescription>
         </DialogHeader>
 
         {/* 全局设置 */}
-        <div className="shrink-0 border-b border-slate-100 bg-theme-soft/40 px-6 py-3">
+        <div className="shrink-0 border-b border-border bg-accent/40 px-6 py-3">
           <div className="flex flex-wrap items-center gap-4">
             {/* 资源类型 */}
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
                 资源类型
               </span>
               <div className="flex gap-1.5">
@@ -545,8 +545,8 @@ export default function BatchUploadResourceDialog({
                     onClick={() => setUploadType(opt.value)}
                     className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-all border ${
                       uploadType === opt.value
-                        ? 'bg-theme-primary text-white border-theme-primary shadow-sm'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-theme-primary hover:text-theme-primary'
+                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                        : 'bg-card text-muted-foreground border-border hover:border-primary hover:text-primary'
                     }`}
                   >
                     <span>{opt.icon}</span>
@@ -558,7 +558,7 @@ export default function BatchUploadResourceDialog({
 
             {/* 可见范围 */}
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
                 可见范围
               </span>
               <div className="flex gap-1.5">
@@ -570,8 +570,8 @@ export default function BatchUploadResourceDialog({
                     onClick={() => setVisibility(opt.value)}
                     className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-all border ${
                       visibility === opt.value
-                        ? 'bg-theme-primary text-white border-theme-primary shadow-sm'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-theme-primary hover:text-theme-primary'
+                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                        : 'bg-card text-muted-foreground border-border hover:border-primary hover:text-primary'
                     }`}
                   >
                     <span>{opt.icon}</span>
@@ -588,24 +588,24 @@ export default function BatchUploadResourceDialog({
           {/* 空态：拖拽选择区 */}
           {items.length === 0 && (
             <div
-              className="flex min-h-72 flex-col items-center justify-center m-6 rounded-2xl border-2 border-dashed border-theme-primary/35 bg-theme-soft/30 px-6 text-center cursor-pointer group transition-all hover:border-theme-primary hover:bg-theme-soft/50"
+              className="flex min-h-72 flex-col items-center justify-center m-6 rounded-2xl border-2 border-dashed border-primary/35 bg-accent/30 px-6 text-center cursor-pointer group transition-all hover:border-primary hover:bg-accent/50"
               onDrop={(e) => void handleDrop(e)}
               onDragOver={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
             >
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-theme-primary/8 ring-1 ring-theme-primary/12 transition-all group-hover:scale-110 group-hover:bg-theme-primary/14">
-                <FileUp className="h-7 w-7 text-theme-primary/60 group-hover:text-theme-primary transition-colors" />
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/10 transition-all group-hover:scale-110 group-hover:bg-primary/14">
+                <FileUp className="h-7 w-7 text-primary/60 group-hover:text-primary transition-colors" />
               </div>
-              <p className="text-sm font-medium text-slate-600 mb-1">
+              <p className="text-sm font-medium text-foreground mb-1">
                 {preparing ? '正在解析图片…' : '拖拽图片到这里，或点击选择'}
               </p>
-              <p className="text-xs text-slate-400 mb-4">
+              <p className="text-xs text-muted-foreground mb-4">
                 支持 JPG、PNG、WebP，最多 {MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张，单张最大 30MB
               </p>
               {preparing ? (
-                <Loader2 className="h-5 w-5 animate-spin text-theme-primary" />
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
               ) : (
-                <Button type="button" className="theme-btn-primary" disabled={preparing}>
+                <Button type="button" className="" disabled={preparing}>
                   <Upload className="mr-1.5 h-4 w-4" />
                   选择图片
                 </Button>
@@ -618,10 +618,10 @@ export default function BatchUploadResourceDialog({
             <div className="p-4 space-y-2">
               {/* 工具栏 */}
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-slate-500">
+                <span className="text-xs font-medium text-muted-foreground">
                   共 {items.length}/{MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张图片
                   {pendingCount > 0 && (
-                    <span className="ml-1 text-slate-400">（{pendingCount} 待上传）</span>
+                    <span className="ml-1 text-muted-foreground">（{pendingCount} 待上传）</span>
                   )}
                 </span>
                 <div className="flex items-center gap-2">
@@ -629,7 +629,7 @@ export default function BatchUploadResourceDialog({
                     type="button"
                     disabled={isBusy || pendingCount === 0}
                     onClick={() => void handleBatchAiName()}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-theme-primary/25 bg-[linear-gradient(135deg,rgba(var(--theme-primary-rgb),0.10),rgba(var(--theme-primary-rgb),0.06))] px-2.5 py-1 text-xs font-medium text-theme-primary transition-all hover:bg-theme-primary hover:text-white hover:border-theme-primary hover:shadow-[0_2px_8px_rgba(var(--theme-primary-rgb),0.30)] disabled:opacity-35 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary/25 bg-[linear-gradient(135deg,hsl(var(--primary) / 0.10),hsl(var(--primary) / 0.06))] px-2.5 py-1 text-xs font-medium text-primary transition-all hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-[0_2px_8px_hsl(var(--primary) / 0.30)] disabled:opacity-35 disabled:cursor-not-allowed"
                   >
                     {batchAiNaming ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
@@ -642,7 +642,7 @@ export default function BatchUploadResourceDialog({
                     type="button"
                     disabled={isBusy || pendingCount === 0}
                     onClick={() => void handleBatchAiTag()}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-theme-primary/25 bg-[linear-gradient(135deg,rgba(var(--theme-primary-rgb),0.10),rgba(var(--theme-primary-rgb),0.06))] px-2.5 py-1 text-xs font-medium text-theme-primary transition-all hover:bg-theme-primary hover:text-white hover:border-theme-primary hover:shadow-[0_2px_8px_rgba(var(--theme-primary-rgb),0.30)] disabled:opacity-35 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary/25 bg-[linear-gradient(135deg,hsl(var(--primary) / 0.10),hsl(var(--primary) / 0.06))] px-2.5 py-1 text-xs font-medium text-primary transition-all hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-[0_2px_8px_hsl(var(--primary) / 0.30)] disabled:opacity-35 disabled:cursor-not-allowed"
                   >
                     {batchAiTagging ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
@@ -664,7 +664,7 @@ export default function BatchUploadResourceDialog({
                         }
                         fileInputRef.current?.click();
                       }}
-                      className="text-xs text-slate-400 hover:text-slate-600 transition"
+                      className="text-xs text-muted-foreground hover:text-foreground transition"
                     >
                       继续添加
                     </button>
@@ -679,18 +679,18 @@ export default function BatchUploadResourceDialog({
                     key={item.uploadKey}
                     className={`flex gap-3 rounded-xl border px-3 py-2.5 transition-all ${
                       item.status === 'success'
-                        ? 'border-emerald-100 bg-emerald-50'
+                        ? 'border-primary/30 bg-accent'
                         : item.status === 'error'
-                          ? 'border-rose-100 bg-rose-50'
+                          ? 'border-destructive/30 bg-destructive/10'
                           : item.status === 'confirming'
-                            ? 'border-amber-200 bg-amber-50'
+                            ? 'border-primary/30 bg-accent'
                             : item.status === 'running'
-                              ? 'border-theme-primary/30 bg-theme-soft/50'
-                              : 'border-slate-100 bg-white'
+                              ? 'border-primary/30 bg-accent/50'
+                              : 'border-border bg-card'
                     }`}
                   >
                     {/* 缩略图 */}
-                    <div className="shrink-0 relative h-16 w-16 rounded-lg overflow-hidden ring-1 ring-slate-200">
+                    <div className="shrink-0 relative h-16 w-16 rounded-lg overflow-hidden ring-1 ring-border">
                       <img
                         src={item.previewUrl}
                         alt={item.title}
@@ -703,18 +703,18 @@ export default function BatchUploadResourceDialog({
                         </div>
                       )}
                       {item.status === 'success' && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/20">
+                        <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
                           <span className="text-lg">✓</span>
                         </div>
                       )}
                       {item.status === 'error' && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-rose-500/20">
+                        <div className="absolute inset-0 flex items-center justify-center bg-destructive/20">
                           <span className="text-lg">✗</span>
                         </div>
                       )}
                       {item.status === 'confirming' && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-amber-500/20">
-                          <Loader2 className="h-5 w-5 animate-spin text-amber-700" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
+                          <Loader2 className="h-5 w-5 animate-spin text-primary" />
                         </div>
                       )}
                     </div>
@@ -732,7 +732,7 @@ export default function BatchUploadResourceDialog({
                           }
                           placeholder="资源名称"
                           maxLength={100}
-                          className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-theme-primary focus:ring-2 focus:ring-theme-primary/15 disabled:bg-slate-50 disabled:text-slate-400"
+                          className="flex-1 min-w-0 rounded-lg border border-border bg-card px-2.5 py-1 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:bg-muted disabled:text-muted-foreground"
                         />
                         {/* 单项 AI 起名 */}
                         <button
@@ -741,7 +741,7 @@ export default function BatchUploadResourceDialog({
                             item.status !== 'pending' || item.aiNaming || uploading || batchAiNaming
                           }
                           onClick={() => void handleAiNameItem(index)}
-                          className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-theme-primary/20 bg-theme-soft/60 px-2 py-1 text-xs font-medium text-theme-primary transition-all hover:bg-theme-primary hover:text-white hover:border-theme-primary disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-primary/20 bg-accent/60 px-2 py-1 text-xs font-medium text-primary transition-all hover:bg-primary hover:text-primary-foreground hover:border-primary disabled:opacity-30 disabled:cursor-not-allowed"
                           title="AI 起名"
                         >
                           {item.aiNaming ? (
@@ -760,7 +760,7 @@ export default function BatchUploadResourceDialog({
                             batchAiTagging
                           }
                           onClick={() => void handleAiTagItem(index)}
-                          className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-theme-primary/20 bg-theme-soft/60 px-2 py-1 text-xs font-medium text-theme-primary transition-all hover:bg-theme-primary hover:text-white hover:border-theme-primary disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-primary/20 bg-accent/60 px-2 py-1 text-xs font-medium text-primary transition-all hover:bg-primary hover:text-primary-foreground hover:border-primary disabled:opacity-30 disabled:cursor-not-allowed"
                           title="AI 识别标签"
                         >
                           {item.aiTagging ? (
@@ -774,14 +774,14 @@ export default function BatchUploadResourceDialog({
                       {/* 标签行 */}
                       <div className="flex flex-wrap items-center gap-1">
                         {item.aiTagging ? (
-                          <span className="text-xs text-slate-400 flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Loader2 className="h-3 w-3 animate-spin" /> 识别标签中…
                           </span>
                         ) : item.tags.length > 0 ? (
                           item.tags.map((tag) => (
                             <span
                               key={tag}
-                              className="group inline-flex items-center gap-1 rounded-full border border-theme-primary/20 bg-theme-soft/60 px-2 py-0.5 text-xs font-medium text-theme-primary"
+                              className="group inline-flex items-center gap-1 rounded-full border border-primary/20 bg-accent/60 px-2 py-0.5 text-xs font-medium text-primary"
                             >
                               <Hash className="h-2.5 w-2.5 opacity-60" />
                               {tag}
@@ -801,7 +801,7 @@ export default function BatchUploadResourceDialog({
                             </span>
                           ))
                         ) : (
-                          <span className="text-xs text-slate-300">
+                          <span className="text-xs text-border">
                             暂无标签，点击 <Hash className="inline h-2.5 w-2.5" /> 按钮识别
                           </span>
                         )}
@@ -809,32 +809,30 @@ export default function BatchUploadResourceDialog({
 
                       {/* 状态/错误信息 */}
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-[10px] text-muted-foreground">
                           {formatSize(item.file.size)}
                         </span>
                         {item.status === 'success' && (
-                          <span className="text-[10px] font-medium text-emerald-600">
-                            ✓ 上传成功
-                          </span>
+                          <span className="text-[10px] font-medium text-primary">✓ 上传成功</span>
                         )}
                         {item.status === 'error' && (
-                          <span className="text-[10px] font-medium text-rose-500">
+                          <span className="text-[10px] font-medium text-destructive">
                             ✗ {item.error || '上传失败'}
                           </span>
                         )}
                         {item.status === 'confirming' && (
-                          <span className="text-[10px] font-medium text-amber-600">
+                          <span className="text-[10px] font-medium text-primary">
                             ⏳ {item.error || uploadConfirmingMessage}
                           </span>
                         )}
                         {item.status === 'running' && (
-                          <span className="text-[10px] text-theme-primary">上传中…</span>
+                          <span className="text-[10px] text-primary">上传中…</span>
                         )}
                         {item.status === 'error' && !uploading && (
                           <button
                             type="button"
                             onClick={() => void handleRetryItem(index)}
-                            className="inline-flex items-center gap-1 rounded-md border border-theme-primary/20 bg-theme-soft/70 px-2 py-0.5 text-[10px] font-medium text-theme-primary transition-all hover:border-theme-primary hover:bg-theme-primary hover:text-white"
+                            className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-accent/70 px-2 py-0.5 text-[10px] font-medium text-primary transition-all hover:border-primary hover:bg-primary hover:text-primary-foreground"
                           >
                             <RefreshCw className="h-2.5 w-2.5" />
                             重新上传
@@ -844,7 +842,7 @@ export default function BatchUploadResourceDialog({
                           <button
                             type="button"
                             onClick={() => removeItem(index)}
-                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500 disabled:bg-zinc-100 disabled:cursor-not-allowed!"
+                            className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-all hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive disabled:bg-muted disabled:cursor-not-allowed!"
                             disabled={isBusy || item.aiNaming || item.aiTagging}
                           >
                             <Trash2 className="h-2.5 w-2.5" />
@@ -861,12 +859,14 @@ export default function BatchUploadResourceDialog({
               {done && (
                 <div className="flex gap-3 pt-1 text-xs">
                   {successCount > 0 && (
-                    <span className="text-emerald-600">✓ 成功 {successCount} 项</span>
+                    <span className="text-primary">✓ 成功 {successCount} 项</span>
                   )}
                   {confirmingCount > 0 && (
-                    <span className="text-amber-600">⏳ 确认中 {confirmingCount} 项</span>
+                    <span className="text-primary">⏳ 确认中 {confirmingCount} 项</span>
                   )}
-                  {errorCount > 0 && <span className="text-rose-500">✗ 失败 {errorCount} 项</span>}
+                  {errorCount > 0 && (
+                    <span className="text-destructive">✗ 失败 {errorCount} 项</span>
+                  )}
                 </div>
               )}
             </div>
@@ -874,8 +874,8 @@ export default function BatchUploadResourceDialog({
         </div>
 
         {/* 底部操作栏 */}
-        <div className="shrink-0 flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-4">
-          <div className="text-xs text-slate-400">
+        <div className="shrink-0 flex items-center justify-between gap-3 border-t border-border bg-muted/60 px-6 py-4">
+          <div className="text-xs text-muted-foreground">
             {items.length > 0
               ? `${items.length}/${MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张图片 · ${uploadType === 'wallpaper' ? '壁纸' : '头像'} · ${visibility === 'private' ? '私密' : visibility === 'shared' ? '共享' : '公开'}${confirmingCount > 0 ? ` · ${confirmingCount} 项确认中` : ''}`
               : `选择图片后即可批量上传，最多 ${MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张`}
@@ -910,7 +910,7 @@ export default function BatchUploadResourceDialog({
               <Button
                 type="button"
                 disabled={isBusy || pendingCount === 0}
-                className="rounded-xl theme-btn-primary font-semibold shadow-[0_4px_16px_rgba(var(--theme-primary-rgb),0.28)] disabled:shadow-none transition-all"
+                className="rounded-xl font-semibold shadow-[0_4px_16px_hsl(var(--primary) / 0.28)] disabled:shadow-none transition-all"
                 onClick={() => void handleBatchUpload()}
               >
                 {uploading ? (

@@ -25,7 +25,7 @@ const PAGE_SIZE = 20;
 
 const PAGE_BACKGROUND = {
   background:
-    'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-primary-soft) 24%, white) 44%, var(--theme-page-cool) 100%)',
+    'linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, hsl(var(--primary) / 0.15) 24%, hsl(var(--background))) 44%, var(--background) 100%)',
 };
 
 export default function Favorites() {
@@ -102,12 +102,12 @@ export default function Favorites() {
     <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
       <PageBanner padding="py-10" maxWidth="max-w-5xl">
         <div className="flex items-center gap-4">
-          <div className="rounded-2xl border border-white/30 bg-white/18 p-3 shadow-lg backdrop-blur-md">
-            <Heart className="h-7 w-7 fill-white text-white" />
+          <div className="rounded-2xl border border-foreground/15 bg-foreground/10 p-3 shadow-lg backdrop-blur-md">
+            <Heart className="h-7 w-7 fill-foreground text-foreground" />
           </div>
-          <div className="text-white">
+          <div className="text-foreground">
             <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">我的收藏</h1>
-            <p className="mt-1 text-sm text-white/82">
+            <p className="mt-1 text-sm text-foreground/82">
               {loading ? '正在整理你收藏的内容...' : `共收藏 ${total} 个资源`}
             </p>
           </div>
@@ -120,7 +120,7 @@ export default function Favorites() {
             {Array.from({ length: 10 }).map((_, index) => (
               <Card
                 key={index}
-                className="overflow-hidden rounded-2xl border border-theme-shell-border bg-white/86 shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm"
+                className="overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm"
               >
                 <Skeleton className="aspect-square w-full" />
                 <CardContent className="space-y-2 p-3">
@@ -131,7 +131,7 @@ export default function Favorites() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="rounded-[28px] border border-theme-shell-border bg-white/72 px-6 shadow-[0_20px_50px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm">
+          <div className="rounded-[28px] border border-border bg-card/72 px-6 shadow-[0_20px_50px_hsl(var(--primary) / 0.10)] backdrop-blur-sm">
             <EmptyState
               icon={Heart}
               title="还没有收藏"
@@ -151,10 +151,10 @@ export default function Favorites() {
               return (
                 <Card
                   key={item.id}
-                  className="group cursor-pointer overflow-hidden rounded-2xl border border-theme-shell-border bg-white/86 shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_rgba(var(--theme-primary-rgb),0.16)]"
+                  className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_hsl(var(--primary) / 0.16)]"
                   onClick={() => resource && navigate(`/resource/${resource.id}`)}
                 >
-                  <div className="relative aspect-square overflow-hidden bg-slate-100">
+                  <div className="relative aspect-square overflow-hidden bg-muted">
                     {resource?.url ? (
                       <img
                         src={resource.thumbnailUrl ?? resource.url}
@@ -163,7 +163,7 @@ export default function Favorites() {
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
-                        <ImageIcon className="h-10 w-10 text-slate-300" />
+                        <ImageIcon className="h-10 w-10 text-muted-foreground" />
                       </div>
                     )}
 
@@ -175,7 +175,7 @@ export default function Favorites() {
                           void handleRemove(item);
                         }}
                         disabled={isRemoving}
-                        className="rounded-full bg-white/92 p-2 text-rose-500 shadow-md transition-all hover:scale-110 hover:bg-rose-50 disabled:opacity-60"
+                        className="rounded-full bg-card/92 p-2 text-destructive shadow-md transition-all hover:scale-110 hover:bg-destructive/10 disabled:opacity-60"
                         title="取消收藏"
                       >
                         {isRemoving ? (
@@ -187,29 +187,31 @@ export default function Favorites() {
                     </div>
 
                     {resource?.type ? (
-                      <div className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+                      <div className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-xs font-medium text-foreground backdrop-blur-sm">
                         {formatResourceType(resource.type)}
                       </div>
                     ) : null}
                   </div>
 
                   <CardContent className="p-3">
-                    <p className="mb-1 truncate text-sm font-medium text-slate-800">
+                    <p className="mb-1 truncate text-sm font-medium text-foreground">
                       {resource?.title || '未知资源'}
                     </p>
-                    <div className="flex items-center justify-between text-xs text-slate-400">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <div className="flex min-w-0 items-center gap-1">
                         <Avatar className="h-4 w-4">
                           <AvatarImage src={resource?.creatorAvatar} />
-                          <AvatarFallback className="bg-theme-soft text-[8px] text-theme-primary">
+                          <AvatarFallback className="bg-accent text-[8px] text-primary">
                             {creatorName[0]?.toUpperCase() || 'C'}
                           </AvatarFallback>
                         </Avatar>
                         <span className="max-w-15 truncate">{creatorName}</span>
                       </div>
-                      <div className="flex items-center gap-0.5 text-theme-primary">
+                      <div className="flex items-center gap-0.5 text-primary">
                         <Download className="h-3 w-3" />
-                        <span className="text-slate-500">{resource?.downloadCount ?? 0}</span>
+                        <span className="text-muted-foreground">
+                          {resource?.downloadCount ?? 0}
+                        </span>
                       </div>
                     </div>
                   </CardContent>
@@ -223,18 +225,18 @@ export default function Favorites() {
             variant="outline"
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage <= 1 || loading}
-            className="rounded-xl border-theme-soft-strong bg-white/80 px-6 text-theme-primary hover:bg-theme-soft"
+            className="rounded-xl border-accent bg-card/80 px-6 text-primary hover:bg-accent"
           >
             上一页
           </Button>
-          <div className="rounded-xl border border-theme-soft-strong bg-white/80 px-5 py-2 text-sm text-slate-600">
+          <div className="rounded-xl border border-accent bg-card/80 px-5 py-2 text-sm text-muted-foreground">
             第 {currentPage} / {totalPages} 页
           </div>
           <Button
             variant="outline"
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage >= totalPages || loading}
-            className="rounded-xl border-theme-soft-strong bg-white/80 px-6 text-theme-primary hover:bg-theme-soft"
+            className="rounded-xl border-accent bg-card/80 px-6 text-primary hover:bg-accent"
           >
             下一页
           </Button>

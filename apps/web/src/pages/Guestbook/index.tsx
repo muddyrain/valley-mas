@@ -22,7 +22,7 @@ const PAGE_SIZE = 16;
 
 const PAGE_BACKGROUND = {
   background:
-    'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-primary-soft) 30%, white) 38%, var(--theme-page-cool) 100%)',
+    'linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, hsl(var(--primary) / 0.15) 30%, hsl(var(--background))) 38%, var(--background) 100%)',
 };
 
 function formatMessageTime(value: string) {
@@ -53,34 +53,34 @@ function getNoteStyle(id: string, index: number): CSSProperties {
   const themeFlavor = seed % 3;
   const glow = 20 + (seed % 16);
 
-  let background = 'linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.88))';
+  let background = 'linear-gradient(180deg, hsl(var(--card) / 0.95), hsl(var(--card) / 0.88))';
   if (themeFlavor === 0) {
     background =
-      'linear-gradient(180deg, color-mix(in srgb, var(--theme-primary-soft) 70%, white), rgba(255,255,255,0.9))';
+      'linear-gradient(180deg, color-mix(in srgb, hsl(var(--primary) / 0.15) 70%, hsl(var(--background))), hsl(var(--background) / 0.9))';
   } else if (themeFlavor === 1) {
     background =
-      'linear-gradient(180deg, color-mix(in srgb, rgba(var(--theme-secondary-rgb),0.25) 36%, white), rgba(255,255,255,0.9))';
+      'linear-gradient(180deg, color-mix(in srgb, hsl(var(--secondary) / 0.25) 36%, hsl(var(--background))), hsl(var(--background) / 0.9))';
   } else {
     background =
-      'linear-gradient(180deg, color-mix(in srgb, rgba(var(--theme-tertiary-rgb),0.24) 36%, white), rgba(255,255,255,0.9))';
+      'linear-gradient(180deg, color-mix(in srgb, hsl(var(--accent) / 0.24) 36%, hsl(var(--background))), hsl(var(--background) / 0.9))';
   }
 
   return {
     transform: `rotate(${rotate}deg) translateY(${lift}px)`,
     background,
-    boxShadow: `0 14px ${glow}px rgba(var(--theme-primary-rgb), 0.16)`,
+    boxShadow: `0 14px ${glow}px hsl(var(--primary) / 0.16)`,
   };
 }
 
 function getPinStyle(id: string, index: number): CSSProperties {
   const seed = hashSeed(`pin-${id}-${index}`);
   if (seed % 3 === 0) {
-    return { background: 'rgba(var(--theme-primary-rgb),0.92)' };
+    return { background: 'hsl(var(--primary) / 0.92)' };
   }
   if (seed % 3 === 1) {
-    return { background: 'rgba(var(--theme-secondary-rgb),0.88)' };
+    return { background: 'hsl(var(--secondary) / 0.88)' };
   }
-  return { background: 'rgba(var(--theme-tertiary-rgb),0.88)' };
+  return { background: 'hsl(var(--accent) / 0.88)' };
 }
 
 export default function Guestbook() {
@@ -200,7 +200,7 @@ export default function Guestbook() {
     <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <section
-          className="relative overflow-hidden rounded-[34px] border border-theme-shell-border bg-white/68 p-4 shadow-[0_24px_56px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur-md sm:p-6"
+          className="relative overflow-hidden rounded-[34px] border border-border bg-card/68 p-4 shadow-[0_24px_56px_hsl(var(--primary) / 0.14)] backdrop-blur-md sm:p-6"
           style={{ perspective: '1400px' }}
         >
           <div className="pointer-events-none absolute inset-0">
@@ -208,14 +208,14 @@ export default function Guestbook() {
               className="absolute inset-0 opacity-75"
               style={{
                 background:
-                  'radial-gradient(circle at 15% 18%, rgba(var(--theme-secondary-rgb), 0.16), transparent 24%), radial-gradient(circle at 83% 20%, rgba(var(--theme-tertiary-rgb), 0.16), transparent 22%), radial-gradient(circle at 48% 84%, rgba(var(--theme-primary-rgb), 0.14), transparent 28%)',
+                  'radial-gradient(circle at 15% 18%, hsl(var(--secondary) / 0.16), transparent 24%), radial-gradient(circle at 83% 20%, hsl(var(--accent) / 0.16), transparent 22%), radial-gradient(circle at 48% 84%, hsl(var(--primary) / 0.14), transparent 28%)',
               }}
             />
             <div
               className="absolute inset-0 opacity-45"
               style={{
                 backgroundImage:
-                  'linear-gradient(rgba(255,255,255,0.14) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.14) 1px, transparent 1px)',
+                  'linear-gradient(hsl(var(--foreground) / 0.07) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground) / 0.07) 1px, transparent 1px)',
                 backgroundSize: '32px 32px',
               }}
             />
@@ -226,33 +226,33 @@ export default function Guestbook() {
               className="relative h-60 w-60 opacity-70 [transform-style:preserve-3d] [transform:rotateX(68deg)_rotateZ(22deg)]"
               style={{ transformOrigin: 'center center' }}
             >
-              <div className="absolute inset-0 rounded-[34px] border border-white/45 bg-white/8 shadow-[0_0_48px_rgba(var(--theme-primary-rgb),0.24)] animate-spin [animation-duration:18s]" />
-              <div className="absolute inset-9 rounded-[28px] border border-theme-soft-strong bg-theme-soft/25 shadow-[0_0_36px_rgba(var(--theme-primary-rgb),0.20)] animate-spin [animation-duration:12s] [animation-direction:reverse]" />
-              <div className="absolute inset-[34%] rounded-2xl border border-white/80 bg-white/65 shadow-[0_0_36px_rgba(var(--theme-primary-rgb),0.34)]" />
+              <div className="absolute inset-0 rounded-[34px] border border-foreground/15 bg-card/8 shadow-[0_0_48px_hsl(var(--primary) / 0.24)] animate-spin [animation-duration:18s]" />
+              <div className="absolute inset-9 rounded-[28px] border border-accent bg-accent/25 shadow-[0_0_36px_hsl(var(--primary) / 0.20)] animate-spin [animation-duration:12s] [animation-direction:reverse]" />
+              <div className="absolute inset-[34%] rounded-2xl border border-foreground/40 bg-card/65 shadow-[0_0_36px_hsl(var(--primary) / 0.34)]" />
             </div>
           </div>
 
-          <div className="relative z-20 mx-auto max-w-3xl rounded-[28px] border border-white/55 bg-white/76 p-4 shadow-[0_20px_44px_rgba(var(--theme-primary-rgb),0.16)] backdrop-blur-lg sm:p-5">
+          <div className="relative z-20 mx-auto max-w-3xl rounded-[28px] border border-border/30 bg-card/76 p-4 shadow-[0_20px_44px_hsl(var(--primary) / 0.16)] backdrop-blur-lg sm:p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h1 className="inline-flex items-center gap-2 text-lg font-semibold text-slate-900 sm:text-xl">
-                <MessageCircleHeart className="h-5 w-5 text-theme-primary" />
+              <h1 className="inline-flex items-center gap-2 text-lg font-semibold text-foreground sm:text-xl">
+                <MessageCircleHeart className="h-5 w-5 text-primary" />
                 {'\u9177\u70ab\u7559\u8a00\u677f'}
               </h1>
-              <span className="rounded-full border border-theme-soft-strong bg-theme-soft px-3 py-1 text-xs font-medium text-theme-primary">
+              <span className="rounded-full border border-accent bg-accent px-3 py-1 text-xs font-medium text-primary">
                 {'\u5df2\u4e0a\u5899'} {total} {'\u6761'}
               </span>
             </div>
 
-            <p className="mb-3 text-xs leading-5 text-slate-500">
+            <p className="mb-3 text-xs leading-5 text-muted-foreground">
               {
                 '\u8fd9\u662f\u4f60\u7684\u7075\u611f\u677f\uff0c\u8f93\u5165\u5185\u5bb9\u540e\u4f1a\u76f4\u63a5\u8d34\u5230\u677f\u9762\u4e0a\u3002\u7559\u8a00\u81ea\u52a8\u4f7f\u7528\u5f53\u524d\u8d26\u53f7\u5934\u50cf\u548c\u6635\u79f0\u3002'
               }
             </p>
 
             <div className="mb-3">
-              <div className="mb-1 flex items-center justify-between text-xs text-slate-600">
+              <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
                 <span className="font-medium">{'\u7559\u8a00\u5185\u5bb9'}</span>
-                <span className={contentCount > 450 ? 'text-amber-600' : 'text-slate-400'}>
+                <span className={contentCount > 450 ? 'text-primary' : 'text-muted-foreground'}>
                   {contentCount}/500
                 </span>
               </div>
@@ -261,7 +261,7 @@ export default function Guestbook() {
                 onChange={(e) => setContent(e.target.value)}
                 maxLength={500}
                 rows={4}
-                className="w-full rounded-2xl border border-theme-border bg-white/92 px-3 py-2.5 text-sm leading-6 text-slate-700 outline-none transition focus:border-theme-soft-strong focus:ring-2 focus:ring-theme-soft"
+                className="w-full rounded-2xl border border-border bg-card/92 px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-ring"
                 placeholder={
                   '\u5199\u70b9\u4ec0\u4e48\u8d34\u4e0a\u6765\uff0c\u6bd4\u5982\u6700\u8fd1\u5728\u505a\u7684\u4f5c\u54c1\u3001\u7075\u611f\u6216\u4e00\u53e5\u8bdd...'
                 }
@@ -269,7 +269,7 @@ export default function Guestbook() {
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-muted-foreground">
                 {isAuthenticated
                   ? '\u5df2\u767b\u5f55\uff0c\u53ef\u76f4\u63a5\u53d1\u5e03'
                   : '\u767b\u5f55\u540e\u53ef\u53d1\u5e03\u7559\u8a00'}
@@ -280,7 +280,7 @@ export default function Guestbook() {
                     type="button"
                     variant="outline"
                     onClick={() => navigate('/login')}
-                    className="rounded-xl border-theme-soft-strong bg-white/78 px-4 text-theme-primary hover:bg-theme-soft"
+                    className="rounded-xl border-accent bg-card/78 px-4 text-primary hover:bg-accent"
                   >
                     {'\u53bb\u767b\u5f55'}
                   </Button>
@@ -289,7 +289,7 @@ export default function Guestbook() {
                   type="button"
                   onClick={() => void handleSubmit()}
                   disabled={submitting}
-                  className="theme-btn-primary rounded-xl px-5 text-sm font-semibold"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl px-5 text-sm font-semibold"
                 >
                   {submitting ? (
                     <>
@@ -320,7 +320,7 @@ export default function Guestbook() {
                 {Array.from({ length: 8 }).map((_, index) => (
                   <div
                     key={index}
-                    className="rounded-2xl border border-theme-border bg-white/88 p-4 shadow-[0_12px_24px_rgba(var(--theme-primary-rgb),0.12)]"
+                    className="rounded-2xl border border-border bg-card/88 p-4 shadow-[0_12px_24px_hsl(var(--primary) / 0.12)]"
                   >
                     <div className="mb-3 flex items-center gap-3">
                       <Skeleton className="h-9 w-9 rounded-full" />
@@ -358,43 +358,43 @@ export default function Guestbook() {
                       <article
                         key={item.id}
                         style={getNoteStyle(item.id, index)}
-                        className="relative rounded-2xl border border-white/66 p-4 backdrop-blur-sm transition-all duration-300 hover:scale-[1.02]"
+                        className="relative rounded-2xl border border-border/35 p-4 backdrop-blur-sm transition-all duration-300 hover:scale-[1.02]"
                       >
                         <span
                           style={getPinStyle(item.id, index)}
-                          className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border border-white/75 shadow-[0_3px_10px_rgba(0,0,0,0.18)]"
+                          className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border border-border/40 shadow-[0_3px_10px_rgba(0,0,0,0.18)]"
                         />
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex min-w-0 items-center gap-2.5">
-                            <Avatar className="h-9 w-9 border border-white/70">
+                            <Avatar className="h-9 w-9 border border-border/35">
                               <AvatarImage src={item.avatar} alt={item.nickname} />
-                              <AvatarFallback className="theme-avatar-fallback text-xs font-semibold text-white">
+                              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
                                 {(item.nickname?.[0] || 'V').toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-slate-900">
+                              <p className="truncate text-sm font-semibold text-foreground">
                                 {item.nickname}
                               </p>
-                              <p className="text-[11px] text-slate-500">
+                              <p className="text-[11px] text-muted-foreground">
                                 {formatMessageTime(item.createdAt)}
                               </p>
                             </div>
                           </div>
                           {item.isPinned ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-theme-soft px-2 py-0.5 text-[11px] font-medium text-theme-primary">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-primary">
                               <Pin className="h-3 w-3" />
                               {'\u7f6e\u9876'}
                             </span>
                           ) : null}
                         </div>
 
-                        <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
+                        <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
                           {item.content}
                         </p>
 
                         <div className="mt-3 flex items-center justify-between gap-2">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-theme-soft-strong bg-white/72 px-2 py-0.5 text-[11px] text-theme-primary">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-accent bg-card/72 px-2 py-0.5 text-[11px] text-primary">
                             <Sparkles className="h-3 w-3" />
                             {'\u4fbf\u7b7e\u6a21\u5f0f'}
                           </span>
@@ -406,8 +406,8 @@ export default function Guestbook() {
                                 disabled={pinningId === item.id}
                                 className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
                                   item.isPinned
-                                    ? 'border-theme-soft-strong bg-theme-soft text-theme-primary hover:bg-theme-soft/80'
-                                    : 'border-sky-200 bg-sky-50/80 text-sky-700 hover:bg-sky-100'
+                                    ? 'border-accent bg-accent text-primary hover:bg-accent'
+                                    : 'border-primary/30 bg-accent/80 text-primary hover:bg-accent'
                                 }`}
                               >
                                 {pinningId === item.id ? (
@@ -424,7 +424,7 @@ export default function Guestbook() {
                                 type="button"
                                 onClick={() => void handleDelete(item)}
                                 disabled={deletingId === item.id}
-                                className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50/80 px-2.5 py-1 text-[11px] font-medium text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-1 text-[11px] font-medium text-destructive transition hover:bg-destructive/15 disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 {deletingId === item.id ? (
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -448,7 +448,7 @@ export default function Guestbook() {
                       variant="outline"
                       onClick={() => setPage(currentPage + 1)}
                       disabled={loading}
-                      className="rounded-xl border-theme-soft-strong bg-white/82 px-8 text-theme-primary hover:bg-theme-soft"
+                      className="rounded-xl border-accent bg-card/82 px-8 text-primary hover:bg-accent"
                     >
                       {loading ? (
                         <>

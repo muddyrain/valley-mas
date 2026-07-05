@@ -9,22 +9,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { applyThemeToDocument, useThemeStore } from '@/stores/useThemeStore';
+import { useThemeStore } from '@/stores/useThemeStore';
 
 export default function Login() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
-  const setTheme = useThemeStore((state) => state.setTheme);
+  const setMode = useThemeStore((state) => state.setMode);
 
   useEffect(() => {
-    const raw = localStorage.getItem('valley_theme');
-    const saved = raw ? (JSON.parse(raw) as { state?: { theme?: string } })?.state?.theme : null;
-    if (!saved) {
-      setTheme('amber');
-    } else {
-      applyThemeToDocument(saved as Parameters<typeof applyThemeToDocument>[0]);
-    }
-  }, [setTheme]);
+    setMode('light');
+  }, [setMode]);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -141,10 +135,10 @@ export default function Login() {
       cardDescription="登录账号，继续探索"
       footer={
         <>
-          <span className="text-slate-500">还没有账号？</span>{' '}
+          <span className="text-muted-foreground">还没有账号？</span>{' '}
           <Link
             to="/register"
-            className="font-semibold text-theme-primary transition-colors hover:text-theme-primary-hover"
+            className="font-semibold text-primary transition-colors hover:text-primary"
           >
             立即注册
           </Link>
@@ -152,14 +146,14 @@ export default function Login() {
       }
       bottomNote="登录即表示您同意我们的服务条款和隐私政策"
     >
-      <div className="mb-5 grid grid-cols-2 rounded-2xl border border-theme-shell-border bg-gradient-to-r from-theme-soft/70 via-white to-theme-soft/70 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+      <div className="mb-5 grid grid-cols-2 rounded-2xl border border-border bg-gradient-to-r from-accent/70 via-background to-accent/70 p-1.5 shadow-[inset_0_1px_0_hsl(var(--background)/0.9)]">
         <button
           type="button"
           onClick={() => setLoginType('code')}
           className={`min-h-10 rounded-lg px-3 text-sm font-medium transition-colors ${
             loginType === 'code'
-              ? 'bg-white text-slate-900 shadow-[0_8px_18px_rgba(var(--theme-primary-rgb),0.22)]'
-              : 'text-slate-500 hover:text-slate-700'
+              ? 'bg-background text-foreground shadow-[0_8px_18px_hsl(var(--primary) / 0.22)]'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           邮箱验证码登录
@@ -169,8 +163,8 @@ export default function Login() {
           onClick={() => setLoginType('password')}
           className={`min-h-10 rounded-lg px-3 text-sm font-medium transition-colors ${
             loginType === 'password'
-              ? 'bg-white text-slate-900 shadow-[0_8px_18px_rgba(var(--theme-primary-rgb),0.22)]'
-              : 'text-slate-500 hover:text-slate-700'
+              ? 'bg-background text-foreground shadow-[0_8px_18px_hsl(var(--primary) / 0.22)]'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           密码登录
@@ -179,49 +173,49 @@ export default function Login() {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-1.5">
-          <Label htmlFor="email" className="text-sm font-medium text-slate-700">
+          <Label htmlFor="email" className="text-sm font-medium text-foreground">
             邮箱
           </Label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="email"
               type="email"
               placeholder="请输入邮箱"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="h-12 rounded-xl border-theme-border/80 bg-theme-soft/80 pl-10 shadow-[0_6px_18px_rgba(var(--theme-primary-rgb),0.08)] transition-all focus-visible:border-theme-primary focus-visible:ring-theme-primary/50 focus-visible:shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.16)]"
+              className="h-12 rounded-xl border-border/80 bg-accent/80 pl-10 shadow-[0_6px_18px_hsl(var(--primary)/0.08)] transition-all focus-visible:border-primary focus-visible:ring-primary/50 focus-visible:shadow-[0_10px_24px_hsl(var(--primary)/0.16)]"
             />
           </div>
         </div>
 
         {loginType === 'password' ? (
           <div className="space-y-1.5">
-            <Label htmlFor="password" className="text-sm font-medium text-slate-700">
+            <Label htmlFor="password" className="text-sm font-medium text-foreground">
               密码
             </Label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="请输入密码"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="h-12 border-theme-border bg-theme-soft/60 pl-10 pr-11 focus-visible:border-theme-primary focus-visible:ring-theme-primary/40"
+                className="h-12 border-border bg-accent/60 pl-10 pr-11 focus-visible:border-primary focus-visible:ring-primary/40"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
         ) : (
-          <div className="space-y-1.5 rounded-2xl border border-theme-shell-border bg-gradient-to-br from-theme-soft/70 via-white to-theme-soft/30 p-3 shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.10)]">
-            <Label htmlFor="verificationCode" className="text-sm font-medium text-slate-700">
+          <div className="space-y-1.5 rounded-2xl border border-border bg-gradient-to-br from-accent/70 via-background to-accent/30 p-3 shadow-[0_10px_26px_hsl(var(--primary)/0.10)]">
+            <Label htmlFor="verificationCode" className="text-sm font-medium text-foreground">
               邮箱验证码
             </Label>
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -236,12 +230,12 @@ export default function Login() {
                     verificationCode: e.target.value.replace(/\D/g, '').slice(0, 6),
                   })
                 }
-                className="h-12 rounded-xl border-theme-border/80 bg-white text-center text-base font-semibold tracking-[0.28em] shadow-[0_6px_18px_rgba(var(--theme-primary-rgb),0.08)] transition-all focus-visible:border-theme-primary focus-visible:ring-theme-primary/50 focus-visible:shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.14)]"
+                className="h-12 rounded-xl border-border/80 bg-background text-center text-base font-semibold tracking-[0.28em] shadow-[0_6px_18px_hsl(var(--primary)/0.08)] transition-all focus-visible:border-primary focus-visible:ring-primary/50 focus-visible:shadow-[0_10px_24px_hsl(var(--primary)/0.14)]"
               />
               <Button
                 type="button"
                 variant="outline"
-                className="h-12 shrink-0 rounded-xl border-theme-primary/35 bg-white/90 px-4 text-theme-primary shadow-[0_6px_18px_rgba(var(--theme-primary-rgb),0.12)] transition-all hover:bg-theme-soft hover:text-theme-primary-hover hover:shadow-[0_10px_22px_rgba(var(--theme-primary-rgb),0.2)] sm:min-w-[132px]"
+                className="h-12 shrink-0 rounded-xl border-primary/35 bg-background/90 px-4 text-primary shadow-[0_6px_18px_hsl(var(--primary) / 0.12)] transition-all hover:bg-accent hover:text-primary hover:shadow-[0_10px_22px_hsl(var(--primary) / 0.2)] sm:min-w-[132px]"
                 onClick={requestCaptcha}
                 disabled={sendingCode || codeCountdown > 0}
               >
@@ -255,7 +249,7 @@ export default function Login() {
           <div className="flex justify-end">
             <Link
               to="/forgot-password"
-              className="text-sm font-medium text-theme-primary transition-colors hover:text-theme-primary-hover"
+              className="text-sm font-medium text-primary transition-colors hover:text-primary"
             >
               忘记密码？
             </Link>
@@ -264,7 +258,7 @@ export default function Login() {
 
         <Button
           type="submit"
-          className="theme-btn-primary h-12 w-full rounded-xl text-base font-semibold"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 h-12 w-full rounded-xl text-base font-semibold"
           disabled={loading}
         >
           {loading ? (

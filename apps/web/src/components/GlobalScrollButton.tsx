@@ -63,7 +63,7 @@ export function GlobalScrollButton() {
       aria-label="回到顶部"
       title="回到顶部"
       onClick={handleClick}
-      className="fixed right-4 bottom-5 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-theme-soft-strong bg-white/92 text-theme-primary shadow-[0_14px_36px_rgba(148,163,184,0.24)] backdrop-blur transition duration-200 hover:-translate-y-0.5 hover:bg-theme-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary/35 sm:right-6 sm:bottom-7"
+      className="fixed right-4 bottom-5 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-accent bg-card/92 text-primary shadow-md backdrop-blur transition duration-200 hover:-translate-y-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:right-6 sm:bottom-7"
     >
       <ArrowUpToLine className="h-5 w-5" />
     </button>

@@ -135,10 +135,10 @@ export default function Register() {
       cardDescription="注册后即可收藏、下载资源"
       footer={
         <>
-          <span className="text-slate-500">已有账号？</span>{' '}
+          <span className="text-muted-foreground">已有账号？</span>{' '}
           <Link
             to="/login"
-            className="font-semibold text-theme-primary transition-colors hover:text-theme-primary-hover"
+            className="font-semibold text-primary transition-colors hover:text-primary"
           >
             立即登录
           </Link>
@@ -147,27 +147,27 @@ export default function Register() {
       bottomNote="注册即表示您同意我们的服务条款和隐私政策"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-4 rounded-2xl border border-theme-shell-border bg-gradient-to-br from-theme-soft/70 via-white to-theme-soft/30 p-4 shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.10)]">
+        <div className="space-y-4 rounded-2xl border border-border bg-gradient-to-br from-accent/70 via-background to-accent/30 p-4 shadow-[0_10px_26px_hsl(var(--primary)/0.10)]">
           <div className="space-y-1.5">
-            <Label htmlFor="email" className="text-sm font-medium text-slate-700">
-              邮箱 <span className="text-red-400">*</span>
+            <Label htmlFor="email" className="text-sm font-medium text-foreground">
+              邮箱 <span className="text-destructive">*</span>
             </Label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="email"
                 type="email"
                 placeholder="请输入邮箱"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="h-12 rounded-xl border-theme-border/80 bg-white pl-10 shadow-[0_6px_18px_rgba(var(--theme-primary-rgb),0.08)] transition-all focus-visible:border-theme-primary focus-visible:ring-theme-primary/50 focus-visible:shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.16)]"
+                className="h-12 rounded-xl border-border/80 bg-background pl-10 shadow-[0_6px_18px_hsl(var(--primary) / 0.08)] transition-all focus-visible:border-primary focus-visible:ring-primary/50 focus-visible:shadow-[0_10px_24px_hsl(var(--primary) / 0.16)]"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="verificationCode" className="text-sm font-medium text-slate-700">
-              邮箱验证码 <span className="text-red-400">*</span>
+            <Label htmlFor="verificationCode" className="text-sm font-medium text-foreground">
+              邮箱验证码 <span className="text-destructive">*</span>
             </Label>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
@@ -181,12 +181,12 @@ export default function Register() {
                     verificationCode: e.target.value.replace(/\D/g, '').slice(0, 6),
                   })
                 }
-                className="h-12 rounded-xl border-theme-border/80 bg-white text-center text-base font-semibold tracking-[0.28em] shadow-[0_6px_18px_rgba(var(--theme-primary-rgb),0.08)] transition-all focus-visible:border-theme-primary focus-visible:ring-theme-primary/50 focus-visible:shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.14)]"
+                className="h-12 rounded-xl border-border/80 bg-background text-center text-base font-semibold tracking-[0.28em] shadow-[0_6px_18px_hsl(var(--primary) / 0.08)] transition-all focus-visible:border-primary focus-visible:ring-primary/50 focus-visible:shadow-[0_10px_24px_hsl(var(--primary) / 0.14)]"
               />
               <Button
                 type="button"
                 variant="outline"
-                className="h-12 shrink-0 rounded-xl border-theme-primary/35 bg-white/90 px-4 text-theme-primary shadow-[0_6px_18px_rgba(var(--theme-primary-rgb),0.12)] transition-all hover:bg-theme-soft hover:text-theme-primary-hover hover:shadow-[0_10px_22px_rgba(var(--theme-primary-rgb),0.2)] sm:min-w-[132px]"
+                className="h-12 shrink-0 rounded-xl border-primary/35 bg-background/90 px-4 text-primary shadow-[0_6px_18px_hsl(var(--primary) / 0.12)] transition-all hover:bg-accent hover:text-primary hover:shadow-[0_10px_22px_hsl(var(--primary) / 0.2)] sm:min-w-[132px]"
                 onClick={requestCaptcha}
                 disabled={sendingCode || codeCountdown > 0}
               >
@@ -198,49 +198,49 @@ export default function Register() {
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-3">
-            <Label htmlFor="nickname" className="text-sm font-medium text-slate-700">
-              昵称 <span className="text-xs font-normal text-slate-400">（可选）</span>
+            <Label htmlFor="nickname" className="text-sm font-medium text-foreground">
+              昵称 <span className="text-xs font-normal text-muted-foreground">（可选）</span>
             </Label>
             <button
               type="button"
               onClick={handleGenerateNickname}
-              className="text-xs font-medium text-theme-primary transition-colors hover:text-theme-primary-hover"
+              className="text-xs font-medium text-primary transition-colors hover:text-primary"
             >
               随机生成
             </button>
           </div>
           <div className="relative">
-            <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="nickname"
               type="text"
               placeholder="不填则自动生成随机昵称"
               value={formData.nickname}
               onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
-              className="h-12 border-theme-border bg-theme-soft/60 pl-10 focus-visible:border-theme-primary focus-visible:ring-theme-primary/40"
+              className="h-12 border-border bg-accent/60 pl-10 focus-visible:border-primary focus-visible:ring-primary/40"
               maxLength={50}
             />
           </div>
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="password" className="text-sm font-medium text-slate-700">
-            密码 <span className="text-red-400">*</span>
+          <Label htmlFor="password" className="text-sm font-medium text-foreground">
+            密码 <span className="text-destructive">*</span>
           </Label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="password"
               type={showPassword ? 'text' : 'password'}
               placeholder="至少 6 个字符"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="h-12 border-theme-border bg-theme-soft/60 pl-10 pr-11 focus-visible:border-theme-primary focus-visible:ring-theme-primary/40"
+              className="h-12 border-border bg-accent/60 pl-10 pr-11 focus-visible:border-primary focus-visible:ring-primary/40"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -248,39 +248,39 @@ export default function Register() {
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="confirmPassword" className="text-sm font-medium text-slate-700">
-            确认密码 <span className="text-red-400">*</span>
+          <Label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
+            确认密码 <span className="text-destructive">*</span>
           </Label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="confirmPassword"
               type={showConfirm ? 'text' : 'password'}
               placeholder="再次输入密码"
               value={formData.confirmPassword}
               onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              className={`h-12 border-theme-border bg-theme-soft/60 pl-10 pr-11 focus-visible:border-theme-primary focus-visible:ring-theme-primary/40 ${
+              className={`h-12 border-border bg-accent/60 pl-10 pr-11 focus-visible:border-primary focus-visible:ring-primary/40 ${
                 formData.confirmPassword && formData.password !== formData.confirmPassword
-                  ? 'border-red-400 focus-visible:border-red-400 focus-visible:ring-red-400/40'
+                  ? 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive/40'
                   : ''
               }`}
             />
             <button
               type="button"
               onClick={() => setShowConfirm(!showConfirm)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
             >
               {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
           {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-            <p className="text-xs text-red-500">两次密码不一致</p>
+            <p className="text-xs text-destructive">两次密码不一致</p>
           )}
         </div>
 
         <Button
           type="submit"
-          className="theme-btn-primary mt-1 h-12 w-full rounded-xl text-base font-semibold"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 mt-1 h-12 w-full rounded-xl text-base font-semibold"
           disabled={loading}
         >
           {loading ? (

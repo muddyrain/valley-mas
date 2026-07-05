@@ -15,8 +15,8 @@ import { Button } from '@/components/ui/button';
 import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
 import { enumParam, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const GROUP_TYPE_META: Record<
   GroupType,
@@ -56,10 +56,7 @@ export default function BlogGroupManage() {
   } = useUrlQueryState({
     type: enumParam(['blog', 'image_text'] as const, 'blog'),
   });
-  const { canAccess } = usePageRoleGuard({
-    allowRoles: ['creator', 'admin'],
-    unauthorizedMessage: '仅创作者可管理分组',
-  });
+  const { isAuthenticated } = useAuthStore();
   const groupType = resolveGroupType(type);
   const meta = useMemo(() => GROUP_TYPE_META[groupType], [groupType]);
 
@@ -92,9 +89,9 @@ export default function BlogGroupManage() {
   }, [groupType]);
 
   useEffect(() => {
-    if (!canAccess) return;
+    if (!isAuthenticated) return;
     void loadGroups();
-  }, [canAccess, loadGroups]);
+  }, [isAuthenticated, loadGroups]);
 
   const handleCreate = async () => {
     const name = createName.trim();
@@ -180,8 +177,8 @@ export default function BlogGroupManage() {
                 onClick={() => setValue('type', 'blog')}
                 className={`rounded-full px-3 py-1 text-xs transition ${
                   groupType === 'blog'
-                    ? 'bg-theme-primary text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:text-slate-900'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-card text-muted-foreground hover:text-foreground'
                 }`}
               >
                 博客分组
@@ -191,15 +188,15 @@ export default function BlogGroupManage() {
                 onClick={() => setValue('type', 'image_text')}
                 className={`rounded-full px-3 py-1 text-xs transition ${
                   groupType === 'image_text'
-                    ? 'bg-theme-primary text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:text-slate-900'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-card text-muted-foreground hover:text-foreground'
                 }`}
               >
                 图文分组
               </button>
             </div>
-            <h1 className="text-2xl font-semibold text-slate-900">{meta.title}</h1>
-            <p className="mt-1 text-sm text-slate-500">{meta.description}</p>
+            <h1 className="text-2xl font-semibold text-foreground">{meta.title}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{meta.description}</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => navigate('/my-space')} className="rounded-xl">
@@ -216,36 +213,38 @@ export default function BlogGroupManage() {
           {loading && groups.length === 0 ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-36 animate-pulse rounded-2xl bg-slate-100" />
+                <div key={i} className="h-36 animate-pulse rounded-2xl bg-muted" />
               ))}
             </div>
           ) : groups.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-14 text-center">
-              <FolderTree className="mx-auto h-10 w-10 text-slate-300" />
-              <p className="mt-3 text-slate-500">{meta.empty}</p>
+            <div className="rounded-2xl border border-dashed border-border bg-card p-14 text-center">
+              <FolderTree className="mx-auto h-10 w-10 text-muted-foreground" />
+              <p className="mt-3 text-muted-foreground">{meta.empty}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {groups.map((group) => (
                 <div
                   key={group.id}
-                  className="rounded-2xl border border-violet-200/70 bg-white p-5 shadow-[0_8px_22px_rgba(99,73,190,0.1)]"
+                  className="rounded-2xl border border-violet-200/70 bg-card p-5 shadow-[0_8px_22px_rgba(99,73,190,0.1)]"
                 >
                   <div className="mb-3 flex items-start justify-between gap-2">
                     <div>
                       <div className="mb-2">
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                           {meta.manageLabel}
                         </span>
                       </div>
-                      <h3 className="text-lg font-semibold text-slate-900">{group.name}</h3>
-                      <p className="mt-1 text-xs text-slate-500">内容数：{group.postCount || 0}</p>
+                      <h3 className="text-lg font-semibold text-foreground">{group.name}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        内容数：{group.postCount || 0}
+                      </p>
                     </div>
-                    <span className="rounded-full bg-theme-primary/10 px-2 py-0.5 text-xs text-theme-primary">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
                       ID {group.id}
                     </span>
                   </div>
-                  <p className="line-clamp-2 min-h-[40px] text-sm text-slate-600">
+                  <p className="line-clamp-2 min-h-[40px] text-sm text-muted-foreground">
                     {group.description || '暂未填写分组说明'}
                   </p>
                   <div className="mt-4 flex items-center gap-2">
@@ -265,7 +264,7 @@ export default function BlogGroupManage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="rounded-lg border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                      className="rounded-lg border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
                       onClick={() => openDeleteConfirm(group)}
                     >
                       <Trash2 className="mr-1 h-3.5 w-3.5" />

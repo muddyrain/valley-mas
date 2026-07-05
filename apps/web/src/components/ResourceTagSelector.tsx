@@ -99,12 +99,14 @@ export default function ResourceTagSelector({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-slate-400">
+        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           标签
           {value.length > 0 && (
             <span
               className={`rounded-full px-1.5 py-0.5 text-xs font-medium normal-case tracking-normal ${
-                value.length >= maxCount ? 'bg-red-100 text-red-500' : 'bg-slate-100 text-slate-500'
+                value.length >= maxCount
+                  ? 'bg-destructive/10 text-destructive'
+                  : 'bg-muted text-muted-foreground'
               }`}
             >
               {value.length}/{maxCount}
@@ -117,7 +119,7 @@ export default function ResourceTagSelector({
             type="button"
             disabled={aiLoading}
             onClick={handleAiMatch}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-theme-primary/25 bg-[linear-gradient(135deg,rgba(var(--theme-primary-rgb),0.10),rgba(var(--theme-primary-rgb),0.06))] px-2.5 py-1 text-xs font-medium text-theme-primary transition-all hover:border-theme-primary hover:bg-theme-primary hover:text-white hover:shadow-[0_2px_8px_rgba(var(--theme-primary-rgb),0.30)] disabled:cursor-not-allowed disabled:opacity-35"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/25 bg-[linear-gradient(135deg,hsl(var(--primary) / 0.10),hsl(var(--primary) / 0.06))] px-2.5 py-1 text-xs font-medium text-primary transition-all hover:border-primary hover:bg-primary hover:text-primary-foreground hover:shadow-[0_2px_8px_hsl(var(--primary) / 0.30)] disabled:cursor-not-allowed disabled:opacity-35"
           >
             {aiLoading ? (
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -129,9 +131,9 @@ export default function ResourceTagSelector({
         )}
       </div>
 
-      <div className="flex min-h-8 flex-wrap gap-1.5 rounded-xl border border-slate-100 bg-slate-50/70 p-2">
+      <div className="flex min-h-8 flex-wrap gap-1.5 rounded-xl border border-border bg-muted/70 p-2">
         {value.length === 0 ? (
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-muted-foreground">
             {canAi ? '输入标签后回车，或使用 AI 生成候选' : '输入标签后回车'}
           </span>
         ) : (
@@ -139,7 +141,7 @@ export default function ResourceTagSelector({
             <span
               key={tag}
               onClick={() => removeTag(tag)}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-theme-soft-strong bg-theme-soft px-2.5 py-0.5 text-xs font-medium text-theme-primary transition hover:opacity-70"
+              className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-accent bg-accent px-2.5 py-0.5 text-xs font-medium text-primary transition hover:opacity-70"
             >
               <Hash className="h-2.5 w-2.5" />
               {tag}
@@ -156,24 +158,24 @@ export default function ResourceTagSelector({
         onKeyDown={handleInputKey}
         placeholder="输入标签名后回车（可用逗号分隔）"
         maxLength={MAX_TAG_LEN}
-        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-theme-primary focus:ring-2 focus:ring-theme-primary/15"
+        className="w-full rounded-xl border border-border bg-card px-3.5 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15"
       />
 
       {candidates.length > 0 && (
-        <div className="rounded-xl border border-slate-100 bg-white p-2">
+        <div className="rounded-xl border border-border bg-card p-2">
           <div className="flex items-center justify-between px-1 pb-1.5">
-            <span className="text-xs text-slate-400">AI 候选（点击勾选）</span>
+            <span className="text-xs text-muted-foreground">AI 候选（点击勾选）</span>
             <button
               type="button"
               onClick={clearCandidates}
-              className="text-xs text-slate-400 hover:text-slate-600"
+              className="text-xs text-muted-foreground hover:text-foreground"
             >
               清空
             </button>
           </div>
           <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
             {value.length >= maxCount && (
-              <p className="w-full px-1 py-0.5 text-xs text-red-400">
+              <p className="w-full px-1 py-0.5 text-xs text-destructive">
                 已达上限（最多 {maxCount} 个标签），请先移除部分标签
               </p>
             )}
@@ -190,8 +192,8 @@ export default function ResourceTagSelector({
                     reachedLimit ? 'cursor-not-allowed opacity-30' : 'cursor-pointer'
                   } ${
                     selected
-                      ? 'border border-theme-soft-strong bg-theme-soft text-theme-primary'
-                      : 'border border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      ? 'border border-accent bg-accent text-primary'
+                      : 'border border-border bg-muted text-muted-foreground hover:bg-secondary'
                   }`}
                 >
                   <Hash className="h-2.5 w-2.5" />

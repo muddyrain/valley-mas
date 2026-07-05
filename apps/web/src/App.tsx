@@ -3,8 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { GlobalScrollButton } from '@/components/GlobalScrollButton';
 import { Toaster } from '@/components/ui/sonner';
 import { applyThemeToDocument, useThemeStore } from '@/stores/useThemeStore';
-import Layout from './layouts/Layout';
-import ApplyCreator from './pages/ApplyCreator';
+import WorkbenchLayout from './layouts/WorkbenchLayout';
 import BlogCreate from './pages/BlogCreate';
 import BlogGroupManage from './pages/BlogGroupManage';
 import BlogList from './pages/blog/BlogList';
@@ -89,8 +88,6 @@ function RouteTitle() {
       title = '通知中心 | Valley';
     } else if (pathname === '/profile') {
       title = '个人资料 | Valley';
-    } else if (pathname === '/apply-creator') {
-      title = '申请创作者 | Valley';
     } else if (pathname === '/login') {
       title = '登录 | Valley';
     } else if (pathname === '/register') {
@@ -106,11 +103,11 @@ function RouteTitle() {
 }
 
 function ThemeController() {
-  const theme = useThemeStore((state) => state.theme);
+  const mode = useThemeStore((state) => state.mode);
 
   useEffect(() => {
-    applyThemeToDocument(theme);
-  }, [theme]);
+    applyThemeToDocument(mode);
+  }, [mode]);
 
   return null;
 }
@@ -121,7 +118,7 @@ function App() {
       <ThemeController />
       <RouteTitle />
       <Routes>
-        <Route path="/" element={<Layout />}>
+        <Route path="/" element={<WorkbenchLayout />}>
           <Route index element={<Home />} />
           <Route path="creators" element={<Creator />} />
           <Route path="creator/:code" element={<CreatorProfile />} />
@@ -142,7 +139,6 @@ function App() {
           <Route path="downloads" element={<Downloads />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="updates" element={<Navigate to="/" replace />} />
-          <Route path="apply-creator" element={<ApplyCreator />} />
           <Route path="blog" element={<BlogList />} />
           <Route path="guestbook" element={<Guestbook />} />
           <Route path="tools/format" element={<FormatTools />} />

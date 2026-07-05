@@ -625,23 +625,23 @@ export default function AvatarBeadEditorDialog({
       }}
     >
       <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)] sm:max-w-[1020px] p-0 overflow-hidden">
-        <DialogHeader className="border-b border-slate-200 bg-white px-5 py-4">
+        <DialogHeader className="border-b border-border bg-card px-5 py-4">
           <DialogTitle className="flex items-center gap-2 text-base">
-            <Sparkles className="h-4 w-4 text-theme-primary" />
+            <Sparkles className="h-4 w-4 text-primary" />
             头像拼豆工坊
           </DialogTitle>
         </DialogHeader>
 
-        <div className="max-h-[85vh] overflow-y-auto bg-slate-50 p-4">
+        <div className="max-h-[85vh] overflow-y-auto bg-muted p-4">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="rounded-2xl border border-border bg-card p-4">
               <div
                 ref={previewWrapRef}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={(e) => endDragging(e.pointerId)}
                 onPointerCancel={(e) => endDragging(e.pointerId)}
-                className={`relative mx-auto h-[360px] w-[360px] max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-inner select-none ${
+                className={`relative mx-auto h-[360px] w-[360px] max-w-full overflow-hidden rounded-2xl border border-border bg-muted shadow-inner select-none ${
                   imageReady ? (dragging ? 'cursor-grabbing' : 'cursor-grab') : ''
                 }`}
               >
@@ -656,8 +656,8 @@ export default function AvatarBeadEditorDialog({
                     />
                     <div className="pointer-events-none absolute inset-0">
                       <div className="absolute inset-3 rounded-xl border border-white/60 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.35)]" />
-                      <div className="absolute left-1/2 top-3 h-[calc(100%-1.5rem)] w-px -translate-x-1/2 bg-white/55" />
-                      <div className="absolute top-1/2 left-3 h-px w-[calc(100%-1.5rem)] -translate-y-1/2 bg-white/55" />
+                      <div className="absolute left-1/2 top-3 h-[calc(100%-1.5rem)] w-px -translate-x-1/2 bg-card/55" />
+                      <div className="absolute top-1/2 left-3 h-px w-[calc(100%-1.5rem)] -translate-y-1/2 bg-card/55" />
                       <div className="absolute right-3 top-3 rounded-md bg-black/35 px-2 py-1 text-[11px] text-white">
                         {dragHint.canDragX && dragHint.canDragY
                           ? '可上下左右拖动'
@@ -673,17 +673,19 @@ export default function AvatarBeadEditorDialog({
                   <button
                     type="button"
                     onClick={() => inputRef.current?.click()}
-                    className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-500 transition hover:bg-slate-100"
+                    className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground transition hover:bg-muted"
                   >
                     <UploadCloud className="h-8 w-8" />
                     <span className="text-sm">点击选择头像图片</span>
-                    <span className="text-xs text-slate-400">支持 PNG/JPG，最大 5MB</span>
+                    <span className="text-xs text-muted-foreground">支持 PNG/JPG，最大 5MB</span>
                   </button>
                 )}
               </div>
 
               <div className="mt-3 flex items-center justify-between gap-2">
-                <p className="text-xs text-slate-500">拖拽预览区可移动裁剪，输出为 1:1 方形头像</p>
+                <p className="text-xs text-muted-foreground">
+                  拖拽预览区可移动裁剪，输出为 1:1 方形头像
+                </p>
                 <Button
                   size="sm"
                   variant="outline"
@@ -704,9 +706,9 @@ export default function AvatarBeadEditorDialog({
               />
             </div>
 
-            <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="space-y-4 rounded-2xl border border-border bg-card p-4">
               <div>
-                <p className="mb-2 text-xs text-slate-500">拼豆风格</p>
+                <p className="mb-2 text-xs text-muted-foreground">拼豆风格</p>
                 <div className="flex flex-wrap gap-2">
                   {[
                     { key: 'none', label: '原图' },
@@ -722,10 +724,10 @@ export default function AvatarBeadEditorDialog({
                       }
                       className={`rounded-full px-3 py-1.5 text-sm transition ${
                         effect === item.key
-                          ? 'bg-theme-primary text-white'
+                          ? 'bg-primary text-primary-foreground'
                           : !canApplyPixelEffects && (item.key === 'pixel' || item.key === 'beads')
-                            ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                            : 'bg-muted text-foreground hover:bg-secondary'
                       }`}
                     >
                       {item.label}
@@ -735,7 +737,7 @@ export default function AvatarBeadEditorDialog({
               </div>
 
               <div>
-                <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
+                <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
                   <span>缩放</span>
                   <span>{zoom.toFixed(2)}x</span>
                 </div>
@@ -752,7 +754,7 @@ export default function AvatarBeadEditorDialog({
               </div>
 
               <div>
-                <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
+                <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
                   <span>颗粒密度</span>
                   <span>{beadGrid}</span>
                 </div>
@@ -769,7 +771,7 @@ export default function AvatarBeadEditorDialog({
               </div>
 
               <div>
-                <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
+                <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
                   <span>色板数量</span>
                   <span>{paletteSize}</span>
                 </div>
@@ -785,32 +787,32 @@ export default function AvatarBeadEditorDialog({
                 />
               </div>
 
-              <label className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">
+              <label className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs text-foreground">
                 <span>显示中间小圆孔</span>
                 <input
                   type="checkbox"
                   checked={showBeadHole}
                   onChange={(e) => setShowBeadHole(e.target.checked)}
-                  className="h-4 w-4  accent-theme-primary"
+                  className="h-4 w-4 accent-primary"
                   disabled={!canApplyPixelEffects || effect === 'none'}
                 />
               </label>
 
               {!canApplyPixelEffects && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+                <div className="rounded-xl border border-border bg-muted p-3 text-xs text-muted-foreground">
                   当前是远程头像预览，拼豆/像素块仅支持本次上传的本地图片。
                 </div>
               )}
 
-              <div className="rounded-lg border border-slate-200 p-3">
-                <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
+              <div className="rounded-lg border border-border p-3">
+                <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
                   <span>历史头像</span>
                   <span>{avatarHistory.length} 张</span>
                 </div>
                 {avatarHistoryLoading ? (
-                  <div className="py-2 text-xs text-slate-400">加载中...</div>
+                  <div className="py-2 text-xs text-muted-foreground">加载中...</div>
                 ) : avatarHistory.length === 0 ? (
-                  <div className="py-2 text-xs text-slate-400">暂无历史头像</div>
+                  <div className="py-2 text-xs text-muted-foreground">暂无历史头像</div>
                 ) : (
                   <div className="grid grid-cols-4 gap-2">
                     {avatarHistory.map((item) => {
@@ -823,8 +825,8 @@ export default function AvatarBeadEditorDialog({
                           disabled={saving || active}
                           className={`group relative aspect-square overflow-hidden rounded-md border transition ${
                             active
-                              ? 'border-theme-primary ring-2 ring-theme-primary/50'
-                              : 'border-slate-200 hover:border-theme-primary'
+                              ? 'border-primary ring-2 ring-primary/50'
+                              : 'border-border hover:border-primary'
                           }`}
                           title="点击预览该历史头像"
                         >
@@ -843,7 +845,7 @@ export default function AvatarBeadEditorDialog({
                 )}
               </div>
 
-              <div className="rounded-xl bg-theme-primary/10 p-3 text-xs leading-5 text-theme-primary">
+              <div className="rounded-xl bg-primary/10 p-3 text-xs leading-5 text-primary">
                 点击历史头像会先在左侧预览，只有点“保存头像”才会真正更新。
               </div>
 

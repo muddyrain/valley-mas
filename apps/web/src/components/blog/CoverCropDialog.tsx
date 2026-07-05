@@ -99,7 +99,7 @@ export function CoverCropDialog({
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, drawX, drawY, drawW, drawH);
-  }, [zoom, offsetX, offsetY, imageLoaded]);
+  }, [imageLoaded, getRenderRect]);
 
   const getDragLimit = (nextZoom = zoom) => {
     const canvas = canvasRef.current;
@@ -192,18 +192,18 @@ export function CoverCropDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100vw-1.5rem)] max-w-240 overflow-hidden p-0">
-        <DialogHeader className="border-b border-slate-200 bg-white px-5 py-4">
+        <DialogHeader className="border-b border-border bg-background px-5 py-4">
           <DialogTitle className="flex items-center gap-2 text-base">
-            <ImagePlus className="h-4 w-4 text-violet-600" />
+            <ImagePlus className="h-4 w-4 text-primary" />
             裁剪封面
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 bg-[linear-gradient(180deg,#f8f7ff_0%,#f2f7ff_100%)] p-5">
-          <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
+        <div className="space-y-4 bg-[linear-gradient(180deg,hsl(var(--primary) / 0.04)_0%,hsl(var(--primary) / 0.07)_100%)] p-5">
+          <div className="rounded-2xl border border-border bg-card/90 p-3 shadow-sm">
             <canvas
               ref={canvasRef}
-              className={`block w-full touch-none rounded-xl bg-slate-950/90 ${BLOG_COVER_ASPECT_CLASS}`}
+              className={`block w-full touch-none rounded-xl bg-foreground/90 ${BLOG_COVER_ASPECT_CLASS}`}
               style={{ cursor: dragging ? 'grabbing' : 'grab' }}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
@@ -212,10 +212,10 @@ export function CoverCropDialog({
             />
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-            <div className="mb-2 flex items-center justify-between text-sm text-slate-600">
+          <div className="rounded-2xl border border-border bg-background/90 p-4 shadow-sm">
+            <div className="mb-2 flex items-center justify-between text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
-                <ZoomIn className="h-4 w-4 text-violet-500" />
+                <ZoomIn className="h-4 w-4 text-primary" />
                 缩放预览
               </span>
               <span>{zoom.toFixed(2)}x</span>
@@ -231,9 +231,9 @@ export function CoverCropDialog({
                 setZoom(nextZoom);
                 applyClampedOffset(offsetX, offsetY, nextZoom);
               }}
-              className="w-full accent-violet-600"
+              className="w-full accent-primary"
             />
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 <Move className="h-3.5 w-3.5" />
                 拖动图片调整位置

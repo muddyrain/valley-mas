@@ -1,4 +1,4 @@
-﻿import { Check, ChevronRight, Copy, Download, Image, Users } from 'lucide-react';
+import { Check, ChevronRight, Copy, Download, Image, Users } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -29,38 +29,38 @@ export default function CreatorCard({ creator, variant = 'detail' }: CreatorCard
   if (variant === 'compact') {
     return (
       <Card
-        className="group cursor-pointer overflow-hidden border-gray-100 bg-white/80 backdrop-blur-sm transition-all hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(var(--theme-primary-rgb),0.14)]"
+        className="group cursor-pointer overflow-hidden border-border bg-card/80 backdrop-blur-sm transition-all hover:-translate-y-1 hover:shadow-lg"
         onClick={handleClick}
       >
         <CardContent className="p-5">
           <div className="flex items-center gap-4">
             <div className="relative shrink-0">
-              <Avatar className="h-14 w-14 border-2 border-theme-soft-strong shadow-md transition-transform group-hover:scale-110">
+              <Avatar className="h-14 w-14 border-2 border-accent shadow-md transition-transform group-hover:scale-110">
                 <AvatarImage src={creator.avatar} />
-                <AvatarFallback className="bg-linear-to-br from-[var(--theme-primary)] to-[var(--theme-primary-deep)] text-lg font-bold text-white">
+                <AvatarFallback className="bg-linear-to-br from-primary to-primary text-lg font-bold text-primary-foreground">
                   {creator.name[0]}
                 </AvatarFallback>
               </Avatar>
-              <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white bg-green-500" />
+              <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-card bg-primary" />
             </div>
 
             <div className="min-w-0 flex-1">
-              <h3 className="truncate font-semibold text-gray-900 transition-colors group-hover:text-theme-primary">
+              <h3 className="truncate font-semibold text-foreground transition-colors group-hover:text-primary">
                 {creator.name}
               </h3>
-              <p className="mb-1.5 mt-0.5 flex items-center gap-1 text-xs text-gray-400">
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-theme-primary" />
+              <p className="mb-1.5 mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                 {creator.resourceCount} 作品
               </p>
-              <div className="inline-flex items-center gap-1 rounded-md border border-theme-soft-strong bg-theme-soft px-2 py-0.5">
-                <span className="text-[10px] font-medium text-theme-primary">口令</span>
-                <span className="text-xs font-bold tracking-wider text-theme-primary">
+              <div className="inline-flex items-center gap-1 rounded-md border border-accent bg-accent px-2 py-0.5">
+                <span className="text-[10px] font-medium text-primary">口令</span>
+                <span className="text-xs font-bold tracking-wider text-primary">
                   {creator.code}
                 </span>
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="ml-0.5 text-theme-primary transition-colors hover:text-theme-primary-deep"
+                  className="ml-0.5 text-primary transition-colors hover:text-primary-deep"
                   title="复制口令"
                 >
                   {copied ? (
@@ -79,33 +79,31 @@ export default function CreatorCard({ creator, variant = 'detail' }: CreatorCard
 
   return (
     <Card
-      className="group cursor-pointer transition-all hover:border-theme-soft-strong hover:shadow-[0_18px_42px_rgba(var(--theme-primary-rgb),0.14)]"
+      className="group cursor-pointer transition-all hover:border-accent hover:shadow-lg"
       onClick={handleClick}
     >
       <CardContent className="p-6">
         <div className="flex items-center gap-4">
-          <Avatar className="h-16 w-16 shrink-0 border-2 border-theme-soft-strong">
+          <Avatar className="h-16 w-16 shrink-0 border-2 border-accent">
             <AvatarImage src={creator.avatar} />
-            <AvatarFallback className="bg-linear-to-br from-[var(--theme-primary)] to-[var(--theme-primary-deep)] text-xl font-bold text-white">
+            <AvatarFallback className="bg-linear-to-br from-primary to-primary text-xl font-bold text-primary-foreground">
               {creator.name[0]}
             </AvatarFallback>
           </Avatar>
 
           <div className="min-w-0 flex-1">
             <div className="mb-0.5 flex items-center gap-2">
-              <h3 className="truncate text-lg font-bold text-gray-900 transition-colors group-hover:text-theme-primary">
+              <h3 className="truncate text-lg font-bold text-foreground transition-colors group-hover:text-primary">
                 {creator.name}
               </h3>
             </div>
-            <div className="mb-2 inline-flex items-center gap-1 rounded-md border border-theme-soft-strong bg-theme-soft px-2 py-0.5">
-              <span className="text-[10px] font-medium text-theme-primary">口令</span>
-              <span className="text-xs font-bold tracking-wider text-theme-primary">
-                {creator.code}
-              </span>
+            <div className="mb-2 inline-flex items-center gap-1 rounded-md border border-accent bg-accent px-2 py-0.5">
+              <span className="text-[10px] font-medium text-primary">口令</span>
+              <span className="text-xs font-bold tracking-wider text-primary">{creator.code}</span>
               <button
                 type="button"
                 onClick={handleCopy}
-                className="ml-0.5 text-theme-primary transition-colors hover:text-theme-primary-deep"
+                className="ml-0.5 text-primary transition-colors hover:text-primary-deep"
                 title="复制口令"
               >
                 {copied ? (
@@ -115,16 +113,16 @@ export default function CreatorCard({ creator, variant = 'detail' }: CreatorCard
                 )}
               </button>
             </div>
-            <p className="mb-3 truncate text-sm text-gray-500">
+            <p className="mb-3 truncate text-sm text-muted-foreground">
               {creator.description || '暂无简介'}
             </p>
-            <div className="flex items-center gap-4 text-sm text-gray-500">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <Image className="h-4 w-4 text-theme-primary" />
+                <Image className="h-4 w-4 text-primary" />
                 {creator.resourceCount}
               </span>
               <span className="flex items-center gap-1.5">
-                <Download className="h-4 w-4 text-sky-500" />
+                <Download className="h-4 w-4 text-primary" />
                 {creator.downloadCount}
               </span>
               <span className="flex items-center gap-1.5">
@@ -134,7 +132,7 @@ export default function CreatorCard({ creator, variant = 'detail' }: CreatorCard
             </div>
           </div>
 
-          <ChevronRight className="h-5 w-5 shrink-0 text-gray-300 transition-colors group-hover:text-theme-primary" />
+          <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/60 transition-colors group-hover:text-primary" />
         </div>
       </CardContent>
     </Card>

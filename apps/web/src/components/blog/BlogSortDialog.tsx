@@ -58,10 +58,10 @@ function SortableRow({ index, item }: SortableRowProps) {
       data-sort-item-id={item.id}
       className={cn(
         'flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition',
-        'border-slate-200 bg-white text-slate-800 shadow-[0_10px_24px_rgba(15,23,42,0.04)]',
-        'touch-none select-none hover:border-theme-shell-border hover:bg-theme-soft/35',
+        'border-border bg-card text-foreground shadow-sm',
+        'touch-none select-none hover:border-border hover:bg-accent/35',
         isDragging &&
-          'z-10 border-theme-primary bg-theme-soft shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.18)]',
+          'z-10 border-primary bg-accent shadow-[0_18px_44px_hsl(var(--primary) / 0.18)]',
       )}
       style={{
         transform: CSS.Transform.toString(transform),
@@ -70,11 +70,11 @@ function SortableRow({ index, item }: SortableRowProps) {
       {...attributes}
       {...listeners}
     >
-      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-theme-soft text-xs font-semibold text-theme-primary">
+      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-primary">
         {index + 1}
       </span>
       <span className="min-w-0 flex-1 truncate text-sm font-medium">{item.title}</span>
-      <GripVertical className="h-4 w-4 shrink-0 text-slate-400" />
+      <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
     </button>
   );
 }
@@ -90,14 +90,14 @@ function DragRowPreview({
 }) {
   return (
     <div
-      className="inline-flex max-w-[min(56rem,calc(100vw-3rem))] items-center gap-3 rounded-2xl border border-theme-primary bg-white px-4 py-3 text-left text-slate-800 shadow-[0_24px_56px_rgba(var(--theme-primary-rgb),0.24)]"
+      className="inline-flex max-w-[min(56rem,calc(100vw-3rem))] items-center gap-3 rounded-2xl border border-primary bg-card px-4 py-3 text-left text-foreground shadow-lg"
       style={width ? { width } : undefined}
     >
-      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-theme-soft text-xs font-semibold text-theme-primary">
+      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-primary">
         {index}
       </span>
       <span className="min-w-0 flex-1 truncate text-sm font-medium">{title}</span>
-      <GripVertical className="h-4 w-4 shrink-0 text-slate-400" />
+      <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
     </div>
   );
 }
@@ -225,21 +225,21 @@ export function BlogSortDialog({ open, onOpenChange, groups, onSorted }: BlogSor
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="max-w-4xl p-0">
-        <DialogHeader className="border-b border-slate-100 bg-[linear-gradient(135deg,rgba(var(--theme-primary-rgb),0.12),rgba(var(--theme-primary-rgb),0.04))] px-6 py-5">
-          <DialogTitle className="text-left text-lg font-bold text-slate-900">
+        <DialogHeader className="border-b border-border bg-[linear-gradient(135deg,hsl(var(--primary) / 0.12),hsl(var(--primary) / 0.04))] px-6 py-5">
+          <DialogTitle className="text-left text-lg font-bold text-foreground">
             设置博客排序
           </DialogTitle>
-          <DialogDescription className="text-left text-sm text-slate-500">
+          <DialogDescription className="text-left text-sm text-muted-foreground">
             不分组内容默认按创建时间倒序展示，这里只调整指定分组内的顺序。
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 px-6 py-5">
-          <div className="rounded-2xl border border-theme-soft-strong bg-theme-soft/40 p-4">
+          <div className="rounded-2xl border border-accent bg-accent/40 p-4">
             <div className="flex flex-wrap items-center gap-3">
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-900">选择要排序的博客分组</p>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="text-sm font-semibold text-foreground">选择要排序的博客分组</p>
+                <p className="mt-1 text-sm text-muted-foreground">
                   已切到标准拖拽排序，直接按住标题拖动即可连续调整位置。
                 </p>
               </div>
@@ -255,14 +255,14 @@ export function BlogSortDialog({ open, onOpenChange, groups, onSorted }: BlogSor
             </div>
           </div>
 
-          <div className="rounded-2xl border border-theme-panel-border bg-white/86 p-3">
+          <div className="rounded-2xl border border-border bg-card/86 p-3">
             {loading ? (
-              <div className="flex min-h-72 items-center justify-center text-sm text-slate-500">
+              <div className="flex min-h-72 items-center justify-center text-sm text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 正在加载分组排序列表...
               </div>
             ) : items.length === 0 ? (
-              <div className="flex min-h-72 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center text-sm text-slate-500">
+              <div className="flex min-h-72 items-center justify-center rounded-xl border border-dashed border-border bg-muted/70 px-6 text-center text-sm text-muted-foreground">
                 {selectedGroup ? '这个分组下还没有博客。' : '先选择一个分组。'}
               </div>
             ) : (

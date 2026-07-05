@@ -1,4 +1,4 @@
-﻿import {
+import {
   ArrowLeft,
   Check,
   ChevronLeftCircle,
@@ -743,12 +743,12 @@ function RenderedCardPreview({
 
   return (
     <div
-      className={`relative aspect-[3/5] overflow-hidden rounded-[30px] border ${template.frameClass} ${widthClass} bg-white shadow-[0_18px_46px_rgba(15,23,42,0.08)]`}
+      className={`relative aspect-[3/5] overflow-hidden rounded-[30px] border ${template.frameClass} ${widthClass} bg-card shadow-[0_18px_46px_rgba(15,23,42,0.08)]`}
     >
       {previewUrl ? (
         <img src={previewUrl} alt="图文渲染预览" className="h-full w-full object-cover" />
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-slate-50 text-xs text-slate-400">
+        <div className="flex h-full w-full items-center justify-center bg-muted text-xs text-muted-foreground">
           预览生成中...
         </div>
       )}
@@ -771,16 +771,16 @@ function TemplatePill({
     <button
       type="button"
       onClick={onSelect}
-      className={`w-[208px] shrink-0 rounded-[22px] border p-2.5 text-left transition ${active ? 'border-orange-300 bg-orange-50/80 shadow-sm ring-2 ring-orange-100' : 'border-slate-200 bg-white hover:border-orange-200'}`}
+      className={`w-[208px] shrink-0 rounded-[22px] border p-2.5 text-left transition ${active ? 'border-accent bg-accent/80 shadow-sm ring-2 ring-accent' : 'border-border bg-card hover:border-accent'}`}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
-          <div className="text-sm font-medium text-slate-900">{template.name}</div>
-          <div className="text-xs text-slate-500">{template.accent}</div>
+          <div className="text-sm font-medium text-foreground">{template.name}</div>
+          <div className="text-xs text-muted-foreground">{template.accent}</div>
         </div>
-        {active ? <Check className="h-4 w-4 text-orange-500" /> : null}
+        {active ? <Check className="h-4 w-4 text-primary" /> : null}
       </div>
-      <div className="flex justify-center rounded-[18px] bg-slate-50/70 py-1">
+      <div className="flex justify-center rounded-[18px] bg-muted/70 py-1">
         <CardPreview
           page={samplePage(template.sampleText)}
           template={template}
@@ -794,7 +794,7 @@ function TemplatePill({
 export default function ImageTextCreate() {
   const navigate = useNavigate();
   const { id: editingId } = useParams<{ id?: string }>();
-  const { user, isAuthenticated } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
   const isEditMode = Boolean(editingId);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -807,7 +807,6 @@ export default function ImageTextCreate() {
   const [loadingPost, setLoadingPost] = useState(false);
   const [activePage, setActivePage] = useState(0);
 
-  const canCreate = user?.role === 'creator' || user?.role === 'admin';
   const selectedTemplate = useMemo(
     () => TEMPLATES.find((item) => item.key === templateKey) || TEMPLATES[0],
     [templateKey],
@@ -898,16 +897,6 @@ export default function ImageTextCreate() {
   }, [editingId, navigate]);
 
   if (!isAuthenticated) return null;
-
-  if (!canCreate) {
-    return (
-      <div className="mx-auto max-w-5xl p-6">
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
-          当前账号暂不支持图文创作，请切换到创作者账号后再试。
-        </div>
-      </div>
-    );
-  }
 
   const updateCurrentPage = (patch: Partial<EditorPage>) => {
     setPages((prev) =>
@@ -1137,8 +1126,8 @@ export default function ImageTextCreate() {
   if (isEditMode && loadingPost) {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-[#f7f3ee] px-4 py-6 md:px-8">
-        <div className="mx-auto max-w-[1460px] rounded-[30px] border border-orange-200/80 bg-white/90 p-8">
-          <div className="text-sm text-slate-500">图文内容加载中...</div>
+        <div className="mx-auto max-w-[1460px] rounded-[30px] border border-accent/80 bg-card/90 p-8">
+          <div className="text-sm text-muted-foreground">图文内容加载中...</div>
         </div>
       </div>
     );
@@ -1147,17 +1136,17 @@ export default function ImageTextCreate() {
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[radial-gradient(circle_at_top,#fff6ec_0%,#f7f2ec_45%,#f5f1ec_100%)] px-4 py-6 md:px-8">
       <div className="mx-auto max-w-[1460px] space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-orange-200/70 bg-white/85 px-5 py-4 shadow-[0_18px_48px_rgba(196,119,59,0.08)] backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-accent/70 bg-card/85 px-5 py-4 shadow-[0_18px_48px_rgba(196,119,59,0.08)] backdrop-blur">
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="rounded-xl">
               <ArrowLeft className="mr-1 h-4 w-4" />
               返回
             </Button>
             <div>
-              <h1 className="text-xl font-semibold text-slate-900">
+              <h1 className="text-xl font-semibold text-foreground">
                 {isEditMode ? '编辑图文' : '创建图文'}
               </h1>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 现在由你手动控制每一页内容、高亮片段和字号，模板只负责版式风格。
               </p>
             </div>
@@ -1167,7 +1156,7 @@ export default function ImageTextCreate() {
             <select
               value={groupId}
               onChange={(e) => setGroupId(e.target.value)}
-              className="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-orange-200"
+              className="h-10 rounded-xl border border-border bg-card px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="">选择分组（可选）</option>
               {groups.map((item) => (
@@ -1179,7 +1168,7 @@ export default function ImageTextCreate() {
             <Button
               onClick={onPublish}
               disabled={submitting}
-              className="rounded-xl bg-orange-500 hover:bg-orange-600"
+              className="rounded-xl bg-primary hover:bg-primary/90"
             >
               <Send className="mr-2 h-4 w-4" />
               {submitting
@@ -1194,35 +1183,35 @@ export default function ImageTextCreate() {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_520px]">
-          <section className="rounded-[30px] border border-orange-200/70 bg-white/92 p-5 shadow-[0_18px_48px_rgba(196,119,59,0.08)] backdrop-blur">
+          <section className="rounded-[30px] border border-accent/70 bg-card/92 p-5 shadow-[0_18px_48px_rgba(196,119,59,0.08)] backdrop-blur">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">
+                <div className="inline-flex items-center gap-2 rounded-full bg-accent px-3 py-1 text-xs font-medium text-primary">
                   <PencilLine className="h-3.5 w-3.5" />
                   内容编辑区
                 </div>
-                <h2 className="mt-3 text-lg font-semibold text-slate-900">
+                <h2 className="mt-3 text-lg font-semibold text-foreground">
                   每一页内容、重点和字号都由你自己决定
                 </h2>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted-foreground">
                   先在文本框里选中一小段内容，你可以给它设高亮，也可以单独调大或调小字号，让每一页重点更清晰。
                 </p>
               </div>
 
               <div className="grid min-w-[220px] grid-cols-2 gap-2 text-sm">
-                <div className="rounded-2xl bg-slate-50 px-3 py-2 text-slate-600">
+                <div className="rounded-2xl bg-muted px-3 py-2 text-muted-foreground">
                   字数 {totalChars}
                 </div>
-                <div className="rounded-2xl bg-slate-50 px-3 py-2 text-slate-600">
+                <div className="rounded-2xl bg-muted px-3 py-2 text-muted-foreground">
                   页数 {livePages.length}
                 </div>
               </div>
             </div>
 
             <div className="mb-4">
-              <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-4">
-                <div className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <SmilePlus className="h-4 w-4 text-orange-500" />
+              <div className="rounded-[24px] border border-border bg-muted/80 p-4">
+                <div className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                  <SmilePlus className="h-4 w-4 text-primary" />
                   贴纸氛围
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1231,7 +1220,7 @@ export default function ImageTextCreate() {
                       key={emoji}
                       type="button"
                       onClick={() => setStickerEmoji(emoji)}
-                      className={`rounded-2xl border px-3 py-2 text-xl transition ${stickerEmoji === emoji ? 'border-orange-300 bg-orange-50 shadow-sm' : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/60'}`}
+                      className={`rounded-2xl border px-3 py-2 text-xl transition ${stickerEmoji === emoji ? 'border-primary/50 bg-accent shadow-sm' : 'border-border bg-card hover:border-accent hover:bg-accent/60'}`}
                     >
                       {emoji}
                     </button>
@@ -1240,8 +1229,8 @@ export default function ImageTextCreate() {
               </div>
             </div>
 
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-orange-100 bg-orange-50/60 px-4 py-3">
-              <div className="text-sm text-slate-600">当前编辑：第 {activePage + 1} 页</div>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-accent bg-accent/60 px-4 py-3">
+              <div className="text-sm text-muted-foreground">当前编辑：第 {activePage + 1} 页</div>
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
@@ -1258,7 +1247,7 @@ export default function ImageTextCreate() {
                   variant="outline"
                   size="sm"
                   onClick={removePage}
-                  className="rounded-xl text-rose-600 hover:text-rose-700"
+                  className="rounded-xl text-destructive hover:text-destructive"
                 >
                   <Trash2 className="mr-1 h-4 w-4" />
                   删除当前页
@@ -1267,9 +1256,9 @@ export default function ImageTextCreate() {
             </div>
 
             <div className="mb-4 grid gap-4 lg:grid-cols-3">
-              <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4 lg:col-span-2">
-                <div className="mb-2 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <WandSparkles className="h-4 w-4 text-orange-500" />
+              <div className="rounded-[22px] border border-border bg-muted/80 p-4 lg:col-span-2">
+                <div className="mb-2 inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                  <WandSparkles className="h-4 w-4 text-primary" />
                   手动高亮
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1291,20 +1280,20 @@ export default function ImageTextCreate() {
                   >
                     清除高亮
                   </Button>
-                  <div className="rounded-xl bg-white px-3 py-2 text-sm text-slate-600">
+                  <div className="rounded-xl bg-card px-3 py-2 text-sm text-muted-foreground">
                     {currentHighlightText
                       ? `当前高亮：${currentHighlightText}`
                       : '当前还没有高亮内容'}
                   </div>
                 </div>
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-muted-foreground">
                   建议一次只高亮同一行里的短句，避免跨行后影响观感。
                 </p>
               </div>
 
-              <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-                <div className="mb-2 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <Type className="h-4 w-4 text-orange-500" />
+              <div className="rounded-[22px] border border-border bg-muted/80 p-4">
+                <div className="mb-2 inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Type className="h-4 w-4 text-primary" />
                   正文字号
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1313,7 +1302,7 @@ export default function ImageTextCreate() {
                       key={size}
                       type="button"
                       onClick={() => updateCurrentPage({ fontSize: size })}
-                      className={`rounded-xl border px-3 py-2 text-sm transition ${currentPage.fontSize === size ? 'border-orange-300 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white hover:border-orange-200'}`}
+                      className={`rounded-xl border px-3 py-2 text-sm transition ${currentPage.fontSize === size ? 'border-primary/50 bg-accent text-primary' : 'border-border bg-card hover:border-accent'}`}
                     >
                       {size}
                     </button>
@@ -1322,9 +1311,9 @@ export default function ImageTextCreate() {
               </div>
             </div>
 
-            <div className="mb-4 rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-              <div className="mb-2 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-                <Type className="h-4 w-4 text-orange-500" />
+            <div className="mb-4 rounded-[22px] border border-border bg-muted/80 p-4">
+              <div className="mb-2 inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                <Type className="h-4 w-4 text-primary" />
                 选中文字字号
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1333,7 +1322,7 @@ export default function ImageTextCreate() {
                     key={`range-${size}`}
                     type="button"
                     onClick={() => applySelectionFontSize(size)}
-                    className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-sm transition hover:border-orange-200 hover:bg-orange-50/60"
+                    className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-card px-3 text-sm transition hover:border-accent hover:bg-accent/60"
                   >
                     {size}
                   </button>
@@ -1342,12 +1331,12 @@ export default function ImageTextCreate() {
                   type="button"
                   variant="outline"
                   onClick={clearSelectionFontSize}
-                  className="h-11 rounded-xl border-slate-200 px-3 text-sm hover:border-orange-200 hover:bg-orange-50/60"
+                  className="h-11 rounded-xl border-border px-3 text-sm hover:border-accent hover:bg-accent/60"
                 >
                   恢复默认字号
                 </Button>
               </div>
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-muted-foreground">
                 同样先选中文字再设置。当前页已设置 {currentPage.textStyles.length} 段局部字号。
               </p>
             </div>
@@ -1358,23 +1347,23 @@ export default function ImageTextCreate() {
               onChange={(e) => updateCurrentPageText(e.target.value)}
               placeholder="写点什么..."
               rows={13}
-              className="min-h-[320px] w-full resize-none rounded-[26px] border border-orange-100 bg-[#fffdf9] p-5 text-base leading-7 text-slate-800 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+              className="min-h-[320px] w-full resize-none rounded-[26px] border border-accent bg-[#fffdf9] p-5 text-base leading-7 text-foreground outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-accent"
             />
           </section>
 
-          <section className="rounded-[30px] border border-orange-200/70 bg-white/92 p-5 shadow-[0_18px_48px_rgba(196,119,59,0.08)] backdrop-blur xl:sticky xl:top-6 xl:self-start">
+          <section className="rounded-[30px] border border-accent/70 bg-card/92 p-5 shadow-[0_18px_48px_rgba(196,119,59,0.08)] backdrop-blur xl:sticky xl:top-6 xl:self-start">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">
+                <div className="inline-flex items-center gap-2 rounded-full bg-accent px-3 py-1 text-xs font-medium text-primary">
                   <Sparkles className="h-3.5 w-3.5" />
                   实时预览
                 </div>
-                <h2 className="mt-3 text-lg font-semibold text-slate-900">实时图文预览</h2>
-                <p className="text-sm text-slate-500">
+                <h2 className="mt-3 text-lg font-semibold text-foreground">实时图文预览</h2>
+                <p className="text-sm text-muted-foreground">
                   当前页的手动高亮和字号都会立刻反映到右侧成片效果里。
                 </p>
               </div>
-              <div className="rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              <div className="rounded-2xl bg-muted px-3 py-2 text-sm text-muted-foreground">
                 第 {activePage + 1} / {livePages.length} 页
               </div>
             </div>
@@ -1386,7 +1375,7 @@ export default function ImageTextCreate() {
                     key={index}
                     type="button"
                     onClick={() => setActivePage(index)}
-                    className={`shrink-0 rounded-[20px] border px-2 py-3 transition ${activePage === index ? 'border-orange-300 bg-orange-50 shadow-sm' : 'border-slate-200 bg-white hover:border-orange-200'}`}
+                    className={`shrink-0 rounded-[20px] border px-2 py-3 transition ${activePage === index ? 'border-primary/50 bg-accent shadow-sm' : 'border-border bg-card hover:border-accent'}`}
                   >
                     <div className="flex flex-col items-center gap-2">
                       <RenderedCardPreview
@@ -1395,21 +1384,23 @@ export default function ImageTextCreate() {
                         stickerEmoji={stickerEmoji}
                         variant="thumb"
                       />
-                      <div className="text-center text-[11px] text-slate-500">P{index + 1}</div>
+                      <div className="text-center text-[11px] text-muted-foreground">
+                        P{index + 1}
+                      </div>
                     </div>
                   </button>
                 ))}
               </div>
 
               <div className="order-1 lg:order-2">
-                <div className="relative mx-auto flex w-full max-w-[420px] items-center justify-center rounded-[34px] border border-slate-200 bg-[linear-gradient(180deg,#fffaf4_0%,#f8f0e7_100%)] px-10 py-4 shadow-[0_22px_58px_rgba(15,23,42,0.12)] sm:px-12">
+                <div className="relative mx-auto flex w-full max-w-[420px] items-center justify-center rounded-[34px] border border-border bg-[linear-gradient(180deg,#fffaf4_0%,#f8f0e7_100%)] px-10 py-4 shadow-[0_22px_58px_rgba(15,23,42,0.12)] sm:px-12">
                   {livePages.length > 1 ? (
                     <button
                       type="button"
                       onClick={() =>
                         setActivePage((prev) => (prev - 1 + livePages.length) % livePages.length)
                       }
-                      className="absolute left-2 top-1/2 z-10 -translate-y-1/2 text-slate-400 transition hover:text-slate-700"
+                      className="absolute left-2 top-1/2 z-10 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
                     >
                       <ChevronLeftCircle className="h-9 w-9" />
                     </button>
@@ -1425,16 +1416,16 @@ export default function ImageTextCreate() {
                     <button
                       type="button"
                       onClick={() => setActivePage((prev) => (prev + 1) % livePages.length)}
-                      className="absolute right-2 top-1/2 z-10 -translate-y-1/2 text-slate-400 transition hover:text-slate-700"
+                      className="absolute right-2 top-1/2 z-10 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
                     >
                       <ChevronRightCircle className="h-9 w-9" />
                     </button>
                   ) : null}
                 </div>
 
-                <div className="mt-5 rounded-[24px] border border-orange-100 bg-orange-50/70 p-4">
-                  <div className="mb-2 text-sm font-medium text-slate-800">当前图文参数</div>
-                  <div className="grid gap-2 text-sm text-slate-600">
+                <div className="mt-5 rounded-[24px] border border-accent bg-accent/70 p-4">
+                  <div className="mb-2 text-sm font-medium text-foreground">当前图文参数</div>
+                  <div className="grid gap-2 text-sm text-muted-foreground">
                     <div className="flex items-center justify-between">
                       <span>模板风格</span>
                       <span>{selectedTemplate.name}</span>
@@ -1462,12 +1453,12 @@ export default function ImageTextCreate() {
           </section>
         </div>
 
-        <section className="rounded-[30px] border border-orange-200/70 bg-white/90 p-5 shadow-[0_18px_48px_rgba(196,119,59,0.08)] backdrop-blur">
-          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
-            <LayoutTemplate className="h-4 w-4 text-orange-500" />
+        <section className="rounded-[30px] border border-accent/70 bg-card/90 p-5 shadow-[0_18px_48px_rgba(196,119,59,0.08)] backdrop-blur">
+          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+            <LayoutTemplate className="h-4 w-4 text-primary" />
             图文模板
           </div>
-          <p className="mb-4 text-sm text-slate-500">
+          <p className="mb-4 text-sm text-muted-foreground">
             模板放到底部后，样例卡能保留更稳定的比例和阅读感。
           </p>
           <div className="flex gap-3 overflow-x-auto pb-2">

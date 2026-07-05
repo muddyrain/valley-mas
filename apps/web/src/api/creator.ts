@@ -226,36 +226,4 @@ export const getMyFollows = (params: { page?: number; pageSize?: number } = {}) 
   );
 };
 
-// ========== 创作者申请 ==========
-
-export interface CreatorApplicationStatus {
-  id: string;
-  status: 'pending' | 'approved' | 'rejected';
-  name: string;
-  description: string;
-  reason: string;
-  phone?: string;
-  email?: string;
-  reviewNote?: string;
-  reviewedAt?: string;
-  createdAt: string;
-}
-
-// 提交申请
-export const submitCreatorApplication = (data: {
-  name: string;
-  description?: string;
-  reason: string;
-  phone?: string;
-  email?: string;
-}) => {
-  return http.post<unknown, { id: string; status: string; createdAt: string }>(
-    '/creator/application',
-    data,
-  );
-};
-
-// 查询我的申请状态
-export const getMyCreatorApplication = () => {
-  return http.get<unknown, CreatorApplicationStatus | null>('/creator/application/my');
-};
+// ========== 创作者申请（已移除：所有登录用户均可创作） ==========

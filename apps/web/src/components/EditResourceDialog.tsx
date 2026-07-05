@@ -168,29 +168,31 @@ export default function EditResourceDialog({
         requestDialogClose();
       }}
     >
-      <DialogContent className="flex h-[90vh] w-[90vw] max-w-4xl flex-col gap-0 overflow-hidden bg-white p-0 sm:max-w-4xl">
+      <DialogContent className="flex h-[90vh] w-[90vw] max-w-4xl flex-col gap-0 overflow-hidden bg-card p-0 sm:max-w-4xl">
         {/* ── 顶部标题栏 ── */}
-        <div className="shrink-0 border-b border-slate-100 bg-[linear-gradient(135deg,rgba(var(--theme-primary-rgb),0.10)_0%,rgba(var(--theme-primary-rgb),0.03)_100%)] px-6 py-4 flex items-center gap-4">
-          <div className="shrink-0 w-10 h-10 rounded-2xl bg-theme-primary/10 flex items-center justify-center shadow-[0_4px_12px_rgba(var(--theme-primary-rgb),0.18)]">
-            <Pencil className="h-4.5 w-4.5 text-theme-primary" />
+        <div className="shrink-0 border-b border-border bg-[linear-gradient(135deg,hsl(var(--primary) / 0.10)_0%,hsl(var(--primary) / 0.03)_100%)] px-6 py-4 flex items-center gap-4">
+          <div className="shrink-0 w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center shadow-[0_4px_12px_hsl(var(--primary) / 0.18)]">
+            <Pencil className="h-4.5 w-4.5 text-primary" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-base font-semibold text-slate-900 leading-tight">编辑资源信息</div>
-            <p className="mt-0.5 text-xs text-slate-500 truncate">{resource?.title}</p>
+            <div className="text-base font-semibold text-foreground leading-tight">
+              编辑资源信息
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground truncate">{resource?.title}</p>
           </div>
         </div>
 
         {/* ── 左右双栏 ── */}
-        <div className="flex min-h-0 flex-1 divide-x divide-slate-100 overflow-hidden">
+        <div className="flex min-h-0 flex-1 divide-x divide-border overflow-hidden">
           {/* ── 左栏：图片预览（只读） ── */}
-          <div className="flex w-[48%] shrink-0 flex-col gap-3 p-6 bg-slate-50/40">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+          <div className="flex w-[48%] shrink-0 flex-col gap-3 p-6 bg-muted/40">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               图片预览
             </p>
             <button
               type="button"
               onClick={() => resource && setPreviewOpen(true)}
-              className="relative flex-1 min-h-0 rounded-2xl overflow-hidden border border-slate-200 bg-white flex items-center justify-center group disabled:cursor-default"
+              className="relative flex-1 min-h-0 rounded-2xl overflow-hidden border border-border bg-card flex items-center justify-center group disabled:cursor-default"
               disabled={!resource}
             >
               {resource && (
@@ -212,21 +214,21 @@ export default function EditResourceDialog({
               </div>
             </button>
             {resource && (
-              <div className="flex items-center gap-2 text-xs text-slate-400">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <ImageIcon className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">{formatSize(resource.size)}</span>
-                <span className="text-slate-300">·</span>
+                <span className="text-border">·</span>
                 <span>{resource.downloadCount} 次下载</span>
               </div>
             )}
           </div>
 
           {/* ── 右栏：表单 ── */}
-          <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[linear-gradient(180deg,rgba(248,252,255,0.68),rgba(255,255,255,0.95))]">
+          <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[linear-gradient(180deg,hsl(var(--card) / 0.68),hsl(var(--card) / 0.95))]">
             <div className="flex-1 space-y-5 overflow-y-auto p-6">
               {/* 资源类型 */}
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   资源类型
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -237,19 +239,21 @@ export default function EditResourceDialog({
                       onClick={() => setType(opt.value)}
                       className={`relative flex flex-col items-center gap-1 rounded-2xl border-2 px-2 py-3 text-center transition-all duration-150 ${
                         type === opt.value
-                          ? 'border-theme-primary bg-theme-soft shadow-[0_0_0_3px_rgba(var(--theme-primary-rgb),0.10)]'
-                          : 'border-slate-200 bg-white hover:border-theme-shell-border hover:bg-theme-soft/40'
+                          ? 'border-primary bg-accent shadow-[0_0_0_3px_hsl(var(--primary) / 0.10)]'
+                          : 'border-border bg-card hover:border-border hover:bg-accent/50'
                       }`}
                     >
                       <span className="text-xl leading-none">{opt.icon}</span>
                       <span
-                        className={`text-sm font-semibold leading-none ${type === opt.value ? 'text-theme-primary' : 'text-slate-700'}`}
+                        className={`text-sm font-semibold leading-none ${type === opt.value ? 'text-primary' : 'text-foreground'}`}
                       >
                         {opt.label}
                       </span>
-                      <span className="text-[10px] text-slate-400 leading-tight">{opt.desc}</span>
+                      <span className="text-[10px] text-muted-foreground leading-tight">
+                        {opt.desc}
+                      </span>
                       {type === opt.value && (
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-theme-primary" />
+                        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
                       )}
                     </button>
                   ))}
@@ -258,7 +262,7 @@ export default function EditResourceDialog({
 
               {/* 可见范围 */}
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   可见范围
                 </label>
                 <div className="flex flex-col gap-2">
@@ -269,18 +273,18 @@ export default function EditResourceDialog({
                       onClick={() => setVisibility(opt.value)}
                       className={`flex items-center gap-2.5 rounded-xl border-2 px-3 py-2 text-left transition-all duration-150 ${
                         visibility === opt.value
-                          ? 'border-theme-primary bg-theme-soft shadow-[0_0_0_3px_rgba(var(--theme-primary-rgb),0.10)]'
-                          : 'border-slate-200 bg-white hover:border-theme-shell-border hover:bg-theme-soft/40'
+                          ? 'border-primary bg-accent shadow-[0_0_0_3px_hsl(var(--primary) / 0.10)]'
+                          : 'border-border bg-card hover:border-border hover:bg-accent/50'
                       }`}
                     >
                       <span className="text-base leading-none">{opt.icon}</span>
                       <div className="min-w-0">
                         <div
-                          className={`text-xs font-semibold leading-none ${visibility === opt.value ? 'text-theme-primary' : 'text-slate-700'}`}
+                          className={`text-xs font-semibold leading-none ${visibility === opt.value ? 'text-primary' : 'text-foreground'}`}
                         >
                           {opt.label}
                         </div>
-                        <div className="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
                           {opt.desc}
                         </div>
                       </div>
@@ -291,9 +295,11 @@ export default function EditResourceDialog({
 
               {/* 资源标题 */}
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   资源标题{' '}
-                  <span className="text-red-400 normal-case tracking-normal font-normal">*</span>
+                  <span className="text-destructive normal-case tracking-normal font-normal">
+                    *
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -301,15 +307,15 @@ export default function EditResourceDialog({
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="给这个资源起个名字"
                   maxLength={100}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-theme-primary focus:ring-2 focus:ring-theme-primary/15"
+                  className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
                 />
               </div>
 
               {/* 描述 */}
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   描述{' '}
-                  <span className="normal-case tracking-normal font-normal text-slate-400">
+                  <span className="normal-case tracking-normal font-normal text-muted-foreground">
                     （可选）
                   </span>
                 </label>
@@ -319,7 +325,7 @@ export default function EditResourceDialog({
                   placeholder="简单描述一下这个资源的用途、风格或来源…"
                   maxLength={255}
                   rows={2}
-                  className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-theme-primary focus:ring-2 focus:ring-theme-primary/15"
+                  className="w-full resize-none rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
                 />
               </div>
 
@@ -336,7 +342,7 @@ export default function EditResourceDialog({
             </div>
 
             {/* ── 底部操作栏 ── */}
-            <div className="shrink-0 flex items-center gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-4">
+            <div className="shrink-0 flex items-center gap-3 border-t border-border bg-muted/60 px-6 py-4">
               <Button
                 variant="outline"
                 onClick={() => onOpenChange(false)}
@@ -348,7 +354,7 @@ export default function EditResourceDialog({
               <Button
                 onClick={handleSubmit}
                 disabled={saving}
-                className="flex-2 rounded-xl theme-btn-primary font-semibold shadow-[0_4px_16px_rgba(var(--theme-primary-rgb),0.28)] disabled:shadow-none transition-all"
+                className="flex-2 rounded-xl font-semibold shadow-[0_4px_16px_hsl(var(--primary) / 0.28)] disabled:shadow-none transition-all"
               >
                 {saving ? (
                   <>
