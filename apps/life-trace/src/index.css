@@ -456,8 +456,9 @@
   }
 }
 
+.captcha-chinese .clawcap-steps li.is-active span:last-child,
 .captcha-chinese .clawcap-steps li span:last-child {
-  display: none !important;
+  display: none;
 }
 
 .captcha-chinese .clawcap-steps li:nth-child(1)::after {
