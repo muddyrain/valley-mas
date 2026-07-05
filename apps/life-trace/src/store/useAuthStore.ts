@@ -4,6 +4,7 @@ import type { LifeTraceUser } from '@/api/auth';
 import {
   getCurrentUser,
   isConfirmedAuthFailure,
+  loginWithCode,
   loginWithPassword,
   registerWithEmail,
   logout as requestLogout,
@@ -20,7 +21,7 @@ type AuthState = {
   updateUser: (
     updater: Partial<LifeTraceUser> | ((current: LifeTraceUser | null) => LifeTraceUser | null),
   ) => void;
-  signIn: (input: { email: string; password: string }) => Promise<void>;
+  signIn: (input: { email: string; password: string; verificationCode?: string }) => Promise<void>;
   signUp: (input: {
     email: string;
     password: string;
@@ -53,8 +54,10 @@ export const useAuthStore = create<AuthState>()(
       signIn: async (input) => {
         set({ error: '' });
         try {
-          const { token, userInfo } = await loginWithPassword(input);
-          set({ token, user: userInfo, status: 'authenticated', error: '' });
+          const result = input.verificationCode
+            ? await loginWithCode({ email: input.email, verificationCode: input.verificationCode })
+            : await loginWithPassword({ email: input.email, password: input.password });
+          set({ token: result.token, user: result.userInfo, status: 'authenticated', error: '' });
         } catch (error) {
           set({
             token: null,

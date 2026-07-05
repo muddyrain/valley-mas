@@ -28,6 +28,7 @@
     "lottie-react": "^2.4.1",
     "lucide-react": "catalog:shared-runtime",
     "onnxruntime-web": "^1.21.0",
+    "playcaptcha": "^0.1.0",
     "react": "catalog:react-19",
     "react-dom": "catalog:react-19",
     "react-router-dom": "catalog:shared-runtime",

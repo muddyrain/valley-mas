@@ -102,6 +102,17 @@ export function loginWithPassword(input: { email: string; password: string }) {
   });
 }
 
+export function loginWithCode(input: { email: string; verificationCode: string }) {
+  return request<LoginResponse>('/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: input.email,
+      verificationCode: input.verificationCode,
+      loginType: 'code',
+    }),
+  });
+}
+
 export function registerWithEmail(input: {
   email: string;
   password: string;

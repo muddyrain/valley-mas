@@ -1,9 +1,10 @@
-﻿import { ArrowRight, Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { register, sendEmailCode } from '@/api/auth';
 import AuthSplitLayout from '@/components/AuthSplitLayout';
+import CaptchaDialog from '@/components/CaptchaDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,6 +27,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [codeCountdown, setCodeCountdown] = useState(0);
+  const [captchaOpen, setCaptchaOpen] = useState(false);
 
   useEffect(() => {
     if (codeCountdown <= 0) return;
@@ -37,7 +39,7 @@ export default function Register() {
     setFormData((prev) => ({ ...prev, nickname: createRandomCnNickname() }));
   };
 
-  const handleSendCode = async () => {
+  const requestCaptcha = () => {
     const email = formData.email.trim();
     if (!email) {
       toast.error('请先输入邮箱');
@@ -47,10 +49,13 @@ export default function Register() {
       toast.error('请输入正确的邮箱地址');
       return;
     }
+    setCaptchaOpen(true);
+  };
 
+  const handleSendCode = async () => {
     try {
       setSendingCode(true);
-      await sendEmailCode({ email, purpose: 'register' });
+      await sendEmailCode({ email: formData.email.trim(), purpose: 'register' });
       setCodeCountdown(60);
       toast.success('验证码已发送');
     } catch (error) {
@@ -182,7 +187,7 @@ export default function Register() {
                 type="button"
                 variant="outline"
                 className="h-12 shrink-0 rounded-xl border-theme-primary/35 bg-white/90 px-4 text-theme-primary shadow-[0_6px_18px_rgba(var(--theme-primary-rgb),0.12)] transition-all hover:bg-theme-soft hover:text-theme-primary-hover hover:shadow-[0_10px_22px_rgba(var(--theme-primary-rgb),0.2)] sm:min-w-[132px]"
-                onClick={handleSendCode}
+                onClick={requestCaptcha}
                 disabled={sendingCode || codeCountdown > 0}
               >
                 {codeButtonText}
@@ -306,6 +311,7 @@ export default function Register() {
           )}
         </Button>
       </form>
+      <CaptchaDialog open={captchaOpen} onOpenChange={setCaptchaOpen} onVerify={handleSendCode} />
     </AuthSplitLayout>
   );
 }

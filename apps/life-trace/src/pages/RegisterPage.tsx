@@ -2,6 +2,7 @@ import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, Shuffle, Sparkles, User } f
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sendEmailVerificationCode } from '@/api/auth';
+import { CaptchaSheet } from '@/components/CaptchaSheet';
 import { LifeTraceBrandMark } from '@/components/LifeTraceBrandMark';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -57,6 +58,7 @@ export function RegisterPage() {
   const [codeCountdown, setCodeCountdown] = useState(0);
   const [codeInfo, setCodeInfo] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [captchaOpen, setCaptchaOpen] = useState(false);
   const pageRef = useRef<HTMLElement>(null);
 
   useLifeTraceEntrance(pageRef, {
@@ -77,7 +79,7 @@ export function RegisterPage() {
     setNickname(createNickname());
   };
 
-  const handleSendCode = async () => {
+  const requestCaptcha = () => {
     const normalizedEmail = email.trim();
     if (!normalizedEmail) {
       setError('请先输入邮箱');
@@ -87,7 +89,11 @@ export function RegisterPage() {
       setError('请输入正确的邮箱地址');
       return;
     }
+    setCaptchaOpen(true);
+  };
 
+  const handleSendCode = async () => {
+    const normalizedEmail = email.trim();
     setSendingCode(true);
     setError('');
     try {
@@ -229,7 +235,7 @@ export function RegisterPage() {
                   type="button"
                   variant="outline"
                   className="h-12 shrink-0 whitespace-nowrap px-3 text-sm"
-                  onClick={handleSendCode}
+                  onClick={requestCaptcha}
                   disabled={sendingCode || codeCountdown > 0}
                 >
                   {codeButtonLabel}
@@ -345,6 +351,7 @@ export function RegisterPage() {
           </p>
         </Card>
       </div>
+      <CaptchaSheet open={captchaOpen} onOpenChange={setCaptchaOpen} onVerify={handleSendCode} />
     </main>
   );
 }

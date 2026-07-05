@@ -30,6 +30,7 @@
     "clsx": "catalog:shared-runtime",
     "lucide-react": "catalog:shared-runtime",
     "marked": "^17.0.4",
+    "playcaptcha": "^0.1.0",
     "react": "catalog:react-19",
     "react-dom": "catalog:react-19",
     "react-router-dom": "catalog:shared-runtime",
