@@ -38,6 +38,7 @@ import {
   BLOG_COVER_OUTPUT_WIDTH,
 } from '@/components/blog';
 import { BatchMarkdownImportDialog } from '@/components/blog/BatchMarkdownImportDialog';
+import { BlogWorkflowDialog } from '@/components/blog/BlogWorkflowDialog';
 import { CoverCropDialog } from '@/components/blog/CoverCropDialog';
 import { CoverPickerDialog } from '@/components/blog/CoverPickerDialog';
 import { MdxMarkdownEditor } from '@/components/blog/MdxMarkdownEditor';
@@ -100,6 +101,7 @@ export default function BlogCreate() {
   const [aiCoverSource, setAiCoverSource] = useState<'manual' | 'import'>('manual');
   const [importingMarkdown, setImportingMarkdown] = useState(false);
   const [batchImportDialogOpen, setBatchImportDialogOpen] = useState(false);
+  const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
@@ -867,6 +869,18 @@ export default function BlogCreate() {
                 type="button"
                 variant="outline"
                 disabled={actionBusy || loadingPost}
+                onClick={() => setWorkflowDialogOpen(true)}
+                className="rounded-xl border-theme-primary text-theme-primary hover:bg-theme-primary/10"
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                AI 工作流
+              </Button>
+            )}
+            {!isEditMode && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={actionBusy || loadingPost}
                 onClick={() => setBatchImportDialogOpen(true)}
                 className="rounded-xl"
               >
@@ -1249,6 +1263,13 @@ export default function BlogCreate() {
       <BatchMarkdownImportDialog
         open={batchImportDialogOpen}
         onOpenChange={setBatchImportDialogOpen}
+        groups={groups}
+        defaultGroupId={groupId}
+        defaultVisibility={visibility}
+      />
+      <BlogWorkflowDialog
+        open={workflowDialogOpen}
+        onOpenChange={setWorkflowDialogOpen}
         groups={groups}
         defaultGroupId={groupId}
         defaultVisibility={visibility}

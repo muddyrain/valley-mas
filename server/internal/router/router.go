@@ -263,6 +263,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.POST("/blog/ai/excerpt", handler.AdminAIGenerateBlogExcerpt)
 				content.POST("/blog/ai/cover", handler.AdminAIGenerateBlogCover)
 				content.POST("/blog/ai/cover/pick", handler.AdminAIPickBlogCoverFromResources)
+				content.POST("/blog/workflow/import", handler.AdminBlogWorkflowImport)
+				content.POST("/blog/workflow/:id/publish", handler.AdminBlogWorkflowPublish)
 				content.GET("/blog/external-images/search", handler.AdminSearchExternalCoverImages)
 				content.POST("/blog/external-images/unsplash/trigger-download", handler.AdminTriggerUnsplashDownload)
 				content.POST("/blog/image-text/assets/upload", handler.AdminUploadImageTextAsset)

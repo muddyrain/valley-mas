@@ -37,6 +37,7 @@ import type { Resource } from '@/api/resource';
 import { BlogPostCard, ImageTextPostCard } from '@/components/blog';
 import { BatchMarkdownImportDialog } from '@/components/blog/BatchMarkdownImportDialog';
 import BlogSortDialog from '@/components/blog/BlogSortDialog';
+import { BlogWorkflowDialog } from '@/components/blog/BlogWorkflowDialog';
 import PostGroupDropdown from '@/components/blog/PostGroupDropdown';
 import { PublicWallpaperPickerDialog } from '@/components/blog/PublicWallpaperPickerDialog';
 import PanelLoadingOverlay from '@/components/PanelLoadingOverlay';
@@ -108,6 +109,7 @@ export default function MyPosts() {
   const [batchWallpaperPickerOpen, setBatchWallpaperPickerOpen] = useState(false);
   const [batchSettingsOpen, setBatchSettingsOpen] = useState(false);
   const [batchImportDialogOpen, setBatchImportDialogOpen] = useState(false);
+  const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
   const [blogSortDialogOpen, setBlogSortDialogOpen] = useState(false);
   const batchCoverUploadInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -645,6 +647,14 @@ export default function MyPosts() {
                 </Button>
                 <Button
                   variant="outline"
+                  onClick={() => setWorkflowDialogOpen(true)}
+                  className="rounded-xl border-theme-primary text-theme-primary hover:bg-theme-primary/10"
+                >
+                  <Sparkles className="mr-1.5 h-4 w-4" />
+                  AI 工作流
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={() => setBatchImportDialogOpen(true)}
                   className="rounded-xl"
                 >
@@ -914,6 +924,16 @@ export default function MyPosts() {
       <BatchMarkdownImportDialog
         open={batchImportDialogOpen}
         onOpenChange={setBatchImportDialogOpen}
+        groups={blogGroups}
+        defaultGroupId={blogGroupFilter}
+        defaultVisibility="private"
+        onCreated={async () => {
+          await loadBlogPostsPage();
+        }}
+      />
+      <BlogWorkflowDialog
+        open={workflowDialogOpen}
+        onOpenChange={setWorkflowDialogOpen}
         groups={blogGroups}
         defaultGroupId={blogGroupFilter}
         defaultVisibility="private"

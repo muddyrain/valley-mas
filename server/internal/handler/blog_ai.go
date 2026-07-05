@@ -19,6 +19,7 @@ import (
 	"unicode"
 	"valley-server/internal/aiclient"
 	"valley-server/internal/service"
+	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
@@ -383,6 +384,39 @@ func buildDeterministicCoverPrompt(req blogAICoverRequest) string {
 
 // AdminAIGenerateBlogExcerpt generates summary from blog content.
 // POST /admin/blog/ai/excerpt
+// generateBlogExcerptInternal generates a blog excerpt using AI without HTTP handler dependencies.
+func generateBlogExcerptInternal(title, content string) (excerpt string, model string, err error) {
+	apiKey, arkBaseURL, textModel, errMsg := readArkTextModelConfig()
+	if errMsg != "" {
+		return "", "", fmt.Errorf("%s", errMsg)
+	}
+	client := ensureSharedArkClient(apiKey, arkBaseURL)
+
+	title = truncateAIText(title, 80)
+	content = truncateAIText(content, 3500)
+	prompt := fmt.Sprintf(
+		"Generate a concise Chinese summary for the blog below. Requirements:\n"+
+			"1) 30-120 Chinese characters;\n"+
+			"2) accurate and neutral;\n"+
+			"3) output summary text only, no quote marks.\n\n"+
+			"Title: %s\nContent: %s",
+		title,
+		content,
+	)
+
+	raw, err := callChatStream(client, textModel, "", prompt, false)
+	if err != nil {
+		return "", textModel, fmt.Errorf("AI request failed: %w", err)
+	}
+
+	excerpt = normalizeAITextOutput(raw)
+	excerpt = truncateAIText(excerpt, 180)
+	if excerpt == "" {
+		return "", textModel, fmt.Errorf("AI returned empty summary")
+	}
+	return excerpt, textModel, nil
+}
+
 func AdminAIGenerateBlogExcerpt(c *gin.Context) {
 	_, role, ok := currentUser(c)
 	if !ok {
@@ -406,41 +440,15 @@ func AdminAIGenerateBlogExcerpt(c *gin.Context) {
 		return
 	}
 
-	apiKey, arkBaseURL, textModel, errMsg := readArkTextModelConfig()
-	if errMsg != "" {
-		Error(c, http.StatusServiceUnavailable, errMsg)
-		return
-	}
-	client := ensureSharedArkClient(apiKey, arkBaseURL)
-
-	title := truncateAIText(req.Title, 80)
-	content = truncateAIText(content, 3500)
-	prompt := fmt.Sprintf(
-		"Generate a concise Chinese summary for the blog below. Requirements:\n"+
-			"1) 30-120 Chinese characters;\n"+
-			"2) accurate and neutral;\n"+
-			"3) output summary text only, no quote marks.\n\n"+
-			"Title: %s\nContent: %s",
-		title,
-		content,
-	)
-
-	raw, err := callChatStream(client, textModel, "", prompt, false)
+	excerpt, model, err := generateBlogExcerptInternal(req.Title, content)
 	if err != nil {
-		Error(c, http.StatusBadGateway, "AI request failed: "+err.Error())
-		return
-	}
-
-	excerpt := normalizeAITextOutput(raw)
-	excerpt = truncateAIText(excerpt, 180)
-	if excerpt == "" {
-		Error(c, http.StatusBadGateway, "AI returned empty summary")
+		Error(c, http.StatusBadGateway, err.Error())
 		return
 	}
 
 	Success(c, gin.H{
 		"excerpt": excerpt,
-		"model":   textModel,
+		"model":   model,
 	})
 }
 
@@ -448,6 +456,176 @@ func buildCoverPromptByTextModel(client *arkruntime.Client, textModel string, re
 	_ = client
 	_ = textModel
 	return buildDeterministicCoverPrompt(req)
+}
+
+// generateBlogCoverInternal generates an AI cover image and uploads it to storage.
+// Returns the cover URL, storage key, model used, and any error.
+func generateBlogCoverInternal(title, excerpt, content string, userID int64) (coverURL string, coverStorageKey string, model string, err error) {
+	apiKey := strings.TrimSpace(os.Getenv("ARK_API_KEY"))
+	imageModel := strings.TrimSpace(os.Getenv("ARK_IMAGE_MODEL"))
+	textModel := strings.TrimSpace(os.Getenv("ARK_TEXT_MODEL"))
+	arkBaseURL := strings.TrimSpace(os.Getenv("ARK_BASE_URL"))
+	if arkBaseURL == "" {
+		arkBaseURL = "https://ark.cn-beijing.volces.com/api/v3"
+	}
+	if apiKey == "" {
+		return "", "", "", fmt.Errorf("AI is not configured: missing ARK_API_KEY")
+	}
+
+	candidateModels := imageModelCandidates(imageModel)
+	if len(candidateModels) == 0 {
+		return "", "", "", fmt.Errorf("AI is not configured: missing ARK_IMAGE_MODEL")
+	}
+
+	client := ensureSharedArkClient(apiKey, arkBaseURL)
+	req := blogAICoverRequest{Title: title, Excerpt: excerpt, Content: content}
+
+	coverPrompt := buildCoverPromptByTextModel(client, textModel, req)
+	if coverPrompt == "" {
+		coverPrompt = buildDeterministicCoverPrompt(req)
+	}
+	coverPrompt = truncateAIText(coverPrompt, 320)
+
+	watermark := false
+	sizeCandidates := []string{
+		"3072x1536", "2560x1280", "2304x1152", "2048x1024",
+		"1792x1024", "1536x768", "2K", "adaptive",
+	}
+	responseFormatCandidates := []string{
+		arkmodel.GenerateImagesResponseFormatBase64,
+		arkmodel.GenerateImagesResponseFormatURL,
+	}
+
+	var (
+		res               arkmodel.ImagesResponse
+		success           bool
+		usedImageModel    string
+		lastUpstreamError string
+	)
+
+	for _, modelCandidate := range candidateModels {
+		for _, formatCandidate := range responseFormatCandidates {
+			for _, sizeCandidate := range sizeCandidates {
+				size := sizeCandidate
+				responseFormat := formatCandidate
+				res, err = client.GenerateImages(
+					context.Background(),
+					arkmodel.GenerateImagesRequest{
+						Model:          modelCandidate,
+						Prompt:         coverPrompt,
+						ResponseFormat: &responseFormat,
+						Size:           &size,
+						Watermark:      &watermark,
+					},
+				)
+				if err != nil {
+					lastUpstreamError = err.Error()
+					if isImageModelCapabilityError(lastUpstreamError) || isImageResponseFormatUnsupportedError(lastUpstreamError) {
+						break
+					}
+					if isImageSizeUnsupportedError(lastUpstreamError) {
+						continue
+					}
+					return "", "", modelCandidate, fmt.Errorf("AI image generation failed: %s", lastUpstreamError)
+				}
+				if res.Error != nil {
+					lastUpstreamError = strings.TrimSpace(res.Error.Code + ": " + res.Error.Message)
+					if isImageModelCapabilityError(lastUpstreamError) || isImageResponseFormatUnsupportedError(lastUpstreamError) {
+						break
+					}
+					if isImageSizeUnsupportedError(lastUpstreamError) {
+						continue
+					}
+					return "", "", modelCandidate, fmt.Errorf("AI image generation failed: %s", res.Error.Message)
+				}
+				if len(res.Data) > 0 && res.Data[0] != nil {
+						success = true
+						usedImageModel = modelCandidate
+						break
+					}
+				lastUpstreamError = "empty image payload"
+			}
+			if success {
+				break
+			}
+			if isImageModelCapabilityError(lastUpstreamError) {
+				break
+			}
+		}
+		if success {
+			break
+		}
+	}
+
+	if !success || len(res.Data) == 0 || res.Data[0] == nil {
+		return "", "", "", fmt.Errorf("AI returned no image (last: %s)", lastUpstreamError)
+	}
+
+	first := res.Data[0]
+	imageBase64 := ""
+	if first.B64Json != nil {
+		imageBase64 = strings.TrimSpace(*first.B64Json)
+	}
+	imageURL := ""
+	if first.Url != nil {
+		imageURL = strings.TrimSpace(*first.Url)
+	}
+
+	// Download remote URL to base64 if needed
+	if imageBase64 == "" && imageURL != "" {
+		uploadConfig := service.GetDefaultConfig(service.UploadTypeCover)
+		maxBytes := uploadConfig.MaxSize * 1024 * 1024
+		downloadedBase64, _, downloadErr := fetchRemoteImageAsBase64(imageURL, maxBytes)
+		if downloadErr != nil {
+			return "", "", usedImageModel, fmt.Errorf("AI image download failed: %w", downloadErr)
+		}
+		imageBase64 = downloadedBase64
+		imageURL = ""
+	}
+
+	// Normalize cover image
+	if imageBase64 != "" {
+		normalizedBase64, _, normalizeErr := normalizeCoverBase64Image(imageBase64)
+		if normalizeErr != nil {
+			return "", "", usedImageModel, fmt.Errorf("AI image normalize failed: %w", normalizeErr)
+		}
+		imageBase64 = normalizedBase64
+		imageURL = ""
+	}
+
+	if imageBase64 == "" && imageURL == "" {
+		return "", "", usedImageModel, fmt.Errorf("AI returned no usable image")
+	}
+
+	// Upload to storage
+	if imageBase64 != "" {
+		imgBytes, decodeErr := base64.StdEncoding.DecodeString(imageBase64)
+		if decodeErr != nil {
+			return "", "", usedImageModel, fmt.Errorf("base64 decode failed: %w", decodeErr)
+		}
+
+		uploadConfig := service.GetDefaultConfig(service.UploadTypeCover)
+		uploadConfig.UserID = userID
+		uploadConfig.CustomFolder = fmt.Sprintf("blog-covers/%d/%s", userID, time.Now().Format("20060102"))
+
+		uploadSvc := service.NewUploadService()
+		storagePath := uploadSvc.GenerateStoragePath(uploadConfig, "ai-cover.jpg")
+
+		uploader := utils.GetTOSUploader()
+		if uploader == nil {
+			return "", "", usedImageModel, fmt.Errorf("upload service is not initialized")
+		}
+
+		uploadedURL, uploadErr := uploader.UploadBytesWithPath(storagePath, imgBytes)
+		if uploadErr != nil {
+			return "", "", usedImageModel, fmt.Errorf("cover upload failed: %w", uploadErr)
+		}
+
+		return uploadedURL, storagePath, usedImageModel, nil
+	}
+
+	// Should not reach here, but handle URL case
+	return imageURL, "", usedImageModel, nil
 }
 
 // AdminAIGenerateBlogCover generates cover image from blog content.
@@ -476,194 +654,21 @@ func AdminAIGenerateBlogCover(c *gin.Context) {
 	}
 	req.Content = content
 
-	apiKey := strings.TrimSpace(os.Getenv("ARK_API_KEY"))
-	imageModel := strings.TrimSpace(os.Getenv("ARK_IMAGE_MODEL"))
-	textModel := strings.TrimSpace(os.Getenv("ARK_TEXT_MODEL"))
-	arkBaseURL := strings.TrimSpace(os.Getenv("ARK_BASE_URL"))
-	if arkBaseURL == "" {
-		arkBaseURL = "https://ark.cn-beijing.volces.com/api/v3"
-	}
-	if apiKey == "" {
-		Error(c, http.StatusServiceUnavailable, "AI is not configured: missing ARK_API_KEY")
-		return
-	}
+	userID, _, _ := currentUser(c)
 
-	candidateModels := imageModelCandidates(imageModel)
-	if len(candidateModels) == 0 {
-		Error(c, http.StatusServiceUnavailable, "AI is not configured: missing ARK_IMAGE_MODEL")
-		return
-	}
-
-	client := ensureSharedArkClient(apiKey, arkBaseURL)
-
-	coverPrompt := buildCoverPromptByTextModel(client, textModel, req)
-	if coverPrompt == "" {
-		coverPrompt = buildDeterministicCoverPrompt(req)
-	}
-	coverPrompt = truncateAIText(coverPrompt, 320)
-
-	watermark := false
-	sizeCandidates := []string{
-		"3072x1536",
-		"2560x1280",
-		"2304x1152",
-		"2048x1024",
-		"1792x1024",
-		"1536x768",
-		"2K",
-		"adaptive",
-	}
-	responseFormatCandidates := []string{
-		arkmodel.GenerateImagesResponseFormatBase64,
-		arkmodel.GenerateImagesResponseFormatURL,
-	}
-
-	var (
-		res               arkmodel.ImagesResponse
-		success           bool
-		err               error
-		usedImageModel    string
-		usedSize          string
-		usedResponseFmt   string
-		lastUpstreamError string
-	)
-
-	for _, modelCandidate := range candidateModels {
-		for _, formatCandidate := range responseFormatCandidates {
-			for _, sizeCandidate := range sizeCandidates {
-				size := sizeCandidate
-				responseFormat := formatCandidate
-				res, err = client.GenerateImages(
-					context.Background(),
-					arkmodel.GenerateImagesRequest{
-						Model:          modelCandidate,
-						Prompt:         coverPrompt,
-						ResponseFormat: &responseFormat,
-						Size:           &size,
-						Watermark:      &watermark,
-					},
-				)
-				if err != nil {
-					lastUpstreamError = err.Error()
-					if isImageModelCapabilityError(lastUpstreamError) {
-						break
-					}
-					if isImageResponseFormatUnsupportedError(lastUpstreamError) {
-						break
-					}
-					if isImageSizeUnsupportedError(lastUpstreamError) {
-						continue
-					}
-					Error(c, http.StatusBadGateway, "AI image generation failed: "+lastUpstreamError)
-					return
-				}
-
-				if res.Error != nil {
-					lastUpstreamError = strings.TrimSpace(res.Error.Code + ": " + res.Error.Message)
-					if isImageModelCapabilityError(lastUpstreamError) {
-						break
-					}
-					if isImageResponseFormatUnsupportedError(lastUpstreamError) {
-						break
-					}
-					if isImageSizeUnsupportedError(lastUpstreamError) {
-						continue
-					}
-					Error(c, http.StatusBadGateway, "AI image generation failed: "+res.Error.Message)
-					return
-				}
-
-				if len(res.Data) > 0 && res.Data[0] != nil {
-					success = true
-					usedImageModel = modelCandidate
-					usedSize = sizeCandidate
-					usedResponseFmt = formatCandidate
-					break
-				}
-				lastUpstreamError = "empty image payload"
-			}
-			if success {
-				break
-			}
-			if isImageModelCapabilityError(lastUpstreamError) {
-				break
-			}
-			if isImageResponseFormatUnsupportedError(lastUpstreamError) {
-				continue
-			}
+	coverURL, coverStorageKey, usedModel, err := generateBlogCoverInternal(req.Title, req.Excerpt, content, userID)
+	if err != nil {
+		status := http.StatusBadGateway
+		if strings.Contains(err.Error(), "not configured") {
+			status = http.StatusServiceUnavailable
 		}
-		if success {
-			break
-		}
-		if isImageModelCapabilityError(lastUpstreamError) {
-			continue
-		}
-	}
-
-	if !success || len(res.Data) == 0 || res.Data[0] == nil {
-		if isImageModelCapabilityError(lastUpstreamError) {
-			Error(c, http.StatusServiceUnavailable, imageModelMisconfiguredMessage(imageModel, lastUpstreamError))
-			return
-		}
-		if isImageSizeUnsupportedError(lastUpstreamError) {
-			Error(c, http.StatusBadGateway, "AI image generation failed: no supported wide image size")
-			return
-		}
-		Error(c, http.StatusBadGateway, "AI returned no image")
-		return
-	}
-
-	first := res.Data[0]
-	imageBase64 := ""
-	if first.B64Json != nil {
-		imageBase64 = strings.TrimSpace(*first.B64Json)
-	}
-	imageURL := ""
-	if first.Url != nil {
-		imageURL = strings.TrimSpace(*first.Url)
-	}
-	mimeType := "image/jpeg"
-
-	// CORS-safe fallback: convert remote URL to base64 on backend so frontend never fetches third-party URL.
-	if imageBase64 == "" && imageURL != "" {
-		uploadConfig := service.GetDefaultConfig(service.UploadTypeCover)
-		maxBytes := uploadConfig.MaxSize * 1024 * 1024
-		downloadedBase64, downloadedMime, downloadErr := fetchRemoteImageAsBase64(imageURL, maxBytes)
-		if downloadErr != nil {
-			Error(c, http.StatusBadGateway, "AI image download failed: "+downloadErr.Error())
-			return
-		}
-		imageBase64 = downloadedBase64
-		if strings.HasPrefix(strings.ToLower(downloadedMime), "image/") {
-			mimeType = downloadedMime
-		}
-		imageURL = ""
-	}
-
-	if imageBase64 != "" {
-		normalizedBase64, normalizedMime, normalizeErr := normalizeCoverBase64Image(imageBase64)
-		if normalizeErr != nil {
-			Error(c, http.StatusBadGateway, "AI image normalize failed: "+normalizeErr.Error())
-			return
-		}
-		imageBase64 = normalizedBase64
-		mimeType = normalizedMime
-		imageURL = ""
-	}
-
-	if imageBase64 == "" && imageURL == "" {
-		Error(c, http.StatusBadGateway, "AI returned no usable image")
+		Error(c, status, err.Error())
 		return
 	}
 
 	Success(c, gin.H{
-		"prompt":      coverPrompt,
-		"imageBase64": imageBase64,
-		"imageUrl":    imageURL,
-		"mimeType":    mimeType,
-		"size":        first.Size,
-		"model":       usedImageModel,
-		"usedSize":    usedSize,
-		"usedFormat":  usedResponseFmt,
+		"coverUrl":        coverURL,
+		"coverStorageKey": coverStorageKey,
+		"model":           usedModel,
 	})
 }
