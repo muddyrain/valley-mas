@@ -100,7 +100,6 @@ func AdminAIPickBlogCoverFromResources(c *gin.Context) {
 	item := buildHotResourceResponseList(
 		[]model.Resource{*resource},
 		map[string]bool{},
-		true,
 	)
 	if len(item) == 0 {
 		Error(c, http.StatusInternalServerError, "failed to serialize resource")
@@ -166,7 +165,7 @@ func pickBlogCoverResource(
 	}
 
 	orderExpr := randomOrderExpr(db)
-	q = applyResourceListQueryShape(q, true).Order(orderExpr).Limit(1)
+	q = applyResourceListQueryShape(q).Order(orderExpr).Limit(1)
 
 	var resources []model.Resource
 	if err := q.Find(&resources).Error; err != nil {

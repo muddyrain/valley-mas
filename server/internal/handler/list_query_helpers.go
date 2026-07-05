@@ -14,7 +14,7 @@ const postListSelectColumns = "" +
 	"posts.category_id, posts.status, posts.view_count, posts.like_count, posts.is_top, " +
 	"posts.sort_order, posts.group_sort_order, posts.published_at, posts.created_at"
 
-func applyResourceListQueryShape(query *gorm.DB, _ bool) *gorm.DB {
+func applyResourceListQueryShape(query *gorm.DB) *gorm.DB {
 	return query.
 		Select(resourceListSelectColumns).
 		Preload("User", func(db *gorm.DB) *gorm.DB {

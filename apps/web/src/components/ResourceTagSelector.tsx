@@ -75,7 +75,9 @@ export default function ResourceTagSelector({
         return;
       }
       setCandidates(list);
-      toast.success(`AI 生成 ${list.length} 个候选标签，点击勾选`);
+      // AI 生成的候选标签默认全选
+      addTags(list);
+      toast.success(`AI 生成 ${list.length} 个标签，已自动应用`);
     } catch {
       // request.ts 已处理错误
     } finally {

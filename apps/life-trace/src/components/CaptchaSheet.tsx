@@ -31,15 +31,28 @@ export function CaptchaSheet({ open, onOpenChange, onVerify }: CaptchaSheetProps
       onOpenChange={onOpenChange}
       overlayLabel="关闭人机验证"
       showHandle={false}
-      closeDisabled
       contentClassName="flex items-center justify-center !px-0 !pt-0 !pb-4"
     >
-      <ChineseClawCaptcha
-        onVerify={() => {
-          onVerify();
-          onOpenChange(false);
-        }}
-      />
+      <div
+        className="captcha-chinese"
+        style={
+          {
+            '--clawcap-bg':
+              'linear-gradient(180deg, rgba(255,253,248,0.98), rgba(251,247,239,0.96))',
+            '--clawcap-ink': '#2d2923',
+            '--clawcap-muted': '#7b7166',
+            '--clawcap-accent': '#2f4738',
+            '--clawcap-action': '#2f4738',
+          } as React.CSSProperties
+        }
+      >
+        <ChineseClawCaptcha
+          onVerify={() => {
+            onVerify();
+            onOpenChange(false);
+          }}
+        />
+      </div>
     </BottomSheet>
   );
 }
@@ -195,7 +208,7 @@ function ChineseClawCaptcha({ onVerify }: { onVerify: () => void }) {
   }, [restructureSub]);
 
   return (
-    <div ref={containerRef} className="captcha-chinese">
+    <div ref={containerRef}>
       <ClawCaptcha title="请完成验证" onVerify={onVerify} />
     </div>
   );

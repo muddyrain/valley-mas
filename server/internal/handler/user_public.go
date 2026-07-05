@@ -312,7 +312,7 @@ func GetCreatorResourcesList(c *gin.Context) {
 
 	// 查询资源列表
 	var resources []model.Resource
-	err := applyResourceListQueryShape(query, true).
+	err := applyResourceListQueryShape(query).
 		Order("resources.created_at DESC").
 		Limit(pageSize).
 		Offset(offset).

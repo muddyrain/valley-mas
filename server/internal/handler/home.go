@@ -39,12 +39,7 @@ func buildPublicResourceListCacheKey(
 	keyword string,
 	tag string,
 	sort string,
-	includeTags bool,
 ) string {
-	includeTagsFlag := "0"
-	if includeTags {
-		includeTagsFlag = "1"
-	}
 	return strings.Join(
 		[]string{
 			strconv.Itoa(page),
@@ -53,7 +48,6 @@ func buildPublicResourceListCacheKey(
 			keyword,
 			tag,
 			sort,
-			includeTagsFlag,
 		},
 		"|",
 	)
@@ -447,7 +441,7 @@ type HotResourceResponse struct {
 	CreatorAvatar string   `json:"creatorAvatar"`
 	CreatedAt     string   `json:"createdAt"`
 	IsFavorited   bool     `json:"isFavorited"`
-	Tags          []string `json:"tags,omitempty"`
+	Tags          []string `json:"tags"`
 }
 
 func collectResourceIDs(resources []model.Resource) []model.Int64String {
@@ -486,7 +480,6 @@ func loadFavoritedSetForResources(db *gorm.DB, c *gin.Context, resourceIDs []mod
 func buildHotResourceResponseList(
 	resources []model.Resource,
 	favoritedSet map[string]bool,
-	includeTags bool,
 ) []HotResourceResponse {
 	response := make([]HotResourceResponse, 0, len(resources))
 	for _, resource := range resources {
@@ -500,10 +493,8 @@ func buildHotResourceResponseList(
 			creatorAvatar = resource.User.Avatar
 		}
 
-		var tags []string
-		if includeTags && len(resource.Tags) > 0 {
-			tags = append([]string(nil), resource.Tags...)
-		}
+		tags := make([]string, len(resource.Tags))
+		copy(tags, resource.Tags)
 
 		response = append(response, HotResourceResponse{
 			ID:            rid,
@@ -579,10 +570,9 @@ func GetHotResources(c *gin.Context) {
 	// 查询热门资源，按下载量排序
 	var resources []model.Resource
 	err := applyResourceListQueryShape(
-		db.Where("deleted_at IS NULL AND download_count > 0").
-			Where(publicVisibilityWhere),
-		false,
-	).
+			db.Where("deleted_at IS NULL AND download_count > 0").
+				Where(publicVisibilityWhere),
+		).
 		Order("download_count DESC, created_at DESC").
 		Limit(pageSize).
 		Offset(offset).
@@ -598,7 +588,7 @@ func GetHotResources(c *gin.Context) {
 
 	resourceIDs := collectResourceIDs(resources)
 	favoritedSet := loadFavoritedSetForResources(db, c, resourceIDs)
-	response := buildHotResourceResponseList(resources, favoritedSet, false)
+	response := buildHotResourceResponseList(resources, favoritedSet)
 
 	c.JSON(200, gin.H{
 		"code":    0,
@@ -625,8 +615,6 @@ func GetAllResources(c *gin.Context) {
 	keyword := c.Query("keyword")
 	tagName := strings.TrimSpace(c.Query("tag"))
 	sort := strings.TrimSpace(c.Query("sort"))
-	includeTags := strings.EqualFold(strings.TrimSpace(c.DefaultQuery("includeTags", "false")), "true")
-
 	if page < 1 {
 		page = 1
 	}
@@ -634,7 +622,7 @@ func GetAllResources(c *gin.Context) {
 		pageSize = 20
 	}
 	offset := (page - 1) * pageSize
-	cacheKey := buildPublicResourceListCacheKey(page, pageSize, resourceType, keyword, tagName, sort, includeTags)
+	cacheKey := buildPublicResourceListCacheKey(page, pageSize, resourceType, keyword, tagName, sort)
 
 	if cachedResponse, cachedTotal, cachedPage, cachedPageSize, ok := getCachedPublicResourceList(cacheKey); ok {
 		resourceIDs := make([]model.Int64String, 0, len(cachedResponse))
@@ -681,7 +669,7 @@ func GetAllResources(c *gin.Context) {
 	}
 
 	var resources []model.Resource
-	if err := applyResourceListQueryShape(query, includeTags).
+	if err := applyResourceListQueryShape(query).
 		Order(orderExpr).
 		Limit(pageSize).
 		Offset(offset).
@@ -692,7 +680,7 @@ func GetAllResources(c *gin.Context) {
 
 	resourceIDs := collectResourceIDs(resources)
 	favoritedSet := loadFavoritedSetForResources(db, c, resourceIDs)
-	response := buildHotResourceResponseList(resources, favoritedSet, includeTags)
+	response := buildHotResourceResponseList(resources, favoritedSet)
 	cacheableResponse := cloneHotResourceResponseList(response)
 	for i := range cacheableResponse {
 		cacheableResponse[i].IsFavorited = false

@@ -131,7 +131,7 @@ func GetMyFavorites(c *gin.Context) {
 
 	query := db.Model(&model.UserFavorite{}).Where("user_id = ?", uid)
 	query.Count(&total)
-	query.Preload("Resource.Tags").
+	query.Preload("Resource").
 		Preload("Resource.User").
 		Order("created_at DESC").
 		Offset(offset).
