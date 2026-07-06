@@ -17,7 +17,7 @@ export const applyThemeToDocument = (mode: ThemeMode) => {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      mode: 'dark',
+      mode: 'light',
       setMode: (mode) => {
         applyThemeToDocument(mode);
         set({ mode });
@@ -36,11 +36,10 @@ export const useThemeStore = create<ThemeState>()(
         if (p && typeof p === 'object' && 'mode' in p) {
           return { mode: p.mode as ThemeMode };
         }
-        // Migrate from old theme/accent system
         if (p && typeof p === 'object') {
-          return { mode: 'dark' as ThemeMode };
+          return { mode: 'light' as ThemeMode };
         }
-        return { mode: 'dark' as ThemeMode };
+        return { mode: 'light' as ThemeMode };
       },
     },
   ),

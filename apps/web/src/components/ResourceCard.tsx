@@ -283,7 +283,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
               className={`h-8 rounded-full border px-2.5 backdrop-blur-md transition-all ${
                 favored
                   ? 'border-destructive/30 bg-destructive/82 text-destructive-foreground hover:bg-destructive'
-                  : 'border-white/18 bg-black/24 text-white hover:bg-black/34'
+                  : 'border-foreground/18 bg-foreground/24 text-foreground hover:bg-foreground/34'
               }`}
               onClick={(e) => {
                 e.stopPropagation();

@@ -50,7 +50,7 @@ function getStatusMeta(status?: string) {
   if (status === 'published') return { label: '已发布', className: 'bg-accent text-primary' };
   if (status === 'archived')
     return { label: '已归档', className: 'bg-muted text-muted-foreground' };
-  return { label: '草稿', className: 'bg-primary/10 text-primary' };
+  return { label: '草稿', className: 'bg-primary text-primary-foreground' };
 }
 
 function getPageText(payload: ImageTextPayload | null) {

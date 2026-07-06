@@ -332,7 +332,7 @@ export default function ResourceDetail() {
               </div>
               <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
                 <div className="rounded-lg bg-accent p-1.5">
-                  <Heart className="h-4 w-4 text-pink-500" />
+                  <Heart className="h-4 w-4 text-primary" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">收藏次数</p>
@@ -425,7 +425,7 @@ export default function ResourceDetail() {
                 disabled={favoriteLoading}
                 className={`h-11 w-11 rounded-xl border-2 transition-all ${
                   favorited
-                    ? 'border-primary bg-primary/10 text-primary hover:bg-primary/20'
+                    ? 'border-primary bg-primary text-primary-foreground hover:bg-primary/90'
                     : 'border-border hover:border-primary/40 hover:text-primary'
                 }`}
                 title={favorited ? '取消收藏' : '收藏'}

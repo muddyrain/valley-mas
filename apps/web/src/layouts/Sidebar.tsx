@@ -59,7 +59,7 @@ export function Sidebar() {
               to={item.to}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 active
-                  ? 'bg-primary/10 text-primary'
+                  ? 'bg-accent text-accent-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               } ${collapsed ? 'justify-center' : ''}`}
             >

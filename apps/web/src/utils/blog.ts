@@ -25,7 +25,7 @@ function highlightCode(code: string): string {
     const placeholder = `___TOKEN_${tokenIndex++}___`;
     tokens.push({
       placeholder,
-      html: `<span style="color:#6c7086">${match}</span>`,
+      html: `<span style="color:#6b7280">${match}</span>`,
     });
     return placeholder;
   });

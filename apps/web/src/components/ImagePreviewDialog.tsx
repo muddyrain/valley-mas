@@ -460,7 +460,7 @@ export default function ImagePreviewDialog({
                   src={inlineSrc}
                   alt={displayTitle}
                   draggable={false}
-                  className={`pointer-events-none select-none rounded-xl shadow-[0_32px_80px_rgba(0,0,0,0.7)] transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
+                  className={`pointer-events-none select-none rounded-xl shadow-[0_32px_80px_hsl(var(--foreground)/0.7)] transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
                   onLoad={(e) => {
                     setImageSize({
                       width: e.currentTarget.naturalWidth,

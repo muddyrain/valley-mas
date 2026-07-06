@@ -79,8 +79,8 @@ const STEP_CONFIG = [
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'border-border bg-accent/30 text-muted-foreground',
-  running: 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30',
-  success: 'border-emerald-400 bg-emerald-50 text-emerald-700',
+  running: 'border-primary bg-primary text-primary-foreground',
+  success: 'border-primary bg-primary text-primary-foreground',
   skipped: 'border-border bg-muted text-muted-foreground',
   error: 'border-destructive/30 bg-destructive/10 text-destructive',
 };
@@ -164,13 +164,17 @@ function buildDagreLayout(steps: StepStatus[]): { nodes: Node[]; edges: Edge[] }
       target: steps[i + 1].step,
       animated: isRunning,
       style: isSkipped
-        ? { stroke: '#e2e8f0', strokeDasharray: '5 5' }
+        ? { stroke: 'hsl(var(--border))', strokeDasharray: '5 5' }
         : isRunning
-          ? { stroke: 'var(--primary)' }
-          : { stroke: '#cbd5e1' },
+          ? { stroke: 'hsl(var(--primary))' }
+          : { stroke: 'hsl(var(--muted-foreground))' },
       markerEnd: {
         type: MarkerType.ArrowClosed,
-        color: isSkipped ? '#e2e8f0' : isRunning ? 'var(--primary)' : '#cbd5e1',
+        color: isSkipped
+          ? 'hsl(var(--border))'
+          : isRunning
+            ? 'hsl(var(--primary))'
+            : 'hsl(var(--muted-foreground))',
       },
     });
   }
@@ -253,8 +257,8 @@ function BlogWorkflowDialogInner({
         id: `e-${s.id}-${STEP_CONFIG[i + 1].id}`,
         source: s.id,
         target: STEP_CONFIG[i + 1].id,
-        style: { stroke: '#cbd5e1' },
-        markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' },
+        style: { stroke: 'hsl(var(--muted-foreground))' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--muted-foreground))' },
       })),
     [],
   );
@@ -419,7 +423,7 @@ function BlogWorkflowDialogInner({
                   type="file"
                   accept=".md,.markdown"
                   onChange={handleFileSelect}
-                  className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-lg file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/20"
+                  className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-lg file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-accent-foreground hover:file:bg-accent/80"
                 />
                 {selectedFile && (
                   <p className="text-sm text-muted-foreground">
@@ -541,7 +545,7 @@ function BlogWorkflowDialogInner({
 
                 {preview.coverUrl && (
                   <div>
-                    <label className="text-sm font-medium text-gray-700">封面</label>
+                    <label className="text-sm font-medium text-foreground">封面</label>
                     <div className="mt-1">
                       <img
                         src={preview.coverUrl}
@@ -557,12 +561,12 @@ function BlogWorkflowDialogInner({
 
                 {preview.tagNames.length > 0 && (
                   <div>
-                    <label className="text-sm font-medium text-gray-700">标签</label>
+                    <label className="text-sm font-medium text-foreground">标签</label>
                     <div className="mt-1 flex flex-wrap gap-2">
                       {preview.tagNames.map((tag) => (
                         <span
                           key={tag}
-                          className="rounded-full bg-primary/10 px-3 py-1 text-xs text-primary"
+                          className="rounded-full bg-accent px-3 py-1 text-xs text-accent-foreground"
                         >
                           {tag}
                         </span>

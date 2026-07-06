@@ -337,7 +337,7 @@ export default function MyResources() {
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
           {/* ── 左侧专辑侧边栏 ── */}
           <aside className="w-full xl:sticky xl:top-6 xl:w-52 xl:shrink-0">
-            <div className="rounded-[28px] border border-border bg-[linear-gradient(180deg,hsl(var(--background)/0.98),hsl(var(--background)/0.92))] p-3 shadow-[0_18px_48px_rgba(148,163,184,0.10)]">
+            <div className="rounded-[28px] border border-border bg-[linear-gradient(180deg,hsl(var(--background)/0.98),hsl(var(--background)/0.92))] p-3 shadow-[0_18px_48px_hsl(var(--foreground)/0.10)]">
               {/* 侧边栏头 */}
               <div className="mb-2 flex items-center justify-between px-1 py-1">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -430,7 +430,7 @@ export default function MyResources() {
 
           {/* ── 右侧资源区 ── */}
           <div className="min-w-0 flex-1">
-            <div className="rounded-[36px] border border-border bg-[linear-gradient(180deg,hsl(var(--background)/0.96),hsl(var(--background)/0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
+            <div className="rounded-[36px] border border-border bg-[linear-gradient(180deg,hsl(var(--background)/0.96),hsl(var(--background)/0.88))] p-5 shadow-[0_22px_56px_hsl(var(--foreground)/0.1)] md:p-6">
               {/* 专辑标题提示 */}
               {activeAlbum && (
                 <div className="mb-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center">

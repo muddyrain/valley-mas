@@ -174,9 +174,9 @@ export function TableOfContents({
               onClick={(e) => handleClick(e, item.id)}
               className={cn(
                 'block py-1.5 text-sm transition-all duration-200 rounded-md px-2 -mx-2',
-                'hover:bg-primary/5 hover:text-primary',
+                'hover:bg-accent hover:text-accent-foreground',
                 activeId === item.id
-                  ? 'text-primary font-medium bg-primary/10'
+                  ? 'text-accent-foreground font-medium bg-accent'
                   : 'text-muted-foreground',
               )}
             >

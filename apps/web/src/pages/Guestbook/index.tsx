@@ -1,5 +1,5 @@
 import { Loader2, MessageCircleHeart, Pin, SendHorizontal, Sparkles, Trash2 } from 'lucide-react';
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -19,11 +19,6 @@ import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_SIZE = 16;
-
-const PAGE_BACKGROUND = {
-  background:
-    'linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, hsl(var(--primary) / 0.15) 30%, hsl(var(--background))) 38%, var(--background) 100%)',
-};
 
 function formatMessageTime(value: string) {
   const date = new Date(value);
@@ -46,41 +41,14 @@ function hashSeed(input: string) {
   return Math.abs(hash);
 }
 
-function getNoteStyle(id: string, index: number): CSSProperties {
+function getNoteStyle(id: string, index: number) {
   const seed = hashSeed(`${id}-${index}`);
   const rotate = (seed % 15) - 7;
   const lift = ((seed >> 3) % 11) - 5;
-  const themeFlavor = seed % 3;
-  const glow = 20 + (seed % 16);
-
-  let background = 'linear-gradient(180deg, hsl(var(--card) / 0.95), hsl(var(--card) / 0.88))';
-  if (themeFlavor === 0) {
-    background =
-      'linear-gradient(180deg, color-mix(in srgb, hsl(var(--primary) / 0.15) 70%, hsl(var(--background))), hsl(var(--background) / 0.9))';
-  } else if (themeFlavor === 1) {
-    background =
-      'linear-gradient(180deg, color-mix(in srgb, hsl(var(--secondary) / 0.25) 36%, hsl(var(--background))), hsl(var(--background) / 0.9))';
-  } else {
-    background =
-      'linear-gradient(180deg, color-mix(in srgb, hsl(var(--accent) / 0.24) 36%, hsl(var(--background))), hsl(var(--background) / 0.9))';
-  }
 
   return {
     transform: `rotate(${rotate}deg) translateY(${lift}px)`,
-    background,
-    boxShadow: `0 14px ${glow}px hsl(var(--primary) / 0.16)`,
   };
-}
-
-function getPinStyle(id: string, index: number): CSSProperties {
-  const seed = hashSeed(`pin-${id}-${index}`);
-  if (seed % 3 === 0) {
-    return { background: 'hsl(var(--primary) / 0.92)' };
-  }
-  if (seed % 3 === 1) {
-    return { background: 'hsl(var(--secondary) / 0.88)' };
-  }
-  return { background: 'hsl(var(--accent) / 0.88)' };
 }
 
 export default function Guestbook() {
@@ -132,19 +100,19 @@ export default function Guestbook() {
     if (submitting) return;
 
     if (!isAuthenticated) {
-      toast.error('\u8bf7\u5148\u767b\u5f55\u540e\u518d\u7559\u8a00');
+      toast.error('请先登录后再留言');
       navigate('/login');
       return;
     }
     if (!content.trim()) {
-      toast.error('\u8bf7\u5199\u4e00\u70b9\u7559\u8a00\u5185\u5bb9');
+      toast.error('请写一点留言内容');
       return;
     }
 
     try {
       setSubmitting(true);
       await createGuestbookMessage({ content: content.trim() });
-      toast.success('\u7559\u8a00\u5df2\u4e0a\u5899\uff0c\u6b22\u8fce\u5e38\u6765');
+      toast.success('留言已上墙，欢迎常来');
       setContent('');
       setPage(1);
     } catch {
@@ -162,7 +130,7 @@ export default function Guestbook() {
         await deleteGuestbookMessage(item.id);
         setMessages((prev) => prev.filter((message) => message.id !== item.id));
         setTotal((prev) => Math.max(0, prev - 1));
-        toast.success('\u7559\u8a00\u5df2\u5220\u9664');
+        toast.success('留言已删除');
       } catch {
         // request.ts handles toast globally
       } finally {
@@ -171,10 +139,10 @@ export default function Guestbook() {
     };
 
     openConfirmToast({
-      title: '\u786e\u8ba4\u5220\u9664\u8fd9\u6761\u7559\u8a00\uff1f',
-      description: '\u5220\u9664\u540e\u4e0d\u53ef\u6062\u590d',
-      confirmText: '\u786e\u8ba4\u5220\u9664',
-      cancelText: '\u53d6\u6d88',
+      title: '确认删除这条留言？',
+      description: '删除后不可恢复',
+      confirmText: '确认删除',
+      cancelText: '取消',
       confirmVariant: 'danger',
       onConfirm: runDelete,
     });
@@ -185,9 +153,7 @@ export default function Guestbook() {
     try {
       setPinningId(item.id);
       await updateGuestbookMessagePin(item.id, !item.isPinned);
-      toast.success(
-        item.isPinned ? '\u5df2\u53d6\u6d88\u7f6e\u9876' : '\u5df2\u7f6e\u9876\u5230\u9876\u90e8',
-      );
+      toast.success(item.isPinned ? '已取消置顶' : '已置顶到顶部');
       setPage(1);
     } catch {
       // request.ts handles toast globally
@@ -197,61 +163,27 @@ export default function Guestbook() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
+    <div className="min-h-[calc(100vh-4rem)]">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <section
-          className="relative overflow-hidden rounded-[34px] border border-border bg-card/68 p-4 shadow-[0_24px_56px_hsl(var(--primary) / 0.14)] backdrop-blur-md sm:p-6"
-          style={{ perspective: '1400px' }}
-        >
-          <div className="pointer-events-none absolute inset-0">
-            <div
-              className="absolute inset-0 opacity-75"
-              style={{
-                background:
-                  'radial-gradient(circle at 15% 18%, hsl(var(--secondary) / 0.16), transparent 24%), radial-gradient(circle at 83% 20%, hsl(var(--accent) / 0.16), transparent 22%), radial-gradient(circle at 48% 84%, hsl(var(--primary) / 0.14), transparent 28%)',
-              }}
-            />
-            <div
-              className="absolute inset-0 opacity-45"
-              style={{
-                backgroundImage:
-                  'linear-gradient(hsl(var(--foreground) / 0.07) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground) / 0.07) 1px, transparent 1px)',
-                backgroundSize: '32px 32px',
-              }}
-            />
-          </div>
-
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div
-              className="relative h-60 w-60 opacity-70 [transform-style:preserve-3d] [transform:rotateX(68deg)_rotateZ(22deg)]"
-              style={{ transformOrigin: 'center center' }}
-            >
-              <div className="absolute inset-0 rounded-[34px] border border-foreground/15 bg-card/8 shadow-[0_0_48px_hsl(var(--primary) / 0.24)] animate-spin [animation-duration:18s]" />
-              <div className="absolute inset-9 rounded-[28px] border border-accent bg-accent/25 shadow-[0_0_36px_hsl(var(--primary) / 0.20)] animate-spin [animation-duration:12s] [animation-direction:reverse]" />
-              <div className="absolute inset-[34%] rounded-2xl border border-foreground/40 bg-card/65 shadow-[0_0_36px_hsl(var(--primary) / 0.34)]" />
-            </div>
-          </div>
-
-          <div className="relative z-20 mx-auto max-w-3xl rounded-[28px] border border-border/30 bg-card/76 p-4 shadow-[0_20px_44px_hsl(var(--primary) / 0.16)] backdrop-blur-lg sm:p-5">
+        <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
+          <div className="mx-auto max-w-3xl rounded-2xl border border-border bg-card p-4 sm:p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h1 className="inline-flex items-center gap-2 text-lg font-semibold text-foreground sm:text-xl">
                 <MessageCircleHeart className="h-5 w-5 text-primary" />
-                {'\u9177\u70ab\u7559\u8a00\u677f'}
+                灵感留言板
               </h1>
               <span className="rounded-full border border-accent bg-accent px-3 py-1 text-xs font-medium text-primary">
-                {'\u5df2\u4e0a\u5899'} {total} {'\u6761'}
+                已上墙 {total} 条
               </span>
             </div>
 
             <p className="mb-3 text-xs leading-5 text-muted-foreground">
-              {
-                '\u8fd9\u662f\u4f60\u7684\u7075\u611f\u677f\uff0c\u8f93\u5165\u5185\u5bb9\u540e\u4f1a\u76f4\u63a5\u8d34\u5230\u677f\u9762\u4e0a\u3002\u7559\u8a00\u81ea\u52a8\u4f7f\u7528\u5f53\u524d\u8d26\u53f7\u5934\u50cf\u548c\u6635\u79f0\u3002'
-              }
+              这是你的灵感板，输入内容后会直接贴到板面上。留言自动使用当前账号头像和昵称。
             </p>
 
             <div className="mb-3">
               <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                <span className="font-medium">{'\u7559\u8a00\u5185\u5bb9'}</span>
+                <span className="font-medium">留言内容</span>
                 <span className={contentCount > 450 ? 'text-primary' : 'text-muted-foreground'}>
                   {contentCount}/500
                 </span>
@@ -262,17 +194,13 @@ export default function Guestbook() {
                 maxLength={500}
                 rows={4}
                 className="w-full rounded-2xl border border-border bg-card/92 px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-ring"
-                placeholder={
-                  '\u5199\u70b9\u4ec0\u4e48\u8d34\u4e0a\u6765\uff0c\u6bd4\u5982\u6700\u8fd1\u5728\u505a\u7684\u4f5c\u54c1\u3001\u7075\u611f\u6216\u4e00\u53e5\u8bdd...'
-                }
+                placeholder="写点什么贴上来，比如最近在做的作品、灵感或一句话..."
               />
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs text-muted-foreground">
-                {isAuthenticated
-                  ? '\u5df2\u767b\u5f55\uff0c\u53ef\u76f4\u63a5\u53d1\u5e03'
-                  : '\u767b\u5f55\u540e\u53ef\u53d1\u5e03\u7559\u8a00'}
+                {isAuthenticated ? '已登录，可直接发布' : '登录后可发布留言'}
               </span>
               <div className="flex items-center gap-2">
                 {!isAuthenticated ? (
@@ -280,26 +208,26 @@ export default function Guestbook() {
                     type="button"
                     variant="outline"
                     onClick={() => navigate('/login')}
-                    className="rounded-xl border-accent bg-card/78 px-4 text-primary hover:bg-accent"
+                    className="rounded-xl border-accent text-primary hover:bg-accent"
                   >
-                    {'\u53bb\u767b\u5f55'}
+                    去登录
                   </Button>
                 ) : null}
                 <Button
                   type="button"
                   onClick={() => void handleSubmit()}
                   disabled={submitting}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl px-5 text-sm font-semibold"
+                  className="rounded-xl px-5 text-sm font-semibold"
                 >
                   {submitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {'\u4e0a\u5899\u4e2d...'}
+                      上墙中...
                     </>
                   ) : (
                     <>
                       <SendHorizontal className="mr-2 h-4 w-4" />
-                      {'\u8d34\u4e0a\u7559\u8a00'}
+                      贴到留言
                     </>
                   )}
                 </Button>
@@ -307,21 +235,18 @@ export default function Guestbook() {
             </div>
           </div>
 
-          <div className="relative z-10 mt-5 min-h-[520px]">
+          <div className="mt-5 min-h-[520px]">
             <BoxLoadingOverlay
               show={loading}
-              title={'\u7559\u8a00\u677f\u52a0\u8f7d\u4e2d...'}
-              hint={'\u6b63\u5728\u6302\u8d77\u6240\u6709\u4fbf\u7b7e'}
-              className="rounded-[24px]"
+              title="留言板加载中..."
+              hint="正在贴上所有便签"
+              className="rounded-2xl"
             />
 
             {loading ? (
               <div className="grid gap-4 p-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="rounded-2xl border border-border bg-card/88 p-4 shadow-[0_12px_24px_hsl(var(--primary) / 0.12)]"
-                  >
+                  <div key={index} className="rounded-2xl border border-border bg-card p-4">
                     <div className="mb-3 flex items-center gap-3">
                       <Skeleton className="h-9 w-9 rounded-full" />
                       <div className="space-y-2">
@@ -338,10 +263,8 @@ export default function Guestbook() {
             ) : messages.length === 0 ? (
               <EmptyState
                 icon={MessageCircleHeart}
-                title={'\u7559\u8a00\u677f\u8fd8\u662f\u7a7a\u7684'}
-                description={
-                  '\u5199\u4e0b\u7b2c\u4e00\u6761\u7559\u8a00\uff0c\u8ba9\u8fd9\u5757\u677f\u5b50\u4eae\u8d77\u6765\u3002'
-                }
+                title="留言板还是空的"
+                description="写下第一条留言，让这块板子亮起来。"
                 padding="py-24"
               />
             ) : (
@@ -358,12 +281,9 @@ export default function Guestbook() {
                       <article
                         key={item.id}
                         style={getNoteStyle(item.id, index)}
-                        className="relative rounded-2xl border border-border/35 p-4 backdrop-blur-sm transition-all duration-300 hover:scale-[1.02]"
+                        className="relative rounded-2xl border border-border/35 bg-card p-4 transition-all duration-300 hover:scale-[1.02]"
                       >
-                        <span
-                          style={getPinStyle(item.id, index)}
-                          className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border border-border/40 shadow-[0_3px_10px_rgba(0,0,0,0.18)]"
-                        />
+                        <span className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border border-border/40 bg-primary" />
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex min-w-0 items-center gap-2.5">
                             <Avatar className="h-9 w-9 border border-border/35">
@@ -384,7 +304,7 @@ export default function Guestbook() {
                           {item.isPinned ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-primary">
                               <Pin className="h-3 w-3" />
-                              {'\u7f6e\u9876'}
+                              置顶
                             </span>
                           ) : null}
                         </div>
@@ -396,7 +316,7 @@ export default function Guestbook() {
                         <div className="mt-3 flex items-center justify-between gap-2">
                           <span className="inline-flex items-center gap-1 rounded-full border border-accent bg-card/72 px-2 py-0.5 text-[11px] text-primary">
                             <Sparkles className="h-3 w-3" />
-                            {'\u4fbf\u7b7e\u6a21\u5f0f'}
+                            便签模式
                           </span>
                           <div className="flex items-center gap-1.5">
                             {canPin ? (
@@ -406,7 +326,7 @@ export default function Guestbook() {
                                 disabled={pinningId === item.id}
                                 className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
                                   item.isPinned
-                                    ? 'border-accent bg-accent text-primary hover:bg-accent'
+                                    ? 'border-accent bg-accent text-primary'
                                     : 'border-primary/30 bg-accent/80 text-primary hover:bg-accent'
                                 }`}
                               >
@@ -415,7 +335,7 @@ export default function Guestbook() {
                                 ) : (
                                   <Pin className="h-3.5 w-3.5" />
                                 )}
-                                {item.isPinned ? '\u53d6\u6d88\u7f6e\u9876' : '\u7f6e\u9876'}
+                                {item.isPinned ? '取消置顶' : '置顶'}
                               </button>
                             ) : null}
 
@@ -431,7 +351,7 @@ export default function Guestbook() {
                                 ) : (
                                   <Trash2 className="h-3.5 w-3.5" />
                                 )}
-                                {'\u5220\u9664'}
+                                删除
                               </button>
                             ) : null}
                           </div>
@@ -448,15 +368,15 @@ export default function Guestbook() {
                       variant="outline"
                       onClick={() => setPage(currentPage + 1)}
                       disabled={loading}
-                      className="rounded-xl border-accent bg-card/82 px-8 text-primary hover:bg-accent"
+                      className="rounded-xl border-accent text-primary hover:bg-accent"
                     >
                       {loading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {'\u52a0\u8f7d\u4e2d...'}
+                          加载中...
                         </>
                       ) : (
-                        `\u518d\u8d34\u4e00\u4e9b\uff08\u5269\u4f59 ${remainingCount} \u6761\uff09`
+                        `再贴一些（剩余 ${remainingCount} 条）`
                       )}
                     </Button>
                   </div>

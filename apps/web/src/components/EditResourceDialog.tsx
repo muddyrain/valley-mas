@@ -170,8 +170,8 @@ export default function EditResourceDialog({
     >
       <DialogContent className="flex h-[90vh] w-[90vw] max-w-4xl flex-col gap-0 overflow-hidden bg-card p-0 sm:max-w-4xl">
         {/* ── 顶部标题栏 ── */}
-        <div className="shrink-0 border-b border-border bg-[linear-gradient(135deg,hsl(var(--primary) / 0.10)_0%,hsl(var(--primary) / 0.03)_100%)] px-6 py-4 flex items-center gap-4">
-          <div className="shrink-0 w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center shadow-[0_4px_12px_hsl(var(--primary) / 0.18)]">
+        <div className="shrink-0 border-b border-border bg-accent/50 px-6 py-4 flex items-center gap-4">
+          <div className="shrink-0 w-10 h-10 rounded-2xl bg-accent flex items-center justify-center">
             <Pencil className="h-4.5 w-4.5 text-primary" />
           </div>
           <div className="min-w-0 flex-1">
@@ -203,12 +203,12 @@ export default function EditResourceDialog({
                 />
               )}
               {resource && (
-                <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[10px] font-medium text-white/90 backdrop-blur-sm opacity-90 group-hover:opacity-100">
+                <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-foreground/45 px-2.5 py-1 text-[10px] font-medium text-foreground/90 backdrop-blur-sm opacity-90 group-hover:opacity-100">
                   点击预览
                 </div>
               )}
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
-                <span className="rounded-full bg-black/40 px-3 py-1 text-[10px] text-white/80 backdrop-blur-sm whitespace-nowrap">
+                <span className="rounded-full bg-foreground/40 px-3 py-1 text-[10px] text-foreground/80 backdrop-blur-sm whitespace-nowrap">
                   🔒 图片不可更换，如需替换请重新上传
                 </span>
               </div>

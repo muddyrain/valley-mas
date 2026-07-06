@@ -188,7 +188,7 @@ function renderAvatarToCanvas(
   for (let y = 0; y < size; y += checker) {
     for (let x = 0; x < size; x += checker) {
       const odd = (x / checker + y / checker) % 2 === 0;
-      ctx.fillStyle = odd ? '#f8fafc' : '#eef2f7';
+      ctx.fillStyle = odd ? '#f5f5f5' : '#ebebeb';
       ctx.fillRect(x, y, checker, checker);
     }
   }
@@ -655,10 +655,10 @@ export default function AvatarBeadEditorDialog({
                       style={{ imageRendering: 'pixelated' }}
                     />
                     <div className="pointer-events-none absolute inset-0">
-                      <div className="absolute inset-3 rounded-xl border border-white/60 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.35)]" />
+                      <div className="absolute inset-3 rounded-xl border border-white/60 shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.35)]" />
                       <div className="absolute left-1/2 top-3 h-[calc(100%-1.5rem)] w-px -translate-x-1/2 bg-card/55" />
                       <div className="absolute top-1/2 left-3 h-px w-[calc(100%-1.5rem)] -translate-y-1/2 bg-card/55" />
-                      <div className="absolute right-3 top-3 rounded-md bg-black/35 px-2 py-1 text-[11px] text-white">
+                      <div className="absolute right-3 top-3 rounded-md bg-foreground/35 px-2 py-1 text-[11px] text-foreground">
                         {dragHint.canDragX && dragHint.canDragY
                           ? '可上下左右拖动'
                           : dragHint.canDragX
@@ -835,7 +835,7 @@ export default function AvatarBeadEditorDialog({
                             alt="历史头像"
                             className="h-full w-full object-cover"
                           />
-                          <span className="absolute inset-x-0 bottom-0 bg-black/40 py-0.5 text-[10px] text-white opacity-0 transition group-hover:opacity-100">
+                          <span className="absolute inset-x-0 bottom-0 bg-foreground/40 py-0.5 text-[10px] text-foreground opacity-0 transition group-hover:opacity-100">
                             {active ? '已选' : '预览'}
                           </span>
                         </button>
@@ -845,7 +845,7 @@ export default function AvatarBeadEditorDialog({
                 )}
               </div>
 
-              <div className="rounded-xl bg-primary/10 p-3 text-xs leading-5 text-primary">
+              <div className="rounded-xl bg-accent p-3 text-xs leading-5 text-accent-foreground">
                 点击历史头像会先在左侧预览，只有点“保存头像”才会真正更新。
               </div>
 

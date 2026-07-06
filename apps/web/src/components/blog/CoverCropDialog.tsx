@@ -94,7 +94,7 @@ export function CoverCropDialog({
     const { drawX, drawY, drawW, drawH } = getRenderRect(viewW, viewH);
 
     ctx.clearRect(0, 0, viewW, viewH);
-    ctx.fillStyle = '#f6eef3';
+    ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, viewW, viewH);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';

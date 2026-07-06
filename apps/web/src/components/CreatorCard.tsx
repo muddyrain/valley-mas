@@ -64,7 +64,7 @@ export default function CreatorCard({ creator, variant = 'detail' }: CreatorCard
                   title="复制口令"
                 >
                   {copied ? (
-                    <Check className="h-3 w-3 text-green-500" />
+                    <Check className="h-3 w-3 text-primary" />
                   ) : (
                     <Copy className="h-3 w-3" />
                   )}
@@ -106,11 +106,7 @@ export default function CreatorCard({ creator, variant = 'detail' }: CreatorCard
                 className="ml-0.5 text-primary transition-colors hover:text-primary-deep"
                 title="复制口令"
               >
-                {copied ? (
-                  <Check className="h-3 w-3 text-green-500" />
-                ) : (
-                  <Copy className="h-3 w-3" />
-                )}
+                {copied ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
               </button>
             </div>
             <p className="mb-3 truncate text-sm text-muted-foreground">
@@ -126,7 +122,7 @@ export default function CreatorCard({ creator, variant = 'detail' }: CreatorCard
                 {creator.downloadCount}
               </span>
               <span className="flex items-center gap-1.5">
-                <Users className="h-4 w-4 text-pink-500" />
+                <Users className="h-4 w-4 text-primary" />
                 {creator.followerCount}
               </span>
             </div>

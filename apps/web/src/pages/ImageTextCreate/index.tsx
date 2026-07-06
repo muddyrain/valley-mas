@@ -106,8 +106,8 @@ const TEMPLATES: Template[] = [
     background: 'lined',
     accentStyle: 'marker',
     layout: 'center',
-    frameClass: 'border-[#efe6d7] bg-[#fffdfa]',
-    textClass: 'text-[#2f2f33]',
+    frameClass: 'border-border bg-card',
+    textClass: 'text-foreground',
     fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
     showDate: true,
   },
@@ -119,8 +119,8 @@ const TEMPLATES: Template[] = [
     background: 'dots',
     accentStyle: 'bubble',
     layout: 'center',
-    frameClass: 'border-[#ece8f4] bg-[#fffefe]',
-    textClass: 'text-[#241d22]',
+    frameClass: 'border-border bg-card',
+    textClass: 'text-foreground',
     fontFamily: '"STSong", "Songti SC", serif',
   },
   {
@@ -131,8 +131,8 @@ const TEMPLATES: Template[] = [
     background: 'plain',
     accentStyle: 'none',
     layout: 'center',
-    frameClass: 'border-[#ebe7dc] bg-[#fcfaf4]',
-    textClass: 'text-[#262626]',
+    frameClass: 'border-border bg-card',
+    textClass: 'text-foreground',
     fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
   },
   {
@@ -143,8 +143,8 @@ const TEMPLATES: Template[] = [
     background: 'plain',
     accentStyle: 'underline',
     layout: 'center',
-    frameClass: 'border-[#efe9dc] bg-[#f9f6ec]',
-    textClass: 'text-[#303133]',
+    frameClass: 'border-border bg-card',
+    textClass: 'text-foreground',
     fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
   },
   {
@@ -155,8 +155,8 @@ const TEMPLATES: Template[] = [
     background: 'plain',
     accentStyle: 'marker',
     layout: 'center',
-    frameClass: 'border-[#f2ddca] bg-[linear-gradient(180deg,#fffaf3_0%,#f9efdd_100%)]',
-    textClass: 'text-[#3f332f]',
+    frameClass: 'border-border bg-card',
+    textClass: 'text-foreground',
     fontFamily: '"Hiragino Sans GB", "Microsoft YaHei", sans-serif',
   },
   {
@@ -167,8 +167,8 @@ const TEMPLATES: Template[] = [
     background: 'dots',
     accentStyle: 'none',
     layout: 'top',
-    frameClass: 'border-[#e3e6ef] bg-[#fbfcff]',
-    textClass: 'text-[#2f3a4d]',
+    frameClass: 'border-border bg-card',
+    textClass: 'text-foreground',
     fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
   },
 ];
@@ -515,37 +515,21 @@ async function renderCardToBlob(page: EditorPage, template: Template, stickerEmo
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('canvas not supported');
 
-  ctx.fillStyle = '#fffdfa';
+  ctx.fillStyle = 'white';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  if (template.key === 'mint') {
-    ctx.fillStyle = '#f9f6ec';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  } else if (template.key === 'ink') {
-    ctx.fillStyle = '#fcfaf4';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  } else if (template.key === 'sunset') {
-    const gradient = ctx.createLinearGradient(0, 0, 0, CARD_CANVAS_HEIGHT);
-    gradient.addColorStop(0, '#fffaf3');
-    gradient.addColorStop(1, '#f9efdd');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
 
   drawBackground(ctx, template);
 
   const lines = buildDisplayLines(page, template, 'full');
   const lineHeights = lines.map((segments) => getLineHeight(segments));
   ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle =
-    template.key === 'grid' ? '#2f3a4d' : template.key === 'sunset' ? '#3f332f' : '#2f2f33';
+  ctx.fillStyle = '#1a1a1a';
 
   if (template.showDate) {
-    ctx.fillStyle = '#d7a911';
+    ctx.fillStyle = '#1a1a1a';
     ctx.font = '62px "Helvetica Neue", sans-serif';
     ctx.fillText('Notes', 96, 100);
-    ctx.fillStyle =
-      template.key === 'grid' ? '#2f3a4d' : template.key === 'sunset' ? '#3f332f' : '#2f2f33';
+    ctx.fillStyle = '#1a1a1a';
   }
 
   const contentHeight = lineHeights.reduce((sum, height) => sum + height, 0);
@@ -580,8 +564,7 @@ async function renderCardToBlob(page: EditorPage, template: Template, stickerEmo
           36,
         );
         ctx.fill();
-        ctx.fillStyle =
-          template.key === 'grid' ? '#2f3a4d' : template.key === 'sunset' ? '#3f332f' : '#2f2f33';
+        ctx.fillStyle = '#1a1a1a';
       }
       ctx.fillText(segment.text, currentX, baselineY);
       currentX += width;
@@ -605,10 +588,10 @@ async function renderCardToBlob(page: EditorPage, template: Template, stickerEmo
 
 function cardBackgroundClass(template: Template) {
   if (template.background === 'lined') {
-    return 'bg-[linear-gradient(180deg,#fffdfa_0%,#fffdfa_100%),repeating-linear-gradient(180deg,transparent_0,transparent_58px,rgba(212,216,224,0.65)_58px,rgba(212,216,224,0.65)_60px)]';
+    return 'bg-[repeating-linear-gradient(180deg,transparent_0,transparent_58px,hsl(var(--border)/0.65)_58px,hsl(var(--border)/0.65)_60px)]';
   }
   if (template.background === 'dots') {
-    return 'bg-[radial-gradient(circle,rgba(156,163,175,0.55)_1.4px,transparent_1.6px)] bg-[length:28px_28px]';
+    return 'bg-[radial-gradient(circle,hsl(var(--border)/0.55)_1.4px,transparent_1.6px)] bg-[length:28px_28px]';
   }
   return '';
 }
@@ -651,11 +634,11 @@ function CardPreview({
 
   return (
     <div
-      className={`relative aspect-[3/5] overflow-hidden rounded-[30px] border ${template.frameClass} ${cardBackgroundClass(template)} ${isCompact ? compactWidth : 'w-full max-w-[390px]'} shadow-[0_18px_46px_rgba(15,23,42,0.08)]`}
+      className={`relative aspect-[3/5] overflow-hidden rounded-[30px] border ${template.frameClass} ${cardBackgroundClass(template)} ${isCompact ? compactWidth : 'w-full max-w-[390px]'} shadow-[0_18px_46px_hsl(var(--foreground)/0.08)]`}
     >
       {template.showDate ? (
         <div
-          className={`absolute left-5 top-4 ${isCompact ? (isTemplate ? 'text-[9px]' : 'text-[7px]') : 'text-[20px]'} font-medium text-[#d7a911]`}
+          className={`absolute left-5 top-4 ${isCompact ? (isTemplate ? 'text-[9px]' : 'text-[7px]') : 'text-[20px]'} font-medium text-primary`}
         >
           Notes
         </div>
@@ -678,7 +661,7 @@ function CardPreview({
                 key={`${segment.text}-${segmentIndex}`}
                 className={
                   segment.highlight
-                    ? 'rounded-full bg-fuchsia-200/70 px-2 py-1 inline-block'
+                    ? 'rounded-full bg-primary text-primary-foreground px-2 py-1 inline-block'
                     : lineAccentClass(template, index, hasCustomHighlight)
                 }
                 style={{ fontSize: `${getSegmentPreviewFontSize(segment, variant)}px` }}
@@ -743,7 +726,7 @@ function RenderedCardPreview({
 
   return (
     <div
-      className={`relative aspect-[3/5] overflow-hidden rounded-[30px] border ${template.frameClass} ${widthClass} bg-card shadow-[0_18px_46px_rgba(15,23,42,0.08)]`}
+      className={`relative aspect-[3/5] overflow-hidden rounded-[30px] border ${template.frameClass} ${widthClass} bg-card shadow-[0_18px_46px_hsl(var(--foreground)/0.08)]`}
     >
       {previewUrl ? (
         <img src={previewUrl} alt="图文渲染预览" className="h-full w-full object-cover" />
@@ -1125,7 +1108,7 @@ export default function ImageTextCreate() {
 
   if (isEditMode && loadingPost) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] bg-[#f7f3ee] px-4 py-6 md:px-8">
+      <div className="min-h-[calc(100vh-4rem)] bg-background px-4 py-6 md:px-8">
         <div className="mx-auto max-w-[1460px] rounded-[30px] border border-accent/80 bg-card/90 p-8">
           <div className="text-sm text-muted-foreground">图文内容加载中...</div>
         </div>
@@ -1134,9 +1117,9 @@ export default function ImageTextCreate() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[radial-gradient(circle_at_top,#fff6ec_0%,#f7f2ec_45%,#f5f1ec_100%)] px-4 py-6 md:px-8">
+    <div className="min-h-[calc(100vh-4rem)] bg-background px-4 py-6 md:px-8">
       <div className="mx-auto max-w-[1460px] space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-accent/70 bg-card/85 px-5 py-4 shadow-[0_18px_48px_rgba(196,119,59,0.08)] backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-accent/70 bg-card/85 px-5 py-4 shadow-[0_18px_48px_hsl(var(--foreground)/0.08)] backdrop-blur">
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="rounded-xl">
               <ArrowLeft className="mr-1 h-4 w-4" />
@@ -1183,7 +1166,7 @@ export default function ImageTextCreate() {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_520px]">
-          <section className="rounded-[30px] border border-accent/70 bg-card/92 p-5 shadow-[0_18px_48px_rgba(196,119,59,0.08)] backdrop-blur">
+          <section className="rounded-[30px] border border-accent/70 bg-card/92 p-5 shadow-[0_18px_48px_hsl(var(--foreground)/0.08)] backdrop-blur">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full bg-accent px-3 py-1 text-xs font-medium text-primary">
@@ -1347,11 +1330,11 @@ export default function ImageTextCreate() {
               onChange={(e) => updateCurrentPageText(e.target.value)}
               placeholder="写点什么..."
               rows={13}
-              className="min-h-[320px] w-full resize-none rounded-[26px] border border-accent bg-[#fffdf9] p-5 text-base leading-7 text-foreground outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-accent"
+              className="min-h-[320px] w-full resize-none rounded-[26px] border border-accent bg-card p-5 text-base leading-7 text-foreground outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-accent"
             />
           </section>
 
-          <section className="rounded-[30px] border border-accent/70 bg-card/92 p-5 shadow-[0_18px_48px_rgba(196,119,59,0.08)] backdrop-blur xl:sticky xl:top-6 xl:self-start">
+          <section className="rounded-[30px] border border-accent/70 bg-card/92 p-5 shadow-[0_18px_48px_hsl(var(--foreground)/0.08)] backdrop-blur xl:sticky xl:top-6 xl:self-start">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full bg-accent px-3 py-1 text-xs font-medium text-primary">
@@ -1393,7 +1376,7 @@ export default function ImageTextCreate() {
               </div>
 
               <div className="order-1 lg:order-2">
-                <div className="relative mx-auto flex w-full max-w-[420px] items-center justify-center rounded-[34px] border border-border bg-[linear-gradient(180deg,#fffaf4_0%,#f8f0e7_100%)] px-10 py-4 shadow-[0_22px_58px_rgba(15,23,42,0.12)] sm:px-12">
+                <div className="relative mx-auto flex w-full max-w-[420px] items-center justify-center rounded-[34px] border border-border bg-card px-10 py-4 shadow-[0_22px_58px_hsl(var(--foreground)/0.12)] sm:px-12">
                   {livePages.length > 1 ? (
                     <button
                       type="button"
@@ -1453,7 +1436,7 @@ export default function ImageTextCreate() {
           </section>
         </div>
 
-        <section className="rounded-[30px] border border-accent/70 bg-card/90 p-5 shadow-[0_18px_48px_rgba(196,119,59,0.08)] backdrop-blur">
+        <section className="rounded-[30px] border border-accent/70 bg-card/90 p-5 shadow-[0_18px_48px_hsl(var(--foreground)/0.08)] backdrop-blur">
           <div className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
             <LayoutTemplate className="h-4 w-4 text-primary" />
             图文模板

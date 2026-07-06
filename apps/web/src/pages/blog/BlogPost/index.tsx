@@ -543,7 +543,7 @@ export default function BlogPost() {
 
   if (loading) {
     return (
-      <div className="min-h-screen" style={{ background: 'var(--background)' }}>
+      <div className="min-h-screen" style={{ background: 'hsl(var(--background))' }}>
         <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_360px]">
             <div className="h-[72vh] animate-pulse rounded-[36px] bg-card/80" />
@@ -561,7 +561,7 @@ export default function BlogPost() {
     return (
       <div
         className="flex min-h-screen items-center justify-center px-4"
-        style={{ background: 'var(--background)' }}
+        style={{ background: 'hsl(var(--background))' }}
       >
         <div className="max-w-md rounded-[28px] border bg-card px-6 py-10 text-center">
           <h1 className="text-2xl font-semibold text-foreground">内容暂时无法访问</h1>
@@ -612,7 +612,7 @@ export default function BlogPost() {
 
         <div className="mx-auto max-w-7xl px-4 pb-24 pt-8 sm:px-6 lg:px-8">
           <section className="relative mb-8 overflow-hidden rounded-[34px] border px-6 py-6 sm:px-8">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_18%,rgba(251,191,36,0.12),transparent_26%),radial-gradient(circle_at_86%_18%,rgba(96,165,250,0.14),transparent_24%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_18%,hsl(var(--primary)/0.12),transparent_26%),radial-gradient(circle_at_86%_18%,hsl(var(--primary)/0.14),transparent_24%)]" />
             <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div className="space-y-4">
                 <div className="inline-flex items-center gap-2 rounded-full border bg-card/82 px-4 py-1.5 text-[11px] tracking-[0.28em] uppercase shadow-[0_10px_24px_hsl(var(--primary) / 0.08)] backdrop-blur">
@@ -631,10 +631,10 @@ export default function BlogPost() {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                <span className="rounded-full border border-border/40 bg-card/82 px-4 py-2 text-sm text-muted-foreground shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+                <span className="rounded-full border border-border/40 bg-card/82 px-4 py-2 text-sm text-muted-foreground shadow-[0_10px_24px_hsl(var(--foreground)/0.08)]">
                   {visibilityLabelMap[post.visibility || 'public'] || '公开可见'}
                 </span>
-                <span className="rounded-full border border-border/40 bg-card/82 px-4 py-2 text-sm text-muted-foreground shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+                <span className="rounded-full border border-border/40 bg-card/82 px-4 py-2 text-sm text-muted-foreground shadow-[0_10px_24px_hsl(var(--foreground)/0.08)]">
                   共 {pageCount || 1} 页
                 </span>
               </div>
@@ -666,8 +666,8 @@ export default function BlogPost() {
                           onClick={() => setImagePageIndex(index)}
                           className={`group flex min-w-[74px] flex-col items-center gap-2 rounded-[26px] border px-2 py-3 transition ${
                             imagePageIndex === index
-                              ? 'border-[#f39b48] bg-card shadow-[0_14px_36px_rgba(243,155,72,0.2)]'
-                              : 'border-border/30 bg-card/70 hover:border-[#f4d5ab]'
+                              ? 'border-primary bg-card shadow-[0_14px_36px_hsl(var(--primary)/0.2)]'
+                              : 'border-border/30 bg-card/70 hover:border-primary/40'
                           }`}
                         >
                           <div className="flex h-[92px] w-[54px] items-center justify-center overflow-hidden rounded-[18px] bg-card">
@@ -713,7 +713,7 @@ export default function BlogPost() {
                       )}
 
                       {imageUrls[imagePageIndex] ? (
-                        <div className="w-full max-w-[740px] overflow-hidden rounded-[28px] border border-[#e7dbc5] bg-card shadow-[0_26px_80px_rgba(100,77,38,0.12)]">
+                        <div className="w-full max-w-[740px] overflow-hidden rounded-[28px] border border-border bg-card shadow-[0_26px_80px_hsl(var(--foreground)/0.12)]">
                           <img
                             src={imageUrls[imagePageIndex]}
                             alt={`${post.title} 第 ${imagePageIndex + 1} 页`}
@@ -721,7 +721,7 @@ export default function BlogPost() {
                           />
                         </div>
                       ) : (
-                        <div className="flex h-[72vh] w-full max-w-[740px] items-center justify-center rounded-[28px] border border-[#e7dbc5] bg-card px-10 text-center shadow-[0_26px_80px_rgba(100,77,38,0.12)]">
+                        <div className="flex h-[72vh] w-full max-w-[740px] items-center justify-center rounded-[28px] border border-border bg-card px-10 text-center shadow-[0_26px_80px_hsl(var(--foreground)/0.12)]">
                           <p
                             className="whitespace-pre-wrap break-words text-[42px] font-semibold leading-[1.45] text-foreground"
                             style={{
@@ -844,8 +844,8 @@ export default function BlogPost() {
 
       <div className="mx-auto max-w-[1440px] px-4 pb-20 pt-6 sm:px-6 sm:pb-24 sm:pt-8 lg:px-10">
         <header className="grid gap-6 xl:grid-cols-[minmax(0,1.24fr)_360px]">
-          <section className="relative overflow-hidden rounded-[32px] border bg-card/92 p-5 shadow-[0_28px_72px_rgba(85,64,34,0.14)] sm:rounded-[38px] sm:p-8">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_6%,hsl(var(--primary) / 0.16),transparent_32%),radial-gradient(circle_at_88%_0%,rgba(77,160,255,0.14),transparent_28%)]" />
+          <section className="relative overflow-hidden rounded-[32px] border bg-card/92 p-5 shadow-[0_28px_72px_hsl(var(--foreground)/0.14)] sm:rounded-[38px] sm:p-8">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_6%,hsl(var(--primary) / 0.16),transparent_32%),radial-gradient(circle_at_88%_0%,hsl(var(--primary) / 0.14),transparent_28%)]" />
             <div className="relative">
               <div className="flex flex-wrap items-center gap-2">
                 {post.group && (
@@ -903,7 +903,7 @@ export default function BlogPost() {
           </section>
 
           <aside className="space-y-6">
-            <section className="overflow-hidden rounded-[28px] border p-5 shadow-[0_20px_52px_rgba(148,163,184,0.12)] sm:rounded-[30px] sm:p-6">
+            <section className="overflow-hidden rounded-[28px] border p-5 shadow-[0_20px_52px_hsl(var(--foreground)/0.12)] sm:rounded-[30px] sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-medium text-foreground">阅读导览</div>
                 <span className="rounded-full bg-card px-2.5 py-1 text-[11px] text-muted-foreground">
@@ -1004,7 +1004,7 @@ export default function BlogPost() {
           <main className="space-y-6">
             <section
               ref={articleSectionRef}
-              className="rounded-[30px] border bg-card/95 p-5 shadow-[0_26px_70px_rgba(99,75,42,0.12)] sm:rounded-[36px] sm:p-10"
+              className="rounded-[30px] border bg-card/95 p-5 shadow-[0_26px_70px_hsl(var(--foreground)/0.12)] sm:rounded-[36px] sm:p-10"
             >
               <MarkdownContent
                 content={processedContent}
@@ -1078,7 +1078,7 @@ export default function BlogPost() {
           <aside>
             <div className="space-y-6">
               {toc.length > 0 && (
-                <section className="rounded-[28px] border p-5 shadow-[0_20px_52px_rgba(148,163,184,0.12)] sm:rounded-[30px] sm:p-6">
+                <section className="rounded-[28px] border p-5 shadow-[0_20px_52px_hsl(var(--foreground)/0.12)] sm:rounded-[30px] sm:p-6">
                   <div className="text-sm font-medium text-foreground">目录导读</div>
                   <div className="mt-4 overflow-x-hidden pr-1">
                     <TableOfContents
@@ -1090,7 +1090,7 @@ export default function BlogPost() {
                 </section>
               )}
 
-              <section className="hidden rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)] xl:block">
+              <section className="hidden rounded-[30px] border p-6 shadow-[0_20px_52px_hsl(var(--foreground)/0.12)] xl:block">
                 <div className="text-sm font-medium text-foreground">阅读状态</div>
                 <div className="mt-4 space-y-3 text-sm text-muted-foreground">
                   <div className="flex items-center justify-between">
@@ -1112,7 +1112,7 @@ export default function BlogPost() {
                   </div>
                 </div>
               </section>
-              <section className="rounded-[28px] border p-5 shadow-[0_20px_52px_rgba(148,163,184,0.12)] sm:rounded-[30px] sm:p-6">
+              <section className="rounded-[28px] border p-5 shadow-[0_20px_52px_hsl(var(--foreground)/0.12)] sm:rounded-[30px] sm:p-6">
                 <div className="text-sm font-medium text-foreground">相关推荐</div>
                 {relatedLoading ? (
                   <div className="mt-4 space-y-2">
@@ -1141,7 +1141,7 @@ export default function BlogPost() {
                   <p className="mt-4 text-xs text-muted-foreground">暂未获取到相关推荐。</p>
                 )}
               </section>
-              <section className="overflow-hidden rounded-[28px] border p-0 shadow-[0_18px_46px_rgba(148,163,184,0.12)] sm:rounded-[30px]">
+              <section className="overflow-hidden rounded-[28px] border p-0 shadow-[0_18px_46px_hsl(var(--foreground)/0.12)] sm:rounded-[30px]">
                 <div className="border-b border-accent bg-[linear-gradient(135deg,hsl(var(--primary) / 0.12),hsl(var(--background) / 0.9))] px-5 py-4 sm:px-6">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-card text-primary shadow-[0_12px_28px_hsl(var(--primary) / 0.16)]">
@@ -1183,7 +1183,7 @@ export default function BlogPost() {
                           <Sparkles className="h-3.5 w-3.5" />
                         )}
                       </div>
-                      <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-accent bg-card/86 px-3.5 py-3 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+                      <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-accent bg-card/86 px-3.5 py-3 shadow-[0_10px_24px_hsl(var(--foreground)/0.08)]">
                         {askResult?.answer ? (
                           <div>
                             {renderAskAnswer(askResult.answer)}
@@ -1273,7 +1273,7 @@ export default function BlogPost() {
         {toc.length > 0 && (
           <>
             <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 px-4 xl:hidden">
-              <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-2 rounded-full border border-accent bg-card/94 p-2 shadow-[0_18px_44px_rgba(100,77,38,0.18)] backdrop-blur">
+              <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-2 rounded-full border border-accent bg-card/94 p-2 shadow-[0_18px_44px_hsl(var(--foreground)/0.18)] backdrop-blur">
                 <div className="min-w-0 flex-1 rounded-full bg-accent/60 px-3 py-1.5 text-xs text-muted-foreground">
                   <div className="truncate">
                     {activeTocTitle ? `正在阅读：${activeTocTitle}` : '打开目录快速定位章节'}
@@ -1302,7 +1302,7 @@ export default function BlogPost() {
                   aria-label="关闭目录面板"
                   onClick={() => setMobileTocOpen(false)}
                 />
-                <section className="absolute bottom-0 left-0 right-0 rounded-t-[24px] border border-b-0 bg-card px-4 pb-6 pt-4 shadow-[0_-24px_60px_rgba(15,23,42,0.2)]">
+                <section className="absolute bottom-0 left-0 right-0 rounded-t-[24px] border border-b-0 bg-card px-4 pb-6 pt-4 shadow-[0_-24px_60px_hsl(var(--foreground)/0.2)]">
                   <div className="mb-3 flex items-center justify-between">
                     <div>
                       <div className="text-sm font-medium text-foreground">目录导读</div>

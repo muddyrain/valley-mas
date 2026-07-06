@@ -38,7 +38,7 @@ export default function PostGroupDropdown({
       <DropdownMenuTrigger
         disabled={disabled}
         className={cn(
-          'inline-flex h-10 max-w-full items-center gap-2 rounded-full border border-border bg-card/92 px-4 text-sm font-medium text-foreground shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition hover:border-primary/35 hover:bg-accent/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50',
+          'inline-flex h-10 max-w-full items-center gap-2 rounded-full border border-border bg-card/92 px-4 text-sm font-medium text-foreground shadow-[0_10px_24px_hsl(var(--foreground)/0.06)] transition hover:border-primary/35 hover:bg-accent/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50',
           triggerClassName,
         )}
       >
@@ -49,7 +49,7 @@ export default function PostGroupDropdown({
         align="end"
         sideOffset={10}
         className={cn(
-          'w-[min(20rem,calc(100vw-2rem))] min-w-[16rem] rounded-[22px] border border-border bg-card/96 p-2 shadow-[0_22px_56px_rgba(15,23,42,0.14)] backdrop-blur-xl',
+          'w-[min(20rem,calc(100vw-2rem))] min-w-[16rem] rounded-[22px] border border-border bg-card/96 p-2 shadow-[0_22px_56px_hsl(var(--foreground)/0.14)] backdrop-blur-xl',
           contentClassName,
         )}
       >

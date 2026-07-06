@@ -381,7 +381,7 @@ export default function Header() {
               onClick={() => navigate('/favorites')}
               className="hover:bg-accent cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
             >
-              <Heart className="h-4 w-4 text-pink-500" />
+              <Heart className="h-4 w-4 text-primary" />
               <span className="font-medium">我的收藏</span>
             </DropdownMenuItem>
             <DropdownMenuItem

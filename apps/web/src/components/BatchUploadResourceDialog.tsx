@@ -593,7 +593,7 @@ export default function BatchUploadResourceDialog({
               onDragOver={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
             >
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/10 transition-all group-hover:scale-110 group-hover:bg-primary/14">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent transition-all group-hover:scale-110 group-hover:bg-accent/80">
                 <FileUp className="h-7 w-7 text-primary/60 group-hover:text-primary transition-colors" />
               </div>
               <p className="text-sm font-medium text-foreground mb-1">
@@ -698,12 +698,12 @@ export default function BatchUploadResourceDialog({
                       />
                       {/* 状态覆盖 */}
                       {item.status === 'running' && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                          <Loader2 className="h-5 w-5 animate-spin text-white" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-foreground/30">
+                          <Loader2 className="h-5 w-5 animate-spin text-foreground" />
                         </div>
                       )}
                       {item.status === 'success' && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
+                        <div className="absolute inset-0 flex items-center justify-center bg-accent/60">
                           <span className="text-lg">✓</span>
                         </div>
                       )}
@@ -713,7 +713,7 @@ export default function BatchUploadResourceDialog({
                         </div>
                       )}
                       {item.status === 'confirming' && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
+                        <div className="absolute inset-0 flex items-center justify-center bg-accent/60">
                           <Loader2 className="h-5 w-5 animate-spin text-primary" />
                         </div>
                       )}

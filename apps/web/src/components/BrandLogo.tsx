@@ -46,7 +46,7 @@ export default function BrandLogo({
         role="img"
         aria-label="Valley Logo Icon"
         className={cn(
-          'h-10 w-10 shrink-0 drop-shadow-[0_4px_10px_rgba(53,33,20,0.22)]',
+          'h-10 w-10 shrink-0 drop-shadow-[0_4px_10px_hsl(var(--foreground)/0.22)]',
           iconClassName,
         )}
       >

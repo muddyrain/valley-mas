@@ -280,8 +280,8 @@ export default function UploadResourceDialog({
     >
       <DialogContent className="flex h-[90vh] w-[90vw] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
         {/* 顶部标题栏 */}
-        <div className="shrink-0 border-b border-border bg-[linear-gradient(135deg,hsl(var(--primary) / 0.10)_0%,hsl(var(--primary) / 0.03)_100%)] px-6 py-4 flex items-center gap-4">
-          <div className="shrink-0 w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center shadow-[0_4px_12px_hsl(var(--primary) / 0.18)]">
+        <div className="shrink-0 border-b border-border bg-accent/50 px-6 py-4 flex items-center gap-4">
+          <div className="shrink-0 w-10 h-10 rounded-2xl bg-accent flex items-center justify-center">
             <Upload className="h-4.5 w-4.5 text-primary" />
           </div>
           <div className="min-w-0 flex-1">
@@ -356,7 +356,7 @@ export default function UploadResourceDialog({
                 </div>
               ) : (
                 <div className="flex h-full flex-col items-center justify-center px-4 text-center">
-                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/10 transition-all group-hover:scale-110 group-hover:bg-primary/14">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent transition-all group-hover:scale-110 group-hover:bg-accent/80">
                     <Upload className="h-7 w-7 text-primary/60 group-hover:text-primary transition-colors" />
                   </div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">
@@ -488,7 +488,7 @@ export default function UploadResourceDialog({
                         className={`rounded-full px-3 py-1 text-xs font-medium transition-all border ${
                           t === uploadTitle
                             ? 'bg-primary text-primary-foreground border-primary shadow-[0_2px_8px_hsl(var(--primary) / 0.30)]'
-                            : 'bg-primary/5 border-primary/25 text-primary hover:bg-primary hover:text-primary-foreground hover:border-primary'
+                            : 'bg-accent border-border text-accent-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary'
                         }`}
                       >
                         {t}

@@ -34,30 +34,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { createRandomCnNickname } from '@/utils/randomNickname';
 
-// 个人中心主页需要和全局主题联动，因此背景、Banner、卡片头和主按钮
-// 都统一走 theme token，而不是继续保留紫色、橙色这类固定配色。
 const ROLE_MAP: Record<string, { label: string; badgeClass: string }> = {
   admin: { label: '管理员', badgeClass: 'bg-destructive/15 text-destructive' },
   creator: { label: '创作者', badgeClass: 'bg-accent text-primary' },
   user: { label: '普通用户', badgeClass: 'bg-muted text-muted-foreground' },
 };
-
-const PAGE_BACKGROUND = {
-  background:
-    'linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, hsl(var(--primary) / 0.15) 28%, hsl(var(--background))) 42%, var(--background) 100%)',
-};
-
-const sectionCardClass =
-  'overflow-hidden rounded-2xl border border-border bg-card/84 shadow-[0_18px_44px_hsl(var(--primary) / 0.10)] backdrop-blur-sm';
-
-const sectionHeaderClass =
-  'border-b border-border bg-[linear-gradient(90deg,color-mix(in_srgb,hsl(var(--primary) / 0.15)_72%,hsl(var(--background))),hsl(var(--background)/0.92))] px-6 py-4';
-
-const statPanelClass =
-  'rounded-xl border border-border/24 bg-card/12 px-5 py-3 backdrop-blur-md shadow-[0_14px_30px_hsl(var(--foreground) / 0.05)]';
-
-const inputClassName =
-  'h-10 border-input bg-card/82 focus-visible:border-primary focus-visible:ring-primary/20';
 
 function extractEmailName(email?: string) {
   return (email || '').split('@')[0]?.trim() || '';
@@ -213,20 +194,12 @@ export default function Profile() {
   const avatarFallbackText = (displayName[0] || 'U').toUpperCase();
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
-      {/* 顶部信息区复用主题 Banner，头像光晕和统计块也跟随当前主题变化 */}
+    <div className="min-h-[calc(100vh-4rem)]">
       <PageBanner padding="py-10" maxWidth="max-w-4xl">
         <div className="flex flex-wrap items-center gap-6">
           <div className="relative shrink-0">
-            <div
-              className="absolute -inset-2 rounded-full opacity-80 blur-xl"
-              style={{
-                background:
-                  'linear-gradient(135deg, hsl(var(--primary) / 0.50), hsl(var(--primary) / 0.34), hsl(var(--primary) / 0.58))',
-              }}
-            />
             {loading ? (
-              <Skeleton className="relative h-24 w-24 rounded-full bg-card/20" />
+              <Skeleton className="h-24 w-24 rounded-full" />
             ) : (
               <button
                 type="button"
@@ -235,9 +208,9 @@ export default function Profile() {
                 title="点击更换头像"
                 disabled={avatarUploading}
               >
-                <Avatar className="h-24 w-24 border-4 border-border/30 shadow-2xl ring-4 ring-foreground/15">
+                <Avatar className="h-24 w-24 border-4 border-border ring-4 ring-foreground/10">
                   <AvatarImage src={profile?.avatar} className="object-cover" />
-                  <AvatarFallback className="bg-primary text-primary-foreground text-3xl font-bold text-primary-foreground">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-3xl font-bold">
                     {avatarFallbackText}
                   </AvatarFallback>
                 </Avatar>
@@ -252,31 +225,33 @@ export default function Profile() {
             )}
           </div>
 
-          <div className="min-w-0 flex-1 text-foreground">
+          <div className="min-w-0 flex-1">
             {loading ? (
               <div className="space-y-2">
-                <Skeleton className="h-8 w-40 bg-card/20" />
-                <Skeleton className="h-4 w-28 bg-card/20" />
+                <Skeleton className="h-8 w-40" />
+                <Skeleton className="h-4 w-28" />
               </div>
             ) : (
               <>
                 <div className="mb-2 flex flex-wrap items-center gap-3">
-                  <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">{displayName}</h1>
+                  <h1 className="text-2xl font-bold text-foreground md:text-3xl">{displayName}</h1>
                   <Badge className={`${roleInfo.badgeClass} border-0 px-3 py-1 font-medium`}>
                     {roleInfo.label}
                   </Badge>
                 </div>
-                <p className="mb-4 text-sm text-foreground/78">
+                <p className="mb-4 text-sm text-muted-foreground">
                   <Mail className="mr-1 inline h-3.5 w-3.5" />
                   {profile?.email || '未绑定邮箱'}
                 </p>
                 <div className="flex flex-wrap gap-4">
-                  <div className={statPanelClass}>
-                    <div className="mb-1 flex items-center gap-2 text-xs font-medium text-foreground/76">
+                  <div className="rounded-xl border border-border bg-card px-5 py-3">
+                    <div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                       <Download className="h-3.5 w-3.5" />
                       <span>累计下载</span>
                     </div>
-                    <div className="text-2xl font-bold">{profile?.downloadCount ?? 0}</div>
+                    <div className="text-2xl font-bold text-foreground">
+                      {profile?.downloadCount ?? 0}
+                    </div>
                   </div>
                 </div>
               </>
@@ -286,9 +261,8 @@ export default function Profile() {
       </PageBanner>
 
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-        {/* 基本信息卡片承接个人资料编辑，是个人中心里的核心操作区 */}
-        <Card className={sectionCardClass}>
-          <div className={sectionHeaderClass}>
+        <Card className="rounded-2xl border border-border bg-card">
+          <div className="border-b border-border px-6 py-4">
             <div className="flex items-center gap-2">
               <div className="rounded-lg bg-accent p-2">
                 <User className="h-4 w-4 text-primary" />
@@ -330,7 +304,7 @@ export default function Profile() {
                       setInfoForm((form) => ({ ...form, nickname: event.target.value }))
                     }
                     placeholder="请输入昵称"
-                    className={inputClassName}
+                    className="h-10"
                     maxLength={50}
                   />
                 </div>
@@ -348,7 +322,7 @@ export default function Profile() {
                     }
                     disabled
                     placeholder="请输入登录邮箱"
-                    className={inputClassName}
+                    className="h-10"
                   />
                   <p className="mt-1 text-xs text-muted-foreground">该邮箱用于登录与接收验证码</p>
                 </div>
@@ -365,7 +339,7 @@ export default function Profile() {
                       setInfoForm((form) => ({ ...form, phone: event.target.value }))
                     }
                     placeholder="请输入手机号"
-                    className={inputClassName}
+                    className="h-10"
                     maxLength={20}
                   />
                 </div>
@@ -394,9 +368,8 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* 密码区域保留安全感，但视觉仍然跟随当前主题，不再单独使用橙红色系 */}
-        <Card className={sectionCardClass}>
-          <div className={sectionHeaderClass}>
+        <Card className="rounded-2xl border border-border bg-card">
+          <div className="border-b border-border px-6 py-4">
             <div className="flex items-center gap-2">
               <div className="rounded-lg bg-accent p-2">
                 <KeyRound className="h-4 w-4 text-primary" />
@@ -416,7 +389,7 @@ export default function Profile() {
                       setPwdForm((form) => ({ ...form, oldPassword: event.target.value }))
                     }
                     placeholder="请输入原密码"
-                    className={`${inputClassName} pr-12`}
+                    className="h-10 pr-12"
                   />
                   <button
                     type="button"
@@ -441,7 +414,7 @@ export default function Profile() {
                       setPwdForm((form) => ({ ...form, newPassword: event.target.value }))
                     }
                     placeholder="请输入新密码"
-                    className={`${inputClassName} pr-12`}
+                    className="h-10 pr-12"
                   />
                   <button
                     type="button"
@@ -465,7 +438,7 @@ export default function Profile() {
                       setPwdForm((form) => ({ ...form, confirmPassword: event.target.value }))
                     }
                     placeholder="请再次输入新密码"
-                    className={`${inputClassName} pr-12 ${
+                    className={`h-10 pr-12 ${
                       pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword
                         ? 'border-destructive/40 focus-visible:border-destructive/40 focus-visible:ring-destructive/30'
                         : ''
@@ -507,10 +480,9 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* 账号信息区用更轻的主题面板承接只读信息，避免信息块跳出整体视觉语言 */}
         {!loading && profile ? (
-          <Card className={sectionCardClass}>
-            <div className={sectionHeaderClass}>
+          <Card className="rounded-2xl border border-border bg-card">
+            <div className="border-b border-border px-6 py-4">
               <div className="flex items-center gap-2">
                 <div className="rounded-lg bg-accent p-2">
                   <Shield className="h-4 w-4 text-primary" />
@@ -520,19 +492,19 @@ export default function Profile() {
             </div>
             <CardContent className="p-6">
               <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-                <div className="flex items-center justify-between rounded-xl bg-accent/72 p-3 sm:col-span-2">
+                <div className="flex items-center justify-between rounded-xl bg-accent p-3 sm:col-span-2">
                   <span className="text-muted-foreground">登录邮箱</span>
                   <span className="font-medium text-foreground">{profile.email || '-'}</span>
                 </div>
-                <div className="flex items-center justify-between rounded-xl bg-accent/72 p-3">
+                <div className="flex items-center justify-between rounded-xl bg-accent p-3">
                   <span className="text-muted-foreground">账号角色</span>
                   <Badge className={`${roleInfo.badgeClass} border-0`}>{roleInfo.label}</Badge>
                 </div>
-                <div className="flex items-center justify-between rounded-xl bg-accent/72 p-3">
+                <div className="flex items-center justify-between rounded-xl bg-accent p-3">
                   <span className="text-muted-foreground">累计下载</span>
                   <span className="font-semibold text-foreground">{profile.downloadCount} 次</span>
                 </div>
-                <div className="flex items-center justify-between rounded-xl bg-accent/72 p-3 sm:col-span-2">
+                <div className="flex items-center justify-between rounded-xl bg-accent p-3 sm:col-span-2">
                   <span className="text-muted-foreground">注册时间</span>
                   <span className="font-medium text-foreground">
                     {profile.createdAt
@@ -548,8 +520,6 @@ export default function Profile() {
             </CardContent>
           </Card>
         ) : null}
-
-        {/* 普通用户的申请入口已移除，所有登录用户均可创作 */}
       </div>
 
       <AvatarBeadEditorDialog

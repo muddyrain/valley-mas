@@ -55,20 +55,22 @@ export function ExternalPreviewPostCard({ post, className }: ExternalPreviewPost
     <Link
       to={`/blog/${post.id}`}
       className={cn(
-        'group block rounded-[24px] border border-border bg-linear-to-b from-background to-muted/60 p-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_20px_42px_rgba(76,63,131,0.14)]',
+        'group block rounded-[24px] border border-border bg-linear-to-b from-background to-muted/60 p-3.5 shadow-[0_10px_24px_hsl(var(--foreground)/0.06)] transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_20px_42px_hsl(var(--foreground)/0.14)]',
         className,
       )}
     >
-      <div className="relative overflow-hidden rounded-[20px] border border-border bg-[#f9f9f6] p-4">
-        <div className="pointer-events-none absolute -right-8 -top-8 h-20 w-20 rounded-full bg-primary/10 blur-2xl transition duration-500 group-hover:scale-110" />
+      <div className="relative overflow-hidden rounded-[20px] border border-border bg-card p-4">
+        <div className="pointer-events-none absolute -right-8 -top-8 h-20 w-20 rounded-full bg-accent/40 blur-2xl transition duration-500 group-hover:scale-110" />
         <div className="pointer-events-none absolute -bottom-8 -left-8 h-20 w-20 rounded-full bg-accent/60 blur-2xl transition duration-500 group-hover:scale-110" />
 
-        <div className="relative mx-auto h-[360px] w-full max-w-[270px] overflow-hidden rounded-2xl border border-[#e4dfd3] bg-[#f7f5ef] p-6 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45),0_10px_30px_rgba(79,70,44,0.08)]">
-          <div className="absolute left-5 top-4 text-[46px] leading-none text-[#e6e0d2]">“</div>
-          <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_85%_15%,rgba(167,139,250,0.18),transparent_42%)]" />
+        <div className="relative mx-auto h-[360px] w-full max-w-[270px] overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-[inset_0_0_0_1px_hsl(var(--background)/0.45),0_10px_30px_hsl(var(--foreground)/0.08)]">
+          <div className="absolute left-5 top-4 text-[46px] leading-none text-muted-foreground/40">
+            “
+          </div>
+          <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_85%_15%,hsl(var(--primary)/0.18),transparent_42%)]" />
           <div
             className={cn(
-              'relative z-10 mt-12 font-semibold tracking-tight text-[#3d3a38]',
+              'relative z-10 mt-12 font-semibold tracking-tight text-foreground',
               textSizeClass(fullText.length),
             )}
           >
@@ -77,7 +79,7 @@ export function ExternalPreviewPostCard({ post, className }: ExternalPreviewPost
             ))}
           </div>
 
-          <div className="absolute bottom-5 right-5 h-1.5 w-10 rounded-full bg-[#ede4cf]" />
+          <div className="absolute bottom-5 right-5 h-1.5 w-10 rounded-full bg-muted-foreground/30" />
         </div>
       </div>
 

@@ -88,7 +88,7 @@ export function PostComments({
             type="button"
             onClick={handleSubmit}
             disabled={!isAuthenticated || !canPublish}
-            className="rounded-full px-5 duration-300 text-primary hover:bg-primary/75!"
+            className="rounded-full px-5 duration-300 text-primary hover:bg-primary/80"
           >
             {submitting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -114,7 +114,7 @@ export function PostComments({
             return (
               <article
                 key={comment.id}
-                className="rounded-[24px] border border-border bg-card px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+                className="rounded-[24px] border border-border bg-card px-4 py-4 shadow-[0_10px_30px_hsl(var(--foreground)/0.05)]"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 items-start gap-3">

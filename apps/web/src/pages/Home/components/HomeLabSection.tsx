@@ -99,51 +99,51 @@ const colorMap: Record<
   }
 > = {
   violet: {
-    card: 'bg-[linear-gradient(148deg,rgba(15,10,40,0.96),rgba(88,28,135,0.52),rgba(99,102,241,0.18))]',
-    glow: 'bg-[radial-gradient(circle_at_80%_20%,rgba(168,85,247,0.32),transparent_55%)]',
-    iconBg: 'bg-purple-500/20 border-purple-400/30',
-    iconText: 'text-purple-300',
-    tag: 'bg-purple-500/18 text-purple-300 border-purple-400/28',
-    tagDot: 'bg-purple-400',
-    accent: 'from-purple-500/70 to-indigo-500/70',
+    card: 'bg-card',
+    glow: 'bg-[radial-gradient(circle_at_80%_20%,hsl(var(--accent)/0.6),transparent_55%)]',
+    iconBg: 'bg-accent border-border',
+    iconText: 'text-primary',
+    tag: 'bg-accent text-accent-foreground border-border',
+    tagDot: 'bg-primary',
+    accent: 'from-primary/70 to-primary/70',
     liveDot: 'bg-primary',
-    liveBg: 'bg-primary/16 border-primary/28',
+    liveBg: 'bg-accent border-border',
     liveText: 'text-primary',
   },
   emerald: {
-    card: 'bg-[linear-gradient(148deg,rgba(10,25,20,0.96),rgba(6,78,59,0.52),rgba(16,185,129,0.16))]',
-    glow: 'bg-[radial-gradient(circle_at_80%_20%,rgba(16,185,129,0.28),transparent_55%)]',
-    iconBg: 'bg-emerald-500/18 border-emerald-400/28',
-    iconText: 'text-emerald-300',
-    tag: 'bg-emerald-500/16 text-emerald-300 border-emerald-400/26',
-    tagDot: 'bg-emerald-400',
-    accent: 'from-emerald-500/70 to-teal-500/70',
+    card: 'bg-card',
+    glow: 'bg-[radial-gradient(circle_at_80%_20%,hsl(var(--accent)/0.6),transparent_55%)]',
+    iconBg: 'bg-accent border-border',
+    iconText: 'text-primary',
+    tag: 'bg-accent text-accent-foreground border-border',
+    tagDot: 'bg-primary',
+    accent: 'from-primary/70 to-primary/70',
     liveDot: 'bg-primary',
-    liveBg: 'bg-primary/16 border-primary/28',
+    liveBg: 'bg-accent border-border',
     liveText: 'text-primary',
   },
   amber: {
-    card: 'bg-[linear-gradient(148deg,rgba(20,15,5,0.96),rgba(120,53,15,0.50),rgba(245,158,11,0.16))]',
-    glow: 'bg-[radial-gradient(circle_at_80%_20%,rgba(245,158,11,0.26),transparent_55%)]',
-    iconBg: 'bg-primary/18 border-primary/26',
+    card: 'bg-card',
+    glow: 'bg-[radial-gradient(circle_at_80%_20%,hsl(var(--accent)/0.4),transparent_55%)]',
+    iconBg: 'bg-accent border-border',
     iconText: 'text-primary',
-    tag: 'bg-primary/16 text-primary border-primary/24',
+    tag: 'bg-accent text-accent-foreground border-border',
     tagDot: 'bg-primary',
-    accent: 'from-amber-500/70 to-orange-500/70',
+    accent: 'from-primary/70 to-primary/70',
     liveDot: 'bg-primary',
-    liveBg: 'bg-primary/16 border-primary/28',
+    liveBg: 'bg-accent border-border',
     liveText: 'text-primary',
   },
   sky: {
-    card: 'bg-[linear-gradient(148deg,rgba(5,18,30,0.96),rgba(7,89,133,0.52),rgba(14,165,233,0.16))]',
-    glow: 'bg-[radial-gradient(circle_at_80%_20%,rgba(14,165,233,0.28),transparent_55%)]',
-    iconBg: 'bg-sky-500/18 border-sky-400/28',
-    iconText: 'text-sky-300',
-    tag: 'bg-sky-500/16 text-sky-300 border-sky-400/26',
-    tagDot: 'bg-sky-400',
-    accent: 'from-sky-500/70 to-cyan-500/70',
+    card: 'bg-card',
+    glow: 'bg-[radial-gradient(circle_at_80%_20%,hsl(var(--accent)/0.6),transparent_55%)]',
+    iconBg: 'bg-accent border-border',
+    iconText: 'text-primary',
+    tag: 'bg-accent text-accent-foreground border-border',
+    tagDot: 'bg-primary',
+    accent: 'from-primary/70 to-primary/70',
     liveDot: 'bg-primary',
-    liveBg: 'bg-primary/16 border-primary/28',
+    liveBg: 'bg-accent border-border',
     liveText: 'text-primary',
   },
 };
@@ -171,7 +171,7 @@ function LabCard({ entry }: { entry: LabEntry }) {
     <button
       type="button"
       onClick={handleClick}
-      className={`group relative flex flex-col overflow-hidden rounded-[28px] border border-border/10 p-5 text-left shadow-[0_20px_52px_rgba(0,0,0,0.32)] transition-all duration-300 hover:-translate-y-1.5 hover:border-border/18 hover:shadow-[0_28px_64px_rgba(0,0,0,0.42)] ${c.card}`}
+      className={`group relative flex flex-col overflow-hidden rounded-[28px] border border-border/10 p-5 text-left shadow-[0_20px_52px_hsl(var(--foreground)/0.32)] transition-all duration-300 hover:-translate-y-1.5 hover:border-border/18 hover:shadow-[0_28px_64px_hsl(var(--foreground)/0.42)] ${c.card}`}
     >
       {/* 光晕 */}
       <div className={`pointer-events-none absolute inset-0 ${c.glow}`} />
@@ -185,7 +185,7 @@ function LabCard({ entry }: { entry: LabEntry }) {
       {/* 头部：图标 + 分类标签 */}
       <div className="relative mb-4 flex items-start justify-between gap-3">
         <div
-          className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${c.iconBg} ${c.iconText} shadow-[0_8px_20px_rgba(0,0,0,0.22)]`}
+          className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${c.iconBg} ${c.iconText} shadow-[0_8px_20px_hsl(var(--foreground)/0.22)]`}
         >
           {entry.icon}
         </div>
@@ -246,7 +246,7 @@ export default function HomeLabSection() {
       </div>
 
       {/* 卡片网格 */}
-      <div className="relative overflow-hidden rounded-[30px] border border-border/12 bg-card p-4 shadow-[0_28px_72px_rgba(0,0,0,0.28)] sm:rounded-[38px] sm:p-5 md:p-6">
+      <div className="relative overflow-hidden rounded-[30px] border border-border/12 bg-card p-4 shadow-[0_28px_72px_hsl(var(--foreground)/0.28)] sm:rounded-[38px] sm:p-5 md:p-6">
         {/* 背景光晕装饰 */}
         <div className="pointer-events-none absolute -left-24 -top-24 h-80 w-80 rounded-full bg-[radial-gradient(circle,hsl(var(--primary) / 0.14),transparent_60%)]" />
         <div className="pointer-events-none absolute -bottom-20 -right-20 h-72 w-72 rounded-full bg-[radial-gradient(circle,hsl(var(--primary) / 0.10),transparent_60%)]" />

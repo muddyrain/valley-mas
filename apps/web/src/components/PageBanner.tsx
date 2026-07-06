@@ -84,7 +84,7 @@ export default function PageBanner({
         />
 
         <div
-          className={`relative px-5 sm:px-8 lg:px-10 ${isSoft ? '' : '[text-shadow:0_1px_2px_rgba(15,23,42,0.2)]'} ${padding} ${contentClassName ?? ''}`}
+          className={`relative px-5 sm:px-8 lg:px-10 ${isSoft ? '' : '[text-shadow:0_1px_2px_hsl(var(--foreground)/0.2)]'} ${padding} ${contentClassName ?? ''}`}
         >
           {children}
         </div>

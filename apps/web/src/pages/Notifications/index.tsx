@@ -164,7 +164,7 @@ export default function Notifications() {
             {Array.from({ length: 6 }).map((_, index) => (
               <Card
                 key={index}
-                className="overflow-hidden rounded-2xl border border-border bg-white/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm"
+                className="overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm"
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-4">
@@ -180,7 +180,7 @@ export default function Notifications() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="rounded-[28px] border border-border bg-white/72 px-6 shadow-[0_20px_50px_hsl(var(--primary) / 0.10)] backdrop-blur-sm">
+          <div className="rounded-[28px] border border-border bg-card/72 px-6 shadow-[0_20px_50px_hsl(var(--primary) / 0.10)] backdrop-blur-sm">
             <EmptyState
               icon={Bell}
               title="还没有收到通知"
@@ -202,7 +202,7 @@ export default function Notifications() {
                     key={item.id}
                     className={`overflow-hidden rounded-2xl border bg-card/86 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_hsl(var(--primary) / 0.16)] ${
                       item.isRead
-                        ? 'border-border shadow-[0_16px_36px_rgba(15,23,42,0.08)]'
+                        ? 'border-border shadow-[0_16px_36px_hsl(var(--foreground)/0.08)]'
                         : 'border-border shadow-[0_18px_44px_hsl(var(--primary) / 0.14)]'
                     }`}
                   >

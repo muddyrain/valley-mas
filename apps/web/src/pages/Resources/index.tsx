@@ -378,7 +378,7 @@ export default function Resources() {
                     <button
                       type="button"
                       onClick={() => setValue('tag', '')}
-                      className="ml-0.5 rounded-full p-0.5 hover:bg-primary/20 transition-colors"
+                      className="ml-0.5 rounded-full p-0.5 hover:bg-accent transition-colors"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>

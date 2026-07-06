@@ -652,7 +652,7 @@ export default function MyPosts() {
                 <Button
                   variant="outline"
                   onClick={() => setWorkflowDialogOpen(true)}
-                  className="rounded-xl border-primary text-primary hover:bg-primary/10"
+                  className="rounded-xl border-primary text-primary hover:bg-accent"
                 >
                   <Sparkles className="mr-1.5 h-4 w-4" />
                   AI 工作流
@@ -717,7 +717,7 @@ export default function MyPosts() {
           </div>
         </div>
 
-        <div className="relative space-y-10 rounded-[36px] border border-border bg-[linear-gradient(180deg,hsl(var(--background)_/_0.96),hsl(var(--background)_/_0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
+        <div className="relative space-y-10 rounded-[36px] border border-border bg-[linear-gradient(180deg,hsl(var(--background)_/_0.96),hsl(var(--background)_/_0.88))] p-5 shadow-[0_22px_56px_hsl(var(--foreground)/0.1)] md:p-6">
           {batchMode && (
             <div className="rounded-2xl border border-accent bg-accent/50 px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">

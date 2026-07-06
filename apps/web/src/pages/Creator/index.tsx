@@ -210,7 +210,7 @@ export default function Creator() {
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-foreground/10 bg-card/82 p-4 shadow-[0_20px_48px_rgba(148,163,184,0.08)] backdrop-blur sm:rounded-[32px] sm:p-5">
+            <div className="rounded-[28px] border border-foreground/10 bg-card/82 p-4 shadow-[0_20px_48px_hsl(var(--foreground)/0.08)] backdrop-blur sm:rounded-[32px] sm:p-5">
               <div className="bg-accent text-primary mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
                 <Users className="h-3.5 w-3.5" />
                 创作者入口
@@ -228,7 +228,7 @@ export default function Creator() {
                   <button
                     type="button"
                     onClick={() => navigate('/resources')}
-                    className="rounded-[22px] border border-foreground/10 bg-card px-4 py-4 text-left shadow-[0_12px_28px_rgba(148,163,184,0.06)] transition hover:bg-card"
+                    className="rounded-[22px] border border-foreground/10 bg-card px-4 py-4 text-left shadow-[0_12px_28px_hsl(var(--foreground)/0.06)] transition hover:bg-card"
                   >
                     <div className="text-sm font-medium text-foreground">去看资源页</div>
                     <div className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -334,7 +334,7 @@ export default function Creator() {
                       ? `当前按关键词“${currentKeyword}”筛选创作者。`
                       : '当前展示最近活跃的创作者内容入口。'}
                   </div>
-                  <div className="rounded-full bg-card/82 px-4 py-2 text-sm text-muted-foreground shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
+                  <div className="rounded-full bg-card/82 px-4 py-2 text-sm text-muted-foreground shadow-[0_10px_24px_hsl(var(--foreground)/0.06)]">
                     本页 {creators.length} / 共 {total} 位
                   </div>
                 </div>
@@ -343,7 +343,7 @@ export default function Creator() {
                   {creators.map((creator) => (
                     <div
                       key={creator.id}
-                      className="rounded-[30px] bg-card/68 p-2 shadow-[0_14px_40px_rgba(148,163,184,0.08)]"
+                      className="rounded-[30px] bg-card/68 p-2 shadow-[0_14px_40px_hsl(var(--foreground)/0.08)]"
                     >
                       <CreatorCard creator={creator} />
                     </div>
@@ -361,7 +361,7 @@ export default function Creator() {
                       >
                         上一页
                       </Button>
-                      <span className="rounded-full bg-card/82 px-4 py-2 text-sm text-muted-foreground shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
+                      <span className="rounded-full bg-card/82 px-4 py-2 text-sm text-muted-foreground shadow-[0_10px_24px_hsl(var(--foreground)/0.06)]">
                         第 {currentPage} / {totalPages} 页
                       </span>
                       <Button

@@ -32,7 +32,7 @@ export function TagCloud({ tags, selectedTag, onTagClick, className }: TagCloudP
           onClick={() => onTagClick?.(tag.name)}
           className={cn(
             'px-3 py-1 rounded-full transition-all duration-200',
-            'hover:bg-primary/10 hover:scale-105',
+            'hover:bg-accent hover:scale-105',
             'border border-border/50',
             getTagSize(tag.count),
             selectedTag === tag.name

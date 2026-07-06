@@ -327,8 +327,8 @@ export default function BlogCreate() {
     const backdropW = coverImageMeta.width * backdropScale;
     const backdropH = coverImageMeta.height * backdropScale;
     const gradient = ctx.createLinearGradient(0, 0, 0, outputH);
-    gradient.addColorStop(0, '#f7eff3');
-    gradient.addColorStop(1, '#efe3ea');
+    gradient.addColorStop(0, '#f5f5f5');
+    gradient.addColorStop(1, '#ebebeb');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, outputW, outputH);
     ctx.save();
@@ -865,7 +865,7 @@ export default function BlogCreate() {
                 variant="outline"
                 disabled={actionBusy || loadingPost}
                 onClick={() => setWorkflowDialogOpen(true)}
-                className="rounded-xl border-primary text-primary hover:bg-primary/10"
+                className="rounded-xl border-primary text-primary hover:bg-accent"
               >
                 <Sparkles className="mr-2 h-4 w-4" />
                 AI 工作流

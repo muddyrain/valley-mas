@@ -397,7 +397,7 @@ export function MdxMarkdownEditor({
             left: floatingToolbarState.left,
           }}
         >
-          <div className="relative flex items-center gap-1.5 rounded-2xl border border-accent bg-card/96 px-2 py-2 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur">
+          <div className="relative flex items-center gap-1.5 rounded-2xl border border-accent bg-card/96 px-2 py-2 shadow-[0_18px_40px_hsl(var(--foreground)/0.16)] backdrop-blur">
             <button
               type="button"
               title="加粗"
@@ -472,7 +472,7 @@ export function MdxMarkdownEditor({
             </button>
 
             {headingMenuOpen ? (
-              <div className="absolute left-0 top-[calc(100%+8px)] min-w-[150px] overflow-hidden rounded-2xl border border-accent bg-popover shadow-[0_20px_40px_rgba(15,23,42,0.18)]">
+              <div className="absolute left-0 top-[calc(100%+8px)] min-w-[150px] overflow-hidden rounded-2xl border border-accent bg-popover shadow-[0_20px_40px_hsl(var(--foreground)/0.18)]">
                 {headingOptions.map((option) => {
                   const active = option.label === floatingToolbarState.activeLabel;
                   return (

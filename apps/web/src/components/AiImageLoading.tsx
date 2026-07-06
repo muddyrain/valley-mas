@@ -25,8 +25,8 @@ export default function AiImageLoading({
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-card/20 via-transparent to-card/20 animate-pulse" />
       <div className="relative flex items-center gap-3">
-        <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-primary/25 bg-card/80">
-          <div className="absolute inset-0 animate-ping rounded-xl bg-primary/10" />
+        <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card/80">
+          <div className="absolute inset-0 animate-ping rounded-xl bg-accent" />
           <Sparkles className="text-primary relative h-5 w-5" />
         </div>
         <div className="space-y-1">
@@ -38,7 +38,7 @@ export default function AiImageLoading({
         {[0, 1, 2].map((item) => (
           <span
             key={`ai-image-loading-${item}`}
-            className="bg-primary/20 h-1.5 rounded-full animate-pulse"
+            className="bg-accent h-1.5 rounded-full animate-pulse"
             style={{ animationDelay: `${item * 180}ms` }}
           />
         ))}

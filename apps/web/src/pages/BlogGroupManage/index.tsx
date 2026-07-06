@@ -167,7 +167,7 @@ export default function BlogGroupManage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[linear-gradient(165deg,#f8f7ff_0%,#f6faff_45%,#fbfbfd_100%)] px-4 py-8 md:px-8">
+    <div className="min-h-[calc(100vh-4rem)] bg-background px-4 py-8 md:px-8">
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -226,7 +226,7 @@ export default function BlogGroupManage() {
               {groups.map((group) => (
                 <div
                   key={group.id}
-                  className="rounded-2xl border border-violet-200/70 bg-card p-5 shadow-[0_8px_22px_rgba(99,73,190,0.1)]"
+                  className="rounded-2xl border border-border bg-card p-5 shadow-[0_8px_22px_hsl(var(--primary)/0.06)]"
                 >
                   <div className="mb-3 flex items-start justify-between gap-2">
                     <div>
@@ -240,7 +240,7 @@ export default function BlogGroupManage() {
                         内容数：{group.postCount || 0}
                       </p>
                     </div>
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                    <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
                       ID {group.id}
                     </span>
                   </div>

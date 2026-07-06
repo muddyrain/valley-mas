@@ -35,11 +35,11 @@ export function DefaultBlogCover({ className, compact = false, children }: Defau
       />
       <div
         className={cn(
-          'absolute inset-0 bg-[linear-gradient(rgba(252,211,77,0.15)_1px,transparent_1px),linear-gradient(90deg,rgba(252,211,77,0.15)_1px,transparent_1px)]',
+          'absolute inset-0 bg-[linear-gradient(hsl(var(--primary)/0.08)_1px,transparent_1px),linear-gradient(90deg,hsl(var(--primary)/0.08)_1px,transparent_1px)]',
           compact ? 'opacity-[0.18] bg-size-[20px_20px]' : 'opacity-[0.16] bg-size-[24px_24px]',
         )}
       />
-      <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_80%_20%,rgba(252,211,77,0.45),transparent_36%),radial-gradient(circle_at_10%_80%,rgba(252,211,77,0.35),transparent_28%)]" />
+      <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_80%_20%,hsl(var(--primary)/0.25),transparent_36%),radial-gradient(circle_at_10%_80%,hsl(var(--primary)/0.18),transparent_28%)]" />
       {!compact && (
         <>
           <div className="absolute -left-8 top-8 h-30 w-80 -rotate-12 bg-primary/15 blur-xl" />

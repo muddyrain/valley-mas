@@ -23,11 +23,6 @@ interface FavoriteItem {
 
 const PAGE_SIZE = 20;
 
-const PAGE_BACKGROUND = {
-  background:
-    'linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, hsl(var(--primary) / 0.15) 24%, hsl(var(--background))) 44%, var(--background) 100%)',
-};
-
 export default function Favorites() {
   const navigate = useNavigate();
   const { page: currentPage, setPage } = useUrlPaginationQuery();
@@ -99,15 +94,15 @@ export default function Favorites() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
+    <div className="min-h-[calc(100vh-4rem)]">
       <PageBanner padding="py-10" maxWidth="max-w-5xl">
         <div className="flex items-center gap-4">
-          <div className="rounded-2xl border border-foreground/15 bg-foreground/10 p-3 shadow-lg backdrop-blur-md">
+          <div className="rounded-2xl border border-foreground/15 bg-foreground/10 p-3">
             <Heart className="h-7 w-7 fill-foreground text-foreground" />
           </div>
-          <div className="text-foreground">
-            <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">我的收藏</h1>
-            <p className="mt-1 text-sm text-foreground/82">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground md:text-3xl">我的收藏</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
               {loading ? '正在整理你收藏的内容...' : `共收藏 ${total} 个资源`}
             </p>
           </div>
@@ -120,7 +115,7 @@ export default function Favorites() {
             {Array.from({ length: 10 }).map((_, index) => (
               <Card
                 key={index}
-                className="overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm"
+                className="overflow-hidden rounded-2xl border border-border bg-card"
               >
                 <Skeleton className="aspect-square w-full" />
                 <CardContent className="space-y-2 p-3">
@@ -131,7 +126,7 @@ export default function Favorites() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="rounded-[28px] border border-border bg-card/72 px-6 shadow-[0_20px_50px_hsl(var(--primary) / 0.10)] backdrop-blur-sm">
+          <div className="rounded-2xl border border-border bg-card px-6">
             <EmptyState
               icon={Heart}
               title="还没有收藏"
@@ -151,7 +146,7 @@ export default function Favorites() {
               return (
                 <Card
                   key={item.id}
-                  className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_hsl(var(--primary) / 0.16)]"
+                  className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-0.5"
                   onClick={() => resource && navigate(`/resource/${resource.id}`)}
                 >
                   <div className="relative aspect-square overflow-hidden bg-muted">
@@ -162,7 +157,7 @@ export default function Favorites() {
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center">
+                      <div className="flex h-full items-center justify-center">
                         <ImageIcon className="h-10 w-10 text-muted-foreground" />
                       </div>
                     )}
@@ -207,11 +202,9 @@ export default function Favorites() {
                         </Avatar>
                         <span className="max-w-15 truncate">{creatorName}</span>
                       </div>
-                      <div className="flex items-center gap-0.5 text-primary">
-                        <Download className="h-3 w-3" />
-                        <span className="text-muted-foreground">
-                          {resource?.downloadCount ?? 0}
-                        </span>
+                      <div className="flex items-center gap-0.5">
+                        <Download className="h-3 w-3 text-primary" />
+                        <span>{resource?.downloadCount ?? 0}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -225,18 +218,18 @@ export default function Favorites() {
             variant="outline"
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage <= 1 || loading}
-            className="rounded-xl border-accent bg-card/80 px-6 text-primary hover:bg-accent"
+            className="rounded-xl border-border bg-card px-6 text-foreground hover:bg-accent"
           >
             上一页
           </Button>
-          <div className="rounded-xl border border-accent bg-card/80 px-5 py-2 text-sm text-muted-foreground">
+          <div className="rounded-xl border border-border bg-card px-5 py-2 text-sm text-muted-foreground">
             第 {currentPage} / {totalPages} 页
           </div>
           <Button
             variant="outline"
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage >= totalPages || loading}
-            className="rounded-xl border-accent bg-card/80 px-6 text-primary hover:bg-accent"
+            className="rounded-xl border-border bg-card px-6 text-foreground hover:bg-accent"
           >
             下一页
           </Button>

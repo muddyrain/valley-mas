@@ -104,7 +104,7 @@ export default function MySpace() {
 
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center">
                       <User className="h-6 w-6 text-primary" />
                     </div>
                     <div>
