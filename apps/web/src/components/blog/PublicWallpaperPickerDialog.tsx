@@ -125,11 +125,7 @@ export function PublicWallpaperPickerBody({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
           {loading ? (
             Array.from({ length: PAGE_SIZE }).map((_, index) => (
-              <ResourceCardSkeleton
-                key={`wallpaper-loading-${index}`}
-                contentPadding="px-3 py-2.5"
-                type="wallpaper"
-              />
+              <ResourceCardSkeleton key={`wallpaper-loading-${index}`} type="wallpaper" />
             ))
           ) : resources.length > 0 ? (
             resources.map((resource) => {

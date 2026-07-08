@@ -7,17 +7,11 @@ interface TypeFilterBarProps {
   options: FilterOption[];
   value: string;
   onChange: (value: string) => void;
-  /** 右侧额外内容（如总数统计） */
   extra?: React.ReactNode;
-  /** 左侧前缀文字，默认不显示 */
   prefix?: string;
   className?: string;
 }
 
-/**
- * 通用分类筛选 Tab 条
- * MySpace / UserProfile 筛选栏共用
- */
 export default function TypeFilterBar({
   options,
   value,
@@ -28,24 +22,26 @@ export default function TypeFilterBar({
 }: TypeFilterBarProps) {
   return (
     <div
-      className={`flex items-center gap-3 bg-card rounded-2xl shadow-sm border border-border p-4 ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-xl border border-border bg-background/80 backdrop-blur-sm p-1.5 shadow-sm ${className}`}
     >
-      {prefix && <span className="text-sm text-muted-foreground font-medium mr-1">{prefix}</span>}
+      {prefix && (
+        <span className="mr-1.5 px-2 text-sm font-medium text-muted-foreground">{prefix}</span>
+      )}
       {options.map((opt) => (
         <button
           type="button"
           key={opt.value}
           onClick={() => onChange(opt.value)}
-          className={`px-5 py-2 rounded-xl font-medium text-sm transition-all duration-200 ${
+          className={`px-4 py-1.5 rounded-lg font-medium text-sm transition-all duration-200 ${
             value === opt.value
-              ? 'bg-primary text-primary-foreground shadow-md shadow-primary/30 scale-105'
-              : 'bg-accent text-primary hover:bg-accent hover:scale-105'
+              ? 'bg-primary text-primary-foreground shadow-md'
+              : 'text-muted-foreground hover:bg-accent hover:text-primary'
           }`}
         >
           {opt.label}
         </button>
       ))}
-      {extra && <div className="ml-auto">{extra}</div>}
+      {extra && <div className="ml-2">{extra}</div>}
     </div>
   );
 }

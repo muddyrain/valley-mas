@@ -1,5 +1,4 @@
 import {
-  ArrowUpDown,
   BookOpen,
   ExternalLink,
   FolderTree,
@@ -345,19 +344,22 @@ export default function BlogList() {
       <div className="mx-auto max-w-[1500px] px-4 pb-16 pt-6 sm:px-6 md:px-8 lg:px-10">
         <Card className="border-border/50 overflow-hidden">
           <CardContent className="p-6 sm:p-8 md:p-10">
-            <div className="grid gap-6 lg:grid-cols-[1.12fr_0.88fr]">
-              <div className="space-y-5">
-                <div className="inline-flex items-center gap-2 rounded-full border border-accent bg-accent/50 px-4 py-1.5 text-[11px] font-semibold tracking-[0.2em] uppercase text-primary">
-                  <Orbit className="h-3.5 w-3.5" />
-                  Valley Blogs
+            <div className="space-y-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-4">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-accent bg-accent/50 px-4 py-1.5 text-[11px] font-semibold tracking-[0.2em] uppercase text-primary">
+                    <Orbit className="h-3.5 w-3.5" />
+                    Valley Blogs
+                  </div>
+                  <h1 className="text-3xl font-semibold text-foreground md:text-4xl">
+                    博客主题深读中心
+                  </h1>
+                  <p className="max-w-3xl text-sm leading-6 text-muted-foreground md:text-base">
+                    先选分组，再深读内容。我们把博客按主题聚合，让阅读路径更清晰、更高效、更有沉浸感。
+                  </p>
                 </div>
-                <h1 className="text-3xl font-semibold text-foreground md:text-4xl">
-                  博客主题深读中心
-                </h1>
-                <p className="max-w-3xl text-sm leading-8 text-muted-foreground md:text-base">
-                  先选分组，再深读内容。我们把博客按主题聚合，让阅读路径更清晰、更高效、更有沉浸感。
-                </p>
-                <div className="flex flex-wrap gap-2">
+
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground">
                     <BookOpen className="h-4 w-4 text-primary" />
                     {total} 篇博客
@@ -369,79 +371,64 @@ export default function BlogList() {
                   {selectedGroupName && (
                     <span className="inline-flex items-center gap-2 rounded-full border border-accent bg-accent/50 px-4 py-2 text-sm text-primary">
                       <Sparkles className="h-4 w-4" />
-                      当前：{selectedGroupName}
+                      {selectedGroupName}
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <Card className="border-border/50">
-                  <CardContent className="p-4">
-                    <div className="mb-2 text-sm font-medium text-foreground">搜索博客</div>
-                    <div className="flex flex-wrap gap-2">
-                      <div className="relative min-w-[220px] grow">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          value={postKeywordInput}
-                          onChange={(event) => setPostKeywordInput(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') handlePostKeywordSearch();
-                          }}
-                          placeholder="搜索标题、摘要、关键词"
-                          className="pl-10"
-                        />
-                      </div>
-                      <Button onClick={handlePostKeywordSearch}>搜索</Button>
-                      {currentKeyword && (
-                        <Button
-                          variant="ghost"
-                          onClick={clearPostKeyword}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          清除
-                        </Button>
-                      )}
-                      <Button variant="outline" onClick={() => setAIRecommendOpen(true)}>
-                        <Sparkles className="mr-1.5 h-4 w-4" />
-                        AI 推荐读哪篇
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                <div className="relative flex-1 min-w-[200px] lg:max-w-md">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={postKeywordInput}
+                    onChange={(event) => setPostKeywordInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') handlePostKeywordSearch();
+                    }}
+                    placeholder="搜索标题、摘要、关键词"
+                    className="h-11 pl-10"
+                  />
+                  {currentKeyword && (
+                    <button
+                      type="button"
+                      onClick={clearPostKeyword}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
 
-                <Card className="border-border/50">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-2 text-sm font-medium text-foreground">
-                      <ArrowUpDown className="h-4 w-4 text-primary" />
-                      排序方式
-                    </div>
-                    <div className="inline-flex items-center gap-1 rounded-full border border-accent bg-card p-1">
-                      <button
-                        type="button"
-                        onClick={() => handleSortChange('newest')}
-                        className={`rounded-full px-4 py-2 text-sm transition ${
-                          currentSort === 'newest'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-accent'
-                        }`}
-                      >
-                        最新优先
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSortChange('oldest')}
-                        className={`rounded-full px-4 py-2 text-sm transition ${
-                          currentSort === 'oldest'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-accent'
-                        }`}
-                      >
-                        最早优先
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+                    <Button
+                      size="sm"
+                      variant={currentSort === 'newest' ? 'default' : 'ghost'}
+                      className={`rounded-md px-4 py-2 text-sm font-medium ${
+                        currentSort === 'newest' ? 'shadow-sm' : ''
+                      }`}
+                      onClick={() => handleSortChange('newest')}
+                    >
+                      最新优先
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={currentSort === 'oldest' ? 'default' : 'ghost'}
+                      className={`rounded-md px-4 py-2 text-sm font-medium ${
+                        currentSort === 'oldest' ? 'shadow-sm' : ''
+                      }`}
+                      onClick={() => handleSortChange('oldest')}
+                    >
+                      最早优先
+                    </Button>
+                  </div>
+
+                  <Button onClick={() => setAIRecommendOpen(true)}>
+                    <Sparkles className="mr-1.5 h-4 w-4" />
+                    AI 推荐读哪篇
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -452,11 +439,11 @@ export default function BlogList() {
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <FolderTree className="h-4 w-4 text-primary" />
-                分组优先导航
+                分组快速筛选
               </div>
               {(selectedGroupId || currentKeyword) && (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={clearFilters}
                   className="text-muted-foreground hover:text-foreground"
@@ -467,32 +454,30 @@ export default function BlogList() {
               )}
             </div>
             <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-              <button
-                type="button"
-                onClick={() => setValue('groupId', '')}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm transition ${
-                  !selectedGroupId
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-muted-foreground hover:bg-accent'
+              <Button
+                size="sm"
+                variant={!selectedGroupId ? 'default' : 'secondary'}
+                className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium ${
+                  !selectedGroupId ? 'shadow-md' : ''
                 }`}
+                onClick={() => setValue('groupId', '')}
               >
-                全部分组
+                全部
                 <span className="ml-1.5 text-xs opacity-70">{allPostsTotal}</span>
-              </button>
+              </Button>
               {topGroups.map((group) => (
-                <button
-                  type="button"
+                <Button
+                  size="sm"
+                  variant={selectedGroupId === group.id ? 'default' : 'secondary'}
+                  className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium ${
+                    selectedGroupId === group.id ? 'shadow-md' : ''
+                  }`}
                   key={group.id}
                   onClick={() => handleGroupClick(group.id)}
-                  className={`shrink-0 rounded-full px-4 py-2 text-sm transition ${
-                    selectedGroupId === group.id
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-secondary text-muted-foreground hover:bg-accent'
-                  }`}
                 >
                   {group.name}
                   <span className="ml-1.5 text-xs opacity-70">{group.count}</span>
-                </button>
+                </Button>
               ))}
             </div>
           </CardContent>

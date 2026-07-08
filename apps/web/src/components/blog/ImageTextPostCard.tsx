@@ -148,21 +148,21 @@ export function ImageTextPostCard({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary) / 0.18),transparent_42%),radial-gradient(circle_at_bottom_left,hsl(var(--primary) / 0.1),transparent_40%)]" />
           <div className="relative mb-4 flex items-start justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full bg-card/80 px-3 py-1 text-xs font-medium text-primary backdrop-blur">
-                <Images className="h-3.5 w-3.5" />
+              <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-3 py-1.5 text-xs font-semibold text-primary shadow-md backdrop-blur-sm">
+                <Images className="h-4 w-4" />
                 图文创作
               </span>
               {mode === 'public' && post.category?.name ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground shadow-sm backdrop-blur">
-                  <Tag className="h-3.5 w-3.5" />
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-md">
+                  <Tag className="h-4 w-4" />
                   {post.category.name}
                 </span>
               ) : null}
               {mode === 'admin' ? (
                 <span
-                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${visibilityMeta.className}`}
+                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold backdrop-blur-sm ${visibilityMeta.className}`}
                 >
-                  <visibilityMeta.icon className="h-3.5 w-3.5" />
+                  <visibilityMeta.icon className="h-4 w-4" />
                   {visibilityMeta.label}
                 </span>
               ) : null}
@@ -170,13 +170,13 @@ export function ImageTextPostCard({
 
             <div className="flex items-center gap-2">
               {!!payload?.stickerEmoji && (
-                <span className="rounded-full bg-card/80 px-3 py-1 text-lg shadow-sm backdrop-blur">
+                <span className="rounded-full bg-card/90 px-3 py-1 text-lg shadow-md backdrop-blur-sm">
                   {payload.stickerEmoji}
                 </span>
               )}
               {mode === 'admin' ? (
                 <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm ${statusMeta.className}`}
                 >
                   {statusMeta.label}
                 </span>

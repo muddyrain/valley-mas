@@ -13,7 +13,7 @@ import EmptyState from '@/components/EmptyState';
 import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
 import TypeFilterBar from '@/components/TypeFilterBar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   enumParam,
@@ -274,20 +274,20 @@ export default function Resources() {
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 md:px-8 lg:px-10">
         <Card className="border-border/50 overflow-hidden">
           <CardContent className="p-6 sm:p-8 md:p-10">
-            <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
-              <div className="space-y-6">
-                <CardHeader>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-accent bg-accent/50 px-3 py-1 text-xs text-primary mb-2">
+            <div className="space-y-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-4">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-accent bg-accent/50 px-3 py-1 text-xs text-primary">
                     <Sparkles className="h-3.5 w-3.5" />
                     RESOURCES
                   </div>
-                  <CardTitle className="text-3xl md:text-4xl">资源整理</CardTitle>
-                </CardHeader>
-                <p className="text-sm text-muted-foreground">
-                  壁纸、头像和最近整理出的图像资源都会先汇在这里，方便继续浏览、筛选和收藏。
-                </p>
+                  <CardTitle className="text-3xl font-semibold md:text-4xl">资源整理</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    壁纸、头像和最近整理出的图像资源都会先汇在这里，方便继续浏览、筛选和收藏。
+                  </p>
+                </div>
 
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground">
                     <ImageIcon className="h-4 w-4 text-primary" />共 {loading ? '...' : total}{' '}
                     项资源
@@ -300,148 +300,130 @@ export default function Resources() {
                     <Sparkles className="h-4 w-4 text-primary" />
                     {avatarCount} 个头像
                   </span>
+                  {isLoggedIn && (
+                    <Button onClick={() => navigate(`/my-space/resources`)}>
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      前往我的创作空间
+                    </Button>
+                  )}
                 </div>
-
-                {isLoggedIn && (
-                  <Button onClick={() => navigate(`/my-space/resources`)}>
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    前往我的创作空间
-                  </Button>
-                )}
               </div>
 
-              <Card className="border-border/50">
-                <CardContent className="p-5">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-accent/50 px-3 py-1 text-xs text-primary mb-4">
-                    <Search className="h-3.5 w-3.5" />
-                    资源检索
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                <div className="relative flex-1 min-w-[200px] lg:max-w-md">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    placeholder="搜索资源标题"
+                    className="h-11 pl-10"
+                  />
+                  {currentKeyword && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setValue('keyword', '');
+                        setInputValue('');
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <TypeFilterBar
+                    options={RESOURCE_TYPES}
+                    value={activeType}
+                    onChange={(nextType) => {
+                      setValue('type', nextType as '' | 'wallpaper' | 'avatar');
+                    }}
+                  />
+
+                  <div className="relative">
+                    {currentTag ? (
+                      <div className="flex items-center gap-1.5 rounded-full border border-accent bg-accent/50 px-3 py-2 text-sm font-medium text-primary">
+                        <Hash className="h-4 w-4" />
+                        {currentTag}
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          className="ml-0.5 rounded-full p-0.5 hover:bg-accent"
+                          onClick={() => setValue('tag', '')}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setTagDropdownOpen(true);
+                          setTagInput('');
+                          setTimeout(() => tagInputRef.current?.focus(), 50);
+                        }}
+                      >
+                        <Hash className="h-4 w-4 mr-1.5" />
+                        按标签筛选
+                      </Button>
+                    )}
+
+                    {tagDropdownOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-10"
+                          onClick={() => setTagDropdownOpen(false)}
+                        />
+                        <div className="absolute right-0 top-full z-20 mt-1.5 w-64 rounded-xl border border-border bg-background shadow-lg overflow-hidden">
+                          <div className="p-3">
+                            <div className="relative">
+                              <Hash className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              <input
+                                ref={tagInputRef}
+                                value={tagInput}
+                                onChange={(e) => setTagInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (tagInput.trim()) applyTagFilter(tagInput);
+                                  } else if (e.key === 'Escape') {
+                                    setTagDropdownOpen(false);
+                                  }
+                                }}
+                                placeholder="输入标签名后回车"
+                                className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                              />
+                            </div>
+                            <p className="mt-2 px-1 text-xs text-muted-foreground">
+                              按标签名精确筛选资源，回车确认。
+                            </p>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        placeholder="搜索资源标题"
-                        className="pl-9"
-                      />
-                    </div>
-                    <Button onClick={handleSearch}>搜索</Button>
-                  </div>
-
-                  <div className="mt-4 rounded-lg bg-accent/50 p-4 text-sm text-muted-foreground">
-                    当前可以按类型筛选，也可以直接搜索资源标题。
-                  </div>
-                </CardContent>
-              </Card>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefresh}
+                    disabled={refreshing || loading}
+                    title="刷新"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
+                    刷新
+                  </Button>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-border/50 mt-6">
           <CardContent className="p-5">
-            <div className="flex flex-wrap items-center gap-3 mb-6">
-              <TypeFilterBar
-                options={RESOURCE_TYPES}
-                value={activeType}
-                onChange={(nextType) => {
-                  setValue('type', nextType as '' | 'wallpaper' | 'avatar');
-                }}
-                prefix="类型："
-                extra={
-                  currentKeyword ? (
-                    <span className="text-sm text-muted-foreground">
-                      搜索"{currentKeyword}"
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setValue('keyword', '');
-                          setInputValue('');
-                        }}
-                        className="text-primary ml-1.5 underline hover:opacity-80"
-                      >
-                        清除
-                      </button>
-                    </span>
-                  ) : null
-                }
-                className="flex-1"
-              />
-
-              <div className="relative">
-                {currentTag ? (
-                  <div className="flex items-center gap-1.5 rounded-full border border-accent bg-accent/50 px-3 py-1.5 text-sm text-primary">
-                    <Hash className="h-3.5 w-3.5" />
-                    <span className="font-medium">{currentTag}</span>
-                    <button
-                      type="button"
-                      onClick={() => setValue('tag', '')}
-                      className="ml-0.5 rounded-full p-0.5 hover:bg-accent transition-colors"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTagDropdownOpen(true);
-                      setTagInput('');
-                      setTimeout(() => tagInputRef.current?.focus(), 50);
-                    }}
-                    className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground hover:border-accent hover:text-primary transition-colors"
-                  >
-                    <Hash className="h-3.5 w-3.5" />
-                    按标签筛选
-                  </button>
-                )}
-
-                {tagDropdownOpen && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setTagDropdownOpen(false)} />
-                    <div className="absolute right-0 top-full z-20 mt-1.5 w-64 rounded-lg border border-border bg-background shadow-lg overflow-hidden">
-                      <div className="p-2">
-                        <div className="relative">
-                          <Hash className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                          <input
-                            ref={tagInputRef}
-                            value={tagInput}
-                            onChange={(e) => setTagInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                if (tagInput.trim()) applyTagFilter(tagInput);
-                              } else if (e.key === 'Escape') {
-                                setTagDropdownOpen(false);
-                              }
-                            }}
-                            placeholder="输入标签名后回车"
-                            className="w-full rounded-lg border border-border bg-card py-1.5 pl-7 pr-3 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-                          />
-                        </div>
-                        <p className="mt-2 px-1 text-xs text-muted-foreground">
-                          按标签名精确筛选资源，回车确认。
-                        </p>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={handleRefresh}
-                disabled={refreshing || loading}
-                title="刷新"
-                className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground hover:border-accent hover:text-primary transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-                刷新
-              </button>
-            </div>
-
             <div className="relative min-h-[280px]">
               {loading && resources.length === 0 ? (
                 <div className="grid grid-cols-2 gap-5 sm:grid-cols-2 md:grid-cols-3">
