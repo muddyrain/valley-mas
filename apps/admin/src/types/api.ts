@@ -22,7 +22,6 @@ export interface AdminListParams extends PaginationParams, DateRangeParams {
   status?: string;
   type?: string;
   userId?: string;
-  creatorId?: string;
   resourceId?: string;
   risk?: string;
 }
@@ -36,7 +35,7 @@ export interface AdminListResponse<T> extends PaginationResponse<T> {
 export type Platform = 'wechat' | 'douyin' | 'mini_app';
 
 // 用户角色
-export type UserRole = 'user' | 'admin' | 'creator';
+export type UserRole = 'user' | 'admin';
 
 // 抖音用户性别
 export enum DouyinGender {

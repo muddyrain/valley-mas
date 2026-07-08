@@ -4,8 +4,6 @@ import http from '../utils/request';
 export interface StatsData {
   overview: {
     userCount: number;
-    creatorCount: number;
-    activeCreatorCount: number;
     resourceCount: number;
     downloadCount: number;
     accessCount: number;
@@ -21,20 +19,6 @@ export interface StatsData {
     type: string;
     downloadCount: number;
     url: string;
-  }>;
-  topCreators: Array<{
-    creatorId: string;
-    resourceCount: number;
-    creator: {
-      id: string;
-      code: string;
-      description: string;
-      user?: {
-        id: string;
-        nickname: string;
-        avatar: string;
-      };
-    };
   }>;
 }
 

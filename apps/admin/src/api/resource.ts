@@ -70,7 +70,3 @@ export const reqUpdateResource = (
 ) => {
   return http.patch<unknown, Resource>(`/admin/resources/${id}`, data);
 };
-
-export const reqUpdateResourceCreator = (id: string, uploaderId: string) => {
-  return http.put<unknown, Resource>(`/admin/resources/${id}/creator`, { uploaderId });
-};

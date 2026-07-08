@@ -84,31 +84,6 @@ func AdminListOperationLogs(c *gin.Context) {
 	adminListResponse(c, list, total, page)
 }
 
-func AdminListCodeAccessLogs(c *gin.Context) {
-	page := parseAdminPage(c, 20, 200)
-	query := database.GetDB().Model(&model.CodeAccessLog{}).Preload("Creator").Preload("Creator.User")
-	if keyword := strings.TrimSpace(c.Query("keyword")); keyword != "" {
-		like := "%" + keyword + "%"
-		query = query.Where("code LIKE ? OR ip LIKE ? OR user_agent LIKE ?", like, like, like)
-	}
-	if creatorID := strings.TrimSpace(c.Query("creatorId")); creatorID != "" {
-		query = query.Where("creator_id = ?", creatorID)
-	}
-	query = applyAdminDateRange(query, c, "created_at")
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		Error(c, http.StatusInternalServerError, "查询口令访问日志失败")
-		return
-	}
-	var list []model.CodeAccessLog
-	if err := query.Order("created_at DESC").Offset(page.Offset).Limit(page.PageSize).Find(&list).Error; err != nil {
-		Error(c, http.StatusInternalServerError, "查询口令访问日志失败")
-		return
-	}
-	adminListResponse(c, list, total, page)
-}
-
 func AdminListStorageAssets(c *gin.Context) {
 	type asset struct {
 		ID             string    `json:"id"`
@@ -613,11 +588,11 @@ func AdminDeleteBlogComment(c *gin.Context) {
 	Success(c, gin.H{"deleted": true})
 }
 
-func AdminListCreatorAlbums(c *gin.Context) {
+func AdminListUserAlbums(c *gin.Context) {
 	page := parseAdminPage(c, 20, 100)
-	query := database.GetDB().Model(&model.CreatorAlbum{}).Preload("Creator").Preload("Creator.User").Preload("CoverResource")
-	if creatorID := strings.TrimSpace(c.Query("creatorId")); creatorID != "" {
-		query = query.Where("creator_id = ?", creatorID)
+	query := database.GetDB().Model(&model.UserAlbum{}).Preload("User").Preload("CoverResource")
+	if userID := strings.TrimSpace(c.Query("userId")); userID != "" {
+		query = query.Where("user_id = ?", userID)
 	}
 	if keyword := strings.TrimSpace(c.Query("keyword")); keyword != "" {
 		like := "%" + keyword + "%"
@@ -626,27 +601,27 @@ func AdminListCreatorAlbums(c *gin.Context) {
 	query = applyAdminDateRange(query, c, "created_at")
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
-		Error(c, http.StatusInternalServerError, "查询创作者专辑失败")
+		Error(c, http.StatusInternalServerError, "查询用户专辑失败")
 		return
 	}
-	var list []model.CreatorAlbum
+	var list []model.UserAlbum
 	if err := query.Order("updated_at DESC").Offset(page.Offset).Limit(page.PageSize).Find(&list).Error; err != nil {
-		Error(c, http.StatusInternalServerError, "查询创作者专辑失败")
+		Error(c, http.StatusInternalServerError, "查询用户专辑失败")
 		return
 	}
 	adminListResponse(c, list, total, page)
 }
 
-func AdminGetCreatorAlbumDetail(c *gin.Context) {
-	var album model.CreatorAlbum
-	if err := database.GetDB().Preload("Creator").Preload("Creator.User").Preload("CoverResource").Preload("Resources").Where("id = ? AND deleted_at IS NULL", c.Param("id")).First(&album).Error; err != nil {
-		Error(c, http.StatusNotFound, "创作者专辑不存在")
+func AdminGetUserAlbumDetail(c *gin.Context) {
+	var album model.UserAlbum
+	if err := database.GetDB().Preload("User").Preload("CoverResource").Preload("Resources").Where("id = ? AND deleted_at IS NULL", c.Param("id")).First(&album).Error; err != nil {
+		Error(c, http.StatusNotFound, "用户专辑不存在")
 		return
 	}
 	Success(c, album)
 }
 
-func AdminUpdateCreatorAlbum(c *gin.Context) {
+func AdminUpdateUserAlbum(c *gin.Context) {
 	var req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
@@ -655,10 +630,10 @@ func AdminUpdateCreatorAlbum(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	var album model.CreatorAlbum
+	var album model.UserAlbum
 	db := database.GetDB()
 	if err := db.Where("id = ? AND deleted_at IS NULL", c.Param("id")).First(&album).Error; err != nil {
-		Error(c, http.StatusNotFound, "创作者专辑不存在")
+		Error(c, http.StatusNotFound, "用户专辑不存在")
 		return
 	}
 	updates := map[string]any{"description": strings.TrimSpace(req.Description)}
@@ -666,22 +641,22 @@ func AdminUpdateCreatorAlbum(c *gin.Context) {
 		updates["name"] = name
 	}
 	if err := db.Model(&album).Updates(updates).Error; err != nil {
-		Error(c, http.StatusInternalServerError, "更新创作者专辑失败")
+		Error(c, http.StatusInternalServerError, "更新用户专辑失败")
 		return
 	}
 	db.First(&album, "id = ?", c.Param("id"))
 	Success(c, album)
 }
 
-func AdminDeleteCreatorAlbum(c *gin.Context) {
-	var album model.CreatorAlbum
+func AdminDeleteUserAlbum(c *gin.Context) {
+	var album model.UserAlbum
 	db := database.GetDB()
 	if err := db.Where("id = ? AND deleted_at IS NULL", c.Param("id")).First(&album).Error; err != nil {
-		Error(c, http.StatusNotFound, "创作者专辑不存在")
+		Error(c, http.StatusNotFound, "用户专辑不存在")
 		return
 	}
 	if err := db.Select("Resources").Delete(&album).Error; err != nil {
-		Error(c, http.StatusInternalServerError, "删除创作者专辑失败")
+		Error(c, http.StatusInternalServerError, "删除用户专辑失败")
 		return
 	}
 	Success(c, gin.H{"ok": true})
@@ -712,12 +687,12 @@ func AdminListFavorites(c *gin.Context) {
 
 func AdminListFollows(c *gin.Context) {
 	page := parseAdminPage(c, 20, 100)
-	query := database.GetDB().Model(&model.UserFollow{}).Preload("User").Preload("Creator").Preload("Creator.User")
+	query := database.GetDB().Model(&model.UserFollow{}).Preload("User").Preload("FollowedUser")
 	if userID := strings.TrimSpace(c.Query("userId")); userID != "" {
 		query = query.Where("user_id = ?", userID)
 	}
-	if creatorID := strings.TrimSpace(c.Query("creatorId")); creatorID != "" {
-		query = query.Where("creator_id = ?", creatorID)
+	if followedUserID := strings.TrimSpace(c.Query("followedUserId")); followedUserID != "" {
+		query = query.Where("followed_user_id = ?", followedUserID)
 	}
 	query = applyAdminDateRange(query, c, "created_at")
 	var total int64
@@ -842,7 +817,7 @@ func AdminGetUserOperations(c *gin.Context) {
 	var guestbookMessages []model.GuestbookMessage
 	_ = db.Where("user_id = ?", userID).Preload("Resource").Order("created_at DESC").Limit(10).Find(&downloads).Error
 	_ = db.Where("user_id = ?", userID).Preload("Resource").Order("created_at DESC").Limit(10).Find(&favorites).Error
-	_ = db.Where("user_id = ?", userID).Preload("Creator").Preload("Creator.User").Order("created_at DESC").Limit(10).Find(&follows).Error
+	_ = db.Where("user_id = ?", userID).Preload("FollowedUser").Order("created_at DESC").Limit(10).Find(&follows).Error
 	_ = db.Where("user_id = ?", userID).Order("created_at DESC").Limit(10).Find(&notifications).Error
 	_ = db.Where("user_id = ?", userID).Preload("Post").Order("created_at DESC").Limit(10).Find(&comments).Error
 	_ = db.Where("user_id = ?", userID).Order("created_at DESC").Limit(10).Find(&guestbookMessages).Error
@@ -897,12 +872,12 @@ func AdminGetResourceOperations(c *gin.Context) {
 	}
 	resource.FillThumbnailURL()
 
-	var albums []model.CreatorAlbum
-	_ = db.Joins("JOIN creator_album_resources ON creator_album_resources.creator_album_id = creator_albums.id").
-		Where("creator_album_resources.resource_id = ?", resource.ID).
-		Preload("Creator").Preload("Creator.User").
-		Order("creator_albums.updated_at DESC").
-		Find(&albums).Error
+	var albums []model.UserAlbum
+		_ = db.Joins("JOIN user_album_resources ON user_album_resources.user_album_id = user_albums.id").
+			Where("user_album_resources.resource_id = ?", resource.ID).
+			Preload("User").
+			Order("user_albums.updated_at DESC").
+			Find(&albums).Error
 
 	var downloads []model.DownloadRecord
 	var favorites []model.UserFavorite

@@ -1,12 +1,10 @@
 import {
-  AuditOutlined,
   BookOutlined,
   CrownOutlined,
   DashboardOutlined,
   DatabaseOutlined,
   ExperimentOutlined,
   FileTextOutlined,
-  FormOutlined,
   HeartOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
@@ -14,7 +12,6 @@ import {
   MessageOutlined,
   NotificationOutlined,
   PictureOutlined,
-  ProfileOutlined,
   TagsOutlined,
   UserOutlined,
 } from '@ant-design/icons';
@@ -51,13 +48,10 @@ const adminMenuItems = [
     ],
   },
   {
-    key: 'creator-content',
+    key: 'content',
     type: 'group' as const,
-    label: '创作者与内容',
+    label: '内容管理',
     children: [
-      { key: '/creators', icon: <CrownOutlined />, label: '创作者管理' },
-      { key: '/creator-applications', icon: <AuditOutlined />, label: '创作者申请审核' },
-      { key: '/creator-albums', icon: <ProfileOutlined />, label: '创作者专辑' },
       { key: '/resources', icon: <PictureOutlined />, label: '资源管理' },
       { key: '/resource-tags', icon: <TagsOutlined />, label: '资源标签统计' },
     ],
@@ -107,14 +101,6 @@ const adminMenuItems = [
   },
 ];
 
-const creatorMenuItems = [
-  { key: '/creator-dashboard', icon: <DashboardOutlined />, label: '数据概览' },
-  { key: '/resources', icon: <PictureOutlined />, label: '我的资源' },
-  { key: '/creators', icon: <CrownOutlined />, label: '我的空间' },
-];
-
-const userMenuItems = [{ key: '/apply-creator', icon: <FormOutlined />, label: '申请成为创作者' }];
-
 const resolveSelectedMenuKey = (pathname: string) => {
   if (pathname.startsWith('/blog-posts')) return '/blog-posts';
   if (pathname.startsWith('/relations/favorites')) return '/relations/favorites';
@@ -122,7 +108,6 @@ const resolveSelectedMenuKey = (pathname: string) => {
   if (pathname.startsWith('/audit/operation-logs')) return '/audit/operation-logs';
   if (pathname.startsWith('/audit/code-access-logs')) return '/audit/code-access-logs';
   if (pathname.startsWith('/audit/storage-assets')) return '/audit/storage-assets';
-  if (pathname.startsWith('/creators/')) return '/creators';
   if (pathname.startsWith('/life-trace/households')) return '/life-trace/households';
   if (pathname.startsWith('/life-trace/push-subscriptions'))
     return '/life-trace/push-subscriptions';
@@ -159,12 +144,7 @@ export default function Layout() {
     }
   }, []);
 
-  const menuItems =
-    userInfo.role === 'admin'
-      ? adminMenuItems
-      : userInfo.role === 'creator'
-        ? creatorMenuItems
-        : userMenuItems;
+  const menuItems = adminMenuItems;
 
   const handleLogout = async () => {
     try {
@@ -229,12 +209,7 @@ export default function Layout() {
           <Dropdown menu={userMenu} placement="bottomRight">
             <div className="flex items-center cursor-pointer">
               <Avatar src={userInfo.avatar} icon={<UserOutlined />} />
-              <span className="ml-2">
-                {userInfo.nickname || userInfo.username || '用户'}
-                {userInfo.role === 'creator' && (
-                  <span className="ml-2 text-xs text-blue-500">[创作者]</span>
-                )}
-              </span>
+              <span className="ml-2">{userInfo.nickname || userInfo.username || '用户'}</span>
             </div>
           </Dropdown>
         </Header>

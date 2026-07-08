@@ -556,7 +556,7 @@ func AdminListGroups(c *gin.Context) {
 
 	groupType := normalizeGroupType(c.Query("groupType"))
 	query := database.DB.Model(&model.PostGroup{}).Where("deleted_at IS NULL")
-	if role == "creator" {
+	if role == "user" {
 		query = query.Where("author_id = ?", userID)
 	}
 	if groupType != "" {
@@ -574,8 +574,8 @@ func AdminCreateGroup(c *gin.Context) {
 		Error(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	if role != "admin" && role != "creator" {
-		Error(c, http.StatusForbidden, "creator required")
+	if role != "admin" && role != "user" {
+		Error(c, http.StatusForbidden, "登录后即可操作")
 		return
 	}
 
@@ -606,7 +606,7 @@ func AdminCreateGroup(c *gin.Context) {
 			Error(c, http.StatusBadRequest, "parent group not found")
 			return
 		}
-		if role == "creator" && int64(parent.AuthorID) != userID {
+		if role == "user" && int64(parent.AuthorID) != userID {
 			Error(c, http.StatusForbidden, "parent group no permission")
 			return
 		}
@@ -785,8 +785,8 @@ func AdminCreatePost(c *gin.Context) {
 	}
 	roleAny, _ := c.Get("userRole")
 	role, _ := roleAny.(string)
-	if role != "admin" && role != "creator" {
-		Error(c, http.StatusForbidden, "creator required")
+	if role != "admin" && role != "user" {
+		Error(c, http.StatusForbidden, "登录后即可操作")
 		return
 	}
 
@@ -1292,7 +1292,7 @@ func AdminGetPosts(c *gin.Context) {
 
 	query := database.DB.Model(&model.Post{})
 
-	if role == "creator" {
+	if role == "user" {
 		query = query.Where("author_id = ?", userID)
 	}
 	if status != "" {
@@ -1352,7 +1352,7 @@ func AdminListPostSortItems(c *gin.Context) {
 		Where("post_type = ?", postType).
 		Preload("Group")
 
-	if role == "creator" {
+	if role == "user" {
 		query = query.Where("author_id = ?", userID)
 	}
 
@@ -1440,7 +1440,7 @@ func AdminSortPosts(c *gin.Context) {
 	}
 
 	scopeQuery := database.DB.Model(&model.Post{}).Where("post_type = ?", postType)
-	if role == "creator" {
+	if role == "user" {
 		scopeQuery = scopeQuery.Where("author_id = ?", userID)
 	}
 
@@ -1468,7 +1468,7 @@ func AdminSortPosts(c *gin.Context) {
 
 	verifyQuery := database.DB.Model(&model.Post{}).
 		Where("post_type = ? AND id IN ?", postType, req.OrderedIDs)
-	if role == "creator" {
+	if role == "user" {
 		verifyQuery = verifyQuery.Where("author_id = ?", userID)
 	}
 	if scope == "group" {
@@ -2004,8 +2004,8 @@ func AdminUploadImageTextAsset(c *gin.Context) {
 		Error(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	if role != "admin" && role != "creator" {
-		Error(c, http.StatusForbidden, "creator required")
+	if role != "admin" && role != "user" {
+		Error(c, http.StatusForbidden, "登录后即可操作")
 		return
 	}
 

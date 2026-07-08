@@ -64,8 +64,6 @@ export interface UserProfile extends User {
   phone: string;
   createdAt: string;
   downloadCount: number;
-  /** 创作者口令，仅 role=creator 时有值，用于跳转创作者主页 */
-  creatorCode?: string;
 }
 
 export interface AvatarHistoryItem {
@@ -78,7 +76,6 @@ export interface DownloadHistoryItem {
   id: string;
   userId: string;
   resourceId: string;
-  creatorId: string;
   ip: string;
   userAgent: string;
   createdAt: string;
@@ -89,14 +86,6 @@ export interface DownloadHistoryItem {
     url: string;
     thumbnailUrl?: string;
     size?: number;
-  };
-  creator?: {
-    id: string;
-    code: string;
-    user?: {
-      nickname: string;
-      avatar: string;
-    };
   };
 }
 
@@ -143,4 +132,14 @@ export const getMyDownloads = (params: { page?: number; pageSize?: number } = {}
   return http.get<unknown, { list: DownloadHistoryItem[]; total: number }>(
     `/user/downloads?page=${page}&pageSize=${pageSize}`,
   );
+};
+
+export interface UserStats {
+  blogCount: number;
+  resourceCount: number;
+  followerCount: number;
+}
+
+export const getMyStats = () => {
+  return http.get<unknown, UserStats>('/user/stats');
 };

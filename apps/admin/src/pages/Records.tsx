@@ -24,7 +24,6 @@ const { RangePicker } = DatePicker;
 interface RecordFilters {
   keyword: string;
   resourceId: string;
-  creatorId: string;
   userId: string;
   resourceType: string;
   dateRange: [Dayjs, Dayjs] | null;
@@ -33,7 +32,6 @@ interface RecordFilters {
 const createInitialFilters = (): RecordFilters => ({
   keyword: '',
   resourceId: '',
-  creatorId: '',
   userId: '',
   resourceType: '',
   dateRange: null,
@@ -59,7 +57,6 @@ export default function Records() {
 
       if (appliedFilters.keyword.trim()) params.keyword = appliedFilters.keyword.trim();
       if (appliedFilters.resourceId.trim()) params.resourceId = appliedFilters.resourceId.trim();
-      if (appliedFilters.creatorId.trim()) params.creatorId = appliedFilters.creatorId.trim();
       if (appliedFilters.userId.trim()) params.userId = appliedFilters.userId.trim();
       if (appliedFilters.resourceType) params.resourceType = appliedFilters.resourceType;
       if (appliedFilters.dateRange) {
@@ -126,7 +123,7 @@ export default function Records() {
     }
   };
 
-  // 管理后台需要明确区分“下载用户”和“创作者”，避免误把创作者当成实际下载者展示。
+  // 管理后台需要明确区分"下载用户"和资源信息，避免信息混淆。
   const downloadColumns: ColumnsType<DownloadRecord> = [
     {
       title: 'ID',
@@ -180,22 +177,6 @@ export default function Records() {
       ),
     },
     {
-      title: '创作者',
-      dataIndex: 'creator',
-      width: 150,
-      render: (creator) => (
-        <Space>
-          <Avatar src={creator?.user?.avatar} size="small">
-            {creator?.user?.nickname?.[0]}
-          </Avatar>
-          <div className="leading-5">
-            <div>{creator?.user?.nickname || '未知'}</div>
-            <div className="text-xs text-gray-400">{creator?.code || '-'}</div>
-          </div>
-        </Space>
-      ),
-    },
-    {
       title: 'IP 地址',
       dataIndex: 'ip',
       width: 130,
@@ -230,7 +211,7 @@ export default function Records() {
             onChange={(e) => setFilters((prev) => ({ ...prev, keyword: e.target.value }))}
             onPressEnter={handleSearch}
             prefix={<SearchOutlined />}
-            placeholder="搜索资源标题 / 创作者 / 下载用户 / IP"
+            placeholder="搜索资源标题 / 下载用户 / IP"
             style={{ width: 280 }}
           />
           <Input
@@ -238,13 +219,6 @@ export default function Records() {
             value={filters.resourceId}
             onChange={(e) => setFilters((prev) => ({ ...prev, resourceId: e.target.value }))}
             placeholder="资源 ID"
-            style={{ width: 180 }}
-          />
-          <Input
-            allowClear
-            value={filters.creatorId}
-            onChange={(e) => setFilters((prev) => ({ ...prev, creatorId: e.target.value }))}
-            placeholder="创作者 ID"
             style={{ width: 180 }}
           />
           <Input

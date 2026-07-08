@@ -106,7 +106,7 @@ type User struct {
 	Username string `gorm:"size:50;uniqueIndex" json:"username,omitempty"` // 登录用户名（管理员必填）
 	Password string `gorm:"size:255" json:"-"`                             // 密码（MD5加密，不返回给前端）
 
-	Role      string         `gorm:"size:20;default:'user'" json:"role"` // user, admin, creator
+	Role      string         `gorm:"size:20;default:'user'" json:"role"` // user, admin
 	IsActive  bool           `gorm:"default:true" json:"isActive"`
 	Phone     string         `gorm:"size:20" json:"phone,omitempty"`  // 手机号（可选）
 	Email     string         `gorm:"size:100" json:"email,omitempty"` // 邮箱（可选）
@@ -119,59 +119,6 @@ type User struct {
 func (u *User) BeforeCreate(tx *gorm.DB) error {
 	if u.ID == 0 {
 		u.ID = Int64String(utils.GenerateID())
-	}
-	return nil
-}
-
-// Creator 创作者模型
-// 注意：创作者的名称和头像使用关联用户的 nickname/avatar，不单独存储
-type Creator struct {
-	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
-	UserID      Int64String    `gorm:"uniqueIndex" json:"userId"`                // 一个用户只能是一个创作者
-	Description string         `gorm:"size:255" json:"description"`
-	Code        string         `gorm:"size:20;uniqueIndex" json:"code"` // 创作者唯一口令
-	IsActive    bool           `gorm:"default:true" json:"isActive"`
-	CreatedAt   time.Time      `json:"createdAt"`
-	UpdatedAt   time.Time      `json:"updatedAt"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
-
-	// 关联
-	User      *User           `gorm:"foreignKey:UserID" json:"user,omitempty"`                        // 关联的用户（用于获取昵称、头像等信息）
-	Space     *CreatorSpace   `gorm:"foreignKey:CreatorID" json:"space,omitempty"`                    // 创作者的空间
-	Resources []Resource      `gorm:"foreignKey:UserID;references:UserID" json:"resources,omitempty"` // 创作者上传的所有资源
-	Logs      []CodeAccessLog `gorm:"foreignKey:CreatorID" json:"logs,omitempty"`                     // 访问日志
-}
-
-// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
-func (c *Creator) BeforeCreate(tx *gorm.DB) error {
-	if c.ID == 0 {
-		c.ID = Int64String(utils.GenerateID())
-	}
-	return nil
-}
-
-// CreatorSpace 创作者空间模型（一个创作者只有一个空间）
-// 空间名称使用创作者名称，口令使用创作者口令，不需要单独的 title 字段
-type CreatorSpace struct {
-	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
-	CreatorID   Int64String    `gorm:"uniqueIndex" json:"creatorId"`             // 一个创作者只有一个空间，唯一索引
-	Description string         `gorm:"size:500" json:"description"`              // 空间描述
-	Banner      string         `gorm:"size:500" json:"banner"`                   // 空间横幅图
-	IsActive    bool           `gorm:"default:true" json:"isActive"`             // 是否启用
-	ViewCount   int            `gorm:"default:0" json:"viewCount"`               // 浏览次数
-	CreatedAt   time.Time      `json:"createdAt"`
-	UpdatedAt   time.Time      `json:"updatedAt"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
-
-	// 关联
-	Creator   *Creator   `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
-	Resources []Resource `gorm:"many2many:space_resources;" json:"resources,omitempty"` // 空间关联的资源
-}
-
-// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
-func (s *CreatorSpace) BeforeCreate(tx *gorm.DB) error {
-	if s.ID == 0 {
-		s.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }
@@ -239,7 +186,6 @@ type DownloadRecord struct {
 	ID         Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
 	UserID     Int64String    `gorm:"index" json:"userId"`
 	ResourceID Int64String    `gorm:"index" json:"resourceId"`
-	CreatorID  Int64String    `gorm:"index" json:"creatorId"`
 	IP         string         `gorm:"size:50" json:"ip"`
 	UserAgent  string         `gorm:"size:500" json:"userAgent"`
 	CreatedAt  time.Time      `json:"createdAt"`
@@ -248,66 +194,12 @@ type DownloadRecord struct {
 	// 关联
 	User     *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Resource *Resource `gorm:"foreignKey:ResourceID" json:"resource,omitempty"`
-	Creator  *Creator  `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
 }
 
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
 func (d *DownloadRecord) BeforeCreate(tx *gorm.DB) error {
 	if d.ID == 0 {
 		d.ID = Int64String(utils.GenerateID())
-	}
-	return nil
-}
-
-// CodeAccessLog 口令访问日志模型
-type CodeAccessLog struct {
-	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
-	CreatorID Int64String    `gorm:"index" json:"creatorId"`                   // 关联到创作者
-	Code      string         `gorm:"size:20;index" json:"code"`
-	IP        string         `gorm:"size:50" json:"ip"`
-	UserAgent string         `gorm:"size:500" json:"userAgent"`
-	CreatedAt time.Time      `json:"createdAt"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
-
-	// 关联
-	Creator *Creator `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
-}
-
-// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
-func (c *CodeAccessLog) BeforeCreate(tx *gorm.DB) error {
-	if c.ID == 0 {
-		c.ID = Int64String(utils.GenerateID())
-	}
-	return nil
-}
-
-// CreatorApplication 创作者申请模型
-type CreatorApplication struct {
-	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`      // Snowflake ID (序列化为字符串)
-	UserID      Int64String    `gorm:"index" json:"userId"`                           // 申请用户ID
-	Name        string         `gorm:"size:50" json:"name"`                           // 创作者名称
-	Description string         `gorm:"size:500" json:"description"`                   // 创作者描述
-	Avatar      string         `gorm:"size:255" json:"avatar"`                        // 创作者头像
-	Reason      string         `gorm:"size:500" json:"reason"`                        // 申请理由
-	Phone       string         `gorm:"size:20" json:"phone"`                          // 联系电话
-	Email       string         `gorm:"size:100" json:"email"`                         // 联系邮箱
-	Status      string         `gorm:"size:20;default:'pending';index" json:"status"` // pending/approved/rejected
-	ReviewerID  *Int64String   `gorm:"index" json:"reviewerId,omitempty"`             // 审核人ID
-	ReviewNote  string         `gorm:"size:500" json:"reviewNote"`                    // 审核备注
-	ReviewedAt  *time.Time     `json:"reviewedAt,omitempty"`                          // 审核时间
-	CreatedAt   time.Time      `json:"createdAt"`
-	UpdatedAt   time.Time      `json:"updatedAt"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
-
-	// 关联
-	User     *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Reviewer *User `gorm:"foreignKey:ReviewerID" json:"reviewer,omitempty"`
-}
-
-// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
-func (c *CreatorApplication) BeforeCreate(tx *gorm.DB) error {
-	if c.ID == 0 {
-		c.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }
@@ -333,17 +225,17 @@ func (f *UserFavorite) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// UserFollow 用户关注创作者
+// UserFollow 用户关注用户
 type UserFollow struct {
-	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID    Int64String    `gorm:"index;uniqueIndex:uidx_user_creator" json:"userId"`
-	CreatorID Int64String    `gorm:"index;uniqueIndex:uidx_user_creator" json:"creatorId"`
-	CreatedAt time.Time      `json:"createdAt"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID         Int64String    `gorm:"index;uniqueIndex:uidx_user_followed_user" json:"userId"`
+	FollowedUserID Int64String    `gorm:"index;uniqueIndex:uidx_user_followed_user" json:"followedUserId"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// 关联
-	User    *User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Creator *Creator `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
+	User         *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	FollowedUser *User `gorm:"foreignKey:FollowedUserID" json:"followedUser,omitempty"`
 }
 
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
@@ -401,7 +293,7 @@ func (b *BlogCoverUpload) BeforeCreate(tx *gorm.DB) error {
 type UserNotification struct {
 	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID    Int64String    `gorm:"index;not null" json:"userId"`
-	Type      string         `gorm:"size:40;index;not null" json:"type"` // creator_application_review
+	Type      string         `gorm:"size:40;index;not null" json:"type"` // system, blog_comment, etc.
 	Title     string         `gorm:"size:120;not null" json:"title"`
 	Content   string         `gorm:"size:1000;not null" json:"content"`
 	IsRead    bool           `gorm:"index;default:false" json:"isRead"`

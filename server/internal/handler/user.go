@@ -12,6 +12,29 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// GetMyStats 获取当前用户的统计数据
+func GetMyStats(c *gin.Context) {
+	userID, exists := c.Get("userId")
+	if !exists {
+		Error(c, 401, "未登录")
+		return
+	}
+
+	db := database.GetDB()
+
+	var blogCount, resourceCount, followerCount int64
+
+	db.Model(&model.Post{}).Where("author_id = ? AND deleted_at IS NULL", userID).Count(&blogCount)
+	db.Model(&model.Resource{}).Where("user_id = ? AND deleted_at IS NULL", userID).Count(&resourceCount)
+	db.Model(&model.UserFollow{}).Where("followed_user_id = ? AND deleted_at IS NULL", userID).Count(&followerCount)
+
+	Success(c, gin.H{
+		"blogCount":     blogCount,
+		"resourceCount": resourceCount,
+		"followerCount": followerCount,
+	})
+}
+
 // GetUserInfo 获取用户信息
 func GetUserInfo(c *gin.Context) {
 	userID, exists := c.Get("userId")
@@ -31,15 +54,6 @@ func GetUserInfo(c *gin.Context) {
 	var downloadCount int64
 	db.Model(&model.DownloadRecord{}).Where("user_id = ?", userID).Count(&downloadCount)
 
-	// 若是创作者，附带 creatorCode（用于前端跳转创作者主页）
-	var creatorCode string
-	if user.Role == "creator" {
-		var creator model.Creator
-		if err := db.Select("code").Where("user_id = ?", user.ID).First(&creator).Error; err == nil {
-			creatorCode = creator.Code
-		}
-	}
-
 	Success(c, gin.H{
 		"id":            user.ID,
 		"username":      user.Username,
@@ -50,7 +64,6 @@ func GetUserInfo(c *gin.Context) {
 		"phone":         user.Phone,
 		"createdAt":     user.CreatedAt,
 		"downloadCount": downloadCount,
-		"creatorCode":   creatorCode,
 	})
 }
 

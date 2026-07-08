@@ -68,8 +68,8 @@ function mapMyResourceToDetail(
     likeCount: 0,
     favoriteCount: 0,
     userId: currentUser?.id || '',
-    creatorName: currentUser?.nickname || currentUser?.username || '我',
-    creatorAvatar: currentUser?.avatar || '',
+    userName: currentUser?.nickname || currentUser?.username || '我',
+    userAvatar: currentUser?.avatar || '',
     tags: [],
     createdAt: resource.createdAt,
     size: resource.size,
@@ -114,7 +114,7 @@ export default function ResourceDetail() {
         try {
           data = await getResourceDetail(id, { suppressErrorToast: true });
         } catch (error) {
-          if (!user) throw error; // creator gate removed: any logged-in user can fallback to admin API
+          if (!user) throw error; // any logged-in user can fallback to admin API
           const mine = await getMyResources(
             { page: 1, pageSize: 1000 },
             { suppressErrorToast: true },
@@ -298,27 +298,21 @@ export default function ResourceDetail() {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                resource.creatorCode ? navigate(`/creator/${resource.creatorCode}`) : undefined
-              }
-              className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left shadow-sm transition-all hover:border-border hover:shadow-md"
-            >
+            <div className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-sm">
               <Avatar className="h-10 w-10 border-2 border-accent">
-                <AvatarImage src={resource.creatorAvatar} className="object-cover" />
+                <AvatarImage src={resource.userAvatar} className="object-cover" />
                 <AvatarFallback className="bg-primary text-primary-foreground text-sm font-bold">
-                  {resource.creatorName?.[0]?.toUpperCase() || 'C'}
+                  {resource.userName?.[0]?.toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <p className="mb-0.5 text-xs text-muted-foreground">创作者</p>
+                <p className="mb-0.5 text-xs text-muted-foreground">上传者</p>
                 <p className="truncate text-sm font-semibold text-foreground">
-                  {resource.creatorName || '未知创作者'}
+                  {resource.userName || '未知用户'}
                 </p>
               </div>
               <User className="h-4 w-4 shrink-0 text-primary" />
-            </button>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">

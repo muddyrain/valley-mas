@@ -7,10 +7,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// CreatorAlbum 创作者资源专辑
-type CreatorAlbum struct {
+// UserAlbum 用户资源专辑
+type UserAlbum struct {
 	ID              Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	CreatorID       Int64String    `gorm:"index;not null" json:"creatorId"`
+	UserID          Int64String    `gorm:"index;not null" json:"userId"`
 	Name            string         `gorm:"size:80;not null" json:"name"`
 	Description     string         `gorm:"size:255" json:"description"`
 	CoverResourceID *Int64String   `gorm:"index" json:"coverResourceId,omitempty"`
@@ -18,12 +18,12 @@ type CreatorAlbum struct {
 	UpdatedAt       time.Time      `json:"updatedAt"`
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
 
-	Creator       *Creator   `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
-	CoverResource *Resource  `gorm:"foreignKey:CoverResourceID" json:"coverResource,omitempty"`
-	Resources     []Resource `gorm:"many2many:creator_album_resources;" json:"resources,omitempty"`
+	User          *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	CoverResource *Resource `gorm:"foreignKey:CoverResourceID" json:"coverResource,omitempty"`
+	Resources     []Resource `gorm:"many2many:user_album_resources;" json:"resources,omitempty"`
 }
 
-func (a *CreatorAlbum) BeforeCreate(tx *gorm.DB) error {
+func (a *UserAlbum) BeforeCreate(tx *gorm.DB) error {
 	if a.ID == 0 {
 		a.ID = Int64String(utils.GenerateID())
 	}

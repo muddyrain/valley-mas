@@ -206,19 +206,19 @@ func ListResources(c *gin.Context) {
 
 	query := db.Model(&model.Resource{})
 
-	// 🔒 如果是创作者角色，只能查看自己上传的资源
-	if userRole == "creator" {
+	// 🔒 如果不是管理员，只能查看自己上传的资源
+	if userRole != "admin" {
 		query = query.Where("user_id = ?", userId)
 	} else if uploaderID != "" {
 		query = query.Where("user_id = ?", uploaderID)
 	}
 
 	// 按专辑过滤
-	if albumID != "" {
-		query = query.
-			Joins("JOIN creator_album_resources ON creator_album_resources.resource_id = resources.id").
-			Where("creator_album_resources.creator_album_id = ?", albumID)
-	}
+		if albumID != "" {
+			query = query.
+				Joins("JOIN user_album_resources ON user_album_resources.resource_id = resources.id").
+				Where("user_album_resources.user_album_id = ?", albumID)
+		}
 
 	if resourceType != "" {
 		query = query.Where("type = ?", resourceType)
@@ -491,8 +491,8 @@ func DeleteResource(c *gin.Context) {
 	Success(c, nil)
 }
 
-// BatchDeleteResources 批量删除资源（创作者只能删自己的）
-// DELETE /creator/resources/batch
+// BatchDeleteResources 批量删除资源
+// DELETE /admin/resources/batch
 func BatchDeleteResources(c *gin.Context) {
 	userRole, _ := c.Get("userRole")
 	userID, _ := c.Get("userId")
@@ -514,7 +514,7 @@ func BatchDeleteResources(c *gin.Context) {
 
 	var resources []model.Resource
 	query := db.Where("id IN ?", req.IDs)
-	if userRole == "creator" {
+	if userRole != "admin" {
 		query = query.Where("user_id = ?", userID)
 	}
 	if err := query.Find(&resources).Error; err != nil {
@@ -565,8 +565,8 @@ func BatchDeleteResources(c *gin.Context) {
 	Success(c, gin.H{"deleted": deletedCount})
 }
 
-// BatchUpdateVisibility 批量设置资源访问范围（创作者只能改自己的）
-// POST /creator/resources/batch-visibility
+// BatchUpdateVisibility 批量设置资源访问范围
+// POST /admin/resources/batch-visibility
 func BatchUpdateVisibility(c *gin.Context) {
 	userRole, _ := c.Get("userRole")
 	userID, _ := c.Get("userId")
@@ -588,7 +588,7 @@ func BatchUpdateVisibility(c *gin.Context) {
 	db := database.GetDB()
 
 	query := db.Model(&model.Resource{}).Where("id IN ?", req.IDs)
-	if userRole == "creator" {
+	if userRole != "admin" {
 		query = query.Where("user_id = ?", userID)
 	}
 	result := query.Update("visibility", normalized)
@@ -601,7 +601,7 @@ func BatchUpdateVisibility(c *gin.Context) {
 	Success(c, gin.H{"updated": result.RowsAffected})
 }
 
-// UpdateResourceCreator 更新资源的上传者
+// UpdateResourceUploader 更新资源的上传者
 // @Summary      更新资源上传者
 // @Description  管理员修改资源的上传者（将资源分配给特定用户）
 // @Tags         管理后台 - 资源管理
@@ -615,8 +615,8 @@ func BatchUpdateVisibility(c *gin.Context) {
 // @Failure      401  {object}  map[string]interface{}  "未登录"
 // @Failure      403  {object}  map[string]interface{}  "无权限"
 // @Failure      404  {object}  map[string]interface{}  "资源不存在"
-// @Router       /admin/resources/{id}/creator [put]
-func UpdateResourceCreator(c *gin.Context) {
+// @Router       /admin/resources/{id}/uploader [put]
+func UpdateResourceUploader(c *gin.Context) {
 	id := c.Param("id")
 
 	var req struct {
@@ -701,10 +701,10 @@ func UpdateResource(c *gin.Context) {
 		return
 	}
 
-	// 权限：创作者只能改自己的资源，管理员可以改所有
+	// 权限：非管理员只能改自己的资源，管理员可以改所有
 	userRole, _ := c.Get("userRole")
 	userID, _ := c.Get("userId")
-	if userRole == "creator" && int64(resource.UserID) != userID.(int64) {
+	if userRole != "admin" && int64(resource.UserID) != userID.(int64) {
 		Error(c, 403, "无权限修改他人资源")
 		return
 	}
@@ -748,9 +748,57 @@ func UpdateResource(c *gin.Context) {
 	invalidatePublicResourceListCache()
 	Success(c, gin.H{
 		"id":          resource.ID,
-		"title":       resource.Title,
-		"description": resource.Description,
-		"type":        resource.Type,
-		"tags":        resource.Tags,
-	})
+			"title":       resource.Title,
+			"description": resource.Description,
+			"type":        resource.Type,
+			"tags":        resource.Tags,
+		})
+}
+
+// collectAlbumIDsByResourceIDs 查找包含指定资源ID的所有用户专辑ID
+func collectAlbumIDsByResourceIDs(db *gorm.DB, resourceIDs []model.Int64String) ([]model.Int64String, error) {
+	if len(resourceIDs) == 0 {
+		return nil, nil
+	}
+	var albumIDs []model.Int64String
+	if err := db.Model(&model.UserAlbum{}).
+		Joins("JOIN user_album_resources ON user_album_resources.user_album_id = user_albums.id").
+		Where("user_album_resources.resource_id IN ?", resourceIDs).
+		Pluck("DISTINCT user_albums.id", &albumIDs).Error; err != nil {
+		return nil, err
+	}
+	return albumIDs, nil
+}
+
+// reconcileAlbumCoverResourceByAlbumIDs 检查并修复专辑封面引用
+func reconcileAlbumCoverResourceByAlbumIDs(db *gorm.DB, albumIDs []model.Int64String) error {
+	if len(albumIDs) == 0 {
+		return nil
+	}
+	for _, albumID := range albumIDs {
+		var album model.UserAlbum
+		if err := db.Preload("Resources").First(&album, "id = ?", albumID).Error; err != nil {
+			continue
+		}
+		// 如果封面资源仍存在于专辑中，无需处理
+		if album.CoverResourceID != nil {
+			found := false
+			for _, res := range album.Resources {
+				if res.ID == *album.CoverResourceID {
+					found = true
+					break
+				}
+			}
+			if found {
+				continue
+			}
+		}
+		// 封面资源不在专辑中，设置为专辑第一个资源或清空
+		if len(album.Resources) > 0 {
+			db.Model(&album).Update("cover_resource_id", album.Resources[0].ID)
+		} else {
+			db.Model(&album).Update("cover_resource_id", nil)
+		}
+	}
+	return nil
 }

@@ -58,23 +58,6 @@ export interface ResourceTagStat {
   resourceCount: number;
 }
 
-export interface CreatorAlbum {
-  id: string;
-  creatorId: string;
-  name: string;
-  description?: string;
-  coverResourceId?: string;
-  createdAt: string;
-  updatedAt: string;
-  creator?: {
-    id: string;
-    code: string;
-    user?: { id: string; nickname?: string; avatar?: string };
-  };
-  coverResource?: { id: string; title: string; url: string };
-  resources?: Array<{ id: string; title: string; url: string }>;
-}
-
 export interface UserNotification {
   id: string;
   userId: string;
@@ -106,16 +89,10 @@ export interface OperationLog {
 
 export interface CodeAccessLog {
   id: string;
-  creatorId: string;
   code: string;
   ip: string;
   userAgent?: string;
   createdAt: string;
-  creator?: {
-    id: string;
-    code: string;
-    user?: { nickname?: string; avatar?: string };
-  };
 }
 
 export interface StorageAsset {
@@ -182,10 +159,9 @@ export interface RelationFavorite {
 export interface RelationFollow {
   id: string;
   userId: string;
-  creatorId: string;
+  targetId: string;
   createdAt: string;
   user?: { id: string; nickname?: string; avatar?: string };
-  creator?: { id: string; code: string; user?: { nickname?: string; avatar?: string } };
 }
 
 export interface LifeTraceOpsRecord {
@@ -228,7 +204,7 @@ export interface AdminUserOperations {
 export interface AdminResourceOperations {
   resource: Record<string, unknown>;
   tags: string[];
-  albums: CreatorAlbum[];
+  albums: Array<{ id: string; name: string }>;
   downloads: Array<Record<string, unknown>>;
   favorites: Array<Record<string, unknown>>;
   downloadCount: number;
@@ -345,18 +321,6 @@ export function listResourceTagStats(params: { keyword?: string; limit?: number 
   return http.get<unknown, AdminListResponse<ResourceTagStat>>('/admin/resource-tags/stats', {
     params,
   });
-}
-
-export function listCreatorAlbums(params: AdminListParams) {
-  return http.get<unknown, AdminListResponse<CreatorAlbum>>('/admin/creator-albums', { params });
-}
-
-export function updateCreatorAlbum(id: string, data: Partial<CreatorAlbum>) {
-  return http.put<unknown, CreatorAlbum>(`/admin/creator-albums/${id}`, data);
-}
-
-export function deleteCreatorAlbum(id: string) {
-  return http.delete<unknown, { ok: boolean }>(`/admin/creator-albums/${id}`);
 }
 
 export function listNotifications(params: AdminListParams & { isRead?: string }) {

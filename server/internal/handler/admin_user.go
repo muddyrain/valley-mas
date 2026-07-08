@@ -20,7 +20,7 @@ import (
 // @Param        pageSize  query     int     false  "每页数量"  default(20)
 // @Param        keyword   query     string  false  "关键词搜索（昵称/OpenID）"
 // @Param        platform  query     string  false  "平台筛选"  Enums(wechat, douyin, all)
-// @Param        role      query     string  false  "角色筛选"  Enums(user, creator, admin)
+// @Param        role      query     string  false  "角色筛选"  Enums(user, admin)
 // @Success      200  {object}  map[string]interface{}  "用户列表"
 // @Failure      401  {object}  map[string]interface{}  "未登录"
 // @Failure      403  {object}  map[string]interface{}  "无权限"

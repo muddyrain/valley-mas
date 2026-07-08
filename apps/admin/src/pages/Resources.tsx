@@ -4,7 +4,6 @@ import {
   ReloadOutlined,
   SearchOutlined,
   UploadOutlined,
-  UserSwitchOutlined,
 } from '@ant-design/icons';
 import { formatFileSize } from '@valley/shared';
 import type { UploadFile, UploadProps } from 'antd';
@@ -13,7 +12,6 @@ import {
   Card,
   Descriptions,
   Drawer,
-  Form,
   Image,
   Input,
   Modal,
@@ -28,7 +26,6 @@ import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useEffect, useState } from 'react';
 import { type AdminResourceOperations, getResourceOperations } from '@/api/operations';
 import { UserCardInfo } from '@/components/UserCardInfo';
-import { type Creator, reqGetCreatorList } from '../api/creator';
 import {
   type Resource,
   type ResourceType,
@@ -36,10 +33,8 @@ import {
   reqDeleteResource,
   reqGetResourceList,
   reqUpdateResource,
-  reqUpdateResourceCreator,
   reqUploadResource,
 } from '../api/resource';
-import { reqGetUserList } from '../api/user';
 
 const visibilityOptions = [
   { label: '私密', value: 'private' },
@@ -61,40 +56,16 @@ export default function Resources() {
   const [pageSize, setPageSize] = useState(20);
   const [typeFilter, setTypeFilter] = useState<ResourceType | ''>('');
   const [keyword, setKeyword] = useState('');
-  const [creatorIdFilter, setCreatorIdFilter] = useState('');
-  const [creators, setCreators] = useState<Creator[]>([]);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadType, setUploadType] = useState<ResourceType>('avatar');
   const [uploadVisibility, setUploadVisibility] = useState<ResourceVisibility>('private');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [creatorModalOpen, setCreatorModalOpen] = useState(false);
-  const [currentResource, setCurrentResource] = useState<Resource | null>(null);
-  const [creatorForm] = Form.useForm();
-  const [users, setUsers] = useState<Array<{ id: string; nickname: string }>>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [resourceOperations, setResourceOperations] = useState<AdminResourceOperations | null>(
     null,
   );
-  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-  const isCreator = userInfo.role === 'creator';
-
-  useEffect(() => {
-    if (isCreator) return;
-
-    const fetchCreators = async () => {
-      try {
-        const response = await reqGetCreatorList({ page: 1, pageSize: 1000 });
-        setCreators(response.list || []);
-      } catch (error) {
-        console.error('Failed to load creators:', error);
-      }
-    };
-
-    void fetchCreators();
-  }, [isCreator]);
 
   const fetchResources = useCallback(async () => {
     setLoading(true);
@@ -104,12 +75,10 @@ export default function Resources() {
         pageSize: number;
         type?: ResourceType;
         keyword?: string;
-        uploaderId?: string;
       } = { page, pageSize };
 
       if (typeFilter) params.type = typeFilter;
       if (keyword) params.keyword = keyword;
-      if (!isCreator && creatorIdFilter) params.uploaderId = creatorIdFilter;
 
       const response = await reqGetResourceList(params);
       setData(response.list || []);
@@ -120,7 +89,7 @@ export default function Resources() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, typeFilter, keyword, creatorIdFilter, isCreator]);
+  }, [page, pageSize, typeFilter, keyword]);
 
   useEffect(() => {
     void fetchResources();
@@ -202,22 +171,6 @@ export default function Resources() {
     }
   };
 
-  const openCreatorModal = async (resource: Resource) => {
-    setCurrentResource(resource);
-    creatorForm.setFieldsValue({ uploaderId: resource.user?.id });
-    setCreatorModalOpen(true);
-
-    setLoadingUsers(true);
-    try {
-      const response = await reqGetUserList({ page: 1, pageSize: 100 });
-      setUsers(response.list || []);
-    } catch {
-      message.error('加载用户列表失败');
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
-
   const openResourceDetail = async (resource: Resource) => {
     setDetailOpen(true);
     setDetailLoading(true);
@@ -228,21 +181,6 @@ export default function Resources() {
       message.error('加载资源详情失败');
     } finally {
       setDetailLoading(false);
-    }
-  };
-
-  const handleUpdateCreator = async () => {
-    if (!currentResource) return;
-
-    try {
-      const values = await creatorForm.validateFields();
-      await reqUpdateResourceCreator(currentResource.id, values.uploaderId);
-      message.success('上传者更新成功');
-      setCreatorModalOpen(false);
-      void fetchResources();
-    } catch (error) {
-      console.error('Failed to update creator:', error);
-      message.error('更新失败');
     }
   };
 
@@ -368,16 +306,6 @@ export default function Resources() {
           >
             详情
           </Button>
-          {!isCreator && (
-            <Button
-              type="link"
-              size="small"
-              icon={<UserSwitchOutlined />}
-              onClick={() => openCreatorModal(record)}
-            >
-              设置上传者
-            </Button>
-          )}
           <Button
             type="link"
             size="small"
@@ -394,7 +322,7 @@ export default function Resources() {
 
   return (
     <div>
-      <h2 className="mb-6 text-2xl font-bold">{isCreator ? '我的资源' : '资源管理'}</h2>
+      <h2 className="mb-6 text-2xl font-bold">资源管理</h2>
       <Card>
         <div className="mb-4 flex justify-between">
           <Space>
@@ -417,25 +345,6 @@ export default function Resources() {
                 { label: '壁纸', value: 'wallpaper' },
               ]}
             />
-            {!isCreator && (
-              <Select
-                placeholder="创作者"
-                className="w-40"
-                allowClear
-                showSearch
-                value={creatorIdFilter || undefined}
-                onChange={(value) => setCreatorIdFilter(value || '')}
-                options={creators.map((c) => ({
-                  label: c.name,
-                  value: c.userId,
-                }))}
-                filterOption={(input, option) =>
-                  String(option?.label ?? '')
-                    .toLowerCase()
-                    .includes(input.toLowerCase())
-                }
-              />
-            )}
             <Button icon={<SearchOutlined />} type="primary" onClick={() => void fetchResources()}>
               搜索
             </Button>
@@ -519,39 +428,6 @@ export default function Resources() {
         </Upload.Dragger>
       </Modal>
 
-      <Modal
-        title="设置上传者"
-        open={creatorModalOpen}
-        onOk={handleUpdateCreator}
-        onCancel={() => setCreatorModalOpen(false)}
-        okText="确定"
-        cancelText="取消"
-      >
-        <Form form={creatorForm} layout="vertical">
-          <Form.Item
-            name="uploaderId"
-            label="选择上传者"
-            rules={[{ required: true, message: '请选择上传者' }]}
-          >
-            <Select
-              placeholder="请选择用户"
-              loading={loadingUsers}
-              showSearch
-              filterOption={(input, option) =>
-                String(option?.label ?? '')
-                  .toLowerCase()
-                  .includes(input.toLowerCase())
-              }
-              allowClear
-              options={users.map((u) => ({ value: u.id, label: u.nickname }))}
-            />
-          </Form.Item>
-          {currentResource && (
-            <div className="text-sm text-gray-500">当前资源：{currentResource.title}</div>
-          )}
-        </Form>
-      </Modal>
-
       <Drawer
         title="资源运营详情"
         open={detailOpen}
@@ -595,10 +471,7 @@ export default function Resources() {
                 <Space direction="vertical" size={2}>
                   {resourceOperations.albums.length
                     ? resourceOperations.albums.map((album) => (
-                        <span key={album.id}>
-                          {album.name}
-                          {album.creator?.user?.nickname ? ` / ${album.creator.user.nickname}` : ''}
-                        </span>
+                        <span key={album.id}>{album.name}</span>
                       ))
                     : '-'}
                 </Space>

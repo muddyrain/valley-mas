@@ -130,7 +130,7 @@ export default function Favorites() {
             <EmptyState
               icon={Heart}
               title="还没有收藏"
-              description="浏览首页、资源页或创作者主页时，看到喜欢的内容就先收藏起来。"
+              description="浏览首页、资源页或用户主页时，看到喜欢的内容就先收藏起来。"
               actionLabel="去逛逛"
               onAction={() => navigate('/')}
             />
@@ -141,7 +141,7 @@ export default function Favorites() {
               const resource = item.resource;
               const resourceId = resource?.id ?? item.resourceId;
               const isRemoving = removingSet.has(resourceId);
-              const creatorName = resource?.creatorName || '创作者';
+              const userName = resource?.userName || '用户';
 
               return (
                 <Card
@@ -195,12 +195,12 @@ export default function Favorites() {
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <div className="flex min-w-0 items-center gap-1">
                         <Avatar className="h-4 w-4">
-                          <AvatarImage src={resource?.creatorAvatar} />
+                          <AvatarImage src={resource?.userAvatar} />
                           <AvatarFallback className="bg-accent text-[8px] text-primary">
-                            {creatorName[0]?.toUpperCase() || 'C'}
+                            {userName[0]?.toUpperCase() || 'U'}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="max-w-15 truncate">{creatorName}</span>
+                        <span className="max-w-15 truncate">{userName}</span>
                       </div>
                       <div className="flex items-center gap-0.5">
                         <Download className="h-3 w-3 text-primary" />

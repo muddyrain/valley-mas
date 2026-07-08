@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type creatorAlbumResourcePayload struct {
+type userAlbumResourcePayload struct {
 	ID           string `json:"id"`
 	Title        string `json:"title"`
 	URL          string `json:"url"`
@@ -21,24 +21,24 @@ type creatorAlbumResourcePayload struct {
 	Visibility   string `json:"visibility,omitempty"`
 }
 
-type creatorAlbumPayload struct {
-	ID              string                        `json:"id"`
-	Name            string                        `json:"name"`
-	Description     string                        `json:"description"`
-	CoverURL        string                        `json:"coverUrl"`
-	CoverResourceID string                        `json:"coverResourceId,omitempty"`
-	ResourceCount   int                           `json:"resourceCount"`
-	CreatorID       string                        `json:"creatorId"`
-	Resources       []creatorAlbumResourcePayload `json:"resources,omitempty"`
+type userAlbumPayload struct {
+	ID              string                       `json:"id"`
+	Name            string                       `json:"name"`
+	Description     string                       `json:"description"`
+	CoverURL        string                       `json:"coverUrl"`
+	CoverResourceID string                       `json:"coverResourceId,omitempty"`
+	ResourceCount   int                          `json:"resourceCount"`
+	UserID          string                       `json:"userId"`
+	Resources       []userAlbumResourcePayload   `json:"resources,omitempty"`
 }
 
-func queryFirstValidAlbumResourceID(db *gorm.DB, albumID model.Int64String) (*model.Int64String, error) {
+func queryFirstValidUserAlbumResourceID(db *gorm.DB, albumID model.Int64String) (*model.Int64String, error) {
 	var firstResourceID model.Int64String
 	err := db.
-		Table("creator_album_resources").
+		Table("user_album_resources").
 		Select("resources.id").
-		Joins("JOIN resources ON resources.id = creator_album_resources.resource_id").
-		Where("creator_album_resources.creator_album_id = ?", albumID).
+		Joins("JOIN resources ON resources.id = user_album_resources.resource_id").
+		Where("user_album_resources.user_album_id = ?", albumID).
 		Where("resources.deleted_at IS NULL").
 		Order("resources.created_at DESC").
 		Limit(1).
@@ -53,17 +53,17 @@ func queryFirstValidAlbumResourceID(db *gorm.DB, albumID model.Int64String) (*mo
 	return &value, nil
 }
 
-func isAlbumCoverResourceValid(db *gorm.DB, albumID model.Int64String, coverResourceID *model.Int64String) (bool, error) {
+func isUserAlbumCoverResourceValid(db *gorm.DB, albumID model.Int64String, coverResourceID *model.Int64String) (bool, error) {
 	if coverResourceID == nil || *coverResourceID == 0 {
 		return false, nil
 	}
 
 	var count int64
 	err := db.
-		Table("creator_album_resources").
-		Joins("JOIN resources ON resources.id = creator_album_resources.resource_id").
-		Where("creator_album_resources.creator_album_id = ?", albumID).
-		Where("creator_album_resources.resource_id = ?", *coverResourceID).
+		Table("user_album_resources").
+		Joins("JOIN resources ON resources.id = user_album_resources.resource_id").
+		Where("user_album_resources.user_album_id = ?", albumID).
+		Where("user_album_resources.resource_id = ?", *coverResourceID).
 		Where("resources.deleted_at IS NULL").
 		Count(&count).Error
 	if err != nil {
@@ -72,7 +72,7 @@ func isAlbumCoverResourceValid(db *gorm.DB, albumID model.Int64String, coverReso
 	return count > 0, nil
 }
 
-func reconcileAlbumCoverResourceByAlbumIDs(db *gorm.DB, albumIDs []model.Int64String) error {
+func reconcileUserAlbumCoverResourceByAlbumIDs(db *gorm.DB, albumIDs []model.Int64String) error {
 	if len(albumIDs) == 0 {
 		return nil
 	}
@@ -87,7 +87,7 @@ func reconcileAlbumCoverResourceByAlbumIDs(db *gorm.DB, albumIDs []model.Int64St
 		}
 		seen[int64(albumID)] = struct{}{}
 
-		var album model.CreatorAlbum
+		var album model.UserAlbum
 		if err := db.Select("id", "cover_resource_id").First(&album, "id = ? AND deleted_at IS NULL", albumID).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				continue
@@ -95,7 +95,7 @@ func reconcileAlbumCoverResourceByAlbumIDs(db *gorm.DB, albumIDs []model.Int64St
 			return err
 		}
 
-		valid, err := isAlbumCoverResourceValid(db, album.ID, album.CoverResourceID)
+		valid, err := isUserAlbumCoverResourceValid(db, album.ID, album.CoverResourceID)
 		if err != nil {
 			return err
 		}
@@ -103,12 +103,12 @@ func reconcileAlbumCoverResourceByAlbumIDs(db *gorm.DB, albumIDs []model.Int64St
 			continue
 		}
 
-		nextCoverID, err := queryFirstValidAlbumResourceID(db, album.ID)
+		nextCoverID, err := queryFirstValidUserAlbumResourceID(db, album.ID)
 		if err != nil {
 			return err
 		}
 
-		if err := db.Model(&model.CreatorAlbum{}).
+		if err := db.Model(&model.UserAlbum{}).
 			Where("id = ?", album.ID).
 			Update("cover_resource_id", nextCoverID).Error; err != nil {
 			return err
@@ -118,41 +118,25 @@ func reconcileAlbumCoverResourceByAlbumIDs(db *gorm.DB, albumIDs []model.Int64St
 	return nil
 }
 
-func collectAlbumIDsByResourceIDs(db *gorm.DB, resourceIDs []model.Int64String) ([]model.Int64String, error) {
+func collectUserAlbumIDsByResourceIDs(db *gorm.DB, resourceIDs []model.Int64String) ([]model.Int64String, error) {
 	if len(resourceIDs) == 0 {
 		return nil, nil
 	}
 
 	var albumIDs []model.Int64String
 	if err := db.
-		Table("creator_album_resources").
+		Table("user_album_resources").
 		Where("resource_id IN ?", resourceIDs).
 		Distinct().
-		Pluck("creator_album_id", &albumIDs).Error; err != nil {
+		Pluck("user_album_id", &albumIDs).Error; err != nil {
 		return nil, err
 	}
 	return albumIDs, nil
 }
 
-func loadCurrentCreator(c *gin.Context) (*model.Creator, error) {
-	userID := model.Int64String(GetCurrentUserID(c))
-	if userID == 0 {
-		return nil, fmt.Errorf("unauthorized")
-	}
-
-	var creator model.Creator
-	if err := database.GetDB().
-		Where("user_id = ? AND deleted_at IS NULL", userID).
-		First(&creator).Error; err != nil {
-		return nil, err
-	}
-
-	return &creator, nil
-}
-
-func parseOwnedAlbumResources(
+func parseOwnedUserAlbumResources(
 	db *gorm.DB,
-	creator *model.Creator,
+	userID model.Int64String,
 	resourceIDs []string,
 ) ([]model.Resource, map[string]model.Resource, error) {
 	resources := make([]model.Resource, 0, len(resourceIDs))
@@ -174,7 +158,7 @@ func parseOwnedAlbumResources(
 
 		var resource model.Resource
 		if err := db.
-			Where("id = ? AND user_id = ? AND deleted_at IS NULL", resourceID, creator.UserID).
+			Where("id = ? AND user_id = ? AND deleted_at IS NULL", resourceID, userID).
 			First(&resource).Error; err != nil {
 			return nil, nil, fmt.Errorf("resource not found")
 		}
@@ -186,7 +170,7 @@ func parseOwnedAlbumResources(
 	return resources, resourceMap, nil
 }
 
-func resolveCoverResourceID(
+func resolveAlbumCoverResourceID(
 	coverResourceID string,
 	resourceMap map[string]model.Resource,
 ) (*model.Int64String, error) {
@@ -204,20 +188,20 @@ func resolveCoverResourceID(
 	return &value, nil
 }
 
-func serializeCreatorAlbum(
-	album model.CreatorAlbum,
+func serializeUserAlbum(
+	album model.UserAlbum,
 	resourceCount int,
 	coverURL string,
 	coverResourceID string,
-	resources []creatorAlbumResourcePayload,
-) creatorAlbumPayload {
-	payload := creatorAlbumPayload{
+	resources []userAlbumResourcePayload,
+) userAlbumPayload {
+	payload := userAlbumPayload{
 		ID:            album.ID.String(),
 		Name:          album.Name,
 		Description:   album.Description,
 		CoverURL:      coverURL,
 		ResourceCount: resourceCount,
-		CreatorID:     album.CreatorID.String(),
+		UserID:        album.UserID.String(),
 		Resources:     resources,
 	}
 
@@ -228,12 +212,12 @@ func serializeCreatorAlbum(
 	return payload
 }
 
-func buildAlbumResourcePayloads(resources []model.Resource) []creatorAlbumResourcePayload {
-	list := make([]creatorAlbumResourcePayload, 0, len(resources))
+func buildUserAlbumResourcePayloads(resources []model.Resource) []userAlbumResourcePayload {
+	list := make([]userAlbumResourcePayload, 0, len(resources))
 	for i := range resources {
 		resources[i].FillThumbnailURL()
 		r := resources[i]
-		list = append(list, creatorAlbumResourcePayload{
+		list = append(list, userAlbumResourcePayload{
 			ID:           r.ID.String(),
 			Title:        r.Title,
 			URL:          r.URL,
@@ -245,31 +229,31 @@ func buildAlbumResourcePayloads(resources []model.Resource) []creatorAlbumResour
 	return list
 }
 
-func ListMyCreatorAlbums(c *gin.Context) {
-	creator, err := loadCurrentCreator(c)
-	if err != nil {
-		Error(c, 403, "当前账号还不是创作者")
+func ListMyUserAlbums(c *gin.Context) {
+	userID := model.Int64String(GetCurrentUserID(c))
+	if userID == 0 {
+		Error(c, 401, "未登录")
 		return
 	}
 
 	db := database.GetDB()
-	var albums []model.CreatorAlbum
+	var albums []model.UserAlbum
 	if err := db.
-		Where("creator_id = ? AND deleted_at IS NULL", creator.ID).
+		Where("user_id = ? AND deleted_at IS NULL", userID).
 		Preload("CoverResource").
 		Preload("Resources", func(tx *gorm.DB) *gorm.DB {
 			return tx.Where("deleted_at IS NULL").Order("created_at DESC")
 		}).
 		Order("updated_at DESC").
 		Find(&albums).Error; err != nil {
-		logger.Log.WithField("error", err).Error("ListMyCreatorAlbums query failed")
+		logger.Log.WithField("error", err).Error("ListMyUserAlbums query failed")
 		Error(c, 500, "加载资源专辑失败："+err.Error())
 		return
 	}
 
-	list := make([]creatorAlbumPayload, 0, len(albums))
+	list := make([]userAlbumPayload, 0, len(albums))
 	for _, album := range albums {
-		resources := buildAlbumResourcePayloads(album.Resources)
+		resources := buildUserAlbumResourcePayloads(album.Resources)
 		coverURL := ""
 		coverResourceID := ""
 		if album.CoverResource != nil {
@@ -280,7 +264,7 @@ func ListMyCreatorAlbums(c *gin.Context) {
 			coverResourceID = resources[0].ID
 		}
 
-		list = append(list, serializeCreatorAlbum(album, len(resources), coverURL, coverResourceID, resources))
+		list = append(list, serializeUserAlbum(album, len(resources), coverURL, coverResourceID, resources))
 	}
 
 	Success(c, gin.H{
@@ -289,10 +273,10 @@ func ListMyCreatorAlbums(c *gin.Context) {
 	})
 }
 
-func CreateCreatorAlbum(c *gin.Context) {
-	creator, err := loadCurrentCreator(c)
-	if err != nil {
-		Error(c, 403, "当前账号还不是创作者")
+func CreateUserAlbum(c *gin.Context) {
+	userID := model.Int64String(GetCurrentUserID(c))
+	if userID == 0 {
+		Error(c, 401, "未登录")
 		return
 	}
 
@@ -314,40 +298,40 @@ func CreateCreatorAlbum(c *gin.Context) {
 	}
 
 	db := database.GetDB()
-	resources, resourceMap, err := parseOwnedAlbumResources(db, creator, req.ResourceIDs)
+	resources, resourceMap, err := parseOwnedUserAlbumResources(db, userID, req.ResourceIDs)
 	if err != nil {
 		Error(c, 400, "专辑资源无效")
 		return
 	}
 
-	coverResourceID, err := resolveCoverResourceID(req.CoverResourceID, resourceMap)
+	coverResourceID, err := resolveAlbumCoverResourceID(req.CoverResourceID, resourceMap)
 	if err != nil {
 		Error(c, 400, err.Error())
 		return
 	}
 
-	album := model.CreatorAlbum{
-		CreatorID:       creator.ID,
+	album := model.UserAlbum{
+		UserID:          userID,
 		Name:            name,
 		Description:     strings.TrimSpace(req.Description),
 		CoverResourceID: coverResourceID,
 	}
 
 	if err := db.Create(&album).Error; err != nil {
-		logger.Log.WithField("error", err).Error("CreateCreatorAlbum insert failed")
+		logger.Log.WithField("error", err).Error("CreateUserAlbum insert failed")
 		Error(c, 500, "创建资源专辑失败："+err.Error())
 		return
 	}
 
 	if len(resources) > 0 {
 		if err := db.Model(&album).Association("Resources").Replace(&resources); err != nil {
-			logger.Log.WithField("error", err).Error("CreateCreatorAlbum associate resources failed")
+			logger.Log.WithField("error", err).Error("CreateUserAlbum associate resources failed")
 			Error(c, 500, "保存专辑资源失败："+err.Error())
 			return
 		}
 	}
-	if err := reconcileAlbumCoverResourceByAlbumIDs(db, []model.Int64String{album.ID}); err != nil {
-		logger.Log.WithField("error", err).Error("CreateCreatorAlbum reconcile cover failed")
+	if err := reconcileUserAlbumCoverResourceByAlbumIDs(db, []model.Int64String{album.ID}); err != nil {
+		logger.Log.WithField("error", err).Error("CreateUserAlbum reconcile cover failed")
 		Error(c, 500, "创建资源专辑失败："+err.Error())
 		return
 	}
@@ -358,7 +342,7 @@ func CreateCreatorAlbum(c *gin.Context) {
 		}).
 		First(&album, album.ID)
 
-	resourcePayloads := buildAlbumResourcePayloads(album.Resources)
+	resourcePayloads := buildUserAlbumResourcePayloads(album.Resources)
 	coverURL := ""
 	coverResourceIDText := ""
 	if album.CoverResource != nil {
@@ -369,22 +353,22 @@ func CreateCreatorAlbum(c *gin.Context) {
 		coverResourceIDText = resourcePayloads[0].ID
 	}
 
-	Success(c, serializeCreatorAlbum(album, len(resourcePayloads), coverURL, coverResourceIDText, resourcePayloads))
+	Success(c, serializeUserAlbum(album, len(resourcePayloads), coverURL, coverResourceIDText, resourcePayloads))
 }
 
-func UpdateCreatorAlbum(c *gin.Context) {
-	creator, err := loadCurrentCreator(c)
-	if err != nil {
-		Error(c, 403, "当前账号还不是创作者")
+func UpdateUserAlbum(c *gin.Context) {
+	userID := model.Int64String(GetCurrentUserID(c))
+	if userID == 0 {
+		Error(c, 401, "未登录")
 		return
 	}
 
 	albumID := c.Param("id")
 	db := database.GetDB()
 
-	var album model.CreatorAlbum
+	var album model.UserAlbum
 	if err := db.
-		Where("id = ? AND creator_id = ? AND deleted_at IS NULL", albumID, creator.ID).
+		Where("id = ? AND user_id = ? AND deleted_at IS NULL", albumID, userID).
 		First(&album).Error; err != nil {
 		Error(c, 404, "资源专辑不存在")
 		return
@@ -407,13 +391,13 @@ func UpdateCreatorAlbum(c *gin.Context) {
 		return
 	}
 
-	resources, resourceMap, err := parseOwnedAlbumResources(db, creator, req.ResourceIDs)
+	resources, resourceMap, err := parseOwnedUserAlbumResources(db, userID, req.ResourceIDs)
 	if err != nil {
 		Error(c, 400, "专辑资源无效")
 		return
 	}
 
-	coverResourceID, err := resolveCoverResourceID(req.CoverResourceID, resourceMap)
+	coverResourceID, err := resolveAlbumCoverResourceID(req.CoverResourceID, resourceMap)
 	if err != nil {
 		Error(c, 400, err.Error())
 		return
@@ -424,26 +408,26 @@ func UpdateCreatorAlbum(c *gin.Context) {
 		"description":       strings.TrimSpace(req.Description),
 		"cover_resource_id": coverResourceID,
 	}).Error; err != nil {
-		logger.Log.WithField("error", err).Error("UpdateCreatorAlbum update fields failed")
+		logger.Log.WithField("error", err).Error("UpdateUserAlbum update fields failed")
 		Error(c, 500, "更新资源专辑失败："+err.Error())
 		return
 	}
 
 	if len(resources) > 0 {
 		if err := db.Model(&album).Association("Resources").Replace(&resources); err != nil {
-			logger.Log.WithField("error", err).Error("UpdateCreatorAlbum replace resources failed")
+			logger.Log.WithField("error", err).Error("UpdateUserAlbum replace resources failed")
 			Error(c, 500, "更新专辑资源失败："+err.Error())
 			return
 		}
 	} else {
 		if err := db.Model(&album).Association("Resources").Clear(); err != nil {
-			logger.Log.WithField("error", err).Error("UpdateCreatorAlbum clear resources failed")
+			logger.Log.WithField("error", err).Error("UpdateUserAlbum clear resources failed")
 			Error(c, 500, "更新专辑资源失败："+err.Error())
 			return
 		}
 	}
-	if err := reconcileAlbumCoverResourceByAlbumIDs(db, []model.Int64String{album.ID}); err != nil {
-		logger.Log.WithField("error", err).Error("UpdateCreatorAlbum reconcile cover failed")
+	if err := reconcileUserAlbumCoverResourceByAlbumIDs(db, []model.Int64String{album.ID}); err != nil {
+		logger.Log.WithField("error", err).Error("UpdateUserAlbum reconcile cover failed")
 		Error(c, 500, "更新资源专辑失败："+err.Error())
 		return
 	}
@@ -454,7 +438,7 @@ func UpdateCreatorAlbum(c *gin.Context) {
 		}).
 		First(&album, album.ID)
 
-	resourcePayloads := buildAlbumResourcePayloads(album.Resources)
+	resourcePayloads := buildUserAlbumResourcePayloads(album.Resources)
 	coverURL := ""
 	coverResourceIDText := ""
 	if album.CoverResource != nil {
@@ -465,29 +449,29 @@ func UpdateCreatorAlbum(c *gin.Context) {
 		coverResourceIDText = resourcePayloads[0].ID
 	}
 
-	Success(c, serializeCreatorAlbum(album, len(resourcePayloads), coverURL, coverResourceIDText, resourcePayloads))
+	Success(c, serializeUserAlbum(album, len(resourcePayloads), coverURL, coverResourceIDText, resourcePayloads))
 }
 
-func DeleteCreatorAlbum(c *gin.Context) {
-	creator, err := loadCurrentCreator(c)
-	if err != nil {
-		Error(c, 403, "当前账号还不是创作者")
+func DeleteUserAlbum(c *gin.Context) {
+	userID := model.Int64String(GetCurrentUserID(c))
+	if userID == 0 {
+		Error(c, 401, "未登录")
 		return
 	}
 
 	albumID := c.Param("id")
 	db := database.GetDB()
 
-	var album model.CreatorAlbum
+	var album model.UserAlbum
 	if err := db.
-		Where("id = ? AND creator_id = ? AND deleted_at IS NULL", albumID, creator.ID).
+		Where("id = ? AND user_id = ? AND deleted_at IS NULL", albumID, userID).
 		First(&album).Error; err != nil {
 		Error(c, 404, "资源专辑不存在")
 		return
 	}
 
 	if err := db.Select("Resources").Delete(&album).Error; err != nil {
-		logger.Log.WithField("error", err).Error("DeleteCreatorAlbum delete failed")
+		logger.Log.WithField("error", err).Error("DeleteUserAlbum delete failed")
 		Error(c, 500, "删除资源专辑失败："+err.Error())
 		return
 	}
@@ -495,8 +479,8 @@ func DeleteCreatorAlbum(c *gin.Context) {
 	Success(c, gin.H{"ok": true})
 }
 
-func ListCreatorAlbums(c *gin.Context) {
-	creatorID := c.Param("id")
+func ListUserAlbums(c *gin.Context) {
+	userIDParam := c.Param("id")
 	page := GetIntQuery(c, "page", 1)
 	pageSize := GetIntQuery(c, "pageSize", 20)
 	keyword := strings.TrimSpace(c.Query("keyword"))
@@ -510,23 +494,22 @@ func ListCreatorAlbums(c *gin.Context) {
 	offset := (page - 1) * pageSize
 
 	db := database.GetDB()
-	var creator model.Creator
-	if err := db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", creatorID, true).First(&creator).Error; err != nil {
-		Error(c, 404, "创作者不存在或未激活")
+
+	var user model.User
+	if err := db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", userIDParam, true).First(&user).Error; err != nil {
+		Error(c, 404, "用户不存在或未激活")
 		return
 	}
 
-	// 子查询：找出"含有公开资源"的专辑 ID 集合（去重交给子查询，外层直接排序）
 	subQuery := db.
-		Table("creator_album_resources").
-		Select("creator_album_resources.creator_album_id").
-		Joins("JOIN resources ON resources.id = creator_album_resources.resource_id").
+		Table("user_album_resources").
+		Select("user_album_resources.user_album_id").
+		Joins("JOIN resources ON resources.id = user_album_resources.resource_id").
 		Where("resources.deleted_at IS NULL").
 		Where("resources.visibility = ? OR resources.visibility IS NULL OR resources.visibility = ''", "public")
 
-	// 外层：在专辑表上过滤 + 关键词 + 排序，不再需要 DISTINCT
-	query := db.Model(&model.CreatorAlbum{}).
-		Where("creator_id = ? AND deleted_at IS NULL", creator.ID).
+	query := db.Model(&model.UserAlbum{}).
+		Where("user_id = ? AND deleted_at IS NULL", user.ID).
 		Where("id IN (?)", subQuery)
 
 	if keyword != "" {
@@ -536,7 +519,7 @@ func ListCreatorAlbums(c *gin.Context) {
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
-		logger.Log.WithField("error", err).Error("ListCreatorAlbums count failed")
+		logger.Log.WithField("error", err).Error("ListUserAlbums count failed")
 		Error(c, 500, "加载资源专辑失败："+err.Error())
 		return
 	}
@@ -547,14 +530,14 @@ func ListCreatorAlbums(c *gin.Context) {
 		Offset(offset).
 		Limit(pageSize).
 		Pluck("id", &albumIDs).Error; err != nil {
-		logger.Log.WithField("error", err).Error("ListCreatorAlbums pluck albumIDs failed")
+		logger.Log.WithField("error", err).Error("ListUserAlbums pluck albumIDs failed")
 		Error(c, 500, "加载资源专辑失败："+err.Error())
 		return
 	}
 
 	if len(albumIDs) == 0 {
 		Success(c, gin.H{
-			"list":     []creatorAlbumPayload{},
+			"list":     []userAlbumPayload{},
 			"total":    total,
 			"page":     page,
 			"pageSize": pageSize,
@@ -562,17 +545,17 @@ func ListCreatorAlbums(c *gin.Context) {
 		return
 	}
 
-	var albums []model.CreatorAlbum
+	var albums []model.UserAlbum
 	if err := db.
 		Where("id IN ?", albumIDs).
 		Preload("CoverResource").
 		Find(&albums).Error; err != nil {
-		logger.Log.WithField("error", err).Error("ListCreatorAlbums find albums failed")
+		logger.Log.WithField("error", err).Error("ListUserAlbums find albums failed")
 		Error(c, 500, "加载资源专辑失败："+err.Error())
 		return
 	}
 
-	albumMap := make(map[string]model.CreatorAlbum, len(albums))
+	albumMap := make(map[string]model.UserAlbum, len(albums))
 	for _, album := range albums {
 		albumMap[album.ID.String()] = album
 	}
@@ -582,13 +565,13 @@ func ListCreatorAlbums(c *gin.Context) {
 		Count   int64
 	}
 	var countRows []countRow
-	db.Table("creator_album_resources").
-		Select("creator_album_resources.creator_album_id AS album_id, COUNT(resources.id) AS count").
-		Joins("JOIN resources ON resources.id = creator_album_resources.resource_id").
-		Where("creator_album_resources.creator_album_id IN ?", albumIDs).
+	db.Table("user_album_resources").
+		Select("user_album_resources.user_album_id AS album_id, COUNT(resources.id) AS count").
+		Joins("JOIN resources ON resources.id = user_album_resources.resource_id").
+		Where("user_album_resources.user_album_id IN ?", albumIDs).
 		Where("resources.deleted_at IS NULL").
 		Where("(resources.visibility = ? OR resources.visibility IS NULL OR resources.visibility = '')", "public").
-		Group("creator_album_resources.creator_album_id").
+		Group("user_album_resources.user_album_id").
 		Scan(&countRows)
 
 	countMap := make(map[string]int, len(countRows))
@@ -601,10 +584,10 @@ func ListCreatorAlbums(c *gin.Context) {
 		URL     string
 	}
 	var coverRows []coverRow
-	db.Table("creator_album_resources").
-		Select("creator_album_resources.creator_album_id AS album_id, resources.url").
-		Joins("JOIN resources ON resources.id = creator_album_resources.resource_id").
-		Where("creator_album_resources.creator_album_id IN ?", albumIDs).
+	db.Table("user_album_resources").
+		Select("user_album_resources.user_album_id AS album_id, resources.url").
+		Joins("JOIN resources ON resources.id = user_album_resources.resource_id").
+		Where("user_album_resources.user_album_id IN ?", albumIDs).
 		Where("resources.deleted_at IS NULL").
 		Where("(resources.visibility = ? OR resources.visibility IS NULL OR resources.visibility = '')", "public").
 		Order("resources.created_at DESC").
@@ -618,7 +601,7 @@ func ListCreatorAlbums(c *gin.Context) {
 		}
 	}
 
-	list := make([]creatorAlbumPayload, 0, len(albumIDs))
+	list := make([]userAlbumPayload, 0, len(albumIDs))
 	for _, albumID := range albumIDs {
 		album, exists := albumMap[albumID.String()]
 		if !exists {
@@ -633,7 +616,7 @@ func ListCreatorAlbums(c *gin.Context) {
 			coverURL = fallbackCoverMap[albumID.String()]
 		}
 
-		list = append(list, serializeCreatorAlbum(album, countMap[albumID.String()], coverURL, "", nil))
+		list = append(list, serializeUserAlbum(album, countMap[albumID.String()], coverURL, "", nil))
 	}
 
 	Success(c, gin.H{

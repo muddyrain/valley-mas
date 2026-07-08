@@ -186,7 +186,7 @@ func HomePage(c *gin.Context) {
 		<div class="list">
 			<div class="row"><strong>健康检查</strong><span><a href="/health">GET /health</a></span></div>
 			<div class="row"><strong>验证口令</strong><span><code>POST /api/v1/code/verify</code></span></div>
-			<div class="row"><strong>创作者资源</strong><span><code>GET /api/v1/creator/:code/resources</code></span></div>
+			<div class="row"><strong>用户资源</strong><span><code>GET /api/v1/public/users/:id/resources</code></span></div>
 			<div class="row"><strong>管理后台</strong><span><code>/api/v1/admin/*</code></span></div>
 		</div>
 		<p class="footer">当前时间：%s</p>
@@ -197,10 +197,9 @@ func HomePage(c *gin.Context) {
 	c.Data(200, "text/html; charset=utf-8", []byte(html))
 }
 
-// HotCreatorResponse 热门创作者响应项
-type HotCreatorResponse struct {
+// HotUserResponse 活跃用户响应项
+type HotUserResponse struct {
 	ID            string `json:"id" example:"1234567890"`
-	Code          string `json:"code" example:"ABCD1234"`
 	Name          string `json:"name" example:"设计师小王"`
 	Avatar        string `json:"avatar" example:"https://example.com/avatar.jpg"`
 	ResourceCount int    `json:"resourceCount" example:"156"`
@@ -210,9 +209,9 @@ type HotCreatorResponse struct {
 	CreatedAt     string `json:"createdAt" example:"2026-03-01T12:00:00Z"`
 }
 
-// GetHotCreators 获取热门创作者
-// @Summary      获取热门创作者列表
-// @Description  获取热门创作者列表，按资源数量和下载量排序
+// GetActiveUsers 获取活跃用户
+// @Summary      获取活跃用户列表
+// @Description  获取活跃用户列表，按资源数量和下载量排序
 // @Tags         公开接口
 // @Accept       json
 // @Produce      json
@@ -221,8 +220,8 @@ type HotCreatorResponse struct {
 // @Success      200  {object}  map[string]interface{}  "获取成功"
 // @Failure      400  {object}  map[string]interface{}  "参数错误"
 // @Failure      500  {object}  map[string]interface{}  "服务器错误"
-// @Router       /public/hot-creators [get]
-func GetHotCreators(c *gin.Context) {
+// @Router       /public/active-users [get]
+func GetActiveUsers(c *gin.Context) {
 	db := database.DB
 
 	// 获取分页参数
@@ -242,89 +241,62 @@ func GetHotCreators(c *gin.Context) {
 
 	offset := (page - 1) * pageSize
 
-	var creators []model.Creator
-	var total int64
+		// 查询有资源的用户（按资源数量和下载量排序）
+		type userResourceStats struct {
+			UserID        model.Int64String
+			ResourceCount int64
+			DownloadCount int64
+		}
+		var stats []userResourceStats
+		err := db.Model(&model.Resource{}).
+			Select("user_id, COUNT(*) as resource_count, COALESCE(SUM(download_count), 0) as download_count").
+			Where("user_id IS NOT NULL AND user_id != '' AND user_id != '0' AND deleted_at IS NULL").
+			Group("user_id").
+			Order("resource_count DESC, download_count DESC").
+			Limit(pageSize).
+			Offset(offset).
+			Scan(&stats).Error
 
-	// 查询热门创作者（按资源数量和下载量排序）
-	err := db.Table("creators").
-		Select(`creators.id, creators.user_id, creators.code, creators.description, creators.created_at,
-			COALESCE(resource_stats.resource_count, 0) as resource_count,
-			COALESCE(resource_stats.download_count, 0) as download_count`).
-		Joins(`LEFT JOIN (
-			SELECT
-				user_id,
-				COUNT(*) as resource_count,
-				SUM(download_count) as download_count
-			FROM resources
-			WHERE deleted_at IS NULL
-			GROUP BY user_id
-		) as resource_stats ON creators.user_id = resource_stats.user_id`).
-		Where("creators.is_active = ? AND creators.deleted_at IS NULL", true).
-		Order("resource_count DESC, download_count DESC").
-		Limit(pageSize).
-		Offset(offset).
-		Scan(&creators).Error
-
-	if err != nil {
-		c.JSON(500, gin.H{
-			"code":    500,
-			"message": "查询热门创作者失败",
-			"data":    nil,
-		})
-		return
-	}
-
-	// 获取总数
-	db.Model(&model.Creator{}).
-		Where("is_active = ? AND deleted_at IS NULL", true).
-		Count(&total)
-
-	// 转换为响应格式
-	var response []HotCreatorResponse
-	for _, creator := range creators {
-		// 获取用户信息以获取昵称和头像
-		var user model.User
-		var name, avatar string
-		if err := db.Where("id = ?", creator.UserID).First(&user).Error; err == nil {
-			name = user.Nickname
-			avatar = user.Avatar
+		if err != nil {
+			c.JSON(500, gin.H{
+				"code":    500,
+				"message": "查询热门用户失败",
+				"data":    nil,
+			})
+			return
 		}
 
-		response = append(response, HotCreatorResponse{
-			ID:            fmt.Sprintf("%d", creator.ID),
-			Code:          creator.Code,
-			Name:          name,
-			Avatar:        avatar,
-			Description:   creator.Description,
-			ResourceCount: 0,
-			DownloadCount: 0,
-			CreatedAt:     creator.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		})
-	}
-
-	// 查询每个创作者的统计数据
-	for i, creator := range creators {
-		var resourceCount int64
-		var downloadCount int64
-		var followerCount int64
-
+		// 获取总数（有资源的用户数）
+		var total int64
 		db.Model(&model.Resource{}).
-			Where("user_id = ? AND deleted_at IS NULL", creator.UserID).
-			Count(&resourceCount)
+			Where("user_id IS NOT NULL AND user_id != '' AND user_id != '0' AND deleted_at IS NULL").
+			Distinct("user_id").
+			Count(&total)
 
-		db.Model(&model.Resource{}).
-			Where("user_id = ? AND deleted_at IS NULL", creator.UserID).
-			Select("COALESCE(SUM(download_count), 0)").
-			Scan(&downloadCount)
+		// 转换为响应格式
+		var response []HotUserResponse
+		for _, stat := range stats {
+			var user model.User
+			if err := db.Where("id = ?", stat.UserID).First(&user).Error; err != nil {
+				continue
+			}
 
-		db.Model(&model.UserFollow{}).
-			Where("creator_id = ?", creator.ID).
-			Count(&followerCount)
+			var followerCount int64
+			db.Model(&model.UserFollow{}).
+				Where("followed_user_id = ?", stat.UserID).
+				Count(&followerCount)
 
-		response[i].ResourceCount = int(resourceCount)
-		response[i].DownloadCount = downloadCount
-		response[i].FollowerCount = followerCount
-	}
+			response = append(response, HotUserResponse{
+				ID:            stat.UserID.String(),
+				Name:          user.Nickname,
+				Avatar:        user.Avatar,
+				ResourceCount: int(stat.ResourceCount),
+				DownloadCount: stat.DownloadCount,
+				FollowerCount: followerCount,
+				Description:   "",
+				CreatedAt:     user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			})
+		}
 
 	c.JSON(200, gin.H{
 		"code":    0,
@@ -375,17 +347,10 @@ func GetResourceDetail(c *gin.Context) {
 	}
 
 	// 查询上传者信息
-	var user model.User
-	if err := db.Where("id = ? AND deleted_at IS NULL", resource.UserID).First(&user).Error; err != nil {
-		user = model.User{}
-	}
-
-	// 查询创作者 code（用于跳转创作者主页）
-	var creator model.Creator
-	creatorCode := ""
-	if err := db.Where("user_id = ?", resource.UserID).First(&creator).Error; err == nil {
-		creatorCode = creator.Code
-	}
+		var user model.User
+		if err := db.Where("id = ? AND deleted_at IS NULL", resource.UserID).First(&user).Error; err != nil {
+			user = model.User{}
+		}
 
 	// 收藏状态（OptionalAuth 已解析 userId）
 	isFavorited := false
@@ -415,10 +380,9 @@ func GetResourceDetail(c *gin.Context) {
 		"extension":     resource.Extension,
 		"createdAt":     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		"userId":        fmt.Sprintf("%d", resource.UserID),
-		"creatorName":   user.Nickname,
-		"creatorAvatar": user.Avatar,
-		"creatorCode":   creatorCode,
-		"isFavorited":   isFavorited,
+		"userName":     user.Nickname,
+			"userAvatar":   user.Avatar,
+			"isFavorited":   isFavorited,
 		"tags":          resource.Tags,
 	})
 }
@@ -437,8 +401,8 @@ type HotResourceResponse struct {
 	DownloadCount int64    `json:"downloadCount"`
 	FavoriteCount int      `json:"favoriteCount"`
 	UserId        string   `json:"userId"`
-	CreatorName   string   `json:"creatorName"`
-	CreatorAvatar string   `json:"creatorAvatar"`
+	UserName     string   `json:"userName"`
+	UserAvatar   string   `json:"userAvatar"`
 	CreatedAt     string   `json:"createdAt"`
 	IsFavorited   bool     `json:"isFavorited"`
 	Tags          []string `json:"tags"`
@@ -486,11 +450,11 @@ func buildHotResourceResponseList(
 		rid := strconv.FormatInt(int64(resource.ID), 10)
 		resource.FillThumbnailURL()
 
-		creatorName := ""
-		creatorAvatar := ""
+		userName := ""
+		userAvatar := ""
 		if resource.User != nil {
-			creatorName = resource.User.Nickname
-			creatorAvatar = resource.User.Avatar
+			userName = resource.User.Nickname
+			userAvatar = resource.User.Avatar
 		}
 
 		tags := make([]string, len(resource.Tags))
@@ -509,8 +473,8 @@ func buildHotResourceResponseList(
 			DownloadCount: int64(resource.DownloadCount),
 			FavoriteCount: resource.FavoriteCount,
 			UserId:        fmt.Sprintf("%d", resource.UserID),
-			CreatorName:   creatorName,
-			CreatorAvatar: creatorAvatar,
+			UserName:     userName,
+				UserAvatar:   userAvatar,
 			CreatedAt:     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			IsFavorited:   favoritedSet[rid],
 			Tags:          tags,

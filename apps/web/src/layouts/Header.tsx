@@ -63,12 +63,6 @@ export default function Header() {
   const navItems = [
     { to: '/', label: '首页', icon: Home, active: location.pathname === '/' },
     {
-      to: '/creators',
-      label: '创作者',
-      icon: Users,
-      active: location.pathname.startsWith('/creators') || location.pathname.startsWith('/creator'),
-    },
-    {
       to: '/resources',
       label: '资源',
       icon: ImageIcon,

@@ -13,7 +13,7 @@ import (
 )
 
 // SuggestResourceTitle 使用 AI 视觉模型根据图片内容建议多个资源标题
-// POST /api/v1/creator/ai/suggest-title
+// POST /api/v1/admin/ai/suggest-title
 // Body: { "imageBase64": "data:image/jpeg;base64,..." , "type": "wallpaper" }
 func SuggestResourceTitle(c *gin.Context) {
 	var req struct {

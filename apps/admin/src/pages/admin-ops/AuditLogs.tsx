@@ -59,7 +59,7 @@ export default function AuditLogs({ kind }: { kind: AuditKind }) {
     if (kind === 'code-access-logs') {
       return [
         { title: '口令', dataIndex: 'code', width: 120 },
-        { title: '创作者', dataIndex: 'creatorId', width: 160 },
+        { title: '用户', dataIndex: 'userId', width: 160 },
         { title: 'IP', dataIndex: 'ip', width: 150 },
         { title: 'User-Agent', dataIndex: 'userAgent', ellipsis: true },
         { title: '时间', dataIndex: 'createdAt', width: 180, render: formatDateTime },

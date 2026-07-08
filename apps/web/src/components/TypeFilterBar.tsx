@@ -16,7 +16,7 @@ interface TypeFilterBarProps {
 
 /**
  * 通用分类筛选 Tab 条
- * MySpace / CreatorProfile 筛选栏共用
+ * MySpace / UserProfile 筛选栏共用
  */
 export default function TypeFilterBar({
   options,

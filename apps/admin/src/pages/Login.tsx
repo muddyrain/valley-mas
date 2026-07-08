@@ -20,16 +20,7 @@ export default function Login() {
 
       message.success('登录成功');
 
-      // 根据角色跳转到不同页面
-      const role = res.userInfo.role;
-      if (role === 'creator') {
-        navigate('/creator-dashboard');
-      } else if (role === 'admin') {
-        navigate('/dashboard');
-      } else {
-        // 普通用户跳转到申请页面
-        navigate('/apply-creator');
-      }
+      navigate('/dashboard');
     } catch (error: unknown) {
       // 错误提示已在 request.ts 中统一处理
       // 这里只需要打印日志用于调试
@@ -46,7 +37,7 @@ export default function Login() {
           <div className="mb-3 flex justify-center">
             <BrandLogo iconClassName="h-12 w-12" wordmarkClassName="text-[1.32rem]" />
           </div>
-          <p className="text-gray-500 mt-2">创作者·管理后台</p>
+          <p className="text-gray-500 mt-2">管理后台</p>
         </div>
         <Form onFinish={onFinish} size="large">
           <Form.Item

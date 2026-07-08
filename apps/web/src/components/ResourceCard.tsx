@@ -36,8 +36,8 @@ export interface ResourceCardItem {
   favoriteCount?: number;
   createdAt?: string;
   size?: number;
-  creatorName?: string;
-  creatorAvatar?: string;
+  userName?: string;
+  userAvatar?: string;
   isFavorited?: boolean;
   tags?: string[];
 }
@@ -48,7 +48,7 @@ interface ResourceCardProps<T extends ResourceCardItem = ResourceCardItem> {
   onFavorite?: (e: React.MouseEvent, resource: T) => void;
   onDelete?: (resource: T) => void;
   onEdit?: (resource: T) => void;
-  showCreator?: boolean;
+  showUser?: boolean;
   showSize?: boolean;
   showDate?: boolean;
   showEngagement?: boolean;
@@ -128,7 +128,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
   onFavorite,
   onDelete,
   onEdit,
-  showCreator = false,
+  showUser = false,
   showSize = false,
   showDate = false,
   showEngagement = false,
@@ -197,10 +197,9 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
   };
 
   const footerMetaVisible =
-    showSize || showDate || showEngagement || showCreator || showVisibilityTag || selectable;
+    showSize || showDate || showEngagement || showUser || showVisibilityTag || selectable;
 
-  const infoLayerVisible =
-    showCreator || showDate || showEngagement || showTags || showVisibilityTag;
+  const infoLayerVisible = showUser || showDate || showEngagement || showTags || showVisibilityTag;
 
   const mediaAspectClass =
     wideWallpaperOnDesktop && resource.type === 'wallpaper'
@@ -373,15 +372,15 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
                     : 'max-h-0 opacity-0'
                 }`}
               >
-                {showCreator ? (
+                {showUser ? (
                   <div className="flex items-center gap-2 text-xs text-foreground">
                     <Avatar className="h-5 w-5 shrink-0 border border-[hsl(var(--color-foreground)/0.14)]">
-                      <AvatarImage src={resource.creatorAvatar} />
+                      <AvatarImage src={resource.userAvatar} />
                       <AvatarFallback className="bg-[hsl(var(--color-foreground)/0.16)] text-[10px] text-foreground">
-                        {resource.creatorName?.[0] || 'U'}
+                        {resource.userName?.[0] || 'U'}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="truncate">{resource.creatorName || '未知创作者'}</span>
+                    <span className="truncate">{resource.userName || '未知用户'}</span>
                   </div>
                 ) : null}
 
@@ -427,10 +426,10 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
           {footerMetaVisible ? (
             <div className="mt-2 hidden items-center justify-between px-1 text-[11px] text-muted-foreground sm:flex">
               <div className="flex min-w-0 items-center gap-3">
-                {showCreator ? (
-                  <span className="truncate">{resource.creatorName || '未知创作者'}</span>
+                {showUser ? (
+                  <span className="truncate">{resource.userName || '未知用户'}</span>
                 ) : null}
-                {!showCreator ? (
+                {!showUser ? (
                   <span className="inline-flex items-center gap-1">
                     <Download className="h-3 w-3" />
                     {resource.downloadCount}

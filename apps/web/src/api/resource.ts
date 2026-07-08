@@ -16,9 +16,8 @@ export interface Resource {
   likeCount: number;
   favoriteCount?: number;
   userId: string;
-  creatorName: string;
-  creatorAvatar: string;
-  creatorCode?: string; // 创作者页跳转 code
+  userName: string;
+  userAvatar: string;
   tags?: string[];
   createdAt: string;
   size?: number;
@@ -64,9 +63,9 @@ export const getAllResources = (
   return http.get<unknown, ListResponse<Resource>>(`/public/resources?${query.toString()}`);
 };
 
-// 获取创作者的资源列表
-export const getCreatorResources = (
-  creatorId: string,
+// 获取用户的资源列表
+export const getUserResources = (
+  userId: string,
   params: { page?: number; pageSize?: number; type?: string; keyword?: string } = {},
 ) => {
   const { page = 1, pageSize = 20, type, keyword } = params;
@@ -77,7 +76,7 @@ export const getCreatorResources = (
   if (type) query.set('type', type);
   if (keyword) query.set('keyword', keyword);
   return http.get<unknown, ListResponse<Resource>>(
-    `/public/creators/${creatorId}/resources?${query.toString()}`,
+    `/public/users/${userId}/resources?${query.toString()}`,
   );
 };
 
@@ -152,7 +151,7 @@ export const getMyFavorites = (params: { page?: number; pageSize?: number } = {}
   >(`/user/favorites?page=${page}&pageSize=${pageSize}`);
 };
 
-// ========== 创作者资源管理接口 ==========
+// ========== 资源管理接口 ==========
 
 export interface MyResource {
   id: string;
@@ -179,7 +178,7 @@ interface MyResourcesResponse {
 
 export const RESOURCE_UPLOAD_TIMEOUT = 5 * 60 * 1000;
 
-// 获取我上传的资源列表（需要创作者/管理员权限）
+// 获取我上传的资源列表
 export const getMyResources = (
   params: {
     page?: number;
@@ -191,16 +190,16 @@ export const getMyResources = (
   config?: RequestConfig,
 ) => {
   const { page = 1, pageSize = 20, type, albumId, keyword } = params;
-  let url = `/creator/resources?page=${page}&pageSize=${pageSize}`;
+  let url = `/content/resources?page=${page}&pageSize=${pageSize}`;
   if (type) url += `&type=${type}`;
   if (albumId) url += `&albumId=${albumId}`;
   if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
   return http.get<unknown, MyResourcesResponse>(url, config);
 };
 
-// 上传资源（需要创作者/管理员权限）
+// 上传资源
 export const uploadResource = (formData: FormData) => {
-  return http.post<unknown, { resource: MyResource }>('/creator/resources/upload', formData, {
+  return http.post<unknown, { resource: MyResource }>('/content/resources/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: RESOURCE_UPLOAD_TIMEOUT,
   });
@@ -209,14 +208,14 @@ export const uploadResource = (formData: FormData) => {
 export const getUploadResourceStatus = (uploadKey: string, config?: RequestConfig) => {
   const query = new URLSearchParams({ uploadKey });
   return http.get<unknown, { found: boolean; resource?: MyResource }>(
-    `/creator/resources/upload-status?${query.toString()}`,
+    `/content/resources/upload-status?${query.toString()}`,
     config,
   );
 };
 
-// 删除资源（需要创作者/管理员权限）
+// 删除资源
 export const deleteResource = (id: string) => {
-  return http.delete<void>(`/creator/resources/${id}`);
+  return http.delete<void>(`/content/resources/${id}`);
 };
 
 // 修改资源元数据（标题、描述、类型、标签）
@@ -240,12 +239,12 @@ export const updateResource = (
       visibility?: ResourceVisibility;
       tags?: string[];
     }
-  >(`/creator/resources/${id}`, data);
+  >(`/content/resources/${id}`, data);
 };
 
 // AI 根据图片内容建议多个资源标题
 export const suggestResourceTitle = (imageBase64: string, type: 'wallpaper' | 'avatar') => {
-  return http.post<unknown, { titles: string[] }>('/creator/ai/suggest-title', {
+  return http.post<unknown, { titles: string[] }>('/content/ai/suggest-title', {
     imageBase64,
     type,
   });
@@ -262,19 +261,19 @@ export const aiSuggestResourceTags = (data: {
   description?: string;
 }) => {
   return http.post<unknown, { tags: string[]; model: string }>(
-    '/creator/ai/resource-tags/suggest',
+    '/content/ai/resource-tags/suggest',
     data,
   );
 };
 
 // 批量删除资源
 export const batchDeleteResources = (ids: string[]) => {
-  return http.delete<unknown, { deleted: number }>('/creator/resources/batch', { data: { ids } });
+  return http.delete<unknown, { deleted: number }>('/content/resources/batch', { data: { ids } });
 };
 
 // 批量设置资源访问范围
 export const batchUpdateVisibility = (ids: string[], visibility: ResourceVisibility) => {
-  return http.post<unknown, { updated: number }>('/creator/resources/batch-visibility', {
+  return http.post<unknown, { updated: number }>('/content/resources/batch-visibility', {
     ids,
     visibility,
   });

@@ -290,19 +290,14 @@ func autoMigrateModelsByName() map[string]any {
 		"ai_agent":                           &model.AIAgent{},
 		"ai_conversation":                    &model.AIConversation{},
 		"ai_message":                         &model.AIMessage{},
-		"creator":                            &model.Creator{},
-		"creator_space":                      &model.CreatorSpace{},
 		"resource":                           &model.Resource{},
-		"download_record":                    &model.DownloadRecord{},
-		"code_access_log":                    &model.CodeAccessLog{},
-		"creator_application":                &model.CreatorApplication{},
-		"creator_audit_config":               &model.CreatorAuditConfig{},
-		"user_favorite":                      &model.UserFavorite{},
-		"user_follow":                        &model.UserFollow{},
+			"download_record":                    &model.DownloadRecord{},
+			"user_favorite":                      &model.UserFavorite{},
+			"user_follow":                        &model.UserFollow{},
 		"user_avatar_history":                &model.UserAvatarHistory{},
 		"user_notification":                  &model.UserNotification{},
 		"guestbook_message":                  &model.GuestbookMessage{},
-		"creator_album":                      &model.CreatorAlbum{},
+			"user_album":                         &model.UserAlbum{},
 		"post_group":                         &model.PostGroup{},
 		"post":                               &model.Post{},
 		"post_category":                      &model.PostCategory{},
@@ -414,28 +409,23 @@ func contentMigrationModels() []any {
 }
 
 func contentDomainMigrationModels() []any {
-	return []any{
-		&model.Creator{},
-		&model.CreatorSpace{},
-		&model.Resource{},
-		&model.DownloadRecord{},
-		&model.CodeAccessLog{},
-		&model.CreatorApplication{},
-		&model.CreatorAuditConfig{},
-		&model.UserFavorite{},
-		&model.UserFollow{},
-		&model.UserAvatarHistory{},
-		&model.UserNotification{},
-		&model.GuestbookMessage{},
-		&model.CreatorAlbum{},
-		&model.PostGroup{},
-		&model.Post{},
-		&model.PostCategory{},
-		&model.PostTag{},
-		&model.PostTagRelation{},
-		&model.PostComment{},
+		return []any{
+			&model.Resource{},
+			&model.DownloadRecord{},
+			&model.UserFavorite{},
+			&model.UserFollow{},
+			&model.UserAvatarHistory{},
+			&model.UserNotification{},
+			&model.GuestbookMessage{},
+			&model.UserAlbum{},
+			&model.PostGroup{},
+			&model.Post{},
+			&model.PostCategory{},
+			&model.PostTag{},
+			&model.PostTagRelation{},
+			&model.PostComment{},
+		}
 	}
-}
 
 func lifeTraceMigrationModels() []any {
 	models := make([]any, 0, len(coreMigrationModels())+len(lifeTraceDomainMigrationModels()))

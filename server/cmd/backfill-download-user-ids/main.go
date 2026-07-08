@@ -29,7 +29,6 @@ func main() {
 	apply := flag.Bool("apply", false, "apply updates instead of dry run")
 	userID := flag.String("user-id", "", "manual user id for targeted repair")
 	resourceID := flag.String("resource-id", "", "only inspect a specific resource id")
-	creatorID := flag.String("creator-id", "", "only inspect a specific creator id")
 	after := flag.String("after", "", "only inspect records created at or after this time")
 	before := flag.String("before", "", "only inspect records created before this time")
 	windowMinutes := flag.Int("window-minutes", 5, "time window for operation-log matching")
@@ -62,11 +61,11 @@ func main() {
 	}
 
 	if *userID != "" {
-		runManualRepair(db, *apply, *userID, *resourceID, *creatorID, afterTime, beforeTime, *limit)
-		return
-	}
+		runManualRepair(db, *apply, *userID, *resourceID, afterTime, beforeTime, *limit)
+			return
+		}
 
-	runAutoRepair(db, *apply, *resourceID, *creatorID, afterTime, beforeTime, *windowMinutes, *limit)
+		runAutoRepair(db, *apply, *resourceID, afterTime, beforeTime, *windowMinutes, *limit)
 }
 
 func runManualRepair(
@@ -74,7 +73,6 @@ func runManualRepair(
 	apply bool,
 	userID string,
 	resourceID string,
-	creatorID string,
 	afterTime *time.Time,
 	beforeTime *time.Time,
 	limit int,
@@ -89,7 +87,7 @@ func runManualRepair(
 		panic(fmt.Errorf("target user not found: %w", err))
 	}
 
-	records := loadOrphanRecords(db, resourceID, creatorID, afterTime, beforeTime, limit)
+	records := loadOrphanRecords(db, resourceID, afterTime, beforeTime, limit)
 	if len(records) == 0 {
 		fmt.Println("no orphan download records matched the current filters")
 		return
@@ -126,13 +124,12 @@ func runAutoRepair(
 	db *gorm.DB,
 	apply bool,
 	resourceID string,
-	creatorID string,
 	afterTime *time.Time,
 	beforeTime *time.Time,
 	windowMinutes int,
 	limit int,
 ) {
-	records := loadOrphanRecords(db, resourceID, creatorID, afterTime, beforeTime, limit)
+	records := loadOrphanRecords(db, resourceID, afterTime, beforeTime, limit)
 	if len(records) == 0 {
 		fmt.Println("no orphan download records matched the current filters")
 		return
@@ -192,7 +189,6 @@ func runAutoRepair(
 func loadOrphanRecords(
 	db *gorm.DB,
 	resourceID string,
-	creatorID string,
 	afterTime *time.Time,
 	beforeTime *time.Time,
 	limit int,
@@ -203,9 +199,6 @@ func loadOrphanRecords(
 
 	if resourceID != "" {
 		query = query.Where("resource_id = ?", resourceID)
-	}
-	if creatorID != "" {
-		query = query.Where("creator_id = ?", creatorID)
 	}
 	if afterTime != nil {
 		query = query.Where("created_at >= ?", *afterTime)
@@ -282,10 +275,10 @@ func printRecordPreview(records []model.DownloadRecord) {
 	for i := 0; i < max; i++ {
 		record := records[i]
 		fmt.Printf(
-			"  record=%s resource=%s creator=%s created_at=%s ip=%s\n",
-			record.ID.String(),
-			record.ResourceID.String(),
-			record.CreatorID.String(),
+				"  record=%s resource=%s user=%s created_at=%s ip=%s\n",
+				record.ID.String(),
+				record.ResourceID.String(),
+				record.UserID.String(),
 			record.CreatedAt.Format(time.RFC3339),
 			record.IP,
 		)

@@ -31,33 +31,30 @@ func setupAdminOperationsTestDB(t *testing.T) *gin.Engine {
 		t.Fatalf("open sqlite: %v", err)
 	}
 	if err := db.AutoMigrate(
-		&model.User{},
-		&model.GuestbookMessage{},
-		&model.OperationLog{},
-		&model.AIUsageLog{},
-		&model.CodeAccessLog{},
-		&model.PostCategory{},
-		&model.PostTag{},
-		&model.Post{},
-		&model.PostComment{},
-		&model.Creator{},
-		&model.CreatorAlbum{},
-		&model.Resource{},
-		&model.DownloadRecord{},
-		&model.UserFavorite{},
-		&model.UserFollow{},
-		&model.UserNotification{},
-		&model.UserAvatarHistory{},
-		&model.BlogCoverUpload{},
-		&model.GuestbookMessage{},
-		&model.LifeTracePlan{},
-		&model.LifeTraceTrace{},
-		&model.LifeTracePantryItem{},
-		&model.LifeTraceAIConversation{},
-		&model.MindArenaDebateSession{},
-		&model.MindArenaDebateMessage{},
-		&model.MindArenaDebateScore{},
-	); err != nil {
+			&model.User{},
+			&model.GuestbookMessage{},
+			&model.OperationLog{},
+			&model.AIUsageLog{},
+			&model.PostCategory{},
+			&model.PostTag{},
+			&model.Post{},
+			&model.PostComment{},
+			&model.UserAlbum{},
+			&model.Resource{},
+			&model.DownloadRecord{},
+			&model.UserFavorite{},
+			&model.UserFollow{},
+			&model.UserNotification{},
+			&model.UserAvatarHistory{},
+			&model.BlogCoverUpload{},
+			&model.LifeTracePlan{},
+			&model.LifeTraceTrace{},
+			&model.LifeTracePantryItem{},
+			&model.LifeTraceAIConversation{},
+			&model.MindArenaDebateSession{},
+			&model.MindArenaDebateMessage{},
+			&model.MindArenaDebateScore{},
+		); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	database.DB = db
@@ -73,7 +70,6 @@ func setupAdminOperationsTestDB(t *testing.T) *gin.Engine {
 	router.GET("/admin/guestbook/messages", AdminListGuestbookMessages)
 	router.PATCH("/admin/guestbook/messages/:id/status", AdminUpdateGuestbookMessageStatus)
 	router.GET("/admin/audit/operation-logs", AdminListOperationLogs)
-	router.GET("/admin/audit/code-access-logs", AdminListCodeAccessLogs)
 	router.GET("/admin/audit/storage-assets", AdminListStorageAssets)
 	router.GET("/admin/ai/usage-logs", AdminListAIUsageLogs)
 	router.GET("/admin/ai/usage-summary", AdminGetAIUsageSummary)
@@ -152,36 +148,22 @@ func TestAdminUpdateGuestbookMessageStatusRejectsUnsupportedStatus(t *testing.T)
 }
 
 func TestAdminAuditListsApplyKeywordAndDateFilters(t *testing.T) {
-	router := setupAdminOperationsTestDB(t)
-	if err := database.DB.Create(&[]model.OperationLog{
-		{ID: 31, LogID: "a", Method: "GET", Path: "/api/v1/admin/users", Status: 200, CreatedAt: time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)},
-		{ID: 32, LogID: "b", Method: "POST", Path: "/api/v1/public/resources", Status: 500, CreatedAt: time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC)},
-	}).Error; err != nil {
-		t.Fatalf("seed operation logs: %v", err)
-	}
-	if err := database.DB.Create(&[]model.CodeAccessLog{
-		{ID: 41, CreatorID: 100, Code: "alpha", IP: "127.0.0.1", CreatedAt: time.Date(2026, 6, 2, 10, 0, 0, 0, time.UTC)},
-		{ID: 42, CreatorID: 101, Code: "beta", IP: "10.0.0.1", CreatedAt: time.Date(2026, 6, 4, 10, 0, 0, 0, time.UTC)},
-	}).Error; err != nil {
-		t.Fatalf("seed code logs: %v", err)
-	}
+		router := setupAdminOperationsTestDB(t)
+		if err := database.DB.Create(&[]model.OperationLog{
+			{ID: 31, LogID: "a", Method: "GET", Path: "/api/v1/admin/users", Status: 200, CreatedAt: time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)},
+			{ID: 32, LogID: "b", Method: "POST", Path: "/api/v1/public/resources", Status: 500, CreatedAt: time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC)},
+		}).Error; err != nil {
+			t.Fatalf("seed operation logs: %v", err)
+		}
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/audit/operation-logs?keyword=admin&dateTo=2026-06-02", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-	data := decodeResponseData(t, rec)
-	if got := int(data["total"].(float64)); got != 1 {
-		t.Fatalf("operation total=%d, want 1", got)
+		req := httptest.NewRequest(http.MethodGet, "/admin/audit/operation-logs?keyword=admin&dateTo=2026-06-02", nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		data := decodeResponseData(t, rec)
+		if got := int(data["total"].(float64)); got != 1 {
+			t.Fatalf("operation total=%d, want 1", got)
+		}
 	}
-
-	req = httptest.NewRequest(http.MethodGet, "/admin/audit/code-access-logs?keyword=alpha&dateFrom=2026-06-01", nil)
-	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-	data = decodeResponseData(t, rec)
-	if got := int(data["total"].(float64)); got != 1 {
-		t.Fatalf("code access total=%d, want 1", got)
-	}
-}
 
 func TestAdminAIUsageLogsFilterAndSummary(t *testing.T) {
 	router := setupAdminOperationsTestDB(t)
@@ -329,16 +311,12 @@ func TestAdminListNotificationsFiltersReadState(t *testing.T) {
 func TestAdminGetUserOperationsReturnsAggregatedActivity(t *testing.T) {
 	router := setupAdminOperationsTestDB(t)
 	user := model.User{ID: 61, Nickname: "Ops User", OpenID: "ops-user", Username: "ops-user", Role: "user", IsActive: true}
-	creatorUser := model.User{ID: 62, Nickname: "Creator", OpenID: "creator", Username: "creator-user", Role: "creator", IsActive: true}
-	creator := model.Creator{ID: 63, UserID: creatorUser.ID, Code: "CREATOR"}
-	resource := model.Resource{ID: 64, UserID: creatorUser.ID, Title: "Ops Resource", URL: "https://example.com/a.png"}
-	post := model.Post{ID: 65, Title: "Ops Post", Slug: "ops-post", Content: "content", AuthorID: creatorUser.ID}
+	followedUser := model.User{ID: 62, Nickname: "Followed", OpenID: "followed", Username: "followed-user", Role: "user", IsActive: true}
+	resource := model.Resource{ID: 64, UserID: followedUser.ID, Title: "Ops Resource", URL: "https://example.com/a.png"}
+	post := model.Post{ID: 65, Title: "Ops Post", Slug: "ops-post", Content: "content", AuthorID: followedUser.ID}
 	guestUserID := user.ID
-	if err := database.DB.Create(&[]model.User{user, creatorUser}).Error; err != nil {
+	if err := database.DB.Create(&[]model.User{user, followedUser}).Error; err != nil {
 		t.Fatalf("seed users: %v", err)
-	}
-	if err := database.DB.Create(&creator).Error; err != nil {
-		t.Fatalf("seed creator: %v", err)
 	}
 	if err := database.DB.Create(&resource).Error; err != nil {
 		t.Fatalf("seed resource: %v", err)
@@ -347,9 +325,9 @@ func TestAdminGetUserOperationsReturnsAggregatedActivity(t *testing.T) {
 		t.Fatalf("seed post: %v", err)
 	}
 	seeds := []interface{}{
-		&model.DownloadRecord{ID: 66, UserID: user.ID, ResourceID: resource.ID, CreatorID: creator.ID},
+		&model.DownloadRecord{ID: 66, UserID: user.ID, ResourceID: resource.ID},
 		&model.UserFavorite{ID: 67, UserID: user.ID, ResourceID: resource.ID},
-		&model.UserFollow{ID: 68, UserID: user.ID, CreatorID: creator.ID},
+		&model.UserFollow{ID: 68, UserID: user.ID, FollowedUserID: followedUser.ID},
 		&model.UserNotification{ID: 69, UserID: user.ID, Type: "admin", Title: "Notice", Content: "Hello"},
 		&model.PostComment{ID: 70, UserID: user.ID, PostID: post.ID, Content: "Comment"},
 		&model.GuestbookMessage{ID: 71, UserID: &guestUserID, Nickname: "Ops User", Content: "Guestbook", Status: "approved"},
@@ -381,20 +359,16 @@ func TestAdminGetUserOperationsReturnsAggregatedActivity(t *testing.T) {
 
 func TestAdminGetResourceOperationsReturnsTagsAlbumsAndCounters(t *testing.T) {
 	router := setupAdminOperationsTestDB(t)
-	uploader := model.User{ID: 81, Nickname: "Uploader", OpenID: "uploader", Username: "uploader", Role: "creator", IsActive: true}
-	creator := model.Creator{ID: 82, UserID: uploader.ID, Code: "UP"}
+	uploader := model.User{ID: 81, Nickname: "Uploader", OpenID: "uploader", Username: "uploader", Role: "user", IsActive: true}
 	resource := model.Resource{
 		ID: 83, UserID: uploader.ID, Title: "Wallpaper", URL: "https://example.com/w.png",
 		StorageKey: "resources/w.png", DownloadCount: 7, FavoriteCount: 3,
 		Tags: model.StringList{"运营"},
 	}
-	album := model.CreatorAlbum{ID: 85, CreatorID: creator.ID, Name: "精选"}
+	album := model.UserAlbum{ID: 85, UserID: uploader.ID, Name: "精选"}
 	favUser := model.User{ID: 86, Nickname: "Fan", OpenID: "fan", Username: "fan", Role: "user", IsActive: true}
 	if err := database.DB.Create(&[]model.User{uploader, favUser}).Error; err != nil {
 		t.Fatalf("seed users: %v", err)
-	}
-	if err := database.DB.Create(&creator).Error; err != nil {
-		t.Fatalf("seed creator: %v", err)
 	}
 	if err := database.DB.Create(&resource).Error; err != nil {
 		t.Fatalf("seed resource: %v", err)
@@ -406,7 +380,7 @@ func TestAdminGetResourceOperationsReturnsTagsAlbumsAndCounters(t *testing.T) {
 		t.Fatalf("append album resource: %v", err)
 	}
 	for _, seed := range []interface{}{
-		&model.DownloadRecord{ID: 87, UserID: favUser.ID, ResourceID: resource.ID, CreatorID: creator.ID},
+		&model.DownloadRecord{ID: 87, UserID: favUser.ID, ResourceID: resource.ID},
 		&model.UserFavorite{ID: 88, UserID: favUser.ID, ResourceID: resource.ID},
 	} {
 		if err := database.DB.Create(seed).Error; err != nil {

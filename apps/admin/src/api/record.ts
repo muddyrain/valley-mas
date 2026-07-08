@@ -7,7 +7,6 @@ export interface DownloadRecord {
   id: string; // Snowflake ID
   userId: string;
   resourceId: string;
-  creatorId: string;
   ip: string;
   userAgent: string;
   createdAt: string;
@@ -23,19 +22,10 @@ export interface DownloadRecord {
     type: string;
     url: string;
   };
-  creator?: {
-    id: string;
-    avatar: string;
-    code: string;
-    user?: {
-      nickname: string;
-    };
-  };
 }
 
 export interface DownloadRecordListParams extends PaginationParams {
   resourceId?: string; // 按资源筛选
-  creatorId?: string; // 按创作者筛选
   userId?: string; // 按用户筛选
   keyword?: string; // 关键词搜索
   resourceType?: string; // 资源类型筛选

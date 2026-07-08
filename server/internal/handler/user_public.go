@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 	"valley-server/internal/database"
@@ -10,96 +11,26 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 )
 
-// GetCreatorSpace 获取创作者空间信息（公开接口，用户端）
-// @Summary      获取创作者空间
-// @Description  通过创作者口令获取创作者空间信息，包含资源列表
+// GetUserSpace 获取用户空间信息（公开接口，用户端）
+// @Summary      获取用户空间
+// @Description  通过用户ID获取用户空间信息，包含资源列表
 // @Tags         用户端 - 公开接口
 // @Accept       json
 // @Produce      json
-// @Param        code  path  string  true  "创作者口令"
+// @Param        id  path  string  true  "用户ID"
 // @Success      200  {object}  map[string]interface{}  "空间信息"
 // @Failure      404  {object}  map[string]interface{}  "空间不存在"
-// @Router       /public/space/{code} [get]
-func GetCreatorSpace(c *gin.Context) {
-	code := c.Param("code")
-
-	db := database.GetDB()
-
-	// 查找创作者
-	var creator model.Creator
-	if err := db.Where("code = ? AND is_active = ?", code, true).
-		Preload("User"). // 预加载用户信息
-		Preload("Space").
-		Preload("Space.Resources", "(visibility = ? OR visibility IS NULL OR visibility = '') AND deleted_at IS NULL", "public").
-		First(&creator).Error; err != nil {
-		Error(c, 404, "创作者不存在或未激活")
-		return
-	}
-
-	// 记录访问日志
-	accessLog := model.CodeAccessLog{
-		ID:        model.Int64String(utils.GenerateID()),
-		CreatorID: creator.ID,
-		Code:      code,
-		IP:        c.ClientIP(),
-		UserAgent: c.GetHeader("User-Agent"),
-	}
-	db.Create(&accessLog)
-
-	// 统计数据
-	var totalViews int64
-	var totalDownloads int64
-	var resourceCount int64
-	var followerCount int64
-	db.Model(&model.CodeAccessLog{}).Where("creator_id = ?", creator.ID).Count(&totalViews)
-	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", creator.ID).Count(&totalDownloads)
-	db.Model(&model.Resource{}).
-		Where("user_id = ? AND deleted_at IS NULL", creator.UserID).
-		Where("(visibility = ? OR visibility IS NULL OR visibility = '')", "public").
-		Count(&resourceCount)
-	db.Model(&model.UserFollow{}).Where("creator_id = ?", creator.ID).Count(&followerCount)
-
-	creatorName := ""
-	creatorAvatar := ""
-	if creator.User != nil {
-		creatorName = creator.User.Nickname
-		creatorAvatar = creator.User.Avatar
-	}
-
-	response := gin.H{
-		"creator": gin.H{
-			"id":          creator.ID,
-			"name":        creatorName,
-			"avatar":      creatorAvatar,
-			"description": creator.Description,
-			"code":        creator.Code,
-		},
-		"stats": gin.H{
-			"totalViews":     totalViews,
-			"totalDownloads": totalDownloads,
-			"resourceCount":  resourceCount,
-			"followerCount":  followerCount,
-		},
-	}
-
-	if creator.Space != nil {
-		response["space"] = gin.H{
-			"id":          creator.Space.ID,
-			"description": creator.Space.Description,
-			"banner":      creator.Space.Banner,
-		}
-		response["resources"] = creator.Space.Resources
-	}
-
-	Success(c, response)
+// @Router       /public/users/{id}/space [get]
+func GetUserSpace(c *gin.Context) {
+	// 空间功能已下线
+	Error(c, http.StatusNotFound, "空间功能已下线")
 }
 
 // DownloadResource 下载资源（公开接口，暂时不需要广告令牌）
 // @Summary      下载资源
-// @Description  用户下载资源，记录下载行为，增加创作者下载量统计
+// @Description  用户下载资源，记录下载行为
 // @Tags         用户端 - 公开接口
 // @Accept       json
 // @Produce      json
@@ -117,17 +48,7 @@ func DownloadResource(c *gin.Context) {
 	if err := db.Where("id = ?", resourceID).
 		Where("(visibility = ? OR visibility IS NULL OR visibility = '')", "public").
 		First(&resource).Error; err != nil {
-		Error(c, 404, "资源不存在")
-		return
-	}
-
-	// 根据资源的 UserID 查找对应的 Creator
-	var creator model.Creator
-	if err := db.Where("user_id = ?", resource.UserID).First(&creator).Error; err != nil {
-		ErrorWithDetail(c, 500, "查询创作者信息失败", err, logrus.Fields{
-			"resource_id": resourceID,
-			"user_id":     resource.UserID,
-		})
+		Error(c, http.StatusNotFound, "资源不存在")
 		return
 	}
 
@@ -144,7 +65,6 @@ func DownloadResource(c *gin.Context) {
 		ID:         model.Int64String(utils.GenerateID()),
 		UserID:     userID, // 如果未登录则为 0
 		ResourceID: resource.ID,
-		CreatorID:  creator.ID, // 使用 Creator.ID 而不是 User.ID
 		IP:         c.ClientIP(),
 		UserAgent:  c.GetHeader("User-Agent"),
 	}
@@ -153,7 +73,6 @@ func DownloadResource(c *gin.Context) {
 		ErrorWithDetail(c, 500, "创建下载记录失败", err, logrus.Fields{
 			"resource_id": resourceID,
 			"user_id":     userID,
-			"creator_id":  creator.ID,
 		})
 		// 记录失败不影响下载，继续返回下载链接
 		logger.Warn(c, "Failed to create download record, but continue download", logrus.Fields{
@@ -168,7 +87,6 @@ func DownloadResource(c *gin.Context) {
 	logger.Info(c, "Resource downloaded", logrus.Fields{
 		"resource_id":    resourceID,
 		"user_id":        userID,
-		"creator_id":     creator.ID,
 		"download_count": resource.DownloadCount + 1,
 	})
 
@@ -215,8 +133,7 @@ func GetMyDownloads(c *gin.Context) {
 	query := db.Model(&model.DownloadRecord{}).Where("user_id = ?", userID)
 	query.Count(&total)
 	query.Preload("Resource").
-		Preload("Creator").
-		Preload("Creator.User").
+		Preload("User").
 		Offset(offset).
 		Limit(pageSize).
 		Order("created_at DESC").
@@ -235,24 +152,24 @@ func GetMyDownloads(c *gin.Context) {
 	})
 }
 
-// GetCreatorResourcesList 获取创作者的资源列表（公开接口）
-// @Summary      获取创作者资源列表
-// @Description  通过创作者ID获取该创作者的所有资源
+// GetUserResourcesList 获取用户的资源列表（公开接口）
+// @Summary      获取用户资源列表
+// @Description  通过用户ID获取该用户的所有资源
 // @Tags         用户端 - 公开接口
 // @Accept       json
 // @Produce      json
-// @Param        id        path   string  true   "创作者ID"
+// @Param        id        path   string  true   "用户ID"
 // @Param        page      query  int     false  "页码"      default(1)
 // @Param        pageSize  query  int     false  "每页数量"  default(20)
 // @Param        type      query  string  false  "资源类型(avatar/wallpaper)"
 // @Success      200  {object}  map[string]interface{}  "资源列表"
-// @Failure      404  {object}  map[string]interface{}  "创作者不存在"
-// @Router       /public/creators/{id}/resources [get]
-func GetCreatorResourcesList(c *gin.Context) {
+// @Failure      404  {object}  map[string]interface{}  "用户不存在"
+// @Router       /public/users/{id}/resources [get]
+func GetUserResourcesList(c *gin.Context) {
 	logger.SkipOperationLog(c)
 	setPublicListCacheHeaders(c)
 
-	creatorID := c.Param("id")
+	userIDStr := c.Param("id")
 	page := GetIntQuery(c, "page", 1)
 	pageSize := GetIntQuery(c, "pageSize", 20)
 	resourceType := c.Query("type")
@@ -266,21 +183,21 @@ func GetCreatorResourcesList(c *gin.Context) {
 
 	db := database.GetDB()
 
-	// 验证创作者是否存在
-	var creator model.Creator
-	if err := db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", creatorID, true).
-		Preload("User", func(db *gorm.DB) *gorm.DB {
-			return db.Select("id, nickname, avatar")
-		}).
-		First(&creator).Error; err != nil {
-		Error(c, 404, "创作者不存在或未激活")
+	// 验证用户是否存在
+	var targetUser model.User
+	targetUserID := model.Int64String(0)
+	if err := targetUserID.Scan(userIDStr); err != nil {
+		Error(c, http.StatusBadRequest, "用户ID格式错误")
+		return
+	}
+	if err := db.Where("id = ? AND deleted_at IS NULL", targetUserID).First(&targetUser).Error; err != nil {
+		Error(c, http.StatusNotFound, "用户不存在")
 		return
 	}
 
-	// 查询资源（resources 表用 user_id 关联上传者，不是 creator_id）
-	// 注意：album 过滤会 JOIN 多张带 deleted_at 的表，这里必须显式表前缀避免歧义。
+	// 查询资源
 	query := db.Model(&model.Resource{}).
-		Where("resources.user_id = ? AND resources.deleted_at IS NULL", creator.UserID).
+		Where("resources.user_id = ? AND resources.deleted_at IS NULL", targetUserID).
 		Where("(resources.visibility = ? OR resources.visibility IS NULL OR resources.visibility = '')", "public")
 
 	// 按类型筛选
@@ -297,13 +214,13 @@ func GetCreatorResourcesList(c *gin.Context) {
 	if albumIDRaw != "" {
 		var albumID model.Int64String
 		if err := albumID.Scan(albumIDRaw); err != nil {
-			Error(c, 400, "专辑ID格式错误")
+			Error(c, http.StatusBadRequest, "专辑ID格式错误")
 			return
 		}
 		query = query.
-			Joins("JOIN creator_album_resources ON creator_album_resources.resource_id = resources.id").
-			Joins("JOIN creator_albums ON creator_albums.id = creator_album_resources.creator_album_id AND creator_albums.deleted_at IS NULL").
-			Where("creator_albums.id = ? AND creator_albums.creator_id = ? AND creator_albums.deleted_at IS NULL", albumID, creator.ID)
+			Joins("JOIN user_album_resources ON user_album_resources.resource_id = resources.id").
+			Joins("JOIN user_albums ON user_albums.id = user_album_resources.user_album_id AND user_albums.deleted_at IS NULL").
+			Where("user_albums.id = ? AND user_albums.user_id = ? AND user_albums.deleted_at IS NULL", albumID, targetUserID)
 	}
 
 	// 统计总数
@@ -323,12 +240,8 @@ func GetCreatorResourcesList(c *gin.Context) {
 		return
 	}
 
-	creatorName := ""
-	creatorAvatar := ""
-	if creator.User != nil {
-		creatorName = creator.User.Nickname
-		creatorAvatar = creator.User.Avatar
-	}
+	userName := targetUser.Nickname
+		userAvatar := targetUser.Avatar
 
 	resourceIDs := collectResourceIDs(resources)
 	favoritedSet := loadFavoritedSetForResources(db, c, resourceIDs)
@@ -351,8 +264,8 @@ func GetCreatorResourcesList(c *gin.Context) {
 			"downloadCount": resource.DownloadCount,
 			"favoriteCount": resource.FavoriteCount,
 			"userId":        resource.UserID,
-			"creatorName":   creatorName,
-			"creatorAvatar": creatorAvatar,
+			"userName":     userName,
+				"userAvatar":   userAvatar,
 			"createdAt":     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			"isFavorited":   favoritedSet[rid],
 			"tags":          resource.Tags,

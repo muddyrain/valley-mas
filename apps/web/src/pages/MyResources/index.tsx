@@ -18,7 +18,7 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { type Album, getMyCreatorAlbums } from '@/api/creator';
+import { getMyUserAlbums, type UserAlbum } from '@/api/album';
 import {
   batchDeleteResources,
   batchUpdateVisibility,
@@ -87,7 +87,7 @@ export default function MyResources() {
   const [editTarget, setEditTarget] = useState<MyResource | null>(null);
 
   // 专辑筛选
-  const [albums, setAlbums] = useState<Album[]>([]);
+  const [albums, setAlbums] = useState<UserAlbum[]>([]);
   const [albumsLoading, setAlbumsLoading] = useState(true);
 
   // 批量操作状态
@@ -103,7 +103,7 @@ export default function MyResources() {
   const loadAlbums = useCallback(async () => {
     try {
       setAlbumsLoading(true);
-      const data = await getMyCreatorAlbums();
+      const data = await getMyUserAlbums();
       setAlbums(data.list || []);
     } catch {
       // 静默失败

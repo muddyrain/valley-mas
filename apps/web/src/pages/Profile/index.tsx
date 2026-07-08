@@ -36,7 +36,6 @@ import { createRandomCnNickname } from '@/utils/randomNickname';
 
 const ROLE_MAP: Record<string, { label: string; badgeClass: string }> = {
   admin: { label: '管理员', badgeClass: 'bg-destructive/15 text-destructive' },
-  creator: { label: '创作者', badgeClass: 'bg-accent text-primary' },
   user: { label: '普通用户', badgeClass: 'bg-muted text-muted-foreground' },
 };
 

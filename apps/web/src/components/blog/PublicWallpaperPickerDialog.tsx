@@ -141,7 +141,7 @@ export function PublicWallpaperPickerBody({
                   selected={selected}
                   onClick={onSelect}
                   enablePreview={false}
-                  showCreator
+                  showUser
                   showTags
                   contentPadding="px-3 py-2.5"
                 />

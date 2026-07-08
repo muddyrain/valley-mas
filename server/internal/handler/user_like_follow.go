@@ -138,29 +138,7 @@ func GetMyFavorites(c *gin.Context) {
 		Limit(pageSize).
 		Find(&favorites)
 
-	creatorCodeMap := map[model.Int64String]string{}
-	resourceUserIDs := make([]model.Int64String, 0, len(favorites))
-	seenUserIDs := map[model.Int64String]struct{}{}
-	for i := range favorites {
-		if favorites[i].Resource == nil {
-			continue
-		}
-		resourceUserID := favorites[i].Resource.UserID
-		if _, ok := seenUserIDs[resourceUserID]; ok {
-			continue
-		}
-		seenUserIDs[resourceUserID] = struct{}{}
-		resourceUserIDs = append(resourceUserIDs, resourceUserID)
-	}
-	if len(resourceUserIDs) > 0 {
-		var creators []model.Creator
-		db.Select("user_id, code").
-			Where("user_id IN ? AND is_active = ? AND deleted_at IS NULL", resourceUserIDs, true).
-			Find(&creators)
-		for i := range creators {
-			creatorCodeMap[creators[i].UserID] = creators[i].Code
-		}
-	}
+	// 不再查询 creatorCodeMap（Creator 模型已移除）
 
 	list := make([]gin.H, 0, len(favorites))
 	for i := range favorites {
@@ -169,11 +147,11 @@ func GetMyFavorites(c *gin.Context) {
 			resource := favorites[i].Resource
 			resource.FillThumbnailURL()
 
-			creatorName := ""
-			creatorAvatar := ""
+			userName := ""
+			userAvatar := ""
 			if resource.User != nil {
-				creatorName = resource.User.Nickname
-				creatorAvatar = resource.User.Avatar
+				userName = resource.User.Nickname
+				userAvatar = resource.User.Avatar
 			}
 
 			resourcePayload = gin.H{
@@ -187,9 +165,8 @@ func GetMyFavorites(c *gin.Context) {
 				"downloadCount": resource.DownloadCount,
 				"favoriteCount": resource.FavoriteCount,
 				"userId":        resource.UserID,
-				"creatorName":   creatorName,
-				"creatorAvatar": creatorAvatar,
-				"creatorCode":   creatorCodeMap[resource.UserID],
+				"userName":      userName,
+				"userAvatar":    userAvatar,
 				"tags":          resource.Tags,
 				"createdAt":     resource.CreatedAt,
 				"size":          resource.Size,
@@ -197,8 +174,8 @@ func GetMyFavorites(c *gin.Context) {
 				"height":        resource.Height,
 				"extension":     resource.Extension,
 				"isFavorited":   true,
+				}
 			}
-		}
 
 		list = append(list, gin.H{
 			"id":         favorites[i].ID,
@@ -278,45 +255,48 @@ func BatchGetFavoriteStatus(c *gin.Context) {
 	Success(c, gin.H{"favorited": result})
 }
 
-// ========== 关注创作者 ==========
+// ========== 关注用户 ==========
 
-// FollowCreator 关注创作者
-// POST /api/v1/user/creators/:id/follow
-func FollowCreator(c *gin.Context) {
+// FollowUser 关注用户
+// POST /api/v1/user/users/:id/follow
+func FollowUser(c *gin.Context) {
 	userID, exists := c.Get("userId")
 	if !exists {
 		Error(c, 401, "未登录")
 		return
 	}
 
-	creatorID := c.Param("id")
+	followedUserIDStr := c.Param("id")
 	db := database.GetDB()
 
-	// 检查创作者是否存在
-	var creator model.Creator
-	if err := db.First(&creator, "id = ?", creatorID).Error; err != nil {
-		Error(c, 404, "创作者不存在")
+	// 检查被关注用户是否存在
+	var followedUser model.User
+	followedUserID := model.Int64String(0)
+	if err := followedUserID.Scan(followedUserIDStr); err != nil {
+		Error(c, 400, "用户ID格式错误")
+		return
+	}
+	if err := db.Where("id = ? AND deleted_at IS NULL", followedUserID).First(&followedUser).Error; err != nil {
+		Error(c, 404, "用户不存在")
 		return
 	}
 
 	uid := model.Int64String(userID.(int64))
 
 	// 不能关注自己
-	if creator.UserID == uid {
+	if followedUserID == uid {
 		Error(c, 400, "不能关注自己")
 		return
 	}
 
-	cid := creator.ID
-
 	// 检查是否已关注（含软删除）
 	var existing model.UserFollow
-	err := db.Unscoped().Where("user_id = ? AND creator_id = ?", uid, cid).First(&existing).Error
+	err := db.Unscoped().Where("user_id = ? AND followed_user_id = ?", uid, followedUserID).First(&existing).Error
 	if err == nil {
 		if existing.DeletedAt.Valid {
 			// 恢复关注
 			if err := db.Unscoped().Model(&existing).Update("deleted_at", nil).Error; err != nil {
-				logger.Log.WithField("error", err).Error("FollowCreator restore failed")
+				logger.Log.WithField("error", err).Error("FollowUser restore failed")
 				Error(c, 500, "关注失败："+err.Error())
 				return
 			}
@@ -326,42 +306,41 @@ func FollowCreator(c *gin.Context) {
 		}
 	} else if err == gorm.ErrRecordNotFound {
 		follow := model.UserFollow{
-			ID:        model.Int64String(utils.GenerateID()),
-			UserID:    uid,
-			CreatorID: cid,
+			ID:             model.Int64String(utils.GenerateID()),
+			UserID:         uid,
+			FollowedUserID: followedUserID,
 		}
 		if err := db.Create(&follow).Error; err != nil {
-			logger.Log.WithField("error", err).Error("FollowCreator create failed")
+			logger.Log.WithField("error", err).Error("FollowUser create failed")
 			Error(c, 500, "关注失败："+err.Error())
 			return
 		}
 	} else {
-		logger.Log.WithField("error", err).Error("FollowCreator check existing failed")
+		logger.Log.WithField("error", err).Error("FollowUser check existing failed")
 		Error(c, 500, "操作失败："+err.Error())
 		return
 	}
 
-	// 更新创作者粉丝数缓存（followerCount 字段如存在可直接+1，这里实时统计即可）
 	Success(c, gin.H{"following": true})
 }
 
-// UnfollowCreator 取消关注创作者
-// DELETE /api/v1/user/creators/:id/follow
-func UnfollowCreator(c *gin.Context) {
+// UnfollowUser 取消关注用户
+// DELETE /api/v1/user/users/:id/follow
+func UnfollowUser(c *gin.Context) {
 	userID, exists := c.Get("userId")
 	if !exists {
 		Error(c, 401, "未登录")
 		return
 	}
 
-	creatorID := c.Param("id")
+	followedUserIDStr := c.Param("id")
 	db := database.GetDB()
 	uid := model.Int64String(userID.(int64))
 
-	result := db.Where("user_id = ? AND creator_id = ?", uid, creatorID).
+	result := db.Where("user_id = ? AND followed_user_id = ?", uid, followedUserIDStr).
 		Delete(&model.UserFollow{})
 	if result.Error != nil {
-		logger.Log.WithField("error", result.Error).Error("UnfollowCreator delete failed")
+		logger.Log.WithField("error", result.Error).Error("UnfollowUser delete failed")
 		Error(c, 500, "取消关注失败："+result.Error.Error())
 		return
 	}
@@ -369,7 +348,7 @@ func UnfollowCreator(c *gin.Context) {
 	Success(c, gin.H{"following": false})
 }
 
-// GetMyFollows 获取我关注的创作者列表
+// GetMyFollows 获取我关注的用户列表
 // GET /api/v1/user/follows
 func GetMyFollows(c *gin.Context) {
 	userID, exists := c.Get("userId")
@@ -393,9 +372,8 @@ func GetMyFollows(c *gin.Context) {
 
 	query := db.Model(&model.UserFollow{}).Where("user_id = ?", uid)
 	query.Count(&total)
-	query.Preload("Creator").
-		Preload("Creator.User").
-		Order("created_at DESC").
+	query.Preload("FollowedUser").
+			Order("created_at DESC").
 		Offset(offset).
 		Limit(pageSize).
 		Find(&follows)
@@ -408,37 +386,35 @@ func GetMyFollows(c *gin.Context) {
 	})
 }
 
-// GetCreatorFollowStatus 查询当前用户对某创作者的关注状态
-// GET /api/v1/user/creators/:id/follow/status
-func GetCreatorFollowStatus(c *gin.Context) {
+// GetUserFollowStatus 查询当前用户对某用户的关注状态
+// GET /api/v1/user/users/:id/follow/status
+func GetUserFollowStatus(c *gin.Context) {
 	userID, exists := c.Get("userId")
 	if !exists {
 		Error(c, 401, "未登录")
 		return
 	}
 
-	creatorID := c.Param("id")
+	followedUserIDStr := c.Param("id")
 	db := database.GetDB()
 	uid := model.Int64String(userID.(int64))
-
-	// 查询该创作者信息，判断是否是自己
-	var creator model.Creator
-	if err := db.First(&creator, "id = ?", creatorID).Error; err != nil {
-		Error(c, 404, "创作者不存在")
+	followedUserID := model.Int64String(0)
+	if err := followedUserID.Scan(followedUserIDStr); err != nil {
+		Error(c, 400, "用户ID格式错误")
 		return
 	}
 
-	isSelf := creator.UserID == uid
+	isSelf := followedUserID == uid
 
 	var count int64
 	db.Model(&model.UserFollow{}).
-		Where("user_id = ? AND creator_id = ?", uid, creatorID).
+		Where("user_id = ? AND followed_user_id = ?", uid, followedUserID).
 		Count(&count)
 
 	// 同时返回粉丝总数
 	var followerCount int64
 	db.Model(&model.UserFollow{}).
-		Where("creator_id = ?", creatorID).
+		Where("followed_user_id = ?", followedUserID).
 		Count(&followerCount)
 
 	Success(c, gin.H{

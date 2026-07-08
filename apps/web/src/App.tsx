@@ -9,8 +9,6 @@ import BlogGroupManage from './pages/BlogGroupManage';
 import BlogList from './pages/blog/BlogList';
 import BlogPost from './pages/blog/BlogPost';
 import ClimberLab from './pages/ClimberLab';
-import Creator from './pages/Creator';
-import CreatorProfile from './pages/CreatorProfile';
 import Downloads from './pages/Downloads';
 import Favorites from './pages/Favorites';
 import Follows from './pages/Follows';
@@ -26,7 +24,6 @@ import NotFound from './pages/NotFound';
 import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
 import Register from './pages/Register';
-import ResourceAlbumManage from './pages/ResourceAlbumManage';
 import ResourceDetail from './pages/ResourceDetail';
 import Resources from './pages/Resources';
 import ScratchLegendLab from './pages/ScratchLegendLab';
@@ -68,16 +65,10 @@ function RouteTitle() {
       title = '编辑博客 | Valley';
     } else if (pathname === '/my-space/blog-groups') {
       title = '博客分组管理 | Valley';
-    } else if (pathname === '/my-space/resource-albums') {
-      title = '资源专辑管理 | Valley';
     } else if (pathname === '/my-space/resources') {
       title = '资源管理 | Valley';
     } else if (pathname === '/my-space/posts') {
       title = '内容管理 | Valley';
-    } else if (pathname === '/creators') {
-      title = '创作者列表 | Valley';
-    } else if (pathname.startsWith('/creator/')) {
-      title = '创作者空间 | Valley';
     } else if (pathname === '/favorites') {
       title = '我的收藏 | Valley';
     } else if (pathname === '/follows') {
@@ -120,8 +111,6 @@ function App() {
       <Routes>
         <Route path="/" element={<WorkbenchLayout />}>
           <Route index element={<Home />} />
-          <Route path="creators" element={<Creator />} />
-          <Route path="creator/:code" element={<CreatorProfile />} />
           <Route path="resources" element={<Resources />} />
           <Route path="resource/:id" element={<ResourceDetail />} />
           <Route path="my-space" element={<MySpace />} />
@@ -130,7 +119,6 @@ function App() {
           <Route path="my-space/blog-create" element={<BlogCreate />} />
           <Route path="my-space/blog-edit/:id" element={<BlogCreate />} />
           <Route path="my-space/blog-groups" element={<BlogGroupManage />} />
-          <Route path="my-space/resource-albums" element={<ResourceAlbumManage />} />
           <Route path="my-space/resources" element={<MyResources />} />
           <Route path="my-space/posts" element={<MyPosts />} />
           <Route path="profile" element={<Profile />} />

@@ -94,8 +94,8 @@ func AdminBlogWorkflowImport(c *gin.Context) {
 		Error(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	if role != "admin" && role != "creator" {
-		Error(c, http.StatusForbidden, "creator required")
+	if role != "admin" && role != "user" {
+		Error(c, http.StatusForbidden, "登录后即可操作")
 		return
 	}
 
@@ -165,8 +165,8 @@ func AdminBlogWorkflowPublish(c *gin.Context) {
 		Error(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	if role != "admin" && role != "creator" {
-		Error(c, http.StatusForbidden, "creator required")
+	if role != "admin" && role != "user" {
+		Error(c, http.StatusForbidden, "登录后即可操作")
 		return
 	}
 

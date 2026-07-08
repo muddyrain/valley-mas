@@ -1,32 +1,25 @@
 import { ArrowUpRight, Brain, Gamepad2, TicketPercent, Wrench } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 
 // ── 类型 ──────────────────────────────────────────────────────────────────────
 
 export type LabStatus = 'live' | 'beta' | 'soon';
 
 export type LabEntry = {
-  /** 唯一标识，用于 key */
   id: string;
-  /** 图标节点 */
   icon: ReactNode;
-  /** 分类标签文字 */
   tag: string;
-  /** 标题 */
   title: string;
-  /** 一句话描述 */
   description: string;
-  /** 状态标签 */
   status: LabStatus;
-  /** 点击时跳转的 URL（外链或 path） */
   href: string;
-  /** 是否在新 tab 打开（外链默认 true） */
   external?: boolean;
-  /** 卡片渐变色主题 */
   colorTheme: 'violet' | 'emerald' | 'amber' | 'sky';
 };
 
-// ── 预设实验场目录（后续追加只需在这里加对象）─────────────────────────────────
+// ── 预设实验场目录 ────────────────────────────────────────────────────────────
 
 const MIND_ARENA_URL =
   (import.meta.env.VITE_MIND_ARENA_URL as string | undefined)?.replace(/\/$/, '') ||
@@ -81,73 +74,6 @@ export const labEntries: LabEntry[] = [
   },
 ];
 
-// ── 颜色 Token 映射 ────────────────────────────────────────────────────────────
-
-const colorMap: Record<
-  LabEntry['colorTheme'],
-  {
-    card: string;
-    glow: string;
-    iconBg: string;
-    iconText: string;
-    tag: string;
-    tagDot: string;
-    accent: string;
-    liveDot: string;
-    liveBg: string;
-    liveText: string;
-  }
-> = {
-  violet: {
-    card: 'bg-card',
-    glow: 'bg-[radial-gradient(circle_at_80%_20%,hsl(var(--accent)/0.6),transparent_55%)]',
-    iconBg: 'bg-accent border-border',
-    iconText: 'text-primary',
-    tag: 'bg-accent text-accent-foreground border-border',
-    tagDot: 'bg-primary',
-    accent: 'from-primary/70 to-primary/70',
-    liveDot: 'bg-primary',
-    liveBg: 'bg-accent border-border',
-    liveText: 'text-primary',
-  },
-  emerald: {
-    card: 'bg-card',
-    glow: 'bg-[radial-gradient(circle_at_80%_20%,hsl(var(--accent)/0.6),transparent_55%)]',
-    iconBg: 'bg-accent border-border',
-    iconText: 'text-primary',
-    tag: 'bg-accent text-accent-foreground border-border',
-    tagDot: 'bg-primary',
-    accent: 'from-primary/70 to-primary/70',
-    liveDot: 'bg-primary',
-    liveBg: 'bg-accent border-border',
-    liveText: 'text-primary',
-  },
-  amber: {
-    card: 'bg-card',
-    glow: 'bg-[radial-gradient(circle_at_80%_20%,hsl(var(--accent)/0.4),transparent_55%)]',
-    iconBg: 'bg-accent border-border',
-    iconText: 'text-primary',
-    tag: 'bg-accent text-accent-foreground border-border',
-    tagDot: 'bg-primary',
-    accent: 'from-primary/70 to-primary/70',
-    liveDot: 'bg-primary',
-    liveBg: 'bg-accent border-border',
-    liveText: 'text-primary',
-  },
-  sky: {
-    card: 'bg-card',
-    glow: 'bg-[radial-gradient(circle_at_80%_20%,hsl(var(--accent)/0.6),transparent_55%)]',
-    iconBg: 'bg-accent border-border',
-    iconText: 'text-primary',
-    tag: 'bg-accent text-accent-foreground border-border',
-    tagDot: 'bg-primary',
-    accent: 'from-primary/70 to-primary/70',
-    liveDot: 'bg-primary',
-    liveBg: 'bg-accent border-border',
-    liveText: 'text-primary',
-  },
-};
-
 const statusLabelMap: Record<LabStatus, string> = {
   live: '已上线',
   beta: 'Beta',
@@ -157,8 +83,6 @@ const statusLabelMap: Record<LabStatus, string> = {
 // ── 单张卡片 ──────────────────────────────────────────────────────────────────
 
 function LabCard({ entry }: { entry: LabEntry }) {
-  const c = colorMap[entry.colorTheme];
-
   const handleClick = () => {
     if (entry.external) {
       window.open(entry.href, '_blank', 'noopener,noreferrer');
@@ -168,58 +92,35 @@ function LabCard({ entry }: { entry: LabEntry }) {
   };
 
   return (
-    <button
-      type="button"
+    <Card
+      className="cursor-pointer transition hover:border-accent hover:shadow"
       onClick={handleClick}
-      className={`group relative flex flex-col overflow-hidden rounded-[28px] border border-border/10 p-5 text-left shadow-[0_20px_52px_hsl(var(--foreground)/0.32)] transition-all duration-300 hover:-translate-y-1.5 hover:border-border/18 hover:shadow-[0_28px_64px_hsl(var(--foreground)/0.42)] ${c.card}`}
     >
-      {/* 光晕 */}
-      <div className={`pointer-events-none absolute inset-0 ${c.glow}`} />
-      {/* 顶部高光线 */}
-      <div
-        className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent ${c.accent} to-transparent opacity-60`}
-      />
-      {/* 悬停扫光 */}
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,transparent_16%,hsl(var(--foreground) / 0.06)_52%,transparent_88%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-
-      {/* 头部：图标 + 分类标签 */}
-      <div className="relative mb-4 flex items-start justify-between gap-3">
-        <div
-          className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${c.iconBg} ${c.iconText} shadow-[0_8px_20px_hsl(var(--foreground)/0.22)]`}
-        >
-          {entry.icon}
+      <CardContent className="p-5">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-primary">
+            {entry.icon}
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <Badge variant="outline">{entry.tag}</Badge>
+            <Badge variant="secondary">
+              <span
+                className={`mr-1 h-1.5 w-1.5 rounded-full bg-primary ${entry.status === 'live' ? 'animate-pulse' : ''}`}
+              />
+              {statusLabelMap[entry.status]}
+            </Badge>
+          </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${c.tag}`}
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${c.tagDot}`} />
-            {entry.tag}
-          </span>
-          {/* 状态 */}
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${c.liveBg} ${c.liveText}`}
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${c.liveDot} ${entry.status === 'live' ? 'animate-pulse' : ''}`}
-            />
-            {statusLabelMap[entry.status]}
-          </span>
+
+        <div className="text-base font-semibold text-foreground">{entry.title}</div>
+        <div className="mt-2 text-sm text-muted-foreground">{entry.description}</div>
+
+        <div className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span>{entry.external ? '前往体验' : '立即进入'}</span>
+          <ArrowUpRight className="h-3.5 w-3.5" />
         </div>
-      </div>
-
-      {/* 内容 */}
-      <div className="relative flex-1">
-        <div className="text-[17px] font-semibold leading-snug text-foreground">{entry.title}</div>
-        <div className="mt-2 text-sm leading-7 text-muted-foreground/55">{entry.description}</div>
-      </div>
-
-      {/* 底部跳转提示 */}
-      <div className="relative mt-5 flex items-center gap-1.5 text-xs text-muted-foreground/40 transition-colors duration-300 group-hover:text-muted-foreground/70">
-        <span>{entry.external ? '前往体验' : '立即进入'}</span>
-        <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-      </div>
-    </button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -227,45 +128,54 @@ function LabCard({ entry }: { entry: LabEntry }) {
 
 export default function HomeLabSection() {
   return (
-    <section className="mt-20 px-4 sm:mt-24 sm:px-0">
-      {/* 标题栏 */}
-      <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-3">
-          <div className="inline-flex items-center rounded-full border border-accent bg-accent/50 px-4 py-1.5 text-[11px] tracking-[0.24em] text-primary uppercase shadow-sm backdrop-blur sm:tracking-[0.3em]">
-            LABS & TOOLS
+    <section className="mt-10">
+      <SectionHeading
+        eyebrow="LABS & TOOLS"
+        title="互动实验场"
+        description="这里是各种实验性项目的聚集地，包含 AI 对战、小游戏和实用工具。后续还有更多在路上。"
+      />
+      <Card>
+        <CardContent className="p-4 sm:p-6">
+          <div className="mb-5 flex items-center gap-3">
+            <Badge variant="secondary">
+              <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              {labEntries.filter((e) => e.status === 'live').length} 个已上线 · {labEntries.length}{' '}
+              个项目
+            </Badge>
           </div>
-          <div className="space-y-2">
-            <h2 className="text-[30px] font-semibold tracking-[-0.045em] text-foreground sm:text-[34px] md:text-[46px]">
-              互动实验场
-            </h2>
-            <p className="max-w-2xl text-[15px] leading-8 text-muted-foreground md:text-base">
-              这里是各种实验性项目的聚集地，包含 AI 对战、小游戏和实用工具。后续还有更多在路上。
-            </p>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {labEntries.map((entry) => (
+              <LabCard key={entry.id} entry={entry} />
+            ))}
           </div>
-        </div>
-      </div>
-
-      {/* 卡片网格 */}
-      <div className="relative overflow-hidden rounded-[30px] border border-border/12 bg-card p-4 shadow-[0_28px_72px_hsl(var(--foreground)/0.28)] sm:rounded-[38px] sm:p-5 md:p-6">
-        {/* 背景光晕装饰 */}
-        <div className="pointer-events-none absolute -left-24 -top-24 h-80 w-80 rounded-full bg-[radial-gradient(circle,hsl(var(--primary) / 0.14),transparent_60%)]" />
-        <div className="pointer-events-none absolute -bottom-20 -right-20 h-72 w-72 rounded-full bg-[radial-gradient(circle,hsl(var(--primary) / 0.10),transparent_60%)]" />
-
-        {/* 顶部小标签 */}
-        <div className="relative mb-5 flex items-center gap-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border/10 bg-card/6 px-3 py-1.5 text-[11px] tracking-[0.18em] text-muted-foreground/50 uppercase">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            {labEntries.filter((e) => e.status === 'live').length} 个已上线 · {labEntries.length}{' '}
-            个项目
-          </div>
-        </div>
-
-        <div className="relative grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {labEntries.map((entry) => (
-            <LabCard key={entry.id} entry={entry} />
-          ))}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </section>
+  );
+}
+
+// Re-use SectionHeading locally to avoid import cycle
+function SectionHeading({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="mb-7 flex flex-col gap-3">
+      <div className="inline-flex items-center rounded-full border border-accent bg-accent px-4 py-1.5 text-[11px] tracking-[0.24em] text-primary uppercase">
+        {eyebrow}
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl">
+          {title}
+        </h2>
+        {description ? <p className="max-w-2xl text-muted-foreground">{description}</p> : null}
+      </div>
+    </div>
   );
 }

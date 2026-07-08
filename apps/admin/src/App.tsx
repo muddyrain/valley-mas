@@ -4,12 +4,10 @@ import { useEffect, useRef } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { reqGetCurrentUser } from './api/auth';
 import Layout from './layouts/Layout';
-import ApplyCreator from './pages/ApplyCreator';
 import AIUsageLogs from './pages/admin-ops/AIUsageLogs';
 import AuditLogs from './pages/admin-ops/AuditLogs';
 import BlogComments from './pages/admin-ops/BlogComments';
 import BlogTaxonomy from './pages/admin-ops/BlogTaxonomy';
-import CreatorAlbums from './pages/admin-ops/CreatorAlbums';
 import GuestbookMessages from './pages/admin-ops/GuestbookMessages';
 import LifeTraceOps from './pages/admin-ops/LifeTraceOps';
 import MindArenaDebates from './pages/admin-ops/MindArenaDebates';
@@ -18,10 +16,6 @@ import Relations from './pages/admin-ops/Relations';
 import ResourceTags from './pages/admin-ops/ResourceTags';
 import BlogPostEdit from './pages/BlogPostEdit';
 import BlogPosts from './pages/BlogPosts';
-import CreatorApplications from './pages/CreatorApplications';
-import CreatorDashboard from './pages/CreatorDashboard';
-import CreatorSpaces from './pages/CreatorSpaces';
-import Creators from './pages/Creators';
 import Dashboard from './pages/Dashboard';
 import Feedbacks from './pages/Feedbacks';
 import LifeTrace from './pages/LifeTrace';
@@ -117,14 +111,9 @@ function App() {
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="creator-dashboard" element={<CreatorDashboard />} />
           <Route path="users" element={<Users />} />
           <Route path="feedbacks" element={<Feedbacks />} />
           <Route path="life-trace" element={<LifeTrace />} />
-          <Route path="creators" element={<Creators />} />
-          <Route path="creators/:creatorId/spaces" element={<CreatorSpaces />} />
-          <Route path="creator-applications" element={<CreatorApplications />} />
-          <Route path="apply-creator" element={<ApplyCreator />} />
           <Route path="resources" element={<Resources />} />
           <Route path="records" element={<Records />} />
           <Route path="system-updates" element={<Navigate to="/dashboard" replace />} />
@@ -137,7 +126,6 @@ function App() {
           <Route path="blog-comments" element={<BlogComments />} />
           <Route path="guestbook" element={<GuestbookMessages />} />
           <Route path="resource-tags" element={<ResourceTags />} />
-          <Route path="creator-albums" element={<CreatorAlbums />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="relations/favorites" element={<Relations kind="favorites" />} />
           <Route path="relations/follows" element={<Relations kind="follows" />} />

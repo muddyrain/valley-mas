@@ -12,7 +12,7 @@ import (
 )
 
 // SuggestResourceTags 根据图片 base64 + 类型 + 标题在线生成候选标签
-// POST /creator/ai/suggest-tags
+// POST /api/v1/admin/ai/resource-tags/suggest
 // Body: { "imageBase64": "data:image/jpeg;base64,...", "type": "wallpaper", "title": "童年小悟空", "description": "" }
 // Response: { "tags": ["国风", "水墨"], "model": "ep-xxx" }
 //

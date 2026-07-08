@@ -1,7 +1,7 @@
 import { ArrowRight, Loader2, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getMyFollows, type MyFollowItem } from '@/api/creator';
+import { type FollowItem, getMyFollows } from '@/api/follow';
 import EmptyState from '@/components/EmptyState';
 import PageBanner from '@/components/PageBanner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,14 +23,14 @@ export default function Follows() {
   const { page: currentPage, setPage } = useUrlPaginationQuery();
   const { hasHydrated, isAuthenticated } = useAuthStore();
 
-  const [items, setItems] = useState<MyFollowItem[]>([]);
+  const [items, setItems] = useState<FollowItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const loadFollowsToPage = async (targetPage: number) => {
     try {
       setLoading(true);
-      let merged: MyFollowItem[] = [];
+      let merged: FollowItem[] = [];
       let latestTotal = 0;
       for (let pageNo = 1; pageNo <= targetPage; pageNo += 1) {
         const data = await getMyFollows({ page: pageNo, pageSize: PAGE_SIZE });
@@ -67,7 +67,7 @@ export default function Follows() {
           <div className="text-foreground">
             <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">我的关注</h1>
             <p className="mt-1 text-sm text-foreground/82">
-              {loading ? '正在整理你关注的创作者...' : `已关注 ${total} 位创作者`}
+              {loading ? '正在整理你关注的用户...' : `已关注 ${total} 位用户`}
             </p>
           </div>
         </div>
@@ -77,10 +77,7 @@ export default function Follows() {
         {loading ? (
           <div className="grid gap-4 md:grid-cols-2">
             {Array.from({ length: 6 }).map((_, index) => (
-              <Card
-                key={index}
-                className="overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm"
-              >
+              <Card key={index} className="overflow-hidden rounded-2xl border border-border">
                 <CardContent className="space-y-4 p-5">
                   <div className="flex items-center gap-3">
                     <Skeleton className="h-14 w-14 rounded-full" />
@@ -96,35 +93,33 @@ export default function Follows() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="rounded-[28px] border border-border bg-card/72 px-6 shadow-[0_20px_50px_hsl(var(--primary) / 0.10)] backdrop-blur-sm">
+          <div className="rounded-2xl border border-border bg-card px-6">
             <EmptyState
               icon={Users}
-              title="还没有关注任何创作者"
-              description="去创作者页面逛一逛，看到喜欢的内容后就先关注起来。"
-              actionLabel="去看创作者"
-              onAction={() => navigate('/creators')}
+              title="还没有关注任何用户"
+              description="去资源页逛一逛，看到喜欢的内容后就先关注起来。"
+              actionLabel="去看资源"
+              onAction={() => navigate('/resources')}
             />
           </div>
         ) : (
           <>
             <div className="grid gap-4 md:grid-cols-2">
               {items.map((item) => {
-                const creator = item.creator;
-                const profile = creator?.user;
-                const name = profile?.nickname || '未命名创作者';
-                const code = creator?.code;
+                const followedUser = item.followedUser;
+                const name = followedUser?.nickname || '未命名用户';
 
                 return (
                   <Card
                     key={item.id}
-                    className="overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_hsl(var(--primary) / 0.16)]"
+                    className="overflow-hidden rounded-2xl border border-border transition-all duration-300 hover:shadow-md"
                   >
                     <CardContent className="p-5">
                       <div className="flex items-start gap-4">
                         <Avatar className="h-14 w-14 border border-accent shadow-sm">
-                          <AvatarImage src={profile?.avatar} alt={name} />
+                          <AvatarImage src={followedUser?.avatar} alt={name} />
                           <AvatarFallback className="bg-accent font-semibold text-primary">
-                            {name[0]?.toUpperCase() || 'C'}
+                            {name[0]?.toUpperCase() || 'U'}
                           </AvatarFallback>
                         </Avatar>
 
@@ -134,24 +129,20 @@ export default function Follows() {
                               <div className="truncate text-base font-semibold text-foreground">
                                 {name}
                               </div>
-                              <div className="mt-1 text-xs text-primary">
-                                {code ? `主页口令：${code}` : '创作者主页待完善'}
-                              </div>
                             </div>
                             <Button
                               variant="outline"
                               size="sm"
                               className="shrink-0 rounded-xl border-accent bg-card/70 text-primary hover:bg-accent"
-                              onClick={() => code && navigate(`/creator/${code}`)}
-                              disabled={!code}
+                              disabled
                             >
-                              进入主页
+                              查看主页
                               <ArrowRight className="ml-1 h-3.5 w-3.5" />
                             </Button>
                           </div>
 
                           <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                            {creator?.description?.trim() || '这个创作者还没有留下更多介绍。'}
+                            {followedUser?.description?.trim() || '这个用户还没有留下更多介绍。'}
                           </p>
 
                           <div className="mt-4 text-xs text-muted-foreground">
@@ -176,7 +167,7 @@ export default function Follows() {
                   variant="outline"
                   onClick={() => setPage(currentPage + 1)}
                   disabled={loading}
-                  className="rounded-xl border-accent bg-card/80 px-10 text-primary hover:bg-accent"
+                  className="rounded-xl border-accent px-10 text-primary hover:bg-accent"
                 >
                   {loading ? (
                     <>

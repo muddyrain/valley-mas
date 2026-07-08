@@ -30,7 +30,6 @@ export function useAdminList<T>(
   const status = searchParams.get('status') ?? '';
   const type = searchParams.get('type') ?? '';
   const userId = searchParams.get('userId') ?? '';
-  const creatorId = searchParams.get('creatorId') ?? '';
   const resourceId = searchParams.get('resourceId') ?? '';
   const risk = searchParams.get('risk') ?? '';
 
@@ -59,7 +58,6 @@ export function useAdminList<T>(
         status: status || undefined,
         type: type || undefined,
         userId: userId || undefined,
-        creatorId: creatorId || undefined,
         resourceId: resourceId || undefined,
         risk: risk || undefined,
       });
@@ -68,7 +66,7 @@ export function useAdminList<T>(
     } finally {
       setLoading(false);
     }
-  }, [creatorId, keyword, loader, page, pageSize, resourceId, risk, status, type, userId]);
+  }, [keyword, loader, page, pageSize, resourceId, risk, status, type, userId]);
 
   useEffect(() => {
     setKeywordDraft(keyword);
@@ -119,7 +117,6 @@ export function useAdminList<T>(
     status,
     type,
     userId,
-    creatorId,
     resourceId,
     risk,
     updateQuery,

@@ -21,8 +21,7 @@ interface NotificationExtraData {
   postSlug?: string;
   resourceId?: string;
   resourceSlug?: string;
-  creatorCode?: string;
-  creatorId?: string;
+  userId?: string;
   redirectUrl?: string;
   path?: string;
 }
@@ -36,7 +35,7 @@ export const formatNotificationTime = (value: string) => {
 };
 
 export const getNotificationVisual = (type: string, content: string): NotificationVisual => {
-  if (type === 'creator_application_review') {
+  if (type === 'application_review') {
     const rejected = content.includes('未通过') || content.includes('拒绝');
     if (rejected) {
       return {
@@ -99,11 +98,8 @@ export const resolveNotificationTarget = (notification: NotificationNavigationIn
   if (extra?.resourceSlug) {
     return `/resource/${extra.resourceSlug}`;
   }
-  if (extra?.creatorCode) {
-    return `/creator/${extra.creatorCode}`;
-  }
-  if (extra?.creatorId) {
-    return '/creators';
+  if (extra?.userId) {
+    return `/user/${extra.userId}`;
   }
 
   if (normalizedType.includes('blog')) {
@@ -112,11 +108,11 @@ export const resolveNotificationTarget = (notification: NotificationNavigationIn
   if (normalizedType.includes('resource')) {
     return '/resources';
   }
-  if (normalizedType.includes('creator')) {
-    return '/creators';
+  if (normalizedType.includes('user')) {
+    return '/users';
   }
 
-  if (notification.type === 'creator_application_review') {
+  if (notification.type === 'application_review') {
     return '/my-space';
   }
 

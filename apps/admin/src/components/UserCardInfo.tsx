@@ -18,7 +18,7 @@ export const UserCardInfo: FC<{
       <div className="flex flex-col">
         <span className="text-sm">{user.nickname || user.username}</span>
         <Tag className="text-xs" color={user.role === 'admin' ? 'red' : 'blue'}>
-          {user.role === 'admin' ? '管理员' : user.role === 'creator' ? '创作者' : '用户'}
+          {user.role === 'admin' ? '管理员' : '用户'}
         </Tag>
       </div>
     </div>

@@ -66,19 +66,19 @@ func InitData(c *gin.Context) {
 			return
 		}
 
-		if err := tx.Unscoped().Where("1 = 1").Delete(&model.Creator{}).Error; err != nil {
-			tx.Rollback()
-			Error(c, 500, "清空创作者失败："+err.Error())
-			return
-		}
+		if err := tx.Unscoped().Where("1 = 1").Delete(&model.UserAlbum{}).Error; err != nil {
+				tx.Rollback()
+				Error(c, 500, "清空用户专辑失败："+err.Error())
+				return
+			}
 
-		if err := tx.Unscoped().Where("1 = 1").Delete(&model.User{}).Error; err != nil {
+			if err := tx.Unscoped().Where("1 = 1").Delete(&model.User{}).Error; err != nil {
 			tx.Rollback()
 			Error(c, 500, "清空用户失败："+err.Error())
 			return
 		}
 
-		if err := tx.Unscoped().Where("1 = 1").Delete(&model.CodeAccessLog{}).Error; err != nil {
+		if err := tx.Unscoped().Where("1 = 1").Delete(&model.OperationLog{}).Error; err != nil {
 			tx.Rollback()
 			Error(c, 500, "清空访问日志失败："+err.Error())
 			return
@@ -106,7 +106,7 @@ func InitData(c *gin.Context) {
 
 	// 再次确认清空（双重保险）
 	// 删除可能存在的测试用户 username
-	testUsernames := []string{"admin", "creator"}
+	testUsernames := []string{"admin", "user2"}
 	for _, username := range testUsernames {
 		database.DB.Unscoped().Where("username = ?", username).Delete(&model.User{})
 	}
@@ -153,14 +153,14 @@ func InitData(c *gin.Context) {
 			IsActive:       true,
 		},
 		{
-			Username:     "creator",
-			Password:     utils.HashPassword("creator123"), // 默认密码：creator123
-			Nickname:     "创作者",
+			Username:     "user2",
+			Password:     utils.HashPassword("user123"), // 默认密码：user123
+			Nickname:     "普通用户2",
 			Avatar:       "https://via.placeholder.com/150",
 			Platform:     "wechat",
-			OpenID:       "creator_001",
-			WechatOpenID: "creator_001",
-			Role:         "creator",
+			OpenID:       "user2_001",
+			WechatOpenID: "user2_001",
+			Role:         "user",
 			IsActive:     true,
 		},
 		{
@@ -183,32 +183,8 @@ func InitData(c *gin.Context) {
 		return
 	}
 
-	// 为创作者用户创建创作者记录
-	creatorUser := users[3] // creator 用户
-	creatorCode := "test12"
-
-	// 注意：创作者名称使用关联用户的昵称，不单独存储
-	creator := model.Creator{
-		UserID:      creatorUser.ID,
-		Description: "这是一个测试创作者空间",
-		Code:        creatorCode,
-		IsActive:    true,
-	}
-	if err := database.DB.Create(&creator).Error; err != nil {
-		Error(c, 500, "创建创作者失败："+err.Error())
-		return
-	}
-
-	// 创建默认空间
-	space := model.CreatorSpace{
-		CreatorID:   creator.ID,
-		Description: "这是一个测试空间",
-		IsActive:    true,
-	}
-	if err := database.DB.Create(&space).Error; err != nil {
-		Error(c, 500, "创建空间失败："+err.Error())
-		return
-	}
+	// 为资源用户设置资源归属（users 列表中的第4个）
+	resourceUser := users[3] // 普通用户2
 
 	// 🔄 恢复备份的真实资源
 	var resources []model.Resource
@@ -218,10 +194,10 @@ func InitData(c *gin.Context) {
 	if hasBackup {
 		backupResources := backupResourcesVal.([]model.Resource)
 
-		// 恢复真实资源并重新关联到新创建的创作者用户
-		for i := range backupResources {
-			// 保持原有的 ID 和其他信息
-			backupResources[i].UserID = creatorUser.ID
+		// 恢复真实资源并重新关联到新创建的用户
+			for i := range backupResources {
+				// 保持原有的 ID 和其他信息
+				backupResources[i].UserID = resourceUser.ID
 			// 重置时间戳（让 GORM 自动设置）
 			backupResources[i].CreatedAt = time.Time{}
 			backupResources[i].UpdatedAt = time.Time{}
@@ -240,9 +216,9 @@ func InitData(c *gin.Context) {
 	if restoredCount == 0 {
 		resources = []model.Resource{
 			{
-				UserID:        creatorUser.ID,
-				Title:         "示例头像 001",
-				Type:          "avatar",
+				UserID:        resourceUser.ID,
+					Title:         "示例头像 001",
+					Type:          "avatar",
 				URL:           "https://via.placeholder.com/300/FF6B6B/FFFFFF?text=Avatar+1",
 				StorageKey:    "avatar/202603/example_avatar_001.jpg", // 示例存储路径
 				Description:   "这是示例数据，请上传真实资源",
@@ -252,9 +228,9 @@ func InitData(c *gin.Context) {
 				DownloadCount: 0,
 			},
 			{
-				UserID:        creatorUser.ID,
-				Title:         "示例壁纸 001",
-				Type:          "wallpaper",
+				UserID:        resourceUser.ID,
+					Title:         "示例壁纸 001",
+					Type:          "wallpaper",
 				URL:           "https://via.placeholder.com/1080x1920/1A1A2E/FFFFFF?text=Wallpaper",
 				StorageKey:    "wallpaper/users/1/202603/example_wallpaper_001.jpg", // 示例存储路径（按用户分类）
 				Description:   "这是示例数据，请上传真实资源",
@@ -286,12 +262,11 @@ func InitData(c *gin.Context) {
 			userIndex := j % len(users)
 
 			record := model.DownloadRecord{
-				UserID:     users[userIndex].ID,
-				ResourceID: resources[resourceIndex].ID,
-				CreatorID:  creator.ID,
-				IP:         "127.0.0.1",
-				UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-			}
+					UserID:     users[userIndex].ID,
+					ResourceID: resources[resourceIndex].ID,
+					IP:         "127.0.0.1",
+					UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+				}
 			// 设置创建时间为指定日期
 			record.CreatedAt = date.Add(time.Hour * time.Duration(j))
 			downloadRecords = append(downloadRecords, record)
@@ -303,39 +278,15 @@ func InitData(c *gin.Context) {
 		return
 	}
 
-	// 创建访问记录（模拟最近 7 天的访问）
-	accessLogs := []model.CodeAccessLog{}
-	for i := 0; i < 7; i++ {
-		date := now.AddDate(0, 0, -i)
-		// 每天随机 3-10 条访问记录
-		dailyAccess := 3 + i
+	// 创建下载记录完成
 
-		for j := 0; j < dailyAccess; j++ {
-			log := model.CodeAccessLog{
-				CreatorID: creator.ID,
-				Code:      creator.Code,
-				IP:        "127.0.0.1",
-				UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-			}
-			log.CreatedAt = date.Add(time.Hour * time.Duration(j*2))
-			accessLogs = append(accessLogs, log)
-		}
-	}
-
-	if err := database.DB.Create(&accessLogs).Error; err != nil {
-		Error(c, 500, "创建访问记录失败："+err.Error())
-		return
-	}
-
-	Success(c, gin.H{
-		"message":           "初始化成功",
-		"createdUsers":      len(users),
-		"createdCreators":   1,
-		"restoredResources": restoredCount,  // 🔄 恢复的真实资源数量
-		"createdResources":  len(resources), // 总资源数量（恢复的 + 新建的）
-		"createdDownloads":  len(downloadRecords),
-		"createdAccessLogs": len(accessLogs),
-		"clearedUsers":      clearedCount,
-		"users":             users,
-	})
+		Success(c, gin.H{
+			"message":           "初始化成功",
+			"createdUsers":      len(users),
+			"restoredResources": restoredCount,  // 🔄 恢复的真实资源数量
+			"createdResources":  len(resources), // 总资源数量（恢复的 + 新建的）
+			"createdDownloads":  len(downloadRecords),
+			"clearedUsers":      clearedCount,
+			"users":             users,
+		})
 }

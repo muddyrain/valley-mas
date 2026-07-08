@@ -216,7 +216,7 @@ export default function BlogPost() {
         try {
           data = await getPostDetailById(postId, { suppressErrorToast: true });
         } catch (error) {
-          if (!user) throw error; // creator gate removed: any logged-in user can fallback to admin API
+          if (!user) throw error; // any logged-in user can fallback to admin API
           data = await getAdminPostDetail(postId, { suppressErrorToast: true });
         }
         setPost(data);
@@ -757,7 +757,7 @@ export default function BlogPost() {
                 <div className="border-accent mt-6 grid gap-3 rounded-[22px] border bg-card/60 p-4 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    <span>{post.author?.nickname || '未署名创作者'}</span>
+                    <span>{post.author?.nickname || '未署名用户'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <CalendarDays className="h-4 w-4" />

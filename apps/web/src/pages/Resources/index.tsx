@@ -53,7 +53,7 @@ export default function Resources() {
   const location = useLocation();
   const navigationType = useNavigationType();
   const { user } = useAuthStore();
-  const isCreator = !!user;
+  const isLoggedIn = !!user;
   const {
     values: { page: currentPage, keyword: currentKeyword, type: activeType, tag: currentTag },
     setValue,
@@ -302,7 +302,7 @@ export default function Resources() {
                   </span>
                 </div>
 
-                {isCreator && (
+                {isLoggedIn && (
                   <Button onClick={() => navigate(`/my-space/resources`)}>
                     <ExternalLink className="h-4 w-4 mr-2" />
                     前往我的创作空间
@@ -499,7 +499,7 @@ export default function Resources() {
                         resource={resource}
                         isFavorited={favoritedMap[resource.id]}
                         onFavorite={handleFavorite}
-                        showCreator
+                        showUser
                         showDate
                         showEngagement
                         showTags

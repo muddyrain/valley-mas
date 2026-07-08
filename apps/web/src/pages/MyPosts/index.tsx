@@ -789,7 +789,7 @@ export default function MyPosts() {
                     <BlogPostCard
                       key={post.id}
                       post={post}
-                      mode="creator"
+                      mode="admin"
                       footer={renderPostFooter(post)}
                     />
                   ))}
@@ -864,7 +864,7 @@ export default function MyPosts() {
                     <ImageTextPostCard
                       key={post.id}
                       post={post}
-                      mode="creator"
+                      mode="admin"
                       footer={renderPostFooter(post)}
                     />
                   ))}

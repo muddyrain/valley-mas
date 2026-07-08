@@ -68,7 +68,7 @@ function getVisibilityMeta(visibility?: Post['visibility']): {
 
 interface BlogPostCardProps {
   post: Post;
-  mode?: 'public' | 'creator';
+  mode?: 'public' | 'admin';
   footer?: ReactNode;
   className?: string;
 }
@@ -82,8 +82,8 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
   const visibilityMeta = getVisibilityMeta(post.visibility);
   const statusMeta = getPostStatusMeta(post.status);
   const returnTo = `${location.pathname}${location.search}`;
-  const returnLabel = mode === 'creator' ? '返回创作空间' : '返回博客列表';
-  const authorName = post.author?.nickname || '创作者';
+  const returnLabel = mode === 'admin' ? '返回创作空间' : '返回博客列表';
+  const authorName = post.author?.nickname || '用户';
   const groupName = post.group?.name || '未分组';
 
   return (
@@ -92,7 +92,7 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
     >
       <Link
         to={`/blog/${post.id}`}
-        state={{ returnTo, returnLabel, source: mode === 'creator' ? 'my-space' : 'blog-list' }}
+        state={{ returnTo, returnLabel, source: mode === 'admin' ? 'my-space' : 'blog-list' }}
         className="block"
       >
         <div className="relative overflow-hidden border-b border-border bg-accent">
@@ -124,7 +124,7 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
                   {post.category.name}
                 </span>
               ) : null}
-              {mode === 'creator' ? (
+              {mode === 'admin' ? (
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs backdrop-blur ${visibilityMeta.className}`}
                 >
@@ -134,7 +134,7 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
               ) : null}
             </div>
 
-            {mode === 'creator' ? (
+            {mode === 'admin' ? (
               <span
                 className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}
               >

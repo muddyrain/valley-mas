@@ -192,7 +192,6 @@ export default function Users() {
     const roleMap: Record<string, { color: string; text: string }> = {
       user: { color: 'default', text: '普通用户' },
       admin: { color: 'red', text: '管理员' },
-      creator: { color: 'orange', text: '创作者' },
     };
     const info = roleMap[role] || { color: 'default', text: role };
     return <Tag color={info.color}>{info.text}</Tag>;
@@ -321,7 +320,6 @@ export default function Users() {
                 { value: '', label: '全部角色' },
                 { value: 'user', label: '普通用户' },
                 { value: 'admin', label: '管理员' },
-                { value: 'creator', label: '创作者' },
               ]}
             />
             <Button icon={<SearchOutlined />} type="primary" onClick={handleSearch}>
@@ -448,7 +446,6 @@ export default function Users() {
               options={[
                 { value: 'user', label: '普通用户' },
                 { value: 'admin', label: '管理员' },
-                { value: 'creator', label: '创作者' },
               ]}
             />
           </Form.Item>

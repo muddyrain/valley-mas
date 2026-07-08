@@ -111,7 +111,7 @@ function PreviewSheet({
 
 interface ImageTextPostCardProps {
   post: Post;
-  mode?: 'public' | 'creator';
+  mode?: 'public' | 'admin';
   footer?: ReactNode;
   className?: string;
 }
@@ -131,9 +131,9 @@ export function ImageTextPostCard({
   const visibilityMeta = getVisibilityMeta(post.visibility);
   const statusMeta = getStatusMeta(post.status);
   const returnTo = `${location.pathname}${location.search}`;
-  const returnLabel = mode === 'creator' ? '返回创作空间' : '返回博客列表';
-  const authorName = post.author?.nickname || '创作者';
-  const groupName = post.group?.name || (mode === 'creator' ? '未分组' : '灵感图文');
+  const returnLabel = mode === 'admin' ? '返回创作空间' : '返回博客列表';
+  const authorName = post.author?.nickname || '用户';
+  const groupName = post.group?.name || (mode === 'admin' ? '未分组' : '灵感图文');
 
   return (
     <article
@@ -141,7 +141,7 @@ export function ImageTextPostCard({
     >
       <Link
         to={`/blog/${post.id}`}
-        state={{ returnTo, returnLabel, source: mode === 'creator' ? 'my-space' : 'blog-list' }}
+        state={{ returnTo, returnLabel, source: mode === 'admin' ? 'my-space' : 'blog-list' }}
         className="block"
       >
         <div className="relative overflow-hidden border-b border-border px-5 pb-5 pt-4">
@@ -158,7 +158,7 @@ export function ImageTextPostCard({
                   {post.category.name}
                 </span>
               ) : null}
-              {mode === 'creator' ? (
+              {mode === 'admin' ? (
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${visibilityMeta.className}`}
                 >
@@ -174,7 +174,7 @@ export function ImageTextPostCard({
                   {payload.stickerEmoji}
                 </span>
               )}
-              {mode === 'creator' ? (
+              {mode === 'admin' ? (
                 <span
                   className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}
                 >

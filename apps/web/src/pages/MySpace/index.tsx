@@ -9,7 +9,10 @@ import {
   User,
   Users,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { getMyStats, type UserStats } from '@/api/auth';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -38,36 +41,41 @@ const quickActions = [
   },
 ];
 
-const overviewCards = [
-  {
-    icon: BookOpen,
-    label: '博客',
-    value: 0,
-    href: '/my-space/blogs',
-  },
-  {
-    icon: ImageIcon,
-    label: '资源',
-    value: 0,
-    href: '/my-space/resources',
-  },
-  {
-    icon: MessageSquare,
-    label: '评论',
-    value: 0,
-    href: '/my-space/comments',
-  },
-  {
-    icon: Users,
-    label: '关注者',
-    value: 0,
-    href: '/my-space/followers',
-  },
-];
-
 export default function MySpace() {
   const navigate = useNavigate();
-  const { user, profile } = useAuthStore();
+  const { user, profile, fetchProfile } = useAuthStore();
+  const [stats, setStats] = useState<UserStats | null>(null);
+
+  useEffect(() => {
+    if (!profile) fetchProfile();
+  }, [profile, fetchProfile]);
+
+  useEffect(() => {
+    getMyStats()
+      .then(setStats)
+      .catch(() => {});
+  }, []);
+
+  const overviewCards = [
+    {
+      icon: BookOpen,
+      label: '博客',
+      value: stats?.blogCount ?? 0,
+      href: '/my-space/blogs',
+    },
+    {
+      icon: ImageIcon,
+      label: '资源',
+      value: stats?.resourceCount ?? 0,
+      href: '/my-space/resources',
+    },
+    {
+      icon: Users,
+      label: '关注者',
+      value: stats?.followerCount ?? 0,
+      href: '/my-space/followers',
+    },
+  ];
 
   if (!user) {
     return (
@@ -104,9 +112,12 @@ export default function MySpace() {
 
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center">
-                      <User className="h-6 w-6 text-primary" />
-                    </div>
+                    <Avatar className="w-12 h-12">
+                      <AvatarImage src={user.avatar} />
+                      <AvatarFallback className="bg-accent text-primary">
+                        <User className="h-6 w-6" />
+                      </AvatarFallback>
+                    </Avatar>
                     <div>
                       <div className="font-medium text-foreground">
                         {user.nickname || user.username}
@@ -118,7 +129,7 @@ export default function MySpace() {
                   </div>
                   <Button
                     variant="outline"
-                    onClick={() => navigate('/my-space/settings')}
+                    onClick={() => navigate('/profile')}
                     className="ml-auto"
                   >
                     <Settings className="h-4 w-4 mr-2" />
@@ -166,7 +177,7 @@ export default function MySpace() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="grid grid-cols-3 gap-4">
               {overviewCards.map((card) => (
                 <Link
                   key={card.label}

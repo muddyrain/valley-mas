@@ -72,7 +72,7 @@ export default function BlogList() {
   const location = useLocation();
   const navigationType = useNavigationType();
   const { user } = useAuthStore();
-  const isCreator = !!user;
+  const isLoggedIn = !!user;
 
   const {
     searchParams,
@@ -565,7 +565,7 @@ export default function BlogList() {
               </CardContent>
             </Card>
 
-            {isCreator && (
+            {isLoggedIn && (
               <Button onClick={() => navigate('/my-space/posts')} className="w-full">
                 <ExternalLink className="h-4 w-4 mr-2" />
                 前往我的创作空间

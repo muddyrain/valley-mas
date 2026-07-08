@@ -1,5 +1,4 @@
 import {
-  CrownOutlined,
   DownloadOutlined,
   EyeOutlined,
   PictureOutlined,
@@ -99,52 +98,13 @@ export default function Dashboard() {
     },
   ];
 
-  // 热门创作者列表配置
-  const creatorColumns: ColumnsType<StatsData['topCreators'][0]> = [
-    {
-      title: '排名',
-      key: 'rank',
-      width: 60,
-      render: (_, __, index) => <span className="font-bold text-lg">{index + 1}</span>,
-    },
-    {
-      title: '创作者',
-      dataIndex: 'creator',
-      render: (creator) => (
-        <div className="flex items-center gap-2">
-          {creator?.user?.avatar ? (
-            <img
-              src={creator.user.avatar}
-              alt={creator.user.nickname}
-              className="w-10 h-10 object-cover rounded-full"
-            />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center">
-              {creator?.user?.nickname?.[0] || '?'}
-            </div>
-          )}
-          <div>
-            <div className="font-medium">{creator?.user?.nickname || '未知'}</div>
-            <Tag className="text-xs">{creator?.code}</Tag>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: '资源数',
-      dataIndex: 'resourceCount',
-      width: 100,
-      render: (count) => <span className="font-bold text-green-600">{count}</span>,
-    },
-  ];
-
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">数据概览</h2>
 
       {/* 核心指标 */}
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8}>
           <Card loading={loading}>
             <Statistic
               title="用户总数"
@@ -154,18 +114,7 @@ export default function Dashboard() {
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card loading={loading}>
-            <Statistic
-              title="创作者数"
-              value={stats?.overview.creatorCount || 0}
-              prefix={<CrownOutlined />}
-              suffix={`/ ${stats?.overview.activeCreatorCount || 0} 活跃`}
-              valueStyle={{ color: '#cf1322' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8}>
           <Card loading={loading}>
             <Statistic
               title="资源总数"
@@ -175,7 +124,7 @@ export default function Dashboard() {
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8}>
           <Card loading={loading}>
             <Statistic
               title="下载次数"
@@ -222,7 +171,7 @@ export default function Dashboard() {
 
       {/* 排行榜 */}
       <Row gutter={[16, 16]} className="mt-4">
-        <Col xs={24} lg={12}>
+        <Col xs={24}>
           <Card
             title={
               <span>
@@ -241,25 +190,6 @@ export default function Dashboard() {
             />
           </Card>
         </Col>
-        <Col xs={24} lg={12}>
-          <Card
-            title={
-              <span>
-                <CrownOutlined className="mr-2" />
-                活跃创作者 TOP 5
-              </span>
-            }
-            loading={loading}
-          >
-            <Table
-              columns={creatorColumns}
-              dataSource={stats?.topCreators || []}
-              rowKey="creatorId"
-              pagination={false}
-              size="small"
-            />
-          </Card>
-        </Col>
       </Row>
 
       {/* 趋势图表 */}
@@ -273,8 +203,6 @@ export default function Dashboard() {
                   data={trends.dates.map((date, index) => ({
                     date,
                     新增用户: trends.series.find((s) => s.name === '新增用户')?.data[index] || 0,
-                    新增创作者:
-                      trends.series.find((s) => s.name === '新增创作者')?.data[index] || 0,
                     新增资源: trends.series.find((s) => s.name === '新增资源')?.data[index] || 0,
                     下载次数: trends.series.find((s) => s.name === '下载次数')?.data[index] || 0,
                   }))}
@@ -286,7 +214,6 @@ export default function Dashboard() {
                   <Tooltip />
                   <Legend />
                   <Line type="monotone" dataKey="新增用户" stroke="#3f8600" strokeWidth={2} />
-                  <Line type="monotone" dataKey="新增创作者" stroke="#cf1322" strokeWidth={2} />
                   <Line type="monotone" dataKey="新增资源" stroke="#1890ff" strokeWidth={2} />
                   <Line type="monotone" dataKey="下载次数" stroke="#722ed1" strokeWidth={2} />
                 </LineChart>
@@ -324,8 +251,6 @@ export default function Dashboard() {
                   data={trends.dates.map((date, index) => ({
                     date,
                     新增用户: trends.series.find((s) => s.name === '新增用户')?.data[index] || 0,
-                    新增创作者:
-                      trends.series.find((s) => s.name === '新增创作者')?.data[index] || 0,
                   }))}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
@@ -337,17 +262,8 @@ export default function Dashboard() {
                   <Area
                     type="monotone"
                     dataKey="新增用户"
-                    stackId="1"
                     stroke="#3f8600"
                     fill="#3f8600"
-                    fillOpacity={0.6}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="新增创作者"
-                    stackId="1"
-                    stroke="#cf1322"
-                    fill="#cf1322"
                     fillOpacity={0.6}
                   />
                 </AreaChart>

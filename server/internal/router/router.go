@@ -49,10 +49,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 		public := api.Group("/public")
 		{
-			public.GET("/space/:code", handler.GetCreatorSpace)
 			public.POST("/resource/:id/download", middleware.OptionalAuth(cfg), handler.DownloadResource)
-			public.GET("/hot-creators", handler.GetHotCreators)
-			public.GET("/creators", handler.SearchCreators)
+			public.GET("/active-users", handler.GetActiveUsers)
 			public.GET("/holiday-calendars/china/:year", handler.GetChinaHolidayCalendar)
 
 			public.GET("/blog/posts", middleware.OptionalAuth(cfg), handler.GetPosts)
@@ -68,12 +66,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 			public.GET("/hot-resources", middleware.OptionalAuth(cfg), handler.GetHotResources)
 			public.GET("/resources", middleware.OptionalAuth(cfg), handler.GetAllResources)
-			public.GET("/creator/:id/albums", handler.ListCreatorAlbums)
-			public.GET(
-				"/creators/:id/resources",
-				middleware.OptionalAuth(cfg),
-				handler.GetCreatorResourcesList,
-			)
+			public.GET("/users/:id/resources", middleware.OptionalAuth(cfg), handler.GetUserResourcesList)
+			public.GET("/users/:id/albums", handler.ListUserAlbums)
 			public.GET("/resources/:id", middleware.OptionalAuth(cfg), handler.GetResourceDetail)
 
 			public.GET("/guestbook/messages", handler.ListGuestbookMessages)
@@ -84,12 +78,11 @@ func Setup(cfg *config.Config) *gin.Engine {
 		api.POST("/register", handler.Register(cfg))
 		api.POST("/email-code/send", handler.SendEmailVerificationCode(cfg))
 		api.GET("/user/mail/accounts/gmail/callback", handler.GmailOAuthCallback(cfg))
-		api.POST("/code/verify", handler.VerifyCode)
-		api.GET("/creator/:code/resources", middleware.OptionalAuth(cfg), handler.GetCreatorResources)
 
 		user := api.Group("/user")
 		user.Use(middleware.Auth(cfg))
 		{
+			user.GET("/stats", handler.GetMyStats)
 			user.GET("/downloads", handler.GetMyDownloads)
 			user.GET("/info", handler.GetUserInfo)
 			user.GET("/preferences/:namespace", handler.GetUserPreference)
@@ -108,10 +101,16 @@ func Setup(cfg *config.Config) *gin.Engine {
 			user.GET("/resources/:id/favorite/status", handler.GetResourceFavoriteStatus)
 			user.GET("/favorites", handler.GetMyFavorites)
 
-			user.POST("/creators/:id/follow", handler.FollowCreator)
-			user.DELETE("/creators/:id/follow", handler.UnfollowCreator)
-			user.GET("/creators/:id/follow/status", handler.GetCreatorFollowStatus)
+			user.POST("/users/:id/follow", handler.FollowUser)
+			user.DELETE("/users/:id/follow", handler.UnfollowUser)
+			user.GET("/users/:id/follow/status", handler.GetUserFollowStatus)
 			user.GET("/follows", handler.GetMyFollows)
+
+			// 用户相册
+			user.GET("/albums", handler.ListMyUserAlbums)
+			user.POST("/albums", handler.CreateUserAlbum)
+			user.PUT("/albums/:id", handler.UpdateUserAlbum)
+			user.DELETE("/albums/:id", handler.DeleteUserAlbum)
 
 			user.GET("/notifications", handler.ListMyNotifications)
 			user.GET("/notifications/unread-count", handler.GetUnreadNotificationCount)
@@ -129,13 +128,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 			auth.POST("/resource/download", handler.RecordDownload)
 
-			auth.POST("/creator/register", handler.RegisterCreator)
-			auth.GET("/creator/my-space", handler.GetMyCreatorSpace)
-			auth.PUT("/creator/code/toggle", handler.ToggleCreatorCode)
-			auth.POST("/creator/code/regenerate", handler.RegenerateCreatorCode)
-
-			auth.POST("/creator/application", handler.SubmitCreatorApplication)
-			auth.GET("/creator/application/my", handler.GetMyApplication)
 			auth.POST("/ai/chat", handler.ChatWithAI)
 			auth.GET("/ai/agents", handler.ListAIAgents)
 			auth.POST("/ai/agents", handler.CreateAIAgent)
@@ -149,26 +141,18 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/ai/agents/:agentId/conversations/:conversationId/chat", handler.ChatWithAIAgent)
 			auth.POST("/blog/posts/:id/comments", handler.CreatePostComment)
 			auth.DELETE("/blog/comments/:commentId", handler.DeletePostComment)
+
+			auth.GET("/content/resources", handler.ListResources)
+			auth.POST("/content/resources/upload", handler.UploadResource)
+			auth.GET("/content/resources/upload-status", handler.GetUploadResourceStatus)
+			auth.PATCH("/content/resources/:id", handler.UpdateResource)
+			auth.PUT("/content/resources/:id/uploader", handler.UpdateResourceUploader)
+			auth.DELETE("/content/resources/:id", handler.DeleteResource)
+			auth.DELETE("/content/resources/batch", handler.BatchDeleteResources)
+			auth.POST("/content/resources/batch-visibility", handler.BatchUpdateVisibility)
+			auth.POST("/content/ai/suggest-title", handler.SuggestResourceTitle)
+			auth.POST("/content/ai/resource-tags/suggest", handler.SuggestResourceTags)
 		}
-
-		creator := api.Group("/creator")
-			creator.Use(middleware.Auth(cfg))
-			{
-				creator.GET("/resources", handler.ListResources)
-				creator.POST("/resources/upload", handler.UploadResource)
-				creator.GET("/resources/upload-status", handler.GetUploadResourceStatus)
-				creator.DELETE("/resources/batch", handler.BatchDeleteResources)
-				creator.POST("/resources/batch-visibility", handler.BatchUpdateVisibility)
-				creator.PATCH("/resources/:id", handler.UpdateResource)
-				creator.DELETE("/resources/:id", handler.DeleteResource)
-
-				creator.GET("/albums", handler.ListMyCreatorAlbums)
-				creator.POST("/albums", handler.CreateCreatorAlbum)
-				creator.PUT("/albums/:id", handler.UpdateCreatorAlbum)
-				creator.DELETE("/albums/:id", handler.DeleteCreatorAlbum)
-				creator.POST("/ai/suggest-title", handler.SuggestResourceTitle)
-				creator.POST("/ai/resource-tags/suggest", handler.SuggestResourceTags)
-			}
 
 		admin := api.Group("/admin")
 		admin.Use(middleware.Auth(cfg))
@@ -184,17 +168,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.PUT("/users/:id/status", handler.UpdateUserStatus)
 				adminOnly.DELETE("/users/:id", handler.DeleteUser)
 
-				adminOnly.POST("/creators", handler.CreateCreator)
-				adminOnly.PUT("/creators/:id", handler.UpdateCreator)
-				adminOnly.POST("/creators/:id/toggle-status", handler.ToggleCreatorStatus)
-				adminOnly.DELETE("/creators/:id", handler.DeleteCreator)
-
-				adminOnly.GET("/creator-applications", handler.ListCreatorApplications)
-				adminOnly.GET("/creator-applications/:id", handler.GetCreatorApplicationDetail)
-				adminOnly.POST("/creator-applications/:id/review", handler.ReviewCreatorApplication)
-				adminOnly.GET("/creator-application-audit-config", handler.GetCreatorApplicationAuditConfig)
-				adminOnly.PUT("/creator-application-audit-config", handler.UpdateCreatorApplicationAuditConfig)
-
 				adminOnly.GET("/stats", handler.GetStats)
 				adminOnly.GET("/trends", handler.GetTrends)
 
@@ -209,11 +182,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.GET("/records/downloads/export", handler.ExportDownloadRecords)
 				adminOnly.GET("/resources/:id/operations", handler.AdminGetResourceOperations)
 				adminOnly.GET("/audit/operation-logs", handler.AdminListOperationLogs)
-				adminOnly.GET("/audit/code-access-logs", handler.AdminListCodeAccessLogs)
 				adminOnly.GET("/audit/storage-assets", handler.AdminListStorageAssets)
 				adminOnly.GET("/ai/usage-logs", handler.AdminListAIUsageLogs)
 				adminOnly.GET("/ai/usage-summary", handler.AdminGetAIUsageSummary)
-				// 资源标签统计（只读）
 				adminOnly.GET("/resource-tags/stats", handler.AdminGetResourceTagStats)
 				adminOnly.GET("/blog/categories", handler.AdminListBlogCategories)
 				adminOnly.POST("/blog/categories", handler.AdminCreateBlogCategory)
@@ -229,10 +200,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.DELETE("/guestbook/messages/:id", handler.DeleteGuestbookMessage)
 				adminOnly.PATCH("/guestbook/messages/:id/pin", handler.UpdateGuestbookMessagePin)
 				adminOnly.PATCH("/guestbook/messages/:id/status", handler.AdminUpdateGuestbookMessageStatus)
-				adminOnly.GET("/creator-albums", handler.AdminListCreatorAlbums)
-				adminOnly.GET("/creator-albums/:id", handler.AdminGetCreatorAlbumDetail)
-				adminOnly.PUT("/creator-albums/:id", handler.AdminUpdateCreatorAlbum)
-				adminOnly.DELETE("/creator-albums/:id", handler.AdminDeleteCreatorAlbum)
 				adminOnly.GET("/relations/favorites", handler.AdminListFavorites)
 				adminOnly.GET("/relations/follows", handler.AdminListFollows)
 				adminOnly.GET("/notifications", handler.AdminListNotifications)
@@ -245,14 +212,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.GET("/life-trace/holiday-calendars", handler.ListAdminLifeTraceHolidayCalendars)
 				adminOnly.GET("/mind-arena/debates", handler.AdminListMindArenaDebates)
 				adminOnly.GET("/mind-arena/debates/:id", handler.AdminGetMindArenaDebate)
-
 			}
 
 			content := admin.Group("")
-				// creator gate removed: any authenticated user can manage their own content
 			{
-				content.GET("/creator/stats", handler.GetCreatorStats)
-
 				content.GET("/blog/posts", handler.AdminGetPosts)
 				content.GET("/blog/posts/sort-items", handler.AdminListPostSortItems)
 				content.PUT("/blog/posts/sort", handler.AdminSortPosts)
@@ -274,24 +237,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.POST("/blog/groups", handler.AdminCreateGroup)
 				content.PUT("/blog/groups/:id", handler.AdminUpdateGroup)
 				content.DELETE("/blog/groups/:id", handler.AdminDeleteGroup)
-
-				content.GET("/creators", handler.ListCreators)
-				content.GET("/creators/:id", handler.GetCreatorDetail)
-
-				content.GET("/creators/:id/spaces", handler.ListCreatorSpaces)
-				content.GET("/creators/:id/spaces/detail", handler.GetCreatorSpaceDetail)
-				content.POST("/creators/:id/spaces", handler.CreateCreatorSpace)
-				content.PUT("/creators/:id/spaces", handler.UpdateCreatorSpace)
-				content.DELETE("/creators/:id/spaces", handler.DeleteCreatorSpace)
-				content.POST("/creators/:id/spaces/resources", handler.AddResourcesToSpace)
-				content.DELETE("/creators/:id/spaces/resources", handler.RemoveResourcesFromSpace)
-
-				content.GET("/resources", handler.ListResources)
-				content.POST("/resources/upload", handler.UploadResource)
-				content.GET("/resources/upload-status", handler.GetUploadResourceStatus)
-				content.PATCH("/resources/:id", handler.UpdateResource)
-				content.PUT("/resources/:id/creator", handler.UpdateResourceCreator)
-				content.DELETE("/resources/:id", handler.DeleteResource)
 			}
 		}
 	}

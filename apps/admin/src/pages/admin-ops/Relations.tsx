@@ -31,7 +31,7 @@ export default function Relations({ kind }: { kind: RelationKind }) {
           user?.nickname || ('userId' in record ? record.userId : '-'),
       },
       {
-        title: kind === 'favorites' ? '资源' : '创作者',
+        title: kind === 'favorites' ? '资源' : '关注目标',
         key: 'target',
         render: (_, record) => {
           if ('resource' in record) {
@@ -42,8 +42,8 @@ export default function Relations({ kind }: { kind: RelationKind }) {
               </div>
             );
           }
-          if ('creator' in record) {
-            return record.creator?.user?.nickname || record.creator?.code || record.creatorId;
+          if ('targetId' in record) {
+            return record.targetId;
           }
           return '-';
         },

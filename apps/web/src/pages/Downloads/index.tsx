@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { type DownloadHistoryItem, getMyDownloads } from '@/api/auth';
 import EmptyState from '@/components/EmptyState';
 import PageBanner from '@/components/PageBanner';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -110,8 +110,7 @@ export default function Downloads() {
             <div className="space-y-4">
               {items.map((item) => {
                 const resource = item.resource;
-                const creator = item.creator;
-                const creatorName = creator?.user?.nickname || '创作者';
+                const uploaderName = '用户';
 
                 return (
                   <Card
@@ -172,15 +171,11 @@ export default function Downloads() {
 
                           <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
                             <Avatar className="h-6 w-6 border border-accent">
-                              <AvatarImage src={creator?.user?.avatar} alt={creatorName} />
                               <AvatarFallback className="bg-accent text-[10px] font-semibold text-primary">
-                                {creatorName[0]?.toUpperCase() || 'C'}
+                                {uploaderName[0]?.toUpperCase() || 'U'}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="truncate">
-                              {creatorName}
-                              {creator?.code ? ` · ${creator.code}` : ''}
-                            </span>
+                            <span className="truncate">{uploaderName}</span>
                           </div>
                         </div>
                       </div>
