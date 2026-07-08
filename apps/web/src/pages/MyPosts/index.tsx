@@ -43,6 +43,7 @@ import { PublicWallpaperPickerDialog } from '@/components/blog/PublicWallpaperPi
 import PanelLoadingOverlay from '@/components/PanelLoadingOverlay';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { numberParam, stringParam, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
@@ -775,7 +776,7 @@ export default function MyPosts() {
             {loadingBlogPosts && blogPosts.length === 0 ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: BLOG_PAGE_SIZE }).map((_, i) => (
-                  <div key={i} className="h-44 animate-pulse rounded-2xl bg-accent" />
+                  <Skeleton key={i} className="h-44 rounded-2xl" />
                 ))}
               </div>
             ) : blogPosts.length === 0 ? (
@@ -850,7 +851,7 @@ export default function MyPosts() {
             {loadingImageTextPosts && imageTextPosts.length === 0 ? (
               <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                 {Array.from({ length: IMAGE_TEXT_PAGE_SIZE }).map((_, i) => (
-                  <div key={i} className="h-44 animate-pulse rounded-2xl bg-accent" />
+                  <Skeleton key={i} className="h-44 rounded-2xl" />
                 ))}
               </div>
             ) : imageTextPosts.length === 0 ? (

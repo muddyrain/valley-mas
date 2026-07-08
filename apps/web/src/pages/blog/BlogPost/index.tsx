@@ -35,6 +35,14 @@ import {
 } from '@/api/blog';
 import { BlogCoverMedia, MarkdownContent, PostComments, TableOfContents } from '@/components/blog';
 import { Button } from '@/components/ui/button';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
   createPlainTextExcerpt,
@@ -543,13 +551,13 @@ export default function BlogPost() {
 
   if (loading) {
     return (
-      <div className="min-h-screen" style={{ background: 'hsl(var(--background))' }}>
+      <div className="min-h-screen bg-background">
         <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_360px]">
-            <div className="h-[72vh] animate-pulse rounded-[36px] bg-card/80" />
+            <Skeleton className="h-[72vh] rounded-3xl" />
             <div className="space-y-4">
-              <div className="h-36 animate-pulse rounded-[28px] bg-card/80" />
-              <div className="h-[48vh] animate-pulse rounded-[28px] bg-card/80" />
+              <Skeleton className="h-36 rounded-3xl" />
+              <Skeleton className="h-[48vh] rounded-3xl" />
             </div>
           </div>
         </div>
@@ -559,19 +567,13 @@ export default function BlogPost() {
 
   if (!post) {
     return (
-      <div
-        className="flex min-h-screen items-center justify-center px-4"
-        style={{ background: 'hsl(var(--background))' }}
-      >
-        <div className="max-w-md rounded-[28px] border bg-card px-6 py-10 text-center">
+      <div className="flex min-h-screen items-center justify-center px-4 bg-background">
+        <div className="max-w-md rounded-3xl border bg-card px-6 py-10 text-center">
           <h1 className="text-2xl font-semibold text-foreground">内容暂时无法访问</h1>
           <p className="mt-3 text-sm leading-7 text-muted-foreground">
             这篇内容可能已被删除，或当前账号没有访问权限。
           </p>
-          <Button
-            onClick={handleReturn}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 mt-6 rounded-full px-5"
-          >
+          <Button onClick={handleReturn} className="mt-6 rounded-full px-5">
             <ArrowLeft className="mr-2 h-4 w-4" />
             {returnLabel}
           </Button>
@@ -1294,24 +1296,21 @@ export default function BlogPost() {
               </div>
             </div>
 
-            {mobileTocOpen && (
-              <div className="fixed inset-0 z-50 xl:hidden">
-                <button
-                  type="button"
-                  className="absolute inset-0 bg-foreground/28"
-                  aria-label="关闭目录面板"
-                  onClick={() => setMobileTocOpen(false)}
-                />
-                <section className="absolute bottom-0 left-0 right-0 rounded-t-[24px] border border-b-0 bg-card px-4 pb-6 pt-4 shadow-[0_-24px_60px_hsl(var(--foreground)/0.2)]">
-                  <div className="mb-3 flex items-center justify-between">
+            <Sheet open={mobileTocOpen} onOpenChange={setMobileTocOpen}>
+              <SheetContent
+                side="bottom"
+                className="rounded-t-3xl xl:hidden"
+                showCloseButton={false}
+              >
+                <SheetHeader className="mb-3">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-medium text-foreground">目录导读</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
+                      <SheetTitle className="text-sm font-medium">目录导读</SheetTitle>
+                      <SheetDescription className="mt-1">
                         点击标题即可跳转到对应章节
-                      </div>
+                      </SheetDescription>
                     </div>
                     <Button
-                      type="button"
                       size="sm"
                       variant="outline"
                       className="h-8 rounded-full px-3 text-xs"
@@ -1320,17 +1319,17 @@ export default function BlogPost() {
                       收起
                     </Button>
                   </div>
-                  <div className="max-h-[52vh] overflow-y-auto overflow-x-hidden pr-1">
-                    <TableOfContents
-                      toc={toc}
-                      activeId={activeTocId}
-                      onActiveIdChange={setActiveTocId}
-                      onItemSelect={() => setMobileTocOpen(false)}
-                    />
-                  </div>
-                </section>
-              </div>
-            )}
+                </SheetHeader>
+                <div className="max-h-[52vh] overflow-y-auto overflow-x-hidden pr-1">
+                  <TableOfContents
+                    toc={toc}
+                    activeId={activeTocId}
+                    onActiveIdChange={setActiveTocId}
+                    onItemSelect={() => setMobileTocOpen(false)}
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
           </>
         )}
       </div>

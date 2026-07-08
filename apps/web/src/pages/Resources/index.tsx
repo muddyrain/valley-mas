@@ -309,7 +309,7 @@ export default function Resources() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <div className="relative flex-1 min-w-[200px] lg:max-w-md">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -317,7 +317,7 @@ export default function Resources() {
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                     placeholder="搜索资源标题"
-                    className="h-11 pl-10"
+                    className="pl-10"
                   />
                   {currentKeyword && (
                     <button
@@ -359,7 +359,6 @@ export default function Resources() {
                     ) : (
                       <Button
                         variant="outline"
-                        size="sm"
                         onClick={() => {
                           setTagDropdownOpen(true);
                           setTagInput('');
@@ -408,7 +407,6 @@ export default function Resources() {
 
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={handleRefresh}
                     disabled={refreshing || loading}
                     title="刷新"

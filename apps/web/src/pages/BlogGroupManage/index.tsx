@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { enumParam, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
@@ -213,7 +214,7 @@ export default function BlogGroupManage() {
           {loading && groups.length === 0 ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-36 animate-pulse rounded-2xl bg-muted" />
+                <Skeleton key={i} className="h-36 rounded-2xl" />
               ))}
             </div>
           ) : groups.length === 0 ? (

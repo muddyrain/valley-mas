@@ -25,6 +25,7 @@ import {
   uploadImageTextAsset,
 } from '@/api/blog';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 type TemplateKey = 'paper' | 'quote' | 'ink' | 'mint' | 'sunset' | 'grid';
@@ -1109,8 +1110,15 @@ export default function ImageTextCreate() {
   if (isEditMode && loadingPost) {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-background px-4 py-6 md:px-8">
-        <div className="mx-auto max-w-[1460px] rounded-[30px] border border-accent/80 bg-card/90 p-8">
-          <div className="text-sm text-muted-foreground">图文内容加载中...</div>
+        <div className="mx-auto max-w-[1460px] space-y-5">
+          <Skeleton className="h-16 rounded-2xl" />
+          <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
+            <Skeleton className="h-[60vh] rounded-2xl" />
+            <div className="space-y-4">
+              <Skeleton className="h-24 rounded-2xl" />
+              <Skeleton className="h-40 rounded-2xl" />
+            </div>
+          </div>
         </div>
       </div>
     );

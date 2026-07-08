@@ -18,6 +18,7 @@ import { BLOG_COVER_ASPECT_CLASS } from '@/components/blog/BlogCoverMedia';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   enumParam,
@@ -377,7 +378,7 @@ export default function BlogList() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <div className="relative flex-1 min-w-[200px] lg:max-w-md">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -387,7 +388,7 @@ export default function BlogList() {
                       if (event.key === 'Enter') handlePostKeywordSearch();
                     }}
                     placeholder="搜索标题、摘要、关键词"
-                    className="h-11 pl-10"
+                    className="pl-10"
                   />
                   {currentKeyword && (
                     <button
@@ -401,11 +402,11 @@ export default function BlogList() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+                  <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-1">
                     <Button
                       size="sm"
                       variant={currentSort === 'newest' ? 'default' : 'ghost'}
-                      className={`rounded-md px-4 py-2 text-sm font-medium ${
+                      className={`rounded-md px-4 text-sm font-medium ${
                         currentSort === 'newest' ? 'shadow-sm' : ''
                       }`}
                       onClick={() => handleSortChange('newest')}
@@ -415,7 +416,7 @@ export default function BlogList() {
                     <Button
                       size="sm"
                       variant={currentSort === 'oldest' ? 'default' : 'ghost'}
-                      className={`rounded-md px-4 py-2 text-sm font-medium ${
+                      className={`rounded-md px-4 text-sm font-medium ${
                         currentSort === 'oldest' ? 'shadow-sm' : ''
                       }`}
                       onClick={() => handleSortChange('oldest')}
@@ -652,124 +653,118 @@ export default function BlogList() {
         </div>
       </div>
 
-      <div
-        className={`fixed inset-0 z-50 transition ${aiRecommendOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
-      >
-        <button
-          type="button"
-          aria-label="关闭 AI 推荐抽屉"
-          onClick={() => setAIRecommendOpen(false)}
-          className={`absolute inset-0 bg-foreground/15 transition-opacity duration-200 ${aiRecommendOpen ? 'opacity-100' : 'opacity-0'}`}
-        />
-        <aside
-          className={`absolute right-0 top-0 h-full w-[min(92vw,560px)] border-l border-border bg-background shadow-lg transition-transform duration-300 ease-out ${aiRecommendOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      <Sheet open={aiRecommendOpen} onOpenChange={setAIRecommendOpen}>
+        <SheetContent
+          side="right"
+          className="w-[min(92vw,560px)] p-0 sm:max-w-[560px]"
+          showCloseButton={false}
         >
-          <div className="flex h-full flex-col">
-            <div className="border-b border-border px-5 py-4">
-              <div className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-                  AI 阅读路线
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setAIRecommendOpen(false)}
-                  className="rounded-full bg-card px-2.5 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
-                >
-                  关闭
-                </button>
-              </div>
+          <SheetHeader className="border-b border-border px-5 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <SheetTitle className="inline-flex items-center gap-2 text-sm font-semibold">
+                <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+                AI 阅读路线
+              </SheetTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setAIRecommendOpen(false)}
+                className="rounded-full px-3 text-xs text-muted-foreground"
+              >
+                关闭
+              </Button>
+            </div>
+          </SheetHeader>
+
+          <div className="flex-1 space-y-3 overflow-y-auto px-5 pb-5 pt-4">
+            <div className="flex gap-2">
+              <Input
+                value={aiPrompt}
+                onChange={(event) => setAIPrompt(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    void handleAIRecommend();
+                  } else if (event.key === 'Escape') {
+                    setAIRecommendOpen(false);
+                  }
+                }}
+                placeholder="例如：想看 JS 异步、CSS 布局、React 性能优化"
+              />
+              <Button onClick={() => void handleAIRecommend()} disabled={aiRecommendLoading}>
+                {aiRecommendLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '生成推荐'}
+              </Button>
             </div>
 
-            <div className="flex-1 space-y-3 overflow-y-auto px-5 pb-5 pt-4">
-              <div className="flex gap-2">
-                <Input
-                  value={aiPrompt}
-                  onChange={(event) => setAIPrompt(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      void handleAIRecommend();
-                    } else if (event.key === 'Escape') {
-                      setAIRecommendOpen(false);
-                    }
+            <div className="flex flex-wrap gap-1.5">
+              {quickIntents.map((intent) => (
+                <Button
+                  key={intent}
+                  variant="outline"
+                  size="xs"
+                  className="rounded-full text-[11px]"
+                  onClick={() => {
+                    setAIPrompt(intent);
+                    setAIRecommendError('');
                   }}
-                  placeholder="例如：想看 JS 异步、CSS 布局、React 性能优化"
-                />
-                <Button onClick={() => void handleAIRecommend()} disabled={aiRecommendLoading}>
-                  {aiRecommendLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '生成推荐'}
+                >
+                  {intent}
                 </Button>
-              </div>
+              ))}
+            </div>
 
-              <div className="flex flex-wrap gap-1.5">
-                {quickIntents.map((intent) => (
+            {aiRecommendError && <p className="text-xs text-destructive">{aiRecommendError}</p>}
+
+            {aiRecommendResult?.items?.length ? (
+              <div className="space-y-2">
+                {aiRecommendResult.items.map((item, index) => (
                   <button
-                    key={intent}
+                    key={item.postId}
                     type="button"
                     onClick={() => {
-                      setAIPrompt(intent);
-                      setAIRecommendError('');
+                      setAIRecommendOpen(false);
+                      navigate(`/blog/${item.postId}`, {
+                        state: {
+                          returnTo: `/blog${window.location.search}`,
+                          returnLabel: '返回博客列表',
+                          source: 'blog-ai-recommend',
+                        },
+                      });
                     }}
-                    className="rounded-full border border-accent bg-card px-2.5 py-1 text-[11px] text-muted-foreground transition hover:bg-accent hover:text-primary"
+                    className="w-full rounded-lg border border-accent bg-accent/35 px-3 py-2 text-left transition hover:bg-accent/70"
                   >
-                    {intent}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="line-clamp-2 text-sm font-medium text-foreground">
+                        {index + 1}. {item.title}
+                      </div>
+                      <span className="shrink-0 rounded-full bg-card px-2 py-0.5 text-[10px] text-muted-foreground">
+                        约 {item.readMinutes} 分钟
+                      </span>
+                    </div>
+                    {item.excerpt && (
+                      <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
+                        {item.excerpt}
+                      </p>
+                    )}
+                    <div className="mt-1.5 flex items-center gap-2 text-[11px]">
+                      {item.groupName && (
+                        <span className="rounded-full bg-card px-2 py-0.5 text-primary">
+                          {item.groupName}
+                        </span>
+                      )}
+                      <span className="text-muted-foreground">{item.reason}</span>
+                    </div>
                   </button>
                 ))}
               </div>
-
-              {aiRecommendError && <p className="text-xs text-destructive">{aiRecommendError}</p>}
-
-              {aiRecommendResult?.items?.length ? (
-                <div className="space-y-2">
-                  {aiRecommendResult.items.map((item, index) => (
-                    <button
-                      key={item.postId}
-                      type="button"
-                      onClick={() => {
-                        setAIRecommendOpen(false);
-                        navigate(`/blog/${item.postId}`, {
-                          state: {
-                            returnTo: `/blog${window.location.search}`,
-                            returnLabel: '返回博客列表',
-                            source: 'blog-ai-recommend',
-                          },
-                        });
-                      }}
-                      className="w-full rounded-lg border border-accent bg-accent/35 px-3 py-2 text-left transition hover:bg-accent/70"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="line-clamp-2 text-sm font-medium text-foreground">
-                          {index + 1}. {item.title}
-                        </div>
-                        <span className="shrink-0 rounded-full bg-card px-2 py-0.5 text-[10px] text-muted-foreground">
-                          约 {item.readMinutes} 分钟
-                        </span>
-                      </div>
-                      {item.excerpt && (
-                        <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
-                          {item.excerpt}
-                        </p>
-                      )}
-                      <div className="mt-1.5 flex items-center gap-2 text-[11px]">
-                        {item.groupName && (
-                          <span className="rounded-full bg-card px-2 py-0.5 text-primary">
-                            {item.groupName}
-                          </span>
-                        )}
-                        <span className="text-muted-foreground">{item.reason}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : aiPrompt && !aiRecommendLoading && !aiRecommendError ? (
-                <p className="rounded-lg bg-card px-3 py-2 text-xs text-muted-foreground">
-                  这次没有推荐结果，可以换个更具体的意图再试试。
-                </p>
-              ) : null}
-            </div>
+            ) : aiPrompt && !aiRecommendLoading && !aiRecommendError ? (
+              <p className="rounded-lg bg-card px-3 py-2 text-xs text-muted-foreground">
+                这次没有推荐结果，可以换个更具体的意图再试试。
+              </p>
+            ) : null}
           </div>
-        </aside>
-      </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
