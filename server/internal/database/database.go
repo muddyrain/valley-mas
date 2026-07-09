@@ -328,6 +328,8 @@ func autoMigrateModelsByName() map[string]any {
 		"lifetrace_daily_brief_delivery":     &model.LifeTraceDailyBriefDelivery{},
 		"lifetrace_pantry_reminder_delivery": &model.LifeTracePantryReminderDelivery{},
 		"lifetrace_holiday_calendar":         &model.LifeTraceHolidayCalendar{},
+		"workflow":                           &model.Workflow{},
+		"workflow_run":                       &model.WorkflowRun{},
 	}
 }
 
@@ -381,6 +383,8 @@ func autoMigrateModelAliases() map[string]string {
 		"daily_brief_delivery":     "lifetrace_daily_brief_delivery",
 		"pantry_reminder_delivery": "lifetrace_pantry_reminder_delivery",
 		"holiday_calendar":         "lifetrace_holiday_calendar",
+		"workflows":               "workflow",
+		"workflow_runs":           "workflow_run",
 	}
 }
 
@@ -424,7 +428,9 @@ func contentDomainMigrationModels() []any {
 			&model.PostTag{},
 			&model.PostTagRelation{},
 			&model.PostComment{},
-		}
+		&model.Workflow{},
+		&model.WorkflowRun{},
+	}
 	}
 
 func lifeTraceMigrationModels() []any {

@@ -27,6 +27,8 @@ import Register from './pages/Register';
 import ResourceDetail from './pages/ResourceDetail';
 import Resources from './pages/Resources';
 import ScratchLegendLab from './pages/ScratchLegendLab';
+import Workbench from './pages/Workbench';
+import WorkflowEditor from './pages/WorkflowEditor';
 
 function RouteTitle() {
   const location = useLocation();
@@ -37,6 +39,12 @@ function RouteTitle() {
 
     if (pathname === '/') {
       title = 'Valley | 内容首页';
+    } else if (pathname === '/workbench') {
+      title = '工作台 | Valley';
+    } else if (pathname.startsWith('/workbench/create')) {
+      title = '创建工作流 | Valley';
+    } else if (pathname.startsWith('/workbench/edit')) {
+      title = '编辑工作流 | Valley';
     } else if (pathname === '/blog') {
       title = '博客与图文 | Valley';
     } else if (pathname === '/guestbook') {
@@ -111,6 +119,9 @@ function App() {
       <Routes>
         <Route path="/" element={<WorkbenchLayout />}>
           <Route index element={<Home />} />
+          <Route path="workbench" element={<Workbench />} />
+          <Route path="workbench/create" element={<WorkflowEditor />} />
+          <Route path="workbench/edit" element={<WorkflowEditor />} />
           <Route path="resources" element={<Resources />} />
           <Route path="resource/:id" element={<ResourceDetail />} />
           <Route path="my-space" element={<MySpace />} />
