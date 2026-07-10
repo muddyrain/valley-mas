@@ -1,0 +1,21 @@
+server/internal/lifetrace/push_worker_test.go
+  s_dfa448ade72bbd::t_986a593baed1d6 437-438,463
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "59d59a8ea8137d49e6d30d16990db3814db4ec78",
+  "prompts": {},
+  "sessions": {
+    "s_dfa448ade72bbd": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f4a1e-3b55-76f3-a57b-49fa4c65a2b1",
+        "model": "unknown"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
