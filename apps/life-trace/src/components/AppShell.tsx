@@ -26,8 +26,9 @@ import {
   getActiveLifeTraceTab,
   getLifeTraceScrollMemoryKey,
   isLifeTraceTabRoute,
+  readScrollMemory,
   restoreScrollMemory,
-  type ScrollMemoryEntry,
+  writeScrollMemory,
 } from '@/lib/lifeTraceNavigation';
 import { getPwaShareFeedback } from '@/lib/pwa';
 import { cn } from '@/lib/utils';
@@ -217,14 +218,13 @@ function PwaActionBanner({ hidden }: { hidden: boolean }) {
 export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const activeTab = getActiveLifeTraceTab(location.pathname);
-  const scrollMemoryKey = getLifeTraceScrollMemoryKey(location.pathname);
+  const scrollMemoryKey = getLifeTraceScrollMemoryKey(location.pathname, location.search);
   const routeViewKey = scrollMemoryKey ?? location.pathname;
   const isAgentChatRoute = location.pathname === '/ai';
   const showBottomNavigation = isLifeTraceTabRoute(location.pathname);
   const showBottomOverlay = showBottomNavigation && !isAgentChatRoute;
   const contentRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
-  const scrollMemoryRef = useRef(new Map<string, ScrollMemoryEntry>());
   const activeScrollMemoryKeyRef = useRef(scrollMemoryKey);
   activeScrollMemoryKeyRef.current = scrollMemoryKey;
 
@@ -253,8 +253,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!currentScrollMemoryKey) {
       return;
     }
-    scrollMemoryRef.current.set(
-      currentScrollMemoryKey,
+    writeScrollMemory(
       captureScrollMemory(
         element,
         currentScrollMemoryKey,
@@ -281,7 +280,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (cancelled) {
         return true;
       }
-      return restoreScrollMemory(element, scrollMemoryRef.current.get(scrollMemoryKey));
+      return restoreScrollMemory(element, readScrollMemory(scrollMemoryKey));
     };
 
     restore();
@@ -323,10 +322,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         if (activeScrollMemoryKeyRef.current !== scrollListenerMemoryKey) {
           return;
         }
-        scrollMemoryRef.current.set(
-          scrollListenerMemoryKey,
-          captureScrollMemory(element, scrollListenerMemoryKey),
-        );
+        writeScrollMemory(captureScrollMemory(element, scrollListenerMemoryKey));
       });
     };
 
@@ -347,7 +343,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
     element.scrollTo({ top: 0, behavior: 'smooth' });
     if (scrollMemoryKey) {
-      scrollMemoryRef.current.set(scrollMemoryKey, {
+      writeScrollMemory({
         key: scrollMemoryKey,
         scrollTop: 0,
         anchorId: '',

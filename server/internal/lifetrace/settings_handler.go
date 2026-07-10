@@ -15,31 +15,32 @@ import (
 )
 
 type updateSettingsRequest struct {
-	ActivePantryHouseholdID string   `json:"activePantryHouseholdId"`
-	City                    string   `json:"city"`
-	WorkStart               string   `json:"workStart"`
-	WorkEnd                 string   `json:"workEnd"`
-	CommuteMethod           string   `json:"commuteMethod"`
-	DailyBriefTime          string   `json:"dailyBriefTime"`
-	WorkdayMode             string   `json:"workdayMode"`
-	Workdays                []string `json:"workdays"`
-	HolidaySync             bool     `json:"holidaySync"`
-	WeekendReminders        bool     `json:"weekendReminders"`
-	PlanReminderLeadMinutes int      `json:"planReminderLeadMinutes"`
-	QuietStart              string   `json:"quietStart"`
-	QuietEnd                string   `json:"quietEnd"`
-	WeatherAlerts           bool     `json:"weatherAlerts"`
-	PlanReminders           bool     `json:"planReminders"`
-	AIPersonalization       bool     `json:"aiPersonalization"`
-	PantryReminderEnabled   bool     `json:"pantryReminderEnabled"`
-	PantryReminderRules     []string `json:"pantryReminderRules"`
-	PantryReminderTime      string   `json:"pantryReminderTime"`
+	ActivePantryHouseholdID     string   `json:"activePantryHouseholdId"`
+	City                        string   `json:"city"`
+	WorkStart                   string   `json:"workStart"`
+	WorkEnd                     string   `json:"workEnd"`
+	CommuteMethod               string   `json:"commuteMethod"`
+	DailyBriefTime              string   `json:"dailyBriefTime"`
+	WorkdayMode                 string   `json:"workdayMode"`
+	Workdays                    []string `json:"workdays"`
+	HolidaySync                 bool     `json:"holidaySync"`
+	WeekendReminders            bool     `json:"weekendReminders"`
+	PlanReminderLeadMinutes     int      `json:"planReminderLeadMinutes"`
+	QuietStart                  string   `json:"quietStart"`
+	QuietEnd                    string   `json:"quietEnd"`
+	WeatherAlerts               bool     `json:"weatherAlerts"`
+	PlanReminders               bool     `json:"planReminders"`
+	AIPersonalization           bool     `json:"aiPersonalization"`
+	PantryReminderEnabled       bool     `json:"pantryReminderEnabled"`
+	PantryReminderRules         []string `json:"pantryReminderRules"`
+	PantryReminderTime          string   `json:"pantryReminderTime"`
 	SubscriptionReminderEnabled bool     `json:"subscriptionReminderEnabled"`
 	SubscriptionReminderRules   []string `json:"subscriptionReminderRules"`
 	SubscriptionReminderTime    string   `json:"subscriptionReminderTime"`
 	PantryListStatusFilter      string   `json:"pantryListStatusFilter"`
 	PantryListCategoryFilter    string   `json:"pantryListCategoryFilter"`
 	PantryListSortMode          string   `json:"pantryListSortMode"`
+	PantryListIncludeExpired    *bool    `json:"pantryListIncludeExpired"`
 }
 
 var errPreferredPantryHouseholdInaccessible = errors.New("preferred pantry household inaccessible")
@@ -70,31 +71,32 @@ var validWorkdays = map[string]bool{
 
 func defaultSettings(userID model.Int64String) model.LifeTraceSettings {
 	return model.LifeTraceSettings{
-		UserID:                  userID,
-		City:                    "上海",
-		WorkStart:               "09:30",
-		WorkEnd:                 "18:30",
-		CommuteMethod:           "开车",
-		DailyBriefTime:          "08:10",
-		WorkdayMode:             "legal",
-		Workdays:                model.StringList{"1", "2", "3", "4", "5"},
-		HolidaySync:             true,
-		WeekendReminders:        false,
-		PlanReminderLeadMinutes: 10,
-		QuietStart:              "22:30",
-		QuietEnd:                "07:30",
-		WeatherAlerts:           true,
-		PlanReminders:           true,
-		AIPersonalization:       true,
-		PantryReminderEnabled:   true,
-		PantryReminderRules:     model.StringList{"7d", "3d", "same-day", "expired"},
-		PantryReminderTime:      "09:00",
+		UserID:                      userID,
+		City:                        "上海",
+		WorkStart:                   "09:30",
+		WorkEnd:                     "18:30",
+		CommuteMethod:               "开车",
+		DailyBriefTime:              "08:10",
+		WorkdayMode:                 "legal",
+		Workdays:                    model.StringList{"1", "2", "3", "4", "5"},
+		HolidaySync:                 true,
+		WeekendReminders:            false,
+		PlanReminderLeadMinutes:     10,
+		QuietStart:                  "22:30",
+		QuietEnd:                    "07:30",
+		WeatherAlerts:               true,
+		PlanReminders:               true,
+		AIPersonalization:           true,
+		PantryReminderEnabled:       true,
+		PantryReminderRules:         model.StringList{"7d", "3d", "same-day", "expired"},
+		PantryReminderTime:          "09:00",
 		SubscriptionReminderEnabled: true,
 		SubscriptionReminderRules:   model.StringList{"7d", "3d", "same-day", "overdue"},
 		SubscriptionReminderTime:    "09:00",
 		PantryListStatusFilter:      "all",
 		PantryListCategoryFilter:    "all",
 		PantryListSortMode:          "expiry-asc",
+		PantryListIncludeExpired:    false,
 	}
 }
 
@@ -313,6 +315,9 @@ func applySettingsRequest(settings *model.LifeTraceSettings, req updateSettingsR
 	settings.PantryListStatusFilter = normalizePantryListStatusFilter(req.PantryListStatusFilter)
 	settings.PantryListCategoryFilter = normalizePantryListCategoryFilter(req.PantryListCategoryFilter)
 	settings.PantryListSortMode = normalizePantryListSortMode(req.PantryListSortMode)
+	if req.PantryListIncludeExpired != nil {
+		settings.PantryListIncludeExpired = *req.PantryListIncludeExpired
+	}
 	return nil
 }
 

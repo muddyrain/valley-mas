@@ -15,19 +15,21 @@ import {
   RefreshCcw,
   Search,
   Settings2,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
   Users,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetHeader } from '@/components/FormItem';
-import { LifeFilterBar, LifeList } from '@/components/LifeLayout';
+import { LifeList } from '@/components/LifeLayout';
 import { LoadErrorState } from '@/components/LoadErrorState';
+import { PantryFilterSheet } from '@/components/PantryFilterSheet';
 import { PantryHouseholdDetailSheet } from '@/components/PantryHouseholdDetailSheet';
 import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
 import { PantryItemDrawer } from '@/components/PantryItemDrawer';
@@ -37,48 +39,28 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { usePantryHouseholdManager } from '@/hooks/usePantryHouseholdManager';
+import { getLifeTraceScrollMemoryKey, readScrollMemory } from '@/lib/lifeTraceNavigation';
 import {
   getPantryCoverUrl,
   getPantryExpiryText,
   getPantryStatusLabel,
   resolvePantryStatus,
 } from '@/lib/pantry';
+import {
+  buildPantryListSearchParams,
+  isSamePantryListQuery,
+  type PantryListFilters,
+  pantryQuickStatuses,
+  pantrySortOptions,
+  readPantryListFilters,
+  toPantryListApiOptions,
+} from '@/lib/pantryListFilters';
 import { cn } from '@/lib/utils';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type {
-  PantryCategory,
-  PantryItem,
-  PantryListCategoryFilter,
-  PantryListStatusFilter,
-  PantrySortMode,
-} from '@/types';
-
-const statusFilters: Array<{ id: PantryListStatusFilter; label: string }> = [
-  { id: 'all', label: '在库' },
-  { id: 'expiring', label: '临期' },
-  { id: 'expired', label: '已过期' },
-  { id: 'no-expiry', label: '未设过期' },
-  { id: 'kept', label: '仍在使用' },
-  { id: 'used-up', label: '已用完' },
-  { id: 'discarded', label: '已丢弃' },
-];
-
-const categoryFilters: PantryListCategoryFilter[] = [
-  'all',
-  '食品',
-  '日用品',
-  '药品',
-  '宠物',
-  '其他',
-];
-
-const sortOptions: Array<{ id: PantrySortMode; label: string }> = [
-  { id: 'expiry-asc', label: '快过期' },
-  { id: 'created-desc', label: '录入时间' },
-  { id: 'expiry-desc', label: '保质期最长' },
-];
+import type { PantryCategory, PantryItem } from '@/types';
 
 const categoryIconMap = {
   食品: Apple,
@@ -90,86 +72,22 @@ const categoryIconMap = {
 
 const PANTRY_PAGE_SIZE = 20;
 
-function readStatusFilter(
-  params: URLSearchParams,
-  fallback: PantryListStatusFilter,
-): PantryListStatusFilter {
-  const value = params.get('status');
-  if (value && statusFilters.some((item) => item.id === value)) {
-    return value as PantryListStatusFilter;
-  }
-  return fallback;
-}
+const quickStatusLabels = {
+  all: '当前库存',
+  expiring: '临期',
+  expired: '已过期',
+} as const;
 
-function readCategoryFilter(
-  params: URLSearchParams,
-  fallback: PantryListCategoryFilter,
-): PantryListCategoryFilter {
-  const value = params.get('category');
-  if (value && categoryFilters.includes(value as PantryListCategoryFilter)) {
-    return value as PantryListCategoryFilter;
-  }
-  return fallback;
-}
-
-function readQueryText(params: URLSearchParams) {
-  return params.get('q')?.trim() ?? '';
-}
-
-function readSortMode(params: URLSearchParams, fallback: PantrySortMode): PantrySortMode {
-  const value = params.get('sort');
-  if (value && sortOptions.some((item) => item.id === value)) {
-    return value as PantrySortMode;
-  }
-  return fallback;
-}
-
-function updateSearchParams(
-  current: URLSearchParams,
-  updates: {
-    status?: PantryListStatusFilter;
-    category?: PantryListCategoryFilter;
-    sort?: PantrySortMode;
-    q?: string;
-  },
-) {
-  const next = new URLSearchParams(current);
-
-  if (updates.status !== undefined) {
-    if (updates.status === 'all') {
-      next.delete('status');
-    } else {
-      next.set('status', updates.status);
-    }
-  }
-
-  if (updates.category !== undefined) {
-    if (updates.category === 'all') {
-      next.delete('category');
-    } else {
-      next.set('category', updates.category);
-    }
-  }
-
-  if (updates.sort !== undefined) {
-    if (updates.sort === 'expiry-asc') {
-      next.delete('sort');
-    } else {
-      next.set('sort', updates.sort);
-    }
-  }
-
-  if (updates.q !== undefined) {
-    const value = updates.q.trim();
-    if (value) {
-      next.set('q', value);
-    } else {
-      next.delete('q');
-    }
-  }
-
-  return next;
-}
+const filterStatusLabels = {
+  all: '当前库存',
+  normal: '正常',
+  expiring: '临期',
+  expired: '已过期',
+  'no-expiry': '未设过期',
+  kept: '仍在使用',
+  'used-up': '已用完',
+  discarded: '已丢弃',
+} as const;
 
 // 首次加载用库存卡骨架占位，刷新时保留已有列表，避免空白、假零值和跳闪。
 function PantryListSkeleton({ rows = 3 }: { rows?: number }) {
@@ -240,12 +158,14 @@ function PantrySummaryValue({
 
 export function PantryPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const preferredPantryHouseholdId = useLifeTraceStore((state) => state.preferredPantryHouseholdId);
   const preferredPantryHouseholdName = useLifeTraceStore(
     (state) => state.preferredPantryHouseholdName,
   );
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
+  const settingsError = useLifeTraceStore((state) => state.settingsError);
   const pantryList = useLifeTraceStore((state) => state.pantryListItems);
   const pantryLoaded = useLifeTraceStore((state) => state.pantryListLoaded);
   const pantryLoading = useLifeTraceStore((state) => state.pantryListLoading);
@@ -266,7 +186,14 @@ export function PantryPage() {
   const addShoppingItem = useLifeTraceStore((state) => state.addShoppingItem);
   const settings = useLifeTraceStore((state) => state.settings);
   const updateSettings = useLifeTraceStore((state) => state.updateSettings);
-  const settingsAppliedRef = useRef(false);
+  const filters = useMemo(
+    () =>
+      readPantryListFilters(searchParams, {
+        includeExpired: settings.pantryListIncludeExpired,
+        sort: settings.pantryListSortMode,
+      }),
+    [searchParams, settings.pantryListIncludeExpired, settings.pantryListSortMode],
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PantryItem | null>(null);
   const [consumeItem, setConsumeItem] = useState<PantryItem | null>(null);
@@ -277,21 +204,8 @@ export function PantryPage() {
   const [transferItems, setTransferItems] = useState<PantryItem[]>([]);
   const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
   const [householdDetailOpen, setHouseholdDetailOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<PantryListStatusFilter>(() =>
-    readStatusFilter(new URLSearchParams(window.location.search), 'all'),
-  );
-  const [categoryFilter, setCategoryFilter] = useState<PantryListCategoryFilter>(() =>
-    readCategoryFilter(new URLSearchParams(window.location.search), 'all'),
-  );
-  const [sortMode, setSortMode] = useState<PantrySortMode>(() =>
-    readSortMode(new URLSearchParams(window.location.search), 'expiry-asc'),
-  );
-  const [searchQuery, setSearchQuery] = useState(() =>
-    readQueryText(new URLSearchParams(window.location.search)),
-  );
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(() =>
-    readQueryText(new URLSearchParams(window.location.search)),
-  );
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(filters.q);
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const statusActionInFlightRef = useRef<Set<string>>(new Set());
   const [shoppingPrompt, setShoppingPrompt] = useState<{
@@ -305,13 +219,16 @@ export function PantryPage() {
     fromSheet: boolean;
   } | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const latestSearchParamsRef = useRef(searchParams);
   const showToast = useFeedbackToastStore((state) => state.showToast);
   const effectiveHouseholdId = preferredPantryHouseholdId || pantryResolvedHouseholdId;
   const currentHouseholdName =
     pantryResolvedHouseholdName || preferredPantryHouseholdName || '当前空间';
   const currentSortLabel =
-    sortOptions.find((option) => option.id === sortMode)?.label ?? sortOptions[0].label;
+    pantrySortOptions.find((option) => option.id === filters.sort)?.label ??
+    pantrySortOptions[0].label;
+  const hiddenFilterCount =
+    Number(!pantryQuickStatuses.includes(filters.status as (typeof pantryQuickStatuses)[number])) +
+    Number(filters.category !== 'all');
   const selectedItems = useMemo(
     () => pantryList.filter((item) => selectedItemIds.includes(item.id)),
     [pantryList, selectedItemIds],
@@ -352,97 +269,38 @@ export function PantryPage() {
   const currentSpaceMetaText =
     currentHousehold?.kind === 'shared' ? `${currentHousehold.memberCount} 人共享` : '个人空间';
 
-  const syncUrlState = useCallback(
-    (updates: {
-      status?: PantryListStatusFilter;
-      category?: PantryListCategoryFilter;
-      sort?: PantrySortMode;
-      q?: string;
-    }) => {
-      const current = latestSearchParamsRef.current;
-      const next = updateSearchParams(current, updates);
-      if (next.toString() !== current.toString()) {
+  const applyFilters = useCallback(
+    (nextFilters: PantryListFilters) => {
+      const next = buildPantryListSearchParams(nextFilters);
+      if (next.toString() !== searchParams.toString()) {
         setSearchParams(next, { replace: true });
       }
     },
-    [setSearchParams],
+    [searchParams, setSearchParams],
   );
 
   useEffect(() => {
-    latestSearchParamsRef.current = searchParams;
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (settingsAppliedRef.current) {
-      return;
-    }
     if (!settingsLoaded) {
       return;
     }
-    settingsAppliedRef.current = true;
-
-    const hasStatusInUrl = searchParams.has('status');
-    const hasCategoryInUrl = searchParams.has('category');
-    const hasSortInUrl = searchParams.has('sort');
-
-    const desiredStatus = hasStatusInUrl
-      ? readStatusFilter(searchParams, settings.pantryListStatusFilter)
-      : settings.pantryListStatusFilter;
-    const desiredCategory = hasCategoryInUrl
-      ? readCategoryFilter(searchParams, settings.pantryListCategoryFilter)
-      : settings.pantryListCategoryFilter;
-    const desiredSort = hasSortInUrl
-      ? readSortMode(searchParams, settings.pantryListSortMode)
-      : settings.pantryListSortMode;
-
-    setStatusFilter((current) => (current === desiredStatus ? current : desiredStatus));
-    setCategoryFilter((current) => (current === desiredCategory ? current : desiredCategory));
-    setSortMode((current) => (current === desiredSort ? current : desiredSort));
-    syncUrlState({
-      status: desiredStatus,
-      category: desiredCategory,
-      sort: desiredSort,
-    });
-  }, [settingsLoaded, settings, searchParams, syncUrlState]);
+    const canonical = buildPantryListSearchParams(filters);
+    if (canonical.toString() !== searchParams.toString()) {
+      setSearchParams(canonical, { replace: true });
+    }
+  }, [filters, searchParams, setSearchParams, settingsLoaded]);
 
   useEffect(() => {
-    if (searchParams.has('status')) {
-      const nextStatus = readStatusFilter(searchParams, 'all');
-      setStatusFilter((current) => (current === nextStatus ? current : nextStatus));
-    }
-    if (searchParams.has('category')) {
-      const nextCategory = readCategoryFilter(searchParams, 'all');
-      setCategoryFilter((current) => (current === nextCategory ? current : nextCategory));
-    }
-    if (searchParams.has('sort')) {
-      const nextSort = readSortMode(searchParams, 'expiry-asc');
-      setSortMode((current) => (current === nextSort ? current : nextSort));
-    }
-    const nextQuery = readQueryText(searchParams);
-    setSearchQuery((current) => (current === nextQuery ? current : nextQuery));
-    setDebouncedSearchQuery((current) => (current === nextQuery ? current : nextQuery));
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (!searchParams.has('householdId')) {
-      return;
-    }
-
-    const next = new URLSearchParams(searchParams);
-    next.delete('householdId');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+    setSearchQuery((current) => (current === filters.q ? current : filters.q));
+  }, [filters.q]);
 
   const pantryQueryOptions = useMemo(
     () => ({
+      ...toPantryListApiOptions(filters),
       householdId: preferredPantryHouseholdId || undefined,
-      status: statusFilter,
-      category: categoryFilter,
-      sort: sortMode,
-      q: debouncedSearchQuery.trim() || undefined,
     }),
-    [categoryFilter, debouncedSearchQuery, preferredPantryHouseholdId, sortMode, statusFilter],
+    [filters, preferredPantryHouseholdId],
   );
+  const scrollMemoryKey = getLifeTraceScrollMemoryKey(location.pathname, location.search);
 
   const loadMorePantryItems = useCallback(async () => {
     if (pantryLoading || pantryLoadingMore || !pantryPagination.hasMore) {
@@ -526,11 +384,18 @@ export function PantryPage() {
   };
 
   const refreshPantryList = useCallback(async () => {
+    const state = useLifeTraceStore.getState();
+    const rememberedCount = scrollMemoryKey
+      ? (readScrollMemory(scrollMemoryKey)?.loadedItemCount ?? 0)
+      : 0;
+    const retainedCount = isSamePantryListQuery(state.pantryListOptions, pantryQueryOptions)
+      ? state.pantryListItems.length
+      : 0;
     await loadPantryList({
       ...pantryQueryOptions,
-      pageSize: PANTRY_PAGE_SIZE,
+      pageSize: Math.max(PANTRY_PAGE_SIZE, rememberedCount, retainedCount),
     });
-  }, [loadPantryList, pantryQueryOptions]);
+  }, [loadPantryList, pantryQueryOptions, scrollMemoryKey]);
 
   const toggleSelectionMode = useCallback(() => {
     setSelectionMode((current) => {
@@ -564,19 +429,26 @@ export function PantryPage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-      syncUrlState({ q: searchQuery });
+      if (searchQuery.trim() !== filters.q) {
+        applyFilters({ ...filters, q: searchQuery });
+      }
     }, 240);
     return () => window.clearTimeout(timer);
-  }, [searchQuery, syncUrlState]);
+  }, [applyFilters, filters, searchQuery]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!settingsLoaded) {
       return;
     }
 
     void refreshPantryList();
   }, [refreshPantryList, settingsLoaded]);
+
+  useEffect(() => {
+    if (settingsError) {
+      showToast(settingsError, 'error');
+    }
+  }, [settingsError, showToast]);
 
   useEffect(() => {
     if (!settingsLoaded || householdsLoaded || householdsLoading) {
@@ -653,7 +525,7 @@ export function PantryPage() {
   }, [householdSheetOpen, loadHouseholdMembersFor, loadHouseholds]);
 
   const pantrySummaryLoading = !pantryLoaded || (pantryLoading && pantryList.length === 0);
-  const pantryListSkeletonLoading = !pantryLoaded || pantryLoading;
+  const pantryListSkeletonLoading = !pantryLoaded || (pantryLoading && pantryList.length === 0);
   const activePantryError = pantryListError;
   const showPantryErrorFallback =
     Boolean(activePantryError) && !pantryLoading && pantryList.length === 0;
@@ -685,7 +557,7 @@ export function PantryPage() {
         </Button>
       }
     >
-      <div className="space-y-5">
+      <div className="space-y-5" data-scroll-loaded-count={pantryList.length}>
         <div className="relative overflow-hidden rounded-[1.5rem] border border-border/75 bg-[radial-gradient(circle_at_top_right,rgba(95,146,112,0.18),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(189,138,36,0.08),transparent_34%),linear-gradient(180deg,rgba(255,253,248,0.94),rgba(250,246,238,0.9))] p-3 shadow-[0_18px_54px_rgba(71,58,42,0.075)] backdrop-blur">
           <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-life-trace/45 to-transparent" />
           <div className="absolute -right-8 -top-8 size-24 rounded-full bg-life-trace/12 blur-2xl" />
@@ -759,10 +631,10 @@ export function PantryPage() {
 
             <div className="flex flex-wrap gap-1.5">
               <span className="rounded-full border border-border/70 bg-card/72 px-2.5 py-1 text-[11px] font-medium text-foreground/88">
-                在库{' '}
+                当前{' '}
                 <PantrySummaryValue
                   loading={pantrySummaryLoading}
-                  value={pantrySummary.total}
+                  value={pantrySummary.active}
                   skeletonClassName="w-4"
                 />
               </span>
@@ -786,11 +658,11 @@ export function PantryPage() {
 
             <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
               <div className="rounded-2xl border border-border/70 bg-card/72 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
-                <p className="text-[11px] font-semibold text-muted-foreground">在库</p>
+                <p className="text-[11px] font-semibold text-muted-foreground">当前库存</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">
                   <PantrySummaryValue
                     loading={pantrySummaryLoading}
-                    value={`${pantrySummary.total} 件`}
+                    value={`${pantrySummary.active} 件`}
                     skeletonClassName="w-12"
                   />
                 </p>
@@ -843,35 +715,23 @@ export function PantryPage() {
           </label>
         </Card>
 
-        <Card className="sticky top-[72px] z-10 space-y-4 bg-card/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/85">
+        <Card className="sticky top-[72px] z-10 space-y-3 bg-card/95 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/85">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-semibold">筛选</p>
+              <p className="text-sm font-semibold">{filterStatusLabels[filters.status]}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {statusFilter === 'all'
-                  ? '只看在库条目'
-                  : statusFilter === 'no-expiry'
-                    ? '状态：未设过期'
-                    : `状态：${getPantryStatusLabel(statusFilter)}`}
-                {categoryFilter === 'all' ? ' · 全部分类' : ` · 分类：${categoryFilter}`}
+                {filters.category === 'all' ? '全部分类' : filters.category}
                 {` · ${currentSortLabel}`}
               </p>
             </div>
-            {statusFilter !== 'all' || categoryFilter !== 'all' || searchQuery.trim() ? (
+            {filters.status !== 'all' || filters.category !== 'all' || searchQuery.trim() ? (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setStatusFilter('all');
-                  setCategoryFilter('all');
                   setSearchQuery('');
-                  setDebouncedSearchQuery('');
-                  syncUrlState({ status: 'all', category: 'all', q: '' });
-                  updateSettings({
-                    pantryListStatusFilter: 'all',
-                    pantryListCategoryFilter: 'all',
-                  });
+                  applyFilters({ ...filters, status: 'all', category: 'all', q: '' });
                 }}
               >
                 清空
@@ -879,86 +739,65 @@ export function PantryPage() {
             ) : null}
           </div>
 
-          <div className="space-y-2">
-            <LifeFilterBar className="items-center">
-              <span className="shrink-0 text-xs font-semibold text-muted-foreground">状态</span>
-              {statusFilters.map((filter) => {
-                const active = statusFilter === filter.id;
-                return (
-                  <button
-                    key={filter.id}
-                    type="button"
-                    className={cn(
-                      'h-9 shrink-0 rounded-full border px-3 text-xs font-semibold transition',
-                      active
-                        ? 'border-life-ai/45 bg-life-ai/10 text-life-ai'
-                        : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
-                    )}
-                    onClick={() => {
-                      setStatusFilter(filter.id);
-                      syncUrlState({ status: filter.id });
-                      updateSettings({ pantryListStatusFilter: filter.id });
-                    }}
-                    aria-pressed={active}
-                  >
-                    {filter.label}
-                  </button>
-                );
-              })}
-            </LifeFilterBar>
-            <LifeFilterBar className="items-center">
-              <span className="shrink-0 text-xs font-semibold text-muted-foreground">分类</span>
-              {categoryFilters.map((category) => {
-                const active = categoryFilter === category;
-                return (
-                  <button
-                    key={category}
-                    type="button"
-                    className={cn(
-                      'h-9 shrink-0 rounded-full border px-3 text-xs font-semibold transition',
-                      active
-                        ? 'border-life-plan/45 bg-life-plan/10 text-life-plan'
-                        : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
-                    )}
-                    onClick={() => {
-                      setCategoryFilter(category);
-                      syncUrlState({ category });
-                      updateSettings({ pantryListCategoryFilter: category });
-                    }}
-                    aria-pressed={active}
-                  >
-                    {category === 'all' ? '全部分类' : category}
-                  </button>
-                );
-              })}
-            </LifeFilterBar>
-            <LifeFilterBar className="items-center">
-              <span className="shrink-0 text-xs font-semibold text-muted-foreground">排序</span>
-              {sortOptions.map((option) => {
-                const active = sortMode === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className={cn(
-                      'h-9 shrink-0 rounded-full border px-3 text-xs font-semibold transition',
-                      active
-                        ? 'border-life-health/45 bg-life-health/10 text-life-health'
-                        : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
-                    )}
-                    onClick={() => {
-                      setSortMode(option.id);
-                      syncUrlState({ sort: option.id });
-                      updateSettings({ pantryListSortMode: option.id });
-                    }}
-                    aria-pressed={active}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </LifeFilterBar>
+          <div className="grid grid-cols-4 gap-2 max-[360px]:grid-cols-2">
+            {pantryQuickStatuses.map((status) => {
+              const active = filters.status === status;
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  className={cn(
+                    'h-10 rounded-2xl border px-2 text-xs font-semibold transition',
+                    active
+                      ? 'border-life-ai/45 bg-life-ai/10 text-life-ai'
+                      : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
+                  )}
+                  onClick={() => applyFilters({ ...filters, status })}
+                  aria-pressed={active}
+                >
+                  {quickStatusLabels[status]}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              className={cn(
+                'relative flex h-10 items-center justify-center gap-1.5 rounded-2xl border px-2 text-xs font-semibold transition',
+                hiddenFilterCount > 0
+                  ? 'border-life-plan/45 bg-life-plan/10 text-life-plan'
+                  : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setFilterSheetOpen(true)}
+            >
+              <SlidersHorizontal className="size-3.5" />
+              筛选
+              {hiddenFilterCount > 0 ? (
+                <span className="grid size-4 place-items-center rounded-full bg-life-plan text-[10px] text-background">
+                  {hiddenFilterCount}
+                </span>
+              ) : null}
+            </button>
           </div>
+
+          {filters.status === 'all' ? (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/75 bg-secondary/45 px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">包含已过期</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {filters.includeExpired ? '已显示' : '已隐藏'}
+                </p>
+              </div>
+              <Switch
+                size="sm"
+                checked={filters.includeExpired}
+                aria-label="包含已过期"
+                onCheckedChange={(checked) => {
+                  applyFilters({ ...filters, status: 'all', includeExpired: checked });
+                  updateSettings({ pantryListIncludeExpired: checked });
+                }}
+              />
+            </div>
+          ) : null}
         </Card>
 
         <section className="space-y-3">
@@ -1019,38 +858,31 @@ export function PantryPage() {
           ) : pantryList.length === 0 ? (
             <EmptyState
               title={
-                statusFilter === 'all' && categoryFilter === 'all' && !debouncedSearchQuery
+                filters.status === 'all' && filters.category === 'all' && !filters.q
                   ? '这个空间还没有在库条目'
                   : '暂无匹配库存'
               }
               description={
-                statusFilter === 'all' && categoryFilter === 'all' && !debouncedSearchQuery
+                filters.status === 'all' && filters.category === 'all' && !filters.q
                   ? '先加一盒牛奶、一袋生菜或一瓶洗衣液，Life Trace 才能开始提醒你。'
                   : '换个筛选条件，或者把搜索词放宽一点试试。'
               }
               eyebrow={
-                statusFilter === 'all' && categoryFilter === 'all' && !debouncedSearchQuery
+                filters.status === 'all' && filters.category === 'all' && !filters.q
                   ? '库存为空'
                   : '筛选结果'
               }
               tone="plan"
               icon={PackagePlus}
               action={
-                statusFilter !== 'all' || categoryFilter !== 'all' || debouncedSearchQuery ? (
+                filters.status !== 'all' || filters.category !== 'all' || filters.q ? (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      setStatusFilter('all');
-                      setCategoryFilter('all');
                       setSearchQuery('');
-                      setDebouncedSearchQuery('');
-                      syncUrlState({ status: 'all', category: 'all', q: '' });
-                      updateSettings({
-                        pantryListStatusFilter: 'all',
-                        pantryListCategoryFilter: 'all',
-                      });
+                      applyFilters({ ...filters, status: 'all', category: 'all', q: '' });
                     }}
                   >
                     清空筛选
@@ -1113,7 +945,9 @@ export function PantryPage() {
                           toggleItemSelection(item.id);
                           return;
                         }
-                        navigate(`/pantry/${item.id}`);
+                        navigate(`/pantry/${item.id}`, {
+                          state: { pantryListFrom: `${location.pathname}${location.search}` },
+                        });
                       }}
                     >
                       <div className="grid h-32 w-[6.75rem] shrink-0 place-items-center overflow-hidden rounded-[1.25rem] border border-border/70 bg-secondary/70 max-[360px]:h-[7.5rem] max-[360px]:w-24">
@@ -1500,6 +1334,18 @@ export function PantryPage() {
           ) : null}
         </BottomSheet>
 
+        <PantryFilterSheet
+          open={filterSheetOpen}
+          value={filters}
+          onOpenChange={setFilterSheetOpen}
+          onApply={(nextFilters) => {
+            if (nextFilters.sort !== filters.sort) {
+              updateSettings({ pantryListSortMode: nextFilters.sort });
+            }
+            applyFilters(nextFilters);
+            setFilterSheetOpen(false);
+          }}
+        />
         <PantryItemDrawer
           open={drawerOpen}
           onOpenChange={(nextOpen) => {

@@ -46,7 +46,7 @@ describe('Life Trace layout system surface', () => {
   it('uses shared list and filter wrappers on dense utility pages', () => {
     expect(plansSource).toContain('<LifeFilterBar');
     expect(plansSource).toContain('<LifeList>');
-    expect(pantrySource).toContain('<LifeFilterBar');
+    expect(pantrySource).toContain('<PantryFilterSheet');
     expect(pantrySource).toContain('<LifeList');
     expect(shoppingSource).toContain('<LifeList>');
   });

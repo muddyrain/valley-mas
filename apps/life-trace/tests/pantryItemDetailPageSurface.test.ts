@@ -14,7 +14,10 @@ describe('pantry item detail surface', () => {
   it('registers the pantry detail route and opens it from list cards', () => {
     expect(appSource).toContain('path="/pantry/:itemId"');
     expect(appSource).toContain('<PantryItemDetailPage />');
-    expect(pantryPageSource).toContain('navigate(`/pantry/${item.id}`)');
+    expect(pantryPageSource).toMatch(/navigate\(`\/pantry\/\$\{item\.id\}`, \{/);
+    expect(pantryPageSource).toMatch(
+      /pantryListFrom: `\$\{location\.pathname\}\$\{location\.search\}`/,
+    );
   });
 
   it('loads pantry detail and timeline from dedicated endpoints', () => {

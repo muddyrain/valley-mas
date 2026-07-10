@@ -27,8 +27,9 @@ describe('AppShell scroll memory surface', () => {
     expect(appShellSource).toContain(
       'activeScrollMemoryKeyRef.current !== scrollListenerMemoryKey',
     );
-    expect(appShellSource).toContain('scrollMemoryRef.current.set(');
-    expect(appShellSource).toContain('scrollListenerMemoryKey,');
+    expect(appShellSource).toContain(
+      'writeScrollMemory(captureScrollMemory(element, scrollListenerMemoryKey))',
+    );
   });
 
   it('only wires passive scroll listeners when scroll memory is enabled', () => {

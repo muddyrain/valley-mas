@@ -569,36 +569,37 @@ func (item *LifeTraceShoppingListItem) BeforeCreate(tx *gorm.DB) error {
 }
 
 type LifeTraceSettings struct {
-	ID                      Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID                  Int64String    `gorm:"column:user_id;uniqueIndex;not null" json:"userId"`
-	ActivePantryHouseholdID Int64String    `gorm:"column:active_pantry_household_id;index" json:"activePantryHouseholdId,omitempty"`
-	City                    string         `gorm:"size:80;not null;default:'上海'" json:"city"`
-	WorkStart               string         `gorm:"size:20;not null;default:'09:30'" json:"workStart"`
-	WorkEnd                 string         `gorm:"size:20;not null;default:'18:30'" json:"workEnd"`
-	CommuteMethod           string         `gorm:"size:20;not null;default:'开车'" json:"commuteMethod"`
-	DailyBriefTime          string         `gorm:"size:20;not null;default:'08:10'" json:"dailyBriefTime"`
-	WorkdayMode             string         `gorm:"size:20;not null;default:'legal'" json:"workdayMode"`
-	Workdays                StringList     `gorm:"type:text" json:"workdays"`
-	HolidaySync             bool           `gorm:"default:true" json:"holidaySync"`
-	WeekendReminders        bool           `gorm:"default:false" json:"weekendReminders"`
-	PlanReminderLeadMinutes int            `gorm:"default:10" json:"planReminderLeadMinutes"`
-	QuietStart              string         `gorm:"size:20;not null;default:'22:30'" json:"quietStart"`
-	QuietEnd                string         `gorm:"size:20;not null;default:'07:30'" json:"quietEnd"`
-	WeatherAlerts           bool           `gorm:"default:true" json:"weatherAlerts"`
-	PlanReminders           bool           `gorm:"default:true" json:"planReminders"`
-	AIPersonalization       bool           `gorm:"column:ai_personalization;default:true" json:"aiPersonalization"`
-	PantryReminderEnabled   bool           `gorm:"column:pantry_reminder_enabled;default:true" json:"pantryReminderEnabled"`
-	PantryReminderRules     StringList     `gorm:"type:text" json:"pantryReminderRules"`
-	PantryReminderTime      string         `gorm:"size:20;not null;default:'09:00'" json:"pantryReminderTime"`
-	SubscriptionReminderEnabled bool       `gorm:"column:subscription_reminder_enabled;default:true" json:"subscriptionReminderEnabled"`
-	SubscriptionReminderRules   StringList `gorm:"column:subscription_reminder_rules;type:text" json:"subscriptionReminderRules"`
-	SubscriptionReminderTime    string     `gorm:"column:subscription_reminder_time;size:20;not null;default:'09:00'" json:"subscriptionReminderTime"`
-	PantryListStatusFilter      string     `gorm:"column:pantry_list_status_filter;size:20;not null;default:'all'" json:"pantryListStatusFilter"`
-	PantryListCategoryFilter    string     `gorm:"column:pantry_list_category_filter;size:20;not null;default:'all'" json:"pantryListCategoryFilter"`
-	PantryListSortMode          string     `gorm:"column:pantry_list_sort_mode;size:20;not null;default:'expiry-asc'" json:"pantryListSortMode"`
-	CreatedAt               time.Time      `json:"createdAt"`
-	UpdatedAt               time.Time      `json:"updatedAt"`
-	DeletedAt               gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID                      Int64String    `gorm:"column:user_id;uniqueIndex;not null" json:"userId"`
+	ActivePantryHouseholdID     Int64String    `gorm:"column:active_pantry_household_id;index" json:"activePantryHouseholdId,omitempty"`
+	City                        string         `gorm:"size:80;not null;default:'上海'" json:"city"`
+	WorkStart                   string         `gorm:"size:20;not null;default:'09:30'" json:"workStart"`
+	WorkEnd                     string         `gorm:"size:20;not null;default:'18:30'" json:"workEnd"`
+	CommuteMethod               string         `gorm:"size:20;not null;default:'开车'" json:"commuteMethod"`
+	DailyBriefTime              string         `gorm:"size:20;not null;default:'08:10'" json:"dailyBriefTime"`
+	WorkdayMode                 string         `gorm:"size:20;not null;default:'legal'" json:"workdayMode"`
+	Workdays                    StringList     `gorm:"type:text" json:"workdays"`
+	HolidaySync                 bool           `gorm:"default:true" json:"holidaySync"`
+	WeekendReminders            bool           `gorm:"default:false" json:"weekendReminders"`
+	PlanReminderLeadMinutes     int            `gorm:"default:10" json:"planReminderLeadMinutes"`
+	QuietStart                  string         `gorm:"size:20;not null;default:'22:30'" json:"quietStart"`
+	QuietEnd                    string         `gorm:"size:20;not null;default:'07:30'" json:"quietEnd"`
+	WeatherAlerts               bool           `gorm:"default:true" json:"weatherAlerts"`
+	PlanReminders               bool           `gorm:"default:true" json:"planReminders"`
+	AIPersonalization           bool           `gorm:"column:ai_personalization;default:true" json:"aiPersonalization"`
+	PantryReminderEnabled       bool           `gorm:"column:pantry_reminder_enabled;default:true" json:"pantryReminderEnabled"`
+	PantryReminderRules         StringList     `gorm:"type:text" json:"pantryReminderRules"`
+	PantryReminderTime          string         `gorm:"size:20;not null;default:'09:00'" json:"pantryReminderTime"`
+	SubscriptionReminderEnabled bool           `gorm:"column:subscription_reminder_enabled;default:true" json:"subscriptionReminderEnabled"`
+	SubscriptionReminderRules   StringList     `gorm:"column:subscription_reminder_rules;type:text" json:"subscriptionReminderRules"`
+	SubscriptionReminderTime    string         `gorm:"column:subscription_reminder_time;size:20;not null;default:'09:00'" json:"subscriptionReminderTime"`
+	PantryListStatusFilter      string         `gorm:"column:pantry_list_status_filter;size:20;not null;default:'all'" json:"pantryListStatusFilter"`
+	PantryListCategoryFilter    string         `gorm:"column:pantry_list_category_filter;size:20;not null;default:'all'" json:"pantryListCategoryFilter"`
+	PantryListSortMode          string         `gorm:"column:pantry_list_sort_mode;size:20;not null;default:'expiry-asc'" json:"pantryListSortMode"`
+	PantryListIncludeExpired    bool           `gorm:"column:pantry_list_include_expired;default:false" json:"pantryListIncludeExpired"`
+	CreatedAt                   time.Time      `json:"createdAt"`
+	UpdatedAt                   time.Time      `json:"updatedAt"`
+	DeletedAt                   gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (settings *LifeTraceSettings) BeforeCreate(tx *gorm.DB) error {

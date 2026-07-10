@@ -38,6 +38,9 @@ func TestGetSettingsCreatesDefaultForCurrentUser(t *testing.T) {
 	if settings["activePantryHouseholdId"] != nil {
 		t.Fatalf("expected default active pantry household id to be empty, got %+v", settings)
 	}
+	if settings["pantryListIncludeExpired"] != false {
+		t.Fatalf("expected expired pantry items to be hidden by default, got %+v", settings)
+	}
 }
 
 func decodeTraceFailurePayload(t *testing.T, recorder *httptest.ResponseRecorder) map[string]interface{} {
@@ -94,7 +97,9 @@ func TestUpdateSettingsPersistsCurrentUserPreferences(t *testing.T) {
 		"aiPersonalization": false,
 		"pantryReminderEnabled": true,
 		"pantryReminderRules": ["3d", "same-day", "same-day"],
-		"pantryReminderTime": "08:45"
+		"pantryReminderTime": "08:45",
+		"pantryListIncludeExpired": true,
+		"pantryListSortMode": "created-desc"
 	}`)
 	updateReq := httptest.NewRequest(http.MethodPut, "/api/v1/life-trace/settings", body)
 	updateReq.Header.Set("Content-Type", "application/json")
@@ -128,14 +133,36 @@ func TestUpdateSettingsPersistsCurrentUserPreferences(t *testing.T) {
 	if settings["activePantryHouseholdId"] != "301" {
 		t.Fatalf("expected active pantry household id to persist, got %+v", settings)
 	}
+	if settings["pantryListIncludeExpired"] != true || settings["pantryListSortMode"] != "created-desc" {
+		t.Fatalf("expected pantry list preferences to persist, got %+v", settings)
+	}
 
 	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/settings", nil)
 	getResp := httptest.NewRecorder()
 	router.ServeHTTP(getResp, getReq)
 
 	persisted := decodeTracePayload(t, getResp)["data"].(map[string]interface{})
-	if persisted["city"] != "杭州" || persisted["workStart"] != "10:00" || persisted["pantryReminderTime"] != "08:45" || persisted["activePantryHouseholdId"] != "301" {
+	if persisted["city"] != "杭州" || persisted["workStart"] != "10:00" || persisted["pantryReminderTime"] != "08:45" || persisted["activePantryHouseholdId"] != "301" || persisted["pantryListIncludeExpired"] != true || persisted["pantryListSortMode"] != "created-desc" {
 		t.Fatalf("expected settings to persist, got %+v", persisted)
+	}
+}
+
+func TestUpdateSettingsPreservesExpiredPreferenceWhenOlderClientOmitsField(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+	settings := defaultSettings(101)
+	settings.PantryListIncludeExpired = true
+	if err := database.GetDB().Create(&settings).Error; err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+
+	updateReq := httptest.NewRequest(http.MethodPut, "/api/v1/life-trace/settings", bytes.NewBufferString(`{}`))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp := httptest.NewRecorder()
+	router.ServeHTTP(updateResp, updateReq)
+
+	updated := decodeTracePayload(t, updateResp)["data"].(map[string]interface{})
+	if updated["pantryListIncludeExpired"] != true {
+		t.Fatalf("expected omitted expired preference to remain unchanged, got %+v", updated)
 	}
 }
 

@@ -74,6 +74,7 @@ export type UserSettings = {
   pantryListStatusFilter: PantryListStatusFilter;
   pantryListCategoryFilter: PantryListCategoryFilter;
   pantryListSortMode: PantrySortMode;
+  pantryListIncludeExpired: boolean;
 };
 
 export type PantryListStatusFilter =

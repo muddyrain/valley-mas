@@ -16,7 +16,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getPantryItem, getPantryItemTimeline } from '@/api/pantry';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { getPantryListReturnPath } from '@/lib/lifeTraceNavigation';
 import {
   formatPantryReminderSummary,
   getPantryCoverUrl,
@@ -132,6 +133,7 @@ function DetailField({
 export function PantryItemDetailPage() {
   const { itemId } = useParams<{ itemId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const token = useAuthStore((state) => state.token);
   const consumePantryItem = useLifeTraceStore((state) => state.consumePantryItem);
   const updatePantryItemStatus = useLifeTraceStore((state) => state.updatePantryItemStatus);
@@ -150,6 +152,7 @@ export function PantryItemDetailPage() {
   const [quantityText, setQuantityText] = useState('1');
   const [transferOpen, setTransferOpen] = useState(false);
   const [usedUpConfirmQuantity, setUsedUpConfirmQuantity] = useState<number | null>(null);
+  const pantryListReturnPath = getPantryListReturnPath(location.state);
 
   const status = item ? resolvePantryStatus(item) : 'normal';
   const coverUrl = item ? getPantryCoverUrl(item) : '';
@@ -161,6 +164,15 @@ export function PantryItemDetailPage() {
     ? Math.min(item.quantity, Math.max(1, Number.parseInt(quantityText, 10) || 1))
     : 1;
   const remainingAfterUse = item ? Math.max(0, item.quantity - quantityNumber) : 0;
+
+  const refreshSourcePantryList = useCallback(async () => {
+    const state = useLifeTraceStore.getState();
+    await loadPantryList({
+      ...state.pantryListOptions,
+      householdId: preferredPantryHouseholdId || undefined,
+      pageSize: Math.max(20, state.pantryListItems.length, state.pantryListOptions.pageSize ?? 20),
+    });
+  }, [loadPantryList, preferredPantryHouseholdId]);
 
   const refreshTimeline = useCallback(async () => {
     if (!token || !itemId) {
@@ -237,9 +249,7 @@ export function PantryItemDetailPage() {
           'success',
         );
         await refreshTimeline();
-        await loadPantryList({
-          householdId: preferredPantryHouseholdId || undefined,
-        });
+        await refreshSourcePantryList();
       }
     } finally {
       setActionId(null);
@@ -258,9 +268,7 @@ export function PantryItemDetailPage() {
         setItem(updated);
         showToast(next === 'kept' ? `已标记「${item.name}」仍在使用` : '已恢复提醒', 'success');
         await refreshTimeline();
-        await loadPantryList({
-          householdId: preferredPantryHouseholdId || undefined,
-        });
+        await refreshSourcePantryList();
       }
     } finally {
       setActionId(null);
@@ -296,7 +304,7 @@ export function PantryItemDetailPage() {
     <SubPageShell
       title={item?.name || '库存详情'}
       eyebrow="Pantry"
-      fallbackBackTo="/pantry"
+      fallbackBackTo={pantryListReturnPath}
       action={
         item ? (
           <Button
@@ -635,13 +643,13 @@ export function PantryItemDetailPage() {
             onRequestTransfer={() => setTransferOpen(true)}
             onDeleted={(message) => {
               showToast(message, 'success');
-              void loadPantryList({ householdId: preferredPantryHouseholdId || undefined });
-              navigate('/pantry', { replace: true });
+              void refreshSourcePantryList();
+              navigate(pantryListReturnPath, { replace: true });
             }}
             onSaved={(message) => {
               showToast(message, 'success');
               void refreshDetail();
-              void loadPantryList({ householdId: preferredPantryHouseholdId || undefined });
+              void refreshSourcePantryList();
             }}
           />
 
@@ -653,7 +661,7 @@ export function PantryItemDetailPage() {
             sourceHouseholdName={household?.name || '我的空间'}
             onTransferred={async () => {
               await refreshDetail();
-              await loadPantryList({ householdId: preferredPantryHouseholdId || undefined });
+              await refreshSourcePantryList();
             }}
           />
 
@@ -718,7 +726,12 @@ export function PantryItemDetailPage() {
           tone="default"
           icon={AlertTriangle}
           action={
-            <Button type="button" variant="outline" size="sm" onClick={() => navigate('/pantry')}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(pantryListReturnPath)}
+            >
               返回库存列表
             </Button>
           }

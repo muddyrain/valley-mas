@@ -5,7 +5,10 @@ export type ScrollMemoryEntry = {
   scrollTop: number;
   anchorId: string;
   anchorOffsetTop?: number;
+  loadedItemCount?: number;
 };
+
+const scrollMemory = new Map<string, ScrollMemoryEntry>();
 
 const tabRootPaths: Record<AppTab, string> = {
   today: '/today',
@@ -37,12 +40,43 @@ export function isLifeTraceTabRoute(pathname: string) {
   return Object.values(tabRootPaths).includes(pathname);
 }
 
-export function getLifeTraceScrollMemoryKey(pathname: string) {
+function getPantryListScrollMemoryKey(search: string) {
+  const source = new URLSearchParams(search);
+  const normalized = new URLSearchParams();
+  for (const key of ['category', 'includeExpired', 'q', 'sort', 'status']) {
+    const value = source.get(key)?.trim();
+    if (!value || (key === 'includeExpired' && value !== 'true')) {
+      continue;
+    }
+    normalized.set(key, value);
+  }
+  const query = normalized.toString();
+  return query ? `list:/pantry?${query}` : 'list:/pantry';
+}
+
+export function getLifeTraceScrollMemoryKey(pathname: string, search = '') {
   if (scrollMemoryTabPaths.has(pathname)) {
     return `tab:${getActiveLifeTraceTab(pathname)}`;
   }
 
+  if (pathname === '/pantry') {
+    return getPantryListScrollMemoryKey(search);
+  }
+
   return null;
+}
+
+export function readScrollMemory(key: string) {
+  return scrollMemory.get(key);
+}
+
+export function writeScrollMemory(entry: ScrollMemoryEntry) {
+  scrollMemory.set(entry.key, entry);
+}
+
+export function getPantryListReturnPath(state: unknown) {
+  const value = (state as { pantryListFrom?: unknown } | null)?.pantryListFrom;
+  return typeof value === 'string' && /^\/pantry(?:\?|$)/.test(value) ? value : '/pantry';
 }
 
 export function captureNearestScrollAnchor(container: HTMLElement) {
@@ -92,11 +126,15 @@ export function captureScrollMemory(
       ? getAnchorSnapshot(container, preferredAnchor)
       : captureNearestScrollAnchorSnapshot(container);
 
+  const loadedCountMarker = container.querySelector<HTMLElement>('[data-scroll-loaded-count]');
+  const loadedItemCount = Number(loadedCountMarker?.dataset.scrollLoadedCount ?? 0);
+
   return {
     key,
     scrollTop: container.scrollTop,
     anchorId: anchorSnapshot?.anchorId ?? '',
     anchorOffsetTop: anchorSnapshot?.anchorOffsetTop ?? 0,
+    ...(Number.isFinite(loadedItemCount) && loadedItemCount > 0 ? { loadedItemCount } : {}),
   };
 }
 

@@ -73,6 +73,7 @@ import { getLifeTraceErrorMessage } from '@/lib/error';
 import { getDefaultLedgerMonth } from '@/lib/ledger';
 import { withMinimumLoadingTime } from '@/lib/loading';
 import { resolvePantryStatus } from '@/lib/pantry';
+import { getPantryRefreshPageSize, isSamePantryListQuery } from '@/lib/pantryListFilters';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import type {
@@ -323,6 +324,7 @@ const defaultSettings: UserSettings = {
   pantryListStatusFilter: 'all',
   pantryListCategoryFilter: 'all',
   pantryListSortMode: 'expiry-asc',
+  pantryListIncludeExpired: false,
 };
 
 const defaultPagination: ListPagination = {
@@ -479,6 +481,7 @@ function normalizeSettings(settings: Partial<UserSettings>): UserSettings {
     'expiring',
     'expired',
     'no-expiry',
+    'kept',
     'used-up',
     'discarded',
   ];
@@ -525,6 +528,10 @@ function normalizeSettings(settings: Partial<UserSettings>): UserSettings {
       settings.pantryListSortMode && validSortModes.includes(settings.pantryListSortMode)
         ? settings.pantryListSortMode
         : defaultSettings.pantryListSortMode,
+    pantryListIncludeExpired:
+      typeof settings.pantryListIncludeExpired === 'boolean'
+        ? settings.pantryListIncludeExpired
+        : defaultSettings.pantryListIncludeExpired,
   };
 }
 
@@ -940,18 +947,28 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       },
       loadPantryList: async (options = {}) => {
         const token = getToken();
-        const nextOptions = normalizePantryListOptions(
+        const currentState = get();
+        let nextOptions = normalizePantryListOptions(
           {
-            ...get().pantryListOptions,
+            ...currentState.pantryListOptions,
             ...options,
             page: 1,
             pageSize:
               options.pageSize ??
-              get().pantryListOptions.pageSize ??
+              currentState.pantryListOptions.pageSize ??
               defaultPantryListOptions.pageSize,
           },
-          get().pantryListOptions,
+          currentState.pantryListOptions,
         );
+        const sameQuery = isSamePantryListQuery(currentState.pantryListOptions, nextOptions);
+        nextOptions = {
+          ...nextOptions,
+          pageSize: getPantryRefreshPageSize(
+            nextOptions.pageSize ?? defaultPantryListOptions.pageSize ?? 20,
+            currentState.pantryListItems.length,
+            sameQuery,
+          ),
+        };
 
         if (!token) {
           set({
@@ -978,6 +995,16 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           pantryListLoadingMore: false,
           pantryListError: '',
           pantryListOptions: nextOptions,
+          ...(sameQuery
+            ? {}
+            : {
+                pantryListItems: [],
+                pantryListLoaded: false,
+                pantryListPagination: {
+                  ...defaultPagination,
+                  pageSize: nextOptions.pageSize ?? defaultPantryListOptions.pageSize ?? 20,
+                },
+              }),
         });
         try {
           const { householdId, householdName, list, pagination, summary } =

@@ -559,6 +559,7 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 	today := time.Now()
 	expiringDate := today.AddDate(0, 0, 2).Format("2006-01-02")
 	expiredDate := today.AddDate(0, 0, -1).Format("2006-01-02")
+	olderExpiredDate := today.AddDate(0, 0, -10).Format("2006-01-02")
 	normalDate := today.AddDate(0, 0, 15).Format("2006-01-02")
 	baseCreatedAt := time.Now().Add(-4 * time.Hour)
 
@@ -594,6 +595,22 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 			ReminderTime:       "09:00",
 			CreatedAt:          baseCreatedAt.Add(time.Hour),
 			UpdatedAt:          baseCreatedAt.Add(time.Hour),
+		},
+		{
+			UserID:             101,
+			Name:               "更早过期罐头",
+			Category:           "食品",
+			Quantity:           1,
+			Unit:               "罐",
+			Location:           "储物柜",
+			ExpiresAt:          olderExpiredDate,
+			Status:             "normal",
+			ReminderEnabled:    true,
+			ReminderUseDefault: true,
+			ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+			ReminderTime:       "09:00",
+			CreatedAt:          baseCreatedAt.Add(90 * time.Minute),
+			UpdatedAt:          baseCreatedAt.Add(90 * time.Minute),
 		},
 		{
 			UserID:             101,
@@ -643,6 +660,38 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 			CreatedAt:          baseCreatedAt.Add(4 * time.Hour),
 			UpdatedAt:          baseCreatedAt.Add(4 * time.Hour),
 		},
+		{
+			UserID:             101,
+			Name:               "仍在使用酸奶",
+			Category:           "食品",
+			Quantity:           1,
+			Unit:               "盒",
+			Location:           "冷藏",
+			ExpiresAt:          expiredDate,
+			Status:             "kept",
+			ReminderEnabled:    false,
+			ReminderUseDefault: true,
+			ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+			ReminderTime:       "09:00",
+			CreatedAt:          baseCreatedAt.Add(5 * time.Hour),
+			UpdatedAt:          baseCreatedAt.Add(5 * time.Hour),
+		},
+		{
+			UserID:             101,
+			Name:               "已用完面包",
+			Category:           "食品",
+			Quantity:           1,
+			Unit:               "袋",
+			Location:           "厨房",
+			ExpiresAt:          normalDate,
+			Status:             "used-up",
+			ReminderEnabled:    false,
+			ReminderUseDefault: true,
+			ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+			ReminderTime:       "09:00",
+			CreatedAt:          baseCreatedAt.Add(6 * time.Hour),
+			UpdatedAt:          baseCreatedAt.Add(6 * time.Hour),
+		},
 	}
 	for _, item := range seedItems {
 		if err := database.GetDB().Create(&item).Error; err != nil {
@@ -656,8 +705,8 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 
 	expiredData := decodeTracePayload(t, expiredResp)["data"].(map[string]interface{})
 	expiredList := expiredData["list"].([]interface{})
-	if len(expiredList) != 1 || expiredList[0].(map[string]interface{})["name"] != "过期酸奶" {
-		t.Fatalf("expected derived expired filter to return only expired item, got %+v", expiredList)
+	if len(expiredList) != 2 || expiredList[0].(map[string]interface{})["name"] != "过期酸奶" || expiredList[1].(map[string]interface{})["name"] != "更早过期罐头" {
+		t.Fatalf("expected derived expired filter to prioritize recently expired items, got %+v", expiredList)
 	}
 
 	discardedReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?status=discarded&page=1&pageSize=10", nil)
@@ -680,6 +729,42 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 		t.Fatalf("expected no-expiry filter to return only items without expiry, got %+v", noExpiryList)
 	}
 
+	normalReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?status=normal&page=1&pageSize=10", nil)
+	normalResp := httptest.NewRecorder()
+	router.ServeHTTP(normalResp, normalReq)
+
+	normalData := decodeTracePayload(t, normalResp)["data"].(map[string]interface{})
+	normalList := normalData["list"].([]interface{})
+	if len(normalList) != 1 || normalList[0].(map[string]interface{})["name"] != "大米" {
+		t.Fatalf("expected normal filter to exclude items without expiry, got %+v", normalList)
+	}
+
+	defaultReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?page=1&pageSize=10", nil)
+	defaultResp := httptest.NewRecorder()
+	router.ServeHTTP(defaultResp, defaultReq)
+
+	defaultData := decodeTracePayload(t, defaultResp)["data"].(map[string]interface{})
+	defaultList := defaultData["list"].([]interface{})
+	expectedDefaultNames := []string{"临期鸡蛋", "大米", "仍在使用酸奶", "未设过期纸巾"}
+	if len(defaultList) != len(expectedDefaultNames) {
+		t.Fatalf("expected current inventory items, got %+v", defaultList)
+	}
+	for index, expectedName := range expectedDefaultNames {
+		if defaultList[index].(map[string]interface{})["name"] != expectedName {
+			t.Fatalf("expected current inventory order %v, got %+v", expectedDefaultNames, defaultList)
+		}
+	}
+
+	includeExpiredReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?includeExpired=true&page=1&pageSize=10", nil)
+	includeExpiredResp := httptest.NewRecorder()
+	router.ServeHTTP(includeExpiredResp, includeExpiredReq)
+
+	includeExpiredData := decodeTracePayload(t, includeExpiredResp)["data"].(map[string]interface{})
+	includeExpiredList := includeExpiredData["list"].([]interface{})
+	if len(includeExpiredList) != 6 || includeExpiredList[0].(map[string]interface{})["name"] != "临期鸡蛋" || includeExpiredList[4].(map[string]interface{})["name"] != "过期酸奶" || includeExpiredList[5].(map[string]interface{})["name"] != "更早过期罐头" {
+		t.Fatalf("expected expired items after current inventory, got %+v", includeExpiredList)
+	}
+
 	pageReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?page=1&pageSize=2", nil)
 	pageResp := httptest.NewRecorder()
 	router.ServeHTTP(pageResp, pageReq)
@@ -689,8 +774,8 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 	if len(pageList) != 2 {
 		t.Fatalf("expected first page to contain 2 items, got %+v", pageList)
 	}
-	if pageList[0].(map[string]interface{})["name"] != "过期酸奶" || pageList[1].(map[string]interface{})["name"] != "临期鸡蛋" {
-		t.Fatalf("expected pantry list to prioritize expired then expiring items, got %+v", pageList)
+	if pageList[0].(map[string]interface{})["name"] != "临期鸡蛋" || pageList[1].(map[string]interface{})["name"] != "大米" {
+		t.Fatalf("expected pantry list to prioritize expiring current items, got %+v", pageList)
 	}
 
 	createdReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?page=1&pageSize=2&sort=created-desc", nil)
@@ -702,29 +787,29 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 	if len(createdList) != 2 {
 		t.Fatalf("expected created sort first page to contain 2 items, got %+v", createdList)
 	}
-	if createdList[0].(map[string]interface{})["name"] != "大米" || createdList[1].(map[string]interface{})["name"] != "临期鸡蛋" {
+	if createdList[0].(map[string]interface{})["name"] != "仍在使用酸奶" || createdList[1].(map[string]interface{})["name"] != "未设过期纸巾" {
 		t.Fatalf("expected created sort to prioritize latest active items, got %+v", createdList)
 	}
 
-	expiryDescReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?page=1&pageSize=3&sort=expiry-desc", nil)
+	expiryDescReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?page=1&pageSize=4&sort=expiry-desc", nil)
 	expiryDescResp := httptest.NewRecorder()
 	router.ServeHTTP(expiryDescResp, expiryDescReq)
 
 	expiryDescData := decodeTracePayload(t, expiryDescResp)["data"].(map[string]interface{})
 	expiryDescList := expiryDescData["list"].([]interface{})
-	if len(expiryDescList) != 3 {
-		t.Fatalf("expected expiry desc sort to contain 3 items, got %+v", expiryDescList)
+	if len(expiryDescList) != 4 {
+		t.Fatalf("expected expiry desc sort to contain current items, got %+v", expiryDescList)
 	}
-	if expiryDescList[0].(map[string]interface{})["name"] != "大米" || expiryDescList[2].(map[string]interface{})["name"] != "过期酸奶" {
+	if expiryDescList[0].(map[string]interface{})["name"] != "大米" || expiryDescList[3].(map[string]interface{})["name"] != "未设过期纸巾" {
 		t.Fatalf("expected expiry desc sort to prioritize longest expiry, got %+v", expiryDescList)
 	}
 
 	pagination := pageData["pagination"].(map[string]interface{})
-	if pagination["total"] != float64(3) || pagination["hasMore"] != true {
+	if pagination["total"] != float64(4) || pagination["hasMore"] != true {
 		t.Fatalf("expected pagination metadata for remaining items, got %+v", pagination)
 	}
 	summary := pageData["summary"].(map[string]interface{})
-	if summary["total"] != float64(4) || summary["expiring"] != float64(1) || summary["expired"] != float64(1) || summary["active"] != float64(3) {
+	if summary["total"] != float64(6) || summary["expiring"] != float64(1) || summary["expired"] != float64(2) || summary["active"] != float64(4) {
 		t.Fatalf("expected consolidated pantry summary, got %+v", summary)
 	}
 }

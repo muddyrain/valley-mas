@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   captureNearestScrollAnchor,
+  captureScrollMemory,
   getActiveLifeTraceTab,
   getLifeTraceScrollMemoryKey,
+  getPantryListReturnPath,
+  readScrollMemory,
   restoreScrollMemory,
+  writeScrollMemory,
 } from './lifeTraceNavigation';
 
 function makeScrollContainer() {
   const anchors: HTMLElement[] = [];
+  let loadedCount = '';
   const container = {
     clientHeight: 600,
     scrollHeight: 1600,
@@ -17,6 +22,15 @@ function makeScrollContainer() {
     },
     querySelectorAll() {
       return anchors;
+    },
+    querySelector(selector: string) {
+      if (selector !== '[data-scroll-loaded-count]' || !loadedCount) {
+        return null;
+      }
+      return { dataset: { scrollLoadedCount: loadedCount } };
+    },
+    setLoadedCount(value: number) {
+      loadedCount = String(value);
     },
     scrollTo({ top }: ScrollToOptions) {
       this.scrollTop = Number(top ?? 0);
@@ -73,6 +87,10 @@ function getScrollTop(container: HTMLElement) {
   return (container as unknown as { scrollTop: number }).scrollTop;
 }
 
+function setLoadedCount(container: HTMLElement, count: number) {
+  (container as unknown as { setLoadedCount: (value: number) => void }).setLoadedCount(count);
+}
+
 describe('life trace navigation helpers', () => {
   it('maps nested routes to the active root tab', () => {
     expect(getActiveLifeTraceTab('/plans/plan-1')).toBe('plans');
@@ -81,15 +99,47 @@ describe('life trace navigation helpers', () => {
     expect(getActiveLifeTraceTab('/pantry')).toBe('today');
   });
 
-  it('only enables scroll memory for stable tab roots', () => {
+  it('enables scroll memory for stable tab roots and pantry query contexts', () => {
     expect(getLifeTraceScrollMemoryKey('/plans')).toBe('tab:plans');
     expect(getLifeTraceScrollMemoryKey('/today')).toBe('tab:today');
     expect(getLifeTraceScrollMemoryKey('/traces')).toBe('tab:traces');
     expect(getLifeTraceScrollMemoryKey('/profile')).toBe('tab:profile');
     expect(getLifeTraceScrollMemoryKey('/ai')).toBeNull();
     expect(getLifeTraceScrollMemoryKey('/ledger')).toBeNull();
-    expect(getLifeTraceScrollMemoryKey('/pantry')).toBeNull();
-    expect(getLifeTraceScrollMemoryKey('/pantry/abc')).toBeNull();
+    expect(getLifeTraceScrollMemoryKey('/pantry', '?status=expired&q=milk')).toBe(
+      'list:/pantry?q=milk&status=expired',
+    );
+    expect(getLifeTraceScrollMemoryKey('/pantry', '?q=milk')).not.toBe(
+      getLifeTraceScrollMemoryKey('/pantry', '?q=rice'),
+    );
+    expect(getLifeTraceScrollMemoryKey('/pantry/abc', '')).toBeNull();
+  });
+
+  it('captures the loaded pantry item count with scroll memory', () => {
+    const container = makeScrollContainer();
+    setLoadedCount(container, 40);
+
+    expect(captureScrollMemory(container, 'list:/pantry')).toMatchObject({
+      key: 'list:/pantry',
+      loadedItemCount: 40,
+    });
+  });
+
+  it('shares saved scroll memory by query key', () => {
+    const entry = { key: 'list:/pantry?q=milk', scrollTop: 720, anchorId: 'pantry:milk' };
+    writeScrollMemory(entry);
+
+    expect(readScrollMemory(entry.key)).toEqual(entry);
+  });
+
+  it('accepts only pantry list URLs as detail return targets', () => {
+    expect(
+      getPantryListReturnPath({ pantryListFrom: '/pantry?status=expired&q=%E7%89%9B%E5%A5%B6' }),
+    ).toBe('/pantry?status=expired&q=%E7%89%9B%E5%A5%B6');
+    expect(getPantryListReturnPath({ pantryListFrom: '/pantry/item-1' })).toBe('/pantry');
+    expect(getPantryListReturnPath({ pantryListFrom: 'https://example.com/pantry' })).toBe(
+      '/pantry',
+    );
   });
 
   it('captures the nearest visible scroll anchor', () => {

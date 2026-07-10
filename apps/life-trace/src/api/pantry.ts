@@ -20,6 +20,7 @@ export type ListPantryOptions = {
   category?: PantryItem['category'] | 'all';
   sort?: PantrySortMode;
   q?: string;
+  includeExpired?: boolean;
 };
 
 type PantryItemResponse = Omit<PantryItem, 'reminder'> & {
@@ -252,6 +253,9 @@ function buildListQuery(options: ListPantryOptions = {}) {
   }
   if (options.status && options.status !== 'all') {
     params.set('status', options.status);
+  }
+  if ((!options.status || options.status === 'all') && options.includeExpired) {
+    params.set('includeExpired', 'true');
   }
   if (options.category && options.category !== 'all') {
     params.set('category', options.category);

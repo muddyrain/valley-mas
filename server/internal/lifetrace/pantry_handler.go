@@ -366,12 +366,27 @@ func pantryDerivedDateBounds(now time.Time) (string, string) {
 	return today, expiringDeadline
 }
 
-func applyPantryListFilters(query *gorm.DB, c *gin.Context) *gorm.DB {
+func isTruthyPantryQuery(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "1", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func applyPantryListFilters(query *gorm.DB, c *gin.Context, now time.Time) *gorm.DB {
 	status := strings.TrimSpace(c.Query("status"))
 	if status == "" || status == "all" {
-		query = query.
-			Where("status NOT IN ?", []string{"used-up", "discarded"}).
-			Where("expires_at <> ''")
+		query = query.Where("status NOT IN ?", []string{"used-up", "discarded"})
+		if !isTruthyPantryQuery(c.Query("includeExpired")) {
+			today, _ := pantryDerivedDateBounds(now)
+			query = query.Where(
+				"status = ? OR expires_at = '' OR expires_at IS NULL OR expires_at >= ?",
+				"kept",
+				today,
+			)
+		}
 	} else if status == "no-expiry" {
 		query = query.
 			Where("status NOT IN ?", []string{"used-up", "discarded"}).
@@ -392,7 +407,7 @@ func applyPantryListFilters(query *gorm.DB, c *gin.Context) *gorm.DB {
 		default:
 			query = query.
 				Where("status NOT IN ?", []string{"used-up", "discarded", "kept"}).
-				Where("(expires_at = '' OR expires_at IS NULL OR expires_at > ?)", expiringDeadline)
+				Where("expires_at <> '' AND expires_at > ?", expiringDeadline)
 		}
 	}
 
@@ -410,7 +425,7 @@ func applyPantryListFilters(query *gorm.DB, c *gin.Context) *gorm.DB {
 	return query
 }
 
-func applyPantryListOrdering(query *gorm.DB, now time.Time, sort string) *gorm.DB {
+func applyPantryListOrdering(query *gorm.DB, now time.Time, status string, sort string) *gorm.DB {
 	switch normalizePantrySort(sort) {
 	case "created-desc":
 		return query.
@@ -425,26 +440,33 @@ func applyPantryListOrdering(query *gorm.DB, now time.Time, sort string) *gorm.D
 	}
 
 	today, expiringDeadline := pantryDerivedDateBounds(now)
+	if strings.TrimSpace(status) == "expired" {
+		return query.
+			Order("expires_at DESC").
+			Order("updated_at DESC").
+			Order("created_at DESC")
+	}
+
 	priorityExpr := clause.Expr{
 		SQL: `
 CASE
-	WHEN status = 'used-up' THEN 3
-	WHEN status = 'discarded' THEN 4
+	WHEN status IN ('used-up', 'discarded') THEN 5
 	WHEN status = 'kept' THEN 2
-	WHEN expires_at <> '' AND expires_at < ? THEN 0
-	WHEN expires_at <> '' AND expires_at >= ? AND expires_at <= ? THEN 1
-	ELSE 2
-END
+	WHEN expires_at = '' OR expires_at IS NULL THEN 3
+	WHEN expires_at >= ? AND expires_at <= ? THEN 0
+	WHEN expires_at > ? THEN 1
+	WHEN expires_at < ? THEN 4
+	ELSE 3
+END,
+CASE WHEN expires_at >= ? THEN expires_at END ASC,
+CASE WHEN expires_at < ? THEN expires_at END DESC,
+updated_at DESC,
+created_at DESC
 `,
-		Vars: []interface{}{today, today, expiringDeadline},
+		Vars: []interface{}{today, expiringDeadline, expiringDeadline, today, today, today},
 	}
 
-	return query.
-		Order(priorityExpr).
-		Order(clause.Expr{SQL: "CASE WHEN expires_at = '' OR expires_at IS NULL THEN 1 ELSE 0 END"}).
-		Order("expires_at ASC").
-		Order("updated_at DESC").
-		Order("created_at DESC")
+	return query.Clauses(clause.OrderBy{Expression: priorityExpr})
 }
 
 func buildPantryListSummary(householdID model.Int64String, now time.Time) (pantryListSummary, error) {
@@ -483,9 +505,9 @@ func (h *Handler) ListPantryItems(c *gin.Context) {
 
 	page, pageSize := parseListPagination(c)
 	offset := (page - 1) * pageSize
-	baseQuery := database.GetDB().Model(&model.LifeTracePantryItem{}).Where("household_id = ?", householdCtx.Household.ID)
-	baseQuery = applyPantryListFilters(baseQuery, c)
 	now := time.Now()
+	baseQuery := database.GetDB().Model(&model.LifeTracePantryItem{}).Where("household_id = ?", householdCtx.Household.ID)
+	baseQuery = applyPantryListFilters(baseQuery, c, now)
 
 	var total int64
 	if err := baseQuery.Count(&total).Error; err != nil {
@@ -494,7 +516,7 @@ func (h *Handler) ListPantryItems(c *gin.Context) {
 	}
 
 	var items []model.LifeTracePantryItem
-	if err := applyPantryListOrdering(baseQuery, now, c.Query("sort")).
+	if err := applyPantryListOrdering(baseQuery, now, c.Query("status"), c.Query("sort")).
 		Limit(pageSize).
 		Offset(offset).
 		Find(&items).Error; err != nil {
