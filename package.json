@@ -12,6 +12,8 @@
     "lint": "turbo lint",
     "format": "turbo format",
     "check": "turbo check",
+    "check:harness": "bash scripts/check-agent-harness.sh",
+    "check:harness:test": "bash scripts/check-agent-harness.test.sh",
     "check:utf8": "powershell -ExecutionPolicy Bypass -File ./scripts/check-utf8.ps1",
     "clean": "turbo clean",
     "prepare": "lefthook install",
