@@ -434,7 +434,8 @@ func TestSendDuePlanPushRemindersUsesLeadMinutesAndQuietHours(t *testing.T) {
 	}
 
 	sender := &fakePushSender{}
-	now := time.Date(2026, 6, 3, 9, 5, 0, 0, time.Local)
+	location := reminderLocation()
+	now := time.Date(2026, 6, 3, 9, 5, 0, 0, location)
 	if err := sendDuePlanPushRemindersAt(context.Background(), sender, 10, now); err != nil {
 		t.Fatalf("send lead-time plan push: %v", err)
 	}
@@ -459,7 +460,7 @@ func TestSendDuePlanPushRemindersUsesLeadMinutesAndQuietHours(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatalf("create quiet-hour plan: %v", err)
 	}
-	quietNow := time.Date(2026, 6, 3, 23, 5, 0, 0, time.Local)
+	quietNow := time.Date(2026, 6, 3, 23, 5, 0, 0, location)
 	if err := sendDuePlanPushRemindersAt(context.Background(), sender, 10, quietNow); err != nil {
 		t.Fatalf("send quiet-hour plan push: %v", err)
 	}
