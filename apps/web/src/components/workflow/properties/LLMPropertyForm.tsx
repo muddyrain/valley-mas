@@ -31,7 +31,7 @@ export function LLMPropertyForm({ config, onUpdateConfig }: LLMPropertyFormProps
             <SelectTrigger>
               <SelectValue placeholder="选择模型" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="min-w-[200px]">
               <SelectItem value="gpt-4o">GPT-4o</SelectItem>
               <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
               <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>

@@ -36,7 +36,7 @@ export function CodePropertyForm({ config, onUpdateConfig }: CodePropertyFormPro
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="min-w-[200px]">
               <SelectItem value="javascript">JavaScript</SelectItem>
               <SelectItem value="python">Python</SelectItem>
             </SelectContent>

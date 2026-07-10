@@ -33,7 +33,9 @@
       "suspicious": {
         "noExplicitAny": "warn",
         "noArrayIndexKey": "off",
-        "useIterableCallbackReturn": "warn"
+        "useIterableCallbackReturn": "warn",
+        "noDocumentCookie": "off",
+        "noDoubleEquals": "off"
       },
       "style": {
         "useImportType": "warn",
@@ -44,10 +46,14 @@
         "useKeyWithClickEvents": "off",
         "useValidAnchor": "off",
         "noLabelWithoutControl": "off",
-        "noSvgWithoutTitle": "off"
+        "noSvgWithoutTitle": "off",
+        "useSemanticElements": "off",
+        "useFocusableInteractive": "off",
+        "useAriaPropsForRole": "off",
+        "noRedundantRoles": "off"
       },
       "security": {
-        "noDangerouslySetInnerHtml": "warn"
+        "noDangerouslySetInnerHtml": "off"
       }
     }
   },

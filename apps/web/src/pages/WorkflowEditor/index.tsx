@@ -57,11 +57,11 @@ const blogImportTemplate = {
           variables: [
             { name: '博客文件', type: 'file', required: true },
             {
-              name: '博客分类',
+              name: '博客分组',
               type: 'select',
               required: false,
               dataSource: {
-                api: '/public/blog/categories',
+                api: '/public/blog/groups',
                 labelField: 'name',
                 valueField: 'id',
               },

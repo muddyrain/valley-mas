@@ -36,7 +36,7 @@ export function HTTPPropertyForm({ config, onUpdateConfig }: HTTPPropertyFormPro
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="min-w-[200px]">
                 <SelectItem value="GET">GET</SelectItem>
                 <SelectItem value="POST">POST</SelectItem>
                 <SelectItem value="PUT">PUT</SelectItem>

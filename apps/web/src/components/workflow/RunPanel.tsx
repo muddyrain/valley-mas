@@ -18,8 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import {
   Select,
   SelectContent,
@@ -258,7 +257,7 @@ export function RunPanel({
         </Button>
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <div className="p-4 space-y-5">
           {/* 输入参数 */}
           <div>
@@ -271,12 +270,10 @@ export function RunPanel({
 
                   return (
                     <div key={v.name} className="space-y-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <Label className="text-sm">
-                          {v.name}
-                          {v.required && <span className="text-red-500 ml-0.5">*</span>}
-                        </Label>
-                      </div>
+                      <label className="text-sm font-medium">
+                        {v.name}
+                        {v.required && <span className="text-red-500 ml-0.5">*</span>}
+                      </label>
                       {v.type === 'boolean' ? (
                         <div className="flex items-center gap-2">
                           <Checkbox
@@ -288,7 +285,7 @@ export function RunPanel({
                           </span>
                         </div>
                       ) : v.type === 'object' ? (
-                        <>
+                        <div className="space-y-1">
                           <Textarea
                             className="font-mono text-xs"
                             value={(val as string) || ''}
@@ -310,7 +307,7 @@ export function RunPanel({
                           {jsonErrors[errorKey] && (
                             <p className="text-xs text-red-500">{jsonErrors[errorKey]}</p>
                           )}
-                        </>
+                        </div>
                       ) : v.type === 'file' ? (
                         <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-primary/50 transition-colors">
                           <input
@@ -347,68 +344,64 @@ export function RunPanel({
                           )}
                         </div>
                       ) : v.type === 'select' ? (
-                        <div className="space-y-1.5">
-                          {selectLoading[v.name] ? (
-                            <div className="space-y-2">
-                              <Skeleton className="h-8 w-full" />
-                            </div>
-                          ) : selectFailed[v.name] ? (
-                            <div className="space-y-1.5">
-                              <Badge variant="secondary" className="text-xs">
-                                加载选项失败，请手动输入
-                              </Badge>
-                              <Input
-                                value={val as string}
-                                onChange={(e) => setValue(v.name, e.target.value)}
-                                placeholder={`输入 ${v.name}`}
-                                className="text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <>
-                              <Select
-                                value={(val as string) || ''}
-                                onValueChange={(selectedVal) => {
-                                  if (selectedVal === '__custom__') {
-                                    setValue(v.name, '');
-                                  } else {
-                                    setValue(v.name, selectedVal);
-                                  }
-                                }}
-                              >
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder={`选择 ${v.name}`} />
-                                </SelectTrigger>
-                                <SelectContent className="w-full">
-                                  {(v.dataSource
-                                    ? selectOptions[v.name] || []
-                                    : v.options || []
-                                  ).map((opt) => (
+                        selectLoading[v.name] ? (
+                          <Skeleton className="h-8 w-full" />
+                        ) : selectFailed[v.name] ? (
+                          <div className="space-y-1.5">
+                            <Badge variant="secondary" className="text-xs">
+                              加载选项失败，请手动输入
+                            </Badge>
+                            <Input
+                              value={val as string}
+                              onChange={(e) => setValue(v.name, e.target.value)}
+                              placeholder={`输入 ${v.name}`}
+                              className="text-sm"
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <Select
+                              value={(val as string) || ''}
+                              onValueChange={(selectedVal) => {
+                                if (selectedVal === '__custom__') {
+                                  setValue(v.name, '');
+                                } else {
+                                  setValue(v.name, selectedVal);
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder={`选择 ${v.name}`} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(v.dataSource ? selectOptions[v.name] || [] : v.options || []).map(
+                                  (opt) => (
                                     <SelectItem key={opt.value} value={opt.value}>
                                       {opt.label}
                                     </SelectItem>
-                                  ))}
-                                  {v.allowCustom !== false && (
-                                    <>
-                                      <SelectSeparator />
-                                      <SelectItem value="__custom__">手动输入</SelectItem>
-                                    </>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                              {v.allowCustom !== false &&
-                                typeof val === 'string' &&
-                                !selectOptions[v.name]?.some((o) => o.value === val) && (
-                                  <Input
-                                    value={val}
-                                    onChange={(e) => setValue(v.name, e.target.value)}
-                                    className="mt-1"
-                                    placeholder="输入自定义值"
-                                  />
+                                  ),
                                 )}
-                            </>
-                          )}
-                        </div>
+                                {v.allowCustom !== false && (
+                                  <>
+                                    <SelectSeparator />
+                                    <SelectItem value="__custom__">手动输入</SelectItem>
+                                  </>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            {v.allowCustom !== false &&
+                              typeof val === 'string' &&
+                              val !== '' &&
+                              !selectOptions[v.name]?.some((o) => o.value === val) && (
+                                <Input
+                                  value={val}
+                                  onChange={(e) => setValue(v.name, e.target.value)}
+                                  className="mt-1"
+                                  placeholder="输入自定义值"
+                                />
+                              )}
+                          </>
+                        )
                       ) : (
                         <Input
                           type={v.type === 'number' ? 'number' : 'text'}
@@ -449,7 +442,7 @@ export function RunPanel({
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }

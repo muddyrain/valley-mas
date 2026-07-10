@@ -75,7 +75,7 @@ export function StartPropertyForm({ config, onUpdateConfig }: StartPropertyFormP
                 <SelectTrigger className="w-24">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-[200px]">
                   <SelectItem value="string">String</SelectItem>
                   <SelectItem value="number">Number</SelectItem>
                   <SelectItem value="boolean">Boolean</SelectItem>
@@ -125,7 +125,7 @@ export function StartPropertyForm({ config, onUpdateConfig }: StartPropertyFormP
                     <SelectTrigger className="flex-1">
                       <SelectValue placeholder="选择数据源" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="min-w-[200px]">
                       {Object.entries(DATA_SOURCES).map(([key, ds]) => (
                         <SelectItem key={key} value={key}>
                           {ds.label}

@@ -1,37 +1,40 @@
-import { CircleCheck, Info, ShieldAlert, TriangleAlert } from 'lucide-react';
-import { Toaster as Sonner } from 'sonner';
-import { useThemeStore } from '@/stores/useThemeStore';
+'use client';
 
-type ToasterProps = React.ComponentProps<typeof Sonner>;
+import {
+  CircleCheckIcon,
+  InfoIcon,
+  Loader2Icon,
+  OctagonXIcon,
+  TriangleAlertIcon,
+} from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { Toaster as Sonner, type ToasterProps } from 'sonner';
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const theme = useThemeStore((s) => s.mode);
+  const { theme = 'system' } = useTheme();
 
   return (
     <Sonner
-      theme={theme as 'light' | 'dark' | 'system'}
+      theme={theme as ToasterProps['theme']}
       className="toaster group"
-      position="top-center"
       icons={{
-        success: <CircleCheck className="h-5 w-5 font-bold text-primary" />,
-        error: <ShieldAlert className="h-5 w-5 font-bold text-destructive" />,
-        warning: <TriangleAlert className="h-5 w-5 font-bold text-primary" />,
-        info: <Info className="h-5 w-5 font-bold text-primary" />,
+        success: <CircleCheckIcon className="size-4" />,
+        info: <InfoIcon className="size-4" />,
+        warning: <TriangleAlertIcon className="size-4" />,
+        error: <OctagonXIcon className="size-4" />,
+        loading: <Loader2Icon className="size-4 animate-spin" />,
       }}
+      style={
+        {
+          '--normal-bg': 'var(--popover)',
+          '--normal-text': 'var(--popover-foreground)',
+          '--normal-border': 'var(--border)',
+          '--border-radius': 'var(--radius)',
+        } as React.CSSProperties
+      }
       toastOptions={{
         classNames: {
-          toast:
-            'group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg',
-          description: 'group-[.toast]:text-muted-foreground',
-          actionButton: 'group-[.toast]:bg-foreground group-[.toast]:text-primary-foreground',
-          cancelButton: 'group-[.toast]:bg-muted group-[.toast]:text-muted-foreground',
-          error:
-            'group-[.toast]:bg-destructive/10 group-[.toast]:text-destructive group-[.toast]:border-destructive/30',
-          success:
-            'group-[.toast]:bg-accent group-[.toast]:text-primary group-[.toast]:border-primary/30',
-          warning:
-            'group-[.toast]:bg-accent group-[.toast]:text-primary group-[.toast]:border-primary/30',
-          info: 'group-[.toast]:bg-accent group-[.toast]:text-primary group-[.toast]:border-primary/30',
+          toast: 'cn-toast',
         },
       }}
       {...props}

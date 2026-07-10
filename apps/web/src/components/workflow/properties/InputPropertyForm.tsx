@@ -53,7 +53,7 @@ export function InputPropertyForm({ config, onUpdateConfig }: InputPropertyFormP
               <SelectTrigger className="w-24">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="min-w-[200px]">
                 <SelectItem value="string">string</SelectItem>
                 <SelectItem value="number">number</SelectItem>
                 <SelectItem value="boolean">boolean</SelectItem>
