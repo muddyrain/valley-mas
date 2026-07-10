@@ -56,7 +56,17 @@ const blogImportTemplate = {
         config: {
           variables: [
             { name: '博客文件', type: 'file', required: true },
-            { name: '博客分类', type: 'string', required: false },
+            {
+              name: '博客分类',
+              type: 'select',
+              required: false,
+              dataSource: {
+                api: '/public/blog/categories',
+                labelField: 'name',
+                valueField: 'id',
+              },
+              allowCustom: true,
+            },
           ],
         },
       },
@@ -137,7 +147,7 @@ export default function WorkflowEditorPage() {
   const [isRunning, setIsRunning] = useState(false);
   const [showRunPanel, setShowRunPanel] = useState(false);
   const [nodeResults, setNodeResults] = useState<Record<string, NodeResult>>({});
-  const [rightPanelWidth, setRightPanelWidth] = useState(320);
+  const [rightPanelWidth, setRightPanelWidth] = useState(380);
   const isDraggingRef = useRef(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
@@ -308,7 +318,7 @@ export default function WorkflowEditorPage() {
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (!isDraggingRef.current) return;
         const deltaX = startX - moveEvent.clientX;
-        const newWidth = Math.max(240, Math.min(600, startWidth + deltaX));
+        const newWidth = Math.max(320, Math.min(640, startWidth + deltaX));
         setRightPanelWidth(newWidth);
       };
 

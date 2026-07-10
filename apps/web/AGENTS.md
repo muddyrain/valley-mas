@@ -26,6 +26,21 @@
 - 需要权限的创作者/个人空间能力优先复用已有守卫、状态和请求封装，不绕过统一 request 层。
 - 不在源码或示例配置中写真实密钥、真实 token 或个人账号凭据。
 
+### shadcn 组件优先
+
+UI 组件必须优先使用 `src/components/ui/` 下的 shadcn 组件，避免自定义样式破坏视觉一致性：
+
+- **交互控件**：使用 `Button`（variant/default/outline/ghost 等）、`Select`、`Checkbox`、`Input`、`Textarea`、`Tabs`/`TabsList`/`TabsTrigger`/`TabsContent`
+- **状态反馈**：使用 `Skeleton` 替代自定义 loading 动画、`Badge` 替代自定义标签、`toast` 替代自定义错误提示
+- **布局容器**：使用 `Card`/`CardHeader`/`CardContent`、`ScrollArea`、`Separator`
+- **禁止事项**：
+  - 禁止用原生 `<button>` 替代 `Button` 组件
+  - 禁止手动覆盖 shadcn 组件的默认高度（如 `h-6`、`h-7`、`h-10`），使用默认 `size` 属性
+  - 禁止用 `Loader2` + 自定义 div 替代 `Skeleton` 做 loading 状态
+  - 禁止用自定义 `<p>` + `text-xs text-muted-foreground` 替代 `Badge` 做状态标签
+  - 禁止用自定义 flex + button 组合替代 `Tabs`/`TabsList`/`TabsTrigger` 做切换控件
+  - 需要新的 UI 模式时，先检查 `src/components/ui/` 是否已有对应组件；如果缺少所需组件，直接在 `apps/web` 目录下运行 `npx shadcn@latest add <组件名>` 安装，不要用手写自定义组件替代
+
 ## 常用命令
 
 ```bash

@@ -12,15 +12,26 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import request from '@/utils/request';
 
 export interface NodeResult {
   status: 'idle' | 'running' | 'success' | 'error';
@@ -39,10 +50,17 @@ interface RunPanelProps {
   nodeResults: Record<string, NodeResult>;
 }
 
-interface VariableDef {
+export interface VariableDef {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'object' | 'file';
+  type: 'string' | 'number' | 'boolean' | 'object' | 'file' | 'select';
   required: boolean;
+  dataSource?: {
+    api: string;
+    labelField: string;
+    valueField: string;
+  };
+  options?: Array<{ label: string; value: string }>;
+  allowCustom?: boolean;
 }
 
 function extractStartVariables(nodes: Node[]): VariableDef[] {
@@ -149,6 +167,41 @@ export function RunPanel({
 
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [jsonErrors, setJsonErrors] = useState<Record<string, string>>({});
+  const [selectOptions, setSelectOptions] = useState<
+    Record<string, Array<{ label: string; value: string }>>
+  >({});
+  const [selectLoading, setSelectLoading] = useState<Record<string, boolean>>({});
+  const [selectFailed, setSelectFailed] = useState<Record<string, boolean>>({});
+  const fetchedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const selectVars = variables.filter((v) => v.type === 'select' && v.dataSource);
+    if (selectVars.length === 0) return;
+
+    const fetchOptions = async () => {
+      for (const v of selectVars) {
+        if (!v.dataSource || fetchedRef.current.has(v.name)) continue;
+        fetchedRef.current.add(v.name);
+        setSelectLoading((prev) => ({ ...prev, [v.name]: true }));
+        try {
+          const data = await request.get<unknown, Record<string, unknown>[]>(v.dataSource.api);
+          const items = Array.isArray(data)
+            ? data
+            : (data as { list?: Record<string, unknown>[] }).list || [];
+          const opts = items.map((item) => ({
+            label: String(item[v.dataSource!.labelField] ?? ''),
+            value: String(item[v.dataSource!.valueField] ?? ''),
+          }));
+          setSelectOptions((prev) => ({ ...prev, [v.name]: opts }));
+        } catch {
+          setSelectFailed((prev) => ({ ...prev, [v.name]: true }));
+        } finally {
+          setSelectLoading((prev) => ({ ...prev, [v.name]: false }));
+        }
+      }
+    };
+    fetchOptions();
+  }, [variables]);
 
   const getValue = (name: string, type: string): unknown => {
     return values[name] ?? (type === 'boolean' ? false : '');
@@ -219,9 +272,6 @@ export function RunPanel({
                           {v.name}
                           {v.required && <span className="text-red-500 ml-0.5">*</span>}
                         </Label>
-                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                          {v.type}
-                        </span>
                       </div>
                       {v.type === 'boolean' ? (
                         <div className="flex items-center gap-2">
@@ -290,6 +340,69 @@ export function RunPanel({
                                 点击或拖拽文件到此处
                               </span>
                             </label>
+                          )}
+                        </div>
+                      ) : v.type === 'select' ? (
+                        <div className="space-y-1.5">
+                          {selectLoading[v.name] ? (
+                            <div className="space-y-2">
+                              <Skeleton className="h-8 w-full" />
+                            </div>
+                          ) : selectFailed[v.name] ? (
+                            <div className="space-y-1.5">
+                              <Badge variant="secondary" className="text-xs">
+                                加载选项失败，请手动输入
+                              </Badge>
+                              <Input
+                                value={val as string}
+                                onChange={(e) => setValue(v.name, e.target.value)}
+                                placeholder={`输入 ${v.name}`}
+                                className="text-sm"
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <Select
+                                value={(val as string) || ''}
+                                onValueChange={(selectedVal) => {
+                                  if (selectedVal === '__custom__') {
+                                    setValue(v.name, '');
+                                  } else {
+                                    setValue(v.name, selectedVal);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder={`选择 ${v.name}`} />
+                                </SelectTrigger>
+                                <SelectContent className="w-full">
+                                  {(v.dataSource
+                                    ? selectOptions[v.name] || []
+                                    : v.options || []
+                                  ).map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </SelectItem>
+                                  ))}
+                                  {v.allowCustom !== false && (
+                                    <>
+                                      <SelectSeparator />
+                                      <SelectItem value="__custom__">手动输入</SelectItem>
+                                    </>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              {v.allowCustom !== false &&
+                                typeof val === 'string' &&
+                                !selectOptions[v.name]?.some((o) => o.value === val) && (
+                                  <Input
+                                    value={val}
+                                    onChange={(e) => setValue(v.name, e.target.value)}
+                                    className="mt-1"
+                                    placeholder="输入自定义值"
+                                  />
+                                )}
+                            </>
                           )}
                         </div>
                       ) : (
