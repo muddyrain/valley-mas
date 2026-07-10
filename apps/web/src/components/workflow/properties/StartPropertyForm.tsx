@@ -100,7 +100,7 @@ export function StartPropertyForm({ config, onUpdateConfig }: StartPropertyFormP
                     value={
                       v.dataSource
                         ? (Object.entries(DATA_SOURCES).find(
-                            ([, ds]) => ds.api === v.dataSource!.api,
+                            ([, ds]) => ds.api === v.dataSource?.api,
                           )?.[0] ?? '')
                         : ''
                     }

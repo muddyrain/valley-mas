@@ -188,9 +188,10 @@ export function RunPanel({
           const items = Array.isArray(data)
             ? data
             : (data as { list?: Record<string, unknown>[] }).list || [];
+          const ds = v.dataSource;
           const opts = items.map((item) => ({
-            label: String(item[v.dataSource!.labelField] ?? ''),
-            value: String(item[v.dataSource!.valueField] ?? ''),
+            label: String(item[ds.labelField] ?? ''),
+            value: String(item[ds.valueField] ?? ''),
           }));
           setSelectOptions((prev) => ({ ...prev, [v.name]: opts }));
         } catch {
@@ -203,9 +204,12 @@ export function RunPanel({
     fetchOptions();
   }, [variables]);
 
-  const getValue = (name: string, type: string): unknown => {
-    return values[name] ?? (type === 'boolean' ? false : '');
-  };
+  const getValue = useCallback(
+    (name: string, type: string): unknown => {
+      return values[name] ?? (type === 'boolean' ? false : '');
+    },
+    [values],
+  );
 
   const setValue = (name: string, value: unknown) => {
     setValues((prev) => ({ ...prev, [name]: value }));
