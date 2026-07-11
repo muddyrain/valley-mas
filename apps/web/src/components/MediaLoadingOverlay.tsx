@@ -12,11 +12,11 @@ export default function MediaLoadingOverlay({ show, className }: MediaLoadingOve
     <div
       aria-live="polite"
       className={cn(
-        'pointer-events-none absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_18%_20%,hsl(var(--primary) / 0.14),transparent_38%),linear-gradient(180deg,hsl(var(--foreground)/0.2),hsl(var(--foreground)/0.36))]',
+        'pointer-events-none absolute inset-0 flex items-center justify-center backdrop-blur-xl bg-[radial-gradient(circle_at_18%_20%,hsl(var(--primary)/0.08),transparent_50%),linear-gradient(180deg,hsl(var(--foreground)/0.18),hsl(var(--foreground)/0.28))]',
         className,
       )}
     >
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/35 border-t-white border-r-white/80" />
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/40 border-t-primary border-r-primary/70" />
     </div>
   );
 }

@@ -26,10 +26,10 @@ export default function BoxLoadingOverlay({
     <div
       aria-live="polite"
       className={cn(
-        'absolute inset-0 z-20 flex items-center justify-center rounded-[inherit] backdrop-blur-[2px]',
+        'absolute inset-0 z-20 flex items-center justify-center rounded-[inherit] backdrop-blur-xl',
         isDark
-          ? 'bg-[radial-gradient(circle_at_18%_20%,hsl(var(--primary)/0.18),transparent_38%),radial-gradient(circle_at_82%_24%,hsl(var(--primary) / 0.2),transparent_34%),linear-gradient(180deg,hsl(var(--foreground)/0.45),hsl(var(--foreground)/0.55))]'
-          : 'bg-[radial-gradient(circle_at_14%_18%,hsl(var(--primary) / 0.16),transparent_36%),radial-gradient(circle_at_84%_22%,hsl(var(--primary) / 0.14),transparent_32%),linear-gradient(180deg,hsl(var(--background)/0.72),hsl(var(--background)/0.84))]',
+          ? 'bg-[radial-gradient(circle_at_18%_20%,hsl(var(--primary)/0.1),transparent_50%),radial-gradient(circle_at_82%_24%,hsl(var(--primary)/0.12),transparent_45%),linear-gradient(180deg,hsl(var(--foreground)/0.2),hsl(var(--foreground)/0.3))]'
+          : 'bg-[radial-gradient(circle_at_14%_18%,hsl(var(--primary)/0.08),transparent_45%),radial-gradient(circle_at_84%_22%,hsl(var(--primary)/0.06),transparent_40%),linear-gradient(180deg,hsl(var(--foreground)/0.12),hsl(var(--foreground)/0.18))]',
         className,
       )}
     >
@@ -38,7 +38,7 @@ export default function BoxLoadingOverlay({
           'relative overflow-hidden text-center',
           compact ? 'rounded-xl px-4 py-3' : 'rounded-2xl px-7 py-5',
           isDark
-            ? 'border border-foreground/10 bg-foreground/38 shadow-[0_18px_44px_hsl(var(--foreground)/0.48)]'
+            ? 'border border-foreground/25 bg-card/70 shadow-[0_18px_44px_hsl(var(--foreground)/0.55)]'
             : 'border border-border bg-card/86 shadow-[0_20px_48px_hsl(var(--foreground)/0.10)]',
         )}
       >
@@ -49,28 +49,28 @@ export default function BoxLoadingOverlay({
           <div
             className={cn(
               'absolute inset-0 rounded-full border-2',
-              isDark ? 'border-foreground/15' : 'border-accent',
+              isDark ? 'border-foreground/30' : 'border-accent',
             )}
           />
           <div
             className={cn(
               'absolute inset-0 animate-spin rounded-full border-2 border-transparent',
               isDark
-                ? 'border-t-foreground border-r-foreground/40'
+                ? 'border-t-foreground border-r-foreground/60'
                 : 'border-t-primary border-r-primary/70',
             )}
           />
           <div
             className={cn(
               'absolute inset-2 flex items-center justify-center rounded-full',
-              isDark ? 'bg-foreground/12' : 'bg-accent/75',
+              isDark ? 'bg-foreground/20' : 'bg-accent/75',
             )}
           >
             <Sparkles
               className={cn(
                 'animate-pulse',
                 compact ? 'h-3 w-3' : 'h-4 w-4',
-                isDark ? 'text-foreground/92' : 'text-primary',
+                isDark ? 'text-foreground' : 'text-primary',
               )}
             />
           </div>
@@ -80,7 +80,7 @@ export default function BoxLoadingOverlay({
           className={cn(
             'relative font-semibold',
             compact ? 'text-xs' : 'text-sm',
-            isDark ? 'text-foreground/92' : 'text-foreground',
+            isDark ? 'text-foreground' : 'text-foreground',
           )}
         >
           {title}
@@ -89,7 +89,7 @@ export default function BoxLoadingOverlay({
           <div
             className={cn(
               'relative mt-1 text-xs',
-              isDark ? 'text-foreground/68' : 'text-muted-foreground',
+              isDark ? 'text-foreground/75' : 'text-muted-foreground',
             )}
           >
             {hint}
