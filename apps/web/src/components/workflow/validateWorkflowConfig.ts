@@ -1,4 +1,5 @@
 import type { Node } from '@xyflow/react';
+import { NODE_CONFIGS } from './nodeConfig';
 
 export interface ValidationError {
   nodeId: string;
@@ -6,7 +7,6 @@ export interface ValidationError {
   nodeType: string;
   message: string;
 }
-
 interface NodeData {
   label: string;
   nodeType: string;
@@ -15,71 +15,77 @@ interface NodeData {
 
 function validateNodeData(nodeId: string, data: NodeData): ValidationError | null {
   const config = data.config || {};
-  const label = data.label;
-  const nodeType = data.nodeType;
-
-  switch (nodeType) {
-    case 'llm':
-      if (!config.model) {
-        return { nodeId, nodeLabel: label, nodeType, message: '请选择模型' };
-      }
+  const unavailable = NODE_CONFIGS[data.nodeType]?.available === false;
+  if (unavailable)
+    return { nodeId, nodeLabel: data.label, nodeType: data.nodeType, message: '该节点尚未开放' };
+  switch (data.nodeType) {
+    case 'start':
+      if (!Object.keys((config.inputs as object) || {}).length)
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请声明运行输入',
+        };
       break;
-    case 'http':
-      if (!config.url) {
-        return { nodeId, nodeLabel: label, nodeType, message: '请填写请求地址' };
-      }
+    case 'blog.parseMarkdown':
+      if (!config.fileInput)
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请选择 Markdown 输入',
+        };
       break;
-    case 'code':
-      if (!config.code) {
-        return { nodeId, nodeLabel: label, nodeType, message: '请填写代码' };
-      }
+    case 'llm.text':
+      if (config.modelProfile !== 'ark-text-default')
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '模型必须为 ARK 默认文本模型',
+        };
+      if (!config.systemPrompt || !config.prompt)
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请填写系统提示词和提示词',
+        };
       break;
-    case 'knowledge':
-      if (!config.datasetId) {
-        return { nodeId, nodeLabel: label, nodeType, message: '请选择数据集' };
-      }
+    case 'blog.createDraft':
+      if (!config.title || !config.content || !config.tags || !config.visibility)
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请完成草稿字段映射',
+        };
       break;
-    case 'condition':
-      if (!config.expression) {
-        return { nodeId, nodeLabel: label, nodeType, message: '请设置条件表达式' };
-      }
+    case 'end':
+      if (!Object.keys((config.outputs as object) || {}).length)
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请设置最终输出',
+        };
       break;
-    case 'loop':
-      if (!config.iterationCount || Number(config.iterationCount) <= 0) {
-        return { nodeId, nodeLabel: label, nodeType, message: '请设置循环次数' };
-      }
-      break;
-    case 'variable':
-      if (!config.variableName) {
-        return { nodeId, nodeLabel: label, nodeType, message: '请设置变量名' };
-      }
-      break;
-    // start, end, input 不需要校验
   }
-
   return null;
 }
 
 export function validateWorkflowConfig(nodes: Node[]): ValidationError[] {
-  const errors: ValidationError[] = [];
-
-  for (const node of nodes) {
-    const data = node.data as unknown as NodeData;
-    const error = validateNodeData(node.id, data);
-    if (error) errors.push(error);
-  }
-
-  return errors;
+  return nodes
+    .map((node) => validateNodeData(node.id, node.data as unknown as NodeData))
+    .filter((error): error is ValidationError => error !== null);
 }
-
 export function validateSingleNode(data: NodeData): ValidationError | null {
   return validateNodeData('temp', data);
 }
-
 export function hasUnconfiguredNodes(nodes: Node[]): boolean {
   return validateWorkflowConfig(nodes).length > 0;
 }
-
 export function getUnconfiguredNodeLabels(nodes: Node[]): string[] {
-  return validateWorkflowConfig(nodes).map((e) => e.nodeLabel);
+  return validateWorkflowConfig(nodes).map((error) => error.nodeLabel);
 }

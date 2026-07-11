@@ -1,155 +1,67 @@
 import type { Node } from '@xyflow/react';
-import {
-  CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  Circle,
-  Clock,
-  FileText,
-  Loader2,
-  Play,
-  Upload,
-  X,
-  XCircle,
-} from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { CheckCircle2, FileText, Loader2, Play, X } from 'lucide-react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { type Group, getGroups, getTags, type Tag } from '@/api/blog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import request from '@/utils/request';
+import type { WorkflowRunSession } from './runSession';
+import { normalizePhaseOneStartInputs, type StartInputDefinition } from './types';
 
-export interface NodeResult {
-  status: 'idle' | 'running' | 'success' | 'error';
-  input?: Record<string, unknown>;
-  output?: Record<string, unknown> | string;
-  duration?: number;
-  error?: string;
+export interface WorkflowRunInput {
+  inputs: Record<string, unknown>;
+  files: Record<string, File>;
 }
 
 interface RunPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nodes: Node[];
-  onRun: (inputs: Record<string, Record<string, unknown>>) => void;
+  onRun: (input: WorkflowRunInput) => void;
+  onCancel: () => void;
   isRunning: boolean;
-  nodeResults: Record<string, NodeResult>;
+  session: WorkflowRunSession;
+  runError: string | null;
 }
 
-export interface VariableDef {
-  name: string;
-  type: 'string' | 'number' | 'boolean' | 'object' | 'file' | 'select';
+function InputLabel({
+  children,
+  htmlFor,
+  required,
+}: {
+  children: ReactNode;
+  htmlFor?: string;
   required: boolean;
-  dataSource?: {
-    api: string;
-    labelField: string;
-    valueField: string;
-  };
-  options?: Array<{ label: string; value: string }>;
-  allowCustom?: boolean;
-}
-
-function extractStartVariables(nodes: Node[]): VariableDef[] {
-  const startNode = nodes.find((n) => (n.data as { nodeType: string }).nodeType === 'start');
-  if (!startNode) return [];
-  const config = (startNode.data as { config?: Record<string, unknown> }).config;
-  if (!config?.variables) return [];
-  return (config.variables as VariableDef[]).filter((v) => v.name);
-}
-
-function NodeResultItem({ node, result }: { node: Node; result: NodeResult }) {
-  const data = node.data as { label: string; nodeType: string };
-  const [expanded, setExpanded] = useState(false);
-
-  const statusIcon = {
-    idle: <Circle className="h-3.5 w-3.5 text-slate-300" />,
-    running: <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin" />,
-    success: <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />,
-    error: <XCircle className="h-3.5 w-3.5 text-red-500" />,
-  }[result.status];
-
-  const statusLabel = {
-    idle: '等待中',
-    running: '运行中',
-    success: '成功',
-    error: '失败',
-  }[result.status];
-
-  const hasDetails = result.input || result.output || result.error;
-
+}) {
   return (
-    <div className="rounded-lg border border-border">
-      <button
-        type="button"
-        className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
-        onClick={() => hasDetails && setExpanded(!expanded)}
-      >
-        {statusIcon}
-        <span className="text-sm font-medium text-foreground flex-1">{data.label}</span>
-        {result.duration != null && result.status === 'success' && (
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {result.duration}ms
-          </span>
-        )}
-        <span
-          className={cn(
-            'text-xs',
-            result.status === 'success' && 'text-green-600',
-            result.status === 'error' && 'text-red-500',
-            result.status === 'running' && 'text-blue-500',
-            result.status === 'idle' && 'text-slate-400',
-          )}
-        >
-          {statusLabel}
-        </span>
-        {hasDetails &&
-          (expanded ? (
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          ))}
-      </button>
-      {expanded && hasDetails && (
-        <div className="border-t border-border px-3 py-2 space-y-2">
-          {result.input && (
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-1">输入</p>
-              <pre className="text-xs bg-muted rounded p-2 overflow-auto max-h-32 font-mono">
-                {JSON.stringify(result.input, null, 2)}
-              </pre>
-            </div>
-          )}
-          {result.output && (
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-1">输出</p>
-              <pre className="text-xs bg-muted rounded p-2 overflow-auto max-h-32 font-mono">
-                {JSON.stringify(result.output, null, 2)}
-              </pre>
-            </div>
-          )}
-          {result.error && (
-            <div>
-              <p className="text-xs font-medium text-red-500 mb-1">错误</p>
-              <p className="text-xs text-red-500">{result.error}</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    <Label htmlFor={htmlFor} className="flex items-center gap-2">
+      <span>
+        {children}
+        {required && <span className="ml-0.5 text-destructive">*</span>}
+      </span>
+      <Badge variant={required ? 'secondary' : 'outline'}>{required ? '必填' : '可选'}</Badge>
+    </Label>
+  );
+}
+
+function startInputs(nodes: Node[]): Record<string, StartInputDefinition> {
+  const node = nodes.find((item) => (item.data as { nodeType?: string }).nodeType === 'start');
+  return normalizePhaseOneStartInputs(
+    (node?.data as { config?: { inputs?: Record<string, StartInputDefinition> } } | undefined)
+      ?.config?.inputs,
   );
 }
 
@@ -158,299 +70,205 @@ export function RunPanel({
   onOpenChange,
   nodes,
   onRun,
+  onCancel,
   isRunning,
-  nodeResults,
+  session,
+  runError,
 }: RunPanelProps) {
-  const variables = extractStartVariables(nodes);
-  const hasInputs = variables.length > 0;
-
-  const [values, setValues] = useState<Record<string, unknown>>({});
-  const [jsonErrors, setJsonErrors] = useState<Record<string, string>>({});
-  const [selectOptions, setSelectOptions] = useState<
-    Record<string, Array<{ label: string; value: string }>>
-  >({});
-  const [selectLoading, setSelectLoading] = useState<Record<string, boolean>>({});
-  const [selectFailed, setSelectFailed] = useState<Record<string, boolean>>({});
-  const fetchedRef = useRef<Set<string>>(new Set());
+  const definitions = startInputs(nodes);
+  const [values, setValues] = useState<Record<string, unknown>>({
+    visibility: 'private',
+    tagIds: [],
+  });
+  const [files, setFiles] = useState<Record<string, File>>({});
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
 
   useEffect(() => {
-    const selectVars = variables.filter((v) => v.type === 'select' && v.dataSource);
-    if (selectVars.length === 0) return;
-
-    const fetchOptions = async () => {
-      for (const v of selectVars) {
-        if (!v.dataSource || fetchedRef.current.has(v.name)) continue;
-        fetchedRef.current.add(v.name);
-        setSelectLoading((prev) => ({ ...prev, [v.name]: true }));
-        try {
-          const data = await request.get<unknown, Record<string, unknown>[]>(v.dataSource.api);
-          const items = Array.isArray(data)
-            ? data
-            : (data as { list?: Record<string, unknown>[] }).list || [];
-          const ds = v.dataSource;
-          const opts = items.map((item) => ({
-            label: String(item[ds.labelField] ?? ''),
-            value: String(item[ds.valueField] ?? ''),
-          }));
-          setSelectOptions((prev) => ({ ...prev, [v.name]: opts }));
-        } catch {
-          setSelectFailed((prev) => ({ ...prev, [v.name]: true }));
-        } finally {
-          setSelectLoading((prev) => ({ ...prev, [v.name]: false }));
-        }
-      }
-    };
-    fetchOptions();
-  }, [variables]);
-
-  const getValue = useCallback(
-    (name: string, type: string): unknown => {
-      return values[name] ?? (type === 'boolean' ? false : '');
-    },
-    [values],
-  );
-
-  const setValue = (name: string, value: unknown) => {
-    setValues((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleFileChange = (name: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setValue(name, file);
-    }
-  };
-
+    if (!open) return;
+    setLoadingOptions(true);
+    Promise.all([getTags(), getGroups({ groupType: 'blog' })])
+      .then(([nextTags, nextGroups]) => {
+        setTags(nextTags);
+        setGroups(nextGroups);
+      })
+      .catch(() => toast.error('加载博客标签或分组失败'))
+      .finally(() => setLoadingOptions(false));
+  }, [open]);
+  const setValue = (name: string, value: unknown) =>
+    setValues((current) => ({ ...current, [name]: value }));
+  const toggleTag = (id: string, checked: boolean) =>
+    setValue(
+      'tagIds',
+      checked
+        ? [...((values.tagIds as string[]) || []), id]
+        : ((values.tagIds as string[]) || []).filter((value) => value !== id),
+    );
   const handleRun = useCallback(() => {
-    for (const v of variables) {
-      if (!v.required) continue;
-      const val = getValue(v.name, v.type);
-      if (val === '' || val === undefined || val === null) {
-        toast.warning(`请填写必填参数 "${v.name}"`);
+    for (const [name, definition] of Object.entries(definitions)) {
+      const value = definition.type === 'file' ? files[name] : values[name];
+      if (
+        definition.required &&
+        (value === undefined || value === '' || (Array.isArray(value) && value.length === 0))
+      ) {
+        toast.warning(`请填写必填参数“${name}”`);
         return;
       }
     }
-
-    for (const key of Object.keys(jsonErrors)) {
-      if (jsonErrors[key]) {
-        toast.warning('请修正 JSON 格式错误');
-        return;
-      }
-    }
-
-    const startNode = nodes.find((n) => (n.data as { nodeType: string }).nodeType === 'start');
-    onRun({ [startNode?.id || 'start-1']: values });
-  }, [variables, values, jsonErrors, nodes, onRun, getValue]);
-
+    onRun({ inputs: values, files });
+  }, [definitions, files, values, onRun]);
   if (!open) return null;
-
-  const hasRunResults = Object.values(nodeResults).some(
-    (r) => r.status !== 'idle' && r.status !== undefined,
-  );
+  const finalOutput = session.finalOutput;
+  const activeNode = nodes.find((node) => session.nodes[node.id]?.status === 'running');
+  const selectedTagIds = (values.tagIds as string[]) || [];
+  const selectedGroup = groups.find((group) => group.id === values.groupId);
 
   return (
-    <div className="h-full flex flex-col border-l border-border bg-card">
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <h2 className="text-sm font-semibold text-foreground">试运行</h2>
+    <div className="flex h-full flex-col border-l border-border bg-card">
+      <div className="flex items-center justify-between border-b border-border p-4">
+        <h2 className="text-sm font-semibold">试运行</h2>
         <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
           <X className="h-4 w-4" />
         </Button>
       </div>
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-4 space-y-5">
-          {/* 输入参数 */}
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-3">输入参数</p>
-            {hasInputs ? (
-              <div className="space-y-3">
-                {variables.map((v) => {
-                  const val = getValue(v.name, v.type);
-                  const errorKey = v.name;
-
-                  return (
-                    <div key={v.name} className="space-y-1.5">
-                      <label className="text-sm font-medium">
-                        {v.name}
-                        {v.required && <span className="text-red-500 ml-0.5">*</span>}
-                      </label>
-                      {v.type === 'boolean' ? (
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            checked={!!val}
-                            onCheckedChange={(checked) => setValue(v.name, !!checked)}
-                          />
-                          <span className="text-sm text-muted-foreground">
-                            {val ? 'true' : 'false'}
-                          </span>
-                        </div>
-                      ) : v.type === 'object' ? (
-                        <div className="space-y-1">
-                          <Textarea
-                            className="font-mono text-xs"
-                            value={(val as string) || ''}
-                            onChange={(e) => {
-                              setValue(v.name, e.target.value);
-                              try {
-                                if (e.target.value.trim()) JSON.parse(e.target.value);
-                                setJsonErrors((prev) => ({ ...prev, [errorKey]: '' }));
-                              } catch {
-                                setJsonErrors((prev) => ({
-                                  ...prev,
-                                  [errorKey]: 'JSON 格式不正确',
-                                }));
-                              }
-                            }}
-                            placeholder='{"key": "value"}'
-                            rows={3}
-                          />
-                          {jsonErrors[errorKey] && (
-                            <p className="text-xs text-red-500">{jsonErrors[errorKey]}</p>
-                          )}
-                        </div>
-                      ) : v.type === 'file' ? (
-                        <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-primary/50 transition-colors">
-                          <input
-                            type="file"
-                            className="hidden"
-                            onChange={(e) => handleFileChange(v.name, e)}
-                            id={`file-input-${v.name}`}
-                          />
-                          {val instanceof File ? (
-                            <div className="flex items-center justify-center gap-2">
-                              <FileText className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm text-foreground truncate max-w-[200px]">
-                                {val.name}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => setValue(v.name, '')}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <label
-                              htmlFor={`file-input-${v.name}`}
-                              className="flex flex-col items-center gap-2 cursor-pointer"
-                            >
-                              <Upload className="h-5 w-5 text-muted-foreground" />
-                              <span className="text-sm text-muted-foreground">
-                                点击或拖拽文件到此处
-                              </span>
-                            </label>
-                          )}
-                        </div>
-                      ) : v.type === 'select' ? (
-                        selectLoading[v.name] ? (
-                          <Skeleton className="h-8 w-full" />
-                        ) : selectFailed[v.name] ? (
-                          <div className="space-y-1.5">
-                            <Badge variant="secondary" className="text-xs">
-                              加载选项失败，请手动输入
-                            </Badge>
-                            <Input
-                              value={val as string}
-                              onChange={(e) => setValue(v.name, e.target.value)}
-                              placeholder={`输入 ${v.name}`}
-                              className="text-sm"
-                            />
-                          </div>
-                        ) : (
-                          <>
-                            <Select
-                              value={(val as string) || ''}
-                              onValueChange={(selectedVal) => {
-                                if (selectedVal === '__custom__') {
-                                  setValue(v.name, '');
-                                } else {
-                                  setValue(v.name, selectedVal);
-                                }
-                              }}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder={`选择 ${v.name}`}>
-                                  {
-                                    (() => {
-                                      if (!val) return null;
-                                      const options = v.dataSource
-                                        ? selectOptions[v.name] || []
-                                        : v.options || [];
-                                      const selectedOpt = options.find((o) => o.value === val);
-                                      return selectedOpt ? selectedOpt.label : val;
-                                    })() as React.ReactNode
-                                  }
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent alignItemWithTrigger={false}>
-                                {(v.dataSource ? selectOptions[v.name] || [] : v.options || []).map(
-                                  (opt) => (
-                                    <SelectItem key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </SelectItem>
-                                  ),
-                                )}
-                                {v.allowCustom !== false && (
-                                  <>
-                                    <SelectSeparator />
-                                    <SelectItem value="__custom__">手动输入</SelectItem>
-                                  </>
-                                )}
-                              </SelectContent>
-                            </Select>
-                            {v.allowCustom !== false &&
-                              typeof val === 'string' &&
-                              val !== '' &&
-                              !selectOptions[v.name]?.some((o) => o.value === val) && (
-                                <Input
-                                  value={val}
-                                  onChange={(e) => setValue(v.name, e.target.value)}
-                                  className="mt-1"
-                                  placeholder="输入自定义值"
-                                />
-                              )}
-                          </>
-                        )
-                      ) : (
-                        <Input
-                          type={v.type === 'number' ? 'number' : 'text'}
-                          value={(val as string) || ''}
-                          onChange={(e) => setValue(v.name, e.target.value)}
-                          placeholder={v.type === 'number' ? '0' : `输入 ${v.name}`}
-                          className="text-sm"
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed border-border p-3 text-center">
-                <p className="text-xs text-muted-foreground">未设置输入参数，在"开始"节点中添加</p>
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="space-y-5">
+          <section className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground">运行输入</p>
+            {definitions.markdownFile && (
+              <div className="space-y-1.5">
+                <InputLabel
+                  htmlFor="workflow-markdown"
+                  required={definitions.markdownFile.required}
+                >
+                  Markdown 文件
+                </InputLabel>
+                <Input
+                  id="workflow-markdown"
+                  type="file"
+                  accept=".md,.markdown,text/markdown"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) setFiles((current) => ({ ...current, markdownFile: file }));
+                  }}
+                />
+                {files.markdownFile && (
+                  <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <FileText className="h-3.5 w-3.5" />
+                    {files.markdownFile.name}
+                  </p>
+                )}
               </div>
             )}
-          </div>
-
-          {/* 运行按钮 */}
-          <Button className="w-full" onClick={handleRun} disabled={isRunning}>
-            <Play className="h-4 w-4 mr-2" />
-            {isRunning ? '运行中...' : '开始运行'}
-          </Button>
-
-          {/* 运行结果 */}
-          {hasRunResults && (
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-3">运行结果</p>
+            {definitions.tagIds && (
               <div className="space-y-2">
-                {nodes.map((node) => {
-                  const result = nodeResults[node.id];
-                  if (!result || result.status === 'idle') return null;
-                  return <NodeResultItem key={node.id} node={node} result={result} />;
-                })}
+                <InputLabel required={definitions.tagIds.required}>博客标签</InputLabel>
+                {loadingOptions ? (
+                  <Skeleton className="h-16 w-full" />
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {tags.map((tag) => (
+                      <label
+                        key={tag.id}
+                        className={cn(
+                          'flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs',
+                          selectedTagIds.includes(tag.id)
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border',
+                        )}
+                      >
+                        <Checkbox
+                          checked={selectedTagIds.includes(tag.id)}
+                          onCheckedChange={(checked) => toggleTag(tag.id, Boolean(checked))}
+                        />
+                        {tag.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
+            )}
+            {definitions.groupId && (
+              <div className="space-y-1.5">
+                <InputLabel required={definitions.groupId.required}>博客分组</InputLabel>
+                <Select
+                  value={(values.groupId as string) || '_none'}
+                  onValueChange={(groupId) =>
+                    setValue('groupId', groupId === '_none' ? '' : groupId)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="不指定分组">
+                      {selectedGroup?.name || '不指定分组'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">不指定分组</SelectItem>
+                    {groups.map((group) => (
+                      <SelectItem key={group.id} value={group.id}>
+                        {group.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {definitions.visibility && (
+              <div className="space-y-1.5">
+                <InputLabel required={definitions.visibility.required}>可见范围</InputLabel>
+                <Select
+                  value={(values.visibility as string) || 'private'}
+                  onValueChange={(visibility) => setValue('visibility', visibility)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private">私密</SelectItem>
+                    <SelectItem value="shared">共享</SelectItem>
+                    <SelectItem value="public">公开</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </section>
+          <Button className="w-full" onClick={handleRun} disabled={isRunning}>
+            <Play className="mr-2 h-4 w-4" />
+            {isRunning ? '运行中…' : '开始运行'}
+          </Button>
+          {isRunning && (
+            <Button variant="outline" className="w-full" onClick={onCancel}>
+              停止运行
+            </Button>
+          )}
+          {isRunning && (
+            <section className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <span>
+                {activeNode ? `正在执行：${String(activeNode.data.label)}` : '正在准备运行…'}
+              </span>
+            </section>
+          )}
+          {runError && (
+            <section className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {runError}
+            </section>
+          )}
+          {finalOutput && (
+            <section className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                草稿已创建
+              </div>
+              <p className="text-xs text-muted-foreground">{String(finalOutput.title || '')}</p>
+              <Link
+                className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
+                to={String(finalOutput.editPath)}
+              >
+                打开草稿
+              </Link>
+            </section>
           )}
         </div>
       </div>

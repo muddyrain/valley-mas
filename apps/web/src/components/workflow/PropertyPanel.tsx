@@ -1,7 +1,6 @@
 import { Settings } from 'lucide-react';
 import { PROPERTY_FORM_MAP } from './properties';
 import { PropertyFormBase } from './properties/PropertyFormBase';
-import type { NodeResult } from './RunPanel';
 
 interface PropertyPanelProps {
   selectedNode: {
@@ -14,15 +13,9 @@ interface PropertyPanelProps {
     nodeId: string,
     updates: Partial<{ label: string; config: Record<string, unknown> }>,
   ) => void;
-  nodeResult?: NodeResult;
 }
 
-export function PropertyPanel({
-  selectedNode,
-  onClose,
-  onUpdateNode,
-  nodeResult,
-}: PropertyPanelProps) {
+export function PropertyPanel({ selectedNode, onClose, onUpdateNode }: PropertyPanelProps) {
   if (!selectedNode) {
     return (
       <div className="h-full flex flex-col border-l border-border bg-card">
@@ -50,12 +43,7 @@ export function PropertyPanel({
   };
 
   return (
-    <PropertyFormBase
-      selectedNode={selectedNode}
-      onClose={onClose}
-      onUpdateNode={onUpdateNode}
-      nodeResult={nodeResult}
-    >
+    <PropertyFormBase selectedNode={selectedNode} onClose={onClose} onUpdateNode={onUpdateNode}>
       {FormComponent && <FormComponent config={config || {}} onUpdateConfig={handleUpdateConfig} />}
     </PropertyFormBase>
   );

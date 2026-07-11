@@ -1,15 +1,17 @@
 export type WorkflowNodeType =
   | 'start'
+  | 'blog.parseMarkdown'
+  | 'llm.text'
+  | 'blog.createDraft'
+  | 'end'
   | 'input'
   | 'fileUpload'
-  | 'llm'
   | 'knowledge'
   | 'code'
   | 'http'
   | 'condition'
   | 'loop'
-  | 'variable'
-  | 'end';
+  | 'variable';
 
 export interface WorkflowNodeConfig {
   type: WorkflowNodeType;
@@ -17,12 +19,9 @@ export interface WorkflowNodeConfig {
   description: string;
   icon: string;
   category: 'ai' | 'action' | 'control' | 'data';
-  handles: {
-    input?: boolean;
-    output?: boolean;
-    outputs?: number;
-  };
+  handles: { input?: boolean; output?: boolean; outputs?: number };
   fixed?: boolean;
+  available?: boolean;
 }
 
 export interface WorkflowNodeData {
@@ -40,84 +39,64 @@ export interface WorkflowEdge {
   targetHandle?: string;
 }
 
-export interface Workflow {
-  id: string;
-  name: string;
-  description?: string;
-  nodes: WorkflowNode[];
-  edges: WorkflowEdge[];
-  createdAt: string;
-  updatedAt: string;
+export interface StartInputDefinition {
+  type: 'string' | 'string[]' | 'object' | 'number' | 'boolean' | 'file';
+  required: boolean;
 }
 
-export interface WorkflowNode {
-  id: string;
-  type: WorkflowNodeType;
-  position: { x: number; y: number };
-  data: WorkflowNodeData;
-}
+export const PHASE_ONE_START_INPUTS: Record<string, StartInputDefinition> = {
+  markdownFile: { type: 'file', required: true },
+  tagIds: { type: 'string[]', required: false },
+  groupId: { type: 'string', required: false },
+  visibility: { type: 'string', required: true },
+};
 
-// --- 节点专属配置类型 ---
+export function normalizePhaseOneStartInputs(
+  inputs: unknown,
+): Record<string, StartInputDefinition> {
+  const configured = inputs && typeof inputs === 'object' ? inputs : {};
+  return Object.fromEntries(
+    Object.entries(PHASE_ONE_START_INPUTS).map(([name, definition]) => {
+      const current = (configured as Record<string, StartInputDefinition>)[name];
+      return [
+        name,
+        {
+          ...definition,
+          required:
+            name === 'markdownFile' || name === 'visibility' ? true : current?.required === true,
+        },
+      ];
+    }),
+  );
+}
 
 export interface StartConfig {
-  variables: Array<{
-    name: string;
-    type: 'string' | 'number' | 'boolean' | 'object';
-    required: boolean;
-  }>;
+  inputs: Record<string, StartInputDefinition>;
 }
 
-export interface InputConfig {
-  variables: Array<{
-    name: string;
-    type: 'string' | 'number' | 'boolean' | 'object';
-    required: boolean;
-  }>;
-}
-
-export interface LLMConfig {
-  model: string;
+export interface LLMTextConfig {
+  modelProfile: 'ark-text-default';
   systemPrompt: string;
+  prompt: string;
   temperature: number;
-  maxTokens: number;
+  maxOutputTokens: number;
 }
 
-export interface KnowledgeConfig {
-  datasetId: string;
-  topK: number;
-  scoreThreshold: number;
+export interface ParseMarkdownConfig {
+  fileInput: string;
 }
 
-export interface CodeConfig {
-  language: 'python' | 'javascript';
-  code: string;
-  inputVars: string[];
-  outputVars: string[];
-}
-
-export interface HTTPConfig {
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  url: string;
-  headers: Array<{ key: string; value: string }>;
-  body?: string;
-}
-
-export interface ConditionConfig {
-  expression: string;
-  trueLabel: string;
-  falseLabel: string;
-}
-
-export interface LoopConfig {
-  loopVariable: string;
-  iterationCount: number;
-}
-
-export interface VariableConfig {
-  variableName: string;
-  valueExpression: string;
+export interface CreateDraftConfig {
+  title: string;
+  content: string;
+  excerpt?: string;
+  cover?: string;
+  tags: string;
+  suggestedTags?: string;
+  tagMode: 'merge' | 'manual_only';
+  visibility: string;
 }
 
 export interface EndConfig {
-  outputMappings: Array<{ source: string; target: string }>;
+  outputs: Record<string, string>;
 }

@@ -72,9 +72,16 @@ export function NodePanel({ onDragStart }: NodePanelProps) {
                     return (
                       <div
                         key={node.type}
-                        draggable
-                        onDragStart={(e) => onDragStart(e, node.type)}
-                        className="group flex items-center gap-3 rounded-lg border border-border bg-background p-3 cursor-grab hover:border-accent hover:bg-accent/50 active:cursor-grabbing transition-colors"
+                        draggable={node.available !== false}
+                        onDragStart={
+                          node.available === false ? undefined : (e) => onDragStart(e, node.type)
+                        }
+                        className={cn(
+                          'group flex items-center gap-3 rounded-lg border border-border bg-background p-3 transition-colors',
+                          node.available === false
+                            ? 'cursor-not-allowed opacity-55'
+                            : 'cursor-grab hover:border-accent hover:bg-accent/50 active:cursor-grabbing',
+                        )}
                       >
                         <div
                           className={cn(
@@ -94,7 +101,7 @@ export function NodePanel({ onDragStart }: NodePanelProps) {
                           variant="ghost"
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          拖拽
+                          {node.available === false ? '计划中' : '拖拽'}
                         </Badge>
                       </div>
                     );
