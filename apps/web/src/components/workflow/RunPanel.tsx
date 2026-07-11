@@ -35,7 +35,7 @@ import request from '@/utils/request';
 export interface NodeResult {
   status: 'idle' | 'running' | 'success' | 'error';
   input?: Record<string, unknown>;
-  output?: Record<string, unknown>;
+  output?: Record<string, unknown> | string;
   duration?: number;
   error?: string;
 }
@@ -371,9 +371,20 @@ export function RunPanel({
                               }}
                             >
                               <SelectTrigger className="w-full">
-                                <SelectValue placeholder={`选择 ${v.name}`} />
+                                <SelectValue placeholder={`选择 ${v.name}`}>
+                                  {
+                                    (() => {
+                                      if (!val) return null;
+                                      const options = v.dataSource
+                                        ? selectOptions[v.name] || []
+                                        : v.options || [];
+                                      const selectedOpt = options.find((o) => o.value === val);
+                                      return selectedOpt ? selectedOpt.label : val;
+                                    })() as React.ReactNode
+                                  }
+                                </SelectValue>
                               </SelectTrigger>
-                              <SelectContent>
+                              <SelectContent alignItemWithTrigger={false}>
                                 {(v.dataSource ? selectOptions[v.name] || [] : v.options || []).map(
                                   (opt) => (
                                     <SelectItem key={opt.value} value={opt.value}>

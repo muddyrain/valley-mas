@@ -9,6 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
+const TAG_COLORS: Record<string, string> = {
+  AI: 'bg-purple-100 text-purple-700 hover:bg-purple-100',
+  博客: 'bg-blue-100 text-blue-700 hover:bg-blue-100',
+  自动: 'bg-green-100 text-green-700 hover:bg-green-100',
+  生成: 'bg-amber-100 text-amber-700 hover:bg-amber-100',
+  内容: 'bg-cyan-100 text-cyan-700 hover:bg-cyan-100',
+  知识库: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100',
+  检索: 'bg-teal-100 text-teal-700 hover:bg-teal-100',
+};
+
 const templates = [
   {
     id: 'blog-import',
@@ -128,7 +138,11 @@ export default function Workbench() {
                         <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
                         <div className="flex flex-wrap gap-2 mt-3">
                           {template.tags.map((tag) => (
-                            <Badge key={tag} variant="ghost" className="text-xs">
+                            <Badge
+                              key={tag}
+                              variant="outline"
+                              className={cn('text-xs border-0', TAG_COLORS[tag])}
+                            >
                               {tag}
                             </Badge>
                           ))}

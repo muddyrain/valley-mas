@@ -2,6 +2,8 @@ import { Handle, type NodeProps, Position } from '@xyflow/react';
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Code,
   Copy,
   Database,
@@ -19,6 +21,7 @@ import {
   XCircle,
   Zap,
 } from 'lucide-react';
+import { useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { getNodeConfigSummary, NODE_CONFIGS } from './nodeConfig';
+import type { NodeResult } from './RunPanel';
 import { validateSingleNode } from './validateWorkflowConfig';
 
 const iconMap: Record<string, typeof Zap> = {
@@ -54,6 +58,7 @@ interface WorkflowNodeData {
 interface WorkflowNodeProps extends NodeProps {
   onCopy?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
+  nodeResult?: NodeResult;
 }
 
 const NODE_COLORS: Record<string, { iconBg: string; iconText: string }> = {
@@ -70,7 +75,8 @@ const NODE_COLORS: Record<string, { iconBg: string; iconText: string }> = {
   end: { iconBg: 'bg-emerald-50', iconText: 'text-emerald-600' },
 };
 
-export function WorkflowNode({ data, selected, onCopy, onDelete }: WorkflowNodeProps) {
+export function WorkflowNode({ data, selected, onCopy, onDelete, nodeResult }: WorkflowNodeProps) {
+  const [expanded, setExpanded] = useState(false);
   const { label, nodeType, config, runningState } = data as unknown as WorkflowNodeData;
   const nodeConfig = NODE_CONFIGS[nodeType];
   const Icon = iconMap[nodeConfig?.icon] || MessageSquare;
@@ -82,6 +88,7 @@ export function WorkflowNode({ data, selected, onCopy, onDelete }: WorkflowNodeP
 
   const isConfigIncomplete = !!validateSingleNode({ label, nodeType, config });
   const isFixed = nodeConfig?.fixed;
+  const hasResult = nodeResult && (nodeResult.input || nodeResult.output || nodeResult.error);
 
   return (
     <div
@@ -135,7 +142,7 @@ export function WorkflowNode({ data, selected, onCopy, onDelete }: WorkflowNodeP
                 e.stopPropagation();
                 onCopy?.(data.id as string);
               }}
-              className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-gray-100 transition-all duration-200"
+              className="p-1.5 rounded hover:bg-gray-100 transition-all duration-200"
               title="复制"
             >
               <Copy className="h-3.5 w-3.5 text-gray-400" />
@@ -143,7 +150,7 @@ export function WorkflowNode({ data, selected, onCopy, onDelete }: WorkflowNodeP
           )}
           {!isFixed && (
             <DropdownMenu>
-              <DropdownMenuTrigger className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-gray-100 transition-all duration-200">
+              <DropdownMenuTrigger className="p-1.5 rounded hover:bg-gray-100 transition-all duration-200">
                 <MoreHorizontal className="h-3.5 w-3.5 text-gray-400" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-36">
@@ -172,6 +179,106 @@ export function WorkflowNode({ data, selected, onCopy, onDelete }: WorkflowNodeP
           {runningState === 'error' && <XCircle className="h-4 w-4 text-red-400 shrink-0" />}
         </div>
       </div>
+
+      {(runningState || hasResult) && (
+        <div
+          className={cn(
+            'border-t border-gray-100 px-4 py-2 cursor-pointer transition-colors',
+            runningState === 'running' && 'bg-blue-50/60',
+            runningState === 'success' && 'bg-green-50/60',
+            runningState === 'error' && 'bg-red-50/60',
+            runningState === 'idle' && hasResult && 'bg-gray-50/50 hover:bg-gray-100',
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (hasResult) setExpanded(!expanded);
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {runningState === 'running' && (
+                <>
+                  <Loader2 className="h-3 w-3 text-blue-500 animate-spin" />
+                  <span className="text-xs text-blue-600 font-medium">试运行中...</span>
+                </>
+              )}
+              {runningState === 'success' && (
+                <>
+                  <CheckCircle2 className="h-3 w-3 text-green-500" />
+                  <span className="text-xs text-green-600 font-medium">运行成功</span>
+                  {nodeResult?.duration != null && (
+                    <span className="text-xs text-green-500">{nodeResult.duration}ms</span>
+                  )}
+                </>
+              )}
+              {runningState === 'error' && (
+                <>
+                  <XCircle className="h-3 w-3 text-red-500" />
+                  <span className="text-xs text-red-600 font-medium">运行失败</span>
+                </>
+              )}
+            </div>
+            {hasResult && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpanded(!expanded);
+                }}
+                className="p-0.5 rounded hover:bg-gray-200/50 transition-colors"
+              >
+                {expanded ? (
+                  <ChevronDown className="h-3 w-3 text-gray-500" />
+                ) : (
+                  <ChevronRight className="h-3 w-3 text-gray-500" />
+                )}
+              </button>
+            )}
+          </div>
+
+          {hasResult && expanded && (
+            <div className="mt-3 space-y-3">
+              {nodeResult?.input && (
+                <div className="bg-white rounded-lg border border-gray-200 p-2">
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                    <span className="text-xs font-medium text-gray-500">输入</span>
+                  </div>
+                  <pre className="text-xs text-gray-700 font-mono whitespace-pre-wrap break-all">
+                    {typeof nodeResult.input === 'string'
+                      ? nodeResult.input
+                      : JSON.stringify(nodeResult.input, null, 2)}
+                  </pre>
+                </div>
+              )}
+              {nodeResult?.output && (
+                <div className="bg-white rounded-lg border border-gray-200 p-2">
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                    <span className="text-xs font-medium text-gray-500">输出</span>
+                  </div>
+                  <pre className="text-xs text-gray-700 font-mono whitespace-pre-wrap break-all">
+                    {typeof nodeResult.output === 'string'
+                      ? nodeResult.output
+                      : JSON.stringify(nodeResult.output, null, 2)}
+                  </pre>
+                </div>
+              )}
+              {nodeResult?.error && (
+                <div className="bg-red-50 rounded-lg border border-red-200 p-2">
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                    <span className="text-xs font-medium text-red-600">错误</span>
+                  </div>
+                  <pre className="text-xs text-red-600 font-mono whitespace-pre-wrap break-all">
+                    {nodeResult.error}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {hasOutput && (
         <Handle

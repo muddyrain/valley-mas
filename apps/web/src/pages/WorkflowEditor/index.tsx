@@ -20,7 +20,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import '@xyflow/react/dist/style.css';
-import { ArrowLeft, Download, Play, RotateCcw, Save, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, Download, Edit2, Play, RotateCcw, Save, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { createWorkflow, getWorkflow, runWorkflow, updateWorkflow } from '@/api/workflow';
 import { Button } from '@/components/ui/button';
@@ -143,6 +143,7 @@ export default function WorkflowEditorPage() {
   } | null>(null);
   const [workflowName, setWorkflowName] = useState('未命名工作流');
   const [workflowId, setWorkflowId] = useState<string | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [showRunPanel, setShowRunPanel] = useState(false);
@@ -336,7 +337,12 @@ export default function WorkflowEditorPage() {
 
   const nodeTypes = {
     workflowNode: (props: NodeProps) => (
-      <WorkflowNode {...props} onCopy={handleCopyNode} onDelete={handleDeleteNode} />
+      <WorkflowNode
+        {...props}
+        onCopy={handleCopyNode}
+        onDelete={handleDeleteNode}
+        nodeResult={nodeResults[props.id as string]}
+      />
     ),
   };
 
@@ -409,13 +415,20 @@ export default function WorkflowEditorPage() {
                       : n,
                   ),
                 );
-                setNodeResults((prev) => ({
-                  ...prev,
-                  [event.step]: {
-                    ...(prev[event.step] || {}),
+                setNodeResults((prev) => {
+                  const current = prev[event.step] || {};
+                  const data = event.data as Record<string, unknown> | undefined;
+                  const result: NodeResult = {
                     status: event.status as NodeResult['status'],
-                  },
-                }));
+                    input: (data?.input as Record<string, unknown> | undefined) ?? current.input,
+                    output:
+                      (data?.output as Record<string, unknown> | string | undefined) ??
+                      current.output,
+                    error: (data?.error as string | undefined) ?? current.error,
+                    duration: (data?.duration as number | undefined) ?? current.duration,
+                  };
+                  return { ...prev, [event.step]: result };
+                });
               }
               if (event.status === 'done') {
                 setIsRunning(false);
@@ -525,11 +538,27 @@ export default function WorkflowEditorPage() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/workbench')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <input
-              value={workflowName}
-              onChange={(e) => setWorkflowName(e.target.value)}
-              className="text-sm font-medium bg-transparent border-none outline-none text-foreground w-40"
-            />
+            <div className="flex items-center gap-1">
+              {isEditingName ? (
+                <input
+                  value={workflowName}
+                  onChange={(e) => setWorkflowName(e.target.value)}
+                  onBlur={() => setIsEditingName(false)}
+                  onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
+                  className="text-sm font-medium bg-accent border border-border rounded px-2 py-1 outline-none text-foreground w-40"
+                />
+              ) : (
+                <span className="text-sm font-medium text-foreground">{workflowName}</span>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-60 hover:opacity-100 transition-opacity"
+                onClick={() => setIsEditingName(!isEditingName)}
+              >
+                <Edit2 className="h-3 w-3" />
+              </Button>
+            </div>
             <span className="text-xs text-muted-foreground">
               {nodes.length} 节点 · {edges.length} 连接
               {workflowId && <span className="ml-2">· 已保存</span>}
