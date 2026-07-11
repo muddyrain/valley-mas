@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import { GlobalScrollButton } from '@/components/GlobalScrollButton';
 import { Toaster } from '@/components/ui/sonner';
 import { applyThemeToDocument, useThemeStore } from '@/stores/useThemeStore';
@@ -29,6 +29,13 @@ import Resources from './pages/Resources';
 import ScratchLegendLab from './pages/ScratchLegendLab';
 import Workbench from './pages/Workbench';
 import WorkflowEditor from './pages/WorkflowEditor';
+
+function WorkflowEditorWithKey() {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const id = searchParams.get('id');
+  return <WorkflowEditor key={`${location.pathname}-${id ?? 'none'}`} />;
+}
 
 function RouteTitle() {
   const location = useLocation();
@@ -120,8 +127,8 @@ function App() {
         <Route path="/" element={<WorkbenchLayout />}>
           <Route index element={<Home />} />
           <Route path="workbench" element={<Workbench />} />
-          <Route path="workbench/create" element={<WorkflowEditor />} />
-          <Route path="workbench/edit" element={<WorkflowEditor />} />
+          <Route path="workbench/create" element={<WorkflowEditorWithKey />} />
+          <Route path="workbench/edit" element={<WorkflowEditorWithKey />} />
           <Route path="resources" element={<Resources />} />
           <Route path="resource/:id" element={<ResourceDetail />} />
           <Route path="my-space" element={<MySpace />} />

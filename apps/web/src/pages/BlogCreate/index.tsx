@@ -781,7 +781,7 @@ export default function BlogCreate() {
     return (
       <div className="min-h-[calc(100vh-4rem)] px-4 py-6 md:px-8">
         <div className="mx-auto max-w-360 space-y-5">
-          <div className="flex items-center gap-3 rounded-2xl border bg-card/85 px-4 py-3 shadow-sm backdrop-blur">
+          <div className="flex items-center gap-3 rounded-2xl border-border/50 bg-card/85 px-4 py-3 shadow-sm backdrop-blur">
             <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-primary/20 bg-accent/80">
               <Loader2 className="text-primary h-4 w-4 animate-spin" />
               <span className="absolute inset-0 rounded-xl border border-primary/15" />
@@ -793,7 +793,7 @@ export default function BlogCreate() {
           </div>
 
           <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-            <section className="w-full min-w-0 rounded-2xl border bg-card/95 p-4 shadow-sm md:p-5">
+            <section className="w-full min-w-0 rounded-2xl border-border/50 bg-card/95 p-4 shadow-sm md:p-5">
               <Skeleton className="mb-4 h-5 w-28 rounded-lg bg-accent/80" />
               <Skeleton className="mb-3 h-12 w-full rounded-xl" />
               <Skeleton className="mb-3 h-28 w-full rounded-xl" />
@@ -802,13 +802,13 @@ export default function BlogCreate() {
             </section>
 
             <section className="min-w-0 space-y-4 lg:sticky lg:top-20 lg:self-start">
-              <div className="rounded-2xl border bg-card/95 p-4 shadow-sm md:p-5">
+              <div className="rounded-2xl border-border/50 bg-card/95 p-4 shadow-sm md:p-5">
                 <Skeleton className="mb-4 h-5 w-32 rounded-lg bg-accent/80" />
                 <Skeleton className="mb-3 h-9 w-full rounded-xl" />
                 <Skeleton className="mb-3 h-9 w-full rounded-xl" />
                 <Skeleton className="h-28 w-full rounded-xl" />
               </div>
-              <div className="rounded-2xl border bg-card/95 p-4 shadow-sm md:p-5">
+              <div className="rounded-2xl border-border/50 bg-card/95 p-4 shadow-sm md:p-5">
                 <Skeleton className="mb-3 h-5 w-28 rounded-lg bg-accent/80" />
                 <Skeleton className="h-52 w-full rounded-xl" />
               </div>
@@ -822,7 +822,7 @@ export default function BlogCreate() {
   return (
     <div className="min-h-[calc(100vh-4rem)] px-4 py-6 md:px-8">
       <div className="mx-auto max-w-360">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card/75 px-4 py-3 shadow-sm backdrop-blur">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-border/50 bg-card/75 px-4 py-3 shadow-sm backdrop-blur">
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
@@ -836,7 +836,7 @@ export default function BlogCreate() {
             <h1 className="text-xl font-semibold text-foreground md:text-2xl">
               {isEditMode ? '编辑博客' : '博客创作'}
             </h1>
-            <span className="border-border bg-accent text-primary rounded-full border px-3 py-1 text-xs shadow-sm">
+            <span className="bg-accent text-primary rounded-full border-border/50 border px-3 py-1 text-xs shadow-sm">
               Markdown Pro
             </span>
           </div>
@@ -921,7 +921,7 @@ export default function BlogCreate() {
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.46fr)_minmax(340px,0.72fr)]">
-          <section className="w-full min-w-0 rounded-2xl border bg-card/95 p-4 shadow-sm md:p-6">
+          <section className="w-full min-w-0 rounded-2xl border-border/50 bg-card/95 p-4 shadow-sm md:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div className="text-sm text-muted-foreground">写作区</div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -938,7 +938,7 @@ export default function BlogCreate() {
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="输入标题，抓住读者注意力"
                 maxLength={200}
-                className="mb-2 h-12 rounded-lg text-base"
+                className="mb-2 h-12 rounded-lg text-base border-border/50 bg-card/95"
               />
             )}
 
@@ -950,7 +950,7 @@ export default function BlogCreate() {
           </section>
 
           <section className="min-w-0 space-y-4 lg:sticky lg:top-20 lg:self-start">
-            <div className="rounded-2xl border bg-card/95 p-4 shadow-sm md:p-5">
+            <div className="rounded-2xl border-border/50 bg-card/95 p-4 shadow-sm md:p-5">
               <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
                 <Sparkles className="text-primary h-4 w-4" />
                 发布设置
@@ -1048,7 +1048,7 @@ export default function BlogCreate() {
                       maxLength={500}
                       className="rounded-xl"
                     />
-                    <label className="border-border bg-accent text-primary hover:bg-accent inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl border px-2.5 text-sm whitespace-nowrap">
+                    <label className="bg-accent text-primary hover:bg-accent inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl border-border/50 border px-2.5 text-sm whitespace-nowrap">
                       <ImagePlus className="mr-1 h-4 w-4" />
                       {coverUploading ? '上传中' : coverObjectUrl ? '重新选图' : '选择图片'}
                       <input
@@ -1084,7 +1084,7 @@ export default function BlogCreate() {
                     }
                   />
                   {(!!cover || !!coverObjectUrl) && (
-                    <div className="mt-3 overflow-hidden rounded-xl border border-border bg-muted">
+                    <div className="mt-3 overflow-hidden rounded-xl border-border/50 border bg-muted">
                       <div
                         ref={coverViewportRef}
                         className={`relative w-full overflow-hidden ${BLOG_COVER_ASPECT_CLASS}`}
@@ -1118,7 +1118,7 @@ export default function BlogCreate() {
 
                 <div>
                   <div className="mb-2 text-xs text-muted-foreground">可见范围</div>
-                  <div className="border-border bg-accent/50 flex flex-wrap gap-2 rounded-xl border p-2">
+                  <div className="flex flex-wrap gap-2 rounded-xl border-border/50 border p-2">
                     {[
                       { label: '私密', value: 'private' as const },
                       { label: '共享', value: 'shared' as const },
@@ -1161,7 +1161,7 @@ export default function BlogCreate() {
                       </button>
                     </div>
                   </div>
-                  <div className="border-border bg-accent/50 flex flex-wrap gap-2 rounded-xl border p-2">
+                  <div className="flex flex-wrap gap-2 rounded-xl border-border/50 border p-2">
                     <button
                       type="button"
                       onClick={() => setGroupId('')}
@@ -1190,7 +1190,7 @@ export default function BlogCreate() {
                   </div>
 
                   {showCreateGroup && (
-                    <div className="border-border bg-accent/60 mt-3 rounded-xl border p-3">
+                    <div className="mt-3 rounded-xl border-border/50 border p-3">
                       <Input
                         value={newGroupName}
                         onChange={(e) => setNewGroupName(e.target.value)}

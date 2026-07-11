@@ -237,8 +237,15 @@ export default function WorkflowEditorPage() {
       setNodes(blogImportTemplate.nodes as Node[]);
       setEdges(blogImportTemplate.edges as Edge[]);
     } else {
-      setNodes(blogImportTemplate.nodes as Node[]);
-      setEdges(blogImportTemplate.edges as Edge[]);
+      setNodes([
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 200, y: 250 },
+          data: { label: '开始', nodeType: 'start', config: { inputs: {} } },
+        },
+      ] as Node[]);
+      setEdges([]);
     }
   }, [searchParams]);
 
@@ -594,8 +601,15 @@ export default function WorkflowEditorPage() {
       setNodes(blogImportTemplate.nodes as Node[]);
       setEdges(blogImportTemplate.edges as Edge[]);
     } else {
-      setNodes(blogImportTemplate.nodes as Node[]);
-      setEdges(blogImportTemplate.edges as Edge[]);
+      setNodes([
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 200, y: 250 },
+          data: { label: '开始', nodeType: 'start', config: { inputs: {} } },
+        },
+      ] as Node[]);
+      setEdges([]);
     }
     setSelectedNode(null);
     toast.info('工作流已重置');

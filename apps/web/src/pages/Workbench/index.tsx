@@ -1,4 +1,4 @@
-import { FileText, LayoutDashboard, Plus, Sparkles, Zap } from 'lucide-react';
+import { FileText, LayoutDashboard, Plus, Sparkles, Trash2, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -6,6 +6,14 @@ import { deleteWorkflow, listWorkflows, type WorkflowItem } from '@/api/workflow
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -50,6 +58,8 @@ export default function Workbench() {
   const navigate = useNavigate();
   const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<WorkflowItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     listWorkflows({ page: 1, pageSize: 20 })
@@ -58,14 +68,23 @@ export default function Workbench() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
+  const handleDelete = (workflow: WorkflowItem, e: React.MouseEvent) => {
     e.stopPropagation();
+    setDeleteTarget(workflow);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteWorkflow(id);
-      setWorkflows((prev) => prev.filter((w) => w.id !== id));
+      setDeleting(true);
+      await deleteWorkflow(deleteTarget.id);
+      setWorkflows((prev) => prev.filter((w) => w.id !== deleteTarget.id));
       toast.success('工作流已删除');
     } catch {
       toast.error('删除失败');
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -222,11 +241,9 @@ export default function Workbench() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => handleDelete(workflow.id, e)}
+                          onClick={(e) => handleDelete(workflow, e)}
                         >
-                          <span className="text-xs text-muted-foreground hover:text-destructive">
-                            x
-                          </span>
+                          <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                         </Button>
                       </div>
                     </div>
@@ -263,6 +280,32 @@ export default function Workbench() {
             </div>
           </CardContent>
         </Card>
+
+        <Dialog
+          open={Boolean(deleteTarget)}
+          onOpenChange={() => !deleting && setDeleteTarget(null)}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-base">删除工作流？</DialogTitle>
+              <DialogDescription>
+                「{deleteTarget?.name}」删除后将无法恢复，确定要删除吗？
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+                取消
+              </Button>
+              <Button
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                className="bg-destructive text-primary-foreground hover:bg-destructive/90"
+              >
+                {deleting ? '删除中...' : '确认删除'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
