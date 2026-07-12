@@ -31,6 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { NodeRunInspector } from './NodeRunInspector';
 import { getNodeConfigSummary, NODE_CONFIGS } from './nodeConfig';
@@ -57,6 +58,7 @@ interface WorkflowNodeData {
   label: string;
   nodeType: string;
   config?: Record<string, unknown>;
+  collapsed?: boolean;
 }
 
 const NODE_COLORS: Record<string, { iconBg: string; iconText: string }> = {
@@ -78,7 +80,7 @@ const NODE_COLORS: Record<string, { iconBg: string; iconText: string }> = {
 
 export function WorkflowNode({ id, data, selected }: NodeProps) {
   const { session, toggleNodeResult, copyNode, deleteNode } = useWorkflowRuntime();
-  const { label, nodeType, config } = data as unknown as WorkflowNodeData;
+  const { label, nodeType, config, collapsed } = data as unknown as WorkflowNodeData;
   const snapshot = session.nodes[id];
   const runningState = snapshot?.status;
   const expanded = session.expandedNodeId === id;
@@ -119,16 +121,27 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
             <Icon className={cn('h-4 w-4', colors.iconText)} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-medium text-gray-800">{label}</span>
-              {isConfigIncomplete && (
-                <AlertCircle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
-              )}
-            </div>
-            {summary && (
+            <Tooltip>
+              <TooltipTrigger render={<div className="flex items-center gap-2" />}>
+                <span className="truncate text-sm font-medium text-gray-800">{label}</span>
+                {isConfigIncomplete && (
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
+                )}
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[280px]">
+                <div className="space-y-0.5">
+                  <div className="font-medium">{label}</div>
+                  {nodeConfig?.description && (
+                    <div className="text-xs opacity-80">{nodeConfig.description}</div>
+                  )}
+                  {summary && <div className="text-xs opacity-60">{summary}</div>}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+            {!collapsed && summary && (
               <span className="mt-0.5 block truncate text-xs text-gray-500">{summary}</span>
             )}
-            {(hasInput || hasOutput) && (
+            {!collapsed && (hasInput || hasOutput) && (
               <span className="mt-0.5 block truncate text-xs text-gray-400">
                 {hasInput && '输入: 1 项'}
                 {hasInput && hasOutput && ' · '}
@@ -138,23 +151,36 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
           </div>
           <div className="nodrag nopan flex items-center gap-0.5">
             {!isFixed && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  copyNode(id);
-                }}
-                aria-label="复制节点"
-              >
-                <Copy className="h-3.5 w-3.5 text-gray-400" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        copyNode(id);
+                      }}
+                      aria-label="复制节点"
+                    />
+                  }
+                >
+                  <Copy className="h-3.5 w-3.5 text-gray-400" />
+                </TooltipTrigger>
+                <TooltipContent side="top">复制节点</TooltipContent>
+              </Tooltip>
             )}
             {!isFixed && (
               <DropdownMenu>
                 <DropdownMenuTrigger
-                  className="rounded p-1.5 transition-all hover:bg-gray-100"
-                  onClick={(event) => event.stopPropagation()}
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={(event) => event.stopPropagation()}
+                      aria-label="节点菜单"
+                    />
+                  }
                 >
                   <MoreHorizontal className="h-3.5 w-3.5 text-gray-400" />
                 </DropdownMenuTrigger>
@@ -187,7 +213,7 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
             {runningState === 'error' && <XCircle className="h-4 w-4 shrink-0 text-red-400" />}
           </div>
         </div>
-        {snapshot && (
+        {!collapsed && snapshot && (
           <Button
             variant="ghost"
             className={cn(
@@ -215,7 +241,7 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
           </Button>
         )}
       </div>
-      {snapshot && expanded && <NodeRunInspector snapshot={snapshot} />}
+      {!collapsed && snapshot && expanded && <NodeRunInspector snapshot={snapshot} />}
       {hasOutput && (
         <Handle
           type="source"

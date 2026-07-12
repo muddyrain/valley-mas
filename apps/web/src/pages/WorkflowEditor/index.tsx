@@ -21,8 +21,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import '@xyflow/react/dist/style.css';
 import {
   ArrowLeft,
+  CheckSquare,
+  ChevronDown,
+  Clipboard,
+  Copy,
   Download,
   Edit2,
+  Maximize,
   Play,
   Redo2,
   RotateCcw,
@@ -202,12 +207,18 @@ export default function WorkflowEditorPage() {
   );
   const [runError, setRunError] = useState<string | null>(null);
   const [rightPanelWidth, setRightPanelWidth] = useState(380);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    nodeId?: string;
+  } | null>(null);
   const isDraggingRef = useRef(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
   const isFitViewComplete = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const runGenerationRef = useRef(0);
+  const clipboardRef = useRef<Node[] | null>(null);
   const { undo, redo, canUndo, canRedo, clearHistory } = useWorkflowHistory(
     nodes,
     edges,
@@ -268,7 +279,7 @@ export default function WorkflowEditorPage() {
       setEdges([]);
       clearHistory();
     }
-  }, [searchParams]);
+  }, [searchParams, clearHistory]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -323,6 +334,39 @@ export default function WorkflowEditorPage() {
     toast.success(`已添加 ${config?.label} 节点`);
   }, []);
 
+  const handleAddNode = useCallback((nodeType: string) => {
+    if (!NODE_CONFIGS[nodeType]?.available) return;
+    if (nodeType === 'start' || nodeType === 'end') return;
+
+    const config = NODE_CONFIGS[nodeType];
+    const wrapper = reactFlowWrapper.current;
+    const center = wrapper
+      ? { x: wrapper.clientWidth / 2, y: wrapper.clientHeight / 2 }
+      : { x: 400, y: 300 };
+    const position = reactFlowInstance.current
+      ? reactFlowInstance.current.screenToFlowPosition({
+          x: (wrapper?.getBoundingClientRect().left ?? 0) + center.x,
+          y: (wrapper?.getBoundingClientRect().top ?? 0) + center.y,
+        })
+      : { x: 300, y: 250 };
+
+    position.x -= 110;
+    position.y -= 20;
+
+    const newNode: Node = {
+      id: `${nodeType}-${Date.now()}`,
+      type: nodeType,
+      position,
+      data: {
+        label: config?.label || nodeType,
+        nodeType,
+      },
+    };
+
+    setNodes((prev) => [...prev, newNode]);
+    toast.success(`已添加 ${config?.label} 节点`);
+  }, []);
+
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => setNodes((prev) => applyNodeChanges(changes, prev)),
     [],
@@ -350,6 +394,32 @@ export default function WorkflowEditorPage() {
       type: node.type || '',
       data: node.data as { label: string; nodeType: string; config?: Record<string, unknown> },
     });
+  }, []);
+
+  const onNodeDoubleClick = useCallback((_event: React.MouseEvent, node: Node) => {
+    setNodes((prev) =>
+      prev.map((n) =>
+        n.id === node.id
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                collapsed: !(n.data as { collapsed?: boolean }).collapsed,
+              },
+            }
+          : n,
+      ),
+    );
+  }, []);
+
+  const onPaneContextMenu = useCallback((event: MouseEvent | React.MouseEvent) => {
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY });
+  }, []);
+
+  const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
   }, []);
 
   const onEdgeClick = useCallback(() => {
@@ -395,6 +465,18 @@ export default function WorkflowEditorPage() {
     [nodes],
   );
 
+  const handlePaste = useCallback(() => {
+    if (!clipboardRef.current || clipboardRef.current.length === 0) return;
+    const stamp = Date.now();
+    const pasted = clipboardRef.current.map((n, i) => ({
+      ...n,
+      id: `${n.id}-paste-${stamp}-${i}`,
+      position: { x: n.position.x + 30, y: n.position.y + 30 },
+      selected: true,
+    }));
+    setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), ...pasted]);
+  }, []);
+
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       const isMod = event.ctrlKey || event.metaKey;
@@ -418,6 +500,38 @@ export default function WorkflowEditorPage() {
         return;
       }
 
+      if (isMod && (event.key === 'c' || event.key === 'C')) {
+        if (isEditingText) return;
+        const selected = nodes.filter((n) => n.selected);
+        if (selected.length > 0) {
+          clipboardRef.current = selected;
+          event.preventDefault();
+        } else if (selectedNode) {
+          const node = nodes.find((n) => n.id === selectedNode.id);
+          if (node) {
+            clipboardRef.current = [node];
+            event.preventDefault();
+          }
+        }
+        return;
+      }
+
+      if (isMod && (event.key === 'v' || event.key === 'V')) {
+        if (isEditingText) return;
+        if (clipboardRef.current && clipboardRef.current.length > 0) {
+          event.preventDefault();
+          handlePaste();
+        }
+        return;
+      }
+
+      if (isMod && (event.key === 'a' || event.key === 'A')) {
+        if (isEditingText) return;
+        event.preventDefault();
+        setNodes((prev) => prev.map((n) => ({ ...n, selected: true })));
+        return;
+      }
+
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
       if (isEditingText) return;
 
@@ -433,13 +547,24 @@ export default function WorkflowEditorPage() {
         setEdges((prev) => prev.filter((e) => !e.selected));
       }
     },
-    [selectedNode, handleDeleteNode, edges, setEdges, undo, redo],
+    [selectedNode, handleDeleteNode, edges, nodes, undo, redo, handlePaste],
   );
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    window.addEventListener('click', close);
+    window.addEventListener('contextmenu', close);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('contextmenu', close);
+    };
+  }, [contextMenu]);
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -793,7 +918,7 @@ export default function WorkflowEditorPage() {
 
           <div className="flex-1 flex overflow-hidden">
             <div className="w-56 flex-shrink-0">
-              <NodePanel onDragStart={onDragStart} />
+              <NodePanel onDragStart={onDragStart} onAddNode={handleAddNode} />
             </div>
 
             <div
@@ -809,8 +934,11 @@ export default function WorkflowEditorPage() {
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
                 onNodeClick={onNodeClick}
+                onNodeDoubleClick={onNodeDoubleClick}
+                onNodeContextMenu={onNodeContextMenu}
                 onEdgeClick={onEdgeClick}
                 onPaneClick={onPaneClick}
+                onPaneContextMenu={onPaneContextMenu}
                 nodeTypes={workflowNodeTypes}
                 defaultEdgeOptions={defaultEdgeOptions}
                 deleteKeyCode={['Delete', 'Backspace']}
@@ -858,6 +986,108 @@ export default function WorkflowEditorPage() {
             </div>
           </div>
         </div>
+        {contextMenu &&
+          (() => {
+            const { x, y, nodeId } = contextMenu;
+            return (
+              <div
+                className="fixed z-50 min-w-[160px] rounded-md border border-border bg-popover p-1 shadow-md"
+                style={{ left: x, top: y }}
+                onClick={(e) => e.stopPropagation()}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                {nodeId ? (
+                  <>
+                    <button
+                      type="button"
+                      className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-foreground hover:bg-accent"
+                      onClick={() => {
+                        handleCopyNode(nodeId);
+                        setContextMenu(null);
+                      }}
+                    >
+                      <Copy className="mr-2 h-3.5 w-3.5" />
+                      复制
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-accent"
+                      onClick={() => {
+                        handleDeleteNode(nodeId);
+                        setContextMenu(null);
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-3.5 w-3.5" />
+                      删除
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-foreground hover:bg-accent"
+                      onClick={() => {
+                        setNodes((prev) =>
+                          prev.map((n) =>
+                            n.id === nodeId
+                              ? {
+                                  ...n,
+                                  data: {
+                                    ...n.data,
+                                    collapsed: !(n.data as { collapsed?: boolean }).collapsed,
+                                  },
+                                }
+                              : n,
+                          ),
+                        );
+                        setContextMenu(null);
+                      }}
+                    >
+                      <ChevronDown className="mr-2 h-3.5 w-3.5" />
+                      折叠/展开
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-foreground hover:bg-accent disabled:opacity-50"
+                      disabled={!clipboardRef.current || clipboardRef.current.length === 0}
+                      onClick={() => {
+                        handlePaste();
+                        setContextMenu(null);
+                      }}
+                    >
+                      <Clipboard className="mr-2 h-3.5 w-3.5" />
+                      粘贴
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-foreground hover:bg-accent"
+                      onClick={() => {
+                        setNodes((prev) => prev.map((n) => ({ ...n, selected: true })));
+                        setContextMenu(null);
+                      }}
+                    >
+                      <CheckSquare className="mr-2 h-3.5 w-3.5" />
+                      全选
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-foreground hover:bg-accent"
+                      onClick={() => {
+                        reactFlowInstance.current?.fitView({ padding: 0.2 });
+                        setContextMenu(null);
+                      }}
+                    >
+                      <Maximize className="mr-2 h-3.5 w-3.5" />
+                      重置视图
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })()}
       </ReactFlowProvider>
     </WorkflowRuntimeProvider>
   );
