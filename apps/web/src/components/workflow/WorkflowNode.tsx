@@ -136,12 +136,15 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-0.5">
+          <div className="nodrag nopan flex items-center gap-0.5">
             {!isFixed && (
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => copyNode(id)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  copyNode(id);
+                }}
                 aria-label="复制节点"
               >
                 <Copy className="h-3.5 w-3.5 text-gray-400" />
@@ -149,16 +152,26 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
             )}
             {!isFixed && (
               <DropdownMenu>
-                <DropdownMenuTrigger className="rounded p-1.5 transition-all hover:bg-gray-100">
+                <DropdownMenuTrigger
+                  className="rounded p-1.5 transition-all hover:bg-gray-100"
+                  onClick={(event) => event.stopPropagation()}
+                >
                   <MoreHorizontal className="h-3.5 w-3.5 text-gray-400" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-36">
-                  <DropdownMenuItem onClick={() => copyNode(id)}>
+                  <DropdownMenuItem
+                    onClick={() => copyNode(id)}
+                    onSelect={(event) => event.stopPropagation()}
+                  >
                     <Copy className="mr-2 h-3.5 w-3.5" />
                     复制
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => deleteNode(id)} className="text-red-500">
+                  <DropdownMenuItem
+                    onClick={() => deleteNode(id)}
+                    className="text-red-500"
+                    onSelect={(event) => event.stopPropagation()}
+                  >
                     <Trash2 className="mr-2 h-3.5 w-3.5" />
                     删除
                   </DropdownMenuItem>

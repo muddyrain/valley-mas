@@ -19,7 +19,18 @@ import {
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import '@xyflow/react/dist/style.css';
-import { ArrowLeft, Download, Edit2, Play, RotateCcw, Save, Trash2, Upload } from 'lucide-react';
+import {
+  ArrowLeft,
+  Download,
+  Edit2,
+  Play,
+  Redo2,
+  RotateCcw,
+  Save,
+  Trash2,
+  Undo2,
+  Upload,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { createWorkflow, getWorkflow, runWorkflow, updateWorkflow } from '@/api/workflow';
 import { Button } from '@/components/ui/button';
@@ -33,6 +44,7 @@ import {
   workflowRunSessionReducer,
 } from '@/components/workflow/runSession';
 import { normalizePhaseOneStartInputs } from '@/components/workflow/types';
+import { useWorkflowHistory } from '@/components/workflow/useWorkflowHistory';
 import { validateWorkflowConfig } from '@/components/workflow/validateWorkflowConfig';
 import { WorkflowNode } from '@/components/workflow/WorkflowNode';
 import { WorkflowRuntimeProvider } from '@/components/workflow/WorkflowRuntimeContext';
@@ -196,6 +208,12 @@ export default function WorkflowEditorPage() {
   const isFitViewComplete = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const runGenerationRef = useRef(0);
+  const { undo, redo, canUndo, canRedo, clearHistory } = useWorkflowHistory(
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+  );
 
   // 从 URL 获取工作流 ID 或模板
   useEffect(() => {
@@ -226,6 +244,7 @@ export default function WorkflowEditorPage() {
               );
             }
             if (graph.edges) setEdges(normalizeWorkflowEdges(graph.edges as Edge[]));
+            clearHistory();
           } catch {
             // invalid graph
           }
@@ -236,6 +255,7 @@ export default function WorkflowEditorPage() {
     } else if (template === 'blog-import') {
       setNodes(blogImportTemplate.nodes as Node[]);
       setEdges(blogImportTemplate.edges as Edge[]);
+      clearHistory();
     } else {
       setNodes([
         {
@@ -246,6 +266,7 @@ export default function WorkflowEditorPage() {
         },
       ] as Node[]);
       setEdges([]);
+      clearHistory();
     }
   }, [searchParams]);
 
@@ -331,6 +352,10 @@ export default function WorkflowEditorPage() {
     });
   }, []);
 
+  const onEdgeClick = useCallback(() => {
+    setSelectedNode(null);
+  }, []);
+
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
   }, []);
@@ -372,13 +397,43 @@ export default function WorkflowEditorPage() {
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (!selectedNode) return;
-      if (event.key === 'Delete' || event.key === 'Backspace') {
+      const isMod = event.ctrlKey || event.metaKey;
+      const target = event.target as HTMLElement | null;
+      const isEditingText =
+        !!target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+
+      if (
+        isMod &&
+        (event.key === 'z' || event.key === 'Z' || event.key === 'y' || event.key === 'Y')
+      ) {
+        if (isEditingText) return;
+        event.preventDefault();
+        const isRedo = event.key === 'y' || event.key === 'Y' || event.shiftKey;
+        if (isRedo) {
+          redo();
+        } else {
+          undo();
+        }
+        return;
+      }
+
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+      if (isEditingText) return;
+
+      if (selectedNode) {
         event.preventDefault();
         handleDeleteNode(selectedNode.id);
+        return;
+      }
+
+      const hasSelectedEdge = edges.some((e) => e.selected);
+      if (hasSelectedEdge) {
+        event.preventDefault();
+        setEdges((prev) => prev.filter((e) => !e.selected));
       }
     },
-    [selectedNode, handleDeleteNode],
+    [selectedNode, handleDeleteNode, edges, setEdges, undo, redo],
   );
 
   useEffect(() => {
@@ -689,6 +744,26 @@ export default function WorkflowEditorPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={undo}
+                disabled={!canUndo}
+                title="撤销 (Ctrl/Cmd+Z)"
+                aria-label="撤销"
+              >
+                <Undo2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={redo}
+                disabled={!canRedo}
+                title="重做 (Ctrl/Cmd+Shift+Z)"
+                aria-label="重做"
+              >
+                <Redo2 className="h-4 w-4" />
+              </Button>
               <Button variant="outline" size="sm" onClick={handleImport}>
                 <Upload className="h-4 w-4 mr-2" />
                 导入
@@ -734,9 +809,11 @@ export default function WorkflowEditorPage() {
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
                 onNodeClick={onNodeClick}
+                onEdgeClick={onEdgeClick}
                 onPaneClick={onPaneClick}
                 nodeTypes={workflowNodeTypes}
                 defaultEdgeOptions={defaultEdgeOptions}
+                deleteKeyCode={['Delete', 'Backspace']}
                 fitView={nodes.length > 0 && !isFitViewComplete.current}
                 minZoom={0.2}
                 maxZoom={2}
