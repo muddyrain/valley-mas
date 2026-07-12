@@ -51,74 +51,74 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
   input: {
     type: 'input',
     label: '输入参数',
-    description: '计划中',
+    description: '声明工作流的可复用输入参数',
     icon: 'Keyboard',
     category: 'data',
     handles: { input: true, output: true },
-    available: false,
+    available: true,
   },
   fileUpload: {
     type: 'fileUpload',
     label: '上传文件',
-    description: '计划中',
+    description: '上传文件供下游节点使用',
     icon: 'Upload',
     category: 'data',
     handles: { input: true, output: true },
-    available: false,
+    available: true,
   },
   knowledge: {
     type: 'knowledge',
     label: '知识库检索',
-    description: '计划中',
+    description: '检索知识库返回相关片段',
     icon: 'Database',
     category: 'ai',
     handles: { input: true, output: true },
-    available: false,
+    available: true,
   },
   code: {
     type: 'code',
     label: '代码执行',
-    description: '计划中',
+    description: '执行 JavaScript 代码处理输入',
     icon: 'Code',
     category: 'action',
     handles: { input: true, output: true },
-    available: false,
+    available: true,
   },
   http: {
     type: 'http',
     label: 'HTTP 请求',
-    description: '计划中',
+    description: '发送 HTTP 请求获取外部数据',
     icon: 'Globe',
     category: 'action',
     handles: { input: true, output: true },
-    available: false,
+    available: true,
   },
   condition: {
     type: 'condition',
     label: '条件分支',
-    description: '计划中',
+    description: '根据条件分支到不同路径',
     icon: 'GitBranch',
     category: 'control',
     handles: { input: true, outputs: 2 },
-    available: false,
+    available: true,
   },
   loop: {
     type: 'loop',
     label: '循环',
-    description: '计划中',
+    description: '遍历数组对每项执行子流程',
     icon: 'Repeat',
     category: 'control',
     handles: { input: true, output: true },
-    available: false,
+    available: true,
   },
   variable: {
     type: 'variable',
     label: '变量赋值',
-    description: '计划中',
+    description: '赋值或转换变量',
     icon: 'Hash',
     category: 'data',
     handles: { input: true, output: true },
-    available: false,
+    available: true,
   },
 };
 
@@ -149,7 +149,27 @@ export function getNodeConfigSummary(nodeType: string, config?: Record<string, u
       return String(config.tagMode === 'manual_only' ? '仅手选标签' : '合并标签');
     case 'end':
       return `${Object.keys((config.outputs as object) || {}).length} 个输出`;
+    case 'input': {
+      const vars = (config.variables as Array<{ name: string }>) || [];
+      return vars.length > 0 ? `${vars.length} 个输入参数` : '未配置参数';
+    }
+    case 'fileUpload': {
+      const files = (config.uploadedFiles as Array<unknown>) || [];
+      return files.length > 0 ? `${files.length} 个文件` : '未上传文件';
+    }
+    case 'knowledge':
+      return String(config.datasetId || '未选择数据集');
+    case 'code':
+      return String(config.language || 'javascript');
+    case 'http':
+      return String(config.url || '未配置 URL');
+    case 'condition':
+      return String(config.expression || '未配置条件');
+    case 'loop':
+      return String(config.loopVariable || '未配置循环变量');
+    case 'variable':
+      return String(config.variableName || '未配置变量名');
     default:
-      return '计划中';
+      return '';
   }
 }

@@ -1,5 +1,4 @@
 import type { Node } from '@xyflow/react';
-import { NODE_CONFIGS } from './nodeConfig';
 
 export interface ValidationError {
   nodeId: string;
@@ -15,9 +14,6 @@ interface NodeData {
 
 function validateNodeData(nodeId: string, data: NodeData): ValidationError | null {
   const config = data.config || {};
-  const unavailable = NODE_CONFIGS[data.nodeType]?.available === false;
-  if (unavailable)
-    return { nodeId, nodeLabel: data.label, nodeType: data.nodeType, message: '该节点尚未开放' };
   switch (data.nodeType) {
     case 'start':
       if (!Object.keys((config.inputs as object) || {}).length)
@@ -70,6 +66,73 @@ function validateNodeData(nodeId: string, data: NodeData): ValidationError | nul
           nodeType: data.nodeType,
           message: '请设置最终输出',
         };
+      break;
+    case 'variable':
+      if (!config.variableName || !config.valueExpression)
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请填写变量名和值表达式',
+        };
+      break;
+    case 'condition':
+      if (!config.expression)
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请填写条件表达式',
+        };
+      break;
+    case 'http':
+      if (!config.url)
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请填写请求 URL',
+        };
+      break;
+    case 'code':
+      if (!config.code)
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请填写代码',
+        };
+      break;
+    case 'knowledge':
+      if (!config.datasetId)
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请填写数据集 ID',
+        };
+      break;
+    case 'loop':
+      if (!config.loopVariable)
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请填写循环变量',
+        };
+      break;
+    case 'input': {
+      const vars = (config.variables as Array<{ name: string }>) || [];
+      if (vars.length === 0 || vars.some((v) => !v.name))
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请至少添加一个命名的输入参数',
+        };
+      break;
+    }
+    case 'fileUpload':
       break;
   }
   return null;
