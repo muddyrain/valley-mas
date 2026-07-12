@@ -468,7 +468,7 @@ export default function WorkflowEditorPage() {
     try {
       const graph = graphToJSON();
       if (workflowId) {
-        await updateWorkflow(workflowId, { graph });
+        await updateWorkflow(workflowId, { name: workflowName, graph });
         toast.success('工作流已保存');
       } else {
         const result = await createWorkflow({ name: workflowName, graph, status: 'draft' });
