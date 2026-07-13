@@ -1,6 +1,6 @@
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { login, sendEmailCode } from '@/api/auth';
 import AuthSplitLayout from '@/components/AuthSplitLayout';
@@ -15,6 +15,10 @@ export default function Login() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
   const setMode = useThemeStore((state) => state.setMode);
+  const [searchParams] = useSearchParams();
+  const redirectPath = searchParams.get('redirect') || '/';
+  const safeRedirectPath =
+    redirectPath && redirectPath.startsWith('/') && redirectPath !== '/login' ? redirectPath : '/';
 
   useEffect(() => {
     setMode('light');
@@ -101,7 +105,7 @@ export default function Login() {
       const { token, userInfo } = await login(payload);
       setAuth(userInfo, token);
       toast.success('登录成功！');
-      navigate('/');
+      navigate(safeRedirectPath, { replace: true });
     } catch (error) {
       console.error('登录失败:', error);
     } finally {
