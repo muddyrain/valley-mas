@@ -138,6 +138,12 @@ func safeEventInput(nodeType NodeType, values map[string]any) map[string]any {
 	switch nodeType {
 	case NodeTypeBlogParse:
 		return safePreviewFields(values, "fileInput")
+	case NodeTypeVariable:
+		return safePreviewFields(values, "variableName", "valueExpression")
+	case NodeTypeHTTP:
+		return safePreviewFields(values, "method", "url", "body")
+	case NodeTypeCode:
+		return safePreviewFields(values, "language", "inputVars", "outputVars")
 	case NodeTypeLLMText:
 		return safePreviewFields(values, "modelProfile", "temperature", "maxOutputTokens")
 	case NodeTypeBlogCreateDraft:
@@ -178,6 +184,15 @@ func safeEventOutput(nodeType NodeType, values map[string]any) map[string]any {
 			preview["textLength"] = len([]rune(text))
 		}
 		return preview
+	case NodeTypeHTTP:
+		preview := safePreviewFields(values, "status", "statusCode", "url", "contentType")
+		if body, ok := values["body"].(string); ok {
+			preview["body"] = truncatePreviewText(body)
+			preview["bodyLength"] = len([]rune(body))
+		}
+		return preview
+	case NodeTypeVariable, NodeTypeCode:
+		return safePreviewFields(values)
 	case NodeTypeBlogCreateDraft, NodeTypeEnd:
 		return safePreviewFields(values, "postId", "title", "editPath", "tagIds")
 	default:

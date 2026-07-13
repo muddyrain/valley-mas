@@ -23,6 +23,9 @@ const (
 	NodeTypeBlogParse       NodeType = "blog.parseMarkdown"
 	NodeTypeLLMText         NodeType = "llm.text"
 	NodeTypeBlogCreateDraft NodeType = "blog.createDraft"
+	NodeTypeVariable        NodeType = "variable"
+	NodeTypeHTTP            NodeType = "http"
+	NodeTypeCode            NodeType = "code"
 	NodeTypeEnd             NodeType = "end"
 )
 

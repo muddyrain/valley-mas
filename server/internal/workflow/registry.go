@@ -24,6 +24,9 @@ func DefaultRegistry() *Registry {
 		NodeDefinition{Type: NodeTypeBlogParse, InputPorts: ports("input"), OutputPorts: ports("output"), OutputFields: outputFields(field("title", ValueTypeString), field("content", ValueTypeString), field("frontMatter", ValueTypeObject), field("excerpt", ValueTypeString), field("cover", ValueTypeObject), field("tagNames", ValueTypeStringList))},
 		NodeDefinition{Type: NodeTypeLLMText, InputPorts: ports("input"), OutputPorts: ports("output"), OutputFields: outputFields(field("text", ValueTypeString), field("model", ValueTypeString), field("tokenUsage", ValueTypeNumber))},
 		NodeDefinition{Type: NodeTypeBlogCreateDraft, InputPorts: ports("input"), OutputPorts: ports("output"), OutputFields: outputFields(field("postId", ValueTypeString), field("title", ValueTypeString), field("editPath", ValueTypeString), field("tagIds", ValueTypeStringList))},
+		NodeDefinition{Type: NodeTypeVariable, InputPorts: ports("input"), OutputPorts: ports("output"), OutputFields: outputFields()},
+		NodeDefinition{Type: NodeTypeHTTP, InputPorts: ports("input"), OutputPorts: ports("output"), OutputFields: outputFields(field("status", ValueTypeString), field("statusCode", ValueTypeNumber), field("headers", ValueTypeObject), field("body", ValueTypeString), field("contentType", ValueTypeString), field("url", ValueTypeString))},
+		NodeDefinition{Type: NodeTypeCode, InputPorts: ports("input"), OutputPorts: ports("output"), OutputFields: outputFields()},
 		NodeDefinition{Type: NodeTypeEnd, InputPorts: ports("input"), OutputFields: outputFields()},
 	)
 	// Start and end are runtime primitives. All business executors are added by
@@ -40,6 +43,20 @@ func RegisterBlogWorkflowExecutors(registry *Registry, generator TextGenerator) 
 		BlogParseExecutor{},
 		LLMTextExecutor{Generator: generator},
 		BlogCreateDraftExecutor{},
+	} {
+		if err := registry.RegisterExecutor(executor); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RegisterCoreWorkflowExecutors enables runtime execution for non-blog utility nodes.
+func RegisterCoreWorkflowExecutors(registry *Registry) error {
+	for _, executor := range []NodeExecutor{
+		VariableExecutor{},
+		HTTPExecutor{},
+		CodeExecutor{},
 	} {
 		if err := registry.RegisterExecutor(executor); err != nil {
 			return err

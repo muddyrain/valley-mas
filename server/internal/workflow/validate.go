@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -46,6 +47,30 @@ type createDraftConfig struct {
 
 type endConfig struct {
 	Outputs map[string]string `json:"outputs"`
+}
+
+type variableConfig struct {
+	VariableName    string `json:"variableName"`
+	ValueExpression string `json:"valueExpression"`
+}
+
+type httpHeaderConfig struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type httpNodeConfig struct {
+	Method  string            `json:"method"`
+	URL     string            `json:"url"`
+	Headers []httpHeaderConfig `json:"headers"`
+	Body    any               `json:"body"`
+}
+
+type codeNodeConfig struct {
+	Language   string   `json:"language"`
+	Code       string   `json:"code"`
+	InputVars  []string `json:"inputVars"`
+	OutputVars []string `json:"outputVars"`
 }
 
 // ValidateGraph returns every detected graph contract violation so callers can
@@ -286,6 +311,120 @@ func validateNodeConfig(node Node, startInputs map[string]inputDefinition, nodes
 			}
 		}
 		return errs
+	case NodeTypeVariable:
+		var config variableConfig
+		if err := json.Unmarshal(node.Config, &config); err != nil {
+			return []string{fmt.Sprintf("节点 %s 配置无效", node.ID)}
+		}
+		errs := strictConfigErrors(node, &config)
+		config.VariableName = strings.TrimSpace(config.VariableName)
+		if config.VariableName == "" {
+			errs = append(errs, "variable 节点变量名不能为空")
+		} else if !variableOutputNamePattern.MatchString(config.VariableName) {
+			errs = append(errs, "variable 节点变量名仅支持字母数字下划线，并且不能以数字开头")
+		}
+		if strings.TrimSpace(config.ValueExpression) == "" {
+			errs = append(errs, "variable 节点值表达式不能为空")
+		}
+		return errs
+	case NodeTypeHTTP:
+		var config httpNodeConfig
+		if err := json.Unmarshal(node.Config, &config); err != nil {
+			return []string{fmt.Sprintf("节点 %s 配置无效", node.ID)}
+		}
+		errs := strictConfigErrors(node, &config)
+		method := strings.ToUpper(strings.TrimSpace(config.Method))
+		if method == "" {
+			method = "GET"
+		}
+		if !isSupportedHTTPMethod(method) {
+			errs = append(errs, "http 节点仅支持 GET/POST/PUT/PATCH/DELETE/HEAD")
+		}
+		config.URL = strings.TrimSpace(config.URL)
+		if config.URL == "" {
+			errs = append(errs, "http 节点 URL 不能为空")
+		} else {
+			parsedURL, parseErr := url.Parse(config.URL)
+			if parseErr != nil || parsedURL.Host == "" {
+				errs = append(errs, "http 节点 URL 格式无效")
+			} else {
+				if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+					errs = append(errs, "http 节点仅支持 http/https")
+				}
+				if !isPublicHTTPHost(parsedURL.Hostname()) {
+					errs = append(errs, "http 节点不允许访问本机或内网地址")
+				}
+			}
+		}
+		if method == "GET" || method == "HEAD" {
+			if hasNonEmptyHTTPBody(config.Body) {
+				errs = append(errs, "GET/HEAD 请求不能携带请求体")
+			}
+		}
+		for index, header := range config.Headers {
+			headerKey := strings.TrimSpace(header.Key)
+			if headerKey == "" {
+				continue
+			}
+			if strings.ContainsAny(headerKey, "\r\n") {
+				errs = append(errs, fmt.Sprintf("http headers 第 %d 项非法", index+1))
+			}
+			if strings.TrimSpace(header.Value) == "" {
+				errs = append(errs, fmt.Sprintf("http headers 第 %d 项 value 不能为空", index+1))
+			}
+		}
+		return errs
+	case NodeTypeCode:
+		var config codeNodeConfig
+		if err := json.Unmarshal(node.Config, &config); err != nil {
+			return []string{fmt.Sprintf("节点 %s 配置无效", node.ID)}
+		}
+		errs := strictConfigErrors(node, &config)
+		config.Language = strings.TrimSpace(config.Language)
+		if config.Language == "" {
+			config.Language = "javascript"
+		}
+		if config.Code = strings.TrimSpace(config.Code); config.Code == "" {
+			errs = append(errs, "代码节点代码不能为空")
+		}
+		if config.Language != "javascript" && config.Language != "python" {
+			errs = append(errs, "代码节点仅支持 javascript 或 python")
+		}
+		inputVarSet := make(map[string]struct{})
+		for index, name := range config.InputVars {
+			name = strings.TrimSpace(name)
+			if name == "" {
+				errs = append(errs, fmt.Sprintf("code.inputVars 第 %d 项不能为空", index+1))
+				continue
+			}
+			if !variableOutputNamePattern.MatchString(name) {
+				errs = append(errs, fmt.Sprintf("code.inputVars 第 %d 项不是合法变量名", index+1))
+				continue
+			}
+			if _, exists := inputVarSet[name]; exists {
+				errs = append(errs, fmt.Sprintf("code.inputVars 第 %d 项重复", index+1))
+				continue
+			}
+			inputVarSet[name] = struct{}{}
+		}
+		outputVarSet := make(map[string]struct{})
+		for index, name := range config.OutputVars {
+			name = strings.TrimSpace(name)
+			if name == "" {
+				errs = append(errs, fmt.Sprintf("code.outputVars 第 %d 项不能为空", index+1))
+				continue
+			}
+			if !variableOutputNamePattern.MatchString(name) {
+				errs = append(errs, fmt.Sprintf("code.outputVars 第 %d 项不是合法变量名", index+1))
+				continue
+			}
+			if _, exists := outputVarSet[name]; exists {
+				errs = append(errs, fmt.Sprintf("code.outputVars 第 %d 项重复", index+1))
+				continue
+			}
+			outputVarSet[name] = struct{}{}
+		}
+		return errs
 	}
 	return nil
 }
@@ -315,6 +454,28 @@ func outputFieldType(registry *Registry, node Node, field string, startInputs ma
 	if node.Type == NodeTypeStart {
 		input, exists := startInputs[field]
 		return input.Type, exists
+	}
+	if node.Type == NodeTypeVariable {
+		var config variableConfig
+		if err := json.Unmarshal(node.Config, &config); err != nil {
+			return "", false
+		}
+		if strings.TrimSpace(config.VariableName) == "" {
+			return "", false
+		}
+		return ValueTypeString, strings.TrimSpace(config.VariableName) == strings.TrimSpace(field)
+	}
+	if node.Type == NodeTypeCode {
+		var config codeNodeConfig
+		if err := json.Unmarshal(node.Config, &config); err != nil {
+			return "", false
+		}
+		for _, name := range config.OutputVars {
+			if strings.TrimSpace(name) == field {
+				return ValueTypeString, true
+			}
+		}
+		return "", false
 	}
 	return registry.OutputFieldType(node.Type, field)
 }
@@ -357,6 +518,19 @@ func strictDecode(raw json.RawMessage, config any) error {
 	}
 	return nil
 }
+
+func hasNonEmptyHTTPBody(value any) bool {
+	switch typed := value.(type) {
+	case nil:
+		return false
+	case string:
+		return strings.TrimSpace(typed) != ""
+	default:
+		return true
+	}
+}
+
+var variableOutputNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func startInputName(value string) (string, bool) {
 	value = strings.TrimSpace(value)
