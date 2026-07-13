@@ -1,0 +1,23 @@
+apps/web/src/App.tsx
+  s_1aa39d9351e28d::t_4dc07617b7c69b 1,42
+apps/web/src/layouts/Sidebar.tsx
+  s_1aa39d9351e28d::t_55b5d561696dd1 112,128-157,218-226
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "2e068927d8a75853d18ef9084f75707789d86dee",
+  "prompts": {},
+  "sessions": {
+    "s_1aa39d9351e28d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f596a-7bf4-7e42-8a64-ad7c8dd99cb8",
+        "model": "unknown"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
