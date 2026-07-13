@@ -86,15 +86,6 @@ function validateNodeData(nodeId: string, data: NodeData): ValidationError | nul
           message: '请填写变量名和值表达式',
         };
       break;
-    case 'condition':
-      if (!config.expression)
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请填写条件表达式',
-        };
-      break;
     case 'http':
       if (!config.url)
         return {
@@ -105,14 +96,26 @@ function validateNodeData(nodeId: string, data: NodeData): ValidationError | nul
         };
       break;
     case 'code':
-      if (!config.code)
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请填写代码',
-        };
-      break;
+      return {
+        nodeId,
+        nodeLabel: data.label,
+        nodeType: data.nodeType,
+        message: '代码执行节点当前未开放',
+      };
+    case 'condition':
+      return {
+        nodeId,
+        nodeLabel: data.label,
+        nodeType: data.nodeType,
+        message: '条件分支节点当前未开放',
+      };
+    case 'loop':
+      return {
+        nodeId,
+        nodeLabel: data.label,
+        nodeType: data.nodeType,
+        message: '循环节点当前未开放',
+      };
     case 'knowledge':
       if (!config.datasetId)
         return {
@@ -120,15 +123,6 @@ function validateNodeData(nodeId: string, data: NodeData): ValidationError | nul
           nodeLabel: data.label,
           nodeType: data.nodeType,
           message: '请填写数据集 ID',
-        };
-      break;
-    case 'loop':
-      if (!config.loopVariable)
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请填写循环变量',
         };
       break;
     case 'input': {

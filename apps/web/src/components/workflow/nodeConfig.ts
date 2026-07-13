@@ -78,11 +78,11 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
   code: {
     type: 'code',
     label: '代码执行',
-    description: '执行 JavaScript 代码处理输入',
+    description: '执行 JavaScript 代码处理输入（当前未对外开放）',
     icon: 'Code',
     category: 'action',
     handles: { input: true, output: true },
-    available: true,
+    available: false,
   },
   http: {
     type: 'http',
@@ -96,20 +96,20 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
   condition: {
     type: 'condition',
     label: '条件分支',
-    description: '根据条件分支到不同路径',
+    description: '根据条件分支到不同路径（当前未对外开放）',
     icon: 'GitBranch',
     category: 'control',
     handles: { input: true, outputs: 2 },
-    available: true,
+    available: false,
   },
   loop: {
     type: 'loop',
     label: '循环',
-    description: '遍历数组对每项执行子流程',
+    description: '遍历数组对每项执行子流程（当前未对外开放）',
     icon: 'Repeat',
     category: 'control',
     handles: { input: true, output: true },
-    available: true,
+    available: false,
   },
   variable: {
     type: 'variable',
@@ -160,7 +160,7 @@ export function getNodeConfigSummary(nodeType: string, config?: Record<string, u
     case 'knowledge':
       return String(config.datasetId || '未选择数据集');
     case 'code':
-      return String(config.language || 'javascript');
+      return '暂未开放';
     case 'http':
       return String(config.url || '未配置 URL');
     case 'condition':
