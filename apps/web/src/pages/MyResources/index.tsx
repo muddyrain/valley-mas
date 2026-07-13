@@ -345,7 +345,7 @@ export default function MyResources() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => navigate('/my-space/albums')}
+                  onClick={() => navigate('/my-space/resources')}
                   className="text-[11px] text-primary hover:underline"
                 >
                   管理
@@ -486,7 +486,9 @@ export default function MyResources() {
                       }
                       actionLabel={activeAlbum ? '管理专辑' : '立即上传'}
                       onAction={
-                        activeAlbum ? () => navigate('/my-space/albums') : () => setUploadOpen(true)
+                        activeAlbum
+                          ? () => navigate('/my-space/resources')
+                          : () => setUploadOpen(true)
                       }
                     />
                   </div>

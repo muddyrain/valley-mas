@@ -29,12 +29,25 @@ import Resources from './pages/Resources';
 import ScratchLegendLab from './pages/ScratchLegendLab';
 import Workbench from './pages/Workbench';
 import WorkflowEditor from './pages/WorkflowEditor';
+import { useAuthStore } from './stores/useAuthStore';
 
 function WorkflowEditorWithKey() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
   return <WorkflowEditor key={`${location.pathname}-${id ?? 'none'}`} />;
+}
+
+function RequireAuth({ children }: { children: JSX.Element }) {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    const redirectPath = `${location.pathname}${location.search}`;
+    return <Navigate to={`/login?redirect=${encodeURIComponent(redirectPath)}`} replace />;
+  }
+
+  return children;
 }
 
 function RouteTitle() {
@@ -126,9 +139,30 @@ function App() {
       <Routes>
         <Route path="/" element={<WorkbenchLayout />}>
           <Route index element={<Home />} />
-          <Route path="workbench" element={<Workbench />} />
-          <Route path="workbench/create" element={<WorkflowEditorWithKey />} />
-          <Route path="workbench/edit" element={<WorkflowEditorWithKey />} />
+          <Route
+            path="workbench"
+            element={
+              <RequireAuth>
+                <Workbench />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="workbench/create"
+            element={
+              <RequireAuth>
+                <WorkflowEditorWithKey />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="workbench/edit"
+            element={
+              <RequireAuth>
+                <WorkflowEditorWithKey />
+              </RequireAuth>
+            }
+          />
           <Route path="resources" element={<Resources />} />
           <Route path="resource/:id" element={<ResourceDetail />} />
           <Route path="my-space" element={<MySpace />} />
@@ -139,6 +173,10 @@ function App() {
           <Route path="my-space/blog-groups" element={<BlogGroupManage />} />
           <Route path="my-space/resources" element={<MyResources />} />
           <Route path="my-space/posts" element={<MyPosts />} />
+          <Route path="my-space/blogs" element={<Navigate to="/my-space/posts" replace />} />
+          <Route path="my-space/comments" element={<Navigate to="/my-space/posts" replace />} />
+          <Route path="my-space/followers" element={<Navigate to="/follows" replace />} />
+          <Route path="my-space/albums" element={<Navigate to="/my-space/resources" replace />} />
           <Route path="profile" element={<Profile />} />
           <Route path="favorites" element={<Favorites />} />
           <Route path="follows" element={<Follows />} />
@@ -153,6 +191,7 @@ function App() {
           <Route path="blog/:id" element={<BlogPost />} />
           <Route path="*" element={<NotFound />} />
         </Route>
+        <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
       </Routes>

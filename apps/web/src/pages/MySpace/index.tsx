@@ -22,7 +22,7 @@ const quickActions = [
     icon: BookOpen,
     title: '博客管理',
     description: '管理和发布博客文章',
-    href: '/my-space/blogs',
+    href: '/my-space/posts',
     color: 'primary',
   },
   {
@@ -36,7 +36,7 @@ const quickActions = [
     icon: MessageSquare,
     title: '评论管理',
     description: '查看和回复评论',
-    href: '/my-space/comments',
+    href: '/my-space/posts',
     color: 'accent',
   },
 ];
@@ -61,7 +61,7 @@ export default function MySpace() {
       icon: BookOpen,
       label: '博客',
       value: stats?.blogCount ?? 0,
-      href: '/my-space/blogs',
+      href: '/my-space/posts',
     },
     {
       icon: ImageIcon,
@@ -73,7 +73,7 @@ export default function MySpace() {
       icon: Users,
       label: '关注者',
       value: stats?.followerCount ?? 0,
-      href: '/my-space/followers',
+      href: '/follows',
     },
   ];
 
