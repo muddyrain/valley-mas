@@ -20,7 +20,7 @@ import {
   ENABLED_TEMPLATE_COUNT,
   TOTAL_TEMPLATE_COUNT,
   WORKFLOW_TEMPLATE_DEFS,
-} from './workflowTemplates';
+} from '../workflowTemplates';
 
 const TAG_COLORS: Record<string, string> = {
   AI: 'bg-purple-100 text-purple-700 hover:bg-purple-100',

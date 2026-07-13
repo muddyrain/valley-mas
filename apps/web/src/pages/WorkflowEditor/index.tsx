@@ -53,7 +53,7 @@ import { useWorkflowHistory } from '@/components/workflow/useWorkflowHistory';
 import { validateWorkflowConfig } from '@/components/workflow/validateWorkflowConfig';
 import { WorkflowNode } from '@/components/workflow/WorkflowNode';
 import { WorkflowRuntimeProvider } from '@/components/workflow/WorkflowRuntimeContext';
-import { getWorkflowTemplate, isTemplateSupported } from './workflowTemplates';
+import { getWorkflowTemplate, isTemplateSupported } from '../workflowTemplates';
 
 const defaultEdgeOptions = {
   type: 'smoothstep',

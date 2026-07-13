@@ -24,14 +24,6 @@ function validateNodeData(nodeId: string, data: NodeData): ValidationError | nul
       message: '未识别的节点类型',
     };
   }
-  if (nodeConfig.available === false) {
-    return {
-      nodeId,
-      nodeLabel: data.label,
-      nodeType: data.nodeType,
-      message: `${nodeConfig.label} 当前仅为计划中节点，暂不可运行`,
-    };
-  }
   switch (data.nodeType) {
     case 'start':
       if (!Object.keys((config.inputs as object) || {}).length)
@@ -151,6 +143,14 @@ function validateNodeData(nodeId: string, data: NodeData): ValidationError | nul
       break;
     }
     case 'fileUpload':
+      if (!Array.isArray(config.uploadedFiles) || config.uploadedFiles.length === 0) {
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请上传至少一个文件',
+        };
+      }
       break;
   }
   return null;
