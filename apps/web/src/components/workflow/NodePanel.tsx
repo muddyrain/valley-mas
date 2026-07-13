@@ -93,7 +93,6 @@ export function NodePanel({ onDragStart, onAddNode }: NodePanelProps) {
     return Object.values(NODE_CONFIGS).filter(
       (node) =>
         !node.fixed &&
-        node.available !== false &&
         (node.label.toLowerCase().includes(keyword) ||
           node.description.toLowerCase().includes(keyword)),
     );

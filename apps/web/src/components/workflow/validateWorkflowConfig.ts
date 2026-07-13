@@ -1,4 +1,5 @@
 import type { Node } from '@xyflow/react';
+import { NODE_CONFIGS } from './nodeConfig';
 
 export interface ValidationError {
   nodeId: string;
@@ -14,6 +15,23 @@ interface NodeData {
 
 function validateNodeData(nodeId: string, data: NodeData): ValidationError | null {
   const config = data.config || {};
+  const nodeConfig = NODE_CONFIGS[data.nodeType];
+  if (!nodeConfig) {
+    return {
+      nodeId,
+      nodeLabel: data.label,
+      nodeType: data.nodeType,
+      message: '未识别的节点类型',
+    };
+  }
+  if (nodeConfig.available === false) {
+    return {
+      nodeId,
+      nodeLabel: data.label,
+      nodeType: data.nodeType,
+      message: `${nodeConfig.label} 当前仅为计划中节点，暂不可运行`,
+    };
+  }
   switch (data.nodeType) {
     case 'start':
       if (!Object.keys((config.inputs as object) || {}).length)

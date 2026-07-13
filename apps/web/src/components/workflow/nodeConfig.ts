@@ -55,7 +55,7 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     icon: 'Keyboard',
     category: 'data',
     handles: { input: true, output: true },
-    available: true,
+    available: false,
   },
   fileUpload: {
     type: 'fileUpload',
@@ -64,7 +64,7 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     icon: 'Upload',
     category: 'data',
     handles: { input: true, output: true },
-    available: true,
+    available: false,
   },
   knowledge: {
     type: 'knowledge',
@@ -73,7 +73,7 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     icon: 'Database',
     category: 'ai',
     handles: { input: true, output: true },
-    available: true,
+    available: false,
   },
   code: {
     type: 'code',
@@ -82,7 +82,7 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     icon: 'Code',
     category: 'action',
     handles: { input: true, output: true },
-    available: true,
+    available: false,
   },
   http: {
     type: 'http',
@@ -91,7 +91,7 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     icon: 'Globe',
     category: 'action',
     handles: { input: true, output: true },
-    available: true,
+    available: false,
   },
   condition: {
     type: 'condition',
@@ -100,7 +100,7 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     icon: 'GitBranch',
     category: 'control',
     handles: { input: true, outputs: 2 },
-    available: true,
+    available: false,
   },
   loop: {
     type: 'loop',
@@ -109,7 +109,7 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     icon: 'Repeat',
     category: 'control',
     handles: { input: true, output: true },
-    available: true,
+    available: false,
   },
   variable: {
     type: 'variable',
@@ -118,7 +118,7 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     icon: 'Hash',
     category: 'data',
     handles: { input: true, output: true },
-    available: true,
+    available: false,
   },
 };
 

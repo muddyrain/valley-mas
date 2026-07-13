@@ -23,6 +23,7 @@ import {
   XCircle,
   Zap,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -87,11 +88,19 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
   const nodeConfig = NODE_CONFIGS[nodeType];
   const Icon = iconMap[nodeConfig?.icon] || MessageSquare;
   const colors = NODE_COLORS[nodeType] || NODE_COLORS.start;
-  const summary = getNodeConfigSummary(nodeType, config);
+  const isRunnable = Boolean(nodeConfig) && nodeConfig.available !== false;
+  const summary = isRunnable
+    ? getNodeConfigSummary(nodeType, config)
+    : nodeConfig
+      ? '当前为计划中节点'
+      : '未识别的节点类型';
   const hasInput = nodeConfig?.handles?.input;
   const hasOutput = nodeConfig?.handles?.output;
   const multiOutputs = nodeConfig?.handles?.outputs;
-  const isConfigIncomplete = Boolean(validateSingleNode({ label, nodeType, config }));
+  const isConfigIncomplete = isRunnable
+    ? Boolean(validateSingleNode({ label, nodeType, config }))
+    : false;
+  const isPlanNode = !nodeConfig || nodeConfig.available === false;
   const isFixed = nodeConfig?.fixed;
 
   return (
@@ -107,6 +116,8 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
         className={cn(
           'group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200',
           selected && 'ring-2 ring-blue-500 ring-offset-2 ring-offset-white shadow-md',
+          !isRunnable &&
+            'border-amber-300 bg-amber-50/40 hover:border-amber-400 hover:bg-amber-50/60',
           isConfigIncomplete &&
             !runningState &&
             'border-orange-300 ring-2 ring-orange-200 ring-offset-2',
@@ -124,6 +135,11 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
             <Tooltip>
               <TooltipTrigger render={<div className="flex items-center gap-2" />}>
                 <span className="truncate text-sm font-medium text-gray-800">{label}</span>
+                {isPlanNode && (
+                  <Badge variant="outline" className="border-amber-300 text-amber-700">
+                    计划中
+                  </Badge>
+                )}
                 {isConfigIncomplete && (
                   <AlertCircle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
                 )}
