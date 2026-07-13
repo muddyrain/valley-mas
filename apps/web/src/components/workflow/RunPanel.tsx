@@ -1,5 +1,5 @@
 import type { Node } from '@xyflow/react';
-import { CheckCircle2, FileText, Loader2, Play, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FileText, Loader2, Play, X } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -121,6 +121,14 @@ export function RunPanel({
   if (!open) return null;
   const finalOutput = session.finalOutput;
   const activeNode = nodes.find((node) => session.nodes[node.id]?.status === 'running');
+  const failedNode = session.failedNodeId
+    ? nodes.find((node) => node.id === session.failedNodeId)
+    : null;
+  const failureMessage = runError || session.error || null;
+  const failedNodeLabel =
+    failedNode && typeof failedNode.data?.label === 'string'
+      ? failedNode.data.label
+      : session.failedNodeId;
   const selectedTagIds = (values.tagIds as string[]) || [];
   const selectedGroup = groups.find((group) => group.id === values.groupId);
 
@@ -250,9 +258,19 @@ export function RunPanel({
               </span>
             </section>
           )}
-          {runError && (
+          {failureMessage && (
             <section className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              {runError}
+              <p className="mb-1 flex items-center gap-2 font-medium">
+                <AlertCircle className="h-4 w-4" />
+                运行失败
+              </p>
+              {failedNodeLabel && (
+                <p className="text-xs text-destructive/90">失败节点：{failedNodeLabel}</p>
+              )}
+              <p className="text-xs text-destructive/90">{failureMessage}</p>
+              {session.failedNodeCode && (
+                <p className="mt-1 text-xs text-destructive/90">错误码：{session.failedNodeCode}</p>
+              )}
             </section>
           )}
           {finalOutput && (

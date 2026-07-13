@@ -78,6 +78,11 @@ export function NodeRunInspector({ snapshot }: { snapshot: NodeRunSnapshot }) {
             <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
               {snapshot.error}
             </p>
+            {snapshot.errorCode && (
+              <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+                错误码：{snapshot.errorCode}
+              </p>
+            )}
           </section>
         )}
       </div>

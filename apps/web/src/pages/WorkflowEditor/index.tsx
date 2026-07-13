@@ -53,6 +53,7 @@ import { useWorkflowHistory } from '@/components/workflow/useWorkflowHistory';
 import { validateWorkflowConfig } from '@/components/workflow/validateWorkflowConfig';
 import { WorkflowNode } from '@/components/workflow/WorkflowNode';
 import { WorkflowRuntimeProvider } from '@/components/workflow/WorkflowRuntimeContext';
+import { getWorkflowTemplate, isTemplateSupported } from './workflowTemplates';
 
 const defaultEdgeOptions = {
   type: 'smoothstep',
@@ -226,10 +227,24 @@ export default function WorkflowEditorPage() {
     setEdges,
   );
 
+  const applyBlankWorkflow = useCallback(() => {
+    setNodes([
+      {
+        id: 'start',
+        type: 'start',
+        position: { x: 200, y: 250 },
+        data: { label: '开始', nodeType: 'start', config: { inputs: {} } },
+      },
+    ] as Node[]);
+    setEdges([]);
+  }, []);
+
   // 从 URL 获取工作流 ID 或模板
   useEffect(() => {
     const id = searchParams.get('id');
     const template = searchParams.get('template');
+    const templateConfig = getWorkflowTemplate(template || '');
+    const isSupportedTemplate = templateConfig ? isTemplateSupported(templateConfig.id) : false;
 
     if (id) {
       getWorkflow(id)
@@ -263,23 +278,21 @@ export default function WorkflowEditorPage() {
         .catch(() => {
           toast.error('加载工作流失败');
         });
-    } else if (template === 'blog-import') {
+    } else if (templateConfig?.id === 'blog-import') {
       setNodes(blogImportTemplate.nodes as Node[]);
       setEdges(blogImportTemplate.edges as Edge[]);
       clearHistory();
+    } else if (template) {
+      if (!isSupportedTemplate) {
+        toast.info(`模板「${template}」尚未对外开放`);
+      }
+      applyBlankWorkflow();
+      clearHistory();
     } else {
-      setNodes([
-        {
-          id: 'start',
-          type: 'start',
-          position: { x: 200, y: 250 },
-          data: { label: '开始', nodeType: 'start', config: { inputs: {} } },
-        },
-      ] as Node[]);
-      setEdges([]);
+      applyBlankWorkflow();
       clearHistory();
     }
-  }, [searchParams, clearHistory]);
+  }, [searchParams, clearHistory, applyBlankWorkflow]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -777,7 +790,9 @@ export default function WorkflowEditorPage() {
 
   const handleReset = useCallback(() => {
     const template = searchParams.get('template');
-    if (template === 'blog-import') {
+    const templateConfig = getWorkflowTemplate(template || '');
+
+    if (templateConfig?.id === 'blog-import' && templateConfig.enabled) {
       setNodes(blogImportTemplate.nodes as Node[]);
       setEdges(blogImportTemplate.edges as Edge[]);
     } else {

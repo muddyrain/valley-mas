@@ -16,6 +16,11 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import {
+  ENABLED_TEMPLATE_COUNT,
+  TOTAL_TEMPLATE_COUNT,
+  WORKFLOW_TEMPLATE_DEFS,
+} from './workflowTemplates';
 
 const TAG_COLORS: Record<string, string> = {
   AI: 'bg-purple-100 text-purple-700 hover:bg-purple-100',
@@ -27,32 +32,7 @@ const TAG_COLORS: Record<string, string> = {
   检索: 'bg-teal-100 text-teal-700 hover:bg-teal-100',
 };
 
-const templates = [
-  {
-    id: 'blog-import',
-    name: '博客导入工作流',
-    description: '上传 Markdown 文件，AI 自动解析、生成摘要、匹配封面、推荐标签，一键创建博客文章',
-    icon: FileText,
-    tags: ['AI', '博客', '自动'],
-    color: 'bg-purple-500',
-  },
-  {
-    id: 'content-generate',
-    name: '内容生成工作流',
-    description: '输入主题，AI 自动生成文章内容、配图和标签',
-    icon: Sparkles,
-    tags: ['AI', '生成', '内容'],
-    color: 'bg-blue-500',
-  },
-  {
-    id: 'knowledge-search',
-    name: '知识库检索工作流',
-    description: '从向量数据库中检索相关知识，辅助内容创作',
-    icon: Zap,
-    tags: ['AI', '知识库', '检索'],
-    color: 'bg-green-500',
-  },
-];
+const templates = WORKFLOW_TEMPLATE_DEFS;
 
 export default function Workbench() {
   const navigate = useNavigate();
@@ -135,11 +115,20 @@ export default function Workbench() {
               <CardContent className="space-y-4">
                 {templates.map((template) => {
                   const Icon = template.icon;
+                  const disabled = template.enabled === false;
+                  const onTemplateClick = disabled
+                    ? () => toast.info(`${template.name}暂未开放，先使用「博客导入工作流」`)
+                    : () => navigate(`/workbench/create?template=${template.id}`);
                   return (
                     <div
                       key={template.id}
-                      onClick={() => navigate(`/workbench/create?template=${template.id}`)}
-                      className="group flex items-start gap-4 rounded-lg border border-border bg-card p-4 hover:border-accent hover:bg-accent/50 cursor-pointer transition-colors"
+                      onClick={onTemplateClick}
+                      className={cn(
+                        'group flex items-start gap-4 rounded-lg border bg-card p-4 transition-colors',
+                        disabled
+                          ? 'border-dashed border-muted-foreground/40 text-muted-foreground cursor-not-allowed bg-muted/30'
+                          : 'border-border hover:border-accent hover:bg-accent/50 cursor-pointer',
+                      )}
                     >
                       <div
                         className={cn(
@@ -155,6 +144,9 @@ export default function Workbench() {
                           {template.name}
                         </h3>
                         <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
+                        {disabled && (
+                          <p className="text-xs mt-1 text-amber-500">该模板正在对齐中</p>
+                        )}
                         <div className="flex flex-wrap gap-2 mt-3">
                           {template.tags.map((tag) => (
                             <Badge
@@ -265,16 +257,18 @@ export default function Workbench() {
               </div>
               <div className="flex gap-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">5+</div>
-                  <div className="text-xs text-muted-foreground">预置模板</div>
+                  <div className="text-2xl font-bold text-primary">
+                    {ENABLED_TEMPLATE_COUNT} / {TOTAL_TEMPLATE_COUNT}
+                  </div>
+                  <div className="text-xs text-muted-foreground">预置模板（已开放）</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">10+</div>
-                  <div className="text-xs text-muted-foreground">节点类型</div>
+                  <div className="text-2xl font-bold text-primary">5</div>
+                  <div className="text-xs text-muted-foreground">可运行节点类型</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">3</div>
-                  <div className="text-xs text-muted-foreground">执行模式</div>
+                  <div className="text-2xl font-bold text-primary">1</div>
+                  <div className="text-xs text-muted-foreground">已开放执行模式</div>
                 </div>
               </div>
             </div>

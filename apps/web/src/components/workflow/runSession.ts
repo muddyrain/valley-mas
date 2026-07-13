@@ -7,6 +7,7 @@ export interface NodeRunSnapshot {
   input?: Record<string, unknown>;
   output?: Record<string, unknown>;
   error?: string;
+  errorCode?: string;
   durationMs?: number;
 }
 
@@ -18,12 +19,20 @@ export interface WorkflowRunSession {
   expandedNodeId: string | null;
   finalOutput: Record<string, unknown> | null;
   error: string | null;
+  failedNodeId: string | null;
+  failedNodeCode: string | null;
 }
 
 export type WorkflowRunSessionAction =
   | { type: 'begin'; generation: number }
   | { type: 'event'; generation: number; event: WorkflowRunEvent }
-  | { type: 'error'; generation: number; error: string }
+  | {
+      type: 'error';
+      generation: number;
+      error: string;
+      failedNodeId?: string;
+      failedNodeCode?: string;
+    }
   | { type: 'toggleExpanded'; nodeId: string }
   | { type: 'clearExpanded' };
 
@@ -36,6 +45,8 @@ export function createWorkflowRunSession(): WorkflowRunSession {
     expandedNodeId: null,
     finalOutput: null,
     error: null,
+    failedNodeId: null,
+    failedNodeCode: null,
   };
 }
 
@@ -62,8 +73,15 @@ export function workflowRunSessionReducer(
       return {
         ...session,
         status: 'error',
-        nodes: closeRunningNodes(session.nodes, action.error),
+        nodes: closeRunningNodes(
+          session.nodes,
+          action.error,
+          action.failedNodeId,
+          action.failedNodeCode,
+        ),
         error: action.error,
+        failedNodeId: action.failedNodeId || session.failedNodeId,
+        failedNodeCode: action.failedNodeCode || session.failedNodeCode,
       };
     case 'event':
       return applyWorkflowRunEvent(session, action.generation, action.event);
@@ -73,12 +91,22 @@ export function workflowRunSessionReducer(
 function closeRunningNodes(
   nodes: Record<string, NodeRunSnapshot>,
   error: string,
+  failedNodeId?: string,
+  failedNodeCode?: string,
 ): Record<string, NodeRunSnapshot> {
-  const errorCode = error === '运行已取消' ? 'WORKFLOW_CANCELLED' : 'WORKFLOW_RUN_INTERRUPTED';
+  const errorCode =
+    failedNodeCode || (error === '运行已取消' ? 'WORKFLOW_CANCELLED' : 'WORKFLOW_RUN_INTERRUPTED');
   return Object.fromEntries(
     Object.entries(nodes).map(([nodeId, snapshot]) => [
       nodeId,
-      snapshot.status === 'running' ? { ...snapshot, status: 'error', error: errorCode } : snapshot,
+      snapshot.status === 'running'
+        ? {
+            ...snapshot,
+            status: 'error',
+            error,
+            errorCode: nodeId === failedNodeId ? errorCode : (snapshot.errorCode ?? errorCode),
+          }
+        : snapshot,
     ]),
   );
 }
@@ -102,41 +130,61 @@ function applyWorkflowRunEvent(
         runId: nextRunID,
         status: 'success',
         finalOutput: outputFromData(data),
+        error: null,
+        failedNodeId: null,
+        failedNodeCode: null,
       };
     }
     if (event.status === 'error') {
+      const nextError = event.message || data?.error || '工作流执行失败';
       return {
         ...session,
         runId: nextRunID,
         status: 'error',
-        error: event.message || data?.error || '工作流执行失败',
+        error: nextError,
+        failedNodeId: session.failedNodeId,
+        failedNodeCode: data?.error || session.failedNodeCode,
       };
     }
     return session;
   }
 
   const current = session.nodes[event.step] || { status: 'idle' as const };
-  const snapshot = snapshotFromEvent(event.status, data, current);
+  const snapshot = snapshotFromEvent(event.status, event.message, data, current);
+  if (snapshot.status === 'error') {
+    return {
+      ...session,
+      runId: nextRunID,
+      status: 'error',
+      nodes: { ...session.nodes, [event.step]: snapshot },
+      error: snapshot.error || session.error,
+      failedNodeId: event.step,
+      failedNodeCode: data?.error || session.failedNodeCode,
+    };
+  }
+
   return {
     ...session,
     runId: nextRunID,
     status: snapshot.status === 'error' ? 'error' : session.status,
     nodes: { ...session.nodes, [event.step]: snapshot },
-    error: snapshot.status === 'error' ? snapshot.error || session.error : session.error,
   };
 }
 
 function snapshotFromEvent(
   status: WorkflowRunEvent['status'],
+  message: string | undefined,
   data: WorkflowRunEventData | undefined,
   current: NodeRunSnapshot,
 ): NodeRunSnapshot {
   const nextStatus: NodeRunStatus = status === 'done' ? current.status : status;
+  const nextError = status === 'error' ? message || data?.error || current.error : current.error;
   return {
     status: nextStatus,
     input: data?.input ?? current.input,
     output: data?.output ?? current.output,
-    error: data?.error ?? current.error,
+    error: nextError,
+    errorCode: data?.error ?? current.errorCode,
     durationMs: data?.durationMs ?? current.durationMs,
   };
 }
