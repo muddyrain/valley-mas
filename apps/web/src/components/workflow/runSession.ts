@@ -149,9 +149,10 @@ function applyWorkflowRunEvent(
     return session;
   }
 
-  const current = session.nodes[event.step] || { status: 'idle' as const };
+  const current: NodeRunSnapshot = session.nodes[event.step] || { status: 'idle' };
   const snapshot = snapshotFromEvent(event.status, event.message, data, current);
-  if (snapshot.status === 'error') {
+  const hasSnapshotError = snapshot.error != null;
+  if (hasSnapshotError) {
     return {
       ...session,
       runId: nextRunID,
@@ -166,7 +167,7 @@ function applyWorkflowRunEvent(
   return {
     ...session,
     runId: nextRunID,
-    status: snapshot.status === 'error' ? 'error' : session.status,
+    status: hasSnapshotError ? 'error' : session.status,
     nodes: { ...session.nodes, [event.step]: snapshot },
   };
 }
