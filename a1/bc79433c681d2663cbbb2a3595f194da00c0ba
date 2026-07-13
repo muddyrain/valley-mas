@@ -1,0 +1,25 @@
+apps/web/src/App.tsx
+  s_1aa39d9351e28d::t_a4c6c698e3c89f 32,41-52,142-165,176-179,194
+apps/web/src/pages/MyResources/index.tsx
+  s_1aa39d9351e28d::t_184a5d0c52d68d 348,489-491
+apps/web/src/pages/MySpace/index.tsx
+  s_1aa39d9351e28d::t_8a08868f65cfdd 25,39,64,76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "a1bc79433c681d2663cbbb2a3595f194da00c0ba",
+  "prompts": {},
+  "sessions": {
+    "s_1aa39d9351e28d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f596a-7bf4-7e42-8a64-ad7c8dd99cb8",
+        "model": "unknown"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
