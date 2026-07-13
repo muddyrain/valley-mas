@@ -109,7 +109,7 @@ export function Sidebar() {
           if (collapsed) {
             return (
               <Tooltip key={item.to}>
-                <TooltipTrigger asChild>{link}</TooltipTrigger>
+                <TooltipTrigger render={link} />
                 <TooltipContent side="right" sideOffset={8}>
                   {item.label}
                 </TooltipContent>
@@ -125,34 +125,36 @@ export function Sidebar() {
       <div className="border-t border-border p-2">
         {isAuthenticated ? (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              {collapsed ? (
-                <button
-                  type="button"
-                  className="flex h-10 w-10 items-center justify-center rounded-lg transition-colors hover:bg-muted"
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user?.avatar} alt={userName} />
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {userAvatarFallback}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-muted"
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user?.avatar} alt={userName} />
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {userAvatarFallback}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="truncate text-foreground">{userName}</span>
-                </button>
-              )}
-            </DropdownMenuTrigger>
+            <DropdownMenuTrigger
+              render={
+                collapsed ? (
+                  <button
+                    type="button"
+                    className="flex h-10 w-10 items-center justify-center rounded-lg transition-colors hover:bg-muted"
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user?.avatar} alt={userName} />
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {userAvatarFallback}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-muted"
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user?.avatar} alt={userName} />
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {userAvatarFallback}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate text-foreground">{userName}</span>
+                  </button>
+                )
+              }
+            ></DropdownMenuTrigger>
             <DropdownMenuContent
               align={collapsed ? 'end' : 'start'}
               side={collapsed ? 'right' : 'top'}
@@ -213,13 +215,15 @@ export function Sidebar() {
           </DropdownMenu>
         ) : collapsed ? (
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Link to="/login">
-                <Button size="icon" variant="outline" className="h-10 w-10 rounded-lg">
-                  <LogIn className="h-4 w-4" />
-                </Button>
-              </Link>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Link to="/login">
+                  <Button size="icon" variant="outline" className="h-10 w-10 rounded-lg">
+                    <LogIn className="h-4 w-4" />
+                  </Button>
+                </Link>
+              }
+            ></TooltipTrigger>
             <TooltipContent side="right">登录 / 注册</TooltipContent>
           </Tooltip>
         ) : (

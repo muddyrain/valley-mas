@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import { GlobalScrollButton } from '@/components/GlobalScrollButton';
@@ -38,7 +39,7 @@ function WorkflowEditorWithKey() {
   return <WorkflowEditor key={`${location.pathname}-${id ?? 'none'}`} />;
 }
 
-function RequireAuth({ children }: { children: JSX.Element }) {
+function RequireAuth({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const location = useLocation();
 
