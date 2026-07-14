@@ -1,0 +1,23 @@
+server/migrations/050_create_ai_knowledge_chunks.sql
+  s_2c5d43632bbaeb::t_e340806d04836d 8
+server/migrations/050_create_ai_knowledge_chunks_test.go
+  s_2c5d43632bbaeb::t_02e791a2812fb1 1-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "92f2a7df9a4fd0fec43eb812d6d7a60337da7368",
+  "prompts": {},
+  "sessions": {
+    "s_2c5d43632bbaeb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5eac-d483-7700-bd19-e6b2ca126245",
+        "model": "unknown"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
