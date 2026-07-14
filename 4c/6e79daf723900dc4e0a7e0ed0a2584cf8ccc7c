@@ -1,0 +1,71 @@
+apps/web/src/App.tsx
+  s_2c5d43632bbaeb::t_94f8e1bcc82373 8,40,70-71,170-177
+apps/web/src/api/aiWorkbench.ts
+  s_2c5d43632bbaeb::t_a3a17267cc14fc 1-161
+apps/web/src/api/workflow.ts
+  s_2c5d43632bbaeb::t_633d36d3006179 93-103,249-263
+apps/web/src/components/workbench/AIAppsPanel.tsx
+  s_2c5d43632bbaeb::t_3ef213642da04d 1-86
+apps/web/src/components/workflow/nodeConfig.ts
+  s_2c5d43632bbaeb::t_30b90750fc2df3 58-59,68-69,78-79,97-98,125-126
+apps/web/src/pages/AIAppEditor/index.tsx
+  s_2c5d43632bbaeb::t_fe1cb05540344b 1-405
+apps/web/src/pages/Workbench/index.tsx
+  s_2c5d43632bbaeb::t_5e96d9bce20308 18,93,95,105-106,175,254
+apps/web/src/pages/WorkflowEditor/index.tsx
+  s_2c5d43632bbaeb::t_e967c3327d568c 30,41-54,56,225-229,250-263,961-971,979-1069
+docs/PROJECT_GUIDE.md
+  s_2c5d43632bbaeb::t_08d166eba51d92 40
+docs/superpowers/plans/2026-07-14-ai-app-editor-recovery.md
+  s_2c5d43632bbaeb::t_db8c4e02a78c69 1-89
+docs/superpowers/plans/2026-07-14-ai-workbench-platform.md
+  s_2c5d43632bbaeb::t_6ff53dc32291fe 1-9
+docs/superpowers/specs/2026-07-11-ai-workflow-automation-design.md
+  s_2c5d43632bbaeb::t_2b454db45859de 3
+docs/superpowers/specs/2026-07-14-ai-app-editor-recovery-design.md
+  s_2c5d43632bbaeb::t_4adb6611935531 1-20
+docs/superpowers/specs/2026-07-14-ai-workbench-platform-design.md
+  s_2c5d43632bbaeb::t_4027fc82524f25 1-23
+server/internal/database/database.go
+  s_2c5d43632bbaeb::t_5035d66f08fa49 293-300,358-363,421-428
+server/internal/handler/ai_platform.go
+  s_2c5d43632bbaeb::t_14b45bfe801ae6 1-631
+server/internal/handler/ai_platform_test.go
+  s_2c5d43632bbaeb::t_7433d381310182 1-164
+server/internal/handler/workflow.go
+  s_2c5d43632bbaeb::t_27bfbd291463b6 19,184-195,200-319,360-369,403,441,447,456,460,464-475
+server/internal/handler/workflow_runtime_test.go
+  s_2c5d43632bbaeb::t_d01d4f5f70cc91 39,164-177
+server/internal/model/ai_platform.go
+  s_2c5d43632bbaeb::t_1675c8d1e6d312 1-168
+server/internal/router/router.go
+  s_2c5d43632bbaeb::t_73d04b8db85279 132-147,177-179
+server/internal/workflow/core_nodes.go
+  s_2c5d43632bbaeb::t_4675694ef9151d 127,131,137,139,143-146
+server/migrations/046_create_ai_workbench_platform.sql
+  s_2c5d43632bbaeb::t_10af04085f71c8 1-25
+server/migrations/047_add_ai_app_runs.sql
+  s_2c5d43632bbaeb::t_37054cb8f927e9 1-8
+server/migrations/048_link_ai_apps_to_workflows.sql
+  s_2c5d43632bbaeb::t_4230fe8f7ac246 1-3
+server/migrations/049_link_ai_app_runs_to_workflow_runs.sql
+  s_2c5d43632bbaeb::t_6f8a979cdbde3c 1-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "4c6e79daf723900dc4e0a7e0ed0a2584cf8ccc7c",
+  "prompts": {},
+  "sessions": {
+    "s_2c5d43632bbaeb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5eac-d483-7700-bd19-e6b2ca126245",
+        "model": "unknown"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
