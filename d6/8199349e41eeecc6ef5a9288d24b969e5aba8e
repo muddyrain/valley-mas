@@ -1,0 +1,53 @@
+apps/web/src/App.tsx
+  s_2c5d43632bbaeb::t_91170826cc405f 21,73-74,181-188
+apps/web/src/api/aiWorkbench.ts
+  s_2c5d43632bbaeb::t_70823ff0599c1c 52-78,126,175,179-181,192-235
+apps/web/src/pages/AIAppEditor/index.tsx
+  s_2c5d43632bbaeb::t_85e3ef7031652e 9-10,13,15,17,24,74,77-79,95-99,102-106,184-197,206,215,217,337-378,400-419
+apps/web/src/pages/KnowledgeBases/index.tsx
+  s_2c5d43632bbaeb::t_8d9b64f35c7b87 1-358
+apps/web/src/pages/Workbench/index.tsx
+  s_2c5d43632bbaeb::t_33ad87f1c5282e 1,97-110
+docs/PROJECT_GUIDE.md
+  s_2c5d43632bbaeb::t_66b14e3003dcf3 40
+docs/README.md
+  s_2c5d43632bbaeb::t_edad3615670400 8
+docs/superpowers/plans/2026-07-14-ai-knowledge-rag.md
+  s_2c5d43632bbaeb::t_3c7a68a1f20ace 1-37
+server/.env.example
+  s_2c5d43632bbaeb::t_2bc1c2b89ebb87 49,55
+server/internal/aiclient/ark_test.go
+  s_2c5d43632bbaeb::t_153f1fb361f8d7 42-60
+server/internal/database/database.go
+  s_2c5d43632bbaeb::t_5c91689cacc694 426
+server/internal/handler/ai_platform.go
+  s_2c5d43632bbaeb::t_7cc90674eada5f 4,12,38-50,322-323,365-370,372-376,387,406-407,410,456-537,558-563,574-651,730-1040
+server/internal/handler/ai_platform_test.go
+  s_2c5d43632bbaeb::t_9a1e8ab6edd992 6,10,33-42,48-50,65-69,74-77,79,86-187
+server/internal/model/ai_platform.go
+  s_2c5d43632bbaeb::t_1f9658c525604e 66,104-107,113-135
+server/internal/model/ai_platform_test.go
+  s_2c5d43632bbaeb::t_bd879fdab15f6f 1-21
+server/internal/router/router.go
+  s_2c5d43632bbaeb::t_a10ef4000ff79d 143-144,147-151
+server/migrations/050_create_ai_knowledge_chunks.sql
+  s_2c5d43632bbaeb::t_f906b555754435 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "d68199349e41eeecc6ef5a9288d24b969e5aba8e",
+  "prompts": {},
+  "sessions": {
+    "s_2c5d43632bbaeb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5eac-d483-7700-bd19-e6b2ca126245",
+        "model": "unknown"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
