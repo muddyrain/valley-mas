@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AIAppsPanel } from '@/components/workbench/AIAppsPanel';
 import { cn } from '@/lib/utils';
 import {
   ENABLED_TEMPLATE_COUNT,
@@ -89,11 +90,9 @@ export default function Workbench() {
                   AI 工作台
                 </Badge>
                 <h1 className="text-3xl md:text-4xl font-semibold text-foreground mb-2">
-                  AI 工作流管理
+                  AI 工作台
                 </h1>
-                <p className="text-muted-foreground">
-                  创建和管理你的 AI 工作流，自动化内容创作和数据处理
-                </p>
+                <p className="text-muted-foreground">管理智能体与自动化工作流</p>
               </div>
               <Button size="lg" onClick={() => navigate('/workbench/create')}>
                 <Plus className="h-5 w-5 mr-2" />
@@ -102,6 +101,8 @@ export default function Workbench() {
             </div>
           </CardContent>
         </Card>
+
+        <AIAppsPanel />
 
         <div className="grid gap-8 lg:grid-cols-2">
           <div>
@@ -171,7 +172,7 @@ export default function Workbench() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-primary" />
-                  我的工作流
+                  工作流
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -250,7 +251,7 @@ export default function Workbench() {
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="flex-1">
-                <h3 className="font-medium text-foreground">AI 工作流能做什么？</h3>
+                <h3 className="font-medium text-foreground">工作流模板</h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   自动化内容创作流程，从输入到输出一键完成
                 </p>

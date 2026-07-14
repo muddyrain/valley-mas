@@ -36,7 +36,7 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&model.User{}, &model.Workflow{}, &model.WorkflowRun{}, &model.WorkflowNodeRun{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Workflow{}, &model.WorkflowRun{}, &model.WorkflowNodeRun{}, &model.AIApp{}, &model.AIAppVersion{}, &model.AIAppRun{}); err != nil {
 		t.Fatalf("migrate workflow runtime: %v", err)
 	}
 	if err := db.Create(&[]model.User{
@@ -160,6 +160,20 @@ func TestWorkflowRunExecutesMultipartGraphAndPersistsSafeHistory(t *testing.T) {
 	}
 	if len(nodeRuns) != 2 || nodeRuns[0].Status != "success" || nodeRuns[1].Status != "success" {
 		t.Fatalf("node run persistence = %#v", nodeRuns)
+	}
+	var app model.AIApp
+	if err := database.DB.Where("workflow_id = ?", workflow.ID).First(&app).Error; err != nil {
+		t.Fatalf("workflow app bridge: %v", err)
+	}
+	if app.Type != aiAppTypeWorkflow || app.DraftVersionID == 0 {
+		t.Fatalf("workflow app bridge = %#v", app)
+	}
+	var appRun model.AIAppRun
+	if err := database.DB.Where("workflow_run_id = ?", run.ID).First(&appRun).Error; err != nil {
+		t.Fatalf("unified workflow run: %v", err)
+	}
+	if appRun.AppID != app.ID || appRun.VersionID != app.DraftVersionID || appRun.Status != "succeeded" || appRun.Model != "workflow-runtime" {
+		t.Fatalf("unified workflow run = %#v", appRun)
 	}
 
 	historyReq := httptest.NewRequest(http.MethodGet, "/workflows/"+strconv.FormatInt(int64(workflow.ID), 10)+"/runs", nil)

@@ -90,6 +90,17 @@ export interface WorkflowRunDetail {
   nodes: WorkflowNodeRun[];
 }
 
+export interface WorkflowVersion {
+  id: string;
+  number: number;
+  createdAt: string;
+}
+
+export interface WorkflowPlatformData {
+  app: { draftVersionId: string; publishedVersionId: string; status: 'draft' | 'published' };
+  versions: WorkflowVersion[];
+}
+
 export async function createWorkflow(data: {
   name: string;
   description?: string;
@@ -234,4 +245,19 @@ export function listWorkflowRuns(
 
 export function getWorkflowRun(id: string, runId: string): Promise<WorkflowRunDetail> {
   return request.get(`/workflows/${id}/runs/${runId}`);
+}
+
+export function getWorkflowPlatform(id: string): Promise<WorkflowPlatformData> {
+  return request.get(`/workflows/${id}/platform`);
+}
+
+export function restoreWorkflowVersion(
+  id: string,
+  versionId: string,
+): Promise<{ version: WorkflowVersion }> {
+  return request.post(`/workflows/${id}/restore`, { versionId });
+}
+
+export function publishWorkflowVersion(id: string): Promise<void> {
+  return request.post(`/workflows/${id}/publish`);
 }

@@ -37,6 +37,7 @@
 - Life Trace：`apps/life-trace/src`、`server/internal/lifetrace`。
 - AI Mind Arena：`apps/ai-mind-arena`、`apps/admin/src/pages/admin-ops/MindArenaDebates.tsx`、`server/internal/mindarena`、`server/internal/model/mind_arena.go`、`server/internal/ai`。
 - AI 能力：`server/internal/ai`、`server/internal/aiusage`、`server/internal/handler/*ai*.go`、`apps/web/src/api/ai.ts`；Admin 可审计 Valley AI Chat 与 Life Trace AI 的调用、失败和耗时。
+- AI 工作台平台基线：Web `/workbench` 将智能体与工作流分区展示；智能体编辑页支持不可变版本保存、历史版本恢复为新草稿、发布及当前草稿版本的 ARK 私有 SSE 调试、停止和最近运行摘要；工作流画布支持版本历史恢复、发布与节点级运行记录入口。服务端 `/ai/apps` 提供 owner 隔离的应用、版本、发布状态、统一运行摘要、受控工具目录与 API Key 基础资产；旧工作流会映射为 workflow 应用，仍通过 `/workflows/*` 维持图编辑和节点级运行历史兼容。知识库 embedding/RAG、真实 Agent 工具执行、工具级 trace 和已发布应用的公共调用 API 仍待后续阶段实现，不能视为已开放能力。
 - AI Agent 运行时：`server/internal/ai/agent`（领域中性 tool loop 抽象，未来可无痛迁 CloudWeGo eino）+ `server/internal/ai/tools`（Tool 接口与 Registry），首批被 Life Trace 生活助理经 `LIFE_TRACE_ASSISTANT_USE_AGENT` 灰度使用。
 - 登录与用户状态：`apps/web/src/stores/useAuthStore.ts`、`apps/*/src/utils/request.ts`、`server/internal/middleware`、`server/internal/utils/jwt.go`。
 

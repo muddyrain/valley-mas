@@ -55,7 +55,8 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     icon: 'Keyboard',
     category: 'data',
     handles: { input: true, output: true },
-    available: true,
+    // Start 节点已经承担运行输入声明；独立输入节点尚无服务端协议。
+    available: false,
   },
   fileUpload: {
     type: 'fileUpload',
@@ -64,7 +65,8 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     icon: 'Upload',
     category: 'data',
     handles: { input: true, output: true },
-    available: true,
+    // 文件只允许由 start.inputs 声明并随运行请求上传。
+    available: false,
   },
   knowledge: {
     type: 'knowledge',
@@ -73,7 +75,8 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     icon: 'Database',
     category: 'ai',
     handles: { input: true, output: true },
-    available: true,
+    // 知识库运行时将在平台化 P2 接入前保持不可用。
+    available: false,
   },
   code: {
     type: 'code',
@@ -91,7 +94,8 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     icon: 'Globe',
     category: 'action',
     handles: { input: true, output: true },
-    available: true,
+    // 任意 HTTP 调用不属于首版受控工具能力。
+    available: false,
   },
   condition: {
     type: 'condition',
@@ -118,7 +122,8 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     icon: 'Hash',
     category: 'data',
     handles: { input: true, output: true },
-    available: true,
+    // 变量转换将在具备版本化变量协议后开放。
+    available: false,
   },
 };
 

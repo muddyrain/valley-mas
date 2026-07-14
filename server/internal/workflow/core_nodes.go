@@ -124,26 +124,26 @@ func (HTTPExecutor) Execute(ctx context.Context, _ RunContext, execution NodeExe
 	if readErr != nil {
 		return NodeResult{}, fmt.Errorf("读取响应失败: %w", readErr)
 	}
-	if len(body) > maxHTTPResponseBytes {
+	if int64(len(body)) > maxHTTPResponseBytes {
 		return NodeResult{}, fmt.Errorf("HTTP 响应超过 %d 字节上限", maxHTTPResponseBytes)
 	}
 
-	headers := make(map[string]any, len(response.Header))
+	responseHeaders := make(map[string]any, len(response.Header))
 	for key, values := range response.Header {
 		if strings.EqualFold(key, "Set-Cookie") {
 			continue
 		}
 		if len(values) == 1 {
-			headers[key] = values[0]
+			responseHeaders[key] = values[0]
 		} else {
-			headers[key] = values
+			responseHeaders[key] = values
 		}
 	}
 	output := map[string]any{
-		"status":      response.Status,
-		"statusCode":  response.StatusCode,
-		"headers":     headers,
-		"url":         response.Request.URL.String(),
+		"status":     response.Status,
+		"statusCode": response.StatusCode,
+		"headers":    responseHeaders,
+		"url":        response.Request.URL.String(),
 	}
 	output["contentType"] = response.Header.Get("Content-Type")
 	if isTextResponse(output["contentType"]) {

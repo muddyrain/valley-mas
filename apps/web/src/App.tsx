@@ -5,6 +5,7 @@ import { GlobalScrollButton } from '@/components/GlobalScrollButton';
 import { Toaster } from '@/components/ui/sonner';
 import { applyThemeToDocument, useThemeStore } from '@/stores/useThemeStore';
 import WorkbenchLayout from './layouts/WorkbenchLayout';
+import AIAppEditor from './pages/AIAppEditor';
 import BlogCreate from './pages/BlogCreate';
 import BlogGroupManage from './pages/BlogGroupManage';
 import BlogList from './pages/blog/BlogList';
@@ -36,7 +37,7 @@ function WorkflowEditorWithKey() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
-  return <WorkflowEditor key={`${location.pathname}-${id ?? 'none'}`} />;
+  return <WorkflowEditor key={`${location.pathname}-${location.search}-${id ?? 'none'}`} />;
 }
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -66,6 +67,8 @@ function RouteTitle() {
       title = '创建工作流 | Valley';
     } else if (pathname.startsWith('/workbench/edit')) {
       title = '编辑工作流 | Valley';
+    } else if (pathname.startsWith('/workbench/apps/')) {
+      title = '编辑 AI 应用 | Valley';
     } else if (pathname === '/blog') {
       title = '博客与图文 | Valley';
     } else if (pathname === '/guestbook') {
@@ -161,6 +164,14 @@ function App() {
             element={
               <RequireAuth>
                 <WorkflowEditorWithKey />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="workbench/apps/:appId"
+            element={
+              <RequireAuth>
+                <AIAppEditor />
               </RequireAuth>
             }
           />

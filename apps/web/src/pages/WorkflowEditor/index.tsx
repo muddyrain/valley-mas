@@ -27,6 +27,7 @@ import {
   Copy,
   Download,
   Edit2,
+  History,
   Maximize,
   Play,
   Redo2,
@@ -37,8 +38,22 @@ import {
   Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createWorkflow, getWorkflow, runWorkflow, updateWorkflow } from '@/api/workflow';
+import {
+  createWorkflow,
+  getWorkflow,
+  getWorkflowPlatform,
+  getWorkflowRun,
+  listWorkflowRuns,
+  publishWorkflowVersion,
+  restoreWorkflowVersion,
+  runWorkflow,
+  updateWorkflow,
+  type WorkflowPlatformData,
+  type WorkflowRun,
+  type WorkflowRunDetail,
+} from '@/api/workflow';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { NodePanel } from '@/components/workflow/NodePanel';
 import { NODE_CONFIGS } from '@/components/workflow/nodeConfig';
 import { PropertyPanel } from '@/components/workflow/PropertyPanel';
@@ -207,6 +222,11 @@ export default function WorkflowEditorPage() {
     createWorkflowRunSession,
   );
   const [runError, setRunError] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<WorkflowPlatformData | null>(null);
+  const [runs, setRuns] = useState<WorkflowRun[]>([]);
+  const [runDetail, setRunDetail] = useState<WorkflowRunDetail | null>(null);
+  const [showVersions, setShowVersions] = useState(false);
+  const [showRuns, setShowRuns] = useState(false);
   const [rightPanelWidth, setRightPanelWidth] = useState(380);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -226,6 +246,20 @@ export default function WorkflowEditorPage() {
     setNodes,
     setEdges,
   );
+
+  const refreshWorkflowMeta = useCallback(async (id: string) => {
+    const [nextPlatform, nextRuns] = await Promise.all([
+      getWorkflowPlatform(id),
+      listWorkflowRuns(id, { page: 1, pageSize: 10 }),
+    ]);
+    setPlatform(nextPlatform);
+    setRuns(nextRuns.list);
+  }, []);
+
+  useEffect(() => {
+    if (!workflowId) return;
+    refreshWorkflowMeta(workflowId).catch(() => undefined);
+  }, [workflowId, refreshWorkflowMeta]);
 
   const applyBlankWorkflow = useCallback(() => {
     setNodes([
@@ -924,12 +958,114 @@ export default function WorkflowEditorPage() {
                 <Save className="h-4 w-4 mr-2" />
                 {isSaving ? '保存中...' : '保存'}
               </Button>
+              {workflowId && (
+                <Button variant="outline" size="sm" onClick={() => setShowVersions(true)}>
+                  <History className="mr-2 h-4 w-4" />
+                  版本
+                </Button>
+              )}
+              {workflowId && (
+                <Button variant="outline" size="sm" onClick={() => setShowRuns(true)}>
+                  运行记录
+                </Button>
+              )}
               <Button size="sm" onClick={handleRun} disabled={isRunning}>
                 <Play className="h-4 w-4 mr-2" />
                 {isRunning ? '运行中...' : '运行'}
               </Button>
             </div>
           </div>
+
+          <Dialog open={showVersions} onOpenChange={setShowVersions}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>版本历史</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2">
+                {platform?.versions.map((version) => (
+                  <div
+                    key={version.id}
+                    className="flex items-center justify-between rounded-lg border p-3 text-sm"
+                  >
+                    <span>v{version.number}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">
+                        {new Date(version.createdAt).toLocaleString('zh-CN')}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={version.id === platform.app.draftVersionId}
+                        onClick={async () => {
+                          if (!workflowId) return;
+                          await restoreWorkflowVersion(workflowId, version.id);
+                          toast.success(`已恢复 v${version.number}`);
+                          navigate(`/workbench/edit?id=${workflowId}&restored=${Date.now()}`, {
+                            replace: true,
+                          });
+                        }}
+                      >
+                        恢复
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Button
+                disabled={
+                  !workflowId || platform?.app.publishedVersionId === platform?.app.draftVersionId
+                }
+                onClick={async () => {
+                  if (!workflowId) return;
+                  await publishWorkflowVersion(workflowId);
+                  await refreshWorkflowMeta(workflowId);
+                  toast.success('已发布当前版本');
+                }}
+              >
+                发布当前版本
+              </Button>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={showRuns} onOpenChange={setShowRuns}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>最近运行</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2">
+                {runs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">暂无运行记录</p>
+                ) : (
+                  runs.map((run) => (
+                    <Button
+                      key={run.id}
+                      variant="outline"
+                      className="h-auto w-full justify-between p-3"
+                      onClick={async () => {
+                        if (!workflowId) return;
+                        setRunDetail(await getWorkflowRun(workflowId, run.id));
+                      }}
+                    >
+                      <span>{run.status === 'success' ? '成功' : '失败'}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(run.startedAt).toLocaleString('zh-CN')}
+                      </span>
+                    </Button>
+                  ))
+                )}
+              </div>
+              {runDetail && (
+                <div className="rounded-lg border p-3 text-xs">
+                  <p className="mb-2 font-medium">节点详情</p>
+                  {runDetail.nodes.map((node) => (
+                    <p key={node.id}>
+                      {node.nodeId} · {node.status} · {node.durationMs ?? 0} ms
+                    </p>
+                  ))}
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
 
           <div className="flex-1 flex overflow-hidden">
             <div className="w-56 flex-shrink-0">

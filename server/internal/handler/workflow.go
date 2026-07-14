@@ -16,6 +16,7 @@ import (
 	"valley-server/internal/workflow"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 const (
@@ -180,8 +181,140 @@ func AdminUpdateWorkflow(c *gin.Context) {
 		Error(c, http.StatusNotFound, "工作流不存在")
 		return
 	}
+	var definition model.Workflow
+	if err := database.DB.Where("id = ? AND user_id = ?", id, userID).First(&definition).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "读取保存后的工作流失败")
+		return
+	}
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		_, _, syncErr := syncWorkflowAIApp(tx, definition)
+		return syncErr
+	}); err != nil {
+		Error(c, http.StatusInternalServerError, "保存工作流版本失败")
+		return
+	}
 
 	Success(c, nil)
+}
+
+func GetWorkflowPlatform(c *gin.Context) {
+	userID, _, ok := currentUser(c)
+	if !ok {
+		return
+	}
+	definition, app, versions, ok := workflowPlatform(c, model.Int64String(userID))
+	if !ok {
+		return
+	}
+	Success(c, gin.H{"workflow": definition, "app": app, "versions": versions})
+}
+
+func RestoreWorkflowVersion(c *gin.Context) {
+	userID, _, ok := currentUser(c)
+	if !ok {
+		return
+	}
+	var payload struct {
+		VersionID model.Int64String `json:"versionId"`
+	}
+	if c.ShouldBindJSON(&payload) != nil || payload.VersionID == 0 {
+		Error(c, 400, "请选择要恢复的历史版本")
+		return
+	}
+	id, err := parsePathInt64(c, "id")
+	if err != nil {
+		Error(c, 400, "无效的 ID")
+		return
+	}
+	var restored model.AIAppVersion
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var definition model.Workflow
+		if err := tx.Where("id = ? AND user_id = ?", id, userID).First(&definition).Error; err != nil {
+			return err
+		}
+		app, _, err := syncWorkflowAIApp(tx, definition)
+		if err != nil {
+			return err
+		}
+		var source model.AIAppVersion
+		if err := tx.Where("id = ? AND app_id = ?", payload.VersionID, app.ID).First(&source).Error; err != nil {
+			return err
+		}
+		if _, err := decodeWorkflowGraph(source.Config); err != nil {
+			return err
+		}
+		var latest model.AIAppVersion
+		if err := tx.Where("app_id = ?", app.ID).Order("number DESC").First(&latest).Error; err != nil {
+			return err
+		}
+		restored = model.AIAppVersion{AppID: app.ID, Number: latest.Number + 1, Config: source.Config}
+		if err := tx.Create(&restored).Error; err != nil {
+			return err
+		}
+		return tx.Model(&definition).Updates(map[string]any{"graph": restored.Config, "status": "draft"}).Error
+	}); err != nil {
+		Error(c, 400, "恢复历史版本失败")
+		return
+	}
+	Success(c, gin.H{"version": restored})
+}
+
+func PublishWorkflowVersion(c *gin.Context) {
+	userID, _, ok := currentUser(c)
+	if !ok {
+		return
+	}
+	id, err := parsePathInt64(c, "id")
+	if err != nil {
+		Error(c, 400, "无效的 ID")
+		return
+	}
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var definition model.Workflow
+		if err := tx.Where("id = ? AND user_id = ?", id, userID).First(&definition).Error; err != nil {
+			return err
+		}
+		app, version, err := syncWorkflowAIApp(tx, definition)
+		if err != nil {
+			return err
+		}
+		if err := tx.Model(&definition).Update("status", "published").Error; err != nil {
+			return err
+		}
+		return tx.Model(&app).Updates(map[string]any{"status": "published", "published_version_id": version.ID}).Error
+	}); err != nil {
+		Error(c, 400, "发布工作流失败")
+		return
+	}
+	Success(c, nil)
+}
+
+func workflowPlatform(c *gin.Context, userID model.Int64String) (model.Workflow, model.AIApp, []model.AIAppVersion, bool) {
+	id, err := parsePathInt64(c, "id")
+	if err != nil {
+		Error(c, 400, "无效的 ID")
+		return model.Workflow{}, model.AIApp{}, nil, false
+	}
+	var definition model.Workflow
+	if err := database.DB.Where("id = ? AND user_id = ?", id, userID).First(&definition).Error; err != nil {
+		Error(c, 404, "工作流不存在")
+		return model.Workflow{}, model.AIApp{}, nil, false
+	}
+	var app model.AIApp
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var syncErr error
+		app, _, syncErr = syncWorkflowAIApp(tx, definition)
+		return syncErr
+	}); err != nil {
+		Error(c, 500, "同步工作流应用失败")
+		return model.Workflow{}, model.AIApp{}, nil, false
+	}
+	var versions []model.AIAppVersion
+	if err := database.DB.Where("app_id = ?", app.ID).Order("number DESC").Find(&versions).Error; err != nil {
+		Error(c, 500, "加载工作流版本失败")
+		return model.Workflow{}, model.AIApp{}, nil, false
+	}
+	return definition, app, versions, true
 }
 
 // AdminDeleteWorkflow 删除工作流
@@ -224,6 +357,16 @@ func AdminRunWorkflow(c *gin.Context) {
 		Error(c, http.StatusNotFound, "工作流不存在")
 		return
 	}
+	var app model.AIApp
+	var appVersion model.AIAppVersion
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var syncErr error
+		app, appVersion, syncErr = syncWorkflowAIApp(tx, definition)
+		return syncErr
+	}); err != nil {
+		Error(c, http.StatusInternalServerError, "同步工作流应用失败")
+		return
+	}
 	graph, err := decodeWorkflowGraph(definition.Graph)
 	if err != nil {
 		Error(c, http.StatusBadRequest, "工作流格式错误")
@@ -257,6 +400,7 @@ func AdminRunWorkflow(c *gin.Context) {
 	if workflowRequiresARKText(graph) {
 		if _, configErr := aiclient.ReadARKTextConfig(); configErr != "" {
 			_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": "ARK_NOT_CONFIGURED"})
+			persistWorkflowAIAppRun(app, appVersion, run, "failed", nil, "ARK_NOT_CONFIGURED")
 			Error(c, http.StatusServiceUnavailable, "AI 服务未配置")
 			return
 		}
@@ -294,11 +438,13 @@ func AdminRunWorkflow(c *gin.Context) {
 	})
 	if persistenceErr != nil {
 		_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": "RUN_PERSISTENCE_FAILED"})
+		persistWorkflowAIAppRun(app, appVersion, run, "failed", nil, "RUN_PERSISTENCE_FAILED")
 		send("", "error", "运行记录保存失败", nil)
 		return
 	}
 	if executeErr != nil {
 		_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": "WORKFLOW_NODE_FAILED"})
+		persistWorkflowAIAppRun(app, appVersion, run, "failed", nil, "WORKFLOW_NODE_FAILED")
 		send("", "error", "工作流执行失败", map[string]any{"runId": run.ID, "error": "WORKFLOW_NODE_FAILED"})
 		return
 	}
@@ -307,10 +453,24 @@ func AdminRunWorkflow(c *gin.Context) {
 	}
 	if err := finishWorkflowRun(&run, string(workflow.StatusSucceeded), finalOutput); err != nil {
 		_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": "RUN_PERSISTENCE_FAILED"})
+		persistWorkflowAIAppRun(app, appVersion, run, "failed", nil, "RUN_PERSISTENCE_FAILED")
 		send("", "error", "运行结果保存失败", map[string]any{"runId": run.ID, "error": "RUN_PERSISTENCE_FAILED", "statusCode": http.StatusInternalServerError})
 		return
 	}
+	persistWorkflowAIAppRun(app, appVersion, run, "succeeded", finalOutput, "")
 	send("", "done", "工作流执行完成", map[string]any{"runId": run.ID, "output": finalOutput})
+}
+
+func persistWorkflowAIAppRun(app model.AIApp, version model.AIAppVersion, workflowRun model.WorkflowRun, status string, output map[string]any, errorCode string) {
+	result := ""
+	if output != nil {
+		if encoded, err := json.Marshal(output); err == nil {
+			result = string(encoded)
+		}
+	}
+	runID := workflowRun.ID
+	run := model.AIAppRun{AppID: app.ID, VersionID: version.ID, WorkflowRunID: &runID, UserID: workflowRun.UserID, Status: status, Model: "workflow-runtime", Input: aiclient.TrimRunes(workflowRun.Inputs, 1000), Output: aiclient.TrimRunes(result, 2000), ErrorCode: errorCode, DurationMs: time.Since(workflowRun.StartedAt).Milliseconds()}
+	_ = database.DB.Create(&run).Error
 }
 
 func AdminListWorkflowRuns(c *gin.Context) {
