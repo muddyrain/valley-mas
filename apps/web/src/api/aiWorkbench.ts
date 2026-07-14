@@ -69,6 +69,7 @@ export interface AIKnowledgeDocument {
   name: string;
   status: 'pending' | 'pending_embedding' | 'indexing' | 'ready' | 'failed';
   errorCode: string;
+  indexProgress: number;
   chunkCount: number;
   mimeType: string;
   sizeBytes: number;
@@ -221,6 +222,13 @@ export function retryAIKnowledgeDocument(
   documentId: string,
 ): Promise<{ document: AIKnowledgeDocument }> {
   return request.post(`/ai/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/retry`);
+}
+
+export function deleteAIKnowledgeDocument(
+  knowledgeBaseId: string,
+  documentId: string,
+): Promise<void> {
+  return request.delete(`/ai/knowledge-bases/${knowledgeBaseId}/documents/${documentId}`);
 }
 
 export function listAIAppKnowledgeBases(appId: string): Promise<{ list: AIKnowledgeBase[] }> {

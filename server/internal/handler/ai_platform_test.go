@@ -64,6 +64,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.POST("/apps/:appId/restore", RestoreAIAppVersion)
 	auth.GET("/knowledge-bases/:knowledgeBaseId/documents", ListAIKnowledgeDocuments)
 	auth.POST("/knowledge-bases/:knowledgeBaseId/documents", UploadAIKnowledgeDocument)
+	auth.DELETE("/knowledge-bases/:knowledgeBaseId/documents/:documentId", DeleteAIKnowledgeDocument)
 	auth.DELETE("/knowledge-bases/:knowledgeBaseId", DeleteAIKnowledgeBase)
 	auth.GET("/apps/:appId/knowledge-bases", ListAIAppKnowledgeBases)
 	auth.PUT("/apps/:appId/knowledge-bases", ReplaceAIAppKnowledgeBases)
@@ -118,7 +119,7 @@ func TestUploadAIKnowledgeDocumentCreatesPendingChunks(t *testing.T) {
 	if err := db.Where("knowledge_base_id = ?", base.ID).First(&document).Error; err != nil {
 		t.Fatalf("load document: %v", err)
 	}
-	if document.Status != "pending_embedding" || document.ChunkCount < 2 || document.SizeBytes == 0 {
+	if document.Status != "pending_embedding" || document.IndexProgress != 0 || document.ChunkCount < 2 || document.SizeBytes == 0 {
 		t.Fatalf("unexpected document = %#v", document)
 	}
 	var count int64
@@ -127,6 +128,35 @@ func TestUploadAIKnowledgeDocumentCreatesPendingChunks(t *testing.T) {
 	}
 	if count != int64(document.ChunkCount) {
 		t.Fatalf("chunk count = %d, want %d", count, document.ChunkCount)
+	}
+}
+
+func TestDeleteAIKnowledgeDocumentRemovesOnlyOwnedChunks(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	base := model.AIKnowledgeBase{UserID: 101, Name: "创作资料"}
+	if err := db.Create(&base).Error; err != nil {
+		t.Fatalf("create knowledge base: %v", err)
+	}
+	document := model.AIKnowledgeDocument{KnowledgeBaseID: base.ID, UserID: 101, Name: "notes.md", Status: "ready", IndexProgress: 100}
+	if err := db.Create(&document).Error; err != nil {
+		t.Fatalf("create document: %v", err)
+	}
+	chunk := model.AIKnowledgeChunk{DocumentID: document.ID, UserID: 101, Position: 0, Content: "内容"}
+	if err := db.Create(&chunk).Error; err != nil {
+		t.Fatalf("create chunk: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodDelete, "/ai/knowledge-bases/"+strconv.FormatInt(int64(base.ID), 10)+"/documents/"+strconv.FormatInt(int64(document.ID), 10), nil)
+	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete response = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var documentCount, chunkCount int64
+	_ = db.Model(&model.AIKnowledgeDocument{}).Where("id = ?", document.ID).Count(&documentCount).Error
+	_ = db.Model(&model.AIKnowledgeChunk{}).Where("document_id = ?", document.ID).Count(&chunkCount).Error
+	if documentCount != 0 || chunkCount != 0 {
+		t.Fatalf("documentCount=%d chunkCount=%d, want both 0", documentCount, chunkCount)
 	}
 }
 

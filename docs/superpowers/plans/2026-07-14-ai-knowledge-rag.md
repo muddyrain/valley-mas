@@ -1,6 +1,6 @@
 # Valley AI 知识库与 RAG 实施计划
 
-> 状态：核心链路已完成；PDF 摄取与 PostgreSQL 实库验收待补
+> 状态：Markdown/TXT 核心链路、真实索引进度与单篇删除已完成；PDF 摄取与 PostgreSQL/ARK 实库验收待补
 
 ## 目标
 
@@ -12,7 +12,7 @@
 - [x] 新增 PostgreSQL 迁移：启用 `vector` 扩展，创建向量列与 owner/文档索引；MySQL 环境明确将资料索引标记为失败，不降级为关键词检索。
 - [x] 在 `server/internal/aiclient` 增加 ARK embedding 配置读取，使用 `ARK_EMBEDDING_MODEL` 接入点；已同步 `server/.env.example`。
 - [~] 新增知识库 CRUD、Markdown/TXT 文档上传、删除、重试和状态查询接口；限制文件大小、每文档分段数。PDF 待实现。
-- [x] Web 新增 `/workbench/knowledge` 入口与文档列表，显示待处理、索引中、成功、失败状态。
+- [x] Web 新增 `/workbench/knowledge` 入口与文档列表，显示待处理、索引中、成功、失败状态与真实索引进度；支持删除单篇文档及其分段。
 
 ## 阶段 B：异步解析、切块与检索
 

@@ -100,6 +100,7 @@ type AIKnowledgeDocument struct {
 	Name            string         `gorm:"size:255;not null" json:"name"`
 	Status          string         `gorm:"size:20;index;not null;default:'pending'" json:"status"`
 	ErrorCode       string         `gorm:"size:80" json:"errorCode"`
+	IndexProgress   int            `gorm:"not null;default:0" json:"indexProgress"`
 	ChunkCount      int            `json:"chunkCount"`
 	MimeType        string         `gorm:"size:120" json:"mimeType"`
 	SizeBytes       int64          `json:"sizeBytes"`

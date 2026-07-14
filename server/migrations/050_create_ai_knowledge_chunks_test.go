@@ -15,3 +15,14 @@ func TestAIKnowledgeChunksMigrationQuotesReferencesColumn(t *testing.T) {
 		t.Fatal("migration must quote the PostgreSQL reserved references column")
 	}
 }
+
+func TestAIKnowledgeDocumentProgressMigrationBackfillsReadyDocuments(t *testing.T) {
+	contents, err := os.ReadFile("051_add_ai_knowledge_document_progress.sql")
+	if err != nil {
+		t.Fatalf("read migration: %v", err)
+	}
+	statement := string(contents)
+	if !strings.Contains(statement, "ADD COLUMN IF NOT EXISTS index_progress") || !strings.Contains(statement, "status = 'ready'") {
+		t.Fatal("migration must add progress and backfill indexed documents")
+	}
+}

@@ -935,14 +935,50 @@ func RetryAIKnowledgeDocument(c *gin.Context) {
 		Error(c, 409, "文档正在索引")
 		return
 	}
-	if err := database.GetDB().Model(&document).Updates(map[string]any{"status": "pending_embedding", "error_code": ""}).Error; err != nil {
+	if err := database.GetDB().Model(&document).Updates(map[string]any{"status": "pending_embedding", "error_code": "", "index_progress": 0}).Error; err != nil {
 		Error(c, 500, "重试文档索引失败")
 		return
 	}
 	document.Status = "pending_embedding"
 	document.ErrorCode = ""
+	document.IndexProgress = 0
 	scheduleAIKnowledgeDocumentIndexing(document.ID)
 	Success(c, gin.H{"document": document})
+}
+
+func DeleteAIKnowledgeDocument(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	knowledgeBaseID, err := parsePathInt64(c, "knowledgeBaseId")
+	if err != nil {
+		Error(c, 400, "无效的知识库 ID")
+		return
+	}
+	documentID, err := parsePathInt64(c, "documentId")
+	if err != nil {
+		Error(c, 400, "无效的文档 ID")
+		return
+	}
+	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		var document model.AIKnowledgeDocument
+		if err := tx.Where("id = ? AND knowledge_base_id = ? AND user_id = ?", documentID, knowledgeBaseID, userID).First(&document).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("document_id = ? AND user_id = ?", document.ID, userID).Delete(&model.AIKnowledgeChunk{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&document).Error
+	}); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(c, 404, "知识库文档不存在")
+			return
+		}
+		Error(c, 500, "删除知识库文档失败")
+		return
+	}
+	Success(c, nil)
 }
 
 func indexAIKnowledgeDocument(documentID model.Int64String) {
@@ -962,7 +998,7 @@ func indexAIKnowledgeDocument(documentID model.Int64String) {
 		markAIKnowledgeDocumentFailed(documentID, knowledgeEmbeddingErrorCode(errMsg))
 		return
 	}
-	if err := db.Model(&model.AIKnowledgeDocument{}).Where("id = ?", documentID).Updates(map[string]any{"status": "indexing", "error_code": ""}).Error; err != nil {
+	if err := db.Model(&model.AIKnowledgeDocument{}).Where("id = ?", documentID).Updates(map[string]any{"status": "indexing", "error_code": "", "index_progress": 5}).Error; err != nil {
 		return
 	}
 	var chunks []model.AIKnowledgeChunk
@@ -974,9 +1010,13 @@ func indexAIKnowledgeDocument(documentID model.Int64String) {
 	for _, chunk := range chunks {
 		inputs = append(inputs, chunk.Content)
 	}
+	updateAIKnowledgeDocumentProgress(db, documentID, 10)
 	ctx, cancel := context.WithTimeout(context.Background(), knowledgeEmbeddingTimeout)
 	defer cancel()
-	vectors, err := aiclient.CreateARKEmbeddings(ctx, inputs)
+	vectors, err := aiclient.CreateARKEmbeddingsWithProgress(ctx, inputs, func(completed, total int) {
+		progress := 10 + completed*70/total
+		updateAIKnowledgeDocumentProgress(db, documentID, progress)
+	})
 	if err != nil || len(vectors) != len(chunks) {
 		markAIKnowledgeDocumentFailed(documentID, "ARK_EMBEDDING_FAILED")
 		return
@@ -991,10 +1031,25 @@ func indexAIKnowledgeDocument(documentID model.Int64String) {
 				return err
 			}
 		}
-		return tx.Model(&model.AIKnowledgeDocument{}).Where("id = ?", documentID).Updates(map[string]any{"status": "ready", "error_code": ""}).Error
+		return tx.Model(&model.AIKnowledgeDocument{}).Where("id = ?", documentID).Updates(map[string]any{"status": "ready", "error_code": "", "index_progress": 100}).Error
 	}); err != nil {
 		markAIKnowledgeDocumentFailed(documentID, "KNOWLEDGE_VECTOR_STORE_FAILED")
 	}
+}
+
+func updateAIKnowledgeDocumentProgress(db *gorm.DB, documentID model.Int64String, progress int) {
+	if db == nil {
+		return
+	}
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 99 {
+		progress = 99
+	}
+	_ = db.Model(&model.AIKnowledgeDocument{}).
+		Where("id = ? AND index_progress < ?", documentID, progress).
+		Update("index_progress", progress).Error
 }
 
 func markAIKnowledgeDocumentFailed(documentID model.Int64String, errorCode string) {

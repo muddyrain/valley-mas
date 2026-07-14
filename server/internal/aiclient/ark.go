@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
@@ -111,6 +112,12 @@ func ReadARKEmbeddingConfig() (ARKConfig, string) {
 // its multimodal contract, while each request intentionally contains a single
 // segment so document chunks never get merged into one vector.
 func CreateARKEmbeddings(ctx context.Context, inputs []string) ([][]float32, error) {
+	return CreateARKEmbeddingsWithProgress(ctx, inputs, nil)
+}
+
+// CreateARKEmbeddingsWithProgress reports each successfully completed segment.
+// The callback is optional and callers must keep it safe for concurrent calls.
+func CreateARKEmbeddingsWithProgress(ctx context.Context, inputs []string, onProgress func(completed, total int)) ([][]float32, error) {
 	if len(inputs) == 0 {
 		return nil, fmt.Errorf("embedding 输入不能为空")
 	}
@@ -132,6 +139,7 @@ func CreateARKEmbeddings(ctx context.Context, inputs []string) ([][]float32, err
 		workerCount = 4
 	}
 	var workers sync.WaitGroup
+	var completed atomic.Int64
 	for range workerCount {
 		workers.Add(1)
 		go func() {
@@ -158,6 +166,9 @@ func CreateARKEmbeddings(ctx context.Context, inputs []string) ([][]float32, err
 					return
 				}
 				vectors[index] = response.Data.Embedding
+				if onProgress != nil {
+					onProgress(int(completed.Add(1)), len(inputs))
+				}
 			}
 		}()
 	}

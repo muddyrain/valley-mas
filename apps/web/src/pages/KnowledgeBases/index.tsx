@@ -1,11 +1,12 @@
-import { BookOpenText, FileText, FolderPlus, RotateCw, Upload } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { BookOpenText, FileText, FolderPlus, RotateCw, Trash2, Upload } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   type AIKnowledgeBase,
   type AIKnowledgeDocument,
   createAIKnowledgeBase,
+  deleteAIKnowledgeDocument,
   getAPIErrorMessage,
   listAIKnowledgeBases,
   listAIKnowledgeDocuments,
@@ -23,6 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -55,16 +57,77 @@ export default function KnowledgeBases() {
   const [bases, setBases] = useState<AIKnowledgeBase[]>([]);
   const [selectedID, setSelectedID] = useState<string | null>(null);
   const [documents, setDocuments] = useState<AIKnowledgeDocument[]>([]);
+  const documentsRef = useRef<AIKnowledgeDocument[]>([]);
+  const completionTimersRef = useRef(new Map<string, number[]>());
+  const [completionProgresses, setCompletionProgresses] = useState<Record<string, number>>({});
   const [loadingBases, setLoadingBases] = useState(true);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [creating, setCreating] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [retryingID, setRetryingID] = useState<string | null>(null);
+  const [deletingID, setDeletingID] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AIKnowledgeDocument | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
   const selectedBase = bases.find((base) => base.id === selectedID) || null;
+
+  const clearCompletionProgress = useCallback((documentID: string) => {
+    for (const timer of completionTimersRef.current.get(documentID) || []) {
+      window.clearTimeout(timer);
+    }
+    completionTimersRef.current.delete(documentID);
+    setCompletionProgresses((current) => {
+      if (!(documentID in current)) return current;
+      const next = { ...current };
+      delete next[documentID];
+      return next;
+    });
+  }, []);
+
+  const showCompletionProgress = useCallback(
+    (document: AIKnowledgeDocument, previous: AIKnowledgeDocument) => {
+      clearCompletionProgress(document.id);
+      const initialProgress = Math.min(
+        99,
+        Math.max(80, Number.isFinite(previous.indexProgress) ? previous.indexProgress : 0),
+      );
+      setCompletionProgresses((current) => ({ ...current, [document.id]: initialProgress }));
+      const completeTimer = window.setTimeout(() => {
+        setCompletionProgresses((current) => ({ ...current, [document.id]: 100 }));
+      }, 80);
+      const dismissTimer = window.setTimeout(() => {
+        clearCompletionProgress(document.id);
+      }, 1200);
+      completionTimersRef.current.set(document.id, [completeTimer, dismissTimer]);
+    },
+    [clearCompletionProgress],
+  );
+
+  const replaceDocuments = useCallback(
+    (nextDocuments: AIKnowledgeDocument[]) => {
+      const previousByID = new Map(documentsRef.current.map((document) => [document.id, document]));
+      documentsRef.current = nextDocuments;
+      setDocuments(nextDocuments);
+      for (const document of nextDocuments) {
+        const previous = previousByID.get(document.id);
+        if (document.status === 'ready' && previous && previous.status !== 'ready') {
+          showCompletionProgress(document, previous);
+        }
+      }
+    },
+    [showCompletionProgress],
+  );
+
+  useEffect(
+    () => () => {
+      for (const timers of completionTimersRef.current.values()) {
+        for (const timer of timers) window.clearTimeout(timer);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const loadBases = async () => {
@@ -84,7 +147,7 @@ export default function KnowledgeBases() {
 
   useEffect(() => {
     if (!selectedID) {
-      setDocuments([]);
+      replaceDocuments([]);
       return;
     }
     let active = true;
@@ -92,7 +155,7 @@ export default function KnowledgeBases() {
     const loadDocuments = async (showError: boolean) => {
       try {
         const { list } = await listAIKnowledgeDocuments(selectedID);
-        if (active) setDocuments(list);
+        if (active) replaceDocuments(list);
       } catch (error) {
         if (active && showError) toast.error(getAPIErrorMessage(error, '加载文档失败'));
       } finally {
@@ -100,12 +163,12 @@ export default function KnowledgeBases() {
       }
     };
     void loadDocuments(true);
-    const timer = window.setInterval(() => void loadDocuments(false), 3000);
+    const timer = window.setInterval(() => void loadDocuments(false), 1000);
     return () => {
       active = false;
       window.clearInterval(timer);
     };
-  }, [selectedID]);
+  }, [replaceDocuments, selectedID]);
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -148,7 +211,7 @@ export default function KnowledgeBases() {
       const formData = new FormData();
       formData.append('file', file);
       const { document } = await uploadAIKnowledgeDocument(selectedID, formData);
-      setDocuments((items) => [document, ...items]);
+      replaceDocuments([document, ...documentsRef.current]);
       toast.success('文档已加入知识库');
     } catch (error) {
       toast.error(getAPIErrorMessage(error, '上传文档失败'));
@@ -162,12 +225,30 @@ export default function KnowledgeBases() {
     try {
       setRetryingID(documentID);
       const { document } = await retryAIKnowledgeDocument(selectedID, documentID);
-      setDocuments((items) => items.map((item) => (item.id === documentID ? document : item)));
+      replaceDocuments(
+        documentsRef.current.map((item) => (item.id === documentID ? document : item)),
+      );
       toast.success('已重新开始处理资料');
     } catch (error) {
       toast.error(getAPIErrorMessage(error, '重试失败'));
     } finally {
       setRetryingID(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedID || !deleteTarget) return;
+    try {
+      setDeletingID(deleteTarget.id);
+      await deleteAIKnowledgeDocument(selectedID, deleteTarget.id);
+      clearCompletionProgress(deleteTarget.id);
+      replaceDocuments(documentsRef.current.filter((item) => item.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      toast.success('文档已删除');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '删除文档失败'));
+    } finally {
+      setDeletingID(null);
     }
   };
 
@@ -281,6 +362,25 @@ export default function KnowledgeBases() {
                     (() => {
                       const canStartIndexing =
                         document.status === 'failed' || document.status === 'pending_embedding';
+                      const isIndexing =
+                        document.status === 'pending' ||
+                        document.status === 'pending_embedding' ||
+                        document.status === 'indexing';
+                      const completionProgress = completionProgresses[document.id];
+                      const showProgress = isIndexing || completionProgress !== undefined;
+                      const progress =
+                        completionProgress ??
+                        (document.status === 'ready'
+                          ? 100
+                          : Math.min(
+                              99,
+                              Math.max(
+                                0,
+                                Number.isFinite(document.indexProgress)
+                                  ? document.indexProgress
+                                  : 0,
+                              ),
+                            ));
                       return (
                         <div
                           key={document.id}
@@ -292,6 +392,14 @@ export default function KnowledgeBases() {
                             <p className="text-xs text-muted-foreground">
                               {formatFileSize(document.sizeBytes)} · {document.chunkCount} 个分段
                             </p>
+                            {showProgress && (
+                              <Progress value={progress} className="mt-2 max-w-sm gap-1.5">
+                                <ProgressLabel className="text-xs text-muted-foreground">
+                                  {completionProgress !== undefined ? '索引完成' : '正在建立索引'}
+                                </ProgressLabel>
+                                <ProgressValue className="text-xs" />
+                              </Progress>
+                            )}
                             {document.status === 'failed' && (
                               <p className="mt-1 text-xs text-destructive">
                                 {documentFailureMessage[document.errorCode] ||
@@ -299,19 +407,30 @@ export default function KnowledgeBases() {
                               </p>
                             )}
                           </div>
-                          {canStartIndexing && (
+                          <div className="flex shrink-0 items-center gap-1">
+                            {canStartIndexing && (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={`处理 ${document.name}`}
+                                disabled={retryingID === document.id}
+                                onClick={() => void handleRetry(document.id)}
+                              >
+                                <RotateCw
+                                  className={retryingID === document.id ? 'animate-spin' : ''}
+                                />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon-sm"
-                              aria-label={`处理 ${document.name}`}
-                              disabled={retryingID === document.id}
-                              onClick={() => void handleRetry(document.id)}
+                              aria-label={`删除 ${document.name}`}
+                              disabled={deletingID === document.id}
+                              onClick={() => setDeleteTarget(document)}
                             >
-                              <RotateCw
-                                className={retryingID === document.id ? 'animate-spin' : ''}
-                              />
+                              <Trash2 />
                             </Button>
-                          )}
+                          </div>
                           <Badge variant={document.status === 'failed' ? 'destructive' : 'outline'}>
                             {documentStatus[document.status]}
                           </Badge>
@@ -349,6 +468,38 @@ export default function KnowledgeBases() {
             </Button>
             <Button disabled={creating} onClick={handleCreate}>
               {creating ? '创建中...' : '创建'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && !deletingID) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除文档</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            删除后将同时清理该文档的索引分段，且无法恢复。
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={Boolean(deletingID)}
+              onClick={() => setDeleteTarget(null)}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={Boolean(deletingID)}
+              onClick={() => void handleDelete()}
+            >
+              {deletingID ? '删除中...' : '删除'}
             </Button>
           </DialogFooter>
         </DialogContent>
