@@ -39,6 +39,25 @@ func TestReadARKTextConfigDefaultsBaseURL(t *testing.T) {
 	}
 }
 
+func TestReadARKEmbeddingConfigRequiresDedicatedEndpoint(t *testing.T) {
+	t.Setenv("ARK_API_KEY", "key")
+	t.Setenv("ARK_EMBEDDING_MODEL", "")
+	_, errMsg := ReadARKEmbeddingConfig()
+	if errMsg != "AI 未配置：ARK_EMBEDDING_MODEL 必须以 ep- 开头" {
+		t.Fatalf("unexpected error: %q", errMsg)
+	}
+}
+
+func TestReadARKEmbeddingConfigUsesEndpoint(t *testing.T) {
+	t.Setenv("ARK_API_KEY", "key")
+	t.Setenv("ARK_BASE_URL", "")
+	t.Setenv("ARK_EMBEDDING_MODEL", "ep-embedding")
+	cfg, errMsg := ReadARKEmbeddingConfig()
+	if errMsg != "" || cfg.Model != "ep-embedding" || cfg.BaseURL != defaultARKBaseURLValue {
+		t.Fatalf("unexpected config=%+v error=%q", cfg, errMsg)
+	}
+}
+
 func TestReadARKVisionConfigPrefersVisionModel(t *testing.T) {
 	t.Setenv("ARK_API_KEY", "key")
 	t.Setenv("ARK_BASE_URL", "")

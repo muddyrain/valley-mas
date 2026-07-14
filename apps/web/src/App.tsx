@@ -18,6 +18,7 @@ import FormatTools from './pages/FormatTools';
 import Guestbook from './pages/Guestbook';
 import Home from './pages/Home';
 import ImageTextCreate from './pages/ImageTextCreate';
+import KnowledgeBases from './pages/KnowledgeBases';
 import Login from './pages/Login';
 import MyPosts from './pages/MyPosts';
 import MyResources from './pages/MyResources';
@@ -69,6 +70,8 @@ function RouteTitle() {
       title = '编辑工作流 | Valley';
     } else if (pathname.startsWith('/workbench/apps/')) {
       title = '编辑 AI 应用 | Valley';
+    } else if (pathname === '/workbench/knowledge') {
+      title = '知识库 | Valley';
     } else if (pathname === '/blog') {
       title = '博客与图文 | Valley';
     } else if (pathname === '/guestbook') {
@@ -172,6 +175,14 @@ function App() {
             element={
               <RequireAuth>
                 <AIAppEditor />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="workbench/knowledge"
+            element={
+              <RequireAuth>
+                <KnowledgeBases />
               </RequireAuth>
             }
           />

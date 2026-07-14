@@ -1,6 +1,8 @@
 package aiclient
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -82,6 +84,107 @@ func ReadARKTextConfig() (ARKConfig, string) {
 		return ARKConfig{}, "AI 未配置：ARK_TEXT_MODEL 必须以 ep- 开头"
 	}
 	return ARKConfig{APIKey: apiKey, BaseURL: baseURL, Model: textModel}, ""
+}
+
+// ReadARKEmbeddingConfig reads the dedicated endpoint used by private
+// knowledge-base indexing. Embeddings must not silently fall back to a chat
+// model because that would make retrieval quality and vector dimensions
+// unpredictable.
+func ReadARKEmbeddingConfig() (ARKConfig, string) {
+	apiKey := strings.TrimSpace(os.Getenv("ARK_API_KEY"))
+	embeddingModel := strings.TrimSpace(os.Getenv("ARK_EMBEDDING_MODEL"))
+	baseURL := strings.TrimSpace(os.Getenv("ARK_BASE_URL"))
+	if baseURL == "" {
+		baseURL = defaultARKBaseURL()
+	}
+	if apiKey == "" {
+		return ARKConfig{}, "AI 未配置：缺少 ARK_API_KEY"
+	}
+	if !strings.HasPrefix(embeddingModel, "ep-") {
+		return ARKConfig{}, "AI 未配置：ARK_EMBEDDING_MODEL 必须以 ep- 开头"
+	}
+	return ARKConfig{APIKey: apiKey, BaseURL: baseURL, Model: embeddingModel}, ""
+}
+
+// CreateARKEmbeddings creates one embedding for every input string through the
+// multimodal endpoint. The configured model accepts text input as a subset of
+// its multimodal contract, while each request intentionally contains a single
+// segment so document chunks never get merged into one vector.
+func CreateARKEmbeddings(ctx context.Context, inputs []string) ([][]float32, error) {
+	if len(inputs) == 0 {
+		return nil, fmt.Errorf("embedding 输入不能为空")
+	}
+	config, errMsg := ReadARKEmbeddingConfig()
+	if errMsg != "" {
+		return nil, fmt.Errorf("%s", errMsg)
+	}
+	client := ARKClient(60 * time.Second)
+	if client == nil {
+		return nil, fmt.Errorf("AI 未配置：缺少 ARK_API_KEY")
+	}
+	vectors := make([][]float32, len(inputs))
+	embeddingCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	jobs := make(chan int)
+	errCh := make(chan error, 1)
+	workerCount := len(inputs)
+	if workerCount > 4 {
+		workerCount = 4
+	}
+	var workers sync.WaitGroup
+	for range workerCount {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for index := range jobs {
+				text := inputs[index]
+				response, err := client.CreateMultiModalEmbeddings(embeddingCtx, arkmodel.MultiModalEmbeddingRequest{
+					Model: config.Model,
+					Input: []arkmodel.MultimodalEmbeddingInput{{
+						Type: arkmodel.MultiModalEmbeddingInputTypeText,
+						Text: &text,
+					}},
+				})
+				if err != nil || len(response.Data.Embedding) == 0 {
+					failure := err
+					if failure == nil {
+						failure = fmt.Errorf("ARK embedding 返回空向量")
+					}
+					select {
+					case errCh <- fmt.Errorf("ARK embedding 调用失败: %w", failure):
+					default:
+					}
+					cancel()
+					return
+				}
+				vectors[index] = response.Data.Embedding
+			}
+		}()
+	}
+dispatch:
+	for index := range inputs {
+		select {
+		case jobs <- index:
+		case <-embeddingCtx.Done():
+			break dispatch
+		}
+	}
+	close(jobs)
+	workers.Wait()
+	select {
+	case err := <-errCh:
+		return nil, err
+	default:
+	}
+	if err := embeddingCtx.Err(); err != nil && ctx.Err() != nil {
+		return nil, fmt.Errorf("ARK embedding 调用失败: %w", err)
+	}
+	for _, vector := range vectors {
+		if len(vector) == 0 {
+			return nil, fmt.Errorf("ARK embedding 返回缺失向量")
+		}
+	}
+	return vectors, nil
 }
 
 // ARKVisionConfigResult 携带视觉模型选择结果以及是否走视觉端点的标志位。

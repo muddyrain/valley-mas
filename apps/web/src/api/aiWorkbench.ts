@@ -49,6 +49,33 @@ export interface AIAppRun {
   createdAt: string;
 }
 
+export interface AIKnowledgeReference {
+  documentName: string;
+  chunkId: string;
+  excerpt: string;
+}
+
+export interface AIKnowledgeBase {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AIKnowledgeDocument {
+  id: string;
+  knowledgeBaseId: string;
+  name: string;
+  status: 'pending' | 'pending_embedding' | 'indexing' | 'ready' | 'failed';
+  errorCode: string;
+  chunkCount: number;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export function listAIApps(): Promise<{ list: AIApp[] }> {
   return request.get('/ai/apps');
 }
@@ -96,7 +123,7 @@ export async function streamDebugAIApp(
   message: string,
   handlers: {
     onDelta: (chunk: string) => void;
-    onDone: (run: AIAppRun, reply: string) => void;
+    onDone: (run: AIAppRun, reply: string, references: AIKnowledgeReference[]) => void;
     onError: (message: string, run?: AIAppRun) => void;
   },
   signal?: AbortSignal,
@@ -145,10 +172,13 @@ export async function streamDebugAIApp(
           message?: string;
           run?: AIAppRun;
           reply?: string;
+          references?: AIKnowledgeReference[];
         };
         if (event.type === 'delta' && event.chunk) handlers.onDelta(event.chunk);
         if (event.type === 'error') handlers.onError(event.message || '调试运行失败', event.run);
-        if (event.type === 'done' && event.run) handlers.onDone(event.run, event.reply || '');
+        if (event.type === 'done' && event.run) {
+          handlers.onDone(event.run, event.reply || '', event.references || []);
+        }
       } catch {
         /* Ignore malformed partial events. */
       }
@@ -158,4 +188,48 @@ export async function streamDebugAIApp(
 
 export function listAIAppRuns(appId: string): Promise<{ list: AIAppRun[] }> {
   return request.get(`/ai/apps/${appId}/runs`);
+}
+
+export function listAIKnowledgeBases(): Promise<{ list: AIKnowledgeBase[] }> {
+  return request.get('/ai/knowledge-bases');
+}
+
+export function createAIKnowledgeBase(data: {
+  name: string;
+  description?: string;
+}): Promise<AIKnowledgeBase> {
+  return request.post('/ai/knowledge-bases', data);
+}
+
+export function listAIKnowledgeDocuments(
+  knowledgeBaseId: string,
+): Promise<{ list: AIKnowledgeDocument[] }> {
+  return request.get(`/ai/knowledge-bases/${knowledgeBaseId}/documents`);
+}
+
+export function uploadAIKnowledgeDocument(
+  knowledgeBaseId: string,
+  formData: FormData,
+): Promise<{ document: AIKnowledgeDocument }> {
+  return request.post(`/ai/knowledge-bases/${knowledgeBaseId}/documents`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+}
+
+export function retryAIKnowledgeDocument(
+  knowledgeBaseId: string,
+  documentId: string,
+): Promise<{ document: AIKnowledgeDocument }> {
+  return request.post(`/ai/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/retry`);
+}
+
+export function listAIAppKnowledgeBases(appId: string): Promise<{ list: AIKnowledgeBase[] }> {
+  return request.get(`/ai/apps/${appId}/knowledge-bases`);
+}
+
+export function replaceAIAppKnowledgeBases(
+  appId: string,
+  knowledgeBaseIds: string[],
+): Promise<{ knowledgeBaseIds: string[] }> {
+  return request.put(`/ai/apps/${appId}/knowledge-bases`, { knowledgeBaseIds });
 }

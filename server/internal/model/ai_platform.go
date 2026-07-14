@@ -63,6 +63,7 @@ type AIAppRun struct {
 	Input         string         `gorm:"type:text;not null" json:"input"`
 	Output        string         `gorm:"type:text" json:"output"`
 	ErrorCode     string         `gorm:"size:80" json:"errorCode"`
+	References    string         `gorm:"type:text;not null;default:'[]'" json:"-"`
 	DurationMs    int64          `json:"durationMs"`
 	CreatedAt     time.Time      `json:"createdAt"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
@@ -100,9 +101,36 @@ type AIKnowledgeDocument struct {
 	Status          string         `gorm:"size:20;index;not null;default:'pending'" json:"status"`
 	ErrorCode       string         `gorm:"size:80" json:"errorCode"`
 	ChunkCount      int            `json:"chunkCount"`
+	MimeType        string         `gorm:"size:120" json:"mimeType"`
+	SizeBytes       int64          `json:"sizeBytes"`
+	SourceKey       string         `gorm:"size:500" json:"-"`
+	ParsedText      string         `gorm:"type:text" json:"-"`
 	CreatedAt       time.Time      `json:"createdAt"`
 	UpdatedAt       time.Time      `json:"updatedAt"`
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// AIKnowledgeChunk contains the minimum data needed for owner-scoped RAG.
+// Embedding is populated only after the ARK embedding stage succeeds. The
+// pgvector column is owned exclusively by the reviewed SQL migration so local
+// GORM AutoMigrate never makes startup depend on an optional DB extension.
+type AIKnowledgeChunk struct {
+	ID         Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	DocumentID Int64String    `gorm:"index:uidx_ai_knowledge_chunk,unique;not null" json:"documentId"`
+	UserID     Int64String    `gorm:"index;not null" json:"userId"`
+	Position   int            `gorm:"index:uidx_ai_knowledge_chunk,unique;not null" json:"position"`
+	Content    string         `gorm:"type:text;not null" json:"content"`
+	TokenCount int            `json:"tokenCount"`
+	Embedding  string         `gorm:"-" json:"-"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (c *AIKnowledgeChunk) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == 0 {
+		c.ID = Int64String(utils.GenerateID())
+	}
+	return nil
 }
 
 func (d *AIKnowledgeDocument) BeforeCreate(tx *gorm.DB) error {

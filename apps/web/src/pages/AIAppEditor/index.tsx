@@ -6,16 +6,22 @@ import {
   type AIApp,
   type AIAppRun,
   type AIAppVersion,
+  type AIKnowledgeBase,
+  type AIKnowledgeReference,
   getAIApp,
   getAPIErrorMessage,
+  listAIAppKnowledgeBases,
   listAIAppRuns,
+  listAIKnowledgeBases,
   publishAIApp,
+  replaceAIAppKnowledgeBases,
   restoreAIAppVersion,
   saveAIAppVersion,
   streamDebugAIApp,
 } from '@/api/aiWorkbench';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -65,8 +71,12 @@ export default function AIAppEditor() {
   const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
   const [debugMessage, setDebugMessage] = useState('');
   const [debugReply, setDebugReply] = useState('');
+  const [debugReferences, setDebugReferences] = useState<AIKnowledgeReference[]>([]);
   const [debugging, setDebugging] = useState(false);
   const [runs, setRuns] = useState<AIAppRun[]>([]);
+  const [knowledgeBases, setKnowledgeBases] = useState<AIKnowledgeBase[]>([]);
+  const [boundKnowledgeBaseIDs, setBoundKnowledgeBaseIDs] = useState<string[]>([]);
+  const [savingKnowledgeBases, setSavingKnowledgeBases] = useState(false);
   const abortDebugRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -82,10 +92,18 @@ export default function AIAppEditor() {
         setName(detail.app.name);
         setDescription(detail.app.description);
         setConfig(parseAgentConfig(detail.versions[0]));
-        return listAIAppRuns(appId);
+        return Promise.all([
+          listAIAppRuns(appId),
+          listAIKnowledgeBases(),
+          listAIAppKnowledgeBases(appId),
+        ]);
       })
       .then((data) => {
-        if (data) setRuns(data.list);
+        if (!data) return;
+        const [runResult, knowledgeBaseResult, bindingResult] = data;
+        setRuns(runResult.list);
+        setKnowledgeBases(knowledgeBaseResult.list);
+        setBoundKnowledgeBaseIDs(bindingResult.list.map((base) => base.id));
       })
       .catch((error) => toast.error(getAPIErrorMessage(error, '加载 AI 应用失败')))
       .finally(() => setLoading(false));
@@ -163,6 +181,20 @@ export default function AIAppEditor() {
     }
   };
 
+  const updateKnowledgeBaseBindings = async (knowledgeBaseIDs: string[]) => {
+    if (!appId) return;
+    try {
+      setSavingKnowledgeBases(true);
+      const result = await replaceAIAppKnowledgeBases(appId, knowledgeBaseIDs);
+      setBoundKnowledgeBaseIDs(result.knowledgeBaseIds);
+      toast.success('资料库已更新');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '更新资料库失败'));
+    } finally {
+      setSavingKnowledgeBases(false);
+    }
+  };
+
   const debug = async () => {
     if (!appId || !debugMessage.trim()) {
       toast.error('请输入调试消息');
@@ -171,6 +203,7 @@ export default function AIAppEditor() {
     try {
       setDebugging(true);
       setDebugReply('');
+      setDebugReferences([]);
       await ensureDraftVersion();
       const controller = new AbortController();
       abortDebugRef.current = controller;
@@ -179,8 +212,9 @@ export default function AIAppEditor() {
         debugMessage.trim(),
         {
           onDelta: (chunk) => setDebugReply((reply) => reply + chunk),
-          onDone: (run, reply) => {
+          onDone: (run, reply, references) => {
             setDebugReply(reply);
+            setDebugReferences(references);
             setRuns((items) => [run, ...items]);
           },
           onError: (message, run) => {
@@ -300,6 +334,48 @@ export default function AIAppEditor() {
                 }
               />
             </div>
+            <div className="space-y-3 rounded-2xl bg-muted/35 p-4">
+              <div>
+                <p className="text-sm font-medium">资料库</p>
+                <p className="mt-1 text-xs text-muted-foreground">已索引的资料会在调试时作为参考</p>
+              </div>
+              {knowledgeBases.length === 0 ? (
+                <p className="text-sm text-muted-foreground">还没有可绑定的资料库</p>
+              ) : (
+                <div className="space-y-2">
+                  {knowledgeBases.map((knowledgeBase) => {
+                    const checked = boundKnowledgeBaseIDs.includes(knowledgeBase.id);
+                    return (
+                      <label
+                        key={knowledgeBase.id}
+                        className="flex cursor-pointer items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          disabled={savingKnowledgeBases}
+                          onCheckedChange={(nextChecked) => {
+                            const next = nextChecked
+                              ? [...boundKnowledgeBaseIDs, knowledgeBase.id]
+                              : boundKnowledgeBaseIDs.filter((id) => id !== knowledgeBase.id);
+                            void updateKnowledgeBaseBindings(next);
+                          }}
+                        />
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium">
+                            {knowledgeBase.name}
+                          </span>
+                          {knowledgeBase.description && (
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {knowledgeBase.description}
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
           <aside className="space-y-5 bg-muted/25 p-6 sm:p-8">
             <div>
@@ -321,9 +397,26 @@ export default function AIAppEditor() {
               </Button>
             )}
             {debugReply && (
-              <div className="whitespace-pre-wrap rounded-2xl border border-border/70 bg-background/70 p-4 text-sm">
-                {debugReply}
-              </div>
+              <>
+                <div className="whitespace-pre-wrap rounded-2xl border border-border/70 bg-background/70 p-4 text-sm">
+                  {debugReply}
+                </div>
+                {debugReferences.length > 0 && (
+                  <div className="rounded-2xl bg-background/60 p-4">
+                    <p className="text-xs font-medium text-muted-foreground">参考资料</p>
+                    <div className="mt-2 space-y-2">
+                      {debugReferences.map((reference) => (
+                        <div key={reference.chunkId} className="text-xs">
+                          <p className="font-medium">{reference.documentName}</p>
+                          <p className="mt-0.5 line-clamp-2 text-muted-foreground">
+                            {reference.excerpt}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
             <div className="border-t border-border/70 pt-5">
               <p className="text-sm font-semibold">最近运行</p>

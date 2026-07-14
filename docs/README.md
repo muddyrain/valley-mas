@@ -5,6 +5,7 @@
 ## 核心文档
 
 - [项目指南](./PROJECT_GUIDE.md)：项目定位、技术栈、模块地图、开发命令、端口和环境变量。
+- [AI 工作台知识库与 RAG 实施计划](./superpowers/plans/2026-07-14-ai-knowledge-rag.md)：私有资料库、ARK embedding、pgvector 检索和智能体引用的阶段状态。
 - [Harness Engineering](./HARNESS_ENGINEERING.md)：AI coding agent 在本仓库中的上下文入口、工具边界、验证命令、评审回路和回归证据。
 - [Agent 常见错误模式](./patterns/agent-pitfalls.md)：只记录 Valley 已确认的失败模式，并把重复问题导向脚本、测试或 CI。
 - [Code Review 规则](../.code-review/README.md)：按 Security、correctness、Go、React/UI 风险加载的轻量 review 清单。

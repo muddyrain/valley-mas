@@ -1,4 +1,4 @@
-import { FileText, LayoutDashboard, Plus, Sparkles, Trash2, Zap } from 'lucide-react';
+import { BookOpenText, FileText, LayoutDashboard, Plus, Sparkles, Trash2, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -94,10 +94,20 @@ export default function Workbench() {
                 </h1>
                 <p className="text-muted-foreground">管理智能体与自动化工作流</p>
               </div>
-              <Button size="lg" onClick={() => navigate('/workbench/create')}>
-                <Plus className="h-5 w-5 mr-2" />
-                创建工作流
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => navigate('/workbench/knowledge')}
+                >
+                  <BookOpenText className="mr-2 h-5 w-5" />
+                  知识库
+                </Button>
+                <Button size="lg" onClick={() => navigate('/workbench/create')}>
+                  <Plus className="h-5 w-5 mr-2" />
+                  创建工作流
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

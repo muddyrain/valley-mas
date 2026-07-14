@@ -423,6 +423,7 @@ func coreMigrationModels() []any {
 		&model.AIAppRun{},
 		&model.AIKnowledgeBase{},
 		&model.AIKnowledgeDocument{},
+		&model.AIKnowledgeChunk{},
 		&model.AIAppKnowledgeBase{},
 		&model.AIAppToolBinding{},
 		&model.AIAPIKey{},

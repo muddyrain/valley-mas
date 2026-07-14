@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -8,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -31,6 +33,19 @@ var builtInAITools = []gin.H{
 	{"name": "blog.create_draft", "description": "创建当前用户的博客草稿", "permission": "write"},
 	{"name": "blog.update_draft", "description": "更新当前用户的博客草稿", "permission": "write"},
 	{"name": "resource.create_draft", "description": "创建当前用户的资源草稿", "permission": "write"},
+}
+
+type aiKnowledgeReference struct {
+	DocumentName string            `json:"documentName"`
+	ChunkID      model.Int64String `json:"chunkId"`
+	Excerpt      string            `json:"excerpt"`
+}
+
+type aiKnowledgeSearchRow struct {
+	ChunkID      model.Int64String `gorm:"column:chunk_id"`
+	DocumentName string            `gorm:"column:document_name"`
+	Content      string            `gorm:"column:content"`
+	Score        float64           `gorm:"column:score"`
 }
 
 type aiAppPayload struct {
@@ -304,8 +319,8 @@ func PublishAIApp(c *gin.Context) {
 	Success(c, gin.H{"appId": app.ID, "publishedVersionId": version.ID})
 }
 
-// DebugAIApp executes the current draft version privately. Tool bindings and
-// knowledge bases are intentionally excluded until their reviewed runtimes land.
+// DebugAIApp executes the current draft version privately with only the
+// owner's explicitly bound, ready knowledge-base segments as RAG context.
 func DebugAIApp(c *gin.Context) {
 	started := time.Now()
 	userID, ok := currentAIAppUser(c)
@@ -347,8 +362,18 @@ func DebugAIApp(c *gin.Context) {
 		Error(c, http.StatusServiceUnavailable, configErr)
 		return
 	}
+	knowledgeContext, references, retrievalErr := retrieveAIKnowledgeContext(c.Request.Context(), userID, app.ID, message)
+	if retrievalErr != nil {
+		persistAIAppRun(app, version, userID, "failed", arkConfig.Model, message, "", "KNOWLEDGE_RETRIEVAL_FAILED", started)
+		Error(c, http.StatusServiceUnavailable, "知识库检索暂不可用")
+		return
+	}
 	messages := make([]*arkmodel.ChatCompletionMessage, 0, 2)
-	if system := strings.TrimSpace(config.SystemPrompt); system != "" {
+	system := strings.TrimSpace(config.SystemPrompt)
+	if knowledgeContext != "" {
+		system = strings.TrimSpace(system + "\n\n以下是与当前问题相关的私有参考资料。请优先依据这些资料回答；资料不足时明确说明。\n" + knowledgeContext)
+	}
+	if system != "" {
 		messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleSystem, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &system}})
 	}
 	messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleUser, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &message}})
@@ -359,7 +384,7 @@ func DebugAIApp(c *gin.Context) {
 		return
 	}
 	if payload.Stream {
-		streamDebugAIApp(c, client, arkConfig.Model, messages, app, version, userID, message, started)
+		streamDebugAIApp(c, client, arkConfig.Model, messages, app, version, userID, message, references, started)
 		return
 	}
 	response, err := client.CreateChatCompletion(c.Request.Context(), aiclient.NewARKChatRequest(arkConfig.Model, messages))
@@ -378,11 +403,11 @@ func DebugAIApp(c *gin.Context) {
 	if modelName == "" {
 		modelName = arkConfig.Model
 	}
-	run := persistAIAppRun(app, version, userID, "succeeded", modelName, message, reply, "", started)
-	Success(c, gin.H{"run": run, "reply": reply, "model": modelName, "versionId": version.ID})
+	run := persistAIAppRunWithReferences(app, version, userID, "succeeded", modelName, message, reply, "", references, started)
+	Success(c, gin.H{"run": run, "reply": reply, "model": modelName, "versionId": version.ID, "references": references})
 }
 
-func streamDebugAIApp(c *gin.Context, client *arkruntime.Client, modelID string, messages []*arkmodel.ChatCompletionMessage, app model.AIApp, version model.AIAppVersion, userID model.Int64String, message string, started time.Time) {
+func streamDebugAIApp(c *gin.Context, client *arkruntime.Client, modelID string, messages []*arkmodel.ChatCompletionMessage, app model.AIApp, version model.AIAppVersion, userID model.Int64String, message string, references []aiKnowledgeReference, started time.Time) {
 	stream, err := client.CreateChatCompletionStream(c.Request.Context(), aiclient.NewARKChatRequest(modelID, messages))
 	if err != nil {
 		persistAIAppRun(app, version, userID, "failed", modelID, message, "", "ARK_UPSTREAM_FAILED", started)
@@ -428,8 +453,88 @@ func streamDebugAIApp(c *gin.Context, client *arkruntime.Client, modelID string,
 		_ = writer.Send(gin.H{"type": "error", "message": "AI 未返回有效内容", "run": run})
 		return
 	}
-	run := persistAIAppRun(app, version, userID, "succeeded", currentModel, message, result, "", started)
-	_ = writer.Send(gin.H{"type": "done", "run": run, "reply": result, "model": currentModel})
+	run := persistAIAppRunWithReferences(app, version, userID, "succeeded", currentModel, message, result, "", references, started)
+	_ = writer.Send(gin.H{"type": "done", "run": run, "reply": result, "model": currentModel, "references": references})
+}
+
+func retrieveAIKnowledgeContext(ctx context.Context, userID, appID model.Int64String, message string) (string, []aiKnowledgeReference, error) {
+	db := database.GetDB()
+	if db == nil || db.Dialector.Name() != "postgres" {
+		var count int64
+		if db != nil {
+			_ = db.Model(&model.AIAppKnowledgeBase{}).Where("app_id = ?", appID).Count(&count).Error
+		}
+		if count > 0 {
+			return "", nil, errors.New("RAG requires PostgreSQL")
+		}
+		return "", nil, nil
+	}
+	if !hasPGVectorExtension(db) {
+		return "", nil, errors.New("pgvector extension is not installed")
+	}
+	var bindings []model.AIAppKnowledgeBase
+	if err := db.Where("app_id = ?", appID).Find(&bindings).Error; err != nil {
+		return "", nil, err
+	}
+	if len(bindings) == 0 {
+		return "", nil, nil
+	}
+	knowledgeBaseIDs := make([]model.Int64String, 0, len(bindings))
+	for _, binding := range bindings {
+		knowledgeBaseIDs = append(knowledgeBaseIDs, binding.KnowledgeBaseID)
+	}
+	var readyDocumentCount int64
+	if err := db.Model(&model.AIKnowledgeDocument{}).
+		Where("user_id = ? AND knowledge_base_id IN ? AND status = ?", userID, knowledgeBaseIDs, "ready").
+		Count(&readyDocumentCount).Error; err != nil {
+		return "", nil, err
+	}
+	if readyDocumentCount == 0 {
+		return "", nil, nil
+	}
+	queryVectors, err := aiclient.CreateARKEmbeddings(ctx, []string{message})
+	if err != nil {
+		return "", nil, err
+	}
+	queryVector, err := json.Marshal(queryVectors[0])
+	if err != nil {
+		return "", nil, err
+	}
+	var rows []aiKnowledgeSearchRow
+	err = db.Raw(`
+		SELECT chunks.id AS chunk_id, documents.name AS document_name, chunks.content,
+		       1 - (chunks.embedding <=> ?::vector) AS score
+		FROM ai_knowledge_chunks AS chunks
+		JOIN ai_knowledge_documents AS documents ON documents.id = chunks.document_id
+		JOIN ai_knowledge_bases AS knowledge_bases ON knowledge_bases.id = documents.knowledge_base_id
+		WHERE chunks.user_id = ? AND documents.user_id = ? AND knowledge_bases.user_id = ?
+		  AND documents.knowledge_base_id IN ? AND documents.status = 'ready'
+		  AND chunks.embedding IS NOT NULL
+		ORDER BY chunks.embedding <=> ?::vector
+		LIMIT 4`, string(queryVector), userID, userID, userID, knowledgeBaseIDs, string(queryVector)).Scan(&rows).Error
+	if err != nil {
+		return "", nil, err
+	}
+	var contextBuilder strings.Builder
+	references := make([]aiKnowledgeReference, 0, len(rows))
+	const minKnowledgeScore = 0.45
+	const maxKnowledgeContextRunes = 4500
+	for _, row := range rows {
+		if row.Score < minKnowledgeScore {
+			continue
+		}
+		content := aiclient.TrimRunes(strings.TrimSpace(row.Content), 1600)
+		if content == "" || len([]rune(contextBuilder.String()))+len([]rune(content)) > maxKnowledgeContextRunes {
+			continue
+		}
+		contextBuilder.WriteString("[资料：")
+		contextBuilder.WriteString(row.DocumentName)
+		contextBuilder.WriteString("]\n")
+		contextBuilder.WriteString(content)
+		contextBuilder.WriteString("\n\n")
+		references = append(references, aiKnowledgeReference{DocumentName: row.DocumentName, ChunkID: row.ChunkID, Excerpt: aiclient.TrimRunes(content, 240)})
+	}
+	return strings.TrimSpace(contextBuilder.String()), references, nil
 }
 
 func ListAIAppRuns(c *gin.Context) {
@@ -450,7 +555,12 @@ func ListAIAppRuns(c *gin.Context) {
 }
 
 func persistAIAppRun(app model.AIApp, version model.AIAppVersion, userID model.Int64String, status, modelName, input, output, errorCode string, started time.Time) model.AIAppRun {
-	run := model.AIAppRun{AppID: app.ID, VersionID: version.ID, UserID: userID, Status: status, Model: modelName, Input: aiclient.TrimRunes(input, 1000), Output: aiclient.TrimRunes(output, 2000), ErrorCode: errorCode, DurationMs: time.Since(started).Milliseconds()}
+	return persistAIAppRunWithReferences(app, version, userID, status, modelName, input, output, errorCode, nil, started)
+}
+
+func persistAIAppRunWithReferences(app model.AIApp, version model.AIAppVersion, userID model.Int64String, status, modelName, input, output, errorCode string, references []aiKnowledgeReference, started time.Time) model.AIAppRun {
+	referenceSummary, _ := json.Marshal(references)
+	run := model.AIAppRun{AppID: app.ID, VersionID: version.ID, UserID: userID, Status: status, Model: modelName, Input: aiclient.TrimRunes(input, 1000), Output: aiclient.TrimRunes(output, 2000), ErrorCode: errorCode, References: string(referenceSummary), DurationMs: time.Since(started).Milliseconds()}
 	_ = database.GetDB().Create(&run).Error
 	return run
 }
@@ -459,6 +569,84 @@ func ListAIAppTools(c *gin.Context) {
 	if _, ok := currentAIAppUser(c); ok {
 		Success(c, gin.H{"list": builtInAITools})
 	}
+}
+
+func ListAIAppKnowledgeBases(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	app, found := findAIApp(c, userID)
+	if !found {
+		return
+	}
+	var items []model.AIKnowledgeBase
+	if err := database.GetDB().Table("ai_knowledge_bases AS knowledge_bases").
+		Select("knowledge_bases.*").
+		Joins("JOIN ai_app_knowledge_bases bindings ON bindings.knowledge_base_id = knowledge_bases.id").
+		Where("bindings.app_id = ? AND knowledge_bases.user_id = ?", app.ID, userID).
+		Order("knowledge_bases.updated_at DESC").
+		Find(&items).Error; err != nil {
+		Error(c, 500, "加载智能体知识库失败")
+		return
+	}
+	Success(c, gin.H{"list": items})
+}
+
+func ReplaceAIAppKnowledgeBases(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	app, found := findAIApp(c, userID)
+	if !found {
+		return
+	}
+	var payload struct {
+		KnowledgeBaseIDs []model.Int64String `json:"knowledgeBaseIds"`
+	}
+	if c.ShouldBindJSON(&payload) != nil {
+		Error(c, 400, "知识库参数错误")
+		return
+	}
+	seen := make(map[model.Int64String]struct{}, len(payload.KnowledgeBaseIDs))
+	ids := make([]model.Int64String, 0, len(payload.KnowledgeBaseIDs))
+	for _, id := range payload.KnowledgeBaseIDs {
+		if id > 0 {
+			if _, exists := seen[id]; !exists {
+				seen[id] = struct{}{}
+				ids = append(ids, id)
+			}
+		}
+	}
+	if len(ids) > 0 {
+		var count int64
+		if err := database.GetDB().Model(&model.AIKnowledgeBase{}).Where("user_id = ? AND id IN ?", userID, ids).Count(&count).Error; err != nil {
+			Error(c, 500, "校验知识库失败")
+			return
+		}
+		if count != int64(len(ids)) {
+			Error(c, 400, "包含无权访问的知识库")
+			return
+		}
+	}
+	bindings := make([]model.AIAppKnowledgeBase, 0, len(ids))
+	for _, knowledgeBaseID := range ids {
+		bindings = append(bindings, model.AIAppKnowledgeBase{AppID: app.ID, KnowledgeBaseID: knowledgeBaseID})
+	}
+	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("app_id = ?", app.ID).Delete(&model.AIAppKnowledgeBase{}).Error; err != nil {
+			return err
+		}
+		if len(bindings) > 0 {
+			return tx.Create(&bindings).Error
+		}
+		return nil
+	}); err != nil {
+		Error(c, 500, "保存智能体知识库失败")
+		return
+	}
+	Success(c, gin.H{"knowledgeBaseIds": ids})
 }
 
 func ReplaceAIAppTools(c *gin.Context) {
@@ -537,6 +725,317 @@ func CreateAIKnowledgeBase(c *gin.Context) {
 		return
 	}
 	Success(c, input)
+}
+
+func UpdateAIKnowledgeBase(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	id, err := parsePathInt64(c, "knowledgeBaseId")
+	if err != nil {
+		Error(c, 400, "无效的知识库 ID")
+		return
+	}
+	var input struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if c.ShouldBindJSON(&input) != nil || strings.TrimSpace(input.Name) == "" {
+		Error(c, 400, "知识库名称不能为空")
+		return
+	}
+	result := database.GetDB().Model(&model.AIKnowledgeBase{}).Where("id = ? AND user_id = ?", id, userID).Updates(map[string]any{"name": strings.TrimSpace(input.Name), "description": strings.TrimSpace(input.Description)})
+	if result.Error != nil {
+		Error(c, 500, "更新知识库失败")
+		return
+	}
+	if result.RowsAffected == 0 {
+		Error(c, 404, "知识库不存在")
+		return
+	}
+	Success(c, nil)
+}
+
+func DeleteAIKnowledgeBase(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	id, err := parsePathInt64(c, "knowledgeBaseId")
+	if err != nil {
+		Error(c, 400, "无效的知识库 ID")
+		return
+	}
+	var base model.AIKnowledgeBase
+	if database.GetDB().Where("id = ? AND user_id = ?", id, userID).First(&base).Error != nil {
+		Error(c, 404, "知识库不存在")
+		return
+	}
+	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		var documentIDs []model.Int64String
+		if err := tx.Model(&model.AIKnowledgeDocument{}).Where("knowledge_base_id = ? AND user_id = ?", id, userID).Pluck("id", &documentIDs).Error; err != nil {
+			return err
+		}
+		if len(documentIDs) > 0 {
+			if err := tx.Where("document_id IN ?", documentIDs).Delete(&model.AIKnowledgeChunk{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("id IN ?", documentIDs).Delete(&model.AIKnowledgeDocument{}).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Where("id = ? AND user_id = ?", id, userID).Delete(&model.AIKnowledgeBase{}).Error
+	}); err != nil {
+		Error(c, 500, "删除知识库失败")
+		return
+	}
+	Success(c, nil)
+}
+
+func ListAIKnowledgeDocuments(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	id, err := parsePathInt64(c, "knowledgeBaseId")
+	if err != nil {
+		Error(c, 400, "无效的知识库 ID")
+		return
+	}
+	var base model.AIKnowledgeBase
+	if database.GetDB().Where("id = ? AND user_id = ?", id, userID).First(&base).Error != nil {
+		Error(c, 404, "知识库不存在")
+		return
+	}
+	var documents []model.AIKnowledgeDocument
+	if err := database.GetDB().Where("knowledge_base_id = ? AND user_id = ?", id, userID).Order("created_at DESC").Find(&documents).Error; err != nil {
+		Error(c, 500, "加载知识库文档失败")
+		return
+	}
+	Success(c, gin.H{"list": documents})
+}
+
+const (
+	knowledgeDocumentMaxBytes = 2 * 1024 * 1024
+	knowledgeChunkMaxCount    = 200
+	knowledgeChunkSize        = 1000
+	knowledgeChunkOverlap     = 150
+	knowledgeEmbeddingTimeout = 60 * time.Second
+)
+
+var scheduleAIKnowledgeDocumentIndexing = func(documentID model.Int64String) {
+	go indexAIKnowledgeDocument(documentID)
+}
+
+func UploadAIKnowledgeDocument(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	id, err := parsePathInt64(c, "knowledgeBaseId")
+	if err != nil {
+		Error(c, 400, "无效的知识库 ID")
+		return
+	}
+	var base model.AIKnowledgeBase
+	if database.GetDB().Where("id = ? AND user_id = ?", id, userID).First(&base).Error != nil {
+		Error(c, 404, "知识库不存在")
+		return
+	}
+	file, err := c.FormFile("file")
+	if err != nil {
+		Error(c, 400, "请上传文档")
+		return
+	}
+	if file.Size <= 0 || file.Size > knowledgeDocumentMaxBytes {
+		Error(c, 400, "文档大小需在 1B 到 2MB 之间")
+		return
+	}
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if ext != ".md" && ext != ".markdown" && ext != ".txt" {
+		Error(c, 400, "当前仅支持 Markdown 或 TXT 文档")
+		return
+	}
+	src, err := file.Open()
+	if err != nil {
+		Error(c, 400, "读取文档失败")
+		return
+	}
+	defer src.Close()
+	content, err := io.ReadAll(io.LimitReader(src, knowledgeDocumentMaxBytes+1))
+	if err != nil || len(content) == 0 || len(content) > knowledgeDocumentMaxBytes {
+		Error(c, 400, "读取文档失败")
+		return
+	}
+	text := strings.TrimSpace(string(content))
+	if text == "" {
+		Error(c, 400, "文档没有可解析文本")
+		return
+	}
+	chunks := splitKnowledgeText(text)
+	if len(chunks) == 0 || len(chunks) > knowledgeChunkMaxCount {
+		Error(c, 400, "文档分段数量超出限制")
+		return
+	}
+	document := model.AIKnowledgeDocument{
+		KnowledgeBaseID: model.Int64String(id),
+		UserID:          userID,
+		Name:            file.Filename,
+		Status:          "pending_embedding",
+		ChunkCount:      len(chunks),
+		MimeType:        file.Header.Get("Content-Type"),
+		SizeBytes:       file.Size,
+		ParsedText:      text,
+	}
+	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&document).Error; err != nil {
+			return err
+		}
+		rows := make([]model.AIKnowledgeChunk, 0, len(chunks))
+		for position, value := range chunks {
+			rows = append(rows, model.AIKnowledgeChunk{
+				DocumentID: document.ID,
+				UserID:     userID,
+				Position:   position,
+				Content:    value,
+				TokenCount: len([]rune(value)),
+			})
+		}
+		return tx.Create(&rows).Error
+	}); err != nil {
+		Error(c, 500, "保存知识库文档失败")
+		return
+	}
+	scheduleAIKnowledgeDocumentIndexing(document.ID)
+	Success(c, gin.H{"document": document})
+}
+
+func RetryAIKnowledgeDocument(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	knowledgeBaseID, err := parsePathInt64(c, "knowledgeBaseId")
+	if err != nil {
+		Error(c, 400, "无效的知识库 ID")
+		return
+	}
+	documentID, err := parsePathInt64(c, "documentId")
+	if err != nil {
+		Error(c, 400, "无效的文档 ID")
+		return
+	}
+	var document model.AIKnowledgeDocument
+	if database.GetDB().Where("id = ? AND knowledge_base_id = ? AND user_id = ?", documentID, knowledgeBaseID, userID).First(&document).Error != nil {
+		Error(c, 404, "知识库文档不存在")
+		return
+	}
+	if document.Status == "indexing" {
+		Error(c, 409, "文档正在索引")
+		return
+	}
+	if err := database.GetDB().Model(&document).Updates(map[string]any{"status": "pending_embedding", "error_code": ""}).Error; err != nil {
+		Error(c, 500, "重试文档索引失败")
+		return
+	}
+	document.Status = "pending_embedding"
+	document.ErrorCode = ""
+	scheduleAIKnowledgeDocumentIndexing(document.ID)
+	Success(c, gin.H{"document": document})
+}
+
+func indexAIKnowledgeDocument(documentID model.Int64String) {
+	db := database.GetDB()
+	if db == nil {
+		return
+	}
+	if db.Dialector.Name() != "postgres" {
+		markAIKnowledgeDocumentFailed(documentID, "RAG_POSTGRES_REQUIRED")
+		return
+	}
+	if !hasPGVectorExtension(db) {
+		markAIKnowledgeDocumentFailed(documentID, "PGVECTOR_NOT_INSTALLED")
+		return
+	}
+	if _, errMsg := aiclient.ReadARKEmbeddingConfig(); errMsg != "" {
+		markAIKnowledgeDocumentFailed(documentID, knowledgeEmbeddingErrorCode(errMsg))
+		return
+	}
+	if err := db.Model(&model.AIKnowledgeDocument{}).Where("id = ?", documentID).Updates(map[string]any{"status": "indexing", "error_code": ""}).Error; err != nil {
+		return
+	}
+	var chunks []model.AIKnowledgeChunk
+	if err := db.Where("document_id = ?", documentID).Order("position ASC").Find(&chunks).Error; err != nil || len(chunks) == 0 {
+		markAIKnowledgeDocumentFailed(documentID, "KNOWLEDGE_CHUNKS_MISSING")
+		return
+	}
+	inputs := make([]string, 0, len(chunks))
+	for _, chunk := range chunks {
+		inputs = append(inputs, chunk.Content)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), knowledgeEmbeddingTimeout)
+	defer cancel()
+	vectors, err := aiclient.CreateARKEmbeddings(ctx, inputs)
+	if err != nil || len(vectors) != len(chunks) {
+		markAIKnowledgeDocumentFailed(documentID, "ARK_EMBEDDING_FAILED")
+		return
+	}
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		for index, chunk := range chunks {
+			vector, marshalErr := json.Marshal(vectors[index])
+			if marshalErr != nil {
+				return marshalErr
+			}
+			if err := tx.Exec("UPDATE ai_knowledge_chunks SET embedding = ?::vector WHERE id = ? AND document_id = ?", string(vector), chunk.ID, documentID).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Model(&model.AIKnowledgeDocument{}).Where("id = ?", documentID).Updates(map[string]any{"status": "ready", "error_code": ""}).Error
+	}); err != nil {
+		markAIKnowledgeDocumentFailed(documentID, "KNOWLEDGE_VECTOR_STORE_FAILED")
+	}
+}
+
+func markAIKnowledgeDocumentFailed(documentID model.Int64String, errorCode string) {
+	if db := database.GetDB(); db != nil {
+		_ = db.Model(&model.AIKnowledgeDocument{}).Where("id = ?", documentID).Updates(map[string]any{"status": "failed", "error_code": errorCode}).Error
+	}
+}
+
+func hasPGVectorExtension(db *gorm.DB) bool {
+	var available bool
+	if db == nil || db.Dialector.Name() != "postgres" {
+		return false
+	}
+	if err := db.Raw("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')").Scan(&available).Error; err != nil {
+		return false
+	}
+	return available
+}
+
+func knowledgeEmbeddingErrorCode(message string) string {
+	if strings.Contains(message, "ARK_EMBEDDING_MODEL") {
+		return "ARK_EMBEDDING_NOT_CONFIGURED"
+	}
+	return "ARK_NOT_CONFIGURED"
+}
+
+func splitKnowledgeText(text string) []string {
+	runes := []rune(text)
+	chunks := make([]string, 0, (len(runes)/knowledgeChunkSize)+1)
+	for start := 0; start < len(runes); {
+		end := start + knowledgeChunkSize
+		if end > len(runes) {
+			end = len(runes)
+		}
+		chunks = append(chunks, string(runes[start:end]))
+		if end == len(runes) {
+			break
+		}
+		start = end - knowledgeChunkOverlap
+	}
+	return chunks
 }
 
 func ListAIAPIKeys(c *gin.Context) {
