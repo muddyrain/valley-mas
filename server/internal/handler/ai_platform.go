@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -13,11 +14,15 @@ import (
 	"strings"
 	"time"
 
+	"valley-server/internal/ai/agent"
+	"valley-server/internal/ai/tools"
+	"valley-server/internal/ai/tools/content"
 	"valley-server/internal/aiclient"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ledongthuc/pdf"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
 	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"gorm.io/gorm"
@@ -377,6 +382,16 @@ func DebugAIApp(c *gin.Context) {
 		messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleSystem, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &system}})
 	}
 	messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleUser, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &message}})
+	registry, toolNames, toolErr := resolveAIAppTools(database.GetDB(), app.ID)
+	if toolErr != nil {
+		persistAIAppRun(app, version, userID, "failed", arkConfig.Model, message, "", "AI_TOOL_REGISTRY_UNAVAILABLE", started)
+		Error(c, http.StatusInternalServerError, "加载智能体工具失败")
+		return
+	}
+	if len(toolNames) > 0 {
+		debugAIAppWithTools(c, payload.Stream, arkConfig.Model, system, message, app, version, userID, registry, toolNames, references, started)
+		return
+	}
 	client := aiclient.ARKClient(60 * time.Second)
 	if client == nil {
 		persistAIAppRun(app, version, userID, "failed", arkConfig.Model, message, "", "ARK_NOT_CONFIGURED", started)
@@ -405,6 +420,75 @@ func DebugAIApp(c *gin.Context) {
 	}
 	run := persistAIAppRunWithReferences(app, version, userID, "succeeded", modelName, message, reply, "", references, started)
 	Success(c, gin.H{"run": run, "reply": reply, "model": modelName, "versionId": version.ID, "references": references})
+}
+
+func debugAIAppWithTools(c *gin.Context, stream bool, modelID, system, message string, app model.AIApp, version model.AIAppVersion, userID model.Int64String, registry *tools.Registry, toolNames []string, references []aiKnowledgeReference, started time.Time) {
+	client := aiclient.ARKClient(60 * time.Second)
+	if client == nil {
+		persistAIAppRun(app, version, userID, "failed", modelID, message, "", "ARK_NOT_CONFIGURED", started)
+		Error(c, http.StatusServiceUnavailable, "AI 服务未配置")
+		return
+	}
+	loop := agent.NewLocalLoop(&aiAppAgentBackend{client: client}, registry)
+	spec := agent.Spec{Provider: "ark", Model: modelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench"}
+	ctx := content.WithOwner(c.Request.Context(), userID)
+	if !stream {
+		result, err := loop.Run(ctx, spec, []agent.Message{{Role: agent.RoleUser, Content: message}})
+		if err != nil {
+			persistAIAppRun(app, version, userID, "failed", modelID, message, result.Reply, "AI_AGENT_RUN_FAILED", started)
+			Error(c, http.StatusBadGateway, "智能体工具调用失败")
+			return
+		}
+		if result.Model == "" {
+			result.Model = modelID
+		}
+		run := persistAIAppRunWithReferences(app, version, userID, "succeeded", result.Model, message, result.Reply, "", references, started)
+		Success(c, gin.H{"run": run, "reply": result.Reply, "model": result.Model, "versionId": version.ID, "references": references})
+		return
+	}
+	events, err := loop.RunStream(ctx, spec, []agent.Message{{Role: agent.RoleUser, Content: message}})
+	if err != nil {
+		persistAIAppRun(app, version, userID, "failed", modelID, message, "", "AI_AGENT_RUN_FAILED", started)
+		Error(c, http.StatusBadGateway, "智能体工具调用失败")
+		return
+	}
+	writer, err := aiclient.NewSSEWriter(c)
+	if err != nil {
+		return
+	}
+	var reply strings.Builder
+	var result agent.Result
+	var loopErr error
+	for event := range events {
+		switch event.Type {
+		case agent.EventDelta:
+			reply.WriteString(event.Delta)
+			_ = writer.Send(gin.H{"type": "delta", "chunk": event.Delta})
+		case agent.EventToolCall:
+			_ = writer.Send(gin.H{"type": "tool_call", "toolName": event.ToolName})
+		case agent.EventToolResult:
+			_ = writer.Send(gin.H{"type": "tool_result", "toolName": event.ToolName, "ok": !strings.Contains(string(event.ToolResult), `"ok":false`)})
+		case agent.EventDone:
+			if event.Result != nil {
+				result = *event.Result
+			}
+		case agent.EventError:
+			loopErr = event.Err
+		}
+	}
+	if result.Reply == "" {
+		result.Reply = reply.String()
+	}
+	if loopErr != nil {
+		run := persistAIAppRun(app, version, userID, "failed", modelID, message, result.Reply, "AI_AGENT_RUN_FAILED", started)
+		_ = writer.Send(gin.H{"type": "error", "message": "智能体工具调用失败", "run": run})
+		return
+	}
+	if result.Model == "" {
+		result.Model = modelID
+	}
+	run := persistAIAppRunWithReferences(app, version, userID, "succeeded", result.Model, message, result.Reply, "", references, started)
+	_ = writer.Send(gin.H{"type": "done", "run": run, "reply": result.Reply, "references": references})
 }
 
 func streamDebugAIApp(c *gin.Context, client *arkruntime.Client, modelID string, messages []*arkmodel.ChatCompletionMessage, app model.AIApp, version model.AIAppVersion, userID model.Int64String, message string, references []aiKnowledgeReference, started time.Time) {
@@ -569,6 +653,27 @@ func ListAIAppTools(c *gin.Context) {
 	if _, ok := currentAIAppUser(c); ok {
 		Success(c, gin.H{"list": builtInAITools})
 	}
+}
+
+func ListAIAppToolBindings(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	app, found := findAIApp(c, userID)
+	if !found {
+		return
+	}
+	var bindings []model.AIAppToolBinding
+	if err := database.GetDB().Where("app_id = ?", app.ID).Order("tool_name ASC").Find(&bindings).Error; err != nil {
+		Error(c, 500, "加载智能体工具失败")
+		return
+	}
+	names := make([]string, 0, len(bindings))
+	for _, binding := range bindings {
+		names = append(names, binding.ToolName)
+	}
+	Success(c, gin.H{"tools": names})
 }
 
 func ListAIAppKnowledgeBases(c *gin.Context) {
@@ -828,6 +933,48 @@ var scheduleAIKnowledgeDocumentIndexing = func(documentID model.Int64String) {
 	go indexAIKnowledgeDocument(documentID)
 }
 
+func resolveAIAppTools(db *gorm.DB, appID model.Int64String) (*tools.Registry, []string, error) {
+	registry := tools.NewRegistry()
+	if db == nil {
+		return registry, nil, errors.New("AI_TOOL_REGISTRY_UNAVAILABLE")
+	}
+	var bindings []model.AIAppToolBinding
+	if err := db.Where("app_id = ?", appID).Order("tool_name ASC").Find(&bindings).Error; err != nil {
+		return registry, nil, err
+	}
+	allowed := make([]string, 0, len(bindings))
+	for _, binding := range bindings {
+		switch binding.ToolName {
+		case "content.search":
+			if registry.Get(binding.ToolName) == nil {
+				registry.MustRegister(content.NewSearchTool(db))
+			}
+			allowed = append(allowed, binding.ToolName)
+		}
+	}
+	return registry, allowed, nil
+}
+
+func extractAIKnowledgeDocumentText(ext string, content []byte) (string, error) {
+	if ext != ".pdf" {
+		return strings.TrimSpace(string(content)), nil
+	}
+
+	reader, err := pdf.NewReader(bytes.NewReader(content), int64(len(content)))
+	if err != nil {
+		return "", err
+	}
+	plainText, err := reader.GetPlainText()
+	if err != nil {
+		return "", err
+	}
+	text, err := io.ReadAll(plainText)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(text)), nil
+}
+
 func UploadAIKnowledgeDocument(c *gin.Context) {
 	userID, ok := currentAIAppUser(c)
 	if !ok {
@@ -853,8 +1000,8 @@ func UploadAIKnowledgeDocument(c *gin.Context) {
 		return
 	}
 	ext := strings.ToLower(filepath.Ext(file.Filename))
-	if ext != ".md" && ext != ".markdown" && ext != ".txt" {
-		Error(c, 400, "当前仅支持 Markdown 或 TXT 文档")
+	if ext != ".md" && ext != ".markdown" && ext != ".txt" && ext != ".pdf" {
+		Error(c, 400, "当前仅支持 Markdown、TXT 或 PDF 文档")
 		return
 	}
 	src, err := file.Open()
@@ -868,8 +1015,25 @@ func UploadAIKnowledgeDocument(c *gin.Context) {
 		Error(c, 400, "读取文档失败")
 		return
 	}
-	text := strings.TrimSpace(string(content))
-	if text == "" {
+	text, parseErr := extractAIKnowledgeDocumentText(ext, content)
+	if parseErr != nil || text == "" {
+		if ext == ".pdf" {
+			document := model.AIKnowledgeDocument{
+				KnowledgeBaseID: model.Int64String(id),
+				UserID:          userID,
+				Name:            file.Filename,
+				Status:          "failed",
+				ErrorCode:       "DOCUMENT_PARSE_FAILED",
+				MimeType:        file.Header.Get("Content-Type"),
+				SizeBytes:       file.Size,
+			}
+			if err := database.GetDB().Create(&document).Error; err != nil {
+				Error(c, 500, "保存知识库文档失败")
+				return
+			}
+			Success(c, gin.H{"document": document})
+			return
+		}
 		Error(c, 400, "文档没有可解析文本")
 		return
 	}

@@ -2,10 +2,10 @@
 
 - [x] P0：隐藏前端未实现节点，保留博客导入工作流基线。
 - [x] P1：应用、版本、发布、API Key、历史版本恢复、智能体私有 SSE 调试与运行记录已完成；既有工作流会兼容映射为 workflow 应用，并保留节点级运行记录与统一应用运行摘要。工具调用 trace 将随 P3 的真实工具执行器接入，当前不伪造工具事件。
-- [~] P2：已完成 Markdown/TXT 摄取、ARK embedding、pgvector 检索引用、真实索引进度和单篇文档删除；PDF 摄取与生产 PostgreSQL/ARK 端到端验收待补。
-- [ ] P3：受控 Valley 工具与 Agent 工具调用。
+- [x] P2：已完成 Markdown/TXT/PDF 摄取、ARK embedding、pgvector 检索引用、真实索引进度和单篇文档删除；生产 PostgreSQL/ARK 端到端验收已完成。扫描件、加密或损坏 PDF 会明确标记为解析失败，不进入 embedding。
+- [x] P3：首个受控只读工具 `content.search` 已接入智能体编辑页绑定、owner 隔离查询、私有调试 Agent loop、ARK 文本增量流式转发与安全工具状态展示；浏览器与 ARK 真实调用、取消绑定和跨用户隔离验收已完成。写入工具、工具级持久化 trace 和公共调用 API 仍未开放。
 - [ ] P4：发布 API、配额和观测页面。
 
 每个阶段完成后必须运行定向类型检查、服务端测试和 Harness 检查；AI 真实调用还需验证配置缺失与上游失败分支。
 
-下一阶段顺序：先补齐 P2 的 PDF 摄取与真实环境验收，再进入 P3 的受控 Valley 工具与 Agent 工具执行；P4 的已发布应用公共 API、配额和观测页在 P3 稳定后推进。
+下一阶段顺序：进入 P4 的已发布应用公共 API、配额和观测页。

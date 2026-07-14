@@ -16,6 +16,13 @@ type Backend interface {
 	Chat(ctx context.Context, spec Spec, msgs []Message, tools []ToolDescriptor) (BackendResponse, error)
 }
 
+// StreamingBackend 是可选扩展。支持它的上游会在生成时通过 emit 推送文本增量，
+// 同时仍返回完整消息，以便 LocalLoop 统一处理 tool call 和最终结果。
+type StreamingBackend interface {
+	Backend
+	ChatStream(ctx context.Context, spec Spec, msgs []Message, tools []ToolDescriptor, emit func(string)) (BackendResponse, error)
+}
+
 // BackendResponse 是一次 Chat 的返回值。
 // Message 一定是 RoleAssistant。若 ToolCalls 非空表示模型请求调用工具。
 type BackendResponse struct {

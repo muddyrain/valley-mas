@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import {
   type AIApp,
   type AIAppRun,
+  type AIAppTool,
   type AIAppVersion,
   type AIKnowledgeBase,
   type AIKnowledgeReference,
@@ -12,9 +13,12 @@ import {
   getAPIErrorMessage,
   listAIAppKnowledgeBases,
   listAIAppRuns,
+  listAIAppToolBindings,
+  listAIAppTools,
   listAIKnowledgeBases,
   publishAIApp,
   replaceAIAppKnowledgeBases,
+  replaceAIAppTools,
   restoreAIAppVersion,
   saveAIAppVersion,
   streamDebugAIApp,
@@ -71,12 +75,16 @@ export default function AIAppEditor() {
   const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
   const [debugMessage, setDebugMessage] = useState('');
   const [debugReply, setDebugReply] = useState('');
+  const [debugToolStatus, setDebugToolStatus] = useState<string | null>(null);
   const [debugReferences, setDebugReferences] = useState<AIKnowledgeReference[]>([]);
   const [debugging, setDebugging] = useState(false);
   const [runs, setRuns] = useState<AIAppRun[]>([]);
   const [knowledgeBases, setKnowledgeBases] = useState<AIKnowledgeBase[]>([]);
   const [boundKnowledgeBaseIDs, setBoundKnowledgeBaseIDs] = useState<string[]>([]);
   const [savingKnowledgeBases, setSavingKnowledgeBases] = useState(false);
+  const [tools, setTools] = useState<AIAppTool[]>([]);
+  const [boundTools, setBoundTools] = useState<string[]>([]);
+  const [savingTools, setSavingTools] = useState(false);
   const abortDebugRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -96,14 +104,18 @@ export default function AIAppEditor() {
           listAIAppRuns(appId),
           listAIKnowledgeBases(),
           listAIAppKnowledgeBases(appId),
+          listAIAppTools(),
+          listAIAppToolBindings(appId),
         ]);
       })
       .then((data) => {
         if (!data) return;
-        const [runResult, knowledgeBaseResult, bindingResult] = data;
+        const [runResult, knowledgeBaseResult, bindingResult, toolResult, toolBindingResult] = data;
         setRuns(runResult.list);
         setKnowledgeBases(knowledgeBaseResult.list);
         setBoundKnowledgeBaseIDs(bindingResult.list.map((base) => base.id));
+        setTools(toolResult.list);
+        setBoundTools(toolBindingResult.tools);
       })
       .catch((error) => toast.error(getAPIErrorMessage(error, '加载 AI 应用失败')))
       .finally(() => setLoading(false));
@@ -195,6 +207,20 @@ export default function AIAppEditor() {
     }
   };
 
+  const updateToolBindings = async (nextTools: string[]) => {
+    if (!appId) return;
+    try {
+      setSavingTools(true);
+      const result = await replaceAIAppTools(appId, nextTools);
+      setBoundTools(result.tools);
+      toast.success('工具已更新');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '更新工具失败'));
+    } finally {
+      setSavingTools(false);
+    }
+  };
+
   const debug = async () => {
     if (!appId || !debugMessage.trim()) {
       toast.error('请输入调试消息');
@@ -203,6 +229,7 @@ export default function AIAppEditor() {
     try {
       setDebugging(true);
       setDebugReply('');
+      setDebugToolStatus(null);
       setDebugReferences([]);
       await ensureDraftVersion();
       const controller = new AbortController();
@@ -212,6 +239,14 @@ export default function AIAppEditor() {
         debugMessage.trim(),
         {
           onDelta: (chunk) => setDebugReply((reply) => reply + chunk),
+          onToolCall: (toolName) => {
+            setDebugToolStatus(toolName === 'content.search' ? '正在搜索内容' : '正在调用工具');
+          },
+          onToolResult: (toolName, ok) => {
+            if (toolName === 'content.search') {
+              setDebugToolStatus(ok ? '内容搜索完成' : '内容搜索失败');
+            }
+          },
           onDone: (run, reply, references) => {
             setDebugReply(reply);
             setDebugReferences(references);
@@ -376,6 +411,46 @@ export default function AIAppEditor() {
                 </div>
               )}
             </div>
+            <div className="space-y-3 rounded-2xl bg-muted/35 p-4">
+              <div>
+                <p className="text-sm font-medium">工具</p>
+                <p className="mt-1 text-xs text-muted-foreground">允许智能体在调试中调用</p>
+              </div>
+              {tools.length === 0 ? (
+                <p className="text-sm text-muted-foreground">暂无可用工具</p>
+              ) : (
+                <div className="space-y-2">
+                  {tools.map((tool) => {
+                    const checked = boundTools.includes(tool.name);
+                    return (
+                      <label
+                        key={tool.name}
+                        className="flex cursor-pointer items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          disabled={savingTools || tool.permission !== 'read'}
+                          onCheckedChange={(nextChecked) => {
+                            const next = nextChecked
+                              ? [...boundTools, tool.name]
+                              : boundTools.filter((name) => name !== tool.name);
+                            void updateToolBindings(next);
+                          }}
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium">
+                            {tool.name === 'content.search' ? '内容搜索' : tool.name}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {tool.description}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
           <aside className="space-y-5 bg-muted/25 p-6 sm:p-8">
             <div>
@@ -395,6 +470,14 @@ export default function AIAppEditor() {
               <Button variant="ghost" onClick={() => abortDebugRef.current?.abort()}>
                 停止
               </Button>
+            )}
+            {debugToolStatus && (
+              <div
+                className="rounded-2xl border border-border/70 bg-background/60 px-4 py-3 text-sm text-muted-foreground"
+                role="status"
+              >
+                {debugToolStatus}
+              </div>
             )}
             {debugReply && (
               <>

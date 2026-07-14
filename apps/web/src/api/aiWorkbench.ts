@@ -77,6 +77,12 @@ export interface AIKnowledgeDocument {
   updatedAt: string;
 }
 
+export interface AIAppTool {
+  name: string;
+  description: string;
+  permission: 'read' | 'write';
+}
+
 export function listAIApps(): Promise<{ list: AIApp[] }> {
   return request.get('/ai/apps');
 }
@@ -124,6 +130,8 @@ export async function streamDebugAIApp(
   message: string,
   handlers: {
     onDelta: (chunk: string) => void;
+    onToolCall?: (toolName: string) => void;
+    onToolResult?: (toolName: string, ok: boolean) => void;
     onDone: (run: AIAppRun, reply: string, references: AIKnowledgeReference[]) => void;
     onError: (message: string, run?: AIAppRun) => void;
   },
@@ -170,12 +178,17 @@ export async function streamDebugAIApp(
         const event = JSON.parse(line.slice(6)) as {
           type?: string;
           chunk?: string;
+          toolName?: string;
+          ok?: boolean;
           message?: string;
           run?: AIAppRun;
           reply?: string;
           references?: AIKnowledgeReference[];
         };
         if (event.type === 'delta' && event.chunk) handlers.onDelta(event.chunk);
+        if (event.type === 'tool_call' && event.toolName) handlers.onToolCall?.(event.toolName);
+        if (event.type === 'tool_result' && event.toolName)
+          handlers.onToolResult?.(event.toolName, event.ok === true);
         if (event.type === 'error') handlers.onError(event.message || '调试运行失败', event.run);
         if (event.type === 'done' && event.run) {
           handlers.onDone(event.run, event.reply || '', event.references || []);
@@ -189,6 +202,18 @@ export async function streamDebugAIApp(
 
 export function listAIAppRuns(appId: string): Promise<{ list: AIAppRun[] }> {
   return request.get(`/ai/apps/${appId}/runs`);
+}
+
+export function listAIAppTools(): Promise<{ list: AIAppTool[] }> {
+  return request.get('/ai/apps/tools');
+}
+
+export function listAIAppToolBindings(appId: string): Promise<{ tools: string[] }> {
+  return request.get(`/ai/apps/${appId}/tools`);
+}
+
+export function replaceAIAppTools(appId: string, tools: string[]): Promise<{ tools: string[] }> {
+  return request.put(`/ai/apps/${appId}/tools`, { tools });
 }
 
 export function listAIKnowledgeBases(): Promise<{ list: AIKnowledgeBase[] }> {

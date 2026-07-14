@@ -44,6 +44,7 @@ const documentFailureMessage: Record<string, string> = {
   ARK_EMBEDDING_FAILED: '向量模型调用失败',
   KNOWLEDGE_VECTOR_STORE_FAILED: '向量无法写入数据库',
   KNOWLEDGE_CHUNKS_MISSING: '文档分段不存在',
+  DOCUMENT_PARSE_FAILED: 'PDF 未包含可解析文本',
 };
 
 function formatFileSize(sizeBytes: number) {
@@ -198,8 +199,8 @@ export default function KnowledgeBases() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file || !selectedID) return;
-    if (!/\.(md|markdown|txt)$/i.test(file.name)) {
-      toast.error('仅支持 Markdown 或 TXT 文档');
+    if (!/\.(md|markdown|txt|pdf)$/i.test(file.name)) {
+      toast.error('仅支持 Markdown、TXT 或 PDF 文档');
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
@@ -327,7 +328,7 @@ export default function KnowledgeBases() {
                     id="knowledge-document-upload"
                     className="sr-only"
                     type="file"
-                    accept=".md,.markdown,.txt,text/markdown,text/plain"
+                    accept=".md,.markdown,.txt,.pdf,text/markdown,text/plain,application/pdf"
                     disabled={uploading}
                     onChange={handleUpload}
                   />
@@ -361,7 +362,9 @@ export default function KnowledgeBases() {
                   {documents.map((document) =>
                     (() => {
                       const canStartIndexing =
-                        document.status === 'failed' || document.status === 'pending_embedding';
+                        document.status === 'pending_embedding' ||
+                        (document.status === 'failed' &&
+                          document.errorCode !== 'DOCUMENT_PARSE_FAILED');
                       const isIndexing =
                         document.status === 'pending' ||
                         document.status === 'pending_embedding' ||

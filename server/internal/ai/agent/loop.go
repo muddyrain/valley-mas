@@ -121,7 +121,20 @@ func (l *LocalLoop) run(
 		}
 		steps = step + 1
 
-		resp, err := l.Backend.Chat(ctx, spec, buf, descriptors)
+		streamed := false
+		var resp BackendResponse
+		var err error
+		if backend, ok := l.Backend.(StreamingBackend); ok {
+			resp, err = backend.ChatStream(ctx, spec, buf, descriptors, func(delta string) {
+				if strings.TrimSpace(delta) == "" {
+					return
+				}
+				streamed = true
+				out <- Event{Type: EventDelta, Delta: delta}
+			})
+		} else {
+			resp, err = l.Backend.Chat(ctx, spec, buf, descriptors)
+		}
 		if err != nil {
 			emitError(out, fmt.Errorf("agent: backend chat failed at step %d: %w", steps, err))
 			return
@@ -135,7 +148,7 @@ func (l *LocalLoop) run(
 
 		if len(resp.Message.ToolCalls) == 0 {
 			// 终态：模型没有请求任何 tool。
-			if delta := strings.TrimSpace(resp.Message.Content); delta != "" {
+			if !streamed && strings.TrimSpace(resp.Message.Content) != "" {
 				out <- Event{Type: EventDelta, Delta: resp.Message.Content}
 			}
 			out <- Event{

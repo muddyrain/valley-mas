@@ -255,3 +255,41 @@ func TestLocalLoopBackendError(t *testing.T) {
 		t.Fatalf("expected backend error, got %v", err)
 	}
 }
+
+type streamingBackend struct{}
+
+func (streamingBackend) Chat(context.Context, Spec, []Message, []ToolDescriptor) (BackendResponse, error) {
+	return BackendResponse{}, errors.New("synchronous chat must not be called")
+}
+
+func (streamingBackend) ChatStream(_ context.Context, _ Spec, _ []Message, _ []ToolDescriptor, emit func(string)) (BackendResponse, error) {
+	emit("first ")
+	emit("second")
+	return BackendResponse{Message: Message{Role: RoleAssistant, Content: "first second"}, Model: "stream-model"}, nil
+}
+
+func TestLocalLoopStreamsDeltasWhenBackendSupportsIt(t *testing.T) {
+	loop := NewLocalLoop(streamingBackend{}, newTestRegistry())
+
+	events, err := loop.RunStream(context.Background(), Spec{Feature: "unit-test"}, []Message{{Role: RoleUser, Content: "hi"}})
+	if err != nil {
+		t.Fatalf("RunStream: %v", err)
+	}
+
+	var reply strings.Builder
+	var gotErr error
+	for event := range events {
+		switch event.Type {
+		case EventDelta:
+			reply.WriteString(event.Delta)
+		case EventError:
+			gotErr = event.Err
+		}
+	}
+	if gotErr != nil {
+		t.Fatalf("unexpected stream error: %v", gotErr)
+	}
+	if reply.String() != "first second" {
+		t.Fatalf("streamed reply=%q, want %q", reply.String(), "first second")
+	}
+}

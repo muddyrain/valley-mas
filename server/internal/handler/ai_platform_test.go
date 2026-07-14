@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -39,6 +40,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		&model.AIKnowledgeDocument{},
 		&model.AIKnowledgeChunk{},
 		&model.AIAppKnowledgeBase{},
+		&model.AIAppToolBinding{},
 	); err != nil {
 		t.Fatalf("migrate ai platform: %v", err)
 	}
@@ -82,6 +84,82 @@ func aiPlatformAuthHeaderFor(t *testing.T, userID, username string) string {
 		t.Fatalf("generate token: %v", err)
 	}
 	return "Bearer " + token
+}
+
+func plainTextPDF(text string) []byte {
+	stream := "BT\n/F1 12 Tf\n72 720 Td\n(" + text + ") Tj\nET\n"
+	objects := []string{
+		"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+		"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+		"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n",
+		fmt.Sprintf("4 0 obj\n<< /Length %d >>\nstream\n%sendstream\nendobj\n", len(stream), stream),
+		"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+	}
+
+	var document bytes.Buffer
+	document.WriteString("%PDF-1.4\n")
+	offsets := make([]int, 0, len(objects))
+	for _, object := range objects {
+		offsets = append(offsets, document.Len())
+		document.WriteString(object)
+	}
+	xrefOffset := document.Len()
+	fmt.Fprintf(&document, "xref\n0 %d\n0000000000 65535 f \n", len(objects)+1)
+	for _, offset := range offsets {
+		fmt.Fprintf(&document, "%010d 00000 n \n", offset)
+	}
+	fmt.Fprintf(&document, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(objects)+1, xrefOffset)
+	return document.Bytes()
+}
+
+func TestExtractAIKnowledgeDocumentTextFromPDF(t *testing.T) {
+	text, err := extractAIKnowledgeDocumentText(".pdf", plainTextPDF("PDF knowledge content"))
+	if err != nil {
+		t.Fatalf("extract PDF text: %v", err)
+	}
+	if text != "PDF knowledge content" {
+		t.Fatalf("text = %q, want PDF text", text)
+	}
+}
+
+func TestUploadAIKnowledgeDocumentAcceptsTextPDF(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	previousSchedule := scheduleAIKnowledgeDocumentIndexing
+	scheduleAIKnowledgeDocumentIndexing = func(model.Int64String) {}
+	t.Cleanup(func() { scheduleAIKnowledgeDocumentIndexing = previousSchedule })
+	base := model.AIKnowledgeBase{UserID: 101, Name: "PDF 资料"}
+	if err := db.Create(&base).Error; err != nil {
+		t.Fatalf("create knowledge base: %v", err)
+	}
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "brief.pdf")
+	if err != nil {
+		t.Fatalf("create multipart file: %v", err)
+	}
+	if _, err := part.Write(plainTextPDF("PDF knowledge content")); err != nil {
+		t.Fatalf("write PDF: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart body: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/ai/knowledge-bases/"+strconv.FormatInt(int64(base.ID), 10)+"/documents", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("upload response = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var document model.AIKnowledgeDocument
+	if err := db.Where("knowledge_base_id = ?", base.ID).First(&document).Error; err != nil {
+		t.Fatalf("load document: %v", err)
+	}
+	if document.Status != "pending_embedding" || !strings.Contains(document.ParsedText, "PDF knowledge content") || document.ChunkCount == 0 {
+		t.Fatalf("unexpected document = %#v", document)
+	}
 }
 
 func TestUploadAIKnowledgeDocumentCreatesPendingChunks(t *testing.T) {
@@ -128,6 +206,31 @@ func TestUploadAIKnowledgeDocumentCreatesPendingChunks(t *testing.T) {
 	}
 	if count != int64(document.ChunkCount) {
 		t.Fatalf("chunk count = %d, want %d", count, document.ChunkCount)
+	}
+}
+
+func TestResolveAIAppToolsReturnsOnlyBoundContentSearch(t *testing.T) {
+	_, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "检索助手"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	if err := db.Create(&[]model.AIAppToolBinding{
+		{AppID: app.ID, ToolName: "content.search"},
+		{AppID: app.ID, ToolName: "unreviewed.tool"},
+	}).Error; err != nil {
+		t.Fatalf("create bindings: %v", err)
+	}
+
+	registry, names, err := resolveAIAppTools(db, app.ID)
+	if err != nil {
+		t.Fatalf("resolve tools: %v", err)
+	}
+	if len(names) != 1 || names[0] != "content.search" {
+		t.Fatalf("names = %#v", names)
+	}
+	if got := registry.Filter("workbench", names); len(got) != 1 || got[0].Name() != "content.search" {
+		t.Fatalf("resolved tools = %#v", got)
 	}
 }
 

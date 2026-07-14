@@ -139,6 +139,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/ai/apps/:appId/publish", handler.PublishAIApp)
 			auth.POST("/ai/apps/:appId/debug", handler.DebugAIApp)
 			auth.GET("/ai/apps/:appId/runs", handler.ListAIAppRuns)
+			auth.GET("/ai/apps/:appId/tools", handler.ListAIAppToolBindings)
 			auth.PUT("/ai/apps/:appId/tools", handler.ReplaceAIAppTools)
 			auth.GET("/ai/apps/:appId/knowledge-bases", handler.ListAIAppKnowledgeBases)
 			auth.PUT("/ai/apps/:appId/knowledge-bases", handler.ReplaceAIAppKnowledgeBases)
