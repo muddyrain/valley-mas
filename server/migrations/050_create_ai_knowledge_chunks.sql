@@ -5,7 +5,7 @@ ALTER TABLE ai_knowledge_documents ADD COLUMN IF NOT EXISTS mime_type VARCHAR(12
 ALTER TABLE ai_knowledge_documents ADD COLUMN IF NOT EXISTS size_bytes BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE ai_knowledge_documents ADD COLUMN IF NOT EXISTS source_key VARCHAR(500) DEFAULT '';
 ALTER TABLE ai_knowledge_documents ADD COLUMN IF NOT EXISTS parsed_text TEXT DEFAULT '';
-ALTER TABLE ai_app_runs ADD COLUMN IF NOT EXISTS references TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE ai_app_runs ADD COLUMN IF NOT EXISTS "references" TEXT NOT NULL DEFAULT '[]';
 
 CREATE TABLE IF NOT EXISTS ai_knowledge_chunks (
   id BIGINT PRIMARY KEY,
