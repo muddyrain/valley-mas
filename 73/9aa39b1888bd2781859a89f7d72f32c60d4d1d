@@ -1,0 +1,35 @@
+apps/web/src/api/aiWorkbench.ts
+  s_2c5d43632bbaeb::t_76feac627ddff2 72,227-233
+server/internal/aiclient/ark.go
+  s_2c5d43632bbaeb::t_db48a0cdd1e910 9,115-120,142,169-171
+server/internal/handler/ai_platform.go
+  s_2c5d43632bbaeb::t_4af1d1c112f3ad 938,944,949-983,1001,1013,1016-1019,1034,1040-1054
+server/internal/handler/ai_platform_test.go
+  s_2c5d43632bbaeb::t_22e2816a84ff11 67,122,134-162
+server/internal/model/ai_platform.go
+  s_2c5d43632bbaeb::t_e96423e174b1e3 103
+server/internal/router/router.go
+  s_2c5d43632bbaeb::t_40d25a22e4b064 152
+server/migrations/050_create_ai_knowledge_chunks_test.go
+  s_2c5d43632bbaeb::t_4270018b46c99f 18-28
+server/migrations/051_add_ai_knowledge_document_progress.sql
+  s_2c5d43632bbaeb::t_671aaa71204b44 1-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "739aa39b1888bd2781859a89f7d72f32c60d4d1d",
+  "prompts": {},
+  "sessions": {
+    "s_2c5d43632bbaeb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5eac-d483-7700-bd19-e6b2ca126245",
+        "model": "unknown"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
