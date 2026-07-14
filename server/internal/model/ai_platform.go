@@ -195,3 +195,60 @@ func (k *AIAPIKey) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+// AIAPIKeyAppBinding limits a public API key to explicitly selected AI apps.
+type AIAPIKeyAppBinding struct {
+	ID        Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	APIKeyID  Int64String `gorm:"not null;uniqueIndex:uidx_ai_api_key_app" json:"apiKeyId"`
+	AppID     Int64String `gorm:"not null;uniqueIndex:uidx_ai_api_key_app" json:"appId"`
+	CreatedAt time.Time   `json:"createdAt"`
+}
+
+func (b *AIAPIKeyAppBinding) BeforeCreate(tx *gorm.DB) error {
+	if b.ID == 0 {
+		b.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+// AIAPIKeyDailyUsage is the per-key, calendar-day counter used to enforce the
+// public API quota. It contains no request or response payload.
+type AIAPIKeyDailyUsage struct {
+	ID           Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	APIKeyID     Int64String `gorm:"not null;uniqueIndex:uidx_ai_api_key_usage_day" json:"apiKeyId"`
+	UsageDate    string      `gorm:"type:date;not null;uniqueIndex:uidx_ai_api_key_usage_day" json:"usageDate"`
+	RequestCount int         `gorm:"not null;default:0" json:"requestCount"`
+	CreatedAt    time.Time   `json:"createdAt"`
+	UpdatedAt    time.Time   `json:"updatedAt"`
+}
+
+func (u *AIAPIKeyDailyUsage) BeforeCreate(tx *gorm.DB) error {
+	if u.ID == 0 {
+		u.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+// AIAppPublicInvocation records observability metadata for a public API call.
+// Request, response, prompt, tool arguments, and tool results are intentionally
+// excluded from this model.
+type AIAppPublicInvocation struct {
+	ID              Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID          Int64String `gorm:"index;not null" json:"userId"`
+	AppID           Int64String `gorm:"index;not null" json:"appId"`
+	VersionID       Int64String `gorm:"index;not null" json:"versionId"`
+	APIKeyID        Int64String `gorm:"index;not null" json:"apiKeyId"`
+	Status          string      `gorm:"size:20;index;not null" json:"status"`
+	DurationMs      int64       `gorm:"not null;default:0" json:"durationMs"`
+	Stream          bool        `gorm:"not null;default:false" json:"stream"`
+	ErrorCode       string      `gorm:"size:80" json:"errorCode"`
+	DailyCallNumber int         `gorm:"not null" json:"dailyCallNumber"`
+	CreatedAt       time.Time   `gorm:"index" json:"createdAt"`
+}
+
+func (i *AIAppPublicInvocation) BeforeCreate(tx *gorm.DB) error {
+	if i.ID == 0 {
+		i.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}

@@ -1,22 +1,31 @@
-import { ArrowLeft, Bot, Play, RotateCcw, Save, Send } from 'lucide-react';
+import { Activity, ArrowLeft, Bot, KeyRound, Play, RotateCcw, Save, Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
+  type AIAPIKey,
+  type AIAPIKeyDailyUsage,
   type AIApp,
+  type AIAppPublicInvocation,
   type AIAppRun,
   type AIAppTool,
   type AIAppVersion,
   type AIKnowledgeBase,
   type AIKnowledgeReference,
+  createAIAPIKey,
+  getAIAPIKeyDailyUsage,
   getAIApp,
   getAPIErrorMessage,
+  listAIAPIKeyAppBindings,
+  listAIAPIKeys,
   listAIAppKnowledgeBases,
+  listAIAppPublicInvocations,
   listAIAppRuns,
   listAIAppToolBindings,
   listAIAppTools,
   listAIKnowledgeBases,
   publishAIApp,
+  replaceAIAPIKeyAppBindings,
   replaceAIAppKnowledgeBases,
   replaceAIAppTools,
   restoreAIAppVersion,
@@ -85,6 +94,14 @@ export default function AIAppEditor() {
   const [tools, setTools] = useState<AIAppTool[]>([]);
   const [boundTools, setBoundTools] = useState<string[]>([]);
   const [savingTools, setSavingTools] = useState(false);
+  const [apiKeys, setAPIKeys] = useState<AIAPIKey[]>([]);
+  const [keyAppBindings, setKeyAppBindings] = useState<Record<string, string[]>>({});
+  const [keyUsage, setKeyUsage] = useState<Record<string, AIAPIKeyDailyUsage>>({});
+  const [savingAPIKeyId, setSavingAPIKeyId] = useState<string | null>(null);
+  const [newAPIKeyName, setNewAPIKeyName] = useState('');
+  const [creatingAPIKey, setCreatingAPIKey] = useState(false);
+  const [generatedAPIKey, setGeneratedAPIKey] = useState<string | null>(null);
+  const [publicInvocations, setPublicInvocations] = useState<AIAppPublicInvocation[]>([]);
   const abortDebugRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -106,16 +123,42 @@ export default function AIAppEditor() {
           listAIAppKnowledgeBases(appId),
           listAIAppTools(),
           listAIAppToolBindings(appId),
+          listAIAPIKeys(),
+          listAIAppPublicInvocations(appId),
         ]);
       })
       .then((data) => {
         if (!data) return;
-        const [runResult, knowledgeBaseResult, bindingResult, toolResult, toolBindingResult] = data;
+        const [
+          runResult,
+          knowledgeBaseResult,
+          bindingResult,
+          toolResult,
+          toolBindingResult,
+          keyResult,
+          invocationResult,
+        ] = data;
         setRuns(runResult.list);
         setKnowledgeBases(knowledgeBaseResult.list);
         setBoundKnowledgeBaseIDs(bindingResult.list.map((base) => base.id));
         setTools(toolResult.list);
         setBoundTools(toolBindingResult.tools);
+        setAPIKeys(keyResult.list);
+        setPublicInvocations(invocationResult.list);
+        void Promise.all(
+          keyResult.list.map(async (key) => {
+            const [binding, usage] = await Promise.all([
+              listAIAPIKeyAppBindings(key.id),
+              getAIAPIKeyDailyUsage(key.id),
+            ]);
+            return { keyId: key.id, appIds: binding.list.map((item) => item.appId), usage };
+          }),
+        )
+          .then((items) => {
+            setKeyAppBindings(Object.fromEntries(items.map((item) => [item.keyId, item.appIds])));
+            setKeyUsage(Object.fromEntries(items.map((item) => [item.keyId, item.usage])));
+          })
+          .catch((error) => toast.error(getAPIErrorMessage(error, '加载 API Key 权限失败')));
       })
       .catch((error) => toast.error(getAPIErrorMessage(error, '加载 AI 应用失败')))
       .finally(() => setLoading(false));
@@ -218,6 +261,46 @@ export default function AIAppEditor() {
       toast.error(getAPIErrorMessage(error, '更新工具失败'));
     } finally {
       setSavingTools(false);
+    }
+  };
+
+  const updateAPIKeyAppBinding = async (key: AIAPIKey, checked: boolean) => {
+    if (!appId) return;
+    const current = keyAppBindings[key.id] || [];
+    const next = checked ? [...current, appId] : current.filter((id) => id !== appId);
+    try {
+      setSavingAPIKeyId(key.id);
+      const result = await replaceAIAPIKeyAppBindings(key.id, next);
+      setKeyAppBindings((items) => ({ ...items, [key.id]: result.appIds }));
+      toast.success(checked ? '已授权此 Key 调用当前应用' : '已取消此 Key 的应用权限');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '更新 API Key 应用权限失败'));
+    } finally {
+      setSavingAPIKeyId(null);
+    }
+  };
+
+  const createAPIKey = async () => {
+    if (!newAPIKeyName.trim()) {
+      toast.error('请输入 Key 名称');
+      return;
+    }
+    try {
+      setCreatingAPIKey(true);
+      const result = await createAIAPIKey({ name: newAPIKeyName.trim() });
+      setAPIKeys((items) => [result.key, ...items]);
+      setKeyAppBindings((items) => ({ ...items, [result.key.id]: [] }));
+      setKeyUsage((items) => ({
+        ...items,
+        [result.key.id]: { limit: 100, count: 0, remaining: 100 },
+      }));
+      setGeneratedAPIKey(result.secret);
+      setNewAPIKeyName('');
+      toast.success('API Key 已创建');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '创建 API Key 失败'));
+    } finally {
+      setCreatingAPIKey(false);
     }
   };
 
@@ -451,6 +534,73 @@ export default function AIAppEditor() {
                 </div>
               )}
             </div>
+            <div className="space-y-3 rounded-2xl bg-muted/35 p-4">
+              <div>
+                <p className="flex items-center gap-2 text-sm font-medium">
+                  <KeyRound className="h-4 w-4 text-primary" />
+                  公开 API
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  仅已发布版本可被调用。每个 Key 每日最多 100 次，未勾选不会获得当前应用权限。
+                </p>
+              </div>
+              <p className="rounded-xl border border-border/70 bg-background/70 px-3 py-2 font-mono text-xs text-muted-foreground">
+                POST /api/v1/public/ai/apps/{appId}/chat
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={newAPIKeyName}
+                  placeholder="新 Key 名称"
+                  maxLength={100}
+                  onChange={(event) => setNewAPIKeyName(event.target.value)}
+                />
+                <Button variant="outline" disabled={creatingAPIKey} onClick={createAPIKey}>
+                  {creatingAPIKey ? '创建中…' : '创建 Key'}
+                </Button>
+              </div>
+              {generatedAPIKey && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                  <p className="text-xs font-medium">请立即保存此 Key，它不会再次显示。</p>
+                  <code className="mt-2 block break-all text-xs text-muted-foreground">
+                    {generatedAPIKey}
+                  </code>
+                </div>
+              )}
+              {apiKeys.length === 0 ? (
+                <p className="text-sm text-muted-foreground">还没有 API Key</p>
+              ) : (
+                <div className="space-y-2">
+                  {apiKeys.map((key) => {
+                    const checked = (keyAppBindings[key.id] || []).includes(appId || '');
+                    const usage = keyUsage[key.id];
+                    return (
+                      <label
+                        key={key.id}
+                        className="flex cursor-pointer items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          disabled={key.status !== 'active' || savingAPIKeyId === key.id}
+                          onCheckedChange={(nextChecked) =>
+                            void updateAPIKeyAppBinding(key, nextChecked === true)
+                          }
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{key.name}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {key.keyPrefix}… ·{' '}
+                            {usage ? `今日 ${usage.count}/${usage.limit}` : '加载配额中'}
+                          </span>
+                        </span>
+                        <Badge variant={key.status === 'active' ? 'outline' : 'secondary'}>
+                          {key.status === 'active' ? '可用' : '已撤销'}
+                        </Badge>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
           <aside className="space-y-5 bg-muted/25 p-6 sm:p-8">
             <div>
@@ -528,6 +678,42 @@ export default function AIAppEditor() {
                       </p>
                       <p className="mt-2 line-clamp-2 text-muted-foreground">
                         {run.output || run.errorCode || run.input}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className="border-t border-border/70 pt-5">
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                <Activity className="h-4 w-4 text-primary" />
+                公开调用记录
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                仅记录状态、耗时和配额次数，不保存外部消息或回复。
+              </p>
+              <div className="mt-3 space-y-2">
+                {publicInvocations.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">暂无公开调用记录</p>
+                ) : (
+                  publicInvocations.slice(0, 5).map((invocation) => (
+                    <div
+                      key={invocation.id}
+                      className="rounded-xl border border-border/70 bg-background/60 px-3 py-2 text-xs"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span>
+                          {invocation.status === 'succeeded'
+                            ? '成功'
+                            : invocation.status === 'rejected'
+                              ? '已拒绝'
+                              : '失败'}
+                        </span>
+                        <span className="text-muted-foreground">{invocation.durationMs} ms</span>
+                      </div>
+                      <p className="mt-1 text-muted-foreground">
+                        第 {invocation.dailyCallNumber} 次 · {invocation.stream ? '流式' : 'JSON'}
+                        {invocation.errorCode ? ` · ${invocation.errorCode}` : ''}
                       </p>
                     </div>
                   ))

@@ -49,6 +49,39 @@ export interface AIAppRun {
   createdAt: string;
 }
 
+export interface AIAPIKey {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  status: 'active' | 'revoked';
+  lastUsedAt?: string;
+  createdAt: string;
+}
+
+export interface AIAPIKeyAppBinding {
+  id: string;
+  apiKeyId: string;
+  appId: string;
+  createdAt: string;
+}
+
+export interface AIAPIKeyDailyUsage {
+  limit: number;
+  count: number;
+  remaining: number;
+}
+
+export interface AIAppPublicInvocation {
+  id: string;
+  apiKeyId: string;
+  status: 'succeeded' | 'failed' | 'cancelled' | 'rejected';
+  durationMs: number;
+  stream: boolean;
+  errorCode: string;
+  dailyCallNumber: number;
+  createdAt: string;
+}
+
 export interface AIKnowledgeReference {
   documentName: string;
   chunkId: string;
@@ -202,6 +235,35 @@ export async function streamDebugAIApp(
 
 export function listAIAppRuns(appId: string): Promise<{ list: AIAppRun[] }> {
   return request.get(`/ai/apps/${appId}/runs`);
+}
+
+export function listAIAPIKeys(): Promise<{ list: AIAPIKey[] }> {
+  return request.get('/ai/api-keys');
+}
+
+export function createAIAPIKey(data: { name: string }): Promise<{ key: AIAPIKey; secret: string }> {
+  return request.post('/ai/api-keys', data);
+}
+
+export function listAIAPIKeyAppBindings(keyId: string): Promise<{ list: AIAPIKeyAppBinding[] }> {
+  return request.get(`/ai/api-keys/${keyId}/apps`);
+}
+
+export function replaceAIAPIKeyAppBindings(
+  keyId: string,
+  appIds: string[],
+): Promise<{ appIds: string[] }> {
+  return request.put(`/ai/api-keys/${keyId}/apps`, { appIds });
+}
+
+export function getAIAPIKeyDailyUsage(keyId: string): Promise<AIAPIKeyDailyUsage> {
+  return request.get(`/ai/api-keys/${keyId}/usage`);
+}
+
+export function listAIAppPublicInvocations(
+  appId: string,
+): Promise<{ list: AIAppPublicInvocation[] }> {
+  return request.get(`/ai/apps/${appId}/public-invocations`);
 }
 
 export function listAIAppTools(): Promise<{ list: AIAppTool[] }> {

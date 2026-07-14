@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
@@ -36,6 +37,10 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		&model.Workflow{},
 		&model.AIApp{},
 		&model.AIAppVersion{},
+		&model.AIAPIKey{},
+		&model.AIAPIKeyAppBinding{},
+		&model.AIAPIKeyDailyUsage{},
+		&model.AIAppPublicInvocation{},
 		&model.AIKnowledgeBase{},
 		&model.AIKnowledgeDocument{},
 		&model.AIKnowledgeChunk{},
@@ -70,7 +75,104 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.DELETE("/knowledge-bases/:knowledgeBaseId", DeleteAIKnowledgeBase)
 	auth.GET("/apps/:appId/knowledge-bases", ListAIAppKnowledgeBases)
 	auth.PUT("/apps/:appId/knowledge-bases", ReplaceAIAppKnowledgeBases)
+	auth.GET("/api-keys/:keyId/apps", ListAIAPIKeyAppBindings)
+	auth.PUT("/api-keys/:keyId/apps", ReplaceAIAPIKeyAppBindings)
+	auth.GET("/apps/:appId/public-invocations", ListAIAppPublicInvocations)
+	public := router.Group("/public")
+	public.POST("/ai/apps/:appId/chat", PublicAIAppChat)
 	return router, db
+}
+
+func TestConsumeAIAPIKeyDailyUsageStopsAtDailyLimit(t *testing.T) {
+	_, db := setupAIPlatformTestRouter(t)
+	key := model.AIAPIKey{UserID: 101, Name: "public-api-key", KeyPrefix: "valley_test", KeyHash: "hash", Status: "active"}
+	if err := db.Create(&key).Error; err != nil {
+		t.Fatalf("create api key: %v", err)
+	}
+
+	for call := 1; call <= aiAPIKeyDailyCallLimit; call++ {
+		remaining, err := consumeAIAPIKeyDailyUsage(db, key.ID, "2026-07-14")
+		if err != nil {
+			t.Fatalf("consume call %d: %v", call, err)
+		}
+		if remaining != aiAPIKeyDailyCallLimit-call {
+			t.Fatalf("call %d remaining = %d, want %d", call, remaining, aiAPIKeyDailyCallLimit-call)
+		}
+	}
+
+	if _, err := consumeAIAPIKeyDailyUsage(db, key.ID, "2026-07-14"); err != ErrAIAPIKeyDailyQuotaExceeded {
+		t.Fatalf("101st call error = %v, want %v", err, ErrAIAPIKeyDailyQuotaExceeded)
+	}
+}
+
+func TestPublicAIAppChatRejectsUnboundKeyAndWritesMetadataOnlyLog(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "公开应用"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	rawKey := "valley_public-api-test-key"
+	digest := sha256.Sum256([]byte(rawKey))
+	key := model.AIAPIKey{UserID: 101, Name: "public-api-key", KeyPrefix: "valley_public", KeyHash: fmt.Sprintf("%x", digest)}
+	if err := db.Create(&key).Error; err != nil {
+		t.Fatalf("create api key: %v", err)
+	}
+	body, _ := json.Marshal(map[string]any{"message": "external request must not be stored"})
+	req := httptest.NewRequest(http.MethodPost, "/public/ai/apps/"+strconv.FormatInt(int64(app.ID), 10)+"/chat", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+rawKey)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("unbound key response = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var invocation model.AIAppPublicInvocation
+	if err := db.Where("api_key_id = ? AND app_id = ?", key.ID, app.ID).First(&invocation).Error; err != nil {
+		t.Fatalf("load invocation metadata: %v", err)
+	}
+	if invocation.Status != "rejected" || invocation.ErrorCode != "API_KEY_APP_NOT_BOUND" {
+		t.Fatalf("unexpected invocation metadata: %+v", invocation)
+	}
+}
+
+func TestReplaceAIAPIKeyAppBindingsRestrictsKeysToOwnedApps(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	key := model.AIAPIKey{UserID: 101, Name: "public-api-key", KeyPrefix: "valley_test", KeyHash: "hash"}
+	if err := db.Create(&key).Error; err != nil {
+		t.Fatalf("create api key: %v", err)
+	}
+	ownedApp := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "我的应用"}
+	foreignApp := model.AIApp{UserID: 202, Type: aiAppTypeAgent, Name: "他人的应用"}
+	if err := db.Create(&ownedApp).Error; err != nil {
+		t.Fatalf("create owned app: %v", err)
+	}
+	if err := db.Create(&foreignApp).Error; err != nil {
+		t.Fatalf("create foreign app: %v", err)
+	}
+	body, _ := json.Marshal(map[string]any{"appIds": []model.Int64String{ownedApp.ID, foreignApp.ID}})
+	req := httptest.NewRequest(http.MethodPut, "/ai/api-keys/"+strconv.FormatInt(int64(key.ID), 10)+"/apps", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "\"code\":400") {
+		t.Fatalf("foreign bind response = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	body, _ = json.Marshal(map[string]any{"appIds": []model.Int64String{ownedApp.ID}})
+	req = httptest.NewRequest(http.MethodPut, "/ai/api-keys/"+strconv.FormatInt(int64(key.ID), 10)+"/apps", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("owned bind response = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var binding model.AIAPIKeyAppBinding
+	if err := db.Where("api_key_id = ? AND app_id = ?", key.ID, ownedApp.ID).First(&binding).Error; err != nil {
+		t.Fatalf("load binding: %v", err)
+	}
 }
 
 func aiPlatformAuthHeader(t *testing.T) string {

@@ -49,6 +49,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 		public := api.Group("/public")
 		{
+			public.POST("/ai/apps/:appId/chat", handler.PublicAIAppChat)
 			public.POST("/resource/:id/download", middleware.OptionalAuth(cfg), handler.DownloadResource)
 			public.GET("/active-users", handler.GetActiveUsers)
 			public.GET("/holiday-calendars/china/:year", handler.GetChinaHolidayCalendar)
@@ -154,6 +155,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.GET("/ai/api-keys", handler.ListAIAPIKeys)
 			auth.POST("/ai/api-keys", handler.CreateAIAPIKey)
 			auth.DELETE("/ai/api-keys/:keyId", handler.RevokeAIAPIKey)
+			auth.GET("/ai/api-keys/:keyId/apps", handler.ListAIAPIKeyAppBindings)
+			auth.PUT("/ai/api-keys/:keyId/apps", handler.ReplaceAIAPIKeyAppBindings)
+			auth.GET("/ai/api-keys/:keyId/usage", handler.GetAIAPIKeyDailyUsage)
+			auth.GET("/ai/apps/:appId/public-invocations", handler.ListAIAppPublicInvocations)
 			auth.GET("/ai/agents", handler.ListAIAgents)
 			auth.POST("/ai/agents", handler.CreateAIAgent)
 			auth.GET("/ai/agents/:agentId", handler.GetAIAgent)

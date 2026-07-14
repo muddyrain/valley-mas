@@ -26,12 +26,45 @@ import (
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
 	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
 	aiAppTypeAgent    = "agent"
 	aiAppTypeWorkflow = "workflow"
+	aiAPIKeyDailyCallLimit = 100
 )
+
+var ErrAIAPIKeyDailyQuotaExceeded = errors.New("ai api key daily quota exceeded")
+
+// consumeAIAPIKeyDailyUsage atomically reserves one call from a key's daily
+// quota. The conditional update is the quota gate: concurrent callers can
+// never increment the count beyond aiAPIKeyDailyCallLimit.
+func consumeAIAPIKeyDailyUsage(db *gorm.DB, apiKeyID model.Int64String, usageDate string) (int, error) {
+	usage := model.AIAPIKeyDailyUsage{APIKeyID: apiKeyID, UsageDate: usageDate}
+	if err := db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "api_key_id"}, {Name: "usage_date"}},
+		DoNothing: true,
+	}).Create(&usage).Error; err != nil {
+		return 0, err
+	}
+
+	result := db.Model(&model.AIAPIKeyDailyUsage{}).
+		Where("api_key_id = ? AND usage_date = ? AND request_count < ?", apiKeyID, usageDate, aiAPIKeyDailyCallLimit).
+		UpdateColumn("request_count", gorm.Expr("request_count + ?", 1))
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return 0, ErrAIAPIKeyDailyQuotaExceeded
+	}
+
+	var current model.AIAPIKeyDailyUsage
+	if err := db.Where("api_key_id = ? AND usage_date = ?", apiKeyID, usageDate).First(&current).Error; err != nil {
+		return 0, err
+	}
+	return aiAPIKeyDailyCallLimit - current.RequestCount, nil
+}
 
 var builtInAITools = []gin.H{
 	{"name": "content.search", "description": "搜索当前用户可访问的内容", "permission": "read"},
@@ -1315,6 +1348,128 @@ func RevokeAIAPIKey(c *gin.Context) {
 		return
 	}
 	Success(c, nil)
+}
+
+func ListAIAPIKeyAppBindings(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	key, found := findOwnedAIAPIKey(c, userID)
+	if !found {
+		return
+	}
+	var bindings []model.AIAPIKeyAppBinding
+	if err := database.GetDB().Where("api_key_id = ?", key.ID).Order("created_at ASC").Find(&bindings).Error; err != nil {
+		Error(c, 500, "加载 API Key 应用权限失败")
+		return
+	}
+	Success(c, gin.H{"list": bindings})
+}
+
+func ReplaceAIAPIKeyAppBindings(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	key, found := findOwnedAIAPIKey(c, userID)
+	if !found {
+		return
+	}
+	var payload struct {
+		AppIDs []model.Int64String `json:"appIds"`
+	}
+	if c.ShouldBindJSON(&payload) != nil {
+		Error(c, 400, "应用权限参数无效")
+		return
+	}
+	uniqueIDs := make([]model.Int64String, 0, len(payload.AppIDs))
+	seen := make(map[model.Int64String]struct{}, len(payload.AppIDs))
+	for _, appID := range payload.AppIDs {
+		if appID == 0 {
+			Error(c, 400, "应用 ID 无效")
+			return
+		}
+		if _, exists := seen[appID]; exists {
+			continue
+		}
+		seen[appID] = struct{}{}
+		uniqueIDs = append(uniqueIDs, appID)
+	}
+	if len(uniqueIDs) > 0 {
+		var count int64
+		if err := database.GetDB().Model(&model.AIApp{}).Where("user_id = ? AND id IN ?", userID, uniqueIDs).Count(&count).Error; err != nil {
+			Error(c, 500, "校验可调用应用失败")
+			return
+		}
+		if count != int64(len(uniqueIDs)) {
+			Error(c, 400, "只能绑定自己的应用")
+			return
+		}
+	}
+	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("api_key_id = ?", key.ID).Delete(&model.AIAPIKeyAppBinding{}).Error; err != nil {
+			return err
+		}
+		for _, appID := range uniqueIDs {
+			if err := tx.Create(&model.AIAPIKeyAppBinding{APIKeyID: key.ID, AppID: appID}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		Error(c, 500, "更新 API Key 应用权限失败")
+		return
+	}
+	Success(c, gin.H{"appIds": uniqueIDs})
+}
+
+func GetAIAPIKeyDailyUsage(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	key, found := findOwnedAIAPIKey(c, userID)
+	if !found {
+		return
+	}
+	var usage model.AIAPIKeyDailyUsage
+	if err := database.GetDB().Where("api_key_id = ? AND usage_date = ?", key.ID, time.Now().Format("2006-01-02")).First(&usage).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		Error(c, 500, "加载 API Key 配额失败")
+		return
+	}
+	Success(c, gin.H{"limit": aiAPIKeyDailyCallLimit, "count": usage.RequestCount, "remaining": aiAPIKeyDailyCallLimit - usage.RequestCount})
+}
+
+func ListAIAppPublicInvocations(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	app, found := findAIApp(c, userID)
+	if !found {
+		return
+	}
+	var invocations []model.AIAppPublicInvocation
+	if err := database.GetDB().Where("app_id = ? AND user_id = ?", app.ID, userID).Order("created_at DESC").Limit(100).Find(&invocations).Error; err != nil {
+		Error(c, 500, "加载公开调用记录失败")
+		return
+	}
+	Success(c, gin.H{"list": invocations})
+}
+
+func findOwnedAIAPIKey(c *gin.Context, userID model.Int64String) (model.AIAPIKey, bool) {
+	id, err := parsePathInt64(c, "keyId")
+	if err != nil {
+		Error(c, 400, "无效的 Key ID")
+		return model.AIAPIKey{}, false
+	}
+	var key model.AIAPIKey
+	if err := database.GetDB().Where("id = ? AND user_id = ?", id, userID).First(&key).Error; err != nil {
+		Error(c, 404, "API Key 不存在")
+		return model.AIAPIKey{}, false
+	}
+	return key, true
 }
 
 func findAIApp(c *gin.Context, userID model.Int64String) (model.AIApp, bool) {
