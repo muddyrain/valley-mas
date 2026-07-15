@@ -19,14 +19,20 @@ const (
 )
 
 const (
-	NodeTypeStart           NodeType = "start"
-	NodeTypeBlogParse       NodeType = "blog.parseMarkdown"
-	NodeTypeLLMText         NodeType = "llm.text"
-	NodeTypeBlogCreateDraft NodeType = "blog.createDraft"
-	NodeTypeVariable        NodeType = "variable"
-	NodeTypeHTTP            NodeType = "http"
-	NodeTypeCode            NodeType = "code"
-	NodeTypeEnd             NodeType = "end"
+	NodeTypeStart             NodeType = "start"
+	NodeTypeBlogParse         NodeType = "blog.parseMarkdown"
+	NodeTypeKnowledgeRetrieve NodeType = "knowledge.retrieve"
+	NodeTypeLLMText           NodeType = "llm.text"
+	NodeTypeBlogCreateDraft   NodeType = "blog.createDraft"
+	NodeTypeVariable          NodeType = "variable"
+	NodeTypeHTTP              NodeType = "http"
+	NodeTypeCode              NodeType = "code"
+	NodeTypeKnowledge         NodeType = "knowledge"
+	NodeTypeCondition         NodeType = "condition"
+	NodeTypeLoop              NodeType = "loop"
+	NodeTypeInput             NodeType = "input"
+	NodeTypeFileUpload        NodeType = "fileUpload"
+	NodeTypeEnd               NodeType = "end"
 )
 
 type Node struct {
@@ -57,10 +63,11 @@ const (
 )
 
 type RunContext struct {
-	ID      string
-	Actor   Actor
-	Inputs  map[string]any
-	Outputs map[string]map[string]any
+	ID                 string
+	Actor              Actor
+	Inputs             map[string]any
+	Outputs            map[string]map[string]any
+	KnowledgeRetriever KnowledgeRetriever
 }
 
 // Actor is the authenticated user who started a workflow run. It is runtime
@@ -104,6 +111,30 @@ type NodeExecution struct {
 	NodeID   string
 	NodeType NodeType
 	Input    map[string]any
+}
+
+// KnowledgeReference is the safe citation shape available to workflow nodes.
+// It intentionally excludes download URLs and complete source documents.
+type KnowledgeReference struct {
+	DocumentName string  `json:"documentName"`
+	ChunkID      string  `json:"chunkId"`
+	Excerpt      string  `json:"excerpt"`
+	Score        float64 `json:"score"`
+}
+
+type KnowledgeResult struct {
+	Context    string               `json:"context"`
+	References []KnowledgeReference `json:"references"`
+}
+
+type KnowledgeRetriever interface {
+	Retrieve(context.Context, string) (KnowledgeResult, error)
+}
+
+type KnowledgeRetrieverFunc func(context.Context, string) (KnowledgeResult, error)
+
+func (fn KnowledgeRetrieverFunc) Retrieve(ctx context.Context, query string) (KnowledgeResult, error) {
+	return fn(ctx, query)
 }
 
 type NodeExecutor interface {

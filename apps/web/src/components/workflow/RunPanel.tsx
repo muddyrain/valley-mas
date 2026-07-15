@@ -37,6 +37,21 @@ interface RunPanelProps {
   runError: string | null;
 }
 
+const customInputCopy: Record<string, { label: string; placeholder?: string }> = {
+  topic: {
+    label: '写作主题',
+    placeholder: '例如：个人创作者如何建立内容素材库',
+  },
+  audience: {
+    label: '目标读者',
+    placeholder: '例如：独立开发者和内容创作者',
+  },
+  style: {
+    label: '写作风格',
+    placeholder: '例如：实用、简洁、有案例',
+  },
+};
+
 function InputLabel({
   children,
   htmlFor,
@@ -131,6 +146,9 @@ export function RunPanel({
       : session.failedNodeId;
   const selectedTagIds = (values.tagIds as string[]) || [];
   const selectedGroup = groups.find((group) => group.id === values.groupId);
+  const customDefinitions = Object.entries(definitions).filter(
+    ([name]) => !['markdownFile', 'tagIds', 'groupId', 'visibility'].includes(name),
+  );
 
   return (
     <div className="flex h-full flex-col border-l border-border bg-card">
@@ -240,6 +258,74 @@ export function RunPanel({
                 </Select>
               </div>
             )}
+            {customDefinitions.map(([name, definition]) => {
+              const inputID = `workflow-input-${name}`;
+              const copy = customInputCopy[name];
+              const label = copy?.label || name;
+              if (definition.type === 'boolean') {
+                return (
+                  <div key={name} className="flex items-center gap-2">
+                    <Checkbox
+                      id={inputID}
+                      checked={values[name] === true}
+                      onCheckedChange={(checked) => setValue(name, checked === true)}
+                    />
+                    <InputLabel htmlFor={inputID} required={definition.required}>
+                      {label}
+                    </InputLabel>
+                  </div>
+                );
+              }
+              if (definition.type === 'file') {
+                return (
+                  <div key={name} className="space-y-1.5">
+                    <InputLabel htmlFor={inputID} required={definition.required}>
+                      {label}
+                    </InputLabel>
+                    <Input
+                      id={inputID}
+                      type="file"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) setFiles((current) => ({ ...current, [name]: file }));
+                      }}
+                    />
+                  </div>
+                );
+              }
+              return (
+                <div key={name} className="space-y-1.5">
+                  <InputLabel htmlFor={inputID} required={definition.required}>
+                    {label}
+                  </InputLabel>
+                  <Input
+                    id={inputID}
+                    type={definition.type === 'number' ? 'number' : 'text'}
+                    value={String(values[name] || '')}
+                    placeholder={
+                      copy?.placeholder ||
+                      (definition.type === 'string[]' ? '以逗号分隔' : undefined)
+                    }
+                    onChange={(event) => {
+                      const raw = event.target.value;
+                      if (definition.type === 'number') {
+                        setValue(name, raw === '' ? '' : Number(raw));
+                      } else if (definition.type === 'string[]') {
+                        setValue(
+                          name,
+                          raw
+                            .split(',')
+                            .map((item) => item.trim())
+                            .filter(Boolean),
+                        );
+                      } else {
+                        setValue(name, raw);
+                      }
+                    }}
+                  />
+                </div>
+              );
+            })}
           </section>
           <Button className="w-full" onClick={handleRun} disabled={isRunning}>
             <Play className="mr-2 h-4 w-4" />

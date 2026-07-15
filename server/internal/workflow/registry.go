@@ -22,6 +22,7 @@ func DefaultRegistry() *Registry {
 	registry := NewRegistry(
 		NodeDefinition{Type: NodeTypeStart, OutputPorts: ports("output"), OutputFields: outputFields(field("markdownFile", ValueTypeFile), field("tagIds", ValueTypeStringList), field("groupId", ValueTypeString), field("visibility", ValueTypeString))},
 		NodeDefinition{Type: NodeTypeBlogParse, InputPorts: ports("input"), OutputPorts: ports("output"), OutputFields: outputFields(field("title", ValueTypeString), field("content", ValueTypeString), field("frontMatter", ValueTypeObject), field("excerpt", ValueTypeString), field("cover", ValueTypeObject), field("tagNames", ValueTypeStringList))},
+		NodeDefinition{Type: NodeTypeKnowledgeRetrieve, InputPorts: ports("input"), OutputPorts: ports("output"), OutputFields: outputFields(field("context", ValueTypeString), field("references", ValueTypeObject))},
 		NodeDefinition{Type: NodeTypeLLMText, InputPorts: ports("input"), OutputPorts: ports("output"), OutputFields: outputFields(field("text", ValueTypeString), field("model", ValueTypeString), field("tokenUsage", ValueTypeNumber))},
 		NodeDefinition{Type: NodeTypeBlogCreateDraft, InputPorts: ports("input"), OutputPorts: ports("output"), OutputFields: outputFields(field("postId", ValueTypeString), field("title", ValueTypeString), field("editPath", ValueTypeString), field("tagIds", ValueTypeStringList))},
 		NodeDefinition{Type: NodeTypeVariable, InputPorts: ports("input"), OutputPorts: ports("output"), OutputFields: outputFields()},
@@ -33,6 +34,7 @@ func DefaultRegistry() *Registry {
 	// the composition root after their dependencies have been assembled.
 	_ = registry.RegisterExecutor(startExecutor{})
 	_ = registry.RegisterExecutor(endExecutor{})
+	_ = registry.RegisterExecutor(KnowledgeRetrieveExecutor{})
 	return registry
 }
 

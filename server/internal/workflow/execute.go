@@ -146,6 +146,8 @@ func safeEventInput(nodeType NodeType, values map[string]any) map[string]any {
 		return safePreviewFields(values, "language", "inputVars", "outputVars")
 	case NodeTypeLLMText:
 		return safePreviewFields(values, "modelProfile", "temperature", "maxOutputTokens")
+	case NodeTypeKnowledgeRetrieve:
+		return map[string]any{}
 	case NodeTypeBlogCreateDraft:
 		preview := safePreviewFields(values, "title", "tagMode", "visibility")
 		if tags, err := stringListFromValue(values["tags"]); err == nil {
@@ -182,6 +184,12 @@ func safeEventOutput(nodeType NodeType, values map[string]any) map[string]any {
 		if text, ok := values["text"].(string); ok {
 			preview["text"] = truncatePreviewText(text)
 			preview["textLength"] = len([]rune(text))
+		}
+		return preview
+	case NodeTypeKnowledgeRetrieve:
+		preview := map[string]any{}
+		if references, ok := values["references"].([]KnowledgeReference); ok {
+			preview["referenceCount"] = len(references)
 		}
 		return preview
 	case NodeTypeHTTP:
@@ -439,6 +447,7 @@ func normalizeRunInputs(graph Graph, inputs map[string]any) error {
 				if definition.Required {
 					return fmt.Errorf("开始节点输入 %s 为必填项", name)
 				}
+				inputs[name] = emptyStartInputValue(definition.Type)
 				continue
 			}
 			normalized, err := normalizeStartInput(name, definition, value)
@@ -450,6 +459,25 @@ func normalizeRunInputs(graph Graph, inputs map[string]any) error {
 		return nil
 	}
 	return nil
+}
+
+func emptyStartInputValue(valueType ValueType) any {
+	switch valueType {
+	case ValueTypeString:
+		return ""
+	case ValueTypeStringList:
+		return []string{}
+	case ValueTypeObject:
+		return map[string]any{}
+	case ValueTypeNumber:
+		return float64(0)
+	case ValueTypeBoolean:
+		return false
+	case ValueTypeFile:
+		return nil
+	default:
+		return nil
+	}
 }
 
 const maxMarkdownFileBytes = 5 * 1024 * 1024

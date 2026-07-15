@@ -1,6 +1,7 @@
 export type WorkflowNodeType =
   | 'start'
   | 'blog.parseMarkdown'
+  | 'knowledge.retrieve'
   | 'llm.text'
   | 'blog.createDraft'
   | 'end'
@@ -55,19 +56,24 @@ export const PHASE_ONE_START_INPUTS: Record<string, StartInputDefinition> = {
 export function normalizePhaseOneStartInputs(
   inputs: unknown,
 ): Record<string, StartInputDefinition> {
-  const configured = inputs && typeof inputs === 'object' ? inputs : {};
+  const configured = inputs && typeof inputs === 'object' ? inputs : null;
+  if (!configured || Object.keys(configured).length === 0) {
+    return PHASE_ONE_START_INPUTS;
+  }
+  const allowedTypes = new Set<StartInputDefinition['type']>([
+    'string',
+    'string[]',
+    'object',
+    'number',
+    'boolean',
+    'file',
+  ]);
   return Object.fromEntries(
-    Object.entries(PHASE_ONE_START_INPUTS).map(([name, definition]) => {
-      const current = (configured as Record<string, StartInputDefinition>)[name];
-      return [
-        name,
-        {
-          ...definition,
-          required:
-            name === 'markdownFile' || name === 'visibility' ? true : current?.required === true,
-        },
-      ];
-    }),
+    Object.entries(configured as Record<string, StartInputDefinition>).flatMap(([name, value]) =>
+      name.trim() && value && allowedTypes.has(value.type)
+        ? [[name, { type: value.type, required: value.required === true }]]
+        : [],
+    ),
   );
 }
 

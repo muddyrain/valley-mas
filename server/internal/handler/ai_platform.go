@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	aiAppTypeAgent    = "agent"
-	aiAppTypeWorkflow = "workflow"
+	aiAppTypeAgent         = "agent"
+	aiAppTypeWorkflow      = "workflow"
 	aiAPIKeyDailyCallLimit = 100
 )
 
@@ -91,6 +91,75 @@ type aiAppPayload struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
 	Config      json.RawMessage `json:"config"`
+}
+
+type aiAppRetrievalConfig struct {
+	TopK        int     `json:"topK"`
+	MinScore    float64 `json:"minScore"`
+	CiteSources bool    `json:"citeSources"`
+}
+
+func defaultAIAppRetrievalConfig() aiAppRetrievalConfig {
+	return aiAppRetrievalConfig{TopK: 4, MinScore: 0.45, CiteSources: true}
+}
+
+func parseAIAppRetrievalConfig(raw string) (aiAppRetrievalConfig, error) {
+	config := defaultAIAppRetrievalConfig()
+	if strings.TrimSpace(raw) == "" || strings.TrimSpace(raw) == "{}" {
+		return config, nil
+	}
+	if err := json.Unmarshal([]byte(raw), &config); err != nil {
+		return aiAppRetrievalConfig{}, err
+	}
+	if config.TopK < 1 || config.TopK > 8 || config.MinScore < 0.20 || config.MinScore > 0.80 {
+		return aiAppRetrievalConfig{}, errors.New("retrieval config out of range")
+	}
+	return config, nil
+}
+
+func serializeAIAppRetrievalConfig(config aiAppRetrievalConfig) string {
+	encoded, _ := json.Marshal(config)
+	return string(encoded)
+}
+
+func copyAIAppVersionKnowledgeBaseSnapshot(tx *gorm.DB, app model.AIApp, source, target model.AIAppVersion) error {
+	var sourceBindings []model.AIAppVersionKnowledgeBase
+	if source.ID != 0 && source.KnowledgeBaseSnapshot {
+		if err := tx.Where("app_version_id = ?", source.ID).Find(&sourceBindings).Error; err != nil {
+			return err
+		}
+	} else {
+		var legacyBindings []model.AIAppKnowledgeBase
+		if err := tx.Where("app_id = ?", app.ID).Find(&legacyBindings).Error; err != nil {
+			return err
+		}
+		for _, binding := range legacyBindings {
+			sourceBindings = append(sourceBindings, model.AIAppVersionKnowledgeBase{KnowledgeBaseID: binding.KnowledgeBaseID})
+		}
+	}
+	bindings := make([]model.AIAppVersionKnowledgeBase, 0, len(sourceBindings))
+	for _, binding := range sourceBindings {
+		bindings = append(bindings, model.AIAppVersionKnowledgeBase{AppVersionID: target.ID, KnowledgeBaseID: binding.KnowledgeBaseID})
+	}
+	if len(bindings) > 0 {
+		return tx.Create(&bindings).Error
+	}
+	return nil
+}
+
+func createAIAppVersionSnapshot(tx *gorm.DB, app model.AIApp, config string, retrievalConfig aiAppRetrievalConfig, source model.AIAppVersion) (model.AIAppVersion, error) {
+	var latest model.AIAppVersion
+	if err := tx.Where("app_id = ?", app.ID).Order("number DESC").First(&latest).Error; err != nil && err != gorm.ErrRecordNotFound {
+		return model.AIAppVersion{}, err
+	}
+	version := model.AIAppVersion{AppID: app.ID, Number: latest.Number + 1, Config: config, RetrievalConfig: serializeAIAppRetrievalConfig(retrievalConfig), KnowledgeBaseSnapshot: true}
+	if err := tx.Create(&version).Error; err != nil {
+		return model.AIAppVersion{}, err
+	}
+	if err := copyAIAppVersionKnowledgeBaseSnapshot(tx, app, source, version); err != nil {
+		return model.AIAppVersion{}, err
+	}
+	return version, nil
 }
 
 func currentAIAppUser(c *gin.Context) (model.Int64String, bool) {
@@ -168,9 +237,18 @@ func syncWorkflowAIApp(tx *gorm.DB, definition model.Workflow) (model.AIApp, mod
 		return model.AIApp{}, model.AIAppVersion{}, err
 	}
 	if latest.ID == 0 || latest.Config != definition.Graph {
-		latest = model.AIAppVersion{AppID: app.ID, Number: latest.Number + 1, Config: definition.Graph}
-		if err := tx.Create(&latest).Error; err != nil {
-			return model.AIApp{}, model.AIAppVersion{}, err
+		var source model.AIAppVersion
+		if latest.ID != 0 {
+			source = latest
+		}
+		retrievalConfig, parseErr := parseAIAppRetrievalConfig(source.RetrievalConfig)
+		if parseErr != nil {
+			return model.AIApp{}, model.AIAppVersion{}, parseErr
+		}
+		var createErr error
+		latest, createErr = createAIAppVersionSnapshot(tx, app, definition.Graph, retrievalConfig, source)
+		if createErr != nil {
+			return model.AIApp{}, model.AIAppVersion{}, createErr
 		}
 	}
 	updates := map[string]any{"name": definition.Name, "description": definition.Description, "status": definition.Status, "draft_version_id": latest.ID}
@@ -215,14 +293,15 @@ func CreateAIApp(c *gin.Context) {
 		return
 	}
 	app := model.AIApp{UserID: userID, Type: payload.Type, Name: payload.Name, Description: strings.TrimSpace(payload.Description)}
-	version := model.AIAppVersion{Number: 1, Config: string(config)}
+	var version model.AIAppVersion
 	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&app).Error; err != nil {
 			return err
 		}
-		version.AppID = app.ID
-		if err := tx.Create(&version).Error; err != nil {
-			return err
+		var createErr error
+		version, createErr = createAIAppVersionSnapshot(tx, app, string(config), defaultAIAppRetrievalConfig(), model.AIAppVersion{})
+		if createErr != nil {
+			return createErr
 		}
 		return tx.Model(&app).Update("draft_version_id", version.ID).Error
 	}); err != nil {
@@ -261,15 +340,22 @@ func SaveAIAppVersion(c *gin.Context) {
 		Error(c, 400, "版本配置必须为 JSON")
 		return
 	}
-	var latest model.AIAppVersion
-	if err := database.GetDB().Where("app_id = ?", app.ID).Order("number DESC").First(&latest).Error; err != nil && err != gorm.ErrRecordNotFound {
-		Error(c, 500, "读取应用版本失败")
-		return
-	}
-	version := model.AIAppVersion{AppID: app.ID, Number: latest.Number + 1, Config: string(payload.Config)}
+	var version model.AIAppVersion
 	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&version).Error; err != nil {
+		var source model.AIAppVersion
+		if app.DraftVersionID != 0 {
+			if err := tx.Where("id = ? AND app_id = ?", app.DraftVersionID, app.ID).First(&source).Error; err != nil {
+				return err
+			}
+		}
+		retrievalConfig, err := parseAIAppRetrievalConfig(source.RetrievalConfig)
+		if err != nil {
 			return err
+		}
+		var createErr error
+		version, createErr = createAIAppVersionSnapshot(tx, app, string(payload.Config), retrievalConfig, source)
+		if createErr != nil {
+			return createErr
 		}
 		updates := map[string]any{"draft_version_id": version.ID}
 		if strings.TrimSpace(payload.Name) != "" {
@@ -312,13 +398,14 @@ func RestoreAIAppVersion(c *gin.Context) {
 	}
 	var restored model.AIAppVersion
 	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
-		var latest model.AIAppVersion
-		if err := tx.Where("app_id = ?", app.ID).Order("number DESC").First(&latest).Error; err != nil && err != gorm.ErrRecordNotFound {
+		retrievalConfig, err := parseAIAppRetrievalConfig(source.RetrievalConfig)
+		if err != nil {
 			return err
 		}
-		restored = model.AIAppVersion{AppID: app.ID, Number: latest.Number + 1, Config: source.Config}
-		if err := tx.Create(&restored).Error; err != nil {
-			return err
+		var createErr error
+		restored, createErr = createAIAppVersionSnapshot(tx, app, source.Config, retrievalConfig, source)
+		if createErr != nil {
+			return createErr
 		}
 		return tx.Model(&app).Update("draft_version_id", restored.ID).Error
 	}); err != nil {
@@ -400,7 +487,7 @@ func DebugAIApp(c *gin.Context) {
 		Error(c, http.StatusServiceUnavailable, configErr)
 		return
 	}
-	knowledgeContext, references, retrievalErr := retrieveAIKnowledgeContext(c.Request.Context(), userID, app.ID, message)
+	knowledgeContext, references, retrievalErr := retrieveAIKnowledgeContext(c.Request.Context(), userID, version, message)
 	if retrievalErr != nil {
 		persistAIAppRun(app, version, userID, "failed", arkConfig.Model, message, "", "KNOWLEDGE_RETRIEVAL_FAILED", started)
 		Error(c, http.StatusServiceUnavailable, "知识库检索暂不可用")
@@ -574,12 +661,16 @@ func streamDebugAIApp(c *gin.Context, client *arkruntime.Client, modelID string,
 	_ = writer.Send(gin.H{"type": "done", "run": run, "reply": result, "model": currentModel, "references": references})
 }
 
-func retrieveAIKnowledgeContext(ctx context.Context, userID, appID model.Int64String, message string) (string, []aiKnowledgeReference, error) {
+func retrieveAIKnowledgeContext(ctx context.Context, userID model.Int64String, version model.AIAppVersion, message string) (string, []aiKnowledgeReference, error) {
 	db := database.GetDB()
 	if db == nil || db.Dialector.Name() != "postgres" {
 		var count int64
 		if db != nil {
-			_ = db.Model(&model.AIAppKnowledgeBase{}).Where("app_id = ?", appID).Count(&count).Error
+			if version.KnowledgeBaseSnapshot {
+				_ = db.Model(&model.AIAppVersionKnowledgeBase{}).Where("app_version_id = ?", version.ID).Count(&count).Error
+			} else {
+				_ = db.Model(&model.AIAppKnowledgeBase{}).Where("app_id = ?", version.AppID).Count(&count).Error
+			}
 		}
 		if count > 0 {
 			return "", nil, errors.New("RAG requires PostgreSQL")
@@ -589,16 +680,30 @@ func retrieveAIKnowledgeContext(ctx context.Context, userID, appID model.Int64St
 	if !hasPGVectorExtension(db) {
 		return "", nil, errors.New("pgvector extension is not installed")
 	}
-	var bindings []model.AIAppKnowledgeBase
-	if err := db.Where("app_id = ?", appID).Find(&bindings).Error; err != nil {
+	config, err := parseAIAppRetrievalConfig(version.RetrievalConfig)
+	if err != nil {
 		return "", nil, err
 	}
-	if len(bindings) == 0 {
-		return "", nil, nil
+	knowledgeBaseIDs := make([]model.Int64String, 0)
+	if version.KnowledgeBaseSnapshot {
+		var bindings []model.AIAppVersionKnowledgeBase
+		if err := db.Where("app_version_id = ?", version.ID).Find(&bindings).Error; err != nil {
+			return "", nil, err
+		}
+		for _, binding := range bindings {
+			knowledgeBaseIDs = append(knowledgeBaseIDs, binding.KnowledgeBaseID)
+		}
+	} else {
+		var bindings []model.AIAppKnowledgeBase
+		if err := db.Where("app_id = ?", version.AppID).Find(&bindings).Error; err != nil {
+			return "", nil, err
+		}
+		for _, binding := range bindings {
+			knowledgeBaseIDs = append(knowledgeBaseIDs, binding.KnowledgeBaseID)
+		}
 	}
-	knowledgeBaseIDs := make([]model.Int64String, 0, len(bindings))
-	for _, binding := range bindings {
-		knowledgeBaseIDs = append(knowledgeBaseIDs, binding.KnowledgeBaseID)
+	if len(knowledgeBaseIDs) == 0 {
+		return "", nil, nil
 	}
 	var readyDocumentCount int64
 	if err := db.Model(&model.AIKnowledgeDocument{}).
@@ -628,16 +733,15 @@ func retrieveAIKnowledgeContext(ctx context.Context, userID, appID model.Int64St
 		  AND documents.knowledge_base_id IN ? AND documents.status = 'ready'
 		  AND chunks.embedding IS NOT NULL
 		ORDER BY chunks.embedding <=> ?::vector
-		LIMIT 4`, string(queryVector), userID, userID, userID, knowledgeBaseIDs, string(queryVector)).Scan(&rows).Error
+	LIMIT ?`, string(queryVector), userID, userID, userID, knowledgeBaseIDs, string(queryVector), config.TopK).Scan(&rows).Error
 	if err != nil {
 		return "", nil, err
 	}
 	var contextBuilder strings.Builder
 	references := make([]aiKnowledgeReference, 0, len(rows))
-	const minKnowledgeScore = 0.45
 	const maxKnowledgeContextRunes = 4500
 	for _, row := range rows {
-		if row.Score < minKnowledgeScore {
+		if row.Score < config.MinScore {
 			continue
 		}
 		content := aiclient.TrimRunes(strings.TrimSpace(row.Content), 1600)
@@ -649,7 +753,9 @@ func retrieveAIKnowledgeContext(ctx context.Context, userID, appID model.Int64St
 		contextBuilder.WriteString("]\n")
 		contextBuilder.WriteString(content)
 		contextBuilder.WriteString("\n\n")
-		references = append(references, aiKnowledgeReference{DocumentName: row.DocumentName, ChunkID: row.ChunkID, Excerpt: aiclient.TrimRunes(content, 240)})
+		if config.CiteSources {
+			references = append(references, aiKnowledgeReference{DocumentName: row.DocumentName, ChunkID: row.ChunkID, Excerpt: aiclient.TrimRunes(content, 240)})
+		}
 	}
 	return strings.TrimSpace(contextBuilder.String()), references, nil
 }
@@ -718,13 +824,25 @@ func ListAIAppKnowledgeBases(c *gin.Context) {
 	if !found {
 		return
 	}
+	if app.DraftVersionID == 0 {
+		Success(c, gin.H{"list": []model.AIKnowledgeBase{}})
+		return
+	}
+	var version model.AIAppVersion
+	if err := database.GetDB().Where("id = ? AND app_id = ?", app.DraftVersionID, app.ID).First(&version).Error; err != nil {
+		Error(c, http.StatusNotFound, "草稿版本不存在")
+		return
+	}
 	var items []model.AIKnowledgeBase
-	if err := database.GetDB().Table("ai_knowledge_bases AS knowledge_bases").
-		Select("knowledge_bases.*").
-		Joins("JOIN ai_app_knowledge_bases bindings ON bindings.knowledge_base_id = knowledge_bases.id").
-		Where("bindings.app_id = ? AND knowledge_bases.user_id = ?", app.ID, userID).
-		Order("knowledge_bases.updated_at DESC").
-		Find(&items).Error; err != nil {
+	query := database.GetDB().Table("ai_knowledge_bases AS knowledge_bases").Select("knowledge_bases.*")
+	if version.KnowledgeBaseSnapshot {
+		query = query.Joins("JOIN ai_app_version_knowledge_bases bindings ON bindings.knowledge_base_id = knowledge_bases.id").
+			Where("bindings.app_version_id = ? AND knowledge_bases.user_id = ?", version.ID, userID)
+	} else {
+		query = query.Joins("JOIN ai_app_knowledge_bases bindings ON bindings.knowledge_base_id = knowledge_bases.id").
+			Where("bindings.app_id = ? AND knowledge_bases.user_id = ?", app.ID, userID)
+	}
+	if err := query.Order("knowledge_bases.updated_at DESC").Find(&items).Error; err != nil {
 		Error(c, 500, "加载智能体知识库失败")
 		return
 	}
@@ -768,23 +886,103 @@ func ReplaceAIAppKnowledgeBases(c *gin.Context) {
 			return
 		}
 	}
-	bindings := make([]model.AIAppKnowledgeBase, 0, len(ids))
-	for _, knowledgeBaseID := range ids {
-		bindings = append(bindings, model.AIAppKnowledgeBase{AppID: app.ID, KnowledgeBaseID: knowledgeBaseID})
-	}
+	var version model.AIAppVersion
 	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("app_id = ?", app.ID).Delete(&model.AIAppKnowledgeBase{}).Error; err != nil {
+		var source model.AIAppVersion
+		if app.DraftVersionID != 0 {
+			if err := tx.Where("id = ? AND app_id = ?", app.DraftVersionID, app.ID).First(&source).Error; err != nil {
+				return err
+			}
+		}
+		retrievalConfig, err := parseAIAppRetrievalConfig(source.RetrievalConfig)
+		if err != nil {
 			return err
 		}
-		if len(bindings) > 0 {
-			return tx.Create(&bindings).Error
+		var createErr error
+		version, createErr = createAIAppVersionSnapshot(tx, app, source.Config, retrievalConfig, model.AIAppVersion{})
+		if createErr != nil {
+			return createErr
 		}
-		return nil
+		if err := tx.Where("app_version_id = ?", version.ID).Delete(&model.AIAppVersionKnowledgeBase{}).Error; err != nil {
+			return err
+		}
+		bindings := make([]model.AIAppVersionKnowledgeBase, 0, len(ids))
+		for _, knowledgeBaseID := range ids {
+			bindings = append(bindings, model.AIAppVersionKnowledgeBase{AppVersionID: version.ID, KnowledgeBaseID: knowledgeBaseID})
+		}
+		if len(bindings) > 0 {
+			if err := tx.Create(&bindings).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Model(&app).Update("draft_version_id", version.ID).Error
 	}); err != nil {
 		Error(c, 500, "保存智能体知识库失败")
 		return
 	}
-	Success(c, gin.H{"knowledgeBaseIds": ids})
+	Success(c, gin.H{"knowledgeBaseIds": ids, "version": version})
+}
+
+func GetAIAppRetrievalConfig(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	app, found := findAIApp(c, userID)
+	if !found {
+		return
+	}
+	config := defaultAIAppRetrievalConfig()
+	if app.DraftVersionID != 0 {
+		var version model.AIAppVersion
+		if err := database.GetDB().Where("id = ? AND app_id = ?", app.DraftVersionID, app.ID).First(&version).Error; err != nil {
+			Error(c, http.StatusNotFound, "草稿版本不存在")
+			return
+		}
+		var err error
+		config, err = parseAIAppRetrievalConfig(version.RetrievalConfig)
+		if err != nil {
+			Error(c, http.StatusBadGateway, "草稿检索配置无效")
+			return
+		}
+	}
+	Success(c, gin.H{"retrievalConfig": config})
+}
+
+func UpdateAIAppRetrievalConfig(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	app, found := findAIApp(c, userID)
+	if !found {
+		return
+	}
+	var config aiAppRetrievalConfig
+	if c.ShouldBindJSON(&config) != nil || config.TopK < 1 || config.TopK > 8 || config.MinScore < 0.20 || config.MinScore > 0.80 {
+		Error(c, http.StatusBadRequest, "检索配置无效")
+		return
+	}
+	var version model.AIAppVersion
+	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		var source model.AIAppVersion
+		if app.DraftVersionID == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		if err := tx.Where("id = ? AND app_id = ?", app.DraftVersionID, app.ID).First(&source).Error; err != nil {
+			return err
+		}
+		var createErr error
+		version, createErr = createAIAppVersionSnapshot(tx, app, source.Config, config, source)
+		if createErr != nil {
+			return createErr
+		}
+		return tx.Model(&app).Update("draft_version_id", version.ID).Error
+	}); err != nil {
+		Error(c, http.StatusInternalServerError, "保存检索配置失败")
+		return
+	}
+	Success(c, gin.H{"retrievalConfig": config, "version": version})
 }
 
 func ReplaceAIAppTools(c *gin.Context) {

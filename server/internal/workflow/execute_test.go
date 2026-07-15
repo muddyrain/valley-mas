@@ -261,7 +261,7 @@ func TestExecutePassesDeclaredMarkdownFileInputToParseExecutor(t *testing.T) {
 	registry := DefaultRegistry()
 	requireRegisterExecutor(t, registry, BlogParseExecutor{})
 	graph := Graph{
-		SchemaVersion: 1,
+		SchemaVersion: 2,
 		Nodes: []Node{
 			{ID: "start", Type: NodeTypeStart, Config: []byte(`{"inputs":{"markdownFile":{"type":"file","required":true}}}`)},
 			{ID: "parse", Type: NodeTypeBlogParse, Config: []byte(`{"fileInput":"markdownFile"}`)},
@@ -347,7 +347,7 @@ func TestExecuteDoesNotPassRawConfigToExecutorValidation(t *testing.T) {
 	registry := DefaultRegistry()
 	requireRegisterExecutor(t, registry, rawConfigRejectingExecutor{})
 	graph := Graph{
-		SchemaVersion: 1,
+		SchemaVersion: 2,
 		Nodes: []Node{
 			{ID: "start", Type: NodeTypeStart, Config: startConfig()},
 			{ID: "summary", Type: NodeTypeLLMText, Config: llmConfig("fixed prompt")},
@@ -387,6 +387,21 @@ func TestExecuteNormalizesJSONStringListInputForExecutor(t *testing.T) {
 	}
 	if got, ok := inputs["tagIds"].([]string); !ok || !reflect.DeepEqual(got, []string{"tag-a", "tag-b"}) {
 		t.Fatalf("normalized input = %#v (%T), want []string", inputs["tagIds"], inputs["tagIds"])
+	}
+}
+
+func TestNormalizeRunInputsFillsOptionalStartValuesForTemplates(t *testing.T) {
+	graph := Graph{SchemaVersion: 2, Nodes: []Node{{ID: "start", Type: NodeTypeStart, Config: []byte(`{"inputs":{"topic":{"type":"string","required":true},"audience":{"type":"string"},"tags":{"type":"string[]"}}}`)}}}
+	inputs := map[string]any{"topic": "知识库写作"}
+
+	if err := normalizeRunInputs(graph, inputs); err != nil {
+		t.Fatalf("normalizeRunInputs() error = %v", err)
+	}
+	if inputs["audience"] != "" {
+		t.Fatalf("audience = %#v, want empty string", inputs["audience"])
+	}
+	if tags, ok := inputs["tags"].([]string); !ok || len(tags) != 0 {
+		t.Fatalf("tags = %#v, want empty string list", inputs["tags"])
 	}
 }
 
@@ -504,7 +519,7 @@ func requireRegisterExecutor(t *testing.T, registry *Registry, executor NodeExec
 
 func executionGraph() Graph {
 	return Graph{
-		SchemaVersion: 1,
+		SchemaVersion: 2,
 		Nodes: []Node{
 			{ID: "start", Type: NodeTypeStart, Config: startConfig()},
 			{ID: "parse", Type: NodeTypeBlogParse, Config: []byte(`{"fileInput":"markdownFile"}`)},

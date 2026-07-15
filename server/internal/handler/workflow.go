@@ -243,13 +243,14 @@ func RestoreWorkflowVersion(c *gin.Context) {
 		if _, err := decodeWorkflowGraph(source.Config); err != nil {
 			return err
 		}
-		var latest model.AIAppVersion
-		if err := tx.Where("app_id = ?", app.ID).Order("number DESC").First(&latest).Error; err != nil {
+		retrievalConfig, err := parseAIAppRetrievalConfig(source.RetrievalConfig)
+		if err != nil {
 			return err
 		}
-		restored = model.AIAppVersion{AppID: app.ID, Number: latest.Number + 1, Config: source.Config}
-		if err := tx.Create(&restored).Error; err != nil {
-			return err
+		var createErr error
+		restored, createErr = createAIAppVersionSnapshot(tx, app, source.Config, retrievalConfig, source)
+		if createErr != nil {
+			return createErr
 		}
 		return tx.Model(&definition).Updates(map[string]any{"graph": restored.Config, "status": "draft"}).Error
 	}); err != nil {
@@ -427,7 +428,7 @@ func AdminRunWorkflow(c *gin.Context) {
 	var finalOutput map[string]any
 	executionContext, cancel := context.WithTimeout(c.Request.Context(), workflowRunExecutionTimeout)
 	defer cancel()
-	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: make(map[string]map[string]any)}, func(event workflow.Event) {
+	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: make(map[string]map[string]any), KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion)}, func(event workflow.Event) {
 		if persistenceErr == nil {
 			persistenceErr = persistWorkflowNodeEvent(run.ID, nodeTypes[event.NodeID], event)
 		}
@@ -578,8 +579,21 @@ func upgradeLegacyOutputReferences(graph *workflow.Graph) {
 func workflowRuntimeRegistry() *workflow.Registry {
 	registry := workflow.DefaultRegistry()
 	_ = workflow.RegisterBlogWorkflowExecutors(registry, nil)
-	_ = workflow.RegisterCoreWorkflowExecutors(registry)
 	return registry
+}
+
+func workflowKnowledgeRetriever(userID model.Int64String, version model.AIAppVersion) workflow.KnowledgeRetriever {
+	return workflow.KnowledgeRetrieverFunc(func(ctx context.Context, query string) (workflow.KnowledgeResult, error) {
+		knowledgeContext, references, err := retrieveAIKnowledgeContext(ctx, userID, version, query)
+		if err != nil {
+			return workflow.KnowledgeResult{}, err
+		}
+		result := workflow.KnowledgeResult{Context: knowledgeContext, References: make([]workflow.KnowledgeReference, 0, len(references))}
+		for _, reference := range references {
+			result.References = append(result.References, workflow.KnowledgeReference{DocumentName: reference.DocumentName, ChunkID: reference.ChunkID.String(), Excerpt: reference.Excerpt})
+		}
+		return result, nil
+	})
 }
 
 func workflowRequiresARKText(graph workflow.Graph) bool {

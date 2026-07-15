@@ -144,6 +144,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.PUT("/ai/apps/:appId/tools", handler.ReplaceAIAppTools)
 			auth.GET("/ai/apps/:appId/knowledge-bases", handler.ListAIAppKnowledgeBases)
 			auth.PUT("/ai/apps/:appId/knowledge-bases", handler.ReplaceAIAppKnowledgeBases)
+			auth.GET("/ai/apps/:appId/retrieval-config", handler.GetAIAppRetrievalConfig)
+			auth.PUT("/ai/apps/:appId/retrieval-config", handler.UpdateAIAppRetrievalConfig)
 			auth.GET("/ai/knowledge-bases", handler.ListAIKnowledgeBases)
 			auth.POST("/ai/knowledge-bases", handler.CreateAIKnowledgeBase)
 			auth.PUT("/ai/knowledge-bases/:knowledgeBaseId", handler.UpdateAIKnowledgeBase)

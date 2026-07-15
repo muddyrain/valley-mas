@@ -43,6 +43,15 @@ function validateNodeData(nodeId: string, data: NodeData): ValidationError | nul
           message: '请选择 Markdown 输入',
         };
       break;
+    case 'knowledge.retrieve':
+      if (!config.query)
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '请设置检索问题',
+        };
+      break;
     case 'llm.text':
       if (config.modelProfile !== 'ark-text-default')
         return {

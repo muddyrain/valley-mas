@@ -1,4 +1,4 @@
-import { FileText, type LucideIcon, Sparkles, Zap } from 'lucide-react';
+import { FileText, type LucideIcon, Sparkles } from 'lucide-react';
 
 export interface WorkflowTemplateConfig {
   id: string;
@@ -22,21 +22,12 @@ export const WORKFLOW_TEMPLATE_DEFS: WorkflowTemplateConfig[] = [
   },
   {
     id: 'content-generate',
-    name: '内容生成工作流',
-    description: '输入主题，AI 自动生成文章内容、配图和标签',
-    enabled: false,
+    name: '主题生成博客草稿',
+    description: '结合已绑定资料生成博客草稿',
+    enabled: true,
     icon: Sparkles,
     tags: ['AI', '生成', '内容'],
     color: 'bg-blue-500',
-  },
-  {
-    id: 'knowledge-search',
-    name: '知识库检索工作流',
-    description: '从向量数据库中检索相关知识，辅助内容创作',
-    enabled: false,
-    icon: Zap,
-    tags: ['AI', '知识库', '检索'],
-    color: 'bg-green-500',
   },
 ];
 

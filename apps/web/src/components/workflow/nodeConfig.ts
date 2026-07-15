@@ -20,6 +20,15 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     handles: { input: true, output: true },
     available: true,
   },
+  'knowledge.retrieve': {
+    type: 'knowledge.retrieve',
+    label: '检索知识库',
+    description: '从当前应用已绑定的资料中检索引用',
+    icon: 'Database',
+    category: 'ai',
+    handles: { input: true, output: true },
+    available: true,
+  },
   'llm.text': {
     type: 'llm.text',
     label: '大模型',
@@ -148,6 +157,8 @@ export function getNodeConfigSummary(nodeType: string, config?: Record<string, u
       return `${Object.keys((config.inputs as object) || {}).length} 个运行输入`;
     case 'blog.parseMarkdown':
       return String(config.fileInput || '未选择 Markdown 输入');
+    case 'knowledge.retrieve':
+      return String(config.query || '未设置检索问题');
     case 'llm.text':
       return String(config.modelProfile || '未选择模型配置');
     case 'blog.createDraft':

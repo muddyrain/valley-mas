@@ -37,6 +37,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		&model.Workflow{},
 		&model.AIApp{},
 		&model.AIAppVersion{},
+		&model.AIAppVersionKnowledgeBase{},
 		&model.AIAPIKey{},
 		&model.AIAPIKeyAppBinding{},
 		&model.AIAPIKeyDailyUsage{},
@@ -75,6 +76,8 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.DELETE("/knowledge-bases/:knowledgeBaseId", DeleteAIKnowledgeBase)
 	auth.GET("/apps/:appId/knowledge-bases", ListAIAppKnowledgeBases)
 	auth.PUT("/apps/:appId/knowledge-bases", ReplaceAIAppKnowledgeBases)
+	auth.GET("/apps/:appId/retrieval-config", GetAIAppRetrievalConfig)
+	auth.PUT("/apps/:appId/retrieval-config", UpdateAIAppRetrievalConfig)
 	auth.GET("/api-keys/:keyId/apps", ListAIAPIKeyAppBindings)
 	auth.PUT("/api-keys/:keyId/apps", ReplaceAIAPIKeyAppBindings)
 	auth.GET("/apps/:appId/public-invocations", ListAIAppPublicInvocations)
@@ -445,6 +448,116 @@ func TestSaveAIAppVersionUpdatesDraftVersionID(t *testing.T) {
 	var version model.AIAppVersion
 	if err := db.First(&version, stored.DraftVersionID).Error; err != nil {
 		t.Fatalf("draft version not persisted: %v", err)
+	}
+}
+
+func TestUpdateAIAppRetrievalConfigCreatesVersionedDraftSnapshot(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "检索配置测试"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	first := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"只依据资料回答"}`}
+	if err := db.Create(&first).Error; err != nil {
+		t.Fatalf("create first version: %v", err)
+	}
+	if err := db.Model(&app).Update("draft_version_id", first.ID).Error; err != nil {
+		t.Fatalf("set draft version: %v", err)
+	}
+
+	body, _ := json.Marshal(map[string]any{"topK": 6, "minScore": 0.6, "citeSources": false})
+	req := httptest.NewRequest(http.MethodPut, "/ai/apps/"+strconv.FormatInt(int64(app.ID), 10)+"/retrieval-config", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update response = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var stored model.AIApp
+	if err := db.First(&stored, app.ID).Error; err != nil {
+		t.Fatalf("load app: %v", err)
+	}
+	if stored.DraftVersionID == first.ID {
+		t.Fatal("retrieval config update must create a new draft version")
+	}
+	var snapshot model.AIAppVersion
+	if err := db.First(&snapshot, stored.DraftVersionID).Error; err != nil {
+		t.Fatalf("load snapshot: %v", err)
+	}
+	if snapshot.Number != 2 || snapshot.Config != first.Config {
+		t.Fatalf("unexpected copied config: %#v", snapshot)
+	}
+	var response struct {
+		Data struct {
+			RetrievalConfig struct {
+				TopK        int     `json:"topK"`
+				MinScore    float64 `json:"minScore"`
+				CiteSources bool    `json:"citeSources"`
+			} `json:"retrievalConfig"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Data.RetrievalConfig.TopK != 6 || response.Data.RetrievalConfig.MinScore != 0.6 || response.Data.RetrievalConfig.CiteSources {
+		t.Fatalf("retrieval snapshot was not returned: %s", rec.Body.String())
+	}
+}
+
+func TestReplaceAIAppKnowledgeBasesKeepsPriorVersionSnapshot(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "资料库快照测试"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	first := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{}`, RetrievalConfig: `{"topK":4,"minScore":0.45,"citeSources":true}`, KnowledgeBaseSnapshot: true}
+	if err := db.Create(&first).Error; err != nil {
+		t.Fatalf("create first version: %v", err)
+	}
+	firstBase := model.AIKnowledgeBase{UserID: 101, Name: "旧资料"}
+	secondBase := model.AIKnowledgeBase{UserID: 101, Name: "新资料"}
+	if err := db.Create(&firstBase).Error; err != nil {
+		t.Fatalf("create first base: %v", err)
+	}
+	if err := db.Create(&secondBase).Error; err != nil {
+		t.Fatalf("create second base: %v", err)
+	}
+	if err := db.Create(&model.AIAppVersionKnowledgeBase{AppVersionID: first.ID, KnowledgeBaseID: firstBase.ID}).Error; err != nil {
+		t.Fatalf("create first snapshot binding: %v", err)
+	}
+	if err := db.Model(&app).Update("draft_version_id", first.ID).Error; err != nil {
+		t.Fatalf("set draft version: %v", err)
+	}
+
+	body, _ := json.Marshal(map[string]any{"knowledgeBaseIds": []model.Int64String{secondBase.ID}})
+	req := httptest.NewRequest(http.MethodPut, "/ai/apps/"+strconv.FormatInt(int64(app.ID), 10)+"/knowledge-bases", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("replace response = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var stored model.AIApp
+	if err := db.First(&stored, app.ID).Error; err != nil {
+		t.Fatalf("load app: %v", err)
+	}
+	var oldBindings []model.AIAppVersionKnowledgeBase
+	if err := db.Where("app_version_id = ?", first.ID).Find(&oldBindings).Error; err != nil {
+		t.Fatalf("load old bindings: %v", err)
+	}
+	if len(oldBindings) != 1 || oldBindings[0].KnowledgeBaseID != firstBase.ID {
+		t.Fatalf("old snapshot changed: %#v", oldBindings)
+	}
+	var newBindings []model.AIAppVersionKnowledgeBase
+	if err := db.Where("app_version_id = ?", stored.DraftVersionID).Find(&newBindings).Error; err != nil {
+		t.Fatalf("load new bindings: %v", err)
+	}
+	if stored.DraftVersionID == first.ID || len(newBindings) != 1 || newBindings[0].KnowledgeBaseID != secondBase.ID {
+		t.Fatalf("new snapshot mismatch: draft=%d bindings=%#v", stored.DraftVersionID, newBindings)
 	}
 }
 

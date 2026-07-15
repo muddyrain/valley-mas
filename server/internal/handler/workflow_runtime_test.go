@@ -36,7 +36,7 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&model.User{}, &model.Workflow{}, &model.WorkflowRun{}, &model.WorkflowNodeRun{}, &model.AIApp{}, &model.AIAppVersion{}, &model.AIAppRun{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Workflow{}, &model.WorkflowRun{}, &model.WorkflowNodeRun{}, &model.AIApp{}, &model.AIAppVersion{}, &model.AIAppVersionKnowledgeBase{}, &model.AIAppKnowledgeBase{}, &model.AIAppRun{}); err != nil {
 		t.Fatalf("migrate workflow runtime: %v", err)
 	}
 	if err := db.Create(&[]model.User{
@@ -69,11 +69,11 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 }
 
 func runtimeTestGraph() []byte {
-	return []byte(`{"schemaVersion":1,"nodes":[{"id":"start","type":"start","config":{"inputs":{"title":{"type":"string","required":true}}}},{"id":"end","type":"end","config":{"outputs":{"title":"{{start.output.title}}"}}}],"edges":[{"source":"start","sourceHandle":"output","target":"end","targetHandle":"input"}]}`)
+	return []byte(`{"schemaVersion":2,"nodes":[{"id":"start","type":"start","config":{"inputs":{"title":{"type":"string","required":true}}}},{"id":"end","type":"end","config":{"outputs":{"title":"{{start.output.title}}"}}}],"edges":[{"source":"start","sourceHandle":"output","target":"end","targetHandle":"input"}]}`)
 }
 
 func TestDecodeWorkflowGraphUpgradesLegacyOutputReferences(t *testing.T) {
-	graph, err := decodeWorkflowGraph(`{"schemaVersion":1,"nodes":[{"id":"start","type":"start","config":{"inputs":{"title":{"type":"string","required":true}}}},{"id":"end","type":"end","config":{"outputs":{"title":"{{start.title}}","literal":"{{unknown.title}}"}}}],"edges":[{"source":"start","target":"end"}]}`)
+	graph, err := decodeWorkflowGraph(`{"schemaVersion":2,"nodes":[{"id":"start","type":"start","config":{"inputs":{"title":{"type":"string","required":true}}}},{"id":"end","type":"end","config":{"outputs":{"title":"{{start.title}}","literal":"{{unknown.title}}"}}}],"edges":[{"source":"start","target":"end"}]}`)
 	if err != nil {
 		t.Fatalf("decode workflow graph: %v", err)
 	}
@@ -185,6 +185,35 @@ func TestWorkflowRunExecutesMultipartGraphAndPersistsSafeHistory(t *testing.T) {
 	}
 }
 
+func TestWorkflowRunRejectsUnavailableNodeBeforeCreatingRun(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	definition.Graph = `{"schemaVersion":2,"nodes":[{"id":"start","type":"start","config":{"inputs":{"title":{"type":"string","required":true}}}},{"id":"request","type":"http","config":{"method":"GET","url":"https://example.com"}},{"id":"end","type":"end","config":{"outputs":{"title":"{{start.output.title}}"}}}],"edges":[{"source":"start","sourceHandle":"output","target":"request","targetHandle":"input"},{"source":"request","sourceHandle":"output","target":"end","targetHandle":"input"}]}`
+	if err := database.DB.Model(&definition).Update("graph", definition.Graph).Error; err != nil {
+		t.Fatalf("update workflow graph: %v", err)
+	}
+
+	path := "/workflows/" + strconv.FormatInt(int64(definition.ID), 10) + "/run"
+	req := workflowMultipartRequest(t, path, `{"title":"不应发起外部请求"}`)
+	req.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	var response Response
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode unavailable node response: %v", err)
+	}
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Message, "当前未开放") {
+		t.Fatalf("unavailable node response = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var count int64
+	if err := database.DB.Model(&model.WorkflowRun{}).Where("workflow_id = ?", definition.ID).Count(&count).Error; err != nil {
+		t.Fatalf("count workflow runs: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("unavailable graph created %d run records", count)
+	}
+}
+
 func TestWorkflowRunHistoryIsOwnerScoped(t *testing.T) {
 	router, workflow := setupWorkflowRuntimeTestRouter(t)
 	path := "/workflows/" + strconv.FormatInt(int64(workflow.ID), 10) + "/run"
@@ -238,7 +267,7 @@ func TestWorkflowRunRequiresAuthentication(t *testing.T) {
 
 func TestWorkflowRunRecordsARKConfigurationFailure(t *testing.T) {
 	router, workflow := setupWorkflowRuntimeTestRouter(t)
-	workflow.Graph = `{"schemaVersion":1,"nodes":[{"id":"start","type":"start","config":{"inputs":{"title":{"type":"string","required":true}}}},{"id":"summary","type":"llm.text","config":{"modelProfile":"ark-text-default","systemPrompt":"summarize","prompt":"{{start.output.title}}","temperature":0.2,"maxOutputTokens":120}},{"id":"end","type":"end","config":{"outputs":{"text":"{{summary.output.text}}"}}}],"edges":[{"source":"start","sourceHandle":"output","target":"summary","targetHandle":"input"},{"source":"summary","sourceHandle":"output","target":"end","targetHandle":"input"}]}`
+	workflow.Graph = `{"schemaVersion":2,"nodes":[{"id":"start","type":"start","config":{"inputs":{"title":{"type":"string","required":true}}}},{"id":"summary","type":"llm.text","config":{"modelProfile":"ark-text-default","systemPrompt":"summarize","prompt":"{{start.output.title}}","temperature":0.2,"maxOutputTokens":120}},{"id":"end","type":"end","config":{"outputs":{"text":"{{summary.output.text}}"}}}],"edges":[{"source":"start","sourceHandle":"output","target":"summary","targetHandle":"input"},{"source":"summary","sourceHandle":"output","target":"end","targetHandle":"input"}]}`
 	if err := database.DB.Save(&workflow).Error; err != nil {
 		t.Fatalf("save llm workflow: %v", err)
 	}
@@ -266,7 +295,7 @@ func TestWorkflowRunRecordsARKConfigurationFailure(t *testing.T) {
 
 func TestWorkflowRunRejectsUndeclaredAndMultipleUploadFiles(t *testing.T) {
 	router, workflow := setupWorkflowRuntimeTestRouter(t)
-	workflow.Graph = `{"schemaVersion":1,"nodes":[{"id":"start","type":"start","config":{"inputs":{"markdownFile":{"type":"file","required":true}}}},{"id":"parse","type":"blog.parseMarkdown","config":{"fileInput":"markdownFile"}},{"id":"end","type":"end","config":{"outputs":{"title":"{{parse.output.title}}"}}}],"edges":[{"source":"start","sourceHandle":"output","target":"parse","targetHandle":"input"},{"source":"parse","sourceHandle":"output","target":"end","targetHandle":"input"}]}`
+	workflow.Graph = `{"schemaVersion":2,"nodes":[{"id":"start","type":"start","config":{"inputs":{"markdownFile":{"type":"file","required":true}}}},{"id":"parse","type":"blog.parseMarkdown","config":{"fileInput":"markdownFile"}},{"id":"end","type":"end","config":{"outputs":{"title":"{{parse.output.title}}"}}}],"edges":[{"source":"start","sourceHandle":"output","target":"parse","targetHandle":"input"},{"source":"parse","sourceHandle":"output","target":"end","targetHandle":"input"}]}`
 	if err := database.DB.Save(&workflow).Error; err != nil {
 		t.Fatalf("save file workflow: %v", err)
 	}
@@ -292,7 +321,7 @@ func TestWorkflowRunRejectsUndeclaredAndMultipleUploadFiles(t *testing.T) {
 
 func TestWorkflowRunRejectsMultipartBodyOverTotalLimit(t *testing.T) {
 	router, workflow := setupWorkflowRuntimeTestRouter(t)
-	workflow.Graph = `{"schemaVersion":1,"nodes":[{"id":"start","type":"start","config":{"inputs":{"markdownFile":{"type":"file","required":true}}}},{"id":"parse","type":"blog.parseMarkdown","config":{"fileInput":"markdownFile"}},{"id":"end","type":"end","config":{"outputs":{"title":"{{parse.output.title}}"}}}],"edges":[{"source":"start","sourceHandle":"output","target":"parse","targetHandle":"input"},{"source":"parse","sourceHandle":"output","target":"end","targetHandle":"input"}]}`
+	workflow.Graph = `{"schemaVersion":2,"nodes":[{"id":"start","type":"start","config":{"inputs":{"markdownFile":{"type":"file","required":true}}}},{"id":"parse","type":"blog.parseMarkdown","config":{"fileInput":"markdownFile"}},{"id":"end","type":"end","config":{"outputs":{"title":"{{parse.output.title}}"}}}],"edges":[{"source":"start","sourceHandle":"output","target":"parse","targetHandle":"input"},{"source":"parse","sourceHandle":"output","target":"end","targetHandle":"input"}]}`
 	if err := database.DB.Save(&workflow).Error; err != nil {
 		t.Fatalf("save file workflow: %v", err)
 	}

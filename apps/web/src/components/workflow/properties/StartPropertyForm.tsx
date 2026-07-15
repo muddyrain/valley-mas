@@ -26,7 +26,7 @@ export function StartPropertyForm({ config }: PropertyFormProps) {
             className="flex items-center justify-between rounded-lg border border-border p-3"
           >
             <div>
-              <Label>{inputLabels[name]}</Label>
+              <Label>{inputLabels[name] || name}</Label>
               <p className="mt-1 text-xs text-muted-foreground">{input.type}</p>
             </div>
             <Badge variant={input.required ? 'secondary' : 'outline'}>

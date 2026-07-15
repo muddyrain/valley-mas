@@ -9,7 +9,7 @@ import (
 
 func TestValidateGraphRejectsCycleAndUnknownVariable(t *testing.T) {
 	graph := Graph{
-		SchemaVersion: 1,
+		SchemaVersion: 2,
 		Nodes: []Node{
 			{ID: "start", Type: NodeTypeStart, Config: startConfig()},
 			{ID: "summary", Type: NodeTypeLLMText, Config: json.RawMessage(`{"modelProfile":"ark-text-default","systemPrompt":"summarize","prompt":"{{missing.output.text}}","temperature":0.4,"maxOutputTokens":120}`)},
@@ -24,7 +24,7 @@ func TestValidateGraphRejectsCycleAndUnknownVariable(t *testing.T) {
 }
 
 func TestValidateGraphRequiresExactlyOneStartAndEnd(t *testing.T) {
-	graph := Graph{SchemaVersion: 1, Nodes: []Node{{ID: "summary", Type: NodeTypeLLMText, Config: json.RawMessage(`{"modelProfile":"ark-text-default","systemPrompt":"summarize","prompt":"article","temperature":0.4,"maxOutputTokens":120}`)}}}
+	graph := Graph{SchemaVersion: 2, Nodes: []Node{{ID: "summary", Type: NodeTypeLLMText, Config: json.RawMessage(`{"modelProfile":"ark-text-default","systemPrompt":"summarize","prompt":"article","temperature":0.4,"maxOutputTokens":120}`)}}}
 
 	errs := ValidateGraph(graph, DefaultRegistry())
 	assertContains(t, errs, "必须且只能有一个开始节点")
@@ -33,7 +33,7 @@ func TestValidateGraphRequiresExactlyOneStartAndEnd(t *testing.T) {
 
 func TestValidateGraphRejectsInvalidLLMParameters(t *testing.T) {
 	graph := Graph{
-		SchemaVersion: 1,
+		SchemaVersion: 2,
 		Nodes: []Node{
 			{ID: "start", Type: NodeTypeStart, Config: startConfig()},
 			{ID: "summary", Type: NodeTypeLLMText, Config: json.RawMessage(`{"modelProfile":"ark-text-default","systemPrompt":"","prompt":"","temperature":2.1,"maxOutputTokens":4097}`)},
@@ -180,6 +180,43 @@ func TestValidateGraphAcceptsBlogImportGraph(t *testing.T) {
 	}
 }
 
+func TestValidateGraphAcceptsLinearGraphV2(t *testing.T) {
+	graph := validBlogGraph()
+	graph.SchemaVersion = 2
+
+	if errs := ValidateGraph(graph, DefaultRegistry()); len(errs) != 0 {
+		t.Fatalf("ValidateGraph() errors = %v, want none", errs)
+	}
+}
+
+func TestValidateGraphV2RejectsBranchedGraph(t *testing.T) {
+	graph := validBlogGraph()
+	graph.SchemaVersion = 2
+	graph.Edges = append(graph.Edges, Edge{Source: "start", SourceHandle: "output", Target: "summary", TargetHandle: "input"})
+
+	errs := ValidateGraph(graph, DefaultRegistry())
+	assertContains(t, errs, "Graph v2 仅支持线性 DAG，节点 start 不能有多条出边")
+}
+
+func TestValidateGraphAcceptsKnowledgeRetrieveNodeV2(t *testing.T) {
+	graph := Graph{
+		SchemaVersion: 2,
+		Nodes: []Node{
+			{ID: "start", Type: NodeTypeStart, Config: json.RawMessage(`{"inputs":{"topic":{"type":"string","required":true}}}`)},
+			{ID: "knowledge", Type: "knowledge.retrieve", Config: json.RawMessage(`{"query":"{{start.output.topic}}"}`)},
+			{ID: "end", Type: NodeTypeEnd, Config: json.RawMessage(`{"outputs":{"context":"{{knowledge.output.context}}"}}`)},
+		},
+		Edges: []Edge{
+			{Source: "start", SourceHandle: "output", Target: "knowledge", TargetHandle: "input"},
+			{Source: "knowledge", SourceHandle: "output", Target: "end", TargetHandle: "input"},
+		},
+	}
+
+	if errs := ValidateGraph(graph, DefaultRegistry()); len(errs) != 0 {
+		t.Fatalf("ValidateGraph() errors = %v, want none", errs)
+	}
+}
+
 func TestDefaultBlogImportGraphPassesMarkdownTagNamesToMergeDraft(t *testing.T) {
 	graph := validBlogGraph()
 	var config createDraftConfig
@@ -193,7 +230,7 @@ func TestDefaultBlogImportGraphPassesMarkdownTagNamesToMergeDraft(t *testing.T) 
 
 func validBlogGraph() Graph {
 	return Graph{
-		SchemaVersion: 1,
+		SchemaVersion: 2,
 		Nodes: []Node{
 			{ID: "start", Type: NodeTypeStart, Config: startConfig()},
 			{ID: "markdown", Type: NodeTypeBlogParse, Config: json.RawMessage(`{"fileInput":"markdownFile"}`)},

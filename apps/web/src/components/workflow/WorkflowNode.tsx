@@ -70,6 +70,7 @@ const NODE_COLORS: Record<string, { iconBg: string; iconText: string }> = {
   llm: { iconBg: 'bg-purple-50', iconText: 'text-purple-600' },
   'llm.text': { iconBg: 'bg-purple-50', iconText: 'text-purple-600' },
   knowledge: { iconBg: 'bg-purple-50', iconText: 'text-purple-600' },
+  'knowledge.retrieve': { iconBg: 'bg-purple-50', iconText: 'text-purple-600' },
   code: { iconBg: 'bg-orange-50', iconText: 'text-orange-600' },
   http: { iconBg: 'bg-orange-50', iconText: 'text-orange-600' },
   condition: { iconBg: 'bg-green-50', iconText: 'text-green-600' },

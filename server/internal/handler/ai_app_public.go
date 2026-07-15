@@ -101,7 +101,7 @@ func PublicAIAppChat(c *gin.Context) {
 	}
 
 	message := truncateAIAgentRunes(payload.Message, 12000)
-	knowledgeContext, _, retrievalErr := retrieveAIKnowledgeContext(c.Request.Context(), key.UserID, app.ID, message)
+	knowledgeContext, _, retrievalErr := retrieveAIKnowledgeContext(c.Request.Context(), key.UserID, version, message)
 	if retrievalErr != nil {
 		persistAIAppPublicInvocation(app, version.ID, *key, "failed", payload.Stream, "KNOWLEDGE_RETRIEVAL_FAILED", dailyCallNumber, started)
 		writePublicAIAppError(c, http.StatusBadGateway, "KNOWLEDGE_RETRIEVAL_FAILED", "知识库检索暂不可用")

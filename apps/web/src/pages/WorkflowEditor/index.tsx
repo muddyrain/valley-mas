@@ -25,6 +25,7 @@ import {
   ChevronDown,
   Clipboard,
   Copy,
+  Database,
   Download,
   Edit2,
   History,
@@ -38,6 +39,13 @@ import {
   Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  type AIKnowledgeBase,
+  getAPIErrorMessage,
+  listAIAppKnowledgeBases,
+  listAIKnowledgeBases,
+  replaceAIAppKnowledgeBases,
+} from '@/api/aiWorkbench';
 import {
   createWorkflow,
   getWorkflow,
@@ -54,6 +62,8 @@ import {
 } from '@/api/workflow';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import { KnowledgeBaseBindings } from '@/components/workbench/KnowledgeBaseBindings';
 import { NodePanel } from '@/components/workflow/NodePanel';
 import { NODE_CONFIGS } from '@/components/workflow/nodeConfig';
 import { PropertyPanel } from '@/components/workflow/PropertyPanel';
@@ -83,7 +93,7 @@ const defaultEdgeOptions = {
 };
 
 const blogImportTemplate = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   nodes: [
     {
       id: 'start',
@@ -184,6 +194,95 @@ const blogImportTemplate = {
   ],
 };
 
+const topicDraftTemplate = {
+  schemaVersion: 2,
+  nodes: [
+    {
+      id: 'start',
+      type: 'start',
+      position: { x: 50, y: 250 },
+      data: {
+        label: '开始',
+        nodeType: 'start',
+        config: {
+          inputs: {
+            topic: { type: 'string', required: true },
+            audience: { type: 'string', required: false },
+            style: { type: 'string', required: false },
+            tagIds: { type: 'string[]', required: false },
+            visibility: { type: 'string', required: true },
+          },
+        },
+      },
+    },
+    {
+      id: 'knowledge',
+      type: 'knowledge.retrieve',
+      position: { x: 330, y: 250 },
+      data: {
+        label: '检索知识库',
+        nodeType: 'knowledge.retrieve',
+        config: { query: '{{start.output.topic}}' },
+      },
+    },
+    {
+      id: 'writer',
+      type: 'llm.text',
+      position: { x: 610, y: 250 },
+      data: {
+        label: '生成正文',
+        nodeType: 'llm.text',
+        config: {
+          modelProfile: 'ark-text-default',
+          systemPrompt: '你是内容编辑。基于参考资料写出准确、易读的博客正文；资料不足时明确说明。',
+          prompt:
+            '主题：{{start.output.topic}}\n受众：{{start.output.audience}}\n风格：{{start.output.style}}\n\n参考资料：\n{{knowledge.output.context}}',
+          temperature: 0.6,
+          maxOutputTokens: 1200,
+        },
+      },
+    },
+    {
+      id: 'create-draft',
+      type: 'blog.createDraft',
+      position: { x: 900, y: 250 },
+      data: {
+        label: '创建博客草稿',
+        nodeType: 'blog.createDraft',
+        config: {
+          title: '{{start.output.topic}}',
+          content: '{{writer.output.text}}',
+          tags: '{{start.output.tagIds}}',
+          tagMode: 'manual_only',
+          visibility: '{{start.output.visibility}}',
+        },
+      },
+    },
+    {
+      id: 'end',
+      type: 'end',
+      position: { x: 1190, y: 250 },
+      data: {
+        label: '结束',
+        nodeType: 'end',
+        config: {
+          outputs: {
+            postId: '{{create-draft.output.postId}}',
+            title: '{{create-draft.output.title}}',
+            editPath: '{{create-draft.output.editPath}}',
+          },
+        },
+      },
+    },
+  ],
+  edges: [
+    { id: 'start-knowledge', source: 'start', sourceHandle: 'output', target: 'knowledge' },
+    { id: 'knowledge-writer', source: 'knowledge', sourceHandle: 'output', target: 'writer' },
+    { id: 'writer-draft', source: 'writer', sourceHandle: 'output', target: 'create-draft' },
+    { id: 'draft-end', source: 'create-draft', sourceHandle: 'output', target: 'end' },
+  ],
+};
+
 function normalizeWorkflowEdges(edges: Edge[]): Edge[] {
   return edges.map((edge, index) => {
     const sourceHandle = edge.sourceHandle || 'output';
@@ -227,6 +326,11 @@ export default function WorkflowEditorPage() {
   const [runDetail, setRunDetail] = useState<WorkflowRunDetail | null>(null);
   const [showVersions, setShowVersions] = useState(false);
   const [showRuns, setShowRuns] = useState(false);
+  const [showKnowledgeBases, setShowKnowledgeBases] = useState(false);
+  const [knowledgeBases, setKnowledgeBases] = useState<AIKnowledgeBase[]>([]);
+  const [boundKnowledgeBaseIDs, setBoundKnowledgeBaseIDs] = useState<string[]>([]);
+  const [loadingKnowledgeBases, setLoadingKnowledgeBases] = useState(false);
+  const [savingKnowledgeBases, setSavingKnowledgeBases] = useState(false);
   const [rightPanelWidth, setRightPanelWidth] = useState(380);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -260,6 +364,45 @@ export default function WorkflowEditorPage() {
     if (!workflowId) return;
     refreshWorkflowMeta(workflowId).catch(() => undefined);
   }, [workflowId, refreshWorkflowMeta]);
+
+  const openKnowledgeBaseBindings = useCallback(async () => {
+    const appID = platform?.app.id;
+    if (!appID) return;
+    setShowKnowledgeBases(true);
+    try {
+      setLoadingKnowledgeBases(true);
+      const [allKnowledgeBases, bindings] = await Promise.all([
+        listAIKnowledgeBases(),
+        listAIAppKnowledgeBases(appID),
+      ]);
+      setKnowledgeBases(allKnowledgeBases.list);
+      setBoundKnowledgeBaseIDs(bindings.list.map((knowledgeBase) => knowledgeBase.id));
+    } catch (error) {
+      setShowKnowledgeBases(false);
+      toast.error(getAPIErrorMessage(error, '加载资料库失败'));
+    } finally {
+      setLoadingKnowledgeBases(false);
+    }
+  }, [platform?.app.id]);
+
+  const updateKnowledgeBaseBindings = useCallback(
+    async (knowledgeBaseIDs: string[]) => {
+      const appID = platform?.app.id;
+      if (!appID) return;
+      try {
+        setSavingKnowledgeBases(true);
+        const result = await replaceAIAppKnowledgeBases(appID, knowledgeBaseIDs);
+        setBoundKnowledgeBaseIDs(result.knowledgeBaseIds);
+        if (workflowId) await refreshWorkflowMeta(workflowId);
+        toast.success('资料库已更新，后续运行将使用新的草稿版本');
+      } catch (error) {
+        toast.error(getAPIErrorMessage(error, '更新资料库失败'));
+      } finally {
+        setSavingKnowledgeBases(false);
+      }
+    },
+    [platform?.app.id, refreshWorkflowMeta, workflowId],
+  );
 
   const applyBlankWorkflow = useCallback(() => {
     setNodes([
@@ -312,9 +455,11 @@ export default function WorkflowEditorPage() {
         .catch(() => {
           toast.error('加载工作流失败');
         });
-    } else if (templateConfig?.id === 'blog-import') {
-      setNodes(blogImportTemplate.nodes as Node[]);
-      setEdges(blogImportTemplate.edges as Edge[]);
+    } else if (templateConfig?.id === 'blog-import' || templateConfig?.id === 'content-generate') {
+      const workflowTemplate =
+        templateConfig.id === 'blog-import' ? blogImportTemplate : topicDraftTemplate;
+      setNodes(workflowTemplate.nodes as Node[]);
+      setEdges(workflowTemplate.edges as Edge[]);
       clearHistory();
     } else if (template) {
       if (!isSupportedTemplate) {
@@ -663,7 +808,7 @@ export default function WorkflowEditorPage() {
 
   const graphToJSON = useCallback(() => {
     return JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       nodes: nodes.map((node) => ({
         id: node.id,
         type: (node.data as { nodeType: string }).nodeType,
@@ -826,9 +971,14 @@ export default function WorkflowEditorPage() {
     const template = searchParams.get('template');
     const templateConfig = getWorkflowTemplate(template || '');
 
-    if (templateConfig?.id === 'blog-import' && templateConfig.enabled) {
-      setNodes(blogImportTemplate.nodes as Node[]);
-      setEdges(blogImportTemplate.edges as Edge[]);
+    if (
+      (templateConfig?.id === 'blog-import' || templateConfig?.id === 'content-generate') &&
+      templateConfig.enabled
+    ) {
+      const workflowTemplate =
+        templateConfig.id === 'blog-import' ? blogImportTemplate : topicDraftTemplate;
+      setNodes(workflowTemplate.nodes as Node[]);
+      setEdges(workflowTemplate.edges as Edge[]);
     } else {
       setNodes([
         {
@@ -965,6 +1115,17 @@ export default function WorkflowEditorPage() {
                 </Button>
               )}
               {workflowId && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!platform}
+                  onClick={() => void openKnowledgeBaseBindings()}
+                >
+                  <Database className="mr-2 h-4 w-4" />
+                  资料库
+                </Button>
+              )}
+              {workflowId && (
                 <Button variant="outline" size="sm" onClick={() => setShowRuns(true)}>
                   运行记录
                 </Button>
@@ -975,6 +1136,32 @@ export default function WorkflowEditorPage() {
               </Button>
             </div>
           </div>
+
+          <Dialog open={showKnowledgeBases} onOpenChange={setShowKnowledgeBases}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>绑定资料库</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                仅检索已绑定的私有资料；修改会创建新的草稿版本。
+              </p>
+              {loadingKnowledgeBases ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-14 w-full" />
+                  <Skeleton className="h-14 w-full" />
+                </div>
+              ) : (
+                <KnowledgeBaseBindings
+                  knowledgeBases={knowledgeBases}
+                  boundKnowledgeBaseIDs={boundKnowledgeBaseIDs}
+                  disabled={savingKnowledgeBases}
+                  onChange={(knowledgeBaseIDs) => {
+                    void updateKnowledgeBaseBindings(knowledgeBaseIDs);
+                  }}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
 
           <Dialog open={showVersions} onOpenChange={setShowVersions}>
             <DialogContent>

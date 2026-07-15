@@ -35,12 +35,31 @@ func (a *AIApp) BeforeCreate(tx *gorm.DB) error {
 }
 
 type AIAppVersion struct {
-	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	AppID     Int64String    `gorm:"index:uidx_ai_app_version,unique;not null" json:"appId"`
-	Number    int            `gorm:"index:uidx_ai_app_version,unique;not null" json:"number"`
-	Config    string         `gorm:"type:text;not null" json:"config"`
-	CreatedAt time.Time      `json:"createdAt"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                    Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	AppID                 Int64String    `gorm:"index:uidx_ai_app_version,unique;not null" json:"appId"`
+	Number                int            `gorm:"index:uidx_ai_app_version,unique;not null" json:"number"`
+	Config                string         `gorm:"type:text;not null" json:"config"`
+	RetrievalConfig       string         `gorm:"type:text;not null;default:'{}'" json:"retrievalConfig"`
+	KnowledgeBaseSnapshot bool           `gorm:"not null;default:false" json:"knowledgeBaseSnapshot"`
+	CreatedAt             time.Time      `json:"createdAt"`
+	DeletedAt             gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// AIAppVersionKnowledgeBase is an immutable knowledge-base binding snapshot
+// used by one application version. It prevents later app edits from changing
+// historical debug, workflow, and public API runs.
+type AIAppVersionKnowledgeBase struct {
+	ID              Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	AppVersionID    Int64String `gorm:"uniqueIndex:uidx_ai_app_version_kb;not null" json:"appVersionId"`
+	KnowledgeBaseID Int64String `gorm:"uniqueIndex:uidx_ai_app_version_kb;not null" json:"knowledgeBaseId"`
+	CreatedAt       time.Time   `json:"createdAt"`
+}
+
+func (b *AIAppVersionKnowledgeBase) BeforeCreate(tx *gorm.DB) error {
+	if b.ID == 0 {
+		b.ID = Int64String(utils.GenerateID())
+	}
+	return nil
 }
 
 func (v *AIAppVersion) BeforeCreate(tx *gorm.DB) error {

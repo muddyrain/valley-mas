@@ -2,7 +2,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import request from '@/utils/request';
 
 export interface WorkflowGraph {
-  schemaVersion: 1;
+  schemaVersion: 2;
   nodes: Array<{
     id: string;
     type: string;
@@ -97,7 +97,12 @@ export interface WorkflowVersion {
 }
 
 export interface WorkflowPlatformData {
-  app: { draftVersionId: string; publishedVersionId: string; status: 'draft' | 'published' };
+  app: {
+    id: string;
+    draftVersionId: string;
+    publishedVersionId: string;
+    status: 'draft' | 'published';
+  };
   versions: WorkflowVersion[];
 }
 

@@ -23,6 +23,7 @@ export const PROPERTY_FORM_MAP: Partial<
 > = {
   start: StartPropertyForm,
   'blog.parseMarkdown': BlogParsePropertyForm,
+  'knowledge.retrieve': KnowledgePropertyForm,
   'llm.text': LLMPropertyForm,
   'blog.createDraft': BlogCreateDraftPropertyForm,
   end: EndPropertyForm,

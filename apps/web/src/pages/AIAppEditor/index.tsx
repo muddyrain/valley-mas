@@ -60,6 +60,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { KnowledgeBaseBindings } from '@/components/workbench/KnowledgeBaseBindings';
 
 interface AgentConfig {
   modelProfile: 'ark-text-default';
@@ -550,42 +551,14 @@ while (true) {
                 <p className="text-sm font-medium">资料库</p>
                 <p className="mt-1 text-xs text-muted-foreground">已索引的资料会在调试时作为参考</p>
               </div>
-              {knowledgeBases.length === 0 ? (
-                <p className="text-sm text-muted-foreground">还没有可绑定的资料库</p>
-              ) : (
-                <div className="space-y-2">
-                  {knowledgeBases.map((knowledgeBase) => {
-                    const checked = boundKnowledgeBaseIDs.includes(knowledgeBase.id);
-                    return (
-                      <label
-                        key={knowledgeBase.id}
-                        className="flex cursor-pointer items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
-                      >
-                        <Checkbox
-                          checked={checked}
-                          disabled={savingKnowledgeBases}
-                          onCheckedChange={(nextChecked) => {
-                            const next = nextChecked
-                              ? [...boundKnowledgeBaseIDs, knowledgeBase.id]
-                              : boundKnowledgeBaseIDs.filter((id) => id !== knowledgeBase.id);
-                            void updateKnowledgeBaseBindings(next);
-                          }}
-                        />
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-medium">
-                            {knowledgeBase.name}
-                          </span>
-                          {knowledgeBase.description && (
-                            <span className="block truncate text-xs text-muted-foreground">
-                              {knowledgeBase.description}
-                            </span>
-                          )}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
+              <KnowledgeBaseBindings
+                knowledgeBases={knowledgeBases}
+                boundKnowledgeBaseIDs={boundKnowledgeBaseIDs}
+                disabled={savingKnowledgeBases}
+                onChange={(knowledgeBaseIDs) => {
+                  void updateKnowledgeBaseBindings(knowledgeBaseIDs);
+                }}
+              />
             </div>
             <div className="space-y-3 rounded-2xl bg-muted/35 p-4">
               <div>

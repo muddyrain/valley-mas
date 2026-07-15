@@ -34,6 +34,10 @@ type parseMarkdownConfig struct {
 	FileInput string `json:"fileInput"`
 }
 
+type knowledgeRetrieveConfig struct {
+	Query string `json:"query"`
+}
+
 type createDraftConfig struct {
 	Title         string `json:"title"`
 	Content       string `json:"content"`
@@ -60,10 +64,10 @@ type httpHeaderConfig struct {
 }
 
 type httpNodeConfig struct {
-	Method  string            `json:"method"`
-	URL     string            `json:"url"`
+	Method  string             `json:"method"`
+	URL     string             `json:"url"`
 	Headers []httpHeaderConfig `json:"headers"`
-	Body    any               `json:"body"`
+	Body    any                `json:"body"`
 }
 
 type codeNodeConfig struct {
@@ -77,8 +81,8 @@ type codeNodeConfig struct {
 // provide actionable feedback before a run is created.
 func ValidateGraph(graph Graph, registry *Registry) []string {
 	errs := make([]string, 0)
-	if graph.SchemaVersion != 1 {
-		errs = append(errs, "schemaVersion 必须为 1")
+	if graph.SchemaVersion != 2 {
+		errs = append(errs, "schemaVersion 必须为 2")
 	}
 
 	nodesByID := make(map[string]Node, len(graph.Nodes))
@@ -98,6 +102,10 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 		}
 		if node.Type == NodeTypeEnd {
 			endCount++
+		}
+		if isUnavailableNodeType(node.Type) {
+			errs = append(errs, fmt.Sprintf("节点 %s 的类型 %s 当前未开放", node.ID, node.Type))
+			continue
 		}
 		if !registry.Supports(node.Type) {
 			errs = append(errs, fmt.Sprintf("节点 %s 的类型 %s 未注册", node.ID, node.Type))
@@ -130,6 +138,9 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 	}
 
 	adjacency, incoming, outgoing := graphAdjacency(graph, nodesByID, registry, &errs)
+	if graph.SchemaVersion == 2 {
+		validateLinearV2(graph.Nodes, nodesByID, incoming, outgoing, &errs)
+	}
 	reachability := allReachability(nodesByID, adjacency)
 	if hasCycle(nodesByID, adjacency, incoming) {
 		errs = append(errs, "工作流不能包含循环")
@@ -162,6 +173,29 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 	}
 
 	return errs
+}
+
+func validateLinearV2(nodes []Node, nodesByID map[string]Node, incoming, outgoing map[string]int, errs *[]string) {
+	for _, node := range nodes {
+		if _, exists := nodesByID[node.ID]; !exists {
+			continue
+		}
+		if incoming[node.ID] > 1 {
+			*errs = append(*errs, fmt.Sprintf("Graph v2 仅支持线性 DAG，节点 %s 不能有多条入边", node.ID))
+		}
+		if outgoing[node.ID] > 1 {
+			*errs = append(*errs, fmt.Sprintf("Graph v2 仅支持线性 DAG，节点 %s 不能有多条出边", node.ID))
+		}
+	}
+}
+
+func isUnavailableNodeType(nodeType NodeType) bool {
+	switch nodeType {
+	case NodeTypeCode, NodeTypeHTTP, NodeTypeCondition, NodeTypeLoop, NodeTypeVariable, NodeTypeKnowledge, NodeTypeInput, NodeTypeFileUpload:
+		return true
+	default:
+		return false
+	}
 }
 
 func validatePhaseOnePolicy(nodes []Node) []string {
@@ -259,6 +293,16 @@ func validateNodeConfig(node Node, startInputs map[string]inputDefinition, nodes
 			errs = append(errs, fmt.Sprintf("fileInput %s 未在开始节点中声明", inputName))
 		} else if input.Type != ValueTypeFile {
 			errs = append(errs, fmt.Sprintf("fileInput %s 必须引用 file 类型输入", inputName))
+		}
+		return errs
+	case NodeTypeKnowledgeRetrieve:
+		var config knowledgeRetrieveConfig
+		if err := json.Unmarshal(node.Config, &config); err != nil {
+			return []string{fmt.Sprintf("节点 %s 配置无效", node.ID)}
+		}
+		errs := strictConfigErrors(node, &config)
+		if !isTemplateReference(config.Query) {
+			errs = append(errs, "知识检索节点 query 必须是上游变量映射")
 		}
 		return errs
 	case NodeTypeBlogCreateDraft:
