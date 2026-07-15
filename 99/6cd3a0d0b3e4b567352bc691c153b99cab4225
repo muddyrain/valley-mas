@@ -1,0 +1,21 @@
+apps/web/src/api/aiWorkbench.ts
+  s_bb048bdf24a176::t_972c043d814890 248-251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "996cd3a0d0b3e4b567352bc691c153b99cab4225",
+  "prompts": {},
+  "sessions": {
+    "s_bb048bdf24a176": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6391-c44c-7393-88ea-c4f07ed6be29",
+        "model": "unknown"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
