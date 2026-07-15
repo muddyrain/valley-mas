@@ -357,6 +357,44 @@ export default function AIAppEditor() {
 
   const publicAPIPath = `/api/v1/public/ai/apps/${appId}/chat`;
   const publicAPICurl = `curl -X POST "YOUR_API_BASE_URL${publicAPIPath}" -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d '{"message":"你好","stream":false}'`;
+  const publicAPIJavaScriptJSON = `const response = await fetch("YOUR_API_BASE_URL${publicAPIPath}", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer YOUR_API_KEY",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({ message: "你好", stream: false })
+});
+
+const data = await response.json();
+console.log(data.reply);`;
+  const publicAPIJavaScriptSSE = `const response = await fetch("YOUR_API_BASE_URL${publicAPIPath}", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer YOUR_API_KEY",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({ message: "你好", stream: true })
+});
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let buffer = "";
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  buffer += decoder.decode(value, { stream: true });
+  const records = buffer.split("\\n\\n");
+  buffer = records.pop() || "";
+  for (const record of records) {
+    const line = record.split("\\n").find((item) => item.startsWith("data: "));
+    if (!line) continue;
+    const event = JSON.parse(line.slice(6));
+    if (event.type === "delta") console.log(event.chunk);
+    if (event.type === "done") console.log("完成", event);
+  }
+}`;
   const activeAPIKeys = apiKeys.filter((key) => key.status === 'active');
 
   const debug = async () => {
@@ -621,6 +659,27 @@ export default function AIAppEditor() {
                 <Copy className="mr-2 h-4 w-4" />
                 复制 curl 示例
               </Button>
+              <div className="space-y-2 rounded-xl border border-border/70 bg-background/50 p-3">
+                <p className="text-xs font-medium text-muted-foreground">JavaScript 示例</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void copyText(publicAPIJavaScriptJSON, 'JSON fetch 示例已复制')}
+                  >
+                    <Copy className="mr-1.5 h-3.5 w-3.5" />
+                    复制 JSON fetch
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void copyText(publicAPIJavaScriptSSE, 'SSE fetch 示例已复制')}
+                  >
+                    <Copy className="mr-1.5 h-3.5 w-3.5" />
+                    复制 SSE fetch
+                  </Button>
+                </div>
+              </div>
               <div className="flex gap-2">
                 <Input
                   value={newAPIKeyName}
