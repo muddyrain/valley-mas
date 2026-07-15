@@ -1,4 +1,15 @@
-import { Activity, ArrowLeft, Bot, KeyRound, Play, RotateCcw, Save, Send } from 'lucide-react';
+import {
+  Activity,
+  ArrowLeft,
+  Bot,
+  Copy,
+  KeyRound,
+  Play,
+  RotateCcw,
+  Save,
+  Send,
+  Trash2,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -29,9 +40,20 @@ import {
   replaceAIAppKnowledgeBases,
   replaceAIAppTools,
   restoreAIAppVersion,
+  revokeAIAPIKey,
   saveAIAppVersion,
   streamDebugAIApp,
 } from '@/api/aiWorkbench';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -52,6 +74,15 @@ const defaultConfig: AgentConfig = {
   openingMessage: '',
   exampleQuestions: [],
 };
+
+async function copyText(value: string, successMessage: string) {
+  try {
+    await navigator.clipboard.writeText(value);
+    toast.success(successMessage);
+  } catch {
+    toast.error('复制失败，请手动复制');
+  }
+}
 
 function parseAgentConfig(version?: AIAppVersion): AgentConfig {
   if (!version) return defaultConfig;
@@ -98,9 +129,11 @@ export default function AIAppEditor() {
   const [keyAppBindings, setKeyAppBindings] = useState<Record<string, string[]>>({});
   const [keyUsage, setKeyUsage] = useState<Record<string, AIAPIKeyDailyUsage>>({});
   const [savingAPIKeyId, setSavingAPIKeyId] = useState<string | null>(null);
+  const [revokingAPIKeyId, setRevokingAPIKeyId] = useState<string | null>(null);
   const [newAPIKeyName, setNewAPIKeyName] = useState('');
   const [creatingAPIKey, setCreatingAPIKey] = useState(false);
   const [generatedAPIKey, setGeneratedAPIKey] = useState<string | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<AIAPIKey | null>(null);
   const [publicInvocations, setPublicInvocations] = useState<AIAppPublicInvocation[]>([]);
   const abortDebugRef = useRef<AbortController | null>(null);
 
@@ -303,6 +336,28 @@ export default function AIAppEditor() {
       setCreatingAPIKey(false);
     }
   };
+
+  const revokeAPIKey = async (key: AIAPIKey) => {
+    if (key.status !== 'active') {
+      return;
+    }
+    try {
+      setRevokingAPIKeyId(key.id);
+      await revokeAIAPIKey(key.id);
+      setAPIKeys((items) => items.filter((item) => item.id !== key.id));
+      setKeyAppBindings((items) => ({ ...items, [key.id]: [] }));
+      toast.success('API Key 已撤销');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '撤销 API Key 失败'));
+    } finally {
+      setRevokingAPIKeyId(null);
+      setRevokeTarget(null);
+    }
+  };
+
+  const publicAPIPath = `/api/v1/public/ai/apps/${appId}/chat`;
+  const publicAPICurl = `curl -X POST "YOUR_API_BASE_URL${publicAPIPath}" -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d '{"message":"你好","stream":false}'`;
+  const activeAPIKeys = apiKeys.filter((key) => key.status === 'active');
 
   const debug = async () => {
     if (!appId || !debugMessage.trim()) {
@@ -544,9 +599,28 @@ export default function AIAppEditor() {
                   仅已发布版本可被调用。每个 Key 每日最多 100 次，未勾选不会获得当前应用权限。
                 </p>
               </div>
-              <p className="rounded-xl border border-border/70 bg-background/70 px-3 py-2 font-mono text-xs text-muted-foreground">
-                POST /api/v1/public/ai/apps/{appId}/chat
-              </p>
+              <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/70 px-3 py-2">
+                <p className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+                  POST {publicAPIPath}
+                </p>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  aria-label="复制接口地址"
+                  title="复制接口地址"
+                  onClick={() => void copyText(publicAPIPath, '接口地址已复制')}
+                >
+                  <Copy />
+                </Button>
+              </div>
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+                onClick={() => void copyText(publicAPICurl, 'curl 示例已复制')}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                复制 curl 示例
+              </Button>
               <div className="flex gap-2">
                 <Input
                   value={newAPIKeyName}
@@ -560,23 +634,33 @@ export default function AIAppEditor() {
               </div>
               {generatedAPIKey && (
                 <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-                  <p className="text-xs font-medium">请立即保存此 Key，它不会再次显示。</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-xs font-medium">请立即保存此 Key，它不会再次显示。</p>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      onClick={() => void copyText(generatedAPIKey, 'API Key 已复制')}
+                    >
+                      <Copy className="mr-1 h-3.5 w-3.5" />
+                      复制 Key
+                    </Button>
+                  </div>
                   <code className="mt-2 block break-all text-xs text-muted-foreground">
                     {generatedAPIKey}
                   </code>
                 </div>
               )}
-              {apiKeys.length === 0 ? (
+              {activeAPIKeys.length === 0 ? (
                 <p className="text-sm text-muted-foreground">还没有 API Key</p>
               ) : (
                 <div className="space-y-2">
-                  {apiKeys.map((key) => {
+                  {activeAPIKeys.map((key) => {
                     const checked = (keyAppBindings[key.id] || []).includes(appId || '');
                     const usage = keyUsage[key.id];
                     return (
-                      <label
+                      <div
                         key={key.id}
-                        className="flex cursor-pointer items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
+                        className="flex items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
                       >
                         <Checkbox
                           checked={checked}
@@ -588,14 +672,27 @@ export default function AIAppEditor() {
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium">{key.name}</span>
                           <span className="block text-xs text-muted-foreground">
-                            {key.keyPrefix}… ·{' '}
+                            {key.keyPrefix}… · 仅显示前缀 ·{' '}
                             {usage ? `今日 ${usage.count}/${usage.limit}` : '加载配额中'}
                           </span>
                         </span>
-                        <Badge variant={key.status === 'active' ? 'outline' : 'secondary'}>
-                          {key.status === 'active' ? '可用' : '已撤销'}
-                        </Badge>
-                      </label>
+                        {savingAPIKeyId === key.id && (
+                          <span className="text-xs text-muted-foreground">
+                            {checked ? '授权中…' : '取消授权中…'}
+                          </span>
+                        )}
+                        <Badge variant="outline">可用</Badge>
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          disabled={revokingAPIKeyId === key.id}
+                          aria-label={`撤销 ${key.name}`}
+                          title="撤销 Key"
+                          onClick={() => setRevokeTarget(key)}
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
                     );
                   })}
                 </div>
@@ -762,6 +859,33 @@ export default function AIAppEditor() {
           </div>
         </div>
       </section>
+      <AlertDialog
+        open={revokeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && revokingAPIKeyId === null) setRevokeTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>撤销 API Key？</AlertDialogTitle>
+            <AlertDialogDescription>
+              「{revokeTarget?.name}」撤销后将无法继续调用公开 API，历史调用记录会保留。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={revokingAPIKeyId !== null}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={revokingAPIKeyId !== null}
+              onClick={() => {
+                if (revokeTarget) void revokeAPIKey(revokeTarget);
+              }}
+            >
+              {revokingAPIKeyId !== null ? '撤销中…' : '确认撤销'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -245,6 +245,10 @@ export function createAIAPIKey(data: { name: string }): Promise<{ key: AIAPIKey;
   return request.post('/ai/api-keys', data);
 }
 
+export function revokeAIAPIKey(keyId: string): Promise<void> {
+  return request.delete(`/ai/api-keys/${keyId}`);
+}
+
 export function listAIAPIKeyAppBindings(keyId: string): Promise<{ list: AIAPIKeyAppBinding[] }> {
   return request.get(`/ai/api-keys/${keyId}/apps`);
 }
