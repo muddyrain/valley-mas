@@ -1,0 +1,99 @@
+.superpowers/brainstorm/40039-1784100243/content/home-content-map.html
+  s_895dd62cd999b2::t_8c8277611ed9f1 1-27
+.superpowers/brainstorm/40039-1784100243/content/home-directions.html
+  s_895dd62cd999b2::t_05e852f836c8bc 1-97
+.superpowers/brainstorm/40039-1784100243/content/waiting.html
+  s_895dd62cd999b2::t_3501b88afe689b 1-3
+.superpowers/brainstorm/40039-1784100243/content/workbench-editor-directions.html
+  s_895dd62cd999b2::t_4cdc33c2dc52e1 1-32
+.superpowers/brainstorm/40039-1784100243/content/workbench-placement.html
+  s_895dd62cd999b2::t_08c0a267e9ca2a 1-33
+.superpowers/brainstorm/40039-1784100243/state/server.pid
+  s_895dd62cd999b2::t_009cf962767241 1
+apps/web/AGENTS.md
+  s_4e76526341a6da::t_866b91161f9f74 24,36
+apps/web/src/components/ai-workbench/EditorPageHeader.tsx
+  s_895dd62cd999b2::t_c29f56a10576d1 1-47
+apps/web/src/components/ai-workbench/EditorSection.tsx
+  s_895dd62cd999b2::t_d36c888b6ec1ee 1-33
+apps/web/src/components/ui/drawer.tsx
+  s_895dd62cd999b2::t_37fd65a04ef668 1-207
+apps/web/src/components/ui/tabs.tsx
+  s_895dd62cd999b2::t_c8b1d53a54c5ec 11-15
+apps/web/src/components/workbench/AIAppsPanel.tsx
+  s_895dd62cd999b2::t_238efbf70a8ad2 9-24,58-64,68-117
+apps/web/src/components/workflow/NodePanel.tsx
+  s_895dd62cd999b2::t_1eccad1a8e572e 2-3,48-54,98,121-136,139,142,158,171-175,177-214
+apps/web/src/components/workflow/PropertyPanel.tsx
+  s_895dd62cd999b2::t_2193e6e36062e2 22-23,29-32
+apps/web/src/components/workflow/WorkflowNode.tsx
+  s_895dd62cd999b2::t_13ffde0889c9a0 118-121,124-129,139,160,163
+apps/web/src/components/workflow/properties/BlogCreateDraftPropertyForm.tsx
+  s_895dd62cd999b2::t_d3e2a6bf7b0121 25
+apps/web/src/components/workflow/properties/BlogParsePropertyForm.tsx
+  s_895dd62cd999b2::t_8bd6e182dafccb 8
+apps/web/src/components/workflow/properties/CodePropertyForm.tsx
+  s_895dd62cd999b2::t_1d5e42dd3cc190 25
+apps/web/src/components/workflow/properties/ConditionPropertyForm.tsx
+  s_895dd62cd999b2::t_46f92fe6c3904c 13
+apps/web/src/components/workflow/properties/EndPropertyForm.tsx
+  s_895dd62cd999b2::t_e00323964d5b38 9
+apps/web/src/components/workflow/properties/FileUploadPropertyForm.tsx
+  s_895dd62cd999b2::t_a2bdd040c88766 55
+apps/web/src/components/workflow/properties/HTTPPropertyForm.tsx
+  s_895dd62cd999b2::t_7cc82f39e46617 24
+apps/web/src/components/workflow/properties/InputPropertyForm.tsx
+  s_895dd62cd999b2::t_d2d33e62216ff0 28
+apps/web/src/components/workflow/properties/KnowledgePropertyForm.tsx
+  s_895dd62cd999b2::t_1f7ed34d373872 1,12-13,22-23
+apps/web/src/components/workflow/properties/LLMPropertyForm.tsx
+  s_895dd62cd999b2::t_dea5421d02cc26 1,9-10,35-36,62-63
+apps/web/src/components/workflow/properties/LoopPropertyForm.tsx
+  s_895dd62cd999b2::t_52f025e4978d71 12
+apps/web/src/components/workflow/properties/PropertyFormBase.tsx
+  s_895dd62cd999b2::t_1d5bd81c8185b1 34,37,44-50,71-73
+apps/web/src/components/workflow/properties/StartPropertyForm.tsx
+  s_895dd62cd999b2::t_dd3fe819ede63c 1,18-19,23,34-35
+apps/web/src/components/workflow/properties/VariablePropertyForm.tsx
+  s_895dd62cd999b2::t_02b26a9de694c8 13
+apps/web/src/pages/AIAppEditor/index.tsx
+  s_895dd62cd999b2::t_a0e06d3d42750d 5,47-48,62-68,70,72,128,483-488,492-510,514,516,519-535,537-545,547-589,591-671,673,675,677-678,680-713,716-719,721-723,725-726,729-783,906-947
+apps/web/src/pages/Workbench/index.tsx
+  s_895dd62cd999b2::t_16bed3c16bf890 20,80-103,107-111,168,170-173,247
+apps/web/src/pages/WorkflowEditor/index.tsx
+  s_895dd62cd999b2::t_0266e53c0f15d1 33,66-72,1046,1099-1124,1185,1188-1190,1192,1194,1196,1198-1212,1214-1216,1219,1230,1233,1292-1293,1299,1330-1331,1342-1358
+docs/superpowers/plans/2026-07-14-ai-app-editor-recovery.md
+  s_4e76526341a6da::t_59a85a68dd7518 5,7,52,54
+docs/superpowers/plans/2026-07-15-web-ai-workbench-redesign.md
+  s_895dd62cd999b2::t_349f4bd341493b 1-214
+docs/superpowers/specs/2026-07-14-ai-app-editor-recovery-design.md
+  s_4e76526341a6da::t_bb3728f29216b0 7,14
+docs/superpowers/specs/2026-07-15-web-ai-workbench-redesign-design.md
+  s_895dd62cd999b2::t_cfaeb59a08fb23 1-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "5863e9c05d34f34f836e361f4489b101dc5c3f49",
+  "prompts": {},
+  "sessions": {
+    "s_4e76526341a6da": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6490-d3ec-7920-a981-b19e8f6a9bda",
+        "model": "unknown"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    },
+    "s_895dd62cd999b2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f64a4-ef55-7f20-a6af-eea4b9a91c16",
+        "model": "unknown"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
