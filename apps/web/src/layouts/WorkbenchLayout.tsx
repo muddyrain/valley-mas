@@ -17,7 +17,7 @@ export default function WorkbenchLayout() {
         <Sidebar />
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="min-w-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
 
@@ -26,12 +26,8 @@ export default function WorkbenchLayout() {
 
         {/* AI Panel Toggle (when closed) */}
         {!aiPanelOpen && (
-          <div className="fixed bottom-4 right-4 z-50">
-            <Button
-              size="icon"
-              onClick={toggleAIPanel}
-              className="h-12 w-12 rounded-full shadow-lg"
-            >
+          <div className="fixed right-4 bottom-4 z-50 hidden md:block">
+            <Button size="icon" onClick={toggleAIPanel} className="rounded-full shadow-lg">
               <MessageCircle className="h-5 w-5" />
             </Button>
           </div>

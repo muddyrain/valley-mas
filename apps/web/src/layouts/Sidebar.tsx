@@ -72,19 +72,48 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`relative flex h-screen flex-col border-r border-border bg-card transition-[width] duration-200 ${
-        collapsed ? 'w-16' : 'w-56'
+      className={`relative flex h-screen shrink-0 flex-col border-r border-border bg-card transition-[width] duration-200 ${
+        collapsed ? 'w-14' : 'w-56 max-md:w-12'
       }`}
     >
       {/* Brand */}
-      <div className="flex h-14 items-center border-b border-border px-3">
-        <Link to="/" className="flex items-center gap-2 overflow-hidden">
-          <BrandLogo className="h-8 w-8 shrink-0" showWordmark={false} />
+      <div
+        className={`flex h-14 items-center border-b border-border ${
+          collapsed ? 'justify-start px-2' : 'px-3 max-md:justify-center'
+        }`}
+      >
+        <Link
+          to="/"
+          className={`flex items-center gap-2 overflow-hidden ${
+            collapsed ? 'size-8 justify-center' : 'max-md:justify-center'
+          }`}
+        >
+          <BrandLogo
+            className="shrink-0"
+            iconClassName={collapsed ? 'h-6 w-6' : 'h-7 w-7 max-md:h-5 max-md:w-5'}
+            showWordmark={false}
+          />
           {!collapsed && (
-            <span className="text-lg font-semibold tracking-tight text-foreground">Valley</span>
+            <span className="text-base font-semibold tracking-tight text-foreground max-md:hidden">
+              Valley
+            </span>
           )}
         </Link>
       </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        onClick={toggle}
+        aria-label={collapsed ? '展开侧栏' : '折叠侧栏'}
+        className={
+          collapsed
+            ? 'absolute top-1/2 -right-3 z-10 -translate-y-1/2 bg-background shadow-xs ring-1 ring-border'
+            : 'absolute top-3 right-3 max-md:hidden'
+        }
+      >
+        {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+      </Button>
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 px-2 py-3">
@@ -95,14 +124,15 @@ export function Sidebar() {
             <Link
               key={item.to}
               to={item.to}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              aria-label={item.label}
+              className={`flex h-9 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors ${
                 active
                   ? 'bg-accent text-accent-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              } ${collapsed ? 'justify-center' : ''}`}
+              } ${collapsed ? 'size-8 justify-center p-0' : 'max-md:size-8 max-md:justify-center max-md:p-0'}`}
             >
-              <Icon className="h-5 w-5 shrink-0" />
-              {!collapsed && <span className="truncate">{item.label}</span>}
+              <Icon className="h-4 w-4 shrink-0" />
+              {!collapsed && <span className="truncate max-md:hidden">{item.label}</span>}
             </Link>
           );
 
@@ -142,15 +172,15 @@ export function Sidebar() {
                 ) : (
                   <button
                     type="button"
-                    className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-muted"
+                    className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-muted max-md:size-8 max-md:justify-center max-md:p-0"
                   >
-                    <Avatar className="h-8 w-8">
+                    <Avatar className="h-8 w-8 max-md:h-7 max-md:w-7">
                       <AvatarImage src={user?.avatar} alt={userName} />
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         {userAvatarFallback}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="truncate text-foreground">{userName}</span>
+                    <span className="truncate text-foreground max-md:hidden">{userName}</span>
                   </button>
                 )
               }
@@ -227,28 +257,13 @@ export function Sidebar() {
             <TooltipContent side="right">登录 / 注册</TooltipContent>
           </Tooltip>
         ) : (
-          <Link to="/login">
-            <Button variant="outline" className="w-full">
+          <Link to="/login" className="max-md:flex max-md:justify-center">
+            <Button variant="outline" className="w-full max-md:size-8 max-md:p-0">
               <LogIn className="mr-2 h-4 w-4" />
-              登录 / 注册
+              <span className="max-md:sr-only">登录 / 注册</span>
             </Button>
           </Link>
         )}
-      </div>
-
-      {/* Collapse toggle */}
-      <div className="border-t border-border p-2">
-        <button
-          type="button"
-          onClick={toggle}
-          className="flex w-full items-center justify-center rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          {collapsed ? (
-            <PanelLeftOpen className="h-5 w-5" />
-          ) : (
-            <PanelLeftClose className="h-5 w-5" />
-          )}
-        </button>
       </div>
     </aside>
   );

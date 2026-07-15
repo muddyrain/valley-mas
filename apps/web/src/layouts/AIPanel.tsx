@@ -131,7 +131,10 @@ export function AIPanel() {
   if (!open) return null;
 
   return (
-    <aside className="flex h-screen flex-col border-l border-border bg-card" style={{ width }}>
+    <aside
+      className="hidden h-screen flex-col border-l border-border bg-card md:flex"
+      style={{ width }}
+    >
       {/* Header */}
       <div className="flex h-14 items-center justify-between border-b border-border px-4">
         <div className="flex items-center gap-2">

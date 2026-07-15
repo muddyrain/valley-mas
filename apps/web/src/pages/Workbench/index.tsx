@@ -16,18 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AIAppsPanel } from '@/components/workbench/AIAppsPanel';
-import { cn } from '@/lib/utils';
 import { WORKFLOW_TEMPLATE_DEFS } from '../workflowTemplates';
-
-const TAG_COLORS: Record<string, string> = {
-  AI: 'bg-purple-100 text-purple-700 hover:bg-purple-100',
-  博客: 'bg-blue-100 text-blue-700 hover:bg-blue-100',
-  自动: 'bg-green-100 text-green-700 hover:bg-green-100',
-  生成: 'bg-amber-100 text-amber-700 hover:bg-amber-100',
-  内容: 'bg-cyan-100 text-cyan-700 hover:bg-cyan-100',
-  知识库: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100',
-  检索: 'bg-teal-100 text-teal-700 hover:bg-teal-100',
-};
 
 const templates = WORKFLOW_TEMPLATE_DEFS;
 
@@ -76,8 +65,8 @@ export default function Workbench() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 md:px-8">
-        <section className="mb-8 flex flex-col gap-5 border-b border-border pb-8 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mx-auto max-w-7xl px-4 pb-12 pt-6 sm:px-6 md:px-8">
+        <section className="mb-6 flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <Badge variant="outline" className="mb-3">
               <LayoutDashboard className="mr-2 h-3.5 w-3.5" />
@@ -104,16 +93,16 @@ export default function Workbench() {
 
         <AIAppsPanel />
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           <section>
-            <Card className="h-full">
+            <Card size="sm" className="h-full">
               <CardHeader className="border-b border-border/70">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Sparkles className="h-4 w-4 text-primary" />
                   预置模板
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-2">
                 {templates.map((template) => {
                   const Icon = template.icon;
                   const disabled = template.enabled === false;
@@ -124,21 +113,14 @@ export default function Workbench() {
                     <div
                       key={template.id}
                       onClick={onTemplateClick}
-                      className={cn(
-                        'group flex items-start gap-4 rounded-lg border bg-card p-4 transition-colors',
+                      className={`group flex items-start gap-3 rounded-lg border bg-background p-3 transition-colors ${
                         disabled
-                          ? 'border-dashed border-muted-foreground/40 text-muted-foreground cursor-not-allowed bg-muted/30'
-                          : 'border-border hover:border-accent hover:bg-accent/50 cursor-pointer',
-                      )}
+                          ? 'cursor-not-allowed border-dashed border-muted-foreground/40 text-muted-foreground bg-muted/30'
+                          : 'cursor-pointer border-border hover:bg-muted/60'
+                      }`}
                     >
-                      <div
-                        className={cn(
-                          'flex items-center justify-center rounded-lg p-3',
-                          template.color,
-                          'text-white',
-                        )}
-                      >
-                        <Icon className="h-6 w-6" />
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground group-hover:bg-accent group-hover:text-accent-foreground">
+                        <Icon className="h-4 w-4" />
                       </div>
                       <div className="flex-1">
                         <h3 className="font-medium text-foreground group-hover:text-primary transition-colors">
@@ -148,13 +130,9 @@ export default function Workbench() {
                         {disabled && (
                           <p className="text-xs mt-1 text-amber-500">该模板正在对齐中</p>
                         )}
-                        <div className="flex flex-wrap gap-2 mt-3">
+                        <div className="mt-2 flex flex-wrap gap-1.5">
                           {template.tags.map((tag) => (
-                            <Badge
-                              key={tag}
-                              variant="outline"
-                              className={cn('text-xs border-0', TAG_COLORS[tag])}
-                            >
+                            <Badge key={tag} variant="secondary">
                               {tag}
                             </Badge>
                           ))}
@@ -168,14 +146,14 @@ export default function Workbench() {
           </section>
 
           <section>
-            <Card className="h-full">
+            <Card size="sm" className="h-full">
               <CardHeader className="border-b border-border/70">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <FileText className="h-4 w-4 text-primary" />
                   工作流
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-2">
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <div key={i} className="flex items-center gap-3 p-4">
@@ -205,11 +183,11 @@ export default function Workbench() {
                     <div
                       key={workflow.id}
                       onClick={() => navigate(`/workbench/edit?id=${workflow.id}`)}
-                      className="group flex items-center justify-between rounded-lg border border-border bg-card p-4 hover:border-accent hover:bg-accent/50 cursor-pointer transition-colors"
+                      className="group flex items-center justify-between rounded-lg border border-border bg-background p-3 transition-colors hover:bg-muted/60 cursor-pointer"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-accent/50 flex items-center justify-center">
-                          <LayoutDashboard className="h-5 w-5 text-primary" />
+                        <div className="flex size-9 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                          <LayoutDashboard className="h-4 w-4" />
                         </div>
                         <div>
                           <h3 className="font-medium text-foreground group-hover:text-primary transition-colors">
@@ -233,7 +211,7 @@ export default function Workbench() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={(e) => handleDelete(workflow, e)}
                         >
                           <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />

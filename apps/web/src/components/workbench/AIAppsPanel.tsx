@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 function AgentItemSkeleton() {
   return (
-    <div className="flex min-h-20 w-full items-center justify-between rounded-lg border border-border bg-background p-4">
+    <div className="flex min-h-18 w-full items-center justify-between rounded-lg border border-border bg-background px-3 py-3">
       <div className="min-w-0 space-y-2">
         <div className="flex items-center gap-2">
           <Skeleton className="h-4 w-4 rounded-sm" />
@@ -55,8 +55,8 @@ export function AIAppsPanel() {
   };
 
   return (
-    <section className="mb-8">
-      <div className="mb-4 flex items-end justify-between gap-4">
+    <section className="mb-6">
+      <div className="mb-3 flex items-end justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-foreground">智能体</h2>
           <p className="mt-1 text-sm text-muted-foreground">配置、调试并发布可复用的 AI 能力。</p>
@@ -66,7 +66,7 @@ export function AIAppsPanel() {
           新建智能体
         </Button>
       </div>
-      <Card>
+      <Card size="sm">
         <CardHeader className="sr-only">
           <CardTitle className="flex items-center gap-2">
             <Bot className="h-4 w-4 text-primary" />
@@ -75,7 +75,7 @@ export function AIAppsPanel() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               <AgentItemSkeleton />
               <AgentItemSkeleton />
             </div>
@@ -88,12 +88,12 @@ export function AIAppsPanel() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               {agents.map((app) => (
                 <Button
                   key={app.id}
                   variant="outline"
-                  className="flex h-auto min-h-20 w-full items-center justify-between rounded-lg p-4 text-left hover:border-primary/40 hover:bg-accent/50"
+                  className="flex h-auto min-h-18 w-full items-center justify-between rounded-lg px-3 py-3 text-left hover:bg-muted/60"
                   onClick={() => navigate(`/workbench/apps/${app.id}`)}
                 >
                   <div className="min-w-0">
