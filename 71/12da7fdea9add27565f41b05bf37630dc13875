@@ -1,0 +1,33 @@
+apps/web/src/components/blog/BatchMarkdownImportDialog.test.jsx
+  s_d0856da80651c7::t_ebc347ff33b617 1-33
+apps/web/src/components/blog/BatchMarkdownImportDialog.tsx
+  s_d0856da80651c7::t_2cdd84bf321c32 2,72,85
+apps/web/src/layouts/Sidebar.tsx
+  s_d0856da80651c7::t_f46edfc6f4d993 41
+apps/web/src/pages/ImageTextCreate/index.tsx
+  s_d0856da80651c7::t_4c3fb9c215a5a4 30,1133-1138
+apps/web/src/pages/NotFound/index.tsx
+  s_d0856da80651c7::t_d26d3e58a1096b 5,40
+apps/web/src/pages/ResourceDetail/index.tsx
+  s_d0856da80651c7::t_1bd618f4fe75ca 30,100
+apps/web/src/utils/navigation.ts
+  s_d0856da80651c7::t_4eb2bf8f112d93 1-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "7112da7fdea9add27565f41b05bf37630dc13875",
+  "prompts": {},
+  "sessions": {
+    "s_d0856da80651c7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f63ff-b8ad-77c2-a775-79c3da7445c3",
+        "model": "unknown"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
