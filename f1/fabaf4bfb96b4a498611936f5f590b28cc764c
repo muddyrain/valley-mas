@@ -1,0 +1,83 @@
+apps/web/src/api/workflow.ts
+  s_bb048bdf24a176::t_402b51306ae62a 5,100-105
+apps/web/src/components/workbench/KnowledgeBaseBindings.tsx
+  s_bb048bdf24a176::t_9a3bf837ea2b6e 1-54
+apps/web/src/components/workflow/RunPanel.tsx
+  s_bb048bdf24a176::t_427c7aca933e93 40-54,149-151,261-328
+apps/web/src/components/workflow/WorkflowNode.tsx
+  s_bb048bdf24a176::t_4e6355599d69fa 73
+apps/web/src/components/workflow/nodeConfig.ts
+  s_bb048bdf24a176::t_a2da862d802702 23-31,160-161
+apps/web/src/components/workflow/properties/KnowledgePropertyForm.tsx
+  s_bb048bdf24a176::t_21fde8644c1ab9 14,18,20-22
+apps/web/src/components/workflow/properties/StartPropertyForm.tsx
+  s_bb048bdf24a176::t_4172d4630fb1f2 29
+apps/web/src/components/workflow/properties/index.ts
+  s_bb048bdf24a176::t_694e96ea5260ab 26
+apps/web/src/components/workflow/types.ts
+  s_bb048bdf24a176::t_fe7112299c9465 4,59-70,72-76
+apps/web/src/components/workflow/validateWorkflowConfig.ts
+  s_bb048bdf24a176::t_1d678fdad4dd95 46-54
+apps/web/src/pages/AIAppEditor/index.tsx
+  s_bb048bdf24a176::t_1ff4974d1ebf04 63,554-561
+apps/web/src/pages/WorkflowEditor/index.tsx
+  s_bb048bdf24a176::t_00689f91679b1d 28,42-48,65-66,96,197-285,329-333,368-406,458-462,811,974-981,1117-1127,1140-1165
+apps/web/src/pages/workflowTemplates.ts
+  s_bb048bdf24a176::t_2cd83d4abde503 1,25-27
+docs/PROJECT_GUIDE.md
+  s_bb048bdf24a176::t_3b0ac6a7e8b6ea 40
+docs/superpowers/plans/2026-07-14-ai-workbench-platform.md
+  s_bb048bdf24a176::t_b1eeb3d73cff9a 8-9,13-15
+server/internal/database/database.go
+  s_bb048bdf24a176::t_e57564d5cbd15f 295,430
+server/internal/handler/ai_app_public.go
+  s_bb048bdf24a176::t_3062bbd57f639e 104
+server/internal/handler/ai_platform.go
+  s_bb048bdf24a176::t_4fa46a8d3c3ba5 33-34,96-164,240-251,296,301-304,343,345-352,355-359,401-402,405-408,490,664,669-673,683-684,687-703,705-706,736,744,756-758,827-835,837-845,889,891-898,901-912,914-916,918,923-985
+server/internal/handler/ai_platform_test.go
+  s_bb048bdf24a176::t_da2dba15187baa 40,79-80,454-563
+server/internal/handler/workflow.go
+  s_bb048bdf24a176::t_fdfc3991710ead 246-247,250-253,431,585-598
+server/internal/handler/workflow_runtime_test.go
+  s_bb048bdf24a176::t_758502a1d55956 39,72,76,188-216,270,298,324
+server/internal/model/ai_platform.go
+  s_bb048bdf24a176::t_1a8fe4edee07ce 38-62
+server/internal/router/router.go
+  s_bb048bdf24a176::t_e33e659857c611 147-148
+server/internal/workflow/execute.go
+  s_bb048bdf24a176::t_2caf6055d3929c 149-150,189-194,450,464-482
+server/internal/workflow/execute_test.go
+  s_bb048bdf24a176::t_3311e315c39aa1 264,350,393-407,522
+server/internal/workflow/knowledge_node.go
+  s_bb048bdf24a176::t_e8440669c5240e 1-29
+server/internal/workflow/knowledge_node_test.go
+  s_bb048bdf24a176::t_78f4b5a591b6fe 1-26
+server/internal/workflow/registry.go
+  s_bb048bdf24a176::t_97110c83f40396 25,37
+server/internal/workflow/types.go
+  s_bb048bdf24a176::t_98e1faf515133a 22-35,66-70,116-139
+server/internal/workflow/validate.go
+  s_bb048bdf24a176::t_0bd1f663a99777 37-40,67-68,70,84-85,106-109,141-143,178-200,298-307
+server/internal/workflow/validate_test.go
+  s_bb048bdf24a176::t_e54d3d52b90783 12,27,36,183-219,233
+server/migrations/053_add_ai_app_version_context_snapshots.sql
+  s_bb048bdf24a176::t_321c9e313ba03c 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "f1fabaf4bfb96b4a498611936f5f590b28cc764c",
+  "prompts": {},
+  "sessions": {
+    "s_bb048bdf24a176": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6391-c44c-7393-88ea-c4f07ed6be29",
+        "model": "unknown"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
