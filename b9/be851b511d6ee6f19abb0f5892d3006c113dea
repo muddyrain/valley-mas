@@ -1,0 +1,23 @@
+apps/web/src/pages/AIAppEditor/index.tsx
+  s_bb048bdf24a176::t_c41a7063a064bd 360-397,662-682
+docs/superpowers/plans/2026-07-15-ai-app-public-api-p5.md
+  s_bb048bdf24a176::t_58ccbd335e84bd 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "b9be851b511d6ee6f19abb0f5892d3006c113dea",
+  "prompts": {},
+  "sessions": {
+    "s_bb048bdf24a176": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6391-c44c-7393-88ea-c4f07ed6be29",
+        "model": "unknown"
+      },
+      "human_author": "muddyrain <qiu3291002845@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
