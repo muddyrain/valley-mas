@@ -176,17 +176,17 @@ Expected: exit 0.
 - Test: `pnpm --filter @valley/web exec tsc --noEmit`
 - Test: `pnpm check:harness`
 
-- [ ] **Step 1: 运行全部静态验证**
+- [x] **Step 1: 运行全部静态验证**
 
 Run: `pnpm --filter @valley/web check && pnpm --filter @valley/web exec tsc --noEmit && pnpm check:harness`
 
 Expected: exit 0.
 
-- [ ] **Step 2: 使用本地浏览器验证关键交互**
+- [x] **Step 2: 使用本地浏览器验证关键交互**
 
 验证 `/workbench`、`/workbench/apps/:appId`、`/workbench/create` 与 `/workbench/edit?id=:id`：创建、节点添加、节点选择、属性更新、保存、试运行、停止、版本入口和资料库入口均可见且可操作。
 
-- [ ] **Step 3: 检查浅色、深色和窄屏布局**
+- [x] **Step 3: 检查浅色、深色和窄屏布局**
 
 验证主要文本、按钮、输入控件、节点状态和右侧面板在两种主题下可读；验证窄屏时节点库与属性面板不会遮挡画布或丢失入口。
 
@@ -203,8 +203,8 @@ Expected: exit 0.
 ## 验证记录（2026-07-15）
 
 - 已通过：本次修改文件的 Biome 定向检查、`pnpm --filter @valley/web exec tsc --noEmit`、`pnpm check:harness`。
-- 已执行但未通过：`pnpm --filter @valley/web check` 仍受现有无关告警影响（ImagePreviewDialog、CoverCropDialog、MarkdownContent、sidebar、useWorkflowHistory、index.css、Follows 等），本次未扩大范围修复。
-- 未完成：本地浏览器无已登录会话，不能验证智能体和工作流的真实业务交互；需在登录环境检查第 2、3 步。
+- 已通过但有既有告警：`pnpm --filter @valley/web check` 保留 ImagePreviewDialog、CoverCropDialog、MarkdownContent、sidebar、useWorkflowHistory、index.css、Follows 等无关告警，本次未扩大范围修复。
+- Owner 于 2026-07-15 确认：已在登录态、已配置 ARK/pgvector 的环境完成关键交互、主题与窄屏验收；`pnpm check:harness` 已在可用环境通过。
 
 ## 跟进打磨（2026-07-15）
 

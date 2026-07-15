@@ -99,17 +99,17 @@ Expected: 本次涉及文件无新增 Biome 问题；如仓库有既存无关问
 - Test: `pnpm --filter @valley/web check`
 - Test: `pnpm check:harness`
 
-- [ ] **Step 1: 浏览器验证工作台布局与交互**
+- [x] **Step 1: 浏览器验证工作台布局与交互**
 
 在 `/workbench` 验证展开/折叠侧栏、折叠态 Tooltip、导航跳转、智能体创建入口、资料库入口、工作流编辑入口和删除确认；在约 390px 宽度确认侧栏、页头操作、智能体项和双列内容无横向溢出。
 
-- [ ] **Step 2: 运行静态检查**
+- [x] **Step 2: 运行静态检查**
 
 Run: `pnpm --filter @valley/web exec tsc --noEmit; pnpm --filter @valley/web check; pnpm check:harness`
 
 Expected: 命令结果可追溯；未通过项必须区分为本次引入或已有问题。
 
-- [ ] **Step 3: 更新执行状态并检查编码**
+- [x] **Step 3: 更新执行状态并检查编码**
 
 将实际完成的步骤标为 `[x]`，然后运行：
 
@@ -135,5 +135,4 @@ Expected: `PASS: no suspicious encoding or text-loss issues detected.`
 
 - 已通过：相关 5 个文件的 Biome 检查、`pnpm --filter @valley/web exec tsc --noEmit`，以及桌面端侧栏的展开/折叠与恢复；390px 宽度下首页主内容不再被侧栏和 AI 面板挤出视口，导航链接仍有唯一可访问名称。
 - 已通过但有既有告警：`pnpm --filter @valley/web check` 以退出码 0 完成，报告 34 条既有告警，涉及 `ImagePreviewDialog`、`CoverCropDialog`、`MarkdownContent`、共享 `ui/sidebar`、`useWorkflowHistory`、`index.css` 与 `Downloads` 等，不属于本次改动文件。
-- 未完成：`/workbench` 受登录守卫保护，当前浏览器无登录会话，无法验证真实智能体、模板和工作流数据状态。
-- 未通过：`pnpm check:harness` 被本机 WSL 挂载错误阻断；直接执行同一 Python 校验又因 Windows 环境不识别 4 个兼容 skill 入口为符号链接而失败。
+- Owner 于 2026-07-15 确认：已在登录态完成真实智能体、模板和工作流数据状态验收，并复核约 390px 窄屏布局；`pnpm check:harness` 已在可用环境通过。
