@@ -2,6 +2,7 @@ import { Compass, Home, SearchX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { navigateBackOrFallback } from '@/utils/navigation';
 
 export default function NotFound() {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ export default function NotFound() {
                   <Compass className="mr-2 h-4 w-4" />
                   去看资源
                 </Button>
-                <Button variant="ghost" onClick={() => navigate(-1)}>
+                <Button variant="ghost" onClick={() => navigateBackOrFallback(navigate, '/')}>
                   返回上一页
                 </Button>
               </div>

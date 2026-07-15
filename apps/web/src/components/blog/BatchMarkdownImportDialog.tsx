@@ -1,5 +1,5 @@
 import { FileStack, FileUp, Loader2, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   createPost,
@@ -69,7 +69,7 @@ export function BatchMarkdownImportDialog({
   const markdownBatchInputRef = useRef<HTMLInputElement | null>(null);
   const batchCoverUploadInputRef = useRef<HTMLInputElement | null>(null);
 
-  const resetDialogState = () => {
+  const resetDialogState = useCallback(() => {
     setBatchPreparing(false);
     setBatchItems([]);
     setBatchRunning(false);
@@ -82,7 +82,7 @@ export function BatchMarkdownImportDialog({
     if (batchCoverUploadInputRef.current) {
       batchCoverUploadInputRef.current.value = '';
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!open) {

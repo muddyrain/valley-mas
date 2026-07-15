@@ -38,7 +38,7 @@ const navItems = [
   { to: '/blog', label: '博客', icon: BookOpen },
   { to: '/resources', label: '资源', icon: ImageIcon },
   { to: '/guestbook', label: '留言墙', icon: MessageCircleHeart },
-  { to: '/labs', label: '实验室', icon: FlaskConical },
+  { to: '/labs/climber', label: '实验室', icon: FlaskConical },
 ];
 
 export function Sidebar() {

@@ -27,6 +27,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { navigateBackOrFallback } from '@/utils/navigation';
 
 type TemplateKey = 'paper' | 'quote' | 'ink' | 'mint' | 'sunset' | 'grid';
 type BackgroundStyle = 'lined' | 'dots' | 'plain';
@@ -1129,7 +1130,12 @@ export default function ImageTextCreate() {
       <div className="mx-auto max-w-[1460px] space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-accent/70 bg-card/85 px-5 py-4 shadow-[0_18px_48px_hsl(var(--foreground)/0.08)] backdrop-blur">
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="rounded-xl">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigateBackOrFallback(navigate, '/my-space/posts')}
+              className="rounded-xl"
+            >
               <ArrowLeft className="mr-1 h-4 w-4" />
               返回
             </Button>

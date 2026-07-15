@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { navigateBackOrFallback } from '@/utils/navigation';
 import { triggerResourceDownload } from '@/utils/resourceDownload';
 import { toInlineUrl } from '@/utils/tos';
 
@@ -96,11 +97,7 @@ export default function ResourceDetail() {
     (location.state as { returnLabel?: string } | null)?.returnLabel || '返回资源列表';
 
   const handleReturn = useCallback(() => {
-    if (window.history.state?.idx > 0) {
-      navigate(-1);
-      return;
-    }
-    navigate(returnTo);
+    navigateBackOrFallback(navigate, returnTo);
   }, [navigate, returnTo]);
 
   useEffect(() => {

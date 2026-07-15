@@ -47,6 +47,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { createAutoExcerpt, parseMarkdownImport } from '@/utils/blogImport';
+import { navigateBackOrFallback } from '@/utils/navigation';
 import { base64ToImageFile, waitNextPaint } from './utils';
 
 type CoverImageMeta = {
@@ -601,7 +602,7 @@ export default function BlogCreate() {
             state: { refreshPostsAt: Date.now() },
           });
         } else {
-          navigate(-1);
+          navigateBackOrFallback(navigate, '/my-space/posts');
         }
       }
     } catch {
@@ -824,12 +825,7 @@ export default function BlogCreate() {
       <div className="mx-auto max-w-360">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-border/50 bg-card/75 px-4 py-3 shadow-sm backdrop-blur">
           <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(returnTo)}
-              className="rounded-xl"
-            >
+            <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="rounded-xl">
               <ArrowLeft className="mr-1 h-4 w-4" />
               {returnLabel}
             </Button>
