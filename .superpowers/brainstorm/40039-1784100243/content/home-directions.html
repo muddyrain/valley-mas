@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Valley Web redesign directions</title>
+    <style>
+      :root { color-scheme: light dark; --bg:#f7f8fb; --ink:#101828; --muted:#667085; --line:#e4e7ec; --surface:#fff; --brand:#155eef; }
+      * { box-sizing:border-box; }
+      body { margin:0; background:var(--bg); color:var(--ink); font-family:ui-sans-serif,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+      main { max-width:1280px; margin:auto; padding:44px 24px 72px; }
+      header { max-width:780px; margin-bottom:32px; }
+      h1 { font-size:clamp(30px,4vw,48px); letter-spacing:-.035em; margin:0 0 12px; line-height:1.1; }
+      header p { margin:0; color:var(--muted); line-height:1.7; }
+      .read { margin-top:18px; display:inline-flex; border:1px solid var(--line); background:var(--surface); border-radius:999px; padding:8px 12px; font-size:13px; color:var(--muted); }
+      .choices { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; }
+      .choice { overflow:hidden; border:1px solid var(--line); border-radius:14px; background:var(--surface); cursor:pointer; transition:transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+      .choice:hover { transform:translateY(-3px); border-color:#98a2b3; box-shadow:0 8px 18px rgb(16 24 40 / .08); }
+      .preview { min-height:390px; padding:15px; border-bottom:1px solid var(--line); }
+      .nav { display:flex; justify-content:space-between; align-items:center; font-size:8px; padding-bottom:12px; }
+      .logo { font-weight:800; letter-spacing:-.06em; font-size:15px; }
+      .navlinks { display:flex; gap:10px; color:#667085; }
+      .navbutton, .cta { border:0; border-radius:6px; background:#101828; color:white; padding:7px 9px; font-size:8px; }
+      .meta { padding:18px 18px 20px; }
+      .meta h2 { margin:0 0 7px; font-size:18px; letter-spacing:-.025em; }
+      .meta p { margin:0; color:var(--muted); font-size:13px; line-height:1.6; }
+      .meta .tag { display:inline-block; margin-top:12px; border-radius:999px; background:#eff4ff; color:#1849a9; padding:5px 8px; font-size:11px; font-weight:650; }
+      .atlas-hero { display:grid; grid-template-columns:1.2fr .8fr; gap:9px; margin-top:18px; }
+      .atlas-copy { min-height:176px; padding:20px; background:#eef4ff; border-radius:10px; }
+      .atlas-copy small, .journal-copy small { color:#475467; font-size:8px; }
+      .atlas-copy h3, .journal-copy h3 { max-width:190px; margin:9px 0 12px; font-size:23px; line-height:1.02; letter-spacing:-.06em; }
+      .atlas-image { border-radius:10px; background:linear-gradient(135deg,#334e91,#7b9bd4 50%,#d0daec); position:relative; overflow:hidden; }
+      .atlas-image:after { content:""; position:absolute; inset:26px 12px 13px 34px; border-radius:50% 0 50% 0; background:rgb(255 255 255 / .48); transform:rotate(24deg); }
+      .atlas-list { display:grid; grid-template-columns:1.1fr .9fr; gap:9px; margin-top:9px; }
+      .tile { min-height:100px; padding:13px; border-radius:10px; background:#f2f4f7; }
+      .tile strong { display:block; margin:8px 0 3px; font-size:11px; }
+      .tile span { color:#667085; font-size:8px; }
+      .catalog-hero { margin-top:18px; padding:20px; border:1px solid #d0d5dd; border-radius:10px; background:#fff; }
+      .catalog-hero h3 { margin:6px 0; font-size:22px; line-height:1.05; letter-spacing:-.055em; }
+      .catalog-hero p { margin:0; max-width:190px; color:#667085; font-size:8px; line-height:1.45; }
+      .tabs { display:flex; gap:8px; margin:16px 0 10px; font-size:8px; }
+      .tabs b { border-bottom:1.5px solid #101828; padding-bottom:4px; }
+      .shelves { display:grid; grid-template-columns:1.3fr .7fr; gap:9px; }
+      .cover { min-height:128px; border-radius:7px; padding:11px; background:linear-gradient(135deg,#181d27,#556070); color:white; }
+      .cover h4 { margin:49px 0 0; font-size:15px; line-height:1.05; letter-spacing:-.04em; }
+      .side-list { display:grid; gap:7px; }
+      .list-row { display:flex; gap:7px; align-items:center; border-bottom:1px solid #eaecf0; padding:6px 0; font-size:8px; }
+      .thumb { width:25px; height:25px; border-radius:4px; background:#d0d5dd; }
+      .journal-hero { margin-top:18px; display:grid; grid-template-columns:.82fr 1.18fr; border-radius:10px; overflow:hidden; background:#101828; color:#fff; }
+      .journal-copy { padding:22px 18px; min-height:184px; }
+      .journal-copy small { color:#d0d5dd; }
+      .journal-copy h3 { font-size:25px; }
+      .journal-media { background:linear-gradient(130deg,#d3d6dc,#7d8999 52%,#202b39); position:relative; }
+      .journal-media:before { content:""; position:absolute; width:80px; height:80px; right:24px; top:26px; border:9px solid rgb(255 255 255 / .48); border-radius:50%; }
+      .journal-stack { display:grid; gap:0; margin-top:10px; border-top:1px solid #d0d5dd; }
+      .story { display:grid; grid-template-columns:42px 1fr auto; gap:9px; align-items:center; padding:8px 0; border-bottom:1px solid #e4e7ec; }
+      .story-image { width:42px; height:35px; border-radius:5px; background:#c5cedd; }
+      .story b { font-size:9px; } .story span { font-size:7px; color:#667085; }
+      .story i { font-style:normal; color:#667085; font-size:7px; }
+      @media (max-width:900px) { .choices{grid-template-columns:1fr;} .preview{min-height:340px;} }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>为 Valley 选择新的首页骨架</h1>
+        <p>现有首页把资源、博客和个人入口都放在同一张长页面里。下面三种方向都保留当前路由和内容能力，但重排优先级，让主页从“功能集合”变成更明确的内容入口。</p>
+        <div class="read">Design Read：面向内容浏览者与创作者的产品型内容站，采用克制、现代的 shadcn 产品语言。</div>
+      </header>
+      <section class="choices">
+        <article class="choice" data-choice="atlas" onclick="toggleSelect(this)">
+          <div class="preview">
+            <div class="nav"><div class="logo">VALLEY</div><div class="navlinks"><span>探索</span><span>资源</span><span>创作</span></div><button class="navbutton">登录</button></div>
+            <div class="atlas-hero"><div class="atlas-copy"><small>今日精选</small><h3>在一个清晰的入口里，发现值得留下的内容。</h3><button class="cta">开始探索</button></div><div class="atlas-image"></div></div>
+            <div class="atlas-list"><div class="tile"><span>最新图文</span><strong>把创作过程讲清楚</strong><span>阅读 5 分钟</span></div><div class="tile"><span>资源更新</span><strong>十二张桌面壁纸</strong><span>立即收藏</span></div></div>
+          </div>
+          <div class="meta"><h2>A. 内容地图</h2><p>推荐方向。一个强而简洁的首页入口，下面按“值得看”和“可立即使用”混排内容，资源与博客同等可见。</p><span class="tag">内容发现优先</span></div>
+        </article>
+        <article class="choice" data-choice="catalog" onclick="toggleSelect(this)">
+          <div class="preview">
+            <div class="nav"><div class="logo">VALLEY</div><div class="navlinks"><span>首页</span><span>资源库</span><span>图文</span></div><button class="navbutton">创作空间</button></div>
+            <div class="catalog-hero"><small>本周浏览</small><h3>从灵感，到可用的资源。</h3><p>把高频资源与最近更新放在一个紧凑、可快速扫读的工作台式首页。</p><div class="tabs"><b>全部</b><span>资源</span><span>图文</span><span>实验室</span></div><div class="shelves"><div class="cover"><h4>成为更好创作者的工具箱</h4></div><div class="side-list"><div class="list-row"><div class="thumb"></div><span>设计系统整理</span></div><div class="list-row"><div class="thumb"></div><span>插画资源包</span></div><div class="list-row"><div class="thumb"></div><span>创作笔记</span></div></div></div></div>
+          </div>
+          <div class="meta"><h2>B. 探索目录</h2><p>更偏效率和浏览密度。首页像一个优质内容目录，过滤、收藏和资源入口会更靠前。</p><span class="tag">资源转化优先</span></div>
+        </article>
+        <article class="choice" data-choice="journal" onclick="toggleSelect(this)">
+          <div class="preview">
+            <div class="nav"><div class="logo">VALLEY</div><div class="navlinks"><span>文章</span><span>收藏</span><span>留言</span></div><button class="navbutton">登录</button></div>
+            <div class="journal-hero"><div class="journal-copy"><small>编辑推荐</small><h3>让作品和经验，拥有更长的停留时间。</h3><button class="cta">阅读最新内容</button></div><div class="journal-media"></div></div>
+            <div class="journal-stack"><div class="story"><div class="story-image"></div><div><b>本周精选图文</b><br/><span>以内容叙事带动发现</span></div><i>05 min</i></div><div class="story"><div class="story-image"></div><div><b>刚刚更新的资源</b><br/><span>资源作为内容的延伸</span></div><i>12 items</i></div></div>
+          </div>
+          <div class="meta"><h2>C. 创作期刊</h2><p>强化作者感和故事感。适合将博客与图文提升为品牌核心，资源则自然落在阅读路径之后。</p><span class="tag">作品叙事优先</span></div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

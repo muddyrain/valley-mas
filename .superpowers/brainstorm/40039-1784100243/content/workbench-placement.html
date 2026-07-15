@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI 工作台入口方案</title>
+    <style>
+      :root { --bg:#f8fafc; --ink:#101828; --muted:#667085; --line:#e4e7ec; --surface:#fff; --accent:#155eef; --accent-soft:#eff4ff; }
+      *{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:ui-sans-serif,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink)}
+      main{max-width:1200px;margin:auto;padding:44px 24px 68px} h1{margin:0;font-size:clamp(28px,4vw,44px);letter-spacing:-.04em;line-height:1.1} .intro{max-width:720px;margin:12px 0 30px;color:var(--muted);line-height:1.7}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}.option{overflow:hidden;border:1px solid var(--line);border-radius:14px;background:var(--surface);cursor:pointer;transition:.2s ease}.option:hover{transform:translateY(-3px);border-color:#98a2b3;box-shadow:0 8px 18px rgb(16 24 40 / .08)}.top{min-height:390px;padding:16px;border-bottom:1px solid var(--line)}.nav{height:29px;display:flex;align-items:center;justify-content:space-between;font-size:8px}.logo{font-size:15px;font-weight:800;letter-spacing:-.08em}.links{display:flex;gap:9px;color:var(--muted)}.login{background:#101828;color:white;border:0;border-radius:5px;font-size:7px;padding:6px 8px}.hero{margin-top:15px;padding:18px;border-radius:9px;background:#f2f4f7}.hero h3{margin:7px 0 6px;max-width:200px;font-size:21px;line-height:1.02;letter-spacing:-.06em}.hero p{margin:0;font-size:8px;line-height:1.5;color:var(--muted)}.button{display:inline-block;margin-top:12px;border-radius:5px;padding:7px 9px;background:#101828;color:#fff;font-size:8px}.workbench{margin-top:10px;border:1px solid #b2ccff;border-radius:9px;background:var(--accent-soft);padding:13px}.workbench-head{display:flex;justify-content:space-between;align-items:center}.workbench-title{font-size:10px;font-weight:750;color:#1849a9}.workbench-action{font-size:8px;color:#1849a9}.workbench p{margin:5px 0 10px;font-size:8px;color:#475467}.chips{display:flex;gap:6px}.chip{padding:5px 6px;border:1px solid #d0d5dd;border-radius:5px;background:#fff;font-size:7px}.stream{margin-top:11px}.streamrow{display:grid;grid-template-columns:32px 1fr auto;gap:8px;align-items:center;border-bottom:1px solid #eaecf0;padding:7px 0}.img{width:32px;height:28px;border-radius:4px;background:linear-gradient(135deg,#d0d5dd,#98a2b3)}.stream b{font-size:8px}.stream span{display:block;margin-top:3px;font-size:7px;color:var(--muted)}.stream i{font-style:normal;font-size:7px;color:var(--muted)}.menu{position:relative}.dropdown{position:absolute;right:0;top:24px;width:88px;border:1px solid var(--line);border-radius:6px;background:white;padding:5px;box-shadow:0 6px 14px rgb(16 24 40 / .11);z-index:2}.dropdown div{padding:5px;font-size:7px}.dropdown .selected{background:var(--accent-soft);border-radius:4px;color:#1849a9;font-weight:700}.meta{padding:18px}.meta h2{margin:0 0 7px;font-size:18px;letter-spacing:-.025em}.meta p{margin:0;color:var(--muted);font-size:13px;line-height:1.6}.badge{display:inline-block;margin-top:12px;border-radius:999px;background:#eff4ff;color:#1849a9;padding:5px 8px;font-size:11px;font-weight:650}@media(max-width:900px){.grid{grid-template-columns:1fr}.top{min-height:350px}}
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>AI 工作台应该出现在哪里？</h1>
+      <p class="intro">它不是内容分类，而是已登录用户持续回来的创作环境。下面是三个位置方案：A 把它混入全局导航，B 用首页任务面板承接，C 只藏在账号菜单。建议选择 B。</p>
+      <section class="grid">
+        <article class="option" data-choice="parallel-nav" onclick="toggleSelect(this)">
+          <div class="top"><div class="nav"><div class="logo">VALLEY</div><div class="links"><span>首页</span><span>资源</span><span>博客</span><b style="color:#101828">AI 工作台</b></div><button class="login">登录</button></div><div class="hero"><small style="font-size:8px;color:#667085">内容发现</small><h3>留住灵感，也找到下一步。</h3><p>博客与资源在这里持续更新。</p><span class="button">浏览内容</span></div><div class="stream"><div class="streamrow"><div class="img"></div><div><b>最近更新的图文</b><span>内容与经验</span></div><i>5 min</i></div><div class="streamrow"><div class="img"></div><div><b>壁纸资源合集</b><span>立即收藏</span></div><i>12 项</i></div></div></div>
+          <div class="meta"><h2>A. 直接并列</h2><p>最容易发现，但把“浏览内容”和“处理任务”混在同一层，导航的心智模型不清晰。</p><span class="badge">不建议</span></div>
+        </article>
+        <article class="option" data-choice="home-panel" onclick="toggleSelect(this)">
+          <div class="top"><div class="nav"><div class="logo">VALLEY</div><div class="links"><span>首页</span><span>资源</span><span>博客</span><span>留言墙</span></div><button class="login">登录</button></div><div class="hero"><small style="font-size:8px;color:#667085">内容发现</small><h3>留住灵感，也找到下一步。</h3><p>博客、图文与资源持续更新。</p><span class="button">浏览内容</span></div><div class="workbench"><div class="workbench-head"><span class="workbench-title">你的 AI 工作台</span><span class="workbench-action">进入工作台</span></div><p>继续上次的创作，或从一个新任务开始。</p><div class="chips"><span class="chip">新建 AI 应用</span><span class="chip">继续工作流</span><span class="chip">资料库</span></div></div><div class="stream"><div class="streamrow"><div class="img"></div><div><b>本周更新</b><span>最新资源与图文</span></div><i>浏览</i></div></div></div>
+          <div class="meta"><h2>B. 登录后任务面板</h2><p>推荐。导航保持干净，工作台在用户已具备创作意图时出现，并可展示最近工作与快捷操作。</p><span class="badge">推荐</span></div>
+        </article>
+        <article class="option" data-choice="profile-menu" onclick="toggleSelect(this)">
+          <div class="top"><div class="nav"><div class="logo">VALLEY</div><div class="links"><span>首页</span><span>资源</span><span>博客</span><span>留言墙</span></div><div class="menu"><button class="login">头像</button><div class="dropdown"><div>个人中心</div><div class="selected">AI 工作台</div><div>我的创作</div><div>收藏与下载</div></div></div></div><div class="hero"><small style="font-size:8px;color:#667085">内容发现</small><h3>留住灵感，也找到下一步。</h3><p>博客、图文与资源持续更新。</p><span class="button">浏览内容</span></div><div class="stream"><div class="streamrow"><div class="img"></div><div><b>最近更新的图文</b><span>内容与经验</span></div><i>5 min</i></div><div class="streamrow"><div class="img"></div><div><b>壁纸资源合集</b><span>立即收藏</span></div><i>12 项</i></div></div></div>
+          <div class="meta"><h2>C. 仅在个人菜单</h2><p>结构最简，但 AI 工作台过于隐蔽，对已登录创作者的回访和继续任务都不够友好。</p><span class="badge">仅作备用入口</span></div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

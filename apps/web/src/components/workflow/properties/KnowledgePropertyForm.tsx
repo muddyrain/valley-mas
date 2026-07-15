@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -9,11 +9,8 @@ interface KnowledgePropertyFormProps {
 
 export function KnowledgePropertyForm({ config, onUpdateConfig }: KnowledgePropertyFormProps) {
   return (
-    <Card className="m-4 border-border/50">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">知识检索</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <EditorSection title="检索设置" description="用上游变量或固定文本描述要查找的信息。">
+      <div className="space-y-2">
         <div className="space-y-2">
           <Label>检索问题</Label>
           <Input
@@ -22,7 +19,7 @@ export function KnowledgePropertyForm({ config, onUpdateConfig }: KnowledgePrope
             placeholder="{{start.output.topic}}"
           />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </EditorSection>
   );
 }

@@ -52,7 +52,7 @@ export function FileUploadPropertyForm({ config, onUpdateConfig }: FileUploadPro
   };
 
   return (
-    <Card className="m-4 border-border/50">
+    <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm">文件上传</CardTitle>
       </CardHeader>

@@ -5,7 +5,7 @@ import type { PropertyFormProps } from './index';
 
 export function BlogParsePropertyForm({ config, onUpdateConfig }: PropertyFormProps) {
   return (
-    <Card className="m-4 border-border/50">
+    <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm">Markdown 配置</CardTitle>
       </CardHeader>

@@ -30,6 +30,7 @@ import {
   Edit2,
   History,
   Maximize,
+  MoreHorizontal,
   Play,
   Redo2,
   RotateCcw,
@@ -62,6 +63,13 @@ import {
 } from '@/api/workflow';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { KnowledgeBaseBindings } from '@/components/workbench/KnowledgeBaseBindings';
 import { NodePanel } from '@/components/workflow/NodePanel';
@@ -1035,7 +1043,7 @@ export default function WorkflowEditorPage() {
     <WorkflowRuntimeProvider value={runtimeValue}>
       <ReactFlowProvider>
         <div className="h-screen flex flex-col bg-background">
-          <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-border bg-card">
+          <div className="flex items-center justify-between gap-4 border-b border-border bg-card px-4 py-3 shadow-xs">
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="icon" onClick={() => navigate('/workbench')}>
                 <ArrowLeft className="h-4 w-4" />
@@ -1088,22 +1096,32 @@ export default function WorkflowEditorPage() {
               >
                 <Redo2 className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="sm" onClick={handleImport}>
-                <Upload className="h-4 w-4 mr-2" />
-                导入
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExport}>
-                <Download className="h-4 w-4 mr-2" />
-                导出
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleReset}>
-                <RotateCcw className="h-4 w-4 mr-2" />
-                重置
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleClear}>
-                <Trash2 className="h-4 w-4 mr-2" />
-                清空
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={<Button variant="outline" size="icon" aria-label="更多工作流操作" />}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-36">
+                  <DropdownMenuItem onClick={handleImport}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    导入
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExport}>
+                    <Download className="mr-2 h-4 w-4" />
+                    导出
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleReset}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    重置
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={handleClear}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    清空
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button variant="outline" size="sm" onClick={handleSave} disabled={isSaving}>
                 <Save className="h-4 w-4 mr-2" />
                 {isSaving ? '保存中...' : '保存'}
@@ -1164,24 +1182,41 @@ export default function WorkflowEditorPage() {
           </Dialog>
 
           <Dialog open={showVersions} onOpenChange={setShowVersions}>
-            <DialogContent>
+            <DialogContent className="max-h-[min(720px,calc(100vh-3rem))] max-w-2xl overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>版本历史</DialogTitle>
+                <p className="text-sm text-muted-foreground">
+                  恢复历史版本会创建一份新的草稿，不会覆盖已有记录。
+                </p>
               </DialogHeader>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {platform?.versions.map((version) => (
-                  <div
+                  <article
                     key={version.id}
-                    className="flex items-center justify-between rounded-lg border p-3 text-sm"
+                    className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/20 p-4"
                   >
-                    <span>v{version.number}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-foreground">v{version.number}</span>
+                        {version.id === platform.app.draftVersionId && (
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                            当前草稿
+                          </span>
+                        )}
+                        {version.id === platform.app.publishedVersionId && (
+                          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                            已发布
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {new Date(version.createdAt).toLocaleString('zh-CN')}
-                      </span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
                       <Button
                         size="sm"
-                        variant="ghost"
+                        variant="outline"
                         disabled={version.id === platform.app.draftVersionId}
                         onClick={async () => {
                           if (!workflowId) return;
@@ -1192,10 +1227,10 @@ export default function WorkflowEditorPage() {
                           });
                         }}
                       >
-                        恢复
+                        恢复为草稿
                       </Button>
                     </div>
-                  </div>
+                  </article>
                 ))}
               </div>
               <Button
@@ -1254,14 +1289,14 @@ export default function WorkflowEditorPage() {
             </DialogContent>
           </Dialog>
 
-          <div className="flex-1 flex overflow-hidden">
-            <div className="w-56 flex-shrink-0">
+          <div className="flex flex-1 overflow-hidden">
+            <div className="w-64 flex-shrink-0">
               <NodePanel onDragStart={onDragStart} onAddNode={handleAddNode} />
             </div>
 
             <div
               ref={reactFlowWrapper}
-              className="flex-1 bg-background"
+              className="relative flex-1 bg-muted/20"
               onDragOver={onDragOver}
               onDrop={onDrop}
             >
@@ -1292,17 +1327,8 @@ export default function WorkflowEditorPage() {
                 <Controls />
                 <MiniMap />
               </ReactFlow>
-            </div>
-
-            <div className="flex">
-              <div
-                className="w-1 bg-gray-200 cursor-col-resize hover:bg-gray-300 transition-colors flex items-center justify-center"
-                onMouseDown={handleMouseDown}
-              >
-                <div className="w-0.5 h-8 bg-gray-400 rounded" />
-              </div>
-              <div style={{ width: `${rightPanelWidth}px` }} className="flex-shrink-0">
-                {showRunPanel ? (
+              {showRunPanel ? (
+                <div className="absolute inset-x-4 bottom-4 z-10 h-[min(520px,55vh)] overflow-hidden rounded-lg border border-border bg-card shadow-lg">
                   <RunPanel
                     open={showRunPanel}
                     onOpenChange={setShowRunPanel}
@@ -1313,13 +1339,23 @@ export default function WorkflowEditorPage() {
                     session={runSession}
                     runError={runError}
                   />
-                ) : (
-                  <PropertyPanel
-                    selectedNode={selectedNode}
-                    onClose={() => setSelectedNode(null)}
-                    onUpdateNode={onUpdateNode}
-                  />
-                )}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex">
+              <div
+                className="flex w-1 cursor-col-resize items-center justify-center bg-border transition-colors hover:bg-primary/30"
+                onMouseDown={handleMouseDown}
+              >
+                <div className="h-8 w-0.5 rounded bg-muted-foreground/40" />
+              </div>
+              <div style={{ width: `${rightPanelWidth}px` }} className="flex-shrink-0">
+                <PropertyPanel
+                  selectedNode={selectedNode}
+                  onClose={() => setSelectedNode(null)}
+                  onUpdateNode={onUpdateNode}
+                />
               </div>
             </div>
           </div>

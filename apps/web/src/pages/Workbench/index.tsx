@@ -17,11 +17,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { AIAppsPanel } from '@/components/workbench/AIAppsPanel';
 import { cn } from '@/lib/utils';
-import {
-  ENABLED_TEMPLATE_COUNT,
-  TOTAL_TEMPLATE_COUNT,
-  WORKFLOW_TEMPLATE_DEFS,
-} from '../workflowTemplates';
+import { WORKFLOW_TEMPLATE_DEFS } from '../workflowTemplates';
 
 const TAG_COLORS: Record<string, string> = {
   AI: 'bg-purple-100 text-purple-700 hover:bg-purple-100',
@@ -81,44 +77,38 @@ export default function Workbench() {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 md:px-8">
-        <Card className="mb-8">
-          <CardContent className="p-8">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-              <div>
-                <Badge variant="outline" className="mb-4">
-                  <LayoutDashboard className="h-3.5 w-3.5 mr-2" />
-                  AI 工作台
-                </Badge>
-                <h1 className="text-3xl md:text-4xl font-semibold text-foreground mb-2">
-                  AI 工作台
-                </h1>
-                <p className="text-muted-foreground">管理智能体与自动化工作流</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={() => navigate('/workbench/knowledge')}
-                >
-                  <BookOpenText className="mr-2 h-5 w-5" />
-                  知识库
-                </Button>
-                <Button size="lg" onClick={() => navigate('/workbench/create')}>
-                  <Plus className="h-5 w-5 mr-2" />
-                  创建工作流
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <section className="mb-8 flex flex-col gap-5 border-b border-border pb-8 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <Badge variant="outline" className="mb-3">
+              <LayoutDashboard className="mr-2 h-3.5 w-3.5" />
+              AI 工作台
+            </Badge>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+              创作与自动化
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              从智能体、工作流和资料库开始，继续最近的创作任务。
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => navigate('/workbench/knowledge')}>
+              <BookOpenText className="mr-2 h-4 w-4" />
+              资料库
+            </Button>
+            <Button onClick={() => navigate('/workbench/create')}>
+              <Plus className="mr-2 h-4 w-4" />
+              新建工作流
+            </Button>
+          </div>
+        </section>
 
         <AIAppsPanel />
 
-        <div className="grid gap-8 lg:grid-cols-2">
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section>
+            <Card className="h-full">
+              <CardHeader className="border-b border-border/70">
+                <CardTitle className="flex items-center gap-2 text-base">
                   <Sparkles className="h-4 w-4 text-primary" />
                   预置模板
                 </CardTitle>
@@ -175,12 +165,12 @@ export default function Workbench() {
                 })}
               </CardContent>
             </Card>
-          </div>
+          </section>
 
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+          <section>
+            <Card className="h-full">
+              <CardHeader className="border-b border-border/70">
+                <CardTitle className="flex items-center gap-2 text-base">
                   <FileText className="h-4 w-4 text-primary" />
                   工作流
                 </CardTitle>
@@ -254,37 +244,8 @@ export default function Workbench() {
                 )}
               </CardContent>
             </Card>
-          </div>
+          </section>
         </div>
-
-        <Card className="mt-8">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <h3 className="font-medium text-foreground">工作流模板</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  自动化内容创作流程，从输入到输出一键完成
-                </p>
-              </div>
-              <div className="flex gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">
-                    {ENABLED_TEMPLATE_COUNT} / {TOTAL_TEMPLATE_COUNT}
-                  </div>
-                  <div className="text-xs text-muted-foreground">预置模板（已开放）</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">5</div>
-                  <div className="text-xs text-muted-foreground">可运行节点类型</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">1</div>
-                  <div className="text-xs text-muted-foreground">已开放执行模式</div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         <Dialog
           open={Boolean(deleteTarget)}

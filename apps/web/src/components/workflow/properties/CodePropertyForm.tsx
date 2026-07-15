@@ -22,7 +22,7 @@ export function CodePropertyForm({ config, onUpdateConfig }: CodePropertyFormPro
   const outputVars = (config.outputVars as string[]) || [];
 
   return (
-    <Card className="m-4 border-border/50">
+    <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm">代码配置</CardTitle>
       </CardHeader>

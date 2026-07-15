@@ -22,7 +22,7 @@ const fields = [
 
 export function BlogCreateDraftPropertyForm({ config, onUpdateConfig }: PropertyFormProps) {
   return (
-    <Card className="m-4 border-border/50">
+    <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm">博客草稿配置</CardTitle>
       </CardHeader>

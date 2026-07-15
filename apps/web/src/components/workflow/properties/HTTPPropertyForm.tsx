@@ -21,7 +21,7 @@ export function HTTPPropertyForm({ config, onUpdateConfig }: HTTPPropertyFormPro
   const headers = (config.headers as Array<{ key: string; value: string }>) || [];
 
   return (
-    <Card className="m-4 border-border/50">
+    <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm">HTTP 请求配置</CardTitle>
       </CardHeader>

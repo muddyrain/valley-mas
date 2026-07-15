@@ -1,5 +1,5 @@
+import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { normalizePhaseOneStartInputs } from '../types';
 import type { PropertyFormProps } from './index';
@@ -15,15 +15,12 @@ export function StartPropertyForm({ config }: PropertyFormProps) {
   const inputs = normalizePhaseOneStartInputs(config.inputs);
 
   return (
-    <Card className="m-4 border-border/50">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">运行输入</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <EditorSection title="运行输入" description="定义启动工作流时需要提供的内容。">
+      <div className="space-y-2">
         {Object.entries(inputs).map(([name, input]) => (
           <div
             key={name}
-            className="flex items-center justify-between rounded-lg border border-border p-3"
+            className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5"
           >
             <div>
               <Label>{inputLabels[name] || name}</Label>
@@ -34,7 +31,7 @@ export function StartPropertyForm({ config }: PropertyFormProps) {
             </Badge>
           </div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </EditorSection>
   );
 }

@@ -1,4 +1,6 @@
 import {
+  ChevronDown,
+  ChevronRight,
   Code,
   Database,
   GitBranch,
@@ -43,6 +45,13 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Upload,
 };
 
+const COMMON_NODE_TYPES = [
+  'blog.parseMarkdown',
+  'llm.text',
+  'knowledge.retrieve',
+  'blog.createDraft',
+];
+
 function NodeItem({
   node,
   categoryColor,
@@ -86,6 +95,7 @@ function NodeItem({
 
 export function NodePanel({ onDragStart, onAddNode }: NodePanelProps) {
   const [query, setQuery] = useState('');
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(() => new Set());
 
   const filteredNodes = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -108,12 +118,28 @@ export function NodePanel({ onDragStart, onAddNode }: NodePanelProps) {
     />
   );
 
+  const commonNodes = Object.values(NODE_CONFIGS).filter(
+    (node) => !node.fixed && COMMON_NODE_TYPES.includes(node.type),
+  );
+
+  const toggleCategory = (categoryId: string) => {
+    setCollapsedCategories((current) => {
+      const next = new Set(current);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="h-full flex flex-col border-r border-border bg-card">
-      <div className="p-4 border-b border-border space-y-3">
+      <div className="space-y-3 border-b border-border p-4">
         <div>
           <h2 className="text-sm font-semibold text-foreground">节点面板</h2>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="mt-1 text-xs text-muted-foreground">
             {onAddNode ? '点击或拖拽节点到画布' : '拖拽节点到画布上'}
           </p>
         </div>
@@ -129,7 +155,7 @@ export function NodePanel({ onDragStart, onAddNode }: NodePanelProps) {
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-3 space-y-5">
+        <div className="space-y-5 p-3">
           {filteredNodes ? (
             filteredNodes.length > 0 ? (
               <div className="space-y-2">
@@ -142,24 +168,50 @@ export function NodePanel({ onDragStart, onAddNode }: NodePanelProps) {
               <div className="text-center py-8 text-xs text-muted-foreground">未找到匹配的节点</div>
             )
           ) : (
-            NODE_CATEGORIES.map((category) => {
-              const CategoryIcon = iconMap[category.icon];
-              const nodesInCategory = Object.values(NODE_CONFIGS).filter(
-                (node) => node.category === category.id && !node.fixed,
-              );
-              if (nodesInCategory.length === 0) return null;
-              return (
-                <div key={category.id}>
-                  <div className="flex items-center gap-2 mb-3 px-1">
-                    {CategoryIcon && <CategoryIcon className="h-3.5 w-3.5 text-muted-foreground" />}
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {category.label}
-                    </span>
-                  </div>
-                  <div className="space-y-2">{nodesInCategory.map(renderNodeItem)}</div>
+            <>
+              <div>
+                <div className="mb-3 flex items-center gap-2 px-1">
+                  <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">常用</span>
                 </div>
-              );
-            })
+                <div className="space-y-2">{commonNodes.map(renderNodeItem)}</div>
+              </div>
+              {NODE_CATEGORIES.map((category) => {
+                const CategoryIcon = iconMap[category.icon];
+                const nodesInCategory = Object.values(NODE_CONFIGS).filter(
+                  (node) =>
+                    node.category === category.id &&
+                    !node.fixed &&
+                    !COMMON_NODE_TYPES.includes(node.type),
+                );
+                if (nodesInCategory.length === 0) return null;
+                const isCollapsed = collapsedCategories.has(category.id);
+                return (
+                  <div key={category.id}>
+                    <button
+                      type="button"
+                      className="mb-3 flex w-full items-center gap-2 px-1 text-left"
+                      onClick={() => toggleCategory(category.id)}
+                    >
+                      {CategoryIcon && (
+                        <CategoryIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                      <span className="flex-1 text-xs font-medium text-muted-foreground">
+                        {category.label}
+                      </span>
+                      {isCollapsed ? (
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                    </button>
+                    {!isCollapsed && (
+                      <div className="space-y-2">{nodesInCategory.map(renderNodeItem)}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       </ScrollArea>

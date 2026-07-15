@@ -6,7 +6,7 @@ import type { PropertyFormProps } from './index';
 export function EndPropertyForm({ config, onUpdateConfig }: PropertyFormProps) {
   const outputs = (config.outputs as Record<string, string>) || {};
   return (
-    <Card className="m-4 border-border/50">
+    <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm">最终输出</CardTitle>
       </CardHeader>

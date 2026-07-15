@@ -9,7 +9,7 @@ interface LoopPropertyFormProps {
 
 export function LoopPropertyForm({ config, onUpdateConfig }: LoopPropertyFormProps) {
   return (
-    <Card className="m-4 border-border/50">
+    <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm">循环配置</CardTitle>
       </CardHeader>

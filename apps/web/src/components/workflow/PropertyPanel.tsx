@@ -19,15 +19,17 @@ export function PropertyPanel({ selectedNode, onClose, onUpdateNode }: PropertyP
   if (!selectedNode) {
     return (
       <div className="h-full flex flex-col border-l border-border bg-card">
-        <div className="p-4 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">属性面板</h2>
+        <div className="border-b border-border px-4 py-3">
+          <h2 className="text-sm font-semibold text-foreground">节点配置</h2>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center mb-4">
             <Settings className="h-6 w-6 text-muted-foreground" />
           </div>
-          <p className="text-sm text-muted-foreground mb-2">选择一个节点查看和编辑属性</p>
-          <p className="text-xs text-muted-foreground/70">点击画布上的节点，在右侧配置其参数</p>
+          <p className="mb-2 text-sm text-muted-foreground">选择一个节点开始配置</p>
+          <p className="text-xs text-muted-foreground/70">
+            画布中的节点会在这里显示输入、参数和输出。
+          </p>
         </div>
       </div>
     );

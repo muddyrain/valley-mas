@@ -25,7 +25,7 @@ export function InputPropertyForm({ config, onUpdateConfig }: InputPropertyFormP
   };
 
   return (
-    <Card className="m-4 border-border/50">
+    <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm">输入参数</CardTitle>
       </CardHeader>

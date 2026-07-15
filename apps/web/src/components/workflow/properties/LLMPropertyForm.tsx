@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -6,11 +6,8 @@ import type { PropertyFormProps } from './index';
 
 export function LLMPropertyForm({ config, onUpdateConfig }: PropertyFormProps) {
   return (
-    <Card className="m-4 border-border/50">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">大模型配置</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4">
+      <EditorSection title="提示词" description="设置模型角色和本次生成任务。">
         <div className="space-y-1.5">
           <Label>模型配置</Label>
           <Input value="ARK 默认文本模型" disabled />
@@ -35,6 +32,8 @@ export function LLMPropertyForm({ config, onUpdateConfig }: PropertyFormProps) {
             rows={5}
           />
         </div>
+      </EditorSection>
+      <EditorSection title="生成参数" description="控制输出的随机性和长度。">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="llm-temperature">Temperature</Label>
@@ -60,7 +59,7 @@ export function LLMPropertyForm({ config, onUpdateConfig }: PropertyFormProps) {
             />
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </EditorSection>
+    </div>
   );
 }

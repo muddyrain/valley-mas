@@ -1,8 +1,8 @@
 import {
   Activity,
-  ArrowLeft,
   Bot,
   Copy,
+  History,
   KeyRound,
   Play,
   RotateCcw,
@@ -44,6 +44,8 @@ import {
   saveAIAppVersion,
   streamDebugAIApp,
 } from '@/api/aiWorkbench';
+import { EditorPageHeader } from '@/components/ai-workbench/EditorPageHeader';
+import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,8 +59,17 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { KnowledgeBaseBindings } from '@/components/workbench/KnowledgeBaseBindings';
 
@@ -114,6 +125,7 @@ export default function AIAppEditor() {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [debugMessage, setDebugMessage] = useState('');
   const [debugReply, setDebugReply] = useState('');
   const [debugToolStatus, setDebugToolStatus] = useState<string | null>(null);
@@ -468,268 +480,307 @@ while (true) {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-4 pb-16 pt-8 sm:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button variant="ghost" onClick={() => navigate('/workbench')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          返回工作台
-        </Button>
-        <div className="flex items-center gap-2">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 pb-16 pt-8 sm:p-8">
+      <EditorPageHeader
+        title={name || '未命名智能体'}
+        description="私有智能体"
+        onBack={() => navigate('/workbench')}
+        status={
           <Badge variant={app.status === 'published' ? 'default' : 'outline'}>
             {app.status === 'published' ? '已发布' : '草稿'}
           </Badge>
-          <Button variant="outline" disabled={saving || publishing} onClick={save}>
-            <Save className="mr-2 h-4 w-4" />
-            保存版本
-          </Button>
-          <Button disabled={saving || publishing} onClick={publish}>
-            <Send className="mr-2 h-4 w-4" />
-            发布
-          </Button>
-        </div>
-      </div>
-      <section className="overflow-hidden rounded-[2rem] border border-border/80 bg-card/80 shadow-sm">
+        }
+        actions={
+          <>
+            <Button variant="outline" onClick={() => setShowVersionHistory(true)}>
+              <History className="mr-2 h-4 w-4" />
+              版本
+            </Button>
+            <Button variant="outline" disabled={saving || publishing} onClick={save}>
+              <Save className="mr-2 h-4 w-4" />
+              保存版本
+            </Button>
+            <Button disabled={saving || publishing} onClick={publish}>
+              <Send className="mr-2 h-4 w-4" />
+              发布
+            </Button>
+          </>
+        }
+      />
+      <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
         <div className="border-b border-border/70 px-6 py-5 sm:px-8">
           <p className="flex items-center gap-2 text-lg font-semibold text-foreground">
             <Bot className="h-5 w-5 text-primary" />
-            {name || '未命名智能体'}
+            编排与调试
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">私有智能体</p>
+          <p className="mt-1 text-sm text-muted-foreground">配置当前草稿，并在右侧即时验证输出。</p>
         </div>
         <div className="grid lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,.9fr)]">
-          <div className="space-y-5 p-6 sm:p-8 lg:border-r lg:border-border/70">
-            <div className="space-y-2">
-              <label htmlFor="app-name" className="text-sm font-medium">
-                名称
-              </label>
-              <Input
-                id="app-name"
-                value={name}
-                maxLength={100}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="app-description" className="text-sm font-medium">
-                简介
-              </label>
-              <Input
-                id="app-description"
-                value={description}
-                maxLength={500}
-                onChange={(event) => setDescription(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="system-prompt" className="text-sm font-medium">
-                系统提示词
-              </label>
-              <Textarea
-                id="system-prompt"
-                value={config.systemPrompt}
-                placeholder="说明智能体的角色、边界和输出要求"
-                onChange={(event) =>
-                  setConfig((value) => ({ ...value, systemPrompt: event.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="opening-message" className="text-sm font-medium">
-                开场白
-              </label>
-              <Textarea
-                id="opening-message"
-                value={config.openingMessage}
-                placeholder="首次对话时显示的欢迎语"
-                onChange={(event) =>
-                  setConfig((value) => ({ ...value, openingMessage: event.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-3 rounded-2xl bg-muted/35 p-4">
-              <div>
-                <p className="text-sm font-medium">资料库</p>
-                <p className="mt-1 text-xs text-muted-foreground">已索引的资料会在调试时作为参考</p>
-              </div>
-              <KnowledgeBaseBindings
-                knowledgeBases={knowledgeBases}
-                boundKnowledgeBaseIDs={boundKnowledgeBaseIDs}
-                disabled={savingKnowledgeBases}
-                onChange={(knowledgeBaseIDs) => {
-                  void updateKnowledgeBaseBindings(knowledgeBaseIDs);
-                }}
-              />
-            </div>
-            <div className="space-y-3 rounded-2xl bg-muted/35 p-4">
-              <div>
-                <p className="text-sm font-medium">工具</p>
-                <p className="mt-1 text-xs text-muted-foreground">允许智能体在调试中调用</p>
-              </div>
-              {tools.length === 0 ? (
-                <p className="text-sm text-muted-foreground">暂无可用工具</p>
-              ) : (
+          <div className="min-w-0 p-6 sm:p-8 lg:border-r lg:border-border/70">
+            <Tabs defaultValue="compose" className="gap-5">
+              <TabsList className="self-start max-w-full overflow-x-auto">
+                <TabsTrigger value="compose" className="flex-none px-3">
+                  编排
+                </TabsTrigger>
+                <TabsTrigger value="knowledge" className="flex-none px-3">
+                  知识库
+                </TabsTrigger>
+                <TabsTrigger value="tools" className="flex-none px-3">
+                  工具
+                </TabsTrigger>
+                <TabsTrigger value="publish" className="flex-none px-3">
+                  发布
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="compose" className="w-full space-y-5">
                 <div className="space-y-2">
-                  {tools.map((tool) => {
-                    const checked = boundTools.includes(tool.name);
-                    return (
-                      <label
-                        key={tool.name}
-                        className="flex cursor-pointer items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
-                      >
-                        <Checkbox
-                          checked={checked}
-                          disabled={savingTools || tool.permission !== 'read'}
-                          onCheckedChange={(nextChecked) => {
-                            const next = nextChecked
-                              ? [...boundTools, tool.name]
-                              : boundTools.filter((name) => name !== tool.name);
-                            void updateToolBindings(next);
-                          }}
-                        />
-                        <span className="min-w-0">
-                          <span className="block text-sm font-medium">
-                            {tool.name === 'content.search' ? '内容搜索' : tool.name}
-                          </span>
-                          <span className="block text-xs text-muted-foreground">
-                            {tool.description}
-                          </span>
-                        </span>
-                      </label>
-                    );
-                  })}
+                  <label htmlFor="app-name" className="text-sm font-medium">
+                    名称
+                  </label>
+                  <Input
+                    id="app-name"
+                    value={name}
+                    maxLength={100}
+                    onChange={(event) => setName(event.target.value)}
+                  />
                 </div>
-              )}
-            </div>
-            <div className="space-y-3 rounded-2xl bg-muted/35 p-4">
-              <div>
-                <p className="flex items-center gap-2 text-sm font-medium">
-                  <KeyRound className="h-4 w-4 text-primary" />
-                  公开 API
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  仅已发布版本可被调用。每个 Key 每日最多 100 次，未勾选不会获得当前应用权限。
-                </p>
-              </div>
-              <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/70 px-3 py-2">
-                <p className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
-                  POST {publicAPIPath}
-                </p>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  aria-label="复制接口地址"
-                  title="复制接口地址"
-                  onClick={() => void copyText(publicAPIPath, '接口地址已复制')}
+                <div className="space-y-2">
+                  <label htmlFor="app-description" className="text-sm font-medium">
+                    简介
+                  </label>
+                  <Input
+                    id="app-description"
+                    value={description}
+                    maxLength={500}
+                    onChange={(event) => setDescription(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="system-prompt" className="text-sm font-medium">
+                    系统提示词
+                  </label>
+                  <Textarea
+                    id="system-prompt"
+                    value={config.systemPrompt}
+                    placeholder="说明智能体的角色、边界和输出要求"
+                    onChange={(event) =>
+                      setConfig((value) => ({ ...value, systemPrompt: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="opening-message" className="text-sm font-medium">
+                    开场白
+                  </label>
+                  <Textarea
+                    id="opening-message"
+                    value={config.openingMessage}
+                    placeholder="首次对话时显示的欢迎语"
+                    onChange={(event) =>
+                      setConfig((value) => ({ ...value, openingMessage: event.target.value }))
+                    }
+                  />
+                </div>
+              </TabsContent>
+              <TabsContent value="knowledge" className="w-full">
+                <EditorSection
+                  title="资料库"
+                  description="已索引的资料会在调试时作为参考。"
+                  className="border-0 bg-transparent p-0"
                 >
-                  <Copy />
-                </Button>
-              </div>
-              <Button
-                className="w-full justify-start"
-                variant="outline"
-                onClick={() => void copyText(publicAPICurl, 'curl 示例已复制')}
-              >
-                <Copy className="mr-2 h-4 w-4" />
-                复制 curl 示例
-              </Button>
-              <div className="space-y-2 rounded-xl border border-border/70 bg-background/50 p-3">
-                <p className="text-xs font-medium text-muted-foreground">JavaScript 示例</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void copyText(publicAPIJavaScriptJSON, 'JSON fetch 示例已复制')}
-                  >
-                    <Copy className="mr-1.5 h-3.5 w-3.5" />
-                    复制 JSON fetch
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void copyText(publicAPIJavaScriptSSE, 'SSE fetch 示例已复制')}
-                  >
-                    <Copy className="mr-1.5 h-3.5 w-3.5" />
-                    复制 SSE fetch
-                  </Button>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  value={newAPIKeyName}
-                  placeholder="新 Key 名称"
-                  maxLength={100}
-                  onChange={(event) => setNewAPIKeyName(event.target.value)}
-                />
-                <Button variant="outline" disabled={creatingAPIKey} onClick={createAPIKey}>
-                  {creatingAPIKey ? '创建中…' : '创建 Key'}
-                </Button>
-              </div>
-              {generatedAPIKey && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-xs font-medium">请立即保存此 Key，它不会再次显示。</p>
+                  <KnowledgeBaseBindings
+                    knowledgeBases={knowledgeBases}
+                    boundKnowledgeBaseIDs={boundKnowledgeBaseIDs}
+                    disabled={savingKnowledgeBases}
+                    onChange={(knowledgeBaseIDs) => {
+                      void updateKnowledgeBaseBindings(knowledgeBaseIDs);
+                    }}
+                  />
+                </EditorSection>
+              </TabsContent>
+              <TabsContent value="tools" className="w-full">
+                <EditorSection
+                  title="工具"
+                  description="仅可调用已授权的工具。"
+                  className="border-0 bg-transparent p-0"
+                >
+                  {tools.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">暂无可用工具</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {tools.map((tool) => {
+                        const checked = boundTools.includes(tool.name);
+                        return (
+                          <label
+                            key={tool.name}
+                            className="flex cursor-pointer items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              disabled={savingTools || tool.permission !== 'read'}
+                              onCheckedChange={(nextChecked) => {
+                                const next = nextChecked
+                                  ? [...boundTools, tool.name]
+                                  : boundTools.filter((name) => name !== tool.name);
+                                void updateToolBindings(next);
+                              }}
+                            />
+                            <span className="min-w-0">
+                              <span className="block text-sm font-medium">
+                                {tool.name === 'content.search' ? '内容搜索' : tool.name}
+                              </span>
+                              <span className="block text-xs text-muted-foreground">
+                                {tool.description}
+                              </span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </EditorSection>
+              </TabsContent>
+              <TabsContent value="publish" className="w-full">
+                <EditorSection
+                  title="公开 API"
+                  description="发布后可通过 API Key 调用当前版本。"
+                  className="border-0 bg-transparent p-0"
+                >
+                  <div>
+                    <p className="flex items-center gap-2 text-sm font-medium">
+                      <KeyRound className="h-4 w-4 text-primary" />
+                      公开 API
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      仅已发布版本可被调用。每个 Key 每日最多 100 次，未勾选不会获得当前应用权限。
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/70 px-3 py-2">
+                    <p className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+                      POST {publicAPIPath}
+                    </p>
                     <Button
-                      size="xs"
-                      variant="outline"
-                      onClick={() => void copyText(generatedAPIKey, 'API Key 已复制')}
+                      size="icon-xs"
+                      variant="ghost"
+                      aria-label="复制接口地址"
+                      title="复制接口地址"
+                      onClick={() => void copyText(publicAPIPath, '接口地址已复制')}
                     >
-                      <Copy className="mr-1 h-3.5 w-3.5" />
-                      复制 Key
+                      <Copy />
                     </Button>
                   </div>
-                  <code className="mt-2 block break-all text-xs text-muted-foreground">
-                    {generatedAPIKey}
-                  </code>
-                </div>
-              )}
-              {activeAPIKeys.length === 0 ? (
-                <p className="text-sm text-muted-foreground">还没有 API Key</p>
-              ) : (
-                <div className="space-y-2">
-                  {activeAPIKeys.map((key) => {
-                    const checked = (keyAppBindings[key.id] || []).includes(appId || '');
-                    const usage = keyUsage[key.id];
-                    return (
-                      <div
-                        key={key.id}
-                        className="flex items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
+                  <Button
+                    className="w-full justify-start"
+                    variant="outline"
+                    onClick={() => void copyText(publicAPICurl, 'curl 示例已复制')}
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    复制 curl 示例
+                  </Button>
+                  <div className="space-y-2 rounded-xl border border-border/70 bg-background/50 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">JavaScript 示例</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          void copyText(publicAPIJavaScriptJSON, 'JSON fetch 示例已复制')
+                        }
                       >
-                        <Checkbox
-                          checked={checked}
-                          disabled={key.status !== 'active' || savingAPIKeyId === key.id}
-                          onCheckedChange={(nextChecked) =>
-                            void updateAPIKeyAppBinding(key, nextChecked === true)
-                          }
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">{key.name}</span>
-                          <span className="block text-xs text-muted-foreground">
-                            {key.keyPrefix}… · 仅显示前缀 ·{' '}
-                            {usage ? `今日 ${usage.count}/${usage.limit}` : '加载配额中'}
-                          </span>
-                        </span>
-                        {savingAPIKeyId === key.id && (
-                          <span className="text-xs text-muted-foreground">
-                            {checked ? '授权中…' : '取消授权中…'}
-                          </span>
-                        )}
-                        <Badge variant="outline">可用</Badge>
+                        <Copy className="mr-1.5 h-3.5 w-3.5" />
+                        复制 JSON fetch
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          void copyText(publicAPIJavaScriptSSE, 'SSE fetch 示例已复制')
+                        }
+                      >
+                        <Copy className="mr-1.5 h-3.5 w-3.5" />
+                        复制 SSE fetch
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={newAPIKeyName}
+                      placeholder="新 Key 名称"
+                      maxLength={100}
+                      onChange={(event) => setNewAPIKeyName(event.target.value)}
+                    />
+                    <Button variant="outline" disabled={creatingAPIKey} onClick={createAPIKey}>
+                      {creatingAPIKey ? '创建中…' : '创建 Key'}
+                    </Button>
+                  </div>
+                  {generatedAPIKey && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-xs font-medium">请立即保存此 Key，它不会再次显示。</p>
                         <Button
-                          size="icon-xs"
-                          variant="ghost"
-                          disabled={revokingAPIKeyId === key.id}
-                          aria-label={`撤销 ${key.name}`}
-                          title="撤销 Key"
-                          onClick={() => setRevokeTarget(key)}
+                          size="xs"
+                          variant="outline"
+                          onClick={() => void copyText(generatedAPIKey, 'API Key 已复制')}
                         >
-                          <Trash2 />
+                          <Copy className="mr-1 h-3.5 w-3.5" />
+                          复制 Key
                         </Button>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                      <code className="mt-2 block break-all text-xs text-muted-foreground">
+                        {generatedAPIKey}
+                      </code>
+                    </div>
+                  )}
+                  {activeAPIKeys.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">还没有 API Key</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {activeAPIKeys.map((key) => {
+                        const checked = (keyAppBindings[key.id] || []).includes(appId || '');
+                        const usage = keyUsage[key.id];
+                        return (
+                          <div
+                            key={key.id}
+                            className="flex items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              disabled={key.status !== 'active' || savingAPIKeyId === key.id}
+                              onCheckedChange={(nextChecked) =>
+                                void updateAPIKeyAppBinding(key, nextChecked === true)
+                              }
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">{key.name}</span>
+                              <span className="block text-xs text-muted-foreground">
+                                {key.keyPrefix}… · 仅显示前缀 ·{' '}
+                                {usage ? `今日 ${usage.count}/${usage.limit}` : '加载配额中'}
+                              </span>
+                            </span>
+                            {savingAPIKeyId === key.id && (
+                              <span className="text-xs text-muted-foreground">
+                                {checked ? '授权中…' : '取消授权中…'}
+                              </span>
+                            )}
+                            <Badge variant="outline">可用</Badge>
+                            <Button
+                              size="icon-xs"
+                              variant="ghost"
+                              disabled={revokingAPIKeyId === key.id}
+                              aria-label={`撤销 ${key.name}`}
+                              title="撤销 Key"
+                              onClick={() => setRevokeTarget(key)}
+                            >
+                              <Trash2 />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </EditorSection>
+              </TabsContent>
+            </Tabs>
           </div>
           <aside className="space-y-5 bg-muted/25 p-6 sm:p-8">
             <div>
@@ -851,46 +902,49 @@ while (true) {
             </div>
           </aside>
         </div>
-        <div className="border-t border-border/70 px-6 py-5 sm:px-8">
-          <p className="mb-3 text-sm font-semibold">版本历史</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {versions.map((version) => (
-              <div
-                key={version.id}
-                className="flex items-center justify-between rounded-xl bg-muted/45 px-3 py-2 text-sm"
-              >
-                <div>
-                  <span>v{version.number}</span>
-                  {version.id === app.draftVersionId && (
-                    <Badge className="ml-2" variant="outline">
-                      当前草稿
-                    </Badge>
-                  )}
-                  {version.id === app.publishedVersionId && (
-                    <Badge className="ml-2" variant="secondary">
-                      已发布
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">
-                    {new Date(version.createdAt).toLocaleString('zh-CN')}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={version.id === app.draftVersionId || restoringVersionId !== null}
-                    onClick={() => restoreVersion(version)}
-                  >
-                    <RotateCcw className="mr-1 h-3.5 w-3.5" />
-                    恢复
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </section>
+      <Dialog open={showVersionHistory} onOpenChange={setShowVersionHistory}>
+        <DialogContent className="max-h-[calc(100vh-2rem)] max-w-2xl gap-4 overflow-hidden">
+          <DialogHeader className="pr-10">
+            <DialogTitle>版本历史</DialogTitle>
+            <DialogDescription>可随时恢复历史配置，恢复后会创建新的草稿。</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[min(720px,calc(100vh-12rem))]">
+            <div className="space-y-3 pr-4">
+              {versions.map((version) => {
+                const isDraft = version.id === app.draftVersionId;
+                const isPublished = version.id === app.publishedVersionId;
+                return (
+                  <article
+                    key={version.id}
+                    className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-foreground">v{version.number}</p>
+                        {isDraft ? <Badge variant="outline">当前草稿</Badge> : null}
+                        {isPublished ? <Badge variant="secondary">已发布</Badge> : null}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        创建于 {new Date(version.createdAt).toLocaleString('zh-CN')}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={isDraft ? 'outline' : 'secondary'}
+                      disabled={isDraft || restoringVersionId !== null}
+                      onClick={() => restoreVersion(version)}
+                    >
+                      <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                      {restoringVersionId === version.id ? '恢复中…' : '恢复为草稿'}
+                    </Button>
+                  </article>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
       <AlertDialog
         open={revokeTarget !== null}
         onOpenChange={(open) => {

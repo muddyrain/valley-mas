@@ -115,17 +115,18 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
       )}
       <div
         className={cn(
-          'group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200',
-          selected && 'ring-2 ring-blue-500 ring-offset-2 ring-offset-white shadow-md',
-          !isRunnable &&
-            'border-amber-300 bg-amber-50/40 hover:border-amber-400 hover:bg-amber-50/60',
+          'group overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-all duration-200',
+          selected &&
+            'border-primary ring-2 ring-primary/30 ring-offset-2 ring-offset-background shadow-sm',
+          !isRunnable && 'border-amber-500/40 bg-amber-500/5',
           isConfigIncomplete &&
             !runningState &&
-            'border-orange-300 ring-2 ring-orange-200 ring-offset-2',
-          runningState === 'running' &&
-            'ring-2 ring-blue-400 ring-offset-2 shadow-blue-100 animate-pulse',
-          runningState === 'success' && 'ring-2 ring-green-400 ring-offset-2 shadow-green-100',
-          runningState === 'error' && 'ring-2 ring-red-400 ring-offset-2 shadow-red-100',
+            'border-destructive/50 ring-2 ring-destructive/15 ring-offset-2',
+          runningState === 'running' && 'border-primary ring-2 ring-primary/30 ring-offset-2',
+          runningState === 'success' &&
+            'border-emerald-600/50 ring-2 ring-emerald-500/20 ring-offset-2',
+          runningState === 'error' &&
+            'border-destructive/50 ring-2 ring-destructive/20 ring-offset-2',
         )}
       >
         <div className="flex items-center gap-3 px-4 py-3">
@@ -135,7 +136,7 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
           <div className="min-w-0 flex-1">
             <Tooltip>
               <TooltipTrigger render={<div className="flex items-center gap-2" />}>
-                <span className="truncate text-sm font-medium text-gray-800">{label}</span>
+                <span className="truncate text-sm font-medium text-foreground">{label}</span>
                 {isPlanNode && (
                   <Badge variant="outline" className="border-amber-300 text-amber-700">
                     计划中
@@ -156,10 +157,10 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
               </TooltipContent>
             </Tooltip>
             {!collapsed && summary && (
-              <span className="mt-0.5 block truncate text-xs text-gray-500">{summary}</span>
+              <span className="mt-0.5 block truncate text-xs text-muted-foreground">{summary}</span>
             )}
             {!collapsed && (hasInput || hasOutput) && (
-              <span className="mt-0.5 block truncate text-xs text-gray-400">
+              <span className="mt-0.5 block truncate text-xs text-muted-foreground/70">
                 {hasInput && '输入: 1 项'}
                 {hasInput && hasOutput && ' · '}
                 {hasOutput && '输出: 1 项'}

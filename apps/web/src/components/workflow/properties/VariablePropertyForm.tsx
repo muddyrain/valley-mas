@@ -10,7 +10,7 @@ interface VariablePropertyFormProps {
 
 export function VariablePropertyForm({ config, onUpdateConfig }: VariablePropertyFormProps) {
   return (
-    <Card className="m-4 border-border/50">
+    <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm">变量赋值配置</CardTitle>
       </CardHeader>
