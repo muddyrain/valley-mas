@@ -219,6 +219,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		fail(500, "AI_TOOL_REGISTRY_UNAVAILABLE", "加载智能体工具失败")
 		return
 	}
+	system = appendContentSearchDateContext(system, toolNames, time.Now())
 	client := aiclient.ARKClient(60 * time.Second)
 	if client == nil {
 		fail(http.StatusServiceUnavailable, "ARK_NOT_CONFIGURED", "AI 服务未配置")

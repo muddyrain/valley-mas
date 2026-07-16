@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -10,8 +11,11 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
+	"valley-server/internal/aiclient"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
 	"valley-server/internal/middleware"
@@ -47,11 +51,14 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		&model.AIAPIKeyAppBinding{},
 		&model.AIAPIKeyDailyUsage{},
 		&model.AIAppPublicInvocation{},
+		&model.AIUsageLog{},
 		&model.AIKnowledgeBase{},
 		&model.AIKnowledgeDocument{},
 		&model.AIKnowledgeChunk{},
 		&model.AIAppKnowledgeBase{},
 		&model.AIAppToolBinding{},
+		&model.Post{},
+		&model.Resource{},
 	); err != nil {
 		t.Fatalf("migrate ai platform: %v", err)
 	}
@@ -75,6 +82,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.Use(middleware.Auth(&config.Config{JWT: config.JWTConfig{Secret: aiPlatformTestSecret}}))
 	auth.POST("/apps/:appId/versions", SaveAIAppVersion)
 	auth.POST("/apps/:appId/restore", RestoreAIAppVersion)
+	auth.POST("/apps/:appId/debug", DebugAIApp)
 	auth.GET("/knowledge-bases/:knowledgeBaseId/documents", ListAIKnowledgeDocuments)
 	auth.POST("/knowledge-bases/:knowledgeBaseId/documents", UploadAIKnowledgeDocument)
 	auth.DELETE("/knowledge-bases/:knowledgeBaseId/documents/:documentId", DeleteAIKnowledgeDocument)
@@ -356,6 +364,157 @@ func TestResolveAIAppToolsReturnsOnlyBoundContentSearch(t *testing.T) {
 	}
 }
 
+func TestAppendContentSearchDateContext(t *testing.T) {
+	now := time.Date(2026, time.July, 15, 16, 5, 6, 0, time.UTC)
+	baseSystem := "仅根据私有资料回答。"
+
+	got := appendContentSearchDateContext(baseSystem, []string{"content.search"}, now)
+	want := baseSystem + "\n\n当前中国标准时间（CST，UTC+08:00）为 2026-07-16 00:05:06。调用 content.search 前，必须将用户的相对日期或未写年份、月份的日期换算为明确的 YYYY-MM-DD 日期范围后再调用工具。"
+	if got != want {
+		t.Fatalf("content.search system prompt = %q, want %q", got, want)
+	}
+
+	withoutSearch := appendContentSearchDateContext(baseSystem, []string{"blog.create_draft"}, now)
+	if withoutSearch != baseSystem {
+		t.Fatalf("system prompt without content.search = %q, want %q", withoutSearch, baseSystem)
+	}
+}
+
+func TestAIAppContentSearchDateContextReachesARKOnlyWhenBound(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	var (
+		requestMu sync.Mutex
+		systems   []string
+	)
+	arkServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Messages []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+			Stream bool `json:"stream"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("decode ARK request: %v", err)
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		for _, message := range payload.Messages {
+			if message.Role == "system" {
+				requestMu.Lock()
+				systems = append(systems, message.Content)
+				requestMu.Unlock()
+				break
+			}
+		}
+		if payload.Stream {
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"content\":\"integration reply\"}}]}\n\n"))
+			_, _ = w.Write([]byte("data: [DONE]\n\n"))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"model":"ep-test","choices":[{"message":{"role":"assistant","content":"integration reply"}}]}`))
+	}))
+	defer arkServer.Close()
+	t.Setenv("ARK_API_KEY", "test-ark-key")
+	t.Setenv("ARK_BASE_URL", arkServer.URL)
+	t.Setenv("ARK_TEXT_MODEL", "ep-test")
+	aiclient.ResetForTest()
+	t.Cleanup(aiclient.ResetForTest)
+
+	createAppVersion := func(name, system string, bindContentSearch bool) (model.AIApp, model.AIAppVersion) {
+		t.Helper()
+		app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: name}
+		if err := db.Create(&app).Error; err != nil {
+			t.Fatalf("create app: %v", err)
+		}
+		config, err := json.Marshal(map[string]string{"systemPrompt": system})
+		if err != nil {
+			t.Fatalf("marshal app config: %v", err)
+		}
+		version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: string(config), ToolSnapshot: true, KnowledgeBaseSnapshot: true}
+		if err := db.Create(&version).Error; err != nil {
+			t.Fatalf("create version: %v", err)
+		}
+		if bindContentSearch {
+			if err := db.Create(&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: "content.search"}).Error; err != nil {
+				t.Fatalf("bind content.search: %v", err)
+			}
+		}
+		if err := db.Model(&app).Update("draft_version_id", version.ID).Error; err != nil {
+			t.Fatalf("set draft version: %v", err)
+		}
+		return app, version
+	}
+	lastSystem := func() string {
+		t.Helper()
+		requestMu.Lock()
+		defer requestMu.Unlock()
+		if len(systems) == 0 {
+			t.Fatal("ARK request did not contain a system message")
+		}
+		return systems[len(systems)-1]
+	}
+	assertDateContext := func(system string) {
+		t.Helper()
+		if !strings.Contains(system, "当前中国标准时间") || !strings.Contains(system, "YYYY-MM-DD") {
+			t.Fatalf("system message missing content.search date context: %q", system)
+		}
+	}
+
+	conversationApp, _ := createAppVersion("私有会话日期助手", "private-conversation-system", true)
+	createRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+conversationApp.ID.String()+"/conversations", strings.NewReader(`{}`))
+	createRequest.Header.Set("Content-Type", "application/json")
+	createRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	createRecorder := httptest.NewRecorder()
+	router.ServeHTTP(createRecorder, createRequest)
+	if createRecorder.Code != http.StatusOK {
+		t.Fatalf("create conversation = %d body=%s", createRecorder.Code, createRecorder.Body.String())
+	}
+	var createPayload struct {
+		Data struct {
+			Conversation model.AIAppConversation `json:"conversation"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(createRecorder.Body.Bytes(), &createPayload); err != nil {
+		t.Fatalf("decode conversation: %v", err)
+	}
+	chatRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+conversationApp.ID.String()+"/conversations/"+createPayload.Data.Conversation.ID.String()+"/chat", strings.NewReader(`{"message":"今天发布了什么？"}`))
+	chatRequest.Header.Set("Content-Type", "application/json")
+	chatRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	chatRecorder := httptest.NewRecorder()
+	router.ServeHTTP(chatRecorder, chatRequest)
+	if chatRecorder.Code != http.StatusOK {
+		t.Fatalf("chat response = %d body=%s", chatRecorder.Code, chatRecorder.Body.String())
+	}
+	assertDateContext(lastSystem())
+
+	debugApp, _ := createAppVersion("调试日期助手", "debug-system", true)
+	debugRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+debugApp.ID.String()+"/debug", strings.NewReader(`{"message":"昨天写了什么？"}`))
+	debugRequest.Header.Set("Content-Type", "application/json")
+	debugRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	debugRecorder := httptest.NewRecorder()
+	router.ServeHTTP(debugRecorder, debugRequest)
+	if debugRecorder.Code != http.StatusOK {
+		t.Fatalf("debug response = %d body=%s", debugRecorder.Code, debugRecorder.Body.String())
+	}
+	assertDateContext(lastSystem())
+
+	unboundApp, _ := createAppVersion("无工具日期助手", "unbound-system", false)
+	unboundRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+unboundApp.ID.String()+"/debug", strings.NewReader(`{"message":"今天发布了什么？"}`))
+	unboundRequest.Header.Set("Content-Type", "application/json")
+	unboundRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	unboundRecorder := httptest.NewRecorder()
+	router.ServeHTTP(unboundRecorder, unboundRequest)
+	if unboundRecorder.Code != http.StatusOK {
+		t.Fatalf("unbound debug response = %d body=%s", unboundRecorder.Code, unboundRecorder.Body.String())
+	}
+	if system := lastSystem(); system != "unbound-system" {
+		t.Fatalf("unbound system message = %q, want %q", system, "unbound-system")
+	}
+}
+
 func TestCreateAIAppVersionSnapshotCopiesToolAllowlist(t *testing.T) {
 	_, db := setupAIPlatformTestRouter(t)
 	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "版本助手"}
@@ -445,6 +604,192 @@ func TestAIAppConversationIsOwnerScopedAndRetainsUserMessageOnConfigFailure(t *t
 	}
 	if len(messages) != 1 || messages[0].Role != "user" || messages[0].Content != "你好" {
 		t.Fatalf("unexpected messages: %#v", messages)
+	}
+}
+
+func TestAIAppConversationStreamsOwnerScopedToolTraceWithoutRawResults(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	var requestCount int
+	arkServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requestCount++
+		w.Header().Set("Content-Type", "text/event-stream")
+		if requestCount == 1 {
+			_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call-1\",\"type\":\"function\",\"function\":{\"name\":\"content.search\",\"arguments\":\"{\\\"query\\\":\\\"P8\\\"}\"}}]}}]}\n\n"))
+			_, _ = w.Write([]byte("data: [DONE]\n\n"))
+			return
+		}
+		_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"content\":\"已找到私有资料。\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer arkServer.Close()
+	t.Setenv("ARK_API_KEY", "test-ark-key")
+	t.Setenv("ARK_BASE_URL", arkServer.URL)
+	t.Setenv("ARK_TEXT_MODEL", "ep-test")
+	aiclient.ResetForTest()
+	t.Cleanup(aiclient.ResetForTest)
+
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "私有检索助手"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"仅回答自己的内容"}`, ToolSnapshot: true, KnowledgeBaseSnapshot: true}
+	if err := db.Create(&version).Error; err != nil {
+		t.Fatalf("create version: %v", err)
+	}
+	if err := db.Create(&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: "content.search"}).Error; err != nil {
+		t.Fatalf("create tool binding: %v", err)
+	}
+	if err := db.Model(&app).Update("draft_version_id", version.ID).Error; err != nil {
+		t.Fatalf("set draft version: %v", err)
+	}
+	if err := db.Create(&[]model.Post{
+		{AuthorID: 101, Title: "P8 私有资料", Slug: "owner-p8", Excerpt: "仅 owner 可见", Content: "P8 已完成"},
+		{AuthorID: 202, Title: "P8 他人资料", Slug: "foreign-p8", Excerpt: "不得泄露", Content: "secret"},
+	}).Error; err != nil {
+		t.Fatalf("seed posts: %v", err)
+	}
+
+	createRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations", strings.NewReader(`{}`))
+	createRequest.Header.Set("Content-Type", "application/json")
+	createRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	createRecorder := httptest.NewRecorder()
+	router.ServeHTTP(createRecorder, createRequest)
+	if createRecorder.Code != http.StatusOK {
+		t.Fatalf("create conversation = %d body=%s", createRecorder.Code, createRecorder.Body.String())
+	}
+	var createPayload struct {
+		Data struct {
+			Conversation model.AIAppConversation `json:"conversation"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(createRecorder.Body.Bytes(), &createPayload); err != nil {
+		t.Fatalf("decode conversation: %v", err)
+	}
+	conversation := createPayload.Data.Conversation
+
+	chatRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String()+"/chat", strings.NewReader(`{"message":"P8","stream":true}`))
+	chatRequest.Header.Set("Content-Type", "application/json")
+	chatRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	chatRecorder := httptest.NewRecorder()
+	router.ServeHTTP(chatRecorder, chatRequest)
+	if chatRecorder.Code != http.StatusOK {
+		t.Fatalf("chat response = %d body=%s", chatRecorder.Code, chatRecorder.Body.String())
+	}
+	if !strings.Contains(chatRecorder.Body.String(), `"type":"done"`) {
+		t.Fatalf("expected SSE done event, got %s", chatRecorder.Body.String())
+	}
+	if strings.Contains(chatRecorder.Body.String(), "不得泄露") || strings.Contains(chatRecorder.Body.String(), "secret") {
+		t.Fatalf("SSE leaked foreign tool result: %s", chatRecorder.Body.String())
+	}
+	var traces []model.AIAppConversationToolTrace
+	if err := db.Where("conversation_id = ?", conversation.ID).Find(&traces).Error; err != nil {
+		t.Fatalf("load traces: %v", err)
+	}
+	if len(traces) != 1 || traces[0].ToolName != "content.search" || traces[0].Status != "succeeded" {
+		t.Fatalf("unexpected safe tool trace: %#v", traces)
+	}
+	if requestCount != 2 {
+		t.Fatalf("ARK request count = %d, want 2", requestCount)
+	}
+}
+
+func TestAIAppConversationStreamsUpstreamFailureWithoutAssistantMessage(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	arkServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "upstream unavailable", http.StatusBadGateway)
+	}))
+	defer arkServer.Close()
+	t.Setenv("ARK_API_KEY", "test-ark-key")
+	t.Setenv("ARK_BASE_URL", arkServer.URL)
+	t.Setenv("ARK_TEXT_MODEL", "ep-test")
+	aiclient.ResetForTest()
+	t.Cleanup(aiclient.ResetForTest)
+
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "失败路径助手"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"test"}`, ToolSnapshot: true, KnowledgeBaseSnapshot: true}
+	if err := db.Create(&version).Error; err != nil {
+		t.Fatalf("create version: %v", err)
+	}
+	if err := db.Model(&app).Update("draft_version_id", version.ID).Error; err != nil {
+		t.Fatalf("set draft version: %v", err)
+	}
+	conversation := model.AIAppConversation{UserID: 101, AppID: app.ID, VersionID: version.ID}
+	if err := db.Create(&conversation).Error; err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String()+"/chat", strings.NewReader(`{"message":"测试失败","stream":true}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"type":"error"`) {
+		t.Fatalf("expected SSE error event, got code=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var run model.AIAppRun
+	if err := db.Where("conversation_id = ?", conversation.ID).First(&run).Error; err != nil {
+		t.Fatalf("load run: %v", err)
+	}
+	if run.Status != "failed" || run.ErrorCode != "AI_AGENT_RUN_FAILED" {
+		t.Fatalf("unexpected upstream failure run: %#v", run)
+	}
+	var messages []model.AIAppConversationMessage
+	if err := db.Where("conversation_id = ?", conversation.ID).Find(&messages).Error; err != nil {
+		t.Fatalf("load messages: %v", err)
+	}
+	if len(messages) != 1 || messages[0].Role != "user" {
+		t.Fatalf("upstream failure must retain only user message: %#v", messages)
+	}
+}
+
+func TestAIAppConversationCancellationWritesCancelledRunWithoutAssistantMessage(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	t.Setenv("ARK_API_KEY", "test-ark-key")
+	t.Setenv("ARK_TEXT_MODEL", "ep-test")
+	aiclient.ResetForTest()
+	t.Cleanup(aiclient.ResetForTest)
+
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "取消路径助手"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"test"}`, ToolSnapshot: true, KnowledgeBaseSnapshot: true}
+	if err := db.Create(&version).Error; err != nil {
+		t.Fatalf("create version: %v", err)
+	}
+	if err := db.Model(&app).Update("draft_version_id", version.ID).Error; err != nil {
+		t.Fatalf("set draft version: %v", err)
+	}
+	conversation := model.AIAppConversation{UserID: 101, AppID: app.ID, VersionID: version.ID}
+	if err := db.Create(&conversation).Error; err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	request := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String()+"/chat", strings.NewReader(`{"message":"测试取消","stream":true}`)).WithContext(ctx)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "会话生成已停止") {
+		t.Fatalf("expected cancelled SSE error event, got code=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var run model.AIAppRun
+	if err := db.Where("conversation_id = ?", conversation.ID).First(&run).Error; err != nil {
+		t.Fatalf("load run: %v", err)
+	}
+	if run.Status != "cancelled" || run.ErrorCode != "RUN_CANCELLED" {
+		t.Fatalf("unexpected cancelled run: %#v", run)
+	}
+	var messages []model.AIAppConversationMessage
+	if err := db.Where("conversation_id = ?", conversation.ID).Find(&messages).Error; err != nil {
+		t.Fatalf("load messages: %v", err)
+	}
+	if len(messages) != 1 || messages[0].Role != "user" {
+		t.Fatalf("cancellation must retain only user message: %#v", messages)
 	}
 }
 

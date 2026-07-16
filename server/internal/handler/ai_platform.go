@@ -536,6 +536,7 @@ func DebugAIApp(c *gin.Context) {
 		Error(c, http.StatusInternalServerError, "加载智能体工具失败")
 		return
 	}
+	system = appendContentSearchDateContext(system, toolNames, time.Now())
 	if len(toolNames) > 0 {
 		debugAIAppWithTools(c, payload.Stream, arkConfig.Model, system, message, app, version, userID, registry, toolNames, references, started)
 		return

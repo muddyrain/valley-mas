@@ -145,6 +145,56 @@ export interface AIAppTool {
   permission: 'read' | 'write';
 }
 
+type AIAppSSEEvent = {
+  type?: string;
+  chunk?: string;
+  toolName?: string;
+  ok?: boolean;
+  durationMs?: number;
+  message?: string;
+  run?: AIAppRun;
+  reply?: string;
+  conversation?: AIAppConversation;
+  userMessage?: AIAppConversationMessage;
+  assistantMessage?: AIAppConversationMessage;
+  references?: AIKnowledgeReference[];
+};
+
+async function consumeAIAppSSE(
+  response: Response,
+  onEvent: (event: AIAppSSEEvent) => void,
+): Promise<boolean> {
+  const reader = response.body?.getReader();
+  if (!reader) return false;
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  const consumeRecords = (flush: boolean) => {
+    const records = buffer.split('\n\n');
+    buffer = flush ? '' : records.pop() || '';
+    for (const record of records) {
+      const line = record.split('\n').find((item) => item.startsWith('data: '));
+      if (!line) continue;
+      try {
+        onEvent(JSON.parse(line.slice(6)) as AIAppSSEEvent);
+      } catch {
+        /* Ignore malformed partial events. */
+      }
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      buffer += decoder.decode();
+      if (buffer) consumeRecords(true);
+      return true;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    consumeRecords(false);
+  }
+}
+
 export function listAIApps(): Promise<{ list: AIApp[] }> {
   return request.get('/ai/apps');
 }
@@ -220,45 +270,18 @@ export async function streamDebugAIApp(
     }
     return;
   }
-  const reader = response.body?.getReader();
-  if (!reader) {
-    handlers.onError('无法读取调试响应');
-    return;
-  }
-  const decoder = new TextDecoder();
-  let buffer = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const records = buffer.split('\n\n');
-    buffer = records.pop() || '';
-    for (const record of records) {
-      const line = record.split('\n').find((item) => item.startsWith('data: '));
-      if (!line) continue;
-      try {
-        const event = JSON.parse(line.slice(6)) as {
-          type?: string;
-          chunk?: string;
-          toolName?: string;
-          ok?: boolean;
-          message?: string;
-          run?: AIAppRun;
-          reply?: string;
-          references?: AIKnowledgeReference[];
-        };
-        if (event.type === 'delta' && event.chunk) handlers.onDelta(event.chunk);
-        if (event.type === 'tool_call' && event.toolName) handlers.onToolCall?.(event.toolName);
-        if (event.type === 'tool_result' && event.toolName)
-          handlers.onToolResult?.(event.toolName, event.ok === true);
-        if (event.type === 'error') handlers.onError(event.message || '调试运行失败', event.run);
-        if (event.type === 'done' && event.run) {
-          handlers.onDone(event.run, event.reply || '', event.references || []);
-        }
-      } catch {
-        /* Ignore malformed partial events. */
-      }
+  const read = await consumeAIAppSSE(response, (event) => {
+    if (event.type === 'delta' && event.chunk) handlers.onDelta(event.chunk);
+    if (event.type === 'tool_call' && event.toolName) handlers.onToolCall?.(event.toolName);
+    if (event.type === 'tool_result' && event.toolName)
+      handlers.onToolResult?.(event.toolName, event.ok === true);
+    if (event.type === 'error') handlers.onError(event.message || '调试运行失败', event.run);
+    if (event.type === 'done' && event.run) {
+      handlers.onDone(event.run, event.reply || '', event.references || []);
     }
+  });
+  if (!read) {
+    handlers.onError('无法读取调试响应');
   }
 }
 
@@ -331,60 +354,30 @@ export async function streamAIAppConversation(
     }
     return;
   }
-  const reader = response.body?.getReader();
-  if (!reader) {
-    handlers.onError('无法读取会话响应');
-    return;
-  }
-  const decoder = new TextDecoder();
-  let buffer = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const records = buffer.split('\n\n');
-    buffer = records.pop() || '';
-    for (const record of records) {
-      const line = record.split('\n').find((item) => item.startsWith('data: '));
-      if (!line) continue;
-      try {
-        const event = JSON.parse(line.slice(6)) as {
-          type?: string;
-          chunk?: string;
-          toolName?: string;
-          ok?: boolean;
-          durationMs?: number;
-          message?: string;
-          run?: AIAppRun;
-          conversation?: AIAppConversation;
-          userMessage?: AIAppConversationMessage;
-          assistantMessage?: AIAppConversationMessage;
-          references?: AIKnowledgeReference[];
-        };
-        if (event.type === 'delta' && event.chunk) handlers.onDelta(event.chunk);
-        if (event.type === 'tool_call' && event.toolName) handlers.onToolCall?.(event.toolName);
-        if (event.type === 'tool_result' && event.toolName)
-          handlers.onToolResult?.(event.toolName, event.ok === true, event.durationMs || 0);
-        if (event.type === 'error') handlers.onError(event.message || '会话发送失败');
-        if (
-          event.type === 'done' &&
-          event.run &&
-          event.conversation &&
-          event.userMessage &&
-          event.assistantMessage
-        ) {
-          handlers.onDone({
-            run: event.run,
-            conversation: event.conversation,
-            userMessage: event.userMessage,
-            assistantMessage: event.assistantMessage,
-            references: event.references || [],
-          });
-        }
-      } catch {
-        /* Ignore malformed partial events. */
-      }
+  const read = await consumeAIAppSSE(response, (event) => {
+    if (event.type === 'delta' && event.chunk) handlers.onDelta(event.chunk);
+    if (event.type === 'tool_call' && event.toolName) handlers.onToolCall?.(event.toolName);
+    if (event.type === 'tool_result' && event.toolName)
+      handlers.onToolResult?.(event.toolName, event.ok === true, event.durationMs || 0);
+    if (event.type === 'error') handlers.onError(event.message || '会话发送失败');
+    if (
+      event.type === 'done' &&
+      event.run &&
+      event.conversation &&
+      event.userMessage &&
+      event.assistantMessage
+    ) {
+      handlers.onDone({
+        run: event.run,
+        conversation: event.conversation,
+        userMessage: event.userMessage,
+        assistantMessage: event.assistantMessage,
+        references: event.references || [],
+      });
     }
+  });
+  if (!read) {
+    handlers.onError('无法读取会话响应');
   }
 }
 

@@ -9,6 +9,7 @@
     "lint": "biome lint src/",
     "format": "biome format --write src/",
     "check": "biome check src/",
+    "test:ai-workbench-sse": "node scripts/test-ai-workbench-sse.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist"
   },
