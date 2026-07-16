@@ -44,11 +44,8 @@ export function NodeRunInspector({ snapshot }: { snapshot: NodeRunSnapshot }) {
   const isRunning = snapshot.status === 'running';
   const isError = snapshot.status === 'error';
   return (
-    <div
-      className="nodrag nopan absolute left-0 top-full z-20 mt-2 w-[320px] rounded-xl border border-border bg-popover p-3 shadow-xl"
-      onClick={(event) => event.stopPropagation()}
-    >
-      <div className="mb-3 flex items-center gap-2">
+    <div className="space-y-4 p-4">
+      <div className="flex items-center gap-2">
         {isRunning ? (
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
         ) : isError ? (
@@ -69,7 +66,7 @@ export function NodeRunInspector({ snapshot }: { snapshot: NodeRunSnapshot }) {
       {isRunning && !snapshot.output && (
         <p className="text-xs text-muted-foreground">节点正在执行，等待可展示的输出。</p>
       )}
-      <div className="space-y-3">
+      <div className="space-y-4">
         <PreviewSection title="输入" value={snapshot.input} />
         <PreviewSection title="输出" value={snapshot.output} />
         {snapshot.error && (

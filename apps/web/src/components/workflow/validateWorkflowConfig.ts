@@ -1,5 +1,9 @@
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import { NODE_CONFIGS } from './nodeConfig';
+import {
+  getInvalidWorkflowVariableTokens,
+  getUpstreamWorkflowVariables,
+} from './workflowVariables';
 
 export interface ValidationError {
   nodeId: string;
@@ -13,7 +17,42 @@ interface NodeData {
   config?: Record<string, unknown>;
 }
 
-function validateNodeData(nodeId: string, data: NodeData): ValidationError | null {
+function hasInvalidVariableReferences(node: Node, nodes: Node[], edges: Edge[], values: unknown[]) {
+  const options = getUpstreamWorkflowVariables(nodes, edges, node.id);
+  return values.some(
+    (value) =>
+      typeof value === 'string' && getInvalidWorkflowVariableTokens(value, options).length > 0,
+  );
+}
+
+function getVariableReferenceValues(nodeType: string, config: Record<string, unknown>): unknown[] {
+  switch (nodeType) {
+    case 'blog.parseMarkdown':
+      return [config.fileInput];
+    case 'knowledge.retrieve':
+      return [config.query];
+    case 'llm.text':
+      return [config.systemPrompt, config.prompt];
+    case 'blog.createDraft':
+      return [
+        config.title,
+        config.content,
+        config.excerpt,
+        config.cover,
+        config.tags,
+        config.suggestedTags,
+        config.visibility,
+      ];
+    case 'end':
+      return Object.values((config.outputs as Record<string, unknown>) || {});
+    default:
+      return [];
+  }
+}
+
+function validateNodeData(node: Node, nodes: Node[], edges: Edge[]): ValidationError | null {
+  const nodeId = node.id;
+  const data = node.data as unknown as NodeData;
   const config = data.config || {};
   const nodeConfig = NODE_CONFIGS[data.nodeType];
   if (!nodeConfig) {
@@ -156,16 +195,37 @@ function validateNodeData(nodeId: string, data: NodeData): ValidationError | nul
       }
       break;
   }
+
+  if (
+    nodes.some((candidate) => candidate.id === node.id) &&
+    hasInvalidVariableReferences(
+      node,
+      nodes,
+      edges,
+      getVariableReferenceValues(data.nodeType, config),
+    )
+  )
+    return {
+      nodeId,
+      nodeLabel: data.label,
+      nodeType: data.nodeType,
+      message: '变量引用必须来自上游节点输出',
+    };
+
   return null;
 }
 
-export function validateWorkflowConfig(nodes: Node[]): ValidationError[] {
+export function validateWorkflowConfig(nodes: Node[], edges: Edge[] = []): ValidationError[] {
   return nodes
-    .map((node) => validateNodeData(node.id, node.data as unknown as NodeData))
+    .map((node) => validateNodeData(node, nodes, edges))
     .filter((error): error is ValidationError => error !== null);
 }
 export function validateSingleNode(data: NodeData): ValidationError | null {
-  return validateNodeData('temp', data);
+  return validateNodeData(
+    { id: 'temp', data: data as unknown as Record<string, unknown>, position: { x: 0, y: 0 } },
+    [],
+    [],
+  );
 }
 export function hasUnconfiguredNodes(nodes: Node[]): boolean {
   return validateWorkflowConfig(nodes).length > 0;

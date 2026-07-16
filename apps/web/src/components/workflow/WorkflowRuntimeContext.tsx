@@ -3,7 +3,6 @@ import type { WorkflowRunSession } from './runSession';
 
 interface WorkflowRuntimeContextValue {
   session: WorkflowRunSession;
-  toggleNodeResult: (nodeId: string) => void;
   copyNode: (nodeId: string) => void;
   deleteNode: (nodeId: string) => void;
 }

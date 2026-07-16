@@ -22,7 +22,6 @@ import '@xyflow/react/dist/style.css';
 import {
   ArrowLeft,
   CheckSquare,
-  ChevronDown,
   Clipboard,
   Copy,
   Database,
@@ -74,19 +73,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { KnowledgeBaseBindings } from '@/components/workbench/KnowledgeBaseBindings';
 import { NodePanel } from '@/components/workflow/NodePanel';
 import { NODE_CONFIGS } from '@/components/workflow/nodeConfig';
-import { PropertyPanel } from '@/components/workflow/PropertyPanel';
+import { PropertyPanel, type PropertyPanelTab } from '@/components/workflow/PropertyPanel';
 import type { WorkflowRunInput } from '@/components/workflow/RunPanel';
 import { RunPanel } from '@/components/workflow/RunPanel';
 import {
   createWorkflowRunSession,
   workflowRunSessionReducer,
 } from '@/components/workflow/runSession';
-import { normalizePhaseOneStartInputs } from '@/components/workflow/types';
 import { useWorkflowHistory } from '@/components/workflow/useWorkflowHistory';
 import { validateWorkflowConfig } from '@/components/workflow/validateWorkflowConfig';
 import { WorkflowNode } from '@/components/workflow/WorkflowNode';
 import { WorkflowRuntimeProvider } from '@/components/workflow/WorkflowRuntimeContext';
-import { getWorkflowTemplate, isTemplateSupported } from '../workflowTemplates';
+import {
+  normalizeWorkflowEdges,
+  serializeWorkflowGraph,
+} from '@/components/workflow/workflowGraph';
 
 const defaultEdgeOptions = {
   type: 'smoothstep',
@@ -100,212 +101,23 @@ const defaultEdgeOptions = {
   },
 };
 
-const blogImportTemplate = {
-  schemaVersion: 2,
-  nodes: [
-    {
-      id: 'start',
-      type: 'start',
-      position: { x: 50, y: 250 },
-      data: {
-        label: '开始',
-        nodeType: 'start',
-        config: {
-          inputs: {
-            markdownFile: { type: 'file', required: true },
-            tagIds: { type: 'string[]', required: false },
-            groupId: { type: 'string', required: false },
-            visibility: { type: 'string', required: true },
-          },
-        },
-      },
-    },
-    {
-      id: 'parse-markdown',
-      type: 'blog.parseMarkdown',
-      position: { x: 330, y: 250 },
-      data: {
-        label: '解析 Markdown',
-        nodeType: 'blog.parseMarkdown',
-        config: { fileInput: '{{start.output.markdownFile}}' },
-      },
-    },
-    {
-      id: 'llm-summary',
-      type: 'llm.text',
-      position: { x: 610, y: 250 },
-      data: {
-        label: '生成摘要',
-        nodeType: 'llm.text',
-        config: {
-          modelProfile: 'ark-text-default',
-          systemPrompt: '你是内容编辑助手。请基于 Markdown 正文生成一句简洁、准确的博客摘要。',
-          prompt:
-            '标题：{{parse-markdown.output.title}}\n\n正文：{{parse-markdown.output.content}}',
-          temperature: 0.4,
-          maxOutputTokens: 512,
-        },
-      },
-    },
-    {
-      id: 'create-draft',
-      type: 'blog.createDraft',
-      position: { x: 900, y: 250 },
-      data: {
-        label: '创建博客草稿',
-        nodeType: 'blog.createDraft',
-        config: {
-          title: '{{parse-markdown.output.title}}',
-          content: '{{parse-markdown.output.content}}',
-          excerpt: '{{llm-summary.output.text}}',
-          cover: '{{parse-markdown.output.cover}}',
-          tags: '{{start.output.tagIds}}',
-          suggestedTags: '{{parse-markdown.output.tagNames}}',
-          tagMode: 'merge',
-          visibility: '{{start.output.visibility}}',
-        },
-      },
-    },
-    {
-      id: 'end',
-      type: 'end',
-      position: { x: 1190, y: 250 },
-      data: {
-        label: '结束',
-        nodeType: 'end',
-        config: {
-          outputs: {
-            postId: '{{create-draft.output.postId}}',
-            title: '{{create-draft.output.title}}',
-            editPath: '{{create-draft.output.editPath}}',
-            tagIds: '{{create-draft.output.tagIds}}',
-          },
-        },
-      },
-    },
-  ],
-  edges: [
-    { id: 'start-parse', source: 'start', sourceHandle: 'output', target: 'parse-markdown' },
-    {
-      id: 'parse-llm',
-      source: 'parse-markdown',
-      sourceHandle: 'output',
-      target: 'llm-summary',
-    },
-    {
-      id: 'llm-draft',
-      source: 'llm-summary',
-      sourceHandle: 'output',
-      target: 'create-draft',
-    },
-    { id: 'draft-end', source: 'create-draft', sourceHandle: 'output', target: 'end' },
-  ],
-};
-
-const topicDraftTemplate = {
-  schemaVersion: 2,
-  nodes: [
-    {
-      id: 'start',
-      type: 'start',
-      position: { x: 50, y: 250 },
-      data: {
-        label: '开始',
-        nodeType: 'start',
-        config: {
-          inputs: {
-            topic: { type: 'string', required: true },
-            audience: { type: 'string', required: false },
-            style: { type: 'string', required: false },
-            tagIds: { type: 'string[]', required: false },
-            visibility: { type: 'string', required: true },
-          },
-        },
-      },
-    },
-    {
-      id: 'knowledge',
-      type: 'knowledge.retrieve',
-      position: { x: 330, y: 250 },
-      data: {
-        label: '检索知识库',
-        nodeType: 'knowledge.retrieve',
-        config: { query: '{{start.output.topic}}' },
-      },
-    },
-    {
-      id: 'writer',
-      type: 'llm.text',
-      position: { x: 610, y: 250 },
-      data: {
-        label: '生成正文',
-        nodeType: 'llm.text',
-        config: {
-          modelProfile: 'ark-text-default',
-          systemPrompt: '你是内容编辑。基于参考资料写出准确、易读的博客正文；资料不足时明确说明。',
-          prompt:
-            '主题：{{start.output.topic}}\n受众：{{start.output.audience}}\n风格：{{start.output.style}}\n\n参考资料：\n{{knowledge.output.context}}',
-          temperature: 0.6,
-          maxOutputTokens: 1200,
-        },
-      },
-    },
-    {
-      id: 'create-draft',
-      type: 'blog.createDraft',
-      position: { x: 900, y: 250 },
-      data: {
-        label: '创建博客草稿',
-        nodeType: 'blog.createDraft',
-        config: {
-          title: '{{start.output.topic}}',
-          content: '{{writer.output.text}}',
-          tags: '{{start.output.tagIds}}',
-          tagMode: 'manual_only',
-          visibility: '{{start.output.visibility}}',
-        },
-      },
-    },
-    {
-      id: 'end',
-      type: 'end',
-      position: { x: 1190, y: 250 },
-      data: {
-        label: '结束',
-        nodeType: 'end',
-        config: {
-          outputs: {
-            postId: '{{create-draft.output.postId}}',
-            title: '{{create-draft.output.title}}',
-            editPath: '{{create-draft.output.editPath}}',
-          },
-        },
-      },
-    },
-  ],
-  edges: [
-    { id: 'start-knowledge', source: 'start', sourceHandle: 'output', target: 'knowledge' },
-    { id: 'knowledge-writer', source: 'knowledge', sourceHandle: 'output', target: 'writer' },
-    { id: 'writer-draft', source: 'writer', sourceHandle: 'output', target: 'create-draft' },
-    { id: 'draft-end', source: 'create-draft', sourceHandle: 'output', target: 'end' },
-  ],
-};
-
-function normalizeWorkflowEdges(edges: Edge[]): Edge[] {
-  return edges.map((edge, index) => {
-    const sourceHandle = edge.sourceHandle || 'output';
-    const targetHandleKey = edge.targetHandle || 'default-target';
-    return {
-      ...edge,
-      id: edge.id || `${edge.source}-${sourceHandle}-${edge.target}-${targetHandleKey}-${index}`,
-      sourceHandle,
-    };
-  });
-}
-
 const workflowNodeTypes = Object.fromEntries(
   Object.keys(NODE_CONFIGS).map((type) => [type, WorkflowNode]),
 );
+
+type SaveStatus = 'idle' | 'creating' | 'saving' | 'saved' | 'error';
+
+interface WorkflowSnapshot {
+  name: string;
+  graph: string;
+  revision: number;
+}
+
+interface WorkflowEditorState {
+  name: string;
+  nodes: Node[];
+  edges: Edge[];
+}
 
 export default function WorkflowEditorPage() {
   const [searchParams] = useSearchParams();
@@ -317,10 +129,12 @@ export default function WorkflowEditorPage() {
     type: string;
     data: { label: string; nodeType: string; config?: Record<string, unknown> };
   } | null>(null);
+  const [activePropertyTab, setActivePropertyTab] = useState<PropertyPanelTab>('config');
   const [workflowName, setWorkflowName] = useState('未命名工作流');
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [saveRevision, setSaveRevision] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [showRunPanel, setShowRunPanel] = useState(false);
   const [runSession, dispatchRunSession] = useReducer(
@@ -351,7 +165,28 @@ export default function WorkflowEditorPage() {
   const isFitViewComplete = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const runGenerationRef = useRef(0);
+  const handledFailedNodeRef = useRef<string | null>(null);
   const clipboardRef = useRef<Node[] | null>(null);
+  const workflowIdRef = useRef<string | null>(null);
+  const workflowStateRef = useRef<WorkflowEditorState>({
+    name: '未命名工作流',
+    nodes: [],
+    edges: [],
+  });
+  const workflowSnapshotRef = useRef<WorkflowSnapshot>({
+    name: '未命名工作流',
+    graph: serializeWorkflowGraph([], []),
+    revision: 0,
+  });
+  const saveRevisionRef = useRef(0);
+  const persistedRevisionRef = useRef(0);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const createPromiseRef = useRef<Promise<boolean> | null>(null);
+  const pendingCreatedWorkflowIdRef = useRef<string | null>(null);
+  const historyMutationRef = useRef(false);
+  const editorSessionRef = useRef(0);
+  const activeRouteKeyRef = useRef<string | null>(null);
+  const isEditorMountedRef = useRef(false);
   const { undo, redo, canUndo, canRedo, clearHistory } = useWorkflowHistory(
     nodes,
     edges,
@@ -359,14 +194,38 @@ export default function WorkflowEditorPage() {
     setEdges,
   );
 
-  const refreshWorkflowMeta = useCallback(async (id: string) => {
-    const [nextPlatform, nextRuns] = await Promise.all([
-      getWorkflowPlatform(id),
-      listWorkflowRuns(id, { page: 1, pageSize: 10 }),
-    ]);
-    setPlatform(nextPlatform);
-    setRuns(nextRuns.list);
+  useEffect(() => {
+    isEditorMountedRef.current = true;
+    return () => {
+      isEditorMountedRef.current = false;
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+      runGenerationRef.current += 1;
+    };
   }, []);
+
+  const isActiveWorkflowSession = useCallback(
+    (session: number, id: string) =>
+      isEditorMountedRef.current &&
+      editorSessionRef.current === session &&
+      workflowIdRef.current === id,
+    [],
+  );
+
+  const refreshWorkflowMeta = useCallback(
+    async (id: string) => {
+      const session = editorSessionRef.current;
+      if (!isActiveWorkflowSession(session, id)) return;
+      const [nextPlatform, nextRuns] = await Promise.all([
+        getWorkflowPlatform(id),
+        listWorkflowRuns(id, { page: 1, pageSize: 10 }),
+      ]);
+      if (!isActiveWorkflowSession(session, id)) return;
+      setPlatform(nextPlatform);
+      setRuns(nextRuns.list);
+    },
+    [isActiveWorkflowSession],
+  );
 
   useEffect(() => {
     if (!workflowId) return;
@@ -375,7 +234,9 @@ export default function WorkflowEditorPage() {
 
   const openKnowledgeBaseBindings = useCallback(async () => {
     const appID = platform?.app.id;
-    if (!appID) return;
+    const id = workflowIdRef.current;
+    const session = editorSessionRef.current;
+    if (!appID || !id || !isActiveWorkflowSession(session, id)) return;
     setShowKnowledgeBases(true);
     try {
       setLoadingKnowledgeBases(true);
@@ -383,33 +244,40 @@ export default function WorkflowEditorPage() {
         listAIKnowledgeBases(),
         listAIAppKnowledgeBases(appID),
       ]);
+      if (!isActiveWorkflowSession(session, id)) return;
       setKnowledgeBases(allKnowledgeBases.list);
       setBoundKnowledgeBaseIDs(bindings.list.map((knowledgeBase) => knowledgeBase.id));
     } catch (error) {
+      if (!isActiveWorkflowSession(session, id)) return;
       setShowKnowledgeBases(false);
       toast.error(getAPIErrorMessage(error, '加载资料库失败'));
     } finally {
-      setLoadingKnowledgeBases(false);
+      if (isActiveWorkflowSession(session, id)) setLoadingKnowledgeBases(false);
     }
-  }, [platform?.app.id]);
+  }, [isActiveWorkflowSession, platform?.app.id]);
 
   const updateKnowledgeBaseBindings = useCallback(
     async (knowledgeBaseIDs: string[]) => {
       const appID = platform?.app.id;
-      if (!appID) return;
+      const id = workflowIdRef.current;
+      const session = editorSessionRef.current;
+      if (!appID || !id || !isActiveWorkflowSession(session, id)) return;
       try {
         setSavingKnowledgeBases(true);
         const result = await replaceAIAppKnowledgeBases(appID, knowledgeBaseIDs);
+        if (!isActiveWorkflowSession(session, id)) return;
         setBoundKnowledgeBaseIDs(result.knowledgeBaseIds);
-        if (workflowId) await refreshWorkflowMeta(workflowId);
+        await refreshWorkflowMeta(id);
+        if (!isActiveWorkflowSession(session, id)) return;
         toast.success('资料库已更新，后续运行将使用新的草稿版本');
       } catch (error) {
+        if (!isActiveWorkflowSession(session, id)) return;
         toast.error(getAPIErrorMessage(error, '更新资料库失败'));
       } finally {
-        setSavingKnowledgeBases(false);
+        if (isActiveWorkflowSession(session, id)) setSavingKnowledgeBases(false);
       }
     },
-    [platform?.app.id, refreshWorkflowMeta, workflowId],
+    [isActiveWorkflowSession, platform?.app.id, refreshWorkflowMeta],
   );
 
   const applyBlankWorkflow = useCallback(() => {
@@ -424,16 +292,249 @@ export default function WorkflowEditorPage() {
     setEdges([]);
   }, []);
 
-  // 从 URL 获取工作流 ID 或模板
+  useEffect(() => {
+    workflowIdRef.current = workflowId;
+  }, [workflowId]);
+
+  useEffect(() => {
+    const currentState = { name: workflowName, nodes, edges };
+    workflowStateRef.current = currentState;
+    if (saveRevisionRef.current === persistedRevisionRef.current) {
+      workflowSnapshotRef.current = {
+        name: currentState.name,
+        graph: serializeWorkflowGraph(currentState.nodes, currentState.edges),
+        revision: saveRevisionRef.current,
+      };
+    }
+  }, [edges, nodes, workflowName]);
+
+  const markWorkflowDirty = useCallback((updates: Partial<WorkflowEditorState> = {}) => {
+    const nextState = { ...workflowStateRef.current, ...updates };
+    workflowStateRef.current = nextState;
+    saveRevisionRef.current += 1;
+    workflowSnapshotRef.current = {
+      name: nextState.name,
+      graph: serializeWorkflowGraph(nextState.nodes, nextState.edges),
+      revision: saveRevisionRef.current,
+    };
+    setSaveRevision(saveRevisionRef.current);
+  }, []);
+
+  const handleWorkflowNameChange = useCallback(
+    (name: string) => {
+      setWorkflowName(name);
+      markWorkflowDirty({ name });
+    },
+    [markWorkflowDirty],
+  );
+
+  useEffect(() => {
+    if (!historyMutationRef.current) return;
+    historyMutationRef.current = false;
+    markWorkflowDirty({ name: workflowName, nodes, edges });
+  }, [edges, markWorkflowDirty, nodes, workflowName]);
+
+  const handleUndo = useCallback(() => {
+    if (!canUndo) return;
+    historyMutationRef.current = true;
+    undo();
+  }, [canUndo, undo]);
+
+  const handleRedo = useCallback(() => {
+    if (!canRedo) return;
+    historyMutationRef.current = true;
+    redo();
+  }, [canRedo, redo]);
+
+  const finishCreatedWorkflow = useCallback(
+    (id: string, session: number) => {
+      if (
+        !isEditorMountedRef.current ||
+        editorSessionRef.current !== session ||
+        workflowIdRef.current !== id
+      )
+        return;
+      if (pendingCreatedWorkflowIdRef.current !== id) return;
+      pendingCreatedWorkflowIdRef.current = null;
+      setWorkflowId(id);
+      setSaveStatus('saved');
+      navigate(`/workbench/edit?id=${id}`, { replace: true });
+    },
+    [navigate],
+  );
+
+  const enqueueWorkflowUpdate = useCallback(
+    async (force = false): Promise<boolean> => {
+      const session = editorSessionRef.current;
+      const id = workflowIdRef.current;
+      if (!id) return false;
+      const queuedUpdate = saveQueueRef.current.then(async () => {
+        if (
+          !isEditorMountedRef.current ||
+          editorSessionRef.current !== session ||
+          workflowIdRef.current !== id
+        )
+          return false;
+
+        setSaveStatus('saving');
+        let shouldForce = force;
+        try {
+          while (
+            shouldForce ||
+            workflowSnapshotRef.current.revision > persistedRevisionRef.current
+          ) {
+            const snapshot = workflowSnapshotRef.current;
+            await updateWorkflow(id, { name: snapshot.name, graph: snapshot.graph });
+            if (
+              !isEditorMountedRef.current ||
+              editorSessionRef.current !== session ||
+              workflowIdRef.current !== id
+            )
+              return false;
+            persistedRevisionRef.current = snapshot.revision;
+            shouldForce = false;
+          }
+          if (
+            !isEditorMountedRef.current ||
+            editorSessionRef.current !== session ||
+            workflowIdRef.current !== id
+          )
+            return false;
+          setSaveStatus('saved');
+          finishCreatedWorkflow(id, session);
+          return true;
+        } catch {
+          if (
+            !isEditorMountedRef.current ||
+            editorSessionRef.current !== session ||
+            workflowIdRef.current !== id
+          )
+            return false;
+          setSaveStatus('error');
+          toast.error('保存失败');
+          return false;
+        }
+      });
+
+      saveQueueRef.current = queuedUpdate.then(
+        () => undefined,
+        () => undefined,
+      );
+      return queuedUpdate;
+    },
+    [finishCreatedWorkflow],
+  );
+
+  const createDraftWorkflow = useCallback(
+    async (snapshot: WorkflowSnapshot): Promise<boolean> => {
+      if (createPromiseRef.current) return createPromiseRef.current;
+      const session = editorSessionRef.current;
+
+      const createPromise = (async () => {
+        setSaveStatus('creating');
+        try {
+          const result = await createWorkflow({
+            name: snapshot.name,
+            graph: snapshot.graph,
+            status: 'draft',
+          });
+          if (!isEditorMountedRef.current || editorSessionRef.current !== session) return false;
+          workflowIdRef.current = result.id;
+          pendingCreatedWorkflowIdRef.current = result.id;
+          persistedRevisionRef.current = snapshot.revision;
+
+          const saved = await enqueueWorkflowUpdate();
+          if (!saved) return false;
+          finishCreatedWorkflow(result.id, session);
+          return true;
+        } catch {
+          if (!isEditorMountedRef.current || editorSessionRef.current !== session) return false;
+          setSaveStatus('error');
+          toast.error('保存失败');
+          return false;
+        } finally {
+          if (editorSessionRef.current === session) createPromiseRef.current = null;
+        }
+      })();
+
+      createPromiseRef.current = createPromise;
+      return createPromise;
+    },
+    [enqueueWorkflowUpdate, finishCreatedWorkflow],
+  );
+
+  const persistLatestWorkflow = useCallback(
+    async ({ force = false, createIfMissing = false } = {}): Promise<boolean> => {
+      if (workflowIdRef.current) return enqueueWorkflowUpdate(force);
+      if (!createIfMissing) return false;
+      return createDraftWorkflow({
+        ...workflowSnapshotRef.current,
+        revision: saveRevisionRef.current,
+      });
+    },
+    [createDraftWorkflow, enqueueWorkflowUpdate],
+  );
+
+  useEffect(() => {
+    if (!workflowId || saveRevision === 0 || saveRevision <= persistedRevisionRef.current) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void persistLatestWorkflow();
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [persistLatestWorkflow, saveRevision, workflowId]);
+
+  // 模板只能在详情页复制；编辑器只加载既有工作流或空白草稿。
   useEffect(() => {
     const id = searchParams.get('id');
     const template = searchParams.get('template');
-    const templateConfig = getWorkflowTemplate(template || '');
-    const isSupportedTemplate = templateConfig ? isTemplateSupported(templateConfig.id) : false;
+    if (template) {
+      navigate(`/workbench/templates/${encodeURIComponent(template)}`, { replace: true });
+      return;
+    }
 
+    const routeKey = id || '';
+    if (activeRouteKeyRef.current !== routeKey) {
+      activeRouteKeyRef.current = routeKey;
+      editorSessionRef.current += 1;
+      workflowIdRef.current = null;
+      pendingCreatedWorkflowIdRef.current = null;
+      persistedRevisionRef.current = 0;
+      saveRevisionRef.current = 0;
+      saveQueueRef.current = Promise.resolve();
+      createPromiseRef.current = null;
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+      runGenerationRef.current += 1;
+      workflowSnapshotRef.current = {
+        name: '未命名工作流',
+        graph: serializeWorkflowGraph([], []),
+        revision: 0,
+      };
+      setWorkflowId(null);
+      setSaveRevision(0);
+      setSaveStatus('idle');
+      setIsRunning(false);
+      setRunError(null);
+      setPlatform(null);
+      setRuns([]);
+      setRunDetail(null);
+      setKnowledgeBases([]);
+      setBoundKnowledgeBaseIDs([]);
+    }
+    const session = editorSessionRef.current;
     if (id) {
+      pendingCreatedWorkflowIdRef.current = null;
+      setSaveStatus('idle');
       getWorkflow(id)
         .then((data) => {
+          if (!isEditorMountedRef.current || editorSessionRef.current !== session) return;
+          workflowIdRef.current = id;
+          saveRevisionRef.current = 0;
+          persistedRevisionRef.current = 0;
+          setSaveRevision(0);
           setWorkflowId(id);
           setWorkflowName(data.name);
           try {
@@ -459,27 +560,19 @@ export default function WorkflowEditorPage() {
           } catch {
             // invalid graph
           }
+          setSaveStatus('saved');
         })
         .catch(() => {
+          if (!isEditorMountedRef.current || editorSessionRef.current !== session) return;
+          setSaveStatus('error');
           toast.error('加载工作流失败');
         });
-    } else if (templateConfig?.id === 'blog-import' || templateConfig?.id === 'content-generate') {
-      const workflowTemplate =
-        templateConfig.id === 'blog-import' ? blogImportTemplate : topicDraftTemplate;
-      setNodes(workflowTemplate.nodes as Node[]);
-      setEdges(workflowTemplate.edges as Edge[]);
-      clearHistory();
-    } else if (template) {
-      if (!isSupportedTemplate) {
-        toast.info(`模板「${template}」尚未对外开放`);
-      }
-      applyBlankWorkflow();
-      clearHistory();
     } else {
+      setWorkflowName('未命名工作流');
       applyBlankWorkflow();
       clearHistory();
     }
-  }, [searchParams, clearHistory, applyBlankWorkflow]);
+  }, [searchParams, clearHistory, applyBlankWorkflow, navigate]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -498,95 +591,124 @@ export default function WorkflowEditorPage() {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
-  const onDrop = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
 
-    const type = event.dataTransfer.getData('application/reactflow');
-    if (
-      !type ||
-      !reactFlowInstance.current ||
-      !reactFlowWrapper.current ||
-      !NODE_CONFIGS[type]?.available
-    )
-      return;
-    if (type === 'start' || type === 'end') return;
+      const type = event.dataTransfer.getData('application/reactflow');
+      if (
+        !type ||
+        !reactFlowInstance.current ||
+        !reactFlowWrapper.current ||
+        !NODE_CONFIGS[type]?.available
+      )
+        return;
+      if (type === 'start' || type === 'end') return;
 
-    const position = reactFlowInstance.current.screenToFlowPosition({
-      x: event.clientX,
-      y: event.clientY,
-    });
+      const position = reactFlowInstance.current.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
 
-    position.x -= 110;
-    position.y -= 20;
+      position.x -= 110;
+      position.y -= 20;
 
-    const config = NODE_CONFIGS[type];
-    const newNode: Node = {
-      id: `${type}-${Date.now()}`,
-      type,
-      position,
-      data: {
-        label: config?.label || type,
-        nodeType: type,
-      },
-    };
+      const config = NODE_CONFIGS[type];
+      const newNode: Node = {
+        id: `${type}-${Date.now()}`,
+        type,
+        position,
+        data: {
+          label: config?.label || type,
+          nodeType: type,
+        },
+      };
 
-    setNodes((prev) => [...prev, newNode]);
-    toast.success(`已添加 ${config?.label} 节点`);
-  }, []);
+      const nextNodes = [...workflowStateRef.current.nodes, newNode];
+      setNodes(nextNodes);
+      markWorkflowDirty({ nodes: nextNodes });
+      toast.success(`已添加 ${config?.label} 节点`);
+    },
+    [markWorkflowDirty],
+  );
 
-  const handleAddNode = useCallback((nodeType: string) => {
-    if (!NODE_CONFIGS[nodeType]?.available) return;
-    if (nodeType === 'start' || nodeType === 'end') return;
+  const handleAddNode = useCallback(
+    (nodeType: string) => {
+      if (!NODE_CONFIGS[nodeType]?.available) return;
+      if (nodeType === 'start' || nodeType === 'end') return;
 
-    const config = NODE_CONFIGS[nodeType];
-    const wrapper = reactFlowWrapper.current;
-    const center = wrapper
-      ? { x: wrapper.clientWidth / 2, y: wrapper.clientHeight / 2 }
-      : { x: 400, y: 300 };
-    const position = reactFlowInstance.current
-      ? reactFlowInstance.current.screenToFlowPosition({
-          x: (wrapper?.getBoundingClientRect().left ?? 0) + center.x,
-          y: (wrapper?.getBoundingClientRect().top ?? 0) + center.y,
-        })
-      : { x: 300, y: 250 };
+      const config = NODE_CONFIGS[nodeType];
+      const wrapper = reactFlowWrapper.current;
+      const center = wrapper
+        ? { x: wrapper.clientWidth / 2, y: wrapper.clientHeight / 2 }
+        : { x: 400, y: 300 };
+      const position = reactFlowInstance.current
+        ? reactFlowInstance.current.screenToFlowPosition({
+            x: (wrapper?.getBoundingClientRect().left ?? 0) + center.x,
+            y: (wrapper?.getBoundingClientRect().top ?? 0) + center.y,
+          })
+        : { x: 300, y: 250 };
 
-    position.x -= 110;
-    position.y -= 20;
+      position.x -= 110;
+      position.y -= 20;
 
-    const newNode: Node = {
-      id: `${nodeType}-${Date.now()}`,
-      type: nodeType,
-      position,
-      data: {
-        label: config?.label || nodeType,
-        nodeType,
-      },
-    };
+      const newNode: Node = {
+        id: `${nodeType}-${Date.now()}`,
+        type: nodeType,
+        position,
+        data: {
+          label: config?.label || nodeType,
+          nodeType,
+        },
+      };
 
-    setNodes((prev) => [...prev, newNode]);
-    toast.success(`已添加 ${config?.label} 节点`);
-  }, []);
+      const nextNodes = [...workflowStateRef.current.nodes, newNode];
+      setNodes(nextNodes);
+      markWorkflowDirty({ nodes: nextNodes });
+      toast.success(`已添加 ${config?.label} 节点`);
+    },
+    [markWorkflowDirty],
+  );
 
   const onNodesChange = useCallback(
-    (changes: NodeChange[]) => setNodes((prev) => applyNodeChanges(changes, prev)),
-    [],
+    (changes: NodeChange[]) => {
+      const nextNodes = applyNodeChanges(changes, workflowStateRef.current.nodes);
+      setNodes(nextNodes);
+      if (changes.some((change) => change.type !== 'select' && change.type !== 'dimensions')) {
+        markWorkflowDirty({ nodes: nextNodes });
+      } else {
+        workflowStateRef.current = { ...workflowStateRef.current, nodes: nextNodes };
+      }
+    },
+    [markWorkflowDirty],
   );
 
   const onEdgesChange = useCallback(
-    (changes: EdgeChange[]) => setEdges((prev) => applyEdgeChanges(changes, prev)),
-    [],
+    (changes: EdgeChange[]) => {
+      const nextEdges = applyEdgeChanges(changes, workflowStateRef.current.edges);
+      setEdges(nextEdges);
+      if (changes.some((change) => change.type !== 'select')) {
+        markWorkflowDirty({ edges: nextEdges });
+      } else {
+        workflowStateRef.current = { ...workflowStateRef.current, edges: nextEdges };
+      }
+    },
+    [markWorkflowDirty],
   );
 
-  const onConnect = useCallback((connection: Connection) => {
-    const { source, target } = connection;
-    if (!source || !target) return;
-    setEdges((prev) =>
-      addEdge(
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      const { source, target } = connection;
+      if (!source || !target) return;
+      const nextEdges = addEdge(
         { ...connection, source, target, sourceHandle: connection.sourceHandle || 'output' },
-        prev,
-      ),
-    );
-  }, []);
+        workflowStateRef.current.edges,
+      );
+      setEdges(nextEdges);
+      markWorkflowDirty({ edges: nextEdges });
+    },
+    [markWorkflowDirty],
+  );
 
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
     setSelectedNode({
@@ -594,23 +716,31 @@ export default function WorkflowEditorPage() {
       type: node.type || '',
       data: node.data as { label: string; nodeType: string; config?: Record<string, unknown> },
     });
+    setActivePropertyTab('config');
   }, []);
 
-  const onNodeDoubleClick = useCallback((_event: React.MouseEvent, node: Node) => {
-    setNodes((prev) =>
-      prev.map((n) =>
-        n.id === node.id
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                collapsed: !(n.data as { collapsed?: boolean }).collapsed,
-              },
-            }
-          : n,
-      ),
-    );
-  }, []);
+  useEffect(() => {
+    const failedNodeId = runSession.failedNodeId;
+    if (!failedNodeId) return;
+
+    const failureKey = `${runSession.generation}:${failedNodeId}`;
+    if (handledFailedNodeRef.current === failureKey) return;
+    handledFailedNodeRef.current = failureKey;
+
+    const failedNode = workflowStateRef.current.nodes.find((node) => node.id === failedNodeId);
+    if (!failedNode) return;
+
+    setSelectedNode({
+      id: failedNode.id,
+      type: failedNode.type || '',
+      data: failedNode.data as {
+        label: string;
+        nodeType: string;
+        config?: Record<string, unknown>;
+      },
+    });
+    setActivePropertyTab('run');
+  }, [runSession.failedNodeId, runSession.generation]);
 
   const onPaneContextMenu = useCallback((event: MouseEvent | React.MouseEvent) => {
     event.preventDefault();
@@ -632,25 +762,30 @@ export default function WorkflowEditorPage() {
 
   const handleDeleteNode = useCallback(
     (nodeId: string) => {
-      const node = nodes.find((n) => n.id === nodeId);
+      const node = workflowStateRef.current.nodes.find((n) => n.id === nodeId);
       if (!node) return;
       const nodeType = (node.data as { nodeType: string }).nodeType;
       if (nodeType === 'start' || nodeType === 'end') {
         toast.warning('开始/结束节点不可删除');
         return;
       }
-      setNodes((prev) => prev.filter((n) => n.id !== nodeId));
-      setEdges((prev) => prev.filter((e) => e.source !== nodeId && e.target !== nodeId));
+      const nextNodes = workflowStateRef.current.nodes.filter((n) => n.id !== nodeId);
+      const nextEdges = workflowStateRef.current.edges.filter(
+        (edge) => edge.source !== nodeId && edge.target !== nodeId,
+      );
+      setNodes(nextNodes);
+      setEdges(nextEdges);
+      markWorkflowDirty({ nodes: nextNodes, edges: nextEdges });
       if (selectedNode?.id === nodeId) {
         setSelectedNode(null);
       }
     },
-    [nodes, selectedNode],
+    [markWorkflowDirty, selectedNode],
   );
 
   const handleCopyNode = useCallback(
     (nodeId: string) => {
-      const node = nodes.find((n) => n.id === nodeId);
+      const node = workflowStateRef.current.nodes.find((n) => n.id === nodeId);
       if (!node) return;
       const newNode: Node = {
         ...node,
@@ -660,9 +795,11 @@ export default function WorkflowEditorPage() {
           y: node.position.y + 50,
         },
       };
-      setNodes((prev) => [...prev, newNode]);
+      const nextNodes = [...workflowStateRef.current.nodes, newNode];
+      setNodes(nextNodes);
+      markWorkflowDirty({ nodes: nextNodes });
     },
-    [nodes],
+    [markWorkflowDirty],
   );
 
   const handlePaste = useCallback(() => {
@@ -674,8 +811,13 @@ export default function WorkflowEditorPage() {
       position: { x: n.position.x + 30, y: n.position.y + 30 },
       selected: true,
     }));
-    setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), ...pasted]);
-  }, []);
+    const nextNodes = [
+      ...workflowStateRef.current.nodes.map((node) => ({ ...node, selected: false })),
+      ...pasted,
+    ];
+    setNodes(nextNodes);
+    markWorkflowDirty({ nodes: nextNodes });
+  }, [markWorkflowDirty]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -693,9 +835,9 @@ export default function WorkflowEditorPage() {
         event.preventDefault();
         const isRedo = event.key === 'y' || event.key === 'Y' || event.shiftKey;
         if (isRedo) {
-          redo();
+          handleRedo();
         } else {
-          undo();
+          handleUndo();
         }
         return;
       }
@@ -741,13 +883,15 @@ export default function WorkflowEditorPage() {
         return;
       }
 
-      const hasSelectedEdge = edges.some((e) => e.selected);
+      const hasSelectedEdge = workflowStateRef.current.edges.some((edge) => edge.selected);
       if (hasSelectedEdge) {
         event.preventDefault();
-        setEdges((prev) => prev.filter((e) => !e.selected));
+        const nextEdges = workflowStateRef.current.edges.filter((edge) => !edge.selected);
+        setEdges(nextEdges);
+        markWorkflowDirty({ edges: nextEdges });
       }
     },
-    [selectedNode, handleDeleteNode, edges, nodes, undo, redo, handlePaste],
+    [selectedNode, handleDeleteNode, nodes, handleRedo, handleUndo, handlePaste, markWorkflowDirty],
   );
 
   useEffect(() => {
@@ -793,92 +937,55 @@ export default function WorkflowEditorPage() {
 
   const onUpdateNode = useCallback(
     (nodeId: string, updates: Partial<{ label: string; config: Record<string, unknown> }>) => {
-      setNodes((prev) =>
-        prev.map((node) =>
-          node.id === nodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  ...updates,
-                },
-              }
-            : node,
-        ),
+      const nextNodes = workflowStateRef.current.nodes.map((node) =>
+        node.id === nodeId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                ...updates,
+              },
+            }
+          : node,
       );
+      setNodes(nextNodes);
 
       if (selectedNode?.id === nodeId) {
         setSelectedNode((prev) => (prev ? { ...prev, data: { ...prev.data, ...updates } } : null));
       }
+      markWorkflowDirty({ nodes: nextNodes });
     },
-    [selectedNode],
+    [markWorkflowDirty, selectedNode],
   );
 
-  const graphToJSON = useCallback(() => {
-    return JSON.stringify({
-      schemaVersion: 2,
-      nodes: nodes.map((node) => ({
-        id: node.id,
-        type: (node.data as { nodeType: string }).nodeType,
-        config:
-          (node.data as { nodeType: string }).nodeType === 'start'
-            ? {
-                inputs: normalizePhaseOneStartInputs(
-                  (node.data as { config?: { inputs?: unknown } }).config?.inputs,
-                ),
-              }
-            : (node.data as { config?: Record<string, unknown> }).config || {},
-        position: node.position,
-        data: node.data,
-      })),
-      edges: normalizeWorkflowEdges(edges).map(
-        ({ id, source, sourceHandle, target, targetHandle }) => ({
-          id,
-          source,
-          sourceHandle,
-          target,
-          targetHandle,
-        }),
-      ),
-    });
-  }, [nodes, edges]);
-
   const handleSave = useCallback(async () => {
-    setIsSaving(true);
-    try {
-      const graph = graphToJSON();
-      if (workflowId) {
-        await updateWorkflow(workflowId, { name: workflowName, graph });
-        toast.success('工作流已保存');
-      } else {
-        const result = await createWorkflow({ name: workflowName, graph, status: 'draft' });
-        setWorkflowId(result.id);
-        navigate(`/workbench/edit?id=${result.id}`, { replace: true });
-        toast.success('工作流已创建');
-      }
-    } catch {
-      toast.error('保存失败');
-    } finally {
-      setIsSaving(false);
-    }
-  }, [workflowId, workflowName, graphToJSON, navigate]);
+    await persistLatestWorkflow({ force: true, createIfMissing: true });
+  }, [persistLatestWorkflow]);
 
   const handleRunConfirm = useCallback(
     async ({ inputs, files }: WorkflowRunInput) => {
+      const id = workflowId;
+      const session = editorSessionRef.current;
+      if (!id || !isActiveWorkflowSession(session, id)) return;
+
       setIsRunning(true);
       setRunError(null);
       const generation = runGenerationRef.current + 1;
       runGenerationRef.current = generation;
       dispatchRunSession({ type: 'begin', generation });
 
-      abortControllerRef.current = new AbortController();
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+      const isActiveRun = () =>
+        isActiveWorkflowSession(session, id) && runGenerationRef.current === generation;
 
       try {
         await runWorkflow(
-          workflowId ?? '',
+          id,
           { inputs, files },
           {
             onEvent: (event) => {
+              if (!isActiveRun()) return;
               dispatchRunSession({ type: 'event', generation, event });
               if (event.status === 'done') {
                 setIsRunning(false);
@@ -886,35 +993,38 @@ export default function WorkflowEditorPage() {
               }
             },
             onError: (msg) => {
+              if (!isActiveRun()) return;
               setRunError(msg);
               dispatchRunSession({ type: 'error', generation, error: msg });
               toast.error(msg);
               setIsRunning(false);
             },
           },
-          abortControllerRef.current.signal,
+          abortController.signal,
         );
       } catch {
+        if (!isActiveRun()) return;
         setRunError('运行请求失败');
         dispatchRunSession({ type: 'error', generation, error: '运行请求失败' });
-        setIsRunning(false);
+      } finally {
+        if (isActiveRun()) {
+          if (abortControllerRef.current === abortController) abortControllerRef.current = null;
+          setIsRunning(false);
+        }
       }
     },
-    [workflowId],
+    [isActiveWorkflowSession, workflowId],
   );
 
-  const handleRun = useCallback(() => {
+  const handleRun = useCallback(async () => {
     if (nodes.length === 0) {
       toast.warning('请先添加节点');
       return;
     }
 
-    if (!workflowId) {
-      toast.warning('请先保存工作流');
-      return;
-    }
+    if (!workflowId) return;
 
-    const errors = validateWorkflowConfig(nodes);
+    const errors = validateWorkflowConfig(nodes, edges);
     if (errors.length > 0) {
       const firstError = errors[0];
       toast.warning(
@@ -924,8 +1034,12 @@ export default function WorkflowEditorPage() {
       return;
     }
 
+    if (!(await persistLatestWorkflow())) {
+      return;
+    }
+
     setShowRunPanel(true);
-  }, [nodes, workflowId]);
+  }, [edges, nodes, persistLatestWorkflow, workflowId]);
 
   const handleCancelRun = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -955,8 +1069,11 @@ export default function WorkflowEditorPage() {
       reader.onload = (event) => {
         try {
           const data = JSON.parse(event.target?.result as string);
-          setNodes(data.nodes || []);
-          setEdges(normalizeWorkflowEdges(data.edges || []));
+          const nextNodes = data.nodes || [];
+          const nextEdges = normalizeWorkflowEdges(data.edges || []);
+          setNodes(nextNodes);
+          setEdges(nextEdges);
+          markWorkflowDirty({ nodes: nextNodes, edges: nextEdges });
           toast.success('工作流已导入');
         } catch {
           toast.error('导入失败，请检查文件格式');
@@ -965,42 +1082,32 @@ export default function WorkflowEditorPage() {
       reader.readAsText(file);
     };
     input.click();
-  }, []);
+  }, [markWorkflowDirty]);
 
   const handleClear = useCallback(() => {
-    if (nodes.length === 0) return;
+    if (workflowStateRef.current.nodes.length === 0) return;
     setNodes([]);
     setEdges([]);
     setSelectedNode(null);
+    markWorkflowDirty({ nodes: [], edges: [] });
     toast.info('工作流已清空');
-  }, [nodes]);
+  }, [markWorkflowDirty]);
 
   const handleReset = useCallback(() => {
-    const template = searchParams.get('template');
-    const templateConfig = getWorkflowTemplate(template || '');
-
-    if (
-      (templateConfig?.id === 'blog-import' || templateConfig?.id === 'content-generate') &&
-      templateConfig.enabled
-    ) {
-      const workflowTemplate =
-        templateConfig.id === 'blog-import' ? blogImportTemplate : topicDraftTemplate;
-      setNodes(workflowTemplate.nodes as Node[]);
-      setEdges(workflowTemplate.edges as Edge[]);
-    } else {
-      setNodes([
-        {
-          id: 'start',
-          type: 'start',
-          position: { x: 200, y: 250 },
-          data: { label: '开始', nodeType: 'start', config: { inputs: {} } },
-        },
-      ] as Node[]);
-      setEdges([]);
-    }
+    const nextNodes = [
+      {
+        id: 'start',
+        type: 'start',
+        position: { x: 200, y: 250 },
+        data: { label: '开始', nodeType: 'start', config: { inputs: {} } },
+      },
+    ] as Node[];
+    setNodes(nextNodes);
+    setEdges([]);
+    markWorkflowDirty({ nodes: nextNodes, edges: [] });
     setSelectedNode(null);
     toast.info('工作流已重置');
-  }, [searchParams]);
+  }, [markWorkflowDirty]);
 
   const renderedEdges = useMemo(
     () =>
@@ -1032,12 +1139,22 @@ export default function WorkflowEditorPage() {
   const runtimeValue = useMemo(
     () => ({
       session: runSession,
-      toggleNodeResult: (nodeId: string) => dispatchRunSession({ type: 'toggleExpanded', nodeId }),
       copyNode: handleCopyNode,
       deleteNode: handleDeleteNode,
     }),
     [handleCopyNode, handleDeleteNode, runSession],
   );
+
+  const saveStatusText =
+    saveStatus === 'creating'
+      ? '正在创建'
+      : saveStatus === 'saving'
+        ? '正在保存'
+        : saveStatus === 'saved'
+          ? '已保存'
+          : saveStatus === 'error'
+            ? '保存失败'
+            : null;
 
   return (
     <WorkflowRuntimeProvider value={runtimeValue}>
@@ -1052,7 +1169,7 @@ export default function WorkflowEditorPage() {
                 {isEditingName ? (
                   <input
                     value={workflowName}
-                    onChange={(e) => setWorkflowName(e.target.value)}
+                    onChange={(e) => handleWorkflowNameChange(e.target.value)}
                     onBlur={() => setIsEditingName(false)}
                     onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
                     className="text-sm font-medium bg-accent border border-border rounded px-2 py-1 outline-none text-foreground w-40"
@@ -1071,7 +1188,7 @@ export default function WorkflowEditorPage() {
               </div>
               <span className="text-xs text-muted-foreground">
                 {nodes.length} 节点 · {edges.length} 连接
-                {workflowId && <span className="ml-2">· 已保存</span>}
+                {saveStatusText && <span className="ml-2">· {saveStatusText}</span>}
               </span>
             </div>
 
@@ -1079,7 +1196,7 @@ export default function WorkflowEditorPage() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={undo}
+                onClick={handleUndo}
                 disabled={!canUndo}
                 title="撤销 (Ctrl/Cmd+Z)"
                 aria-label="撤销"
@@ -1089,7 +1206,7 @@ export default function WorkflowEditorPage() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={redo}
+                onClick={handleRedo}
                 disabled={!canRedo}
                 title="重做 (Ctrl/Cmd+Shift+Z)"
                 aria-label="重做"
@@ -1122,9 +1239,14 @@ export default function WorkflowEditorPage() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button variant="outline" size="sm" onClick={handleSave} disabled={isSaving}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handleSave()}
+                disabled={saveStatus === 'creating' || saveStatus === 'saving'}
+              >
                 <Save className="h-4 w-4 mr-2" />
-                {isSaving ? '保存中...' : '保存'}
+                立即保存
               </Button>
               {workflowId && (
                 <Button variant="outline" size="sm" onClick={() => setShowVersions(true)}>
@@ -1148,7 +1270,11 @@ export default function WorkflowEditorPage() {
                   运行记录
                 </Button>
               )}
-              <Button size="sm" onClick={handleRun} disabled={isRunning}>
+              <Button
+                size="sm"
+                onClick={() => void handleRun()}
+                disabled={!workflowId || isRunning || saveStatus === 'creating'}
+              >
                 <Play className="h-4 w-4 mr-2" />
                 {isRunning ? '运行中...' : '运行'}
               </Button>
@@ -1307,7 +1433,6 @@ export default function WorkflowEditorPage() {
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
                 onNodeClick={onNodeClick}
-                onNodeDoubleClick={onNodeDoubleClick}
                 onNodeContextMenu={onNodeContextMenu}
                 onEdgeClick={onEdgeClick}
                 onPaneClick={onPaneClick}
@@ -1355,6 +1480,11 @@ export default function WorkflowEditorPage() {
                   selectedNode={selectedNode}
                   onClose={() => setSelectedNode(null)}
                   onUpdateNode={onUpdateNode}
+                  nodes={nodes}
+                  edges={edges}
+                  runSnapshot={selectedNode ? runSession.nodes[selectedNode.id] : undefined}
+                  activeTab={activePropertyTab}
+                  onActiveTabChange={setActivePropertyTab}
                 />
               </div>
             </div>
@@ -1396,29 +1526,6 @@ export default function WorkflowEditorPage() {
                     >
                       <Trash2 className="mr-2 h-3.5 w-3.5" />
                       删除
-                    </button>
-                    <button
-                      type="button"
-                      className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-foreground hover:bg-accent"
-                      onClick={() => {
-                        setNodes((prev) =>
-                          prev.map((n) =>
-                            n.id === nodeId
-                              ? {
-                                  ...n,
-                                  data: {
-                                    ...n.data,
-                                    collapsed: !(n.data as { collapsed?: boolean }).collapsed,
-                                  },
-                                }
-                              : n,
-                          ),
-                        );
-                        setContextMenu(null);
-                      }}
-                    >
-                      <ChevronDown className="mr-2 h-3.5 w-3.5" />
-                      折叠/展开
                     </button>
                   </>
                 ) : (

@@ -30,7 +30,6 @@ export interface WorkflowNodeData {
   nodeType: WorkflowNodeType;
   config?: Record<string, unknown>;
   runningState?: 'idle' | 'running' | 'success' | 'error';
-  collapsed?: boolean;
 }
 
 export interface WorkflowEdge {

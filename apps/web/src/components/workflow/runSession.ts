@@ -16,7 +16,6 @@ export interface WorkflowRunSession {
   runId: string | null;
   status: 'idle' | 'running' | 'success' | 'error';
   nodes: Record<string, NodeRunSnapshot>;
-  expandedNodeId: string | null;
   finalOutput: Record<string, unknown> | null;
   error: string | null;
   failedNodeId: string | null;
@@ -32,9 +31,7 @@ export type WorkflowRunSessionAction =
       error: string;
       failedNodeId?: string;
       failedNodeCode?: string;
-    }
-  | { type: 'toggleExpanded'; nodeId: string }
-  | { type: 'clearExpanded' };
+    };
 
 export function createWorkflowRunSession(): WorkflowRunSession {
   return {
@@ -42,7 +39,6 @@ export function createWorkflowRunSession(): WorkflowRunSession {
     runId: null,
     status: 'idle',
     nodes: {},
-    expandedNodeId: null,
     finalOutput: null,
     error: null,
     failedNodeId: null,
@@ -61,13 +57,6 @@ export function workflowRunSessionReducer(
         generation: action.generation,
         status: 'running',
       };
-    case 'toggleExpanded':
-      return {
-        ...session,
-        expandedNodeId: session.expandedNodeId === action.nodeId ? null : action.nodeId,
-      };
-    case 'clearExpanded':
-      return { ...session, expandedNodeId: null };
     case 'error':
       if (action.generation !== session.generation) return session;
       return {

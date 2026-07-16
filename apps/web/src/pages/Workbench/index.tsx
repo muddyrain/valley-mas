@@ -1,6 +1,6 @@
 import { BookOpenText, FileText, LayoutDashboard, Plus, Sparkles, Trash2, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { deleteWorkflow, listWorkflows, type WorkflowItem } from '@/api/workflow';
 import { Badge } from '@/components/ui/badge';
@@ -106,16 +106,13 @@ export default function Workbench() {
                 {templates.map((template) => {
                   const Icon = template.icon;
                   const disabled = template.enabled === false;
-                  const onTemplateClick = disabled
-                    ? () => toast.info(`${template.name}暂未开放，先使用「博客导入工作流」`)
-                    : () => navigate(`/workbench/create?template=${template.id}`);
                   return (
-                    <div
+                    <Link
                       key={template.id}
-                      onClick={onTemplateClick}
+                      to={`/workbench/templates/${template.id}`}
                       className={`group flex items-start gap-3 rounded-lg border bg-background p-3 transition-colors ${
                         disabled
-                          ? 'cursor-not-allowed border-dashed border-muted-foreground/40 text-muted-foreground bg-muted/30'
+                          ? 'border-dashed border-muted-foreground/40 bg-muted/30 text-muted-foreground'
                           : 'cursor-pointer border-border hover:bg-muted/60'
                       }`}
                     >
@@ -138,7 +135,7 @@ export default function Workbench() {
                           ))}
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </CardContent>

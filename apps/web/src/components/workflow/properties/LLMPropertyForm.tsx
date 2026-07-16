@@ -1,10 +1,14 @@
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { VariableTokenEditor } from '../VariableTokenEditor';
 import type { PropertyFormProps } from './index';
 
-export function LLMPropertyForm({ config, onUpdateConfig }: PropertyFormProps) {
+export function LLMPropertyForm({
+  config,
+  onUpdateConfig,
+  variableOptions = [],
+}: PropertyFormProps) {
   return (
     <div className="space-y-4">
       <EditorSection title="提示词" description="设置模型角色和本次生成任务。">
@@ -14,22 +18,24 @@ export function LLMPropertyForm({ config, onUpdateConfig }: PropertyFormProps) {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="llm-system-prompt">系统提示词</Label>
-          <Textarea
+          <VariableTokenEditor
             id="llm-system-prompt"
             value={(config.systemPrompt as string) || ''}
-            onChange={(event) =>
-              onUpdateConfig({ systemPrompt: event.target.value, modelProfile: 'ark-text-default' })
+            onChange={(systemPrompt) =>
+              onUpdateConfig({ systemPrompt, modelProfile: 'ark-text-default' })
             }
-            rows={4}
+            options={variableOptions}
+            placeholder="定义模型的角色和边界"
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="llm-prompt">提示词</Label>
-          <Textarea
+          <VariableTokenEditor
             id="llm-prompt"
             value={(config.prompt as string) || ''}
-            onChange={(event) => onUpdateConfig({ prompt: event.target.value })}
-            rows={5}
+            onChange={(prompt) => onUpdateConfig({ prompt })}
+            options={variableOptions}
+            placeholder="描述本次生成任务"
           />
         </div>
       </EditorSection>

@@ -1,6 +1,12 @@
+import type { Edge, Node } from '@xyflow/react';
 import { Settings } from 'lucide-react';
+import { NodeRunInspector } from './NodeRunInspector';
 import { PROPERTY_FORM_MAP } from './properties';
 import { PropertyFormBase } from './properties/PropertyFormBase';
+import type { NodeRunSnapshot } from './runSession';
+import { getUpstreamWorkflowVariables } from './workflowVariables';
+
+export type PropertyPanelTab = 'config' | 'run';
 
 interface PropertyPanelProps {
   selectedNode: {
@@ -13,9 +19,23 @@ interface PropertyPanelProps {
     nodeId: string,
     updates: Partial<{ label: string; config: Record<string, unknown> }>,
   ) => void;
+  nodes: Node[];
+  edges: Edge[];
+  runSnapshot?: NodeRunSnapshot;
+  activeTab?: PropertyPanelTab;
+  onActiveTabChange?: (tab: PropertyPanelTab) => void;
 }
 
-export function PropertyPanel({ selectedNode, onClose, onUpdateNode }: PropertyPanelProps) {
+export function PropertyPanel({
+  selectedNode,
+  onClose,
+  onUpdateNode,
+  nodes,
+  edges,
+  runSnapshot,
+  activeTab,
+  onActiveTabChange,
+}: PropertyPanelProps) {
   if (!selectedNode) {
     return (
       <div className="h-full flex flex-col border-l border-border bg-card">
@@ -37,16 +57,51 @@ export function PropertyPanel({ selectedNode, onClose, onUpdateNode }: PropertyP
 
   const { nodeType, config } = selectedNode.data;
   const FormComponent = PROPERTY_FORM_MAP[nodeType as keyof typeof PROPERTY_FORM_MAP];
+  const variableOptions = getUpstreamWorkflowVariables(nodes, edges, selectedNode.id);
 
   const handleUpdateConfig = (updates: Partial<Record<string, unknown>>) => {
     onUpdateNode(selectedNode.id, {
       config: { ...(config || {}), ...updates },
     });
   };
+  const showRunTab =
+    activeTab !== undefined || onActiveTabChange !== undefined || runSnapshot !== undefined;
+  const runContent = runSnapshot ? (
+    <NodeRunInspector snapshot={runSnapshot} />
+  ) : (
+    <div className="flex min-h-full flex-col items-center justify-center p-6 text-center">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted/50">
+        <Settings className="h-6 w-6 text-muted-foreground" />
+      </div>
+      <p className="mb-2 text-sm text-muted-foreground">本次运行尚无节点详情</p>
+      <p className="text-xs text-muted-foreground/70">
+        运行工作流后，这里会显示安全的输入和输出摘要。
+      </p>
+    </div>
+  );
 
   return (
-    <PropertyFormBase selectedNode={selectedNode} onClose={onClose} onUpdateNode={onUpdateNode}>
-      {FormComponent && <FormComponent config={config || {}} onUpdateConfig={handleUpdateConfig} />}
+    <PropertyFormBase
+      selectedNode={selectedNode}
+      onClose={onClose}
+      onUpdateNode={onUpdateNode}
+      activeTab={activeTab}
+      onActiveTabChange={onActiveTabChange}
+      runContent={showRunTab ? runContent : undefined}
+    >
+      {FormComponent && (
+        <FormComponent
+          config={config || {}}
+          onUpdateConfig={handleUpdateConfig}
+          variableOptions={
+            nodeType === 'blog.parseMarkdown' ||
+            nodeType === 'knowledge.retrieve' ||
+            nodeType === 'llm.text'
+              ? variableOptions
+              : undefined
+          }
+        />
+      )}
     </PropertyFormBase>
   );
 }

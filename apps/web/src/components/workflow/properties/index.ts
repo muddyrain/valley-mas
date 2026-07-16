@@ -1,4 +1,5 @@
 import type { WorkflowNodeType } from '../types';
+import type { WorkflowVariableOption } from '../workflowVariables';
 import { BlogCreateDraftPropertyForm } from './BlogCreateDraftPropertyForm';
 import { BlogParsePropertyForm } from './BlogParsePropertyForm';
 import { CodePropertyForm } from './CodePropertyForm';
@@ -16,6 +17,7 @@ import { VariablePropertyForm } from './VariablePropertyForm';
 export interface PropertyFormProps {
   config: Record<string, unknown>;
   onUpdateConfig: (updates: Partial<Record<string, unknown>>) => void;
+  variableOptions?: WorkflowVariableOption[];
 }
 
 export const PROPERTY_FORM_MAP: Partial<

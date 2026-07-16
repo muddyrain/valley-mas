@@ -2,8 +2,6 @@ import { Handle, type NodeProps, Position } from '@xyflow/react';
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronDown,
-  ChevronRight,
   Code,
   Copy,
   Database,
@@ -34,7 +32,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { NodeRunInspector } from './NodeRunInspector';
 import { getNodeConfigSummary, NODE_CONFIGS } from './nodeConfig';
 import { validateSingleNode } from './validateWorkflowConfig';
 import { useWorkflowRuntime } from './WorkflowRuntimeContext';
@@ -59,7 +56,6 @@ interface WorkflowNodeData {
   label: string;
   nodeType: string;
   config?: Record<string, unknown>;
-  collapsed?: boolean;
 }
 
 const NODE_COLORS: Record<string, { iconBg: string; iconText: string }> = {
@@ -81,11 +77,10 @@ const NODE_COLORS: Record<string, { iconBg: string; iconText: string }> = {
 };
 
 export function WorkflowNode({ id, data, selected }: NodeProps) {
-  const { session, toggleNodeResult, copyNode, deleteNode } = useWorkflowRuntime();
-  const { label, nodeType, config, collapsed } = data as unknown as WorkflowNodeData;
+  const { session, copyNode, deleteNode } = useWorkflowRuntime();
+  const { label, nodeType, config } = data as unknown as WorkflowNodeData;
   const snapshot = session.nodes[id];
   const runningState = snapshot?.status;
-  const expanded = session.expandedNodeId === id;
   const nodeConfig = NODE_CONFIGS[nodeType];
   const Icon = iconMap[nodeConfig?.icon] || MessageSquare;
   const colors = NODE_COLORS[nodeType] || NODE_COLORS.start;
@@ -103,6 +98,12 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
     : false;
   const isPlanNode = !nodeConfig || nodeConfig.available === false;
   const isFixed = nodeConfig?.fixed;
+  const ioSummary = [
+    hasInput ? '输入: 1 项' : null,
+    hasOutput || multiOutputs ? `输出: ${multiOutputs || 1} 项` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <div className="relative w-[220px] cursor-grab overflow-visible active:cursor-grabbing">
@@ -129,7 +130,7 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
             'border-destructive/50 ring-2 ring-destructive/20 ring-offset-2',
         )}
       >
-        <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex h-[92px] items-center gap-3 px-4 py-3">
           <div className={cn('flex items-center justify-center rounded-full p-2', colors.iconBg)}>
             <Icon className={cn('h-4 w-4', colors.iconText)} />
           </div>
@@ -156,16 +157,12 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
                 </div>
               </TooltipContent>
             </Tooltip>
-            {!collapsed && summary && (
-              <span className="mt-0.5 block truncate text-xs text-muted-foreground">{summary}</span>
-            )}
-            {!collapsed && (hasInput || hasOutput) && (
-              <span className="mt-0.5 block truncate text-xs text-muted-foreground/70">
-                {hasInput && '输入: 1 项'}
-                {hasInput && hasOutput && ' · '}
-                {hasOutput && '输出: 1 项'}
-              </span>
-            )}
+            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+              {summary || '尚未配置'}
+            </span>
+            <span className="mt-0.5 block truncate text-xs text-muted-foreground/70">
+              {ioSummary || '无输入/输出'}
+            </span>
           </div>
           <div className="nodrag nopan flex items-center gap-0.5">
             {!isFixed && (
@@ -226,40 +223,15 @@ export function WorkflowNode({ id, data, selected }: NodeProps) {
               <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-500" />
             )}
             {runningState === 'success' && (
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                {snapshot.durationMs != null && <span>{snapshot.durationMs}ms</span>}
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
+              </div>
             )}
             {runningState === 'error' && <XCircle className="h-4 w-4 shrink-0 text-red-400" />}
           </div>
         </div>
-        {!collapsed && snapshot && (
-          <Button
-            variant="ghost"
-            className={cn(
-              'nodrag nopan w-full justify-between rounded-none border-t border-gray-100 px-4 py-2',
-              runningState === 'running' && 'bg-blue-50/60',
-              runningState === 'success' && 'bg-green-50/60',
-              runningState === 'error' && 'bg-red-50/60',
-            )}
-            onClick={(event) => {
-              event.stopPropagation();
-              toggleNodeResult(id);
-            }}
-          >
-            <span className="flex items-center gap-2 text-xs font-medium">
-              {runningState === 'running' && '试运行中…'}
-              {runningState === 'success' &&
-                `运行成功${snapshot.durationMs != null ? ` · ${snapshot.durationMs}ms` : ''}`}
-              {runningState === 'error' && '运行失败'}
-            </span>
-            {expanded ? (
-              <ChevronDown className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5" />
-            )}
-          </Button>
-        )}
       </div>
-      {!collapsed && snapshot && expanded && <NodeRunInspector snapshot={snapshot} />}
       {hasOutput && (
         <Handle
           type="source"
