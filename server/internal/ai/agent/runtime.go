@@ -81,13 +81,14 @@ const (
 // Event 是 RunStream 通过 channel 分发的中间事件。
 // 上层 handler 负责把 Event 映射为具体协议（SSE / WebSocket）。
 type Event struct {
-	Type       EventType
-	Delta      string
-	ToolCall   *ToolCall
-	ToolName   string
-	ToolResult json.RawMessage
-	Result     *Result
-	Err        error
+	Type           EventType
+	Delta          string
+	ToolCall       *ToolCall
+	ToolName       string
+	ToolResult     json.RawMessage
+	ToolDurationMs int64
+	Result         *Result
+	Err            error
 }
 
 // Result 是 Run 的最终返回值。

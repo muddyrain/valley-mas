@@ -7,6 +7,7 @@ interface BoxLoadingOverlayProps {
   hint?: string;
   tone?: 'light' | 'dark';
   compact?: boolean;
+  minimal?: boolean;
   className?: string;
 }
 
@@ -16,6 +17,7 @@ export default function BoxLoadingOverlay({
   hint = 'Please wait a moment.',
   tone = 'light',
   compact = false,
+  minimal = false,
   className,
 }: BoxLoadingOverlayProps) {
   if (!show) return null;
@@ -27,9 +29,11 @@ export default function BoxLoadingOverlay({
       aria-live="polite"
       className={cn(
         'absolute inset-0 z-20 flex items-center justify-center rounded-[inherit] backdrop-blur-xl',
-        isDark
-          ? 'bg-[radial-gradient(circle_at_18%_20%,hsl(var(--primary)/0.1),transparent_50%),radial-gradient(circle_at_82%_24%,hsl(var(--primary)/0.12),transparent_45%),linear-gradient(180deg,hsl(var(--foreground)/0.2),hsl(var(--foreground)/0.3))]'
-          : 'bg-[radial-gradient(circle_at_14%_18%,hsl(var(--primary)/0.08),transparent_45%),radial-gradient(circle_at_84%_22%,hsl(var(--primary)/0.06),transparent_40%),linear-gradient(180deg,hsl(var(--foreground)/0.12),hsl(var(--foreground)/0.18))]',
+        minimal
+          ? 'bg-transparent backdrop-blur-0'
+          : isDark
+            ? 'bg-[radial-gradient(circle_at_18%_20%,hsl(var(--primary)/0.1),transparent_50%),radial-gradient(circle_at_82%_24%,hsl(var(--primary)/0.12),transparent_45%),linear-gradient(180deg,hsl(var(--foreground)/0.2),hsl(var(--foreground)/0.3))]'
+            : 'bg-[radial-gradient(circle_at_14%_18%,hsl(var(--primary)/0.08),transparent_45%),radial-gradient(circle_at_84%_22%,hsl(var(--primary)/0.06),transparent_40%),linear-gradient(180deg,hsl(var(--foreground)/0.12),hsl(var(--foreground)/0.18))]',
         className,
       )}
     >
@@ -37,9 +41,11 @@ export default function BoxLoadingOverlay({
         className={cn(
           'relative overflow-hidden text-center',
           compact ? 'rounded-xl px-4 py-3' : 'rounded-2xl px-7 py-5',
-          isDark
-            ? 'border border-foreground/25 bg-card/70 shadow-[0_18px_44px_hsl(var(--foreground)/0.55)]'
-            : 'border border-border bg-card/86 shadow-[0_20px_48px_hsl(var(--foreground)/0.10)]',
+          minimal
+            ? 'border border-border/70 bg-card shadow-xs'
+            : isDark
+              ? 'border border-foreground/25 bg-card/70 shadow-[0_18px_44px_hsl(var(--foreground)/0.55)]'
+              : 'border border-border bg-card/86 shadow-[0_20px_48px_hsl(var(--foreground)/0.10)]',
         )}
       >
         <div className="pointer-events-none absolute -left-8 -top-8 h-24 w-24 rounded-full bg-accent blur-2xl" />

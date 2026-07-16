@@ -167,14 +167,14 @@ func (l *LocalLoop) run(
 		for i := range resp.Message.ToolCalls {
 			tc := resp.Message.ToolCalls[i]
 			out <- Event{Type: EventToolCall, ToolCall: &tc, ToolName: tc.Name}
-			result := runTool(ctx, spec, toolIndex, tc)
+			result, durationMs := runTool(ctx, spec, toolIndex, tc)
 			buf = append(buf, Message{
 				Role:       RoleTool,
 				Content:    string(result),
 				ToolCallID: tc.ID,
 				ToolName:   tc.Name,
 			})
-			out <- Event{Type: EventToolResult, ToolName: tc.Name, ToolResult: result}
+			out <- Event{Type: EventToolResult, ToolName: tc.Name, ToolResult: result, ToolDurationMs: durationMs}
 		}
 	}
 
@@ -196,19 +196,19 @@ func runTool(
 	spec Spec,
 	toolIndex map[string]tools.Tool,
 	tc ToolCall,
-) json.RawMessage {
+) (json.RawMessage, int64) {
 	stepStart := time.Now()
 
 	tool, ok := toolIndex[tc.Name]
 	if !ok {
 		payload := errorPayload(fmt.Sprintf("tool %q not found", tc.Name))
 		recordStep(ctx, spec, tc.Name, stepStart, fmt.Errorf("tool %q not found", tc.Name))
-		return payload
+		return payload, time.Since(stepStart).Milliseconds()
 	}
 	result, err := tool.Run(ctx, tc.Args)
 	if err != nil {
 		recordStep(ctx, spec, tc.Name, stepStart, err)
-		return errorPayload(err.Error())
+		return errorPayload(err.Error()), time.Since(stepStart).Milliseconds()
 	}
 	if len(result) == 0 {
 		result = json.RawMessage(`{"ok":true}`)
@@ -217,7 +217,7 @@ func runTool(
 		result = json.RawMessage(string(result[:toolResultCharsMax]))
 	}
 	recordStep(ctx, spec, tc.Name, stepStart, nil)
-	return result
+	return result, time.Since(stepStart).Milliseconds()
 }
 
 func errorPayload(message string) json.RawMessage {

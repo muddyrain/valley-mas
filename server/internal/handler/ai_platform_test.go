@@ -38,6 +38,11 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		&model.AIApp{},
 		&model.AIAppVersion{},
 		&model.AIAppVersionKnowledgeBase{},
+		&model.AIAppVersionToolBinding{},
+		&model.AIAppConversation{},
+		&model.AIAppConversationMessage{},
+		&model.AIAppConversationToolTrace{},
+		&model.AIAppRun{},
 		&model.AIAPIKey{},
 		&model.AIAPIKeyAppBinding{},
 		&model.AIAPIKeyDailyUsage{},
@@ -81,6 +86,11 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.GET("/api-keys/:keyId/apps", ListAIAPIKeyAppBindings)
 	auth.PUT("/api-keys/:keyId/apps", ReplaceAIAPIKeyAppBindings)
 	auth.GET("/apps/:appId/public-invocations", ListAIAppPublicInvocations)
+	auth.GET("/apps/:appId/conversations", ListAIAppConversations)
+	auth.POST("/apps/:appId/conversations", CreateAIAppConversation)
+	auth.GET("/apps/:appId/conversations/:conversationId", GetAIAppConversation)
+	auth.DELETE("/apps/:appId/conversations/:conversationId", DeleteAIAppConversation)
+	auth.POST("/apps/:appId/conversations/:conversationId/chat", ChatWithAIAppConversation)
 	public := router.Group("/public")
 	public.POST("/ai/apps/:appId/chat", PublicAIAppChat)
 	return router, db
@@ -327,7 +337,14 @@ func TestResolveAIAppToolsReturnsOnlyBoundContentSearch(t *testing.T) {
 		t.Fatalf("create bindings: %v", err)
 	}
 
-	registry, names, err := resolveAIAppTools(db, app.ID)
+	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{}`, ToolSnapshot: true}
+	if err := db.Create(&version).Error; err != nil {
+		t.Fatalf("create version: %v", err)
+	}
+	if err := db.Create(&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: "content.search"}).Error; err != nil {
+		t.Fatalf("create tool binding: %v", err)
+	}
+	registry, names, err := resolveAIAppTools(db, app.ID, version)
 	if err != nil {
 		t.Fatalf("resolve tools: %v", err)
 	}
@@ -336,6 +353,98 @@ func TestResolveAIAppToolsReturnsOnlyBoundContentSearch(t *testing.T) {
 	}
 	if got := registry.Filter("workbench", names); len(got) != 1 || got[0].Name() != "content.search" {
 		t.Fatalf("resolved tools = %#v", got)
+	}
+}
+
+func TestCreateAIAppVersionSnapshotCopiesToolAllowlist(t *testing.T) {
+	_, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "版本助手"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	source := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{}`, RetrievalConfig: `{}`, KnowledgeBaseSnapshot: true, ToolSnapshot: true}
+	if err := db.Create(&source).Error; err != nil {
+		t.Fatalf("create source version: %v", err)
+	}
+	if err := db.Create(&model.AIAppVersionToolBinding{AppVersionID: source.ID, ToolName: "content.search"}).Error; err != nil {
+		t.Fatalf("create source tool binding: %v", err)
+	}
+	var target model.AIAppVersion
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		target, err = createAIAppVersionSnapshot(tx, app, source.Config, defaultAIAppRetrievalConfig(), source)
+		return err
+	}); err != nil {
+		t.Fatalf("create target version: %v", err)
+	}
+	var bindings []model.AIAppVersionToolBinding
+	if err := db.Where("app_version_id = ?", target.ID).Find(&bindings).Error; err != nil {
+		t.Fatalf("load target tool bindings: %v", err)
+	}
+	if !target.ToolSnapshot || len(bindings) != 1 || bindings[0].ToolName != "content.search" {
+		t.Fatalf("unexpected target tool snapshot: %#v %#v", target, bindings)
+	}
+}
+
+func TestAIAppConversationIsOwnerScopedAndRetainsUserMessageOnConfigFailure(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	t.Setenv("ARK_API_KEY", "")
+	t.Setenv("ARK_TEXT_MODEL", "")
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "私有助手"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"test"}`, ToolSnapshot: true, KnowledgeBaseSnapshot: true}
+	if err := db.Create(&version).Error; err != nil {
+		t.Fatalf("create version: %v", err)
+	}
+	if err := db.Model(&app).Update("draft_version_id", version.ID).Error; err != nil {
+		t.Fatalf("set draft version: %v", err)
+	}
+
+	createRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations", strings.NewReader(`{}`))
+	createRequest.Header.Set("Content-Type", "application/json")
+	createRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	createRecorder := httptest.NewRecorder()
+	router.ServeHTTP(createRecorder, createRequest)
+	if createRecorder.Code != http.StatusOK {
+		t.Fatalf("create conversation = %d body=%s", createRecorder.Code, createRecorder.Body.String())
+	}
+	var createPayload struct {
+		Data struct {
+			Conversation model.AIAppConversation `json:"conversation"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(createRecorder.Body.Bytes(), &createPayload); err != nil {
+		t.Fatalf("decode conversation: %v", err)
+	}
+	conversation := createPayload.Data.Conversation
+	if conversation.VersionID != version.ID {
+		t.Fatalf("conversation version = %d, want %d", conversation.VersionID, version.ID)
+	}
+
+	foreignRequest := httptest.NewRequest(http.MethodGet, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String(), nil)
+	foreignRequest.Header.Set("Authorization", aiPlatformAuthHeaderFor(t, "202", "other-user"))
+	foreignRecorder := httptest.NewRecorder()
+	router.ServeHTTP(foreignRecorder, foreignRequest)
+	if foreignRecorder.Code != http.StatusOK || !strings.Contains(foreignRecorder.Body.String(), `"code":404`) {
+		t.Fatalf("foreign conversation read = %d body=%s", foreignRecorder.Code, foreignRecorder.Body.String())
+	}
+
+	chatRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String()+"/chat", strings.NewReader(`{"message":"你好"}`))
+	chatRequest.Header.Set("Content-Type", "application/json")
+	chatRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	chatRecorder := httptest.NewRecorder()
+	router.ServeHTTP(chatRecorder, chatRequest)
+	if chatRecorder.Code != http.StatusOK || !strings.Contains(chatRecorder.Body.String(), `"code":503`) {
+		t.Fatalf("chat config failure = %d body=%s", chatRecorder.Code, chatRecorder.Body.String())
+	}
+	var messages []model.AIAppConversationMessage
+	if err := db.Where("conversation_id = ?", conversation.ID).Find(&messages).Error; err != nil {
+		t.Fatalf("load messages: %v", err)
+	}
+	if len(messages) != 1 || messages[0].Role != "user" || messages[0].Content != "你好" {
+		t.Fatalf("unexpected messages: %#v", messages)
 	}
 }
 

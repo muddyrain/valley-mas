@@ -41,6 +41,7 @@ type AIAppVersion struct {
 	Config                string         `gorm:"type:text;not null" json:"config"`
 	RetrievalConfig       string         `gorm:"type:text;not null;default:'{}'" json:"retrievalConfig"`
 	KnowledgeBaseSnapshot bool           `gorm:"not null;default:false" json:"knowledgeBaseSnapshot"`
+	ToolSnapshot          bool           `gorm:"not null;default:false" json:"toolSnapshot"`
 	CreatedAt             time.Time      `json:"createdAt"`
 	DeletedAt             gorm.DeletedAt `gorm:"index" json:"-"`
 }
@@ -53,6 +54,22 @@ type AIAppVersionKnowledgeBase struct {
 	AppVersionID    Int64String `gorm:"uniqueIndex:uidx_ai_app_version_kb;not null" json:"appVersionId"`
 	KnowledgeBaseID Int64String `gorm:"uniqueIndex:uidx_ai_app_version_kb;not null" json:"knowledgeBaseId"`
 	CreatedAt       time.Time   `json:"createdAt"`
+}
+
+// AIAppVersionToolBinding freezes the reviewed tool allowlist for one app
+// version. Conversations must never pick up a later app-level binding change.
+type AIAppVersionToolBinding struct {
+	ID           Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	AppVersionID Int64String `gorm:"uniqueIndex:uidx_ai_app_version_tool;not null" json:"appVersionId"`
+	ToolName     string      `gorm:"size:100;uniqueIndex:uidx_ai_app_version_tool;not null" json:"toolName"`
+	CreatedAt    time.Time   `json:"createdAt"`
+}
+
+func (b *AIAppVersionToolBinding) BeforeCreate(tx *gorm.DB) error {
+	if b.ID == 0 {
+		b.ID = Int64String(utils.GenerateID())
+	}
+	return nil
 }
 
 func (b *AIAppVersionKnowledgeBase) BeforeCreate(tx *gorm.DB) error {
@@ -72,20 +89,89 @@ func (v *AIAppVersion) BeforeCreate(tx *gorm.DB) error {
 // AIAppRun records a safe summary of an interactive app debug run. It never
 // stores raw files, credentials, or the full system prompt.
 type AIAppRun struct {
-	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	AppID         Int64String    `gorm:"index;not null" json:"appId"`
-	VersionID     Int64String    `gorm:"index;not null" json:"versionId"`
-	WorkflowRunID *Int64String   `gorm:"index" json:"workflowRunId,omitempty"`
-	UserID        Int64String    `gorm:"index;not null" json:"userId"`
-	Status        string         `gorm:"size:20;index;not null" json:"status"`
-	Model         string         `gorm:"size:160" json:"model"`
-	Input         string         `gorm:"type:text;not null" json:"input"`
-	Output        string         `gorm:"type:text" json:"output"`
-	ErrorCode     string         `gorm:"size:80" json:"errorCode"`
-	References    string         `gorm:"type:text;not null;default:'[]'" json:"-"`
-	DurationMs    int64          `json:"durationMs"`
-	CreatedAt     time.Time      `json:"createdAt"`
-	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	AppID          Int64String    `gorm:"index;not null" json:"appId"`
+	VersionID      Int64String    `gorm:"index;not null" json:"versionId"`
+	WorkflowRunID  *Int64String   `gorm:"index" json:"workflowRunId,omitempty"`
+	ConversationID *Int64String   `gorm:"index" json:"conversationId,omitempty"`
+	UserID         Int64String    `gorm:"index;not null" json:"userId"`
+	Status         string         `gorm:"size:20;index;not null" json:"status"`
+	Model          string         `gorm:"size:160" json:"model"`
+	Input          string         `gorm:"type:text;not null" json:"input"`
+	Output         string         `gorm:"type:text" json:"output"`
+	ErrorCode      string         `gorm:"size:80" json:"errorCode"`
+	References     string         `gorm:"type:text;not null;default:'[]'" json:"-"`
+	DurationMs     int64          `json:"durationMs"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// AIAppConversation is an owner-private chat pinned to one immutable app
+// version. It is intentionally separate from the legacy AIAgent conversations.
+type AIAppConversation struct {
+	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID    Int64String    `gorm:"index:idx_ai_app_conversation_owner;not null" json:"userId"`
+	AppID     Int64String    `gorm:"index:idx_ai_app_conversation_owner;not null" json:"appId"`
+	VersionID Int64String    `gorm:"index;not null" json:"versionId"`
+	Title     string         `gorm:"size:120;not null;default:'新对话'" json:"title"`
+	Status    string         `gorm:"size:20;not null;default:'active';index" json:"status"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (c *AIAppConversation) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == 0 {
+		c.ID = Int64String(utils.GenerateID())
+	}
+	if c.Title == "" {
+		c.Title = "新对话"
+	}
+	if c.Status == "" {
+		c.Status = "active"
+	}
+	return nil
+}
+
+type AIAppConversationMessage struct {
+	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID         Int64String    `gorm:"index;not null" json:"userId"`
+	AppID          Int64String    `gorm:"index;not null" json:"appId"`
+	ConversationID Int64String    `gorm:"index;not null" json:"conversationId"`
+	RunID          *Int64String   `gorm:"index" json:"runId,omitempty"`
+	Role           string         `gorm:"size:20;not null;index" json:"role"`
+	Content        string         `gorm:"type:text;not null" json:"content"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (m *AIAppConversationMessage) BeforeCreate(tx *gorm.DB) error {
+	if m.ID == 0 {
+		m.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+// AIAppConversationToolTrace keeps only an observable execution summary. Tool
+// arguments and raw results are deliberately never persisted here.
+type AIAppConversationToolTrace struct {
+	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID         Int64String    `gorm:"index;not null" json:"userId"`
+	AppID          Int64String    `gorm:"index;not null" json:"appId"`
+	ConversationID Int64String    `gorm:"index;not null" json:"conversationId"`
+	RunID          Int64String    `gorm:"index;not null" json:"runId"`
+	ToolName       string         `gorm:"size:100;not null" json:"toolName"`
+	Status         string         `gorm:"size:20;not null" json:"status"`
+	DurationMs     int64          `gorm:"not null;default:0" json:"durationMs"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (t *AIAppConversationToolTrace) BeforeCreate(tx *gorm.DB) error {
+	if t.ID == 0 {
+		t.ID = Int64String(utils.GenerateID())
+	}
+	return nil
 }
 
 func (r *AIAppRun) BeforeCreate(tx *gorm.DB) error {

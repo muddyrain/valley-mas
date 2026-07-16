@@ -5,6 +5,7 @@ import { GlobalScrollButton } from '@/components/GlobalScrollButton';
 import { Toaster } from '@/components/ui/sonner';
 import { applyThemeToDocument, useThemeStore } from '@/stores/useThemeStore';
 import WorkbenchLayout from './layouts/WorkbenchLayout';
+import AIAppConversation from './pages/AIAppConversation';
 import AIAppEditor from './pages/AIAppEditor';
 import BlogCreate from './pages/BlogCreate';
 import BlogGroupManage from './pages/BlogGroupManage';
@@ -71,6 +72,8 @@ function RouteTitle() {
       title = '创建工作流 | Valley';
     } else if (pathname.startsWith('/workbench/edit')) {
       title = '编辑工作流 | Valley';
+    } else if (pathname.includes('/conversations/')) {
+      title = '私有会话 | Valley';
     } else if (pathname.startsWith('/workbench/apps/')) {
       title = '编辑 AI 应用 | Valley';
     } else if (pathname === '/workbench/knowledge') {
@@ -178,6 +181,14 @@ function App() {
             element={
               <RequireAuth>
                 <WorkflowEditorWithKey />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="workbench/apps/:appId/conversations/:conversationId"
+            element={
+              <RequireAuth>
+                <AIAppConversation />
               </RequireAuth>
             }
           />

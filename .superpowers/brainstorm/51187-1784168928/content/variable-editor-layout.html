@@ -1,0 +1,25 @@
+<h2>提示词中的变量，采用哪种编辑体验？</h2>
+<p class="subtitle">三种方案都只允许选择上游变量；底层继续保存原有的 <code>{{node.output.field}}</code> 格式。</p>
+
+<div class="cards">
+  <div class="card" data-choice="inline-token-editor" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup"><div class="mockup-header">推荐：行内变量胶囊</div><div class="mockup-body" style="padding:16px"><div style="font-size:12px;color:#6b7280;margin-bottom:8px">提示词</div><div style="min-height:86px;border:2px solid #6475f7;border-radius:10px;padding:12px;line-height:2"><span>请根据主题 </span><span style="background:#eef0ff;color:#5667e9;padding:2px 7px;border-radius:5px">开始 · topic</span><span> 和资料 </span><span style="background:#eef0ff;color:#5667e9;padding:2px 7px;border-radius:5px">检索知识库 · context</span><span> 生成正文</span></div><div style="margin-top:8px;padding:8px 12px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;width:55%">变量　　开始 · audience<br>　　　　开始 · style</div></div></div>
+    </div>
+    <div class="card-body"><h3>A · 行内变量胶囊</h3><p>输入 <code>{{</code> 或点击插入变量后选择；已插入变量以可删除的胶囊展示，最接近 Coze。</p></div>
+  </div>
+  <div class="card" data-choice="token-row-builder" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup"><div class="mockup-header">文本区 + 变量片段栏</div><div class="mockup-body" style="padding:16px"><div style="font-size:12px;color:#6b7280;margin-bottom:8px">提示词</div><div style="min-height:55px;border:1px solid #d8dee9;border-radius:8px;padding:12px">请基于资料生成一篇文章</div><div style="display:flex;gap:6px;margin-top:10px;align-items:center"><span style="font-size:12px">引用变量：</span><span style="background:#eef0ff;color:#5667e9;padding:3px 7px;border-radius:5px;font-size:12px">开始 · topic ×</span><button class="mock-button">+ 添加</button></div></div></div>
+    </div>
+    <div class="card-body"><h3>B · 单独变量片段栏</h3><p>编辑稳定、实现最简单，但变量与文案位置分离，表达复杂提示词会不直观。</p></div>
+  </div>
+  <div class="card" data-choice="syntax-highlight" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup"><div class="mockup-header">语法高亮文本框</div><div class="mockup-body" style="padding:16px"><div style="font-size:12px;color:#6b7280;margin-bottom:8px">提示词</div><div style="min-height:86px;border:1px solid #d8dee9;border-radius:8px;padding:12px;line-height:2">主题：<span style="color:#5667e9;background:#f1f2ff">{{start.output.topic}}</span><br>资料：<span style="color:#5667e9;background:#f1f2ff">{{knowledge.output.context}}</span></div></div></div>
+    </div>
+    <div class="card-body"><h3>C · 语法高亮</h3><p>保留原始占位符文本，仅作颜色强调；迁移成本低，但仍显得像代码。</p></div>
+  </div>
+</div>
+
+<p class="subtitle">我推荐 A：仅把已确认的变量渲染为胶囊；其余文本保持普通可编辑文本，并提供 <code>{{</code> 触发和“插入变量”按钮。</p>

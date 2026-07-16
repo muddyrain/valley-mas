@@ -147,16 +147,44 @@ func copyAIAppVersionKnowledgeBaseSnapshot(tx *gorm.DB, app model.AIApp, source,
 	return nil
 }
 
+func copyAIAppVersionToolSnapshot(tx *gorm.DB, app model.AIApp, source, target model.AIAppVersion) error {
+	var sourceBindings []model.AIAppVersionToolBinding
+	if source.ID != 0 && source.ToolSnapshot {
+		if err := tx.Where("app_version_id = ?", source.ID).Find(&sourceBindings).Error; err != nil {
+			return err
+		}
+	} else if source.ID != 0 {
+		var legacyBindings []model.AIAppToolBinding
+		if err := tx.Where("app_id = ?", app.ID).Find(&legacyBindings).Error; err != nil {
+			return err
+		}
+		for _, binding := range legacyBindings {
+			sourceBindings = append(sourceBindings, model.AIAppVersionToolBinding{ToolName: binding.ToolName})
+		}
+	}
+	bindings := make([]model.AIAppVersionToolBinding, 0, len(sourceBindings))
+	for _, binding := range sourceBindings {
+		bindings = append(bindings, model.AIAppVersionToolBinding{AppVersionID: target.ID, ToolName: binding.ToolName})
+	}
+	if len(bindings) > 0 {
+		return tx.Create(&bindings).Error
+	}
+	return nil
+}
+
 func createAIAppVersionSnapshot(tx *gorm.DB, app model.AIApp, config string, retrievalConfig aiAppRetrievalConfig, source model.AIAppVersion) (model.AIAppVersion, error) {
 	var latest model.AIAppVersion
 	if err := tx.Where("app_id = ?", app.ID).Order("number DESC").First(&latest).Error; err != nil && err != gorm.ErrRecordNotFound {
 		return model.AIAppVersion{}, err
 	}
-	version := model.AIAppVersion{AppID: app.ID, Number: latest.Number + 1, Config: config, RetrievalConfig: serializeAIAppRetrievalConfig(retrievalConfig), KnowledgeBaseSnapshot: true}
+	version := model.AIAppVersion{AppID: app.ID, Number: latest.Number + 1, Config: config, RetrievalConfig: serializeAIAppRetrievalConfig(retrievalConfig), KnowledgeBaseSnapshot: true, ToolSnapshot: true}
 	if err := tx.Create(&version).Error; err != nil {
 		return model.AIAppVersion{}, err
 	}
 	if err := copyAIAppVersionKnowledgeBaseSnapshot(tx, app, source, version); err != nil {
+		return model.AIAppVersion{}, err
+	}
+	if err := copyAIAppVersionToolSnapshot(tx, app, source, version); err != nil {
 		return model.AIAppVersion{}, err
 	}
 	return version, nil
@@ -502,7 +530,7 @@ func DebugAIApp(c *gin.Context) {
 		messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleSystem, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &system}})
 	}
 	messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleUser, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &message}})
-	registry, toolNames, toolErr := resolveAIAppTools(database.GetDB(), app.ID)
+	registry, toolNames, toolErr := resolveAIAppTools(database.GetDB(), app.ID, version)
 	if toolErr != nil {
 		persistAIAppRun(app, version, userID, "failed", arkConfig.Model, message, "", "AI_TOOL_REGISTRY_UNAVAILABLE", started)
 		Error(c, http.StatusInternalServerError, "加载智能体工具失败")
@@ -803,8 +831,13 @@ func ListAIAppToolBindings(c *gin.Context) {
 	if !found {
 		return
 	}
-	var bindings []model.AIAppToolBinding
-	if err := database.GetDB().Where("app_id = ?", app.ID).Order("tool_name ASC").Find(&bindings).Error; err != nil {
+	var version model.AIAppVersion
+	if app.DraftVersionID == 0 || database.GetDB().Where("id = ? AND app_id = ?", app.DraftVersionID, app.ID).First(&version).Error != nil {
+		Error(c, http.StatusNotFound, "草稿版本不存在")
+		return
+	}
+	var bindings []model.AIAppVersionToolBinding
+	if err := database.GetDB().Where("app_version_id = ?", version.ID).Order("tool_name ASC").Find(&bindings).Error; err != nil {
 		Error(c, 500, "加载智能体工具失败")
 		return
 	}
@@ -1001,12 +1034,9 @@ func ReplaceAIAppTools(c *gin.Context) {
 		Error(c, 400, "工具参数错误")
 		return
 	}
-	allowed := map[string]bool{}
-	for _, tool := range builtInAITools {
-		allowed[tool["name"].(string)] = true
-	}
+	allowed := map[string]bool{"content.search": true}
 	seen := map[string]bool{}
-	bindings := make([]model.AIAppToolBinding, 0, len(payload.Tools))
+	bindings := make([]model.AIAppVersionToolBinding, 0, len(payload.Tools))
 	for _, name := range payload.Tools {
 		name = strings.TrimSpace(name)
 		if !allowed[name] {
@@ -1015,22 +1045,41 @@ func ReplaceAIAppTools(c *gin.Context) {
 		}
 		if !seen[name] {
 			seen[name] = true
-			bindings = append(bindings, model.AIAppToolBinding{AppID: app.ID, ToolName: name})
+			bindings = append(bindings, model.AIAppVersionToolBinding{ToolName: name})
 		}
 	}
+	var version model.AIAppVersion
 	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("app_id = ?", app.ID).Delete(&model.AIAppToolBinding{}).Error; err != nil {
+		var source model.AIAppVersion
+		if app.DraftVersionID == 0 || tx.Where("id = ? AND app_id = ?", app.DraftVersionID, app.ID).First(&source).Error != nil {
+			return gorm.ErrRecordNotFound
+		}
+		retrievalConfig, err := parseAIAppRetrievalConfig(source.RetrievalConfig)
+		if err != nil {
 			return err
 		}
-		if len(bindings) > 0 {
-			return tx.Create(&bindings).Error
+		var createErr error
+		version, createErr = createAIAppVersionSnapshot(tx, app, source.Config, retrievalConfig, source)
+		if createErr != nil {
+			return createErr
 		}
-		return nil
+		if err := tx.Where("app_version_id = ?", version.ID).Delete(&model.AIAppVersionToolBinding{}).Error; err != nil {
+			return err
+		}
+		for index := range bindings {
+			bindings[index].AppVersionID = version.ID
+		}
+		if len(bindings) > 0 {
+			if err := tx.Create(&bindings).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Model(&app).Update("draft_version_id", version.ID).Error
 	}); err != nil {
 		Error(c, 500, "保存工具绑定失败")
 		return
 	}
-	Success(c, gin.H{"tools": payload.Tools})
+	Success(c, gin.H{"tools": payload.Tools, "version": version})
 }
 
 func ListAIKnowledgeBases(c *gin.Context) {
@@ -1164,14 +1213,24 @@ var scheduleAIKnowledgeDocumentIndexing = func(documentID model.Int64String) {
 	go indexAIKnowledgeDocument(documentID)
 }
 
-func resolveAIAppTools(db *gorm.DB, appID model.Int64String) (*tools.Registry, []string, error) {
+func resolveAIAppTools(db *gorm.DB, appID model.Int64String, version model.AIAppVersion) (*tools.Registry, []string, error) {
 	registry := tools.NewRegistry()
 	if db == nil {
 		return registry, nil, errors.New("AI_TOOL_REGISTRY_UNAVAILABLE")
 	}
-	var bindings []model.AIAppToolBinding
-	if err := db.Where("app_id = ?", appID).Order("tool_name ASC").Find(&bindings).Error; err != nil {
-		return registry, nil, err
+	var bindings []model.AIAppVersionToolBinding
+	if version.ToolSnapshot {
+		if err := db.Where("app_version_id = ?", version.ID).Order("tool_name ASC").Find(&bindings).Error; err != nil {
+			return registry, nil, err
+		}
+	} else {
+		var legacyBindings []model.AIAppToolBinding
+		if err := db.Where("app_id = ?", appID).Order("tool_name ASC").Find(&legacyBindings).Error; err != nil {
+			return registry, nil, err
+		}
+		for _, binding := range legacyBindings {
+			bindings = append(bindings, model.AIAppVersionToolBinding{ToolName: binding.ToolName})
+		}
 	}
 	allowed := make([]string, 0, len(bindings))
 	for _, binding := range bindings {

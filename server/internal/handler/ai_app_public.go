@@ -111,7 +111,7 @@ func PublicAIAppChat(c *gin.Context) {
 	if knowledgeContext != "" {
 		system = strings.TrimSpace(system + "\n\n以下是与当前问题相关的私有参考资料。请优先依据这些资料回答；资料不足时明确说明。\n" + knowledgeContext)
 	}
-	registry, toolNames, toolErr := resolveAIAppTools(database.GetDB(), app.ID)
+	registry, toolNames, toolErr := resolveAIAppTools(database.GetDB(), app.ID, version)
 	if toolErr != nil {
 		persistAIAppPublicInvocation(app, version.ID, *key, "failed", payload.Stream, "AI_TOOL_REGISTRY_UNAVAILABLE", dailyCallNumber, started)
 		writePublicAIAppError(c, http.StatusInternalServerError, "AI_TOOL_REGISTRY_UNAVAILABLE", "应用工具不可用")

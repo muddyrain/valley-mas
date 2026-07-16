@@ -1,5 +1,6 @@
 import { MessageCircle } from 'lucide-react';
-import { Outlet } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AIPanel } from '@/layouts/AIPanel';
@@ -9,6 +10,13 @@ import { useLayoutStore } from '@/stores/useLayoutStore';
 export default function WorkbenchLayout() {
   const aiPanelOpen = useLayoutStore((s) => s.aiPanelOpen);
   const toggleAIPanel = useLayoutStore((s) => s.toggleAIPanel);
+  const setAIPanelOpen = useLayoutStore((s) => s.setAIPanelOpen);
+  const location = useLocation();
+  const isAIAppWorkspace = location.pathname.startsWith('/workbench/apps/');
+
+  useEffect(() => {
+    if (isAIAppWorkspace && aiPanelOpen) setAIPanelOpen(false);
+  }, [aiPanelOpen, isAIAppWorkspace, setAIPanelOpen]);
 
   return (
     <TooltipProvider>
@@ -22,12 +30,18 @@ export default function WorkbenchLayout() {
         </main>
 
         {/* AI Panel */}
-        {aiPanelOpen && <AIPanel />}
+        {!isAIAppWorkspace && aiPanelOpen && <AIPanel />}
 
         {/* AI Panel Toggle (when closed) */}
-        {!aiPanelOpen && (
+        {!isAIAppWorkspace && !aiPanelOpen && (
           <div className="fixed right-4 bottom-4 z-50 hidden md:block">
-            <Button size="icon" onClick={toggleAIPanel} className="rounded-full shadow-lg">
+            <Button
+              size="icon"
+              onClick={toggleAIPanel}
+              className="rounded-full shadow-lg"
+              aria-label="打开快速助手"
+              title="打开快速助手"
+            >
               <MessageCircle className="h-5 w-5" />
             </Button>
           </div>

@@ -1,0 +1,25 @@
+<h2>节点运行详情应该放在哪里？</h2>
+<p class="subtitle">目标：画布保持稳定，连接线不因查看结果而重排。</p>
+
+<div class="cards">
+  <div class="card" data-choice="side-panel" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup"><div class="mockup-header">推荐：固定画布 + 右侧详情</div><div class="mockup-body" style="display:flex;gap:10px;min-height:150px"><div style="flex:1;padding:24px 8px;display:flex;align-items:center;justify-content:space-around;background-image:radial-gradient(#d5dbe7 1px, transparent 1px);background-size:12px 12px"><span class="mock-button">开始</span><span style="color:#6799f7">───→</span><span class="mock-button">生成正文</span><span style="color:#6799f7">───→</span><span class="mock-button">结束</span></div><div style="width:34%;border-left:1px solid #e5e7eb;padding:12px"><b>运行详情</b><p style="font-size:12px">状态：成功<br>耗时：3519ms<br>输入 / 输出摘要</p></div></div></div>
+    </div>
+    <div class="card-body"><h3>A · 右侧详情面板</h3><p>点击节点查看配置或运行结果；节点尺寸与连线始终不变。</p></div>
+  </div>
+  <div class="card" data-choice="bottom-panel" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup"><div class="mockup-header">画布稳定 + 底部运行详情</div><div class="mockup-body" style="min-height:150px"><div style="height:86px;padding:28px;display:flex;align-items:center;justify-content:space-around;background-image:radial-gradient(#d5dbe7 1px, transparent 1px);background-size:12px 12px"><span class="mock-button">检索知识库</span><span style="color:#6799f7">───→</span><span class="mock-button">生成正文</span></div><div style="padding:12px;border-top:1px solid #e5e7eb;font-size:12px"><b>节点运行详情</b>　成功 · 3519ms · 可复制输入 / 输出摘要</div></div></div>
+    </div>
+    <div class="card-body"><h3>B · 底部详情面板</h3><p>沿用现有试运行区域，配置仍留在右侧；适合较宽屏幕。</p></div>
+  </div>
+  <div class="card" data-choice="anchored-popover" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup"><div class="mockup-header">节点旁浮层</div><div class="mockup-body" style="position:relative;min-height:150px;padding:38px;display:flex;gap:32px;align-items:center;background-image:radial-gradient(#d5dbe7 1px, transparent 1px);background-size:12px 12px"><span class="mock-button">生成正文</span><span class="mock-button">创建草稿</span><div style="position:absolute;left:52px;top:88px;background:#fff;border:1px solid #d9dee8;border-radius:8px;padding:8px;font-size:11px;box-shadow:0 8px 20px #0001">运行成功<br>输入 / 输出摘要</div></div></div>
+    </div>
+    <div class="card-body"><h3>C · 节点旁浮层</h3><p>不改变节点高度，但会遮挡画布，窄屏和多节点时较拥挤。</p></div>
+  </div>
+</div>
+
+<p class="subtitle">点击选择一个方案；我推荐 A：配置与运行详情统一在右侧，画布只表达流程。</p>
