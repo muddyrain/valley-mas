@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -11,11 +10,13 @@ import (
 	"valley-server/internal/ai/agent"
 	"valley-server/internal/ai/tools"
 	"valley-server/internal/ai/tools/content"
+	"valley-server/internal/aiapp"
 	"valley-server/internal/aiclient"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
 	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 )
@@ -85,10 +86,8 @@ func PublicAIAppChat(c *gin.Context) {
 		writePublicAIAppError(c, http.StatusBadGateway, "PUBLISHED_VERSION_NOT_FOUND", "已发布版本不可用")
 		return
 	}
-	var config struct {
-		SystemPrompt string `json:"systemPrompt"`
-	}
-	if json.Unmarshal([]byte(version.Config), &config) != nil {
+	config, configParseErr := aiapp.Parse(version.Config)
+	if configParseErr != nil {
 		persistAIAppPublicInvocation(app, version.ID, *key, "failed", payload.Stream, "APP_CONFIG_INVALID", dailyCallNumber, started)
 		writePublicAIAppError(c, http.StatusBadGateway, "APP_CONFIG_INVALID", "应用配置无效")
 		return
@@ -103,8 +102,10 @@ func PublicAIAppChat(c *gin.Context) {
 	message := truncateAIAgentRunes(payload.Message, 12000)
 	knowledgeContext, _, retrievalErr := retrieveAIKnowledgeContext(c.Request.Context(), key.UserID, version, message)
 	if retrievalErr != nil {
-		persistAIAppPublicInvocation(app, version.ID, *key, "failed", payload.Stream, "KNOWLEDGE_RETRIEVAL_FAILED", dailyCallNumber, started)
-		writePublicAIAppError(c, http.StatusBadGateway, "KNOWLEDGE_RETRIEVAL_FAILED", "知识库检索暂不可用")
+		code, publicMessage := aiKnowledgeRetrievalFailure(retrievalErr)
+		logAIKnowledgeRetrievalFailure(c, retrievalErr, logrus.Fields{"app_id": app.ID, "version_id": version.ID, "feature": "ai-workbench-public"})
+		persistAIAppPublicInvocation(app, version.ID, *key, "failed", payload.Stream, code, dailyCallNumber, started)
+		writePublicAIAppError(c, http.StatusBadGateway, code, publicMessage)
 		return
 	}
 	system := strings.TrimSpace(config.SystemPrompt)

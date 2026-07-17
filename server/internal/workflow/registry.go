@@ -53,7 +53,16 @@ func RegisterBlogWorkflowExecutors(registry *Registry, generator TextGenerator) 
 	return nil
 }
 
-// RegisterCoreWorkflowExecutors enables runtime execution for non-blog utility nodes.
+// RegisterSafeVariableExecutor enables only the string/template variable node.
+// It is intentionally separate from HTTP and code so composition roots cannot
+// accidentally broaden the workflow security boundary.
+func RegisterSafeVariableExecutor(registry *Registry) error {
+	return registry.RegisterExecutor(VariableExecutor{})
+}
+
+// RegisterCoreWorkflowExecutors is retained for isolated tests and future
+// security-reviewed composition roots. Production must register capabilities
+// individually through the narrow helpers above.
 func RegisterCoreWorkflowExecutors(registry *Registry) error {
 	for _, executor := range []NodeExecutor{
 		VariableExecutor{},

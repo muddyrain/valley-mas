@@ -3,14 +3,17 @@ import {
   Bot,
   Copy,
   History,
+  ImagePlus,
   KeyRound,
   MessageCircle,
   Play,
   RotateCcw,
   Save,
   Send,
+  Sparkles,
   Square,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -27,6 +30,7 @@ import {
   type AIKnowledgeReference,
   createAIAPIKey,
   createAIAppConversation,
+  generateAIAppAvatar,
   getAIAPIKeyDailyUsage,
   getAIApp,
   getAPIErrorMessage,
@@ -38,6 +42,7 @@ import {
   listAIAppToolBindings,
   listAIAppTools,
   listAIKnowledgeBases,
+  type PromptAssistantField,
   publishAIApp,
   replaceAIAPIKeyAppBindings,
   replaceAIAppKnowledgeBases,
@@ -46,10 +51,13 @@ import {
   revokeAIAPIKey,
   saveAIAppVersion,
   streamDebugAIApp,
+  uploadAIAppAvatar,
 } from '@/api/aiWorkbench';
+import { AgentAvatar } from '@/components/ai-workbench/AgentAvatar';
 import { AIResponseContext } from '@/components/ai-workbench/AIResponseContext';
 import { EditorPageHeader } from '@/components/ai-workbench/EditorPageHeader';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
+import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import {
   AlertDialog,
@@ -76,6 +84,7 @@ import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { KnowledgeBaseBindings } from '@/components/workbench/KnowledgeBaseBindings';
@@ -155,7 +164,10 @@ export default function AIAppEditor() {
   const [generatedAPIKey, setGeneratedAPIKey] = useState<string | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<AIAPIKey | null>(null);
   const [publicInvocations, setPublicInvocations] = useState<AIAppPublicInvocation[]>([]);
+  const [assistantField, setAssistantField] = useState<PromptAssistantField | null>(null);
+  const [avatarAction, setAvatarAction] = useState<'generate' | 'upload' | null>(null);
   const abortDebugRef = useRef<AbortController | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!appId) return;
@@ -430,6 +442,39 @@ while (true) {
 }`;
   const activeAPIKeys = apiKeys.filter((key) => key.status === 'active');
 
+  const generateAvatar = async () => {
+    if (!appId) return;
+    setAvatarAction('generate');
+    try {
+      const result = await generateAIAppAvatar(appId, {
+        name,
+        description,
+        systemPrompt: config.systemPrompt,
+      });
+      setApp(result.app);
+      toast.success('头像已生成');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '头像生成失败'));
+    } finally {
+      setAvatarAction(null);
+    }
+  };
+
+  const uploadAvatar = async (file?: File) => {
+    if (!appId || !file) return;
+    setAvatarAction('upload');
+    try {
+      const result = await uploadAIAppAvatar(appId, file);
+      setApp(result.app);
+      toast.success('头像已更新');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '头像上传失败'));
+    } finally {
+      setAvatarAction(null);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
+  };
+
   const debug = async () => {
     if (!appId || !debugMessage.trim()) {
       toast.error('请输入调试消息');
@@ -559,6 +604,43 @@ while (true) {
                 <TabsContent value="compose" className="w-full">
                   <FieldGroup>
                     <Field>
+                      <FieldLabel>头像</FieldLabel>
+                      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/20 p-3">
+                        <AgentAvatar name={name} src={app.avatarUrl} className="size-16" />
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={avatarAction !== null}
+                            onClick={() => void generateAvatar()}
+                          >
+                            <ImagePlus className="mr-2 size-4" />
+                            {avatarAction === 'generate'
+                              ? 'AI 生成中…'
+                              : `AI ${app.avatarUrl ? '重新生成' : '生成'}`}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={avatarAction !== null}
+                            onClick={() => avatarInputRef.current?.click()}
+                          >
+                            <Upload className="mr-2 size-4" />
+                            {avatarAction === 'upload' ? '上传中…' : '上传图片'}
+                          </Button>
+                          <input
+                            ref={avatarInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="sr-only"
+                            onChange={(event) => void uploadAvatar(event.target.files?.[0])}
+                          />
+                        </div>
+                      </div>
+                    </Field>
+                    <Field>
                       <FieldLabel htmlFor="app-name">名称</FieldLabel>
                       <Input
                         id="app-name"
@@ -568,7 +650,18 @@ while (true) {
                       />
                     </Field>
                     <Field>
-                      <FieldLabel htmlFor="app-description">简介</FieldLabel>
+                      <div className="flex items-center justify-between gap-3">
+                        <FieldLabel htmlFor="app-description">简介</FieldLabel>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAssistantField('description')}
+                        >
+                          <Sparkles className="mr-2 size-4" />
+                          AI 生成
+                        </Button>
+                      </div>
                       <Input
                         id="app-description"
                         value={description}
@@ -577,7 +670,18 @@ while (true) {
                       />
                     </Field>
                     <Field>
-                      <FieldLabel htmlFor="system-prompt">系统提示词</FieldLabel>
+                      <div className="flex items-center justify-between gap-3">
+                        <FieldLabel htmlFor="system-prompt">系统提示词</FieldLabel>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAssistantField('system_prompt')}
+                        >
+                          <Sparkles className="mr-2 size-4" />
+                          AI 优化
+                        </Button>
+                      </div>
                       <Textarea
                         id="system-prompt"
                         value={config.systemPrompt}
@@ -588,7 +692,18 @@ while (true) {
                       />
                     </Field>
                     <Field>
-                      <FieldLabel htmlFor="opening-message">开场白</FieldLabel>
+                      <div className="flex items-center justify-between gap-3">
+                        <FieldLabel htmlFor="opening-message">开场白</FieldLabel>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAssistantField('opening_message')}
+                        >
+                          <Sparkles className="mr-2 size-4" />
+                          AI 生成
+                        </Button>
+                      </div>
                       <Textarea
                         id="opening-message"
                         value={config.openingMessage}
@@ -597,6 +712,42 @@ while (true) {
                           setConfig((value) => ({ ...value, openingMessage: event.target.value }))
                         }
                       />
+                    </Field>
+                    <Field>
+                      <div className="flex items-center justify-between gap-3">
+                        <FieldLabel>示例问题（最多 4 条）</FieldLabel>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAssistantField('example_questions')}
+                        >
+                          <Sparkles className="mr-2 size-4" />
+                          AI 生成
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        {Array.from({ length: 4 }, (_, index) => (
+                          <Input
+                            key={index}
+                            value={config.exampleQuestions[index] || ''}
+                            maxLength={120}
+                            placeholder={`示例问题 ${index + 1}`}
+                            onChange={(event) =>
+                              setConfig((value) => {
+                                const next = [...value.exampleQuestions];
+                                next[index] = event.target.value;
+                                return {
+                                  ...value,
+                                  exampleQuestions: next.filter(
+                                    (item, itemIndex) => itemIndex <= index || item.trim(),
+                                  ),
+                                };
+                              })
+                            }
+                          />
+                        ))}
+                      </div>
                     </Field>
                   </FieldGroup>
                 </TabsContent>
@@ -802,41 +953,90 @@ while (true) {
                 </TabsContent>
               </Tabs>
             </div>
-            <aside className="flex flex-col gap-5 bg-muted/25 p-6 sm:p-8 lg:border-l lg:border-border/70">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">在线调试</p>
-                  <p className="mt-1 text-xs text-muted-foreground">使用当前草稿版本运行</p>
-                </div>
-                <Badge variant="outline">草稿</Badge>
-              </div>
-              <Textarea
-                value={debugMessage}
-                placeholder="输入一条消息，使用当前草稿版本测试"
-                onChange={(event) => setDebugMessage(event.target.value)}
-              />
-              <Button className="self-start" disabled={debugging} onClick={debug}>
-                <Play data-icon="inline-start" />
-                {debugging ? '正在运行…' : '运行调试'}
-              </Button>
-              {debugging && (
-                <Button
-                  className="self-start"
-                  variant="ghost"
-                  onClick={() => abortDebugRef.current?.abort()}
-                >
-                  <Square data-icon="inline-start" />
-                  停止
-                </Button>
-              )}
-              {debugReply && (
-                <div className="flex flex-col gap-4">
-                  <div className="whitespace-pre-wrap rounded-xl bg-background px-4 py-3 text-sm leading-6 shadow-xs ring-1 ring-border/80">
-                    {debugReply}
+            <aside className="flex flex-col gap-4 bg-muted/25 p-5 sm:p-6 lg:border-l lg:border-border/70">
+              <Card size="sm" className="gap-0 shadow-none">
+                <CardHeader className="border-b border-border bg-muted/30">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background ring-1 ring-border">
+                        <Bot className="size-4 text-primary" />
+                      </div>
+                      <div>
+                        <CardTitle>在线调试</CardTitle>
+                        <CardDescription>直接测试当前草稿</CardDescription>
+                      </div>
+                    </div>
+                    <Badge variant="secondary">草稿</Badge>
                   </div>
-                </div>
-              )}
-              <AIResponseContext toolStatus={debugToolStatus} references={debugReferences} />
+                </CardHeader>
+                <CardContent className="space-y-3 pt-4">
+                  <Textarea
+                    value={debugMessage}
+                    className="min-h-28 resize-y bg-background"
+                    placeholder="输入一条消息，看看智能体会如何回答"
+                    onChange={(event) => setDebugMessage(event.target.value)}
+                  />
+                  {config.exampleQuestions.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {config.exampleQuestions.slice(0, 2).map((question) => (
+                        <Button
+                          key={question}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="max-w-full justify-start font-normal"
+                          disabled={debugging}
+                          onClick={() => setDebugMessage(question)}
+                        >
+                          <span className="truncate">{question}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="flex justify-end">
+                    <Button
+                      variant={debugging ? 'outline' : 'default'}
+                      disabled={!debugging && !debugMessage.trim()}
+                      onClick={() => {
+                        if (debugging) {
+                          abortDebugRef.current?.abort();
+                        } else {
+                          void debug();
+                        }
+                      }}
+                    >
+                      {debugging ? (
+                        <Square data-icon="inline-start" />
+                      ) : (
+                        <Play data-icon="inline-start" />
+                      )}
+                      {debugging ? '停止生成' : '开始调试'}
+                    </Button>
+                  </div>
+                  {debugging && !debugReply ? (
+                    <div className="space-y-3 rounded-lg bg-muted/50 p-3" aria-live="polite">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Bot className="size-3.5" />
+                        智能体正在思考
+                      </div>
+                      <Skeleton className="h-3 w-full" />
+                      <Skeleton className="h-3 w-4/5" />
+                    </div>
+                  ) : null}
+                  {debugReply ? (
+                    <div className="overflow-hidden rounded-lg border border-border bg-background">
+                      <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
+                        <AgentAvatar name={name} src={app.avatarUrl} className="size-5" />
+                        {name || '智能体'}的回复
+                      </div>
+                      <div className="whitespace-pre-wrap px-3 py-3 text-sm leading-6">
+                        {debugReply}
+                      </div>
+                    </div>
+                  ) : null}
+                  <AIResponseContext toolStatus={debugToolStatus} references={debugReferences} />
+                </CardContent>
+              </Card>
               <Separator />
               <div className="flex flex-col gap-3">
                 <p className="text-sm font-semibold">最近运行</p>
@@ -912,6 +1112,65 @@ while (true) {
           </div>
         </CardContent>
       </Card>
+      <PromptAssistantDialog
+        open={assistantField !== null}
+        onOpenChange={(open) => {
+          if (!open) setAssistantField(null);
+        }}
+        appId={appId || ''}
+        field={assistantField || 'system_prompt'}
+        currentPrompt={
+          assistantField === 'description'
+            ? description
+            : assistantField === 'opening_message'
+              ? config.openingMessage
+              : assistantField === 'example_questions'
+                ? config.exampleQuestions.join('\n')
+                : config.systemPrompt
+        }
+        agentContext={{
+          name,
+          description,
+          systemPrompt: config.systemPrompt,
+          openingMessage: config.openingMessage,
+          exampleQuestions: config.exampleQuestions,
+        }}
+        runs={runs}
+        onReplace={(suggestion, includeGreetings) => {
+          if (assistantField === 'description') {
+            setDescription(suggestion.description || description);
+            toast.success('已更新简介草稿，尚未保存版本');
+            return;
+          }
+          if (assistantField === 'opening_message') {
+            setConfig((value) => ({
+              ...value,
+              openingMessage: suggestion.openingMessage || value.openingMessage,
+            }));
+            toast.success('已更新开场白草稿，尚未保存版本');
+            return;
+          }
+          if (assistantField === 'example_questions') {
+            setConfig((value) => ({
+              ...value,
+              exampleQuestions: suggestion.exampleQuestions || value.exampleQuestions,
+            }));
+            toast.success('已更新示例问题草稿，尚未保存版本');
+            return;
+          }
+          setConfig((value) => ({
+            ...value,
+            systemPrompt: suggestion.optimizedPrompt,
+            openingMessage: includeGreetings
+              ? suggestion.openingMessage || value.openingMessage
+              : value.openingMessage,
+            exampleQuestions: includeGreetings
+              ? suggestion.exampleQuestions || value.exampleQuestions
+              : value.exampleQuestions,
+          }));
+          toast.success('已替换当前草稿，尚未保存版本');
+        }}
+      />
       <Dialog open={showVersionHistory} onOpenChange={setShowVersionHistory}>
         <DialogContent className="max-h-[calc(100vh-2rem)] max-w-2xl gap-4 overflow-hidden">
           <DialogHeader className="pr-10">

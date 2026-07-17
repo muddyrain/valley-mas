@@ -117,6 +117,14 @@
 }
 
 @layer base {
+  *,
+  ::before,
+  ::after,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: hsl(var(--border));
+  }
+
   html {
     width: 100%;
     overflow-x: hidden;

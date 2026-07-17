@@ -579,6 +579,7 @@ func upgradeLegacyOutputReferences(graph *workflow.Graph) {
 func workflowRuntimeRegistry() *workflow.Registry {
 	registry := workflow.DefaultRegistry()
 	_ = workflow.RegisterBlogWorkflowExecutors(registry, nil)
+	_ = workflow.RegisterSafeVariableExecutor(registry)
 	return registry
 }
 

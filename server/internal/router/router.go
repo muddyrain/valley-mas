@@ -133,12 +133,16 @@ func Setup(cfg *config.Config) *gin.Engine {
 			// AI Workbench platform assets. Legacy /ai/agents and /workflows remain supported.
 			auth.GET("/ai/apps", handler.ListAIApps)
 			auth.POST("/ai/apps", handler.CreateAIApp)
+			auth.POST("/ai/app-assistant/proposals", handler.CreateAIAppProposal)
+			auth.POST("/ai/prompt-assistant/suggestions", handler.CreatePromptAssistantSuggestion)
 			auth.GET("/ai/apps/tools", handler.ListAIAppTools)
 			auth.GET("/ai/apps/:appId", handler.GetAIApp)
 			auth.POST("/ai/apps/:appId/versions", handler.SaveAIAppVersion)
 			auth.POST("/ai/apps/:appId/restore", handler.RestoreAIAppVersion)
 			auth.POST("/ai/apps/:appId/publish", handler.PublishAIApp)
 			auth.POST("/ai/apps/:appId/debug", handler.DebugAIApp)
+			auth.POST("/ai/apps/:appId/avatar/generate", handler.GenerateAIAppAvatar)
+			auth.POST("/ai/apps/:appId/avatar", handler.UploadAIAppAvatar)
 			auth.GET("/ai/apps/:appId/runs", handler.ListAIAppRuns)
 			auth.GET("/ai/apps/:appId/conversations", handler.ListAIAppConversations)
 			auth.POST("/ai/apps/:appId/conversations", handler.CreateAIAppConversation)
@@ -193,6 +197,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			// Workflow 工作流（用户侧）
 			auth.GET("/workflows", handler.AdminListWorkflows)
 			auth.POST("/workflows", handler.AdminCreateWorkflow)
+			auth.POST("/workflows/ai-draft", handler.CreateAIWorkflowDraft)
 			auth.GET("/workflows/:id", handler.AdminGetWorkflow)
 			auth.PUT("/workflows/:id", handler.AdminUpdateWorkflow)
 			auth.GET("/workflows/:id/platform", handler.GetWorkflowPlatform)
@@ -202,6 +207,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/workflows/:id/run", handler.AdminRunWorkflow)
 			auth.GET("/workflows/:id/runs", handler.AdminListWorkflowRuns)
 			auth.GET("/workflows/:id/runs/:runId", handler.AdminGetWorkflowRun)
+			auth.POST("/workflows/:id/runs/:runId/explain", handler.ExplainWorkflowRun)
 		}
 
 		admin := api.Group("/admin")

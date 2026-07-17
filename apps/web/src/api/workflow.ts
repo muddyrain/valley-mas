@@ -90,6 +90,42 @@ export interface WorkflowRunDetail {
   nodes: WorkflowNodeRun[];
 }
 
+export interface AIWorkflowDraft {
+  name: string;
+  description: string;
+  graph: {
+    schemaVersion: 2;
+    nodes: Array<{ id: string; type: string; config: Record<string, unknown> }>;
+    edges: Array<{
+      source: string;
+      sourceHandle?: string;
+      target: string;
+      targetHandle?: string;
+    }>;
+  };
+}
+
+export interface WorkflowRunExplanation {
+  cause: string;
+  suggestions: string[];
+  nodeId: string;
+}
+
+export function createAIWorkflowDraft(
+  description: string,
+  current?: AIWorkflowDraft,
+  signal?: AbortSignal,
+): Promise<{ draft: AIWorkflowDraft }> {
+  return request.post('/workflows/ai-draft', { description, current }, { signal });
+}
+
+export function explainWorkflowRun(
+  id: string,
+  runId: string,
+): Promise<{ explanation: WorkflowRunExplanation }> {
+  return request.post(`/workflows/${id}/runs/${runId}/explain`);
+}
+
 export interface WorkflowVersion {
   id: string;
   number: number;

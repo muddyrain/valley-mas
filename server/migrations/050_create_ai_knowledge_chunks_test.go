@@ -26,3 +26,16 @@ func TestAIKnowledgeDocumentProgressMigrationBackfillsReadyDocuments(t *testing.
 		t.Fatal("migration must add progress and backfill indexed documents")
 	}
 }
+
+func TestKnowledgeEmbeddingTypeRepairMigrationConvertsLegacyText(t *testing.T) {
+	contents, err := os.ReadFile("055_convert_ai_knowledge_chunk_embeddings_to_vector.sql")
+	if err != nil {
+		t.Fatalf("read migration: %v", err)
+	}
+	statement := string(contents)
+	if !strings.Contains(statement, "attributes.atttypid = 'text'::regtype") ||
+		!strings.Contains(statement, "ALTER COLUMN embedding TYPE vector") ||
+		!strings.Contains(statement, "NULLIF(BTRIM(embedding), '')::vector") {
+		t.Fatal("migration must safely convert legacy text embeddings to pgvector")
+	}
+}

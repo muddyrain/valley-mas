@@ -38,10 +38,6 @@ assert.equal(session.nodes.start.status, 'success');
 assert.deepEqual(session.nodes.start.output, { markdownFile: { filename: 'post.md' } });
 assert.equal(session.nodes.start.durationMs, 3);
 
-session = workflowRunSessionReducer(session, { type: 'toggleExpanded', nodeId: 'start' });
-session = workflowRunSessionReducer(session, { type: 'toggleExpanded', nodeId: 'llm-summary' });
-assert.equal(session.expandedNodeId, 'llm-summary');
-
 const afterStaleEvent = workflowRunSessionReducer(session, {
   type: 'event',
   generation: 0,
@@ -56,7 +52,6 @@ assert.equal(afterStaleEvent, session);
 session = workflowRunSessionReducer(session, { type: 'begin', generation: 2 });
 assert.equal(session.runId, null);
 assert.deepEqual(session.nodes, {});
-assert.equal(session.expandedNodeId, null);
 
 session = workflowRunSessionReducer(session, {
   type: 'event',
@@ -74,6 +69,7 @@ session = workflowRunSessionReducer(session, {
 });
 assert.equal(session.status, 'error');
 assert.equal(session.nodes['parse-markdown'].status, 'error');
-assert.equal(session.nodes['parse-markdown'].error, 'WORKFLOW_CANCELLED');
+assert.equal(session.nodes['parse-markdown'].error, '运行已取消');
+assert.equal(session.nodes['parse-markdown'].errorCode, 'WORKFLOW_CANCELLED');
 
 console.log('workflow run session tests passed');

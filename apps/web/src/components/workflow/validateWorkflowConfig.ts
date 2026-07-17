@@ -45,6 +45,8 @@ function getVariableReferenceValues(nodeType: string, config: Record<string, unk
       ];
     case 'end':
       return Object.values((config.outputs as Record<string, unknown>) || {});
+    case 'variable':
+      return [config.valueExpression];
     default:
       return [];
   }
@@ -133,6 +135,13 @@ function validateNodeData(node: Node, nodes: Node[], edges: Edge[]): ValidationE
           nodeType: data.nodeType,
           message: '请填写变量名和值表达式',
         };
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(String(config.variableName)))
+        return {
+          nodeId,
+          nodeLabel: data.label,
+          nodeType: data.nodeType,
+          message: '变量名只能包含字母、数字和下划线，且不能以数字开头',
+        };
       break;
     case 'http':
       if (!config.url)
@@ -216,9 +225,18 @@ function validateNodeData(node: Node, nodes: Node[], edges: Edge[]): ValidationE
 }
 
 export function validateWorkflowConfig(nodes: Node[], edges: Edge[] = []): ValidationError[] {
-  return nodes
+  const errors = nodes
     .map((node) => validateNodeData(node, nodes, edges))
     .filter((error): error is ValidationError => error !== null);
+  if (nodes.length > 8) {
+    errors.unshift({
+      nodeId: nodes[0]?.id || 'workflow',
+      nodeLabel: '工作流',
+      nodeType: 'workflow',
+      message: 'Graph v2 最多支持 8 个节点',
+    });
+  }
+  return errors;
 }
 export function validateSingleNode(data: NodeData): ValidationError | null {
   return validateNodeData(

@@ -25,6 +25,7 @@ description: Web 页面改动时使用，统一检查主题 token、品牌色、
 ## 必须
 
 - 使用项目主题 token、`theme-*` 工具类或已有组件承接主视觉。
+- 新增或修改 `border`、`border-b` 等边框 utility 时，必须同时使用 `border-border`、`border-border/xx` 或明确的语义边框色，不能依赖浏览器的 `currentColor` 回退。
 - 使用已有 loading 组件处理加载态；中大型内容容器使用 `BoxLoadingOverlay`，小媒体位使用 `MediaLoadingOverlay`。
 - 让列表页搜索、筛选、分页状态支持刷新和浏览器回退一致性。
 - 在发现重复 UI 结构或重复 handler 时使用 `component-reuse-guard`。
@@ -32,6 +33,7 @@ description: Web 页面改动时使用，统一检查主题 token、品牌色、
 ## 禁止
 
 - 为单个页面创建脱离全站主题的独立色系。
+- 使用没有主题颜色的裸 `border`、`border-b`、`border-t` 等边框 utility。
 - 使用硬编码高饱和颜色作为主按钮、主 Banner、页面大背景或高频入口色。
 - 复制粘贴 spinner、遮罩或 loading JSX。
 - 仅用组件内 `useState` 管理列表页真实搜索、筛选和分页条件。
@@ -87,6 +89,7 @@ const page = Math.max(1, Number(searchParams.get("page") ?? 1));
 ## 最终 Checklist
 
 - [ ] 是否复用主题 token、`theme-*` 工具类或已有组件。
+- [ ] 新增边框是否显式使用主题或语义边框色，没有回退成 `currentColor`。
 - [ ] 是否没有新增单页独立色系或高饱和主视觉。
 - [ ] loading 是否使用已有 loading 组件。
 - [ ] 是否没有复制 spinner / overlay JSX。

@@ -18,11 +18,43 @@ export interface AIApp {
   workflowId?: string;
   name: string;
   description: string;
+  avatarUrl: string;
+  avatarSource: 'default' | 'ai' | 'upload';
   status: 'draft' | 'published';
   draftVersionId: string;
   publishedVersionId: string;
   updatedAt: string;
 }
+
+export interface AgentConfig {
+  modelProfile: 'ark-text-default';
+  systemPrompt: string;
+  openingMessage: string;
+  exampleQuestions: string[];
+}
+
+export interface AgentProposal {
+  name: string;
+  description: string;
+  config: AgentConfig;
+  avatarPrompt: string;
+  toolSuggestions: Array<{ name: 'content.search'; reason: string }>;
+  knowledgeBaseSuggestions: Array<{ id: string; name: string; reason: string }>;
+}
+
+export interface PromptAssistantSuggestion {
+  optimizedPrompt: string;
+  description?: string;
+  summary: string[];
+  openingMessage?: string;
+  exampleQuestions?: string[];
+}
+
+export type PromptAssistantField =
+  | 'system_prompt'
+  | 'description'
+  | 'opening_message'
+  | 'example_questions';
 
 export interface AIAppVersion {
   id: string;
@@ -152,12 +184,14 @@ type AIAppSSEEvent = {
   ok?: boolean;
   durationMs?: number;
   message?: string;
+  errorCode?: string;
   run?: AIAppRun;
   reply?: string;
   conversation?: AIAppConversation;
   userMessage?: AIAppConversationMessage;
   assistantMessage?: AIAppConversationMessage;
   references?: AIKnowledgeReference[];
+  suggestion?: PromptAssistantSuggestion;
 };
 
 async function consumeAIAppSSE(
@@ -204,8 +238,79 @@ export function createAIApp(data: {
   name: string;
   description?: string;
   config: object;
+  toolNames?: string[];
+  knowledgeBaseIds?: string[];
 }): Promise<{ app: AIApp; version: AIAppVersion }> {
   return request.post('/ai/apps', data);
+}
+
+export function createAIAppProposal(
+  description: string,
+  current?: AgentProposal,
+  signal?: AbortSignal,
+): Promise<{ proposal: AgentProposal }> {
+  return request.post('/ai/app-assistant/proposals', { description, current }, { signal });
+}
+
+export async function createPromptAssistantSuggestion(
+  data: {
+    target: 'agent' | 'workflow_llm';
+    field?: PromptAssistantField;
+    mode: 'auto' | 'instruction' | 'debug_run';
+    appId?: string;
+    currentPrompt: string;
+    instruction?: string;
+    debugRunIds?: string[];
+    allowedVariables?: string[];
+    generateGreetings?: boolean;
+    agentContext?: {
+      name: string;
+      description: string;
+      systemPrompt: string;
+      openingMessage: string;
+      exampleQuestions: string[];
+    };
+  },
+  signal?: AbortSignal,
+): Promise<{ suggestion: PromptAssistantSuggestion }> {
+  const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+  const response = await fetch(`${base}/ai/prompt-assistant/suggestions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${useAuthStore.getState().token}`,
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    },
+    body: JSON.stringify({ ...data, stream: true }),
+    signal,
+  });
+  if (!response.headers.get('content-type')?.includes('text/event-stream')) {
+    const payload = (await response.json()) as { message?: string };
+    throw new Error(payload.message || '提示词优化失败');
+  }
+  let suggestion: PromptAssistantSuggestion | undefined;
+  let failure = '';
+  await consumeAIAppSSE(response, (event) => {
+    if (event.type === 'done' && event.suggestion) suggestion = event.suggestion;
+    if (event.type === 'error') failure = event.message || '提示词优化失败';
+  });
+  if (!suggestion) throw new Error(failure || 'AI 未返回可用的提示词建议');
+  return { suggestion };
+}
+
+export function generateAIAppAvatar(
+  appId: string,
+  context?: { name: string; description: string; systemPrompt: string },
+): Promise<{ app: AIApp; model: string }> {
+  return request.post(`/ai/apps/${appId}/avatar/generate`, context);
+}
+
+export function uploadAIAppAvatar(appId: string, file: File): Promise<{ app: AIApp }> {
+  const formData = new FormData();
+  formData.set('file', file, file.name);
+  return request.post(`/ai/apps/${appId}/avatar`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
 }
 
 export function publishAIApp(appId: string, versionId?: string): Promise<void> {
@@ -307,6 +412,7 @@ export function getAIAppConversation(
   conversation: AIAppConversation;
   messages: AIAppConversationMessage[];
   toolTraces: AIAppConversationToolTrace[];
+  runs: AIAppRun[];
 }> {
   return request.get(`/ai/apps/${appId}/conversations/${conversationId}`);
 }
@@ -330,7 +436,12 @@ export async function streamAIAppConversation(
       assistantMessage: AIAppConversationMessage;
       references: AIKnowledgeReference[];
     }) => void;
-    onError: (message: string) => void;
+    onError: (payload: {
+      message: string;
+      errorCode?: string;
+      run?: AIAppRun;
+      userMessage?: AIAppConversationMessage;
+    }) => void;
   },
   signal?: AbortSignal,
 ): Promise<void> {
@@ -348,9 +459,19 @@ export async function streamAIAppConversation(
   if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream')) {
     const body = await response.text();
     try {
-      handlers.onError((JSON.parse(body) as { message?: string }).message || '会话发送失败');
+      const payload = JSON.parse(body) as {
+        message?: string;
+        errorCode?: string;
+        data?: { run?: AIAppRun; userMessage?: AIAppConversationMessage };
+      };
+      handlers.onError({
+        message: payload.message || '会话发送失败',
+        errorCode: payload.errorCode,
+        run: payload.data?.run,
+        userMessage: payload.data?.userMessage,
+      });
     } catch {
-      handlers.onError(body || '会话发送失败');
+      handlers.onError({ message: body || '会话发送失败' });
     }
     return;
   }
@@ -359,7 +480,14 @@ export async function streamAIAppConversation(
     if (event.type === 'tool_call' && event.toolName) handlers.onToolCall?.(event.toolName);
     if (event.type === 'tool_result' && event.toolName)
       handlers.onToolResult?.(event.toolName, event.ok === true, event.durationMs || 0);
-    if (event.type === 'error') handlers.onError(event.message || '会话发送失败');
+    if (event.type === 'error') {
+      handlers.onError({
+        message: event.message || '会话发送失败',
+        errorCode: event.errorCode,
+        run: event.run,
+        userMessage: event.userMessage,
+      });
+    }
     if (
       event.type === 'done' &&
       event.run &&
@@ -377,7 +505,7 @@ export async function streamAIAppConversation(
     }
   });
   if (!read) {
-    handlers.onError('无法读取会话响应');
+    handlers.onError({ message: '无法读取会话响应' });
   }
 }
 

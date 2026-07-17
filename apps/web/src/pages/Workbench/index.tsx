@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AIAppsPanel } from '@/components/workbench/AIAppsPanel';
+import { AIWorkflowCreateDialog } from '@/components/workbench/AIWorkflowCreateDialog';
 import { WORKFLOW_TEMPLATE_DEFS } from '../workflowTemplates';
 
 const templates = WORKFLOW_TEMPLATE_DEFS;
@@ -26,6 +27,7 @@ export default function Workbench() {
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<WorkflowItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showAICreateWorkflow, setShowAICreateWorkflow] = useState(false);
 
   useEffect(() => {
     listWorkflows({ page: 1, pageSize: 20 })
@@ -84,9 +86,13 @@ export default function Workbench() {
               <BookOpenText className="mr-2 h-4 w-4" />
               资料库
             </Button>
-            <Button onClick={() => navigate('/workbench/create')}>
+            <Button variant="outline" onClick={() => navigate('/workbench/create')}>
               <Plus className="mr-2 h-4 w-4" />
-              新建工作流
+              空白工作流
+            </Button>
+            <Button onClick={() => setShowAICreateWorkflow(true)}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              AI 创建工作流
             </Button>
           </div>
         </section>
@@ -247,6 +253,10 @@ export default function Workbench() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        <AIWorkflowCreateDialog
+          open={showAICreateWorkflow}
+          onOpenChange={setShowAICreateWorkflow}
+        />
       </div>
     </div>
   );

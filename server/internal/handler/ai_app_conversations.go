@@ -2,17 +2,21 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"valley-server/internal/ai/agent"
 	"valley-server/internal/ai/tools/content"
+	"valley-server/internal/aiapp"
 	"valley-server/internal/aiclient"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -98,6 +102,7 @@ func GetAIAppConversation(c *gin.Context) {
 	}
 	var messages []model.AIAppConversationMessage
 	var traces []model.AIAppConversationToolTrace
+	var runs []model.AIAppRun
 	if err := database.GetDB().Where("user_id = ? AND app_id = ? AND conversation_id = ?", userID, app.ID, conversation.ID).Order("created_at ASC").Find(&messages).Error; err != nil {
 		Error(c, 500, "加载会话消息失败")
 		return
@@ -106,7 +111,37 @@ func GetAIAppConversation(c *gin.Context) {
 		Error(c, 500, "加载工具轨迹失败")
 		return
 	}
-	Success(c, gin.H{"conversation": conversation, "messages": messages, "toolTraces": traces})
+	if err := database.GetDB().Where("user_id = ? AND app_id = ? AND conversation_id = ?", userID, app.ID, conversation.ID).Order("created_at ASC").Find(&runs).Error; err != nil {
+		Error(c, 500, "加载会话运行记录失败")
+		return
+	}
+	Success(c, gin.H{"conversation": conversation, "messages": messages, "toolTraces": traces, "runs": runs})
+}
+
+func writeAIAppConversationFailure(
+	c *gin.Context,
+	status int,
+	errorCode string,
+	message string,
+	run model.AIAppRun,
+	userMessage model.AIAppConversationMessage,
+	cause error,
+) {
+	logger.Error(c, "AI App conversation failed", cause, logrus.Fields{
+		"error_code":      errorCode,
+		"run_id":          run.ID,
+		"conversation_id": run.ConversationID,
+	})
+	c.JSON(status, gin.H{
+		"code":      status,
+		"errorCode": errorCode,
+		"message":   message,
+		"data": gin.H{
+			"run":         run,
+			"userMessage": userMessage,
+		},
+		"logId": logger.GetLogID(c),
+	})
 }
 
 func DeleteAIAppConversation(c *gin.Context) {
@@ -168,9 +203,16 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		return
 	}
 	message := truncateAIAgentRunes(payload.Message, 12000)
-	userMessage := model.AIAppConversationMessage{UserID: userID, AppID: app.ID, ConversationID: conversation.ID, Role: "user", Content: message}
-	if database.GetDB().Create(&userMessage).Error != nil {
-		Error(c, 500, "保存会话消息失败")
+	run := model.AIAppRun{AppID: app.ID, VersionID: conversation.VersionID, ConversationID: &conversation.ID, UserID: userID, Status: "running", Input: aiclient.TrimRunes(message, 1000)}
+	userMessage := model.AIAppConversationMessage{UserID: userID, AppID: app.ID, ConversationID: conversation.ID, RunID: &run.ID, Role: "user", Content: message}
+	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&run).Error; err != nil {
+			return err
+		}
+		userMessage.RunID = &run.ID
+		return tx.Create(&userMessage).Error
+	}); err != nil {
+		Error(c, 500, "创建会话运行记录失败")
 		return
 	}
 	if conversation.Title == "新对话" {
@@ -178,36 +220,34 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		_ = database.GetDB().Model(&conversation).Updates(map[string]any{"title": conversation.Title, "updated_at": time.Now()}).Error
 	}
 
-	var version model.AIAppVersion
-	if database.GetDB().Where("id = ? AND app_id = ?", conversation.VersionID, app.ID).First(&version).Error != nil {
-		Error(c, http.StatusBadRequest, "会话版本不存在")
-		return
-	}
-	run := model.AIAppRun{AppID: app.ID, VersionID: version.ID, ConversationID: &conversation.ID, UserID: userID, Status: "running", Input: aiclient.TrimRunes(message, 1000)}
-	if database.GetDB().Create(&run).Error != nil {
-		Error(c, 500, "创建会话运行记录失败")
-		return
-	}
-	fail := func(status int, code, message string) {
+	fail := func(status int, code, message string, cause error) {
 		_ = database.GetDB().Model(&run).Updates(map[string]any{"status": "failed", "error_code": code, "duration_ms": time.Since(started).Milliseconds()}).Error
-		Error(c, status, message)
+		run.Status = "failed"
+		run.ErrorCode = code
+		run.DurationMs = time.Since(started).Milliseconds()
+		writeAIAppConversationFailure(c, status, code, message, run, userMessage, cause)
 	}
 
-	var config struct {
-		SystemPrompt string `json:"systemPrompt"`
+	var version model.AIAppVersion
+	if err := database.GetDB().Where("id = ? AND app_id = ?", conversation.VersionID, app.ID).First(&version).Error; err != nil {
+		fail(http.StatusBadRequest, "CONVERSATION_VERSION_NOT_FOUND", "会话版本不存在", err)
+		return
 	}
-	if json.Unmarshal([]byte(version.Config), &config) != nil {
-		fail(400, "APP_CONFIG_INVALID", "智能体版本配置无效")
+
+	config, configParseErr := aiapp.Parse(version.Config)
+	if configParseErr != nil {
+		fail(400, "APP_CONFIG_INVALID", "智能体版本配置无效", errors.New("invalid AI App version config"))
 		return
 	}
 	arkConfig, configErr := aiclient.ReadARKTextConfig()
 	if configErr != "" {
-		fail(http.StatusServiceUnavailable, "ARK_NOT_CONFIGURED", configErr)
+		fail(http.StatusServiceUnavailable, "ARK_NOT_CONFIGURED", configErr, errors.New(configErr))
 		return
 	}
 	knowledgeContext, references, retrievalErr := retrieveAIKnowledgeContext(c.Request.Context(), userID, version, message)
 	if retrievalErr != nil {
-		fail(http.StatusServiceUnavailable, "KNOWLEDGE_RETRIEVAL_FAILED", "知识库检索暂不可用")
+		code, publicMessage := aiKnowledgeRetrievalFailure(retrievalErr)
+		fail(http.StatusServiceUnavailable, code, publicMessage, retrievalErr)
 		return
 	}
 	system := strings.TrimSpace(config.SystemPrompt)
@@ -216,19 +256,19 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	}
 	registry, toolNames, toolErr := resolveAIAppTools(database.GetDB(), app.ID, version)
 	if toolErr != nil {
-		fail(500, "AI_TOOL_REGISTRY_UNAVAILABLE", "加载智能体工具失败")
+		fail(500, "AI_TOOL_REGISTRY_UNAVAILABLE", "加载智能体工具失败", toolErr)
 		return
 	}
 	system = appendContentSearchDateContext(system, toolNames, time.Now())
 	client := aiclient.ARKClient(60 * time.Second)
 	if client == nil {
-		fail(http.StatusServiceUnavailable, "ARK_NOT_CONFIGURED", "AI 服务未配置")
+		fail(http.StatusServiceUnavailable, "ARK_NOT_CONFIGURED", "AI 服务未配置", errors.New("ARK client unavailable"))
 		return
 	}
 
 	var history []model.AIAppConversationMessage
 	if err := database.GetDB().Where("user_id = ? AND app_id = ? AND conversation_id = ?", userID, app.ID, conversation.ID).Order("created_at DESC").Limit(aiAppConversationHistoryLimit).Find(&history).Error; err != nil {
-		fail(500, "CONVERSATION_HISTORY_UNAVAILABLE", "加载会话历史失败")
+		fail(500, "CONVERSATION_HISTORY_UNAVAILABLE", "加载会话历史失败", err)
 		return
 	}
 	messages := make([]agent.Message, 0, len(history))
@@ -243,7 +283,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	loop := agent.NewLocalLoop(&aiAppAgentBackend{client: client}, registry)
 	events, loopErr := loop.RunStream(content.WithOwner(c.Request.Context(), userID), agent.Spec{Provider: "ark", Model: arkConfig.Model, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench-conversation"}, messages)
 	if loopErr != nil {
-		fail(http.StatusBadGateway, "AI_AGENT_RUN_FAILED", "智能体工具调用失败")
+		fail(http.StatusBadGateway, "AI_AGENT_RUN_FAILED", "智能体工具调用失败", loopErr)
 		return
 	}
 
@@ -311,10 +351,14 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		run.DurationMs = time.Since(started).Milliseconds()
 		_ = database.GetDB().Model(&run).Updates(map[string]any{"status": run.Status, "model": run.Model, "output": run.Output, "error_code": run.ErrorCode, "duration_ms": run.DurationMs}).Error
 		if writer != nil {
-			_ = writer.Send(gin.H{"type": "error", "message": message, "run": run})
+			_ = writer.Send(gin.H{"type": "error", "errorCode": code, "message": message, "run": run, "userMessage": userMessage})
 			return
 		}
-		Error(c, http.StatusBadGateway, message)
+		failure := runErr
+		if failure == nil {
+			failure = errors.New(message)
+		}
+		writeAIAppConversationFailure(c, http.StatusBadGateway, code, message, run, userMessage, failure)
 		return
 	}
 	modelName := result.Model
@@ -334,10 +378,10 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		run.ErrorCode = "ASSISTANT_MESSAGE_PERSISTENCE_FAILED"
 		_ = database.GetDB().Model(&run).Updates(map[string]any{"status": run.Status, "error_code": run.ErrorCode}).Error
 		if writer != nil {
-			_ = writer.Send(gin.H{"type": "error", "message": "保存助手回复失败", "run": run})
+			_ = writer.Send(gin.H{"type": "error", "errorCode": run.ErrorCode, "message": "保存助手回复失败", "run": run, "userMessage": userMessage})
 			return
 		}
-		Error(c, 500, "保存助手回复失败")
+		writeAIAppConversationFailure(c, http.StatusInternalServerError, run.ErrorCode, "保存助手回复失败", run, userMessage, errors.New("assistant message persistence failed"))
 		return
 	}
 	_ = database.GetDB().Model(&conversation).Update("updated_at", time.Now()).Error

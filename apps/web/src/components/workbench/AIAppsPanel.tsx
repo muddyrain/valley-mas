@@ -1,25 +1,78 @@
-import { Bot, Plus } from 'lucide-react';
+import { ArrowUpRight, Bot, Clock3, Plus, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { type AIApp, createAIApp, listAIApps } from '@/api/aiWorkbench';
+import { type AIApp, createAIApp, generateAIAppAvatar, listAIApps } from '@/api/aiWorkbench';
+import { AgentAvatar } from '@/components/ai-workbench/AgentAvatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AIAgentCreateDialog } from './AIAgentCreateDialog';
 
 function AgentItemSkeleton() {
   return (
-    <div className="flex min-h-18 w-full items-center justify-between rounded-lg border border-border bg-background px-3 py-3">
-      <div className="min-w-0 space-y-2">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-4 w-4 rounded-sm" />
-          <Skeleton className="h-4 w-24" />
+    <Card size="sm" className="min-h-44 gap-0 py-0 ring-border/70">
+      <CardContent className="flex h-full flex-col p-4">
+        <div className="flex items-start gap-3">
+          <Skeleton className="size-12 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1 space-y-2 pt-1">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-4/5" />
+          </div>
         </div>
-        <Skeleton className="h-3 w-36" />
-      </div>
-      <Skeleton className="h-5 w-10 rounded-md" />
-    </div>
+        <div className="mt-auto flex items-center justify-between border-t border-border/70 pt-3">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-5 w-12 rounded-full" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatUpdatedAt(value: string) {
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(value));
+}
+
+function AgentCard({ app }: { app: AIApp }) {
+  return (
+    <Card
+      size="sm"
+      className="group/agent min-h-44 gap-0 py-0 ring-border/70 transition-[box-shadow,ring-color] duration-200 hover:shadow-md hover:ring-foreground/20 focus-within:ring-2 focus-within:ring-ring"
+    >
+      <Link
+        to={`/workbench/apps/${app.id}`}
+        className="flex h-full min-h-44 cursor-pointer flex-col p-4 outline-none"
+      >
+        <div className="flex items-start gap-3">
+          <AgentAvatar name={app.name} src={app.avatarUrl} className="size-12" />
+          <div className="min-w-0 flex-1 pt-0.5">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="truncate text-base font-semibold tracking-tight text-foreground">
+                {app.name}
+              </h3>
+              <ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-colors group-hover/agent:text-foreground" />
+            </div>
+            <p className="mt-1 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">
+              {app.description || '等待配置'}
+            </p>
+          </div>
+        </div>
+        <div className="mt-auto flex items-center justify-between gap-3 border-t border-border/70 pt-3">
+          <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock3 className="size-3.5 shrink-0" />
+            更新于 {formatUpdatedAt(app.updatedAt)}
+          </span>
+          <Badge variant={app.status === 'published' ? 'default' : 'secondary'}>
+            {app.status === 'published' ? '已发布' : '草稿'}
+          </Badge>
+        </div>
+      </Link>
+    </Card>
   );
 }
 
@@ -28,6 +81,7 @@ export function AIAppsPanel() {
   const [apps, setApps] = useState<AIApp[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [showAICreate, setShowAICreate] = useState(false);
   const agents = apps.filter((app) => app.type === 'agent');
 
   useEffect(() => {
@@ -43,10 +97,19 @@ export function AIAppsPanel() {
       const { app } = await createAIApp({
         type: 'agent',
         name: '未命名智能体',
-        config: { modelProfile: 'ark-text-default', systemPrompt: '', openingMessage: '' },
+        config: {
+          modelProfile: 'ark-text-default',
+          systemPrompt: '',
+          openingMessage: '',
+          exampleQuestions: [],
+        },
       });
       setApps((items) => [app, ...items]);
       toast.success('已创建智能体草稿');
+      void generateAIAppAvatar(app.id).catch(() => {
+        toast.info('头像暂未生成，可在编辑页重试或上传');
+      });
+      navigate(`/workbench/apps/${app.id}`);
     } catch {
       toast.error('创建智能体失败');
     } finally {
@@ -61,25 +124,26 @@ export function AIAppsPanel() {
           <h2 className="text-lg font-semibold tracking-tight text-foreground">智能体</h2>
           <p className="mt-1 text-sm text-muted-foreground">配置、调试并发布可复用的 AI 能力。</p>
         </div>
-        <Button size="sm" disabled={creating} onClick={createAgent}>
-          <Plus className="mr-2 h-4 w-4" />
-          新建智能体
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" disabled={creating} onClick={createAgent}>
+            <Plus className="mr-2 h-4 w-4" />
+            空白创建
+          </Button>
+          <Button size="sm" onClick={() => setShowAICreate(true)}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            AI 创建智能体
+          </Button>
+        </div>
       </div>
-      <Card size="sm">
-        <CardHeader className="sr-only">
-          <CardTitle className="flex items-center gap-2">
-            <Bot className="h-4 w-4 text-primary" />
-            智能体
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="grid gap-2 sm:grid-cols-2">
-              <AgentItemSkeleton />
-              <AgentItemSkeleton />
-            </div>
-          ) : agents.length === 0 ? (
+      {loading ? (
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+          <AgentItemSkeleton />
+          <AgentItemSkeleton />
+          <AgentItemSkeleton />
+        </div>
+      ) : agents.length === 0 ? (
+        <Card size="sm">
+          <CardContent>
             <div className="py-7 text-center">
               <Bot className="mx-auto mb-3 h-9 w-9 text-muted-foreground" />
               <p className="text-sm font-medium text-foreground">还没有智能体</p>
@@ -87,33 +151,22 @@ export function AIAppsPanel() {
                 从一个草稿开始，配置后可随时调试和发布。
               </p>
             </div>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {agents.map((app) => (
-                <Button
-                  key={app.id}
-                  variant="outline"
-                  className="flex h-auto min-h-18 w-full items-center justify-between rounded-lg px-3 py-3 text-left hover:bg-muted/60"
-                  onClick={() => navigate(`/workbench/apps/${app.id}`)}
-                >
-                  <div className="min-w-0">
-                    <p className="flex items-center gap-2 font-medium">
-                      <Bot className="h-4 w-4 text-primary" />
-                      {app.name}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {app.description || '等待配置'}
-                    </p>
-                  </div>
-                  <Badge variant={app.status === 'published' ? 'default' : 'outline'}>
-                    {app.status === 'published' ? '已发布' : '草稿'}
-                  </Badge>
-                </Button>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+          {agents.map((app) => (
+            <AgentCard key={app.id} app={app} />
+          ))}
+        </div>
+      )}
+      <AIAgentCreateDialog
+        open={showAICreate}
+        onOpenChange={setShowAICreate}
+        onCreated={() => {
+          void listAIApps().then(({ list }) => setApps(list));
+        }}
+      />
     </section>
   );
 }

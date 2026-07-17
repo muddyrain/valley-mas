@@ -201,11 +201,24 @@ func safeEventOutput(nodeType NodeType, values map[string]any) map[string]any {
 		return preview
 	case NodeTypeVariable, NodeTypeCode:
 		return safePreviewFields(values)
-	case NodeTypeBlogCreateDraft, NodeTypeEnd:
+	case NodeTypeBlogCreateDraft:
 		return safePreviewFields(values, "postId", "title", "editPath", "tagIds")
+	case NodeTypeEnd:
+		return safeEndOutput(values)
 	default:
 		return nil
 	}
+}
+
+func safeEndOutput(values map[string]any) map[string]any {
+	preview := make(map[string]any, len(values))
+	for key, value := range values {
+		if isSensitiveKey(key) {
+			continue
+		}
+		preview[key] = safePreviewValue(value)
+	}
+	return preview
 }
 
 func safePreviewFields(values map[string]any, keys ...string) map[string]any {

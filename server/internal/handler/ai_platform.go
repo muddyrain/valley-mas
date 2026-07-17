@@ -17,12 +17,15 @@ import (
 	"valley-server/internal/ai/agent"
 	"valley-server/internal/ai/tools"
 	"valley-server/internal/ai/tools/content"
+	"valley-server/internal/aiapp"
 	"valley-server/internal/aiclient"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ledongthuc/pdf"
+	"github.com/sirupsen/logrus"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
 	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"gorm.io/gorm"
@@ -87,10 +90,12 @@ type aiKnowledgeSearchRow struct {
 }
 
 type aiAppPayload struct {
-	Type        string          `json:"type"`
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Config      json.RawMessage `json:"config"`
+	Type             string              `json:"type"`
+	Name             string              `json:"name"`
+	Description      string              `json:"description"`
+	Config           json.RawMessage     `json:"config"`
+	ToolNames        []string            `json:"toolNames"`
+	KnowledgeBaseIDs []model.Int64String `json:"knowledgeBaseIds"`
 }
 
 type aiAppRetrievalConfig struct {
@@ -115,6 +120,46 @@ func parseAIAppRetrievalConfig(raw string) (aiAppRetrievalConfig, error) {
 		return aiAppRetrievalConfig{}, errors.New("retrieval config out of range")
 	}
 	return config, nil
+}
+
+// aiKnowledgeRetrievalFailure converts internal RAG failures into a stable
+// public contract. The original error is kept for structured server logs only.
+func aiKnowledgeRetrievalFailure(err error) (code, message string) {
+	if err == nil {
+		return "", ""
+	}
+
+	value := err.Error()
+	lowerValue := strings.ToLower(value)
+	switch {
+	case strings.Contains(value, "RAG requires PostgreSQL"):
+		return "RAG_POSTGRES_REQUIRED", "知识库检索需要 PostgreSQL 数据库"
+	case strings.Contains(value, "pgvector extension is not installed"):
+		return "RAG_PGVECTOR_UNAVAILABLE", "数据库未启用 pgvector 扩展"
+	case strings.Contains(lowerValue, "different vector dimensions"):
+		return "RAG_VECTOR_DIMENSION_MISMATCH", "知识库向量维度不匹配，请重新索引全部文档"
+	case strings.Contains(lowerValue, "operator does not exist") && strings.Contains(lowerValue, "vector"):
+		return "RAG_VECTOR_OPERATOR_UNAVAILABLE", "知识库向量检索不可用，请检查 pgvector 与数据库迁移"
+	case strings.Contains(lowerValue, "relation \"ai_knowledge_") || strings.Contains(lowerValue, "column \"embedding\""):
+		return "RAG_SCHEMA_OUTDATED", "知识库数据库结构未迁移，请执行服务端迁移"
+	case strings.Contains(lowerValue, "connection refused") ||
+		strings.Contains(lowerValue, "failed to connect") ||
+		strings.Contains(lowerValue, "connection reset") ||
+		strings.Contains(lowerValue, "database is closed"):
+		return "RAG_DATABASE_UNAVAILABLE", "知识库数据库暂不可用，请稍后重试"
+	case strings.Contains(value, "ARK_EMBEDDING_MODEL"):
+		return "ARK_EMBEDDING_NOT_CONFIGURED", "知识库向量模型未配置"
+	case strings.Contains(value, "ARK embedding"):
+		return "ARK_EMBEDDING_FAILED", "知识库向量服务调用失败"
+	case strings.Contains(value, "retrieval config"):
+		return "RAG_CONFIG_INVALID", "知识库检索配置无效"
+	default:
+		return "RAG_QUERY_FAILED", "知识库检索服务异常"
+	}
+}
+
+func logAIKnowledgeRetrievalFailure(c *gin.Context, err error, fields logrus.Fields) {
+	logger.Error(c, "AI knowledge retrieval failed", err, fields)
 }
 
 func serializeAIAppRetrievalConfig(config aiAppRetrievalConfig) string {
@@ -320,6 +365,29 @@ func CreateAIApp(c *gin.Context) {
 		Error(c, 400, "应用配置必须为 JSON")
 		return
 	}
+	if payload.Type == aiAppTypeAgent {
+		parsed, err := aiapp.Parse(string(config))
+		if err != nil {
+			Error(c, 400, err.Error())
+			return
+		}
+		normalized, err := aiapp.Marshal(parsed)
+		if err != nil {
+			Error(c, 400, "智能体配置无效")
+			return
+		}
+		config = normalized
+	}
+	toolNames, err := validateInitialAIAppTools(payload.ToolNames)
+	if err != nil {
+		Error(c, 400, err.Error())
+		return
+	}
+	knowledgeBaseIDs, err := validateInitialAIAppKnowledgeBases(database.GetDB(), userID, payload.KnowledgeBaseIDs)
+	if err != nil {
+		Error(c, 400, err.Error())
+		return
+	}
 	app := model.AIApp{UserID: userID, Type: payload.Type, Name: payload.Name, Description: strings.TrimSpace(payload.Description)}
 	var version model.AIAppVersion
 	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
@@ -331,6 +399,16 @@ func CreateAIApp(c *gin.Context) {
 		if createErr != nil {
 			return createErr
 		}
+		for _, toolName := range toolNames {
+			if err := tx.Create(&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: toolName}).Error; err != nil {
+				return err
+			}
+		}
+		for _, knowledgeBaseID := range knowledgeBaseIDs {
+			if err := tx.Create(&model.AIAppVersionKnowledgeBase{AppVersionID: version.ID, KnowledgeBaseID: knowledgeBaseID}).Error; err != nil {
+				return err
+			}
+		}
 		return tx.Model(&app).Update("draft_version_id", version.ID).Error
 	}); err != nil {
 		Error(c, 500, "创建应用失败")
@@ -338,6 +416,52 @@ func CreateAIApp(c *gin.Context) {
 	}
 	app.DraftVersionID = version.ID
 	Success(c, gin.H{"app": app, "version": version})
+}
+
+func validateInitialAIAppTools(values []string) ([]string, error) {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		name := strings.TrimSpace(value)
+		if name == "" {
+			continue
+		}
+		if name != "content.search" {
+			return nil, errors.New("首期仅允许绑定只读工具 content.search")
+		}
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = struct{}{}
+		result = append(result, name)
+	}
+	return result, nil
+}
+
+func validateInitialAIAppKnowledgeBases(db *gorm.DB, userID model.Int64String, values []model.Int64String) ([]model.Int64String, error) {
+	seen := make(map[model.Int64String]struct{}, len(values))
+	ids := make([]model.Int64String, 0, len(values))
+	for _, value := range values {
+		if value == 0 {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		ids = append(ids, value)
+	}
+	if len(ids) == 0 {
+		return ids, nil
+	}
+	var count int64
+	if err := db.Model(&model.AIKnowledgeBase{}).Where("user_id = ? AND id IN ?", userID, ids).Count(&count).Error; err != nil {
+		return nil, errors.New("校验知识库失败")
+	}
+	if count != int64(len(ids)) {
+		return nil, errors.New("知识库不存在或无权访问")
+	}
+	return ids, nil
 }
 
 func GetAIApp(c *gin.Context) {
@@ -368,6 +492,19 @@ func SaveAIAppVersion(c *gin.Context) {
 		Error(c, 400, "版本配置必须为 JSON")
 		return
 	}
+	configValue := payload.Config
+	if app.Type == aiAppTypeAgent {
+		config, err := aiapp.Parse(string(payload.Config))
+		if err != nil {
+			Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		configValue, err = aiapp.Marshal(config)
+		if err != nil {
+			Error(c, http.StatusBadRequest, "智能体配置无效")
+			return
+		}
+	}
 	var version model.AIAppVersion
 	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
 		var source model.AIAppVersion
@@ -381,7 +518,7 @@ func SaveAIAppVersion(c *gin.Context) {
 			return err
 		}
 		var createErr error
-		version, createErr = createAIAppVersionSnapshot(tx, app, string(payload.Config), retrievalConfig, source)
+		version, createErr = createAIAppVersionSnapshot(tx, app, string(configValue), retrievalConfig, source)
 		if createErr != nil {
 			return createErr
 		}
@@ -502,10 +639,8 @@ func DebugAIApp(c *gin.Context) {
 		Error(c, 400, "草稿版本不存在")
 		return
 	}
-	var config struct {
-		SystemPrompt string `json:"systemPrompt"`
-	}
-	if json.Unmarshal([]byte(version.Config), &config) != nil {
+	config, configParseErr := aiapp.Parse(version.Config)
+	if configParseErr != nil {
 		Error(c, 400, "智能体版本配置无效")
 		return
 	}
@@ -517,8 +652,10 @@ func DebugAIApp(c *gin.Context) {
 	}
 	knowledgeContext, references, retrievalErr := retrieveAIKnowledgeContext(c.Request.Context(), userID, version, message)
 	if retrievalErr != nil {
-		persistAIAppRun(app, version, userID, "failed", arkConfig.Model, message, "", "KNOWLEDGE_RETRIEVAL_FAILED", started)
-		Error(c, http.StatusServiceUnavailable, "知识库检索暂不可用")
+		code, publicMessage := aiKnowledgeRetrievalFailure(retrievalErr)
+		logAIKnowledgeRetrievalFailure(c, retrievalErr, logrus.Fields{"app_id": app.ID, "version_id": version.ID, "feature": "ai-workbench-debug"})
+		persistAIAppRun(app, version, userID, "failed", arkConfig.Model, message, "", code, started)
+		Error(c, http.StatusServiceUnavailable, publicMessage)
 		return
 	}
 	messages := make([]*arkmodel.ChatCompletionMessage, 0, 2)

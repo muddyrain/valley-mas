@@ -5,7 +5,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -18,12 +20,14 @@ import (
 	"valley-server/internal/aiclient"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/middleware"
 	"valley-server/internal/model"
 	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -32,6 +36,10 @@ const aiPlatformTestSecret = "ai-platform-test-secret"
 func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
+	if logger.Log == nil {
+		logger.Log = logrus.New()
+		logger.Log.SetOutput(io.Discard)
+	}
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
@@ -80,6 +88,8 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	router := gin.New()
 	auth := router.Group("/ai")
 	auth.Use(middleware.Auth(&config.Config{JWT: config.JWTConfig{Secret: aiPlatformTestSecret}}))
+	auth.POST("/apps", CreateAIApp)
+	auth.POST("/app-assistant/proposals", CreateAIAppProposal)
 	auth.POST("/apps/:appId/versions", SaveAIAppVersion)
 	auth.POST("/apps/:appId/restore", RestoreAIAppVersion)
 	auth.POST("/apps/:appId/debug", DebugAIApp)
@@ -595,15 +605,47 @@ func TestAIAppConversationIsOwnerScopedAndRetainsUserMessageOnConfigFailure(t *t
 	chatRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
 	chatRecorder := httptest.NewRecorder()
 	router.ServeHTTP(chatRecorder, chatRequest)
-	if chatRecorder.Code != http.StatusOK || !strings.Contains(chatRecorder.Body.String(), `"code":503`) {
+	if chatRecorder.Code != http.StatusServiceUnavailable || !strings.Contains(chatRecorder.Body.String(), `"code":503`) || !strings.Contains(chatRecorder.Body.String(), `"errorCode":"ARK_NOT_CONFIGURED"`) {
 		t.Fatalf("chat config failure = %d body=%s", chatRecorder.Code, chatRecorder.Body.String())
 	}
 	var messages []model.AIAppConversationMessage
 	if err := db.Where("conversation_id = ?", conversation.ID).Find(&messages).Error; err != nil {
 		t.Fatalf("load messages: %v", err)
 	}
-	if len(messages) != 1 || messages[0].Role != "user" || messages[0].Content != "你好" {
+	if len(messages) != 1 || messages[0].Role != "user" || messages[0].Content != "你好" || messages[0].RunID == nil {
 		t.Fatalf("unexpected messages: %#v", messages)
+	}
+
+	historyRequest := httptest.NewRequest(http.MethodGet, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String(), nil)
+	historyRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	historyRecorder := httptest.NewRecorder()
+	router.ServeHTTP(historyRecorder, historyRequest)
+	if historyRecorder.Code != http.StatusOK || !strings.Contains(historyRecorder.Body.String(), `"errorCode":"ARK_NOT_CONFIGURED"`) {
+		t.Fatalf("conversation history = %d body=%s", historyRecorder.Code, historyRecorder.Body.String())
+	}
+}
+
+func TestAIKnowledgeRetrievalFailureUsesStablePublicCodes(t *testing.T) {
+	tests := []struct {
+		err  error
+		code string
+	}{
+		{errors.New("RAG requires PostgreSQL"), "RAG_POSTGRES_REQUIRED"},
+		{errors.New("pgvector extension is not installed"), "RAG_PGVECTOR_UNAVAILABLE"},
+		{errors.New("ERROR: different vector dimensions 1024 and 2048 (SQLSTATE 22000)"), "RAG_VECTOR_DIMENSION_MISMATCH"},
+		{errors.New("ERROR: operator does not exist: vector <=> vector (SQLSTATE 42883)"), "RAG_VECTOR_OPERATOR_UNAVAILABLE"},
+		{errors.New("ERROR: relation \"ai_knowledge_chunks\" does not exist (SQLSTATE 42P01)"), "RAG_SCHEMA_OUTDATED"},
+		{errors.New("failed to connect to database"), "RAG_DATABASE_UNAVAILABLE"},
+		{errors.New("AI 未配置：ARK_EMBEDDING_MODEL 必须以 ep- 开头"), "ARK_EMBEDDING_NOT_CONFIGURED"},
+		{errors.New("ARK embedding 调用失败: upstream"), "ARK_EMBEDDING_FAILED"},
+		{errors.New("unexpected database error"), "RAG_QUERY_FAILED"},
+	}
+
+	for _, test := range tests {
+		code, message := aiKnowledgeRetrievalFailure(test.err)
+		if code != test.code || message == "" {
+			t.Fatalf("retrieval error %q = (%q, %q)", test.err, code, message)
+		}
 	}
 }
 

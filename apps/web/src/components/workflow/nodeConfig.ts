@@ -127,12 +127,11 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
   variable: {
     type: 'variable',
     label: '变量赋值',
-    description: '赋值或转换变量',
+    description: '设置字符串或上游变量模板',
     icon: 'Hash',
     category: 'data',
     handles: { input: true, output: true },
-    // 变量转换将在具备版本化变量协议后开放。
-    available: false,
+    available: true,
   },
 };
 

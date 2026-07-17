@@ -94,9 +94,19 @@ function getStartOutputFields(node: Node): ReadonlyArray<readonly [string, Workf
 }
 
 function getOutputFields(node: Node): ReadonlyArray<readonly [string, WorkflowVariableType]> {
-  return getNodeType(node) === 'start'
-    ? getStartOutputFields(node)
-    : NODE_OUTPUT_FIELDS[getNodeType(node)] || [];
+  const nodeType = getNodeType(node);
+  if (nodeType === 'start') return getStartOutputFields(node);
+  if (nodeType === 'variable') {
+    const config = getNodeData(node).config;
+    const variableName =
+      config && typeof config === 'object'
+        ? (config as { variableName?: unknown }).variableName
+        : undefined;
+    return typeof variableName === 'string' && variableName.trim()
+      ? [[variableName.trim(), 'string']]
+      : [];
+  }
+  return NODE_OUTPUT_FIELDS[nodeType] || [];
 }
 
 /** Returns only variables exposed by nodes that can reach the target node. */

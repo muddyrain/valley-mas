@@ -191,7 +191,7 @@ func validateLinearV2(nodes []Node, nodesByID map[string]Node, incoming, outgoin
 
 func isUnavailableNodeType(nodeType NodeType) bool {
 	switch nodeType {
-	case NodeTypeCode, NodeTypeHTTP, NodeTypeCondition, NodeTypeLoop, NodeTypeVariable, NodeTypeKnowledge, NodeTypeInput, NodeTypeFileUpload:
+	case NodeTypeCode, NodeTypeHTTP, NodeTypeCondition, NodeTypeLoop, NodeTypeKnowledge, NodeTypeInput, NodeTypeFileUpload:
 		return true
 	default:
 		return false
@@ -200,8 +200,8 @@ func isUnavailableNodeType(nodeType NodeType) bool {
 
 func validatePhaseOnePolicy(nodes []Node) []string {
 	errs := make([]string, 0)
-	if len(nodes) > 5 {
-		errs = append(errs, "第一阶段工作流节点不能超过 5 个")
+	if len(nodes) > 8 {
+		errs = append(errs, "第一阶段工作流节点不能超过 8 个")
 	}
 	llmCount, draftCount, totalLLMTokens := 0, 0, 0
 	for _, node := range nodes {

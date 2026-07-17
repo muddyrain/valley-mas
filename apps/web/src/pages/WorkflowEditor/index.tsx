@@ -34,6 +34,7 @@ import {
   Redo2,
   RotateCcw,
   Save,
+  Sparkles,
   Trash2,
   Undo2,
   Upload,
@@ -48,6 +49,7 @@ import {
 } from '@/api/aiWorkbench';
 import {
   createWorkflow,
+  explainWorkflowRun,
   getWorkflow,
   getWorkflowPlatform,
   getWorkflowRun,
@@ -59,7 +61,9 @@ import {
   type WorkflowPlatformData,
   type WorkflowRun,
   type WorkflowRunDetail,
+  type WorkflowRunExplanation,
 } from '@/api/workflow';
+import { AIGenerationProgress } from '@/components/ai-workbench/AIGenerationProgress';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -146,6 +150,8 @@ export default function WorkflowEditorPage() {
   const [platform, setPlatform] = useState<WorkflowPlatformData | null>(null);
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
   const [runDetail, setRunDetail] = useState<WorkflowRunDetail | null>(null);
+  const [runExplanation, setRunExplanation] = useState<WorkflowRunExplanation | null>(null);
+  const [explainingRun, setExplainingRun] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
   const [showRuns, setShowRuns] = useState(false);
   const [showKnowledgeBases, setShowKnowledgeBases] = useState(false);
@@ -1392,6 +1398,7 @@ export default function WorkflowEditorPage() {
                       onClick={async () => {
                         if (!workflowId) return;
                         setRunDetail(await getWorkflowRun(workflowId, run.id));
+                        setRunExplanation(null);
                       }}
                     >
                       <span>{run.status === 'success' ? '成功' : '失败'}</span>
@@ -1403,13 +1410,59 @@ export default function WorkflowEditorPage() {
                 )}
               </div>
               {runDetail && (
-                <div className="rounded-lg border p-3 text-xs">
-                  <p className="mb-2 font-medium">节点详情</p>
+                <div className="rounded-lg border border-border p-3 text-xs">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="font-medium">节点详情</p>
+                    {runDetail.run.status === 'error' ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={explainingRun}
+                        onClick={async () => {
+                          if (!workflowId) return;
+                          setExplainingRun(true);
+                          try {
+                            const result = await explainWorkflowRun(workflowId, runDetail.run.id);
+                            setRunExplanation(result.explanation);
+                          } catch (error) {
+                            toast.error(getAPIErrorMessage(error, 'AI 解释失败'));
+                          } finally {
+                            setExplainingRun(false);
+                          }
+                        }}
+                      >
+                        <Sparkles className="mr-1.5 size-3.5" />
+                        AI 解释
+                      </Button>
+                    ) : null}
+                  </div>
                   {runDetail.nodes.map((node) => (
                     <p key={node.id}>
                       {node.nodeId} · {node.status} · {node.durationMs ?? 0} ms
                     </p>
                   ))}
+                  {explainingRun ? (
+                    <AIGenerationProgress
+                      compact
+                      className="mt-3"
+                      title="正在分析失败原因"
+                      description="AI 正在定位异常节点并整理可执行的修复建议。"
+                    />
+                  ) : runExplanation ? (
+                    <div className="mt-3 rounded-md bg-muted p-3 text-sm">
+                      <p className="font-medium">{runExplanation.cause}</p>
+                      {runExplanation.nodeId ? (
+                        <p className="mt-1 font-mono text-xs text-muted-foreground">
+                          定位节点：{runExplanation.nodeId}
+                        </p>
+                      ) : null}
+                      <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">
+                        {runExplanation.suggestions.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </DialogContent>

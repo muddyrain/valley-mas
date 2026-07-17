@@ -16,6 +16,9 @@ type AIApp struct {
 	WorkflowID         *Int64String   `gorm:"uniqueIndex" json:"workflowId,omitempty"`
 	Name               string         `gorm:"size:100;not null" json:"name"`
 	Description        string         `gorm:"size:500" json:"description"`
+	AvatarURL          string         `gorm:"column:avatar_url;size:1000" json:"avatarUrl"`
+	AvatarSource       string         `gorm:"column:avatar_source;size:20;not null;default:'default'" json:"avatarSource"`
+	AvatarStorageKey   string         `gorm:"column:avatar_storage_key;size:500" json:"-"`
 	Status             string         `gorm:"size:20;index;not null;default:'draft'" json:"status"`
 	DraftVersionID     Int64String    `gorm:"index" json:"draftVersionId"`
 	PublishedVersionID Int64String    `gorm:"index" json:"publishedVersionId"`
@@ -30,6 +33,9 @@ func (a *AIApp) BeforeCreate(tx *gorm.DB) error {
 	}
 	if a.Status == "" {
 		a.Status = "draft"
+	}
+	if a.AvatarSource == "" {
+		a.AvatarSource = "default"
 	}
 	return nil
 }

@@ -1,4 +1,8 @@
+import { Sparkles } from 'lucide-react';
+import { useState } from 'react';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
+import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { VariableTokenEditor } from '../VariableTokenEditor';
@@ -9,6 +13,9 @@ export function LLMPropertyForm({
   onUpdateConfig,
   variableOptions = [],
 }: PropertyFormProps) {
+  const [showAssistant, setShowAssistant] = useState(false);
+  const systemPrompt = (config.systemPrompt as string) || '';
+  const taskPrompt = (config.prompt as string) || '';
   return (
     <div className="space-y-4">
       <EditorSection title="提示词" description="设置模型角色和本次生成任务。">
@@ -17,7 +24,18 @@ export function LLMPropertyForm({
           <Input value="ARK 默认文本模型" disabled />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="llm-system-prompt">系统提示词</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="llm-system-prompt">系统提示词</Label>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!systemPrompt.trim() && !taskPrompt.trim()}
+              onClick={() => setShowAssistant(true)}
+            >
+              <Sparkles className="mr-2 size-3.5" />
+              AI 优化
+            </Button>
+          </div>
           <VariableTokenEditor
             id="llm-system-prompt"
             value={(config.systemPrompt as string) || ''}
@@ -66,6 +84,19 @@ export function LLMPropertyForm({
           </div>
         </div>
       </EditorSection>
+      <PromptAssistantDialog
+        open={showAssistant}
+        onOpenChange={setShowAssistant}
+        target="workflow_llm"
+        currentPrompt={systemPrompt || taskPrompt}
+        allowedVariables={variableOptions.map((item) => item.token)}
+        onReplace={(suggestion) =>
+          onUpdateConfig({
+            systemPrompt: suggestion.optimizedPrompt,
+            modelProfile: 'ark-text-default',
+          })
+        }
+      />
     </div>
   );
 }
