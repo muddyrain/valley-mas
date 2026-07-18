@@ -40,6 +40,22 @@ func TestGraphV4RejectsLegacySchemaAndBusinessNode(t *testing.T) {
 	}
 }
 
+func TestWorkflowCapabilitiesExposeInputGuidance(t *testing.T) {
+	registry := testRegistry(t)
+	capability, _, ok := registry.Capability(CapabilityGenerateCover)
+	if !ok {
+		t.Fatal("generate cover capability is missing")
+	}
+	properties, ok := capability.InputSchema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("properties=%T", capability.InputSchema["properties"])
+	}
+	title, ok := properties["title"].(map[string]any)
+	if !ok || title["title"] != "封面标题" || title["placeholder"] == "" {
+		t.Fatalf("title field=%+v", title)
+	}
+}
+
 func TestGraphV4MergeUsesFirstActiveBranch(t *testing.T) {
 	registry := testRegistry(t)
 	graph := Graph{SchemaVersion: 4, Nodes: []Node{
@@ -96,23 +112,65 @@ func TestExecuteEmitsCancelledStatusWhenContextIsCancelled(t *testing.T) {
 	}
 }
 
-func TestGraphV4WhenSkipsCoverWithoutSideEffect(t *testing.T) {
+func TestGraphV4WhenSkipsCoverAndReturnsEmptyStringOutput(t *testing.T) {
 	registry := testRegistry(t)
 	called := 0
 	graph := Graph{SchemaVersion: 4, Nodes: []Node{
 		node("start", NodeTypeStart, `{"inputs":{"title":{"type":"string","required":true},"generateCover":{"type":"boolean","required":false}}}`),
 		{ID: "cover", Type: NodeTypeTool, Label: "cover", Config: json.RawMessage(`{"capabilityId":"image.generateCover","inputs":{"title":"{{start.output.title}}","summary":"","style":"editorial"}}`), When: &Rule{Left: "{{start.output.generateCover}}", Operator: "equals", Right: true}},
-		node("end", NodeTypeEnd, `{"outputs":{}}`),
+		node("end", NodeTypeEnd, `{"outputs":{"imageUrl":"{{cover.output.imageUrl}}"},"outputTypes":{"imageUrl":"string"}}`),
 	}, Edges: []Edge{{Source: "start", Target: "cover"}, {Source: "cover", Target: "end"}}}
+	if errs := ValidateGraph(graph, registry); len(errs) > 0 {
+		t.Fatalf("validation errors: %v", errs)
+	}
+
+	var final map[string]any
 	err := Execute(context.Background(), graph, registry, RunContext{Inputs: map[string]any{"title": "hello", "generateCover": false}, CoverGenerator: CoverGeneratorFunc(func(context.Context, int64, string, string, string) (GeneratedCover, error) {
 		called++
 		return GeneratedCover{URL: "https://example.test/cover.png"}, nil
-	})}, nil)
+	})}, func(event Event) {
+		if event.NodeID == "end" && event.Status == StatusSucceeded {
+			final = event.Output
+		}
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if called != 0 {
 		t.Fatalf("cover generator called %d times", called)
+	}
+	if final["imageUrl"] != "" {
+		t.Fatalf("final=%v", final)
+	}
+}
+
+func TestGraphV4GeneratedCoverExposesImageURLForDownstreamNodes(t *testing.T) {
+	registry := testRegistry(t)
+	graph := Graph{SchemaVersion: 4, Nodes: []Node{
+		node("start", NodeTypeStart, `{"inputs":{"title":{"type":"string","required":true}}}`),
+		node("cover", NodeTypeTool, `{"capabilityId":"image.generateCover","inputs":{"title":"{{start.output.title}}"}}`),
+		node("end", NodeTypeEnd, `{"outputs":{"imageUrl":"{{cover.output.imageUrl}}"},"outputTypes":{"imageUrl":"string"}}`),
+	}, Edges: []Edge{{Source: "start", Target: "cover"}, {Source: "cover", Target: "end"}}}
+	if errs := ValidateGraph(graph, registry); len(errs) > 0 {
+		t.Fatalf("validation errors: %v", errs)
+	}
+
+	var final map[string]any
+	err := Execute(context.Background(), graph, registry, RunContext{
+		Inputs: map[string]any{"title": "hello"},
+		CoverGenerator: CoverGeneratorFunc(func(context.Context, int64, string, string, string) (GeneratedCover, error) {
+			return GeneratedCover{URL: "https://example.test/cover.png"}, nil
+		}),
+	}, func(event Event) {
+		if event.NodeID == "end" && event.Status == StatusSucceeded {
+			final = event.Output
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if final["imageUrl"] != "https://example.test/cover.png" {
+		t.Fatalf("final=%v", final)
 	}
 }
 

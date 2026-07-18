@@ -25,8 +25,8 @@ const propertyPanel = readFileSync(
   'utf8',
 );
 const api = readFileSync(new URL('../src/api/workflow.ts', import.meta.url), 'utf8');
-const parseProperty = readFileSync(
-  new URL('../src/components/workflow/properties/BlogParsePropertyForm.tsx', import.meta.url),
+const toolProperty = readFileSync(
+  new URL('../src/components/workflow/properties/ToolPropertyForm.tsx', import.meta.url),
   'utf8',
 );
 const variableEditor = readFileSync(
@@ -83,20 +83,16 @@ if (!panel.includes('selectedGroup?.name')) {
   throw new Error('Selected blog group must render its display name');
 }
 
-if (!parseProperty.includes('{{start.output.markdownFile}}')) {
-  throw new Error('Markdown property default must use the Graph v1 output namespace');
+if (!toolProperty.includes('VariableTokenEditor')) {
+  throw new Error('Tool inputs must use the shared variable editor');
 }
 
-if (!parseProperty.includes('VariableTokenEditor') || !parseProperty.includes('compact')) {
-  throw new Error('Markdown file input must use the compact variable editor');
+if (!propertyPanel.includes("nodeType === 'tool'")) {
+  throw new Error('Tool nodes must receive upstream variable options');
 }
 
-if (!propertyPanel.includes("nodeType === 'blog.parseMarkdown'")) {
-  throw new Error('Markdown parser must receive upstream variable options');
-}
-
-if (!api.includes('await response.json()')) {
-  throw new Error('Workflow run API must read non-2xx JSON error responses');
+if (!api.includes('workflowRunErrorMessage') || !api.includes('await response.text()')) {
+  throw new Error('Workflow run API must read non-2xx response messages');
 }
 
 if (!api.includes("response.headers.get('content-type')")) {
@@ -111,7 +107,7 @@ if (!templateGraphs.includes("sourceHandle: 'output'")) {
   throw new Error('Blog import template edges must declare the named output handle');
 }
 
-if (!workflowGraph.includes('id: edge.id ||')) {
+if (!workflowGraph.includes('edge.id ||')) {
   throw new Error('Loaded legacy workflow edges must receive stable IDs');
 }
 
@@ -131,27 +127,27 @@ if (!variableEditor.includes('document.createTreeWalker')) {
   throw new Error('Variable editor must restore the caret within inline variable text');
 }
 
-if (variableEditor.includes("token.contentEditable = 'false'")) {
-  throw new Error('Variable editor tokens must remain editable inline text');
+if (!variableEditor.includes("token.contentEditable = 'false'")) {
+  throw new Error('Variable editor tokens must remain atomic inline elements');
 }
 
-if (!variableEditor.includes('{{}}')) {
-  throw new Error('Variable editor must provide a complete placeholder when typing {{');
+if (!variableEditor.includes("endsWith('{{')")) {
+  throw new Error('Variable editor must open suggestions when typing {{');
 }
 
 if (!variableEditor.includes('readRawValue(editor) !== value')) {
   throw new Error('Variable editor must not redraw unchanged local input while typing');
 }
 
-if (!variableEditor.includes('选择变量') || !variableEditor.includes('shadow-2xl')) {
-  throw new Error('Variable editor must show prominent variable suggestions');
+if (!variableEditor.includes('选择变量') || !variableEditor.includes('可用变量')) {
+  throw new Error('Variable editor must show variable suggestions');
 }
 
-if (!variableEditor.includes('initialFocus={false}')) {
-  throw new Error('Variable suggestions must not take focus away from the editor');
+if (!variableEditor.includes('finalFocus={false}')) {
+  throw new Error('Variable suggestions must not restore focus to the trigger');
 }
 
-if (!variableEditor.includes('InlineVariableOptionList') || !variableEditor.includes('space-y-3')) {
+if (!variableEditor.includes('InlineVariableOptionList') || !variableEditor.includes('space-y-2')) {
   throw new Error('Variable suggestions must use separated selectable rows');
 }
 
@@ -166,8 +162,8 @@ if (
   throw new Error('Variable editor must support undo after inserting a variable');
 }
 
-if (!variableEditor.includes('text-blue-600')) {
-  throw new Error('Variable editor must render valid references in blue');
+if (!variableEditor.includes('text-primary')) {
+  throw new Error('Variable editor must render valid references with the primary color');
 }
 
 if (!workflowVariables.includes('\\{\\{[^\\n]*?(?:\\}\\}|$)')) {

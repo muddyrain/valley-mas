@@ -116,11 +116,11 @@ func RegisterWorkflowCapabilities(registry *Registry) error {
 		definition ToolCapability
 		executor   CapabilityExecutor
 	}{
-		{ToolCapability{ID: CapabilityParseMarkdown, Name: "解析 Markdown", Description: "解析 Markdown 标题、正文和 Front Matter", Category: "content", SideEffect: "none", InputSchema: schema([]string{"fileInput"}, map[string]string{"fileInput": "file"}), OutputSchema: fields(field("title", ValueTypeString), field("content", ValueTypeString), field("excerpt", ValueTypeString), field("frontMatter", ValueTypeObject), field("cover", ValueTypeObject), field("tagNames", ValueTypeStringList)), AIUsage: "需要解析上传的 Markdown 文件时使用"}, ParseMarkdownCapabilityAdapter{}},
-		{ToolCapability{ID: CapabilityKnowledge, Name: "知识库检索", Description: "检索当前工作流绑定的私有资料库", Category: "knowledge", SideEffect: "read", InputSchema: schema([]string{"query"}, map[string]string{"query": "string"}), OutputSchema: fields(field("context", ValueTypeString), field("references", ValueTypeObject)), AIUsage: "需要引用用户私有知识时使用"}, KnowledgeRetrieveCapabilityAdapter{}},
-		{ToolCapability{ID: CapabilityContentSearch, Name: "搜索内容", Description: "搜索当前用户的博客和资源", Category: "content", SideEffect: "read", InputSchema: schema(nil, map[string]string{"query": "string", "createdFrom": "string", "createdTo": "string"}), OutputSchema: fields(field("count", ValueTypeNumber), field("items", ValueTypeObject)), AIUsage: "需要搜索用户已有内容时使用"}, ContentSearchCapabilityAdapter{}},
-		{ToolCapability{ID: CapabilityGenerateCover, Name: "生成封面", Description: "根据标题和摘要生成博客封面", Category: "image", SideEffect: "model_and_storage", ModelCost: 1, InputSchema: schema([]string{"title"}, map[string]string{"title": "string", "summary": "string", "style": "string"}), OutputSchema: fields(field("cover", ValueTypeObject), field("url", ValueTypeString), field("model", ValueTypeString), field("size", ValueTypeString)), AIUsage: "生成封面时使用；可通过节点 when 受 Start boolean 控制，不要额外创建 Condition"}, CoverGenerateCapabilityAdapter{}},
-		{ToolCapability{ID: CapabilityCreateBlogDraft, Name: "创建博客草稿", Description: "为当前用户创建博客草稿", Category: "content", SideEffect: "write", WriteCost: 1, InputSchema: schema([]string{"title", "content", "tags", "tagMode", "visibility"}, map[string]string{"title": "string", "content": "string", "excerpt": "string", "cover": "object", "tags": "string[]", "suggestedTags": "string[]", "tagMode": "string", "visibility": "string"}), OutputSchema: fields(field("postId", ValueTypeString), field("title", ValueTypeString), field("editPath", ValueTypeString), field("tagIds", ValueTypeStringList)), AIUsage: "只创建草稿，永不自动发布"}, BlogCreateDraftCapabilityAdapter{}},
+		{ToolCapability{ID: CapabilityParseMarkdown, Name: "解析 Markdown", Description: "解析 Markdown 标题、正文和 Front Matter", Category: "content", SideEffect: "none", InputSchema: schemaWithFields([]string{"fileInput"}, map[string]map[string]any{"fileInput": inputField("file", "Markdown 文件", "选择开始节点上传的 Markdown 文件。", "选择 Markdown 文件变量")}), OutputSchema: fields(field("title", ValueTypeString), field("content", ValueTypeString), field("excerpt", ValueTypeString), field("frontMatter", ValueTypeObject), field("cover", ValueTypeObject), field("tagNames", ValueTypeStringList)), AIUsage: "需要解析上传的 Markdown 文件时使用"}, ParseMarkdownCapabilityAdapter{}},
+		{ToolCapability{ID: CapabilityKnowledge, Name: "知识库检索", Description: "检索当前工作流绑定的私有资料库", Category: "knowledge", SideEffect: "read", InputSchema: schemaWithFields([]string{"query"}, map[string]map[string]any{"query": inputField("string", "检索问题", "描述希望从知识库中找到的信息。", "例如：介绍 AI 工作流的最佳实践")}), OutputSchema: fields(field("context", ValueTypeString), field("references", ValueTypeObject)), AIUsage: "需要引用用户私有知识时使用"}, KnowledgeRetrieveCapabilityAdapter{}},
+		{ToolCapability{ID: CapabilityContentSearch, Name: "搜索内容", Description: "搜索当前用户的博客和资源", Category: "content", SideEffect: "read", InputSchema: schemaWithFields(nil, map[string]map[string]any{"query": inputField("string", "关键词", "按标题、正文或资源内容搜索。", "例如：AI 工作流"), "createdFrom": inputField("string", "开始日期", "可选，限定创建日期下限。", "例如：2026-07-01"), "createdTo": inputField("string", "结束日期", "可选，限定创建日期上限。", "例如：2026-07-31")}), OutputSchema: fields(field("count", ValueTypeNumber), field("items", ValueTypeObject)), AIUsage: "需要搜索用户已有内容时使用"}, ContentSearchCapabilityAdapter{}},
+		{ToolCapability{ID: CapabilityGenerateCover, Name: "生成封面", Description: "根据标题和摘要生成博客封面", Category: "image", SideEffect: "model_and_storage", ModelCost: 1, InputSchema: schemaWithFields([]string{"title"}, map[string]map[string]any{"title": inputField("string", "封面标题", "概括封面要表达的主题。", "例如：AI 工作流封面测试"), "summary": inputField("string", "画面摘要", "补充画面应传达的主体和场景。", "例如：展示一条从开始到结束的自动化内容创作流程"), "style": inputField("string", "视觉风格", "描述构图、风格和限制。", "例如：简洁蓝紫科技插画，抽象工作流节点与连线，无文字")}), OutputSchema: fields(field("imageUrl", ValueTypeString), field("cover", ValueTypeObject), field("url", ValueTypeString), field("model", ValueTypeString), field("size", ValueTypeString)), AIUsage: "生成封面时使用；默认直接执行，需要时可在节点生成条件中绑定上游布尔变量"}, CoverGenerateCapabilityAdapter{}},
+		{ToolCapability{ID: CapabilityCreateBlogDraft, Name: "创建博客草稿", Description: "为当前用户创建博客草稿", Category: "content", SideEffect: "write", WriteCost: 1, InputSchema: schemaWithFields([]string{"title", "content", "tags", "tagMode", "visibility"}, map[string]map[string]any{"title": inputField("string", "草稿标题", "文章展示的主标题。", "例如：用 AI 工作流自动生成内容"), "content": inputField("string", "文章正文", "要保存到草稿的 Markdown 正文。", "例如：## 开始\n\n这是正文内容。"), "excerpt": inputField("string", "摘要", "可选，用于列表页的简短介绍。", "例如：用一条工作流完成内容创作。"), "cover": inputField("object", "封面", "可选，绑定生成封面的 cover 输出。", "选择生成封面 · cover"), "tags": inputField("string[]", "标签", "文章标签名称列表。", "例如：AI, 工作流"), "suggestedTags": inputField("string[]", "推荐标签", "可选，使用上游给出的标签建议。", "选择解析 Markdown · tagNames"), "tagMode": inputField("string", "标签模式", "选择手动标签或使用推荐标签。", "例如：manual"), "visibility": inputField("string", "可见范围", "保存后的默认访问范围。", "例如：private")}), OutputSchema: fields(field("postId", ValueTypeString), field("title", ValueTypeString), field("editPath", ValueTypeString), field("tagIds", ValueTypeStringList)), AIUsage: "只创建草稿，永不自动发布"}, BlogCreateDraftCapabilityAdapter{}},
 	}
 	for _, item := range definitions {
 		if err := registry.RegisterCapability(item.definition, item.executor); err != nil {
@@ -190,6 +190,23 @@ func schema(required []string, properties map[string]string) map[string]any {
 	props := make(map[string]any, len(properties))
 	for name, valueType := range properties {
 		props[name] = map[string]any{"type": valueType}
+	}
+	return map[string]any{"type": "object", "required": required, "properties": props}
+}
+
+func inputField(valueType, title, description, placeholder string) map[string]any {
+	return map[string]any{
+		"type":        valueType,
+		"title":       title,
+		"description": description,
+		"placeholder": placeholder,
+	}
+}
+
+func schemaWithFields(required []string, properties map[string]map[string]any) map[string]any {
+	props := make(map[string]any, len(properties))
+	for name, property := range properties {
+		props[name] = property
 	}
 	return map[string]any{"type": "object", "required": required, "properties": props}
 }

@@ -2,7 +2,6 @@ import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +9,7 @@ import { VariableTokenEditor } from '../VariableTokenEditor';
 import { getWorkflowNodeOutputFields } from '../workflowVariables';
 import type { PropertyFormProps } from './index';
 import { VariableBindingEditor } from './VariableBindingEditor';
+import { WorkflowOutputFieldList } from './WorkflowOutputFieldList';
 
 export function LLMPropertyForm({
   config,
@@ -112,25 +112,14 @@ export function LLMPropertyForm({
         </div>
       </EditorSection>
       <EditorSection title="输出" description="下游节点可直接引用这些字段。">
-        <div className="divide-y divide-border overflow-hidden rounded-md border border-border">
-          {outputs.map(([name, type]) => (
-            <div key={name} className="flex items-center justify-between gap-3 px-3 py-2.5">
-              <div className="min-w-0">
-                <p className="truncate font-mono text-sm font-medium">{name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {name === 'text'
-                    ? '模型生成内容'
-                    : name === 'model'
-                      ? '实际使用的模型'
-                      : '本次调用的 Token 用量'}
-                </p>
-              </div>
-              <Badge variant="secondary" className="font-mono">
-                {type}
-              </Badge>
-            </div>
-          ))}
-        </div>
+        <WorkflowOutputFieldList
+          outputs={outputs}
+          descriptions={{
+            text: '模型生成内容',
+            model: '实际使用的模型',
+            tokenUsage: '本次调用的 Token 用量',
+          }}
+        />
       </EditorSection>
       <PromptAssistantDialog
         open={showAssistant}

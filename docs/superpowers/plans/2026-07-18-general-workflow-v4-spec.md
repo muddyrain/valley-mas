@@ -2,14 +2,14 @@
 
 ## 目标
 
-以通用节点和受控能力注册表替换 Graph v2/v3 业务节点，使编辑器、运行时和 AI 协作共享同一能力边界。旧 Graph 不迁移；开发数据通过显式、受保护命令清理。
+以通用节点和受控能力注册表替换 Graph v2/v3 业务节点，使编辑器、运行时和 AI 协作共享同一能力边界。旧 Graph 不迁移，既有开发数据保留，不作为 Graph v4 验收或上线前置条件。
 
 ## Graph v4
 
 - 节点固定为 `start`、`end`、`llm`、`tool`、`condition`、`merge`、`variable`、`subworkflow`。
 - 业务能力固定为 Tool capability：`content.parseMarkdown`、`knowledge.retrieve`、`content.search`、`image.generateCover`、`blog.createDraft`。
 - 一个 Start、一个 End、最多 30 节点，只允许 DAG。
-- `condition` 只有 `true` / `false` 输出；`merge` 使用 `firstActive`；Tool、LLM、Variable、Subworkflow 可声明受控 `when`，未命中输出字段为 `null` 并记录 `skipped`。
+- `condition` 只有 `true` / `false` 输出；`merge` 使用 `firstActive`；Tool、LLM、Variable、Subworkflow 可声明受控 `when`，未命中输出字段为 `null` 并记录 `skipped`。当 End 显式声明 `string` 输出且直接映射此类 `when` 输出时，运行结果固定归一为空字符串，避免把“未生成”误报为运行失败。
 - LLM 的系统提示词可选，用于持续角色和边界；用户提示词必填，用于本次执行任务。End 通过“输出名 / 类型 / 值”映射返回固定值或上游变量，并校验引用类型。
 - 单次最多 5 个模型能力、3 个写入能力；不开放代码、任意 HTTP、SQL、循环、批处理、自动发布、任意数据库写入或外部凭据。
 - Subworkflow 只引用当前 owner 的不可变已发布版本，保存和运行都检查直接或传递递归。
@@ -33,17 +33,16 @@
 - 试运行时每个已执行或跳过的节点在画布卡片下展示可展开详情，包含状态、耗时、输入、输出和安全错误；详情展开不得改变主卡 Handle 的连线锚点。
 - 空白创建返回完整 Graph v4；已有工作流修改只返回 operations，服务端基于 baseHash 应用、完整校验并生成候选草稿和语义差异。
 - operations 固定为 Start 输入增删、节点插入/修改/删除和边连接/断开；AI 不保存、运行、发布或调用工具。
-- 可选封面需求必须只增加 Start boolean 和 `tool/image.generateCover`，通过节点 `when` 控制，不创建 Condition，不改动其他节点。
+- 生成封面需求默认只插入 `tool/image.generateCover`，节点直接执行且不新增 Start 输入；只有用户明确要求依赖已有上游布尔输出时，才在该节点的“生成条件”设置 `when`，不创建 Condition，不改动其他节点。
 
-## 数据清理
+## 数据保留
 
-- `go run ./cmd/purge-legacy-workflows --dry-run` 默认只统计。
-- 仅 `ENV=development` 且显式传入 `--confirm DELETE_LEGACY_WORKFLOWS` 才在单事务内硬删除旧工作流、运行、工作流副驾驶和关联 workflow AI App 数据。
-- 保留智能体 App、知识库和 API Key；只解除 API Key 与旧 workflow App 的绑定。
+- 旧 Graph 不迁移，但既有工作流、运行、工作流副驾驶和关联 workflow AI App 数据均保留。
+- 不以数据库清理作为 Graph v4 或后续 P12 的验收条件；当前清理命令存在无法仅限定旧 Graph 的风险，不应执行。
 
 ## 验收
 
-- Graph v2/v3 固定拒绝并包含 `GRAPH_VERSION_UNSUPPORTED`。
+- Graph v2/v3 固定拒绝并包含 `GRAPH_VERSION_UNSUPPORTED`，但既有数据保持可审计。
 - 未命中的模型和写入能力零调用；节点运行记录包含 `nodeType` 和可选 `capabilityId`。
 - 新建草稿可直接点击运行并先完成持久化；ARK 缺配置、上游失败、超时和无效响应返回可行动的安全原因与稳定错误码。
 - 三种节点入口、键盘/焦点、响应式、主题、AI operations 与撤销闭环通过。

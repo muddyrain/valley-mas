@@ -230,7 +230,7 @@ func TestCopilotNamedNodeTakesPriorityOverSelectedNodeForCoverInsertion(t *testi
 		},
 	}
 	payload := copilotMessageRequest{
-		Message: "在生成摘要节点后增加封面节点，根据 start 参数决定是否生成封面",
+		Message: "在生成摘要节点后增加封面节点",
 		Context: copilotContextPayload{
 			SelectedNodeID: "create-draft",
 			NodeLabels:     map[string]string{"summary": "生成摘要", "create-draft": "创建博客草稿"},
@@ -239,9 +239,9 @@ func TestCopilotNamedNodeTakesPriorityOverSelectedNodeForCoverInsertion(t *testi
 	candidate := &aiWorkflowDraft{Graph: workflow.Graph{
 		SchemaVersion: 4,
 		Nodes: []workflow.Node{
-			{ID: "start", Type: workflow.NodeTypeStart, Config: json.RawMessage(`{"inputs":{"generateCover":{"type":"boolean","required":false}}}`)},
+			{ID: "start", Type: workflow.NodeTypeStart},
 			{ID: "summary", Type: workflow.NodeTypeLLM},
-			{ID: "cover", Type: workflow.NodeTypeTool, Config: json.RawMessage(`{"capabilityId":"image.generateCover","inputs":{}}`), When: &workflow.Rule{Left: "{{start.output.generateCover}}", Operator: "equals", Right: true}},
+			{ID: "cover", Type: workflow.NodeTypeTool, Config: json.RawMessage(`{"capabilityId":"image.generateCover","inputs":{}}`)},
 			{ID: "create-draft", Type: workflow.NodeTypeTool, Config: json.RawMessage(`{"capabilityId":"blog.createDraft","inputs":{}}`)},
 			{ID: "end", Type: workflow.NodeTypeEnd},
 		},
@@ -250,27 +250,22 @@ func TestCopilotNamedNodeTakesPriorityOverSelectedNodeForCoverInsertion(t *testi
 	if err := validateCopilotWorkflowEditIntent(payload, base, candidate); err != nil {
 		t.Fatalf("named insertion should pass: %v", err)
 	}
-	candidate.Graph.Nodes[2].When = &workflow.Rule{Left: "{{summary.output.generateCover}}", Operator: "equals", Right: true}
-	if err := validateCopilotWorkflowEditIntent(payload, base, candidate); err == nil {
-		t.Fatal("explicit start parameter must not be replaced by another upstream output")
-	}
-	candidate.Graph.Nodes[2].When = &workflow.Rule{Left: "{{start.output.generateCover}}", Operator: "equals", Right: true}
 	candidate.Graph.Edges = []workflow.Edge{{Source: "start", Target: "summary"}, {Source: "summary", Target: "create-draft"}, {Source: "create-draft", Target: "cover"}, {Source: "cover", Target: "end"}}
 	if err := validateCopilotWorkflowEditIntent(payload, base, candidate); err == nil {
 		t.Fatal("selected-node insertion must not override explicitly named summary node")
 	}
 }
 
-func TestPlanDeterministicCoverOperationsOnlyChangesStartAndInsertion(t *testing.T) {
+func TestPlanDeterministicCoverOperationsOnlyInsertsCoverNode(t *testing.T) {
 	base := aiWorkflowDraft{Name: "博客导入", Description: "test", Graph: workflow.Graph{SchemaVersion: 4, Nodes: []workflow.Node{
 		{ID: "start", Type: workflow.NodeTypeStart, Label: "开始", Config: json.RawMessage(`{"inputs":{"title":{"type":"string","required":true}}}`)},
 		{ID: "summary", Type: workflow.NodeTypeLLM, Label: "生成摘要", Config: json.RawMessage(`{"systemPrompt":"summarize","prompt":"article"}`)},
 		{ID: "draft", Type: workflow.NodeTypeTool, Label: "创建草稿", Config: json.RawMessage(`{"capabilityId":"blog.createDraft","inputs":{"title":"{{start.output.title}}","content":"body","tags":[],"tagMode":"manual_only","visibility":"private"}}`)},
 		{ID: "end", Type: workflow.NodeTypeEnd, Label: "结束", Config: json.RawMessage(`{"outputs":{"postId":"{{draft.output.postId}}"}}`)},
 	}, Edges: []workflow.Edge{{Source: "start", Target: "summary"}, {Source: "summary", Target: "draft"}, {Source: "draft", Target: "end"}}}}
-	payload := copilotMessageRequest{Message: "在生成摘要节点后加一个自动生成封面的节点，根据 start 参数是否生成封面，勾选才走", Context: copilotContextPayload{SelectedNodeID: "draft", NodeLabels: map[string]string{"summary": "生成摘要", "draft": "创建草稿"}}}
+	payload := copilotMessageRequest{Message: "在生成摘要节点后加一个自动生成封面的节点", Context: copilotContextPayload{SelectedNodeID: "draft", NodeLabels: map[string]string{"summary": "生成摘要", "draft": "创建草稿"}}}
 	envelope, handled := planDeterministicWorkflowOperations(payload, base)
-	if !handled || envelope.Mode != "proposal" || len(envelope.Operations) != 2 {
+	if !handled || envelope.Mode != "proposal" || len(envelope.Operations) != 1 {
 		t.Fatalf("envelope=%+v", envelope)
 	}
 	candidate, err := workflow.ApplyOperations(base.Graph, envelope.Operations, workflowRuntimeRegistry())
@@ -292,7 +287,7 @@ func TestPlanDeterministicCoverOperationsOnlyChangesStartAndInsertion(t *testing
 				CapabilityID string `json:"capabilityId"`
 			}
 			_ = json.Unmarshal(node.Config, &config)
-			if config.CapabilityID == workflow.CapabilityGenerateCover && (node.When == nil || node.When.Left != "{{start.output.generateCover}}") {
+			if config.CapabilityID == workflow.CapabilityGenerateCover && node.When != nil {
 				t.Fatalf("cover when=%+v", node.When)
 			}
 		}

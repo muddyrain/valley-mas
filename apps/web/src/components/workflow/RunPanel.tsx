@@ -155,10 +155,15 @@ export function RunPanel({
   );
 
   return (
-    <div className="flex h-full flex-col border-l border-border bg-card">
+    <div className="flex h-full flex-col bg-card">
       <div className="flex items-center justify-between border-b border-border p-4">
         <h2 className="text-sm font-semibold">试运行</h2>
-        <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="关闭试运行"
+          onClick={() => onOpenChange(false)}
+        >
           <X className="h-4 w-4" />
         </Button>
       </div>

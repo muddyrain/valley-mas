@@ -14,16 +14,40 @@ export interface ValidationError {
   message: string;
 }
 
-function valuesWithReferences(data: WorkflowNodeData): string[] {
+const WORKFLOW_REFERENCE_PATTERN = /\{\{\s*([^{}]+?)\s*\}\}/g;
+const WORKFLOW_RULE_OPERATORS = new Set([
+  'equals',
+  'notEquals',
+  'contains',
+  'isEmpty',
+  'greaterThan',
+  'lessThan',
+]);
+
+function stringsInValue(value: unknown): string[] {
   const values: string[] = [];
-  const visit = (value: unknown) => {
-    if (typeof value === 'string') values.push(value);
-    else if (Array.isArray(value)) value.forEach(visit);
-    else if (value && typeof value === 'object') Object.values(value).forEach(visit);
+  const visit = (current: unknown) => {
+    if (typeof current === 'string') values.push(current);
+    else if (Array.isArray(current)) current.forEach(visit);
+    else if (current && typeof current === 'object') Object.values(current).forEach(visit);
   };
-  visit(data.config);
-  visit(data.when);
+  visit(value);
   return values;
+}
+
+function valuesWithReferences(data: WorkflowNodeData): string[] {
+  return [...stringsInValue(data.config), ...stringsInValue(data.when)];
+}
+
+function workflowReferences(value: unknown): string[] {
+  return stringsInValue(value).flatMap((text) =>
+    [...text.matchAll(WORKFLOW_REFERENCE_PATTERN)].map((match) => match[1].trim()),
+  );
+}
+
+function referencedNodeID(reference: string): string | null {
+  const match = reference.match(/^([^.\s]+)\.output\.[^.\s]+$/);
+  return match?.[1] || null;
 }
 
 function validateNode(
@@ -41,6 +65,11 @@ function validateNode(
     message,
   });
   if (!NODE_CONFIGS[data.nodeType]) return fail('未识别的 Graph v4 节点类型');
+  if (data.when) {
+    if (!WORKFLOW_RULE_OPERATORS.has(data.when.operator)) return fail('执行条件的操作符无效');
+    if (data.when.left === undefined || String(data.when.left).trim() === '')
+      return fail('请选择上游变量作为执行条件');
+  }
   switch (data.nodeType) {
     case 'llm':
       if (!config.prompt) return fail('请填写用户提示词');
@@ -108,6 +137,39 @@ function validateNode(
   return null;
 }
 
+function validateOptionalEndOutputs(nodes: Node[]): ValidationError[] {
+  const nodeByID = new Map(nodes.map((node) => [node.id, node]));
+
+  return nodes.flatMap((node) => {
+    const data = node.data as unknown as WorkflowNodeData;
+    if (data.nodeType !== 'end') return [];
+    const outputs = data.config?.outputs;
+    if (!outputs || typeof outputs !== 'object') return [];
+    const outputTypes =
+      data.config?.outputTypes && typeof data.config.outputTypes === 'object'
+        ? (data.config.outputTypes as Record<string, unknown>)
+        : {};
+
+    for (const [name, value] of Object.entries(outputs)) {
+      const optionalSource = workflowReferences(value)
+        .map(referencedNodeID)
+        .filter((nodeID): nodeID is string => Boolean(nodeID))
+        .map((nodeID) => nodeByID.get(nodeID))
+        .find((source) => (source?.data as unknown as WorkflowNodeData | undefined)?.when);
+      if (!optionalSource || outputTypes[name] === 'string') continue;
+
+      const sourceData = optionalSource.data as unknown as WorkflowNodeData;
+      return [
+        workflowError(
+          `“${sourceData.label || optionalSource.id}”可能跳过，只能直接映射到 string 结束输出。`,
+          node,
+        ),
+      ];
+    }
+    return [];
+  });
+}
+
 export function validateWorkflowConfig(nodes: Node[], edges: Edge[] = []): ValidationError[] {
   const errors = nodes
     .map((node) => validateNode(node, nodes, edges))
@@ -134,7 +196,7 @@ function workflowError(message: string, node?: Node): ValidationError {
 
 /** Mirrors the graph-shape checks that block server persistence without running tools. */
 export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): ValidationError[] {
-  const errors = validateWorkflowConfig(nodes, edges);
+  const errors = [...validateWorkflowConfig(nodes, edges), ...validateOptionalEndOutputs(nodes)];
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const starts = nodes.filter(
     (node) => (node.data as unknown as WorkflowNodeData).nodeType === 'start',

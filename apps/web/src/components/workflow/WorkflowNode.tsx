@@ -35,6 +35,7 @@ import { getNodeConfigSummary, NODE_CONFIGS } from './nodeConfig';
 import type { WorkflowNodeData } from './types';
 import { validateSingleNode } from './validateWorkflowConfig';
 import { useWorkflowRuntime } from './WorkflowRuntimeContext';
+import { getWorkflowSideEffectLabel } from './workflowSideEffects';
 import { getWorkflowNodeOutputFields } from './workflowVariables';
 
 const iconMap = {
@@ -93,7 +94,7 @@ function NodeLabel({ label }: { label: string }) {
 }
 
 export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: NodeProps) {
-  const { session, connectedSourceNodeIDs, copyNode, deleteNode, insertAfter } =
+  const { session, connectedSourceNodeIDs, validationErrors, copyNode, deleteNode, insertAfter } =
     useWorkflowRuntime();
   const nodeData = data as unknown as WorkflowNodeData;
   const { label, nodeType, config } = nodeData;
@@ -104,11 +105,22 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
   const hasInput = definition?.handles.input;
   const hasOutput = definition?.handles.output;
   const multiOutputs = definition?.handles.outputs;
-  const validationError = validateSingleNode(nodeData);
+  const draftValidationMessage = validationErrors.get(id);
+  const validationError = draftValidationMessage ? null : validateSingleNode(nodeData);
+  const validationMessage = draftValidationMessage || validationError?.message;
+  const hasDraftValidationError = Boolean(draftValidationMessage);
   const incomplete = Boolean(validationError);
   const summary = getNodeConfigSummary(nodeType, config);
   const fixed = definition?.fixed;
   const sideEffect = nodeType === 'tool' ? String(config?.sideEffect || '') : '';
+  const sideEffectLabel = getWorkflowSideEffectLabel(sideEffect);
+  const nodeKind =
+    nodeType === 'tool'
+      ? ['工具', sideEffectLabel].filter(Boolean).join(' · ')
+      : definition?.label !== label
+        ? definition?.label
+        : '';
+  const configDetail = summary && summary !== label && summary !== nodeKind ? summary : '';
   const outputFields = getWorkflowNodeOutputFields(nodeType, config);
 
   return (
@@ -126,16 +138,21 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
           className={cn(
             'overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-[border-color,box-shadow] duration-150 hover:border-primary/35 hover:bg-card hover:shadow-sm',
             incomplete && !runningState && 'border-amber-500/45 hover:border-amber-500/60',
+            hasDraftValidationError &&
+              !runningState &&
+              'border-destructive/70 ring-1 ring-destructive/20 hover:border-destructive',
             runningState === 'running' && 'border-primary/55 ring-1 ring-primary/10',
             runningState === 'success' &&
               'border-emerald-500/45 ring-1 ring-emerald-500/10 hover:border-emerald-500/65 hover:bg-card',
             runningState === 'error' &&
               'border-destructive/55 ring-1 ring-destructive/10 hover:border-destructive/70',
             runningState === 'skipped' && 'opacity-60',
-            selected && 'border-primary/65 ring-1 ring-primary/25 shadow-sm',
+            selected &&
+              !hasDraftValidationError &&
+              'border-primary/65 ring-1 ring-primary/25 shadow-sm',
           )}
         >
-          <div className="flex min-h-[104px] items-start gap-3 px-4 py-4">
+          <div className="flex min-h-[88px] items-start gap-3 px-4 py-3.5">
             <span
               className={cn(
                 'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg',
@@ -147,32 +164,39 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
             <div className="min-w-0 flex-1 pt-0.5">
               <div className="flex min-w-0 items-center gap-1.5">
                 <NodeLabel label={label} />
-                {incomplete ? (
-                  <Tooltip>
-                    <TooltipTrigger render={<span className="flex shrink-0" />}>
-                      <AlertCircle className="size-3.5 text-orange-500" />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-72">
-                      {validationError?.message}
-                    </TooltipContent>
-                  </Tooltip>
+                {validationMessage ? (
+                  hasDraftValidationError ? (
+                    <AlertCircle
+                      aria-label="运行前需完善"
+                      className="size-3.5 shrink-0 text-destructive"
+                    />
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger render={<span className="flex shrink-0" />}>
+                        <AlertCircle className="size-3.5 text-orange-500" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-72">
+                        {validationMessage}
+                      </TooltipContent>
+                    </Tooltip>
+                  )
                 ) : null}
               </div>
-              <span className="mt-1 block truncate text-xs text-muted-foreground">
-                {nodeType === 'tool'
-                  ? String(config?.capabilityName || config?.capabilityId || '工具')
-                  : definition?.label}
-              </span>
-              <span className="mt-0.5 block truncate text-xs text-muted-foreground/70">
-                {summary || '尚未配置'}
-              </span>
+              {nodeKind ? (
+                <span className="mt-1 block truncate text-xs text-muted-foreground">
+                  {nodeKind}
+                </span>
+              ) : null}
+              {configDetail ? (
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground/70">
+                  {configDetail}
+                </span>
+              ) : null}
+              {!nodeKind && !configDetail ? (
+                <span className="mt-1 block text-xs text-muted-foreground/70">尚未配置</span>
+              ) : null}
             </div>
             <div className="nodrag nopan -mt-1 flex shrink-0 items-center gap-0.5">
-              {sideEffect ? (
-                <Badge variant="outline" className="px-1 text-[10px]">
-                  {sideEffect}
-                </Badge>
-              ) : null}
               {!fixed ? (
                 <Button
                   variant="ghost"

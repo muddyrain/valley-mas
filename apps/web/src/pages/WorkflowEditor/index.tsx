@@ -131,6 +131,8 @@ const workflowNodeTypes = Object.fromEntries(
   Object.keys(NODE_CONFIGS).map((type) => [type, WorkflowNode]),
 );
 const workflowEdgeTypes = { insertable: InsertableEdge };
+const minimumRunPanelHeight = 220;
+const maximumRunPanelHeight = 720;
 
 type SaveStatus = 'idle' | 'pending' | 'creating' | 'saving' | 'saved' | 'error';
 
@@ -187,6 +189,9 @@ export default function WorkflowEditorPage() {
   const [saveRevision, setSaveRevision] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [showRunPanel, setShowRunPanel] = useState(false);
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
+  const [runPanelHeight, setRunPanelHeight] = useState<number | null>(null);
+  const [isRunPanelResizing, setIsRunPanelResizing] = useState(false);
   const [runSession, dispatchRunSession] = useReducer(
     workflowRunSessionReducer,
     undefined,
@@ -212,6 +217,7 @@ export default function WorkflowEditorPage() {
   const alignmentGuidesRef = useRef<WorkflowAlignment | null>(null);
   const isDraggingRef = useRef(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const runPanelRef = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
   const isFitViewComplete = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -387,6 +393,7 @@ export default function WorkflowEditorPage() {
   const markWorkflowDirty = useCallback((updates: Partial<WorkflowEditorState> = {}) => {
     const nextState = { ...workflowStateRef.current, ...updates };
     workflowStateRef.current = nextState;
+    setShowValidationErrors(false);
     saveRevisionRef.current += 1;
     workflowSnapshotRef.current = {
       name: nextState.name,
@@ -1174,6 +1181,33 @@ export default function WorkflowEditorPage() {
     [rightPanelWidth],
   );
 
+  const handleRunPanelResizeStart = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startY = event.clientY;
+    const startHeight =
+      runPanelRef.current?.getBoundingClientRect().height ??
+      Math.min(360, Math.round(window.innerHeight * 0.48));
+    const maxHeight = Math.max(
+      minimumRunPanelHeight,
+      Math.min(maximumRunPanelHeight, window.innerHeight - 64),
+    );
+
+    setIsRunPanelResizing(true);
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const nextHeight = startHeight - (moveEvent.clientY - startY);
+      setRunPanelHeight(Math.max(minimumRunPanelHeight, Math.min(maxHeight, nextHeight)));
+    };
+    const handleMouseUp = () => {
+      setIsRunPanelResizing(false);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, []);
+
   const copilotDraftVersion = `${workflowId || 'new'}:${saveRevision}`;
   const copilotDraft = useMemo(() => {
     void copilotDraftVersion;
@@ -1266,7 +1300,17 @@ export default function WorkflowEditorPage() {
       setSaveStatus('pending');
       return;
     }
-    await persistLatestWorkflow({ force: true, createIfMissing: true, recordHistory: true });
+    setShowValidationErrors(false);
+    const saved = await persistLatestWorkflow({
+      force: true,
+      createIfMissing: true,
+      recordHistory: true,
+    });
+    if (saved) {
+      toast.success('已保存', {
+        className: '!border-emerald-200 !bg-emerald-50 !text-emerald-700 [&_svg]:!text-emerald-600',
+      });
+    }
   }, [persistLatestWorkflow]);
 
   const handleRunConfirm = useCallback(
@@ -1274,6 +1318,10 @@ export default function WorkflowEditorPage() {
       const id = workflowId;
       const session = editorSessionRef.current;
       if (!id || !isActiveWorkflowSession(session, id)) return;
+      if (abortControllerRef.current) {
+        toast.message('工作流正在运行，请等待当前运行结束。');
+        return;
+      }
 
       setIsRunning(true);
       setRunError(null);
@@ -1332,6 +1380,25 @@ export default function WorkflowEditorPage() {
     [isActiveWorkflowSession, workflowId],
   );
 
+  const focusValidationNode = useCallback((nodeID: string) => {
+    const node = workflowStateRef.current.nodes.find((item) => item.id === nodeID);
+    if (!node) return;
+
+    setNodes((prev) => prev.map((item) => ({ ...item, selected: item.id === nodeID })));
+    setSelectedNode({
+      id: node.id,
+      type: node.type || '',
+      data: node.data as {
+        label: string;
+        nodeType: string;
+        config?: Record<string, unknown>;
+        when?: import('@/api/workflow').WorkflowRule;
+      },
+    });
+    setActiveWorkspaceTab('node');
+    setActivePropertyTab('config');
+  }, []);
+
   const handleRun = useCallback(async () => {
     if (nodes.length === 0) {
       toast.warning('请先添加节点');
@@ -1340,31 +1407,34 @@ export default function WorkflowEditorPage() {
 
     const errors = validateWorkflowDraft(nodes, edges);
     if (errors.length > 0) {
+      setShowValidationErrors(true);
       const firstError = errors[0];
-      toast.warning(`${firstError.nodeLabel}：${firstError.message}`);
-      setNodes((prev) => prev.map((n) => ({ ...n, selected: n.id === firstError.nodeId })));
-      const node = nodes.find((item) => item.id === firstError.nodeId);
-      if (node) {
-        setSelectedNode({
-          id: node.id,
-          type: node.type || '',
-          data: node.data as {
-            label: string;
-            nodeType: string;
-            config?: Record<string, unknown>;
-            when?: import('@/api/workflow').WorkflowRule;
-          },
-        });
-      }
+      const invalidNodeLabels = [
+        ...new Set(
+          errors.filter((error) => error.nodeId !== 'workflow').map((error) => error.nodeLabel),
+        ),
+      ];
+      toast.error(
+        invalidNodeLabels.length > 0
+          ? `运行前请完善：${invalidNodeLabels.join('、')}`
+          : '运行前请完善工作流配置',
+        {
+          className:
+            '!border-destructive/30 !bg-destructive/10 !text-destructive [&_svg]:!text-destructive',
+        },
+      );
+      focusValidationNode(firstError.nodeId);
       return;
     }
+
+    setShowValidationErrors(false);
 
     if (!(await persistLatestWorkflow({ createIfMissing: true }))) {
       return;
     }
 
     setShowRunPanel(true);
-  }, [edges, nodes, persistLatestWorkflow]);
+  }, [edges, focusValidationNode, nodes, persistLatestWorkflow]);
 
   const handleCancelRun = useCallback(() => {
     if (!abortControllerRef.current) return;
@@ -1491,16 +1561,35 @@ export default function WorkflowEditorPage() {
     [edges, runSession.nodes],
   );
 
+  const visibleValidationErrors = useMemo(
+    () =>
+      showValidationErrors
+        ? validateWorkflowDraft(nodes, edges).filter((error) => error.nodeId !== 'workflow')
+        : [],
+    [edges, nodes, showValidationErrors],
+  );
+
   const runtimeValue = useMemo(
     () => ({
       session: runSession,
       connectedSourceNodeIDs: new Set(edges.map((edge) => edge.source)),
+      validationErrors: new Map(
+        visibleValidationErrors.map((error) => [error.nodeId, error.message]),
+      ),
       copyNode: handleCopyNode,
       deleteNode: handleDeleteNode,
       insertAfter: handleInsertAfter,
       insertOnEdge: handleInsertOnEdge,
     }),
-    [edges, handleCopyNode, handleDeleteNode, handleInsertAfter, handleInsertOnEdge, runSession],
+    [
+      edges,
+      handleCopyNode,
+      handleDeleteNode,
+      handleInsertAfter,
+      handleInsertOnEdge,
+      runSession,
+      visibleValidationErrors,
+    ],
   );
 
   const saveStatusText =
@@ -1878,23 +1967,42 @@ export default function WorkflowEditorPage() {
                 <Controls />
                 <MiniMap />
               </ReactFlow>
-              <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
-                <NodePicker
-                  trigger={
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl bg-background shadow-md"
-                    >
-                      <Plus className="mr-2 size-4" />
-                      添加节点
-                    </Button>
-                  }
-                  onSelect={handleAddNode}
-                />
-              </div>
+              {!showRunPanel ? (
+                <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
+                  <NodePicker
+                    trigger={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl bg-background shadow-md"
+                      >
+                        <Plus className="mr-2 size-4" />
+                        添加节点
+                      </Button>
+                    }
+                    onSelect={handleAddNode}
+                  />
+                </div>
+              ) : null}
               {showRunPanel ? (
-                <div className="absolute inset-x-4 bottom-4 z-10 h-[min(520px,55vh)] overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+                <div
+                  ref={runPanelRef}
+                  style={runPanelHeight ? { height: `${runPanelHeight}px` } : undefined}
+                  className={`absolute inset-x-4 bottom-4 z-30 overflow-hidden rounded-lg border border-border bg-card shadow-lg ${
+                    isRunPanelResizing
+                      ? 'transition-none'
+                      : 'transition-[height] duration-200 motion-reduce:transition-none'
+                  } ${runPanelHeight ? '' : 'h-[min(360px,48vh)]'}`}
+                >
+                  <div
+                    role="separator"
+                    aria-orientation="horizontal"
+                    aria-label="调整试运行面板高度"
+                    className="group absolute inset-x-0 top-0 z-10 h-3 cursor-row-resize touch-none hover:bg-primary/10"
+                    onMouseDown={handleRunPanelResizeStart}
+                  >
+                    <span className="absolute left-1/2 top-1 h-0.5 w-10 -translate-x-1/2 rounded-full bg-border transition-colors group-hover:bg-primary/60" />
+                  </div>
                   <RunPanel
                     open={showRunPanel}
                     onOpenChange={setShowRunPanel}

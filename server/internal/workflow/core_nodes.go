@@ -20,7 +20,16 @@ func (endExecutor) Type() NodeType { return NodeTypeEnd }
 
 func (endExecutor) Execute(_ context.Context, _ RunContext, execution NodeExecution) (NodeResult, error) {
 	outputs, _ := execution.Input["outputs"].(map[string]any)
-	return NodeResult{Output: outputs}, nil
+	outputTypes, _ := execution.Input["outputTypes"].(map[string]any)
+	result := make(map[string]any, len(outputs))
+	for name, value := range outputs {
+		if value == nil && ValueType(stringFromValue(outputTypes[name])) == ValueTypeString {
+			result[name] = ""
+			continue
+		}
+		result[name] = value
+	}
+	return NodeResult{Output: result}, nil
 }
 
 type ContentSearchCapabilityAdapter struct{}

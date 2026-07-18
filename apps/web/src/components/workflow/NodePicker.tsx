@@ -26,6 +26,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { useWorkflowCapabilities } from './useWorkflowCapabilities';
+import { getWorkflowSideEffectLabel } from './workflowSideEffects';
 
 export interface NodePickerItem {
   key: string;
@@ -283,6 +284,7 @@ function PickerContent({
                   >
                     {grouped.map((item) => {
                       const Icon = itemIcons[item.key] || (group === 'tool' ? Wrench : Workflow);
+                      const sideEffectLabel = getWorkflowSideEffectLabel(item.sideEffect);
                       return (
                         <Button
                           key={item.key}
@@ -308,13 +310,9 @@ function PickerContent({
                           <span className="min-w-0 flex-1">
                             <span className="flex items-center gap-1.5 text-sm font-medium">
                               {item.label}
-                              {item.sideEffect && item.sideEffect !== 'none' ? (
+                              {sideEffectLabel ? (
                                 <Badge variant="outline" className="px-1.5 text-[10px]">
-                                  {item.sideEffect === 'read'
-                                    ? '只读'
-                                    : item.sideEffect === 'write'
-                                      ? '写入'
-                                      : 'AI'}
+                                  {sideEffectLabel}
                                 </Badge>
                               ) : null}
                             </span>

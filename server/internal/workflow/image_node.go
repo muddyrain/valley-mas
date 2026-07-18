@@ -24,10 +24,11 @@ func (CoverGenerateCapabilityAdapter) Execute(ctx context.Context, run RunContex
 		return NodeResult{}, fmt.Errorf("封面生成结果缺少图片地址")
 	}
 	return NodeResult{Output: map[string]any{
-		"cover": map[string]any{"url": cover.URL},
-		"url":   cover.URL,
-		"model": cover.Model,
-		"size":  cover.Size,
+		"imageUrl": cover.URL,
+		"cover":    map[string]any{"url": cover.URL},
+		"url":      cover.URL,
+		"model":    cover.Model,
+		"size":     cover.Size,
 	}}, nil
 }
 

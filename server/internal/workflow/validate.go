@@ -239,7 +239,10 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 				errs = append(errs, fmt.Sprintf("变量 %s 未声明", reference))
 				continue
 			}
-			if referenceMayBeSkipped(source, node.ID, nodes, graph.Edges, reachability) && node.Type != NodeTypeMerge && !referenceBindsOptionalToolInput(node, reference, registry) {
+			if referenceMayBeSkipped(source, node.ID, nodes, graph.Edges, reachability) &&
+				node.Type != NodeTypeMerge &&
+				!referenceBindsOptionalToolInput(node, reference, registry) &&
+				!(nodes[source].When != nil && referenceBindsOptionalEndStringOutput(node, reference)) {
 				errs = append(errs, fmt.Sprintf("变量 %s 可能被跳过，必须经过 Merge", reference))
 			}
 		}
@@ -434,6 +437,26 @@ func referenceBindsOptionalToolInput(node Node, reference string, registry *Regi
 		}
 	}
 	return found
+}
+
+func referenceBindsOptionalEndStringOutput(node Node, reference string) bool {
+	if node.Type != NodeTypeEnd {
+		return false
+	}
+	config, err := decodeConfig(node.Config)
+	if err != nil {
+		return false
+	}
+	outputs, _ := config["outputs"].(map[string]any)
+	outputTypes, _ := config["outputTypes"].(map[string]any)
+	for name, value := range outputs {
+		exact, ok := exactReference(value)
+		if !ok || exact != reference {
+			continue
+		}
+		return ValueType(stringFromValue(outputTypes[name])) == ValueTypeString
+	}
+	return false
 }
 
 func containsReference(value any, reference string) bool {

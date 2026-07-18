@@ -239,16 +239,25 @@ function findVariableDraft(value: string, cursor: number): VariableDraft | null 
   const start = value.lastIndexOf('{{', Math.max(0, cursor - 1));
   if (start < 0) return null;
 
+  const closingStart = value.indexOf('}}', start + 2);
+  if (closingStart >= 0) {
+    const end = closingStart + 2;
+    if (cursor >= start && cursor <= end) {
+      return {
+        start,
+        end,
+        query: value.slice(start + 2, closingStart).trim(),
+      };
+    }
+  }
+
   const previousClose = value.lastIndexOf('}}', Math.max(0, cursor - 1));
   if (previousClose >= start) return null;
 
-  const closingStart = value.indexOf('}}', cursor);
-  const end = closingStart < 0 ? cursor : closingStart + 2;
-  const queryEnd = closingStart < 0 ? cursor : closingStart;
   return {
     start,
-    end,
-    query: value.slice(start + 2, queryEnd).trim(),
+    end: cursor,
+    query: value.slice(start + 2, cursor).trim(),
   };
 }
 
@@ -495,7 +504,9 @@ export function VariableTokenEditor({
     const editor = editorRef.current;
     if (!editor) return;
     const selection = getSelectionOffsets(editor) || pickerSelectionRef.current;
-    pickerSelectionRef.current = selection;
+    const currentValue = readRawValue(editor);
+    const draft = findVariableDraft(currentValue, selection.start);
+    pickerSelectionRef.current = draft || selection;
     inlineSearchStartRef.current = null;
     setCaretAnchor(getCaretAnchor(editor));
     setPickerSearchMode(true);

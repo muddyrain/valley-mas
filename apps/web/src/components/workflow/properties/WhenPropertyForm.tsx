@@ -17,21 +17,29 @@ export function WhenPropertyForm({
   when,
   onChange,
   variableOptions,
+  title = '执行条件',
+  description = '条件不满足时节点标记为已跳过，输出字段为 null。',
+  enabledLabel = '仅在满足条件时执行',
+  variablePlaceholder = '选择 Start 输入或上游输出',
 }: {
   when?: WorkflowRule;
   onChange: (when?: WorkflowRule) => void;
   variableOptions: WorkflowVariableOption[];
+  title?: string;
+  description?: string;
+  enabledLabel?: string;
+  variablePlaceholder?: string;
 }) {
   const enabled = Boolean(when);
   const rule = when || { left: '', operator: 'equals' as const, right: true };
   return (
-    <EditorSection title="执行条件" description="条件不满足时节点标记为已跳过，输出字段为 null。">
+    <EditorSection title={title} description={description}>
       <label className="flex items-center gap-2 text-sm">
         <Checkbox
           checked={enabled}
           onCheckedChange={(checked) => onChange(checked === true ? rule : undefined)}
         />
-        仅在满足条件时执行
+        {enabledLabel}
       </label>
       {enabled ? (
         <>
@@ -41,7 +49,7 @@ export function WhenPropertyForm({
               value={String(rule.left ?? '')}
               onChange={(left) => onChange({ ...rule, left })}
               options={variableOptions}
-              placeholder="选择 Start 输入或上游输出"
+              placeholder={variablePlaceholder}
             />
           </div>
           <div className="space-y-1.5">

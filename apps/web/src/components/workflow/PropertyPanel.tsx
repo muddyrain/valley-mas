@@ -94,6 +94,8 @@ export function PropertyPanel({
     () => variableOptions.filter((option) => option.scope !== 'local'),
     [variableOptions],
   );
+  const isCoverGenerationNode =
+    nodeType === 'tool' && config?.capabilityId === 'image.generateCover';
 
   const handleUpdateConfig = (updates: Partial<Record<string, unknown>>) => {
     onUpdateNode(selectedNode.id, {
@@ -150,6 +152,10 @@ export function PropertyPanel({
           when={when}
           onChange={(nextWhen) => onUpdateNode(selectedNode.id, { when: nextWhen })}
           variableOptions={upstreamVariableOptions}
+          title={isCoverGenerationNode ? '生成条件' : undefined}
+          description={isCoverGenerationNode ? '未设置时，每次运行都会生成封面。' : undefined}
+          enabledLabel={isCoverGenerationNode ? '根据上游变量决定是否生成' : undefined}
+          variablePlaceholder={isCoverGenerationNode ? '选择上游布尔变量' : undefined}
         />
       ) : null}
     </PropertyFormBase>

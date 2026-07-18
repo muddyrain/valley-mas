@@ -49,6 +49,7 @@ const TOOL_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
     ['items', 'object'],
   ],
   'image.generateCover': [
+    ['imageUrl', 'string'],
     ['cover', 'object'],
     ['url', 'string'],
     ['model', 'string'],

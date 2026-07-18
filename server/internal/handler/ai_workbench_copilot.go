@@ -243,7 +243,7 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	}
 	historyJSON, _ := json.Marshal(promptHistory)
 	draftJSON, _ := json.Marshal(draft)
-	systemPrompt := `你是 Valley Graph v4 上下文副驾驶。严格只输出 JSON，字段必须且只能是 mode、message、targetType、questions、operations、workflow、agent。mode 只能是 answer、clarify、proposal。信息不足时用 clarify，给 1-3 个问题，每题 2-4 个简短选项。workflow 作用域的 proposal 只能返回 operations，workflow 必须为 null；不得返回完整候选图。operations 只能使用 startInput.upsert、startInput.remove、node.insert、node.update、node.remove、edge.connect、edge.disconnect。node.insert 优先使用 afterNodeId 或 beforeNodeId 自动重连。节点定位不唯一时必须 clarify，不得猜测。通用节点只有 start、end、llm、tool、condition、merge、variable、subworkflow；业务能力只能使用 tool/config.capabilityId。不得保存、运行、发布或实际调用工具。可选封面必须：Start 新增 generateCover boolean；在用户指定的摘要节点后插入 tool/image.generateCover；node.when 引用 {{start.output.generateCover}} equals true；不得创建 Condition；不得修改其他节点。agent 作用域继续在 agent 字段返回候选，operations 为空。`
+	systemPrompt := `你是 Valley Graph v4 上下文副驾驶。严格只输出 JSON，字段必须且只能是 mode、message、targetType、questions、operations、workflow、agent。mode 只能是 answer、clarify、proposal。信息不足时用 clarify，给 1-3 个问题，每题 2-4 个简短选项。workflow 作用域的 proposal 只能返回 operations，workflow 必须为 null；不得返回完整候选图。operations 只能使用 startInput.upsert、startInput.remove、node.insert、node.update、node.remove、edge.connect、edge.disconnect。node.insert 优先使用 afterNodeId 或 beforeNodeId 自动重连。节点定位不唯一时必须 clarify，不得猜测。通用节点只有 start、end、llm、tool、condition、merge、variable、subworkflow；业务能力只能使用 tool/config.capabilityId。不得保存、运行、发布或实际调用工具。生成封面时，在用户指定的摘要节点后插入 tool/image.generateCover，默认直接执行；仅当用户明确要求依赖已有上游布尔输出时，才为该节点设置 node.when。不得为封面新增 Start 输入，不得创建 Condition，不得修改其他节点。agent 作用域继续在 agent 字段返回候选，operations 为空。`
 	labelsJSON, _ := json.Marshal(payload.Context.NodeLabels)
 	userPrompt := fmt.Sprintf("作用域：%s\n目标 ID：%s\n选中节点：%s\n节点名称映射：%s\n安全运行 ID：%s\n能力目录：%s\n最近对话：%s\n当前草稿：%s\n\n用户消息：%s", payload.Scope, payload.TargetID, payload.Context.SelectedNodeID, labelsJSON, payload.Context.RunID, capabilities, historyJSON, draftJSON, payload.Message)
 	sendCopilotEvent(c, "activity", gin.H{"label": "正在理解需求"})
@@ -734,12 +734,10 @@ func planDeterministicWorkflowOperations(payload copilotMessageRequest, base any
 		}
 	}
 	titleReference := "{{" + anchorID + ".output." + summaryField + "}}"
-	startID := "start"
 	for _, node := range draft.Graph.Nodes {
 		if node.Type != workflow.NodeTypeStart {
 			continue
 		}
-		startID = node.ID
 		var config struct {
 			Inputs map[string]any `json:"inputs"`
 		}
@@ -749,12 +747,11 @@ func planDeterministicWorkflowOperations(payload copilotMessageRequest, base any
 		}
 	}
 	coverConfig, _ := json.Marshal(map[string]any{"capabilityId": workflow.CapabilityGenerateCover, "inputs": map[string]any{"title": titleReference, "summary": "{{" + anchorID + ".output." + summaryField + "}}", "style": "editorial"}})
-	coverNode := workflow.Node{ID: coverID, Type: workflow.NodeTypeTool, Label: "生成封面", Position: workflow.Position{X: anchor.Position.X + 280, Y: anchor.Position.Y}, Config: coverConfig, When: &workflow.Rule{Left: "{{" + startID + ".output.generateCover}}", Operator: "equals", Right: true}}
+	coverNode := workflow.Node{ID: coverID, Type: workflow.NodeTypeTool, Label: "生成封面", Position: workflow.Position{X: anchor.Position.X + 280, Y: anchor.Position.Y}, Config: coverConfig}
 	operations := []workflow.WorkflowOperation{
-		{Type: workflow.OperationStartInputUpsert, InputName: "generateCover", Input: &workflow.InputDefinition{Type: workflow.ValueTypeBoolean, Required: false}},
 		{Type: workflow.OperationNodeInsert, Node: &coverNode, AfterNodeID: anchorID},
 	}
-	return copilotAIEnvelope{Mode: "proposal", Message: "已生成局部变更：增加“是否生成封面”输入，并在指定摘要节点后按该开关选择性生成封面。其他节点保持不变。", TargetType: "workflow", Questions: []copilotQuestion{}, Operations: operations}, true
+	return copilotAIEnvelope{Mode: "proposal", Message: "已在指定摘要节点后增加生成封面节点。", TargetType: "workflow", Questions: []copilotQuestion{}, Operations: operations}, true
 }
 
 func uniqueWorkflowNodeID(graph workflow.Graph, prefix string) string {
@@ -859,40 +856,6 @@ func validateCopilotWorkflowEditIntent(payload copilotMessageRequest, base any, 
 	}
 	if coverID == "" {
 		return errors.New("封面需求必须新增 image.generateCover 节点")
-	}
-	if containsAny(message, "勾选", "不勾选", "是否生成", "start", "开始节点", "参数") {
-		for _, node := range candidate.Graph.Nodes {
-			if node.Type == workflow.NodeTypeCondition {
-				return errors.New("可选封面必须使用 tool/image.generateCover 的 when，不得新增条件分支")
-			}
-		}
-		var coverNode *workflow.Node
-		for index := range candidate.Graph.Nodes {
-			if candidate.Graph.Nodes[index].ID == coverID {
-				coverNode = &candidate.Graph.Nodes[index]
-				break
-			}
-		}
-		if coverNode == nil || coverNode.When == nil {
-			return errors.New("可选封面节点必须配置受控 when")
-		}
-		right, ok := coverNode.When.Right.(bool)
-		if strings.TrimSpace(fmt.Sprint(coverNode.When.Left)) == "" || coverNode.When.Operator != "equals" || !ok || !right {
-			return errors.New("可选封面 when 必须在 Start boolean 为 true 时执行")
-		}
-		if containsAny(message, "start", "开始节点") {
-			startID := ""
-			for _, node := range candidate.Graph.Nodes {
-				if node.Type == workflow.NodeTypeStart {
-					startID = node.ID
-					break
-				}
-			}
-			left := strings.TrimSpace(fmt.Sprint(coverNode.When.Left))
-			if startID == "" || !strings.HasPrefix(left, "{{"+startID+".output.") || !strings.HasSuffix(left, "}}") {
-				return errors.New("用户指定 Start 参数时，封面 when 必须引用 Start 节点的 boolean 输出")
-			}
-		}
 	}
 	anchorID := namedCopilotNodeID(message, payload.Context.NodeLabels)
 	if anchorID == "" && containsAny(message, "当前节点", "这个节点", "此节点") {

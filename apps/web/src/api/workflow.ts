@@ -157,7 +157,10 @@ export interface WorkflowToolCapability {
   inputSchema: {
     type?: string;
     required?: string[];
-    properties?: Record<string, { type?: string; title?: string }>;
+    properties?: Record<
+      string,
+      { type?: string; title?: string; description?: string; placeholder?: string }
+    >;
   };
   outputSchema: Record<string, string>;
   aiUsage: string;
@@ -248,14 +251,40 @@ export async function deleteWorkflow(id: string): Promise<void> {
   return request.delete(`/workflows/${id}`);
 }
 
+function normalizeWorkflowRunProxyError(message: string): string | null {
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes('econnrefused') ||
+    normalized.includes('socket hang up') ||
+    normalized.includes('econnreset') ||
+    normalized.includes('econnaborted')
+  ) {
+    return '工作流服务未启动或正在重启，请稍后重试。';
+  }
+  return null;
+}
+
 async function workflowRunErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
-    const data = (await response.json()) as { message?: unknown };
+    const body = (await response.text()).trim();
+    if (!body) return fallback;
+
+    let data: { message?: unknown } | null = null;
+    try {
+      data = JSON.parse(body) as { message?: unknown };
+    } catch {
+      const proxyError = normalizeWorkflowRunProxyError(body);
+      if (proxyError) return proxyError;
+
+      const conciseBody = body.replace(/\s+/g, ' ').slice(0, 240);
+      return conciseBody ? `运行服务错误（HTTP ${response.status}）：${conciseBody}` : fallback;
+    }
+
     if (typeof data.message === 'string' && data.message.trim()) {
       return data.message;
     }
   } catch {
-    // Keep the caller's fallback when the server does not return JSON.
+    // Keep the caller's fallback when the response body cannot be read.
   }
   return fallback;
 }
