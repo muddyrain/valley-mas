@@ -96,12 +96,18 @@ import {
 } from '@/components/workflow/runSession';
 import { useWorkflowHistory } from '@/components/workflow/useWorkflowHistory';
 import { validateWorkflowDraft } from '@/components/workflow/validateWorkflowConfig';
+import { WorkflowAlignmentGuides } from '@/components/workflow/WorkflowAlignmentGuides';
 import { WorkflowNode } from '@/components/workflow/WorkflowNode';
+import { WorkflowRunHistory } from '@/components/workflow/WorkflowRunHistory';
 import { WorkflowRuntimeProvider } from '@/components/workflow/WorkflowRuntimeContext';
 import {
   WorkflowWorkspacePanel,
   type WorkflowWorkspaceTab,
 } from '@/components/workflow/WorkflowWorkspacePanel';
+import {
+  getWorkflowAlignment,
+  type WorkflowAlignment,
+} from '@/components/workflow/workflowAlignment';
 import {
   normalizeWorkflowEdges,
   serializeWorkflowGraph,
@@ -138,6 +144,22 @@ interface WorkflowEditorState {
   name: string;
   nodes: Node[];
   edges: Edge[];
+}
+
+function hasSameAlignment(current: WorkflowAlignment | null, next: WorkflowAlignment | null) {
+  if (current === next) return true;
+  if (!current || !next) return false;
+
+  return (
+    current.position.x === next.position.x &&
+    current.position.y === next.position.y &&
+    current.vertical?.position === next.vertical?.position &&
+    current.vertical?.start === next.vertical?.start &&
+    current.vertical?.end === next.vertical?.end &&
+    current.horizontal?.position === next.horizontal?.position &&
+    current.horizontal?.start === next.horizontal?.start &&
+    current.horizontal?.end === next.horizontal?.end
+  );
 }
 
 export default function WorkflowEditorPage() {
@@ -186,6 +208,8 @@ export default function WorkflowEditorPage() {
     y: number;
     nodeId?: string;
   } | null>(null);
+  const [alignmentGuides, setAlignmentGuides] = useState<WorkflowAlignment | null>(null);
+  const alignmentGuidesRef = useRef<WorkflowAlignment | null>(null);
   const isDraggingRef = useRef(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
@@ -416,7 +440,7 @@ export default function WorkflowEditorPage() {
   );
 
   const enqueueWorkflowUpdate = useCallback(
-    async (force = false, silent = false): Promise<boolean> => {
+    async (force = false, silent = false, recordHistory = false): Promise<boolean> => {
       const session = editorSessionRef.current;
       const id = workflowIdRef.current;
       if (!id) return false;
@@ -430,17 +454,30 @@ export default function WorkflowEditorPage() {
 
         setSaveStatus('saving');
         let shouldForce = force;
+        let shouldRecordHistory = recordHistory;
         try {
           while (
             shouldForce ||
             workflowSnapshotRef.current.revision > persistedRevisionRef.current
           ) {
+            if (
+              validateWorkflowDraft(workflowStateRef.current.nodes, workflowStateRef.current.edges)
+                .length > 0
+            ) {
+              setSaveStatus('pending');
+              return false;
+            }
             const snapshot = workflowSnapshotRef.current;
-            const result = await updateWorkflow(id, {
-              name: snapshot.name,
-              graph: snapshot.graph,
-              baseHash: persistedGraphHashRef.current || undefined,
-            });
+            const result = await updateWorkflow(
+              id,
+              {
+                name: snapshot.name,
+                graph: snapshot.graph,
+                baseHash: persistedGraphHashRef.current || undefined,
+                recordHistory: shouldRecordHistory,
+              },
+              { suppressErrorToast: true },
+            );
             if (
               !isEditorMountedRef.current ||
               editorSessionRef.current !== session ||
@@ -450,6 +487,7 @@ export default function WorkflowEditorPage() {
             persistedRevisionRef.current = snapshot.revision;
             persistedGraphHashRef.current = result.graphHash;
             shouldForce = false;
+            shouldRecordHistory = false;
           }
           if (
             !isEditorMountedRef.current ||
@@ -467,6 +505,13 @@ export default function WorkflowEditorPage() {
             workflowIdRef.current !== id
           )
             return false;
+          if (
+            validateWorkflowDraft(workflowStateRef.current.nodes, workflowStateRef.current.edges)
+              .length > 0
+          ) {
+            setSaveStatus('pending');
+            return false;
+          }
           setSaveStatus('error');
           if (!silent) toast.error(getAPIErrorMessage(error, '保存失败'));
           return false;
@@ -522,8 +567,13 @@ export default function WorkflowEditorPage() {
   );
 
   const persistLatestWorkflow = useCallback(
-    async ({ force = false, createIfMissing = false, silent = false } = {}): Promise<boolean> => {
-      if (workflowIdRef.current) return enqueueWorkflowUpdate(force, silent);
+    async ({
+      force = false,
+      createIfMissing = false,
+      silent = false,
+      recordHistory = false,
+    } = {}): Promise<boolean> => {
+      if (workflowIdRef.current) return enqueueWorkflowUpdate(force, silent, recordHistory);
       if (!createIfMissing) return false;
       return createDraftWorkflow({
         ...workflowSnapshotRef.current,
@@ -819,9 +869,34 @@ export default function WorkflowEditorPage() {
     [createPickerNode, markWorkflowDirty],
   );
 
+  const updateAlignmentGuides = useCallback((next: WorkflowAlignment | null) => {
+    if (hasSameAlignment(alignmentGuidesRef.current, next)) return;
+    alignmentGuidesRef.current = next;
+    setAlignmentGuides(next);
+  }, []);
+
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      const nextNodes = applyNodeChanges(changes, workflowStateRef.current.nodes);
+      let nextNodes = applyNodeChanges(changes, workflowStateRef.current.nodes);
+      const movedNodeChange = changes.find(
+        (change) => change.type === 'position' && change.position,
+      );
+      if (movedNodeChange?.type === 'position') {
+        const movedNode = nextNodes.find((node) => node.id === movedNodeChange.id);
+        if (movedNode && movedNodeChange.dragging !== undefined) {
+          const alignment = getWorkflowAlignment(
+            movedNode,
+            nextNodes,
+            reactFlowInstance.current?.getViewport().zoom || 1,
+          );
+          if (alignment.vertical || alignment.horizontal) {
+            nextNodes = nextNodes.map((node) =>
+              node.id === movedNode.id ? { ...node, position: alignment.position } : node,
+            );
+          }
+          updateAlignmentGuides(movedNodeChange.dragging ? alignment : null);
+        }
+      }
       setNodes(nextNodes);
       const hasCommittedChange = changes.some(
         (change) =>
@@ -835,8 +910,12 @@ export default function WorkflowEditorPage() {
         workflowStateRef.current = { ...workflowStateRef.current, nodes: nextNodes };
       }
     },
-    [markWorkflowDirty],
+    [markWorkflowDirty, updateAlignmentGuides],
   );
+
+  const onNodeDragStop = useCallback(() => {
+    updateAlignmentGuides(null);
+  }, [updateAlignmentGuides]);
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
@@ -1185,10 +1264,9 @@ export default function WorkflowEditorPage() {
     const firstError = validateWorkflowDraft(state.nodes, state.edges)[0];
     if (firstError) {
       setSaveStatus('pending');
-      toast.warning(`${firstError.nodeLabel}：${firstError.message}`);
       return;
     }
-    await persistLatestWorkflow({ force: true, createIfMissing: true });
+    await persistLatestWorkflow({ force: true, createIfMissing: true, recordHistory: true });
   }, [persistLatestWorkflow]);
 
   const handleRunConfirm = useCallback(
@@ -1220,9 +1298,18 @@ export default function WorkflowEditorPage() {
                 setIsRunning(false);
                 toast.success('工作流执行完成');
               }
+              if (event.status === 'cancelled') {
+                setIsRunning(false);
+                toast.message('工作流已取消');
+              }
             },
             onError: (msg) => {
               if (!isActiveRun()) return;
+              if (msg === '运行已取消') {
+                dispatchRunSession({ type: 'cancelled', generation });
+                setIsRunning(false);
+                return;
+              }
               setRunError(msg);
               dispatchRunSession({ type: 'error', generation, error: msg });
               toast.error(msg);
@@ -1280,7 +1367,12 @@ export default function WorkflowEditorPage() {
   }, [edges, nodes, persistLatestWorkflow]);
 
   const handleCancelRun = useCallback(() => {
+    if (!abortControllerRef.current) return;
     abortControllerRef.current?.abort();
+    dispatchRunSession({ type: 'cancelled', generation: runGenerationRef.current });
+    setRunError(null);
+    setIsRunning(false);
+    toast.message('已请求取消，正在停止当前节点');
   }, []);
 
   const handleExport = useCallback(() => {
@@ -1638,84 +1730,95 @@ export default function WorkflowEditorPage() {
             <SheetContent side="right" className="w-full gap-0 sm:max-w-md">
               <SheetHeader className="border-b pr-14">
                 <SheetTitle>历史</SheetTitle>
-                <SheetDescription>草稿与发布版本</SheetDescription>
+                <SheetDescription>草稿版本与最近运行</SheetDescription>
               </SheetHeader>
 
               <ScrollArea className="min-h-0 flex-1">
                 <div className="p-4">
-                  {loadingHistory && !platform ? (
-                    <div className="space-y-3">
-                      <Skeleton className="h-24 w-full" />
-                      <Skeleton className="h-24 w-full" />
-                    </div>
-                  ) : platform?.versions.length ? (
-                    <ol className="relative ml-2 border-l border-border">
-                      {platform.versions.map((version) => {
-                        const isCurrent = version.id === platform.app.draftVersionId;
-                        const isPublished = version.id === platform.app.publishedVersionId;
-                        return (
-                          <li key={version.id} className="relative pb-4 pl-6 last:pb-0">
-                            <span
-                              className={`absolute -left-[5px] top-4 size-2.5 rounded-full border-2 border-background ${
-                                isCurrent ? 'bg-primary' : 'bg-muted-foreground/40'
-                              }`}
-                              aria-hidden="true"
-                            />
-                            <article
-                              aria-current={isCurrent ? 'true' : undefined}
-                              className={`rounded-lg border p-3 transition-colors ${
-                                isCurrent
-                                  ? 'border-primary/25 bg-primary/5'
-                                  : 'border-transparent hover:bg-muted/40'
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <span className="font-medium text-foreground">
-                                      v{version.number}
-                                    </span>
-                                    {isCurrent ? <Badge variant="secondary">当前草稿</Badge> : null}
-                                    {isPublished ? <Badge variant="outline">已发布</Badge> : null}
+                  <section className="mb-6">
+                    <h3 className="mb-3 text-sm font-medium text-foreground">最近运行</h3>
+                    <WorkflowRunHistory workflowId={workflowId} open={showHistory} />
+                  </section>
+                  <section className="border-t border-border pt-5">
+                    <h3 className="mb-3 text-sm font-medium text-foreground">草稿与发布版本</h3>
+                    {loadingHistory && !platform ? (
+                      <div className="space-y-3">
+                        <Skeleton className="h-24 w-full" />
+                        <Skeleton className="h-24 w-full" />
+                      </div>
+                    ) : platform?.versions.length ? (
+                      <ol className="relative ml-2 border-l border-border">
+                        {platform.versions.map((version) => {
+                          const isCurrent = version.id === platform.app.draftVersionId;
+                          const isPublished = version.id === platform.app.publishedVersionId;
+                          return (
+                            <li key={version.id} className="relative pb-4 pl-6 last:pb-0">
+                              <span
+                                className={`absolute -left-[5px] top-4 size-2.5 rounded-full border-2 border-background ${
+                                  isCurrent ? 'bg-primary' : 'bg-muted-foreground/40'
+                                }`}
+                                aria-hidden="true"
+                              />
+                              <article
+                                aria-current={isCurrent ? 'true' : undefined}
+                                className={`rounded-lg border p-3 transition-colors ${
+                                  isCurrent
+                                    ? 'border-primary/25 bg-primary/5'
+                                    : 'border-transparent hover:bg-muted/40'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="font-medium text-foreground">
+                                        v{version.number}
+                                      </span>
+                                      {isCurrent ? (
+                                        <Badge variant="secondary">当前草稿</Badge>
+                                      ) : null}
+                                      {isPublished ? <Badge variant="outline">已发布</Badge> : null}
+                                    </div>
+                                    <time
+                                      className="mt-2 block text-xs text-muted-foreground"
+                                      dateTime={version.createdAt}
+                                    >
+                                      {new Date(version.createdAt).toLocaleString('zh-CN')}
+                                    </time>
                                   </div>
-                                  <time
-                                    className="mt-2 block text-xs text-muted-foreground"
-                                    dateTime={version.createdAt}
-                                  >
-                                    {new Date(version.createdAt).toLocaleString('zh-CN')}
-                                  </time>
+                                  {!isCurrent ? (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={async () => {
+                                        if (!workflowId) return;
+                                        try {
+                                          await restoreWorkflowVersion(workflowId, version.id);
+                                          setShowHistory(false);
+                                          toast.success(`已恢复 v${version.number}`);
+                                          navigate(
+                                            `/workbench/edit?id=${workflowId}&restored=${Date.now()}`,
+                                            { replace: true },
+                                          );
+                                        } catch (error) {
+                                          toast.error(getAPIErrorMessage(error, '恢复版本失败'));
+                                        }
+                                      }}
+                                    >
+                                      恢复
+                                    </Button>
+                                  ) : null}
                                 </div>
-                                {!isCurrent ? (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={async () => {
-                                      if (!workflowId) return;
-                                      try {
-                                        await restoreWorkflowVersion(workflowId, version.id);
-                                        setShowHistory(false);
-                                        toast.success(`已恢复 v${version.number}`);
-                                        navigate(
-                                          `/workbench/edit?id=${workflowId}&restored=${Date.now()}`,
-                                          { replace: true },
-                                        );
-                                      } catch (error) {
-                                        toast.error(getAPIErrorMessage(error, '恢复版本失败'));
-                                      }
-                                    }}
-                                  >
-                                    恢复
-                                  </Button>
-                                ) : null}
-                              </div>
-                            </article>
-                          </li>
-                        );
-                      })}
-                    </ol>
-                  ) : (
-                    <p className="py-10 text-center text-sm text-muted-foreground">暂无历史版本</p>
-                  )}
+                              </article>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    ) : (
+                      <p className="py-10 text-center text-sm text-muted-foreground">
+                        暂无历史版本
+                      </p>
+                    )}
+                  </section>
                 </div>
               </ScrollArea>
 
@@ -1752,6 +1855,7 @@ export default function WorkflowEditorPage() {
                 onConnect={onConnect}
                 onNodeClick={onNodeClick}
                 onNodeContextMenu={onNodeContextMenu}
+                onNodeDragStop={onNodeDragStop}
                 onEdgeClick={onEdgeClick}
                 onPaneClick={onPaneClick}
                 onPaneContextMenu={onPaneContextMenu}
@@ -1770,6 +1874,7 @@ export default function WorkflowEditorPage() {
                 }}
               >
                 <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+                <WorkflowAlignmentGuides alignment={alignmentGuides} />
                 <Controls />
                 <MiniMap />
               </ReactFlow>

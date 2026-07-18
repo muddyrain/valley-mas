@@ -50,3 +50,37 @@
 ## Final result
 
 passed
+
+---
+
+# AI 资源工作台 Design QA
+
+## Context
+
+- Source visual truth: `C:\Users\A\AppData\Local\Temp\codex-clipboard-0a228bff-9bad-433f-826e-9385fd03b5d2.png`
+- Implemented route: `http://127.0.0.1:5175/workbench/resources?tab=knowledge`
+- Intended desktop canvas: 1920 × 1080
+- Captured evidence: `output/product-design/ai-resources-reference-redesign-auth-blocked.png`
+
+## Full-view comparison
+
+Blocked. The implemented route is protected and redirects an unauthenticated browser session to `/login`; no authenticated visual capture was available. The login redirect was preserved rather than bypassing authentication.
+
+## Focused-region comparison
+
+Blocked for the same reason. The reference's AI resource Tabs, left knowledge-base rail, and document table require an authenticated session to render.
+
+## Findings
+
+- [P1] Authenticated 1920 × 1080 visual comparison is pending a signed-in browser session.
+  - Intended implementation changes: strengthened blue-underlined Tabs; a left knowledge-base rail with real search state; a right document table using actual document data; a matching workflow management surface.
+
+## Comparison history
+
+1. Previous reference used a broader AI resource concept and could not be captured while signed out.
+2. Current iteration adopted the user-provided knowledge-base workspace reference and rebuilt the resource Tabs, knowledge-base rail, document table, and workflow table around that structure.
+3. Browser capture redirected to `/login`, so no same-state visual comparison was possible.
+
+## Current result
+
+blocked

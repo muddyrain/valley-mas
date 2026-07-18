@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
-export const WORKFLOW_NODE_WIDTH = 220;
+export const WORKFLOW_NODE_WIDTH = 264;
+export const WORKFLOW_NODE_HEIGHT = 144;
 export const WORKFLOW_NODE_GAP = 96;
 
 interface InsertNodeLayout {

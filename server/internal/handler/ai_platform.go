@@ -281,6 +281,16 @@ func syncLegacyWorkflowApps(userID model.Int64String) error {
 }
 
 func syncWorkflowAIApp(tx *gorm.DB, definition model.Workflow) (model.AIApp, model.AIAppVersion, error) {
+	return syncWorkflowAIAppWithSnapshot(tx, definition, true)
+}
+
+// syncWorkflowAIAppWithoutSnapshot keeps the editable workflow draft in its own
+// table without turning every autosave, read, or run into a user-visible history version.
+func syncWorkflowAIAppWithoutSnapshot(tx *gorm.DB, definition model.Workflow) (model.AIApp, model.AIAppVersion, error) {
+	return syncWorkflowAIAppWithSnapshot(tx, definition, false)
+}
+
+func syncWorkflowAIAppWithSnapshot(tx *gorm.DB, definition model.Workflow, createSnapshot bool) (model.AIApp, model.AIAppVersion, error) {
 	workflowID := definition.ID
 	var app model.AIApp
 	err := tx.Where("workflow_id = ?", workflowID).First(&app).Error
@@ -309,7 +319,7 @@ func syncWorkflowAIApp(tx *gorm.DB, definition model.Workflow) (model.AIApp, mod
 	if err := tx.Where("app_id = ?", app.ID).Order("number DESC").First(&latest).Error; err != nil && err != gorm.ErrRecordNotFound {
 		return model.AIApp{}, model.AIAppVersion{}, err
 	}
-	if latest.ID == 0 || latest.Config != definition.Graph {
+	if latest.ID == 0 || (createSnapshot && latest.Config != definition.Graph) {
 		var source model.AIAppVersion
 		if latest.ID != 0 {
 			source = latest

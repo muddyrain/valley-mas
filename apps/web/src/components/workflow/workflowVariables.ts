@@ -6,6 +6,7 @@ export interface WorkflowVariableOption {
   field: string;
   type: 'string' | 'string[]' | 'object' | 'number' | 'boolean' | 'file' | 'unknown';
   token: string;
+  scope?: 'upstream' | 'local';
 }
 
 export type TemplateSegment =
@@ -195,7 +196,7 @@ export function getUpstreamWorkflowVariables(
     pending.push(...(parentsByNodeID.get(nodeID) || []));
   }
 
-  return nodes.flatMap((node) => {
+  const upstream = nodes.flatMap((node) => {
     if (!ancestorIDs.has(node.id)) return [];
     return getOutputFields(node).map(([field, type]) => ({
       nodeId: node.id,
@@ -203,8 +204,29 @@ export function getUpstreamWorkflowVariables(
       field,
       type,
       token: `{{${node.id}.output.${field}}}`,
+      scope: 'upstream' as const,
     }));
   });
+
+  const target = nodes.find((node) => node.id === targetNodeID);
+  if (!target || getNodeType(target) !== 'llm') return upstream;
+  const config = getNodeData(target).config;
+  if (!config || typeof config !== 'object') return upstream;
+  const inputs = (config as Record<string, unknown>).inputs;
+  const inputTypes = (config as Record<string, unknown>).inputTypes;
+  if (!inputs || typeof inputs !== 'object') return upstream;
+  const types = inputTypes && typeof inputTypes === 'object' ? inputTypes : {};
+  const local = Object.keys(inputs as Record<string, unknown>)
+    .filter((field) => field.trim())
+    .map((field) => ({
+      nodeId: targetNodeID,
+      nodeLabel: '本节点输入',
+      field,
+      type: String((types as Record<string, unknown>)[field] || 'unknown') as WorkflowVariableType,
+      token: `{{${field}}}`,
+      scope: 'local' as const,
+    }));
+  return [...local, ...upstream];
 }
 
 export function splitWorkflowTemplate(
@@ -223,8 +245,9 @@ export function splitWorkflowTemplate(
     const normalizedToken = normalizeWorkflowVariableToken(token);
     // Keep an unfinished `{{ }}` draft editable so the user can continue typing
     // while the contextual variable picker remains open.
-    if (normalizedToken) {
-      segments.push({ type: 'variable', token, option: getWorkflowVariableOption(token, options) });
+    const option = getWorkflowVariableOption(token, options);
+    if (normalizedToken && option) {
+      segments.push({ type: 'variable', token, option });
     } else {
       segments.push({ type: 'text', value: token });
     }

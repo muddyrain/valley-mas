@@ -1,4 +1,4 @@
-import { Braces, Plus, Variable } from 'lucide-react';
+import { Braces, Plus } from 'lucide-react';
 import {
   type ClipboardEvent,
   type FocusEvent,
@@ -12,14 +12,6 @@ import {
   useState,
 } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -138,21 +130,24 @@ function getCaretAnchor(root: HTMLElement): CaretAnchor {
       caretRange.collapse(false);
       const rect = caretRange.getBoundingClientRect();
       if (rect.height > 0 || rect.width > 0) {
-        return { getBoundingClientRect: () => rect };
+        return { getBoundingClientRect: () => caretRange.getBoundingClientRect() };
       }
     }
   }
-  const rootRect = root.getBoundingClientRect();
-  const fallback = new DOMRect(rootRect.left + 12, rootRect.top + 12, 0, 24);
-  return { getBoundingClientRect: () => fallback };
+  return {
+    getBoundingClientRect: () => {
+      const rect = root.getBoundingClientRect();
+      return new DOMRect(rect.left + 12, rect.top + 12, 0, 24);
+    },
+  };
 }
 
 function getVariableTokenClassName(option?: WorkflowVariableOption) {
   return cn(
-    'mx-0.5 inline-flex cursor-pointer items-center rounded-md px-1.5 py-0.5 align-baseline font-medium transition-colors',
+    'mx-0.5 inline-flex cursor-pointer items-center rounded-sm border px-1 py-px align-baseline font-medium transition-colors',
     option
-      ? 'bg-primary/8 text-primary hover:bg-primary/12'
-      : 'rounded-sm bg-destructive/10 text-destructive underline decoration-dotted',
+      ? 'border-primary/20 bg-primary/5 text-primary hover:bg-primary/10'
+      : 'border-destructive/20 bg-destructive/10 text-destructive underline decoration-dotted',
   );
 }
 
@@ -267,22 +262,6 @@ function getMatchingVariableOptions(options: WorkflowVariableOption[], query: st
   );
 }
 
-interface VariableOptionListProps {
-  options: WorkflowVariableOption[];
-  heading: string;
-  emptyText?: string;
-  onSelect: (option: WorkflowVariableOption) => void;
-}
-
-interface VariablePickerProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  options: WorkflowVariableOption[];
-  onSelect: (option: WorkflowVariableOption) => void;
-  onRememberSelection: () => void;
-  compact?: boolean;
-}
-
 interface VariableOptionDetailsProps {
   option: WorkflowVariableOption;
   icon: ReactNode;
@@ -304,8 +283,8 @@ function VariableOptionDetails({
           {option.nodeLabel} · {option.field}
         </span>
         {showToken && (
-          <span className="block truncate font-mono text-xs text-muted-foreground">
-            {option.token}
+          <span className="block truncate text-xs text-muted-foreground">
+            {option.scope === 'local' ? '本节点已绑定输入' : '来自上游节点输出'}
           </span>
         )}
       </span>
@@ -321,78 +300,15 @@ function VariableOptionDetails({
   );
 }
 
-function VariableOptionList({ options, heading, emptyText, onSelect }: VariableOptionListProps) {
-  if (options.length === 0) {
-    return emptyText ? (
-      <div className="px-2 py-3 text-xs text-muted-foreground">{emptyText}</div>
-    ) : null;
-  }
-
-  return (
-    <CommandGroup heading={heading}>
-      {options.map((option) => (
-        <CommandItem
-          key={option.token}
-          value={`${option.nodeLabel} ${option.field} ${option.token}`}
-          className="mx-1 my-1 gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-colors data-selected:border-border data-selected:bg-accent/55 data-selected:text-accent-foreground"
-          onSelect={() => onSelect(option)}
-        >
-          <VariableOptionDetails
-            option={option}
-            icon={
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Variable className="size-4" />
-              </span>
-            }
-          />
-        </CommandItem>
-      ))}
-    </CommandGroup>
-  );
-}
-
-function VariablePicker({
-  open,
-  onOpenChange,
-  options,
-  onSelect,
-  onRememberSelection,
-  compact = false,
-}: VariablePickerProps) {
-  return (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger
-        render={
-          <Button
-            type="button"
-            variant="ghost"
-            size={compact ? 'icon-xs' : 'xs'}
-            aria-label={compact ? '选择上游变量' : undefined}
-          />
-        }
-        onMouseDown={onRememberSelection}
-      >
-        <Braces />
-        {compact ? null : '插入变量'}
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 gap-0 overflow-hidden p-0">
-        <Command>
-          <CommandInput placeholder="搜索变量" />
-          <CommandList className="py-1">
-            <CommandEmpty>暂无可用上游变量</CommandEmpty>
-            <VariableOptionList options={options} heading="上游变量" onSelect={onSelect} />
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 function InlineVariableOptionList({
   options,
   emptyText,
   onSelect,
-}: Omit<VariableOptionListProps, 'heading'>) {
+}: {
+  options: WorkflowVariableOption[];
+  emptyText?: string;
+  onSelect: (option: WorkflowVariableOption) => void;
+}) {
   if (options.length === 0) {
     return <div className="px-4 py-6 text-sm text-muted-foreground">{emptyText}</div>;
   }
@@ -434,30 +350,33 @@ export function VariableTokenEditor({
   className,
   compact = false,
 }: VariableTokenEditorProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const pendingSelectionRef = useRef<TextSelection | null>(null);
   const pickerSelectionRef = useRef<TextSelection>({ start: value.length, end: value.length });
   const undoStackRef = useRef<EditorHistoryEntry[]>([]);
   const redoStackRef = useRef<EditorHistoryEntry[]>([]);
   const inlineSearchStartRef = useRef<number | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const lastInlineVariableQueryRef = useRef('');
+  const suppressNextFocusRef = useRef(false);
   const [inlineVariableQuery, setInlineVariableQuery] = useState<string | null>(null);
+  const [isPickerContentMounted, setIsPickerContentMounted] = useState(false);
   const [pickerSearchMode, setPickerSearchMode] = useState(false);
   const [caretAnchor, setCaretAnchor] = useState<CaretAnchor | null>(null);
-  const segments = splitWorkflowTemplate(value, options);
+  const isPickerOpen = inlineVariableQuery !== null;
+  if (inlineVariableQuery !== null) {
+    lastInlineVariableQueryRef.current = inlineVariableQuery;
+  }
+  const pickerQuery = inlineVariableQuery ?? lastInlineVariableQueryRef.current;
+  const segments = useMemo(() => splitWorkflowTemplate(value, options), [options, value]);
   const matchingInlineOptions = useMemo(
-    () =>
-      inlineVariableQuery === null ? [] : getMatchingVariableOptions(options, inlineVariableQuery),
-    [inlineVariableQuery, options],
+    () => (isPickerContentMounted ? getMatchingVariableOptions(options, pickerQuery) : []),
+    [isPickerContentMounted, options, pickerQuery],
   );
 
-  const rememberSelection = useCallback(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    const selection = getSelectionOffsets(editor);
-    if (selection) pickerSelectionRef.current = selection;
-    setInlineVariableQuery(null);
-  }, []);
+  useLayoutEffect(() => {
+    if (isPickerOpen) setIsPickerContentMounted(true);
+  }, [isPickerOpen]);
 
   const applyText = useCallback(
     (nextValue: string, selection: TextSelection, previousSelection?: TextSelection) => {
@@ -545,28 +464,50 @@ export function VariableTokenEditor({
     applyText(nextValue, selection, selection);
   }, [applyText, compact, options]);
 
-  const openPickerFromCaret = useCallback((editor: HTMLDivElement, allowEmpty: boolean) => {
-    const selection = getSelectionOffsets(editor);
-    if (!selection) return;
-    const currentValue = readRawValue(editor);
-    const draft = findVariableDraft(currentValue, selection.start);
-    if (draft) {
-      pickerSelectionRef.current = draft;
+  const openPickerFromCaret = useCallback(
+    (editor: HTMLDivElement, allowEmpty: boolean) => {
+      const selection = getSelectionOffsets(editor);
+      if (!selection) return;
+      const currentValue = readRawValue(editor);
+      const draft = findVariableDraft(currentValue, selection.start);
+      if (draft) {
+        pickerSelectionRef.current = draft;
+        inlineSearchStartRef.current = null;
+        setCaretAnchor(getCaretAnchor(editor));
+        setPickerSearchMode(false);
+        setInlineVariableQuery(draft.query);
+        return;
+      }
+      if (!allowEmpty) return;
+      inlineSearchStartRef.current = null;
+      pickerSelectionRef.current = selection;
       setCaretAnchor(getCaretAnchor(editor));
-      setPickerSearchMode(false);
-      setInlineVariableQuery(draft.query);
-      return;
-    }
-    if (!allowEmpty) return;
-    inlineSearchStartRef.current = 0;
-    pickerSelectionRef.current = { start: 0, end: currentValue.length };
+      const selectedToken = getVariableTokenRanges(currentValue, options).some(
+        (range) => range.start === selection.start && range.end === selection.end,
+      );
+      setPickerSearchMode(selectedToken);
+      setInlineVariableQuery('');
+    },
+    [options],
+  );
+
+  const openPickerFromButton = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const selection = getSelectionOffsets(editor) || pickerSelectionRef.current;
+    pickerSelectionRef.current = selection;
+    inlineSearchStartRef.current = null;
     setCaretAnchor(getCaretAnchor(editor));
     setPickerSearchMode(true);
-    setInlineVariableQuery(currentValue.trim());
+    setInlineVariableQuery('');
   }, []);
 
   const handleEditorFocus = useCallback(
     (_event: FocusEvent<HTMLDivElement>) => {
+      if (suppressNextFocusRef.current) {
+        suppressNextFocusRef.current = false;
+        return;
+      }
       window.requestAnimationFrame(() => {
         const editor = editorRef.current;
         if (editor) openPickerFromCaret(editor, compact);
@@ -589,8 +530,7 @@ export function VariableTokenEditor({
       const tokenSelection = getElementSelection(editor, token);
       pickerSelectionRef.current = tokenSelection;
       inlineSearchStartRef.current = tokenSelection.start;
-      const rect = token.getBoundingClientRect();
-      setCaretAnchor({ getBoundingClientRect: () => rect });
+      setCaretAnchor({ getBoundingClientRect: () => token.getBoundingClientRect() });
       setPickerSearchMode(true);
       setInlineVariableQuery('');
     },
@@ -649,7 +589,6 @@ export function VariableTokenEditor({
       if (event.key === 'Escape' && inlineVariableQuery !== null) {
         event.preventDefault();
         inlineSearchStartRef.current = null;
-        setPickerSearchMode(false);
         setInlineVariableQuery(null);
         return;
       }
@@ -678,15 +617,14 @@ export function VariableTokenEditor({
 
   const handleSelectOption = useCallback(
     (option: WorkflowVariableOption) => {
-      const selection = compact ? { start: 0, end: value.length } : pickerSelectionRef.current;
+      const selection = pickerSelectionRef.current;
       const nextValue = `${value.slice(0, selection.start)}${option.token}${value.slice(selection.end)}`;
       const nextPosition = selection.start + option.token.length;
       const nextSelection = { start: nextPosition, end: nextPosition };
       applyText(nextValue, nextSelection, selection);
       inlineSearchStartRef.current = null;
-      setPickerSearchMode(false);
       setInlineVariableQuery(null);
-      setPickerOpen(false);
+      suppressNextFocusRef.current = true;
       window.requestAnimationFrame(() => {
         const editor = editorRef.current;
         if (!editor) return;
@@ -695,11 +633,12 @@ export function VariableTokenEditor({
         restoreSelection(editor, nextSelection);
       });
     },
-    [applyText, compact, value],
+    [applyText, value],
   );
 
   return (
     <div
+      ref={containerRef}
       className={cn(
         'overflow-hidden rounded-md border border-input bg-transparent shadow-xs',
         className,
@@ -718,7 +657,7 @@ export function VariableTokenEditor({
           data-placeholder={placeholder}
           className={cn(
             compact
-              ? 'min-h-9 whitespace-pre-wrap break-words py-2 pl-3 pr-10 text-sm leading-5 outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus-visible:ring-3 focus-visible:ring-ring/50'
+              ? 'min-h-9 whitespace-pre-wrap break-words px-3 py-2 text-sm leading-5 outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus-visible:ring-3 focus-visible:ring-ring/50'
               : 'min-h-24 whitespace-pre-wrap break-words px-2.5 py-2 text-sm leading-6 outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus-visible:ring-3 focus-visible:ring-ring/50',
           )}
           onInput={handleInput}
@@ -729,92 +668,99 @@ export function VariableTokenEditor({
           onCut={handleCut}
           onPaste={handlePaste}
         />
-        {compact ? (
-          <div className="absolute right-1 top-1 z-10">
-            <VariablePicker
-              compact
-              open={pickerOpen}
-              onOpenChange={setPickerOpen}
-              options={options}
-              onSelect={handleSelectOption}
-              onRememberSelection={rememberSelection}
-            />
-          </div>
-        ) : null}
-      </div>
-      {inlineVariableQuery !== null && (
         <Popover
-          open
+          open={isPickerOpen}
           modal={false}
-          onOpenChange={(open) => {
+          onOpenChange={(open, eventDetails) => {
             if (!open) {
+              const target = eventDetails.event.target;
+              if (
+                eventDetails.reason === 'outside-press' &&
+                target instanceof Node &&
+                containerRef.current?.contains(target)
+              ) {
+                eventDetails.cancel();
+                return;
+              }
               inlineSearchStartRef.current = null;
-              setPickerSearchMode(false);
               setInlineVariableQuery(null);
+            }
+          }}
+          onOpenChangeComplete={(open) => {
+            if (!open) {
+              setIsPickerContentMounted(false);
+              setPickerSearchMode(false);
             }
           }}
         >
           <PopoverTrigger
             nativeButton={false}
-            render={<span aria-hidden="true" className="block h-px" />}
+            render={
+              <span aria-hidden="true" className="pointer-events-none absolute size-px opacity-0" />
+            }
           />
-          <PopoverContent
-            anchor={caretAnchor}
-            align="start"
-            side="bottom"
-            sideOffset={10}
-            initialFocus={pickerSearchMode ? undefined : false}
-            finalFocus={false}
-            className="w-[min(34rem,calc(100vw-2rem))] gap-0 overflow-hidden rounded-xl! border-border p-0 shadow-md"
-          >
-            <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/30 px-4 py-3">
-              <div className="flex items-center gap-2.5">
-                <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Braces className="size-4" />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">选择变量</p>
-                  <p className="text-xs text-muted-foreground">上游节点输出</p>
+          {isPickerContentMounted && (
+            <PopoverContent
+              anchor={caretAnchor}
+              align="start"
+              side="bottom"
+              sideOffset={10}
+              initialFocus={pickerSearchMode ? undefined : false}
+              finalFocus={false}
+              className="w-[min(34rem,calc(100vw-2rem))] gap-0 overflow-hidden rounded-xl! border-border p-0 shadow-md"
+            >
+              <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/30 px-4 py-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Braces className="size-4" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">选择变量</p>
+                    <p className="text-xs text-muted-foreground">本节点输入与上游输出</p>
+                  </div>
                 </div>
+                <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                  {matchingInlineOptions.length} 项
+                </span>
               </div>
-              <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                {matchingInlineOptions.length} 项
-              </span>
-            </div>
-            {pickerSearchMode ? (
-              <div className="border-b border-border p-3">
-                <Input
-                  autoFocus
-                  aria-label="筛选变量"
-                  value={inlineVariableQuery || ''}
-                  placeholder="输入节点名或变量名"
-                  onChange={(event) => setInlineVariableQuery(event.target.value)}
+              {pickerSearchMode ? (
+                <div className="border-b border-border p-3">
+                  <Input
+                    autoFocus
+                    aria-label="筛选变量"
+                    value={pickerQuery}
+                    placeholder="输入节点名或变量名"
+                    onChange={(event) => setInlineVariableQuery(event.target.value)}
+                  />
+                </div>
+              ) : null}
+              <div className="max-h-72 overflow-y-auto pt-3">
+                <p className="px-4 pb-2 text-xs font-medium text-muted-foreground">
+                  {pickerQuery ? '匹配结果' : '可用变量'}
+                </p>
+                <InlineVariableOptionList
+                  options={matchingInlineOptions}
+                  emptyText="未找到匹配变量"
+                  onSelect={handleSelectOption}
                 />
               </div>
-            ) : null}
-            <div className="max-h-72 overflow-y-auto pt-3">
-              <p className="px-4 pb-2 text-xs font-medium text-muted-foreground">
-                {inlineVariableQuery ? '匹配结果' : '可用变量'}
-              </p>
-              <InlineVariableOptionList
-                options={matchingInlineOptions}
-                emptyText="未找到匹配变量"
-                onSelect={handleSelectOption}
-              />
-            </div>
-          </PopoverContent>
+            </PopoverContent>
+          )}
         </Popover>
-      )}
+      </div>
       {!compact && (
         <div className="flex items-center justify-between border-t border-input bg-muted/30 px-2 py-1.5">
-          <span className="text-xs text-muted-foreground">仅可引用上游节点输出</span>
-          <VariablePicker
-            open={pickerOpen}
-            onOpenChange={setPickerOpen}
-            options={options}
-            onSelect={handleSelectOption}
-            onRememberSelection={rememberSelection}
-          />
+          <span className="text-xs text-muted-foreground">可引用本节点输入与上游输出</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={openPickerFromButton}
+          >
+            <Braces />
+            插入变量
+          </Button>
         </div>
       )}
     </div>

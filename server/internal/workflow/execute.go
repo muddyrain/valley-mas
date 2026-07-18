@@ -11,13 +11,17 @@ import (
 )
 
 func ResolveTemplate(value string, outputs map[string]map[string]any) (any, error) {
+	return resolveTemplate(value, outputs, nil)
+}
+
+func resolveTemplate(value string, outputs map[string]map[string]any, locals map[string]any) (any, error) {
 	matches := templatePattern.FindAllStringIndex(value, -1)
 	if len(matches) == 1 && matches[0][0] == 0 && matches[0][1] == len(value) {
-		return resolveTemplateToken(value, outputs)
+		return resolveTemplateToken(value, outputs, locals)
 	}
 	var resolveErr error
 	resolved := templatePattern.ReplaceAllStringFunc(value, func(token string) string {
-		result, err := resolveTemplateToken(token, outputs)
+		result, err := resolveTemplateToken(token, outputs, locals)
 		if err != nil {
 			resolveErr = err
 			return token
@@ -30,8 +34,14 @@ func ResolveTemplate(value string, outputs map[string]map[string]any) (any, erro
 	return resolved, nil
 }
 
-func resolveTemplateToken(token string, outputs map[string]map[string]any) (any, error) {
+func resolveTemplateToken(token string, outputs map[string]map[string]any, locals map[string]any) (any, error) {
 	reference := strings.TrimSpace(token[2 : len(token)-2])
+	if !strings.Contains(reference, ".") {
+		if value, exists := locals[reference]; exists {
+			return value, nil
+		}
+		return nil, fmt.Errorf("变量 %s 不存在或不在上游", reference)
+	}
 	nodeID, field, valid := splitReference(reference)
 	if !valid {
 		return nil, fmt.Errorf("无效变量 %s", token)
@@ -146,6 +156,9 @@ func resolveNodeInput(node Node, run RunContext) (map[string]any, error) {
 	if node.Type == NodeTypeMerge {
 		return config, nil
 	}
+	if node.Type == NodeTypeLLM {
+		return resolveLLMNodeInput(config, run.Outputs)
+	}
 	resolved, err := resolveAny(config, run.Outputs)
 	if err != nil {
 		return nil, err
@@ -153,6 +166,51 @@ func resolveNodeInput(node Node, run RunContext) (map[string]any, error) {
 	result, ok := resolved.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("节点配置必须为对象")
+	}
+	return result, nil
+}
+
+func resolveLLMNodeInput(config map[string]any, outputs map[string]map[string]any) (map[string]any, error) {
+	base := make(map[string]any, len(config))
+	for key, value := range config {
+		if key == "inputs" || key == "prompt" || key == "systemPrompt" {
+			continue
+		}
+		base[key] = value
+	}
+	resolvedBase, err := resolveAny(base, outputs)
+	if err != nil {
+		return nil, err
+	}
+	result, ok := resolvedBase.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("节点配置必须为对象")
+	}
+
+	inputs := map[string]any{}
+	if rawInputs, exists := config["inputs"]; exists {
+		resolvedInputs, err := resolveAny(rawInputs, outputs)
+		if err != nil {
+			return nil, err
+		}
+		var valid bool
+		inputs, valid = resolvedInputs.(map[string]any)
+		if !valid {
+			return nil, fmt.Errorf("大模型节点 inputs 必须为对象")
+		}
+	}
+	result["inputs"] = inputs
+	for _, key := range []string{"systemPrompt", "prompt"} {
+		raw, _ := config[key].(string)
+		resolved, err := resolveTemplate(raw, outputs, inputs)
+		if err != nil {
+			return nil, err
+		}
+		text, ok := resolved.(string)
+		if !ok {
+			return nil, fmt.Errorf("大模型节点 %s 必须解析为文本", key)
+		}
+		result[key] = text
 	}
 	return result, nil
 }
@@ -227,7 +285,11 @@ func capabilityIDForNode(node Node) string {
 
 func emitFailure(emit func(Event), runID string, node Node, capabilityID string, input map[string]any, err error, startedAt time.Time) error {
 	message, code := publicExecutionError(node, err)
-	emitEvent(emit, Event{RunID: runID, NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Status: StatusFailed, Input: input, Message: message, Error: code, DurationMs: time.Since(startedAt).Milliseconds()})
+	status := StatusFailed
+	if errors.Is(err, context.Canceled) {
+		status = StatusCancelled
+	}
+	emitEvent(emit, Event{RunID: runID, NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Status: status, Input: input, Message: message, Error: code, DurationMs: time.Since(startedAt).Milliseconds()})
 	return err
 }
 

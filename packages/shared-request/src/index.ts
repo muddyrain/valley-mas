@@ -106,10 +106,13 @@ export function createHttpClient(options: CreateHttpClientOptions): AxiosInstanc
           clearAuth?.();
           redirectToLogin?.();
         }
-        showError(msg || '请求失败', {
-          requestConfig: response.config as RequestConfig,
-          rawError: new Error(msg || 'Error'),
-        });
+        const requestConfig = response.config as RequestConfig;
+        if (!requestConfig.suppressErrorToast) {
+          showError(msg || '请求失败', {
+            requestConfig,
+            rawError: new Error(msg || 'Error'),
+          });
+        }
         return Promise.reject(new Error(msg || 'Error'));
       }
       return data as typeof response;

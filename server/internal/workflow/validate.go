@@ -227,6 +227,9 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 	reachability := allReachability(nodes, adjacency)
 	for _, node := range graph.Nodes {
 		for _, reference := range referencesIn(node.Config, node.When) {
+			if llmLocalInputReference(node, reference) {
+				continue
+			}
 			source, field, ok := splitReference(reference)
 			if !ok || source == node.ID || !reachability[source][node.ID] {
 				errs = append(errs, fmt.Sprintf("变量 %s 不存在或不在上游", reference))
@@ -241,8 +244,42 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 			}
 		}
 	}
+	errs = append(errs, validateLLMLocalInputReferences(graph.Nodes)...)
 	errs = append(errs, validateBindingTypes(graph.Nodes, outputFields, registry)...)
 	sort.Strings(errs)
+	return errs
+}
+
+func llmLocalInputReference(node Node, reference string) bool {
+	if node.Type != NodeTypeLLM || strings.Contains(reference, ".") {
+		return false
+	}
+	config, err := decodeConfig(node.Config)
+	if err != nil {
+		return false
+	}
+	inputs, _ := config["inputs"].(map[string]any)
+	_, exists := inputs[strings.TrimSpace(reference)]
+	return exists
+}
+
+func validateLLMLocalInputReferences(nodes []Node) []string {
+	errs := []string{}
+	for _, node := range nodes {
+		if node.Type != NodeTypeLLM {
+			continue
+		}
+		config, err := decodeConfig(node.Config)
+		if err != nil {
+			continue
+		}
+		inputs, _ := config["inputs"].(map[string]any)
+		for _, reference := range referencesInValue(inputs) {
+			if _, exists := inputs[reference]; exists && !strings.Contains(reference, ".") {
+				errs = append(errs, fmt.Sprintf("大模型节点 %s 的输入不能引用本节点输入 %s", node.ID, reference))
+			}
+		}
+	}
 	return errs
 }
 
@@ -639,6 +676,14 @@ func referencesIn(raw json.RawMessage, when *Rule) []string {
 		}
 	}
 	return result
+}
+
+func referencesInValue(value any) []string {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return nil
+	}
+	return referencesIn(encoded, nil)
 }
 
 func splitReference(reference string) (string, string, bool) {

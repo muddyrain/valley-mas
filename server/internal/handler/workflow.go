@@ -166,11 +166,12 @@ func AdminUpdateWorkflow(c *gin.Context) {
 	}
 
 	var req struct {
-		Name        *string `json:"name"`
-		Description *string `json:"description"`
-		Graph       *string `json:"graph"`
-		Status      *string `json:"status"`
-		BaseHash    *string `json:"baseHash"`
+		Name          *string `json:"name"`
+		Description   *string `json:"description"`
+		Graph         *string `json:"graph"`
+		Status        *string `json:"status"`
+		BaseHash      *string `json:"baseHash"`
+		RecordHistory bool    `json:"recordHistory"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Error(c, http.StatusBadRequest, "参数错误: "+err.Error())
@@ -219,7 +220,7 @@ func AdminUpdateWorkflow(c *gin.Context) {
 		if err := tx.Where("id = ?", definition.ID).First(&definition).Error; err != nil {
 			return err
 		}
-		_, _, syncErr := syncWorkflowAIApp(tx, definition)
+		_, _, syncErr := syncWorkflowAIAppWithSnapshot(tx, definition, req.RecordHistory)
 		return syncErr
 	})
 	if errors.Is(err, errWorkflowSaveConflict) {
@@ -278,7 +279,7 @@ func RestoreWorkflowVersion(c *gin.Context) {
 		if err := tx.Where("id = ? AND user_id = ?", id, userID).First(&definition).Error; err != nil {
 			return err
 		}
-		app, _, err := syncWorkflowAIApp(tx, definition)
+		app, _, err := syncWorkflowAIAppWithoutSnapshot(tx, definition)
 		if err != nil {
 			return err
 		}
@@ -356,7 +357,7 @@ func workflowPlatform(c *gin.Context, userID model.Int64String) (model.Workflow,
 			return fmt.Errorf("%w: %v", errWorkflowDraftInvalid, err)
 		}
 		var syncErr error
-		app, _, syncErr = syncWorkflowAIApp(tx, definition)
+		app, _, syncErr = syncWorkflowAIAppWithoutSnapshot(tx, definition)
 		return syncErr
 	}); err != nil {
 		if errors.Is(err, errWorkflowDraftInvalid) {
@@ -418,7 +419,7 @@ func AdminRunWorkflow(c *gin.Context) {
 	var appVersion model.AIAppVersion
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
 		var syncErr error
-		app, appVersion, syncErr = syncWorkflowAIApp(tx, definition)
+		app, appVersion, syncErr = syncWorkflowAIAppWithoutSnapshot(tx, definition)
 		return syncErr
 	}); err != nil {
 		Error(c, http.StatusInternalServerError, "同步工作流应用失败")
@@ -508,7 +509,7 @@ func AdminRunWorkflow(c *gin.Context) {
 		if nodeTypes[event.NodeID] == workflow.NodeTypeEnd && event.Status == workflow.StatusSucceeded {
 			finalOutput = event.Output
 		}
-		if event.Status == workflow.StatusFailed {
+		if event.Status == workflow.StatusFailed || event.Status == workflow.StatusCancelled {
 			failureMessage = event.Message
 			failureCode = event.Error
 			failedNodeID = event.NodeID
@@ -527,6 +528,12 @@ func AdminRunWorkflow(c *gin.Context) {
 		}
 		if failureCode == "" {
 			failureCode = "WORKFLOW_NODE_FAILED"
+		}
+		if failureCode == "WORKFLOW_CANCELLED" {
+			_ = finishWorkflowRun(&run, string(workflow.StatusCancelled), map[string]any{"error": failureCode})
+			persistWorkflowAIAppRun(app, appVersion, run, "cancelled", nil, failureCode)
+			send("", string(workflow.StatusCancelled), failureMessage, map[string]any{"runId": run.ID, "nodeId": failedNodeID, "error": failureCode})
+			return
 		}
 		_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": failureCode})
 		persistWorkflowAIAppRun(app, appVersion, run, "failed", nil, failureCode)

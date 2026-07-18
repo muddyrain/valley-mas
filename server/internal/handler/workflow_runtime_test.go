@@ -99,6 +99,45 @@ func TestAdminUpdateWorkflowRejectsStaleBaseHash(t *testing.T) {
 	}
 }
 
+func TestAdminUpdateWorkflowRecordsHistoryOnlyWhenRequested(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	baseHash := workflowGraphHash(definition.Graph)
+	first := strings.Replace(definition.Graph, `"title":"{{start.output.title}}"`, `"first":"{{start.output.title}}"`, 1)
+	second := strings.Replace(first, `"first":"{{start.output.title}}"`, `"second":"{{start.output.title}}"`, 1)
+	request := func(graph, hash string, recordHistory bool) *httptest.ResponseRecorder {
+		body, _ := json.Marshal(map[string]any{"graph": graph, "baseHash": hash, "recordHistory": recordHistory})
+		req := httptest.NewRequest(http.MethodPut, "/workflows/"+definition.ID.String(), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, req)
+		return recorder
+	}
+	if response := request(first, baseHash, false); responseCode(response) != 0 {
+		t.Fatalf("autosave: %s", response.Body.String())
+	}
+	var app model.AIApp
+	if err := database.DB.Where("workflow_id = ?", definition.ID).First(&app).Error; err != nil {
+		t.Fatal(err)
+	}
+	var versions []model.AIAppVersion
+	if err := database.DB.Where("app_id = ?", app.ID).Find(&versions).Error; err != nil || len(versions) != 1 {
+		t.Fatalf("initial versions=%d err=%v", len(versions), err)
+	}
+	if response := request(second, workflowGraphHash(first), false); responseCode(response) != 0 {
+		t.Fatalf("second autosave: %s", response.Body.String())
+	}
+	if err := database.DB.Where("app_id = ?", app.ID).Find(&versions).Error; err != nil || len(versions) != 1 {
+		t.Fatalf("autosave must not add history: versions=%d err=%v", len(versions), err)
+	}
+	if response := request(second, workflowGraphHash(second), true); responseCode(response) != 0 {
+		t.Fatalf("manual save: %s", response.Body.String())
+	}
+	if err := database.DB.Where("app_id = ?", app.ID).Find(&versions).Error; err != nil || len(versions) != 2 {
+		t.Fatalf("manual save must add history: versions=%d err=%v", len(versions), err)
+	}
+}
+
 func TestWorkflowRunPersistsGraphV4NodeTypes(t *testing.T) {
 	router, definition := setupWorkflowRuntimeTestRouter(t)
 	req := workflowMultipartRequest(t, "/workflows/"+definition.ID.String()+"/run", `{"title":"Graph v4"}`)

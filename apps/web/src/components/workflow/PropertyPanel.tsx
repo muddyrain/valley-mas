@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import { Settings } from 'lucide-react';
+import { useMemo } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { NodeRunInspector } from './NodeRunInspector';
@@ -85,7 +86,14 @@ export function PropertyPanel({
 
   const { nodeType, config, when } = selectedNode.data;
   const FormComponent = PROPERTY_FORM_MAP[nodeType as keyof typeof PROPERTY_FORM_MAP];
-  const variableOptions = getUpstreamWorkflowVariables(nodes, edges, selectedNode.id);
+  const variableOptions = useMemo(
+    () => getUpstreamWorkflowVariables(nodes, edges, selectedNode.id),
+    [edges, nodes, selectedNode.id],
+  );
+  const upstreamVariableOptions = useMemo(
+    () => variableOptions.filter((option) => option.scope !== 'local'),
+    [variableOptions],
+  );
 
   const handleUpdateConfig = (updates: Partial<Record<string, unknown>>) => {
     onUpdateNode(selectedNode.id, {
@@ -141,7 +149,7 @@ export function PropertyPanel({
         <WhenPropertyForm
           when={when}
           onChange={(nextWhen) => onUpdateNode(selectedNode.id, { when: nextWhen })}
-          variableOptions={variableOptions}
+          variableOptions={upstreamVariableOptions}
         />
       ) : null}
     </PropertyFormBase>

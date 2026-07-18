@@ -26,12 +26,13 @@ export function ConditionPropertyForm({
   variableOptions = [],
 }: PropertyFormProps) {
   const operator = (config.operator as string) || 'equals';
+  const left = typeof config.left === 'string' ? config.left : String(config.left ?? '');
   return (
     <EditorSection title="条件规则" description="只允许引用开始输入或上游输出，不执行表达式代码。">
       <div className="space-y-2">
         <Label>左值</Label>
         <VariableTokenEditor
-          value={(config.left as string) || ''}
+          value={left}
           onChange={(left) => onUpdateConfig({ left })}
           options={variableOptions}
           placeholder="选择开始输入或上游输出"

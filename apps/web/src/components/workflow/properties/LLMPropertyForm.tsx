@@ -22,6 +22,7 @@ export function LLMPropertyForm({
   const inputs = (config.inputs as Record<string, unknown>) || {};
   const inputTypes =
     (config.inputTypes as Record<string, import('../types').WorkflowValueType>) || {};
+  const upstreamVariableOptions = variableOptions.filter((option) => option.scope !== 'local');
   const outputs = getWorkflowNodeOutputFields('llm', config);
   return (
     <div className="space-y-4">
@@ -29,7 +30,7 @@ export function LLMPropertyForm({
         <VariableBindingEditor
           values={inputs}
           types={inputTypes}
-          variableOptions={variableOptions}
+          variableOptions={upstreamVariableOptions}
           onChange={(nextInputs, nextTypes) =>
             onUpdateConfig({ inputs: nextInputs, inputTypes: nextTypes })
           }

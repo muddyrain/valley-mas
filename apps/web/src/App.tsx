@@ -7,6 +7,7 @@ import { applyThemeToDocument, useThemeStore } from '@/stores/useThemeStore';
 import WorkbenchLayout from './layouts/WorkbenchLayout';
 import AIAppConversation from './pages/AIAppConversation';
 import AIAppEditor from './pages/AIAppEditor';
+import AIResources from './pages/AIResources';
 import BlogCreate from './pages/BlogCreate';
 import BlogGroupManage from './pages/BlogGroupManage';
 import BlogList from './pages/blog/BlogList';
@@ -19,7 +20,6 @@ import FormatTools from './pages/FormatTools';
 import Guestbook from './pages/Guestbook';
 import Home from './pages/Home';
 import ImageTextCreate from './pages/ImageTextCreate';
-import KnowledgeBases from './pages/KnowledgeBases';
 import Login from './pages/Login';
 import MyPosts from './pages/MyPosts';
 import MyResources from './pages/MyResources';
@@ -33,7 +33,6 @@ import Resources from './pages/Resources';
 import ScratchLegendLab from './pages/ScratchLegendLab';
 import Workbench from './pages/Workbench';
 import WorkflowEditor from './pages/WorkflowEditor';
-import Workflows from './pages/Workflows';
 import WorkflowTemplateDetail from './pages/WorkflowTemplateDetail';
 import { useAuthStore } from './stores/useAuthStore';
 
@@ -67,8 +66,8 @@ function RouteTitle() {
       title = 'Valley | 内容首页';
     } else if (pathname === '/workbench') {
       title = '项目 | Valley';
-    } else if (pathname === '/workbench/workflows') {
-      title = '工作流 | Valley';
+    } else if (pathname === '/workbench/resources') {
+      title = 'AI 资源 | Valley';
     } else if (pathname.startsWith('/workbench/templates/')) {
       title = '工作流模板 | Valley';
     } else if (pathname.startsWith('/workbench/create')) {
@@ -79,8 +78,6 @@ function RouteTitle() {
       title = '私有会话 | Valley';
     } else if (pathname.startsWith('/workbench/apps/')) {
       title = '编辑 AI 应用 | Valley';
-    } else if (pathname === '/workbench/knowledge') {
-      title = '知识库 | Valley';
     } else if (pathname === '/blog') {
       title = '博客与图文 | Valley';
     } else if (pathname === '/guestbook') {
@@ -172,12 +169,16 @@ function App() {
             }
           />
           <Route
-            path="workbench/workflows"
+            path="workbench/resources"
             element={
               <RequireAuth>
-                <Workflows />
+                <AIResources />
               </RequireAuth>
             }
+          />
+          <Route
+            path="workbench/workflows"
+            element={<Navigate to="/workbench/resources?tab=workflows" replace />}
           />
           <Route
             path="workbench/templates/:templateId"
@@ -213,11 +214,7 @@ function App() {
           />
           <Route
             path="workbench/knowledge"
-            element={
-              <RequireAuth>
-                <KnowledgeBases />
-              </RequireAuth>
-            }
+            element={<Navigate to="/workbench/resources?tab=knowledge" replace />}
           />
           <Route path="resources" element={<Resources />} />
           <Route path="resource/:id" element={<ResourceDetail />} />

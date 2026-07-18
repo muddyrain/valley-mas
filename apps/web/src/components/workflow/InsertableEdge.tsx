@@ -10,6 +10,7 @@ export function InsertableEdge(props: EdgeProps) {
   const [hovered, setHovered] = useState(false);
   const hideTimerRef = useRef<number | null>(null);
   const [path, labelX, labelY] = getBezierPath({ ...props, curvature: 0.3 });
+  const selectedStroke = '#7c3aed';
   useEffect(
     () => () => {
       if (hideTimerRef.current !== null) window.clearTimeout(hideTimerRef.current);
@@ -42,6 +43,7 @@ export function InsertableEdge(props: EdgeProps) {
         style={{
           ...props.style,
           pointerEvents: 'none',
+          stroke: props.selected ? selectedStroke : props.style?.stroke,
           strokeWidth: props.selected ? 3 : hovered ? 2.5 : props.style?.strokeWidth,
         }}
         interactionWidth={0}

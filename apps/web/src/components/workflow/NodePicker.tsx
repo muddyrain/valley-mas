@@ -67,7 +67,7 @@ const genericItems: NodePickerItem[] = [
     nodeType: 'condition',
     label: '条件',
     description: '按 true / false 选择执行路径',
-    config: { left: true, operator: 'equals', right: true },
+    config: { left: '', operator: 'equals', right: true },
   },
   {
     key: 'merge',

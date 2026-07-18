@@ -72,6 +72,30 @@ func TestGraphV4MergeUsesFirstActiveBranch(t *testing.T) {
 	}
 }
 
+func TestExecuteEmitsCancelledStatusWhenContextIsCancelled(t *testing.T) {
+	registry := testRegistry(t)
+	graph := Graph{
+		SchemaVersion: 4,
+		Nodes: []Node{
+			node("start", NodeTypeStart, `{"inputs":{}}`),
+			node("end", NodeTypeEnd, `{"outputs":{}}`),
+		},
+		Edges: []Edge{{Source: "start", Target: "end"}},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	var events []Event
+	err := Execute(ctx, graph, registry, RunContext{ID: "cancelled"}, func(event Event) {
+		events = append(events, event)
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error=%v", err)
+	}
+	if len(events) != 1 || events[0].Status != StatusCancelled || events[0].Error != "WORKFLOW_CANCELLED" {
+		t.Fatalf("events=%+v", events)
+	}
+}
+
 func TestGraphV4WhenSkipsCoverWithoutSideEffect(t *testing.T) {
 	registry := testRegistry(t)
 	called := 0
@@ -250,6 +274,34 @@ func TestLLMInputBindingTypeValidation(t *testing.T) {
 	graph.Nodes[1] = node("model", NodeTypeLLM, `{"modelProfile":"ark-text-default","prompt":"write","inputs":{"count":"{{start.output.count}}"},"inputTypes":{"count":"number"}}`)
 	if errs := ValidateGraph(graph, registry); len(errs) > 0 {
 		t.Fatalf("validation errors: %v", errs)
+	}
+}
+
+func TestLLMInputAliasIsValidAndResolvesInsidePrompts(t *testing.T) {
+	registry := testRegistry(t)
+	graph := Graph{SchemaVersion: 4, Nodes: []Node{
+		node("start", NodeTypeStart, `{"inputs":{"topic":{"type":"string","required":true}}}`),
+		node("writer", NodeTypeLLM, `{"modelProfile":"ark-text-default","inputs":{"model_input":"{{start.output.topic}}"},"inputTypes":{"model_input":"string"},"systemPrompt":"You write about {{model_input}}","prompt":"Draft {{model_input}}"}`),
+		node("end", NodeTypeEnd, `{"outputs":{"text":"{{writer.output.text}}"},"outputTypes":{"text":"string"}}`),
+	}, Edges: []Edge{{Source: "start", Target: "writer"}, {Source: "writer", Target: "end"}}}
+	if errs := ValidateGraph(graph, registry); len(errs) != 0 {
+		t.Fatalf("validation errors: %v", errs)
+	}
+	config, err := decodeConfig(graph.Nodes[1].Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := resolveLLMNodeInput(config, map[string]map[string]any{"start": {"topic": "AI"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved["systemPrompt"] != "You write about AI" || resolved["prompt"] != "Draft AI" {
+		t.Fatalf("resolved=%+v", resolved)
+	}
+
+	graph.Nodes[1] = node("writer", NodeTypeLLM, `{"modelProfile":"ark-text-default","inputs":{"model_input":"{{model_input}}"},"inputTypes":{"model_input":"string"},"prompt":"Draft {{model_input}}"}`)
+	if errs := ValidateGraph(graph, registry); !containsError(errs, "不能引用本节点输入") {
+		t.Fatalf("expected self-reference error, got %v", errs)
 	}
 }
 

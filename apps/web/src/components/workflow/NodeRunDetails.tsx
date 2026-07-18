@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { workflowRunErrorGuidance } from './runErrorGuidance';
 import type { NodeRunSnapshot, NodeRunStatus } from './runSession';
 
 function jsonPreview(value: Record<string, unknown> | undefined): string | null {
@@ -71,6 +72,9 @@ function statusMeta(status: NodeRunStatus) {
   if (status === 'skipped') {
     return { label: '已跳过', icon: CircleSlash2, iconClassName: 'text-muted-foreground' };
   }
+  if (status === 'cancelled') {
+    return { label: '已取消', icon: CircleSlash2, iconClassName: 'text-muted-foreground' };
+  }
   return { label: '运行成功', icon: CheckCircle2, iconClassName: 'text-emerald-600' };
 }
 
@@ -94,9 +98,14 @@ function RunDetailsBody({ snapshot, compact }: { snapshot: NodeRunSnapshot; comp
             {snapshot.error}
           </p>
           {snapshot.errorCode ? (
-            <p className="font-mono text-[11px] text-destructive/90">
-              错误码：{snapshot.errorCode}
-            </p>
+            <>
+              <p className="font-mono text-[11px] text-destructive/90">
+                错误码：{snapshot.errorCode}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                建议：{workflowRunErrorGuidance(snapshot.errorCode)}
+              </p>
+            </>
           ) : null}
         </section>
       ) : null}

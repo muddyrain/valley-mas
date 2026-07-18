@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { workflowRunErrorGuidance } from './runErrorGuidance';
 import type { WorkflowRunSession } from './runSession';
 import { normalizeStartInputs, type StartInputDefinition } from './types';
 
@@ -358,7 +359,14 @@ export function RunPanel({
               )}
               <p className="text-xs text-destructive/90">{failureMessage}</p>
               {session.failedNodeCode && (
-                <p className="mt-1 text-xs text-destructive/90">错误码：{session.failedNodeCode}</p>
+                <>
+                  <p className="mt-1 text-xs text-destructive/90">
+                    错误码：{session.failedNodeCode}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    建议：{workflowRunErrorGuidance(session.failedNodeCode)}
+                  </p>
+                </>
               )}
             </section>
           )}

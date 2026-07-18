@@ -1,6 +1,6 @@
 import type { WorkflowRunEvent, WorkflowRunEventData } from '@/api/workflow';
 
-export type NodeRunStatus = 'idle' | 'running' | 'success' | 'error' | 'skipped';
+export type NodeRunStatus = 'idle' | 'running' | 'success' | 'error' | 'skipped' | 'cancelled';
 
 export interface NodeRunSnapshot {
   status: NodeRunStatus;
@@ -14,7 +14,7 @@ export interface NodeRunSnapshot {
 export interface WorkflowRunSession {
   generation: number;
   runId: string | null;
-  status: 'idle' | 'running' | 'success' | 'error';
+  status: 'idle' | 'running' | 'success' | 'error' | 'cancelled';
   nodes: Record<string, NodeRunSnapshot>;
   finalOutput: Record<string, unknown> | null;
   error: string | null;
@@ -24,6 +24,7 @@ export interface WorkflowRunSession {
 
 export type WorkflowRunSessionAction =
   | { type: 'begin'; generation: number }
+  | { type: 'cancelled'; generation: number }
   | { type: 'event'; generation: number; event: WorkflowRunEvent }
   | {
       type: 'error';
@@ -72,6 +73,22 @@ export function workflowRunSessionReducer(
         failedNodeId: action.failedNodeId || session.failedNodeId,
         failedNodeCode: action.failedNodeCode || session.failedNodeCode,
       };
+    case 'cancelled':
+      if (action.generation !== session.generation) return session;
+      return {
+        ...session,
+        status: 'cancelled',
+        nodes: closeRunningNodes(
+          session.nodes,
+          '运行已取消',
+          undefined,
+          'WORKFLOW_CANCELLED',
+          'cancelled',
+        ),
+        error: null,
+        failedNodeId: null,
+        failedNodeCode: null,
+      };
     case 'event':
       return applyWorkflowRunEvent(session, action.generation, action.event);
   }
@@ -82,6 +99,7 @@ function closeRunningNodes(
   error: string,
   failedNodeId?: string,
   failedNodeCode?: string,
+  terminalStatus: Extract<NodeRunStatus, 'error' | 'cancelled'> = 'error',
 ): Record<string, NodeRunSnapshot> {
   const errorCode =
     failedNodeCode || (error === '运行已取消' ? 'WORKFLOW_CANCELLED' : 'WORKFLOW_RUN_INTERRUPTED');
@@ -91,8 +109,8 @@ function closeRunningNodes(
       snapshot.status === 'running'
         ? {
             ...snapshot,
-            status: 'error',
-            error,
+            status: terminalStatus,
+            error: terminalStatus === 'cancelled' ? undefined : error,
             errorCode: nodeId === failedNodeId ? errorCode : (snapshot.errorCode ?? errorCode),
           }
         : snapshot,
@@ -135,11 +153,42 @@ function applyWorkflowRunEvent(
         failedNodeCode: data?.error || session.failedNodeCode,
       };
     }
+    if (event.status === 'cancelled') {
+      return {
+        ...session,
+        runId: nextRunID,
+        status: 'cancelled',
+        nodes: closeRunningNodes(
+          session.nodes,
+          '运行已取消',
+          data?.nodeId,
+          data?.error,
+          'cancelled',
+        ),
+        error: null,
+        failedNodeId: null,
+        failedNodeCode: null,
+      };
+    }
     return session;
   }
 
   const current: NodeRunSnapshot = session.nodes[event.step] || { status: 'idle' };
   const snapshot = snapshotFromEvent(event.status, event.message, data, current);
+  if (event.status === 'cancelled') {
+    return {
+      ...session,
+      runId: nextRunID,
+      status: 'cancelled',
+      nodes: {
+        ...closeRunningNodes(session.nodes, '运行已取消', event.step, data?.error, 'cancelled'),
+        [event.step]: snapshot,
+      },
+      error: null,
+      failedNodeId: null,
+      failedNodeCode: null,
+    };
+  }
   const hasSnapshotError = snapshot.error != null;
   if (hasSnapshotError) {
     return {

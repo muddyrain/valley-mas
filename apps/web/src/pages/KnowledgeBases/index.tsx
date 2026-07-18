@@ -1,6 +1,15 @@
-import { BookOpenText, FileText, FolderPlus, RotateCw, Trash2, Upload } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import {
+  BookOpenText,
+  FileText,
+  FolderPlus,
+  MoreHorizontal,
+  RotateCw,
+  Search,
+  Trash2,
+  Upload,
+} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   type AIKnowledgeBase,
@@ -24,17 +33,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-
-const documentStatus: Record<AIKnowledgeDocument['status'], string> = {
-  pending: '待处理',
-  pending_embedding: '资料准备中',
-  indexing: '索引中',
-  ready: '已索引',
-  failed: '处理失败',
-};
 
 const documentFailureMessage: Record<string, string> = {
   PGVECTOR_NOT_INSTALLED: '数据库尚未启用 pgvector 扩展',
@@ -53,8 +61,26 @@ function formatFileSize(sizeBytes: number) {
   return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function KnowledgeBases() {
+function getDocumentType(document: AIKnowledgeDocument) {
+  const extension = document.name.split('.').pop()?.trim();
+  return extension
+    ? extension.toUpperCase()
+    : document.mimeType.split('/').pop()?.toUpperCase() || '文件';
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(value));
+}
+
+export default function KnowledgeBases({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [bases, setBases] = useState<AIKnowledgeBase[]>([]);
   const [selectedID, setSelectedID] = useState<string | null>(null);
   const [documents, setDocuments] = useState<AIKnowledgeDocument[]>([]);
@@ -73,6 +99,33 @@ export default function KnowledgeBases() {
   const [description, setDescription] = useState('');
 
   const selectedBase = bases.find((base) => base.id === selectedID) || null;
+  const baseSearch = searchParams.get('knowledge_base') || '';
+  const documentSearch = searchParams.get('knowledge_document') || '';
+  const visibleBases = useMemo(
+    () =>
+      bases.filter((base) =>
+        base.name.toLocaleLowerCase().includes(baseSearch.toLocaleLowerCase()),
+      ),
+    [baseSearch, bases],
+  );
+  const visibleDocuments = useMemo(
+    () =>
+      documents.filter((document) =>
+        document.name.toLocaleLowerCase().includes(documentSearch.toLocaleLowerCase()),
+      ),
+    [documentSearch, documents],
+  );
+  const selectedBaseSize = useMemo(
+    () => documents.reduce((total, document) => total + document.sizeBytes, 0),
+    [documents],
+  );
+
+  const updateSearchParam = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value.trim()) next.set(key, value);
+    else next.delete(key);
+    setSearchParams(next, { replace: true });
+  };
 
   const clearCompletionProgress = useCallback((documentID: string) => {
     for (const timer of completionTimersRef.current.get(documentID) || []) {
@@ -254,76 +307,128 @@ export default function KnowledgeBases() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 md:px-8">
-        <Card className="mb-8 bg-card/80 shadow-sm ring-foreground/7">
-          <CardContent className="flex flex-col gap-5 p-8 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <Badge variant="outline" className="mb-4">
-                <BookOpenText className="mr-2 h-3.5 w-3.5" />
-                AI 工作台
-              </Badge>
-              <h1 className="mb-2 text-3xl font-semibold text-foreground">知识库</h1>
-              <p className="text-muted-foreground">整理智能体可使用的私有资料</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => navigate('/workbench')}>
-                返回工作台
-              </Button>
-              <Button onClick={() => setCreateOpen(true)}>
-                <FolderPlus className="mr-2 h-4 w-4" />
-                新建知识库
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <Card className="bg-card/80 shadow-sm ring-foreground/7">
-            <CardHeader>
-              <CardTitle className="text-base">我的知识库</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {loadingBases ? (
-                <>
-                  <Skeleton className="h-14 w-full" />
-                  <Skeleton className="h-14 w-full" />
-                </>
-              ) : bases.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">还没有知识库</p>
-              ) : (
-                bases.map((base) => (
-                  <Button
-                    key={base.id}
-                    variant={selectedID === base.id ? 'secondary' : 'ghost'}
-                    className="h-auto w-full justify-start rounded-lg px-3 py-3 text-left hover:bg-accent focus-visible:bg-accent"
-                    onClick={() => setSelectedID(base.id)}
-                  >
-                    <BookOpenText className="mr-3 h-4 w-4 shrink-0 text-primary" />
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{base.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {base.description || '未添加说明'}
-                      </span>
-                    </span>
-                  </Button>
-                ))
-              )}
+    <div className={embedded ? '' : 'min-h-screen bg-background'}>
+      <div className={embedded ? '' : 'mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 md:px-8'}>
+        {!embedded && (
+          <Card className="mb-8 bg-card/80 shadow-sm ring-foreground/7">
+            <CardContent className="flex flex-col gap-5 p-8 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <Badge variant="outline" className="mb-4">
+                  <BookOpenText className="mr-2 h-3.5 w-3.5" />
+                  AI 工作台
+                </Badge>
+                <h1 className="mb-2 text-3xl font-semibold text-foreground">知识库</h1>
+                <p className="text-muted-foreground">整理智能体可使用的私有资料</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => navigate('/workbench')}>
+                  返回工作台
+                </Button>
+                <Button onClick={() => setCreateOpen(true)}>
+                  <FolderPlus className="mr-2 h-4 w-4" />
+                  新建知识库
+                </Button>
+              </div>
             </CardContent>
           </Card>
+        )}
 
-          <Card className="bg-card/80 shadow-sm ring-foreground/7">
-            <CardHeader className="flex-row items-center justify-between gap-4">
-              <div>
-                <CardTitle className="text-base">
-                  {selectedBase ? selectedBase.name : '选择一个知识库'}
-                </CardTitle>
-                {selectedBase?.description && (
-                  <p className="mt-1 text-sm text-muted-foreground">{selectedBase.description}</p>
-                )}
+        <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
+          <Card className="overflow-hidden border-border shadow-none">
+            <CardHeader className="gap-4 border-b border-border px-5 py-5">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">知识库</CardTitle>
+                <Button
+                  size="icon-sm"
+                  variant="outline"
+                  aria-label="新建知识库"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <FolderPlus />
+                </Button>
+              </div>
+              <div className="relative">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={baseSearch}
+                  onChange={(event) => updateSearchParam('knowledge_base', event.target.value)}
+                  placeholder="搜索知识库"
+                  className="pl-9"
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="min-h-96 space-y-2 px-3 py-4">
+              {loadingBases ? (
+                <>
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </>
+              ) : visibleBases.length === 0 ? (
+                <p className="px-3 py-8 text-sm text-muted-foreground">没有匹配的知识库</p>
+              ) : (
+                visibleBases.map((base) => {
+                  const selected = base.id === selectedID;
+                  const documentCount = selected ? documents.length : undefined;
+                  return (
+                    <Button
+                      key={base.id}
+                      variant="ghost"
+                      size="lg"
+                      className={`min-h-14 w-full justify-start gap-3 rounded-lg px-3.5 py-2.5 text-left whitespace-normal ${
+                        selected
+                          ? 'bg-accent text-accent-foreground hover:bg-accent'
+                          : 'hover:bg-muted'
+                      }`}
+                      onClick={() => setSelectedID(base.id)}
+                    >
+                      <BookOpenText
+                        className={`size-5 shrink-0 ${selected ? 'text-primary' : 'text-muted-foreground'}`}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium leading-5">{base.name}</span>
+                        <span className="mt-1 block line-clamp-2 text-xs leading-4 font-normal text-muted-foreground">
+                          {selected && documentCount !== undefined
+                            ? `${documentCount} 个文档 · ${formatFileSize(selectedBaseSize)}`
+                            : base.description || '未添加说明'}
+                        </span>
+                      </span>
+                    </Button>
+                  );
+                })
+              )}
+            </CardContent>
+            <div className="border-t border-border px-5 py-4 text-sm text-muted-foreground">
+              共 {bases.length} 个知识库
+            </div>
+          </Card>
+
+          <Card className="overflow-hidden border-border shadow-none">
+            <CardHeader className="flex-row items-start justify-between gap-4 border-b border-border px-6 py-5">
+              <div className="flex min-w-0 items-center gap-4">
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <BookOpenText className="size-6" />
+                </span>
+                <div className="min-w-0">
+                  <CardTitle className="truncate text-xl">
+                    {selectedBase?.name || '选择一个知识库'}
+                  </CardTitle>
+                  {selectedBase && (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {documents.length} 个文档 · {formatFileSize(selectedBaseSize)}
+                    </p>
+                  )}
+                  {selectedBase?.description && (
+                    <p className="mt-1 truncate text-sm text-muted-foreground">
+                      {selectedBase.description}
+                    </p>
+                  )}
+                </div>
               </div>
               {selectedBase && (
-                <>
+                <div className="flex shrink-0 gap-2">
+                  <Button variant="outline" size="icon-sm" aria-label="知识库操作">
+                    <MoreHorizontal />
+                  </Button>
                   <Input
                     id="knowledge-document-upload"
                     className="sr-only"
@@ -336,81 +441,94 @@ export default function KnowledgeBases() {
                     render={<label htmlFor="knowledge-document-upload" />}
                     disabled={uploading}
                   >
-                    <Upload className="mr-2 h-4 w-4" />
+                    <Upload className="mr-2 size-4" />
                     {uploading ? '上传中...' : '上传文档'}
                   </Button>
-                </>
+                </div>
               )}
             </CardHeader>
-            <CardContent>
-              {!selectedBase ? (
-                <p className="py-16 text-center text-sm text-muted-foreground">
-                  新建或选择一个知识库
-                </p>
-              ) : loadingDocuments ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-16 w-full" />
-                </div>
-              ) : documents.length === 0 ? (
-                <div className="py-16 text-center">
-                  <FileText className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">暂无文档</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {documents.map((document) =>
-                    (() => {
-                      const canStartIndexing =
-                        document.status === 'pending_embedding' ||
-                        (document.status === 'failed' &&
-                          document.errorCode !== 'DOCUMENT_PARSE_FAILED');
-                      const isIndexing =
-                        document.status === 'pending' ||
-                        document.status === 'pending_embedding' ||
-                        document.status === 'indexing';
-                      const completionProgress = completionProgresses[document.id];
-                      const showProgress = isIndexing || completionProgress !== undefined;
-                      const progress =
-                        completionProgress ??
-                        (document.status === 'ready'
-                          ? 100
-                          : Math.min(
-                              99,
-                              Math.max(
-                                0,
-                                Number.isFinite(document.indexProgress)
-                                  ? document.indexProgress
-                                  : 0,
-                              ),
-                            ));
-                      return (
-                        <div
-                          key={document.id}
-                          className="flex items-center gap-3 rounded-xl border border-border/55 bg-muted/20 p-4 shadow-sm transition-colors hover:bg-muted/35"
-                        >
-                          <FileText className="h-5 w-5 shrink-0 text-primary" />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">{document.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatFileSize(document.sizeBytes)} · {document.chunkCount} 个分段
-                            </p>
-                            {showProgress && (
-                              <Progress value={progress} className="mt-2 max-w-sm gap-1.5">
-                                <ProgressLabel className="text-xs text-muted-foreground">
-                                  {completionProgress !== undefined ? '索引完成' : '正在建立索引'}
-                                </ProgressLabel>
-                                <ProgressValue className="text-xs" />
-                              </Progress>
-                            )}
-                            {document.status === 'failed' && (
-                              <p className="mt-1 text-xs text-destructive">
-                                {documentFailureMessage[document.errorCode] ||
-                                  '资料处理失败，可重新尝试'}
+            <div className="flex flex-col gap-3 border-b border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full sm:max-w-72">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={documentSearch}
+                  onChange={(event) => updateSearchParam('knowledge_document', event.target.value)}
+                  placeholder="搜索文档"
+                  className="pl-9"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">按更新时间排序</p>
+            </div>
+            {!selectedBase ? (
+              <div className="py-24 text-center text-sm text-muted-foreground">
+                新建或选择一个知识库
+              </div>
+            ) : loadingDocuments ? (
+              <div className="space-y-3 p-6">
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+              </div>
+            ) : documents.length === 0 ? (
+              <div className="py-24 text-center">
+                <FileText className="mx-auto mb-3 size-10 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">暂无文档</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="px-6">文档名称</TableHead>
+                    <TableHead>类型</TableHead>
+                    <TableHead>大小</TableHead>
+                    <TableHead>更新时间</TableHead>
+                    <TableHead className="w-24 text-right">操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visibleDocuments.map((document) => {
+                    const canStartIndexing =
+                      document.status === 'pending_embedding' ||
+                      (document.status === 'failed' &&
+                        document.errorCode !== 'DOCUMENT_PARSE_FAILED');
+                    const isIndexing =
+                      document.status === 'pending' ||
+                      document.status === 'pending_embedding' ||
+                      document.status === 'indexing';
+                    const completedIndexing = completionProgresses[document.id] !== undefined;
+                    return (
+                      <TableRow key={document.id}>
+                        <TableCell className="max-w-0 px-6">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <FileText className="size-5 shrink-0 text-primary" />
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-foreground">
+                                {document.name}
                               </p>
-                            )}
+                              {isIndexing && (
+                                <p className="mt-0.5 text-xs text-muted-foreground">正在建立索引</p>
+                              )}
+                              {completedIndexing && !isIndexing && (
+                                <p className="mt-0.5 text-xs text-muted-foreground">索引完成</p>
+                              )}
+                              {document.status === 'failed' && (
+                                <p className="mt-0.5 text-xs text-destructive">
+                                  {documentFailureMessage[document.errorCode] || '资料处理失败'}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex shrink-0 items-center gap-1">
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {getDocumentType(document)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatFileSize(document.sizeBytes)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDate(document.updatedAt)}
+                        </TableCell>
+                        <TableCell className="pr-4 text-right">
+                          <div className="flex justify-end gap-1">
                             {canStartIndexing && (
                               <Button
                                 variant="ghost"
@@ -434,16 +552,18 @@ export default function KnowledgeBases() {
                               <Trash2 />
                             </Button>
                           </div>
-                          <Badge variant={document.status === 'failed' ? 'destructive' : 'outline'}>
-                            {documentStatus[document.status]}
-                          </Badge>
-                        </div>
-                      );
-                    })(),
-                  )}
-                </div>
-              )}
-            </CardContent>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+            {selectedBase && documents.length > 0 && (
+              <div className="border-t border-border px-6 py-4 text-sm text-muted-foreground">
+                共 {visibleDocuments.length} 个文档
+              </div>
+            )}
           </Card>
         </div>
       </div>

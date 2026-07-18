@@ -16,7 +16,6 @@ import {
   Sparkles,
   User,
   Users,
-  Workflow,
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -35,15 +34,29 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useLayoutStore } from '@/stores/useLayoutStore';
 
-const navItems = [
-  { to: '/', label: '首页', icon: Home },
-  { to: '/workbench', label: '项目', icon: Bot },
-  { to: '/workbench/workflows', label: '工作流', icon: Workflow },
-  { to: '/workbench/knowledge', label: '资源库', icon: LibraryBig },
-  { to: '/blog', label: '博客', icon: BookOpen },
-  { to: '/resources', label: '资源', icon: ImageIcon },
-  { to: '/guestbook', label: '留言墙', icon: MessageCircleHeart },
-  { to: '/labs/climber', label: '实验室', icon: FlaskConical },
+const navGroups = [
+  {
+    label: '浏览',
+    items: [
+      { to: '/', label: '首页', icon: Home },
+      { to: '/blog', label: '博客', icon: BookOpen },
+      { to: '/resources', label: '资源', icon: ImageIcon },
+    ],
+  },
+  {
+    label: '创作',
+    items: [
+      { to: '/workbench', label: '项目', icon: Bot },
+      { to: '/workbench/resources', label: 'AI 资源', icon: LibraryBig },
+    ],
+  },
+  {
+    label: '更多',
+    items: [
+      { to: '/guestbook', label: '留言墙', icon: MessageCircleHeart },
+      { to: '/labs/climber', label: '实验室', icon: FlaskConical },
+    ],
+  },
 ];
 
 export function Sidebar() {
@@ -58,11 +71,11 @@ export function Sidebar() {
     if (to === '/workbench') {
       return location.pathname === to || location.pathname.startsWith('/workbench/apps/');
     }
-    if (to === '/workbench/workflows') {
+    if (to === '/workbench/resources') {
       return (
         location.pathname === to ||
         location.pathname === '/workbench/create' ||
-        location.pathname === '/workbench/edit' ||
+        location.pathname.startsWith('/workbench/edit/') ||
         location.pathname.startsWith('/workbench/templates/')
       );
     }
@@ -125,46 +138,55 @@ export function Sidebar() {
         className={
           collapsed
             ? 'absolute top-1/2 -right-3 z-10 -translate-y-1/2 bg-background shadow-xs ring-1 ring-border'
-            : 'absolute top-3 right-3 max-md:hidden'
+            : 'absolute top-1/2 right-3 -translate-y-1/2 max-md:hidden'
         }
       >
         {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
       </Button>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-1 px-2 py-3">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.to);
-          const link = (
-            <Link
-              key={item.to}
-              to={item.to}
-              aria-label={item.label}
-              className={`flex h-9 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors ${
-                active
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              } ${collapsed ? 'size-8 justify-center p-0' : 'max-md:size-8 max-md:justify-center max-md:p-0'}`}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="truncate max-md:hidden">{item.label}</span>}
-            </Link>
-          );
+      <nav className="flex-1 space-y-5 px-2 py-4">
+        {navGroups.map((group) => (
+          <div key={group.label} className="space-y-1">
+            {!collapsed && (
+              <p className="px-2.5 text-xs font-medium text-muted-foreground max-md:hidden">
+                {group.label}
+              </p>
+            )}
+            {group.items.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.to);
+              const link = (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  aria-label={item.label}
+                  className={`flex h-9 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors ${
+                    active
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  } ${collapsed ? 'size-8 justify-center p-0' : 'max-md:size-8 max-md:justify-center max-md:p-0'}`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {!collapsed && <span className="truncate max-md:hidden">{item.label}</span>}
+                </Link>
+              );
 
-          if (collapsed) {
-            return (
-              <Tooltip key={item.to}>
-                <TooltipTrigger render={link} />
-                <TooltipContent side="right" sideOffset={8}>
-                  {item.label}
-                </TooltipContent>
-              </Tooltip>
-            );
-          }
+              if (collapsed) {
+                return (
+                  <Tooltip key={item.to}>
+                    <TooltipTrigger render={link} />
+                    <TooltipContent side="right" sideOffset={8}>
+                      {item.label}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
 
-          return link;
-        })}
+              return link;
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* User area */}

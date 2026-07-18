@@ -72,6 +72,7 @@ const (
 	StatusSucceeded RunStatus = "success"
 	StatusFailed    RunStatus = "error"
 	StatusSkipped   RunStatus = "skipped"
+	StatusCancelled RunStatus = "cancelled"
 )
 
 type RunContext struct {

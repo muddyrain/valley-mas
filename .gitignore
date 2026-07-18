@@ -50,6 +50,7 @@ coverage/
 .turbo
 .turbo/
 .playwright-mcp/
+__pycache__/
 
 # Unity generated caches
 [Ll]ibrary/

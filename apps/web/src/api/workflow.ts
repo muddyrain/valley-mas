@@ -1,5 +1,5 @@
 import { useAuthStore } from '@/stores/useAuthStore';
-import request from '@/utils/request';
+import request, { type RequestConfig } from '@/utils/request';
 
 export type WorkflowNodeType =
   | 'start'
@@ -57,7 +57,7 @@ export interface WorkflowListData {
 
 export interface WorkflowRunEvent {
   step: string;
-  status: 'running' | 'success' | 'error' | 'skipped' | 'done';
+  status: 'running' | 'success' | 'error' | 'skipped' | 'cancelled' | 'done';
   message?: string;
   data?: WorkflowRunEventData;
 }
@@ -67,7 +67,7 @@ export interface WorkflowRunEventData {
   nodeId?: string;
   nodeType?: WorkflowNodeType;
   capabilityId?: string;
-  status?: 'running' | 'success' | 'error' | 'skipped';
+  status?: 'running' | 'success' | 'error' | 'skipped' | 'cancelled';
   message?: string;
   input?: Record<string, unknown>;
   output?: Record<string, unknown>;
@@ -78,7 +78,7 @@ export interface WorkflowRunEventData {
 export interface WorkflowRun {
   id: string;
   workflowId: string;
-  status: 'running' | 'success' | 'error';
+  status: 'running' | 'success' | 'error' | 'cancelled';
   inputs: string;
   result: string;
   startedAt: string;
@@ -91,7 +91,7 @@ export interface WorkflowNodeRun {
   nodeId: string;
   nodeType: string;
   capabilityId?: string;
-  status: 'running' | 'success' | 'error' | 'skipped';
+  status: 'running' | 'success' | 'error' | 'skipped' | 'cancelled';
   input: string;
   output: string;
   errorCode?: string;
@@ -237,9 +237,11 @@ export async function updateWorkflow(
     graph: string;
     status: string;
     baseHash: string;
+    recordHistory: boolean;
   }>,
+  config?: RequestConfig,
 ): Promise<{ graphHash: string }> {
-  return request.put(`/workflows/${id}`, data);
+  return request.put(`/workflows/${id}`, data, config);
 }
 
 export async function deleteWorkflow(id: string): Promise<void> {
@@ -316,7 +318,7 @@ export async function runWorkflow(
         try {
           const event: WorkflowRunEvent = JSON.parse(line.slice(6));
           handlers.onEvent(event);
-          if (event.status === 'done') {
+          if (event.status === 'done' || event.status === 'cancelled') {
             receivedTerminalEvent = true;
           }
           if (event.status === 'error') {
