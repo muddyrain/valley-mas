@@ -19,7 +19,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { WorkflowRunSession } from './runSession';
-import { normalizePhaseOneStartInputs, type StartInputDefinition } from './types';
+import { normalizeStartInputs, type StartInputDefinition } from './types';
 
 export interface WorkflowRunInput {
   inputs: Record<string, unknown>;
@@ -50,6 +50,9 @@ const customInputCopy: Record<string, { label: string; placeholder?: string }> =
     label: '写作风格',
     placeholder: '例如：实用、简洁、有案例',
   },
+  generateCover: {
+    label: '生成封面',
+  },
 };
 
 function InputLabel({
@@ -74,7 +77,7 @@ function InputLabel({
 
 function startInputs(nodes: Node[]): Record<string, StartInputDefinition> {
   const node = nodes.find((item) => (item.data as { nodeType?: string }).nodeType === 'start');
-  return normalizePhaseOneStartInputs(
+  return normalizeStartInputs(
     (node?.data as { config?: { inputs?: Record<string, StartInputDefinition> } } | undefined)
       ?.config?.inputs,
   );
@@ -363,15 +366,19 @@ export function RunPanel({
             <section className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                草稿已创建
+                工作流执行完成
               </div>
-              <p className="text-xs text-muted-foreground">{String(finalOutput.title || '')}</p>
-              <Link
-                className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
-                to={String(finalOutput.editPath)}
-              >
-                打开草稿
-              </Link>
+              <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-background p-2 text-xs text-foreground">
+                {JSON.stringify(finalOutput, null, 2)}
+              </pre>
+              {typeof finalOutput.editPath === 'string' && finalOutput.editPath ? (
+                <Link
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
+                  to={finalOutput.editPath}
+                >
+                  打开结果
+                </Link>
+              ) : null}
             </section>
           )}
         </div>

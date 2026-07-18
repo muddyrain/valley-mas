@@ -11,6 +11,19 @@ const originalFetch = globalThis.fetch;
 try {
   const { createPromptAssistantSuggestion, streamAIAppConversation } =
     await vite.ssrLoadModule('/src/api/aiWorkbench.ts');
+  const { hashCopilotDraft, isCopilotTargetReady } = await vite.ssrLoadModule(
+    '/src/api/workbenchCopilot.ts',
+  );
+  assert.equal(isCopilotTargetReady('workflow', undefined), false);
+  assert.equal(isCopilotTargetReady('workflow', '   '), false);
+  assert.equal(isCopilotTargetReady('workflow', 'workflow-1'), true);
+  assert.equal(isCopilotTargetReady('agent', ''), false);
+  assert.equal(isCopilotTargetReady('workbench', ''), true);
+  assert.equal(
+    await hashCopilotDraft({ 中文: '<a&b>', alpha: { z: 1, a: true } }),
+    '979b21ae3d080ec90e1712cbd52d138e6b5f6845504551845425e46e13763024',
+    'copilot hashes must match Go encoding/json key order and escaping',
+  );
   const terminalEvent = {
     type: 'done',
     run: { id: 'run-1' },

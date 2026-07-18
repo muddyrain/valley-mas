@@ -135,7 +135,7 @@ export default function WorkflowTemplateDetail() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">该模板可能已下架或链接无效。</p>
-              <Button onClick={() => navigate('/workbench')}>返回工作台</Button>
+              <Button onClick={() => navigate('/workbench/workflows')}>返回工作流</Button>
             </CardContent>
           </Card>
         </main>
@@ -150,9 +150,9 @@ export default function WorkflowTemplateDetail() {
       <div className="min-h-screen bg-background">
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:px-8">
           <div className="mb-6 flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/workbench')}>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/workbench/workflows')}>
               <ArrowLeft className="h-4 w-4" />
-              <span className="sr-only">返回工作台</span>
+              <span className="sr-only">返回工作流</span>
             </Button>
             <div>
               <p className="text-sm text-muted-foreground">工作流模板</p>

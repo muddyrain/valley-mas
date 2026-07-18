@@ -1,288 +1,160 @@
 package workflow
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net"
-	"net/http"
-	"net/url"
-	"regexp"
 	"strings"
-	"time"
 )
 
-var variableNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+type startExecutor struct{}
+
+func (startExecutor) Type() NodeType { return NodeTypeStart }
+
+func (startExecutor) Execute(_ context.Context, run RunContext, _ NodeExecution) (NodeResult, error) {
+	return NodeResult{Output: run.Inputs}, nil
+}
+
+type endExecutor struct{}
+
+func (endExecutor) Type() NodeType { return NodeTypeEnd }
+
+func (endExecutor) Execute(_ context.Context, _ RunContext, execution NodeExecution) (NodeResult, error) {
+	outputs, _ := execution.Input["outputs"].(map[string]any)
+	return NodeResult{Output: outputs}, nil
+}
+
+type ContentSearchCapabilityAdapter struct{}
+
+func (ContentSearchCapabilityAdapter) Execute(ctx context.Context, run RunContext, execution NodeExecution) (NodeResult, error) {
+	if run.ContentSearcher == nil {
+		return NodeResult{}, fmt.Errorf("内容搜索未配置")
+	}
+	result, err := run.ContentSearcher.Search(ctx, stringFromValue(execution.Input["query"]), stringFromValue(execution.Input["createdFrom"]), stringFromValue(execution.Input["createdTo"]))
+	if err != nil {
+		return NodeResult{}, err
+	}
+	return NodeResult{Output: map[string]any{"count": len(result.Items), "items": result.Items}}, nil
+}
+
+type ConditionExecutor struct{}
+
+func (ConditionExecutor) Type() NodeType { return NodeTypeCondition }
+
+func (ConditionExecutor) Execute(_ context.Context, _ RunContext, execution NodeExecution) (NodeResult, error) {
+	matched, err := evaluateCondition(execution.Input["left"], stringFromValue(execution.Input["operator"]), execution.Input["right"])
+	if err != nil {
+		return NodeResult{}, err
+	}
+	return NodeResult{Output: map[string]any{"matched": matched}}, nil
+}
+
+type MergeExecutor struct{}
+
+func (MergeExecutor) Type() NodeType { return NodeTypeMerge }
+
+func (MergeExecutor) Execute(_ context.Context, run RunContext, execution NodeExecution) (NodeResult, error) {
+	fieldsValue, ok := execution.Input["fields"].([]any)
+	if !ok {
+		return NodeResult{}, fmt.Errorf("合并节点 fields 必须为数组")
+	}
+	output := make(map[string]any, len(fieldsValue))
+	for _, raw := range fieldsValue {
+		fieldConfig, ok := raw.(map[string]any)
+		if !ok {
+			return NodeResult{}, fmt.Errorf("合并字段配置无效")
+		}
+		name := stringFromValue(fieldConfig["name"])
+		if name == "" {
+			return NodeResult{}, fmt.Errorf("合并字段名称不能为空")
+		}
+		output[name] = nil
+		sources, _ := fieldConfig["sources"].([]any)
+		for _, rawSource := range sources {
+			source := stringFromValue(rawSource)
+			value, err := ResolveTemplate(source, run.Outputs)
+			if err == nil && value != nil {
+				output[name] = value
+				break
+			}
+		}
+	}
+	return NodeResult{Output: output}, nil
+}
 
 type VariableExecutor struct{}
 
 func (VariableExecutor) Type() NodeType { return NodeTypeVariable }
 
 func (VariableExecutor) Execute(_ context.Context, _ RunContext, execution NodeExecution) (NodeResult, error) {
-	varName, exists := execution.Input["variableName"]
-	if !exists {
-		return NodeResult{}, fmt.Errorf("变量赋值节点缺少 variableName")
-	}
-	varNameText, ok := varName.(string)
+	assignments, ok := execution.Input["assignments"].([]any)
 	if !ok {
-		return NodeResult{}, fmt.Errorf("变量名必须为字符串")
+		return NodeResult{}, fmt.Errorf("变量节点 assignments 必须为数组")
 	}
-	variableName := strings.TrimSpace(varNameText)
-	if variableName == "" {
-		return NodeResult{}, fmt.Errorf("变量赋值节点变量名不能为空")
-	}
-	if !variableNamePattern.MatchString(variableName) {
-		return NodeResult{}, fmt.Errorf("变量名不能包含 . [ ]")
-	}
-	value, exists := execution.Input["valueExpression"]
-	if !exists {
-		value = ""
-	}
-	if valueText, ok := value.(string); ok {
-		value = strings.TrimSpace(valueText)
-	}
-	return NodeResult{Output: map[string]any{variableName: value}}, nil
-}
-
-type HTTPExecutor struct{}
-
-func (HTTPExecutor) Type() NodeType { return NodeTypeHTTP }
-
-func (HTTPExecutor) Execute(ctx context.Context, _ RunContext, execution NodeExecution) (NodeResult, error) {
-	methodText, _ := execution.Input["method"].(string)
-	method := "GET"
-	if strings.TrimSpace(methodText) != "" {
-		method = strings.ToUpper(strings.TrimSpace(methodText))
-	}
-	if method == "" {
-		method = "GET"
-	}
-	if !isSupportedHTTPMethod(method) {
-		return NodeResult{}, fmt.Errorf("HTTP 方法不支持: %s", method)
-	}
-	urlText, ok := execution.Input["url"].(string)
-	if !ok || strings.TrimSpace(urlText) == "" {
-		return NodeResult{}, fmt.Errorf("HTTP 节点 URL 不能为空")
-	}
-	urlText = strings.TrimSpace(urlText)
-	target, parseErr := url.Parse(urlText)
-	if parseErr != nil {
-		return NodeResult{}, fmt.Errorf("HTTP 节点 URL 无效: %w", parseErr)
-	}
-	if target.Scheme != "http" && target.Scheme != "https" {
-		return NodeResult{}, fmt.Errorf("HTTP 节点仅支持 http 或 https")
-	}
-	if target.Host == "" {
-		return NodeResult{}, fmt.Errorf("HTTP 节点 URL 必须包含主机")
-	}
-	if !isPublicHTTPHost(target.Hostname()) {
-		return NodeResult{}, fmt.Errorf("HTTP 节点不允许访问本机或内网地址")
-	}
-
-	var bodyReader io.Reader
-	if hasBody(method) {
-		rawBody, bodySet := execution.Input["body"]
-		if bodySet {
-			bodyText, marshalErr := normalizeHTTPBody(rawBody)
-			if marshalErr != nil {
-				return NodeResult{}, marshalErr
-			}
-			if len(bodyText) > 0 {
-				bodyReader = bytes.NewReader([]byte(bodyText))
-			}
+	output := make(map[string]any, len(assignments))
+	for _, raw := range assignments {
+		assignment, ok := raw.(map[string]any)
+		if !ok {
+			return NodeResult{}, fmt.Errorf("变量赋值配置无效")
 		}
-	}
-
-	request, requestErr := http.NewRequestWithContext(ctx, method, target.String(), bodyReader)
-	if requestErr != nil {
-		return NodeResult{}, fmt.Errorf("创建 HTTP 请求失败: %w", requestErr)
-	}
-	request.Header.Set("User-Agent", "ValleyMAS-Workflow/1.0")
-	headers, headersErr := parseHeadersFromExecutionInput(execution.Input["headers"])
-	if headersErr != nil {
-		return NodeResult{}, headersErr
-	}
-	for key, values := range headers {
-		if strings.TrimSpace(key) != "" {
-			request.Header[key] = append([]string{}, values...)
+		name := stringFromValue(assignment["name"])
+		if name == "" {
+			return NodeResult{}, fmt.Errorf("变量名称不能为空")
 		}
-	}
-	if hasBody(method) && request.Header.Get("Content-Type") == "" {
-		request.Header.Set("Content-Type", "application/json")
-	}
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	response, responseErr := client.Do(request)
-	if responseErr != nil {
-		return NodeResult{}, fmt.Errorf("HTTP 请求失败: %w", responseErr)
-	}
-	defer response.Body.Close()
-
-	body, readErr := io.ReadAll(io.LimitReader(response.Body, maxHTTPResponseBytes+1))
-	if readErr != nil {
-		return NodeResult{}, fmt.Errorf("读取响应失败: %w", readErr)
-	}
-	if int64(len(body)) > maxHTTPResponseBytes {
-		return NodeResult{}, fmt.Errorf("HTTP 响应超过 %d 字节上限", maxHTTPResponseBytes)
-	}
-
-	responseHeaders := make(map[string]any, len(response.Header))
-	for key, values := range response.Header {
-		if strings.EqualFold(key, "Set-Cookie") {
-			continue
-		}
-		if len(values) == 1 {
-			responseHeaders[key] = values[0]
-		} else {
-			responseHeaders[key] = values
-		}
-	}
-	output := map[string]any{
-		"status":     response.Status,
-		"statusCode": response.StatusCode,
-		"headers":    responseHeaders,
-		"url":        response.Request.URL.String(),
-	}
-	output["contentType"] = response.Header.Get("Content-Type")
-	if isTextResponse(output["contentType"]) {
-		output["body"] = string(body)
+		output[name] = assignment["value"]
 	}
 	return NodeResult{Output: output}, nil
 }
 
-type CodeExecutor struct{}
+type SubworkflowExecutor struct{}
 
-func (CodeExecutor) Type() NodeType { return NodeTypeCode }
+func (SubworkflowExecutor) Type() NodeType { return NodeTypeSubworkflow }
 
-func (CodeExecutor) Execute(_ context.Context, _ RunContext, execution NodeExecution) (NodeResult, error) {
-	code, _ := execution.Input["code"].(string)
-	if strings.TrimSpace(code) == "" {
-		return NodeResult{}, fmt.Errorf("代码节点不能为空")
+func (SubworkflowExecutor) Execute(ctx context.Context, run RunContext, execution NodeExecution) (NodeResult, error) {
+	if run.SubworkflowRunner == nil {
+		return NodeResult{}, fmt.Errorf("子工作流运行器未配置")
 	}
-	return NodeResult{}, fmt.Errorf("代码执行节点当前未开放")
+	inputs, _ := execution.Input["inputs"].(map[string]any)
+	output, err := run.SubworkflowRunner.Run(ctx, run.Actor, SubworkflowRequest{WorkflowID: stringFromValue(execution.Input["workflowId"]), VersionID: stringFromValue(execution.Input["versionId"]), Inputs: inputs})
+	if err != nil {
+		return NodeResult{}, err
+	}
+	return NodeResult{Output: output}, nil
 }
 
-const maxHTTPResponseBytes int64 = 2 * 1024 * 1024
+type ToolNodeExecutor struct{ Registry *Registry }
 
-func isTextResponse(contentType any) bool {
-	typed := strings.ToLower(strings.TrimSpace(stringFromValue(contentType)))
-	return strings.Contains(typed, "application/json") || strings.Contains(typed, "text/") || strings.Contains(typed, "application/xml") || strings.Contains(typed, "text/plain")
-}
+func (ToolNodeExecutor) Type() NodeType { return NodeTypeTool }
 
-func hasBody(method string) bool {
-	switch method {
-	case http.MethodGet, http.MethodHead:
-		return false
-	default:
-		return true
-	}
-}
-
-func isSupportedHTTPMethod(method string) bool {
-	switch method {
-	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
-		return true
-	default:
-		return false
-	}
-}
-
-func normalizeHTTPBody(value any) ([]byte, error) {
-	switch typed := value.(type) {
-	case nil:
-		return nil, nil
-	case string:
-		return []byte(strings.TrimSpace(typed)), nil
-	case []byte:
-		return typed, nil
-	default:
-		raw, err := json.Marshal(typed)
-		if err != nil {
-			return nil, fmt.Errorf("请求体不支持: %w", err)
-		}
-		return raw, nil
-	}
-}
-
-func isPublicHTTPHost(host string) bool {
-	host = strings.TrimSpace(strings.ToLower(host))
-	if host == "" {
-		return false
-	}
-	switch host {
-	case "localhost", "127.0.0.1", "::1":
-		return false
-	}
-	switch parsed := net.ParseIP(host); {
-	case parsed != nil:
-		if parsed.IsLoopback() || parsed.IsPrivate() || parsed.IsLinkLocalUnicast() || parsed.IsLinkLocalMulticast() || parsed.Equal(net.IPv4zero) || parsed.Equal(net.IPv6unspecified) {
-			return false
-		}
-		return true
-	default:
-		if strings.HasSuffix(host, ".localhost") || host == "localhost" {
-			return false
-		}
-	}
-	return true
-}
-
-func parseHeadersFromExecutionInput(raw any) (http.Header, error) {
-	headers := make(http.Header)
-	if raw == nil {
-		return headers, nil
-	}
-	entries, ok := raw.([]any)
+func (executor ToolNodeExecutor) Execute(ctx context.Context, run RunContext, execution NodeExecution) (NodeResult, error) {
+	capabilityID := stringFromValue(execution.Input["capabilityId"])
+	_, capabilityExecutor, ok := executor.Registry.Capability(capabilityID)
 	if !ok {
-		return nil, fmt.Errorf("请求头配置必须是数组")
+		return NodeResult{}, fmt.Errorf("工具能力 %s 未开放", capabilityID)
 	}
-	for index, value := range entries {
-		object, ok := value.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("请求头配置第 %d 项格式错误", index+1)
-		}
-		key := strings.TrimSpace(stringFromValue(object["key"]))
-		if key == "" {
-			continue
-		}
-		headerValue := strings.TrimSpace(stringFromValue(object["value"]))
-		if headerValue == "" {
-			continue
-		}
-		if strings.ContainsAny(key, "\r\n") || strings.ContainsAny(headerValue, "\r\n") {
-			return nil, fmt.Errorf("请求头不允许包含换行字符")
-		}
-		headers.Add(key, headerValue)
+	inputs, ok := execution.Input["inputs"].(map[string]any)
+	if !ok {
+		return NodeResult{}, fmt.Errorf("工具节点 inputs 必须为对象")
 	}
-	return headers, nil
+	execution.CapabilityID = capabilityID
+	execution.Input = inputs
+	return capabilityExecutor.Execute(ctx, run, execution)
 }
 
-func normalizeHeaders(rawHeaders map[string][]string) map[string]any {
-	result := make(map[string]any, len(rawHeaders))
-	for key, values := range rawHeaders {
-		if len(values) == 1 {
-			result[key] = values[0]
-		} else {
-			result[key] = values
-		}
-	}
-	return result
-}
-
-func isLoopbackHost(host string) bool {
-	switch strings.ToLower(host) {
-	case "localhost", "127.0.0.1", "::1":
-		return true
+func evaluateCondition(left any, operator string, right any) (bool, error) {
+	switch operator {
+	case "equals":
+		return fmt.Sprint(left) == fmt.Sprint(right), nil
+	case "notEquals":
+		return fmt.Sprint(left) != fmt.Sprint(right), nil
+	case "contains":
+		return strings.Contains(fmt.Sprint(left), fmt.Sprint(right)), nil
+	case "isEmpty":
+		return left == nil || strings.TrimSpace(fmt.Sprint(left)) == "", nil
+	case "greaterThan":
+		return numberFromValue(left) > numberFromValue(right), nil
+	case "lessThan":
+		return numberFromValue(left) < numberFromValue(right), nil
 	default:
-		parsed := net.ParseIP(host)
-		if parsed == nil {
-			return false
-		}
-		if parsed.IsLoopback() || parsed.IsPrivate() || parsed.IsLinkLocalUnicast() || parsed.IsLinkLocalMulticast() {
-			return true
-		}
-		return parsed.Equal(net.IPv4zero) || parsed.Equal(net.IPv6unspecified)
+		return false, fmt.Errorf("不支持的条件操作符 %s", operator)
 	}
 }

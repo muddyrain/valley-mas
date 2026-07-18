@@ -1,10 +1,12 @@
 import {
   BookOpen,
+  Bot,
   Download,
   FlaskConical,
   Heart,
   Home,
   ImageIcon,
+  LibraryBig,
   LogIn,
   LogOut,
   MessageCircleHeart,
@@ -14,6 +16,7 @@ import {
   Sparkles,
   User,
   Users,
+  Workflow,
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -34,7 +37,9 @@ import { useLayoutStore } from '@/stores/useLayoutStore';
 
 const navItems = [
   { to: '/', label: '首页', icon: Home },
-  { to: '/workbench', label: '工作台', icon: Sparkles },
+  { to: '/workbench', label: '项目', icon: Bot },
+  { to: '/workbench/workflows', label: '工作流', icon: Workflow },
+  { to: '/workbench/knowledge', label: '资源库', icon: LibraryBig },
   { to: '/blog', label: '博客', icon: BookOpen },
   { to: '/resources', label: '资源', icon: ImageIcon },
   { to: '/guestbook', label: '留言墙', icon: MessageCircleHeart },
@@ -50,6 +55,17 @@ export function Sidebar() {
 
   const isActive = (to: string) => {
     if (to === '/') return location.pathname === '/';
+    if (to === '/workbench') {
+      return location.pathname === to || location.pathname.startsWith('/workbench/apps/');
+    }
+    if (to === '/workbench/workflows') {
+      return (
+        location.pathname === to ||
+        location.pathname === '/workbench/create' ||
+        location.pathname === '/workbench/edit' ||
+        location.pathname.startsWith('/workbench/templates/')
+      );
+    }
     return location.pathname.startsWith(to);
   };
 

@@ -1,8 +1,8 @@
-import { ArrowUpRight, Bot, Clock3, Plus, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Bot, Clock3, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { type AIApp, createAIApp, generateAIAppAvatar, listAIApps } from '@/api/aiWorkbench';
+import { type AIApp, listAIApps } from '@/api/aiWorkbench';
 import { AgentAvatar } from '@/components/ai-workbench/AgentAvatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -77,11 +77,9 @@ function AgentCard({ app }: { app: AIApp }) {
 }
 
 export function AIAppsPanel() {
-  const navigate = useNavigate();
   const [apps, setApps] = useState<AIApp[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [showAICreate, setShowAICreate] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
   const agents = apps.filter((app) => app.type === 'agent');
 
   useEffect(() => {
@@ -91,32 +89,6 @@ export function AIAppsPanel() {
       .finally(() => setLoading(false));
   }, []);
 
-  const createAgent = async () => {
-    try {
-      setCreating(true);
-      const { app } = await createAIApp({
-        type: 'agent',
-        name: '未命名智能体',
-        config: {
-          modelProfile: 'ark-text-default',
-          systemPrompt: '',
-          openingMessage: '',
-          exampleQuestions: [],
-        },
-      });
-      setApps((items) => [app, ...items]);
-      toast.success('已创建智能体草稿');
-      void generateAIAppAvatar(app.id).catch(() => {
-        toast.info('头像暂未生成，可在编辑页重试或上传');
-      });
-      navigate(`/workbench/apps/${app.id}`);
-    } catch {
-      toast.error('创建智能体失败');
-    } finally {
-      setCreating(false);
-    }
-  };
-
   return (
     <section className="mb-6">
       <div className="mb-3 flex items-end justify-between gap-4">
@@ -125,13 +97,9 @@ export function AIAppsPanel() {
           <p className="mt-1 text-sm text-muted-foreground">配置、调试并发布可复用的 AI 能力。</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={creating} onClick={createAgent}>
+          <Button size="sm" onClick={() => setShowCreate(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            空白创建
-          </Button>
-          <Button size="sm" onClick={() => setShowAICreate(true)}>
-            <Sparkles className="mr-2 h-4 w-4" />
-            AI 创建智能体
+            创建智能体
           </Button>
         </div>
       </div>
@@ -161,8 +129,8 @@ export function AIAppsPanel() {
         </div>
       )}
       <AIAgentCreateDialog
-        open={showAICreate}
-        onOpenChange={setShowAICreate}
+        open={showCreate}
+        onOpenChange={setShowCreate}
         onCreated={() => {
           void listAIApps().then(({ list }) => setApps(list));
         }}

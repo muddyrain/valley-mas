@@ -12,11 +12,9 @@ import (
 
 // BlogParseExecutor converts the runtime-only uploaded file into normalized
 // Markdown fields. It never returns the original file bytes.
-type BlogParseExecutor struct{}
+type ParseMarkdownCapabilityAdapter struct{}
 
-func (BlogParseExecutor) Type() NodeType { return NodeTypeBlogParse }
-
-func (BlogParseExecutor) Execute(_ context.Context, _ RunContext, execution NodeExecution) (NodeResult, error) {
+func (ParseMarkdownCapabilityAdapter) Execute(_ context.Context, _ RunContext, execution NodeExecution) (NodeResult, error) {
 	file, err := fileFromValue(execution.Input["fileInput"])
 	if err != nil {
 		return NodeResult{}, err
@@ -41,11 +39,9 @@ func (BlogParseExecutor) Execute(_ context.Context, _ RunContext, execution Node
 
 // BlogCreateDraftExecutor writes the final draft. The actor comes from the
 // trusted RunContext, never graph configuration.
-type BlogCreateDraftExecutor struct{}
+type BlogCreateDraftCapabilityAdapter struct{}
 
-func (BlogCreateDraftExecutor) Type() NodeType { return NodeTypeBlogCreateDraft }
-
-func (BlogCreateDraftExecutor) Execute(ctx context.Context, run RunContext, execution NodeExecution) (NodeResult, error) {
+func (BlogCreateDraftCapabilityAdapter) Execute(ctx context.Context, run RunContext, execution NodeExecution) (NodeResult, error) {
 	if err := ctx.Err(); err != nil {
 		return NodeResult{}, err
 	}

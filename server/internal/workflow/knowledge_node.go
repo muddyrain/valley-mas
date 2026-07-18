@@ -9,11 +9,9 @@ import (
 // KnowledgeRetrieveExecutor delegates lookup to a handler-provided retriever.
 // The executor never selects a knowledge base itself, so owner and version
 // snapshot checks remain at the application boundary.
-type KnowledgeRetrieveExecutor struct{}
+type KnowledgeRetrieveCapabilityAdapter struct{}
 
-func (KnowledgeRetrieveExecutor) Type() NodeType { return NodeTypeKnowledgeRetrieve }
-
-func (KnowledgeRetrieveExecutor) Execute(ctx context.Context, run RunContext, execution NodeExecution) (NodeResult, error) {
+func (KnowledgeRetrieveCapabilityAdapter) Execute(ctx context.Context, run RunContext, execution NodeExecution) (NodeResult, error) {
 	if run.KnowledgeRetriever == nil {
 		return NodeResult{}, fmt.Errorf("知识库检索未配置")
 	}

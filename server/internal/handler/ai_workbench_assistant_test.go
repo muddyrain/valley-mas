@@ -52,14 +52,14 @@ func TestValidatePromptSuggestionPreservesWorkflowVariables(t *testing.T) {
 
 func TestValidateAIWorkflowDraftUsesServerWhitelist(t *testing.T) {
 	draft := aiWorkflowDraft{Name: "安全工作流", Description: "变量赋值", Graph: workflow.Graph{
-		SchemaVersion: 2,
+		SchemaVersion: 4,
 		Nodes: []workflow.Node{
 			{ID: "start", Type: workflow.NodeTypeStart, Config: json.RawMessage(`{"inputs":{}}`)},
-			{ID: "unsafe", Type: workflow.NodeTypeHTTP, Config: json.RawMessage(`{"url":"https://example.com"}`)},
+			{ID: "unsafe", Type: workflow.NodeType("http"), Config: json.RawMessage(`{"url":"https://example.com"}`)},
 			{ID: "end", Type: workflow.NodeTypeEnd, Config: json.RawMessage(`{"outputs":{}}`)},
 		},
 	}}
-	if err := validateAIWorkflowDraft(&draft); err == nil || !strings.Contains(err.Error(), "白名单") {
+	if err := validateAIWorkflowDraft(&draft); err == nil || !strings.Contains(err.Error(), "未开放") {
 		t.Fatalf("validateAIWorkflowDraft() error = %v, want whitelist rejection", err)
 	}
 }

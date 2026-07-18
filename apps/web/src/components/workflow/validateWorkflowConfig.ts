@@ -1,8 +1,10 @@
 import type { Edge, Node } from '@xyflow/react';
 import { NODE_CONFIGS } from './nodeConfig';
+import type { WorkflowNodeData } from './types';
 import {
   getInvalidWorkflowVariableTokens,
   getUpstreamWorkflowVariables,
+  getWorkflowVariableOption,
 } from './workflowVariables';
 
 export interface ValidationError {
@@ -11,238 +13,201 @@ export interface ValidationError {
   nodeType: string;
   message: string;
 }
-interface NodeData {
-  label: string;
-  nodeType: string;
-  config?: Record<string, unknown>;
+
+function valuesWithReferences(data: WorkflowNodeData): string[] {
+  const values: string[] = [];
+  const visit = (value: unknown) => {
+    if (typeof value === 'string') values.push(value);
+    else if (Array.isArray(value)) value.forEach(visit);
+    else if (value && typeof value === 'object') Object.values(value).forEach(visit);
+  };
+  visit(data.config);
+  visit(data.when);
+  return values;
 }
 
-function hasInvalidVariableReferences(node: Node, nodes: Node[], edges: Edge[], values: unknown[]) {
-  const options = getUpstreamWorkflowVariables(nodes, edges, node.id);
-  return values.some(
-    (value) =>
-      typeof value === 'string' && getInvalidWorkflowVariableTokens(value, options).length > 0,
-  );
-}
-
-function getVariableReferenceValues(nodeType: string, config: Record<string, unknown>): unknown[] {
-  switch (nodeType) {
-    case 'blog.parseMarkdown':
-      return [config.fileInput];
-    case 'knowledge.retrieve':
-      return [config.query];
-    case 'llm.text':
-      return [config.systemPrompt, config.prompt];
-    case 'blog.createDraft':
-      return [
-        config.title,
-        config.content,
-        config.excerpt,
-        config.cover,
-        config.tags,
-        config.suggestedTags,
-        config.visibility,
-      ];
-    case 'end':
-      return Object.values((config.outputs as Record<string, unknown>) || {});
-    case 'variable':
-      return [config.valueExpression];
-    default:
-      return [];
-  }
-}
-
-function validateNodeData(node: Node, nodes: Node[], edges: Edge[]): ValidationError | null {
-  const nodeId = node.id;
-  const data = node.data as unknown as NodeData;
+function validateNode(
+  node: Node,
+  nodes: Node[],
+  edges: Edge[],
+  validateReferences = true,
+): ValidationError | null {
+  const data = node.data as unknown as WorkflowNodeData;
   const config = data.config || {};
-  const nodeConfig = NODE_CONFIGS[data.nodeType];
-  if (!nodeConfig) {
-    return {
-      nodeId,
-      nodeLabel: data.label,
-      nodeType: data.nodeType,
-      message: '未识别的节点类型',
-    };
-  }
+  const fail = (message: string): ValidationError => ({
+    nodeId: node.id,
+    nodeLabel: data.label || node.id,
+    nodeType: data.nodeType,
+    message,
+  });
+  if (!NODE_CONFIGS[data.nodeType]) return fail('未识别的 Graph v4 节点类型');
   switch (data.nodeType) {
-    case 'start':
-      if (!Object.keys((config.inputs as object) || {}).length)
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请声明运行输入',
-        };
+    case 'llm':
+      if (!config.prompt) return fail('请填写用户提示词');
       break;
-    case 'blog.parseMarkdown':
-      if (!config.fileInput)
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请选择 Markdown 输入',
-        };
+    case 'tool':
+      if (!config.capabilityId || !config.inputs || typeof config.inputs !== 'object')
+        return fail('请选择工具并完成输入映射');
       break;
-    case 'knowledge.retrieve':
-      if (!config.query)
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请设置检索问题',
-        };
-      break;
-    case 'llm.text':
-      if (config.modelProfile !== 'ark-text-default')
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '模型必须为 ARK 默认文本模型',
-        };
-      if (!config.systemPrompt || !config.prompt)
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请填写系统提示词和提示词',
-        };
-      break;
-    case 'blog.createDraft':
-      if (!config.title || !config.content || !config.tags || !config.visibility)
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请完成草稿字段映射',
-        };
-      break;
-    case 'end':
-      if (!Object.keys((config.outputs as object) || {}).length)
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请设置最终输出',
-        };
-      break;
-    case 'variable':
-      if (!config.variableName || !config.valueExpression)
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请填写变量名和值表达式',
-        };
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(String(config.variableName)))
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '变量名只能包含字母、数字和下划线，且不能以数字开头',
-        };
-      break;
-    case 'http':
-      if (!config.url)
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请填写请求 URL',
-        };
-      break;
-    case 'code':
-      return {
-        nodeId,
-        nodeLabel: data.label,
-        nodeType: data.nodeType,
-        message: '代码执行节点当前未开放',
-      };
     case 'condition':
-      return {
-        nodeId,
-        nodeLabel: data.label,
-        nodeType: data.nodeType,
-        message: '条件分支节点当前未开放',
-      };
-    case 'loop':
-      return {
-        nodeId,
-        nodeLabel: data.label,
-        nodeType: data.nodeType,
-        message: '循环节点当前未开放',
-      };
-    case 'knowledge':
-      if (!config.datasetId)
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请填写数据集 ID',
-        };
+      if (config.left === undefined || !config.operator) return fail('请完成受控条件规则');
       break;
-    case 'input': {
-      const vars = (config.variables as Array<{ name: string }>) || [];
-      if (vars.length === 0 || vars.some((v) => !v.name))
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请至少添加一个命名的输入参数',
-        };
+    case 'merge': {
+      const fields = Array.isArray(config.fields)
+        ? (config.fields as Array<{ name?: string; sources?: unknown[] }>)
+        : [];
+      if (
+        !fields.length ||
+        fields.some(
+          (field) => !field.name || !Array.isArray(field.sources) || field.sources.length < 2,
+        )
+      )
+        return fail('每个合并字段至少需要两个候选引用');
       break;
     }
-    case 'fileUpload':
-      if (!Array.isArray(config.uploadedFiles) || config.uploadedFiles.length === 0) {
-        return {
-          nodeId,
-          nodeLabel: data.label,
-          nodeType: data.nodeType,
-          message: '请上传至少一个文件',
-        };
-      }
+    case 'variable': {
+      const assignments = Array.isArray(config.assignments)
+        ? (config.assignments as Array<{ name?: string }>)
+        : [];
+      if (!assignments.length || assignments.some((item) => !item.name))
+        return fail('请至少添加一个命名变量');
+      break;
+    }
+    case 'subworkflow':
+      if (!config.workflowId || !config.versionId) return fail('请选择已发布工作流版本');
       break;
   }
-
+  const options = getUpstreamWorkflowVariables(nodes, edges, node.id);
+  if (validateReferences && (data.nodeType === 'end' || data.nodeType === 'llm')) {
+    const bindings =
+      data.nodeType === 'end'
+        ? (config.outputs as Record<string, unknown>) || {}
+        : (config.inputs as Record<string, unknown>) || {};
+    const bindingTypes =
+      data.nodeType === 'end'
+        ? (config.outputTypes as Record<string, string>) || {}
+        : (config.inputTypes as Record<string, string>) || {};
+    for (const [name, value] of Object.entries(bindings)) {
+      if (typeof value !== 'string') continue;
+      const option = getWorkflowVariableOption(value, options);
+      if (option && bindingTypes[name] && option.type !== bindingTypes[name]) {
+        const bindingLabel = data.nodeType === 'end' ? '输出' : '输入';
+        return fail(
+          `${bindingLabel}“${name}”选择了 ${option.type} 变量，但声明类型为 ${bindingTypes[name]}`,
+        );
+      }
+    }
+  }
   if (
-    nodes.some((candidate) => candidate.id === node.id) &&
-    hasInvalidVariableReferences(
-      node,
-      nodes,
-      edges,
-      getVariableReferenceValues(data.nodeType, config),
+    validateReferences &&
+    valuesWithReferences(data).some(
+      (value) => getInvalidWorkflowVariableTokens(value, options).length > 0,
     )
   )
-    return {
-      nodeId,
-      nodeLabel: data.label,
-      nodeType: data.nodeType,
-      message: '变量引用必须来自上游节点输出',
-    };
-
+    return fail('变量引用必须来自上游节点输出');
   return null;
 }
 
 export function validateWorkflowConfig(nodes: Node[], edges: Edge[] = []): ValidationError[] {
   const errors = nodes
-    .map((node) => validateNodeData(node, nodes, edges))
+    .map((node) => validateNode(node, nodes, edges))
     .filter((error): error is ValidationError => error !== null);
-  if (nodes.length > 8) {
+  if (nodes.length > 30)
     errors.unshift({
       nodeId: nodes[0]?.id || 'workflow',
       nodeLabel: '工作流',
       nodeType: 'workflow',
-      message: 'Graph v2 最多支持 8 个节点',
+      message: 'Graph v4 最多支持 30 个节点',
     });
-  }
   return errors;
 }
-export function validateSingleNode(data: NodeData): ValidationError | null {
-  return validateNodeData(
+
+function workflowError(message: string, node?: Node): ValidationError {
+  const data = node?.data as unknown as WorkflowNodeData | undefined;
+  return {
+    nodeId: node?.id || 'workflow',
+    nodeLabel: data?.label || '工作流',
+    nodeType: data?.nodeType || 'workflow',
+    message,
+  };
+}
+
+/** Mirrors the graph-shape checks that block server persistence without running tools. */
+export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): ValidationError[] {
+  const errors = validateWorkflowConfig(nodes, edges);
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const starts = nodes.filter(
+    (node) => (node.data as unknown as WorkflowNodeData).nodeType === 'start',
+  );
+  const ends = nodes.filter(
+    (node) => (node.data as unknown as WorkflowNodeData).nodeType === 'end',
+  );
+  if (starts.length !== 1) errors.push(workflowError('必须且只能有一个开始节点'));
+  if (ends.length !== 1) errors.push(workflowError('必须且只能有一个结束节点'));
+
+  const incoming = new Map(nodes.map((node) => [node.id, 0]));
+  const outgoing = new Map(nodes.map((node) => [node.id, 0]));
+  const adjacency = new Map(nodes.map((node) => [node.id, [] as string[]]));
+  const conditionHandles = new Map<string, { true: number; false: number }>();
+  for (const edge of edges) {
+    const source = nodeById.get(edge.source);
+    const target = nodeById.get(edge.target);
+    if (!source || !target) {
+      errors.push(workflowError('连线引用了不存在的节点', source || target));
+      continue;
+    }
+    incoming.set(target.id, (incoming.get(target.id) || 0) + 1);
+    outgoing.set(source.id, (outgoing.get(source.id) || 0) + 1);
+    adjacency.get(source.id)?.push(target.id);
+    const sourceData = source.data as unknown as WorkflowNodeData;
+    if (sourceData.nodeType === 'condition') {
+      const counts = conditionHandles.get(source.id) || { true: 0, false: 0 };
+      if (edge.sourceHandle === 'true') counts.true += 1;
+      if (edge.sourceHandle === 'false') counts.false += 1;
+      conditionHandles.set(source.id, counts);
+    }
+  }
+
+  for (const node of nodes) {
+    const data = node.data as unknown as WorkflowNodeData;
+    if (data.nodeType !== 'start' && (incoming.get(node.id) || 0) === 0) {
+      errors.push(workflowError('无法从开始节点到达', node));
+    }
+    if (data.nodeType !== 'end' && (outgoing.get(node.id) || 0) === 0) {
+      errors.push(workflowError('无法到达结束节点', node));
+    }
+    if (data.nodeType === 'condition') {
+      const counts = conditionHandles.get(node.id) || { true: 0, false: 0 };
+      if (counts.true !== 1 || counts.false !== 1) {
+        errors.push(workflowError('必须各有一条 true / false 连线', node));
+      }
+    }
+  }
+
+  const remainingIncoming = new Map(incoming);
+  const queue = nodes
+    .filter((node) => (remainingIncoming.get(node.id) || 0) === 0)
+    .map((node) => node.id);
+  let visited = 0;
+  for (let index = 0; index < queue.length; index += 1) {
+    const id = queue[index];
+    visited += 1;
+    for (const target of adjacency.get(id) || []) {
+      const next = (remainingIncoming.get(target) || 0) - 1;
+      remainingIncoming.set(target, next);
+      if (next === 0) queue.push(target);
+    }
+  }
+  if (visited !== nodes.length) errors.push(workflowError('工作流不能包含循环'));
+  return errors;
+}
+
+export function validateSingleNode(data: WorkflowNodeData): ValidationError | null {
+  return validateNode(
     { id: 'temp', data: data as unknown as Record<string, unknown>, position: { x: 0, y: 0 } },
     [],
     [],
+    false,
   );
 }
 export function hasUnconfiguredNodes(nodes: Node[]): boolean {

@@ -3,21 +3,18 @@ package workflow
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 )
 
-// ResolveTemplate replaces only {{node.output.field}} references using output
-// that is already present in this run. It deliberately has no expression
-// language, template functions, URL fetching, or code execution surface.
 func ResolveTemplate(value string, outputs map[string]map[string]any) (any, error) {
 	matches := templatePattern.FindAllStringIndex(value, -1)
 	if len(matches) == 1 && matches[0][0] == 0 && matches[0][1] == len(value) {
 		return resolveTemplateToken(value, outputs)
 	}
-
 	var resolveErr error
 	resolved := templatePattern.ReplaceAllStringFunc(value, func(token string) string {
 		result, err := resolveTemplateToken(token, outputs)
@@ -50,586 +47,345 @@ func resolveTemplateToken(token string, outputs map[string]map[string]any) (any,
 	return result, nil
 }
 
-// Execute runs a graph in deterministic topological order. Handler code is
-// responsible for persisting the events; this package never performs I/O.
 func Execute(ctx context.Context, graph Graph, registry *Registry, run RunContext, emit func(Event)) error {
-	if registry == nil {
-		return fmt.Errorf("工作流注册表不能为空")
-	}
 	if errs := ValidateGraph(graph, registry); len(errs) > 0 {
 		return fmt.Errorf("工作流校验失败：%s", strings.Join(errs, "；"))
 	}
-	nodes, err := topologicalNodes(graph)
+	ordered, err := topologicalNodes(graph)
 	if err != nil {
 		return err
 	}
 	if run.Inputs == nil {
-		run.Inputs = make(map[string]any)
+		run.Inputs = map[string]any{}
 	}
 	if run.Outputs == nil {
-		run.Outputs = make(map[string]map[string]any)
+		run.Outputs = map[string]map[string]any{}
 	}
 	if err := normalizeRunInputs(graph, run.Inputs); err != nil {
 		return err
 	}
 
-	for _, node := range nodes {
-		input, inputErr := resolveNodeInput(node, run)
+	outgoing := make(map[string][]int, len(graph.Nodes))
+	incoming := make(map[string][]int, len(graph.Nodes))
+	for index, edge := range graph.Edges {
+		outgoing[edge.Source] = append(outgoing[edge.Source], index)
+		incoming[edge.Target] = append(incoming[edge.Target], index)
+	}
+	activeEdges := make(map[int]bool, len(graph.Edges))
+	outputFields := buildOutputFieldsByGraph(graph, registry)
+
+	for _, node := range ordered {
+		capabilityID := capabilityIDForNode(node)
+		if node.Type != NodeTypeStart && !hasActiveIncoming(incoming[node.ID], activeEdges) {
+			output := nullOutput(outputFields[node.ID])
+			run.Outputs[node.ID] = output
+			emitEvent(emit, Event{RunID: run.ID, NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Status: StatusSkipped, Message: "未命中当前执行分支", Output: output})
+			continue
+		}
 		startedAt := time.Now()
-		emitEvent(emit, node.Type, Event{RunID: run.ID, NodeID: node.ID, Status: StatusRunning, Input: input})
+		input, inputErr := resolveNodeInput(node, run)
 		if inputErr != nil {
-			err := inputErr
-			emitEvent(emit, node.Type, failedEvent(run.ID, node.ID, input, err, startedAt))
-			return err
+			return emitFailure(emit, run.ID, node, capabilityID, input, inputErr, startedAt)
 		}
 		if err := ctx.Err(); err != nil {
-			emitEvent(emit, node.Type, failedEvent(run.ID, node.ID, input, err, startedAt))
-			return err
+			return emitFailure(emit, run.ID, node, capabilityID, input, err, startedAt)
 		}
+		matched, whenErr := evaluateWhen(node.When, run.Outputs)
+		if whenErr != nil {
+			return emitFailure(emit, run.ID, node, capabilityID, input, whenErr, startedAt)
+		}
+		if !matched {
+			output := nullOutput(outputFields[node.ID])
+			run.Outputs[node.ID] = output
+			emitEvent(emit, Event{RunID: run.ID, NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Status: StatusSkipped, Message: "执行条件未满足", Output: output})
+			activateOutgoingEdges(node, output, graph.Edges, outgoing[node.ID], activeEdges)
+			continue
+		}
+		emitEvent(emit, Event{RunID: run.ID, NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Status: StatusRunning, Input: input})
 		executor := registry.Executor(node.Type)
 		if executor == nil {
-			err := fmt.Errorf("节点类型 %s 没有已启用的执行器", node.Type)
-			emitEvent(emit, node.Type, failedEvent(run.ID, node.ID, input, err, startedAt))
-			return err
+			return emitFailure(emit, run.ID, node, capabilityID, input, fmt.Errorf("节点类型 %s 没有执行器", node.Type), startedAt)
 		}
-		result, err := executor.Execute(ctx, run, NodeExecution{NodeID: node.ID, NodeType: node.Type, Input: input})
-		if err != nil {
-			emitEvent(emit, node.Type, failedEvent(run.ID, node.ID, input, err, startedAt))
-			return err
+		result, executeErr := executor.Execute(ctx, run, NodeExecution{NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Input: input})
+		if executeErr != nil {
+			return emitFailure(emit, run.ID, node, capabilityID, input, executeErr, startedAt)
 		}
 		if result.Output == nil {
-			result.Output = make(map[string]any)
+			result.Output = map[string]any{}
 		}
 		run.Outputs[node.ID] = result.Output
-		emitEvent(emit, node.Type, Event{
-			RunID:      run.ID,
-			NodeID:     node.ID,
-			Status:     StatusSucceeded,
-			Input:      input,
-			Output:     result.Output,
-			DurationMs: time.Since(startedAt).Milliseconds(),
-		})
+		emitEvent(emit, Event{RunID: run.ID, NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Status: StatusSucceeded, Input: input, Output: result.Output, DurationMs: time.Since(startedAt).Milliseconds()})
+		activateOutgoingEdges(node, result.Output, graph.Edges, outgoing[node.ID], activeEdges)
 	}
 	return nil
 }
 
-func failedEvent(runID, nodeID string, input map[string]any, err error, startedAt time.Time) Event {
-	_ = err
-	return Event{
-		RunID:      runID,
-		NodeID:     nodeID,
-		Status:     StatusFailed,
-		Input:      input,
-		Message:    "节点执行失败，请检查节点配置或服务状态",
-		Error:      "WORKFLOW_NODE_FAILED",
-		DurationMs: time.Since(startedAt).Milliseconds(),
+func evaluateWhen(rule *Rule, outputs map[string]map[string]any) (bool, error) {
+	if rule == nil {
+		return true, nil
 	}
+	left, err := resolveAny(rule.Left, outputs)
+	if err != nil {
+		return false, err
+	}
+	right, err := resolveAny(rule.Right, outputs)
+	if err != nil {
+		return false, err
+	}
+	return evaluateCondition(left, rule.Operator, right)
 }
 
-func emitEvent(emit func(Event), nodeType NodeType, event Event) {
-	if emit != nil {
-		event.Input = safeEventInput(nodeType, event.Input)
-		event.Output = safeEventOutput(nodeType, event.Output)
-		emit(event)
+func resolveNodeInput(node Node, run RunContext) (map[string]any, error) {
+	if node.Type == NodeTypeStart {
+		return run.Inputs, nil
 	}
+	config, err := decodeConfig(node.Config)
+	if err != nil {
+		return nil, err
+	}
+	if node.Type == NodeTypeMerge {
+		return config, nil
+	}
+	resolved, err := resolveAny(config, run.Outputs)
+	if err != nil {
+		return nil, err
+	}
+	result, ok := resolved.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("节点配置必须为对象")
+	}
+	return result, nil
 }
 
-func safeEventInput(nodeType NodeType, values map[string]any) map[string]any {
-	switch nodeType {
-	case NodeTypeBlogParse:
-		return safePreviewFields(values, "fileInput")
-	case NodeTypeVariable:
-		return safePreviewFields(values, "variableName", "valueExpression")
-	case NodeTypeHTTP:
-		return safePreviewFields(values, "method", "url", "body")
-	case NodeTypeCode:
-		return safePreviewFields(values, "language", "inputVars", "outputVars")
-	case NodeTypeLLMText:
-		return safePreviewFields(values, "modelProfile", "temperature", "maxOutputTokens")
-	case NodeTypeKnowledgeRetrieve:
-		return map[string]any{}
-	case NodeTypeBlogCreateDraft:
-		preview := safePreviewFields(values, "title", "tagMode", "visibility")
-		if tags, err := stringListFromValue(values["tags"]); err == nil {
-			preview["tagCount"] = len(tags)
+func resolveAny(value any, outputs map[string]map[string]any) (any, error) {
+	switch typed := value.(type) {
+	case string:
+		return ResolveTemplate(typed, outputs)
+	case map[string]any:
+		result := make(map[string]any, len(typed))
+		for key, item := range typed {
+			resolved, err := resolveAny(item, outputs)
+			if err != nil {
+				return nil, err
+			}
+			result[key] = resolved
 		}
-		if tags, err := optionalStringListFromValue(values["suggestedTags"]); err == nil && tags != nil {
-			preview["suggestedTagCount"] = len(tags)
+		return result, nil
+	case []any:
+		result := make([]any, len(typed))
+		for index, item := range typed {
+			resolved, err := resolveAny(item, outputs)
+			if err != nil {
+				return nil, err
+			}
+			result[index] = resolved
 		}
-		return preview
-	case NodeTypeEnd:
-		return safePreviewFields(values, "postId", "title", "editPath", "tagIds")
+		return result, nil
 	default:
-		return nil
+		return value, nil
 	}
 }
 
-func safeEventOutput(nodeType NodeType, values map[string]any) map[string]any {
-	switch nodeType {
-	case NodeTypeStart:
-		preview := safePreviewFields(values, "markdownFile", "groupId", "visibility")
-		if tags, err := stringListFromValue(values["tagIds"]); err == nil {
-			preview["tagCount"] = len(tags)
+func activateOutgoingEdges(node Node, output map[string]any, edges []Edge, indexes []int, active map[int]bool) {
+	selected := ""
+	if node.Type == NodeTypeCondition {
+		if matched, _ := output["matched"].(bool); matched {
+			selected = "true"
+		} else {
+			selected = "false"
 		}
-		return preview
-	case NodeTypeBlogParse:
-		preview := safePreviewFields(values, "title", "excerpt", "tagNames")
-		if content, ok := values["content"].(string); ok {
-			preview["contentPreview"] = truncatePreviewText(content)
-			preview["contentLength"] = len([]rune(content))
+	}
+	for _, index := range indexes {
+		active[index] = selected == "" || edges[index].SourceHandle == selected
+	}
+}
+
+func hasActiveIncoming(indexes []int, active map[int]bool) bool {
+	for _, index := range indexes {
+		if active[index] {
+			return true
 		}
-		return preview
-	case NodeTypeLLMText:
-		preview := safePreviewFields(values, "model", "tokenUsage")
-		if text, ok := values["text"].(string); ok {
-			preview["text"] = truncatePreviewText(text)
-			preview["textLength"] = len([]rune(text))
+	}
+	return false
+}
+
+func nullOutput(fields map[string]ValueType) map[string]any {
+	result := map[string]any{}
+	for name := range fields {
+		result[name] = nil
+	}
+	return result
+}
+
+func capabilityIDForNode(node Node) string {
+	if node.Type != NodeTypeTool {
+		return ""
+	}
+	config, _ := decodeConfig(node.Config)
+	return stringFromValue(config["capabilityId"])
+}
+
+func emitFailure(emit func(Event), runID string, node Node, capabilityID string, input map[string]any, err error, startedAt time.Time) error {
+	message, code := publicExecutionError(node, err)
+	emitEvent(emit, Event{RunID: runID, NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Status: StatusFailed, Input: input, Message: message, Error: code, DurationMs: time.Since(startedAt).Milliseconds()})
+	return err
+}
+
+func publicExecutionError(node Node, err error) (string, string) {
+	if errors.Is(err, context.Canceled) {
+		return "运行已取消", "WORKFLOW_CANCELLED"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		if node.Type == NodeTypeLLM {
+			return "大模型响应超时，请稍后重试", "AI_UPSTREAM_TIMEOUT"
 		}
-		return preview
-	case NodeTypeKnowledgeRetrieve:
-		preview := map[string]any{}
-		if references, ok := values["references"].([]KnowledgeReference); ok {
-			preview["referenceCount"] = len(references)
-		}
-		return preview
-	case NodeTypeHTTP:
-		preview := safePreviewFields(values, "status", "statusCode", "url", "contentType")
-		if body, ok := values["body"].(string); ok {
-			preview["body"] = truncatePreviewText(body)
-			preview["bodyLength"] = len([]rune(body))
-		}
-		return preview
-	case NodeTypeVariable, NodeTypeCode:
-		return safePreviewFields(values)
-	case NodeTypeBlogCreateDraft:
-		return safePreviewFields(values, "postId", "title", "editPath", "tagIds")
-	case NodeTypeEnd:
-		return safeEndOutput(values)
+		return "节点执行超时，请稍后重试", "WORKFLOW_NODE_TIMEOUT"
+	}
+	message := err.Error()
+	switch {
+	case strings.Contains(message, "AI 未配置") || strings.Contains(message, "ARK_"):
+		return "AI 服务未配置，请检查 ARK_API_KEY 和 ARK_TEXT_MODEL", "AI_CONFIGURATION_UNAVAILABLE"
+	case strings.Contains(message, "AI 上游调用失败"):
+		return "ARK 模型调用失败，请稍后重试或检查服务配置", "AI_UPSTREAM_FAILED"
+	case strings.Contains(message, "AI 响应解析失败") || strings.Contains(message, "AI 返回为空"):
+		return "模型没有返回可用内容，请调整提示词后重试", "AI_RESPONSE_INVALID"
+	case strings.Contains(message, "变量"):
+		return message, "WORKFLOW_VARIABLE_RESOLUTION_FAILED"
+	case node.Type == NodeTypeLLM:
+		return "大模型节点执行失败，请检查提示词和模型配置", "AI_NODE_FAILED"
 	default:
-		return nil
+		return "节点执行失败，请检查节点配置或服务状态", "WORKFLOW_NODE_FAILED"
 	}
 }
 
-func safeEndOutput(values map[string]any) map[string]any {
-	preview := make(map[string]any, len(values))
-	for key, value := range values {
-		if isSensitiveKey(key) {
-			continue
-		}
-		preview[key] = safePreviewValue(value)
+func emitEvent(emit func(Event), event Event) {
+	if emit == nil {
+		return
 	}
-	return preview
+	event.Input = safePreviewMap(event.Input)
+	event.Output = safePreviewMap(event.Output)
+	emit(event)
 }
-
-func safePreviewFields(values map[string]any, keys ...string) map[string]any {
-	if values == nil {
-		return nil
-	}
-	preview := make(map[string]any, len(keys))
-	for _, key := range keys {
-		if value, exists := values[key]; exists {
-			preview[key] = safePreviewValue(value)
-		}
-	}
-	return preview
-}
-
-const previewTextLimit = 2048
 
 func safePreviewMap(values map[string]any) map[string]any {
 	if values == nil {
 		return nil
 	}
-	preview := make(map[string]any, len(values))
+	result := make(map[string]any, len(values))
 	for key, value := range values {
-		if isSensitiveKey(key) {
-			preview[key] = "[REDACTED]"
-			continue
-		}
-		preview[key] = safePreviewValue(value)
-	}
-	return preview
-}
-
-func safePreviewValue(value any) any {
-	switch typed := value.(type) {
-	case nil, bool, float64, float32, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		return typed
-	case string:
-		return truncatePreviewText(typed)
-	case []byte:
-		return fmt.Sprintf("[binary %d bytes]", len(typed))
-	case FileInput:
-		return map[string]any{
-			"filename":    typed.Filename,
-			"contentType": typed.ContentType,
-			"size":        typed.Size,
-		}
-	case *FileInput:
-		if typed == nil {
-			return nil
-		}
-		return safePreviewValue(*typed)
-	case []string:
-		preview := make([]string, len(typed))
-		for index, item := range typed {
-			preview[index] = truncatePreviewText(item)
-		}
-		return preview
-	case []any:
-		preview := make([]any, len(typed))
-		for index, item := range typed {
-			preview[index] = safePreviewValue(item)
-		}
-		return preview
-	case map[string]any:
-		if isFileValue(typed) {
-			return safeFileMetadata(typed)
-		}
-		return safePreviewMap(typed)
-	case map[string]string:
-		if isStringFileValue(typed) {
-			return safeStringFileMetadata(typed)
-		}
-		preview := make(map[string]any, len(typed))
-		for key, item := range typed {
-			if isSensitiveKey(key) {
-				preview[key] = "[REDACTED]"
-				continue
+		switch typed := value.(type) {
+		case FileInput:
+			result[key] = map[string]any{"filename": typed.Filename, "contentType": typed.ContentType, "size": typed.Size}
+		case *FileInput:
+			if typed != nil {
+				result[key] = map[string]any{"filename": typed.Filename, "contentType": typed.ContentType, "size": typed.Size}
 			}
-			preview[key] = truncatePreviewText(item)
-		}
-		return preview
-	default:
-		return fmt.Sprintf("[%T]", value)
-	}
-}
-
-func isSensitiveKey(key string) bool {
-	normalized := strings.ToLower(key)
-	return strings.Contains(normalized, "secret") || strings.Contains(normalized, "key") || strings.Contains(normalized, "token") || strings.Contains(normalized, "password")
-}
-
-func isFileValue(value map[string]any) bool {
-	for key := range value {
-		if isFileNameKey(key) {
-			return true
+		case string:
+			if len([]rune(typed)) > 300 {
+				result[key] = string([]rune(typed)[:300]) + "…"
+			} else {
+				result[key] = typed
+			}
+		case map[string]any:
+			result[key] = safePreviewMap(typed)
+		default:
+			result[key] = value
 		}
 	}
-	return false
-}
-
-func safeFileMetadata(value map[string]any) map[string]any {
-	preview := make(map[string]any)
-	for key, item := range value {
-		if !isFileMetadataKey(key) {
-			continue
-		}
-		preview[key] = safePreviewValue(item)
-	}
-	return preview
-}
-
-func isStringFileValue(value map[string]string) bool {
-	for key := range value {
-		if isFileNameKey(key) {
-			return true
-		}
-	}
-	return false
-}
-
-func safeStringFileMetadata(value map[string]string) map[string]any {
-	preview := make(map[string]any)
-	for key, item := range value {
-		if isFileMetadataKey(key) {
-			preview[key] = truncatePreviewText(item)
-		}
-	}
-	return preview
-}
-
-func isFileNameKey(key string) bool {
-	normalized := strings.ReplaceAll(strings.ToLower(key), "_", "")
-	return normalized == "filename" || normalized == "name"
-}
-
-func isFileMetadataKey(key string) bool {
-	normalized := strings.ReplaceAll(strings.ToLower(key), "_", "")
-	switch normalized {
-	case "filename", "name", "size", "contenttype", "mimetype":
-		return true
-	default:
-		return false
-	}
-}
-
-func truncatePreviewText(value string) string {
-	runes := []rune(value)
-	if len(runes) <= previewTextLimit {
-		return value
-	}
-	return string(runes[:previewTextLimit])
+	return result
 }
 
 func topologicalNodes(graph Graph) ([]Node, error) {
-	nodesByID := make(map[string]Node, len(graph.Nodes))
-	order := make(map[string]int, len(graph.Nodes))
+	nodes := make(map[string]Node, len(graph.Nodes))
 	incoming := make(map[string]int, len(graph.Nodes))
 	adjacency := make(map[string][]string, len(graph.Nodes))
-	for index, node := range graph.Nodes {
-		nodesByID[node.ID] = node
-		order[node.ID] = index
-		adjacency[node.ID] = nil
+	for _, node := range graph.Nodes {
+		nodes[node.ID] = node
 	}
 	for _, edge := range graph.Edges {
-		adjacency[edge.Source] = append(adjacency[edge.Source], edge.Target)
 		incoming[edge.Target]++
+		adjacency[edge.Source] = append(adjacency[edge.Source], edge.Target)
 	}
-	queue := make([]string, 0, len(graph.Nodes))
-	for _, node := range graph.Nodes {
-		if incoming[node.ID] == 0 {
-			queue = append(queue, node.ID)
+	queue := []string{}
+	for id := range nodes {
+		if incoming[id] == 0 {
+			queue = append(queue, id)
 		}
 	}
-	result := make([]Node, 0, len(graph.Nodes))
+	sort.Strings(queue)
+	ordered := make([]Node, 0, len(nodes))
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
-		result = append(result, nodesByID[current])
-		for _, target := range adjacency[current] {
-			incoming[target]--
-			if incoming[target] == 0 {
-				queue = append(queue, target)
+		ordered = append(ordered, nodes[current])
+		for _, next := range adjacency[current] {
+			incoming[next]--
+			if incoming[next] == 0 {
+				queue = append(queue, next)
+				sort.Strings(queue)
 			}
 		}
-		sort.SliceStable(queue, func(left, right int) bool { return order[queue[left]] < order[queue[right]] })
 	}
-	if len(result) != len(graph.Nodes) {
+	if len(ordered) != len(nodes) {
 		return nil, fmt.Errorf("工作流不能包含循环")
 	}
-	return result, nil
-}
-
-func resolveNodeInput(node Node, run RunContext) (map[string]any, error) {
-	if len(node.Config) == 0 {
-		return map[string]any{}, nil
-	}
-	var input map[string]any
-	if err := json.Unmarshal(node.Config, &input); err != nil {
-		return nil, err
-	}
-	resolved, err := resolveInputValue(input, run.Outputs)
-	if err != nil {
-		return nil, err
-	}
-	result := resolved.(map[string]any)
-	if node.Type != NodeTypeBlogParse {
-		return result, nil
-	}
-	inputName, ok := result["fileInput"].(string)
-	if !ok {
-		return result, nil
-	}
-	file, exists := run.Inputs[inputName]
-	if !exists {
-		return nil, fmt.Errorf("开始节点文件输入 %s 不存在", inputName)
-	}
-	result["fileInput"] = file
-	return result, nil
+	return ordered, nil
 }
 
 func normalizeRunInputs(graph Graph, inputs map[string]any) error {
+	var definitions map[string]InputDefinition
 	for _, node := range graph.Nodes {
-		if node.Type != NodeTypeStart {
+		if node.Type == NodeTypeStart {
+			config, _ := decodeConfig(node.Config)
+			encoded, _ := json.Marshal(config["inputs"])
+			_ = json.Unmarshal(encoded, &definitions)
+			break
+		}
+	}
+	for name, definition := range definitions {
+		value, exists := inputs[name]
+		if definition.Required && (!exists || value == nil || value == "") {
+			return fmt.Errorf("缺少必填输入 %s", name)
+		}
+		if !exists || value == nil {
 			continue
 		}
-		var config startNodeConfig
-		if err := strictDecode(node.Config, &config); err != nil {
-			return fmt.Errorf("开始节点输入配置无效: %w", err)
-		}
-		names := make([]string, 0, len(config.Inputs))
-		for name := range config.Inputs {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for _, name := range names {
-			definition := config.Inputs[name]
-			value, exists := inputs[name]
-			if !exists || value == nil {
-				if definition.Required {
-					return fmt.Errorf("开始节点输入 %s 为必填项", name)
-				}
-				inputs[name] = emptyStartInputValue(definition.Type)
-				continue
+		switch definition.Type {
+		case ValueTypeString:
+			if _, ok := value.(string); !ok {
+				return fmt.Errorf("输入 %s 必须为 string", name)
 			}
-			normalized, err := normalizeStartInput(name, definition, value)
-			if err != nil {
-				return err
+		case ValueTypeBoolean:
+			if _, ok := value.(bool); !ok {
+				return fmt.Errorf("输入 %s 必须为 boolean", name)
 			}
-			inputs[name] = normalized
+		case ValueTypeNumber:
+			if numberFromValue(value) == 0 && fmt.Sprint(value) != "0" {
+				return fmt.Errorf("输入 %s 必须为 number", name)
+			}
+		case ValueTypeStringList:
+			if _, err := stringListFromValue(value); err != nil {
+				return fmt.Errorf("输入 %s 必须为 string[]", name)
+			}
+		case ValueTypeFile:
+			if _, err := fileFromValue(value); err != nil {
+				return fmt.Errorf("输入 %s 必须为 file", name)
+			}
 		}
-		return nil
 	}
 	return nil
 }
 
-func emptyStartInputValue(valueType ValueType) any {
-	switch valueType {
-	case ValueTypeString:
-		return ""
-	case ValueTypeStringList:
-		return []string{}
-	case ValueTypeObject:
-		return map[string]any{}
-	case ValueTypeNumber:
-		return float64(0)
-	case ValueTypeBoolean:
-		return false
-	case ValueTypeFile:
-		return nil
-	default:
-		return nil
-	}
-}
-
-const maxMarkdownFileBytes = 5 * 1024 * 1024
-
-func normalizeStartInput(name string, definition inputDefinition, value any) (any, error) {
-	switch definition.Type {
-	case ValueTypeString:
-		text, ok := value.(string)
-		if !ok || (definition.Required && strings.TrimSpace(text) == "") {
-			return nil, fmt.Errorf("开始节点输入 %s 必须是非空 string", name)
+func buildOutputFieldsByGraph(graph Graph, registry *Registry) map[string]map[string]ValueType {
+	nodes := make(map[string]Node, len(graph.Nodes))
+	startInputs := map[string]InputDefinition{}
+	for _, node := range graph.Nodes {
+		nodes[node.ID] = node
+		if node.Type == NodeTypeStart {
+			config, _ := decodeConfig(node.Config)
+			encoded, _ := json.Marshal(config["inputs"])
+			_ = json.Unmarshal(encoded, &startInputs)
 		}
-		return text, nil
-	case ValueTypeStringList:
-		list, err := normalizeStringList(value)
-		if err != nil || (definition.Required && len(list) == 0) {
-			return nil, fmt.Errorf("开始节点输入 %s 必须是 string[]", name)
-		}
-		return list, nil
-	case ValueTypeObject:
-		switch typed := value.(type) {
-		case map[string]any:
-			return typed, nil
-		case map[string]string:
-			return typed, nil
-		default:
-			return nil, fmt.Errorf("开始节点输入 %s 必须是 object", name)
-		}
-	case ValueTypeNumber:
-		switch value.(type) {
-		case float64, float32, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-			return value, nil
-		default:
-			return nil, fmt.Errorf("开始节点输入 %s 必须是 number", name)
-		}
-	case ValueTypeBoolean:
-		if _, ok := value.(bool); !ok {
-			return nil, fmt.Errorf("开始节点输入 %s 必须是 boolean", name)
-		}
-		return value, nil
-	case ValueTypeFile:
-		file, err := validateMarkdownFile(value)
-		if err != nil {
-			return nil, fmt.Errorf("开始节点输入 %s 无效: %w", name, err)
-		}
-		return file, nil
-	default:
-		return nil, fmt.Errorf("开始节点输入 %s 类型不支持", name)
 	}
-}
-
-func validateMarkdownFile(value any) (FileInput, error) {
-	file, err := fileFromValue(value)
-	if err != nil {
-		return FileInput{}, err
-	}
-	name := strings.ToLower(strings.TrimSpace(file.Filename))
-	if !strings.HasSuffix(name, ".md") && !strings.HasSuffix(name, ".markdown") {
-		return FileInput{}, fmt.Errorf("只支持 .md 或 .markdown 文件")
-	}
-	if len(file.Content) == 0 {
-		return FileInput{}, fmt.Errorf("文件内容不能为空")
-	}
-	if file.Size == 0 {
-		file.Size = int64(len(file.Content))
-	}
-	if file.Size > maxMarkdownFileBytes || len(file.Content) > maxMarkdownFileBytes {
-		return FileInput{}, fmt.Errorf("文件不能超过 5MB")
-	}
-	return file, nil
-}
-
-func normalizeStringList(value any) ([]string, error) {
-	switch typed := value.(type) {
-	case []string:
-		return typed, nil
-	case []any:
-		result := make([]string, len(typed))
-		for index, item := range typed {
-			text, ok := item.(string)
-			if !ok {
-				return nil, fmt.Errorf("列表第 %d 项不是字符串", index)
-			}
-			result[index] = text
-		}
-		return result, nil
-	default:
-		return nil, fmt.Errorf("不是字符串列表")
-	}
-}
-
-func resolveInputValue(value any, outputs map[string]map[string]any) (any, error) {
-	switch typed := value.(type) {
-	case string:
-		return ResolveTemplate(typed, outputs)
-	case map[string]any:
-		resolved := make(map[string]any, len(typed))
-		for key, nested := range typed {
-			value, err := resolveInputValue(nested, outputs)
-			if err != nil {
-				return nil, err
-			}
-			resolved[key] = value
-		}
-		return resolved, nil
-	case []any:
-		resolved := make([]any, len(typed))
-		for index, nested := range typed {
-			value, err := resolveInputValue(nested, outputs)
-			if err != nil {
-				return nil, err
-			}
-			resolved[index] = value
-		}
-		return resolved, nil
-	default:
-		return value, nil
-	}
-}
-
-type startExecutor struct{}
-
-func (startExecutor) Type() NodeType { return NodeTypeStart }
-
-func (startExecutor) Execute(_ context.Context, run RunContext, _ NodeExecution) (NodeResult, error) {
-	output := make(map[string]any, len(run.Inputs))
-	for key, value := range run.Inputs {
-		output[key] = value
-	}
-	return NodeResult{Output: output}, nil
-}
-
-type endExecutor struct{}
-
-func (endExecutor) Type() NodeType { return NodeTypeEnd }
-
-func (endExecutor) Execute(_ context.Context, _ RunContext, execution NodeExecution) (NodeResult, error) {
-	outputs, ok := execution.Input["outputs"].(map[string]any)
-	if !ok {
-		return NodeResult{}, fmt.Errorf("结束节点输出配置无效")
-	}
-	return NodeResult{Output: outputs}, nil
+	return buildOutputFields(nodes, startInputs, registry)
 }

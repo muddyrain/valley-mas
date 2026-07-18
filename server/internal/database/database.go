@@ -23,6 +23,7 @@ const (
 	AutoMigrateScopeCore      = "core"
 	AutoMigrateScopeContent   = "content"
 	AutoMigrateScopeLifeTrace = "lifetrace"
+	legacyCopilotTargetIndex  = "uidx_workbench_copilot_target"
 )
 
 // Init initializes database connection and migrations.
@@ -140,6 +141,9 @@ func AutoMigrate(scope string) error {
 	if err := DB.AutoMigrate(plan.models...); err != nil {
 		return err
 	}
+	if err := dropLegacyCopilotTargetUniqueness(); err != nil {
+		return err
+	}
 
 	if plan.fixResourceForeignKey {
 		if err := fixResourceForeignKeyConstraint(); err != nil {
@@ -168,9 +172,37 @@ func AutoMigrateModels(names []string) error {
 	if err := DB.AutoMigrate(models...); err != nil {
 		return err
 	}
+	if err := dropLegacyCopilotTargetUniqueness(); err != nil {
+		return err
+	}
 
 	log.Printf("Auto migrate completed (models=%s)", strings.Join(normalizedNames, ","))
 	return nil
+}
+
+func dropLegacyCopilotTargetUniqueness() error {
+	if DB == nil || !DB.Migrator().HasTable(&model.AIWorkbenchCopilotSession{}) {
+		return nil
+	}
+
+	switch DB.Dialector.Name() {
+	case "postgres":
+		if err := DB.Exec(`ALTER TABLE ai_workbench_copilot_sessions DROP CONSTRAINT IF EXISTS uidx_workbench_copilot_target`).Error; err != nil {
+			return fmt.Errorf("drop legacy copilot target constraint: %w", err)
+		}
+		if err := DB.Exec(`DROP INDEX IF EXISTS uidx_workbench_copilot_target`).Error; err != nil {
+			return fmt.Errorf("drop legacy copilot target index: %w", err)
+		}
+		return nil
+	default:
+		if !DB.Migrator().HasIndex(&model.AIWorkbenchCopilotSession{}, legacyCopilotTargetIndex) {
+			return nil
+		}
+		if err := DB.Migrator().DropIndex(&model.AIWorkbenchCopilotSession{}, legacyCopilotTargetIndex); err != nil {
+			return fmt.Errorf("drop legacy copilot target index: %w", err)
+		}
+		return nil
+	}
 }
 
 type autoMigratePlan struct {
@@ -298,6 +330,9 @@ func autoMigrateModelsByName() map[string]any {
 		"ai_app_conversation":                  &model.AIAppConversation{},
 		"ai_app_conversation_message":          &model.AIAppConversationMessage{},
 		"ai_app_conversation_tool_trace":       &model.AIAppConversationToolTrace{},
+		"ai_workbench_copilot_session":         &model.AIWorkbenchCopilotSession{},
+		"ai_workbench_copilot_message":         &model.AIWorkbenchCopilotMessage{},
+		"ai_workbench_change_proposal":         &model.AIWorkbenchChangeProposal{},
 		"ai_knowledge_base":                    &model.AIKnowledgeBase{},
 		"ai_knowledge_document":                &model.AIKnowledgeDocument{},
 		"ai_app_knowledge_base":                &model.AIAppKnowledgeBase{},
@@ -437,6 +472,9 @@ func coreMigrationModels() []any {
 		&model.AIAppConversation{},
 		&model.AIAppConversationMessage{},
 		&model.AIAppConversationToolTrace{},
+		&model.AIWorkbenchCopilotSession{},
+		&model.AIWorkbenchCopilotMessage{},
+		&model.AIWorkbenchChangeProposal{},
 		&model.AIKnowledgeBase{},
 		&model.AIKnowledgeDocument{},
 		&model.AIKnowledgeChunk{},

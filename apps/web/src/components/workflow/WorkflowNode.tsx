@@ -2,25 +2,22 @@ import { Handle, type NodeProps, Position } from '@xyflow/react';
 import {
   AlertCircle,
   CheckCircle2,
-  Code,
   Copy,
-  Database,
-  FileText,
   GitBranch,
-  Globe,
+  GitMerge,
   Hash,
-  Keyboard,
   Loader2,
   MessageSquare,
   MoreHorizontal,
-  PenLine,
-  Repeat,
+  Plus,
   Send,
   Trash2,
-  Upload,
+  Workflow,
+  Wrench,
   XCircle,
   Zap,
 } from 'lucide-react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,232 +29,267 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { NodePicker } from './NodePicker';
+import { NodeRunDetails } from './NodeRunDetails';
 import { getNodeConfigSummary, NODE_CONFIGS } from './nodeConfig';
+import type { WorkflowNodeData } from './types';
 import { validateSingleNode } from './validateWorkflowConfig';
 import { useWorkflowRuntime } from './WorkflowRuntimeContext';
+import { getWorkflowNodeOutputFields } from './workflowVariables';
 
-const iconMap: Record<string, typeof Zap> = {
-  Zap,
-  Keyboard,
-  MessageSquare,
-  Database,
-  FileText,
-  Code,
-  Globe,
-  GitBranch,
-  Repeat,
-  PenLine,
-  Hash,
-  Send,
-  Upload,
+const iconMap = {
+  start: Zap,
+  end: Send,
+  llm: MessageSquare,
+  tool: Wrench,
+  condition: GitBranch,
+  merge: GitMerge,
+  variable: Hash,
+  subworkflow: Workflow,
 };
+const colors = {
+  start: 'bg-blue-500/10 text-blue-600',
+  end: 'bg-emerald-500/10 text-emerald-600',
+  llm: 'bg-violet-500/10 text-violet-600',
+  tool: 'bg-orange-500/10 text-orange-600',
+  condition: 'bg-green-500/10 text-green-600',
+  merge: 'bg-teal-500/10 text-teal-600',
+  variable: 'bg-cyan-500/10 text-cyan-600',
+  subworkflow: 'bg-indigo-500/10 text-indigo-600',
+} as const;
 
-interface WorkflowNodeData {
-  label: string;
-  nodeType: string;
-  config?: Record<string, unknown>;
-}
+function NodeLabel({ label }: { label: string }) {
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [truncated, setTruncated] = useState(false);
 
-const NODE_COLORS: Record<string, { iconBg: string; iconText: string }> = {
-  start: { iconBg: 'bg-blue-50', iconText: 'text-blue-600' },
-  'blog.parseMarkdown': { iconBg: 'bg-blue-50', iconText: 'text-blue-600' },
-  input: { iconBg: 'bg-blue-50', iconText: 'text-blue-600' },
-  fileUpload: { iconBg: 'bg-blue-50', iconText: 'text-blue-600' },
-  llm: { iconBg: 'bg-purple-50', iconText: 'text-purple-600' },
-  'llm.text': { iconBg: 'bg-purple-50', iconText: 'text-purple-600' },
-  knowledge: { iconBg: 'bg-purple-50', iconText: 'text-purple-600' },
-  'knowledge.retrieve': { iconBg: 'bg-purple-50', iconText: 'text-purple-600' },
-  code: { iconBg: 'bg-orange-50', iconText: 'text-orange-600' },
-  http: { iconBg: 'bg-orange-50', iconText: 'text-orange-600' },
-  condition: { iconBg: 'bg-green-50', iconText: 'text-green-600' },
-  loop: { iconBg: 'bg-green-50', iconText: 'text-green-600' },
-  variable: { iconBg: 'bg-cyan-50', iconText: 'text-cyan-600' },
-  'blog.createDraft': { iconBg: 'bg-orange-50', iconText: 'text-orange-600' },
-  end: { iconBg: 'bg-emerald-50', iconText: 'text-emerald-600' },
-};
+  useEffect(() => {
+    const element = textRef.current;
+    if (!element) return;
+    const update = () => {
+      if (element.textContent !== label) return;
+      setTruncated(element.scrollWidth > element.clientWidth);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [label]);
 
-export function WorkflowNode({ id, data, selected }: NodeProps) {
-  const { session, copyNode, deleteNode } = useWorkflowRuntime();
-  const { label, nodeType, config } = data as unknown as WorkflowNodeData;
-  const snapshot = session.nodes[id];
-  const runningState = snapshot?.status;
-  const nodeConfig = NODE_CONFIGS[nodeType];
-  const Icon = iconMap[nodeConfig?.icon] || MessageSquare;
-  const colors = NODE_COLORS[nodeType] || NODE_COLORS.start;
-  const isRunnable = Boolean(nodeConfig) && nodeConfig.available !== false;
-  const summary = isRunnable
-    ? getNodeConfigSummary(nodeType, config)
-    : nodeConfig
-      ? '当前为计划中节点'
-      : '未识别的节点类型';
-  const hasInput = nodeConfig?.handles?.input;
-  const hasOutput = nodeConfig?.handles?.output;
-  const multiOutputs = nodeConfig?.handles?.outputs;
-  const isConfigIncomplete = isRunnable
-    ? Boolean(validateSingleNode({ label, nodeType, config }))
-    : false;
-  const isPlanNode = !nodeConfig || nodeConfig.available === false;
-  const isFixed = nodeConfig?.fixed;
-  const ioSummary = [
-    hasInput ? '输入: 1 项' : null,
-    hasOutput || multiOutputs ? `输出: ${multiOutputs || 1} 项` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const text = (
+    <span ref={textRef} className="block min-w-0 flex-1 truncate text-sm font-medium">
+      {label}
+    </span>
+  );
+  if (!truncated) return text;
 
   return (
-    <div className="relative w-[220px] cursor-grab overflow-visible active:cursor-grabbing">
-      {hasInput && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="!w-3 !h-3 !-left-1.5 !rounded-full !bg-white !border-2 !border-blue-400"
-        />
-      )}
-      <div
-        className={cn(
-          'group overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-all duration-200',
-          selected &&
-            'border-primary ring-2 ring-primary/30 ring-offset-2 ring-offset-background shadow-sm',
-          !isRunnable && 'border-amber-500/40 bg-amber-500/5',
-          isConfigIncomplete &&
-            !runningState &&
-            'border-destructive/50 ring-2 ring-destructive/15 ring-offset-2',
-          runningState === 'running' && 'border-primary ring-2 ring-primary/30 ring-offset-2',
-          runningState === 'success' &&
-            'border-emerald-600/50 ring-2 ring-emerald-500/20 ring-offset-2',
-          runningState === 'error' &&
-            'border-destructive/50 ring-2 ring-destructive/20 ring-offset-2',
-        )}
-      >
-        <div className="flex h-[92px] items-center gap-3 px-4 py-3">
-          <div className={cn('flex items-center justify-center rounded-full p-2', colors.iconBg)}>
-            <Icon className={cn('h-4 w-4', colors.iconText)} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <Tooltip>
-              <TooltipTrigger render={<div className="flex items-center gap-2" />}>
-                <span className="truncate text-sm font-medium text-foreground">{label}</span>
-                {isPlanNode && (
-                  <Badge variant="outline" className="border-amber-300 text-amber-700">
-                    计划中
-                  </Badge>
-                )}
-                {isConfigIncomplete && (
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                )}
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[280px]">
-                <div className="space-y-0.5">
-                  <div className="font-medium">{label}</div>
-                  {nodeConfig?.description && (
-                    <div className="text-xs opacity-80">{nodeConfig.description}</div>
-                  )}
-                  {summary && <div className="text-xs opacity-60">{summary}</div>}
-                </div>
-              </TooltipContent>
-            </Tooltip>
-            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-              {summary || '尚未配置'}
-            </span>
-            <span className="mt-0.5 block truncate text-xs text-muted-foreground/70">
-              {ioSummary || '无输入/输出'}
-            </span>
-          </div>
-          <div className="nodrag nopan flex items-center gap-0.5">
-            {!isFixed && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        copyNode(id);
-                      }}
-                      aria-label="复制节点"
-                    />
-                  }
-                >
-                  <Copy className="h-3.5 w-3.5 text-gray-400" />
-                </TooltipTrigger>
-                <TooltipContent side="top">复制节点</TooltipContent>
-              </Tooltip>
-            )}
-            {!isFixed && (
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={(event) => event.stopPropagation()}
-                      aria-label="节点菜单"
-                    />
-                  }
-                >
-                  <MoreHorizontal className="h-3.5 w-3.5 text-gray-400" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-36">
-                  <DropdownMenuItem
-                    onClick={() => copyNode(id)}
-                    onSelect={(event) => event.stopPropagation()}
-                  >
-                    <Copy className="mr-2 h-3.5 w-3.5" />
-                    复制
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => deleteNode(id)}
-                    className="text-red-500"
-                    onSelect={(event) => event.stopPropagation()}
-                  >
-                    <Trash2 className="mr-2 h-3.5 w-3.5" />
-                    删除
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            {runningState === 'running' && (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-500" />
-            )}
-            {runningState === 'success' && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                {snapshot.durationMs != null && <span>{snapshot.durationMs}ms</span>}
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
-              </div>
-            )}
-            {runningState === 'error' && <XCircle className="h-4 w-4 shrink-0 text-red-400" />}
-          </div>
-        </div>
-      </div>
-      {hasOutput && (
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="output"
-          className="!w-3 !h-3 !-right-1.5 !rounded-full !bg-white !border-2 !border-blue-400"
-        />
-      )}
-      {multiOutputs && multiOutputs > 1 && (
-        <>
-          <Handle
-            type="source"
-            position={Position.Right}
-            id="output-true"
-            style={{ top: '30%' }}
-            className="!w-3 !h-3 !-right-1.5 !rounded-full !bg-white !border-2 !border-green-400"
-          />
-          <Handle
-            type="source"
-            position={Position.Right}
-            id="output-false"
-            style={{ top: '70%' }}
-            className="!w-3 !h-3 !-right-1.5 !rounded-full !bg-white !border-2 !border-red-400"
-          />
-        </>
-      )}
-    </div>
+    <Tooltip>
+      <TooltipTrigger render={<span className="block min-w-0 flex-1" />}>{text}</TooltipTrigger>
+      <TooltipContent side="top" className="max-w-72">
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 }
+
+export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: NodeProps) {
+  const { session, connectedSourceNodeIDs, copyNode, deleteNode, insertAfter } =
+    useWorkflowRuntime();
+  const nodeData = data as unknown as WorkflowNodeData;
+  const { label, nodeType, config } = nodeData;
+  const snapshot = session.nodes[id];
+  const runningState = snapshot?.status;
+  const definition = NODE_CONFIGS[nodeType];
+  const Icon = iconMap[nodeType] || MessageSquare;
+  const hasInput = definition?.handles.input;
+  const hasOutput = definition?.handles.output;
+  const multiOutputs = definition?.handles.outputs;
+  const validationError = validateSingleNode(nodeData);
+  const incomplete = Boolean(validationError);
+  const summary = getNodeConfigSummary(nodeType, config);
+  const fixed = definition?.fixed;
+  const sideEffect = nodeType === 'tool' ? String(config?.sideEffect || '') : '';
+  const outputFields = getWorkflowNodeOutputFields(nodeType, config);
+
+  return (
+    <div className="group/node relative w-[264px] cursor-grab overflow-visible active:cursor-grabbing">
+      <div className="relative">
+        {hasInput ? (
+          <Handle
+            type="target"
+            position={Position.Left}
+            id="input"
+            className="!size-3 !-left-1.5 !rounded-full !border-2 !border-blue-400 !bg-background"
+          />
+        ) : null}
+        <div
+          className={cn(
+            'overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-[border-color,box-shadow] duration-150 hover:border-primary/35 hover:bg-card hover:shadow-sm',
+            incomplete && !runningState && 'border-amber-500/45 hover:border-amber-500/60',
+            runningState === 'running' && 'border-primary/55 ring-1 ring-primary/10',
+            runningState === 'success' &&
+              'border-emerald-500/45 ring-1 ring-emerald-500/10 hover:border-emerald-500/65 hover:bg-card',
+            runningState === 'error' &&
+              'border-destructive/55 ring-1 ring-destructive/10 hover:border-destructive/70',
+            runningState === 'skipped' && 'opacity-60',
+            selected && 'border-primary/65 ring-1 ring-primary/25 shadow-sm',
+          )}
+        >
+          <div className="flex min-h-[104px] items-start gap-3 px-4 py-4">
+            <span
+              className={cn(
+                'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg',
+                colors[nodeType] || colors.start,
+              )}
+            >
+              <Icon className="size-4" />
+            </span>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <NodeLabel label={label} />
+                {incomplete ? (
+                  <Tooltip>
+                    <TooltipTrigger render={<span className="flex shrink-0" />}>
+                      <AlertCircle className="size-3.5 text-orange-500" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-72">
+                      {validationError?.message}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : null}
+              </div>
+              <span className="mt-1 block truncate text-xs text-muted-foreground">
+                {nodeType === 'tool'
+                  ? String(config?.capabilityName || config?.capabilityId || '工具')
+                  : definition?.label}
+              </span>
+              <span className="mt-0.5 block truncate text-xs text-muted-foreground/70">
+                {summary || '尚未配置'}
+              </span>
+            </div>
+            <div className="nodrag nopan -mt-1 flex shrink-0 items-center gap-0.5">
+              {sideEffect ? (
+                <Badge variant="outline" className="px-1 text-[10px]">
+                  {sideEffect}
+                </Badge>
+              ) : null}
+              {!fixed ? (
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="复制节点"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    copyNode(id);
+                  }}
+                >
+                  <Copy className="size-3.5" />
+                </Button>
+              ) : null}
+              {!fixed ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="节点菜单"
+                        onClick={(event) => event.stopPropagation()}
+                      />
+                    }
+                  >
+                    <MoreHorizontal className="size-3.5" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => copyNode(id)}>
+                      <Copy className="mr-2 size-3.5" />
+                      复制
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive" onClick={() => deleteNode(id)}>
+                      <Trash2 className="mr-2 size-3.5" />
+                      删除
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+              {runningState === 'running' ? (
+                <Loader2 className="size-4 animate-spin text-primary" />
+              ) : null}
+              {runningState === 'success' ? (
+                <CheckCircle2 className="size-4 text-emerald-500" />
+              ) : null}
+              {runningState === 'error' ? <XCircle className="size-4 text-destructive" /> : null}
+              {runningState === 'skipped' ? (
+                <Badge variant="outline" className="text-[10px]">
+                  已跳过
+                </Badge>
+              ) : null}
+            </div>
+          </div>
+          {outputFields.length > 0 ? (
+            <div className="flex min-h-10 items-center gap-2 border-t border-border bg-muted/20 px-4 py-2 text-xs">
+              <span className="shrink-0 text-muted-foreground">输出</span>
+              <span className="min-w-0 truncate font-mono font-medium text-foreground">
+                {outputFields[0][0]}
+              </span>
+              <Badge variant="secondary" className="ml-auto shrink-0 px-1.5 font-mono text-[10px]">
+                {outputFields[0][1]}
+              </Badge>
+              {outputFields.length > 1 ? (
+                <span className="shrink-0 text-muted-foreground">+{outputFields.length - 1}</span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        {hasOutput ? (
+          <Handle
+            type="source"
+            position={Position.Right}
+            id="output"
+            className="!size-3 !-right-1.5 !rounded-full !border-2 !border-blue-400 !bg-background"
+          />
+        ) : null}
+        {multiOutputs ? (
+          <>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="true"
+              style={{ top: '30%' }}
+              className="!size-3 !-right-1.5 !rounded-full !border-2 !border-green-500 !bg-background"
+            />
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="false"
+              style={{ top: '70%' }}
+              className="!size-3 !-right-1.5 !rounded-full !border-2 !border-red-500 !bg-background"
+            />
+          </>
+        ) : null}
+        {nodeType !== 'end' && nodeType !== 'condition' && !connectedSourceNodeIDs.has(id) ? (
+          <div className="nodrag nopan absolute left-full top-1/2 z-10 ml-5 -translate-y-1/2 opacity-0 transition-opacity group-hover/node:opacity-100">
+            <NodePicker
+              side="right"
+              align="center"
+              trigger={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  className="rounded-full bg-background shadow-sm"
+                  aria-label={`在 ${label} 后添加节点`}
+                >
+                  <Plus className="size-4" />
+                </Button>
+              }
+              onSelect={(item) => insertAfter(id, item)}
+            />
+          </div>
+        ) : null}
+      </div>
+      {snapshot ? <NodeRunDetails snapshot={snapshot} /> : null}
+    </div>
+  );
+});

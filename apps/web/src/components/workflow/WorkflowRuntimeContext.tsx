@@ -1,10 +1,14 @@
 import { createContext, type ReactNode, useContext } from 'react';
+import type { NodePickerItem } from './NodePicker';
 import type { WorkflowRunSession } from './runSession';
 
 interface WorkflowRuntimeContextValue {
   session: WorkflowRunSession;
+  connectedSourceNodeIDs: ReadonlySet<string>;
   copyNode: (nodeId: string) => void;
   deleteNode: (nodeId: string) => void;
+  insertAfter: (nodeId: string, item: NodePickerItem) => void;
+  insertOnEdge: (edgeId: string, item: NodePickerItem) => void;
 }
 
 const WorkflowRuntimeContext = createContext<WorkflowRuntimeContextValue | null>(null);

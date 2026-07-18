@@ -296,7 +296,7 @@ export default function KnowledgeBases() {
                   <Button
                     key={base.id}
                     variant={selectedID === base.id ? 'secondary' : 'ghost'}
-                    className="h-auto w-full justify-start rounded-lg px-3 py-3 text-left"
+                    className="h-auto w-full justify-start rounded-lg px-3 py-3 text-left hover:bg-accent focus-visible:bg-accent"
                     onClick={() => setSelectedID(base.id)}
                   >
                     <BookOpenText className="mr-3 h-4 w-4 shrink-0 text-primary" />

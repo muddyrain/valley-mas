@@ -12,12 +12,21 @@ interface PropertyFormBaseProps {
   selectedNode: {
     id: string;
     type: string;
-    data: { label: string; nodeType: string; config?: Record<string, unknown> };
+    data: {
+      label: string;
+      nodeType: string;
+      config?: Record<string, unknown>;
+      when?: import('../types').WorkflowRule;
+    };
   };
   onClose: () => void;
   onUpdateNode: (
     nodeId: string,
-    updates: Partial<{ label: string; config: Record<string, unknown> }>,
+    updates: Partial<{
+      label: string;
+      config: Record<string, unknown>;
+      when: import('../types').WorkflowRule | undefined;
+    }>,
   ) => void;
   children: ReactNode;
   runContent?: ReactNode;
@@ -41,7 +50,9 @@ export function PropertyFormBase({
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <Badge variant="outline">{config?.label}</Badge>
-          <span className="text-sm font-semibold text-foreground">节点配置</span>
+          <span className="truncate text-sm font-semibold text-foreground">
+            {selectedNode.data.label}
+          </span>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose}>
           <X className="h-4 w-4" />
@@ -61,9 +72,11 @@ export function PropertyFormBase({
             <TabsTrigger value="config" className="flex-none px-3">
               配置
             </TabsTrigger>
-            <TabsTrigger value="run" className="flex-none px-3">
-              本次运行
-            </TabsTrigger>
+            {runContent ? (
+              <TabsTrigger value="run" className="flex-none px-3">
+                运行
+              </TabsTrigger>
+            ) : null}
           </TabsList>
           <TabsContent value="config" className="min-h-0">
             <PropertyConfigContent
@@ -74,9 +87,11 @@ export function PropertyFormBase({
               {children}
             </PropertyConfigContent>
           </TabsContent>
-          <TabsContent value="run" className="min-h-0">
-            <ScrollArea className="h-full bg-muted/20">{runContent}</ScrollArea>
-          </TabsContent>
+          {runContent ? (
+            <TabsContent value="run" className="min-h-0">
+              <ScrollArea className="h-full bg-muted/20">{runContent}</ScrollArea>
+            </TabsContent>
+          ) : null}
         </Tabs>
       ) : (
         <PropertyConfigContent

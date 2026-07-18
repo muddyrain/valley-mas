@@ -1,8 +1,11 @@
 import type { Edge, Node } from '@xyflow/react';
 import { Settings } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { NodeRunInspector } from './NodeRunInspector';
 import { PROPERTY_FORM_MAP } from './properties';
 import { PropertyFormBase } from './properties/PropertyFormBase';
+import { WhenPropertyForm } from './properties/WhenPropertyForm';
 import type { NodeRunSnapshot } from './runSession';
 import { getUpstreamWorkflowVariables } from './workflowVariables';
 
@@ -12,12 +15,21 @@ interface PropertyPanelProps {
   selectedNode: {
     id: string;
     type: string;
-    data: { label: string; nodeType: string; config?: Record<string, unknown> };
+    data: {
+      label: string;
+      nodeType: string;
+      config?: Record<string, unknown>;
+      when?: import('./types').WorkflowRule;
+    };
   } | null;
   onClose: () => void;
   onUpdateNode: (
     nodeId: string,
-    updates: Partial<{ label: string; config: Record<string, unknown> }>,
+    updates: Partial<{
+      label: string;
+      config: Record<string, unknown>;
+      when: import('./types').WorkflowRule | undefined;
+    }>,
   ) => void;
   nodes: Node[];
   edges: Edge[];
@@ -40,22 +52,38 @@ export function PropertyPanel({
     return (
       <div className="h-full flex flex-col border-l border-border bg-card">
         <div className="border-b border-border px-4 py-3">
-          <h2 className="text-sm font-semibold text-foreground">节点配置</h2>
+          <h2 className="text-sm font-semibold text-foreground">当前节点</h2>
         </div>
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-            <Settings className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <p className="mb-2 text-sm text-muted-foreground">选择一个节点开始配置</p>
-          <p className="text-xs text-muted-foreground/70">
-            画布中的节点会在这里显示输入、参数和输出。
-          </p>
-        </div>
+        <Tabs
+          value={activeTab || 'config'}
+          onValueChange={(value) => onActiveTabChange?.(value as PropertyPanelTab)}
+          className="min-h-0 flex-1 gap-0"
+        >
+          <TabsList
+            className="w-full rounded-none border-b border-border bg-card px-4"
+            variant="line"
+          >
+            <TabsTrigger value="config" className="flex-none px-3">
+              配置
+            </TabsTrigger>
+            <TabsTrigger value="run" className="flex-none px-3">
+              运行
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="config" className="min-h-0">
+            <EmptyPanel message="选择一个节点开始配置" />
+          </TabsContent>
+          <TabsContent value="run" className="min-h-0">
+            <ScrollArea className="h-full">
+              <EmptyPanel message="运行后查看节点详情" />
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
       </div>
     );
   }
 
-  const { nodeType, config } = selectedNode.data;
+  const { nodeType, config, when } = selectedNode.data;
   const FormComponent = PROPERTY_FORM_MAP[nodeType as keyof typeof PROPERTY_FORM_MAP];
   const variableOptions = getUpstreamWorkflowVariables(nodes, edges, selectedNode.id);
 
@@ -94,14 +122,39 @@ export function PropertyPanel({
           config={config || {}}
           onUpdateConfig={handleUpdateConfig}
           variableOptions={
-            nodeType === 'blog.parseMarkdown' ||
-            nodeType === 'knowledge.retrieve' ||
-            nodeType === 'llm.text'
+            nodeType === 'tool' ||
+            nodeType === 'end' ||
+            nodeType === 'condition' ||
+            nodeType === 'llm' ||
+            nodeType === 'merge' ||
+            nodeType === 'variable' ||
+            nodeType === 'subworkflow'
               ? variableOptions
               : undefined
           }
         />
       )}
+      {nodeType === 'tool' ||
+      nodeType === 'llm' ||
+      nodeType === 'variable' ||
+      nodeType === 'subworkflow' ? (
+        <WhenPropertyForm
+          when={when}
+          onChange={(nextWhen) => onUpdateNode(selectedNode.id, { when: nextWhen })}
+          variableOptions={variableOptions}
+        />
+      ) : null}
     </PropertyFormBase>
+  );
+}
+
+function EmptyPanel({ message }: { message: string }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+      <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-muted/50">
+        <Settings className="size-6 text-muted-foreground" />
+      </div>
+      <p className="mb-2 text-sm text-muted-foreground">{message}</p>
+    </div>
   );
 }

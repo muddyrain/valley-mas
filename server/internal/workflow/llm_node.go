@@ -2,7 +2,9 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -34,20 +36,21 @@ type LLMTextExecutor struct {
 	Generator TextGenerator
 }
 
-func (LLMTextExecutor) Type() NodeType { return NodeTypeLLMText }
+func (LLMTextExecutor) Type() NodeType { return NodeTypeLLM }
 
 func (executor LLMTextExecutor) Execute(ctx context.Context, _ RunContext, execution NodeExecution) (NodeResult, error) {
 	if stringFromValue(execution.Input["modelProfile"]) != "ark-text-default" {
 		return NodeResult{}, fmt.Errorf("modelProfile 必须为 ark-text-default")
 	}
+	inputs, _ := execution.Input["inputs"].(map[string]any)
 	request := TextGenerationRequest{
 		SystemPrompt:    stringFromValue(execution.Input["systemPrompt"]),
-		Prompt:          stringFromValue(execution.Input["prompt"]),
+		Prompt:          promptWithInputs(stringFromValue(execution.Input["prompt"]), inputs),
 		Temperature:     numberFromValue(execution.Input["temperature"]),
 		MaxOutputTokens: int(numberFromValue(execution.Input["maxOutputTokens"])),
 	}
-	if request.SystemPrompt == "" || request.Prompt == "" {
-		return NodeResult{}, fmt.Errorf("大模型节点提示词不能为空")
+	if request.Prompt == "" {
+		return NodeResult{}, fmt.Errorf("大模型节点用户提示词不能为空")
 	}
 	generator := executor.Generator
 	if generator == nil {
@@ -63,6 +66,36 @@ func (executor LLMTextExecutor) Execute(ctx context.Context, _ RunContext, execu
 	return NodeResult{Output: map[string]any{"text": strings.TrimSpace(result.Text), "model": result.Model, "tokenUsage": result.TokenUsage}}, nil
 }
 
+func promptWithInputs(prompt string, inputs map[string]any) string {
+	if len(inputs) == 0 {
+		return prompt
+	}
+	names := make([]string, 0, len(inputs))
+	for name := range inputs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var builder strings.Builder
+	builder.WriteString(prompt)
+	builder.WriteString("\n\n输入变量：")
+	for _, name := range names {
+		builder.WriteString("\n- ")
+		builder.WriteString(name)
+		builder.WriteString(": ")
+		if text, ok := inputs[name].(string); ok {
+			builder.WriteString(text)
+			continue
+		}
+		encoded, err := json.Marshal(inputs[name])
+		if err != nil {
+			builder.WriteString(fmt.Sprint(inputs[name]))
+			continue
+		}
+		builder.Write(encoded)
+	}
+	return builder.String()
+}
+
 // ARKTextGenerator is intentionally restricted to ReadARKTextConfig: graph
 // authors may tune generation parameters but cannot choose an endpoint.
 type ARKTextGenerator struct{}
@@ -76,12 +109,13 @@ func (ARKTextGenerator) Generate(ctx context.Context, input TextGenerationReques
 	if client == nil {
 		return TextGenerationResult{}, fmt.Errorf("AI 未配置：ARK client 不可用")
 	}
-	system := input.SystemPrompt
 	prompt := input.Prompt
-	request := aiclient.NewARKChatRequest(cfg.Model, []*arkmodel.ChatCompletionMessage{
-		{Role: arkmodel.ChatMessageRoleSystem, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &system}},
-		{Role: arkmodel.ChatMessageRoleUser, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &prompt}},
-	}, aiclient.WithARKChatTemperature(float32(input.Temperature)), aiclient.WithARKChatTokens(input.MaxOutputTokens))
+	messages := []*arkmodel.ChatCompletionMessage{}
+	if system := strings.TrimSpace(input.SystemPrompt); system != "" {
+		messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleSystem, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &system}})
+	}
+	messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleUser, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &prompt}})
+	request := aiclient.NewARKChatRequest(cfg.Model, messages, aiclient.WithARKChatTemperature(float32(input.Temperature)), aiclient.WithARKChatTokens(input.MaxOutputTokens))
 	response, err := client.CreateChatCompletion(ctx, request)
 	if err != nil {
 		return TextGenerationResult{}, fmt.Errorf("AI 上游调用失败: %w", err)

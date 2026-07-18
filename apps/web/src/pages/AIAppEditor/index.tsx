@@ -42,7 +42,6 @@ import {
   listAIAppToolBindings,
   listAIAppTools,
   listAIKnowledgeBases,
-  type PromptAssistantField,
   publishAIApp,
   replaceAIAPIKeyAppBindings,
   replaceAIAppKnowledgeBases,
@@ -53,12 +52,11 @@ import {
   streamDebugAIApp,
   uploadAIAppAvatar,
 } from '@/api/aiWorkbench';
+import type { CopilotProposal } from '@/api/workbenchCopilot';
 import { AgentAvatar } from '@/components/ai-workbench/AgentAvatar';
 import { AIResponseContext } from '@/components/ai-workbench/AIResponseContext';
 import { EditorPageHeader } from '@/components/ai-workbench/EditorPageHeader';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
-import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
-import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -88,6 +86,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { KnowledgeBaseBindings } from '@/components/workbench/KnowledgeBaseBindings';
+import { MobileCopilotSheet } from '@/components/workbench/MobileCopilotSheet';
+import { WorkbenchCopilot } from '@/components/workbench/WorkbenchCopilot';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AgentConfig {
   modelProfile: 'ark-text-default';
@@ -102,6 +103,43 @@ const defaultConfig: AgentConfig = {
   openingMessage: '',
   exampleQuestions: [],
 };
+
+function AgentEditorSkeleton() {
+  return (
+    <div className="mx-auto max-w-[1440px] space-y-6 p-4 pb-16 pt-8 sm:p-8" aria-busy="true">
+      <div className="flex items-center justify-between gap-4 border-b border-border bg-card px-4 py-3 sm:px-6">
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-9 rounded-md" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-9 w-20" />
+          <Skeleton className="h-9 w-20" />
+        </div>
+      </div>
+      <Card className="gap-0 py-0 shadow-xs">
+        <CardHeader className="border-b border-border/70 px-6 py-5 sm:px-8">
+          <Skeleton className="h-5 w-32" />
+        </CardHeader>
+        <CardContent className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="space-y-5">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-56 w-full" />
+          </div>
+          <div className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-28 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 async function copyText(value: string, successMessage: string) {
   try {
@@ -164,8 +202,11 @@ export default function AIAppEditor() {
   const [generatedAPIKey, setGeneratedAPIKey] = useState<string | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<AIAPIKey | null>(null);
   const [publicInvocations, setPublicInvocations] = useState<AIAppPublicInvocation[]>([]);
-  const [assistantField, setAssistantField] = useState<PromptAssistantField | null>(null);
+  const [rightWorkspaceTab, setRightWorkspaceTab] = useState<'debug' | 'ai'>('debug');
+  const [copilotField, setCopilotField] = useState<string>('');
+  const [showMobileCopilot, setShowMobileCopilot] = useState(false);
   const [avatarAction, setAvatarAction] = useState<'generate' | 'upload' | null>(null);
+  const isMobile = useIsMobile();
   const abortDebugRef = useRef<AbortController | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -522,12 +563,39 @@ while (true) {
     }
   };
 
+  const openCopilotForField = (field: string) => {
+    setCopilotField(field);
+    setRightWorkspaceTab('ai');
+    if (isMobile) setShowMobileCopilot(true);
+  };
+
+  const applyCopilotProposal = (proposal: CopilotProposal) => {
+    const candidate = proposal.candidate as Partial<{
+      name: string;
+      description: string;
+      config: Partial<AgentConfig>;
+    }>;
+    if (proposal.targetType !== 'agent' || !candidate || typeof candidate !== 'object') {
+      throw new Error('提案不是有效的智能体草稿');
+    }
+    if (typeof candidate.name === 'string') setName(candidate.name);
+    if (typeof candidate.description === 'string') setDescription(candidate.description);
+    if (candidate.config && typeof candidate.config === 'object') {
+      setConfig((current) => ({
+        ...current,
+        ...candidate.config,
+        modelProfile: 'ark-text-default',
+        exampleQuestions: Array.isArray(candidate.config?.exampleQuestions)
+          ? candidate.config.exampleQuestions.filter(
+              (item): item is string => typeof item === 'string',
+            )
+          : current.exampleQuestions,
+      }));
+    }
+  };
+
   if (loading) {
-    return (
-      <div className="relative mx-auto min-h-[calc(100vh-10rem)] max-w-3xl">
-        <BoxLoadingOverlay show compact minimal title="加载智能体" />
-      </div>
-    );
+    return <AgentEditorSkeleton />;
   }
   if (!app) return null;
   if (app.type !== 'agent') {
@@ -542,6 +610,29 @@ while (true) {
       </div>
     );
   }
+
+  const copilot = (
+    <WorkbenchCopilot
+      context={{
+        scope: 'agent',
+        targetId: appId,
+        draft: {
+          name,
+          description,
+          config,
+          selectedField: copilotField,
+        },
+        runId: runs[0]?.id,
+      }}
+      suggestions={[
+        copilotField
+          ? `优化当前${copilotField}，保持其他字段不变`
+          : '检查当前智能体草稿并给出改进提案',
+        runs[0]?.status === 'failed' ? '根据最近失败生成修复提案' : '让开场白和示例问题更一致',
+      ]}
+      onApplyProposal={applyCopilotProposal}
+    />
+  );
 
   return (
     <div className="mx-auto max-w-[1440px] space-y-6 p-4 pb-16 pt-8 sm:p-8">
@@ -656,7 +747,7 @@ while (true) {
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => setAssistantField('description')}
+                          onClick={() => openCopilotForField('简介')}
                         >
                           <Sparkles className="mr-2 size-4" />
                           AI 生成
@@ -676,7 +767,7 @@ while (true) {
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => setAssistantField('system_prompt')}
+                          onClick={() => openCopilotForField('系统提示词')}
                         >
                           <Sparkles className="mr-2 size-4" />
                           AI 优化
@@ -698,7 +789,7 @@ while (true) {
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => setAssistantField('opening_message')}
+                          onClick={() => openCopilotForField('开场白')}
                         >
                           <Sparkles className="mr-2 size-4" />
                           AI 生成
@@ -720,7 +811,7 @@ while (true) {
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => setAssistantField('example_questions')}
+                          onClick={() => openCopilotForField('示例问题')}
                         >
                           <Sparkles className="mr-2 size-4" />
                           AI 生成
@@ -954,223 +1045,205 @@ while (true) {
               </Tabs>
             </div>
             <aside className="flex flex-col gap-4 bg-muted/25 p-5 sm:p-6 lg:border-l lg:border-border/70">
-              <Card size="sm" className="gap-0 shadow-none">
-                <CardHeader className="border-b border-border bg-muted/30">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background ring-1 ring-border">
-                        <Bot className="size-4 text-primary" />
+              <Tabs
+                value={rightWorkspaceTab}
+                onValueChange={(value) => setRightWorkspaceTab(value as 'debug' | 'ai')}
+                className="min-h-[620px] gap-4"
+              >
+                <TabsList className="self-start">
+                  <TabsTrigger value="debug">在线调试</TabsTrigger>
+                  <TabsTrigger value="ai">AI 协作</TabsTrigger>
+                </TabsList>
+                <TabsContent value="debug" className="space-y-4">
+                  <Card size="sm" className="gap-0 shadow-none">
+                    <CardHeader className="border-b border-border bg-muted/30">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background ring-1 ring-border">
+                            <Bot className="size-4 text-primary" />
+                          </div>
+                          <div>
+                            <CardTitle>在线调试</CardTitle>
+                            <CardDescription>直接测试当前草稿</CardDescription>
+                          </div>
+                        </div>
+                        <Badge variant="secondary">草稿</Badge>
                       </div>
-                      <div>
-                        <CardTitle>在线调试</CardTitle>
-                        <CardDescription>直接测试当前草稿</CardDescription>
-                      </div>
-                    </div>
-                    <Badge variant="secondary">草稿</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3 pt-4">
-                  <Textarea
-                    value={debugMessage}
-                    className="min-h-28 resize-y bg-background"
-                    placeholder="输入一条消息，看看智能体会如何回答"
-                    onChange={(event) => setDebugMessage(event.target.value)}
-                  />
-                  {config.exampleQuestions.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {config.exampleQuestions.slice(0, 2).map((question) => (
+                    </CardHeader>
+                    <CardContent className="space-y-3 pt-4">
+                      <Textarea
+                        value={debugMessage}
+                        className="min-h-28 resize-y bg-background"
+                        placeholder="输入一条消息，看看智能体会如何回答"
+                        onChange={(event) => setDebugMessage(event.target.value)}
+                      />
+                      {config.exampleQuestions.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {config.exampleQuestions.slice(0, 2).map((question) => (
+                            <Button
+                              key={question}
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="max-w-full justify-start font-normal"
+                              disabled={debugging}
+                              onClick={() => setDebugMessage(question)}
+                            >
+                              <span className="truncate">{question}</span>
+                            </Button>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="flex justify-end">
                         <Button
-                          key={question}
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="max-w-full justify-start font-normal"
-                          disabled={debugging}
-                          onClick={() => setDebugMessage(question)}
+                          variant={debugging ? 'outline' : 'default'}
+                          disabled={!debugging && !debugMessage.trim()}
+                          onClick={() => {
+                            if (debugging) {
+                              abortDebugRef.current?.abort();
+                            } else {
+                              void debug();
+                            }
+                          }}
                         >
-                          <span className="truncate">{question}</span>
+                          {debugging ? (
+                            <Square data-icon="inline-start" />
+                          ) : (
+                            <Play data-icon="inline-start" />
+                          )}
+                          {debugging ? '停止生成' : '开始调试'}
                         </Button>
-                      ))}
-                    </div>
-                  ) : null}
-                  <div className="flex justify-end">
-                    <Button
-                      variant={debugging ? 'outline' : 'default'}
-                      disabled={!debugging && !debugMessage.trim()}
-                      onClick={() => {
-                        if (debugging) {
-                          abortDebugRef.current?.abort();
-                        } else {
-                          void debug();
-                        }
-                      }}
-                    >
-                      {debugging ? (
-                        <Square data-icon="inline-start" />
+                      </div>
+                      {debugging && !debugReply ? (
+                        <div className="space-y-3 rounded-lg bg-muted/50 p-3" aria-live="polite">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Bot className="size-3.5" />
+                            智能体正在思考
+                          </div>
+                          <Skeleton className="h-3 w-full" />
+                          <Skeleton className="h-3 w-4/5" />
+                        </div>
+                      ) : null}
+                      {debugReply ? (
+                        <div className="overflow-hidden rounded-lg border border-border bg-background">
+                          <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
+                            <AgentAvatar name={name} src={app.avatarUrl} className="size-5" />
+                            {name || '智能体'}的回复
+                          </div>
+                          <div className="whitespace-pre-wrap px-3 py-3 text-sm leading-6">
+                            {debugReply}
+                          </div>
+                        </div>
+                      ) : null}
+                      <AIResponseContext
+                        toolStatus={debugToolStatus}
+                        references={debugReferences}
+                      />
+                    </CardContent>
+                  </Card>
+                  <Separator />
+                  <div className="flex flex-col gap-3">
+                    <p className="text-sm font-semibold">最近运行</p>
+                    <div className="flex flex-col gap-3">
+                      {runs.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">暂无运行记录</p>
                       ) : (
-                        <Play data-icon="inline-start" />
+                        runs.slice(0, 3).map((run) => (
+                          <div
+                            key={run.id}
+                            className="rounded-2xl border border-border/70 bg-background/60 p-3 text-sm"
+                          >
+                            <div className="flex justify-between">
+                              <span>
+                                {run.status === 'succeeded'
+                                  ? '成功'
+                                  : run.status === 'cancelled'
+                                    ? '已停止'
+                                    : '失败'}
+                              </span>
+                              <span className="text-muted-foreground">{run.durationMs} ms</span>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              v
+                              {versions.find((version) => version.id === run.versionId)?.number ??
+                                '—'}{' '}
+                              · {run.model || '模型信息不可用'}
+                            </p>
+                            <p className="mt-2 line-clamp-2 text-muted-foreground">
+                              {run.output || run.errorCode || run.input}
+                            </p>
+                          </div>
+                        ))
                       )}
-                      {debugging ? '停止生成' : '开始调试'}
-                    </Button>
+                    </div>
                   </div>
-                  {debugging && !debugReply ? (
-                    <div className="space-y-3 rounded-lg bg-muted/50 p-3" aria-live="polite">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Bot className="size-3.5" />
-                        智能体正在思考
-                      </div>
-                      <Skeleton className="h-3 w-full" />
-                      <Skeleton className="h-3 w-4/5" />
+                  <Separator />
+                  <div className="flex flex-col gap-3">
+                    <p className="flex items-center gap-2 text-sm font-semibold">
+                      <Activity className="h-4 w-4 text-primary" />
+                      公开调用记录
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      仅记录状态、耗时和配额次数，不保存外部消息或回复。
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {publicInvocations.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">暂无公开调用记录</p>
+                      ) : (
+                        publicInvocations.slice(0, 5).map((invocation) => (
+                          <div
+                            key={invocation.id}
+                            className="rounded-xl border border-border/70 bg-background/60 px-3 py-2 text-xs"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span>
+                                {invocation.status === 'succeeded'
+                                  ? '成功'
+                                  : invocation.status === 'rejected'
+                                    ? '已拒绝'
+                                    : '失败'}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {invocation.durationMs} ms
+                              </span>
+                            </div>
+                            <p className="mt-1 text-muted-foreground">
+                              第 {invocation.dailyCallNumber} 次 ·{' '}
+                              {invocation.stream ? '流式' : 'JSON'}
+                              {invocation.errorCode ? ` · ${invocation.errorCode}` : ''}
+                            </p>
+                          </div>
+                        ))
+                      )}
                     </div>
-                  ) : null}
-                  {debugReply ? (
-                    <div className="overflow-hidden rounded-lg border border-border bg-background">
-                      <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
-                        <AgentAvatar name={name} src={app.avatarUrl} className="size-5" />
-                        {name || '智能体'}的回复
-                      </div>
-                      <div className="whitespace-pre-wrap px-3 py-3 text-sm leading-6">
-                        {debugReply}
-                      </div>
+                  </div>
+                </TabsContent>
+                <TabsContent
+                  value="ai"
+                  className="min-h-0 overflow-hidden rounded-xl border border-border bg-card"
+                >
+                  {isMobile ? (
+                    <div className="flex min-h-40 items-center justify-center p-6">
+                      <Button onClick={() => setShowMobileCopilot(true)}>打开 AI 协作</Button>
                     </div>
-                  ) : null}
-                  <AIResponseContext toolStatus={debugToolStatus} references={debugReferences} />
-                </CardContent>
-              </Card>
-              <Separator />
-              <div className="flex flex-col gap-3">
-                <p className="text-sm font-semibold">最近运行</p>
-                <div className="flex flex-col gap-3">
-                  {runs.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">暂无运行记录</p>
                   ) : (
-                    runs.slice(0, 3).map((run) => (
-                      <div
-                        key={run.id}
-                        className="rounded-2xl border border-border/70 bg-background/60 p-3 text-sm"
-                      >
-                        <div className="flex justify-between">
-                          <span>
-                            {run.status === 'succeeded'
-                              ? '成功'
-                              : run.status === 'cancelled'
-                                ? '已停止'
-                                : '失败'}
-                          </span>
-                          <span className="text-muted-foreground">{run.durationMs} ms</span>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          v{versions.find((version) => version.id === run.versionId)?.number ?? '—'}{' '}
-                          · {run.model || '模型信息不可用'}
-                        </p>
-                        <p className="mt-2 line-clamp-2 text-muted-foreground">
-                          {run.output || run.errorCode || run.input}
-                        </p>
-                      </div>
-                    ))
+                    copilot
                   )}
-                </div>
-              </div>
-              <Separator />
-              <div className="flex flex-col gap-3">
-                <p className="flex items-center gap-2 text-sm font-semibold">
-                  <Activity className="h-4 w-4 text-primary" />
-                  公开调用记录
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  仅记录状态、耗时和配额次数，不保存外部消息或回复。
-                </p>
-                <div className="flex flex-col gap-2">
-                  {publicInvocations.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">暂无公开调用记录</p>
-                  ) : (
-                    publicInvocations.slice(0, 5).map((invocation) => (
-                      <div
-                        key={invocation.id}
-                        className="rounded-xl border border-border/70 bg-background/60 px-3 py-2 text-xs"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span>
-                            {invocation.status === 'succeeded'
-                              ? '成功'
-                              : invocation.status === 'rejected'
-                                ? '已拒绝'
-                                : '失败'}
-                          </span>
-                          <span className="text-muted-foreground">{invocation.durationMs} ms</span>
-                        </div>
-                        <p className="mt-1 text-muted-foreground">
-                          第 {invocation.dailyCallNumber} 次 · {invocation.stream ? '流式' : 'JSON'}
-                          {invocation.errorCode ? ` · ${invocation.errorCode}` : ''}
-                        </p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
+                </TabsContent>
+              </Tabs>
             </aside>
           </div>
         </CardContent>
       </Card>
-      <PromptAssistantDialog
-        open={assistantField !== null}
-        onOpenChange={(open) => {
-          if (!open) setAssistantField(null);
-        }}
-        appId={appId || ''}
-        field={assistantField || 'system_prompt'}
-        currentPrompt={
-          assistantField === 'description'
-            ? description
-            : assistantField === 'opening_message'
-              ? config.openingMessage
-              : assistantField === 'example_questions'
-                ? config.exampleQuestions.join('\n')
-                : config.systemPrompt
-        }
-        agentContext={{
-          name,
-          description,
-          systemPrompt: config.systemPrompt,
-          openingMessage: config.openingMessage,
-          exampleQuestions: config.exampleQuestions,
-        }}
-        runs={runs}
-        onReplace={(suggestion, includeGreetings) => {
-          if (assistantField === 'description') {
-            setDescription(suggestion.description || description);
-            toast.success('已更新简介草稿，尚未保存版本');
-            return;
-          }
-          if (assistantField === 'opening_message') {
-            setConfig((value) => ({
-              ...value,
-              openingMessage: suggestion.openingMessage || value.openingMessage,
-            }));
-            toast.success('已更新开场白草稿，尚未保存版本');
-            return;
-          }
-          if (assistantField === 'example_questions') {
-            setConfig((value) => ({
-              ...value,
-              exampleQuestions: suggestion.exampleQuestions || value.exampleQuestions,
-            }));
-            toast.success('已更新示例问题草稿，尚未保存版本');
-            return;
-          }
-          setConfig((value) => ({
-            ...value,
-            systemPrompt: suggestion.optimizedPrompt,
-            openingMessage: includeGreetings
-              ? suggestion.openingMessage || value.openingMessage
-              : value.openingMessage,
-            exampleQuestions: includeGreetings
-              ? suggestion.exampleQuestions || value.exampleQuestions
-              : value.exampleQuestions,
-          }));
-          toast.success('已替换当前草稿，尚未保存版本');
-        }}
-      />
+      {isMobile ? (
+        <MobileCopilotSheet
+          open={showMobileCopilot}
+          onOpenChange={setShowMobileCopilot}
+          title="智能体 AI 协作"
+        >
+          {copilot}
+        </MobileCopilotSheet>
+      ) : null}
       <Dialog open={showVersionHistory} onOpenChange={setShowVersionHistory}>
         <DialogContent className="max-h-[calc(100vh-2rem)] max-w-2xl gap-4 overflow-hidden">
           <DialogHeader className="pr-10">

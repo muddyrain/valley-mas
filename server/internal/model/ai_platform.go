@@ -173,6 +173,72 @@ type AIAppConversationToolTrace struct {
 	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
+// AIWorkbenchCopilotSession is one owner-private collaboration thread for a workbench target.
+// A target may have multiple sessions; the most recently updated session is the default.
+type AIWorkbenchCopilotSession struct {
+	ID        Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID    Int64String `gorm:"index:idx_workbench_copilot_target;not null" json:"userId"`
+	Scope     string      `gorm:"size:20;index:idx_workbench_copilot_target;not null" json:"scope"`
+	TargetID  string      `gorm:"size:80;index:idx_workbench_copilot_target;not null;default:''" json:"targetId"`
+	Title     string      `gorm:"size:120;not null;default:'AI 协作'" json:"title"`
+	CreatedAt time.Time   `json:"createdAt"`
+	UpdatedAt time.Time   `json:"updatedAt"`
+}
+
+func (s *AIWorkbenchCopilotSession) BeforeCreate(tx *gorm.DB) error {
+	if s.ID == 0 {
+		s.ID = Int64String(utils.GenerateID())
+	}
+	if s.Title == "" {
+		s.Title = "AI 协作"
+	}
+	return nil
+}
+
+type AIWorkbenchCopilotMessage struct {
+	ID        Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	SessionID Int64String `gorm:"index;not null" json:"sessionId"`
+	UserID    Int64String `gorm:"index;not null" json:"userId"`
+	Role      string      `gorm:"size:20;not null" json:"role"`
+	Kind      string      `gorm:"size:20;not null;default:'text'" json:"kind"`
+	Content   string      `gorm:"type:text;not null" json:"content"`
+	CreatedAt time.Time   `json:"createdAt"`
+}
+
+func (m *AIWorkbenchCopilotMessage) BeforeCreate(tx *gorm.DB) error {
+	if m.ID == 0 {
+		m.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+type AIWorkbenchChangeProposal struct {
+	ID            Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	SessionID     Int64String `gorm:"index;not null" json:"sessionId"`
+	UserID        Int64String `gorm:"index;not null" json:"userId"`
+	TargetType    string      `gorm:"size:20;not null" json:"targetType"`
+	TargetID      string      `gorm:"size:80;not null;default:''" json:"targetId"`
+	BaseHash      string      `gorm:"size:64;not null" json:"baseHash"`
+	BaseDraft     string      `gorm:"type:text;not null;default:'{}'" json:"baseDraft"`
+	Candidate     string      `gorm:"type:text;not null" json:"candidate"`
+	CandidateHash string      `gorm:"size:64;not null;default:''" json:"candidateHash"`
+	Diff          string      `gorm:"type:text;not null;default:'{}'" json:"diff"`
+	Status        string      `gorm:"size:20;index;not null;default:'pending'" json:"status"`
+	CreatedAt     time.Time   `json:"createdAt"`
+	UpdatedAt     time.Time   `json:"updatedAt"`
+	ResolvedAt    *time.Time  `json:"resolvedAt,omitempty"`
+}
+
+func (p *AIWorkbenchChangeProposal) BeforeCreate(tx *gorm.DB) error {
+	if p.ID == 0 {
+		p.ID = Int64String(utils.GenerateID())
+	}
+	if p.Status == "" {
+		p.Status = "pending"
+	}
+	return nil
+}
+
 func (t *AIAppConversationToolTrace) BeforeCreate(tx *gorm.DB) error {
 	if t.ID == 0 {
 		t.ID = Int64String(utils.GenerateID())

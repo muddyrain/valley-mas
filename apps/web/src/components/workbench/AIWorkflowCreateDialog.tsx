@@ -19,28 +19,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { NODE_CONFIGS } from '@/components/workflow/nodeConfig';
-
-function editorGraph(draft: AIWorkflowDraft) {
-  return {
-    schemaVersion: 2,
-    nodes: draft.graph.nodes.map((node, index) => ({
-      id: node.id,
-      type: node.type,
-      position: { x: 280, y: 80 + index * 150 },
-      data: {
-        label: NODE_CONFIGS[node.type]?.label || node.id,
-        nodeType: node.type,
-        config: node.config,
-      },
-      config: node.config,
-    })),
-    edges: draft.graph.edges.map((edge, index) => ({
-      id: `${edge.source}-${edge.target}-${index}`,
-      ...edge,
-      sourceHandle: edge.sourceHandle || 'output',
-    })),
-  };
-}
+import { workflowDraftToEditorGraph } from './workflowDraft';
 
 export function AIWorkflowCreateDialog({
   open,
@@ -87,7 +66,7 @@ export function AIWorkflowCreateDialog({
       const workflow = await createWorkflow({
         name: draft.name,
         description: draft.description,
-        graph: JSON.stringify(editorGraph(draft)),
+        graph: JSON.stringify(workflowDraftToEditorGraph(draft)),
         status: 'draft',
       });
       toast.success('工作流草稿已创建');

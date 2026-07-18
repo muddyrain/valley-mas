@@ -12,11 +12,11 @@ export default function WorkbenchLayout() {
   const toggleAIPanel = useLayoutStore((s) => s.toggleAIPanel);
   const setAIPanelOpen = useLayoutStore((s) => s.setAIPanelOpen);
   const location = useLocation();
-  const isAIAppWorkspace = location.pathname.startsWith('/workbench/apps/');
+  const isContextualWorkspace = location.pathname.startsWith('/workbench');
 
   useEffect(() => {
-    if (isAIAppWorkspace && aiPanelOpen) setAIPanelOpen(false);
-  }, [aiPanelOpen, isAIAppWorkspace, setAIPanelOpen]);
+    if (isContextualWorkspace && aiPanelOpen) setAIPanelOpen(false);
+  }, [aiPanelOpen, isContextualWorkspace, setAIPanelOpen]);
 
   return (
     <TooltipProvider>
@@ -30,10 +30,10 @@ export default function WorkbenchLayout() {
         </main>
 
         {/* AI Panel */}
-        {!isAIAppWorkspace && aiPanelOpen && <AIPanel />}
+        {!isContextualWorkspace && aiPanelOpen && <AIPanel />}
 
         {/* AI Panel Toggle (when closed) */}
-        {!isAIAppWorkspace && !aiPanelOpen && (
+        {!isContextualWorkspace && !aiPanelOpen && (
           <div className="fixed right-4 bottom-4 z-50 hidden md:block">
             <Button
               size="icon"

@@ -1,13 +1,31 @@
 import { useAuthStore } from '@/stores/useAuthStore';
 import request from '@/utils/request';
 
+export type WorkflowNodeType =
+  | 'start'
+  | 'end'
+  | 'llm'
+  | 'tool'
+  | 'condition'
+  | 'merge'
+  | 'variable'
+  | 'subworkflow';
+
+export interface WorkflowRule {
+  left: unknown;
+  operator: 'equals' | 'notEquals' | 'contains' | 'isEmpty' | 'greaterThan' | 'lessThan';
+  right?: unknown;
+}
+
 export interface WorkflowGraph {
-  schemaVersion: 2;
+  schemaVersion: 4;
   nodes: Array<{
     id: string;
-    type: string;
+    type: WorkflowNodeType;
+    label: string;
     position: { x: number; y: number };
-    data: Record<string, unknown>;
+    config: Record<string, unknown>;
+    when?: WorkflowRule;
   }>;
   edges: Array<{
     id: string;
@@ -24,6 +42,7 @@ export interface WorkflowItem {
   name: string;
   description: string;
   graph: string;
+  graphHash?: string;
   status: 'draft' | 'published';
   createdAt: string;
   updatedAt: string;
@@ -38,7 +57,7 @@ export interface WorkflowListData {
 
 export interface WorkflowRunEvent {
   step: string;
-  status: 'running' | 'success' | 'error' | 'done';
+  status: 'running' | 'success' | 'error' | 'skipped' | 'done';
   message?: string;
   data?: WorkflowRunEventData;
 }
@@ -46,7 +65,9 @@ export interface WorkflowRunEvent {
 export interface WorkflowRunEventData {
   runId?: string;
   nodeId?: string;
-  status?: 'running' | 'success' | 'error';
+  nodeType?: WorkflowNodeType;
+  capabilityId?: string;
+  status?: 'running' | 'success' | 'error' | 'skipped';
   message?: string;
   input?: Record<string, unknown>;
   output?: Record<string, unknown>;
@@ -69,7 +90,8 @@ export interface WorkflowNodeRun {
   workflowRunId: string;
   nodeId: string;
   nodeType: string;
-  status: 'running' | 'success' | 'error';
+  capabilityId?: string;
+  status: 'running' | 'success' | 'error' | 'skipped';
   input: string;
   output: string;
   errorCode?: string;
@@ -94,8 +116,15 @@ export interface AIWorkflowDraft {
   name: string;
   description: string;
   graph: {
-    schemaVersion: 2;
-    nodes: Array<{ id: string; type: string; config: Record<string, unknown> }>;
+    schemaVersion: 4;
+    nodes: Array<{
+      id: string;
+      type: WorkflowNodeType;
+      label: string;
+      position: { x: number; y: number };
+      config: Record<string, unknown>;
+      when?: WorkflowRule;
+    }>;
     edges: Array<{
       source: string;
       sourceHandle?: string;
@@ -103,6 +132,44 @@ export interface AIWorkflowDraft {
       targetHandle?: string;
     }>;
   };
+}
+
+export interface WorkflowNodeDefinition {
+  type: WorkflowNodeType;
+  label: string;
+  description: string;
+  category: 'model' | 'flow' | 'tool' | 'subworkflow';
+  inputPorts: string[];
+  outputPorts: string[];
+  whenAllowed: boolean;
+  configSchema: Record<string, unknown>;
+}
+
+export interface WorkflowToolCapability {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  sideEffect: 'none' | 'read' | 'model_and_storage' | 'write';
+  modelCost: number;
+  writeCost: number;
+  available: boolean;
+  inputSchema: {
+    type?: string;
+    required?: string[];
+    properties?: Record<string, { type?: string; title?: string }>;
+  };
+  outputSchema: Record<string, string>;
+  aiUsage: string;
+}
+
+export function listWorkflowCapabilities(): Promise<{
+  schemaVersion: 4;
+  nodeTypes: WorkflowNodeDefinition[];
+  toolCapabilities: WorkflowToolCapability[];
+  limits: { maxNodes: number; maxModelCapabilities: number; maxWriteCapabilities: number };
+}> {
+  return request.get('/workflows/capabilities');
 }
 
 export interface WorkflowRunExplanation {
@@ -164,8 +231,14 @@ export async function getWorkflow(id: string): Promise<WorkflowItem> {
 
 export async function updateWorkflow(
   id: string,
-  data: Partial<{ name: string; description: string; graph: string; status: string }>,
-): Promise<void> {
+  data: Partial<{
+    name: string;
+    description: string;
+    graph: string;
+    status: string;
+    baseHash: string;
+  }>,
+): Promise<{ graphHash: string }> {
   return request.put(`/workflows/${id}`, data);
 }
 

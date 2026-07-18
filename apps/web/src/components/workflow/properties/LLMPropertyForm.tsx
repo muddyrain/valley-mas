@@ -2,11 +2,14 @@ import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { VariableTokenEditor } from '../VariableTokenEditor';
+import { getWorkflowNodeOutputFields } from '../workflowVariables';
 import type { PropertyFormProps } from './index';
+import { VariableBindingEditor } from './VariableBindingEditor';
 
 export function LLMPropertyForm({
   config,
@@ -16,8 +19,25 @@ export function LLMPropertyForm({
   const [showAssistant, setShowAssistant] = useState(false);
   const systemPrompt = (config.systemPrompt as string) || '';
   const taskPrompt = (config.prompt as string) || '';
+  const inputs = (config.inputs as Record<string, unknown>) || {};
+  const inputTypes =
+    (config.inputTypes as Record<string, import('../types').WorkflowValueType>) || {};
+  const outputs = getWorkflowNodeOutputFields('llm', config);
   return (
     <div className="space-y-4">
+      <EditorSection title="输入变量" description="绑定模型本次调用使用的上游变量。">
+        <VariableBindingEditor
+          values={inputs}
+          types={inputTypes}
+          variableOptions={variableOptions}
+          onChange={(nextInputs, nextTypes) =>
+            onUpdateConfig({ inputs: nextInputs, inputTypes: nextTypes })
+          }
+          addLabel="添加输入"
+          baseName="input"
+          nameAriaLabel="输入名称"
+        />
+      </EditorSection>
       <EditorSection title="提示词" description="设置模型角色和本次生成任务。">
         <div className="space-y-1.5">
           <Label>模型配置</Label>
@@ -36,24 +56,30 @@ export function LLMPropertyForm({
               AI 优化
             </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            定义模型持续遵循的角色、规则和边界，可留空。
+          </p>
           <VariableTokenEditor
             id="llm-system-prompt"
+            ariaLabel="系统提示词"
             value={(config.systemPrompt as string) || ''}
             onChange={(systemPrompt) =>
               onUpdateConfig({ systemPrompt, modelProfile: 'ark-text-default' })
             }
             options={variableOptions}
-            placeholder="定义模型的角色和边界"
+            placeholder="例如：你是专业的内容编辑，回答应准确、简洁"
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="llm-prompt">提示词</Label>
+          <Label htmlFor="llm-prompt">用户提示词</Label>
+          <p className="text-xs text-muted-foreground">描述本次执行的具体任务，可引用上游变量。</p>
           <VariableTokenEditor
             id="llm-prompt"
+            ariaLabel="用户提示词"
             value={(config.prompt as string) || ''}
             onChange={(prompt) => onUpdateConfig({ prompt })}
             options={variableOptions}
-            placeholder="描述本次生成任务"
+            placeholder="例如：根据输入主题生成一篇文章"
           />
         </div>
       </EditorSection>
@@ -82,6 +108,27 @@ export function LLMPropertyForm({
               onChange={(event) => onUpdateConfig({ maxOutputTokens: Number(event.target.value) })}
             />
           </div>
+        </div>
+      </EditorSection>
+      <EditorSection title="输出" description="下游节点可直接引用这些字段。">
+        <div className="divide-y divide-border overflow-hidden rounded-md border border-border">
+          {outputs.map(([name, type]) => (
+            <div key={name} className="flex items-center justify-between gap-3 px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="truncate font-mono text-sm font-medium">{name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {name === 'text'
+                    ? '模型生成内容'
+                    : name === 'model'
+                      ? '实际使用的模型'
+                      : '本次调用的 Token 用量'}
+                </p>
+              </div>
+              <Badge variant="secondary" className="font-mono">
+                {type}
+              </Badge>
+            </div>
+          ))}
         </div>
       </EditorSection>
       <PromptAssistantDialog

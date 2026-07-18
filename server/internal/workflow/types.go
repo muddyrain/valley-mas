@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 )
 
+const SchemaVersion = 4
+
 type NodeType string
 
 type ValueType string
@@ -19,29 +21,38 @@ const (
 )
 
 const (
-	NodeTypeStart             NodeType = "start"
-	NodeTypeBlogParse         NodeType = "blog.parseMarkdown"
-	NodeTypeKnowledgeRetrieve NodeType = "knowledge.retrieve"
-	NodeTypeLLMText           NodeType = "llm.text"
-	NodeTypeBlogCreateDraft   NodeType = "blog.createDraft"
-	NodeTypeVariable          NodeType = "variable"
-	NodeTypeHTTP              NodeType = "http"
-	NodeTypeCode              NodeType = "code"
-	NodeTypeKnowledge         NodeType = "knowledge"
-	NodeTypeCondition         NodeType = "condition"
-	NodeTypeLoop              NodeType = "loop"
-	NodeTypeInput             NodeType = "input"
-	NodeTypeFileUpload        NodeType = "fileUpload"
-	NodeTypeEnd               NodeType = "end"
+	NodeTypeStart       NodeType = "start"
+	NodeTypeEnd         NodeType = "end"
+	NodeTypeLLM         NodeType = "llm"
+	NodeTypeTool        NodeType = "tool"
+	NodeTypeCondition   NodeType = "condition"
+	NodeTypeMerge       NodeType = "merge"
+	NodeTypeVariable    NodeType = "variable"
+	NodeTypeSubworkflow NodeType = "subworkflow"
 )
 
+type Position struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type Rule struct {
+	Left     any    `json:"left"`
+	Operator string `json:"operator"`
+	Right    any    `json:"right,omitempty"`
+}
+
 type Node struct {
-	ID     string          `json:"id"`
-	Type   NodeType        `json:"type"`
-	Config json.RawMessage `json:"config"`
+	ID       string          `json:"id"`
+	Type     NodeType        `json:"type"`
+	Label    string          `json:"label"`
+	Position Position        `json:"position"`
+	Config   json.RawMessage `json:"config"`
+	When     *Rule           `json:"when,omitempty"`
 }
 
 type Edge struct {
+	ID           string `json:"id,omitempty"`
 	Source       string `json:"source"`
 	SourceHandle string `json:"sourceHandle,omitempty"`
 	Target       string `json:"target"`
@@ -60,6 +71,7 @@ const (
 	StatusRunning   RunStatus = "running"
 	StatusSucceeded RunStatus = "success"
 	StatusFailed    RunStatus = "error"
+	StatusSkipped   RunStatus = "skipped"
 )
 
 type RunContext struct {
@@ -68,18 +80,16 @@ type RunContext struct {
 	Inputs             map[string]any
 	Outputs            map[string]map[string]any
 	KnowledgeRetriever KnowledgeRetriever
+	ContentSearcher    ContentSearcher
+	CoverGenerator     CoverGenerator
+	SubworkflowRunner  SubworkflowRunner
 }
 
-// Actor is the authenticated user who started a workflow run. It is runtime
-// context rather than a graph input, so workflow definitions cannot forge an
-// owner or elevate their role.
 type Actor struct {
 	UserID int64
 	Role   string
 }
 
-// FileInput is a runtime-only uploaded file. Content must never be persisted
-// or included in events; safePreviewMap emits only its metadata.
 type FileInput struct {
 	Filename    string
 	ContentType string
@@ -87,17 +97,17 @@ type FileInput struct {
 	Content     []byte
 }
 
-// Event is emitted at every node state transition. Input and Output contain
-// only values already supplied to, or produced by, the workflow runtime.
 type Event struct {
-	RunID      string         `json:"runId"`
-	NodeID     string         `json:"nodeId"`
-	Status     RunStatus      `json:"status"`
-	Message    string         `json:"message,omitempty"`
-	Input      map[string]any `json:"input,omitempty"`
-	Output     map[string]any `json:"output,omitempty"`
-	Error      string         `json:"error,omitempty"`
-	DurationMs int64          `json:"durationMs,omitempty"`
+	RunID        string         `json:"runId"`
+	NodeID       string         `json:"nodeId"`
+	NodeType     NodeType       `json:"nodeType"`
+	CapabilityID string         `json:"capabilityId,omitempty"`
+	Status       RunStatus      `json:"status"`
+	Message      string         `json:"message,omitempty"`
+	Input        map[string]any `json:"input,omitempty"`
+	Output       map[string]any `json:"output,omitempty"`
+	Error        string         `json:"error,omitempty"`
+	DurationMs   int64          `json:"durationMs,omitempty"`
 }
 
 type NodeResult struct {
@@ -105,16 +115,13 @@ type NodeResult struct {
 	Metadata map[string]any
 }
 
-// NodeExecution is the runtime view of a graph node. Input contains the
-// already resolved, type-preserving configuration values for this execution.
 type NodeExecution struct {
-	NodeID   string
-	NodeType NodeType
-	Input    map[string]any
+	NodeID       string
+	NodeType     NodeType
+	CapabilityID string
+	Input        map[string]any
 }
 
-// KnowledgeReference is the safe citation shape available to workflow nodes.
-// It intentionally excludes download URLs and complete source documents.
 type KnowledgeReference struct {
 	DocumentName string  `json:"documentName"`
 	ChunkID      string  `json:"chunkId"`
@@ -137,7 +144,66 @@ func (fn KnowledgeRetrieverFunc) Retrieve(ctx context.Context, query string) (Kn
 	return fn(ctx, query)
 }
 
+type ContentSearchItem struct {
+	Type    string `json:"type"`
+	ID      string `json:"id"`
+	Title   string `json:"title"`
+	Excerpt string `json:"excerpt"`
+	Href    string `json:"href"`
+}
+
+type ContentSearchResult struct {
+	Items []ContentSearchItem `json:"items"`
+}
+
+type ContentSearcher interface {
+	Search(context.Context, string, string, string) (ContentSearchResult, error)
+}
+
+type ContentSearcherFunc func(context.Context, string, string, string) (ContentSearchResult, error)
+
+func (fn ContentSearcherFunc) Search(ctx context.Context, query, createdFrom, createdTo string) (ContentSearchResult, error) {
+	return fn(ctx, query, createdFrom, createdTo)
+}
+
+type GeneratedCover struct {
+	URL        string `json:"url"`
+	StorageKey string `json:"storageKey"`
+	Model      string `json:"model"`
+	Size       string `json:"size"`
+}
+
+type CoverGenerator interface {
+	GenerateCover(context.Context, int64, string, string, string) (GeneratedCover, error)
+}
+
+type CoverGeneratorFunc func(context.Context, int64, string, string, string) (GeneratedCover, error)
+
+func (fn CoverGeneratorFunc) GenerateCover(ctx context.Context, userID int64, title, summary, style string) (GeneratedCover, error) {
+	return fn(ctx, userID, title, summary, style)
+}
+
+type SubworkflowRequest struct {
+	WorkflowID string
+	VersionID  string
+	Inputs     map[string]any
+}
+
+type SubworkflowRunner interface {
+	Run(context.Context, Actor, SubworkflowRequest) (map[string]any, error)
+}
+
+type SubworkflowRunnerFunc func(context.Context, Actor, SubworkflowRequest) (map[string]any, error)
+
+func (fn SubworkflowRunnerFunc) Run(ctx context.Context, actor Actor, request SubworkflowRequest) (map[string]any, error) {
+	return fn(ctx, actor, request)
+}
+
 type NodeExecutor interface {
 	Type() NodeType
+	Execute(context.Context, RunContext, NodeExecution) (NodeResult, error)
+}
+
+type CapabilityExecutor interface {
 	Execute(context.Context, RunContext, NodeExecution) (NodeResult, error)
 }

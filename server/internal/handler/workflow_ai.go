@@ -47,8 +47,9 @@ func CreateAIWorkflowDraft(c *gin.Context) {
 		return
 	}
 	current, _ := json.Marshal(payload.Current)
-	systemPrompt := `你是 Valley 工作流设计助手。只输出 JSON，字段必须且只能是 name、description、graph。graph.schemaVersion 必须为 2，并且是从 start 到 end 的单链 DAG，最多 8 个节点。只能使用以下节点：start、blog.parseMarkdown、knowledge.retrieve、llm.text、blog.createDraft、variable、end。最多一个 llm.text、一个 blog.createDraft，LLM maxOutputTokens 总和不超过 4096。禁止 HTTP、code、condition、loop 和任何未知节点。变量引用只能使用严格的 {{upstreamNodeId.output.field}}，且必须来自上游已声明输出。variable 配置为 {"variableName":"合法标识符","valueExpression":"字符串或上游变量模板"}。start 配置必须有 inputs；end 配置必须有 outputs。每个节点 config 必须是对象。根据需求选择最少节点，不要为展示能力而添加无关节点。`
-	userPrompt := fmt.Sprintf("用户需求：\n%s\n\n当前草稿（可能为空）：\n%s", truncateAIAgentRunes(payload.Description, 4000), current)
+	capabilities, _ := json.Marshal(workflow.Capabilities(workflowRuntimeRegistry()))
+	systemPrompt := `你是 Valley Graph v4 工作流规划器。只输出 JSON，字段必须且只能是 name、description、graph。graph.schemaVersion 必须为 4。节点类型只能是 start、end、llm、tool、condition、merge、variable、subworkflow；业务能力必须用 tool 节点并在 config.capabilityId 中选择能力目录里的工具 ID。只能生成 DAG，必须各有一个 Start 和 End，最多 30 个节点。条件节点使用 true/false 端口；可选执行优先使用节点 when，不要创建多余 Condition。变量引用严格使用 {{upstreamNodeId.output.field}}。可选封面必须让 Start 声明 generateCover boolean，在摘要节点后插入 tool/image.generateCover，并设置 node.when={"left":"{{start.output.generateCover}}","operator":"equals","right":true}。不要运行、发布或调用工具。根据需求生成最少节点。`
+	userPrompt := fmt.Sprintf("能力目录：\n%s\n\n用户需求：\n%s\n\n当前草稿（可能为空）：\n%s", capabilities, truncateAIAgentRunes(payload.Description, 4000), current)
 	var draft aiWorkflowDraft
 	err := runStructuredWorkbenchAI(c.Request.Context(), featureWorkflowDraft, model.Int64String(userID), systemPrompt, userPrompt, &draft, func() error {
 		return validateAIWorkflowDraft(&draft)
@@ -65,15 +66,6 @@ func validateAIWorkflowDraft(draft *aiWorkflowDraft) error {
 	draft.Description = truncateAIAgentRunes(strings.TrimSpace(draft.Description), 500)
 	if draft.Name == "" || draft.Description == "" {
 		return errors.New("工作流名称和简介不能为空")
-	}
-	allowed := map[workflow.NodeType]struct{}{
-		workflow.NodeTypeStart: {}, workflow.NodeTypeBlogParse: {}, workflow.NodeTypeKnowledgeRetrieve: {},
-		workflow.NodeTypeLLMText: {}, workflow.NodeTypeBlogCreateDraft: {}, workflow.NodeTypeVariable: {}, workflow.NodeTypeEnd: {},
-	}
-	for _, node := range draft.Graph.Nodes {
-		if _, exists := allowed[node.Type]; !exists {
-			return fmt.Errorf("节点类型 %s 不在 AI 草稿白名单", node.Type)
-		}
 	}
 	if validationErrors := workflow.ValidateGraph(draft.Graph, workflowRuntimeRegistry()); len(validationErrors) > 0 {
 		return errors.New(strings.Join(validationErrors, "；"))

@@ -1,7 +1,9 @@
 import { Braces, Plus, Variable } from 'lucide-react';
 import {
   type ClipboardEvent,
+  type FocusEvent,
   type KeyboardEvent,
+  type MouseEvent,
   type ReactNode,
   useCallback,
   useLayoutEffect,
@@ -18,6 +20,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import {
@@ -41,8 +44,13 @@ interface VariableDraft extends TextSelection {
   query: string;
 }
 
+interface CaretAnchor {
+  getBoundingClientRect: () => DOMRect;
+}
+
 interface VariableTokenEditorProps {
   id?: string;
+  ariaLabel?: string;
   value: string;
   onChange: (value: string) => void;
   options: WorkflowVariableOption[];
@@ -54,6 +62,10 @@ interface VariableTokenEditorProps {
 function readRawValue(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
   if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'BR') return '\n';
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    const token = (node as HTMLElement).dataset.variableToken;
+    if (token) return token;
+  }
   return Array.from(node.childNodes, readRawValue).join('');
 }
 
@@ -76,13 +88,27 @@ function getSelectionOffsets(root: HTMLElement): TextSelection | null {
   };
 }
 
+function getElementSelection(root: HTMLElement, element: HTMLElement): TextSelection {
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  return getSelectionOffsets(root) || { start: 0, end: 0 };
+}
+
 function getSelectionPosition(root: HTMLElement, offset: number): [Node, number] {
   let consumed = 0;
   const textNodes = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let textNode = textNodes.nextNode();
   while (textNode) {
-    const next = consumed + (textNode.textContent || '').length;
+    const token = textNode.parentElement?.closest<HTMLElement>('[data-variable-token]');
+    const next = consumed + (token?.dataset.variableToken || textNode.textContent || '').length;
     if (offset <= next) {
+      if (token?.parentNode) {
+        const tokenIndex = Array.from(token.parentNode.childNodes).indexOf(token);
+        return [token.parentNode, offset <= consumed ? tokenIndex : tokenIndex + 1];
+      }
       return [textNode, Math.max(0, offset - consumed)];
     }
     consumed = next;
@@ -103,11 +129,29 @@ function restoreSelection(root: HTMLElement, selection: TextSelection) {
   nextSelection.addRange(range);
 }
 
+function getCaretAnchor(root: HTMLElement): CaretAnchor {
+  const selection = window.getSelection();
+  if (selection?.rangeCount) {
+    const range = selection.getRangeAt(0);
+    if (root.contains(range.startContainer)) {
+      const caretRange = range.cloneRange();
+      caretRange.collapse(false);
+      const rect = caretRange.getBoundingClientRect();
+      if (rect.height > 0 || rect.width > 0) {
+        return { getBoundingClientRect: () => rect };
+      }
+    }
+  }
+  const rootRect = root.getBoundingClientRect();
+  const fallback = new DOMRect(rootRect.left + 12, rootRect.top + 12, 0, 24);
+  return { getBoundingClientRect: () => fallback };
+}
+
 function getVariableTokenClassName(option?: WorkflowVariableOption) {
   return cn(
-    'font-medium',
+    'mx-0.5 inline-flex cursor-pointer items-center rounded-md px-1.5 py-0.5 align-baseline font-medium transition-colors',
     option
-      ? 'text-blue-600 dark:text-blue-400'
+      ? 'bg-primary/8 text-primary hover:bg-primary/12'
       : 'rounded-sm bg-destructive/10 text-destructive underline decoration-dotted',
   );
 }
@@ -117,8 +161,47 @@ function createVariableTokenElement(segment: Extract<TemplateSegment, { type: 'v
   token.dataset.variableToken = segment.token;
   token.title = segment.token;
   token.className = getVariableTokenClassName(segment.option);
-  token.textContent = segment.token;
+  token.textContent = segment.option
+    ? `${segment.option.nodeLabel} · ${segment.option.field}`
+    : segment.token;
+  token.contentEditable = 'false';
+  token.setAttribute('role', 'button');
+  token.setAttribute('aria-label', `更换变量 ${segment.option?.nodeLabel || segment.token}`);
   return token;
+}
+
+function getVariableTokenRanges(value: string, options: WorkflowVariableOption[]) {
+  let offset = 0;
+  return splitWorkflowTemplate(value, options).flatMap((segment) => {
+    const start = offset;
+    const length = segment.type === 'text' ? segment.value.length : segment.token.length;
+    offset += length;
+    return segment.type === 'variable' ? [{ start, end: offset }] : [];
+  });
+}
+
+function getAtomicDeletionSelection(
+  value: string,
+  selection: TextSelection,
+  key: 'Backspace' | 'Delete',
+  options: WorkflowVariableOption[],
+): TextSelection | null {
+  const ranges = getVariableTokenRanges(value, options);
+  if (selection.start !== selection.end) {
+    const overlapping = ranges.filter(
+      (range) => range.start < selection.end && range.end > selection.start,
+    );
+    if (overlapping.length === 0) return null;
+    return {
+      start: Math.min(selection.start, ...overlapping.map((range) => range.start)),
+      end: Math.max(selection.end, ...overlapping.map((range) => range.end)),
+    };
+  }
+  return (
+    ranges.find((range) =>
+      key === 'Backspace' ? range.end === selection.start : range.start === selection.start,
+    ) || null
+  );
 }
 
 function renderEditorContents(editor: HTMLElement, segments: TemplateSegment[]) {
@@ -135,10 +218,11 @@ function renderEditorContents(editor: HTMLElement, segments: TemplateSegment[]) 
 
 function syncVariableTokenStyles(editor: HTMLElement, options: WorkflowVariableOption[]) {
   for (const token of editor.querySelectorAll<HTMLElement>('[data-variable-token]')) {
-    const value = token.textContent || '';
-    token.dataset.variableToken = value;
+    const value = token.dataset.variableToken || '';
+    const option = getWorkflowVariableOption(value, options);
     token.title = value;
-    token.className = getVariableTokenClassName(getWorkflowVariableOption(value, options));
+    token.className = getVariableTokenClassName(option);
+    token.textContent = option ? `${option.nodeLabel} · ${option.field}` : value;
   }
 }
 
@@ -150,7 +234,9 @@ function hasMatchingVariableElements(editor: HTMLElement, segments: TemplateSegm
   const tokenElements = Array.from(editor.querySelectorAll<HTMLElement>('[data-variable-token]'));
   return (
     tokenElements.length === expectedTokens.length &&
-    expectedTokens.every((segment, index) => tokenElements[index]?.textContent === segment.token)
+    expectedTokens.every(
+      (segment, index) => tokenElements[index]?.dataset.variableToken === segment.token,
+    )
   );
 }
 
@@ -188,6 +274,15 @@ interface VariableOptionListProps {
   onSelect: (option: WorkflowVariableOption) => void;
 }
 
+interface VariablePickerProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  options: WorkflowVariableOption[];
+  onSelect: (option: WorkflowVariableOption) => void;
+  onRememberSelection: () => void;
+  compact?: boolean;
+}
+
 interface VariableOptionDetailsProps {
   option: WorkflowVariableOption;
   icon: ReactNode;
@@ -217,7 +312,7 @@ function VariableOptionDetails({
       <span
         className={cn(
           'font-mono text-xs text-muted-foreground',
-          highlighted && 'rounded-full bg-primary/10 px-2 py-0.5 text-primary',
+          highlighted && 'rounded-full bg-muted px-2 py-0.5',
         )}
       >
         {option.type}
@@ -239,15 +334,57 @@ function VariableOptionList({ options, heading, emptyText, onSelect }: VariableO
         <CommandItem
           key={option.token}
           value={`${option.nodeLabel} ${option.field} ${option.token}`}
+          className="mx-1 my-1 gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-colors data-selected:border-border data-selected:bg-accent/55 data-selected:text-accent-foreground"
           onSelect={() => onSelect(option)}
         >
           <VariableOptionDetails
             option={option}
-            icon={<Variable className="text-blue-600 dark:text-blue-400" />}
+            icon={
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <Variable className="size-4" />
+              </span>
+            }
           />
         </CommandItem>
       ))}
     </CommandGroup>
+  );
+}
+
+function VariablePicker({
+  open,
+  onOpenChange,
+  options,
+  onSelect,
+  onRememberSelection,
+  compact = false,
+}: VariablePickerProps) {
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size={compact ? 'icon-xs' : 'xs'}
+            aria-label={compact ? '选择上游变量' : undefined}
+          />
+        }
+        onMouseDown={onRememberSelection}
+      >
+        <Braces />
+        {compact ? null : '插入变量'}
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 gap-0 overflow-hidden p-0">
+        <Command>
+          <CommandInput placeholder="搜索变量" />
+          <CommandList className="py-1">
+            <CommandEmpty>暂无可用上游变量</CommandEmpty>
+            <VariableOptionList options={options} heading="上游变量" onSelect={onSelect} />
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -261,19 +398,23 @@ function InlineVariableOptionList({
   }
 
   return (
-    <div className="space-y-3 px-4 pb-4">
+    <div className="space-y-2 px-3 pb-3">
       {options.map((option) => (
         <Button
           key={option.token}
           type="button"
-          variant="outline"
-          className="h-auto w-full justify-start rounded-xl border-border bg-background px-4 py-3 text-left shadow-xs hover:border-primary/45 hover:bg-primary/5 hover:text-foreground hover:shadow-sm"
+          variant="ghost"
+          className="h-auto w-full justify-start gap-3 rounded-lg border border-transparent bg-background px-3 py-2.5 text-left transition-colors hover:border-border hover:bg-accent/55 hover:text-accent-foreground"
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onSelect(option)}
         >
           <VariableOptionDetails
             option={option}
-            icon={<Plus className="text-primary" />}
+            icon={
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <Plus className="size-4" />
+              </span>
+            }
             showToken
             highlighted
           />
@@ -285,6 +426,7 @@ function InlineVariableOptionList({
 
 export function VariableTokenEditor({
   id,
+  ariaLabel,
   value,
   onChange,
   options,
@@ -297,8 +439,11 @@ export function VariableTokenEditor({
   const pickerSelectionRef = useRef<TextSelection>({ start: value.length, end: value.length });
   const undoStackRef = useRef<EditorHistoryEntry[]>([]);
   const redoStackRef = useRef<EditorHistoryEntry[]>([]);
+  const inlineSearchStartRef = useRef<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [inlineVariableQuery, setInlineVariableQuery] = useState<string | null>(null);
+  const [pickerSearchMode, setPickerSearchMode] = useState(false);
+  const [caretAnchor, setCaretAnchor] = useState<CaretAnchor | null>(null);
   const segments = splitWorkflowTemplate(value, options);
   const matchingInlineOptions = useMemo(
     () =>
@@ -367,27 +512,90 @@ export function VariableTokenEditor({
     if (!editor) return;
     const selection = getSelectionOffsets(editor);
     if (!selection) return;
+    setCaretAnchor(getCaretAnchor(editor));
     pickerSelectionRef.current = selection;
     const nextValue = readRawValue(editor);
+    const searchStart = inlineSearchStartRef.current;
+    if (searchStart !== null && selection.start >= searchStart) {
+      const searchEnd = compact ? nextValue.length : selection.start;
+      pickerSelectionRef.current = { start: searchStart, end: searchEnd };
+      setInlineVariableQuery(nextValue.slice(searchStart, searchEnd).trim());
+      applyText(nextValue, selection, selection);
+      return;
+    }
     if (nextValue.slice(0, selection.start).endsWith('{{')) {
       const placeholderStart = selection.start - 2;
-      const placeholder = `${nextValue.slice(0, placeholderStart)}{{}}${nextValue.slice(selection.end)}`;
-      pickerSelectionRef.current = { start: placeholderStart, end: placeholderStart + 4 };
+      pickerSelectionRef.current = { start: placeholderStart, end: selection.end };
+      setPickerSearchMode(false);
       setInlineVariableQuery('');
-      applyText(placeholder, { start: placeholderStart + 2, end: placeholderStart + 2 }, selection);
+      applyText(nextValue, selection, selection);
       return;
     }
 
     const draft = findVariableDraft(nextValue, selection.start);
     if (draft) {
       pickerSelectionRef.current = draft;
+      setPickerSearchMode(false);
       setInlineVariableQuery(draft.query);
     } else {
+      inlineSearchStartRef.current = null;
       setInlineVariableQuery(null);
     }
     syncVariableTokenStyles(editor, options);
     applyText(nextValue, selection, selection);
-  }, [applyText, options]);
+  }, [applyText, compact, options]);
+
+  const openPickerFromCaret = useCallback((editor: HTMLDivElement, allowEmpty: boolean) => {
+    const selection = getSelectionOffsets(editor);
+    if (!selection) return;
+    const currentValue = readRawValue(editor);
+    const draft = findVariableDraft(currentValue, selection.start);
+    if (draft) {
+      pickerSelectionRef.current = draft;
+      setCaretAnchor(getCaretAnchor(editor));
+      setPickerSearchMode(false);
+      setInlineVariableQuery(draft.query);
+      return;
+    }
+    if (!allowEmpty) return;
+    inlineSearchStartRef.current = 0;
+    pickerSelectionRef.current = { start: 0, end: currentValue.length };
+    setCaretAnchor(getCaretAnchor(editor));
+    setPickerSearchMode(true);
+    setInlineVariableQuery(currentValue.trim());
+  }, []);
+
+  const handleEditorFocus = useCallback(
+    (_event: FocusEvent<HTMLDivElement>) => {
+      window.requestAnimationFrame(() => {
+        const editor = editorRef.current;
+        if (editor) openPickerFromCaret(editor, compact);
+      });
+    },
+    [compact, openPickerFromCaret],
+  );
+
+  const handleEditorClick = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      const editor = editorRef.current;
+      const target = event.target instanceof Element ? event.target : null;
+      const token = target?.closest<HTMLElement>('[data-variable-token]');
+      if (!editor) return;
+      if (!token || !editor.contains(token)) {
+        openPickerFromCaret(editor, compact);
+        return;
+      }
+      event.preventDefault();
+      const tokenSelection = getElementSelection(editor, token);
+      pickerSelectionRef.current = tokenSelection;
+      inlineSearchStartRef.current = tokenSelection.start;
+      const rect = token.getBoundingClientRect();
+      setCaretAnchor({ getBoundingClientRect: () => rect });
+      setPickerSearchMode(true);
+      setInlineVariableQuery('');
+    },
+    [compact, openPickerFromCaret],
+  );
 
   const handlePaste = useCallback(
     (event: ClipboardEvent<HTMLDivElement>) => {
@@ -440,23 +648,43 @@ export function VariableTokenEditor({
       }
       if (event.key === 'Escape' && inlineVariableQuery !== null) {
         event.preventDefault();
+        inlineSearchStartRef.current = null;
+        setPickerSearchMode(false);
         setInlineVariableQuery(null);
         return;
+      }
+      if (event.key === 'Backspace' || event.key === 'Delete') {
+        const editor = editorRef.current;
+        const selection = editor ? getSelectionOffsets(editor) : null;
+        if (selection) {
+          const deletion = getAtomicDeletionSelection(value, selection, event.key, options);
+          if (deletion) {
+            event.preventDefault();
+            const nextValue = `${value.slice(0, deletion.start)}${value.slice(deletion.end)}`;
+            applyText(nextValue, { start: deletion.start, end: deletion.start }, selection);
+            inlineSearchStartRef.current = null;
+            setPickerSearchMode(false);
+            setInlineVariableQuery(null);
+            return;
+          }
+        }
       }
       if (event.key !== 'Enter') return;
       event.preventDefault();
       if (!compact) insertText('\n');
     },
-    [compact, inlineVariableQuery, insertText, onChange, value],
+    [applyText, compact, inlineVariableQuery, insertText, onChange, options, value],
   );
 
   const handleSelectOption = useCallback(
     (option: WorkflowVariableOption) => {
-      const selection = pickerSelectionRef.current;
+      const selection = compact ? { start: 0, end: value.length } : pickerSelectionRef.current;
       const nextValue = `${value.slice(0, selection.start)}${option.token}${value.slice(selection.end)}`;
       const nextPosition = selection.start + option.token.length;
       const nextSelection = { start: nextPosition, end: nextPosition };
       applyText(nextValue, nextSelection, selection);
+      inlineSearchStartRef.current = null;
+      setPickerSearchMode(false);
       setInlineVariableQuery(null);
       setPickerOpen(false);
       window.requestAnimationFrame(() => {
@@ -467,7 +695,7 @@ export function VariableTokenEditor({
         restoreSelection(editor, nextSelection);
       });
     },
-    [applyText, value],
+    [applyText, compact, value],
   );
 
   return (
@@ -477,32 +705,53 @@ export function VariableTokenEditor({
         className,
       )}
     >
-      <div
-        ref={editorRef}
-        id={id}
-        role="textbox"
-        aria-multiline={!compact}
-        contentEditable
-        suppressContentEditableWarning
-        spellCheck={false}
-        data-placeholder={placeholder}
-        className={cn(
-          compact
-            ? 'min-h-9 whitespace-pre-wrap break-words px-3 py-2 text-sm leading-5 outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus-visible:ring-3 focus-visible:ring-ring/50'
-            : 'min-h-24 whitespace-pre-wrap break-words px-2.5 py-2 text-sm leading-6 outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus-visible:ring-3 focus-visible:ring-ring/50',
-        )}
-        onInput={handleInput}
-        onKeyDown={handleKeyDown}
-        onCopy={handleCopy}
-        onCut={handleCut}
-        onPaste={handlePaste}
-      />
+      <div className="relative">
+        <div
+          ref={editorRef}
+          id={id}
+          role="textbox"
+          aria-label={ariaLabel}
+          aria-multiline={!compact}
+          contentEditable
+          suppressContentEditableWarning
+          spellCheck={false}
+          data-placeholder={placeholder}
+          className={cn(
+            compact
+              ? 'min-h-9 whitespace-pre-wrap break-words py-2 pl-3 pr-10 text-sm leading-5 outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus-visible:ring-3 focus-visible:ring-ring/50'
+              : 'min-h-24 whitespace-pre-wrap break-words px-2.5 py-2 text-sm leading-6 outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus-visible:ring-3 focus-visible:ring-ring/50',
+          )}
+          onInput={handleInput}
+          onFocus={handleEditorFocus}
+          onClick={handleEditorClick}
+          onKeyDown={handleKeyDown}
+          onCopy={handleCopy}
+          onCut={handleCut}
+          onPaste={handlePaste}
+        />
+        {compact ? (
+          <div className="absolute right-1 top-1 z-10">
+            <VariablePicker
+              compact
+              open={pickerOpen}
+              onOpenChange={setPickerOpen}
+              options={options}
+              onSelect={handleSelectOption}
+              onRememberSelection={rememberSelection}
+            />
+          </div>
+        ) : null}
+      </div>
       {inlineVariableQuery !== null && (
         <Popover
           open
           modal={false}
           onOpenChange={(open) => {
-            if (!open) setInlineVariableQuery(null);
+            if (!open) {
+              inlineSearchStartRef.current = null;
+              setPickerSearchMode(false);
+              setInlineVariableQuery(null);
+            }
           }}
         >
           <PopoverTrigger
@@ -510,14 +759,15 @@ export function VariableTokenEditor({
             render={<span aria-hidden="true" className="block h-px" />}
           />
           <PopoverContent
+            anchor={caretAnchor}
             align="start"
             side="bottom"
             sideOffset={10}
-            initialFocus={false}
+            initialFocus={pickerSearchMode ? undefined : false}
             finalFocus={false}
-            className="w-[min(34rem,calc(100vw-2rem))] gap-0 overflow-hidden rounded-xl! border-primary/25 p-0 shadow-2xl"
+            className="w-[min(34rem,calc(100vw-2rem))] gap-0 overflow-hidden rounded-xl! border-border p-0 shadow-md"
           >
-            <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/60 px-4 py-3">
+            <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/30 px-4 py-3">
               <div className="flex items-center gap-2.5">
                 <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Braces className="size-4" />
@@ -531,6 +781,17 @@ export function VariableTokenEditor({
                 {matchingInlineOptions.length} 项
               </span>
             </div>
+            {pickerSearchMode ? (
+              <div className="border-b border-border p-3">
+                <Input
+                  autoFocus
+                  aria-label="筛选变量"
+                  value={inlineVariableQuery || ''}
+                  placeholder="输入节点名或变量名"
+                  onChange={(event) => setInlineVariableQuery(event.target.value)}
+                />
+              </div>
+            ) : null}
             <div className="max-h-72 overflow-y-auto pt-3">
               <p className="px-4 pb-2 text-xs font-medium text-muted-foreground">
                 {inlineVariableQuery ? '匹配结果' : '可用变量'}
@@ -547,28 +808,13 @@ export function VariableTokenEditor({
       {!compact && (
         <div className="flex items-center justify-between border-t border-input bg-muted/30 px-2 py-1.5">
           <span className="text-xs text-muted-foreground">仅可引用上游节点输出</span>
-          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-            <PopoverTrigger
-              render={<Button type="button" variant="ghost" size="xs" />}
-              onMouseDown={rememberSelection}
-            >
-              <Braces />
-              插入变量
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-80 gap-0 overflow-hidden p-0">
-              <Command>
-                <CommandInput placeholder="搜索变量" />
-                <CommandList>
-                  <CommandEmpty>暂无可用上游变量</CommandEmpty>
-                  <VariableOptionList
-                    options={options}
-                    heading="上游变量"
-                    onSelect={handleSelectOption}
-                  />
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          <VariablePicker
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
+            options={options}
+            onSelect={handleSelectOption}
+            onRememberSelection={rememberSelection}
+          />
         </div>
       )}
     </div>

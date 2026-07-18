@@ -1,6 +1,6 @@
 import type { WorkflowRunEvent, WorkflowRunEventData } from '@/api/workflow';
 
-export type NodeRunStatus = 'idle' | 'running' | 'success' | 'error';
+export type NodeRunStatus = 'idle' | 'running' | 'success' | 'error' | 'skipped';
 
 export interface NodeRunSnapshot {
   status: NodeRunStatus;
@@ -131,7 +131,7 @@ function applyWorkflowRunEvent(
         runId: nextRunID,
         status: 'error',
         error: nextError,
-        failedNodeId: session.failedNodeId,
+        failedNodeId: data?.nodeId || session.failedNodeId,
         failedNodeCode: data?.error || session.failedNodeCode,
       };
     }

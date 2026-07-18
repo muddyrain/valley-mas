@@ -13,6 +13,7 @@ export type TemplateSegment =
   | { type: 'variable'; token: string; option?: WorkflowVariableOption };
 
 type WorkflowVariableType = WorkflowVariableOption['type'];
+export type WorkflowOutputField = readonly [string, WorkflowVariableType];
 
 interface WorkflowNodeData {
   label?: unknown;
@@ -21,7 +22,16 @@ interface WorkflowNodeData {
 }
 
 const NODE_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, WorkflowVariableType]>> = {
-  'blog.parseMarkdown': [
+  llm: [
+    ['text', 'string'],
+    ['model', 'string'],
+    ['tokenUsage', 'number'],
+  ],
+  condition: [['matched', 'boolean']],
+};
+
+const TOOL_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, WorkflowVariableType]>> = {
+  'content.parseMarkdown': [
     ['title', 'string'],
     ['content', 'string'],
     ['frontMatter', 'object'],
@@ -33,10 +43,15 @@ const NODE_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
     ['context', 'string'],
     ['references', 'object'],
   ],
-  'llm.text': [
-    ['text', 'string'],
+  'content.search': [
+    ['count', 'number'],
+    ['items', 'object'],
+  ],
+  'image.generateCover': [
+    ['cover', 'object'],
+    ['url', 'string'],
     ['model', 'string'],
-    ['tokenUsage', 'number'],
+    ['size', 'string'],
   ],
   'blog.createDraft': [
     ['postId', 'string'],
@@ -74,10 +89,11 @@ function getNodeLabel(node: Node): string {
   return typeof label === 'string' && label.trim() ? label : node.id;
 }
 
-function getStartOutputFields(node: Node): ReadonlyArray<readonly [string, WorkflowVariableType]> {
-  const config = getNodeData(node).config;
+function getStartOutputFields(
+  config: Record<string, unknown> | undefined,
+): ReadonlyArray<WorkflowOutputField> {
   if (!config || typeof config !== 'object') return [];
-  const inputs = (config as { inputs?: unknown }).inputs;
+  const inputs = config.inputs;
   if (!inputs || typeof inputs !== 'object') return [];
 
   return Object.entries(inputs as Record<string, unknown>).flatMap(([field, definition]) => {
@@ -93,20 +109,64 @@ function getStartOutputFields(node: Node): ReadonlyArray<readonly [string, Workf
   });
 }
 
-function getOutputFields(node: Node): ReadonlyArray<readonly [string, WorkflowVariableType]> {
-  const nodeType = getNodeType(node);
-  if (nodeType === 'start') return getStartOutputFields(node);
+export function getWorkflowNodeOutputFields(
+  nodeType: string,
+  config: Record<string, unknown> = {},
+): ReadonlyArray<WorkflowOutputField> {
+  if (nodeType === 'start') return getStartOutputFields(config);
+  if (nodeType === 'end') {
+    const outputs =
+      config.outputs && typeof config.outputs === 'object'
+        ? (config.outputs as Record<string, unknown>)
+        : {};
+    const outputTypes =
+      config.outputTypes && typeof config.outputTypes === 'object'
+        ? (config.outputTypes as Record<string, WorkflowVariableType>)
+        : {};
+    return Object.keys(outputs).map((name) => [name, outputTypes[name] || 'unknown'] as const);
+  }
   if (nodeType === 'variable') {
-    const config = getNodeData(node).config;
-    const variableName =
-      config && typeof config === 'object'
-        ? (config as { variableName?: unknown }).variableName
-        : undefined;
-    return typeof variableName === 'string' && variableName.trim()
-      ? [[variableName.trim(), 'string']]
+    const assignments = config.assignments;
+    return Array.isArray(assignments)
+      ? assignments.flatMap((item) =>
+          item && typeof item === 'object' && typeof (item as { name?: unknown }).name === 'string'
+            ? [
+                [
+                  String((item as { name: string }).name),
+                  String((item as { type?: unknown }).type || 'unknown') as WorkflowVariableType,
+                ] as const,
+              ]
+            : [],
+        )
       : [];
   }
+  if (nodeType === 'merge') {
+    const fields = config.fields;
+    return Array.isArray(fields)
+      ? fields.flatMap((item) =>
+          item && typeof item === 'object' && typeof (item as { name?: unknown }).name === 'string'
+            ? [
+                [
+                  String((item as { name: string }).name),
+                  String((item as { type?: unknown }).type || 'unknown') as WorkflowVariableType,
+                ] as const,
+              ]
+            : [],
+        )
+      : [];
+  }
+  if (nodeType === 'tool') {
+    const capabilityId = config.capabilityId;
+    return typeof capabilityId === 'string' ? TOOL_OUTPUT_FIELDS[capabilityId] || [] : [];
+  }
   return NODE_OUTPUT_FIELDS[nodeType] || [];
+}
+
+function getOutputFields(node: Node): ReadonlyArray<WorkflowOutputField> {
+  const rawConfig = getNodeData(node).config;
+  const config =
+    rawConfig && typeof rawConfig === 'object' ? (rawConfig as Record<string, unknown>) : undefined;
+  return getWorkflowNodeOutputFields(getNodeType(node), config);
 }
 
 /** Returns only variables exposed by nodes that can reach the target node. */
@@ -160,7 +220,14 @@ export function splitWorkflowTemplate(
       segments.push({ type: 'text', value: value.slice(textStart, matchStart) });
     }
     const token = match[0];
-    segments.push({ type: 'variable', token, option: getWorkflowVariableOption(token, options) });
+    const normalizedToken = normalizeWorkflowVariableToken(token);
+    // Keep an unfinished `{{ }}` draft editable so the user can continue typing
+    // while the contextual variable picker remains open.
+    if (normalizedToken) {
+      segments.push({ type: 'variable', token, option: getWorkflowVariableOption(token, options) });
+    } else {
+      segments.push({ type: 'text', value: token });
+    }
     textStart = matchStart + token.length;
   }
 

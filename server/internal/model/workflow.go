@@ -14,6 +14,7 @@ type Workflow struct {
 	Name        string         `gorm:"size:100;not null" json:"name"`
 	Description string         `gorm:"size:500" json:"description"`
 	Graph       string         `gorm:"type:json;not null" json:"graph"`
+	GraphHash   string         `gorm:"-" json:"graphHash,omitempty"`
 	Status      string         `gorm:"size:20;not null;default:'draft';index" json:"status"`
 	CreatedAt   time.Time      `json:"createdAt"`
 	UpdatedAt   time.Time      `json:"updatedAt"`
@@ -58,6 +59,7 @@ type WorkflowNodeRun struct {
 	WorkflowRunID Int64String    `gorm:"index;not null;uniqueIndex:uidx_workflow_run_node" json:"workflowRunId"`
 	NodeID        string         `gorm:"size:120;not null;uniqueIndex:uidx_workflow_run_node" json:"nodeId"`
 	NodeType      string         `gorm:"size:80;not null" json:"nodeType"`
+	CapabilityID  string         `gorm:"size:120;index" json:"capabilityId,omitempty"`
 	Status        string         `gorm:"size:20;not null;index" json:"status"`
 	Input         string         `gorm:"type:json" json:"input,omitempty"`
 	Output        string         `gorm:"type:json" json:"output,omitempty"`

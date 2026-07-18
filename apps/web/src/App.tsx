@@ -33,6 +33,7 @@ import Resources from './pages/Resources';
 import ScratchLegendLab from './pages/ScratchLegendLab';
 import Workbench from './pages/Workbench';
 import WorkflowEditor from './pages/WorkflowEditor';
+import Workflows from './pages/Workflows';
 import WorkflowTemplateDetail from './pages/WorkflowTemplateDetail';
 import { useAuthStore } from './stores/useAuthStore';
 
@@ -65,7 +66,9 @@ function RouteTitle() {
     if (pathname === '/') {
       title = 'Valley | 内容首页';
     } else if (pathname === '/workbench') {
-      title = '工作台 | Valley';
+      title = '项目 | Valley';
+    } else if (pathname === '/workbench/workflows') {
+      title = '工作流 | Valley';
     } else if (pathname.startsWith('/workbench/templates/')) {
       title = '工作流模板 | Valley';
     } else if (pathname.startsWith('/workbench/create')) {
@@ -165,6 +168,14 @@ function App() {
             element={
               <RequireAuth>
                 <WorkflowEditorWithKey />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="workbench/workflows"
+            element={
+              <RequireAuth>
+                <Workflows />
               </RequireAuth>
             }
           />

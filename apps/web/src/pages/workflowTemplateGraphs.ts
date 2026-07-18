@@ -1,200 +1,133 @@
 import type { Edge, Node } from '@xyflow/react';
 
 export interface WorkflowTemplateGraph {
-  schemaVersion: 2;
+  schemaVersion: 4;
   nodes: Node[];
   edges: Edge[];
 }
 
+const node = (
+  id: string,
+  type: string,
+  label: string,
+  x: number,
+  config: Record<string, unknown>,
+): Node => ({ id, type, position: { x, y: 250 }, data: { label, nodeType: type, config } });
+const edge = (source: string, target: string): Edge => ({
+  id: `${source}-${target}`,
+  source,
+  sourceHandle: 'output',
+  target,
+  targetHandle: 'input',
+  type: 'insertable',
+});
+
 const WORKFLOW_TEMPLATE_GRAPHS: Record<string, WorkflowTemplateGraph> = {
   'blog-import': {
-    schemaVersion: 2,
+    schemaVersion: 4,
     nodes: [
-      {
-        id: 'start',
-        type: 'start',
-        position: { x: 50, y: 250 },
-        data: {
-          label: '开始',
-          nodeType: 'start',
-          config: {
-            inputs: {
-              markdownFile: { type: 'file', required: true },
-              tagIds: { type: 'string[]', required: false },
-              groupId: { type: 'string', required: false },
-              visibility: { type: 'string', required: true },
-            },
-          },
+      node('start', 'start', '开始', 50, {
+        inputs: {
+          markdownFile: { type: 'file', required: true },
+          tagIds: { type: 'string[]', required: false },
+          groupId: { type: 'string', required: false },
+          visibility: { type: 'string', required: true },
         },
-      },
-      {
-        id: 'parse-markdown',
-        type: 'blog.parseMarkdown',
-        position: { x: 330, y: 250 },
-        data: {
-          label: '解析 Markdown',
-          nodeType: 'blog.parseMarkdown',
-          config: { fileInput: '{{start.output.markdownFile}}' },
+      }),
+      node('parse-markdown', 'tool', '解析 Markdown', 330, {
+        capabilityId: 'content.parseMarkdown',
+        capabilityName: '解析 Markdown',
+        inputs: { fileInput: '{{start.output.markdownFile}}' },
+      }),
+      node('llm-summary', 'llm', '生成摘要', 610, {
+        modelProfile: 'ark-text-default',
+        systemPrompt: '你是内容编辑助手。请生成一句简洁、准确的博客摘要。',
+        prompt: '标题：{{parse-markdown.output.title}}\n\n正文：{{parse-markdown.output.content}}',
+        temperature: 0.4,
+        maxOutputTokens: 512,
+      }),
+      node('create-draft', 'tool', '创建博客草稿', 900, {
+        capabilityId: 'blog.createDraft',
+        capabilityName: '创建博客草稿',
+        sideEffect: 'write',
+        inputs: {
+          title: '{{parse-markdown.output.title}}',
+          content: '{{parse-markdown.output.content}}',
+          excerpt: '{{llm-summary.output.text}}',
+          cover: '{{parse-markdown.output.cover}}',
+          tags: '{{start.output.tagIds}}',
+          suggestedTags: '{{parse-markdown.output.tagNames}}',
+          tagMode: 'merge',
+          visibility: '{{start.output.visibility}}',
         },
-      },
-      {
-        id: 'llm-summary',
-        type: 'llm.text',
-        position: { x: 610, y: 250 },
-        data: {
-          label: '生成摘要',
-          nodeType: 'llm.text',
-          config: {
-            modelProfile: 'ark-text-default',
-            systemPrompt: '你是内容编辑助手。请基于 Markdown 正文生成一句简洁、准确的博客摘要。',
-            prompt:
-              '标题：{{parse-markdown.output.title}}\n\n正文：{{parse-markdown.output.content}}',
-            temperature: 0.4,
-            maxOutputTokens: 512,
-          },
+      }),
+      node('end', 'end', '结束', 1190, {
+        outputs: {
+          postId: '{{create-draft.output.postId}}',
+          title: '{{create-draft.output.title}}',
+          editPath: '{{create-draft.output.editPath}}',
+          tagIds: '{{create-draft.output.tagIds}}',
         },
-      },
-      {
-        id: 'create-draft',
-        type: 'blog.createDraft',
-        position: { x: 900, y: 250 },
-        data: {
-          label: '创建博客草稿',
-          nodeType: 'blog.createDraft',
-          config: {
-            title: '{{parse-markdown.output.title}}',
-            content: '{{parse-markdown.output.content}}',
-            excerpt: '{{llm-summary.output.text}}',
-            cover: '{{parse-markdown.output.cover}}',
-            tags: '{{start.output.tagIds}}',
-            suggestedTags: '{{parse-markdown.output.tagNames}}',
-            tagMode: 'merge',
-            visibility: '{{start.output.visibility}}',
-          },
-        },
-      },
-      {
-        id: 'end',
-        type: 'end',
-        position: { x: 1190, y: 250 },
-        data: {
-          label: '结束',
-          nodeType: 'end',
-          config: {
-            outputs: {
-              postId: '{{create-draft.output.postId}}',
-              title: '{{create-draft.output.title}}',
-              editPath: '{{create-draft.output.editPath}}',
-              tagIds: '{{create-draft.output.tagIds}}',
-            },
-          },
-        },
-      },
+      }),
     ],
     edges: [
-      { id: 'start-parse', source: 'start', sourceHandle: 'output', target: 'parse-markdown' },
-      {
-        id: 'parse-llm',
-        source: 'parse-markdown',
-        sourceHandle: 'output',
-        target: 'llm-summary',
-      },
-      {
-        id: 'llm-draft',
-        source: 'llm-summary',
-        sourceHandle: 'output',
-        target: 'create-draft',
-      },
-      { id: 'draft-end', source: 'create-draft', sourceHandle: 'output', target: 'end' },
+      edge('start', 'parse-markdown'),
+      edge('parse-markdown', 'llm-summary'),
+      edge('llm-summary', 'create-draft'),
+      edge('create-draft', 'end'),
     ],
   },
   'content-generate': {
-    schemaVersion: 2,
+    schemaVersion: 4,
     nodes: [
-      {
-        id: 'start',
-        type: 'start',
-        position: { x: 50, y: 250 },
-        data: {
-          label: '开始',
-          nodeType: 'start',
-          config: {
-            inputs: {
-              topic: { type: 'string', required: true },
-              audience: { type: 'string', required: false },
-              style: { type: 'string', required: false },
-              tagIds: { type: 'string[]', required: false },
-              visibility: { type: 'string', required: true },
-            },
-          },
+      node('start', 'start', '开始', 50, {
+        inputs: {
+          topic: { type: 'string', required: true },
+          audience: { type: 'string', required: false },
+          style: { type: 'string', required: false },
+          tagIds: { type: 'string[]', required: false },
+          visibility: { type: 'string', required: true },
         },
-      },
-      {
-        id: 'knowledge',
-        type: 'knowledge.retrieve',
-        position: { x: 330, y: 250 },
-        data: {
-          label: '检索知识库',
-          nodeType: 'knowledge.retrieve',
-          config: { query: '{{start.output.topic}}' },
+      }),
+      node('knowledge', 'tool', '检索知识库', 330, {
+        capabilityId: 'knowledge.retrieve',
+        capabilityName: '知识库检索',
+        sideEffect: 'read',
+        inputs: { query: '{{start.output.topic}}' },
+      }),
+      node('writer', 'llm', '生成正文', 610, {
+        modelProfile: 'ark-text-default',
+        systemPrompt: '你是内容编辑。基于参考资料写出准确、易读的博客正文。',
+        prompt:
+          '主题：{{start.output.topic}}\n受众：{{start.output.audience}}\n风格：{{start.output.style}}\n\n参考资料：\n{{knowledge.output.context}}',
+        temperature: 0.6,
+        maxOutputTokens: 1200,
+      }),
+      node('create-draft', 'tool', '创建博客草稿', 900, {
+        capabilityId: 'blog.createDraft',
+        capabilityName: '创建博客草稿',
+        sideEffect: 'write',
+        inputs: {
+          title: '{{start.output.topic}}',
+          content: '{{writer.output.text}}',
+          tags: '{{start.output.tagIds}}',
+          tagMode: 'manual_only',
+          visibility: '{{start.output.visibility}}',
         },
-      },
-      {
-        id: 'writer',
-        type: 'llm.text',
-        position: { x: 610, y: 250 },
-        data: {
-          label: '生成正文',
-          nodeType: 'llm.text',
-          config: {
-            modelProfile: 'ark-text-default',
-            systemPrompt:
-              '你是内容编辑。基于参考资料写出准确、易读的博客正文；资料不足时明确说明。',
-            prompt:
-              '主题：{{start.output.topic}}\n受众：{{start.output.audience}}\n风格：{{start.output.style}}\n\n参考资料：\n{{knowledge.output.context}}',
-            temperature: 0.6,
-            maxOutputTokens: 1200,
-          },
+      }),
+      node('end', 'end', '结束', 1190, {
+        outputs: {
+          postId: '{{create-draft.output.postId}}',
+          title: '{{create-draft.output.title}}',
+          editPath: '{{create-draft.output.editPath}}',
         },
-      },
-      {
-        id: 'create-draft',
-        type: 'blog.createDraft',
-        position: { x: 900, y: 250 },
-        data: {
-          label: '创建博客草稿',
-          nodeType: 'blog.createDraft',
-          config: {
-            title: '{{start.output.topic}}',
-            content: '{{writer.output.text}}',
-            tags: '{{start.output.tagIds}}',
-            tagMode: 'manual_only',
-            visibility: '{{start.output.visibility}}',
-          },
-        },
-      },
-      {
-        id: 'end',
-        type: 'end',
-        position: { x: 1190, y: 250 },
-        data: {
-          label: '结束',
-          nodeType: 'end',
-          config: {
-            outputs: {
-              postId: '{{create-draft.output.postId}}',
-              title: '{{create-draft.output.title}}',
-              editPath: '{{create-draft.output.editPath}}',
-            },
-          },
-        },
-      },
+      }),
     ],
     edges: [
-      { id: 'start-knowledge', source: 'start', sourceHandle: 'output', target: 'knowledge' },
-      { id: 'knowledge-writer', source: 'knowledge', sourceHandle: 'output', target: 'writer' },
-      { id: 'writer-draft', source: 'writer', sourceHandle: 'output', target: 'create-draft' },
-      { id: 'draft-end', source: 'create-draft', sourceHandle: 'output', target: 'end' },
+      edge('start', 'knowledge'),
+      edge('knowledge', 'writer'),
+      edge('writer', 'create-draft'),
+      edge('create-draft', 'end'),
     ],
   },
 };

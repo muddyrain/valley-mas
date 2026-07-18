@@ -67,6 +67,9 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		&model.AIAppToolBinding{},
 		&model.Post{},
 		&model.Resource{},
+		&model.AIWorkbenchCopilotSession{},
+		&model.AIWorkbenchCopilotMessage{},
+		&model.AIWorkbenchChangeProposal{},
 	); err != nil {
 		t.Fatalf("migrate ai platform: %v", err)
 	}
@@ -90,6 +93,10 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.Use(middleware.Auth(&config.Config{JWT: config.JWTConfig{Secret: aiPlatformTestSecret}}))
 	auth.POST("/apps", CreateAIApp)
 	auth.POST("/app-assistant/proposals", CreateAIAppProposal)
+	auth.GET("/workbench/copilot/session", GetWorkbenchCopilotSession)
+	auth.GET("/workbench/copilot/sessions", ListWorkbenchCopilotSessions)
+	auth.POST("/workbench/copilot/sessions", CreateWorkbenchCopilotSession)
+	auth.PATCH("/workbench/copilot/proposals/:proposalId", UpdateWorkbenchCopilotProposal)
 	auth.POST("/apps/:appId/versions", SaveAIAppVersion)
 	auth.POST("/apps/:appId/restore", RestoreAIAppVersion)
 	auth.POST("/apps/:appId/debug", DebugAIApp)
