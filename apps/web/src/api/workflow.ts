@@ -137,6 +137,46 @@ export interface WorkflowRunDetail {
   };
 }
 
+export type WorkflowTestAssertionOperator =
+  | 'exists'
+  | 'type'
+  | 'equals'
+  | 'contains'
+  | 'range'
+  | 'jsonSchema';
+
+export interface WorkflowTestAssertion {
+  field: string;
+  operator: WorkflowTestAssertionOperator;
+  value?: unknown;
+}
+
+export interface WorkflowTestResult {
+  id: string;
+  workflowTestCaseId: string;
+  workflowRunId?: string;
+  workflowId: string;
+  versionId: string;
+  status: 'passed' | 'failed' | 'error' | 'rejected';
+  output: string;
+  assertionResults: string;
+  errorCode?: string;
+  startedAt: string;
+  finishedAt?: string;
+}
+
+export interface WorkflowTestCase {
+  id: string;
+  workflowId: string;
+  versionId: string;
+  name: string;
+  inputs: string;
+  assertions: string;
+  createdAt: string;
+  updatedAt: string;
+  latestResult?: WorkflowTestResult;
+}
+
 export interface AIWorkflowDraft {
   name: string;
   description: string;
@@ -520,6 +560,33 @@ export function listWorkflowRuns(
 
 export function getWorkflowRun(id: string, runId: string): Promise<WorkflowRunDetail> {
   return request.get(`/workflows/${id}/runs/${runId}`);
+}
+
+export function listWorkflowTestCases(id: string): Promise<{ list: WorkflowTestCase[] }> {
+  return request.get(`/workflows/${id}/test-cases`);
+}
+
+export function createWorkflowTestCase(
+  id: string,
+  data: {
+    name: string;
+    versionId: string;
+    inputs: Record<string, unknown>;
+    assertions: WorkflowTestAssertion[];
+  },
+): Promise<WorkflowTestCase> {
+  return request.post(`/workflows/${id}/test-cases`, data);
+}
+
+export function deleteWorkflowTestCase(id: string, testCaseId: string): Promise<void> {
+  return request.delete(`/workflows/${id}/test-cases/${testCaseId}`);
+}
+
+export function runWorkflowTestCase(
+  id: string,
+  testCaseId: string,
+): Promise<{ result: WorkflowTestResult }> {
+  return request.post(`/workflows/${id}/test-cases/${testCaseId}/run`);
 }
 
 export function getWorkflowPlatform(id: string): Promise<WorkflowPlatformData> {

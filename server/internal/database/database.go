@@ -371,6 +371,7 @@ func autoMigrateModelsByName() map[string]any {
 		"ai_workbench_copilot_session":         &model.AIWorkbenchCopilotSession{},
 		"ai_workbench_copilot_message":         &model.AIWorkbenchCopilotMessage{},
 		"ai_workbench_copilot_run":             &model.AIWorkbenchCopilotRun{},
+		"ai_workbench_copilot_run_event":       &model.AIWorkbenchCopilotRunEvent{},
 		"ai_workbench_change_proposal":         &model.AIWorkbenchChangeProposal{},
 		"ai_knowledge_base":                    &model.AIKnowledgeBase{},
 		"ai_knowledge_document":                &model.AIKnowledgeDocument{},
@@ -422,6 +423,8 @@ func autoMigrateModelsByName() map[string]any {
 		"workflow_run":                         &model.WorkflowRun{},
 		"workflow_node_run":                    &model.WorkflowNodeRun{},
 		"workflow_run_event":                   &model.WorkflowRunEvent{},
+		"workflow_test_case":                   &model.WorkflowTestCase{},
+		"workflow_test_result":                 &model.WorkflowTestResult{},
 	}
 }
 
@@ -488,6 +491,8 @@ func autoMigrateModelAliases() map[string]string {
 		"workflow_runs":              "workflow_run",
 		"workflow_node_runs":         "workflow_node_run",
 		"workflow_run_events":        "workflow_run_event",
+		"workflow_test_cases":        "workflow_test_case",
+		"workflow_test_results":      "workflow_test_result",
 	}
 }
 
@@ -516,6 +521,7 @@ func coreMigrationModels() []any {
 		&model.AIWorkbenchCopilotSession{},
 		&model.AIWorkbenchCopilotMessage{},
 		&model.AIWorkbenchCopilotRun{},
+		&model.AIWorkbenchCopilotRunEvent{},
 		&model.AIWorkbenchChangeProposal{},
 		&model.AIKnowledgeBase{},
 		&model.AIKnowledgeDocument{},
@@ -553,6 +559,8 @@ func contentDomainMigrationModels() []any {
 		&model.WorkflowRun{},
 		&model.WorkflowNodeRun{},
 		&model.WorkflowRunEvent{},
+		&model.WorkflowTestCase{},
+		&model.WorkflowTestResult{},
 	}
 }
 

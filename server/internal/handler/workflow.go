@@ -772,7 +772,11 @@ func AdminListWorkflowRuns(c *gin.Context) {
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 20
 	}
-	query := database.DB.Model(&model.WorkflowRun{}).Where("workflow_id = ? AND user_id = ?", workflowID, userID)
+	testRunIDs := database.DB.Model(&model.WorkflowTestResult{}).
+		Select("workflow_run_id").Where("workflow_run_id IS NOT NULL")
+	query := database.DB.Model(&model.WorkflowRun{}).
+		Where("workflow_id = ? AND user_id = ?", workflowID, userID).
+		Where("id NOT IN (?)", testRunIDs)
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		Error(c, http.StatusInternalServerError, "查询运行历史失败")

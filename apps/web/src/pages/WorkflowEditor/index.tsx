@@ -113,6 +113,7 @@ import { WorkflowAlignmentGuides } from '@/components/workflow/WorkflowAlignment
 import { WorkflowNode } from '@/components/workflow/WorkflowNode';
 import { WorkflowRunHistory } from '@/components/workflow/WorkflowRunHistory';
 import { WorkflowRuntimeProvider } from '@/components/workflow/WorkflowRuntimeContext';
+import { WorkflowTestCases } from '@/components/workflow/WorkflowTestCases';
 import {
   WorkflowWorkspacePanel,
   type WorkflowWorkspaceTab,
@@ -2004,6 +2005,13 @@ export default function WorkflowEditorPage() {
                       workflowId={workflowId}
                       open={showHistory}
                       onRetry={handleRetryFromHistory}
+                    />
+                  </section>
+                  <section className="mb-6 border-t border-border pt-5">
+                    <WorkflowTestCases
+                      workflowId={workflowId}
+                      versions={platform?.versions || []}
+                      open={showHistory}
                     />
                   </section>
                   <section className="border-t border-border pt-5">

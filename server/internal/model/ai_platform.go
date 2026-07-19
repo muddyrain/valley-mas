@@ -222,6 +222,20 @@ type AIWorkbenchCopilotRun struct {
 	UpdatedAt  time.Time   `json:"updatedAt"`
 }
 
+// AIWorkbenchCopilotRunEvent is an owner-private, replayable lifecycle event.
+// It deliberately stores only a short status label or safe failure summary;
+// prompts and model replies continue to live in the message records.
+type AIWorkbenchCopilotRunEvent struct {
+	ID        Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	RunID     Int64String `gorm:"not null;uniqueIndex:uidx_workbench_copilot_run_event_sequence" json:"runId"`
+	Sequence  int64       `gorm:"not null;uniqueIndex:uidx_workbench_copilot_run_event_sequence" json:"sequence"`
+	EventType string      `gorm:"size:24;not null" json:"eventType"`
+	Stage     string      `gorm:"size:40;not null;default:''" json:"stage"`
+	Message   string      `gorm:"size:500;not null;default:''" json:"message"`
+	ErrorCode string      `gorm:"size:80;not null;default:''" json:"errorCode"`
+	CreatedAt time.Time   `json:"createdAt"`
+}
+
 func (r *AIWorkbenchCopilotRun) BeforeCreate(tx *gorm.DB) error {
 	if r.ID == 0 {
 		r.ID = Int64String(utils.GenerateID())
@@ -231,6 +245,13 @@ func (r *AIWorkbenchCopilotRun) BeforeCreate(tx *gorm.DB) error {
 	}
 	if r.StartedAt.IsZero() {
 		r.StartedAt = time.Now()
+	}
+	return nil
+}
+
+func (e *AIWorkbenchCopilotRunEvent) BeforeCreate(tx *gorm.DB) error {
+	if e.ID == 0 {
+		e.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }

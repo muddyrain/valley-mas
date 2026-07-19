@@ -24,13 +24,28 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
 	featureWorkbenchCopilot       = "ai-workbench-contextual-copilot"
 	copilotARKTimeout             = 60 * time.Second
 	copilotPlanningTimeout        = 90 * time.Second
-	copilotActivityUpdateInterval = 12 * time.Second
+	copilotActivityUpdateInterval = 5 * time.Second
+	copilotEventPollInterval      = 400 * time.Millisecond
+	copilotEventHeartbeatInterval = 5 * time.Second
+)
+
+const (
+	copilotStageReadingContext = "reading_context"
+	copilotStagePlanning       = "planning"
+	copilotStageValidating     = "validating"
+	copilotStageProposed       = "proposed"
+	copilotStageClarifying     = "clarifying"
+	copilotStageCompleted      = "completed"
+	copilotStageFailed         = "failed"
+	copilotStageCancelled      = "cancelled"
+	copilotStageCancelling     = "cancelling"
 )
 
 var copilotPlanningActivities = []string{
@@ -52,6 +67,13 @@ type copilotAIEnvelope struct {
 	Workflow   *aiWorkflowDraft             `json:"workflow"`
 	Agent      *agentProposal               `json:"agent"`
 }
+
+type copilotValidationError struct {
+	err error
+}
+
+func (e copilotValidationError) Error() string { return e.err.Error() }
+func (e copilotValidationError) Unwrap() error { return e.err }
 
 type copilotContextPayload struct {
 	Draft          json.RawMessage   `json:"draft"`
@@ -222,18 +244,16 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	c.Header("X-Accel-Buffering", "no")
 	sendCopilotEvent(c, "session", gin.H{"session": session})
 	sendCopilotEvent(c, "run", gin.H{"run": run})
-	sendCopilotEvent(c, "activity", gin.H{"label": "正在读取当前草稿与可用能力"})
+	emitCopilotActivity(c, &run, copilotStageReadingContext, "正在读取当前草稿与可用能力")
 
 	draft, err := resolveCopilotDraft(ownerID, payload)
 	if err != nil {
-		completeCopilotRun(&run, "failed", "COPILOT_INVALID_REQUEST")
-		sendCopilotEvent(c, "error", gin.H{"message": err.Error()})
+		completeCopilotRun(c, &run, "failed", copilotStageFailed, "COPILOT_INVALID_REQUEST", err.Error())
 		return
 	}
 	baseHash := canonicalJSONHash(draft)
 	if payload.Context.BaseHash != "" && payload.Context.BaseHash != baseHash {
-		completeCopilotRun(&run, "failed", "COPILOT_DRAFT_CONFLICT")
-		sendCopilotEvent(c, "error", gin.H{"message": "当前草稿已变化，请重新发送需求"})
+		completeCopilotRun(c, &run, "failed", copilotStageFailed, "COPILOT_DRAFT_CONFLICT", "当前草稿已变化，请重新发送需求")
 		return
 	}
 
@@ -256,16 +276,16 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	systemPrompt := `你是 Valley Graph v4 上下文副驾驶。严格只输出 JSON，字段必须且只能是 mode、message、targetType、questions、operations、workflow、agent。mode 只能是 answer、clarify、proposal。信息不足时用 clarify，给 1-3 个问题，每题 2-4 个简短选项。workflow 作用域的 proposal 只能返回 operations，workflow 必须为 null；不得返回完整候选图。operations 只能使用 startInput.upsert、startInput.remove、node.insert、node.update、node.remove、edge.connect、edge.disconnect。node.insert 优先使用 afterNodeId 或 beforeNodeId 自动重连。节点定位不唯一时必须 clarify，不得猜测。通用节点只有 start、end、llm、tool、condition、merge、variable、subworkflow；业务能力只能使用 tool/config.capabilityId。不得保存、运行、发布或实际调用工具。生成封面时，在用户指定的摘要节点后插入 tool/image.generateCover，默认直接执行；仅当用户明确要求依赖已有上游布尔输出时，才为该节点设置 node.when。不得为封面新增 Start 输入，不得创建 Condition，不得修改其他节点。agent 作用域继续在 agent 字段返回候选，operations 为空。`
 	labelsJSON, _ := json.Marshal(payload.Context.NodeLabels)
 	userPrompt := fmt.Sprintf("作用域：%s\n目标 ID：%s\n选中节点：%s\n节点名称映射：%s\n安全运行 ID：%s\n能力目录：%s\n最近对话：%s\n当前草稿：%s\n\n用户消息：%s", payload.Scope, payload.TargetID, payload.Context.SelectedNodeID, labelsJSON, payload.Context.RunID, capabilities, historyJSON, draftJSON, payload.Message)
-	sendCopilotEvent(c, "activity", gin.H{"label": "正在理解需求"})
+	emitCopilotActivity(c, &run, copilotStagePlanning, "正在理解需求")
 	var envelope copilotAIEnvelope
 	var knowledgeBases []model.AIKnowledgeBase
 	_ = database.GetDB().Where("user_id = ?", ownerID).Order("updated_at DESC").Limit(50).Find(&knowledgeBases).Error
 	if payload.Scope == "workflow" {
 		if planned, handled := planDeterministicWorkflowOperations(payload, draft); handled {
-			sendCopilotEvent(c, "activity", gin.H{"label": "正在生成操作"})
+			emitCopilotActivity(c, &run, copilotStagePlanning, "正在生成操作")
 			envelope = planned
-			sendCopilotEvent(c, "activity", gin.H{"label": "正在应用操作并校验候选"})
-			err = validateCopilotEnvelope(&envelope, knowledgeBases, payload, draft)
+			emitCopilotActivity(c, &run, copilotStageValidating, "正在应用操作并校验候选")
+			err = validateCopilotEnvelopeForRun(&envelope, knowledgeBases, payload, draft)
 		}
 	}
 	if envelope.Mode == "" && err == nil {
@@ -273,30 +293,28 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 			planningContext,
 			copilotPlanningTimeout,
 			copilotActivityUpdateInterval,
-			func(label string) { sendCopilotEvent(c, "activity", gin.H{"label": label}) },
-			func(planningContext context.Context) error {
-				sendCopilotEvent(c, "activity", gin.H{"label": "正在生成操作"})
+			func(label string) { emitCopilotActivity(c, &run, copilotStagePlanning, label) },
+			func(planningContext context.Context, reportActivity func(string)) error {
+				reportActivity("正在生成操作")
 				return runCopilotAgentStructured(planningContext, ownerID, systemPrompt, userPrompt, payload, draft, &envelope, func() error {
-					sendCopilotEvent(c, "activity", gin.H{"label": "正在应用操作并校验候选"})
-					return validateCopilotEnvelope(&envelope, knowledgeBases, payload, draft)
+					reportActivity("正在应用操作并校验候选")
+					return validateCopilotEnvelopeForRun(&envelope, knowledgeBases, payload, draft)
 				})
 			},
 		)
 	}
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			completeCopilotRun(&run, "cancelled", "COPILOT_CANCELLED")
-			sendCopilotEvent(c, "cancelled", gin.H{"runId": run.ID})
+			completeCopilotRun(c, &run, "cancelled", copilotStageCancelled, "COPILOT_CANCELLED", "AI 协作已取消")
 			return
 		} else if errors.Is(err, context.DeadlineExceeded) {
-			completeCopilotRun(&run, "failed", "COPILOT_TIMEOUT")
-			sendCopilotEvent(c, "error", gin.H{"message": "AI 规划超时，请重试或简化需求", "statusCode": http.StatusBadGateway})
+			completeCopilotRun(c, &run, "failed", copilotStageFailed, "COPILOT_TIMEOUT", "AI 规划超时，请重试或简化需求")
+		} else if isCopilotValidationError(err) {
+			completeCopilotRun(c, &run, "failed", copilotStageFailed, "COPILOT_INVALID_OPERATION", "AI 返回的变更不符合当前草稿，请重新描述需求")
 		} else if isARKConfigurationError(err) {
-			completeCopilotRun(&run, "failed", "COPILOT_CONFIGURATION_INVALID")
-			sendCopilotEvent(c, "error", gin.H{"message": err.Error(), "statusCode": http.StatusServiceUnavailable})
+			completeCopilotRun(c, &run, "failed", copilotStageFailed, "MODEL_NOT_CONFIGURED", err.Error())
 		} else {
-			completeCopilotRun(&run, "failed", "COPILOT_PLANNING_FAILED")
-			sendCopilotEvent(c, "error", gin.H{"message": "AI 未返回可用结果，请重试", "statusCode": http.StatusBadGateway})
+			completeCopilotRun(c, &run, "failed", copilotStageFailed, "MODEL_UPSTREAM_FAILED", "AI 未返回可用结果，请重试")
 		}
 		return
 	}
@@ -304,8 +322,7 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	assistantKind := envelope.Mode
 	assistantMessage := model.AIWorkbenchCopilotMessage{SessionID: session.ID, UserID: ownerID, Role: "assistant", Kind: assistantKind, Content: envelope.Message}
 	if err := database.GetDB().Create(&assistantMessage).Error; err != nil {
-		completeCopilotRun(&run, "failed", "COPILOT_PERSIST_FAILED")
-		sendCopilotEvent(c, "error", gin.H{"message": "保存 AI 回复失败"})
+		completeCopilotRun(c, &run, "failed", copilotStageFailed, "COPILOT_PERSIST_FAILED", "保存 AI 回复失败")
 		return
 	}
 	for _, delta := range chunkCopilotText(envelope.Message, 48) {
@@ -317,8 +334,7 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	if envelope.Mode == "proposal" {
 		proposal, proposalErr := persistCopilotProposal(session, ownerID, payload.TargetID, baseHash, draft, envelope)
 		if proposalErr != nil {
-			completeCopilotRun(&run, "failed", "COPILOT_PERSIST_FAILED")
-			sendCopilotEvent(c, "error", gin.H{"message": "保存变更提案失败"})
+			completeCopilotRun(c, &run, "failed", copilotStageFailed, "COPILOT_PERSIST_FAILED", "保存变更提案失败")
 			return
 		}
 		var candidate any
@@ -327,16 +343,172 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 		_ = json.Unmarshal([]byte(proposal.Diff), &diff)
 		sendCopilotEvent(c, "proposal", gin.H{"proposal": proposal, "candidate": candidate, "diff": diff})
 	}
-	completeCopilotRun(&run, "completed", "")
-	sendCopilotEvent(c, "done", gin.H{"messageId": assistantMessage.ID})
+	stage := copilotStageCompleted
+	if envelope.Mode == "proposal" {
+		stage = copilotStageProposed
+	} else if envelope.Mode == "clarify" {
+		stage = copilotStageClarifying
+	}
+	completeCopilotRun(c, &run, "completed", stage, "", "")
 }
 
-func completeCopilotRun(run *model.AIWorkbenchCopilotRun, status, errorCode string) {
+func completeCopilotRun(c *gin.Context, run *model.AIWorkbenchCopilotRun, status, stage, errorCode, message string) {
 	now := time.Now()
 	run.Status = status
 	run.ErrorCode = errorCode
 	run.FinishedAt = &now
 	_ = database.GetDB().Model(run).Updates(map[string]any{"status": status, "error_code": errorCode, "finished_at": &now}).Error
+	event, err := appendCopilotRunEvent(run.ID, "terminal", stage, message, errorCode)
+	if err == nil {
+		writeCopilotRunSSE(c, event)
+		return
+	}
+	if stage == copilotStageCancelled {
+		sendCopilotEvent(c, "cancelled", gin.H{"runId": run.ID})
+		return
+	}
+	if stage == copilotStageFailed {
+		sendCopilotEvent(c, "error", gin.H{"message": message, "statusCode": copilotErrorStatusCode(errorCode)})
+		return
+	}
+	sendCopilotEvent(c, "done", gin.H{"runId": run.ID})
+}
+
+func emitCopilotActivity(c *gin.Context, run *model.AIWorkbenchCopilotRun, stage, label string) {
+	event, err := appendCopilotRunEvent(run.ID, "stage", stage, label, "")
+	if err == nil {
+		writeCopilotRunSSE(c, event)
+		return
+	}
+	sendCopilotEvent(c, "activity", gin.H{"label": label, "stage": stage, "runId": run.ID})
+}
+
+func appendCopilotRunEvent(runID model.Int64String, eventType, stage, message, errorCode string) (model.AIWorkbenchCopilotRunEvent, error) {
+	event := model.AIWorkbenchCopilotRunEvent{
+		RunID:     runID,
+		EventType: eventType,
+		Stage:     stage,
+		Message:   truncateAIAgentRunes(strings.TrimSpace(message), 500),
+		ErrorCode: truncateAIAgentRunes(strings.TrimSpace(errorCode), 80),
+	}
+	err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		var run model.AIWorkbenchCopilotRun
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&run, runID).Error; err != nil {
+			return err
+		}
+		var latest model.AIWorkbenchCopilotRunEvent
+		err := tx.Where("run_id = ?", runID).Order("sequence DESC").First(&latest).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		event.Sequence = latest.Sequence + 1
+		return tx.Create(&event).Error
+	})
+	return event, err
+}
+
+func copilotErrorStatusCode(errorCode string) int {
+	switch errorCode {
+	case "MODEL_NOT_CONFIGURED":
+		return http.StatusServiceUnavailable
+	case "COPILOT_INVALID_REQUEST", "COPILOT_INVALID_OPERATION":
+		return http.StatusBadRequest
+	case "COPILOT_DRAFT_CONFLICT":
+		return http.StatusConflict
+	default:
+		return http.StatusBadGateway
+	}
+}
+
+func StreamWorkbenchCopilotRunEvents(c *gin.Context) {
+	userID, _, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+	runID, err := parsePathInt64(c, "runId")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的协作请求 ID")
+		return
+	}
+	var run model.AIWorkbenchCopilotRun
+	if err := database.GetDB().Where("id = ? AND user_id = ?", runID, userID).First(&run).Error; err != nil {
+		Error(c, http.StatusNotFound, "协作请求不存在")
+		return
+	}
+	streamCopilotRunEvents(c, &run)
+}
+
+func streamCopilotRunEvents(c *gin.Context, run *model.AIWorkbenchCopilotRun) {
+	after, _ := strconv.ParseInt(c.GetHeader("Last-Event-ID"), 10, 64)
+	if queryAfter := c.Query("after"); queryAfter != "" {
+		if parsed, parseErr := strconv.ParseInt(queryAfter, 10, 64); parseErr == nil {
+			after = parsed
+		}
+	}
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	poll := time.NewTicker(copilotEventPollInterval)
+	defer poll.Stop()
+	heartbeat := time.NewTicker(copilotEventHeartbeatInterval)
+	defer heartbeat.Stop()
+	for {
+		var events []model.AIWorkbenchCopilotRunEvent
+		if err := database.GetDB().Where("run_id = ? AND sequence > ?", run.ID, after).Order("sequence ASC").Find(&events).Error; err != nil {
+			return
+		}
+		for _, event := range events {
+			writeCopilotRunSSE(c, event)
+			after = event.Sequence
+		}
+		if err := database.GetDB().First(run, run.ID).Error; err != nil || copilotRunIsTerminal(run.Status) {
+			return
+		}
+		select {
+		case <-c.Request.Context().Done():
+			return
+		case <-heartbeat.C:
+			_, _ = fmt.Fprint(c.Writer, ": keep-alive\n\n")
+			if flusher, ok := c.Writer.(http.Flusher); ok {
+				flusher.Flush()
+			}
+		case <-poll.C:
+		}
+	}
+}
+
+func copilotRunIsTerminal(status string) bool {
+	return status == "completed" || status == "failed" || status == "cancelled"
+}
+
+func writeCopilotRunSSE(c *gin.Context, event model.AIWorkbenchCopilotRunEvent) {
+	eventType := "activity"
+	data := gin.H{
+		"runId":    event.RunID,
+		"sequence": event.Sequence,
+		"stage":    event.Stage,
+		"label":    event.Message,
+	}
+	if event.EventType == "terminal" {
+		switch event.Stage {
+		case copilotStageCancelled:
+			eventType = "cancelled"
+		case copilotStageFailed:
+			eventType = "error"
+			data["message"] = event.Message
+			data["errorCode"] = event.ErrorCode
+			data["statusCode"] = copilotErrorStatusCode(event.ErrorCode)
+		default:
+			eventType = "done"
+		}
+	}
+	encoded, _ := json.Marshal(gin.H{"type": eventType, "data": data})
+	_, _ = fmt.Fprintf(c.Writer, "id: %d\ndata: %s\n\n", event.Sequence, encoded)
+	if flusher, ok := c.Writer.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
 
 func CancelWorkbenchCopilotRun(c *gin.Context) {
@@ -361,6 +533,10 @@ func CancelWorkbenchCopilotRun(c *gin.Context) {
 	}
 	if err := database.GetDB().Model(&run).Where("status = ?", "running").Update("status", "cancelling").Error; err != nil {
 		Error(c, http.StatusInternalServerError, "更新取消状态失败")
+		return
+	}
+	if _, err := appendCopilotRunEvent(run.ID, "stage", copilotStageCancelling, "正在取消 AI 协作", ""); err != nil {
+		Error(c, http.StatusInternalServerError, "记录取消状态失败")
 		return
 	}
 	Success(c, gin.H{"status": "cancelling"})
@@ -390,14 +566,20 @@ func runCopilotPlanningWithActivity(
 	timeout time.Duration,
 	activityInterval time.Duration,
 	onActivity func(string),
-	run func(context.Context) error,
+	run func(context.Context, func(string)) error,
 ) error {
 	planningContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	result := make(chan error, 1)
+	activities := make(chan string, 2)
 	go func() {
-		result <- run(planningContext)
+		result <- run(planningContext, func(label string) {
+			select {
+			case activities <- label:
+			case <-planningContext.Done():
+			}
+		})
 	}()
 
 	ticker := time.NewTicker(activityInterval)
@@ -409,6 +591,10 @@ func runCopilotPlanningWithActivity(
 			return err
 		case <-planningContext.Done():
 			return planningContext.Err()
+		case label := <-activities:
+			if onActivity != nil {
+				onActivity(label)
+			}
 		case <-ticker.C:
 			if onActivity == nil {
 				continue
@@ -709,6 +895,18 @@ func validateCopilotEnvelope(envelope *copilotAIEnvelope, knowledgeBases []model
 	default:
 		return errors.New("AI 回复模式无效")
 	}
+}
+
+func validateCopilotEnvelopeForRun(envelope *copilotAIEnvelope, knowledgeBases []model.AIKnowledgeBase, payload copilotMessageRequest, base any) error {
+	if err := validateCopilotEnvelope(envelope, knowledgeBases, payload, base); err != nil {
+		return copilotValidationError{err: err}
+	}
+	return nil
+}
+
+func isCopilotValidationError(err error) bool {
+	var validationErr copilotValidationError
+	return errors.As(err, &validationErr)
 }
 
 func decodeCopilotWorkflowDraft(value any) (aiWorkflowDraft, error) {

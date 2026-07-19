@@ -23,7 +23,7 @@ func TestCopilotPlanningPublishesActivityAndStopsAtDeadline(t *testing.T) {
 		30*time.Millisecond,
 		5*time.Millisecond,
 		func(label string) { activities = append(activities, label) },
-		func(ctx context.Context) error {
+		func(ctx context.Context, _ func(string)) error {
 			<-ctx.Done()
 			return ctx.Err()
 		},

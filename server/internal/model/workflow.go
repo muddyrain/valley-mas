@@ -102,6 +102,59 @@ type WorkflowRunEvent struct {
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
+// WorkflowTestCase is an owner-private, version-locked regression case. Inputs
+// and assertions are structured JSON so the server can validate them before a
+// test run is created.
+type WorkflowTestCase struct {
+	ID         Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	WorkflowID Int64String    `gorm:"index;not null" json:"workflowId"`
+	UserID     Int64String    `gorm:"index;not null" json:"userId"`
+	VersionID  Int64String    `gorm:"index;not null" json:"versionId"`
+	Name       string         `gorm:"size:120;not null" json:"name"`
+	Inputs     string         `gorm:"type:json;not null" json:"inputs"`
+	Assertions string         `gorm:"type:json;not null" json:"assertions"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	UpdatedAt  time.Time      `json:"updatedAt"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (r *WorkflowTestCase) BeforeCreate(tx *gorm.DB) error {
+	if r.ID == 0 {
+		r.ID = Int64String(utils.GenerateID())
+	}
+	r.Inputs = normalizeWorkflowJSON(r.Inputs)
+	r.Assertions = normalizeWorkflowJSONArray(r.Assertions)
+	return nil
+}
+
+// WorkflowTestResult records one independent test run. It never alters the
+// immutable workflow version or ordinary run history.
+type WorkflowTestResult struct {
+	ID                 Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	WorkflowTestCaseID Int64String    `gorm:"index;not null" json:"workflowTestCaseId"`
+	WorkflowRunID      *Int64String   `gorm:"index" json:"workflowRunId,omitempty"`
+	WorkflowID         Int64String    `gorm:"index;not null" json:"workflowId"`
+	UserID             Int64String    `gorm:"index;not null" json:"userId"`
+	VersionID          Int64String    `gorm:"index;not null" json:"versionId"`
+	Status             string         `gorm:"size:20;not null;index" json:"status"`
+	Output             string         `gorm:"type:json" json:"output,omitempty"`
+	AssertionResults   string         `gorm:"type:json" json:"assertionResults,omitempty"`
+	ErrorCode          string         `gorm:"size:80" json:"errorCode,omitempty"`
+	StartedAt          time.Time      `json:"startedAt"`
+	FinishedAt         *time.Time     `json:"finishedAt,omitempty"`
+	CreatedAt          time.Time      `json:"createdAt"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (r *WorkflowTestResult) BeforeCreate(tx *gorm.DB) error {
+	if r.ID == 0 {
+		r.ID = Int64String(utils.GenerateID())
+	}
+	r.Output = normalizeWorkflowJSON(r.Output)
+	r.AssertionResults = normalizeWorkflowJSONArray(r.AssertionResults)
+	return nil
+}
+
 func (r *WorkflowRunEvent) BeforeCreate(tx *gorm.DB) error {
 	if r.ID == 0 {
 		r.ID = Int64String(utils.GenerateID())
@@ -114,6 +167,13 @@ func (r *WorkflowRunEvent) BeforeCreate(tx *gorm.DB) error {
 func normalizeWorkflowJSON(value string) string {
 	if strings.TrimSpace(value) == "" {
 		return "{}"
+	}
+	return value
+}
+
+func normalizeWorkflowJSONArray(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "[]"
 	}
 	return value
 }

@@ -202,6 +202,13 @@ export function WorkbenchCopilot({
     setActivity('正在连接工作台上下文');
     const controller = new AbortController();
     controllerRef.current = controller;
+    const refreshSessionAfterTerminal = () => {
+      if (!activeSessionId) return;
+      void getCopilotSession(context.scope, context.targetId, activeSessionId).then((result) => {
+        setMessages(result.messages);
+        setProposals(result.proposals);
+      });
+    };
     try {
       await streamCopilotMessage(
         context,
@@ -257,27 +264,28 @@ export function WorkbenchCopilot({
               setActivity('');
               setRequestError(event.data.message);
               toast.error(event.data.message);
+              if (event.data.sequence) refreshSessionAfterTerminal();
             }
             if (event.type === 'done') {
               setActivity('');
               setStreaming(false);
+              if (event.data.sequence) refreshSessionAfterTerminal();
             }
             if (event.type === 'cancelled') {
               setActivity('');
               setCancelling(false);
+              if (event.data.sequence) refreshSessionAfterTerminal();
             }
           },
-          onError: (error) => {
-            setRequestError(error);
-            toast.error(error);
-          },
+          onReconnect: () => setActivity('正在恢复连接'),
         },
         controller.signal,
       );
-    } catch {
+    } catch (error) {
       if (!controller.signal.aborted) {
-        setRequestError('AI 协作请求失败');
-        toast.error('AI 协作请求失败');
+        const errorMessage = error instanceof Error ? error.message : 'AI 协作请求失败';
+        setRequestError(errorMessage);
+        toast.error(errorMessage);
       }
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;

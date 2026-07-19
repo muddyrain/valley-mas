@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
@@ -35,7 +36,7 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.User{}, &model.Workflow{}, &model.WorkflowRun{}, &model.WorkflowNodeRun{}, &model.WorkflowRunEvent{}, &model.AIApp{}, &model.AIAppVersion{}, &model.AIAppVersionKnowledgeBase{}, &model.AIAppVersionToolBinding{}, &model.AIAppKnowledgeBase{}, &model.AIAppRun{}, &model.Post{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Workflow{}, &model.WorkflowRun{}, &model.WorkflowNodeRun{}, &model.WorkflowRunEvent{}, &model.WorkflowTestCase{}, &model.WorkflowTestResult{}, &model.AIApp{}, &model.AIAppVersion{}, &model.AIAppVersionKnowledgeBase{}, &model.AIAppVersionToolBinding{}, &model.AIAppKnowledgeBase{}, &model.AIAppRun{}, &model.Post{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Create(&[]model.User{{ID: 101, Username: "workflow-owner", Role: "user", IsActive: true}, {ID: 202, Username: "workflow-other", Role: "user", IsActive: true}}).Error; err != nil {
@@ -58,6 +59,10 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	auth.Use(middleware.Auth(&config.Config{JWT: config.JWTConfig{Secret: workflowRuntimeTestSecret}}))
 	auth.POST("/:id/run", AdminRunWorkflow)
 	auth.GET("/:id/runs", AdminListWorkflowRuns)
+	auth.GET("/:id/test-cases", ListWorkflowTestCases)
+	auth.POST("/:id/test-cases", CreateWorkflowTestCase)
+	auth.DELETE("/:id/test-cases/:testCaseId", DeleteWorkflowTestCase)
+	auth.POST("/:id/test-cases/:testCaseId/run", RunWorkflowTestCase)
 	auth.GET("/:id/runs/:runId", AdminGetWorkflowRun)
 	auth.GET("/:id/runs/:runId/events", StreamWorkflowRunEvents)
 	auth.POST("/:id/runs/:runId/cancel", CancelWorkflowRun)
@@ -69,6 +74,116 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 
 func runtimeTestGraph() string {
 	return `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","position":{"x":0,"y":0},"config":{"inputs":{"title":{"type":"string","required":true}}}},{"id":"end","type":"end","label":"结束","position":{"x":300,"y":0},"config":{"outputs":{"title":"{{start.output.title}}"}}}],"edges":[{"source":"start","sourceHandle":"output","target":"end","targetHandle":"input"}]}`
+}
+
+func TestWorkflowTestCaseRunsLockedVersionAndKeepsRunHistorySeparate(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	var version model.AIAppVersion
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		_, createdVersion, err := syncWorkflowAIApp(tx, definition)
+		version = createdVersion
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	createBody, _ := json.Marshal(map[string]any{
+		"name":      "标题透传",
+		"versionId": version.ID.String(),
+		"inputs":    map[string]any{"title": "Valley"},
+		"assertions": []map[string]any{
+			{"field": "title", "operator": "equals", "value": "Valley"},
+			{"field": "title", "operator": "type", "value": "string"},
+		},
+	})
+	createRequest := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/test-cases", bytes.NewReader(createBody))
+	createRequest.Header.Set("Content-Type", "application/json")
+	createRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	createRecorder := httptest.NewRecorder()
+	router.ServeHTTP(createRecorder, createRequest)
+	if responseCode(createRecorder) != 0 {
+		t.Fatalf("create test case: %s", createRecorder.Body.String())
+	}
+	var createResponse struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(createRecorder.Body.Bytes(), &createResponse); err != nil {
+		t.Fatal(err)
+	}
+	var testCase model.WorkflowTestCase
+	if err := json.Unmarshal(createResponse.Data, &testCase); err != nil {
+		t.Fatal(err)
+	}
+	runRequest := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/test-cases/"+testCase.ID.String()+"/run", nil)
+	runRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	runRecorder := httptest.NewRecorder()
+	router.ServeHTTP(runRecorder, runRequest)
+	if responseCode(runRecorder) != 0 || !strings.Contains(runRecorder.Body.String(), `"status":"passed"`) {
+		t.Fatalf("run test case: %s", runRecorder.Body.String())
+	}
+	var stored model.WorkflowTestResult
+	if err := database.DB.Where("workflow_test_case_id = ?", testCase.ID).First(&stored).Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.WorkflowRunID == nil || stored.Status != workflowTestStatusPassed {
+		t.Fatalf("stored result=%+v", stored)
+	}
+	historyRequest := httptest.NewRequest(http.MethodGet, "/workflows/"+definition.ID.String()+"/runs", nil)
+	historyRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	historyRecorder := httptest.NewRecorder()
+	router.ServeHTTP(historyRecorder, historyRequest)
+	if responseCode(historyRecorder) != 0 || strings.Contains(historyRecorder.Body.String(), stored.WorkflowRunID.String()) {
+		t.Fatalf("test run must stay out of ordinary history: %s", historyRecorder.Body.String())
+	}
+}
+
+func TestWorkflowTestCaseIsOwnerScoped(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	var version model.AIAppVersion
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		_, createdVersion, err := syncWorkflowAIApp(tx, definition)
+		version = createdVersion
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	testCase := model.WorkflowTestCase{WorkflowID: definition.ID, UserID: 101, VersionID: version.ID, Name: "私有测试", Inputs: `{"title":"Valley"}`, Assertions: `[{"field":"title","operator":"exists"}]`}
+	if err := database.DB.Create(&testCase).Error; err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/test-cases/"+testCase.ID.String()+"/run", nil)
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "202"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if responseCode(recorder) != http.StatusNotFound {
+		t.Fatalf("owner isolation: %s", recorder.Body.String())
+	}
+}
+
+func TestWorkflowTestCaseRejectsSideEffectGraph(t *testing.T) {
+	_, definition := setupWorkflowRuntimeTestRouter(t)
+	definition.Graph = `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","position":{"x":0,"y":0},"config":{"inputs":{"title":{"type":"string","required":true}}}},{"id":"cover","type":"tool","label":"生成封面","position":{"x":260,"y":0},"config":{"capabilityId":"image.generateCover","inputs":{"title":"{{start.output.title}}"}}},{"id":"end","type":"end","label":"结束","position":{"x":520,"y":0},"config":{"outputs":{"url":"{{cover.output.url}}"}}}],"edges":[{"source":"start","target":"cover"},{"source":"cover","target":"end"}]}`
+	if err := database.DB.Model(&model.Workflow{}).Where("id = ?", definition.ID).Update("graph", definition.Graph).Error; err != nil {
+		t.Fatal(err)
+	}
+	var version model.AIAppVersion
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		_, createdVersion, err := syncWorkflowAIApp(tx, definition)
+		version = createdVersion
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	testCase := model.WorkflowTestCase{WorkflowID: definition.ID, UserID: 101, VersionID: version.ID, Name: "禁止副作用", Inputs: `{"title":"Valley"}`, Assertions: `[{"field":"url","operator":"exists"}]`}
+	if err := database.DB.Create(&testCase).Error; err != nil {
+		t.Fatal(err)
+	}
+	result, err := executeWorkflowTestCase(context.Background(), testCase, "user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != workflowTestStatusRejected || result.ErrorCode != "TEST_SIDE_EFFECT_FORBIDDEN" || result.WorkflowRunID != nil {
+		t.Fatalf("result=%+v", result)
+	}
 }
 
 func TestWorkflowGraphV4RejectsLegacySchema(t *testing.T) {

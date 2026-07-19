@@ -70,6 +70,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		&model.AIWorkbenchCopilotSession{},
 		&model.AIWorkbenchCopilotMessage{},
 		&model.AIWorkbenchCopilotRun{},
+		&model.AIWorkbenchCopilotRunEvent{},
 		&model.AIWorkbenchChangeProposal{},
 	); err != nil {
 		t.Fatalf("migrate ai platform: %v", err)
@@ -97,6 +98,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.GET("/workbench/copilot/session", GetWorkbenchCopilotSession)
 	auth.GET("/workbench/copilot/sessions", ListWorkbenchCopilotSessions)
 	auth.POST("/workbench/copilot/sessions", CreateWorkbenchCopilotSession)
+	auth.GET("/workbench/copilot/runs/:runId/events", StreamWorkbenchCopilotRunEvents)
 	auth.POST("/workbench/copilot/runs/:runId/cancel", CancelWorkbenchCopilotRun)
 	auth.PATCH("/workbench/copilot/proposals/:proposalId", UpdateWorkbenchCopilotProposal)
 	auth.POST("/apps/:appId/versions", SaveAIAppVersion)
@@ -151,6 +153,43 @@ func TestCancelWorkbenchCopilotRunRequiresOwnerAndSignalsActiveRun(t *testing.T)
 	case <-context.Done():
 	case <-time.After(time.Second):
 		t.Fatal("copilot run context was not cancelled")
+	}
+}
+
+func TestStreamWorkbenchCopilotRunEventsReplaysMissingOwnerEvents(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	run := model.AIWorkbenchCopilotRun{SessionID: 1, UserID: 101, Scope: "workbench", Status: "completed"}
+	if err := db.Create(&run).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, event := range []model.AIWorkbenchCopilotRunEvent{
+		{RunID: run.ID, Sequence: 1, EventType: "stage", Stage: copilotStageReadingContext, Message: "正在读取当前草稿与可用能力"},
+		{RunID: run.ID, Sequence: 2, EventType: "terminal", Stage: copilotStageCompleted},
+	} {
+		if err := db.Create(&event).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/ai/workbench/copilot/runs/"+run.ID.String()+"/events", nil)
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	request.Header.Set("Last-Event-ID", "1")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("response=%s", recorder.Body.String())
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, "id: 2") || strings.Contains(body, "id: 1") || !strings.Contains(body, `"type":"done"`) {
+		t.Fatalf("stream=%s", body)
+	}
+
+	other := httptest.NewRequest(http.MethodGet, "/ai/workbench/copilot/runs/"+run.ID.String()+"/events", nil)
+	other.Header.Set("Authorization", aiPlatformAuthHeaderFor(t, "202", "other-user"))
+	otherRecorder := httptest.NewRecorder()
+	router.ServeHTTP(otherRecorder, other)
+	if responseCode(otherRecorder) != http.StatusNotFound {
+		t.Fatalf("other owner response=%s", otherRecorder.Body.String())
 	}
 }
 
