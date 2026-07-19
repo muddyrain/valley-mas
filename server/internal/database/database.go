@@ -1,6 +1,7 @@
 package database
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -144,6 +145,9 @@ func AutoMigrate(scope string) error {
 	if err := backfillLegacyPublishedWorkflowVersions(); err != nil {
 		return err
 	}
+	if err := backfillLegacyPromptLibraryContent(); err != nil {
+		return err
+	}
 	if err := dropLegacyCopilotTargetUniqueness(); err != nil {
 		return err
 	}
@@ -176,6 +180,9 @@ func AutoMigrateModels(names []string) error {
 		return err
 	}
 	if err := backfillLegacyPublishedWorkflowVersions(); err != nil {
+		return err
+	}
+	if err := backfillLegacyPromptLibraryContent(); err != nil {
 		return err
 	}
 	if err := dropLegacyCopilotTargetUniqueness(); err != nil {
@@ -213,6 +220,41 @@ func backfillLegacyPublishedWorkflowVersions() error {
 			Where("app_id = ? AND number <= ? AND published_at IS NULL", app.ID, published.Number).
 			Update("published_at", publishedAt).Error; err != nil {
 			return fmt.Errorf("backfill legacy published workflow versions: %w", err)
+		}
+	}
+	return nil
+}
+
+// backfillLegacyPromptLibraryContent keeps locally created prompt resources
+// usable after P13.1 was simplified from versioned templates to a plain text
+// library. Historical data only existed in the temporary draft JSON column.
+func backfillLegacyPromptLibraryContent() error {
+	if DB == nil || !DB.Migrator().HasTable(&model.AIPrompt{}) || !DB.Migrator().HasColumn("ai_prompts", "draft") {
+		return nil
+	}
+	type legacyPromptRow struct {
+		ID      model.Int64String
+		Draft   string
+		Content string
+	}
+	var rows []legacyPromptRow
+	if err := DB.Table("ai_prompts").Select("id, draft, content").Where("content = '' OR content IS NULL").Find(&rows).Error; err != nil {
+		return fmt.Errorf("load legacy prompt library content: %w", err)
+	}
+	for _, row := range rows {
+		var draft struct {
+			SystemPrompt string `json:"systemPrompt"`
+			Prompt       string `json:"prompt"`
+		}
+		if err := json.Unmarshal([]byte(row.Draft), &draft); err != nil {
+			continue
+		}
+		content := strings.TrimSpace(strings.Join([]string{strings.TrimSpace(draft.SystemPrompt), strings.TrimSpace(draft.Prompt)}, "\n\n"))
+		if content == "" {
+			continue
+		}
+		if err := DB.Model(&model.AIPrompt{}).Where("id = ?", row.ID).Update("content", content).Error; err != nil {
+			return fmt.Errorf("backfill legacy prompt content: %w", err)
 		}
 	}
 	return nil
@@ -376,6 +418,7 @@ func autoMigrateModelsByName() map[string]any {
 		"ai_workbench_copilot_run":             &model.AIWorkbenchCopilotRun{},
 		"ai_workbench_copilot_run_event":       &model.AIWorkbenchCopilotRunEvent{},
 		"ai_workbench_change_proposal":         &model.AIWorkbenchChangeProposal{},
+		"ai_prompt":                            &model.AIPrompt{},
 		"ai_knowledge_base":                    &model.AIKnowledgeBase{},
 		"ai_knowledge_document":                &model.AIKnowledgeDocument{},
 		"ai_app_knowledge_base":                &model.AIAppKnowledgeBase{},
@@ -452,6 +495,7 @@ func autoMigrateModelAliases() map[string]string {
 		"ai_app_runs":                "ai_app_run",
 		"ai_knowledge_bases":         "ai_knowledge_base",
 		"ai_knowledge_documents":     "ai_knowledge_document",
+		"ai_prompts":                 "ai_prompt",
 		"ai_api_keys":                "ai_api_key",
 		"ai_api_key_app_bindings":    "ai_api_key_app_binding",
 		"ai_api_key_daily_usages":    "ai_api_key_daily_usage",
@@ -532,6 +576,7 @@ func coreMigrationModels() []any {
 		&model.AIWorkbenchCopilotRun{},
 		&model.AIWorkbenchCopilotRunEvent{},
 		&model.AIWorkbenchChangeProposal{},
+		&model.AIPrompt{},
 		&model.AIKnowledgeBase{},
 		&model.AIKnowledgeDocument{},
 		&model.AIKnowledgeChunk{},

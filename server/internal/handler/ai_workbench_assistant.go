@@ -295,7 +295,7 @@ func CreatePromptAssistantSuggestion(c *gin.Context) {
 		payload.Field = promptFieldSystem
 	}
 	payload.Mode = strings.TrimSpace(payload.Mode)
-	if payload.Target != "agent" && payload.Target != "workflow_llm" {
+	if payload.Target != "agent" && payload.Target != "workflow_llm" && payload.Target != "prompt_resource" {
 		Error(c, http.StatusBadRequest, "不支持的提示词目标")
 		return
 	}
@@ -307,8 +307,8 @@ func CreatePromptAssistantSuggestion(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "不支持的 AI 生成字段")
 		return
 	}
-	if payload.Target == "workflow_llm" && payload.Field != promptFieldSystem {
-		Error(c, http.StatusBadRequest, "工作流节点仅支持优化提示词")
+	if (payload.Target == "workflow_llm" || payload.Target == "prompt_resource") && payload.Field != promptFieldSystem {
+		Error(c, http.StatusBadRequest, "当前目标仅支持优化提示词")
 		return
 	}
 	currentPrompt := truncateAIAgentRunes(strings.TrimSpace(payload.CurrentPrompt), aiapp.MaxSystemPromptRunes)
@@ -346,6 +346,9 @@ func CreatePromptAssistantSuggestion(c *gin.Context) {
 	}
 	if payload.Target == "workflow_llm" {
 		systemPrompt += ` 这是工作流 LLM 节点提示词。所有已有 {{node.output.field}} 变量必须原样保留，只能使用给定变量白名单，不能新增未知变量。`
+	}
+	if payload.Target == "prompt_resource" {
+		systemPrompt += ` 这是提示词库中的可复用正文。只优化表达与结构，不要引入变量占位符或工作流绑定说明。`
 	}
 	userPrompt := fmt.Sprintf("目标：%s\n字段：%s\n模式：%s\n生成问候语：%t\n用户调整要求：%s\n合法变量：%s\n调试摘要：%s\n智能体上下文：%s\n\n当前字段内容：\n%s", payload.Target, payload.Field, payload.Mode, payload.GenerateGreetings, truncateAIAgentRunes(payload.Instruction, 2000), variablesJSON, debugContext, contextJSON, currentPrompt)
 	var suggestion promptAssistantSuggestion

@@ -171,6 +171,16 @@ export interface AIKnowledgeDocument {
   updatedAt: string;
 }
 
+export interface AIPrompt {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+  archivedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AIAppTool {
   name: string;
   description: string;
@@ -262,7 +272,7 @@ export function createAIAppProposal(
 
 export async function createPromptAssistantSuggestion(
   data: {
-    target: 'agent' | 'workflow_llm';
+    target: 'agent' | 'workflow_llm' | 'prompt_resource';
     field?: PromptAssistantField;
     mode: 'auto' | 'instruction' | 'debug_run';
     appId?: string;
@@ -576,6 +586,33 @@ export function replaceAIAppTools(appId: string, tools: string[]): Promise<{ too
 
 export function listAIKnowledgeBases(): Promise<{ list: AIKnowledgeBase[] }> {
   return request.get('/ai/knowledge-bases');
+}
+
+export function listAIPrompts(): Promise<{ list: AIPrompt[] }> {
+  return request.get('/ai/prompts');
+}
+
+export function createAIPrompt(data: {
+  name: string;
+  description?: string;
+  content: string;
+}): Promise<AIPrompt> {
+  return request.post('/ai/prompts', data);
+}
+
+export function updateAIPrompt(
+  promptId: string,
+  data: {
+    name: string;
+    description?: string;
+    content: string;
+  },
+): Promise<AIPrompt> {
+  return request.patch(`/ai/prompts/${promptId}`, data);
+}
+
+export function archiveAIPrompt(promptId: string): Promise<void> {
+  return request.delete(`/ai/prompts/${promptId}`);
 }
 
 export function createAIKnowledgeBase(data: {

@@ -3,18 +3,19 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import KnowledgeBases from '@/pages/KnowledgeBases';
 import Workflows from '@/pages/Workflows';
 import NotionConnectorCard from './NotionConnectorCard';
+import PromptResources from './PromptResources';
 
 const tabs = [
   { value: 'workflows', label: '工作流', disabled: false },
   { value: 'knowledge', label: '知识库', disabled: false },
-  { value: 'prompts', label: '提示词', disabled: true },
+  { value: 'prompts', label: '提示词', disabled: false },
   { value: 'tools', label: '工具', disabled: false },
 ] as const;
 
 type ResourceTab = (typeof tabs)[number]['value'];
 
 function parseResourceTab(value: string | null): ResourceTab {
-  return value === 'knowledge' || value === 'tools' ? value : 'workflows';
+  return value === 'knowledge' || value === 'prompts' || value === 'tools' ? value : 'workflows';
 }
 
 export default function AIResources() {
@@ -56,6 +57,8 @@ export default function AIResources() {
         <div className="pt-6">
           {activeTab === 'knowledge' ? (
             <KnowledgeBases embedded />
+          ) : activeTab === 'prompts' ? (
+            <PromptResources />
           ) : activeTab === 'tools' ? (
             <NotionConnectorCard />
           ) : (

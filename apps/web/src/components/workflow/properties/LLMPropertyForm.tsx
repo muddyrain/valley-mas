@@ -1,7 +1,8 @@
-import { Plus, Sparkles, Trash2 } from 'lucide-react';
+import { BookOpen, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
+import { PromptLibraryDialog } from '@/components/ai-workbench/PromptLibraryDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,6 +26,7 @@ export function LLMPropertyForm({
   variableOptions = [],
 }: PropertyFormProps) {
   const [showAssistant, setShowAssistant] = useState(false);
+  const [showPromptLibrary, setShowPromptLibrary] = useState(false);
   const systemPrompt = (config.systemPrompt as string) || '';
   const taskPrompt = (config.prompt as string) || '';
   const inputs = (config.inputs as Record<string, unknown>) || {};
@@ -44,6 +46,7 @@ export function LLMPropertyForm({
   ];
   const updateOutputSchema = (nextSchema: Record<string, import('../types').WorkflowValueType>) =>
     onUpdateConfig({ outputMode: 'json', outputSchema: nextSchema });
+
   return (
     <div className="space-y-4">
       <EditorSection title="输入变量" description="绑定模型本次调用使用的上游变量。">
@@ -60,52 +63,11 @@ export function LLMPropertyForm({
           valueMode="reference"
         />
       </EditorSection>
-      <EditorSection title="提示词" description="设置模型角色和本次生成任务。">
+      <EditorSection title="模型设置" description="选择模型并调整生成参数。">
         <div className="space-y-1.5">
-          <Label>模型配置</Label>
+          <Label>模型</Label>
           <Input value="ARK 默认文本模型" disabled />
         </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="llm-system-prompt">系统提示词</Label>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!systemPrompt.trim() && !taskPrompt.trim()}
-              onClick={() => setShowAssistant(true)}
-            >
-              <Sparkles className="mr-2 size-3.5" />
-              AI 优化
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            定义模型持续遵循的角色、规则和边界，可留空。
-          </p>
-          <VariableTokenEditor
-            id="llm-system-prompt"
-            ariaLabel="系统提示词"
-            value={(config.systemPrompt as string) || ''}
-            onChange={(systemPrompt) =>
-              onUpdateConfig({ systemPrompt, modelProfile: 'ark-text-default' })
-            }
-            options={variableOptions}
-            placeholder="例如：你是专业的内容编辑，回答应准确、简洁"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="llm-prompt">用户提示词</Label>
-          <p className="text-xs text-muted-foreground">描述本次执行的具体任务，可引用上游变量。</p>
-          <VariableTokenEditor
-            id="llm-prompt"
-            ariaLabel="用户提示词"
-            value={(config.prompt as string) || ''}
-            onChange={(prompt) => onUpdateConfig({ prompt })}
-            options={variableOptions}
-            placeholder="例如：根据输入主题生成一篇文章"
-          />
-        </div>
-      </EditorSection>
-      <EditorSection title="生成参数" description="控制输出的随机性和长度。">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="llm-temperature">Temperature</Label>
@@ -130,6 +92,53 @@ export function LLMPropertyForm({
               onChange={(event) => onUpdateConfig({ maxOutputTokens: Number(event.target.value) })}
             />
           </div>
+        </div>
+      </EditorSection>
+      <EditorSection title="模型指令" description="设置模型角色规则与本次任务。">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="llm-system-prompt">系统指令</Label>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => setShowPromptLibrary(true)}>
+                <BookOpen className="mr-2 size-3.5" />
+                提示词库
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!systemPrompt.trim() && !taskPrompt.trim()}
+                onClick={() => setShowAssistant(true)}
+              >
+                <Sparkles className="mr-2 size-3.5" />
+                AI 优化
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            定义模型持续遵循的角色、规则和边界，可留空。
+          </p>
+          <VariableTokenEditor
+            id="llm-system-prompt"
+            ariaLabel="系统指令"
+            value={systemPrompt}
+            onChange={(nextSystemPrompt) =>
+              onUpdateConfig({ systemPrompt: nextSystemPrompt, modelProfile: 'ark-text-default' })
+            }
+            options={variableOptions}
+            placeholder="例如：你是专业的内容编辑，回答应准确、简洁"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="llm-prompt">用户任务</Label>
+          <p className="text-xs text-muted-foreground">描述本次执行的具体任务，可引用上游变量。</p>
+          <VariableTokenEditor
+            id="llm-prompt"
+            ariaLabel="用户提示词"
+            value={taskPrompt}
+            onChange={(prompt) => onUpdateConfig({ prompt })}
+            options={variableOptions}
+            placeholder="例如：根据输入主题生成一篇文章"
+          />
         </div>
       </EditorSection>
       <EditorSection title="输出" description="下游节点可直接引用这些字段。">
@@ -225,6 +234,16 @@ export function LLMPropertyForm({
           )}
         </div>
       </EditorSection>
+      <PromptLibraryDialog
+        open={showPromptLibrary}
+        onOpenChange={setShowPromptLibrary}
+        onInsert={(content) =>
+          onUpdateConfig({
+            systemPrompt: [systemPrompt.trim(), content.trim()].filter(Boolean).join('\n\n'),
+            modelProfile: 'ark-text-default',
+          })
+        }
+      />
       <PromptAssistantDialog
         open={showAssistant}
         onOpenChange={setShowAssistant}

@@ -314,6 +314,30 @@ type AIKnowledgeBase struct {
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
+// AIPrompt is an owner-scoped reusable prompt-library entry. It deliberately
+// stores one editable body: prompt resources are text snippets, not runnable
+// applications with draft, publish, or version lifecycles.
+type AIPrompt struct {
+	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID      Int64String    `gorm:"index;not null" json:"userId"`
+	Name        string         `gorm:"size:100;not null" json:"name"`
+	Description string         `gorm:"size:500" json:"description"`
+	Content     string         `gorm:"type:text;not null;default:''" json:"content"`
+	ArchivedAt  *time.Time     `gorm:"index" json:"archivedAt,omitempty"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (p *AIPrompt) BeforeCreate(tx *gorm.DB) error {
+	if p.ID == 0 {
+		p.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+func (AIPrompt) TableName() string { return "ai_prompts" }
+
 func (k *AIKnowledgeBase) BeforeCreate(tx *gorm.DB) error {
 	if k.ID == 0 {
 		k.ID = Int64String(utils.GenerateID())

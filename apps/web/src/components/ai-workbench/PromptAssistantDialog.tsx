@@ -47,7 +47,7 @@ export function PromptAssistantDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   appId?: string;
-  target?: 'agent' | 'workflow_llm';
+  target?: 'agent' | 'workflow_llm' | 'prompt_resource';
   field?: PromptAssistantField;
   allowedVariables?: string[];
   currentPrompt: string;
