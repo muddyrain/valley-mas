@@ -1,5 +1,6 @@
 import {
   BookOpenText,
+  Eye,
   FileText,
   FolderPlus,
   MoreHorizontal,
@@ -13,11 +14,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   type AIKnowledgeBase,
+  type AIKnowledgeChunkPreview,
   type AIKnowledgeDocument,
   createAIKnowledgeBase,
   deleteAIKnowledgeDocument,
   getAPIErrorMessage,
   listAIKnowledgeBases,
+  listAIKnowledgeDocumentChunks,
   listAIKnowledgeDocuments,
   retryAIKnowledgeDocument,
   uploadAIKnowledgeDocument,
@@ -33,6 +36,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -78,6 +82,18 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function getDocumentStatus(document: AIKnowledgeDocument) {
+  if (document.status === 'ready') return { label: '已就绪', variant: 'secondary' as const };
+  if (document.status === 'failed') return { label: '处理失败', variant: 'destructive' as const };
+  if (document.status === 'indexing')
+    return { label: `索引中 ${document.indexProgress}%`, variant: 'outline' as const };
+  return { label: '等待处理', variant: 'outline' as const };
+}
+
+function getDocumentSourceLabel(source: AIKnowledgeDocument['source']) {
+  return source === 'upload' ? '上传文件' : '未知来源';
+}
+
 export default function KnowledgeBases({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -94,6 +110,12 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
   const [retryingID, setRetryingID] = useState<string | null>(null);
   const [deletingID, setDeletingID] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AIKnowledgeDocument | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<{
+    knowledgeBaseID: string;
+    document: AIKnowledgeDocument;
+  } | null>(null);
+  const [previewChunks, setPreviewChunks] = useState<AIKnowledgeChunkPreview[]>([]);
+  const [loadingPreview, setLoadingPreview] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -223,6 +245,28 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
       window.clearInterval(timer);
     };
   }, [replaceDocuments, selectedID]);
+
+  useEffect(() => {
+    if (!previewTarget) {
+      setPreviewChunks([]);
+      return;
+    }
+    let active = true;
+    setLoadingPreview(true);
+    void listAIKnowledgeDocumentChunks(previewTarget.knowledgeBaseID, previewTarget.document.id)
+      .then(({ list }) => {
+        if (active) setPreviewChunks(list);
+      })
+      .catch((error) => {
+        if (active) toast.error(getAPIErrorMessage(error, '加载文档详情失败'));
+      })
+      .finally(() => {
+        if (active) setLoadingPreview(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [previewTarget]);
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -479,6 +523,7 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="px-6">文档名称</TableHead>
                     <TableHead>类型</TableHead>
+                    <TableHead>处理状态</TableHead>
                     <TableHead>大小</TableHead>
                     <TableHead>更新时间</TableHead>
                     <TableHead className="w-24 text-right">操作</TableHead>
@@ -521,6 +566,11 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                         <TableCell className="text-muted-foreground">
                           {getDocumentType(document)}
                         </TableCell>
+                        <TableCell>
+                          <Badge variant={getDocumentStatus(document).variant}>
+                            {getDocumentStatus(document).label}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="text-muted-foreground">
                           {formatFileSize(document.sizeBytes)}
                         </TableCell>
@@ -529,6 +579,16 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                         </TableCell>
                         <TableCell className="pr-4 text-right">
                           <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`查看 ${document.name} 详情`}
+                              onClick={() =>
+                                setPreviewTarget({ knowledgeBaseID: selectedBase.id, document })
+                              }
+                            >
+                              <Eye />
+                            </Button>
                             {canStartIndexing && (
                               <Button
                                 variant="ghost"
@@ -623,6 +683,83 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
               onClick={() => void handleDelete()}
             >
               {deletingID ? '删除中...' : '删除'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(previewTarget)}
+        onOpenChange={(open) => {
+          if (!open) setPreviewTarget(null);
+        }}
+      >
+        <DialogContent className="flex h-[min(44rem,82vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+          <DialogHeader className="border-b border-border px-6 py-5">
+            <DialogTitle className="truncate pr-8">{previewTarget?.document.name}</DialogTitle>
+          </DialogHeader>
+          {previewTarget && (
+            <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)]">
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-b border-border px-6 py-5 text-sm sm:grid-cols-4">
+                <div>
+                  <dt className="text-muted-foreground">来源</dt>
+                  <dd className="mt-1 font-medium">
+                    {getDocumentSourceLabel(previewTarget.document.source)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">处理状态</dt>
+                  <dd className="mt-1">
+                    <Badge variant={getDocumentStatus(previewTarget.document).variant}>
+                      {getDocumentStatus(previewTarget.document).label}
+                    </Badge>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">分段</dt>
+                  <dd className="mt-1 font-medium">{previewTarget.document.chunkCount} 段</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">更新时间</dt>
+                  <dd className="mt-1 font-medium">
+                    {formatDate(previewTarget.document.updatedAt)}
+                  </dd>
+                </div>
+              </dl>
+              <div className="min-h-0 px-6 py-5">
+                <h3 className="mb-3 text-sm font-medium">片段预览</h3>
+                {loadingPreview ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-28 w-full" />
+                    <Skeleton className="h-28 w-full" />
+                  </div>
+                ) : previewChunks.length === 0 ? (
+                  <div className="flex h-36 items-center justify-center rounded-lg border border-border text-sm text-muted-foreground">
+                    暂无可预览的片段
+                  </div>
+                ) : (
+                  <ScrollArea className="h-full pr-4">
+                    <div className="space-y-3 pb-1">
+                      {previewChunks.map((chunk) => (
+                        <article key={chunk.id} className="rounded-lg border border-border p-4">
+                          <div className="mb-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                            <span>片段 {chunk.position + 1}</span>
+                            <span>{chunk.tokenCount} 字符</span>
+                          </div>
+                          <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">
+                            {chunk.content}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter className="border-t border-border px-6 py-4">
+            <Button variant="outline" onClick={() => setPreviewTarget(null)}>
+              关闭
             </Button>
           </DialogFooter>
         </DialogContent>

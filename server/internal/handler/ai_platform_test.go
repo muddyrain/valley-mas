@@ -105,6 +105,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.POST("/apps/:appId/restore", RestoreAIAppVersion)
 	auth.POST("/apps/:appId/debug", DebugAIApp)
 	auth.GET("/knowledge-bases/:knowledgeBaseId/documents", ListAIKnowledgeDocuments)
+	auth.GET("/knowledge-bases/:knowledgeBaseId/documents/:documentId/chunks", ListAIKnowledgeDocumentChunks)
 	auth.POST("/knowledge-bases/:knowledgeBaseId/documents", UploadAIKnowledgeDocument)
 	auth.DELETE("/knowledge-bases/:knowledgeBaseId/documents/:documentId", DeleteAIKnowledgeDocument)
 	auth.DELETE("/knowledge-bases/:knowledgeBaseId", DeleteAIKnowledgeBase)
@@ -940,6 +941,73 @@ func TestDeleteAIKnowledgeDocumentRemovesOnlyOwnedChunks(t *testing.T) {
 	_ = db.Model(&model.AIKnowledgeChunk{}).Where("document_id = ?", document.ID).Count(&chunkCount).Error
 	if documentCount != 0 || chunkCount != 0 {
 		t.Fatalf("documentCount=%d chunkCount=%d, want both 0", documentCount, chunkCount)
+	}
+}
+
+func TestListAIKnowledgeDocumentChunksReturnsOrderedSafePreviews(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	base := model.AIKnowledgeBase{UserID: 101, Name: "创作资料"}
+	if err := db.Create(&base).Error; err != nil {
+		t.Fatalf("create knowledge base: %v", err)
+	}
+	document := model.AIKnowledgeDocument{KnowledgeBaseID: base.ID, UserID: 101, Name: "notes.md", Status: "ready", IndexProgress: 100}
+	if err := db.Create(&document).Error; err != nil {
+		t.Fatalf("create document: %v", err)
+	}
+	first := model.AIKnowledgeChunk{DocumentID: document.ID, UserID: 101, Position: 0, Content: strings.Repeat("甲", 900), TokenCount: 900}
+	second := model.AIKnowledgeChunk{DocumentID: document.ID, UserID: 101, Position: 1, Content: "第二段", TokenCount: 3}
+	if err := db.Create(&[]model.AIKnowledgeChunk{first, second}).Error; err != nil {
+		t.Fatalf("create chunks: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/ai/knowledge-bases/"+strconv.FormatInt(int64(base.ID), 10)+"/documents/"+strconv.FormatInt(int64(document.ID), 10)+"/chunks", nil)
+	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list previews response = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var response struct {
+		Code int `json:"code"`
+		Data struct {
+			Document struct {
+				Source string `json:"source"`
+			} `json:"document"`
+			List []struct {
+				Position int    `json:"position"`
+				Content  string `json:"content"`
+			} `json:"list"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode preview response: %v", err)
+	}
+	if response.Data.Document.Source != "upload" {
+		t.Fatalf("source = %q, want upload", response.Data.Document.Source)
+	}
+	if len(response.Data.List) != 2 || response.Data.List[0].Position != 0 || response.Data.List[1].Position != 1 {
+		t.Fatalf("previews not ordered: %#v", response.Data.List)
+	}
+	if got := len([]rune(response.Data.List[0].Content)); got != 800 {
+		t.Fatalf("preview runes = %d, want 800", got)
+	}
+}
+
+func TestListAIKnowledgeDocumentChunksRejectsForeignDocument(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	base := model.AIKnowledgeBase{UserID: 202, Name: "他人的资料"}
+	if err := db.Create(&base).Error; err != nil {
+		t.Fatalf("create foreign base: %v", err)
+	}
+	document := model.AIKnowledgeDocument{KnowledgeBaseID: base.ID, UserID: 202, Name: "private.md"}
+	if err := db.Create(&document).Error; err != nil {
+		t.Fatalf("create foreign document: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/ai/knowledge-bases/"+strconv.FormatInt(int64(base.ID), 10)+"/documents/"+strconv.FormatInt(int64(document.ID), 10)+"/chunks", nil)
+	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"code":404`) {
+		t.Fatalf("foreign preview response = %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 

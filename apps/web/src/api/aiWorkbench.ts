@@ -167,8 +167,16 @@ export interface AIKnowledgeDocument {
   chunkCount: number;
   mimeType: string;
   sizeBytes: number;
+  source: 'upload';
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AIKnowledgeChunkPreview {
+  id: string;
+  position: number;
+  content: string;
+  tokenCount: number;
 }
 
 export interface AIPrompt {
@@ -626,6 +634,13 @@ export function listAIKnowledgeDocuments(
   knowledgeBaseId: string,
 ): Promise<{ list: AIKnowledgeDocument[] }> {
   return request.get(`/ai/knowledge-bases/${knowledgeBaseId}/documents`);
+}
+
+export function listAIKnowledgeDocumentChunks(
+  knowledgeBaseId: string,
+  documentId: string,
+): Promise<{ document: AIKnowledgeDocument; list: AIKnowledgeChunkPreview[] }> {
+  return request.get(`/ai/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/chunks`);
 }
 
 export function uploadAIKnowledgeDocument(

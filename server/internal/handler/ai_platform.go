@@ -89,6 +89,22 @@ type aiKnowledgeSearchRow struct {
 	Score        float64           `gorm:"column:score"`
 }
 
+type aiKnowledgeDocumentResponse struct {
+	model.AIKnowledgeDocument
+	Source string `json:"source"`
+}
+
+type aiKnowledgeChunkPreview struct {
+	ID         model.Int64String `json:"id"`
+	Position   int               `json:"position"`
+	Content    string            `json:"content"`
+	TokenCount int               `json:"tokenCount"`
+}
+
+func presentAIKnowledgeDocument(document model.AIKnowledgeDocument) aiKnowledgeDocumentResponse {
+	return aiKnowledgeDocumentResponse{AIKnowledgeDocument: document, Source: "upload"}
+}
+
 type aiAppPayload struct {
 	Type             string              `json:"type"`
 	Name             string              `json:"name"`
@@ -1376,7 +1392,48 @@ func ListAIKnowledgeDocuments(c *gin.Context) {
 		Error(c, 500, "加载知识库文档失败")
 		return
 	}
-	Success(c, gin.H{"list": documents})
+	items := make([]aiKnowledgeDocumentResponse, 0, len(documents))
+	for _, document := range documents {
+		items = append(items, presentAIKnowledgeDocument(document))
+	}
+	Success(c, gin.H{"list": items})
+}
+
+func ListAIKnowledgeDocumentChunks(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	knowledgeBaseID, err := parsePathInt64(c, "knowledgeBaseId")
+	if err != nil {
+		Error(c, 400, "无效的知识库 ID")
+		return
+	}
+	documentID, err := parsePathInt64(c, "documentId")
+	if err != nil {
+		Error(c, 400, "无效的文档 ID")
+		return
+	}
+	var document model.AIKnowledgeDocument
+	if err := database.GetDB().Where("id = ? AND knowledge_base_id = ? AND user_id = ?", documentID, knowledgeBaseID, userID).First(&document).Error; err != nil {
+		Error(c, 404, "知识库文档不存在")
+		return
+	}
+	var chunks []model.AIKnowledgeChunk
+	if err := database.GetDB().Where("document_id = ? AND user_id = ?", document.ID, userID).Order("position ASC").Find(&chunks).Error; err != nil {
+		Error(c, 500, "加载文档片段失败")
+		return
+	}
+	previews := make([]aiKnowledgeChunkPreview, 0, len(chunks))
+	for _, chunk := range chunks {
+		previews = append(previews, aiKnowledgeChunkPreview{
+			ID:         chunk.ID,
+			Position:   chunk.Position,
+			Content:    aiclient.TrimRunes(strings.TrimSpace(chunk.Content), 800),
+			TokenCount: chunk.TokenCount,
+		})
+	}
+	Success(c, gin.H{"document": presentAIKnowledgeDocument(document), "list": previews})
 }
 
 const (
@@ -1499,7 +1556,7 @@ func UploadAIKnowledgeDocument(c *gin.Context) {
 				Error(c, 500, "保存知识库文档失败")
 				return
 			}
-			Success(c, gin.H{"document": document})
+			Success(c, gin.H{"document": presentAIKnowledgeDocument(document)})
 			return
 		}
 		Error(c, 400, "文档没有可解析文本")
@@ -1540,7 +1597,7 @@ func UploadAIKnowledgeDocument(c *gin.Context) {
 		return
 	}
 	scheduleAIKnowledgeDocumentIndexing(document.ID)
-	Success(c, gin.H{"document": document})
+	Success(c, gin.H{"document": presentAIKnowledgeDocument(document)})
 }
 
 func RetryAIKnowledgeDocument(c *gin.Context) {
@@ -1575,7 +1632,7 @@ func RetryAIKnowledgeDocument(c *gin.Context) {
 	document.ErrorCode = ""
 	document.IndexProgress = 0
 	scheduleAIKnowledgeDocumentIndexing(document.ID)
-	Success(c, gin.H{"document": document})
+	Success(c, gin.H{"document": presentAIKnowledgeDocument(document)})
 }
 
 func DeleteAIKnowledgeDocument(c *gin.Context) {

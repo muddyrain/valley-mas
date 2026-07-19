@@ -173,6 +173,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.PUT("/ai/knowledge-bases/:knowledgeBaseId", handler.UpdateAIKnowledgeBase)
 			auth.DELETE("/ai/knowledge-bases/:knowledgeBaseId", handler.DeleteAIKnowledgeBase)
 			auth.GET("/ai/knowledge-bases/:knowledgeBaseId/documents", handler.ListAIKnowledgeDocuments)
+			auth.GET("/ai/knowledge-bases/:knowledgeBaseId/documents/:documentId/chunks", handler.ListAIKnowledgeDocumentChunks)
 			auth.POST("/ai/knowledge-bases/:knowledgeBaseId/documents", handler.UploadAIKnowledgeDocument)
 			auth.POST("/ai/knowledge-bases/:knowledgeBaseId/documents/:documentId/retry", handler.RetryAIKnowledgeDocument)
 			auth.DELETE("/ai/knowledge-bases/:knowledgeBaseId/documents/:documentId", handler.DeleteAIKnowledgeDocument)
