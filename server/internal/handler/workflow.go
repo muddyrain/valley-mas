@@ -142,13 +142,52 @@ func AdminGetWorkflow(c *gin.Context) {
 	}
 
 	var workflow model.Workflow
-	if err := database.DB.Where("id = ? AND user_id = ?", id, userID).First(&workflow).Error; err != nil {
-		Error(c, http.StatusNotFound, "工作流不存在")
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ? AND user_id = ?", id, userID).First(&workflow).Error; err != nil {
+			return err
+		}
+		return reconcileWorkflowEditorDraft(tx, &workflow)
+	}); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(c, http.StatusNotFound, "工作流不存在")
+			return
+		}
+		Error(c, http.StatusInternalServerError, "加载工作流草稿失败")
 		return
 	}
 
+	// 编辑器必须读取当前草稿；已发布版本只用于子工作流调用和历史回放。
+	c.Header("Cache-Control", "private, no-store")
 	workflow.GraphHash = workflowGraphHash(workflow.Graph)
 	Success(c, workflow)
+}
+
+// reconcileWorkflowEditorDraft repairs legacy rows where the editable canvas
+// and the AI app draft pointer diverged. The newer saved representation wins;
+// a published version is never selected merely because it is newer by number.
+func reconcileWorkflowEditorDraft(tx *gorm.DB, definition *model.Workflow) error {
+	_, draft, err := syncWorkflowAIAppWithoutSnapshot(tx, *definition)
+	if err != nil {
+		return err
+	}
+	if draft.ID == 0 || draft.Config == definition.Graph {
+		return nil
+	}
+
+	// The workflow table is the newer saved canvas. Materialize it as a fresh
+	// draft snapshot instead of allowing a stale published snapshot to replace it.
+	if definition.UpdatedAt.After(draft.CreatedAt) {
+		_, _, err = syncWorkflowAIAppWithSnapshot(tx, *definition, true)
+		return err
+	}
+
+	// The versioned draft is newer (for example a draft saved by an older editor
+	// path). Restore the editable table from it, without touching publication.
+	if err := tx.Model(definition).Update("graph", draft.Config).Error; err != nil {
+		return err
+	}
+	definition.Graph = draft.Config
+	return nil
 }
 
 // AdminUpdateWorkflow 更新工作流

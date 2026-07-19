@@ -9,6 +9,25 @@ export interface WorkflowVariableOption {
   scope?: 'upstream' | 'local';
 }
 
+export function workflowValueTypeLabel(type: WorkflowVariableOption['type']) {
+  switch (type) {
+    case 'string':
+      return '文本';
+    case 'string[]':
+      return '文本列表';
+    case 'number':
+      return '数字';
+    case 'boolean':
+      return '布尔值';
+    case 'object':
+      return '对象';
+    case 'file':
+      return '文件';
+    default:
+      return '变量';
+  }
+}
+
 export type TemplateSegment =
   | { type: 'text'; value: string }
   | { type: 'variable'; token: string; option?: WorkflowVariableOption };
@@ -29,6 +48,11 @@ const NODE_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
     ['tokenUsage', 'number'],
   ],
   condition: [['matched', 'boolean']],
+  intent: [
+    ['intentId', 'string'],
+    ['intentName', 'string'],
+    ['confidence', 'number'],
+  ],
 };
 
 const TOOL_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, WorkflowVariableType]>> = {

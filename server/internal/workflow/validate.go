@@ -157,6 +157,9 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 			if _, _, _, err := subworkflowDeclaredSchemas(config); err != nil {
 				errs = append(errs, err.Error())
 			}
+		case NodeTypeIntent:
+			errs = append(errs, validateIntentConfig(node.ID, config)...)
+			modelCost++
 		}
 	}
 	if startCount != 1 {
@@ -175,7 +178,21 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 	adjacency := make(map[string][]string, len(nodes))
 	incoming := make(map[string]int, len(nodes))
 	outgoing := make(map[string]int, len(nodes))
-	conditionHandles := make(map[string]map[string]int)
+	branchHandles := make(map[string]map[string]int)
+	intentOutputHandles := make(map[string]map[string]bool)
+	for id, node := range nodes {
+		if node.Type != NodeTypeIntent {
+			continue
+		}
+		config, err := decodeConfig(node.Config)
+		if err != nil {
+			continue
+		}
+		intentOutputHandles[id] = make(map[string]bool)
+		for _, handle := range intentBranchHandles(config) {
+			intentOutputHandles[id][handle] = true
+		}
+	}
 	edgeKeys := make(map[string]struct{}, len(graph.Edges))
 	for _, edge := range graph.Edges {
 		source, sourceOK := nodes[edge.Source]
@@ -200,10 +217,19 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 			if edge.SourceHandle != "true" && edge.SourceHandle != "false" {
 				errs = append(errs, fmt.Sprintf("条件节点 %s 只能使用 true/false 输出", source.ID))
 			} else {
-				if conditionHandles[source.ID] == nil {
-					conditionHandles[source.ID] = map[string]int{}
+				if branchHandles[source.ID] == nil {
+					branchHandles[source.ID] = map[string]int{}
 				}
-				conditionHandles[source.ID][edge.SourceHandle]++
+				branchHandles[source.ID][edge.SourceHandle]++
+			}
+		} else if source.Type == NodeTypeIntent {
+			if !intentOutputHandles[source.ID][edge.SourceHandle] {
+				errs = append(errs, fmt.Sprintf("意图识别节点 %s 的分流出口无效", source.ID))
+			} else {
+				if branchHandles[source.ID] == nil {
+					branchHandles[source.ID] = map[string]int{}
+				}
+				branchHandles[source.ID][edge.SourceHandle]++
 			}
 		} else if edge.SourceHandle != "" && edge.SourceHandle != "output" {
 			errs = append(errs, fmt.Sprintf("节点 %s 的输出端口无效", source.ID))
@@ -214,8 +240,15 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 	}
 	for id, node := range nodes {
 		if node.Type == NodeTypeCondition {
-			if conditionHandles[id]["true"] != 1 || conditionHandles[id]["false"] != 1 {
+			if branchHandles[id]["true"] != 1 || branchHandles[id]["false"] != 1 {
 				errs = append(errs, fmt.Sprintf("条件节点 %s 必须各有一条 true/false 连线", id))
+			}
+		}
+		if node.Type == NodeTypeIntent {
+			for handle := range intentOutputHandles[id] {
+				if branchHandles[id][handle] != 1 {
+					errs = append(errs, fmt.Sprintf("意图识别节点 %s 的 %s 出口必须各有一条连线", id, handle))
+				}
 			}
 		}
 		if node.Type != NodeTypeStart && incoming[id] == 0 {
@@ -248,7 +281,7 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 			if referenceMayBeSkipped(source, node.ID, nodes, graph.Edges, reachability) &&
 				node.Type != NodeTypeMerge &&
 				!referenceBindsOptionalToolInput(node, reference, registry) &&
-				!(nodes[source].When != nil && referenceBindsOptionalEndStringOutput(node, reference)) {
+				!referenceBindsOptionalEndStringOutput(node, reference) {
 				errs = append(errs, fmt.Sprintf("变量 %s 可能被跳过，必须经过 Merge", reference))
 			}
 		}
@@ -382,33 +415,31 @@ func referenceMayBeSkipped(sourceID, targetID string, nodes map[string]Node, edg
 	if nodes[sourceID].When != nil {
 		return true
 	}
-	for conditionID, condition := range nodes {
-		if condition.Type != NodeTypeCondition {
+	for branchID, branch := range nodes {
+		if branch.Type != NodeTypeCondition && branch.Type != NodeTypeIntent {
 			continue
 		}
-		trueTarget, falseTarget := "", ""
+		branchTargets := map[string]string{}
 		for _, edge := range edges {
-			if edge.Source != conditionID {
+			if edge.Source != branchID {
 				continue
 			}
-			if edge.SourceHandle == "true" {
-				trueTarget = edge.Target
-			} else if edge.SourceHandle == "false" {
-				falseTarget = edge.Target
+			branchTargets[edge.SourceHandle] = edge.Target
+		}
+		sourceOnBranch := false
+		for _, branchTarget := range branchTargets {
+			if reachableFrom(branchTarget, sourceID, reachability) {
+				sourceOnBranch = true
+				break
 			}
 		}
-		sourceTrue := reachableFrom(trueTarget, sourceID, reachability)
-		sourceFalse := reachableFrom(falseTarget, sourceID, reachability)
-		if sourceTrue == sourceFalse {
+		if !sourceOnBranch {
 			continue
 		}
-		targetTrue := reachableFrom(trueTarget, targetID, reachability)
-		targetFalse := reachableFrom(falseTarget, targetID, reachability)
-		if sourceTrue && !sourceFalse && !(targetTrue && !targetFalse) {
-			return true
-		}
-		if sourceFalse && !sourceTrue && !(targetFalse && !targetTrue) {
-			return true
+		for _, branchTarget := range branchTargets {
+			if reachableFrom(branchTarget, targetID, reachability) && !reachableFrom(branchTarget, sourceID, reachability) {
+				return true
+			}
 		}
 	}
 	return false
@@ -533,6 +564,8 @@ func validateBindingTypes(nodes []Node, outputFields map[string]map[string]Value
 			for name, value := range inputs {
 				errs = append(errs, validateBoundValueType(node.ID, name, value, inputSchema[name], outputFields)...)
 			}
+		case NodeTypeIntent:
+			errs = append(errs, validateBoundValueType(node.ID, "query", config["query"], ValueTypeString, outputFields)...)
 		case NodeTypeMerge:
 			fields, _ := config["fields"].([]any)
 			for _, raw := range fields {
@@ -699,6 +732,12 @@ func buildOutputFields(nodes map[string]Node, startInputs map[string]InputDefini
 			} else {
 				result[id] = nil
 			}
+		case NodeTypeIntent:
+			result[id] = fields(
+				field("intentId", ValueTypeString),
+				field("intentName", ValueTypeString),
+				field("confidence", ValueTypeNumber),
+			)
 		default:
 			result[id] = map[string]ValueType{}
 		}

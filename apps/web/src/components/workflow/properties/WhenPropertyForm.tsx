@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { WorkflowRule } from '../types';
-import { VariableTokenEditor } from '../VariableTokenEditor';
+import { VariableReferencePicker } from '../VariableReferencePicker';
 import type { WorkflowVariableOption } from '../workflowVariables';
 
 export function WhenPropertyForm({
@@ -45,7 +45,7 @@ export function WhenPropertyForm({
         <>
           <div className="space-y-1.5">
             <Label>左值</Label>
-            <VariableTokenEditor
+            <VariableReferencePicker
               value={String(rule.left ?? '')}
               onChange={(left) => onChange({ ...rule, left })}
               options={variableOptions}

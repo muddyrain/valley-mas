@@ -6,6 +6,7 @@ import {
   GitBranch,
   GitMerge,
   Hash,
+  Lightbulb,
   Loader2,
   MessageSquare,
   MoreHorizontal,
@@ -47,6 +48,7 @@ const iconMap = {
   merge: GitMerge,
   variable: Hash,
   subworkflow: Workflow,
+  intent: Lightbulb,
 };
 const colors = {
   start: 'bg-blue-500/10 text-blue-600',
@@ -57,7 +59,22 @@ const colors = {
   merge: 'bg-teal-500/10 text-teal-600',
   variable: 'bg-cyan-500/10 text-cyan-600',
   subworkflow: 'bg-indigo-500/10 text-indigo-600',
+  intent: 'bg-cyan-500/10 text-cyan-600',
 } as const;
+
+function getIntentBranchOutputs(config: Record<string, unknown> | undefined) {
+  const intents = Array.isArray(config?.intents) ? config.intents : [];
+  return [
+    ...intents.flatMap((intent) => {
+      if (!intent || typeof intent !== 'object') return [];
+      const { id, name } = intent as { id?: unknown; name?: unknown };
+      return typeof id === 'string' && typeof name === 'string' && id
+        ? [{ id: `intent:${id}`, name }]
+        : [];
+    }),
+    { id: 'intent:other', name: '其他' },
+  ];
+}
 
 function NodeLabel({ label }: { label: string }) {
   const textRef = useRef<HTMLSpanElement>(null);
@@ -103,8 +120,16 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
   const definition = NODE_CONFIGS[nodeType];
   const Icon = iconMap[nodeType] || MessageSquare;
   const hasInput = definition?.handles.input;
-  const hasOutput = definition?.handles.output;
-  const multiOutputs = definition?.handles.outputs;
+  const branchOutputs =
+    nodeType === 'condition'
+      ? [
+          { id: 'true', name: 'true' },
+          { id: 'false', name: 'false' },
+        ]
+      : nodeType === 'intent'
+        ? getIntentBranchOutputs(config)
+        : [];
+  const hasOutput = definition?.handles.output && branchOutputs.length === 0;
   const draftValidationMessage = validationErrors.get(id);
   const validationError = draftValidationMessage ? null : validateSingleNode(nodeData);
   const validationMessage = draftValidationMessage || validationError?.message;
@@ -166,10 +191,17 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
                 <NodeLabel label={label} />
                 {validationMessage ? (
                   hasDraftValidationError ? (
-                    <AlertCircle
-                      aria-label="运行前需完善"
-                      className="size-3.5 shrink-0 text-destructive"
-                    />
+                    <Tooltip>
+                      <TooltipTrigger render={<span className="flex shrink-0" />}>
+                        <AlertCircle
+                          aria-label="运行前需完善"
+                          className="size-3.5 text-destructive"
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-72">
+                        {validationMessage}
+                      </TooltipContent>
+                    </Tooltip>
                   ) : (
                     <Tooltip>
                       <TooltipTrigger render={<span className="flex shrink-0" />}>
@@ -265,6 +297,18 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
               ) : null}
             </div>
           ) : null}
+          {nodeType === 'intent' && branchOutputs.length ? (
+            <div className="space-y-1 border-t border-border bg-muted/10 px-4 py-1.5 text-xs">
+              {branchOutputs.map((branch, index) => (
+                <div key={branch.id} className="flex min-h-6 items-center gap-2">
+                  <span className="w-7 shrink-0 text-muted-foreground">
+                    {index === 0 ? '分流' : ''}
+                  </span>
+                  <span className="min-w-0 truncate text-muted-foreground">{branch.name}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
         {hasOutput ? (
           <Handle
@@ -274,25 +318,37 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
             className="!size-3 !-right-1.5 !rounded-full !border-2 !border-blue-400 !bg-background"
           />
         ) : null}
-        {multiOutputs ? (
-          <>
-            <Handle
-              type="source"
-              position={Position.Right}
-              id="true"
-              style={{ top: '30%' }}
-              className="!size-3 !-right-1.5 !rounded-full !border-2 !border-green-500 !bg-background"
-            />
-            <Handle
-              type="source"
-              position={Position.Right}
-              id="false"
-              style={{ top: '70%' }}
-              className="!size-3 !-right-1.5 !rounded-full !border-2 !border-red-500 !bg-background"
-            />
-          </>
-        ) : null}
-        {nodeType !== 'end' && nodeType !== 'condition' && !connectedSourceNodeIDs.has(id) ? (
+        {branchOutputs.length
+          ? branchOutputs.map((branch, index) => (
+              <Handle
+                key={branch.id}
+                type="source"
+                position={Position.Right}
+                id={branch.id}
+                title={branch.name}
+                style={{
+                  top:
+                    nodeType === 'intent'
+                      ? `${((142 + index * 28) / (128 + branchOutputs.length * 28)) * 100}%`
+                      : `${((index + 1) / (branchOutputs.length + 1)) * 100}%`,
+                }}
+                className={cn(
+                  '!size-3 !-right-1.5 !rounded-full !border-2 !bg-background',
+                  branch.id === 'true'
+                    ? '!border-green-500'
+                    : branch.id === 'false'
+                      ? '!border-red-500'
+                      : branch.id === 'intent:other'
+                        ? '!border-slate-400'
+                        : '!border-cyan-500',
+                )}
+              />
+            ))
+          : null}
+        {nodeType !== 'end' &&
+        nodeType !== 'condition' &&
+        nodeType !== 'intent' &&
+        !connectedSourceNodeIDs.has(id) ? (
           <div className="nodrag nopan absolute left-full top-1/2 z-10 ml-5 -translate-y-1/2 opacity-0 transition-opacity group-hover/node:opacity-100">
             <NodePicker
               side="right"

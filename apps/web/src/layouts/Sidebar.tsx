@@ -107,7 +107,7 @@ export function Sidebar() {
     >
       {/* Brand */}
       <div
-        className={`flex h-14 items-center border-b border-border ${
+        className={`relative flex h-14 items-center border-b border-border ${
           collapsed ? 'justify-start px-2' : 'px-3 max-md:justify-center'
         }`}
       >
@@ -128,21 +128,21 @@ export function Sidebar() {
             </span>
           )}
         </Link>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          onClick={toggle}
+          aria-label={collapsed ? '展开侧栏' : '折叠侧栏'}
+          className={
+            collapsed
+              ? 'absolute top-1/2 -right-3 z-10 -translate-y-1/2 bg-background shadow-xs ring-1 ring-border'
+              : 'ml-auto max-md:hidden'
+          }
+        >
+          {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+        </Button>
       </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        onClick={toggle}
-        aria-label={collapsed ? '展开侧栏' : '折叠侧栏'}
-        className={
-          collapsed
-            ? 'absolute top-1/2 -right-3 z-10 -translate-y-1/2 bg-background shadow-xs ring-1 ring-border'
-            : 'absolute top-1/2 right-3 -translate-y-1/2 max-md:hidden'
-        }
-      >
-        {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
-      </Button>
 
       {/* Nav */}
       <nav className="flex-1 space-y-5 px-2 py-4">

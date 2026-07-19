@@ -29,6 +29,7 @@ const (
 	NodeTypeMerge       NodeType = "merge"
 	NodeTypeVariable    NodeType = "variable"
 	NodeTypeSubworkflow NodeType = "subworkflow"
+	NodeTypeIntent      NodeType = "intent"
 )
 
 type Position struct {

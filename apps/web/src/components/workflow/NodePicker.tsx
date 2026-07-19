@@ -2,6 +2,7 @@ import {
   GitBranch,
   GitMerge,
   Hash,
+  Lightbulb,
   Loader2,
   MessageSquare,
   Search,
@@ -31,7 +32,7 @@ import { getWorkflowSideEffectLabel } from './workflowSideEffects';
 
 export interface NodePickerItem {
   key: string;
-  group: 'model' | 'flow' | 'tool' | 'subworkflow';
+  group: 'model' | 'flow' | 'logic' | 'tool' | 'subworkflow';
   nodeType: WorkflowNodeType;
   label: string;
   description: string;
@@ -88,17 +89,37 @@ const genericItems: NodePickerItem[] = [
     description: '设置类型明确的工作流变量',
     config: { assignments: [{ name: 'value', type: 'string', value: '' }] },
   },
+  {
+    key: 'intent',
+    group: 'logic',
+    nodeType: 'intent',
+    label: '意图识别',
+    description: '按已配置意图将文本分流',
+    config: {
+      query: '',
+      intents: [
+        {
+          id: 'intent_1',
+          name: '意图 1',
+          description: '',
+          examples: [],
+        },
+      ],
+    },
+  },
 ];
 
 const groupLabels = {
   model: '大模型',
   flow: '流程控制',
+  logic: '业务逻辑',
   tool: '工具',
   subworkflow: '子工作流',
 } as const;
 const groupIcons = {
   model: Sparkles,
   flow: GitBranch,
+  logic: Lightbulb,
   tool: Wrench,
   subworkflow: Workflow,
 } as const;
@@ -107,6 +128,7 @@ const itemIcons: Record<string, typeof MessageSquare> = {
   condition: GitBranch,
   merge: GitMerge,
   variable: Hash,
+  intent: Lightbulb,
 };
 
 export function NodePicker({ trigger, onSelect, side = 'top', align = 'center' }: NodePickerProps) {
@@ -310,9 +332,11 @@ function PickerContent({
                                 ? 'bg-violet-500/10 text-violet-600'
                                 : group === 'flow'
                                   ? 'bg-emerald-500/10 text-emerald-600'
-                                  : group === 'tool'
-                                    ? 'bg-orange-500/10 text-orange-600'
-                                    : 'bg-blue-500/10 text-blue-600',
+                                  : group === 'logic'
+                                    ? 'bg-cyan-500/10 text-cyan-600'
+                                    : group === 'tool'
+                                      ? 'bg-orange-500/10 text-orange-600'
+                                      : 'bg-blue-500/10 text-blue-600',
                             )}
                           >
                             <Icon className="size-4" />

@@ -14,6 +14,7 @@ type Config struct {
 	JWT            JWTConfig
 	SMTP           SMTPConfig
 	Mail           MailConfig
+	NotionOAuth    NotionOAuthConfig
 	QWeather       QWeatherConfig
 	WebPush        WebPushConfig
 	Holiday        HolidaySyncConfig
@@ -65,6 +66,16 @@ type MailConfig struct {
 	GmailClientID       string
 	GmailClientSecret   string
 	GmailRedirectURL    string
+}
+
+// NotionOAuthConfig keeps the server-only credentials required to connect a
+// user's Notion workspace. TokenKey is deliberately separate from mail
+// credentials so either connector can be rotated independently.
+type NotionOAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	TokenKey     string
 }
 
 type QWeatherConfig struct {
@@ -152,6 +163,12 @@ func Load() *Config {
 			GmailClientID:       getEnv("GMAIL_CLIENT_ID", ""),
 			GmailClientSecret:   getEnv("GMAIL_CLIENT_SECRET", ""),
 			GmailRedirectURL:    getEnv("GMAIL_REDIRECT_URL", ""),
+		},
+		NotionOAuth: NotionOAuthConfig{
+			ClientID:     strings.TrimSpace(getEnv("NOTION_OAUTH_CLIENT_ID", "")),
+			ClientSecret: strings.TrimSpace(getEnv("NOTION_OAUTH_CLIENT_SECRET", "")),
+			RedirectURL:  strings.TrimSpace(getEnv("NOTION_OAUTH_REDIRECT_URL", "")),
+			TokenKey:     strings.TrimSpace(getEnv("NOTION_OAUTH_TOKEN_KEY", "")),
 		},
 		QWeather: QWeatherConfig{
 			APIKey:                 getEnv("QWEATHER_API_KEY", ""),

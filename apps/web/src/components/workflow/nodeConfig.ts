@@ -71,11 +71,20 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     handles: { input: true, output: true },
     whenAllowed: true,
   },
+  intent: {
+    type: 'intent',
+    label: '意图识别',
+    description: '按已配置意图将文本分流',
+    icon: 'Lightbulb',
+    category: 'logic',
+    handles: { input: true, outputs: 2 },
+  },
 };
 
 export const NODE_CATEGORIES = [
   { id: 'model', label: '大模型', icon: 'Sparkles' },
   { id: 'flow', label: '流程控制', icon: 'GitBranch' },
+  { id: 'logic', label: '业务逻辑', icon: 'Lightbulb' },
   { id: 'tool', label: '工具', icon: 'Wrench' },
   { id: 'subworkflow', label: '子工作流', icon: 'Workflow' },
 ] as const;
@@ -101,6 +110,8 @@ export function getNodeConfigSummary(nodeType: string, config?: Record<string, u
       return `${Array.isArray(config.assignments) ? config.assignments.length : 0} 个变量`;
     case 'subworkflow':
       return String(config.workflowName || config.workflowId || '未选择已发布工作流');
+    case 'intent':
+      return `${Array.isArray(config.intents) ? config.intents.length : 0} 个意图 + 其他`;
     default:
       return '';
   }

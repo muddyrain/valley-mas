@@ -319,7 +319,20 @@ func syncWorkflowAIAppWithSnapshot(tx *gorm.DB, definition model.Workflow, creat
 	if err := tx.Where("app_id = ?", app.ID).Order("number DESC").First(&latest).Error; err != nil && err != gorm.ErrRecordNotFound {
 		return model.AIApp{}, model.AIAppVersion{}, err
 	}
-	if latest.ID == 0 || (createSnapshot && latest.Config != definition.Graph) {
+
+	// DraftVersionID is the editor's current saved draft. A metadata read must
+	// not replace it with the numerically newest version, because that version
+	// may be an immutable published snapshot.
+	draft := model.AIAppVersion{}
+	if app.DraftVersionID != 0 {
+		if err := tx.Where("id = ? AND app_id = ?", app.DraftVersionID, app.ID).First(&draft).Error; err != nil && err != gorm.ErrRecordNotFound {
+			return model.AIApp{}, model.AIAppVersion{}, err
+		}
+	}
+	if draft.ID == 0 {
+		draft = latest
+	}
+	if draft.ID == 0 || (createSnapshot && draft.Config != definition.Graph) {
 		var source model.AIAppVersion
 		if latest.ID != 0 {
 			source = latest
@@ -329,37 +342,37 @@ func syncWorkflowAIAppWithSnapshot(tx *gorm.DB, definition model.Workflow, creat
 			return model.AIApp{}, model.AIAppVersion{}, parseErr
 		}
 		var createErr error
-		latest, createErr = createAIAppVersionSnapshot(tx, app, definition.Graph, retrievalConfig, source)
+		draft, createErr = createAIAppVersionSnapshot(tx, app, definition.Graph, retrievalConfig, source)
 		if createErr != nil {
 			return model.AIApp{}, model.AIAppVersion{}, createErr
 		}
 	}
-	updates := map[string]any{"name": definition.Name, "description": definition.Description, "status": definition.Status, "draft_version_id": latest.ID}
+	updates := map[string]any{"name": definition.Name, "description": definition.Description, "status": definition.Status, "draft_version_id": draft.ID}
 	// A saved draft must never silently replace an already published workflow
 	// version. Keep the one-time backfill for legacy published workflows that
 	// have not acquired a published pointer yet; explicit publish is the only
 	// path that advances an existing published pointer.
 	if definition.Status == "published" && app.PublishedVersionID == 0 {
-		updates["published_version_id"] = latest.ID
+		updates["published_version_id"] = draft.ID
 	}
 	if err := tx.Model(&app).Updates(updates).Error; err != nil {
 		return model.AIApp{}, model.AIAppVersion{}, err
 	}
 	if definition.Status == "published" && app.PublishedVersionID == 0 {
-		if err := tx.Model(&model.AIAppVersion{}).Where("id = ?", latest.ID).Update("published_at", time.Now()).Error; err != nil {
+		if err := tx.Model(&model.AIAppVersion{}).Where("id = ?", draft.ID).Update("published_at", time.Now()).Error; err != nil {
 			return model.AIApp{}, model.AIAppVersion{}, err
 		}
 		publishedAt := time.Now()
-		latest.PublishedAt = &publishedAt
+		draft.PublishedAt = &publishedAt
 	}
 	app.Name = definition.Name
 	app.Description = definition.Description
 	app.Status = definition.Status
-	app.DraftVersionID = latest.ID
+	app.DraftVersionID = draft.ID
 	if definition.Status == "published" && app.PublishedVersionID == 0 {
-		app.PublishedVersionID = latest.ID
+		app.PublishedVersionID = draft.ID
 	}
-	return app, latest, nil
+	return app, draft, nil
 }
 
 func CreateAIApp(c *gin.Context) {

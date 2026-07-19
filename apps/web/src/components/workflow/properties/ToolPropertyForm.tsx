@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useWorkflowCapabilities } from '../useWorkflowCapabilities';
-import { VariableTokenEditor } from '../VariableTokenEditor';
+import { VariableValueEditor } from '../VariableReferencePicker';
 import { getWorkflowSideEffectLabel } from '../workflowSideEffects';
 import type { PropertyFormProps } from './index';
 import { WorkflowOutputFieldList } from './WorkflowOutputFieldList';
@@ -108,11 +108,13 @@ export function ToolPropertyForm({
                 }
               />
             ) : (
-              <VariableTokenEditor
+              <VariableValueEditor
+                ariaLabel={`${schema.title || name} 输入值`}
                 value={String(inputs[name] ?? '')}
                 onChange={(value) => onUpdateConfig({ inputs: { ...inputs, [name]: value } })}
                 options={variableOptions}
-                placeholder={schema.placeholder || `设置 ${schema.title || name}`}
+                fixedPlaceholder={schema.placeholder || `设置 ${schema.title || name}`}
+                defaultMode="fixed"
               />
             )}
           </div>

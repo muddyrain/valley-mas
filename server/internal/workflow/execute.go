@@ -253,6 +253,13 @@ func activateOutgoingEdges(node Node, output map[string]any, edges []Edge, index
 			selected = "false"
 		}
 	}
+	if node.Type == NodeTypeIntent {
+		intentID := stringFromValue(output["intentId"])
+		if intentID == "" {
+			intentID = otherIntentID
+		}
+		selected = "intent:" + intentID
+	}
 	for _, index := range indexes {
 		active[index] = selected == "" || edges[index].SourceHandle == selected
 	}
@@ -307,6 +314,8 @@ func publicExecutionError(node Node, err error) (string, string) {
 	switch {
 	case errors.Is(err, ErrLLMStructuredOutputInvalid):
 		return "模型返回格式不符合输出字段，请调整提示词后重试", "LLM_STRUCTURED_OUTPUT_INVALID"
+	case errors.Is(err, ErrIntentClassificationInvalid):
+		return "意图识别结果无效，请稍后重试", "INTENT_CLASSIFICATION_INVALID"
 	case strings.Contains(message, "AI 未配置") || strings.Contains(message, "ARK_"):
 		return "AI 服务未配置，请检查 ARK_API_KEY 和 ARK_TEXT_MODEL", "AI_CONFIGURATION_UNAVAILABLE"
 	case strings.Contains(message, "AI 上游调用失败"):
@@ -317,6 +326,8 @@ func publicExecutionError(node Node, err error) (string, string) {
 		return message, "WORKFLOW_VARIABLE_RESOLUTION_FAILED"
 	case node.Type == NodeTypeLLM:
 		return "大模型节点执行失败，请检查提示词和模型配置", "AI_NODE_FAILED"
+	case node.Type == NodeTypeIntent:
+		return "意图识别节点执行失败，请检查输入或模型配置", "INTENT_NODE_FAILED"
 	default:
 		return "节点执行失败，请检查节点配置或服务状态", "WORKFLOW_NODE_FAILED"
 	}

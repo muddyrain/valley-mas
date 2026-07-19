@@ -2,6 +2,7 @@ import type { WorkflowNodeType } from '../types';
 import type { WorkflowVariableOption } from '../workflowVariables';
 import { ConditionPropertyForm } from './ConditionPropertyForm';
 import { EndPropertyForm } from './EndPropertyForm';
+import { IntentPropertyForm } from './IntentPropertyForm';
 import { LLMPropertyForm } from './LLMPropertyForm';
 import { MergePropertyForm } from './MergePropertyForm';
 import { StartPropertyForm } from './StartPropertyForm';
@@ -26,4 +27,5 @@ export const PROPERTY_FORM_MAP: Partial<
   merge: MergePropertyForm,
   variable: VariablePropertyForm,
   subworkflow: SubworkflowPropertyForm,
+  intent: IntentPropertyForm,
 };

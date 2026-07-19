@@ -5,6 +5,8 @@ import {
   getInvalidWorkflowVariableTokens,
   getUpstreamWorkflowVariables,
   getWorkflowVariableOption,
+  type WorkflowVariableOption,
+  workflowValueTypeLabel,
 } from './workflowVariables';
 
 export interface ValidationError {
@@ -23,6 +25,38 @@ const WORKFLOW_RULE_OPERATORS = new Set([
   'greaterThan',
   'lessThan',
 ]);
+const INTENT_ID_PATTERN = /^[a-z][a-z0-9_-]{0,39}$/;
+export const INVALID_WORKFLOW_VARIABLE_REFERENCE_MESSAGE = '关联的上游变量已失效，请重新选择变量';
+
+export function getWorkflowBindingTypeMismatchMessage(
+  name: string,
+  value: unknown,
+  expected: WorkflowVariableOption['type'] | undefined,
+  options: WorkflowVariableOption[],
+): string | null {
+  if (!expected || expected === 'unknown') return null;
+  if (typeof value !== 'string') return null;
+  const option = getWorkflowVariableOption(value, options);
+  if (option && option.type !== expected) {
+    return `字段“${name}”声明为${workflowValueTypeLabel(expected)}，但引用变量为${workflowValueTypeLabel(option.type)}`;
+  }
+  if (getInvalidWorkflowVariableTokens(value, options).length === 0 && expected !== 'string') {
+    return `字段“${name}”声明为${workflowValueTypeLabel(expected)}，固定值只能填写文本，请改为文本或引用同类型变量`;
+  }
+  return null;
+}
+
+function intentOutputHandles(config: Record<string, unknown>): string[] {
+  const intents = Array.isArray(config.intents) ? config.intents : [];
+  const handles = intents.flatMap((intent) => {
+    if (!intent || typeof intent !== 'object') return [];
+    const id = (intent as { id?: unknown }).id;
+    return typeof id === 'string' && INTENT_ID_PATTERN.test(id) && id !== 'other'
+      ? [`intent:${id}`]
+      : [];
+  });
+  return [...handles, 'intent:other'];
+}
 
 function stringsInValue(value: unknown): string[] {
   const values: string[] = [];
@@ -112,6 +146,27 @@ function validateNode(
     case 'subworkflow':
       if (!config.workflowId || !config.versionId) return fail('请选择已发布工作流版本');
       break;
+    case 'intent': {
+      const intents = Array.isArray(config.intents) ? config.intents : [];
+      if (!config.query || !String(config.query).trim()) return fail('请选择分类输入变量');
+      if (!intents.length || intents.length > 10) return fail('请设置 1 到 10 个意图');
+      const ids = new Set<string>();
+      for (const item of intents) {
+        if (!item || typeof item !== 'object') return fail('意图配置无效');
+        const intent = item as { id?: unknown; name?: unknown };
+        if (
+          typeof intent.id !== 'string' ||
+          !INTENT_ID_PATTERN.test(intent.id) ||
+          intent.id === 'other' ||
+          ids.has(intent.id) ||
+          typeof intent.name !== 'string' ||
+          !intent.name.trim()
+        )
+          return fail('请完善每个意图名称');
+        ids.add(intent.id);
+      }
+      break;
+    }
   }
   const options = getUpstreamWorkflowVariables(nodes, edges, node.id);
   if (validateReferences && (data.nodeType === 'end' || data.nodeType === 'llm')) {
@@ -124,13 +179,15 @@ function validateNode(
         ? (config.outputTypes as Record<string, string>) || {}
         : (config.inputTypes as Record<string, string>) || {};
     for (const [name, value] of Object.entries(bindings)) {
-      if (typeof value !== 'string') continue;
-      const option = getWorkflowVariableOption(value, options);
-      if (option && bindingTypes[name] && option.type !== bindingTypes[name]) {
+      const mismatchMessage = getWorkflowBindingTypeMismatchMessage(
+        name,
+        value,
+        bindingTypes[name] as WorkflowVariableOption['type'] | undefined,
+        options,
+      );
+      if (mismatchMessage) {
         const bindingLabel = data.nodeType === 'end' ? '输出' : '输入';
-        return fail(
-          `${bindingLabel}“${name}”选择了 ${option.type} 变量，但声明类型为 ${bindingTypes[name]}`,
-        );
+        return fail(`${bindingLabel}${mismatchMessage}`);
       }
     }
   }
@@ -140,8 +197,25 @@ function validateNode(
       (value) => getInvalidWorkflowVariableTokens(value, options).length > 0,
     )
   )
-    return fail('变量引用必须来自上游节点输出');
+    return fail(INVALID_WORKFLOW_VARIABLE_REFERENCE_MESSAGE);
   return null;
+}
+
+export function getInvalidWorkflowVariableReferenceErrors(
+  nodes: Node[],
+  edges: Edge[] = [],
+): ValidationError[] {
+  return nodes.flatMap((node) => {
+    const data = node.data as unknown as WorkflowNodeData;
+    const options = getUpstreamWorkflowVariables(nodes, edges, node.id);
+    const hasInvalidReference = valuesWithReferences(data).some(
+      (value) => getInvalidWorkflowVariableTokens(value, options).length > 0,
+    );
+
+    return hasInvalidReference
+      ? [workflowError(INVALID_WORKFLOW_VARIABLE_REFERENCE_MESSAGE, node)]
+      : [];
+  });
 }
 
 function validateOptionalEndOutputs(nodes: Node[]): ValidationError[] {
@@ -217,7 +291,7 @@ export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): Valida
   const incoming = new Map(nodes.map((node) => [node.id, 0]));
   const outgoing = new Map(nodes.map((node) => [node.id, 0]));
   const adjacency = new Map(nodes.map((node) => [node.id, [] as string[]]));
-  const conditionHandles = new Map<string, { true: number; false: number }>();
+  const branchHandles = new Map<string, Map<string, number>>();
   for (const edge of edges) {
     const source = nodeById.get(edge.source);
     const target = nodeById.get(edge.target);
@@ -229,11 +303,18 @@ export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): Valida
     outgoing.set(source.id, (outgoing.get(source.id) || 0) + 1);
     adjacency.get(source.id)?.push(target.id);
     const sourceData = source.data as unknown as WorkflowNodeData;
-    if (sourceData.nodeType === 'condition') {
-      const counts = conditionHandles.get(source.id) || { true: 0, false: 0 };
-      if (edge.sourceHandle === 'true') counts.true += 1;
-      if (edge.sourceHandle === 'false') counts.false += 1;
-      conditionHandles.set(source.id, counts);
+    if (sourceData.nodeType === 'condition' || sourceData.nodeType === 'intent') {
+      const allowedHandles =
+        sourceData.nodeType === 'condition'
+          ? new Set(['true', 'false'])
+          : new Set(intentOutputHandles(sourceData.config || {}));
+      if (!allowedHandles.has(edge.sourceHandle || '')) {
+        errors.push(workflowError('分流出口无效', source));
+        continue;
+      }
+      const counts = branchHandles.get(source.id) || new Map<string, number>();
+      counts.set(edge.sourceHandle || '', (counts.get(edge.sourceHandle || '') || 0) + 1);
+      branchHandles.set(source.id, counts);
     }
   }
 
@@ -246,9 +327,15 @@ export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): Valida
       errors.push(workflowError('无法到达结束节点', node));
     }
     if (data.nodeType === 'condition') {
-      const counts = conditionHandles.get(node.id) || { true: 0, false: 0 };
-      if (counts.true !== 1 || counts.false !== 1) {
+      const counts = branchHandles.get(node.id) || new Map<string, number>();
+      if (counts.get('true') !== 1 || counts.get('false') !== 1) {
         errors.push(workflowError('必须各有一条 true / false 连线', node));
+      }
+    }
+    if (data.nodeType === 'intent') {
+      const counts = branchHandles.get(node.id) || new Map<string, number>();
+      if (intentOutputHandles(data.config || {}).some((handle) => counts.get(handle) !== 1)) {
+        errors.push(workflowError('每个意图和其他出口都必须各有一条连线', node));
       }
     }
   }

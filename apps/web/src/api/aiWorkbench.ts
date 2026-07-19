@@ -177,6 +177,14 @@ export interface AIAppTool {
   permission: 'read' | 'write';
 }
 
+export interface NotionConnectionStatus {
+  connected: boolean;
+  configured: boolean;
+  workspaceId?: string;
+  workspaceName?: string;
+  connectedAt?: string;
+}
+
 type AIAppSSEEvent = {
   type?: string;
   chunk?: string;
@@ -544,6 +552,18 @@ export function listAIAppPublicInvocations(
 
 export function listAIAppTools(): Promise<{ list: AIAppTool[] }> {
   return request.get('/ai/apps/tools');
+}
+
+export function getNotionConnection(): Promise<NotionConnectionStatus> {
+  return request.get('/integrations/notion');
+}
+
+export function startNotionAuthorization(): Promise<{ authUrl: string }> {
+  return request.post('/integrations/notion/authorization');
+}
+
+export function disconnectNotion(): Promise<void> {
+  return request.delete('/integrations/notion');
 }
 
 export function listAIAppToolBindings(appId: string): Promise<{ tools: string[] }> {

@@ -58,6 +58,7 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	auth := router.Group("/workflows")
 	auth.Use(middleware.Auth(&config.Config{JWT: config.JWTConfig{Secret: workflowRuntimeTestSecret}}))
 	auth.POST("/:id/run", AdminRunWorkflow)
+	auth.GET("/:id", AdminGetWorkflow)
 	auth.GET("/:id/runs", AdminListWorkflowRuns)
 	auth.GET("/:id/test-cases", ListWorkflowTestCases)
 	auth.POST("/:id/test-cases", CreateWorkflowTestCase)
@@ -355,6 +356,102 @@ func TestPublishedWorkflowSaveKeepsPublishedVersionUntilExplicitPublish(t *testi
 	}
 	if republished.PublishedVersionID != saved.DraftVersionID {
 		t.Fatalf("republish must advance published pointer: published=%s draft=%s", republished.PublishedVersionID, saved.DraftVersionID)
+	}
+}
+
+func TestAdminGetWorkflowReturnsSavedDraftAfterPublish(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	update := func(graph, hash string) *httptest.ResponseRecorder {
+		body, _ := json.Marshal(map[string]any{"graph": graph, "baseHash": hash, "recordHistory": true})
+		req := httptest.NewRequest(http.MethodPut, "/workflows/"+definition.ID.String(), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, req)
+		return recorder
+	}
+	publish := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/publish", nil)
+	publish.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	if response := update(definition.Graph, workflowGraphHash(definition.Graph)); responseCode(response) != 0 {
+		t.Fatalf("initial save: %s", response.Body.String())
+	}
+	publishRecorder := httptest.NewRecorder()
+	router.ServeHTTP(publishRecorder, publish)
+	if responseCode(publishRecorder) != 0 {
+		t.Fatalf("publish: %s", publishRecorder.Body.String())
+	}
+	draftGraph := strings.Replace(definition.Graph, `"title":"{{start.output.title}}"`, `"draftTitle":"{{start.output.title}}"`, 1)
+	if response := update(draftGraph, workflowGraphHash(definition.Graph)); responseCode(response) != 0 {
+		t.Fatalf("save draft: %s", response.Body.String())
+	}
+	request := httptest.NewRequest(http.MethodGet, "/workflows/"+definition.ID.String(), nil)
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if responseCode(recorder) != 0 || recorder.Header().Get("Cache-Control") != "private, no-store" {
+		t.Fatalf("get draft: %s headers=%v", recorder.Body.String(), recorder.Header())
+	}
+	var response struct {
+		Data model.Workflow `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Data.Graph != draftGraph {
+		t.Fatalf("editor must receive saved draft, got=%s", response.Data.Graph)
+	}
+}
+
+func TestAdminGetWorkflowRestoresNewerDraftVersionInsteadOfPublishedGraph(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	publishedGraph := definition.Graph
+	draftGraph := strings.Replace(publishedGraph, `"title":"{{start.output.title}}"`, `"draftTitle":"{{start.output.title}}"`, 1)
+	publishedAt := time.Now().Add(-time.Minute)
+	draftCreatedAt := time.Now()
+
+	app := model.AIApp{UserID: 101, Type: aiAppTypeWorkflow, WorkflowID: &definition.ID, Name: definition.Name, Status: "published"}
+	if err := database.DB.Create(&app).Error; err != nil {
+		t.Fatal(err)
+	}
+	published := model.AIAppVersion{AppID: app.ID, Number: 1, Config: publishedGraph, PublishedAt: &publishedAt}
+	draft := model.AIAppVersion{AppID: app.ID, Number: 2, Config: draftGraph, CreatedAt: draftCreatedAt}
+	if err := database.DB.Create(&published).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Create(&draft).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Model(&app).Updates(map[string]any{"published_version_id": published.ID, "draft_version_id": draft.ID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	// Simulate legacy data: the workflow table still points at the old published
+	// canvas while the explicit draft pointer already has the user's save.
+	if err := database.DB.Model(&model.Workflow{}).Where("id = ?", definition.ID).Updates(map[string]any{"graph": publishedGraph, "updated_at": publishedAt}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/workflows/"+definition.ID.String(), nil)
+	req.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+	if responseCode(recorder) != 0 {
+		t.Fatalf("get draft: %s", recorder.Body.String())
+	}
+	var response struct {
+		Data model.Workflow `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Data.Graph != draftGraph {
+		t.Fatalf("editor graph=%s, want saved draft=%s", response.Data.Graph, draftGraph)
+	}
+	var repaired model.Workflow
+	if err := database.DB.First(&repaired, definition.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if repaired.Graph != draftGraph {
+		t.Fatalf("workflow graph was not repaired: %s", repaired.Graph)
 	}
 }
 

@@ -57,6 +57,7 @@ export function LLMPropertyForm({
           addLabel="添加输入"
           baseName="input"
           nameAriaLabel="输入名称"
+          valueMode="reference"
         />
       </EditorSection>
       <EditorSection title="提示词" description="设置模型角色和本次生成任务。">

@@ -6,7 +6,8 @@ export type WorkflowNodeType =
   | 'condition'
   | 'merge'
   | 'variable'
-  | 'subworkflow';
+  | 'subworkflow'
+  | 'intent';
 
 export type WorkflowValueType = 'string' | 'string[]' | 'object' | 'number' | 'boolean' | 'file';
 
@@ -21,7 +22,7 @@ export interface WorkflowNodeConfig {
   label: string;
   description: string;
   icon: string;
-  category: 'model' | 'flow' | 'tool' | 'subworkflow';
+  category: 'model' | 'flow' | 'logic' | 'tool' | 'subworkflow';
   handles: { input?: boolean; output?: boolean; outputs?: number };
   fixed?: boolean;
   whenAllowed?: boolean;
@@ -71,4 +72,11 @@ export interface WorkflowMergeField {
   name: string;
   type: WorkflowValueType;
   sources: string[];
+}
+
+export interface WorkflowIntentDefinition {
+  id: string;
+  name: string;
+  description: string;
+  examples: string[];
 }

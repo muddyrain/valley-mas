@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { WorkflowValueType, WorkflowVariableAssignment } from '../types';
-import { VariableTokenEditor } from '../VariableTokenEditor';
+import { VariableValueEditor } from '../VariableReferencePicker';
 import type { PropertyFormProps } from './index';
 
 const valueTypes: WorkflowValueType[] = ['string', 'string[]', 'object', 'number', 'boolean'];
@@ -32,7 +32,10 @@ export function VariablePropertyForm({
   return (
     <EditorSection title="变量赋值" description="一次设置一个或多个类型明确的值。">
       {assignments.map((assignment, index) => (
-        <div key={`${assignment.name}-${index}`} className="space-y-2 rounded-lg border p-3">
+        <div
+          key={`${assignment.name}-${index}`}
+          className="space-y-2 rounded-lg border border-border p-3"
+        >
           <div className="flex gap-2">
             <Input
               value={assignment.name}
@@ -66,11 +69,13 @@ export function VariablePropertyForm({
               <Trash2 className="size-4" />
             </Button>
           </div>
-          <VariableTokenEditor
+          <VariableValueEditor
+            ariaLabel={`${assignment.name || `变量 ${index + 1}`}的值`}
             value={String(assignment.value ?? '')}
             onChange={(value) => update(index, { value })}
             options={variableOptions}
-            placeholder="固定值或上游变量"
+            fixedPlaceholder="输入固定值"
+            defaultMode="fixed"
           />
         </div>
       ))}

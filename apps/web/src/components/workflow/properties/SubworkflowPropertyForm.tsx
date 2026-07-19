@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   compareSubworkflowContracts,
   normalizeSubworkflowSchema,
@@ -32,7 +33,7 @@ import {
   publishedWorkflowContract,
   type SubworkflowContractIssue,
 } from '../subworkflowContract';
-import { VariableTokenEditor } from '../VariableTokenEditor';
+import { VariableValueEditor } from '../VariableReferencePicker';
 import type { PropertyFormProps } from './index';
 
 function versionLabel(version: WorkflowVersion) {
@@ -64,6 +65,27 @@ function selectedContract(
   return publishedWorkflowContract(version?.config || '');
 }
 
+function PublishedWorkflowSkeleton() {
+  return (
+    <div className="space-y-4" aria-busy="true">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-5 w-9" />
+        </div>
+        <Skeleton className="h-3 w-5/6" />
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-16" />
+        <div className="flex gap-2">
+          <Skeleton className="h-9 flex-1" />
+          <Skeleton className="h-9 w-12" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SubworkflowPropertyForm({
   config,
   onUpdateConfig,
@@ -74,16 +96,21 @@ export function SubworkflowPropertyForm({
   const inputs = (config.inputs as Record<string, unknown>) || {};
   const [platform, setPlatform] = useState<WorkflowPlatformData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoadingPlatform, setIsLoadingPlatform] = useState(Boolean(workflowID));
   const [targetVersionID, setTargetVersionID] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     if (!workflowID) {
       setPlatform(null);
+      setLoadError(null);
+      setIsLoadingPlatform(false);
       return;
     }
     let active = true;
+    setPlatform(null);
     setLoadError(null);
+    setIsLoadingPlatform(true);
     void getWorkflowPlatform(workflowID)
       .then((result) => {
         if (!active) return;
@@ -97,6 +124,9 @@ export function SubworkflowPropertyForm({
       })
       .catch(() => {
         if (active) setLoadError('无法加载可用版本');
+      })
+      .finally(() => {
+        if (active) setIsLoadingPlatform(false);
       });
     return () => {
       active = false;
@@ -149,72 +179,81 @@ export function SubworkflowPropertyForm({
             {String(config.workflowName || config.workflowId || '未选择')}
           </div>
         </div>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <Label>已锁定版本</Label>
-            {currentVersion ? (
-              <Badge variant="outline">{versionLabel(currentVersion)}</Badge>
-            ) : null}
-          </div>
-          {currentVersion ? (
-            <p className="text-xs text-muted-foreground">
-              已发布版本不会随子工作流的后续修改自动改变。
-            </p>
+        <div className="min-h-36">
+          {isLoadingPlatform ? (
+            <PublishedWorkflowSkeleton />
           ) : (
-            <p className="text-xs text-destructive">当前版本不可用，请选择一个已发布版本。</p>
+            <>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label>已锁定版本</Label>
+                  {currentVersion ? (
+                    <Badge variant="outline">{versionLabel(currentVersion)}</Badge>
+                  ) : null}
+                </div>
+                {currentVersion ? (
+                  <p className="text-xs text-muted-foreground">
+                    已发布版本不会随子工作流的后续修改自动改变。
+                  </p>
+                ) : (
+                  <p className="text-xs text-destructive">当前版本不可用，请选择一个已发布版本。</p>
+                )}
+              </div>
+              {versions.length > 0 ? (
+                <div className="mt-4 space-y-2">
+                  <Label>切换版本</Label>
+                  <div className="flex gap-2">
+                    <Select
+                      items={versionSelectItems}
+                      value={targetVersionID}
+                      onValueChange={(value) => setTargetVersionID(value || '')}
+                    >
+                      <SelectTrigger className="min-w-0 flex-1">
+                        <SelectValue placeholder="选择已发布版本" />
+                      </SelectTrigger>
+                      <SelectContent side="bottom" align="start" alignItemWithTrigger={false}>
+                        {versions.map((version) => (
+                          <SelectItem key={version.id} value={version.id}>
+                            {versionLabel(version)}
+                            {version.id === versionID ? '（当前）' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={requestVersionChange}
+                      disabled={!isDifferentVersion}
+                    >
+                      {issues.length ? '检查并更新' : '更新'}
+                    </Button>
+                  </div>
+                  {isDifferentVersion && issues.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      可直接更新，现有输入和输出字段保持兼容。
+                    </p>
+                  ) : null}
+                  {isDifferentVersion && issues.length > 0 ? (
+                    <p className="text-xs text-destructive">
+                      新版本有 {issues.length} 项字段变化，需要确认映射。
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              {loadError ? <p className="mt-4 text-xs text-destructive">{loadError}</p> : null}
+            </>
           )}
         </div>
-        {versions.length > 0 ? (
-          <div className="space-y-2">
-            <Label>切换版本</Label>
-            <div className="flex gap-2">
-              <Select
-                items={versionSelectItems}
-                value={targetVersionID}
-                onValueChange={(value) => setTargetVersionID(value || '')}
-              >
-                <SelectTrigger className="min-w-0 flex-1">
-                  <SelectValue placeholder="选择已发布版本" />
-                </SelectTrigger>
-                <SelectContent side="bottom" align="start" alignItemWithTrigger={false}>
-                  {versions.map((version) => (
-                    <SelectItem key={version.id} value={version.id}>
-                      {versionLabel(version)}
-                      {version.id === versionID ? '（当前）' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={requestVersionChange}
-                disabled={!isDifferentVersion}
-              >
-                {issues.length ? '检查并更新' : '更新'}
-              </Button>
-            </div>
-            {isDifferentVersion && issues.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                可直接更新，现有输入和输出字段保持兼容。
-              </p>
-            ) : null}
-            {isDifferentVersion && issues.length > 0 ? (
-              <p className="text-xs text-destructive">
-                新版本有 {issues.length} 项字段变化，需要确认映射。
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-        {loadError ? <p className="text-xs text-destructive">{loadError}</p> : null}
         {Object.entries(inputs).map(([name, value]) => (
           <div key={name} className="space-y-1.5">
             <Label>{name}</Label>
-            <VariableTokenEditor
+            <VariableValueEditor
+              ariaLabel={`${name} 输入值`}
               value={String(value ?? '')}
               onChange={(nextValue) => onUpdateConfig({ inputs: { ...inputs, [name]: nextValue } })}
               options={variableOptions}
-              placeholder={`映射 ${name}`}
+              fixedPlaceholder={`输入 ${name} 的固定值`}
             />
           </div>
         ))}

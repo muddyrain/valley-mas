@@ -2,21 +2,28 @@ import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import KnowledgeBases from '@/pages/KnowledgeBases';
 import Workflows from '@/pages/Workflows';
+import NotionConnectorCard from './NotionConnectorCard';
 
 const tabs = [
   { value: 'workflows', label: '工作流', disabled: false },
   { value: 'knowledge', label: '知识库', disabled: false },
   { value: 'prompts', label: '提示词', disabled: true },
-  { value: 'tools', label: '工具', disabled: true },
+  { value: 'tools', label: '工具', disabled: false },
 ] as const;
+
+type ResourceTab = (typeof tabs)[number]['value'];
+
+function parseResourceTab(value: string | null): ResourceTab {
+  return value === 'knowledge' || value === 'tools' ? value : 'workflows';
+}
 
 export default function AIResources() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') === 'knowledge' ? 'knowledge' : 'workflows';
+  const activeTab = parseResourceTab(searchParams.get('tab'));
 
   const handleTabChange = (value: string) => {
     const next = new URLSearchParams(searchParams);
-    next.set('tab', value === 'knowledge' ? 'knowledge' : 'workflows');
+    next.set('tab', parseResourceTab(value));
     setSearchParams(next, { replace: true });
   };
 
@@ -47,7 +54,13 @@ export default function AIResources() {
         </header>
 
         <div className="pt-6">
-          {activeTab === 'knowledge' ? <KnowledgeBases embedded /> : <Workflows embedded />}
+          {activeTab === 'knowledge' ? (
+            <KnowledgeBases embedded />
+          ) : activeTab === 'tools' ? (
+            <NotionConnectorCard />
+          ) : (
+            <Workflows embedded />
+          )}
         </div>
       </div>
     </main>

@@ -9,7 +9,8 @@ export type WorkflowNodeType =
   | 'condition'
   | 'merge'
   | 'variable'
-  | 'subworkflow';
+  | 'subworkflow'
+  | 'intent';
 
 export interface WorkflowRule {
   left: unknown;
@@ -296,7 +297,7 @@ export async function listWorkflows(params?: {
 }
 
 export async function getWorkflow(id: string): Promise<WorkflowItem> {
-  return request.get(`/workflows/${id}`);
+  return request.get(`/workflows/${id}`, { headers: { 'Cache-Control': 'no-cache' } });
 }
 
 export async function updateWorkflow(

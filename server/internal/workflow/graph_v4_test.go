@@ -88,6 +88,76 @@ func TestGraphV4MergeUsesFirstActiveBranch(t *testing.T) {
 	}
 }
 
+func TestIntentNodeClassifiesConfiguredIntentAndRoutesBranch(t *testing.T) {
+	registry := NewRegistry(
+		NodeDefinition{Type: NodeTypeStart},
+		NodeDefinition{Type: NodeTypeIntent},
+		NodeDefinition{Type: NodeTypeVariable},
+		NodeDefinition{Type: NodeTypeMerge},
+		NodeDefinition{Type: NodeTypeEnd},
+	)
+	for _, executor := range []NodeExecutor{
+		startExecutor{},
+		IntentClassifierExecutor{Generator: textGeneratorFunc(func(context.Context, TextGenerationRequest) (TextGenerationResult, error) {
+			return TextGenerationResult{Text: `{"intentId":"billing","confidence":0.93}`}, nil
+		})},
+		VariableExecutor{},
+		MergeExecutor{},
+		endExecutor{},
+	} {
+		if err := registry.RegisterExecutor(executor); err != nil {
+			t.Fatal(err)
+		}
+	}
+	graph := Graph{SchemaVersion: 4, Nodes: []Node{
+		node("start", NodeTypeStart, `{"inputs":{"query":{"type":"string","required":true}}}`),
+		node("intent", NodeTypeIntent, `{"query":"{{start.output.query}}","intents":[{"id":"billing","name":"账单咨询"}]}`),
+		node("billing", NodeTypeVariable, `{"assignments":[{"name":"result","type":"string","value":"billing"}]}`),
+		node("other", NodeTypeVariable, `{"assignments":[{"name":"result","type":"string","value":"other"}]}`),
+		node("merge", NodeTypeMerge, `{"fields":[{"name":"result","type":"string","sources":["{{billing.output.result}}","{{other.output.result}}"]}]}`),
+		node("end", NodeTypeEnd, `{"outputs":{"result":"{{merge.output.result}}"},"outputTypes":{"result":"string"}}`),
+	}, Edges: []Edge{
+		{Source: "start", Target: "intent"},
+		{Source: "intent", SourceHandle: "intent:billing", Target: "billing"},
+		{Source: "intent", SourceHandle: "intent:other", Target: "other"},
+		{Source: "billing", Target: "merge"},
+		{Source: "other", Target: "merge"},
+		{Source: "merge", Target: "end"},
+	}}
+	if errs := ValidateGraph(graph, registry); len(errs) > 0 {
+		t.Fatalf("validation errors: %v", errs)
+	}
+	var intentOutput, final map[string]any
+	if err := Execute(context.Background(), graph, registry, RunContext{Inputs: map[string]any{"query": "我的订阅怎么付款？"}}, func(event Event) {
+		if event.NodeID == "intent" && event.Status == StatusSucceeded {
+			intentOutput = event.Output
+		}
+		if event.NodeID == "end" && event.Status == StatusSucceeded {
+			final = event.Output
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if intentOutput["intentId"] != "billing" || intentOutput["intentName"] != "账单咨询" || final["result"] != "billing" {
+		t.Fatalf("intent=%v final=%v", intentOutput, final)
+	}
+}
+
+func TestIntentNodeRoutesUnexpectedModelIntentToOther(t *testing.T) {
+	executor := IntentClassifierExecutor{Generator: textGeneratorFunc(func(context.Context, TextGenerationRequest) (TextGenerationResult, error) {
+		return TextGenerationResult{Text: `{"intentId":"unsupported","confidence":0.4}`}, nil
+	})}
+	result, err := executor.Execute(context.Background(), RunContext{}, NodeExecution{Input: map[string]any{
+		"query": "随便问一句",
+		"intents": []any{map[string]any{
+			"id": "billing", "name": "账单咨询", "description": "咨询账单", "examples": []any{"怎么付款"},
+		}},
+	}})
+	if err != nil || result.Output["intentId"] != "other" || result.Output["intentName"] != "其他" {
+		t.Fatalf("result=%v err=%v", result, err)
+	}
+}
+
 func TestExecuteEmitsCancelledStatusWhenContextIsCancelled(t *testing.T) {
 	registry := testRegistry(t)
 	graph := Graph{
@@ -228,6 +298,24 @@ func TestGraphV4RejectsSkippedBranchOutputWithoutMerge(t *testing.T) {
 	}, Edges: []Edge{{Source: "start", Target: "condition"}, {Source: "condition", SourceHandle: "true", Target: "yes"}, {Source: "condition", SourceHandle: "false", Target: "no"}, {Source: "yes", Target: "end"}, {Source: "no", Target: "end"}}}
 	if errs := ValidateGraph(graph, registry); !containsError(errs, "可能被跳过") {
 		t.Fatalf("unexpected errors: %v", errs)
+	}
+}
+
+func TestGraphV4AllowsSkippedIntentBranchStringEndOutput(t *testing.T) {
+	registry := testRegistry(t)
+	graph := Graph{SchemaVersion: 4, Nodes: []Node{
+		node("start", NodeTypeStart, `{"inputs":{"query":{"type":"string","required":true}}}`),
+		node("intent", NodeTypeIntent, `{"query":"{{start.output.query}}","intents":[{"id":"game","name":"游戏"}]}`),
+		node("game", NodeTypeVariable, `{"assignments":[{"name":"text","type":"string","value":"游戏内容"}]}`),
+		node("end", NodeTypeEnd, `{"outputs":{"text":"{{game.output.text}}","intentName":"{{intent.output.intentName}}"},"outputTypes":{"text":"string","intentName":"string"}}`),
+	}, Edges: []Edge{
+		{Source: "start", Target: "intent"},
+		{Source: "intent", SourceHandle: "intent:game", Target: "game"},
+		{Source: "intent", SourceHandle: "intent:other", Target: "end"},
+		{Source: "game", Target: "end"},
+	}}
+	if errs := ValidateGraph(graph, registry); len(errs) > 0 {
+		t.Fatalf("validation errors: %v", errs)
 	}
 }
 

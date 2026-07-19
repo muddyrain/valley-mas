@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { VariableTokenEditor } from '../VariableTokenEditor';
+import { VariableReferencePicker } from '../VariableReferencePicker';
 import type { PropertyFormProps } from './index';
 
 const operators = [
@@ -31,7 +31,7 @@ export function ConditionPropertyForm({
     <EditorSection title="条件规则" description="只允许引用开始输入或上游输出，不执行表达式代码。">
       <div className="space-y-2">
         <Label>左值</Label>
-        <VariableTokenEditor
+        <VariableReferencePicker
           value={left}
           onChange={(left) => onUpdateConfig({ left })}
           options={variableOptions}

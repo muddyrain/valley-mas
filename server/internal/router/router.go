@@ -122,6 +122,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 		auth := api.Group("")
 		auth.Use(middleware.Auth(cfg))
 		{
+			handler.RegisterNotionOAuthRoutes(auth, api, cfg)
 			auth.POST("/logout", handler.Logout())
 			auth.GET("/user/current", handler.GetCurrentUser())
 			auth.DELETE("/guestbook/messages/:id", handler.DeleteGuestbookMessage)

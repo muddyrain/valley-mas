@@ -108,7 +108,11 @@ import {
   workflowRunSessionReducer,
 } from '@/components/workflow/runSession';
 import { useWorkflowHistory } from '@/components/workflow/useWorkflowHistory';
-import { validateWorkflowDraft } from '@/components/workflow/validateWorkflowConfig';
+import {
+  getInvalidWorkflowVariableReferenceErrors,
+  type ValidationError,
+  validateWorkflowDraft,
+} from '@/components/workflow/validateWorkflowConfig';
 import { WorkflowAlignmentGuides } from '@/components/workflow/WorkflowAlignmentGuides';
 import { WorkflowNode } from '@/components/workflow/WorkflowNode';
 import { WorkflowRunHistory } from '@/components/workflow/WorkflowRunHistory';
@@ -147,8 +151,35 @@ const workflowNodeTypes = Object.fromEntries(
 const workflowEdgeTypes = { insertable: InsertableEdge };
 const minimumRunPanelHeight = 220;
 const maximumRunPanelHeight = 720;
+const minimumRightPanelWidth = 420;
+const maximumRightPanelWidth = 560;
+
+function notifyWorkflowValidation(action: '保存' | '发布' | '运行', errors: ValidationError[]) {
+  const firstError = errors[0];
+  if (!firstError) return;
+
+  const remainingCount = errors.length - 1;
+  toast.error(
+    firstError.nodeId === 'workflow'
+      ? `${action}前请完善：${firstError.message}`
+      : `${action}前请完善：${firstError.nodeLabel} — ${firstError.message}${
+          remainingCount > 0 ? `（另有 ${remainingCount} 项）` : ''
+        }`,
+    {
+      className:
+        '!border-destructive/30 !bg-destructive/10 !text-destructive [&_svg]:!text-destructive',
+    },
+  );
+}
 
 type SaveStatus = 'idle' | 'pending' | 'creating' | 'saving' | 'saved' | 'error';
+
+function formatAutoSavedAt(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '已自动保存';
+  return `已自动保存 ${date.toLocaleTimeString('zh-CN', { hour12: false })}`;
+}
 
 interface WorkflowSnapshot {
   name: string;
@@ -231,6 +262,7 @@ export default function WorkflowEditorPage() {
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [saveRevision, setSaveRevision] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
@@ -254,7 +286,7 @@ export default function WorkflowEditorPage() {
   const [boundKnowledgeBaseIDs, setBoundKnowledgeBaseIDs] = useState<string[]>([]);
   const [loadingKnowledgeBases, setLoadingKnowledgeBases] = useState(false);
   const [savingKnowledgeBases, setSavingKnowledgeBases] = useState(false);
-  const [rightPanelWidth, setRightPanelWidth] = useState(380);
+  const [rightPanelWidth, setRightPanelWidth] = useState(minimumRightPanelWidth);
   const [showMobileWorkspace, setShowMobileWorkspace] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -490,6 +522,7 @@ export default function WorkflowEditorPage() {
       pendingCreatedWorkflowIdRef.current = null;
       setWorkflowId(id);
       setSaveStatus('saved');
+      setLastAutoSavedAt(new Date().toISOString());
       navigate(`/workbench/edit?id=${id}`, { replace: true });
     },
     [navigate],
@@ -559,6 +592,7 @@ export default function WorkflowEditorPage() {
           )
             return false;
           setSaveStatus('saved');
+          setLastAutoSavedAt(new Date().toISOString());
           finishCreatedWorkflow(id, session);
           return true;
         } catch (error) {
@@ -704,6 +738,7 @@ export default function WorkflowEditorPage() {
       setLoadingHistory(false);
       setKnowledgeBases([]);
       setBoundKnowledgeBaseIDs([]);
+      setLastAutoSavedAt(null);
     }
     const session = editorSessionRef.current;
     if (id) {
@@ -719,6 +754,7 @@ export default function WorkflowEditorPage() {
           setWorkflowId(id);
           setWorkflowName(data.name);
           setWorkflowDescription(data.description || '');
+          setLastAutoSavedAt(data.updatedAt || null);
           persistedGraphHashRef.current = data.graphHash || '';
           try {
             const graph = JSON.parse(data.graph);
@@ -849,7 +885,7 @@ export default function WorkflowEditorPage() {
             type: 'insertable',
           },
         ];
-        if (item.nodeType !== 'condition') {
+        if (item.nodeType !== 'condition' && item.nodeType !== 'intent') {
           insertedEdges.push({
             id: `${newNode.id}-${outgoing[0].target}`,
             source: newNode.id,
@@ -877,8 +913,12 @@ export default function WorkflowEditorPage() {
       setNodes(nextNodes);
       setEdges(nextEdges);
       markWorkflowDirty({ nodes: nextNodes, edges: nextEdges });
-      if (item.nodeType === 'condition' && outgoing[0]) {
-        toast.info('条件节点已插入，请从 true / false 端口连接后续节点');
+      if ((item.nodeType === 'condition' || item.nodeType === 'intent') && outgoing[0]) {
+        toast.info(
+          item.nodeType === 'intent'
+            ? '意图识别节点已插入，请连接每个意图和其他出口'
+            : '条件节点已插入，请从 true / false 端口连接后续节点',
+        );
       }
     },
     [createPickerNode, markWorkflowDirty],
@@ -910,7 +950,7 @@ export default function WorkflowEditorPage() {
           type: 'insertable',
         },
       ];
-      if (item.nodeType !== 'condition') {
+      if (item.nodeType !== 'condition' && item.nodeType !== 'intent') {
         insertedEdges.push({
           id: `${newNode.id}-${edge.target}`,
           source: newNode.id,
@@ -927,8 +967,12 @@ export default function WorkflowEditorPage() {
       setNodes(nextNodes);
       setEdges(nextEdges);
       markWorkflowDirty({ nodes: nextNodes, edges: nextEdges });
-      if (item.nodeType === 'condition') {
-        toast.info('条件节点已插入，请从 true / false 端口连接后续节点');
+      if (item.nodeType === 'condition' || item.nodeType === 'intent') {
+        toast.info(
+          item.nodeType === 'intent'
+            ? '意图识别节点已插入，请连接每个意图和其他出口'
+            : '条件节点已插入，请从 true / false 端口连接后续节点',
+        );
       }
     },
     [createPickerNode, markWorkflowDirty],
@@ -978,9 +1022,22 @@ export default function WorkflowEditorPage() {
     [markWorkflowDirty, updateAlignmentGuides],
   );
 
-  const onNodeDragStop = useCallback(() => {
-    updateAlignmentGuides(null);
-  }, [updateAlignmentGuides]);
+  const onNodeDragStop = useCallback(
+    (_event: MouseEvent | TouchEvent, node: Node) => {
+      updateAlignmentGuides(null);
+      setSelectedNode({
+        id: node.id,
+        type: node.type || '',
+        data: node.data as {
+          label: string;
+          nodeType: string;
+          config?: Record<string, unknown>;
+          when?: import('@/api/workflow').WorkflowRule;
+        },
+      });
+    },
+    [updateAlignmentGuides],
+  );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
@@ -1053,6 +1110,11 @@ export default function WorkflowEditorPage() {
 
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
     event.preventDefault();
+    const nodeType = (node.data as { nodeType?: string }).nodeType || node.type || '';
+    if (NODE_CONFIGS[nodeType]?.fixed) {
+      setContextMenu(null);
+      return;
+    }
     setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
   }, []);
 
@@ -1091,6 +1153,8 @@ export default function WorkflowEditorPage() {
     (nodeId: string) => {
       const node = workflowStateRef.current.nodes.find((n) => n.id === nodeId);
       if (!node) return;
+      const nodeType = (node.data as { nodeType?: string }).nodeType || node.type || '';
+      if (NODE_CONFIGS[nodeType]?.fixed) return;
       const newNode: Node = {
         ...node,
         id: `${nodeId}-copy-${Date.now()}`,
@@ -1109,7 +1173,12 @@ export default function WorkflowEditorPage() {
   const handlePaste = useCallback(() => {
     if (!clipboardRef.current || clipboardRef.current.length === 0) return;
     const stamp = Date.now();
-    const pasted = clipboardRef.current.map((n, i) => ({
+    const copyableNodes = clipboardRef.current.filter((node) => {
+      const nodeType = (node.data as { nodeType?: string }).nodeType || node.type || '';
+      return !NODE_CONFIGS[nodeType]?.fixed;
+    });
+    if (copyableNodes.length === 0) return;
+    const pasted = copyableNodes.map((n, i) => ({
       ...n,
       id: `${n.id}-paste-${stamp}-${i}`,
       position: { x: n.position.x + 30, y: n.position.y + 30 },
@@ -1150,11 +1219,16 @@ export default function WorkflowEditorPage() {
         if (isEditingText) return;
         const selected = nodes.filter((n) => n.selected);
         if (selected.length > 0) {
-          clipboardRef.current = selected;
+          clipboardRef.current = selected.filter((node) => {
+            const nodeType = (node.data as { nodeType?: string }).nodeType || node.type || '';
+            return !NODE_CONFIGS[nodeType]?.fixed;
+          });
           event.preventDefault();
         } else if (selectedNode) {
           const node = nodes.find((n) => n.id === selectedNode.id);
-          if (node) {
+          const nodeType =
+            (node?.data as { nodeType?: string } | undefined)?.nodeType || node?.type || '';
+          if (node && !NODE_CONFIGS[nodeType]?.fixed) {
             clipboardRef.current = [node];
             event.preventDefault();
           }
@@ -1223,7 +1297,10 @@ export default function WorkflowEditorPage() {
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (!isDraggingRef.current) return;
         const deltaX = startX - moveEvent.clientX;
-        const newWidth = Math.max(360, Math.min(520, startWidth + deltaX));
+        const newWidth = Math.max(
+          minimumRightPanelWidth,
+          Math.min(maximumRightPanelWidth, startWidth + deltaX),
+        );
         setRightPanelWidth(newWidth);
       };
 
@@ -1353,9 +1430,11 @@ export default function WorkflowEditorPage() {
 
   const handleSave = useCallback(async () => {
     const state = workflowStateRef.current;
-    const firstError = validateWorkflowDraft(state.nodes, state.edges)[0];
-    if (firstError) {
+    const errors = validateWorkflowDraft(state.nodes, state.edges);
+    if (errors.length > 0) {
       setSaveStatus('pending');
+      setShowValidationErrors(true);
+      notifyWorkflowValidation('保存', errors);
       return;
     }
     setShowValidationErrors(false);
@@ -1373,10 +1452,11 @@ export default function WorkflowEditorPage() {
 
   const handlePublish = useCallback(async () => {
     const state = workflowStateRef.current;
-    const firstError = validateWorkflowDraft(state.nodes, state.edges)[0];
-    if (firstError) {
+    const errors = validateWorkflowDraft(state.nodes, state.edges);
+    if (errors.length > 0) {
       setSaveStatus('pending');
-      toast.error(`发布前请完善：${firstError.nodeLabel} · ${firstError.message}`);
+      setShowValidationErrors(true);
+      notifyWorkflowValidation('发布', errors);
       return;
     }
 
@@ -1505,20 +1585,7 @@ export default function WorkflowEditorPage() {
     if (errors.length > 0) {
       setShowValidationErrors(true);
       const firstError = errors[0];
-      const invalidNodeLabels = [
-        ...new Set(
-          errors.filter((error) => error.nodeId !== 'workflow').map((error) => error.nodeLabel),
-        ),
-      ];
-      toast.error(
-        invalidNodeLabels.length > 0
-          ? `运行前请完善：${invalidNodeLabels.join('、')}`
-          : '运行前请完善工作流配置',
-        {
-          className:
-            '!border-destructive/30 !bg-destructive/10 !text-destructive [&_svg]:!text-destructive',
-        },
-      );
+      notifyWorkflowValidation('运行', errors);
       focusValidationNode(firstError.nodeId);
       return;
     }
@@ -1691,13 +1758,15 @@ export default function WorkflowEditorPage() {
     [edges, runSession.nodes],
   );
 
-  const visibleValidationErrors = useMemo(
-    () =>
-      showValidationErrors
-        ? validateWorkflowDraft(nodes, edges).filter((error) => error.nodeId !== 'workflow')
-        : [],
-    [edges, nodes, showValidationErrors],
-  );
+  const visibleValidationErrors = useMemo(() => {
+    const invalidReferenceErrors = getInvalidWorkflowVariableReferenceErrors(nodes, edges);
+    if (!showValidationErrors) return invalidReferenceErrors;
+
+    return [
+      ...validateWorkflowDraft(nodes, edges).filter((error) => error.nodeId !== 'workflow'),
+      ...invalidReferenceErrors,
+    ];
+  }, [edges, nodes, showValidationErrors]);
 
   const runtimeValue = useMemo(
     () => ({
@@ -1722,18 +1791,7 @@ export default function WorkflowEditorPage() {
     ],
   );
 
-  const saveStatusText =
-    saveStatus === 'creating'
-      ? '正在创建'
-      : saveStatus === 'saving'
-        ? '正在保存'
-        : saveStatus === 'saved'
-          ? '已保存'
-          : saveStatus === 'pending'
-            ? '待完善'
-            : saveStatus === 'error'
-              ? '保存失败'
-              : null;
+  const saveStatusText = formatAutoSavedAt(lastAutoSavedAt);
 
   const copilot = (
     <WorkbenchCopilot

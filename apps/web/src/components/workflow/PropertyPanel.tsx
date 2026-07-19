@@ -138,7 +138,8 @@ export function PropertyPanel({
             nodeType === 'llm' ||
             nodeType === 'merge' ||
             nodeType === 'variable' ||
-            nodeType === 'subworkflow'
+            nodeType === 'subworkflow' ||
+            nodeType === 'intent'
               ? variableOptions
               : undefined
           }
