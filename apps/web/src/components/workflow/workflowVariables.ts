@@ -115,6 +115,19 @@ export function getWorkflowNodeOutputFields(
   nodeType: string,
   config: Record<string, unknown> = {},
 ): ReadonlyArray<WorkflowOutputField> {
+  if (nodeType === 'llm') {
+    const outputSchema =
+      config.outputMode === 'json' && config.outputSchema && typeof config.outputSchema === 'object'
+        ? (config.outputSchema as Record<string, WorkflowVariableType>)
+        : null;
+    return outputSchema
+      ? [
+          ...Object.entries(outputSchema).map(([name, type]) => [name, type] as const),
+          ['model', 'string'],
+          ['tokenUsage', 'number'],
+        ]
+      : NODE_OUTPUT_FIELDS.llm;
+  }
   if (nodeType === 'start') return getStartOutputFields(config);
   if (nodeType === 'end') {
     const outputs =
@@ -160,6 +173,16 @@ export function getWorkflowNodeOutputFields(
   if (nodeType === 'tool') {
     const capabilityId = config.capabilityId;
     return typeof capabilityId === 'string' ? TOOL_OUTPUT_FIELDS[capabilityId] || [] : [];
+  }
+  if (nodeType === 'subworkflow') {
+    const outputSchema = config.outputSchema;
+    if (!outputSchema || typeof outputSchema !== 'object') return [];
+    return Object.entries(outputSchema as Record<string, WorkflowVariableType>).flatMap(
+      ([name, type]) =>
+        typeof type === 'string' && START_VARIABLE_TYPES.has(type as WorkflowVariableType)
+          ? [[name, type as WorkflowVariableType] as const]
+          : [],
+    );
   }
   return NODE_OUTPUT_FIELDS[nodeType] || [];
 }

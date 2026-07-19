@@ -19,6 +19,7 @@ import {
   type CopilotProposal,
   type CopilotQuestion,
   type CopilotSession,
+  cancelCopilotRun,
   createCopilotSession,
   getCopilotSession,
   hashCopilotDraft,
@@ -69,6 +70,8 @@ export function WorkbenchCopilot({
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [streaming, setStreaming] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [activeRunId, setActiveRunId] = useState('');
   const [activity, setActivity] = useState('');
   const [requestError, setRequestError] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -87,6 +90,8 @@ export function WorkbenchCopilot({
     setQuestions([]);
     setActivity('');
     setRequestError('');
+    setCancelling(false);
+    setActiveRunId('');
     if (!targetReady) {
       controllerRef.current?.abort();
       setLoading(false);
@@ -192,6 +197,8 @@ export function WorkbenchCopilot({
     setQuestions([]);
     setRequestError('');
     setStreaming(true);
+    setCancelling(false);
+    setActiveRunId('');
     setActivity('正在连接工作台上下文');
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -209,6 +216,7 @@ export function WorkbenchCopilot({
                 ...current.filter((item) => item.id !== event.data.session?.id),
               ]);
             }
+            if (event.type === 'run') setActiveRunId(event.data.run.id);
             if (event.type === 'activity') setActivity(event.data.label);
             if (event.type === 'assistant.delta') {
               setActivity('');
@@ -254,6 +262,10 @@ export function WorkbenchCopilot({
               setActivity('');
               setStreaming(false);
             }
+            if (event.type === 'cancelled') {
+              setActivity('');
+              setCancelling(false);
+            }
           },
           onError: (error) => {
             setRequestError(error);
@@ -271,6 +283,21 @@ export function WorkbenchCopilot({
       if (controllerRef.current === controller) controllerRef.current = null;
       setActivity('');
       setStreaming(false);
+      setCancelling(false);
+      setActiveRunId('');
+    }
+  };
+
+  const cancelActiveRun = async () => {
+    if (!activeRunId || cancelling) return;
+    setCancelling(true);
+    setActivity('正在取消');
+    try {
+      await cancelCopilotRun(activeRunId);
+    } catch {
+      setCancelling(false);
+      setActivity('');
+      toast.error('取消 AI 协作失败');
     }
   };
 
@@ -509,14 +536,14 @@ export function WorkbenchCopilot({
           <Button
             size="sm"
             variant={streaming ? 'outline' : 'default'}
-            disabled={!targetReady || (!streaming && !input.trim())}
+            disabled={!targetReady || (!streaming && !input.trim()) || (streaming && !activeRunId)}
             onClick={() => {
-              if (streaming) controllerRef.current?.abort();
+              if (streaming) void cancelActiveRun();
               else void sendMessage();
             }}
           >
             {streaming ? <Square data-icon="inline-start" /> : <Send data-icon="inline-start" />}
-            {streaming ? '停止' : '发送'}
+            {streaming ? (cancelling ? '取消中' : '停止') : '发送'}
           </Button>
         </div>
       </div>

@@ -305,6 +305,8 @@ func publicExecutionError(node Node, err error) (string, string) {
 	}
 	message := err.Error()
 	switch {
+	case errors.Is(err, ErrLLMStructuredOutputInvalid):
+		return "模型返回格式不符合输出字段，请调整提示词后重试", "LLM_STRUCTURED_OUTPUT_INVALID"
 	case strings.Contains(message, "AI 未配置") || strings.Contains(message, "ARK_"):
 		return "AI 服务未配置，请检查 ARK_API_KEY 和 ARK_TEXT_MODEL", "AI_CONFIGURATION_UNAVAILABLE"
 	case strings.Contains(message, "AI 上游调用失败"):
@@ -324,12 +326,12 @@ func emitEvent(emit func(Event), event Event) {
 	if emit == nil {
 		return
 	}
-	event.Input = safePreviewMap(event.Input)
-	event.Output = safePreviewMap(event.Output)
+	event.Input = SafePreviewMap(event.Input)
+	event.Output = SafePreviewMap(event.Output)
 	emit(event)
 }
 
-func safePreviewMap(values map[string]any) map[string]any {
+func SafePreviewMap(values map[string]any) map[string]any {
 	if values == nil {
 		return nil
 	}
@@ -349,7 +351,7 @@ func safePreviewMap(values map[string]any) map[string]any {
 				result[key] = typed
 			}
 		case map[string]any:
-			result[key] = safePreviewMap(typed)
+			result[key] = SafePreviewMap(typed)
 		default:
 			result[key] = value
 		}

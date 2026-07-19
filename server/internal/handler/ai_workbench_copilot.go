@@ -208,21 +208,31 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	}
 	session.UpdatedAt = time.Now()
 	_ = database.GetDB().Model(&session).Updates(map[string]any{"title": session.Title, "updated_at": session.UpdatedAt}).Error
+	run := model.AIWorkbenchCopilotRun{SessionID: session.ID, UserID: ownerID, Scope: payload.Scope, TargetID: payload.TargetID}
+	if err := database.GetDB().Create(&run).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "创建 AI 协作请求失败")
+		return
+	}
+	planningContext, releaseRun := activeCopilotRuns.Start(run.ID.String(), copilotPlanningTimeout)
+	defer releaseRun()
 
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("X-Accel-Buffering", "no")
 	sendCopilotEvent(c, "session", gin.H{"session": session})
+	sendCopilotEvent(c, "run", gin.H{"run": run})
 	sendCopilotEvent(c, "activity", gin.H{"label": "正在读取当前草稿与可用能力"})
 
 	draft, err := resolveCopilotDraft(ownerID, payload)
 	if err != nil {
+		completeCopilotRun(&run, "failed", "COPILOT_INVALID_REQUEST")
 		sendCopilotEvent(c, "error", gin.H{"message": err.Error()})
 		return
 	}
 	baseHash := canonicalJSONHash(draft)
 	if payload.Context.BaseHash != "" && payload.Context.BaseHash != baseHash {
+		completeCopilotRun(&run, "failed", "COPILOT_DRAFT_CONFLICT")
 		sendCopilotEvent(c, "error", gin.H{"message": "当前草稿已变化，请重新发送需求"})
 		return
 	}
@@ -260,7 +270,7 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	}
 	if envelope.Mode == "" && err == nil {
 		err = runCopilotPlanningWithActivity(
-			c.Request.Context(),
+			planningContext,
 			copilotPlanningTimeout,
 			copilotActivityUpdateInterval,
 			func(label string) { sendCopilotEvent(c, "activity", gin.H{"label": label}) },
@@ -275,12 +285,17 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	}
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
+			completeCopilotRun(&run, "cancelled", "COPILOT_CANCELLED")
+			sendCopilotEvent(c, "cancelled", gin.H{"runId": run.ID})
 			return
 		} else if errors.Is(err, context.DeadlineExceeded) {
+			completeCopilotRun(&run, "failed", "COPILOT_TIMEOUT")
 			sendCopilotEvent(c, "error", gin.H{"message": "AI 规划超时，请重试或简化需求", "statusCode": http.StatusBadGateway})
 		} else if isARKConfigurationError(err) {
+			completeCopilotRun(&run, "failed", "COPILOT_CONFIGURATION_INVALID")
 			sendCopilotEvent(c, "error", gin.H{"message": err.Error(), "statusCode": http.StatusServiceUnavailable})
 		} else {
+			completeCopilotRun(&run, "failed", "COPILOT_PLANNING_FAILED")
 			sendCopilotEvent(c, "error", gin.H{"message": "AI 未返回可用结果，请重试", "statusCode": http.StatusBadGateway})
 		}
 		return
@@ -289,6 +304,7 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	assistantKind := envelope.Mode
 	assistantMessage := model.AIWorkbenchCopilotMessage{SessionID: session.ID, UserID: ownerID, Role: "assistant", Kind: assistantKind, Content: envelope.Message}
 	if err := database.GetDB().Create(&assistantMessage).Error; err != nil {
+		completeCopilotRun(&run, "failed", "COPILOT_PERSIST_FAILED")
 		sendCopilotEvent(c, "error", gin.H{"message": "保存 AI 回复失败"})
 		return
 	}
@@ -301,6 +317,7 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	if envelope.Mode == "proposal" {
 		proposal, proposalErr := persistCopilotProposal(session, ownerID, payload.TargetID, baseHash, draft, envelope)
 		if proposalErr != nil {
+			completeCopilotRun(&run, "failed", "COPILOT_PERSIST_FAILED")
 			sendCopilotEvent(c, "error", gin.H{"message": "保存变更提案失败"})
 			return
 		}
@@ -310,7 +327,43 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 		_ = json.Unmarshal([]byte(proposal.Diff), &diff)
 		sendCopilotEvent(c, "proposal", gin.H{"proposal": proposal, "candidate": candidate, "diff": diff})
 	}
+	completeCopilotRun(&run, "completed", "")
 	sendCopilotEvent(c, "done", gin.H{"messageId": assistantMessage.ID})
+}
+
+func completeCopilotRun(run *model.AIWorkbenchCopilotRun, status, errorCode string) {
+	now := time.Now()
+	run.Status = status
+	run.ErrorCode = errorCode
+	run.FinishedAt = &now
+	_ = database.GetDB().Model(run).Updates(map[string]any{"status": status, "error_code": errorCode, "finished_at": &now}).Error
+}
+
+func CancelWorkbenchCopilotRun(c *gin.Context) {
+	userID, _, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+	runID, err := parsePathInt64(c, "runId")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的协作请求 ID")
+		return
+	}
+	var run model.AIWorkbenchCopilotRun
+	if err := database.GetDB().Where("id = ? AND user_id = ?", runID, userID).First(&run).Error; err != nil {
+		Error(c, http.StatusNotFound, "协作请求不存在")
+		return
+	}
+	if run.Status != "running" || !activeCopilotRuns.Cancel(run.ID.String()) {
+		Error(c, http.StatusConflict, "该协作请求已结束，不能取消")
+		return
+	}
+	if err := database.GetDB().Model(&run).Where("status = ?", "running").Update("status", "cancelling").Error; err != nil {
+		Error(c, http.StatusInternalServerError, "更新取消状态失败")
+		return
+	}
+	Success(c, gin.H{"status": "cancelling"})
 }
 
 type copilotReadOnlyTool struct {

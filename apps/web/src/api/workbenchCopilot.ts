@@ -51,6 +51,15 @@ export interface CopilotProposal {
   createdAt: string;
 }
 
+export interface CopilotRun {
+  id: string;
+  sessionId: string;
+  status: 'running' | 'cancelling' | 'completed' | 'failed' | 'cancelled';
+  errorCode?: string;
+  startedAt: string;
+  finishedAt?: string;
+}
+
 export interface CopilotContext {
   scope: CopilotScope;
   targetId?: string;
@@ -81,6 +90,7 @@ export interface CopilotSessionData {
 
 export type CopilotStreamEvent =
   | { type: 'session'; data: { session: CopilotSessionData['session'] } }
+  | { type: 'run'; data: { run: CopilotRun } }
   | { type: 'assistant.delta'; data: { messageId: string; content: string } }
   | { type: 'activity'; data: { label: string } }
   | { type: 'clarification'; data: { messageId: string; questions: CopilotQuestion[] } }
@@ -89,6 +99,7 @@ export type CopilotStreamEvent =
       data: { proposal: RawProposal; candidate: unknown; diff: CopilotDiff };
     }
   | { type: 'done'; data: { messageId: string } }
+  | { type: 'cancelled'; data: { runId: string } }
   | { type: 'error'; data: { message: string; statusCode?: number } };
 
 function parseJSONValue<T>(value: string | T, fallback: T): T {
@@ -150,6 +161,14 @@ export async function updateCopilotProposal(
   await request.patch(
     `/ai/workbench/copilot/proposals/${proposalId}`,
     { status, currentHash },
+    copilotRequestConfig,
+  );
+}
+
+export function cancelCopilotRun(runId: string): Promise<{ status: 'cancelling' }> {
+  return request.post(
+    `/ai/workbench/copilot/runs/${runId}/cancel`,
+    undefined,
     copilotRequestConfig,
   );
 }

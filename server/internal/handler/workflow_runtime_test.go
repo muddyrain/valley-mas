@@ -3,11 +3,13 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"valley-server/internal/config"
 	"valley-server/internal/database"
@@ -15,6 +17,7 @@ import (
 	"valley-server/internal/middleware"
 	"valley-server/internal/model"
 	"valley-server/internal/utils"
+	"valley-server/internal/workflow"
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -32,7 +35,7 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.User{}, &model.Workflow{}, &model.WorkflowRun{}, &model.WorkflowNodeRun{}, &model.AIApp{}, &model.AIAppVersion{}, &model.AIAppVersionKnowledgeBase{}, &model.AIAppVersionToolBinding{}, &model.AIAppKnowledgeBase{}, &model.AIAppRun{}, &model.Post{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Workflow{}, &model.WorkflowRun{}, &model.WorkflowNodeRun{}, &model.WorkflowRunEvent{}, &model.AIApp{}, &model.AIAppVersion{}, &model.AIAppVersionKnowledgeBase{}, &model.AIAppVersionToolBinding{}, &model.AIAppKnowledgeBase{}, &model.AIAppRun{}, &model.Post{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Create(&[]model.User{{ID: 101, Username: "workflow-owner", Role: "user", IsActive: true}, {ID: 202, Username: "workflow-other", Role: "user", IsActive: true}}).Error; err != nil {
@@ -56,7 +59,11 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	auth.POST("/:id/run", AdminRunWorkflow)
 	auth.GET("/:id/runs", AdminListWorkflowRuns)
 	auth.GET("/:id/runs/:runId", AdminGetWorkflowRun)
+	auth.GET("/:id/runs/:runId/events", StreamWorkflowRunEvents)
+	auth.POST("/:id/runs/:runId/cancel", CancelWorkflowRun)
+	auth.POST("/:id/runs/:runId/retry", RetryWorkflowRun)
 	auth.PUT("/:id", AdminUpdateWorkflow)
+	auth.POST("/:id/publish", PublishWorkflowVersion)
 	return router, definition
 }
 
@@ -75,6 +82,33 @@ func TestWorkflowGraphV4RejectsLegacySchema(t *testing.T) {
 	router.ServeHTTP(recorder, req)
 	if responseCode(recorder) != http.StatusBadRequest || !strings.Contains(recorder.Body.String(), "GRAPH_VERSION_UNSUPPORTED") {
 		t.Fatalf("body=%s", recorder.Body.String())
+	}
+}
+
+func TestWorkflowSaveRejectsForgedSubworkflowContract(t *testing.T) {
+	_, _ = setupWorkflowRuntimeTestRouter(t)
+	childGraph := `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","config":{"inputs":{"topic":{"type":"string","required":true}}}},{"id":"end","type":"end","label":"结束","config":{"outputs":{"title":"{{start.output.topic}}"},"outputTypes":{"title":"string"}}}],"edges":[{"source":"start","target":"end"}]}`
+	child := model.Workflow{UserID: 101, Name: "子工作流", Graph: childGraph}
+	if err := database.DB.Create(&child).Error; err != nil {
+		t.Fatal(err)
+	}
+	app := model.AIApp{UserID: 101, Type: aiAppTypeWorkflow, WorkflowID: &child.ID, Name: "子工作流", Status: "published"}
+	if err := database.DB.Create(&app).Error; err != nil {
+		t.Fatal(err)
+	}
+	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: childGraph}
+	if err := database.DB.Create(&version).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Model(&app).Update("published_version_id", version.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	parentGraph := fmt.Sprintf(`{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","config":{"inputs":{"topic":{"type":"string","required":true}}}},{"id":"child","type":"subworkflow","label":"子工作流","config":{"workflowId":"%s","versionId":"%s","inputs":{"topic":"{{start.output.topic}}"},"inputSchema":{"topic":"string"},"outputSchema":{"title":"number"}}},{"id":"end","type":"end","label":"结束","config":{"outputs":{"title":"{{child.output.title}}"},"outputTypes":{"title":"number"}}}],"edges":[{"source":"start","target":"child"},{"source":"child","target":"end"}]}`,
+		child.ID.String(), version.ID.String())
+	err := validateWorkflowDraftForSave(database.DB, parentGraph, 101, 0)
+	if err == nil || !strings.Contains(err.Error(), "字段契约与锁定版本不一致") {
+		t.Fatalf("err=%v", err)
 	}
 }
 
@@ -138,13 +172,116 @@ func TestAdminUpdateWorkflowRecordsHistoryOnlyWhenRequested(t *testing.T) {
 	}
 }
 
+func TestPublishedWorkflowSaveKeepsPublishedVersionUntilExplicitPublish(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	update := func(graph, hash string) *httptest.ResponseRecorder {
+		body, _ := json.Marshal(map[string]any{
+			"graph":         graph,
+			"baseHash":      hash,
+			"recordHistory": true,
+		})
+		req := httptest.NewRequest(http.MethodPut, "/workflows/"+definition.ID.String(), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, req)
+		return recorder
+	}
+	publish := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/publish", nil)
+		req.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, req)
+		return recorder
+	}
+
+	if response := update(definition.Graph, workflowGraphHash(definition.Graph)); responseCode(response) != 0 {
+		t.Fatalf("initial save: %s", response.Body.String())
+	}
+	if response := publish(); responseCode(response) != 0 {
+		t.Fatalf("initial publish: %s", response.Body.String())
+	}
+
+	var published model.AIApp
+	if err := database.DB.Where("workflow_id = ?", definition.ID).First(&published).Error; err != nil {
+		t.Fatal(err)
+	}
+	if published.DraftVersionID == 0 || published.PublishedVersionID != published.DraftVersionID {
+		t.Fatalf("initial published pointers=%+v", published)
+	}
+	var initialPublishedVersion model.AIAppVersion
+	if err := database.DB.First(&initialPublishedVersion, published.PublishedVersionID).Error; err != nil || initialPublishedVersion.PublishedAt == nil {
+		t.Fatalf("initial published version=%+v err=%v", initialPublishedVersion, err)
+	}
+	initialPublishedVersionID := published.PublishedVersionID
+
+	updatedGraph := strings.Replace(definition.Graph, `"title":"{{start.output.title}}"`, `"renamed":"{{start.output.title}}"`, 1)
+	if response := update(updatedGraph, workflowGraphHash(definition.Graph)); responseCode(response) != 0 {
+		t.Fatalf("save after publish: %s", response.Body.String())
+	}
+	var saved model.AIApp
+	if err := database.DB.Where("workflow_id = ?", definition.ID).First(&saved).Error; err != nil {
+		t.Fatal(err)
+	}
+	if saved.DraftVersionID == saved.PublishedVersionID || saved.PublishedVersionID != initialPublishedVersionID {
+		t.Fatalf("save must keep published pointer while advancing draft: %+v", saved)
+	}
+	var savedDraftVersion model.AIAppVersion
+	if err := database.DB.First(&savedDraftVersion, saved.DraftVersionID).Error; err != nil || savedDraftVersion.PublishedAt != nil {
+		t.Fatalf("saved draft version=%+v err=%v", savedDraftVersion, err)
+	}
+
+	if response := publish(); responseCode(response) != 0 {
+		t.Fatalf("republish: %s", response.Body.String())
+	}
+	var republished model.AIApp
+	if err := database.DB.Where("workflow_id = ?", definition.ID).First(&republished).Error; err != nil {
+		t.Fatal(err)
+	}
+	if republished.PublishedVersionID != saved.DraftVersionID {
+		t.Fatalf("republish must advance published pointer: published=%s draft=%s", republished.PublishedVersionID, saved.DraftVersionID)
+	}
+}
+
+func TestPreviouslyPublishedSubworkflowVersionRemainsValidAfterNewerPublish(t *testing.T) {
+	_, _ = setupWorkflowRuntimeTestRouter(t)
+	childV1Graph := `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","config":{"inputs":{}}},{"id":"end","type":"end","label":"结束","config":{"outputs":{"title":"static"},"outputTypes":{"title":"string"}}}],"edges":[{"source":"start","target":"end"}]}`
+	childV2Graph := `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","config":{"inputs":{}}},{"id":"end","type":"end","label":"结束","config":{"outputs":{"title":"static","tags":"static"},"outputTypes":{"title":"string","tags":"string[]"}}}],"edges":[{"source":"start","target":"end"}]}`
+	child := model.Workflow{UserID: 101, Name: "稳定子工作流", Graph: childV2Graph, Status: "published"}
+	if err := database.DB.Create(&child).Error; err != nil {
+		t.Fatal(err)
+	}
+	publishedAt := time.Now()
+	app := model.AIApp{UserID: 101, Type: aiAppTypeWorkflow, WorkflowID: &child.ID, Name: child.Name, Status: "published"}
+	if err := database.DB.Create(&app).Error; err != nil {
+		t.Fatal(err)
+	}
+	v1 := model.AIAppVersion{AppID: app.ID, Number: 1, Config: childV1Graph, PublishedAt: &publishedAt}
+	v2 := model.AIAppVersion{AppID: app.ID, Number: 2, Config: childV2Graph, PublishedAt: &publishedAt}
+	if err := database.DB.Create(&v1).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Create(&v2).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Model(&app).Updates(map[string]any{"draft_version_id": v2.ID, "published_version_id": v2.ID}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	parentGraph := fmt.Sprintf(`{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","config":{"inputs":{}}},{"id":"child","type":"subworkflow","label":"稳定子工作流","config":{"workflowId":"%s","versionId":"%s","inputs":{},"inputSchema":{},"outputSchema":{"title":"string"}}},{"id":"end","type":"end","label":"结束","config":{"outputs":{"result":"{{child.output.title}}"},"outputTypes":{"result":"string"}}}],"edges":[{"source":"start","target":"child"},{"source":"child","target":"end"}]}`,
+		child.ID.String(), v1.ID.String())
+	if err := validateWorkflowDraftForSave(database.DB, parentGraph, 101, 0); err != nil {
+		t.Fatalf("previously published child version must remain valid: %v", err)
+	}
+}
+
 func TestWorkflowRunPersistsGraphV4NodeTypes(t *testing.T) {
 	router, definition := setupWorkflowRuntimeTestRouter(t)
 	req := workflowMultipartRequest(t, "/workflows/"+definition.ID.String()+"/run", `{"title":"Graph v4"}`)
 	req.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, req)
-	if !strings.Contains(recorder.Header().Get("Content-Type"), "text/event-stream") || !strings.Contains(recorder.Body.String(), `"status":"done"`) {
+	if !strings.Contains(recorder.Header().Get("Content-Type"), "text/event-stream") || !strings.Contains(recorder.Body.String(), `"status":"done"`) || !strings.Contains(recorder.Body.String(), "id: 5") {
 		t.Fatalf("body=%s", recorder.Body.String())
 	}
 	var rows []model.WorkflowNodeRun
@@ -153,6 +290,18 @@ func TestWorkflowRunPersistsGraphV4NodeTypes(t *testing.T) {
 	}
 	if rows[0].NodeType != "start" || rows[1].NodeType != "end" {
 		t.Fatalf("rows=%v", rows)
+	}
+	var events []model.WorkflowRunEvent
+	if err := database.DB.Order("sequence ASC").Find(&events).Error; err != nil || len(events) != 5 {
+		t.Fatalf("events=%v err=%v", events, err)
+	}
+	for index, event := range events {
+		if event.Sequence != int64(index+1) {
+			t.Fatalf("event sequence=%d index=%d", event.Sequence, index)
+		}
+	}
+	if events[4].Status != string(workflow.StatusSucceeded) || events[4].NodeID != "" {
+		t.Fatalf("terminal event=%+v", events[4])
 	}
 }
 
@@ -219,6 +368,113 @@ func TestWorkflowRunHistoryIsOwnerScoped(t *testing.T) {
 	router.ServeHTTP(recorder, list)
 	if responseCode(recorder) != http.StatusNotFound {
 		t.Fatalf("body=%s", recorder.Body.String())
+	}
+}
+
+func TestWorkflowRunTraceReturnsOrderedEvents(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	runRequest := workflowMultipartRequest(t, "/workflows/"+definition.ID.String()+"/run", `{"title":"trace"}`)
+	runRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	router.ServeHTTP(httptest.NewRecorder(), runRequest)
+
+	var run model.WorkflowRun
+	if err := database.DB.Where("workflow_id = ?", definition.ID).First(&run).Error; err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/workflows/"+definition.ID.String()+"/runs/"+run.ID.String(), nil)
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if responseCode(recorder) != 0 {
+		t.Fatalf("body=%s", recorder.Body.String())
+	}
+	var response struct {
+		Data struct {
+			Events []model.WorkflowRunEvent `json:"events"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Data.Events) != 5 {
+		t.Fatalf("events=%+v", response.Data.Events)
+	}
+	for index, event := range response.Data.Events {
+		if event.Sequence != int64(index+1) {
+			t.Fatalf("event sequence=%d index=%d", event.Sequence, index)
+		}
+	}
+	streamRequest := httptest.NewRequest(http.MethodGet, "/workflows/"+definition.ID.String()+"/runs/"+run.ID.String()+"/events", nil)
+	streamRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	streamRequest.Header.Set("Last-Event-ID", "2")
+	streamRecorder := httptest.NewRecorder()
+	router.ServeHTTP(streamRecorder, streamRequest)
+	streamBody := streamRecorder.Body.String()
+	if !strings.Contains(streamBody, "id: 3") || !strings.Contains(streamBody, "id: 5") || strings.Contains(streamBody, "id: 2") || !strings.Contains(streamBody, `"status":"done"`) {
+		t.Fatalf("stream=%s", streamBody)
+	}
+}
+
+func TestCancelWorkflowRunCancelsActiveOwnerRun(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	run := model.WorkflowRun{
+		WorkflowID:    definition.ID,
+		UserID:        101,
+		Status:        "running",
+		GraphSnapshot: definition.Graph,
+		StartedAt:     time.Now(),
+	}
+	if err := database.DB.Create(&run).Error; err != nil {
+		t.Fatal(err)
+	}
+	ctx, release := activeWorkflowRuns.Start(run.ID.String(), time.Minute)
+	defer release()
+	request := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/runs/"+run.ID.String()+"/cancel", nil)
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if responseCode(recorder) != 0 {
+		t.Fatalf("body=%s", recorder.Body.String())
+	}
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("run context was not cancelled")
+	}
+	if err := database.DB.First(&run, run.ID).Error; err != nil || run.Status != "cancelling" {
+		t.Fatalf("run=%+v err=%v", run, err)
+	}
+}
+
+func TestRetryWorkflowRunCreatesNewRunFromSnapshot(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	firstRequest := workflowMultipartRequest(t, "/workflows/"+definition.ID.String()+"/run", `{"title":"first"}`)
+	firstRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	firstRecorder := httptest.NewRecorder()
+	router.ServeHTTP(firstRecorder, firstRequest)
+	if responseCode(firstRecorder) != 0 {
+		t.Fatalf("first run: %s", firstRecorder.Body.String())
+	}
+	var source model.WorkflowRun
+	if err := database.DB.Where("workflow_id = ?", definition.ID).First(&source).Error; err != nil {
+		t.Fatal(err)
+	}
+	retryRequest := workflowMultipartRequest(t, "/workflows/"+definition.ID.String()+"/runs/"+source.ID.String()+"/retry", `{"title":"second"}`)
+	retryRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	retryRecorder := httptest.NewRecorder()
+	router.ServeHTTP(retryRecorder, retryRequest)
+	if responseCode(retryRecorder) != 0 {
+		t.Fatalf("retry: %s", retryRecorder.Body.String())
+	}
+	var runs []model.WorkflowRun
+	if err := database.DB.Where("workflow_id = ?", definition.ID).Order("created_at ASC").Find(&runs).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 2 || runs[1].SourceRunID == nil || *runs[1].SourceRunID != source.ID {
+		t.Fatalf("runs=%+v", runs)
+	}
+	if runs[1].GraphSnapshot != source.GraphSnapshot {
+		t.Fatalf("retry must preserve graph snapshot: source=%s retry=%s", source.GraphSnapshot, runs[1].GraphSnapshot)
 	}
 }
 

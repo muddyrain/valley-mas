@@ -73,6 +73,13 @@ function validateNode(
   switch (data.nodeType) {
     case 'llm':
       if (!config.prompt) return fail('请填写用户提示词');
+      if (
+        config.outputMode === 'json' &&
+        (!config.outputSchema ||
+          typeof config.outputSchema !== 'object' ||
+          Object.keys(config.outputSchema as Record<string, unknown>).length === 0)
+      )
+        return fail('请至少声明一个 JSON 输出字段');
       break;
     case 'tool':
       if (!config.capabilityId || !config.inputs || typeof config.inputs !== 'object')

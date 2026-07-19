@@ -35,6 +35,7 @@ type WorkflowRun struct {
 	Status        string         `gorm:"size:20;not null;default:'running';index" json:"status"`
 	Inputs        string         `gorm:"type:json" json:"inputs,omitempty"`
 	GraphSnapshot string         `gorm:"type:json;not null" json:"graphSnapshot"`
+	SourceRunID   *Int64String   `gorm:"index" json:"sourceRunId,omitempty"`
 	Result        string         `gorm:"type:json" json:"result,omitempty"`
 	StartedAt     time.Time      `gorm:"index:idx_workflow_runs_workflow_user_started,priority:3" json:"startedAt"`
 	FinishedAt    *time.Time     `json:"finishedAt,omitempty"`
@@ -73,6 +74,35 @@ type WorkflowNodeRun struct {
 }
 
 func (r *WorkflowNodeRun) BeforeCreate(tx *gorm.DB) error {
+	if r.ID == 0 {
+		r.ID = Int64String(utils.GenerateID())
+	}
+	r.Input = normalizeWorkflowJSON(r.Input)
+	r.Output = normalizeWorkflowJSON(r.Output)
+	return nil
+}
+
+// WorkflowRunEvent is an immutable, owner-scoped trace event. It stores only
+// the same safe previews that are emitted to the workflow SSE stream.
+type WorkflowRunEvent struct {
+	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	WorkflowRunID Int64String    `gorm:"index;not null;uniqueIndex:uidx_workflow_run_event_sequence,priority:1" json:"workflowRunId"`
+	Sequence      int64          `gorm:"not null;uniqueIndex:uidx_workflow_run_event_sequence,priority:2" json:"sequence"`
+	NodeID        string         `gorm:"size:120;index" json:"nodeId,omitempty"`
+	NodeType      string         `gorm:"size:80" json:"nodeType,omitempty"`
+	CapabilityID  string         `gorm:"size:120;index" json:"capabilityId,omitempty"`
+	Status        string         `gorm:"size:20;not null;index" json:"status"`
+	Message       string         `gorm:"size:500" json:"message,omitempty"`
+	Input         string         `gorm:"type:json" json:"input,omitempty"`
+	Output        string         `gorm:"type:json" json:"output,omitempty"`
+	ErrorCode     string         `gorm:"size:80" json:"errorCode,omitempty"`
+	DurationMs    int64          `json:"durationMs,omitempty"`
+	OccurredAt    time.Time      `gorm:"index;not null" json:"occurredAt"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (r *WorkflowRunEvent) BeforeCreate(tx *gorm.DB) error {
 	if r.ID == 0 {
 		r.ID = Int64String(utils.GenerateID())
 	}

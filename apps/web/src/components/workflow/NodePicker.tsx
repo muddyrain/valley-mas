@@ -25,6 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { type PublishedWorkflowContract, publishedWorkflowContract } from './subworkflowContract';
 import { useWorkflowCapabilities } from './useWorkflowCapabilities';
 import { getWorkflowSideEffectLabel } from './workflowSideEffects';
 
@@ -58,6 +59,7 @@ const genericItems: NodePickerItem[] = [
       prompt: '请完成当前任务。',
       inputs: {},
       inputTypes: {},
+      outputMode: 'text',
       temperature: 0.4,
       maxOutputTokens: 512,
     },
@@ -112,7 +114,14 @@ export function NodePicker({ trigger, onSelect, side = 'top', align = 'center' }
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [published, setPublished] = useState<
-    Array<{ id: string; name: string; versionId: string; inputNames: string[] }>
+    Array<{
+      id: string;
+      name: string;
+      versionId: string;
+      versionNumber: number;
+      versionPublishedAt?: string;
+      contract: PublishedWorkflowContract;
+    }>
   >([]);
   const capabilities = useWorkflowCapabilities(open);
 
@@ -124,22 +133,17 @@ export function NodePicker({ trigger, onSelect, side = 'top', align = 'center' }
         const workflows = result.list.filter((item) => item.status === 'published');
         const entries = await Promise.all(
           workflows.map(async (item) => {
-            let inputNames: string[] = [];
-            try {
-              const graph = JSON.parse(item.graph) as {
-                nodes?: Array<{ type?: string; config?: { inputs?: Record<string, unknown> } }>;
-              };
-              inputNames = Object.keys(
-                graph.nodes?.find((node) => node.type === 'start')?.config?.inputs || {},
-              );
-            } catch {
-              inputNames = [];
-            }
+            const platform = await getWorkflowPlatform(item.id);
+            const version = platform.versions.find(
+              (candidate) => candidate.id === platform.app.publishedVersionId,
+            );
             return {
               id: item.id,
               name: item.name,
-              versionId: (await getWorkflowPlatform(item.id)).app.publishedVersionId,
-              inputNames,
+              versionId: platform.app.publishedVersionId,
+              versionNumber: version?.number || 0,
+              versionPublishedAt: version?.publishedAt,
+              contract: publishedWorkflowContract(version?.config || ''),
             };
           }),
         );
@@ -176,8 +180,14 @@ export function NodePicker({ trigger, onSelect, side = 'top', align = 'center' }
       config: {
         workflowId: item.id,
         versionId: item.versionId,
+        versionNumber: item.versionNumber,
+        versionPublishedAt: item.versionPublishedAt,
         workflowName: item.name,
-        inputs: Object.fromEntries(item.inputNames.map((name) => [name, ''])),
+        inputs: Object.fromEntries(
+          Object.keys(item.contract.inputSchema).map((name) => [name, '']),
+        ),
+        inputSchema: item.contract.inputSchema,
+        outputSchema: item.contract.outputSchema,
       },
     }));
     const keyword = query.trim().toLowerCase();

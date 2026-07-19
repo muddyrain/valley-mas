@@ -48,6 +48,7 @@ type AIAppVersion struct {
 	RetrievalConfig       string         `gorm:"type:text;not null;default:'{}'" json:"retrievalConfig"`
 	KnowledgeBaseSnapshot bool           `gorm:"not null;default:false" json:"knowledgeBaseSnapshot"`
 	ToolSnapshot          bool           `gorm:"not null;default:false" json:"toolSnapshot"`
+	PublishedAt           *time.Time     `gorm:"index" json:"publishedAt,omitempty"`
 	CreatedAt             time.Time      `json:"createdAt"`
 	DeletedAt             gorm.DeletedAt `gorm:"index" json:"-"`
 }
@@ -203,6 +204,35 @@ type AIWorkbenchCopilotMessage struct {
 	Kind      string      `gorm:"size:20;not null;default:'text'" json:"kind"`
 	Content   string      `gorm:"type:text;not null" json:"content"`
 	CreatedAt time.Time   `json:"createdAt"`
+}
+
+// AIWorkbenchCopilotRun records one cancellable planning request. It stores
+// lifecycle metadata only; prompts and model replies remain in messages.
+type AIWorkbenchCopilotRun struct {
+	ID         Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	SessionID  Int64String `gorm:"index;not null" json:"sessionId"`
+	UserID     Int64String `gorm:"index;not null" json:"userId"`
+	Scope      string      `gorm:"size:20;index;not null" json:"scope"`
+	TargetID   string      `gorm:"size:80;index;not null;default:''" json:"targetId"`
+	Status     string      `gorm:"size:20;index;not null;default:'running'" json:"status"`
+	ErrorCode  string      `gorm:"size:80" json:"errorCode"`
+	StartedAt  time.Time   `json:"startedAt"`
+	FinishedAt *time.Time  `json:"finishedAt,omitempty"`
+	CreatedAt  time.Time   `json:"createdAt"`
+	UpdatedAt  time.Time   `json:"updatedAt"`
+}
+
+func (r *AIWorkbenchCopilotRun) BeforeCreate(tx *gorm.DB) error {
+	if r.ID == 0 {
+		r.ID = Int64String(utils.GenerateID())
+	}
+	if r.Status == "" {
+		r.Status = "running"
+	}
+	if r.StartedAt.IsZero() {
+		r.StartedAt = time.Now()
+	}
+	return nil
 }
 
 func (m *AIWorkbenchCopilotMessage) BeforeCreate(tx *gorm.DB) error {

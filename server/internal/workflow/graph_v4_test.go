@@ -296,6 +296,32 @@ func TestGraphV4EndOutputTypesValidateAndExecute(t *testing.T) {
 	}
 }
 
+func TestSubworkflowContractExposesTypedOutputs(t *testing.T) {
+	registry := testRegistry(t)
+	graph := Graph{SchemaVersion: 4, Nodes: []Node{
+		node("start", NodeTypeStart, `{"inputs":{"topic":{"type":"string","required":true}}}`),
+		node("child", NodeTypeSubworkflow, `{"workflowId":"1","versionId":"2","inputs":{"topic":"{{start.output.topic}}"},"inputSchema":{"topic":"string"},"outputSchema":{"title":"string"}}`),
+		node("end", NodeTypeEnd, `{"outputs":{"title":"{{child.output.title}}"},"outputTypes":{"title":"string"}}`),
+	}, Edges: []Edge{{Source: "start", Target: "child"}, {Source: "child", Target: "end"}}}
+	if errs := ValidateGraph(graph, registry); len(errs) > 0 {
+		t.Fatalf("validation errors: %v", errs)
+	}
+
+	graph.Nodes[1] = node("child", NodeTypeSubworkflow, `{"workflowId":"1","versionId":"2","inputs":{"topic":"{{start.output.topic}}"},"inputSchema":{"topic":"string"},"outputSchema":{"title":"number"}}`)
+	if errs := ValidateGraph(graph, registry); !containsError(errs, "需要 string，实际为 number") {
+		t.Fatalf("expected output type mismatch, got %v", errs)
+	}
+
+	child := Graph{SchemaVersion: 4, Nodes: []Node{
+		node("start", NodeTypeStart, `{"inputs":{"topic":{"type":"string","required":true}}}`),
+		node("end", NodeTypeEnd, `{"outputs":{"title":"{{start.output.topic}}"},"outputTypes":{"title":"string"}}`),
+	}, Edges: []Edge{{Source: "start", Target: "end"}}}
+	contract, err := SubworkflowContractFromGraph(child)
+	if err != nil || contract.Inputs["topic"].Type != ValueTypeString || contract.Outputs["title"] != ValueTypeString {
+		t.Fatalf("contract=%+v err=%v", contract, err)
+	}
+}
+
 func TestLLMNodeAllowsEmptySystemPromptAndReportsSafeErrors(t *testing.T) {
 	executor := LLMTextExecutor{Generator: textGeneratorFunc(func(_ context.Context, request TextGenerationRequest) (TextGenerationResult, error) {
 		if request.SystemPrompt != "" || request.Prompt != "write\n\n输入变量：\n- count: 3\n- topic: AI" {
@@ -315,6 +341,36 @@ func TestLLMNodeAllowsEmptySystemPromptAndReportsSafeErrors(t *testing.T) {
 	message, code := publicExecutionError(Node{Type: NodeTypeLLM}, errors.New("AI 未配置：ARK_API_KEY 未设置"))
 	if code != "AI_CONFIGURATION_UNAVAILABLE" || !strings.Contains(message, "ARK_API_KEY") {
 		t.Fatalf("message=%q code=%q", message, code)
+	}
+}
+
+func TestLLMStructuredOutputValidatesDeclaredFields(t *testing.T) {
+	executor := LLMTextExecutor{Generator: textGeneratorFunc(func(_ context.Context, request TextGenerationRequest) (TextGenerationResult, error) {
+		if !strings.Contains(request.Prompt, "只返回一个 JSON 对象") {
+			t.Fatalf("prompt=%q", request.Prompt)
+		}
+		return TextGenerationResult{Text: "```json\n{\"title\":\"AI\",\"tags\":[\"workflow\"]}\n```", Model: "test"}, nil
+	})}
+	result, err := executor.Execute(context.Background(), RunContext{}, NodeExecution{Input: map[string]any{
+		"modelProfile": "ark-text-default",
+		"prompt":       "write",
+		"outputMode":   "json",
+		"outputSchema": map[string]any{"title": "string", "tags": "string[]"},
+	}})
+	if err != nil || result.Output["title"] != "AI" || result.Output["model"] != "test" {
+		t.Fatalf("result=%v err=%v", result, err)
+	}
+	invalid := LLMTextExecutor{Generator: textGeneratorFunc(func(context.Context, TextGenerationRequest) (TextGenerationResult, error) {
+		return TextGenerationResult{Text: `{"title":3}`, Model: "test"}, nil
+	})}
+	_, err = invalid.Execute(context.Background(), RunContext{}, NodeExecution{Input: map[string]any{
+		"modelProfile": "ark-text-default",
+		"prompt":       "write",
+		"outputMode":   "json",
+		"outputSchema": map[string]any{"title": "string"},
+	}})
+	if !errors.Is(err, ErrLLMStructuredOutputInvalid) {
+		t.Fatalf("err=%v", err)
 	}
 }
 

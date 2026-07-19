@@ -335,17 +335,28 @@ func syncWorkflowAIAppWithSnapshot(tx *gorm.DB, definition model.Workflow, creat
 		}
 	}
 	updates := map[string]any{"name": definition.Name, "description": definition.Description, "status": definition.Status, "draft_version_id": latest.ID}
-	if definition.Status == "published" {
+	// A saved draft must never silently replace an already published workflow
+	// version. Keep the one-time backfill for legacy published workflows that
+	// have not acquired a published pointer yet; explicit publish is the only
+	// path that advances an existing published pointer.
+	if definition.Status == "published" && app.PublishedVersionID == 0 {
 		updates["published_version_id"] = latest.ID
 	}
 	if err := tx.Model(&app).Updates(updates).Error; err != nil {
 		return model.AIApp{}, model.AIAppVersion{}, err
 	}
+	if definition.Status == "published" && app.PublishedVersionID == 0 {
+		if err := tx.Model(&model.AIAppVersion{}).Where("id = ?", latest.ID).Update("published_at", time.Now()).Error; err != nil {
+			return model.AIApp{}, model.AIAppVersion{}, err
+		}
+		publishedAt := time.Now()
+		latest.PublishedAt = &publishedAt
+	}
 	app.Name = definition.Name
 	app.Description = definition.Description
 	app.Status = definition.Status
 	app.DraftVersionID = latest.ID
-	if definition.Status == "published" {
+	if definition.Status == "published" && app.PublishedVersionID == 0 {
 		app.PublishedVersionID = latest.ID
 	}
 	return app, latest, nil
@@ -612,7 +623,13 @@ func PublishAIApp(c *gin.Context) {
 		Error(c, 400, "待发布版本不存在")
 		return
 	}
-	if err := database.GetDB().Model(&app).Updates(map[string]any{"published_version_id": version.ID, "status": "published"}).Error; err != nil {
+	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		if err := tx.Model(&model.AIAppVersion{}).Where("id = ? AND app_id = ?", version.ID, app.ID).Update("published_at", now).Error; err != nil {
+			return err
+		}
+		return tx.Model(&app).Updates(map[string]any{"published_version_id": version.ID, "status": "published"}).Error
+	}); err != nil {
 		Error(c, 500, "发布应用失败")
 		return
 	}

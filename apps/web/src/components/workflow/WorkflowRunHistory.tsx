@@ -7,6 +7,7 @@ import {
   listWorkflowRuns,
   type WorkflowRun,
   type WorkflowRunDetail,
+  type WorkflowRunTraceEvent,
 } from '@/api/workflow';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,11 +15,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { NodeRunDetails } from './NodeRunDetails';
 import type { NodeRunSnapshot } from './runSession';
 
-function statusMeta(status: WorkflowRun['status']) {
+function statusMeta(status: WorkflowRun['status'] | WorkflowRunTraceEvent['status']) {
   if (status === 'success')
     return { label: '成功', icon: CheckCircle2, className: 'text-emerald-600' };
   if (status === 'cancelled')
     return { label: '已取消', icon: CircleSlash2, className: 'text-muted-foreground' };
+  if (status === 'cancelling')
+    return { label: '取消中', icon: Loader2, className: 'animate-spin text-primary' };
+  if (status === 'skipped')
+    return { label: '已跳过', icon: CircleSlash2, className: 'text-muted-foreground' };
   if (status === 'running')
     return { label: '运行中', icon: Loader2, className: 'animate-spin text-primary' };
   return { label: '失败', icon: AlertCircle, className: 'text-destructive' };
@@ -50,9 +55,11 @@ function nodeSnapshot(detail: WorkflowRunDetail, nodeID: string): NodeRunSnapsho
 export function WorkflowRunHistory({
   workflowId,
   open,
+  onRetry,
 }: {
   workflowId: string | null;
   open: boolean;
+  onRetry: (run: WorkflowRunDetail) => void;
 }) {
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
   const [loading, setLoading] = useState(false);
@@ -134,20 +141,57 @@ export function WorkflowRunHistory({
       </div>
       {loadingTrace ? <Skeleton className="h-32 w-full" /> : null}
       {selectedRun ? (
-        <section className="rounded-lg border border-border bg-muted/20">
-          <div className="border-b border-border px-3 py-2 text-sm font-medium">本次运行详情</div>
-          <div className="divide-y divide-border">
-            {selectedRun.nodes.map((node) => (
-              <div key={node.id} className="p-3">
-                <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">{node.nodeId}</span>
-                  <Badge variant="outline">{node.nodeType}</Badge>
+        <>
+          {selectedRun.retry?.allowed ? (
+            <Button className="w-full" onClick={() => onRetry(selectedRun)}>
+              重新运行
+            </Button>
+          ) : null}
+          <section className="rounded-lg border border-border bg-muted/20">
+            <div className="border-b border-border px-3 py-2 text-sm font-medium">本次运行详情</div>
+            <div className="divide-y divide-border">
+              {selectedRun.nodes.map((node) => (
+                <div key={node.id} className="p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{node.nodeId}</span>
+                    <Badge variant="outline">{node.nodeType}</Badge>
+                  </div>
+                  <NodeRunDetails
+                    snapshot={nodeSnapshot(selectedRun, node.nodeId)}
+                    variant="panel"
+                  />
                 </div>
-                <NodeRunDetails snapshot={nodeSnapshot(selectedRun, node.nodeId)} variant="panel" />
-              </div>
-            ))}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
+          {selectedRun.events?.length ? (
+            <section className="rounded-lg border border-border bg-muted/20">
+              <div className="border-b border-border px-3 py-2 text-sm font-medium">运行事件</div>
+              <ol className="divide-y divide-border">
+                {selectedRun.events.map((event) => {
+                  const meta = statusMeta(event.status);
+                  const Icon = meta.icon;
+                  return (
+                    <li key={event.id} className="flex items-start gap-2 px-3 py-2 text-xs">
+                      <Icon className={`mt-0.5 size-3.5 shrink-0 ${meta.className}`} />
+                      <span className="min-w-0 flex-1 text-muted-foreground">
+                        <span className="font-medium text-foreground">
+                          #{event.sequence} {event.nodeId || '工作流'} · {meta.label}
+                        </span>
+                        {event.message ? (
+                          <span className="mt-0.5 block">{event.message}</span>
+                        ) : null}
+                      </span>
+                      <time className="shrink-0 text-muted-foreground" dateTime={event.occurredAt}>
+                        {new Date(event.occurredAt).toLocaleTimeString('zh-CN')}
+                      </time>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          ) : null}
+        </>
       ) : null}
     </div>
   );

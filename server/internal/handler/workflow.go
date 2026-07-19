@@ -332,6 +332,10 @@ func PublishWorkflowVersion(c *gin.Context) {
 		if err := tx.Model(&definition).Update("status", "published").Error; err != nil {
 			return err
 		}
+		now := time.Now()
+		if err := tx.Model(&model.AIAppVersion{}).Where("id = ? AND app_id = ?", version.ID, app.ID).Update("published_at", now).Error; err != nil {
+			return err
+		}
 		return tx.Model(&app).Updates(map[string]any{"status": "published", "published_version_id": version.ID}).Error
 	}); err != nil {
 		Error(c, 400, "发布工作流失败")
@@ -361,7 +365,7 @@ func workflowPlatform(c *gin.Context, userID model.Int64String) (model.Workflow,
 		return syncErr
 	}); err != nil {
 		if errors.Is(err, errWorkflowDraftInvalid) {
-			Error(c, 400, "工作流草稿已不受 Graph v4 支持")
+			Error(c, 400, "工作流草稿无效: "+strings.TrimPrefix(err.Error(), errWorkflowDraftInvalid.Error()+": "))
 			return model.Workflow{}, model.AIApp{}, nil, false
 		}
 		Error(c, 500, "同步工作流应用失败")
@@ -435,6 +439,134 @@ func AdminRunWorkflow(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "工作流配置无效: "+strings.Join(validationErrors, "；"))
 		return
 	}
+	budget := workflowExecutionBudget{}
+	if err := validateSubworkflowReferences(database.DB, graph, model.Int64String(userID), definition.ID, map[string]bool{}, &budget); err != nil {
+		Error(c, http.StatusBadRequest, "工作流配置无效: "+err.Error())
+		return
+	}
+	runWorkflowGraph(c, userID, role, definition, graph, app, appVersion, nil)
+}
+
+// RetryWorkflowRun starts a new run from a terminal run's immutable graph snapshot.
+// It deliberately requires fresh request inputs because run history only stores safe summaries.
+func RetryWorkflowRun(c *gin.Context) {
+	userID, role, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+	workflowID, err := parsePathInt64(c, "id")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的 ID")
+		return
+	}
+	runID, err := parsePathInt64(c, "runId")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的运行 ID")
+		return
+	}
+	var sourceRun model.WorkflowRun
+	if err := database.DB.Where("id = ? AND workflow_id = ? AND user_id = ?", runID, workflowID, userID).First(&sourceRun).Error; err != nil {
+		Error(c, http.StatusNotFound, "运行记录不存在")
+		return
+	}
+	if sourceRun.Status == string(workflow.StatusRunning) || sourceRun.Status == "cancelling" {
+		Error(c, http.StatusConflict, "该运行尚未结束，不能重新运行")
+		return
+	}
+	graph, err := decodeWorkflowGraph(sourceRun.GraphSnapshot)
+	if err != nil {
+		Error(c, http.StatusBadRequest, "历史工作流格式错误")
+		return
+	}
+	registry := workflowRuntimeRegistry()
+	if validationErrors := workflow.ValidateGraph(graph, registry); len(validationErrors) > 0 {
+		Error(c, http.StatusConflict, "历史工作流已不符合当前运行规则: "+strings.Join(validationErrors, "；"))
+		return
+	}
+	budget := workflowExecutionBudget{}
+	if err := validateSubworkflowReferences(database.DB, graph, model.Int64String(userID), model.Int64String(workflowID), map[string]bool{}, &budget); err != nil {
+		Error(c, http.StatusConflict, "历史工作流已不符合当前运行规则: "+err.Error())
+		return
+	}
+	if workflowRetryRequiresConfirmation(graph, registry) && c.GetHeader("X-Workflow-Retry-Confirmed") != "true" {
+		Error(c, http.StatusConflict, "本次重试可能再次执行 AI 存储或写入操作，请确认后重试")
+		return
+	}
+	var definition model.Workflow
+	if err := database.DB.Where("id = ? AND user_id = ?", workflowID, userID).First(&definition).Error; err != nil {
+		Error(c, http.StatusNotFound, "工作流不存在")
+		return
+	}
+	app, appVersion, found := workflowRunAIAppVersion(sourceRun.ID, model.Int64String(userID))
+	if !found {
+		if err := database.DB.Transaction(func(tx *gorm.DB) error {
+			var syncErr error
+			app, appVersion, syncErr = syncWorkflowAIAppWithoutSnapshot(tx, definition)
+			return syncErr
+		}); err != nil {
+			Error(c, http.StatusInternalServerError, "同步工作流应用失败")
+			return
+		}
+	}
+	sourceRunID := sourceRun.ID
+	runWorkflowGraph(c, userID, role, definition, graph, app, appVersion, &sourceRunID)
+}
+
+func workflowRunAIAppVersion(workflowRunID, userID model.Int64String) (model.AIApp, model.AIAppVersion, bool) {
+	var appRun model.AIAppRun
+	if err := database.DB.Where("workflow_run_id = ? AND user_id = ?", workflowRunID, userID).Order("created_at DESC").First(&appRun).Error; err != nil {
+		return model.AIApp{}, model.AIAppVersion{}, false
+	}
+	var app model.AIApp
+	if err := database.DB.Where("id = ? AND user_id = ?", appRun.AppID, userID).First(&app).Error; err != nil {
+		return model.AIApp{}, model.AIAppVersion{}, false
+	}
+	var version model.AIAppVersion
+	if err := database.DB.Where("id = ? AND app_id = ?", appRun.VersionID, app.ID).First(&version).Error; err != nil {
+		return model.AIApp{}, model.AIAppVersion{}, false
+	}
+	return app, version, true
+}
+
+func workflowRetryRequiresConfirmation(graph workflow.Graph, registry *workflow.Registry) bool {
+	for _, node := range graph.Nodes {
+		if node.Type != workflow.NodeTypeTool {
+			continue
+		}
+		var config struct {
+			CapabilityID string `json:"capabilityId"`
+		}
+		if json.Unmarshal(node.Config, &config) != nil {
+			continue
+		}
+		capability, _, found := registry.Capability(config.CapabilityID)
+		if found && (capability.SideEffect == "write" || capability.SideEffect == "model_and_storage") {
+			return true
+		}
+	}
+	return false
+}
+
+func mustEncodeWorkflowGraph(graph workflow.Graph, fallback string) string {
+	encoded, err := json.Marshal(graph)
+	if err != nil {
+		return fallback
+	}
+	return string(encoded)
+}
+
+func runWorkflowGraph(
+	c *gin.Context,
+	userID int64,
+	role string,
+	definition model.Workflow,
+	graph workflow.Graph,
+	app model.AIApp,
+	appVersion model.AIAppVersion,
+	sourceRunID *model.Int64String,
+) {
+	registry := workflowRuntimeRegistry()
 	fileInputs, err := declaredStartFileInputs(graph)
 	if err != nil {
 		Error(c, http.StatusBadRequest, "工作流文件输入配置无效")
@@ -450,7 +582,7 @@ func AdminRunWorkflow(c *gin.Context) {
 		Error(c, http.StatusInternalServerError, "运行记录序列化失败")
 		return
 	}
-	run := model.WorkflowRun{WorkflowID: model.Int64String(workflowID), UserID: model.Int64String(userID), Status: string(workflow.StatusRunning), Inputs: string(inputsJSON), GraphSnapshot: definition.Graph, StartedAt: time.Now()}
+	run := model.WorkflowRun{WorkflowID: definition.ID, UserID: model.Int64String(userID), Status: string(workflow.StatusRunning), Inputs: string(inputsJSON), GraphSnapshot: mustEncodeWorkflowGraph(graph, definition.Graph), SourceRunID: sourceRunID, StartedAt: time.Now()}
 	if err := database.DB.Create(&run).Error; err != nil {
 		Error(c, http.StatusInternalServerError, "创建运行记录失败")
 		return
@@ -482,12 +614,18 @@ func AdminRunWorkflow(c *gin.Context) {
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("X-Accel-Buffering", "no")
-	send := func(step string, status string, message string, data any) {
-		event := map[string]any{"step": step, "status": status, "message": message}
-		if data != nil {
-			event["data"] = data
+	send := func(event workflow.Event, streamStatus string) {
+		payload := map[string]any{
+			"step":     event.NodeID,
+			"status":   streamStatus,
+			"message":  event.Message,
+			"sequence": event.Sequence,
+			"data":     event,
 		}
-		encoded, _ := json.Marshal(event)
+		encoded, _ := json.Marshal(payload)
+		if event.Sequence > 0 {
+			_, _ = fmt.Fprintf(c.Writer, "id: %d\n", event.Sequence)
+		}
 		_, _ = fmt.Fprintf(c.Writer, "data: %s\n\n", encoded)
 		c.Writer.(http.Flusher).Flush()
 	}
@@ -500,11 +638,41 @@ func AdminRunWorkflow(c *gin.Context) {
 	var failureMessage string
 	var failureCode string
 	var failedNodeID string
-	executionContext, cancel := context.WithTimeout(c.Request.Context(), workflowRunExecutionTimeout)
-	defer cancel()
+	var eventSequence int64
+	persistNodeEvent := func(event workflow.Event) (workflow.Event, error) {
+		eventSequence++
+		event.Sequence = eventSequence
+		err := database.DB.Transaction(func(tx *gorm.DB) error {
+			if err := persistWorkflowNodeEvent(tx, run.ID, nodeTypes[event.NodeID], event); err != nil {
+				return err
+			}
+			return persistWorkflowRunEvent(tx, run.ID, event)
+		})
+		return event, err
+	}
+	persistTerminalEvent := func(status workflow.RunStatus, nodeID, message, errorCode string, output map[string]any) (workflow.Event, error) {
+		eventSequence++
+		event := workflow.Event{
+			RunID:    run.ID.String(),
+			Sequence: eventSequence,
+			NodeID:   nodeID,
+			Status:   status,
+			Message:  message,
+			Error:    errorCode,
+			Output:   workflow.SafePreviewMap(output),
+		}
+		return event, database.DB.Transaction(func(tx *gorm.DB) error {
+			return persistWorkflowRunEvent(tx, run.ID, event)
+		})
+	}
+	executionContext, releaseRun := activeWorkflowRuns.Start(run.ID.String(), workflowRunExecutionTimeout)
+	defer releaseRun()
 	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: make(map[string]map[string]any), KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion), ContentSearcher: workflowContentSearcher(model.Int64String(userID)), CoverGenerator: workflowCoverGenerator(), SubworkflowRunner: workflowSubworkflowRunner(model.Int64String(userID))}, func(event workflow.Event) {
 		if persistenceErr == nil {
-			persistenceErr = persistWorkflowNodeEvent(run.ID, nodeTypes[event.NodeID], event)
+			event, persistenceErr = persistNodeEvent(event)
+			if persistenceErr == nil {
+				send(event, string(event.Status))
+			}
 		}
 		if nodeTypes[event.NodeID] == workflow.NodeTypeEnd && event.Status == workflow.StatusSucceeded {
 			finalOutput = event.Output
@@ -514,12 +682,11 @@ func AdminRunWorkflow(c *gin.Context) {
 			failureCode = event.Error
 			failedNodeID = event.NodeID
 		}
-		send(event.NodeID, string(event.Status), event.Message, event)
 	})
 	if persistenceErr != nil {
 		_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": "RUN_PERSISTENCE_FAILED"})
 		persistWorkflowAIAppRun(app, appVersion, run, "failed", nil, "RUN_PERSISTENCE_FAILED")
-		send("", "error", "运行记录保存失败", nil)
+		send(workflow.Event{RunID: run.ID.String(), Status: workflow.StatusFailed, Message: "运行记录保存失败", Error: "RUN_PERSISTENCE_FAILED"}, "error")
 		return
 	}
 	if executeErr != nil {
@@ -532,12 +699,22 @@ func AdminRunWorkflow(c *gin.Context) {
 		if failureCode == "WORKFLOW_CANCELLED" {
 			_ = finishWorkflowRun(&run, string(workflow.StatusCancelled), map[string]any{"error": failureCode})
 			persistWorkflowAIAppRun(app, appVersion, run, "cancelled", nil, failureCode)
-			send("", string(workflow.StatusCancelled), failureMessage, map[string]any{"runId": run.ID, "nodeId": failedNodeID, "error": failureCode})
+			event, eventErr := persistTerminalEvent(workflow.StatusCancelled, failedNodeID, failureMessage, failureCode, nil)
+			if eventErr != nil {
+				send(workflow.Event{RunID: run.ID.String(), Status: workflow.StatusFailed, Message: "运行记录保存失败", Error: "RUN_PERSISTENCE_FAILED"}, "error")
+				return
+			}
+			send(event, string(workflow.StatusCancelled))
 			return
 		}
 		_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": failureCode})
 		persistWorkflowAIAppRun(app, appVersion, run, "failed", nil, failureCode)
-		send("", "error", failureMessage, map[string]any{"runId": run.ID, "nodeId": failedNodeID, "error": failureCode})
+		event, eventErr := persistTerminalEvent(workflow.StatusFailed, failedNodeID, failureMessage, failureCode, nil)
+		if eventErr != nil {
+			send(workflow.Event{RunID: run.ID.String(), Status: workflow.StatusFailed, Message: "运行记录保存失败", Error: "RUN_PERSISTENCE_FAILED"}, "error")
+			return
+		}
+		send(event, "error")
 		return
 	}
 	if finalOutput == nil {
@@ -546,11 +723,18 @@ func AdminRunWorkflow(c *gin.Context) {
 	if err := finishWorkflowRun(&run, string(workflow.StatusSucceeded), finalOutput); err != nil {
 		_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": "RUN_PERSISTENCE_FAILED"})
 		persistWorkflowAIAppRun(app, appVersion, run, "failed", nil, "RUN_PERSISTENCE_FAILED")
-		send("", "error", "运行结果保存失败", map[string]any{"runId": run.ID, "error": "RUN_PERSISTENCE_FAILED", "statusCode": http.StatusInternalServerError})
+		send(workflow.Event{RunID: run.ID.String(), Status: workflow.StatusFailed, Message: "运行结果保存失败", Error: "RUN_PERSISTENCE_FAILED"}, "error")
 		return
 	}
 	persistWorkflowAIAppRun(app, appVersion, run, "succeeded", finalOutput, "")
-	send("", "done", "工作流执行完成", map[string]any{"runId": run.ID, "output": finalOutput})
+	event, eventErr := persistTerminalEvent(workflow.StatusSucceeded, "", "工作流执行完成", "", finalOutput)
+	if eventErr != nil {
+		_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": "RUN_PERSISTENCE_FAILED"})
+		persistWorkflowAIAppRun(app, appVersion, run, "failed", nil, "RUN_PERSISTENCE_FAILED")
+		send(workflow.Event{RunID: run.ID.String(), Status: workflow.StatusFailed, Message: "运行记录保存失败", Error: "RUN_PERSISTENCE_FAILED"}, "error")
+		return
+	}
+	send(event, "done")
 }
 
 func persistWorkflowAIAppRun(app model.AIApp, version model.AIAppVersion, workflowRun model.WorkflowRun, status string, output map[string]any, errorCode string) {
@@ -628,7 +812,145 @@ func AdminGetWorkflowRun(c *gin.Context) {
 		Error(c, http.StatusInternalServerError, "查询节点记录失败")
 		return
 	}
-	Success(c, gin.H{"run": run, "nodes": nodes})
+	var events []model.WorkflowRunEvent
+	if err := database.DB.Where("workflow_run_id = ?", run.ID).Order("sequence ASC").Find(&events).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "查询运行事件失败")
+		return
+	}
+	retry := gin.H{
+		"allowed":              run.Status != string(workflow.StatusRunning) && run.Status != "cancelling",
+		"requiresConfirmation": false,
+	}
+	if graph, graphErr := decodeWorkflowGraph(run.GraphSnapshot); graphErr == nil {
+		retry["requiresConfirmation"] = workflowRetryRequiresConfirmation(graph, workflowRuntimeRegistry())
+	}
+	Success(c, gin.H{"run": run, "nodes": nodes, "events": events, "retry": retry})
+}
+
+func CancelWorkflowRun(c *gin.Context) {
+	userID, _, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+	workflowID, err := parsePathInt64(c, "id")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的 ID")
+		return
+	}
+	runID, err := parsePathInt64(c, "runId")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的运行 ID")
+		return
+	}
+	var run model.WorkflowRun
+	if err := database.DB.Where("id = ? AND workflow_id = ? AND user_id = ?", runID, workflowID, userID).First(&run).Error; err != nil {
+		Error(c, http.StatusNotFound, "运行记录不存在")
+		return
+	}
+	if run.Status != string(workflow.StatusRunning) {
+		Error(c, http.StatusConflict, "该运行已结束，不能取消")
+		return
+	}
+	if !activeWorkflowRuns.Cancel(run.ID.String()) {
+		Error(c, http.StatusConflict, "该运行不在当前服务进程中，不能取消")
+		return
+	}
+	if err := database.DB.Model(&run).Update("status", "cancelling").Error; err != nil {
+		Error(c, http.StatusInternalServerError, "更新取消状态失败")
+		return
+	}
+	Success(c, gin.H{"status": "cancelling"})
+}
+
+func StreamWorkflowRunEvents(c *gin.Context) {
+	userID, _, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+	workflowID, err := parsePathInt64(c, "id")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的 ID")
+		return
+	}
+	runID, err := parsePathInt64(c, "runId")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的运行 ID")
+		return
+	}
+	var run model.WorkflowRun
+	if err := database.DB.Where("id = ? AND workflow_id = ? AND user_id = ?", runID, workflowID, userID).First(&run).Error; err != nil {
+		Error(c, http.StatusNotFound, "运行记录不存在")
+		return
+	}
+	after, _ := strconv.ParseInt(c.GetHeader("Last-Event-ID"), 10, 64)
+	if queryAfter := c.Query("after"); queryAfter != "" {
+		if parsed, parseErr := strconv.ParseInt(queryAfter, 10, 64); parseErr == nil {
+			after = parsed
+		}
+	}
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	ticker := time.NewTicker(400 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		var events []model.WorkflowRunEvent
+		if err := database.DB.Where("workflow_run_id = ? AND sequence > ?", run.ID, after).Order("sequence ASC").Find(&events).Error; err != nil {
+			return
+		}
+		for _, event := range events {
+			writeWorkflowRunSSE(c, event)
+			after = event.Sequence
+		}
+		if err := database.DB.First(&run, run.ID).Error; err != nil || run.Status == "success" || run.Status == "error" || run.Status == "cancelled" {
+			return
+		}
+		select {
+		case <-c.Request.Context().Done():
+			return
+		case <-ticker.C:
+			_, _ = fmt.Fprint(c.Writer, ": keep-alive\n\n")
+			c.Writer.(http.Flusher).Flush()
+		}
+	}
+}
+
+func writeWorkflowRunSSE(c *gin.Context, event model.WorkflowRunEvent) {
+	streamStatus := event.Status
+	if event.NodeType == "" && event.Status == string(workflow.StatusSucceeded) {
+		streamStatus = "done"
+	}
+	payload := gin.H{
+		"step":     event.NodeID,
+		"status":   streamStatus,
+		"message":  event.Message,
+		"sequence": event.Sequence,
+		"data": gin.H{
+			"runId":        event.WorkflowRunID,
+			"sequence":     event.Sequence,
+			"nodeId":       event.NodeID,
+			"nodeType":     event.NodeType,
+			"capabilityId": event.CapabilityID,
+			"status":       event.Status,
+			"message":      event.Message,
+			"input":        workflowEventPreview(event.Input),
+			"output":       workflowEventPreview(event.Output),
+			"error":        event.ErrorCode,
+			"durationMs":   event.DurationMs,
+		},
+	}
+	encoded, _ := json.Marshal(payload)
+	_, _ = fmt.Fprintf(c.Writer, "id: %d\ndata: %s\n\n", event.Sequence, encoded)
+	c.Writer.(http.Flusher).Flush()
+}
+
+func workflowEventPreview(raw string) map[string]any {
+	result := map[string]any{}
+	_ = json.Unmarshal([]byte(raw), &result)
+	return result
 }
 
 func decodeWorkflowGraph(raw string) (workflow.Graph, error) {
@@ -698,8 +1020,11 @@ func validateSubworkflowReferences(db *gorm.DB, graph workflow.Graph, userID, cu
 			continue
 		}
 		var config struct {
-			WorkflowID string `json:"workflowId"`
-			VersionID  string `json:"versionId"`
+			WorkflowID   string                        `json:"workflowId"`
+			VersionID    string                        `json:"versionId"`
+			Inputs       map[string]any                `json:"inputs"`
+			InputSchema  map[string]workflow.ValueType `json:"inputSchema"`
+			OutputSchema map[string]workflow.ValueType `json:"outputSchema"`
 		}
 		if err := json.Unmarshal(node.Config, &config); err != nil {
 			return fmt.Errorf("子工作流节点 %s 配置无效", node.ID)
@@ -720,16 +1045,26 @@ func validateSubworkflowReferences(db *gorm.DB, graph workflow.Graph, userID, cu
 			return fmt.Errorf("子工作流存在传递循环")
 		}
 		var app model.AIApp
-		if err := db.Where("user_id = ? AND type = ? AND workflow_id = ? AND published_version_id = ?", userID, aiAppTypeWorkflow, workflowID, versionID).First(&app).Error; err != nil {
-			return fmt.Errorf("子工作流 %s 必须锁定当前 owner 的已发布版本", config.WorkflowID)
+		if err := db.Where("user_id = ? AND type = ? AND workflow_id = ?", userID, aiAppTypeWorkflow, workflowID).First(&app).Error; err != nil {
+			return fmt.Errorf("子工作流 %s 不存在或不属于当前用户", config.WorkflowID)
 		}
 		var version model.AIAppVersion
 		if err := db.Where("id = ? AND app_id = ?", versionID, app.ID).First(&version).Error; err != nil {
 			return fmt.Errorf("子工作流版本不存在")
 		}
+		if version.PublishedAt == nil && version.ID != app.PublishedVersionID {
+			return fmt.Errorf("子工作流 %s 必须锁定已发布版本", config.WorkflowID)
+		}
 		child, err := decodeWorkflowGraph(version.Config)
 		if err != nil {
 			return fmt.Errorf("子工作流版本 Graph 无效")
+		}
+		contract, err := workflow.SubworkflowContractFromGraph(child)
+		if err != nil {
+			return fmt.Errorf("子工作流版本契约无效: %w", err)
+		}
+		if err := validateSubworkflowNodeContract(node.ID, config.Inputs, config.InputSchema, config.OutputSchema, contract); err != nil {
+			return err
 		}
 		visiting[key] = true
 		if err := validateSubworkflowReferences(db, child, userID, currentWorkflowID, visiting, budget); err != nil {
@@ -738,6 +1073,52 @@ func validateSubworkflowReferences(db *gorm.DB, graph workflow.Graph, userID, cu
 		delete(visiting, key)
 	}
 	return nil
+}
+
+func validateSubworkflowNodeContract(nodeID string, inputs map[string]any, inputSchema, outputSchema map[string]workflow.ValueType, expected workflow.SubworkflowContract) error {
+	declared := inputSchema != nil || outputSchema != nil
+	if !declared {
+		return nil
+	}
+	if inputSchema == nil || outputSchema == nil {
+		return fmt.Errorf("子工作流节点 %s 必须同时声明输入和输出契约", nodeID)
+	}
+	if !workflowValueTypeSchemaEqual(inputSchema, inputDefinitionTypes(expected.Inputs)) || !workflowValueTypeSchemaEqual(outputSchema, expected.Outputs) {
+		return fmt.Errorf("子工作流节点 %s 的字段契约与锁定版本不一致，请重新选择该版本", nodeID)
+	}
+	for name := range inputs {
+		if _, ok := expected.Inputs[name]; !ok {
+			return fmt.Errorf("子工作流节点 %s 包含锁定版本不存在的输入 %s", nodeID, name)
+		}
+	}
+	for name, definition := range expected.Inputs {
+		if definition.Required {
+			if _, ok := inputs[name]; !ok {
+				return fmt.Errorf("子工作流节点 %s 缺少必填输入 %s", nodeID, name)
+			}
+		}
+	}
+	return nil
+}
+
+func inputDefinitionTypes(inputs map[string]workflow.InputDefinition) map[string]workflow.ValueType {
+	types := make(map[string]workflow.ValueType, len(inputs))
+	for name, definition := range inputs {
+		types[name] = definition.Type
+	}
+	return types
+}
+
+func workflowValueTypeSchemaEqual(left, right map[string]workflow.ValueType) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for name, valueType := range left {
+		if right[name] != valueType {
+			return false
+		}
+	}
+	return true
 }
 
 func workflowRuntimeRegistry() *workflow.Registry {
@@ -976,17 +1357,17 @@ func safeWorkflowRunInputs(inputs map[string]any) map[string]any {
 	return preview
 }
 
-func persistWorkflowNodeEvent(runID model.Int64String, nodeType workflow.NodeType, event workflow.Event) error {
+func persistWorkflowNodeEvent(db *gorm.DB, runID model.Int64String, nodeType workflow.NodeType, event workflow.Event) error {
 	now := time.Now()
 	if event.Status == workflow.StatusRunning {
 		input, err := json.Marshal(event.Input)
 		if err != nil {
 			return err
 		}
-		return database.DB.Create(&model.WorkflowNodeRun{WorkflowRunID: runID, NodeID: event.NodeID, NodeType: string(nodeType), CapabilityID: event.CapabilityID, Status: string(event.Status), Input: string(input), StartedAt: now}).Error
+		return db.Create(&model.WorkflowNodeRun{WorkflowRunID: runID, NodeID: event.NodeID, NodeType: string(nodeType), CapabilityID: event.CapabilityID, Status: string(event.Status), Input: string(input), StartedAt: now}).Error
 	}
 	if event.Status == workflow.StatusSkipped {
-		return database.DB.Create(&model.WorkflowNodeRun{
+		return db.Create(&model.WorkflowNodeRun{
 			WorkflowRunID: runID, NodeID: event.NodeID, NodeType: string(nodeType), CapabilityID: event.CapabilityID,
 			Status: string(event.Status), StartedAt: now, FinishedAt: &now,
 		}).Error
@@ -1002,7 +1383,32 @@ func persistWorkflowNodeEvent(runID model.Int64String, nodeType workflow.NodeTyp
 	if event.Error != "" {
 		updates["error_code"] = event.Error
 	}
-	return database.DB.Model(&model.WorkflowNodeRun{}).Where("workflow_run_id = ? AND node_id = ?", runID, event.NodeID).Updates(updates).Error
+	return db.Model(&model.WorkflowNodeRun{}).Where("workflow_run_id = ? AND node_id = ?", runID, event.NodeID).Updates(updates).Error
+}
+
+func persistWorkflowRunEvent(db *gorm.DB, runID model.Int64String, event workflow.Event) error {
+	input, err := json.Marshal(event.Input)
+	if err != nil {
+		return err
+	}
+	output, err := json.Marshal(event.Output)
+	if err != nil {
+		return err
+	}
+	return db.Create(&model.WorkflowRunEvent{
+		WorkflowRunID: runID,
+		Sequence:      event.Sequence,
+		NodeID:        event.NodeID,
+		NodeType:      string(event.NodeType),
+		CapabilityID:  event.CapabilityID,
+		Status:        string(event.Status),
+		Message:       event.Message,
+		Input:         string(input),
+		Output:        string(output),
+		ErrorCode:     event.Error,
+		DurationMs:    event.DurationMs,
+		OccurredAt:    time.Now(),
+	}).Error
 }
 
 func finishWorkflowRun(run *model.WorkflowRun, status string, result map[string]any) error {

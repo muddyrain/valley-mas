@@ -54,12 +54,18 @@ export function VariableBindingEditor({
               names={names}
               ariaLabel={nameAriaLabel}
               onCommit={(nextName) => {
-                const nextValues = { ...values };
-                const nextTypes = { ...types };
-                delete nextValues[name];
-                delete nextTypes[name];
-                nextValues[nextName] = value;
-                nextTypes[nextName] = types[name] || 'string';
+                const nextValues = Object.fromEntries(
+                  Object.entries(values).map(([currentName, currentValue]) => [
+                    currentName === name ? nextName : currentName,
+                    currentValue,
+                  ]),
+                );
+                const nextTypes = Object.fromEntries(
+                  Object.keys(values).map((currentName) => [
+                    currentName === name ? nextName : currentName,
+                    types[currentName] || 'string',
+                  ]),
+                ) as Record<string, WorkflowValueType>;
                 onChange(nextValues, nextTypes);
               }}
             />

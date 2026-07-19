@@ -100,6 +100,7 @@ type FileInput struct {
 
 type Event struct {
 	RunID        string         `json:"runId"`
+	Sequence     int64          `json:"sequence,omitempty"`
 	NodeID       string         `json:"nodeId"`
 	NodeType     NodeType       `json:"nodeType"`
 	CapabilityID string         `json:"capabilityId,omitempty"`

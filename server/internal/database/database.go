@@ -141,6 +141,9 @@ func AutoMigrate(scope string) error {
 	if err := DB.AutoMigrate(plan.models...); err != nil {
 		return err
 	}
+	if err := backfillLegacyPublishedWorkflowVersions(); err != nil {
+		return err
+	}
 	if err := dropLegacyCopilotTargetUniqueness(); err != nil {
 		return err
 	}
@@ -172,11 +175,46 @@ func AutoMigrateModels(names []string) error {
 	if err := DB.AutoMigrate(models...); err != nil {
 		return err
 	}
+	if err := backfillLegacyPublishedWorkflowVersions(); err != nil {
+		return err
+	}
 	if err := dropLegacyCopilotTargetUniqueness(); err != nil {
 		return err
 	}
 
 	log.Printf("Auto migrate completed (models=%s)", strings.Join(normalizedNames, ","))
+	return nil
+}
+
+// backfillLegacyPublishedWorkflowVersions preserves existing subworkflow
+// references created before AIAppVersion tracked publication per version. A
+// legacy published workflow could have several historical snapshots but only
+// one mutable app-level pointer, so every snapshot through that pointer is
+// treated as a formerly published version. New drafts are always created after
+// the pointer and therefore remain unpublishable until an explicit publish.
+func backfillLegacyPublishedWorkflowVersions() error {
+	if DB == nil || !DB.Migrator().HasTable(&model.AIApp{}) || !DB.Migrator().HasTable(&model.AIAppVersion{}) {
+		return nil
+	}
+	var apps []model.AIApp
+	if err := DB.Where("type = ? AND status = ? AND published_version_id <> ?", "workflow", "published", 0).Find(&apps).Error; err != nil {
+		return fmt.Errorf("load legacy published workflows: %w", err)
+	}
+	for _, app := range apps {
+		var published model.AIAppVersion
+		if err := DB.Where("id = ? AND app_id = ?", app.PublishedVersionID, app.ID).First(&published).Error; err != nil {
+			return fmt.Errorf("load legacy published workflow version: %w", err)
+		}
+		publishedAt := app.UpdatedAt
+		if publishedAt.IsZero() {
+			publishedAt = time.Now()
+		}
+		if err := DB.Model(&model.AIAppVersion{}).
+			Where("app_id = ? AND number <= ? AND published_at IS NULL", app.ID, published.Number).
+			Update("published_at", publishedAt).Error; err != nil {
+			return fmt.Errorf("backfill legacy published workflow versions: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -332,6 +370,7 @@ func autoMigrateModelsByName() map[string]any {
 		"ai_app_conversation_tool_trace":       &model.AIAppConversationToolTrace{},
 		"ai_workbench_copilot_session":         &model.AIWorkbenchCopilotSession{},
 		"ai_workbench_copilot_message":         &model.AIWorkbenchCopilotMessage{},
+		"ai_workbench_copilot_run":             &model.AIWorkbenchCopilotRun{},
 		"ai_workbench_change_proposal":         &model.AIWorkbenchChangeProposal{},
 		"ai_knowledge_base":                    &model.AIKnowledgeBase{},
 		"ai_knowledge_document":                &model.AIKnowledgeDocument{},
@@ -382,6 +421,7 @@ func autoMigrateModelsByName() map[string]any {
 		"workflow":                             &model.Workflow{},
 		"workflow_run":                         &model.WorkflowRun{},
 		"workflow_node_run":                    &model.WorkflowNodeRun{},
+		"workflow_run_event":                   &model.WorkflowRunEvent{},
 	}
 }
 
@@ -447,6 +487,7 @@ func autoMigrateModelAliases() map[string]string {
 		"workflows":                  "workflow",
 		"workflow_runs":              "workflow_run",
 		"workflow_node_runs":         "workflow_node_run",
+		"workflow_run_events":        "workflow_run_event",
 	}
 }
 
@@ -474,6 +515,7 @@ func coreMigrationModels() []any {
 		&model.AIAppConversationToolTrace{},
 		&model.AIWorkbenchCopilotSession{},
 		&model.AIWorkbenchCopilotMessage{},
+		&model.AIWorkbenchCopilotRun{},
 		&model.AIWorkbenchChangeProposal{},
 		&model.AIKnowledgeBase{},
 		&model.AIKnowledgeDocument{},
@@ -510,6 +552,7 @@ func contentDomainMigrationModels() []any {
 		&model.Workflow{},
 		&model.WorkflowRun{},
 		&model.WorkflowNodeRun{},
+		&model.WorkflowRunEvent{},
 	}
 }
 

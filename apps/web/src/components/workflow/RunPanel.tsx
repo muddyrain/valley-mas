@@ -36,6 +36,7 @@ interface RunPanelProps {
   isRunning: boolean;
   session: WorkflowRunSession;
   runError: string | null;
+  retrying?: boolean;
 }
 
 const customInputCopy: Record<string, { label: string; placeholder?: string }> = {
@@ -93,6 +94,7 @@ export function RunPanel({
   isRunning,
   session,
   runError,
+  retrying = false,
 }: RunPanelProps) {
   const definitions = startInputs(nodes);
   const [values, setValues] = useState<Record<string, unknown>>({
@@ -157,7 +159,12 @@ export function RunPanel({
   return (
     <div className="flex h-full flex-col bg-card">
       <div className="flex items-center justify-between border-b border-border p-4">
-        <h2 className="text-sm font-semibold">试运行</h2>
+        <div>
+          <h2 className="text-sm font-semibold">{retrying ? '重新运行' : '试运行'}</h2>
+          {retrying ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">历史输入已隐藏，请重新填写。</p>
+          ) : null}
+        </div>
         <Button
           variant="ghost"
           size="icon"

@@ -69,6 +69,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		&model.Resource{},
 		&model.AIWorkbenchCopilotSession{},
 		&model.AIWorkbenchCopilotMessage{},
+		&model.AIWorkbenchCopilotRun{},
 		&model.AIWorkbenchChangeProposal{},
 	); err != nil {
 		t.Fatalf("migrate ai platform: %v", err)
@@ -96,6 +97,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.GET("/workbench/copilot/session", GetWorkbenchCopilotSession)
 	auth.GET("/workbench/copilot/sessions", ListWorkbenchCopilotSessions)
 	auth.POST("/workbench/copilot/sessions", CreateWorkbenchCopilotSession)
+	auth.POST("/workbench/copilot/runs/:runId/cancel", CancelWorkbenchCopilotRun)
 	auth.PATCH("/workbench/copilot/proposals/:proposalId", UpdateWorkbenchCopilotProposal)
 	auth.POST("/apps/:appId/versions", SaveAIAppVersion)
 	auth.POST("/apps/:appId/restore", RestoreAIAppVersion)
@@ -119,6 +121,37 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	public := router.Group("/public")
 	public.POST("/ai/apps/:appId/chat", PublicAIAppChat)
 	return router, db
+}
+
+func TestCancelWorkbenchCopilotRunRequiresOwnerAndSignalsActiveRun(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	run := model.AIWorkbenchCopilotRun{SessionID: 1, UserID: 101, Scope: "workbench", Status: "running"}
+	if err := db.Create(&run).Error; err != nil {
+		t.Fatal(err)
+	}
+	context, release := activeCopilotRuns.Start(run.ID.String(), time.Second)
+	defer release()
+
+	other := httptest.NewRequest(http.MethodPost, "/ai/workbench/copilot/runs/"+run.ID.String()+"/cancel", nil)
+	other.Header.Set("Authorization", aiPlatformAuthHeaderFor(t, "202", "other-user"))
+	otherRecorder := httptest.NewRecorder()
+	router.ServeHTTP(otherRecorder, other)
+	if responseCode(otherRecorder) != http.StatusNotFound {
+		t.Fatalf("other owner response=%s", otherRecorder.Body.String())
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/ai/workbench/copilot/runs/"+run.ID.String()+"/cancel", nil)
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if responseCode(recorder) != 0 || !strings.Contains(recorder.Body.String(), "cancelling") {
+		t.Fatalf("response=%s", recorder.Body.String())
+	}
+	select {
+	case <-context.Done():
+	case <-time.After(time.Second):
+		t.Fatal("copilot run context was not cancelled")
+	}
 }
 
 func TestConsumeAIAPIKeyDailyUsageStopsAtDailyLimit(t *testing.T) {

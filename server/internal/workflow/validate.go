@@ -119,6 +119,9 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 					}
 				}
 			}
+			if _, err := llmOutputFields(config); err != nil {
+				errs = append(errs, err.Error())
+			}
 			modelCost++
 		case NodeTypeTool:
 			capabilityID := stringFromValue(config["capabilityId"])
@@ -150,6 +153,9 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 			}
 			if _, ok := config["inputs"].(map[string]any); !ok {
 				errs = append(errs, fmt.Sprintf("子工作流节点 %s inputs 必须为对象", node.ID))
+			}
+			if _, _, _, err := subworkflowDeclaredSchemas(config); err != nil {
+				errs = append(errs, err.Error())
 			}
 		}
 	}
@@ -518,6 +524,15 @@ func validateBindingTypes(nodes []Node, outputFields map[string]map[string]Value
 				expected := ValueType(stringFromValue(property["type"]))
 				errs = append(errs, validateBoundValueType(node.ID, name, value, expected, outputFields)...)
 			}
+		case NodeTypeSubworkflow:
+			inputs, _ := config["inputs"].(map[string]any)
+			inputSchema, _, declared, err := subworkflowDeclaredSchemas(config)
+			if err != nil || !declared {
+				continue
+			}
+			for name, value := range inputs {
+				errs = append(errs, validateBoundValueType(node.ID, name, value, inputSchema[name], outputFields)...)
+			}
 		case NodeTypeMerge:
 			fields, _ := config["fields"].([]any)
 			for _, raw := range fields {
@@ -646,7 +661,8 @@ func buildOutputFields(nodes map[string]Node, startInputs map[string]InputDefini
 				result[id][name] = definition.Type
 			}
 		case NodeTypeLLM:
-			result[id] = fields(field("text", ValueTypeString), field("model", ValueTypeString), field("tokenUsage", ValueTypeNumber))
+			config, _ := decodeConfig(node.Config)
+			result[id], _ = llmOutputFields(config)
 		case NodeTypeCondition:
 			result[id] = fields(field("matched", ValueTypeBoolean))
 		case NodeTypeTool:
@@ -676,7 +692,13 @@ func buildOutputFields(nodes map[string]Node, startInputs map[string]InputDefini
 				}
 			}
 		case NodeTypeSubworkflow:
-			result[id] = nil
+			config, _ := decodeConfig(node.Config)
+			_, outputSchema, declared, err := subworkflowDeclaredSchemas(config)
+			if err == nil && declared {
+				result[id] = outputSchema
+			} else {
+				result[id] = nil
+			}
 		default:
 			result[id] = map[string]ValueType{}
 		}

@@ -139,6 +139,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.GET("/ai/workbench/copilot/sessions", handler.ListWorkbenchCopilotSessions)
 			auth.POST("/ai/workbench/copilot/sessions", handler.CreateWorkbenchCopilotSession)
 			auth.POST("/ai/workbench/copilot/messages/stream", handler.StreamWorkbenchCopilotMessage)
+			auth.POST("/ai/workbench/copilot/runs/:runId/cancel", handler.CancelWorkbenchCopilotRun)
 			auth.PATCH("/ai/workbench/copilot/proposals/:proposalId", handler.UpdateWorkbenchCopilotProposal)
 			auth.GET("/ai/apps/tools", handler.ListAIAppTools)
 			auth.GET("/ai/apps/:appId", handler.GetAIApp)
@@ -213,6 +214,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/workflows/:id/run", handler.AdminRunWorkflow)
 			auth.GET("/workflows/:id/runs", handler.AdminListWorkflowRuns)
 			auth.GET("/workflows/:id/runs/:runId", handler.AdminGetWorkflowRun)
+			auth.GET("/workflows/:id/runs/:runId/events", handler.StreamWorkflowRunEvents)
+			auth.POST("/workflows/:id/runs/:runId/cancel", handler.CancelWorkflowRun)
+			auth.POST("/workflows/:id/runs/:runId/retry", handler.RetryWorkflowRun)
 			auth.POST("/workflows/:id/runs/:runId/explain", handler.ExplainWorkflowRun)
 		}
 

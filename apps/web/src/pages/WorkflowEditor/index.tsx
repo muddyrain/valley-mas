@@ -50,15 +50,28 @@ import {
 } from '@/api/aiWorkbench';
 import type { CopilotProposal } from '@/api/workbenchCopilot';
 import {
+  cancelWorkflowRun,
   createWorkflow,
   getWorkflow,
   getWorkflowPlatform,
   publishWorkflowVersion,
   restoreWorkflowVersion,
+  retryWorkflowRun,
   runWorkflow,
   updateWorkflow,
   type WorkflowPlatformData,
+  type WorkflowRunDetail,
 } from '@/api/workflow';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -164,6 +177,37 @@ function hasSameAlignment(current: WorkflowAlignment | null, next: WorkflowAlign
   );
 }
 
+function retryInputNodes(graphSnapshot: string): Node[] | null {
+  try {
+    const graph: unknown = JSON.parse(graphSnapshot);
+    if (
+      !graph ||
+      typeof graph !== 'object' ||
+      !Array.isArray((graph as { nodes?: unknown }).nodes)
+    ) {
+      return null;
+    }
+    return (graph as { nodes: Array<Record<string, unknown>> }).nodes.map((node) => ({
+      id: String(node.id || ''),
+      type: typeof node.type === 'string' ? node.type : undefined,
+      position:
+        node.position && typeof node.position === 'object'
+          ? (node.position as { x: number; y: number })
+          : { x: 0, y: 0 },
+      data: {
+        label: typeof node.label === 'string' ? node.label : String(node.id || ''),
+        nodeType: typeof node.type === 'string' ? node.type : '',
+        config:
+          node.config && typeof node.config === 'object'
+            ? (node.config as Record<string, unknown>)
+            : {},
+      },
+    }));
+  } catch {
+    return null;
+  }
+}
+
 export default function WorkflowEditorPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -186,9 +230,12 @@ export default function WorkflowEditorPage() {
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [isPublishing, setIsPublishing] = useState(false);
   const [saveRevision, setSaveRevision] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [showRunPanel, setShowRunPanel] = useState(false);
+  const [retryRun, setRetryRun] = useState<WorkflowRunDetail | null>(null);
+  const [pendingRetryRun, setPendingRetryRun] = useState<WorkflowRunDetail | null>(null);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
   const [runPanelHeight, setRunPanelHeight] = useState<number | null>(null);
   const [isRunPanelResizing, setIsRunPanelResizing] = useState(false);
@@ -221,6 +268,7 @@ export default function WorkflowEditorPage() {
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
   const isFitViewComplete = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const activeRunIDRef = useRef<string | null>(null);
   const runGenerationRef = useRef(0);
   const handledFailedNodeRef = useRef<string | null>(null);
   const clipboardRef = useRef<Node[] | null>(null);
@@ -502,6 +550,13 @@ export default function WorkflowEditorPage() {
             workflowIdRef.current !== id
           )
             return false;
+          await refreshWorkflowMeta(id).catch(() => undefined);
+          if (
+            !isEditorMountedRef.current ||
+            editorSessionRef.current !== session ||
+            workflowIdRef.current !== id
+          )
+            return false;
           setSaveStatus('saved');
           finishCreatedWorkflow(id, session);
           return true;
@@ -531,7 +586,7 @@ export default function WorkflowEditorPage() {
       );
       return queuedUpdate;
     },
-    [finishCreatedWorkflow],
+    [finishCreatedWorkflow, refreshWorkflowMeta],
   );
 
   const createDraftWorkflow = useCallback(
@@ -640,6 +695,8 @@ export default function WorkflowEditorPage() {
       setSaveRevision(0);
       setSaveStatus('idle');
       setIsRunning(false);
+      setRetryRun(null);
+      setPendingRetryRun(null);
       setRunError(null);
       setPlatform(null);
       setShowHistory(false);
@@ -1313,9 +1370,40 @@ export default function WorkflowEditorPage() {
     }
   }, [persistLatestWorkflow]);
 
+  const handlePublish = useCallback(async () => {
+    const state = workflowStateRef.current;
+    const firstError = validateWorkflowDraft(state.nodes, state.edges)[0];
+    if (firstError) {
+      setSaveStatus('pending');
+      toast.error(`发布前请完善：${firstError.nodeLabel} · ${firstError.message}`);
+      return;
+    }
+
+    setShowValidationErrors(false);
+    setIsPublishing(true);
+    try {
+      const saved = await persistLatestWorkflow({
+        force: true,
+        createIfMissing: true,
+        recordHistory: true,
+      });
+      const id = workflowIdRef.current;
+      if (!saved || !id) return;
+
+      await publishWorkflowVersion(id);
+      await refreshWorkflowMeta(id);
+      toast.success('已发布当前版本');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '发布失败'));
+    } finally {
+      setIsPublishing(false);
+    }
+  }, [persistLatestWorkflow, refreshWorkflowMeta]);
+
   const handleRunConfirm = useCallback(
     async ({ inputs, files }: WorkflowRunInput) => {
       const id = workflowId;
+      const sourceRun = retryRun;
       const session = editorSessionRef.current;
       if (!id || !isActiveWorkflowSession(session, id)) return;
       if (abortControllerRef.current) {
@@ -1331,41 +1419,46 @@ export default function WorkflowEditorPage() {
 
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
+      activeRunIDRef.current = null;
       const isActiveRun = () =>
         isActiveWorkflowSession(session, id) && runGenerationRef.current === generation;
 
       try {
-        await runWorkflow(
-          id,
-          { inputs, files },
-          {
-            onEvent: (event) => {
-              if (!isActiveRun()) return;
-              dispatchRunSession({ type: 'event', generation, event });
-              if (event.status === 'done') {
-                setIsRunning(false);
-                toast.success('工作流执行完成');
-              }
-              if (event.status === 'cancelled') {
-                setIsRunning(false);
-                toast.message('工作流已取消');
-              }
-            },
-            onError: (msg) => {
-              if (!isActiveRun()) return;
-              if (msg === '运行已取消') {
-                dispatchRunSession({ type: 'cancelled', generation });
-                setIsRunning(false);
-                return;
-              }
-              setRunError(msg);
-              dispatchRunSession({ type: 'error', generation, error: msg });
-              toast.error(msg);
+        const handlers = {
+          onEvent: (event: import('@/api/workflow').WorkflowRunEvent) => {
+            if (!isActiveRun()) return;
+            if (event.data?.runId) activeRunIDRef.current = event.data.runId;
+            dispatchRunSession({ type: 'event', generation, event });
+            if (event.status === 'done') {
               setIsRunning(false);
-            },
+              toast.success('工作流执行完成');
+            }
+            if (event.status === 'cancelled') {
+              setIsRunning(false);
+              if (!event.data?.nodeType) toast.message('工作流已取消');
+            }
           },
-          abortController.signal,
-        );
+          onError: (msg: string) => {
+            if (!isActiveRun()) return;
+            if (msg === '运行已取消') {
+              dispatchRunSession({ type: 'cancelled', generation });
+              setIsRunning(false);
+              return;
+            }
+            setRunError(msg);
+            dispatchRunSession({ type: 'error', generation, error: msg });
+            toast.error(msg);
+            setIsRunning(false);
+          },
+        };
+        if (sourceRun) {
+          await retryWorkflowRun(id, sourceRun.run.id, { inputs, files }, handlers, {
+            confirmedSideEffects: sourceRun.retry?.requiresConfirmation === true,
+            signal: abortController.signal,
+          });
+        } else {
+          await runWorkflow(id, { inputs, files }, handlers, abortController.signal);
+        }
       } catch {
         if (!isActiveRun()) return;
         setRunError('运行请求失败');
@@ -1373,11 +1466,13 @@ export default function WorkflowEditorPage() {
       } finally {
         if (isActiveRun()) {
           if (abortControllerRef.current === abortController) abortControllerRef.current = null;
+          if (isActiveRun()) activeRunIDRef.current = null;
           setIsRunning(false);
+          setRetryRun(null);
         }
       }
     },
-    [isActiveWorkflowSession, workflowId],
+    [isActiveWorkflowSession, retryRun, workflowId],
   );
 
   const focusValidationNode = useCallback((nodeID: string) => {
@@ -1433,17 +1528,51 @@ export default function WorkflowEditorPage() {
       return;
     }
 
+    setRetryRun(null);
     setShowRunPanel(true);
   }, [edges, focusValidationNode, nodes, persistLatestWorkflow]);
 
-  const handleCancelRun = useCallback(() => {
-    if (!abortControllerRef.current) return;
-    abortControllerRef.current?.abort();
-    dispatchRunSession({ type: 'cancelled', generation: runGenerationRef.current });
-    setRunError(null);
-    setIsRunning(false);
-    toast.message('已请求取消，正在停止当前节点');
+  const openRetryRunPanel = useCallback((run: WorkflowRunDetail) => {
+    if (!retryInputNodes(run.run.graphSnapshot)) {
+      toast.error('历史工作流无法读取，不能重新运行');
+      return;
+    }
+    setRetryRun(run);
+    setShowHistory(false);
+    setShowRunPanel(true);
   }, []);
+
+  const handleRetryFromHistory = useCallback(
+    (run: WorkflowRunDetail) => {
+      if (run.retry?.requiresConfirmation) {
+        setPendingRetryRun(run);
+        return;
+      }
+      openRetryRunPanel(run);
+    },
+    [openRetryRunPanel],
+  );
+
+  const handleRunPanelOpenChange = useCallback(
+    (open: boolean) => {
+      setShowRunPanel(open);
+      if (!open && !isRunning) setRetryRun(null);
+    },
+    [isRunning],
+  );
+
+  const handleCancelRun = useCallback(async () => {
+    const id = workflowId;
+    const runID = activeRunIDRef.current;
+    if (!id || !runID) {
+      return;
+    }
+    try {
+      await cancelWorkflowRun(id, runID);
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '取消运行失败'));
+    }
+  }, [workflowId]);
 
   const handleExport = useCallback(() => {
     const workflow = { nodes, edges };
@@ -1756,10 +1885,27 @@ export default function WorkflowEditorPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => void handleSave()}
-                disabled={saveStatus === 'creating' || saveStatus === 'saving'}
+                disabled={saveStatus === 'creating' || saveStatus === 'saving' || isPublishing}
               >
                 <Save className="h-4 w-4 mr-2" />
                 立即保存
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handlePublish()}
+                disabled={
+                  isPublishing ||
+                  saveStatus === 'creating' ||
+                  saveStatus === 'saving' ||
+                  (Boolean(workflowId) &&
+                    platform?.app.publishedVersionId === platform?.app.draftVersionId)
+                }
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {platform?.app.publishedVersionId === platform?.app.draftVersionId
+                  ? '已发布'
+                  : '发布'}
               </Button>
               {workflowId && (
                 <Button variant="outline" size="sm" onClick={() => void openHistory()}>
@@ -1815,6 +1961,34 @@ export default function WorkflowEditorPage() {
             </DialogContent>
           </Dialog>
 
+          <AlertDialog
+            open={Boolean(pendingRetryRun)}
+            onOpenChange={(open) => {
+              if (!open) setPendingRetryRun(null);
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>确认重新运行？</AlertDialogTitle>
+                <AlertDialogDescription>
+                  此工作流包含 AI
+                  存储或写入操作。重新运行可能再次生成文件或创建内容草稿；历史文本和文件不会被自动复用。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>取消</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    if (pendingRetryRun) openRetryRunPanel(pendingRetryRun);
+                    setPendingRetryRun(null);
+                  }}
+                >
+                  继续重新运行
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           <Sheet open={showHistory} onOpenChange={setShowHistory}>
             <SheetContent side="right" className="w-full gap-0 sm:max-w-md">
               <SheetHeader className="border-b pr-14">
@@ -1826,7 +2000,11 @@ export default function WorkflowEditorPage() {
                 <div className="p-4">
                   <section className="mb-6">
                     <h3 className="mb-3 text-sm font-medium text-foreground">最近运行</h3>
-                    <WorkflowRunHistory workflowId={workflowId} open={showHistory} />
+                    <WorkflowRunHistory
+                      workflowId={workflowId}
+                      open={showHistory}
+                      onRetry={handleRetryFromHistory}
+                    />
                   </section>
                   <section className="border-t border-border pt-5">
                     <h3 className="mb-3 text-sm font-medium text-foreground">草稿与发布版本</h3>
@@ -1915,18 +2093,11 @@ export default function WorkflowEditorPage() {
                 <Button
                   className="w-full"
                   disabled={
-                    !workflowId || platform?.app.publishedVersionId === platform?.app.draftVersionId
+                    !workflowId ||
+                    isPublishing ||
+                    platform?.app.publishedVersionId === platform?.app.draftVersionId
                   }
-                  onClick={async () => {
-                    if (!workflowId) return;
-                    try {
-                      await publishWorkflowVersion(workflowId);
-                      await refreshWorkflowMeta(workflowId);
-                      toast.success('已发布当前版本');
-                    } catch (error) {
-                      toast.error(getAPIErrorMessage(error, '发布失败'));
-                    }
-                  }}
+                  onClick={() => void handlePublish()}
                 >
                   发布当前版本
                 </Button>
@@ -1953,6 +2124,7 @@ export default function WorkflowEditorPage() {
                 defaultEdgeOptions={defaultEdgeOptions}
                 deleteKeyCode="Delete"
                 fitView={nodes.length > 0 && !isFitViewComplete.current}
+                fitViewOptions={{ maxZoom: 0.8, padding: 0.2 }}
                 minZoom={0.2}
                 maxZoom={2}
                 connectionLineType={ConnectionLineType.Bezier}
@@ -2005,13 +2177,14 @@ export default function WorkflowEditorPage() {
                   </div>
                   <RunPanel
                     open={showRunPanel}
-                    onOpenChange={setShowRunPanel}
-                    nodes={nodes}
+                    onOpenChange={handleRunPanelOpenChange}
+                    nodes={retryRun ? retryInputNodes(retryRun.run.graphSnapshot) || nodes : nodes}
                     onRun={handleRunConfirm}
                     onCancel={handleCancelRun}
                     isRunning={isRunning}
                     session={runSession}
                     runError={runError}
+                    retrying={Boolean(retryRun)}
                   />
                 </div>
               ) : null}

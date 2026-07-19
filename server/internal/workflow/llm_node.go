@@ -43,9 +43,17 @@ func (executor LLMTextExecutor) Execute(ctx context.Context, _ RunContext, execu
 		return NodeResult{}, fmt.Errorf("modelProfile 必须为 ark-text-default")
 	}
 	inputs, _ := execution.Input["inputs"].(map[string]any)
+	schema, structured, err := llmStructuredOutputSchema(execution.Input)
+	if err != nil {
+		return NodeResult{}, err
+	}
+	prompt := promptWithInputs(stringFromValue(execution.Input["prompt"]), inputs)
+	if structured {
+		prompt = structuredOutputPrompt(prompt, schema)
+	}
 	request := TextGenerationRequest{
 		SystemPrompt:    stringFromValue(execution.Input["systemPrompt"]),
-		Prompt:          promptWithInputs(stringFromValue(execution.Input["prompt"]), inputs),
+		Prompt:          prompt,
 		Temperature:     numberFromValue(execution.Input["temperature"]),
 		MaxOutputTokens: int(numberFromValue(execution.Input["maxOutputTokens"])),
 	}
@@ -62,6 +70,15 @@ func (executor LLMTextExecutor) Execute(ctx context.Context, _ RunContext, execu
 	}
 	if strings.TrimSpace(result.Text) == "" {
 		return NodeResult{}, fmt.Errorf("AI 返回为空")
+	}
+	if structured {
+		output, parseErr := parseStructuredLLMOutput(result.Text, schema)
+		if parseErr != nil {
+			return NodeResult{}, parseErr
+		}
+		output["model"] = result.Model
+		output["tokenUsage"] = result.TokenUsage
+		return NodeResult{Output: output}, nil
 	}
 	return NodeResult{Output: map[string]any{"text": strings.TrimSpace(result.Text), "model": result.Model, "tokenUsage": result.TokenUsage}}, nil
 }
