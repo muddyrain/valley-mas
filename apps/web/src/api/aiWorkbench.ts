@@ -153,6 +153,7 @@ export interface AIKnowledgeBase {
   id: string;
   name: string;
   description: string;
+  documentCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -177,6 +178,13 @@ export interface AIKnowledgeChunkPreview {
   position: number;
   content: string;
   tokenCount: number;
+}
+
+export interface AIKnowledgeRetrievalTestResult {
+  documentName: string;
+  chunkId: string;
+  excerpt: string;
+  score: number;
 }
 
 export interface AIPrompt {
@@ -641,6 +649,13 @@ export function listAIKnowledgeDocumentChunks(
   documentId: string,
 ): Promise<{ document: AIKnowledgeDocument; list: AIKnowledgeChunkPreview[] }> {
   return request.get(`/ai/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/chunks`);
+}
+
+export function testAIKnowledgeRetrieval(
+  knowledgeBaseId: string,
+  query: string,
+): Promise<{ list: AIKnowledgeRetrievalTestResult[] }> {
+  return request.post(`/ai/knowledge-bases/${knowledgeBaseId}/retrieval-tests`, { query });
 }
 
 export function uploadAIKnowledgeDocument(

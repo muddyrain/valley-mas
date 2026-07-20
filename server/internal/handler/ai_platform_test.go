@@ -104,8 +104,10 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.POST("/apps/:appId/versions", SaveAIAppVersion)
 	auth.POST("/apps/:appId/restore", RestoreAIAppVersion)
 	auth.POST("/apps/:appId/debug", DebugAIApp)
+	auth.GET("/knowledge-bases", ListAIKnowledgeBases)
 	auth.GET("/knowledge-bases/:knowledgeBaseId/documents", ListAIKnowledgeDocuments)
 	auth.GET("/knowledge-bases/:knowledgeBaseId/documents/:documentId/chunks", ListAIKnowledgeDocumentChunks)
+	auth.POST("/knowledge-bases/:knowledgeBaseId/retrieval-tests", TestAIKnowledgeRetrieval)
 	auth.POST("/knowledge-bases/:knowledgeBaseId/documents", UploadAIKnowledgeDocument)
 	auth.DELETE("/knowledge-bases/:knowledgeBaseId/documents/:documentId", DeleteAIKnowledgeDocument)
 	auth.DELETE("/knowledge-bases/:knowledgeBaseId", DeleteAIKnowledgeBase)
@@ -1008,6 +1010,90 @@ func TestListAIKnowledgeDocumentChunksRejectsForeignDocument(t *testing.T) {
 	router.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"code":404`) {
 		t.Fatalf("foreign preview response = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestListAIKnowledgeBasesIncludesOwnedDocumentCount(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	base := model.AIKnowledgeBase{UserID: 101, Name: "创作资料"}
+	emptyBase := model.AIKnowledgeBase{UserID: 101, Name: "空知识库"}
+	foreignBase := model.AIKnowledgeBase{UserID: 202, Name: "他人的资料"}
+	for _, item := range []*model.AIKnowledgeBase{&base, &emptyBase, &foreignBase} {
+		if err := db.Create(item).Error; err != nil {
+			t.Fatalf("create knowledge base: %v", err)
+		}
+	}
+	if err := db.Create(&[]model.AIKnowledgeDocument{
+		{KnowledgeBaseID: base.ID, UserID: 101, Name: "one.md"},
+		{KnowledgeBaseID: base.ID, UserID: 101, Name: "two.md"},
+		{KnowledgeBaseID: foreignBase.ID, UserID: 202, Name: "private.md"},
+	}).Error; err != nil {
+		t.Fatalf("create documents: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/ai/knowledge-bases", nil)
+	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list knowledge bases response = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var response struct {
+		Data struct {
+			List []struct {
+				ID            model.Int64String `json:"id"`
+				DocumentCount int               `json:"documentCount"`
+			} `json:"list"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode knowledge base response: %v", err)
+	}
+	counts := make(map[model.Int64String]int, len(response.Data.List))
+	for _, item := range response.Data.List {
+		counts[item.ID] = item.DocumentCount
+	}
+	if len(counts) != 2 || counts[base.ID] != 2 || counts[emptyBase.ID] != 0 {
+		t.Fatalf("unexpected document counts: %#v", counts)
+	}
+}
+
+func TestAIKnowledgeRetrievalTestRequiresOwnedKnowledgeBaseAndReportsUnavailableStore(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	base := model.AIKnowledgeBase{UserID: 101, Name: "创作资料"}
+	if err := db.Create(&base).Error; err != nil {
+		t.Fatalf("create knowledge base: %v", err)
+	}
+
+	emptyRequest := httptest.NewRequest(http.MethodPost, "/ai/knowledge-bases/"+strconv.FormatInt(int64(base.ID), 10)+"/retrieval-tests", strings.NewReader(`{"query":"   "}`))
+	emptyRequest.Header.Set("Content-Type", "application/json")
+	emptyRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	emptyRecorder := httptest.NewRecorder()
+	router.ServeHTTP(emptyRecorder, emptyRequest)
+	if emptyRecorder.Code != http.StatusOK || !strings.Contains(emptyRecorder.Body.String(), `"code":400`) {
+		t.Fatalf("empty retrieval query response = %d body=%s", emptyRecorder.Code, emptyRecorder.Body.String())
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/ai/knowledge-bases/"+strconv.FormatInt(int64(base.ID), 10)+"/retrieval-tests", strings.NewReader(`{"query":"如何安排选题"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"code":503`) || !strings.Contains(recorder.Body.String(), "知识库检索需要 PostgreSQL 数据库") {
+		t.Fatalf("unavailable retrieval response = %d body=%s", recorder.Code, recorder.Body.String())
+	}
+
+	foreign := model.AIKnowledgeBase{UserID: 202, Name: "他人的资料"}
+	if err := db.Create(&foreign).Error; err != nil {
+		t.Fatalf("create foreign knowledge base: %v", err)
+	}
+	foreignRequest := httptest.NewRequest(http.MethodPost, "/ai/knowledge-bases/"+strconv.FormatInt(int64(foreign.ID), 10)+"/retrieval-tests", strings.NewReader(`{"query":"私有内容"}`))
+	foreignRequest.Header.Set("Content-Type", "application/json")
+	foreignRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	foreignRecorder := httptest.NewRecorder()
+	router.ServeHTTP(foreignRecorder, foreignRequest)
+	if foreignRecorder.Code != http.StatusOK || !strings.Contains(foreignRecorder.Body.String(), `"code":404`) {
+		t.Fatalf("foreign retrieval response = %d body=%s", foreignRecorder.Code, foreignRecorder.Body.String())
 	}
 }
 

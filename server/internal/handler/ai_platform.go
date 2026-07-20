@@ -94,11 +94,27 @@ type aiKnowledgeDocumentResponse struct {
 	Source string `json:"source"`
 }
 
+type aiKnowledgeBaseResponse struct {
+	model.AIKnowledgeBase
+	DocumentCount int `json:"documentCount"`
+}
+
 type aiKnowledgeChunkPreview struct {
 	ID         model.Int64String `json:"id"`
 	Position   int               `json:"position"`
 	Content    string            `json:"content"`
 	TokenCount int               `json:"tokenCount"`
+}
+
+type aiKnowledgeRetrievalTestRequest struct {
+	Query string `json:"query"`
+}
+
+type aiKnowledgeRetrievalTestResult struct {
+	DocumentName string            `json:"documentName"`
+	ChunkID      model.Int64String `json:"chunkId"`
+	Excerpt      string            `json:"excerpt"`
+	Score        float64           `json:"score"`
 }
 
 func presentAIKnowledgeDocument(document model.AIKnowledgeDocument) aiKnowledgeDocumentResponse {
@@ -885,22 +901,8 @@ func streamDebugAIApp(c *gin.Context, client *arkruntime.Client, modelID string,
 
 func retrieveAIKnowledgeContext(ctx context.Context, userID model.Int64String, version model.AIAppVersion, message string) (string, []aiKnowledgeReference, error) {
 	db := database.GetDB()
-	if db == nil || db.Dialector.Name() != "postgres" {
-		var count int64
-		if db != nil {
-			if version.KnowledgeBaseSnapshot {
-				_ = db.Model(&model.AIAppVersionKnowledgeBase{}).Where("app_version_id = ?", version.ID).Count(&count).Error
-			} else {
-				_ = db.Model(&model.AIAppKnowledgeBase{}).Where("app_id = ?", version.AppID).Count(&count).Error
-			}
-		}
-		if count > 0 {
-			return "", nil, errors.New("RAG requires PostgreSQL")
-		}
+	if db == nil {
 		return "", nil, nil
-	}
-	if !hasPGVectorExtension(db) {
-		return "", nil, errors.New("pgvector extension is not installed")
 	}
 	config, err := parseAIAppRetrievalConfig(version.RetrievalConfig)
 	if err != nil {
@@ -927,35 +929,7 @@ func retrieveAIKnowledgeContext(ctx context.Context, userID model.Int64String, v
 	if len(knowledgeBaseIDs) == 0 {
 		return "", nil, nil
 	}
-	var readyDocumentCount int64
-	if err := db.Model(&model.AIKnowledgeDocument{}).
-		Where("user_id = ? AND knowledge_base_id IN ? AND status = ?", userID, knowledgeBaseIDs, "ready").
-		Count(&readyDocumentCount).Error; err != nil {
-		return "", nil, err
-	}
-	if readyDocumentCount == 0 {
-		return "", nil, nil
-	}
-	queryVectors, err := aiclient.CreateARKEmbeddings(ctx, []string{message})
-	if err != nil {
-		return "", nil, err
-	}
-	queryVector, err := json.Marshal(queryVectors[0])
-	if err != nil {
-		return "", nil, err
-	}
-	var rows []aiKnowledgeSearchRow
-	err = db.Raw(`
-		SELECT chunks.id AS chunk_id, documents.name AS document_name, chunks.content,
-		       1 - (chunks.embedding <=> ?::vector) AS score
-		FROM ai_knowledge_chunks AS chunks
-		JOIN ai_knowledge_documents AS documents ON documents.id = chunks.document_id
-		JOIN ai_knowledge_bases AS knowledge_bases ON knowledge_bases.id = documents.knowledge_base_id
-		WHERE chunks.user_id = ? AND documents.user_id = ? AND knowledge_bases.user_id = ?
-		  AND documents.knowledge_base_id IN ? AND documents.status = 'ready'
-		  AND chunks.embedding IS NOT NULL
-		ORDER BY chunks.embedding <=> ?::vector
-	LIMIT ?`, string(queryVector), userID, userID, userID, knowledgeBaseIDs, string(queryVector), config.TopK).Scan(&rows).Error
+	rows, err := searchAIKnowledgeChunks(ctx, userID, knowledgeBaseIDs, config, message)
 	if err != nil {
 		return "", nil, err
 	}
@@ -963,9 +937,6 @@ func retrieveAIKnowledgeContext(ctx context.Context, userID model.Int64String, v
 	references := make([]aiKnowledgeReference, 0, len(rows))
 	const maxKnowledgeContextRunes = 4500
 	for _, row := range rows {
-		if row.Score < config.MinScore {
-			continue
-		}
 		content := aiclient.TrimRunes(strings.TrimSpace(row.Content), 1600)
 		if content == "" || len([]rune(contextBuilder.String()))+len([]rune(content)) > maxKnowledgeContextRunes {
 			continue
@@ -980,6 +951,55 @@ func retrieveAIKnowledgeContext(ctx context.Context, userID model.Int64String, v
 		}
 	}
 	return strings.TrimSpace(contextBuilder.String()), references, nil
+}
+
+func searchAIKnowledgeChunks(ctx context.Context, userID model.Int64String, knowledgeBaseIDs []model.Int64String, config aiAppRetrievalConfig, query string) ([]aiKnowledgeSearchRow, error) {
+	db := database.GetDB()
+	if db == nil || db.Dialector.Name() != "postgres" {
+		return nil, errors.New("RAG requires PostgreSQL")
+	}
+	if !hasPGVectorExtension(db) {
+		return nil, errors.New("pgvector extension is not installed")
+	}
+	var readyDocumentCount int64
+	if err := db.Model(&model.AIKnowledgeDocument{}).
+		Where("user_id = ? AND knowledge_base_id IN ? AND status = ?", userID, knowledgeBaseIDs, "ready").
+		Count(&readyDocumentCount).Error; err != nil {
+		return nil, err
+	}
+	if readyDocumentCount == 0 {
+		return []aiKnowledgeSearchRow{}, nil
+	}
+	queryVectors, err := aiclient.CreateARKEmbeddings(ctx, []string{query})
+	if err != nil {
+		return nil, err
+	}
+	queryVector, err := json.Marshal(queryVectors[0])
+	if err != nil {
+		return nil, err
+	}
+	var rows []aiKnowledgeSearchRow
+	err = db.Raw(`
+		SELECT chunks.id AS chunk_id, documents.name AS document_name, chunks.content,
+		       1 - (chunks.embedding <=> ?::vector) AS score
+		FROM ai_knowledge_chunks AS chunks
+		JOIN ai_knowledge_documents AS documents ON documents.id = chunks.document_id
+		JOIN ai_knowledge_bases AS knowledge_bases ON knowledge_bases.id = documents.knowledge_base_id
+		WHERE chunks.user_id = ? AND documents.user_id = ? AND knowledge_bases.user_id = ?
+		  AND documents.knowledge_base_id IN ? AND documents.status = 'ready'
+		  AND chunks.embedding IS NOT NULL
+		ORDER BY chunks.embedding <=> ?::vector
+	LIMIT ?`, string(queryVector), userID, userID, userID, knowledgeBaseIDs, string(queryVector), config.TopK).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]aiKnowledgeSearchRow, 0, len(rows))
+	for _, row := range rows {
+		if row.Score >= config.MinScore && strings.TrimSpace(row.Content) != "" {
+			filtered = append(filtered, row)
+		}
+	}
+	return filtered, nil
 }
 
 func ListAIAppRuns(c *gin.Context) {
@@ -1286,7 +1306,36 @@ func ListAIKnowledgeBases(c *gin.Context) {
 		Error(c, 500, "加载知识库失败")
 		return
 	}
-	Success(c, gin.H{"list": items})
+	counts := make([]struct {
+		KnowledgeBaseID model.Int64String `gorm:"column:knowledge_base_id"`
+		DocumentCount   int               `gorm:"column:document_count"`
+	}, 0)
+	if len(items) > 0 {
+		baseIDs := make([]model.Int64String, 0, len(items))
+		for _, item := range items {
+			baseIDs = append(baseIDs, item.ID)
+		}
+		if err := database.GetDB().Model(&model.AIKnowledgeDocument{}).
+			Select("knowledge_base_id, COUNT(*) AS document_count").
+			Where("user_id = ? AND knowledge_base_id IN ?", userID, baseIDs).
+			Group("knowledge_base_id").
+			Scan(&counts).Error; err != nil {
+			Error(c, 500, "加载知识库文档数量失败")
+			return
+		}
+	}
+	countByBaseID := make(map[model.Int64String]int, len(counts))
+	for _, count := range counts {
+		countByBaseID[count.KnowledgeBaseID] = count.DocumentCount
+	}
+	list := make([]aiKnowledgeBaseResponse, 0, len(items))
+	for _, item := range items {
+		list = append(list, aiKnowledgeBaseResponse{
+			AIKnowledgeBase: item,
+			DocumentCount:   countByBaseID[item.ID],
+		})
+	}
+	Success(c, gin.H{"list": list})
 }
 func CreateAIKnowledgeBase(c *gin.Context) {
 	userID, ok := currentAIAppUser(c)
@@ -1434,6 +1483,51 @@ func ListAIKnowledgeDocumentChunks(c *gin.Context) {
 		})
 	}
 	Success(c, gin.H{"document": presentAIKnowledgeDocument(document), "list": previews})
+}
+
+func TestAIKnowledgeRetrieval(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	knowledgeBaseID, err := parsePathInt64(c, "knowledgeBaseId")
+	if err != nil {
+		Error(c, 400, "无效的知识库 ID")
+		return
+	}
+	var base model.AIKnowledgeBase
+	if err := database.GetDB().Where("id = ? AND user_id = ?", knowledgeBaseID, userID).First(&base).Error; err != nil {
+		Error(c, 404, "知识库不存在")
+		return
+	}
+	var payload aiKnowledgeRetrievalTestRequest
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		Error(c, 400, "检索内容格式无效")
+		return
+	}
+	query := aiclient.TrimRunes(strings.TrimSpace(payload.Query), 1000)
+	if query == "" {
+		Error(c, 400, "请输入检索内容")
+		return
+	}
+
+	rows, err := searchAIKnowledgeChunks(c.Request.Context(), userID, []model.Int64String{base.ID}, defaultAIAppRetrievalConfig(), query)
+	if err != nil {
+		_, publicMessage := aiKnowledgeRetrievalFailure(err)
+		logAIKnowledgeRetrievalFailure(c, err, logrus.Fields{"knowledge_base_id": base.ID, "feature": "ai-knowledge-retrieval-test"})
+		Error(c, http.StatusServiceUnavailable, publicMessage)
+		return
+	}
+	results := make([]aiKnowledgeRetrievalTestResult, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, aiKnowledgeRetrievalTestResult{
+			DocumentName: row.DocumentName,
+			ChunkID:      row.ChunkID,
+			Excerpt:      aiclient.TrimRunes(strings.TrimSpace(row.Content), 360),
+			Score:        row.Score,
+		})
+	}
+	Success(c, gin.H{"list": results})
 }
 
 const (

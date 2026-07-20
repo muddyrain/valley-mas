@@ -2,6 +2,7 @@ import {
   BookOpenText,
   Eye,
   FileText,
+  FlaskConical,
   FolderPlus,
   MoreHorizontal,
   RotateCw,
@@ -16,6 +17,7 @@ import {
   type AIKnowledgeBase,
   type AIKnowledgeChunkPreview,
   type AIKnowledgeDocument,
+  type AIKnowledgeRetrievalTestResult,
   createAIKnowledgeBase,
   deleteAIKnowledgeDocument,
   getAPIErrorMessage,
@@ -23,6 +25,7 @@ import {
   listAIKnowledgeDocumentChunks,
   listAIKnowledgeDocuments,
   retryAIKnowledgeDocument,
+  testAIKnowledgeRetrieval,
   uploadAIKnowledgeDocument,
 } from '@/api/aiWorkbench';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +34,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -116,6 +120,11 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
   } | null>(null);
   const [previewChunks, setPreviewChunks] = useState<AIKnowledgeChunkPreview[]>([]);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [retrievalTestOpen, setRetrievalTestOpen] = useState(false);
+  const [retrievalQuery, setRetrievalQuery] = useState('');
+  const [retrievalResults, setRetrievalResults] = useState<AIKnowledgeRetrievalTestResult[]>([]);
+  const [hasTestedRetrieval, setHasTestedRetrieval] = useState(false);
+  const [testingRetrieval, setTestingRetrieval] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -231,7 +240,14 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
     const loadDocuments = async (showError: boolean) => {
       try {
         const { list } = await listAIKnowledgeDocuments(selectedID);
-        if (active) replaceDocuments(list);
+        if (active) {
+          replaceDocuments(list);
+          setBases((items) =>
+            items.map((base) =>
+              base.id === selectedID ? { ...base, documentCount: list.length } : base,
+            ),
+          );
+        }
       } catch (error) {
         if (active && showError) toast.error(getAPIErrorMessage(error, '加载文档失败'));
       } finally {
@@ -279,7 +295,7 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
         name: name.trim(),
         description: description.trim(),
       });
-      setBases((items) => [base, ...items]);
+      setBases((items) => [{ ...base, documentCount: 0 }, ...items]);
       setSelectedID(base.id);
       setName('');
       setDescription('');
@@ -309,7 +325,13 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
       const formData = new FormData();
       formData.append('file', file);
       const { document } = await uploadAIKnowledgeDocument(selectedID, formData);
-      replaceDocuments([document, ...documentsRef.current]);
+      const nextDocuments = [document, ...documentsRef.current];
+      replaceDocuments(nextDocuments);
+      setBases((items) =>
+        items.map((base) =>
+          base.id === selectedID ? { ...base, documentCount: nextDocuments.length } : base,
+        ),
+      );
       toast.success('文档已加入知识库');
     } catch (error) {
       toast.error(getAPIErrorMessage(error, '上传文档失败'));
@@ -340,13 +362,44 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
       setDeletingID(deleteTarget.id);
       await deleteAIKnowledgeDocument(selectedID, deleteTarget.id);
       clearCompletionProgress(deleteTarget.id);
-      replaceDocuments(documentsRef.current.filter((item) => item.id !== deleteTarget.id));
+      const nextDocuments = documentsRef.current.filter((item) => item.id !== deleteTarget.id);
+      replaceDocuments(nextDocuments);
+      setBases((items) =>
+        items.map((base) =>
+          base.id === selectedID ? { ...base, documentCount: nextDocuments.length } : base,
+        ),
+      );
       setDeleteTarget(null);
       toast.success('文档已删除');
     } catch (error) {
       toast.error(getAPIErrorMessage(error, '删除文档失败'));
     } finally {
       setDeletingID(null);
+    }
+  };
+
+  const openRetrievalTest = () => {
+    setRetrievalQuery('');
+    setRetrievalResults([]);
+    setHasTestedRetrieval(false);
+    setRetrievalTestOpen(true);
+  };
+
+  const handleRetrievalTest = async () => {
+    if (!selectedID) return;
+    if (!retrievalQuery.trim()) {
+      toast.error('请输入要检索的问题或关键词');
+      return;
+    }
+    try {
+      setTestingRetrieval(true);
+      const { list } = await testAIKnowledgeRetrieval(selectedID, retrievalQuery.trim());
+      setRetrievalResults(list);
+      setHasTestedRetrieval(true);
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '检索试验失败'));
+    } finally {
+      setTestingRetrieval(false);
     }
   };
 
@@ -412,16 +465,16 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
               ) : (
                 visibleBases.map((base) => {
                   const selected = base.id === selectedID;
-                  const documentCount = selected ? documents.length : undefined;
+                  const documentCount = selected ? documents.length : (base.documentCount ?? 0);
                   return (
                     <Button
                       key={base.id}
                       variant="ghost"
                       size="lg"
-                      className={`min-h-14 w-full justify-start gap-3 rounded-lg px-3.5 py-2.5 text-left whitespace-normal ${
+                      className={`min-h-16 w-full justify-start gap-3 rounded-lg px-3.5 py-3 text-left whitespace-normal ${
                         selected
-                          ? 'bg-accent text-accent-foreground hover:bg-accent'
-                          : 'hover:bg-muted'
+                          ? 'bg-primary/8 text-foreground ring-1 ring-primary/15 hover:bg-primary/10'
+                          : 'hover:bg-muted/70'
                       }`}
                       onClick={() => setSelectedID(base.id)}
                     >
@@ -430,10 +483,11 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium leading-5">{base.name}</span>
-                        <span className="mt-1 block line-clamp-2 text-xs leading-4 font-normal text-muted-foreground">
-                          {selected && documentCount !== undefined
-                            ? `${documentCount} 个文档 · ${formatFileSize(selectedBaseSize)}`
-                            : base.description || '未添加说明'}
+                        <span className="mt-1 block truncate text-xs leading-4 font-normal text-muted-foreground">
+                          {base.description || '未添加说明'}
+                        </span>
+                        <span className="mt-1 block text-xs leading-4 font-normal text-muted-foreground">
+                          {documentCount} 个文档
                         </span>
                       </span>
                     </Button>
@@ -470,6 +524,10 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
               </div>
               {selectedBase && (
                 <div className="flex shrink-0 gap-2">
+                  <Button variant="outline" onClick={openRetrievalTest}>
+                    <FlaskConical className="mr-2 size-4" />
+                    检索试验台
+                  </Button>
                   <Button variant="outline" size="icon-sm" aria-label="知识库操作">
                     <MoreHorizontal />
                   </Button>
@@ -759,6 +817,103 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
           )}
           <DialogFooter className="border-t border-border px-6 py-4">
             <Button variant="outline" onClick={() => setPreviewTarget(null)}>
+              关闭
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={retrievalTestOpen}
+        onOpenChange={(open) => {
+          if (!testingRetrieval) setRetrievalTestOpen(open);
+        }}
+      >
+        <DialogContent
+          className="grid h-[min(42rem,84vh)] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0"
+          style={{ width: 'calc(100% - 2rem)', maxWidth: '60rem' }}
+        >
+          <DialogHeader className="border-b border-border px-6 py-5">
+            <DialogTitle>检索试验台</DialogTitle>
+            <DialogDescription>{selectedBase?.name || '当前知识库'} · 安全摘要</DialogDescription>
+          </DialogHeader>
+          <form
+            className="flex gap-3 border-b border-border px-6 py-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleRetrievalTest();
+            }}
+          >
+            <Input
+              value={retrievalQuery}
+              onChange={(event) => {
+                setRetrievalQuery(event.target.value);
+                setRetrievalResults([]);
+                setHasTestedRetrieval(false);
+              }}
+              placeholder="输入问题或关键词"
+              disabled={testingRetrieval}
+              maxLength={1000}
+            />
+            <Button type="submit" disabled={testingRetrieval || !retrievalQuery.trim()}>
+              {testingRetrieval ? '检索中...' : '检索'}
+            </Button>
+          </form>
+          <div className="min-h-0 px-6 py-5">
+            {!hasTestedRetrieval && !testingRetrieval ? (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                输入问题后点击检索
+              </div>
+            ) : (
+              <>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-medium">命中资料</h3>
+                  {retrievalResults.length > 0 && (
+                    <Badge variant="secondary">{retrievalResults.length} 条</Badge>
+                  )}
+                </div>
+                {testingRetrieval ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-28 w-full" />
+                    <Skeleton className="h-28 w-full" />
+                  </div>
+                ) : retrievalResults.length === 0 ? (
+                  <div className="flex h-40 items-center justify-center rounded-lg border border-border text-sm text-muted-foreground">
+                    没有达到当前检索阈值的资料
+                  </div>
+                ) : (
+                  <ScrollArea className="h-full pr-4">
+                    <div className="space-y-3 pb-1">
+                      {retrievalResults.map((result) => (
+                        <article
+                          key={result.chunkId}
+                          className="rounded-lg border border-border bg-card p-4"
+                        >
+                          <div className="mb-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                            <span className="truncate font-medium text-foreground">
+                              {result.documentName}
+                            </span>
+                            <Badge variant="secondary" className="shrink-0">
+                              匹配度 {(result.score * 100).toFixed(1)}%
+                            </Badge>
+                          </div>
+                          <p className="line-clamp-4 whitespace-pre-wrap text-sm leading-6 text-foreground">
+                            {result.excerpt}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </>
+            )}
+          </div>
+          <DialogFooter className="border-t border-border px-6 py-4">
+            <Button
+              variant="outline"
+              disabled={testingRetrieval}
+              onClick={() => setRetrievalTestOpen(false)}
+            >
               关闭
             </Button>
           </DialogFooter>
