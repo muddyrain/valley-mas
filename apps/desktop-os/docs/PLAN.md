@@ -48,7 +48,7 @@
 - 边界：rAF 直驱 transform（Window 拖动 / Dock magnification / ResizeHandles）与装饰类 `@keyframes`（loading / shimmer / spin / cloud-drift / 控件 pop）不动。
 - reduced-motion：被迁组件统一走 `useReducedMotion()`，同名 CSS `@media (prefers-reduced-motion: reduce)` 分支同步删除。
 - Phase 进度：P1 PlushMotion 原语 ✅ / P2 窗口层（Window / Spotlight / Dock 菜单）✅ / P3 面板层（ControlCenter / NotificationCenter / Launchpad）✅ / P4 业务列表（AICommandCenter / Launchpad 翻页）✅。
-- 工作流档位：C 档，plan / spec 临时存放在 `docs/superpowers/{specs,plans}/2026-06-23-desktop-os-motion-migration*.md`，任务收尾后由 owner 决定是否清理。
+- 工作流档位：C 档，plan / spec 临时存放在 `docs/{specs,plans}/2026-06-23-desktop-os-motion-migration*.md`，任务收尾后由 owner 决定是否清理。
 
 ## 当前阶段
 

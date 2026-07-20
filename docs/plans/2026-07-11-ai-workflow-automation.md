@@ -387,8 +387,8 @@ Expected: PASS。
 ## Task 8: 收尾验证、文档状态和风险检查
 
 **Files:**
-- Modify: `docs/superpowers/specs/2026-07-11-ai-workflow-automation-design.md`
-- Modify: `docs/superpowers/plans/2026-07-11-ai-workflow-automation.md`
+- Modify: `docs/specs/2026-07-11-ai-workflow-automation-design.md`
+- Modify: `docs/plans/2026-07-11-ai-workflow-automation.md`
 
 - [ ] **Step 1: 运行定向与全链路校验**
 

@@ -80,10 +80,10 @@ Expected: PASS.
 ### Task 3: Synchronize platform documentation and run focused verification
 
 **Files:**
-- Modify: `docs/superpowers/specs/2026-07-14-ai-agent-content-search-design.md`
-- Modify: `docs/superpowers/plans/2026-07-14-ai-workbench-platform.md`
-- Modify: `docs/superpowers/specs/2026-07-16-ai-agent-content-search-date-filter-design.md`
-- Modify: `docs/superpowers/plans/2026-07-16-ai-agent-content-search-date-filter.md`
+- Modify: `docs/specs/2026-07-14-ai-agent-content-search-design.md`
+- Modify: `docs/plans/2026-07-14-ai-workbench-platform.md`
+- Modify: `docs/specs/2026-07-16-ai-agent-content-search-date-filter-design.md`
+- Modify: `docs/plans/2026-07-16-ai-agent-content-search-date-filter.md`
 
 - [x] **Step 1: Mark completed implementation tasks truthfully**
 

@@ -119,8 +119,8 @@ Expected: PASS.
 ### Task 5: 回归、文档和真实验收
 
 **Files:**
-- Modify: `docs/superpowers/plans/2026-07-14-ai-workbench-platform.md`
-- Modify: `docs/superpowers/specs/2026-07-14-ai-app-public-api-design.md`（仅实现与设计不一致时）
+- Modify: `docs/plans/2026-07-14-ai-workbench-platform.md`
+- Modify: `docs/specs/2026-07-14-ai-app-public-api-design.md`（仅实现与设计不一致时）
 
 - [x] **Step 1: 运行完整回归**
 

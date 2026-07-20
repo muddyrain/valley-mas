@@ -8,7 +8,7 @@
 
 **Tech Stack:** React 19 + TypeScript + shadcn/base-ui + Plush 设计 token + biome + vitest (文件扫描断言)。
 
-**Spec:** `docs/superpowers/specs/2026-06-22-desktop-os-plush-control-migration-design.md`
+**Spec:** `docs/specs/2026-06-22-desktop-os-plush-control-migration-design.md`
 
 ---
 
@@ -1683,7 +1683,7 @@ git commit -m "docs(desktop-os): 同步 Plush 控件下沉完成状态"
 
 ## Execution Handoff
 
-Plan 完成并保存到 `docs/superpowers/plans/2026-06-22-desktop-os-plush-control-migration.md`,共 31 个窗口拆为 5 批,**约 32 个 task / 130+ steps**。两种执行选择:
+Plan 完成并保存到 `docs/plans/2026-06-22-desktop-os-plush-control-migration.md`,共 31 个窗口拆为 5 批,**约 32 个 task / 130+ steps**。两种执行选择:
 
 **1. Subagent-Driven (recommended)** — 我每批派一个 fresh subagent (或更细粒度按 task),subagent 完成后我做两阶段 review (类型 / 代码 / 视觉清单);适合本任务的高重复度 + 文件互不耦合。
 

@@ -124,8 +124,8 @@ Expected: PASS.
 ### Task 4: Documentation and regression verification
 
 **Files:**
-- Modify: `docs/superpowers/plans/2026-07-14-ai-workbench-platform.md`
-- Modify: `docs/superpowers/specs/2026-07-14-ai-agent-content-search-design.md`
+- Modify: `docs/plans/2026-07-14-ai-workbench-platform.md`
+- Modify: `docs/specs/2026-07-14-ai-agent-content-search-design.md`
 
 - [ ] **Step 1: Synchronize P3 status**
 

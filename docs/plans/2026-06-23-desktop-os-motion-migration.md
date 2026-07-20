@@ -8,7 +8,7 @@
 
 **Tech Stack:** React 19、`motion@12.40.0`(`motion/react`)、Vite 6、TypeScript、vitest + @testing-library/react、Tailwind 4、zustand。
 
-**Spec:** [docs/superpowers/specs/2026-06-23-desktop-os-motion-migration-design.md](file:///Users/bytedance/Desktop/study/valley-mas/docs/superpowers/specs/2026-06-23-desktop-os-motion-migration-design.md)
+**Spec:** [docs/specs/2026-06-23-desktop-os-motion-migration-design.md](file:///Users/bytedance/Desktop/study/valley-mas/docs/specs/2026-06-23-desktop-os-motion-migration-design.md)
 
 ---
 
@@ -269,7 +269,7 @@ Expected: 全绿,89 + 4 = 93 用例通过(若现有用例数有变,以基线数 
 - [ ] **Step 6:** 跑 build 记录基线
 
 Run: `pnpm --filter @valley/desktop-os build`
-Expected: build 成功;把 `dist/` 体积(`du -sh apps/desktop-os/dist`)写入 [本 plan](file:///Users/bytedance/Desktop/study/valley-mas/docs/superpowers/plans/2026-06-23-desktop-os-motion-migration.md) 末尾「实施后记 · P1 体积基线」。
+Expected: build 成功;把 `dist/` 体积(`du -sh apps/desktop-os/dist`)写入 [本 plan](file:///Users/bytedance/Desktop/study/valley-mas/docs/plans/2026-06-23-desktop-os-motion-migration.md) 末尾「实施后记 · P1 体积基线」。
 
 - [ ] **Step 7:** 跑 mojibake 检查
 
@@ -304,7 +304,7 @@ git commit -m "feat(desktop-os): motion P1 - PlushMotion primitives"
 - 边界:rAF 直驱 transform(Window 拖动 / Dock magnification / ResizeHandles)与装饰类 `@keyframes` 不动。
 - reduced-motion:被迁组件统一走 `useReducedMotion()`,同名 CSS `@media (prefers-reduced-motion: reduce)` 分支同步删除。
 - Phase:P1 PlushMotion 原语 ✅ / P2 窗口层(Window / Spotlight / Dock 菜单)/ P3 面板层(ControlCenter / NotificationCenter / Launchpad)/ P4 业务列表(AICommandCenter / Launchpad 翻页)。
-- 工作流档位:C 档,spec 与 plan 临时存放在 `docs/superpowers/{specs,plans}/2026-06-23-desktop-os-motion-migration*.md`。
+- 工作流档位：C 档，spec 与 plan 临时存放在 `docs/{specs,plans}/2026-06-23-desktop-os-motion-migration*.md`。
 ```
 
 (注:Phase 进度条按完成情况更新 ✅。)
@@ -628,7 +628,7 @@ Expected: 全绿。
 
 - [ ] **Step 8:** 人工验收(Phase 2 收尾)
 
-按 spec § 4 Phase 2 「人工验收清单」逐条复核:5 个 App 开关、Spotlight ⌘空格、Dock 右键菜单 + 二级、系统设置开启「减少动画」复测。把异常写入 [本 plan](file:///Users/bytedance/Desktop/study/valley-mas/docs/superpowers/plans/2026-06-23-desktop-os-motion-migration.md) 末尾「实施后记 · P2 人工验收记录」。
+按 spec § 4 Phase 2 「人工验收清单」逐条复核:5 个 App 开关、Spotlight ⌘空格、Dock 右键菜单 + 二级、系统设置开启「减少动画」复测。把异常写入 [本 plan](file:///Users/bytedance/Desktop/study/valley-mas/docs/plans/2026-06-23-desktop-os-motion-migration.md) 末尾「实施后记 · P2 人工验收记录」。
 
 - [ ] **Step 9:** Commit
 
@@ -1109,4 +1109,4 @@ git commit -m "docs(desktop-os): motion migration complete"
 - [ ] [apps/desktop-os/docs/PLAN.md](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/docs/PLAN.md) 「动画统一迁移到 motion」条目 P1–P4 ✅。
 - [ ] [apps/desktop-os/AGENTS.md](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/AGENTS.md) 「设计系统约束」补充行 + layout 例外行均落地。
 - [ ] 实施后记 4 段全部填完,体积差未超预算。
-- [ ] [docs/superpowers/specs/2026-06-23-desktop-os-motion-migration-design.md](file:///Users/bytedance/Desktop/study/valley-mas/docs/superpowers/specs/2026-06-23-desktop-os-motion-migration-design.md) 与 [本 plan](file:///Users/bytedance/Desktop/study/valley-mas/docs/superpowers/plans/2026-06-23-desktop-os-motion-migration.md) 由 owner 决定是否清理(C 档临时产物)。
+- [ ] [docs/specs/2026-06-23-desktop-os-motion-migration-design.md](file:///Users/bytedance/Desktop/study/valley-mas/docs/specs/2026-06-23-desktop-os-motion-migration-design.md) 与 [本 plan](file:///Users/bytedance/Desktop/study/valley-mas/docs/plans/2026-06-23-desktop-os-motion-migration.md) 由 owner 决定是否清理（C 档临时产物）。

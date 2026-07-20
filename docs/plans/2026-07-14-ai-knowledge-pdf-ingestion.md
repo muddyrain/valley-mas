@@ -48,8 +48,8 @@ For a PDF that cannot yield text, create an `AIKnowledgeDocument` with `status=f
 
 **Files:**
 - Modify: `apps/web/src/pages/KnowledgeBases/index.tsx`
-- Modify: `docs/superpowers/plans/2026-07-14-ai-knowledge-rag.md`
-- Modify: `docs/superpowers/plans/2026-07-14-ai-workbench-platform.md`
+- Modify: `docs/plans/2026-07-14-ai-knowledge-rag.md`
+- Modify: `docs/plans/2026-07-14-ai-workbench-platform.md`
 
 - [x] **Step 1: Allow `.pdf` in the browser picker and client validation**
 

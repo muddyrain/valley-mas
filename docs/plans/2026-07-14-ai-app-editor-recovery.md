@@ -72,7 +72,7 @@ Expected: exit 0。
 ### Task 3: 回归验证与文档状态
 
 **Files:**
-- Modify: `docs/superpowers/specs/2026-07-14-ai-app-editor-recovery-design.md`
+- Modify: `docs/specs/2026-07-14-ai-app-editor-recovery-design.md`
 
 - [x] **Step 1: 将设计状态标记为已实施**
 

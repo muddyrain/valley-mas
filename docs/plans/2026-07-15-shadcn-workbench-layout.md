@@ -94,7 +94,7 @@ Expected: 本次涉及文件无新增 Biome 问题；如仓库有既存无关问
 
 **Files:**
 
-- Modify: `docs/superpowers/plans/2026-07-15-shadcn-workbench-layout.md`
+- Modify: `docs/plans/2026-07-15-shadcn-workbench-layout.md`
 - Test: `pnpm --filter @valley/web exec tsc --noEmit`
 - Test: `pnpm --filter @valley/web check`
 - Test: `pnpm check:harness`
@@ -119,7 +119,7 @@ python .agents/skills/encoding-guard/scripts/check_mojibake.py \
   apps/web/src/layouts/WorkbenchLayout.tsx \
   apps/web/src/pages/Workbench/index.tsx \
   apps/web/src/components/workbench/AIAppsPanel.tsx \
-  docs/superpowers/plans/2026-07-15-shadcn-workbench-layout.md
+  docs/plans/2026-07-15-shadcn-workbench-layout.md
 ```
 
 Expected: `PASS: no suspicious encoding or text-loss issues detected.`

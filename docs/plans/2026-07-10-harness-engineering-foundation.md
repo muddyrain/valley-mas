@@ -152,8 +152,8 @@ Expected: exit 0。
 ### Task 6: 全量验证和状态收尾
 
 **Files:**
-- Modify: `docs/superpowers/specs/2026-07-10-harness-engineering-foundation-design.md`
-- Modify: `docs/superpowers/plans/2026-07-10-harness-engineering-foundation.md`
+- Modify: `docs/specs/2026-07-10-harness-engineering-foundation-design.md`
+- Modify: `docs/plans/2026-07-10-harness-engineering-foundation.md`
 
 - [x] **Step 1: 运行 Harness 与文本检查**
 
@@ -167,8 +167,8 @@ python3 .agents/skills/encoding-guard/scripts/check_mojibake.py \
   AGENTS.md .agents/skills/INDEX.md docs/HARNESS_ENGINEERING.md \
   docs/PROJECT_GUIDE.md docs/README.md docs/patterns/agent-pitfalls.md \
   .code-review/README.md .code-review/rules/*.md \
-  docs/superpowers/specs/2026-07-10-harness-engineering-foundation-design.md \
-  docs/superpowers/plans/2026-07-10-harness-engineering-foundation.md
+  docs/specs/2026-07-10-harness-engineering-foundation-design.md \
+  docs/plans/2026-07-10-harness-engineering-foundation.md
 ```
 
 Expected: 全部 exit 0。

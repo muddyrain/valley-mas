@@ -442,7 +442,7 @@ git commit -m "feat(life-trace): 库存保质期填写显示合理性提示"
 
 ## Execution Handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-06-30-pantry-shelf-life-validation.md`. Two execution options:
+Plan complete and saved to `docs/plans/2026-06-30-pantry-shelf-life-validation.md`. Two execution options:
 
 **1. Subagent-Driven (recommended)** — I dispatch a fresh subagent per task, review between tasks, fast iteration
 

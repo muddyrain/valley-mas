@@ -25,8 +25,8 @@
 ## Task 3：验证与状态收尾
 
 **Files:**
-- Modify: `docs/superpowers/specs/2026-07-15-test-governance-design.md`
-- Modify: `docs/superpowers/plans/2026-07-15-test-governance.md`
+- Modify: `docs/specs/2026-07-15-test-governance-design.md`
+- Modify: `docs/plans/2026-07-15-test-governance.md`
 
 - [x] 运行 `pnpm check:harness`、Markdown 空白检查和编码检查。
 - [x] 确认未覆盖或改写已有未知工作树改动。

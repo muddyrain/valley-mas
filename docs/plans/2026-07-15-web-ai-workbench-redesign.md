@@ -171,7 +171,7 @@ Expected: exit 0.
 
 **Files:**
 
-- Modify: `docs/superpowers/plans/2026-07-15-web-ai-workbench-redesign.md`，勾选实际完成项。
+- Modify: `docs/plans/2026-07-15-web-ai-workbench-redesign.md`，勾选实际完成项。
 - Test: `pnpm --filter @valley/web check`
 - Test: `pnpm --filter @valley/web exec tsc --noEmit`
 - Test: `pnpm check:harness`
