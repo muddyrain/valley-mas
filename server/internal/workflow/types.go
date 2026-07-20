@@ -83,6 +83,7 @@ type RunContext struct {
 	Outputs            map[string]map[string]any
 	KnowledgeRetriever KnowledgeRetriever
 	ContentSearcher    ContentSearcher
+	NotionSearcher     NotionSearcher
 	CoverGenerator     CoverGenerator
 	SubworkflowRunner  SubworkflowRunner
 }
@@ -167,6 +168,28 @@ type ContentSearcherFunc func(context.Context, string, string, string) (ContentS
 
 func (fn ContentSearcherFunc) Search(ctx context.Context, query, createdFrom, createdTo string) (ContentSearchResult, error) {
 	return fn(ctx, query, createdFrom, createdTo)
+}
+
+type NotionSearchItem struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	URL          string `json:"url"`
+	Kind         string `json:"kind"`
+	LastEditedAt string `json:"lastEditedAt,omitempty"`
+}
+
+type NotionSearchResult struct {
+	Items []NotionSearchItem `json:"items"`
+}
+
+type NotionSearcher interface {
+	Search(context.Context, string, int) (NotionSearchResult, error)
+}
+
+type NotionSearcherFunc func(context.Context, string, int) (NotionSearchResult, error)
+
+func (fn NotionSearcherFunc) Search(ctx context.Context, query string, limit int) (NotionSearchResult, error) {
+	return fn(ctx, query, limit)
 }
 
 type GeneratedCover struct {

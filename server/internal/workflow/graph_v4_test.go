@@ -56,6 +56,44 @@ func TestWorkflowCapabilitiesExposeInputGuidance(t *testing.T) {
 	}
 }
 
+func TestNotionSearchCapabilityValidatesInputsAndReturnsSafeFields(t *testing.T) {
+	registry := testRegistry(t)
+	capability, _, ok := registry.Capability(CapabilityNotionSearch)
+	if !ok || capability.SideEffect != "read" || capability.WriteCost != 0 {
+		t.Fatalf("capability=%+v ok=%v", capability, ok)
+	}
+	properties, ok := capability.InputSchema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("properties=%T", capability.InputSchema["properties"])
+	}
+	if limit, ok := properties["limit"].(map[string]any); !ok || limit["type"] != "number" {
+		t.Fatalf("limit=%#v", properties["limit"])
+	}
+
+	adapter := NotionSearchCapabilityAdapter{}
+	called := 0
+	result, err := adapter.Execute(context.Background(), RunContext{NotionSearcher: NotionSearcherFunc(func(_ context.Context, query string, limit int) (NotionSearchResult, error) {
+		called++
+		if query != "项目计划" || limit != 2 {
+			t.Fatalf("query=%q limit=%d", query, limit)
+		}
+		return NotionSearchResult{Items: []NotionSearchItem{{ID: "page-1", Title: "项目计划", URL: "https://www.notion.so/page-1", Kind: "page"}}}, nil
+	})}, NodeExecution{Input: map[string]any{"query": "项目计划", "limit": 2}})
+	if err != nil || called != 1 || result.Output["count"] != 1 {
+		t.Fatalf("result=%#v err=%v called=%d", result, err, called)
+	}
+	if _, err := adapter.Execute(context.Background(), RunContext{NotionSearcher: NotionSearcherFunc(func(context.Context, string, int) (NotionSearchResult, error) {
+		return NotionSearchResult{}, nil
+	})}, NodeExecution{Input: map[string]any{"query": "", "limit": 2}}); err == nil {
+		t.Fatal("empty query must fail")
+	}
+	if _, err := adapter.Execute(context.Background(), RunContext{NotionSearcher: NotionSearcherFunc(func(context.Context, string, int) (NotionSearchResult, error) {
+		return NotionSearchResult{}, nil
+	})}, NodeExecution{Input: map[string]any{"query": "项目计划", "limit": 11}}); err == nil {
+		t.Fatal("out-of-range limit must fail")
+	}
+}
+
 func TestGraphV4MergeUsesFirstActiveBranch(t *testing.T) {
 	registry := testRegistry(t)
 	graph := Graph{SchemaVersion: 4, Nodes: []Node{

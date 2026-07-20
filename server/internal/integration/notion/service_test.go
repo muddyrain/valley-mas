@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"valley-server/internal/config"
+	mailvault "valley-server/internal/mail"
 	"valley-server/internal/model"
 
 	"github.com/glebarez/sqlite"
@@ -83,8 +84,12 @@ func TestNotionOAuthStoresEncryptedOwnerPrivateConnectionAndRevokes(t *testing.T
 	if stored.AccessTokenCiphertext == "secret-access-token" || strings.Contains(stored.AccessTokenCiphertext, "secret-access-token") {
 		t.Fatalf("access token was not encrypted: %q", stored.AccessTokenCiphertext)
 	}
-	if err := service.Disconnect(context.Background(), 101); err != nil {
+	disconnectResult, err := service.Disconnect(context.Background(), 101)
+	if err != nil {
 		t.Fatalf("disconnect: %v", err)
+	}
+	if !disconnectResult.RemoteRevoked {
+		t.Fatalf("disconnect result=%#v", disconnectResult)
 	}
 	if revokeToken != "secret-access-token" {
 		t.Fatalf("expected external revoke with access token, got %q", revokeToken)
@@ -95,6 +100,59 @@ func TestNotionOAuthStoresEncryptedOwnerPrivateConnectionAndRevokes(t *testing.T
 	}
 	if status.Connected {
 		t.Fatalf("connection should be removed after revocation")
+	}
+}
+
+func TestNotionConnectionWithRotatedTokenKeyRequiresReconnectAndCanBeCleanedUp(t *testing.T) {
+	db := openTestDB(t)
+	service := newTestService(t, db)
+	oldVault, err := mailvault.NewCredentialVault("abcdefghijklmnopqrstuvwxzy123456")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ciphertext, err := oldVault.Encrypt("old-access-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&model.ExternalConnection{
+		UserID:                101,
+		Provider:              Provider,
+		Status:                statusConnected,
+		WorkspaceName:         "旧工作区",
+		AccessTokenCiphertext: ciphertext,
+		ConnectedAt:           service.now(),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	status, err := service.Status(context.Background(), 101)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Connected || !status.ReconnectRequired || status.WorkspaceName != "旧工作区" {
+		t.Fatalf("status=%#v", status)
+	}
+
+	disconnectResult, err := service.Disconnect(context.Background(), 101)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if disconnectResult.RemoteRevoked {
+		t.Fatalf("disconnect result=%#v", disconnectResult)
+	}
+	var remaining int64
+	if err := db.Model(&model.ExternalConnection{}).Where("user_id = ? AND provider = ?", 101, Provider).Count(&remaining).Error; err != nil {
+		t.Fatal(err)
+	}
+	if remaining != 0 {
+		t.Fatalf("remaining connections=%d", remaining)
+	}
+	var audit model.ExternalConnectionAudit
+	if err := db.Where("user_id = ? AND action = ?", 101, auditDisconnected).Order("created_at DESC").First(&audit).Error; err != nil {
+		t.Fatal(err)
+	}
+	if audit.Status != "succeeded" || audit.Detail != "credential_unavailable_local_cleanup" {
+		t.Fatalf("audit=%#v", audit)
 	}
 }
 
@@ -125,6 +183,84 @@ func TestNotionOAuthStateIsSingleUseAndOwnerScoped(t *testing.T) {
 	}
 	if status.Connected {
 		t.Fatal("another owner must not see a connection")
+	}
+}
+
+func TestNotionSearchUsesEncryptedOwnerConnectionAndReturnsSafeResults(t *testing.T) {
+	var requestCount int
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if r.Method != http.MethodPost || r.URL.Path != "/search" {
+			t.Fatalf("unexpected search request %s %s", r.Method, r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer secret-access-token" {
+			t.Fatalf("authorization=%q", r.Header.Get("Authorization"))
+		}
+		if r.Header.Get("Notion-Version") != notionAPIVersion {
+			t.Fatalf("notion version=%q", r.Header.Get("Notion-Version"))
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["query"] != "项目计划" || body["page_size"] != float64(2) {
+			t.Fatalf("body=%#v", body)
+		}
+		_, _ = w.Write([]byte(`{"results":[{"object":"page","id":"page-1","url":"https://www.notion.so/page-1","last_edited_time":"2026-07-20T08:00:00.000Z","properties":{"Name":{"type":"title","title":[{"plain_text":"项目计划"}]}},"ignored":"full-page-content"},{"object":"data_source","id":"source-1","url":"https://www.notion.so/source-1","last_edited_time":"2026-07-19T08:00:00Z","title":[{"plain_text":"项目数据源"}]},{"object":"comment","id":"comment-1","url":"https://www.notion.so/comment-1"}]}`))
+	}))
+	defer provider.Close()
+
+	db := openTestDB(t)
+	service := newTestService(t, db)
+	service.searchURL = provider.URL + "/search"
+	seedSearchConnection(t, db, service, 101)
+
+	result, err := service.Search(context.Background(), 101, " 项目计划 ", 2)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if requestCount != 1 || len(result.Items) != 2 {
+		t.Fatalf("requestCount=%d result=%#v", requestCount, result)
+	}
+	if result.Items[0].Title != "项目计划" || result.Items[0].Kind != "page" || result.Items[0].LastEditedAt != "2026-07-20T08:00:00Z" {
+		t.Fatalf("first item=%#v", result.Items[0])
+	}
+	if result.Items[1].Title != "项目数据源" || result.Items[1].Kind != "data_source" {
+		t.Fatalf("second item=%#v", result.Items[1])
+	}
+	var audit model.ExternalConnectionAudit
+	if err := db.Where("user_id = ? AND action = ?", 101, auditSearched).Order("created_at DESC").First(&audit).Error; err != nil {
+		t.Fatalf("search audit: %v", err)
+	}
+	if audit.Status != "succeeded" || audit.Detail != "result_count=2" {
+		t.Fatalf("audit=%#v", audit)
+	}
+	if _, err := service.Search(context.Background(), 202, "项目计划", 2); err == nil {
+		t.Fatal("other owner must not be able to use the connection")
+	}
+	if requestCount != 1 {
+		t.Fatalf("other owner unexpectedly reached provider: %d", requestCount)
+	}
+}
+
+func seedSearchConnection(t *testing.T, db *gorm.DB, service *Service, userID int64) {
+	t.Helper()
+	vault, err := mailvault.NewCredentialVault(service.cfg.TokenKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ciphertext, err := vault.Encrypt("secret-access-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&model.ExternalConnection{
+		UserID:                model.Int64String(userID),
+		Provider:              Provider,
+		Status:                statusConnected,
+		AccessTokenCiphertext: ciphertext,
+		ConnectedAt:           service.now(),
+	}).Error; err != nil {
+		t.Fatal(err)
 	}
 }
 

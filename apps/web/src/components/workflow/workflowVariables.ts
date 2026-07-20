@@ -72,6 +72,10 @@ const TOOL_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
     ['count', 'number'],
     ['items', 'object'],
   ],
+  'notion.search': [
+    ['count', 'number'],
+    ['results', 'object'],
+  ],
   'image.generateCover': [
     ['imageUrl', 'string'],
     ['cover', 'object'],

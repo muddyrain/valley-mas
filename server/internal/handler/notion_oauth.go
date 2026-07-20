@@ -55,7 +55,8 @@ func disconnectNotion(cfg *config.Config) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		if err := service.Disconnect(c.Request.Context(), GetCurrentUserID(c)); err != nil {
+		result, err := service.Disconnect(c.Request.Context(), GetCurrentUserID(c))
+		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				Error(c, http.StatusNotFound, "Notion 连接不存在")
 				return
@@ -63,7 +64,7 @@ func disconnectNotion(cfg *config.Config) gin.HandlerFunc {
 			Error(c, http.StatusBadGateway, "断开 Notion 连接失败")
 			return
 		}
-		Success(c, nil)
+		Success(c, result)
 	}
 }
 

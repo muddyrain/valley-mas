@@ -12,7 +12,9 @@ import (
 	"time"
 	contenttool "valley-server/internal/ai/tools/content"
 	"valley-server/internal/aiclient"
+	"valley-server/internal/config"
 	"valley-server/internal/database"
+	"valley-server/internal/integration/notion"
 	"valley-server/internal/model"
 	"valley-server/internal/utils"
 	"valley-server/internal/workflow"
@@ -706,7 +708,7 @@ func runWorkflowGraph(
 	}
 	executionContext, releaseRun := activeWorkflowRuns.Start(run.ID.String(), workflowRunExecutionTimeout)
 	defer releaseRun()
-	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: make(map[string]map[string]any), KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion), ContentSearcher: workflowContentSearcher(model.Int64String(userID)), CoverGenerator: workflowCoverGenerator(), SubworkflowRunner: workflowSubworkflowRunner(model.Int64String(userID))}, func(event workflow.Event) {
+	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: make(map[string]map[string]any), KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion), ContentSearcher: workflowContentSearcher(model.Int64String(userID)), NotionSearcher: workflowNotionSearcher(model.Int64String(userID)), CoverGenerator: workflowCoverGenerator(), SubworkflowRunner: workflowSubworkflowRunner(model.Int64String(userID))}, func(event workflow.Event) {
 		if persistenceErr == nil {
 			event, persistenceErr = persistNodeEvent(event)
 			if persistenceErr == nil {
@@ -1183,6 +1185,24 @@ func workflowContentSearcher(userID model.Int64String) workflow.ContentSearcher 
 			return workflow.ContentSearchResult{}, err
 		}
 		return result, nil
+	})
+}
+
+func workflowNotionSearcher(userID model.Int64String) workflow.NotionSearcher {
+	return workflow.NotionSearcherFunc(func(ctx context.Context, query string, limit int) (workflow.NotionSearchResult, error) {
+		service, err := notion.NewService(database.GetDB(), config.Load().NotionOAuth)
+		if err != nil {
+			return workflow.NotionSearchResult{}, err
+		}
+		result, err := service.Search(ctx, int64(userID), query, limit)
+		if err != nil {
+			return workflow.NotionSearchResult{}, err
+		}
+		items := make([]workflow.NotionSearchItem, len(result.Items))
+		for index, item := range result.Items {
+			items[index] = workflow.NotionSearchItem{ID: item.ID, Title: item.Title, URL: item.URL, Kind: item.Kind, LastEditedAt: item.LastEditedAt}
+		}
+		return workflow.NotionSearchResult{Items: items}, nil
 	})
 }
 

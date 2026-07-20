@@ -1,5 +1,7 @@
+import { useNavigate } from 'react-router-dom';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useWorkflowCapabilities } from '../useWorkflowCapabilities';
@@ -31,6 +33,10 @@ const toolOutputPresentations: Record<
     order: ['count', 'items'],
     labels: { count: '结果数量', items: '结果列表' },
   },
+  'notion.search': {
+    order: ['count', 'results'],
+    labels: { count: '结果数量', results: 'Notion 结果' },
+  },
   'image.generateCover': {
     order: ['imageUrl', 'cover', 'url', 'model', 'size'],
     labels: {
@@ -61,6 +67,7 @@ export function ToolPropertyForm({
   onUpdateConfig,
   variableOptions = [],
 }: PropertyFormProps) {
+  const navigate = useNavigate();
   const capabilities = useWorkflowCapabilities();
   const capability = capabilities.toolCapabilities.find((item) => item.id === config.capabilityId);
   const inputs = (config.inputs as Record<string, unknown>) || {};
@@ -90,6 +97,18 @@ export function ToolPropertyForm({
           <Badge variant="outline">{capability.id}</Badge>
           {sideEffectLabel ? <Badge variant="secondary">{sideEffectLabel}</Badge> : null}
         </div>
+        {capability.id === 'notion.search' ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            <span>仅搜索已连接工作区中的页面和数据源。</span>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => navigate('/workbench/resources?tab=tools')}
+            >
+              管理 Notion 连接
+            </Button>
+          </div>
+        ) : null}
         {Object.entries(capability.inputSchema.properties || {}).map(([name, schema]) => (
           <div key={name} className="space-y-1.5">
             <Label>

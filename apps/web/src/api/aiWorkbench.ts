@@ -206,6 +206,7 @@ export interface AIAppTool {
 export interface NotionConnectionStatus {
   connected: boolean;
   configured: boolean;
+  reconnectRequired: boolean;
   workspaceId?: string;
   workspaceName?: string;
   connectedAt?: string;
@@ -588,7 +589,7 @@ export function startNotionAuthorization(): Promise<{ authUrl: string }> {
   return request.post('/integrations/notion/authorization');
 }
 
-export function disconnectNotion(): Promise<void> {
+export function disconnectNotion(): Promise<{ remoteRevoked: boolean }> {
   return request.delete('/integrations/notion');
 }
 

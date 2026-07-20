@@ -322,6 +322,14 @@ func publicExecutionError(node Node, err error) (string, string) {
 		return "ARK 模型调用失败，请稍后重试或检查服务配置", "AI_UPSTREAM_FAILED"
 	case strings.Contains(message, "AI 响应解析失败") || strings.Contains(message, "AI 返回为空"):
 		return "模型没有返回可用内容，请调整提示词后重试", "AI_RESPONSE_INVALID"
+	case strings.Contains(message, "Notion OAuth 尚未配置"):
+		return "Notion 服务尚未配置，请联系管理员", "NOTION_CONFIGURATION_UNAVAILABLE"
+	case strings.Contains(message, "Notion 连接不存在"):
+		return "请先在工具页连接 Notion 工作区", "NOTION_NOT_CONNECTED"
+	case strings.Contains(message, "Notion 凭据无法解密"):
+		return "Notion 授权已失效，请重新连接工作区", "NOTION_CONNECTION_INVALID"
+	case strings.Contains(message, "Notion 搜索请求失败") || strings.Contains(message, "Notion 搜索响应无效"):
+		return "Notion 搜索暂时不可用，请稍后重试", "NOTION_SEARCH_FAILED"
 	case strings.Contains(message, "变量"):
 		return message, "WORKFLOW_VARIABLE_RESOLUTION_FAILED"
 	case node.Type == NodeTypeLLM:
