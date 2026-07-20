@@ -48,6 +48,11 @@ const NODE_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
     ['tokenUsage', 'number'],
   ],
   condition: [['matched', 'boolean']],
+  switch: [
+    ['matchedCaseId', 'string'],
+    ['matchedLabel', 'string'],
+    ['matchedValue', 'unknown'],
+  ],
   intent: [
     ['intentId', 'string'],
     ['intentName', 'string'],

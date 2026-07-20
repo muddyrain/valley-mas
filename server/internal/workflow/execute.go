@@ -260,6 +260,17 @@ func activateOutgoingEdges(node Node, output map[string]any, edges []Edge, index
 		}
 		selected = "intent:" + intentID
 	}
+	if node.Type == NodeTypeSwitch {
+		matchedCaseID := stringFromValue(output["matchedCaseId"])
+		if matchedCaseID == "" {
+			matchedCaseID = "default"
+		}
+		if matchedCaseID == "default" {
+			selected = "default"
+		} else {
+			selected = "case:" + matchedCaseID
+		}
+	}
 	for _, index := range indexes {
 		active[index] = selected == "" || edges[index].SourceHandle == selected
 	}

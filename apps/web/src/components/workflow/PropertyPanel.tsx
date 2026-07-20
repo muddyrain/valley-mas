@@ -8,6 +8,7 @@ import { PROPERTY_FORM_MAP } from './properties';
 import { PropertyFormBase } from './properties/PropertyFormBase';
 import { WhenPropertyForm } from './properties/WhenPropertyForm';
 import type { NodeRunSnapshot } from './runSession';
+import type { ValidationError } from './validateWorkflowConfig';
 import { getUpstreamWorkflowVariables } from './workflowVariables';
 
 export type PropertyPanelTab = 'config' | 'run';
@@ -35,6 +36,7 @@ interface PropertyPanelProps {
   nodes: Node[];
   edges: Edge[];
   runSnapshot?: NodeRunSnapshot;
+  validationErrors?: readonly ValidationError[];
   activeTab?: PropertyPanelTab;
   onActiveTabChange?: (tab: PropertyPanelTab) => void;
 }
@@ -46,6 +48,7 @@ export function PropertyPanel({
   nodes,
   edges,
   runSnapshot,
+  validationErrors = [],
   activeTab,
   onActiveTabChange,
 }: PropertyPanelProps) {
@@ -96,6 +99,11 @@ export function PropertyPanel({
   );
   const isCoverGenerationNode =
     nodeType === 'tool' && config?.capabilityId === 'image.generateCover';
+  const fieldErrors = Object.fromEntries(
+    validationErrors
+      .filter((error) => error.nodeId === selectedNode.id && error.field)
+      .map((error) => [error.field as string, error.message]),
+  );
 
   const handleUpdateConfig = (updates: Partial<Record<string, unknown>>) => {
     onUpdateNode(selectedNode.id, {
@@ -139,10 +147,12 @@ export function PropertyPanel({
             nodeType === 'merge' ||
             nodeType === 'variable' ||
             nodeType === 'subworkflow' ||
-            nodeType === 'intent'
+            nodeType === 'intent' ||
+            nodeType === 'switch'
               ? variableOptions
               : undefined
           }
+          fieldErrors={fieldErrors}
         />
       )}
       {nodeType === 'tool' ||

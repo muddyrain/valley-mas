@@ -2,10 +2,9 @@ import { useNavigate } from 'react-router-dom';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { toWorkflowValueType } from '../TypedVariableValueEditor';
 import { useWorkflowCapabilities } from '../useWorkflowCapabilities';
-import { VariableValueEditor } from '../VariableReferencePicker';
+import { WorkflowVariableBindingField } from '../WorkflowVariableBindingField';
 import { getWorkflowSideEffectLabel } from '../workflowSideEffects';
 import type { PropertyFormProps } from './index';
 import { WorkflowOutputFieldList } from './WorkflowOutputFieldList';
@@ -66,12 +65,14 @@ export function ToolPropertyForm({
   config,
   onUpdateConfig,
   variableOptions = [],
+  fieldErrors = {},
 }: PropertyFormProps) {
   const navigate = useNavigate();
   const capabilities = useWorkflowCapabilities();
   const capability = capabilities.toolCapabilities.find((item) => item.id === config.capabilityId);
   const inputs = (config.inputs as Record<string, unknown>) || {};
   const sideEffectLabel = getWorkflowSideEffectLabel(capability?.sideEffect);
+
   if (!capability)
     return (
       <EditorSection title="工具配置" description="该工具能力当前不可用。">
@@ -109,35 +110,23 @@ export function ToolPropertyForm({
             </Button>
           </div>
         ) : null}
-        {Object.entries(capability.inputSchema.properties || {}).map(([name, schema]) => (
-          <div key={name} className="space-y-1.5">
-            <Label>
-              {schema.title || name}
-              {capability.inputSchema.required?.includes(name) ? ' *' : ''}
-            </Label>
-            {schema.description ? (
-              <p className="text-xs text-muted-foreground">{schema.description}</p>
-            ) : null}
-            {schema.type === 'number' ? (
-              <Input
-                type="number"
-                value={String(inputs[name] ?? '')}
-                onChange={(event) =>
-                  onUpdateConfig({ inputs: { ...inputs, [name]: Number(event.target.value) } })
-                }
-              />
-            ) : (
-              <VariableValueEditor
-                ariaLabel={`${schema.title || name} 输入值`}
-                value={String(inputs[name] ?? '')}
-                onChange={(value) => onUpdateConfig({ inputs: { ...inputs, [name]: value } })}
-                options={variableOptions}
-                fixedPlaceholder={schema.placeholder || `设置 ${schema.title || name}`}
-                defaultMode="fixed"
-              />
-            )}
-          </div>
-        ))}
+        {Object.entries(capability.inputSchema.properties || {}).map(([name, schema]) => {
+          const type = toWorkflowValueType(schema.type);
+          return (
+            <WorkflowVariableBindingField
+              key={name}
+              label={schema.title || name}
+              type={type}
+              value={inputs[name]}
+              onChange={(value) => onUpdateConfig({ inputs: { ...inputs, [name]: value } })}
+              options={variableOptions}
+              description={schema.description}
+              required={capability.inputSchema.required?.includes(name)}
+              error={fieldErrors[name]}
+              ariaLabel={`${schema.title || name} 输入值`}
+            />
+          );
+        })}
       </EditorSection>
       <EditorSection title="输出变量" description="下游节点可直接引用这些字段。">
         <WorkflowOutputFieldList

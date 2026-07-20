@@ -7,6 +7,7 @@ import { LLMPropertyForm } from './LLMPropertyForm';
 import { MergePropertyForm } from './MergePropertyForm';
 import { StartPropertyForm } from './StartPropertyForm';
 import { SubworkflowPropertyForm } from './SubworkflowPropertyForm';
+import { SwitchPropertyForm } from './SwitchPropertyForm';
 import { ToolPropertyForm } from './ToolPropertyForm';
 import { VariablePropertyForm } from './VariablePropertyForm';
 
@@ -14,6 +15,7 @@ export interface PropertyFormProps {
   config: Record<string, unknown>;
   onUpdateConfig: (updates: Partial<Record<string, unknown>>) => void;
   variableOptions?: WorkflowVariableOption[];
+  fieldErrors?: Readonly<Record<string, string>>;
 }
 
 export const PROPERTY_FORM_MAP: Partial<
@@ -24,6 +26,7 @@ export const PROPERTY_FORM_MAP: Partial<
   llm: LLMPropertyForm,
   tool: ToolPropertyForm,
   condition: ConditionPropertyForm,
+  switch: SwitchPropertyForm,
   merge: MergePropertyForm,
   variable: VariablePropertyForm,
   subworkflow: SubworkflowPropertyForm,

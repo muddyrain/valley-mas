@@ -33,7 +33,7 @@ import {
   publishedWorkflowContract,
   type SubworkflowContractIssue,
 } from '../subworkflowContract';
-import { VariableValueEditor } from '../VariableReferencePicker';
+import { WorkflowVariableBindingField } from '../WorkflowVariableBindingField';
 import type { PropertyFormProps } from './index';
 
 function versionLabel(version: WorkflowVersion) {
@@ -245,18 +245,21 @@ export function SubworkflowPropertyForm({
             </>
           )}
         </div>
-        {Object.entries(inputs).map(([name, value]) => (
-          <div key={name} className="space-y-1.5">
-            <Label>{name}</Label>
-            <VariableValueEditor
-              ariaLabel={`${name} 输入值`}
-              value={String(value ?? '')}
+        {Object.entries(inputs).map(([name, value]) => {
+          const type = currentContract.inputSchema[name] || 'string';
+          return (
+            <WorkflowVariableBindingField
+              key={name}
+              label={name}
+              type={type}
+              value={value}
               onChange={(nextValue) => onUpdateConfig({ inputs: { ...inputs, [name]: nextValue } })}
               options={variableOptions}
-              fixedPlaceholder={`输入 ${name} 的固定值`}
+              required={currentContract.requiredInputs.includes(name)}
+              ariaLabel={`${name} 输入值`}
             />
-          </div>
-        ))}
+          );
+        })}
       </EditorSection>
 
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>

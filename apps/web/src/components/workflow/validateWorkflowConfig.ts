@@ -14,6 +14,7 @@ export interface ValidationError {
   nodeLabel: string;
   nodeType: string;
   message: string;
+  field?: string;
 }
 
 const WORKFLOW_REFERENCE_PATTERN = /\{\{\s*([^{}]+?)\s*\}\}/g;
@@ -53,6 +54,18 @@ function intentOutputHandles(config: Record<string, unknown>): string[] {
       : [];
   });
   return [...handles, 'intent:other'];
+}
+
+function switchOutputHandles(config: Record<string, unknown>): string[] {
+  const cases = Array.isArray(config.cases) ? config.cases : [];
+  const handles = cases.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const id = (item as { id?: unknown }).id;
+    return typeof id === 'string' && INTENT_ID_PATTERN.test(id) && id !== 'default'
+      ? [`case:${id}`]
+      : [];
+  });
+  return [...handles, 'default'];
 }
 
 function stringsInValue(value: unknown): string[] {
@@ -119,6 +132,35 @@ function validateNode(
     case 'condition':
       if (config.left === undefined || !config.operator) return fail('请完成受控条件规则');
       break;
+    case 'switch': {
+      const valueType = config.valueType;
+      const cases = Array.isArray(config.cases) ? config.cases : [];
+      if (!config.value || !String(config.value).trim()) return fail('请选择分流值变量');
+      if (valueType !== 'string' && valueType !== 'number' && valueType !== 'boolean')
+        return fail('请选择分流值类型');
+      if (cases.length < 2 || cases.length > 8) return fail('请设置 2 到 8 个分支');
+      const ids = new Set<string>();
+      const values = new Set<string>();
+      for (const item of cases) {
+        if (!item || typeof item !== 'object') return fail('分支配置无效');
+        const branch = item as { id?: unknown; label?: unknown; value?: unknown };
+        if (
+          typeof branch.id !== 'string' ||
+          !INTENT_ID_PATTERN.test(branch.id) ||
+          branch.id === 'default' ||
+          ids.has(branch.id) ||
+          typeof branch.label !== 'string' ||
+          !branch.label.trim()
+        )
+          return fail('请完善每个分支名称');
+        if (typeof branch.value !== valueType) return fail('分支值类型必须与分流值一致');
+        const key = `${typeof branch.value}:${String(branch.value)}`;
+        if (values.has(key)) return fail('分支值不能重复');
+        ids.add(branch.id);
+        values.add(key);
+      }
+      break;
+    }
     case 'merge': {
       const fields = Array.isArray(config.fields)
         ? (config.fields as Array<{ name?: string; sources?: unknown[] }>)
@@ -166,6 +208,15 @@ function validateNode(
     }
   }
   const options = getUpstreamWorkflowVariables(nodes, edges, node.id);
+  if (validateReferences && data.nodeType === 'switch') {
+    const mismatchMessage = getWorkflowBindingTypeMismatchMessage(
+      '分流值',
+      config.value,
+      config.valueType as WorkflowVariableOption['type'] | undefined,
+      options,
+    );
+    if (mismatchMessage) return fail(mismatchMessage);
+  }
   if (validateReferences && (data.nodeType === 'end' || data.nodeType === 'llm')) {
     const bindings =
       data.nodeType === 'end'
@@ -300,11 +351,19 @@ export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): Valida
     outgoing.set(source.id, (outgoing.get(source.id) || 0) + 1);
     adjacency.get(source.id)?.push(target.id);
     const sourceData = source.data as unknown as WorkflowNodeData;
-    if (sourceData.nodeType === 'condition' || sourceData.nodeType === 'intent') {
+    if (
+      sourceData.nodeType === 'condition' ||
+      sourceData.nodeType === 'intent' ||
+      sourceData.nodeType === 'switch'
+    ) {
       const allowedHandles =
         sourceData.nodeType === 'condition'
           ? new Set(['true', 'false'])
-          : new Set(intentOutputHandles(sourceData.config || {}));
+          : new Set(
+              sourceData.nodeType === 'intent'
+                ? intentOutputHandles(sourceData.config || {})
+                : switchOutputHandles(sourceData.config || {}),
+            );
       if (!allowedHandles.has(edge.sourceHandle || '')) {
         errors.push(workflowError('分流出口无效', source));
         continue;
@@ -333,6 +392,12 @@ export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): Valida
       const counts = branchHandles.get(node.id) || new Map<string, number>();
       if (intentOutputHandles(data.config || {}).some((handle) => counts.get(handle) !== 1)) {
         errors.push(workflowError('每个意图和其他出口都必须各有一条连线', node));
+      }
+    }
+    if (data.nodeType === 'switch') {
+      const counts = branchHandles.get(node.id) || new Map<string, number>();
+      if (switchOutputHandles(data.config || {}).some((handle) => counts.get(handle) !== 1)) {
+        errors.push(workflowError('每个分支和默认出口都必须各有一条连线', node));
       }
     }
   }

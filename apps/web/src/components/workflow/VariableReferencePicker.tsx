@@ -1,5 +1,5 @@
 import { Braces } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -20,6 +20,9 @@ interface VariableReferencePickerProps {
   placeholder?: string;
   ariaLabel?: string;
   className?: string;
+  showType?: boolean;
+  leading?: ReactNode;
+  emptyText?: string;
 }
 
 // A reference is a single typed value, not a text template. Keep it separate
@@ -31,6 +34,9 @@ export function VariableReferencePicker({
   placeholder = '选择变量',
   ariaLabel,
   className,
+  showType = true,
+  leading,
+  emptyText = '暂无可用变量',
 }: VariableReferencePickerProps) {
   const selected = options.find((option) => option.token === value);
 
@@ -44,9 +50,12 @@ export function VariableReferencePicker({
       <SelectTrigger aria-label={ariaLabel} className={cn('min-w-0', className)}>
         {selected ? (
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {workflowValueTypeLabel(selected.type)}
-            </span>
+            {leading}
+            {showType ? (
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {workflowValueTypeLabel(selected.type)}
+              </span>
+            ) : null}
             <span className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-primary/20 bg-primary/5 px-1.5 py-0.5 text-primary">
               <Braces className="size-3 shrink-0" />
               <span
@@ -56,6 +65,11 @@ export function VariableReferencePicker({
                 来源：{selected.nodeLabel} · {selected.field}
               </span>
             </span>
+          </span>
+        ) : leading ? (
+          <span className="flex min-w-0 items-center gap-1.5">
+            {leading}
+            <SelectValue placeholder={placeholder} />
           </span>
         ) : (
           <SelectValue placeholder={placeholder} />
@@ -67,18 +81,26 @@ export function VariableReferencePicker({
             清除选择
           </SelectItem>
         ) : null}
-        {options.map((option) => (
-          <SelectItem key={option.token} value={option.token} className="h-auto py-2">
-            <span className="flex min-w-0 flex-col items-start gap-0.5 whitespace-normal">
-              <span className="max-w-full truncate text-sm font-medium text-foreground">
-                变量：{option.field}
-              </span>
-              <span className="min-w-0 truncate text-xs text-muted-foreground">
-                来源节点：{option.nodeLabel} · 类型：{workflowValueTypeLabel(option.type)}
-              </span>
+        {options.length === 0 ? (
+          <SelectItem value="__workflow_variable_option_empty__" disabled className="h-auto py-3">
+            <span className="whitespace-normal text-xs leading-relaxed text-muted-foreground">
+              {emptyText}
             </span>
           </SelectItem>
-        ))}
+        ) : (
+          options.map((option) => (
+            <SelectItem key={option.token} value={option.token} className="h-auto py-2">
+              <span className="flex min-w-0 flex-col items-start gap-0.5 whitespace-normal">
+                <span className="max-w-full truncate text-sm font-medium text-foreground">
+                  变量：{option.field}
+                </span>
+                <span className="min-w-0 truncate text-xs text-muted-foreground">
+                  来源节点：{option.nodeLabel} · 类型：{workflowValueTypeLabel(option.type)}
+                </span>
+              </span>
+            </SelectItem>
+          ))
+        )}
       </SelectContent>
     </Select>
   );

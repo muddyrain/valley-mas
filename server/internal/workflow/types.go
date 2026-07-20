@@ -26,6 +26,7 @@ const (
 	NodeTypeLLM         NodeType = "llm"
 	NodeTypeTool        NodeType = "tool"
 	NodeTypeCondition   NodeType = "condition"
+	NodeTypeSwitch      NodeType = "switch"
 	NodeTypeMerge       NodeType = "merge"
 	NodeTypeVariable    NodeType = "variable"
 	NodeTypeSubworkflow NodeType = "subworkflow"

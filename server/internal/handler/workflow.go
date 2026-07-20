@@ -69,7 +69,7 @@ func AdminCreateWorkflow(c *gin.Context) {
 	}
 
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
-		if err := validateWorkflowDraftForSave(tx, req.Graph, userID, 0); err != nil {
+		if err := validateWorkflowDraftForPersistence(req.Graph); err != nil {
 			return fmt.Errorf("%w: %v", errWorkflowDraftInvalid, err)
 		}
 		if err := tx.Create(&workflow).Error; err != nil {
@@ -248,11 +248,11 @@ func AdminUpdateWorkflow(c *gin.Context) {
 			!strings.EqualFold(strings.TrimSpace(*req.BaseHash), workflowGraphHash(definition.Graph)) {
 			return errWorkflowSaveConflict
 		}
-		graphToValidate := definition.Graph
+		graphToPersist := definition.Graph
 		if req.Graph != nil {
-			graphToValidate = *req.Graph
+			graphToPersist = *req.Graph
 		}
-		if err := validateWorkflowDraftForSave(tx, graphToValidate, userID, id); err != nil {
+		if err := validateWorkflowDraftForPersistence(graphToPersist); err != nil {
 			return fmt.Errorf("%w: %v", errWorkflowDraftInvalid, err)
 		}
 		if err := tx.Model(&definition).Updates(updates).Error; err != nil {
@@ -328,7 +328,7 @@ func RestoreWorkflowVersion(c *gin.Context) {
 		if err := tx.Where("id = ? AND app_id = ?", payload.VersionID, app.ID).First(&source).Error; err != nil {
 			return err
 		}
-		if err := validateWorkflowDraftForSave(tx, source.Config, userID, id); err != nil {
+		if err := validateWorkflowDraftForPersistence(source.Config); err != nil {
 			return fmt.Errorf("%w: %v", errWorkflowDraftInvalid, err)
 		}
 		retrievalConfig, err := parseAIAppRetrievalConfig(source.RetrievalConfig)
@@ -379,6 +379,10 @@ func PublishWorkflowVersion(c *gin.Context) {
 		}
 		return tx.Model(&app).Updates(map[string]any{"status": "published", "published_version_id": version.ID}).Error
 	}); err != nil {
+		if errors.Is(err, errWorkflowDraftInvalid) {
+			Error(c, http.StatusBadRequest, "工作流配置无效: "+strings.TrimPrefix(err.Error(), errWorkflowDraftInvalid.Error()+": "))
+			return
+		}
 		Error(c, 400, "发布工作流失败")
 		return
 	}
@@ -398,9 +402,6 @@ func workflowPlatform(c *gin.Context, userID model.Int64String) (model.Workflow,
 	}
 	var app model.AIApp
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
-		if err := validateWorkflowDraftForSave(tx, definition.Graph, int64(userID), int64(definition.ID)); err != nil {
-			return fmt.Errorf("%w: %v", errWorkflowDraftInvalid, err)
-		}
 		var syncErr error
 		app, _, syncErr = syncWorkflowAIAppWithoutSnapshot(tx, definition)
 		return syncErr
@@ -1014,8 +1015,21 @@ func workflowGraphHash(raw string) string {
 	return canonicalJSONHash(value)
 }
 
-// Saved drafts must remain executable and must never bypass the server-owned
-// capability, owner, version, recursion, or transitive budget boundaries.
+// Saved drafts may be incomplete while users build a workflow, but they must remain
+// serializable Graph v4 data so the editor can safely restore them.
+func validateWorkflowDraftForPersistence(raw string) error {
+	graph, err := decodeWorkflowGraph(raw)
+	if err != nil {
+		return fmt.Errorf("Graph JSON 无法解析")
+	}
+	if graph.SchemaVersion != workflow.SchemaVersion {
+		return fmt.Errorf("GRAPH_VERSION_UNSUPPORTED: schemaVersion 必须为 %d", workflow.SchemaVersion)
+	}
+	return nil
+}
+
+// Publishing and execution require a complete, executable graph and must never
+// bypass the server-owned capability, owner, version, recursion, or budget boundaries.
 func validateWorkflowDraftForSave(db *gorm.DB, raw string, userID, currentWorkflowID int64) error {
 	graph, err := decodeWorkflowGraph(raw)
 	if err != nil {

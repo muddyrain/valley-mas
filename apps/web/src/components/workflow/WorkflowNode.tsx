@@ -36,6 +36,7 @@ import { getNodeConfigSummary, NODE_CONFIGS } from './nodeConfig';
 import type { WorkflowNodeData } from './types';
 import { validateSingleNode } from './validateWorkflowConfig';
 import { useWorkflowRuntime } from './WorkflowRuntimeContext';
+import { getWorkflowRunBranchHandle } from './workflowRunBranches';
 import { getWorkflowSideEffectLabel } from './workflowSideEffects';
 import { getWorkflowNodeOutputFields } from './workflowVariables';
 
@@ -45,6 +46,7 @@ const iconMap = {
   llm: MessageSquare,
   tool: Wrench,
   condition: GitBranch,
+  switch: GitBranch,
   merge: GitMerge,
   variable: Hash,
   subworkflow: Workflow,
@@ -56,6 +58,7 @@ const colors = {
   llm: 'bg-violet-500/10 text-violet-600',
   tool: 'bg-orange-500/10 text-orange-600',
   condition: 'bg-green-500/10 text-green-600',
+  switch: 'bg-green-500/10 text-green-600',
   merge: 'bg-teal-500/10 text-teal-600',
   variable: 'bg-cyan-500/10 text-cyan-600',
   subworkflow: 'bg-indigo-500/10 text-indigo-600',
@@ -73,6 +76,20 @@ function getIntentBranchOutputs(config: Record<string, unknown> | undefined) {
         : [];
     }),
     { id: 'intent:other', name: '其他' },
+  ];
+}
+
+function getSwitchBranchOutputs(config: Record<string, unknown> | undefined) {
+  const cases = Array.isArray(config?.cases) ? config.cases : [];
+  return [
+    ...cases.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const { id, label } = item as { id?: unknown; label?: unknown };
+      return typeof id === 'string' && typeof label === 'string' && id
+        ? [{ id: `case:${id}`, name: label }]
+        : [];
+    }),
+    { id: 'default', name: '默认' },
   ];
 }
 
@@ -128,7 +145,11 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
         ]
       : nodeType === 'intent'
         ? getIntentBranchOutputs(config)
-        : [];
+        : nodeType === 'switch'
+          ? getSwitchBranchOutputs(config)
+          : [];
+  const activeBranchID =
+    runningState === 'success' ? getWorkflowRunBranchHandle(nodeType, snapshot?.output) : null;
   const hasOutput = definition?.handles.output && branchOutputs.length === 0;
   const draftValidationMessage = validationErrors.get(id);
   const validationError = draftValidationMessage ? null : validateSingleNode(nodeData);
@@ -297,16 +318,37 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
               ) : null}
             </div>
           ) : null}
-          {nodeType === 'intent' && branchOutputs.length ? (
+          {(nodeType === 'intent' || nodeType === 'switch') && branchOutputs.length ? (
             <div className="space-y-1 border-t border-border bg-muted/10 px-4 py-1.5 text-xs">
-              {branchOutputs.map((branch, index) => (
-                <div key={branch.id} className="flex min-h-6 items-center gap-2">
-                  <span className="w-7 shrink-0 text-muted-foreground">
-                    {index === 0 ? '分流' : ''}
-                  </span>
-                  <span className="min-w-0 truncate text-muted-foreground">{branch.name}</span>
-                </div>
-              ))}
+              {branchOutputs.map((branch, index) => {
+                const isActiveBranch = activeBranchID === branch.id;
+                return (
+                  <div
+                    key={branch.id}
+                    className={cn(
+                      'flex min-h-6 items-center gap-2 rounded-md px-1',
+                      isActiveBranch && 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'w-7 shrink-0 text-muted-foreground',
+                        isActiveBranch && 'text-emerald-600 dark:text-emerald-400',
+                      )}
+                    >
+                      {index === 0 ? '输出' : ''}
+                    </span>
+                    <span
+                      className={cn(
+                        'min-w-0 truncate text-muted-foreground',
+                        isActiveBranch && 'font-medium text-emerald-700 dark:text-emerald-400',
+                      )}
+                    >
+                      {branch.name}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           ) : null}
         </div>
@@ -328,7 +370,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
                 title={branch.name}
                 style={{
                   top:
-                    nodeType === 'intent'
+                    nodeType === 'intent' || nodeType === 'switch'
                       ? `${((142 + index * 28) / (128 + branchOutputs.length * 28)) * 100}%`
                       : `${((index + 1) / (branchOutputs.length + 1)) * 100}%`,
                 }}
@@ -340,13 +382,17 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
                       ? '!border-red-500'
                       : branch.id === 'intent:other'
                         ? '!border-slate-400'
-                        : '!border-cyan-500',
+                        : branch.id === 'default'
+                          ? '!border-slate-400'
+                          : '!border-cyan-500',
+                  activeBranchID === branch.id && '!border-emerald-500 !bg-emerald-50',
                 )}
               />
             ))
           : null}
         {nodeType !== 'end' &&
         nodeType !== 'condition' &&
+        nodeType !== 'switch' &&
         nodeType !== 'intent' &&
         !connectedSourceNodeIDs.has(id) ? (
           <div className="nodrag nopan absolute left-full top-1/2 z-10 ml-5 -translate-y-1/2 opacity-0 transition-opacity group-hover/node:opacity-100">

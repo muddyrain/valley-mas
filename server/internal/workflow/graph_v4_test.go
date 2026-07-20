@@ -126,6 +126,88 @@ func TestGraphV4MergeUsesFirstActiveBranch(t *testing.T) {
 	}
 }
 
+func TestSwitchNodeRoutesConfiguredCaseOrDefault(t *testing.T) {
+	registry := testRegistry(t)
+	graph := Graph{SchemaVersion: 4, Nodes: []Node{
+		node("start", NodeTypeStart, `{"inputs":{"contentType":{"type":"string","required":true}}}`),
+		node("switch", NodeTypeSwitch, `{"value":"{{start.output.contentType}}","valueType":"string","cases":[{"id":"article","label":"文章","value":"article"},{"id":"resource","label":"资源","value":"resource"}]}`),
+		node("article", NodeTypeVariable, `{"assignments":[{"name":"result","type":"string","value":"article"}]}`),
+		node("resource", NodeTypeVariable, `{"assignments":[{"name":"result","type":"string","value":"resource"}]}`),
+		node("fallback", NodeTypeVariable, `{"assignments":[{"name":"result","type":"string","value":"default"}]}`),
+		node("merge", NodeTypeMerge, `{"fields":[{"name":"result","type":"string","sources":["{{article.output.result}}","{{resource.output.result}}","{{fallback.output.result}}"]}]}`),
+		node("end", NodeTypeEnd, `{"outputs":{"result":"{{merge.output.result}}"},"outputTypes":{"result":"string"}}`),
+	}, Edges: []Edge{
+		{Source: "start", Target: "switch"},
+		{Source: "switch", SourceHandle: "case:article", Target: "article"},
+		{Source: "switch", SourceHandle: "case:resource", Target: "resource"},
+		{Source: "switch", SourceHandle: "default", Target: "fallback"},
+		{Source: "article", Target: "merge"},
+		{Source: "resource", Target: "merge"},
+		{Source: "fallback", Target: "merge"},
+		{Source: "merge", Target: "end"},
+	}}
+	if errs := ValidateGraph(graph, registry); len(errs) > 0 {
+		t.Fatalf("validation errors: %v", errs)
+	}
+	for _, test := range []struct {
+		contentType string
+		want        string
+		caseID      string
+	}{{"article", "article", "article"}, {"unknown", "default", "default"}} {
+		var switchOutput, final map[string]any
+		err := Execute(context.Background(), graph, registry, RunContext{Inputs: map[string]any{"contentType": test.contentType}}, func(event Event) {
+			if event.NodeID == "switch" && event.Status == StatusSucceeded {
+				switchOutput = event.Output
+			}
+			if event.NodeID == "end" && event.Status == StatusSucceeded {
+				final = event.Output
+			}
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if switchOutput["matchedCaseId"] != test.caseID || final["result"] != test.want {
+			t.Fatalf("contentType=%q switch=%v final=%v", test.contentType, switchOutput, final)
+		}
+	}
+}
+
+func TestSwitchExecutorMatchesNumberAndBooleanValues(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		value     any
+		valueType string
+		caseValue any
+		other     any
+	}{
+		{name: "number", value: 2, valueType: "number", caseValue: 2, other: 3},
+		{name: "boolean", value: true, valueType: "boolean", caseValue: true, other: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := (SwitchExecutor{}).Execute(context.Background(), RunContext{}, NodeExecution{
+				Input: map[string]any{
+					"value":     tc.value,
+					"valueType": tc.valueType,
+					"cases": []any{
+						map[string]any{"id": "matched", "label": "命中", "value": tc.caseValue},
+						map[string]any{"id": "other", "label": "其他", "value": tc.other},
+					},
+				},
+			})
+			if err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			if got := result.Output["matchedCaseId"]; got != "matched" {
+				t.Fatalf("matchedCaseId = %v, want matched", got)
+			}
+		})
+	}
+}
+
 func TestIntentNodeClassifiesConfiguredIntentAndRoutesBranch(t *testing.T) {
 	registry := NewRegistry(
 		NodeDefinition{Type: NodeTypeStart},

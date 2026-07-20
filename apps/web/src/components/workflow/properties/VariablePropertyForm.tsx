@@ -9,8 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { TypedVariableValueEditor } from '../TypedVariableValueEditor';
 import type { WorkflowValueType, WorkflowVariableAssignment } from '../types';
-import { VariableValueEditor } from '../VariableReferencePicker';
 import type { PropertyFormProps } from './index';
 
 const valueTypes: WorkflowValueType[] = ['string', 'string[]', 'object', 'number', 'boolean'];
@@ -69,9 +69,10 @@ export function VariablePropertyForm({
               <Trash2 className="size-4" />
             </Button>
           </div>
-          <VariableValueEditor
+          <TypedVariableValueEditor
             ariaLabel={`${assignment.name || `变量 ${index + 1}`}的值`}
-            value={String(assignment.value ?? '')}
+            type={assignment.type}
+            value={assignment.value}
             onChange={(value) => update(index, { value })}
             options={variableOptions}
             fixedPlaceholder="输入固定值"

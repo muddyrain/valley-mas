@@ -45,6 +45,14 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     category: 'flow',
     handles: { input: true, outputs: 2 },
   },
+  switch: {
+    type: 'switch',
+    label: '选择器',
+    description: '根据结构化字段选择一条路径',
+    icon: 'GitBranch',
+    category: 'flow',
+    handles: { input: true, outputs: 3 },
+  },
   merge: {
     type: 'merge',
     label: '合并',
@@ -104,6 +112,8 @@ export function getNodeConfigSummary(nodeType: string, config?: Record<string, u
       return config.left && config.operator
         ? `${String(config.left)} ${String(config.operator)}`
         : '未配置条件';
+    case 'switch':
+      return `${Array.isArray(config.cases) ? config.cases.length : 0} 个 case + 默认`;
     case 'merge':
       return `${Array.isArray(config.fields) ? config.fields.length : 0} 个合并字段`;
     case 'variable':

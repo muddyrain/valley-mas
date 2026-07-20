@@ -105,6 +105,7 @@ import type { WorkflowRunInput } from '@/components/workflow/RunPanel';
 import { RunPanel } from '@/components/workflow/RunPanel';
 import {
   createWorkflowRunSession,
+  type WorkflowRunSession,
   workflowRunSessionReducer,
 } from '@/components/workflow/runSession';
 import { useWorkflowHistory } from '@/components/workflow/useWorkflowHistory';
@@ -131,6 +132,7 @@ import {
   serializeWorkflowGraph,
 } from '@/components/workflow/workflowGraph';
 import { layoutNodeInsertion } from '@/components/workflow/workflowLayout';
+import { getWorkflowRunBranchHandle } from '@/components/workflow/workflowRunBranches';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const defaultEdgeOptions = {
@@ -153,6 +155,64 @@ const minimumRunPanelHeight = 220;
 const maximumRunPanelHeight = 720;
 const minimumRightPanelWidth = 420;
 const maximumRightPanelWidth = 560;
+const SERVER_NODE_FIELD_VALIDATION_PATTERN =
+  /节点\s+([^\s；，]+)\s+的\s+([^\s；，]+)\s+需要\s+([^，；]+)，实际为\s+([^；]+)/g;
+const SERVER_NODE_VALIDATION_PATTERN = /(?:选择器)?节点\s+([^\s；，]+)/g;
+
+function didRunTraverseEdge(edge: Edge, nodes: Node[], session: WorkflowRunSession) {
+  const sourceRun = session.nodes[edge.source];
+  if (sourceRun?.status !== 'success' || !sourceRun.output) return true;
+  const sourceNode = nodes.find((node) => node.id === edge.source);
+  const sourceType = (sourceNode?.data as { nodeType?: string } | undefined)?.nodeType;
+
+  const activeHandle = getWorkflowRunBranchHandle(sourceType, sourceRun.output);
+  return activeHandle ? edge.sourceHandle === activeHandle : true;
+}
+
+function runtimeEdgeStyle(edge: Edge, stroke: string) {
+  return {
+    ...edge.style,
+    stroke,
+    strokeWidth: edge.style?.strokeWidth ?? defaultEdgeOptions.style.strokeWidth,
+  };
+}
+
+function getServerValidationErrors(message: string, nodes: Node[]): ValidationError[] {
+  const nodeByID = new Map(nodes.map((node) => [node.id, node]));
+  const errors: ValidationError[] = [];
+  const handledNodeIDs = new Set<string>();
+
+  for (const match of message.matchAll(SERVER_NODE_FIELD_VALIDATION_PATTERN)) {
+    const [, nodeID, field, expected, actual] = match;
+    const node = nodeByID.get(nodeID);
+    if (!node) continue;
+    const data = node.data as { label?: string; nodeType?: string };
+    errors.push({
+      nodeId: nodeID,
+      nodeLabel: data.label || nodeID,
+      nodeType: data.nodeType || node.type || '',
+      field,
+      message: `字段“${field}”需要${expected}，实际为${actual.trim()}`,
+    });
+    handledNodeIDs.add(nodeID);
+  }
+
+  for (const match of message.matchAll(SERVER_NODE_VALIDATION_PATTERN)) {
+    const nodeID = match[1];
+    if (handledNodeIDs.has(nodeID)) continue;
+    const node = nodeByID.get(nodeID);
+    if (!node) continue;
+    const data = node.data as { label?: string; nodeType?: string };
+    errors.push({
+      nodeId: nodeID,
+      nodeLabel: data.label || nodeID,
+      nodeType: data.nodeType || node.type || '',
+      message: message.replace(/^工作流配置无效:\s*/, ''),
+    });
+  }
+
+  return errors;
+}
 
 function notifyWorkflowValidation(action: '保存' | '发布' | '运行', errors: ValidationError[]) {
   const firstError = errors[0];
@@ -270,6 +330,10 @@ export default function WorkflowEditorPage() {
   const [retryRun, setRetryRun] = useState<WorkflowRunDetail | null>(null);
   const [pendingRetryRun, setPendingRetryRun] = useState<WorkflowRunDetail | null>(null);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
+  const [serverValidationErrors, setServerValidationErrors] = useState<ValidationError[]>([]);
+  const [pendingValidationFocusNodeID, setPendingValidationFocusNodeID] = useState<string | null>(
+    null,
+  );
   const [runPanelHeight, setRunPanelHeight] = useState<number | null>(null);
   const [isRunPanelResizing, setIsRunPanelResizing] = useState(false);
   const [runSession, dispatchRunSession] = useReducer(
@@ -333,6 +397,15 @@ export default function WorkflowEditorPage() {
     setNodes,
     setEdges,
   );
+
+  const applyServerValidationError = useCallback((message: string) => {
+    const errors = getServerValidationErrors(message, workflowStateRef.current.nodes);
+    if (errors.length === 0) return message;
+    setServerValidationErrors(errors);
+    setShowValidationErrors(true);
+    setPendingValidationFocusNodeID(errors[0].nodeId);
+    return `“${errors[0].nodeLabel}”节点：${errors[0].message}`;
+  }, []);
 
   useEffect(() => {
     isEditorMountedRef.current = true;
@@ -475,6 +548,8 @@ export default function WorkflowEditorPage() {
     const nextState = { ...workflowStateRef.current, ...updates };
     workflowStateRef.current = nextState;
     setShowValidationErrors(false);
+    setServerValidationErrors([]);
+    setPendingValidationFocusNodeID(null);
     saveRevisionRef.current += 1;
     workflowSnapshotRef.current = {
       name: nextState.name,
@@ -549,13 +624,6 @@ export default function WorkflowEditorPage() {
             shouldForce ||
             workflowSnapshotRef.current.revision > persistedRevisionRef.current
           ) {
-            if (
-              validateWorkflowDraft(workflowStateRef.current.nodes, workflowStateRef.current.edges)
-                .length > 0
-            ) {
-              setSaveStatus('pending');
-              return false;
-            }
             const snapshot = workflowSnapshotRef.current;
             const result = await updateWorkflow(
               id,
@@ -602,15 +670,11 @@ export default function WorkflowEditorPage() {
             workflowIdRef.current !== id
           )
             return false;
-          if (
-            validateWorkflowDraft(workflowStateRef.current.nodes, workflowStateRef.current.edges)
-              .length > 0
-          ) {
-            setSaveStatus('pending');
-            return false;
-          }
           setSaveStatus('error');
-          if (!silent) toast.error(getAPIErrorMessage(error, '保存失败'));
+          if (!silent) {
+            const message = applyServerValidationError(getAPIErrorMessage(error, '保存失败'));
+            toast.error(message);
+          }
           return false;
         }
       });
@@ -621,7 +685,7 @@ export default function WorkflowEditorPage() {
       );
       return queuedUpdate;
     },
-    [finishCreatedWorkflow, refreshWorkflowMeta],
+    [applyServerValidationError, finishCreatedWorkflow, refreshWorkflowMeta],
   );
 
   const createDraftWorkflow = useCallback(
@@ -682,12 +746,6 @@ export default function WorkflowEditorPage() {
 
   useEffect(() => {
     if (!workflowId || saveRevision === 0 || saveRevision <= persistedRevisionRef.current) {
-      return;
-    }
-
-    const state = workflowStateRef.current;
-    if (validateWorkflowDraft(state.nodes, state.edges).length > 0) {
-      setSaveStatus('pending');
       return;
     }
 
@@ -1429,15 +1487,8 @@ export default function WorkflowEditorPage() {
   );
 
   const handleSave = useCallback(async () => {
-    const state = workflowStateRef.current;
-    const errors = validateWorkflowDraft(state.nodes, state.edges);
-    if (errors.length > 0) {
-      setSaveStatus('pending');
-      setShowValidationErrors(true);
-      notifyWorkflowValidation('保存', errors);
-      return;
-    }
     setShowValidationErrors(false);
+    setServerValidationErrors([]);
     const saved = await persistLatestWorkflow({
       force: true,
       createIfMissing: true,
@@ -1456,11 +1507,13 @@ export default function WorkflowEditorPage() {
     if (errors.length > 0) {
       setSaveStatus('pending');
       setShowValidationErrors(true);
+      setPendingValidationFocusNodeID(errors[0].nodeId);
       notifyWorkflowValidation('发布', errors);
       return;
     }
 
     setShowValidationErrors(false);
+    setServerValidationErrors([]);
     setIsPublishing(true);
     try {
       const saved = await persistLatestWorkflow({
@@ -1475,11 +1528,12 @@ export default function WorkflowEditorPage() {
       await refreshWorkflowMeta(id);
       toast.success('已发布当前版本');
     } catch (error) {
-      toast.error(getAPIErrorMessage(error, '发布失败'));
+      const message = applyServerValidationError(getAPIErrorMessage(error, '发布失败'));
+      toast.error(message);
     } finally {
       setIsPublishing(false);
     }
-  }, [persistLatestWorkflow, refreshWorkflowMeta]);
+  }, [applyServerValidationError, persistLatestWorkflow, refreshWorkflowMeta]);
 
   const handleRunConfirm = useCallback(
     async ({ inputs, files }: WorkflowRunInput) => {
@@ -1526,9 +1580,10 @@ export default function WorkflowEditorPage() {
               setIsRunning(false);
               return;
             }
-            setRunError(msg);
-            dispatchRunSession({ type: 'error', generation, error: msg });
-            toast.error(msg);
+            const errorMessage = applyServerValidationError(msg);
+            setRunError(errorMessage);
+            dispatchRunSession({ type: 'error', generation, error: errorMessage });
+            toast.error(errorMessage);
             setIsRunning(false);
           },
         };
@@ -1553,7 +1608,7 @@ export default function WorkflowEditorPage() {
         }
       }
     },
-    [isActiveWorkflowSession, retryRun, workflowId],
+    [applyServerValidationError, isActiveWorkflowSession, retryRun, workflowId],
   );
 
   const focusValidationNode = useCallback((nodeID: string) => {
@@ -1575,6 +1630,12 @@ export default function WorkflowEditorPage() {
     setActivePropertyTab('config');
   }, []);
 
+  useEffect(() => {
+    if (!pendingValidationFocusNodeID) return;
+    focusValidationNode(pendingValidationFocusNodeID);
+    setPendingValidationFocusNodeID(null);
+  }, [focusValidationNode, pendingValidationFocusNodeID]);
+
   const handleRun = useCallback(async () => {
     const state = workflowStateRef.current;
     if (state.nodes.length === 0) {
@@ -1587,7 +1648,7 @@ export default function WorkflowEditorPage() {
       setShowValidationErrors(true);
       const firstError = errors[0];
       notifyWorkflowValidation('运行', errors);
-      focusValidationNode(firstError.nodeId);
+      setPendingValidationFocusNodeID(firstError.nodeId);
       return;
     }
 
@@ -1599,7 +1660,7 @@ export default function WorkflowEditorPage() {
 
     setRetryRun(null);
     setShowRunPanel(true);
-  }, [focusValidationNode, persistLatestWorkflow]);
+  }, [persistLatestWorkflow]);
 
   const openRetryRunPanel = useCallback((run: WorkflowRunDetail) => {
     if (!retryInputNodes(run.run.graphSnapshot)) {
@@ -1737,45 +1798,60 @@ export default function WorkflowEditorPage() {
       edges.map((edge) => {
         const source = runSession.nodes[edge.source]?.status;
         const target = runSession.nodes[edge.target]?.status;
+        if (!didRunTraverseEdge(edge, nodes, runSession)) {
+          return edge;
+        }
         if (source === 'error' || target === 'error') {
           return {
             ...edge,
             animated: false,
-            style: { ...edge.style, stroke: 'hsl(var(--destructive))' },
+            style: runtimeEdgeStyle(edge, 'hsl(var(--destructive))'),
           };
         }
         if (source === 'running' || target === 'running') {
           return {
             ...edge,
             animated: true,
-            style: { ...edge.style, stroke: 'hsl(var(--primary))' },
+            style: runtimeEdgeStyle(edge, 'hsl(var(--primary))'),
           };
         }
         if (source === 'success' && target === 'success') {
-          return { ...edge, animated: false, style: { ...edge.style, stroke: '#16a34a' } };
+          return { ...edge, animated: false, style: runtimeEdgeStyle(edge, '#16a34a') };
         }
         return edge;
       }),
-    [edges, runSession.nodes],
+    [edges, nodes, runSession],
   );
 
   const visibleValidationErrors = useMemo(() => {
     const invalidReferenceErrors = getInvalidWorkflowVariableReferenceErrors(nodes, edges);
-    if (!showValidationErrors) return invalidReferenceErrors;
+    if (!showValidationErrors) return [...invalidReferenceErrors, ...serverValidationErrors];
 
     return [
       ...validateWorkflowDraft(nodes, edges).filter((error) => error.nodeId !== 'workflow'),
       ...invalidReferenceErrors,
+      ...serverValidationErrors,
     ];
-  }, [edges, nodes, showValidationErrors]);
+  }, [edges, nodes, serverValidationErrors, showValidationErrors]);
+
+  const nodeValidationMessages = useMemo(() => {
+    const messages = new Map<string, string>();
+    for (const error of visibleValidationErrors) {
+      messages.set(
+        error.nodeId,
+        messages.has(error.nodeId)
+          ? `${messages.get(error.nodeId)}；${error.message}`
+          : error.message,
+      );
+    }
+    return messages;
+  }, [visibleValidationErrors]);
 
   const runtimeValue = useMemo(
     () => ({
       session: runSession,
       connectedSourceNodeIDs: new Set(edges.map((edge) => edge.source)),
-      validationErrors: new Map(
-        visibleValidationErrors.map((error) => [error.nodeId, error.message]),
-      ),
+      validationErrors: nodeValidationMessages,
       copyNode: handleCopyNode,
       deleteNode: handleDeleteNode,
       insertAfter: handleInsertAfter,
@@ -1788,7 +1864,7 @@ export default function WorkflowEditorPage() {
       handleInsertAfter,
       handleInsertOnEdge,
       runSession,
-      visibleValidationErrors,
+      nodeValidationMessages,
     ],
   );
 
@@ -1822,6 +1898,7 @@ export default function WorkflowEditorPage() {
       nodes={nodes}
       edges={edges}
       runSnapshot={selectedNode ? runSession.nodes[selectedNode.id] : undefined}
+      validationErrors={visibleValidationErrors}
       activeTab={activePropertyTab}
       onActiveTabChange={setActivePropertyTab}
     />

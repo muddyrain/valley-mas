@@ -141,6 +141,8 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 		case NodeTypeCondition:
 			rule := Rule{Left: config["left"], Operator: stringFromValue(config["operator"]), Right: config["right"]}
 			errs = append(errs, validateRule(rule, node.ID)...)
+		case NodeTypeSwitch:
+			errs = append(errs, validateSwitchConfig(node.ID, config)...)
 		case NodeTypeMerge:
 			errs = append(errs, validateMergeConfig(node.ID, config)...)
 		case NodeTypeVariable:
@@ -179,18 +181,22 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 	incoming := make(map[string]int, len(nodes))
 	outgoing := make(map[string]int, len(nodes))
 	branchHandles := make(map[string]map[string]int)
-	intentOutputHandles := make(map[string]map[string]bool)
+	branchOutputHandles := make(map[string]map[string]bool)
 	for id, node := range nodes {
-		if node.Type != NodeTypeIntent {
+		if node.Type != NodeTypeIntent && node.Type != NodeTypeSwitch {
 			continue
 		}
 		config, err := decodeConfig(node.Config)
 		if err != nil {
 			continue
 		}
-		intentOutputHandles[id] = make(map[string]bool)
-		for _, handle := range intentBranchHandles(config) {
-			intentOutputHandles[id][handle] = true
+		branchOutputHandles[id] = make(map[string]bool)
+		handles := intentBranchHandles(config)
+		if node.Type == NodeTypeSwitch {
+			handles = switchBranchHandles(config)
+		}
+		for _, handle := range handles {
+			branchOutputHandles[id][handle] = true
 		}
 	}
 	edgeKeys := make(map[string]struct{}, len(graph.Edges))
@@ -222,9 +228,9 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 				}
 				branchHandles[source.ID][edge.SourceHandle]++
 			}
-		} else if source.Type == NodeTypeIntent {
-			if !intentOutputHandles[source.ID][edge.SourceHandle] {
-				errs = append(errs, fmt.Sprintf("意图识别节点 %s 的分流出口无效", source.ID))
+		} else if source.Type == NodeTypeIntent || source.Type == NodeTypeSwitch {
+			if !branchOutputHandles[source.ID][edge.SourceHandle] {
+				errs = append(errs, fmt.Sprintf("分流节点 %s 的出口无效", source.ID))
 			} else {
 				if branchHandles[source.ID] == nil {
 					branchHandles[source.ID] = map[string]int{}
@@ -245,9 +251,16 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 			}
 		}
 		if node.Type == NodeTypeIntent {
-			for handle := range intentOutputHandles[id] {
+			for handle := range branchOutputHandles[id] {
 				if branchHandles[id][handle] != 1 {
 					errs = append(errs, fmt.Sprintf("意图识别节点 %s 的 %s 出口必须各有一条连线", id, handle))
+				}
+			}
+		}
+		if node.Type == NodeTypeSwitch {
+			for handle := range branchOutputHandles[id] {
+				if branchHandles[id][handle] != 1 {
+					errs = append(errs, fmt.Sprintf("选择器节点 %s 的 %s 出口必须各有一条连线", id, handle))
 				}
 			}
 		}
@@ -416,7 +429,7 @@ func referenceMayBeSkipped(sourceID, targetID string, nodes map[string]Node, edg
 		return true
 	}
 	for branchID, branch := range nodes {
-		if branch.Type != NodeTypeCondition && branch.Type != NodeTypeIntent {
+		if branch.Type != NodeTypeCondition && branch.Type != NodeTypeIntent && branch.Type != NodeTypeSwitch {
 			continue
 		}
 		branchTargets := map[string]string{}
@@ -566,6 +579,8 @@ func validateBindingTypes(nodes []Node, outputFields map[string]map[string]Value
 			}
 		case NodeTypeIntent:
 			errs = append(errs, validateBoundValueType(node.ID, "query", config["query"], ValueTypeString, outputFields)...)
+		case NodeTypeSwitch:
+			errs = append(errs, validateBoundValueType(node.ID, "value", config["value"], ValueType(stringFromValue(config["valueType"])), outputFields)...)
 		case NodeTypeMerge:
 			fields, _ := config["fields"].([]any)
 			for _, raw := range fields {
@@ -698,6 +713,13 @@ func buildOutputFields(nodes map[string]Node, startInputs map[string]InputDefini
 			result[id], _ = llmOutputFields(config)
 		case NodeTypeCondition:
 			result[id] = fields(field("matched", ValueTypeBoolean))
+		case NodeTypeSwitch:
+			config, _ := decodeConfig(node.Config)
+			result[id] = fields(
+				field("matchedCaseId", ValueTypeString),
+				field("matchedLabel", ValueTypeString),
+				field("matchedValue", ValueType(stringFromValue(config["valueType"]))),
+			)
 		case NodeTypeTool:
 			config, _ := decodeConfig(node.Config)
 			capability, _, ok := registry.Capability(stringFromValue(config["capabilityId"]))

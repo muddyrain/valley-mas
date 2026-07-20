@@ -4,6 +4,7 @@ export type WorkflowNodeType =
   | 'llm'
   | 'tool'
   | 'condition'
+  | 'switch'
   | 'merge'
   | 'variable'
   | 'subworkflow'
@@ -79,4 +80,10 @@ export interface WorkflowIntentDefinition {
   name: string;
   description: string;
   examples: string[];
+}
+
+export interface WorkflowSwitchCase {
+  id: string;
+  label: string;
+  value: string | number | boolean;
 }

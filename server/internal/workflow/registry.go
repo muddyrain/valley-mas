@@ -68,12 +68,13 @@ func DefaultRegistry() *Registry {
 		NodeDefinition{Type: NodeTypeLLM, Label: "大模型", Description: "使用受控模型生成文本", Category: "model", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, WhenAllowed: true, ConfigSchema: required("prompt")},
 		NodeDefinition{Type: NodeTypeTool, Label: "工具", Description: "调用白名单业务能力", Category: "tool", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, WhenAllowed: true, ConfigSchema: required("capabilityId", "inputs")},
 		NodeDefinition{Type: NodeTypeCondition, Label: "条件", Description: "按受控规则选择分支", Category: "flow", InputPorts: []string{"input"}, OutputPorts: []string{"true", "false"}, ConfigSchema: required("left", "operator")},
+		NodeDefinition{Type: NodeTypeSwitch, Label: "选择器", Description: "根据结构化字段选择一条路径", Category: "flow", InputPorts: []string{"input"}, OutputPorts: []string{"case:*", "default"}, ConfigSchema: required("value", "valueType", "cases")},
 		NodeDefinition{Type: NodeTypeMerge, Label: "合并", Description: "从已执行分支选择首个可用值", Category: "flow", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, ConfigSchema: required("fields")},
 		NodeDefinition{Type: NodeTypeVariable, Label: "变量", Description: "设置可复用变量", Category: "flow", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, WhenAllowed: true, ConfigSchema: required("assignments")},
 		NodeDefinition{Type: NodeTypeSubworkflow, Label: "子工作流", Description: "调用已发布的不可变工作流版本", Category: "subworkflow", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, WhenAllowed: true, ConfigSchema: required("workflowId", "versionId", "inputs")},
 		NodeDefinition{Type: NodeTypeIntent, Label: "意图识别", Description: "按已配置意图将文本分流", Category: "logic", InputPorts: []string{"input"}, OutputPorts: []string{"intent:*", "intent:other"}, ConfigSchema: required("query", "intents")},
 	)
-	for _, executor := range []NodeExecutor{startExecutor{}, endExecutor{}, ConditionExecutor{}, MergeExecutor{}, VariableExecutor{}, SubworkflowExecutor{}, IntentClassifierExecutor{}, LLMTextExecutor{}, ToolNodeExecutor{Registry: registry}} {
+	for _, executor := range []NodeExecutor{startExecutor{}, endExecutor{}, ConditionExecutor{}, SwitchExecutor{}, MergeExecutor{}, VariableExecutor{}, SubworkflowExecutor{}, IntentClassifierExecutor{}, LLMTextExecutor{}, ToolNodeExecutor{Registry: registry}} {
 		_ = registry.RegisterExecutor(executor)
 	}
 	return registry

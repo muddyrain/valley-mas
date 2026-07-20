@@ -10,8 +10,9 @@ import {
 } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { TypedVariableBindingPicker } from '../TypedVariableBindingPicker';
 import type { WorkflowValueType } from '../types';
-import { VariableReferencePicker, VariableValueEditor } from '../VariableReferencePicker';
+import { VariableReferencePicker } from '../VariableReferencePicker';
 import { VariableTokenEditor } from '../VariableTokenEditor';
 import {
   getWorkflowBindingTypeMismatchMessage,
@@ -274,19 +275,13 @@ function VariableBindingField({
         </Button>
       </div>
       {valueMode === 'explicit' ? (
-        <VariableValueEditor
+        <TypedVariableBindingPicker
           ariaLabel={`${name} 变量值`}
-          value={stringValue}
-          onChange={(nextValue, selected) => {
-            const selectedType = selected?.type;
-            onChange(
-              { ...values, [name]: nextValue },
-              selectedType && selectedType !== 'unknown'
-                ? { ...types, [name]: selectedType }
-                : types,
-            );
-          }}
+          type={types[name] || 'string'}
+          value={value}
+          onChange={(nextValue) => onChange({ ...values, [name]: nextValue }, types)}
           options={variableOptions}
+          showType={false}
         />
       ) : (
         <VariableTokenEditor

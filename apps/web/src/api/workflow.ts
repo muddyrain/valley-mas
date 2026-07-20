@@ -7,6 +7,7 @@ export type WorkflowNodeType =
   | 'llm'
   | 'tool'
   | 'condition'
+  | 'switch'
   | 'merge'
   | 'variable'
   | 'subworkflow'

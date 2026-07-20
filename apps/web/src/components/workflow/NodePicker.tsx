@@ -74,6 +74,21 @@ const genericItems: NodePickerItem[] = [
     config: { left: '', operator: 'equals', right: true },
   },
   {
+    key: 'switch',
+    group: 'flow',
+    nodeType: 'switch',
+    label: '选择器',
+    description: '根据结构化字段选择一条路径',
+    config: {
+      value: '',
+      valueType: 'string',
+      cases: [
+        { id: 'case_1', label: '选项 1', value: 'option_1' },
+        { id: 'case_2', label: '选项 2', value: 'option_2' },
+      ],
+    },
+  },
+  {
     key: 'merge',
     group: 'flow',
     nodeType: 'merge',
@@ -126,6 +141,7 @@ const groupIcons = {
 const itemIcons: Record<string, typeof MessageSquare> = {
   llm: MessageSquare,
   condition: GitBranch,
+  switch: GitBranch,
   merge: GitMerge,
   variable: Hash,
   intent: Lightbulb,

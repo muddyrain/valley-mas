@@ -201,6 +201,46 @@ func TestWorkflowGraphV4RejectsLegacySchema(t *testing.T) {
 	}
 }
 
+func TestWorkflowSaveAllowsInvalidDraftButPublishRejectsIt(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	invalid := strings.Replace(
+		definition.Graph,
+		`{{start.output.title}}`,
+		`{{start.output.missing}}`,
+		1,
+	)
+	body, _ := json.Marshal(map[string]string{
+		"graph":    invalid,
+		"baseHash": workflowGraphHash(definition.Graph),
+	})
+	update := httptest.NewRequest(
+		http.MethodPut,
+		"/workflows/"+definition.ID.String(),
+		bytes.NewReader(body),
+	)
+	update.Header.Set("Content-Type", "application/json")
+	update.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	updateRecorder := httptest.NewRecorder()
+	router.ServeHTTP(updateRecorder, update)
+	if responseCode(updateRecorder) != 0 {
+		t.Fatalf("invalid draft must save: %s", updateRecorder.Body.String())
+	}
+
+	var saved model.Workflow
+	if err := database.DB.First(&saved, definition.ID).Error; err != nil || saved.Graph != invalid {
+		t.Fatalf("saved draft=%+v err=%v", saved, err)
+	}
+
+	publish := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/publish", nil)
+	publish.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	publishRecorder := httptest.NewRecorder()
+	router.ServeHTTP(publishRecorder, publish)
+	if responseCode(publishRecorder) != http.StatusBadRequest ||
+		!strings.Contains(publishRecorder.Body.String(), "变量 start.output.missing 未声明") {
+		t.Fatalf("invalid draft must not publish: %s", publishRecorder.Body.String())
+	}
+}
+
 func TestWorkflowSaveRejectsForgedSubworkflowContract(t *testing.T) {
 	_, _ = setupWorkflowRuntimeTestRouter(t)
 	childGraph := `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","config":{"inputs":{"topic":{"type":"string","required":true}}}},{"id":"end","type":"end","label":"结束","config":{"outputs":{"title":"{{start.output.topic}}"},"outputTypes":{"title":"string"}}}],"edges":[{"source":"start","target":"end"}]}`
