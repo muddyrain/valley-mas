@@ -1,5 +1,13 @@
-import { Plus, Trash2 } from 'lucide-react';
+import { CircleAlert, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import type { WorkflowValueType } from '../types';
@@ -34,6 +42,32 @@ interface VariableBindingEditorProps {
   nameAriaLabel: string;
   allowedTypes?: WorkflowValueType[];
   valueMode?: 'inline' | 'explicit' | 'reference';
+}
+
+function BindingErrorInfo({ message }: { message: string }) {
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="absolute -right-2 -top-2 z-10 rounded-full border border-destructive/30 bg-background text-destructive shadow-xs hover:bg-destructive/10 hover:text-destructive"
+            aria-label="查看配置错误"
+          >
+            <CircleAlert />
+          </Button>
+        }
+      />
+      <PopoverContent side="bottom" align="start" className="w-80 gap-2">
+        <PopoverHeader>
+          <PopoverTitle>配置提示</PopoverTitle>
+          <PopoverDescription>{message}</PopoverDescription>
+        </PopoverHeader>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function VariableBindingEditor({
@@ -157,42 +191,44 @@ function VariableBindingField({
       <div
         aria-invalid={Boolean(fieldErrorMessage) || undefined}
         className={cn(
-          'grid grid-cols-[minmax(96px,0.7fr)_minmax(0,1.3fr)_auto] items-center gap-2',
+          'relative space-y-2',
           fieldErrorMessage && 'rounded-lg border border-destructive/70 bg-destructive/5 px-2 py-2',
         )}
-        title={fieldErrorMessage || undefined}
       >
-        <RecordKeyInput
-          name={name}
-          names={names}
-          ariaLabel={nameAriaLabel}
-          onCommit={renameVariable}
-        />
-        <VariableReferencePicker
-          ariaLabel={`${name} 变量值`}
-          className="w-full"
-          value={stringValue}
-          onChange={(nextValue) => {
-            const selected = variableOptions.find((option) => option.token === nextValue);
-            onChange(
-              { ...values, [name]: nextValue },
-              selected?.type && selected.type !== 'unknown'
-                ? { ...types, [name]: selected.type }
-                : types,
-            );
-          }}
-          options={variableOptions}
-          placeholder="选择上游变量"
-        />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label={`删除变量 ${name}`}
-          onClick={removeVariable}
-        >
-          <Trash2 className="size-4" />
-        </Button>
+        <div className="grid grid-cols-[minmax(96px,0.7fr)_minmax(0,1.3fr)_auto] items-center gap-2">
+          <RecordKeyInput
+            name={name}
+            names={names}
+            ariaLabel={nameAriaLabel}
+            onCommit={renameVariable}
+          />
+          <VariableReferencePicker
+            ariaLabel={`${name} 变量值`}
+            className="w-full"
+            value={stringValue}
+            onChange={(nextValue) => {
+              const selected = variableOptions.find((option) => option.token === nextValue);
+              onChange(
+                { ...values, [name]: nextValue },
+                selected?.type && selected.type !== 'unknown'
+                  ? { ...types, [name]: selected.type }
+                  : types,
+              );
+            }}
+            options={variableOptions}
+            placeholder="选择上游变量"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`删除变量 ${name}`}
+            onClick={removeVariable}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        </div>
+        {fieldErrorMessage ? <BindingErrorInfo message={fieldErrorMessage} /> : null}
       </div>
     );
   }
@@ -201,10 +237,9 @@ function VariableBindingField({
     <div
       aria-invalid={Boolean(fieldErrorMessage) || undefined}
       className={cn(
-        'space-y-2 rounded-lg border border-border p-3',
+        'relative space-y-2 rounded-lg border border-border p-3',
         fieldErrorMessage && 'border-destructive/70 bg-destructive/5',
       )}
-      title={fieldErrorMessage || undefined}
     >
       <div className="grid grid-cols-[minmax(0,1fr)_110px_auto] items-center gap-2">
         <RecordKeyInput
@@ -272,6 +307,7 @@ function VariableBindingField({
           placeholder="输入固定值或选择上游变量"
         />
       )}
+      {fieldErrorMessage ? <BindingErrorInfo message={fieldErrorMessage} /> : null}
     </div>
   );
 }

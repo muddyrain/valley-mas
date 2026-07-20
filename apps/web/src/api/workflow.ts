@@ -429,6 +429,13 @@ async function streamWorkflow(
     formData.set(name, file, file.name);
   }
 
+  let reportedError = false;
+  const reportError = (message: string) => {
+    if (reportedError) return;
+    reportedError = true;
+    handlers.onError(message);
+  };
+
   try {
     const response = await fetch(`${base}/workflows/${id}${path}`, {
       method: 'POST',
@@ -442,18 +449,18 @@ async function streamWorkflow(
     });
 
     if (!response.ok) {
-      handlers.onError(await workflowRunErrorMessage(response, `请求失败: ${response.status}`));
+      reportError(await workflowRunErrorMessage(response, `请求失败: ${response.status}`));
       return;
     }
 
     if (!response.headers.get('content-type')?.includes('text/event-stream')) {
-      handlers.onError(await workflowRunErrorMessage(response, '运行接口未返回事件流'));
+      reportError(await workflowRunErrorMessage(response, '运行接口未返回事件流'));
       return;
     }
 
     const reader = response.body?.getReader();
     if (!reader) {
-      handlers.onError('无法读取响应流');
+      reportError('无法读取响应流');
       return;
     }
 
@@ -478,7 +485,7 @@ async function streamWorkflow(
           }
           if (event.status === 'error') {
             receivedTerminalEvent = true;
-            handlers.onError(event.message || event.data?.error || '工作流执行失败');
+            reportError(event.message || event.data?.error || '工作流执行失败');
           }
         } catch {
           // Ignore malformed event records and wait for a valid terminal event.
@@ -502,19 +509,19 @@ async function streamWorkflow(
         id,
         runId,
         lastSequence,
-        handlers,
+        { ...handlers, onError: reportError },
         signal,
       );
     }
     if (!receivedTerminalEvent) {
-      handlers.onError('运行连接已关闭，未收到最终结果');
+      reportError('运行连接已关闭，未收到最终结果');
     }
   } catch (error) {
     if (signal?.aborted) {
-      handlers.onError('运行已取消');
+      reportError('运行已取消');
       return;
     }
-    handlers.onError(error instanceof Error ? error.message : '运行请求失败');
+    reportError(error instanceof Error ? error.message : '运行请求失败');
   }
 }
 

@@ -1576,12 +1576,13 @@ export default function WorkflowEditorPage() {
   }, []);
 
   const handleRun = useCallback(async () => {
-    if (nodes.length === 0) {
+    const state = workflowStateRef.current;
+    if (state.nodes.length === 0) {
       toast.warning('请先添加节点');
       return;
     }
 
-    const errors = validateWorkflowDraft(nodes, edges);
+    const errors = validateWorkflowDraft(state.nodes, state.edges);
     if (errors.length > 0) {
       setShowValidationErrors(true);
       const firstError = errors[0];
@@ -1598,7 +1599,7 @@ export default function WorkflowEditorPage() {
 
     setRetryRun(null);
     setShowRunPanel(true);
-  }, [edges, focusValidationNode, nodes, persistLatestWorkflow]);
+  }, [focusValidationNode, persistLatestWorkflow]);
 
   const openRetryRunPanel = useCallback((run: WorkflowRunDetail) => {
     if (!retryInputNodes(run.run.graphSnapshot)) {

@@ -40,9 +40,6 @@ export function getWorkflowBindingTypeMismatchMessage(
   if (option && option.type !== expected) {
     return `字段“${name}”声明为${workflowValueTypeLabel(expected)}，但引用变量为${workflowValueTypeLabel(option.type)}`;
   }
-  if (getInvalidWorkflowVariableTokens(value, options).length === 0 && expected !== 'string') {
-    return `字段“${name}”声明为${workflowValueTypeLabel(expected)}，固定值只能填写文本，请改为文本或引用同类型变量`;
-  }
   return null;
 }
 
