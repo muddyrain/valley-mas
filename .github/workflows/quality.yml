@@ -33,6 +33,9 @@ jobs:
       - name: Check agent harness
         run: pnpm check:harness
 
+      - name: Check plans index
+        run: pnpm check:plans-index
+
       - name: Check workspace
         run: pnpm check
 

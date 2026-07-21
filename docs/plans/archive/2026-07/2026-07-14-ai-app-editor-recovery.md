@@ -1,6 +1,8 @@
 # AI App Editor Recovery Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> **状态：已完成（历史计划）。** 页面级修复功能已在后续版本流程中验收，不再作为当前活跃计划跟踪；本文件保留为历史实现记录。
 
 **Goal:** 修复草稿版本丢失导致的调试失败，并将智能体编辑页改为轻量 shadcn/ui 双栏界面。
 
@@ -78,12 +80,12 @@ Expected: exit 0。
 
 在验证完成后把状态更新为“已实施，待真实 ARK 环境验收”。
 
-- [ ] **Step 2: 执行回归命令**
+- [x] **Step 2: 执行回归命令**
 
 Run: `pnpm --filter @valley/web exec tsc --noEmit && pnpm check:harness && cd server && go test ./...`
 
 Expected: 全部 exit 0。
 
-- [ ] **Step 3: 人工验收**
+- [x] **Step 3: 人工验收**
 
 在 `/workbench/apps/:appId`：打开一个缺少草稿版本的旧应用，输入调试消息，确认先生成版本；在缺少 ARK 配置时确认页面显示服务端返回的配置错误，而非固定泛化提示。

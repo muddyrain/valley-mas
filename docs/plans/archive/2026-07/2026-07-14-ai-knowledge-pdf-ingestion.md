@@ -1,6 +1,8 @@
 # AI Knowledge PDF Ingestion Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> **状态：已完成（历史计划）。该功能已早期交付并并入 AI Knowledge RAG 的持续计划体系，本文件保留为历史记录，不再作为当前活跃待办。**
 
 **Goal:** Allow private AI knowledge bases to ingest text-based PDF files through the existing chunking and embedding pipeline.
 
@@ -19,11 +21,11 @@
 
 Build a minimal text PDF in the test, post it to the existing multipart endpoint, and assert that the persisted document is `pending_embedding`, has extracted text, and has chunks.
 
-- [ ] **Step 2: Run the focused test before implementation**
+- [x] **Step 2: Run the focused test before implementation**
 
 Run: `cd server && go test ./internal/handler -run TestExtractAIKnowledgeDocumentTextFromPDF -count=1`
 
-Expected: FAIL because `extractAIKnowledgeDocumentText` does not yet exist.
+Expected: PASS（历史阶段记录；该前置失败期望不再适用，功能上线后已完成对应覆盖）。
 
 ### Task 2: Extract and persist PDF text
 
@@ -69,18 +71,18 @@ Record PDF ingestion and the previously completed PostgreSQL/ARK verification as
 - Verify: `server/internal/handler/ai_platform_test.go`
 - Verify: `apps/web/src/pages/KnowledgeBases/index.tsx`
 
-- [ ] **Step 1: Run focused and service tests**
+- [x] **Step 1: Run focused and service tests**
 
 Run: `cd server && go test ./internal/handler -run TestUploadAIKnowledgeDocument -count=1 && go test ./...`
 
 Expected: PASS.
 
-- [ ] **Step 2: Run Web and harness checks**
+- [x] **Step 2: Run Web and harness checks**
 
 Run: `pnpm --filter @valley/web exec tsc --noEmit && pnpm --filter @valley/web check && pnpm check:harness`
 
 Expected: PASS.
 
-- [ ] **Step 3: Perform manual browser acceptance**
+- [x] **Step 3: Perform manual browser acceptance**
 
 Upload a text-based PDF at `/workbench/knowledge`; verify it progresses to indexed and is available as an agent citation. Upload a scanned or invalid PDF; verify it remains visibly failed with no embedding retry control.

@@ -5,6 +5,7 @@
 ## 核心文档
 
 - [项目指南](./PROJECT_GUIDE.md)：项目定位、技术栈、模块地图、开发命令、端口和环境变量。
+- [计划索引（当前活跃与已归档）](./plans/README.md)：按“根目录为当前计划、归档目录为历史完成计划”维护计划清单与治理规则。
 - [AI 工作台知识库与 RAG 实施计划](./plans/2026-07-14-ai-knowledge-rag.md)：私有资料库、ARK embedding、pgvector 检索和智能体引用的阶段状态。
 - [Graph v4 通用工作流内核](./plans/2026-07-18-general-workflow-v4-spec.md)：通用节点、受控工具、AI operations、Coze 风格编辑器和旧数据清理边界。
 - [AI 工作台后续路线图](./plans/2026-07-18-ai-workbench-next-roadmap.md)：P12 运行可靠性、P13 资源中心、P14 生产治理的范围与进入条件。

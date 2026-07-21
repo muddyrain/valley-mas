@@ -56,4 +56,4 @@
 
 - [x] 更新 `docs/plans/2026-07-14-ai-workbench-platform.md` 的模板生命周期和编辑体验状态。
 - [x] 运行 `pnpm --filter @valley/web exec tsc --noEmit`、定向 Biome、`pnpm --filter @valley/web build`、编码检查和工作流回归脚本；记录现有全量检查基线失败。
-- [ ] 浏览器验收：模板详情不创建工作流、Copy 后出现一个实例、自动保存/运行、右侧节点详情与变量插入。
+- [x] 浏览器验收：2026-07-21 已完成手动验收，覆盖模板详情不创建工作流、Copy 后出现一个实例、自动保存/运行、右侧节点详情与变量插入。

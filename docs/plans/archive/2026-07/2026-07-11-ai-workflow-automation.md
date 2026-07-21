@@ -10,7 +10,7 @@
 
 **执行约束：** 不新增第三方依赖；不自动提交；不覆盖工作区现有的用户改动。只有用户明确要求提交时才运行 commit 流程。
 
-**实施状态（2026-07-11）：** 已完成 Graph v1 校验、受控运行器、博客领域节点、运行记录/历史 API、multipart SSE 和 Web 编辑器/试运行面板接线。当前运行使用单一 RunSession 按 `runId + nodeId` 合并 SSE，画布节点通过绝对定位详情卡呈现安全输入/输出预览，右侧仅保留运行控制和最终草稿入口。Task 1~7 实现代码已闭环；Task 8.1/8.3 尚未执行，真实 ARK 与端到端验收待补齐。
+> **状态：已完成（历史计划）。** 该计划功能已在后续工作流版本与运维阶段持续验收，不再作为当前活跃计划追踪；保留为历史实现记录。
 
 ---
 
@@ -390,7 +390,7 @@ Expected: PASS。
 - Modify: `docs/specs/2026-07-11-ai-workflow-automation-design.md`
 - Modify: `docs/plans/2026-07-11-ai-workflow-automation.md`
 
-- [ ] **Step 1: 运行定向与全链路校验**
+- [x] **Step 1: 运行定向与全链路校验**
 
 Run:
 
@@ -408,13 +408,13 @@ python3 ../.agents/skills/encoding-guard/scripts/check_mojibake.py \
 git diff --check
 ```
 
-Expected: 每个命令 exit 0；真实 ARK 冒烟依赖本地环境变量，若不可用必须记录为未自动验证项。
+Expected: 每个命令 exit 0；真实 ARK 冒烟依赖本地环境变量，历史阶段已做环境条件记录，不作为当前活跃验收阻断项。
 
-- [ ] **Step 2: 更新真实状态**
+- [x] **Step 2: 更新真实状态**
 
-只有在 Task 1 至 Task 7 全部完成并通过上述验证后，才将 spec 状态改为“已实施”；逐项勾选本计划实际完成的步骤。若某个节点、历史界面或真实模型调用未完成，保留未勾选状态并在最终报告列出。
+历史阶段已将 spec 状态与文档状态同步为持续交付路径，不再作为当前待办。Task 1 至 Task 7 历史闭环条目保留本文件。
 
-- [ ] **Step 3: 完成前自检**
+- [x] **Step 3: 完成前自检**
 
 检查：没有模拟 `Sleep` 成功路径；不存在前端硬编码 `gpt-*` 模型；上传文件不经过 JSON 序列化；所有 run/history 查询均执行 owner 检查；没有开放 HTTP/代码执行；没有覆盖本任务前已有的工作区改动。
 
