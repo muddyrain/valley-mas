@@ -1,6 +1,6 @@
 # P10：上下文副驾驶实施记录
 
-> 已由 P11 Graph v4 通用工作流内核取代。Graph v2/v3、业务节点与 `runIf` 不再是当前实现；当前实施记录见 `2026-07-14-ai-workbench-platform.md`。
+> 已由 P11 Graph v4 通用工作流内核取代。Graph v2/v3、业务节点与 `runIf` 不再是当前实现；当前实施记录见 `docs/plans/archive/2026-07/2026-07-14-ai-workbench-platform.md`。
 
 ## 实施状态
 

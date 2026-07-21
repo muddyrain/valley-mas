@@ -31,7 +31,6 @@
 - [2026-06-30-server-ai-foundation-refactor.md](2026-06-30-server-ai-foundation-refactor.md)
 - [2026-07-02-server-ai-agent-runtime.md](2026-07-02-server-ai-agent-runtime.md)
 - [2026-07-10-life-trace-pantry-mobile-browsing.md](2026-07-10-life-trace-pantry-mobile-browsing.md)
-- [2026-07-14-ai-workbench-platform.md](2026-07-14-ai-workbench-platform.md)
 - [2026-07-18-ai-workbench-next-roadmap.md](2026-07-18-ai-workbench-next-roadmap.md)
 
 ## 已归档（2026-07）
@@ -40,6 +39,7 @@
 - [archive/2026-07/2026-07-14-ai-app-editor-recovery.md](archive/2026-07/2026-07-14-ai-app-editor-recovery.md)
 - [archive/2026-07/2026-07-14-ai-knowledge-pdf-ingestion.md](archive/2026-07/2026-07-14-ai-knowledge-pdf-ingestion.md)
 - [archive/2026-07/2026-07-16-workflow-editor-ergonomics.md](archive/2026-07/2026-07-16-workflow-editor-ergonomics.md)
+- [archive/2026-07/2026-07-14-ai-workbench-platform.md](archive/2026-07/2026-07-14-ai-workbench-platform.md)
 - [archive/2026-07/2026-07-15-ai-app-public-api-p5.md](archive/2026-07/2026-07-15-ai-app-public-api-p5.md)
 - [archive/2026-07/2026-07-17-ai-contextual-copilot-implementation.md](archive/2026-07/2026-07-17-ai-contextual-copilot-implementation.md)
 - [archive/2026-07/2026-07-19-p13-knowledge-base-2.md](archive/2026-07/2026-07-19-p13-knowledge-base-2.md)
