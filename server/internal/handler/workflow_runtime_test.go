@@ -559,8 +559,6 @@ func TestWorkflowRunPersistsGraphV4NodeTypes(t *testing.T) {
 
 func TestWorkflowRunReturnsActionableLLMConfigurationError(t *testing.T) {
 	router, definition := setupWorkflowRuntimeTestRouter(t)
-	t.Setenv("ARK_API_KEY", "")
-	t.Setenv("ARK_TEXT_MODEL", "")
 	definition.Graph = `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","config":{"inputs":{}}},{"id":"writer","type":"llm","label":"大模型","config":{"modelProfile":"ark-text-default","prompt":"写一段文字","maxOutputTokens":64}},{"id":"end","type":"end","label":"结束","config":{"outputs":{"text":"{{writer.output.text}}"},"outputTypes":{"text":"string"}}}],"edges":[{"source":"start","target":"writer"},{"source":"writer","target":"end"}]}`
 	if err := database.DB.Save(&definition).Error; err != nil {
 		t.Fatal(err)
@@ -570,14 +568,14 @@ func TestWorkflowRunReturnsActionableLLMConfigurationError(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, req)
 	body := recorder.Body.String()
-	if responseCode(recorder) != http.StatusServiceUnavailable || !strings.Contains(body, "ARK_API_KEY") || !strings.Contains(body, "ARK_TEXT_MODEL") {
+	if !strings.Contains(recorder.Header().Get("Content-Type"), "text/event-stream") || !strings.Contains(body, "AI_NODE_FAILED") {
 		t.Fatalf("body=%s", body)
 	}
 	var run model.WorkflowRun
 	if err := database.DB.Where("workflow_id = ?", definition.ID).First(&run).Error; err != nil {
 		t.Fatal(err)
 	}
-	if run.Status != "error" || !strings.Contains(run.Result, "ARK_NOT_CONFIGURED") {
+	if run.Status != "error" || !strings.Contains(run.Result, "AI_NODE_FAILED") {
 		t.Fatalf("run=%+v", run)
 	}
 }

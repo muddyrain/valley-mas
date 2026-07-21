@@ -4,16 +4,19 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 	"valley-server/internal/aiclient"
+	"valley-server/internal/aimodel"
 	"valley-server/internal/aiusage"
+	"valley-server/internal/database"
 
 	"github.com/gin-gonic/gin"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
-	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
+	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 )
 
 type aiChatMessage struct {
@@ -24,6 +27,7 @@ type aiChatMessage struct {
 type aiChatRequest struct {
 	Message string          `json:"message" binding:"required"`
 	History []aiChatMessage `json:"history"`
+	ModelID string          `json:"modelId" binding:"required"`
 	Stream  bool            `json:"stream"`
 }
 
@@ -47,41 +51,43 @@ func normalizedAIChatSystemPrompt() string {
 	return basePrompt + " " + systemPrompt
 }
 
-func buildARKChatMessages(req aiChatRequest) []*model.ChatCompletionMessage {
-	messages := make([]*model.ChatCompletionMessage, 0, len(req.History)+2)
+func buildARKChatMessages(req aiChatRequest) []*arkmodel.ChatCompletionMessage {
+	messages := make([]*arkmodel.ChatCompletionMessage, 0, len(req.History)+2)
 	appendMessage := func(role, content string) {
 		text := strings.TrimSpace(content)
 		if text == "" {
 			return
 		}
 		textCopy := text
-		messages = append(messages, &model.ChatCompletionMessage{
+		messages = append(messages, &arkmodel.ChatCompletionMessage{
 			Role:    role,
-			Content: &model.ChatCompletionMessageContent{StringValue: &textCopy},
+			Content: &arkmodel.ChatCompletionMessageContent{StringValue: &textCopy},
 		})
 	}
 
-	appendMessage(model.ChatMessageRoleSystem, normalizedAIChatSystemPrompt())
+	appendMessage(arkmodel.ChatMessageRoleSystem, normalizedAIChatSystemPrompt())
 
 	for _, item := range req.History {
 		role := strings.TrimSpace(item.Role)
-		if role != model.ChatMessageRoleUser && role != model.ChatMessageRoleAssistant {
+		if role != arkmodel.ChatMessageRoleUser && role != arkmodel.ChatMessageRoleAssistant {
 			continue
 		}
 		appendMessage(role, item.Content)
 	}
 
-	appendMessage(model.ChatMessageRoleUser, req.Message)
+	appendMessage(arkmodel.ChatMessageRoleUser, req.Message)
 	return messages
 }
 
 // arkChatRequest 是 handler 内部 shim，转调 aiclient.NewARKChatRequest，
 // 保留同名函数让 ai_agent.go 等旧调用点不变。
-func arkChatRequest(modelID string, messages []*model.ChatCompletionMessage) model.CreateChatCompletionRequest {
+func arkChatRequest(modelID string, messages []*arkmodel.ChatCompletionMessage) arkmodel.CreateChatCompletionRequest {
 	return aiclient.NewARKChatRequest(modelID, messages)
 }
 
-// ChatWithAI AI 对话（使用 ARK_TEXT_MODEL）
+// ChatWithAI uses the database-backed valley-chat policy. The selected model is
+// an approved SiliconFlow/Amux model, optionally overridden by the signed-in
+// user's text preference; it never takes a model ID from the browser.
 func ChatWithAI(c *gin.Context) {
 	start := time.Now()
 	var req aiChatRequest
@@ -96,44 +102,77 @@ func ChatWithAI(c *gin.Context) {
 		return
 	}
 
-	cfg, errMsg := aiclient.ReadARKTextConfig()
-	if errMsg != "" {
-		recordValleyAIChatUsage(c, req, "", cfg.Model, aiusage.Since(start), errMsg)
-		Error(c, 503, errMsg)
+	selected, err := aimodel.FindEnabledModel(database.GetDB(), req.ModelID, "text")
+	if err != nil {
+		recordValleyAIChatUsageWithProvider(c, req, "", "", "", aiclient.CompatibleUsage{}, aiusage.Since(start), err.Error())
+		Error(c, http.StatusBadRequest, "请选择一个可用的文本模型")
 		return
 	}
-
-	client := aiclient.ARKClient(90 * time.Second)
-	if client == nil {
-		recordValleyAIChatUsage(c, req, "", cfg.Model, aiusage.Since(start), "AI 未配置：缺少 ARK_API_KEY")
-		Error(c, 503, "AI 未配置：缺少 ARK_API_KEY")
+	providerConfig, err := aimodel.ProviderFromEnv(selected.Provider)
+	if err != nil {
+		recordValleyAIChatUsageWithProvider(c, req, "", selected.Provider, selected.ModelID, aiclient.CompatibleUsage{}, aiusage.Since(start), err.Error())
+		Error(c, 503, err.Error())
 		return
 	}
-	messages := buildARKChatMessages(req)
+	client := aiclient.NewCompatibleClient(providerConfig.BaseURL, providerConfig.APIKey, 90*time.Second)
+	messages := buildCompatibleChatMessages(req)
 
 	if req.Stream {
-		streamChatWithARK(c, client, cfg.Model, messages, req, start)
+		streamChatWithCompatibleProvider(c, client, selected.Provider, selected.ModelID, messages, req, start)
 		return
 	}
 
-	reply, modelName, err := chatWithARK(c.Request.Context(), client, cfg.Model, messages)
+	response, err := client.Chat(c.Request.Context(), aiclient.CompatibleChatRequest{Model: selected.ModelID, Messages: messages})
 	if err != nil {
-		recordValleyAIChatUsage(c, req, "", modelNameOrFallback(modelName, cfg.Model), aiusage.Since(start), err.Error())
+		recordValleyAIChatUsageWithProvider(c, req, "", selected.Provider, selected.ModelID, response.Usage, aiusage.Since(start), err.Error())
 		Error(c, 502, "AI upstream error: "+err.Error())
 		return
 	}
+	reply := compatibleMessageText(response.Choices[0].Message.Content)
 	if strings.TrimSpace(reply) == "" {
-		recordValleyAIChatUsage(c, req, "", modelNameOrFallback(modelName, cfg.Model), aiusage.Since(start), "AI upstream returned empty content")
+		recordValleyAIChatUsageWithProvider(c, req, "", selected.Provider, selected.ModelID, response.Usage, aiusage.Since(start), "AI upstream returned empty content")
 		Error(c, 502, "AI upstream returned empty content")
 		return
 	}
-	recordValleyAIChatUsage(c, req, reply, modelNameOrFallback(modelName, cfg.Model), aiusage.Since(start), "")
+	modelName := modelNameOrFallback(response.Model, selected.ModelID)
+	recordValleyAIChatUsageWithProvider(c, req, reply, selected.Provider, modelName, response.Usage, aiusage.Since(start), "")
 
 	Success(c, gin.H{
 		"reply":    strings.TrimSpace(reply),
 		"model":    modelName,
-		"provider": "ark",
+		"provider": selected.Provider,
 	})
+}
+
+func buildCompatibleChatMessages(req aiChatRequest) []aiclient.CompatibleMessage {
+	messages := []aiclient.CompatibleMessage{{Role: "system", Content: normalizedAIChatSystemPrompt()}}
+	for _, item := range req.History {
+		role, content := strings.TrimSpace(item.Role), strings.TrimSpace(item.Content)
+		if content == "" || (role != "user" && role != "assistant") {
+			continue
+		}
+		messages = append(messages, aiclient.CompatibleMessage{Role: role, Content: content})
+	}
+	return append(messages, aiclient.CompatibleMessage{Role: "user", Content: req.Message})
+}
+
+func compatibleMessageText(content any) string {
+	if value, ok := content.(string); ok {
+		return strings.TrimSpace(value)
+	}
+	parts, ok := content.([]any)
+	if !ok {
+		return ""
+	}
+	var text strings.Builder
+	for _, part := range parts {
+		if object, ok := part.(map[string]any); ok {
+			if value, ok := object["text"].(string); ok {
+				text.WriteString(value)
+			}
+		}
+	}
+	return strings.TrimSpace(text.String())
 }
 
 func modelNameOrFallback(modelName string, fallback string) string {
@@ -144,6 +183,10 @@ func modelNameOrFallback(modelName string, fallback string) string {
 }
 
 func recordValleyAIChatUsage(c *gin.Context, req aiChatRequest, reply string, modelName string, latencyMs int64, errMessage string) {
+	recordValleyAIChatUsageWithProvider(c, req, reply, "ark", modelName, aiclient.CompatibleUsage{}, latencyMs, errMessage)
+}
+
+func recordValleyAIChatUsageWithProvider(c *gin.Context, req aiChatRequest, reply, provider, modelName string, usage aiclient.CompatibleUsage, latencyMs int64, errMessage string) {
 	userID := ""
 	if value := GetCurrentUserID(c); value > 0 {
 		userID = strconv.FormatInt(value, 10)
@@ -157,24 +200,65 @@ func recordValleyAIChatUsage(c *gin.Context, req aiChatRequest, reply string, mo
 		promptChars += aiusage.CharCount(item.Content)
 	}
 	aiusage.Record(aiusage.Entry{
-		Feature:       aiclient.FeatureValleyAIChat,
-		Provider:      "ark",
-		Model:         modelName,
-		UserID:        userID,
-		Status:        status,
-		Stream:        req.Stream,
-		PromptChars:   promptChars,
-		ResponseChars: aiusage.CharCount(reply),
-		LatencyMs:     latencyMs,
-		ErrorMessage:  errMessage,
+		Feature:          aiclient.FeatureValleyAIChat,
+		Provider:         provider,
+		Model:            modelName,
+		UserID:           userID,
+		Status:           status,
+		Stream:           req.Stream,
+		PromptChars:      promptChars,
+		ResponseChars:    aiusage.CharCount(reply),
+		PromptTokens:     usage.PromptTokens,
+		CompletionTokens: usage.CompletionTokens,
+		TotalTokens:      usage.TotalTokens,
+		LatencyMs:        latencyMs,
+		ErrorMessage:     errMessage,
 	})
+}
+
+func streamChatWithCompatibleProvider(c *gin.Context, client *aiclient.CompatibleClient, provider, modelID string, messages []aiclient.CompatibleMessage, req aiChatRequest, start time.Time) {
+	writer, err := aiclient.NewSSEWriter(c)
+	if err != nil {
+		Error(c, http.StatusInternalServerError, "streaming not supported")
+		return
+	}
+	_ = writer.Send(gin.H{"provider": provider, "model": modelID, "chunk": "", "done": false})
+	var chunks strings.Builder
+	currentModel := modelID
+	var usage aiclient.CompatibleUsage
+	err = client.ChatStream(c.Request.Context(), aiclient.CompatibleChatRequest{Model: modelID, Messages: messages}, func(chunk aiclient.CompatibleChatStreamChunk) error {
+		if strings.TrimSpace(chunk.Model) != "" {
+			currentModel = chunk.Model
+		}
+		if chunk.Usage.TotalTokens > 0 || chunk.Usage.PromptTokens > 0 || chunk.Usage.CompletionTokens > 0 {
+			usage = chunk.Usage
+		}
+		for _, choice := range chunk.Choices {
+			text := compatibleMessageText(choice.Delta.Content)
+			if text == "" {
+				continue
+			}
+			chunks.WriteString(text)
+			if err := writer.Send(gin.H{"provider": provider, "model": currentModel, "chunk": text, "done": false}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		recordValleyAIChatUsageWithProvider(c, req, chunks.String(), provider, currentModel, usage, aiusage.Since(start), err.Error())
+		_ = writer.Send(gin.H{"error": "AI upstream error: " + err.Error(), "done": true})
+		return
+	}
+	recordValleyAIChatUsageWithProvider(c, req, chunks.String(), provider, currentModel, usage, aiusage.Since(start), "")
+	_ = writer.Send(gin.H{"provider": provider, "model": currentModel, "done": true})
 }
 
 func chatWithARK(
 	ctx context.Context,
 	client *arkruntime.Client,
 	modelID string,
-	messages []*model.ChatCompletionMessage,
+	messages []*arkmodel.ChatCompletionMessage,
 ) (string, string, error) {
 	req := aiclient.NewARKChatRequest(modelID, messages)
 	resp, err := client.CreateChatCompletion(ctx, req)
@@ -192,7 +276,7 @@ func streamChatWithARK(
 	c *gin.Context,
 	client *arkruntime.Client,
 	modelID string,
-	messages []*model.ChatCompletionMessage,
+	messages []*arkmodel.ChatCompletionMessage,
 	req aiChatRequest,
 	start time.Time,
 ) {
@@ -248,7 +332,7 @@ func streamChatWithARK(
 					"done":  false,
 				})
 			}
-			if choice.FinishReason != model.FinishReasonNull && choice.FinishReason != "" {
+			if choice.FinishReason != arkmodel.FinishReasonNull && choice.FinishReason != "" {
 				done = true
 			}
 		}

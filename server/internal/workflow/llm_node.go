@@ -9,17 +9,18 @@ import (
 	"time"
 
 	"valley-server/internal/aiclient"
-
-	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
+	"valley-server/internal/aimodel"
+	"valley-server/internal/database"
 )
 
 // TextGenerator is injectable so workflow tests never need an ARK network
-// call. Production uses ARKTextGenerator exclusively.
+// call. Production uses PolicyTextGenerator exclusively.
 type TextGenerator interface {
 	Generate(context.Context, TextGenerationRequest) (TextGenerationResult, error)
 }
 
 type TextGenerationRequest struct {
+	ModelID         string
 	SystemPrompt    string
 	Prompt          string
 	Temperature     float64
@@ -39,9 +40,6 @@ type LLMTextExecutor struct {
 func (LLMTextExecutor) Type() NodeType { return NodeTypeLLM }
 
 func (executor LLMTextExecutor) Execute(ctx context.Context, _ RunContext, execution NodeExecution) (NodeResult, error) {
-	if stringFromValue(execution.Input["modelProfile"]) != "ark-text-default" {
-		return NodeResult{}, fmt.Errorf("modelProfile 必须为 ark-text-default")
-	}
 	inputs, _ := execution.Input["inputs"].(map[string]any)
 	schema, structured, err := llmStructuredOutputSchema(execution.Input)
 	if err != nil {
@@ -52,6 +50,7 @@ func (executor LLMTextExecutor) Execute(ctx context.Context, _ RunContext, execu
 		prompt = structuredOutputPrompt(prompt, schema)
 	}
 	request := TextGenerationRequest{
+		ModelID:         stringFromValue(execution.Input["modelId"]),
 		SystemPrompt:    stringFromValue(execution.Input["systemPrompt"]),
 		Prompt:          prompt,
 		Temperature:     numberFromValue(execution.Input["temperature"]),
@@ -62,7 +61,10 @@ func (executor LLMTextExecutor) Execute(ctx context.Context, _ RunContext, execu
 	}
 	generator := executor.Generator
 	if generator == nil {
-		generator = ARKTextGenerator{}
+		if request.ModelID == "" {
+			return NodeResult{}, fmt.Errorf("请选择一个文本模型")
+		}
+		generator = CatalogTextGenerator{}
 	}
 	result, err := generator.Generate(ctx, request)
 	if err != nil {
@@ -113,35 +115,44 @@ func promptWithInputs(prompt string, inputs map[string]any) string {
 	return builder.String()
 }
 
-// ARKTextGenerator is intentionally restricted to ReadARKTextConfig: graph
-// authors may tune generation parameters but cannot choose an endpoint.
-type ARKTextGenerator struct{}
+// CatalogTextGenerator resolves a graph-selected, administrator-approved text
+// model. The model ID remains stable in the workflow graph and is revalidated
+// at runtime for enablement and capability.
+type CatalogTextGenerator struct{}
 
-func (ARKTextGenerator) Generate(ctx context.Context, input TextGenerationRequest) (TextGenerationResult, error) {
-	cfg, configErr := aiclient.ReadARKTextConfig()
-	if configErr != "" {
-		return TextGenerationResult{}, fmt.Errorf("%s", configErr)
+const workflowModelRequestTimeout = 120 * time.Second
+
+func (CatalogTextGenerator) Generate(ctx context.Context, input TextGenerationRequest) (TextGenerationResult, error) {
+	selected, err := aimodel.FindEnabledModel(database.GetDB(), input.ModelID, "text")
+	if err != nil {
+		return TextGenerationResult{}, err
 	}
-	client := aiclient.ARKClient(45 * time.Second)
-	if client == nil {
-		return TextGenerationResult{}, fmt.Errorf("AI 未配置：ARK client 不可用")
+	provider, err := aimodel.ProviderFromEnv(selected.Provider)
+	if err != nil {
+		return TextGenerationResult{}, err
 	}
-	prompt := input.Prompt
-	messages := []*arkmodel.ChatCompletionMessage{}
+	messages := make([]aiclient.CompatibleMessage, 0, 2)
 	if system := strings.TrimSpace(input.SystemPrompt); system != "" {
-		messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleSystem, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &system}})
+		messages = append(messages, aiclient.CompatibleMessage{Role: "system", Content: system})
 	}
-	messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleUser, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &prompt}})
-	request := aiclient.NewARKChatRequest(cfg.Model, messages, aiclient.WithARKChatTemperature(float32(input.Temperature)), aiclient.WithARKChatTokens(input.MaxOutputTokens))
-	response, err := client.CreateChatCompletion(ctx, request)
+	messages = append(messages, aiclient.CompatibleMessage{Role: "user", Content: input.Prompt})
+	temperature := input.Temperature
+	maxTokens := input.MaxOutputTokens
+	response, err := aiclient.NewCompatibleClient(provider.BaseURL, provider.APIKey, workflowModelRequestTimeout).Chat(ctx, aiclient.CompatibleChatRequest{
+		Model: selected.ModelID, Messages: messages, Temperature: &temperature, MaxTokens: &maxTokens,
+	})
 	if err != nil {
 		return TextGenerationResult{}, fmt.Errorf("AI 上游调用失败: %w", err)
 	}
-	text, err := aiclient.ExtractARKContent(response)
-	if err != nil {
-		return TextGenerationResult{}, fmt.Errorf("AI 响应解析失败: %w", err)
+	text, ok := response.Choices[0].Message.Content.(string)
+	if !ok || strings.TrimSpace(text) == "" {
+		return TextGenerationResult{}, fmt.Errorf("AI 响应解析失败: 未返回文本内容")
 	}
-	return TextGenerationResult{Text: text, Model: response.Model}, nil
+	modelID := response.Model
+	if modelID == "" {
+		modelID = selected.ModelID
+	}
+	return TextGenerationResult{Text: text, Model: modelID, TokenUsage: response.Usage.TotalTokens}, nil
 }
 
 func numberFromValue(value any) float64 {

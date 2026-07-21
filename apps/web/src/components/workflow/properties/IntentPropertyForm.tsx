@@ -2,6 +2,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ModelPicker } from '../ModelPicker';
 import type { WorkflowIntentDefinition } from '../types';
 import { VariableReferencePicker } from '../VariableReferencePicker';
 import type { PropertyFormProps } from './index';
@@ -34,6 +35,14 @@ export function IntentPropertyForm({
 
   return (
     <>
+      <EditorSection title="模型" description="选择用于意图识别的文本模型。">
+        <ModelPicker
+          value={(config.modelId as string) || undefined}
+          onValueChange={(modelId) => onUpdateConfig({ modelId })}
+          capability="text"
+          label="文本模型"
+        />
+      </EditorSection>
       <EditorSection title="分类输入" description="选择需要识别意图的文本变量。">
         <VariableReferencePicker
           ariaLabel="分类输入变量"

@@ -327,10 +327,10 @@ func publicExecutionError(node Node, err error) (string, string) {
 		return "模型返回格式不符合输出字段，请调整提示词后重试", "LLM_STRUCTURED_OUTPUT_INVALID"
 	case errors.Is(err, ErrIntentClassificationInvalid):
 		return "意图识别结果无效，请稍后重试", "INTENT_CLASSIFICATION_INVALID"
-	case strings.Contains(message, "AI 未配置") || strings.Contains(message, "ARK_"):
-		return "AI 服务未配置，请检查 ARK_API_KEY 和 ARK_TEXT_MODEL", "AI_CONFIGURATION_UNAVAILABLE"
+	case strings.Contains(message, "AI 服务未配置") || strings.Contains(message, "ARK_"):
+		return "AI 服务未配置，请检查 Provider 密钥和 Base URL", "AI_CONFIGURATION_UNAVAILABLE"
 	case strings.Contains(message, "AI 上游调用失败"):
-		return "ARK 模型调用失败，请稍后重试或检查服务配置", "AI_UPSTREAM_FAILED"
+		return "模型上游调用失败，请稍后重试或检查 Provider 配置", "AI_UPSTREAM_FAILED"
 	case strings.Contains(message, "AI 响应解析失败") || strings.Contains(message, "AI 返回为空"):
 		return "模型没有返回可用内容，请调整提示词后重试", "AI_RESPONSE_INVALID"
 	case strings.Contains(message, "Notion OAuth 尚未配置"):

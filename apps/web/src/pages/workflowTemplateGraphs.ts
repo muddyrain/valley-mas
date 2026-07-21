@@ -40,7 +40,6 @@ const WORKFLOW_TEMPLATE_GRAPHS: Record<string, WorkflowTemplateGraph> = {
         inputs: { fileInput: '{{start.output.markdownFile}}' },
       }),
       node('llm-summary', 'llm', '生成摘要', 610, {
-        modelProfile: 'ark-text-default',
         systemPrompt: '你是内容编辑助手。请生成一句简洁、准确的博客摘要。',
         prompt: '标题：{{parse-markdown.output.title}}\n\n正文：{{parse-markdown.output.content}}',
         temperature: 0.4,
@@ -96,7 +95,6 @@ const WORKFLOW_TEMPLATE_GRAPHS: Record<string, WorkflowTemplateGraph> = {
         inputs: { query: '{{start.output.topic}}' },
       }),
       node('writer', 'llm', '生成正文', 610, {
-        modelProfile: 'ark-text-default',
         systemPrompt: '你是内容编辑。基于参考资料写出准确、易读的博客正文。',
         prompt:
           '主题：{{start.output.topic}}\n受众：{{start.output.audience}}\n风格：{{start.output.style}}\n\n参考资料：\n{{knowledge.output.context}}',

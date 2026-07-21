@@ -547,7 +547,7 @@ func TestLLMNodeAllowsEmptySystemPromptAndReportsSafeErrors(t *testing.T) {
 	}
 
 	message, code := publicExecutionError(Node{Type: NodeTypeLLM}, errors.New("AI 未配置：ARK_API_KEY 未设置"))
-	if code != "AI_CONFIGURATION_UNAVAILABLE" || !strings.Contains(message, "ARK_API_KEY") {
+	if code != "AI_CONFIGURATION_UNAVAILABLE" || !strings.Contains(message, "Provider 密钥") {
 		t.Fatalf("message=%q code=%q", message, code)
 	}
 }

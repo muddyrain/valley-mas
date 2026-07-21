@@ -24,6 +24,7 @@ type intentDefinition struct {
 }
 
 type intentNodeConfig struct {
+	ModelID string             `json:"modelId"`
 	Query   string             `json:"query"`
 	Intents []intentDefinition `json:"intents"`
 }
@@ -52,9 +53,10 @@ func (executor IntentClassifierExecutor) Execute(
 	definitions, _ := json.Marshal(config.Intents)
 	generator := executor.Generator
 	if generator == nil {
-		generator = ARKTextGenerator{}
+		generator = CatalogTextGenerator{}
 	}
 	result, err := generator.Generate(ctx, TextGenerationRequest{
+		ModelID:      config.ModelID,
 		SystemPrompt: "你是一个严格的意图分类器。只能从给定 intentId 或 other 中选择，不能解释。",
 		Prompt: fmt.Sprintf(
 			"用户输入：%s\n\n可选意图：%s\n\n只返回一个 JSON 对象，不要使用 Markdown：{\"intentId\":\"已配置的 intentId 或 other\",\"confidence\":0 到 1 的数字}。输入无法明确匹配时必须返回 other。",
@@ -129,6 +131,7 @@ func intentConfigFromMap(config map[string]any) (intentNodeConfig, error) {
 		return intentNodeConfig{}, err
 	}
 	parsed.Query = strings.TrimSpace(parsed.Query)
+	parsed.ModelID = strings.TrimSpace(parsed.ModelID)
 	if parsed.Query == "" {
 		return intentNodeConfig{}, errors.New("query 不能为空")
 	}

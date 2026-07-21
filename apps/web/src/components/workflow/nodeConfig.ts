@@ -105,7 +105,7 @@ export function getNodeConfigSummary(nodeType: string, config?: Record<string, u
     case 'end':
       return `${Object.keys((config.outputs as object) || {}).length} 个输出`;
     case 'llm':
-      return String(config.modelProfile || 'ARK 默认文本模型');
+      return String(config.modelId || '未选择模型');
     case 'tool':
       return String(config.capabilityName || config.capabilityId || '未选择工具');
     case 'condition':

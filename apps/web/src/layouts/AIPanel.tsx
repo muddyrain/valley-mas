@@ -2,7 +2,12 @@ import { MessageCircle, PanelRightClose, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { type AIChatMessage, reqAIChatStream } from '@/api/ai';
+import {
+  type AIChatMessage,
+  type AvailableAIModel,
+  listAvailableAIModels,
+  reqAIChatStream,
+} from '@/api/ai';
 import {
   type AIApp,
   createAIAppConversation,
@@ -57,6 +62,8 @@ export function AIPanel() {
   const [loading, setLoading] = useState(false);
   const [apps, setApps] = useState<AIApp[]>([]);
   const [selectedAssistantId, setSelectedAssistantId] = useState('quick');
+  const [textModels, setTextModels] = useState<AvailableAIModel[]>([]);
+  const [selectedTextModelID, setSelectedTextModelID] = useState('');
   const [openingAppId, setOpeningAppId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -76,6 +83,20 @@ export function AIPanel() {
     void listAIApps()
       .then((result) => setApps(result.list.filter((app) => app.type === 'agent')))
       .catch((error) => toast.error(getAPIErrorMessage(error, '加载智能体列表失败')));
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setTextModels([]);
+      setSelectedTextModelID('');
+      return;
+    }
+    void listAvailableAIModels('text')
+      .then((result) => {
+        setTextModels(result.list);
+        setSelectedTextModelID((current) => current || result.list[0]?.id || '');
+      })
+      .catch(() => setTextModels([]));
   }, [isAuthenticated]);
 
   const openAgentConversation = async (appId: string) => {
@@ -100,6 +121,10 @@ export function AIPanel() {
       navigate('/login');
       return;
     }
+    if (!selectedTextModelID) {
+      toast.error('请先选择文本模型');
+      return;
+    }
 
     const history: AIChatMessage[] = messages
       .filter((m) => !m.pending)
@@ -120,7 +145,7 @@ export function AIPanel() {
     let streamed = '';
     try {
       await reqAIChatStream(
-        { message: prompt, history },
+        { message: prompt, history, modelId: selectedTextModelID },
         {
           onChunk: (payload) => {
             if (payload.chunk) {
@@ -193,6 +218,26 @@ export function AIPanel() {
           <PanelRightClose />
         </Button>
       </div>
+
+      {!selectedApp ? (
+        <div className="border-b border-border p-3">
+          <Select
+            value={selectedTextModelID}
+            onValueChange={(value) => setSelectedTextModelID(value || '')}
+          >
+            <SelectTrigger className="w-full" aria-label="选择文本模型">
+              <SelectValue placeholder="选择文本模型" />
+            </SelectTrigger>
+            <SelectContent>
+              {textModels.map((item) => (
+                <SelectItem key={item.id} value={item.id}>
+                  {item.displayName} · {item.provider}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
 
       <div className="border-b border-border p-3">
         <Select

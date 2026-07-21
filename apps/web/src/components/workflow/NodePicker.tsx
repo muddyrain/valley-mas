@@ -53,9 +53,8 @@ const genericItems: NodePickerItem[] = [
     group: 'model',
     nodeType: 'llm',
     label: '大模型',
-    description: '使用 ARK 文本模型生成内容',
+    description: '选择文本模型生成内容',
     config: {
-      modelProfile: 'ark-text-default',
       systemPrompt: '你是一个可靠的内容助手。',
       prompt: '请完成当前任务。',
       inputs: {},

@@ -188,7 +188,8 @@ export default function Profile() {
   if (!hasHydrated) return null;
   if (!isAuthenticated) return null;
 
-  const roleInfo = ROLE_MAP[profile?.role || user?.role || 'user'];
+  const role = (profile?.role || user?.role || 'user').trim().toLowerCase();
+  const roleInfo = ROLE_MAP[role] ?? ROLE_MAP.user;
   const displayName = profile?.nickname?.trim() || extractEmailName(profile?.email) || '未命名用户';
   const avatarFallbackText = (displayName[0] || 'U').toUpperCase();
 

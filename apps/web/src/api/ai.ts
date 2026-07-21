@@ -9,8 +9,20 @@ export interface AIChatMessage {
 export interface AIChatRequest {
   message: string;
   history?: AIChatMessage[];
+  modelId: string;
   stream?: boolean;
 }
+
+export interface AvailableAIModel {
+  id: string;
+  provider: string;
+  modelId: string;
+  displayName: string;
+  capabilities: string[];
+}
+
+export const listAvailableAIModels = (capability: string) =>
+  http.get<unknown, { list: AvailableAIModel[] }>('/ai/models', { params: { capability } });
 
 export interface AIChatResponse {
   reply: string;

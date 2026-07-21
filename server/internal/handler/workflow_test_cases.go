@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"valley-server/internal/aiclient"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 	"valley-server/internal/workflow"
@@ -242,11 +241,6 @@ func executeWorkflowTestCase(requestContext context.Context, testCase model.Work
 	}
 	if err := validateWorkflowTestInputs(graph, inputs); err != nil {
 		return persistWorkflowTestResult(testCase, nil, workflowTestStatusRejected, nil, nil, "TEST_INPUT_INVALID", startedAt)
-	}
-	if workflowRequiresARKText(graph) {
-		if _, configErr := aiclient.ReadARKTextConfig(); configErr != "" {
-			return persistWorkflowTestResult(testCase, nil, workflowTestStatusError, nil, nil, "MODEL_NOT_CONFIGURED", startedAt)
-		}
 	}
 	if workflowRequiresARKImage(graph) {
 		return persistWorkflowTestResult(testCase, nil, workflowTestStatusRejected, nil, nil, "TEST_SIDE_EFFECT_FORBIDDEN", startedAt)

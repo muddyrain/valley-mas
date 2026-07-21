@@ -233,6 +233,20 @@ export interface WorkflowToolCapability {
   aiUsage: string;
 }
 
+export interface WorkflowAIModelOption {
+  id: string;
+  provider: string;
+  modelId: string;
+  displayName: string;
+  capabilities: string[];
+}
+
+export function listWorkflowAIModels(
+  capability: string,
+): Promise<{ list: WorkflowAIModelOption[] }> {
+  return request.get('/ai/models', { params: { capability } });
+}
+
 export function listWorkflowCapabilities(): Promise<{
   schemaVersion: 4;
   nodeTypes: WorkflowNodeDefinition[];

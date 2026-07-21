@@ -629,14 +629,6 @@ func runWorkflowGraph(
 		Error(c, http.StatusInternalServerError, "创建运行记录失败")
 		return
 	}
-	if workflowRequiresARKText(graph) {
-		if _, configErr := aiclient.ReadARKTextConfig(); configErr != "" {
-			_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": "ARK_NOT_CONFIGURED"})
-			persistWorkflowAIAppRun(app, appVersion, run, "failed", nil, "ARK_NOT_CONFIGURED")
-			Error(c, http.StatusServiceUnavailable, "AI 服务未配置：请检查 ARK_API_KEY 和 ARK_TEXT_MODEL")
-			return
-		}
-	}
 	if workflowRequiresARKImage(graph) {
 		if _, _, configErr := aiclient.ReadARKImageConfig(); configErr != "" {
 			_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": "ARK_IMAGE_NOT_CONFIGURED"})
@@ -1321,15 +1313,6 @@ func workflowKnowledgeRetriever(userID model.Int64String, version model.AIAppVer
 		}
 		return result, nil
 	})
-}
-
-func workflowRequiresARKText(graph workflow.Graph) bool {
-	for _, node := range graph.Nodes {
-		if node.Type == workflow.NodeTypeLLM {
-			return true
-		}
-	}
-	return false
 }
 
 func workflowRequiresARKImage(graph workflow.Graph) bool {

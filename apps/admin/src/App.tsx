@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { reqGetCurrentUser } from './api/auth';
 import Layout from './layouts/Layout';
+import AIModelPolicies from './pages/admin-ops/AIModelPolicies';
 import AIUsageLogs from './pages/admin-ops/AIUsageLogs';
 import AuditLogs from './pages/admin-ops/AuditLogs';
 import BlogComments from './pages/admin-ops/BlogComments';
@@ -133,6 +134,8 @@ function App() {
           <Route path="audit/code-access-logs" element={<AuditLogs kind="code-access-logs" />} />
           <Route path="audit/storage-assets" element={<AuditLogs kind="storage-assets" />} />
           <Route path="ai/usage-logs" element={<AIUsageLogs />} />
+          <Route path="ai/models" element={<AIModelPolicies />} />
+          <Route path="ai/model-policies" element={<Navigate to="/ai/models" replace />} />
           <Route path="life-trace/households" element={<LifeTraceOps kind="households" />} />
           <Route
             path="life-trace/push-subscriptions"

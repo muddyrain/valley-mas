@@ -131,6 +131,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/resource/download", handler.RecordDownload)
 
 			auth.POST("/ai/chat", handler.ChatWithAI)
+			auth.GET("/ai/models", handler.ListAvailableAIModels)
 			// AI Workbench platform assets. Legacy /ai/agents and /workflows remain supported.
 			auth.GET("/ai/apps", handler.ListAIApps)
 			auth.POST("/ai/apps", handler.CreateAIApp)
@@ -264,6 +265,11 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.GET("/audit/storage-assets", handler.AdminListStorageAssets)
 				adminOnly.GET("/ai/usage-logs", handler.AdminListAIUsageLogs)
 				adminOnly.GET("/ai/usage-summary", handler.AdminGetAIUsageSummary)
+				adminOnly.GET("/ai/models", handler.AdminListAIModels)
+				adminOnly.POST("/ai/models", handler.AdminCreateAIModel)
+				adminOnly.POST("/ai/models/test-connection", handler.AdminTestAIModelConnection)
+				adminOnly.PUT("/ai/models/:id", handler.AdminUpdateAIModel)
+				adminOnly.GET("/ai/providers/:provider/models-preview", handler.AdminPreviewAIProviderModels)
 				adminOnly.GET("/resource-tags/stats", handler.AdminGetResourceTagStats)
 				adminOnly.GET("/blog/categories", handler.AdminListBlogCategories)
 				adminOnly.POST("/blog/categories", handler.AdminCreateBlogCategory)

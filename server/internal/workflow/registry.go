@@ -65,7 +65,7 @@ func DefaultRegistry() *Registry {
 	registry := NewRegistry(
 		NodeDefinition{Type: NodeTypeStart, Label: "开始", Description: "声明工作流输入", Category: "flow", OutputPorts: []string{"output"}, ConfigSchema: required("inputs")},
 		NodeDefinition{Type: NodeTypeEnd, Label: "结束", Description: "返回工作流输出", Category: "flow", InputPorts: []string{"input"}, ConfigSchema: required("outputs")},
-		NodeDefinition{Type: NodeTypeLLM, Label: "大模型", Description: "使用受控模型生成文本", Category: "model", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, WhenAllowed: true, ConfigSchema: required("prompt")},
+		NodeDefinition{Type: NodeTypeLLM, Label: "大模型", Description: "使用已选文本模型生成内容", Category: "model", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, WhenAllowed: true, ConfigSchema: required("prompt")},
 		NodeDefinition{Type: NodeTypeTool, Label: "工具", Description: "调用白名单业务能力", Category: "tool", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, WhenAllowed: true, ConfigSchema: required("capabilityId", "inputs")},
 		NodeDefinition{Type: NodeTypeCondition, Label: "条件", Description: "按受控规则选择分支", Category: "flow", InputPorts: []string{"input"}, OutputPorts: []string{"true", "false"}, ConfigSchema: required("left", "operator")},
 		NodeDefinition{Type: NodeTypeSwitch, Label: "选择器", Description: "根据结构化字段选择一条路径", Category: "flow", InputPorts: []string{"input"}, OutputPorts: []string{"case:*", "default"}, ConfigSchema: required("value", "valueType", "cases")},

@@ -85,6 +85,7 @@ const adminMenuItems = [
     label: 'AI 与实验',
     children: [
       { key: '/ai/usage-logs', icon: <ExperimentOutlined />, label: 'AI 调用审计' },
+      { key: '/ai/models', icon: <ExperimentOutlined />, label: 'AI 模型目录' },
       { key: '/mind-arena/debates', icon: <ExperimentOutlined />, label: 'Mind Arena 辩论' },
     ],
   },
@@ -115,6 +116,7 @@ const resolveSelectedMenuKey = (pathname: string) => {
   if (pathname.startsWith('/life-trace/ai-conversations')) return '/life-trace/ai-conversations';
   if (pathname.startsWith('/life-trace/holiday-calendars')) return '/life-trace/holiday-calendars';
   if (pathname.startsWith('/ai/usage-logs')) return '/ai/usage-logs';
+  if (pathname.startsWith('/ai/models')) return '/ai/models';
   if (pathname.startsWith('/mind-arena/debates')) return '/mind-arena/debates';
   if (pathname.startsWith('/life-trace')) return '/life-trace';
   return pathname;

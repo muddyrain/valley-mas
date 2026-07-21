@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ModelPicker } from '../ModelPicker';
 import { VariableTokenEditor } from '../VariableTokenEditor';
 import { getWorkflowNodeOutputFields } from '../workflowVariables';
 import type { PropertyFormProps } from './index';
@@ -64,10 +65,12 @@ export function LLMPropertyForm({
         />
       </EditorSection>
       <EditorSection title="模型设置" description="选择模型并调整生成参数。">
-        <div className="space-y-1.5">
-          <Label>模型</Label>
-          <Input value="ARK 默认文本模型" disabled />
-        </div>
+        <ModelPicker
+          value={(config.modelId as string) || undefined}
+          onValueChange={(modelId) => onUpdateConfig({ modelId })}
+          capability="text"
+          label="文本模型"
+        />
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="llm-temperature">Temperature</Label>
@@ -121,9 +124,7 @@ export function LLMPropertyForm({
             id="llm-system-prompt"
             ariaLabel="系统指令"
             value={systemPrompt}
-            onChange={(nextSystemPrompt) =>
-              onUpdateConfig({ systemPrompt: nextSystemPrompt, modelProfile: 'ark-text-default' })
-            }
+            onChange={(nextSystemPrompt) => onUpdateConfig({ systemPrompt: nextSystemPrompt })}
             options={variableOptions}
             placeholder="例如：你是专业的内容编辑，回答应准确、简洁"
           />
@@ -240,7 +241,6 @@ export function LLMPropertyForm({
         onInsert={(content) =>
           onUpdateConfig({
             systemPrompt: [systemPrompt.trim(), content.trim()].filter(Boolean).join('\n\n'),
-            modelProfile: 'ark-text-default',
           })
         }
       />
@@ -253,7 +253,6 @@ export function LLMPropertyForm({
         onReplace={(suggestion) =>
           onUpdateConfig({
             systemPrompt: suggestion.optimizedPrompt,
-            modelProfile: 'ark-text-default',
           })
         }
       />

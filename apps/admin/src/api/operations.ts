@@ -147,6 +147,20 @@ export interface AdminAIUsageSummary {
   }>;
 }
 
+export type AIModelCapability = 'text' | 'vision' | 'image_generation' | 'embedding' | 'tool_call';
+
+export interface AdminAIModel {
+  id: string;
+  provider: 'siliconflow' | 'amux' | 'ark';
+  modelId: string;
+  displayName: string;
+  capabilities: AIModelCapability[];
+  enabled: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RelationFavorite {
   id: string;
   userId: string;
@@ -363,6 +377,34 @@ export function listAIUsageLogs(params: AdminListParams) {
 
 export function getAIUsageSummary(params: AdminListParams) {
   return http.get<unknown, AdminAIUsageSummary>('/admin/ai/usage-summary', { params });
+}
+
+export function listAIModels(provider?: string) {
+  return http.get<unknown, { list: AdminAIModel[] }>('/admin/ai/models', { params: { provider } });
+}
+
+export function createAIModel(payload: Omit<AdminAIModel, 'id' | 'createdAt' | 'updatedAt'>) {
+  return http.post<unknown, AdminAIModel>('/admin/ai/models', payload);
+}
+
+export function updateAIModel(
+  id: string,
+  payload: Omit<AdminAIModel, 'id' | 'createdAt' | 'updatedAt'>,
+) {
+  return http.put<unknown, AdminAIModel>(`/admin/ai/models/${id}`, payload);
+}
+
+export function testAIModelConnection(payload: Pick<AdminAIModel, 'provider' | 'modelId'>) {
+  return http.post<
+    unknown,
+    { provider: string; modelId: string; available: boolean; latencyMs: number }
+  >('/admin/ai/models/test-connection', payload);
+}
+
+export function previewAIProviderModels(provider: 'siliconflow' | 'amux') {
+  return http.get<unknown, { provider: string; models: string[] }>(
+    `/admin/ai/providers/${provider}/models-preview`,
+  );
 }
 
 export function listFavorites(params: AdminListParams) {
