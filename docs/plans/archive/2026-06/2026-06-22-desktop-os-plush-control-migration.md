@@ -1,3 +1,5 @@
+> [!HISTORICAL] 该计划已迁移为历史参考，不作为当前可执行计划
+
 # Desktop OS · Plush 控件下沉迁移 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

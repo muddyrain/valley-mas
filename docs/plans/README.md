@@ -23,20 +23,22 @@
 
 ## 当前活跃计划
 
-- [2026-06-22-desktop-os-plush-control-migration.md](2026-06-22-desktop-os-plush-control-migration.md)
-- [2026-06-23-desktop-os-motion-migration.md](2026-06-23-desktop-os-motion-migration.md)
-- [2026-06-26-life-trace-calendar-selection.md](2026-06-26-life-trace-calendar-selection.md)
-- [2026-06-30-pantry-drawer-ai-augment.md](2026-06-30-pantry-drawer-ai-augment.md)
-- [2026-06-30-pantry-shelf-life-validation.md](2026-06-30-pantry-shelf-life-validation.md)
-- [2026-06-30-server-ai-foundation-refactor.md](2026-06-30-server-ai-foundation-refactor.md)
-- [2026-07-02-server-ai-agent-runtime.md](2026-07-02-server-ai-agent-runtime.md)
-- [2026-07-10-life-trace-pantry-mobile-browsing.md](2026-07-10-life-trace-pantry-mobile-browsing.md)
-- [2026-07-18-ai-workbench-next-roadmap.md](2026-07-18-ai-workbench-next-roadmap.md)
+- 暂无（历史计划已归档，当前无活跃计划条目）
+
+## 已归档（2026-06）
+
+- [archive/2026-06/2026-06-22-desktop-os-plush-control-migration.md](archive/2026-06/2026-06-22-desktop-os-plush-control-migration.md)
+- [archive/2026-06/2026-06-23-desktop-os-motion-migration.md](archive/2026-06/2026-06-23-desktop-os-motion-migration.md)
+- [archive/2026-06/2026-06-26-life-trace-calendar-selection.md](archive/2026-06/2026-06-26-life-trace-calendar-selection.md)
+- [archive/2026-06/2026-06-30-pantry-drawer-ai-augment.md](archive/2026-06/2026-06-30-pantry-drawer-ai-augment.md)
+- [archive/2026-06/2026-06-30-pantry-shelf-life-validation.md](archive/2026-06/2026-06-30-pantry-shelf-life-validation.md)
+- [archive/2026-06/2026-06-30-server-ai-foundation-refactor.md](archive/2026-06/2026-06-30-server-ai-foundation-refactor.md)
 
 ## 已归档（2026-07）
 
 - [archive/2026-07/2026-07-11-ai-workflow-automation.md](archive/2026-07/2026-07-11-ai-workflow-automation.md)
 - [archive/2026-07/2026-07-14-ai-app-editor-recovery.md](archive/2026-07/2026-07-14-ai-app-editor-recovery.md)
+- [archive/2026-07/2026-07-02-server-ai-agent-runtime.md](archive/2026-07/2026-07-02-server-ai-agent-runtime.md)
 - [archive/2026-07/2026-07-14-ai-knowledge-pdf-ingestion.md](archive/2026-07/2026-07-14-ai-knowledge-pdf-ingestion.md)
 - [archive/2026-07/2026-07-16-workflow-editor-ergonomics.md](archive/2026-07/2026-07-16-workflow-editor-ergonomics.md)
 - [archive/2026-07/2026-07-14-ai-workbench-platform.md](archive/2026-07/2026-07-14-ai-workbench-platform.md)
@@ -44,4 +46,6 @@
 - [archive/2026-07/2026-07-17-ai-contextual-copilot-implementation.md](archive/2026-07/2026-07-17-ai-contextual-copilot-implementation.md)
 - [archive/2026-07/2026-07-19-p13-knowledge-base-2.md](archive/2026-07/2026-07-19-p13-knowledge-base-2.md)
 - [archive/2026-07/2026-07-19-p13-prompt-resources.md](archive/2026-07/2026-07-19-p13-prompt-resources.md)
+- [archive/2026-07/2026-07-10-life-trace-pantry-mobile-browsing.md](archive/2026-07/2026-07-10-life-trace-pantry-mobile-browsing.md)
+- [archive/2026-07/2026-07-18-ai-workbench-next-roadmap.md](archive/2026-07/2026-07-18-ai-workbench-next-roadmap.md)
 - [archive/2026-07/2026-07-20-p13-switch-node.md](archive/2026-07/2026-07-20-p13-switch-node.md)

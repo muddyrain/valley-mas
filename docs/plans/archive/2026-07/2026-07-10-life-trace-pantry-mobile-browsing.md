@@ -1,3 +1,5 @@
+> [!HISTORICAL] 该计划已迁移为历史参考，不作为当前可执行计划
+
 # Life Trace Pantry Mobile Browsing Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Valley MAS project rules prohibit automatic commits unless the user explicitly requests one, so each task ends with a verification checkpoint instead of a commit.

@@ -1,3 +1,5 @@
+> [!HISTORICAL] 该计划已迁移为历史参考，不作为当前可执行计划
+
 # Server AI Agent Runtime（阶段 A：手写 tool loop）
 
 > **For agentic workers:** REQUIRED SUB-SKILL：使用 `executing-plans` 或 `subagent-driven-development` 按 task 顺序推进。每个 step 都用 `- [ ]`，落地一项勾一项。落地过程中启用 `ai-capability-orchestration`、`karpathy-guidelines`、`test-driven-development`。
