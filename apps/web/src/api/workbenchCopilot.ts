@@ -185,6 +185,7 @@ export function cancelCopilotRun(runId: string): Promise<{ status: 'cancelling' 
 export async function streamCopilotMessage(
   context: CopilotContext,
   message: string,
+  modelId: string,
   sessionId: string,
   handlers: { onEvent: (event: CopilotStreamEvent) => void; onReconnect?: () => void },
   signal?: AbortSignal,
@@ -202,6 +203,7 @@ export async function streamCopilotMessage(
     body: JSON.stringify({
       scope: context.scope,
       targetId: context.targetId || '',
+      modelId,
       sessionId,
       message,
       context: {

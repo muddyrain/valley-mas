@@ -9,6 +9,8 @@
 - [AI 工作台知识库与 RAG 状态（归档）](./plans/archive/2026-07/2026-07-14-ai-workbench-platform.md)：私有资料库、ARK embedding、pgvector 检索和智能体引用状态汇总（历史完成，P12 前置）。
 - [AI 工作台后续路线图（归档）](./plans/archive/2026-07/2026-07-18-ai-workbench-next-roadmap.md)：P12 运行可靠性、P13 资源中心、P14 生产治理的范围与进入条件。
 - [选择器（Switch）节点](./specs/2026-07-20-p13-switch-node-design.md)：P13.3 对结构化字段做无模型、确定性多分支路由的规格与实施边界。
+- [博客摘要模型目录迁移](./specs/2026-07-21-blog-excerpt-model-catalog-design.md)：博客编辑器按文本能力选择模型并写入 Provider 用量审计。
+- [交互式 AI 模型目录全量迁移](./specs/2026-07-21-interactive-ai-model-catalog-migration-design.md)：所有用户主动触发的文本、视觉与生图 AI 统一按能力选择模型目录记录。
 - [Harness Engineering](./HARNESS_ENGINEERING.md)：AI coding agent 在本仓库中的上下文入口、工具边界、验证命令、评审回路和回归证据。
 - [测试治理策略](./TESTING_STRATEGY.md)：新增改动的测试要求、历史测试债治理、运行时证据边界与覆盖率推进条件。
 - [Agent 常见错误模式](./patterns/agent-pitfalls.md)：只记录 Valley 已确认的失败模式，并把重复问题导向脚本、测试或 CI。

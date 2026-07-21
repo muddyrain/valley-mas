@@ -32,6 +32,7 @@ import {
 } from '@/api/blog';
 import type { Resource } from '@/api/resource';
 import AiImageLoading from '@/components/AiImageLoading';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import {
   BLOG_COVER_ASPECT_CLASS,
   BLOG_COVER_OUTPUT_HEIGHT,
@@ -98,7 +99,9 @@ export default function BlogCreate() {
   const [submitting, setSubmitting] = useState(false);
   const [submitIntent, setSubmitIntent] = useState<'draft' | 'published' | null>(null);
   const [aiExcerptLoading, setAiExcerptLoading] = useState(false);
+  const [excerptModelID, setExcerptModelID] = useState('');
   const [aiCoverLoading, setAiCoverLoading] = useState(false);
+  const [coverModelID, setCoverModelID] = useState('');
   const [aiCoverSource, setAiCoverSource] = useState<'manual' | 'import'>('manual');
   const [importingMarkdown, setImportingMarkdown] = useState(false);
   const [batchImportDialogOpen, setBatchImportDialogOpen] = useState(false);
@@ -418,13 +421,14 @@ export default function BlogCreate() {
 
   const handleAIGenerateExcerpt = async () => {
     const trimmedContent = content.trim();
-    if (!trimmedContent) return;
+    if (!trimmedContent || !excerptModelID) return;
 
     try {
       setAiExcerptLoading(true);
       const result = await generateBlogExcerpt({
         title: title.trim(),
         content: trimmedContent,
+        modelId: excerptModelID,
       });
       const nextExcerpt = result.excerpt?.trim();
       if (!nextExcerpt) {
@@ -448,6 +452,10 @@ export default function BlogCreate() {
   }) => {
     const trimmedContent = (payload?.content ?? content).trim();
     if (!trimmedContent) return;
+    if (!coverModelID) {
+      toast.error('请先选择生图模型');
+      return;
+    }
 
     try {
       setAiCoverSource(payload?.source ?? 'manual');
@@ -456,6 +464,7 @@ export default function BlogCreate() {
         title: (payload?.title ?? title).trim(),
         excerpt: (payload?.excerpt ?? excerpt).trim(),
         content: trimmedContent,
+        modelId: coverModelID,
       });
 
       if (result.imageBase64) {
@@ -959,9 +968,15 @@ export default function BlogCreate() {
                     <button
                       type="button"
                       onClick={() => void handleAIGenerateExcerpt()}
-                      disabled={isContentEmpty || aiExcerptLoading || submitting}
+                      disabled={isContentEmpty || !excerptModelID || aiExcerptLoading || submitting}
                       className="inline-flex h-6 items-center gap-1 rounded-lg border border-primary/30 bg-accent px-1.5 text-xs font-medium text-primary transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-45"
-                      title={isContentEmpty ? '请先输入正文内容' : 'AI 自动提取摘要'}
+                      title={
+                        isContentEmpty
+                          ? '请先输入正文内容'
+                          : !excerptModelID
+                            ? '请先选择摘要模型'
+                            : 'AI 自动提取摘要'
+                      }
                     >
                       {aiExcerptLoading ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -978,6 +993,14 @@ export default function BlogCreate() {
                     maxLength={500}
                     className="rounded-xl"
                   />
+                  <div className="mt-3">
+                    <ModelPicker
+                      value={excerptModelID || undefined}
+                      onValueChange={setExcerptModelID}
+                      capability="text"
+                      label="摘要模型"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -1017,9 +1040,21 @@ export default function BlogCreate() {
                       <button
                         type="button"
                         onClick={() => void handleAIGenerateCover()}
-                        disabled={isContentEmpty || aiCoverLoading || coverUploading || submitting}
+                        disabled={
+                          isContentEmpty ||
+                          !coverModelID ||
+                          aiCoverLoading ||
+                          coverUploading ||
+                          submitting
+                        }
                         className="inline-flex h-6 items-center gap-1 rounded-lg border border-primary/30 bg-accent px-1.5 text-xs font-medium text-primary transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-45"
-                        title={isContentEmpty ? '请先输入正文内容' : 'AI 自动配图为封面'}
+                        title={
+                          isContentEmpty
+                            ? '请先输入正文内容'
+                            : !coverModelID
+                              ? '请先选择生图模型'
+                              : 'AI 自动配图为封面'
+                        }
                       >
                         {aiCoverLoading ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1029,6 +1064,14 @@ export default function BlogCreate() {
                         {aiCoverLoading ? '配图中' : 'AI配图封面'}
                       </button>
                     </div>
+                  </div>
+                  <div className="mb-3">
+                    <ModelPicker
+                      value={coverModelID || undefined}
+                      onValueChange={setCoverModelID}
+                      capability="image_generation"
+                      label="生图模型"
+                    />
                   </div>
                   <div className="flex gap-2">
                     <Input

@@ -23,7 +23,8 @@
 
 ## 当前活跃计划
 
-- 暂无（历史计划已归档，当前无活跃计划条目）
+- [2026-07-21-blog-excerpt-model-catalog.md](2026-07-21-blog-excerpt-model-catalog.md)：博客编辑器摘要生成接入模型目录。
+- [2026-07-21-interactive-ai-model-catalog-migration.md](2026-07-21-interactive-ai-model-catalog-migration.md)：交互式 AI 功能迁移到模型目录。
 
 ## 已归档（2026-06）
 

@@ -18,6 +18,7 @@ import {
   updateResource,
   uploadResource,
 } from '@/api/resource';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import ResourceTagSelector from '@/components/ResourceTagSelector';
 import { Button } from '@/components/ui/button';
 import { openConfirmToast } from '@/components/ui/confirm-toast';
@@ -96,6 +97,7 @@ export default function UploadResourceDialog({
   const [uploadConfirming, setUploadConfirming] = useState(false);
   const [aiNaming, setAiNaming] = useState(false);
   const [aiTitles, setAiTitles] = useState<string[]>([]);
+  const [visionModelId, setVisionModelId] = useState('');
   // 标签预选（上传前选好，上传成功后立即绑定）
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   // 压缩后的 base64（AI 起名和 AI 标签共用）
@@ -123,6 +125,7 @@ export default function UploadResourceDialog({
     setUploadTitle('');
     setUploadDesc('');
     setAiTitles([]);
+    setVisionModelId('');
     setSelectedTags([]);
     setPreviewBase64('');
     setUploadConfirming(false);
@@ -170,12 +173,16 @@ export default function UploadResourceDialog({
       toast.error('请先选择图片');
       return;
     }
+    if (!visionModelId) {
+      toast.error('请先选择视觉模型');
+      return;
+    }
     try {
       setAiNaming(true);
       setAiTitles([]);
       // 复用已生成的 base64，没有则现场生成
       const base64 = previewBase64 || (await resizeImageForAI(uploadFile, 512));
-      const result = await suggestResourceTitle(base64, uploadType);
+      const result = await suggestResourceTitle(base64, uploadType, visionModelId);
       if (result.titles && result.titles.length > 0) {
         setAiTitles(result.titles);
         setUploadTitle(result.titles[0]);
@@ -447,6 +454,12 @@ export default function UploadResourceDialog({
 
               {/* 资源标题 */}
               <div className="space-y-2">
+                <ModelPicker
+                  value={visionModelId}
+                  onValueChange={setVisionModelId}
+                  capability="vision"
+                  label="视觉模型"
+                />
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     资源标题{' '}
@@ -533,6 +546,7 @@ export default function UploadResourceDialog({
                   title: uploadTitle,
                   description: uploadDesc,
                 }}
+                modelId={visionModelId}
               />
             </div>
 

@@ -91,6 +91,34 @@ func TestCreateDebateStartsWithEmptyPersonas(t *testing.T) {
 	}
 }
 
+func TestCreateDebateWithModelPersistsCatalogSelection(t *testing.T) {
+	store := NewMemoryStore()
+	service := NewServiceWithAIFactory(store, nil, func(provider string, model string) (DebateAI, error) {
+		return nil, fmt.Errorf("factory should not run while creating a session")
+	})
+
+	response, err := service.CreateDebateWithModel(context.Background(), CreateDebateRequest{
+		Topic:        "要不要换工作",
+		Mode:         "serious",
+		PersonaCount: 5,
+		ModelID:      "123",
+	}, ModelSelection{CatalogModelID: "123", Provider: "siliconflow", Model: "Qwen/Qwen3-8B"})
+	if err != nil {
+		t.Fatalf("CreateDebateWithModel returned error: %v", err)
+	}
+	if response.CatalogModelID != "123" || response.Provider != "siliconflow" || response.Model != "Qwen/Qwen3-8B" {
+		t.Fatalf("unexpected create response: %+v", response)
+	}
+
+	session, err := store.Get(response.SessionID)
+	if err != nil {
+		t.Fatalf("load persisted session: %v", err)
+	}
+	if session.CatalogModelID != "123" || session.Provider != "siliconflow" || session.Model != "Qwen/Qwen3-8B" {
+		t.Fatalf("catalog model selection was not persisted: %+v", session)
+	}
+}
+
 func TestStreamDebateEmitsMessageJudgeAndDoneEvents(t *testing.T) {
 	restore := disableStreamDelays(t)
 	defer restore()

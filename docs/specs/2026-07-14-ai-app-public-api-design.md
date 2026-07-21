@@ -37,18 +37,19 @@
 请求：
 
 ```json
-{"message":"你好","stream":false}
+{"message":"你好","modelId":"目录文本模型 ID","stream":false}
 ```
 
 JSON 成功响应返回 `reply`、`model`、`versionId`、`requestId` 和剩余次数。`stream:true` 返回 `text/event-stream`；事件使用 `meta`、`delta`、`tool_call`、`tool_result`、`done`、`error`，且 `done` 仅返回 `requestId`、模型、版本和剩余次数，不返回工具原始结果。
 
 失败响应：
 
-- `400`：消息为空或请求无效。
+- `400`：消息、模型 ID 为空，或所选模型不存在、已停用、能力不匹配。
 - `401`：Key 缺失、格式错误、无效或已撤销。
 - `403`：Key 未绑定该应用，或应用未发布。
 - `429`：当天 100 次配额已用完。
-- `502`：ARK 或 Agent 执行失败。
+- `502`：目录模型上游或 Agent 执行失败。
+- `503`：所选模型的 Provider 未配置。
 
 ### 工作台管理与观测
 

@@ -1,5 +1,6 @@
 import { BookOpen, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
 import { PromptLibraryDialog } from '@/components/ai-workbench/PromptLibraryDialog';
@@ -13,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ModelPicker } from '../ModelPicker';
 import { VariableTokenEditor } from '../VariableTokenEditor';
 import { getWorkflowNodeOutputFields } from '../workflowVariables';
 import type { PropertyFormProps } from './index';

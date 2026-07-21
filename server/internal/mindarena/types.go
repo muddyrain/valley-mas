@@ -81,6 +81,9 @@ type DebateSession struct {
 	ID                   string               `json:"id"`
 	Topic                string               `json:"topic"`
 	Mode                 DebateMode           `json:"mode"`
+	CatalogModelID       string               `json:"catalogModelId,omitempty"`
+	Provider             string               `json:"provider,omitempty"`
+	Model                string               `json:"model,omitempty"`
 	Status               DebateStatus         `json:"status"`
 	PersonaCount         int                  `json:"personaCount"`
 	CurrentRound         int                  `json:"currentRound"`
@@ -104,16 +107,20 @@ type CreateDebateRequest struct {
 	Topic        string `json:"topic" binding:"required"`
 	Mode         string `json:"mode"`
 	PersonaCount int    `json:"personaCount"`
+	ModelID      string `json:"modelId" binding:"required"`
 }
 
 type CreateDebateResponse struct {
-	SessionID    string       `json:"sessionId"`
-	Topic        string       `json:"topic"`
-	Mode         DebateMode   `json:"mode"`
-	Status       DebateStatus `json:"status"`
-	PersonaCount int          `json:"personaCount"`
-	CurrentRound int          `json:"currentRound"`
-	Personas     []Persona    `json:"personas"`
+	SessionID      string       `json:"sessionId"`
+	Topic          string       `json:"topic"`
+	Mode           DebateMode   `json:"mode"`
+	CatalogModelID string       `json:"catalogModelId,omitempty"`
+	Provider       string       `json:"provider,omitempty"`
+	Model          string       `json:"model,omitempty"`
+	Status         DebateStatus `json:"status"`
+	PersonaCount   int          `json:"personaCount"`
+	CurrentRound   int          `json:"currentRound"`
+	Personas       []Persona    `json:"personas"`
 }
 
 type SubmitRoundSupportRequest struct {

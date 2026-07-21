@@ -150,10 +150,8 @@ func TestValidateAIAppAvatarContentRejectsFakeImage(t *testing.T) {
 	}
 }
 
-func TestAIAppProposalReturns503WhenARKIsMissing(t *testing.T) {
+func TestAIAppProposalRequiresSelectedModel(t *testing.T) {
 	router, _ := setupAIPlatformTestRouter(t)
-	t.Setenv("ARK_API_KEY", "")
-	t.Setenv("ARK_TEXT_MODEL", "")
 	request := httptest.NewRequest(http.MethodPost, "/ai/app-assistant/proposals", strings.NewReader(`{"description":"创建资料助手"}`))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
@@ -161,10 +159,26 @@ func TestAIAppProposalReturns503WhenARKIsMissing(t *testing.T) {
 	router.ServeHTTP(response, request)
 	var payload Response
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode response: %v", err)
+		t.Fatalf("decode response: %v; body = %s", err, response.Body.String())
 	}
-	if payload.Code != http.StatusServiceUnavailable {
-		t.Fatalf("proposal code = %d, want 503; response = %s", payload.Code, response.Body.String())
+	if payload.Code != http.StatusBadRequest {
+		t.Fatalf("proposal code = %d, want 400; response = %s", payload.Code, response.Body.String())
+	}
+}
+
+func TestPromptAssistantSuggestionRequiresSelectedModel(t *testing.T) {
+	router, _ := setupAIPlatformTestRouter(t)
+	request := httptest.NewRequest(http.MethodPost, "/ai/prompt-assistant/suggestions", strings.NewReader(`{"target":"workflow_llm","mode":"auto","currentPrompt":"提取文章要点"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	var payload Response
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v; body = %s", err, response.Body.String())
+	}
+	if payload.Code != http.StatusBadRequest {
+		t.Fatalf("prompt assistant code = %d, want 400; response = %s", payload.Code, response.Body.String())
 	}
 }
 

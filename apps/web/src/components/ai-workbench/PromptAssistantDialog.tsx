@@ -8,6 +8,7 @@ import {
   type PromptAssistantField,
   type PromptAssistantSuggestion,
 } from '@/api/aiWorkbench';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import { AIGenerationProgress } from '@/components/ai-workbench/AIGenerationProgress';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -63,6 +64,7 @@ export function PromptAssistantDialog({
 }) {
   const [mode, setMode] = useState<PromptMode>('auto');
   const [instruction, setInstruction] = useState('');
+  const [textModelId, setTextModelId] = useState('');
   const [selectedRuns, setSelectedRuns] = useState<string[]>([]);
   const [includeGreetings, setIncludeGreetings] = useState(false);
   const [suggestion, setSuggestion] = useState<PromptAssistantSuggestion | null>(null);
@@ -74,6 +76,7 @@ export function PromptAssistantDialog({
     if (!open) return;
     setSuggestion(null);
     setInstruction('');
+    setTextModelId('');
     setSelectedRuns([]);
     setIncludeGreetings(false);
     setMode('auto');
@@ -92,6 +95,10 @@ export function PromptAssistantDialog({
       toast.error('请选择 1–3 次调试结果');
       return;
     }
+    if (!textModelId) {
+      toast.error('请选择文本模型');
+      return;
+    }
     const controller = new AbortController();
     controllerRef.current = controller;
     setLoading(true);
@@ -99,6 +106,7 @@ export function PromptAssistantDialog({
       const result = await createPromptAssistantSuggestion(
         {
           target,
+          modelId: textModelId,
           field,
           mode,
           appId,
@@ -214,6 +222,12 @@ export function PromptAssistantDialog({
             同时生成开场白和示例问题
           </label>
         ) : null}
+        <ModelPicker
+          value={textModelId || undefined}
+          onValueChange={setTextModelId}
+          capability="text"
+          label="文本模型"
+        />
         {loading ? (
           <AIGenerationProgress
             title={isSystemPrompt ? '正在优化提示词' : `正在生成${fieldLabels[field]}`}

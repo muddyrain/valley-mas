@@ -1,5 +1,6 @@
 import { Heart } from 'lucide-react';
 import type { MouseEvent, ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 
 export function SectionHeading({
   eyebrow,
@@ -114,5 +115,15 @@ export function ResourceFavoriteButton({
     >
       <Heart className={`${iconClass} ${active ? 'fill-current' : ''}`} />
     </button>
+  );
+}
+
+export function ResourcePreviewLink({ resourceId, title }: { resourceId: string; title: string }) {
+  return (
+    <Link
+      to={`/resource/${resourceId}`}
+      aria-label={`查看资源：${title}`}
+      className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    />
   );
 }

@@ -7,6 +7,14 @@ export interface AIChatMessage {
   content: string;
 }
 
+export interface AvailableAIModel {
+  id: string;
+  displayName: string;
+  modelId: string;
+  provider: string;
+  capabilities: string[];
+}
+
 export interface AIAgent {
   id: string;
   name: string;
@@ -41,6 +49,7 @@ export interface AIMessage {
 
 export interface AIChatRequest {
   message: string;
+  modelId: string;
   history?: AIChatMessage[];
   stream?: boolean;
 }
@@ -89,7 +98,7 @@ export interface AIAgentChatResponse {
   assistantMessage: AIMessage;
   reply: string;
   model: string;
-  provider: 'ark';
+  provider: string;
 }
 
 export type AIAgentChatStreamEvent =
@@ -98,7 +107,7 @@ export type AIAgentChatStreamEvent =
       conversation: AIConversation;
       userMessage: AIMessage;
       model: string;
-      provider: 'ark';
+      provider: string;
     }
   | {
       type: 'delta';
@@ -111,7 +120,7 @@ export type AIAgentChatStreamEvent =
       assistantMessage: AIMessage;
       reply: string;
       model: string;
-      provider: 'ark';
+      provider: string;
     }
   | {
       type: 'error';
@@ -133,6 +142,10 @@ export function postAIChat(input: AIChatRequest, token: string) {
       stream: false,
     },
   });
+}
+
+export function listAvailableAIModels(token: string) {
+  return apiRequest<{ list: AvailableAIModel[] }>('/ai/models?capability=text', { token });
 }
 
 export function listAIAgents(token: string) {
@@ -200,7 +213,7 @@ export function deleteAIConversation(agentId: string, conversationId: string, to
 export function postAIAgentChat(
   agentId: string,
   conversationId: string,
-  input: { message: string },
+  input: { message: string; modelId: string },
   token: string,
 ) {
   return apiRequest<AIAgentChatResponse>(
@@ -216,7 +229,7 @@ export function postAIAgentChat(
 export async function streamAIAgentChat(
   agentId: string,
   conversationId: string,
-  input: { message: string },
+  input: { message: string; modelId: string },
   token: string,
   handlers: AIAgentChatStreamHandlers,
 ) {

@@ -14,10 +14,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
 	"valley-server/internal/aiclient"
+	"valley-server/internal/aimodel"
+	"valley-server/internal/aiusage"
+	"valley-server/internal/database"
 	"valley-server/internal/service"
 	"valley-server/internal/utils"
 
@@ -29,12 +33,18 @@ import (
 type blogAIExcerptRequest struct {
 	Title   string `json:"title"`
 	Content string `json:"content" binding:"required"`
+	ModelID string `json:"modelId" binding:"required"`
+}
+
+type blogExcerptChatClient interface {
+	Chat(context.Context, aiclient.CompatibleChatRequest) (aiclient.CompatibleChatResponse, error)
 }
 
 type blogAICoverRequest struct {
 	Title   string `json:"title"`
 	Excerpt string `json:"excerpt"`
 	Content string `json:"content" binding:"required"`
+	ModelID string `json:"modelId" binding:"required"`
 }
 
 func normalizeAITextOutput(raw string) string {
@@ -382,6 +392,20 @@ func buildDeterministicCoverPrompt(req blogAICoverRequest) string {
 	)
 }
 
+func buildBlogExcerptPrompt(title, content string) string {
+	title = truncateAIText(title, 80)
+	content = truncateAIText(content, 3500)
+	return fmt.Sprintf(
+		"Generate a concise Chinese summary for the blog below. Requirements:\n"+
+			"1) 30-120 Chinese characters;\n"+
+			"2) accurate and neutral;\n"+
+			"3) output summary text only, no quote marks.\n\n"+
+			"Title: %s\nContent: %s",
+		title,
+		content,
+	)
+}
+
 // AdminAIGenerateBlogExcerpt generates summary from blog content.
 // POST /admin/blog/ai/excerpt
 // generateBlogExcerptInternal generates a blog excerpt using AI without HTTP handler dependencies.
@@ -392,17 +416,7 @@ func generateBlogExcerptInternal(title, content string) (excerpt string, model s
 	}
 	client := ensureSharedArkClient(apiKey, arkBaseURL)
 
-	title = truncateAIText(title, 80)
-	content = truncateAIText(content, 3500)
-	prompt := fmt.Sprintf(
-		"Generate a concise Chinese summary for the blog below. Requirements:\n"+
-			"1) 30-120 Chinese characters;\n"+
-			"2) accurate and neutral;\n"+
-			"3) output summary text only, no quote marks.\n\n"+
-			"Title: %s\nContent: %s",
-		title,
-		content,
-	)
+	prompt := buildBlogExcerptPrompt(title, content)
 
 	raw, err := callChatStream(client, textModel, "", prompt, false)
 	if err != nil {
@@ -417,8 +431,60 @@ func generateBlogExcerptInternal(title, content string) (excerpt string, model s
 	return excerpt, textModel, nil
 }
 
+func generateBlogExcerptWithCatalogModel(
+	ctx context.Context,
+	client blogExcerptChatClient,
+	modelID string,
+	prompt string,
+) (excerpt string, actualModel string, usage aiclient.CompatibleUsage, err error) {
+	response, err := client.Chat(ctx, aiclient.CompatibleChatRequest{
+		Model:    modelID,
+		Messages: []aiclient.CompatibleMessage{{Role: "user", Content: prompt}},
+	})
+	if err != nil {
+		return "", modelID, aiclient.CompatibleUsage{}, err
+	}
+
+	actualModel = modelNameOrFallback(response.Model, modelID)
+	excerpt = truncateAIText(normalizeAITextOutput(compatibleMessageText(response.Choices[0].Message.Content)), 180)
+	if excerpt == "" {
+		return "", actualModel, response.Usage, fmt.Errorf("AI returned empty summary")
+	}
+	return excerpt, actualModel, response.Usage, nil
+}
+
+func recordBlogExcerptUsage(
+	userID int64,
+	provider string,
+	modelName string,
+	prompt string,
+	excerpt string,
+	usage aiclient.CompatibleUsage,
+	latencyMs int64,
+	errMessage string,
+) {
+	status := aiusage.StatusSuccess
+	if strings.TrimSpace(errMessage) != "" {
+		status = aiusage.StatusFailed
+	}
+	aiusage.Record(aiusage.Entry{
+		Feature:          aiclient.FeatureBlogExcerpt,
+		Provider:         provider,
+		Model:            modelName,
+		UserID:           strconv.FormatInt(userID, 10),
+		Status:           status,
+		PromptChars:      aiusage.CharCount(prompt),
+		ResponseChars:    aiusage.CharCount(excerpt),
+		PromptTokens:     usage.PromptTokens,
+		CompletionTokens: usage.CompletionTokens,
+		TotalTokens:      usage.TotalTokens,
+		LatencyMs:        latencyMs,
+		ErrorMessage:     errMessage,
+	})
+}
+
 func AdminAIGenerateBlogExcerpt(c *gin.Context) {
-	_, role, ok := currentUser(c)
+	userID, role, ok := currentUser(c)
 	if !ok {
 		Error(c, http.StatusUnauthorized, "unauthorized")
 		return
@@ -439,16 +505,38 @@ func AdminAIGenerateBlogExcerpt(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "content cannot be empty")
 		return
 	}
-
-	excerpt, model, err := generateBlogExcerptInternal(req.Title, content)
+	prompt := buildBlogExcerptPrompt(req.Title, content)
+	started := time.Now()
+	selected, err := aimodel.FindEnabledModel(database.GetDB(), req.ModelID, "text")
 	if err != nil {
-		Error(c, http.StatusBadGateway, err.Error())
+		recordBlogExcerptUsage(userID, "", "", prompt, "", aiclient.CompatibleUsage{}, aiusage.Since(started), err.Error())
+		Error(c, http.StatusBadRequest, "请选择一个可用的文本模型")
+		return
+	}
+	providerConfig, err := aimodel.ProviderFromEnv(selected.Provider)
+	if err != nil {
+		recordBlogExcerptUsage(userID, selected.Provider, selected.ModelID, prompt, "", aiclient.CompatibleUsage{}, aiusage.Since(started), err.Error())
+		Error(c, http.StatusServiceUnavailable, err.Error())
 		return
 	}
 
+	excerpt, actualModel, usage, err := generateBlogExcerptWithCatalogModel(
+		c.Request.Context(),
+		aiclient.NewCompatibleClient(providerConfig.BaseURL, providerConfig.APIKey, 90*time.Second),
+		selected.ModelID,
+		prompt,
+	)
+	if err != nil {
+		recordBlogExcerptUsage(userID, selected.Provider, actualModel, prompt, excerpt, usage, aiusage.Since(started), err.Error())
+		Error(c, http.StatusBadGateway, "AI 摘要生成失败："+err.Error())
+		return
+	}
+	recordBlogExcerptUsage(userID, selected.Provider, actualModel, prompt, excerpt, usage, aiusage.Since(started), "")
+
 	Success(c, gin.H{
-		"excerpt": excerpt,
-		"model":   model,
+		"excerpt":  excerpt,
+		"model":    actualModel,
+		"provider": selected.Provider,
 	})
 }
 
@@ -539,10 +627,10 @@ func generateBlogCoverInternal(title, excerpt, content string, userID int64) (co
 					return "", "", modelCandidate, fmt.Errorf("AI image generation failed: %s", res.Error.Message)
 				}
 				if len(res.Data) > 0 && res.Data[0] != nil {
-						success = true
-						usedImageModel = modelCandidate
-						break
-					}
+					success = true
+					usedImageModel = modelCandidate
+					break
+				}
 				lastUpstreamError = "empty image payload"
 			}
 			if success {
@@ -631,7 +719,7 @@ func generateBlogCoverInternal(title, excerpt, content string, userID int64) (co
 // AdminAIGenerateBlogCover generates cover image from blog content.
 // POST /admin/blog/ai/cover
 func AdminAIGenerateBlogCover(c *gin.Context) {
-	_, role, ok := currentUser(c)
+	userID, role, ok := currentUser(c)
 	if !ok {
 		Error(c, http.StatusUnauthorized, "unauthorized")
 		return
@@ -654,21 +742,40 @@ func AdminAIGenerateBlogCover(c *gin.Context) {
 	}
 	req.Content = content
 
-	userID, _, _ := currentUser(c)
-
-	coverURL, coverStorageKey, usedModel, err := generateBlogCoverInternal(req.Title, req.Excerpt, content, userID)
+	start := time.Now()
+	invocation, err := aimodel.ResolveInvocation(database.GetDB(), req.ModelID, "image_generation", 120*time.Second)
 	if err != nil {
-		status := http.StatusBadGateway
-		if strings.Contains(err.Error(), "not configured") {
-			status = http.StatusServiceUnavailable
-		}
-		Error(c, status, err.Error())
+		recordBlogCoverUsage(userID, "", "", "", "", start, err)
+		respondCatalogModelError(c, err)
 		return
 	}
+	prompt := truncateAIText(buildDeterministicCoverPrompt(req), 320)
+	coverURL, err := invocation.Client.GenerateImage(c.Request.Context(), invocation.Model.ModelID, prompt, "")
+	usedModel := invocation.Model.ModelID
+	if err != nil {
+		recordBlogCoverUsage(userID, invocation.Provider.Provider, usedModel, prompt, "", start, err)
+		Error(c, http.StatusBadGateway, "AI 封面生成失败："+err.Error())
+		return
+	}
+	recordBlogCoverUsage(userID, invocation.Provider.Provider, usedModel, prompt, coverURL, start, nil)
 
 	Success(c, gin.H{
 		"coverUrl":        coverURL,
-		"coverStorageKey": coverStorageKey,
+		"coverStorageKey": "",
+		"imageUrl":        coverURL,
 		"model":           usedModel,
+		"provider":        invocation.Provider.Provider,
+	})
+}
+
+func recordBlogCoverUsage(userID int64, provider, modelName, prompt, imageURL string, start time.Time, callErr error) {
+	status, errMessage := aiusage.StatusSuccess, ""
+	if callErr != nil {
+		status, errMessage = aiusage.StatusFailed, callErr.Error()
+	}
+	aiusage.Record(aiusage.Entry{
+		Feature: aiclient.FeatureBlogCover, Provider: provider, Model: modelName, UserID: strconv.FormatInt(userID, 10),
+		Status: status, PromptChars: aiusage.CharCount(prompt), ResponseChars: aiusage.CharCount(imageURL),
+		LatencyMs: aiusage.Since(start), ErrorMessage: errMessage,
 	})
 }

@@ -13,7 +13,8 @@ import (
 	"unicode"
 
 	"valley-server/internal/aiapp"
-	"valley-server/internal/aiclient"
+	"valley-server/internal/aimodel"
+	"valley-server/internal/aiusage"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 	"valley-server/internal/service"
@@ -22,7 +23,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var generateAIAppAvatarImage = aiclient.GenerateARKImage
 var deleteManagedAIAppAvatar = func(ctx context.Context, key string) error {
 	uploader := utils.GetTOSUploader()
 	if uploader == nil {
@@ -32,6 +32,7 @@ var deleteManagedAIAppAvatar = func(ctx context.Context, key string) error {
 }
 
 func GenerateAIAppAvatar(c *gin.Context) {
+	started := time.Now()
 	userID, ok := currentAIAppUser(c)
 	if !ok {
 		return
@@ -45,12 +46,17 @@ func GenerateAIAppAvatar(c *gin.Context) {
 		return
 	}
 	var payload struct {
+		ModelID      string `json:"modelId"`
 		Name         string `json:"name"`
 		Description  string `json:"description"`
 		SystemPrompt string `json:"systemPrompt"`
 	}
 	if c.Request.ContentLength != 0 && c.ShouldBindJSON(&payload) != nil {
 		Error(c, http.StatusBadRequest, "头像生成参数错误")
+		return
+	}
+	if strings.TrimSpace(payload.ModelID) == "" {
+		Error(c, http.StatusBadRequest, "请选择图片生成模型")
 		return
 	}
 	contextApp := app
@@ -70,34 +76,25 @@ func GenerateAIAppAvatar(c *gin.Context) {
 		}
 	}
 	prompt := buildAIAppAvatarPrompt(contextApp, systemPrompt)
-	image, err := generateAIAppAvatarImage(c.Request.Context(), prompt, "1024x1024")
+	invocation, err := aimodel.ResolveInvocation(database.GetDB(), payload.ModelID, "image_generation", 120*time.Second)
 	if err != nil {
-		if isARKConfigurationError(err) {
-			Error(c, http.StatusServiceUnavailable, err.Error())
-		} else {
-			Error(c, http.StatusBadGateway, "头像生成失败，可稍后重试或上传图片")
-		}
+		aiusage.Record(aiusage.Entry{Feature: "ai-workbench-avatar", Provider: "unknown", Model: payload.ModelID, UserID: userID.String(), Status: aiusage.StatusFailed, PromptChars: aiusage.CharCount(prompt), LatencyMs: aiusage.Since(started), ErrorMessage: err.Error()})
+		respondCatalogModelError(c, err)
 		return
 	}
-	extension := avatarExtension(image.MIMEType)
-	key := fmt.Sprintf("ai-app-avatars/%s/%s/%d%s", userID.String(), time.Now().Format("20060102"), time.Now().UnixNano(), extension)
-	uploader := utils.GetTOSUploader()
-	if uploader == nil {
-		Error(c, http.StatusServiceUnavailable, "文件上传服务未配置")
-		return
-	}
-	url, err := uploader.UploadBytesWithPathContext(c.Request.Context(), key, image.Bytes)
+	url, err := invocation.Client.GenerateImage(c.Request.Context(), invocation.Model.ModelID, prompt, "1024x1024")
 	if err != nil {
-		Error(c, http.StatusBadGateway, "头像上传失败")
+		aiusage.Record(aiusage.Entry{Feature: "ai-workbench-avatar", Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, UserID: userID.String(), Status: aiusage.StatusFailed, PromptChars: aiusage.CharCount(prompt), LatencyMs: aiusage.Since(started), ErrorMessage: err.Error()})
+		Error(c, http.StatusBadGateway, "头像生成失败，可稍后重试或上传图片")
 		return
 	}
-	if err := replaceAIAppAvatar(c.Request.Context(), app, url, key, "ai"); err != nil {
-		_ = deleteManagedAIAppAvatar(context.Background(), key)
+	if err := replaceAIAppAvatar(c.Request.Context(), app, url, "", "ai"); err != nil {
 		Error(c, http.StatusInternalServerError, "保存头像失败")
 		return
 	}
-	app.AvatarURL, app.AvatarStorageKey, app.AvatarSource = url, key, "ai"
-	Success(c, gin.H{"app": app, "model": image.Model})
+	app.AvatarURL, app.AvatarStorageKey, app.AvatarSource = url, "", "ai"
+	aiusage.Record(aiusage.Entry{Feature: "ai-workbench-avatar", Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, UserID: userID.String(), Status: aiusage.StatusSuccess, PromptChars: aiusage.CharCount(prompt), ResponseChars: aiusage.CharCount(url), LatencyMs: aiusage.Since(started)})
+	Success(c, gin.H{"app": app, "model": invocation.Model.ModelID})
 }
 
 func UploadAIAppAvatar(c *gin.Context) {

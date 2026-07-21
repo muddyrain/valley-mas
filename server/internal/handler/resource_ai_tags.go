@@ -1,143 +1,113 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 	"unicode"
-
 	"valley-server/internal/aiclient"
+	"valley-server/internal/aimodel"
+	"valley-server/internal/database"
 
 	"github.com/gin-gonic/gin"
 )
 
-// SuggestResourceTags 根据图片 base64 + 类型 + 标题在线生成候选标签
-// POST /api/v1/admin/ai/resource-tags/suggest
-// Body: { "imageBase64": "data:image/jpeg;base64,...", "type": "wallpaper", "title": "童年小悟空", "description": "" }
-// Response: { "tags": ["国风", "水墨"], "model": "ep-xxx" }
-//
-// 不再依赖 resource_tags 表：AI 直接生成 5-8 个候选标签名交给前端，由用户勾选后写入 resources.tags。
+// SuggestResourceTags generates resource tag candidates with a selected catalog model.
+// Images require a vision model; title/description-only requests require a text model.
 func SuggestResourceTags(c *gin.Context) {
 	var req struct {
-		ImageBase64 string `json:"imageBase64"` // 可选：有图时用视觉模型
-		Type        string `json:"type"`        // wallpaper / avatar
+		ImageBase64 string `json:"imageBase64"`
+		Type        string `json:"type"`
 		Title       string `json:"title"`
 		Description string `json:"description"`
+		ModelID     string `json:"modelId" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		Error(c, 400, "参数错误："+err.Error())
+		Error(c, 400, "参数错误：需要模型")
 		return
 	}
 
-	visionCfg, errMsg := aiclient.ReadARKVisionConfig()
-	if errMsg != "" {
-		Error(c, 503, errMsg)
-		return
+	hasImage := strings.TrimSpace(req.ImageBase64) != ""
+	capability := "text"
+	if hasImage {
+		capability = "vision"
 	}
-	hasImage := strings.HasPrefix(req.ImageBase64, "data:") || strings.TrimSpace(req.ImageBase64) != ""
-	useVision := hasImage && visionCfg.UseVision
-
-	resourceType := map[string]string{
-		"wallpaper": "壁纸",
-		"avatar":    "头像",
-	}[req.Type]
+	resourceType := map[string]string{"wallpaper": "壁纸", "avatar": "头像"}[req.Type]
 	if resourceType == "" {
 		resourceType = strings.TrimSpace(req.Type)
 		if resourceType == "" {
 			resourceType = "图片"
 		}
 	}
+	prompt := fmt.Sprintf("你是图片标签专家。标题：%s。描述：%s。类型：%s。请生成 5-8 个最合适的中文标签，覆盖题材、风格、情绪和画面元素。每个标签不超过 6 个字，禁止英文、标点、重复。只输出标签名，每行一个，不要编号或解释。", strings.TrimSpace(req.Title), strings.TrimSpace(req.Description), resourceType)
 
-	titleHint := ""
-	if t := strings.TrimSpace(req.Title); t != "" {
-		titleHint = fmt.Sprintf("标题：%s。", t)
+	start := time.Now()
+	invocation, err := aimodel.ResolveInvocation(database.GetDB(), req.ModelID, capability, 60*time.Second)
+	if err != nil {
+		recordResourceAIUsage(c, aiclient.FeatureResourceTags, "", req.ModelID, prompt, "", aiclient.CompatibleUsage{}, start, err)
+		respondCatalogModelError(c, err)
+		return
 	}
-	descHint := ""
-	if d := strings.TrimSpace(req.Description); d != "" {
-		descHint = fmt.Sprintf("描述：%s。", d)
-	}
-
-	prompt := fmt.Sprintf(
-		"你是图片标签专家。%s%s类型：%s。\n"+
-			"请为该资源生成 5-8 个最合适的中文标签，覆盖题材/风格/情绪/画面元素。\n"+
-			"每个标签不超过 6 个字，禁止英文、禁止标点符号、禁止重复。\n"+
-			"只输出标签名，每行一个，不要编号，不要解释。",
-		titleHint, descHint, resourceType,
-	)
-
-	imageURL := ""
-	if useVision {
-		imageURL = req.ImageBase64
+	content := any(prompt)
+	if hasImage {
+		imageURL := strings.TrimSpace(req.ImageBase64)
 		if !strings.HasPrefix(imageURL, "data:") {
 			imageURL = "data:image/jpeg;base64," + imageURL
 		}
+		content = []map[string]any{
+			{"type": "image_url", "image_url": map[string]string{"url": imageURL}},
+			{"type": "text", "text": prompt},
+		}
 	}
-
-	client := aiclient.ARKClient(60 * time.Second)
-	if client == nil {
-		Error(c, 503, "AI 未配置：缺少 ARK_API_KEY")
-		return
+	response, err := invocation.Client.Chat(c.Request.Context(), aiclient.CompatibleChatRequest{Model: invocation.Model.ModelID, Messages: []aiclient.CompatibleMessage{{Role: "user", Content: content}}})
+	actualModel := invocation.Model.ModelID
+	rawText := ""
+	if err == nil {
+		actualModel = modelNameOrFallback(response.Model, invocation.Model.ModelID)
+		rawText = compatibleMessageText(response.Choices[0].Message.Content)
 	}
-
-	rawText, aiErr := callChatStream(client, visionCfg.Config.Model, imageURL, prompt, useVision)
-	if aiErr != nil {
-		Error(c, 502, "AI 服务请求失败："+aiErr.Error())
+	if err != nil {
+		recordResourceAIUsage(c, aiclient.FeatureResourceTags, invocation.Provider.Provider, actualModel, prompt, rawText, response.Usage, start, err)
+		Error(c, 502, "AI 服务请求失败："+err.Error())
 		return
 	}
 
 	tags := parseAIGeneratedTagNames(rawText, 8)
 	if len(tags) == 0 {
-		Error(c, 200, "AI 未能生成合适的标签，请手动输入")
+		recordResourceAIUsage(c, aiclient.FeatureResourceTags, invocation.Provider.Provider, actualModel, prompt, rawText, response.Usage, start, errors.New("AI 未能生成合适的标签"))
+		Error(c, 502, "AI 未能生成合适的标签，请手动输入")
 		return
 	}
-
-	Success(c, gin.H{
-		"tags":  tags,
-		"model": visionCfg.Config.Model,
-	})
+	recordResourceAIUsage(c, aiclient.FeatureResourceTags, invocation.Provider.Provider, actualModel, prompt, rawText, response.Usage, start, nil)
+	Success(c, gin.H{"tags": tags, "model": actualModel, "provider": invocation.Provider.Provider})
 }
 
-// parseAIGeneratedTagNames 解析 AI 输出的每行标签名并做基础清洗，最多返回 max 个。
-// 清洗规则：
-//   - 去掉行首序号/项目符号
-//   - 去掉括号内注释
-//   - 去掉两端引号
-//   - 长度超过 10 字（大概率是废话）直接丢弃
-//   - 大小写去重（保留首次出现的原始大小写）
+// parseAIGeneratedTagNames parses generated tag lines and returns up to max values.
 func parseAIGeneratedTagNames(rawText string, max int) []string {
 	if max <= 0 {
 		max = 8
 	}
-	lines := strings.Split(rawText, "\n")
-	seen := make(map[string]bool, len(lines))
+	seen := make(map[string]bool)
 	tags := make([]string, 0, max)
-
-	for _, line := range lines {
+	for _, line := range strings.Split(rawText, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
 		runes := []rune(line)
 		start := 0
-		for start < len(runes) {
-			r := runes[start]
-			if unicode.IsDigit(r) || r == '.' || r == '、' || r == '·' || r == '•' || r == '-' || r == '*' || r == ' ' || r == '\t' {
-				start++
-				continue
-			}
-			break
+		for start < len(runes) && (unicode.IsDigit(runes[start]) || strings.ContainsRune(".、·•-* \t", runes[start])) {
+			start++
 		}
 		line = strings.TrimSpace(string(runes[start:]))
 		for _, sep := range []string{"（", "(", "【", " -", " —"} {
-			if idx := strings.Index(line, sep); idx > 0 {
-				line = strings.TrimSpace(line[:idx])
+			if index := strings.Index(line, sep); index > 0 {
+				line = strings.TrimSpace(line[:index])
 			}
 		}
 		line = strings.Trim(line, "\"'“”'")
-		if line == "" {
-			continue
-		}
-		if len([]rune(line)) > 10 {
+		if line == "" || len([]rune(line)) > 10 {
 			continue
 		}
 		key := strings.ToLower(line)
@@ -146,7 +116,7 @@ func parseAIGeneratedTagNames(rawText string, max int) []string {
 		}
 		seen[key] = true
 		tags = append(tags, line)
-		if len(tags) >= max {
+		if len(tags) == max {
 			break
 		}
 	}

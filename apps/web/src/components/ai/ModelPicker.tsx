@@ -1,6 +1,6 @@
 import { Check, ChevronsUpDown, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { listWorkflowAIModels, type WorkflowAIModelOption } from '@/api/workflow';
+import { type AvailableAIModel, listAvailableAIModels } from '@/api/ai';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,6 +29,7 @@ interface ModelPickerProps {
   onValueChange: (modelID: string) => void;
   capability: string;
   label?: string;
+  catalog?: 'auth' | 'public';
 }
 
 export function ModelPicker({
@@ -36,9 +37,10 @@ export function ModelPicker({
   onValueChange,
   capability,
   label = '模型',
+  catalog = 'auth',
 }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
-  const [models, setModels] = useState<WorkflowAIModelOption[]>([]);
+  const [models, setModels] = useState<AvailableAIModel[]>([]);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [query, setQuery] = useState('');
@@ -47,7 +49,7 @@ export function ModelPicker({
     let active = true;
     setLoading(true);
     setFailed(false);
-    void listWorkflowAIModels(capability)
+    void listAvailableAIModels(capability, catalog)
       .then((result) => {
         if (active) setModels(result.list);
       })
@@ -63,7 +65,7 @@ export function ModelPicker({
     return () => {
       active = false;
     };
-  }, [capability]);
+  }, [capability, catalog]);
 
   const selectedModel = models.find((item) => item.id === value);
   const filteredModels = useMemo(() => {
@@ -100,7 +102,7 @@ export function ModelPicker({
         <DialogContent className="flex h-[min(42rem,82vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
           <DialogHeader className="border-b border-border px-6 py-5">
             <DialogTitle>选择模型</DialogTitle>
-            <DialogDescription>仅展示已启用且适合当前节点的模型。</DialogDescription>
+            <DialogDescription>仅展示已启用且适合当前任务的模型。</DialogDescription>
           </DialogHeader>
           <div className="border-b border-border p-4">
             <div className="relative">

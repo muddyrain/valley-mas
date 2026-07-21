@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
+	"valley-server/internal/aimodel"
+	"valley-server/internal/database"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,13 +27,39 @@ func (h *Handler) CreateDebate(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.service.CreateDebate(c.Request.Context(), req)
+	if database.GetDB() == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"message": "模型目录暂不可用"})
+		return
+	}
+	invocation, err := aimodel.ResolveInvocation(database.GetDB(), req.ModelID, "text", 90*time.Second)
+	if err != nil {
+		h.writeCatalogModelError(c, err)
+		return
+	}
+
+	resp, err := h.service.CreateDebateWithModel(c.Request.Context(), req, ModelSelection{
+		CatalogModelID: invocation.Model.ID.String(),
+		Provider:       invocation.Provider.Provider,
+		Model:          invocation.Model.ModelID,
+	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) writeCatalogModelError(c *gin.Context, err error) {
+	if errors.Is(err, aimodel.ErrModelNotAvailable) {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "所选模型不可用或不支持文本能力"})
+		return
+	}
+	if strings.Contains(err.Error(), "AI 服务未配置") || strings.Contains(err.Error(), "不支持的 AI Provider") {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusInternalServerError, gin.H{"message": "加载 AI 模型失败：" + err.Error()})
 }
 
 func (h *Handler) GetDebate(c *gin.Context) {

@@ -26,6 +26,7 @@ import {
   type AIAgent,
   type AIConversation,
   type AIMessage,
+  type AvailableAIModel,
   createAIAgent,
   createAIConversation,
   deleteAIAgent,
@@ -33,11 +34,13 @@ import {
   getAIConversation,
   listAIAgents,
   listAIConversations,
+  listAvailableAIModels,
   streamAIAgentChat,
   updateAIAgent,
 } from '../api/ai';
 import { useAuthStore } from '../store/authStore';
 import { PlushFade, PlushPop, PlushPresence, PlushSlide } from '../ui/PlushMotion';
+import PlushSelect, { type PlushSelectOption } from '../ui/PlushSelect';
 import { deriveAICommandTitle } from './aiCommandCenterHistory';
 import './AICommandCenterWindow.css';
 
@@ -224,6 +227,8 @@ export default function AICommandCenterWindow() {
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState('');
   const [activeMessages, setActiveMessages] = useState<AIMessage[]>([]);
+  const [textModels, setTextModels] = useState<AvailableAIModel[]>([]);
+  const [textModelId, setTextModelId] = useState('');
   const [agentDraft, setAgentDraft] = useState<AgentDraft>(() => emptyAgentDraft());
   const [createDraft, setCreateDraft] = useState<AgentDraft>(() => ({
     ...emptyAgentDraft(),
@@ -243,6 +248,21 @@ export default function AICommandCenterWindow() {
   const [error, setError] = useState('');
   const activeConversationRef = useRef('');
   const threadScrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    void listAvailableAIModels(token)
+      .then((result) => {
+        if (active) setTextModels(result.list);
+      })
+      .catch(() => {
+        if (active) setError('模型列表加载失败');
+      });
+    return () => {
+      active = false;
+    };
+  }, [token]);
 
   const activePreset = COMMAND_PRESETS.find((preset) => preset.id === mode) ?? COMMAND_PRESETS[0];
   const activeAgent = agents.find((agent) => agent.id === activeAgentId);
@@ -464,7 +484,8 @@ export default function AICommandCenterWindow() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const input = draft.trim();
-    if (!input || !token || !activeAgent || !activeConversation || isSending) return;
+    if (!input || !token || !activeAgent || !activeConversation || !textModelId || isSending)
+      return;
     const composedMessage = activePreset.compose(input);
     const userMessage = createLocalMessage('user', activeAgent.id, activeConversation.id, input);
     const assistantMessage = createLocalMessage(
@@ -480,39 +501,47 @@ export default function AICommandCenterWindow() {
     setActiveMessages((current) => [...current, userMessage, assistantMessage]);
 
     try {
-      await streamAIAgentChat(activeAgent.id, conversationId, { message: composedMessage }, token, {
-        onMeta: (event) => {
-          setActiveMessages((current) =>
-            current.map((message) => (message.id === userMessage.id ? event.userMessage : message)),
-          );
-          setConversations((current) =>
-            current.map((conversation) =>
-              conversation.id === event.conversation.id ? event.conversation : conversation,
-            ),
-          );
+      await streamAIAgentChat(
+        activeAgent.id,
+        conversationId,
+        { message: composedMessage, modelId: textModelId },
+        token,
+        {
+          onMeta: (event) => {
+            setActiveMessages((current) =>
+              current.map((message) =>
+                message.id === userMessage.id ? event.userMessage : message,
+              ),
+            );
+            setConversations((current) =>
+              current.map((conversation) =>
+                conversation.id === event.conversation.id ? event.conversation : conversation,
+              ),
+            );
+          },
+          onDelta: (event) => {
+            setActiveMessages((current) =>
+              current.map((message) =>
+                message.id === assistantMessage.id
+                  ? { ...message, content: `${message.content}${event.chunk}` }
+                  : message,
+              ),
+            );
+          },
+          onDone: (event) => {
+            setActiveMessages((current) =>
+              current.map((message) =>
+                message.id === assistantMessage.id ? event.assistantMessage : message,
+              ),
+            );
+            setConversations((current) =>
+              current.map((conversation) =>
+                conversation.id === event.conversation.id ? event.conversation : conversation,
+              ),
+            );
+          },
         },
-        onDelta: (event) => {
-          setActiveMessages((current) =>
-            current.map((message) =>
-              message.id === assistantMessage.id
-                ? { ...message, content: `${message.content}${event.chunk}` }
-                : message,
-            ),
-          );
-        },
-        onDone: (event) => {
-          setActiveMessages((current) =>
-            current.map((message) =>
-              message.id === assistantMessage.id ? event.assistantMessage : message,
-            ),
-          );
-          setConversations((current) =>
-            current.map((conversation) =>
-              conversation.id === event.conversation.id ? event.conversation : conversation,
-            ),
-          );
-        },
-      });
+      );
     } catch (caught) {
       setActiveMessages((current) =>
         current.filter((message) => message.id !== assistantMessage.id || message.content),
@@ -733,6 +762,21 @@ export default function AICommandCenterWindow() {
                 {suggestion}
               </button>
             ))}
+            <PlushSelect
+              value={textModelId}
+              options={
+                [
+                  { value: '', label: '选择文本模型', disabled: true },
+                  ...textModels.map((item) => ({
+                    value: item.id,
+                    label: `${item.displayName} · ${item.provider}`,
+                  })),
+                ] as PlushSelectOption[]
+              }
+              onChange={setTextModelId}
+              ariaLabel="选择文本模型"
+              disabled={isSending}
+            />
           </div>
 
           <div className="ai-command-center__composer-shell">
@@ -761,7 +805,9 @@ export default function AICommandCenterWindow() {
               <button
                 className="ai-command-center__send"
                 type="submit"
-                disabled={!draft.trim() || isSending || !activeAgent || !activeConversation}
+                disabled={
+                  !draft.trim() || !textModelId || isSending || !activeAgent || !activeConversation
+                }
               >
                 <Send size={16} />
                 <span>{isSending ? '发送中' : '发送'}</span>
@@ -834,7 +880,10 @@ export default function AICommandCenterWindow() {
                   <section className="ai-command-center__detail-rows">
                     <div>
                       <span>模型</span>
-                      <strong>ARK 对话模型</strong>
+                      <strong>
+                        {textModels.find((item) => item.id === textModelId)?.displayName ||
+                          '未选择'}
+                      </strong>
                       <ChevronRight size={15} />
                     </div>
                     <div>

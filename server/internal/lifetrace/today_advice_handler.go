@@ -19,6 +19,7 @@ import (
 
 const lifeTraceTodayAdviceDefaultTimeout = 30 * time.Second
 const lifeTraceTodayAdviceCacheTTL = 10 * time.Minute
+
 type todayAdviceCacheEntry struct {
 	Response  todayAdviceAIResponse
 	Source    string

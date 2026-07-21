@@ -243,10 +243,15 @@ export const updateResource = (
 };
 
 // AI 根据图片内容建议多个资源标题
-export const suggestResourceTitle = (imageBase64: string, type: 'wallpaper' | 'avatar') => {
+export const suggestResourceTitle = (
+  imageBase64: string,
+  type: 'wallpaper' | 'avatar',
+  modelId: string,
+) => {
   return http.post<unknown, { titles: string[] }>('/content/ai/suggest-title', {
     imageBase64,
     type,
+    modelId,
   });
 };
 
@@ -259,6 +264,7 @@ export const aiSuggestResourceTags = (data: {
   type: string;
   title?: string;
   description?: string;
+  modelId: string;
 }) => {
   return http.post<unknown, { tags: string[]; model: string }>(
     '/content/ai/resource-tags/suggest',

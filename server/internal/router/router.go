@@ -3,6 +3,7 @@ package router
 import (
 	"valley-server/internal/ai"
 	"valley-server/internal/ai/tools"
+	"valley-server/internal/aimodel"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
 	"valley-server/internal/handler"
@@ -35,7 +36,18 @@ func Setup(cfg *config.Config) *gin.Engine {
 		if db := database.GetDB(); db != nil {
 			mindArenaStore = mindarena.NewGormStore(db)
 		}
-		mindArenaService := mindarena.NewService(mindArenaStore, ai.NewServiceFromEnv())
+		mindArenaService := mindarena.NewServiceWithAIFactory(mindArenaStore, ai.NewServiceFromEnv(), func(provider, modelID string) (mindarena.DebateAI, error) {
+			providerConfig, err := aimodel.ProviderFromEnv(provider)
+			if err != nil {
+				return nil, err
+			}
+			return ai.NewOpenAICompatibleService(ai.OpenAICompatibleConfig{
+				Provider: ai.AIProviderOpenAICompatible,
+				BaseURL:  providerConfig.BaseURL,
+				APIKey:   providerConfig.APIKey,
+				Model:    modelID,
+			}), nil
+		})
 		mindarena.RegisterMindArenaRoutes(api, mindarena.NewHandler(mindArenaService))
 
 		lifeTraceWeatherService := lifetrace.NewWeatherService(cfg.QWeather)
@@ -49,6 +61,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 		public := api.Group("/public")
 		{
+			public.GET("/ai/models", handler.ListAvailableAIModels)
 			public.POST("/ai/apps/:appId/chat", handler.PublicAIAppChat)
 			public.POST("/resource/:id/download", middleware.OptionalAuth(cfg), handler.DownloadResource)
 			public.GET("/active-users", handler.GetActiveUsers)

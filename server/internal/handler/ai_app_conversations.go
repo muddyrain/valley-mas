@@ -11,6 +11,7 @@ import (
 	"valley-server/internal/ai/tools/content"
 	"valley-server/internal/aiapp"
 	"valley-server/internal/aiclient"
+	"valley-server/internal/aimodel"
 	"valley-server/internal/database"
 	"valley-server/internal/logger"
 	"valley-server/internal/model"
@@ -196,10 +197,11 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	}
 	var payload struct {
 		Message string `json:"message"`
+		ModelID string `json:"modelId"`
 		Stream  bool   `json:"stream"`
 	}
-	if c.ShouldBindJSON(&payload) != nil || strings.TrimSpace(payload.Message) == "" {
-		Error(c, 400, "消息不能为空")
+	if c.ShouldBindJSON(&payload) != nil || strings.TrimSpace(payload.Message) == "" || strings.TrimSpace(payload.ModelID) == "" {
+		Error(c, 400, "请输入消息并选择文本模型")
 		return
 	}
 	message := truncateAIAgentRunes(payload.Message, 12000)
@@ -239,11 +241,13 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		fail(400, "APP_CONFIG_INVALID", "智能体版本配置无效", errors.New("invalid AI App version config"))
 		return
 	}
-	arkConfig, configErr := aiclient.ReadARKTextConfig()
-	if configErr != "" {
-		fail(http.StatusServiceUnavailable, "ARK_NOT_CONFIGURED", configErr, errors.New(configErr))
+	invocation, invocationErr := aimodel.ResolveInvocation(database.GetDB(), payload.ModelID, "text", 60*time.Second)
+	if invocationErr != nil {
+		fail(http.StatusServiceUnavailable, "MODEL_NOT_CONFIGURED", "所选模型暂不可用", invocationErr)
 		return
 	}
+	run.Model = invocation.Model.ModelID
+	_ = database.GetDB().Model(&run).Update("model", run.Model).Error
 	knowledgeContext, references, retrievalErr := retrieveAIKnowledgeContext(c.Request.Context(), userID, version, message)
 	if retrievalErr != nil {
 		code, publicMessage := aiKnowledgeRetrievalFailure(retrievalErr)
@@ -259,12 +263,10 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		fail(500, "AI_TOOL_REGISTRY_UNAVAILABLE", "加载智能体工具失败", toolErr)
 		return
 	}
-	system = appendContentSearchDateContext(system, toolNames, time.Now())
-	client := aiclient.ARKClient(60 * time.Second)
-	if client == nil {
-		fail(http.StatusServiceUnavailable, "ARK_NOT_CONFIGURED", "AI 服务未配置", errors.New("ARK client unavailable"))
-		return
+	if !aimodel.HasCapabilities(invocation.Model, []string{"tool_call"}) {
+		toolNames = nil
 	}
+	system = appendContentSearchDateContext(system, toolNames, time.Now())
 
 	var history []model.AIAppConversationMessage
 	if err := database.GetDB().Where("user_id = ? AND app_id = ? AND conversation_id = ?", userID, app.ID, conversation.ID).Order("created_at DESC").Limit(aiAppConversationHistoryLimit).Find(&history).Error; err != nil {
@@ -280,8 +282,8 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		}
 		messages = append(messages, agent.Message{Role: role, Content: item.Content})
 	}
-	loop := agent.NewLocalLoop(&aiAppAgentBackend{client: client}, registry)
-	events, loopErr := loop.RunStream(content.WithOwner(c.Request.Context(), userID), agent.Spec{Provider: "ark", Model: arkConfig.Model, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench-conversation"}, messages)
+	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
+	events, loopErr := loop.RunStream(content.WithOwner(c.Request.Context(), userID), agent.Spec{Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench-conversation"}, messages)
 	if loopErr != nil {
 		fail(http.StatusBadGateway, "AI_AGENT_RUN_FAILED", "智能体工具调用失败", loopErr)
 		return
@@ -293,7 +295,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		if err != nil {
 			return
 		}
-		_ = writer.Send(gin.H{"type": "meta", "conversation": conversation, "versionId": version.ID, "model": arkConfig.Model})
+		_ = writer.Send(gin.H{"type": "meta", "conversation": conversation, "versionId": version.ID, "model": invocation.Model.ModelID})
 	}
 	var reply strings.Builder
 	var result agent.Result
@@ -341,7 +343,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 			status = "cancelled"
 		}
 		if runErr == nil && c.Request.Context().Err() == nil {
-			code = "ARK_EMPTY_RESPONSE"
+			code = "AI_EMPTY_RESPONSE"
 			message = "AI 未返回有效内容"
 		}
 		run.Status = status
@@ -363,7 +365,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	}
 	modelName := result.Model
 	if modelName == "" {
-		modelName = arkConfig.Model
+		modelName = invocation.Model.ModelID
 	}
 	referenceSummary, _ := json.Marshal(references)
 	run.Status = "succeeded"

@@ -39,6 +39,7 @@
 - Dock 右键菜单已改为更接近 macOS 的紧凑毛玻璃菜单：主操作、选项子菜单和 Dock 设置分层展示，并带有轻量弹出动画与 reduced-motion 兜底。
 - AI 宠物已移除：不再加载 3D runtime、不保留宠物偏好同步、不维护本地 GLB 资产槽；Dock “AI 工具”改为打开 AI Command Center。
 - AI Command Center 多智能体 v1 已升级为云端私有多智能体方向：登录后通过 `/ai/agents` 管理个人私有提示词型智能体，通过智能体会话接口保存云端对话记录；窗口视觉升级为参考图式毛绒三栏智能体 App，左侧是角色化智能体卡片和会话列表，中间是柔和主对话区、建议胶囊和 SSE 流式输入框，右侧是可收起的智能体详情卡与资料编辑区；v1 头像使用 `avatarColor + avatarIcon` 渲染 CSS/Emoji 毛绒头像，不新增图片资产；继续保留 Chat、总结、翻译、改写和 Prompt Lab 快捷指令，v1 不做公开市场、分享链接、知识库、工具调用或图片生成。
+- AI Command Center 对话已改为由用户选择模型目录中的文本模型；服务端校验模型能力与启用状态，并按所选 Provider 和实际模型写入用量审计，不再使用 ARK 默认文本模型。
 - Desktop OS 已完成运行时生命周期治理：窗口内容、音乐 audio runtime、通知中心/控制中心面板和资源数据加载均按打开或使用时激活，窗口焦点提供轻量 `focusedAppId`，拖拽和缩放按 animation frame 合并写入，保留动画和毛玻璃效果但减少关闭态与高频交互开销。
 - Desktop OS 已完成后台任务与 App 独立运行治理：普通 App 默认 `foreground-only`，最小化后只保留窗口壳层和状态元数据，业务组件、定时器和局部监听随窗口内容卸载；Music 与 FocusTimer 作为明确后台白名单运行，根组件的全局事件和通知轮询集中到 Gate，Spotlight/Safari/Finder 的资源加载和滚动持久化避开首帧与滚动热路径。
 

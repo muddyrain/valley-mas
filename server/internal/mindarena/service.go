@@ -8,6 +8,7 @@ import (
 	"log"
 	"strings"
 	"time"
+	"valley-server/internal/aiusage"
 )
 
 type DebateAI interface {
@@ -19,8 +20,19 @@ type DebateAI interface {
 }
 
 type Service struct {
-	store Store
-	ai    DebateAI
+	store     Store
+	ai        DebateAI
+	aiFactory DebateAIFactory
+}
+
+// DebateAIFactory recreates a compatible client from the provider/model locked
+// into a debate session. Credentials stay in environment variables.
+type DebateAIFactory func(provider, model string) (DebateAI, error)
+
+type ModelSelection struct {
+	CatalogModelID string
+	Provider       string
+	Model          string
 }
 
 type personaGenerationResult struct {
@@ -42,7 +54,22 @@ func NewService(store Store, ai DebateAI) *Service {
 	return &Service{store: store, ai: ai}
 }
 
+func NewServiceWithAIFactory(store Store, fallback DebateAI, factory DebateAIFactory) *Service {
+	return &Service{store: store, ai: fallback, aiFactory: factory}
+}
+
 func (s *Service) CreateDebate(ctx context.Context, req CreateDebateRequest) (*CreateDebateResponse, error) {
+	return s.createDebate(ctx, req, ModelSelection{})
+}
+
+func (s *Service) CreateDebateWithModel(ctx context.Context, req CreateDebateRequest, selection ModelSelection) (*CreateDebateResponse, error) {
+	if strings.TrimSpace(selection.CatalogModelID) == "" || strings.TrimSpace(selection.Provider) == "" || strings.TrimSpace(selection.Model) == "" {
+		return nil, fmt.Errorf("所选模型不可用或不支持当前能力")
+	}
+	return s.createDebate(ctx, req, selection)
+}
+
+func (s *Service) createDebate(ctx context.Context, req CreateDebateRequest, selection ModelSelection) (*CreateDebateResponse, error) {
 	topic := strings.TrimSpace(req.Topic)
 	if topic == "" {
 		return nil, fmt.Errorf("议题不能为空")
@@ -56,6 +83,9 @@ func (s *Service) CreateDebate(ctx context.Context, req CreateDebateRequest) (*C
 		ID:                 newID("deb"),
 		Topic:              topic,
 		Mode:               mode,
+		CatalogModelID:     strings.TrimSpace(selection.CatalogModelID),
+		Provider:           strings.TrimSpace(selection.Provider),
+		Model:              strings.TrimSpace(selection.Model),
 		Status:             DebateStatusCreated,
 		PersonaCount:       count,
 		CurrentRound:       1,
@@ -71,13 +101,16 @@ func (s *Service) CreateDebate(ctx context.Context, req CreateDebateRequest) (*C
 	}
 
 	return &CreateDebateResponse{
-		SessionID:    session.ID,
-		Topic:        session.Topic,
-		Mode:         session.Mode,
-		Status:       session.Status,
-		PersonaCount: session.PersonaCount,
-		CurrentRound: session.CurrentRound,
-		Personas:     session.Personas,
+		SessionID:      session.ID,
+		Topic:          session.Topic,
+		Mode:           session.Mode,
+		CatalogModelID: session.CatalogModelID,
+		Provider:       session.Provider,
+		Model:          session.Model,
+		Status:         session.Status,
+		PersonaCount:   session.PersonaCount,
+		CurrentRound:   session.CurrentRound,
+		Personas:       session.Personas,
 	}, nil
 }
 
@@ -127,9 +160,28 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 	events := make(chan SSEEvent)
 
 	go func() {
+		started := time.Now()
+		var auditSession *DebateSession
+		var auditErr error
 		defer close(events)
 		defer func() {
 			_, _ = s.store.FinishStreaming(id)
+			if persisted, err := s.store.Get(id); err == nil {
+				auditSession = persisted
+			}
+			if auditSession != nil && strings.TrimSpace(auditSession.Provider) != "" {
+				aiusage.Record(aiusage.Entry{
+					Feature:       "mind-arena-debate",
+					Provider:      auditSession.Provider,
+					Model:         auditSession.Model,
+					Status:        mapDebateAuditStatus(auditErr),
+					Stream:        true,
+					PromptChars:   aiusage.CharCount(auditSession.Topic),
+					ResponseChars: debateResponseChars(auditSession),
+					LatencyMs:     aiusage.Since(started),
+					ErrorMessage:  errorText(auditErr),
+				})
+			}
 		}()
 
 		session, shouldRun, err := s.store.TryStartStreaming(id)
@@ -142,9 +194,17 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 			s.replaySession(ctx, session, events)
 			return
 		}
+		auditSession = session
+		debateAI, err := s.aiForSession(session)
+		if err != nil {
+			auditErr = err
+			s.failAndSend(events, id, "所选模型暂不可用: "+err.Error())
+			return
+		}
 
-		session, ok := s.revealPersonas(ctx, events, session)
+		session, ok := s.revealPersonas(ctx, events, session, debateAI)
 		if !ok {
+			auditErr = fmt.Errorf("生成人格未完成")
 			return
 		}
 
@@ -161,8 +221,9 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 					continue
 				}
 
-				message, err := s.ai.GenerateDebateMessage(ctx, session.Topic, string(session.Mode), activePersonas, persona, round, history, session.SupportHistory)
+				message, err := debateAI.GenerateDebateMessage(ctx, session.Topic, string(session.Mode), activePersonas, persona, round, history, session.SupportHistory)
 				if err != nil {
+					auditErr = err
 					s.failAndSend(events, id, fmt.Sprintf("生成第 %d 轮 %s 发言失败: %v", round, persona.Name, err))
 					return
 				}
@@ -265,8 +326,9 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 			}
 		}
 
-		result, err := s.ai.JudgeDebate(ctx, session.Topic, session.Personas, history)
+		result, err := debateAI.JudgeDebate(ctx, session.Topic, session.Personas, history)
 		if err != nil {
+			auditErr = err
 			s.failAndSend(events, id, fmt.Sprintf("裁判团掉线了: %v", err))
 			return
 		}
@@ -285,7 +347,48 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 	return events
 }
 
-func (s *Service) revealPersonas(ctx context.Context, events chan<- SSEEvent, session *DebateSession) (*DebateSession, bool) {
+func (s *Service) aiForSession(session *DebateSession) (DebateAI, error) {
+	if session != nil && strings.TrimSpace(session.Provider) != "" && strings.TrimSpace(session.Model) != "" {
+		if s.aiFactory == nil {
+			return nil, fmt.Errorf("模型目录运行时未配置")
+		}
+		return s.aiFactory(session.Provider, session.Model)
+	}
+	if s.ai == nil {
+		return nil, fmt.Errorf("辩论 AI 未配置")
+	}
+	return s.ai, nil
+}
+
+func mapDebateAuditStatus(err error) string {
+	if err != nil {
+		return aiusage.StatusFailed
+	}
+	return aiusage.StatusSuccess
+}
+
+func errorText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+func debateResponseChars(session *DebateSession) int {
+	if session == nil {
+		return 0
+	}
+	var total int
+	for _, message := range session.Messages {
+		total += aiusage.CharCount(message.Content)
+	}
+	if session.Result != nil {
+		total += aiusage.CharCount(session.Result.FinalAdvice) + aiusage.CharCount(session.Result.Quote)
+	}
+	return total
+}
+
+func (s *Service) revealPersonas(ctx context.Context, events chan<- SSEEvent, session *DebateSession, debateAI DebateAI) (*DebateSession, bool) {
 	if len(session.Personas) > 0 {
 		if !sendEvent(ctx, events, SSEEvent{
 			Type:         "personas",
@@ -316,7 +419,7 @@ func (s *Service) revealPersonas(ctx context.Context, events chan<- SSEEvent, se
 			personaStart := time.Now()
 			log.Printf("ai-mind-arena: session=%s 开始生成人格 index=%d/%d persona=%s", session.ID, index+1, count, target.Name)
 
-			generated, err := s.ai.GeneratePersona(personaCtx, session.Topic, string(session.Mode), target, index, count)
+			generated, err := debateAI.GeneratePersona(personaCtx, session.Topic, string(session.Mode), target, index, count)
 			result := personaGenerationResult{
 				index:   index,
 				target:  target,

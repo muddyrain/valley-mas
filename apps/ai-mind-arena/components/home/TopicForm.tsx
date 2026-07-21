@@ -2,9 +2,9 @@
 
 import { Flame, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { createDebate } from '@/lib/api';
-import type { DebateMode } from '@/lib/types';
+import { useEffect, useState } from 'react';
+import { createDebate, listAvailableAIModels } from '@/lib/api';
+import type { AvailableAIModel, DebateMode } from '@/lib/types';
 import { ModeSelector } from './ModeSelector';
 
 const hotTopics = [
@@ -22,11 +22,33 @@ export function TopicForm() {
   const router = useRouter();
   const [topic, setTopic] = useState('');
   const [mode, setMode] = useState<DebateMode>('serious');
+  const [models, setModels] = useState<AvailableAIModel[]>([]);
+  const [modelId, setModelId] = useState('');
+  const [modelsLoading, setModelsLoading] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const trimmedTopic = topic.trim();
-  const disabled = !trimmedTopic || submitting;
+  const disabled = !trimmedTopic || !modelId || submitting || modelsLoading;
+
+  useEffect(() => {
+    let active = true;
+    void listAvailableAIModels('text')
+      .then((items) => {
+        if (!active) return;
+        setModels(items);
+        setModelId((current) => current || items[0]?.id || '');
+      })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : '模型目录暂不可用');
+      })
+      .finally(() => {
+        if (active) setModelsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,7 +57,7 @@ export function TopicForm() {
     setSubmitting(true);
     setError('');
     try {
-      const debate = await createDebate({ topic: trimmedTopic, mode, personaCount: 5 });
+      const debate = await createDebate({ topic: trimmedTopic, mode, personaCount: 5, modelId });
       router.push(`/debate/${debate.sessionId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : '开场失败，评委团还在化妆');
@@ -84,6 +106,26 @@ export function TopicForm() {
               {item}
             </button>
           ))}
+        </div>
+
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <label htmlFor="debate-model" className="text-sm font-semibold text-purple-100">
+            辩论模型
+          </label>
+          <select
+            id="debate-model"
+            value={modelId}
+            onChange={(event) => setModelId(event.target.value)}
+            disabled={modelsLoading || models.length === 0}
+            className="h-10 min-w-[260px] rounded-xl border border-purple-300/35 bg-[#15123a] px-3 text-sm font-medium text-white outline-none transition focus:border-fuchsia-300 focus:ring-2 focus:ring-fuchsia-400/35 disabled:cursor-not-allowed disabled:opacity-55"
+          >
+            <option value="">{modelsLoading ? '正在加载文本模型…' : '请选择文本模型'}</option>
+            {models.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.displayName} · {item.provider}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

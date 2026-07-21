@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"valley-server/internal/aimodel"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
 	"valley-server/internal/middleware"
@@ -27,7 +28,7 @@ func setupAIAgentTestRouter(t *testing.T) *gin.Engine {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&model.User{}, &model.AIAgent{}, &model.AIConversation{}, &model.AIMessage{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.AIAgent{}, &model.AIConversation{}, &model.AIMessage{}, &model.AIModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	if err := db.Create(&[]model.User{
@@ -167,17 +168,20 @@ func TestAIAgentDataIsIsolatedByUser(t *testing.T) {
 
 func TestAIAgentConversationStoresMessagesAndConfigFailureDoesNotSaveAssistant(t *testing.T) {
 	router := setupAIAgentTestRouter(t)
-	t.Setenv("ARK_API_KEY", "")
-	t.Setenv("ARK_TEXT_MODEL", "")
+	t.Setenv("SILICONFLOW_API_KEY", "")
+	catalogModel := model.AIModel{Provider: "siliconflow", ModelID: "ep-test", DisplayName: "test", Capabilities: aimodel.EncodeStrings([]string{"text"}), Enabled: true}
+	if err := database.GetDB().Create(&catalogModel).Error; err != nil {
+		t.Fatalf("create catalog model: %v", err)
+	}
 
 	createResp := requestAIAgent(t, router, http.MethodPost, "/ai/agents", "101", `{"name":"默认助手","systemPrompt":"你是测试助手。"}`)
 	agentID := decodeAIAgentData(t, createResp)["agent"].(map[string]interface{})["id"].(string)
 	conversationResp := requestAIAgent(t, router, http.MethodPost, "/ai/agents/"+agentID+"/conversations", "101", `{"title":"测试对话"}`)
 	conversationID := decodeAIAgentData(t, conversationResp)["conversation"].(map[string]interface{})["id"].(string)
 
-	chatResp := requestAIAgent(t, router, http.MethodPost, "/ai/agents/"+agentID+"/conversations/"+conversationID+"/chat", "101", `{"message":"你好"}`)
+	chatResp := requestAIAgent(t, router, http.MethodPost, "/ai/agents/"+agentID+"/conversations/"+conversationID+"/chat", "101", `{"message":"你好","modelId":"`+catalogModel.ID.String()+`"}`)
 	if chatResp.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503 when ARK is not configured, got %d body=%s", chatResp.Code, chatResp.Body.String())
+		t.Fatalf("expected 503 when catalog provider is not configured, got %d body=%s", chatResp.Code, chatResp.Body.String())
 	}
 
 	var messages []model.AIMessage

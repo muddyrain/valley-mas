@@ -1,8 +1,8 @@
 import { Plus, Trash2 } from 'lucide-react';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ModelPicker } from '../ModelPicker';
 import type { WorkflowIntentDefinition } from '../types';
 import { VariableReferencePicker } from '../VariableReferencePicker';
 import type { PropertyFormProps } from './index';

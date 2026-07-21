@@ -22,6 +22,7 @@ import {
   HeroRibbon,
   HeroStat,
   ResourceFavoriteButton,
+  ResourcePreviewLink,
   SectionHeading,
 } from './components/HomeSectionBlocks';
 
@@ -158,9 +159,7 @@ export default function Home() {
   const avatarShelf = avatarResources.slice(0, 6);
   const featuredPost = posts[0];
 
-  const handleFavoriteResource = async (event: React.MouseEvent, resource: Resource) => {
-    event.preventDefault();
-    event.stopPropagation();
+  const handleFavoriteResource = async (resource: Resource) => {
     if (!isAuthenticated) {
       toast.info('登录后再收藏会更方便。');
       navigate('/login');
@@ -276,12 +275,12 @@ export default function Home() {
                 <div className="grid gap-5 lg:grid-cols-[1.54fr_0.72fr]">
                   <div className="space-y-5">
                     {featuredWallpaper && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/resource/${featuredWallpaper.id}`)}
-                        className="group block w-full overflow-hidden rounded-xl border border-border bg-card text-left transition hover:shadow"
-                      >
-                        <div className="relative h-[260px] overflow-hidden bg-muted sm:h-[336px]">
+                      <article className="group relative w-full overflow-hidden rounded-xl border border-border bg-card text-left transition hover:shadow">
+                        <ResourcePreviewLink
+                          resourceId={featuredWallpaper.id}
+                          title={featuredWallpaper.title}
+                        />
+                        <div className="pointer-events-none relative z-10 h-[260px] overflow-hidden bg-muted sm:h-[336px]">
                           <img
                             src={featuredWallpaper.thumbnailUrl ?? featuredWallpaper.url}
                             alt={featuredWallpaper.title}
@@ -291,10 +290,10 @@ export default function Home() {
                           <div className="absolute left-5 top-5 inline-flex items-center rounded-full bg-card px-3 py-1 text-xs font-medium text-primary">
                             热门壁纸
                           </div>
-                          <div className="absolute right-5 top-5">
+                          <div className="pointer-events-auto absolute right-5 top-5 z-20">
                             <ResourceFavoriteButton
                               active={favoritedMap[featuredWallpaper.id] ?? false}
-                              onClick={(event) => handleFavoriteResource(event, featuredWallpaper)}
+                              onClick={() => void handleFavoriteResource(featuredWallpaper)}
                               size="md"
                             />
                           </div>
@@ -311,32 +310,31 @@ export default function Home() {
                             </div>
                           </div>
                         </div>
-                      </button>
+                      </article>
                     )}
                     {wallpaperRail.length > 0 && (
                       <div className="grid gap-4 md:grid-cols-2">
                         {wallpaperRail.slice(0, 2).map((resource) => (
-                          <button
+                          <article
                             key={resource.id}
-                            type="button"
-                            onClick={() => navigate(`/resource/${resource.id}`)}
-                            className="group overflow-hidden rounded-xl border border-border bg-card text-left transition hover:shadow"
+                            className="group relative overflow-hidden rounded-xl border border-border bg-card text-left transition hover:shadow"
                           >
-                            <div className="relative h-44 overflow-hidden bg-muted">
+                            <ResourcePreviewLink resourceId={resource.id} title={resource.title} />
+                            <div className="pointer-events-none relative z-10 h-44 overflow-hidden bg-muted">
                               <img
                                 src={resource.thumbnailUrl ?? resource.url}
                                 alt={resource.title}
                                 className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
                               />
-                              <div className="absolute right-3 top-3">
+                              <div className="pointer-events-auto absolute right-3 top-3 z-20">
                                 <ResourceFavoriteButton
                                   active={favoritedMap[resource.id] ?? false}
-                                  onClick={(event) => handleFavoriteResource(event, resource)}
+                                  onClick={() => void handleFavoriteResource(resource)}
                                   size="sm"
                                 />
                               </div>
                             </div>
-                            <div className="space-y-2 p-4">
+                            <div className="pointer-events-none relative z-10 space-y-2 p-4">
                               <div className="line-clamp-1 text-base font-medium text-foreground">
                                 {resource.title}
                               </div>
@@ -344,7 +342,7 @@ export default function Home() {
                                 {resource.userName}
                               </div>
                             </div>
-                          </button>
+                          </article>
                         ))}
                       </div>
                     )}
@@ -361,17 +359,19 @@ export default function Home() {
                       {avatarShelf.length > 0 ? (
                         <div className="grid grid-cols-2 gap-4">
                           {avatarShelf.map((resource) => (
-                            <button
+                            <article
                               key={resource.id}
-                              type="button"
-                              onClick={() => navigate(`/resource/${resource.id}`)}
-                              className="group overflow-hidden rounded-xl border border-border bg-muted text-left transition hover:shadow"
+                              className="group relative overflow-hidden rounded-xl border border-border bg-muted text-left transition hover:shadow"
                             >
-                              <div className="relative px-4 pb-3 pt-4">
-                                <div className="absolute right-3 top-3">
+                              <ResourcePreviewLink
+                                resourceId={resource.id}
+                                title={resource.title}
+                              />
+                              <div className="pointer-events-none relative z-10 px-4 pb-3 pt-4">
+                                <div className="pointer-events-auto absolute right-3 top-3 z-20">
                                   <ResourceFavoriteButton
                                     active={favoritedMap[resource.id] ?? false}
-                                    onClick={(event) => handleFavoriteResource(event, resource)}
+                                    onClick={() => void handleFavoriteResource(resource)}
                                     size="sm"
                                   />
                                 </div>
@@ -383,7 +383,7 @@ export default function Home() {
                                   />
                                 </div>
                               </div>
-                              <div className="space-y-1 px-4 pb-4 text-center">
+                              <div className="pointer-events-none relative z-10 space-y-1 px-4 pb-4 text-center">
                                 <div className="line-clamp-1 text-sm font-medium text-foreground">
                                   {resource.title}
                                 </div>
@@ -391,7 +391,7 @@ export default function Home() {
                                   {resource.downloadCount} 次下载
                                 </div>
                               </div>
-                            </button>
+                            </article>
                           ))}
                         </div>
                       ) : (

@@ -18,6 +18,7 @@ export interface ResourceTagSelectorProps {
     title?: string;
     description?: string;
   };
+  modelId?: string;
 }
 
 const MAX_TAG_LEN = 20;
@@ -31,6 +32,7 @@ export default function ResourceTagSelector({
   onChange,
   maxCount = 10,
   aiPreUpload,
+  modelId,
 }: ResourceTagSelectorProps) {
   const [aiLoading, setAiLoading] = useState(false);
   const [candidates, setCandidates] = useState<string[]>([]);
@@ -65,9 +67,13 @@ export default function ResourceTagSelector({
 
   const handleAiMatch = async () => {
     if (!aiPreUpload) return;
+    if (!modelId) {
+      toast.error('请先选择 AI 模型');
+      return;
+    }
     try {
       setAiLoading(true);
-      const result = await aiSuggestResourceTags(aiPreUpload);
+      const result = await aiSuggestResourceTags({ ...aiPreUpload, modelId });
       const list = (result.tags ?? []).map(normalizeTag).filter((tag) => tag.length > 0);
       if (list.length === 0) {
         toast.warning('AI 未生成候选标签');

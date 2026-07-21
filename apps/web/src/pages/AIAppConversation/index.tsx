@@ -19,6 +19,7 @@ import {
   listAIAppConversations,
   streamAIAppConversation,
 } from '@/api/aiWorkbench';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import { AgentAvatar } from '@/components/ai-workbench/AgentAvatar';
 import { AIResponseContext } from '@/components/ai-workbench/AIResponseContext';
 import { EditorPageHeader } from '@/components/ai-workbench/EditorPageHeader';
@@ -86,10 +87,10 @@ function formatRunFailure(run: AIAppRun) {
       return '知识库检索服务异常';
     case 'RUN_CANCELLED':
       return '已停止生成';
-    case 'ARK_EMPTY_RESPONSE':
+    case 'AI_EMPTY_RESPONSE':
       return 'AI 未返回有效内容';
-    case 'ARK_NOT_CONFIGURED':
-      return 'AI 服务未配置';
+    case 'MODEL_NOT_CONFIGURED':
+      return '所选模型暂不可用';
     case 'APP_CONFIG_INVALID':
       return '智能体版本配置无效';
     case 'AI_AGENT_RUN_FAILED':
@@ -160,6 +161,7 @@ export default function AIAppConversationPage() {
   const [sending, setSending] = useState(false);
   const [streamingReply, setStreamingReply] = useState('');
   const [toolStatus, setToolStatus] = useState<string | null>(null);
+  const [textModelId, setTextModelId] = useState('');
   const controllerRef = useRef<AbortController | null>(null);
   const loadedAppIdRef = useRef<string | null>(null);
 
@@ -299,7 +301,7 @@ export default function AIAppConversationPage() {
       : quickPrompts;
 
   const send = async () => {
-    if (!appId || !conversationId || !input.trim() || sending) return;
+    if (!appId || !conversationId || !input.trim() || !textModelId || sending) return;
     const content = input.trim();
     const localUserMessage: AIAppConversationMessage = {
       id: `local-user-${Date.now()}`,
@@ -321,6 +323,7 @@ export default function AIAppConversationPage() {
         appId,
         conversationId,
         content,
+        textModelId,
         {
           onDelta: (chunk) => setStreamingReply((reply) => reply + chunk),
           onToolCall: (name) =>
@@ -586,6 +589,14 @@ export default function AIAppConversationPage() {
           <div className="border-t border-border bg-background px-4 py-5 sm:px-7">
             <Card className="mx-auto max-w-3xl gap-0 border-border py-0 shadow-none" size="sm">
               <CardContent className="px-4 py-3">
+                <div className="mb-3">
+                  <ModelPicker
+                    value={textModelId}
+                    onValueChange={setTextModelId}
+                    capability="text"
+                    label="对话模型"
+                  />
+                </div>
                 <Textarea
                   value={input}
                   placeholder="输入消息，Enter 发送，Shift + Enter 换行"
@@ -626,7 +637,7 @@ export default function AIAppConversationPage() {
                     <Button
                       size="icon"
                       onClick={() => void send()}
-                      disabled={!input.trim()}
+                      disabled={!input.trim() || !textModelId}
                       aria-label="发送消息"
                       title="发送消息"
                     >

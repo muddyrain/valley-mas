@@ -61,6 +61,9 @@ export interface DebateSession {
   id: string;
   topic: string;
   mode: DebateMode;
+  catalogModelId?: string;
+  provider?: string;
+  model?: string;
   status: DebateStatus;
   personaCount?: number | null;
   currentRound?: number | null;
@@ -83,12 +86,24 @@ export interface CreateDebateRequest {
   topic: string;
   mode: DebateMode;
   personaCount: number;
+  modelId: string;
+}
+
+export interface AvailableAIModel {
+  id: string;
+  provider: string;
+  modelId: string;
+  displayName: string;
+  capabilities: string[];
 }
 
 export interface CreateDebateResponse {
   sessionId: string;
   topic: string;
   mode: DebateMode;
+  catalogModelId?: string;
+  provider?: string;
+  model?: string;
   status: DebateStatus;
   personaCount?: number | null;
   currentRound?: number | null;

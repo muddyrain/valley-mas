@@ -1,4 +1,5 @@
 import type {
+  AvailableAIModel,
   CreateDebateRequest,
   CreateDebateResponse,
   DebateResult,
@@ -41,6 +42,12 @@ export function createDebate(data: CreateDebateRequest) {
     method: 'POST',
     body: JSON.stringify(data),
   }).then(normalizeCreateDebateResponse);
+}
+
+export function listAvailableAIModels(capability: string) {
+  return requestJSON<{ list: AvailableAIModel[] }>(
+    `/api/v1/public/ai/models?capability=${encodeURIComponent(capability)}`,
+  ).then((response) => (Array.isArray(response.list) ? response.list : []));
 }
 
 export function getDebate(id: string) {

@@ -36,6 +36,18 @@ func TestCopilotPlanningPublishesActivityAndStopsAtDeadline(t *testing.T) {
 	}
 }
 
+func TestCopilotMessageRequiresSelectedModel(t *testing.T) {
+	router, _ := setupAIPlatformTestRouter(t)
+	request := httptest.NewRequest(http.MethodPost, "/ai/workbench/copilot/messages/stream", bytes.NewBufferString(`{"scope":"workbench","message":"检查当前草稿"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if code := responseCode(response); code != http.StatusBadRequest {
+		t.Fatalf("code = %d, want 400; body = %s", code, response.Body.String())
+	}
+}
+
 func TestCopilotStructuredResultDoesNotRepairAgentFailure(t *testing.T) {
 	upstreamErr := errors.New("upstream timeout")
 	repairCalls := 0

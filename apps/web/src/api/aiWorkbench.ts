@@ -281,15 +281,17 @@ export function createAIApp(data: {
 
 export function createAIAppProposal(
   description: string,
+  modelId: string,
   current?: AgentProposal,
   signal?: AbortSignal,
 ): Promise<{ proposal: AgentProposal }> {
-  return request.post('/ai/app-assistant/proposals', { description, current }, { signal });
+  return request.post('/ai/app-assistant/proposals', { description, modelId, current }, { signal });
 }
 
 export async function createPromptAssistantSuggestion(
   data: {
     target: 'agent' | 'workflow_llm' | 'prompt_resource';
+    modelId: string;
     field?: PromptAssistantField;
     mode: 'auto' | 'instruction' | 'debug_run';
     appId?: string;
@@ -335,9 +337,10 @@ export async function createPromptAssistantSuggestion(
 
 export function generateAIAppAvatar(
   appId: string,
+  modelId: string,
   context?: { name: string; description: string; systemPrompt: string },
 ): Promise<{ app: AIApp; model: string }> {
-  return request.post(`/ai/apps/${appId}/avatar/generate`, context);
+  return request.post(`/ai/apps/${appId}/avatar/generate`, { ...context, modelId });
 }
 
 export function uploadAIAppAvatar(appId: string, file: File): Promise<{ app: AIApp }> {
@@ -380,6 +383,7 @@ export function debugAIApp(
 export async function streamDebugAIApp(
   appId: string,
   message: string,
+  modelId: string,
   handlers: {
     onDelta: (chunk: string) => void;
     onToolCall?: (toolName: string) => void;
@@ -397,7 +401,7 @@ export async function streamDebugAIApp(
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     },
-    body: JSON.stringify({ message, stream: true }),
+    body: JSON.stringify({ message, modelId, stream: true }),
     signal,
   });
   if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream')) {
@@ -460,6 +464,7 @@ export async function streamAIAppConversation(
   appId: string,
   conversationId: string,
   message: string,
+  modelId: string,
   handlers: {
     onDelta: (chunk: string) => void;
     onToolCall?: (toolName: string) => void;
@@ -488,7 +493,7 @@ export async function streamAIAppConversation(
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     },
-    body: JSON.stringify({ message, stream: true }),
+    body: JSON.stringify({ message, modelId, stream: true }),
     signal,
   });
   if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream')) {

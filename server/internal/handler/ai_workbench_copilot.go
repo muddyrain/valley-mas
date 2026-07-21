@@ -16,7 +16,7 @@ import (
 
 	"valley-server/internal/ai/agent"
 	"valley-server/internal/ai/tools"
-	"valley-server/internal/aiclient"
+	"valley-server/internal/aimodel"
 	"valley-server/internal/aiusage"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
@@ -29,7 +29,6 @@ import (
 
 const (
 	featureWorkbenchCopilot       = "ai-workbench-contextual-copilot"
-	copilotARKTimeout             = 60 * time.Second
 	copilotPlanningTimeout        = 90 * time.Second
 	copilotActivityUpdateInterval = 5 * time.Second
 	copilotEventPollInterval      = 400 * time.Millisecond
@@ -84,6 +83,7 @@ type copilotContextPayload struct {
 }
 
 type copilotMessageRequest struct {
+	ModelID   string                `json:"modelId"`
 	Scope     string                `json:"scope"`
 	TargetID  string                `json:"targetId"`
 	SessionID string                `json:"sessionId"`
@@ -205,14 +205,25 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	payload.Scope = strings.TrimSpace(payload.Scope)
 	payload.TargetID = strings.TrimSpace(payload.TargetID)
 	payload.SessionID = strings.TrimSpace(payload.SessionID)
+	payload.ModelID = strings.TrimSpace(payload.ModelID)
 	payload.Message = truncateAIAgentRunes(strings.TrimSpace(payload.Message), 4000)
 	if payload.Message == "" {
 		Error(c, http.StatusBadRequest, "请输入要讨论的内容")
 		return
 	}
+	if payload.ModelID == "" {
+		Error(c, http.StatusBadRequest, "请选择文本模型")
+		return
+	}
 	ownerID := model.Int64String(userID)
 	if err := validateCopilotTarget(ownerID, payload.Scope, payload.TargetID); err != nil {
 		Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	invocation, err := aimodel.ResolveInvocation(database.GetDB(), payload.ModelID, "text", copilotPlanningTimeout)
+	if err != nil {
+		aiusage.Record(aiusage.Entry{Feature: featureWorkbenchCopilot, Provider: "unknown", Model: payload.ModelID, UserID: ownerID.String(), Status: aiusage.StatusFailed, ErrorMessage: err.Error()})
+		respondCatalogModelError(c, err)
 		return
 	}
 	session, err := loadCopilotSession(ownerID, payload.Scope, payload.TargetID, payload.SessionID)
@@ -296,7 +307,7 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 			func(label string) { emitCopilotActivity(c, &run, copilotStagePlanning, label) },
 			func(planningContext context.Context, reportActivity func(string)) error {
 				reportActivity("正在生成操作")
-				return runCopilotAgentStructured(planningContext, ownerID, systemPrompt, userPrompt, payload, draft, &envelope, func() error {
+				return runCopilotAgentStructured(planningContext, ownerID, invocation, systemPrompt, userPrompt, payload, draft, &envelope, func() error {
 					reportActivity("正在应用操作并校验候选")
 					return validateCopilotEnvelopeForRun(&envelope, knowledgeBases, payload, draft)
 				})
@@ -311,7 +322,7 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 			completeCopilotRun(c, &run, "failed", copilotStageFailed, "COPILOT_TIMEOUT", "AI 规划超时，请重试或简化需求")
 		} else if isCopilotValidationError(err) {
 			completeCopilotRun(c, &run, "failed", copilotStageFailed, "COPILOT_INVALID_OPERATION", "AI 返回的变更不符合当前草稿，请重新描述需求")
-		} else if isARKConfigurationError(err) {
+		} else if strings.Contains(err.Error(), "AI 服务未配置") {
 			completeCopilotRun(c, &run, "failed", copilotStageFailed, "MODEL_NOT_CONFIGURED", err.Error())
 		} else {
 			completeCopilotRun(c, &run, "failed", copilotStageFailed, "MODEL_UPSTREAM_FAILED", "AI 未返回可用结果，请重试")
@@ -609,19 +620,11 @@ func runCopilotPlanningWithActivity(
 	}
 }
 
-func runCopilotAgentStructured(ctx context.Context, userID model.Int64String, systemPrompt, userPrompt string, payload copilotMessageRequest, draft any, target any, validate func() error) error {
-	arkConfig, configErr := aiclient.ReadARKTextConfig()
-	if configErr != "" {
-		return errors.New(configErr)
-	}
-	client := aiclient.ARKClient(copilotARKTimeout)
-	if client == nil {
-		return errors.New("AI 未配置：缺少 ARK_API_KEY")
-	}
+func runCopilotAgentStructured(ctx context.Context, userID model.Int64String, invocation aimodel.Invocation, systemPrompt, userPrompt string, payload copilotMessageRequest, draft any, target any, validate func() error) error {
 	registry := copilotToolRegistry(userID, payload, draft)
-	loop := agent.NewLocalLoop(&aiAppAgentBackend{client: client}, registry)
+	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
 	spec := agent.Spec{
-		Provider: "ark", Model: arkConfig.Model, System: systemPrompt,
+		Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, System: systemPrompt,
 		Tools:    []string{"workbench.current", "workflow.capabilities", "workflow.runSummary", "workflow.validateDraft"},
 		MaxSteps: 3, MaxTokens: 4096, Temperature: 0.2, Feature: featureWorkbenchCopilot,
 	}
@@ -629,6 +632,9 @@ func runCopilotAgentStructured(ctx context.Context, userID model.Int64String, sy
 		spec.MaxTokens = 1500
 		spec.MaxSteps = 1
 		spec.Tools = []string{"workbench.current", "workflow.capabilities", "workflow.runSummary"}
+	}
+	if !aimodel.HasCapabilities(invocation.Model, []string{"tool_call"}) {
+		spec.Tools = nil
 	}
 	ctx = aiusage.WithAudit(ctx, featureWorkbenchCopilot, userID.String())
 	result, err := loop.Run(ctx, spec, []agent.Message{{Role: agent.RoleUser, Content: userPrompt}})

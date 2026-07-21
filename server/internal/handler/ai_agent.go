@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"valley-server/internal/aiclient"
+	"valley-server/internal/aimodel"
 	"valley-server/internal/aiusage"
 	"valley-server/internal/database"
 	appmodel "valley-server/internal/model"
@@ -40,6 +42,7 @@ type aiConversationPayload struct {
 
 type aiAgentChatPayload struct {
 	Message string `json:"message" binding:"required"`
+	ModelID string `json:"modelId" binding:"required"`
 	Stream  bool   `json:"stream"`
 }
 
@@ -547,7 +550,7 @@ func ChatWithAIAgent(c *gin.Context) {
 		UserID:         userID,
 		AgentID:        agentID,
 		ConversationID: conversationID,
-		Role:           arkmodel.ChatMessageRoleUser,
+		Role:           "user",
 		Content:        payload.Message,
 	}
 	if err := db.Create(&userMessage).Error; err != nil {
@@ -559,30 +562,30 @@ func ChatWithAIAgent(c *gin.Context) {
 		_ = db.Save(&conversation).Error
 	}
 
-	apiKey, arkBaseURL, textModel, errMsg := readArkTextModelConfig()
-	if errMsg != "" {
-		recordAIAgentChatUsage(userID, payload.Message, history, "", textModel, aiusage.Since(start), errMsg)
-		aiAgentError(c, http.StatusServiceUnavailable, errMsg)
+	invocation, invocationErr := aimodel.ResolveInvocation(db, payload.ModelID, "text", 90*time.Second)
+	if invocationErr != nil {
+		recordAIAgentChatUsageWithProvider(userID, payload.Message, history, "", "unknown", payload.ModelID, aiusage.Since(start), invocationErr.Error())
+		aiAgentError(c, http.StatusServiceUnavailable, "所选模型暂不可用")
 		return
 	}
-
-	messages := buildAIAgentARKMessages(agent, history, payload.Message)
-	client := ensureSharedArkClient(apiKey, arkBaseURL)
+	messages := buildAIAgentCompatibleMessages(agent, history, payload.Message)
 
 	if payload.Stream {
-		streamAIAgentChatWithARK(c, client, textModel, messages, userID, history, payload.Message, conversation, userMessage, start)
+		streamAIAgentChatWithCompatible(c, invocation.Client, invocation.Provider.Provider, invocation.Model.ModelID, messages, userID, history, payload.Message, conversation, userMessage, start)
 		return
 	}
 
-	reply, modelName, err := chatWithARK(c.Request.Context(), client, textModel, messages)
+	response, err := invocation.Client.Chat(c.Request.Context(), aiclient.CompatibleChatRequest{Model: invocation.Model.ModelID, Messages: messages})
 	if err != nil {
-		recordAIAgentChatUsage(userID, payload.Message, history, "", modelNameOrFallback(modelName, textModel), aiusage.Since(start), err.Error())
+		recordAIAgentChatUsageWithProvider(userID, payload.Message, history, "", invocation.Provider.Provider, invocation.Model.ModelID, aiusage.Since(start), err.Error())
 		aiAgentError(c, http.StatusBadGateway, "AI upstream error: "+err.Error())
 		return
 	}
+	reply := compatibleMessageText(response.Choices[0].Message.Content)
+	modelName := modelNameOrFallback(response.Model, invocation.Model.ModelID)
 	reply = strings.TrimSpace(reply)
 	if reply == "" {
-		recordAIAgentChatUsage(userID, payload.Message, history, "", modelNameOrFallback(modelName, textModel), aiusage.Since(start), "AI upstream returned empty content")
+		recordAIAgentChatUsageWithProvider(userID, payload.Message, history, "", invocation.Provider.Provider, modelName, aiusage.Since(start), "AI upstream returned empty content")
 		aiAgentError(c, http.StatusBadGateway, "AI upstream returned empty content")
 		return
 	}
@@ -591,23 +594,85 @@ func ChatWithAIAgent(c *gin.Context) {
 		UserID:         userID,
 		AgentID:        agentID,
 		ConversationID: conversationID,
-		Role:           arkmodel.ChatMessageRoleAssistant,
+		Role:           "assistant",
 		Content:        reply,
 	}
 	if err := db.Create(&assistantMessage).Error; err != nil {
 		aiAgentError(c, http.StatusInternalServerError, "保存回复失败")
 		return
 	}
-	recordAIAgentChatUsage(userID, payload.Message, history, reply, modelNameOrFallback(modelName, textModel), aiusage.Since(start), "")
+	recordAIAgentChatUsageWithProvider(userID, payload.Message, history, reply, invocation.Provider.Provider, modelName, aiusage.Since(start), "")
 
 	Success(c, gin.H{
 		"conversation":     conversation,
 		"userMessage":      userMessage,
 		"assistantMessage": assistantMessage,
 		"reply":            reply,
-		"model":            modelNameOrFallback(modelName, textModel),
-		"provider":         "ark",
+		"model":            modelName,
+		"provider":         invocation.Provider.Provider,
 	})
+}
+
+func buildAIAgentCompatibleMessages(agent appmodel.AIAgent, history []appmodel.AIMessage, message string) []aiclient.CompatibleMessage {
+	items := make([]aiclient.CompatibleMessage, 0, len(history)+2)
+	system := strings.TrimSpace(agent.SystemPrompt)
+	if system == "" {
+		system = defaultAIAgentSystemPrompt()
+	}
+	items = append(items, aiclient.CompatibleMessage{Role: "system", Content: system})
+	for _, item := range history {
+		role, content := strings.TrimSpace(item.Role), strings.TrimSpace(item.Content)
+		if content != "" && (role == "user" || role == "assistant") {
+			items = append(items, aiclient.CompatibleMessage{Role: role, Content: content})
+		}
+	}
+	return append(items, aiclient.CompatibleMessage{Role: "user", Content: message})
+}
+
+func streamAIAgentChatWithCompatible(c *gin.Context, client *aiclient.CompatibleClient, provider, modelID string, messages []aiclient.CompatibleMessage, userID appmodel.Int64String, history []appmodel.AIMessage, userText string, conversation appmodel.AIConversation, userMessage appmodel.AIMessage, start time.Time) {
+	writer, err := aiclient.NewSSEWriter(c)
+	if err != nil {
+		aiAgentError(c, http.StatusInternalServerError, "streaming not supported")
+		return
+	}
+	_ = writer.Send(gin.H{"type": "meta", "conversation": conversation, "userMessage": userMessage, "model": modelID, "provider": provider})
+	var chunks strings.Builder
+	currentModel := modelID
+	err = client.ChatStream(c.Request.Context(), aiclient.CompatibleChatRequest{Model: modelID, Messages: messages}, func(chunk aiclient.CompatibleChatStreamChunk) error {
+		if strings.TrimSpace(chunk.Model) != "" {
+			currentModel = chunk.Model
+		}
+		for _, choice := range chunk.Choices {
+			text := compatibleMessageText(choice.Delta.Content)
+			if text == "" {
+				continue
+			}
+			chunks.WriteString(text)
+			if sendErr := writer.Send(gin.H{"type": "delta", "chunk": text, "model": currentModel}); sendErr != nil {
+				return sendErr
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		recordAIAgentChatUsageWithProvider(userID, userText, history, chunks.String(), provider, currentModel, aiusage.Since(start), err.Error())
+		_ = writer.Send(gin.H{"type": "error", "message": "AI upstream error: " + err.Error()})
+		return
+	}
+	reply := strings.TrimSpace(chunks.String())
+	if reply == "" {
+		recordAIAgentChatUsageWithProvider(userID, userText, history, "", provider, currentModel, aiusage.Since(start), "AI upstream returned empty content")
+		_ = writer.Send(gin.H{"type": "error", "message": "AI upstream returned empty content"})
+		return
+	}
+	assistantMessage := appmodel.AIMessage{UserID: userID, AgentID: conversation.AgentID, ConversationID: conversation.ID, Role: "assistant", Content: reply}
+	if err := database.GetDB().Create(&assistantMessage).Error; err != nil {
+		recordAIAgentChatUsageWithProvider(userID, userText, history, reply, provider, currentModel, aiusage.Since(start), err.Error())
+		_ = writer.Send(gin.H{"type": "error", "message": "保存回复失败"})
+		return
+	}
+	recordAIAgentChatUsageWithProvider(userID, userText, history, reply, provider, currentModel, aiusage.Since(start), "")
+	_ = writer.Send(gin.H{"type": "done", "conversation": conversation, "assistantMessage": assistantMessage, "reply": reply, "model": currentModel, "provider": provider})
 }
 
 func streamAIAgentChatWithARK(
@@ -750,6 +815,10 @@ func buildAIAgentARKMessages(agent appmodel.AIAgent, history []appmodel.AIMessag
 }
 
 func recordAIAgentChatUsage(userID appmodel.Int64String, message string, history []appmodel.AIMessage, reply string, modelName string, latencyMs int64, errMessage string) {
+	recordAIAgentChatUsageWithProvider(userID, message, history, reply, "ark", modelName, latencyMs, errMessage)
+}
+
+func recordAIAgentChatUsageWithProvider(userID appmodel.Int64String, message string, history []appmodel.AIMessage, reply, provider, modelName string, latencyMs int64, errMessage string) {
 	status := aiusage.StatusSuccess
 	if strings.TrimSpace(errMessage) != "" {
 		status = aiusage.StatusFailed
@@ -760,7 +829,7 @@ func recordAIAgentChatUsage(userID appmodel.Int64String, message string, history
 	}
 	aiusage.Record(aiusage.Entry{
 		Feature:       "desktop-ai-agent-chat",
-		Provider:      "ark",
+		Provider:      provider,
 		Model:         modelName,
 		UserID:        strconv.FormatInt(int64(userID), 10),
 		Status:        status,

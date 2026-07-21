@@ -75,7 +75,7 @@ func (Client) GenerateText(ctx context.Context, cfg TextConfig, req TextRequest)
 		req.Temperature = 0.35
 	}
 
-	if cfg.Source == "openai" {
+	if cfg.Source != "ark" {
 		return generateOpenAIText(ctx, cfg, req)
 	}
 	return generateARKText(ctx, cfg, req)
@@ -396,6 +396,10 @@ type openAIResponse struct {
 
 func generateOpenAIText(ctx context.Context, cfg TextConfig, req TextRequest) (Result, error) {
 	start := time.Now()
+	provider := strings.TrimSpace(cfg.Source)
+	if provider == "" {
+		provider = "openai"
+	}
 	payload := openAIRequest{
 		Model: cfg.Model,
 		Messages: []openAIMessage{
@@ -411,14 +415,14 @@ func generateOpenAIText(ctx context.Context, cfg TextConfig, req TextRequest) (R
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		recordUsage(ctx, "openai", cfg.Model, req.Prompt, "", aiusage.Since(start), err)
+		recordUsage(ctx, provider, cfg.Model, req.Prompt, "", aiusage.Since(start), err)
 		return Result{}, err
 	}
 
 	httpClient := &http.Client{Timeout: cfg.Timeout}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.BaseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
-		recordUsage(ctx, "openai", cfg.Model, req.Prompt, "", aiusage.Since(start), err)
+		recordUsage(ctx, provider, cfg.Model, req.Prompt, "", aiusage.Since(start), err)
 		return Result{}, err
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+cfg.APIKey)
@@ -427,43 +431,43 @@ func generateOpenAIText(ctx context.Context, cfg TextConfig, req TextRequest) (R
 
 	resp, err := httpClient.Do(httpReq)
 	if err != nil {
-		recordUsage(ctx, "openai", cfg.Model, req.Prompt, "", aiusage.Since(start), err)
+		recordUsage(ctx, provider, cfg.Model, req.Prompt, "", aiusage.Since(start), err)
 		return Result{}, err
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		recordUsage(ctx, "openai", cfg.Model, req.Prompt, "", aiusage.Since(start), err)
+		recordUsage(ctx, provider, cfg.Model, req.Prompt, "", aiusage.Since(start), err)
 		return Result{}, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		err := fmt.Errorf("OpenAI upstream returned %d: %s", resp.StatusCode, trimRunes(string(respBody), 180))
-		recordUsage(ctx, "openai", cfg.Model, req.Prompt, "", aiusage.Since(start), err)
+		recordUsage(ctx, provider, cfg.Model, req.Prompt, "", aiusage.Since(start), err)
 		return Result{}, err
 	}
 
 	var parsed openAIResponse
 	if err := json.Unmarshal(respBody, &parsed); err != nil {
 		wrapped := fmt.Errorf("decode OpenAI response failed: %w", err)
-		recordUsage(ctx, "openai", cfg.Model, req.Prompt, "", aiusage.Since(start), wrapped)
+		recordUsage(ctx, provider, cfg.Model, req.Prompt, "", aiusage.Since(start), wrapped)
 		return Result{}, wrapped
 	}
 	if len(parsed.Choices) == 0 {
 		err := errors.New("OpenAI upstream returned no choices")
-		recordUsage(ctx, "openai", parsed.Model, req.Prompt, "", aiusage.Since(start), err)
-		return Result{Model: parsed.Model, Source: "openai"}, err
+		recordUsage(ctx, provider, parsed.Model, req.Prompt, "", aiusage.Since(start), err)
+		return Result{Model: parsed.Model, Source: provider}, err
 	}
 
 	content := strings.TrimSpace(parsed.Choices[0].Message.Content)
 	if content == "" {
 		err := errors.New("OpenAI upstream returned empty content")
-		recordUsage(ctx, "openai", parsed.Model, req.Prompt, "", aiusage.Since(start), err)
-		return Result{Model: parsed.Model, Source: "openai"}, err
+		recordUsage(ctx, provider, parsed.Model, req.Prompt, "", aiusage.Since(start), err)
+		return Result{Model: parsed.Model, Source: provider}, err
 	}
 
-	recordUsage(ctx, "openai", parsed.Model, req.Prompt, content, aiusage.Since(start), nil)
-	return Result{Content: content, Model: parsed.Model, Source: "openai"}, nil
+	recordUsage(ctx, provider, parsed.Model, req.Prompt, content, aiusage.Since(start), nil)
+	return Result{Content: content, Model: parsed.Model, Source: provider}, nil
 }
 
 func NormalizeImageInput(raw string) string { return aiclient.NormalizeImageInput(raw) }

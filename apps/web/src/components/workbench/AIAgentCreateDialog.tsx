@@ -6,9 +6,9 @@ import {
   type AgentProposal,
   createAIApp,
   createAIAppProposal,
-  generateAIAppAvatar,
   getAPIErrorMessage,
 } from '@/api/aiWorkbench';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import { AIGenerationProgress } from '@/components/ai-workbench/AIGenerationProgress';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -40,6 +40,7 @@ export function AIAgentCreateDialog({
   const [standardName, setStandardName] = useState('');
   const [standardDescription, setStandardDescription] = useState('');
   const [description, setDescription] = useState('');
+  const [textModelId, setTextModelId] = useState('');
   const [proposal, setProposal] = useState<AgentProposal | null>(null);
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [selectedKnowledge, setSelectedKnowledge] = useState<string[]>([]);
@@ -55,6 +56,7 @@ export function AIAgentCreateDialog({
     setStandardName('');
     setStandardDescription('');
     setDescription('');
+    setTextModelId('');
     setProposal(null);
     setSelectedTools([]);
     setSelectedKnowledge([]);
@@ -68,9 +70,6 @@ export function AIAgentCreateDialog({
   const finishCreation = (appId: string) => {
     onCreated?.(appId);
     onOpenChange(false);
-    void generateAIAppAvatar(appId)
-      .then(() => toast.success('智能体头像已生成'))
-      .catch(() => toast.info('头像暂未生成，可在编辑页重试或上传'));
     navigate(`/workbench/apps/${appId}`);
   };
 
@@ -104,12 +103,17 @@ export function AIAgentCreateDialog({
       toast.error('请描述智能体要完成的任务');
       return;
     }
+    if (!textModelId) {
+      toast.error('请选择文本模型');
+      return;
+    }
     const controller = new AbortController();
     controllerRef.current = controller;
     setGenerating(true);
     try {
       const result = await createAIAppProposal(
         description.trim(),
+        textModelId,
         proposal || undefined,
         controller.signal,
       );
@@ -209,6 +213,12 @@ export function AIAgentCreateDialog({
               placeholder="描述你希望创建的智能体"
               className="min-h-28"
               onChange={(event) => setDescription(event.target.value)}
+            />
+            <ModelPicker
+              value={textModelId || undefined}
+              onValueChange={setTextModelId}
+              capability="text"
+              label="文本模型"
             />
             {generating ? (
               <AIGenerationProgress

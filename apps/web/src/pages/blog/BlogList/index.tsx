@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import type { BlogRecommendResponse, Group, Post } from '@/api/blog';
 import { getGroups, getPosts, recommendBlogPosts } from '@/api/blog';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import { BlogFeedCard } from '@/components/blog';
 import { BLOG_COVER_ASPECT_CLASS } from '@/components/blog/BlogCoverMedia';
@@ -99,6 +100,7 @@ export default function BlogList() {
   const [showAllGroups, setShowAllGroups] = useState(false);
   const [aiRecommendOpen, setAIRecommendOpen] = useState(false);
   const [aiPrompt, setAIPrompt] = useState('');
+  const [textModelId, setTextModelId] = useState('');
   const [aiRecommendLoading, setAIRecommendLoading] = useState(false);
   const [aiRecommendError, setAIRecommendError] = useState('');
   const [aiRecommendResult, setAIRecommendResult] = useState<BlogRecommendResponse | null>(null);
@@ -268,12 +270,17 @@ export default function BlogList() {
       setAIRecommendError('请输入你想读的主题或问题。');
       return;
     }
+    if (!textModelId) {
+      setAIRecommendError('请先选择文本模型。');
+      return;
+    }
     setAIRecommendLoading(true);
     setAIRecommendError('');
     setAIRecommendResult(null);
     try {
       const data = await recommendBlogPosts({
         prompt,
+        modelId: textModelId,
         groupId: selectedGroupId || undefined,
         keyword: currentKeyword || undefined,
         sort: currentSort,
@@ -677,6 +684,13 @@ export default function BlogList() {
           </SheetHeader>
 
           <div className="flex-1 space-y-3 overflow-y-auto px-5 pb-5 pt-4">
+            <ModelPicker
+              value={textModelId}
+              onValueChange={setTextModelId}
+              capability="text"
+              label="推荐模型"
+              catalog="public"
+            />
             <div className="flex gap-2">
               <Input
                 value={aiPrompt}

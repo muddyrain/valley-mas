@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"errors"
-	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -12,17 +10,17 @@ import (
 	"valley-server/internal/ai/tools/content"
 	"valley-server/internal/aiapp"
 	"valley-server/internal/aiclient"
+	"valley-server/internal/aimodel"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
-	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 )
 
 type publicAIAppChatPayload struct {
 	Message string `json:"message"`
+	ModelID string `json:"modelId"`
 	Stream  bool   `json:"stream"`
 }
 
@@ -58,9 +56,9 @@ func PublicAIAppChat(c *gin.Context) {
 	}
 
 	var payload publicAIAppChatPayload
-	if c.ShouldBindJSON(&payload) != nil || strings.TrimSpace(payload.Message) == "" {
+	if c.ShouldBindJSON(&payload) != nil || strings.TrimSpace(payload.Message) == "" || strings.TrimSpace(payload.ModelID) == "" {
 		persistAIAppPublicInvocation(app, 0, *key, "rejected", false, "MESSAGE_REQUIRED", 0, started)
-		writePublicAIAppError(c, http.StatusBadRequest, "MESSAGE_REQUIRED", "message 不能为空")
+		writePublicAIAppError(c, http.StatusBadRequest, "MESSAGE_REQUIRED", "message 和 modelId 不能为空")
 		return
 	}
 	remaining, err := consumeAIAPIKeyDailyUsage(database.GetDB(), key.ID, time.Now().Format("2006-01-02"))
@@ -92,10 +90,10 @@ func PublicAIAppChat(c *gin.Context) {
 		writePublicAIAppError(c, http.StatusBadGateway, "APP_CONFIG_INVALID", "应用配置无效")
 		return
 	}
-	arkConfig, configErr := aiclient.ReadARKTextConfig()
-	if configErr != "" {
-		persistAIAppPublicInvocation(app, version.ID, *key, "failed", payload.Stream, "ARK_NOT_CONFIGURED", dailyCallNumber, started)
-		writePublicAIAppError(c, http.StatusBadGateway, "ARK_NOT_CONFIGURED", "AI 服务暂不可用")
+	invocation, invocationErr := aimodel.ResolveInvocation(database.GetDB(), payload.ModelID, "text", 60*time.Second)
+	if invocationErr != nil {
+		persistAIAppPublicInvocation(app, version.ID, *key, "failed", payload.Stream, "MODEL_NOT_CONFIGURED", dailyCallNumber, started)
+		writePublicAIAppError(c, http.StatusServiceUnavailable, "MODEL_NOT_CONFIGURED", "所选模型暂不可用")
 		return
 	}
 
@@ -118,11 +116,10 @@ func PublicAIAppChat(c *gin.Context) {
 		writePublicAIAppError(c, http.StatusInternalServerError, "AI_TOOL_REGISTRY_UNAVAILABLE", "应用工具不可用")
 		return
 	}
-	if len(toolNames) > 0 {
-		publicAIAppChatWithTools(c, payload.Stream, arkConfig.Model, system, message, app, version, *key, registry, toolNames, dailyCallNumber, started)
-		return
+	if !aimodel.HasCapabilities(invocation.Model, []string{"tool_call"}) {
+		toolNames = nil
 	}
-	publicAIAppChatWithoutTools(c, payload.Stream, arkConfig.Model, system, message, app, version, *key, dailyCallNumber, started)
+	publicAIAppChatWithTools(c, payload.Stream, invocation, system, message, app, version, *key, registry, toolNames, dailyCallNumber, started)
 }
 
 func publicAIAPIKeyFromRequest(c *gin.Context) (*model.AIAPIKey, bool) {
@@ -133,51 +130,10 @@ func publicAIAPIKeyFromRequest(c *gin.Context) (*model.AIAPIKey, bool) {
 	return VerifyAIAPIKey(strings.TrimSpace(strings.TrimPrefix(authorization, "Bearer ")))
 }
 
-func publicAIAppChatWithoutTools(c *gin.Context, stream bool, modelID, system, message string, app model.AIApp, version model.AIAppVersion, key model.AIAPIKey, dailyCallNumber int, started time.Time) {
-	client := aiclient.ARKClient(60 * time.Second)
-	if client == nil {
-		persistAIAppPublicInvocation(app, version.ID, key, "failed", stream, "ARK_NOT_CONFIGURED", dailyCallNumber, started)
-		writePublicAIAppError(c, http.StatusBadGateway, "ARK_NOT_CONFIGURED", "AI 服务暂不可用")
-		return
-	}
-	messages := make([]*arkmodel.ChatCompletionMessage, 0, 2)
-	if system != "" {
-		messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleSystem, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &system}})
-	}
-	messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleUser, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &message}})
-	if stream {
-		streamPublicAIAppResponse(c, client, modelID, messages, app, version, key, dailyCallNumber, started)
-		return
-	}
-	response, err := client.CreateChatCompletion(c.Request.Context(), aiclient.NewARKChatRequest(modelID, messages))
-	if err != nil {
-		persistAIAppPublicInvocation(app, version.ID, key, "failed", false, "ARK_UPSTREAM_FAILED", dailyCallNumber, started)
-		writePublicAIAppError(c, http.StatusBadGateway, "ARK_UPSTREAM_FAILED", "AI 上游调用失败")
-		return
-	}
-	reply, err := aiclient.ExtractARKContent(response)
-	if err != nil || strings.TrimSpace(reply) == "" {
-		persistAIAppPublicInvocation(app, version.ID, key, "failed", false, "ARK_EMPTY_RESPONSE", dailyCallNumber, started)
-		writePublicAIAppError(c, http.StatusBadGateway, "ARK_EMPTY_RESPONSE", "AI 未返回有效内容")
-		return
-	}
-	responseModel := strings.TrimSpace(response.Model)
-	if responseModel == "" {
-		responseModel = modelID
-	}
-	persistAIAppPublicInvocation(app, version.ID, key, "succeeded", false, "", dailyCallNumber, started)
-	c.JSON(http.StatusOK, gin.H{"reply": reply, "model": responseModel, "versionId": version.ID})
-}
-
-func publicAIAppChatWithTools(c *gin.Context, stream bool, modelID, system, message string, app model.AIApp, version model.AIAppVersion, key model.AIAPIKey, registry *tools.Registry, toolNames []string, dailyCallNumber int, started time.Time) {
-	client := aiclient.ARKClient(60 * time.Second)
-	if client == nil {
-		persistAIAppPublicInvocation(app, version.ID, key, "failed", stream, "ARK_NOT_CONFIGURED", dailyCallNumber, started)
-		writePublicAIAppError(c, http.StatusBadGateway, "ARK_NOT_CONFIGURED", "AI 服务暂不可用")
-		return
-	}
-	loop := agent.NewLocalLoop(&aiAppAgentBackend{client: client}, registry)
-	spec := agent.Spec{Provider: "ark", Model: modelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench-public"}
+func publicAIAppChatWithTools(c *gin.Context, stream bool, invocation aimodel.Invocation, system, message string, app model.AIApp, version model.AIAppVersion, key model.AIAPIKey, registry *tools.Registry, toolNames []string, dailyCallNumber int, started time.Time) {
+	modelID := invocation.Model.ModelID
+	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
+	spec := agent.Spec{Provider: invocation.Provider.Provider, Model: modelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench-public"}
 	ctx := content.WithOwner(c.Request.Context(), key.UserID)
 	if !stream {
 		result, err := loop.Run(ctx, spec, []agent.Message{{Role: agent.RoleUser, Content: message}})
@@ -226,55 +182,6 @@ func publicAIAppChatWithTools(c *gin.Context, stream bool, modelID, system, mess
 	}
 	persistAIAppPublicInvocation(app, version.ID, key, "succeeded", true, "", dailyCallNumber, started)
 	_ = writer.Send(gin.H{"type": "done", "model": result.Model, "versionId": version.ID})
-}
-
-func streamPublicAIAppResponse(c *gin.Context, client *arkruntime.Client, modelID string, messages []*arkmodel.ChatCompletionMessage, app model.AIApp, version model.AIAppVersion, key model.AIAPIKey, dailyCallNumber int, started time.Time) {
-	stream, err := client.CreateChatCompletionStream(c.Request.Context(), aiclient.NewARKChatRequest(modelID, messages))
-	if err != nil {
-		persistAIAppPublicInvocation(app, version.ID, key, "failed", true, "ARK_UPSTREAM_FAILED", dailyCallNumber, started)
-		writePublicAIAppError(c, http.StatusBadGateway, "ARK_UPSTREAM_FAILED", "AI 上游调用失败")
-		return
-	}
-	defer stream.Close()
-	writer, err := aiclient.NewSSEWriter(c)
-	if err != nil {
-		persistAIAppPublicInvocation(app, version.ID, key, "failed", true, "SSE_NOT_SUPPORTED", dailyCallNumber, started)
-		return
-	}
-	var reply strings.Builder
-	currentModel := modelID
-	for {
-		response, recvErr := stream.Recv()
-		if errors.Is(recvErr, io.EOF) {
-			break
-		}
-		if recvErr != nil {
-			if c.Request.Context().Err() != nil {
-				persistAIAppPublicInvocation(app, version.ID, key, "cancelled", true, "RUN_CANCELLED", dailyCallNumber, started)
-				return
-			}
-			persistAIAppPublicInvocation(app, version.ID, key, "failed", true, "ARK_UPSTREAM_FAILED", dailyCallNumber, started)
-			_ = writer.Send(gin.H{"type": "error", "code": "ARK_UPSTREAM_FAILED", "message": "AI 上游调用失败"})
-			return
-		}
-		if strings.TrimSpace(response.Model) != "" {
-			currentModel = response.Model
-		}
-		for _, choice := range response.Choices {
-			if choice == nil || strings.TrimSpace(choice.Delta.Content) == "" {
-				continue
-			}
-			reply.WriteString(choice.Delta.Content)
-			_ = writer.Send(gin.H{"type": "delta", "chunk": choice.Delta.Content})
-		}
-	}
-	if strings.TrimSpace(reply.String()) == "" {
-		persistAIAppPublicInvocation(app, version.ID, key, "failed", true, "ARK_EMPTY_RESPONSE", dailyCallNumber, started)
-		_ = writer.Send(gin.H{"type": "error", "code": "ARK_EMPTY_RESPONSE", "message": "AI 未返回有效内容"})
-		return
-	}
-	persistAIAppPublicInvocation(app, version.ID, key, "succeeded", true, "", dailyCallNumber, started)
-	_ = writer.Send(gin.H{"type": "done", "model": currentModel, "versionId": version.ID})
 }
 
 func persistAIAppPublicInvocation(app model.AIApp, versionID model.Int64String, key model.AIAPIKey, status string, stream bool, errorCode string, dailyCallNumber int, started time.Time) {

@@ -7,6 +7,7 @@ import { Image as ImageIcon, Loader2, Pencil } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { type ResourceVisibility, updateResource } from '@/api/resource';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import ImagePreviewDialog from '@/components/ImagePreviewDialog';
 import ResourceTagSelector from '@/components/ResourceTagSelector';
@@ -93,6 +94,7 @@ export default function EditResourceDialog({
 
   // 标签状态（字符串数组，随 resource 变化重置）
   const [tags, setTags] = useState<string[]>([]);
+  const [textModelId, setTextModelId] = useState('');
 
   // resource 变化时重置表单
   useEffect(() => {
@@ -105,6 +107,7 @@ export default function EditResourceDialog({
     setType(resource.type);
     setVisibility(resource.visibility ?? 'private');
     setTags(resource.tags ?? []);
+    setTextModelId('');
     setSaving(false);
   }, [resource]);
 
@@ -330,6 +333,12 @@ export default function EditResourceDialog({
               </div>
 
               {/* ── 标签 ── */}
+              <ModelPicker
+                value={textModelId}
+                onValueChange={setTextModelId}
+                capability="text"
+                label="标签模型"
+              />
               <ResourceTagSelector
                 value={tags}
                 onChange={setTags}
@@ -338,6 +347,7 @@ export default function EditResourceDialog({
                   title,
                   description: desc,
                 }}
+                modelId={textModelId}
               />
             </div>
 

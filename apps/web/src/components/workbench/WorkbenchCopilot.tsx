@@ -28,6 +28,7 @@ import {
   streamCopilotMessage,
   updateCopilotProposal,
 } from '@/api/workbenchCopilot';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -68,6 +69,7 @@ export function WorkbenchCopilot({
   const [activeSessionId, setActiveSessionId] = useState('');
   const [questions, setQuestions] = useState<CopilotQuestion[]>([]);
   const [input, setInput] = useState('');
+  const [textModelId, setTextModelId] = useState('');
   const [loading, setLoading] = useState(true);
   const [streaming, setStreaming] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -181,6 +183,10 @@ export function WorkbenchCopilot({
   const sendMessage = async (raw?: string) => {
     const message = (raw ?? input).trim();
     if (!targetReady || !message || streaming || !activeSessionId) return;
+    if (!textModelId) {
+      toast.error('请选择文本模型');
+      return;
+    }
     const optimisticId = `local-${Date.now()}`;
     setMessages((current) => [
       ...current,
@@ -213,6 +219,7 @@ export function WorkbenchCopilot({
       await streamCopilotMessage(
         context,
         message,
+        textModelId,
         activeSessionId,
         {
           onEvent: (event) => {
@@ -526,6 +533,14 @@ export function WorkbenchCopilot({
       </div>
 
       <div className="border-t border-border p-3">
+        <div className="mb-2">
+          <ModelPicker
+            value={textModelId || undefined}
+            onValueChange={setTextModelId}
+            capability="text"
+            label="文本模型"
+          />
+        </div>
         <Textarea
           value={input}
           className="min-h-20 resize-none"

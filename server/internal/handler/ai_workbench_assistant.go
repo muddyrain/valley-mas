@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"reflect"
 	"regexp"
@@ -16,6 +15,7 @@ import (
 
 	"valley-server/internal/aiapp"
 	"valley-server/internal/aiclient"
+	"valley-server/internal/aimodel"
 	"valley-server/internal/aiusage"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
@@ -114,8 +114,47 @@ func textARKMessageContent(value string) *arkmodel.ChatCompletionMessageContent 
 }
 
 func runStructuredWorkbenchAI(ctx context.Context, feature string, userID model.Int64String, systemPrompt, userPrompt string, target any, validate func() error) error {
+	return runStructuredWorkbenchAIWithCall(ctx, feature, userID, "ark", systemPrompt, userPrompt, target, validate, callWorkbenchStructuredAI)
+}
+
+func runStructuredWorkbenchAIWithCatalog(ctx context.Context, feature string, userID model.Int64String, rawModelID, systemPrompt, userPrompt string, target any, validate func() error) error {
+	invocation, err := aimodel.ResolveInvocation(database.GetDB(), rawModelID, "text", 75*time.Second)
+	if err != nil {
+		aiusage.Record(aiusage.Entry{Feature: feature, Provider: "unknown", Model: rawModelID, UserID: userID.String(), Status: aiusage.StatusFailed, ErrorMessage: err.Error()})
+		return err
+	}
+	return runStructuredWorkbenchAIWithCall(ctx, feature, userID, invocation.Provider.Provider, systemPrompt, userPrompt, target, validate, func(callCtx context.Context, callSystem, callUser string) (structuredAIResult, error) {
+		return callStructuredWorkbenchCatalog(callCtx, invocation, callSystem, callUser)
+	})
+}
+
+func callStructuredWorkbenchCatalog(ctx context.Context, invocation aimodel.Invocation, systemPrompt, userPrompt string) (structuredAIResult, error) {
+	temperature := 0.2
+	maxTokens := 4096
+	response, err := invocation.Client.Chat(ctx, aiclient.CompatibleChatRequest{
+		Model: invocation.Model.ModelID,
+		Messages: []aiclient.CompatibleMessage{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: userPrompt},
+		},
+		Temperature: &temperature,
+		MaxTokens:   &maxTokens,
+	})
+	if err != nil {
+		return structuredAIResult{Model: invocation.Model.ModelID}, err
+	}
+	return structuredAIResult{
+		Content:          compatibleMessageText(response.Choices[0].Message.Content),
+		Model:            modelNameOrFallback(response.Model, invocation.Model.ModelID),
+		PromptTokens:     response.Usage.PromptTokens,
+		CompletionTokens: response.Usage.CompletionTokens,
+		TotalTokens:      response.Usage.TotalTokens,
+	}, nil
+}
+
+func runStructuredWorkbenchAIWithCall(ctx context.Context, feature string, userID model.Int64String, provider, systemPrompt, userPrompt string, target any, validate func() error, call func(context.Context, string, string) (structuredAIResult, error)) error {
 	started := time.Now()
-	result, err := callWorkbenchStructuredAI(ctx, systemPrompt, userPrompt)
+	result, err := call(ctx, systemPrompt, userPrompt)
 	repairEligible := false
 	if err == nil {
 		err = decodeStructuredWorkbenchOutput(result.Content, target)
@@ -126,7 +165,7 @@ func runStructuredWorkbenchAI(ctx context.Context, feature string, userID model.
 	}
 	if repairEligible && ctx.Err() == nil {
 		repairSystem, repairUser := buildStructuredRepairRequest(systemPrompt, userPrompt, result.Content, err)
-		result, err = callWorkbenchStructuredAI(ctx, repairSystem, repairUser)
+		result, err = call(ctx, repairSystem, repairUser)
 		if err == nil {
 			err = decodeStructuredWorkbenchOutput(result.Content, target)
 			if err == nil && validate != nil {
@@ -141,7 +180,7 @@ func runStructuredWorkbenchAI(ctx context.Context, feature string, userID model.
 		errorMessage = err.Error()
 	}
 	aiusage.Record(aiusage.Entry{
-		Feature: feature, Provider: "ark", Model: result.Model, UserID: userID.String(), Status: status,
+		Feature: feature, Provider: provider, Model: result.Model, UserID: userID.String(), Status: status,
 		PromptChars:   utf8.RuneCountInString(systemPrompt) + utf8.RuneCountInString(userPrompt),
 		ResponseChars: utf8.RuneCountInString(result.Content), PromptTokens: result.PromptTokens,
 		CompletionTokens: result.CompletionTokens, TotalTokens: result.TotalTokens,
@@ -182,6 +221,14 @@ func respondWorkbenchAIError(c *gin.Context, err error) {
 	if c.Request.Context().Err() != nil {
 		return
 	}
+	if errors.Is(err, aimodel.ErrModelNotAvailable) {
+		Error(c, http.StatusBadRequest, "所选模型不可用或不支持当前能力")
+		return
+	}
+	if strings.Contains(err.Error(), "AI 服务未配置") {
+		Error(c, http.StatusServiceUnavailable, err.Error())
+		return
+	}
 	if isARKConfigurationError(err) {
 		Error(c, http.StatusServiceUnavailable, err.Error())
 		return
@@ -197,9 +244,10 @@ func CreateAIAppProposal(c *gin.Context) {
 	var payload struct {
 		Description string         `json:"description"`
 		Current     *agentProposal `json:"current"`
+		ModelID     string         `json:"modelId"`
 	}
-	if c.ShouldBindJSON(&payload) != nil || strings.TrimSpace(payload.Description) == "" {
-		Error(c, http.StatusBadRequest, "请描述你想创建的智能体")
+	if c.ShouldBindJSON(&payload) != nil || strings.TrimSpace(payload.Description) == "" || strings.TrimSpace(payload.ModelID) == "" {
+		Error(c, http.StatusBadRequest, "请描述需求并选择文本模型")
 		return
 	}
 	description := truncateAIAgentRunes(strings.TrimSpace(payload.Description), 4000)
@@ -213,7 +261,7 @@ func CreateAIAppProposal(c *gin.Context) {
 	systemPrompt := `你是 Valley 智能体设计助手。根据用户需求生成一个可编辑提案。严格只输出 JSON，字段必须且只能是：name、description、config、avatarPrompt、toolSuggestions、knowledgeBaseSuggestions。config 必须包含 modelProfile="ark-text-default"、systemPrompt、openingMessage、exampleQuestions；exampleQuestions 最多 4 条。toolSuggestions 只能推荐 content.search，且仅在确有搜索需求时推荐。知识库只能从给定目录选择，不能虚构 ID。提示词要明确角色、目标、约束、工作步骤、异常处理和输出格式。avatarPrompt 只描述无文字、方形、简洁统一风格的头像视觉概念。`
 	userPrompt := fmt.Sprintf("用户需求：\n%s\n\n当前提案（可能为空）：\n%s\n\n可选知识库目录：\n%s", description, current, catalog)
 	var proposal agentProposal
-	err := runStructuredWorkbenchAI(c.Request.Context(), featureAIAppProposal, userID, systemPrompt, userPrompt, &proposal, func() error {
+	err := runStructuredWorkbenchAIWithCatalog(c.Request.Context(), featureAIAppProposal, userID, payload.ModelID, systemPrompt, userPrompt, &proposal, func() error {
 		return validateAgentProposal(&proposal, knowledgeBases)
 	})
 	if err != nil {
@@ -274,6 +322,7 @@ func CreatePromptAssistantSuggestion(c *gin.Context) {
 	}
 	var payload struct {
 		Target            string                      `json:"target"`
+		ModelID           string                      `json:"modelId"`
 		Field             string                      `json:"field"`
 		Mode              string                      `json:"mode"`
 		AppID             model.Int64String           `json:"appId"`
@@ -287,6 +336,10 @@ func CreatePromptAssistantSuggestion(c *gin.Context) {
 	}
 	if c.ShouldBindJSON(&payload) != nil {
 		Error(c, http.StatusBadRequest, "提示词优化参数错误")
+		return
+	}
+	if strings.TrimSpace(payload.ModelID) == "" {
+		Error(c, http.StatusBadRequest, "请选择文本模型")
 		return
 	}
 	payload.Target = strings.TrimSpace(payload.Target)
@@ -356,10 +409,10 @@ func CreatePromptAssistantSuggestion(c *gin.Context) {
 		return validatePromptSuggestion(&suggestion, currentPrompt, payload.Target, allowedVariables, payload.GenerateGreetings, payload.Field)
 	}
 	if payload.Stream {
-		streamPromptAssistantSuggestion(c, userID, systemPrompt, userPrompt, &suggestion, validate)
+		streamPromptAssistantSuggestion(c, userID, payload.ModelID, systemPrompt, userPrompt, &suggestion, validate)
 		return
 	}
-	err = runStructuredWorkbenchAI(c.Request.Context(), featurePromptAssistant, userID, systemPrompt, userPrompt, &suggestion, func() error {
+	err = runStructuredWorkbenchAIWithCatalog(c.Request.Context(), featurePromptAssistant, userID, payload.ModelID, systemPrompt, userPrompt, &suggestion, func() error {
 		return validate()
 	})
 	if err != nil {
@@ -369,58 +422,44 @@ func CreatePromptAssistantSuggestion(c *gin.Context) {
 	Success(c, gin.H{"suggestion": suggestion})
 }
 
-func streamPromptAssistantSuggestion(c *gin.Context, userID model.Int64String, systemPrompt, userPrompt string, suggestion *promptAssistantSuggestion, validate func() error) {
-	config, configErr := aiclient.ReadARKTextConfig()
-	if configErr != "" {
-		Error(c, http.StatusServiceUnavailable, configErr)
-		return
-	}
-	client := aiclient.ARKClient(75 * time.Second)
-	if client == nil {
-		Error(c, http.StatusServiceUnavailable, "AI 未配置：缺少 ARK_API_KEY")
-		return
-	}
-	messages := []*arkmodel.ChatCompletionMessage{
-		{Role: arkmodel.ChatMessageRoleSystem, Content: textARKMessageContent(systemPrompt)},
-		{Role: arkmodel.ChatMessageRoleUser, Content: textARKMessageContent(userPrompt)},
-	}
-	stream, err := client.CreateChatCompletionStream(c.Request.Context(), aiclient.NewARKChatRequest(config.Model, messages, aiclient.WithARKChatTokens(4096), aiclient.WithARKChatTemperature(0.2)))
+func streamPromptAssistantSuggestion(c *gin.Context, userID model.Int64String, rawModelID, systemPrompt, userPrompt string, suggestion *promptAssistantSuggestion, validate func() error) {
+	invocation, err := aimodel.ResolveInvocation(database.GetDB(), rawModelID, "text", 75*time.Second)
 	if err != nil {
-		Error(c, http.StatusBadGateway, "AI 上游调用失败")
+		aiusage.Record(aiusage.Entry{Feature: featurePromptAssistant, Provider: "unknown", Model: rawModelID, UserID: userID.String(), Status: aiusage.StatusFailed, Stream: true, ErrorMessage: err.Error()})
+		respondCatalogModelError(c, err)
 		return
 	}
-	defer stream.Close()
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("X-Accel-Buffering", "no")
 	started := time.Now()
 	var builder strings.Builder
-	result := structuredAIResult{Model: config.Model}
-	for {
-		response, recvErr := stream.Recv()
-		if recvErr == io.EOF {
-			break
-		}
-		if recvErr != nil {
-			err = recvErr
-			break
-		}
-		if strings.TrimSpace(response.Model) != "" {
-			result.Model = response.Model
-		}
-		if response.Usage != nil {
-			result.PromptTokens = response.Usage.PromptTokens
-			result.CompletionTokens = response.Usage.CompletionTokens
-			result.TotalTokens = response.Usage.TotalTokens
-		}
-		for _, choice := range response.Choices {
-			if choice == nil || choice.Delta.Content == "" {
+	result := structuredAIResult{Model: invocation.Model.ModelID}
+	temperature := 0.2
+	maxTokens := 4096
+	err = invocation.Client.ChatStream(c.Request.Context(), aiclient.CompatibleChatRequest{
+		Model: invocation.Model.ModelID,
+		Messages: []aiclient.CompatibleMessage{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: userPrompt},
+		},
+		Temperature: &temperature,
+		MaxTokens:   &maxTokens,
+	}, func(chunk aiclient.CompatibleChatStreamChunk) error {
+		result.Model = modelNameOrFallback(chunk.Model, result.Model)
+		result.PromptTokens = chunk.Usage.PromptTokens
+		result.CompletionTokens = chunk.Usage.CompletionTokens
+		result.TotalTokens = chunk.Usage.TotalTokens
+		for _, choice := range chunk.Choices {
+			text := compatibleMessageText(choice.Delta.Content)
+			if text == "" {
 				continue
 			}
-			builder.WriteString(choice.Delta.Content)
-			writeWorkbenchSSE(c, gin.H{"type": "delta", "chunk": choice.Delta.Content})
+			builder.WriteString(text)
+			writeWorkbenchSSE(c, gin.H{"type": "delta", "chunk": text})
 		}
-	}
+		return nil
+	})
 	result.Content = builder.String()
 	if err == nil {
 		err = decodeStructuredWorkbenchOutput(result.Content, suggestion)
@@ -430,7 +469,7 @@ func streamPromptAssistantSuggestion(c *gin.Context, userID model.Int64String, s
 		if err != nil && c.Request.Context().Err() == nil {
 			repairSystem, repairUser := buildStructuredRepairRequest(systemPrompt, userPrompt, result.Content, err)
 			var repaired structuredAIResult
-			repaired, err = callWorkbenchStructuredAI(c.Request.Context(), repairSystem, repairUser)
+			repaired, err = callStructuredWorkbenchCatalog(c.Request.Context(), invocation, repairSystem, repairUser)
 			if err == nil {
 				result.CompletionTokens += repaired.CompletionTokens
 				result.PromptTokens += repaired.PromptTokens
@@ -450,7 +489,7 @@ func streamPromptAssistantSuggestion(c *gin.Context, userID model.Int64String, s
 		errorMessage = err.Error()
 	}
 	aiusage.Record(aiusage.Entry{
-		Feature: featurePromptAssistant, Provider: "ark", Model: result.Model, UserID: userID.String(), Status: status, Stream: true,
+		Feature: featurePromptAssistant, Provider: invocation.Provider.Provider, Model: result.Model, UserID: userID.String(), Status: status, Stream: true,
 		PromptChars: utf8.RuneCountInString(systemPrompt) + utf8.RuneCountInString(userPrompt), ResponseChars: utf8.RuneCountInString(result.Content),
 		PromptTokens: result.PromptTokens, CompletionTokens: result.CompletionTokens, TotalTokens: result.TotalTokens,
 		LatencyMs: time.Since(started).Milliseconds(), ErrorMessage: errorMessage,

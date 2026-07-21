@@ -29,6 +29,7 @@ import {
   updateResource,
   uploadResource,
 } from '@/api/resource';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -140,6 +141,7 @@ export default function BatchUploadResourceDialog({
   const [preparing, setPreparing] = useState(false);
   const [batchAiNaming, setBatchAiNaming] = useState(false);
   const [batchAiTagging, setBatchAiTagging] = useState(false);
+  const [visionModelId, setVisionModelId] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const itemsRef = useRef<BatchResourceItem[]>([]);
 
@@ -160,6 +162,7 @@ export default function BatchUploadResourceDialog({
     setPreparing(false);
     setBatchAiNaming(false);
     setBatchAiTagging(false);
+    setVisionModelId('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -309,10 +312,14 @@ export default function BatchUploadResourceDialog({
       toast.error('图片未准备好，请稍后重试');
       return;
     }
+    if (!visionModelId) {
+      toast.error('请先选择视觉模型');
+      return;
+    }
     const itemKey = item.uploadKey;
     try {
       updateItemByKey(itemKey, { aiNaming: true });
-      const result = await suggestResourceTitle(item.base64, uploadType);
+      const result = await suggestResourceTitle(item.base64, uploadType, visionModelId);
       if (!findItemByKey(itemKey)) return;
       if (result.titles?.length) {
         updateItemByKey(itemKey, { title: result.titles[0], aiNaming: false });
@@ -334,12 +341,17 @@ export default function BatchUploadResourceDialog({
     if (!item) return;
     const itemKey = item?.uploadKey;
     if (!itemKey) return;
+    if (!visionModelId) {
+      toast.error('请先选择视觉模型');
+      return;
+    }
     try {
       updateItemByKey(itemKey, { aiTagging: true });
       const result = await aiSuggestResourceTags({
         imageBase64: item.base64,
         type: uploadType,
         title: item.title,
+        modelId: visionModelId,
       });
       if (!findItemByKey(itemKey)) return;
       if (result.tags?.length) {
@@ -358,6 +370,10 @@ export default function BatchUploadResourceDialog({
 
   // ── 批量 AI 起名 ─────────────────────────────────────────────────────────────
   const handleBatchAiName = async () => {
+    if (!visionModelId) {
+      toast.error('请先选择视觉模型');
+      return;
+    }
     const pendingKeys = items
       .filter((item) => item.status === 'pending' && item.base64)
       .map((item) => item.uploadKey);
@@ -375,7 +391,7 @@ export default function BatchUploadResourceDialog({
         if (!item || item.status !== 'pending' || !item.base64) continue;
         try {
           updateItemByKey(itemKey, { aiNaming: true });
-          const result = await suggestResourceTitle(item.base64, uploadType);
+          const result = await suggestResourceTitle(item.base64, uploadType, visionModelId);
           if (!findItemByKey(itemKey)) continue;
           if (result.titles?.length) {
             updateItemByKey(itemKey, { title: result.titles[0], aiNaming: false });
@@ -396,6 +412,10 @@ export default function BatchUploadResourceDialog({
   };
   // ── 批量 AI 识别标签 ─────────────────────────────────────────────────────────
   const handleBatchAiTag = async () => {
+    if (!visionModelId) {
+      toast.error('请先选择视觉模型');
+      return;
+    }
     const pendingKeys = items
       .filter((item) => item.status === 'pending' && item.base64)
       .map((item) => item.uploadKey);
@@ -416,6 +436,7 @@ export default function BatchUploadResourceDialog({
             imageBase64: item.base64,
             type: uploadType,
             title: item.title,
+            modelId: visionModelId,
           });
           if (!findItemByKey(itemKey)) continue;
           if (result.tags?.length) {
@@ -579,6 +600,14 @@ export default function BatchUploadResourceDialog({
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="min-w-56 flex-1">
+              <ModelPicker
+                value={visionModelId}
+                onValueChange={setVisionModelId}
+                capability="vision"
+                label="视觉模型"
+              />
             </div>
           </div>
         </div>

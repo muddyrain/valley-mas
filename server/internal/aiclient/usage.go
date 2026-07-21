@@ -11,6 +11,12 @@ const (
 	FeatureValleyAIChat     = "valley-ai-chat"
 	FeatureDesktopAgentChat = "desktop-ai-agent-chat"
 	FeatureBlogReaderAsk    = "blog-reader-ask"
+	FeatureBlogExcerpt      = "blog-ai-excerpt"
+	FeatureBlogCover        = "blog-ai-cover"
+	FeatureBlogReaderGuide  = "blog-reader-guide"
+	FeatureBlogRecommend    = "blog-recommend"
+	FeatureResourceTitle    = "resource-ai-title"
+	FeatureResourceTags     = "resource-ai-tags"
 )
 
 // RecordCall 记录一次 AI 调用结果。audit 通常通过 aiusage.FromContext(ctx) 获取。

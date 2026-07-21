@@ -11,6 +11,9 @@ type MindArenaDebateSession struct {
 	ID                   string         `gorm:"primaryKey;size:80" json:"id"`
 	Topic                string         `gorm:"type:text;not null" json:"topic"`
 	Mode                 string         `gorm:"size:30;index;not null" json:"mode"`
+	CatalogModelID       string         `gorm:"size:40;index" json:"catalogModelId,omitempty"`
+	Provider             string         `gorm:"size:40" json:"provider,omitempty"`
+	Model                string         `gorm:"size:180" json:"model,omitempty"`
 	Status               string         `gorm:"size:30;index;not null" json:"status"`
 	PersonaCount         int            `gorm:"not null;default:5" json:"personaCount"`
 	CurrentRound         int            `gorm:"not null;default:1" json:"currentRound"`

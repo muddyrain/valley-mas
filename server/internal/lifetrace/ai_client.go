@@ -3,11 +3,14 @@ package lifetrace
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 	"valley-server/internal/aiclient"
+	"valley-server/internal/aimodel"
 	"valley-server/internal/aiusage"
+	"valley-server/internal/database"
 	lifeai "valley-server/internal/lifetrace/ai"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +24,35 @@ import (
 
 func readLifeTraceAIConfig() (lifeTraceAIConfig, string) {
 	return lifeai.ReadTextConfig(lifeTraceTodayAdviceDefaultTimeout)
+}
+
+// resolveLifeTraceCatalogTextModel validates a user-selected text model from
+// the directory before passing its provider credentials to Life Trace prompts.
+func resolveLifeTraceCatalogTextModel(c *gin.Context, rawModelID string, timeout time.Duration) (lifeTraceAIConfig, bool) {
+	invocation, err := aimodel.ResolveInvocation(database.GetDB(), rawModelID, "text", timeout)
+	if err != nil {
+		respondLifeTraceCatalogModelError(c, err)
+		return lifeTraceAIConfig{}, false
+	}
+	return lifeai.TextConfig{
+		Source:  invocation.Provider.Provider,
+		APIKey:  invocation.Provider.APIKey,
+		BaseURL: invocation.Provider.BaseURL,
+		Model:   invocation.Model.ModelID,
+		Timeout: timeout,
+	}, true
+}
+
+func respondLifeTraceCatalogModelError(c *gin.Context, err error) {
+	if errors.Is(err, aimodel.ErrModelNotAvailable) {
+		fail(c, http.StatusBadRequest, "所选模型不可用或不支持当前能力")
+		return
+	}
+	if strings.Contains(err.Error(), "AI 服务未配置") || strings.Contains(err.Error(), "不支持的 AI Provider") {
+		fail(c, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	fail(c, http.StatusInternalServerError, "加载 AI 模型失败："+err.Error())
 }
 
 func readLifeTraceArkTextConfig() (apiKey, arkBaseURL, textModel string, errMsg string) {

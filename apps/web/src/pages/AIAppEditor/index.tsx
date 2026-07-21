@@ -53,6 +53,7 @@ import {
   uploadAIAppAvatar,
 } from '@/api/aiWorkbench';
 import type { CopilotProposal } from '@/api/workbenchCopilot';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import { AgentAvatar } from '@/components/ai-workbench/AgentAvatar';
 import { AIResponseContext } from '@/components/ai-workbench/AIResponseContext';
 import { EditorPageHeader } from '@/components/ai-workbench/EditorPageHeader';
@@ -181,6 +182,7 @@ export default function AIAppEditor() {
   const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [debugMessage, setDebugMessage] = useState('');
+  const [debugModelId, setDebugModelId] = useState('');
   const [debugReply, setDebugReply] = useState('');
   const [debugToolStatus, setDebugToolStatus] = useState<string | null>(null);
   const [debugReferences, setDebugReferences] = useState<AIKnowledgeReference[]>([]);
@@ -206,6 +208,7 @@ export default function AIAppEditor() {
   const [copilotField, setCopilotField] = useState<string>('');
   const [showMobileCopilot, setShowMobileCopilot] = useState(false);
   const [avatarAction, setAvatarAction] = useState<'generate' | 'upload' | null>(null);
+  const [imageModelId, setImageModelId] = useState('');
   const isMobile = useIsMobile();
   const abortDebugRef = useRef<AbortController | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
@@ -442,14 +445,14 @@ export default function AIAppEditor() {
   };
 
   const publicAPIPath = `/api/v1/public/ai/apps/${appId}/chat`;
-  const publicAPICurl = `curl -X POST "YOUR_API_BASE_URL${publicAPIPath}" -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d '{"message":"你好","stream":false}'`;
+  const publicAPICurl = `curl -X POST "YOUR_API_BASE_URL${publicAPIPath}" -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d '{"message":"你好","modelId":"YOUR_MODEL_ID","stream":false}'`;
   const publicAPIJavaScriptJSON = `const response = await fetch("YOUR_API_BASE_URL${publicAPIPath}", {
   method: "POST",
   headers: {
     "Authorization": "Bearer YOUR_API_KEY",
     "Content-Type": "application/json"
   },
-  body: JSON.stringify({ message: "你好", stream: false })
+  body: JSON.stringify({ message: "你好", modelId: "YOUR_MODEL_ID", stream: false })
 });
 
 const data = await response.json();
@@ -460,7 +463,7 @@ console.log(data.reply);`;
     "Authorization": "Bearer YOUR_API_KEY",
     "Content-Type": "application/json"
   },
-  body: JSON.stringify({ message: "你好", stream: true })
+  body: JSON.stringify({ message: "你好", modelId: "YOUR_MODEL_ID", stream: true })
 });
 
 const reader = response.body.getReader();
@@ -485,9 +488,13 @@ while (true) {
 
   const generateAvatar = async () => {
     if (!appId) return;
+    if (!imageModelId) {
+      toast.error('请选择图片生成模型');
+      return;
+    }
     setAvatarAction('generate');
     try {
-      const result = await generateAIAppAvatar(appId, {
+      const result = await generateAIAppAvatar(appId, imageModelId, {
         name,
         description,
         systemPrompt: config.systemPrompt,
@@ -521,6 +528,10 @@ while (true) {
       toast.error('请输入调试消息');
       return;
     }
+    if (!debugModelId) {
+      toast.error('请选择文本模型');
+      return;
+    }
     try {
       setDebugging(true);
       setDebugReply('');
@@ -532,6 +543,7 @@ while (true) {
       await streamDebugAIApp(
         appId,
         debugMessage.trim(),
+        debugModelId,
         {
           onDelta: (chunk) => setDebugReply((reply) => reply + chunk),
           onToolCall: (toolName) => {
@@ -698,6 +710,14 @@ while (true) {
                       <FieldLabel>头像</FieldLabel>
                       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/20 p-3">
                         <AgentAvatar name={name} src={app.avatarUrl} className="size-16" />
+                        <div className="min-w-56 flex-1">
+                          <ModelPicker
+                            value={imageModelId || undefined}
+                            onValueChange={setImageModelId}
+                            capability="image_generation"
+                            label="图片生成模型"
+                          />
+                        </div>
                         <div className="flex flex-wrap gap-2">
                           <Button
                             type="button"
@@ -1071,6 +1091,12 @@ while (true) {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-3 pt-4">
+                      <ModelPicker
+                        value={debugModelId || undefined}
+                        onValueChange={setDebugModelId}
+                        capability="text"
+                        label="文本模型"
+                      />
                       <Textarea
                         value={debugMessage}
                         className="min-h-28 resize-y bg-background"

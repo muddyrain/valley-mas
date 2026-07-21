@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { getAPIErrorMessage } from '@/api/aiWorkbench';
 import { type AIWorkflowDraft, createAIWorkflowDraft, createWorkflow } from '@/api/workflow';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import { AIGenerationProgress } from '@/components/ai-workbench/AIGenerationProgress';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,6 +31,7 @@ export function AIWorkflowCreateDialog({
 }) {
   const navigate = useNavigate();
   const [description, setDescription] = useState('');
+  const [textModelId, setTextModelId] = useState('');
   const [draft, setDraft] = useState<AIWorkflowDraft | null>(null);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -40,12 +42,17 @@ export function AIWorkflowCreateDialog({
       toast.error('请描述工作流要完成的任务');
       return;
     }
+    if (!textModelId) {
+      toast.error('请选择文本模型');
+      return;
+    }
     const controller = new AbortController();
     controllerRef.current = controller;
     setLoading(true);
     try {
       const result = await createAIWorkflowDraft(
         description.trim(),
+        textModelId,
         draft || undefined,
         controller.signal,
       );
@@ -97,6 +104,12 @@ export function AIWorkflowCreateDialog({
           maxLength={4000}
           placeholder="例如：上传 Markdown，提取内容后让 AI 生成摘要，最后创建博客草稿。"
           onChange={(event) => setDescription(event.target.value)}
+        />
+        <ModelPicker
+          value={textModelId || undefined}
+          onValueChange={setTextModelId}
+          capability="text"
+          label="文本模型"
         />
         {loading ? (
           <AIGenerationProgress

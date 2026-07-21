@@ -19,6 +19,7 @@ import (
 	"valley-server/internal/ai/tools/content"
 	"valley-server/internal/aiapp"
 	"valley-server/internal/aiclient"
+	"valley-server/internal/aimodel"
 	"valley-server/internal/database"
 	"valley-server/internal/logger"
 	"valley-server/internal/model"
@@ -26,8 +27,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ledongthuc/pdf"
 	"github.com/sirupsen/logrus"
-	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
-	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -699,10 +698,11 @@ func DebugAIApp(c *gin.Context) {
 	}
 	var payload struct {
 		Message string `json:"message"`
+		ModelID string `json:"modelId"`
 		Stream  bool   `json:"stream"`
 	}
-	if c.ShouldBindJSON(&payload) != nil || strings.TrimSpace(payload.Message) == "" {
-		Error(c, 400, "调试消息不能为空")
+	if c.ShouldBindJSON(&payload) != nil || strings.TrimSpace(payload.Message) == "" || strings.TrimSpace(payload.ModelID) == "" {
+		Error(c, 400, "请输入调试消息并选择文本模型")
 		return
 	}
 	message := truncateAIAgentRunes(payload.Message, 12000)
@@ -716,79 +716,41 @@ func DebugAIApp(c *gin.Context) {
 		Error(c, 400, "智能体版本配置无效")
 		return
 	}
-	arkConfig, configErr := aiclient.ReadARKTextConfig()
-	if configErr != "" {
-		persistAIAppRun(app, version, userID, "failed", "", message, "", "ARK_NOT_CONFIGURED", started)
-		Error(c, http.StatusServiceUnavailable, configErr)
+	invocation, err := aimodel.ResolveInvocation(database.GetDB(), payload.ModelID, "text", 60*time.Second)
+	if err != nil {
+		persistAIAppRun(app, version, userID, "failed", payload.ModelID, message, "", "MODEL_NOT_CONFIGURED", started)
+		respondCatalogModelError(c, err)
 		return
 	}
 	knowledgeContext, references, retrievalErr := retrieveAIKnowledgeContext(c.Request.Context(), userID, version, message)
 	if retrievalErr != nil {
 		code, publicMessage := aiKnowledgeRetrievalFailure(retrievalErr)
 		logAIKnowledgeRetrievalFailure(c, retrievalErr, logrus.Fields{"app_id": app.ID, "version_id": version.ID, "feature": "ai-workbench-debug"})
-		persistAIAppRun(app, version, userID, "failed", arkConfig.Model, message, "", code, started)
+		persistAIAppRun(app, version, userID, "failed", invocation.Model.ModelID, message, "", code, started)
 		Error(c, http.StatusServiceUnavailable, publicMessage)
 		return
 	}
-	messages := make([]*arkmodel.ChatCompletionMessage, 0, 2)
 	system := strings.TrimSpace(config.SystemPrompt)
 	if knowledgeContext != "" {
 		system = strings.TrimSpace(system + "\n\n以下是与当前问题相关的私有参考资料。请优先依据这些资料回答；资料不足时明确说明。\n" + knowledgeContext)
 	}
-	if system != "" {
-		messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleSystem, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &system}})
-	}
-	messages = append(messages, &arkmodel.ChatCompletionMessage{Role: arkmodel.ChatMessageRoleUser, Content: &arkmodel.ChatCompletionMessageContent{StringValue: &message}})
 	registry, toolNames, toolErr := resolveAIAppTools(database.GetDB(), app.ID, version)
 	if toolErr != nil {
-		persistAIAppRun(app, version, userID, "failed", arkConfig.Model, message, "", "AI_TOOL_REGISTRY_UNAVAILABLE", started)
+		persistAIAppRun(app, version, userID, "failed", invocation.Model.ModelID, message, "", "AI_TOOL_REGISTRY_UNAVAILABLE", started)
 		Error(c, http.StatusInternalServerError, "加载智能体工具失败")
 		return
 	}
+	if !aimodel.HasCapabilities(invocation.Model, []string{"tool_call"}) {
+		toolNames = nil
+	}
 	system = appendContentSearchDateContext(system, toolNames, time.Now())
-	if len(toolNames) > 0 {
-		debugAIAppWithTools(c, payload.Stream, arkConfig.Model, system, message, app, version, userID, registry, toolNames, references, started)
-		return
-	}
-	client := aiclient.ARKClient(60 * time.Second)
-	if client == nil {
-		persistAIAppRun(app, version, userID, "failed", arkConfig.Model, message, "", "ARK_NOT_CONFIGURED", started)
-		Error(c, http.StatusServiceUnavailable, "AI 服务未配置")
-		return
-	}
-	if payload.Stream {
-		streamDebugAIApp(c, client, arkConfig.Model, messages, app, version, userID, message, references, started)
-		return
-	}
-	response, err := client.CreateChatCompletion(c.Request.Context(), aiclient.NewARKChatRequest(arkConfig.Model, messages))
-	if err != nil {
-		persistAIAppRun(app, version, userID, "failed", arkConfig.Model, message, "", "ARK_UPSTREAM_FAILED", started)
-		Error(c, http.StatusBadGateway, "AI 上游调用失败")
-		return
-	}
-	reply, err := aiclient.ExtractARKContent(response)
-	if err != nil || strings.TrimSpace(reply) == "" {
-		persistAIAppRun(app, version, userID, "failed", arkConfig.Model, message, "", "ARK_EMPTY_RESPONSE", started)
-		Error(c, http.StatusBadGateway, "AI 未返回有效内容")
-		return
-	}
-	modelName := strings.TrimSpace(response.Model)
-	if modelName == "" {
-		modelName = arkConfig.Model
-	}
-	run := persistAIAppRunWithReferences(app, version, userID, "succeeded", modelName, message, reply, "", references, started)
-	Success(c, gin.H{"run": run, "reply": reply, "model": modelName, "versionId": version.ID, "references": references})
+	debugAIAppWithTools(c, payload.Stream, invocation, system, message, app, version, userID, registry, toolNames, references, started)
 }
 
-func debugAIAppWithTools(c *gin.Context, stream bool, modelID, system, message string, app model.AIApp, version model.AIAppVersion, userID model.Int64String, registry *tools.Registry, toolNames []string, references []aiKnowledgeReference, started time.Time) {
-	client := aiclient.ARKClient(60 * time.Second)
-	if client == nil {
-		persistAIAppRun(app, version, userID, "failed", modelID, message, "", "ARK_NOT_CONFIGURED", started)
-		Error(c, http.StatusServiceUnavailable, "AI 服务未配置")
-		return
-	}
-	loop := agent.NewLocalLoop(&aiAppAgentBackend{client: client}, registry)
-	spec := agent.Spec{Provider: "ark", Model: modelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench"}
+func debugAIAppWithTools(c *gin.Context, stream bool, invocation aimodel.Invocation, system, message string, app model.AIApp, version model.AIAppVersion, userID model.Int64String, registry *tools.Registry, toolNames []string, references []aiKnowledgeReference, started time.Time) {
+	modelID := invocation.Model.ModelID
+	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
+	spec := agent.Spec{Provider: invocation.Provider.Provider, Model: modelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench"}
 	ctx := content.WithOwner(c.Request.Context(), userID)
 	if !stream {
 		result, err := loop.Run(ctx, spec, []agent.Message{{Role: agent.RoleUser, Content: message}})
@@ -847,56 +809,6 @@ func debugAIAppWithTools(c *gin.Context, stream bool, modelID, system, message s
 	}
 	run := persistAIAppRunWithReferences(app, version, userID, "succeeded", result.Model, message, result.Reply, "", references, started)
 	_ = writer.Send(gin.H{"type": "done", "run": run, "reply": result.Reply, "references": references})
-}
-
-func streamDebugAIApp(c *gin.Context, client *arkruntime.Client, modelID string, messages []*arkmodel.ChatCompletionMessage, app model.AIApp, version model.AIAppVersion, userID model.Int64String, message string, references []aiKnowledgeReference, started time.Time) {
-	stream, err := client.CreateChatCompletionStream(c.Request.Context(), aiclient.NewARKChatRequest(modelID, messages))
-	if err != nil {
-		persistAIAppRun(app, version, userID, "failed", modelID, message, "", "ARK_UPSTREAM_FAILED", started)
-		Error(c, http.StatusBadGateway, "AI 上游调用失败")
-		return
-	}
-	defer stream.Close()
-	writer, err := aiclient.NewSSEWriter(c)
-	if err != nil {
-		return
-	}
-	_ = writer.Send(gin.H{"type": "meta", "versionId": version.ID, "model": modelID})
-	var reply strings.Builder
-	currentModel := modelID
-	for {
-		response, recvErr := stream.Recv()
-		if errors.Is(recvErr, io.EOF) {
-			break
-		}
-		if recvErr != nil {
-			if c.Request.Context().Err() != nil {
-				persistAIAppRun(app, version, userID, "cancelled", currentModel, message, reply.String(), "RUN_CANCELLED", started)
-				return
-			}
-			run := persistAIAppRun(app, version, userID, "failed", currentModel, message, reply.String(), "ARK_UPSTREAM_FAILED", started)
-			_ = writer.Send(gin.H{"type": "error", "message": "AI 上游调用失败", "run": run})
-			return
-		}
-		if strings.TrimSpace(response.Model) != "" {
-			currentModel = response.Model
-		}
-		for _, choice := range response.Choices {
-			if choice == nil || strings.TrimSpace(choice.Delta.Content) == "" {
-				continue
-			}
-			reply.WriteString(choice.Delta.Content)
-			_ = writer.Send(gin.H{"type": "delta", "chunk": choice.Delta.Content})
-		}
-	}
-	result := strings.TrimSpace(reply.String())
-	if result == "" {
-		run := persistAIAppRun(app, version, userID, "failed", currentModel, message, "", "ARK_EMPTY_RESPONSE", started)
-		_ = writer.Send(gin.H{"type": "error", "message": "AI 未返回有效内容", "run": run})
-		return
-	}
-	run := persistAIAppRunWithReferences(app, version, userID, "succeeded", currentModel, message, result, "", references, started)
-	_ = writer.Send(gin.H{"type": "done", "run": run, "reply": result, "model": currentModel, "references": references})
 }
 
 func retrieveAIKnowledgeContext(ctx context.Context, userID model.Int64String, version model.AIAppVersion, message string) (string, []aiKnowledgeReference, error) {

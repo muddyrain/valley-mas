@@ -233,20 +233,6 @@ export interface WorkflowToolCapability {
   aiUsage: string;
 }
 
-export interface WorkflowAIModelOption {
-  id: string;
-  provider: string;
-  modelId: string;
-  displayName: string;
-  capabilities: string[];
-}
-
-export function listWorkflowAIModels(
-  capability: string,
-): Promise<{ list: WorkflowAIModelOption[] }> {
-  return request.get('/ai/models', { params: { capability } });
-}
-
 export function listWorkflowCapabilities(): Promise<{
   schemaVersion: 4;
   nodeTypes: WorkflowNodeDefinition[];
@@ -264,17 +250,19 @@ export interface WorkflowRunExplanation {
 
 export function createAIWorkflowDraft(
   description: string,
+  modelId: string,
   current?: AIWorkflowDraft,
   signal?: AbortSignal,
 ): Promise<{ draft: AIWorkflowDraft }> {
-  return request.post('/workflows/ai-draft', { description, current }, { signal });
+  return request.post('/workflows/ai-draft', { description, modelId, current }, { signal });
 }
 
 export function explainWorkflowRun(
   id: string,
   runId: string,
+  modelId: string,
 ): Promise<{ explanation: WorkflowRunExplanation }> {
-  return request.post(`/workflows/${id}/runs/${runId}/explain`);
+  return request.post(`/workflows/${id}/runs/${runId}/explain`, { modelId });
 }
 
 export interface WorkflowVersion {

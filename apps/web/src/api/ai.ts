@@ -21,8 +21,11 @@ export interface AvailableAIModel {
   capabilities: string[];
 }
 
-export const listAvailableAIModels = (capability: string) =>
-  http.get<unknown, { list: AvailableAIModel[] }>('/ai/models', { params: { capability } });
+export const listAvailableAIModels = (capability: string, catalog: 'auth' | 'public' = 'auth') =>
+  http.get<unknown, { list: AvailableAIModel[] }>(
+    catalog === 'public' ? '/public/ai/models' : '/ai/models',
+    { params: { capability } },
+  );
 
 export interface AIChatResponse {
   reply: string;
