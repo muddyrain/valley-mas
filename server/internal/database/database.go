@@ -475,6 +475,8 @@ func autoMigrateModelsByName() map[string]any {
 		"workflow_run_event":                   &model.WorkflowRunEvent{},
 		"workflow_test_case":                   &model.WorkflowTestCase{},
 		"workflow_test_result":                 &model.WorkflowTestResult{},
+		"workflow_trigger":                     &model.WorkflowTrigger{},
+		"workflow_run_job":                     &model.WorkflowRunJob{},
 	}
 }
 
@@ -551,6 +553,8 @@ func autoMigrateModelAliases() map[string]string {
 		"workflow_run_events":        "workflow_run_event",
 		"workflow_test_cases":        "workflow_test_case",
 		"workflow_test_results":      "workflow_test_result",
+		"workflow_triggers":         "workflow_trigger",
+		"workflow_run_jobs":         "workflow_run_job",
 	}
 }
 
@@ -627,6 +631,8 @@ func contentDomainMigrationModels() []any {
 		&model.WorkflowRunEvent{},
 		&model.WorkflowTestCase{},
 		&model.WorkflowTestResult{},
+		&model.WorkflowTrigger{},
+		&model.WorkflowRunJob{},
 	}
 }
 

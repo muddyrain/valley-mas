@@ -36,7 +36,7 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.User{}, &model.Workflow{}, &model.WorkflowRun{}, &model.WorkflowNodeRun{}, &model.WorkflowRunEvent{}, &model.WorkflowTestCase{}, &model.WorkflowTestResult{}, &model.AIApp{}, &model.AIAppVersion{}, &model.AIAppVersionKnowledgeBase{}, &model.AIAppVersionToolBinding{}, &model.AIAppKnowledgeBase{}, &model.AIAppRun{}, &model.Post{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Workflow{}, &model.WorkflowRun{}, &model.WorkflowNodeRun{}, &model.WorkflowRunEvent{}, &model.WorkflowTestCase{}, &model.WorkflowTestResult{}, &model.WorkflowTrigger{}, &model.AIApp{}, &model.AIAppVersion{}, &model.AIAppVersionKnowledgeBase{}, &model.AIAppVersionToolBinding{}, &model.AIAppKnowledgeBase{}, &model.AIAppRun{}, &model.Post{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Create(&[]model.User{{ID: 101, Username: "workflow-owner", Role: "user", IsActive: true}, {ID: 202, Username: "workflow-other", Role: "user", IsActive: true}}).Error; err != nil {
@@ -58,6 +58,10 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	auth := router.Group("/workflows")
 	auth.Use(middleware.Auth(&config.Config{JWT: config.JWTConfig{Secret: workflowRuntimeTestSecret}}))
 	auth.POST("/:id/run", AdminRunWorkflow)
+	auth.GET("/:id/triggers", ListWorkflowTriggers)
+	auth.POST("/:id/triggers", CreateWorkflowTrigger)
+	auth.PATCH("/:id/triggers/:triggerId", UpdateWorkflowTrigger)
+	auth.DELETE("/:id/triggers/:triggerId", DeleteWorkflowTrigger)
 	auth.GET("/:id", AdminGetWorkflow)
 	auth.GET("/:id/runs", AdminListWorkflowRuns)
 	auth.GET("/:id/test-cases", ListWorkflowTestCases)
@@ -134,6 +138,36 @@ func TestWorkflowTestCaseRunsLockedVersionAndKeepsRunHistorySeparate(t *testing.
 	router.ServeHTTP(historyRecorder, historyRequest)
 	if responseCode(historyRecorder) != 0 || strings.Contains(historyRecorder.Body.String(), stored.WorkflowRunID.String()) {
 		t.Fatalf("test run must stay out of ordinary history: %s", historyRecorder.Body.String())
+	}
+}
+
+func TestWorkflowTriggerRequiresPublishedReadOnlyWorkflow(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		app, version, err := syncWorkflowAIApp(tx, definition)
+		if err != nil {
+			return err
+		}
+		now := time.Now()
+		if err := tx.Model(&model.AIAppVersion{}).Where("id = ?", version.ID).Update("published_at", now).Error; err != nil {
+			return err
+		}
+		return tx.Model(&app).Updates(map[string]any{"status": "published", "published_version_id": version.ID}).Error
+	}); err != nil {
+		t.Fatal(err)
+	}
+	body := bytes.NewBufferString(`{"cronExpression":"0 9 * * 1-5","timezone":"Asia/Shanghai"}`)
+	request := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/triggers", body)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if responseCode(recorder) != 0 || !strings.Contains(recorder.Body.String(), `"cronExpression":"0 9 * * 1-5"`) {
+		t.Fatalf("create trigger: %s", recorder.Body.String())
+	}
+	var stored model.WorkflowTrigger
+	if err := database.DB.Where("workflow_id = ?", definition.ID).First(&stored).Error; err != nil || stored.NextRunAt == nil {
+		t.Fatalf("trigger=%+v err=%v", stored, err)
 	}
 }
 
