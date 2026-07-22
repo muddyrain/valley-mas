@@ -162,12 +162,13 @@ export interface AIKnowledgeDocument {
   id: string;
   knowledgeBaseId: string;
   name: string;
-  status: 'pending' | 'pending_embedding' | 'indexing' | 'ready' | 'failed';
+  status: 'pending' | 'pending_parse' | 'pending_embedding' | 'indexing' | 'ready' | 'failed';
   errorCode: string;
   indexProgress: number;
   chunkCount: number;
   mimeType: string;
   sizeBytes: number;
+  visionModelId?: string;
   source: 'upload';
   createdAt: string;
   updatedAt: string;
@@ -178,6 +179,8 @@ export interface AIKnowledgeChunkPreview {
   position: number;
   content: string;
   tokenCount: number;
+  pageNumber: number;
+  sourceType: 'text' | 'visual';
 }
 
 export interface AIKnowledgeRetrievalTestResult {

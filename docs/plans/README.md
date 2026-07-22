@@ -23,6 +23,7 @@
 
 ## 当前活跃计划
 
+- [2026-07-22-ai-knowledge-pdf-multimodal.md](2026-07-22-ai-knowledge-pdf-multimodal.md)：知识库 PDF 的页面渲染、视觉解析、表格与图片摄取。
 - [2026-07-22-ai-workflow-p14-production-runtime.md](2026-07-22-ai-workflow-p14-production-runtime.md)：P14.1 工作流异步运行、定时触发与持久化调度底座。
 - [2026-07-21-blog-excerpt-model-catalog.md](2026-07-21-blog-excerpt-model-catalog.md)：博客编辑器摘要生成接入模型目录。
 - [2026-07-21-interactive-ai-model-catalog-migration.md](2026-07-21-interactive-ai-model-catalog-migration.md)：交互式 AI 功能迁移到模型目录。

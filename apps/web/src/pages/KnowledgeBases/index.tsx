@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { type AvailableAIModel, listAvailableAIModels } from '@/api/ai';
 import {
   type AIKnowledgeBase,
   type AIKnowledgeChunkPreview,
@@ -41,6 +42,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -61,6 +69,13 @@ const documentFailureMessage: Record<string, string> = {
   KNOWLEDGE_VECTOR_STORE_FAILED: '向量无法写入数据库',
   KNOWLEDGE_CHUNKS_MISSING: '文档分段不存在',
   DOCUMENT_PARSE_FAILED: 'PDF 未包含可解析文本',
+  DOCUMENT_CHUNK_LIMIT_EXCEEDED: '文档内容过长，无法生成可检索片段',
+  PDF_PAGE_LIMIT_EXCEEDED: 'PDF 页数超出当前处理范围',
+  PDF_RENDERER_UNAVAILABLE: 'PDF 解析组件未安装',
+  PDF_RENDER_FAILED: 'PDF 页面解析失败',
+  PDF_VISION_MODEL_UNAVAILABLE: '所选视觉模型不可用',
+  PDF_VISION_PROVIDER_UNAVAILABLE: '视觉模型服务不可用',
+  PDF_VISION_ANALYSIS_FAILED: '图片与表格识别失败',
 };
 
 function formatFileSize(sizeBytes: number) {
@@ -89,6 +104,8 @@ function formatDate(value: string) {
 function getDocumentStatus(document: AIKnowledgeDocument) {
   if (document.status === 'ready') return { label: '已就绪', variant: 'secondary' as const };
   if (document.status === 'failed') return { label: '处理失败', variant: 'destructive' as const };
+  if (document.status === 'pending_parse')
+    return { label: '等待解析', variant: 'outline' as const };
   if (document.status === 'indexing')
     return { label: `索引中 ${document.indexProgress}%`, variant: 'outline' as const };
   return { label: '等待处理', variant: 'outline' as const };
@@ -96,6 +113,10 @@ function getDocumentStatus(document: AIKnowledgeDocument) {
 
 function getDocumentSourceLabel(source: AIKnowledgeDocument['source']) {
   return source === 'upload' ? '上传文件' : '未知来源';
+}
+
+function getChunkSourceLabel(sourceType: AIKnowledgeChunkPreview['sourceType']) {
+  return sourceType === 'visual' ? '图片与表格' : '原文文本';
 }
 
 export default function KnowledgeBases({ embedded = false }: { embedded?: boolean }) {
@@ -125,11 +146,14 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
   const [retrievalResults, setRetrievalResults] = useState<AIKnowledgeRetrievalTestResult[]>([]);
   const [hasTestedRetrieval, setHasTestedRetrieval] = useState(false);
   const [testingRetrieval, setTestingRetrieval] = useState(false);
+  const [visionModels, setVisionModels] = useState<AvailableAIModel[]>([]);
+  const [visionModelID, setVisionModelID] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
   const selectedBase = bases.find((base) => base.id === selectedID) || null;
+  const selectedVisionModel = visionModels.find((model) => model.id === visionModelID);
   const baseSearch = searchParams.get('knowledge_base') || '';
   const documentSearch = searchParams.get('knowledge_document') || '';
   const visibleBases = useMemo(
@@ -231,6 +255,20 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
   }, []);
 
   useEffect(() => {
+    let active = true;
+    void listAvailableAIModels('vision')
+      .then(({ list }) => {
+        if (active) setVisionModels(list);
+      })
+      .catch(() => {
+        if (active) setVisionModels([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!selectedID) {
       replaceDocuments([]);
       return;
@@ -324,6 +362,9 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
       setUploading(true);
       const formData = new FormData();
       formData.append('file', file);
+      if (/\.pdf$/i.test(file.name) && visionModelID) {
+        formData.append('visionModelId', visionModelID);
+      }
       const { document } = await uploadAIKnowledgeDocument(selectedID, formData);
       const nextDocuments = [document, ...documentsRef.current];
       replaceDocuments(nextDocuments);
@@ -531,6 +572,27 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                   <Button variant="outline" size="icon-sm" aria-label="知识库操作">
                     <MoreHorizontal />
                   </Button>
+                  <Select
+                    value={visionModelID || null}
+                    onValueChange={(value) =>
+                      setVisionModelID(value === '__text_only__' ? '' : value || '')
+                    }
+                    disabled={uploading}
+                  >
+                    <SelectTrigger aria-label="PDF 视觉解析模型" className="max-w-52">
+                      <SelectValue
+                        placeholder={selectedVisionModel?.displayName || 'PDF 基础解析'}
+                      />
+                    </SelectTrigger>
+                    <SelectContent align="end">
+                      <SelectItem value="__text_only__">PDF 基础解析</SelectItem>
+                      {visionModels.map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          {model.displayName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
                     id="knowledge-document-upload"
                     className="sr-only"
@@ -591,10 +653,12 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                   {visibleDocuments.map((document) => {
                     const canStartIndexing =
                       document.status === 'pending_embedding' ||
+                      document.status === 'pending_parse' ||
                       (document.status === 'failed' &&
                         document.errorCode !== 'DOCUMENT_PARSE_FAILED');
                     const isIndexing =
                       document.status === 'pending' ||
+                      document.status === 'pending_parse' ||
                       document.status === 'pending_embedding' ||
                       document.status === 'indexing';
                     const completedIndexing = completionProgresses[document.id] !== undefined;
@@ -608,7 +672,11 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                                 {document.name}
                               </p>
                               {isIndexing && (
-                                <p className="mt-0.5 text-xs text-muted-foreground">正在建立索引</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  {document.status === 'pending_parse'
+                                    ? '正在解析 PDF'
+                                    : '正在建立索引'}
+                                </p>
                               )}
                               {completedIndexing && !isIndexing && (
                                 <p className="mt-0.5 text-xs text-muted-foreground">索引完成</p>
@@ -801,7 +869,10 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                       {previewChunks.map((chunk) => (
                         <article key={chunk.id} className="rounded-lg border border-border p-4">
                           <div className="mb-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                            <span>片段 {chunk.position + 1}</span>
+                            <span>
+                              {chunk.pageNumber > 0 ? `第 ${chunk.pageNumber} 页 · ` : ''}
+                              {getChunkSourceLabel(chunk.sourceType)} · 片段 {chunk.position + 1}
+                            </span>
                             <span>{chunk.tokenCount} 字符</span>
                           </div>
                           <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">

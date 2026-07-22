@@ -103,6 +103,8 @@ type aiKnowledgeChunkPreview struct {
 	Position   int               `json:"position"`
 	Content    string            `json:"content"`
 	TokenCount int               `json:"tokenCount"`
+	PageNumber int               `json:"pageNumber"`
+	SourceType string            `json:"sourceType"`
 }
 
 type aiKnowledgeRetrievalTestRequest struct {
@@ -1392,6 +1394,8 @@ func ListAIKnowledgeDocumentChunks(c *gin.Context) {
 			Position:   chunk.Position,
 			Content:    aiclient.TrimRunes(strings.TrimSpace(chunk.Content), 800),
 			TokenCount: chunk.TokenCount,
+			PageNumber: chunk.PageNumber,
+			SourceType: chunk.SourceType,
 		})
 	}
 	Success(c, gin.H{"document": presentAIKnowledgeDocument(document), "list": previews})
@@ -1546,7 +1550,38 @@ func UploadAIKnowledgeDocument(c *gin.Context) {
 		Error(c, 400, "读取文档失败")
 		return
 	}
+	visionModelID := strings.TrimSpace(c.PostForm("visionModelId"))
+	if ext != ".pdf" && visionModelID != "" {
+		Error(c, 400, "仅 PDF 文档支持视觉解析模型")
+		return
+	}
+	if visionModelID != "" {
+		if _, err := aimodel.ResolveInvocation(database.GetDB(), visionModelID, "vision", knowledgePDFVisionTimeout); err != nil {
+			respondCatalogModelError(c, err)
+			return
+		}
+	}
 	text, parseErr := extractAIKnowledgeDocumentText(ext, content)
+	if ext == ".pdf" && visionModelID != "" {
+		document := model.AIKnowledgeDocument{
+			KnowledgeBaseID: model.Int64String(id),
+			UserID:          userID,
+			Name:            file.Filename,
+			Status:          "pending_parse",
+			MimeType:        file.Header.Get("Content-Type"),
+			SizeBytes:       file.Size,
+			ParsedText:      text,
+			VisionModelID:   visionModelID,
+			SourceContent:   content,
+		}
+		if err := database.GetDB().Create(&document).Error; err != nil {
+			Error(c, 500, "保存知识库文档失败")
+			return
+		}
+		scheduleAIKnowledgeDocumentIndexing(document.ID)
+		Success(c, gin.H{"document": presentAIKnowledgeDocument(document)})
+		return
+	}
 	if parseErr != nil || text == "" {
 		if ext == ".pdf" {
 			document := model.AIKnowledgeDocument{
@@ -1630,11 +1665,15 @@ func RetryAIKnowledgeDocument(c *gin.Context) {
 		Error(c, 409, "文档正在索引")
 		return
 	}
-	if err := database.GetDB().Model(&document).Updates(map[string]any{"status": "pending_embedding", "error_code": "", "index_progress": 0}).Error; err != nil {
+	status := "pending_embedding"
+	if len(document.SourceContent) > 0 && document.ChunkCount == 0 {
+		status = "pending_parse"
+	}
+	if err := database.GetDB().Model(&document).Updates(map[string]any{"status": status, "error_code": "", "index_progress": 0}).Error; err != nil {
 		Error(c, 500, "重试文档索引失败")
 		return
 	}
-	document.Status = "pending_embedding"
+	document.Status = status
 	document.ErrorCode = ""
 	document.IndexProgress = 0
 	scheduleAIKnowledgeDocumentIndexing(document.ID)
@@ -1694,6 +1733,10 @@ func indexAIKnowledgeDocument(documentID model.Int64String) {
 		return
 	}
 	if err := db.Model(&model.AIKnowledgeDocument{}).Where("id = ?", documentID).Updates(map[string]any{"status": "indexing", "error_code": "", "index_progress": 5}).Error; err != nil {
+		return
+	}
+	if err := prepareAIKnowledgeDocumentChunks(db, documentID); err != nil {
+		markAIKnowledgeDocumentFailed(documentID, aiKnowledgeDocumentParseErrorCode(err))
 		return
 	}
 	var chunks []model.AIKnowledgeChunk

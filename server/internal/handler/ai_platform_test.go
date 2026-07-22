@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -393,6 +394,139 @@ func TestUploadAIKnowledgeDocumentAcceptsTextPDF(t *testing.T) {
 	}
 	if document.Status != "pending_embedding" || !strings.Contains(document.ParsedText, "PDF knowledge content") || document.ChunkCount == 0 {
 		t.Fatalf("unexpected document = %#v", document)
+	}
+}
+
+func TestUploadAIKnowledgeDocumentQueuesPDFVisionParsing(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	previousSchedule := scheduleAIKnowledgeDocumentIndexing
+	scheduleAIKnowledgeDocumentIndexing = func(model.Int64String) {}
+	t.Cleanup(func() { scheduleAIKnowledgeDocumentIndexing = previousSchedule })
+	t.Setenv("ARK_API_KEY", "test-key")
+	base := model.AIKnowledgeBase{UserID: 101, Name: "视觉 PDF 资料"}
+	vision := model.AIModel{Provider: "ark", ModelID: "vision-test", DisplayName: "视觉测试模型", Capabilities: aimodel.EncodeStrings([]string{"vision"}), Enabled: true}
+	if err := db.Create(&base).Error; err != nil {
+		t.Fatalf("create knowledge base: %v", err)
+	}
+	if err := db.Create(&vision).Error; err != nil {
+		t.Fatalf("create vision model: %v", err)
+	}
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("visionModelId", vision.ID.String()); err != nil {
+		t.Fatalf("write vision model: %v", err)
+	}
+	part, err := writer.CreateFormFile("file", "scan.pdf")
+	if err != nil {
+		t.Fatalf("create multipart file: %v", err)
+	}
+	content := plainTextPDF("visual PDF knowledge content")
+	if _, err := part.Write(content); err != nil {
+		t.Fatalf("write PDF: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart body: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/ai/knowledge-bases/"+strconv.FormatInt(int64(base.ID), 10)+"/documents", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("upload response = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var document model.AIKnowledgeDocument
+	if err := db.Where("knowledge_base_id = ?", base.ID).First(&document).Error; err != nil {
+		t.Fatalf("load document: %v", err)
+	}
+	if document.Status != "pending_parse" || document.VisionModelID != vision.ID.String() || !bytes.Equal(document.SourceContent, content) {
+		t.Fatalf("unexpected document = %#v", document)
+	}
+}
+
+func TestSplitAIKnowledgeSectionsPreservesPageAndSource(t *testing.T) {
+	chunks := splitAIKnowledgeSections([]aiKnowledgeSection{
+		{pageNumber: 2, sourceType: "text", content: "第一段\n\n第二段"},
+		{pageNumber: 3, sourceType: "visual", content: "| 名称 | 数量 |\n| --- | --- |\n| 苹果 | 2 |"},
+	})
+	if len(chunks) != 2 {
+		t.Fatalf("chunk count = %d, want 2", len(chunks))
+	}
+	if chunks[0].pageNumber != 2 || chunks[0].sourceType != "text" || !strings.HasPrefix(chunks[0].content, "第 2 页\n") {
+		t.Fatalf("unexpected text chunk = %#v", chunks[0])
+	}
+	if chunks[1].pageNumber != 3 || chunks[1].sourceType != "visual" || !strings.Contains(chunks[1].content, "| --- | --- |\n| 苹果 | 2 |") {
+		t.Fatalf("unexpected visual chunk = %#v", chunks[1])
+	}
+}
+
+func TestPrepareAIKnowledgeDocumentChunksAddsVisualPageMetadata(t *testing.T) {
+	_, db := setupAIPlatformTestRouter(t)
+	t.Setenv("ARK_API_KEY", "test-key")
+	previousRender := renderAIKnowledgePDFPages
+	previousAnalyze := analyzeAIKnowledgePDFPage
+	renderAIKnowledgePDFPages = func([]byte) ([][]byte, error) {
+		return [][]byte{[]byte("rendered page")}, nil
+	}
+	analyzeAIKnowledgePDFPage = func(_ aimodel.Invocation, _ model.Int64String, pageNumber int, _ []byte, nativeText string) (string, error) {
+		if pageNumber != 1 || !strings.Contains(nativeText, "PDF knowledge content") {
+			t.Fatalf("unexpected visual input page=%d text=%q", pageNumber, nativeText)
+		}
+		return "| 项目 | 数量 |\n| --- | --- |\n| 苹果 | 2 |", nil
+	}
+	t.Cleanup(func() {
+		renderAIKnowledgePDFPages = previousRender
+		analyzeAIKnowledgePDFPage = previousAnalyze
+	})
+	base := model.AIKnowledgeBase{UserID: 101, Name: "多模态资料"}
+	vision := model.AIModel{Provider: "ark", ModelID: "vision-test", DisplayName: "视觉测试模型", Capabilities: aimodel.EncodeStrings([]string{"vision"}), Enabled: true}
+	if err := db.Create(&base).Error; err != nil {
+		t.Fatalf("create base: %v", err)
+	}
+	if err := db.Create(&vision).Error; err != nil {
+		t.Fatalf("create vision model: %v", err)
+	}
+	document := model.AIKnowledgeDocument{
+		KnowledgeBaseID: base.ID,
+		UserID:          101,
+		Name:            "report.pdf",
+		Status:          "pending_parse",
+		VisionModelID:   vision.ID.String(),
+		SourceContent:   plainTextPDF("PDF knowledge content"),
+	}
+	if err := db.Create(&document).Error; err != nil {
+		t.Fatalf("create document: %v", err)
+	}
+	if err := prepareAIKnowledgeDocumentChunks(db, document.ID); err != nil {
+		t.Fatalf("prepare PDF chunks: %v", err)
+	}
+	var chunks []model.AIKnowledgeChunk
+	if err := db.Where("document_id = ?", document.ID).Order("position ASC").Find(&chunks).Error; err != nil {
+		t.Fatalf("load chunks: %v", err)
+	}
+	if len(chunks) != 2 {
+		t.Fatalf("chunk count = %d, want 2", len(chunks))
+	}
+	if chunks[0].PageNumber != 1 || chunks[0].SourceType != "text" {
+		t.Fatalf("unexpected native chunk = %#v", chunks[0])
+	}
+	if chunks[1].PageNumber != 1 || chunks[1].SourceType != "visual" || !strings.Contains(chunks[1].Content, "苹果") {
+		t.Fatalf("unexpected visual chunk = %#v", chunks[1])
+	}
+}
+
+func TestRenderAIKnowledgePDFPagesWithInstalledPoppler(t *testing.T) {
+	if _, err := exec.LookPath("pdftocairo"); err != nil {
+		t.Skip("pdftocairo 未安装；部署环境安装 Poppler 后执行真实渲染验证")
+	}
+	pages, err := renderAIKnowledgePDFPagesWithPoppler(plainTextPDF("rendered PDF knowledge content"))
+	if err != nil {
+		t.Fatalf("render PDF pages: %v", err)
+	}
+	if len(pages) != 1 || len(pages[0]) == 0 {
+		t.Fatalf("pages = %d, want one non-empty page", len(pages))
 	}
 }
 

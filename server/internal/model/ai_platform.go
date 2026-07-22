@@ -358,6 +358,8 @@ type AIKnowledgeDocument struct {
 	SizeBytes       int64          `json:"sizeBytes"`
 	SourceKey       string         `gorm:"size:500" json:"-"`
 	ParsedText      string         `gorm:"type:text" json:"-"`
+	VisionModelID   string         `gorm:"size:40;not null;default:''" json:"visionModelId,omitempty"`
+	SourceContent   []byte         `gorm:"type:bytea" json:"-"`
 	CreatedAt       time.Time      `json:"createdAt"`
 	UpdatedAt       time.Time      `json:"updatedAt"`
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
@@ -374,6 +376,8 @@ type AIKnowledgeChunk struct {
 	Position   int            `gorm:"index:uidx_ai_knowledge_chunk,unique;not null" json:"position"`
 	Content    string         `gorm:"type:text;not null" json:"content"`
 	TokenCount int            `json:"tokenCount"`
+	PageNumber int            `gorm:"not null;default:0" json:"pageNumber"`
+	SourceType string         `gorm:"size:20;not null;default:'text'" json:"sourceType"`
 	Embedding  string         `gorm:"-" json:"-"`
 	CreatedAt  time.Time      `json:"createdAt"`
 	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`

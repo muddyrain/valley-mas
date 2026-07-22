@@ -36,6 +36,30 @@ cd server && air
 cd server && air db=true
 ```
 
+## 知识库 PDF 解析环境
+
+知识库的基础 PDF 文本提取不依赖系统工具；用户选择视觉模型上传 PDF 时，服务会调用 Poppler 的 `pdftocairo` 把页面渲染为图片，用于扫描件 OCR、表格 Markdown 化和图片说明。开发机、测试机与线上服务必须安装同一项依赖。
+
+```bash
+# macOS 本地开发
+brew install poppler
+
+# Debian / Ubuntu 服务器
+sudo apt-get update && sudo apt-get install -y poppler-utils
+
+# Rocky / AlmaLinux / CentOS 服务器
+sudo dnf install -y poppler-utils
+```
+
+安装或发布前验证：
+
+```bash
+command -v pdftocairo
+pdftocairo -v
+```
+
+没有该命令时，普通文本 PDF 仍按原有方式处理；选择视觉模型的 PDF 会标记为“PDF 解析组件未安装”，可在安装完成后从知识库重试。服务会把渲染页写入受限临时目录，任务结束立即清理；不要把用户 PDF 放入长期共享临时目录。
+
 ## 国内服务器自动部署
 
 当前推荐用于国内云服务器的部署链路：
@@ -54,6 +78,7 @@ systemctl restart valley-server
 - 二进制输出：`/opt/valley/bin/valley-server`
 - 环境变量文件：`/opt/valley/config/server.env`
 - systemd 服务：`valley-server.service`
+- PDF 视觉解析：已安装 `poppler-utils`，且 `pdftocairo` 可被 `valley` 用户在 `PATH` 中找到。
 - 仓库 `origin` 指向 Gitee，例如：
 
 ```bash
@@ -67,6 +92,8 @@ git remote set-url origin https://gitee.com/muddyrain/valley-mas.git
 /usr/local/go/bin/go env -w GOPROXY=https://goproxy.cn,direct
 /usr/local/go/bin/go env -w GOSUMDB=sum.golang.google.cn
 ```
+
+首次发布多模态 PDF 能力时，先安装并验证 Poppler，再推送服务端代码。部署工作流会在构建前检查该命令，避免发布后才发现扫描件和表格无法处理。
 
 ### 本地双 push 配置
 

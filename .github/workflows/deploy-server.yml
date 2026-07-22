@@ -33,25 +33,29 @@ jobs:
             -o ServerAliveCountMax=8 \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" 'bash -se' <<EOF
             set -euo pipefail
-            echo "[1/6] sync code"
+            echo "[1/7] verify PDF renderer"
+            command -v pdftocairo
+            pdftocairo -v
+
+            echo "[2/7] sync code"
             cd /opt/valley-mas
             git fetch --all --prune
             git checkout "${{ github.ref_name }}"
             git pull --ff-only origin "${{ github.ref_name }}"
 
-            echo "[2/6] download modules"
+            echo "[3/7] download modules"
             cd server
             /usr/local/go/bin/go mod download
 
-            echo "[3/6] test server"
+            echo "[4/7] test server"
             /usr/local/go/bin/go test ./...
 
-            echo "[4/6] build server"
+            echo "[5/7] build server"
             /usr/local/go/bin/go build -o /opt/valley/bin/valley-server ./cmd/server
 
-            echo "[5/6] restart service"
+            echo "[6/7] restart service"
             sudo -n /usr/bin/systemctl restart valley-server
 
-            echo "[6/6] service status"
+            echo "[7/7] service status"
             /usr/bin/systemctl status valley-server --no-pager | head -n 20
           EOF
