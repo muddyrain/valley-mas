@@ -23,6 +23,7 @@
 
 ## 当前活跃计划
 
+- [2026-07-22-ai-workflow-p14-production-runtime.md](2026-07-22-ai-workflow-p14-production-runtime.md)：P14.1 工作流异步运行、定时触发与持久化调度底座。
 - [2026-07-21-blog-excerpt-model-catalog.md](2026-07-21-blog-excerpt-model-catalog.md)：博客编辑器摘要生成接入模型目录。
 - [2026-07-21-interactive-ai-model-catalog-migration.md](2026-07-21-interactive-ai-model-catalog-migration.md)：交互式 AI 功能迁移到模型目录。
 
@@ -50,4 +51,3 @@
 - [archive/2026-07/2026-07-10-life-trace-pantry-mobile-browsing.md](archive/2026-07/2026-07-10-life-trace-pantry-mobile-browsing.md)
 - [archive/2026-07/2026-07-18-ai-workbench-next-roadmap.md](archive/2026-07/2026-07-18-ai-workbench-next-roadmap.md)
 - [archive/2026-07/2026-07-20-p13-switch-node.md](archive/2026-07/2026-07-20-p13-switch-node.md)
-- [2026-07-22-ai-workflow-p14-production-runtime.md](2026-07-22-ai-workflow-p14-production-runtime.md)：P14.1 工作流异步运行、定时触发与持久化调度底座。

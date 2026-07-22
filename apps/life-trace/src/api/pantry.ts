@@ -45,6 +45,7 @@ export type PantryThumbnailResponse = {
 };
 
 export type PantryDescriptionRequest = {
+  modelId: string;
   name: string;
   category?: PantryItem['category'];
   location?: PantryItem['location'];

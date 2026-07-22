@@ -169,13 +169,10 @@ func TestListMediaDiaryEntriesSupportsFiltersAndSummary(t *testing.T) {
 	}
 }
 
-func TestSuggestMediaDiaryEntryRejectsMissingAIConfig(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "")
-	t.Setenv("ARK_API_KEY", "")
-	t.Setenv("ARK_TEXT_MODEL", "")
+func TestSuggestMediaDiaryEntryRejectsUnavailableCatalogModel(t *testing.T) {
 	router := setupTraceTestRouter(t, 101)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/media-diary/ai-suggest", bytes.NewBufferString(`{"mediaType":"书籍","title":"小王子"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/media-diary/ai-suggest", bytes.NewBufferString(`{"modelId":"missing-model","mediaType":"书籍","title":"小王子"}`))
 	req.Header.Set("Content-Type", "application/json")
 	resp := httptest.NewRecorder()
 
@@ -185,8 +182,8 @@ func TestSuggestMediaDiaryEntryRejectsMissingAIConfig(t *testing.T) {
 		t.Fatalf("expected business error response, got %d body=%s", resp.Code, resp.Body.String())
 	}
 	payload := decodeTraceErrorPayload(t, resp)
-	if payload["code"] != float64(http.StatusServiceUnavailable) || payload["message"] == "" {
-		t.Fatalf("expected config error message, got %+v", payload)
+	if payload["code"] != float64(http.StatusBadRequest) || payload["message"] == "" {
+		t.Fatalf("expected unavailable model message, got %+v", payload)
 	}
 }
 

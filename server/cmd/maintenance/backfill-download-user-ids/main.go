@@ -1,3 +1,4 @@
+// Command backfill-download-user-ids repairs historical download ownership records.
 package main
 
 import (
@@ -62,10 +63,10 @@ func main() {
 
 	if *userID != "" {
 		runManualRepair(db, *apply, *userID, *resourceID, afterTime, beforeTime, *limit)
-			return
-		}
+		return
+	}
 
-		runAutoRepair(db, *apply, *resourceID, afterTime, beforeTime, *windowMinutes, *limit)
+	runAutoRepair(db, *apply, *resourceID, afterTime, beforeTime, *windowMinutes, *limit)
 }
 
 func runManualRepair(
@@ -275,10 +276,10 @@ func printRecordPreview(records []model.DownloadRecord) {
 	for i := 0; i < max; i++ {
 		record := records[i]
 		fmt.Printf(
-				"  record=%s resource=%s user=%s created_at=%s ip=%s\n",
-				record.ID.String(),
-				record.ResourceID.String(),
-				record.UserID.String(),
+			"  record=%s resource=%s user=%s created_at=%s ip=%s\n",
+			record.ID.String(),
+			record.ResourceID.String(),
+			record.UserID.String(),
 			record.CreatedAt.Format(time.RFC3339),
 			record.IP,
 		)

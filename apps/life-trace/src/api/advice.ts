@@ -1,10 +1,12 @@
 import { apiRequest } from '@/api/request';
 import type { AdvicePayload } from '@/types';
 
+export type AIProvider = 'ark' | 'siliconflow' | 'amux';
+
 export type TodayAdviceResponse = {
   summary: string;
   list: AdvicePayload[];
-  source: 'ark' | 'openai';
+  source: AIProvider;
   model?: string;
 };
 
@@ -17,7 +19,7 @@ export type WeeklyReviewResponse = {
   delays: string[];
   insights: string[];
   nextActions: string[];
-  source: 'ark' | 'openai';
+  source: AIProvider;
   model?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -42,11 +44,12 @@ export type ImageAnalysisResponse = {
     dateOption: '今天' | '明天' | '周五' | '周六' | '周日';
     time: string;
   };
-  source: 'ark';
+  source: AIProvider;
   model?: string;
 };
 
 export type RecipeSuggestionRequest = {
+  modelId: string;
   meal?: '早餐' | '午餐' | '晚餐' | '加餐';
   servings?: number;
   maxMinutes?: number;
@@ -74,7 +77,7 @@ export type RecipeSuggestionResponse = {
   warnings: string[];
   householdId?: string;
   householdName?: string;
-  source: 'ark' | 'openai' | 'local';
+  source: AIProvider | 'local';
   model?: string;
 };
 
@@ -83,24 +86,34 @@ const WEEKLY_REVIEW_TIMEOUT_MS = 45000;
 const IMAGE_ANALYSIS_TIMEOUT_MS = 45000;
 const RECIPE_SUGGESTION_TIMEOUT_MS = 45000;
 
-export function generateTodayAdvice(token: string, options: { signal?: AbortSignal } = {}) {
+export function generateTodayAdvice(
+  token: string,
+  modelId: string,
+  options: { signal?: AbortSignal } = {},
+) {
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), TODAY_ADVICE_TIMEOUT_MS);
   options.signal?.addEventListener('abort', () => controller.abort(), { once: true });
 
   return apiRequest<TodayAdviceResponse>('/life-trace/ai/today-advice', token, {
     method: 'POST',
+    body: JSON.stringify({ modelId }),
     signal: controller.signal,
   }).finally(() => globalThis.clearTimeout(timeout));
 }
 
-export function generateWeeklyReview(token: string, options: { signal?: AbortSignal } = {}) {
+export function generateWeeklyReview(
+  token: string,
+  modelId: string,
+  options: { signal?: AbortSignal } = {},
+) {
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), WEEKLY_REVIEW_TIMEOUT_MS);
   options.signal?.addEventListener('abort', () => controller.abort(), { once: true });
 
   return apiRequest<WeeklyReviewResponse>('/life-trace/ai/weekly-review', token, {
     method: 'POST',
+    body: JSON.stringify({ modelId }),
     signal: controller.signal,
   }).finally(() => globalThis.clearTimeout(timeout));
 }
@@ -135,7 +148,7 @@ export function analyzeImage(
 
 export function generateRecipeSuggestions(
   token: string,
-  input: RecipeSuggestionRequest = {},
+  input: RecipeSuggestionRequest,
   options: { signal?: AbortSignal } = {},
 ) {
   const controller = new AbortController();
@@ -146,6 +159,7 @@ export function generateRecipeSuggestions(
   return apiRequest<RecipeSuggestionResponse>(`/life-trace/ai/recipes${query}`, token, {
     method: 'POST',
     body: JSON.stringify({
+      modelId: input.modelId,
       meal: input.meal,
       servings: input.servings,
       maxMinutes: input.maxMinutes,

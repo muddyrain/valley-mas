@@ -42,6 +42,8 @@ export default function AIModelPolicies() {
   const [testingConnection, setTestingConnection] = useState(false);
   const [testingModelID, setTestingModelID] = useState<string>();
   const [modelForm] = Form.useForm<ModelForm>();
+  const selectedCapabilities = Form.useWatch('capabilities', modelForm) || [];
+  const probesImageGeneration = selectedCapabilities.includes('image_generation');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -133,10 +135,14 @@ export default function AIModelPolicies() {
   };
 
   const testConnection = async () => {
-    const value = await modelForm.validateFields(['provider', 'modelId']);
+    const value = await modelForm.validateFields(['provider', 'modelId', 'capabilities']);
     try {
       setTestingConnection(true);
-      const result = await testAIModelConnection(value);
+      const result = await testAIModelConnection({
+        provider: value.provider,
+        modelId: value.modelId,
+        capabilities: value.capabilities,
+      });
       message.success(`模型调用正常（${result.latencyMs}ms）`);
     } finally {
       setTestingConnection(false);
@@ -149,6 +155,7 @@ export default function AIModelPolicies() {
       const result = await testAIModelConnection({
         provider: selected.provider,
         modelId: selected.modelId,
+        capabilities: selected.capabilities,
       });
       message.success(`${selected.displayName} 调用正常（${result.latencyMs}ms）`);
     } finally {
@@ -233,7 +240,9 @@ export default function AIModelPolicies() {
                 检测连接
               </Button>
               <span className="text-xs text-gray-400">
-                发送最小请求验证模型实际可用，会消耗极少量 token
+                {probesImageGeneration
+                  ? '生图检测会生成一张测试图，可能消耗额度'
+                  : '发送最小请求验证模型实际可用，会消耗极少量 token'}
               </span>
             </Space>
           </Form.Item>

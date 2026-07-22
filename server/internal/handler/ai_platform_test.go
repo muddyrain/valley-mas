@@ -107,6 +107,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.POST("/apps/:appId/versions", SaveAIAppVersion)
 	auth.POST("/apps/:appId/restore", RestoreAIAppVersion)
 	auth.POST("/apps/:appId/debug", DebugAIApp)
+	auth.POST("/apps/:appId/avatar/generate", GenerateAIAppAvatar)
 	auth.GET("/knowledge-bases", ListAIKnowledgeBases)
 	auth.GET("/knowledge-bases/:knowledgeBaseId/documents", ListAIKnowledgeDocuments)
 	auth.GET("/knowledge-bases/:knowledgeBaseId/documents/:documentId/chunks", ListAIKnowledgeDocumentChunks)

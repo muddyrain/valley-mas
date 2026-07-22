@@ -1,3 +1,4 @@
+// Command purge-legacy-workflows removes obsolete workflow data from development databases.
 package main
 
 import (

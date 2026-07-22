@@ -27,6 +27,10 @@ type todayAdviceCacheEntry struct {
 	ExpiresAt time.Time
 }
 
+type todayAdviceRequest struct {
+	ModelID string `json:"modelId" binding:"required"`
+}
+
 var lifeTraceTodayAdviceCache = struct {
 	sync.RWMutex
 	items map[string]todayAdviceCacheEntry
@@ -41,9 +45,13 @@ func (h *Handler) GenerateTodayAdvice(c *gin.Context) {
 		return
 	}
 
-	aiCfg, errMsg := readLifeTraceAIConfig()
-	if errMsg != "" {
-		c.JSON(http.StatusServiceUnavailable, apiResponse{Code: http.StatusServiceUnavailable, Message: errMsg})
+	var req todayAdviceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, http.StatusBadRequest, "请选择用于生成建议的模型")
+		return
+	}
+	invocation, ok := resolveLifeTraceCatalogInvocation(c, req.ModelID, "text", lifeTraceTodayAdviceDefaultTimeout)
+	if !ok {
 		return
 	}
 
@@ -65,7 +73,7 @@ func (h *Handler) GenerateTodayAdvice(c *gin.Context) {
 
 	weather := h.weather.Fetch(c.Request.Context(), settings.City, false)
 	prompt := buildTodayAdvicePrompt(settings, weather, plans)
-	cacheKey := buildTodayAdviceCacheKey(userID, aiCfg, prompt)
+	cacheKey := buildTodayAdviceCacheKey(userID, invocation.Provider.Provider, invocation.Model.ModelID, prompt)
 	if cached, ok := getCachedTodayAdvice(cacheKey, time.Now()); ok {
 		success(c, gin.H{
 			"summary": cached.Response.Summary,
@@ -77,11 +85,11 @@ func (h *Handler) GenerateTodayAdvice(c *gin.Context) {
 		return
 	}
 
-	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
+	aiCtx, cancel := context.WithTimeout(c.Request.Context(), lifeTraceTodayAdviceDefaultTimeout)
 	aiCtx = aiusage.WithAudit(aiCtx, "life-trace-today-advice", userID.String())
 	defer cancel()
 
-	raw, modelName, err := callLifeTraceAI(aiCtx, aiCfg, prompt)
+	raw, modelName, err := callLifeTraceCatalogJSON(aiCtx, invocation, prompt, 260)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "AI 服务请求失败：" + err.Error()})
 		return
@@ -95,11 +103,11 @@ func (h *Handler) GenerateTodayAdvice(c *gin.Context) {
 
 	modelName = strings.TrimSpace(modelName)
 	if modelName == "" {
-		modelName = aiCfg.Model
+		modelName = invocation.Model.ModelID
 	}
 	setCachedTodayAdvice(cacheKey, todayAdviceCacheEntry{
 		Response:  parsed,
-		Source:    aiCfg.Source,
+		Source:    invocation.Provider.Provider,
 		Model:     modelName,
 		ExpiresAt: time.Now().Add(lifeTraceTodayAdviceCacheTTL),
 	})
@@ -107,17 +115,17 @@ func (h *Handler) GenerateTodayAdvice(c *gin.Context) {
 	success(c, gin.H{
 		"summary": parsed.Summary,
 		"list":    parsed.Items,
-		"source":  aiCfg.Source,
+		"source":  invocation.Provider.Provider,
 		"model":   modelName,
 		"cached":  false,
 	})
 }
 
-func buildTodayAdviceCacheKey(userID model.Int64String, cfg lifeTraceAIConfig, prompt string) string {
+func buildTodayAdviceCacheKey(userID model.Int64String, provider, modelName, prompt string) string {
 	sum := sha256.Sum256([]byte(strings.Join([]string{
 		fmt.Sprint(userID),
-		cfg.Source,
-		cfg.Model,
+		provider,
+		modelName,
 		prompt,
 	}, "\x00")))
 	return fmt.Sprintf("%x", sum)

@@ -6,6 +6,7 @@ import {
   generatePantryThumbnail,
 } from '@/api/pantry';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { AIModelPicker } from '@/components/AIModelPicker';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -133,6 +134,7 @@ export function PantryItemDrawer({
   const [aiPolishError, setAiPolishError] = useState('');
   const [aiPolishTips, setAiPolishTips] = useState<string[]>([]);
   const [aiPolishModelTag, setAiPolishModelTag] = useState('');
+  const [aiPolishModelId, setAiPolishModelId] = useState('');
   const queuedPayloadRef = useRef<NewPantryItemInput | null>(null);
   const editing = Boolean(item);
 
@@ -159,6 +161,7 @@ export function PantryItemDrawer({
     setAiPolishError('');
     setAiPolishTips([]);
     setAiPolishModelTag('');
+    setAiPolishModelId('');
   }, [pantryPreferences]);
 
   useEffect(() => {
@@ -466,6 +469,10 @@ export function PantryItemDrawer({
       setAiPolishError('请先填写名称，AI 才能给出建议。');
       return;
     }
+    if (!aiPolishModelId) {
+      setAiPolishError('请先选择用于润色的文本模型。');
+      return;
+    }
     if (aiPolishLoading) {
       return;
     }
@@ -475,6 +482,7 @@ export function PantryItemDrawer({
     setAiPolishTips([]);
     try {
       const result = await generatePantryDescription(token, {
+        modelId: aiPolishModelId,
         name: form.name.trim(),
         category: form.category,
         location: form.location,
@@ -895,6 +903,14 @@ export function PantryItemDrawer({
                 onChange={(event) => updateField('note', event.target.value)}
                 rows={3}
                 placeholder="例如：周末早餐要先喝掉。"
+              />
+              <AIModelPicker
+                token={token || undefined}
+                capability="text"
+                value={aiPolishModelId}
+                onValueChange={setAiPolishModelId}
+                disabled={aiPolishLoading || submitting}
+                compact
               />
               {aiPolishTips.length > 0 ? (
                 <div className="rounded-2xl border border-life-ai/30 bg-life-ai/5 px-3 py-2 text-xs text-muted-foreground">

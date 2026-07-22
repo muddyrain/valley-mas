@@ -155,13 +155,17 @@ func (s *UploadService) GenerateStoragePath(config UploadConfig, fileName string
 
 // ValidateFile 验证文件
 func (s *UploadService) ValidateFile(file *multipart.FileHeader, config UploadConfig) error {
+	return validateUploadInput(file.Filename, file.Size, config)
+}
+
+func validateUploadInput(fileName string, size int64, config UploadConfig) error {
 	// 验证文件扩展名
-	if !utils.ValidateFileType(file.Filename, config.AllowedExts) {
+	if !utils.ValidateFileType(fileName, config.AllowedExts) {
 		return fmt.Errorf("不支持的文件类型，仅支持：%s", strings.Join(config.AllowedExts, ", "))
 	}
 
 	// 验证文件大小
-	if !utils.ValidateFileSize(file.Size, config.MaxSize) {
+	if !utils.ValidateFileSize(size, config.MaxSize) {
 		return fmt.Errorf("文件过大，最大支持 %dMB", config.MaxSize)
 	}
 
@@ -199,9 +203,28 @@ func (s *UploadService) UploadWithContext(
 		return nil, err
 	}
 
+	return s.UploadBytesWithContext(ctx, file.Filename, fileBytes, config)
+}
+
+// UploadBytesWithContext uploads trusted in-memory file bytes using the same
+// validation, path generation, and metadata rules as multipart uploads.
+func (s *UploadService) UploadBytesWithContext(
+	ctx context.Context,
+	fileName string,
+	fileBytes []byte,
+	config UploadConfig,
+) (*UploadResult, error) {
+	if s.uploader == nil {
+		return nil, fmt.Errorf("文件上传服务未配置")
+	}
+
+	if err := validateUploadInput(fileName, int64(len(fileBytes)), config); err != nil {
+		return nil, err
+	}
+
 	// 尝试读取图片尺寸（仅对 jpg/png 有效）
 	width, height := 0, 0
-	ext := strings.ToLower(filepath.Ext(file.Filename))
+	ext := strings.ToLower(filepath.Ext(fileName))
 	if ext == ".jpg" || ext == ".jpeg" || ext == ".png" {
 		if cfg, _, err := image.DecodeConfig(bytes.NewReader(fileBytes)); err == nil {
 			width = cfg.Width
@@ -212,7 +235,7 @@ func (s *UploadService) UploadWithContext(
 	fileHash := sha256.Sum256(fileBytes)
 
 	// 生成存储路径
-	storagePath := s.GenerateStoragePath(config, file.Filename)
+	storagePath := s.GenerateStoragePath(config, fileName)
 
 	// 上传到 TOS（使用自定义路径）
 	url, err := s.uploader.UploadBytesWithPathContext(ctx, storagePath, fileBytes)
@@ -223,9 +246,9 @@ func (s *UploadService) UploadWithContext(
 	return &UploadResult{
 		URL:      url,
 		Key:      storagePath,
-		FileName: file.Filename,
-		Size:     file.Size,
-		Ext:      filepath.Ext(file.Filename),
+		FileName: fileName,
+		Size:     int64(len(fileBytes)),
+		Ext:      filepath.Ext(fileName),
 		Width:    width,
 		Height:   height,
 		FileHash: hex.EncodeToString(fileHash[:]),

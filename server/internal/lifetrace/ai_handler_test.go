@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"valley-server/internal/aimodel"
 	"valley-server/internal/database"
 	lifeai "valley-server/internal/lifetrace/ai"
 	"valley-server/internal/model"
@@ -18,10 +19,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestGenerateTodayAdviceRequiresAIConfig(t *testing.T) {
-	t.Setenv("ARK_API_KEY", "")
-	t.Setenv("ARK_TEXT_MODEL", "")
+func createLifeTraceCatalogModel(t *testing.T, modelID string) model.AIModel {
+	t.Helper()
+	item := model.AIModel{
+		Provider:     "siliconflow",
+		ModelID:      modelID,
+		DisplayName:  "Life Trace 测试模型",
+		Capabilities: aimodel.EncodeStrings([]string{"text"}),
+		Enabled:      true,
+	}
+	if err := database.GetDB().Create(&item).Error; err != nil {
+		t.Fatalf("create catalog model: %v", err)
+	}
+	return item
+}
 
+func TestGenerateTodayAdviceRequiresSelectedModel(t *testing.T) {
 	router := setupTraceTestRouter(t, 101)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/today-advice", bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -29,18 +42,15 @@ func TestGenerateTodayAdviceRequiresAIConfig(t *testing.T) {
 
 	router.ServeHTTP(resp, req)
 
-	if resp.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503, got %d: %s", resp.Code, resp.Body.String())
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected envelope response, got %d: %s", resp.Code, resp.Body.String())
 	}
-	if !strings.Contains(resp.Body.String(), "ARK_API_KEY") {
-		t.Fatalf("expected config message, got %s", resp.Body.String())
+	if !strings.Contains(resp.Body.String(), "选择") {
+		t.Fatalf("expected model message, got %s", resp.Body.String())
 	}
 }
 
-func TestGenerateWeeklyReviewRequiresAIConfig(t *testing.T) {
-	t.Setenv("ARK_API_KEY", "")
-	t.Setenv("ARK_TEXT_MODEL", "")
-
+func TestGenerateWeeklyReviewRequiresSelectedModel(t *testing.T) {
 	router := setupTraceTestRouter(t, 101)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/weekly-review", bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -48,19 +58,15 @@ func TestGenerateWeeklyReviewRequiresAIConfig(t *testing.T) {
 
 	router.ServeHTTP(resp, req)
 
-	if resp.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503, got %d: %s", resp.Code, resp.Body.String())
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected envelope response, got %d: %s", resp.Code, resp.Body.String())
 	}
-	if !strings.Contains(resp.Body.String(), "ARK_API_KEY") {
-		t.Fatalf("expected config message, got %s", resp.Body.String())
+	if !strings.Contains(resp.Body.String(), "选择") {
+		t.Fatalf("expected model message, got %s", resp.Body.String())
 	}
 }
 
-func TestGenerateRecipeSuggestionsRequiresAIConfigWhenPantryHasFood(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "")
-	t.Setenv("ARK_API_KEY", "")
-	t.Setenv("ARK_TEXT_MODEL", "")
-
+func TestGenerateRecipeSuggestionsRequiresSelectedModel(t *testing.T) {
 	router := setupTraceTestRouter(t, 101)
 	if err := database.GetDB().Create(&model.LifeTracePantryItem{
 		UserID:      101,
@@ -82,16 +88,17 @@ func TestGenerateRecipeSuggestionsRequiresAIConfigWhenPantryHasFood(t *testing.T
 
 	router.ServeHTTP(resp, req)
 
-	if resp.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503, got %d: %s", resp.Code, resp.Body.String())
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
 	}
-	if !strings.Contains(resp.Body.String(), "ARK_API_KEY") {
-		t.Fatalf("expected config message, got %s", resp.Body.String())
+	if !strings.Contains(resp.Body.String(), "请求内容") {
+		t.Fatalf("expected model message, got %s", resp.Body.String())
 	}
 }
 
 func TestGenerateRecipeSuggestionsReturnsEmptyWhenNoUsableFood(t *testing.T) {
 	router := setupTraceTestRouter(t, 101)
+	catalogModel := createLifeTraceCatalogModel(t, "gpt-empty")
 	if err := database.GetDB().Create(&model.LifeTracePantryItem{
 		UserID:      101,
 		HouseholdID: personalHouseholdID(101),
@@ -106,7 +113,7 @@ func TestGenerateRecipeSuggestionsReturnsEmptyWhenNoUsableFood(t *testing.T) {
 		t.Fatalf("seed expired pantry item: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/recipes", bytes.NewBufferString(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/recipes", bytes.NewBufferString(`{"modelId":"`+catalogModel.ID.String()+`"}`))
 	req.Header.Set("Content-Type", "application/json")
 	resp := httptest.NewRecorder()
 
@@ -141,11 +148,11 @@ func TestGenerateRecipeSuggestionsUsesUsablePantryContext(t *testing.T) {
 	}))
 	defer openAIServer.Close()
 
-	t.Setenv("OPENAI_API_KEY", "test-openai-key")
-	t.Setenv("OPENAI_API_BASE_URL", openAIServer.URL)
-	t.Setenv("OPENAI_API_MODEL", "gpt-recipe")
+	t.Setenv("SILICONFLOW_API_KEY", "test-siliconflow-key")
+	t.Setenv("SILICONFLOW_BASE_URL", openAIServer.URL)
 
 	router := setupTraceTestRouter(t, 101)
+	catalogModel := createLifeTraceCatalogModel(t, "gpt-recipe")
 	for _, item := range []model.LifeTracePantryItem{
 		{
 			UserID:      101,
@@ -195,7 +202,7 @@ func TestGenerateRecipeSuggestionsUsesUsablePantryContext(t *testing.T) {
 		}
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/recipes", bytes.NewBufferString(`{"meal":"晚餐","servings":2,"maxMinutes":20}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/recipes", bytes.NewBufferString(`{"modelId":"`+catalogModel.ID.String()+`","meal":"晚餐","servings":2,"maxMinutes":20}`))
 	req.Header.Set("Content-Type", "application/json")
 	resp := httptest.NewRecorder()
 
@@ -213,8 +220,8 @@ func TestGenerateRecipeSuggestionsUsesUsablePantryContext(t *testing.T) {
 	if recipe["title"] != "番茄炒蛋" || recipe["planTitle"] != "晚餐做番茄炒蛋" {
 		t.Fatalf("unexpected recipe payload: %+v", recipe)
 	}
-	if data["source"] != "openai" || data["model"] != "gpt-recipe" {
-		t.Fatalf("expected OpenAI metadata, got %+v", data)
+	if data["source"] != "siliconflow" || data["model"] != "gpt-recipe" {
+		t.Fatalf("expected catalog model metadata, got %+v", data)
 	}
 
 	userPrompt := captured.Messages[1].Content
@@ -683,11 +690,11 @@ func TestGenerateWeeklyReviewUsesCloudLifeContext(t *testing.T) {
 	}))
 	defer openAIServer.Close()
 
-	t.Setenv("OPENAI_API_KEY", "test-openai-key")
-	t.Setenv("OPENAI_API_BASE_URL", openAIServer.URL)
-	t.Setenv("OPENAI_API_MODEL", "gpt-test")
+	t.Setenv("SILICONFLOW_API_KEY", "test-siliconflow-key")
+	t.Setenv("SILICONFLOW_BASE_URL", openAIServer.URL)
 
 	router := setupTraceTestRouter(t, 101)
+	catalogModel := createLifeTraceCatalogModel(t, "gpt-test")
 	now := time.Now()
 	completedAt := now
 	if err := database.GetDB().Create(&model.LifeTraceSettings{
@@ -727,7 +734,7 @@ func TestGenerateWeeklyReviewUsesCloudLifeContext(t *testing.T) {
 		t.Fatalf("seed trace: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/weekly-review", bytes.NewBufferString(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/weekly-review", bytes.NewBufferString(`{"modelId":"`+catalogModel.ID.String()+`"}`))
 	req.Header.Set("Content-Type", "application/json")
 	resp := httptest.NewRecorder()
 
@@ -740,8 +747,8 @@ func TestGenerateWeeklyReviewUsesCloudLifeContext(t *testing.T) {
 	if data["summary"] != "这周完成了电影和运动，节奏比上周稳定。" {
 		t.Fatalf("unexpected weekly review: %+v", data)
 	}
-	if data["source"] != "openai" || data["model"] != "gpt-test" {
-		t.Fatalf("expected AI source and model, got %+v", data)
+	if data["source"] != "siliconflow" || data["model"] != "gpt-test" {
+		t.Fatalf("expected catalog model metadata, got %+v", data)
 	}
 	if data["id"] == "" || data["weekStart"] == "" || data["weekEnd"] == "" {
 		t.Fatalf("expected persisted weekly review identity fields, got %+v", data)
@@ -1788,9 +1795,8 @@ func TestTodayAdviceCacheDropsExpiredEntry(t *testing.T) {
 }
 
 func TestTodayAdviceCacheKeyChangesWithPrompt(t *testing.T) {
-	cfg := lifeTraceAIConfig{Source: "openai", Model: "gpt-5.4"}
-	first := buildTodayAdviceCacheKey(1, cfg, "城市：上海")
-	second := buildTodayAdviceCacheKey(1, cfg, "城市：北京")
+	first := buildTodayAdviceCacheKey(1, "openai", "gpt-5.4", "城市：上海")
+	second := buildTodayAdviceCacheKey(1, "openai", "gpt-5.4", "城市：北京")
 
 	if first == second {
 		t.Fatalf("expected different prompts to produce different cache keys")

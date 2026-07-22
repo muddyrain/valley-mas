@@ -1,9 +1,7 @@
 package handler
 
 import (
-	"bytes"
 	"fmt"
-	"image"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
@@ -13,7 +11,6 @@ import (
 	"strings"
 	"time"
 	"valley-server/internal/service"
-	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -163,42 +160,23 @@ func AdminUploadBlogCoverByURL(c *gin.Context) {
 
 	ext := pickImageExt(contentType, parsedURL.Path)
 	virtualFileName := "ai-cover" + ext
-	if !utils.ValidateFileType(virtualFileName, uploadConfig.AllowedExts) {
-		Error(c, http.StatusBadRequest, "unsupported cover image type")
-		return
-	}
-
 	uploadConfig.UserID = userID
 	uploadConfig.CustomFolder = fmt.Sprintf("blog-covers/%d/%s", userID, time.Now().Format("20060102"))
 	uploadService := service.NewUploadService()
-	storagePath := uploadService.GenerateStoragePath(uploadConfig, virtualFileName)
-
-	uploader := utils.GetTOSUploader()
-	if uploader == nil {
-		Error(c, http.StatusServiceUnavailable, "upload service is not initialized")
-		return
-	}
-
-	uploadedURL, err := uploader.UploadBytesWithPath(storagePath, fileBytes)
+	result, err := uploadService.UploadBytesWithContext(c.Request.Context(), virtualFileName, fileBytes, uploadConfig)
 	if err != nil {
-		Error(c, http.StatusBadGateway, "failed to upload cover to storage")
+		ErrorWithDetail(c, http.StatusBadGateway, "failed to upload cover to storage", err)
 		return
-	}
-
-	width, height := 0, 0
-	if cfg, _, err := image.DecodeConfig(bytes.NewReader(fileBytes)); err == nil {
-		width = cfg.Width
-		height = cfg.Height
 	}
 
 	Success(c, gin.H{
-		"url":         uploadedURL,
-		"storageKey":  storagePath,
-		"fileName":    virtualFileName,
-		"size":        len(fileBytes),
-		"width":       width,
-		"height":      height,
-		"extension":   ext,
+		"url":         result.URL,
+		"storageKey":  result.Key,
+		"fileName":    result.FileName,
+		"size":        result.Size,
+		"width":       result.Width,
+		"height":      result.Height,
+		"extension":   result.Ext,
 		"contentType": contentType,
 	})
 }

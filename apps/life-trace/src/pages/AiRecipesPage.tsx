@@ -2,6 +2,7 @@ import { ArrowRight, Clock, Loader2, Plus, Sparkles, Utensils } from 'lucide-rea
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateRecipeSuggestions, type RecipeSuggestionRequest } from '@/api/advice';
+import { AIModelPicker } from '@/components/AIModelPicker';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -114,6 +115,7 @@ export function AiRecipesPage() {
   const [meal, setMeal] = useState<RecipeSuggestionRequest['meal']>('晚餐');
   const [servings, setServings] = useState(2);
   const [maxMinutes, setMaxMinutes] = useState(30);
+  const [modelId, setModelId] = useState('');
   const [loading, setLoading] = useState(false);
   const [addingRecipeId, setAddingRecipeId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -138,6 +140,7 @@ export function AiRecipesPage() {
     setError('');
     try {
       const response = await generateRecipeSuggestions(token, {
+        modelId,
         meal,
         servings,
         maxMinutes,
@@ -243,6 +246,16 @@ export function AiRecipesPage() {
               </div>
             </div>
           </div>
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">生成模型</p>
+            <AIModelPicker
+              token={token || undefined}
+              capability="text"
+              value={modelId}
+              onValueChange={setModelId}
+              disabled={loading}
+            />
+          </div>
           {error ? (
             <div className="rounded-2xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-sm text-destructive">
               {error}
@@ -251,7 +264,7 @@ export function AiRecipesPage() {
           <Button
             type="button"
             className="w-full"
-            disabled={loading}
+            disabled={loading || !modelId}
             onClick={() => void handleGenerate()}
           >
             {loading ? (

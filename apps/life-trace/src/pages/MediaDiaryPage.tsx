@@ -25,6 +25,7 @@ import {
   updateMediaDiaryEntry,
 } from '@/api/mediaDiary';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { AIModelPicker } from '@/components/AIModelPicker';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -401,6 +402,7 @@ function MediaDiaryEditor({
   onOpenChange,
   onSubmit,
   onSuggest,
+  token,
 }: {
   open: boolean;
   entry: MediaDiaryEntry | null;
@@ -409,15 +411,18 @@ function MediaDiaryEditor({
   suggesting: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: NewMediaDiaryEntryInput) => Promise<void>;
+  token?: string;
   onSuggest: (
     mediaType: MediaDiaryType,
     title: string,
+    modelId: string,
   ) => Promise<Partial<NewMediaDiaryEntryInput> | null>;
 }) {
   const [form, setForm] = useState<NewMediaDiaryEntryInput>(defaultForm);
   const [tagText, setTagText] = useState(stringifyTags(defaultForm.tags));
   const [errors, setErrors] = useState<MediaDiaryFormErrors>({});
   const [imageUploading, setImageUploading] = useState(false);
+  const [suggestionModelId, setSuggestionModelId] = useState('');
   const submitting = saving || suggesting || imageUploading;
 
   useEffect(() => {
@@ -453,7 +458,11 @@ function MediaDiaryEditor({
       return;
     }
 
-    const suggestion = await onSuggest(form.mediaType, form.title);
+    if (!suggestionModelId) {
+      setErrors({ title: '请先选择模型' });
+      return;
+    }
+    const suggestion = await onSuggest(form.mediaType, form.title, suggestionModelId);
     if (!suggestion) {
       return;
     }
@@ -553,6 +562,14 @@ function MediaDiaryEditor({
               {suggesting ? '补全中' : 'AI 补全'}
             </Button>
           </div>
+          <AIModelPicker
+            token={token}
+            capability="text"
+            value={suggestionModelId}
+            onValueChange={setSuggestionModelId}
+            disabled={submitting}
+            compact
+          />
         </FormItem>
 
         <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
@@ -819,13 +836,13 @@ export function MediaDiaryPage() {
     }
   };
 
-  const handleSuggest = async (mediaType: MediaDiaryType, title: string) => {
+  const handleSuggest = async (mediaType: MediaDiaryType, title: string, modelId: string) => {
     if (!token) {
       return null;
     }
     setSuggesting(true);
     try {
-      const suggestion = await suggestMediaDiaryEntry(token, { mediaType, title });
+      const suggestion = await suggestMediaDiaryEntry(token, { modelId, mediaType, title });
       showToast('AI 补全已填入草稿', 'success');
       return suggestion;
     } catch {
@@ -900,6 +917,7 @@ export function MediaDiaryPage() {
           prefill={editorPrefill}
           saving={saving}
           suggesting={suggesting}
+          token={token || undefined}
           onOpenChange={(open) => {
             setEditorOpen(open);
             if (!open) {
@@ -1089,6 +1107,7 @@ export function MediaDiaryPage() {
         prefill={editorPrefill}
         saving={saving}
         suggesting={suggesting}
+        token={token || undefined}
         onOpenChange={(open) => {
           setEditorOpen(open);
           if (!open) {

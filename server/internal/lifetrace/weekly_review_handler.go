@@ -18,6 +18,10 @@ import (
 
 const lifeTraceWeeklyReviewMaxTokens = prompts.WeeklyReviewMaxTokens
 
+type weeklyReviewRequest struct {
+	ModelID string `json:"modelId" binding:"required"`
+}
+
 func (h *Handler) GenerateWeeklyReview(c *gin.Context) {
 	userID, ok := currentUserID(c)
 	if !ok {
@@ -25,9 +29,13 @@ func (h *Handler) GenerateWeeklyReview(c *gin.Context) {
 		return
 	}
 
-	aiCfg, errMsg := readLifeTraceAIConfig()
-	if errMsg != "" {
-		c.JSON(http.StatusServiceUnavailable, apiResponse{Code: http.StatusServiceUnavailable, Message: errMsg})
+	var req weeklyReviewRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, http.StatusBadRequest, "请选择用于生成周报的模型")
+		return
+	}
+	invocation, ok := resolveLifeTraceCatalogInvocation(c, req.ModelID, "text", 45*time.Second)
+	if !ok {
 		return
 	}
 
@@ -70,11 +78,11 @@ func (h *Handler) GenerateWeeklyReview(c *gin.Context) {
 	}
 
 	prompt := buildWeeklyReviewPrompt(settings, weekStart, weekEnd, completedPlans, openPlans, traces)
-	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
+	aiCtx, cancel := context.WithTimeout(c.Request.Context(), 45*time.Second)
 	aiCtx = aiusage.WithAudit(aiCtx, "life-trace-weekly-review", userID.String())
 	defer cancel()
 
-	raw, modelName, err := callLifeTraceAIWithMaxTokens(aiCtx, aiCfg, prompt, lifeTraceWeeklyReviewMaxTokens)
+	raw, modelName, err := callLifeTraceCatalogJSON(aiCtx, invocation, prompt, lifeTraceWeeklyReviewMaxTokens)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "AI 服务请求失败：" + err.Error()})
 		return
@@ -88,9 +96,9 @@ func (h *Handler) GenerateWeeklyReview(c *gin.Context) {
 
 	modelName = strings.TrimSpace(modelName)
 	if modelName == "" {
-		modelName = aiCfg.Model
+		modelName = invocation.Model.ModelID
 	}
-	review, err := saveWeeklyReview(userID, weekStart, weekEnd, parsed, aiCfg.Source, modelName)
+	review, err := saveWeeklyReview(userID, weekStart, weekEnd, parsed, invocation.Provider.Provider, modelName)
 	if err != nil {
 		c.JSON(http.StatusOK, apiResponse{Code: http.StatusInternalServerError, Message: weeklyReviewSaveErrorMessage(err)})
 		return

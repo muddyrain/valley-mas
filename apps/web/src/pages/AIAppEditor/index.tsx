@@ -98,6 +98,24 @@ interface AgentConfig {
   exampleQuestions: string[];
 }
 
+const AVATAR_IMAGE_MODEL_PREFERENCE_KEY = 'valley.ai-workbench.avatar-image-model';
+
+function readAvatarImageModelPreference() {
+  try {
+    return window.localStorage.getItem(AVATAR_IMAGE_MODEL_PREFERENCE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function saveAvatarImageModelPreference(modelID: string) {
+  try {
+    window.localStorage.setItem(AVATAR_IMAGE_MODEL_PREFERENCE_KEY, modelID);
+  } catch {
+    // Ignore unavailable browser storage; model selection still works for this session.
+  }
+}
+
 const defaultConfig: AgentConfig = {
   modelProfile: 'ark-text-default',
   systemPrompt: '',
@@ -208,7 +226,7 @@ export default function AIAppEditor() {
   const [copilotField, setCopilotField] = useState<string>('');
   const [showMobileCopilot, setShowMobileCopilot] = useState(false);
   const [avatarAction, setAvatarAction] = useState<'generate' | 'upload' | null>(null);
-  const [imageModelId, setImageModelId] = useState('');
+  const [imageModelId, setImageModelId] = useState(readAvatarImageModelPreference);
   const isMobile = useIsMobile();
   const abortDebugRef = useRef<AbortController | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
@@ -508,6 +526,11 @@ while (true) {
     }
   };
 
+  const handleImageModelChange = (modelID: string) => {
+    setImageModelId(modelID);
+    saveAvatarImageModelPreference(modelID);
+  };
+
   const uploadAvatar = async (file?: File) => {
     if (!appId || !file) return;
     setAvatarAction('upload');
@@ -711,11 +734,14 @@ while (true) {
                       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/20 p-3">
                         <AgentAvatar name={name} src={app.avatarUrl} className="size-16" />
                         <div className="min-w-56 flex-1">
+                          <p className="text-sm font-medium text-foreground">智能体头像</p>
                           <ModelPicker
                             value={imageModelId || undefined}
-                            onValueChange={setImageModelId}
+                            onValueChange={handleImageModelChange}
                             capability="image_generation"
-                            label="图片生成模型"
+                            label="图片模型"
+                            compact
+                            autoSelectFirst
                           />
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -723,7 +749,7 @@ while (true) {
                             type="button"
                             size="sm"
                             variant="outline"
-                            disabled={avatarAction !== null}
+                            disabled={avatarAction !== null || !imageModelId}
                             onClick={() => void generateAvatar()}
                           >
                             <ImagePlus className="mr-2 size-4" />

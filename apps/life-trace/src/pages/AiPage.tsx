@@ -45,6 +45,7 @@ import {
   saveLifeAssistantMessage,
 } from '@/api/assistant';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { AIModelPicker } from '@/components/AIModelPicker';
 import { AssistantMessageCard } from '@/components/AssistantMessageCard';
 import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -1760,6 +1761,7 @@ function useAiPageState() {
   const [assistantStreaming, setAssistantStreaming] = useState(false);
   const [assistantHistoryLoading, setAssistantHistoryLoading] = useState(false);
   const [assistantModel, setAssistantModel] = useState('');
+  const [textModelId, setTextModelId] = useState('');
   const [assistantSpeechSupported, setAssistantSpeechSupported] = useState(false);
   const [assistantListening, setAssistantListening] = useState(false);
   const [assistantSpeechError, setAssistantSpeechError] = useState('');
@@ -2270,6 +2272,15 @@ function useAiPageState() {
   };
 
   const runWeeklyReview = async () => {
+    if (!textModelId) {
+      setResult({
+        title: '请先选择模型',
+        detail: '选择文本模型后，再生成每周回顾。',
+        tone: 'alert',
+      });
+      return;
+    }
+
     setQuickActionLoading('每周回顾');
     try {
       if (!token) {
@@ -2279,7 +2290,7 @@ function useAiPageState() {
         throw new Error('“我的”页的 AI 个性化开关未开启');
       }
 
-      const review = await generateWeeklyReview(token);
+      const review = await generateWeeklyReview(token, textModelId);
       setResult({
         title: '服务端 AI 每周回顾已生成',
         detail: review.summary,
@@ -2378,13 +2389,22 @@ function useAiPageState() {
     }
 
     if (label === '生成今日建议') {
+      if (!textModelId) {
+        setResult({
+          title: '请先选择模型',
+          detail: '选择文本模型后，再生成今日建议。',
+          tone: 'alert',
+        });
+        return;
+      }
+
       setQuickActionLoading(label);
       try {
         if (!token || !settings.aiPersonalization) {
           throw new Error('use local advice');
         }
 
-        const advice = await generateTodayAdvice(token);
+        const advice = await generateTodayAdvice(token, textModelId);
         setAdviceCards(advice.list);
         const details = advice.list
           .slice(0, 3)
@@ -2670,6 +2690,7 @@ function useAiPageState() {
   };
 
   return {
+    token,
     plans,
     traces,
     settings,
@@ -2700,6 +2721,8 @@ function useAiPageState() {
     assistantStreaming,
     assistantHistoryLoading,
     assistantModel,
+    textModelId,
+    setTextModelId,
     assistantSpeechSupported,
     assistantListening,
     assistantSpeechError,
@@ -2861,6 +2884,7 @@ export function AiWeeklyReviewsPage() {
 
 export function AiPage() {
   const {
+    token,
     plans,
     aiActions,
     navigate,
@@ -2884,6 +2908,8 @@ export function AiPage() {
     assistantStreaming,
     assistantHistoryLoading,
     assistantModel,
+    textModelId,
+    setTextModelId,
     assistantSpeechSupported,
     assistantListening,
     assistantSpeechError,
@@ -2913,6 +2939,16 @@ export function AiPage() {
 
   return (
     <div className="h-full min-w-0 overflow-hidden">
+      <div className="border-b border-border bg-background/90 px-4 py-2.5">
+        <p className="mb-1 text-xs text-muted-foreground">用于今日建议与每周回顾</p>
+        <AIModelPicker
+          token={token || undefined}
+          capability="text"
+          value={textModelId}
+          onValueChange={setTextModelId}
+          compact
+        />
+      </div>
       <AgentConversationPanel
         conversation={activeAssistantConversation}
         messages={assistantMessages}

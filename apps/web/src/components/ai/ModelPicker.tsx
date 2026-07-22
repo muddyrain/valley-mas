@@ -30,6 +30,8 @@ interface ModelPickerProps {
   capability: string;
   label?: string;
   catalog?: 'auth' | 'public';
+  compact?: boolean;
+  autoSelectFirst?: boolean;
 }
 
 export function ModelPicker({
@@ -38,6 +40,8 @@ export function ModelPicker({
   capability,
   label = '模型',
   catalog = 'auth',
+  compact = false,
+  autoSelectFirst = false,
 }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<AvailableAIModel[]>([]);
@@ -81,22 +85,50 @@ export function ModelPicker({
     if (!nextOpen) setQuery('');
   };
 
+  useEffect(() => {
+    if (!autoSelectFirst || loading || models.length === 0 || selectedModel) return;
+    onValueChange(models[0].id);
+  }, [autoSelectFirst, loading, models, onValueChange, selectedModel]);
+
+  const selectedLabel = selectedModel
+    ? `${selectedModel.displayName} · ${selectedModel.provider}`
+    : `选择${label}`;
+
   return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full justify-between font-normal"
-        onClick={() => setOpen(true)}
-      >
-        <span className="min-w-0 truncate text-left">
-          {selectedModel
-            ? `${selectedModel.displayName} · ${selectedModel.provider}`
-            : `选择${label}`}
-        </span>
-        <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
-      </Button>
+    <div className={compact ? 'min-w-0' : 'space-y-1.5'}>
+      {compact ? (
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+          <span className="min-w-0 truncate">
+            {selectedModel
+              ? `使用 ${selectedLabel}`
+              : loading
+                ? `正在选择${label}…`
+                : selectedLabel}
+          </span>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="shrink-0"
+            onClick={() => setOpen(true)}
+          >
+            切换
+          </Button>
+        </div>
+      ) : (
+        <>
+          <Label>{label}</Label>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full justify-between font-normal"
+            onClick={() => setOpen(true)}
+          >
+            <span className="min-w-0 truncate text-left">{selectedLabel}</span>
+            <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
+          </Button>
+        </>
+      )}
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="flex h-[min(42rem,82vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">

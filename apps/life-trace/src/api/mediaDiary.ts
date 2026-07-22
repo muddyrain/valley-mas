@@ -25,6 +25,7 @@ export type ListMediaDiaryResponse = {
 };
 
 export type MediaDiaryAISuggestInput = {
+  modelId: string;
   mediaType: MediaDiaryType;
   title: string;
 };

@@ -29,8 +29,9 @@ type adminAIModelRequest struct {
 }
 
 type aiModelConnectionTestRequest struct {
-	Provider string `json:"provider"`
-	ModelID  string `json:"modelId"`
+	Provider     string   `json:"provider"`
+	ModelID      string   `json:"modelId"`
+	Capabilities []string `json:"capabilities"`
 }
 
 type aiModelOption struct {
@@ -150,6 +151,7 @@ func AdminTestAIModelConnection(c *gin.Context) {
 		contextWithTimeout,
 		aiclient.NewCompatibleClient(config.BaseURL, config.APIKey, aiModelConnectionProbeTimeout),
 		modelID,
+		req.Capabilities,
 	)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(contextWithTimeout.Err(), context.DeadlineExceeded) {
@@ -166,12 +168,22 @@ func AdminTestAIModelConnection(c *gin.Context) {
 
 type aiModelProbeClient interface {
 	Chat(context.Context, aiclient.CompatibleChatRequest) (aiclient.CompatibleChatResponse, error)
+	Embeddings(context.Context, string, []string) (aiclient.CompatibleEmbeddingResponse, error)
+	GenerateImage(context.Context, string, string, string) (string, error)
 }
 
-func probeAIModel(ctx context.Context, client aiModelProbeClient, modelID string) (time.Duration, error) {
+func probeAIModel(ctx context.Context, client aiModelProbeClient, modelID string, capabilities []string) (time.Duration, error) {
+	startedAt := time.Now()
+	if aimodel.HasCapabilities(model.AIModel{Capabilities: aimodel.EncodeStrings(capabilities)}, []string{"image_generation"}) {
+		_, err := client.GenerateImage(ctx, modelID, "A small blue circle on a white background.", "1024x1024")
+		return time.Since(startedAt), err
+	}
+	if aimodel.HasCapabilities(model.AIModel{Capabilities: aimodel.EncodeStrings(capabilities)}, []string{"embedding"}) {
+		_, err := client.Embeddings(ctx, modelID, []string{"ping"})
+		return time.Since(startedAt), err
+	}
 	temperature := 0.0
 	maxTokens := 1
-	startedAt := time.Now()
 	_, err := client.Chat(ctx, aiclient.CompatibleChatRequest{
 		Model:       modelID,
 		Messages:    []aiclient.CompatibleMessage{{Role: "user", Content: "ping"}},

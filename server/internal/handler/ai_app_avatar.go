@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -30,6 +31,8 @@ var deleteManagedAIAppAvatar = func(ctx context.Context, key string) error {
 	}
 	return uploader.DeleteFileWithContext(ctx, key)
 }
+
+var persistGeneratedAIAppAvatar = persistGeneratedAIAppAvatarToStorage
 
 func GenerateAIAppAvatar(c *gin.Context) {
 	started := time.Now()
@@ -82,19 +85,67 @@ func GenerateAIAppAvatar(c *gin.Context) {
 		respondCatalogModelError(c, err)
 		return
 	}
-	url, err := invocation.Client.GenerateImage(c.Request.Context(), invocation.Model.ModelID, prompt, "1024x1024")
+	generatedURL, err := invocation.Client.GenerateImage(c.Request.Context(), invocation.Model.ModelID, prompt, "1024x1024")
 	if err != nil {
 		aiusage.Record(aiusage.Entry{Feature: "ai-workbench-avatar", Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, UserID: userID.String(), Status: aiusage.StatusFailed, PromptChars: aiusage.CharCount(prompt), LatencyMs: aiusage.Since(started), ErrorMessage: err.Error()})
 		Error(c, http.StatusBadGateway, "头像生成失败，可稍后重试或上传图片")
 		return
 	}
-	if err := replaceAIAppAvatar(c.Request.Context(), app, url, "", "ai"); err != nil {
-		Error(c, http.StatusInternalServerError, "保存头像失败")
+	storedAvatar, err := persistGeneratedAIAppAvatar(c.Request.Context(), userID, generatedURL)
+	if err != nil {
+		aiusage.Record(aiusage.Entry{Feature: "ai-workbench-avatar", Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, UserID: userID.String(), Status: aiusage.StatusFailed, PromptChars: aiusage.CharCount(prompt), LatencyMs: aiusage.Since(started), ErrorMessage: err.Error()})
+		ErrorWithDetail(c, http.StatusBadGateway, "头像生成后转存失败，可稍后重试或上传图片", err)
 		return
 	}
-	app.AvatarURL, app.AvatarStorageKey, app.AvatarSource = url, "", "ai"
-	aiusage.Record(aiusage.Entry{Feature: "ai-workbench-avatar", Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, UserID: userID.String(), Status: aiusage.StatusSuccess, PromptChars: aiusage.CharCount(prompt), ResponseChars: aiusage.CharCount(url), LatencyMs: aiusage.Since(started)})
+	if err := replaceAIAppAvatar(c.Request.Context(), app, storedAvatar.URL, storedAvatar.Key, "ai"); err != nil {
+		_ = deleteManagedAIAppAvatar(c.Request.Context(), storedAvatar.Key)
+		aiusage.Record(aiusage.Entry{Feature: "ai-workbench-avatar", Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, UserID: userID.String(), Status: aiusage.StatusFailed, PromptChars: aiusage.CharCount(prompt), LatencyMs: aiusage.Since(started), ErrorMessage: err.Error()})
+		ErrorWithDetail(c, http.StatusInternalServerError, "保存头像失败", err)
+		return
+	}
+	app.AvatarURL, app.AvatarStorageKey, app.AvatarSource = storedAvatar.URL, storedAvatar.Key, "ai"
+	aiusage.Record(aiusage.Entry{Feature: "ai-workbench-avatar", Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, UserID: userID.String(), Status: aiusage.StatusSuccess, PromptChars: aiusage.CharCount(prompt), ResponseChars: aiusage.CharCount(storedAvatar.URL), LatencyMs: aiusage.Since(started)})
 	Success(c, gin.H{"app": app, "model": invocation.Model.ModelID})
+}
+
+func persistGeneratedAIAppAvatarToStorage(ctx context.Context, userID model.Int64String, remoteURL string) (*service.UploadResult, error) {
+	parsedURL, err := url.Parse(strings.TrimSpace(remoteURL))
+	if err != nil || parsedURL == nil || parsedURL.Scheme != "https" || parsedURL.Host == "" {
+		return nil, errors.New("AI 返回的头像地址无效")
+	}
+
+	uploadConfig := service.GetDefaultConfig(service.UploadTypeAvatar)
+	uploadConfig.UserID = int64(userID)
+	uploadConfig.CustomFolder = fmt.Sprintf("ai-app-avatars/%s/%s", userID.String(), time.Now().Format("20060102"))
+	maxBytes := uploadConfig.MaxSize * 1024 * 1024
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, parsedURL.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("创建头像下载请求失败: %w", err)
+	}
+	response, err := (&http.Client{Timeout: 45 * time.Second}).Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("下载 AI 头像失败: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("AI 头像地址不可访问: HTTP %d", response.StatusCode)
+	}
+
+	content, err := io.ReadAll(io.LimitReader(response.Body, maxBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("读取 AI 头像失败: %w", err)
+	}
+	if int64(len(content)) > maxBytes {
+		return nil, fmt.Errorf("AI 头像文件过大，最大支持 %dMB", uploadConfig.MaxSize)
+	}
+	mimeType, err := validateAIAppAvatarBytes(content)
+	if err != nil {
+		return nil, err
+	}
+
+	uploadService := service.NewUploadService()
+	return uploadService.UploadBytesWithContext(ctx, "generated-avatar"+avatarExtension(mimeType), content, uploadConfig)
 }
 
 func UploadAIAppAvatar(c *gin.Context) {
@@ -148,12 +199,20 @@ func validateAIAppAvatarContent(file *multipart.FileHeader) error {
 	if err != nil && err != io.EOF {
 		return errors.New("无法读取头像图片")
 	}
-	mimeType := http.DetectContentType(header[:count])
+	_, err = validateAIAppAvatarBytes(header[:count])
+	return err
+}
+
+func validateAIAppAvatarBytes(content []byte) (string, error) {
+	if len(content) == 0 {
+		return "", errors.New("头像内容无效，仅支持 JPG、PNG、WebP")
+	}
+	mimeType := http.DetectContentType(content)
 	switch mimeType {
 	case "image/jpeg", "image/png", "image/webp":
-		return nil
+		return mimeType, nil
 	default:
-		return errors.New("头像内容无效，仅支持 JPG、PNG、WebP")
+		return "", errors.New("头像内容无效，仅支持 JPG、PNG、WebP")
 	}
 }
 

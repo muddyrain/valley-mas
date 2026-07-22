@@ -165,6 +165,10 @@ cd server && go run ./cmd/sync-schema --apply --scope all
 
 `--scope all` 保留历史全量 AutoMigrate 行为，因此除了补齐字段，也会执行当前 AutoMigrate 后置的资源外键修复和默认博客分类初始化。其他范围或 `--models` 只同步对应 model，不执行内容库的后置修复。
 
+## 一次性维护命令
+
+不参与服务启动的修复、清理与账号初始化命令集中在 [`cmd/maintenance`](cmd/maintenance/README.md)。这类命令可能读取或修改历史数据，执行前先确认环境与参数；创建或重置管理员账号必须显式传入 `--password`，命令不会输出密码。
+
 ## 常见问题
 
 - 端口被占用：检查是否已有服务监听 `:8080`，或通过 `PORT` 改端口。

@@ -50,6 +50,7 @@ func setupTraceTestRouter(t *testing.T, userID model.Int64String, webPush ...con
 		&model.LifeTraceDailyBriefDelivery{},
 		&model.LifeTracePantryReminderDelivery{},
 		&model.LifeTraceHolidayCalendar{},
+		&model.AIModel{},
 	); err != nil {
 		t.Fatalf("migrate test db: %v", err)
 	}

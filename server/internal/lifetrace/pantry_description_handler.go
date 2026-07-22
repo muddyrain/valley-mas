@@ -1,9 +1,9 @@
 package lifetrace
 
 import (
-	"context"
 	"net/http"
 	"strings"
+	"time"
 	"valley-server/internal/aiusage"
 	prompts "valley-server/internal/lifetrace/ai/prompts"
 	"valley-server/internal/logger"
@@ -15,6 +15,7 @@ import (
 const lifeTracePantryDescriptionMaxTokens = prompts.PantryDescriptionMaxTokens
 
 type pantryDescriptionRequest struct {
+	ModelID   string   `json:"modelId" binding:"required"`
 	Name      string   `json:"name"`
 	Category  string   `json:"category"`
 	Location  string   `json:"location"`
@@ -43,22 +44,18 @@ func (h *Handler) GeneratePantryDescription(c *gin.Context) {
 		return
 	}
 
-	aiCfg, errMsg := readLifeTraceAIConfig()
-	if errMsg != "" {
-		fail(c, http.StatusServiceUnavailable, errMsg)
+	invocation, ok := resolveLifeTraceCatalogInvocation(c, req.ModelID, "text", 45*time.Second)
+	if !ok {
 		return
 	}
 
 	prompt := buildPantryDescriptionPrompt(req)
-	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
-	aiCtx = aiusage.WithAudit(aiCtx, "life-trace-pantry-description", userID.String())
-	defer cancel()
-
-	raw, modelName, err := callLifeTraceAIWithMaxTokens(aiCtx, aiCfg, prompt, lifeTracePantryDescriptionMaxTokens)
+	aiCtx := aiusage.WithAudit(c.Request.Context(), "life-trace-pantry-description", userID.String())
+	raw, modelName, err := callLifeTraceCatalogJSON(aiCtx, invocation, prompt, lifeTracePantryDescriptionMaxTokens)
 	if err != nil {
 		logger.Error(c, "LifeTrace pantry description AI call failed", err, logrus.Fields{
-			"source": aiCfg.Source,
-			"model":  aiCfg.Model,
+			"source": invocation.Provider.Provider,
+			"model":  invocation.Model.ModelID,
 		})
 		fail(c, http.StatusBadGateway, "AI 备注生成失败:"+err.Error())
 		return
@@ -67,7 +64,7 @@ func (h *Handler) GeneratePantryDescription(c *gin.Context) {
 	parsed, err := parsePantryDescriptionAIResponse(raw)
 	if err != nil {
 		logger.Error(c, "LifeTrace pantry description AI parse failed", err, logrus.Fields{
-			"source": aiCfg.Source,
+			"source": invocation.Provider.Provider,
 			"model":  modelName,
 		})
 		fail(c, http.StatusBadGateway, "AI 备注生成解析失败")
@@ -76,14 +73,14 @@ func (h *Handler) GeneratePantryDescription(c *gin.Context) {
 
 	modelName = strings.TrimSpace(modelName)
 	if modelName == "" {
-		modelName = aiCfg.Model
+		modelName = invocation.Model.ModelID
 	}
 	success(c, gin.H{
 		"note":     strings.TrimSpace(parsed.Note),
 		"tips":     normalizeDescriptionTips(parsed.Tips),
-		"source":   aiCfg.Source,
+		"source":   invocation.Provider.Provider,
 		"model":    modelName,
-		"modelTag": buildAIModelTag(aiCfg.Source, modelName),
+		"modelTag": buildAIModelTag(invocation.Provider.Provider, modelName),
 	})
 }
 

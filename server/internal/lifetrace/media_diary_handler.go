@@ -1,7 +1,6 @@
 package lifetrace
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -37,6 +36,7 @@ type mediaDiaryEntryRequest struct {
 }
 
 type mediaDiaryAISuggestRequest struct {
+	ModelID   string `json:"modelId" binding:"required"`
 	MediaType string `json:"mediaType"`
 	Title     string `json:"title"`
 }
@@ -487,15 +487,14 @@ func (h *Handler) SuggestMediaDiaryEntry(c *gin.Context) {
 	}
 	mediaType := normalizeMediaDiaryType(req.MediaType)
 
-	cfg, errMsg := readLifeTraceAIConfig()
-	if errMsg != "" {
-		fail(c, http.StatusServiceUnavailable, errMsg)
+	invocation, ok := resolveLifeTraceCatalogInvocation(c, req.ModelID, "text", 45*time.Second)
+	if !ok {
 		return
 	}
 
 	prompt := buildMediaDiaryAISuggestPrompt(mediaType, title)
 	aiCtx := aiusage.WithAudit(c.Request.Context(), "life-trace-media-diary", userID.String())
-	raw, _, err := callLifeTraceAIWithMaxTokens(aiCtx, cfg, prompt, lifeTraceMediaDiaryAISuggestMaxTokens)
+	raw, _, err := callLifeTraceCatalogJSON(aiCtx, invocation, prompt, lifeTraceMediaDiaryAISuggestMaxTokens)
 	if err != nil {
 		fail(c, http.StatusBadGateway, "AI 补全失败，请稍后再试")
 		return
@@ -551,16 +550,4 @@ func findMediaDiaryEntry(id string, userID model.Int64String) (model.LifeTraceMe
 		return model.LifeTraceMediaDiaryEntry{}, false
 	}
 	return model.LifeTraceMediaDiaryEntry{}, false
-}
-
-func callMediaDiaryAISuggestForTest(ctx context.Context, mediaType string, title string) (mediaDiaryAISuggestion, error) {
-	cfg, errMsg := readLifeTraceAIConfig()
-	if errMsg != "" {
-		return mediaDiaryAISuggestion{}, errors.New(errMsg)
-	}
-	raw, _, err := callLifeTraceAIWithMaxTokens(ctx, cfg, buildMediaDiaryAISuggestPrompt(mediaType, title), lifeTraceMediaDiaryAISuggestMaxTokens)
-	if err != nil {
-		return mediaDiaryAISuggestion{}, err
-	}
-	return parseMediaDiaryAISuggestion(raw)
 }

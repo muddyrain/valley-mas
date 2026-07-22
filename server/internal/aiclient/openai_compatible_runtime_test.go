@@ -44,6 +44,23 @@ func TestCompatibleClientEmbeddingsRejectsIncompleteResponse(t *testing.T) {
 	}
 }
 
+func TestCompatibleClientGenerateImageUsesImageEndpoint(t *testing.T) {
+	client := &CompatibleClient{BaseURL: "https://provider.test/v1", APIKey: "test-key", Client: &http.Client{Timeout: time.Second, Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path != "/v1/images/generations" {
+			t.Fatalf("path = %q", request.URL.Path)
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"images":[{"url":"https://provider.test/image.png"}]}`)), Request: request}, nil
+	})}}
+
+	url, err := client.GenerateImage(context.Background(), "Kwai-Kolors/Kolors", "blue circle", "1024x1024")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if url != "https://provider.test/image.png" {
+		t.Fatalf("url = %q", url)
+	}
+}
+
 func TestCompatibleClientChatStreamEmitsContent(t *testing.T) {
 	client := testCompatibleClient(t, "data: {\"model\":\"text\",\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"你好\"}}]}\n\ndata: [DONE]\n")
 	var content string

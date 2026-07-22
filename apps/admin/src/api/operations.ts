@@ -394,7 +394,9 @@ export function updateAIModel(
   return http.put<unknown, AdminAIModel>(`/admin/ai/models/${id}`, payload);
 }
 
-export function testAIModelConnection(payload: Pick<AdminAIModel, 'provider' | 'modelId'>) {
+export function testAIModelConnection(
+  payload: Pick<AdminAIModel, 'provider' | 'modelId' | 'capabilities'>,
+) {
   return http.post<
     unknown,
     { provider: string; modelId: string; available: boolean; latencyMs: number }

@@ -20,6 +20,7 @@ type recipeSuggestionRequest struct {
 	Meal       string `json:"meal"`
 	Servings   int    `json:"servings"`
 	MaxMinutes int    `json:"maxMinutes"`
+	ModelID    string `json:"modelId" binding:"required"`
 }
 
 type recipeSuggestionResponse struct {
@@ -77,18 +78,17 @@ func (h *Handler) GenerateRecipeSuggestions(c *gin.Context) {
 		return
 	}
 
-	aiCfg, errMsg := readLifeTraceAIConfig()
-	if errMsg != "" {
-		c.JSON(http.StatusServiceUnavailable, apiResponse{Code: http.StatusServiceUnavailable, Message: errMsg})
+	invocation, ok := resolveLifeTraceCatalogInvocation(c, req.ModelID, "text", 45*time.Second)
+	if !ok {
 		return
 	}
 
 	prompt := buildRecipeSuggestionPrompt(req, pantryCtx, time.Now())
-	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
+	aiCtx, cancel := context.WithTimeout(c.Request.Context(), 45*time.Second)
 	aiCtx = aiusage.WithAudit(aiCtx, "life-trace-recipe", userID.String())
 	defer cancel()
 
-	raw, modelName, err := callLifeTraceAIWithMaxTokens(aiCtx, aiCfg, prompt, lifeTraceRecipeMaxTokens)
+	raw, modelName, err := callLifeTraceCatalogJSON(aiCtx, invocation, prompt, lifeTraceRecipeMaxTokens)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "AI 菜谱生成失败：" + err.Error()})
 		return
@@ -102,7 +102,7 @@ func (h *Handler) GenerateRecipeSuggestions(c *gin.Context) {
 
 	modelName = strings.TrimSpace(modelName)
 	if modelName == "" {
-		modelName = aiCfg.Model
+		modelName = invocation.Model.ModelID
 	}
 	warnings := append(buildRecipePantryWarnings(pantryCtx), parsed.Warnings...)
 	success(c, recipeSuggestionResponse{
@@ -111,7 +111,7 @@ func (h *Handler) GenerateRecipeSuggestions(c *gin.Context) {
 		Warnings:      normalizeRecipeTextList(warnings, 4, 36),
 		HouseholdID:   householdCtx.Household.ID,
 		HouseholdName: householdCtx.Household.Name,
-		Source:        aiCfg.Source,
+		Source:        invocation.Provider.Provider,
 		Model:         modelName,
 	})
 }

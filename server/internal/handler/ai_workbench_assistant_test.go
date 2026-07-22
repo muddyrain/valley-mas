@@ -12,7 +12,9 @@ import (
 	"testing"
 
 	"valley-server/internal/aiapp"
+	"valley-server/internal/aiusage"
 	"valley-server/internal/model"
+	"valley-server/internal/service"
 	"valley-server/internal/workflow"
 )
 
@@ -234,6 +236,104 @@ func TestBuildAIAppAvatarPromptRequiresChibiAgentCharacter(t *testing.T) {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("avatar prompt missing %q: %s", expected, prompt)
 		}
+	}
+}
+
+func TestGenerateAIAppAvatarStoresGeneratedImageBeforeUpdatingApp(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "头像助手"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	catalogModel := createAIPlatformCatalogModel(t, db, "image_generation")
+	provider := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/images/generations" {
+			t.Fatalf("provider path = %s", request.URL.Path)
+		}
+		_, _ = writer.Write([]byte(`{"images":[{"url":"https://provider.test/generated-avatar.png"}]}`))
+	}))
+	defer provider.Close()
+	t.Setenv("SILICONFLOW_API_KEY", "test-key")
+	t.Setenv("SILICONFLOW_BASE_URL", provider.URL)
+
+	originalPersist := persistGeneratedAIAppAvatar
+	t.Cleanup(func() { persistGeneratedAIAppAvatar = originalPersist })
+	persistGeneratedAIAppAvatar = func(_ context.Context, ownerID model.Int64String, remoteURL string) (*service.UploadResult, error) {
+		if ownerID != app.UserID || remoteURL != "https://provider.test/generated-avatar.png" {
+			t.Fatalf("persist input owner=%s url=%s", ownerID, remoteURL)
+		}
+		return &service.UploadResult{URL: "https://bucket.tos-cn-beijing.volces.com/ai-app-avatars/test.png", Key: "ai-app-avatars/test.png"}, nil
+	}
+
+	body := strings.NewReader(`{"modelId":"` + catalogModel.ID.String() + `"}`)
+	request := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/avatar/generate", body)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if responseCode(recorder) != 0 {
+		t.Fatalf("response = %s", recorder.Body.String())
+	}
+
+	var stored model.AIApp
+	if err := db.First(&stored, "id = ?", app.ID).Error; err != nil {
+		t.Fatalf("load app: %v", err)
+	}
+	if stored.AvatarURL != "https://bucket.tos-cn-beijing.volces.com/ai-app-avatars/test.png" || stored.AvatarStorageKey != "ai-app-avatars/test.png" || stored.AvatarSource != "ai" {
+		t.Fatalf("stored avatar = %#v", stored)
+	}
+	var usage model.AIUsageLog
+	if err := db.Where("feature = ? AND user_id = ?", "ai-workbench-avatar", app.UserID.String()).First(&usage).Error; err != nil {
+		t.Fatalf("load usage: %v", err)
+	}
+	if usage.Status != aiusage.StatusSuccess {
+		t.Fatalf("usage status = %s", usage.Status)
+	}
+}
+
+func TestGenerateAIAppAvatarReportsTransferFailure(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "头像助手"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	catalogModel := createAIPlatformCatalogModel(t, db, "image_generation")
+	provider := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write([]byte(`{"images":[{"url":"https://provider.test/generated-avatar.png"}]}`))
+	}))
+	defer provider.Close()
+	t.Setenv("SILICONFLOW_API_KEY", "test-key")
+	t.Setenv("SILICONFLOW_BASE_URL", provider.URL)
+
+	originalPersist := persistGeneratedAIAppAvatar
+	t.Cleanup(func() { persistGeneratedAIAppAvatar = originalPersist })
+	persistGeneratedAIAppAvatar = func(context.Context, model.Int64String, string) (*service.UploadResult, error) {
+		return nil, errors.New("TOS unavailable")
+	}
+
+	body := strings.NewReader(`{"modelId":"` + catalogModel.ID.String() + `"}`)
+	request := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/avatar/generate", body)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if responseCode(recorder) != http.StatusBadGateway || !strings.Contains(recorder.Body.String(), "转存失败") {
+		t.Fatalf("response = %s", recorder.Body.String())
+	}
+
+	var stored model.AIApp
+	if err := db.First(&stored, "id = ?", app.ID).Error; err != nil {
+		t.Fatalf("load app: %v", err)
+	}
+	if stored.AvatarURL != "" || stored.AvatarStorageKey != "" || stored.AvatarSource != "default" {
+		t.Fatalf("app changed after transfer failure: %#v", stored)
+	}
+	var usage model.AIUsageLog
+	if err := db.Where("feature = ? AND user_id = ?", "ai-workbench-avatar", app.UserID.String()).First(&usage).Error; err != nil {
+		t.Fatalf("load usage: %v", err)
+	}
+	if usage.Status != aiusage.StatusFailed || !strings.Contains(usage.ErrorMessage, "TOS unavailable") {
+		t.Fatalf("usage = %#v", usage)
 	}
 }
 
