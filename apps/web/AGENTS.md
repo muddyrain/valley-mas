@@ -28,19 +28,19 @@
 
 ### shadcn 组件优先
 
-UI 组件必须优先使用 `src/components/ui/` 下的 shadcn 组件，避免自定义样式破坏视觉一致性：
+UI 组件优先使用 `src/components/ui/` 下的 shadcn 组件；当现有组件语义不匹配、第三方接口要求原生元素或需要专用交互时，可以在遵守 token 和可访问性的前提下使用更合适的实现：
 
 - **交互控件**：使用 `Button`（variant/default/outline/ghost 等）、`Select`、`Checkbox`、`Input`、`Textarea`、`Tabs`/`TabsList`/`TabsTrigger`/`TabsContent`
 - **状态反馈**：使用 `Skeleton` 替代自定义 loading 动画、`Badge` 替代自定义标签、`toast` 替代自定义错误提示
 - **布局容器**：使用 `Card`/`CardHeader`/`CardContent`、`ScrollArea`、`Separator`
 - **视觉基线**：优先沿用 shadcn 的默认圆角、间距、阴影、边框和语义色；页面骨架使用熟悉的应用栏、侧边栏、Tabs、表单和列表模式，不额外叠加纸张纹理、玻璃拟态、渐变背景或装饰性大色块。
-- **禁止事项**：
-  - 禁止用原生 `<button>` 替代 `Button` 组件
-  - 禁止手动覆盖 shadcn 组件的默认高度（如 `h-6`、`h-7`、`h-10`），使用默认 `size` 属性
-  - 禁止用 `Loader2` + 自定义 div 替代 `Skeleton` 做 loading 状态
-  - 禁止用自定义 `<p>` + `text-xs text-muted-foreground` 替代 `Badge` 做状态标签
-  - 禁止用自定义 flex + button 组合替代 `Tabs`/`TabsList`/`TabsTrigger` 做切换控件
-  - 需要新的 UI 模式时，先检查 `src/components/ui/` 是否已有对应组件；如果缺少所需组件，直接在 `apps/web` 目录下运行 `npx shadcn@latest add <组件名>` 安装，不要用手写自定义组件替代
+- **使用边界**：
+  - 常规动作优先使用 `Button`；无障碍语义、第三方 render prop 或特殊画布交互确实需要时可使用原生 `<button>`，但需复用现有焦点、禁用态和 token。
+  - 紧凑尺寸优先使用组件已有 `size`；确需新尺寸时增加命名 variant，不在业务页面散落临时高度覆盖。
+  - 内容占位优先使用 `Skeleton`；按钮提交、后台任务等需要表达进行中状态时可使用 spinner 或进度反馈。
+  - 离散状态标签优先使用 `Badge`；说明性状态文本不必强行包装成 Badge。
+  - 真正的标签页切换使用 `Tabs`；筛选、分段控制或工具栏动作按其交互语义选择 Toggle、Select 或 Button group。
+  - 需要新的 UI 模式时先检查 `src/components/ui/`。确需从 shadcn 生成组件时，使用仓库已安装版本执行 `pnpm --filter @valley/web exec shadcn add <组件名>`，检查生成 diff；若会新增依赖，按根规则先取得确认。不要使用 `npx shadcn@latest`。
 
 ## 常用命令
 

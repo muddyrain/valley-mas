@@ -4,10 +4,10 @@
 
 ## 使用约定
 
-- 每个任务选择 1 个主 skill；只有触发条件明确时再叠加最多 2 个业务辅助 skill。
+- 每个任务按需选择 0 或 1 个主 skill；没有明确触发条件时不强行套用 skill。只有触发条件明确时再叠加最多 2 个业务辅助 skill。
 - `encoding-guard` 是文本风险检查，不计入业务辅助 skill 上限。
 - 使用任何 skill 时，在开始阶段简短说明名称和原因；这是一条输出约定，不需要再递归启用 `skill-usage-disclosure`。
-- `task-completion-guard` 只用于跨 3 个以上文件、多轮实施、计划驱动或完成状态容易误报的任务。
+- `task-completion-guard` 只用于跨 3 个以上文件、多轮实施、计划驱动或完成状态容易误报的实施任务；只读分析和普通问答不触发。
 - `delivery-reporting` 只用于用户要求阶段汇报，或长期文档、功能状态、接口、依赖、数据模型、产品方向、验收标准可能变化的任务。
 - CJK/非 ASCII 文本、Markdown、skill、配置示例或批量文本改写使用 `encoding-guard` 做定向检查。
 - 外部参考 skill 不参与默认路由，不能覆盖根 `AGENTS.md`、子项目规则和现有设计系统。
@@ -20,7 +20,7 @@
 | 技能 | 状态 | 触发场景 |
 |---|---|---|
 | `encoding-guard` | 风险触发 | 修改非 ASCII 用户文本、Markdown、skill、配置示例或批量文本时检查乱码和文本丢失 |
-| `task-completion-guard` | 风险触发 | 跨 3 个以上文件、多轮实施、计划驱动或完成状态容易误报 |
+| `task-completion-guard` | 风险触发 | 跨 3 个以上文件、多轮实施、计划驱动或完成状态容易误报的实施任务；不含只读分析 |
 | `component-reuse-guard` | 日常启用 | 出现重复 JSX、handler、弹窗、表单、上传或列表逻辑 |
 | `conventional-commit-guard` | 日常启用 | 生成提交信息或用户明确要求执行 `git commit` |
 | `delivery-reporting` | 风险触发 | 分阶段汇报，或长期状态、接口、依赖、数据模型、产品方向、验收标准变化 |

@@ -3,15 +3,14 @@
 本文件是 AI 在 `apps/toy-climb-arena` 目录内工作的局部协作入口。  
 全局规则、skill 选择和 Git 约定仍以根目录 `AGENTS.md` 为准。
 
-## ⚠️ 强制阅读要求
+## 按范围阅读
 
-**在修改本 app 内任何代码或文档之前，AI 必须先阅读以下文件：**
+只读取与任务有关的文档章节，不为无关的 typo、配置或局部修复强制加载全部长期文档：
 
-1. `docs/GAME_DESIGN.md` — 游戏定位、美术主题、阶段规划
-2. `docs/LEVEL_DESIGN_RULES.md` — 关卡设计约束和技术规格
-3. `docs/TASKS.md` — 当前任务状态和里程碑列表
-
-不阅读上述文件直接修改代码属于**违反协作约定**。
+- 玩法、主题或阶段变化：读取 `docs/GAME_DESIGN.md` 与 `docs/TASKS.md` 的相关章节。
+- 关卡、平台、碰撞或跳跃参数变化：读取 `docs/LEVEL_DESIGN_RULES.md` 及对应任务条目。
+- 模型和 setpiece 变化：读取 `docs/ASSET_GUIDE.md` 与相关登记代码。
+- 普通 bugfix、测试、文案或工程配置：读取相关代码和局部说明即可；若过程中发现会改变玩法或验收标准，再补读并同步对应文档。
 
 ---
 
@@ -62,7 +61,7 @@ apps/toy-climb-arena/
 ### 代码修改
 - 修改游戏逻辑前，先确认 `docs/TASKS.md` 中对应里程碑是否已就绪
 - 不要在未完成 v0.1 工程稳定前添加 v0.2+ 的复杂视觉/网络功能
-- 主游戏组件 `ClimberArcadeExperience.tsx` 已经超过 1500 行，修改前优先考虑拆分
+- `ClimberArcadeExperience.tsx` 已完成主体拆分，后续保持其编排职责；只有出现新的独立职责或重复逻辑时再提取组件，不因历史行数机械重构
 
 ### 资源修改
 - 新增或删除模型文件必须同步更新 `docs/ASSET_GUIDE.md`
@@ -70,7 +69,7 @@ apps/toy-climb-arena/
 
 ### 关卡修改
 - 所有关卡改动必须符合 `docs/LEVEL_DESIGN_RULES.md` 的规格
-- 修改后需确认 `ClimberJumpClearanceReport` 无高风险问题
+- 关卡可达性变化时应通过当前运行时入口检查 `ClimberJumpClearanceReport`。在截图/日志验收流程尚未建立前，不得把“代码中存在报告”表述为“已验证无高风险”；应记录未验证范围和可重复的人工检查步骤，且不阻塞无关改动
 
 ### 美术主题
 - 所有视觉改动须符合玩具世界美术方向（详见 `docs/GAME_DESIGN.md`）

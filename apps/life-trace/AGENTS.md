@@ -23,18 +23,20 @@
 - Life Trace 页面样式、loading、交互状态改动，优先对照现有组件和页面模式，不要把开发者分析、实现解释或“页面说明”写进用户界面。
 - 设置页和概览页优先展示状态、摘要和动作，不写“这里会影响哪里”“这个入口已经被整理到哪里”这类元说明。
 - Pantry、提醒、家庭空间、AI、Today 之间的依赖关系如果需要解释，写进最终回复、文档或注释，不写进界面。
-- 前端改动不使用 Playwright 自动验收；最终回复说明需要用户手动看的关键路径。
+- 前端运行时验证优先复用用户当前 Chrome 会话；不可用时可使用仓库已有的自动化或当前环境提供的 headless 工具。不要仅为一次验收新增 Playwright 等浏览器依赖；仍无法验证时再说明人工验收关键路径。
 
 ## 常用命令
 
 ```bash
 cd apps/life-trace && pnpm dev
 pnpm --filter @valley/life-trace exec tsc --noEmit
+pnpm --filter @valley/life-trace check
 pnpm --filter @valley/life-trace exec vitest run
 ```
 
 ## 校验要求
 
 - 仅类型或逻辑改动：至少运行 `pnpm --filter @valley/life-trace exec tsc --noEmit`。
-- 页面或文案改动：补充相关测试，并运行针对性 vitest。
+- 页面交互、状态或业务行为变化：补充与风险相称的测试，并运行针对性 vitest。
+- 纯文案、纯样式或无行为的布局微调不强制新增单测；运行类型、lint 或浏览器验证中与改动相符的部分，并说明未覆盖的运行时风险。
 - 实际修改 CJK/非 ASCII 文案、Markdown、协作规则或 skill 时：运行定向 `encoding-guard`。
