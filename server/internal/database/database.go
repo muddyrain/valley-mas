@@ -403,6 +403,7 @@ func autoMigrateModelsByName() map[string]any {
 		"operation_log":                        &model.OperationLog{},
 		"ai_usage_log":                         &model.AIUsageLog{},
 		"ai_model":                             &model.AIModel{},
+		"ai_image_generation":                  &model.AIImageGeneration{},
 		"mind_arena_debate_session":            &model.MindArenaDebateSession{},
 		"mind_arena_debate_message":            &model.MindArenaDebateMessage{},
 		"mind_arena_debate_score":              &model.MindArenaDebateScore{},
@@ -553,8 +554,8 @@ func autoMigrateModelAliases() map[string]string {
 		"workflow_run_events":        "workflow_run_event",
 		"workflow_test_cases":        "workflow_test_case",
 		"workflow_test_results":      "workflow_test_result",
-		"workflow_triggers":         "workflow_trigger",
-		"workflow_run_jobs":         "workflow_run_job",
+		"workflow_triggers":          "workflow_trigger",
+		"workflow_run_jobs":          "workflow_run_job",
 	}
 }
 
@@ -573,6 +574,7 @@ func coreMigrationModels() []any {
 		&model.OperationLog{},
 		&model.AIUsageLog{},
 		&model.AIModel{},
+		&model.AIImageGeneration{},
 		&model.MindArenaDebateSession{},
 		&model.MindArenaDebateMessage{},
 		&model.MindArenaDebateScore{},

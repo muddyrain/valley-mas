@@ -20,6 +20,7 @@ const CAPABILITY_LABELS: Record<string, string> = {
   text: '文本生成',
   vision: '图片理解',
   image_generation: '图片生成',
+  reference_image: '支持参考图',
   embedding: '向量检索',
   tool_call: '工具调用',
 };
@@ -27,6 +28,7 @@ const CAPABILITY_LABELS: Record<string, string> = {
 interface ModelPickerProps {
   value?: string;
   onValueChange: (modelID: string) => void;
+  onModelChange?: (model?: AvailableAIModel) => void;
   capability: string;
   label?: string;
   catalog?: 'auth' | 'public';
@@ -37,6 +39,7 @@ interface ModelPickerProps {
 export function ModelPicker({
   value,
   onValueChange,
+  onModelChange,
   capability,
   label = '模型',
   catalog = 'auth',
@@ -72,6 +75,10 @@ export function ModelPicker({
   }, [capability, catalog]);
 
   const selectedModel = models.find((item) => item.id === value);
+
+  useEffect(() => {
+    onModelChange?.(selectedModel);
+  }, [onModelChange, selectedModel]);
   const filteredModels = useMemo(() => {
     const keyword = query.trim().toLocaleLowerCase();
     if (!keyword) return models;

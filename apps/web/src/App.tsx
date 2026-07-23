@@ -7,6 +7,7 @@ import { applyThemeToDocument, useThemeStore } from '@/stores/useThemeStore';
 import WorkbenchLayout from './layouts/WorkbenchLayout';
 import AIAppConversation from './pages/AIAppConversation';
 import AIAppEditor from './pages/AIAppEditor';
+import AIImageStudio from './pages/AIImageStudio';
 import AIResources from './pages/AIResources';
 import BlogCreate from './pages/BlogCreate';
 import BlogGroupManage from './pages/BlogGroupManage';
@@ -66,6 +67,8 @@ function RouteTitle() {
       title = 'Valley | 内容首页';
     } else if (pathname === '/workbench') {
       title = '项目 | Valley';
+    } else if (pathname === '/workbench/images') {
+      title = 'AI 图片 | Valley';
     } else if (pathname === '/workbench/resources') {
       title = 'AI 资源 | Valley';
     } else if (pathname.startsWith('/workbench/templates/')) {
@@ -165,6 +168,14 @@ function App() {
             element={
               <RequireAuth>
                 <WorkflowEditorWithKey />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="workbench/images"
+            element={
+              <RequireAuth>
+                <AIImageStudio />
               </RequireAuth>
             }
           />

@@ -1,0 +1,76 @@
+.ai-image-generation-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 50% 35%, hsl(var(--primary) / 0.12), transparent 45%),
+    hsl(var(--background) / 0.76);
+  backdrop-filter: blur(5px);
+}
+
+.ai-image-generation-grain {
+  position: absolute;
+  inset: -30%;
+  background-image:
+    radial-gradient(circle, hsl(var(--primary) / 0.22) 0 1px, transparent 1.5px),
+    radial-gradient(circle, hsl(var(--foreground) / 0.1) 0 1px, transparent 1.5px);
+  background-position:
+    0 0,
+    9px 11px;
+  background-size: 18px 18px;
+  opacity: 0.38;
+  animation: ai-image-grain-drift 5s steps(8) infinite;
+}
+
+.ai-image-generation-scan {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 28%;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    hsl(var(--primary) / 0.12) 45%,
+    hsl(var(--primary) / 0.3) 50%,
+    transparent
+  );
+  filter: blur(1px);
+  animation: ai-image-scan 2.8s ease-in-out infinite;
+}
+
+@keyframes ai-image-grain-drift {
+  0% {
+    transform: translate3d(-2%, -1%, 0);
+  }
+  50% {
+    transform: translate3d(2%, 1%, 0);
+  }
+  100% {
+    transform: translate3d(-1%, 2%, 0);
+  }
+}
+
+@keyframes ai-image-scan {
+  0% {
+    transform: translateY(-180%);
+  }
+  100% {
+    transform: translateY(420%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-image-generation-grain,
+  .ai-image-generation-scan {
+    animation: none;
+  }
+
+  .ai-image-generation-scan {
+    top: 36%;
+  }
+}

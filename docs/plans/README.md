@@ -23,6 +23,7 @@
 
 ## 当前活跃计划
 
+- [2026-07-23-ai-image-studio.md](2026-07-23-ai-image-studio.md)：AI 图片独立创作页、参考图生成、任务历史与资源保存。
 - [2026-07-22-ai-knowledge-pdf-multimodal.md](2026-07-22-ai-knowledge-pdf-multimodal.md)：知识库 PDF 的页面渲染、视觉解析、表格与图片摄取。
 - [2026-07-22-ai-workflow-p14-production-runtime.md](2026-07-22-ai-workflow-p14-production-runtime.md)：P14.1 工作流异步运行、定时触发与持久化调度底座。
 - [2026-07-21-blog-excerpt-model-catalog.md](2026-07-21-blog-excerpt-model-catalog.md)：博客编辑器摘要生成接入模型目录。
@@ -42,6 +43,7 @@
 - [archive/2026-07/2026-07-11-ai-workflow-automation.md](archive/2026-07/2026-07-11-ai-workflow-automation.md)
 - [archive/2026-07/2026-07-14-ai-app-editor-recovery.md](archive/2026-07/2026-07-14-ai-app-editor-recovery.md)
 - [archive/2026-07/2026-07-02-server-ai-agent-runtime.md](archive/2026-07/2026-07-02-server-ai-agent-runtime.md)
+- [archive/2026-07/2026-07-02-remove-resource-tag-table.md](archive/2026-07/2026-07-02-remove-resource-tag-table.md)
 - [archive/2026-07/2026-07-14-ai-knowledge-pdf-ingestion.md](archive/2026-07/2026-07-14-ai-knowledge-pdf-ingestion.md)
 - [archive/2026-07/2026-07-16-workflow-editor-ergonomics.md](archive/2026-07/2026-07-16-workflow-editor-ergonomics.md)
 - [archive/2026-07/2026-07-14-ai-workbench-platform.md](archive/2026-07/2026-07-14-ai-workbench-platform.md)

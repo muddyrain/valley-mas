@@ -3,19 +3,22 @@ package handler
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 
 	"valley-server/internal/aiclient"
 )
 
 type fakeAIModelProbeClient struct {
-	request        aiclient.CompatibleChatRequest
-	embeddingModel string
-	embeddingInput []string
-	imageModel     string
-	imagePrompt    string
-	imageSize      string
-	err            error
+	request         aiclient.CompatibleChatRequest
+	embeddingModel  string
+	embeddingInput  []string
+	imageModel      string
+	imagePrompt     string
+	imageSize       string
+	imageReferences []string
+	err             error
 }
 
 func (client *fakeAIModelProbeClient) Chat(_ context.Context, request aiclient.CompatibleChatRequest) (aiclient.CompatibleChatResponse, error) {
@@ -40,10 +43,14 @@ func (client *fakeAIModelProbeClient) Embeddings(_ context.Context, modelID stri
 	}{{Embedding: []float32{0.1}, Index: 0}}}, nil
 }
 
-func (client *fakeAIModelProbeClient) GenerateImage(_ context.Context, modelID, prompt, imageSize string) (string, error) {
-	client.imageModel = modelID
-	client.imagePrompt = prompt
-	client.imageSize = imageSize
+func (client *fakeAIModelProbeClient) GenerateImageWithRequest(
+	_ context.Context,
+	request aiclient.ImageGenerationRequest,
+) (string, error) {
+	client.imageModel = request.ModelID
+	client.imagePrompt = request.Prompt
+	client.imageSize = request.Size
+	client.imageReferences = request.Images
 	if client.err != nil {
 		return "", client.err
 	}
@@ -52,12 +59,12 @@ func (client *fakeAIModelProbeClient) GenerateImage(_ context.Context, modelID, 
 
 func TestProbeAIModelUsesMinimalInferenceRequest(t *testing.T) {
 	client := &fakeAIModelProbeClient{}
-	latency, err := probeAIModel(context.Background(), client, "deepseek-ai/DeepSeek-V3", []string{"text"})
+	result, err := probeAIModel(context.Background(), client, "deepseek-ai/DeepSeek-V3", []string{"text"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if latency < 0 {
-		t.Fatalf("latency = %v", latency)
+	if result.Latency < 0 {
+		t.Fatalf("latency = %v", result.Latency)
 	}
 	if client.request.Model != "deepseek-ai/DeepSeek-V3" {
 		t.Fatalf("model = %q", client.request.Model)
@@ -90,6 +97,26 @@ func TestProbeAIModelUsesImageGenerationEndpoint(t *testing.T) {
 	}
 }
 
+func TestProbeAIModelUsesReferenceImageWhenDeclared(t *testing.T) {
+	client := &fakeAIModelProbeClient{}
+	result, err := probeAIModel(
+		context.Background(),
+		client,
+		"gpt-image-2",
+		[]string{"image_generation", "reference_image"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(client.imageReferences) != 1 ||
+		!strings.HasPrefix(client.imageReferences[0], "data:image/png;base64,") {
+		t.Fatalf("reference probe missing: %+v", client.imageReferences)
+	}
+	if !slices.Equal(result.VerifiedCapabilities, []string{"image_generation", "reference_image"}) {
+		t.Fatalf("verified capabilities = %+v", result.VerifiedCapabilities)
+	}
+}
+
 func TestProbeAIModelUsesEmbeddingEndpoint(t *testing.T) {
 	client := &fakeAIModelProbeClient{}
 	_, err := probeAIModel(context.Background(), client, "BAAI/bge-m3", []string{"embedding"})
@@ -107,5 +134,35 @@ func TestProbeAIModelReturnsUpstreamError(t *testing.T) {
 	_, err := probeAIModel(context.Background(), client, "text-model", []string{"text"})
 	if !errors.Is(err, upstreamErr) {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestNewAIModelRequiresImageGenerationForReferenceImage(t *testing.T) {
+	_, err := newAIModel(adminAIModelRequest{
+		Provider: "amux", ModelID: "gpt-image-2", Capabilities: []string{"reference_image"}, Enabled: true,
+	})
+	if err == nil {
+		t.Fatal("expected reference_image dependency validation")
+	}
+	if _, err := newAIModel(adminAIModelRequest{
+		Provider: "amux", ModelID: "gpt-image-2",
+		Capabilities: []string{"image_generation", "reference_image"}, Enabled: true,
+	}); err != nil {
+		t.Fatalf("valid image model rejected: %v", err)
+	}
+}
+
+func TestAIModelVerificationStatusTracksPartialCapabilities(t *testing.T) {
+	if status := aiModelVerificationStatus(
+		[]string{"text", "vision"},
+		[]string{"text"},
+	); status != "partial" {
+		t.Fatalf("status = %q", status)
+	}
+	if status := aiModelVerificationStatus(
+		[]string{"image_generation", "reference_image"},
+		[]string{"image_generation", "reference_image"},
+	); status != "verified" {
+		t.Fatalf("status = %q", status)
 	}
 }

@@ -47,6 +47,7 @@ const navGroups = [
     label: '创作',
     items: [
       { to: '/workbench', label: '项目', icon: Bot },
+      { to: '/workbench/images', label: 'AI 图片', icon: Sparkles },
       { to: '/workbench/resources', label: 'AI 资源', icon: LibraryBig },
     ],
   },
@@ -70,6 +71,9 @@ export function Sidebar() {
     if (to === '/') return location.pathname === '/';
     if (to === '/workbench') {
       return location.pathname === to || location.pathname.startsWith('/workbench/apps/');
+    }
+    if (to === '/workbench/images') {
+      return location.pathname === to;
     }
     if (to === '/workbench/resources') {
       return (

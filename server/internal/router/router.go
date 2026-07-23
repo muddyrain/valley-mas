@@ -145,6 +145,11 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 			auth.POST("/ai/chat", handler.ChatWithAI)
 			auth.GET("/ai/models", handler.ListAvailableAIModels)
+			auth.GET("/ai/image-presets", handler.ListAIImagePresets)
+			auth.GET("/ai/image-generations", handler.ListAIImageGenerations)
+			auth.POST("/ai/image-generations", handler.CreateAIImageGeneration)
+			auth.GET("/ai/image-generations/:generationId", handler.GetAIImageGeneration)
+			auth.POST("/ai/image-generations/:generationId/resource", handler.SaveAIImageGenerationResource)
 			// AI Workbench platform assets. Legacy /ai/agents and /workflows remain supported.
 			auth.GET("/ai/apps", handler.ListAIApps)
 			auth.POST("/ai/apps", handler.CreateAIApp)

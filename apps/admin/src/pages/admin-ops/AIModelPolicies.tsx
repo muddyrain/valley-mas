@@ -12,11 +12,13 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   type AdminAIModel,
+  type AdminAIModelInput,
   type AIModelCapability,
   createAIModel,
   listAIModels,
@@ -29,11 +31,29 @@ const capabilityOptions: Array<{ value: AIModelCapability; label: string }> = [
   { value: 'text', label: '文本' },
   { value: 'vision', label: '视觉' },
   { value: 'image_generation', label: '生图' },
+  { value: 'reference_image', label: '支持参考图' },
   { value: 'embedding', label: '向量' },
   { value: 'tool_call', label: '工具调用' },
 ];
 
-type ModelForm = Omit<AdminAIModel, 'id' | 'createdAt' | 'updatedAt'>;
+const imageProtocolOptions = [
+  { value: 'auto', label: '自动匹配 Provider（推荐）' },
+  { value: 'siliconflow_images', label: 'SiliconFlow Images JSON' },
+  { value: 'openai_images', label: 'OpenAI Images（生成 / 编辑）' },
+  { value: 'ark_images', label: 'ARK Images JSON' },
+];
+
+type ModelForm = AdminAIModelInput;
+
+const verificationLabels: Record<
+  AdminAIModel['verificationStatus'],
+  { color: string; label: string }
+> = {
+  unverified: { color: 'default', label: '未验证' },
+  partial: { color: 'gold', label: '部分验证' },
+  verified: { color: 'green', label: '已验证' },
+  failed: { color: 'red', label: '验证失败' },
+};
 export default function AIModelPolicies() {
   const [models, setModels] = useState<AdminAIModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,58 +79,86 @@ export default function AIModelPolicies() {
     void reload();
   }, [reload]);
 
-  const modelColumns: ColumnsType<AdminAIModel> = useMemo(
-    () => [
-      {
-        title: '模型',
-        key: 'model',
-        render: (_, item) => (
-          <>
-            <div>{item.displayName}</div>
-            <div className="text-xs text-gray-400">{item.modelId}</div>
-          </>
-        ),
+  const modelColumns: ColumnsType<AdminAIModel> = [
+    {
+      title: '模型',
+      key: 'model',
+      render: (_, item) => (
+        <>
+          <div>{item.displayName}</div>
+          <div className="text-xs text-gray-400">{item.modelId}</div>
+        </>
+      ),
+    },
+    { title: 'Provider', dataIndex: 'provider', width: 140 },
+    {
+      title: '能力',
+      dataIndex: 'capabilities',
+      render: (values: string[], item) =>
+        (Array.isArray(values) ? values : []).map((value) => (
+          <Tag
+            key={value}
+            color={
+              item.verifiedCapabilities?.includes(value as AIModelCapability) ? 'green' : undefined
+            }
+            title={
+              item.verifiedCapabilities?.includes(value as AIModelCapability)
+                ? '已验证'
+                : '已声明，尚未验证'
+            }
+          >
+            {capabilityOptions.find((item) => item.value === value)?.label || value}
+          </Tag>
+        )),
+    },
+    {
+      title: '状态',
+      dataIndex: 'enabled',
+      width: 100,
+      render: (enabled: boolean) => (
+        <Tag color={enabled ? 'green' : 'default'}>{enabled ? '启用' : '停用'}</Tag>
+      ),
+    },
+    {
+      title: '验证',
+      key: 'verification',
+      width: 140,
+      render: (_, item) => {
+        const verification =
+          verificationLabels[item.verificationStatus] || verificationLabels.unverified;
+        return (
+          <div>
+            <Tooltip title={item.verificationMessage || undefined}>
+              <Tag color={verification.color}>{verification.label}</Tag>
+            </Tooltip>
+            {item.lastVerifiedAt ? (
+              <div className="mt-1 text-xs text-gray-400">
+                {new Date(item.lastVerifiedAt).toLocaleString('zh-CN')}
+              </div>
+            ) : null}
+          </div>
+        );
       },
-      { title: 'Provider', dataIndex: 'provider', width: 140 },
-      {
-        title: '能力',
-        dataIndex: 'capabilities',
-        render: (values: string[]) =>
-          (Array.isArray(values) ? values : []).map((value) => (
-            <Tag key={value}>
-              {capabilityOptions.find((item) => item.value === value)?.label || value}
-            </Tag>
-          )),
-      },
-      {
-        title: '状态',
-        dataIndex: 'enabled',
-        width: 100,
-        render: (enabled: boolean) => (
-          <Tag color={enabled ? 'green' : 'default'}>{enabled ? '启用' : '停用'}</Tag>
-        ),
-      },
-      {
-        title: '操作',
-        width: 170,
-        render: (_, item) => (
-          <Space size={0}>
-            <Button
-              type="link"
-              loading={testingModelID === item.id}
-              onClick={() => void testSavedModelConnection(item)}
-            >
-              检测连接
-            </Button>
-            <Button type="link" onClick={() => openModel(item)}>
-              编辑
-            </Button>
-          </Space>
-        ),
-      },
-    ],
-    [testingModelID],
-  );
+    },
+    {
+      title: '操作',
+      width: 170,
+      render: (_, item) => (
+        <Space size={0}>
+          <Button
+            type="link"
+            loading={testingModelID === item.id}
+            onClick={() => void testSavedModelConnection(item)}
+          >
+            检测连接
+          </Button>
+          <Button type="link" onClick={() => openModel(item)}>
+            编辑
+          </Button>
+        </Space>
+      ),
+    },
+  ];
 
   const openModel = (item?: AdminAIModel) => {
     setEditingModel(item || null);
@@ -118,6 +166,7 @@ export default function AIModelPolicies() {
       item || {
         provider: 'siliconflow',
         capabilities: ['text'],
+        imageProtocol: 'auto',
         enabled: true,
         sortOrder: models.length + 1,
       },
@@ -135,13 +184,19 @@ export default function AIModelPolicies() {
   };
 
   const testConnection = async () => {
-    const value = await modelForm.validateFields(['provider', 'modelId', 'capabilities']);
+    const value = await modelForm.validateFields([
+      'provider',
+      'modelId',
+      'capabilities',
+      'imageProtocol',
+    ]);
     try {
       setTestingConnection(true);
       const result = await testAIModelConnection({
         provider: value.provider,
         modelId: value.modelId,
         capabilities: value.capabilities,
+        imageProtocol: value.imageProtocol,
       });
       message.success(`模型调用正常（${result.latencyMs}ms）`);
     } finally {
@@ -153,13 +208,20 @@ export default function AIModelPolicies() {
     try {
       setTestingModelID(selected.id);
       const result = await testAIModelConnection({
+        catalogId: selected.id,
         provider: selected.provider,
         modelId: selected.modelId,
         capabilities: selected.capabilities,
+        imageProtocol: selected.imageProtocol,
       });
-      message.success(`${selected.displayName} 调用正常（${result.latencyMs}ms）`);
+      message.success(
+        `${selected.displayName} 调用正常（${result.latencyMs}ms，${
+          result.verificationStatus === 'verified' ? '能力已验证' : '部分能力已验证'
+        }）`,
+      );
     } finally {
       setTestingModelID(undefined);
+      await reload();
     }
   };
 
@@ -219,7 +281,7 @@ export default function AIModelPolicies() {
         open={modelOpen}
         onCancel={() => setModelOpen(false)}
         onOk={() => void saveModel()}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={modelForm} layout="vertical">
           <Form.Item name="provider" label="Provider" rules={[{ required: true }]}>
@@ -250,8 +312,33 @@ export default function AIModelPolicies() {
             <Input />
           </Form.Item>
           <Form.Item name="capabilities" label="能力" rules={[{ required: true }]}>
-            <Select mode="multiple" options={capabilityOptions} />
+            <Select
+              mode="multiple"
+              options={capabilityOptions.map((item) =>
+                item.value === 'reference_image'
+                  ? { ...item, disabled: !probesImageGeneration }
+                  : item,
+              )}
+              onChange={(values: AIModelCapability[]) => {
+                if (!values.includes('image_generation')) {
+                  modelForm.setFieldValue(
+                    'capabilities',
+                    values.filter((value) => value !== 'reference_image'),
+                  );
+                }
+              }}
+            />
           </Form.Item>
+          {probesImageGeneration ? (
+            <Form.Item
+              name="imageProtocol"
+              label="图片协议"
+              rules={[{ required: true }]}
+              extra="自动模式按 Provider 选择默认协议；仅在模型文档明确要求时手动指定。"
+            >
+              <Select options={imageProtocolOptions} />
+            </Form.Item>
+          ) : null}
           <Form.Item name="sortOrder" label="排序">
             <InputNumber className="w-full" min={0} />
           </Form.Item>

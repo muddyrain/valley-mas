@@ -45,7 +45,7 @@ func TestCompatibleClientEmbeddingsRejectsIncompleteResponse(t *testing.T) {
 }
 
 func TestCompatibleClientGenerateImageUsesImageEndpoint(t *testing.T) {
-	client := &CompatibleClient{BaseURL: "https://provider.test/v1", APIKey: "test-key", Client: &http.Client{Timeout: time.Second, Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+	client := &CompatibleClient{Provider: "siliconflow", BaseURL: "https://provider.test/v1", APIKey: "test-key", Client: &http.Client{Timeout: time.Second, Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
 		if request.URL.Path != "/v1/images/generations" {
 			t.Fatalf("path = %q", request.URL.Path)
 		}

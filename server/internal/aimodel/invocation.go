@@ -26,9 +26,16 @@ func ResolveInvocation(db *gorm.DB, modelID, capability string, timeout time.Dur
 	if err != nil {
 		return Invocation{}, err
 	}
+	client := aiclient.NewProviderCompatibleClient(
+		provider.Provider,
+		provider.BaseURL,
+		provider.APIKey,
+		timeout,
+	)
+	client.ImageProtocol = selected.ImageProtocol
 	return Invocation{
 		Model:    selected,
 		Provider: provider,
-		Client:   aiclient.NewCompatibleClient(provider.BaseURL, provider.APIKey, timeout),
+		Client:   client,
 	}, nil
 }

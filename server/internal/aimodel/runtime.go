@@ -69,6 +69,9 @@ func DecodeStrings(raw string) []string {
 	seen := make(map[string]struct{}, len(values))
 	for _, value := range values {
 		value = strings.TrimSpace(value)
+		if value == "image_edit" {
+			value = "reference_image"
+		}
 		if value == "" {
 			continue
 		}

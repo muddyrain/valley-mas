@@ -7,6 +7,7 @@ import {
   getAPIErrorMessage,
   type PromptAssistantField,
   type PromptAssistantSuggestion,
+  type PromptAssistantTarget,
 } from '@/api/aiWorkbench';
 import { ModelPicker } from '@/components/ai/ModelPicker';
 import { AIGenerationProgress } from '@/components/ai-workbench/AIGenerationProgress';
@@ -31,6 +32,7 @@ const fieldLabels: Record<PromptAssistantField, string> = {
   description: '简介',
   opening_message: '开场白',
   example_questions: '示例问题',
+  image_prompt: '画面描述',
 };
 
 export function PromptAssistantDialog({
@@ -48,7 +50,7 @@ export function PromptAssistantDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   appId?: string;
-  target?: 'agent' | 'workflow_llm' | 'prompt_resource';
+  target?: PromptAssistantTarget;
   field?: PromptAssistantField;
   allowedVariables?: string[];
   currentPrompt: string;
@@ -87,6 +89,10 @@ export function PromptAssistantDialog({
       toast.error('请先填写系统提示词');
       return;
     }
+    if (field === 'image_prompt' && !currentPrompt.trim()) {
+      toast.error('请先填写画面描述');
+      return;
+    }
     if (mode === 'instruction' && !instruction.trim()) {
       toast.error('请填写调整要求');
       return;
@@ -122,7 +128,12 @@ export function PromptAssistantDialog({
       setSuggestion(result.suggestion);
     } catch (error) {
       if (controller.signal.aborted) return;
-      toast.error(getAPIErrorMessage(error, '提示词优化失败'));
+      toast.error(
+        getAPIErrorMessage(
+          error,
+          isSystemPrompt ? '提示词优化失败' : `${fieldLabels[field]}生成失败`,
+        ),
+      );
     } finally {
       controllerRef.current = null;
       setLoading(false);
@@ -146,7 +157,7 @@ export function PromptAssistantDialog({
             <Sparkles className="size-4 text-primary" />
             {title}
           </DialogTitle>
-          <DialogDescription>生成结果不会自动保存，确认后仅写入当前草稿。</DialogDescription>
+          <DialogDescription>生成结果不会自动保存，确认后才会替换当前内容。</DialogDescription>
         </DialogHeader>
         {isSystemPrompt ? (
           <div className="flex flex-wrap gap-2">
@@ -231,7 +242,7 @@ export function PromptAssistantDialog({
         {loading ? (
           <AIGenerationProgress
             title={isSystemPrompt ? '正在优化提示词' : `正在生成${fieldLabels[field]}`}
-            description="AI 正在组织内容并检查格式，完成后会显示可编辑结果。"
+            description="AI 正在组织内容并检查格式，完成后会显示预览结果。"
           />
         ) : suggestion ? (
           <div className="min-h-0 space-y-3 rounded-xl border border-border bg-muted/30 p-4">

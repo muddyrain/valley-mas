@@ -12,13 +12,14 @@ import (
 	"time"
 )
 
-// CompatibleClient is the shared OpenAI-compatible transport used by the
-// SiliconFlow and Amux providers. It deliberately has no provider-specific
-// model list or credentials baked into it.
+// CompatibleClient is the shared OpenAI-compatible transport. Image behavior
+// is selected by provider defaults or an explicit model-level protocol adapter.
 type CompatibleClient struct {
-	BaseURL string
-	APIKey  string
-	Client  *http.Client
+	Provider      string
+	ImageProtocol string
+	BaseURL       string
+	APIKey        string
+	Client        *http.Client
 }
 
 type CompatibleMessage struct {
@@ -73,23 +74,20 @@ type CompatibleEmbeddingResponse struct {
 	Usage CompatibleUsage `json:"usage"`
 }
 
-type CompatibleImageResponse struct {
-	Images []struct {
-		URL string `json:"url"`
-	} `json:"images"`
-	Data []struct {
-		URL string `json:"url"`
-	} `json:"data"`
+func NewCompatibleClient(baseURL, apiKey string, timeout time.Duration) *CompatibleClient {
+	return NewProviderCompatibleClient("", baseURL, apiKey, timeout)
 }
 
-func NewCompatibleClient(baseURL, apiKey string, timeout time.Duration) *CompatibleClient {
+func NewProviderCompatibleClient(provider, baseURL, apiKey string, timeout time.Duration) *CompatibleClient {
 	if timeout <= 0 {
 		timeout = 60 * time.Second
 	}
 	return &CompatibleClient{
-		BaseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"),
-		APIKey:  strings.TrimSpace(apiKey),
-		Client:  &http.Client{Timeout: timeout},
+		Provider:      strings.TrimSpace(provider),
+		ImageProtocol: "auto",
+		BaseURL:       strings.TrimRight(strings.TrimSpace(baseURL), "/"),
+		APIKey:        strings.TrimSpace(apiKey),
+		Client:        &http.Client{Timeout: timeout},
 	}
 }
 
@@ -170,24 +168,6 @@ func (c *CompatibleClient) Embeddings(ctx context.Context, modelID string, input
 	return response, nil
 }
 
-func (c *CompatibleClient) GenerateImage(ctx context.Context, modelID, prompt, imageSize string) (string, error) {
-	payload := map[string]any{"model": modelID, "prompt": prompt}
-	if strings.TrimSpace(imageSize) != "" {
-		payload["image_size"] = imageSize
-	}
-	var response CompatibleImageResponse
-	if err := c.doJSON(ctx, http.MethodPost, "/images/generations", payload, &response); err != nil {
-		return "", err
-	}
-	if len(response.Images) > 0 && strings.TrimSpace(response.Images[0].URL) != "" {
-		return strings.TrimSpace(response.Images[0].URL), nil
-	}
-	if len(response.Data) > 0 && strings.TrimSpace(response.Data[0].URL) != "" {
-		return strings.TrimSpace(response.Data[0].URL), nil
-	}
-	return "", fmt.Errorf("AI 生图返回空 URL")
-}
-
 func (c *CompatibleClient) ListModels(ctx context.Context) ([]string, error) {
 	var response struct {
 		Data []struct {
@@ -207,6 +187,17 @@ func (c *CompatibleClient) ListModels(ctx context.Context) ([]string, error) {
 }
 
 func (c *CompatibleClient) doJSON(ctx context.Context, method, path string, payload any, destination any) error {
+	return c.doJSONWithLimit(ctx, method, path, payload, destination, 8<<20)
+}
+
+func (c *CompatibleClient) doJSONWithLimit(
+	ctx context.Context,
+	method string,
+	path string,
+	payload any,
+	destination any,
+	maxResponseBytes int64,
+) error {
 	if c == nil || c.BaseURL == "" || c.APIKey == "" {
 		return fmt.Errorf("AI compatible client 未配置")
 	}
@@ -232,9 +223,12 @@ func (c *CompatibleClient) doJSON(ctx context.Context, method, path string, payl
 		return fmt.Errorf("AI 上游请求失败: %w", err)
 	}
 	defer response.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(response.Body, 8<<20))
+	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
 	if err != nil {
 		return err
+	}
+	if int64(len(data)) > maxResponseBytes {
+		return fmt.Errorf("AI 上游响应超过 %dMB", maxResponseBytes>>20)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("AI 上游返回 %d: %s", response.StatusCode, strings.TrimSpace(string(data)))

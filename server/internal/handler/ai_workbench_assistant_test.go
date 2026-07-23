@@ -184,6 +184,28 @@ func TestPromptAssistantSuggestionRequiresSelectedModel(t *testing.T) {
 	}
 }
 
+func TestPromptAssistantImagePromptRequiresCurrentContent(t *testing.T) {
+	router, _ := setupAIPlatformTestRouter(t)
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/ai/prompt-assistant/suggestions",
+		strings.NewReader(
+			`{"target":"image_studio","field":"image_prompt","mode":"auto","modelId":"1","currentPrompt":""}`,
+		),
+	)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	var payload Response
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v; body = %s", err, response.Body.String())
+	}
+	if payload.Code != http.StatusBadRequest {
+		t.Fatalf("image prompt code = %d, want 400; response = %s", payload.Code, response.Body.String())
+	}
+}
+
 func TestRunStructuredWorkbenchAIRepairsInvalidOutputOnce(t *testing.T) {
 	_, _ = setupAIPlatformTestRouter(t)
 	original := callWorkbenchStructuredAI
@@ -220,6 +242,23 @@ func TestValidatePromptSuggestionSupportsAgentFields(t *testing.T) {
 	questions := promptAssistantSuggestion{ExampleQuestions: []string{"模拟一次咖啡店点单", "纠正我的英语发音表达"}, Summary: []string{"覆盖常用练习"}}
 	if err := validatePromptSuggestion(&questions, "", "agent", nil, false, promptFieldQuestions); err != nil {
 		t.Fatalf("validate example questions error = %v", err)
+	}
+}
+
+func TestValidatePromptSuggestionSupportsImagePrompt(t *testing.T) {
+	suggestion := promptAssistantSuggestion{
+		OptimizedPrompt: "一株清晨的小草，叶片带着露珠，低机位微距摄影，柔和逆光。",
+		Summary:         []string{"补充构图与光线"},
+	}
+	if err := validatePromptSuggestion(
+		&suggestion,
+		"小草",
+		"image_studio",
+		nil,
+		false,
+		promptFieldImage,
+	); err != nil {
+		t.Fatalf("validate image prompt error = %v", err)
 	}
 }
 

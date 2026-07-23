@@ -14,6 +14,7 @@ import (
 	"unicode"
 
 	"valley-server/internal/aiapp"
+	"valley-server/internal/aiclient"
 	"valley-server/internal/aimodel"
 	"valley-server/internal/aiusage"
 	"valley-server/internal/database"
@@ -109,15 +110,28 @@ func GenerateAIAppAvatar(c *gin.Context) {
 }
 
 func persistGeneratedAIAppAvatarToStorage(ctx context.Context, userID model.Int64String, remoteURL string) (*service.UploadResult, error) {
-	parsedURL, err := url.Parse(strings.TrimSpace(remoteURL))
-	if err != nil || parsedURL == nil || parsedURL.Scheme != "https" || parsedURL.Host == "" {
-		return nil, errors.New("AI 返回的头像地址无效")
-	}
-
 	uploadConfig := service.GetDefaultConfig(service.UploadTypeAvatar)
 	uploadConfig.UserID = int64(userID)
 	uploadConfig.CustomFolder = fmt.Sprintf("ai-app-avatars/%s/%s", userID.String(), time.Now().Format("20060102"))
 	maxBytes := uploadConfig.MaxSize * 1024 * 1024
+
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(remoteURL)), "data:image/") {
+		content, mimeType, err := aiclient.DecodeImageDataURL(remoteURL, maxBytes)
+		if err != nil {
+			return nil, fmt.Errorf("读取 AI 头像失败: %w", err)
+		}
+		return service.NewUploadService().UploadBytesWithContext(
+			ctx,
+			"generated-avatar"+avatarExtension(mimeType),
+			content,
+			uploadConfig,
+		)
+	}
+
+	parsedURL, err := url.Parse(strings.TrimSpace(remoteURL))
+	if err != nil || parsedURL == nil || parsedURL.Scheme != "https" || parsedURL.Host == "" {
+		return nil, errors.New("AI 返回的头像地址无效")
+	}
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, parsedURL.String(), nil)
 	if err != nil {

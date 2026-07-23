@@ -54,7 +54,10 @@ export type PromptAssistantField =
   | 'system_prompt'
   | 'description'
   | 'opening_message'
-  | 'example_questions';
+  | 'example_questions'
+  | 'image_prompt';
+
+export type PromptAssistantTarget = 'agent' | 'workflow_llm' | 'prompt_resource' | 'image_studio';
 
 export interface AIAppVersion {
   id: string;
@@ -293,7 +296,7 @@ export function createAIAppProposal(
 
 export async function createPromptAssistantSuggestion(
   data: {
-    target: 'agent' | 'workflow_llm' | 'prompt_resource';
+    target: PromptAssistantTarget;
     modelId: string;
     field?: PromptAssistantField;
     mode: 'auto' | 'instruction' | 'debug_run';

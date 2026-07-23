@@ -1,11 +1,17 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -17,21 +23,27 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const aiModelConnectionProbeTimeout = 45 * time.Second
+const (
+	aiModelConnectionProbeTimeout      = 45 * time.Second
+	aiImageModelConnectionProbeTimeout = 180 * time.Second
+)
 
 type adminAIModelRequest struct {
-	Provider     string   `json:"provider"`
-	ModelID      string   `json:"modelId"`
-	DisplayName  string   `json:"displayName"`
-	Capabilities []string `json:"capabilities"`
-	Enabled      bool     `json:"enabled"`
-	SortOrder    int      `json:"sortOrder"`
+	Provider      string   `json:"provider"`
+	ModelID       string   `json:"modelId"`
+	DisplayName   string   `json:"displayName"`
+	Capabilities  []string `json:"capabilities"`
+	ImageProtocol string   `json:"imageProtocol"`
+	Enabled       bool     `json:"enabled"`
+	SortOrder     int      `json:"sortOrder"`
 }
 
 type aiModelConnectionTestRequest struct {
-	Provider     string   `json:"provider"`
-	ModelID      string   `json:"modelId"`
-	Capabilities []string `json:"capabilities"`
+	CatalogID     string   `json:"catalogId"`
+	Provider      string   `json:"provider"`
+	ModelID       string   `json:"modelId"`
+	Capabilities  []string `json:"capabilities"`
+	ImageProtocol string   `json:"imageProtocol"`
 }
 
 type aiModelOption struct {
@@ -45,15 +57,20 @@ type aiModelOption struct {
 // Admin responses expose JSON fields as their semantic array types rather than
 // the database's JSON-text storage representation.
 type adminAIModelResponse struct {
-	ID           string    `json:"id"`
-	Provider     string    `json:"provider"`
-	ModelID      string    `json:"modelId"`
-	DisplayName  string    `json:"displayName"`
-	Capabilities []string  `json:"capabilities"`
-	Enabled      bool      `json:"enabled"`
-	SortOrder    int       `json:"sortOrder"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	ID                   string     `json:"id"`
+	Provider             string     `json:"provider"`
+	ModelID              string     `json:"modelId"`
+	DisplayName          string     `json:"displayName"`
+	Capabilities         []string   `json:"capabilities"`
+	ImageProtocol        string     `json:"imageProtocol"`
+	VerifiedCapabilities []string   `json:"verifiedCapabilities"`
+	VerificationStatus   string     `json:"verificationStatus"`
+	VerificationMessage  string     `json:"verificationMessage"`
+	LastVerifiedAt       *time.Time `json:"lastVerifiedAt,omitempty"`
+	Enabled              bool       `json:"enabled"`
+	SortOrder            int        `json:"sortOrder"`
+	CreatedAt            time.Time  `json:"createdAt"`
+	UpdatedAt            time.Time  `json:"updatedAt"`
 }
 
 func AdminListAIModels(c *gin.Context) {
@@ -112,10 +129,21 @@ func AdminUpdateAIModel(c *gin.Context) {
 		Error(c, http.StatusNotFound, "AI 模型不存在")
 		return
 	}
-	if err := database.GetDB().Model(&existing).Updates(map[string]any{
+	updates := map[string]any{
 		"provider": item.Provider, "model_id": item.ModelID, "display_name": item.DisplayName,
-		"capabilities": item.Capabilities, "enabled": item.Enabled, "sort_order": item.SortOrder,
-	}).Error; err != nil {
+		"capabilities": item.Capabilities, "image_protocol": item.ImageProtocol,
+		"enabled": item.Enabled, "sort_order": item.SortOrder,
+	}
+	if existing.Provider != item.Provider ||
+		existing.ModelID != item.ModelID ||
+		existing.Capabilities != item.Capabilities ||
+		existing.ImageProtocol != item.ImageProtocol {
+		updates["verified_capabilities"] = "[]"
+		updates["verification_status"] = "unverified"
+		updates["verification_message"] = ""
+		updates["last_verified_at"] = nil
+	}
+	if err := database.GetDB().Model(&existing).Updates(updates).Error; err != nil {
 		Error(c, http.StatusBadRequest, "更新 AI 模型失败")
 		return
 	}
@@ -140,20 +168,41 @@ func AdminTestAIModelConnection(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "模型 ID 不能为空")
 		return
 	}
+	profile := resolveAIModelProbeProfile(
+		req.CatalogID,
+		provider,
+		modelID,
+		req.Capabilities,
+		req.ImageProtocol,
+	)
+	capabilities := profile.Capabilities
 	config, err := aimodel.ProviderFromEnv(provider)
 	if err != nil {
+		recordAIModelVerification(req.CatalogID, provider, modelID, "failed", nil, err.Error())
 		Error(c, http.StatusServiceUnavailable, err.Error())
 		return
 	}
-	contextWithTimeout, cancel := context.WithTimeout(c.Request.Context(), aiModelConnectionProbeTimeout)
+	probeTimeout := aiModelConnectionProbeTimeout
+	if slices.Contains(aimodel.DecodeStrings(mustEncodeStringSlice(capabilities)), "image_generation") {
+		probeTimeout = aiImageModelConnectionProbeTimeout
+	}
+	contextWithTimeout, cancel := context.WithTimeout(c.Request.Context(), probeTimeout)
 	defer cancel()
-	latency, err := probeAIModel(
+	probeClient := aiclient.NewProviderCompatibleClient(
+		config.Provider,
+		config.BaseURL,
+		config.APIKey,
+		probeTimeout,
+	)
+	probeClient.ImageProtocol = profile.ImageProtocol
+	probe, err := probeAIModel(
 		contextWithTimeout,
-		aiclient.NewCompatibleClient(config.BaseURL, config.APIKey, aiModelConnectionProbeTimeout),
+		probeClient,
 		modelID,
-		req.Capabilities,
+		capabilities,
 	)
 	if err != nil {
+		recordAIModelVerification(req.CatalogID, provider, modelID, "failed", nil, err.Error())
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(contextWithTimeout.Err(), context.DeadlineExceeded) {
 			Error(c, http.StatusGatewayTimeout, "模型响应超时，请稍后重试或更换模型")
 			return
@@ -161,26 +210,72 @@ func AdminTestAIModelConnection(c *gin.Context) {
 		Error(c, http.StatusBadGateway, "模型调用检测失败："+err.Error())
 		return
 	}
+	status := aiModelVerificationStatus(capabilities, probe.VerifiedCapabilities)
+	verifiedAt := time.Now()
+	recordAIModelVerification(
+		req.CatalogID,
+		provider,
+		modelID,
+		status,
+		probe.VerifiedCapabilities,
+		"",
+	)
 	Success(c, gin.H{
-		"provider": provider, "modelId": modelID, "available": true, "latencyMs": latency.Milliseconds(),
+		"provider": provider, "modelId": modelID, "available": true,
+		"latencyMs": probe.Latency.Milliseconds(), "verificationStatus": status,
+		"verifiedCapabilities": probe.VerifiedCapabilities, "verifiedAt": verifiedAt,
 	})
 }
 
 type aiModelProbeClient interface {
 	Chat(context.Context, aiclient.CompatibleChatRequest) (aiclient.CompatibleChatResponse, error)
 	Embeddings(context.Context, string, []string) (aiclient.CompatibleEmbeddingResponse, error)
-	GenerateImage(context.Context, string, string, string) (string, error)
+	GenerateImageWithRequest(context.Context, aiclient.ImageGenerationRequest) (string, error)
 }
 
-func probeAIModel(ctx context.Context, client aiModelProbeClient, modelID string, capabilities []string) (time.Duration, error) {
+type aiModelProbeResult struct {
+	Latency              time.Duration
+	VerifiedCapabilities []string
+}
+
+type aiModelProbeProfile struct {
+	Capabilities  []string
+	ImageProtocol string
+}
+
+func probeAIModel(
+	ctx context.Context,
+	client aiModelProbeClient,
+	modelID string,
+	capabilities []string,
+) (aiModelProbeResult, error) {
 	startedAt := time.Now()
-	if aimodel.HasCapabilities(model.AIModel{Capabilities: aimodel.EncodeStrings(capabilities)}, []string{"image_generation"}) {
-		_, err := client.GenerateImage(ctx, modelID, "A small blue circle on a white background.", "1024x1024")
-		return time.Since(startedAt), err
+	item := model.AIModel{Capabilities: aimodel.EncodeStrings(capabilities)}
+	if aimodel.HasCapabilities(item, []string{"image_generation"}) {
+		request := aiclient.ImageGenerationRequest{
+			ModelID: modelID,
+			Prompt:  "A small blue circle on a white background.",
+			Size:    "1024x1024",
+		}
+		verified := []string{"image_generation"}
+		if aimodel.HasCapabilities(item, []string{"reference_image"}) {
+			reference, err := buildAIModelProbeReference()
+			if err != nil {
+				return aiModelProbeResult{}, err
+			}
+			request.Images = []string{reference}
+			verified = append(verified, "reference_image")
+		}
+		_, err := client.GenerateImageWithRequest(ctx, request)
+		return aiModelProbeResult{
+			Latency: time.Since(startedAt), VerifiedCapabilities: verified,
+		}, err
 	}
-	if aimodel.HasCapabilities(model.AIModel{Capabilities: aimodel.EncodeStrings(capabilities)}, []string{"embedding"}) {
+	if aimodel.HasCapabilities(item, []string{"embedding"}) {
 		_, err := client.Embeddings(ctx, modelID, []string{"ping"})
-		return time.Since(startedAt), err
+		return aiModelProbeResult{
+			Latency: time.Since(startedAt), VerifiedCapabilities: []string{"embedding"},
+		}, err
 	}
 	temperature := 0.0
 	maxTokens := 1
@@ -190,13 +285,22 @@ func probeAIModel(ctx context.Context, client aiModelProbeClient, modelID string
 		Temperature: &temperature,
 		MaxTokens:   &maxTokens,
 	})
-	return time.Since(startedAt), err
+	verified := []string{}
+	if aimodel.HasCapabilities(item, []string{"text"}) {
+		verified = append(verified, "text")
+	}
+	return aiModelProbeResult{
+		Latency: time.Since(startedAt), VerifiedCapabilities: verified,
+	}, err
 }
 
 func adminAIModelResponseFromModel(item model.AIModel) adminAIModelResponse {
 	return adminAIModelResponse{
 		ID: item.ID.String(), Provider: item.Provider, ModelID: item.ModelID, DisplayName: item.DisplayName,
-		Capabilities: aimodel.DecodeStrings(item.Capabilities), Enabled: item.Enabled, SortOrder: item.SortOrder,
+		Capabilities: aimodel.DecodeStrings(item.Capabilities), ImageProtocol: item.ImageProtocol,
+		VerifiedCapabilities: aimodel.DecodeStrings(item.VerifiedCapabilities),
+		VerificationStatus:   item.VerificationStatus, VerificationMessage: item.VerificationMessage,
+		LastVerifiedAt: item.LastVerifiedAt, Enabled: item.Enabled, SortOrder: item.SortOrder,
 		CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
 	}
 }
@@ -208,7 +312,12 @@ func AdminPreviewAIProviderModels(c *gin.Context) {
 		Error(c, http.StatusServiceUnavailable, err.Error())
 		return
 	}
-	models, err := aiclient.NewCompatibleClient(config.BaseURL, config.APIKey, 20*time.Second).ListModels(c.Request.Context())
+	models, err := aiclient.NewProviderCompatibleClient(
+		config.Provider,
+		config.BaseURL,
+		config.APIKey,
+		20*time.Second,
+	).ListModels(c.Request.Context())
 	if err != nil {
 		Error(c, http.StatusBadGateway, "读取 Provider 模型列表失败："+err.Error())
 		return
@@ -244,11 +353,25 @@ func newAIModel(req adminAIModelRequest) (model.AIModel, error) {
 	if len(capabilities) == 0 {
 		return model.AIModel{}, errors.New("请至少配置一种模型能力")
 	}
+	if slices.Contains(capabilities, "reference_image") && !slices.Contains(capabilities, "image_generation") {
+		return model.AIModel{}, errors.New("支持参考图需要同时启用生图能力")
+	}
 	displayName := strings.TrimSpace(req.DisplayName)
 	if displayName == "" {
 		displayName = modelID
 	}
-	return model.AIModel{Provider: provider, ModelID: modelID, DisplayName: displayName, Capabilities: aimodel.EncodeStrings(capabilities), Enabled: req.Enabled, SortOrder: req.SortOrder}, nil
+	imageProtocol := normalizeImageProtocol(req.ImageProtocol)
+	if !slices.Contains(
+		[]string{"auto", "siliconflow_images", "openai_images", "ark_images"},
+		imageProtocol,
+	) {
+		return model.AIModel{}, errors.New("请选择有效的图片协议")
+	}
+	return model.AIModel{
+		Provider: provider, ModelID: modelID, DisplayName: displayName,
+		Capabilities: aimodel.EncodeStrings(capabilities), ImageProtocol: imageProtocol,
+		Enabled: req.Enabled, SortOrder: req.SortOrder,
+	}, nil
 }
 
 func parseModelID(raw string) (model.Int64String, bool) {
@@ -262,4 +385,95 @@ func parseModelID(raw string) (model.Int64String, bool) {
 func mustEncodeStringSlice(values []string) string {
 	encoded, _ := json.Marshal(values)
 	return string(encoded)
+}
+
+func normalizeImageProtocol(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "auto"
+	}
+	return value
+}
+
+func buildAIModelProbeReference() (string, error) {
+	canvas := image.NewRGBA(image.Rect(0, 0, 64, 64))
+	for y := 0; y < 64; y++ {
+		for x := 0; x < 64; x++ {
+			canvas.Set(x, y, color.RGBA{R: 255, G: 255, B: 255, A: 255})
+		}
+	}
+	for y := 18; y < 46; y++ {
+		for x := 18; x < 46; x++ {
+			canvas.Set(x, y, color.RGBA{R: 37, G: 99, B: 235, A: 255})
+		}
+	}
+	var output bytes.Buffer
+	if err := png.Encode(&output, canvas); err != nil {
+		return "", err
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(output.Bytes()), nil
+}
+
+func aiModelVerificationStatus(declared, verified []string) string {
+	declaredSet := make(map[string]struct{})
+	for _, capability := range aimodel.DecodeStrings(mustEncodeStringSlice(declared)) {
+		declaredSet[capability] = struct{}{}
+	}
+	for _, capability := range verified {
+		delete(declaredSet, capability)
+	}
+	if len(declaredSet) == 0 {
+		return "verified"
+	}
+	return "partial"
+}
+
+func recordAIModelVerification(
+	rawCatalogID string,
+	provider string,
+	modelID string,
+	status string,
+	verifiedCapabilities []string,
+	message string,
+) {
+	catalogID, ok := parseModelID(rawCatalogID)
+	if !ok {
+		return
+	}
+	now := time.Now()
+	_ = database.GetDB().Model(&model.AIModel{}).
+		Where("id = ? AND provider = ? AND model_id = ?", catalogID, provider, modelID).
+		Updates(map[string]any{
+			"verified_capabilities": aimodel.EncodeStrings(verifiedCapabilities),
+			"verification_status":   status,
+			"verification_message":  truncateRunes(strings.TrimSpace(message), 500),
+			"last_verified_at":      now,
+		}).Error
+}
+
+func resolveAIModelProbeProfile(
+	rawCatalogID string,
+	provider string,
+	modelID string,
+	requested []string,
+	requestedImageProtocol string,
+) aiModelProbeProfile {
+	fallback := aiModelProbeProfile{
+		Capabilities:  aimodel.DecodeStrings(mustEncodeStringSlice(requested)),
+		ImageProtocol: normalizeImageProtocol(requestedImageProtocol),
+	}
+	catalogID, ok := parseModelID(rawCatalogID)
+	if !ok {
+		return fallback
+	}
+	var item model.AIModel
+	if database.GetDB().
+		Where("id = ? AND provider = ? AND model_id = ?", catalogID, provider, modelID).
+		First(&item).Error != nil {
+		return fallback
+	}
+	return aiModelProbeProfile{
+		Capabilities:  aimodel.DecodeStrings(item.Capabilities),
+		ImageProtocol: normalizeImageProtocol(item.ImageProtocol),
+	}
 }

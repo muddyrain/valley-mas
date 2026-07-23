@@ -147,7 +147,16 @@ export interface AdminAIUsageSummary {
   }>;
 }
 
-export type AIModelCapability = 'text' | 'vision' | 'image_generation' | 'embedding' | 'tool_call';
+export type AIModelCapability =
+  | 'text'
+  | 'vision'
+  | 'image_generation'
+  | 'reference_image'
+  | 'embedding'
+  | 'tool_call';
+
+export type AIModelVerificationStatus = 'unverified' | 'partial' | 'verified' | 'failed';
+export type AIImageProtocol = 'auto' | 'siliconflow_images' | 'openai_images' | 'ark_images';
 
 export interface AdminAIModel {
   id: string;
@@ -155,11 +164,27 @@ export interface AdminAIModel {
   modelId: string;
   displayName: string;
   capabilities: AIModelCapability[];
+  imageProtocol: AIImageProtocol;
+  verifiedCapabilities: AIModelCapability[];
+  verificationStatus: AIModelVerificationStatus;
+  verificationMessage: string;
+  lastVerifiedAt?: string;
   enabled: boolean;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
 }
+
+export type AdminAIModelInput = Pick<
+  AdminAIModel,
+  | 'provider'
+  | 'modelId'
+  | 'displayName'
+  | 'capabilities'
+  | 'imageProtocol'
+  | 'enabled'
+  | 'sortOrder'
+>;
 
 export interface RelationFavorite {
   id: string;
@@ -383,24 +408,31 @@ export function listAIModels(provider?: string) {
   return http.get<unknown, { list: AdminAIModel[] }>('/admin/ai/models', { params: { provider } });
 }
 
-export function createAIModel(payload: Omit<AdminAIModel, 'id' | 'createdAt' | 'updatedAt'>) {
+export function createAIModel(payload: AdminAIModelInput) {
   return http.post<unknown, AdminAIModel>('/admin/ai/models', payload);
 }
 
-export function updateAIModel(
-  id: string,
-  payload: Omit<AdminAIModel, 'id' | 'createdAt' | 'updatedAt'>,
-) {
+export function updateAIModel(id: string, payload: AdminAIModelInput) {
   return http.put<unknown, AdminAIModel>(`/admin/ai/models/${id}`, payload);
 }
 
 export function testAIModelConnection(
-  payload: Pick<AdminAIModel, 'provider' | 'modelId' | 'capabilities'>,
+  payload: Pick<AdminAIModel, 'provider' | 'modelId' | 'capabilities' | 'imageProtocol'> & {
+    catalogId?: string;
+  },
 ) {
   return http.post<
     unknown,
-    { provider: string; modelId: string; available: boolean; latencyMs: number }
-  >('/admin/ai/models/test-connection', payload);
+    {
+      provider: string;
+      modelId: string;
+      available: boolean;
+      latencyMs: number;
+      verificationStatus: AIModelVerificationStatus;
+      verifiedCapabilities: AIModelCapability[];
+      verifiedAt: string;
+    }
+  >('/admin/ai/models/test-connection', payload, { timeout: 210000 });
 }
 
 export function previewAIProviderModels(provider: 'siliconflow' | 'amux') {
