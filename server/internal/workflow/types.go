@@ -14,6 +14,7 @@ type ValueType string
 const (
 	ValueTypeString     ValueType = "string"
 	ValueTypeStringList ValueType = "string[]"
+	ValueTypeArray      ValueType = "array"
 	ValueTypeObject     ValueType = "object"
 	ValueTypeNumber     ValueType = "number"
 	ValueTypeBoolean    ValueType = "boolean"
@@ -21,16 +22,20 @@ const (
 )
 
 const (
-	NodeTypeStart       NodeType = "start"
-	NodeTypeEnd         NodeType = "end"
-	NodeTypeLLM         NodeType = "llm"
-	NodeTypeTool        NodeType = "tool"
-	NodeTypeCondition   NodeType = "condition"
-	NodeTypeSwitch      NodeType = "switch"
-	NodeTypeMerge       NodeType = "merge"
-	NodeTypeVariable    NodeType = "variable"
-	NodeTypeSubworkflow NodeType = "subworkflow"
-	NodeTypeIntent      NodeType = "intent"
+	NodeTypeStart         NodeType = "start"
+	NodeTypeEnd           NodeType = "end"
+	NodeTypeLLM           NodeType = "llm"
+	NodeTypeTool          NodeType = "tool"
+	NodeTypeCondition     NodeType = "condition"
+	NodeTypeSwitch        NodeType = "switch"
+	NodeTypeMerge         NodeType = "merge"
+	NodeTypeVariable      NodeType = "variable"
+	NodeTypeSubworkflow   NodeType = "subworkflow"
+	NodeTypeIntent        NodeType = "intent"
+	NodeTypeLoop          NodeType = "loop"
+	NodeTypeSetLoopVar    NodeType = "set_loop_variable"
+	NodeTypeContinueLoop  NodeType = "continue_loop"
+	NodeTypeTerminateLoop NodeType = "terminate_loop"
 )
 
 type Position struct {
@@ -87,6 +92,7 @@ type RunContext struct {
 	NotionSearcher     NotionSearcher
 	CoverGenerator     CoverGenerator
 	SubworkflowRunner  SubworkflowRunner
+	Emitter            func(Event)
 }
 
 type Actor struct {
@@ -102,17 +108,20 @@ type FileInput struct {
 }
 
 type Event struct {
-	RunID        string         `json:"runId"`
-	Sequence     int64          `json:"sequence,omitempty"`
-	NodeID       string         `json:"nodeId"`
-	NodeType     NodeType       `json:"nodeType"`
-	CapabilityID string         `json:"capabilityId,omitempty"`
-	Status       RunStatus      `json:"status"`
-	Message      string         `json:"message,omitempty"`
-	Input        map[string]any `json:"input,omitempty"`
-	Output       map[string]any `json:"output,omitempty"`
-	Error        string         `json:"error,omitempty"`
-	DurationMs   int64          `json:"durationMs,omitempty"`
+	RunID         string         `json:"runId"`
+	Sequence      int64          `json:"sequence,omitempty"`
+	NodeID        string         `json:"nodeId"`
+	NodeType      NodeType       `json:"nodeType"`
+	CapabilityID  string         `json:"capabilityId,omitempty"`
+	Status        RunStatus      `json:"status"`
+	Message       string         `json:"message,omitempty"`
+	Input         map[string]any `json:"input,omitempty"`
+	Output        map[string]any `json:"output,omitempty"`
+	Error         string         `json:"error,omitempty"`
+	DurationMs    int64          `json:"durationMs,omitempty"`
+	LoopIteration *int           `json:"loopIteration,omitempty"`
+	LoopDepth     int            `json:"loopDepth,omitempty"`
+	BodyNodeID    string         `json:"bodyNodeId,omitempty"`
 }
 
 type NodeResult struct {
@@ -125,6 +134,7 @@ type NodeExecution struct {
 	NodeType     NodeType
 	CapabilityID string
 	Input        map[string]any
+	Locals       map[string]any
 }
 
 type KnowledgeReference struct {

@@ -87,6 +87,38 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     category: 'logic',
     handles: { input: true, outputs: 2 },
   },
+  loop: {
+    type: 'loop',
+    label: '循环',
+    description: '重复执行循环体中的子流程',
+    icon: 'Repeat2',
+    category: 'flow',
+    handles: { input: true, output: true },
+  },
+  set_loop_variable: {
+    type: 'set_loop_variable',
+    label: '设置循环变量',
+    description: '更新下一轮使用的中间变量',
+    icon: 'Hash',
+    category: 'flow',
+    handles: { input: true, output: true },
+  },
+  continue_loop: {
+    type: 'continue_loop',
+    label: '继续循环',
+    description: '结束当前轮循环',
+    icon: 'Repeat2',
+    category: 'flow',
+    handles: { input: true, output: true },
+  },
+  terminate_loop: {
+    type: 'terminate_loop',
+    label: '终止循环',
+    description: '结束整个循环',
+    icon: 'Repeat2',
+    category: 'flow',
+    handles: { input: true, output: true },
+  },
 };
 
 export const NODE_CATEGORIES = [
@@ -122,6 +154,15 @@ export function getNodeConfigSummary(nodeType: string, config?: Record<string, u
       return String(config.workflowName || config.workflowId || '未选择已发布工作流');
     case 'intent':
       return `${Array.isArray(config.intents) ? config.intents.length : 0} 个意图 + 其他`;
+    case 'loop': {
+      const mode =
+        config.mode === 'count' ? '指定次数' : config.mode === 'infinite' ? '无限循环' : '数组循环';
+      const body =
+        config.body && typeof config.body === 'object'
+          ? (config.body as { nodes?: unknown[] })
+          : undefined;
+      return `${mode} · ${Array.isArray(body?.nodes) ? body.nodes.length : 0} 个循环体节点`;
+    }
     default:
       return '';
   }

@@ -11,6 +11,7 @@ import {
   MessageSquare,
   MoreHorizontal,
   Plus,
+  Repeat2,
   Send,
   Trash2,
   Workflow,
@@ -51,6 +52,10 @@ const iconMap = {
   variable: Hash,
   subworkflow: Workflow,
   intent: Lightbulb,
+  loop: Repeat2,
+  set_loop_variable: Hash,
+  continue_loop: Repeat2,
+  terminate_loop: Repeat2,
 };
 const colors = {
   start: 'bg-blue-500/10 text-blue-600',
@@ -63,6 +68,10 @@ const colors = {
   variable: 'bg-cyan-500/10 text-cyan-600',
   subworkflow: 'bg-indigo-500/10 text-indigo-600',
   intent: 'bg-cyan-500/10 text-cyan-600',
+  set_loop_variable: 'bg-teal-500/10 text-teal-600',
+  continue_loop: 'bg-teal-500/10 text-teal-600',
+  terminate_loop: 'bg-teal-500/10 text-teal-600',
+  loop: 'bg-teal-500/10 text-teal-600',
 } as const;
 
 function getIntentBranchOutputs(config: Record<string, unknown> | undefined) {
@@ -360,6 +369,15 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
               '!size-3 !-right-1.5 !rounded-full !border-2 !border-blue-400 !bg-background transition-opacity duration-200',
               'group-hover/node:!pointer-events-none group-hover/node:!opacity-0',
             )}
+          />
+        ) : null}
+        {nodeType === 'loop' ? (
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            id="body"
+            isConnectable={false}
+            className="!size-3 !-bottom-1.5 !border-2 !border-primary !bg-background"
           />
         ) : null}
         {branchOutputs.length

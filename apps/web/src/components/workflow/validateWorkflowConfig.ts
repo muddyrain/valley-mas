@@ -115,6 +115,24 @@ function validateNode(
       return fail('请选择上游变量作为执行条件');
   }
   switch (data.nodeType) {
+    case 'loop': {
+      const mode = config.mode;
+      if (mode !== 'array' && mode !== 'count' && mode !== 'infinite')
+        return fail('请选择循环方式');
+      if (mode === 'array' && !String(config.input || '').trim()) return fail('请选择循环数组');
+      if (mode === 'count' && !config.count) return fail('请设置循环次数');
+      if (
+        mode === 'infinite' &&
+        (!Number.isInteger(config.maxIterations) ||
+          Number(config.maxIterations) < 1 ||
+          Number(config.maxIterations) > 1000)
+      )
+        return fail('无限循环需要 1 到 1000 的最大轮次保护');
+      const body = config.body as { nodes?: unknown[] } | undefined;
+      if (!body || !Array.isArray(body.nodes) || body.nodes.length === 0)
+        return fail('循环体至少需要一个节点');
+      break;
+    }
     case 'llm':
       if (!config.prompt) return fail('请填写用户提示词');
       if (
@@ -253,9 +271,15 @@ export function getInvalidWorkflowVariableReferenceErrors(
   nodes: Node[],
   edges: Edge[] = [],
 ): ValidationError[] {
-  return nodes.flatMap((node) => {
+  const outerNodes = nodes.filter((node) => {
     const data = node.data as unknown as WorkflowNodeData;
-    const options = getUpstreamWorkflowVariables(nodes, edges, node.id);
+    return !data.isLoopBody && !data.loopParentId;
+  });
+  const outerIDs = new Set(outerNodes.map((node) => node.id));
+  const outerEdges = edges.filter((edge) => outerIDs.has(edge.source) && outerIDs.has(edge.target));
+  return outerNodes.flatMap((node) => {
+    const data = node.data as unknown as WorkflowNodeData;
+    const options = getUpstreamWorkflowVariables(outerNodes, outerEdges, node.id);
     const hasInvalidReference = valuesWithReferences(data).some(
       (value) => getInvalidWorkflowVariableTokens(value, options).length > 0,
     );
@@ -325,22 +349,31 @@ function workflowError(message: string, node?: Node): ValidationError {
 
 /** Mirrors the graph-shape checks that block server persistence without running tools. */
 export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): ValidationError[] {
-  const errors = [...validateWorkflowConfig(nodes, edges), ...validateOptionalEndOutputs(nodes)];
-  const nodeById = new Map(nodes.map((node) => [node.id, node]));
-  const starts = nodes.filter(
+  const outerNodes = nodes.filter((node) => {
+    const data = node.data as unknown as WorkflowNodeData;
+    return !data.isLoopBody && !data.loopParentId;
+  });
+  const outerIDs = new Set(outerNodes.map((node) => node.id));
+  const outerEdges = edges.filter((edge) => outerIDs.has(edge.source) && outerIDs.has(edge.target));
+  const errors = [
+    ...validateWorkflowConfig(outerNodes, outerEdges),
+    ...validateOptionalEndOutputs(outerNodes),
+  ];
+  const nodeById = new Map(outerNodes.map((node) => [node.id, node]));
+  const starts = outerNodes.filter(
     (node) => (node.data as unknown as WorkflowNodeData).nodeType === 'start',
   );
-  const ends = nodes.filter(
+  const ends = outerNodes.filter(
     (node) => (node.data as unknown as WorkflowNodeData).nodeType === 'end',
   );
   if (starts.length !== 1) errors.push(workflowError('必须且只能有一个开始节点'));
   if (ends.length !== 1) errors.push(workflowError('必须且只能有一个结束节点'));
 
-  const incoming = new Map(nodes.map((node) => [node.id, 0]));
-  const outgoing = new Map(nodes.map((node) => [node.id, 0]));
-  const adjacency = new Map(nodes.map((node) => [node.id, [] as string[]]));
+  const incoming = new Map(outerNodes.map((node) => [node.id, 0]));
+  const outgoing = new Map(outerNodes.map((node) => [node.id, 0]));
+  const adjacency = new Map(outerNodes.map((node) => [node.id, [] as string[]]));
   const branchHandles = new Map<string, Map<string, number>>();
-  for (const edge of edges) {
+  for (const edge of outerEdges) {
     const source = nodeById.get(edge.source);
     const target = nodeById.get(edge.target);
     if (!source || !target) {
@@ -374,7 +407,7 @@ export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): Valida
     }
   }
 
-  for (const node of nodes) {
+  for (const node of outerNodes) {
     const data = node.data as unknown as WorkflowNodeData;
     if (data.nodeType !== 'start' && (incoming.get(node.id) || 0) === 0) {
       errors.push(workflowError('无法从开始节点到达', node));
@@ -403,7 +436,7 @@ export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): Valida
   }
 
   const remainingIncoming = new Map(incoming);
-  const queue = nodes
+  const queue = outerNodes
     .filter((node) => (remainingIncoming.get(node.id) || 0) === 0)
     .map((node) => node.id);
   let visited = 0;
@@ -416,7 +449,7 @@ export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): Valida
       if (next === 0) queue.push(target);
     }
   }
-  if (visited !== nodes.length) errors.push(workflowError('工作流不能包含循环'));
+  if (visited !== outerNodes.length) errors.push(workflowError('工作流不能包含循环'));
   return errors;
 }
 

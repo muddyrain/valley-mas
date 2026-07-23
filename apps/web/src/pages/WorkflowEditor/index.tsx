@@ -98,6 +98,7 @@ import { MobileCopilotSheet } from '@/components/workbench/MobileCopilotSheet';
 import { WorkbenchCopilot } from '@/components/workbench/WorkbenchCopilot';
 import { isAIWorkflowDraft, workflowDraftToCanvas } from '@/components/workbench/workflowDraft';
 import { InsertableEdge } from '@/components/workflow/InsertableEdge';
+import { LoopBodyNode } from '@/components/workflow/LoopBodyNode';
 import { NodePicker, type NodePickerItem } from '@/components/workflow/NodePicker';
 import { NODE_CONFIGS } from '@/components/workflow/nodeConfig';
 import { PropertyPanel, type PropertyPanelTab } from '@/components/workflow/PropertyPanel';
@@ -108,6 +109,7 @@ import {
   type WorkflowRunSession,
   workflowRunSessionReducer,
 } from '@/components/workflow/runSession';
+import type { WorkflowNodeData } from '@/components/workflow/types';
 import { useWorkflowHistory } from '@/components/workflow/useWorkflowHistory';
 import {
   getInvalidWorkflowVariableReferenceErrors,
@@ -128,6 +130,10 @@ import {
   type WorkflowAlignment,
 } from '@/components/workflow/workflowAlignment';
 import {
+  expandLoopCanvas,
+  loopBodyChildID,
+  loopBodyHeight,
+  loopBodyID,
   normalizeWorkflowEdges,
   serializeWorkflowGraph,
 } from '@/components/workflow/workflowGraph';
@@ -150,6 +156,7 @@ const defaultEdgeOptions = {
 const workflowNodeTypes = Object.fromEntries(
   Object.keys(NODE_CONFIGS).map((type) => [type, WorkflowNode]),
 );
+workflowNodeTypes.loopBody = LoopBodyNode;
 const workflowEdgeTypes = { insertable: InsertableEdge };
 const minimumRunPanelHeight = 220;
 const maximumRunPanelHeight = 720;
@@ -888,14 +895,19 @@ export default function WorkflowEditorPage() {
             const nextEdges = Array.isArray(graph.edges)
               ? normalizeWorkflowEdges(graph.edges as Edge[])
               : [];
-            workflowStateRef.current = { name: data.name, nodes: nextNodes, edges: nextEdges };
+            const expanded = expandLoopCanvas(nextNodes, nextEdges);
+            workflowStateRef.current = {
+              name: data.name,
+              nodes: expanded.nodes,
+              edges: expanded.edges,
+            };
             workflowSnapshotRef.current = {
               name: data.name,
-              graph: serializeWorkflowGraph(nextNodes, nextEdges),
+              graph: serializeWorkflowGraph(expanded.nodes, expanded.edges),
               revision: 0,
             };
-            setNodes(nextNodes);
-            setEdges(nextEdges);
+            setNodes(expanded.nodes);
+            setEdges(expanded.edges);
             clearHistory();
           } catch {
             // invalid graph
@@ -951,10 +963,65 @@ export default function WorkflowEditorPage() {
 
       const newNode = createPickerNode(item, position);
 
-      const nextNodes = [...workflowStateRef.current.nodes, newNode];
-      setNodes(nextNodes);
-      markWorkflowDirty({ nodes: nextNodes });
+      const expanded = expandLoopCanvas(
+        [...workflowStateRef.current.nodes, newNode],
+        workflowStateRef.current.edges,
+      );
+      setNodes(expanded.nodes);
+      setEdges(expanded.edges);
+      markWorkflowDirty({ nodes: expanded.nodes, edges: expanded.edges });
       toast.success(`已添加 ${item.label} 节点`);
+    },
+    [createPickerNode, markWorkflowDirty],
+  );
+
+  const handleAddLoopBodyNode = useCallback(
+    (loopID: string, item: NodePickerItem) => {
+      const bodyID = loopBodyID(loopID);
+      const body = workflowStateRef.current.nodes.find((node) => node.id === bodyID);
+      if (!body) return;
+      const childNodes = workflowStateRef.current.nodes.filter(
+        (node) => (node.data as { loopParentId?: string }).loopParentId === loopID,
+      );
+      if (childNodes.length >= 30) {
+        toast.warning('循环体最多支持 30 个节点');
+        return;
+      }
+      const created = createPickerNode(item, {
+        x: 18 + (childNodes.length % 2) * 274,
+        y: 88 + Math.floor(childNodes.length / 2) * 126,
+      });
+      const child: Node = {
+        ...created,
+        id: loopBodyChildID(loopID, created.id),
+        parentId: bodyID,
+        extent: 'parent',
+        data: {
+          ...created.data,
+          loopParentId: loopID,
+          loopBodyNodeId: created.id,
+        },
+      };
+      const nextNodes = workflowStateRef.current.nodes.map((node) =>
+        node.id === bodyID
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                nodeCount: childNodes.length + 1,
+              },
+              style: {
+                ...node.style,
+                height: loopBodyHeight(childNodes.length + 1),
+              },
+            }
+          : node,
+      );
+      nextNodes.push(child);
+      const expanded = expandLoopCanvas(nextNodes, workflowStateRef.current.edges);
+      setNodes(expanded.nodes);
+      setEdges(expanded.edges);
+      markWorkflowDirty({ nodes: expanded.nodes, edges: expanded.edges });
     },
     [createPickerNode, markWorkflowDirty],
   );
@@ -1013,7 +1080,9 @@ export default function WorkflowEditorPage() {
           },
         ] as Edge[]);
       }
-      const nextNodes = [...layout.nodes, newNode];
+      const expanded = expandLoopCanvas([...layout.nodes, newNode], nextEdges);
+      const nextNodes = expanded.nodes;
+      nextEdges = expanded.edges;
       setNodes(nextNodes);
       setEdges(nextEdges);
       markWorkflowDirty({ nodes: nextNodes, edges: nextEdges });
@@ -1043,7 +1112,6 @@ export default function WorkflowEditorPage() {
       );
       if (!layout) return;
       const newNode = createPickerNode(item, layout.position);
-      const nextNodes = [...layout.nodes, newNode];
       const insertedEdges: Edge[] = [
         {
           id: `${edge.source}-${newNode.id}`,
@@ -1064,10 +1132,13 @@ export default function WorkflowEditorPage() {
           type: 'insertable',
         });
       }
-      const nextEdges = normalizeWorkflowEdges([
+      const baseEdges = normalizeWorkflowEdges([
         ...workflowStateRef.current.edges.filter((candidate) => candidate.id !== edgeId),
         ...insertedEdges,
       ]);
+      const expanded = expandLoopCanvas([...layout.nodes, newNode], baseEdges);
+      const nextNodes = expanded.nodes;
+      const nextEdges = expanded.edges;
       setNodes(nextNodes);
       setEdges(nextEdges);
       markWorkflowDirty({ nodes: nextNodes, edges: nextEdges });
@@ -1112,6 +1183,7 @@ export default function WorkflowEditorPage() {
       if (movedNodeChange?.type === 'position') {
         const movedNode = nextNodes.find((node) => node.id === movedNodeChange.id);
         if (movedNode && movedNodeChange.dragging !== undefined) {
+          const movedData = movedNode.data as unknown as WorkflowNodeData;
           const alignment = getWorkflowAlignment(
             movedNode,
             nextNodes,
@@ -1121,6 +1193,22 @@ export default function WorkflowEditorPage() {
             nextNodes = nextNodes.map((node) =>
               node.id === movedNode.id ? { ...node, position: alignment.position } : node,
             );
+          }
+          if (movedData.isLoopBody && movedData.loopParentId) {
+            const bodyPosition = nextNodes.find((node) => node.id === movedNode.id)?.position;
+            if (bodyPosition) {
+              nextNodes = nextNodes.map((node) => {
+                if (node.id !== movedData.loopParentId) return node;
+                const data = node.data as unknown as WorkflowNodeData;
+                return {
+                  ...node,
+                  data: {
+                    ...data,
+                    config: { ...data.config, bodyPosition },
+                  },
+                };
+              });
+            }
           }
           updateAlignmentGuides(movedNodeChange.dragging ? alignment : null);
         }
@@ -1185,6 +1273,75 @@ export default function WorkflowEditorPage() {
       isNodeDragInProgressRef.current = false;
       setIsNodeDragging(false);
       updateAlignmentGuides(null);
+      const nodeData = node.data as {
+        loopParentId?: string;
+        isLoopBody?: boolean;
+        label?: string;
+        nodeType?: string;
+        config?: Record<string, unknown>;
+      };
+      if (!nodeData.loopParentId && !nodeData.isLoopBody) {
+        const loopBody = workflowStateRef.current.nodes.find((candidate) => {
+          const data = candidate.data as { isLoopBody?: boolean };
+          if (!data.isLoopBody) return false;
+          const width = Number(candidate.style?.width || 560);
+          const height = Number(candidate.style?.height || 330);
+          return (
+            node.position.x >= candidate.position.x &&
+            node.position.x <= candidate.position.x + width &&
+            node.position.y >= candidate.position.y &&
+            node.position.y <= candidate.position.y + height
+          );
+        });
+        if (loopBody) {
+          const bodyData = loopBody.data as { loopParentId?: string };
+          const parentID = bodyData.loopParentId;
+          const attachedEdges = workflowStateRef.current.edges.filter(
+            (edge) => edge.source === node.id || edge.target === node.id,
+          );
+          if (!parentID || attachedEdges.length) {
+            toast.warning('请先断开节点的外层连线，再拖入循环体');
+          } else {
+            const childID = loopBodyChildID(parentID, node.id);
+            const nextNodes = workflowStateRef.current.nodes.map((candidate) =>
+              candidate.id === node.id
+                ? {
+                    ...candidate,
+                    id: childID,
+                    parentId: loopBody.id,
+                    extent: 'parent' as const,
+                    position: {
+                      x: node.position.x - loopBody.position.x,
+                      y: node.position.y - loopBody.position.y,
+                    },
+                    data: { ...candidate.data, loopParentId: parentID, loopBodyNodeId: node.id },
+                  }
+                : candidate.id === loopBody.id
+                  ? {
+                      ...candidate,
+                      data: {
+                        ...candidate.data,
+                        nodeCount:
+                          Number((candidate.data as { nodeCount?: number }).nodeCount || 0) + 1,
+                      },
+                      style: {
+                        ...candidate.style,
+                        height: loopBodyHeight(
+                          Number((candidate.data as { nodeCount?: number }).nodeCount || 0) + 1,
+                        ),
+                      },
+                    }
+                  : candidate,
+            );
+            const expanded = expandLoopCanvas(nextNodes, workflowStateRef.current.edges);
+            setNodes(expanded.nodes);
+            setEdges(expanded.edges);
+            markWorkflowDirty({ nodes: expanded.nodes, edges: expanded.edges });
+            setSelectedNode(null);
+            return;
+          }
+        }
+      }
       setSelectedNode({
         id: node.id,
         type: node.type || '',
@@ -1196,7 +1353,7 @@ export default function WorkflowEditorPage() {
         },
       });
     },
-    [updateAlignmentGuides],
+    [markWorkflowDirty, updateAlignmentGuides],
   );
 
   const onEdgesChange = useCallback(
@@ -1216,6 +1373,16 @@ export default function WorkflowEditorPage() {
     (connection: Connection) => {
       const { source, target } = connection;
       if (!source || !target) return;
+      const sourceNode = workflowStateRef.current.nodes.find((node) => node.id === source);
+      const targetNode = workflowStateRef.current.nodes.find((node) => node.id === target);
+      const sourceParent = (sourceNode?.data as { loopParentId?: string } | undefined)
+        ?.loopParentId;
+      const targetParent = (targetNode?.data as { loopParentId?: string } | undefined)
+        ?.loopParentId;
+      if (sourceParent !== targetParent) {
+        toast.warning('循环体内外不能直接连线，请通过循环输入或输出映射传递数据');
+        return;
+      }
       const nextEdges = addEdge(
         { ...connection, source, target, sourceHandle: connection.sourceHandle || 'output' },
         workflowStateRef.current.edges,
@@ -1298,19 +1465,48 @@ export default function WorkflowEditorPage() {
     (nodeId: string) => {
       const node = workflowStateRef.current.nodes.find((n) => n.id === nodeId);
       if (!node) return;
-      const nodeType = (node.data as { nodeType: string }).nodeType;
+      const nodeData = node.data as { nodeType: string; loopParentId?: string };
+      const nodeType = nodeData.nodeType;
       if (nodeType === 'start' || nodeType === 'end') {
         toast.warning('开始/结束节点不可删除');
         return;
       }
-      const nextNodes = workflowStateRef.current.nodes.filter((n) => n.id !== nodeId);
+      const removedNodeIDs = new Set<string>();
+      const collectLoopDescendants = (id: string) => {
+        if (removedNodeIDs.has(id)) return;
+        removedNodeIDs.add(id);
+        removedNodeIDs.add(loopBodyID(id));
+        for (const candidate of workflowStateRef.current.nodes) {
+          const candidateData = candidate.data as { loopParentId?: string; nodeType?: string };
+          if (candidateData.loopParentId !== id) continue;
+          if (candidateData.nodeType === 'loop') collectLoopDescendants(candidate.id);
+          else removedNodeIDs.add(candidate.id);
+        }
+      };
+      if (nodeType === 'loop') collectLoopDescendants(nodeId);
+      else removedNodeIDs.add(nodeId);
+
+      const nextNodes = workflowStateRef.current.nodes
+        .filter((candidate) => !removedNodeIDs.has(candidate.id))
+        .map((candidate) => {
+          if (!nodeData.loopParentId || candidate.id !== loopBodyID(nodeData.loopParentId)) {
+            return candidate;
+          }
+          const bodyData = candidate.data as { nodeCount?: number };
+          const nodeCount = Math.max(0, Number(bodyData.nodeCount || 0) - 1);
+          return {
+            ...candidate,
+            data: { ...candidate.data, nodeCount },
+            style: { ...candidate.style, height: loopBodyHeight(nodeCount) },
+          };
+        });
       const nextEdges = workflowStateRef.current.edges.filter(
-        (edge) => edge.source !== nodeId && edge.target !== nodeId,
+        (edge) => !removedNodeIDs.has(edge.source) && !removedNodeIDs.has(edge.target),
       );
       setNodes(nextNodes);
       setEdges(nextEdges);
       markWorkflowDirty({ nodes: nextNodes, edges: nextEdges });
-      if (selectedNode?.id === nodeId) {
+      if (selectedNode && removedNodeIDs.has(selectedNode.id)) {
         setSelectedNode(null);
       }
     },
@@ -1970,12 +2166,14 @@ export default function WorkflowEditorPage() {
       deleteNode: handleDeleteNode,
       insertAfter: handleInsertAfter,
       insertOnEdge: handleInsertOnEdge,
+      addLoopBodyNode: handleAddLoopBodyNode,
     }),
     [
       handleCopyNode,
       handleDeleteNode,
       handleInsertAfter,
       handleInsertOnEdge,
+      handleAddLoopBodyNode,
       runSession,
       nodeValidationMessages,
     ],

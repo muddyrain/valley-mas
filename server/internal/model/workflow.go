@@ -150,6 +150,9 @@ type WorkflowRunEvent struct {
 	Output        string         `gorm:"type:json" json:"output,omitempty"`
 	ErrorCode     string         `gorm:"size:80" json:"errorCode,omitempty"`
 	DurationMs    int64          `json:"durationMs,omitempty"`
+	LoopIteration *int           `json:"loopIteration,omitempty"`
+	LoopDepth     int            `json:"loopDepth,omitempty"`
+	BodyNodeID    string         `gorm:"size:120;index" json:"bodyNodeId,omitempty"`
 	OccurredAt    time.Time      `gorm:"index;not null" json:"occurredAt"`
 	CreatedAt     time.Time      `json:"createdAt"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`

@@ -11,7 +11,11 @@ export type WorkflowNodeType =
   | 'merge'
   | 'variable'
   | 'subworkflow'
-  | 'intent';
+  | 'intent'
+  | 'loop'
+  | 'set_loop_variable'
+  | 'continue_loop'
+  | 'terminate_loop';
 
 export interface WorkflowRule {
   left: unknown;
@@ -77,6 +81,9 @@ export interface WorkflowRunEventData {
   output?: Record<string, unknown>;
   error?: string;
   durationMs?: number;
+  loopIteration?: number;
+  loopDepth?: number;
+  bodyNodeId?: string;
 }
 
 export interface WorkflowRun {
@@ -119,6 +126,9 @@ export interface WorkflowRunTraceEvent {
   output: string;
   errorCode?: string;
   durationMs?: number;
+  loopIteration?: number;
+  loopDepth?: number;
+  bodyNodeId?: string;
   occurredAt: string;
 }
 

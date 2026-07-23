@@ -71,6 +71,7 @@ func Execute(ctx context.Context, graph Graph, registry *Registry, run RunContex
 	if run.Outputs == nil {
 		run.Outputs = map[string]map[string]any{}
 	}
+	run.Emitter = emit
 	if err := normalizeRunInputs(graph, run.Inputs); err != nil {
 		return err
 	}
@@ -154,6 +155,9 @@ func resolveNodeInput(node Node, run RunContext) (map[string]any, error) {
 		return nil, err
 	}
 	if node.Type == NodeTypeMerge {
+		return config, nil
+	}
+	if node.Type == NodeTypeLoop {
 		return config, nil
 	}
 	if node.Type == NodeTypeLLM {
@@ -460,6 +464,12 @@ func normalizeRunInputs(graph Graph, inputs map[string]any) error {
 		case ValueTypeStringList:
 			if _, err := stringListFromValue(value); err != nil {
 				return fmt.Errorf("输入 %s 必须为 string[]", name)
+			}
+		case ValueTypeArray:
+			switch value.(type) {
+			case []any, []string, []float64, []int, []bool:
+			default:
+				return fmt.Errorf("输入 %s 必须为 array", name)
 			}
 		case ValueTypeFile:
 			if _, err := fileFromValue(value); err != nil {

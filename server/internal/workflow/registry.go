@@ -73,8 +73,12 @@ func DefaultRegistry() *Registry {
 		NodeDefinition{Type: NodeTypeVariable, Label: "变量", Description: "设置可复用变量", Category: "flow", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, WhenAllowed: true, ConfigSchema: required("assignments")},
 		NodeDefinition{Type: NodeTypeSubworkflow, Label: "子工作流", Description: "调用已发布的不可变工作流版本", Category: "subworkflow", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, WhenAllowed: true, ConfigSchema: required("workflowId", "versionId", "inputs")},
 		NodeDefinition{Type: NodeTypeIntent, Label: "意图识别", Description: "按已配置意图将文本分流", Category: "logic", InputPorts: []string{"input"}, OutputPorts: []string{"intent:*", "intent:other"}, ConfigSchema: required("query", "intents")},
+		NodeDefinition{Type: NodeTypeLoop, Label: "循环", Description: "重复执行循环体子流程", Category: "flow", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, ConfigSchema: required("mode", "body", "outputs")},
+		NodeDefinition{Type: NodeTypeSetLoopVar, Label: "设置循环变量", Description: "更新下一轮循环使用的中间变量", Category: "flow", ConfigSchema: required("name", "value")},
+		NodeDefinition{Type: NodeTypeContinueLoop, Label: "继续循环", Description: "结束当前轮循环", Category: "flow", ConfigSchema: required()},
+		NodeDefinition{Type: NodeTypeTerminateLoop, Label: "终止循环", Description: "结束整个循环", Category: "flow", ConfigSchema: required()},
 	)
-	for _, executor := range []NodeExecutor{startExecutor{}, endExecutor{}, ConditionExecutor{}, SwitchExecutor{}, MergeExecutor{}, VariableExecutor{}, SubworkflowExecutor{}, IntentClassifierExecutor{}, LLMTextExecutor{}, ToolNodeExecutor{Registry: registry}} {
+	for _, executor := range []NodeExecutor{startExecutor{}, endExecutor{}, ConditionExecutor{}, SwitchExecutor{}, MergeExecutor{}, VariableExecutor{}, SubworkflowExecutor{}, IntentClassifierExecutor{}, LLMTextExecutor{}, ToolNodeExecutor{Registry: registry}, LoopExecutor{Registry: registry}} {
 		_ = registry.RegisterExecutor(executor)
 	}
 	return registry

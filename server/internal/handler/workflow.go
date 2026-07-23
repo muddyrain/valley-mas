@@ -677,8 +677,10 @@ func runWorkflowGraph(
 		eventSequence++
 		event.Sequence = eventSequence
 		err := database.DB.Transaction(func(tx *gorm.DB) error {
-			if err := persistWorkflowNodeEvent(tx, run.ID, nodeTypes[event.NodeID], event); err != nil {
-				return err
+			if event.BodyNodeID == "" {
+				if err := persistWorkflowNodeEvent(tx, run.ID, nodeTypes[event.NodeID], event); err != nil {
+					return err
+				}
 			}
 			return persistWorkflowRunEvent(tx, run.ID, event)
 		})
@@ -967,17 +969,20 @@ func writeWorkflowRunSSE(c *gin.Context, event model.WorkflowRunEvent) {
 		"message":  event.Message,
 		"sequence": event.Sequence,
 		"data": gin.H{
-			"runId":        event.WorkflowRunID,
-			"sequence":     event.Sequence,
-			"nodeId":       event.NodeID,
-			"nodeType":     event.NodeType,
-			"capabilityId": event.CapabilityID,
-			"status":       event.Status,
-			"message":      event.Message,
-			"input":        workflowEventPreview(event.Input),
-			"output":       workflowEventPreview(event.Output),
-			"error":        event.ErrorCode,
-			"durationMs":   event.DurationMs,
+			"runId":         event.WorkflowRunID,
+			"sequence":      event.Sequence,
+			"nodeId":        event.NodeID,
+			"nodeType":      event.NodeType,
+			"capabilityId":  event.CapabilityID,
+			"status":        event.Status,
+			"message":       event.Message,
+			"input":         workflowEventPreview(event.Input),
+			"output":        workflowEventPreview(event.Output),
+			"error":         event.ErrorCode,
+			"durationMs":    event.DurationMs,
+			"loopIteration": event.LoopIteration,
+			"loopDepth":     event.LoopDepth,
+			"bodyNodeId":    event.BodyNodeID,
 		},
 	}
 	encoded, _ := json.Marshal(payload)
@@ -1467,6 +1472,9 @@ func persistWorkflowRunEvent(db *gorm.DB, runID model.Int64String, event workflo
 		Output:        string(output),
 		ErrorCode:     event.Error,
 		DurationMs:    event.DurationMs,
+		LoopIteration: event.LoopIteration,
+		LoopDepth:     event.LoopDepth,
+		BodyNodeID:    event.BodyNodeID,
 		OccurredAt:    time.Now(),
 	}).Error
 }

@@ -148,7 +148,8 @@ export const PropertyPanel = memo(function PropertyPanel({
             nodeType === 'variable' ||
             nodeType === 'subworkflow' ||
             nodeType === 'intent' ||
-            nodeType === 'switch'
+            nodeType === 'switch' ||
+            nodeType === 'loop'
               ? variableOptions
               : undefined
           }

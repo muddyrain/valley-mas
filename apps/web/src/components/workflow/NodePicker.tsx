@@ -5,6 +5,7 @@ import {
   Lightbulb,
   Loader2,
   MessageSquare,
+  Repeat2,
   Search,
   Sparkles,
   Workflow,
@@ -59,6 +60,23 @@ interface NodePickerProps {
 }
 
 const genericItems: NodePickerItem[] = [
+  {
+    key: 'loop',
+    group: 'flow',
+    nodeType: 'loop',
+    label: '循环',
+    description: '重复执行循环体中的子流程',
+    config: {
+      mode: 'array',
+      input: '',
+      middleVariables: [],
+      outputs: [],
+      body: {
+        nodes: [],
+        edges: [],
+      },
+    },
+  },
   {
     key: 'llm',
     group: 'model',
@@ -155,6 +173,7 @@ const itemIcons: Record<string, typeof MessageSquare> = {
   merge: GitMerge,
   variable: Hash,
   intent: Lightbulb,
+  loop: Repeat2,
 };
 
 export function NodePicker({

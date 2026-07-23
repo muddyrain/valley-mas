@@ -8,9 +8,20 @@ export type WorkflowNodeType =
   | 'merge'
   | 'variable'
   | 'subworkflow'
-  | 'intent';
+  | 'intent'
+  | 'loop'
+  | 'set_loop_variable'
+  | 'continue_loop'
+  | 'terminate_loop';
 
-export type WorkflowValueType = 'string' | 'string[]' | 'object' | 'number' | 'boolean' | 'file';
+export type WorkflowValueType =
+  | 'string'
+  | 'string[]'
+  | 'array'
+  | 'object'
+  | 'number'
+  | 'boolean'
+  | 'file';
 
 export interface WorkflowRule {
   left: unknown;
@@ -37,6 +48,9 @@ export interface WorkflowNodeData {
   capabilityName?: string;
   sideEffect?: string;
   runningState?: 'idle' | 'running' | 'success' | 'error' | 'skipped';
+  loopParentId?: string;
+  loopBodyNodeId?: string;
+  isLoopBody?: boolean;
 }
 
 export interface StartInputDefinition {
@@ -49,6 +63,7 @@ export function normalizeStartInputs(inputs: unknown): Record<string, StartInput
   const allowed = new Set<WorkflowValueType>([
     'string',
     'string[]',
+    'array',
     'object',
     'number',
     'boolean',

@@ -80,7 +80,7 @@ func (MergeExecutor) Execute(_ context.Context, run RunContext, execution NodeEx
 		sources, _ := fieldConfig["sources"].([]any)
 		for _, rawSource := range sources {
 			source := stringFromValue(rawSource)
-			value, err := ResolveTemplate(source, run.Outputs)
+			value, err := resolveTemplate(source, run.Outputs, execution.Locals)
 			if err == nil && value != nil {
 				output[name] = value
 				break

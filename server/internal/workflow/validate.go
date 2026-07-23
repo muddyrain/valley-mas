@@ -162,6 +162,10 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 		case NodeTypeIntent:
 			errs = append(errs, validateIntentConfig(node.ID, config)...)
 			modelCost++
+		case NodeTypeLoop:
+			errs = append(errs, validateLoopConfig(node.ID, config, registry, 1)...)
+		case NodeTypeSetLoopVar, NodeTypeContinueLoop, NodeTypeTerminateLoop:
+			errs = append(errs, fmt.Sprintf("循环控制节点 %s 只能放在循环体内", node.ID))
 		}
 	}
 	if startCount != 1 {
@@ -278,7 +282,7 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 	outputFields := buildOutputFields(nodes, startInputs, registry)
 	reachability := allReachability(nodes, adjacency)
 	for _, node := range graph.Nodes {
-		for _, reference := range referencesIn(node.Config, node.When) {
+		for _, reference := range referencesForNode(node) {
 			if llmLocalInputReference(node, reference) {
 				continue
 			}
@@ -693,7 +697,7 @@ func validateRuleTypes(nodeID string, rule *Rule, outputFields map[string]map[st
 
 func validValueType(valueType ValueType) bool {
 	switch valueType {
-	case ValueTypeString, ValueTypeStringList, ValueTypeObject, ValueTypeNumber, ValueTypeBoolean, ValueTypeFile:
+	case ValueTypeString, ValueTypeStringList, ValueTypeArray, ValueTypeObject, ValueTypeNumber, ValueTypeBoolean, ValueTypeFile:
 		return true
 	}
 	return false
@@ -760,11 +764,38 @@ func buildOutputFields(nodes map[string]Node, startInputs map[string]InputDefini
 				field("intentName", ValueTypeString),
 				field("confidence", ValueTypeNumber),
 			)
+		case NodeTypeLoop:
+			config, _ := decodeConfig(node.Config)
+			result[id] = loopOutputFields(config)
+		case NodeTypeSetLoopVar:
+			config, _ := decodeConfig(node.Config)
+			result[id] = fields(field(stringFromValue(config["name"]), ValueTypeObject))
+		case NodeTypeContinueLoop:
+			result[id] = fields(field("continued", ValueTypeBoolean))
+		case NodeTypeTerminateLoop:
+			result[id] = fields(field("terminated", ValueTypeBoolean))
 		default:
 			result[id] = map[string]ValueType{}
 		}
 	}
 	return result
+}
+
+func referencesForNode(node Node) []string {
+	if node.Type != NodeTypeLoop {
+		return referencesIn(node.Config, node.When)
+	}
+	config, err := decodeConfig(node.Config)
+	if err != nil {
+		return referencesIn(node.Config, node.When)
+	}
+	delete(config, "body")
+	delete(config, "outputs")
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		return nil
+	}
+	return referencesIn(encoded, node.When)
 }
 
 func referencesIn(raw json.RawMessage, when *Rule) []string {

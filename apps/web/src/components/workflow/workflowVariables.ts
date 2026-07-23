@@ -4,7 +4,7 @@ export interface WorkflowVariableOption {
   nodeId: string;
   nodeLabel: string;
   field: string;
-  type: 'string' | 'string[]' | 'object' | 'number' | 'boolean' | 'file' | 'unknown';
+  type: 'string' | 'string[]' | 'array' | 'object' | 'number' | 'boolean' | 'file' | 'unknown';
   token: string;
   scope?: 'upstream' | 'local';
 }
@@ -15,6 +15,8 @@ export function workflowValueTypeLabel(type: WorkflowVariableOption['type']) {
       return '文本';
     case 'string[]':
       return '文本列表';
+    case 'array':
+      return '数组';
     case 'number':
       return '数字';
     case 'boolean':
@@ -99,6 +101,7 @@ const TOOL_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
 const START_VARIABLE_TYPES = new Set<WorkflowVariableType>([
   'string',
   'string[]',
+  'array',
   'object',
   'number',
   'boolean',
@@ -172,6 +175,14 @@ export function getWorkflowNodeOutputFields(
         ? (config.outputTypes as Record<string, WorkflowVariableType>)
         : {};
     return Object.keys(outputs).map((name) => [name, outputTypes[name] || 'unknown'] as const);
+  }
+  if (nodeType === 'loop') {
+    const outputs = Array.isArray(config.outputs) ? config.outputs : [];
+    return outputs.flatMap((item) =>
+      item && typeof item === 'object' && typeof (item as { name?: unknown }).name === 'string'
+        ? [[String((item as { name: string }).name), 'array'] as const]
+        : [],
+    );
   }
   if (nodeType === 'variable') {
     const assignments = config.assignments;

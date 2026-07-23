@@ -591,6 +591,35 @@ func TestWorkflowRunPersistsGraphV4NodeTypes(t *testing.T) {
 	}
 }
 
+func TestWorkflowRunPersistsLoopBodyTraceWithoutDuplicatingNodeRuns(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	definition.Graph = `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","config":{"inputs":{"items":{"type":"array","required":true}}}},{"id":"loop","type":"loop","label":"循环","config":{"mode":"array","input":"{{start.output.items}}","middleVariables":[],"outputs":[{"name":"results","type":"string","source":"{{copy.output.value}}"}],"body":{"nodes":[{"id":"copy","type":"variable","label":"复制当前项","position":{"x":0,"y":0},"config":{"assignments":[{"name":"value","type":"string","value":"{{item}}"}]}}],"edges":[]}}},{"id":"end","type":"end","label":"结束","config":{"outputs":{"results":"{{loop.output.results}}"},"outputTypes":{"results":"array"}}}],"edges":[{"source":"start","target":"loop"},{"source":"loop","target":"end"}]}`
+	if err := database.DB.Save(&definition).Error; err != nil {
+		t.Fatal(err)
+	}
+	req := workflowMultipartRequest(t, "/workflows/"+definition.ID.String()+"/run", `{"items":["a","b"]}`)
+	req.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+	if !strings.Contains(recorder.Body.String(), `"bodyNodeId":"copy"`) {
+		t.Fatalf("body=%s", recorder.Body.String())
+	}
+	var bodyEvents []model.WorkflowRunEvent
+	if err := database.DB.Where("body_node_id = ?", "copy").Order("sequence ASC").Find(&bodyEvents).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(bodyEvents) != 4 || bodyEvents[0].LoopIteration == nil || *bodyEvents[0].LoopIteration != 0 || bodyEvents[2].LoopIteration == nil || *bodyEvents[2].LoopIteration != 1 {
+		t.Fatalf("body events=%+v", bodyEvents)
+	}
+	var nodeRuns []model.WorkflowNodeRun
+	if err := database.DB.Order("created_at ASC").Find(&nodeRuns).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(nodeRuns) != 3 {
+		t.Fatalf("loop body must not collide with outer node runs: %+v", nodeRuns)
+	}
+}
+
 func TestWorkflowRunReturnsActionableLLMConfigurationError(t *testing.T) {
 	router, definition := setupWorkflowRuntimeTestRouter(t)
 	definition.Graph = `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","config":{"inputs":{}}},{"id":"writer","type":"llm","label":"大模型","config":{"modelProfile":"ark-text-default","prompt":"写一段文字","maxOutputTokens":64}},{"id":"end","type":"end","label":"结束","config":{"outputs":{"text":"{{writer.output.text}}"},"outputTypes":{"text":"string"}}}],"edges":[{"source":"start","target":"writer"},{"source":"writer","target":"end"}]}`

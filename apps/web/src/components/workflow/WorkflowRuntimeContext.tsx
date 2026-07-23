@@ -9,6 +9,7 @@ interface WorkflowRuntimeContextValue {
   deleteNode: (nodeId: string) => void;
   insertAfter: (nodeId: string, item: NodePickerItem) => void;
   insertOnEdge: (edgeId: string, item: NodePickerItem) => void;
+  addLoopBodyNode: (loopId: string, item: NodePickerItem) => void;
 }
 
 const WorkflowRuntimeContext = createContext<WorkflowRuntimeContextValue | null>(null);

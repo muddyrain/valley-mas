@@ -4,6 +4,7 @@ import { ConditionPropertyForm } from './ConditionPropertyForm';
 import { EndPropertyForm } from './EndPropertyForm';
 import { IntentPropertyForm } from './IntentPropertyForm';
 import { LLMPropertyForm } from './LLMPropertyForm';
+import { LoopPropertyForm } from './LoopPropertyForm';
 import { MergePropertyForm } from './MergePropertyForm';
 import { StartPropertyForm } from './StartPropertyForm';
 import { SubworkflowPropertyForm } from './SubworkflowPropertyForm';
@@ -31,4 +32,5 @@ export const PROPERTY_FORM_MAP: Partial<
   variable: VariablePropertyForm,
   subworkflow: SubworkflowPropertyForm,
   intent: IntentPropertyForm,
+  loop: LoopPropertyForm,
 };
