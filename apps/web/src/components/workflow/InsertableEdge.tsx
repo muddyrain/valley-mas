@@ -1,30 +1,17 @@
 import { BaseEdge, EdgeLabelRenderer, type EdgeProps, getBezierPath } from '@xyflow/react';
 import { Plus } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { NodePicker } from './NodePicker';
+import { DeferredNodePicker } from './NodePicker';
+import { useDelayedHoverVisibility } from './useDelayedHoverVisibility';
 import { useWorkflowRuntime } from './WorkflowRuntimeContext';
 
 export function InsertableEdge(props: EdgeProps) {
   const { insertOnEdge } = useWorkflowRuntime();
-  const [hovered, setHovered] = useState(false);
-  const hideTimerRef = useRef<number | null>(null);
+  const { visible: hovered, show, scheduleHide } = useDelayedHoverVisibility();
   const [path, labelX, labelY] = getBezierPath({ ...props, curvature: 0.3 });
   const selectedStroke = '#7c3aed';
-  useEffect(
-    () => () => {
-      if (hideTimerRef.current !== null) window.clearTimeout(hideTimerRef.current);
-    },
-    [],
-  );
-  const showButton = () => {
-    if (hideTimerRef.current !== null) window.clearTimeout(hideTimerRef.current);
-    setHovered(true);
-  };
-  const scheduleHideButton = () => {
-    if (hideTimerRef.current !== null) window.clearTimeout(hideTimerRef.current);
-    hideTimerRef.current = window.setTimeout(() => setHovered(false), 120);
-  };
+  const hoverStroke = '#22c7f3';
+
   return (
     <>
       <path
@@ -34,8 +21,8 @@ export function InsertableEdge(props: EdgeProps) {
         strokeWidth={28}
         pointerEvents="stroke"
         className="react-flow__edge-hover-target"
-        onMouseEnter={showButton}
-        onMouseLeave={scheduleHideButton}
+        onPointerEnter={show}
+        onPointerLeave={scheduleHide}
       />
       <BaseEdge
         path={path}
@@ -43,34 +30,42 @@ export function InsertableEdge(props: EdgeProps) {
         style={{
           ...props.style,
           pointerEvents: 'none',
-          stroke: props.selected ? selectedStroke : props.style?.stroke,
+          stroke: hovered ? hoverStroke : props.selected ? selectedStroke : props.style?.stroke,
           strokeWidth: props.selected ? 3 : hovered ? 2.5 : props.style?.strokeWidth,
         }}
         interactionWidth={0}
       />
       <EdgeLabelRenderer>
         <div
-          className={`nodrag nopan absolute z-10 transition-opacity ${hovered ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
+          className="nodrag nopan absolute z-10"
           style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-          onMouseEnter={showButton}
-          onMouseLeave={scheduleHideButton}
-          onFocus={showButton}
-          onBlur={scheduleHideButton}
         >
-          <NodePicker
-            trigger={
-              <Button
-                type="button"
-                variant="default"
-                size="icon-xs"
-                className="rounded-full border border-blue-500 bg-blue-500 text-white shadow-sm hover:bg-blue-600"
-                aria-label="在连线中插入节点"
-              >
-                <Plus className="size-3" />
-              </Button>
-            }
-            onSelect={(item) => insertOnEdge(props.id, item)}
-          />
+          <div
+            className={`transition-[opacity,transform] duration-200 ease-out ${
+              hovered
+                ? 'pointer-events-auto scale-100 opacity-100'
+                : 'pointer-events-none scale-75 opacity-0'
+            }`}
+            onPointerEnter={show}
+            onPointerLeave={scheduleHide}
+            onFocus={show}
+            onBlur={scheduleHide}
+          >
+            <DeferredNodePicker
+              trigger={
+                <Button
+                  type="button"
+                  variant="default"
+                  size="icon-sm"
+                  className="rounded-full border border-background bg-cyan-500 text-white shadow-md hover:bg-cyan-600"
+                  aria-label="在连线中插入节点"
+                >
+                  <Plus className="size-4" />
+                </Button>
+              }
+              onSelect={(item) => insertOnEdge(props.id, item)}
+            />
+          </div>
         </div>
       </EdgeLabelRenderer>
     </>

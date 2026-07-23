@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import { Settings } from 'lucide-react';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { NodeRunInspector } from './NodeRunInspector';
@@ -41,7 +41,7 @@ interface PropertyPanelProps {
   onActiveTabChange?: (tab: PropertyPanelTab) => void;
 }
 
-export function PropertyPanel({
+export const PropertyPanel = memo(function PropertyPanel({
   selectedNode,
   onClose,
   onUpdateNode,
@@ -171,7 +171,7 @@ export function PropertyPanel({
       ) : null}
     </PropertyFormBase>
   );
-}
+});
 
 function EmptyPanel({ message }: { message: string }) {
   return (

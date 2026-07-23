@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { NodePicker } from './NodePicker';
+import { DeferredNodePicker } from './NodePicker';
 import { NodeRunDetails } from './NodeRunDetails';
 import { getNodeConfigSummary, NODE_CONFIGS } from './nodeConfig';
 import type { WorkflowNodeData } from './types';
@@ -128,8 +128,7 @@ function NodeLabel({ label }: { label: string }) {
 }
 
 export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: NodeProps) {
-  const { session, connectedSourceNodeIDs, validationErrors, copyNode, deleteNode, insertAfter } =
-    useWorkflowRuntime();
+  const { session, validationErrors, copyNode, deleteNode, insertAfter } = useWorkflowRuntime();
   const nodeData = data as unknown as WorkflowNodeData;
   const { label, nodeType, config } = nodeData;
   const snapshot = session.nodes[id];
@@ -182,7 +181,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
         ) : null}
         <div
           className={cn(
-            'overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-[border-color,box-shadow] duration-150 hover:border-primary/35 hover:bg-card hover:shadow-sm',
+            'workflow-node-card overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-colors duration-100 hover:border-primary/35 hover:bg-card',
             incomplete && !runningState && 'border-amber-500/45 hover:border-amber-500/60',
             hasDraftValidationError &&
               !runningState &&
@@ -357,7 +356,10 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
             type="source"
             position={Position.Right}
             id="output"
-            className="!size-3 !-right-1.5 !rounded-full !border-2 !border-blue-400 !bg-background"
+            className={cn(
+              '!size-3 !-right-1.5 !rounded-full !border-2 !border-blue-400 !bg-background transition-opacity duration-200',
+              'group-hover/node:!pointer-events-none group-hover/node:!opacity-0',
+            )}
           />
         ) : null}
         {branchOutputs.length
@@ -394,17 +396,21 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
         nodeType !== 'condition' &&
         nodeType !== 'switch' &&
         nodeType !== 'intent' &&
-        !connectedSourceNodeIDs.has(id) ? (
-          <div className="nodrag nopan absolute left-full top-1/2 z-10 ml-5 -translate-y-1/2 opacity-0 transition-opacity group-hover/node:opacity-100">
-            <NodePicker
+        hasOutput ? (
+          <div
+            className={cn(
+              'nodrag nopan pointer-events-none absolute left-full top-1/2 z-20 ml-1.5 -translate-x-1/2 -translate-y-1/2 scale-75 opacity-0 transition-[opacity,transform] duration-200 ease-out will-change-transform group-hover/node:pointer-events-auto group-hover/node:scale-100 group-hover/node:opacity-100',
+            )}
+          >
+            <DeferredNodePicker
               side="right"
               align="center"
               trigger={
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="default"
                   size="icon-sm"
-                  className="rounded-full bg-background shadow-sm"
+                  className="rounded-full border border-primary-foreground/30 shadow-md"
                   aria-label={`在 ${label} 后添加节点`}
                 >
                   <Plus className="size-4" />

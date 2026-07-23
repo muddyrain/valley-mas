@@ -10,7 +10,15 @@ import {
   Workflow,
   Wrench,
 } from 'lucide-react';
-import { type ReactElement, useEffect, useMemo, useState } from 'react';
+import {
+  cloneElement,
+  type MouseEvent,
+  type ReactElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { getWorkflowPlatform, listWorkflows, type WorkflowNodeType } from '@/api/workflow';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,10 +49,13 @@ export interface NodePickerItem {
 }
 
 interface NodePickerProps {
-  trigger: ReactElement;
+  trigger: ReactElement<{
+    onClick?: (event: MouseEvent<HTMLElement>) => void;
+  }>;
   onSelect: (item: NodePickerItem) => void;
   side?: 'top' | 'bottom' | 'left' | 'right';
   align?: 'start' | 'center' | 'end';
+  defer?: boolean;
 }
 
 const genericItems: NodePickerItem[] = [
@@ -146,9 +157,67 @@ const itemIcons: Record<string, typeof MessageSquare> = {
   intent: Lightbulb,
 };
 
-export function NodePicker({ trigger, onSelect, side = 'top', align = 'center' }: NodePickerProps) {
-  const isMobile = useIsMobile();
+export function NodePicker({
+  trigger,
+  onSelect,
+  side = 'top',
+  align = 'center',
+  defer = false,
+}: NodePickerProps) {
+  if (defer) return trigger;
+  return <NodePickerPopover trigger={trigger} onSelect={onSelect} side={side} align={align} />;
+}
+
+export function DeferredNodePicker({
+  trigger,
+  onSelect,
+  side = 'top',
+  align = 'center',
+}: Omit<NodePickerProps, 'defer'>) {
   const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return cloneElement(trigger, {
+      onClick: (event: MouseEvent<HTMLElement>) => {
+        trigger.props.onClick?.(event);
+        if (!event.defaultPrevented) setOpen(true);
+      },
+    });
+  }
+
+  return (
+    <NodePickerPopover
+      trigger={trigger}
+      onSelect={onSelect}
+      side={side}
+      align={align}
+      open={open}
+      onOpenChange={setOpen}
+    />
+  );
+}
+
+function NodePickerPopover({
+  trigger,
+  onSelect,
+  side,
+  align,
+  open: controlledOpen,
+  onOpenChange,
+}: Omit<NodePickerProps, 'defer'> & {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const isMobile = useIsMobile();
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = useCallback(
+    (nextOpen: boolean) => {
+      if (controlledOpen === undefined) setUncontrolledOpen(nextOpen);
+      onOpenChange?.(nextOpen);
+    },
+    [controlledOpen, onOpenChange],
+  );
   const [query, setQuery] = useState('');
   const [published, setPublished] = useState<
     Array<{
@@ -193,6 +262,7 @@ export function NodePicker({ trigger, onSelect, side = 'top', align = 'center' }
   }, [open]);
 
   const items = useMemo(() => {
+    if (!open) return [];
     const tools: NodePickerItem[] = capabilities.toolCapabilities
       .filter((item) => item.available)
       .map((item) => ({
@@ -232,7 +302,7 @@ export function NodePicker({ trigger, onSelect, side = 'top', align = 'center' }
       (item) =>
         !keyword || `${item.label} ${item.description} ${item.key}`.toLowerCase().includes(keyword),
     );
-  }, [capabilities.toolCapabilities, published, query]);
+  }, [capabilities.toolCapabilities, open, published, query]);
 
   const content = (
     <PickerContent
@@ -257,7 +327,7 @@ export function NodePicker({ trigger, onSelect, side = 'top', align = 'center' }
           <SheetHeader className="border-b">
             <SheetTitle>添加节点</SheetTitle>
           </SheetHeader>
-          {content}
+          {open ? content : null}
         </SheetContent>
       </Sheet>
     );
@@ -265,16 +335,18 @@ export function NodePicker({ trigger, onSelect, side = 'top', align = 'center' }
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger render={trigger} />
-      <PopoverContent
-        side={side}
-        align={align}
-        className="w-[min(36rem,calc(100vw-2rem))] gap-0 overflow-hidden p-0"
-      >
-        <PopoverHeader className="border-b border-border px-5 py-4">
-          <PopoverTitle>添加节点</PopoverTitle>
-        </PopoverHeader>
-        {content}
-      </PopoverContent>
+      {open ? (
+        <PopoverContent
+          side={side}
+          align={align}
+          className="w-[min(36rem,calc(100vw-2rem))] gap-0 overflow-hidden p-0"
+        >
+          <PopoverHeader className="border-b border-border px-5 py-4">
+            <PopoverTitle>添加节点</PopoverTitle>
+          </PopoverHeader>
+          {content}
+        </PopoverContent>
+      ) : null}
     </Popover>
   );
 }

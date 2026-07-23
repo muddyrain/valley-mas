@@ -187,5 +187,17 @@ button {
 .react-flow__edge .react-flow__edge-path {
   transition:
     stroke 0.15s ease,
-    stroke-width 0.15s ease;
+    stroke-width 0.15s ease,
+    fill 0.15s ease;
+}
+
+/* Keep drag and pan on the compositor path: edge hit testing and visual transitions
+ * are not useful while the canvas is already moving. */
+.workflow-canvas.is-interacting .react-flow__edge-hover-target {
+  pointer-events: none !important;
+}
+
+.workflow-canvas.is-interacting .react-flow__edge-path,
+.workflow-canvas.is-interacting .workflow-node-card {
+  transition: none;
 }

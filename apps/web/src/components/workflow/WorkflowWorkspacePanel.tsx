@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export type WorkflowWorkspaceTab = 'ai' | 'node';
@@ -10,7 +10,7 @@ interface WorkflowWorkspacePanelProps {
   nodeContent: ReactNode;
 }
 
-export function WorkflowWorkspacePanel({
+export const WorkflowWorkspacePanel = memo(function WorkflowWorkspacePanel({
   activeTab,
   onActiveTabChange,
   copilotContent,
@@ -40,4 +40,4 @@ export function WorkflowWorkspacePanel({
       </Tabs>
     </div>
   );
-}
+});

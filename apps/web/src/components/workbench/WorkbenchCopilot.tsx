@@ -11,7 +11,7 @@ import {
   Square,
   X,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   type CopilotContext,
@@ -54,7 +54,7 @@ interface WorkbenchCopilotProps {
 
 const DEFAULT_SUGGESTIONS = ['根据当前草稿给我改进建议', '检查有没有缺失的配置'];
 
-export function WorkbenchCopilot({
+export const WorkbenchCopilot = memo(function WorkbenchCopilot({
   context,
   title = 'AI 协作',
   suggestions = DEFAULT_SUGGESTIONS,
@@ -572,7 +572,7 @@ export function WorkbenchCopilot({
       </div>
     </section>
   );
-}
+});
 
 function ProposalCard({
   proposal,

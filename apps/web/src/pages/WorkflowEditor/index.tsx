@@ -177,6 +177,35 @@ function runtimeEdgeStyle(edge: Edge, stroke: string) {
   };
 }
 
+function hasSameValidationGraph(
+  previousNodes: Node[],
+  nextNodes: Node[],
+  previousEdges: Edge[],
+  nextEdges: Edge[],
+) {
+  if (previousNodes.length !== nextNodes.length || previousEdges.length !== nextEdges.length) {
+    return false;
+  }
+  if (
+    previousNodes.some(
+      (node, index) =>
+        node.id !== nextNodes[index].id ||
+        node.type !== nextNodes[index].type ||
+        node.data !== nextNodes[index].data,
+    )
+  ) {
+    return false;
+  }
+  return !previousEdges.some(
+    (edge, index) =>
+      edge.id !== nextEdges[index].id ||
+      edge.source !== nextEdges[index].source ||
+      edge.sourceHandle !== nextEdges[index].sourceHandle ||
+      edge.target !== nextEdges[index].target ||
+      edge.targetHandle !== nextEdges[index].targetHandle,
+  );
+}
+
 function getServerValidationErrors(message: string, nodes: Node[]): ValidationError[] {
   const nodeByID = new Map(nodes.map((node) => [node.id, node]));
   const errors: ValidationError[] = [];
@@ -258,8 +287,6 @@ function hasSameAlignment(current: WorkflowAlignment | null, next: WorkflowAlign
   if (!current || !next) return false;
 
   return (
-    current.position.x === next.position.x &&
-    current.position.y === next.position.y &&
     current.vertical?.position === next.vertical?.position &&
     current.vertical?.start === next.vertical?.start &&
     current.vertical?.end === next.vertical?.end &&
@@ -358,12 +385,17 @@ export default function WorkflowEditorPage() {
     nodeId?: string;
   } | null>(null);
   const [alignmentGuides, setAlignmentGuides] = useState<WorkflowAlignment | null>(null);
+  const [isViewportMoving, setIsViewportMoving] = useState(false);
+  const [isNodeDragging, setIsNodeDragging] = useState(false);
   const alignmentGuidesRef = useRef<WorkflowAlignment | null>(null);
   const isDraggingRef = useRef(false);
+  const isNodeDragInProgressRef = useRef(false);
+  const pendingNodeDragChangesRef = useRef<NodeChange[] | null>(null);
+  const nodeDragFrameRef = useRef<number | null>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const runPanelRef = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
-  const isFitViewComplete = useRef(false);
+  const [shouldFitView, setShouldFitView] = useState(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeRunIDRef = useRef<string | null>(null);
   const runGenerationRef = useRef(0);
@@ -391,6 +423,18 @@ export default function WorkflowEditorPage() {
   const editorSessionRef = useRef(0);
   const activeRouteKeyRef = useRef<string | null>(null);
   const isEditorMountedRef = useRef(false);
+  const validationGraphRef = useRef({ nodes, edges });
+  if (
+    !hasSameValidationGraph(
+      validationGraphRef.current.nodes,
+      nodes,
+      validationGraphRef.current.edges,
+      edges,
+    )
+  ) {
+    validationGraphRef.current = { nodes, edges };
+  }
+  const validationGraph = validationGraphRef.current;
   const { undo, redo, canUndo, canRedo, clearHistory } = useWorkflowHistory(
     nodes,
     edges,
@@ -411,6 +455,9 @@ export default function WorkflowEditorPage() {
     isEditorMountedRef.current = true;
     return () => {
       isEditorMountedRef.current = false;
+      if (nodeDragFrameRef.current !== null) {
+        window.cancelAnimationFrame(nodeDragFrameRef.current);
+      }
       abortControllerRef.current?.abort();
       abortControllerRef.current = null;
       runGenerationRef.current += 1;
@@ -535,6 +582,7 @@ export default function WorkflowEditorPage() {
   useEffect(() => {
     const currentState = { name: workflowName, nodes, edges };
     workflowStateRef.current = currentState;
+    if (isNodeDragInProgressRef.current) return;
     if (saveRevisionRef.current === persistedRevisionRef.current) {
       workflowSnapshotRef.current = {
         name: currentState.name,
@@ -867,9 +915,7 @@ export default function WorkflowEditorPage() {
   }, [searchParams, clearHistory, applyBlankWorkflow, navigate]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      isFitViewComplete.current = true;
-    }, 500);
+    const timer = setTimeout(() => setShouldFitView(false), 500);
     return () => clearTimeout(timer);
   }, []);
 
@@ -1042,8 +1088,23 @@ export default function WorkflowEditorPage() {
     setAlignmentGuides(next);
   }, []);
 
-  const onNodesChange = useCallback(
+  const applyWorkflowNodeChanges = useCallback(
     (changes: NodeChange[]) => {
+      const isDragging = changes.some(
+        (change) => change.type === 'position' && change.dragging === true,
+      );
+      const didStopDragging = changes.some(
+        (change) => change.type === 'position' && change.dragging === false,
+      );
+      if (isDragging && !isNodeDragInProgressRef.current) {
+        isNodeDragInProgressRef.current = true;
+        setIsNodeDragging(true);
+      }
+      if (didStopDragging && isNodeDragInProgressRef.current) {
+        isNodeDragInProgressRef.current = false;
+        setIsNodeDragging(false);
+      }
+
       let nextNodes = applyNodeChanges(changes, workflowStateRef.current.nodes);
       const movedNodeChange = changes.find(
         (change) => change.type === 'position' && change.position,
@@ -1080,8 +1141,49 @@ export default function WorkflowEditorPage() {
     [markWorkflowDirty, updateAlignmentGuides],
   );
 
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      const draggingChanges = changes.filter(
+        (change) => change.type === 'position' && change.dragging === true,
+      );
+      const didStopDragging = changes.some(
+        (change) => change.type === 'position' && change.dragging === false,
+      );
+
+      if (!draggingChanges.length) {
+        if (didStopDragging && nodeDragFrameRef.current !== null) {
+          window.cancelAnimationFrame(nodeDragFrameRef.current);
+          nodeDragFrameRef.current = null;
+          const pendingChanges = pendingNodeDragChangesRef.current;
+          pendingNodeDragChangesRef.current = null;
+          if (pendingChanges?.length) applyWorkflowNodeChanges(pendingChanges);
+        }
+        applyWorkflowNodeChanges(changes);
+        return;
+      }
+
+      const immediateChanges = changes.filter(
+        (change) => !(change.type === 'position' && change.dragging === true),
+      );
+      if (immediateChanges.length) applyWorkflowNodeChanges(immediateChanges);
+
+      pendingNodeDragChangesRef.current = draggingChanges;
+      if (nodeDragFrameRef.current !== null) return;
+
+      nodeDragFrameRef.current = window.requestAnimationFrame(() => {
+        nodeDragFrameRef.current = null;
+        const pendingChanges = pendingNodeDragChangesRef.current;
+        pendingNodeDragChangesRef.current = null;
+        if (pendingChanges?.length) applyWorkflowNodeChanges(pendingChanges);
+      });
+    },
+    [applyWorkflowNodeChanges],
+  );
+
   const onNodeDragStop = useCallback(
     (_event: MouseEvent | TouchEvent, node: Node) => {
+      isNodeDragInProgressRef.current = false;
+      setIsNodeDragging(false);
       updateAlignmentGuides(null);
       setSelectedNode({
         id: node.id,
@@ -1182,6 +1284,14 @@ export default function WorkflowEditorPage() {
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
+  }, []);
+
+  const onViewportMoveStart = useCallback(() => {
+    setIsViewportMoving(true);
+  }, []);
+
+  const onViewportMoveEnd = useCallback(() => {
+    setIsViewportMoving(false);
   }, []);
 
   const handleDeleteNode = useCallback(
@@ -1798,7 +1908,7 @@ export default function WorkflowEditorPage() {
       edges.map((edge) => {
         const source = runSession.nodes[edge.source]?.status;
         const target = runSession.nodes[edge.target]?.status;
-        if (!didRunTraverseEdge(edge, nodes, runSession)) {
+        if (!didRunTraverseEdge(edge, workflowStateRef.current.nodes, runSession)) {
           return edge;
         }
         if (source === 'error' || target === 'error') {
@@ -1820,19 +1930,24 @@ export default function WorkflowEditorPage() {
         }
         return edge;
       }),
-    [edges, nodes, runSession],
+    [edges, runSession],
   );
 
   const visibleValidationErrors = useMemo(() => {
-    const invalidReferenceErrors = getInvalidWorkflowVariableReferenceErrors(nodes, edges);
+    const invalidReferenceErrors = getInvalidWorkflowVariableReferenceErrors(
+      validationGraph.nodes,
+      validationGraph.edges,
+    );
     if (!showValidationErrors) return [...invalidReferenceErrors, ...serverValidationErrors];
 
     return [
-      ...validateWorkflowDraft(nodes, edges).filter((error) => error.nodeId !== 'workflow'),
+      ...validateWorkflowDraft(validationGraph.nodes, validationGraph.edges).filter(
+        (error) => error.nodeId !== 'workflow',
+      ),
       ...invalidReferenceErrors,
       ...serverValidationErrors,
     ];
-  }, [edges, nodes, serverValidationErrors, showValidationErrors]);
+  }, [serverValidationErrors, showValidationErrors, validationGraph]);
 
   const nodeValidationMessages = useMemo(() => {
     const messages = new Map<string, string>();
@@ -1850,7 +1965,6 @@ export default function WorkflowEditorPage() {
   const runtimeValue = useMemo(
     () => ({
       session: runSession,
-      connectedSourceNodeIDs: new Set(edges.map((edge) => edge.source)),
       validationErrors: nodeValidationMessages,
       copyNode: handleCopyNode,
       deleteNode: handleDeleteNode,
@@ -1858,7 +1972,6 @@ export default function WorkflowEditorPage() {
       insertOnEdge: handleInsertOnEdge,
     }),
     [
-      edges,
       handleCopyNode,
       handleDeleteNode,
       handleInsertAfter,
@@ -1869,48 +1982,86 @@ export default function WorkflowEditorPage() {
   );
 
   const saveStatusText = formatAutoSavedAt(lastAutoSavedAt);
+  const isCanvasInteracting = isViewportMoving || isNodeDragging;
 
-  const copilot = (
-    <WorkbenchCopilot
-      context={{
-        scope: 'workflow',
-        targetId: workflowId || undefined,
-        draft: copilotDraft,
-        selectedNodeId: selectedNode?.id,
-        nodeLabels: Object.fromEntries(
-          nodes.map((node) => [node.id, (node.data as { label?: string }).label || node.id]),
-        ),
-        runId: runSession.runId || undefined,
-      }}
-      suggestions={[
-        selectedNode ? '把这一步改得更适合初学者' : '根据当前草稿补全工作流',
-        runSession.failedNodeId ? '根据最近失败生成修复提案' : '检查节点配置和风险',
-      ]}
-      onApplyProposal={applyCopilotProposal}
-    />
+  const copilotNodeLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        validationGraph.nodes.map((node) => [
+          node.id,
+          (node.data as { label?: string }).label || node.id,
+        ]),
+      ),
+    [validationGraph.nodes],
   );
 
-  const propertyPanel = (
-    <PropertyPanel
-      selectedNode={selectedNode}
-      onClose={() => setSelectedNode(null)}
-      onUpdateNode={onUpdateNode}
-      nodes={nodes}
-      edges={edges}
-      runSnapshot={selectedNode ? runSession.nodes[selectedNode.id] : undefined}
-      validationErrors={visibleValidationErrors}
-      activeTab={activePropertyTab}
-      onActiveTabChange={setActivePropertyTab}
-    />
+  const copilotContext = useMemo(
+    () => ({
+      scope: 'workflow' as const,
+      targetId: workflowId || undefined,
+      draft: copilotDraft,
+      selectedNodeId: selectedNode?.id,
+      nodeLabels: copilotNodeLabels,
+      runId: runSession.runId || undefined,
+    }),
+    [copilotDraft, copilotNodeLabels, runSession.runId, selectedNode?.id, workflowId],
   );
 
-  const workspacePanel = (
-    <WorkflowWorkspacePanel
-      activeTab={activeWorkspaceTab}
-      onActiveTabChange={setActiveWorkspaceTab}
-      copilotContent={copilot}
-      nodeContent={propertyPanel}
-    />
+  const copilotSuggestions = useMemo(
+    () => [
+      selectedNode ? '把这一步改得更适合初学者' : '根据当前草稿补全工作流',
+      runSession.failedNodeId ? '根据最近失败生成修复提案' : '检查节点配置和风险',
+    ],
+    [runSession.failedNodeId, selectedNode],
+  );
+
+  const copilot = useMemo(
+    () => (
+      <WorkbenchCopilot
+        context={copilotContext}
+        suggestions={copilotSuggestions}
+        onApplyProposal={applyCopilotProposal}
+      />
+    ),
+    [applyCopilotProposal, copilotContext, copilotSuggestions],
+  );
+
+  const propertyPanel = useMemo(
+    () => (
+      <PropertyPanel
+        selectedNode={selectedNode}
+        onClose={onPaneClick}
+        onUpdateNode={onUpdateNode}
+        nodes={validationGraph.nodes}
+        edges={validationGraph.edges}
+        runSnapshot={selectedNode ? runSession.nodes[selectedNode.id] : undefined}
+        validationErrors={visibleValidationErrors}
+        activeTab={activePropertyTab}
+        onActiveTabChange={setActivePropertyTab}
+      />
+    ),
+    [
+      activePropertyTab,
+      onPaneClick,
+      onUpdateNode,
+      runSession.nodes,
+      selectedNode,
+      validationGraph.edges,
+      validationGraph.nodes,
+      visibleValidationErrors,
+    ],
+  );
+
+  const workspacePanel = useMemo(
+    () => (
+      <WorkflowWorkspacePanel
+        activeTab={activeWorkspaceTab}
+        onActiveTabChange={setActiveWorkspaceTab}
+        copilotContent={copilot}
+        nodeContent={propertyPanel}
+      />
+    ),
+    [activeWorkspaceTab, copilot, propertyPanel],
   );
 
   return (
@@ -2252,6 +2403,9 @@ export default function WorkflowEditorPage() {
           <div className="flex flex-1 overflow-hidden">
             <div ref={reactFlowWrapper} className="relative flex-1 bg-muted/20">
               <ReactFlow
+                className={
+                  isCanvasInteracting ? 'workflow-canvas is-interacting' : 'workflow-canvas'
+                }
                 nodes={nodes}
                 edges={renderedEdges}
                 onNodesChange={onNodesChange}
@@ -2263,11 +2417,13 @@ export default function WorkflowEditorPage() {
                 onEdgeClick={onEdgeClick}
                 onPaneClick={onPaneClick}
                 onPaneContextMenu={onPaneContextMenu}
+                onMoveStart={onViewportMoveStart}
+                onMoveEnd={onViewportMoveEnd}
                 nodeTypes={workflowNodeTypes}
                 edgeTypes={workflowEdgeTypes}
                 defaultEdgeOptions={defaultEdgeOptions}
                 deleteKeyCode="Delete"
-                fitView={nodes.length > 0 && !isFitViewComplete.current}
+                fitView={nodes.length > 0 && shouldFitView}
                 fitViewOptions={{ maxZoom: 0.8, padding: 0.2 }}
                 minZoom={0.2}
                 maxZoom={2}
@@ -2281,7 +2437,7 @@ export default function WorkflowEditorPage() {
                 <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
                 <WorkflowAlignmentGuides alignment={alignmentGuides} />
                 <Controls />
-                <MiniMap />
+                {isCanvasInteracting ? null : <MiniMap />}
               </ReactFlow>
               {!showRunPanel ? (
                 <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
