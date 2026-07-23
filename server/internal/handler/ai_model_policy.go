@@ -47,11 +47,12 @@ type aiModelConnectionTestRequest struct {
 }
 
 type aiModelOption struct {
-	ID           string   `json:"id"`
-	Provider     string   `json:"provider"`
-	ModelID      string   `json:"modelId"`
-	DisplayName  string   `json:"displayName"`
-	Capabilities []string `json:"capabilities"`
+	ID             string   `json:"id"`
+	Provider       string   `json:"provider"`
+	ModelID        string   `json:"modelId"`
+	DisplayName    string   `json:"displayName"`
+	Capabilities   []string `json:"capabilities"`
+	ImageQualities []string `json:"imageQualities,omitempty"`
 }
 
 // Admin responses expose JSON fields as their semantic array types rather than
@@ -335,7 +336,14 @@ func ListAvailableAIModels(c *gin.Context) {
 	}
 	options := make([]aiModelOption, 0, len(items))
 	for _, item := range items {
-		options = append(options, aiModelOption{ID: item.ID.String(), Provider: item.Provider, ModelID: item.ModelID, DisplayName: item.DisplayName, Capabilities: aimodel.DecodeStrings(item.Capabilities)})
+		option := aiModelOption{
+			ID: item.ID.String(), Provider: item.Provider, ModelID: item.ModelID,
+			DisplayName: item.DisplayName, Capabilities: aimodel.DecodeStrings(item.Capabilities),
+		}
+		if aimodel.HasCapabilities(item, []string{"image_generation"}) {
+			option.ImageQualities = aimodel.ImageGenerationQualities(item)
+		}
+		options = append(options, option)
 	}
 	Success(c, gin.H{"list": options})
 }

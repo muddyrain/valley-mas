@@ -1,15 +1,19 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -39,26 +43,26 @@ type aiImagePreset struct {
 	ID                string `json:"id"`
 	Name              string `json:"name"`
 	Description       string `json:"description"`
-	PromptPrefix      string `json:"-"`
+	PromptContent     string `json:"promptContent"`
 	RequiresReference bool   `json:"requiresReference"`
 	RecommendedAspect string `json:"recommendedAspect"`
 }
 
 var aiImagePresets = []aiImagePreset{
-	{ID: "free", Name: "自由创作", Description: "根据描述生成完整画面", PromptPrefix: "Create one polished, coherent image from the user's visual brief.", RecommendedAspect: "1:1"},
-	{ID: "sketch", Name: "草图成图", Description: "保留构图，把线稿发展成完整画面", PromptPrefix: "Transform the reference sketch into a finished image. Preserve its main composition, subject placement and pose while adding coherent materials, lighting and detail.", RequiresReference: true, RecommendedAspect: "4:3"},
-	{ID: "cover", Name: "文章封面", Description: "生成清晰、克制的主题封面", PromptPrefix: "Create a strong editorial cover image with one clear focal point, balanced negative space and no visible text.", RecommendedAspect: "16:9"},
-	{ID: "product", Name: "产品展示", Description: "生成干净的产品视觉图", PromptPrefix: "Create a premium product presentation with accurate subject shape, controlled studio lighting, clean composition and no extra products.", RecommendedAspect: "4:3"},
-	{ID: "avatar", Name: "角色头像", Description: "生成单角色方形头像", PromptPrefix: "Create a square, avatar-ready image with exactly one clear character, a simple background and a readable silhouette.", RecommendedAspect: "1:1"},
-	{ID: "felt", Name: "毛毡玩具", Description: "转成柔软的手作毛毡质感", PromptPrefix: "Render the subject as a handcrafted felt toy scene with soft fibers, rounded forms, subtle stitching and warm studio lighting.", RecommendedAspect: "1:1"},
+	{ID: "free", Name: "自由创作", Description: "根据描述生成完整画面", PromptContent: "根据用户的画面描述，生成一张完整、精致且风格统一的图片。", RecommendedAspect: "1:1"},
+	{ID: "sketch", Name: "草图成图", Description: "保留构图，把线稿发展成完整画面", PromptContent: "将参考草图发展为完整画面。保留主要构图、主体位置和姿态，同时补充连贯的材质、光线和细节。", RequiresReference: true, RecommendedAspect: "4:3"},
+	{ID: "cover", Name: "文章封面", Description: "生成清晰、克制的主题封面", PromptContent: "生成一张清晰克制的主题封面，保留一个明确视觉焦点、均衡的留白，并且不要出现可见文字。", RecommendedAspect: "16:9"},
+	{ID: "product", Name: "产品展示", Description: "生成干净的产品视觉图", PromptContent: "生成一张高品质的产品展示图，准确呈现主体形态，使用克制的棚拍光线与干净构图，不要添加额外产品。", RecommendedAspect: "4:3"},
+	{ID: "avatar", Name: "角色头像", Description: "生成单角色方形头像", PromptContent: "生成一张适合头像使用的方形图片，只呈现一个清晰角色，使用简洁背景并保持容易辨识的轮廓。", RecommendedAspect: "1:1"},
+	{ID: "felt", Name: "毛毡玩具", Description: "转成柔软的手作毛毡质感", PromptContent: "将主体渲染为手作毛毡玩具场景，呈现柔软纤维、圆润形体、细微缝线和温暖棚拍光线。", RecommendedAspect: "1:1"},
 }
 
 var aiImageSizes = map[string]map[string]string{
-	"1:1":  {"1K": "1024x1024", "2K": "2048x2048"},
-	"4:3":  {"1K": "1024x768", "2K": "2048x1536"},
-	"3:4":  {"1K": "768x1024", "2K": "1536x2048"},
-	"16:9": {"1K": "1280x720", "2K": "2048x1152"},
-	"9:16": {"1K": "720x1280", "2K": "1152x2048"},
+	"1:1":  {"1K": "1024x1024", "2K": "2048x2048", "3K": "3072x3072", "4K": "4096x4096"},
+	"4:3":  {"1K": "1024x768", "2K": "2048x1536", "3K": "3072x2304", "4K": "4096x3072"},
+	"3:4":  {"1K": "768x1024", "2K": "1536x2048", "3K": "2304x3072", "4K": "3072x4096"},
+	"16:9": {"1K": "1280x720", "2K": "2048x1152", "3K": "3072x1728", "4K": "4096x2304"},
+	"9:16": {"1K": "720x1280", "2K": "1152x2048", "3K": "1728x3072", "4K": "2304x4096"},
 }
 
 type createAIImageGenerationRequest struct {
@@ -75,6 +79,7 @@ func ListAIImagePresets(c *gin.Context) {
 		"presets":      aiImagePresets,
 		"aspectRatios": []string{"1:1", "4:3", "3:4", "16:9", "9:16"},
 		"qualities":    []string{"1K", "2K"},
+		"sizes":        aiImageSizes,
 	})
 }
 
@@ -90,14 +95,17 @@ func CreateAIImageGeneration(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "图片生成参数错误")
 		return
 	}
-	preset, size, references, err := validateAIImageGenerationRequest(payload)
-	if err != nil {
-		Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
 	invocation, err := aimodel.ResolveInvocation(database.GetDB(), payload.ModelID, "image_generation", aiImageGenerationTimeout)
 	if err != nil {
 		respondCatalogModelError(c, err)
+		return
+	}
+	preset, size, references, err := validateAIImageGenerationRequest(
+		payload,
+		aimodel.ImageGenerationQualities(invocation.Model),
+	)
+	if err != nil {
+		Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	if len(references) > 0 {
@@ -110,23 +118,35 @@ func CreateAIImageGeneration(c *gin.Context) {
 		Error(c, http.StatusServiceUnavailable, "图片存储服务未配置")
 		return
 	}
+	canvasSnapshot, err := storeAIImageCanvasSnapshot(c.Request.Context(), userID, references)
+	if err != nil {
+		ErrorWithDetail(c, http.StatusInternalServerError, "画布快照保存失败，请稍后重试", err)
+		return
+	}
 
 	prompt := buildAIImagePrompt(preset, payload.Prompt, len(references) > 0)
 	generation := model.AIImageGeneration{
-		UserID:         userID,
-		ModelCatalogID: invocation.Model.ID,
-		Provider:       invocation.Provider.Provider,
-		Model:          invocation.Model.ModelID,
-		PresetID:       preset.ID,
-		Prompt:         strings.TrimSpace(payload.Prompt),
-		AspectRatio:    payload.AspectRatio,
-		Quality:        payload.Quality,
-		RequestedSize:  size,
-		ReferenceCount: len(references),
-		Status:         "queued",
-		Stage:          "preparing",
+		UserID:                   userID,
+		ModelCatalogID:           invocation.Model.ID,
+		Provider:                 invocation.Provider.Provider,
+		Model:                    invocation.Model.ModelID,
+		PresetID:                 preset.ID,
+		PresetName:               preset.Name,
+		PresetPrompt:             preset.PromptContent,
+		Prompt:                   strings.TrimSpace(payload.Prompt),
+		AspectRatio:              payload.AspectRatio,
+		Quality:                  payload.Quality,
+		RequestedSize:            size,
+		ReferenceCount:           len(references),
+		CanvasSnapshotURL:        canvasSnapshot.URL,
+		CanvasSnapshotStorageKey: canvasSnapshot.StorageKey,
+		CanvasSnapshotWidth:      canvasSnapshot.Width,
+		CanvasSnapshotHeight:     canvasSnapshot.Height,
+		Status:                   "queued",
+		Stage:                    "preparing",
 	}
 	if err := database.GetDB().Create(&generation).Error; err != nil {
+		deleteAIImageCanvasSnapshot(canvasSnapshot)
 		ErrorWithDetail(c, http.StatusInternalServerError, "创建图片生成任务失败", err)
 		return
 	}
@@ -194,23 +214,64 @@ func SaveAIImageGenerationResource(c *gin.Context) {
 		return
 	}
 
+	if utils.GetTOSUploader() == nil {
+		Error(c, http.StatusServiceUnavailable, "图片存储服务未配置")
+		return
+	}
+
+	var generation model.AIImageGeneration
+	if err := database.GetDB().Where("id = ? AND user_id = ?", generationID, userID).First(&generation).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(c, http.StatusNotFound, "图片生成记录不存在")
+			return
+		}
+		ErrorWithDetail(c, http.StatusInternalServerError, "读取图片生成记录失败", err)
+		return
+	}
+	if generation.Status != "succeeded" || generation.ResultURL == "" {
+		Error(c, http.StatusConflict, "图片尚未生成完成")
+		return
+	}
+	if generation.ResourceID != nil && *generation.ResourceID != 0 {
+		Error(c, http.StatusConflict, "图片已经保存到资源库")
+		return
+	}
+
+	content, mimeType, err := fetchGeneratedAIImage(c.Request.Context(), generation.ResultURL)
+	if err != nil {
+		ErrorWithDetail(c, http.StatusBadGateway, "读取历史图片失败，请稍后重试", err)
+		return
+	}
+	uploadConfig := service.GetDefaultConfig(service.UploadType(payload.Type))
+	uploadConfig.UserID = int64(userID)
+	stored, err := service.NewUploadService().UploadBytesWithContext(
+		c.Request.Context(),
+		"saved-ai-image"+aiImageExtension(mimeType),
+		content,
+		uploadConfig,
+	)
+	if err != nil {
+		ErrorWithDetail(c, http.StatusInternalServerError, "保存到资源库失败", err)
+		return
+	}
+
 	var saved model.Resource
-	err := database.GetDB().Transaction(func(tx *gorm.DB) error {
-		var generation model.AIImageGeneration
+	err = database.GetDB().Transaction(func(tx *gorm.DB) error {
+		var locked model.AIImageGeneration
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ? AND user_id = ?", generationID, userID).
-			First(&generation).Error; err != nil {
+			First(&locked).Error; err != nil {
 			return err
 		}
-		if generation.Status != "succeeded" || generation.ResultURL == "" {
+		if locked.Status != "succeeded" || locked.ResultURL == "" {
 			return errAIImageNotReady
 		}
-		if generation.ResourceID != nil && *generation.ResourceID != 0 {
+		if locked.ResourceID != nil && *locked.ResourceID != 0 {
 			return errAIImageAlreadySaved
 		}
 		title := strings.TrimSpace(payload.Title)
 		if title == "" {
-			title = aiImageResourceTitle(generation.Prompt)
+			title = aiImageResourceTitle(locked.Prompt)
 		}
 		title = truncateRunes(title, 100)
 		saved = model.Resource{
@@ -219,19 +280,22 @@ func SaveAIImageGenerationResource(c *gin.Context) {
 			Visibility:  "private",
 			Title:       title,
 			Description: "AI 图片创作",
-			URL:         generation.ResultURL,
-			StorageKey:  generation.ResultStorageKey,
-			Width:       generation.ResultWidth,
-			Height:      generation.ResultHeight,
-			Size:        generation.ResultSize,
-			Extension:   strings.TrimPrefix(filepath.Ext(generation.ResultStorageKey), "."),
+			URL:         stored.URL,
+			StorageKey:  stored.Key,
+			Width:       locked.ResultWidth,
+			Height:      locked.ResultHeight,
+			Size:        stored.Size,
+			Extension:   strings.TrimPrefix(stored.Ext, "."),
 			Tags:        model.StringList{},
 		}
 		if err := tx.Create(&saved).Error; err != nil {
 			return err
 		}
-		return tx.Model(&generation).Update("resource_id", saved.ID).Error
+		return tx.Model(&locked).Update("resource_id", saved.ID).Error
 	})
+	if err != nil {
+		_ = service.NewUploadService().DeleteByKey(stored.Key)
+	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		Error(c, http.StatusNotFound, "图片生成记录不存在")
 		return
@@ -251,6 +315,55 @@ func SaveAIImageGenerationResource(c *gin.Context) {
 	Success(c, gin.H{"resource": saved})
 }
 
+type aiImageCanvasSnapshot struct {
+	URL        string
+	StorageKey string
+	Width      int
+	Height     int
+}
+
+func storeAIImageCanvasSnapshot(
+	ctx context.Context,
+	userID model.Int64String,
+	references []string,
+) (aiImageCanvasSnapshot, error) {
+	if len(references) == 0 {
+		return aiImageCanvasSnapshot{}, nil
+	}
+	content, mimeType, err := aiclient.DecodeImageDataURL(references[0], maxAIImageReferenceBytes)
+	if err != nil {
+		return aiImageCanvasSnapshot{}, err
+	}
+	width, height, err := generatedAIImageDimensions(content, mimeType)
+	if err != nil {
+		return aiImageCanvasSnapshot{}, err
+	}
+	uploadConfig := service.GetDefaultConfig(service.UploadTypeWallpaper)
+	uploadConfig.UserID = int64(userID)
+	uploadConfig.CustomFolder = fmt.Sprintf("ai-image-snapshots/%s/%s", userID.String(), time.Now().Format("20060102"))
+	stored, err := service.NewUploadService().UploadBytesWithContext(
+		ctx,
+		"canvas"+aiImageExtension(mimeType),
+		content,
+		uploadConfig,
+	)
+	if err != nil {
+		return aiImageCanvasSnapshot{}, err
+	}
+	return aiImageCanvasSnapshot{
+		URL: stored.URL, StorageKey: stored.Key, Width: width, Height: height,
+	}, nil
+}
+
+func deleteAIImageCanvasSnapshot(snapshot aiImageCanvasSnapshot) {
+	if snapshot.StorageKey == "" {
+		return
+	}
+	if err := service.NewUploadService().DeleteByKey(snapshot.StorageKey); err != nil {
+		log.Printf("[WARN] clean up AI image canvas snapshot failed: key=%s err=%v", snapshot.StorageKey, err)
+	}
+}
+
 var (
 	errAIImageNotReady     = errors.New("AI image generation is not ready")
 	errAIImageAlreadySaved = errors.New("AI image generation is already saved")
@@ -258,6 +371,7 @@ var (
 
 func validateAIImageGenerationRequest(
 	payload createAIImageGenerationRequest,
+	availableQualities []string,
 ) (aiImagePreset, string, []string, error) {
 	preset, ok := findAIImagePreset(payload.PresetID)
 	if !ok {
@@ -276,7 +390,10 @@ func validateAIImageGenerationRequest(
 	}
 	size, ok := qualityMap[payload.Quality]
 	if !ok {
-		return aiImagePreset{}, "", nil, errors.New("请选择有效的清晰度")
+		return aiImagePreset{}, "", nil, errors.New("请选择有效的目标分辨率")
+	}
+	if !slices.Contains(availableQualities, payload.Quality) {
+		return aiImagePreset{}, "", nil, errors.New("所选图片模型不支持该目标分辨率")
 	}
 	if len(payload.ReferenceRaw) > maxAIImageReferences {
 		return aiImagePreset{}, "", nil, fmt.Errorf("最多支持 %d 张参考图", maxAIImageReferences)
@@ -328,7 +445,7 @@ func buildAIImagePrompt(preset aiImagePreset, userPrompt string, hasReference bo
 	return fmt.Sprintf(
 		"%s %s Follow this visual brief: %s. Produce exactly one image. Keep the composition coherent and intentional. Do not add a watermark, logo, border, interface chrome or unrequested visible text.",
 		referenceContract,
-		preset.PromptPrefix,
+		preset.PromptContent,
 		strings.TrimSpace(userPrompt),
 	)
 }
@@ -363,6 +480,14 @@ func executeAIImageGeneration(
 		failAIImageGeneration(generation, invocation, started, "IMAGE_DOWNLOAD_FAILED", "生成图片读取失败，请稍后重试", err)
 		return
 	}
+	resultWidth, resultHeight, dimensionErr := generatedAIImageDimensions(content, mimeType)
+	if dimensionErr != nil {
+		log.Printf(
+			"[WARN] AI image dimensions unavailable; preserving valid result: id=%s err=%v",
+			generation.ID.String(),
+			dimensionErr,
+		)
+	}
 	uploadConfig := service.GetDefaultConfig(service.UploadTypeWallpaper)
 	uploadConfig.UserID = int64(generation.UserID)
 	uploadConfig.CustomFolder = fmt.Sprintf("ai-images/%s/%s", generation.UserID.String(), time.Now().Format("20060102"))
@@ -379,7 +504,7 @@ func executeAIImageGeneration(
 	finished := time.Now()
 	updateAIImageGeneration(generation.ID, map[string]any{
 		"status": "succeeded", "stage": "completed", "result_url": stored.URL,
-		"result_storage_key": stored.Key, "result_width": stored.Width, "result_height": stored.Height,
+		"result_storage_key": stored.Key, "result_width": resultWidth, "result_height": resultHeight,
 		"result_size": stored.Size, "finished_at": finished, "error_code": "", "error_message": "",
 	})
 	aiusage.Record(aiusage.Entry{
@@ -491,6 +616,73 @@ func aiImageExtension(mimeType string) string {
 		return ".webp"
 	default:
 		return ".png"
+	}
+}
+
+func generatedAIImageDimensions(content []byte, mimeType string) (int, int, error) {
+	if mimeType == "image/webp" {
+		return webPImageDimensions(content)
+	}
+	config, _, err := image.DecodeConfig(bytes.NewReader(content))
+	if err != nil || config.Width <= 0 || config.Height <= 0 {
+		return 0, 0, errors.New("无法读取 AI 返回图片的像素尺寸")
+	}
+	return config.Width, config.Height, nil
+}
+
+func webPImageDimensions(content []byte) (int, int, error) {
+	if len(content) < 20 || string(content[:4]) != "RIFF" || string(content[8:12]) != "WEBP" {
+		return 0, 0, errors.New("无法读取 AI 返回图片的像素尺寸")
+	}
+	for offset := 12; offset+8 <= len(content); {
+		chunkType := string(content[offset : offset+4])
+		chunkSize := int(content[offset+4]) |
+			int(content[offset+5])<<8 |
+			int(content[offset+6])<<16 |
+			int(content[offset+7])<<24
+		dataOffset := offset + 8
+		if chunkSize < 0 || chunkSize > len(content)-dataOffset {
+			return 0, 0, errors.New("无法读取 AI 返回图片的像素尺寸")
+		}
+		chunk := content[dataOffset : dataOffset+chunkSize]
+		width, height, ok := webPChunkDimensions(chunkType, chunk)
+		if ok {
+			return width, height, nil
+		}
+		offset = dataOffset + chunkSize
+		if chunkSize%2 != 0 {
+			offset++
+		}
+	}
+	return 0, 0, errors.New("无法读取 AI 返回图片的像素尺寸")
+}
+
+func webPChunkDimensions(chunkType string, chunk []byte) (int, int, bool) {
+	switch chunkType {
+	case "VP8X":
+		if len(chunk) < 10 {
+			return 0, 0, false
+		}
+		width := 1 + int(chunk[4]) + int(chunk[5])<<8 + int(chunk[6])<<16
+		height := 1 + int(chunk[7]) + int(chunk[8])<<8 + int(chunk[9])<<16
+		return width, height, true
+	case "VP8 ":
+		if len(chunk) < 10 || chunk[3] != 0x9d || chunk[4] != 0x01 || chunk[5] != 0x2a {
+			return 0, 0, false
+		}
+		width := int(chunk[6]) + int(chunk[7]&0x3f)<<8
+		height := int(chunk[8]) + int(chunk[9]&0x3f)<<8
+		return width, height, width > 0 && height > 0
+	case "VP8L":
+		if len(chunk) < 5 || chunk[0] != 0x2f {
+			return 0, 0, false
+		}
+		bits := uint32(chunk[1]) | uint32(chunk[2])<<8 | uint32(chunk[3])<<16 | uint32(chunk[4])<<24
+		width := 1 + int(bits&0x3fff)
+		height := 1 + int((bits>>14)&0x3fff)
+		return width, height, true
+	default:
+		return 0, 0, false
 	}
 }
 

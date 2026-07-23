@@ -39,6 +39,7 @@ interface ImageLayer {
   y: number;
   width: number;
   height: number;
+  fitCanvas?: boolean;
 }
 
 const CANVAS_SIZES: Record<string, { width: number; height: number }> = {
@@ -80,6 +81,10 @@ interface SketchCanvasProps {
   aspectRatio: string;
   disabled?: boolean;
   onContentChange?: (hasContent: boolean) => void;
+  restoreSnapshot?: {
+    id: string;
+    dataURL: string;
+  };
 }
 
 function renderCanvasScene(
@@ -151,12 +156,13 @@ function renderCanvasScene(
 }
 
 export const SketchCanvas = forwardRef<SketchCanvasHandle, SketchCanvasProps>(function SketchCanvas(
-  { aspectRatio, disabled = false, onContentChange },
+  { aspectRatio, disabled = false, onContentChange, restoreSnapshot },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageElementsRef = useRef(new Map<string, HTMLImageElement>());
+  const restoredSnapshotIDRef = useRef<string | undefined>(undefined);
   const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
   const [tool, setTool] = useState<CanvasTool>('brush');
   const [brushColor, setBrushColor] = useState('#111827');
@@ -185,6 +191,9 @@ export const SketchCanvas = forwardRef<SketchCanvasHandle, SketchCanvasProps>(fu
   useEffect(() => {
     setLayers((current) =>
       current.map((layer) => {
+        if (layer.fitCanvas) {
+          return { ...layer, x: 0, y: 0, width: 1, height: 1 };
+        }
         const nextSize = getImageLayerSize(
           layer.sourceAspect,
           canvasSize,
@@ -203,6 +212,42 @@ export const SketchCanvas = forwardRef<SketchCanvasHandle, SketchCanvasProps>(fu
   useEffect(() => {
     onContentChange?.(layers.length > 0 || strokes.length > 0);
   }, [layers.length, onContentChange, strokes.length]);
+
+  useEffect(() => {
+    if (!restoreSnapshot || restoredSnapshotIDRef.current === restoreSnapshot.id) return;
+    let active = true;
+    const image = new Image();
+    image.onload = () => {
+      if (!active) return;
+      const id = `history-${restoreSnapshot.id}`;
+      imageElementsRef.current.clear();
+      imageElementsRef.current.set(id, image);
+      setStrokes([]);
+      setLayers([
+        {
+          id,
+          name: '历史画布快照',
+          dataUrl: restoreSnapshot.dataURL,
+          sourceAspect: image.naturalWidth / image.naturalHeight || 1,
+          x: 0,
+          y: 0,
+          width: 1,
+          height: 1,
+          fitCanvas: true,
+        },
+      ]);
+      setSelectedLayerID(undefined);
+      setTool('select');
+      restoredSnapshotIDRef.current = restoreSnapshot.id;
+    };
+    image.onerror = () => {
+      if (active) toast.error('画布快照读取失败，请稍后重试');
+    };
+    image.src = restoreSnapshot.dataURL;
+    return () => {
+      active = false;
+    };
+  }, [restoreSnapshot]);
 
   useImperativeHandle(
     ref,
@@ -471,45 +516,44 @@ export const SketchCanvas = forwardRef<SketchCanvasHandle, SketchCanvasProps>(fu
         </div>
       </div>
 
-      {selectedLayer ? (
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
-          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-            {selectedLayer.name}
-          </span>
-          <div className="flex w-48 items-center gap-2">
-            <Label className="text-xs">大小</Label>
-            <Slider
-              value={[Math.round(Math.max(selectedLayer.width, selectedLayer.height) * 100)]}
-              min={15}
-              max={95}
-              step={1}
-              onValueChange={(value) =>
-                updateSelectedLayerSize((Array.isArray(value) ? value[0] : value) ?? 55)
-              }
-              disabled={disabled}
-              aria-label="素材大小"
-            />
-            <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">
-              {Math.round(Math.max(selectedLayer.width, selectedLayer.height) * 100)}%
-            </span>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            onClick={deleteSelectedLayer}
-            aria-label="删除素材"
-            disabled={disabled}
-          >
-            <Trash2 />
-          </Button>
-        </div>
-      ) : null}
-
       <div
-        className="flex min-h-[18rem] items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30 p-3 sm:min-h-[24rem] sm:p-5"
+        className="relative flex min-h-[18rem] items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30 p-3 sm:min-h-[24rem] sm:p-5"
         data-testid="ai-image-canvas-stage"
       >
+        {selectedLayer ? (
+          <div className="absolute top-3 right-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-3 rounded-lg border border-border bg-background/95 px-3 py-2 shadow-sm backdrop-blur-sm sm:top-5 sm:right-5">
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+              {selectedLayer.name}
+            </span>
+            <div className="flex w-48 shrink-0 items-center gap-2">
+              <Label className="shrink-0 whitespace-nowrap text-xs">大小</Label>
+              <Slider
+                value={[Math.round(Math.max(selectedLayer.width, selectedLayer.height) * 100)]}
+                min={15}
+                max={95}
+                step={1}
+                onValueChange={(value) =>
+                  updateSelectedLayerSize((Array.isArray(value) ? value[0] : value) ?? 55)
+                }
+                disabled={disabled}
+                aria-label="素材大小"
+              />
+              <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">
+                {Math.round(Math.max(selectedLayer.width, selectedLayer.height) * 100)}%
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={deleteSelectedLayer}
+              aria-label="删除素材"
+              disabled={disabled}
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        ) : null}
         <canvas
           ref={canvasRef}
           width={canvasSize.width}

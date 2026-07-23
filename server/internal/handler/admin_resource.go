@@ -214,11 +214,11 @@ func ListResources(c *gin.Context) {
 	}
 
 	// 按专辑过滤
-		if albumID != "" {
-			query = query.
-				Joins("JOIN user_album_resources ON user_album_resources.resource_id = resources.id").
-				Where("user_album_resources.user_album_id = ?", albumID)
-		}
+	if albumID != "" {
+		query = query.
+			Joins("JOIN user_album_resources ON user_album_resources.resource_id = resources.id").
+			Where("user_album_resources.user_album_id = ?", albumID)
+	}
 
 	if resourceType != "" {
 		query = query.Where("type = ?", resourceType)
@@ -459,24 +459,32 @@ func DeleteResource(c *gin.Context) {
 		return
 	}
 
+	// 已保存的旧 AI 历史可能仍与资源共用对象；保留该对象，避免删除资源时破坏历史。
+	preserveHistoryObject := aiImageResourceBacksHistory(db, resource)
+
 	// 使用上传服务删除文件
 	uploadService := service.NewUploadService()
 
 	// 优先使用 StorageKey，如果没有则从 URL 提取（兼容旧数据）
-	if resource.StorageKey != "" {
+	if !preserveHistoryObject && resource.StorageKey != "" {
 		if err := uploadService.DeleteByKey(resource.StorageKey); err != nil {
 			// 即使删除文件失败，也继续删除数据库记录（打印日志）
 			println("警告: 删除文件失败:", err.Error())
 		}
-	} else {
+	} else if !preserveHistoryObject {
 		// 兼容旧数据：从 URL 提取 Key
 		if err := uploadService.Delete(resource.URL); err != nil {
 			println("警告: 删除文件失败:", err.Error())
 		}
 	}
 
-	// 从数据库软删除
-	if err := db.Delete(&resource).Error; err != nil {
+	// 从数据库软删除，并解除历史记录到已删除资源的关联。
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&resource).Error; err != nil {
+			return err
+		}
+		return clearAIImageGenerationResourceLinks(tx, []model.Int64String{resource.ID})
+	}); err != nil {
 		logrus.WithField("error", err).Error("AdminDeleteResource db delete failed")
 		Error(c, 500, "删除失败："+err.Error())
 		return
@@ -538,13 +546,15 @@ func BatchDeleteResources(c *gin.Context) {
 	}
 
 	deletedCount := 0
+	deletedResourceIDs := make([]model.Int64String, 0, len(resources))
 	for _, resource := range resources {
+		preserveHistoryObject := aiImageResourceBacksHistory(db, resource)
 		// 删除存储文件（失败不阻断）
-		if resource.StorageKey != "" {
+		if !preserveHistoryObject && resource.StorageKey != "" {
 			if err := uploadService.DeleteByKey(resource.StorageKey); err != nil {
 				logrus.Warnf("批量删除：删除文件失败 key=%s err=%v", resource.StorageKey, err)
 			}
-		} else if resource.URL != "" {
+		} else if !preserveHistoryObject && resource.URL != "" {
 			if err := uploadService.Delete(resource.URL); err != nil {
 				logrus.Warnf("批量删除：删除文件失败 url=%s err=%v", resource.URL, err)
 			}
@@ -554,6 +564,12 @@ func BatchDeleteResources(c *gin.Context) {
 			continue
 		}
 		deletedCount++
+		deletedResourceIDs = append(deletedResourceIDs, resource.ID)
+	}
+	if err := clearAIImageGenerationResourceLinks(db, deletedResourceIDs); err != nil {
+		logrus.WithField("error", err).Error("BatchDeleteResources clear AI image history links failed")
+		Error(c, 500, "批量删除失败："+err.Error())
+		return
 	}
 	if err := reconcileAlbumCoverResourceByAlbumIDs(db, affectedAlbumIDs); err != nil {
 		logrus.WithField("error", err).Error("BatchDeleteResources reconcile album cover failed")
@@ -563,6 +579,28 @@ func BatchDeleteResources(c *gin.Context) {
 
 	invalidatePublicResourceListCache()
 	Success(c, gin.H{"deleted": deletedCount})
+}
+
+func aiImageResourceBacksHistory(db *gorm.DB, resource model.Resource) bool {
+	query := db.Model(&model.AIImageGeneration{}).Where("status = ?", "succeeded")
+	if resource.StorageKey != "" {
+		query = query.Where("result_storage_key = ?", resource.StorageKey)
+	} else if resource.URL != "" {
+		query = query.Where("result_url = ?", resource.URL)
+	} else {
+		return false
+	}
+	var count int64
+	return query.Count(&count).Error == nil && count > 0
+}
+
+func clearAIImageGenerationResourceLinks(db *gorm.DB, resourceIDs []model.Int64String) error {
+	if len(resourceIDs) == 0 {
+		return nil
+	}
+	return db.Model(&model.AIImageGeneration{}).
+		Where("resource_id IN ?", resourceIDs).
+		Update("resource_id", nil).Error
 }
 
 // BatchUpdateVisibility 批量设置资源访问范围
@@ -748,11 +786,11 @@ func UpdateResource(c *gin.Context) {
 	invalidatePublicResourceListCache()
 	Success(c, gin.H{
 		"id":          resource.ID,
-			"title":       resource.Title,
-			"description": resource.Description,
-			"type":        resource.Type,
-			"tags":        resource.Tags,
-		})
+		"title":       resource.Title,
+		"description": resource.Description,
+		"type":        resource.Type,
+		"tags":        resource.Tags,
+	})
 }
 
 // collectAlbumIDsByResourceIDs 查找包含指定资源ID的所有用户专辑ID

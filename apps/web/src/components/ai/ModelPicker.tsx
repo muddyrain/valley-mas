@@ -212,6 +212,11 @@ export function ModelPicker({
                                   {CAPABILITY_LABELS[itemCapability] || itemCapability}
                                 </Badge>
                               ))}
+                              {item.imageQualities?.map((quality) => (
+                                <Badge key={quality} variant="outline" className="text-[10px]">
+                                  {quality} 目标输出
+                                </Badge>
+                              ))}
                             </span>
                           </span>
                           {selected ? (

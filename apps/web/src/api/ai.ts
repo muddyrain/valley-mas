@@ -19,6 +19,7 @@ export interface AvailableAIModel {
   modelId: string;
   displayName: string;
   capabilities: string[];
+  imageQualities?: string[];
 }
 
 export const listAvailableAIModels = (capability: string, catalog: 'auth' | 'public' = 'auth') =>

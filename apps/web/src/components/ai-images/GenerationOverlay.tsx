@@ -41,11 +41,20 @@ export function GenerationOverlay({ stage }: { stage: AIImageGenerationStage }) 
             <Sparkles className="size-4 animate-pulse motion-reduce:animate-none" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground">{content.title}</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-foreground">{content.title}</p>
+              <span className="shrink-0 text-xs font-medium tabular-nums text-primary">
+                {content.progress}%
+              </span>
+            </div>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">{content.description}</p>
           </div>
         </div>
-        <Progress value={content.progress} className="mt-4" aria-label="图片生成进度" />
+        <Progress
+          value={content.progress}
+          className="ai-image-generation-progress mt-4"
+          aria-label="图片生成进度"
+        />
       </div>
     </div>
   );

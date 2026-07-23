@@ -7,6 +7,7 @@ export interface AIImagePreset {
   id: string;
   name: string;
   description: string;
+  promptContent: string;
   requiresReference: boolean;
   recommendedAspect: string;
 }
@@ -15,6 +16,7 @@ export interface AIImagePresetCatalog {
   presets: AIImagePreset[];
   aspectRatios: string[];
   qualities: string[];
+  sizes: Record<string, Record<string, string>>;
 }
 
 export interface AIImageGeneration {
@@ -23,6 +25,8 @@ export interface AIImageGeneration {
   provider: string;
   model: string;
   presetId: string;
+  presetName: string;
+  presetPrompt: string;
   prompt: string;
   aspectRatio: string;
   quality: string;
@@ -34,6 +38,9 @@ export interface AIImageGeneration {
   resultWidth: number;
   resultHeight: number;
   resultSize: number;
+  canvasSnapshotUrl: string;
+  canvasSnapshotWidth: number;
+  canvasSnapshotHeight: number;
   resourceId?: string;
   errorCode: string;
   errorMessage: string;

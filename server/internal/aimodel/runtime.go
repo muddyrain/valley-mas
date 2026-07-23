@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
+	"sort"
 	"strings"
 	"valley-server/internal/model"
 
@@ -108,6 +110,35 @@ func HasCapabilities(item model.AIModel, required []string) bool {
 	return true
 }
 
+// ImageGenerationQualities returns declared target tiers for known models.
+// Provider selection only controls transport; capability belongs to the model
+// itself. The image studio records returned pixels after storing the result,
+// so a declared target is never treated as a fixed-pixel promise.
+func ImageGenerationQualities(item model.AIModel) []string {
+	modelID := strings.ToLower(strings.TrimSpace(item.ModelID))
+	switch {
+	case strings.HasPrefix(modelID, "doubao-seedream-4-0"):
+		return []string{"1K", "2K", "3K", "4K"}
+	case modelID == "gpt-image-2":
+		return []string{"1K", "2K", "4K"}
+	}
+	return []string{"1K", "2K"}
+}
+
+func imageGenerationDefaultPriority(item model.AIModel) int {
+	if !HasCapabilities(item, []string{"image_generation"}) {
+		return 0
+	}
+	if HasCapabilities(item, []string{"reference_image"}) &&
+		slices.Contains(ImageGenerationQualities(item), "4K") {
+		return 2
+	}
+	if HasCapabilities(item, []string{"reference_image"}) {
+		return 1
+	}
+	return 0
+}
+
 func ListEnabledModels(db *gorm.DB, capability string) ([]model.AIModel, error) {
 	var items []model.AIModel
 	if err := db.Where("enabled = ?", true).Order("sort_order ASC, display_name ASC").Find(&items).Error; err != nil {
@@ -118,6 +149,11 @@ func ListEnabledModels(db *gorm.DB, capability string) ([]model.AIModel, error) 
 		if capability == "" || HasCapabilities(item, []string{capability}) {
 			result = append(result, item)
 		}
+	}
+	if capability == "image_generation" {
+		sort.SliceStable(result, func(i, j int) bool {
+			return imageGenerationDefaultPriority(result[i]) > imageGenerationDefaultPriority(result[j])
+		})
 	}
 	return result, nil
 }

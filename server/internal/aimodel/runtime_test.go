@@ -38,6 +38,46 @@ func TestDecodeStringsMigratesLegacyImageEditCapability(t *testing.T) {
 	}
 }
 
+func TestImageGenerationQualitiesFollowModelRatherThanProvider(t *testing.T) {
+	seedream := model.AIModel{Provider: "ark", ModelID: "doubao-seedream-4-0-250828"}
+	if values := ImageGenerationQualities(seedream); !slices.Equal(values, []string{"1K", "2K", "3K", "4K"}) {
+		t.Fatalf("qualities = %#v", values)
+	}
+	gptImage := model.AIModel{Provider: "siliconflow", ModelID: "gpt-image-2"}
+	if values := ImageGenerationQualities(gptImage); !slices.Equal(values, []string{"1K", "2K", "4K"}) {
+		t.Fatalf("qualities = %#v", values)
+	}
+	legacy := model.AIModel{Provider: "siliconflow", ModelID: "Kwai-Kolors/Kolors"}
+	if values := ImageGenerationQualities(legacy); !slices.Equal(values, []string{"1K", "2K"}) {
+		t.Fatalf("qualities = %#v", values)
+	}
+}
+
+func TestListEnabledModelsPrioritizes4KReferenceImageModel(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&model.AIModel{}); err != nil {
+		t.Fatal(err)
+	}
+	items := []model.AIModel{
+		{ID: 1, Provider: "siliconflow", ModelID: "Kwai-Kolors/Kolors", DisplayName: "Kolors", Capabilities: EncodeStrings([]string{"image_generation"}), Enabled: true, SortOrder: 1},
+		{ID: 2, Provider: "amux", ModelID: "gpt-image-2", DisplayName: "GPT Image", Capabilities: EncodeStrings([]string{"image_generation", "reference_image"}), Enabled: true, SortOrder: 2},
+		{ID: 3, Provider: "ark", ModelID: "doubao-seedream-4-0-250828", DisplayName: "Seedream 4", Capabilities: EncodeStrings([]string{"image_generation", "reference_image"}), Enabled: true, SortOrder: 3},
+	}
+	if err := db.Create(&items).Error; err != nil {
+		t.Fatal(err)
+	}
+	models, err := ListEnabledModels(db, "image_generation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(models) != 3 || models[0].ID != 2 || models[1].ID != 3 || models[2].ID != 1 {
+		t.Fatalf("unexpected image model order: %+v", models)
+	}
+}
+
 func TestResolveInvocationUsesCatalogProvider(t *testing.T) {
 	t.Setenv("SILICONFLOW_API_KEY", "test-key")
 	t.Setenv("SILICONFLOW_BASE_URL", "https://provider.test/v1")

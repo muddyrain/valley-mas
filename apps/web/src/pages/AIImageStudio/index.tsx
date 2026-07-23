@@ -26,6 +26,7 @@ import { GenerationOverlay } from '@/components/ai-images/GenerationOverlay';
 import { SketchCanvas, type SketchCanvasHandle } from '@/components/ai-images/SketchCanvas';
 import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
+import ImagePreviewDialog from '@/components/ImagePreviewDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,6 +44,8 @@ import { cn } from '@/lib/utils';
 
 const DEFAULT_ASPECTS = ['1:1', '4:3', '3:4', '16:9', '9:16'];
 const DEFAULT_QUALITIES = ['1K', '2K'];
+const SELECTED_OPTION_CLASS =
+  'border-primary/40 bg-secondary text-foreground shadow-sm hover:bg-secondary/80';
 
 const STATUS_LABELS: Record<AIImageGeneration['status'], string> = {
   queued: '等待生成',
@@ -59,12 +62,24 @@ const formatDateTime = (value: string) =>
     minute: '2-digit',
   }).format(new Date(value));
 
+const readImageAsDataURL = async (url: string) => {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`画布快照读取失败（${response.status}）`);
+  const blob = await response.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => (typeof reader.result === 'string' ? resolve(reader.result) : reject());
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+};
+
 export default function AIImageStudio() {
   const sketchCanvasRef = useRef<SketchCanvasHandle | null>(null);
   const creatingRef = useRef(false);
   const [presets, setPresets] = useState<AIImagePreset[]>([]);
   const [aspectRatios, setAspectRatios] = useState(DEFAULT_ASPECTS);
-  const [qualities, setQualities] = useState(DEFAULT_QUALITIES);
+  const [sizes, setSizes] = useState<Record<string, Record<string, string>>>({});
   const [presetID, setPresetID] = useState('free');
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState('1:1');
@@ -79,6 +94,8 @@ export default function AIImageStudio() {
   const [creating, setCreating] = useState(false);
   const [savingID, setSavingID] = useState<string>();
   const [promptAssistantOpen, setPromptAssistantOpen] = useState(false);
+  const [canvasRestore, setCanvasRestore] = useState<{ id: string; dataURL: string }>();
+  const [historyPreview, setHistoryPreview] = useState<{ src: string; title: string }>();
 
   const applyHistory = useCallback((generations: AIImageGeneration[]) => {
     setHistory(generations);
@@ -103,7 +120,7 @@ export default function AIImageStudio() {
         if (!active) return;
         setPresets(catalog.presets);
         setAspectRatios(catalog.aspectRatios);
-        setQualities(catalog.qualities);
+        setSizes(catalog.sizes ?? {});
         applyHistory(generations.list);
       })
       .catch((error) => {
@@ -228,11 +245,23 @@ export default function AIImageStudio() {
     }
   };
 
-  const reuseGeneration = (generation: AIImageGeneration) => {
+  const reuseGeneration = async (generation: AIImageGeneration) => {
     setPresetID(generation.presetId);
     setPrompt(generation.prompt);
     setAspectRatio(generation.aspectRatio);
     setQuality(generation.quality);
+    setModelID(generation.modelCatalogId);
+    if (generation.canvasSnapshotUrl) {
+      try {
+        const dataURL = await readImageAsDataURL(generation.canvasSnapshotUrl);
+        setCanvasRestore({ id: generation.id, dataURL });
+        setUseCanvasReference(true);
+      } catch (error) {
+        toast.error(getAPIErrorMessage(error, '画布快照读取失败，请稍后重试'));
+      }
+    } else if (generation.referenceCount > 0) {
+      toast.info('这条旧历史没有画布快照，已恢复提示词与生成设置');
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -242,9 +271,20 @@ export default function AIImageStudio() {
   const supportsReference = selectedModel?.capabilities.includes('reference_image') ?? false;
   const usesCanvasReference = hasCanvasContent && useCanvasReference && supportsReference;
   const selectedPreset = presets.find((preset) => preset.id === presetID);
+  const modelQualities =
+    selectedModel?.imageQualities && selectedModel.imageQualities.length > 0
+      ? selectedModel.imageQualities
+      : DEFAULT_QUALITIES;
+  const targetSize = sizes[aspectRatio]?.[quality];
   const missingRequiredReference = Boolean(
     selectedPreset?.requiresReference && !usesCanvasReference,
   );
+
+  useEffect(() => {
+    if (!modelQualities.includes(quality)) {
+      setQuality(modelQualities[modelQualities.length - 1] || DEFAULT_QUALITIES[0]);
+    }
+  }, [modelQualities, quality]);
 
   return (
     <main className="min-h-full bg-muted/20">
@@ -295,6 +335,7 @@ export default function AIImageStudio() {
                 aspectRatio={aspectRatio}
                 disabled={isBusy}
                 onContentChange={setHasCanvasContent}
+                restoreSnapshot={canvasRestore}
               />
               {isGenerating && activeGeneration ? (
                 <GenerationOverlay stage={activeGeneration.stage} />
@@ -337,6 +378,19 @@ export default function AIImageStudio() {
                     </Button>
                   ))}
                 </div>
+                {selectedPreset ? (
+                  <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-foreground">模板提示词</span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {selectedPreset.name}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                      {selectedPreset.promptContent}
+                    </p>
+                  </div>
+                ) : null}
               </section>
 
               <section className="space-y-2">
@@ -373,7 +427,12 @@ export default function AIImageStudio() {
                       key={ratio}
                       type="button"
                       size="sm"
-                      variant={aspectRatio === ratio ? 'secondary' : 'outline'}
+                      variant="outline"
+                      className={cn(
+                        'transition-[background-color,border-color,box-shadow]',
+                        aspectRatio === ratio && SELECTED_OPTION_CLASS,
+                      )}
+                      aria-pressed={aspectRatio === ratio}
                       onClick={() => setAspectRatio(ratio)}
                       disabled={isBusy}
                     >
@@ -384,14 +443,24 @@ export default function AIImageStudio() {
               </section>
 
               <section className="space-y-2">
-                <Label>清晰度</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label>目标分辨率</Label>
+                  {targetSize ? (
+                    <span className="text-xs tabular-nums text-muted-foreground">{targetSize}</span>
+                  ) : null}
+                </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {qualities.map((item) => (
+                  {modelQualities.map((item) => (
                     <Button
                       key={item}
                       type="button"
                       size="sm"
-                      variant={quality === item ? 'secondary' : 'outline'}
+                      variant="outline"
+                      className={cn(
+                        'transition-[background-color,border-color,box-shadow]',
+                        quality === item && SELECTED_OPTION_CLASS,
+                      )}
+                      aria-pressed={quality === item}
                       onClick={() => setQuality(item)}
                       disabled={isBusy}
                     >
@@ -409,6 +478,12 @@ export default function AIImageStudio() {
                 label="图片模型"
                 autoSelectFirst
               />
+
+              {selectedModel ? (
+                <p className="text-xs text-muted-foreground">
+                  当前模型可选目标分辨率：{modelQualities.join('、')}；结果会记录实际返回像素
+                </p>
+              ) : null}
 
               {hasCanvasContent && supportsReference ? (
                 <div
@@ -490,12 +565,24 @@ export default function AIImageStudio() {
                 >
                   <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden border-b border-border bg-muted/30">
                     {generation.resultUrl ? (
-                      <img
-                        src={generation.resultUrl}
-                        alt={generation.prompt}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
+                      <button
+                        type="button"
+                        className="h-full w-full cursor-zoom-in"
+                        onClick={() =>
+                          setHistoryPreview({
+                            src: generation.resultUrl,
+                            title: generation.prompt || '生成图片预览',
+                          })
+                        }
+                        aria-label="预览生成图片"
+                      >
+                        <img
+                          src={generation.resultUrl}
+                          alt={generation.prompt}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      </button>
                     ) : generation.status === 'failed' ? (
                       <div className="px-5 text-center">
                         <p className="text-sm font-medium text-destructive">生成失败</p>
@@ -523,9 +610,28 @@ export default function AIImageStudio() {
                     <div className="flex flex-wrap gap-1.5">
                       <Badge variant="outline">{generation.aspectRatio}</Badge>
                       <Badge variant="outline">{generation.quality}</Badge>
+                      {generation.resultWidth > 0 && generation.resultHeight > 0 ? (
+                        <Badge variant="outline">
+                          {generation.resultWidth} × {generation.resultHeight}
+                        </Badge>
+                      ) : null}
                       <Badge variant="outline">{generation.provider}</Badge>
                       {generation.referenceCount > 0 ? (
                         <Badge variant="secondary">参考画布</Badge>
+                      ) : null}
+                      {generation.canvasSnapshotUrl ? (
+                        <Badge variant="secondary">已保存画布</Badge>
+                      ) : null}
+                    </div>
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <p>
+                        模板：
+                        {generation.presetName ||
+                          presets.find((preset) => preset.id === generation.presetId)?.name ||
+                          generation.presetId}
+                      </p>
+                      {generation.presetPrompt ? (
+                        <p className="line-clamp-2 leading-5">{generation.presetPrompt}</p>
                       ) : null}
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -549,6 +655,19 @@ export default function AIImageStudio() {
                             type="button"
                             variant="outline"
                             size="sm"
+                            onClick={() =>
+                              setHistoryPreview({
+                                src: generation.resultUrl,
+                                title: generation.prompt || '生成图片预览',
+                              })
+                            }
+                          >
+                            预览
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={() => void saveToResources(generation)}
                             disabled={Boolean(generation.resourceId) || savingID === generation.id}
                           >
@@ -561,13 +680,28 @@ export default function AIImageStudio() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => reuseGeneration(generation)}
+                        onClick={() => void reuseGeneration(generation)}
                         disabled={isBusy}
                         className={cn(generation.status !== 'succeeded' && 'ml-0')}
                       >
                         <RefreshCw />
                         再次创作
                       </Button>
+                      {generation.canvasSnapshotUrl ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setHistoryPreview({
+                              src: generation.canvasSnapshotUrl,
+                              title: '历史画布快照',
+                            })
+                          }
+                        >
+                          画布快照
+                        </Button>
+                      ) : null}
                     </div>
                   </CardContent>
                 </Card>
@@ -583,6 +717,14 @@ export default function AIImageStudio() {
         field="image_prompt"
         currentPrompt={prompt}
         onReplace={(suggestion) => setPrompt(suggestion.optimizedPrompt)}
+      />
+      <ImagePreviewDialog
+        open={Boolean(historyPreview)}
+        src={historyPreview?.src}
+        title={historyPreview?.title}
+        onOpenChange={(open) => {
+          if (!open) setHistoryPreview(undefined);
+        }}
       />
     </main>
   );
