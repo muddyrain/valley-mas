@@ -13,6 +13,10 @@ export default function WorkbenchLayout() {
   const setAIPanelOpen = useLayoutStore((s) => s.setAIPanelOpen);
   const location = useLocation();
   const isContextualWorkspace = location.pathname.startsWith('/workbench');
+  const isWorkflowEditor =
+    location.pathname.startsWith('/workbench/create') ||
+    location.pathname.startsWith('/workbench/edit');
+  const isAgentWorkspace = location.pathname.startsWith('/workbench/apps/');
 
   useEffect(() => {
     if (isContextualWorkspace && aiPanelOpen) setAIPanelOpen(false);
@@ -21,8 +25,7 @@ export default function WorkbenchLayout() {
   return (
     <TooltipProvider>
       <div className="flex h-screen overflow-hidden bg-background">
-        {/* Sidebar */}
-        <Sidebar />
+        {!isWorkflowEditor && !isAgentWorkspace && <Sidebar />}
 
         {/* Main Content */}
         <main className="min-w-0 flex-1 overflow-y-auto">

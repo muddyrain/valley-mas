@@ -77,10 +77,8 @@ function RouteTitle() {
       title = '创建工作流 | Valley';
     } else if (pathname.startsWith('/workbench/edit')) {
       title = '编辑工作流 | Valley';
-    } else if (pathname.includes('/conversations/')) {
-      title = '私有会话 | Valley';
     } else if (pathname.startsWith('/workbench/apps/')) {
-      title = '编辑 AI 应用 | Valley';
+      title = pathname.endsWith('/settings') ? '智能体设置 | Valley' : '智能体对话 | Valley';
     } else if (pathname === '/blog') {
       title = '博客与图文 | Valley';
     } else if (pathname === '/guestbook') {
@@ -216,10 +214,18 @@ function App() {
             }
           />
           <Route
-            path="workbench/apps/:appId"
+            path="workbench/apps/:appId/settings"
             element={
               <RequireAuth>
                 <AIAppEditor />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="workbench/apps/:appId"
+            element={
+              <RequireAuth>
+                <AIAppConversation />
               </RequireAuth>
             }
           />
