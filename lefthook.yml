@@ -15,6 +15,13 @@ pre-commit:
         已自动修复并暂存可修复项；剩余问题请手动处理后再提交
         手动修复：pnpm biome check --write --files-ignore-unknown=true {staged_files}
 
+    plans-index:
+      run: pnpm check:plans-index
+      fail_text: |
+        ❌ 计划索引不一致！
+        新增或归档 docs/plans 中的计划后，请同步更新 docs/plans/README.md
+        手动检查：pnpm check:plans-index
+
 # 🚀 Pre-push：推送前构建检查
 pre-push:
   commands:
