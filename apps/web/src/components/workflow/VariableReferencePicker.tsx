@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
   getWorkflowVariableOption,
@@ -60,15 +61,20 @@ export function VariableReferencePicker({
                 {workflowValueTypeLabel(selected.type)}
               </span>
             ) : null}
-            <span className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-primary/20 bg-primary/5 px-1.5 py-0.5 text-primary">
-              <Braces className="size-3 shrink-0" />
-              <span
-                className="truncate"
-                title={`来源节点：${selected.nodeLabel}；变量：${selected.field}；类型：${workflowValueTypeLabel(selected.type)}`}
-              >
-                来源：{selected.nodeLabel} · {selected.field}
-              </span>
-            </span>
+            <Tooltip>
+              <TooltipTrigger render={<span className="inline-flex min-w-0" />}>
+                <span className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-primary/20 bg-primary/5 px-1.5 py-0.5 text-primary">
+                  <Braces className="size-3 shrink-0" />
+                  <span className="truncate">
+                    来源：{selected.nodeLabel} · {selected.field}
+                  </span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-80">
+                来源节点：{selected.nodeLabel}；变量：{selected.field}；类型：
+                {workflowValueTypeLabel(selected.type)}
+              </TooltipContent>
+            </Tooltip>
           </span>
         ) : leading ? (
           <span className="flex min-w-0 items-center gap-1.5">
@@ -118,6 +124,7 @@ interface VariableValueEditorProps {
   fixedPlaceholder?: string;
   className?: string;
   defaultMode?: 'reference' | 'fixed';
+  referenceEmptyText?: string;
 }
 
 // Input and output mappings deliberately choose either one reference or one
@@ -130,6 +137,7 @@ export function VariableValueEditor({
   fixedPlaceholder = '输入固定值',
   className,
   defaultMode = 'reference',
+  referenceEmptyText,
 }: VariableValueEditorProps) {
   const hasReference = options.some((option) => option.token === value);
   const [mode, setMode] = useState<'reference' | 'fixed'>(
@@ -171,6 +179,7 @@ export function VariableValueEditor({
           }
           options={options}
           placeholder="选择上游变量"
+          emptyText={referenceEmptyText}
         />
       ) : (
         <Input

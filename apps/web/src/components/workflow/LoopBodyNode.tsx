@@ -10,7 +10,7 @@ export const LoopBodyNode = memo(function LoopBodyNode({ data }: NodeProps) {
   const loopID = typeof data?.loopParentId === 'string' ? data.loopParentId : '';
   const { addLoopBodyNode, isRunning } = useWorkflowRuntime();
   return (
-    <div className="h-full min-h-[300px] w-full cursor-grab rounded-xl border-2 border-primary/50 bg-card/85 shadow-sm active:cursor-grabbing">
+    <div className="h-full min-h-[300px] w-full cursor-grab rounded-xl border-2 border-primary/50 bg-card shadow-sm active:cursor-grabbing">
       <Handle
         type="target"
         position={Position.Top}
@@ -22,12 +22,14 @@ export const LoopBodyNode = memo(function LoopBodyNode({ data }: NodeProps) {
         type="source"
         position={Position.Left}
         id="entry"
+        isConnectable={!isRunning}
         className="!z-30 !size-3 !-left-1.5 !border-2 !border-blue-500 !bg-blue-500"
       />
       <Handle
         type="target"
         position={Position.Right}
         id="exit"
+        isConnectable={!isRunning}
         className="!z-30 !size-3 !-right-1.5 !border-2 !border-blue-500 !bg-blue-500"
       />
       <div className="flex h-14 items-center gap-2 border-b border-primary/15 px-4 text-sm font-semibold text-foreground">

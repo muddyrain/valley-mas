@@ -11,7 +11,13 @@ type workflowRunController struct {
 }
 
 func (controller *workflowRunController) Start(runID string, timeout time.Duration) (context.Context, func()) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+	} else {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
 	controller.cancels.Store(runID, cancel)
 	return ctx, func() {
 		controller.cancels.Delete(runID)

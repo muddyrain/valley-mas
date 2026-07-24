@@ -282,7 +282,9 @@ func executeWorkflowTestCase(requestContext context.Context, testCase model.Work
 			})
 		})
 	}
-	executionContext, releaseRun := activeWorkflowRuns.Start(run.ID.String(), workflowRunExecutionTimeout)
+	// Individual model requests and loop executions own their deadlines. The
+	// controller context only coordinates user cancellation for a test run.
+	executionContext, releaseRun := activeWorkflowRuns.Start(run.ID.String(), 0)
 	defer releaseRun()
 	if requestContext != nil {
 		go func() {

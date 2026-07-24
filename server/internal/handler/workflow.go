@@ -25,8 +25,7 @@ import (
 )
 
 const (
-	workflowRunRequestMaxBytes  = 6 * 1024 * 1024
-	workflowRunExecutionTimeout = 2 * time.Minute
+	workflowRunRequestMaxBytes = 6 * 1024 * 1024
 )
 
 var (
@@ -701,7 +700,11 @@ func runWorkflowGraph(
 			return persistWorkflowRunEvent(tx, run.ID, event)
 		})
 	}
-	executionContext, releaseRun := activeWorkflowRuns.Start(run.ID.String(), workflowRunExecutionTimeout)
+	// A fixed two-minute owner context cancels a loop before its per-request
+	// budget can be consumed. Individual model requests still have their own
+	// 120-second timeout and LoopExecutor derives an exact loop budget from the
+	// actual number of requests, so the owner context only coordinates cancel.
+	executionContext, releaseRun := activeWorkflowRuns.Start(run.ID.String(), 0)
 	defer releaseRun()
 	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: make(map[string]map[string]any), KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion), ContentSearcher: workflowContentSearcher(model.Int64String(userID)), NotionSearcher: workflowNotionSearcher(model.Int64String(userID)), CoverGenerator: workflowCoverGenerator(), SubworkflowRunner: workflowSubworkflowRunner(model.Int64String(userID))}, func(event workflow.Event) {
 		if persistenceErr == nil {

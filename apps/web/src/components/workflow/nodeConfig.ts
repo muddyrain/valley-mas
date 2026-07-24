@@ -140,8 +140,10 @@ export function getNodeConfigSummary(
       return `${Object.keys((config.inputs as object) || {}).length} 个运行输入`;
     case 'end':
       return `${Object.keys((config.outputs as object) || {}).length} 个输出`;
-    case 'llm':
-      return String(config.modelId || '未选择模型');
+    case 'llm': {
+      const modelName = typeof config.modelName === 'string' ? config.modelName.trim() : '';
+      return modelName || (config.modelId ? '已选择模型' : '未选择模型');
+    }
     case 'tool':
       return String(config.capabilityName || config.capabilityId || '未选择工具');
     case 'condition':

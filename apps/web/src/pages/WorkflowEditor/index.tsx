@@ -188,6 +188,42 @@ function runtimeEdgeStyle(edge: Edge, stroke: string) {
   };
 }
 
+function isLoopBodyChildNode(node: Node) {
+  const data = node.data as unknown as WorkflowNodeData;
+  return data.isLoopBody !== true && Boolean(data.loopParentId);
+}
+
+function workflowPanelNode(node: Node, nodes: Node[]) {
+  const data = node.data as unknown as WorkflowNodeData;
+  if (!data.isLoopBody || !data.loopParentId) return node;
+  return nodes.find((candidate) => candidate.id === data.loopParentId) || node;
+}
+
+// React Flow applies a z-index per canvas node. Runtime details should sit
+// above ordinary cards. A selected loop body may intentionally cover its
+// parent's detail panel, but a selected child card must not hide that panel.
+function workflowCanvasNodeZIndex(
+  node: Node,
+  selectedNodeID: string | undefined,
+  session: WorkflowRunSession,
+) {
+  const snapshot = session.nodes[node.id];
+  const isSelected = node.id === selectedNodeID || node.selected;
+  const data = node.data as unknown as WorkflowNodeData;
+  const parentRun = data.loopParentId ? session.nodes[data.loopParentId] : undefined;
+
+  // While an outer loop detail panel is visible, keep completed/idle children
+  // beneath it. An actively running child still rises so its own live detail
+  // remains inspectable.
+  if (isLoopBodyChildNode(node) && parentRun && snapshot?.status !== 'running') {
+    if (isSelected) return 10;
+    return snapshot ? 5 : 0;
+  }
+
+  if (isSelected) return 30;
+  return snapshot ? 20 : 0;
+}
+
 function hasSameValidationGraph(
   previousNodes: Node[],
   nextNodes: Node[],
@@ -465,6 +501,13 @@ export default function WorkflowEditorPage() {
     setPendingValidationFocusNodeID(errors[0].nodeId);
     return `“${errors[0].nodeLabel}”节点：${errors[0].message}`;
   }, []);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    setShowValidationErrors(false);
+    setServerValidationErrors([]);
+    setPendingValidationFocusNodeID(null);
+  }, [isRunning]);
 
   useEffect(() => {
     isEditorMountedRef.current = true;
@@ -1448,10 +1491,11 @@ export default function WorkflowEditorPage() {
           }
         }
       }
+      const panelNode = workflowPanelNode(node, workflowStateRef.current.nodes);
       setSelectedNode({
-        id: node.id,
-        type: node.type || '',
-        data: node.data as {
+        id: panelNode.id,
+        type: panelNode.type || '',
+        data: panelNode.data as {
           label: string;
           nodeType: string;
           config?: Record<string, unknown>;
@@ -1549,18 +1593,26 @@ export default function WorkflowEditorPage() {
     }
   }, []);
 
-  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
-    setSelectedNode({
-      id: node.id,
-      type: node.type || '',
-      data: node.data as {
-        label: string;
-        nodeType: string;
-        config?: Record<string, unknown>;
-        when?: import('@/api/workflow').WorkflowRule;
-      },
-    });
-  }, []);
+  const onNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      const panelNode = workflowPanelNode(node, workflowStateRef.current.nodes);
+      setSelectedNode({
+        id: panelNode.id,
+        type: panelNode.type || '',
+        data: panelNode.data as {
+          label: string;
+          nodeType: string;
+          config?: Record<string, unknown>;
+          when?: import('@/api/workflow').WorkflowRule;
+        },
+      });
+
+      // A completed run remains inspectable from the 运行 tab, but subsequent
+      // node selection returns the editor to the configuration workflow.
+      setActivePropertyTab(isRunning ? 'run' : 'config');
+    },
+    [isRunning],
+  );
 
   useEffect(() => {
     const failedNodeId = runSession.failedNodeId;
@@ -2055,6 +2107,9 @@ export default function WorkflowEditorPage() {
 
       setIsRunning(true);
       setRunError(null);
+      setShowValidationErrors(false);
+      setServerValidationErrors([]);
+      setPendingValidationFocusNodeID(null);
       const generation = runGenerationRef.current + 1;
       runGenerationRef.current = generation;
       dispatchRunSession({ type: 'begin', generation });
@@ -2160,6 +2215,8 @@ export default function WorkflowEditorPage() {
     }
 
     setShowValidationErrors(false);
+    setServerValidationErrors([]);
+    setPendingValidationFocusNodeID(null);
 
     if (!(await persistLatestWorkflow({ createIfMissing: true }))) {
       return;
@@ -2328,6 +2385,15 @@ export default function WorkflowEditorPage() {
         return edge;
       }),
     [edges, runSession],
+  );
+
+  const renderedNodes = useMemo<Node[]>(
+    () =>
+      nodes.map((node) => ({
+        ...node,
+        zIndex: workflowCanvasNodeZIndex(node, selectedNode?.id, runSession),
+      })),
+    [nodes, runSession, selectedNode?.id],
   );
 
   const visibleValidationErrors = useMemo(() => {
@@ -2821,7 +2887,7 @@ export default function WorkflowEditorPage() {
                 className={
                   isCanvasInteracting ? 'workflow-canvas is-interacting' : 'workflow-canvas'
                 }
-                nodes={nodes}
+                nodes={renderedNodes}
                 edges={renderedEdges}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
@@ -2837,7 +2903,6 @@ export default function WorkflowEditorPage() {
                 onMoveStart={onViewportMoveStart}
                 onMoveEnd={onViewportMoveEnd}
                 nodesDraggable={!isRunning}
-                nodesConnectable={!isRunning}
                 edgesReconnectable={!isRunning}
                 nodeTypes={workflowNodeTypes}
                 edgeTypes={workflowEdgeTypes}

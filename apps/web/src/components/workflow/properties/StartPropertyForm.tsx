@@ -91,7 +91,11 @@ export function StartPropertyForm({ config, onUpdateConfig }: PropertyFormProps)
         variant="outline"
         size="sm"
         onClick={() => {
-          let index = 1;
+          if (!inputs.input) {
+            update({ ...inputs, input: { type: 'string', required: false } });
+            return;
+          }
+          let index = 2;
           while (inputs[`input${index}`]) index += 1;
           update({ ...inputs, [`input${index}`]: { type: 'string', required: false } });
         }}

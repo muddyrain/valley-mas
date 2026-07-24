@@ -139,9 +139,15 @@ export function serializeWorkflowGraph(nodes: Node[], edges: Edge[]): string {
     const bodyEdges = edges.filter((edge) => {
       const source = nodeByID.get(edge.source);
       const target = nodeByID.get(edge.target);
-      if (loopParentID(source) !== node.id || loopParentID(target) !== node.id) return false;
       if (!source || !target) return false;
-      return !isLoopBodyNode(source) && !isLoopBodyNode(target);
+      const sourceIsBodyMember = isLoopBodyNode(source) || loopParentID(source) === node.id;
+      const targetIsBodyMember = isLoopBodyNode(target) || loopParentID(target) === node.id;
+      if (!sourceIsBodyMember || !targetIsBodyMember) return false;
+
+      // Keep the loop body's entry and exit edges alongside ordinary child
+      // edges. The canvas uses the body node for these endpoints, while the
+      // persisted graph uses stable sentinels that expandLoopCanvas restores.
+      return !(isLoopBodyNode(source) && isLoopBodyNode(target));
     });
     const config =
       data.nodeType === 'loop'
@@ -149,13 +155,23 @@ export function serializeWorkflowGraph(nodes: Node[], edges: Edge[]): string {
             ...(normalizeLoopBodyReferences(data.config || {}, node.id) as Record<string, unknown>),
             body: {
               nodes: bodyNodes.map((bodyNode) => serializeNode(bodyNode, node.id)),
-              edges: bodyEdges.map((edge) => ({
-                id: edge.id,
-                source: bodyNodeIDFromCanvasID(node.id, edge.source),
-                sourceHandle: edge.sourceHandle,
-                target: bodyNodeIDFromCanvasID(node.id, edge.target),
-                targetHandle: edge.targetHandle,
-              })),
+              edges: bodyEdges.map((edge) => {
+                const source = nodeByID.get(edge.source);
+                const target = nodeByID.get(edge.target);
+                return {
+                  id: edge.id,
+                  source:
+                    source && isLoopBodyNode(source)
+                      ? loopBodyEntryID
+                      : bodyNodeIDFromCanvasID(node.id, edge.source),
+                  sourceHandle: edge.sourceHandle,
+                  target:
+                    target && isLoopBodyNode(target)
+                      ? loopBodyExitID
+                      : bodyNodeIDFromCanvasID(node.id, edge.target),
+                  targetHandle: edge.targetHandle,
+                };
+              }),
             },
           }
         : parentLoopID

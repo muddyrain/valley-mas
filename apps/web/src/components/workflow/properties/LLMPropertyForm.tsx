@@ -67,7 +67,9 @@ export function LLMPropertyForm({
       <EditorSection title="模型设置" description="选择模型并调整生成参数。">
         <ModelPicker
           value={(config.modelId as string) || undefined}
-          onValueChange={(modelId) => onUpdateConfig({ modelId })}
+          onValueChange={(modelId, model) =>
+            onUpdateConfig({ modelId, modelName: model?.displayName || '' })
+          }
           capability="text"
           label="文本模型"
         />

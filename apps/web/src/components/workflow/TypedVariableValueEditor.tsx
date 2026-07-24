@@ -1,6 +1,6 @@
 import type { WorkflowValueType } from './types';
 import { VariableReferencePicker, VariableValueEditor } from './VariableReferencePicker';
-import type { WorkflowVariableOption } from './workflowVariables';
+import { type WorkflowVariableOption, workflowValueTypeLabel } from './workflowVariables';
 
 const workflowValueTypes = new Set<WorkflowValueType>([
   'string',
@@ -119,6 +119,7 @@ export function TypedVariableValueEditor({
       options={compatibleOptions}
       fixedPlaceholder={fixedValuePlaceholder(type, fixedPlaceholder)}
       defaultMode={defaultMode}
+      referenceEmptyText={`暂无可引用的${workflowValueTypeLabel(type)}变量`}
     />
   );
 }

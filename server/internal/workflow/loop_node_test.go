@@ -119,6 +119,31 @@ func TestLoopNodeAllowsNoOutputs(t *testing.T) {
 	}
 }
 
+func TestLoopNodeIgnoresCanvasBoundaryEdges(t *testing.T) {
+	registry := testRegistry(t)
+	graph := Graph{SchemaVersion: SchemaVersion, Nodes: []Node{
+		node("start", NodeTypeStart, `{"inputs":{}}`),
+		node("loop", NodeTypeLoop, `{"mode":"count","count":1,"middleVariables":[],"outputs":[{"name":"results","type":"string","source":"{{second.output.value}}"}],"body":{"nodes":[{"id":"first","type":"variable","label":"first","position":{"x":0,"y":0},"config":{"assignments":[{"name":"value","type":"string","value":"ok"}]}},{"id":"second","type":"variable","label":"second","position":{"x":240,"y":0},"config":{"assignments":[{"name":"value","type":"string","value":"{{first.output.value}}"}]}}],"edges":[{"source":"__loop_entry__","sourceHandle":"entry","target":"first","targetHandle":"input"},{"source":"first","target":"second"},{"source":"second","target":"__loop_exit__","targetHandle":"exit"}]}}`),
+		node("end", NodeTypeEnd, `{"outputs":{"results":"{{loop.output.results}}"},"outputTypes":{"results":"array"}}`),
+	}, Edges: []Edge{{Source: "start", Target: "loop"}, {Source: "loop", Target: "end"}}}
+
+	if errs := ValidateGraph(graph, registry); len(errs) > 0 {
+		t.Fatalf("validation errors: %v", errs)
+	}
+	var output map[string]any
+	if err := Execute(context.Background(), graph, registry, RunContext{}, func(event Event) {
+		if event.NodeID == "end" && event.Status == StatusSucceeded {
+			output = event.Output
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	values, ok := output["results"].([]any)
+	if !ok || len(values) != 1 || values[0] != "ok" {
+		t.Fatalf("output=%#v", output)
+	}
+}
+
 func TestLoopBodyResolvesLegacyLoopVariableReference(t *testing.T) {
 	value, err := resolveTemplate(
 		"{{loop-legacy.loop.index}}",

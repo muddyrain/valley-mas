@@ -20,6 +20,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { memo, useEffect, useRef, useState } from 'react';
+import { listAvailableAIModels } from '@/api/ai';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -73,6 +74,50 @@ const colors = {
   terminate_loop: 'bg-teal-500/10 text-teal-600',
   loop: 'bg-teal-500/10 text-teal-600',
 } as const;
+
+const textModelNames = new Map<string, string>();
+let textModelNamesRequest: Promise<void> | null = null;
+
+function loadTextModelNames() {
+  if (!textModelNamesRequest) {
+    textModelNamesRequest = listAvailableAIModels('text')
+      .then(({ list }) => {
+        for (const model of list) textModelNames.set(model.id, model.displayName);
+      })
+      .catch(() => undefined);
+  }
+  return textModelNamesRequest;
+}
+
+function useTextModelName(modelID: unknown, configuredName: unknown) {
+  const configured = typeof configuredName === 'string' ? configuredName.trim() : '';
+  const [name, setName] = useState(configured);
+
+  useEffect(() => {
+    if (configured) {
+      setName(configured);
+      return;
+    }
+    if (typeof modelID !== 'string' || !modelID) {
+      setName('');
+      return;
+    }
+    const cached = textModelNames.get(modelID);
+    if (cached) {
+      setName(cached);
+      return;
+    }
+    let active = true;
+    void loadTextModelNames().then(() => {
+      if (active) setName(textModelNames.get(modelID) || '');
+    });
+    return () => {
+      active = false;
+    };
+  }, [configured, modelID]);
+
+  return name;
+}
 
 function getIntentBranchOutputs(config: Record<string, unknown> | undefined) {
   const intents = Array.isArray(config?.intents) ? config.intents : [];
@@ -238,7 +283,14 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
   const validationMessage = draftValidationMessage || validationError?.message;
   const hasDraftValidationError = Boolean(draftValidationMessage);
   const incomplete = Boolean(validationError);
-  const summary = getNodeConfigSummary(nodeType, config, nodeData.loopBodyNodeCount);
+  const textModelName = useTextModelName(
+    nodeType === 'llm' ? config?.modelId : undefined,
+    nodeType === 'llm' ? config?.modelName : undefined,
+  );
+  const summary =
+    nodeType === 'llm' && textModelName
+      ? textModelName
+      : getNodeConfigSummary(nodeType, config, nodeData.loopBodyNodeCount);
   const fixed = definition?.fixed;
   const sideEffect = nodeType === 'tool' ? String(config?.sideEffect || '') : '';
   const sideEffectLabel = getWorkflowSideEffectLabel(sideEffect);
@@ -248,7 +300,12 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
       : definition?.label !== label
         ? definition?.label
         : '';
-  const configDetail = summary && summary !== label && summary !== nodeKind ? summary : '';
+  const configDetail =
+    summary && summary !== label && summary !== nodeKind
+      ? nodeType === 'llm'
+        ? `模型 · ${summary}`
+        : summary
+      : '';
   const outputFields = getWorkflowNodeOutputFields(nodeType, config);
   const outputPickerOpen = outputPickerNodeId === id;
   const outputConnecting = connectingOutputNodeId === id;
@@ -261,6 +318,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
             type="target"
             position={Position.Left}
             id="input"
+            isConnectable={!isRunning}
             className="!z-30 !size-3 !-left-1.5 !rounded-full !border-2 !border-blue-500 !bg-blue-500"
           />
         ) : null}
@@ -486,6 +544,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
                 position={Position.Right}
                 id={branch.id}
                 title={branch.name}
+                isConnectable={!isRunning}
                 style={{
                   top:
                     nodeType === 'intent' || nodeType === 'switch'
@@ -531,7 +590,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
         ) : null}
       </div>
       {snapshot ? (
-        <div className={cn(nodeData.loopParentId && 'absolute left-0 top-full z-40 w-full')}>
+        <div className="absolute left-0 top-full z-40 w-full">
           <NodeRunDetails snapshot={snapshot} />
         </div>
       ) : null}

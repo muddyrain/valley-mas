@@ -27,7 +27,7 @@ const CAPABILITY_LABELS: Record<string, string> = {
 
 interface ModelPickerProps {
   value?: string;
-  onValueChange: (modelID: string) => void;
+  onValueChange: (modelID: string, model?: AvailableAIModel) => void;
   onModelChange?: (model?: AvailableAIModel) => void;
   capability: string;
   label?: string;
@@ -94,7 +94,7 @@ export function ModelPicker({
 
   useEffect(() => {
     if (!autoSelectFirst || loading || models.length === 0 || selectedModel) return;
-    onValueChange(models[0].id);
+    onValueChange(models[0].id, models[0]);
   }, [autoSelectFirst, loading, models, onValueChange, selectedModel]);
 
   const selectedLabel = selectedModel
@@ -184,7 +184,7 @@ export function ModelPicker({
                           selected && 'bg-accent text-accent-foreground',
                         )}
                         onClick={() => {
-                          onValueChange(item.id);
+                          onValueChange(item.id, item);
                           setOpen(false);
                         }}
                       >

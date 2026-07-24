@@ -12,6 +12,8 @@ const (
 	maxLoopIterations = 1000
 	maxLoopBodyNodes  = 30
 	maxLoopDepth      = 3
+	loopBodyEntryID   = "__loop_entry__"
+	loopBodyExitID    = "__loop_exit__"
 )
 
 type loopMode string
@@ -262,6 +264,10 @@ func loopConfigFromMap(config map[string]any) (loopNodeConfig, error) {
 	if err := json.Unmarshal(encoded, &parsed); err != nil {
 		return loopNodeConfig{}, err
 	}
+	// The editor persists loop-body boundary links so it can restore the
+	// left/right canvas connectors after a refresh. They are presentation-only:
+	// the executable loop DAG starts at its root body node and ends at its leaf.
+	parsed.Body.Edges = executableLoopBodyEdges(parsed.Body.Edges)
 	if parsed.Mode != loopModeArray && parsed.Mode != loopModeCount && parsed.Mode != loopModeInfinite {
 		return loopNodeConfig{}, fmt.Errorf("循环 mode 必须为 array、count 或 infinite")
 	}
@@ -272,6 +278,17 @@ func loopConfigFromMap(config map[string]any) (loopNodeConfig, error) {
 		return loopNodeConfig{}, fmt.Errorf("无限循环必须声明 1 到 %d 的 maxIterations", maxLoopIterations)
 	}
 	return parsed, nil
+}
+
+func executableLoopBodyEdges(edges []Edge) []Edge {
+	executable := make([]Edge, 0, len(edges))
+	for _, edge := range edges {
+		if edge.Source == loopBodyEntryID || edge.Target == loopBodyExitID {
+			continue
+		}
+		executable = append(executable, edge)
+	}
+	return executable
 }
 
 func validateLoopConfig(nodeID string, config map[string]any, registry *Registry, depth int) []string {
