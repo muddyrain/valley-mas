@@ -23,6 +23,44 @@ session = workflowRunSessionReducer(session, {
   type: 'event',
   generation: 1,
   event: {
+    step: 'loop',
+    status: 'running',
+    data: {
+      runId: 'run-1',
+      nodeId: 'loop',
+      bodyNodeId: 'writer',
+      loopIteration: 1,
+      status: 'running',
+      input: { prompt: 'draft' },
+    },
+  },
+});
+assert.equal(session.nodes['loop::loop-node::writer'].status, 'running');
+assert.equal(session.nodes['loop::loop-node::writer'].loopIteration, 1);
+
+session = workflowRunSessionReducer(session, {
+  type: 'event',
+  generation: 1,
+  event: {
+    step: 'loop',
+    status: 'error',
+    message: '大模型响应超时，请稍后重试',
+    data: {
+      runId: 'run-1',
+      nodeId: 'loop',
+      bodyNodeId: 'writer',
+      status: 'error',
+      error: 'AI_UPSTREAM_TIMEOUT',
+    },
+  },
+});
+assert.equal(session.failedNodeId, 'loop::loop-node::writer');
+assert.equal(session.nodes['loop::loop-node::writer'].errorCode, 'AI_UPSTREAM_TIMEOUT');
+
+session = workflowRunSessionReducer(session, {
+  type: 'event',
+  generation: 1,
+  event: {
     step: 'start',
     status: 'success',
     data: {

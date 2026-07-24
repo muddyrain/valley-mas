@@ -9,7 +9,7 @@ import { PropertyFormBase } from './properties/PropertyFormBase';
 import { WhenPropertyForm } from './properties/WhenPropertyForm';
 import type { NodeRunSnapshot } from './runSession';
 import type { ValidationError } from './validateWorkflowConfig';
-import { getUpstreamWorkflowVariables } from './workflowVariables';
+import { getLoopOutputVariables, getUpstreamWorkflowVariables } from './workflowVariables';
 
 export type PropertyPanelTab = 'config' | 'run';
 
@@ -39,6 +39,7 @@ interface PropertyPanelProps {
   validationErrors?: readonly ValidationError[];
   activeTab?: PropertyPanelTab;
   onActiveTabChange?: (tab: PropertyPanelTab) => void;
+  isRunning?: boolean;
 }
 
 export const PropertyPanel = memo(function PropertyPanel({
@@ -51,6 +52,7 @@ export const PropertyPanel = memo(function PropertyPanel({
   validationErrors = [],
   activeTab,
   onActiveTabChange,
+  isRunning = false,
 }: PropertyPanelProps) {
   if (!selectedNode) {
     return (
@@ -60,14 +62,17 @@ export const PropertyPanel = memo(function PropertyPanel({
         </div>
         <Tabs
           value={activeTab || 'config'}
-          onValueChange={(value) => onActiveTabChange?.(value as PropertyPanelTab)}
+          onValueChange={(value) => {
+            if (isRunning && value === 'config') return;
+            onActiveTabChange?.(value as PropertyPanelTab);
+          }}
           className="min-h-0 flex-1 gap-0"
         >
           <TabsList
             className="w-full rounded-none border-b border-border bg-card px-4"
             variant="line"
           >
-            <TabsTrigger value="config" className="flex-none px-3">
+            <TabsTrigger value="config" className="flex-none px-3" disabled={isRunning}>
               配置
             </TabsTrigger>
             <TabsTrigger value="run" className="flex-none px-3">
@@ -97,6 +102,10 @@ export const PropertyPanel = memo(function PropertyPanel({
     () => variableOptions.filter((option) => option.scope !== 'local'),
     [variableOptions],
   );
+  const loopOutputOptions = useMemo(
+    () => (nodeType === 'loop' ? getLoopOutputVariables(nodes, selectedNode.id) : []),
+    [nodeType, nodes, selectedNode.id],
+  );
   const isCoverGenerationNode =
     nodeType === 'tool' && config?.capabilityId === 'image.generateCover';
   const fieldErrors = Object.fromEntries(
@@ -106,6 +115,7 @@ export const PropertyPanel = memo(function PropertyPanel({
   );
 
   const handleUpdateConfig = (updates: Partial<Record<string, unknown>>) => {
+    if (isRunning) return;
     onUpdateNode(selectedNode.id, {
       config: { ...(config || {}), ...updates },
     });
@@ -134,6 +144,7 @@ export const PropertyPanel = memo(function PropertyPanel({
       activeTab={activeTab}
       onActiveTabChange={onActiveTabChange}
       runContent={showRunTab ? runContent : undefined}
+      configLocked={isRunning}
     >
       {FormComponent && (
         <FormComponent
@@ -153,6 +164,7 @@ export const PropertyPanel = memo(function PropertyPanel({
               ? variableOptions
               : undefined
           }
+          loopOutputOptions={nodeType === 'loop' ? loopOutputOptions : undefined}
           fieldErrors={fieldErrors}
         />
       )}
@@ -162,7 +174,9 @@ export const PropertyPanel = memo(function PropertyPanel({
       nodeType === 'subworkflow' ? (
         <WhenPropertyForm
           when={when}
-          onChange={(nextWhen) => onUpdateNode(selectedNode.id, { when: nextWhen })}
+          onChange={(nextWhen) => {
+            if (!isRunning) onUpdateNode(selectedNode.id, { when: nextWhen });
+          }}
           variableOptions={upstreamVariableOptions}
           title={isCoverGenerationNode ? '生成条件' : undefined}
           description={isCoverGenerationNode ? '未设置时，每次运行都会生成封面。' : undefined}

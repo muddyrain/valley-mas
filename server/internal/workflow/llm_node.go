@@ -120,6 +120,10 @@ func promptWithInputs(prompt string, inputs map[string]any) string {
 // at runtime for enablement and capability.
 type CatalogTextGenerator struct{}
 
+// workflowModelRequestTimeout applies to one model request only. Loop-level
+// budgets are calculated separately from the number of requests the loop will
+// make, so a slow single request does not silently turn into a five-minute
+// request just because it is inside a loop.
 const workflowModelRequestTimeout = 120 * time.Second
 
 func (CatalogTextGenerator) Generate(ctx context.Context, input TextGenerationRequest) (TextGenerationResult, error) {

@@ -32,6 +32,7 @@ interface PropertyFormBaseProps {
   runContent?: ReactNode;
   activeTab?: 'config' | 'run';
   onActiveTabChange?: (tab: 'config' | 'run') => void;
+  configLocked?: boolean;
 }
 
 export function PropertyFormBase({
@@ -42,6 +43,7 @@ export function PropertyFormBase({
   runContent,
   activeTab = 'config',
   onActiveTabChange,
+  configLocked = false,
 }: PropertyFormBaseProps) {
   const config = NODE_CONFIGS[selectedNode.data.nodeType];
 
@@ -62,14 +64,17 @@ export function PropertyFormBase({
       {runContent ? (
         <Tabs
           value={activeTab}
-          onValueChange={(value) => onActiveTabChange?.(value as 'config' | 'run')}
+          onValueChange={(value) => {
+            if (configLocked && value === 'config') return;
+            onActiveTabChange?.(value as 'config' | 'run');
+          }}
           className="min-h-0 flex-1 gap-0"
         >
           <TabsList
             className="w-full rounded-none border-b border-border bg-card px-4"
             variant="line"
           >
-            <TabsTrigger value="config" className="flex-none px-3">
+            <TabsTrigger value="config" className="flex-none px-3" disabled={configLocked}>
               配置
             </TabsTrigger>
             {runContent ? (
@@ -82,7 +87,7 @@ export function PropertyFormBase({
             <PropertyConfigContent
               selectedNode={selectedNode}
               configLabel={config?.label}
-              onUpdateNode={onUpdateNode}
+              onUpdateNode={configLocked ? () => undefined : onUpdateNode}
             >
               {children}
             </PropertyConfigContent>
@@ -97,7 +102,7 @@ export function PropertyFormBase({
         <PropertyConfigContent
           selectedNode={selectedNode}
           configLabel={config?.label}
-          onUpdateNode={onUpdateNode}
+          onUpdateNode={configLocked ? () => undefined : onUpdateNode}
         >
           {children}
         </PropertyConfigContent>

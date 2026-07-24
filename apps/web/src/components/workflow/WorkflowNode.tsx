@@ -102,6 +102,69 @@ function getSwitchBranchOutputs(config: Record<string, unknown> | undefined) {
   ];
 }
 
+function getVariableReferenceLabel(value: unknown) {
+  if (typeof value !== 'string') return '';
+  const reference = value.match(/^\{\{\s*([^{}]+?)\s*\}\}$/)?.[1];
+  const parts = reference?.split('.') || [];
+  return parts[parts.length - 1] || value.trim();
+}
+
+function LoopVariableRow({ label, values }: { label: string; values: string[] }) {
+  return (
+    <div className="flex min-h-5 items-center gap-2">
+      <span className="w-14 shrink-0 text-muted-foreground">{label}</span>
+      {values.length ? (
+        <div className="flex min-w-0 flex-wrap gap-1">
+          {values.map((value) => (
+            <span
+              key={value}
+              className="max-w-full truncate rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground"
+            >
+              {value}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <span className="text-muted-foreground/70">未配置</span>
+      )}
+    </div>
+  );
+}
+
+function LoopVariableSummary({ config }: { config?: Record<string, unknown> }) {
+  const mode = config?.mode;
+  const input =
+    mode === 'array'
+      ? getVariableReferenceLabel(config?.input)
+      : mode === 'count'
+        ? `次数 ${String(config?.count || '')}`.trim()
+        : mode === 'infinite'
+          ? `最大 ${String(config?.maxIterations || 10)} 轮`
+          : '';
+  const middleVariables = Array.isArray(config?.middleVariables)
+    ? config.middleVariables.flatMap((variable) => {
+        if (!variable || typeof variable !== 'object') return [];
+        const name = (variable as { name?: unknown }).name;
+        return typeof name === 'string' && name.trim() ? [name.trim()] : [];
+      })
+    : [];
+  const outputs = Array.isArray(config?.outputs)
+    ? config.outputs.flatMap((output) => {
+        if (!output || typeof output !== 'object') return [];
+        const name = (output as { name?: unknown }).name;
+        return typeof name === 'string' && name.trim() ? [name.trim()] : [];
+      })
+    : [];
+
+  return (
+    <div className="space-y-1.5 border-t border-border bg-muted/10 px-4 py-2 text-xs">
+      <LoopVariableRow label="输入" values={input ? [input] : []} />
+      <LoopVariableRow label="中间变量" values={['item', 'index', ...middleVariables]} />
+      <LoopVariableRow label="输出" values={outputs} />
+    </div>
+  );
+}
+
 function NodeLabel({ label }: { label: string }) {
   const textRef = useRef<HTMLSpanElement>(null);
   const [truncated, setTruncated] = useState(false);
@@ -137,7 +200,18 @@ function NodeLabel({ label }: { label: string }) {
 }
 
 export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: NodeProps) {
-  const { session, validationErrors, copyNode, deleteNode, insertAfter } = useWorkflowRuntime();
+  const {
+    session,
+    isRunning,
+    validationErrors,
+    copyNode,
+    deleteNode,
+    insertAfter,
+    outputPickerNodeId,
+    connectingOutputNodeId,
+    openOutputPicker,
+    closeOutputPicker,
+  } = useWorkflowRuntime();
   const nodeData = data as unknown as WorkflowNodeData;
   const { label, nodeType, config } = nodeData;
   const snapshot = session.nodes[id];
@@ -164,7 +238,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
   const validationMessage = draftValidationMessage || validationError?.message;
   const hasDraftValidationError = Boolean(draftValidationMessage);
   const incomplete = Boolean(validationError);
-  const summary = getNodeConfigSummary(nodeType, config);
+  const summary = getNodeConfigSummary(nodeType, config, nodeData.loopBodyNodeCount);
   const fixed = definition?.fixed;
   const sideEffect = nodeType === 'tool' ? String(config?.sideEffect || '') : '';
   const sideEffectLabel = getWorkflowSideEffectLabel(sideEffect);
@@ -176,6 +250,8 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
         : '';
   const configDetail = summary && summary !== label && summary !== nodeKind ? summary : '';
   const outputFields = getWorkflowNodeOutputFields(nodeType, config);
+  const outputPickerOpen = outputPickerNodeId === id;
+  const outputConnecting = connectingOutputNodeId === id;
 
   return (
     <div className="group/node relative w-[264px] cursor-grab overflow-visible active:cursor-grabbing">
@@ -185,7 +261,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
             type="target"
             position={Position.Left}
             id="input"
-            className="!size-3 !-left-1.5 !rounded-full !border-2 !border-blue-400 !bg-background"
+            className="!z-30 !size-3 !-left-1.5 !rounded-full !border-2 !border-blue-500 !bg-blue-500"
           />
         ) : null}
         <div
@@ -263,6 +339,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
                   variant="ghost"
                   size="icon-xs"
                   aria-label="复制节点"
+                  disabled={isRunning}
                   onClick={(event) => {
                     event.stopPropagation();
                     copyNode(id);
@@ -279,6 +356,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
                         variant="ghost"
                         size="icon-xs"
                         aria-label="节点菜单"
+                        disabled={isRunning}
                         onClick={(event) => event.stopPropagation()}
                       />
                     }
@@ -286,12 +364,16 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
                     <MoreHorizontal className="size-3.5" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => copyNode(id)}>
+                    <DropdownMenuItem disabled={isRunning} onClick={() => copyNode(id)}>
                       <Copy className="mr-2 size-3.5" />
                       复制
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive" onClick={() => deleteNode(id)}>
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      disabled={isRunning}
+                      onClick={() => deleteNode(id)}
+                    >
                       <Trash2 className="mr-2 size-3.5" />
                       删除
                     </DropdownMenuItem>
@@ -312,7 +394,8 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
               ) : null}
             </div>
           </div>
-          {outputFields.length > 0 ? (
+          {nodeType === 'loop' ? <LoopVariableSummary config={config} /> : null}
+          {nodeType !== 'loop' && outputFields.length > 0 ? (
             <div className="flex min-h-10 items-center gap-2 border-t border-border bg-muted/20 px-4 py-2 text-xs">
               <span className="shrink-0 text-muted-foreground">输出</span>
               <span className="min-w-0 truncate font-mono font-medium text-foreground">
@@ -365,11 +448,26 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
             type="source"
             position={Position.Right}
             id="output"
+            aria-label={`在 ${label} 后添加节点`}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (!isRunning && !outputConnecting) openOutputPicker(id);
+            }}
+            isConnectable={!isRunning}
             className={cn(
-              '!size-3 !-right-1.5 !rounded-full !border-2 !border-blue-400 !bg-background transition-opacity duration-200',
-              'group-hover/node:!pointer-events-none group-hover/node:!opacity-0',
+              '!z-30 !flex !size-3 !-right-1.5 !items-center !justify-center !rounded-full !border-2 !border-blue-500 !bg-blue-500 !transition-[width,height,right,background-color,border-color] !duration-150',
+              'group-hover/node:!size-8 group-hover/node:!-right-1.5 group-hover/node:!border-0 group-hover/node:!bg-primary',
+              outputConnecting && '!size-3 !-right-1.5 !border-2 !border-blue-500 !bg-blue-500',
             )}
-          />
+          >
+            <Plus
+              className={cn(
+                'pointer-events-none size-4 scale-75 text-primary-foreground opacity-0 transition-[opacity,transform] duration-150',
+                'group-hover/node:scale-100 group-hover/node:opacity-100',
+                outputConnecting && 'opacity-0',
+              )}
+            />
+          </Handle>
         ) : null}
         {nodeType === 'loop' ? (
           <Handle
@@ -377,7 +475,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
             position={Position.Bottom}
             id="body"
             isConnectable={false}
-            className="!size-3 !-bottom-1.5 !border-2 !border-primary !bg-background"
+            className="!z-30 !size-3 !-bottom-1.5 !border-2 !border-blue-500 !bg-blue-500"
           />
         ) : null}
         {branchOutputs.length
@@ -415,31 +513,28 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
         nodeType !== 'switch' &&
         nodeType !== 'intent' &&
         hasOutput ? (
-          <div
-            className={cn(
-              'nodrag nopan pointer-events-none absolute left-full top-1/2 z-20 ml-1.5 -translate-x-1/2 -translate-y-1/2 scale-75 opacity-0 transition-[opacity,transform] duration-200 ease-out will-change-transform group-hover/node:pointer-events-auto group-hover/node:scale-100 group-hover/node:opacity-100',
-            )}
-          >
-            <DeferredNodePicker
-              side="right"
-              align="center"
-              trigger={
-                <Button
-                  type="button"
-                  variant="default"
-                  size="icon-sm"
-                  className="rounded-full border border-primary-foreground/30 shadow-md"
-                  aria-label={`在 ${label} 后添加节点`}
-                >
-                  <Plus className="size-4" />
-                </Button>
-              }
-              onSelect={(item) => insertAfter(id, item)}
-            />
-          </div>
+          <DeferredNodePicker
+            open={outputPickerOpen}
+            onOpenChange={(open) => {
+              if (!open) closeOutputPicker(id);
+            }}
+            side="right"
+            align="center"
+            trigger={
+              <span
+                aria-hidden="true"
+                className="nodrag nopan pointer-events-none absolute right-0 top-1/2 z-20 size-8 -translate-y-1/2 translate-x-1/2"
+              />
+            }
+            onSelect={(item) => insertAfter(id, item)}
+          />
         ) : null}
       </div>
-      {snapshot ? <NodeRunDetails snapshot={snapshot} /> : null}
+      {snapshot ? (
+        <div className={cn(nodeData.loopParentId && 'absolute left-0 top-full z-40 w-full')}>
+          <NodeRunDetails snapshot={snapshot} />
+        </div>
+      ) : null}
     </div>
   );
 });

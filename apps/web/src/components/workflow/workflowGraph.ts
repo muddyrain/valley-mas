@@ -12,9 +12,62 @@ type SerializedWorkflowNode = {
 
 const loopBodySuffix = '::loop-body';
 const loopBodyNodePrefix = '::loop-node::';
+const loopBodyEntryID = '__loop_entry__';
+const loopBodyExitID = '__loop_exit__';
+const loopBodyMinWidth = 560;
+const loopBodyNodeWidth = 264;
+const loopBodyNodeHeight = 144;
+const loopBodyNodeGap = 80;
+const loopBodyHorizontalPadding = 64;
+const loopBodyVerticalPadding = 64;
+const loopBodyContentTop = 104;
+
+export function loopBodyWidth(nodeCount: number) {
+  const count = Math.max(1, nodeCount);
+  return Math.max(
+    loopBodyMinWidth,
+    count * loopBodyNodeWidth + (count - 1) * loopBodyNodeGap + loopBodyHorizontalPadding * 2,
+  );
+}
 
 export function loopBodyHeight(nodeCount: number) {
-  return Math.max(330, 120 + Math.ceil(Math.max(1, nodeCount) / 2) * 126);
+  void nodeCount;
+  return 330;
+}
+
+export function loopBodyChildPosition(index: number, nodeCount: number) {
+  const count = Math.max(1, nodeCount);
+  const contentWidth = count * loopBodyNodeWidth + (count - 1) * loopBodyNodeGap;
+  return {
+    x: (loopBodyWidth(count) - contentWidth) / 2 + index * (loopBodyNodeWidth + loopBodyNodeGap),
+    y: loopBodyContentTop,
+  };
+}
+
+function constrainLoopBodyChildPosition(position: Node['position']): Node['position'] {
+  return {
+    x: Math.max(loopBodyHorizontalPadding, position.x),
+    y: Math.max(loopBodyContentTop, position.y),
+  };
+}
+
+export function loopBodyDimensions(nodes: Node[]) {
+  return nodes.reduce(
+    (dimensions, node) => ({
+      width: Math.max(
+        dimensions.width,
+        node.position.x + loopBodyNodeWidth + loopBodyHorizontalPadding,
+      ),
+      height: Math.max(
+        dimensions.height,
+        node.position.y + loopBodyNodeHeight + loopBodyVerticalPadding,
+      ),
+    }),
+    {
+      width: loopBodyWidth(nodes.length),
+      height: loopBodyHeight(nodes.length),
+    },
+  );
 }
 
 export function loopBodyID(loopID: string) {
@@ -27,6 +80,29 @@ export function loopBodyChildID(loopID: string, bodyNodeID: string) {
 
 function bodyNodeIDFromCanvasID(loopID: string, canvasID: string) {
   return canvasID.slice(`${loopID}${loopBodyNodePrefix}`.length);
+}
+
+function normalizeLoopBodyReferences(value: unknown, loopID: string): unknown {
+  const prefix = `${loopID}${loopBodyNodePrefix}`;
+  if (typeof value === 'string') {
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const referencePattern = new RegExp(
+      `\\{\\{\\s*${escapedPrefix}([^{}.\\s]+)\\.output\\.([^{}.\\s]+)\\s*\\}\\}`,
+      'g',
+    );
+    return value.replace(
+      referencePattern,
+      (_, bodyNodeID: string, field: string) => `{{${bodyNodeID}.output.${field}}}`,
+    );
+  }
+  if (Array.isArray(value)) return value.map((item) => normalizeLoopBodyReferences(item, loopID));
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+      key,
+      normalizeLoopBodyReferences(item, loopID),
+    ]),
+  );
 }
 
 function isLoopBodyNode(node: Node) {
@@ -57,16 +133,20 @@ export function serializeWorkflowGraph(nodes: Node[], edges: Edge[]): string {
 
   const serializeNode = (node: Node, parentLoopID?: string): SerializedWorkflowNode => {
     const data = node.data as unknown as WorkflowNodeData;
-    const bodyNodes = nodes.filter((candidate) => loopParentID(candidate) === node.id);
-    const bodyEdges = edges.filter(
-      (edge) =>
-        loopParentID(nodeByID.get(edge.source)) === node.id &&
-        loopParentID(nodeByID.get(edge.target)) === node.id,
+    const bodyNodes = nodes.filter(
+      (candidate) => loopParentID(candidate) === node.id && !isLoopBodyNode(candidate),
     );
+    const bodyEdges = edges.filter((edge) => {
+      const source = nodeByID.get(edge.source);
+      const target = nodeByID.get(edge.target);
+      if (loopParentID(source) !== node.id || loopParentID(target) !== node.id) return false;
+      if (!source || !target) return false;
+      return !isLoopBodyNode(source) && !isLoopBodyNode(target);
+    });
     const config =
       data.nodeType === 'loop'
         ? {
-            ...(data.config || {}),
+            ...(normalizeLoopBodyReferences(data.config || {}, node.id) as Record<string, unknown>),
             body: {
               nodes: bodyNodes.map((bodyNode) => serializeNode(bodyNode, node.id)),
               edges: bodyEdges.map((edge) => ({
@@ -78,7 +158,12 @@ export function serializeWorkflowGraph(nodes: Node[], edges: Edge[]): string {
               })),
             },
           }
-        : data.config || {};
+        : parentLoopID
+          ? (normalizeLoopBodyReferences(data.config || {}, parentLoopID) as Record<
+              string,
+              unknown
+            >)
+          : data.config || {};
 
     return {
       id: parentLoopID ? bodyNodeIDFromCanvasID(parentLoopID, node.id) : node.id,
@@ -132,7 +217,8 @@ export function expandLoopCanvas(nodes: Node[], edges: Edge[]): { nodes: Node[];
         ? (config.bodyPosition as { x?: unknown; y?: unknown })
         : undefined;
     const bodyID = loopBodyID(loop.id);
-    if (!existing.has(bodyID)) {
+    const shouldHydrateBody = !existing.has(bodyID);
+    if (shouldHydrateBody) {
       expandedNodes.push({
         id: bodyID,
         type: 'loopBody',
@@ -141,8 +227,8 @@ export function expandLoopCanvas(nodes: Node[], edges: Edge[]): { nodes: Node[];
           y: typeof bodyPosition?.y === 'number' ? bodyPosition.y : loop.position.y + 250,
         },
         ...(loop.parentId ? { parentId: loop.parentId, extent: 'parent' as const } : {}),
-        style: { width: 560, height: loopBodyHeight(bodyNodes.length) },
-        selectable: false,
+        style: { width: loopBodyWidth(bodyNodes.length), height: loopBodyHeight(bodyNodes.length) },
+        selectable: true,
         draggable: true,
         data: { isLoopBody: true, loopParentId: loop.id, nodeCount: bodyNodes.length },
       });
@@ -152,7 +238,7 @@ export function expandLoopCanvas(nodes: Node[], edges: Edge[]): { nodes: Node[];
         sourceHandle: 'body',
         target: bodyID,
         targetHandle: 'loop-entry',
-        type: 'default',
+        type: 'loopBoundary',
         style: { stroke: 'hsl(var(--primary))', strokeWidth: 2.5 },
         selectable: false,
         focusable: false,
@@ -160,7 +246,7 @@ export function expandLoopCanvas(nodes: Node[], edges: Edge[]): { nodes: Node[];
         data: { isLoopBodyLink: true },
       });
     }
-    for (const raw of bodyNodes) {
+    for (const raw of shouldHydrateBody ? bodyNodes : []) {
       if (!raw || typeof raw !== 'object') continue;
       const item = raw as {
         id?: unknown;
@@ -195,7 +281,7 @@ export function expandLoopCanvas(nodes: Node[], edges: Edge[]): { nodes: Node[];
         pendingLoops.push(expandedNodes[expandedNodes.length - 1]);
       }
     }
-    for (const raw of bodyEdges) {
+    for (const raw of shouldHydrateBody ? bodyEdges : []) {
       if (!raw || typeof raw !== 'object') continue;
       const edge = raw as {
         id?: unknown;
@@ -205,6 +291,11 @@ export function expandLoopCanvas(nodes: Node[], edges: Edge[]): { nodes: Node[];
         targetHandle?: unknown;
       };
       if (typeof edge.source !== 'string' || typeof edge.target !== 'string') continue;
+      const source =
+        edge.source === loopBodyEntryID ? bodyID : loopBodyChildID(loop.id, edge.source);
+      const target =
+        edge.target === loopBodyExitID ? bodyID : loopBodyChildID(loop.id, edge.target);
+      const isBoundaryEdge = source === bodyID || target === bodyID;
       const id =
         typeof edge.id === 'string'
           ? `${loop.id}${loopBodyNodePrefix}${edge.id}`
@@ -212,12 +303,53 @@ export function expandLoopCanvas(nodes: Node[], edges: Edge[]): { nodes: Node[];
       if (expandedEdges.some((candidate) => candidate.id === id)) continue;
       expandedEdges.push({
         id,
-        source: loopBodyChildID(loop.id, edge.source),
+        source,
         sourceHandle: typeof edge.sourceHandle === 'string' ? edge.sourceHandle : 'output',
-        target: loopBodyChildID(loop.id, edge.target),
+        target,
         targetHandle: typeof edge.targetHandle === 'string' ? edge.targetHandle : 'input',
-        type: 'insertable',
+        type: isBoundaryEdge ? 'loopBoundary' : 'insertable',
+        ...(isBoundaryEdge
+          ? { data: { isLoopBodyBoundary: true }, selectable: true, deletable: true }
+          : {}),
       });
+    }
+
+    const directBodyNodes = expandedNodes.filter(
+      (candidate) => loopParentID(candidate) === loop.id && !isLoopBodyNode(candidate),
+    );
+    const constrainedBodyNodes = directBodyNodes.map((candidate) => ({
+      ...candidate,
+      expandParent: false,
+      position: constrainLoopBodyChildPosition(candidate.position),
+    }));
+    const constrainedNodesByID = new Map(
+      constrainedBodyNodes.map((candidate) => [candidate.id, candidate]),
+    );
+    for (let bodyNodeIndex = 0; bodyNodeIndex < expandedNodes.length; bodyNodeIndex += 1) {
+      const candidate = expandedNodes[bodyNodeIndex];
+      const constrainedNode = constrainedNodesByID.get(candidate.id);
+      if (constrainedNode) expandedNodes[bodyNodeIndex] = constrainedNode;
+    }
+    const bodyIndex = expandedNodes.findIndex((candidate) => candidate.id === bodyID);
+    if (bodyIndex !== -1) {
+      const loopBody = expandedNodes[bodyIndex];
+      const dimensions = loopBodyDimensions(constrainedBodyNodes);
+      expandedNodes[bodyIndex] = {
+        ...loopBody,
+        data: { ...loopBody.data, nodeCount: constrainedBodyNodes.length },
+        style: {
+          ...loopBody.style,
+          ...dimensions,
+        },
+      };
+    }
+    const loopIndex = expandedNodes.findIndex((candidate) => candidate.id === loop.id);
+    if (loopIndex !== -1) {
+      const loopNode = expandedNodes[loopIndex];
+      expandedNodes[loopIndex] = {
+        ...loopNode,
+        data: { ...loopNode.data, loopBodyNodeCount: constrainedBodyNodes.length },
+      };
     }
   }
   return { nodes: expandedNodes, edges: expandedEdges };

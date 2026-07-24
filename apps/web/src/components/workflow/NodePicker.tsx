@@ -192,8 +192,21 @@ export function DeferredNodePicker({
   onSelect,
   side = 'top',
   align = 'center',
-}: Omit<NodePickerProps, 'defer'>) {
-  const [open, setOpen] = useState(false);
+  open: controlledOpen,
+  onOpenChange,
+}: Omit<NodePickerProps, 'defer'> & {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = useCallback(
+    (nextOpen: boolean) => {
+      if (controlledOpen === undefined) setUncontrolledOpen(nextOpen);
+      onOpenChange?.(nextOpen);
+    },
+    [controlledOpen, onOpenChange],
+  );
 
   if (!open) {
     return cloneElement(trigger, {

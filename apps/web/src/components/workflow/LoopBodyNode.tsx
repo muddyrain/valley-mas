@@ -8,29 +8,27 @@ import { useWorkflowRuntime } from './WorkflowRuntimeContext';
 export const LoopBodyNode = memo(function LoopBodyNode({ data }: NodeProps) {
   const bodyNodeCount = typeof data?.nodeCount === 'number' ? data.nodeCount : 0;
   const loopID = typeof data?.loopParentId === 'string' ? data.loopParentId : '';
-  const { addLoopBodyNode } = useWorkflowRuntime();
+  const { addLoopBodyNode, isRunning } = useWorkflowRuntime();
   return (
     <div className="h-full min-h-[300px] w-full cursor-grab rounded-xl border-2 border-primary/50 bg-card/85 shadow-sm active:cursor-grabbing">
       <Handle
         type="target"
         position={Position.Top}
         id="loop-entry"
-        className="!size-3 !-top-1.5 !border-2 !border-primary !bg-background"
+        className="!z-30 !size-3 !-top-1.5 !border-2 !border-blue-500 !bg-blue-500"
         isConnectable={false}
       />
       <Handle
         type="source"
         position={Position.Left}
         id="entry"
-        className="!size-3 !-left-1.5 !border-2 !border-primary !bg-background"
-        isConnectable={false}
+        className="!z-30 !size-3 !-left-1.5 !border-2 !border-blue-500 !bg-blue-500"
       />
       <Handle
         type="target"
         position={Position.Right}
         id="exit"
-        className="!size-3 !-right-1.5 !border-2 !border-primary !bg-background"
-        isConnectable={false}
+        className="!z-30 !size-3 !-right-1.5 !border-2 !border-blue-500 !bg-blue-500"
       />
       <div className="flex h-14 items-center gap-2 border-b border-primary/15 px-4 text-sm font-semibold text-foreground">
         <span className="flex size-7 items-center justify-center rounded-md bg-teal-500/10 text-teal-600">
@@ -49,7 +47,7 @@ export const LoopBodyNode = memo(function LoopBodyNode({ data }: NodeProps) {
               variant="outline"
               size="sm"
               className="nodrag nopan h-7 gap-1 px-2 text-xs"
-              disabled={!loopID}
+              disabled={!loopID || isRunning}
             >
               <Plus className="size-3.5" />
               添加节点

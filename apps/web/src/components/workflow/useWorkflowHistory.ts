@@ -19,19 +19,22 @@ interface Snapshot {
 function snapshot(nodes: Node[], edges: Edge[]): Snapshot {
   return {
     nodes: nodes.map((node) => ({
+      ...node,
       id: node.id,
       type: node.type,
       position: { ...node.position },
-      data: node.data,
+      data: { ...node.data },
+      style: node.style ? { ...node.style } : undefined,
     })),
     edges: edges.map((edge) => ({
+      ...edge,
       id: edge.id,
       source: edge.source,
       target: edge.target,
       sourceHandle: edge.sourceHandle,
       targetHandle: edge.targetHandle,
       type: edge.type,
-      data: edge.data,
+      data: edge.data ? { ...edge.data } : undefined,
     })),
   };
 }
@@ -105,7 +108,8 @@ export function useWorkflowHistory(
       debounceRef.current = null;
     }
 
-    const previous = pastRef.current.pop()!;
+    const previous = pastRef.current.pop();
+    if (!previous) return;
     futureRef.current.push(snapshot(nodes, edges));
     isApplyingRef.current = true;
     setNodes(previous.nodes);
@@ -121,7 +125,8 @@ export function useWorkflowHistory(
       debounceRef.current = null;
     }
 
-    const next = futureRef.current.pop()!;
+    const next = futureRef.current.pop();
+    if (!next) return;
     pastRef.current.push(snapshot(nodes, edges));
     isApplyingRef.current = true;
     setNodes(next.nodes);

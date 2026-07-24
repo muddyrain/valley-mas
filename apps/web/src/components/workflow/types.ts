@@ -50,6 +50,7 @@ export interface WorkflowNodeData {
   runningState?: 'idle' | 'running' | 'success' | 'error' | 'skipped';
   loopParentId?: string;
   loopBodyNodeId?: string;
+  loopBodyNodeCount?: number;
   isLoopBody?: boolean;
 }
 

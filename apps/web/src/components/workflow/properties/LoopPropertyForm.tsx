@@ -24,6 +24,7 @@ export function LoopPropertyForm({
   config,
   onUpdateConfig,
   variableOptions = [],
+  loopOutputOptions = [],
 }: PropertyFormProps) {
   const mode = config.mode === 'count' || config.mode === 'infinite' ? config.mode : 'array';
   const variables = Array.isArray(config.middleVariables)
@@ -183,7 +184,6 @@ export function LoopPropertyForm({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                disabled={outputs.length === 1}
                 onClick={() =>
                   onUpdateConfig({ outputs: outputs.filter((_, itemIndex) => itemIndex !== index) })
                 }
@@ -191,10 +191,12 @@ export function LoopPropertyForm({
                 <Trash2 className="size-4" />
               </Button>
             </div>
-            <Input
+            <VariableReferencePicker
               value={output.source}
-              onChange={(event) => updateOutput(index, { source: event.target.value })}
-              placeholder="{{循环体节点.output.字段}}"
+              onChange={(source) => updateOutput(index, { source })}
+              options={loopOutputOptions}
+              placeholder="选择循环变量或循环体输出"
+              emptyText="请先在循环体中添加节点，或声明中间变量。"
             />
           </div>
         ))}

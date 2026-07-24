@@ -51,6 +51,17 @@ type loopNodeConfig struct {
 
 type loopControl string
 
+type loopBodyExecutionError struct {
+	node Node
+	err  error
+}
+
+func (err *loopBodyExecutionError) Error() string {
+	return fmt.Sprintf("循环体节点 %s 执行失败: %v", err.node.ID, err.err)
+}
+
+func (err *loopBodyExecutionError) Unwrap() error { return err.err }
+
 const (
 	loopControlNone      loopControl = ""
 	loopControlContinue  loopControl = "continue"
@@ -84,8 +95,10 @@ func (executor LoopExecutor) Execute(ctx context.Context, run RunContext, execut
 	for _, output := range config.Outputs {
 		aggregated[output.Name] = []any{}
 	}
+	loopCtx, cancel := loopExecutionContext(ctx, iterations, config.Body)
+	defer cancel()
 	for iteration := 0; iteration < iterations; iteration++ {
-		if err := ctx.Err(); err != nil {
+		if err := loopCtx.Err(); err != nil {
 			return NodeResult{}, err
 		}
 		locals := cloneAnyMap(middle)
@@ -95,13 +108,18 @@ func (executor LoopExecutor) Execute(ctx context.Context, run RunContext, execut
 		}
 		bodyRun := run
 		bodyRun.Outputs = cloneOutputs(run.Outputs)
-		control, nextMiddle, err := executor.executeBody(ctx, config.Body, bodyRun, execution, locals, iteration, 1)
+		control, nextMiddle, err := executor.executeBody(loopCtx, config.Body, bodyRun, execution, locals, iteration, 1)
 		if err != nil {
 			return NodeResult{}, fmt.Errorf("循环第 %d 轮失败: %w", iteration+1, err)
 		}
 		middle = nextMiddle
+		outputLocals := cloneAnyMap(nextMiddle)
+		outputLocals["index"] = iteration
+		if config.Mode == loopModeArray {
+			outputLocals["item"] = items[iteration]
+		}
 		for _, output := range config.Outputs {
-			value, resolveErr := resolveTemplate(output.Source, bodyRun.Outputs, locals)
+			value, resolveErr := resolveTemplate(output.Source, bodyRun.Outputs, outputLocals)
 			if resolveErr != nil {
 				return NodeResult{}, fmt.Errorf("循环输出 %s 无法解析: %w", output.Name, resolveErr)
 			}
@@ -116,6 +134,28 @@ func (executor LoopExecutor) Execute(ctx context.Context, run RunContext, execut
 		output[name] = values
 	}
 	return NodeResult{Output: output}, nil
+}
+
+// loopExecutionContext gives the entire loop enough time for each model call
+// while retaining the normal timeout for every individual upstream request.
+// For example, a loop that executes two model nodes for five rounds receives a
+// 20-minute total budget, but every model call still times out after 120s.
+func loopExecutionContext(ctx context.Context, iterations int, body loopBody) (context.Context, context.CancelFunc) {
+	requestCount := iterations * loopModelRequestCount(body)
+	if requestCount <= 0 {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, time.Duration(requestCount)*workflowModelRequestTimeout)
+}
+
+func loopModelRequestCount(body loopBody) int {
+	count := 0
+	for _, node := range body.Nodes {
+		if node.Type == NodeTypeLLM {
+			count++
+		}
+	}
+	return count
 }
 
 func (executor LoopExecutor) executeBody(
@@ -150,11 +190,15 @@ func (executor LoopExecutor) executeBody(
 		}
 		input, resolveErr := resolveLoopBodyInput(node, run, nextMiddle)
 		if resolveErr != nil {
-			return loopControlNone, nextMiddle, resolveErr
+			message, code := publicExecutionError(node, resolveErr)
+			executor.emitBodyEvent(run, execution, node, iteration, depth, StatusFailed, message, nil, nil, code, 0)
+			return loopControlNone, nextMiddle, &loopBodyExecutionError{node: node, err: resolveErr}
 		}
 		matched, whenErr := evaluateWhenWithLocals(node.When, run.Outputs, nextMiddle)
 		if whenErr != nil {
-			return loopControlNone, nextMiddle, whenErr
+			message, code := publicExecutionError(node, whenErr)
+			executor.emitBodyEvent(run, execution, node, iteration, depth, StatusFailed, message, input, nil, code, 0)
+			return loopControlNone, nextMiddle, &loopBodyExecutionError{node: node, err: whenErr}
 		}
 		if !matched {
 			run.Outputs[node.ID] = nullOutput(outputFields[node.ID])
@@ -187,8 +231,9 @@ func (executor LoopExecutor) executeBody(
 			}
 			result, executeErr := registered.Execute(ctx, run, NodeExecution{NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityIDForNode(node), Input: input, Locals: nextMiddle})
 			if executeErr != nil {
-				executor.emitBodyEvent(run, execution, node, iteration, depth, StatusFailed, "循环体节点执行失败", input, nil, "WORKFLOW_LOOP_BODY_FAILED", time.Since(startedAt).Milliseconds())
-				return loopControlNone, nextMiddle, executeErr
+				message, code := publicExecutionError(node, executeErr)
+				executor.emitBodyEvent(run, execution, node, iteration, depth, StatusFailed, message, input, nil, code, time.Since(startedAt).Milliseconds())
+				return loopControlNone, nextMiddle, &loopBodyExecutionError{node: node, err: executeErr}
 			}
 			if result.Output == nil {
 				result.Output = map[string]any{}
@@ -222,9 +267,6 @@ func loopConfigFromMap(config map[string]any) (loopNodeConfig, error) {
 	}
 	if len(parsed.Body.Nodes) == 0 || len(parsed.Body.Nodes) > maxLoopBodyNodes {
 		return loopNodeConfig{}, fmt.Errorf("循环体节点数必须为 1 到 %d", maxLoopBodyNodes)
-	}
-	if len(parsed.Outputs) == 0 {
-		return loopNodeConfig{}, fmt.Errorf("循环必须至少声明一个输出")
 	}
 	if parsed.Mode == loopModeInfinite && (parsed.MaxIterations < 1 || parsed.MaxIterations > maxLoopIterations) {
 		return loopNodeConfig{}, fmt.Errorf("无限循环必须声明 1 到 %d 的 maxIterations", maxLoopIterations)
@@ -263,7 +305,7 @@ func validateLoopConfig(nodeID string, config map[string]any, registry *Registry
 			continue
 		}
 		if _, ok := exactReference(output.Source); !ok {
-			errs = append(errs, fmt.Sprintf("循环节点 %s 的输出 %s 必须引用循环体节点输出", nodeID, output.Name))
+			errs = append(errs, fmt.Sprintf("循环节点 %s 的输出 %s 必须引用循环体节点输出或循环变量", nodeID, output.Name))
 		}
 		outputNames[output.Name] = true
 	}
@@ -365,12 +407,24 @@ func validateLoopBody(parentID string, config loopNodeConfig, registry *Registry
 		if !ok {
 			continue
 		}
+		if isLoopOutputLocalReference(reference, middle, config.Mode) {
+			continue
+		}
 		source, fieldName, parsed := splitReference(reference)
 		if !parsed || fields[source] == nil || fields[source][fieldName] == "" {
 			errs = append(errs, fmt.Sprintf("循环节点 %s 的输出 %s 未引用已声明的循环体字段", parentID, output.Name))
 		}
 	}
 	return errs
+}
+
+func isLoopOutputLocalReference(reference string, middle map[string]ValueType, mode loopMode) bool {
+	name := strings.TrimSpace(reference)
+	if name == "index" || (name == "item" && mode == loopModeArray) {
+		return true
+	}
+	_, exists := middle[name]
+	return exists
 }
 
 func validLoopVariableName(value string) bool {

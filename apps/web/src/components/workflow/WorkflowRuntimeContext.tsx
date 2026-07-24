@@ -4,12 +4,17 @@ import type { WorkflowRunSession } from './runSession';
 
 interface WorkflowRuntimeContextValue {
   session: WorkflowRunSession;
+  isRunning: boolean;
   validationErrors: ReadonlyMap<string, string>;
   copyNode: (nodeId: string) => void;
   deleteNode: (nodeId: string) => void;
   insertAfter: (nodeId: string, item: NodePickerItem) => void;
   insertOnEdge: (edgeId: string, item: NodePickerItem) => void;
   addLoopBodyNode: (loopId: string, item: NodePickerItem) => void;
+  outputPickerNodeId: string | null;
+  connectingOutputNodeId: string | null;
+  openOutputPicker: (nodeId: string) => void;
+  closeOutputPicker: (nodeId: string) => void;
 }
 
 const WorkflowRuntimeContext = createContext<WorkflowRuntimeContextValue | null>(null);

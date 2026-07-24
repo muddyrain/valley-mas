@@ -113,9 +113,12 @@ export function VariableBindingEditor({
         variant="outline"
         size="sm"
         onClick={() => {
+          let name = baseName;
           let index = 1;
-          while (values[`${baseName}${index}`] !== undefined) index += 1;
-          const name = `${baseName}${index}`;
+          while (values[name] !== undefined) {
+            name = `${baseName}${index}`;
+            index += 1;
+          }
           onChange({ ...values, [name]: '' }, { ...types, [name]: 'string' });
         }}
       >

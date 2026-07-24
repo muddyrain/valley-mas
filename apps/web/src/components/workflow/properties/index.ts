@@ -16,6 +16,7 @@ export interface PropertyFormProps {
   config: Record<string, unknown>;
   onUpdateConfig: (updates: Partial<Record<string, unknown>>) => void;
   variableOptions?: WorkflowVariableOption[];
+  loopOutputOptions?: WorkflowVariableOption[];
   fieldErrors?: Readonly<Record<string, string>>;
 }
 

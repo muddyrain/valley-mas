@@ -129,7 +129,11 @@ export const NODE_CATEGORIES = [
   { id: 'subworkflow', label: '子工作流', icon: 'Workflow' },
 ] as const;
 
-export function getNodeConfigSummary(nodeType: string, config?: Record<string, unknown>): string {
+export function getNodeConfigSummary(
+  nodeType: string,
+  config?: Record<string, unknown>,
+  loopBodyNodeCount?: number,
+): string {
   if (!config) return '';
   switch (nodeType) {
     case 'start':
@@ -161,7 +165,13 @@ export function getNodeConfigSummary(nodeType: string, config?: Record<string, u
         config.body && typeof config.body === 'object'
           ? (config.body as { nodes?: unknown[] })
           : undefined;
-      return `${mode} · ${Array.isArray(body?.nodes) ? body.nodes.length : 0} 个循环体节点`;
+      const nodeCount =
+        typeof loopBodyNodeCount === 'number'
+          ? loopBodyNodeCount
+          : Array.isArray(body?.nodes)
+            ? body.nodes.length
+            : 0;
+      return `${mode} · ${nodeCount} 个循环体节点`;
     }
     default:
       return '';

@@ -2,13 +2,20 @@ import type { WorkflowRunEvent, WorkflowRunEventData } from '@/api/workflow';
 
 export type NodeRunStatus = 'idle' | 'running' | 'success' | 'error' | 'skipped' | 'cancelled';
 
-export interface NodeRunSnapshot {
+export interface NodeRunIterationSnapshot {
   status: NodeRunStatus;
   input?: Record<string, unknown>;
   output?: Record<string, unknown>;
   error?: string;
   errorCode?: string;
   durationMs?: number;
+  loopIteration?: number;
+  loopDepth?: number;
+}
+
+export interface NodeRunSnapshot extends NodeRunIterationSnapshot {
+  /** Per-round snapshots are retained for loop-body nodes during one run. */
+  iterations?: Record<number, NodeRunIterationSnapshot>;
 }
 
 export interface WorkflowRunSession {
@@ -173,16 +180,21 @@ function applyWorkflowRunEvent(
     return session;
   }
 
-  const current: NodeRunSnapshot = session.nodes[event.step] || { status: 'idle' };
-  const snapshot = snapshotFromEvent(event.status, event.message, data, current);
+  const nodeID = workflowRunEventNodeID(event);
+  const current: NodeRunSnapshot = session.nodes[nodeID] || { status: 'idle' };
+  const snapshot = snapshotWithIteration(
+    snapshotFromEvent(event.status, event.message, data, current),
+    data,
+    current,
+  );
   if (event.status === 'cancelled') {
     return {
       ...session,
       runId: nextRunID,
       status: 'cancelled',
       nodes: {
-        ...closeRunningNodes(session.nodes, '运行已取消', event.step, data?.error, 'cancelled'),
-        [event.step]: snapshot,
+        ...closeRunningNodes(session.nodes, '运行已取消', nodeID, data?.error, 'cancelled'),
+        [nodeID]: snapshot,
       },
       error: null,
       failedNodeId: null,
@@ -195,9 +207,9 @@ function applyWorkflowRunEvent(
       ...session,
       runId: nextRunID,
       status: 'error',
-      nodes: { ...session.nodes, [event.step]: snapshot },
+      nodes: { ...session.nodes, [nodeID]: snapshot },
       error: snapshot.error || session.error,
-      failedNodeId: event.step,
+      failedNodeId: nodeID,
       failedNodeCode: data?.error || session.failedNodeCode,
     };
   }
@@ -206,8 +218,19 @@ function applyWorkflowRunEvent(
     ...session,
     runId: nextRunID,
     status: hasSnapshotError ? 'error' : session.status,
-    nodes: { ...session.nodes, [event.step]: snapshot },
+    nodes: { ...session.nodes, [nodeID]: snapshot },
   };
+}
+
+/**
+ * Loop body execution events keep the loop as `step` and identify the actual
+ * body node separately. The canvas gives that child a deterministic ID using
+ * the same parent/body pair, so routing the snapshot through this key lets the
+ * child card and its edges render their own runtime state.
+ */
+export function workflowRunEventNodeID(event: WorkflowRunEvent) {
+  const bodyNodeID = event.data?.bodyNodeId;
+  return bodyNodeID ? `${event.step}::loop-node::${bodyNodeID}` : event.step;
 }
 
 function snapshotFromEvent(
@@ -216,6 +239,15 @@ function snapshotFromEvent(
   data: WorkflowRunEventData | undefined,
   current: NodeRunSnapshot,
 ): NodeRunSnapshot {
+  if (status === 'running') {
+    return {
+      status,
+      input: data?.input ?? current.input,
+      loopIteration: data?.loopIteration,
+      loopDepth: data?.loopDepth,
+      iterations: current.iterations,
+    };
+  }
   const nextStatus: NodeRunStatus = status === 'done' ? current.status : status;
   const nextError = status === 'error' ? message || data?.error || current.error : current.error;
   return {
@@ -225,6 +257,25 @@ function snapshotFromEvent(
     error: nextError,
     errorCode: data?.error ?? current.errorCode,
     durationMs: data?.durationMs ?? current.durationMs,
+    loopIteration: data?.loopIteration ?? current.loopIteration,
+    loopDepth: data?.loopDepth ?? current.loopDepth,
+    iterations: current.iterations,
+  };
+}
+
+function snapshotWithIteration(
+  snapshot: NodeRunSnapshot,
+  data: WorkflowRunEventData | undefined,
+  current: NodeRunSnapshot,
+): NodeRunSnapshot {
+  if (!data?.bodyNodeId || data.loopIteration == null) return snapshot;
+  const { iterations: _iterations, ...iterationSnapshot } = snapshot;
+  return {
+    ...snapshot,
+    iterations: {
+      ...current.iterations,
+      [data.loopIteration]: iterationSnapshot,
+    },
   };
 }
 

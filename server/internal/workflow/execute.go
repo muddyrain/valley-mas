@@ -42,11 +42,19 @@ func resolveTemplateToken(token string, outputs map[string]map[string]any, local
 		}
 		return nil, fmt.Errorf("变量 %s 不存在或不在上游", reference)
 	}
+	if value, ok := resolveLegacyLoopLocalReference(reference, locals); ok {
+		return value, nil
+	}
 	nodeID, field, valid := splitReference(reference)
 	if !valid {
 		return nil, fmt.Errorf("无效变量 %s", token)
 	}
 	output, exists := outputs[nodeID]
+	if !exists {
+		if legacyNodeID := legacyLoopBodyNodeID(nodeID); legacyNodeID != nodeID {
+			output, exists = outputs[legacyNodeID]
+		}
+	}
 	if !exists {
 		return nil, fmt.Errorf("变量 %s 不存在或不在上游", reference)
 	}
@@ -55,6 +63,32 @@ func resolveTemplateToken(token string, outputs map[string]map[string]any, local
 		return nil, fmt.Errorf("变量 %s 不存在或不在上游", reference)
 	}
 	return result, nil
+}
+
+func legacyLoopBodyNodeID(nodeID string) string {
+	const marker = "::loop-node::"
+	index := strings.LastIndex(nodeID, marker)
+	if index == -1 {
+		return nodeID
+	}
+	return nodeID[index+len(marker):]
+}
+
+// The original loop-body picker emitted {{loopID.loop.name}}. Keep these
+// saved workflows executable while new selections use the standard {{name}}
+// local-variable form.
+func resolveLegacyLoopLocalReference(reference string, locals map[string]any) (any, bool) {
+	const marker = ".loop."
+	index := strings.Index(reference, marker)
+	if index <= 0 {
+		return nil, false
+	}
+	name := reference[index+len(marker):]
+	if name == "" || strings.Contains(name, ".") {
+		return nil, false
+	}
+	value, exists := locals[name]
+	return value, exists
 }
 
 func Execute(ctx context.Context, graph Graph, registry *Registry, run RunContext, emit func(Event)) error {
@@ -316,6 +350,11 @@ func emitFailure(emit func(Event), runID string, node Node, capabilityID string,
 }
 
 func publicExecutionError(node Node, err error) (string, string) {
+	var bodyErr *loopBodyExecutionError
+	if errors.As(err, &bodyErr) {
+		message, code := publicExecutionError(bodyErr.node, bodyErr.err)
+		return fmt.Sprintf("循环体节点 %s 执行失败：%s", bodyErr.node.Label, message), code
+	}
 	if errors.Is(err, context.Canceled) {
 		return "运行已取消", "WORKFLOW_CANCELLED"
 	}

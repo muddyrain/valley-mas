@@ -80,6 +80,15 @@ function stringsInValue(value: unknown): string[] {
 }
 
 function valuesWithReferences(data: WorkflowNodeData): string[] {
+  if (data.nodeType === 'loop') {
+    const config = data.config || {};
+    const mode = config.mode;
+    return [
+      ...(mode === 'array' ? stringsInValue(config.input) : []),
+      ...(mode === 'count' ? stringsInValue(config.count) : []),
+      ...stringsInValue(config.middleVariables),
+    ];
+  }
   return [...stringsInValue(data.config), ...stringsInValue(data.when)];
 }
 
@@ -131,6 +140,16 @@ function validateNode(
       const body = config.body as { nodes?: unknown[] } | undefined;
       if (!body || !Array.isArray(body.nodes) || body.nodes.length === 0)
         return fail('循环体至少需要一个节点');
+      const outputs = Array.isArray(config.outputs)
+        ? (config.outputs as Array<{ source?: unknown }>)
+        : [];
+      if (
+        outputs.some(
+          (output) =>
+            typeof output.source !== 'string' || !/^\{\{\s*[^{}]+\s*\}\}$/.test(output.source),
+        )
+      )
+        return fail('请为每个循环输出选择变量');
       break;
     }
     case 'llm':

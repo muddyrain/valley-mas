@@ -11,11 +11,12 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { workflowRunErrorGuidance } from './runErrorGuidance';
-import type { NodeRunSnapshot, NodeRunStatus } from './runSession';
+import type { NodeRunIterationSnapshot, NodeRunSnapshot, NodeRunStatus } from './runSession';
 
 function jsonPreview(value: Record<string, unknown> | undefined): string | null {
   return value ? JSON.stringify(value, null, 2) : null;
@@ -83,7 +84,13 @@ function durationText(durationMs: number | undefined) {
   return durationMs >= 1000 ? `${(durationMs / 1000).toFixed(2)}s` : `${durationMs}ms`;
 }
 
-function RunDetailsBody({ snapshot, compact }: { snapshot: NodeRunSnapshot; compact: boolean }) {
+function RunDetailsBody({
+  snapshot,
+  compact,
+}: {
+  snapshot: NodeRunIterationSnapshot;
+  compact: boolean;
+}) {
   return (
     <div className={cn('space-y-3', compact ? 'p-3' : 'p-4')}>
       {snapshot.status === 'running' && !snapshot.input && !snapshot.output ? (
@@ -113,14 +120,83 @@ function RunDetailsBody({ snapshot, compact }: { snapshot: NodeRunSnapshot; comp
   );
 }
 
+function LoopIterationDetails({
+  snapshot,
+  compact,
+}: {
+  snapshot: NodeRunSnapshot;
+  compact: boolean;
+}) {
+  const [selectedIteration, setSelectedIteration] = useState(snapshot.loopIteration);
+  const [errorsOnly, setErrorsOnly] = useState(false);
+  const entries = Object.entries(snapshot.iterations ?? {})
+    .map(([iteration, value]) => ({ iteration: Number(iteration), snapshot: value }))
+    .sort((left, right) => left.iteration - right.iteration);
+
+  useEffect(() => {
+    if (snapshot.loopIteration != null) setSelectedIteration(snapshot.loopIteration);
+  }, [snapshot.loopIteration]);
+
+  if (entries.length === 0) return <RunDetailsBody snapshot={snapshot} compact={compact} />;
+
+  const visibleEntries = errorsOnly
+    ? entries.filter((entry) => entry.snapshot.status === 'error')
+    : entries;
+  const activeEntry =
+    visibleEntries.find((entry) => entry.iteration === selectedIteration) ||
+    visibleEntries[visibleEntries.length - 1] ||
+    entries.find((entry) => entry.iteration === selectedIteration) ||
+    entries[entries.length - 1];
+
+  return (
+    <div className={cn('space-y-3', compact ? 'p-3' : 'p-4')}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-medium text-foreground">已处理轮次：{entries.length}</p>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Checkbox
+            checked={errorsOnly}
+            onCheckedChange={(checked) => setErrorsOnly(checked === true)}
+            aria-label="仅看失败轮次"
+          />
+          仅看失败
+        </label>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {visibleEntries.map((entry) => (
+          <Button
+            key={entry.iteration}
+            type="button"
+            size="sm"
+            variant={activeEntry?.iteration === entry.iteration ? 'outline' : 'ghost'}
+            className={cn(
+              'h-7 min-w-7 px-2 text-xs',
+              activeEntry?.iteration === entry.iteration && 'border-primary text-primary',
+            )}
+            onClick={() => setSelectedIteration(entry.iteration)}
+          >
+            {entry.iteration + 1}
+          </Button>
+        ))}
+      </div>
+      {activeEntry ? (
+        <RunDetailsBody snapshot={activeEntry.snapshot} compact={compact} />
+      ) : (
+        <p className="text-xs text-muted-foreground">当前没有失败轮次。</p>
+      )}
+    </div>
+  );
+}
+
 function RunStatus({ snapshot }: { snapshot: NodeRunSnapshot }) {
   const meta = statusMeta(snapshot.status);
   const Icon = meta.icon;
   const duration = durationText(snapshot.durationMs);
+  const iteration = snapshot.loopIteration == null ? null : `第 ${snapshot.loopIteration + 1} 轮`;
   return (
     <>
       <Icon className={cn('size-4 shrink-0', meta.iconClassName)} />
       <span className="text-xs font-medium text-foreground">{meta.label}</span>
+      {iteration ? <span className="text-xs text-muted-foreground">{iteration}</span> : null}
       {duration ? (
         <Badge variant="secondary" className="ml-1 gap-1 px-1.5 font-mono text-[10px]">
           <Clock3 className="size-3" />
@@ -138,10 +214,10 @@ export function NodeRunDetails({
   snapshot: NodeRunSnapshot;
   variant?: 'canvas' | 'panel';
 }) {
-  const [open, setOpen] = useState(snapshot.status === 'running' || snapshot.status === 'error');
+  const [open, setOpen] = useState(snapshot.status === 'error');
 
   useEffect(() => {
-    if (snapshot.status === 'running' || snapshot.status === 'error') setOpen(true);
+    if (snapshot.status === 'error') setOpen(true);
   }, [snapshot.status]);
 
   if (variant === 'panel') {
@@ -150,7 +226,7 @@ export function NodeRunDetails({
         <div className="flex items-center gap-2">
           <RunStatus snapshot={snapshot} />
         </div>
-        <RunDetailsBody snapshot={snapshot} compact={false} />
+        <LoopIterationDetails snapshot={snapshot} compact={false} />
       </div>
     );
   }
@@ -182,7 +258,7 @@ export function NodeRunDetails({
         />
       </CollapsibleTrigger>
       <CollapsibleContent className="border-t border-border">
-        <RunDetailsBody snapshot={snapshot} compact />
+        <LoopIterationDetails snapshot={snapshot} compact />
       </CollapsibleContent>
     </Collapsible>
   );

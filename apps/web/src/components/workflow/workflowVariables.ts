@@ -6,7 +6,7 @@ export interface WorkflowVariableOption {
   field: string;
   type: 'string' | 'string[]' | 'array' | 'object' | 'number' | 'boolean' | 'file' | 'unknown';
   token: string;
-  scope?: 'upstream' | 'local';
+  scope?: 'upstream' | 'local' | 'loop';
 }
 
 export function workflowValueTypeLabel(type: WorkflowVariableOption['type']) {
@@ -41,6 +41,9 @@ interface WorkflowNodeData {
   label?: unknown;
   nodeType?: unknown;
   config?: unknown;
+  loopParentId?: unknown;
+  loopBodyNodeId?: unknown;
+  isLoopBody?: unknown;
 }
 
 const NODE_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, WorkflowVariableType]>> = {
@@ -238,6 +241,114 @@ function getOutputFields(node: Node): ReadonlyArray<WorkflowOutputField> {
   return getWorkflowNodeOutputFields(getNodeType(node), config);
 }
 
+function getReferenceNodeID(node: Node): string {
+  const loopBodyNodeID = getNodeData(node).loopBodyNodeId;
+  return typeof loopBodyNodeID === 'string' && loopBodyNodeID ? loopBodyNodeID : node.id;
+}
+
+function getLoopContextVariables(nodes: Node[], targetNodeID: string): WorkflowVariableOption[] {
+  const target = nodes.find((node) => node.id === targetNodeID);
+  if (!target) return [];
+  const loopID = getNodeData(target).loopParentId;
+  if (typeof loopID !== 'string' || !loopID) return [];
+
+  const loop = nodes.find((node) => node.id === loopID);
+  if (!loop || getNodeType(loop) !== 'loop') return [];
+
+  const rawConfig = getNodeData(loop).config;
+  const config =
+    rawConfig && typeof rawConfig === 'object' ? (rawConfig as Record<string, unknown>) : {};
+  const mode = config.mode;
+  const middleVariables = Array.isArray(config.middleVariables) ? config.middleVariables : [];
+  const nodeLabel = `${getNodeLabel(loop)} · 循环变量`;
+  const createOption = (field: string, type: WorkflowVariableType): WorkflowVariableOption => ({
+    nodeId: loop.id,
+    nodeLabel,
+    field,
+    type,
+    token: `{{${field}}}`,
+    scope: 'loop',
+  });
+  const middle = middleVariables.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const { name, type } = item as { name?: unknown; type?: unknown };
+    if (typeof name !== 'string' || !name.trim()) return [];
+    const valueType =
+      typeof type === 'string' && START_VARIABLE_TYPES.has(type as WorkflowVariableType)
+        ? (type as WorkflowVariableType)
+        : 'unknown';
+    return [createOption(name.trim(), valueType)];
+  });
+
+  return [
+    ...(mode === 'array' ? [createOption('item', 'unknown')] : []),
+    createOption('index', 'number'),
+    ...middle,
+  ];
+}
+
+/** Returns values that a loop can aggregate after each body iteration. */
+export function getLoopOutputVariables(
+  nodes: Node[],
+  loopNodeID: string,
+): WorkflowVariableOption[] {
+  const loop = nodes.find((node) => node.id === loopNodeID);
+  if (!loop || getNodeType(loop) !== 'loop') return [];
+
+  const config = getNodeData(loop).config;
+  const loopConfig =
+    config && typeof config === 'object' ? (config as Record<string, unknown>) : {};
+  const loopLabel = getNodeLabel(loop);
+  const mode = loopConfig.mode;
+  const createLocalOption = (
+    field: string,
+    type: WorkflowVariableType,
+  ): WorkflowVariableOption => ({
+    nodeId: loop.id,
+    nodeLabel: `${loopLabel} · 循环变量`,
+    field,
+    type,
+    token: `{{${field}}}`,
+    scope: 'loop',
+  });
+  const middleVariables = Array.isArray(loopConfig.middleVariables)
+    ? loopConfig.middleVariables
+    : [];
+  const locals = [
+    ...(mode === 'array' ? [createLocalOption('item', 'unknown')] : []),
+    createLocalOption('index', 'number'),
+    ...middleVariables.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const { name, type } = item as { name?: unknown; type?: unknown };
+      if (typeof name !== 'string' || !name.trim()) return [];
+      const valueType =
+        typeof type === 'string' && START_VARIABLE_TYPES.has(type as WorkflowVariableType)
+          ? (type as WorkflowVariableType)
+          : 'unknown';
+      return [createLocalOption(name.trim(), valueType)];
+    }),
+  ];
+
+  const bodyOutputs = nodes.flatMap((node) => {
+    const data = getNodeData(node);
+    if (data.loopParentId !== loopNodeID || data.isLoopBody === true) return [];
+    const bodyNodeID =
+      typeof data.loopBodyNodeId === 'string' && data.loopBodyNodeId
+        ? data.loopBodyNodeId
+        : node.id;
+    return getOutputFields(node).map(([field, type]) => ({
+      nodeId: bodyNodeID,
+      nodeLabel: getNodeLabel(node),
+      field,
+      type,
+      token: `{{${bodyNodeID}.output.${field}}}`,
+      scope: 'loop' as const,
+    }));
+  });
+
+  return [...locals, ...bodyOutputs];
+}
+
 /** Returns only variables exposed by nodes that can reach the target node. */
 export function getUpstreamWorkflowVariables(
   nodes: Node[],
@@ -266,23 +377,25 @@ export function getUpstreamWorkflowVariables(
 
   const upstream = nodes.flatMap((node) => {
     if (!ancestorIDs.has(node.id)) return [];
+    const referenceNodeID = getReferenceNodeID(node);
     return getOutputFields(node).map(([field, type]) => ({
-      nodeId: node.id,
+      nodeId: referenceNodeID,
       nodeLabel: getNodeLabel(node),
       field,
       type,
-      token: `{{${node.id}.output.${field}}}`,
+      token: `{{${referenceNodeID}.output.${field}}}`,
       scope: 'upstream' as const,
     }));
   });
 
+  const loopContext = getLoopContextVariables(nodes, targetNodeID);
   const target = nodes.find((node) => node.id === targetNodeID);
-  if (!target || getNodeType(target) !== 'llm') return upstream;
+  if (!target || getNodeType(target) !== 'llm') return [...loopContext, ...upstream];
   const config = getNodeData(target).config;
-  if (!config || typeof config !== 'object') return upstream;
+  if (!config || typeof config !== 'object') return [...loopContext, ...upstream];
   const inputs = (config as Record<string, unknown>).inputs;
   const inputTypes = (config as Record<string, unknown>).inputTypes;
-  if (!inputs || typeof inputs !== 'object') return upstream;
+  if (!inputs || typeof inputs !== 'object') return [...loopContext, ...upstream];
   const types = inputTypes && typeof inputTypes === 'object' ? inputTypes : {};
   const local = Object.keys(inputs as Record<string, unknown>)
     .filter((field) => field.trim())
@@ -294,7 +407,7 @@ export function getUpstreamWorkflowVariables(
       token: `{{${field}}}`,
       scope: 'local' as const,
     }));
-  return [...local, ...upstream];
+  return [...local, ...loopContext, ...upstream];
 }
 
 export function splitWorkflowTemplate(
@@ -331,7 +444,13 @@ export function splitWorkflowTemplate(
 function normalizeWorkflowVariableToken(token: string): string | null {
   const match = token.match(/^\{\{\s*([^{}]+?)\s*\}\}$/);
   if (!match) return null;
-  return `{{${match[1].trim()}}}`;
+  const reference = match[1].trim();
+  const legacyLoopLocal = reference.match(/^[^.]+\.loop\.([^.\s]+)$/);
+  if (legacyLoopLocal) return `{{${legacyLoopLocal[1]}}}`;
+  const legacyLoopBodyOutput = reference.match(/^.+::loop-node::([^.\s]+)\.output\.([^.\s]+)$/);
+  if (legacyLoopBodyOutput)
+    return `{{${legacyLoopBodyOutput[1]}.output.${legacyLoopBodyOutput[2]}}}`;
+  return `{{${reference}}}`;
 }
 
 export function getWorkflowVariableOption(

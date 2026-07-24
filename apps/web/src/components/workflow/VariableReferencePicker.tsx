@@ -9,7 +9,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { type WorkflowVariableOption, workflowValueTypeLabel } from './workflowVariables';
+import {
+  getWorkflowVariableOption,
+  type WorkflowVariableOption,
+  workflowValueTypeLabel,
+} from './workflowVariables';
 
 const CLEAR_VALUE = '__clear_workflow_variable__';
 
@@ -38,7 +42,7 @@ export function VariableReferencePicker({
   leading,
   emptyText = '暂无可用变量',
 }: VariableReferencePickerProps) {
-  const selected = options.find((option) => option.token === value);
+  const selected = getWorkflowVariableOption(value, options);
 
   return (
     <Select
