@@ -100,6 +100,7 @@ import { MobileCopilotSheet } from '@/components/workbench/MobileCopilotSheet';
 import { WorkbenchCopilot } from '@/components/workbench/WorkbenchCopilot';
 import { isAIWorkflowDraft, workflowDraftToCanvas } from '@/components/workbench/workflowDraft';
 import { InsertableEdge } from '@/components/workflow/InsertableEdge';
+import { LoopBodyExitNode } from '@/components/workflow/LoopBodyExitNode';
 import { LoopBodyNode } from '@/components/workflow/LoopBodyNode';
 import { LoopBoundaryEdge } from '@/components/workflow/LoopBoundaryEdge';
 import { NodePicker, type NodePickerItem } from '@/components/workflow/NodePicker';
@@ -161,6 +162,7 @@ const workflowNodeTypes = Object.fromEntries(
   Object.keys(NODE_CONFIGS).map((type) => [type, WorkflowNode]),
 );
 workflowNodeTypes.loopBody = LoopBodyNode;
+workflowNodeTypes.loopBodyExit = LoopBodyExitNode;
 const workflowEdgeTypes = { insertable: InsertableEdge, loopBoundary: LoopBoundaryEdge };
 const minimumRunPanelHeight = 220;
 const maximumRunPanelHeight = 720;
@@ -190,7 +192,7 @@ function runtimeEdgeStyle(edge: Edge, stroke: string) {
 
 function isLoopBodyChildNode(node: Node) {
   const data = node.data as unknown as WorkflowNodeData;
-  return data.isLoopBody !== true && Boolean(data.loopParentId);
+  return data.isLoopBody !== true && data.isLoopBodyExit !== true && Boolean(data.loopParentId);
 }
 
 function workflowPanelNode(node: Node, nodes: Node[]) {
@@ -1013,8 +1015,12 @@ export default function WorkflowEditorPage() {
 
       const children = workflowStateRef.current.nodes
         .filter((node) => {
-          const data = node.data as { isLoopBody?: boolean; loopParentId?: string };
-          return data.loopParentId === loopID && !data.isLoopBody;
+          const data = node.data as {
+            isLoopBody?: boolean;
+            isLoopBodyExit?: boolean;
+            loopParentId?: string;
+          };
+          return data.loopParentId === loopID && !data.isLoopBody && !data.isLoopBodyExit;
         })
         .sort(
           (left, right) =>
@@ -1345,7 +1351,7 @@ export default function WorkflowEditorPage() {
         if (change.type !== 'position' || !change.position) return false;
         const changedNode = nextNodes.find((node) => node.id === change.id);
         const data = changedNode?.data as WorkflowNodeData | undefined;
-        return Boolean(data?.loopParentId) && !data?.isLoopBody;
+        return Boolean(data?.loopParentId) && !data?.isLoopBody && !data?.isLoopBodyExit;
       });
       if (movedLoopBodyChild) {
         nextNodes = expandLoopCanvas(nextNodes, workflowStateRef.current.edges).nodes;
@@ -1418,11 +1424,12 @@ export default function WorkflowEditorPage() {
       const nodeData = node.data as {
         loopParentId?: string;
         isLoopBody?: boolean;
+        isLoopBodyExit?: boolean;
         label?: string;
         nodeType?: string;
         config?: Record<string, unknown>;
       };
-      if (nodeData.loopParentId && !nodeData.isLoopBody) {
+      if (nodeData.loopParentId && !nodeData.isLoopBody && !nodeData.isLoopBodyExit) {
         const nextNodes = workflowStateRef.current.nodes.map((candidate) =>
           candidate.id === node.id ? { ...candidate, position: node.position } : candidate,
         );
@@ -1467,8 +1474,12 @@ export default function WorkflowEditorPage() {
             const childID = loopBodyChildID(parentID, node.id);
             const nextNodeCount =
               workflowStateRef.current.nodes.filter((candidate) => {
-                const data = candidate.data as { isLoopBody?: boolean; loopParentId?: string };
-                return data.loopParentId === parentID && !data.isLoopBody;
+                const data = candidate.data as {
+                  isLoopBody?: boolean;
+                  isLoopBodyExit?: boolean;
+                  loopParentId?: string;
+                };
+                return data.loopParentId === parentID && !data.isLoopBody && !data.isLoopBodyExit;
               }).length + 1;
             const nextNodes = workflowStateRef.current.nodes.map((candidate) =>
               candidate.id === node.id

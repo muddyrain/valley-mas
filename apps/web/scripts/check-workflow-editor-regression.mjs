@@ -16,6 +16,14 @@ const workflowVariables = readFileSync(
   new URL('../src/components/workflow/workflowVariables.ts', import.meta.url),
   'utf8',
 );
+const workflowNode = readFileSync(
+  new URL('../src/components/workflow/WorkflowNode.tsx', import.meta.url),
+  'utf8',
+);
+const loopBoundaryEdge = readFileSync(
+  new URL('../src/components/workflow/LoopBoundaryEdge.tsx', import.meta.url),
+  'utf8',
+);
 const panel = readFileSync(
   new URL('../src/components/workflow/RunPanel.tsx', import.meta.url),
   'utf8',
@@ -168,4 +176,30 @@ if (!variableEditor.includes('text-primary')) {
 
 if (!workflowVariables.includes('\\{\\{[^\\n]*?(?:\\}\\}|$)')) {
   throw new Error('Variable parser must preserve incomplete references for invalid styling');
+}
+
+for (const label of ['输入', '输出', '变量', '模型']) {
+  if (!workflowNode.includes(`label="${label}"`)) {
+    throw new Error(`LLM canvas summary must render ${label}`);
+  }
+}
+
+if (!loopBoundaryEdge.includes('markerEnd={props.markerEnd}')) {
+  throw new Error('Loop body boundary edges must use the standard edge marker');
+}
+
+if (!loopBoundaryEdge.includes('const hoverPath = path;')) {
+  throw new Error('Loop body boundary hover must reuse the exact visible edge path');
+}
+
+if (!workflowGraph.includes("type: 'loopBodyExit'")) {
+  throw new Error('Loop body exit must use a dedicated anchor node');
+}
+
+if (!workflowGraph.includes('edge.target === loopBodyExitSentinel || edge.target === bodyID')) {
+  throw new Error('Legacy loop body exit edges must resolve to the dedicated anchor');
+}
+
+if (!workflowGraph.includes("targetsExitAnchor ? 'input'")) {
+  throw new Error('Loop body exit edges must target the anchor input handle');
 }

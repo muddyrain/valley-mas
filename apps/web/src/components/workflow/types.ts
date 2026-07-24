@@ -52,6 +52,7 @@ export interface WorkflowNodeData {
   loopBodyNodeId?: string;
   loopBodyNodeCount?: number;
   isLoopBody?: boolean;
+  isLoopBodyExit?: boolean;
 }
 
 export interface StartInputDefinition {

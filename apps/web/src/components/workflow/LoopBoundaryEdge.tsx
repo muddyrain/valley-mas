@@ -22,14 +22,12 @@ export function LoopBoundaryEdge(props: EdgeProps) {
   const { insertOnEdge, isRunning } = useWorkflowRuntime();
   const { visible: hovered, show, scheduleHide } = useDelayedHoverVisibility();
   const isBodyEntry = props.sourceHandleId === 'entry';
-  const isBodyExit = props.targetHandleId === 'exit';
   const isLoopBodyLink = props.sourceHandleId === 'body' && props.targetHandleId === 'loop-entry';
   const interactive = !isLoopBodyLink && !isRunning;
   const stroke = props.style?.stroke ?? '#3b82f6';
   const selectedStroke = '#7c3aed';
   const hoverStroke = '#22c7f3';
   const sourceHandleRadius = 14;
-  const targetHandleClearance = 8;
   const edgePositions = isLoopBodyLink
     ? {
         sourcePosition: Position.Bottom,
@@ -37,37 +35,19 @@ export function LoopBoundaryEdge(props: EdgeProps) {
       }
     : {
         sourcePosition: isBodyEntry ? Position.Right : props.sourcePosition,
-        targetPosition: isBodyExit ? Position.Left : props.targetPosition,
+        targetPosition: props.targetPosition,
       };
   const [path, labelX, labelY] = getBezierPath({
     ...props,
     ...(isLoopBodyLink
       ? {}
       : {
-          sourceX: isBodyEntry
-            ? props.sourceX + sourceHandleRadius
-            : isBodyExit
-              ? props.sourceX - 12
-              : props.sourceX,
+          sourceX: isBodyEntry ? props.sourceX + sourceHandleRadius : props.sourceX,
         }),
     ...edgePositions,
     curvature: 0.2,
   });
-  const [hoverPath] = getBezierPath({
-    ...props,
-    ...(isLoopBodyLink
-      ? {}
-      : {
-          sourceX: isBodyEntry
-            ? props.sourceX + sourceHandleRadius
-            : isBodyExit
-              ? props.sourceX - sourceHandleRadius
-              : props.sourceX,
-          targetX: props.targetX - targetHandleClearance,
-        }),
-    ...edgePositions,
-    curvature: 0.2,
-  });
+  const hoverPath = path;
 
   return (
     <>
@@ -83,17 +63,6 @@ export function LoopBoundaryEdge(props: EdgeProps) {
           onPointerLeave={scheduleHide}
         />
       ) : null}
-      <BaseEdge
-        path={path}
-        markerEnd={props.markerEnd}
-        style={{
-          ...props.style,
-          pointerEvents: interactive ? 'none' : undefined,
-          stroke: props.selected ? selectedStroke : stroke,
-          strokeWidth: props.selected ? 3 : (props.style?.strokeWidth ?? 2),
-        }}
-        interactionWidth={interactive ? 0 : 16}
-      />
       {interactive && hovered ? (
         <BaseEdge
           path={hoverPath}
@@ -106,6 +75,17 @@ export function LoopBoundaryEdge(props: EdgeProps) {
           interactionWidth={0}
         />
       ) : null}
+      <BaseEdge
+        path={path}
+        markerEnd={props.markerEnd}
+        style={{
+          ...props.style,
+          pointerEvents: interactive ? 'none' : undefined,
+          stroke: interactive && hovered ? 'transparent' : props.selected ? selectedStroke : stroke,
+          strokeWidth: props.selected ? 3 : (props.style?.strokeWidth ?? 2),
+        }}
+        interactionWidth={interactive ? 0 : 16}
+      />
       {interactive ? (
         <EdgeLabelRenderer>
           <div

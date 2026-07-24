@@ -25,13 +25,6 @@ export const LoopBodyNode = memo(function LoopBodyNode({ data }: NodeProps) {
         isConnectable={!isRunning}
         className="!z-30 !size-3 !-left-1.5 !border-2 !border-blue-500 !bg-blue-500"
       />
-      <Handle
-        type="target"
-        position={Position.Right}
-        id="exit"
-        isConnectable={!isRunning}
-        className="!z-30 !size-3 !-right-1.5 !border-2 !border-blue-500 !bg-blue-500"
-      />
       <div className="flex h-14 items-center gap-2 border-b border-primary/15 px-4 text-sm font-semibold text-foreground">
         <span className="flex size-7 items-center justify-center rounded-md bg-teal-500/10 text-teal-600">
           <Repeat2 className="size-4" />

@@ -11,9 +11,10 @@ type SerializedWorkflowNode = {
 };
 
 const loopBodySuffix = '::loop-body';
+const loopBodyExitSuffix = '::loop-exit';
 const loopBodyNodePrefix = '::loop-node::';
 const loopBodyEntryID = '__loop_entry__';
-const loopBodyExitID = '__loop_exit__';
+const loopBodyExitSentinel = '__loop_exit__';
 const loopBodyMinWidth = 560;
 const loopBodyNodeWidth = 264;
 const loopBodyNodeHeight = 144;
@@ -74,6 +75,10 @@ export function loopBodyID(loopID: string) {
   return `${loopID}${loopBodySuffix}`;
 }
 
+export function loopBodyExitID(loopID: string) {
+  return `${loopID}${loopBodyExitSuffix}`;
+}
+
 export function loopBodyChildID(loopID: string, bodyNodeID: string) {
   return `${loopID}${loopBodyNodePrefix}${bodyNodeID}`;
 }
@@ -109,6 +114,10 @@ function isLoopBodyNode(node: Node) {
   return (node.data as unknown as WorkflowNodeData).isLoopBody === true;
 }
 
+function isLoopBodyExitNode(node: Node) {
+  return (node.data as unknown as WorkflowNodeData).isLoopBodyExit === true;
+}
+
 function loopParentID(node: Node | undefined) {
   if (!node) return undefined;
   return (node.data as unknown as WorkflowNodeData).loopParentId;
@@ -134,7 +143,10 @@ export function serializeWorkflowGraph(nodes: Node[], edges: Edge[]): string {
   const serializeNode = (node: Node, parentLoopID?: string): SerializedWorkflowNode => {
     const data = node.data as unknown as WorkflowNodeData;
     const bodyNodes = nodes.filter(
-      (candidate) => loopParentID(candidate) === node.id && !isLoopBodyNode(candidate),
+      (candidate) =>
+        loopParentID(candidate) === node.id &&
+        !isLoopBodyNode(candidate) &&
+        !isLoopBodyExitNode(candidate),
     );
     const bodyEdges = edges.filter((edge) => {
       const source = nodeByID.get(edge.source);
@@ -145,8 +157,8 @@ export function serializeWorkflowGraph(nodes: Node[], edges: Edge[]): string {
       if (!sourceIsBodyMember || !targetIsBodyMember) return false;
 
       // Keep the loop body's entry and exit edges alongside ordinary child
-      // edges. The canvas uses the body node for these endpoints, while the
-      // persisted graph uses stable sentinels that expandLoopCanvas restores.
+      // edges. The canvas uses dedicated child anchors for these endpoints,
+      // while the persisted graph uses stable sentinels that expandLoopCanvas restores.
       return !(isLoopBodyNode(source) && isLoopBodyNode(target));
     });
     const config =
@@ -166,8 +178,8 @@ export function serializeWorkflowGraph(nodes: Node[], edges: Edge[]): string {
                       : bodyNodeIDFromCanvasID(node.id, edge.source),
                   sourceHandle: edge.sourceHandle,
                   target:
-                    target && isLoopBodyNode(target)
-                      ? loopBodyExitID
+                    target && (isLoopBodyNode(target) || isLoopBodyExitNode(target))
+                      ? loopBodyExitSentinel
                       : bodyNodeIDFromCanvasID(node.id, edge.target),
                   targetHandle: edge.targetHandle,
                 };
@@ -233,6 +245,7 @@ export function expandLoopCanvas(nodes: Node[], edges: Edge[]): { nodes: Node[];
         ? (config.bodyPosition as { x?: unknown; y?: unknown })
         : undefined;
     const bodyID = loopBodyID(loop.id);
+    const exitID = loopBodyExitID(loop.id);
     const shouldHydrateBody = !existing.has(bodyID);
     if (shouldHydrateBody) {
       expandedNodes.push({
@@ -260,6 +273,19 @@ export function expandLoopCanvas(nodes: Node[], edges: Edge[]): { nodes: Node[];
         focusable: false,
         deletable: false,
         data: { isLoopBodyLink: true },
+      });
+      expandedNodes.push({
+        id: exitID,
+        type: 'loopBodyExit',
+        parentId: bodyID,
+        extent: 'parent',
+        position: {
+          x: loopBodyWidth(bodyNodes.length) - 1,
+          y: loopBodyContentTop + loopBodyNodeHeight / 2,
+        },
+        selectable: false,
+        draggable: false,
+        data: { isLoopBodyExit: true, loopParentId: loop.id },
       });
     }
     for (const raw of shouldHydrateBody ? bodyNodes : []) {
@@ -309,9 +335,9 @@ export function expandLoopCanvas(nodes: Node[], edges: Edge[]): { nodes: Node[];
       if (typeof edge.source !== 'string' || typeof edge.target !== 'string') continue;
       const source =
         edge.source === loopBodyEntryID ? bodyID : loopBodyChildID(loop.id, edge.source);
-      const target =
-        edge.target === loopBodyExitID ? bodyID : loopBodyChildID(loop.id, edge.target);
-      const isBoundaryEdge = source === bodyID || target === bodyID;
+      const targetsExitAnchor = edge.target === loopBodyExitSentinel || edge.target === bodyID;
+      const target = targetsExitAnchor ? exitID : loopBodyChildID(loop.id, edge.target);
+      const isBoundaryEdge = source === bodyID;
       const id =
         typeof edge.id === 'string'
           ? `${loop.id}${loopBodyNodePrefix}${edge.id}`
@@ -322,7 +348,11 @@ export function expandLoopCanvas(nodes: Node[], edges: Edge[]): { nodes: Node[];
         source,
         sourceHandle: typeof edge.sourceHandle === 'string' ? edge.sourceHandle : 'output',
         target,
-        targetHandle: typeof edge.targetHandle === 'string' ? edge.targetHandle : 'input',
+        targetHandle: targetsExitAnchor
+          ? 'input'
+          : typeof edge.targetHandle === 'string'
+            ? edge.targetHandle
+            : 'input',
         type: isBoundaryEdge ? 'loopBoundary' : 'insertable',
         ...(isBoundaryEdge
           ? { data: { isLoopBodyBoundary: true }, selectable: true, deletable: true }
@@ -331,7 +361,10 @@ export function expandLoopCanvas(nodes: Node[], edges: Edge[]): { nodes: Node[];
     }
 
     const directBodyNodes = expandedNodes.filter(
-      (candidate) => loopParentID(candidate) === loop.id && !isLoopBodyNode(candidate),
+      (candidate) =>
+        loopParentID(candidate) === loop.id &&
+        !isLoopBodyNode(candidate) &&
+        !isLoopBodyExitNode(candidate),
     );
     const constrainedBodyNodes = directBodyNodes.map((candidate) => ({
       ...candidate,
@@ -358,6 +391,16 @@ export function expandLoopCanvas(nodes: Node[], edges: Edge[]): { nodes: Node[];
           ...dimensions,
         },
       };
+      const exitIndex = expandedNodes.findIndex((candidate) => candidate.id === exitID);
+      if (exitIndex !== -1) {
+        expandedNodes[exitIndex] = {
+          ...expandedNodes[exitIndex],
+          position: {
+            x: dimensions.width - 1,
+            y: loopBodyContentTop + loopBodyNodeHeight / 2,
+          },
+        };
+      }
     }
     const loopIndex = expandedNodes.findIndex((candidate) => candidate.id === loop.id);
     if (loopIndex !== -1) {

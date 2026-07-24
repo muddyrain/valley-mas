@@ -154,6 +154,104 @@ function getVariableReferenceLabel(value: unknown) {
   return parts[parts.length - 1] || value.trim();
 }
 
+function getTemplateVariableReferences(value: unknown): string[] {
+  if (typeof value === 'string') {
+    return Array.from(value.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g), (match) =>
+      getVariableReferenceLabel(`{{${match[1]}}}`),
+    );
+  }
+  if (Array.isArray(value)) return value.flatMap(getTemplateVariableReferences);
+  if (value && typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).flatMap(getTemplateVariableReferences);
+  }
+  return [];
+}
+
+function uniqueLabels(values: string[]) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function LLMNodeDetailRow({
+  label,
+  values,
+  emptyLabel,
+  model,
+}: {
+  label: string;
+  values: string[];
+  emptyLabel: string;
+  model?: boolean;
+}) {
+  return (
+    <div className="flex min-h-5 items-center gap-2">
+      <span className="w-7 shrink-0 text-muted-foreground">{label}</span>
+      {values.length ? (
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
+          {values.map((value) =>
+            model ? (
+              <span key={value} className="min-w-0 truncate text-foreground">
+                {value}
+              </span>
+            ) : (
+              <span
+                key={value}
+                className="max-w-full truncate rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground"
+              >
+                {value}
+              </span>
+            ),
+          )}
+        </div>
+      ) : (
+        <span className="text-muted-foreground/70">{emptyLabel}</span>
+      )}
+    </div>
+  );
+}
+
+function LLMNodeSummary({
+  config,
+  outputFields,
+  modelName,
+}: {
+  config?: Record<string, unknown>;
+  outputFields: ReadonlyArray<readonly [string, string]>;
+  modelName: string;
+}) {
+  const inputEntries = config?.inputs;
+  const inputVariables =
+    inputEntries && typeof inputEntries === 'object'
+      ? uniqueLabels(
+          Object.entries(inputEntries as Record<string, unknown>).flatMap(([name, value]) => {
+            const references = getTemplateVariableReferences(value);
+            return references.length ? references : name.trim() ? [name.trim()] : [];
+          }),
+        )
+      : [];
+  const promptVariables = uniqueLabels([
+    ...getTemplateVariableReferences(config?.systemPrompt),
+    ...getTemplateVariableReferences(config?.prompt),
+  ]);
+
+  return (
+    <div className="space-y-1.5 border-t border-border bg-muted/10 px-4 py-2 text-xs">
+      <LLMNodeDetailRow label="输入" values={inputVariables} emptyLabel="未配置" />
+      <LLMNodeDetailRow
+        label="输出"
+        values={outputFields.map(([name]) => name)}
+        emptyLabel="未配置"
+      />
+      <LLMNodeDetailRow label="变量" values={promptVariables} emptyLabel="未引用" />
+      <LLMNodeDetailRow
+        label="模型"
+        values={modelName ? [modelName] : []}
+        emptyLabel="未选择"
+        model
+      />
+    </div>
+  );
+}
+
 function LoopVariableRow({ label, values }: { label: string; values: string[] }) {
   return (
     <div className="flex min-h-5 items-center gap-2">
@@ -382,7 +480,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
                   {nodeKind}
                 </span>
               ) : null}
-              {configDetail ? (
+              {configDetail && nodeType !== 'llm' ? (
                 <span className="mt-0.5 block truncate text-xs text-muted-foreground/70">
                   {configDetail}
                 </span>
@@ -453,7 +551,14 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
             </div>
           </div>
           {nodeType === 'loop' ? <LoopVariableSummary config={config} /> : null}
-          {nodeType !== 'loop' && outputFields.length > 0 ? (
+          {nodeType === 'llm' ? (
+            <LLMNodeSummary
+              config={config}
+              outputFields={outputFields}
+              modelName={textModelName || summary}
+            />
+          ) : null}
+          {nodeType !== 'loop' && nodeType !== 'llm' && outputFields.length > 0 ? (
             <div className="flex min-h-10 items-center gap-2 border-t border-border bg-muted/20 px-4 py-2 text-xs">
               <span className="shrink-0 text-muted-foreground">输出</span>
               <span className="min-w-0 truncate font-mono font-medium text-foreground">

@@ -44,6 +44,7 @@ interface WorkflowNodeData {
   loopParentId?: unknown;
   loopBodyNodeId?: unknown;
   isLoopBody?: unknown;
+  isLoopBodyExit?: unknown;
 }
 
 const NODE_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, WorkflowVariableType]>> = {
@@ -331,7 +332,12 @@ export function getLoopOutputVariables(
 
   const bodyOutputs = nodes.flatMap((node) => {
     const data = getNodeData(node);
-    if (data.loopParentId !== loopNodeID || data.isLoopBody === true) return [];
+    if (
+      data.loopParentId !== loopNodeID ||
+      data.isLoopBody === true ||
+      data.isLoopBodyExit === true
+    )
+      return [];
     const bodyNodeID =
       typeof data.loopBodyNodeId === 'string' && data.loopBodyNodeId
         ? data.loopBodyNodeId
