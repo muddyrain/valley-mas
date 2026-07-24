@@ -21,7 +21,7 @@
 
 ## 开发规范
 
-- 修改玩法、地图、模拟参数、剧本、编辑模式、回放或架构时，必须使用 `game-doc-sync-guard` 并同步 `docs/TDD.md` 或相关设计文档。
+- 修改玩法、地图、模拟参数、剧本、编辑模式、回放或架构时，按影响范围同步 `docs/TDD.md` 或相关设计文档；普通局部修复不制造无关文档更新。
 - 当前运行时地图来源只保留 `random` 与 `three-kingdoms` 两种模式；不要重新引入 GeoJSON、外部地图数据或 `/public/geo` 资源，除非任务明确要求恢复该能力并同步设计文档。
 - 新增地图模式先改 `src/core/map/sources.ts`，再检查 `mapSlice`、Sidebar、Replay meta、测试和 TDD 描述。
 - 模拟逻辑优先保持纯函数和可测试入口，避免把规则写进 UI 组件或 Pixi 渲染层。

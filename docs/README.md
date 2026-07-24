@@ -13,6 +13,7 @@
 - [交互式 AI 模型目录全量迁移](./specs/2026-07-21-interactive-ai-model-catalog-migration-design.md)：所有用户主动触发的文本、视觉与生图 AI 统一按能力选择模型目录记录。
 - [AI 图片创作工作台](./specs/2026-07-23-ai-image-studio-design.md)：独立画布、参考素材、受控模板、异步生成状态和私有图片历史。
 - [Harness Engineering](./HARNESS_ENGINEERING.md)：AI coding agent 在本仓库中的上下文入口、工具边界、验证命令、评审回路和回归证据。
+- [架构决策指南](./ARCHITECTURE_GUIDE.md)：共享模块、跨应用复用、协议迁移和复杂状态协调的轻量判断准则。
 - [测试治理策略](./TESTING_STRATEGY.md)：新增改动的测试要求、历史测试债治理、运行时证据边界与覆盖率推进条件。
 - [Agent 常见错误模式](./patterns/agent-pitfalls.md)：只记录 Valley 已确认的失败模式，并把重复问题导向脚本、测试或 CI。
 - [Code Review 规则](../.code-review/README.md)：按 Security、correctness、Go、React/UI 风险加载的轻量 review 清单。

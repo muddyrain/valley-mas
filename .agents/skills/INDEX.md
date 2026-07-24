@@ -21,14 +21,12 @@
 |---|---|---|
 | `encoding-guard` | 风险触发 | 修改非 ASCII 用户文本、Markdown、skill、配置示例或批量文本时检查乱码和文本丢失 |
 | `task-completion-guard` | 风险触发 | 跨 3 个以上文件、多轮实施、计划驱动或完成状态容易误报的实施任务；不含只读分析 |
-| `component-reuse-guard` | 日常启用 | 出现重复 JSX、handler、弹窗、表单、上传或列表逻辑 |
 | `conventional-commit-guard` | 日常启用 | 生成提交信息或用户明确要求执行 `git commit` |
 | `delivery-reporting` | 风险触发 | 分阶段汇报，或长期状态、接口、依赖、数据模型、产品方向、验收标准变化 |
+| `documentation-freshness-audit` | 范围限定 | 用户明确要求文档巡检、README 是否过时、文档与代码对齐，或重构后核对文档事实 |
 | `ui-copy-boundary-guard` | 日常启用 | 修改用户可见标题、按钮、说明、空状态、副标题或设置文案 |
-| `ai-capability-orchestration` | 范围限定 | Go 服务端 ARK AI、模型配置、提示词、多模态、响应解析、降级和错误映射 |
+| `web-performance-review` | 范围限定 | 用户明确要求性能 review、检查性能、评估性能回归或审查 Web diff 性能风险 |
 | `web-ui-consistency-guard` | 范围限定 | Web 页面主题、loading、列表、URL query、刷新和回退行为变化 |
-| `worldbox-alignment-guard` | 范围限定 | 仅 WorldSim：玩法、平衡、模拟规则、神力、文明和可读性 UI |
-| `game-doc-sync-guard` | 范围限定 | 仅 WorldSim：玩法、参数或架构变化时同步设计文档 |
 
 ## 项目可选
 
@@ -47,6 +45,7 @@
 |---|---|---|
 | `grill-me` | 手动触发 | 用户明确要求 `/grilling` 或高强度追问计划 |
 | `grill-with-docs` | 手动触发 | 用户明确要求追问并同步 ADR、术语表等文档 |
+| `improve-codebase-architecture` | 外部参考 | 用户明确要求架构深度审查时使用；依赖 `CONTEXT.md`、`docs/adr/` 与外部架构辅助能力，缺失时不自动启用 |
 | `gsap-core` | 外部参考 | GSAP tween、ease、stagger、matchMedia 和 reduced-motion |
 | `gsap-react` | 外部参考 | React/Next.js 中的 `useGSAP`、refs、scope 和清理 |
 | `gsap-timeline` | 外部参考 | 多步骤动画时间轴、嵌套、暂停和反转 |
@@ -60,4 +59,4 @@
 
 ## UI 组合上限
 
-普通 UI 维护通常以 `web-ui-consistency-guard` 或子项目规则为主；涉及用户文案时叠加 `ui-copy-boundary-guard`；确认存在重复 UI 或处理器时再叠加 `component-reuse-guard`。不要继续堆叠外部设计 skills。
+普通 UI 维护通常以 `web-ui-consistency-guard` 或子项目规则为主；涉及用户文案时叠加 `ui-copy-boundary-guard`。发现重复 UI 或处理器时，按所在子项目现有组件、hooks 与 utils 就近收敛，不继续堆叠外部设计 skills。

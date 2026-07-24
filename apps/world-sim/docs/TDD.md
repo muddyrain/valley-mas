@@ -462,7 +462,7 @@ apps/world-sim/
 ### 9.6 兼容根项目协作约定
 - `apps/world-sim/AGENTS.md`：WorldSim 子项目协作入口，记录路由、命名、地图模式和验证规则。
 - 当前没有单独的 `apps/world-sim/docs/PLAN.md`；长期设计基线以本 TDD 为主，平衡专项记录放在 `docs/BALANCE_FIX_PLAN.md`。
-- 任何玩法/参数/架构改动需要同步本 TDD 与对应设计文档（受 `game-doc-sync-guard` 与根 `AGENTS.md` 红线约束）。
+- 任何玩法、参数或架构改动需要同步本 TDD 与对应设计文档；普通局部修复不制造无关文档更新。
 - 由于本项目定位与既有"WorldBox 式沙盒"略有不同，后续根级文档（`docs/PROJECT_GUIDE.md` 与根 `AGENTS.md` 的 WorldSim 描述）需要在确认后同步更新；TDD 仅描述设计，不改动这些文档。
 
 ### 9.7 地图模式现状

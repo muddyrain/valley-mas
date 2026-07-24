@@ -8,7 +8,8 @@
 2. 按任务范围读取 `docs/PROJECT_GUIDE.md` 的相关章节。
 3. 进入子项目时先读对应 `AGENTS.md`，再读相关 README、环境变量示例、路由、处理器或包脚本。
 4. 涉及 AI 协作流程、验证闭环或 Harness 本身时，读取 `docs/HARNESS_ENGINEERING.md`。
-5. 以当前代码和文档为准，不凭旧记忆推断路径、命令或业务规则。
+5. 涉及共享模块、跨应用复用、协议或 Provider 迁移、复杂状态协调时，按需读取 `docs/ARCHITECTURE_GUIDE.md`。
+6. 以当前代码和文档为准，不凭旧记忆推断路径、命令或业务规则。
 
 只装载当前任务需要的上下文。普通任务不要求全文读取所有长期文档或所有 skills。
 
@@ -32,7 +33,7 @@
 
 - Life Trace：`apps/life-trace/docs/PLAN.md`。
 - Desktop OS：`apps/desktop-os/docs/PLAN.md`。
-- WorldSim：按 `apps/world-sim/AGENTS.md` 和 `game-doc-sync-guard` 同步对应设计文档。
+- WorldSim：按 `apps/world-sim/AGENTS.md` 同步 `docs/TDD.md` 或受影响的设计文档。
 - 根长期文档索引：`docs/README.md`。
 - 必须同步：功能状态、页面入口、接口路径、依赖策略、数据模型、产品方向、长期文档索引或验收标准发生变化。
 - 通常无需同步：临时调试、格式化、拼写、注释、局部样式微调和不改变长期状态的协作规则收敛。
@@ -62,10 +63,12 @@
 
 ## 项目 Skill 路由
 
-- 重复 JSX、handler、弹窗、表单、上传或列表逻辑：`component-reuse-guard`。
+- 发现重复 JSX、handler、弹窗、表单、上传或列表逻辑时，先定位既有组件、hooks、utils 和页面模式；确认存在稳定复用价值后，按所在子项目的目录约定就近收敛。
 - 生成提交信息或执行提交：`conventional-commit-guard`。
 - 多阶段汇报或长期文档、功能状态、接口、依赖、数据模型、产品方向、验收标准变化：`delivery-reporting`。
+- 用户明确要求文档巡检、README 是否过时、文档与代码对齐：`documentation-freshness-audit`。
 - 修改用户可见 UI 文案：`ui-copy-boundary-guard`。
+- 用户明确要求性能 review、检查性能或评估 Web diff 性能风险：`web-performance-review`。
 - 修改 CJK/非 ASCII 文本、Markdown、skill 或配置示例：`encoding-guard`。
 - 实施任务跨 3 个以上文件、多轮落地或计划驱动，且存在完成状态误报风险：`task-completion-guard`；只读分析和普通问答不触发。
 - 其他专项能力按 `.agents/skills/INDEX.md` 路由。

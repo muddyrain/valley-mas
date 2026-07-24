@@ -214,8 +214,8 @@ internal/handler                 ← 保持，但 ARK 直接接入逐步换成 a
 ### Task 2.5：文档同步
 
 - [ ] **Step 1：更新 [server/AGENTS.md](file:///Users/bytedance/Desktop/study/valley-mas/server/AGENTS.md)**
-  - "路由与代码入口"段落新增：`通用 AI 客户端：internal/aiclient`。
-  - "开发规范"中"AI/火山 ARK/多模态/模型配置/降级/响应解析相关改动必须启用 ai-capability-orchestration"后面追加："新增 AI 接入应优先复用 internal/aiclient，禁止再 `os.Getenv("ARK_*")` 直接读"。
+- "路由与代码入口"段落新增：`通用 AI 客户端：internal/aiclient`。
+- "开发规范"补充：新增用户主动发起的 AI 接入应通过模型目录解析能力并复用 `internal/aiclient`，禁止再由 handler 直接 `os.Getenv("ARK_*")` 读取配置。
 - [ ] **Step 2：在 `internal/aiclient/doc.go` 写包级注释**
   - 简述：(1) 设计原则不依赖业务包；(2) 三个 provider 的 env 来源；(3) 新增 AI 功能的接入路径。
 - [ ] **Step 3：encoding-guard**

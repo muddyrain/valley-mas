@@ -2,7 +2,7 @@
 
 # Server AI Agent Runtime（阶段 A：手写 tool loop）
 
-> **For agentic workers:** REQUIRED SUB-SKILL：使用 `executing-plans` 或 `subagent-driven-development` 按 task 顺序推进。每个 step 都用 `- [ ]`，落地一项勾一项。落地过程中启用 `ai-capability-orchestration`、`karpathy-guidelines`、`test-driven-development`。
+> **For agentic workers:** REQUIRED SUB-SKILL：使用 `executing-plans` 或 `subagent-driven-development` 按 task 顺序推进。每个 step 都用 `- [ ]`，落地一项勾一项。AI 接入遵循当前 `server/AGENTS.md` 中模型目录与 `internal/aiclient` 的约束。
 >
 > **本计划只覆盖阶段 A**：从"prompt-as-a-function"演进到"tool loop 驱动的 agent"。**不引入外部框架**（不用 langchaingo、暂不引入 CloudWeGo eino）。落地范围先限定 Life Trace 生活助理一个入口，跑通闭环之后再横向铺 blog / creator / desktop-os。
 
