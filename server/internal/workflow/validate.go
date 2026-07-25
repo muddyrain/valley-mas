@@ -123,6 +123,10 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 				errs = append(errs, err.Error())
 			}
 			modelCost++
+		case NodeTypeHTTP:
+			if _, err := httpConfigFromMapWithPolicy(config, registry.httpOutboundPolicy); err != nil {
+				errs = append(errs, fmt.Sprintf("HTTP 请求节点 %s 配置无效: %v", node.ID, err))
+			}
 		case NodeTypeTool:
 			capabilityID := stringFromValue(config["capabilityId"])
 			capability, _, ok := registry.Capability(capabilityID)
@@ -715,6 +719,12 @@ func buildOutputFields(nodes map[string]Node, startInputs map[string]InputDefini
 		case NodeTypeLLM:
 			config, _ := decodeConfig(node.Config)
 			result[id], _ = llmOutputFields(config)
+		case NodeTypeHTTP:
+			result[id] = fields(
+				field("body", ValueTypeString),
+				field("statusCode", ValueTypeNumber),
+				field("headers", ValueTypeObject),
+			)
 		case NodeTypeCondition:
 			result[id] = fields(field("matched", ValueTypeBoolean))
 		case NodeTypeSwitch:

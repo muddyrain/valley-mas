@@ -388,6 +388,8 @@ func publicExecutionError(node Node, err error) (string, string) {
 		return message, "WORKFLOW_VARIABLE_RESOLUTION_FAILED"
 	case node.Type == NodeTypeLLM:
 		return "大模型节点执行失败，请检查提示词和模型配置", "AI_NODE_FAILED"
+	case node.Type == NodeTypeHTTP:
+		return "HTTP 请求节点执行失败，请检查 URL、请求参数和网络策略", "HTTP_REQUEST_FAILED"
 	case node.Type == NodeTypeIntent:
 		return "意图识别节点执行失败，请检查输入或模型配置", "INTENT_NODE_FAILED"
 	default:

@@ -5,6 +5,7 @@ export type WorkflowNodeType =
   | 'start'
   | 'end'
   | 'llm'
+  | 'http'
   | 'tool'
   | 'condition'
   | 'switch'

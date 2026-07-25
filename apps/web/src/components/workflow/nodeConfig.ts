@@ -28,6 +28,15 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     handles: { input: true, output: true },
     whenAllowed: true,
   },
+  http: {
+    type: 'http',
+    label: 'HTTP 请求',
+    description: '向受控的 HTTP(S) API 发送请求',
+    icon: 'Globe2',
+    category: 'tool',
+    handles: { input: true, output: true },
+    whenAllowed: true,
+  },
   tool: {
     type: 'tool',
     label: '工具',
@@ -143,6 +152,10 @@ export function getNodeConfigSummary(
     case 'llm': {
       const modelName = typeof config.modelName === 'string' ? config.modelName.trim() : '';
       return modelName || (config.modelId ? '已选择模型' : '未选择模型');
+    }
+    case 'http': {
+      const method = typeof config.method === 'string' ? config.method.toUpperCase() : 'GET';
+      return config.url ? `${method} 已配置 URL` : `${method} 未配置 URL`;
     }
     case 'tool':
       return String(config.capabilityName || config.capabilityId || '未选择工具');

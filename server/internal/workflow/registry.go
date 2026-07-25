@@ -53,12 +53,17 @@ type capabilityRegistration struct {
 }
 
 type Registry struct {
-	nodes        map[NodeType]NodeDefinition
-	executors    map[NodeType]NodeExecutor
-	capabilities map[string]capabilityRegistration
+	nodes              map[NodeType]NodeDefinition
+	executors          map[NodeType]NodeExecutor
+	capabilities       map[string]capabilityRegistration
+	httpOutboundPolicy HTTPOutboundPolicy
 }
 
 func DefaultRegistry() *Registry {
+	return DefaultRegistryWithHTTPOutboundPolicy(HTTPOutboundPolicy{})
+}
+
+func DefaultRegistryWithHTTPOutboundPolicy(policy HTTPOutboundPolicy) *Registry {
 	required := func(names ...string) map[string]any {
 		return map[string]any{"type": "object", "required": names}
 	}
@@ -66,6 +71,7 @@ func DefaultRegistry() *Registry {
 		NodeDefinition{Type: NodeTypeStart, Label: "开始", Description: "声明工作流输入", Category: "flow", OutputPorts: []string{"output"}, ConfigSchema: required("inputs")},
 		NodeDefinition{Type: NodeTypeEnd, Label: "结束", Description: "返回工作流输出", Category: "flow", InputPorts: []string{"input"}, ConfigSchema: required("outputs")},
 		NodeDefinition{Type: NodeTypeLLM, Label: "大模型", Description: "使用已选文本模型生成内容", Category: "model", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, WhenAllowed: true, ConfigSchema: required("prompt")},
+		NodeDefinition{Type: NodeTypeHTTP, Label: "HTTP 请求", Description: "向受控的 HTTP(S) API 发送请求", Category: "tool", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, WhenAllowed: true, ConfigSchema: required("method", "url")},
 		NodeDefinition{Type: NodeTypeTool, Label: "工具", Description: "调用白名单业务能力", Category: "tool", InputPorts: []string{"input"}, OutputPorts: []string{"output"}, WhenAllowed: true, ConfigSchema: required("capabilityId", "inputs")},
 		NodeDefinition{Type: NodeTypeCondition, Label: "条件", Description: "按受控规则选择分支", Category: "flow", InputPorts: []string{"input"}, OutputPorts: []string{"true", "false"}, ConfigSchema: required("left", "operator")},
 		NodeDefinition{Type: NodeTypeSwitch, Label: "选择器", Description: "根据结构化字段选择一条路径", Category: "flow", InputPorts: []string{"input"}, OutputPorts: []string{"case:*", "default"}, ConfigSchema: required("value", "valueType", "cases")},
@@ -78,7 +84,8 @@ func DefaultRegistry() *Registry {
 		NodeDefinition{Type: NodeTypeContinueLoop, Label: "继续循环", Description: "结束当前轮循环", Category: "flow", ConfigSchema: required()},
 		NodeDefinition{Type: NodeTypeTerminateLoop, Label: "终止循环", Description: "结束整个循环", Category: "flow", ConfigSchema: required()},
 	)
-	for _, executor := range []NodeExecutor{startExecutor{}, endExecutor{}, ConditionExecutor{}, SwitchExecutor{}, MergeExecutor{}, VariableExecutor{}, SubworkflowExecutor{}, IntentClassifierExecutor{}, LLMTextExecutor{}, ToolNodeExecutor{Registry: registry}, LoopExecutor{Registry: registry}} {
+	registry.httpOutboundPolicy = policy
+	for _, executor := range []NodeExecutor{startExecutor{}, endExecutor{}, ConditionExecutor{}, SwitchExecutor{}, MergeExecutor{}, VariableExecutor{}, SubworkflowExecutor{}, IntentClassifierExecutor{}, LLMTextExecutor{}, HTTPRequestExecutor{OutboundPolicy: policy}, ToolNodeExecutor{Registry: registry}, LoopExecutor{Registry: registry}} {
 		_ = registry.RegisterExecutor(executor)
 	}
 	return registry

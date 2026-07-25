@@ -155,6 +155,7 @@ export const PropertyPanel = memo(function PropertyPanel({
             nodeType === 'end' ||
             nodeType === 'condition' ||
             nodeType === 'llm' ||
+            nodeType === 'http' ||
             nodeType === 'merge' ||
             nodeType === 'variable' ||
             nodeType === 'subworkflow' ||
@@ -170,6 +171,7 @@ export const PropertyPanel = memo(function PropertyPanel({
       )}
       {nodeType === 'tool' ||
       nodeType === 'llm' ||
+      nodeType === 'http' ||
       nodeType === 'variable' ||
       nodeType === 'subworkflow' ? (
         <WhenPropertyForm

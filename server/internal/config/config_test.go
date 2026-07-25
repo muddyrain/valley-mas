@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestQWeatherGeoHostDefaultsToAPIHost(t *testing.T) {
 	t.Setenv("QWEATHER_API_HOST", "https://example.qweatherapi.com/")
@@ -152,5 +155,30 @@ func TestHolidaySyncConfigLoadsFromEnv(t *testing.T) {
 	}
 	if cfg.Holiday.SyncIntervalHours != 24 || cfg.Holiday.FutureYears != 2 || cfg.Holiday.TimeoutSeconds != 3 {
 		t.Fatalf("expected configured holiday sync timing, got %+v", cfg.Holiday)
+	}
+}
+
+func TestWorkflowHTTPLocalAllowlistIsDevelopmentOnly(t *testing.T) {
+	t.Setenv("ENV", "development")
+	t.Setenv("PORT", "9080")
+	t.Setenv("WORKFLOW_HTTP_LOCAL_ALLOWLIST", " localhost:9080, 127.0.0.1:9081, [::1]:9082 ")
+
+	if got, want := Load().WorkflowHTTP.LocalAllowlist, []string{"localhost:9080", "127.0.0.1:9081", "[::1]:9082"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("development local allowlist = %#v, want %#v", got, want)
+	}
+
+	t.Setenv("ENV", "production")
+	if got := Load().WorkflowHTTP.LocalAllowlist; len(got) != 0 {
+		t.Fatalf("production local allowlist = %#v, want empty", got)
+	}
+}
+
+func TestWorkflowHTTPLocalAllowlistDefaultsToServerPort(t *testing.T) {
+	t.Setenv("ENV", "development")
+	t.Setenv("PORT", "9090")
+	t.Setenv("WORKFLOW_HTTP_LOCAL_ALLOWLIST", "")
+
+	if got, want := Load().WorkflowHTTP.LocalAllowlist, []string{"localhost:9090"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("development default local allowlist = %#v, want %#v", got, want)
 	}
 }

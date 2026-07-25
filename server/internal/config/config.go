@@ -19,6 +19,7 @@ type Config struct {
 	WebPush        WebPushConfig
 	Holiday        HolidaySyncConfig
 	ExternalImages ExternalImagesConfig
+	WorkflowHTTP   WorkflowHTTPConfig
 }
 
 type DatabaseConfig struct {
@@ -112,16 +113,24 @@ type ExternalImagesConfig struct {
 	TimeoutSeconds    int
 }
 
+// WorkflowHTTPConfig controls the small local-only exception to the HTTP
+// workflow node's outbound SSRF policy. Entries must be loopback host:port
+// pairs and are ignored outside development.
+type WorkflowHTTPConfig struct {
+	LocalAllowlist []string
+}
+
 const defaultJWTExpireHours int64 = 24 * 365 * 10
 
 func Load() *Config {
 	env := getEnv("ENV", "development")
+	port := getEnv("PORT", "8080")
 	qWeatherAPIHost := normalizeURL(getEnv("QWEATHER_API_HOST", getEnv("QWEATHER_HOST", "")))
 	qWeatherGeoHost := normalizeURL(getEnv("QWEATHER_GEO_HOST", qWeatherAPIHost))
 
 	return &Config{
 		Env:  env,
-		Port: getEnv("PORT", "8080"),
+		Port: port,
 		Database: DatabaseConfig{
 			Driver:             getEnv("DB_DRIVER", getDefaultDriver()),
 			DSN:                getEnv("DB_DSN", ""),
@@ -200,7 +209,25 @@ func Load() *Config {
 			PexelsAPIKey:      strings.TrimSpace(getEnv("PEXELS_API_KEY", "")),
 			TimeoutSeconds:    getEnvInt("EXTERNAL_IMAGES_TIMEOUT_SECONDS", 8),
 		},
+		WorkflowHTTP: WorkflowHTTPConfig{
+			LocalAllowlist: workflowHTTPLocalAllowlist(env, port),
+		},
 	}
+}
+
+func workflowHTTPLocalAllowlist(env, port string) []string {
+	if !strings.EqualFold(strings.TrimSpace(env), "development") {
+		return nil
+	}
+	value := getEnv("WORKFLOW_HTTP_LOCAL_ALLOWLIST", "localhost:"+port)
+	entries := strings.Split(value, ",")
+	allowlist := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry = strings.TrimSpace(entry); entry != "" {
+			allowlist = append(allowlist, entry)
+		}
+	}
+	return allowlist
 }
 
 func getEnv(key, defaultValue string) string {

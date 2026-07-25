@@ -53,6 +53,11 @@ const NODE_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
     ['model', 'string'],
     ['tokenUsage', 'number'],
   ],
+  http: [
+    ['body', 'string'],
+    ['statusCode', 'number'],
+    ['headers', 'object'],
+  ],
   condition: [['matched', 'boolean']],
   switch: [
     ['matchedCaseId', 'string'],

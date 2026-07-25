@@ -2,6 +2,7 @@ import type { WorkflowNodeType } from '../types';
 import type { WorkflowVariableOption } from '../workflowVariables';
 import { ConditionPropertyForm } from './ConditionPropertyForm';
 import { EndPropertyForm } from './EndPropertyForm';
+import { HTTPPropertyForm } from './HTTPPropertyForm';
 import { IntentPropertyForm } from './IntentPropertyForm';
 import { LLMPropertyForm } from './LLMPropertyForm';
 import { LoopPropertyForm } from './LoopPropertyForm';
@@ -26,6 +27,7 @@ export const PROPERTY_FORM_MAP: Partial<
   start: StartPropertyForm,
   end: EndPropertyForm,
   llm: LLMPropertyForm,
+  http: HTTPPropertyForm,
   tool: ToolPropertyForm,
   condition: ConditionPropertyForm,
   switch: SwitchPropertyForm,

@@ -57,7 +57,7 @@ func TestValidateAIWorkflowDraftUsesServerWhitelist(t *testing.T) {
 		SchemaVersion: 4,
 		Nodes: []workflow.Node{
 			{ID: "start", Type: workflow.NodeTypeStart, Config: json.RawMessage(`{"inputs":{}}`)},
-			{ID: "unsafe", Type: workflow.NodeType("http"), Config: json.RawMessage(`{"url":"https://example.com"}`)},
+			{ID: "unsafe", Type: workflow.NodeType("sql"), Config: json.RawMessage(`{"query":"select 1"}`)},
 			{ID: "end", Type: workflow.NodeTypeEnd, Config: json.RawMessage(`{"outputs":{}}`)},
 		},
 	}}

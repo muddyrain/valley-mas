@@ -1181,7 +1181,7 @@ func workflowValueTypeSchemaEqual(left, right map[string]workflow.ValueType) boo
 }
 
 func workflowRuntimeRegistry() *workflow.Registry {
-	registry := workflow.DefaultRegistry()
+	registry := workflow.DefaultRegistryWithHTTPOutboundPolicy(workflow.NewHTTPOutboundPolicy(config.Load().WorkflowHTTP.LocalAllowlist))
 	_ = workflow.RegisterWorkflowCapabilities(registry)
 	return registry
 }

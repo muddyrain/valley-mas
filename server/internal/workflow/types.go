@@ -25,6 +25,7 @@ const (
 	NodeTypeStart         NodeType = "start"
 	NodeTypeEnd           NodeType = "end"
 	NodeTypeLLM           NodeType = "llm"
+	NodeTypeHTTP          NodeType = "http"
 	NodeTypeTool          NodeType = "tool"
 	NodeTypeCondition     NodeType = "condition"
 	NodeTypeSwitch        NodeType = "switch"

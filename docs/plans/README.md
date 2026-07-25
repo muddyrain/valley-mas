@@ -23,6 +23,7 @@
 
 ## 当前活跃计划
 
+- [2026-07-24-workflow-http-node.md](2026-07-24-workflow-http-node.md)：工作流 HTTP 请求节点的受控配置、执行与画布交互。
 - [2026-07-23-ai-image-studio.md](2026-07-23-ai-image-studio.md)：AI 图片独立创作页、参考图生成、任务历史与资源保存。
 - [2026-07-23-workflow-loop-node.md](2026-07-23-workflow-loop-node.md)：工作流循环节点与循环体的存储、校验、执行、画布交互和运行追踪。
 - [2026-07-22-ai-knowledge-pdf-multimodal.md](2026-07-22-ai-knowledge-pdf-multimodal.md)：知识库 PDF 的页面渲染、视觉解析、表格与图片摄取。

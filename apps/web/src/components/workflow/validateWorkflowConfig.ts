@@ -162,6 +162,34 @@ function validateNode(
       )
         return fail('请至少声明一个 JSON 输出字段');
       break;
+    case 'http': {
+      const method = String(config.method || '').toUpperCase();
+      if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method))
+        return fail('请选择 HTTP 请求方法');
+      if (!String(config.url || '').trim()) return fail('请输入请求 URL');
+      const timeoutSeconds = Number(config.timeoutSeconds);
+      if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 60)
+        return fail('超时必须在 1 到 60 秒之间');
+      const retryCount = Number(config.retryCount);
+      if (!Number.isInteger(retryCount) || retryCount < 0 || retryCount > 3)
+        return fail('重试次数必须在 0 到 3 次之间');
+      const pairs = [
+        ...(Array.isArray(config.params) ? config.params : []),
+        ...(Array.isArray(config.headers) ? config.headers : []),
+      ];
+      if (
+        pairs.some(
+          (item) =>
+            !item ||
+            typeof item !== 'object' ||
+            !String((item as { name?: unknown }).name || '').trim(),
+        )
+      )
+        return fail('请求参数和请求头名称不能为空');
+      if (config.bodyType !== 'none' && config.bodyType !== 'json')
+        return fail('请求体仅支持 none 或 JSON');
+      break;
+    }
     case 'tool':
       if (!config.capabilityId || !config.inputs || typeof config.inputs !== 'object')
         return fail('请选择工具并完成输入映射');

@@ -1,6 +1,7 @@
 import {
   GitBranch,
   GitMerge,
+  Globe2,
   Hash,
   Lightbulb,
   Loader2,
@@ -60,6 +61,24 @@ interface NodePickerProps {
 }
 
 const genericItems: NodePickerItem[] = [
+  {
+    key: 'http',
+    group: 'tool',
+    nodeType: 'http',
+    label: 'HTTP 请求',
+    description: '向受控的 HTTP(S) API 发送请求并返回响应数据',
+    config: {
+      method: 'GET',
+      url: '',
+      params: [],
+      headers: [],
+      bodyType: 'none',
+      body: '',
+      timeoutSeconds: 30,
+      retryCount: 0,
+      ignoreError: false,
+    },
+  },
   {
     key: 'loop',
     group: 'flow',
@@ -167,6 +186,7 @@ const groupIcons = {
   subworkflow: Workflow,
 } as const;
 const itemIcons: Record<string, typeof MessageSquare> = {
+  http: Globe2,
   llm: MessageSquare,
   condition: GitBranch,
   switch: GitBranch,
