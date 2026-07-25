@@ -311,7 +311,7 @@ export async function listWorkflows(params?: {
 }
 
 export async function getWorkflow(id: string): Promise<WorkflowItem> {
-  return request.get(`/workflows/${id}`, { headers: { 'Cache-Control': 'no-cache' } });
+  return request.get(`/workflows/${id}`);
 }
 
 export async function updateWorkflow(
