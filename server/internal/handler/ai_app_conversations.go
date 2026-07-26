@@ -23,6 +23,20 @@ import (
 
 const aiAppConversationHistoryLimit = 24
 
+const aiAppConversationRuntimePrompt = `平台对话规则（优先于智能体自定义指令）：你正在与用户进行多轮对话。请直接回应最新一条用户消息的实际意图，并结合此前对话理解上下文。智能体自定义指令中的角色、能力说明、示例或视觉描述只约束你的回答方式，不代表用户本轮已经提出了对应任务；除非用户明确提出，否则不要擅自执行或补全这些任务。若最新消息只是问候、确认或信息不足，请自然回应或简短澄清，不要把自定义指令直接复述成答案。`
+
+func buildAIAppConversationSystemPrompt(customPrompt, knowledgeContext string) string {
+	parts := make([]string, 0, 3)
+	if customPrompt = strings.TrimSpace(customPrompt); customPrompt != "" {
+		parts = append(parts, "智能体自定义指令：\n"+customPrompt)
+	}
+	if knowledgeContext = strings.TrimSpace(knowledgeContext); knowledgeContext != "" {
+		parts = append(parts, "以下是与当前问题相关的私有参考资料。请优先依据这些资料回答；资料不足时明确说明。\n"+knowledgeContext)
+	}
+	parts = append(parts, aiAppConversationRuntimePrompt)
+	return strings.Join(parts, "\n\n")
+}
+
 func findAIAppConversation(db *gorm.DB, userID, appID, conversationID model.Int64String) (model.AIAppConversation, bool) {
 	var conversation model.AIAppConversation
 	if db.Where("id = ? AND user_id = ? AND app_id = ? AND status = ?", conversationID, userID, appID, "active").First(&conversation).Error != nil {
@@ -69,13 +83,13 @@ func CreateAIAppConversation(c *gin.Context) {
 		Title string `json:"title"`
 	}
 	_ = c.ShouldBindJSON(&payload)
-	if app.DraftVersionID == 0 {
-		Error(c, http.StatusBadRequest, "草稿版本不存在")
+	if app.PublishedVersionID == 0 {
+		Error(c, http.StatusBadRequest, "请先发布智能体配置")
 		return
 	}
 	var version model.AIAppVersion
-	if database.GetDB().Where("id = ? AND app_id = ?", app.DraftVersionID, app.ID).First(&version).Error != nil {
-		Error(c, http.StatusBadRequest, "草稿版本不存在")
+	if database.GetDB().Where("id = ? AND app_id = ? AND published_at IS NOT NULL", app.PublishedVersionID, app.ID).First(&version).Error != nil {
+		Error(c, http.StatusBadRequest, "已发布配置不存在")
 		return
 	}
 	conversation := model.AIAppConversation{UserID: userID, AppID: app.ID, VersionID: version.ID, Title: truncateAIAgentRunes(payload.Title, 120)}
@@ -254,10 +268,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		fail(http.StatusServiceUnavailable, code, publicMessage, retrievalErr)
 		return
 	}
-	system := strings.TrimSpace(config.SystemPrompt)
-	if knowledgeContext != "" {
-		system = strings.TrimSpace(system + "\n\n以下是与当前问题相关的私有参考资料。请优先依据这些资料回答；资料不足时明确说明。\n" + knowledgeContext)
-	}
+	system := buildAIAppConversationSystemPrompt(config.SystemPrompt, knowledgeContext)
 	registry, toolNames, toolErr := resolveAIAppTools(database.GetDB(), app.ID, version)
 	if toolErr != nil {
 		fail(500, "AI_TOOL_REGISTRY_UNAVAILABLE", "加载智能体工具失败", toolErr)

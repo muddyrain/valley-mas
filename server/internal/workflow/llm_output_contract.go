@@ -51,7 +51,7 @@ func llmStructuredOutputSchema(config map[string]any) (map[string]ValueType, boo
 		if strings.TrimSpace(name) == "" || !validValueType(valueType) || valueType == ValueTypeFile {
 			return nil, true, fmt.Errorf("大模型节点 JSON 输出字段 %s 类型无效", name)
 		}
-		if name == "model" || name == "tokenUsage" {
+		if name == "model" || name == "tokenUsage" || strings.HasPrefix(name, "_") {
 			return nil, true, fmt.Errorf("大模型节点 JSON 输出字段 %s 为保留名称", name)
 		}
 		schema[name] = valueType
@@ -95,6 +95,9 @@ func matchesWorkflowValueType(value any, valueType ValueType) bool {
 	case ValueTypeStringList:
 		items, ok := value.([]any)
 		return ok && allStrings(items)
+	case ValueTypeArray:
+		_, ok := value.([]any)
+		return ok
 	default:
 		return false
 	}

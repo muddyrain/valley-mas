@@ -1,4 +1,10 @@
-import { BaseEdge, EdgeLabelRenderer, type EdgeProps, getBezierPath } from '@xyflow/react';
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  type EdgeProps,
+  getBezierPath,
+  useReactFlow,
+} from '@xyflow/react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DeferredNodePicker } from './NodePicker';
@@ -7,6 +13,9 @@ import { useWorkflowRuntime } from './WorkflowRuntimeContext';
 
 export function InsertableEdge(props: EdgeProps) {
   const { insertOnEdge, isRunning } = useWorkflowRuntime();
+  const { getNode } = useReactFlow();
+  const sourceData = getNode(props.source)?.data as { loopParentId?: unknown } | undefined;
+  const scope = typeof sourceData?.loopParentId === 'string' ? 'loop' : 'root';
   const { visible: hovered, show, scheduleHide } = useDelayedHoverVisibility();
   const [path, labelX, labelY] = getBezierPath({ ...props, curvature: 0.3 });
   const selectedStroke = '#7c3aed';
@@ -55,6 +64,7 @@ export function InsertableEdge(props: EdgeProps) {
               onBlur={scheduleHide}
             >
               <DeferredNodePicker
+                scope={scope}
                 trigger={
                   <Button
                     type="button"

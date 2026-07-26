@@ -47,6 +47,27 @@ func NormalizeImageInput(raw string) string {
 	return "data:image/jpeg;base64," + imageURL
 }
 
+// CompatibleMessageText extracts text from either a plain OpenAI-compatible
+// message or a multipart message response.
+func CompatibleMessageText(content any) string {
+	if value, ok := content.(string); ok {
+		return strings.TrimSpace(value)
+	}
+	parts, ok := content.([]any)
+	if !ok {
+		return ""
+	}
+	var text strings.Builder
+	for _, part := range parts {
+		if object, ok := part.(map[string]any); ok {
+			if value, ok := object["text"].(string); ok {
+				text.WriteString(value)
+			}
+		}
+	}
+	return strings.TrimSpace(text.String())
+}
+
 // ExtractARKMessageText 从 ARK ChatCompletionMessage 提取纯文本：
 // StringValue 直接返回；ListValue 拼接非空 text part；都没有则返回空串。
 func ExtractARKMessageText(message *arkmodel.ChatCompletionMessage) string {

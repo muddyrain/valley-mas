@@ -18,6 +18,7 @@ type fakeAIModelProbeClient struct {
 	imagePrompt     string
 	imageSize       string
 	imageReferences []string
+	chatResponse    string
 	err             error
 }
 
@@ -26,9 +27,13 @@ func (client *fakeAIModelProbeClient) Chat(_ context.Context, request aiclient.C
 	if client.err != nil {
 		return aiclient.CompatibleChatResponse{}, client.err
 	}
+	response := client.chatResponse
+	if response == "" {
+		response = "ok"
+	}
 	return aiclient.CompatibleChatResponse{Choices: []struct {
 		Message aiclient.CompatibleMessage `json:"message"`
-	}{{Message: aiclient.CompatibleMessage{Role: "assistant", Content: "ok"}}}}, nil
+	}{{Message: aiclient.CompatibleMessage{Role: "assistant", Content: response}}}}, nil
 }
 
 func (client *fakeAIModelProbeClient) Embeddings(_ context.Context, modelID string, inputs []string) (aiclient.CompatibleEmbeddingResponse, error) {
@@ -128,6 +133,39 @@ func TestProbeAIModelUsesEmbeddingEndpoint(t *testing.T) {
 	}
 }
 
+func TestProbeAIModelVerifiesVisionWithImageContent(t *testing.T) {
+	client := &fakeAIModelProbeClient{chatResponse: "RED, BLUE, GREEN, YELLOW"}
+	result, err := probeAIModel(context.Background(), client, "vision-model", []string{"text", "vision"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.request.MaxTokens == nil || *client.request.MaxTokens != 16 {
+		t.Fatalf("maxTokens = %v", client.request.MaxTokens)
+	}
+	if len(client.request.Messages) != 1 {
+		t.Fatalf("messages = %+v", client.request.Messages)
+	}
+	parts, ok := client.request.Messages[0].Content.([]map[string]any)
+	if !ok || len(parts) != 2 {
+		t.Fatalf("vision content = %#v", client.request.Messages[0].Content)
+	}
+	imageURL, _ := parts[0]["image_url"].(map[string]string)
+	if !strings.HasPrefix(imageURL["url"], "data:image/png;base64,") {
+		t.Fatalf("vision image = %#v", parts[0])
+	}
+	if !slices.Equal(result.VerifiedCapabilities, []string{"vision", "text"}) {
+		t.Fatalf("verified capabilities = %+v", result.VerifiedCapabilities)
+	}
+}
+
+func TestProbeAIModelRejectsInvalidVisionAnswer(t *testing.T) {
+	client := &fakeAIModelProbeClient{chatResponse: "BLUE"}
+	_, err := probeAIModel(context.Background(), client, "vision-model", []string{"vision"})
+	if err == nil || !strings.Contains(err.Error(), "未正确识别") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestProbeAIModelReturnsUpstreamError(t *testing.T) {
 	upstreamErr := errors.New("upstream unavailable")
 	client := &fakeAIModelProbeClient{err: upstreamErr}
@@ -149,6 +187,25 @@ func TestNewAIModelRequiresImageGenerationForReferenceImage(t *testing.T) {
 		Capabilities: []string{"image_generation", "reference_image"}, Enabled: true,
 	}); err != nil {
 		t.Fatalf("valid image model rejected: %v", err)
+	}
+}
+
+func TestNewAIModelKeepsOptionalTokenLimits(t *testing.T) {
+	item, err := newAIModel(adminAIModelRequest{
+		Provider: "siliconflow", ModelID: "text-model", Capabilities: []string{"text"}, Enabled: true,
+		ContextWindowTokens: 128000, MaxOutputTokens: 8192,
+	})
+	if err != nil {
+		t.Fatalf("create model: %v", err)
+	}
+	if item.ContextWindowTokens != 128000 || item.MaxOutputTokens != 8192 {
+		t.Fatalf("unexpected token limits: context=%d output=%d", item.ContextWindowTokens, item.MaxOutputTokens)
+	}
+	if _, err := newAIModel(adminAIModelRequest{
+		Provider: "siliconflow", ModelID: "invalid-model", Capabilities: []string{"text"}, Enabled: true,
+		ContextWindowTokens: -1,
+	}); err == nil {
+		t.Fatal("expected negative token limit validation")
 	}
 }
 

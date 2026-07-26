@@ -34,6 +34,8 @@ type adminAIModelRequest struct {
 	DisplayName   string   `json:"displayName"`
 	Capabilities  []string `json:"capabilities"`
 	ImageProtocol string   `json:"imageProtocol"`
+	ContextWindowTokens int `json:"contextWindowTokens"`
+	MaxOutputTokens     int `json:"maxOutputTokens"`
 	Enabled       bool     `json:"enabled"`
 	SortOrder     int      `json:"sortOrder"`
 }
@@ -47,12 +49,13 @@ type aiModelConnectionTestRequest struct {
 }
 
 type aiModelOption struct {
-	ID             string   `json:"id"`
-	Provider       string   `json:"provider"`
-	ModelID        string   `json:"modelId"`
-	DisplayName    string   `json:"displayName"`
-	Capabilities   []string `json:"capabilities"`
-	ImageQualities []string `json:"imageQualities,omitempty"`
+	ID                      string   `json:"id"`
+	Provider                string   `json:"provider"`
+	ModelID                 string   `json:"modelId"`
+	DisplayName             string   `json:"displayName"`
+	Capabilities            []string `json:"capabilities"`
+	ImageQualities          []string `json:"imageQualities,omitempty"`
+	ImageReferenceQualities []string `json:"imageReferenceQualities,omitempty"`
 }
 
 // Admin responses expose JSON fields as their semantic array types rather than
@@ -68,6 +71,8 @@ type adminAIModelResponse struct {
 	VerificationStatus   string     `json:"verificationStatus"`
 	VerificationMessage  string     `json:"verificationMessage"`
 	LastVerifiedAt       *time.Time `json:"lastVerifiedAt,omitempty"`
+	ContextWindowTokens int        `json:"contextWindowTokens,omitempty"`
+	MaxOutputTokens     int        `json:"maxOutputTokens,omitempty"`
 	Enabled              bool       `json:"enabled"`
 	SortOrder            int        `json:"sortOrder"`
 	CreatedAt            time.Time  `json:"createdAt"`
@@ -133,6 +138,7 @@ func AdminUpdateAIModel(c *gin.Context) {
 	updates := map[string]any{
 		"provider": item.Provider, "model_id": item.ModelID, "display_name": item.DisplayName,
 		"capabilities": item.Capabilities, "image_protocol": item.ImageProtocol,
+		"context_window_tokens": item.ContextWindowTokens, "max_output_tokens": item.MaxOutputTokens,
 		"enabled": item.Enabled, "sort_order": item.SortOrder,
 	}
 	if existing.Provider != item.Provider ||
@@ -252,47 +258,87 @@ func probeAIModel(
 ) (aiModelProbeResult, error) {
 	startedAt := time.Now()
 	item := model.AIModel{Capabilities: aimodel.EncodeStrings(capabilities)}
+	verified := make([]string, 0, len(capabilities))
 	if aimodel.HasCapabilities(item, []string{"image_generation"}) {
 		request := aiclient.ImageGenerationRequest{
 			ModelID: modelID,
 			Prompt:  "A small blue circle on a white background.",
 			Size:    "1024x1024",
 		}
-		verified := []string{"image_generation"}
+		imageVerified := []string{"image_generation"}
 		if aimodel.HasCapabilities(item, []string{"reference_image"}) {
 			reference, err := buildAIModelProbeReference()
 			if err != nil {
 				return aiModelProbeResult{}, err
 			}
 			request.Images = []string{reference}
-			verified = append(verified, "reference_image")
+			imageVerified = append(imageVerified, "reference_image")
 		}
 		_, err := client.GenerateImageWithRequest(ctx, request)
-		return aiModelProbeResult{
-			Latency: time.Since(startedAt), VerifiedCapabilities: verified,
-		}, err
+		if err != nil {
+			return aiModelProbeResult{Latency: time.Since(startedAt), VerifiedCapabilities: verified}, err
+		}
+		verified = append(verified, imageVerified...)
 	}
 	if aimodel.HasCapabilities(item, []string{"embedding"}) {
 		_, err := client.Embeddings(ctx, modelID, []string{"ping"})
-		return aiModelProbeResult{
-			Latency: time.Since(startedAt), VerifiedCapabilities: []string{"embedding"},
-		}, err
+		if err != nil {
+			return aiModelProbeResult{Latency: time.Since(startedAt), VerifiedCapabilities: verified}, err
+		}
+		verified = append(verified, "embedding")
 	}
-	temperature := 0.0
-	maxTokens := 1
-	_, err := client.Chat(ctx, aiclient.CompatibleChatRequest{
-		Model:       modelID,
-		Messages:    []aiclient.CompatibleMessage{{Role: "user", Content: "ping"}},
-		Temperature: &temperature,
-		MaxTokens:   &maxTokens,
-	})
-	verified := []string{}
-	if aimodel.HasCapabilities(item, []string{"text"}) {
+	if aimodel.HasCapabilities(item, []string{"vision"}) {
+		imageURL, err := buildAIModelVisionProbeReference()
+		if err != nil {
+			return aiModelProbeResult{Latency: time.Since(startedAt), VerifiedCapabilities: verified}, err
+		}
+		temperature := 0.0
+		maxTokens := 16
+		response, err := client.Chat(ctx, aiclient.CompatibleChatRequest{
+			Model: modelID,
+			Messages: []aiclient.CompatibleMessage{{
+				Role: "user",
+				Content: []map[string]any{
+					{"type": "image_url", "image_url": map[string]string{"url": imageURL}},
+					{"type": "text", "text": "Inspect the attached image. Reply with the four quadrant colors in reading order, using only uppercase English color names separated by commas."},
+				},
+			}},
+			Temperature: &temperature,
+			MaxTokens:   &maxTokens,
+		})
+		if err != nil {
+			return aiModelProbeResult{Latency: time.Since(startedAt), VerifiedCapabilities: verified}, err
+		}
+		if len(response.Choices) == 0 || !isValidVisionProbeAnswer(compatibleMessageText(response.Choices[0].Message.Content)) {
+			return aiModelProbeResult{Latency: time.Since(startedAt), VerifiedCapabilities: verified}, errors.New("视觉模型未正确识别测试图片")
+		}
+		verified = append(verified, "vision")
+		if aimodel.HasCapabilities(item, []string{"text"}) {
+			verified = append(verified, "text")
+		}
+	} else if aimodel.HasCapabilities(item, []string{"text"}) {
+		temperature := 0.0
+		maxTokens := 1
+		_, err := client.Chat(ctx, aiclient.CompatibleChatRequest{
+			Model:       modelID,
+			Messages:    []aiclient.CompatibleMessage{{Role: "user", Content: "ping"}},
+			Temperature: &temperature,
+			MaxTokens:   &maxTokens,
+		})
+		if err != nil {
+			return aiModelProbeResult{Latency: time.Since(startedAt), VerifiedCapabilities: verified}, err
+		}
 		verified = append(verified, "text")
 	}
 	return aiModelProbeResult{
 		Latency: time.Since(startedAt), VerifiedCapabilities: verified,
-	}, err
+	}, nil
+}
+
+func isValidVisionProbeAnswer(value string) bool {
+	normalized := strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(value), "，", ","))
+	normalized = strings.Join(strings.Fields(normalized), "")
+	return normalized == "RED,BLUE,GREEN,YELLOW"
 }
 
 func adminAIModelResponseFromModel(item model.AIModel) adminAIModelResponse {
@@ -301,7 +347,9 @@ func adminAIModelResponseFromModel(item model.AIModel) adminAIModelResponse {
 		Capabilities: aimodel.DecodeStrings(item.Capabilities), ImageProtocol: item.ImageProtocol,
 		VerifiedCapabilities: aimodel.DecodeStrings(item.VerifiedCapabilities),
 		VerificationStatus:   item.VerificationStatus, VerificationMessage: item.VerificationMessage,
-		LastVerifiedAt: item.LastVerifiedAt, Enabled: item.Enabled, SortOrder: item.SortOrder,
+		LastVerifiedAt: item.LastVerifiedAt,
+		ContextWindowTokens: item.ContextWindowTokens, MaxOutputTokens: item.MaxOutputTokens,
+		Enabled: item.Enabled, SortOrder: item.SortOrder,
 		CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
 	}
 }
@@ -342,6 +390,9 @@ func ListAvailableAIModels(c *gin.Context) {
 		}
 		if aimodel.HasCapabilities(item, []string{"image_generation"}) {
 			option.ImageQualities = aimodel.ImageGenerationQualities(item)
+			if aimodel.HasCapabilities(item, []string{"reference_image"}) {
+				option.ImageReferenceQualities = aimodel.ImageGenerationReferenceQualities(item)
+			}
 		}
 		options = append(options, option)
 	}
@@ -375,9 +426,13 @@ func newAIModel(req adminAIModelRequest) (model.AIModel, error) {
 	) {
 		return model.AIModel{}, errors.New("请选择有效的图片协议")
 	}
+	if req.ContextWindowTokens < 0 || req.MaxOutputTokens < 0 {
+		return model.AIModel{}, errors.New("模型规格不能小于 0")
+	}
 	return model.AIModel{
 		Provider: provider, ModelID: modelID, DisplayName: displayName,
 		Capabilities: aimodel.EncodeStrings(capabilities), ImageProtocol: imageProtocol,
+		ContextWindowTokens: req.ContextWindowTokens, MaxOutputTokens: req.MaxOutputTokens,
 		Enabled: req.Enabled, SortOrder: req.SortOrder,
 	}, nil
 }
@@ -413,6 +468,33 @@ func buildAIModelProbeReference() (string, error) {
 	for y := 18; y < 46; y++ {
 		for x := 18; x < 46; x++ {
 			canvas.Set(x, y, color.RGBA{R: 37, G: 99, B: 235, A: 255})
+		}
+	}
+	var output bytes.Buffer
+	if err := png.Encode(&output, canvas); err != nil {
+		return "", err
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(output.Bytes()), nil
+}
+
+func buildAIModelVisionProbeReference() (string, error) {
+	canvas := image.NewRGBA(image.Rect(0, 0, 64, 64))
+	colors := [4]color.RGBA{
+		{R: 255, A: 255},
+		{B: 255, A: 255},
+		{G: 192, A: 255},
+		{R: 255, G: 255, A: 255},
+	}
+	for y := 0; y < 64; y++ {
+		for x := 0; x < 64; x++ {
+			quadrant := 0
+			if x >= 32 {
+				quadrant++
+			}
+			if y >= 32 {
+				quadrant += 2
+			}
+			canvas.Set(x, y, colors[quadrant])
 		}
 	}
 	var output bytes.Buffer

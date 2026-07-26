@@ -56,6 +56,8 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		&model.AIAppConversationMessage{},
 		&model.AIAppConversationToolTrace{},
 		&model.AIAppRun{},
+		&model.AIImageConversation{},
+		&model.AIImageConversationMessage{},
 		&model.AIAPIKey{},
 		&model.AIAPIKeyAppBinding{},
 		&model.AIAPIKeyDailyUsage{},
@@ -128,6 +130,13 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.GET("/apps/:appId/conversations/:conversationId", GetAIAppConversation)
 	auth.DELETE("/apps/:appId/conversations/:conversationId", DeleteAIAppConversation)
 	auth.POST("/apps/:appId/conversations/:conversationId/chat", ChatWithAIAppConversation)
+	auth.GET("/image-conversations", ListAIImageConversations)
+	auth.GET("/image-conversations/current", GetCurrentAIImageConversation)
+	auth.DELETE("/image-conversations/current", ClearCurrentAIImageConversation)
+	auth.POST("/image-conversations", CreateAIImageConversation)
+	auth.GET("/image-conversations/:conversationId", GetAIImageConversation)
+	auth.DELETE("/image-conversations/:conversationId/messages", ClearAIImageConversation)
+	auth.POST("/image-conversations/:conversationId/messages", AddAIImageConversationMessage)
 	public := router.Group("/public")
 	public.POST("/ai/apps/:appId/chat", PublicAIAppChat)
 	return router, db
@@ -404,7 +413,7 @@ func TestUploadAIKnowledgeDocumentQueuesPDFVisionParsing(t *testing.T) {
 	t.Cleanup(func() { scheduleAIKnowledgeDocumentIndexing = previousSchedule })
 	t.Setenv("ARK_API_KEY", "test-key")
 	base := model.AIKnowledgeBase{UserID: 101, Name: "视觉 PDF 资料"}
-	vision := model.AIModel{Provider: "ark", ModelID: "vision-test", DisplayName: "视觉测试模型", Capabilities: aimodel.EncodeStrings([]string{"vision"}), Enabled: true}
+	vision := model.AIModel{Provider: "ark", ModelID: "vision-test", DisplayName: "视觉测试模型", Capabilities: aimodel.EncodeStrings([]string{"vision"}), VerifiedCapabilities: aimodel.EncodeStrings([]string{"vision"}), Enabled: true}
 	if err := db.Create(&base).Error; err != nil {
 		t.Fatalf("create knowledge base: %v", err)
 	}
@@ -481,7 +490,7 @@ func TestPrepareAIKnowledgeDocumentChunksAddsVisualPageMetadata(t *testing.T) {
 		analyzeAIKnowledgePDFPage = previousAnalyze
 	})
 	base := model.AIKnowledgeBase{UserID: 101, Name: "多模态资料"}
-	vision := model.AIModel{Provider: "ark", ModelID: "vision-test", DisplayName: "视觉测试模型", Capabilities: aimodel.EncodeStrings([]string{"vision"}), Enabled: true}
+	vision := model.AIModel{Provider: "ark", ModelID: "vision-test", DisplayName: "视觉测试模型", Capabilities: aimodel.EncodeStrings([]string{"vision"}), VerifiedCapabilities: aimodel.EncodeStrings([]string{"vision"}), Enabled: true}
 	if err := db.Create(&base).Error; err != nil {
 		t.Fatalf("create base: %v", err)
 	}
@@ -769,12 +778,13 @@ func TestAIAppConversationIsOwnerScopedAndRetainsUserMessageOnConfigFailure(t *t
 	if err := db.Create(&app).Error; err != nil {
 		t.Fatalf("create app: %v", err)
 	}
-	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"test"}`, ToolSnapshot: true, KnowledgeBaseSnapshot: true}
+	publishedAt := time.Now()
+	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"test"}`, ToolSnapshot: true, KnowledgeBaseSnapshot: true, PublishedAt: &publishedAt}
 	if err := db.Create(&version).Error; err != nil {
 		t.Fatalf("create version: %v", err)
 	}
-	if err := db.Model(&app).Update("draft_version_id", version.ID).Error; err != nil {
-		t.Fatalf("set draft version: %v", err)
+	if err := db.Model(&app).Updates(map[string]any{"draft_version_id": version.ID, "published_version_id": version.ID, "status": "published"}).Error; err != nil {
+		t.Fatalf("set published version: %v", err)
 	}
 
 	createRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations", strings.NewReader(`{}`))
@@ -831,6 +841,46 @@ func TestAIAppConversationIsOwnerScopedAndRetainsUserMessageOnConfigFailure(t *t
 	}
 }
 
+func TestCreateAIAppConversationUsesPublishedVersionInsteadOfDraft(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "发布优先助手"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	publishedAt := time.Now()
+	published := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"published"}`, PublishedAt: &publishedAt}
+	draft := model.AIAppVersion{AppID: app.ID, Number: 2, Config: `{"systemPrompt":"draft"}`}
+	if err := db.Create(&published).Error; err != nil {
+		t.Fatalf("create published version: %v", err)
+	}
+	if err := db.Create(&draft).Error; err != nil {
+		t.Fatalf("create draft version: %v", err)
+	}
+	if err := db.Model(&app).Updates(map[string]any{"draft_version_id": draft.ID, "published_version_id": published.ID, "status": "published"}).Error; err != nil {
+		t.Fatalf("set version pointers: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations", strings.NewReader(`{}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("create conversation = %d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var payload struct {
+		Data struct {
+			Conversation model.AIAppConversation `json:"conversation"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode conversation: %v", err)
+	}
+	if payload.Data.Conversation.VersionID != published.ID {
+		t.Fatalf("conversation version = %d, want published %d", payload.Data.Conversation.VersionID, published.ID)
+	}
+}
+
 func TestAIKnowledgeRetrievalFailureUsesStablePublicCodes(t *testing.T) {
 	tests := []struct {
 		err  error
@@ -860,12 +910,15 @@ func TestAIAppConversationStreamsOwnerScopedToolTraceWithoutRawResults(t *testin
 	var requestCount int
 	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requestCount++
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "text/event-stream")
 		if requestCount == 1 {
-			_, _ = w.Write([]byte(`{"model":"ep-test","choices":[{"message":{"role":"assistant","tool_calls":[{"id":"call-1","type":"function","function":{"name":"content.search","arguments":"{\"query\":\"P8\"}"}}]}}]}`))
+			_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call-1\",\"type\":\"function\",\"function\":{\"name\":\"content.search\",\"arguments\":\"{\\\"query\\\":\\\"P8\\\"}\"}}]}}]}\n\n"))
+			_, _ = w.Write([]byte("data: [DONE]\n\n"))
 			return
 		}
-		_, _ = w.Write([]byte(`{"model":"ep-test","choices":[{"message":{"role":"assistant","content":"已找到私有资料。"}}]}`))
+		_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"content\":\"已找到\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"content\":\"私有资料。\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
 	}))
 	defer providerServer.Close()
 	t.Setenv("SILICONFLOW_API_KEY", "test-siliconflow-key")
@@ -876,15 +929,16 @@ func TestAIAppConversationStreamsOwnerScopedToolTraceWithoutRawResults(t *testin
 	if err := db.Create(&app).Error; err != nil {
 		t.Fatalf("create app: %v", err)
 	}
-	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"仅回答自己的内容"}`, ToolSnapshot: true, KnowledgeBaseSnapshot: true}
+	publishedAt := time.Now()
+	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"仅回答自己的内容"}`, ToolSnapshot: true, KnowledgeBaseSnapshot: true, PublishedAt: &publishedAt}
 	if err := db.Create(&version).Error; err != nil {
 		t.Fatalf("create version: %v", err)
 	}
 	if err := db.Create(&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: "content.search"}).Error; err != nil {
 		t.Fatalf("create tool binding: %v", err)
 	}
-	if err := db.Model(&app).Update("draft_version_id", version.ID).Error; err != nil {
-		t.Fatalf("set draft version: %v", err)
+	if err := db.Model(&app).Updates(map[string]any{"draft_version_id": version.ID, "published_version_id": version.ID, "status": "published"}).Error; err != nil {
+		t.Fatalf("set published version: %v", err)
 	}
 	if err := db.Create(&[]model.Post{
 		{AuthorID: 101, Title: "P8 私有资料", Slug: "owner-p8", Excerpt: "仅 owner 可见", Content: "P8 已完成"},
@@ -921,6 +975,9 @@ func TestAIAppConversationStreamsOwnerScopedToolTraceWithoutRawResults(t *testin
 	}
 	if !strings.Contains(chatRecorder.Body.String(), `"type":"done"`) {
 		t.Fatalf("expected SSE done event, got %s", chatRecorder.Body.String())
+	}
+	if !strings.Contains(chatRecorder.Body.String(), `"chunk":"已找到"`) || !strings.Contains(chatRecorder.Body.String(), `"chunk":"私有资料。"`) {
+		t.Fatalf("expected separate upstream text deltas, got %s", chatRecorder.Body.String())
 	}
 	if strings.Contains(chatRecorder.Body.String(), "不得泄露") || strings.Contains(chatRecorder.Body.String(), "secret") {
 		t.Fatalf("SSE leaked foreign tool result: %s", chatRecorder.Body.String())

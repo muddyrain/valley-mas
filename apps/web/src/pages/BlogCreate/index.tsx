@@ -99,7 +99,6 @@ export default function BlogCreate() {
   const [submitting, setSubmitting] = useState(false);
   const [submitIntent, setSubmitIntent] = useState<'draft' | 'published' | null>(null);
   const [aiExcerptLoading, setAiExcerptLoading] = useState(false);
-  const [excerptModelID, setExcerptModelID] = useState('');
   const [aiCoverLoading, setAiCoverLoading] = useState(false);
   const [coverModelID, setCoverModelID] = useState('');
   const [aiCoverSource, setAiCoverSource] = useState<'manual' | 'import'>('manual');
@@ -421,14 +420,13 @@ export default function BlogCreate() {
 
   const handleAIGenerateExcerpt = async () => {
     const trimmedContent = content.trim();
-    if (!trimmedContent || !excerptModelID) return;
+    if (!trimmedContent) return;
 
     try {
       setAiExcerptLoading(true);
       const result = await generateBlogExcerpt({
         title: title.trim(),
         content: trimmedContent,
-        modelId: excerptModelID,
       });
       const nextExcerpt = result.excerpt?.trim();
       if (!nextExcerpt) {
@@ -968,15 +966,9 @@ export default function BlogCreate() {
                     <button
                       type="button"
                       onClick={() => void handleAIGenerateExcerpt()}
-                      disabled={isContentEmpty || !excerptModelID || aiExcerptLoading || submitting}
+                      disabled={isContentEmpty || aiExcerptLoading || submitting}
                       className="inline-flex h-6 items-center gap-1 rounded-lg border border-primary/30 bg-accent px-1.5 text-xs font-medium text-primary transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-45"
-                      title={
-                        isContentEmpty
-                          ? '请先输入正文内容'
-                          : !excerptModelID
-                            ? '请先选择摘要模型'
-                            : 'AI 自动提取摘要'
-                      }
+                      title={isContentEmpty ? '请先输入正文内容' : 'AI 自动提取摘要'}
                     >
                       {aiExcerptLoading ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -993,14 +985,6 @@ export default function BlogCreate() {
                     maxLength={500}
                     className="rounded-xl"
                   />
-                  <div className="mt-3">
-                    <ModelPicker
-                      value={excerptModelID || undefined}
-                      onValueChange={setExcerptModelID}
-                      capability="text"
-                      label="摘要模型"
-                    />
-                  </div>
                 </div>
 
                 <div>

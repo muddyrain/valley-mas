@@ -28,6 +28,15 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     handles: { input: true, output: true },
     whenAllowed: true,
   },
+  template: {
+    type: 'template',
+    label: '文本模板',
+    description: '使用上游变量确定性地拼装文本',
+    icon: 'FileText',
+    category: 'content',
+    handles: { input: true, output: true },
+    whenAllowed: true,
+  },
   http: {
     type: 'http',
     label: 'HTTP 请求',
@@ -118,13 +127,29 @@ export const NODE_CONFIGS: Record<string, WorkflowNodeConfig> = {
     description: '结束当前轮循环',
     icon: 'Repeat2',
     category: 'flow',
-    handles: { input: true, output: true },
+    handles: { input: true },
   },
   terminate_loop: {
     type: 'terminate_loop',
     label: '终止循环',
     description: '结束整个循环',
     icon: 'Repeat2',
+    category: 'flow',
+    handles: { input: true },
+  },
+  approval: {
+    type: 'approval',
+    label: '人工审批',
+    description: '暂停运行，等待所有者批准或拒绝',
+    icon: 'ShieldCheck',
+    category: 'flow',
+    handles: { input: true, output: true },
+  },
+  delay: {
+    type: 'delay',
+    label: '延时',
+    description: '等待一段时间后继续执行',
+    icon: 'Clock3',
     category: 'flow',
     handles: { input: true, output: true },
   },
@@ -153,6 +178,8 @@ export function getNodeConfigSummary(
       const modelName = typeof config.modelName === 'string' ? config.modelName.trim() : '';
       return modelName || (config.modelId ? '已选择模型' : '未选择模型');
     }
+    case 'template':
+      return config.template ? '已配置文本模板' : '未配置文本模板';
     case 'http': {
       const method = typeof config.method === 'string' ? config.method.toUpperCase() : 'GET';
       return config.url ? `${method} 已配置 URL` : `${method} 未配置 URL`;
@@ -188,6 +215,10 @@ export function getNodeConfigSummary(
             : 0;
       return `${mode} · ${nodeCount} 个循环体节点`;
     }
+    case 'approval':
+      return String(config.title || '确认继续执行');
+    case 'delay':
+      return `${Number(config.delayMs || 0)} 毫秒`;
     default:
       return '';
   }

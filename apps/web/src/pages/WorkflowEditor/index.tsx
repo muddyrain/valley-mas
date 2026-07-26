@@ -26,11 +26,13 @@ import {
   ArrowLeft,
   CheckSquare,
   Clipboard,
+  Clock3,
   Copy,
   Database,
   Download,
   Edit2,
   History,
+  LayoutDashboard,
   Maximize,
   MoreHorizontal,
   Play,
@@ -38,6 +40,7 @@ import {
   Redo2,
   RotateCcw,
   Save,
+  ShieldCheck,
   Trash2,
   Undo2,
   Upload,
@@ -121,11 +124,13 @@ import {
   validateWorkflowDraft,
 } from '@/components/workflow/validateWorkflowConfig';
 import { WorkflowAlignmentGuides } from '@/components/workflow/WorkflowAlignmentGuides';
+import { WorkflowApprovalsDialog } from '@/components/workflow/WorkflowApprovalsDialog';
 import { WorkflowConnectionLine } from '@/components/workflow/WorkflowConnectionLine';
 import { WorkflowNode } from '@/components/workflow/WorkflowNode';
 import { WorkflowRunHistory } from '@/components/workflow/WorkflowRunHistory';
 import { WorkflowRuntimeProvider } from '@/components/workflow/WorkflowRuntimeContext';
 import { WorkflowTestCases } from '@/components/workflow/WorkflowTestCases';
+import { WorkflowTriggersDialog } from '@/components/workflow/WorkflowTriggersDialog';
 import {
   WorkflowWorkspacePanel,
   type WorkflowWorkspaceTab,
@@ -142,7 +147,7 @@ import {
   normalizeWorkflowEdges,
   serializeWorkflowGraph,
 } from '@/components/workflow/workflowGraph';
-import { layoutNodeInsertion } from '@/components/workflow/workflowLayout';
+import { layoutNodeInsertion, layoutWorkflowNodes } from '@/components/workflow/workflowLayout';
 import { getWorkflowRunBranchHandle } from '@/components/workflow/workflowRunBranches';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -376,6 +381,96 @@ function retryInputNodes(graphSnapshot: string): Node[] | null {
   }
 }
 
+function WorkflowEditorLoadingSkeleton({
+  isMobile,
+  rightPanelWidth,
+}: {
+  isMobile: boolean;
+  rightPanelWidth: number;
+}) {
+  return (
+    <div
+      className="flex h-screen flex-col bg-background"
+      role="status"
+      aria-busy="true"
+      aria-label="正在加载工作流"
+    >
+      <div className="flex items-center justify-between gap-4 border-b border-border bg-card px-4 py-3 shadow-xs">
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-9 rounded-md" />
+          <Skeleton className="h-5 w-36" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Skeleton className="hidden size-9 rounded-md sm:block" />
+          <Skeleton className="hidden size-9 rounded-md sm:block" />
+          <Skeleton className="hidden size-9 rounded-md sm:block" />
+          <Skeleton className="h-9 w-24 rounded-md" />
+          <Skeleton className="h-9 w-20 rounded-md" />
+          <Skeleton className="h-9 w-20 rounded-md" />
+        </div>
+      </div>
+
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="relative flex-1 overflow-hidden bg-muted/20">
+          <div className="absolute left-[12%] top-[28%] w-56 rounded-xl border border-border bg-card p-4 shadow-xs">
+            <div className="flex items-center gap-3">
+              <Skeleton className="size-9 rounded-lg" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+            </div>
+          </div>
+          <Skeleton className="absolute left-[calc(12%+14rem)] top-[calc(28%+2.2rem)] h-1 w-[12%]" />
+          <div className="absolute left-[40%] top-[28%] w-56 rounded-xl border border-border bg-card p-4 shadow-xs">
+            <div className="flex items-center gap-3">
+              <Skeleton className="size-9 rounded-lg" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-3 w-36" />
+              </div>
+            </div>
+          </div>
+          <Skeleton className="absolute bottom-6 left-1/2 h-10 w-28 -translate-x-1/2 rounded-xl" />
+          <div className="absolute bottom-4 left-4 space-y-1">
+            <Skeleton className="size-8 rounded-md" />
+            <Skeleton className="size-8 rounded-md" />
+            <Skeleton className="size-8 rounded-md" />
+          </div>
+        </div>
+
+        {!isMobile ? (
+          <div className="flex">
+            <div className="w-1 bg-border" />
+            <aside
+              className="flex flex-shrink-0 flex-col bg-card"
+              style={{ width: `${rightPanelWidth}px` }}
+            >
+              <div className="border-b border-border p-3">
+                <Skeleton className="h-9 w-full rounded-lg" />
+              </div>
+              <div className="space-y-5 p-4">
+                <Skeleton className="h-5 w-24" />
+                <div className="grid grid-cols-2 gap-3 border-b border-border pb-3">
+                  <Skeleton className="h-7 w-full" />
+                  <Skeleton className="h-7 w-full" />
+                </div>
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-10 w-full rounded-md" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-24 w-full rounded-md" />
+                </div>
+              </div>
+            </aside>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function WorkflowEditorPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -396,6 +491,7 @@ export default function WorkflowEditorPage() {
   const [workflowName, setWorkflowName] = useState('未命名工作流');
   const [workflowDescription, setWorkflowDescription] = useState('');
   const [workflowId, setWorkflowId] = useState<string | null>(null);
+  const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(() => Boolean(searchParams.get('id')));
   const [isEditingName, setIsEditingName] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<string | null>(null);
@@ -420,6 +516,8 @@ export default function WorkflowEditorPage() {
   const [runError, setRunError] = useState<string | null>(null);
   const [platform, setPlatform] = useState<WorkflowPlatformData | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showTriggers, setShowTriggers] = useState(false);
+  const [showApprovals, setShowApprovals] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [showKnowledgeBases, setShowKnowledgeBases] = useState(false);
   const [knowledgeBases, setKnowledgeBases] = useState<AIKnowledgeBase[]>([]);
@@ -923,6 +1021,7 @@ export default function WorkflowEditorPage() {
     if (id) {
       pendingCreatedWorkflowIdRef.current = null;
       setSaveStatus('idle');
+      setIsLoadingWorkflow(true);
       getWorkflow(id)
         .then((data) => {
           if (!isEditorMountedRef.current || editorSessionRef.current !== session) return;
@@ -985,8 +1084,13 @@ export default function WorkflowEditorPage() {
           if (!isEditorMountedRef.current || editorSessionRef.current !== session) return;
           setSaveStatus('error');
           toast.error('加载工作流失败');
+        })
+        .finally(() => {
+          if (!isEditorMountedRef.current || editorSessionRef.current !== session) return;
+          setIsLoadingWorkflow(false);
         });
     } else {
+      setIsLoadingWorkflow(false);
       setWorkflowName('未命名工作流');
       applyBlankWorkflow();
       clearHistory();
@@ -1163,7 +1267,11 @@ export default function WorkflowEditorPage() {
             type: 'insertable',
           },
         ];
-        if (item.nodeType !== 'condition' && item.nodeType !== 'intent') {
+        if (
+          !['condition', 'switch', 'intent', 'continue_loop', 'terminate_loop'].includes(
+            item.nodeType,
+          )
+        ) {
           insertedEdges.push({
             id: `${newNode.id}-${outgoing[0].target}`,
             source: newNode.id,
@@ -1193,12 +1301,16 @@ export default function WorkflowEditorPage() {
       setNodes(nextNodes);
       setEdges(nextEdges);
       markWorkflowDirty({ nodes: nextNodes, edges: nextEdges });
-      if ((item.nodeType === 'condition' || item.nodeType === 'intent') && outgoing[0]) {
+      if (['condition', 'switch', 'intent'].includes(item.nodeType) && outgoing[0]) {
         toast.info(
           item.nodeType === 'intent'
             ? '意图识别节点已插入，请连接每个意图和其他出口'
-            : '条件节点已插入，请从 true / false 端口连接后续节点',
+            : item.nodeType === 'switch'
+              ? '选择器节点已插入，请连接每个选项和默认出口'
+              : '条件节点已插入，请从 true / false 端口连接后续节点',
         );
+      } else if (['continue_loop', 'terminate_loop'].includes(item.nodeType) && outgoing[0]) {
+        toast.info('循环控制节点已插入，原下游分支已断开');
       }
     },
     [createPickerNode, insertLoopBodyNode, isRunning, markWorkflowDirty],
@@ -1254,7 +1366,11 @@ export default function WorkflowEditorPage() {
             : { type: 'insertable' }),
         },
       ];
-      if (item.nodeType !== 'condition' && item.nodeType !== 'intent') {
+      if (
+        !['condition', 'switch', 'intent', 'continue_loop', 'terminate_loop'].includes(
+          item.nodeType,
+        )
+      ) {
         insertedEdges.push({
           id: `${newNode.id}-${edge.target}`,
           source: newNode.id,
@@ -1276,12 +1392,16 @@ export default function WorkflowEditorPage() {
       setNodes(nextNodes);
       setEdges(nextEdges);
       markWorkflowDirty({ nodes: nextNodes, edges: nextEdges });
-      if (item.nodeType === 'condition' || item.nodeType === 'intent') {
+      if (['condition', 'switch', 'intent'].includes(item.nodeType)) {
         toast.info(
           item.nodeType === 'intent'
             ? '意图识别节点已插入，请连接每个意图和其他出口'
-            : '条件节点已插入，请从 true / false 端口连接后续节点',
+            : item.nodeType === 'switch'
+              ? '选择器节点已插入，请连接每个选项和默认出口'
+              : '条件节点已插入，请从 true / false 端口连接后续节点',
         );
+      } else if (['continue_loop', 'terminate_loop'].includes(item.nodeType)) {
+        toast.info('循环控制节点已插入，原下游分支已断开');
       }
     },
     [createPickerNode, insertLoopBodyNode, isRunning, markWorkflowDirty],
@@ -2145,6 +2265,11 @@ export default function WorkflowEditorPage() {
               setIsRunning(false);
               if (!event.data?.nodeType) toast.message('工作流已取消');
             }
+            if (event.status === 'waiting_approval') {
+              setIsRunning(false);
+              setShowApprovals(true);
+              toast.message('工作流正在等待人工审批');
+            }
           },
           onError: (msg: string) => {
             if (!isActiveRun()) return;
@@ -2290,6 +2415,20 @@ export default function WorkflowEditorPage() {
     URL.revokeObjectURL(url);
     toast.success('工作流已导出');
   }, [nodes, edges, workflowName]);
+
+  const handleAutoLayout = useCallback(() => {
+    if (isRunning) return;
+    const current = workflowStateRef.current;
+    if (current.nodes.length < 2) {
+      toast.message('暂无可整理的节点');
+      return;
+    }
+    const nextNodes = layoutWorkflowNodes(current.nodes, current.edges);
+    setNodes(nextNodes);
+    markWorkflowDirty({ nodes: nextNodes });
+    requestFitView();
+    toast.success('已整理工作流节点');
+  }, [isRunning, markWorkflowDirty, requestFitView]);
 
   const handleImport = useCallback(() => {
     const input = document.createElement('input');
@@ -2556,6 +2695,10 @@ export default function WorkflowEditorPage() {
     [activeWorkspaceTab, copilot, propertyPanel],
   );
 
+  if (isLoadingWorkflow) {
+    return <WorkflowEditorLoadingSkeleton isMobile={isMobile} rightPanelWidth={rightPanelWidth} />;
+  }
+
   return (
     <WorkflowRuntimeProvider value={runtimeValue}>
       <ReactFlowProvider>
@@ -2635,6 +2778,16 @@ export default function WorkflowEditorPage() {
               >
                 <Redo2 className="h-4 w-4" />
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAutoLayout}
+                disabled={isRunning || nodes.length < 2}
+                title="自动整理节点"
+              >
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                整理
+              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={<Button variant="outline" size="icon" aria-label="更多工作流操作" />}
@@ -2650,6 +2803,12 @@ export default function WorkflowEditorPage() {
                     <Download className="mr-2 h-4 w-4" />
                     导出
                   </DropdownMenuItem>
+                  {workflowId ? (
+                    <DropdownMenuItem onClick={() => setShowApprovals(true)}>
+                      <ShieldCheck className="mr-2 h-4 w-4" />
+                      审批记录
+                    </DropdownMenuItem>
+                  ) : null}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleReset}>
                     <RotateCcw className="mr-2 h-4 w-4" />
@@ -2687,6 +2846,20 @@ export default function WorkflowEditorPage() {
                   ? '已发布'
                   : '发布'}
               </Button>
+              {workflowId && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!platform?.app.publishedVersionId}
+                  title={
+                    platform?.app.publishedVersionId ? '管理定时触发' : '发布工作流后可配置定时触发'
+                  }
+                  onClick={() => setShowTriggers(true)}
+                >
+                  <Clock3 className="mr-2 h-4 w-4" />
+                  定时
+                </Button>
+              )}
               {workflowId && (
                 <Button variant="outline" size="sm" onClick={() => void openHistory()}>
                   <History className="mr-2 h-4 w-4" />
@@ -2740,6 +2913,22 @@ export default function WorkflowEditorPage() {
               )}
             </DialogContent>
           </Dialog>
+
+          {workflowId ? (
+            <WorkflowApprovalsDialog
+              workflowId={workflowId}
+              open={showApprovals}
+              onOpenChange={setShowApprovals}
+            />
+          ) : null}
+
+          {workflowId ? (
+            <WorkflowTriggersDialog
+              workflowId={workflowId}
+              open={showTriggers}
+              onOpenChange={setShowTriggers}
+            />
+          ) : null}
 
           <AlertDialog
             open={Boolean(pendingRetryRun)}

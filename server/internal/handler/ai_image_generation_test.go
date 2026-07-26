@@ -33,6 +33,19 @@ func TestValidateAIImageGenerationRequestRequiresSketchReference(t *testing.T) {
 	}
 }
 
+func TestValidateAIImageGenerationRequestAcceptsConversationReference(t *testing.T) {
+	_, _, references, err := validateAIImageGenerationRequest(createAIImageGenerationRequest{
+		ModelID: "1", PresetID: "sketch", Prompt: "把上一张图改成夜景", AspectRatio: "4:3", Quality: "1K",
+		ReferenceGenerationID: "123",
+	}, []string{"1K", "2K"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(references) != 0 {
+		t.Fatalf("generation reference should be resolved after validation, got %d raw references", len(references))
+	}
+}
+
 func TestValidateAIImageGenerationRequestRejectsUnsupportedModelQuality(t *testing.T) {
 	_, _, _, err := validateAIImageGenerationRequest(createAIImageGenerationRequest{
 		ModelID: "1", PresetID: "free", Prompt: "山谷", AspectRatio: "1:1", Quality: "4K",
@@ -46,8 +59,52 @@ func TestValidateAIImageGenerationRequestAccepts4KForSupportedModel(t *testing.T
 	_, size, _, err := validateAIImageGenerationRequest(createAIImageGenerationRequest{
 		ModelID: "1", PresetID: "free", Prompt: "山谷", AspectRatio: "16:9", Quality: "4K",
 	}, []string{"1K", "2K", "3K", "4K"})
-	if err != nil || size != "4096x2304" {
+	if err != nil || size != "3840x2160" {
 		t.Fatalf("expected 4K target size, got %q err=%v", size, err)
+	}
+}
+
+func TestAIImageGenerationDeletableStatuses(t *testing.T) {
+	for _, status := range []string{"queued", "running"} {
+		if isAIImageGenerationDeletable(status) {
+			t.Fatalf("status %q should not be deletable", status)
+		}
+	}
+	for _, status := range []string{"succeeded", "failed"} {
+		if !isAIImageGenerationDeletable(status) {
+			t.Fatalf("status %q should be deletable", status)
+		}
+	}
+}
+
+func TestAIImageGenerationFavoriteRequestRequiresExplicitValue(t *testing.T) {
+	var missing updateAIImageGenerationFavoriteRequest
+	if missing.Favorited != nil {
+		t.Fatal("expected absent favorite flag to remain nil")
+	}
+
+	favorited := false
+	present := updateAIImageGenerationFavoriteRequest{Favorited: &favorited}
+	if present.Favorited == nil || *present.Favorited {
+		t.Fatal("expected explicit false favorite flag to be accepted")
+	}
+}
+
+func TestNormalizeAIImageResourceVisibility(t *testing.T) {
+	if got := normalizeAIImageResourceVisibility(" public "); got != "public" {
+		t.Fatalf("expected public visibility, got %q", got)
+	}
+	for _, value := range []string{"", "private", "shared", "unexpected"} {
+		if got := normalizeAIImageResourceVisibility(value); got != "private" {
+			t.Fatalf("expected private visibility for %q, got %q", value, got)
+		}
+	}
+}
+
+func TestAIImageReferenceDataURL(t *testing.T) {
+	dataURL := aiImageReferenceDataURL([]byte("image"), "image/png")
+	if dataURL != "data:image/png;base64,aW1hZ2U=" {
+		t.Fatalf("unexpected data URL: %s", dataURL)
 	}
 }
 
@@ -102,6 +159,29 @@ func TestAIImagePresetsExposePromptContent(t *testing.T) {
 	}
 	if !strings.Contains(string(encoded), `"promptContent":"根据用户的画面描述`) {
 		t.Fatalf("preset response must expose its prompt content: %s", encoded)
+	}
+}
+
+func TestParseAIImageQuickSamplesDropsDisplayedAndDuplicatePrompts(t *testing.T) {
+	values := parseAIImageQuickSamples(`[
+  "已经展示过的山谷壁纸",
+  "晨雾山谷壁纸，松林与湖面形成纵深构图，柔和金色晨光",
+  "夜色海岸壁纸，浪花与灯塔形成清晰视觉焦点，蓝紫色电影光影",
+  "晨雾山谷壁纸，松林与湖面形成纵深构图，柔和金色晨光",
+  "雨后森林壁纸，苔藓岩石与瀑布构成清新层次，空气感柔和"
+]`, []string{"已经展示过的山谷壁纸"})
+	if len(values) != aiImageQuickSampleCount {
+		t.Fatalf("quick samples = %#v", values)
+	}
+	if values[0] == "已经展示过的山谷壁纸" || values[0] == values[2] {
+		t.Fatalf("displayed or duplicate sample returned: %#v", values)
+	}
+}
+
+func TestNormalizeAIImageQuickSamplePromptsLimitsAndDeduplicates(t *testing.T) {
+	values := normalizeAIImageQuickSamplePrompts([]string{"  夜景  ", "夜景", "森林", "海岸"}, 2)
+	if len(values) != 2 || values[0] != "夜景" || values[1] != "森林" {
+		t.Fatalf("normalized prompts = %#v", values)
 	}
 }
 

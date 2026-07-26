@@ -104,6 +104,7 @@ export function LoopBoundaryEdge(props: EdgeProps) {
               onBlur={scheduleHide}
             >
               <DeferredNodePicker
+                scope="loop"
                 trigger={
                   <Button
                     type="button"

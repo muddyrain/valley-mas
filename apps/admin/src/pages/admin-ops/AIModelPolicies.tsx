@@ -45,6 +45,11 @@ const imageProtocolOptions = [
 
 type ModelForm = AdminAIModelInput;
 
+const formatTokenLimit = (value?: number) => {
+  if (!value) return '未配置';
+  return value >= 1000 ? `${Math.round((value / 1000) * 10) / 10}K` : String(value);
+};
+
 const verificationLabels: Record<
   AdminAIModel['verificationStatus'],
   { color: string; label: string }
@@ -59,8 +64,7 @@ export default function AIModelPolicies() {
   const [loading, setLoading] = useState(true);
   const [modelOpen, setModelOpen] = useState(false);
   const [editingModel, setEditingModel] = useState<AdminAIModel | null>(null);
-  const [testingConnection, setTestingConnection] = useState(false);
-  const [testingModelID, setTestingModelID] = useState<string>();
+  const [testingModelIDs, setTestingModelIDs] = useState<Set<string>>(() => new Set());
   const [modelForm] = Form.useForm<ModelForm>();
   const selectedCapabilities = Form.useWatch('capabilities', modelForm) || [];
   const probesImageGeneration = selectedCapabilities.includes('image_generation');
@@ -141,13 +145,24 @@ export default function AIModelPolicies() {
       },
     },
     {
+      title: '规格',
+      key: 'limits',
+      width: 150,
+      render: (_, item) => (
+        <div className="text-xs text-gray-500">
+          <div>上下文：{formatTokenLimit(item.contextWindowTokens)}</div>
+          <div>最大输出：{formatTokenLimit(item.maxOutputTokens)}</div>
+        </div>
+      ),
+    },
+    {
       title: '操作',
       width: 170,
       render: (_, item) => (
         <Space size={0}>
           <Button
             type="link"
-            loading={testingModelID === item.id}
+            loading={testingModelIDs.has(item.id)}
             onClick={() => void testSavedModelConnection(item)}
           >
             检测连接
@@ -162,51 +177,38 @@ export default function AIModelPolicies() {
 
   const openModel = (item?: AdminAIModel) => {
     setEditingModel(item || null);
-    modelForm.setFieldsValue(
-      item || {
+    if (item) {
+      modelForm.setFieldsValue(item);
+    } else {
+      modelForm.resetFields();
+      modelForm.setFieldsValue({
         provider: 'siliconflow',
         capabilities: ['text'],
         imageProtocol: 'auto',
         enabled: true,
         sortOrder: models.length + 1,
-      },
-    );
+      });
+    }
     setModelOpen(true);
   };
 
   const saveModel = async () => {
     const value = await modelForm.validateFields();
-    if (editingModel) await updateAIModel(editingModel.id, value);
-    else await createAIModel(value);
+    if (editingModel) {
+      await updateAIModel(editingModel.id, value);
+    } else {
+      await createAIModel(value);
+    }
     message.success('模型已保存');
+    modelForm.resetFields();
+    setEditingModel(null);
     setModelOpen(false);
     await reload();
   };
 
-  const testConnection = async () => {
-    const value = await modelForm.validateFields([
-      'provider',
-      'modelId',
-      'capabilities',
-      'imageProtocol',
-    ]);
-    try {
-      setTestingConnection(true);
-      const result = await testAIModelConnection({
-        provider: value.provider,
-        modelId: value.modelId,
-        capabilities: value.capabilities,
-        imageProtocol: value.imageProtocol,
-      });
-      message.success(`模型调用正常（${result.latencyMs}ms）`);
-    } finally {
-      setTestingConnection(false);
-    }
-  };
-
   const testSavedModelConnection = async (selected: AdminAIModel) => {
     try {
-      setTestingModelID(selected.id);
+      setTestingModelIDs((current) => new Set(current).add(selected.id));
       const result = await testAIModelConnection({
         catalogId: selected.id,
         provider: selected.provider,
@@ -220,7 +222,11 @@ export default function AIModelPolicies() {
         }）`,
       );
     } finally {
-      setTestingModelID(undefined);
+      setTestingModelIDs((current) => {
+        const next = new Set(current);
+        next.delete(selected.id);
+        return next;
+      });
       await reload();
     }
   };
@@ -296,18 +302,6 @@ export default function AIModelPolicies() {
           <Form.Item name="modelId" label="模型 ID" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item label="连接检测">
-            <Space>
-              <Button onClick={() => void testConnection()} loading={testingConnection}>
-                检测连接
-              </Button>
-              <span className="text-xs text-gray-400">
-                {probesImageGeneration
-                  ? '生图检测会生成一张测试图，可能消耗额度'
-                  : '发送最小请求验证模型实际可用，会消耗极少量 token'}
-              </span>
-            </Space>
-          </Form.Item>
           <Form.Item name="displayName" label="显示名称" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
@@ -341,6 +335,20 @@ export default function AIModelPolicies() {
           ) : null}
           <Form.Item name="sortOrder" label="排序">
             <InputNumber className="w-full" min={0} />
+          </Form.Item>
+          <Form.Item
+            name="contextWindowTokens"
+            label="上下文窗口（token）"
+            extra="可选。中转服务未返回此数据时手动填写；留空表示未知，不会影响模型使用。"
+          >
+            <InputNumber className="w-full" min={1} precision={0} placeholder="例如 128000" />
+          </Form.Item>
+          <Form.Item
+            name="maxOutputTokens"
+            label="最大输出（token）"
+            extra="可选。留空表示未知；用于管理员查看模型规格。"
+          >
+            <InputNumber className="w-full" min={1} precision={0} placeholder="例如 8192" />
           </Form.Item>
           <Form.Item name="enabled" label="启用" valuePropName="checked">
             <Switch />

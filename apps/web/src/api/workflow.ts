@@ -5,6 +5,7 @@ export type WorkflowNodeType =
   | 'start'
   | 'end'
   | 'llm'
+  | 'template'
   | 'http'
   | 'tool'
   | 'condition'
@@ -16,7 +17,9 @@ export type WorkflowNodeType =
   | 'loop'
   | 'set_loop_variable'
   | 'continue_loop'
-  | 'terminate_loop';
+  | 'terminate_loop'
+  | 'approval'
+  | 'delay';
 
 export interface WorkflowRule {
   left: unknown;
@@ -65,7 +68,7 @@ export interface WorkflowListData {
 export interface WorkflowRunEvent {
   step: string;
   sequence?: number;
-  status: 'running' | 'success' | 'error' | 'skipped' | 'cancelled' | 'done';
+  status: 'running' | 'waiting_approval' | 'success' | 'error' | 'skipped' | 'cancelled' | 'done';
   message?: string;
   data?: WorkflowRunEventData;
 }
@@ -76,7 +79,7 @@ export interface WorkflowRunEventData {
   nodeId?: string;
   nodeType?: WorkflowNodeType;
   capabilityId?: string;
-  status?: 'running' | 'success' | 'error' | 'skipped' | 'cancelled';
+  status?: 'running' | 'waiting_approval' | 'success' | 'error' | 'skipped' | 'cancelled';
   message?: string;
   input?: Record<string, unknown>;
   output?: Record<string, unknown>;
@@ -90,13 +93,48 @@ export interface WorkflowRunEventData {
 export interface WorkflowRun {
   id: string;
   workflowId: string;
-  status: 'running' | 'cancelling' | 'success' | 'error' | 'cancelled';
+  status: 'running' | 'waiting_approval' | 'cancelling' | 'success' | 'error' | 'cancelled';
   inputs: string;
   graphSnapshot: string;
   sourceRunId?: string;
+  triggerId?: string;
+  runJobId?: string;
   result: string;
   startedAt: string;
   finishedAt?: string;
+}
+
+export interface WorkflowApproval {
+  id: string;
+  workflowRunId: string;
+  workflowId: string;
+  userId: string;
+  nodeId: string;
+  title: string;
+  description: string;
+  status: 'pending' | 'approved' | 'rejected';
+  note?: string;
+  decidedAt?: string;
+  resumedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkflowTrigger {
+  id: string;
+  workflowId: string;
+  userId: string;
+  type: 'cron' | 'webhook' | 'event';
+  cronExpression?: string;
+  timezone?: string;
+  eventKey?: string;
+  webhookSecret?: string;
+  webhookPath?: string;
+  status: 'active' | 'disabled';
+  nextRunAt?: string;
+  lastRunAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface WorkflowNodeRun {
@@ -105,7 +143,7 @@ export interface WorkflowNodeRun {
   nodeId: string;
   nodeType: string;
   capabilityId?: string;
-  status: 'running' | 'success' | 'error' | 'skipped' | 'cancelled';
+  status: 'running' | 'waiting_approval' | 'success' | 'error' | 'skipped' | 'cancelled';
   input: string;
   output: string;
   errorCode?: string;
@@ -121,7 +159,7 @@ export interface WorkflowRunTraceEvent {
   nodeId?: string;
   nodeType?: string;
   capabilityId?: string;
-  status: 'running' | 'success' | 'error' | 'skipped' | 'cancelled';
+  status: 'running' | 'waiting_approval' | 'success' | 'error' | 'skipped' | 'cancelled';
   message?: string;
   input: string;
   output: string;
@@ -216,11 +254,12 @@ export interface WorkflowNodeDefinition {
   type: WorkflowNodeType;
   label: string;
   description: string;
-  category: 'model' | 'flow' | 'tool' | 'subworkflow';
+  category: 'model' | 'content' | 'image' | 'knowledge' | 'flow' | 'logic' | 'tool' | 'subworkflow';
   inputPorts: string[];
   outputPorts: string[];
   whenAllowed: boolean;
   configSchema: Record<string, unknown>;
+  defaultConfig: Record<string, unknown>;
 }
 
 export interface WorkflowToolCapability {
@@ -228,7 +267,7 @@ export interface WorkflowToolCapability {
   name: string;
   description: string;
   category: string;
-  sideEffect: 'none' | 'read' | 'model_and_storage' | 'write';
+  sideEffect: 'none' | 'read' | 'model' | 'model_and_storage' | 'write';
   modelCost: number;
   writeCost: number;
   available: boolean;
@@ -237,7 +276,15 @@ export interface WorkflowToolCapability {
     required?: string[];
     properties?: Record<
       string,
-      { type?: string; title?: string; description?: string; placeholder?: string }
+      {
+        type?: string;
+        title?: string;
+        description?: string;
+        placeholder?: string;
+        modelCapability?: string;
+        enum?: string[];
+        default?: unknown;
+      }
     >;
   };
   outputSchema: Record<string, string>;
@@ -401,7 +448,12 @@ async function resumeWorkflowRunEvents(
       try {
         const event: WorkflowRunEvent = JSON.parse(line.slice(6));
         handlers.onEvent(event);
-        if (event.status === 'done' || event.status === 'cancelled') terminal = true;
+        if (
+          event.status === 'done' ||
+          event.status === 'cancelled' ||
+          event.status === 'waiting_approval'
+        )
+          terminal = true;
         if (event.status === 'error') {
           terminal = true;
           handlers.onError(event.message || event.data?.error || '工作流执行失败');
@@ -494,7 +546,11 @@ async function streamWorkflow(
           if (event.data?.runId) runId = event.data.runId;
           lastSequence = Math.max(lastSequence, event.sequence || event.data?.sequence || 0);
           handlers.onEvent(event);
-          if (event.status === 'done' || event.status === 'cancelled') {
+          if (
+            event.status === 'done' ||
+            event.status === 'cancelled' ||
+            event.status === 'waiting_approval'
+          ) {
             receivedTerminalEvent = true;
           }
           if (event.status === 'error') {
@@ -624,4 +680,59 @@ export function restoreWorkflowVersion(
 
 export function publishWorkflowVersion(id: string): Promise<void> {
   return request.post(`/workflows/${id}/publish`);
+}
+
+export function listWorkflowTriggers(id: string): Promise<{ list: WorkflowTrigger[] }> {
+  return request.get(`/workflows/${id}/triggers`);
+}
+
+export function createWorkflowTrigger(
+  id: string,
+  data:
+    | { type: 'cron'; cronExpression: string; timezone: string }
+    | { type: 'webhook' }
+    | { type: 'event'; eventKey: string },
+): Promise<WorkflowTrigger> {
+  return request.post(`/workflows/${id}/triggers`, data);
+}
+
+export function updateWorkflowTrigger(
+  id: string,
+  triggerId: string,
+  status: WorkflowTrigger['status'],
+): Promise<WorkflowTrigger> {
+  return request.patch(`/workflows/${id}/triggers/${triggerId}`, { status });
+}
+
+export function deleteWorkflowTrigger(id: string, triggerId: string): Promise<void> {
+  return request.delete(`/workflows/${id}/triggers/${triggerId}`);
+}
+
+export function rotateWorkflowWebhookSecret(
+  id: string,
+  triggerId: string,
+): Promise<WorkflowTrigger> {
+  return request.post(`/workflows/${id}/triggers/${triggerId}/rotate-secret`);
+}
+
+export function getWorkflowWebhookURL(triggerId: string): string {
+  const base = (
+    (import.meta as { env: { VITE_API_BASE_URL?: string } }).env.VITE_API_BASE_URL || '/api/v1'
+  ).replace(/\/+$/, '');
+  const path = `${base}/workflow-hooks/${triggerId}`;
+  if (/^https?:\/\//i.test(path)) return path;
+  return new URL(path, window.location.origin).toString();
+}
+
+export function listWorkflowApprovals(id: string): Promise<{ list: WorkflowApproval[] }> {
+  return request.get(`/workflows/${id}/approvals`);
+}
+
+export function decideWorkflowApproval(
+  id: string,
+  approvalId: string,
+  decision: 'approved' | 'rejected',
+  note = '',
+): Promise<WorkflowApproval> {
+  return request.post(`/workflows/${id}/approvals/${approvalId}/decision`, { decision, note });
 }

@@ -37,8 +37,12 @@
 - Life Trace：`apps/life-trace/src`、`server/internal/lifetrace`。
 - AI Mind Arena：`apps/ai-mind-arena`、`apps/admin/src/pages/admin-ops/MindArenaDebates.tsx`、`server/internal/mindarena`、`server/internal/model/mind_arena.go`、`server/internal/ai`。
 - AI 能力：`server/internal/ai`、`server/internal/aiusage`、`server/internal/handler/*ai*.go`、`apps/web/src/api/ai.ts`；Admin 可审计 Valley AI Chat 与 Life Trace AI 的调用、失败和耗时。
-- AI 工作台平台基线：Web `/workbench` 是智能体项目页，智能体通过同一创建弹窗在“标准创建 / AI 创建”之间选择；`/workbench/workflows` 是独立工作流页面，承载模板、普通创建与 AI 创建；`/workbench/knowledge` 当前作为资源库中的知识库入口，提示词资源待对应服务端能力完成后再开放，`/ai-resources?tab=tools` 提供 owner 私有的 Notion OAuth 连接管理。知识库 PDF 可在选择视觉模型后按页渲染，补充扫描件 OCR、表格 Markdown 与图片说明；运行环境需提供 Poppler `pdftocairo`。工作流编辑器使用按资产持久化的上下文副驾驶创建或持续修改工作流；每个资产可保存、切换多条 owner 私有历史会话。协作请求会持久化安全的阶段与终态事件，浏览器断线后按序续接；所有 AI 改动先返回语义差异，不自动保存、运行或发布；已有工作流只接受节点级 operations，服务端基于 baseHash 应用并校验候选图。工作流编辑器右栏一级为“节点信息 / AI 协作”并默认打开节点信息，一级 Tab 由用户独占控制，节点信息内二级为“配置 / 运行”。工作流只接受 Graph v4：通用节点为 Start、End、LLM、Tool、Condition、Switch、Merge、Variable、Subworkflow、Intent；LLM 使用可选系统提示词和必填用户提示词，支持命名输入绑定，并声明 `text`、`model`、`tokenUsage` 输出；Switch 对已有 string、number 或 boolean 字段做 2 至 8 个固定值分流，并要求每个 case 和默认出口各连接一条路径；Intent 使用受控 ARK 文本模型，固定输出 `intentId`、`intentName`、`confidence`，并要求每个已配置意图及“其他”出口各连接一条路径；End 按名称、类型和上游变量映射最终输出；工具、结束和子工作流输入只允许选择类型匹配的上游变量，固定常量统一由 Variable 节点定义。变量引用底层保存规范引用，界面以“节点名 · 变量名”原子 Token 展示，支持聚焦搜索、更换和整体删除。业务能力通过服务端 Tool capability 注册，首期开放 Markdown 解析、知识检索、内容搜索、封面生成和博客草稿。画布使用底部、节点后和连线中部弹出选择器，不保留常驻节点栏；连线插入按钮仅在对应边 hover / focus 时显示并固定在贝塞尔曲线中点，插入节点自动为下游让位，节点拖拽结束后再提交草稿快照；自动保存与立即保存都会持久化未完成草稿，发布和运行才执行完整校验并定位具体问题。试运行节点在画布主卡下展示可折叠的状态、耗时、输入、输出和安全错误详情，展开不会移动主卡连线锚点。历史抽屉还提供 owner 私有、版本锁定的回归测试用例；测试运行保留独立 trace，不混入普通运行历史，含副作用或文件输入的图默认拒绝测试执行。Subworkflow 锁定当前 owner 的已发布不可变版本。Graph v2/v3 固定拒绝；HTTP、代码、SQL、循环、批处理、自动发布与外部凭据继续拒绝；Notion OAuth 凭据仅服务端 AES-GCM 加密保存，连接状态和审计记录按 owner 隔离，尚未作为工作流运行时工具开放。`/workbench/knowledge` 和 `/ai/apps` 的版本化检索、运行与公共 API 边界保持不变。
-- AI 图片创作：Web `/workbench/images` 是独立图片创作页，支持简笔画、最多三张画布素材、受控提示词模板、基于当前输入的 AI 画面描述扩写、五种画面比例、模型感知的目标分辨率、生成阶段动效、owner 私有历史、下载和保存到资源库。画面描述复用提示词助手和已启用文本模型，结果需预览确认后才回填。用户统一选择具备 `image_generation` 的图片模型；`reference_image` 表示该模型还支持把画布或素材作为参考输入。尺寸能力按模型 ID 判断、Provider 只处理传输协议：`doubao-seedream-4-0-*` 支持 1K/2K/3K/4K，`gpt-image-2` 支持 1K/2K/4K；支持参考图的 4K 模型优先成为默认模型。启用参考画布时，画布的主体数量、轮廓、姿态、取景和空间布局优先于模板与文字；当前模型不支持参考图时保留模型选择，并明确按文字生成；草图成图模板必须使用参考图。图片调用由 SiliconFlow、Amux、ARK Provider Adapter 处理各自尺寸字段、JSON/multipart 端点与 URL/Base64 响应；生成结果会保留模型实际返回的像素尺寸，不因未达到目标尺寸而失败，任务状态持久化在 `ai_image_generations`。参考图 data URL 只在当前请求和后台生成过程中使用，不进入数据库或 AI 审计日志；使用画布时会额外保存一张扁平快照，供历史预览与再次创作恢复，不保存逐笔轨迹或独立图层。生成结果必须转存 TOS 后才进入长期历史；保存到资源库会复制为独立对象，因此资源删除不会影响历史。首期不开放智能体图片附件、局部重绘、图层持久化或真实扩散预览帧。
+- AI 工作台入口：Web `/workbench` 是智能体项目页，智能体通过同一创建弹窗在“标准创建 / AI 创建”之间选择；`/workbench/workflows` 是独立工作流页面，承载模板、普通创建与 AI 创建；`/workbench/knowledge` 当前作为资源库中的知识库入口，提示词资源待对应服务端能力完成后再开放，`/ai-resources?tab=tools` 提供 owner 私有的 Notion OAuth 连接管理。知识库 PDF 可在选择视觉模型后按页渲染，补充扫描件 OCR、表格 Markdown 与图片说明；运行环境需提供 Poppler `pdftocairo`。
+- AI 工作流协作：编辑器使用按资产持久化的上下文副驾驶创建或持续修改工作流；每个资产可保存、切换多条 owner 私有历史会话。协作请求会持久化安全的阶段与终态事件，浏览器断线后按序续接；所有 AI 改动先返回语义差异，不自动保存、运行或发布；已有工作流只接受节点级 operations，服务端基于 baseHash 应用并校验候选图。编辑器工具栏支持一键从左到右整理节点并自动适配视图，保留连线、节点配置和循环体层级，位置变化进入撤销与自动保存。
+- Graph v4 节点目录：节点名称、说明、分类和默认配置由服务端 `/workflows/capabilities` 提供，Web 只展示已具备配置界面的节点。主画布通用节点为 Start、End、LLM、Template、HTTP、Tool、Condition、Switch、Merge、Variable、Subworkflow、Intent、Loop 和 Delay；循环体另提供设置循环变量、继续循环和终止循环。Template 确定性拼装文本；Delay 最长等待 5 分钟并响应取消；LLM 支持命名输入绑定、文本或结构化输出；End 按名称、类型和上游变量映射最终输出。工具、结束和子工作流输入只允许选择类型匹配的上游变量，变量引用底层保存规范引用，界面以“节点名 · 变量名”原子 Token 展示。人工审批不再向新工作流开放，服务端继续兼容已有审批图。
+- 工作流业务能力：服务端 Tool capability 提供 Markdown 解析、通用文档提取、结构化提取、JSON 解析、安全列表处理、列表切批、知识检索、知识引用整理、内容/Notion 搜索、封面与通用图片生成、图片理解、AI 生图资源保存、博客草稿和站内通知。安全列表处理提供筛选、字段映射、稳定排序和去重，不执行用户代码；列表切批只生成批次数组，实际逐批执行复用 Loop。站内通知只写入当前工作流 owner 的通知记录，支持完成和失败后继续场景。图片工作流与图片创作页复用同一模型目录、Provider、存储和 AI 审计服务；扫描 PDF 仍走图片理解或知识库 OCR。节点选择器按内容、图片、知识、流程、逻辑、工具和子工作流分类。
+- 工作流运行治理：可执行节点支持最多 3 次节点级自动重试和失败后继续；写入、生图存储、非幂等 HTTP 和自行重试的节点禁止自动重放。失败后继续会输出 `_failed`、`_error`、`_errorCode`、`_attempts`。已有人工审批图仍使用 owner 私有记录和冻结版本恢复，审批记录入口收纳在编辑器“更多”菜单，不再占用主工具栏或节点选择器。Cron、Webhook 和内部事件统一冻结当前已发布版本并进入数据库任务 worker：Cron 只允许无输入、无文件、无写入/模型存储副作用的图；Webhook 使用只展示一次、数据库仅存 SHA-256 哈希的 256 位 Bearer 密钥，内部事件按 owner 与事件键隔离，两者都要求唯一 `X-Valley-Delivery` 防止重复投递。任务一旦创建运行记录，租约过期后不会重新执行整张图，而是标记中断，避免重复写入。代码、SQL、自动发布与未受控外部凭据继续拒绝；死信、告警和租约续期仍待后续。Notion OAuth 凭据仅服务端 AES-GCM 加密保存，连接状态和审计记录按 owner 隔离。
+- AI 图片创作：Web `/workbench/images` 是独立图片创作页，默认进入排在画布之前的 AI 对话，并支持查看、切换 owner 私有历史会话；同时支持画布创作、对话描述与连续修改、简笔画、最多三张画布素材、受控提示词模板、从 owner 私有 AI 提示词资源选择自定义画面描述、基于当前输入的 AI 画面描述扩写、五种画面比例、模型感知的目标分辨率、生成阶段动效、owner 私有生成历史、下载和保存到资源库。模板侧栏的快速示例首屏使用受控兜底项；点击“换一些”会由 AI 生成三条不与当前项重复的画面描述，服务端统一选择已启用文本模型中声明上下文窗口最小的模型，供短文本快速生成场景复用。对话模式首条消息直接生成，后续消息优先引用本次对话最近一张成功图片；消息和会话按当前用户持久化到服务端，图片结果持久化到历史。画面描述复用提示词助手和已启用文本模型，结果需预览确认后才回填。用户统一选择具备 `image_generation` 的图片模型；`reference_image` 表示该模型还支持把画布、素材或上一张生成图作为参考输入。尺寸能力按模型 ID 判断、Provider 只处理传输协议：`doubao-seedream-4-0-*` 支持 1K/2K/3K/4K，`gpt-image-2` 包括参考图编辑在内均支持 1K/2K/4K。启用参考画布时，画布的主体数量、轮廓、姿态、取景和空间布局优先于模板与文字；当前模型不支持参考图时保留模型选择，并明确按文字生成；草图成图模板必须使用参考图。图片调用由 SiliconFlow、Amux、ARK Provider Adapter 处理各自尺寸字段、JSON/multipart 端点与 URL/Base64 响应；目标尺寸是请求意图而非精确像素承诺，4K 请求返回达到该目标对应 1K 宽高基线的有效图片即按实际像素保存，只有低于最低可用尺寸的明显异常结果才失败，任务状态持久化在 `ai_image_generations`。参考图 data URL 只在当前请求和后台生成过程中使用，不进入数据库或 AI 审计日志；使用画布或对话引用上一张图片时会额外保存一张扁平快照，供历史预览与再次创作恢复，快照上传失败只影响历史恢复，不阻断图片生成，不保存逐笔轨迹或独立图层。生成结果必须转存 TOS 后才进入长期历史；保存到资源库会复制为独立对象，因此资源删除不会影响历史。首期不开放智能体图片附件、局部重绘、图层持久化或真实扩散预览帧。
 - AI Agent 运行时：`server/internal/ai/agent`（领域中性 tool loop 抽象，未来可无痛迁 CloudWeGo eino）+ `server/internal/ai/tools`（Tool 接口与 Registry），首批被 Life Trace 生活助理经 `LIFE_TRACE_ASSISTANT_USE_AGENT` 灰度使用。
 - 登录与用户状态：`apps/web/src/stores/useAuthStore.ts`、`apps/*/src/utils/request.ts`、`server/internal/middleware`、`server/internal/utils/jwt.go`。
 
@@ -69,6 +73,12 @@ pnpm --filter @valley/world-sim dev
 
 # 启动 Go 服务
 cd server && go run ./cmd/server
+
+# 启动 Go 服务热重载；只检查并执行尚未应用的版本化迁移
+cd server && air
+
+# 仅空的本地开发数据库需要显式初始化一次
+cd server && go run ./cmd/migrate bootstrap --apply
 ```
 
 ## 端口速查
@@ -157,5 +167,5 @@ python3 .agents/skills/encoding-guard/scripts/check_mojibake.py <相关文件>
 ## CI 质量门禁
 
 - `.github/workflows/quality.yml` 在 push 和 pull request 上执行 Harness 检查、workspace check/build 和 Go 测试。
-- `.github/workflows/deploy-server.yml` 只处理服务端部署，并在远端 build/restart 之前运行 `go test ./...`。
+- `.github/workflows/deploy-server.yml` 只处理服务端部署：远端测试通过后构建服务与迁移程序，应用待执行迁移，成功后才重启服务。
 - 当前不使用 changed-files 第三方 action；优先保证完整验证，后续根据 CI 耗时再评估增量矩阵。

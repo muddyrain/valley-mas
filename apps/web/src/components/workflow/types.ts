@@ -2,6 +2,7 @@ export type WorkflowNodeType =
   | 'start'
   | 'end'
   | 'llm'
+  | 'template'
   | 'http'
   | 'tool'
   | 'condition'
@@ -13,7 +14,9 @@ export type WorkflowNodeType =
   | 'loop'
   | 'set_loop_variable'
   | 'continue_loop'
-  | 'terminate_loop';
+  | 'terminate_loop'
+  | 'approval'
+  | 'delay';
 
 export type WorkflowValueType =
   | 'string'
@@ -35,7 +38,7 @@ export interface WorkflowNodeConfig {
   label: string;
   description: string;
   icon: string;
-  category: 'model' | 'flow' | 'logic' | 'tool' | 'subworkflow';
+  category: 'model' | 'content' | 'image' | 'knowledge' | 'flow' | 'logic' | 'tool' | 'subworkflow';
   handles: { input?: boolean; output?: boolean; outputs?: number };
   fixed?: boolean;
   whenAllowed?: boolean;

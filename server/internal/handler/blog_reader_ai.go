@@ -27,7 +27,6 @@ type blogReaderGuideResponse struct {
 type blogAskRequest struct {
 	Question string `json:"question" binding:"required"`
 	Stream   bool   `json:"stream"`
-	ModelID  string `json:"modelId" binding:"required"`
 }
 
 type blogAskCitation struct {
@@ -408,9 +407,9 @@ func AskBlogPost(c *gin.Context) {
 		return
 	}
 
-	invocation, err := aimodel.ResolveInvocation(database.GetDB(), req.ModelID, "text", 90*time.Second)
+	invocation, err := aimodel.ResolveFastTextInvocation(database.GetDB(), 90*time.Second)
 	if err != nil {
-		recordBlogReaderUsage(c, aiclient.FeatureBlogReaderAsk, "", req.ModelID, "", "", aiclient.CompatibleUsage{}, time.Now(), err, req.Stream)
+		recordBlogReaderUsage(c, aiclient.FeatureBlogReaderAsk, "", "", "", "", aiclient.CompatibleUsage{}, time.Now(), err, req.Stream)
 		respondCatalogModelError(c, err)
 		return
 	}

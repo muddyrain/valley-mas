@@ -16,6 +16,7 @@ import (
 	"valley-server/internal/database"
 	"valley-server/internal/integration/notion"
 	"valley-server/internal/model"
+	"valley-server/internal/service"
 	"valley-server/internal/utils"
 	"valley-server/internal/workflow"
 
@@ -623,7 +624,7 @@ func runWorkflowGraph(
 		Error(c, http.StatusInternalServerError, "运行记录序列化失败")
 		return
 	}
-	run := model.WorkflowRun{WorkflowID: definition.ID, UserID: model.Int64String(userID), Status: string(workflow.StatusRunning), Inputs: string(inputsJSON), GraphSnapshot: mustEncodeWorkflowGraph(graph, definition.Graph), SourceRunID: sourceRunID, StartedAt: time.Now()}
+	run := model.WorkflowRun{WorkflowID: definition.ID, UserID: model.Int64String(userID), AppID: app.ID, VersionID: appVersion.ID, Status: string(workflow.StatusRunning), Inputs: string(inputsJSON), GraphSnapshot: mustEncodeWorkflowGraph(graph, definition.Graph), SourceRunID: sourceRunID, StartedAt: time.Now()}
 	if err := database.DB.Create(&run).Error; err != nil {
 		Error(c, http.StatusInternalServerError, "创建运行记录失败")
 		return
@@ -706,7 +707,7 @@ func runWorkflowGraph(
 	// actual number of requests, so the owner context only coordinates cancel.
 	executionContext, releaseRun := activeWorkflowRuns.Start(run.ID.String(), 0)
 	defer releaseRun()
-	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: make(map[string]map[string]any), KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion), ContentSearcher: workflowContentSearcher(model.Int64String(userID)), NotionSearcher: workflowNotionSearcher(model.Int64String(userID)), CoverGenerator: workflowCoverGenerator(), SubworkflowRunner: workflowSubworkflowRunner(model.Int64String(userID))}, func(event workflow.Event) {
+	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: make(map[string]map[string]any), KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion), ContentSearcher: workflowContentSearcher(model.Int64String(userID)), NotionSearcher: workflowNotionSearcher(model.Int64String(userID)), CoverGenerator: workflowCoverGenerator(), AIImageGenerator: workflowAIImageGenerator(), AIImageUnderstander: workflowAIImageUnderstander(), AIImageResourceSaver: workflowAIImageResourceSaver(), NotificationSender: workflowNotificationSender(), SubworkflowRunner: workflowSubworkflowRunner(model.Int64String(userID)), ApprovalGate: workflowApprovalGate(run)}, func(event workflow.Event) {
 		if persistenceErr == nil {
 			event, persistenceErr = persistNodeEvent(event)
 			if persistenceErr == nil {
@@ -716,7 +717,7 @@ func runWorkflowGraph(
 		if nodeTypes[event.NodeID] == workflow.NodeTypeEnd && event.Status == workflow.StatusSucceeded {
 			finalOutput = event.Output
 		}
-		if event.Status == workflow.StatusFailed || event.Status == workflow.StatusCancelled {
+		if event.Status == workflow.StatusFailed || event.Status == workflow.StatusCancelled || event.Status == workflow.StatusWaiting {
 			failureMessage = event.Message
 			failureCode = event.Error
 			failedNodeID = event.NodeID
@@ -734,6 +735,18 @@ func runWorkflowGraph(
 		}
 		if failureCode == "" {
 			failureCode = "WORKFLOW_NODE_FAILED"
+		}
+		if failureCode == "WORKFLOW_APPROVAL_REQUIRED" {
+			_ = database.DB.Model(&run).Updates(map[string]any{
+				"status": string(workflow.StatusWaiting), "result": `{"status":"waiting_approval"}`,
+			}).Error
+			event, eventErr := persistTerminalEvent(workflow.StatusWaiting, failedNodeID, failureMessage, failureCode, nil)
+			if eventErr != nil {
+				send(workflow.Event{RunID: run.ID.String(), Status: workflow.StatusFailed, Message: "运行记录保存失败", Error: "RUN_PERSISTENCE_FAILED"}, "error")
+				return
+			}
+			send(event, "waiting_approval")
+			return
 		}
 		if failureCode == "WORKFLOW_CANCELLED" {
 			_ = finishWorkflowRun(&run, string(workflow.StatusCancelled), map[string]any{"error": failureCode})
@@ -861,7 +874,7 @@ func AdminGetWorkflowRun(c *gin.Context) {
 		return
 	}
 	retry := gin.H{
-		"allowed":              run.Status != string(workflow.StatusRunning) && run.Status != "cancelling",
+		"allowed":              run.Status != string(workflow.StatusRunning) && run.Status != "cancelling" && run.Status != string(workflow.StatusWaiting),
 		"requiresConfirmation": false,
 	}
 	if graph, graphErr := decodeWorkflowGraph(run.GraphSnapshot); graphErr == nil {
@@ -1202,6 +1215,38 @@ func workflowContentSearcher(userID model.Int64String) workflow.ContentSearcher 
 	})
 }
 
+func workflowNotificationSender() workflow.NotificationSender {
+	return workflow.NotificationSenderFunc(func(
+		ctx context.Context,
+		userID int64,
+		request workflow.NotificationRequest,
+	) (workflow.SentNotification, error) {
+		extraData, err := json.Marshal(map[string]string{
+			"path":          request.Path,
+			"status":        request.Status,
+			"workflowRunId": request.RunID,
+		})
+		if err != nil {
+			return workflow.SentNotification{}, err
+		}
+		notification := model.UserNotification{
+			UserID:    model.Int64String(userID),
+			Type:      "workflow",
+			Title:     request.Title,
+			Content:   request.Content,
+			ExtraData: string(extraData),
+		}
+		if err := database.GetDB().WithContext(ctx).Create(&notification).Error; err != nil {
+			return workflow.SentNotification{}, err
+		}
+		return workflow.SentNotification{
+			ID:     notification.ID.String(),
+			Status: request.Status,
+			Path:   request.Path,
+		}, nil
+	})
+}
+
 func workflowNotionSearcher(userID model.Int64String) workflow.NotionSearcher {
 	return workflow.NotionSearcherFunc(func(ctx context.Context, query string, limit int) (workflow.NotionSearchResult, error) {
 		service, err := notion.NewService(database.GetDB(), config.Load().NotionOAuth)
@@ -1246,6 +1291,102 @@ func workflowCoverGenerator() workflow.CoverGenerator {
 	})
 }
 
+func workflowAIImageGenerator() workflow.AIImageGenerator {
+	return workflow.AIImageGeneratorFunc(func(
+		ctx context.Context,
+		userID int64,
+		modelID string,
+		prompt string,
+		aspectRatio string,
+		quality string,
+		referenceImage string,
+	) (workflow.GeneratedAIImage, error) {
+		preset, _ := findAIImagePreset("free")
+		references := []string(nil)
+		if strings.TrimSpace(referenceImage) != "" {
+			references = []string{referenceImage}
+		}
+		generation, err := service.NewAIImageGenerationService(database.GetDB()).Generate(
+			ctx,
+			service.AIImageGenerationInput{
+				UserID:       model.Int64String(userID),
+				ModelID:      modelID,
+				PresetID:     preset.ID,
+				PresetName:   preset.Name,
+				PresetPrompt: preset.PromptContent,
+				Prompt:       prompt,
+				AspectRatio:  aspectRatio,
+				Quality:      quality,
+				References:   references,
+				Feature:      "workflow-image-generation",
+			},
+		)
+		if err != nil {
+			return workflow.GeneratedAIImage{}, err
+		}
+		return workflow.GeneratedAIImage{
+			GenerationID: generation.ID.String(),
+			URL:          generation.ResultURL,
+			Width:        generation.ResultWidth,
+			Height:       generation.ResultHeight,
+			Model:        generation.Model,
+			Size:         generation.RequestedSize,
+		}, nil
+	})
+}
+
+func workflowAIImageUnderstander() workflow.AIImageUnderstander {
+	return workflow.AIImageUnderstanderFunc(func(
+		ctx context.Context,
+		userID int64,
+		modelID string,
+		imageURL string,
+		prompt string,
+	) (workflow.UnderstoodAIImage, error) {
+		result, err := service.NewAIImageUnderstandingService(database.GetDB()).Understand(
+			ctx,
+			service.AIImageUnderstandingInput{
+				UserID:      model.Int64String(userID),
+				ModelID:     modelID,
+				ImageSource: imageURL,
+				Prompt:      prompt,
+				Feature:     "workflow-image-understanding",
+			},
+		)
+		if err != nil {
+			return workflow.UnderstoodAIImage{}, err
+		}
+		return workflow.UnderstoodAIImage{
+			Text: result.Text, Model: result.Model, TokenUsage: result.TokenUsage,
+		}, nil
+	})
+}
+
+func workflowAIImageResourceSaver() workflow.AIImageResourceSaver {
+	return workflow.AIImageResourceSaverFunc(func(ctx context.Context, userID int64, generationID, visibility string) (workflow.SavedAIImageResource, error) {
+		id, err := strconv.ParseInt(strings.TrimSpace(generationID), 10, 64)
+		if err != nil || id <= 0 {
+			return workflow.SavedAIImageResource{}, fmt.Errorf("AI 生图记录 ID 无效")
+		}
+		result, err := newAIImageResourceSaver().Save(ctx, service.SaveAIImageGenerationResourceInput{
+			UserID:       model.Int64String(userID),
+			GenerationID: model.Int64String(id),
+			Visibility:   visibility,
+		})
+		if err != nil {
+			return workflow.SavedAIImageResource{}, err
+		}
+		return workflow.SavedAIImageResource{
+			ResourceID: result.Resource.ID.String(),
+			Title:      result.Resource.Title,
+			Tags:       result.Resource.Tags,
+			URL:        result.Resource.URL,
+			Visibility: result.Resource.Visibility,
+			Model:      result.MetadataModel,
+		}, nil
+	})
+}
+
 type subworkflowStackContextKey struct{}
 
 func workflowSubworkflowRunner(ownerID model.Int64String) workflow.SubworkflowRunner {
@@ -1285,7 +1426,7 @@ func workflowSubworkflowRunner(ownerID model.Int64String) workflow.SubworkflowRu
 		}
 		var final map[string]any
 		executionContext := context.WithValue(ctx, subworkflowStackContextKey{}, nextStack)
-		err = workflow.Execute(executionContext, graph, workflowRuntimeRegistry(), workflow.RunContext{ID: request.VersionID, Actor: actor, Inputs: request.Inputs, Outputs: map[string]map[string]any{}, KnowledgeRetriever: workflowKnowledgeRetriever(ownerID, version), ContentSearcher: workflowContentSearcher(ownerID), CoverGenerator: workflowCoverGenerator(), SubworkflowRunner: runner}, func(event workflow.Event) {
+		err = workflow.Execute(executionContext, graph, workflowRuntimeRegistry(), workflow.RunContext{ID: request.VersionID, Actor: actor, Inputs: request.Inputs, Outputs: map[string]map[string]any{}, KnowledgeRetriever: workflowKnowledgeRetriever(ownerID, version), ContentSearcher: workflowContentSearcher(ownerID), NotionSearcher: workflowNotionSearcher(ownerID), CoverGenerator: workflowCoverGenerator(), AIImageGenerator: workflowAIImageGenerator(), AIImageUnderstander: workflowAIImageUnderstander(), AIImageResourceSaver: workflowAIImageResourceSaver(), NotificationSender: workflowNotificationSender(), SubworkflowRunner: runner}, func(event workflow.Event) {
 			if event.NodeType == workflow.NodeTypeEnd && event.Status == workflow.StatusSucceeded {
 				final = event.Output
 			}
@@ -1432,7 +1573,16 @@ func persistWorkflowNodeEvent(db *gorm.DB, runID model.Int64String, nodeType wor
 		if err != nil {
 			return err
 		}
-		return db.Create(&model.WorkflowNodeRun{WorkflowRunID: runID, NodeID: event.NodeID, NodeType: string(nodeType), CapabilityID: event.CapabilityID, Status: string(event.Status), Input: string(input), StartedAt: now}).Error
+		row := model.WorkflowNodeRun{}
+		return db.Where("workflow_run_id = ? AND node_id = ?", runID, event.NodeID).
+			Assign(model.WorkflowNodeRun{
+				NodeType: string(nodeType), CapabilityID: event.CapabilityID,
+				Status: string(event.Status), Input: string(input), Output: "{}",
+				ErrorCode: "", DurationMs: 0, StartedAt: now, FinishedAt: nil,
+			}).
+			FirstOrCreate(&row, model.WorkflowNodeRun{
+				WorkflowRunID: runID, NodeID: event.NodeID,
+			}).Error
 	}
 	if event.Status == workflow.StatusSkipped {
 		return db.Create(&model.WorkflowNodeRun{

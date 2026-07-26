@@ -1,0 +1,4 @@
+-- +goose Up
+ALTER TABLE ai_models
+  ADD COLUMN IF NOT EXISTS context_window_tokens INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS max_output_tokens INTEGER NOT NULL DEFAULT 0;

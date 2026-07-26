@@ -32,10 +32,14 @@ type WorkflowRun struct {
 	ID            Int64String    `gorm:"primaryKey;autoIncrement:false;index:idx_workflow_runs_workflow_user_started,priority:4" json:"id"`
 	WorkflowID    Int64String    `gorm:"index;not null;index:idx_workflow_runs_workflow_user_started,priority:1" json:"workflowId"`
 	UserID        Int64String    `gorm:"index;not null;index:idx_workflow_runs_workflow_user_started,priority:2" json:"userId"`
+	AppID         Int64String    `gorm:"index" json:"appId,omitempty"`
+	VersionID     Int64String    `gorm:"index" json:"versionId,omitempty"`
 	Status        string         `gorm:"size:20;not null;default:'running';index" json:"status"`
 	Inputs        string         `gorm:"type:json" json:"inputs,omitempty"`
 	GraphSnapshot string         `gorm:"type:json;not null" json:"graphSnapshot"`
 	SourceRunID   *Int64String   `gorm:"index" json:"sourceRunId,omitempty"`
+	TriggerID     *Int64String   `gorm:"index" json:"triggerId,omitempty"`
+	RunJobID      *Int64String   `gorm:"uniqueIndex" json:"runJobId,omitempty"`
 	Result        string         `gorm:"type:json" json:"result,omitempty"`
 	StartedAt     time.Time      `gorm:"index:idx_workflow_runs_workflow_user_started,priority:3" json:"startedAt"`
 	FinishedAt    *time.Time     `json:"finishedAt,omitempty"`
@@ -43,9 +47,32 @@ type WorkflowRun struct {
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-// WorkflowTrigger is an owner-private schedule that can enqueue a published
-// workflow. P14.1 only permits cron triggers for graphs with no file input or
-// side-effect capability.
+type WorkflowApproval struct {
+	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	WorkflowRunID Int64String    `gorm:"not null;index;uniqueIndex:uidx_workflow_approval_run_node" json:"workflowRunId"`
+	WorkflowID    Int64String    `gorm:"not null;index" json:"workflowId"`
+	UserID        Int64String    `gorm:"not null;index" json:"userId"`
+	NodeID        string         `gorm:"size:120;not null;uniqueIndex:uidx_workflow_approval_run_node" json:"nodeId"`
+	Title         string         `gorm:"size:200;not null" json:"title"`
+	Description   string         `gorm:"size:1000" json:"description"`
+	Status        string         `gorm:"size:20;not null;default:'pending';index" json:"status"`
+	Note          string         `gorm:"size:1000" json:"note,omitempty"`
+	DecidedAt     *time.Time     `json:"decidedAt,omitempty"`
+	ResumedAt     *time.Time     `gorm:"index" json:"resumedAt,omitempty"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (approval *WorkflowApproval) BeforeCreate(tx *gorm.DB) error {
+	if approval.ID == 0 {
+		approval.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+// WorkflowTrigger is an owner-private invocation rule for a published
+// workflow. Secrets are write-only API data; only their digest is persisted.
 type WorkflowTrigger struct {
 	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	WorkflowID     Int64String    `gorm:"not null;index:idx_workflow_trigger_owner_workflow" json:"workflowId"`
@@ -53,9 +80,13 @@ type WorkflowTrigger struct {
 	Type           string         `gorm:"size:20;not null;default:'cron'" json:"type"`
 	CronExpression string         `gorm:"size:120;not null" json:"cronExpression"`
 	Timezone       string         `gorm:"size:80;not null;default:'Asia/Shanghai'" json:"timezone"`
+	EventKey       string         `gorm:"size:100;index" json:"eventKey,omitempty"`
+	SecretHash     string         `gorm:"size:64" json:"-"`
 	Status         string         `gorm:"size:20;not null;default:'active';index" json:"status"`
 	NextRunAt      *time.Time     `gorm:"index" json:"nextRunAt,omitempty"`
 	LastRunAt      *time.Time     `json:"lastRunAt,omitempty"`
+	WebhookSecret  string         `gorm:"-" json:"webhookSecret,omitempty"`
+	WebhookPath    string         `gorm:"-" json:"webhookPath,omitempty"`
 	CreatedAt      time.Time      `json:"createdAt"`
 	UpdatedAt      time.Time      `json:"updatedAt"`
 	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
@@ -67,15 +98,18 @@ type WorkflowTrigger struct {
 type WorkflowRunJob struct {
 	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	TriggerID      Int64String    `gorm:"not null;index" json:"triggerId"`
+	TriggerType    string         `gorm:"size:20;not null;default:'cron'" json:"triggerType"`
 	WorkflowID     Int64String    `gorm:"not null;index" json:"workflowId"`
 	UserID         Int64String    `gorm:"not null;index" json:"userId"`
 	VersionID      Int64String    `gorm:"not null" json:"versionId"`
 	GraphSnapshot  string         `gorm:"type:json;not null" json:"-"`
+	Inputs         string         `gorm:"type:json;not null" json:"-"`
 	Status         string         `gorm:"size:20;not null;default:'queued';index" json:"status"`
 	IdempotencyKey string         `gorm:"size:180;not null;uniqueIndex" json:"-"`
 	ScheduledAt    time.Time      `gorm:"not null;index" json:"scheduledAt"`
 	LeaseUntil     *time.Time     `gorm:"index" json:"leaseUntil,omitempty"`
 	Attempt        int            `gorm:"not null;default:0" json:"attempt"`
+	ErrorCode      string         `gorm:"size:80" json:"errorCode,omitempty"`
 	CreatedAt      time.Time      `json:"createdAt"`
 	UpdatedAt      time.Time      `json:"updatedAt"`
 	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
@@ -86,6 +120,7 @@ func (job *WorkflowRunJob) BeforeCreate(tx *gorm.DB) error {
 		job.ID = Int64String(utils.GenerateID())
 	}
 	job.GraphSnapshot = normalizeWorkflowJSON(job.GraphSnapshot)
+	job.Inputs = normalizeWorkflowJSON(job.Inputs)
 	return nil
 }
 

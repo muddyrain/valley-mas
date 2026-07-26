@@ -1,0 +1,3 @@
+-- +goose Up
+-- Embedding search currently requires PostgreSQL + pgvector.
+-- Keep the version aligned so both dialects share one migration history.

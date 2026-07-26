@@ -2,8 +2,8 @@ import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import KnowledgeBases from '@/pages/KnowledgeBases';
 import Workflows from '@/pages/Workflows';
-import NotionConnectorCard from './NotionConnectorCard';
 import PromptResources from './PromptResources';
+import ToolResources from './ToolResources';
 
 const tabs = [
   { value: 'workflows', label: '工作流', disabled: false },
@@ -60,7 +60,7 @@ export default function AIResources() {
           ) : activeTab === 'prompts' ? (
             <PromptResources />
           ) : activeTab === 'tools' ? (
-            <NotionConnectorCard />
+            <ToolResources />
           ) : (
             <Workflows embedded />
           )}

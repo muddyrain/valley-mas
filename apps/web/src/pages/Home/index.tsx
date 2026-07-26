@@ -16,7 +16,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
 import HomeAuthorProfileCard, { type GithubProfile } from './components/HomeAuthorProfileCard';
-import HomeLabSection from './components/HomeLabSection';
 import {
   EmptyPanel,
   HeroRibbon,
@@ -125,7 +124,7 @@ export default function Home() {
     let cancelled = false;
     setLoadingGithubProfile(true);
 
-    fetch(`https://api.github.com/users/your-github-username`, {
+    fetch('https://api.github.com/users/muddyrain', {
       headers: {
         Accept: 'application/vnd.github+json',
       },
@@ -427,9 +426,6 @@ export default function Home() {
             </CardContent>
           </Card>
         </section>
-
-        {/* Lab */}
-        <HomeLabSection />
 
         {/* Blog Updates */}
         <section className="mt-10">

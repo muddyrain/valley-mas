@@ -1,19 +1,28 @@
 # 数据库迁移说明
 
-本目录保存服务端数据库结构变更的 SQL 记录。当前仓库没有统一的迁移执行器脚本，不能再按旧文档里的单次 PowerShell 流程或固定 `002` 迁移流程操作。
+本目录是历史 SQL 档案，不再作为自动执行入口。早期文件存在重复版本号和混合数据库方言，不能安全地从头重放。
+
+可执行迁移的唯一真源是：
+
+- `internal/dbmigration/postgres/*.sql`
+- `internal/dbmigration/mysql/*.sql`
+
+迁移文件编译进 `cmd/migrate`，执行状态记录在目标数据库的 `schema_migrations` 表中。
 
 ## 当前原则
 
-- GORM model 改动必须同时考虑迁移 SQL、默认值、索引、已有数据兼容和生产 `DB_AUTO_MIGRATE=false` 的约束。
-- 本地开发可以临时开启 `DB_AUTO_MIGRATE=true` 或使用 `air db=true` 快速验证模型变化。
-- 生产或共享环境不要依赖 AutoMigrate 隐式改结构，应使用明确、可审查、可回滚的 SQL 迁移。
-- 新增迁移文件时沿用三位递增编号，例如 `035_add_xxx.sql`。
+- GORM model 改动必须同时新增 PostgreSQL 与 MySQL 的同版本迁移，并考虑默认值、索引和已有数据兼容。
+- 迁移使用唯一时间戳版本，例如 `202607260010_add_xxx.sql`；两个方言目录的版本集合必须一致。
+- 本地 `air` 只执行待处理迁移；普通热重载只查询版本表，不做全量 GORM schema introspection。
+- 生产服务进程不隐式修改结构；部署在服务重启前显式执行迁移，失败即停止发布。
+- MySQL 的 managed baseline 会创建 `valley_managed_add_column_if_missing` 与 `valley_managed_add_index_if_missing` 两个受控 helper；后续 MySQL 迁移用它们兼容已由 GORM 建好的旧库。
+- 迁移账号必须具备目标结构所需的 DDL 权限；MySQL 首次接入还需要 `CREATE ROUTINE`，PostgreSQL 仅在尚未安装 pgvector 时需要创建扩展的权限。
 - 破坏性迁移必须写清楚数据影响和回滚方式。
 
 ## 新增迁移检查清单
 
-- [ ] 迁移编号没有与现有文件冲突。
-- [ ] SQL 与当前支持的数据库驱动匹配。
+- [ ] 时间戳版本唯一，PostgreSQL 与 MySQL 文件版本一致。
+- [ ] SQL 使用 Goose `-- +goose Up` 注解，并与目标数据库方言匹配。
 - [ ] model、handler、service 和前端 API 需要的字段已同步。
 - [ ] 对已有数据有兼容策略，例如默认值、回填或分阶段上线。
 - [ ] 需要回滚时提供 down SQL 或明确人工回退步骤。
@@ -28,30 +37,31 @@
 cd server && go test ./...
 ```
 
-一次性补齐当前 GORM model 对应的缺失表和字段。优先指定具体 model，避免远程 PostgreSQL 上全量 schema introspection 过慢：
+查看并应用版本化迁移：
+
+```bash
+cd server
+go run ./cmd/migrate status
+go run ./cmd/migrate up
+go run ./cmd/migrate version
+```
+
+全新的空开发库显式初始化一次：
+
+```bash
+cd server && go run ./cmd/migrate bootstrap --apply
+```
+
+`bootstrap` 会执行一次完整 GORM AutoMigrate，因此仍可能较慢，并且拒绝非空数据库与生产环境。已有数据库通过首个 managed baseline 接入，不重放本目录的历史 SQL。
+
+`sync-schema` 只保留作开发/共享测试环境的定向应急修复。例如：
 
 ```bash
 cd server && go run ./cmd/sync-schema --apply --models places,ledger,closet
 ```
 
-如需同步其他范围，可显式传入 `--scope lifetrace`、`--scope core`、`--scope content` 或 `--scope all`。`--scope all` 保留历史全量 AutoMigrate 行为，可能在远程库上很慢。带 `--apply` 时必须指定 `--models` 或 `--scope`，避免误跑大范围同步。
-
-`sync-schema` 是开发和共享测试环境的应急同步命令，不是完整迁移执行器。它不会记录 SQL 文件是否已执行，也不会替代生产环境的审查、回滚和分阶段发布流程。新增字段或生产变更仍优先写明确 SQL 迁移。
-
-使用本地自动迁移验证模型：
-
-```bash
-cd server && air db=true
-```
-
-或在 `.env` 中临时配置：
-
-```env
-DB_AUTO_MIGRATE=true
-```
-
-验证结束后不要把本地 `.env` 提交到仓库。
+它不会写入迁移版本历史，不能代替正式迁移。
 
 ## 历史迁移
 
-目录中保留了从 `001` 到当前最新的 `071` 迁移，其中部分早期迁移只适用于当时的 SQLite/本地开发阶段。查看旧迁移时，应以当前 `server/.env.example`、`internal/model` 和目标数据库为准，不要直接照搬旧文档里的单次迁移步骤。
+目录中保留了从 `001` 到当前最新编号的历史迁移，其中部分早期迁移只适用于当时的 SQLite/本地开发阶段。查看旧迁移时，应以当前 `server/.env.example`、`internal/model`、managed migrations 和目标数据库为准，不要直接执行整个目录。

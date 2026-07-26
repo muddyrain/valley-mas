@@ -1,6 +1,8 @@
 package router
 
 import (
+	"context"
+
 	"valley-server/internal/ai"
 	"valley-server/internal/ai/tools"
 	"valley-server/internal/aimodel"
@@ -18,6 +20,7 @@ import (
 )
 
 func Setup(cfg *config.Config) *gin.Engine {
+	handler.StartWorkflowTriggerWorker(context.Background())
 	r := gin.Default()
 
 	r.Use(logger.RequestLogger())
@@ -49,6 +52,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			}), nil
 		})
 		mindarena.RegisterMindArenaRoutes(api, mindarena.NewHandler(mindArenaService))
+		api.POST("/workflow-hooks/:triggerId", handler.InvokeWorkflowWebhook)
 
 		lifeTraceWeatherService := lifetrace.NewWeatherService(cfg.QWeather)
 		lifeTraceHandler := lifetrace.NewHandler(lifeTraceWeatherService, cfg.WebPush)
@@ -146,10 +150,21 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/ai/chat", handler.ChatWithAI)
 			auth.GET("/ai/models", handler.ListAvailableAIModels)
 			auth.GET("/ai/image-presets", handler.ListAIImagePresets)
+			auth.POST("/ai/image-presets/:presetId/sample-prompts", handler.GenerateAIImagePresetSamples)
 			auth.GET("/ai/image-generations", handler.ListAIImageGenerations)
 			auth.POST("/ai/image-generations", handler.CreateAIImageGeneration)
+			auth.GET("/ai/image-generations/:generationId/image-data", handler.GetAIImageGenerationImageData)
 			auth.GET("/ai/image-generations/:generationId", handler.GetAIImageGeneration)
+			auth.PATCH("/ai/image-generations/:generationId/favorite", handler.UpdateAIImageGenerationFavorite)
+			auth.DELETE("/ai/image-generations/:generationId", handler.DeleteAIImageGeneration)
 			auth.POST("/ai/image-generations/:generationId/resource", handler.SaveAIImageGenerationResource)
+			auth.GET("/ai/image-conversations", handler.ListAIImageConversations)
+			auth.GET("/ai/image-conversations/current", handler.GetCurrentAIImageConversation)
+			auth.DELETE("/ai/image-conversations/current", handler.ClearCurrentAIImageConversation)
+			auth.POST("/ai/image-conversations", handler.CreateAIImageConversation)
+			auth.GET("/ai/image-conversations/:conversationId", handler.GetAIImageConversation)
+			auth.DELETE("/ai/image-conversations/:conversationId/messages", handler.ClearAIImageConversation)
+			auth.POST("/ai/image-conversations/:conversationId/messages", handler.AddAIImageConversationMessage)
 			// AI Workbench platform assets. Legacy /ai/agents and /workflows remain supported.
 			auth.GET("/ai/apps", handler.ListAIApps)
 			auth.POST("/ai/apps", handler.CreateAIApp)
@@ -244,6 +259,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/workflows/:id/triggers", handler.CreateWorkflowTrigger)
 			auth.PATCH("/workflows/:id/triggers/:triggerId", handler.UpdateWorkflowTrigger)
 			auth.DELETE("/workflows/:id/triggers/:triggerId", handler.DeleteWorkflowTrigger)
+			auth.POST("/workflows/:id/triggers/:triggerId/rotate-secret", handler.RotateWorkflowWebhookSecret)
+			auth.POST("/workflow-events/:eventKey", handler.PublishWorkflowEvent)
 			auth.GET("/workflows/:id/runs", handler.AdminListWorkflowRuns)
 			auth.GET("/workflows/:id/test-cases", handler.ListWorkflowTestCases)
 			auth.POST("/workflows/:id/test-cases", handler.CreateWorkflowTestCase)
@@ -254,6 +271,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/workflows/:id/runs/:runId/cancel", handler.CancelWorkflowRun)
 			auth.POST("/workflows/:id/runs/:runId/retry", handler.RetryWorkflowRun)
 			auth.POST("/workflows/:id/runs/:runId/explain", handler.ExplainWorkflowRun)
+			auth.GET("/workflows/:id/approvals", handler.ListWorkflowApprovals)
+			auth.POST("/workflows/:id/approvals/:approvalId/decision", handler.DecideWorkflowApproval)
 		}
 
 		admin := api.Group("/admin")

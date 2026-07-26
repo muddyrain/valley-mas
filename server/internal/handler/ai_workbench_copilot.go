@@ -83,7 +83,6 @@ type copilotContextPayload struct {
 }
 
 type copilotMessageRequest struct {
-	ModelID   string                `json:"modelId"`
 	Scope     string                `json:"scope"`
 	TargetID  string                `json:"targetId"`
 	SessionID string                `json:"sessionId"`
@@ -94,6 +93,20 @@ type copilotMessageRequest struct {
 func workbenchCopilotEnabled() bool {
 	value := strings.TrimSpace(strings.ToLower(os.Getenv("AI_WORKBENCH_COPILOT_ENABLED")))
 	return value != "false" && value != "0" && value != "off" && value != "no"
+}
+
+// defaultWorkbenchTextModel intentionally follows the administrator's
+// model directory ordering. Context-window metadata is advisory only: an
+// unknown limit must not cause us to fabricate a value or block a usable model.
+func defaultWorkbenchTextModel(db *gorm.DB) (model.AIModel, error) {
+	items, err := aimodel.ListEnabledModels(db, "text")
+	if err != nil {
+		return model.AIModel{}, err
+	}
+	if len(items) == 0 {
+		return model.AIModel{}, errors.New("no enabled text model")
+	}
+	return items[0], nil
 }
 
 func GetWorkbenchCopilotSession(c *gin.Context) {
@@ -205,14 +218,9 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	payload.Scope = strings.TrimSpace(payload.Scope)
 	payload.TargetID = strings.TrimSpace(payload.TargetID)
 	payload.SessionID = strings.TrimSpace(payload.SessionID)
-	payload.ModelID = strings.TrimSpace(payload.ModelID)
 	payload.Message = truncateAIAgentRunes(strings.TrimSpace(payload.Message), 4000)
 	if payload.Message == "" {
 		Error(c, http.StatusBadRequest, "请输入要讨论的内容")
-		return
-	}
-	if payload.ModelID == "" {
-		Error(c, http.StatusBadRequest, "请选择文本模型")
 		return
 	}
 	ownerID := model.Int64String(userID)
@@ -220,9 +228,14 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 		Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	invocation, err := aimodel.ResolveInvocation(database.GetDB(), payload.ModelID, "text", copilotPlanningTimeout)
+	defaultModel, err := defaultWorkbenchTextModel(database.GetDB())
 	if err != nil {
-		aiusage.Record(aiusage.Entry{Feature: featureWorkbenchCopilot, Provider: "unknown", Model: payload.ModelID, UserID: ownerID.String(), Status: aiusage.StatusFailed, ErrorMessage: err.Error()})
+		Error(c, http.StatusServiceUnavailable, "当前没有可用的文本模型，请在模型目录启用并排序")
+		return
+	}
+	invocation, err := aimodel.ResolveInvocation(database.GetDB(), defaultModel.ID.String(), "text", copilotPlanningTimeout)
+	if err != nil {
+		aiusage.Record(aiusage.Entry{Feature: featureWorkbenchCopilot, Provider: "unknown", Model: defaultModel.ModelID, UserID: ownerID.String(), Status: aiusage.StatusFailed, ErrorMessage: err.Error()})
 		respondCatalogModelError(c, err)
 		return
 	}
@@ -284,7 +297,7 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	}
 	historyJSON, _ := json.Marshal(promptHistory)
 	draftJSON, _ := json.Marshal(draft)
-	systemPrompt := `你是 Valley Graph v4 上下文副驾驶。严格只输出 JSON，字段必须且只能是 mode、message、targetType、questions、operations、workflow、agent。mode 只能是 answer、clarify、proposal。信息不足时用 clarify，给 1-3 个问题，每题 2-4 个简短选项。workflow 作用域的 proposal 只能返回 operations，workflow 必须为 null；不得返回完整候选图。operations 只能使用 startInput.upsert、startInput.remove、node.insert、node.update、node.remove、edge.connect、edge.disconnect。node.insert 优先使用 afterNodeId 或 beforeNodeId 自动重连。节点定位不唯一时必须 clarify，不得猜测。通用节点只有 start、end、llm、tool、condition、switch、merge、variable、subworkflow、intent；业务能力只能使用 tool/config.capabilityId。switch 只用于已有 string、number 或 boolean 字段的固定值多路分流，必须配置 2 至 8 个 case 和 default 出口；自由文本分类必须使用 intent，不得猜测 case 值。不得保存、运行、发布或实际调用工具。生成封面时，在用户指定的摘要节点后插入 tool/image.generateCover，默认直接执行；仅当用户明确要求依赖已有上游布尔输出时，才为该节点设置 node.when。不得为封面新增 Start 输入，不得创建 Condition，不得修改其他节点。agent 作用域继续在 agent 字段返回候选，operations 为空。`
+	systemPrompt := `你是 Valley Graph v4 上下文副驾驶。严格只输出 JSON，字段必须且只能是 mode、message、targetType、questions、operations、workflow、agent。mode 只能是 answer、clarify、proposal。信息不足时用 clarify，给 1-3 个问题，每题 2-4 个简短选项。workflow 作用域的 proposal 只能返回 operations，workflow 必须为 null；不得返回完整候选图。operations 只能使用 startInput.upsert、startInput.remove、node.insert、node.update、node.remove、edge.connect、edge.disconnect。node.insert 优先使用 afterNodeId 或 beforeNodeId 自动重连。节点定位不唯一时必须 clarify，不得猜测。通用节点只有 start、end、llm、template、http、tool、condition、switch、merge、variable、subworkflow、intent、loop；业务能力只能使用 tool/config.capabilityId。纯文本拼装优先使用 template，不得为确定性字符串处理调用模型。switch 只用于已有 string、number 或 boolean 字段的固定值多路分流，必须配置 2 至 8 个 case 和 default 出口；自由文本分类必须使用 intent，不得猜测 case 值。不得保存、运行、发布或实际调用工具。生成封面时，在用户指定的摘要节点后插入 tool/image.generateCover，默认直接执行；仅当用户明确要求依赖已有上游布尔输出时，才为该节点设置 node.when。不得为封面新增 Start 输入，不得创建 Condition，不得修改其他节点。agent 作用域继续在 agent 字段返回候选，operations 为空。`
 	labelsJSON, _ := json.Marshal(payload.Context.NodeLabels)
 	userPrompt := fmt.Sprintf("作用域：%s\n目标 ID：%s\n选中节点：%s\n节点名称映射：%s\n安全运行 ID：%s\n能力目录：%s\n最近对话：%s\n当前草稿：%s\n\n用户消息：%s", payload.Scope, payload.TargetID, payload.Context.SelectedNodeID, labelsJSON, payload.Context.RunID, capabilities, historyJSON, draftJSON, payload.Message)
 	emitCopilotActivity(c, &run, copilotStagePlanning, "正在理解需求")

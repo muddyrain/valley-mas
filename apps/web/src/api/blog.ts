@@ -321,7 +321,7 @@ export function uploadBlogCoverByUrl(data: { url: string }) {
   >('/admin/blog/cover/upload-by-url', data);
 }
 
-export function generateBlogExcerpt(data: { title?: string; content: string; modelId: string }) {
+export function generateBlogExcerpt(data: { title?: string; content: string }) {
   return request.post<unknown, BlogAIExcerptResponse>('/admin/blog/ai/excerpt', data);
 }
 
@@ -341,13 +341,13 @@ export function generateBlogReaderGuide(postId: string, modelId: string) {
   );
 }
 
-export function askBlogPost(postId: string, data: { question: string; modelId: string }) {
+export function askBlogPost(postId: string, data: { question: string }) {
   return request.post<unknown, BlogAskResponse>(`/public/blog/posts/id/${postId}/ai/ask`, data);
 }
 
 export async function askBlogPostStream(
   postId: string,
-  data: { question: string; modelId: string; signal?: AbortSignal },
+  data: { question: string; signal?: AbortSignal },
   handlers: {
     onChunk: (payload: BlogAskStreamChunk) => void;
     onError?: (message: string) => void;
@@ -362,7 +362,7 @@ export async function askBlogPostStream(
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ question: data.question, modelId: data.modelId, stream: true }),
+    body: JSON.stringify({ question: data.question, stream: true }),
     credentials: 'include',
     signal: data.signal,
   });

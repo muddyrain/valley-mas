@@ -21,7 +21,7 @@ export interface NodeRunSnapshot extends NodeRunIterationSnapshot {
 export interface WorkflowRunSession {
   generation: number;
   runId: string | null;
-  status: 'idle' | 'running' | 'success' | 'error' | 'cancelled';
+  status: 'idle' | 'running' | 'waiting_approval' | 'success' | 'error' | 'cancelled';
   nodes: Record<string, NodeRunSnapshot>;
   finalOutput: Record<string, unknown> | null;
   error: string | null;
@@ -187,6 +187,14 @@ function applyWorkflowRunEvent(
     data,
     current,
   );
+  if (event.status === 'waiting_approval') {
+    return {
+      ...session,
+      runId: nextRunID,
+      status: 'waiting_approval',
+      nodes: { ...session.nodes, [nodeID]: snapshot },
+    };
+  }
   if (event.status === 'cancelled') {
     return {
       ...session,
@@ -248,7 +256,8 @@ function snapshotFromEvent(
       iterations: current.iterations,
     };
   }
-  const nextStatus: NodeRunStatus = status === 'done' ? current.status : status;
+  const nextStatus: NodeRunStatus =
+    status === 'done' ? current.status : status === 'waiting_approval' ? 'running' : status;
   const nextError = status === 'error' ? message || data?.error || current.error : current.error;
   return {
     status: nextStatus,

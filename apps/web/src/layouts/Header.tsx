@@ -8,7 +8,6 @@ import {
   ImageIcon,
   LogOut,
   Menu,
-  MessageCircleHeart,
   Moon,
   RefreshCw,
   Sparkles,
@@ -74,12 +73,6 @@ export default function Header() {
       label: '博客',
       icon: BookOpen,
       active: location.pathname.startsWith('/blog'),
-    },
-    {
-      to: '/guestbook',
-      label: '留言墙',
-      icon: MessageCircleHeart,
-      active: location.pathname.startsWith('/guestbook'),
     },
   ];
 

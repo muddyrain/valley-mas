@@ -19,7 +19,7 @@ import { replaceAll } from '@milkdown/kit/utils';
 import { Bold, ChevronDown, Code2, Italic, Link2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { normalizeOrderedListStarts } from '@/utils/blog';
+import { normalizeHtmlImageTags, normalizeOrderedListStarts } from '@/utils/blog';
 
 type HeadingOption = {
   label: string;
@@ -54,6 +54,10 @@ const DEFAULT_HEADING_OPTIONS: HeadingOption[] = [
   { label: '标题 6', level: 6 },
 ];
 
+function normalizeEditorMarkdown(value: string) {
+  return normalizeOrderedListStarts(normalizeHtmlImageTags(value));
+}
+
 export function MdxMarkdownEditor({
   value,
   onChange,
@@ -64,8 +68,8 @@ export function MdxMarkdownEditor({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const floatingToolbarRef = useRef<HTMLDivElement | null>(null);
   const crepeRef = useRef<Crepe | null>(null);
-  const latestMarkdownRef = useRef(normalizeOrderedListStarts(value));
-  const valueRef = useRef(normalizeOrderedListStarts(value));
+  const latestMarkdownRef = useRef(normalizeEditorMarkdown(value));
+  const valueRef = useRef(normalizeEditorMarkdown(value));
   const onChangeRef = useRef(onChange);
   const pendingSyncedMarkdownRef = useRef<string | null>(null);
   const [floatingToolbarState, setFloatingToolbarState] = useState<FloatingToolbarState | null>(
@@ -81,7 +85,9 @@ export function MdxMarkdownEditor({
   );
 
   useEffect(() => {
-    valueRef.current = normalizeOrderedListStarts(value);
+    const normalizedValue = normalizeEditorMarkdown(value);
+    valueRef.current = normalizedValue;
+    if (normalizedValue !== value) onChangeRef.current(normalizedValue);
   }, [value]);
 
   useEffect(() => {
@@ -261,7 +267,7 @@ export function MdxMarkdownEditor({
 
     crepe.on((listener) => {
       listener.markdownUpdated((_ctx, markdown) => {
-        const normalizedMarkdown = normalizeOrderedListStarts(markdown);
+        const normalizedMarkdown = normalizeEditorMarkdown(markdown);
         const pendingSyncedMarkdown = pendingSyncedMarkdownRef.current;
         latestMarkdownRef.current = normalizedMarkdown;
 
@@ -290,7 +296,7 @@ export function MdxMarkdownEditor({
         }
 
         crepeRef.current = crepe;
-        const currentMarkdown = normalizeOrderedListStarts(crepe.getMarkdown());
+        const currentMarkdown = normalizeEditorMarkdown(crepe.getMarkdown());
         const nextMarkdown = valueRef.current;
         latestMarkdownRef.current = currentMarkdown;
 
@@ -318,7 +324,7 @@ export function MdxMarkdownEditor({
   }, [headingOptions, updateFloatingToolbar]);
 
   useEffect(() => {
-    valueRef.current = normalizeOrderedListStarts(value);
+    valueRef.current = normalizeEditorMarkdown(value);
     const crepe = crepeRef.current;
     if (!crepe) {
       latestMarkdownRef.current = valueRef.current;

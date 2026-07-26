@@ -5,6 +5,7 @@ import { type WorkflowVariableOption, workflowValueTypeLabel } from './workflowV
 const workflowValueTypes = new Set<WorkflowValueType>([
   'string',
   'string[]',
+  'array',
   'object',
   'number',
   'boolean',
@@ -22,7 +23,8 @@ export function toWorkflowValueType(type: string | undefined): WorkflowValueType
 }
 
 export function formatTypedVariableValue(value: unknown, type: WorkflowValueType) {
-  if (type === 'string[]' && Array.isArray(value)) return JSON.stringify(value);
+  if ((type === 'string[]' || type === 'array') && Array.isArray(value))
+    return JSON.stringify(value);
   if (type === 'object' && isRecord(value)) return JSON.stringify(value);
   return String(value ?? '');
 }
@@ -36,6 +38,15 @@ export function parseTypedVariableValue(value: string, type: WorkflowValueType):
       return Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')
         ? parsed
         : value;
+    } catch {
+      return value;
+    }
+  }
+  if (type === 'array') {
+    if (!trimmed) return [];
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      return Array.isArray(parsed) ? parsed : value;
     } catch {
       return value;
     }
@@ -67,6 +78,7 @@ export function normalizeTypedVariableValue(value: unknown, type: WorkflowValueT
 
 function fixedValuePlaceholder(type: WorkflowValueType, fallback: string) {
   if (type === 'string[]') return '例如：["AI", "工作流"]';
+  if (type === 'array') return '输入 JSON 数组';
   if (type === 'object') return '输入 JSON 对象';
   if (type === 'number') return '例如：5';
   if (type === 'boolean') return 'true 或 false';

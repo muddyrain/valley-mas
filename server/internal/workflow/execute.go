@@ -151,13 +151,38 @@ func Execute(ctx context.Context, graph Graph, registry *Registry, run RunContex
 		if executor == nil {
 			return emitFailure(emit, run.ID, node, capabilityID, input, fmt.Errorf("节点类型 %s 没有执行器", node.Type), startedAt)
 		}
-		result, executeErr := executor.Execute(ctx, run, NodeExecution{NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Input: input})
+		config, _ := decodeConfig(node.Config)
+		policy, policyErr := executionPolicyFromConfig(node, config, registry)
+		if policyErr != nil {
+			return emitFailure(emit, run.ID, node, capabilityID, input, policyErr, startedAt)
+		}
+		result, attempts, executeErr := executeNodeWithPolicy(
+			ctx,
+			executor,
+			run,
+			NodeExecution{NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Input: input},
+			policy,
+		)
 		if executeErr != nil {
+			if policy.ErrorAction == "continue" && !errors.Is(executeErr, context.Canceled) {
+				message, code := publicExecutionError(node, executeErr)
+				output := nullOutput(outputFields[node.ID])
+				addExecutionPolicyOutput(output, policy, attempts, true, message, code)
+				run.Outputs[node.ID] = output
+				emitEvent(emit, Event{
+					RunID: run.ID, NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID,
+					Status: StatusSucceeded, Message: "节点失败，已按错误策略继续", Input: input,
+					Output: output, Error: code, DurationMs: time.Since(startedAt).Milliseconds(),
+				})
+				activateOutgoingEdges(node, output, graph.Edges, outgoing[node.ID], activeEdges)
+				continue
+			}
 			return emitFailure(emit, run.ID, node, capabilityID, input, executeErr, startedAt)
 		}
 		if result.Output == nil {
 			result.Output = map[string]any{}
 		}
+		addExecutionPolicyOutput(result.Output, policy, attempts, false, "", "")
 		run.Outputs[node.ID] = result.Output
 		emitEvent(emit, Event{RunID: run.ID, NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Status: StatusSucceeded, Input: input, Output: result.Output, DurationMs: time.Since(startedAt).Milliseconds()})
 		activateOutgoingEdges(node, result.Output, graph.Edges, outgoing[node.ID], activeEdges)
@@ -344,6 +369,8 @@ func emitFailure(emit func(Event), runID string, node Node, capabilityID string,
 	status := StatusFailed
 	if errors.Is(err, context.Canceled) {
 		status = StatusCancelled
+	} else if errors.Is(err, ErrApprovalRequired) {
+		status = StatusWaiting
 	}
 	emitEvent(emit, Event{RunID: runID, NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Status: status, Input: input, Message: message, Error: code, DurationMs: time.Since(startedAt).Milliseconds()})
 	return err
@@ -357,6 +384,9 @@ func publicExecutionError(node Node, err error) (string, string) {
 	}
 	if errors.Is(err, context.Canceled) {
 		return "运行已取消", "WORKFLOW_CANCELLED"
+	}
+	if errors.Is(err, ErrApprovalRequired) {
+		return "等待人工审批", "WORKFLOW_APPROVAL_REQUIRED"
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
 		if node.Type == NodeTypeLLM {

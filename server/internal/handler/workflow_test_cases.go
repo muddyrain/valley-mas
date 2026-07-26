@@ -304,6 +304,7 @@ func executeWorkflowTestCase(requestContext context.Context, testCase model.Work
 		ContentSearcher:    workflowContentSearcher(testCase.UserID),
 		NotionSearcher:     workflowNotionSearcher(testCase.UserID),
 		CoverGenerator:     workflowCoverGenerator(),
+		NotificationSender: workflowNotificationSender(),
 		SubworkflowRunner:  workflowSubworkflowRunner(testCase.UserID),
 	}, func(event workflow.Event) {
 		if persistenceErr == nil {

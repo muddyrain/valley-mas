@@ -30,6 +30,7 @@ import {
   type AIKnowledgeReference,
   createAIAPIKey,
   createAIAppConversation,
+  createPromptAssistantSuggestion,
   generateAIAppAvatar,
   getAIAPIKeyDailyUsage,
   getAIApp,
@@ -42,6 +43,7 @@ import {
   listAIAppToolBindings,
   listAIAppTools,
   listAIKnowledgeBases,
+  type PromptAssistantField,
   publishAIApp,
   replaceAIAPIKeyAppBindings,
   replaceAIAppKnowledgeBases,
@@ -223,7 +225,7 @@ export default function AIAppEditor() {
   const [revokeTarget, setRevokeTarget] = useState<AIAPIKey | null>(null);
   const [publicInvocations, setPublicInvocations] = useState<AIAppPublicInvocation[]>([]);
   const [rightWorkspaceTab, setRightWorkspaceTab] = useState<'debug' | 'ai'>('debug');
-  const [copilotField, setCopilotField] = useState<string>('');
+  const [generatingField, setGeneratingField] = useState<PromptAssistantField | null>(null);
   const [showMobileCopilot, setShowMobileCopilot] = useState(false);
   const [avatarAction, setAvatarAction] = useState<'generate' | 'upload' | null>(null);
   const [imageModelId, setImageModelId] = useState(readAvatarImageModelPreference);
@@ -503,6 +505,7 @@ while (true) {
   }
 }`;
   const activeAPIKeys = apiKeys.filter((key) => key.status === 'active');
+  const agentSelectableTools = tools.filter((tool) => tool.permission === 'read');
 
   const generateAvatar = async () => {
     if (!appId) return;
@@ -598,10 +601,50 @@ while (true) {
     }
   };
 
-  const openCopilotForField = (field: string) => {
-    setCopilotField(field);
-    setRightWorkspaceTab('ai');
-    if (isMobile) setShowMobileCopilot(true);
+  const generateAgentField = async (field: PromptAssistantField) => {
+    if (!appId || generatingField) return;
+    const currentPrompt =
+      field === 'description'
+        ? description
+        : field === 'system_prompt'
+          ? config.systemPrompt
+          : field === 'opening_message'
+            ? config.openingMessage
+            : config.exampleQuestions.join('\n');
+    setRightWorkspaceTab('debug');
+    setShowMobileCopilot(false);
+    setGeneratingField(field);
+    try {
+      const { suggestion } = await createPromptAssistantSuggestion({
+        target: 'agent',
+        field,
+        mode: 'auto',
+        appId,
+        quick: true,
+        currentPrompt,
+        agentContext: {
+          name,
+          description,
+          systemPrompt: config.systemPrompt,
+          openingMessage: config.openingMessage,
+          exampleQuestions: config.exampleQuestions,
+        },
+      });
+      if (field === 'description') {
+        setDescription(suggestion.description || '');
+      } else if (field === 'system_prompt') {
+        setConfig((value) => ({ ...value, systemPrompt: suggestion.optimizedPrompt }));
+      } else if (field === 'opening_message') {
+        setConfig((value) => ({ ...value, openingMessage: suggestion.openingMessage || '' }));
+      } else {
+        setConfig((value) => ({ ...value, exampleQuestions: suggestion.exampleQuestions || [] }));
+      }
+      toast.success('AI 内容已生成');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, 'AI 生成失败'));
+    } finally {
+      setGeneratingField(null);
+    }
   };
 
   const applyCopilotProposal = (proposal: CopilotProposal) => {
@@ -655,14 +698,11 @@ while (true) {
           name,
           description,
           config,
-          selectedField: copilotField,
         },
         runId: runs[0]?.id,
       }}
       suggestions={[
-        copilotField
-          ? `优化当前${copilotField}，保持其他字段不变`
-          : '检查当前智能体草稿并给出改进提案',
+        '检查当前智能体草稿并给出改进提案',
         runs[0]?.status === 'failed' ? '根据最近失败生成修复提案' : '让开场白和示例问题更一致',
       ]}
       onApplyProposal={applyCopilotProposal}
@@ -793,10 +833,11 @@ while (true) {
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => openCopilotForField('简介')}
+                          disabled={generatingField !== null}
+                          onClick={() => void generateAgentField('description')}
                         >
                           <Sparkles className="mr-2 size-4" />
-                          AI 生成
+                          {generatingField === 'description' ? 'AI 生成中…' : 'AI 生成'}
                         </Button>
                       </div>
                       <Input
@@ -813,10 +854,11 @@ while (true) {
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => openCopilotForField('系统提示词')}
+                          disabled={generatingField !== null}
+                          onClick={() => void generateAgentField('system_prompt')}
                         >
                           <Sparkles className="mr-2 size-4" />
-                          AI 优化
+                          {generatingField === 'system_prompt' ? 'AI 优化中…' : 'AI 优化'}
                         </Button>
                       </div>
                       <Textarea
@@ -835,10 +877,11 @@ while (true) {
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => openCopilotForField('开场白')}
+                          disabled={generatingField !== null}
+                          onClick={() => void generateAgentField('opening_message')}
                         >
                           <Sparkles className="mr-2 size-4" />
-                          AI 生成
+                          {generatingField === 'opening_message' ? 'AI 生成中…' : 'AI 生成'}
                         </Button>
                       </div>
                       <Textarea
@@ -857,10 +900,11 @@ while (true) {
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => openCopilotForField('示例问题')}
+                          disabled={generatingField !== null}
+                          onClick={() => void generateAgentField('example_questions')}
                         >
                           <Sparkles className="mr-2 size-4" />
-                          AI 生成
+                          {generatingField === 'example_questions' ? 'AI 生成中…' : 'AI 生成'}
                         </Button>
                       </div>
                       <div className="space-y-2">
@@ -907,14 +951,24 @@ while (true) {
                 <TabsContent value="tools" className="w-full">
                   <EditorSection
                     title="工具"
-                    description="仅可调用已授权的工具。"
+                    description="选择智能体可调用的只读工具；写入或模型工具请在工作流中编排。"
                     className="border-0 bg-transparent p-0"
+                    action={
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate('/workbench/resources?tab=tools')}
+                      >
+                        工具目录
+                      </Button>
+                    }
                   >
-                    {tools.length === 0 ? (
+                    {agentSelectableTools.length === 0 ? (
                       <p className="text-sm text-muted-foreground">暂无可用工具</p>
                     ) : (
                       <div className="space-y-2">
-                        {tools.map((tool) => {
+                        {agentSelectableTools.map((tool) => {
                           const checked = boundTools.includes(tool.name);
                           return (
                             <label
@@ -923,7 +977,7 @@ while (true) {
                             >
                               <Checkbox
                                 checked={checked}
-                                disabled={savingTools || tool.permission !== 'read'}
+                                disabled={savingTools}
                                 onCheckedChange={(nextChecked) => {
                                   const next = nextChecked
                                     ? [...boundTools, tool.name]

@@ -25,6 +25,8 @@ type AIImageGeneration struct {
 	Quality                  string         `gorm:"size:10;not null" json:"quality"`
 	RequestedSize            string         `gorm:"size:30;not null" json:"requestedSize"`
 	ReferenceCount           int            `gorm:"not null;default:0" json:"referenceCount"`
+	ParentGenerationID       *Int64String   `gorm:"index:idx_ai_image_generations_parent" json:"parentGenerationId,omitempty"`
+	IsFavorited              bool           `gorm:"not null;default:false;index" json:"isFavorited"`
 	Status                   string         `gorm:"size:20;index;not null;default:'queued'" json:"status"`
 	Stage                    string         `gorm:"size:20;not null;default:'preparing'" json:"stage"`
 	ResultURL                string         `gorm:"size:1000" json:"resultUrl"`

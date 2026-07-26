@@ -110,6 +110,13 @@ func HasCapabilities(item model.AIModel, required []string) bool {
 	return true
 }
 
+func HasVerifiedCapability(item model.AIModel, capability string) bool {
+	return HasCapabilities(
+		model.AIModel{Capabilities: item.VerifiedCapabilities},
+		[]string{capability},
+	)
+}
+
 // ImageGenerationQualities returns declared target tiers for known models.
 // Provider selection only controls transport; capability belongs to the model
 // itself. The image studio records returned pixels after storing the result,
@@ -123,6 +130,14 @@ func ImageGenerationQualities(item model.AIModel) []string {
 		return []string{"1K", "2K", "4K"}
 	}
 	return []string{"1K", "2K"}
+}
+
+// ImageGenerationReferenceQualities returns target tiers available when a
+// reference image is sent. Models declare the same supported tiers for text
+// generation and reference editing unless a provider publishes a narrower
+// contract.
+func ImageGenerationReferenceQualities(item model.AIModel) []string {
+	return ImageGenerationQualities(item)
 }
 
 func imageGenerationDefaultPriority(item model.AIModel) int {
@@ -146,6 +161,9 @@ func ListEnabledModels(db *gorm.DB, capability string) ([]model.AIModel, error) 
 	}
 	result := make([]model.AIModel, 0, len(items))
 	for _, item := range items {
+		if capability == "vision" && !HasVerifiedCapability(item, capability) {
+			continue
+		}
 		if capability == "" || HasCapabilities(item, []string{capability}) {
 			result = append(result, item)
 		}
@@ -173,5 +191,31 @@ func FindEnabledModel(db *gorm.DB, rawID, capability string) (model.AIModel, err
 	if capability != "" && !HasCapabilities(item, []string{capability}) {
 		return model.AIModel{}, ErrModelNotAvailable
 	}
+	if capability == "vision" && !HasVerifiedCapability(item, capability) {
+		return model.AIModel{}, ErrModelNotAvailable
+	}
 	return item, nil
+}
+
+// FindFastTextModel returns the text-capable enabled model with the smallest
+// declared context window. Models without a declared window are retained as a
+// fallback, while existing catalog order remains the tie breaker.
+func FindFastTextModel(db *gorm.DB) (model.AIModel, error) {
+	items, err := ListEnabledModels(db, "text")
+	if err != nil {
+		return model.AIModel{}, err
+	}
+	if len(items) == 0 {
+		return model.AIModel{}, ErrModelNotAvailable
+	}
+
+	selected := items[0]
+	for _, item := range items[1:] {
+		selectedKnown := selected.ContextWindowTokens > 0
+		itemKnown := item.ContextWindowTokens > 0
+		if itemKnown && (!selectedKnown || item.ContextWindowTokens < selected.ContextWindowTokens) {
+			selected = item
+		}
+	}
+	return selected, nil
 }

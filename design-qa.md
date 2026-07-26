@@ -1,36 +1,46 @@
-**Findings**
+# 智能体对话页设计 QA
 
-- [P1] Chrome 当前没有可进入的智能体会话，阻断了最新改版的运行时视觉对比。
-  Location: `/workbench/apps/:appId`。
-  Evidence: 布局参考为 `/var/folders/68/4sshfgt96fv2p3v8x71ngbn80000gn/T/codex-clipboard-504f55b5-0e9b-4b4c-ad98-6f515ca6badd.png`，模型控件参考为 `/var/folders/68/4sshfgt96fv2p3v8x71ngbn80000gn/T/codex-clipboard-b72dc014-2e53-442c-9107-2897b34492c6.png`。Chrome 中仅有工作流页，无法在真实智能体数据、同一登录态和同一桌面视口下捕获更新后的实现。
-  Impact: 无法对字体、布局、抽屉展开态、颜色与文案进行真实的并排视觉核验。
-  Fix: 使用已登录的测试账号重新捕获同一桌面视口下的对话页和已展开配置抽屉，完成对比后更新本报告。
+## 比较目标
 
-**Open Questions**
+- Source visual truth: `C:\Users\A\.codex\generated_images\019f9a2c-da64-7a12-87f1-dd4308ac0853\exec-c6c4e69a-afc7-4ff0-82dc-8b1978ff3c03.png`
+- Implementation route: `http://127.0.0.1:5174/workbench/apps/preview`
+- Intended viewport: desktop 1536 × 1152, light mode, 通用智能体新会话状态，配置抽屉打开。
+- Implementation screenshot: unavailable. The route redirected to the login screen because the in-app browser has no authenticated session.
 
-- 模型选择已改成紧凑浮层并自动选中首个可用模型；后端未提供推理强度和速度参数，因此不展示无法真实生效的控制项。
+## 可核对的实现范围
 
-**Implementation Checklist**
+- 通用智能体对话工作台：扩宽会话侧栏、强化活动会话状态、新会话引导与聚焦输入框。
+- 交互层：会话下拉菜单、三段式配置 Sheet、发布确认 Dialog、窄屏底部 Drawer。
+- 视觉基线：沿用项目 shadcn token、语义蓝主动作、无渐变与无专属壁纸生成功能。
 
-1. 已将智能体默认入口改为对话工作台；没有会话时自动创建。
-2. 已重排顶部、会话历史、主聊天区和悬浮输入区，减少页面边界与蓝色强调。
-3. 已将模型选择改为紧凑浮层，保留真实模型切换。
-4. 待用户在 Chrome 打开任一智能体会话后：在 1440 × 1024 CSS px 视口下捕获普通态、模型浮层态和配置抽屉态，并检查控制台错误。
+## Required Fidelity Surfaces
 
-**Follow-up Polish**
+- Fonts and typography: 未能以浏览器渲染图核对；实现沿用项目字体与既有 shadcn 字号/字重。
+- Spacing and layout rhythm: 未能以浏览器渲染图核对；代码按目标使用 17rem 会话轨、最大 3xl 输入区和语义间距。
+- Colors and visual tokens: 已静态核对，使用 `background`、`muted`、`border`、`primary` 等现有 token。
+- Image quality and asset fidelity: 智能体头像沿用已有 `AgentAvatar` 实际资源；未新增图像资产。
+- Copy and content: 已静态核对，界面文案均为通用智能体任务、会话和配置语境。
 
-- P3：根据真实会话标题长度调整左侧历史列表的行密度和截断策略。
+## Findings
 
-**Comparison metadata**
+- [P1] 运行时设计比对被登录守卫阻断。
+  Location: `/workbench/apps/preview`。
+  Evidence: 应用内浏览器在该路由被重定向到登录页；无控制台错误。
+  Impact: 无法捕获与目标图同状态的实现截图，也无法验证 Sheet、Dialog、Drawer 的实际开关和响应式布局。
+  Fix: 在已登录的本地会话打开任意智能体路由后，按相同桌面与窄屏视口重新捕获并对照。
 
-- Source visual truth: `/var/folders/68/4sshfgt96fv2p3v8x71ngbn80000gn/T/codex-clipboard-504f55b5-0e9b-4b4c-ad98-6f515ca6badd.png` and `/var/folders/68/4sshfgt96fv2p3v8x71ngbn80000gn/T/codex-clipboard-b72dc014-2e53-442c-9107-2897b34492c6.png`
-- Source dimensions: 2048 × 1024 px and 848 × 428 px
-- Intended implementation viewport: 1440 × 1024 CSS px, density normalization: not performed
-- Implementation screenshot: unavailable; Chrome 当前没有可进入的智能体会话
-- State: desktop, authenticated-agent-conversation target; 已核验 Chrome 会话，但缺少匹配的智能体资源
-- Full-view comparison: blocked because no matched implementation state was available
-- Focused region comparison: not performed because no matched implementation state was available
-- Primary interaction checked: Chrome 中的工作流页可见；未对智能体页执行交互，避免猜测或创建测试数据
-- Console errors checked: 未对智能体页执行，因为页面不可访问
+## Open Questions
+
+- 暂无。验证只缺少已登录会话，不需要改变产品范围或鉴权边界。
+
+## Implementation Checklist
+
+1. 在已登录会话中打开任意通用智能体。
+2. 验证会话菜单、配置 Tab、发布确认和窄屏操作 Drawer。
+3. 截图与源视觉同屏对照，补充本报告的实现截图路径与最终结论。
+
+## Follow-up Polish
+
+- [P3] 根据真实对话内容长度，微调侧栏标题截断和空状态纵向留白。
 
 final result: blocked

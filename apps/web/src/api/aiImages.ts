@@ -8,6 +8,7 @@ export interface AIImagePreset {
   name: string;
   description: string;
   promptContent: string;
+  samplePrompts: string[];
   requiresReference: boolean;
   recommendedAspect: string;
 }
@@ -32,6 +33,8 @@ export interface AIImageGeneration {
   quality: string;
   requestedSize: string;
   referenceCount: number;
+  parentGenerationId?: string;
+  isFavorited: boolean;
   status: AIImageGenerationStatus;
   stage: AIImageGenerationStage;
   resultUrl: string;
@@ -57,10 +60,48 @@ export interface CreateAIImageGenerationInput {
   aspectRatio: string;
   quality: string;
   references: string[];
+  referenceGenerationId?: string;
+}
+
+export type AIImageConversationMessageRole = 'user' | 'assistant';
+export type AIImageResourceVisibility = 'private' | 'public';
+
+export interface AIImageConversation {
+  id: string;
+  userId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AIImageConversationMessage {
+  id: string;
+  userId: string;
+  conversationId: string;
+  role: AIImageConversationMessageRole;
+  content: string;
+  generationId?: string;
+  createdAt: string;
+}
+
+export interface AIImageConversationPayload {
+  conversation: AIImageConversation | null;
+  messages: AIImageConversationMessage[];
+}
+
+export interface AIImageConversationCreatedPayload {
+  conversation: AIImageConversation;
+  messages: AIImageConversationMessage[];
 }
 
 export const listAIImagePresets = () =>
   request.get<unknown, AIImagePresetCatalog>('/ai/image-presets');
+
+export const generateAIImagePresetSamples = (presetId: string, excludedPrompts: string[]) =>
+  request.post<unknown, { list: string[]; model: string }>(
+    `/ai/image-presets/${presetId}/sample-prompts`,
+    { excludedPrompts },
+  );
 
 export const listAIImageGenerations = (limit = 24) =>
   request.get<unknown, { list: AIImageGeneration[] }>('/ai/image-generations', {
@@ -75,11 +116,53 @@ export const createAIImageGeneration = (data: CreateAIImageGenerationInput) =>
 export const getAIImageGeneration = (generationId: string) =>
   request.get<unknown, { generation: AIImageGeneration }>(`/ai/image-generations/${generationId}`);
 
+export const deleteAIImageGeneration = (generationId: string) =>
+  request.delete<unknown, { deleted: boolean }>(`/ai/image-generations/${generationId}`);
+
+export const updateAIImageGenerationFavorite = (generationId: string, favorited: boolean) =>
+  request.patch<unknown, { generation: AIImageGeneration }>(
+    `/ai/image-generations/${generationId}/favorite`,
+    { favorited },
+  );
+
 export const saveAIImageGenerationResource = (
   generationId: string,
-  data: { type: 'wallpaper' | 'avatar'; title?: string },
+  data: { visibility?: AIImageResourceVisibility },
 ) =>
-  request.post<unknown, { resource: { id: string } }>(
+  request.post<unknown, { resource: { id: string }; metadataModel?: string }>(
     `/ai/image-generations/${generationId}/resource`,
+    data,
+  );
+
+export const getCurrentAIImageConversation = () =>
+  request.get<unknown, AIImageConversationPayload>('/ai/image-conversations/current');
+
+export const listAIImageConversations = () =>
+  request.get<unknown, { list: AIImageConversation[] }>('/ai/image-conversations');
+
+export const getAIImageConversation = (conversationId: string) =>
+  request.get<unknown, AIImageConversationPayload>(`/ai/image-conversations/${conversationId}`);
+
+export const clearCurrentAIImageConversation = () =>
+  request.delete<unknown, AIImageConversationPayload>('/ai/image-conversations/current');
+
+export const clearAIImageConversation = (conversationId: string) =>
+  request.delete<unknown, AIImageConversationPayload>(
+    `/ai/image-conversations/${conversationId}/messages`,
+  );
+
+export const createAIImageConversation = (data: { title?: string } = {}) =>
+  request.post<unknown, AIImageConversationCreatedPayload>('/ai/image-conversations', data);
+
+export const addAIImageConversationMessage = (
+  conversationId: string,
+  data: {
+    role: AIImageConversationMessageRole;
+    content: string;
+    generationId?: string;
+  },
+) =>
+  request.post<unknown, { conversation: AIImageConversation; message: AIImageConversationMessage }>(
+    `/ai/image-conversations/${conversationId}/messages`,
     data,
   );

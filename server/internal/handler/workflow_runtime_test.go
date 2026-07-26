@@ -36,7 +36,7 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.User{}, &model.Workflow{}, &model.WorkflowRun{}, &model.WorkflowNodeRun{}, &model.WorkflowRunEvent{}, &model.WorkflowTestCase{}, &model.WorkflowTestResult{}, &model.WorkflowTrigger{}, &model.AIApp{}, &model.AIAppVersion{}, &model.AIAppVersionKnowledgeBase{}, &model.AIAppVersionToolBinding{}, &model.AIAppKnowledgeBase{}, &model.AIAppRun{}, &model.Post{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Workflow{}, &model.WorkflowRun{}, &model.WorkflowNodeRun{}, &model.WorkflowRunEvent{}, &model.WorkflowTestCase{}, &model.WorkflowTestResult{}, &model.WorkflowTrigger{}, &model.WorkflowRunJob{}, &model.WorkflowApproval{}, &model.AIApp{}, &model.AIAppVersion{}, &model.AIAppVersionKnowledgeBase{}, &model.AIAppVersionToolBinding{}, &model.AIAppKnowledgeBase{}, &model.AIAppRun{}, &model.Post{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Create(&[]model.User{{ID: 101, Username: "workflow-owner", Role: "user", IsActive: true}, {ID: 202, Username: "workflow-other", Role: "user", IsActive: true}}).Error; err != nil {
@@ -55,6 +55,7 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 		}
 	})
 	router := gin.New()
+	router.POST("/workflow-hooks/:triggerId", InvokeWorkflowWebhook)
 	auth := router.Group("/workflows")
 	auth.Use(middleware.Auth(&config.Config{JWT: config.JWTConfig{Secret: workflowRuntimeTestSecret}}))
 	auth.POST("/:id/run", AdminRunWorkflow)
@@ -62,6 +63,8 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	auth.POST("/:id/triggers", CreateWorkflowTrigger)
 	auth.PATCH("/:id/triggers/:triggerId", UpdateWorkflowTrigger)
 	auth.DELETE("/:id/triggers/:triggerId", DeleteWorkflowTrigger)
+	auth.POST("/:id/triggers/:triggerId/rotate-secret", RotateWorkflowWebhookSecret)
+	auth.POST("/events/:eventKey", PublishWorkflowEvent)
 	auth.GET("/:id", AdminGetWorkflow)
 	auth.GET("/:id/runs", AdminListWorkflowRuns)
 	auth.GET("/:id/test-cases", ListWorkflowTestCases)
@@ -72,6 +75,8 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	auth.GET("/:id/runs/:runId/events", StreamWorkflowRunEvents)
 	auth.POST("/:id/runs/:runId/cancel", CancelWorkflowRun)
 	auth.POST("/:id/runs/:runId/retry", RetryWorkflowRun)
+	auth.GET("/:id/approvals", ListWorkflowApprovals)
+	auth.POST("/:id/approvals/:approvalId/decision", DecideWorkflowApproval)
 	auth.PUT("/:id", AdminUpdateWorkflow)
 	auth.POST("/:id/publish", PublishWorkflowVersion)
 	return router, definition
@@ -143,6 +148,10 @@ func TestWorkflowTestCaseRunsLockedVersionAndKeepsRunHistorySeparate(t *testing.
 
 func TestWorkflowTriggerRequiresPublishedReadOnlyWorkflow(t *testing.T) {
 	router, definition := setupWorkflowRuntimeTestRouter(t)
+	definition.Graph = `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","position":{"x":0,"y":0},"config":{"inputs":{}}},{"id":"end","type":"end","label":"结束","position":{"x":300,"y":0},"config":{"outputs":{"ok":true},"outputTypes":{"ok":"boolean"}}}],"edges":[{"source":"start","target":"end"}]}`
+	if err := database.DB.Model(&definition).Update("graph", definition.Graph).Error; err != nil {
+		t.Fatal(err)
+	}
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
 		app, version, err := syncWorkflowAIApp(tx, definition)
 		if err != nil {
@@ -168,6 +177,111 @@ func TestWorkflowTriggerRequiresPublishedReadOnlyWorkflow(t *testing.T) {
 	var stored model.WorkflowTrigger
 	if err := database.DB.Where("workflow_id = ?", definition.ID).First(&stored).Error; err != nil || stored.NextRunAt == nil {
 		t.Fatalf("trigger=%+v err=%v", stored, err)
+	}
+}
+
+func TestWorkflowTriggerWorkerExecutesLeasedJob(t *testing.T) {
+	_, definition := setupWorkflowRuntimeTestRouter(t)
+	definition.Graph = `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","position":{"x":0,"y":0},"config":{"inputs":{}}},{"id":"end","type":"end","label":"结束","position":{"x":300,"y":0},"config":{"outputs":{"ok":true},"outputTypes":{"ok":"boolean"}}}],"edges":[{"source":"start","target":"end"}]}`
+	if err := database.DB.Model(&definition).Update("graph", definition.Graph).Error; err != nil {
+		t.Fatal(err)
+	}
+	var version model.AIAppVersion
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		app, createdVersion, err := syncWorkflowAIApp(tx, definition)
+		if err != nil {
+			return err
+		}
+		version = createdVersion
+		now := time.Now()
+		if err := tx.Model(&version).Update("published_at", now).Error; err != nil {
+			return err
+		}
+		return tx.Model(&app).Updates(map[string]any{
+			"status": "published", "published_version_id": version.ID,
+		}).Error
+	}); err != nil {
+		t.Fatal(err)
+	}
+	due := time.Now().Add(-time.Minute)
+	trigger := model.WorkflowTrigger{
+		WorkflowID: definition.ID, UserID: definition.UserID, Type: "cron",
+		CronExpression: "0 9 * * *", Timezone: "Asia/Shanghai", Status: "active", NextRunAt: &due,
+	}
+	if err := database.DB.Create(&trigger).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	runWorkflowTriggerWorkerTick(context.Background(), time.Now())
+
+	var job model.WorkflowRunJob
+	if err := database.DB.Where("trigger_id = ?", trigger.ID).First(&job).Error; err != nil {
+		t.Fatal(err)
+	}
+	if job.Status != "success" || job.Attempt != 1 || job.ErrorCode != "" {
+		t.Fatalf("unexpected job: %+v", job)
+	}
+	var run model.WorkflowRun
+	if err := database.DB.Where("run_job_id = ?", job.ID).First(&run).Error; err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != string(workflow.StatusSucceeded) || run.TriggerID == nil || *run.TriggerID != trigger.ID {
+		t.Fatalf("unexpected run: %+v", run)
+	}
+}
+
+func TestWorkflowApprovalPausesAndResumesFrozenRun(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	definition.Graph = `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","position":{"x":0,"y":0},"config":{"inputs":{}}},{"id":"approval","type":"approval","label":"人工审批","position":{"x":200,"y":0},"config":{"title":"确认继续","description":"批准后返回结果"}},{"id":"end","type":"end","label":"结束","position":{"x":400,"y":0},"config":{"outputs":{"approved":"{{approval.output.approved}}"},"outputTypes":{"approved":"boolean"}}}],"edges":[{"source":"start","target":"approval"},{"source":"approval","target":"end"}]}`
+	if err := database.DB.Model(&definition).Update("graph", definition.Graph).Error; err != nil {
+		t.Fatal(err)
+	}
+	request := workflowMultipartRequest(t, "/workflows/"+definition.ID.String()+"/run", `{}`)
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if !strings.Contains(recorder.Body.String(), "waiting_approval") {
+		t.Fatalf("expected waiting approval stream: %s", recorder.Body.String())
+	}
+	var approval model.WorkflowApproval
+	if err := database.DB.Where("workflow_id = ?", definition.ID).First(&approval).Error; err != nil {
+		t.Fatal(err)
+	}
+	var run model.WorkflowRun
+	if err := database.DB.First(&run, approval.WorkflowRunID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != string(workflow.StatusWaiting) || approval.Status != "pending" {
+		t.Fatalf("run=%+v approval=%+v", run, approval)
+	}
+
+	body := bytes.NewBufferString(`{"decision":"approved","note":"可以继续"}`)
+	decisionRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/workflows/"+definition.ID.String()+"/approvals/"+approval.ID.String()+"/decision",
+		body,
+	)
+	decisionRequest.Header.Set("Content-Type", "application/json")
+	decisionRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	decisionRecorder := httptest.NewRecorder()
+	router.ServeHTTP(decisionRecorder, decisionRequest)
+	if responseCode(decisionRecorder) != 0 {
+		t.Fatalf("decision failed: %s", decisionRecorder.Body.String())
+	}
+
+	resumeDecidedWorkflowApprovals(context.Background(), time.Now())
+
+	if err := database.DB.First(&run, run.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != string(workflow.StatusSucceeded) || !strings.Contains(run.Result, `"approved":true`) {
+		t.Fatalf("unexpected resumed run: %+v", run)
+	}
+	if err := database.DB.First(&approval, approval.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if approval.ResumedAt == nil || approval.Status != "approved" {
+		t.Fatalf("unexpected approval: %+v", approval)
 	}
 }
 

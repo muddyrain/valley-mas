@@ -10,6 +10,14 @@ export interface GithubProfile {
   html_url: string;
 }
 
+const FALLBACK_AUTHOR_PROFILE: GithubProfile = {
+  login: 'muddyrain',
+  name: 'muddyrain',
+  bio: null,
+  avatar_url: 'https://github.com/muddyrain.png?size=160',
+  html_url: 'https://github.com/muddyrain',
+};
+
 interface HomeAuthorProfileCardProps {
   loadingGithubProfile: boolean;
   githubProfile: GithubProfile | null;
@@ -19,6 +27,8 @@ export default function HomeAuthorProfileCard({
   loadingGithubProfile,
   githubProfile,
 }: HomeAuthorProfileCardProps) {
+  const authorProfile = githubProfile || FALLBACK_AUTHOR_PROFILE;
+
   return (
     <Card className="border-border">
       <CardContent className="p-5">
@@ -41,27 +51,27 @@ export default function HomeAuthorProfileCard({
             </div>
             <Skeleton className="h-20 rounded-xl" />
           </div>
-        ) : githubProfile ? (
+        ) : (
           <div className="space-y-4">
             <div className="flex items-center gap-4">
               <div className="h-16 w-16 overflow-hidden rounded-xl border border-border bg-card">
                 <img
-                  src={githubProfile.avatar_url}
-                  alt={githubProfile.login}
+                  src={authorProfile.avatar_url}
+                  alt={authorProfile.login}
                   className="h-full w-full object-cover"
                 />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="line-clamp-1 text-xl font-semibold text-foreground">
-                  {githubProfile.name || githubProfile.login}
+                  {authorProfile.name || authorProfile.login}
                 </div>
                 <a
-                  href={githubProfile.html_url}
+                  href={authorProfile.html_url}
                   target="_blank"
                   rel="noreferrer"
                   className="mt-1 inline-flex items-center gap-1 text-sm text-primary hover:underline"
                 >
-                  @{githubProfile.login}
+                  @{authorProfile.login}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </a>
               </div>
@@ -70,37 +80,18 @@ export default function HomeAuthorProfileCard({
             <Card className="border-border">
               <CardContent className="p-4">
                 <p className="text-sm leading-7 text-muted-foreground">
-                  {githubProfile.bio || '你好，我是一名前端开发者，热衷于探索新技术和解决问题。'}
+                  {authorProfile.bio || 'GitHub: @muddyrain'}
                 </p>
               </CardContent>
             </Card>
 
             <a
-              href={githubProfile.html_url}
+              href={authorProfile.html_url}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-4 py-2 text-sm text-primary transition hover:bg-accent"
             >
               访问 GitHub 主页
-              <ArrowRight className="h-4 w-4" />
-            </a>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <Card className="border-border">
-              <CardContent className="p-4">
-                <p className="text-sm leading-7 text-muted-foreground">
-                  这里会展示网站作者的 GitHub 公开资料。
-                </p>
-              </CardContent>
-            </Card>
-            <a
-              href="https://github.com/muddyrain"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-4 py-2 text-sm text-primary transition hover:bg-accent"
-            >
-              打开 @muddyrain
               <ArrowRight className="h-4 w-4" />
             </a>
           </div>

@@ -26,6 +26,8 @@ function statusMeta(status: WorkflowRun['status'] | WorkflowRunTraceEvent['statu
     return { label: '已跳过', icon: CircleSlash2, className: 'text-muted-foreground' };
   if (status === 'running')
     return { label: '运行中', icon: Loader2, className: 'animate-spin text-primary' };
+  if (status === 'waiting_approval')
+    return { label: '等待审批', icon: Clock3, className: 'text-amber-600' };
   return { label: '失败', icon: AlertCircle, className: 'text-destructive' };
 }
 
@@ -43,7 +45,7 @@ function parsePreview(raw: string): Record<string, unknown> | undefined {
 function nodeSnapshot(detail: WorkflowRunDetail, nodeID: string): NodeRunSnapshot {
   const node = detail.nodes.find((item) => item.nodeId === nodeID);
   return {
-    status: node?.status || 'error',
+    status: node?.status === 'waiting_approval' ? 'running' : (node?.status ?? 'error'),
     input: node ? parsePreview(node.input) : undefined,
     output: node ? parsePreview(node.output) : undefined,
     error: node?.status === 'error' ? '该节点在本次运行中失败' : undefined,

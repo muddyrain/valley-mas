@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"valley-server/internal/aiapp"
 	"valley-server/internal/aiusage"
@@ -168,7 +169,7 @@ func TestAIAppProposalRequiresSelectedModel(t *testing.T) {
 	}
 }
 
-func TestPromptAssistantSuggestionRequiresSelectedModel(t *testing.T) {
+func TestPromptAssistantSuggestionUsesDefaultModelWhenNoneIsProvided(t *testing.T) {
 	router, _ := setupAIPlatformTestRouter(t)
 	request := httptest.NewRequest(http.MethodPost, "/ai/prompt-assistant/suggestions", strings.NewReader(`{"target":"workflow_llm","mode":"auto","currentPrompt":"提取文章要点"}`))
 	request.Header.Set("Content-Type", "application/json")
@@ -179,8 +180,58 @@ func TestPromptAssistantSuggestionRequiresSelectedModel(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v; body = %s", err, response.Body.String())
 	}
-	if payload.Code != http.StatusBadRequest {
-		t.Fatalf("prompt assistant code = %d, want 400; response = %s", payload.Code, response.Body.String())
+	if payload.Code != http.StatusServiceUnavailable {
+		t.Fatalf("prompt assistant code = %d, want 503; response = %s", payload.Code, response.Body.String())
+	}
+}
+
+func TestPromptAssistantAllowsEmptyAgentSystemPrompt(t *testing.T) {
+	router, _ := setupAIPlatformTestRouter(t)
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/ai/prompt-assistant/suggestions",
+		strings.NewReader(`{"target":"agent","field":"system_prompt","mode":"auto","currentPrompt":"","agentContext":{"name":"资料助手"}}`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	var payload Response
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v; body = %s", err, response.Body.String())
+	}
+	if payload.Code != http.StatusServiceUnavailable {
+		t.Fatalf("empty system prompt should reach default model selection, code = %d, response = %s", payload.Code, response.Body.String())
+	}
+}
+
+func TestPromptAssistantQuickPolicyUsesFieldBudgetWithoutRepair(t *testing.T) {
+	tests := []struct {
+		field     string
+		maxTokens int
+		timeout   time.Duration
+	}{
+		{field: promptFieldDescription, maxTokens: 256, timeout: quickPromptAssistantTimeout},
+		{field: promptFieldOpening, maxTokens: 320, timeout: quickPromptAssistantTimeout},
+		{field: promptFieldQuestions, maxTokens: 400, timeout: quickPromptAssistantTimeout},
+		{field: promptFieldSystem, maxTokens: 512, timeout: quickSystemPromptAssistantTimeout},
+	}
+	for _, test := range tests {
+		policy := promptAssistantPolicy(test.field, true)
+		if policy.Timeout != test.timeout || policy.MaxTokens != test.maxTokens || policy.AllowRepair {
+			t.Fatalf("quick policy for %s = %+v", test.field, policy)
+		}
+	}
+	standard := promptAssistantPolicy(promptFieldDescription, false)
+	if standard.Timeout != 75*time.Second || standard.MaxTokens != 4096 || !standard.AllowRepair {
+		t.Fatalf("standard policy = %+v", standard)
+	}
+}
+
+func TestSplitQuickAssistantQuestionsNormalizesNumberedLines(t *testing.T) {
+	questions := splitQuickAssistantQuestions("1. 帮我制定学习计划\n2、解释这个概念\n- 帮我复盘今天的任务\n• 给我下一步建议")
+	if len(questions) != 4 || questions[0] != "帮我制定学习计划" || questions[3] != "给我下一步建议" {
+		t.Fatalf("questions = %#v", questions)
 	}
 }
 

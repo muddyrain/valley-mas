@@ -5,6 +5,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { NodeRunInspector } from './NodeRunInspector';
 import { PROPERTY_FORM_MAP } from './properties';
+import { ErrorHandlingPropertyForm } from './properties/ErrorHandlingPropertyForm';
 import { PropertyFormBase } from './properties/PropertyFormBase';
 import { WhenPropertyForm } from './properties/WhenPropertyForm';
 import type { NodeRunSnapshot } from './runSession';
@@ -22,6 +23,7 @@ interface PropertyPanelProps {
       nodeType: string;
       config?: Record<string, unknown>;
       when?: import('./types').WorkflowRule;
+      sideEffect?: string;
     };
   } | null;
   onClose: () => void;
@@ -108,6 +110,21 @@ export const PropertyPanel = memo(function PropertyPanel({
   );
   const isCoverGenerationNode =
     nodeType === 'tool' && config?.capabilityId === 'image.generateCover';
+  const supportsErrorHandling =
+    nodeType === 'llm' ||
+    nodeType === 'template' ||
+    nodeType === 'http' ||
+    nodeType === 'tool' ||
+    nodeType === 'variable' ||
+    nodeType === 'subworkflow';
+  const retryAllowed =
+    nodeType === 'llm' ||
+    nodeType === 'template' ||
+    nodeType === 'variable' ||
+    (nodeType === 'http' &&
+      ['GET', 'HEAD'].includes(String(config?.method || '').toUpperCase()) &&
+      Number(config?.retryCount || 0) === 0) ||
+    (nodeType === 'tool' && ['none', 'read', 'model'].includes(selectedNode.data.sideEffect || ''));
   const fieldErrors = Object.fromEntries(
     validationErrors
       .filter((error) => error.nodeId === selectedNode.id && error.field)
@@ -155,13 +172,15 @@ export const PropertyPanel = memo(function PropertyPanel({
             nodeType === 'end' ||
             nodeType === 'condition' ||
             nodeType === 'llm' ||
+            nodeType === 'template' ||
             nodeType === 'http' ||
             nodeType === 'merge' ||
             nodeType === 'variable' ||
             nodeType === 'subworkflow' ||
             nodeType === 'intent' ||
             nodeType === 'switch' ||
-            nodeType === 'loop'
+            nodeType === 'loop' ||
+            nodeType === 'set_loop_variable'
               ? variableOptions
               : undefined
           }
@@ -169,8 +188,16 @@ export const PropertyPanel = memo(function PropertyPanel({
           fieldErrors={fieldErrors}
         />
       )}
+      {supportsErrorHandling ? (
+        <ErrorHandlingPropertyForm
+          value={config?.errorHandling}
+          onChange={(errorHandling) => handleUpdateConfig({ errorHandling })}
+          retryAllowed={retryAllowed}
+        />
+      ) : null}
       {nodeType === 'tool' ||
       nodeType === 'llm' ||
+      nodeType === 'template' ||
       nodeType === 'http' ||
       nodeType === 'variable' ||
       nodeType === 'subworkflow' ? (

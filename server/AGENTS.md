@@ -31,7 +31,7 @@
 
 - 新增或修改接口时，先定位 `internal/router/router.go` 的路由分组，再按 handler、model/service、middleware、前端 API 封装的顺序联动检查。
 - 权限逻辑优先放在中间件或明确的服务端判断中，前端隐藏入口不能作为权限依据。
-- GORM model 改动要考虑迁移、默认值、索引、生产 `DB_AUTO_MIGRATE=false` 的约束，以及现有数据兼容。
+- GORM model 改动要同步新增 `internal/dbmigration/{postgres,mysql}` 版本化迁移，并考虑默认值、索引和现有数据兼容；生产服务启动不隐式执行 DDL。
 - 新增用户主动发起的 AI 接入优先通过 `aimodel.ResolveInvocation` 从模型目录解析能力，并复用 `internal/aiclient`；不在 handler 里直接 `os.Getenv("ARK_*")` 或 `arkruntime.NewClientWithApiKey(...)`。
 - 需要多轮推理、追问、按需查询数据的 AI 场景优先落成 `internal/ai/tools/<domain>` 下的 Tool，通过 `internal/ai/agent.AgentRuntime` 驱动;只有单次 prompt 就能收敛的场景（摘要 / 翻译 / 单图分析）才继续走现有 `PromptContract` 直调路径。
 - Mind Arena 接口改动要同步检查前端 `apps/ai-mind-arena/lib/api.ts`、`lib/types.ts` 和 SSE 事件处理。
@@ -51,8 +51,9 @@
 
 ```bash
 cd server && go run ./cmd/server
+cd server && go run ./cmd/migrate status
 cd server && go test ./...
-cd server && go build ./cmd/server
+cd server && go build ./cmd/server ./cmd/migrate
 cd server && air
 ```
 

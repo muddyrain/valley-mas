@@ -26,7 +26,6 @@ type DatabaseConfig struct {
 	Driver             string // mysql, postgres
 	DSN                string
 	SlowLogMs          int
-	AutoMigrate        bool
 	MaxOpenConns       int
 	MaxIdleConns       int
 	ConnMaxLifetimeMin int
@@ -135,7 +134,6 @@ func Load() *Config {
 			Driver:             getEnv("DB_DRIVER", getDefaultDriver()),
 			DSN:                getEnv("DB_DSN", ""),
 			SlowLogMs:          getEnvInt("DB_SLOW_LOG_MS", 100),
-			AutoMigrate:        getEnvBool("DB_AUTO_MIGRATE", getDefaultAutoMigrate(env)),
 			MaxOpenConns:       getEnvInt("DB_MAX_OPEN_CONNS", getDefaultDBMaxOpenConns(env)),
 			MaxIdleConns:       getEnvInt("DB_MAX_IDLE_CONNS", getDefaultDBMaxIdleConns(env)),
 			ConnMaxLifetimeMin: getEnvInt("DB_CONN_MAX_LIFETIME_MIN", 30),
@@ -239,15 +237,6 @@ func getEnv(key, defaultValue string) string {
 
 func getDefaultDriver() string {
 	return "postgres"
-}
-
-func getDefaultAutoMigrate(env string) bool {
-	if env == "production" {
-		return false
-	}
-	// 远程 PostgreSQL / Supabase 在开发环境下也不应默认跑自动迁移，
-	// 否则启动时容易放大连接占用和 schema introspection 开销。
-	return false
 }
 
 func getDefaultDBMaxOpenConns(env string) int {

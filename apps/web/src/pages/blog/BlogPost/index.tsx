@@ -418,10 +418,6 @@ export default function BlogPost() {
       setAskError('请输入你想问的问题。');
       return;
     }
-    if (!textModelId) {
-      setAskError('请先选择文本模型。');
-      return;
-    }
     askAbortRef.current?.abort();
     const controller = new AbortController();
     askAbortRef.current = controller;
@@ -433,7 +429,7 @@ export default function BlogPost() {
     try {
       await askBlogPostStream(
         post.id,
-        { question, modelId: textModelId, signal: controller.signal },
+        { question, signal: controller.signal },
         {
           onChunk: (payload) => {
             if (payload.done) return;
@@ -1244,14 +1240,6 @@ export default function BlogPost() {
                       </div>
                     </div>
                   )}
-
-                  <ModelPicker
-                    value={textModelId}
-                    onValueChange={setTextModelId}
-                    capability="text"
-                    label="问答模型"
-                    catalog="public"
-                  />
 
                   <div className="rounded-2xl border border-accent bg-card p-2 shadow-[inset_0_1px_0_hsl(var(--background)_/_0.8)]">
                     <textarea

@@ -44,7 +44,7 @@ func EnqueueDue(ctx context.Context, db *gorm.DB, now time.Time) (int, error) {
 				return err
 			}
 			slot := trigger.NextRunAt.UTC()
-			job := model.WorkflowRunJob{TriggerID: trigger.ID, WorkflowID: trigger.WorkflowID, UserID: trigger.UserID, VersionID: version.ID, GraphSnapshot: version.Config, Status: "queued", ScheduledAt: slot, IdempotencyKey: fmt.Sprintf("trigger:%s:%d", trigger.ID, slot.UnixNano())}
+			job := model.WorkflowRunJob{TriggerID: trigger.ID, TriggerType: TypeCron, WorkflowID: trigger.WorkflowID, UserID: trigger.UserID, VersionID: version.ID, GraphSnapshot: version.Config, Inputs: "{}", Status: "queued", ScheduledAt: slot, IdempotencyKey: fmt.Sprintf("trigger:%s:%d", trigger.ID, slot.UnixNano())}
 			result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&job)
 			if result.Error != nil {
 				return result.Error

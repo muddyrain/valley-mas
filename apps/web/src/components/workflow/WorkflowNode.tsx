@@ -2,7 +2,9 @@ import { Handle, type NodeProps, Position } from '@xyflow/react';
 import {
   AlertCircle,
   CheckCircle2,
+  Clock3,
   Copy,
+  FileText,
   GitBranch,
   GitMerge,
   Globe2,
@@ -14,6 +16,7 @@ import {
   Plus,
   Repeat2,
   Send,
+  ShieldCheck,
   Trash2,
   Workflow,
   Wrench,
@@ -47,6 +50,7 @@ const iconMap = {
   start: Zap,
   end: Send,
   llm: MessageSquare,
+  template: FileText,
   http: Globe2,
   tool: Wrench,
   condition: GitBranch,
@@ -59,11 +63,14 @@ const iconMap = {
   set_loop_variable: Hash,
   continue_loop: Repeat2,
   terminate_loop: Repeat2,
+  approval: ShieldCheck,
+  delay: Clock3,
 };
 const colors = {
   start: 'bg-blue-500/10 text-blue-600',
   end: 'bg-emerald-500/10 text-emerald-600',
   llm: 'bg-violet-500/10 text-violet-600',
+  template: 'bg-sky-500/10 text-sky-600',
   http: 'bg-blue-500/10 text-blue-600',
   tool: 'bg-orange-500/10 text-orange-600',
   condition: 'bg-green-500/10 text-green-600',
@@ -75,6 +82,8 @@ const colors = {
   set_loop_variable: 'bg-teal-500/10 text-teal-600',
   continue_loop: 'bg-teal-500/10 text-teal-600',
   terminate_loop: 'bg-teal-500/10 text-teal-600',
+  approval: 'bg-amber-500/10 text-amber-700',
+  delay: 'bg-blue-500/10 text-blue-600',
   loop: 'bg-teal-500/10 text-teal-600',
 } as const;
 
@@ -681,6 +690,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
         nodeType !== 'intent' &&
         hasOutput ? (
           <DeferredNodePicker
+            scope={nodeData.loopParentId ? 'loop' : 'root'}
             open={outputPickerOpen}
             onOpenChange={(open) => {
               if (!open) closeOutputPicker(id);

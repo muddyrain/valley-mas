@@ -16,7 +16,9 @@ import (
 const (
 	maxCompatibleImageResponseBytes = 48 << 20
 	maxCompatibleGeneratedImageSize = 30 << 20
-	maxCompatibleReferenceSize      = 5 << 20
+	// Browser-uploaded references are capped at 5MB by the handler. The larger
+	// limit is for an already-generated 4K image reused by conversation editing.
+	maxCompatibleReferenceSize = 30 << 20
 )
 
 // ImageGenerationRequest is the provider-neutral image generation interface.

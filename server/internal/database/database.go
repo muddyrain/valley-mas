@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -27,7 +28,8 @@ const (
 	legacyCopilotTargetIndex  = "uidx_workbench_copilot_target"
 )
 
-// Init initializes database connection and migrations.
+// Init initializes the database connection. Schema changes are owned by the
+// dbmigration module and never run implicitly from this connection seam.
 func Init(cfg *config.Config) error {
 	var err error
 	var dialector gorm.Dialector
@@ -75,14 +77,6 @@ func Init(cfg *config.Config) error {
 
 	if err := sqlDB.Ping(); err != nil {
 		return fmt.Errorf("failed to ping database: %w", err)
-	}
-
-	if cfg.Database.AutoMigrate {
-		if err := AutoMigrate(AutoMigrateScopeAll); err != nil {
-			return fmt.Errorf("failed to migrate database: %w", err)
-		}
-	} else {
-		log.Printf("Auto migrate skipped (DB_AUTO_MIGRATE=false)")
 	}
 
 	log.Printf(
@@ -404,6 +398,8 @@ func autoMigrateModelsByName() map[string]any {
 		"ai_usage_log":                         &model.AIUsageLog{},
 		"ai_model":                             &model.AIModel{},
 		"ai_image_generation":                  &model.AIImageGeneration{},
+		"ai_image_conversation":                &model.AIImageConversation{},
+		"ai_image_conversation_message":        &model.AIImageConversationMessage{},
 		"mind_arena_debate_session":            &model.MindArenaDebateSession{},
 		"mind_arena_debate_message":            &model.MindArenaDebateMessage{},
 		"mind_arena_debate_score":              &model.MindArenaDebateScore{},
@@ -478,6 +474,7 @@ func autoMigrateModelsByName() map[string]any {
 		"workflow_test_result":                 &model.WorkflowTestResult{},
 		"workflow_trigger":                     &model.WorkflowTrigger{},
 		"workflow_run_job":                     &model.WorkflowRunJob{},
+		"workflow_approval":                    &model.WorkflowApproval{},
 	}
 }
 
@@ -575,6 +572,8 @@ func coreMigrationModels() []any {
 		&model.AIUsageLog{},
 		&model.AIModel{},
 		&model.AIImageGeneration{},
+		&model.AIImageConversation{},
+		&model.AIImageConversationMessage{},
 		&model.MindArenaDebateSession{},
 		&model.MindArenaDebateMessage{},
 		&model.MindArenaDebateScore{},
@@ -635,6 +634,7 @@ func contentDomainMigrationModels() []any {
 		&model.WorkflowTestResult{},
 		&model.WorkflowTrigger{},
 		&model.WorkflowRunJob{},
+		&model.WorkflowApproval{},
 	}
 }
 
@@ -751,4 +751,11 @@ func Close() error {
 
 func GetDB() *gorm.DB {
 	return DB
+}
+
+func SQLDB() (*sql.DB, error) {
+	if DB == nil {
+		return nil, fmt.Errorf("database is not initialized")
+	}
+	return DB.DB()
 }

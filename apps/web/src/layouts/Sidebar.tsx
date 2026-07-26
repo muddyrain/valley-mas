@@ -2,14 +2,12 @@ import {
   BookOpen,
   Bot,
   Download,
-  FlaskConical,
   Heart,
   Home,
   ImageIcon,
   LibraryBig,
   LogIn,
   LogOut,
-  MessageCircleHeart,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
@@ -46,16 +44,9 @@ const navGroups = [
   {
     label: '创作',
     items: [
-      { to: '/workbench', label: '项目', icon: Bot },
+      { to: '/workbench', label: '智能体', icon: Bot },
       { to: '/workbench/images', label: 'AI 图片', icon: Sparkles },
       { to: '/workbench/resources', label: 'AI 资源', icon: LibraryBig },
-    ],
-  },
-  {
-    label: '更多',
-    items: [
-      { to: '/guestbook', label: '留言墙', icon: MessageCircleHeart },
-      { to: '/labs/climber', label: '实验室', icon: FlaskConical },
     ],
   },
 ];

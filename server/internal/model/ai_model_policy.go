@@ -20,6 +20,10 @@ type AIModel struct {
 	VerificationStatus   string         `gorm:"size:20;index;not null;default:'unverified'" json:"verificationStatus"`
 	VerificationMessage  string         `gorm:"size:500;not null;default:''" json:"verificationMessage"`
 	LastVerifiedAt       *time.Time     `json:"lastVerifiedAt,omitempty"`
+	// Zero means the provider did not expose this limit and the administrator
+	// has not configured it. Do not infer a value from the model name.
+	ContextWindowTokens int            `gorm:"not null;default:0" json:"contextWindowTokens,omitempty"`
+	MaxOutputTokens     int            `gorm:"not null;default:0" json:"maxOutputTokens,omitempty"`
 	Enabled              bool           `gorm:"index;not null;default:true" json:"enabled"`
 	SortOrder            int            `gorm:"index;not null;default:0" json:"sortOrder"`
 	CreatedAt            time.Time      `json:"createdAt"`

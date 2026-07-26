@@ -126,7 +126,7 @@ func (l *LocalLoop) run(
 		var err error
 		if backend, ok := l.Backend.(StreamingBackend); ok {
 			resp, err = backend.ChatStream(ctx, spec, buf, descriptors, func(delta string) {
-				if strings.TrimSpace(delta) == "" {
+				if delta == "" {
 					return
 				}
 				streamed = true

@@ -34,6 +34,7 @@ export const LoopBodyNode = memo(function LoopBodyNode({ data }: NodeProps) {
           {bodyNodeCount} 个节点
         </span>
         <NodePicker
+          scope="loop"
           side="right"
           align="start"
           trigger={

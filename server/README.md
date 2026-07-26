@@ -10,7 +10,6 @@
 
 - `PORT`：默认 `8080`。
 - `DB_DRIVER`、`DB_DSN`、`DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME`：数据库配置。
-- `DB_AUTO_MIGRATE`：是否启用 GORM AutoMigrate，本地按需开启，生产默认应保持关闭。
 - `JWT_SECRET`、`SMTP_*`、`TOS_*`、`ARK_*`、`AI_*`、`QWEATHER_*`、`WEB_PUSH_*`：业务能力配置。
 - `WEB_PUSH_WORKER_ENABLED`：是否启动服务进程内置 Web Push 扫描 worker。当前服务按长驻服务器部署，本地或生产默认可保留 `true`；若另接外部 Cron 扫描，再按需设为 `false` 避免重复扫描。
 
@@ -30,11 +29,38 @@ cd server && go run ./cmd/server
 cd server && air
 ```
 
-`.air.toml` 当前会构建 `./cmd/local`，用于本地开发时读取额外启动参数。例如临时开启自动迁移：
+`.air.toml` 构建 `./cmd/local`。本地入口会在 worker 和 HTTP 服务启动前，只查询并执行 `internal/dbmigration` 中尚未应用的版本化迁移；没有待执行迁移时只做轻量版本检查，不再全量扫描所有 GORM model。
 
 ```bash
-cd server && air db=true
+cd server && air
 ```
+
+全新的空开发库需要显式初始化一次。该命令会执行一次完整 GORM bootstrap，再接入版本化迁移历史；非空数据库和生产环境都会拒绝执行：
+
+```bash
+cd server && go run ./cmd/migrate bootstrap --apply
+```
+
+生产风格入口 `go run ./cmd/server` 不执行任何隐式 DDL。部署流程会在重启服务前运行 `go run ./cmd/migrate up --allow-production` 对应的迁移二进制，迁移失败则不重启。
+
+常用迁移命令：
+
+```bash
+cd server
+go run ./cmd/migrate status
+go run ./cmd/migrate version
+go run ./cmd/migrate up
+```
+
+### 修改 model 字段时
+
+修改字段、字段类型或 GORM tag 时，不要运行 `bootstrap --apply`。正确流程是：
+
+1. 修改 `internal/model` 中的 GORM model。
+2. 在 `internal/dbmigration/postgres` 和 `internal/dbmigration/mysql` 中新增同版本的迁移 SQL。
+3. 正常运行 `air`，本地入口会自动执行尚未应用的迁移；也可以手动运行 `go run ./cmd/migrate up`。
+
+只修改 model 不会自动改变数据库结构。`go run ./cmd/migrate bootstrap --apply` 仅用于第一次初始化全新的空开发库，已有数据库会拒绝执行。
 
 ## 知识库 PDF 解析环境
 
@@ -66,8 +92,8 @@ pdftocairo -v
 
 ```text
 本地 git push -> 同时 push GitHub 和 Gitee -> GitHub Actions 触发 ->
-SSH 登录服务器 -> 服务器从 Gitee pull 最新代码 -> 本机 go build ->
-systemctl restart valley-server
+SSH 登录服务器 -> 服务器从 Gitee pull 最新代码 -> go test ->
+构建服务与迁移程序 -> 应用待执行迁移 -> systemctl restart valley-server
 ```
 
 这样可以避免服务器直连 GitHub 或 GitHub Actions 直接跨境上传大体积二进制过慢的问题。
@@ -188,7 +214,7 @@ cd server && go run ./cmd/sync-schema --apply --scope core
 cd server && go run ./cmd/sync-schema --apply --scope all
 ```
 
-默认不加 `--apply` 时只打印目标库和同步目标，不会连接或修改数据库。带 `--apply` 时必须显式传入 `--models` 或 `--scope`，避免误跑大范围 AutoMigrate。`ENV=production` 时还必须额外传入 `--allow-production`，生产环境仍建议优先使用 `migrations/` 下可审查的 SQL 迁移。
+默认不加 `--apply` 时只打印目标库和同步目标，不会连接或修改数据库。带 `--apply` 时必须显式传入 `--models` 或 `--scope`，避免误跑大范围 AutoMigrate。`ENV=production` 时还必须额外传入 `--allow-production`；生产变更必须写入 `internal/dbmigration` 的可审查版本化迁移。
 
 `--scope all` 保留历史全量 AutoMigrate 行为，因此除了补齐字段，也会执行当前 AutoMigrate 后置的资源外键修复和默认博客分类初始化。其他范围或 `--models` 只同步对应 model，不执行内容库的后置修复。
 
@@ -200,7 +226,7 @@ cd server && go run ./cmd/sync-schema --apply --scope all
 
 - 端口被占用：检查是否已有服务监听 `:8080`，或通过 `PORT` 改端口。
 - 环境变量缺失：对照 `server/.env.example` 补齐本地 `.env`。
-- 数据库结构不一致：本地可使用 `go run ./cmd/sync-schema --apply --models places,ledger` 等精确命令，或确认当前环境是否允许 `DB_AUTO_MIGRATE=true`；生产环境应使用明确的迁移流程。
+- 数据库结构不一致：先运行 `go run ./cmd/migrate status` 查看版本；已有开发库运行 `go run ./cmd/migrate up`，空开发库运行一次 `go run ./cmd/migrate bootstrap --apply`。`sync-schema` 仅保留作定向应急修复，不属于日常启动或生产发布流程。
 - AI 调用失败：先确认功能归属。Valley/Blog/Creator 默认看 `ARK_*`；Life Trace 文本 AI 若配置了 `LIFE_TRACE_AI_*` 会优先使用它，否则回退 `ARK_TEXT_MODEL`；AI Mind Arena 看 `MIND_ARENA_AI_*`，默认复用 `ARK_TEXT_MODEL`，只有单独切模型时才配置 `MIND_ARENA_AI_MODEL`。配置缺失或上游失败时应回退 mock，旧 `OPENAI_API_*` 和 `AI_*` 仅作兼容。
 
 ## 相关入口

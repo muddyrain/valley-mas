@@ -33,7 +33,6 @@ import (
 type blogAIExcerptRequest struct {
 	Title   string `json:"title"`
 	Content string `json:"content" binding:"required"`
-	ModelID string `json:"modelId" binding:"required"`
 }
 
 type blogExcerptChatClient interface {
@@ -507,36 +506,30 @@ func AdminAIGenerateBlogExcerpt(c *gin.Context) {
 	}
 	prompt := buildBlogExcerptPrompt(req.Title, content)
 	started := time.Now()
-	selected, err := aimodel.FindEnabledModel(database.GetDB(), req.ModelID, "text")
+	invocation, err := aimodel.ResolveFastTextInvocation(database.GetDB(), 90*time.Second)
 	if err != nil {
 		recordBlogExcerptUsage(userID, "", "", prompt, "", aiclient.CompatibleUsage{}, aiusage.Since(started), err.Error())
-		Error(c, http.StatusBadRequest, "请选择一个可用的文本模型")
-		return
-	}
-	providerConfig, err := aimodel.ProviderFromEnv(selected.Provider)
-	if err != nil {
-		recordBlogExcerptUsage(userID, selected.Provider, selected.ModelID, prompt, "", aiclient.CompatibleUsage{}, aiusage.Since(started), err.Error())
-		Error(c, http.StatusServiceUnavailable, err.Error())
+		respondCatalogModelError(c, err)
 		return
 	}
 
 	excerpt, actualModel, usage, err := generateBlogExcerptWithCatalogModel(
 		c.Request.Context(),
-		aiclient.NewCompatibleClient(providerConfig.BaseURL, providerConfig.APIKey, 90*time.Second),
-		selected.ModelID,
+		invocation.Client,
+		invocation.Model.ModelID,
 		prompt,
 	)
 	if err != nil {
-		recordBlogExcerptUsage(userID, selected.Provider, actualModel, prompt, excerpt, usage, aiusage.Since(started), err.Error())
+		recordBlogExcerptUsage(userID, invocation.Provider.Provider, actualModel, prompt, excerpt, usage, aiusage.Since(started), err.Error())
 		Error(c, http.StatusBadGateway, "AI 摘要生成失败："+err.Error())
 		return
 	}
-	recordBlogExcerptUsage(userID, selected.Provider, actualModel, prompt, excerpt, usage, aiusage.Since(started), "")
+	recordBlogExcerptUsage(userID, invocation.Provider.Provider, actualModel, prompt, excerpt, usage, aiusage.Since(started), "")
 
 	Success(c, gin.H{
 		"excerpt":  excerpt,
 		"model":    actualModel,
-		"provider": selected.Provider,
+		"provider": invocation.Provider.Provider,
 	})
 }
 

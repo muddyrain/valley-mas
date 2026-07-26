@@ -1,6 +1,7 @@
 const sideEffectLabels = {
   none: null,
   read: '只读',
+  model: 'AI 调用',
   write: '写入',
   model_and_storage: 'AI + 存储',
 } as const;

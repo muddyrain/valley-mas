@@ -36,10 +36,20 @@ func TestValidateScheduledGraphAllowsReadOnlyGraph(t *testing.T) {
 		t.Fatal(err)
 	}
 	graph := workflow.Graph{Nodes: []workflow.Node{
-		triggerTestNode("start", workflow.NodeTypeStart, `{"inputs":{"topic":{"type":"string"}}}`),
+		triggerTestNode("start", workflow.NodeTypeStart, `{"inputs":{}}`),
 		triggerTestNode("search", workflow.NodeTypeTool, `{"capabilityId":"content.search"}`),
 	}}
 	if err := ValidateScheduledGraph(graph, registry); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestValidateScheduledGraphRejectsStartInputs(t *testing.T) {
+	registry := workflow.DefaultRegistry()
+	graph := workflow.Graph{Nodes: []workflow.Node{
+		triggerTestNode("start", workflow.NodeTypeStart, `{"inputs":{"topic":{"type":"string"}}}`),
+	}}
+	if err := ValidateScheduledGraph(graph, registry); err == nil {
+		t.Fatal("expected start input to be rejected")
 	}
 }

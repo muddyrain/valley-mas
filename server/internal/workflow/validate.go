@@ -66,6 +66,9 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 			errs = append(errs, fmt.Sprintf("节点 %s 配置无效: %v", node.ID, err))
 			continue
 		}
+		if _, err := executionPolicyFromConfig(node, config, registry); err != nil {
+			errs = append(errs, fmt.Sprintf("节点 %s 执行策略无效: %v", node.ID, err))
+		}
 		switch node.Type {
 		case NodeTypeStart:
 			raw, ok := config["inputs"]
@@ -123,6 +126,10 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 				errs = append(errs, err.Error())
 			}
 			modelCost++
+		case NodeTypeTemplate:
+			if strings.TrimSpace(stringFromValue(config["template"])) == "" {
+				errs = append(errs, fmt.Sprintf("文本模板节点 %s 的 template 不能为空", node.ID))
+			}
 		case NodeTypeHTTP:
 			if _, err := httpConfigFromMapWithPolicy(config, registry.httpOutboundPolicy); err != nil {
 				errs = append(errs, fmt.Sprintf("HTTP 请求节点 %s 配置无效: %v", node.ID, err))
@@ -168,6 +175,15 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 			modelCost++
 		case NodeTypeLoop:
 			errs = append(errs, validateLoopConfig(node.ID, config, registry, 1)...)
+		case NodeTypeApproval:
+			if strings.TrimSpace(stringFromValue(config["title"])) == "" {
+				errs = append(errs, fmt.Sprintf("人工审批节点 %s 的 title 不能为空", node.ID))
+			}
+		case NodeTypeDelay:
+			delay := numberFromValue(config["delayMs"])
+			if delay < 0 || delay > maxDelayMilliseconds {
+				errs = append(errs, fmt.Sprintf("延时节点 %s 必须设置 0 到 %d 毫秒", node.ID, maxDelayMilliseconds))
+			}
 		case NodeTypeSetLoopVar, NodeTypeContinueLoop, NodeTypeTerminateLoop:
 			errs = append(errs, fmt.Sprintf("循环控制节点 %s 只能放在循环体内", node.ID))
 		}
@@ -184,6 +200,7 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 	if writeCost > DefaultLimits.MaxWriteCapabilities {
 		errs = append(errs, fmt.Sprintf("写入能力预算超过 %d", DefaultLimits.MaxWriteCapabilities))
 	}
+	errs = append(errs, validateApprovalTopology(graph)...)
 
 	adjacency := make(map[string][]string, len(nodes))
 	incoming := make(map[string]int, len(nodes))
@@ -719,6 +736,8 @@ func buildOutputFields(nodes map[string]Node, startInputs map[string]InputDefini
 		case NodeTypeLLM:
 			config, _ := decodeConfig(node.Config)
 			result[id], _ = llmOutputFields(config)
+		case NodeTypeTemplate:
+			result[id] = fields(field("text", ValueTypeString))
 		case NodeTypeHTTP:
 			result[id] = fields(
 				field("body", ValueTypeString),
@@ -784,11 +803,66 @@ func buildOutputFields(nodes map[string]Node, startInputs map[string]InputDefini
 			result[id] = fields(field("continued", ValueTypeBoolean))
 		case NodeTypeTerminateLoop:
 			result[id] = fields(field("terminated", ValueTypeBoolean))
+		case NodeTypeApproval:
+			result[id] = fields(
+				field("approved", ValueTypeBoolean),
+				field("decision", ValueTypeString),
+				field("note", ValueTypeString),
+				field("approvalId", ValueTypeString),
+			)
+		case NodeTypeDelay:
+			result[id] = fields(field("delayedMs", ValueTypeNumber))
 		default:
 			result[id] = map[string]ValueType{}
 		}
+		config, _ := decodeConfig(node.Config)
+		policy, _ := executionPolicyFromConfig(node, config, registry)
+		result[id] = addExecutionPolicyOutputFields(result[id], policy)
 	}
 	return result
+}
+
+func validateApprovalTopology(graph Graph) []string {
+	var approval *Node
+	for index := range graph.Nodes {
+		if graph.Nodes[index].Type != NodeTypeApproval {
+			continue
+		}
+		if approval != nil {
+			return []string{"每个工作流最多只能有一个人工审批节点"}
+		}
+		approval = &graph.Nodes[index]
+	}
+	if approval == nil {
+		return nil
+	}
+	var start Node
+	for _, node := range graph.Nodes {
+		if node.Type == NodeTypeStart {
+			start = node
+			break
+		}
+	}
+	config, _ := decodeConfig(start.Config)
+	if inputs, _ := config["inputs"].(map[string]any); len(inputs) > 0 {
+		return []string{"含人工审批的工作流不能声明开始输入"}
+	}
+	incomingToApproval := 0
+	outgoingFromStart := 0
+	direct := false
+	for _, edge := range graph.Edges {
+		if edge.Target == approval.ID {
+			incomingToApproval++
+			direct = edge.Source == start.ID
+		}
+		if edge.Source == start.ID {
+			outgoingFromStart++
+		}
+	}
+	if !direct || incomingToApproval != 1 || outgoingFromStart != 1 {
+		return []string{"人工审批必须是开始节点后的唯一第一步"}
+	}
+	return nil
 }
 
 func referencesForNode(node Node) []string {

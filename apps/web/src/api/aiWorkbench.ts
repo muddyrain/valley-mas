@@ -297,7 +297,7 @@ export function createAIAppProposal(
 export async function createPromptAssistantSuggestion(
   data: {
     target: PromptAssistantTarget;
-    modelId: string;
+    modelId?: string;
     field?: PromptAssistantField;
     mode: 'auto' | 'instruction' | 'debug_run';
     appId?: string;
@@ -306,6 +306,8 @@ export async function createPromptAssistantSuggestion(
     debugRunIds?: string[];
     allowedVariables?: string[];
     generateGreetings?: boolean;
+    /** Lightweight field generation: shorter timeout/output and no repair retry. */
+    quick?: boolean;
     agentContext?: {
       name: string;
       description: string;
@@ -324,9 +326,20 @@ export async function createPromptAssistantSuggestion(
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     },
-    body: JSON.stringify({ ...data, stream: true }),
+    body: JSON.stringify({ ...data, stream: !data.quick }),
     signal,
   });
+  if (data.quick) {
+    const payload = (await response.json()) as {
+      code?: number;
+      message?: string;
+      data?: { suggestion?: PromptAssistantSuggestion };
+    };
+    if (!response.ok || payload.code !== 0 || !payload.data?.suggestion) {
+      throw new Error(payload.message || '提示词优化失败');
+    }
+    return { suggestion: payload.data.suggestion };
+  }
   if (!response.headers.get('content-type')?.includes('text/event-stream')) {
     const payload = (await response.json()) as { message?: string };
     throw new Error(payload.message || '提示词优化失败');

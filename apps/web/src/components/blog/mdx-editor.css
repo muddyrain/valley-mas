@@ -72,12 +72,20 @@
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-item,
 .valley-md-editor-shell .milkdown .milkdown-toolbar .toolbar-item {
   border-radius: 10px;
+  color: hsl(var(--primary) / 0.9);
+}
+
+.valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-heading-button svg,
+.valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-item svg,
+.valley-md-editor-shell .milkdown .milkdown-toolbar .toolbar-item svg {
+  color: currentColor;
+  opacity: 0.95;
 }
 
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-heading-button:hover,
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-item:hover,
 .valley-md-editor-shell .milkdown .milkdown-toolbar .toolbar-item:hover {
-  background: hsl(var(--accent));
+  background: hsl(var(--primary) / 0.1);
 }
 
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-item.active svg,

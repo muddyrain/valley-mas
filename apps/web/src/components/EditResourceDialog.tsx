@@ -4,7 +4,7 @@
  * 图片不可更换，如需替换请重新上传。
  */
 import { Image as ImageIcon, Loader2, Pencil } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { type ResourceVisibility, updateResource } from '@/api/resource';
 import { ModelPicker } from '@/components/ai/ModelPicker';
@@ -12,7 +12,6 @@ import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import ImagePreviewDialog from '@/components/ImagePreviewDialog';
 import ResourceTagSelector from '@/components/ResourceTagSelector';
 import { Button } from '@/components/ui/button';
-import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 // ── 资源的最小必要字段（可兼容 MyResource / Resource 等多种类型）──
@@ -81,17 +80,6 @@ export default function EditResourceDialog({
   const [visibility, setVisibility] = useState<ResourceVisibility>('private');
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const closeConfirmToastIdRef = useRef<string | number | null>(null);
-  const closeConfirmTimeoutRef = useRef<number | null>(null);
-
-  const clearCloseConfirmGuard = () => {
-    closeConfirmToastIdRef.current = null;
-    if (closeConfirmTimeoutRef.current !== null) {
-      window.clearTimeout(closeConfirmTimeoutRef.current);
-      closeConfirmTimeoutRef.current = null;
-    }
-  };
-
   // 标签状态（字符串数组，随 resource 变化重置）
   const [tags, setTags] = useState<string[]>([]);
   const [textModelId, setTextModelId] = useState('');
@@ -140,35 +128,12 @@ export default function EditResourceDialog({
     }
   };
 
-  const requestDialogClose = () => {
-    if (saving) return;
-    if (closeConfirmToastIdRef.current !== null) return;
-    closeConfirmToastIdRef.current = openConfirmToast({
-      title: '确认关闭编辑弹窗？',
-      description: '关闭后，当前未保存的修改将丢失。',
-      confirmText: '确认关闭',
-      cancelText: '继续编辑',
-      onConfirm: () => {
-        clearCloseConfirmGuard();
-        onOpenChange(false);
-      },
-      onCancel: clearCloseConfirmGuard,
-    });
-    closeConfirmTimeoutRef.current = window.setTimeout(() => {
-      clearCloseConfirmGuard();
-    }, 8200);
-  };
-
   return (
     <Dialog
       open={open}
-      onOpenChange={(o) => {
-        if (o) {
-          clearCloseConfirmGuard();
-          onOpenChange(true);
-          return;
-        }
-        requestDialogClose();
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && saving) return;
+        onOpenChange(nextOpen);
       }}
     >
       <DialogContent className="flex h-[90vh] w-[90vw] max-w-4xl flex-col gap-0 overflow-hidden bg-card p-0 sm:max-w-4xl">
@@ -206,12 +171,12 @@ export default function EditResourceDialog({
                 />
               )}
               {resource && (
-                <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-foreground/45 px-2.5 py-1 text-[10px] font-medium text-foreground/90 backdrop-blur-sm opacity-90 group-hover:opacity-100">
+                <div className="pointer-events-none absolute right-3 top-3 rounded-full border border-border/80 bg-background/85 px-2.5 py-1 text-[10px] font-medium text-foreground shadow-sm backdrop-blur-sm opacity-90 group-hover:opacity-100">
                   点击预览
                 </div>
               )}
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
-                <span className="rounded-full bg-foreground/40 px-3 py-1 text-[10px] text-foreground/80 backdrop-blur-sm whitespace-nowrap">
+                <span className="whitespace-nowrap rounded-full border border-border/80 bg-background/85 px-3 py-1 text-[10px] text-muted-foreground shadow-sm backdrop-blur-sm">
                   🔒 图片不可更换，如需替换请重新上传
                 </span>
               </div>

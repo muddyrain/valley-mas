@@ -46,7 +46,6 @@ func run(args []string, out io.Writer) error {
 		return err
 	}
 
-	cfg.Database.AutoMigrate = false
 	fmt.Fprintf(out, "syncing database schema via scoped GORM AutoMigrate\n")
 	fmt.Fprintf(out, "target: %s\n", describeDatabaseTarget(cfg))
 	fmt.Fprintf(out, "scope: %s\n", describeSyncSelection(options))

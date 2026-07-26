@@ -56,6 +56,149 @@ func TestWorkflowCapabilitiesExposeInputGuidance(t *testing.T) {
 	}
 }
 
+func TestWorkflowCapabilitiesExposeNodeDefaultConfig(t *testing.T) {
+	catalog := Capabilities(DefaultRegistry())
+	for _, definition := range catalog.NodeTypes {
+		if definition.Type == NodeTypeTemplate {
+			if _, ok := definition.DefaultConfig["template"]; !ok {
+				t.Fatalf("template default config missing: %#v", definition.DefaultConfig)
+			}
+			return
+		}
+	}
+	t.Fatal("template node definition missing")
+}
+
+func TestTemplateExecutorReturnsResolvedText(t *testing.T) {
+	result, err := (TemplateExecutor{}).Execute(context.Background(), RunContext{}, NodeExecution{
+		Input: map[string]any{"template": "标题：Valley"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Output["text"] != "标题：Valley" {
+		t.Fatalf("unexpected template output: %#v", result.Output)
+	}
+	numberResult, err := (TemplateExecutor{}).Execute(context.Background(), RunContext{}, NodeExecution{
+		Input: map[string]any{"template": 42},
+	})
+	if err != nil || numberResult.Output["text"] != "42" {
+		t.Fatalf("unexpected scalar template output: %#v err=%v", numberResult.Output, err)
+	}
+}
+
+func TestGraphV4TemplateResolvesUpstreamVariables(t *testing.T) {
+	registry := testRegistry(t)
+	graph := Graph{SchemaVersion: 4, Nodes: []Node{
+		node("start", NodeTypeStart, `{"inputs":{"topic":{"type":"string","required":true}}}`),
+		node("template", NodeTypeTemplate, `{"template":"# {{start.output.topic}}\n\n由 Valley 生成"}`),
+		node("end", NodeTypeEnd, `{"outputs":{"markdown":"{{template.output.text}}"},"outputTypes":{"markdown":"string"}}`),
+	}, Edges: []Edge{{Source: "start", Target: "template"}, {Source: "template", Target: "end"}}}
+	if errs := ValidateGraph(graph, registry); len(errs) > 0 {
+		t.Fatalf("validation errors: %v", errs)
+	}
+	var final map[string]any
+	err := Execute(context.Background(), graph, registry, RunContext{
+		Inputs: map[string]any{"topic": "工作流节点"},
+	}, func(event Event) {
+		if event.NodeID == "end" && event.Status == StatusSucceeded {
+			final = event.Output
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if final["markdown"] != "# 工作流节点\n\n由 Valley 生成" {
+		t.Fatalf("unexpected final output: %#v", final)
+	}
+}
+
+func TestSaveAIImageResourceCapabilityUsesOwnerScopedSaver(t *testing.T) {
+	adapter := SaveAIImageResourceCapabilityAdapter{}
+	result, err := adapter.Execute(context.Background(), RunContext{
+		Actor: Actor{UserID: 42},
+		AIImageResourceSaver: AIImageResourceSaverFunc(func(_ context.Context, userID int64, generationID, visibility string) (SavedAIImageResource, error) {
+			if userID != 42 || generationID != "1001" || visibility != "public" {
+				t.Fatalf("unexpected saver input: user=%d generation=%s visibility=%s", userID, generationID, visibility)
+			}
+			return SavedAIImageResource{ResourceID: "2002", Title: "雪夜少女", Tags: []string{"二次元", "雪景"}, URL: "https://example.test/image.png", Visibility: "public", Model: "vision-model"}, nil
+		}),
+	}, NodeExecution{Input: map[string]any{"generationId": "1001", "visibility": "public"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Output["resourceId"] != "2002" || result.Output["model"] != "vision-model" {
+		t.Fatalf("unexpected output: %#v", result.Output)
+	}
+}
+
+func TestGenerateAIImageCapabilityUsesConfiguredModel(t *testing.T) {
+	result, err := (GenerateAIImageCapabilityAdapter{}).Execute(
+		context.Background(),
+		RunContext{
+			Actor: Actor{UserID: 42},
+			AIImageGenerator: AIImageGeneratorFunc(func(
+				_ context.Context,
+				userID int64,
+				modelID string,
+				prompt string,
+				aspectRatio string,
+				quality string,
+				referenceImage string,
+			) (GeneratedAIImage, error) {
+				if userID != 42 || modelID != "7" || prompt != "山谷图书馆" ||
+					aspectRatio != "16:9" || quality != "2K" || referenceImage != "" {
+					t.Fatalf("unexpected image generation input")
+				}
+				return GeneratedAIImage{
+					GenerationID: "1001", URL: "https://example.test/image.png",
+					Width: 2048, Height: 1152, Model: "image-model", Size: "2048x1152",
+				}, nil
+			}),
+		},
+		NodeExecution{Input: map[string]any{
+			"modelId": "7", "prompt": "山谷图书馆", "aspectRatio": "16:9", "quality": "2K",
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Output["generationId"] != "1001" || result.Output["width"] != 2048 {
+		t.Fatalf("unexpected output: %#v", result.Output)
+	}
+}
+
+func TestUnderstandAIImageCapabilityReturnsText(t *testing.T) {
+	result, err := (UnderstandAIImageCapabilityAdapter{}).Execute(
+		context.Background(),
+		RunContext{
+			Actor: Actor{UserID: 42},
+			AIImageUnderstander: AIImageUnderstanderFunc(func(
+				_ context.Context,
+				userID int64,
+				modelID string,
+				imageURL string,
+				prompt string,
+			) (UnderstoodAIImage, error) {
+				if userID != 42 || modelID != "8" ||
+					imageURL != "https://example.test/image.png" || prompt != "描述画面" {
+					t.Fatalf("unexpected image understanding input")
+				}
+				return UnderstoodAIImage{Text: "一座山谷图书馆", Model: "vision-model", TokenUsage: 12}, nil
+			}),
+		},
+		NodeExecution{Input: map[string]any{
+			"modelId": "8", "imageUrl": "https://example.test/image.png", "prompt": "描述画面",
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Output["text"] != "一座山谷图书馆" || result.Output["tokenUsage"] != 12 {
+		t.Fatalf("unexpected output: %#v", result.Output)
+	}
+}
+
 func TestNotionSearchCapabilityValidatesInputsAndReturnsSafeFields(t *testing.T) {
 	registry := testRegistry(t)
 	capability, _, ok := registry.Capability(CapabilityNotionSearch)

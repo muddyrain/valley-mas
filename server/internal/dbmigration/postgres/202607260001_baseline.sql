@@ -1,0 +1,4 @@
+-- +goose Up
+-- Managed migration baseline.
+-- Historical migrations through 070 are intentionally not replayed because
+-- the legacy directory contains duplicate versions and mixed SQL dialects.

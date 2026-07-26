@@ -900,7 +900,7 @@ func TestDeleteWeeklyReviewOnlyDeletesCurrentUserReview(t *testing.T) {
 func TestWeeklyReviewSaveErrorMessageExplainsMissingTable(t *testing.T) {
 	message := weeklyReviewSaveErrorMessage(errors.New(`ERROR: relation "life_trace_weekly_reviews" does not exist (SQLSTATE 42P01)`))
 
-	if !strings.Contains(message, "air db=true") || !strings.Contains(message, "029") {
+	if !strings.Contains(message, "数据结构尚未完成升级") {
 		t.Fatalf("expected actionable missing table message, got %s", message)
 	}
 }

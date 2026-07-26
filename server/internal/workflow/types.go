@@ -25,6 +25,7 @@ const (
 	NodeTypeStart         NodeType = "start"
 	NodeTypeEnd           NodeType = "end"
 	NodeTypeLLM           NodeType = "llm"
+	NodeTypeTemplate      NodeType = "template"
 	NodeTypeHTTP          NodeType = "http"
 	NodeTypeTool          NodeType = "tool"
 	NodeTypeCondition     NodeType = "condition"
@@ -37,6 +38,8 @@ const (
 	NodeTypeSetLoopVar    NodeType = "set_loop_variable"
 	NodeTypeContinueLoop  NodeType = "continue_loop"
 	NodeTypeTerminateLoop NodeType = "terminate_loop"
+	NodeTypeApproval      NodeType = "approval"
+	NodeTypeDelay         NodeType = "delay"
 )
 
 type Position struct {
@@ -81,19 +84,25 @@ const (
 	StatusFailed    RunStatus = "error"
 	StatusSkipped   RunStatus = "skipped"
 	StatusCancelled RunStatus = "cancelled"
+	StatusWaiting   RunStatus = "waiting_approval"
 )
 
 type RunContext struct {
-	ID                 string
-	Actor              Actor
-	Inputs             map[string]any
-	Outputs            map[string]map[string]any
-	KnowledgeRetriever KnowledgeRetriever
-	ContentSearcher    ContentSearcher
-	NotionSearcher     NotionSearcher
-	CoverGenerator     CoverGenerator
-	SubworkflowRunner  SubworkflowRunner
-	Emitter            func(Event)
+	ID                   string
+	Actor                Actor
+	Inputs               map[string]any
+	Outputs              map[string]map[string]any
+	KnowledgeRetriever   KnowledgeRetriever
+	ContentSearcher      ContentSearcher
+	NotionSearcher       NotionSearcher
+	CoverGenerator       CoverGenerator
+	AIImageGenerator     AIImageGenerator
+	AIImageUnderstander  AIImageUnderstander
+	AIImageResourceSaver AIImageResourceSaver
+	NotificationSender   NotificationSender
+	SubworkflowRunner    SubworkflowRunner
+	ApprovalGate         ApprovalGate
+	Emitter              func(Event)
 }
 
 type Actor struct {
@@ -219,6 +228,102 @@ type CoverGeneratorFunc func(context.Context, int64, string, string, string) (Ge
 
 func (fn CoverGeneratorFunc) GenerateCover(ctx context.Context, userID int64, title, summary, style string) (GeneratedCover, error) {
 	return fn(ctx, userID, title, summary, style)
+}
+
+type GeneratedAIImage struct {
+	GenerationID string
+	URL          string
+	Width        int
+	Height       int
+	Model        string
+	Size         string
+}
+
+type AIImageGenerator interface {
+	GenerateAIImage(context.Context, int64, string, string, string, string, string) (GeneratedAIImage, error)
+}
+
+type AIImageGeneratorFunc func(context.Context, int64, string, string, string, string, string) (GeneratedAIImage, error)
+
+func (fn AIImageGeneratorFunc) GenerateAIImage(
+	ctx context.Context,
+	userID int64,
+	modelID string,
+	prompt string,
+	aspectRatio string,
+	quality string,
+	referenceImage string,
+) (GeneratedAIImage, error) {
+	return fn(ctx, userID, modelID, prompt, aspectRatio, quality, referenceImage)
+}
+
+type UnderstoodAIImage struct {
+	Text       string
+	Model      string
+	TokenUsage int
+}
+
+type AIImageUnderstander interface {
+	UnderstandAIImage(context.Context, int64, string, string, string) (UnderstoodAIImage, error)
+}
+
+type AIImageUnderstanderFunc func(context.Context, int64, string, string, string) (UnderstoodAIImage, error)
+
+func (fn AIImageUnderstanderFunc) UnderstandAIImage(
+	ctx context.Context,
+	userID int64,
+	modelID string,
+	imageURL string,
+	prompt string,
+) (UnderstoodAIImage, error) {
+	return fn(ctx, userID, modelID, imageURL, prompt)
+}
+
+type SavedAIImageResource struct {
+	ResourceID string
+	Title      string
+	Tags       []string
+	URL        string
+	Visibility string
+	Model      string
+}
+
+type AIImageResourceSaver interface {
+	SaveAIImageResource(context.Context, int64, string, string) (SavedAIImageResource, error)
+}
+
+type AIImageResourceSaverFunc func(context.Context, int64, string, string) (SavedAIImageResource, error)
+
+func (fn AIImageResourceSaverFunc) SaveAIImageResource(ctx context.Context, userID int64, generationID, visibility string) (SavedAIImageResource, error) {
+	return fn(ctx, userID, generationID, visibility)
+}
+
+type NotificationRequest struct {
+	RunID   string
+	Status  string
+	Title   string
+	Content string
+	Path    string
+}
+
+type SentNotification struct {
+	ID     string
+	Status string
+	Path   string
+}
+
+type NotificationSender interface {
+	SendNotification(context.Context, int64, NotificationRequest) (SentNotification, error)
+}
+
+type NotificationSenderFunc func(context.Context, int64, NotificationRequest) (SentNotification, error)
+
+func (fn NotificationSenderFunc) SendNotification(
+	ctx context.Context,
+	userID int64,
+	request NotificationRequest,
+) (SentNotification, error) {
+	return fn(ctx, userID, request)
 }
 
 type SubworkflowRequest struct {

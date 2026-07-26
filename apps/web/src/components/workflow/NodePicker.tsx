@@ -1,14 +1,19 @@
 import {
+  BookOpen,
+  Clock3,
+  FileText,
   GitBranch,
   GitMerge,
   Globe2,
   Hash,
+  Image as ImageIcon,
   Lightbulb,
-  Loader2,
   MessageSquare,
   Repeat2,
   Search,
+  SkipForward,
   Sparkles,
+  Square,
   Workflow,
   Wrench,
 } from 'lucide-react';
@@ -21,7 +26,12 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { getWorkflowPlatform, listWorkflows, type WorkflowNodeType } from '@/api/workflow';
+import {
+  getWorkflowPlatform,
+  listWorkflows,
+  type WorkflowNodeDefinition,
+  type WorkflowNodeType,
+} from '@/api/workflow';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +44,7 @@ import {
 } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { type PublishedWorkflowContract, publishedWorkflowContract } from './subworkflowContract';
@@ -42,13 +53,24 @@ import { getWorkflowSideEffectLabel } from './workflowSideEffects';
 
 export interface NodePickerItem {
   key: string;
-  group: 'model' | 'flow' | 'logic' | 'tool' | 'subworkflow';
+  group: NodePickerGroup;
   nodeType: WorkflowNodeType;
   label: string;
   description: string;
   config: Record<string, unknown>;
   sideEffect?: string;
 }
+
+type NodePickerGroup =
+  | 'model'
+  | 'content'
+  | 'image'
+  | 'knowledge'
+  | 'flow'
+  | 'logic'
+  | 'tool'
+  | 'subworkflow';
+type NodePickerScope = 'root' | 'loop';
 
 interface NodePickerProps {
   trigger: ReactElement<{
@@ -58,121 +80,14 @@ interface NodePickerProps {
   side?: 'top' | 'bottom' | 'left' | 'right';
   align?: 'start' | 'center' | 'end';
   defer?: boolean;
+  scope?: NodePickerScope;
 }
-
-const genericItems: NodePickerItem[] = [
-  {
-    key: 'http',
-    group: 'tool',
-    nodeType: 'http',
-    label: 'HTTP 请求',
-    description: '向受控的 HTTP(S) API 发送请求并返回响应数据',
-    config: {
-      method: 'GET',
-      url: '',
-      params: [],
-      headers: [],
-      bodyType: 'none',
-      body: '',
-      timeoutSeconds: 30,
-      retryCount: 0,
-      ignoreError: false,
-    },
-  },
-  {
-    key: 'loop',
-    group: 'flow',
-    nodeType: 'loop',
-    label: '循环',
-    description: '重复执行循环体中的子流程',
-    config: {
-      mode: 'array',
-      input: '',
-      middleVariables: [],
-      outputs: [],
-      body: {
-        nodes: [],
-        edges: [],
-      },
-    },
-  },
-  {
-    key: 'llm',
-    group: 'model',
-    nodeType: 'llm',
-    label: '大模型',
-    description: '选择文本模型生成内容',
-    config: {
-      systemPrompt: '你是一个可靠的内容助手。',
-      prompt: '请完成当前任务。',
-      inputs: {},
-      inputTypes: {},
-      outputMode: 'text',
-      temperature: 0.4,
-      maxOutputTokens: 512,
-    },
-  },
-  {
-    key: 'condition',
-    group: 'flow',
-    nodeType: 'condition',
-    label: '条件',
-    description: '按 true / false 选择执行路径',
-    config: { left: '', operator: 'equals', right: true },
-  },
-  {
-    key: 'switch',
-    group: 'flow',
-    nodeType: 'switch',
-    label: '选择器',
-    description: '根据结构化字段选择一条路径',
-    config: {
-      value: '',
-      valueType: 'string',
-      cases: [
-        { id: 'case_1', label: '选项 1', value: 'option_1' },
-        { id: 'case_2', label: '选项 2', value: 'option_2' },
-      ],
-    },
-  },
-  {
-    key: 'merge',
-    group: 'flow',
-    nodeType: 'merge',
-    label: '合并',
-    description: '从已执行分支选择首个可用值',
-    config: { fields: [] },
-  },
-  {
-    key: 'variable',
-    group: 'flow',
-    nodeType: 'variable',
-    label: '变量',
-    description: '设置类型明确的工作流变量',
-    config: { assignments: [{ name: 'value', type: 'string', value: '' }] },
-  },
-  {
-    key: 'intent',
-    group: 'logic',
-    nodeType: 'intent',
-    label: '意图识别',
-    description: '按已配置意图将文本分流',
-    config: {
-      query: '',
-      intents: [
-        {
-          id: 'intent_1',
-          name: '意图 1',
-          description: '',
-          examples: [],
-        },
-      ],
-    },
-  },
-];
 
 const groupLabels = {
   model: '大模型',
+  content: '内容处理',
+  image: '图片',
+  knowledge: '知识',
   flow: '流程控制',
   logic: '业务逻辑',
   tool: '工具',
@@ -180,6 +95,9 @@ const groupLabels = {
 } as const;
 const groupIcons = {
   model: Sparkles,
+  content: FileText,
+  image: ImageIcon,
+  knowledge: BookOpen,
   flow: GitBranch,
   logic: Lightbulb,
   tool: Wrench,
@@ -188,13 +106,64 @@ const groupIcons = {
 const itemIcons: Record<string, typeof MessageSquare> = {
   http: Globe2,
   llm: MessageSquare,
+  template: FileText,
   condition: GitBranch,
   switch: GitBranch,
   merge: GitMerge,
   variable: Hash,
   intent: Lightbulb,
   loop: Repeat2,
+  set_loop_variable: Hash,
+  continue_loop: SkipForward,
+  terminate_loop: Square,
+  delay: Clock3,
 };
+
+const pickerNodeTypes = new Set<WorkflowNodeType>([
+  'llm',
+  'template',
+  'http',
+  'condition',
+  'switch',
+  'merge',
+  'variable',
+  'intent',
+  'loop',
+  'set_loop_variable',
+  'continue_loop',
+  'terminate_loop',
+  'delay',
+]);
+const loopControlNodeTypes = new Set<WorkflowNodeType>([
+  'set_loop_variable',
+  'continue_loop',
+  'terminate_loop',
+]);
+
+function normalizeGroup(category: string): NodePickerGroup {
+  return category in groupLabels ? (category as NodePickerGroup) : 'tool';
+}
+
+function genericNodeItems(
+  definitions: WorkflowNodeDefinition[],
+  scope: NodePickerScope,
+): NodePickerItem[] {
+  return definitions.flatMap((definition) => {
+    if (!pickerNodeTypes.has(definition.type)) return [];
+    const loopControl = loopControlNodeTypes.has(definition.type);
+    if (scope === 'root' && loopControl) return [];
+    return [
+      {
+        key: definition.type,
+        group: normalizeGroup(definition.category),
+        nodeType: definition.type,
+        label: definition.label,
+        description: definition.description,
+        config: definition.defaultConfig || {},
+      },
+    ];
+  });
+}
 
 export function NodePicker({
   trigger,
@@ -202,9 +171,18 @@ export function NodePicker({
   side = 'top',
   align = 'center',
   defer = false,
+  scope = 'root',
 }: NodePickerProps) {
   if (defer) return trigger;
-  return <NodePickerPopover trigger={trigger} onSelect={onSelect} side={side} align={align} />;
+  return (
+    <NodePickerPopover
+      trigger={trigger}
+      onSelect={onSelect}
+      side={side}
+      align={align}
+      scope={scope}
+    />
+  );
 }
 
 export function DeferredNodePicker({
@@ -212,6 +190,7 @@ export function DeferredNodePicker({
   onSelect,
   side = 'top',
   align = 'center',
+  scope = 'root',
   open: controlledOpen,
   onOpenChange,
 }: Omit<NodePickerProps, 'defer'> & {
@@ -243,6 +222,7 @@ export function DeferredNodePicker({
       onSelect={onSelect}
       side={side}
       align={align}
+      scope={scope}
       open={open}
       onOpenChange={setOpen}
     />
@@ -254,6 +234,7 @@ function NodePickerPopover({
   onSelect,
   side,
   align,
+  scope = 'root',
   open: controlledOpen,
   onOpenChange,
 }: Omit<NodePickerProps, 'defer'> & {
@@ -319,14 +300,19 @@ function NodePickerPopover({
       .filter((item) => item.available)
       .map((item) => ({
         key: `tool:${item.id}`,
-        group: 'tool',
+        group: normalizeGroup(item.category),
         nodeType: 'tool',
         label: item.name,
         description: item.description,
         config: {
           capabilityId: item.id,
           capabilityName: item.name,
-          inputs: Object.fromEntries((item.inputSchema.required || []).map((name) => [name, ''])),
+          inputs: Object.fromEntries(
+            (item.inputSchema.required || []).map((name) => [
+              name,
+              item.inputSchema.properties?.[name]?.default ?? '',
+            ]),
+          ),
         },
         sideEffect: item.sideEffect,
       }));
@@ -350,11 +336,12 @@ function NodePickerPopover({
       },
     }));
     const keyword = query.trim().toLowerCase();
-    return [...genericItems, ...tools, ...workflows].filter(
+    const generic = genericNodeItems(capabilities.nodeTypes, scope);
+    return [...generic, ...tools, ...workflows].filter(
       (item) =>
         !keyword || `${item.label} ${item.description} ${item.key}`.toLowerCase().includes(keyword),
     );
-  }, [capabilities.toolCapabilities, open, published, query]);
+  }, [capabilities.nodeTypes, capabilities.toolCapabilities, open, published, query, scope]);
 
   const content = (
     <PickerContent
@@ -364,7 +351,7 @@ function NodePickerPopover({
       loading={capabilities.loading}
       error={capabilities.error}
       onSelect={(item) => {
-        onSelect(item);
+        onSelect({ ...item, config: structuredClone(item.config) });
         setOpen(false);
         setQuery('');
       }}
@@ -376,7 +363,7 @@ function NodePickerPopover({
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger render={trigger} />
         <SheetContent side="right" className="w-full max-w-none p-0">
-          <SheetHeader className="border-b">
+          <SheetHeader className="border-b border-border">
             <SheetTitle>添加节点</SheetTitle>
           </SheetHeader>
           {open ? content : null}
@@ -433,10 +420,7 @@ function PickerContent({
       <ScrollArea className="h-[min(560px,70vh)]">
         <div className="space-y-6 p-5">
           {loading ? (
-            <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              正在加载能力
-            </div>
+            <NodePickerLoadingSkeleton />
           ) : error ? (
             <p className="py-10 text-center text-sm text-destructive">{error}</p>
           ) : (
@@ -454,7 +438,7 @@ function PickerContent({
                     className={cn('grid gap-2', group === 'model' ? 'grid-cols-1' : 'grid-cols-2')}
                   >
                     {grouped.map((item) => {
-                      const Icon = itemIcons[item.key] || (group === 'tool' ? Wrench : Workflow);
+                      const Icon = itemIcons[item.key] || groupIcons[group];
                       const sideEffectLabel = getWorkflowSideEffectLabel(item.sideEffect);
                       return (
                         <Button
@@ -469,13 +453,19 @@ function PickerContent({
                               'flex size-8 shrink-0 items-center justify-center rounded-lg',
                               group === 'model'
                                 ? 'bg-violet-500/10 text-violet-600'
-                                : group === 'flow'
-                                  ? 'bg-emerald-500/10 text-emerald-600'
-                                  : group === 'logic'
-                                    ? 'bg-cyan-500/10 text-cyan-600'
-                                    : group === 'tool'
-                                      ? 'bg-orange-500/10 text-orange-600'
-                                      : 'bg-blue-500/10 text-blue-600',
+                                : group === 'content'
+                                  ? 'bg-sky-500/10 text-sky-600'
+                                  : group === 'image'
+                                    ? 'bg-fuchsia-500/10 text-fuchsia-600'
+                                    : group === 'knowledge'
+                                      ? 'bg-indigo-500/10 text-indigo-600'
+                                      : group === 'flow'
+                                        ? 'bg-emerald-500/10 text-emerald-600'
+                                        : group === 'logic'
+                                          ? 'bg-cyan-500/10 text-cyan-600'
+                                          : group === 'tool'
+                                            ? 'bg-orange-500/10 text-orange-600'
+                                            : 'bg-blue-500/10 text-blue-600',
                             )}
                           >
                             <Icon className="size-4" />
@@ -507,5 +497,35 @@ function PickerContent({
         </div>
       </ScrollArea>
     </div>
+  );
+}
+
+function NodePickerLoadingSkeleton() {
+  return (
+    <>
+      {[0, 1, 2].map((group) => (
+        <section key={group} aria-hidden="true">
+          <div className="mb-3 flex items-center gap-2">
+            <Skeleton className="size-3.5 rounded-sm" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[0, 1].map((item) => (
+              <div
+                key={item}
+                className="flex min-h-20 items-start gap-3 rounded-lg border border-border/70 bg-card p-3.5"
+              >
+                <Skeleton className="size-8 shrink-0 rounded-lg" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-3/4" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </>
   );
 }

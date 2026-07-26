@@ -271,7 +271,7 @@ func weeklyReviewSaveErrorMessage(err error) string {
 	normalized := strings.ToLower(raw)
 	if strings.Contains(normalized, "life_trace_weekly_reviews") &&
 		(strings.Contains(normalized, "does not exist") || strings.Contains(normalized, "no such table")) {
-		return "保存每周回顾失败：数据表 life_trace_weekly_reviews 不存在，请在 server 目录运行 air db=true 或执行 029 迁移后重试"
+		return "保存每周回顾失败：服务数据结构尚未完成升级，请稍后重试"
 	}
 	return "保存每周回顾失败：" + trimRunes(raw, 120)
 }

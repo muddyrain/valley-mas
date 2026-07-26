@@ -22,7 +22,7 @@ export default function TypeFilterBar({
 }: TypeFilterBarProps) {
   return (
     <div
-      className={`inline-flex items-center gap-1 rounded-xl border border-border bg-background/80 backdrop-blur-sm px-1 shadow-sm ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-2xl border border-border bg-card px-2 py-2 shadow-sm ${className}`}
     >
       {prefix && (
         <span className="mr-1 px-2 text-sm font-medium text-muted-foreground">{prefix}</span>
@@ -32,16 +32,20 @@ export default function TypeFilterBar({
           type="button"
           key={opt.value}
           onClick={() => onChange(opt.value)}
-          className={`h-7 px-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+          className={`h-9 rounded-xl px-4 text-sm font-medium transition-colors ${
             value === opt.value
-              ? 'bg-primary text-primary-foreground shadow-md'
-              : 'text-muted-foreground hover:bg-accent hover:text-primary'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:bg-accent hover:text-foreground'
           }`}
         >
           {opt.label}
         </button>
       ))}
-      {extra && <div className="ml-1.5 text-sm text-muted-foreground">{extra}</div>}
+      {extra && (
+        <div className="ml-1 border-l border-border pl-3 pr-2 text-sm text-muted-foreground">
+          {extra}
+        </div>
+      )}
     </div>
   );
 }

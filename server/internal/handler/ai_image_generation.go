@@ -1,18 +1,13 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"image"
-	_ "image/jpeg"
-	_ "image/png"
-	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -24,54 +19,152 @@ import (
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 	"valley-server/internal/service"
-	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 const (
-	aiImageGenerationTimeout = 240 * time.Second
-	maxAIImagePromptRunes    = 2000
-	maxAIImageReferences     = 3
-	maxAIImageReferenceBytes = 5 << 20
-	maxGeneratedImageBytes   = 30 << 20
+	maxAIImagePromptRunes         = service.MaxAIImagePromptRunes
+	maxAIImageReferences          = service.MaxAIImageReferences
+	maxAIImageReferenceBytes      = service.MaxAIImageReferenceBytes
+	aiImageQuickSampleCount       = 3
+	aiImageQuickSampleTimeout     = 20 * time.Second
+	aiImageQuickSampleMaxExcluded = 12
 )
 
 type aiImagePreset struct {
-	ID                string `json:"id"`
-	Name              string `json:"name"`
-	Description       string `json:"description"`
-	PromptContent     string `json:"promptContent"`
-	RequiresReference bool   `json:"requiresReference"`
-	RecommendedAspect string `json:"recommendedAspect"`
+	ID                string   `json:"id"`
+	Name              string   `json:"name"`
+	Description       string   `json:"description"`
+	PromptContent     string   `json:"promptContent"`
+	SamplePrompts     []string `json:"samplePrompts"`
+	RequiresReference bool     `json:"requiresReference"`
+	RecommendedAspect string   `json:"recommendedAspect"`
 }
 
 var aiImagePresets = []aiImagePreset{
-	{ID: "free", Name: "自由创作", Description: "根据描述生成完整画面", PromptContent: "根据用户的画面描述，生成一张完整、精致且风格统一的图片。", RecommendedAspect: "1:1"},
-	{ID: "sketch", Name: "草图成图", Description: "保留构图，把线稿发展成完整画面", PromptContent: "将参考草图发展为完整画面。保留主要构图、主体位置和姿态，同时补充连贯的材质、光线和细节。", RequiresReference: true, RecommendedAspect: "4:3"},
-	{ID: "cover", Name: "文章封面", Description: "生成清晰、克制的主题封面", PromptContent: "生成一张清晰克制的主题封面，保留一个明确视觉焦点、均衡的留白，并且不要出现可见文字。", RecommendedAspect: "16:9"},
-	{ID: "product", Name: "产品展示", Description: "生成干净的产品视觉图", PromptContent: "生成一张高品质的产品展示图，准确呈现主体形态，使用克制的棚拍光线与干净构图，不要添加额外产品。", RecommendedAspect: "4:3"},
-	{ID: "avatar", Name: "角色头像", Description: "生成单角色方形头像", PromptContent: "生成一张适合头像使用的方形图片，只呈现一个清晰角色，使用简洁背景并保持容易辨识的轮廓。", RecommendedAspect: "1:1"},
-	{ID: "felt", Name: "毛毡玩具", Description: "转成柔软的手作毛毡质感", PromptContent: "将主体渲染为手作毛毡玩具场景，呈现柔软纤维、圆润形体、细微缝线和温暖棚拍光线。", RecommendedAspect: "1:1"},
+	{
+		ID:            "free",
+		Name:          "自由创作",
+		Description:   "按描述生成高质壁纸",
+		PromptContent: "根据用户的画面描述，生成一张完整、精致且风格统一的图片。默认输出可直接用于桌面/手机壁纸的构图，强调视觉中心明确、层次分明、材质清晰。",
+		SamplePrompts: []string{
+			"4K高清二次元风格桌面风景，云海中的城市夜景，主视觉清晰，建筑线条简洁，层次分明，色彩高级克制，适合长宽比1:1",
+			"4K超清抽象科技壁纸，流动的光带与几何纹理组成主视觉，边缘细节清晰，留有中等留白，适合手机或桌面显示",
+			"4K自然系极简壁纸，湖面倒映月光，远景群山与前景树影形成深远透视，细节纹理细腻无噪点",
+		},
+		RecommendedAspect: "1:1",
+	},
+	{
+		ID:            "anime",
+		Name:          "二次元壁纸",
+		Description:   "日系动漫质感的高清壁纸",
+		PromptContent: "生成二次元动漫风高清壁纸，主视觉保持清爽大气，角色与场景比例协调，色彩可爱但有高级质感，突出光影层次、空气感和边缘细节。",
+		SamplePrompts: []string{
+			"4K 高清日系二次元壁纸，清澈蓝天下的校园天台，主角站位居中，裙摆随风轻扬，景深柔和，氛围明亮高级",
+			"4K 动漫风森林冒险场景，角色与精灵互动，树叶和光斑细节丰富，构图统一，主体层次清晰，画面稳定",
+			"4K 清新雨后街景二次元壁纸，湿润路面反射霓虹，角色回头微笑，雨滴和街景细节可辨识，情绪浪漫",
+		},
+		RecommendedAspect: "16:9",
+	},
+	{
+		ID:            "ip-wallpaper",
+		Name:          "动画IP壁纸",
+		Description:   "具备动画IP氛围的精致壁纸",
+		PromptContent: "生成具有动画IP场景感的壁纸级画面，延续明快叙事线条与角色气质，强调统一世界观视觉语言、清晰主角关系和戏剧化光照。",
+		SamplePrompts: []string{
+			"4K 动画IP风格世界观壁纸，主角色位于繁华都市高空走廊，角色关系清晰，戏剧化逆光塑造体积感，构图有强烈故事性",
+			"4K 水彩质感的动画IP横版壁纸，角色与配角同框，背景延续统一色调与透视，前景有轻微动态模糊表现运动",
+			"4K 宽幅动画IP海报感图像，角色三联动构图，统一角色比例与明暗关系，保持留白与视觉中心平衡",
+		},
+		RecommendedAspect: "16:9",
+	},
+	{
+		ID:            "landscape",
+		Name:          "风景壁纸",
+		Description:   "电影感自然景观与空间感",
+		PromptContent: "生成富有电影质感的风景壁纸，突出远景层次、真实天空与地表关系、景深与环境光；保持画面完整度，适合高清长宽比使用。",
+		SamplePrompts: []string{
+			"4K 电影感雪山风景壁纸，清晨薄雾与层层山脊形成纵深，远景明暗分离，前景松林有细节层次与真实纹理",
+			"4K 热带海岸线风景壁纸，浪花卷起的体积感强，海面反光明晰，阳光穿透云层形成光束，构图稳定",
+			"4K 森林瀑布壁纸，远景水汽与石壁形成空间纵深，树叶和水雾细节自然，整体清新高对比",
+		},
+		RecommendedAspect: "16:9",
+	},
+	{
+		ID:            "sketch",
+		Name:          "草图成图",
+		Description:   "保留构图，把线稿发展成完整画面",
+		PromptContent: "将参考草图发展为完整画面。保留主要构图、主体位置和姿态，同时补充连贯的材质、光线和细节。",
+		SamplePrompts: []string{
+			"将当前草图转成电影级真实场景，保留构图与姿态，补充光照和材质细节，画面清晰可读",
+			"将参考线稿转成二次元插画风格，保持主体比例不变，增强背景氛围与色彩统一",
+		},
+		RequiresReference: true,
+		RecommendedAspect: "4:3",
+	},
+	{
+		ID:            "cover",
+		Name:          "文章封面",
+		Description:   "生成清晰、克制的主题封面",
+		PromptContent: "生成一张清晰克制的主题封面，保留一个明确视觉焦点、均衡的留白，并且不要出现可见文字。整体风格偏向高级排版友好，便于添加标题。",
+		SamplePrompts: []string{
+			"高级杂志封面风格壁纸，主体在黄金分割点，整体克制，留白适中，色彩统一，适配后续加标题",
+			"4K 清晰主题封面构图，单一焦点+渐变背景，边缘干净，构图稳定，支持标题排版",
+			"简约科技封面风壁纸，冷暖过渡光照，前景图形醒目，底部有视觉留白便于放文字",
+		},
+		RecommendedAspect: "16:9",
+	},
+	{
+		ID:            "product",
+		Name:          "产品展示",
+		Description:   "生成干净的产品视觉图",
+		PromptContent: "生成一张高品质的产品展示图，准确呈现主体形态，使用克制的棚拍光线与干净构图，不要添加额外产品。",
+		SamplePrompts: []string{
+			"高端电子产品棚拍，主产品居中，柔和顶光与环境光相结合，金属与玻璃纹理清晰，背景干净低噪",
+			"4K 商品展示图，深色背景下产品局部高光突出，角度稳固，构图留白以突出产品形态",
+		},
+		RecommendedAspect: "4:3",
+	},
+	{
+		ID:            "avatar",
+		Name:          "角色头像",
+		Description:   "生成单角色方形头像",
+		PromptContent: "生成一张适合头像使用的方形图片，只呈现一个清晰角色，使用简洁背景并保持容易辨识的轮廓。",
+		SamplePrompts: []string{
+			"1:1 角色头像，单人物居中，清晰可辨识面部表情，背景简洁渐变，光影突出颧骨和轮廓",
+			"动漫风单人头像，面部细节丰富，头部占比适中，背景纯色柔和，不出现多余元素",
+		},
+		RecommendedAspect: "1:1",
+	},
+	{
+		ID:            "felt",
+		Name:          "毛毡玩具",
+		Description:   "转成柔软的手作毛毡质感",
+		PromptContent: "将主体渲染为手作毛毡玩具场景，呈现柔软纤维、圆润形体、细微缝线和温暖棚拍光线。",
+		SamplePrompts: []string{
+			"毛毡玩具风格森林插画，圆润毛绒熊为主角，纤维质感清晰，缝线细节自然，背景温暖柔和",
+			"毛毡工艺场景，桌面摆放多个小人偶，柔软体积边缘真实可触感，色彩温馨，光线明亮舒适",
+		},
+		RecommendedAspect: "1:1",
+	},
 }
 
-var aiImageSizes = map[string]map[string]string{
-	"1:1":  {"1K": "1024x1024", "2K": "2048x2048", "3K": "3072x3072", "4K": "4096x4096"},
-	"4:3":  {"1K": "1024x768", "2K": "2048x1536", "3K": "3072x2304", "4K": "4096x3072"},
-	"3:4":  {"1K": "768x1024", "2K": "1536x2048", "3K": "2304x3072", "4K": "3072x4096"},
-	"16:9": {"1K": "1280x720", "2K": "2048x1152", "3K": "3072x1728", "4K": "4096x2304"},
-	"9:16": {"1K": "720x1280", "2K": "1152x2048", "3K": "1728x3072", "4K": "2304x4096"},
-}
+var aiImageSizes = service.AIImageSizes
 
 type createAIImageGenerationRequest struct {
-	ModelID      string   `json:"modelId"`
-	PresetID     string   `json:"presetId"`
-	Prompt       string   `json:"prompt"`
-	AspectRatio  string   `json:"aspectRatio"`
-	Quality      string   `json:"quality"`
-	ReferenceRaw []string `json:"references"`
+	ModelID               string   `json:"modelId"`
+	PresetID              string   `json:"presetId"`
+	Prompt                string   `json:"prompt"`
+	AspectRatio           string   `json:"aspectRatio"`
+	Quality               string   `json:"quality"`
+	ReferenceRaw          []string `json:"references"`
+	ReferenceGenerationID string   `json:"referenceGenerationId"`
+}
+
+type aiImageQuickSampleRequest struct {
+	ExcludedPrompts []string `json:"excludedPrompts"`
 }
 
 func ListAIImagePresets(c *gin.Context) {
@@ -81,6 +174,95 @@ func ListAIImagePresets(c *gin.Context) {
 		"qualities":    []string{"1K", "2K"},
 		"sizes":        aiImageSizes,
 	})
+}
+
+// GenerateAIImagePresetSamples creates a small set of replaceable prompt
+// examples. It intentionally uses the catalog's fastest text model policy so
+// this lightweight interaction cannot accidentally consume a large-context
+// model selected for a different workflow.
+func GenerateAIImagePresetSamples(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	var payload aiImageQuickSampleRequest
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		Error(c, http.StatusBadRequest, "快速示例参数错误")
+		return
+	}
+	preset, ok := findAIImagePreset(c.Param("presetId"))
+	if !ok {
+		Error(c, http.StatusNotFound, "提示词模板不存在")
+		return
+	}
+
+	excluded := normalizeAIImageQuickSamplePrompts(payload.ExcludedPrompts, aiImageQuickSampleMaxExcluded)
+	systemPrompt, userPrompt := buildAIImageQuickSamplePrompt(preset, excluded)
+	requestPrompt := systemPrompt + "\n" + userPrompt
+	started := time.Now()
+	invocation, err := aimodel.ResolveFastTextInvocation(database.GetDB(), aiImageQuickSampleTimeout)
+	if err != nil {
+		aiusage.Record(aiusage.Entry{
+			Feature: "ai-image-quick-samples", Provider: "unknown", UserID: userID.String(),
+			Status: aiusage.StatusFailed, PromptChars: aiusage.CharCount(requestPrompt),
+			LatencyMs: aiusage.Since(started), ErrorMessage: err.Error(),
+		})
+		respondCatalogModelError(c, err)
+		return
+	}
+
+	temperature := 0.95
+	maxTokens := 480
+	response, err := invocation.Client.Chat(c.Request.Context(), aiclient.CompatibleChatRequest{
+		Model: invocation.Model.ModelID,
+		Messages: []aiclient.CompatibleMessage{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: userPrompt},
+		},
+		Temperature: &temperature,
+		MaxTokens:   &maxTokens,
+	})
+	if err != nil {
+		aiusage.Record(aiusage.Entry{
+			Feature: "ai-image-quick-samples", Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID,
+			UserID: userID.String(), Status: aiusage.StatusFailed, PromptChars: aiusage.CharCount(requestPrompt),
+			LatencyMs: aiusage.Since(started), ErrorMessage: err.Error(),
+		})
+		Error(c, http.StatusBadGateway, "生成快速示例失败，请稍后重试")
+		return
+	}
+	if len(response.Choices) == 0 {
+		aiusage.Record(aiusage.Entry{
+			Feature: "ai-image-quick-samples", Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID,
+			UserID: userID.String(), Status: aiusage.StatusFailed, PromptChars: aiusage.CharCount(requestPrompt),
+			LatencyMs: aiusage.Since(started), ErrorMessage: "empty model response",
+		})
+		Error(c, http.StatusBadGateway, "生成快速示例失败，请稍后重试")
+		return
+	}
+
+	raw := compatibleMessageText(response.Choices[0].Message.Content)
+	samples := parseAIImageQuickSamples(raw, excluded)
+	if len(samples) != aiImageQuickSampleCount {
+		aiusage.Record(aiusage.Entry{
+			Feature: "ai-image-quick-samples", Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID,
+			UserID: userID.String(), Status: aiusage.StatusFailed, PromptChars: aiusage.CharCount(requestPrompt),
+			ResponseChars: aiusage.CharCount(raw), PromptTokens: response.Usage.PromptTokens,
+			CompletionTokens: response.Usage.CompletionTokens, TotalTokens: response.Usage.TotalTokens,
+			LatencyMs: aiusage.Since(started), ErrorMessage: "invalid quick sample response",
+		})
+		Error(c, http.StatusBadGateway, "生成快速示例失败，请稍后重试")
+		return
+	}
+
+	aiusage.Record(aiusage.Entry{
+		Feature: "ai-image-quick-samples", Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID,
+		UserID: userID.String(), Status: aiusage.StatusSuccess, PromptChars: aiusage.CharCount(requestPrompt),
+		ResponseChars: aiusage.CharCount(raw), PromptTokens: response.Usage.PromptTokens,
+		CompletionTokens: response.Usage.CompletionTokens, TotalTokens: response.Usage.TotalTokens,
+		LatencyMs: aiusage.Since(started),
+	})
+	Success(c, gin.H{"list": samples, "model": modelNameOrFallback(response.Model, invocation.Model.ModelID)})
 }
 
 func CreateAIImageGeneration(c *gin.Context) {
@@ -95,62 +277,44 @@ func CreateAIImageGeneration(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "图片生成参数错误")
 		return
 	}
-	invocation, err := aimodel.ResolveInvocation(database.GetDB(), payload.ModelID, "image_generation", aiImageGenerationTimeout)
-	if err != nil {
-		respondCatalogModelError(c, err)
-		return
-	}
-	preset, size, references, err := validateAIImageGenerationRequest(
-		payload,
-		aimodel.ImageGenerationQualities(invocation.Model),
-	)
+	preset, _, references, err := validateAIImageGenerationRequest(payload, nil)
 	if err != nil {
 		Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if len(references) > 0 {
-		if !aimodel.HasCapabilities(invocation.Model, []string{"reference_image"}) {
-			Error(c, http.StatusBadRequest, "所选图片模型不支持参考图")
-			return
-		}
-	}
-	if utils.GetTOSUploader() == nil {
-		Error(c, http.StatusServiceUnavailable, "图片存储服务未配置")
-		return
-	}
-	canvasSnapshot, err := storeAIImageCanvasSnapshot(c.Request.Context(), userID, references)
+	generation, err := service.NewAIImageGenerationService(database.GetDB()).Queue(
+		c.Request.Context(),
+		service.AIImageGenerationInput{
+			UserID:                userID,
+			ModelID:               payload.ModelID,
+			PresetID:              preset.ID,
+			PresetName:            preset.Name,
+			PresetPrompt:          preset.PromptContent,
+			Prompt:                payload.Prompt,
+			AspectRatio:           payload.AspectRatio,
+			Quality:               payload.Quality,
+			References:            references,
+			ReferenceGenerationID: payload.ReferenceGenerationID,
+			RequiresReference:     preset.RequiresReference,
+			Feature:               "ai-image-studio",
+		},
+	)
 	if err != nil {
-		ErrorWithDetail(c, http.StatusInternalServerError, "画布快照保存失败，请稍后重试", err)
+		var inputErr *service.AIImageGenerationInputError
+		switch {
+		case errors.As(err, &inputErr):
+			Error(c, http.StatusBadRequest, inputErr.Error())
+		case errors.Is(err, service.ErrAIImageStorageUnavailable):
+			Error(c, http.StatusServiceUnavailable, err.Error())
+		case errors.Is(err, aimodel.ErrModelNotAvailable),
+			strings.Contains(err.Error(), "AI 服务未配置"),
+			strings.Contains(err.Error(), "不支持的 AI Provider"):
+			respondCatalogModelError(c, err)
+		default:
+			ErrorWithDetail(c, http.StatusInternalServerError, "创建图片生成任务失败", err)
+		}
 		return
 	}
-
-	prompt := buildAIImagePrompt(preset, payload.Prompt, len(references) > 0)
-	generation := model.AIImageGeneration{
-		UserID:                   userID,
-		ModelCatalogID:           invocation.Model.ID,
-		Provider:                 invocation.Provider.Provider,
-		Model:                    invocation.Model.ModelID,
-		PresetID:                 preset.ID,
-		PresetName:               preset.Name,
-		PresetPrompt:             preset.PromptContent,
-		Prompt:                   strings.TrimSpace(payload.Prompt),
-		AspectRatio:              payload.AspectRatio,
-		Quality:                  payload.Quality,
-		RequestedSize:            size,
-		ReferenceCount:           len(references),
-		CanvasSnapshotURL:        canvasSnapshot.URL,
-		CanvasSnapshotStorageKey: canvasSnapshot.StorageKey,
-		CanvasSnapshotWidth:      canvasSnapshot.Width,
-		CanvasSnapshotHeight:     canvasSnapshot.Height,
-		Status:                   "queued",
-		Stage:                    "preparing",
-	}
-	if err := database.GetDB().Create(&generation).Error; err != nil {
-		deleteAIImageCanvasSnapshot(canvasSnapshot)
-		ErrorWithDetail(c, http.StatusInternalServerError, "创建图片生成任务失败", err)
-		return
-	}
-	go executeAIImageGeneration(generation, invocation, prompt, references)
 	Success(c, gin.H{"generation": generation})
 }
 
@@ -188,6 +352,65 @@ func GetAIImageGeneration(c *gin.Context) {
 	Success(c, gin.H{"generation": generation})
 }
 
+type updateAIImageGenerationFavoriteRequest struct {
+	Favorited *bool `json:"favorited"`
+}
+
+func UpdateAIImageGenerationFavorite(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	var payload updateAIImageGenerationFavoriteRequest
+	if err := c.ShouldBindJSON(&payload); err != nil || payload.Favorited == nil {
+		Error(c, http.StatusBadRequest, "收藏参数错误")
+		return
+	}
+	generation, found := findAIImageGeneration(c, userID)
+	if !found {
+		return
+	}
+	if err := database.GetDB().Model(&generation).Update("is_favorited", *payload.Favorited).Error; err != nil {
+		ErrorWithDetail(c, http.StatusInternalServerError, "更新图片收藏失败", err)
+		return
+	}
+	generation.IsFavorited = *payload.Favorited
+	Success(c, gin.H{"generation": generation})
+}
+
+func DeleteAIImageGeneration(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	generation, found := findAIImageGeneration(c, userID)
+	if !found {
+		return
+	}
+	if !isAIImageGenerationDeletable(generation.Status) {
+		Error(c, http.StatusConflict, "图片正在生成，暂不能删除")
+		return
+	}
+	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.AIImageConversationMessage{}).
+			Where("generation_id = ?", generation.ID).
+			Update("generation_id", nil).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&model.AIImageGeneration{}).
+			Where("parent_generation_id = ?", generation.ID).
+			Update("parent_generation_id", nil).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&generation).Error
+	}); err != nil {
+		ErrorWithDetail(c, http.StatusInternalServerError, "删除图片生成记录失败", err)
+		return
+	}
+	deleteAIImageGenerationAssets(generation)
+	Success(c, gin.H{"deleted": true})
+}
+
 func SaveAIImageGenerationResource(c *gin.Context) {
 	userID, ok := currentAIAppUser(c)
 	if !ok {
@@ -199,26 +422,68 @@ func SaveAIImageGenerationResource(c *gin.Context) {
 		return
 	}
 	var payload struct {
-		Type  string `json:"type"`
-		Title string `json:"title"`
+		Visibility string `json:"visibility"`
 	}
 	if c.Request.ContentLength != 0 && c.ShouldBindJSON(&payload) != nil {
 		Error(c, http.StatusBadRequest, "资源保存参数错误")
 		return
 	}
-	if payload.Type == "" {
-		payload.Type = "wallpaper"
-	}
-	if payload.Type != "wallpaper" && payload.Type != "avatar" {
-		Error(c, http.StatusBadRequest, "资源类型仅支持壁纸或头像")
+	result, err := newAIImageResourceSaver().Save(c.Request.Context(), service.SaveAIImageGenerationResourceInput{
+		UserID:       userID,
+		GenerationID: model.Int64String(generationID),
+		Visibility:   payload.Visibility,
+	})
+	if errors.Is(err, service.ErrAIImageGenerationNotFound) {
+		Error(c, http.StatusNotFound, "图片生成记录不存在")
 		return
 	}
-
-	if utils.GetTOSUploader() == nil {
-		Error(c, http.StatusServiceUnavailable, "图片存储服务未配置")
+	if errors.Is(err, service.ErrAIImageGenerationNotReady) {
+		Error(c, http.StatusConflict, "图片尚未生成完成")
 		return
 	}
+	if errors.Is(err, service.ErrAIImageAlreadySaved) {
+		Error(c, http.StatusConflict, "图片已经保存到资源库")
+		return
+	}
+	if err != nil {
+		if strings.Contains(err.Error(), "文件过大") {
+			Error(c, http.StatusRequestEntityTooLarge, "生成图片文件过大，最大支持 30MB")
+			return
+		}
+		if strings.Contains(err.Error(), "当前没有已验证的可用视觉模型") {
+			Error(c, http.StatusServiceUnavailable, "当前没有已验证的可用视觉模型，无法自动识别图片标题和标签")
+			return
+		}
+		if strings.Contains(err.Error(), "generate image metadata") {
+			ErrorWithDetail(c, http.StatusBadGateway, "AI 自动识别图片标题和标签失败，请稍后重试", err)
+			return
+		}
+		if strings.Contains(err.Error(), "fetch generated image") {
+			ErrorWithDetail(c, http.StatusBadGateway, "读取历史图片失败，请稍后重试", err)
+			return
+		}
+		ErrorWithDetail(c, http.StatusInternalServerError, "保存到资源库失败", err)
+		return
+	}
+	if result.Resource.Visibility == "public" {
+		invalidatePublicResourceListCache()
+	}
+	Success(c, gin.H{"resource": result.Resource, "metadataModel": result.MetadataModel})
+}
 
+// GetAIImageGenerationImageData proxies an owned generated image as a data URL.
+// Generated-image providers frequently omit browser CORS headers, while the
+// resource metadata flow needs a browser-readable image input for vision APIs.
+func GetAIImageGenerationImageData(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	generationID, valid := parsePositiveInt64(c.Param("generationId"))
+	if !valid {
+		Error(c, http.StatusBadRequest, "图片生成记录 ID 无效")
+		return
+	}
 	var generation model.AIImageGeneration
 	if err := database.GetDB().Where("id = ? AND user_id = ?", generationID, userID).First(&generation).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -232,142 +497,94 @@ func SaveAIImageGenerationResource(c *gin.Context) {
 		Error(c, http.StatusConflict, "图片尚未生成完成")
 		return
 	}
-	if generation.ResourceID != nil && *generation.ResourceID != 0 {
-		Error(c, http.StatusConflict, "图片已经保存到资源库")
-		return
-	}
-
 	content, mimeType, err := fetchGeneratedAIImage(c.Request.Context(), generation.ResultURL)
 	if err != nil {
 		ErrorWithDetail(c, http.StatusBadGateway, "读取历史图片失败，请稍后重试", err)
 		return
 	}
-	uploadConfig := service.GetDefaultConfig(service.UploadType(payload.Type))
-	uploadConfig.UserID = int64(userID)
-	stored, err := service.NewUploadService().UploadBytesWithContext(
-		c.Request.Context(),
-		"saved-ai-image"+aiImageExtension(mimeType),
-		content,
-		uploadConfig,
-	)
-	if err != nil {
-		ErrorWithDetail(c, http.StatusInternalServerError, "保存到资源库失败", err)
-		return
-	}
-
-	var saved model.Resource
-	err = database.GetDB().Transaction(func(tx *gorm.DB) error {
-		var locked model.AIImageGeneration
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("id = ? AND user_id = ?", generationID, userID).
-			First(&locked).Error; err != nil {
-			return err
-		}
-		if locked.Status != "succeeded" || locked.ResultURL == "" {
-			return errAIImageNotReady
-		}
-		if locked.ResourceID != nil && *locked.ResourceID != 0 {
-			return errAIImageAlreadySaved
-		}
-		title := strings.TrimSpace(payload.Title)
-		if title == "" {
-			title = aiImageResourceTitle(locked.Prompt)
-		}
-		title = truncateRunes(title, 100)
-		saved = model.Resource{
-			UserID:      userID,
-			Type:        payload.Type,
-			Visibility:  "private",
-			Title:       title,
-			Description: "AI 图片创作",
-			URL:         stored.URL,
-			StorageKey:  stored.Key,
-			Width:       locked.ResultWidth,
-			Height:      locked.ResultHeight,
-			Size:        stored.Size,
-			Extension:   strings.TrimPrefix(stored.Ext, "."),
-			Tags:        model.StringList{},
-		}
-		if err := tx.Create(&saved).Error; err != nil {
-			return err
-		}
-		return tx.Model(&locked).Update("resource_id", saved.ID).Error
-	})
-	if err != nil {
-		_ = service.NewUploadService().DeleteByKey(stored.Key)
-	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		Error(c, http.StatusNotFound, "图片生成记录不存在")
-		return
-	}
-	if errors.Is(err, errAIImageNotReady) {
-		Error(c, http.StatusConflict, "图片尚未生成完成")
-		return
-	}
-	if errors.Is(err, errAIImageAlreadySaved) {
-		Error(c, http.StatusConflict, "图片已经保存到资源库")
-		return
-	}
-	if err != nil {
-		ErrorWithDetail(c, http.StatusInternalServerError, "保存到资源库失败", err)
-		return
-	}
-	Success(c, gin.H{"resource": saved})
+	Success(c, gin.H{"imageBase64": aiImageReferenceDataURL(content, mimeType)})
 }
 
-type aiImageCanvasSnapshot struct {
-	URL        string
-	StorageKey string
-	Width      int
-	Height     int
+func normalizeAIImageResourceVisibility(value string) string {
+	if strings.EqualFold(strings.TrimSpace(value), "public") {
+		return "public"
+	}
+	return "private"
 }
 
-func storeAIImageCanvasSnapshot(
-	ctx context.Context,
-	userID model.Int64String,
-	references []string,
-) (aiImageCanvasSnapshot, error) {
-	if len(references) == 0 {
-		return aiImageCanvasSnapshot{}, nil
-	}
-	content, mimeType, err := aiclient.DecodeImageDataURL(references[0], maxAIImageReferenceBytes)
-	if err != nil {
-		return aiImageCanvasSnapshot{}, err
-	}
-	width, height, err := generatedAIImageDimensions(content, mimeType)
-	if err != nil {
-		return aiImageCanvasSnapshot{}, err
-	}
-	uploadConfig := service.GetDefaultConfig(service.UploadTypeWallpaper)
-	uploadConfig.UserID = int64(userID)
-	uploadConfig.CustomFolder = fmt.Sprintf("ai-image-snapshots/%s/%s", userID.String(), time.Now().Format("20060102"))
-	stored, err := service.NewUploadService().UploadBytesWithContext(
-		ctx,
-		"canvas"+aiImageExtension(mimeType),
-		content,
-		uploadConfig,
-	)
-	if err != nil {
-		return aiImageCanvasSnapshot{}, err
-	}
-	return aiImageCanvasSnapshot{
-		URL: stored.URL, StorageKey: stored.Key, Width: width, Height: height,
-	}, nil
-}
-
-func deleteAIImageCanvasSnapshot(snapshot aiImageCanvasSnapshot) {
-	if snapshot.StorageKey == "" {
-		return
-	}
-	if err := service.NewUploadService().DeleteByKey(snapshot.StorageKey); err != nil {
-		log.Printf("[WARN] clean up AI image canvas snapshot failed: key=%s err=%v", snapshot.StorageKey, err)
+func newAIImageResourceSaver() service.AIImageResourceSaver {
+	return service.AIImageResourceSaver{
+		DB:         database.GetDB(),
+		FetchImage: fetchGeneratedAIImage,
+		GenerateMetadata: func(ctx context.Context, generation model.AIImageGeneration, content []byte, mimeType, resourceType string) (service.AIImageResourceMetadata, error) {
+			models, err := aimodel.ListEnabledModels(database.GetDB(), "vision")
+			if err != nil {
+				return service.AIImageResourceMetadata{}, err
+			}
+			if len(models) == 0 {
+				return service.AIImageResourceMetadata{}, errors.New("当前没有已验证的可用视觉模型，无法自动识别图片标题和标签")
+			}
+			modelID := models[0].ID.String()
+			invocation, err := aimodel.ResolveInvocation(database.GetDB(), modelID, "vision", 60*time.Second)
+			if err != nil {
+				return service.AIImageResourceMetadata{}, err
+			}
+			typeName := "壁纸"
+			if resourceType == "avatar" {
+				typeName = "头像"
+			}
+			prompt := fmt.Sprintf("看图后完成资源整理。先为这张%s生成一个准确自然的中文标题（不超过20字），再生成5到8个中文标签（每个不超过6字）。标题必须反映画面的主体、场景或可识别角色；标签覆盖主题、风格、色彩或画面元素。严格只输出 JSON：{\"title\":\"...\",\"tags\":[\"...\"]}。", typeName)
+			imageURL := aiImageReferenceDataURL(content, mimeType)
+			response, err := invocation.Client.Chat(ctx, aiclient.CompatibleChatRequest{Model: invocation.Model.ModelID, Messages: []aiclient.CompatibleMessage{{
+				Role: "user",
+				Content: []map[string]any{
+					{"type": "image_url", "image_url": map[string]string{"url": imageURL}},
+					{"type": "text", "text": prompt},
+				},
+			}}})
+			if err != nil {
+				return service.AIImageResourceMetadata{}, err
+			}
+			if len(response.Choices) == 0 {
+				return service.AIImageResourceMetadata{}, errors.New("视觉模型未返回识别结果")
+			}
+			raw := compatibleMessageText(response.Choices[0].Message.Content)
+			var parsed struct {
+				Title string   `json:"title"`
+				Tags  []string `json:"tags"`
+			}
+			if err := json.Unmarshal([]byte(aiclient.ExtractJSONObject(raw)), &parsed); err != nil {
+				return service.AIImageResourceMetadata{}, errors.New("视觉模型未返回有效的标题和标签")
+			}
+			title := strings.TrimSpace(parsed.Title)
+			tags := normalizeResourceTagNames(parsed.Tags)
+			if title == "" || len(tags) == 0 {
+				return service.AIImageResourceMetadata{}, errors.New("视觉模型未返回有效的标题和标签")
+			}
+			return service.AIImageResourceMetadata{
+				Title: title,
+				Tags:  tags,
+				Model: modelNameOrFallback(response.Model, invocation.Model.ModelID),
+			}, nil
+		},
 	}
 }
 
-var (
-	errAIImageNotReady     = errors.New("AI image generation is not ready")
-	errAIImageAlreadySaved = errors.New("AI image generation is already saved")
-)
+func isAIImageGenerationDeletable(status string) bool {
+	return status != "queued" && status != "running"
+}
+
+func deleteAIImageGenerationAssets(generation model.AIImageGeneration) {
+	uploader := service.NewUploadService()
+	for _, key := range []string{generation.ResultStorageKey, generation.CanvasSnapshotStorageKey} {
+		if key == "" {
+			continue
+		}
+		if err := uploader.DeleteByKey(key); err != nil {
+			log.Printf("[WARN] clean up AI image generation asset failed: id=%s key=%s err=%v", generation.ID.String(), key, err)
+		}
+	}
+}
 
 func validateAIImageGenerationRequest(
 	payload createAIImageGenerationRequest,
@@ -392,7 +609,7 @@ func validateAIImageGenerationRequest(
 	if !ok {
 		return aiImagePreset{}, "", nil, errors.New("请选择有效的目标分辨率")
 	}
-	if !slices.Contains(availableQualities, payload.Quality) {
+	if len(availableQualities) > 0 && !slices.Contains(availableQualities, payload.Quality) {
 		return aiImagePreset{}, "", nil, errors.New("所选图片模型不支持该目标分辨率")
 	}
 	if len(payload.ReferenceRaw) > maxAIImageReferences {
@@ -406,10 +623,90 @@ func validateAIImageGenerationRequest(
 		}
 		references = append(references, normalized)
 	}
-	if preset.RequiresReference && len(references) == 0 {
+	if preset.RequiresReference && len(references) == 0 && strings.TrimSpace(payload.ReferenceGenerationID) == "" {
 		return aiImagePreset{}, "", nil, errors.New("当前模板需要先绘制草图或添加参考素材")
 	}
 	return preset, size, references, nil
+}
+
+func buildAIImageQuickSamplePrompt(preset aiImagePreset, excluded []string) (string, string) {
+	systemPrompt := fmt.Sprintf(`你是 AI 图片创作工作台的灵感编辑。请为“%s”生成可直接提交给图片模型的中文画面描述。
+
+严格只输出 JSON 字符串数组，必须恰好 %d 项；不要 Markdown、编号、解释或代码块。每项都要具体描述主体、场景、构图、光影或色彩，且不超过 %d 个字符。不要使用知名人物、角色、商标或受版权保护的 IP 名称。`, preset.Name, aiImageQuickSampleCount, maxAIImagePromptRunes)
+	excludedBlock := "无"
+	if len(excluded) > 0 {
+		excludedBlock = "- " + strings.Join(excluded, "\n- ")
+	}
+	userPrompt := fmt.Sprintf(`模板要求：%s
+
+当前展示过的示例如下，生成内容不得重复或只做同义改写：
+%s
+
+本次变体标记：%d`, preset.PromptContent, excludedBlock, time.Now().UnixNano())
+	return systemPrompt, userPrompt
+}
+
+func parseAIImageQuickSamples(raw string, excluded []string) []string {
+	raw = strings.TrimSpace(raw)
+	start := strings.Index(raw, "[")
+	end := strings.LastIndex(raw, "]")
+	if start < 0 || end <= start {
+		return nil
+	}
+	var values []string
+	if err := json.Unmarshal([]byte(raw[start:end+1]), &values); err != nil {
+		return nil
+	}
+	excludedSet := make(map[string]struct{}, len(excluded))
+	for _, value := range excluded {
+		excludedSet[normalizeAIImageQuickSamplePrompt(value)] = struct{}{}
+	}
+	result := make([]string, 0, aiImageQuickSampleCount)
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		key := normalizeAIImageQuickSamplePrompt(value)
+		if key == "" || utf8.RuneCountInString(value) > maxAIImagePromptRunes {
+			continue
+		}
+		if _, ok := excludedSet[key]; ok {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, value)
+		if len(result) == aiImageQuickSampleCount {
+			break
+		}
+	}
+	return result
+}
+
+func normalizeAIImageQuickSamplePrompts(values []string, limit int) []string {
+	result := make([]string, 0, min(len(values), limit))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		key := normalizeAIImageQuickSamplePrompt(value)
+		if key == "" || utf8.RuneCountInString(value) > maxAIImagePromptRunes {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, value)
+		if len(result) == limit {
+			break
+		}
+	}
+	return result
+}
+
+func normalizeAIImageQuickSamplePrompt(value string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
 }
 
 func normalizeAIImageReference(raw string) (string, error) {
@@ -437,259 +734,24 @@ func normalizeAIImageReference(raw string) (string, error) {
 	return "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(content), nil
 }
 
+func aiImageReferenceDataURL(content []byte, mimeType string) string {
+	return "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(content)
+}
+
 func buildAIImagePrompt(preset aiImagePreset, userPrompt string, hasReference bool) string {
-	referenceContract := ""
-	if hasReference {
-		referenceContract = "The attached canvas is the primary structural source of truth. Preserve its subject count, silhouette, pose, framing, spatial layout and relative proportions. Do not crop, reframe, replace or redesign the composition. Interpret the text and template only as appearance, material and rendering guidance. If any style-template instruction conflicts with the canvas structure, the canvas must win."
-	}
-	return fmt.Sprintf(
-		"%s %s Follow this visual brief: %s. Produce exactly one image. Keep the composition coherent and intentional. Do not add a watermark, logo, border, interface chrome or unrequested visible text.",
-		referenceContract,
-		preset.PromptContent,
-		strings.TrimSpace(userPrompt),
-	)
-}
-
-func executeAIImageGeneration(
-	generation model.AIImageGeneration,
-	invocation aimodel.Invocation,
-	prompt string,
-	references []string,
-) {
-	started := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), aiImageGenerationTimeout)
-	defer cancel()
-	updateAIImageGeneration(generation.ID, map[string]any{
-		"status": "running", "stage": "generating", "started_at": started,
-	})
-	generatedURL, err := invocation.Client.GenerateImageWithRequest(ctx, aiclient.ImageGenerationRequest{
-		Provider: invocation.Provider.Provider,
-		Protocol: invocation.Model.ImageProtocol,
-		ModelID:  invocation.Model.ModelID,
-		Prompt:   prompt,
-		Size:     generation.RequestedSize,
-		Images:   references,
-	})
-	if err != nil {
-		failAIImageGeneration(generation, invocation, started, "IMAGE_GENERATION_FAILED", "图片生成失败，请稍后重试或切换模型", err)
-		return
-	}
-	updateAIImageGeneration(generation.ID, map[string]any{"stage": "storing"})
-	content, mimeType, err := fetchGeneratedAIImage(ctx, generatedURL)
-	if err != nil {
-		failAIImageGeneration(generation, invocation, started, "IMAGE_DOWNLOAD_FAILED", "生成图片读取失败，请稍后重试", err)
-		return
-	}
-	resultWidth, resultHeight, dimensionErr := generatedAIImageDimensions(content, mimeType)
-	if dimensionErr != nil {
-		log.Printf(
-			"[WARN] AI image dimensions unavailable; preserving valid result: id=%s err=%v",
-			generation.ID.String(),
-			dimensionErr,
-		)
-	}
-	uploadConfig := service.GetDefaultConfig(service.UploadTypeWallpaper)
-	uploadConfig.UserID = int64(generation.UserID)
-	uploadConfig.CustomFolder = fmt.Sprintf("ai-images/%s/%s", generation.UserID.String(), time.Now().Format("20060102"))
-	stored, err := service.NewUploadService().UploadBytesWithContext(
-		ctx,
-		"generated"+aiImageExtension(mimeType),
-		content,
-		uploadConfig,
-	)
-	if err != nil {
-		failAIImageGeneration(generation, invocation, started, "IMAGE_STORAGE_FAILED", "生成图片转存失败，请检查存储服务", err)
-		return
-	}
-	finished := time.Now()
-	updateAIImageGeneration(generation.ID, map[string]any{
-		"status": "succeeded", "stage": "completed", "result_url": stored.URL,
-		"result_storage_key": stored.Key, "result_width": resultWidth, "result_height": resultHeight,
-		"result_size": stored.Size, "finished_at": finished, "error_code": "", "error_message": "",
-	})
-	aiusage.Record(aiusage.Entry{
-		Feature: "ai-image-studio", Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID,
-		UserID: generation.UserID.String(), Status: aiusage.StatusSuccess, PromptChars: aiusage.CharCount(prompt),
-		ResponseChars: aiusage.CharCount(stored.URL), LatencyMs: time.Since(started).Milliseconds(),
-	})
-}
-
-func failAIImageGeneration(
-	generation model.AIImageGeneration,
-	invocation aimodel.Invocation,
-	started time.Time,
-	code string,
-	message string,
-	cause error,
-) {
-	finished := time.Now()
-	safeCause := summarizeAIImageError(cause)
-	updateAIImageGeneration(generation.ID, map[string]any{
-		"status": "failed", "stage": "completed", "error_code": code,
-		"error_message": message, "finished_at": finished,
-	})
-	aiusage.Record(aiusage.Entry{
-		Feature: "ai-image-studio", Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID,
-		UserID: generation.UserID.String(), Status: aiusage.StatusFailed, PromptChars: aiusage.CharCount(generation.Prompt),
-		LatencyMs: time.Since(started).Milliseconds(), ErrorMessage: safeCause,
-	})
-	log.Printf("[WARN] AI image generation failed: id=%s code=%s err=%s", generation.ID.String(), code, safeCause)
+	return service.BuildAIImagePrompt(preset.PromptContent, userPrompt, hasReference)
 }
 
 func summarizeAIImageError(cause error) string {
-	if cause == nil {
-		return ""
-	}
-	message := strings.TrimSpace(cause.Error())
-	if index := strings.Index(strings.ToLower(message), "data:image/"); index >= 0 {
-		message = strings.TrimSpace(message[:index]) + " [reference omitted]"
-	}
-	return truncateRunes(message, 500)
+	return service.SummarizeAIImageError(cause)
 }
 
 func fetchGeneratedAIImage(ctx context.Context, source string) ([]byte, string, error) {
-	source = strings.TrimSpace(source)
-	if strings.HasPrefix(source, "data:image/") {
-		normalized, err := normalizeGeneratedAIImageDataURL(source)
-		if err != nil {
-			return nil, "", err
-		}
-		return normalized.content, normalized.mimeType, nil
-	}
-	parsed, err := url.Parse(source)
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
-		return nil, "", errors.New("AI 返回的图片地址无效")
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
-	if err != nil {
-		return nil, "", err
-	}
-	response, err := (&http.Client{Timeout: 45 * time.Second}).Do(request)
-	if err != nil {
-		return nil, "", err
-	}
-	defer response.Body.Close()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return nil, "", fmt.Errorf("图片下载返回 HTTP %d", response.StatusCode)
-	}
-	content, err := io.ReadAll(io.LimitReader(response.Body, maxGeneratedImageBytes+1))
-	if err != nil || len(content) == 0 || len(content) > maxGeneratedImageBytes {
-		return nil, "", errors.New("AI 返回的图片内容无效或过大")
-	}
-	mimeType := http.DetectContentType(content)
-	if !supportedAIImageMIME(mimeType) {
-		return nil, "", errors.New("AI 返回了不支持的图片格式")
-	}
-	return content, mimeType, nil
-}
-
-type generatedAIImageData struct {
-	content  []byte
-	mimeType string
-}
-
-func normalizeGeneratedAIImageDataURL(raw string) (generatedAIImageData, error) {
-	header, encoded, ok := strings.Cut(raw, ",")
-	if !ok || !strings.HasSuffix(strings.ToLower(header), ";base64") {
-		return generatedAIImageData{}, errors.New("AI 返回的图片内容无效")
-	}
-	mimeType := strings.TrimSuffix(strings.TrimPrefix(strings.ToLower(header), "data:"), ";base64")
-	content, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil || len(content) == 0 || len(content) > maxGeneratedImageBytes {
-		return generatedAIImageData{}, errors.New("AI 返回的图片内容无效或过大")
-	}
-	if !supportedAIImageMIME(mimeType) || http.DetectContentType(content) != mimeType {
-		return generatedAIImageData{}, errors.New("AI 返回了不支持的图片格式")
-	}
-	return generatedAIImageData{content: content, mimeType: mimeType}, nil
-}
-
-func supportedAIImageMIME(value string) bool {
-	return value == "image/jpeg" || value == "image/png" || value == "image/webp"
-}
-
-func aiImageExtension(mimeType string) string {
-	switch mimeType {
-	case "image/jpeg":
-		return ".jpg"
-	case "image/webp":
-		return ".webp"
-	default:
-		return ".png"
-	}
+	return service.FetchAIImageSource(ctx, source)
 }
 
 func generatedAIImageDimensions(content []byte, mimeType string) (int, int, error) {
-	if mimeType == "image/webp" {
-		return webPImageDimensions(content)
-	}
-	config, _, err := image.DecodeConfig(bytes.NewReader(content))
-	if err != nil || config.Width <= 0 || config.Height <= 0 {
-		return 0, 0, errors.New("无法读取 AI 返回图片的像素尺寸")
-	}
-	return config.Width, config.Height, nil
-}
-
-func webPImageDimensions(content []byte) (int, int, error) {
-	if len(content) < 20 || string(content[:4]) != "RIFF" || string(content[8:12]) != "WEBP" {
-		return 0, 0, errors.New("无法读取 AI 返回图片的像素尺寸")
-	}
-	for offset := 12; offset+8 <= len(content); {
-		chunkType := string(content[offset : offset+4])
-		chunkSize := int(content[offset+4]) |
-			int(content[offset+5])<<8 |
-			int(content[offset+6])<<16 |
-			int(content[offset+7])<<24
-		dataOffset := offset + 8
-		if chunkSize < 0 || chunkSize > len(content)-dataOffset {
-			return 0, 0, errors.New("无法读取 AI 返回图片的像素尺寸")
-		}
-		chunk := content[dataOffset : dataOffset+chunkSize]
-		width, height, ok := webPChunkDimensions(chunkType, chunk)
-		if ok {
-			return width, height, nil
-		}
-		offset = dataOffset + chunkSize
-		if chunkSize%2 != 0 {
-			offset++
-		}
-	}
-	return 0, 0, errors.New("无法读取 AI 返回图片的像素尺寸")
-}
-
-func webPChunkDimensions(chunkType string, chunk []byte) (int, int, bool) {
-	switch chunkType {
-	case "VP8X":
-		if len(chunk) < 10 {
-			return 0, 0, false
-		}
-		width := 1 + int(chunk[4]) + int(chunk[5])<<8 + int(chunk[6])<<16
-		height := 1 + int(chunk[7]) + int(chunk[8])<<8 + int(chunk[9])<<16
-		return width, height, true
-	case "VP8 ":
-		if len(chunk) < 10 || chunk[3] != 0x9d || chunk[4] != 0x01 || chunk[5] != 0x2a {
-			return 0, 0, false
-		}
-		width := int(chunk[6]) + int(chunk[7]&0x3f)<<8
-		height := int(chunk[8]) + int(chunk[9]&0x3f)<<8
-		return width, height, width > 0 && height > 0
-	case "VP8L":
-		if len(chunk) < 5 || chunk[0] != 0x2f {
-			return 0, 0, false
-		}
-		bits := uint32(chunk[1]) | uint32(chunk[2])<<8 | uint32(chunk[3])<<16 | uint32(chunk[4])<<24
-		width := 1 + int(bits&0x3fff)
-		height := 1 + int((bits>>14)&0x3fff)
-		return width, height, true
-	default:
-		return 0, 0, false
-	}
-}
-
-func updateAIImageGeneration(id model.Int64String, values map[string]any) {
-	if err := database.GetDB().Model(&model.AIImageGeneration{}).Where("id = ?", id).Updates(values).Error; err != nil {
-		log.Printf("[WARN] update AI image generation failed: id=%s err=%v", id.String(), err)
-	}
+	return service.GeneratedAIImageDimensions(content, mimeType)
 }
 
 func reconcileStaleAIImageGenerations(userID model.Int64String) {

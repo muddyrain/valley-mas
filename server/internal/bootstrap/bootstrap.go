@@ -1,15 +1,16 @@
 package bootstrap
 
 import (
-	"bytes"
 	"context"
 	"log"
 	"net/http"
-	"os"
-	"strings"
 	"sync"
+	"time"
+
 	"valley-server/internal/config"
 	"valley-server/internal/database"
+	"valley-server/internal/dbmigration"
+	"valley-server/internal/envfile"
 	"valley-server/internal/lifetrace"
 	"valley-server/internal/logger"
 	"valley-server/internal/router"
@@ -18,7 +19,6 @@ import (
 	_ "valley-server/docs"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 )
 
 var (
@@ -28,14 +28,29 @@ var (
 	globalHTTP http.Handler
 )
 
-const localAutoMigrateFlagEnv = "VALLEY_LOCAL_DB_AUTO_MIGRATE"
-
 // Init prepares app dependencies once and returns shared HTTP handler.
 func Init() (*config.Config, http.Handler, error) {
-	initOnce.Do(func() {
-		loadEnv()
-		applyLocalEnvOverrides()
+	return initApp(false)
+}
 
+// InitLocal prepares the local development app and applies only pending,
+// versioned migrations before workers and HTTP handlers can access the schema.
+func InitLocal() (*config.Config, http.Handler, error) {
+	return initApp(true)
+}
+
+func initApp(runMigrations bool) (*config.Config, http.Handler, error) {
+	initOnce.Do(func() {
+		envPath, err := envfile.Load()
+		if err != nil {
+			initErr = err
+			return
+		}
+		if envPath == "" {
+			log.Println("No .env file found, using system environment variables")
+		} else {
+			log.Printf("Loaded env file: %s", envPath)
+		}
 		globalCfg = config.Load()
 
 		logger.InitLogger()
@@ -58,6 +73,25 @@ func Init() (*config.Config, http.Handler, error) {
 			initErr = err
 			return
 		}
+		if runMigrations {
+			sqlDB, err := database.SQLDB()
+			if err != nil {
+				initErr = err
+				return
+			}
+			migrationContext, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			summary, err := dbmigration.Up(migrationContext, sqlDB, globalCfg.Database.Driver)
+			if err != nil {
+				initErr = err
+				return
+			}
+			logger.Log.Infof(
+				"Database migrations ready (applied=%d, version=%d)",
+				len(summary.Applied),
+				summary.CurrentVersion,
+			)
+		}
 
 		lifetraceWeatherService := lifetrace.NewWeatherService(globalCfg.QWeather)
 		lifetrace.StartHolidayCalendarSyncWorker(context.Background(), globalCfg.Holiday)
@@ -71,49 +105,6 @@ func Init() (*config.Config, http.Handler, error) {
 	})
 
 	return globalCfg, globalHTTP, initErr
-}
-
-func applyLocalEnvOverrides() {
-	if strings.EqualFold(strings.TrimSpace(os.Getenv(localAutoMigrateFlagEnv)), "true") {
-		_ = os.Setenv("DB_AUTO_MIGRATE", "true")
-		log.Println("DB_AUTO_MIGRATE enabled by local startup argument")
-	}
-}
-
-func loadEnv() {
-	envCandidates := []string{".env", "server/.env", "./server/.env", "../server/.env"}
-	loaded := false
-	for _, p := range envCandidates {
-		if _, err := os.Stat(p); err == nil {
-			if err := loadEnvFileCompat(p); err == nil {
-				log.Printf("Loaded env file: %s", p)
-				loaded = true
-				break
-			}
-		}
-	}
-	if !loaded {
-		log.Println("No .env file found, using system environment variables")
-	}
-}
-
-func loadEnvFileCompat(path string) error {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	content = bytes.TrimPrefix(content, []byte{0xEF, 0xBB, 0xBF})
-
-	values, err := godotenv.Unmarshal(string(content))
-	if err != nil {
-		return err
-	}
-	for key, value := range values {
-		if err := os.Setenv(key, value); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func AsGin(handler http.Handler) *gin.Engine {

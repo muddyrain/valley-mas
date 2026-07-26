@@ -44,7 +44,6 @@ func run(args []string, out io.Writer) error {
 	if !apply && !*dryRun {
 		fmt.Fprintln(out, "defaulting to dry-run")
 	}
-	cfg.Database.AutoMigrate = false
 	if err := database.Init(cfg); err != nil {
 		return err
 	}

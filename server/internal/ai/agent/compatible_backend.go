@@ -11,9 +11,8 @@ import (
 )
 
 // CompatibleBackend adapts an OpenAI-compatible catalog provider to the
-// provider-neutral agent loop. It deliberately uses non-streaming calls: the
-// loop can still execute tool calls over multiple steps without losing their
-// complete arguments to fragmented stream deltas.
+// provider-neutral agent loop. Streaming calls emit text immediately while
+// accumulating fragmented tool calls for the next loop step.
 type CompatibleBackend struct {
 	Client *aiclient.CompatibleClient
 }
@@ -22,10 +21,7 @@ func NewCompatibleBackend(client *aiclient.CompatibleClient) *CompatibleBackend 
 	return &CompatibleBackend{Client: client}
 }
 
-func (b *CompatibleBackend) Chat(ctx context.Context, spec Spec, messages []Message, descriptors []ToolDescriptor) (BackendResponse, error) {
-	if b == nil || b.Client == nil {
-		return BackendResponse{}, errors.New("AI_AGENT_BACKEND_UNAVAILABLE")
-	}
+func compatibleAgentChatRequest(spec Spec, messages []Message, descriptors []ToolDescriptor) aiclient.CompatibleChatRequest {
 	temperature := float64(spec.Temperature)
 	if temperature <= 0 {
 		temperature = 0.2
@@ -43,6 +39,14 @@ func (b *CompatibleBackend) Chat(ctx context.Context, spec Spec, messages []Mess
 		payload.Tools = compatibleAgentTools(descriptors)
 		payload.ToolChoice = "auto"
 	}
+	return payload
+}
+
+func (b *CompatibleBackend) Chat(ctx context.Context, spec Spec, messages []Message, descriptors []ToolDescriptor) (BackendResponse, error) {
+	if b == nil || b.Client == nil {
+		return BackendResponse{}, errors.New("AI_AGENT_BACKEND_UNAVAILABLE")
+	}
+	payload := compatibleAgentChatRequest(spec, messages, descriptors)
 	response, err := b.Client.Chat(ctx, payload)
 	if err != nil {
 		return BackendResponse{}, err
@@ -53,6 +57,153 @@ func (b *CompatibleBackend) Chat(ctx context.Context, spec Spec, messages []Mess
 		return BackendResponse{}, err
 	}
 	return BackendResponse{Message: message, Model: strings.TrimSpace(response.Model)}, nil
+}
+
+type compatibleStreamToolCallDelta struct {
+	Index    int    `json:"index"`
+	ID       string `json:"id"`
+	Function struct {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	} `json:"function"`
+}
+
+type compatibleStreamToolCall struct {
+	ID        string
+	Name      string
+	Arguments strings.Builder
+}
+
+func (b *CompatibleBackend) ChatStream(
+	ctx context.Context,
+	spec Spec,
+	messages []Message,
+	descriptors []ToolDescriptor,
+	emit func(string),
+) (BackendResponse, error) {
+	if b == nil || b.Client == nil {
+		return BackendResponse{}, errors.New("AI_AGENT_BACKEND_UNAVAILABLE")
+	}
+	var content strings.Builder
+	var modelName string
+	sawChoice := false
+	callOrder := make([]int, 0)
+	calls := make(map[int]*compatibleStreamToolCall)
+	err := b.Client.ChatStream(ctx, compatibleAgentChatRequest(spec, messages, descriptors), func(chunk aiclient.CompatibleChatStreamChunk) error {
+		if trimmed := strings.TrimSpace(chunk.Model); trimmed != "" {
+			modelName = trimmed
+		}
+		if len(chunk.Choices) == 0 {
+			return nil
+		}
+		sawChoice = true
+		delta := chunk.Choices[0].Delta
+		if text := compatibleContentDelta(delta.Content); text != "" {
+			content.WriteString(text)
+			if emit != nil {
+				emit(text)
+			}
+		}
+		fragments, err := compatibleToolCallDeltas(delta.ToolCalls)
+		if err != nil {
+			return err
+		}
+		for _, fragment := range fragments {
+			call := calls[fragment.Index]
+			if call == nil {
+				call = &compatibleStreamToolCall{}
+				calls[fragment.Index] = call
+				callOrder = append(callOrder, fragment.Index)
+			}
+			call.ID = mergeCompatibleStreamIdentifier(call.ID, fragment.ID)
+			call.Name = mergeCompatibleStreamIdentifier(call.Name, fragment.Function.Name)
+			call.Arguments.WriteString(fragment.Function.Arguments)
+		}
+		return nil
+	})
+	if err != nil {
+		return BackendResponse{}, err
+	}
+	if !sawChoice {
+		return BackendResponse{}, errors.New("AI 上游流响应为空")
+	}
+
+	var toolCalls any
+	if len(callOrder) > 0 {
+		assembled := make([]map[string]any, 0, len(callOrder))
+		for _, index := range callOrder {
+			call := calls[index]
+			assembled = append(assembled, map[string]any{
+				"id":   call.ID,
+				"type": "function",
+				"function": map[string]any{
+					"name": call.Name, "arguments": call.Arguments.String(),
+				},
+			})
+		}
+		toolCalls = assembled
+	}
+	message, err := compatibleAgentMessage(aiclient.CompatibleMessage{
+		Role:      "assistant",
+		Content:   content.String(),
+		ToolCalls: toolCalls,
+	})
+	if err != nil {
+		return BackendResponse{}, err
+	}
+	if modelName == "" {
+		modelName = spec.Model
+	}
+	return BackendResponse{Message: message, Model: modelName}, nil
+}
+
+func compatibleToolCallDeltas(value any) ([]compatibleStreamToolCallDelta, error) {
+	if value == nil {
+		return nil, nil
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return nil, fmt.Errorf("encode compatible tool call deltas: %w", err)
+	}
+	var fragments []compatibleStreamToolCallDelta
+	if err := json.Unmarshal(encoded, &fragments); err != nil {
+		return nil, fmt.Errorf("decode compatible tool call deltas: %w", err)
+	}
+	return fragments, nil
+}
+
+func mergeCompatibleStreamIdentifier(current, fragment string) string {
+	if fragment == "" || fragment == current || strings.HasSuffix(current, fragment) {
+		return current
+	}
+	if current == "" || strings.HasPrefix(fragment, current) {
+		return fragment
+	}
+	return current + fragment
+}
+
+func compatibleContentDelta(content any) string {
+	if value, ok := content.(string); ok {
+		return value
+	}
+	encoded, err := json.Marshal(content)
+	if err != nil {
+		return ""
+	}
+	var parts []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if json.Unmarshal(encoded, &parts) != nil {
+		return ""
+	}
+	var builder strings.Builder
+	for _, part := range parts {
+		if part.Type == "text" {
+			builder.WriteString(part.Text)
+		}
+	}
+	return builder.String()
 }
 
 func compatibleAgentMessages(messages []Message) []aiclient.CompatibleMessage {

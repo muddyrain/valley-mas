@@ -32,6 +32,20 @@ func (endExecutor) Execute(_ context.Context, _ RunContext, execution NodeExecut
 	return NodeResult{Output: result}, nil
 }
 
+type TemplateExecutor struct{}
+
+func (TemplateExecutor) Type() NodeType { return NodeTypeTemplate }
+
+func (TemplateExecutor) Execute(_ context.Context, _ RunContext, execution NodeExecution) (NodeResult, error) {
+	value := execution.Input["template"]
+	switch value.(type) {
+	case string, bool, float32, float64, int, int32, int64, uint, uint32, uint64:
+		return NodeResult{Output: map[string]any{"text": fmt.Sprint(value)}}, nil
+	default:
+		return NodeResult{}, fmt.Errorf("文本模板必须解析为文本")
+	}
+}
+
 type ContentSearchCapabilityAdapter struct{}
 
 func (ContentSearchCapabilityAdapter) Execute(ctx context.Context, run RunContext, execution NodeExecution) (NodeResult, error) {

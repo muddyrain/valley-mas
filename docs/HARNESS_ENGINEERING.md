@@ -92,7 +92,7 @@ pnpm check:harness:test
 - `pnpm build`
 - `cd server && go test ./...`
 
-服务端部署工作流在 build 和 restart 之前执行 `go test ./...`。任何测试失败都会由 `set -euo pipefail` 中止部署，不得重启旧代码路径上的服务进程。
+服务端部署工作流先执行 `go test ./...`，再构建服务与迁移程序、应用待执行的版本化迁移，最后重启服务。测试、构建或迁移任一步失败都会由 `set -euo pipefail` 中止部署，不会用不匹配的代码与数据库结构重启服务。
 
 当前优先完整验证，不引入 changed-files 第三方 action 或复杂 job matrix。后续只有在 CI 时间形成稳定数据后再优化增量执行。
 

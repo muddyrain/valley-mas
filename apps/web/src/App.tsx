@@ -18,7 +18,6 @@ import Downloads from './pages/Downloads';
 import Favorites from './pages/Favorites';
 import Follows from './pages/Follows';
 import FormatTools from './pages/FormatTools';
-import Guestbook from './pages/Guestbook';
 import Home from './pages/Home';
 import ImageTextCreate from './pages/ImageTextCreate';
 import Login from './pages/Login';
@@ -81,8 +80,6 @@ function RouteTitle() {
       title = pathname.endsWith('/settings') ? '智能体设置 | Valley' : '智能体对话 | Valley';
     } else if (pathname === '/blog') {
       title = '博客与图文 | Valley';
-    } else if (pathname === '/guestbook') {
-      title = '访客留言墙 | Valley';
     } else if (pathname === '/tools/format') {
       title = '格式转换工具 | Valley';
     } else if (pathname === '/labs/climber') {
@@ -254,7 +251,6 @@ function App() {
           <Route path="notifications" element={<Notifications />} />
           <Route path="updates" element={<Navigate to="/" replace />} />
           <Route path="blog" element={<BlogList />} />
-          <Route path="guestbook" element={<Guestbook />} />
           <Route path="tools/format" element={<FormatTools />} />
           <Route path="labs/climber" element={<ClimberLab />} />
           <Route path="labs/scratch-legend" element={<ScratchLegendLab />} />

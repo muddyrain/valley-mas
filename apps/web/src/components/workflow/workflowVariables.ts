@@ -53,6 +53,7 @@ const NODE_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
     ['model', 'string'],
     ['tokenUsage', 'number'],
   ],
+  template: [['text', 'string']],
   http: [
     ['body', 'string'],
     ['statusCode', 'number'],
@@ -69,6 +70,13 @@ const NODE_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
     ['intentName', 'string'],
     ['confidence', 'number'],
   ],
+  approval: [
+    ['approved', 'boolean'],
+    ['decision', 'string'],
+    ['note', 'string'],
+    ['approvalId', 'string'],
+  ],
+  delay: [['delayedMs', 'number']],
 };
 
 const TOOL_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, WorkflowVariableType]>> = {
@@ -80,9 +88,37 @@ const TOOL_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
     ['cover', 'object'],
     ['tagNames', 'string[]'],
   ],
+  'content.extractDocument': [
+    ['text', 'string'],
+    ['pages', 'array'],
+    ['format', 'string'],
+    ['pageCount', 'number'],
+    ['characterCount', 'number'],
+  ],
+  'content.extractStructured': [
+    ['data', 'object'],
+    ['model', 'string'],
+    ['tokenUsage', 'number'],
+  ],
   'knowledge.retrieve': [
     ['context', 'string'],
     ['references', 'object'],
+  ],
+  'knowledge.formatReferences': [
+    ['citationText', 'string'],
+    ['referenceList', 'array'],
+    ['count', 'number'],
+  ],
+  'data.parseJSON': [['value', 'object']],
+  'data.chunkList': [
+    ['batches', 'array'],
+    ['batchCount', 'number'],
+    ['itemCount', 'number'],
+  ],
+  'data.processList': [
+    ['items', 'array'],
+    ['count', 'number'],
+    ['originalCount', 'number'],
   ],
   'content.search': [
     ['count', 'number'],
@@ -99,11 +135,39 @@ const TOOL_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
     ['model', 'string'],
     ['size', 'string'],
   ],
+  'image.generate': [
+    ['generationId', 'string'],
+    ['imageUrl', 'string'],
+    ['url', 'string'],
+    ['width', 'number'],
+    ['height', 'number'],
+    ['model', 'string'],
+    ['size', 'string'],
+  ],
+  'image.understand': [
+    ['text', 'string'],
+    ['model', 'string'],
+    ['tokenUsage', 'number'],
+  ],
+  'image.saveGeneratedResource': [
+    ['resourceId', 'string'],
+    ['title', 'string'],
+    ['tags', 'string[]'],
+    ['url', 'string'],
+    ['visibility', 'string'],
+    ['model', 'string'],
+  ],
   'blog.createDraft': [
     ['postId', 'string'],
     ['title', 'string'],
     ['editPath', 'string'],
     ['tagIds', 'string[]'],
+  ],
+  'notification.send': [
+    ['notificationId', 'string'],
+    ['delivered', 'boolean'],
+    ['status', 'string'],
+    ['path', 'string'],
   ],
 };
 
@@ -157,6 +221,21 @@ function getStartOutputFields(
 }
 
 export function getWorkflowNodeOutputFields(
+  nodeType: string,
+  config: Record<string, unknown> = {},
+): ReadonlyArray<WorkflowOutputField> {
+  const base = getWorkflowNodeOutputFieldsBase(nodeType, config);
+  if (!config.errorHandling || typeof config.errorHandling !== 'object') return base;
+  return [
+    ...base,
+    ['_failed', 'boolean'],
+    ['_error', 'string'],
+    ['_errorCode', 'string'],
+    ['_attempts', 'number'],
+  ];
+}
+
+function getWorkflowNodeOutputFieldsBase(
   nodeType: string,
   config: Record<string, unknown> = {},
 ): ReadonlyArray<WorkflowOutputField> {

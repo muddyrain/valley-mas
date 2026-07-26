@@ -116,6 +116,47 @@ export function normalizeOrderedListStarts(content: string): string {
     .join('\n');
 }
 
+const HTML_IMAGE_TAG_PATTERN = /<img\b[^>]*>/gi;
+const HTML_ATTRIBUTE_PATTERN = /([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
+
+function normalizeHtmlImageTag(tag: string): string {
+  let src = '';
+  let alt = '';
+
+  for (const match of tag.matchAll(HTML_ATTRIBUTE_PATTERN)) {
+    const name = match[1].toLowerCase();
+    const value = match[2] ?? match[3] ?? match[4] ?? '';
+    if (name === 'src') src = value.trim();
+    if (name === 'alt') alt = value.trim();
+  }
+
+  if (!src) return tag;
+
+  const escapedAlt = alt.split('[').join('\\[').split(']').join('\\]');
+  const destination = /[\s()]/.test(src) ? `<${src}>` : src;
+  return `![${escapedAlt}](${destination})`;
+}
+
+// Milkdown's CommonMark parser treats raw HTML image tags as text. Normalize
+// imported HTML images before they reach the editor so they become image nodes.
+export function normalizeHtmlImageTags(content: string): string {
+  if (!content) return '';
+
+  let activeFence = '';
+  return String(content)
+    .split('\n')
+    .map((line) => {
+      const fenceMatch = line.match(/^\s*(```+|~~~+)/);
+      if (fenceMatch) {
+        const fence = fenceMatch[1];
+        activeFence = activeFence === fence[0] ? '' : fence[0];
+        return line;
+      }
+      return activeFence ? line : line.replace(HTML_IMAGE_TAG_PATTERN, normalizeHtmlImageTag);
+    })
+    .join('\n');
+}
+
 // 渲染 Markdown 为 HTML
 export function renderMarkdown(content: string): string {
   return marked.parse(normalizeOrderedListStarts(content)) as string;

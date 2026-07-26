@@ -162,6 +162,9 @@ function validateNode(
       )
         return fail('请至少声明一个 JSON 输出字段');
       break;
+    case 'template':
+      if (!String(config.template || '').trim()) return fail('请填写文本模板');
+      break;
     case 'http': {
       const method = String(config.method || '').toUpperCase();
       if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method))

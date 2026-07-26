@@ -169,6 +169,10 @@ export interface AdminAIModel {
   verificationStatus: AIModelVerificationStatus;
   verificationMessage: string;
   lastVerifiedAt?: string;
+  /** 0 / undefined means the upstream limit is not configured. */
+  contextWindowTokens?: number;
+  /** 0 / undefined means the upstream limit is not configured. */
+  maxOutputTokens?: number;
   enabled: boolean;
   sortOrder: number;
   createdAt: string;
@@ -182,6 +186,8 @@ export type AdminAIModelInput = Pick<
   | 'displayName'
   | 'capabilities'
   | 'imageProtocol'
+  | 'contextWindowTokens'
+  | 'maxOutputTokens'
   | 'enabled'
   | 'sortOrder'
 >;

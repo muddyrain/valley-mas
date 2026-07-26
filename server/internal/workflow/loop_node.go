@@ -356,6 +356,10 @@ func validateLoopBody(parentID string, config loopNodeConfig, registry *Registry
 			if stringFromValue(bodyConfig["prompt"]) == "" {
 				errs = append(errs, fmt.Sprintf("循环体大模型节点 %s 的 prompt 不能为空", node.ID))
 			}
+		case NodeTypeTemplate:
+			if strings.TrimSpace(stringFromValue(bodyConfig["template"])) == "" {
+				errs = append(errs, fmt.Sprintf("循环体文本模板节点 %s 的 template 不能为空", node.ID))
+			}
 		case NodeTypeTool:
 			capability, _, ok := registry.Capability(stringFromValue(bodyConfig["capabilityId"]))
 			if !ok {

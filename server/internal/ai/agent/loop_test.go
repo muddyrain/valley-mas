@@ -263,7 +263,8 @@ func (streamingBackend) Chat(context.Context, Spec, []Message, []ToolDescriptor)
 }
 
 func (streamingBackend) ChatStream(_ context.Context, _ Spec, _ []Message, _ []ToolDescriptor, emit func(string)) (BackendResponse, error) {
-	emit("first ")
+	emit("first")
+	emit(" ")
 	emit("second")
 	return BackendResponse{Message: Message{Role: RoleAssistant, Content: "first second"}, Model: "stream-model"}, nil
 }

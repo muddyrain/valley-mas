@@ -36,13 +36,16 @@ export function useWorkflowCapabilities(enabled = true): WorkflowCapabilityState
   const [state, setState] = useState<WorkflowCapabilityState>(() => ({
     nodeTypes: cached?.nodeTypes || [],
     toolCapabilities: cached?.toolCapabilities || [],
-    loading: enabled && !cached,
+    loading: !cached,
     error: null,
   }));
 
   useEffect(() => {
     if (!enabled) return;
     let active = true;
+    if (!cached) {
+      setState((current) => ({ ...current, loading: true, error: null }));
+    }
     void loadCapabilities()
       .then((result) => {
         if (active && result) setState({ ...result, loading: false, error: null });
