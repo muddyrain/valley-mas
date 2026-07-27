@@ -4,17 +4,21 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"valley-server/internal/service"
+
+	"github.com/gin-gonic/gin"
 )
 
 const onePixelPNGBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
 
 func TestValidateAIImageGenerationRequestAcceptsControlledInputs(t *testing.T) {
 	preset, size, references, err := validateAIImageGenerationRequest(createAIImageGenerationRequest{
-		ModelID: "1", PresetID: "sketch", Prompt: "把线稿画成森林小屋",
+		ModelID: "1", RecipeID: "sketch", Brief: "把线稿画成森林小屋",
 		AspectRatio: "4:3", Quality: "1K",
 		ReferenceRaw: []string{"data:image/png;base64," + onePixelPNGBase64},
 	}, []string{"1K", "2K"})
@@ -28,7 +32,7 @@ func TestValidateAIImageGenerationRequestAcceptsControlledInputs(t *testing.T) {
 
 func TestValidateAIImageGenerationRequestRequiresSketchReference(t *testing.T) {
 	_, _, _, err := validateAIImageGenerationRequest(createAIImageGenerationRequest{
-		ModelID: "1", PresetID: "sketch", Prompt: "森林小屋", AspectRatio: "4:3", Quality: "1K",
+		ModelID: "1", RecipeID: "sketch", Brief: "森林小屋", AspectRatio: "4:3", Quality: "1K",
 	}, []string{"1K", "2K"})
 	if err == nil || !strings.Contains(err.Error(), "需要先绘制草图") {
 		t.Fatalf("expected reference validation, got %v", err)
@@ -37,7 +41,7 @@ func TestValidateAIImageGenerationRequestRequiresSketchReference(t *testing.T) {
 
 func TestValidateAIImageGenerationRequestAcceptsConversationReference(t *testing.T) {
 	_, _, references, err := validateAIImageGenerationRequest(createAIImageGenerationRequest{
-		ModelID: "1", PresetID: "sketch", Prompt: "把上一张图改成夜景", AspectRatio: "4:3", Quality: "1K",
+		ModelID: "1", RecipeID: "sketch", Brief: "把上一张图改成夜景", AspectRatio: "4:3", Quality: "1K",
 		ReferenceGenerationID: "123",
 	}, []string{"1K", "2K"})
 	if err != nil {
@@ -50,7 +54,7 @@ func TestValidateAIImageGenerationRequestAcceptsConversationReference(t *testing
 
 func TestValidateAIImageGenerationRequestRejectsUnsupportedModelQuality(t *testing.T) {
 	_, _, _, err := validateAIImageGenerationRequest(createAIImageGenerationRequest{
-		ModelID: "1", PresetID: "free", Prompt: "山谷", AspectRatio: "1:1", Quality: "4K",
+		ModelID: "1", RecipeID: "free", Brief: "山谷", AspectRatio: "1:1", Quality: "4K",
 	}, []string{"1K", "2K"})
 	if err == nil || !strings.Contains(err.Error(), "不支持该目标分辨率") {
 		t.Fatalf("expected unsupported quality validation, got %v", err)
@@ -59,10 +63,21 @@ func TestValidateAIImageGenerationRequestRejectsUnsupportedModelQuality(t *testi
 
 func TestValidateAIImageGenerationRequestAccepts4KForSupportedModel(t *testing.T) {
 	_, size, _, err := validateAIImageGenerationRequest(createAIImageGenerationRequest{
-		ModelID: "1", PresetID: "free", Prompt: "山谷", AspectRatio: "16:9", Quality: "4K",
+		ModelID: "1", RecipeID: "free", Brief: "山谷", AspectRatio: "16:9", Quality: "4K",
 	}, []string{"1K", "2K", "3K", "4K"})
 	if err != nil || size != "3840x2160" {
 		t.Fatalf("expected 4K target size, got %q err=%v", size, err)
+	}
+}
+
+func TestAIImageGenerationRequestMapsLegacyPresetAndSkill(t *testing.T) {
+	payload := createAIImageGenerationRequest{
+		PresetID: "anime", SkillID: "42", Prompt: "云海城市",
+	}
+	if payload.effectiveRecipeID() != "wallpaper" ||
+		payload.effectiveStyleProfileID() != "skill:42" ||
+		payload.effectiveBrief() != "云海城市" {
+		t.Fatalf("legacy request was not mapped: %+v", payload)
 	}
 }
 
@@ -147,7 +162,7 @@ func TestWebPImageDimensionsReadsVP8XCanvas(t *testing.T) {
 func TestBuildAIImagePromptKeepsPresetAndSafetyConstraints(t *testing.T) {
 	preset, _ := findAIImagePreset("cover")
 	prompt := buildAIImagePrompt(preset, "一座漂浮在云海里的图书馆", false)
-	for _, expected := range []string{"主题封面", "漂浮在云海里的图书馆", "Do not add a watermark"} {
+	for _, expected := range []string{"editorial cover", "漂浮在云海里的图书馆", "Do not add a watermark"} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("prompt must contain %q: %s", expected, prompt)
 		}
@@ -156,37 +171,97 @@ func TestBuildAIImagePromptKeepsPresetAndSafetyConstraints(t *testing.T) {
 
 func TestBuildAIImagePromptAppliesSkillWithoutReplacingUserDescription(t *testing.T) {
 	preset, _ := findAIImagePreset("free")
-	prompt := service.BuildAIImagePrompt(preset.PromptContent, "优先留白与旧纸张质感", "雨天的极简海报", false)
-	for _, expected := range []string{"优先留白与旧纸张质感", "雨天的极简海报", "Apply the selected image skill"} {
+	prompt := service.CompileAIImagePrompt(service.AIImageGenerationPlan{
+		Recipe: preset,
+		StyleProfile: &service.AIImageStyleProfile{
+			ID: "skill:1", Name: "极简海报", Source: "skill",
+			Instructions: "优先留白与旧纸张质感",
+		},
+		Brief: "雨天的极简海报",
+	}, false)
+	for _, expected := range []string{"优先留白与旧纸张质感", "雨天的极简海报", "[VISUAL STYLE]"} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("skill prompt must contain %q: %s", expected, prompt)
 		}
 	}
 }
 
-func TestAIImagePresetsExposePromptContent(t *testing.T) {
+func TestAIImageRecipesDoNotExposeInternalInstructions(t *testing.T) {
 	encoded, err := json.Marshal(aiImagePresets)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(encoded), `"promptContent":"根据用户的画面描述`) {
-		t.Fatalf("preset response must expose its prompt content: %s", encoded)
+	if strings.Contains(string(encoded), "Instructions") ||
+		strings.Contains(string(encoded), "promptContent") ||
+		strings.Contains(string(encoded), "QuickSamplePrompts") {
+		t.Fatalf("recipe response leaked internal instructions: %s", encoded)
+	}
+	preset, _ := findAIImagePreset("free")
+	if preset.Instructions != "" {
+		t.Fatalf("free creation must be neutral, got %q", preset.Instructions)
 	}
 }
 
-func TestParseAIImageQuickSamplesDropsDisplayedAndDuplicatePrompts(t *testing.T) {
-	values := parseAIImageQuickSamples(`[
-  "已经展示过的山谷壁纸",
-  "晨雾山谷壁纸，松林与湖面形成纵深构图，柔和金色晨光",
-  "夜色海岸壁纸，浪花与灯塔形成清晰视觉焦点，蓝紫色电影光影",
-  "晨雾山谷壁纸，松林与湖面形成纵深构图，柔和金色晨光",
-  "雨后森林壁纸，苔藓岩石与瀑布构成清新层次，空气感柔和"
-]`, []string{"已经展示过的山谷壁纸"})
+func TestSelectAIImageQuickSamplesRotatesLocalPool(t *testing.T) {
+	preset, _ := findAIImagePreset("wallpaper")
+	values := selectAIImageQuickSamples(preset, preset.SamplePrompts, aiImageQuickSampleCount)
 	if len(values) != aiImageQuickSampleCount {
 		t.Fatalf("quick samples = %#v", values)
 	}
-	if values[0] == "已经展示过的山谷壁纸" || values[0] == values[2] {
-		t.Fatalf("displayed or duplicate sample returned: %#v", values)
+	excluded := make(map[string]struct{}, len(preset.SamplePrompts))
+	for _, value := range preset.SamplePrompts {
+		excluded[normalizeAIImageQuickSamplePrompt(value)] = struct{}{}
+	}
+	for _, value := range values {
+		if _, ok := excluded[normalizeAIImageQuickSamplePrompt(value)]; ok {
+			t.Fatalf("displayed sample returned: %#v", values)
+		}
+	}
+
+	allSeen := append(append(append([]string(nil), values...), preset.SamplePrompts...), preset.QuickSamplePrompts...)
+	rotated := selectAIImageQuickSamples(preset, allSeen, aiImageQuickSampleCount)
+	if len(rotated) != aiImageQuickSampleCount {
+		t.Fatalf("exhausted pool did not rotate: %#v", rotated)
+	}
+	for _, value := range rotated {
+		for _, current := range values {
+			if value == current {
+				t.Fatalf("rotation immediately repeated current sample: %#v", rotated)
+			}
+		}
+	}
+}
+
+func TestGenerateAIImageRecipeSamplesUsesLocalCatalog(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/ai/image-recipes/:recipeId/sample-prompts", func(c *gin.Context) {
+		c.Set("userId", int64(1))
+		GenerateAIImageRecipeSamples(c)
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/ai/image-recipes/wallpaper/sample-prompts",
+		strings.NewReader(`{"excludedPrompts":[]}`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var response struct {
+		Data struct {
+			List  []string `json:"list"`
+			Model string   `json:"model"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Data.List) != aiImageQuickSampleCount || response.Data.Model != "local-curated" {
+		t.Fatalf("unexpected local samples response: %+v", response.Data)
 	}
 }
 
@@ -201,9 +276,9 @@ func TestBuildAIImagePromptPrioritizesReferenceStructure(t *testing.T) {
 	preset, _ := findAIImagePreset("avatar")
 	prompt := buildAIImagePrompt(preset, "一只小粉猪", true)
 	for _, expected := range []string{
-		"primary structural source of truth",
-		"Preserve its subject count, silhouette, pose, framing, spatial layout and relative proportions",
-		"the canvas must win",
+		"structural source of truth",
+		"Preserve subject count, silhouette, pose, framing, spatial layout, and relative proportions",
+		"the reference structure wins",
 		"一只小粉猪",
 	} {
 		if !strings.Contains(prompt, expected) {

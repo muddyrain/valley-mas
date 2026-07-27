@@ -35,30 +35,25 @@ import {
   type AIImageConversation,
   type AIImageConversationMessage,
   type AIImageGeneration,
-  type AIImagePreset,
+  type AIImageRecipe,
+  type AIImageStyleProfile,
   addAIImageConversationMessage,
   clearAIImageConversation,
   createAIImageConversation,
   createAIImageGeneration,
   deleteAIImageGeneration,
-  generateAIImagePresetSamples,
+  generateAIImageRecipeSamples,
   getAIImageConversation,
   getAIImageGeneration,
   getCurrentAIImageConversation,
   listAIImageConversations,
+  listAIImageCreationOptions,
   listAIImageGenerations,
-  listAIImagePresets,
   pauseAIImageGeneration,
   saveAIImageGenerationResource,
   updateAIImageGenerationFavorite,
 } from '@/api/aiImages';
-import {
-  type AIPrompt,
-  type AISkill,
-  getAPIErrorMessage,
-  listAIPrompts,
-  listAISkills,
-} from '@/api/aiWorkbench';
+import { type AIPrompt, getAPIErrorMessage, listAIPrompts } from '@/api/aiWorkbench';
 import { ConversationMessageBubble } from '@/components/ai/ConversationMessageBubble';
 import { ModelPicker } from '@/components/ai/ModelPicker';
 import {
@@ -406,7 +401,7 @@ export default function AIImageStudio() {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentUserID = useAuthStore((state) => state.user?.id);
   const legacyConversationKey = legacyConversationStorageKey(currentUserID);
-  const [presets, setPresets] = useState<AIImagePreset[]>([]);
+  const [presets, setPresets] = useState<AIImageRecipe[]>([]);
   const [generatedPresetSamples, setGeneratedPresetSamples] = useState<Record<string, string[]>>(
     {},
   );
@@ -417,11 +412,12 @@ export default function AIImageStudio() {
   const [promptResourcePickerOpen, setPromptResourcePickerOpen] = useState(false);
   const [promptResourceQuery, setPromptResourceQuery] = useState('');
   const [pendingPromptResource, setPendingPromptResource] = useState<AIPrompt | null>(null);
-  const [skills, setSkills] = useState<AISkill[]>([]);
-  const [skillsLoading, setSkillsLoading] = useState(true);
-  const [skillPickerOpen, setSkillPickerOpen] = useState(false);
-  const [skillQuery, setSkillQuery] = useState('');
-  const [selectedSkill, setSelectedSkill] = useState<AISkill | null>(null);
+  const [styleProfiles, setStyleProfiles] = useState<AIImageStyleProfile[]>([]);
+  const [stylePickerOpen, setStylePickerOpen] = useState(false);
+  const [styleQuery, setStyleQuery] = useState('');
+  const [selectedStyleProfile, setSelectedStyleProfile] = useState<AIImageStyleProfile | null>(
+    null,
+  );
   const [aspectRatios, setAspectRatios] = useState(DEFAULT_ASPECTS);
   const [sizes, setSizes] = useState<Record<string, Record<string, string>>>({});
   const [presetID, setPresetID] = useState('free');
@@ -514,14 +510,15 @@ export default function AIImageStudio() {
     let active = true;
     setLoading(true);
     void Promise.all([
-      listAIImagePresets(),
+      listAIImageCreationOptions(),
       listAIImageGenerations(50),
       getCurrentAIImageConversation(),
       listAIImageConversations(),
     ])
       .then(async ([catalog, generations, conversation, conversationHistory]) => {
         if (!active) return;
-        setPresets(catalog.presets);
+        setPresets(catalog.recipes);
+        setStyleProfiles(catalog.styleProfiles);
         setAspectRatios(catalog.aspectRatios);
         setSizes(catalog.sizes ?? {});
         applyHistory(generations.list);
@@ -606,23 +603,6 @@ export default function AIImageStudio() {
   }, []);
 
   useEffect(() => {
-    let active = true;
-    void listAISkills()
-      .then(({ list }) => {
-        if (active) setSkills(list);
-      })
-      .catch((error) => {
-        if (active) toast.error(getAPIErrorMessage(error, '加载技能失败'));
-      })
-      .finally(() => {
-        if (active) setSkillsLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
     if (
       !activeGeneration ||
       (activeGeneration.status !== 'queued' && activeGeneration.status !== 'running')
@@ -672,7 +652,7 @@ export default function AIImageStudio() {
     };
   }, [activeGeneration, scheduleConversationScroll]);
 
-  const selectPreset = (preset: AIImagePreset) => {
+  const selectPreset = (preset: AIImageRecipe) => {
     setPresetID(preset.id);
     if (aspectRatios.includes(preset.recommendedAspect)) {
       setAspectRatio(preset.recommendedAspect);
@@ -703,9 +683,9 @@ export default function AIImageStudio() {
     try {
       const result = await createAIImageGeneration({
         modelId: modelID,
-        presetId: presetID,
-        skillId: selectedSkill?.id,
-        prompt: prompt.trim(),
+        recipeId: presetID,
+        styleProfileId: selectedStyleProfile?.id,
+        brief: prompt.trim(),
         aspectRatio,
         quality,
         references: reference ? [reference] : [],
@@ -765,8 +745,12 @@ export default function AIImageStudio() {
     setAspectRatio(generation.aspectRatio);
     setQuality(generation.quality);
     handleImageModelChange(generation.modelCatalogId);
-    setSelectedSkill(
-      generation.skillId ? skills.find((skill) => skill.id === generation.skillId) || null : null,
+    setSelectedStyleProfile(
+      styleProfiles.find(
+        (profile) =>
+          profile.id === generation.styleProfileId ||
+          (generation.skillId && profile.id === `skill:${generation.skillId}`),
+      ) || null,
     );
     if (generation.canvasSnapshotUrl) {
       try {
@@ -810,9 +794,9 @@ export default function AIImageStudio() {
     try {
       const result = await createAIImageGeneration({
         modelId: modelID,
-        presetId: presetID,
-        skillId: selectedSkill?.id,
-        prompt: instruction,
+        recipeId: presetID,
+        styleProfileId: selectedStyleProfile?.id,
+        brief: instruction,
         aspectRatio,
         quality,
         references: [],
@@ -857,7 +841,7 @@ export default function AIImageStudio() {
     const content = conversationInput.trim();
     if (!content || isBusy || !modelID) return;
     if (selectedPreset?.requiresReference && !conversationReferenceGeneration) {
-      toast.error('当前模板需要先生成一张图片作为参考');
+      toast.error('当前创作类型需要先生成一张图片作为参考');
       return;
     }
     const selectedReferenceGeneration = conversationReferenceGeneration;
@@ -905,9 +889,9 @@ export default function AIImageStudio() {
       scheduleConversationScroll();
       const result = await createAIImageGeneration({
         modelId: modelID,
-        presetId: presetID,
-        skillId: selectedSkill?.id,
-        prompt: generationPrompt,
+        recipeId: presetID,
+        styleProfileId: selectedStyleProfile?.id,
+        brief: generationPrompt,
         aspectRatio,
         quality,
         references: [],
@@ -1207,13 +1191,10 @@ export default function AIImageStudio() {
         Number(right.tags.includes('生图')) - Number(left.tags.includes('生图')) ||
         right.updatedAt.localeCompare(left.updatedAt),
     );
-  const visibleSkills = skills.filter((skill) => {
-    const keyword = skillQuery.trim().toLocaleLowerCase();
+  const visibleStyleProfiles = styleProfiles.filter((profile) => {
+    const keyword = styleQuery.trim().toLocaleLowerCase();
     return (
-      !keyword ||
-      `${skill.name} ${skill.description} ${skill.sourceAuthor}`
-        .toLocaleLowerCase()
-        .includes(keyword)
+      !keyword || `${profile.name} ${profile.description}`.toLocaleLowerCase().includes(keyword)
     );
   });
   const latestConversationGeneration = [...conversationMessages]
@@ -1328,12 +1309,13 @@ export default function AIImageStudio() {
     setRefreshingPresetSamples(true);
     try {
       const excludedPrompts = [
+        ...selectedPresetSamples,
+        ...[...(shownPresetSamples[selectedPreset.id] ?? [])].reverse(),
         ...selectedPreset.samplePrompts,
-        ...(shownPresetSamples[selectedPreset.id] ?? selectedPresetSamples),
       ];
-      const result = await generateAIImagePresetSamples(selectedPreset.id, excludedPrompts);
+      const result = await generateAIImageRecipeSamples(selectedPreset.id, excludedPrompts);
       if (result.list.length === 0) {
-        throw new Error('AI 未返回可用的快速示例');
+        throw new Error('没有更多可用的快速示例');
       }
       setGeneratedPresetSamples((current) => ({
         ...current,
@@ -1350,7 +1332,7 @@ export default function AIImageStudio() {
         ).slice(-12),
       }));
     } catch (error) {
-      toast.error(getAPIErrorMessage(error, '生成快速示例失败，请稍后重试'));
+      toast.error(getAPIErrorMessage(error, '加载快速示例失败，请稍后重试'));
     } finally {
       setRefreshingPresetSamples(false);
     }
@@ -1381,10 +1363,10 @@ export default function AIImageStudio() {
     }
     commitPromptResource(promptResource, 'replace');
   };
-  const selectSkill = (skill: AISkill) => {
-    setSelectedSkill(skill);
-    setSkillPickerOpen(false);
-    toast.success(`本次将使用“${skill.name}”技能`);
+  const selectStyleProfile = (profile: AIImageStyleProfile) => {
+    setSelectedStyleProfile(profile);
+    setStylePickerOpen(false);
+    toast.success(`视觉风格已设为“${profile.name}”`);
   };
   useEffect(() => {
     if (safeHistoryPage !== historyPage) {
@@ -1519,6 +1501,7 @@ export default function AIImageStudio() {
                         {isGenerating && activeGeneration ? (
                           <GenerationOverlay
                             stage={activeGeneration.stage}
+                            generation={activeGeneration}
                             onPause={() => void pauseGeneration(activeGeneration)}
                             pausing={pausingGenerationID === activeGeneration.id}
                           />
@@ -1665,6 +1648,7 @@ export default function AIImageStudio() {
                                                   <GenerationPreview
                                                     compact
                                                     stage={generation.stage}
+                                                    generation={generation}
                                                   />
                                                 </div>
                                               ) : null}
@@ -1693,19 +1677,19 @@ export default function AIImageStudio() {
                           </ScrollArea>
                         </div>
                         <div className="border-t border-border bg-card p-3">
-                          {selectedSkill ? (
+                          {selectedStyleProfile ? (
                             <div className="mb-2 flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-2 text-xs text-foreground">
                               <WandSparkles className="size-3.5 text-primary" />
                               <span className="min-w-0 flex-1 truncate">
-                                用技能：{selectedSkill.name}
+                                视觉风格：{selectedStyleProfile.name}
                               </span>
                               <Button
                                 type="button"
                                 size="icon-xs"
                                 variant="ghost"
                                 className="shrink-0"
-                                aria-label="移除当前技能"
-                                onClick={() => setSelectedSkill(null)}
+                                aria-label="恢复默认视觉风格"
+                                onClick={() => setSelectedStyleProfile(null)}
                                 disabled={isBusy}
                               >
                                 <X />
@@ -1742,13 +1726,26 @@ export default function AIImageStudio() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => {
-                                  setSkillQuery('');
-                                  setSkillPickerOpen(true);
+                                  setStyleQuery('');
+                                  setStylePickerOpen(true);
                                 }}
                                 disabled={isBusy}
                               >
                                 <WandSparkles />
-                                用技能
+                                视觉风格
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setPromptResourceQuery('');
+                                  setPromptResourcePickerOpen(true);
+                                }}
+                                disabled={isBusy}
+                              >
+                                <FileText />
+                                插入描述
                               </Button>
                               <Button
                                 type="button"
@@ -1823,19 +1820,7 @@ export default function AIImageStudio() {
               <CardContent className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pb-5 pt-4">
                 <section className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
-                    <Label>提示词模板</Label>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setPromptResourceQuery('');
-                        setPromptResourcePickerOpen(true);
-                      }}
-                      disabled={isBusy}
-                    >
-                      <FileText />从 AI 资源选择
-                    </Button>
+                    <Label>创作类型</Label>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {presets.map((preset) => (
@@ -1966,13 +1951,26 @@ export default function AIImageStudio() {
                           size="sm"
                           variant="outline"
                           onClick={() => {
-                            setSkillQuery('');
-                            setSkillPickerOpen(true);
+                            setPromptResourceQuery('');
+                            setPromptResourcePickerOpen(true);
+                          }}
+                          disabled={isBusy}
+                        >
+                          <FileText />
+                          插入描述
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setStyleQuery('');
+                            setStylePickerOpen(true);
                           }}
                           disabled={isBusy}
                         >
                           <WandSparkles />
-                          用技能
+                          视觉风格
                         </Button>
                         <Button
                           type="button"
@@ -1986,19 +1984,19 @@ export default function AIImageStudio() {
                         </Button>
                       </div>
                     </div>
-                    {selectedSkill ? (
+                    {selectedStyleProfile ? (
                       <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-2 text-xs text-foreground">
                         <WandSparkles className="size-3.5 text-primary" />
                         <span className="min-w-0 flex-1 truncate">
-                          用技能：{selectedSkill.name}
+                          视觉风格：{selectedStyleProfile.name}
                         </span>
                         <Button
                           type="button"
                           size="icon-xs"
                           variant="ghost"
                           className="shrink-0"
-                          aria-label="移除当前技能"
-                          onClick={() => setSelectedSkill(null)}
+                          aria-label="恢复默认视觉风格"
+                          onClick={() => setSelectedStyleProfile(null)}
                           disabled={isBusy}
                         >
                           <X />
@@ -2348,7 +2346,7 @@ export default function AIImageStudio() {
                   generation.resultWidth > 0 && generation.resultHeight > 0
                     ? `${generation.resultWidth} × ${generation.resultHeight}`
                     : '';
-                const presetLabel =
+                const recipeLabel =
                   generation.presetName ||
                   presets.find((preset) => preset.id === generation.presetId)?.name ||
                   generation.presetId;
@@ -2403,6 +2401,7 @@ export default function AIImageStudio() {
                       ) : (
                         <GenerationPreview
                           stage={generation.stage}
+                          generation={generation}
                           className="ai-image-generation-card-preview"
                         />
                       )}
@@ -2486,9 +2485,9 @@ export default function AIImageStudio() {
                           </p>
                         </div>
                         <div className="min-w-0 rounded-lg border border-border bg-muted/20 px-2.5 py-2">
-                          <p className="text-[10px] text-muted-foreground">模板</p>
+                          <p className="text-[10px] text-muted-foreground">创作类型</p>
                           <p className="mt-0.5 truncate text-xs font-medium text-foreground">
-                            {presetLabel}
+                            {recipeLabel}
                           </p>
                         </div>
                       </div>
@@ -2795,56 +2794,75 @@ export default function AIImageStudio() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
-      <Dialog open={skillPickerOpen} onOpenChange={setSkillPickerOpen}>
+      <Dialog open={stylePickerOpen} onOpenChange={setStylePickerOpen}>
         <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl">
           <DialogHeader className="border-b border-border px-5 py-4 pr-12">
-            <DialogTitle>用技能生成</DialogTitle>
-            <DialogDescription>
-              选择已安装技能。它会在生成时应用，不会写入画面描述。
-            </DialogDescription>
+            <DialogTitle>视觉风格</DialogTitle>
+            <DialogDescription>风格只调整色彩、材质、光线与渲染语言。</DialogDescription>
           </DialogHeader>
           <div className="border-b border-border p-4">
             <div className="relative">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                value={skillQuery}
-                onChange={(event) => setSkillQuery(event.target.value)}
+                value={styleQuery}
+                onChange={(event) => setStyleQuery(event.target.value)}
                 className="pl-9"
-                placeholder="搜索已安装技能"
+                placeholder="搜索视觉风格"
               />
             </div>
           </div>
           <ScrollArea className="max-h-[min(28rem,65vh)]">
             <div className="space-y-2 p-4">
-              {skillsLoading ? (
-                <>
-                  <Skeleton className="h-20 w-full" />
-                  <Skeleton className="h-20 w-full" />
-                </>
-              ) : visibleSkills.length === 0 ? (
+              <Button
+                type="button"
+                variant={selectedStyleProfile ? 'outline' : 'secondary'}
+                aria-pressed={!selectedStyleProfile}
+                className="h-auto w-full items-start justify-start px-3 py-2.5 text-left font-normal"
+                onClick={() => {
+                  setSelectedStyleProfile(null);
+                  setStylePickerOpen(false);
+                }}
+                disabled={isBusy}
+              >
+                <span className="flex min-w-0 flex-1 items-start gap-3">
+                  <WandSparkles className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <span>
+                    <span className="block text-sm font-medium text-foreground">默认风格</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      不添加额外视觉风格
+                    </span>
+                  </span>
+                </span>
+                {!selectedStyleProfile ? (
+                  <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-label="已选中" />
+                ) : null}
+              </Button>
+              {visibleStyleProfiles.length === 0 ? (
                 <div className="py-10 text-center">
                   <WandSparkles className="mx-auto size-7 text-muted-foreground" />
-                  <p className="mt-3 text-sm font-medium">
-                    {skills.length === 0 ? '还没有已安装技能' : '没有匹配的技能'}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">可在 AI 资源的“技能”页安装。</p>
+                  <p className="mt-3 text-sm font-medium">没有匹配的视觉风格</p>
                 </div>
               ) : (
-                visibleSkills.map((skill) => (
+                visibleStyleProfiles.map((profile) => (
                   <Button
-                    key={skill.id}
+                    key={profile.id}
                     type="button"
-                    variant={selectedSkill?.id === skill.id ? 'secondary' : 'outline'}
-                    aria-pressed={selectedSkill?.id === skill.id}
+                    variant={selectedStyleProfile?.id === profile.id ? 'secondary' : 'outline'}
+                    aria-pressed={selectedStyleProfile?.id === profile.id}
                     className="h-auto w-full items-start justify-start px-3 py-2.5 text-left font-normal !whitespace-normal"
-                    onClick={() => selectSkill(skill)}
+                    onClick={() => selectStyleProfile(profile)}
                     disabled={isBusy}
                   >
                     <span className="flex min-w-0 flex-1 items-start gap-3 text-left">
                       <WandSparkles className="mt-0.5 size-4 shrink-0 text-primary" />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-foreground">
-                          {skill.name}
+                        <span className="flex items-center gap-2">
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                            {profile.name}
+                          </span>
+                          <Badge variant="outline" className="shrink-0">
+                            {profile.source === 'skill' ? '已安装' : '内置'}
+                          </Badge>
                         </span>
                         <span
                           className="mt-1 block overflow-hidden !whitespace-normal break-words text-xs leading-5 text-muted-foreground"
@@ -2854,11 +2872,11 @@ export default function AIImageStudio() {
                             WebkitLineClamp: 2,
                           }}
                         >
-                          {skill.description || '未提供技能说明'}
+                          {profile.description || '未提供风格说明'}
                         </span>
                       </span>
                     </span>
-                    {selectedSkill?.id === skill.id ? (
+                    {selectedStyleProfile?.id === profile.id ? (
                       <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-label="已选中" />
                     ) : null}
                   </Button>
@@ -3101,7 +3119,7 @@ export default function AIImageStudio() {
                     { label: '目标清晰度', value: historyDetailTarget.quality || '未记录' },
                     { label: '模型服务', value: historyDetailTarget.provider || '未记录' },
                     {
-                      label: '模板',
+                      label: '创作类型',
                       value:
                         historyDetailTarget.presetName ||
                         presets.find((preset) => preset.id === historyDetailTarget.presetId)
@@ -3109,7 +3127,10 @@ export default function AIImageStudio() {
                         historyDetailTarget.presetId ||
                         '未记录',
                     },
-                    { label: '技能', value: historyDetailTarget.skillName || '未使用' },
+                    {
+                      label: '视觉风格',
+                      value: historyDetailTarget.skillName || '默认风格',
+                    },
                     { label: '参考内容', value: `${historyDetailTarget.referenceCount} 项` },
                     { label: '文件大小', value: formatByteSize(historyDetailTarget.resultSize) },
                   ].map((item) => (

@@ -22,6 +22,9 @@ type AIImageGeneration struct {
 	PresetPrompt             string         `gorm:"type:text;not null;default:''" json:"presetPrompt"`
 	SkillID                  *Int64String   `gorm:"index" json:"skillId,omitempty"`
 	SkillName                string         `gorm:"size:100;not null;default:''" json:"skillName"`
+	StyleProfileID           string         `gorm:"size:120;not null;default:''" json:"styleProfileId"`
+	StyleProfileSource       string         `gorm:"size:20;not null;default:''" json:"styleProfileSource"`
+	StyleProfilePrompt       string         `gorm:"type:text;not null;default:''" json:"-"`
 	Prompt                   string         `gorm:"type:text;not null" json:"prompt"`
 	AspectRatio              string         `gorm:"size:10;not null" json:"aspectRatio"`
 	Quality                  string         `gorm:"size:10;not null" json:"quality"`

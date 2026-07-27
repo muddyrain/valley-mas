@@ -166,15 +166,6 @@ func TestPreviewAISkillImportReturnsReferencesAndSelectedInstallStoresThem(t *te
 	}
 }
 
-func TestComposeAIImageSkillContentIncludesBundledReferences(t *testing.T) {
-	content := composeAIImageSkillContent(model.AISkill{
-		Content: "核心规则", ReferenceContent: "## 参考资料：references/paper.md\n旧纸张纹理",
-	})
-	if content == "核心规则" || !bytes.Contains([]byte(content), []byte("旧纸张纹理")) {
-		t.Fatalf("composed content=%q", content)
-	}
-}
-
 func TestGetAISkillShowsImportedDirectoryFiles(t *testing.T) {
 	router := setupAISkillTestRouter(t)
 	skill := model.AISkill{

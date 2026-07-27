@@ -1,7 +1,7 @@
 import gsap from 'gsap';
 import { CirclePause, Sparkles } from 'lucide-react';
-import { useEffect, useRef } from 'react';
-import type { AIImageGenerationStage } from '@/api/aiImages';
+import { useEffect, useRef, useState } from 'react';
+import type { AIImageGeneration, AIImageGenerationStage } from '@/api/aiImages';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -43,16 +43,56 @@ const FIELD_DOTS = Array.from({ length: 121 }, (_, index) => {
   };
 });
 
+type GenerationTiming = Pick<
+  AIImageGeneration,
+  'status' | 'createdAt' | 'startedAt' | 'finishedAt' | 'updatedAt'
+>;
+
+const isLiveGeneration = (generation: GenerationTiming) =>
+  generation.status === 'queued' || generation.status === 'running';
+
+const getGenerationElapsedMilliseconds = (generation: GenerationTiming, now: number) => {
+  const startedAt = Date.parse(generation.startedAt || generation.createdAt);
+  if (!Number.isFinite(startedAt)) return null;
+
+  const finishedAt = isLiveGeneration(generation)
+    ? now
+    : Date.parse(generation.finishedAt || generation.updatedAt || generation.createdAt);
+  if (!Number.isFinite(finishedAt)) return null;
+
+  return Math.max(0, finishedAt - startedAt);
+};
+
+const formatElapsedTime = (milliseconds: number) => {
+  const totalSeconds = Math.floor(milliseconds / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
+};
+
 export function GenerationPreview({
   stage = 'generating',
   compact = false,
   className,
+  generation,
 }: {
   stage?: AIImageGenerationStage;
   compact?: boolean;
   className?: string;
+  generation?: GenerationTiming;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const isGenerating = Boolean(generation && isLiveGeneration(generation));
+
+  useEffect(() => {
+    if (!isGenerating) return;
+    setNow(Date.now());
+    const intervalID = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(intervalID);
+  }, [isGenerating]);
+
+  const elapsedMilliseconds = generation ? getGenerationElapsedMilliseconds(generation, now) : null;
 
   useEffect(() => {
     if (!rootRef.current || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -117,7 +157,14 @@ export function GenerationPreview({
           />
         ))}
       </svg>
-      <span className="ai-image-generation-caption">正在生成</span>
+      <div className="ai-image-generation-meta">
+        <span className="ai-image-generation-caption">正在生成</span>
+        {elapsedMilliseconds !== null ? (
+          <span className="ai-image-generation-elapsed">
+            已耗时 {formatElapsedTime(elapsedMilliseconds)}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -126,10 +173,12 @@ export function GenerationOverlay({
   stage,
   onPause,
   pausing = false,
+  generation,
 }: {
   stage: AIImageGenerationStage;
   onPause?: () => void;
   pausing?: boolean;
+  generation?: GenerationTiming;
 }) {
   const content = STAGES[stage] ?? STAGES.generating;
   const activeStageIndex = Math.max(0, REAL_STAGES.indexOf(stage as (typeof REAL_STAGES)[number]));
@@ -149,7 +198,11 @@ export function GenerationOverlay({
         </div>
         <div className="ai-image-generation-skeleton mt-4" aria-hidden="true">
           <Skeleton className="absolute inset-0 h-full w-full rounded-none" />
-          <GenerationPreview stage={stage} className="ai-image-generation-skeleton-preview" />
+          <GenerationPreview
+            stage={stage}
+            generation={generation}
+            className="ai-image-generation-skeleton-preview"
+          />
           <Skeleton className="absolute top-[14%] left-[10%] h-[18%] w-[42%] bg-background/70" />
           <Skeleton className="absolute right-[10%] bottom-[14%] h-[46%] w-[30%] bg-background/70" />
           <Skeleton className="absolute bottom-[14%] left-[10%] h-[22%] w-[34%] bg-background/60" />

@@ -3,18 +3,25 @@ import request from '@/utils/request';
 export type AIImageGenerationStatus = 'queued' | 'running' | 'paused' | 'succeeded' | 'failed';
 export type AIImageGenerationStage = 'preparing' | 'generating' | 'storing' | 'completed';
 
-export interface AIImagePreset {
+export interface AIImageRecipe {
   id: string;
   name: string;
   description: string;
-  promptContent: string;
   samplePrompts: string[];
   requiresReference: boolean;
   recommendedAspect: string;
 }
 
-export interface AIImagePresetCatalog {
-  presets: AIImagePreset[];
+export interface AIImageStyleProfile {
+  id: string;
+  name: string;
+  description: string;
+  source: 'builtin' | 'skill';
+}
+
+export interface AIImageCreationOptions {
+  recipes: AIImageRecipe[];
+  styleProfiles: AIImageStyleProfile[];
   aspectRatios: string[];
   qualities: string[];
   sizes: Record<string, Record<string, string>>;
@@ -30,6 +37,8 @@ export interface AIImageGeneration {
   presetPrompt: string;
   skillId?: string;
   skillName: string;
+  styleProfileId: string;
+  styleProfileSource: 'builtin' | 'skill' | '';
   prompt: string;
   aspectRatio: string;
   quality: string;
@@ -57,9 +66,9 @@ export interface AIImageGeneration {
 
 export interface CreateAIImageGenerationInput {
   modelId: string;
-  presetId: string;
-  skillId?: string;
-  prompt: string;
+  recipeId: string;
+  styleProfileId?: string;
+  brief: string;
   aspectRatio: string;
   quality: string;
   references: string[];
@@ -97,12 +106,12 @@ export interface AIImageConversationCreatedPayload {
   messages: AIImageConversationMessage[];
 }
 
-export const listAIImagePresets = () =>
-  request.get<unknown, AIImagePresetCatalog>('/ai/image-presets');
+export const listAIImageCreationOptions = () =>
+  request.get<unknown, AIImageCreationOptions>('/ai/image-options');
 
-export const generateAIImagePresetSamples = (presetId: string, excludedPrompts: string[]) =>
+export const generateAIImageRecipeSamples = (recipeId: string, excludedPrompts: string[]) =>
   request.post<unknown, { list: string[]; model: string }>(
-    `/ai/image-presets/${presetId}/sample-prompts`,
+    `/ai/image-recipes/${recipeId}/sample-prompts`,
     { excludedPrompts },
   );
 

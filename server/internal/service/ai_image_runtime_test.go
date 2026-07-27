@@ -28,7 +28,7 @@ func newAIImageRuntimeTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.AIImageGeneration{}); err != nil {
+	if err := db.AutoMigrate(&model.AIImageGeneration{}, &model.AISkill{}); err != nil {
 		t.Fatal(err)
 	}
 	return db
@@ -71,10 +71,15 @@ func TestAIImageGenerationServiceGeneratePersistsStoredResult(t *testing.T) {
 	service.recordUsage = func(entry aiusage.Entry) { usages = append(usages, entry) }
 
 	skillID := model.Int64String(11)
+	if err := db.Create(&model.AISkill{
+		ID: skillID, UserID: 1, Name: "极简海报", Content: "优先留白与旧纸张质感",
+		SourceURL: "https://example.com/skill",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
 	result, err := service.Generate(context.Background(), AIImageGenerationInput{
-		UserID: 1, ModelID: "7", PresetID: "free", PresetName: "自由创作",
-		PresetPrompt: "生成完整图片", SkillID: &skillID, SkillName: "极简海报",
-		SkillContent: "优先留白与旧纸张质感", Prompt: prompt, AspectRatio: "1:1", Quality: "1K",
+		UserID: 1, ModelID: "7", RecipeID: "free", StyleProfileID: "skill:11",
+		Brief: prompt, AspectRatio: "1:1", Quality: "1K",
 		Feature: "workflow-image-generation",
 	})
 	if err != nil {
@@ -91,6 +96,10 @@ func TestAIImageGenerationServiceGeneratePersistsStoredResult(t *testing.T) {
 	}
 	if result.SkillID == nil || *result.SkillID != skillID || result.SkillName != "极简海报" {
 		t.Fatalf("selected skill was not persisted: %+v", result)
+	}
+	if result.StyleProfileID != "skill:11" || result.StyleProfileSource != "skill" ||
+		!strings.Contains(result.StyleProfilePrompt, "优先留白与旧纸张质感") {
+		t.Fatalf("style profile snapshot was not persisted: %+v", result)
 	}
 	if !strings.Contains(generatedPrompt, "优先留白与旧纸张质感") || !strings.Contains(generatedPrompt, strings.TrimSpace(prompt)) {
 		t.Fatalf("skill and user prompt must both reach image model: %s", generatedPrompt)
@@ -122,7 +131,7 @@ func TestAIImageGenerationServicePauseCancelsActiveRequest(t *testing.T) {
 	}
 
 	generation, err := service.Queue(context.Background(), AIImageGenerationInput{
-		UserID: 1, ModelID: "7", Prompt: "暂停中的图片", AspectRatio: "1:1", Quality: "1K",
+		UserID: 1, ModelID: "7", Brief: "暂停中的图片", AspectRatio: "1:1", Quality: "1K",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -163,7 +172,7 @@ func TestAIImageGenerationServiceRejectsUnsupportedReferenceModel(t *testing.T) 
 	service.storageAvailable = func() bool { return true }
 
 	_, err := service.Generate(context.Background(), AIImageGenerationInput{
-		UserID: 1, ModelID: "7", Prompt: "沿用构图", AspectRatio: "1:1", Quality: "1K",
+		UserID: 1, ModelID: "7", Brief: "沿用构图", AspectRatio: "1:1", Quality: "1K",
 		References: []string{"data:image/png;base64," + onePixelPNGBase64},
 	})
 	if err == nil || err.Error() != "所选图片模型不支持参考图" {
@@ -203,7 +212,7 @@ func TestAIImageGenerationServicePersistsReferenceParent(t *testing.T) {
 	service.storageAvailable = func() bool { return true }
 
 	result, err := service.Generate(context.Background(), AIImageGenerationInput{
-		UserID: 1, ModelID: "7", PresetID: "free", Prompt: "derive from parent", AspectRatio: "1:1", Quality: "1K",
+		UserID: 1, ModelID: "7", RecipeID: "free", Brief: "derive from parent", AspectRatio: "1:1", Quality: "1K",
 		ReferenceGenerationID: parent.ID.String(),
 	})
 	if err != nil {
@@ -211,6 +220,43 @@ func TestAIImageGenerationServicePersistsReferenceParent(t *testing.T) {
 	}
 	if result.ParentGenerationID == nil || *result.ParentGenerationID != parent.ID {
 		t.Fatalf("parent generation was not persisted: %+v", result)
+	}
+}
+
+func TestAIImageGenerationServiceAllowsLargeStoredGenerationReference(t *testing.T) {
+	db := newAIImageRuntimeTestDB(t)
+	parent := model.AIImageGeneration{
+		ID: 100, UserID: 1, ModelCatalogID: 7, Provider: "test", Model: "test-image-model",
+		PresetID: "free", Prompt: "parent", AspectRatio: "16:9", Quality: "4K", RequestedSize: "3840x2160",
+		Status: "succeeded", Stage: "completed", ResultURL: "https://cdn.example.com/large-parent.png",
+	}
+	if err := db.Create(&parent).Error; err != nil {
+		t.Fatal(err)
+	}
+	service := NewAIImageGenerationService(db)
+	service.fetch = func(context.Context, string) ([]byte, string, error) {
+		return make([]byte, MaxAIImageReferenceBytes+1), "image/png", nil
+	}
+
+	references, err := service.resolveReferences(context.Background(), AIImageGenerationInput{
+		UserID: 1, ReferenceGenerationID: parent.ID.String(),
+	})
+	if err != nil || len(references) != 1 {
+		t.Fatalf("stored generation reference should allow more than 5MB: count=%d err=%v", len(references), err)
+	}
+}
+
+func TestAIImageGenerationServiceKeepsUploadReferenceLimit(t *testing.T) {
+	service := NewAIImageGenerationService(newAIImageRuntimeTestDB(t))
+	service.fetch = func(context.Context, string) ([]byte, string, error) {
+		return make([]byte, MaxAIImageReferenceBytes+1), "image/png", nil
+	}
+
+	_, err := service.resolveReferences(context.Background(), AIImageGenerationInput{
+		UserID: 1, References: []string{"data:image/png;base64,oversized"},
+	})
+	if err == nil || err.Error() != "单张上传参考图不能超过 5MB" {
+		t.Fatalf("expected upload reference limit, got %v", err)
 	}
 }
 
@@ -244,7 +290,7 @@ func TestAIImageGenerationServiceAcceptsUsableNonExact4KOutput(t *testing.T) {
 	service.storageAvailable = func() bool { return true }
 
 	result, err := service.Generate(context.Background(), AIImageGenerationInput{
-		UserID: 1, ModelID: "7", Prompt: "山谷", AspectRatio: "16:9", Quality: "4K",
+		UserID: 1, ModelID: "7", Brief: "山谷", AspectRatio: "16:9", Quality: "4K",
 	})
 	if err != nil {
 		t.Fatal(err)

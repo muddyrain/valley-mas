@@ -149,8 +149,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 			auth.POST("/ai/chat", handler.ChatWithAI)
 			auth.GET("/ai/models", handler.ListAvailableAIModels)
-			auth.GET("/ai/image-presets", handler.ListAIImagePresets)
-			auth.POST("/ai/image-presets/:presetId/sample-prompts", handler.GenerateAIImagePresetSamples)
+			auth.GET("/ai/image-options", handler.ListAIImageCreationOptions)
+			auth.POST("/ai/image-recipes/:recipeId/sample-prompts", handler.GenerateAIImageRecipeSamples)
+			auth.GET("/ai/image-presets", handler.ListAIImageCreationOptions)
+			auth.POST("/ai/image-presets/:presetId/sample-prompts", handler.GenerateAIImageRecipeSamples)
 			auth.GET("/ai/image-generations", handler.ListAIImageGenerations)
 			auth.POST("/ai/image-generations", handler.CreateAIImageGeneration)
 			auth.GET("/ai/image-generations/:generationId/image-data", handler.GetAIImageGenerationImageData)
