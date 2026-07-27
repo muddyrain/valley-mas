@@ -31,7 +31,7 @@ func (CoverGenerateCapabilityAdapter) Execute(ctx context.Context, run RunContex
 	}
 	return NodeResult{Output: map[string]any{
 		"imageUrl": cover.URL,
-		"cover":    map[string]any{"url": cover.URL},
+		"cover":    cover.URL,
 		"url":      cover.URL,
 		"model":    cover.Model,
 		"size":     cover.Size,

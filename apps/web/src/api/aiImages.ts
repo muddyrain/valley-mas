@@ -128,6 +128,9 @@ export const createAIImageGeneration = (data: CreateAIImageGenerationInput) =>
 export const getAIImageGeneration = (generationId: string) =>
   request.get<unknown, { generation: AIImageGeneration }>(`/ai/image-generations/${generationId}`);
 
+export const getAIImageGenerationImageData = (generationId: string) =>
+  request.get<unknown, { imageBase64: string }>(`/ai/image-generations/${generationId}/image-data`);
+
 export const pauseAIImageGeneration = (generationId: string) =>
   request.post<unknown, { generation: AIImageGeneration }>(
     `/ai/image-generations/${generationId}/pause`,

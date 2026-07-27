@@ -33,7 +33,6 @@ import {
   type PostComment,
   type PostDetail,
 } from '@/api/blog';
-import { ModelPicker } from '@/components/ai/ModelPicker';
 import { BlogCoverMedia, MarkdownContent, PostComments, TableOfContents } from '@/components/blog';
 import { Button } from '@/components/ui/button';
 import {
@@ -177,7 +176,6 @@ export default function BlogPost() {
   const [aiGuide, setAIGuide] = useState<BlogReaderGuideResponse | null>(null);
   const [aiGuideLoading, setAIGuideLoading] = useState(false);
   const [aiGuideError, setAIGuideError] = useState('');
-  const [textModelId, setTextModelId] = useState('');
   const [askQuestion, setAskQuestion] = useState('');
   const [askAskedQuestion, setAskAskedQuestion] = useState('');
   const [askResult, setAskResult] = useState<BlogAskResponse | null>(null);
@@ -394,14 +392,10 @@ export default function BlogPost() {
 
   const handleGenerateAIGuide = async () => {
     if (!post || post.postType !== 'blog') return;
-    if (!textModelId) {
-      setAIGuideError('请先选择文本模型。');
-      return;
-    }
     setAIGuideLoading(true);
     setAIGuideError('');
     try {
-      const data = await generateBlogReaderGuide(post.id, textModelId);
+      const data = await generateBlogReaderGuide(post.id);
       setAIGuide(data);
     } catch (error) {
       console.error('Failed to generate AI guide:', error);
@@ -939,15 +933,6 @@ export default function BlogPost() {
                 </div>
               </div>
               <p className="mt-3 text-xs leading-6 text-muted-foreground">{scrollStatusTip}</p>
-              <div className="mt-4">
-                <ModelPicker
-                  value={textModelId}
-                  onValueChange={setTextModelId}
-                  capability="text"
-                  label="阅读模型"
-                  catalog="public"
-                />
-              </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
                   type="button"

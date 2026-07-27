@@ -54,6 +54,36 @@ func TestWorkflowCapabilitiesExposeInputGuidance(t *testing.T) {
 	if !ok || title["title"] != "封面标题" || title["placeholder"] == "" {
 		t.Fatalf("title field=%+v", title)
 	}
+	if capability.OutputSchema["cover"] != ValueTypeString {
+		t.Fatalf("generate cover output type=%v", capability.OutputSchema["cover"])
+	}
+	draftCapability, _, ok := registry.Capability(CapabilityCreateBlogDraft)
+	if !ok {
+		t.Fatal("create blog draft capability is missing")
+	}
+	draftProperties, ok := draftCapability.InputSchema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("draft properties=%T", draftCapability.InputSchema["properties"])
+	}
+	draftCover, ok := draftProperties["cover"].(map[string]any)
+	if !ok || draftCover["type"] != string(ValueTypeString) {
+		t.Fatalf("draft cover input=%+v", draftCover)
+	}
+	if _, exists := draftProperties["tagMode"]; exists {
+		t.Fatal("tagMode should not be exposed in the draft capability schema")
+	}
+	imageCapability, _, ok := registry.Capability(CapabilityGenerateAIImage)
+	if !ok {
+		t.Fatal("generate image capability is missing")
+	}
+	imageProperties, ok := imageCapability.InputSchema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("image properties=%T", imageCapability.InputSchema["properties"])
+	}
+	prompt, ok := imageProperties["prompt"].(map[string]any)
+	if !ok || prompt["allowFixedValue"] != true {
+		t.Fatalf("image prompt fixed-value guidance=%+v", prompt)
+	}
 }
 
 func TestWorkflowCapabilitiesExposeNodeDefaultConfig(t *testing.T) {

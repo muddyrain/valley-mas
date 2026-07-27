@@ -2,6 +2,7 @@ import { Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { TypedVariableBindingPicker } from './TypedVariableBindingPicker';
+import { TypedVariableValueEditor } from './TypedVariableValueEditor';
 import type { WorkflowValueType } from './types';
 import type { WorkflowVariableOption } from './workflowVariables';
 
@@ -9,12 +10,14 @@ interface WorkflowVariableBindingFieldProps {
   label: string;
   type: WorkflowValueType;
   value: unknown;
-  onChange: (value: string) => void;
+  onChange: (value: unknown) => void;
   options: WorkflowVariableOption[];
   description?: string;
   required?: boolean;
   error?: string;
   ariaLabel?: string;
+  allowFixed?: boolean;
+  fixedPlaceholder?: string;
 }
 
 // Shared binding card for fields whose name and type are defined by the caller.
@@ -29,6 +32,8 @@ export function WorkflowVariableBindingField({
   required = false,
   error,
   ariaLabel,
+  allowFixed = false,
+  fixedPlaceholder,
 }: WorkflowVariableBindingFieldProps) {
   return (
     <div className="space-y-1.5">
@@ -61,13 +66,24 @@ export function WorkflowVariableBindingField({
           ) : null}
         </div>
         <div className="mt-2 min-w-0">
-          <TypedVariableBindingPicker
-            ariaLabel={ariaLabel || `${label} 输入值`}
-            type={type}
-            value={value}
-            onChange={onChange}
-            options={options}
-          />
+          {allowFixed ? (
+            <TypedVariableValueEditor
+              ariaLabel={ariaLabel || `${label} 输入值`}
+              type={type}
+              value={value}
+              onChange={onChange}
+              options={options}
+              fixedPlaceholder={fixedPlaceholder}
+            />
+          ) : (
+            <TypedVariableBindingPicker
+              ariaLabel={ariaLabel || `${label} 输入值`}
+              type={type}
+              value={value}
+              onChange={(nextValue) => onChange(nextValue)}
+              options={options}
+            />
+          )}
         </div>
       </div>
       {error ? (

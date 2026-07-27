@@ -61,6 +61,7 @@ import {
   type SaveResourceProgress,
   type SaveResourceVisibility,
 } from '@/components/ai/SaveResourceDialog';
+import { AIImageGenerationImage } from '@/components/ai-images/AIImageGenerationImage';
 import { GenerationOverlay, GenerationPreview } from '@/components/ai-images/GenerationOverlay';
 import { SketchCanvas, type SketchCanvasHandle } from '@/components/ai-images/SketchCanvas';
 import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
@@ -161,7 +162,9 @@ const parseStudioMode = (value: string | null): ImageStudioMode =>
   value === 'canvas' ? 'canvas' : 'conversation';
 
 const parseHistoryStatusFilter = (value: string | null): HistoryStatusFilter =>
-  value === 'succeeded' || value === 'active' || value === 'failed' ? value : 'all';
+  value === 'all' || value === 'succeeded' || value === 'active' || value === 'failed'
+    ? value
+    : 'succeeded';
 
 const getHistoryModelFilterValue = (provider: string, model: string) =>
   JSON.stringify([provider.trim(), model.trim()]);
@@ -1283,8 +1286,7 @@ export default function AIImageStudio() {
       const nextStatus = filters.status ?? historyStatusFilter;
       const nextModel = filters.model ?? historyModelFilter;
       const nextFavoritesOnly = filters.favoritesOnly ?? favoritesOnly;
-      if (nextStatus === 'all') next.delete('historyStatus');
-      else next.set('historyStatus', nextStatus);
+      next.set('historyStatus', nextStatus);
       if (nextModel === 'all') next.delete('historyModel');
       else next.set('historyModel', nextModel);
       if (nextFavoritesOnly) next.set('historyFavorite', 'true');
@@ -1627,7 +1629,8 @@ export default function AIImageStudio() {
                                                     })
                                                   }
                                                 >
-                                                  <img
+                                                  <AIImageGenerationImage
+                                                    generationId={generation.id}
                                                     src={generation.resultUrl}
                                                     alt={generation.prompt || '生成图片'}
                                                     className="max-h-64 w-full object-contain"
@@ -2186,7 +2189,8 @@ export default function AIImageStudio() {
                             onClick={() => setLockedConversationReferenceID(generation.id)}
                             disabled={isBusy}
                           >
-                            <img
+                            <AIImageGenerationImage
+                              generationId={generation.id}
                               src={generation.resultUrl}
                               alt="可选参考图"
                               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
@@ -2373,7 +2377,8 @@ export default function AIImageStudio() {
                           }
                           aria-label="预览生成图片"
                         >
-                          <img
+                          <AIImageGenerationImage
+                            generationId={generation.id}
                             src={generation.resultUrl}
                             alt="AI 生成图片"
                             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.025] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
@@ -2953,7 +2958,8 @@ export default function AIImageStudio() {
               </DialogHeader>
               <div className="space-y-4 p-5">
                 <div className="flex gap-3 rounded-lg border border-border bg-muted/20 p-3">
-                  <img
+                  <AIImageGenerationImage
+                    generationId={variantSource.id}
                     src={variantSource.resultUrl}
                     alt="作为参考的原图"
                     className="size-16 shrink-0 rounded-md border border-border object-cover"
@@ -3058,7 +3064,8 @@ export default function AIImageStudio() {
                     }
                     aria-label="预览生成图片"
                   >
-                    <img
+                    <AIImageGenerationImage
+                      generationId={historyDetailTarget.id}
                       src={historyDetailTarget.resultUrl}
                       alt="AI 生成图片"
                       className="aspect-[4/3] w-full object-cover transition-transform duration-300 group-hover:scale-[1.015] motion-reduce:transition-none motion-reduce:group-hover:scale-100"

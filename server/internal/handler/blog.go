@@ -939,6 +939,97 @@ func AdminCreatePost(c *gin.Context) {
 	Success(c, post)
 }
 
+// AdminBatchPublishPosts publishes selected blog drafts in one transaction.
+func AdminBatchPublishPosts(c *gin.Context) {
+	_, _, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "登录后即可操作")
+		return
+	}
+
+	var req struct {
+		PostIDs []model.Int64String `json:"postIds"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Error(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if len(req.PostIDs) == 0 || len(req.PostIDs) > 100 {
+		Error(c, http.StatusBadRequest, "一次最多发布 100 篇博客")
+		return
+	}
+
+	ids := make([]int64, 0, len(req.PostIDs))
+	seen := make(map[int64]struct{}, len(req.PostIDs))
+	for _, rawID := range req.PostIDs {
+		id := int64(rawID)
+		if id <= 0 {
+			Error(c, http.StatusBadRequest, "invalid post id")
+			return
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+
+	var posts []model.Post
+	if err := database.DB.
+		Where("id IN ? AND deleted_at IS NULL", ids).
+		Find(&posts).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "查询博客失败")
+		return
+	}
+	if len(posts) != len(ids) {
+		Error(c, http.StatusBadRequest, "无权操作所选博客")
+		return
+	}
+	for _, post := range posts {
+		if !canManagePost(c, post.AuthorID) {
+			Error(c, http.StatusBadRequest, "无权操作所选博客")
+			return
+		}
+		if normalizePostType(post.PostType) != postTypeBlog || post.Status != "draft" {
+			Error(c, http.StatusBadRequest, "只能批量发布博客草稿")
+			return
+		}
+	}
+
+	publishedAt := time.Now()
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&model.Post{}).
+			Where(
+				"id IN ? AND post_type = ? AND status = ? AND deleted_at IS NULL",
+				ids,
+				postTypeBlog,
+				"draft",
+			).
+			Updates(map[string]interface{}{
+				"status":           "published",
+				"published_at":     publishedAt,
+				"draft_data":       "",
+				"draft_updated_at": nil,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != int64(len(ids)) {
+			return fmt.Errorf("published rows changed during batch operation")
+		}
+		return nil
+	})
+	if err != nil {
+		Error(c, http.StatusInternalServerError, "批量发布失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"publishedIds": req.PostIDs,
+		"publishedAt":  publishedAt,
+	})
+}
+
 func AdminUpdatePost(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 

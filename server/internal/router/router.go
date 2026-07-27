@@ -365,6 +365,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.POST("/blog/external-images/unsplash/trigger-download", handler.AdminTriggerUnsplashDownload)
 				content.POST("/blog/image-text/assets/upload", handler.AdminUploadImageTextAsset)
 				content.POST("/blog/posts", handler.AdminCreatePost)
+				content.POST("/blog/posts/batch/publish", handler.AdminBatchPublishPosts)
 				content.PUT("/blog/posts/:id", handler.AdminUpdatePost)
 				content.DELETE("/blog/posts/:id", handler.AdminDeletePost)
 				content.GET("/blog/groups", handler.AdminListGroups)

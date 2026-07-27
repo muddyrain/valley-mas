@@ -316,16 +316,9 @@ func GenerateBlogReaderGuide(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "仅博客类型支持 AI 导读")
 		return
 	}
-	var req struct {
-		ModelID string `json:"modelId" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		Error(c, http.StatusBadRequest, "需要选择文本模型")
-		return
-	}
-	invocation, err := aimodel.ResolveInvocation(database.GetDB(), req.ModelID, "text", 90*time.Second)
+	invocation, err := aimodel.ResolveFastTextInvocation(database.GetDB(), 90*time.Second)
 	if err != nil {
-		recordBlogReaderUsage(c, aiclient.FeatureBlogReaderGuide, "", req.ModelID, "", "", aiclient.CompatibleUsage{}, time.Now(), err, false)
+		recordBlogReaderUsage(c, aiclient.FeatureBlogReaderGuide, "", "", "", "", aiclient.CompatibleUsage{}, time.Now(), err, false)
 		respondCatalogModelError(c, err)
 		return
 	}

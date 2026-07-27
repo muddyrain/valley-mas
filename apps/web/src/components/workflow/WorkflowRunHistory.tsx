@@ -1,8 +1,9 @@
-import { AlertCircle, CheckCircle2, CircleSlash2, Clock3, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { AlertCircle, Ban, CheckCircle2, CircleSlash2, Clock3, Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { getAPIErrorMessage } from '@/api/aiWorkbench';
 import {
+  cancelWorkflowRun,
   getWorkflowRun,
   listWorkflowRuns,
   type WorkflowRun,
@@ -67,26 +68,40 @@ export function WorkflowRunHistory({
   const [loading, setLoading] = useState(false);
   const [selectedRun, setSelectedRun] = useState<WorkflowRunDetail | null>(null);
   const [loadingTrace, setLoadingTrace] = useState(false);
+  const [cancellingRunId, setCancellingRunId] = useState<string | null>(null);
+
+  const loadRuns = useCallback(
+    async (showLoading = true) => {
+      if (!workflowId) return;
+      if (showLoading) setLoading(true);
+      try {
+        setRuns((await listWorkflowRuns(workflowId, { page: 1, pageSize: 20 })).list);
+      } catch (error) {
+        setRuns([]);
+        toast.error(getAPIErrorMessage(error, '加载运行历史失败'));
+      } finally {
+        if (showLoading) setLoading(false);
+      }
+    },
+    [workflowId],
+  );
 
   useEffect(() => {
     if (!open || !workflowId) return;
-    let active = true;
-    setLoading(true);
-    listWorkflowRuns(workflowId, { page: 1, pageSize: 20 })
-      .then((data) => {
-        if (active) setRuns(data.list);
-      })
-      .catch((error) => {
-        if (active) setRuns([]);
-        if (active) toast.error(getAPIErrorMessage(error, '加载运行历史失败'));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [open, workflowId]);
+    void loadRuns();
+  }, [loadRuns, open, workflowId]);
+
+  useEffect(() => {
+    if (
+      !open ||
+      !workflowId ||
+      !runs.some((run) => run.status === 'running' || run.status === 'cancelling')
+    ) {
+      return;
+    }
+    const timer = window.setTimeout(() => void loadRuns(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [loadRuns, open, runs, workflowId]);
 
   const loadTrace = async (run: WorkflowRun) => {
     if (!workflowId) return;
@@ -97,6 +112,27 @@ export function WorkflowRunHistory({
       toast.error(getAPIErrorMessage(error, '加载运行详情失败'));
     } finally {
       setLoadingTrace(false);
+    }
+  };
+
+  const handleCancelRun = async (run: WorkflowRun) => {
+    if (!workflowId || run.status !== 'running' || cancellingRunId) return;
+    setCancellingRunId(run.id);
+    try {
+      await cancelWorkflowRun(workflowId, run.id);
+      setRuns((previous) =>
+        previous.map((item) => (item.id === run.id ? { ...item, status: 'cancelling' } : item)),
+      );
+      setSelectedRun((previous) =>
+        previous?.run.id === run.id
+          ? { ...previous, run: { ...previous.run, status: 'cancelling' } }
+          : previous,
+      );
+      toast.success('已请求取消运行');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '取消运行失败'));
+    } finally {
+      setCancellingRunId(null);
     }
   };
 
@@ -118,26 +154,59 @@ export function WorkflowRunHistory({
           const meta = statusMeta(run.status);
           const Icon = meta.icon;
           const selected = selectedRun?.run.id === run.id;
+          const canCancel = run.status === 'running' || run.status === 'cancelling';
+          const isCancelling = run.status === 'cancelling' || cancellingRunId === run.id;
           return (
-            <Button
+            <div
               key={run.id}
-              variant="ghost"
-              className="h-auto w-full justify-start rounded-lg border border-border px-3 py-2.5 text-left hover:bg-muted/50"
-              aria-pressed={selected}
-              onClick={() => void loadTrace(run)}
+              className="flex min-w-0 items-stretch rounded-lg border border-border hover:bg-muted/50"
             >
-              <Icon className={`mr-2 size-4 shrink-0 ${meta.className}`} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-foreground">{meta.label}</span>
-                <time
-                  className="mt-0.5 block text-xs text-muted-foreground"
-                  dateTime={run.startedAt}
+              <Button
+                variant="ghost"
+                className="h-auto min-w-0 flex-1 justify-start rounded-lg border-0 px-3 py-2.5 text-left"
+                aria-pressed={selected}
+                onClick={() => void loadTrace(run)}
+              >
+                <Icon className={`mr-2 size-4 shrink-0 ${meta.className}`} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-foreground">{meta.label}</span>
+                  <time
+                    className="mt-0.5 block text-xs text-muted-foreground"
+                    dateTime={run.startedAt}
+                  >
+                    {new Date(run.startedAt).toLocaleString('zh-CN')}
+                  </time>
+                </span>
+                {run.finishedAt ? <Clock3 className="size-4 text-muted-foreground" /> : null}
+              </Button>
+              {canCancel ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mr-1 self-center px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  disabled={isCancelling}
+                  aria-label={isCancelling ? '取消中' : '取消运行'}
+                  title={isCancelling ? '取消中' : '取消运行'}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleCancelRun(run);
+                  }}
                 >
-                  {new Date(run.startedAt).toLocaleString('zh-CN')}
-                </time>
-              </span>
-              {run.finishedAt ? <Clock3 className="size-4 text-muted-foreground" /> : null}
-            </Button>
+                  {isCancelling ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      <span className="ml-1 text-xs">取消中</span>
+                    </>
+                  ) : (
+                    <>
+                      <Ban className="size-4" />
+                      <span className="ml-1 text-xs">取消</span>
+                    </>
+                  )}
+                </Button>
+              ) : null}
+            </div>
           );
         })}
       </div>

@@ -18,6 +18,7 @@ import (
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 	"valley-server/internal/service"
+	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -413,7 +414,7 @@ func GetAIImageGenerationImageData(c *gin.Context) {
 		Error(c, http.StatusConflict, "图片尚未生成完成")
 		return
 	}
-	content, mimeType, err := fetchGeneratedAIImage(c.Request.Context(), generation.ResultURL)
+	content, mimeType, err := fetchAIImageGenerationContent(c.Request.Context(), generation)
 	if err != nil {
 		ErrorWithDetail(c, http.StatusBadGateway, "读取历史图片失败，请稍后重试", err)
 		return
@@ -658,6 +659,91 @@ func summarizeAIImageError(cause error) string {
 
 func fetchGeneratedAIImage(ctx context.Context, source string) ([]byte, string, error) {
 	return service.FetchAIImageSource(ctx, source)
+}
+
+// fetchAIImageGenerationContent keeps history usable across the OSS -> TOS
+// migration. Older rows can still point at the legacy OSS URL while carrying
+// the original storage key; newer rows use the current TOS URL directly.
+// When the legacy object is still readable, re-home a copy to TOS and repair
+// the row so subsequent browser requests no longer depend on the old domain.
+func fetchAIImageGenerationContent(ctx context.Context, generation model.AIImageGeneration) ([]byte, string, error) {
+	legacyURL := strings.TrimSpace(generation.ResultURL)
+	candidates := make([]string, 0, 2)
+	if generation.ResultStorageKey != "" {
+		if uploader := utils.GetTOSUploader(); uploader != nil {
+			candidates = append(candidates, uploader.GetPublicURL(generation.ResultStorageKey))
+		}
+	}
+	if legacyURL != "" {
+		candidates = append(candidates, legacyURL)
+	}
+
+	var lastErr error
+	seen := make(map[string]struct{}, len(candidates))
+	for _, source := range candidates {
+		if source == "" {
+			continue
+		}
+		if _, exists := seen[source]; exists {
+			continue
+		}
+		seen[source] = struct{}{}
+		content, mimeType, err := fetchGeneratedAIImage(ctx, source)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		if source != legacyURL {
+			repairAIImageGenerationURL(generation, source)
+		} else if !isCurrentAIImageStorageURL(source) {
+			if repairedURL := rehomeAIImageGeneration(ctx, generation, content, mimeType); repairedURL != "" {
+				source = repairedURL
+			}
+		}
+		return content, mimeType, nil
+	}
+	if lastErr == nil {
+		lastErr = errors.New("AI 鍥剧墖鍦板潃涓虹┖")
+	}
+	return nil, "", lastErr
+}
+
+func isCurrentAIImageStorageURL(source string) bool {
+	uploader := utils.GetTOSUploader()
+	if uploader == nil {
+		return false
+	}
+	return strings.HasPrefix(strings.TrimSpace(source), uploader.GetPublicURL(""))
+}
+
+func repairAIImageGenerationURL(generation model.AIImageGeneration, source string) {
+	if source == "" || source == generation.ResultURL {
+		return
+	}
+	_ = database.GetDB().Model(&model.AIImageGeneration{}).
+		Where("id = ? AND user_id = ? AND result_url = ?", generation.ID, generation.UserID, generation.ResultURL).
+		Updates(map[string]any{"result_url": source}).Error
+}
+
+func rehomeAIImageGeneration(ctx context.Context, generation model.AIImageGeneration, content []byte, mimeType string) string {
+	uploader := service.NewUploadService()
+	config := service.GetDefaultConfig(service.UploadTypeWallpaper)
+	config.UserID = int64(generation.UserID)
+	config.CustomFolder = fmt.Sprintf("ai-images/%s/%s", generation.UserID.String(), time.Now().Format("20060102"))
+	stored, err := uploader.UploadBytesWithContext(ctx, "recovered"+service.AIImageExtension(mimeType), content, config)
+	if err != nil {
+		log.Printf("[WARN] recover AI image generation asset failed: id=%s err=%v", generation.ID.String(), err)
+		return ""
+	}
+	if err := database.GetDB().Model(&model.AIImageGeneration{}).
+		Where("id = ? AND user_id = ? AND result_url = ?", generation.ID, generation.UserID, generation.ResultURL).
+		Updates(map[string]any{
+			"result_url": stored.URL, "result_storage_key": stored.Key, "result_size": stored.Size,
+		}).Error; err != nil {
+		log.Printf("[WARN] repair AI image generation record failed: id=%s err=%v", generation.ID.String(), err)
+	}
+	return stored.URL
 }
 
 func generatedAIImageDimensions(content []byte, mimeType string) (int, int, error) {

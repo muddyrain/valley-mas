@@ -13,6 +13,7 @@ import {
   Loader2,
   Lock,
   Pencil,
+  Send,
   Sparkles,
   Square,
   Trash2,
@@ -25,6 +26,7 @@ import { toast } from 'sonner';
 import {
   type Group as BlogGroup,
   type Post as BlogPost,
+  batchPublishPosts,
   deletePost,
   getAdminGroups,
   getAdminPosts,
@@ -99,6 +101,7 @@ export default function MyPosts() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchVisibilityOpen, setBatchVisibilityOpen] = useState(false);
   const [batchUpdatingVisibility, setBatchUpdatingVisibility] = useState(false);
+  const [batchPublishing, setBatchPublishing] = useState(false);
   const [batchCoverDialogOpen, setBatchCoverDialogOpen] = useState(false);
   const [batchCoverItems, setBatchCoverItems] = useState<BatchCoverItem[]>([]);
   const [batchCoverRunning, setBatchCoverRunning] = useState(false);
@@ -122,6 +125,16 @@ export default function MyPosts() {
   const hasLoadedPosts = visiblePosts.length > 0;
   const showPostLoadingOverlay = loadingPosts && hasLoadedPosts;
   const selectedCount = selectedIds.size;
+  const selectedBlogDraftIds = useMemo(
+    () =>
+      visiblePosts
+        .filter(
+          (post) => post.postType === 'blog' && post.status === 'draft' && selectedIds.has(post.id),
+        )
+        .map((post) => post.id),
+    [selectedIds, visiblePosts],
+  );
+  const selectedBlogDraftCount = selectedBlogDraftIds.length;
   const allVisibleSelected =
     visiblePosts.length > 0 && visiblePosts.every((post) => selectedIds.has(post.id));
 
@@ -326,6 +339,31 @@ export default function MyPosts() {
       toast.error('批量设置访问状态失败');
     } finally {
       setBatchUpdatingVisibility(false);
+    }
+  };
+
+  const handleBatchPublish = async () => {
+    if (selectedBlogDraftIds.length === 0) {
+      toast.error('请先选择未发布的博客');
+      return;
+    }
+
+    try {
+      setBatchPublishing(true);
+      const result = await batchPublishPosts(selectedBlogDraftIds);
+      const publishedIds = new Set(result.publishedIds);
+      const publishedAt = result.publishedAt || new Date().toISOString();
+      setBlogPosts((prev) =>
+        prev.map((post) =>
+          publishedIds.has(post.id) ? { ...post, status: 'published', publishedAt } : post,
+        ),
+      );
+      toast.success(`已发布 ${publishedIds.size} 篇博客`);
+      handleExitBatchMode();
+    } catch {
+      toast.error('批量发布失败，请稍后重试');
+    } finally {
+      setBatchPublishing(false);
     }
   };
 
@@ -742,7 +780,7 @@ export default function MyPosts() {
                 <Button
                   type="button"
                   size="sm"
-                  disabled={batchUpdatingVisibility || batchCoverRunning}
+                  disabled={batchUpdatingVisibility || batchCoverRunning || batchPublishing}
                   onClick={() => setBatchSettingsOpen(true)}
                   className="bg-primary text-primary-foreground hover:bg-primary/90 ml-auto h-8 rounded-lg"
                 >
@@ -958,7 +996,7 @@ export default function MyPosts() {
       <Dialog
         open={batchSettingsOpen}
         onOpenChange={(open) => {
-          if (batchUpdatingVisibility || batchCoverRunning) return;
+          if (batchUpdatingVisibility || batchCoverRunning || batchPublishing) return;
           setBatchSettingsOpen(open);
         }}
       >
@@ -977,7 +1015,37 @@ export default function MyPosts() {
               type="button"
               variant="outline"
               className="w-full justify-start"
-              disabled={selectedCount === 0 || batchUpdatingVisibility || batchCoverRunning}
+              disabled={
+                selectedBlogDraftCount === 0 ||
+                batchUpdatingVisibility ||
+                batchCoverRunning ||
+                batchPublishing
+              }
+              onClick={() => {
+                setBatchSettingsOpen(false);
+                void handleBatchPublish();
+              }}
+            >
+              {batchPublishing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              一键发布博客
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              已选博客草稿：{selectedBlogDraftCount} 篇；已发布博客和图文内容不会处理。
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full justify-start"
+              disabled={
+                selectedCount === 0 ||
+                batchUpdatingVisibility ||
+                batchCoverRunning ||
+                batchPublishing
+              }
               onClick={() => {
                 setBatchSettingsOpen(false);
                 setBatchVisibilityOpen(true);
@@ -990,7 +1058,12 @@ export default function MyPosts() {
               type="button"
               variant="outline"
               className="w-full justify-start"
-              disabled={selectedCount === 0 || batchUpdatingVisibility || batchCoverRunning}
+              disabled={
+                selectedCount === 0 ||
+                batchUpdatingVisibility ||
+                batchCoverRunning ||
+                batchPublishing
+              }
               onClick={() => {
                 setBatchSettingsOpen(false);
                 openBatchCoverDialog();
@@ -1007,7 +1080,7 @@ export default function MyPosts() {
             variant="outline"
             className="w-full"
             onClick={() => setBatchSettingsOpen(false)}
-            disabled={batchUpdatingVisibility || batchCoverRunning}
+            disabled={batchUpdatingVisibility || batchCoverRunning || batchPublishing}
           >
             关闭
           </Button>

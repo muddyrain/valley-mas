@@ -49,8 +49,8 @@ const customInputCopy: Record<string, { label: string; placeholder?: string }> =
     placeholder: '例如：独立开发者和内容创作者',
   },
   style: {
-    label: '写作风格',
-    placeholder: '例如：实用、简洁、有案例',
+    label: '风格',
+    placeholder: '例如：简洁、专业、科技感',
   },
   generateCover: {
     label: '生成封面',

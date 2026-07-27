@@ -27,7 +27,7 @@ func (ParseMarkdownCapabilityAdapter) Execute(_ context.Context, _ RunContext, e
 		"title":    parsed.Title,
 		"content":  parsed.Content,
 		"excerpt":  parsed.Excerpt,
-		"cover":    map[string]any{"url": parsed.Cover},
+		"cover":    parsed.Cover,
 		"tagNames": parsed.FrontMatterTag,
 		"frontMatter": map[string]any{
 			"excerpt": parsed.Excerpt,
@@ -57,6 +57,10 @@ func (BlogCreateDraftCapabilityAdapter) Execute(ctx context.Context, run RunCont
 	if err != nil {
 		return NodeResult{}, fmt.Errorf("开始节点 groupId 无效: %w", err)
 	}
+	tagMode := stringFromValue(execution.Input["tagMode"])
+	if tagMode == "" {
+		tagMode = blogworkflow.TagModeMerge
+	}
 	draft, err := blogworkflow.CreateDraft(database.DB.WithContext(ctx), blogworkflow.CreateDraftInput{
 		Title:         stringFromValue(execution.Input["title"]),
 		Content:       stringFromValue(execution.Input["content"]),
@@ -64,7 +68,7 @@ func (BlogCreateDraftCapabilityAdapter) Execute(ctx context.Context, run RunCont
 		Cover:         coverURLFromValue(execution.Input["cover"]),
 		ManualTagIDs:  manualTagIDs,
 		SuggestedTags: suggestedTags,
-		TagMode:       stringFromValue(execution.Input["tagMode"]),
+		TagMode:       tagMode,
 		Visibility:    stringFromValue(execution.Input["visibility"]),
 		GroupID:       groupID,
 		AuthorID:      run.Actor.UserID,

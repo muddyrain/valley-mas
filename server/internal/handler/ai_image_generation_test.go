@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"valley-server/internal/model"
 	"valley-server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -122,6 +124,24 @@ func TestAIImageReferenceDataURL(t *testing.T) {
 	dataURL := aiImageReferenceDataURL([]byte("image"), "image/png")
 	if dataURL != "data:image/png;base64,aW1hZ2U=" {
 		t.Fatalf("unexpected data URL: %s", dataURL)
+	}
+}
+
+func TestFetchAIImageGenerationContentSupportsInlineResult(t *testing.T) {
+	content, mimeType, err := fetchAIImageGenerationContent(
+		context.Background(),
+		model.AIImageGeneration{
+			ID:        1,
+			UserID:    1,
+			Status:    "succeeded",
+			ResultURL: "data:image/png;base64," + onePixelPNGBase64,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mimeType != "image/png" || len(content) == 0 {
+		t.Fatalf("unexpected inline image result: mime=%s bytes=%d", mimeType, len(content))
 	}
 }
 

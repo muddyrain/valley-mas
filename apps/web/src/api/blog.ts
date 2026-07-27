@@ -334,10 +334,10 @@ export function generateBlogCover(data: {
   return request.post<unknown, BlogAICoverResponse>('/admin/blog/ai/cover', data);
 }
 
-export function generateBlogReaderGuide(postId: string, modelId: string) {
+export function generateBlogReaderGuide(postId: string) {
   return request.post<unknown, BlogReaderGuideResponse>(
     `/public/blog/posts/id/${postId}/ai/guide`,
-    { modelId },
+    {},
   );
 }
 
@@ -420,6 +420,13 @@ export function recommendBlogPosts(data: {
 
 export function updatePost(id: string, data: Partial<CreatePostData>) {
   return request.put<unknown, null>(`/admin/blog/posts/${id}`, data);
+}
+
+export function batchPublishPosts(postIds: string[]) {
+  return request.post<unknown, { publishedIds: string[]; publishedAt: string }>(
+    '/admin/blog/posts/batch/publish',
+    { postIds },
+  );
 }
 
 export function deletePost(id: string) {

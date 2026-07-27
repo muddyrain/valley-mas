@@ -85,7 +85,7 @@ const TOOL_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
     ['content', 'string'],
     ['frontMatter', 'object'],
     ['excerpt', 'string'],
-    ['cover', 'object'],
+    ['cover', 'string'],
     ['tagNames', 'string[]'],
   ],
   'content.extractDocument': [
@@ -130,7 +130,7 @@ const TOOL_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
   ],
   'image.generateCover': [
     ['imageUrl', 'string'],
-    ['cover', 'object'],
+    ['cover', 'string'],
     ['url', 'string'],
     ['model', 'string'],
     ['size', 'string'],

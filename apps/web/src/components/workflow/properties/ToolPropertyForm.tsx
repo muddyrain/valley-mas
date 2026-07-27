@@ -98,14 +98,14 @@ const toolOutputPresentations: Record<
     order: ['imageUrl', 'cover', 'url', 'model', 'size'],
     labels: {
       imageUrl: '图片地址',
-      cover: '封面对象',
+      cover: '封面地址',
       url: '图片地址（兼容）',
       model: '生成模型',
       size: '图片尺寸',
     },
     descriptions: {
       imageUrl: '下游节点可直接引用',
-      cover: '兼容博客草稿的封面字段',
+      cover: '可直接绑定到博客草稿的封面地址',
     },
   },
   'image.generate': {
@@ -337,6 +337,8 @@ export function ToolPropertyForm({
               required={capability.inputSchema.required?.includes(name)}
               error={fieldErrors[name]}
               ariaLabel={`${schema.title || name} 输入值`}
+              allowFixed={schema.allowFixedValue}
+              fixedPlaceholder={schema.placeholder}
             />
           );
         })}
