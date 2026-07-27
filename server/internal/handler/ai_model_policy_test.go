@@ -19,6 +19,7 @@ type fakeAIModelProbeClient struct {
 	imageSize       string
 	imageReferences []string
 	chatResponse    string
+	embedding       []float32
 	err             error
 }
 
@@ -42,10 +43,14 @@ func (client *fakeAIModelProbeClient) Embeddings(_ context.Context, modelID stri
 	if client.err != nil {
 		return aiclient.CompatibleEmbeddingResponse{}, client.err
 	}
+	embedding := client.embedding
+	if len(embedding) == 0 {
+		embedding = []float32{0.1}
+	}
 	return aiclient.CompatibleEmbeddingResponse{Data: []struct {
 		Embedding []float32 `json:"embedding"`
 		Index     int       `json:"index"`
-	}{{Embedding: []float32{0.1}, Index: 0}}}, nil
+	}{{Embedding: embedding, Index: 0}}}, nil
 }
 
 func (client *fakeAIModelProbeClient) GenerateImageWithRequest(
@@ -123,13 +128,16 @@ func TestProbeAIModelUsesReferenceImageWhenDeclared(t *testing.T) {
 }
 
 func TestProbeAIModelUsesEmbeddingEndpoint(t *testing.T) {
-	client := &fakeAIModelProbeClient{}
-	_, err := probeAIModel(context.Background(), client, "BAAI/bge-m3", []string{"embedding"})
+	client := &fakeAIModelProbeClient{embedding: make([]float32, 1024)}
+	result, err := probeAIModel(context.Background(), client, "BAAI/bge-m3", []string{"embedding"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if client.embeddingModel != "BAAI/bge-m3" || len(client.embeddingInput) != 1 || client.embeddingInput[0] != "ping" {
 		t.Fatalf("embedding probe = model %q, input %+v", client.embeddingModel, client.embeddingInput)
+	}
+	if result.EmbeddingDimension != 1024 {
+		t.Fatalf("embedding dimension = %d", result.EmbeddingDimension)
 	}
 }
 
@@ -206,6 +214,36 @@ func TestNewAIModelKeepsOptionalTokenLimits(t *testing.T) {
 		ContextWindowTokens: -1,
 	}); err == nil {
 		t.Fatal("expected negative token limit validation")
+	}
+}
+
+func TestNewAIModelRequiresEmbeddingDimension(t *testing.T) {
+	if _, err := newAIModel(adminAIModelRequest{
+		Provider: "siliconflow", ModelID: "BAAI/bge-m3", Capabilities: []string{"embedding"}, Enabled: true,
+	}); err == nil {
+		t.Fatal("expected embedding dimension validation")
+	}
+
+	item, err := newAIModel(adminAIModelRequest{
+		Provider: "siliconflow", ModelID: "BAAI/bge-m3", Capabilities: []string{"embedding"},
+		EmbeddingDimension: 1024, Enabled: true,
+	})
+	if err != nil {
+		t.Fatalf("valid embedding model rejected: %v", err)
+	}
+	if item.EmbeddingDimension != 1024 {
+		t.Fatalf("embedding dimension = %d", item.EmbeddingDimension)
+	}
+
+	textModel, err := newAIModel(adminAIModelRequest{
+		Provider: "siliconflow", ModelID: "text-model", Capabilities: []string{"text"},
+		EmbeddingDimension: 384, Enabled: true,
+	})
+	if err != nil {
+		t.Fatalf("text model rejected: %v", err)
+	}
+	if textModel.EmbeddingDimension != 0 {
+		t.Fatalf("non-embedding model retained dimension = %d", textModel.EmbeddingDimension)
 	}
 }
 

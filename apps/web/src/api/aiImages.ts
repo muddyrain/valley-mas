@@ -1,6 +1,6 @@
 import request from '@/utils/request';
 
-export type AIImageGenerationStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+export type AIImageGenerationStatus = 'queued' | 'running' | 'paused' | 'succeeded' | 'failed';
 export type AIImageGenerationStage = 'preparing' | 'generating' | 'storing' | 'completed';
 
 export interface AIImagePreset {
@@ -28,6 +28,8 @@ export interface AIImageGeneration {
   presetId: string;
   presetName: string;
   presetPrompt: string;
+  skillId?: string;
+  skillName: string;
   prompt: string;
   aspectRatio: string;
   quality: string;
@@ -56,6 +58,7 @@ export interface AIImageGeneration {
 export interface CreateAIImageGenerationInput {
   modelId: string;
   presetId: string;
+  skillId?: string;
   prompt: string;
   aspectRatio: string;
   quality: string;
@@ -115,6 +118,11 @@ export const createAIImageGeneration = (data: CreateAIImageGenerationInput) =>
 
 export const getAIImageGeneration = (generationId: string) =>
   request.get<unknown, { generation: AIImageGeneration }>(`/ai/image-generations/${generationId}`);
+
+export const pauseAIImageGeneration = (generationId: string) =>
+  request.post<unknown, { generation: AIImageGeneration }>(
+    `/ai/image-generations/${generationId}/pause`,
+  );
 
 export const deleteAIImageGeneration = (generationId: string) =>
   request.delete<unknown, { deleted: boolean }>(`/ai/image-generations/${generationId}`);

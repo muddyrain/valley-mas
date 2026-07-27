@@ -32,4 +32,14 @@ const http = createHttpClient({
   },
 });
 
+// 页面会根据当前操作提供具体的错误提示。默认抑制请求层 toast，避免同一失败
+// 被全局拦截器和页面 catch 重复展示；确实需要兜底提示时可显式传入 false。
+http.interceptors.request.use((config) => {
+  const requestConfig = config as typeof config & RequestConfig;
+  if (requestConfig.suppressErrorToast === undefined) {
+    requestConfig.suppressErrorToast = true;
+  }
+  return config;
+});
+
 export default http;

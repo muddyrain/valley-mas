@@ -19,6 +19,7 @@ export interface AvailableAIModel {
   modelId: string;
   displayName: string;
   capabilities: string[];
+  embeddingDimension?: number;
   imageQualities?: string[];
   imageReferenceQualities?: string[];
 }

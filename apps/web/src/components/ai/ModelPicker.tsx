@@ -29,10 +29,13 @@ interface ModelPickerProps {
   value?: string;
   onValueChange: (modelID: string, model?: AvailableAIModel) => void;
   onModelChange?: (model?: AvailableAIModel) => void;
+  onUnavailableValue?: (modelID: string) => void;
   capability: string;
   label?: string;
   catalog?: 'auth' | 'public';
   compact?: boolean;
+  compactLabel?: string;
+  compactTrigger?: boolean;
   autoSelectFirst?: boolean;
 }
 
@@ -40,10 +43,13 @@ export function ModelPicker({
   value,
   onValueChange,
   onModelChange,
+  onUnavailableValue,
   capability,
   label = '模型',
   catalog = 'auth',
   compact = false,
+  compactLabel = '使用',
+  compactTrigger = false,
   autoSelectFirst = false,
 }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
@@ -94,8 +100,9 @@ export function ModelPicker({
 
   useEffect(() => {
     if (!autoSelectFirst || loading || models.length === 0 || selectedModel) return;
+    if (value) onUnavailableValue?.(value);
     onValueChange(models[0].id, models[0]);
-  }, [autoSelectFirst, loading, models, onValueChange, selectedModel]);
+  }, [autoSelectFirst, loading, models, onUnavailableValue, onValueChange, selectedModel, value]);
 
   const selectedLabel = selectedModel
     ? `${selectedModel.displayName} · ${selectedModel.provider}`
@@ -104,24 +111,43 @@ export function ModelPicker({
   return (
     <div className={compact ? 'min-w-0' : 'space-y-1.5'}>
       {compact ? (
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-          <span className="min-w-0 truncate">
-            {selectedModel
-              ? `使用 ${selectedLabel}`
-              : loading
-                ? `正在选择${label}…`
-                : selectedLabel}
-          </span>
+        compactTrigger ? (
           <Button
             type="button"
-            variant="link"
+            variant="outline"
             size="sm"
-            className="shrink-0"
+            className="h-8 max-w-[15rem] justify-between gap-1 px-2 text-xs font-normal"
             onClick={() => setOpen(true)}
           >
-            切换
+            <span className="min-w-0 truncate text-left">
+              {selectedModel
+                ? `${compactLabel} ${selectedLabel}`
+                : loading
+                  ? `正在选择${label}…`
+                  : selectedLabel}
+            </span>
+            <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
           </Button>
-        </div>
+        ) : (
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+            <span className="min-w-0 truncate">
+              {selectedModel
+                ? `${compactLabel} ${selectedLabel}`
+                : loading
+                  ? `正在选择${label}…`
+                  : selectedLabel}
+            </span>
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setOpen(true)}
+            >
+              切换
+            </Button>
+          </div>
+        )
       ) : (
         <>
           <Label>{label}</Label>

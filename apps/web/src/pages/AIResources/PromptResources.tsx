@@ -1,4 +1,5 @@
 import {
+  ExternalLink,
   FileText,
   MoreHorizontal,
   Pencil,
@@ -20,6 +21,7 @@ import {
   updateAIPrompt,
 } from '@/api/aiWorkbench';
 import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -60,6 +62,23 @@ function formatPromptDate(value: string) {
   }).format(new Date(value));
 }
 
+const suggestedPromptTags = ['通用', '智能体', '工作流', '生图', '写作', '博客'];
+
+function parsePromptTags(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[,，]/)
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, 8);
+}
+
+function formatPromptTags(tags: string[]) {
+  return tags.join('，');
+}
+
 export default function PromptResources() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [prompts, setPrompts] = useState<AIPrompt[]>([]);
@@ -71,15 +90,38 @@ export default function PromptResources() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
+  const [tagText, setTagText] = useState('');
   const keyword = searchParams.get('prompt_search') || '';
+  const activeTag = searchParams.get('prompt_tag') || '';
 
   const visiblePrompts = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLocaleLowerCase();
-    if (!normalizedKeyword) return prompts;
-    return prompts.filter((prompt) =>
-      `${prompt.name} ${prompt.description}`.toLocaleLowerCase().includes(normalizedKeyword),
-    );
-  }, [keyword, prompts]);
+    return prompts.filter((prompt) => {
+      const matchesKeyword =
+        !normalizedKeyword ||
+        `${prompt.name} ${prompt.description} ${prompt.tags.join(' ')}`
+          .toLocaleLowerCase()
+          .includes(normalizedKeyword);
+      return matchesKeyword && (!activeTag || prompt.tags.includes(activeTag));
+    });
+  }, [activeTag, keyword, prompts]);
+  const tagFilters = useMemo(
+    () =>
+      Array.from(
+        new Set([activeTag, ...prompts.flatMap((prompt) => prompt.tags)].filter(Boolean)),
+      ).sort((left, right) => {
+        const leftIndex = suggestedPromptTags.indexOf(left);
+        const rightIndex = suggestedPromptTags.indexOf(right);
+        if (leftIndex >= 0 || rightIndex >= 0) {
+          return (
+            (leftIndex < 0 ? Number.MAX_SAFE_INTEGER : leftIndex) -
+            (rightIndex < 0 ? Number.MAX_SAFE_INTEGER : rightIndex)
+          );
+        }
+        return left.localeCompare(right, 'zh-CN');
+      }),
+    [activeTag, prompts],
+  );
 
   useEffect(() => {
     let active = true;
@@ -110,6 +152,7 @@ export default function PromptResources() {
     setName(prompt?.name || '');
     setDescription(prompt?.description || '');
     setContent(prompt?.content || '');
+    setTagText(formatPromptTags(prompt?.tags || []));
     setEditorOpen(true);
   };
 
@@ -124,7 +167,12 @@ export default function PromptResources() {
     }
     try {
       setSaving(true);
-      const payload = { name: name.trim(), description: description.trim(), content };
+      const payload = {
+        name: name.trim(),
+        description: description.trim(),
+        content,
+        tags: parsePromptTags(tagText),
+      };
       const saved = editingPrompt
         ? await updateAIPrompt(editingPrompt.id, payload)
         : await createAIPrompt(payload);
@@ -137,6 +185,20 @@ export default function PromptResources() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateTagFilter = (tag: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (tag) next.set('prompt_tag', tag);
+    else next.delete('prompt_tag');
+    setSearchParams(next, { replace: true });
+  };
+
+  const toggleEditorTag = (tag: string) => {
+    const tags = parsePromptTags(tagText);
+    setTagText(
+      formatPromptTags(tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag]),
+    );
   };
 
   const handleArchive = async (prompt: AIPrompt) => {
@@ -161,11 +223,37 @@ export default function PromptResources() {
             className="pl-9"
           />
         </div>
-        <Button onClick={() => openEditor(null)}>
-          <Plus className="mr-2 size-4" />
-          新建提示词
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => openEditor(null)}>
+            <Plus className="mr-2 size-4" />
+            新建提示词
+          </Button>
+        </div>
       </div>
+
+      {tagFilters.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="按标签筛选">
+          <Button
+            type="button"
+            size="sm"
+            variant={activeTag ? 'outline' : 'secondary'}
+            onClick={() => updateTagFilter('')}
+          >
+            全部
+          </Button>
+          {tagFilters.map((tag) => (
+            <Button
+              key={tag}
+              type="button"
+              size="sm"
+              variant={activeTag === tag ? 'secondary' : 'outline'}
+              onClick={() => updateTagFilter(tag)}
+            >
+              {tag}
+            </Button>
+          ))}
+        </div>
+      ) : null}
 
       {loading ? (
         <div aria-busy="true" className="space-y-3 py-4">
@@ -176,7 +264,7 @@ export default function PromptResources() {
         <div className="py-24 text-center">
           <FileText className="mx-auto mb-3 size-10 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            {keyword ? '没有匹配的提示词' : '还没有提示词'}
+            {keyword || activeTag ? '没有匹配的提示词' : '还没有提示词'}
           </p>
         </div>
       ) : (
@@ -184,7 +272,7 @@ export default function PromptResources() {
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="px-3">资源</TableHead>
-              <TableHead>类型</TableHead>
+              <TableHead>来源</TableHead>
               <TableHead>编辑时间</TableHead>
               <TableHead className="w-24 text-right">操作</TableHead>
             </TableRow>
@@ -208,10 +296,24 @@ export default function PromptResources() {
                           {prompt.description}
                         </span>
                       ) : null}
+                      {prompt.tags.length > 0 ? (
+                        <span className="mt-1.5 flex flex-wrap gap-1">
+                          {prompt.tags.slice(0, 3).map((tag) => (
+                            <Badge key={tag} variant="secondary">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {prompt.tags.length > 3 ? (
+                            <Badge variant="outline">+{prompt.tags.length - 3}</Badge>
+                          ) : null}
+                        </span>
+                      ) : null}
                     </span>
                   </div>
                 </TableCell>
-                <TableCell className="text-muted-foreground">提示词</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {prompt.sourceUrl ? '链接导入' : '自己创建'}
+                </TableCell>
                 <TableCell className="text-muted-foreground">
                   {formatPromptDate(prompt.updatedAt)}
                 </TableCell>
@@ -284,6 +386,56 @@ export default function PromptResources() {
                 placeholder="简要说明用途"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="prompt-resource-tags">适用标签</Label>
+              <div className="flex flex-wrap gap-2">
+                {suggestedPromptTags.map((tag) => {
+                  const selected = parsePromptTags(tagText).includes(tag);
+                  return (
+                    <Button
+                      key={tag}
+                      type="button"
+                      size="sm"
+                      variant={selected ? 'secondary' : 'outline'}
+                      aria-pressed={selected}
+                      onClick={() => toggleEditorTag(tag)}
+                    >
+                      {tag}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Input
+                id="prompt-resource-tags"
+                value={tagText}
+                maxLength={120}
+                onChange={(event) => setTagText(event.target.value)}
+                placeholder="用逗号分隔，最多 8 个"
+              />
+            </div>
+            {editingPrompt?.sourceUrl ? (
+              <div className="space-y-2 rounded-lg border border-border bg-muted/25 p-3">
+                <p className="text-sm font-medium text-foreground">导入来源</p>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  {editingPrompt.sourceAuthor ? <span>{editingPrompt.sourceAuthor}</span> : null}
+                  {editingPrompt.sourceLicense ? (
+                    <Badge variant="outline">{editingPrompt.sourceLicense}</Badge>
+                  ) : null}
+                  {editingPrompt.importedAt ? (
+                    <span>导入于 {formatPromptDate(editingPrompt.importedAt)}</span>
+                  ) : null}
+                  <a
+                    href={editingPrompt.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    查看仓库
+                    <ExternalLink className="size-3" />
+                  </a>
+                </div>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <Label htmlFor="prompt-resource-content">提示词</Label>

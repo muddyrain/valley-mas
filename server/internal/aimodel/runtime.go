@@ -47,6 +47,16 @@ func ProviderFromEnv(provider string) (ProviderConfig, error) {
 			baseURL = "https://api.amux.ai/v1"
 		}
 		return ProviderConfig{Provider: "amux", APIKey: key, BaseURL: baseURL}, nil
+	case "pipixia":
+		key := strings.TrimSpace(os.Getenv("PIPIXIA_API_KEY"))
+		if key == "" {
+			return ProviderConfig{}, errors.New("AI 服务未配置：缺少 PIPIXIA_API_KEY")
+		}
+		baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("PIPIXIA_BASE_URL")), "/")
+		if baseURL == "" {
+			return ProviderConfig{}, errors.New("AI 服务未配置：缺少 PIPIXIA_BASE_URL")
+		}
+		return ProviderConfig{Provider: "pipixia", APIKey: key, BaseURL: baseURL}, nil
 	case "ark":
 		key := strings.TrimSpace(os.Getenv("ARK_API_KEY"))
 		if key == "" {

@@ -156,6 +156,7 @@ var aiImageSizes = service.AIImageSizes
 type createAIImageGenerationRequest struct {
 	ModelID               string   `json:"modelId"`
 	PresetID              string   `json:"presetId"`
+	SkillID               string   `json:"skillId"`
 	Prompt                string   `json:"prompt"`
 	AspectRatio           string   `json:"aspectRatio"`
 	Quality               string   `json:"quality"`
@@ -282,6 +283,16 @@ func CreateAIImageGeneration(c *gin.Context) {
 		Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
+	skill, err := loadOwnedAIImageSkill(userID, payload.SkillID)
+	if err != nil {
+		Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	var skillID *model.Int64String
+	if skill.ID > 0 {
+		id := skill.ID
+		skillID = &id
+	}
 	generation, err := service.NewAIImageGenerationService(database.GetDB()).Queue(
 		c.Request.Context(),
 		service.AIImageGenerationInput{
@@ -290,6 +301,9 @@ func CreateAIImageGeneration(c *gin.Context) {
 			PresetID:              preset.ID,
 			PresetName:            preset.Name,
 			PresetPrompt:          preset.PromptContent,
+			SkillID:               skillID,
+			SkillName:             skill.Name,
+			SkillContent:          composeAIImageSkillContent(skill),
 			Prompt:                payload.Prompt,
 			AspectRatio:           payload.AspectRatio,
 			Quality:               payload.Quality,
@@ -316,6 +330,38 @@ func CreateAIImageGeneration(c *gin.Context) {
 		return
 	}
 	Success(c, gin.H{"generation": generation})
+}
+
+func composeAIImageSkillContent(skill model.AISkill) string {
+	content := strings.TrimSpace(skill.Content)
+	references := strings.TrimSpace(skill.ReferenceContent)
+	if references == "" {
+		return content
+	}
+	return content + "\n\n以下是该技能随附的参考资料；仅在与当前创作任务相关时使用：\n" + references
+}
+
+func loadOwnedAIImageSkill(userID model.Int64String, rawID string) (model.AISkill, error) {
+	rawID = strings.TrimSpace(rawID)
+	if rawID == "" {
+		return model.AISkill{}, nil
+	}
+	id, err := strconv.ParseInt(rawID, 10, 64)
+	if err != nil || id <= 0 {
+		return model.AISkill{}, errors.New("技能无效")
+	}
+	var skill model.AISkill
+	if err := database.GetDB().Where(
+		"id = ? AND user_id = ? AND archived_at IS NULL",
+		id,
+		userID,
+	).First(&skill).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return model.AISkill{}, errors.New("技能不存在或不可用")
+		}
+		return model.AISkill{}, errors.New("读取技能失败")
+	}
+	return skill, nil
 }
 
 func ListAIImageGenerations(c *gin.Context) {
@@ -375,6 +421,42 @@ func UpdateAIImageGenerationFavorite(c *gin.Context) {
 		return
 	}
 	generation.IsFavorited = *payload.Favorited
+	Success(c, gin.H{"generation": generation})
+}
+
+func PauseAIImageGeneration(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	generation, found := findAIImageGeneration(c, userID)
+	if !found {
+		return
+	}
+	if generation.Status != "queued" && generation.Status != "running" {
+		Error(c, http.StatusConflict, "当前图片任务无法暂停")
+		return
+	}
+	finished := time.Now()
+	result := database.GetDB().Model(&model.AIImageGeneration{}).
+		Where("id = ? AND user_id = ? AND status IN ?", generation.ID, userID, []string{"queued", "running"}).
+		Updates(map[string]any{
+			"status": "paused", "stage": "completed", "error_code": "GENERATION_PAUSED",
+			"error_message": "已暂停生成", "finished_at": finished,
+		})
+	if result.Error != nil {
+		ErrorWithDetail(c, http.StatusInternalServerError, "暂停图片生成失败", result.Error)
+		return
+	}
+	if result.RowsAffected == 0 {
+		Error(c, http.StatusConflict, "当前图片任务无法暂停")
+		return
+	}
+	service.CancelAIImageGeneration(generation.ID)
+	generation, found = findAIImageGeneration(c, userID)
+	if !found {
+		return
+	}
 	Success(c, gin.H{"generation": generation})
 }
 
@@ -739,7 +821,7 @@ func aiImageReferenceDataURL(content []byte, mimeType string) string {
 }
 
 func buildAIImagePrompt(preset aiImagePreset, userPrompt string, hasReference bool) string {
-	return service.BuildAIImagePrompt(preset.PromptContent, userPrompt, hasReference)
+	return service.BuildAIImagePrompt(preset.PromptContent, "", userPrompt, hasReference)
 }
 
 func summarizeAIImageError(cause error) string {

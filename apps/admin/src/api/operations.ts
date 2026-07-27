@@ -157,10 +157,11 @@ export type AIModelCapability =
 
 export type AIModelVerificationStatus = 'unverified' | 'partial' | 'verified' | 'failed';
 export type AIImageProtocol = 'auto' | 'siliconflow_images' | 'openai_images' | 'ark_images';
+export type AIModelProvider = 'siliconflow' | 'amux' | 'pipixia' | 'ark';
 
 export interface AdminAIModel {
   id: string;
-  provider: 'siliconflow' | 'amux' | 'ark';
+  provider: AIModelProvider;
   modelId: string;
   displayName: string;
   capabilities: AIModelCapability[];
@@ -173,6 +174,8 @@ export interface AdminAIModel {
   contextWindowTokens?: number;
   /** 0 / undefined means the upstream limit is not configured. */
   maxOutputTokens?: number;
+  /** Required for embedding models; matches the length of each returned vector. */
+  embeddingDimension?: number;
   enabled: boolean;
   sortOrder: number;
   createdAt: string;
@@ -188,6 +191,7 @@ export type AdminAIModelInput = Pick<
   | 'imageProtocol'
   | 'contextWindowTokens'
   | 'maxOutputTokens'
+  | 'embeddingDimension'
   | 'enabled'
   | 'sortOrder'
 >;
@@ -441,7 +445,7 @@ export function testAIModelConnection(
   >('/admin/ai/models/test-connection', payload, { timeout: 210000 });
 }
 
-export function previewAIProviderModels(provider: 'siliconflow' | 'amux') {
+export function previewAIProviderModels(provider: AIModelProvider) {
   return http.get<unknown, { provider: string; models: string[] }>(
     `/admin/ai/providers/${provider}/models-preview`,
   );

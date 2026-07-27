@@ -198,9 +198,48 @@ export interface AIPrompt {
   name: string;
   description: string;
   content: string;
+  tags: string[];
+  sourceUrl?: string;
+  sourceAuthor?: string;
+  sourceLicense?: string;
+  importedAt?: string;
   archivedAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AISkill {
+  id: string;
+  name: string;
+  description: string;
+  sourceUrl: string;
+  sourceAuthor: string;
+  sourceLicense: string;
+  installedAt: string;
+}
+
+export interface AISkillFile {
+  path: string;
+  kind: 'skill' | 'reference';
+  content: string;
+}
+
+export interface AISkillDetail extends AISkill {
+  files: AISkillFile[];
+}
+
+export interface AISkillImportCandidate {
+  path: string;
+  name: string;
+  description: string;
+  referenceCount: number;
+  sourceUrl: string;
+}
+
+export interface AISkillImportPreview {
+  repositoryUrl: string;
+  author: string;
+  skills: AISkillImportCandidate[];
 }
 
 export interface AIAppTool {
@@ -637,6 +676,7 @@ export function createAIPrompt(data: {
   name: string;
   description?: string;
   content: string;
+  tags: string[];
 }): Promise<AIPrompt> {
   return request.post('/ai/prompts', data);
 }
@@ -647,6 +687,7 @@ export function updateAIPrompt(
     name: string;
     description?: string;
     content: string;
+    tags: string[];
   },
 ): Promise<AIPrompt> {
   return request.patch(`/ai/prompts/${promptId}`, data);
@@ -654,6 +695,26 @@ export function updateAIPrompt(
 
 export function archiveAIPrompt(promptId: string): Promise<void> {
   return request.delete(`/ai/prompts/${promptId}`);
+}
+
+export function listAISkills(): Promise<{ list: AISkill[] }> {
+  return request.get('/ai/skills');
+}
+
+export function getAISkill(skillId: string): Promise<AISkillDetail> {
+  return request.get(`/ai/skills/${skillId}`);
+}
+
+export function previewAISkillImport(url: string): Promise<AISkillImportPreview> {
+  return request.post('/ai/skills/preview', { url });
+}
+
+export function installAISkill(url: string, paths: string[]): Promise<{ list: AISkill[] }> {
+  return request.post('/ai/skills/install', { url, paths });
+}
+
+export function archiveAISkill(skillId: string): Promise<void> {
+  return request.delete(`/ai/skills/${skillId}`);
 }
 
 export function createAIKnowledgeBase(data: {

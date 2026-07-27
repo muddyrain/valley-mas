@@ -2,6 +2,7 @@ import gsap from 'gsap';
 import { Flip } from 'gsap/Flip';
 import {
   Check,
+  CirclePause,
   Download,
   Eye,
   FileText,
@@ -17,11 +18,13 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Search,
   Send,
   SlidersHorizontal,
   Sparkles,
   Trash2,
   WandSparkles,
+  X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -45,10 +48,17 @@ import {
   listAIImageConversations,
   listAIImageGenerations,
   listAIImagePresets,
+  pauseAIImageGeneration,
   saveAIImageGenerationResource,
   updateAIImageGenerationFavorite,
 } from '@/api/aiImages';
-import { type AIPrompt, getAPIErrorMessage, listAIPrompts } from '@/api/aiWorkbench';
+import {
+  type AIPrompt,
+  type AISkill,
+  getAPIErrorMessage,
+  listAIPrompts,
+  listAISkills,
+} from '@/api/aiWorkbench';
 import { ConversationMessageBubble } from '@/components/ai/ConversationMessageBubble';
 import { ModelPicker } from '@/components/ai/ModelPicker';
 import {
@@ -89,6 +99,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -122,14 +133,43 @@ type ImageStudioMode = 'canvas' | 'conversation';
 type ConversationReferenceMode = 'latest' | 'locked' | 'none';
 type HistoryStatusFilter = 'all' | 'succeeded' | 'active' | 'failed';
 
+const HISTORY_STATUS_LABELS: Record<HistoryStatusFilter, string> = {
+  all: '全部状态',
+  succeeded: '已完成',
+  active: '生成中',
+  failed: '生成失败',
+};
+
 const LEGACY_CONVERSATION_STORAGE_PREFIX = 'valley-ai-image-conversation-v1';
+const IMAGE_MODEL_PREFERENCE_KEY = 'valley.ai-image-studio.image-model';
 const MAX_CONVERSATION_MESSAGES = 100;
+const MAX_IMAGE_PROMPT_LENGTH = 48_000;
+const MAX_CONVERSATION_INPUT_LENGTH = 20_000;
+
+function readAIImageModelPreference() {
+  try {
+    return window.localStorage.getItem(IMAGE_MODEL_PREFERENCE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function saveAIImageModelPreference(modelID: string) {
+  try {
+    window.localStorage.setItem(IMAGE_MODEL_PREFERENCE_KEY, modelID);
+  } catch {
+    // Browser storage can be unavailable; the model still stays selected for this session.
+  }
+}
 
 const parseStudioMode = (value: string | null): ImageStudioMode =>
   value === 'canvas' ? 'canvas' : 'conversation';
 
 const parseHistoryStatusFilter = (value: string | null): HistoryStatusFilter =>
   value === 'succeeded' || value === 'active' || value === 'failed' ? value : 'all';
+
+const getHistoryModelFilterValue = (provider: string, model: string) =>
+  JSON.stringify([provider.trim(), model.trim()]);
 
 type ImageConversationMessage = {
   id: string;
@@ -186,6 +226,7 @@ const isObsoleteCanvasSnapshotError = (
 const STATUS_LABELS: Record<AIImageGeneration['status'], string> = {
   queued: '等待生成',
   running: '生成中',
+  paused: '已暂停',
   succeeded: '已完成',
   failed: '生成失败',
 };
@@ -374,18 +415,27 @@ export default function AIImageStudio() {
   const [promptResources, setPromptResources] = useState<AIPrompt[]>([]);
   const [promptResourcesLoading, setPromptResourcesLoading] = useState(true);
   const [promptResourcePickerOpen, setPromptResourcePickerOpen] = useState(false);
+  const [promptResourceQuery, setPromptResourceQuery] = useState('');
+  const [pendingPromptResource, setPendingPromptResource] = useState<AIPrompt | null>(null);
+  const [skills, setSkills] = useState<AISkill[]>([]);
+  const [skillsLoading, setSkillsLoading] = useState(true);
+  const [skillPickerOpen, setSkillPickerOpen] = useState(false);
+  const [skillQuery, setSkillQuery] = useState('');
+  const [selectedSkill, setSelectedSkill] = useState<AISkill | null>(null);
   const [aspectRatios, setAspectRatios] = useState(DEFAULT_ASPECTS);
   const [sizes, setSizes] = useState<Record<string, Record<string, string>>>({});
   const [presetID, setPresetID] = useState('free');
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState('1:1');
   const [quality, setQuality] = useState('1K');
-  const [modelID, setModelID] = useState('');
+  const [modelID, setModelID] = useState(readAIImageModelPreference);
   const [selectedModel, setSelectedModel] = useState<AvailableAIModel>();
+  const imageModelFallbackNotifiedRef = useRef(false);
   const [hasCanvasContent, setHasCanvasContent] = useState(false);
   const [useCanvasReference, setUseCanvasReference] = useState(true);
   const [history, setHistory] = useState<AIImageGeneration[]>([]);
   const [activeGeneration, setActiveGeneration] = useState<AIImageGeneration | null>(null);
+  const [pausingGenerationID, setPausingGenerationID] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [conversationInput, setConversationInput] = useState('');
@@ -414,6 +464,17 @@ export default function AIImageStudio() {
   const [favoriteUpdatingID, setFavoriteUpdatingID] = useState<string>();
   const [variantSource, setVariantSource] = useState<AIImageGeneration | null>(null);
   const [variantInstruction, setVariantInstruction] = useState('');
+
+  const handleImageModelChange = useCallback((nextModelID: string) => {
+    setModelID(nextModelID);
+    saveAIImageModelPreference(nextModelID);
+  }, []);
+
+  const handleUnavailableImageModel = useCallback(() => {
+    if (imageModelFallbackNotifiedRef.current) return;
+    imageModelFallbackNotifiedRef.current = true;
+    toast.info('已切换到可用模型', { description: '上次选择的图片模型已不可用。' });
+  }, []);
 
   const scheduleConversationScroll = useCallback((behavior: ScrollBehavior = 'smooth') => {
     conversationScrollBehaviorRef.current = behavior;
@@ -545,6 +606,23 @@ export default function AIImageStudio() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    void listAISkills()
+      .then(({ list }) => {
+        if (active) setSkills(list);
+      })
+      .catch((error) => {
+        if (active) toast.error(getAPIErrorMessage(error, '加载技能失败'));
+      })
+      .finally(() => {
+        if (active) setSkillsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (
       !activeGeneration ||
       (activeGeneration.status !== 'queued' && activeGeneration.status !== 'running')
@@ -571,6 +649,11 @@ export default function AIImageStudio() {
         if (result.generation.status === 'failed') {
           scheduleConversationScroll();
           toast.error(result.generation.errorMessage || '图片生成失败');
+          setActiveGeneration(null);
+          return;
+        }
+        if (result.generation.status === 'paused') {
+          scheduleConversationScroll();
           setActiveGeneration(null);
           return;
         }
@@ -621,6 +704,7 @@ export default function AIImageStudio() {
       const result = await createAIImageGeneration({
         modelId: modelID,
         presetId: presetID,
+        skillId: selectedSkill?.id,
         prompt: prompt.trim(),
         aspectRatio,
         quality,
@@ -680,7 +764,10 @@ export default function AIImageStudio() {
     setPrompt(generation.prompt);
     setAspectRatio(generation.aspectRatio);
     setQuality(generation.quality);
-    setModelID(generation.modelCatalogId);
+    handleImageModelChange(generation.modelCatalogId);
+    setSelectedSkill(
+      generation.skillId ? skills.find((skill) => skill.id === generation.skillId) || null : null,
+    );
     if (generation.canvasSnapshotUrl) {
       try {
         const dataURL = await readImageAsDataURL(generation.canvasSnapshotUrl);
@@ -724,6 +811,7 @@ export default function AIImageStudio() {
       const result = await createAIImageGeneration({
         modelId: modelID,
         presetId: presetID,
+        skillId: selectedSkill?.id,
         prompt: instruction,
         aspectRatio,
         quality,
@@ -818,6 +906,7 @@ export default function AIImageStudio() {
       const result = await createAIImageGeneration({
         modelId: modelID,
         presetId: presetID,
+        skillId: selectedSkill?.id,
         prompt: generationPrompt,
         aspectRatio,
         quality,
@@ -1021,12 +1110,45 @@ export default function AIImageStudio() {
   const isBusy =
     creating || isGenerating || conversationSending || conversationStarting || conversationLoading;
   const studioMode = parseStudioMode(searchParams.get('mode'));
+
+  const pauseGeneration = async (generation: AIImageGeneration) => {
+    if (generation.status !== 'queued' && generation.status !== 'running') return;
+    setPausingGenerationID(generation.id);
+    try {
+      const result = await pauseAIImageGeneration(generation.id);
+      setHistory((current) => [
+        result.generation,
+        ...current.filter((item) => item.id !== result.generation.id),
+      ]);
+      setActiveGeneration((current) => (current?.id === result.generation.id ? null : current));
+      toast.success('已暂停生成');
+      scheduleConversationScroll();
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '暂停生成失败'));
+    } finally {
+      setPausingGenerationID(undefined);
+    }
+  };
   const historyStatusFilter = parseHistoryStatusFilter(searchParams.get('historyStatus'));
   const historyModelFilter = searchParams.get('historyModel') || 'all';
   const favoritesOnly = searchParams.get('historyFavorite') === 'true';
   const historyModelOptions = Array.from(
-    new Set(history.map((generation) => generation.model).filter(Boolean)),
-  ).sort((left, right) => left.localeCompare(right, 'zh-CN'));
+    new Map(
+      history
+        .filter((generation) => generation.model.trim())
+        .map((generation) => {
+          const provider = generation.provider.trim() || '未知服务商';
+          const model = generation.model.trim();
+          const value = getHistoryModelFilterValue(provider, model);
+          return [value, { value, label: `${provider} · ${model}` }] as const;
+        }),
+    ).values(),
+  ).sort((left, right) => left.label.localeCompare(right.label, 'zh-CN'));
+  const selectedHistoryModelLabel =
+    historyModelFilter === 'all'
+      ? '全部模型'
+      : historyModelOptions.find((option) => option.value === historyModelFilter)?.label ||
+        historyModelFilter;
   const visibleHistory = history.filter((generation) => {
     const statusMatches =
       historyStatusFilter === 'all' ||
@@ -1036,7 +1158,9 @@ export default function AIImageStudio() {
       (historyStatusFilter === 'failed' && generation.status === 'failed');
     return (
       statusMatches &&
-      (historyModelFilter === 'all' || generation.model === historyModelFilter) &&
+      (historyModelFilter === 'all' ||
+        historyModelFilter === getHistoryModelFilterValue(generation.provider, generation.model) ||
+        generation.model === historyModelFilter) &&
       (!favoritesOnly || generation.isFavorited)
     );
   });
@@ -1069,6 +1193,29 @@ export default function AIImageStudio() {
   const selectedPresetSamples = selectedPreset
     ? (generatedPresetSamples[selectedPreset.id] ?? selectedPreset.samplePrompts)
     : [];
+  const normalizedPromptResourceQuery = promptResourceQuery.trim().toLocaleLowerCase();
+  const visiblePromptResources = [...promptResources]
+    .filter(
+      (promptResource) =>
+        !normalizedPromptResourceQuery ||
+        `${promptResource.name} ${promptResource.description} ${promptResource.tags.join(' ')}`
+          .toLocaleLowerCase()
+          .includes(normalizedPromptResourceQuery),
+    )
+    .sort(
+      (left, right) =>
+        Number(right.tags.includes('生图')) - Number(left.tags.includes('生图')) ||
+        right.updatedAt.localeCompare(left.updatedAt),
+    );
+  const visibleSkills = skills.filter((skill) => {
+    const keyword = skillQuery.trim().toLocaleLowerCase();
+    return (
+      !keyword ||
+      `${skill.name} ${skill.description} ${skill.sourceAuthor}`
+        .toLocaleLowerCase()
+        .includes(keyword)
+    );
+  });
   const latestConversationGeneration = [...conversationMessages]
     .reverse()
     .map((message) =>
@@ -1208,10 +1355,36 @@ export default function AIImageStudio() {
       setRefreshingPresetSamples(false);
     }
   };
-  const applyPromptResource = (promptResource: AIPrompt) => {
-    applyPresetSamplePrompt(promptResource.content);
+  const commitPromptResource = (promptResource: AIPrompt, mode: 'replace' | 'append') => {
+    const current = studioMode === 'conversation' ? conversationInput : prompt;
+    const maxLength =
+      studioMode === 'conversation' ? MAX_CONVERSATION_INPUT_LENGTH : MAX_IMAGE_PROMPT_LENGTH;
+    const next =
+      mode === 'append' && current.trim()
+        ? `${current.trim()}\n\n${promptResource.content.trim()}`
+        : promptResource.content;
+    if (next.length > maxLength) {
+      toast.error(`填入后将超过 ${maxLength.toLocaleString()} 字，请先精简当前内容`);
+      return;
+    }
+    applyPresetSamplePrompt(next);
+    setPendingPromptResource(null);
     setPromptResourcePickerOpen(false);
     toast.success(`已填入“${promptResource.name}”`);
+  };
+  const applyPromptResource = (promptResource: AIPrompt) => {
+    const current = studioMode === 'conversation' ? conversationInput : prompt;
+    if (current.trim()) {
+      setPendingPromptResource(promptResource);
+      setPromptResourcePickerOpen(false);
+      return;
+    }
+    commitPromptResource(promptResource, 'replace');
+  };
+  const selectSkill = (skill: AISkill) => {
+    setSelectedSkill(skill);
+    setSkillPickerOpen(false);
+    toast.success(`本次将使用“${skill.name}”技能`);
   };
   useEffect(() => {
     if (safeHistoryPage !== historyPage) {
@@ -1344,7 +1517,11 @@ export default function AIImageStudio() {
                           restoreSnapshot={canvasRestore}
                         />
                         {isGenerating && activeGeneration ? (
-                          <GenerationOverlay stage={activeGeneration.stage} />
+                          <GenerationOverlay
+                            stage={activeGeneration.stage}
+                            onPause={() => void pauseGeneration(activeGeneration)}
+                            pausing={pausingGenerationID === activeGeneration.id}
+                          />
                         ) : null}
                       </>
                     ) : (
@@ -1437,6 +1614,19 @@ export default function AIImageStudio() {
                                                 <Save />
                                                 {generation.resourceId ? '已保存' : '保存图片'}
                                               </Button>
+                                            ) : generation?.status === 'queued' ||
+                                              generation?.status === 'running' ? (
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 px-2 text-xs"
+                                                onClick={() => void pauseGeneration(generation)}
+                                                disabled={pausingGenerationID === generation.id}
+                                              >
+                                                <CirclePause />
+                                                暂停生成
+                                              </Button>
                                             ) : undefined
                                           }
                                         >
@@ -1446,7 +1636,7 @@ export default function AIImageStudio() {
                                               generation.resultUrl ? (
                                                 <button
                                                   type="button"
-                                                  className="block max-w-full overflow-hidden rounded-xl border border-border/70 bg-background text-left"
+                                                  className="block max-w-full overflow-hidden rounded-xl border border-border/70 bg-background text-left outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                                                   onClick={() =>
                                                     setHistoryPreview({
                                                       src: generation.resultUrl,
@@ -1466,8 +1656,12 @@ export default function AIImageStudio() {
                                                 <div className="w-full min-w-0 rounded-md border border-destructive/20 bg-destructive/10 px-2.5 py-2 text-xs leading-5 text-destructive break-words whitespace-pre-wrap [overflow-wrap:anywhere]">
                                                   {generation.errorMessage || '生成失败'}
                                                 </div>
+                                              ) : generation.status === 'paused' ? (
+                                                <div className="w-[min(100%,20rem)] rounded-md border border-border bg-background/70 px-2.5 py-2 text-xs text-muted-foreground">
+                                                  已暂停生成
+                                                </div>
                                               ) : generation.status !== 'succeeded' ? (
-                                                <div className="space-y-2 rounded-lg border border-border/70 bg-background/60 p-2">
+                                                <div className="w-[min(100%,20rem)] space-y-2 rounded-lg border border-border/70 bg-background/60 p-2">
                                                   <GenerationPreview
                                                     compact
                                                     stage={generation.stage}
@@ -1485,9 +1679,9 @@ export default function AIImageStudio() {
                                       {/* biome-ignore lint/a11y/useValidAriaRole: role identifies the conversation author, not an ARIA role. */}
                                       <ConversationMessageBubble
                                         role="assistant"
-                                        content="正在生成图片"
+                                        content="我正在根据你的描述生成图片。"
                                       >
-                                        <div className="mt-3">
+                                        <div className="mt-3 w-[min(100%,20rem)]">
                                           <GenerationPreview compact stage="preparing" />
                                         </div>
                                       </ConversationMessageBubble>
@@ -1499,6 +1693,25 @@ export default function AIImageStudio() {
                           </ScrollArea>
                         </div>
                         <div className="border-t border-border bg-card p-3">
+                          {selectedSkill ? (
+                            <div className="mb-2 flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-2 text-xs text-foreground">
+                              <WandSparkles className="size-3.5 text-primary" />
+                              <span className="min-w-0 flex-1 truncate">
+                                用技能：{selectedSkill.name}
+                              </span>
+                              <Button
+                                type="button"
+                                size="icon-xs"
+                                variant="ghost"
+                                className="shrink-0"
+                                aria-label="移除当前技能"
+                                onClick={() => setSelectedSkill(null)}
+                                disabled={isBusy}
+                              >
+                                <X />
+                              </Button>
+                            </div>
+                          ) : null}
                           <Textarea
                             value={conversationInput}
                             placeholder="描述图片，或继续修改上一张结果"
@@ -1511,19 +1724,43 @@ export default function AIImageStudio() {
                                 void sendConversationMessage();
                               }
                             }}
-                            maxLength={2000}
+                            maxLength={MAX_CONVERSATION_INPUT_LENGTH}
                           />
                           <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => void clearConversationContext()}
-                              disabled={isBusy || conversationMessages.length === 0}
-                            >
-                              <Trash2 />
-                              清空上下文
-                            </Button>
+                            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                              <ModelPicker
+                                value={modelID}
+                                onValueChange={handleImageModelChange}
+                                capability="image_generation"
+                                label="图片模型"
+                                compact
+                                compactLabel="模型："
+                                compactTrigger
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSkillQuery('');
+                                  setSkillPickerOpen(true);
+                                }}
+                                disabled={isBusy}
+                              >
+                                <WandSparkles />
+                                用技能
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void clearConversationContext()}
+                                disabled={isBusy || conversationMessages.length === 0}
+                              >
+                                <Trash2 />
+                                清空上下文
+                              </Button>
+                            </div>
                             <span className="min-w-0 truncate text-xs text-muted-foreground">
                               {latestConversationGeneration
                                 ? supportsReference
@@ -1591,7 +1828,10 @@ export default function AIImageStudio() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => setPromptResourcePickerOpen(true)}
+                      onClick={() => {
+                        setPromptResourceQuery('');
+                        setPromptResourcePickerOpen(true);
+                      }}
                       disabled={isBusy}
                     >
                       <FileText />从 AI 资源选择
@@ -1692,7 +1932,13 @@ export default function AIImageStudio() {
                         {quality} · {targetSize || '由模型确定'}
                       </dd>
                     </div>
-                    <div className="col-span-2 min-w-0">
+                    <div className="min-w-0">
+                      <dt className="text-muted-foreground">服务商</dt>
+                      <dd className="mt-0.5 truncate font-medium text-foreground">
+                        {selectedModel?.provider || '尚未选择'}
+                      </dd>
+                    </div>
+                    <div className="min-w-0">
                       <dt className="text-muted-foreground">参考</dt>
                       <dd className="mt-0.5 truncate font-medium text-foreground">
                         {requestReferenceLabel}
@@ -1714,28 +1960,62 @@ export default function AIImageStudio() {
                   <section className="space-y-2.5 border-t border-border/70 pt-4">
                     <div className="flex items-center justify-between gap-3">
                       <Label htmlFor="ai-image-prompt">画面描述</Label>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={isBusy || !prompt.trim()}
-                        onClick={() => setPromptAssistantOpen(true)}
-                      >
-                        <Sparkles />
-                        AI 扩写
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSkillQuery('');
+                            setSkillPickerOpen(true);
+                          }}
+                          disabled={isBusy}
+                        >
+                          <WandSparkles />
+                          用技能
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={isBusy || !prompt.trim()}
+                          onClick={() => setPromptAssistantOpen(true)}
+                        >
+                          <Sparkles />
+                          AI 扩写
+                        </Button>
+                      </div>
                     </div>
+                    {selectedSkill ? (
+                      <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-2 text-xs text-foreground">
+                        <WandSparkles className="size-3.5 text-primary" />
+                        <span className="min-w-0 flex-1 truncate">
+                          用技能：{selectedSkill.name}
+                        </span>
+                        <Button
+                          type="button"
+                          size="icon-xs"
+                          variant="ghost"
+                          className="shrink-0"
+                          aria-label="移除当前技能"
+                          onClick={() => setSelectedSkill(null)}
+                          disabled={isBusy}
+                        >
+                          <X />
+                        </Button>
+                      </div>
+                    ) : null}
                     <Textarea
                       id="ai-image-prompt"
                       value={prompt}
                       onChange={(event) => setPrompt(event.target.value)}
                       placeholder="例如：雨后的山谷里，一间亮着暖光的木屋，远处有薄雾和松林"
                       className="min-h-28 resize-y"
-                      maxLength={2000}
+                      maxLength={MAX_IMAGE_PROMPT_LENGTH}
                       disabled={isBusy}
                     />
                     <div className="text-right text-xs text-muted-foreground">
-                      {prompt.length}/2000
+                      {prompt.length}/{MAX_IMAGE_PROMPT_LENGTH}
                     </div>
                   </section>
                 ) : null}
@@ -1806,8 +2086,9 @@ export default function AIImageStudio() {
                 <div className="space-y-2.5 border-t border-border/70 pt-4">
                   <ModelPicker
                     value={modelID}
-                    onValueChange={setModelID}
+                    onValueChange={handleImageModelChange}
                     onModelChange={setSelectedModel}
+                    onUnavailableValue={handleUnavailableImageModel}
                     capability="image_generation"
                     label="图片模型"
                     autoSelectFirst
@@ -1996,9 +2277,9 @@ export default function AIImageStudio() {
                 }
               >
                 <SelectTrigger size="sm" className="w-30" aria-label="按生成状态筛选创作历史">
-                  <SelectValue />
+                  <SelectValue>{HISTORY_STATUS_LABELS[historyStatusFilter]}</SelectValue>
                 </SelectTrigger>
-                <SelectContent align="end">
+                <SelectContent align="start">
                   <SelectItem value="all">全部状态</SelectItem>
                   <SelectItem value="succeeded">已完成</SelectItem>
                   <SelectItem value="active">生成中</SelectItem>
@@ -2009,14 +2290,14 @@ export default function AIImageStudio() {
                 value={historyModelFilter}
                 onValueChange={(value) => setHistoryFilters({ model: value || 'all' })}
               >
-                <SelectTrigger size="sm" className="w-36" aria-label="按图片模型筛选创作历史">
-                  <SelectValue />
+                <SelectTrigger size="sm" className="w-52" aria-label="按图片模型筛选创作历史">
+                  <SelectValue>{selectedHistoryModelLabel}</SelectValue>
                 </SelectTrigger>
-                <SelectContent align="end">
+                <SelectContent align="start">
                   <SelectItem value="all">全部模型</SelectItem>
-                  {historyModelOptions.map((model) => (
-                    <SelectItem key={model} value={model}>
-                      {model}
+                  {historyModelOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -2059,6 +2340,8 @@ export default function AIImageStudio() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {pagedHistory.map((generation) => {
                 const statusIsFailed = generation.status === 'failed';
+                const statusIsPaused = generation.status === 'paused';
+                const statusIsTerminal = statusIsFailed || statusIsPaused;
                 const statusIsReady = generation.status === 'succeeded' && generation.resultUrl;
                 const failureRecovery = statusIsFailed ? getGenerationRecovery(generation) : null;
                 const resultSizeText =
@@ -2081,7 +2364,7 @@ export default function AIImageStudio() {
                       {generation.resultUrl ? (
                         <button
                           type="button"
-                          className="group h-full w-full cursor-zoom-in"
+                          className="group h-full w-full cursor-zoom-in outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 focus-visible:ring-inset"
                           onClick={() =>
                             setHistoryPreview({
                               src: generation.resultUrl,
@@ -2099,7 +2382,7 @@ export default function AIImageStudio() {
                             loading="lazy"
                           />
                         </button>
-                      ) : statusIsFailed ? (
+                      ) : statusIsTerminal ? (
                         <div className="space-y-3 px-5 text-center">
                           <p
                             className={cn(
@@ -2114,7 +2397,7 @@ export default function AIImageStudio() {
                           <p className="text-xs leading-5 text-muted-foreground">
                             {statusIsFailed
                               ? generation.errorMessage || failureRecovery?.description
-                              : STATUS_LABELS[generation.status]}
+                              : '本次生成已暂停，可调整参数后再次创作。'}
                           </p>
                         </div>
                       ) : (
@@ -2242,12 +2525,12 @@ export default function AIImageStudio() {
                             onClick={() => void reuseGeneration(generation)}
                             disabled={isBusy}
                             title={
-                              statusIsFailed ? '仅恢复原参数，不会自动再次调用模型' : undefined
+                              statusIsTerminal ? '仅恢复原参数，不会自动再次调用模型' : undefined
                             }
                           >
                             <RefreshCw />
                             <span className="truncate">
-                              {statusIsFailed ? '恢复参数' : '再次创作'}
+                              {statusIsTerminal ? '恢复参数' : '再次创作'}
                             </span>
                           </Button>
                           <DropdownMenu>
@@ -2437,8 +2720,19 @@ export default function AIImageStudio() {
         <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl">
           <DialogHeader className="border-b border-border px-5 py-4 pr-12">
             <DialogTitle>选择提示词资源</DialogTitle>
-            <DialogDescription>选择后填入当前画面描述。</DialogDescription>
+            <DialogDescription>生图标签优先展示，其他提示词仍可选择。</DialogDescription>
           </DialogHeader>
+          <div className="border-b border-border p-4">
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={promptResourceQuery}
+                onChange={(event) => setPromptResourceQuery(event.target.value)}
+                className="pl-9"
+                placeholder="搜索名称、描述或标签"
+              />
+            </div>
+          </div>
           <ScrollArea className="max-h-[min(32rem,70vh)]">
             <div className="space-y-2 p-4">
               {promptResourcesLoading ? (
@@ -2447,13 +2741,15 @@ export default function AIImageStudio() {
                   <Skeleton className="h-24 w-full" />
                   <Skeleton className="h-24 w-full" />
                 </>
-              ) : promptResources.length === 0 ? (
+              ) : visiblePromptResources.length === 0 ? (
                 <div className="py-10 text-center">
                   <FileText className="mx-auto size-7 text-muted-foreground" />
-                  <p className="mt-3 text-sm font-medium">还没有可用提示词</p>
+                  <p className="mt-3 text-sm font-medium">
+                    {promptResources.length === 0 ? '还没有可用提示词' : '没有匹配的提示词'}
+                  </p>
                 </div>
               ) : (
-                promptResources.map((promptResource) => (
+                visiblePromptResources.map((promptResource) => (
                   <Button
                     key={promptResource.id}
                     type="button"
@@ -2463,8 +2759,13 @@ export default function AIImageStudio() {
                     disabled={isBusy}
                   >
                     <span className="min-w-0 space-y-1 text-left">
-                      <span className="block truncate text-sm font-medium text-foreground">
-                        {promptResource.name}
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                          {promptResource.name}
+                        </span>
+                        {promptResource.tags.includes('生图') ? (
+                          <Badge variant="secondary">推荐</Badge>
+                        ) : null}
                       </span>
                       {promptResource.description ? (
                         <span className="block truncate text-xs text-muted-foreground">
@@ -2474,6 +2775,18 @@ export default function AIImageStudio() {
                       <span className="block line-clamp-2 whitespace-pre-wrap text-xs leading-5 text-muted-foreground">
                         {promptResource.content}
                       </span>
+                      <span className="flex flex-wrap items-center gap-1 pt-1">
+                        {promptResource.tags.slice(0, 4).map((tag) => (
+                          <Badge key={tag} variant="outline">
+                            {tag}
+                          </Badge>
+                        ))}
+                        {promptResource.sourceUrl ? (
+                          <span className="ml-auto text-[11px] text-muted-foreground">
+                            GitHub · {promptResource.sourceAuthor || '链接导入'}
+                          </span>
+                        ) : null}
+                      </span>
                     </span>
                   </Button>
                 ))
@@ -2482,6 +2795,112 @@ export default function AIImageStudio() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+      <Dialog open={skillPickerOpen} onOpenChange={setSkillPickerOpen}>
+        <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl">
+          <DialogHeader className="border-b border-border px-5 py-4 pr-12">
+            <DialogTitle>用技能生成</DialogTitle>
+            <DialogDescription>
+              选择已安装技能。它会在生成时应用，不会写入画面描述。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="border-b border-border p-4">
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={skillQuery}
+                onChange={(event) => setSkillQuery(event.target.value)}
+                className="pl-9"
+                placeholder="搜索已安装技能"
+              />
+            </div>
+          </div>
+          <ScrollArea className="max-h-[min(28rem,65vh)]">
+            <div className="space-y-2 p-4">
+              {skillsLoading ? (
+                <>
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                </>
+              ) : visibleSkills.length === 0 ? (
+                <div className="py-10 text-center">
+                  <WandSparkles className="mx-auto size-7 text-muted-foreground" />
+                  <p className="mt-3 text-sm font-medium">
+                    {skills.length === 0 ? '还没有已安装技能' : '没有匹配的技能'}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">可在 AI 资源的“技能”页安装。</p>
+                </div>
+              ) : (
+                visibleSkills.map((skill) => (
+                  <Button
+                    key={skill.id}
+                    type="button"
+                    variant={selectedSkill?.id === skill.id ? 'secondary' : 'outline'}
+                    aria-pressed={selectedSkill?.id === skill.id}
+                    className="h-auto w-full items-start justify-start px-3 py-2.5 text-left font-normal !whitespace-normal"
+                    onClick={() => selectSkill(skill)}
+                    disabled={isBusy}
+                  >
+                    <span className="flex min-w-0 flex-1 items-start gap-3 text-left">
+                      <WandSparkles className="mt-0.5 size-4 shrink-0 text-primary" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-foreground">
+                          {skill.name}
+                        </span>
+                        <span
+                          className="mt-1 block overflow-hidden !whitespace-normal break-words text-xs leading-5 text-muted-foreground"
+                          style={{
+                            display: '-webkit-box',
+                            WebkitBoxOrient: 'vertical',
+                            WebkitLineClamp: 2,
+                          }}
+                        >
+                          {skill.description || '未提供技能说明'}
+                        </span>
+                      </span>
+                    </span>
+                    {selectedSkill?.id === skill.id ? (
+                      <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-label="已选中" />
+                    ) : null}
+                  </Button>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog
+        open={Boolean(pendingPromptResource)}
+        onOpenChange={(open) => {
+          if (!open) setPendingPromptResource(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>填入提示词</AlertDialogTitle>
+            <AlertDialogDescription>
+              当前已有画面描述，请选择如何填入“{pendingPromptResource?.name}”。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (pendingPromptResource) commitPromptResource(pendingPromptResource, 'append');
+              }}
+            >
+              追加
+            </Button>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingPromptResource) commitPromptResource(pendingPromptResource, 'replace');
+              }}
+            >
+              替换
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <PromptAssistantDialog
         open={promptAssistantOpen}
         onOpenChange={setPromptAssistantOpen}
@@ -2607,7 +3026,7 @@ export default function AIImageStudio() {
                 {historyDetailTarget.resultUrl ? (
                   <button
                     type="button"
-                    className="group relative block w-full overflow-hidden rounded-lg border border-border bg-muted/30"
+                    className="group relative block w-full overflow-hidden rounded-lg border border-border bg-muted/30 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     onClick={() =>
                       setHistoryPreview({
                         src: historyDetailTarget.resultUrl,
@@ -2690,6 +3109,7 @@ export default function AIImageStudio() {
                         historyDetailTarget.presetId ||
                         '未记录',
                     },
+                    { label: '技能', value: historyDetailTarget.skillName || '未使用' },
                     { label: '参考内容', value: `${historyDetailTarget.referenceCount} 项` },
                     { label: '文件大小', value: formatByteSize(historyDetailTarget.resultSize) },
                   ].map((item) => (
@@ -2723,9 +3143,13 @@ export default function AIImageStudio() {
                         : '尚未完成'}
                     </span>
                   </div>
-                  {historyDetailTarget.status === 'failed' ? (
+                  {historyDetailTarget.status === 'failed' ||
+                  historyDetailTarget.status === 'paused' ? (
                     <div className="border-t border-border pt-2 text-muted-foreground">
-                      {historyDetailTarget.errorMessage || '本次生成未完成，可恢复参数后再次提交。'}
+                      {historyDetailTarget.status === 'paused'
+                        ? '本次生成已暂停，可恢复参数后再次提交。'
+                        : historyDetailTarget.errorMessage ||
+                          '本次生成未完成，可恢复参数后再次提交。'}
                     </div>
                   ) : null}
                 </div>

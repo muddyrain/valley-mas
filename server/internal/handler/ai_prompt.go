@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"valley-server/internal/database"
 	"valley-server/internal/model"
@@ -13,19 +15,25 @@ import (
 )
 
 type aiPromptPayload struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Content     string `json:"content"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Content     string   `json:"content"`
+	Tags        []string `json:"tags"`
 }
 
 type aiPromptView struct {
-	ID          model.Int64String `json:"id"`
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	Content     string            `json:"content"`
-	ArchivedAt  *time.Time        `json:"archivedAt,omitempty"`
-	CreatedAt   time.Time         `json:"createdAt"`
-	UpdatedAt   time.Time         `json:"updatedAt"`
+	ID            model.Int64String `json:"id"`
+	Name          string            `json:"name"`
+	Description   string            `json:"description"`
+	Content       string            `json:"content"`
+	Tags          []string          `json:"tags"`
+	SourceURL     string            `json:"sourceUrl,omitempty"`
+	SourceAuthor  string            `json:"sourceAuthor,omitempty"`
+	SourceLicense string            `json:"sourceLicense,omitempty"`
+	ImportedAt    *time.Time        `json:"importedAt,omitempty"`
+	ArchivedAt    *time.Time        `json:"archivedAt,omitempty"`
+	CreatedAt     time.Time         `json:"createdAt"`
+	UpdatedAt     time.Time         `json:"updatedAt"`
 }
 
 func normalizeAIPromptPayload(payload aiPromptPayload) (aiPromptPayload, error) {
@@ -41,11 +49,61 @@ func normalizeAIPromptPayload(payload aiPromptPayload) (aiPromptPayload, error) 
 	if payload.Content == "" {
 		return aiPromptPayload{}, errors.New("提示词不能为空")
 	}
+	tags, err := normalizeAIPromptTags(payload.Tags)
+	if err != nil {
+		return aiPromptPayload{}, err
+	}
+	payload.Tags = tags
 	return payload, nil
 }
 
+func normalizeAIPromptTags(values []string) ([]string, error) {
+	result := make([]string, 0, min(len(values), 8))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if utf8.RuneCountInString(value) > 20 {
+			return nil, errors.New("单个标签不能超过 20 个字符")
+		}
+		key := strings.ToLower(value)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, value)
+		if len(result) > 8 {
+			return nil, errors.New("最多添加 8 个标签")
+		}
+	}
+	return result, nil
+}
+
+func encodeAIPromptTags(tags []string) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	encoded, _ := json.Marshal(tags)
+	return string(encoded)
+}
+
+func decodeAIPromptTags(value string) []string {
+	var tags []string
+	if json.Unmarshal([]byte(value), &tags) != nil {
+		return []string{}
+	}
+	return tags
+}
+
 func viewAIPrompt(prompt model.AIPrompt) aiPromptView {
-	return aiPromptView{ID: prompt.ID, Name: prompt.Name, Description: prompt.Description, Content: prompt.Content, ArchivedAt: prompt.ArchivedAt, CreatedAt: prompt.CreatedAt, UpdatedAt: prompt.UpdatedAt}
+	return aiPromptView{
+		ID: prompt.ID, Name: prompt.Name, Description: prompt.Description, Content: prompt.Content,
+		Tags: decodeAIPromptTags(prompt.Tags), SourceURL: prompt.SourceURL, SourceAuthor: prompt.SourceAuthor,
+		SourceLicense: prompt.SourceLicense, ImportedAt: prompt.ImportedAt, ArchivedAt: prompt.ArchivedAt,
+		CreatedAt: prompt.CreatedAt, UpdatedAt: prompt.UpdatedAt,
+	}
 }
 
 func loadOwnedAIPrompt(c *gin.Context, userID model.Int64String) (model.AIPrompt, bool) {
@@ -98,7 +156,10 @@ func CreateAIPrompt(c *gin.Context) {
 		Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	prompt := model.AIPrompt{UserID: userID, Name: payload.Name, Description: payload.Description, Content: payload.Content}
+	prompt := model.AIPrompt{
+		UserID: userID, Name: payload.Name, Description: payload.Description,
+		Content: payload.Content, Tags: encodeAIPromptTags(payload.Tags),
+	}
 	if err := database.GetDB().Create(&prompt).Error; err != nil {
 		Error(c, http.StatusInternalServerError, "创建提示词失败")
 		return
@@ -141,7 +202,10 @@ func UpdateAIPrompt(c *gin.Context) {
 		Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := database.GetDB().Model(&prompt).Updates(map[string]any{"name": payload.Name, "description": payload.Description, "content": payload.Content}).Error; err != nil {
+	if err := database.GetDB().Model(&prompt).Updates(map[string]any{
+		"name": payload.Name, "description": payload.Description,
+		"content": payload.Content, "tags": encodeAIPromptTags(payload.Tags),
+	}).Error; err != nil {
 		Error(c, http.StatusInternalServerError, "保存提示词失败")
 		return
 	}

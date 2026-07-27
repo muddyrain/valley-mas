@@ -110,7 +110,7 @@ func imageAdapterFor(provider, protocol string) (imageProviderAdapter, error) {
 		switch provider {
 		case "siliconflow":
 			protocol = "siliconflow_images"
-		case "amux":
+		case "amux", "pipixia":
 			protocol = "openai_images"
 		case "ark":
 			protocol = "ark_images"

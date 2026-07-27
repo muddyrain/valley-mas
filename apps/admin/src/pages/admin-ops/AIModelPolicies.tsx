@@ -20,6 +20,7 @@ import {
   type AdminAIModel,
   type AdminAIModelInput,
   type AIModelCapability,
+  type AIModelProvider,
   createAIModel,
   listAIModels,
   previewAIProviderModels,
@@ -68,6 +69,7 @@ export default function AIModelPolicies() {
   const [modelForm] = Form.useForm<ModelForm>();
   const selectedCapabilities = Form.useWatch('capabilities', modelForm) || [];
   const probesImageGeneration = selectedCapabilities.includes('image_generation');
+  const isEmbeddingModel = selectedCapabilities.includes('embedding');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -152,6 +154,11 @@ export default function AIModelPolicies() {
         <div className="text-xs text-gray-500">
           <div>上下文：{formatTokenLimit(item.contextWindowTokens)}</div>
           <div>最大输出：{formatTokenLimit(item.maxOutputTokens)}</div>
+          {item.capabilities.includes('embedding') ? (
+            <div>
+              向量维度：{item.embeddingDimension ? `${item.embeddingDimension} 维` : '未配置'}
+            </div>
+          ) : null}
         </div>
       ),
     },
@@ -231,7 +238,7 @@ export default function AIModelPolicies() {
     }
   };
 
-  const preview = async (provider: 'siliconflow' | 'amux') => {
+  const preview = async (provider: AIModelProvider) => {
     const result = await previewAIProviderModels(provider);
     Modal.info({
       title: `${provider} 模型预览`,
@@ -270,6 +277,7 @@ export default function AIModelPolicies() {
           <Space>
             <Button onClick={() => void preview('siliconflow')}>预览 SiliconFlow</Button>
             <Button onClick={() => void preview('amux')}>预览 Amux</Button>
+            <Button onClick={() => void preview('pipixia')}>预览 pipixia</Button>
           </Space>
         }
       >
@@ -295,6 +303,7 @@ export default function AIModelPolicies() {
               options={[
                 { value: 'siliconflow', label: 'SiliconFlow' },
                 { value: 'amux', label: 'Amux' },
+                { value: 'pipixia', label: 'pipixia' },
                 { value: 'ark', label: 'ARK（仅 Legacy）' },
               ]}
             />
@@ -320,9 +329,22 @@ export default function AIModelPolicies() {
                     values.filter((value) => value !== 'reference_image'),
                   );
                 }
+                if (!values.includes('embedding')) {
+                  modelForm.setFieldValue('embeddingDimension', undefined);
+                }
               }}
             />
           </Form.Item>
+          {isEmbeddingModel ? (
+            <Form.Item
+              name="embeddingDimension"
+              label="向量维度"
+              rules={[{ required: true, message: '请填写向量模型的输出维度' }]}
+              extra="填写模型每条输出向量的长度，例如 384、768 或 1024。"
+            >
+              <InputNumber className="w-full" min={1} precision={0} placeholder="例如 1024" />
+            </Form.Item>
+          ) : null}
           {probesImageGeneration ? (
             <Form.Item
               name="imageProtocol"

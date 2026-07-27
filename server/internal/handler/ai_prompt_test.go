@@ -2,9 +2,12 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"valley-server/internal/config"
@@ -46,6 +49,8 @@ func setupAIPromptTestRouter(t *testing.T) *gin.Engine {
 	auth.Use(middleware.Auth(&config.Config{JWT: config.JWTConfig{Secret: workflowRuntimeTestSecret}}))
 	auth.GET("/prompts", ListAIPrompts)
 	auth.POST("/prompts", CreateAIPrompt)
+	auth.POST("/prompts/import-preview", PreviewAIPromptImport)
+	auth.POST("/prompts/import", CreateImportedAIPrompt)
 	auth.GET("/prompts/:promptId", GetAIPrompt)
 	auth.PATCH("/prompts/:promptId", UpdateAIPrompt)
 	auth.DELETE("/prompts/:promptId", ArchiveAIPrompt)
@@ -90,11 +95,13 @@ func TestAIPromptStoresSimpleLibraryEntryAndArchivesPerOwner(t *testing.T) {
 		Name:        "内容摘要",
 		Description: "生成简明摘要",
 		Content:     "你是一名编辑，请用三点概括输入内容。",
+		Tags:        []string{"通用", "写作", "通用"},
 	}
 	createRecorder := httptest.NewRecorder()
 	router.ServeHTTP(createRecorder, aiPromptRequest(t, http.MethodPost, "/ai/prompts", "101", create))
 	prompt := decodeAIPromptData[aiPromptView](t, createRecorder)
-	if prompt.ID == 0 || prompt.Content != create.Content {
+	if prompt.ID == 0 || prompt.Content != create.Content ||
+		len(prompt.Tags) != 2 || prompt.Tags[0] != "通用" || prompt.SourceURL != "" || prompt.ImportedAt != nil {
 		t.Fatalf("created prompt=%+v", prompt)
 	}
 
@@ -128,6 +135,113 @@ func TestAIPromptStoresSimpleLibraryEntryAndArchivesPerOwner(t *testing.T) {
 	}](t, listRecorder).List
 	if len(list) != 0 {
 		t.Fatalf("archived prompt must not be in default list: %+v", list)
+	}
+}
+
+func TestAIPromptImportPreviewsAndStoresRawSkill(t *testing.T) {
+	router := setupAIPromptTestRouter(t)
+	previousFetch := fetchAIPromptImportSource
+	skillContent := strings.TrimSpace(
+		"# Minimal Zine\n\n" + strings.Repeat("Preserve the complete visual rule set.\n", 100),
+	)
+	fetchAIPromptImportSource = func(context.Context, string) (aiPromptImportSource, error) {
+		return aiPromptImportSource{
+			Name: "minimal-zine", Content: skillContent,
+			URL: "https://github.com/example/minimal-zine", Author: "example",
+		}, nil
+	}
+	t.Cleanup(func() {
+		fetchAIPromptImportSource = previousFetch
+	})
+
+	previewRecorder := httptest.NewRecorder()
+	router.ServeHTTP(previewRecorder, aiPromptRequest(t, http.MethodPost, "/ai/prompts/import-preview", "101", aiPromptImportPreviewRequest{
+		URL: "https://github.com/example/minimal-zine",
+	}))
+	preview := decodeAIPromptData[aiPromptImportDraft](t, previewRecorder)
+	if preview.Name != "minimal-zine" || preview.Content != skillContent ||
+		preview.Description != "" || len(preview.Tags) != 0 ||
+		preview.SourceAuthor != "example" || preview.SourceLicense != "" {
+		t.Fatalf("preview=%+v", preview)
+	}
+
+	importRecorder := httptest.NewRecorder()
+	router.ServeHTTP(importRecorder, aiPromptRequest(t, http.MethodPost, "/ai/prompts/import", "101", aiPromptImportPayload{
+		Name: preview.Name, Description: preview.Description, Content: preview.Content, Tags: preview.Tags,
+		SourceURL: preview.SourceURL, SourceAuthor: preview.SourceAuthor, SourceLicense: preview.SourceLicense,
+	}))
+	prompt := decodeAIPromptData[aiPromptView](t, importRecorder)
+	if prompt.SourceURL != preview.SourceURL || prompt.SourceAuthor != "example" ||
+		prompt.Content != skillContent || prompt.SourceLicense != "" || prompt.ImportedAt == nil {
+		t.Fatalf("imported prompt=%+v", prompt)
+	}
+}
+
+func TestNormalizeGitHubRepositoryURLRejectsOtherHosts(t *testing.T) {
+	if _, _, _, err := normalizeGitHubRepositoryURL("https://example.com/owner/repo"); err == nil {
+		t.Fatal("expected non-GitHub URL to be rejected")
+	}
+	canonical, owner, repository, err := normalizeGitHubRepositoryURL("https://github.com/owner/repo/tree/main")
+	if err != nil || canonical != "https://github.com/owner/repo" || owner != "owner" || repository != "repo" {
+		t.Fatalf("normalized=%q owner=%q repository=%q err=%v", canonical, owner, repository, err)
+	}
+}
+
+type aiPromptImportRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (roundTrip aiPromptImportRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return roundTrip(request)
+}
+
+func TestFetchGitHubAIPromptImportSourceReadsOnlyRawHeadSkill(t *testing.T) {
+	previousClient := promptImportHTTPClient
+	requestCount := 0
+	promptImportHTTPClient = &http.Client{Transport: aiPromptImportRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		requestCount++
+		status := http.StatusTeapot
+		body := "unexpected request"
+		if request.URL.Host == "raw.githubusercontent.com" &&
+			request.URL.Path == "/owner/minimal-zine/HEAD/SKILL.md" {
+			status = http.StatusOK
+			body = "# Minimal Zine\nGenerate a sparse paper poster."
+		}
+		return &http.Response{
+			StatusCode: status,
+			Body:       io.NopCloser(strings.NewReader(body)),
+			Header:     make(http.Header),
+		}, nil
+	})}
+	t.Cleanup(func() {
+		promptImportHTTPClient = previousClient
+	})
+
+	source, err := fetchGitHubAIPromptImportSource(context.Background(), "https://github.com/owner/minimal-zine")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requestCount != 1 || source.Name != "minimal-zine" || source.Author != "owner" ||
+		source.URL != "https://github.com/owner/minimal-zine" ||
+		!strings.Contains(source.Content, "Generate a sparse paper poster.") {
+		t.Fatalf("source=%+v", source)
+	}
+}
+
+func TestFetchGitHubAIPromptImportSourceReportsMissingRootSkill(t *testing.T) {
+	previousClient := promptImportHTTPClient
+	promptImportHTTPClient = &http.Client{Transport: aiPromptImportRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusNotFound,
+			Body:       io.NopCloser(strings.NewReader(`{"message":"Not Found"}`)),
+			Header:     make(http.Header),
+		}, nil
+	})}
+	t.Cleanup(func() {
+		promptImportHTTPClient = previousClient
+	})
+
+	_, err := fetchGitHubAIPromptImportSource(context.Background(), "https://github.com/owner/minimal-zine")
+	if err == nil || !strings.Contains(err.Error(), "仓库根目录的 SKILL.md") {
+		t.Fatalf("err=%v", err)
 	}
 }
 

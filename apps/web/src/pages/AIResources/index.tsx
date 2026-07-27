@@ -3,19 +3,23 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import KnowledgeBases from '@/pages/KnowledgeBases';
 import Workflows from '@/pages/Workflows';
 import PromptResources from './PromptResources';
+import SkillResources from './SkillResources';
 import ToolResources from './ToolResources';
 
 const tabs = [
   { value: 'workflows', label: '工作流', disabled: false },
   { value: 'knowledge', label: '知识库', disabled: false },
   { value: 'prompts', label: '提示词', disabled: false },
+  { value: 'skills', label: '技能', disabled: false },
   { value: 'tools', label: '工具', disabled: false },
 ] as const;
 
 type ResourceTab = (typeof tabs)[number]['value'];
 
 function parseResourceTab(value: string | null): ResourceTab {
-  return value === 'knowledge' || value === 'prompts' || value === 'tools' ? value : 'workflows';
+  return value === 'knowledge' || value === 'prompts' || value === 'skills' || value === 'tools'
+    ? value
+    : 'workflows';
 }
 
 export default function AIResources() {
@@ -59,6 +63,8 @@ export default function AIResources() {
             <KnowledgeBases embedded />
           ) : activeTab === 'prompts' ? (
             <PromptResources />
+          ) : activeTab === 'skills' ? (
+            <SkillResources />
           ) : activeTab === 'tools' ? (
             <ToolResources />
           ) : (

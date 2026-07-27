@@ -104,6 +104,33 @@ func TestAmuxImageAdapterUsesSizeAndAcceptsBase64Result(t *testing.T) {
 	}
 }
 
+func TestPipixiaAutoImageProtocolUsesOpenAIImagesContract(t *testing.T) {
+	var payload map[string]any
+	client := NewProviderCompatibleClient("pipixia", "https://provider.test/v1", "test-key", time.Second)
+	client.Client.Transport = roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"data":[{"url":"https://example.com/pipixia.png"}]}`)),
+			Request:    request,
+		}, nil
+	})
+	result, err := client.GenerateImageResult(context.Background(), ImageGenerationRequest{
+		ModelID: "gpt-image-2",
+		Prompt:  "draw a cat",
+		Size:    "1024x1024",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Source != "https://example.com/pipixia.png" || payload["size"] != "1024x1024" {
+		t.Fatalf("unexpected pipixia image result: source=%q payload=%#v", result.Source, payload)
+	}
+}
+
 func TestImageProtocolOverrideSelectsConfiguredAdapter(t *testing.T) {
 	var payload map[string]any
 	client := NewProviderCompatibleClient("amux", "https://provider.test/v1", "test-key", time.Second)

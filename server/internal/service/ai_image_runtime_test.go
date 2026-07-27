@@ -8,6 +8,7 @@ import (
 	"errors"
 	"image"
 	"image/png"
+	"strings"
 	"testing"
 	"time"
 	"valley-server/internal/aiclient"
@@ -46,16 +47,19 @@ func testImageInvocation() aimodel.Invocation {
 
 func TestAIImageGenerationServiceGeneratePersistsStoredResult(t *testing.T) {
 	db := newAIImageRuntimeTestDB(t)
+	prompt := strings.Repeat("complete imported skill content\n", 500)
 	imageBytes, err := base64.StdEncoding.DecodeString(onePixelPNGBase64)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var usages []aiusage.Entry
+	var generatedPrompt string
 	service := NewAIImageGenerationService(db)
 	service.resolve = func(*gorm.DB, string, string, time.Duration) (aimodel.Invocation, error) {
 		return testImageInvocation(), nil
 	}
-	service.generate = func(context.Context, aimodel.Invocation, aiclient.ImageGenerationRequest) (string, error) {
+	service.generate = func(_ context.Context, _ aimodel.Invocation, request aiclient.ImageGenerationRequest) (string, error) {
+		generatedPrompt = request.Prompt
 		return AIImageDataURL(imageBytes, "image/png"), nil
 	}
 	service.upload = func(_ context.Context, _ model.Int64String, _, filename string, content []byte) (*UploadResult, error) {
@@ -66,9 +70,11 @@ func TestAIImageGenerationServiceGeneratePersistsStoredResult(t *testing.T) {
 	service.storageAvailable = func() bool { return true }
 	service.recordUsage = func(entry aiusage.Entry) { usages = append(usages, entry) }
 
+	skillID := model.Int64String(11)
 	result, err := service.Generate(context.Background(), AIImageGenerationInput{
 		UserID: 1, ModelID: "7", PresetID: "free", PresetName: "自由创作",
-		PresetPrompt: "生成完整图片", Prompt: "山谷里的图书馆", AspectRatio: "1:1", Quality: "1K",
+		PresetPrompt: "生成完整图片", SkillID: &skillID, SkillName: "极简海报",
+		SkillContent: "优先留白与旧纸张质感", Prompt: prompt, AspectRatio: "1:1", Quality: "1K",
 		Feature: "workflow-image-generation",
 	})
 	if err != nil {
@@ -80,8 +86,71 @@ func TestAIImageGenerationServiceGeneratePersistsStoredResult(t *testing.T) {
 	if result.ResultWidth != 1 || result.ResultHeight != 1 || result.ModelCatalogID != 7 {
 		t.Fatalf("generation metadata was not persisted: %+v", result)
 	}
+	if result.Prompt != strings.TrimSpace(prompt) {
+		t.Fatalf("complete imported prompt was not preserved: got %d chars", len(result.Prompt))
+	}
+	if result.SkillID == nil || *result.SkillID != skillID || result.SkillName != "极简海报" {
+		t.Fatalf("selected skill was not persisted: %+v", result)
+	}
+	if !strings.Contains(generatedPrompt, "优先留白与旧纸张质感") || !strings.Contains(generatedPrompt, strings.TrimSpace(prompt)) {
+		t.Fatalf("skill and user prompt must both reach image model: %s", generatedPrompt)
+	}
 	if len(usages) != 1 || usages[0].Feature != "workflow-image-generation" || usages[0].Status != aiusage.StatusSuccess {
 		t.Fatalf("unexpected usage audit: %+v", usages)
+	}
+}
+
+func TestAIImageGenerationServicePauseCancelsActiveRequest(t *testing.T) {
+	db := newAIImageRuntimeTestDB(t)
+	started := make(chan struct{})
+	finished := make(chan struct{})
+	service := NewAIImageGenerationService(db)
+	service.resolve = func(*gorm.DB, string, string, time.Duration) (aimodel.Invocation, error) {
+		return testImageInvocation(), nil
+	}
+	service.generate = func(ctx context.Context, _ aimodel.Invocation, _ aiclient.ImageGenerationRequest) (string, error) {
+		close(started)
+		<-ctx.Done()
+		return "", ctx.Err()
+	}
+	service.storageAvailable = func() bool { return true }
+	service.enqueue = func(run func()) {
+		go func() {
+			defer close(finished)
+			run()
+		}()
+	}
+
+	generation, err := service.Queue(context.Background(), AIImageGenerationInput{
+		UserID: 1, ModelID: "7", Prompt: "暂停中的图片", AspectRatio: "1:1", Quality: "1K",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("image generation did not start")
+	}
+	if err := db.Model(&model.AIImageGeneration{}).Where("id = ?", generation.ID).Updates(map[string]any{
+		"status": "paused", "stage": "completed", "error_code": "GENERATION_PAUSED",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !CancelAIImageGeneration(generation.ID) {
+		t.Fatal("expected active image generation to receive cancel signal")
+	}
+	select {
+	case <-finished:
+	case <-time.After(time.Second):
+		t.Fatal("paused image generation did not stop")
+	}
+	var paused model.AIImageGeneration
+	if err := db.First(&paused, generation.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if paused.Status != "paused" || paused.ErrorCode != "GENERATION_PAUSED" {
+		t.Fatalf("pause state was overwritten: %+v", paused)
 	}
 }
 

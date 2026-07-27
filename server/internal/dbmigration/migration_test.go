@@ -30,7 +30,7 @@ func TestManagedDialectsHaveMatchingVersions(t *testing.T) {
 		t.Fatal("expected embedded managed migrations")
 	}
 	latestVersion := versionsByDriver["postgres"][len(versionsByDriver["postgres"])-1]
-	if latestVersion != 202607260011 {
+	if latestVersion != 202607270004 {
 		t.Fatalf("unexpected latest managed migration version: %d", latestVersion)
 	}
 }
@@ -38,7 +38,7 @@ func TestManagedDialectsHaveMatchingVersions(t *testing.T) {
 func TestApplyPendingSkipsUpWhenCurrent(t *testing.T) {
 	migrationProvider := &fakeProvider{
 		pending: false,
-		version: 202607260011,
+		version: 202607270001,
 	}
 
 	summary, err := applyPending(context.Background(), migrationProvider)
@@ -56,7 +56,7 @@ func TestApplyPendingSkipsUpWhenCurrent(t *testing.T) {
 func TestApplyPendingReturnsAppliedVersions(t *testing.T) {
 	migrationProvider := &fakeProvider{
 		pending: true,
-		version: 202607260011,
+		version: 202607270001,
 		results: []*goose.MigrationResult{
 			{Source: &goose.Source{Version: 202607260008, Path: "extend_workflow_triggers.sql"}},
 			{Source: &goose.Source{Version: 202607260009, Path: "ensure_knowledge_embedding.sql"}},

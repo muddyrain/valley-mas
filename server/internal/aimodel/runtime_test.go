@@ -147,6 +147,28 @@ func TestResolveInvocationUsesCatalogProvider(t *testing.T) {
 	}
 }
 
+func TestProviderFromEnvUsesPipixiaCompatibleConfig(t *testing.T) {
+	t.Setenv("PIPIXIA_API_KEY", "test-key")
+	t.Setenv("PIPIXIA_BASE_URL", "https://pipixia.example/v1/")
+
+	provider, err := ProviderFromEnv("pipixia")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider.Provider != "pipixia" || provider.APIKey != "test-key" || provider.BaseURL != "https://pipixia.example/v1" {
+		t.Fatalf("unexpected pipixia provider config: %+v", provider)
+	}
+}
+
+func TestProviderFromEnvRequiresPipixiaBaseURL(t *testing.T) {
+	t.Setenv("PIPIXIA_API_KEY", "test-key")
+	t.Setenv("PIPIXIA_BASE_URL", "")
+
+	if _, err := ProviderFromEnv("pipixia"); err == nil {
+		t.Fatal("expected missing PIPIXIA_BASE_URL error")
+	}
+}
+
 func TestFindFastTextModelUsesLowestDeclaredContextWindow(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {

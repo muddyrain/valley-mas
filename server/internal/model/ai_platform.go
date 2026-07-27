@@ -314,19 +314,23 @@ type AIKnowledgeBase struct {
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-// AIPrompt is an owner-scoped reusable prompt-library entry. It deliberately
-// stores one editable body: prompt resources are text snippets, not runnable
-// applications with draft, publish, or version lifecycles.
+// AIPrompt is an owner-scoped reusable prompt-library entry. Its content is
+// directly reusable text, separate from installed AI skills.
 type AIPrompt struct {
-	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID      Int64String    `gorm:"index;not null" json:"userId"`
-	Name        string         `gorm:"size:100;not null" json:"name"`
-	Description string         `gorm:"size:500" json:"description"`
-	Content     string         `gorm:"type:text;not null;default:''" json:"content"`
-	ArchivedAt  *time.Time     `gorm:"index" json:"archivedAt,omitempty"`
-	CreatedAt   time.Time      `json:"createdAt"`
-	UpdatedAt   time.Time      `json:"updatedAt"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID        Int64String    `gorm:"index;not null" json:"userId"`
+	Name          string         `gorm:"size:100;not null" json:"name"`
+	Description   string         `gorm:"size:500" json:"description"`
+	Content       string         `gorm:"type:text;not null;default:''" json:"content"`
+	Tags          string         `gorm:"type:text" json:"-"`
+	SourceURL     string         `gorm:"size:1000" json:"sourceUrl,omitempty"`
+	SourceAuthor  string         `gorm:"size:200" json:"sourceAuthor,omitempty"`
+	SourceLicense string         `gorm:"size:100" json:"sourceLicense,omitempty"`
+	ImportedAt    *time.Time     `json:"importedAt,omitempty"`
+	ArchivedAt    *time.Time     `gorm:"index" json:"archivedAt,omitempty"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (p *AIPrompt) BeforeCreate(tx *gorm.DB) error {
@@ -337,6 +341,38 @@ func (p *AIPrompt) BeforeCreate(tx *gorm.DB) error {
 }
 
 func (AIPrompt) TableName() string { return "ai_prompts" }
+
+// AISkill is an owner-scoped installed instruction bundle. The complete
+// SKILL.md body remains server-side and is only applied when the user chooses
+// the skill for a supported capability.
+type AISkill struct {
+	ID               Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID           Int64String    `gorm:"index;not null" json:"userId"`
+	Name             string         `gorm:"size:100;not null" json:"name"`
+	Description      string         `gorm:"size:500" json:"description"`
+	Content          string         `gorm:"type:text;not null" json:"-"`
+	ReferenceContent string         `gorm:"type:text;not null;default:''" json:"-"`
+	SourceURL        string         `gorm:"size:1000;not null" json:"sourceUrl"`
+	SourceAuthor     string         `gorm:"size:200" json:"sourceAuthor"`
+	SourceLicense    string         `gorm:"size:100" json:"sourceLicense"`
+	InstalledAt      time.Time      `gorm:"not null" json:"installedAt"`
+	ArchivedAt       *time.Time     `gorm:"index" json:"archivedAt,omitempty"`
+	CreatedAt        time.Time      `json:"createdAt"`
+	UpdatedAt        time.Time      `json:"updatedAt"`
+	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (s *AISkill) BeforeCreate(tx *gorm.DB) error {
+	if s.ID == 0 {
+		s.ID = Int64String(utils.GenerateID())
+	}
+	if s.InstalledAt.IsZero() {
+		s.InstalledAt = time.Now()
+	}
+	return nil
+}
+
+func (AISkill) TableName() string { return "ai_skills" }
 
 func (k *AIKnowledgeBase) BeforeCreate(tx *gorm.DB) error {
 	if k.ID == 0 {

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"valley-server/internal/service"
 )
 
 const onePixelPNGBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
@@ -70,7 +72,7 @@ func TestAIImageGenerationDeletableStatuses(t *testing.T) {
 			t.Fatalf("status %q should not be deletable", status)
 		}
 	}
-	for _, status := range []string{"succeeded", "failed"} {
+	for _, status := range []string{"succeeded", "failed", "paused"} {
 		if !isAIImageGenerationDeletable(status) {
 			t.Fatalf("status %q should be deletable", status)
 		}
@@ -148,6 +150,16 @@ func TestBuildAIImagePromptKeepsPresetAndSafetyConstraints(t *testing.T) {
 	for _, expected := range []string{"主题封面", "漂浮在云海里的图书馆", "Do not add a watermark"} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("prompt must contain %q: %s", expected, prompt)
+		}
+	}
+}
+
+func TestBuildAIImagePromptAppliesSkillWithoutReplacingUserDescription(t *testing.T) {
+	preset, _ := findAIImagePreset("free")
+	prompt := service.BuildAIImagePrompt(preset.PromptContent, "优先留白与旧纸张质感", "雨天的极简海报", false)
+	for _, expected := range []string{"优先留白与旧纸张质感", "雨天的极简海报", "Apply the selected image skill"} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("skill prompt must contain %q: %s", expected, prompt)
 		}
 	}
 }

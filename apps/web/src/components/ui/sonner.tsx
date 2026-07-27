@@ -8,12 +8,15 @@ import {
   TriangleAlertIcon,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { createPortal } from 'react-dom';
 import { Toaster as Sonner, type ToasterProps } from 'sonner';
 
-const Toaster = ({ ...props }: ToasterProps) => {
+const toastLayerZIndex = 2_147_483_647;
+
+const Toaster = ({ style, ...props }: ToasterProps) => {
   const { theme = 'system' } = useTheme();
 
-  return (
+  const toaster = (
     <Sonner
       theme={theme as ToasterProps['theme']}
       position="top-center"
@@ -27,10 +30,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       style={
         {
-          '--normal-bg': 'var(--popover)',
-          '--normal-text': 'var(--popover-foreground)',
-          '--normal-border': 'var(--border)',
+          '--normal-bg': 'hsl(var(--popover))',
+          '--normal-text': 'hsl(var(--popover-foreground))',
+          '--normal-border': 'hsl(var(--border))',
           '--border-radius': 'var(--radius)',
+          ...style,
+          zIndex: toastLayerZIndex,
         } as React.CSSProperties
       }
       toastOptions={{
@@ -41,6 +46,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       {...props}
     />
   );
+
+  return typeof document === 'undefined' ? toaster : createPortal(toaster, document.body);
 };
 
 export { Toaster };

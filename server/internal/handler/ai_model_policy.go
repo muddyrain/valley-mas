@@ -29,15 +29,16 @@ const (
 )
 
 type adminAIModelRequest struct {
-	Provider      string   `json:"provider"`
-	ModelID       string   `json:"modelId"`
-	DisplayName   string   `json:"displayName"`
-	Capabilities  []string `json:"capabilities"`
-	ImageProtocol string   `json:"imageProtocol"`
-	ContextWindowTokens int `json:"contextWindowTokens"`
-	MaxOutputTokens     int `json:"maxOutputTokens"`
-	Enabled       bool     `json:"enabled"`
-	SortOrder     int      `json:"sortOrder"`
+	Provider            string   `json:"provider"`
+	ModelID             string   `json:"modelId"`
+	DisplayName         string   `json:"displayName"`
+	Capabilities        []string `json:"capabilities"`
+	ImageProtocol       string   `json:"imageProtocol"`
+	ContextWindowTokens int      `json:"contextWindowTokens"`
+	MaxOutputTokens     int      `json:"maxOutputTokens"`
+	EmbeddingDimension  int      `json:"embeddingDimension"`
+	Enabled             bool     `json:"enabled"`
+	SortOrder           int      `json:"sortOrder"`
 }
 
 type aiModelConnectionTestRequest struct {
@@ -54,6 +55,7 @@ type aiModelOption struct {
 	ModelID                 string   `json:"modelId"`
 	DisplayName             string   `json:"displayName"`
 	Capabilities            []string `json:"capabilities"`
+	EmbeddingDimension      int      `json:"embeddingDimension,omitempty"`
 	ImageQualities          []string `json:"imageQualities,omitempty"`
 	ImageReferenceQualities []string `json:"imageReferenceQualities,omitempty"`
 }
@@ -71,8 +73,9 @@ type adminAIModelResponse struct {
 	VerificationStatus   string     `json:"verificationStatus"`
 	VerificationMessage  string     `json:"verificationMessage"`
 	LastVerifiedAt       *time.Time `json:"lastVerifiedAt,omitempty"`
-	ContextWindowTokens int        `json:"contextWindowTokens,omitempty"`
-	MaxOutputTokens     int        `json:"maxOutputTokens,omitempty"`
+	ContextWindowTokens  int        `json:"contextWindowTokens,omitempty"`
+	MaxOutputTokens      int        `json:"maxOutputTokens,omitempty"`
+	EmbeddingDimension   int        `json:"embeddingDimension,omitempty"`
 	Enabled              bool       `json:"enabled"`
 	SortOrder            int        `json:"sortOrder"`
 	CreatedAt            time.Time  `json:"createdAt"`
@@ -139,12 +142,14 @@ func AdminUpdateAIModel(c *gin.Context) {
 		"provider": item.Provider, "model_id": item.ModelID, "display_name": item.DisplayName,
 		"capabilities": item.Capabilities, "image_protocol": item.ImageProtocol,
 		"context_window_tokens": item.ContextWindowTokens, "max_output_tokens": item.MaxOutputTokens,
-		"enabled": item.Enabled, "sort_order": item.SortOrder,
+		"embedding_dimension": item.EmbeddingDimension,
+		"enabled":             item.Enabled, "sort_order": item.SortOrder,
 	}
 	if existing.Provider != item.Provider ||
 		existing.ModelID != item.ModelID ||
 		existing.Capabilities != item.Capabilities ||
-		existing.ImageProtocol != item.ImageProtocol {
+		existing.ImageProtocol != item.ImageProtocol ||
+		existing.EmbeddingDimension != item.EmbeddingDimension {
 		updates["verified_capabilities"] = "[]"
 		updates["verification_status"] = "unverified"
 		updates["verification_message"] = ""
@@ -217,6 +222,16 @@ func AdminTestAIModelConnection(c *gin.Context) {
 		Error(c, http.StatusBadGateway, "模型调用检测失败："+err.Error())
 		return
 	}
+	if profile.EmbeddingDimension > 0 && probe.EmbeddingDimension != profile.EmbeddingDimension {
+		message := fmt.Sprintf(
+			"向量维度不匹配：配置为 %d 维，模型实际返回 %d 维",
+			profile.EmbeddingDimension,
+			probe.EmbeddingDimension,
+		)
+		recordAIModelVerification(req.CatalogID, provider, modelID, "failed", nil, message)
+		Error(c, http.StatusBadGateway, message)
+		return
+	}
 	status := aiModelVerificationStatus(capabilities, probe.VerifiedCapabilities)
 	verifiedAt := time.Now()
 	recordAIModelVerification(
@@ -243,11 +258,13 @@ type aiModelProbeClient interface {
 type aiModelProbeResult struct {
 	Latency              time.Duration
 	VerifiedCapabilities []string
+	EmbeddingDimension   int
 }
 
 type aiModelProbeProfile struct {
-	Capabilities  []string
-	ImageProtocol string
+	Capabilities       []string
+	ImageProtocol      string
+	EmbeddingDimension int
 }
 
 func probeAIModel(
@@ -259,6 +276,7 @@ func probeAIModel(
 	startedAt := time.Now()
 	item := model.AIModel{Capabilities: aimodel.EncodeStrings(capabilities)}
 	verified := make([]string, 0, len(capabilities))
+	embeddingDimension := 0
 	if aimodel.HasCapabilities(item, []string{"image_generation"}) {
 		request := aiclient.ImageGenerationRequest{
 			ModelID: modelID,
@@ -281,11 +299,16 @@ func probeAIModel(
 		verified = append(verified, imageVerified...)
 	}
 	if aimodel.HasCapabilities(item, []string{"embedding"}) {
-		_, err := client.Embeddings(ctx, modelID, []string{"ping"})
+		response, err := client.Embeddings(ctx, modelID, []string{"ping"})
 		if err != nil {
 			return aiModelProbeResult{Latency: time.Since(startedAt), VerifiedCapabilities: verified}, err
 		}
+		if len(response.Data) == 0 || len(response.Data[0].Embedding) == 0 {
+			return aiModelProbeResult{Latency: time.Since(startedAt), VerifiedCapabilities: verified},
+				errors.New("向量模型返回了空向量")
+		}
 		verified = append(verified, "embedding")
+		embeddingDimension = len(response.Data[0].Embedding)
 	}
 	if aimodel.HasCapabilities(item, []string{"vision"}) {
 		imageURL, err := buildAIModelVisionProbeReference()
@@ -332,6 +355,7 @@ func probeAIModel(
 	}
 	return aiModelProbeResult{
 		Latency: time.Since(startedAt), VerifiedCapabilities: verified,
+		EmbeddingDimension: embeddingDimension,
 	}, nil
 }
 
@@ -347,9 +371,10 @@ func adminAIModelResponseFromModel(item model.AIModel) adminAIModelResponse {
 		Capabilities: aimodel.DecodeStrings(item.Capabilities), ImageProtocol: item.ImageProtocol,
 		VerifiedCapabilities: aimodel.DecodeStrings(item.VerifiedCapabilities),
 		VerificationStatus:   item.VerificationStatus, VerificationMessage: item.VerificationMessage,
-		LastVerifiedAt: item.LastVerifiedAt,
+		LastVerifiedAt:      item.LastVerifiedAt,
 		ContextWindowTokens: item.ContextWindowTokens, MaxOutputTokens: item.MaxOutputTokens,
-		Enabled: item.Enabled, SortOrder: item.SortOrder,
+		EmbeddingDimension: item.EmbeddingDimension,
+		Enabled:            item.Enabled, SortOrder: item.SortOrder,
 		CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
 	}
 }
@@ -387,6 +412,7 @@ func ListAvailableAIModels(c *gin.Context) {
 		option := aiModelOption{
 			ID: item.ID.String(), Provider: item.Provider, ModelID: item.ModelID,
 			DisplayName: item.DisplayName, Capabilities: aimodel.DecodeStrings(item.Capabilities),
+			EmbeddingDimension: item.EmbeddingDimension,
 		}
 		if aimodel.HasCapabilities(item, []string{"image_generation"}) {
 			option.ImageQualities = aimodel.ImageGenerationQualities(item)
@@ -401,8 +427,8 @@ func ListAvailableAIModels(c *gin.Context) {
 
 func newAIModel(req adminAIModelRequest) (model.AIModel, error) {
 	provider := strings.TrimSpace(req.Provider)
-	if provider != "siliconflow" && provider != "amux" && provider != "ark" {
-		return model.AIModel{}, errors.New("Provider 仅支持 siliconflow、amux 或兼容期 ark")
+	if provider != "siliconflow" && provider != "amux" && provider != "pipixia" && provider != "ark" {
+		return model.AIModel{}, errors.New("Provider 仅支持 siliconflow、amux、pipixia 或兼容期 ark")
 	}
 	modelID := strings.TrimSpace(req.ModelID)
 	if modelID == "" {
@@ -429,11 +455,19 @@ func newAIModel(req adminAIModelRequest) (model.AIModel, error) {
 	if req.ContextWindowTokens < 0 || req.MaxOutputTokens < 0 {
 		return model.AIModel{}, errors.New("模型规格不能小于 0")
 	}
+	if slices.Contains(capabilities, "embedding") && req.EmbeddingDimension <= 0 {
+		return model.AIModel{}, errors.New("向量模型必须填写大于 0 的向量维度")
+	}
+	embeddingDimension := req.EmbeddingDimension
+	if !slices.Contains(capabilities, "embedding") {
+		embeddingDimension = 0
+	}
 	return model.AIModel{
 		Provider: provider, ModelID: modelID, DisplayName: displayName,
 		Capabilities: aimodel.EncodeStrings(capabilities), ImageProtocol: imageProtocol,
 		ContextWindowTokens: req.ContextWindowTokens, MaxOutputTokens: req.MaxOutputTokens,
-		Enabled: req.Enabled, SortOrder: req.SortOrder,
+		EmbeddingDimension: embeddingDimension,
+		Enabled:            req.Enabled, SortOrder: req.SortOrder,
 	}, nil
 }
 
@@ -563,7 +597,8 @@ func resolveAIModelProbeProfile(
 		return fallback
 	}
 	return aiModelProbeProfile{
-		Capabilities:  aimodel.DecodeStrings(item.Capabilities),
-		ImageProtocol: normalizeImageProtocol(item.ImageProtocol),
+		Capabilities:       aimodel.DecodeStrings(item.Capabilities),
+		ImageProtocol:      normalizeImageProtocol(item.ImageProtocol),
+		EmbeddingDimension: item.EmbeddingDimension,
 	}
 }

@@ -1441,7 +1441,7 @@ export default function AIAppConversationPage() {
           variant="outline"
           size="icon-sm"
           className={cn(
-            'absolute top-1/2 z-30 hidden -translate-y-1/2 rounded-full bg-background shadow-sm active:translate-y-0 motion-safe:transition-[right] motion-safe:duration-300 motion-safe:ease-out lg:inline-flex',
+            'absolute top-1/2 z-30 hidden -translate-y-1/2 rounded-full bg-background shadow-sm active:not-aria-[haspopup]:!-translate-y-1/2 motion-safe:transition-[right] motion-safe:duration-300 motion-safe:ease-out lg:inline-flex',
             inspectorOpen ? 'right-[21rem]' : 'right-3',
           )}
           onClick={() => setInspectorOpen((current) => !current)}

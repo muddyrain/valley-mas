@@ -1,7 +1,8 @@
-import { FileText, Search } from 'lucide-react';
+import { ExternalLink, FileText, Github, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { type AIPrompt, getAPIErrorMessage, listAIPrompts } from '@/api/aiWorkbench';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -53,7 +54,9 @@ export function PromptLibraryDialog({ open, onOpenChange, onInsert }: PromptLibr
     const keyword = query.trim().toLocaleLowerCase();
     if (!keyword) return prompts;
     return prompts.filter((item) =>
-      `${item.name} ${item.description}`.toLocaleLowerCase().includes(keyword),
+      `${item.name} ${item.description} ${item.tags.join(' ')}`
+        .toLocaleLowerCase()
+        .includes(keyword),
     );
   }, [prompts, query]);
   const selected = prompts.find((item) => item.id === selectedID) || null;
@@ -107,6 +110,18 @@ export function PromptLibraryDialog({ open, onOpenChange, onInsert }: PromptLibr
                         <span className="mt-1 block truncate text-xs text-muted-foreground">
                           {prompt.description || '未填写描述'}
                         </span>
+                        {prompt.tags.length > 0 ? (
+                          <span className="mt-1.5 flex flex-wrap gap-1">
+                            {prompt.tags.slice(0, 2).map((tag) => (
+                              <Badge key={tag} variant="secondary">
+                                {tag}
+                              </Badge>
+                            ))}
+                            {prompt.tags.length > 2 ? (
+                              <Badge variant="outline">+{prompt.tags.length - 2}</Badge>
+                            ) : null}
+                          </span>
+                        ) : null}
                       </span>
                     </span>
                   </button>
@@ -122,6 +137,25 @@ export function PromptLibraryDialog({ open, onOpenChange, onInsert }: PromptLibr
                   {selected.description ? (
                     <p className="mt-1 text-sm text-muted-foreground">{selected.description}</p>
                   ) : null}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {selected.tags.map((tag) => (
+                      <Badge key={tag} variant="secondary">
+                        {tag}
+                      </Badge>
+                    ))}
+                    {selected.sourceUrl ? (
+                      <a
+                        href={selected.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        <Github className="size-3.5" />
+                        {selected.sourceAuthor || '导入来源'}
+                        <ExternalLink className="size-3" />
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
                 <pre className="min-h-64 whitespace-pre-wrap rounded-lg border border-border bg-muted/25 p-4 text-sm leading-6 text-foreground">
                   {selected.content}

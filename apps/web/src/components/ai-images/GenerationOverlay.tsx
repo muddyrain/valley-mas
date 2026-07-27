@@ -1,7 +1,8 @@
 import gsap from 'gsap';
-import { Sparkles } from 'lucide-react';
+import { CirclePause, Sparkles } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { AIImageGenerationStage } from '@/api/aiImages';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import './generation-overlay.css';
@@ -56,6 +57,11 @@ export function GenerationPreview({
   useEffect(() => {
     if (!rootRef.current || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const context = gsap.context(() => {
+      gsap.fromTo(
+        rootRef.current,
+        { autoAlpha: 0, y: 12, scale: 0.98 },
+        { autoAlpha: 1, y: 0, scale: 1, duration: 0.42, ease: 'power3.out' },
+      );
       const field = rootRef.current?.querySelector('[data-generation-field]');
       const dots = rootRef.current?.querySelectorAll('[data-generation-dot]');
       if (!field || !dots?.length) return;
@@ -83,7 +89,7 @@ export function GenerationPreview({
         });
     }, rootRef);
     return () => context.revert();
-  }, [stage]);
+  }, []);
 
   return (
     <div
@@ -116,7 +122,15 @@ export function GenerationPreview({
   );
 }
 
-export function GenerationOverlay({ stage }: { stage: AIImageGenerationStage }) {
+export function GenerationOverlay({
+  stage,
+  onPause,
+  pausing = false,
+}: {
+  stage: AIImageGenerationStage;
+  onPause?: () => void;
+  pausing?: boolean;
+}) {
   const content = STAGES[stage] ?? STAGES.generating;
   const activeStageIndex = Math.max(0, REAL_STAGES.indexOf(stage as (typeof REAL_STAGES)[number]));
   return (
@@ -156,6 +170,14 @@ export function GenerationOverlay({ stage }: { stage: AIImageGenerationStage }) 
             );
           })}
         </ol>
+        {onPause ? (
+          <div className="mt-4 flex justify-end">
+            <Button type="button" size="sm" variant="outline" onClick={onPause} disabled={pausing}>
+              <CirclePause />
+              暂停生成
+            </Button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
