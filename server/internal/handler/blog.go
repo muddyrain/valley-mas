@@ -29,9 +29,9 @@ const (
 )
 
 func buildPostTimelineOrderExpr(sort string) string {
-	orderExpr := "is_top DESC, COALESCE(published_at, created_at) DESC"
+	orderExpr := "is_top DESC, COALESCE(published_at, created_at) DESC, created_at DESC, id DESC"
 	if strings.EqualFold(strings.TrimSpace(sort), "oldest") {
-		orderExpr = "is_top DESC, COALESCE(published_at, created_at) ASC"
+		orderExpr = "is_top DESC, COALESCE(published_at, created_at) ASC, created_at ASC, id ASC"
 	}
 	return orderExpr
 }
@@ -48,11 +48,8 @@ func buildScopedPostOrderExpr(groupScoped bool) string {
 	)
 }
 
-func applyPostListOrder(query *gorm.DB, groupScoped bool, sort string) *gorm.DB {
-	if !groupScoped || strings.EqualFold(strings.TrimSpace(sort), "oldest") {
-		return query.Order(buildPostTimelineOrderExpr(sort))
-	}
-	return query.Order(buildScopedPostOrderExpr(groupScoped))
+func applyPostListOrder(query *gorm.DB, sort string) *gorm.DB {
+	return query.Order(buildPostTimelineOrderExpr(sort))
 }
 
 type PostListResponse struct {
@@ -252,7 +249,7 @@ func GetPosts(c *gin.Context) {
 	query.Count(&total)
 
 	var posts []model.Post
-	query = applyPostListOrder(query, groupIDRaw != "" || groupSlug != "", sort)
+	query = applyPostListOrder(query, sort)
 	applyPostListQueryShape(query).
 		Limit(pageSize).
 		Offset(offset).
@@ -340,11 +337,7 @@ func loadAdjacentPosts(current *model.Post) (*model.Post, *model.Post) {
 
 		var posts []model.Post
 		query = query.Select("id, title, slug, post_type, visibility, excerpt, cover, cover_storage_key, group_id, category_id, status, view_count, like_count, is_top, sort_order, group_sort_order, published_at, created_at")
-		if groupID != 0 {
-			query = query.Order(buildScopedPostOrderExpr(true))
-		} else {
-			query = query.Order(buildPostTimelineOrderExpr(""))
-		}
+		query = query.Order(buildPostTimelineOrderExpr(""))
 		query.Find(&posts)
 		return posts
 	}
@@ -1402,7 +1395,7 @@ func AdminGetPosts(c *gin.Context) {
 	query.Count(&total)
 
 	var posts []model.Post
-	query = applyPostListOrder(query, groupIDRaw != "", "")
+	query = applyPostListOrder(query, "")
 	applyPostListQueryShape(query).
 		Limit(pageSize).
 		Offset(offset).

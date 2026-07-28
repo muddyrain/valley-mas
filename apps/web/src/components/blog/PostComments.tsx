@@ -88,7 +88,7 @@ export function PostComments({
             type="button"
             onClick={handleSubmit}
             disabled={!isAuthenticated || !canPublish}
-            className="rounded-full px-5 duration-300 text-primary hover:bg-primary/80"
+            className="rounded-full px-5 text-primary-foreground duration-300 hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
           >
             {submitting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

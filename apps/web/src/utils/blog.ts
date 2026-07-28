@@ -25,7 +25,7 @@ function highlightCode(code: string): string {
     const placeholder = `___TOKEN_${tokenIndex++}___`;
     tokens.push({
       placeholder,
-      html: `<span style="color:#6b7280">${match}</span>`,
+      html: `<span class="code-token-comment">${match}</span>`,
     });
     return placeholder;
   });
@@ -35,7 +35,7 @@ function highlightCode(code: string): string {
     const placeholder = `___TOKEN_${tokenIndex++}___`;
     tokens.push({
       placeholder,
-      html: `<span style="color:#a6e3a1">${match}</span>`,
+      html: `<span class="code-token-string">${match}</span>`,
     });
     return placeholder;
   });
@@ -45,7 +45,7 @@ function highlightCode(code: string): string {
     const placeholder = `___TOKEN_${tokenIndex++}___`;
     tokens.push({
       placeholder,
-      html: `<span style="color:#a6e3a1">${match}</span>`,
+      html: `<span class="code-token-string">${match}</span>`,
     });
     return placeholder;
   });
@@ -53,19 +53,28 @@ function highlightCode(code: string): string {
   // 4. 关键字高亮
   processed = processed.replace(
     /\b(const|let|var|function|return|if|else|for|while|class|import|export|from|async|await|new|this|try|catch)\b/g,
-    '<span style="color:#cba6f7">$1</span>',
+    '<span class="code-token-keyword">$1</span>',
   );
 
   // 5. 函数名高亮
   processed = processed.replace(
     /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*(?=\()/g,
-    '<span style="color:#89b4fa">$1</span>',
+    '<span class="code-token-function">$1</span>',
   );
 
-  // 6. 数字高亮
-  processed = processed.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span style="color:#fab387">$1</span>');
+  // 6. 对象属性高亮
+  processed = processed.replace(
+    /\b([a-zA-Z_$][a-zA-Z0-9_$]*)(?=\s*:)/g,
+    '<span class="code-token-property">$1</span>',
+  );
 
-  // 7. 还原所有占位符
+  // 7. 数字高亮
+  processed = processed.replace(
+    /\b(\d+(?:\.\d+)?)\b/g,
+    '<span class="code-token-number">$1</span>',
+  );
+
+  // 8. 还原所有占位符
   for (const token of tokens.reverse()) {
     processed = processed.replace(token.placeholder, token.html);
   }
@@ -79,8 +88,12 @@ const renderer = new marked.Renderer();
 renderer.code = (code: { text: string; lang?: string }) => {
   const codeText = typeof code === 'string' ? code : code.text || '';
   const language = typeof code === 'string' ? '' : code.lang || 'text';
-  const highlighted = highlightCode(codeText);
-  return `<pre><code class="language-${language}">${highlighted}</code></pre>`;
+  const lines = codeText
+    .split('\n')
+    .map((line) => `<span class="markdown-code-line">${highlightCode(line) || ' '}</span>`)
+    .join('');
+  const languageLabel = escapeHtml(language || 'text');
+  return `<pre class="markdown-code-block"><div class="markdown-code-header"><span class="markdown-code-language">${languageLabel}</span></div><code class="language-${languageLabel}">${lines}</code></pre>`;
 };
 
 marked.setOptions({

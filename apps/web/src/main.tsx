@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
+import './components/blog/code-theme.css';
 import './components/blog/mdx-editor.css';
 import { applyThemeToDocument } from './stores/useThemeStore';
 

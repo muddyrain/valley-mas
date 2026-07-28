@@ -1,0 +1,13 @@
+:root {
+  /* Shared One Dark syntax palette for the editor and rendered Markdown. */
+  --code-token-base: #abb2bf;
+  --code-token-comment: #7d8799;
+  --code-token-string: #98c379;
+  --code-token-keyword: #c678dd;
+  --code-token-function: #61afef;
+  --code-token-property: #e06c75;
+  --code-token-constant: #d19a66;
+  --code-token-type: #e5c07b;
+  --code-token-number: #e5c07b;
+  --code-token-operator: #56b6c2;
+}

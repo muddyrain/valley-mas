@@ -135,21 +135,120 @@
 .markdown-body pre {
   margin: 1.5em 0;
   padding: 1.2em;
-  background: hsl(var(--muted));
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--primary) / 0.22);
   border-radius: 12px;
   overflow-x: auto;
   max-width: 100%;
   position: relative;
   font-size: 0.9em;
   line-height: 1.6;
+  box-shadow:
+    0 18px 34px hsl(var(--foreground) / 0.12),
+    0 0 0 1px hsl(var(--primary) / 0.08) inset;
 }
 
 .markdown-body pre code {
   background: none;
   padding: 0;
-  color: hsl(var(--foreground));
+  color: var(--code-token-base);
   font-size: 1em;
   border-radius: 0;
+}
+
+.markdown-body pre.markdown-code-block {
+  padding: 12px 14px 14px;
+  border-radius: 18px;
+}
+
+.markdown-code-header {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  margin-bottom: 8px;
+}
+
+.markdown-code-language {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  text-transform: lowercase;
+}
+
+.markdown-body pre.markdown-code-block > code {
+  display: block;
+  counter-reset: code-line;
+}
+
+.markdown-code-line {
+  position: relative;
+  display: block;
+  min-height: 1.6em;
+  padding-left: 3.25rem;
+  white-space: pre;
+}
+
+.markdown-code-line::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2.25rem;
+  padding-right: 0.75rem;
+  border-right: 1px solid hsl(var(--border) / 0.72);
+  color: var(--code-token-comment);
+  content: counter(code-line);
+  counter-increment: code-line;
+  font-size: 0.9em;
+  line-height: inherit;
+  text-align: right;
+  user-select: none;
+}
+
+.markdown-body pre.markdown-code-block .copy-button {
+  top: 12px;
+  right: 14px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  opacity: 1;
+}
+
+.markdown-body pre.markdown-code-block .copy-button:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+}
+
+.markdown-body .code-token-comment {
+  color: var(--code-token-comment);
+}
+
+.markdown-body .code-token-string {
+  color: var(--code-token-string);
+}
+
+.markdown-body .code-token-keyword {
+  color: var(--code-token-keyword);
+  font-weight: 600;
+}
+
+.markdown-body .code-token-function {
+  color: var(--code-token-function);
+}
+
+.markdown-body .code-token-property {
+  color: var(--code-token-property);
+}
+
+.markdown-body .code-token-number {
+  color: var(--code-token-number);
 }
 
 .markdown-body img {
@@ -236,6 +335,10 @@
 
 .dark .markdown-body pre {
   background: hsl(var(--muted));
+}
+
+.dark .markdown-body pre.markdown-code-block {
+  background: hsl(var(--card));
 }
 
 .dark .markdown-body img {
