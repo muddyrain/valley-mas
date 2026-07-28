@@ -35,10 +35,11 @@ Harness Engineering 是面向 AI coding agent 的工程环境层。它通过清�
 ### 3.1 任务进入
 
 1. 读取根 `AGENTS.md` 和 `.agents/skills/INDEX.md`。
-2. 按范围读取 `docs/PROJECT_GUIDE.md` 相关章节与子项目 `AGENTS.md`。
-3. 定位相关代码、测试、文档、脚本和 `.env.example`。
-4. 区分问答、分析、文档、实现、修复、review 和提交任务。
-5. 只装载当前任务需要的上下文。
+2. 确定代码或配置改动范围后，运行 `pnpm context:recent -- <相关目录>` 查看近期提交和活跃计划。
+3. 按范围读取 `docs/PROJECT_GUIDE.md` 相关章节与子项目 `AGENTS.md`。
+4. 定位相关代码、测试、文档、脚本和 `.env.example`。
+5. 区分问答、分析、文档、实现、修复、review 和提交任务。
+6. 只装载当前任务需要的上下文。
 
 ### 3.2 执行边界
 

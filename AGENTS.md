@@ -5,11 +5,12 @@
 ## 任务进入
 
 1. 读取 `.agents/skills/INDEX.md`，确认项目 skill 路由。
-2. 按任务范围读取 `docs/PROJECT_GUIDE.md` 的相关章节。
-3. 进入子项目时先读对应 `AGENTS.md`，再读相关 README、环境变量示例、路由、处理器或包脚本。
-4. 涉及 AI 协作流程、验证闭环或 Harness 本身时，读取 `docs/HARNESS_ENGINEERING.md`。
-5. 涉及共享模块、跨应用复用、协议或 Provider 迁移、复杂状态协调时，按需读取 `docs/ARCHITECTURE_GUIDE.md`。
-6. 以当前代码和文档为准，不凭旧记忆推断路径、命令或业务规则。
+2. 确定代码或配置改动范围后，运行 `pnpm context:recent -- <相关目录>` 查看近期提交和活跃计划；只按需读取其输出关联的文档。
+3. 按任务范围读取 `docs/PROJECT_GUIDE.md` 的相关章节。
+4. 进入子项目时先读对应 `AGENTS.md`，再读相关 README、环境变量示例、路由、处理器或包脚本。
+5. 涉及 AI 协作流程、验证闭环或 Harness 本身时，读取 `docs/HARNESS_ENGINEERING.md`。
+6. 涉及共享模块、跨应用复用、协议或 Provider 迁移、复杂状态协调时，按需读取 `docs/ARCHITECTURE_GUIDE.md`。
+7. 以当前代码和文档为准，不凭旧记忆推断路径、命令或业务规则。
 
 只装载当前任务需要的上下文。普通任务不要求全文读取所有长期文档或所有 skills。
 

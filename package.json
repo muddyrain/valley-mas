@@ -12,6 +12,7 @@
     "lint": "turbo lint",
     "format": "turbo format",
     "check": "turbo check",
+    "context:recent": "node scripts/context-recent.mjs",
     "check:plans-index": "node scripts/check-plans-index.mjs",
     "check:harness": "bash scripts/check-agent-harness.sh",
     "check:harness:test": "bash scripts/check-agent-harness.test.sh",
