@@ -99,6 +99,7 @@ const defaultConfig: AgentConfig = {
   systemPrompt: '',
   openingMessage: '',
   exampleQuestions: [],
+  skillIds: [],
 };
 
 type ConversationStreamState = {
@@ -117,6 +118,9 @@ function parseAgentConfig(version?: AIAppVersion): AgentConfig {
         ? parsed.exampleQuestions
             .filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
             .slice(0, 4)
+        : [],
+      skillIds: Array.isArray(parsed.skillIds)
+        ? parsed.skillIds.filter((item): item is string => typeof item === 'string').slice(0, 8)
         : [],
     };
   } catch {

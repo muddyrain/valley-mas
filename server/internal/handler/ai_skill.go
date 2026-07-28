@@ -4,10 +4,12 @@ import (
 	"errors"
 	"net/http"
 	pathpkg "path"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"valley-server/internal/aiclient"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 
@@ -22,6 +24,7 @@ type aiSkillView struct {
 	SourceURL     string            `json:"sourceUrl"`
 	SourceAuthor  string            `json:"sourceAuthor"`
 	SourceLicense string            `json:"sourceLicense"`
+	Tags          []string          `json:"tags"`
 	InstalledAt   time.Time         `json:"installedAt"`
 }
 
@@ -30,11 +33,16 @@ type installAISkillPayload struct {
 	Paths []string `json:"paths"`
 }
 
+type updateAISkillPayload struct {
+	Tags []string `json:"tags"`
+}
+
 type aiSkillImportCandidateView struct {
 	Path           string `json:"path"`
 	Name           string `json:"name"`
 	Description    string `json:"description"`
 	ReferenceCount int    `json:"referenceCount"`
+	ScriptCount    int    `json:"scriptCount"`
 	SourceURL      string `json:"sourceUrl"`
 }
 
@@ -57,11 +65,16 @@ type aiSkillDetailView struct {
 
 var discoverAISkillSources = discoverGitHubAISkillSources
 
+const (
+	maxAISkillRuntimeInstructions      = 16_000
+	maxAISkillRuntimeInstructionsPerID = 6_000
+)
+
 func viewAISkill(skill model.AISkill) aiSkillView {
 	return aiSkillView{
 		ID: skill.ID, Name: skill.Name, Description: skill.Description, SourceURL: skill.SourceURL,
 		SourceAuthor: skill.SourceAuthor, SourceLicense: skill.SourceLicense,
-		InstalledAt: skill.InstalledAt,
+		Tags: decodeAIPromptTags(skill.Tags), InstalledAt: skill.InstalledAt,
 	}
 }
 
@@ -125,7 +138,7 @@ func PreviewAISkillImport(c *gin.Context) {
 	for _, source := range sources {
 		candidates = append(candidates, aiSkillImportCandidateView{
 			Path: source.Path, Name: source.Name, Description: source.Description,
-			ReferenceCount: source.ReferenceCount, SourceURL: source.URL,
+			ReferenceCount: source.ReferenceCount, ScriptCount: source.ScriptCount, SourceURL: source.URL,
 		})
 	}
 	Success(c, aiSkillImportPreviewView{
@@ -169,6 +182,8 @@ func InstallAISkill(c *gin.Context) {
 				"description":       source.Description,
 				"content":           source.Content,
 				"reference_content": source.ReferenceContent,
+				"script_content":    source.ScriptContent,
+				"tags":              encodeAIPromptTags(mergeAISkillTags(decodeAIPromptTags(existing.Tags), source.Tags)),
 				"source_author":     source.Author,
 			}).Error; updateErr != nil {
 				Error(c, http.StatusInternalServerError, "更新已安装技能失败")
@@ -178,6 +193,8 @@ func InstallAISkill(c *gin.Context) {
 			existing.Description = source.Description
 			existing.Content = source.Content
 			existing.ReferenceContent = source.ReferenceContent
+			existing.ScriptContent = source.ScriptContent
+			existing.Tags = encodeAIPromptTags(mergeAISkillTags(decodeAIPromptTags(existing.Tags), source.Tags))
 			existing.SourceAuthor = source.Author
 			installed = append(installed, viewAISkill(existing))
 			continue
@@ -188,7 +205,7 @@ func InstallAISkill(c *gin.Context) {
 		}
 		skill := model.AISkill{
 			UserID: userID, Name: source.Name, Description: source.Description,
-			Content: source.Content, ReferenceContent: source.ReferenceContent,
+			Content: source.Content, ReferenceContent: source.ReferenceContent, ScriptContent: source.ScriptContent, Tags: encodeAIPromptTags(source.Tags),
 			SourceURL: source.URL, SourceAuthor: source.Author,
 		}
 		if err := database.GetDB().Create(&skill).Error; err != nil {
@@ -198,6 +215,112 @@ func InstallAISkill(c *gin.Context) {
 		installed = append(installed, viewAISkill(skill))
 	}
 	Success(c, gin.H{"list": installed})
+}
+
+func UpdateAISkill(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	id, err := parsePathInt64(c, "skillId")
+	if err != nil || id <= 0 {
+		Error(c, http.StatusBadRequest, "无效的技能 ID")
+		return
+	}
+	var payload updateAISkillPayload
+	if c.ShouldBindJSON(&payload) != nil {
+		Error(c, http.StatusBadRequest, "技能参数无效")
+		return
+	}
+	tags, err := normalizeAIPromptTags(payload.Tags)
+	if err != nil {
+		Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	var skill model.AISkill
+	if err := database.GetDB().Where("id = ? AND user_id = ? AND archived_at IS NULL", id, userID).First(&skill).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(c, http.StatusNotFound, "技能不存在或不可用")
+			return
+		}
+		ErrorWithDetail(c, http.StatusInternalServerError, "加载技能失败", err)
+		return
+	}
+	if err := database.GetDB().Model(&skill).Update("tags", encodeAIPromptTags(tags)).Error; err != nil {
+		ErrorWithDetail(c, http.StatusInternalServerError, "保存技能标签失败", err)
+		return
+	}
+	skill.Tags = encodeAIPromptTags(tags)
+	Success(c, viewAISkill(skill))
+}
+
+func mergeAISkillTags(values ...[]string) []string {
+	merged := make([]string, 0, 8)
+	seen := make(map[string]struct{}, 8)
+	for _, group := range values {
+		for _, value := range group {
+			if _, exists := seen[value]; exists {
+				continue
+			}
+			seen[value] = struct{}{}
+			merged = append(merged, value)
+			if len(merged) == 8 {
+				return merged
+			}
+		}
+	}
+	return merged
+}
+
+func resolveAISkillRuntimeInstructions(db *gorm.DB, userID model.Int64String, rawIDs []string) (string, error) {
+	if len(rawIDs) == 0 {
+		return "", nil
+	}
+	ids := make([]model.Int64String, 0, len(rawIDs))
+	seen := make(map[model.Int64String]struct{}, len(rawIDs))
+	for _, rawID := range rawIDs {
+		id, err := strconv.ParseInt(strings.TrimSpace(rawID), 10, 64)
+		if err != nil || id <= 0 {
+			return "", errors.New("技能配置无效")
+		}
+		skillID := model.Int64String(id)
+		if _, exists := seen[skillID]; !exists {
+			seen[skillID] = struct{}{}
+			ids = append(ids, skillID)
+		}
+	}
+	var skills []model.AISkill
+	if err := db.Where("user_id = ? AND archived_at IS NULL AND id IN ?", userID, ids).Find(&skills).Error; err != nil {
+		return "", err
+	}
+	if len(skills) != len(ids) {
+		return "", errors.New("已绑定技能不存在或不可用")
+	}
+	byID := make(map[model.Int64String]model.AISkill, len(skills))
+	for _, skill := range skills {
+		byID[skill.ID] = skill
+	}
+	var builder strings.Builder
+	for _, id := range ids {
+		skill := byID[id]
+		body := strings.TrimSpace(skill.Content)
+		if references := strings.TrimSpace(skill.ReferenceContent); references != "" {
+			body = strings.TrimSpace(body + "\n\n" + references)
+		}
+		body = aiclient.TrimRunes(body, maxAISkillRuntimeInstructionsPerID)
+		if body == "" {
+			continue
+		}
+		entry := "已启用技能：" + skill.Name + "\n" + body
+		if builder.Len()+len(entry) > maxAISkillRuntimeInstructions {
+			break
+		}
+		if builder.Len() > 0 {
+			builder.WriteString("\n\n")
+		}
+		builder.WriteString(entry)
+	}
+	return builder.String(), nil
 }
 
 func selectAISkillImportSources(sources []aiSkillImportSource, paths []string) ([]aiSkillImportSource, error) {
@@ -270,27 +393,33 @@ func extractAISkillDescription(content string) string {
 
 func viewAISkillFiles(skill model.AISkill) []aiSkillFileView {
 	files := []aiSkillFileView{{Path: "SKILL.md", Kind: "skill", Content: strings.TrimSpace(skill.Content)}}
-	for _, section := range strings.Split(skill.ReferenceContent, "## 参考资料：")[1:] {
-		referencePath, content, found := strings.Cut(strings.TrimSpace(section), "\n")
+	files = appendAISkillBundledFiles(files, skill.ReferenceContent, "## 参考资料：", "reference")
+	return appendAISkillBundledFiles(files, skill.ScriptContent, "## 脚本：", "script")
+}
+
+func appendAISkillBundledFiles(files []aiSkillFileView, bundledContent, marker, kind string) []aiSkillFileView {
+	for _, section := range strings.Split(bundledContent, marker)[1:] {
+		filePath, content, found := strings.Cut(strings.TrimSpace(section), "\n")
 		if !found || strings.TrimSpace(content) == "" {
 			continue
 		}
 		files = append(files, aiSkillFileView{
-			Path:    normalizeAISkillReferencePath(referencePath),
-			Kind:    "reference",
+			Path:    normalizeAISkillBundledPath(filePath, kind),
+			Kind:    kind,
 			Content: strings.TrimSpace(content),
 		})
 	}
 	return files
 }
 
-func normalizeAISkillReferencePath(rawPath string) string {
+func normalizeAISkillBundledPath(rawPath, kind string) string {
 	value := strings.Trim(strings.TrimSpace(rawPath), "/")
-	if index := strings.Index(value, "references/"); index >= 0 {
+	directory := kind + "s/"
+	if index := strings.Index(value, directory); index >= 0 {
 		return value[index:]
 	}
 	if value == "" {
-		return "references/未命名文件"
+		return directory + "未命名文件"
 	}
-	return "references/" + pathpkg.Base(value)
+	return directory + pathpkg.Base(value)
 }

@@ -39,7 +39,7 @@ type LLMTextExecutor struct {
 
 func (LLMTextExecutor) Type() NodeType { return NodeTypeLLM }
 
-func (executor LLMTextExecutor) Execute(ctx context.Context, _ RunContext, execution NodeExecution) (NodeResult, error) {
+func (executor LLMTextExecutor) Execute(ctx context.Context, run RunContext, execution NodeExecution) (NodeResult, error) {
 	inputs, _ := execution.Input["inputs"].(map[string]any)
 	schema, structured, err := llmStructuredOutputSchema(execution.Input)
 	if err != nil {
@@ -55,6 +55,18 @@ func (executor LLMTextExecutor) Execute(ctx context.Context, _ RunContext, execu
 		Prompt:          prompt,
 		Temperature:     numberFromValue(execution.Input["temperature"]),
 		MaxOutputTokens: int(numberFromValue(execution.Input["maxOutputTokens"])),
+	}
+	if skillIDs := stringSliceFromValue(execution.Input["skillIds"]); len(skillIDs) > 0 {
+		if run.SkillInstructionResolver == nil {
+			return NodeResult{}, fmt.Errorf("当前工作流不支持技能")
+		}
+		instructions, resolveErr := run.SkillInstructionResolver(ctx, skillIDs)
+		if resolveErr != nil {
+			return NodeResult{}, resolveErr
+		}
+		if instructions != "" {
+			request.SystemPrompt = strings.TrimSpace(request.SystemPrompt + "\n\n" + instructions)
+		}
 	}
 	if request.Prompt == "" {
 		return NodeResult{}, fmt.Errorf("大模型节点用户提示词不能为空")
@@ -83,6 +95,23 @@ func (executor LLMTextExecutor) Execute(ctx context.Context, _ RunContext, execu
 		return NodeResult{Output: output}, nil
 	}
 	return NodeResult{Output: map[string]any{"text": strings.TrimSpace(result.Text), "model": result.Model, "tokenUsage": result.TokenUsage}}, nil
+}
+
+func stringSliceFromValue(value any) []string {
+	items, ok := value.([]any)
+	if !ok {
+		if direct, directOK := value.([]string); directOK {
+			return direct
+		}
+		return nil
+	}
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		if text, ok := item.(string); ok && strings.TrimSpace(text) != "" {
+			result = append(result, strings.TrimSpace(text))
+		}
+	}
+	return result
 }
 
 func promptWithInputs(prompt string, inputs map[string]any) string {

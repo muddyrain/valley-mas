@@ -352,6 +352,8 @@ type AISkill struct {
 	Description      string         `gorm:"size:500" json:"description"`
 	Content          string         `gorm:"type:text;not null" json:"-"`
 	ReferenceContent string         `gorm:"type:text;not null;default:''" json:"-"`
+	ScriptContent    string         `gorm:"type:text;not null;default:''" json:"-"`
+	Tags             string         `gorm:"type:text;not null;default:''" json:"-"`
 	SourceURL        string         `gorm:"size:1000;not null" json:"sourceUrl"`
 	SourceAuthor     string         `gorm:"size:200" json:"sourceAuthor"`
 	SourceLicense    string         `gorm:"size:100" json:"sourceLicense"`

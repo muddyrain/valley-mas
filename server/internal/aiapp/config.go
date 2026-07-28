@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -14,6 +15,7 @@ const (
 	MaxOpeningMessageRunes     = 1000
 	MaxExampleQuestions        = 4
 	MaxExampleQuestionRunes    = 120
+	MaxSkillBindings           = 8
 )
 
 type Config struct {
@@ -21,10 +23,11 @@ type Config struct {
 	SystemPrompt     string   `json:"systemPrompt"`
 	OpeningMessage   string   `json:"openingMessage"`
 	ExampleQuestions []string `json:"exampleQuestions"`
+	SkillIDs         []string `json:"skillIds"`
 }
 
 func DefaultConfig() Config {
-	return Config{ModelProfile: ModelProfileARKTextDefault, ExampleQuestions: []string{}}
+	return Config{ModelProfile: ModelProfileARKTextDefault, ExampleQuestions: []string{}, SkillIDs: []string{}}
 }
 
 func Parse(raw string) (Config, error) {
@@ -70,6 +73,23 @@ func Normalize(config Config) Config {
 		}
 	}
 	config.ExampleQuestions = questions
+	seenSkillIDs := make(map[string]struct{}, len(config.SkillIDs))
+	skillIDs := make([]string, 0, min(len(config.SkillIDs), MaxSkillBindings))
+	for _, rawID := range config.SkillIDs {
+		id := strings.TrimSpace(rawID)
+		if _, exists := seenSkillIDs[id]; exists {
+			continue
+		}
+		seenSkillIDs[id] = struct{}{}
+		if id == "" {
+			continue
+		}
+		skillIDs = append(skillIDs, id)
+		if len(skillIDs) == MaxSkillBindings {
+			break
+		}
+	}
+	config.SkillIDs = skillIDs
 	return config
 }
 
@@ -104,6 +124,15 @@ func ValidateEditable(config Config) error {
 	for _, question := range config.ExampleQuestions {
 		if utf8.RuneCountInString(question) > MaxExampleQuestionRunes {
 			return fmt.Errorf("示例问题不能超过 %d 个字符", MaxExampleQuestionRunes)
+		}
+	}
+	if len(config.SkillIDs) > MaxSkillBindings {
+		return fmt.Errorf("技能不能超过 %d 个", MaxSkillBindings)
+	}
+	for _, rawID := range config.SkillIDs {
+		id, err := strconv.ParseInt(strings.TrimSpace(rawID), 10, 64)
+		if err != nil || id <= 0 {
+			return fmt.Errorf("技能 ID 无效")
 		}
 	}
 	return nil

@@ -52,6 +52,7 @@ func setupAISkillTestRouter(t *testing.T) *gin.Engine {
 	auth.GET("/skills/:skillId", GetAISkill)
 	auth.POST("/skills/preview", PreviewAISkillImport)
 	auth.POST("/skills/install", InstallAISkill)
+	auth.PATCH("/skills/:skillId", UpdateAISkill)
 	auth.DELETE("/skills/:skillId", ArchiveAISkill)
 	return router
 }
@@ -71,9 +72,12 @@ func TestInstallAISkillStoresSkillBodyServerSide(t *testing.T) {
 			Path:          "skills/minimal-zine/SKILL.md", Name: "minimal-zine",
 			URL: "https://github.com/example/minimal-zine/blob/main/skills/minimal-zine/SKILL.md", Author: "example",
 			Description:      "Generate a minimal zine poster",
+			Tags:             []string{"写作", "智能体"},
 			Content:          "---\nname: minimal-zine\ndescription: Generate a minimal zine poster\n---\n# Skill body",
 			ReferenceContent: references,
 			ReferenceCount:   1,
+			ScriptContent:    "## 脚本：skills/minimal-zine/scripts/compose.py\nprint('compose')",
+			ScriptCount:      1,
 		}}, nil
 	}
 	t.Cleanup(func() { discoverAISkillSources = previousDiscover })
@@ -101,6 +105,9 @@ func TestInstallAISkillStoresSkillBodyServerSide(t *testing.T) {
 	if installed.ID == 0 {
 		t.Fatalf("missing installed skill ID: %+v", installed)
 	}
+	if got := strings.Join(installed.Tags, ","); got != "写作,智能体" {
+		t.Fatalf("installed tags=%q", got)
+	}
 
 	var stored model.AISkill
 	if err := database.GetDB().First(&stored, installed.ID).Error; err != nil {
@@ -111,6 +118,9 @@ func TestInstallAISkillStoresSkillBodyServerSide(t *testing.T) {
 	}
 	if stored.ReferenceContent == "" {
 		t.Fatalf("skill references were not stored: %+v", stored)
+	}
+	if stored.ScriptContent == "" {
+		t.Fatalf("skill scripts were not stored: %+v", stored)
 	}
 
 	secondRecorder := httptest.NewRecorder()
@@ -136,12 +146,54 @@ func TestInstallAISkillStoresSkillBodyServerSide(t *testing.T) {
 	}
 }
 
+func TestUpdateAISkillTagsAndRuntimeInstructionsExcludeScripts(t *testing.T) {
+	router := setupAISkillTestRouter(t)
+	skill := model.AISkill{
+		UserID:           101,
+		Name:             "writing",
+		Content:          "# Writing\nUse concise prose.",
+		ReferenceContent: "# Reference\nPrefer active voice.",
+		ScriptContent:    "print('must not reach the model')",
+	}
+	if err := database.GetDB().Create(&skill).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, aiPromptRequest(t, http.MethodPatch, "/ai/skills/"+skill.ID.String(), "101", updateAISkillPayload{Tags: []string{"智能体", "写作", "智能体"}}))
+	updated := decodeAIPromptData[aiSkillView](t, recorder)
+	if got := strings.Join(updated.Tags, ","); got != "智能体,写作" {
+		t.Fatalf("updated tags=%q", got)
+	}
+
+	instructions, err := resolveAISkillRuntimeInstructions(database.GetDB(), 101, []string{skill.ID.String()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(instructions, "Use concise prose.") || !strings.Contains(instructions, "Prefer active voice.") || strings.Contains(instructions, "must not reach the model") {
+		t.Fatalf("instructions=%q", instructions)
+	}
+}
+
+func TestNormalizeAISkillInstallSourceSupportsNpxSkillsAdd(t *testing.T) {
+	url, names, err := normalizeAISkillInstallSource("npx skills add owner/collection --skill writing,review")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if url != "https://github.com/owner/collection" || strings.Join(names, ",") != "writing,review" {
+		t.Fatalf("url=%q names=%v", url, names)
+	}
+	if _, _, err := normalizeAISkillInstallSource("npx skills add owner/collection --all"); err == nil {
+		t.Fatal("expected unsupported npx option to fail")
+	}
+}
+
 func TestPreviewAISkillImportReturnsReferencesAndSelectedInstallStoresThem(t *testing.T) {
 	router := setupAISkillTestRouter(t)
 	previousDiscover := discoverAISkillSources
 	discoverAISkillSources = func(context.Context, string) ([]aiSkillImportSource, error) {
 		return []aiSkillImportSource{
-			{RepositoryURL: "https://github.com/example/collection", Path: "skills/a/SKILL.md", Name: "skill-a", ReferenceCount: 2, URL: "https://github.com/example/collection/blob/main/skills/a/SKILL.md", Author: "example", Content: "a"},
+			{RepositoryURL: "https://github.com/example/collection", Path: "skills/a/SKILL.md", Name: "skill-a", ReferenceCount: 2, ScriptCount: 1, URL: "https://github.com/example/collection/blob/main/skills/a/SKILL.md", Author: "example", Content: "a"},
 			{RepositoryURL: "https://github.com/example/collection", Path: "skills/b/SKILL.md", Name: "skill-b", URL: "https://github.com/example/collection/blob/main/skills/b/SKILL.md", Author: "example", Content: "b"},
 		}, nil
 	}
@@ -150,7 +202,7 @@ func TestPreviewAISkillImportReturnsReferencesAndSelectedInstallStoresThem(t *te
 	previewRecorder := httptest.NewRecorder()
 	router.ServeHTTP(previewRecorder, aiPromptRequest(t, http.MethodPost, "/ai/skills/preview", "101", installAISkillPayload{URL: "https://github.com/example/collection"}))
 	preview := decodeAIPromptData[aiSkillImportPreviewView](t, previewRecorder)
-	if len(preview.Skills) != 2 || preview.Skills[0].ReferenceCount != 2 {
+	if len(preview.Skills) != 2 || preview.Skills[0].ReferenceCount != 2 || preview.Skills[0].ScriptCount != 1 {
 		t.Fatalf("preview=%+v", preview)
 	}
 
@@ -171,6 +223,7 @@ func TestGetAISkillShowsImportedDirectoryFiles(t *testing.T) {
 	skill := model.AISkill{
 		UserID: 101, Name: "photography-scene", Content: "# Skill\nUse camera details.",
 		ReferenceContent: "## 参考资料：skills/photography-scene/references/camera.md\n# Cameras\nUse 50mm lens.\n\n## 参考资料：skills/photography-scene/references/examples/portrait.mdx\n# Portrait",
+		ScriptContent:    "## 脚本：skills/photography-scene/scripts/crop.py\nprint('crop')",
 		SourceURL:        "https://github.com/example/skills/blob/main/skills/photography-scene/SKILL.md",
 	}
 	if err := database.GetDB().Create(&skill).Error; err != nil {
@@ -180,9 +233,10 @@ func TestGetAISkillShowsImportedDirectoryFiles(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, aiPromptRequest(t, http.MethodGet, "/ai/skills/"+skill.ID.String(), "101", nil))
 	detail := decodeAIPromptData[aiSkillDetailView](t, recorder)
-	if detail.Name != "photography-scene" || len(detail.Files) != 3 ||
+	if detail.Name != "photography-scene" || len(detail.Files) != 4 ||
 		detail.Files[0].Path != "SKILL.md" || detail.Files[1].Path != "references/camera.md" ||
-		detail.Files[2].Path != "references/examples/portrait.mdx" {
+		detail.Files[2].Path != "references/examples/portrait.mdx" ||
+		detail.Files[3].Path != "scripts/crop.py" || detail.Files[3].Kind != "script" {
 		t.Fatalf("detail=%+v", detail)
 	}
 }
@@ -202,12 +256,18 @@ func TestDiscoverGitHubAISkillSourcesImportsBundledReferences(t *testing.T) {
 		case "api.github.com/repos/owner/collection/contents/skills/zelda-style/references":
 			status = http.StatusOK
 			body = `[{"name":"palette.md","type":"file"},{"name":"rendering.md","type":"file"}]`
+		case "api.github.com/repos/owner/collection/contents/skills/zelda-style/scripts":
+			status = http.StatusOK
+			body = `[{"name":"render.py","type":"file"},{"name":"ignored.json","type":"file"}]`
 		case "raw.githubusercontent.com/owner/collection/HEAD/skills/zelda-style/references/palette.md":
 			status = http.StatusOK
 			body = "warm forest palette"
 		case "raw.githubusercontent.com/owner/collection/HEAD/skills/zelda-style/references/rendering.md":
 			status = http.StatusOK
 			body = "hand-painted rendering"
+		case "raw.githubusercontent.com/owner/collection/HEAD/skills/zelda-style/scripts/render.py":
+			status = http.StatusOK
+			body = "print('render')"
 		}
 		return &http.Response{
 			StatusCode: status,
@@ -222,7 +282,8 @@ func TestDiscoverGitHubAISkillSourcesImportsBundledReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(sources) != 1 || sources[0].Name != "zelda-style" || sources[0].ReferenceCount != 2 ||
-		!strings.Contains(sources[0].ReferenceContent, "hand-painted rendering") {
+		sources[0].ScriptCount != 1 || !strings.Contains(sources[0].ReferenceContent, "hand-painted rendering") ||
+		!strings.Contains(sources[0].ScriptContent, "print('render')") {
 		t.Fatalf("sources=%+v", sources)
 	}
 }

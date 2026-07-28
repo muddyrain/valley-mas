@@ -45,6 +45,9 @@ type aiSkillImportSource struct {
 	Content          string
 	ReferenceContent string
 	ReferenceCount   int
+	ScriptContent    string
+	ScriptCount      int
+	Tags             []string
 	URL              string
 	Author           string
 }
@@ -53,7 +56,11 @@ type aiSkillImportSource struct {
 // URL. A direct SKILL.md wins; otherwise the selected directory is treated as
 // a collection whose direct child folders each contain a SKILL.md.
 func discoverGitHubAISkillSources(ctx context.Context, rawURL string) ([]aiSkillImportSource, error) {
-	location, err := parseGitHubAISkillLocation(rawURL)
+	normalizedURL, requestedNames, err := normalizeAISkillInstallSource(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	location, err := parseGitHubAISkillLocation(normalizedURL)
 	if err != nil {
 		return nil, err
 	}
@@ -69,6 +76,9 @@ func discoverGitHubAISkillSources(ctx context.Context, rawURL string) ([]aiSkill
 		}
 		if source.Content == "" {
 			continue
+		}
+		if len(requestedNames) > 0 && !matchesAISkillRequestedName(source, requestedNames) {
+			return nil, errors.New("未找到 npx skills add 指定的技能")
 		}
 		return []aiSkillImportSource{source}, nil
 	}
@@ -104,11 +114,74 @@ func discoverGitHubAISkillSources(ctx context.Context, rawURL string) ([]aiSkill
 			}
 		}
 		if len(sources) > 0 {
+			if len(requestedNames) > 0 {
+				sources = filterAISkillRequestedNames(sources, requestedNames)
+				if len(sources) == 0 {
+					return nil, errors.New("未找到 npx skills add 指定的技能")
+				}
+			}
 			return sources, nil
 		}
 	}
 
 	return nil, errors.New("未找到可导入的 SKILL.md；请提供仓库链接或包含技能的 GitHub 目录链接")
+}
+
+func normalizeAISkillInstallSource(rawValue string) (string, []string, error) {
+	value := strings.TrimSpace(rawValue)
+	if !strings.HasPrefix(value, "npx ") {
+		return normalizeAISkillGitHubSource(value), nil, nil
+	}
+	parts := strings.Fields(value)
+	if len(parts) < 4 || parts[0] != "npx" || !strings.HasPrefix(parts[1], "skills") || parts[2] != "add" {
+		return "", nil, errors.New("仅支持 npx skills add <来源> [--skill <技能>] 格式")
+	}
+	source := parts[3]
+	requestedNames := make([]string, 0, 4)
+	for index := 4; index < len(parts); index++ {
+		switch parts[index] {
+		case "--skill", "-s":
+			index++
+			if index >= len(parts) || strings.HasPrefix(parts[index], "-") {
+				return "", nil, errors.New("npx skills add 缺少 --skill 名称")
+			}
+			for _, name := range strings.Split(parts[index], ",") {
+				if normalized := strings.TrimSpace(name); normalized != "" {
+					requestedNames = append(requestedNames, normalized)
+				}
+			}
+		default:
+			return "", nil, errors.New("仅支持 npx skills add 的 --skill 选项")
+		}
+	}
+	return normalizeAISkillGitHubSource(source), requestedNames, nil
+}
+
+func normalizeAISkillGitHubSource(value string) string {
+	value = strings.TrimSpace(value)
+	if strings.Count(value, "/") == 1 && !strings.Contains(value, "://") {
+		return "https://github.com/" + value
+	}
+	return value
+}
+
+func matchesAISkillRequestedName(source aiSkillImportSource, names []string) bool {
+	for _, name := range names {
+		if name == source.Name || name == pathpkg.Base(pathpkg.Dir(source.Path)) {
+			return true
+		}
+	}
+	return false
+}
+
+func filterAISkillRequestedNames(sources []aiSkillImportSource, names []string) []aiSkillImportSource {
+	result := make([]aiSkillImportSource, 0, len(names))
+	for _, source := range sources {
+		if matchesAISkillRequestedName(source, names) {
+			result = append(result, source)
+		}
+	}
+	return result
 }
 
 func parseGitHubAISkillLocation(rawURL string) (gitHubAISkillLocation, error) {
@@ -172,19 +245,23 @@ func directAISkillPaths(location gitHubAISkillLocation) []string {
 	if location.Directory != "" {
 		return []string{pathpkg.Join(location.Directory, "SKILL.md")}
 	}
-	return []string{"SKILL.md", "skills/SKILL.md"}
+	return []string{"SKILL.md", "skills/SKILL.md", ".agents/skills/SKILL.md", ".claude/skills/SKILL.md", ".codex/skills/SKILL.md", ".cursor/skills/SKILL.md"}
 }
 
 func collectionAISkillDirectories(location gitHubAISkillLocation) []string {
 	if location.Directory != "" {
 		return []string{location.Directory}
 	}
-	return []string{"skills"}
+	return []string{"skills", "skills/.curated", "skills/.experimental", "skills/.system", ".agents/skills", ".claude/skills", ".codex/skills", ".cursor/skills"}
 }
 
 func buildAISkillImportSource(ctx context.Context, location gitHubAISkillLocation, skillPath, content string) (aiSkillImportSource, error) {
 	content = strings.TrimSpace(content)
 	referenceContent, referenceCount, err := fetchAISkillReferenceContent(ctx, location, skillPath)
+	if err != nil {
+		return aiSkillImportSource{}, err
+	}
+	scriptContent, scriptCount, err := fetchAISkillScriptContent(ctx, location, skillPath)
 	if err != nil {
 		return aiSkillImportSource{}, err
 	}
@@ -209,9 +286,35 @@ func buildAISkillImportSource(ctx context.Context, location gitHubAISkillLocatio
 		Content:          content,
 		ReferenceContent: referenceContent,
 		ReferenceCount:   referenceCount,
+		ScriptContent:    scriptContent,
+		ScriptCount:      scriptCount,
+		Tags:             extractAISkillTags(content),
 		URL:              sourceURL,
 		Author:           location.Owner,
 	}, nil
+}
+
+func extractAISkillTags(content string) []string {
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "tags:") {
+			continue
+		}
+		value := strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, "tags:")), "[]")
+		items := strings.Split(value, ",")
+		tags := make([]string, 0, len(items))
+		for _, item := range items {
+			if tag := strings.Trim(strings.TrimSpace(item), "\"'"); tag != "" {
+				tags = append(tags, tag)
+			}
+		}
+		normalized, err := normalizeAIPromptTags(tags)
+		if err == nil {
+			return normalized
+		}
+		return []string{}
+	}
+	return []string{}
 }
 
 func extractAISkillName(content, fallback string) string {
@@ -349,8 +452,21 @@ func fetchGitHubAISkillDirectoryFromArchive(ctx context.Context, owner, reposito
 }
 
 func fetchAISkillReferenceContent(ctx context.Context, location gitHubAISkillLocation, skillPath string) (string, int, error) {
-	referenceDirectory := pathpkg.Join(pathpkg.Dir(skillPath), "references")
-	paths, err := collectAISkillReferencePaths(ctx, location, referenceDirectory, 0)
+	return fetchAISkillBundledContent(ctx, location, skillPath, "references", "## 参考资料：", isSupportedAISkillReferenceFile)
+}
+
+func fetchAISkillScriptContent(ctx context.Context, location gitHubAISkillLocation, skillPath string) (string, int, error) {
+	return fetchAISkillBundledContent(ctx, location, skillPath, "scripts", "## 脚本：", isSupportedAISkillScriptFile)
+}
+
+func fetchAISkillBundledContent(
+	ctx context.Context,
+	location gitHubAISkillLocation,
+	skillPath, directoryName, sectionMarker string,
+	isSupportedFile func(string) bool,
+) (string, int, error) {
+	directory := pathpkg.Join(pathpkg.Dir(skillPath), directoryName)
+	paths, err := collectAISkillBundledPaths(ctx, location, directory, 0, isSupportedFile)
 	if err != nil {
 		return "", 0, err
 	}
@@ -360,16 +476,16 @@ func fetchAISkillReferenceContent(ctx context.Context, location gitHubAISkillLoc
 
 	var builder strings.Builder
 	referenceCount := 0
-	for _, referencePath := range paths {
-		content, fetchErr := fetchGitHubRawFile(ctx, location.Owner, location.Repository, location.Ref, referencePath)
+	for _, filePath := range paths {
+		content, fetchErr := fetchGitHubRawFile(ctx, location.Owner, location.Repository, location.Ref, filePath)
 		if fetchErr != nil {
-			return "", 0, errors.New("读取技能参考资料失败")
+			return "", 0, errors.New("读取技能附带文件失败")
 		}
 		content = strings.TrimSpace(content)
 		if content == "" {
 			continue
 		}
-		entry := "\n\n## 参考资料：" + referencePath + "\n" + content
+		entry := "\n\n" + sectionMarker + filePath + "\n" + content
 		if builder.Len()+len(entry) > maxAISkillReferenceContentBytes {
 			break
 		}
@@ -383,7 +499,13 @@ func fetchAISkillReferenceContent(ctx context.Context, location gitHubAISkillLoc
 	return referenceContent, referenceCount, nil
 }
 
-func collectAISkillReferencePaths(ctx context.Context, location gitHubAISkillLocation, directory string, depth int) ([]string, error) {
+func collectAISkillBundledPaths(
+	ctx context.Context,
+	location gitHubAISkillLocation,
+	directory string,
+	depth int,
+	isSupportedFile func(string) bool,
+) ([]string, error) {
 	if depth > maxAISkillReferenceDepth {
 		return nil, nil
 	}
@@ -398,10 +520,10 @@ func collectAISkillReferencePaths(ctx context.Context, location gitHubAISkillLoc
 		}
 		entryPath := pathpkg.Join(directory, entry.Name)
 		switch {
-		case entry.Type == "file" && isSupportedAISkillReferenceFile(entry.Name):
+		case entry.Type == "file" && isSupportedFile(entry.Name):
 			paths = append(paths, entryPath)
 		case entry.Type == "dir" && depth < maxAISkillReferenceDepth:
-			nested, nestedErr := collectAISkillReferencePaths(ctx, location, entryPath, depth+1)
+			nested, nestedErr := collectAISkillBundledPaths(ctx, location, entryPath, depth+1, isSupportedFile)
 			if nestedErr != nil {
 				return nil, nestedErr
 			}
@@ -421,6 +543,15 @@ func collectAISkillReferencePaths(ctx context.Context, location gitHubAISkillLoc
 func isSupportedAISkillReferenceFile(fileName string) bool {
 	switch strings.ToLower(pathpkg.Ext(fileName)) {
 	case ".md", ".mdx", ".txt":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSupportedAISkillScriptFile(fileName string) bool {
+	switch strings.ToLower(pathpkg.Ext(fileName)) {
+	case ".py", ".pyw", ".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".sh", ".bash", ".zsh", ".fish", ".ps1", ".rb", ".php", ".pl", ".lua", ".r":
 		return true
 	default:
 		return false

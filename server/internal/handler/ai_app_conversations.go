@@ -255,6 +255,11 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		fail(400, "APP_CONFIG_INVALID", "智能体版本配置无效", errors.New("invalid AI App version config"))
 		return
 	}
+	skillInstructions, skillErr := resolveAISkillRuntimeInstructions(database.GetDB(), userID, config.SkillIDs)
+	if skillErr != nil {
+		fail(http.StatusBadRequest, "APP_SKILLS_UNAVAILABLE", "已绑定技能不可用", skillErr)
+		return
+	}
 	invocation, invocationErr := aimodel.ResolveInvocation(database.GetDB(), payload.ModelID, "text", 60*time.Second)
 	if invocationErr != nil {
 		fail(http.StatusServiceUnavailable, "MODEL_NOT_CONFIGURED", "所选模型暂不可用", invocationErr)
@@ -269,6 +274,9 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		return
 	}
 	system := buildAIAppConversationSystemPrompt(config.SystemPrompt, knowledgeContext)
+	if skillInstructions != "" {
+		system = strings.TrimSpace(system + "\n\n" + skillInstructions)
+	}
 	registry, toolNames, toolErr := resolveAIAppTools(database.GetDB(), app.ID, version)
 	if toolErr != nil {
 		fail(500, "AI_TOOL_REGISTRY_UNAVAILABLE", "加载智能体工具失败", toolErr)

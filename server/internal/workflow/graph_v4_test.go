@@ -725,6 +725,30 @@ func TestLLMNodeAllowsEmptySystemPromptAndReportsSafeErrors(t *testing.T) {
 	}
 }
 
+func TestLLMNodeAddsResolvedSkillInstructions(t *testing.T) {
+	executor := LLMTextExecutor{Generator: textGeneratorFunc(func(_ context.Context, request TextGenerationRequest) (TextGenerationResult, error) {
+		if request.SystemPrompt != "base instructions\n\nresolved skill instructions" {
+			t.Fatalf("system prompt=%q", request.SystemPrompt)
+		}
+		return TextGenerationResult{Text: "done", Model: "test"}, nil
+	})}
+	result, err := executor.Execute(context.Background(), RunContext{
+		SkillInstructionResolver: func(_ context.Context, ids []string) (string, error) {
+			if len(ids) != 1 || ids[0] != "12" {
+				t.Fatalf("skill ids=%v", ids)
+			}
+			return "resolved skill instructions", nil
+		},
+	}, NodeExecution{Input: map[string]any{
+		"prompt":       "write",
+		"systemPrompt": "base instructions",
+		"skillIds":     []any{"12"},
+	}})
+	if err != nil || result.Output["text"] != "done" {
+		t.Fatalf("result=%v err=%v", result, err)
+	}
+}
+
 func TestLLMStructuredOutputValidatesDeclaredFields(t *testing.T) {
 	executor := LLMTextExecutor{Generator: textGeneratorFunc(func(_ context.Context, request TextGenerationRequest) (TextGenerationResult, error) {
 		if !strings.Contains(request.Prompt, "只返回一个 JSON 对象") {

@@ -1,10 +1,12 @@
 import { BookOpen, Plus, Sparkles, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { type AISkill, getAPIErrorMessage, listAISkills } from '@/api/aiWorkbench';
 import { ModelPicker } from '@/components/ai/ModelPicker';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
 import { PromptLibraryDialog } from '@/components/ai-workbench/PromptLibraryDialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -28,6 +30,8 @@ export function LLMPropertyForm({
 }: PropertyFormProps) {
   const [showAssistant, setShowAssistant] = useState(false);
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
+  const [skills, setSkills] = useState<AISkill[]>([]);
+  const [skillLoadError, setSkillLoadError] = useState('');
   const systemPrompt = (config.systemPrompt as string) || '';
   const taskPrompt = (config.prompt as string) || '';
   const inputs = (config.inputs as Record<string, unknown>) || {};
@@ -47,6 +51,23 @@ export function LLMPropertyForm({
   ];
   const updateOutputSchema = (nextSchema: Record<string, import('../types').WorkflowValueType>) =>
     onUpdateConfig({ outputMode: 'json', outputSchema: nextSchema });
+  const skillIDs = Array.isArray(config.skillIds)
+    ? config.skillIds.filter((id): id is string => typeof id === 'string')
+    : [];
+
+  useEffect(() => {
+    let active = true;
+    void listAISkills()
+      .then(({ list }) => {
+        if (active) setSkills(list);
+      })
+      .catch((error) => {
+        if (active) setSkillLoadError(getAPIErrorMessage(error, '加载技能失败'));
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -143,6 +164,43 @@ export function LLMPropertyForm({
             placeholder="例如：根据输入主题生成一篇文章"
           />
         </div>
+      </EditorSection>
+      <EditorSection title="技能" description="所选技能仅在当前 LLM 节点运行时生效。">
+        {skillLoadError ? (
+          <p className="text-xs text-destructive">{skillLoadError}</p>
+        ) : skills.length === 0 ? (
+          <p className="text-xs text-muted-foreground">暂无已安装技能</p>
+        ) : (
+          <div className="space-y-2">
+            {skills.map((skill) => {
+              const checked = skillIDs.includes(skill.id);
+              return (
+                <label
+                  key={skill.id}
+                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-background px-3 py-2"
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={(nextChecked) =>
+                      onUpdateConfig({
+                        skillIds:
+                          nextChecked === true
+                            ? [...skillIDs, skill.id].slice(0, 8)
+                            : skillIDs.filter((id) => id !== skill.id),
+                      })
+                    }
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">{skill.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {skill.description || '未提供技能说明'}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        )}
       </EditorSection>
       <EditorSection title="输出" description="下游节点可直接引用这些字段。">
         <div className="space-y-3">

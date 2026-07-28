@@ -1,15 +1,18 @@
 import {
   Download,
   ExternalLink,
+  FileCode2,
   FileText,
   FolderOpen,
   Github,
   MoreHorizontal,
+  Pencil,
   Search,
   Sparkles,
   Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   type AISkill,
@@ -21,6 +24,7 @@ import {
   installAISkill,
   listAISkills,
   previewAISkillImport,
+  updateAISkill,
 } from '@/api/aiWorkbench';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,10 +48,27 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 
+const suggestedSkillTags = ['通用', '智能体', '工作流', '写作', '生图', '数据'];
+
+function parseSkillTags(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[,，]/)
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, 8);
+}
+
+function formatSkillTags(tags: string[]) {
+  return tags.join('，');
+}
+
 export default function SkillResources() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [skills, setSkills] = useState<AISkill[]>([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState('');
   const [installOpen, setInstallOpen] = useState(false);
   const [installURL, setInstallURL] = useState('');
   const [installPreview, setInstallPreview] = useState<AISkillImportPreview | null>(null);
@@ -59,6 +80,11 @@ export default function SkillResources() {
   const [skillDetail, setSkillDetail] = useState<AISkillDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedFilePath, setSelectedFilePath] = useState('SKILL.md');
+  const [tagEditorSkill, setTagEditorSkill] = useState<AISkill | null>(null);
+  const [tagText, setTagText] = useState('');
+  const [savingTags, setSavingTags] = useState(false);
+  const keyword = searchParams.get('skill_search') || '';
+  const activeTag = searchParams.get('skill_tag') || '';
 
   useEffect(() => {
     let active = true;
@@ -78,14 +104,48 @@ export default function SkillResources() {
   }, []);
 
   const visibleSkills = useMemo(() => {
-    const keyword = query.trim().toLocaleLowerCase();
-    if (!keyword) return skills;
-    return skills.filter((skill) =>
-      `${skill.name} ${skill.description} ${skill.sourceAuthor}`
-        .toLocaleLowerCase()
-        .includes(keyword),
-    );
-  }, [query, skills]);
+    const normalizedKeyword = keyword.trim().toLocaleLowerCase();
+    return skills.filter((skill) => {
+      const matchesKeyword =
+        !normalizedKeyword ||
+        `${skill.name} ${skill.description} ${skill.sourceAuthor} ${skill.tags.join(' ')}`
+          .toLocaleLowerCase()
+          .includes(normalizedKeyword);
+      return matchesKeyword && (!activeTag || skill.tags.includes(activeTag));
+    });
+  }, [activeTag, keyword, skills]);
+
+  const tagFilters = useMemo(
+    () =>
+      Array.from(
+        new Set([activeTag, ...skills.flatMap((skill) => skill.tags)].filter(Boolean)),
+      ).sort((left, right) => {
+        const leftIndex = suggestedSkillTags.indexOf(left);
+        const rightIndex = suggestedSkillTags.indexOf(right);
+        if (leftIndex >= 0 || rightIndex >= 0) {
+          return (
+            (leftIndex < 0 ? Number.MAX_SAFE_INTEGER : leftIndex) -
+            (rightIndex < 0 ? Number.MAX_SAFE_INTEGER : rightIndex)
+          );
+        }
+        return left.localeCompare(right, 'zh-CN');
+      }),
+    [activeTag, skills],
+  );
+
+  const updateSearch = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value.trim()) next.set('skill_search', value);
+    else next.delete('skill_search');
+    setSearchParams(next, { replace: true });
+  };
+
+  const updateTagFilter = (tag: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (tag) next.set('skill_tag', tag);
+    else next.delete('skill_tag');
+    setSearchParams(next, { replace: true });
+  };
 
   const resetInstallFlow = () => {
     setInstallURL('');
@@ -154,6 +214,26 @@ export default function SkillResources() {
     }
   };
 
+  const openTagEditor = (skill: AISkill) => {
+    setTagEditorSkill(skill);
+    setTagText(formatSkillTags(skill.tags));
+  };
+
+  const saveTags = async () => {
+    if (!tagEditorSkill) return;
+    try {
+      setSavingTags(true);
+      const updated = await updateAISkill(tagEditorSkill.id, { tags: parseSkillTags(tagText) });
+      setSkills((items) => [updated, ...items.filter((item) => item.id !== updated.id)]);
+      setTagEditorSkill(null);
+      toast.success('技能标签已保存');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '保存技能标签失败'));
+    } finally {
+      setSavingTags(false);
+    }
+  };
+
   const openSkillDetail = async (skill: AISkill) => {
     setDetailSkill(skill);
     setSkillDetail(null);
@@ -174,6 +254,7 @@ export default function SkillResources() {
   const selectedFile = detailFiles.find((file) => file.path === selectedFilePath) ?? detailFiles[0];
   const skillFile = detailFiles.find((file) => file.kind === 'skill');
   const referenceFiles = detailFiles.filter((file) => file.kind === 'reference');
+  const scriptFiles = detailFiles.filter((file) => file.kind === 'script');
 
   return (
     <div className="space-y-5">
@@ -181,8 +262,8 @@ export default function SkillResources() {
         <div className="relative w-full max-w-xs">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={keyword}
+            onChange={(event) => updateSearch(event.target.value)}
             placeholder="搜索已安装技能"
             className="pl-9"
           />
@@ -193,6 +274,30 @@ export default function SkillResources() {
         </Button>
       </div>
 
+      {tagFilters.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="按标签筛选">
+          <Button
+            type="button"
+            size="sm"
+            variant={activeTag ? 'outline' : 'secondary'}
+            onClick={() => updateTagFilter('')}
+          >
+            全部
+          </Button>
+          {tagFilters.map((tag) => (
+            <Button
+              key={tag}
+              type="button"
+              size="sm"
+              variant={activeTag === tag ? 'secondary' : 'outline'}
+              onClick={() => updateTagFilter(tag)}
+            >
+              {tag}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+
       {loading ? (
         <div aria-busy="true" className="space-y-3 py-4">
           <Skeleton className="h-24 w-full" />
@@ -202,7 +307,7 @@ export default function SkillResources() {
         <div className="py-24 text-center">
           <Sparkles className="mx-auto mb-3 size-10 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            {query.trim() ? '没有匹配的技能' : '还没有安装技能'}
+            {keyword || activeTag ? '没有匹配的技能' : '还没有安装技能'}
           </p>
         </div>
       ) : (
@@ -241,6 +346,10 @@ export default function SkillResources() {
                       <MoreHorizontal />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openTagEditor(skill)}>
+                        <Pencil />
+                        编辑标签
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive"
                         onClick={() => void archive(skill)}
@@ -253,7 +362,15 @@ export default function SkillResources() {
                 </div>
               </div>
               <div className="mt-3 flex shrink-0 items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
-                <Badge variant="secondary">生图可用</Badge>
+                {skill.tags.slice(0, 2).map((tag) => (
+                  <Badge key={tag} variant="secondary">
+                    {tag}
+                  </Badge>
+                ))}
+                {skill.tags.length > 2 ? (
+                  <Badge variant="outline">+{skill.tags.length - 2}</Badge>
+                ) : null}
+                {skill.tags.length === 0 ? <Badge variant="outline">未分类</Badge> : null}
                 <a
                   href={skill.sourceUrl}
                   target="_blank"
@@ -283,7 +400,7 @@ export default function SkillResources() {
         <DialogContent className="flex h-[min(44rem,calc(100vh-2rem))] flex-col overflow-hidden sm:max-w-4xl">
           <DialogHeader className="shrink-0">
             <DialogTitle>{skillDetail?.name || detailSkill?.name || '技能目录'}</DialogTitle>
-            <DialogDescription>已导入的技能说明和参考资料。</DialogDescription>
+            <DialogDescription>已导入的技能说明、参考资料和脚本。</DialogDescription>
           </DialogHeader>
           {detailLoading ? (
             <div className="grid min-h-0 flex-1 overflow-hidden rounded-lg border border-border sm:grid-cols-[12rem_minmax(0,1fr)]">
@@ -331,6 +448,28 @@ export default function SkillResources() {
                       ))}
                     </div>
                   ) : null}
+                  {scriptFiles.length > 0 ? (
+                    <div className="pt-1">
+                      <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                        <FolderOpen className="size-3.5" />
+                        scripts
+                      </div>
+                      {scriptFiles.map((file) => (
+                        <Button
+                          key={file.path}
+                          variant={selectedFile.path === file.path ? 'secondary' : 'ghost'}
+                          size="sm"
+                          className="w-full justify-start gap-2 truncate"
+                          onClick={() => setSelectedFilePath(file.path)}
+                        >
+                          <FileCode2 className="size-3.5 shrink-0" />
+                          <span className="truncate pl-2">
+                            {file.path.replace(/^scripts\//, '')}
+                          </span>
+                        </Button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
               <div className="flex min-w-0 flex-col">
@@ -368,6 +507,63 @@ export default function SkillResources() {
       </Dialog>
 
       <Dialog
+        open={tagEditorSkill !== null}
+        onOpenChange={(open) => !open && setTagEditorSkill(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>编辑技能标签</DialogTitle>
+            <DialogDescription>用标签组织技能，方便在智能体和工作流中选择。</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="ai-skill-tags">标签</Label>
+              <Input
+                id="ai-skill-tags"
+                value={tagText}
+                onChange={(event) => setTagText(event.target.value)}
+                placeholder="例如：智能体，写作"
+                disabled={savingTags}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {suggestedSkillTags.map((tag) => {
+                const selected = parseSkillTags(tagText).includes(tag);
+                return (
+                  <Button
+                    key={tag}
+                    type="button"
+                    size="sm"
+                    variant={selected ? 'secondary' : 'outline'}
+                    disabled={savingTags}
+                    onClick={() => {
+                      const tags = parseSkillTags(tagText);
+                      setTagText(
+                        formatSkillTags(
+                          selected ? tags.filter((item) => item !== tag) : [...tags, tag],
+                        ),
+                      );
+                    }}
+                  >
+                    {tag}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={savingTags} onClick={() => setTagEditorSkill(null)}>
+              取消
+            </Button>
+            <Button disabled={savingTags} onClick={() => void saveTags()}>
+              {savingTags ? <Spinner /> : null}
+              保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={installOpen}
         onOpenChange={(open) => {
           if (installing || resolvingInstall) return;
@@ -379,11 +575,11 @@ export default function SkillResources() {
           <DialogHeader>
             <DialogTitle>安装技能</DialogTitle>
             <DialogDescription>
-              粘贴公开 GitHub 仓库或目录链接，选择要安装的 SKILL.md。
+              粘贴公开 GitHub 仓库、目录链接，或 npx skills add 命令，选择要安装的 SKILL.md。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
-            <Label htmlFor="ai-skill-install-url">GitHub 仓库或目录链接</Label>
+            <Label htmlFor="ai-skill-install-url">技能来源</Label>
             <Input
               id="ai-skill-install-url"
               value={installURL}
@@ -392,7 +588,7 @@ export default function SkillResources() {
                 setInstallPreview(null);
                 setSelectedInstallPaths([]);
               }}
-              placeholder="https://github.com/owner/repository 或 /tree/main/skills"
+              placeholder="npx skills add owner/repository --skill skill-name"
               disabled={installing || resolvingInstall}
             />
           </div>
@@ -443,6 +639,11 @@ export default function SkillResources() {
                         {skill.referenceCount > 0 ? (
                           <span className="mt-1 block text-xs text-muted-foreground">
                             含 {skill.referenceCount} 份参考资料
+                          </span>
+                        ) : null}
+                        {skill.scriptCount > 0 ? (
+                          <span className="mt-1 block text-xs text-muted-foreground">
+                            含 {skill.scriptCount} 个脚本
                           </span>
                         ) : null}
                       </span>

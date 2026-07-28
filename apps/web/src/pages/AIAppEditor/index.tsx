@@ -28,6 +28,7 @@ import {
   type AIAppVersion,
   type AIKnowledgeBase,
   type AIKnowledgeReference,
+  type AISkill,
   createAIAPIKey,
   createAIAppConversation,
   createPromptAssistantSuggestion,
@@ -43,6 +44,7 @@ import {
   listAIAppToolBindings,
   listAIAppTools,
   listAIKnowledgeBases,
+  listAISkills,
   type PromptAssistantField,
   publishAIApp,
   replaceAIAPIKeyAppBindings,
@@ -98,6 +100,7 @@ interface AgentConfig {
   systemPrompt: string;
   openingMessage: string;
   exampleQuestions: string[];
+  skillIds: string[];
 }
 
 const AVATAR_IMAGE_MODEL_PREFERENCE_KEY = 'valley.ai-workbench.avatar-image-model';
@@ -123,6 +126,7 @@ const defaultConfig: AgentConfig = {
   systemPrompt: '',
   openingMessage: '',
   exampleQuestions: [],
+  skillIds: [],
 };
 
 function AgentEditorSkeleton() {
@@ -182,6 +186,9 @@ function parseAgentConfig(version?: AIAppVersion): AgentConfig {
       exampleQuestions: Array.isArray(value.exampleQuestions)
         ? value.exampleQuestions.filter((item): item is string => typeof item === 'string')
         : [],
+      skillIds: Array.isArray(value.skillIds)
+        ? value.skillIds.filter((item): item is string => typeof item === 'string').slice(0, 8)
+        : [],
     };
   } catch {
     return defaultConfig;
@@ -214,6 +221,7 @@ export default function AIAppEditor() {
   const [tools, setTools] = useState<AIAppTool[]>([]);
   const [boundTools, setBoundTools] = useState<string[]>([]);
   const [savingTools, setSavingTools] = useState(false);
+  const [skills, setSkills] = useState<AISkill[]>([]);
   const [apiKeys, setAPIKeys] = useState<AIAPIKey[]>([]);
   const [keyAppBindings, setKeyAppBindings] = useState<Record<string, string[]>>({});
   const [keyUsage, setKeyUsage] = useState<Record<string, AIAPIKeyDailyUsage>>({});
@@ -253,6 +261,7 @@ export default function AIAppEditor() {
           listAIAppKnowledgeBases(appId),
           listAIAppTools(),
           listAIAppToolBindings(appId),
+          listAISkills(),
           listAIAPIKeys(),
           listAIAppPublicInvocations(appId),
         ])
@@ -263,6 +272,7 @@ export default function AIAppEditor() {
               bindingResult,
               toolResult,
               toolBindingResult,
+              skillResult,
               keyResult,
               invocationResult,
             ] = data;
@@ -271,6 +281,7 @@ export default function AIAppEditor() {
             setBoundKnowledgeBaseIDs(bindingResult.list.map((base) => base.id));
             setTools(toolResult.list);
             setBoundTools(toolBindingResult.tools);
+            setSkills(skillResult.list);
             setAPIKeys(keyResult.list);
             setPublicInvocations(invocationResult.list);
             void Promise.all(
@@ -763,6 +774,9 @@ while (true) {
                   <TabsTrigger value="tools" className="flex-none px-3">
                     工具
                   </TabsTrigger>
+                  <TabsTrigger value="skills" className="flex-none px-3">
+                    技能
+                  </TabsTrigger>
                   <TabsTrigger value="publish" className="flex-none px-3">
                     发布
                   </TabsTrigger>
@@ -991,6 +1005,58 @@ while (true) {
                                 </span>
                                 <span className="block text-xs text-muted-foreground">
                                   {tool.description}
+                                </span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </EditorSection>
+                </TabsContent>
+                <TabsContent value="skills" className="w-full">
+                  <EditorSection
+                    title="技能"
+                    description="所选技能会随当前版本保存，并在对话运行时提供说明与参考资料。"
+                    className="border-0 bg-transparent p-0"
+                    action={
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate('/workbench/resources?tab=skills')}
+                      >
+                        技能目录
+                      </Button>
+                    }
+                  >
+                    {skills.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">暂无已安装技能</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {skills.map((skill) => {
+                          const checked = config.skillIds.includes(skill.id);
+                          return (
+                            <label
+                              key={skill.id}
+                              className="flex cursor-pointer items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
+                            >
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(nextChecked) => {
+                                  setConfig((value) => ({
+                                    ...value,
+                                    skillIds:
+                                      nextChecked === true
+                                        ? [...value.skillIds, skill.id].slice(0, 8)
+                                        : value.skillIds.filter((id) => id !== skill.id),
+                                  }));
+                                }}
+                              />
+                              <span className="min-w-0">
+                                <span className="block text-sm font-medium">{skill.name}</span>
+                                <span className="block text-xs text-muted-foreground">
+                                  {skill.description || '未提供技能说明'}
                                 </span>
                               </span>
                             </label>

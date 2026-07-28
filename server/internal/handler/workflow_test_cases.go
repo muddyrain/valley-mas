@@ -296,16 +296,17 @@ func executeWorkflowTestCase(requestContext context.Context, testCase model.Work
 		}()
 	}
 	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{
-		ID:                 run.ID.String(),
-		Actor:              workflow.Actor{UserID: int64(testCase.UserID), Role: role},
-		Inputs:             inputs,
-		Outputs:            map[string]map[string]any{},
-		KnowledgeRetriever: workflowKnowledgeRetriever(testCase.UserID, version),
-		ContentSearcher:    workflowContentSearcher(testCase.UserID),
-		NotionSearcher:     workflowNotionSearcher(testCase.UserID),
-		CoverGenerator:     workflowCoverGenerator(),
-		NotificationSender: workflowNotificationSender(),
-		SubworkflowRunner:  workflowSubworkflowRunner(testCase.UserID),
+		ID:                       run.ID.String(),
+		Actor:                    workflow.Actor{UserID: int64(testCase.UserID), Role: role},
+		Inputs:                   inputs,
+		Outputs:                  map[string]map[string]any{},
+		KnowledgeRetriever:       workflowKnowledgeRetriever(testCase.UserID, version),
+		ContentSearcher:          workflowContentSearcher(testCase.UserID),
+		NotionSearcher:           workflowNotionSearcher(testCase.UserID),
+		CoverGenerator:           workflowCoverGenerator(),
+		NotificationSender:       workflowNotificationSender(),
+		SubworkflowRunner:        workflowSubworkflowRunner(testCase.UserID),
+		SkillInstructionResolver: workflowAISkillInstructionResolver(testCase.UserID),
 	}, func(event workflow.Event) {
 		if persistenceErr == nil {
 			sequence++

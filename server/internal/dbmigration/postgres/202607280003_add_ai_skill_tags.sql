@@ -1,0 +1,3 @@
+-- +goose Up
+ALTER TABLE ai_skills
+  ADD COLUMN IF NOT EXISTS tags TEXT NOT NULL DEFAULT '';

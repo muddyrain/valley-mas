@@ -853,7 +853,7 @@ func runWorkflowGraphWithResume(
 	// actual number of requests, so the owner context only coordinates cancel.
 	executionContext, releaseRun := activeWorkflowRuns.Start(run.ID.String(), 0)
 	defer releaseRun()
-	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: runtimeState.Outputs, CompletedNodes: workflowCompletedNodes(runtimeState), ResumeFromNodeID: resumeFromNodeID, KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion), ContentSearcher: workflowContentSearcher(model.Int64String(userID)), NotionSearcher: workflowNotionSearcher(model.Int64String(userID)), CoverGenerator: workflowCoverGenerator(), AIImageGenerator: workflowAIImageGenerator(), AIImageUnderstander: workflowAIImageUnderstander(), AIImageResourceSaver: workflowAIImageResourceSaver(), NotificationSender: workflowNotificationSender(), SubworkflowRunner: workflowSubworkflowRunner(model.Int64String(userID)), ApprovalGate: workflowApprovalGate(run), RegisterNodeCancellation: func(nodeID string, cancel func()) func() {
+	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: runtimeState.Outputs, CompletedNodes: workflowCompletedNodes(runtimeState), ResumeFromNodeID: resumeFromNodeID, KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion), ContentSearcher: workflowContentSearcher(model.Int64String(userID)), NotionSearcher: workflowNotionSearcher(model.Int64String(userID)), CoverGenerator: workflowCoverGenerator(), AIImageGenerator: workflowAIImageGenerator(), AIImageUnderstander: workflowAIImageUnderstander(), AIImageResourceSaver: workflowAIImageResourceSaver(), NotificationSender: workflowNotificationSender(), SubworkflowRunner: workflowSubworkflowRunner(model.Int64String(userID)), ApprovalGate: workflowApprovalGate(run), SkillInstructionResolver: workflowAISkillInstructionResolver(model.Int64String(userID)), RegisterNodeCancellation: func(nodeID string, cancel func()) func() {
 		return activeWorkflowRuns.RegisterNodeCancel(run.ID.String(), nodeID, cancel)
 	}}, func(event workflow.Event) {
 		if persistenceErr == nil {
@@ -1632,7 +1632,7 @@ func workflowSubworkflowRunner(ownerID model.Int64String) workflow.SubworkflowRu
 		}
 		var final map[string]any
 		executionContext := context.WithValue(ctx, subworkflowStackContextKey{}, nextStack)
-		err = workflow.Execute(executionContext, graph, workflowRuntimeRegistry(), workflow.RunContext{ID: request.VersionID, Actor: actor, Inputs: request.Inputs, Outputs: map[string]map[string]any{}, KnowledgeRetriever: workflowKnowledgeRetriever(ownerID, version), ContentSearcher: workflowContentSearcher(ownerID), NotionSearcher: workflowNotionSearcher(ownerID), CoverGenerator: workflowCoverGenerator(), AIImageGenerator: workflowAIImageGenerator(), AIImageUnderstander: workflowAIImageUnderstander(), AIImageResourceSaver: workflowAIImageResourceSaver(), NotificationSender: workflowNotificationSender(), SubworkflowRunner: runner}, func(event workflow.Event) {
+		err = workflow.Execute(executionContext, graph, workflowRuntimeRegistry(), workflow.RunContext{ID: request.VersionID, Actor: actor, Inputs: request.Inputs, Outputs: map[string]map[string]any{}, KnowledgeRetriever: workflowKnowledgeRetriever(ownerID, version), ContentSearcher: workflowContentSearcher(ownerID), NotionSearcher: workflowNotionSearcher(ownerID), CoverGenerator: workflowCoverGenerator(), AIImageGenerator: workflowAIImageGenerator(), AIImageUnderstander: workflowAIImageUnderstander(), AIImageResourceSaver: workflowAIImageResourceSaver(), NotificationSender: workflowNotificationSender(), SubworkflowRunner: runner, SkillInstructionResolver: workflowAISkillInstructionResolver(ownerID)}, func(event workflow.Event) {
 			if event.NodeType == workflow.NodeTypeEnd && event.Status == workflow.StatusSucceeded {
 				final = event.Output
 			}
@@ -1654,6 +1654,12 @@ func ListWorkflowCapabilities(c *gin.Context) {
 		return
 	}
 	Success(c, workflow.Capabilities(workflowRuntimeRegistry()))
+}
+
+func workflowAISkillInstructionResolver(userID model.Int64String) workflow.SkillInstructionResolver {
+	return func(_ context.Context, skillIDs []string) (string, error) {
+		return resolveAISkillRuntimeInstructions(database.GetDB(), userID, skillIDs)
+	}
 }
 
 func workflowKnowledgeRetriever(userID model.Int64String, version model.AIAppVersion) workflow.KnowledgeRetriever {

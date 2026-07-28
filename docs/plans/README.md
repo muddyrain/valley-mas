@@ -24,6 +24,7 @@
 ## 当前活跃计划
 
 - [2026-07-28-auth-security-hardening.md](2026-07-28-auth-security-hardening.md)：会话失效、持久化验证码、频率限制与密码哈希升级。
+- [2026-07-28-standard-agent-skills.md](2026-07-28-standard-agent-skills.md)：标准技能包导入、分类与智能体/工作流复用。
 - [2026-07-24-workflow-http-node.md](2026-07-24-workflow-http-node.md)：工作流 HTTP 请求节点的受控配置、执行与画布交互。
 - [2026-07-26-workflow-node-catalog.md](2026-07-26-workflow-node-catalog.md)：服务端驱动的节点目录、Valley 内容/图片/知识节点扩展与后续通用节点对齐。
 - [2026-07-23-ai-image-studio.md](2026-07-23-ai-image-studio.md)：AI 图片独立创作页、参考图生成、任务历史与资源保存。

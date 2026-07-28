@@ -31,6 +31,7 @@ export interface AgentConfig {
   systemPrompt: string;
   openingMessage: string;
   exampleQuestions: string[];
+  skillIds: string[];
 }
 
 export interface AgentProposal {
@@ -215,12 +216,13 @@ export interface AISkill {
   sourceUrl: string;
   sourceAuthor: string;
   sourceLicense: string;
+  tags: string[];
   installedAt: string;
 }
 
 export interface AISkillFile {
   path: string;
-  kind: 'skill' | 'reference';
+  kind: 'skill' | 'reference' | 'script';
   content: string;
 }
 
@@ -233,6 +235,7 @@ export interface AISkillImportCandidate {
   name: string;
   description: string;
   referenceCount: number;
+  scriptCount: number;
   sourceUrl: string;
 }
 
@@ -715,6 +718,10 @@ export function installAISkill(url: string, paths: string[]): Promise<{ list: AI
 
 export function archiveAISkill(skillId: string): Promise<void> {
   return request.delete(`/ai/skills/${skillId}`);
+}
+
+export function updateAISkill(skillId: string, data: { tags: string[] }): Promise<AISkill> {
+  return request.patch(`/ai/skills/${skillId}`, data);
 }
 
 export function createAIKnowledgeBase(data: {
