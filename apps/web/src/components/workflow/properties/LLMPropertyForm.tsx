@@ -38,6 +38,7 @@ export function LLMPropertyForm({
   const inputTypes =
     (config.inputTypes as Record<string, import('../types').WorkflowValueType>) || {};
   const upstreamVariableOptions = variableOptions.filter((option) => option.scope !== 'local');
+  const localVariableOptions = variableOptions.filter((option) => option.scope === 'local');
   const outputs = getWorkflowNodeOutputFields('llm', config);
   const outputMode = config.outputMode === 'json' ? 'json' : 'text';
   const outputSchema =
@@ -148,20 +149,24 @@ export function LLMPropertyForm({
             ariaLabel="系统指令"
             value={systemPrompt}
             onChange={(nextSystemPrompt) => onUpdateConfig({ systemPrompt: nextSystemPrompt })}
-            options={variableOptions}
+            options={localVariableOptions}
             placeholder="例如：你是专业的内容编辑，回答应准确、简洁"
+            variableScopeLabel="仅可引用本节点输入"
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="llm-prompt">用户任务</Label>
-          <p className="text-xs text-muted-foreground">描述本次执行的具体任务，可引用上游变量。</p>
+          <p className="text-xs text-muted-foreground">
+            描述本次执行的具体任务，可引用本节点输入。
+          </p>
           <VariableTokenEditor
             id="llm-prompt"
             ariaLabel="用户提示词"
             value={taskPrompt}
             onChange={(prompt) => onUpdateConfig({ prompt })}
-            options={variableOptions}
+            options={localVariableOptions}
             placeholder="例如：根据输入主题生成一篇文章"
+            variableScopeLabel="仅可引用本节点输入"
           />
         </div>
       </EditorSection>
@@ -309,7 +314,7 @@ export function LLMPropertyForm({
         onOpenChange={setShowAssistant}
         target="workflow_llm"
         currentPrompt={systemPrompt || taskPrompt}
-        allowedVariables={variableOptions.map((item) => item.token)}
+        allowedVariables={localVariableOptions.map((item) => item.token)}
         onReplace={(suggestion) =>
           onUpdateConfig({
             systemPrompt: suggestion.optimizedPrompt,

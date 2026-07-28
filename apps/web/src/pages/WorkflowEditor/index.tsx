@@ -69,6 +69,7 @@ import {
   updateWorkflow,
   type WorkflowPlatformData,
   type WorkflowRunDetail,
+  type WorkflowVersion,
 } from '@/api/workflow';
 import {
   AlertDialog,
@@ -80,7 +81,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -120,10 +120,16 @@ import {
   workflowRunSessionReducer,
   workflowRunSnapshotsFromNodeRuns,
 } from '@/components/workflow/runSession';
-import type { WorkflowNodeData } from '@/components/workflow/types';
+import {
+  normalizeStartInputs,
+  renameStartInput,
+  type WorkflowNodeData,
+} from '@/components/workflow/types';
+import { useWorkflowCapabilities } from '@/components/workflow/useWorkflowCapabilities';
 import { useWorkflowHistory } from '@/components/workflow/useWorkflowHistory';
 import {
   getInvalidWorkflowVariableReferenceErrors,
+  getWorkflowToolInputErrors,
   type ValidationError,
   validateWorkflowDraft,
 } from '@/components/workflow/validateWorkflowConfig';
@@ -131,10 +137,10 @@ import { WorkflowAlignmentGuides } from '@/components/workflow/WorkflowAlignment
 import { WorkflowApprovalsDialog } from '@/components/workflow/WorkflowApprovalsDialog';
 import { WorkflowConnectionLine } from '@/components/workflow/WorkflowConnectionLine';
 import { WorkflowNode } from '@/components/workflow/WorkflowNode';
-import { WorkflowRunHistory } from '@/components/workflow/WorkflowRunHistory';
 import { WorkflowRuntimeProvider } from '@/components/workflow/WorkflowRuntimeContext';
-import { WorkflowTestCases } from '@/components/workflow/WorkflowTestCases';
 import { WorkflowTriggersDialog } from '@/components/workflow/WorkflowTriggersDialog';
+import { WorkflowValidationPanel } from '@/components/workflow/WorkflowValidationPanel';
+import { WorkflowVersionHistory } from '@/components/workflow/WorkflowVersionHistory';
 import {
   WorkflowWorkspacePanel,
   type WorkflowWorkspaceTab,
@@ -153,6 +159,10 @@ import {
 } from '@/components/workflow/workflowGraph';
 import { layoutNodeInsertion, layoutWorkflowNodes } from '@/components/workflow/workflowLayout';
 import { getWorkflowRunBranchHandle } from '@/components/workflow/workflowRunBranches';
+import {
+  migrateLLMPromptBindings,
+  renameWorkflowNodeOutputReferences,
+} from '@/components/workflow/workflowVariables';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const defaultEdgeOptions = {
@@ -301,7 +311,7 @@ function getServerValidationErrors(message: string, nodes: Node[]): ValidationEr
   return errors;
 }
 
-function notifyWorkflowValidation(action: '保存' | '发布' | '运行', errors: ValidationError[]) {
+function notifyWorkflowValidation(action: '保存' | '发布' | '试运行', errors: ValidationError[]) {
   const firstError = errors[0];
   if (!firstError) return;
 
@@ -478,6 +488,7 @@ function WorkflowEditorLoadingSkeleton({
 export default function WorkflowEditorPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const workflowCapabilities = useWorkflowCapabilities();
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<{
@@ -591,6 +602,19 @@ export default function WorkflowEditorPage() {
     validationGraphRef.current = { nodes, edges };
   }
   const validationGraph = validationGraphRef.current;
+  const validationContext = useMemo(
+    () => ({
+      toolCapabilities:
+        workflowCapabilities.loading || workflowCapabilities.error
+          ? undefined
+          : workflowCapabilities.toolCapabilities,
+    }),
+    [
+      workflowCapabilities.error,
+      workflowCapabilities.loading,
+      workflowCapabilities.toolCapabilities,
+    ],
+  );
   const { undo, redo, canUndo, canRedo, clearHistory } = useWorkflowHistory(
     nodes,
     edges,
@@ -1066,17 +1090,18 @@ export default function WorkflowEditorPage() {
               ? normalizeWorkflowEdges(graph.edges as Edge[])
               : [];
             const expanded = expandLoopCanvas(nextNodes, nextEdges);
+            const migratedNodes = migrateLLMPromptBindings(expanded.nodes, expanded.edges);
             workflowStateRef.current = {
               name: data.name,
-              nodes: expanded.nodes,
+              nodes: migratedNodes,
               edges: expanded.edges,
             };
             workflowSnapshotRef.current = {
               name: data.name,
-              graph: serializeWorkflowGraph(expanded.nodes, expanded.edges),
+              graph: serializeWorkflowGraph(migratedNodes, expanded.edges),
               revision: 0,
             };
-            setNodes(expanded.nodes);
+            setNodes(migratedNodes);
             setEdges(expanded.edges);
             requestFitView();
             clearHistory();
@@ -2136,14 +2161,15 @@ export default function WorkflowEditorPage() {
         throw new Error('提案不是有效的工作流草稿');
       }
       const canvas = workflowDraftToCanvas(proposal.candidate);
+      const migratedNodes = migrateLLMPromptBindings(canvas.nodes, canvas.edges);
       setWorkflowName(proposal.candidate.name);
-      setNodes(canvas.nodes);
+      setNodes(migratedNodes);
       setEdges(canvas.edges);
       setSelectedNode(null);
       requestFitView();
       markWorkflowDirty({
         name: proposal.candidate.name,
-        nodes: canvas.nodes,
+        nodes: migratedNodes,
         edges: canvas.edges,
       });
     },
@@ -2181,6 +2207,61 @@ export default function WorkflowEditorPage() {
     [isRunning, markWorkflowDirty, selectedNode],
   );
 
+  const onRenameStartInput = useCallback(
+    (nodeId: string, previousName: string, nextName: string) => {
+      if (isRunning || !previousName || !nextName || previousName === nextName) return;
+      const currentNodes = workflowStateRef.current.nodes;
+      const startNode = currentNodes.find((node) => node.id === nodeId);
+      const startData = startNode?.data as WorkflowNodeData | undefined;
+      if (!startNode || startData?.nodeType !== 'start') return;
+
+      const config = startData.config || {};
+      const inputs = normalizeStartInputs(config.inputs);
+      if (!inputs[previousName] || inputs[nextName]) return;
+
+      const renamedInputs = renameStartInput(inputs, previousName, nextName);
+      const nodesWithRenamedInput = currentNodes.map((node) =>
+        node.id === nodeId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                config: {
+                  ...config,
+                  inputs: renamedInputs,
+                },
+              },
+            }
+          : node,
+      );
+      const nextNodes = renameWorkflowNodeOutputReferences(
+        nodesWithRenamedInput,
+        nodeId,
+        previousName,
+        nextName,
+      );
+      setNodes(nextNodes);
+      if (selectedNode?.id === nodeId) {
+        setSelectedNode((current) =>
+          current
+            ? {
+                ...current,
+                data: {
+                  ...current.data,
+                  config: {
+                    ...config,
+                    inputs: renamedInputs,
+                  },
+                },
+              }
+            : null,
+        );
+      }
+      markWorkflowDirty({ nodes: nextNodes });
+    },
+    [isRunning, markWorkflowDirty, selectedNode],
+  );
+
   const handleSave = useCallback(async () => {
     setShowValidationErrors(false);
     setServerValidationErrors([]);
@@ -2198,7 +2279,15 @@ export default function WorkflowEditorPage() {
 
   const handlePublish = useCallback(async () => {
     const state = workflowStateRef.current;
-    const errors = validateWorkflowDraft(state.nodes, state.edges);
+    if (workflowCapabilities.loading) {
+      toast.warning('正在加载节点能力，请稍后重试');
+      return;
+    }
+    if (workflowCapabilities.error) {
+      toast.error('节点能力加载失败，暂时无法校验工具输入');
+      return;
+    }
+    const errors = validateWorkflowDraft(state.nodes, state.edges, validationContext);
     if (errors.length > 0) {
       setSaveStatus('pending');
       setShowValidationErrors(true);
@@ -2228,7 +2317,31 @@ export default function WorkflowEditorPage() {
     } finally {
       setIsPublishing(false);
     }
-  }, [applyServerValidationError, persistLatestWorkflow, refreshWorkflowMeta]);
+  }, [
+    applyServerValidationError,
+    persistLatestWorkflow,
+    refreshWorkflowMeta,
+    validationContext,
+    workflowCapabilities.error,
+    workflowCapabilities.loading,
+  ]);
+
+  const handleRestoreVersion = useCallback(
+    async (version: WorkflowVersion) => {
+      const id = workflowIdRef.current;
+      if (!id) return;
+      try {
+        await restoreWorkflowVersion(id, version.id);
+        setShowHistory(false);
+        toast.success(`已恢复为 v${version.number}`);
+        navigate(`/workbench/edit?id=${id}&restored=${Date.now()}`, { replace: true });
+      } catch (error) {
+        toast.error(getAPIErrorMessage(error, '恢复版本失败'));
+        throw error;
+      }
+    },
+    [navigate],
+  );
 
   const startWorkflowRun = useCallback(
     async ({
@@ -2369,6 +2482,14 @@ export default function WorkflowEditorPage() {
     });
     setActiveWorkspaceTab('node');
     setActivePropertyTab('config');
+    window.requestAnimationFrame(() => {
+      reactFlowInstance.current?.fitView({
+        nodes: [node],
+        maxZoom: 0.9,
+        padding: 0.8,
+        duration: 250,
+      });
+    });
   }, []);
 
   useEffect(() => {
@@ -2384,11 +2505,20 @@ export default function WorkflowEditorPage() {
       return;
     }
 
-    const errors = validateWorkflowDraft(state.nodes, state.edges);
+    if (workflowCapabilities.loading) {
+      toast.warning('正在加载节点能力，请稍后重试');
+      return;
+    }
+    if (workflowCapabilities.error) {
+      toast.error('节点能力加载失败，暂时无法校验工具输入');
+      return;
+    }
+
+    const errors = validateWorkflowDraft(state.nodes, state.edges, validationContext);
     if (errors.length > 0) {
       setShowValidationErrors(true);
       const firstError = errors[0];
-      notifyWorkflowValidation('运行', errors);
+      notifyWorkflowValidation('试运行', errors);
       setPendingValidationFocusNodeID(firstError.nodeId);
       return;
     }
@@ -2403,7 +2533,12 @@ export default function WorkflowEditorPage() {
 
     setRetryRun(null);
     setShowRunPanel(true);
-  }, [persistLatestWorkflow]);
+  }, [
+    persistLatestWorkflow,
+    validationContext,
+    workflowCapabilities.error,
+    workflowCapabilities.loading,
+  ]);
 
   const openRetryRunPanel = useCallback((run: WorkflowRunDetail) => {
     if (!retryInputNodes(run.run.graphSnapshot)) {
@@ -2626,16 +2761,20 @@ export default function WorkflowEditorPage() {
       validationGraph.nodes,
       validationGraph.edges,
     );
-    if (!showValidationErrors) return [...invalidReferenceErrors, ...serverValidationErrors];
+    const toolInputErrors = getWorkflowToolInputErrors(validationGraph.nodes, validationContext);
+    if (!showValidationErrors)
+      return [...toolInputErrors, ...invalidReferenceErrors, ...serverValidationErrors];
 
     return [
-      ...validateWorkflowDraft(validationGraph.nodes, validationGraph.edges).filter(
-        (error) => error.nodeId !== 'workflow',
-      ),
+      ...validateWorkflowDraft(
+        validationGraph.nodes,
+        validationGraph.edges,
+        validationContext,
+      ).filter((error) => error.nodeId !== 'workflow'),
       ...invalidReferenceErrors,
       ...serverValidationErrors,
     ];
-  }, [serverValidationErrors, showValidationErrors, validationGraph]);
+  }, [serverValidationErrors, showValidationErrors, validationContext, validationGraph]);
 
   const nodeValidationMessages = useMemo(() => {
     const messages = new Map<string, string>();
@@ -2740,6 +2879,7 @@ export default function WorkflowEditorPage() {
         selectedNode={selectedNode}
         onClose={onPaneClick}
         onUpdateNode={onUpdateNode}
+        onRenameStartInput={onRenameStartInput}
         nodes={validationGraph.nodes}
         edges={validationGraph.edges}
         runSnapshot={selectedNode ? runSession.nodes[selectedNode.id] : undefined}
@@ -2753,6 +2893,7 @@ export default function WorkflowEditorPage() {
       activePropertyTab,
       isRunning,
       onPaneClick,
+      onRenameStartInput,
       onUpdateNode,
       runSession.nodes,
       selectedNode,
@@ -3071,107 +3212,16 @@ export default function WorkflowEditorPage() {
             <SheetContent side="right" className="w-full gap-0 sm:max-w-md">
               <SheetHeader className="border-b pr-14">
                 <SheetTitle>历史</SheetTitle>
-                <SheetDescription>草稿版本与最近运行</SheetDescription>
+                <SheetDescription>查看并预览已保存的工作流版本</SheetDescription>
               </SheetHeader>
 
               <ScrollArea className="min-h-0 flex-1">
                 <div className="p-4">
-                  <section className="mb-6">
-                    <h3 className="mb-3 text-sm font-medium text-foreground">最近运行</h3>
-                    <WorkflowRunHistory
-                      workflowId={workflowId}
-                      open={showHistory}
-                      onRetry={handleRetryFromHistory}
-                      onResume={handleResumeFromHistory}
-                    />
-                  </section>
-                  <section className="mb-6 border-t border-border pt-5">
-                    <WorkflowTestCases
-                      workflowId={workflowId}
-                      versions={platform?.versions || []}
-                      open={showHistory}
-                    />
-                  </section>
-                  <section className="border-t border-border pt-5">
-                    <h3 className="mb-3 text-sm font-medium text-foreground">草稿与发布版本</h3>
-                    {loadingHistory && !platform ? (
-                      <div className="space-y-3">
-                        <Skeleton className="h-24 w-full" />
-                        <Skeleton className="h-24 w-full" />
-                      </div>
-                    ) : platform?.versions.length ? (
-                      <ol className="relative ml-2 border-l border-border">
-                        {platform.versions.map((version) => {
-                          const isCurrent = version.id === platform.app.draftVersionId;
-                          const isPublished = version.id === platform.app.publishedVersionId;
-                          return (
-                            <li key={version.id} className="relative pb-4 pl-6 last:pb-0">
-                              <span
-                                className={`absolute -left-[5px] top-4 size-2.5 rounded-full border-2 border-background ${
-                                  isCurrent ? 'bg-primary' : 'bg-muted-foreground/40'
-                                }`}
-                                aria-hidden="true"
-                              />
-                              <article
-                                aria-current={isCurrent ? 'true' : undefined}
-                                className={`rounded-lg border p-3 transition-colors ${
-                                  isCurrent
-                                    ? 'border-primary/25 bg-primary/5'
-                                    : 'border-transparent hover:bg-muted/40'
-                                }`}
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <span className="font-medium text-foreground">
-                                        v{version.number}
-                                      </span>
-                                      {isCurrent ? (
-                                        <Badge variant="secondary">当前草稿</Badge>
-                                      ) : null}
-                                      {isPublished ? <Badge variant="outline">已发布</Badge> : null}
-                                    </div>
-                                    <time
-                                      className="mt-2 block text-xs text-muted-foreground"
-                                      dateTime={version.createdAt}
-                                    >
-                                      {new Date(version.createdAt).toLocaleString('zh-CN')}
-                                    </time>
-                                  </div>
-                                  {!isCurrent ? (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={async () => {
-                                        if (!workflowId) return;
-                                        try {
-                                          await restoreWorkflowVersion(workflowId, version.id);
-                                          setShowHistory(false);
-                                          toast.success(`已恢复 v${version.number}`);
-                                          navigate(
-                                            `/workbench/edit?id=${workflowId}&restored=${Date.now()}`,
-                                            { replace: true },
-                                          );
-                                        } catch (error) {
-                                          toast.error(getAPIErrorMessage(error, '恢复版本失败'));
-                                        }
-                                      }}
-                                    >
-                                      恢复
-                                    </Button>
-                                  ) : null}
-                                </div>
-                              </article>
-                            </li>
-                          );
-                        })}
-                      </ol>
-                    ) : (
-                      <p className="py-10 text-center text-sm text-muted-foreground">
-                        暂无历史版本
-                      </p>
-                    )}
-                  </section>
+                  <WorkflowVersionHistory
+                    platform={platform}
+                    loading={loadingHistory}
+                    onRestore={handleRestoreVersion}
+                  />
                 </div>
               </ScrollArea>
 
@@ -3234,7 +3284,7 @@ export default function WorkflowEditorPage() {
                 <Controls />
                 {isCanvasInteracting ? null : <MiniMap />}
               </ReactFlow>
-              {!showRunPanel ? (
+              {!showRunPanel && !(showValidationErrors && visibleValidationErrors.length > 0) ? (
                 <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
                   <NodePicker
                     trigger={
@@ -3249,6 +3299,15 @@ export default function WorkflowEditorPage() {
                       </Button>
                     }
                     onSelect={handleAddNode}
+                  />
+                </div>
+              ) : null}
+              {!showRunPanel && showValidationErrors && visibleValidationErrors.length > 0 ? (
+                <div className="absolute inset-x-4 bottom-4 z-30 h-[min(280px,38vh)] overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+                  <WorkflowValidationPanel
+                    errors={visibleValidationErrors}
+                    onSelect={focusValidationNode}
+                    onClose={() => setShowValidationErrors(false)}
                   />
                 </div>
               ) : null}
@@ -3274,9 +3333,13 @@ export default function WorkflowEditorPage() {
                   <RunPanel
                     open={showRunPanel}
                     onOpenChange={handleRunPanelOpenChange}
+                    workflowId={workflowId}
+                    versions={platform?.versions || []}
                     nodes={retryRun ? retryInputNodes(retryRun.run.graphSnapshot) || nodes : nodes}
                     onRun={handleRunConfirm}
                     onCancel={handleCancelRun}
+                    onRetry={handleRetryFromHistory}
+                    onResume={handleResumeFromHistory}
                     isRunning={isRunning}
                     session={runSession}
                     runError={runError}

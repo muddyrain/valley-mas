@@ -500,6 +500,146 @@ export function getUpstreamWorkflowVariables(
   return [...local, ...loopContext, ...upstream];
 }
 
+function escapeReferencePattern(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function replaceWorkflowOutputReference(
+  value: unknown,
+  sourceNodeID: string,
+  previousField: string,
+  nextField: string,
+): unknown {
+  if (typeof value === 'string') {
+    const pattern = new RegExp(
+      `\\{\\{\\s*${escapeReferencePattern(sourceNodeID)}\\.output\\.${escapeReferencePattern(previousField)}\\s*\\}\\}`,
+      'g',
+    );
+    return value.replace(pattern, `{{${sourceNodeID}.output.${nextField}}}`);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) =>
+      replaceWorkflowOutputReference(item, sourceNodeID, previousField, nextField),
+    );
+  }
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+      key,
+      replaceWorkflowOutputReference(item, sourceNodeID, previousField, nextField),
+    ]),
+  );
+}
+
+/** Atomically keeps downstream bindings valid when one output field is renamed. */
+export function renameWorkflowNodeOutputReferences(
+  nodes: Node[],
+  sourceNodeID: string,
+  previousField: string,
+  nextField: string,
+): Node[] {
+  if (!sourceNodeID || !previousField || !nextField || previousField === nextField) return nodes;
+  return nodes.map((node) => {
+    const data = getNodeData(node);
+    const nextConfig = replaceWorkflowOutputReference(
+      data.config,
+      sourceNodeID,
+      previousField,
+      nextField,
+    );
+    const nextWhen = replaceWorkflowOutputReference(
+      (node.data as { when?: unknown }).when,
+      sourceNodeID,
+      previousField,
+      nextField,
+    );
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        config: nextConfig,
+        ...((node.data as { when?: unknown }).when !== undefined ? { when: nextWhen } : {}),
+      },
+    };
+  });
+}
+
+function nextLLMInputName(
+  preferredName: string,
+  sourceNodeID: string,
+  inputs: Record<string, unknown>,
+) {
+  if (inputs[preferredName] === undefined) return preferredName;
+  const base = `${sourceNodeID}_${preferredName}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+  if (inputs[base] === undefined) return base;
+  let index = 2;
+  while (inputs[`${base}${index}`] !== undefined) index += 1;
+  return `${base}${index}`;
+}
+
+/** Upgrades legacy LLM prompts that referenced upstream outputs directly. */
+export function migrateLLMPromptBindings(nodes: Node[], edges: Edge[]): Node[] {
+  return nodes.map((node) => {
+    if (getNodeType(node) !== 'llm') return node;
+    const data = getNodeData(node);
+    const config =
+      data.config && typeof data.config === 'object'
+        ? (data.config as Record<string, unknown>)
+        : {};
+    const upstreamOptions = getUpstreamWorkflowVariables(nodes, edges, node.id).filter(
+      (option) => option.scope !== 'local',
+    );
+    const inputs =
+      config.inputs && typeof config.inputs === 'object'
+        ? { ...(config.inputs as Record<string, unknown>) }
+        : {};
+    const inputTypes =
+      config.inputTypes && typeof config.inputTypes === 'object'
+        ? { ...(config.inputTypes as Record<string, WorkflowVariableType>) }
+        : {};
+    const inputNamesByToken = new Map(
+      Object.entries(inputs).flatMap(([name, value]) =>
+        typeof value === 'string' ? [[normalizeWorkflowVariableToken(value), name] as const] : [],
+      ),
+    );
+    let changed = false;
+    const migratePrompt = (value: unknown) => {
+      if (typeof value !== 'string') return value;
+      return value.replace(WORKFLOW_VARIABLE_PATTERN, (token) => {
+        const option = getWorkflowVariableOption(token, upstreamOptions);
+        if (!option) return token;
+        const normalizedToken = normalizeWorkflowVariableToken(token);
+        if (!normalizedToken) return token;
+        let inputName = inputNamesByToken.get(normalizedToken);
+        if (!inputName) {
+          inputName = nextLLMInputName(option.field, option.nodeId, inputs);
+          inputs[inputName] = option.token;
+          inputTypes[inputName] = option.type === 'unknown' ? 'string' : option.type;
+          inputNamesByToken.set(normalizedToken, inputName);
+        }
+        changed = true;
+        return `{{${inputName}}}`;
+      });
+    };
+    const systemPrompt = migratePrompt(config.systemPrompt);
+    const prompt = migratePrompt(config.prompt);
+    if (!changed) return node;
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        config: {
+          ...config,
+          inputs,
+          inputTypes,
+          systemPrompt,
+          prompt,
+        },
+      },
+    };
+  });
+}
+
 export function splitWorkflowTemplate(
   value: string,
   options: WorkflowVariableOption[],

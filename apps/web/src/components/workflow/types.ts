@@ -27,6 +27,13 @@ export type WorkflowValueType =
   | 'boolean'
   | 'file';
 
+export type WorkflowStartInputControl =
+  | 'default'
+  | 'markdown_file'
+  | 'blog_tags'
+  | 'blog_group'
+  | 'visibility';
+
 export interface WorkflowRule {
   left: unknown;
   operator: 'equals' | 'notEquals' | 'contains' | 'isEmpty' | 'greaterThan' | 'lessThan';
@@ -60,8 +67,42 @@ export interface WorkflowNodeData {
 }
 
 export interface StartInputDefinition {
+  id?: string;
   type: WorkflowValueType;
   required: boolean;
+  control: WorkflowStartInputControl;
+}
+
+const startInputControls = new Set<WorkflowStartInputControl>([
+  'default',
+  'markdown_file',
+  'blog_tags',
+  'blog_group',
+  'visibility',
+]);
+
+const legacyStartInputControls: Record<string, WorkflowStartInputControl> = {
+  markdownFile: 'markdown_file',
+  tagIds: 'blog_tags',
+  groupId: 'blog_group',
+  visibility: 'visibility',
+};
+
+export function workflowStartInputControlType(
+  control: WorkflowStartInputControl,
+  fallback: WorkflowValueType = 'string',
+): WorkflowValueType {
+  switch (control) {
+    case 'markdown_file':
+      return 'file';
+    case 'blog_tags':
+      return 'string[]';
+    case 'blog_group':
+    case 'visibility':
+      return 'string';
+    default:
+      return fallback;
+  }
 }
 
 export function normalizeStartInputs(inputs: unknown): Record<string, StartInputDefinition> {
@@ -77,10 +118,40 @@ export function normalizeStartInputs(inputs: unknown): Record<string, StartInput
   ]);
   return Object.fromEntries(
     Object.entries(inputs as Record<string, StartInputDefinition>).flatMap(([name, value]) =>
-      name.trim() && value && allowed.has(value.type)
-        ? [[name, { type: value.type, required: value.required === true }]]
-        : [],
+      (() => {
+        if (!name.trim() || !value || !allowed.has(value.type)) return [];
+        const configuredControl = value.control;
+        const control =
+          typeof configuredControl === 'string' &&
+          startInputControls.has(configuredControl as WorkflowStartInputControl)
+            ? (configuredControl as WorkflowStartInputControl)
+            : legacyStartInputControls[name] || 'default';
+        return [
+          [
+            name,
+            {
+              ...(typeof value.id === 'string' && value.id.trim() ? { id: value.id } : {}),
+              type: workflowStartInputControlType(control, value.type),
+              required: value.required === true,
+              control,
+            },
+          ],
+        ];
+      })(),
     ),
+  );
+}
+
+export function renameStartInput(
+  inputs: Record<string, StartInputDefinition>,
+  previousName: string,
+  nextName: string,
+): Record<string, StartInputDefinition> {
+  return Object.fromEntries(
+    Object.entries(inputs).map(([name, definition]) => [
+      name === previousName ? nextName : name,
+      definition,
+    ]),
   );
 }
 

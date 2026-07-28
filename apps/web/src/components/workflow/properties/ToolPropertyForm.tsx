@@ -3,7 +3,6 @@ import { ModelPicker } from '@/components/ai/ModelPicker';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -11,11 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toWorkflowValueType } from '../TypedVariableValueEditor';
 import { useWorkflowCapabilities } from '../useWorkflowCapabilities';
 import { WorkflowVariableBindingField } from '../WorkflowVariableBindingField';
 import { getWorkflowSideEffectLabel } from '../workflowSideEffects';
 import type { PropertyFormProps } from './index';
+import { WorkflowIOField } from './WorkflowIOField';
 import { WorkflowOutputFieldList } from './WorkflowOutputFieldList';
 
 const toolOutputPresentations: Record<
@@ -204,6 +205,27 @@ const toolInputOrders: Record<string, string[]> = {
   'notification.send': ['status', 'title', 'content', 'path'],
 };
 
+function ToolPropertyFormLoadingSkeleton() {
+  return (
+    <EditorSection title="工具配置">
+      <div className="space-y-4" aria-busy="true">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-5 w-40" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      </div>
+    </EditorSection>
+  );
+}
+
 export function ToolPropertyForm({
   config,
   onUpdateConfig,
@@ -215,6 +237,8 @@ export function ToolPropertyForm({
   const capability = capabilities.toolCapabilities.find((item) => item.id === config.capabilityId);
   const inputs = (config.inputs as Record<string, unknown>) || {};
   const sideEffectLabel = getWorkflowSideEffectLabel(capability?.sideEffect);
+
+  if (capabilities.loading) return <ToolPropertyFormLoadingSkeleton />;
 
   if (!capability)
     return (
@@ -251,8 +275,9 @@ export function ToolPropertyForm({
   });
   return (
     <div className="space-y-4">
-      <EditorSection title={capability.name} description={capability.description}>
+      <EditorSection title="输入" description={capability.description}>
         <div className="flex items-center gap-2">
+          <Badge variant="outline">{capability.name}</Badge>
           <Badge variant="outline">{capability.id}</Badge>
           {sideEffectLabel ? <Badge variant="secondary">{sideEffectLabel}</Badge> : null}
         </div>
@@ -271,63 +296,70 @@ export function ToolPropertyForm({
         {visibleInputProperties.map(([name, schema]) => {
           if (schema.modelCapability) {
             return (
-              <div key={name} className="space-y-1.5">
-                <ModelPicker
-                  value={typeof inputs[name] === 'string' ? inputs[name] : undefined}
-                  onValueChange={(modelId) =>
-                    onUpdateConfig({ inputs: { ...inputs, [name]: modelId } })
-                  }
-                  capability={schema.modelCapability}
-                  label={schema.title || '模型'}
-                />
-                {fieldErrors[name] ? (
-                  <p role="alert" className="text-xs text-destructive">
-                    {fieldErrors[name]}
-                  </p>
-                ) : null}
-              </div>
+              <WorkflowIOField
+                key={name}
+                name={name}
+                label={schema.title}
+                type="model"
+                required={capability.inputSchema.required?.includes(name)}
+                description={schema.description}
+                error={fieldErrors[name]}
+                valueControl={
+                  <ModelPicker
+                    value={typeof inputs[name] === 'string' ? inputs[name] : undefined}
+                    onValueChange={(modelId) =>
+                      onUpdateConfig({ inputs: { ...inputs, [name]: modelId } })
+                    }
+                    capability={schema.modelCapability}
+                    label={schema.title || '模型'}
+                    compact
+                    compactTrigger
+                  />
+                }
+              />
             );
           }
           if (schema.enum?.length) {
             return (
-              <div key={name} className="space-y-1.5">
-                <Label>{schema.title || name}</Label>
-                <Select
-                  value={String(inputs[name] ?? schema.default ?? '')}
-                  onValueChange={(value) =>
-                    onUpdateConfig({ inputs: { ...inputs, [name]: value } })
-                  }
-                >
-                  <SelectTrigger aria-label={schema.title || name}>
-                    <SelectValue>
-                      {toolEnumLabels[capability.id]?.[name]?.[
-                        String(inputs[name] ?? schema.default ?? '')
-                      ] || String(inputs[name] ?? schema.default ?? '')}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {schema.enum.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {toolEnumLabels[capability.id]?.[name]?.[option] || option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {schema.description ? (
-                  <p className="text-xs text-muted-foreground">{schema.description}</p>
-                ) : null}
-                {fieldErrors[name] ? (
-                  <p role="alert" className="text-xs text-destructive">
-                    {fieldErrors[name]}
-                  </p>
-                ) : null}
-              </div>
+              <WorkflowIOField
+                key={name}
+                name={name}
+                label={schema.title}
+                type={toWorkflowValueType(schema.type)}
+                required={capability.inputSchema.required?.includes(name)}
+                description={schema.description}
+                error={fieldErrors[name]}
+                valueControl={
+                  <Select
+                    value={String(inputs[name] ?? schema.default ?? '')}
+                    onValueChange={(value) =>
+                      onUpdateConfig({ inputs: { ...inputs, [name]: value } })
+                    }
+                  >
+                    <SelectTrigger aria-label={schema.title || name}>
+                      <SelectValue>
+                        {toolEnumLabels[capability.id]?.[name]?.[
+                          String(inputs[name] ?? schema.default ?? '')
+                        ] || String(inputs[name] ?? schema.default ?? '')}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {schema.enum.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {toolEnumLabels[capability.id]?.[name]?.[option] || option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                }
+              />
             );
           }
           const type = toWorkflowValueType(schema.type);
           return (
             <WorkflowVariableBindingField
               key={name}
+              name={name}
               label={schema.title || name}
               type={type}
               value={inputs[name]}
@@ -343,7 +375,7 @@ export function ToolPropertyForm({
           );
         })}
       </EditorSection>
-      <EditorSection title="输出变量" description="下游节点可直接引用这些字段。">
+      <EditorSection title="输出" description="输出字段由工具能力固定，下游节点可直接引用。">
         <WorkflowOutputFieldList
           outputs={outputs}
           labels={outputPresentation?.labels}

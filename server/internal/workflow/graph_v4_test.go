@@ -86,6 +86,20 @@ func TestWorkflowCapabilitiesExposeInputGuidance(t *testing.T) {
 	}
 }
 
+func TestValidateCapabilityInputsRejectsEmptyRequiredValues(t *testing.T) {
+	schema := map[string]any{"required": []string{"url", "enabled", "limit"}}
+	inputs := map[string]any{"url": "   ", "enabled": false, "limit": 0}
+	errs := validateCapabilityInputs("tool", inputs, schema)
+	if len(errs) != 1 || !strings.Contains(errs[0], "输入 url 不能为空") {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+
+	inputs["url"] = "https://example.com"
+	if errs := validateCapabilityInputs("tool", inputs, schema); len(errs) != 0 {
+		t.Fatalf("false and zero must remain valid required values: %v", errs)
+	}
+}
+
 func TestWorkflowCapabilitiesExposeNodeDefaultConfig(t *testing.T) {
 	catalog := Capabilities(DefaultRegistry())
 	for _, definition := range catalog.NodeTypes {

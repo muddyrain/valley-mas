@@ -10,6 +10,7 @@
     "format": "biome format --write src/",
     "check": "biome check src/",
     "test:ai-workbench-sse": "node scripts/test-ai-workbench-sse.mjs",
+    "test:workflow-variables": "node --experimental-strip-types scripts/test-workflow-variable-model.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist"
   },

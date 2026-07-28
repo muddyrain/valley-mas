@@ -20,6 +20,7 @@ import { VariablePropertyForm } from './VariablePropertyForm';
 export interface PropertyFormProps {
   config: Record<string, unknown>;
   onUpdateConfig: (updates: Partial<Record<string, unknown>>) => void;
+  onRenameInput?: (previousName: string, nextName: string) => void;
   variableOptions?: WorkflowVariableOption[];
   loopOutputOptions?: WorkflowVariableOption[];
   fieldErrors?: Readonly<Record<string, string>>;

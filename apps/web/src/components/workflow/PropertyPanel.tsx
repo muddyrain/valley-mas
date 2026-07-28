@@ -35,6 +35,7 @@ interface PropertyPanelProps {
       when: import('./types').WorkflowRule | undefined;
     }>,
   ) => void;
+  onRenameStartInput?: (nodeId: string, previousName: string, nextName: string) => void;
   nodes: Node[];
   edges: Edge[];
   runSnapshot?: NodeRunSnapshot;
@@ -48,6 +49,7 @@ export const PropertyPanel = memo(function PropertyPanel({
   selectedNode,
   onClose,
   onUpdateNode,
+  onRenameStartInput,
   nodes,
   edges,
   runSnapshot,
@@ -167,6 +169,12 @@ export const PropertyPanel = memo(function PropertyPanel({
         <FormComponent
           config={config || {}}
           onUpdateConfig={handleUpdateConfig}
+          onRenameInput={
+            nodeType === 'start'
+              ? (previousName, nextName) =>
+                  onRenameStartInput?.(selectedNode.id, previousName, nextName)
+              : undefined
+          }
           variableOptions={
             nodeType === 'tool' ||
             nodeType === 'end' ||

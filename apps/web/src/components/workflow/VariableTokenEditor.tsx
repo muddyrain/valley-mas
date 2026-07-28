@@ -49,6 +49,7 @@ interface VariableTokenEditorProps {
   placeholder?: string;
   className?: string;
   compact?: boolean;
+  variableScopeLabel?: string;
 }
 
 function readRawValue(node: Node): string {
@@ -358,6 +359,7 @@ export function VariableTokenEditor({
   placeholder,
   className,
   compact = false,
+  variableScopeLabel = '本节点输入与上游输出',
 }: VariableTokenEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -727,7 +729,7 @@ export function VariableTokenEditor({
                   </span>
                   <div>
                     <p className="text-sm font-semibold text-foreground">选择变量</p>
-                    <p className="text-xs text-muted-foreground">本节点输入与上游输出</p>
+                    <p className="text-xs text-muted-foreground">{variableScopeLabel}</p>
                   </div>
                 </div>
                 <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
@@ -761,7 +763,7 @@ export function VariableTokenEditor({
       </div>
       {!compact && (
         <div className="flex items-center justify-between border-t border-input bg-muted/30 px-2 py-1.5">
-          <span className="text-xs text-muted-foreground">可引用本节点输入与上游输出</span>
+          <span className="text-xs text-muted-foreground">{variableScopeLabel}</span>
           <Button
             type="button"
             variant="ghost"

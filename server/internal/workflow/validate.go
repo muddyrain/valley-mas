@@ -388,11 +388,27 @@ func validateCapabilityInputs(nodeID string, inputs map[string]any, schema map[s
 		}
 	}
 	for _, name := range required {
-		if _, ok := inputs[name]; !ok {
+		value, ok := inputs[name]
+		if !ok {
 			errs = append(errs, fmt.Sprintf("工具节点 %s 缺少输入 %s", nodeID, name))
+			continue
+		}
+		if isEmptyRequiredCapabilityInput(value) {
+			errs = append(errs, fmt.Sprintf("工具节点 %s 输入 %s 不能为空", nodeID, name))
 		}
 	}
 	return errs
+}
+
+func isEmptyRequiredCapabilityInput(value any) bool {
+	switch typed := value.(type) {
+	case nil:
+		return true
+	case string:
+		return strings.TrimSpace(typed) == ""
+	default:
+		return false
+	}
 }
 
 func validateRule(rule Rule, nodeID string) []string {

@@ -28,10 +28,10 @@ const WORKFLOW_TEMPLATE_GRAPHS: Record<string, WorkflowTemplateGraph> = {
     nodes: [
       node('start', 'start', '开始', 50, {
         inputs: {
-          markdownFile: { type: 'file', required: true },
-          tagIds: { type: 'string[]', required: false },
-          groupId: { type: 'string', required: false },
-          visibility: { type: 'string', required: true },
+          markdownFile: { type: 'file', required: true, control: 'markdown_file' },
+          tagIds: { type: 'string[]', required: false, control: 'blog_tags' },
+          groupId: { type: 'string', required: false, control: 'blog_group' },
+          visibility: { type: 'string', required: true, control: 'visibility' },
         },
       }),
       node('parse-markdown', 'tool', '解析 Markdown', 330, {
@@ -41,7 +41,12 @@ const WORKFLOW_TEMPLATE_GRAPHS: Record<string, WorkflowTemplateGraph> = {
       }),
       node('llm-summary', 'llm', '生成摘要', 610, {
         systemPrompt: '你是内容编辑助手。请生成一句简洁、准确的博客摘要。',
-        prompt: '标题：{{parse-markdown.output.title}}\n\n正文：{{parse-markdown.output.content}}',
+        prompt: '标题：{{title}}\n\n正文：{{content}}',
+        inputs: {
+          title: '{{parse-markdown.output.title}}',
+          content: '{{parse-markdown.output.content}}',
+        },
+        inputTypes: { title: 'string', content: 'string' },
         temperature: 0.4,
         maxOutputTokens: 512,
       }),
@@ -83,8 +88,8 @@ const WORKFLOW_TEMPLATE_GRAPHS: Record<string, WorkflowTemplateGraph> = {
           topic: { type: 'string', required: true },
           audience: { type: 'string', required: false },
           style: { type: 'string', required: false },
-          tagIds: { type: 'string[]', required: false },
-          visibility: { type: 'string', required: true },
+          tagIds: { type: 'string[]', required: false, control: 'blog_tags' },
+          visibility: { type: 'string', required: true, control: 'visibility' },
         },
       }),
       node('knowledge', 'tool', '检索知识库', 330, {
@@ -95,8 +100,19 @@ const WORKFLOW_TEMPLATE_GRAPHS: Record<string, WorkflowTemplateGraph> = {
       }),
       node('writer', 'llm', '生成正文', 610, {
         systemPrompt: '你是内容编辑。基于参考资料写出准确、易读的博客正文。',
-        prompt:
-          '主题：{{start.output.topic}}\n受众：{{start.output.audience}}\n风格：{{start.output.style}}\n\n参考资料：\n{{knowledge.output.context}}',
+        prompt: '主题：{{topic}}\n受众：{{audience}}\n风格：{{style}}\n\n参考资料：\n{{context}}',
+        inputs: {
+          topic: '{{start.output.topic}}',
+          audience: '{{start.output.audience}}',
+          style: '{{start.output.style}}',
+          context: '{{knowledge.output.context}}',
+        },
+        inputTypes: {
+          topic: 'string',
+          audience: 'string',
+          style: 'string',
+          context: 'string',
+        },
         temperature: 0.6,
         maxOutputTokens: 1200,
       }),

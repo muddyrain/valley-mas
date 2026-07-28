@@ -1,6 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
+import type { WorkflowToolCapability } from '@/api/workflow';
 import { NODE_CONFIGS } from './nodeConfig';
 import type { WorkflowNodeData } from './types';
+import { validateToolCapabilityInputs } from './workflowToolInputValidation';
 import {
   getInvalidWorkflowVariableTokens,
   getUpstreamWorkflowVariables,
@@ -15,6 +17,10 @@ export interface ValidationError {
   nodeType: string;
   message: string;
   field?: string;
+}
+
+export interface WorkflowValidationContext {
+  toolCapabilities?: readonly WorkflowToolCapability[];
 }
 
 const WORKFLOW_REFERENCE_PATTERN = /\{\{\s*([^{}]+?)\s*\}\}/g;
@@ -92,6 +98,37 @@ function valuesWithReferences(data: WorkflowNodeData): string[] {
   return [...stringsInValue(data.config), ...stringsInValue(data.when)];
 }
 
+function invalidLLMReferenceMessage(
+  data: WorkflowNodeData,
+  options: WorkflowVariableOption[],
+): string | null {
+  const config = data.config || {};
+  const upstreamOptions = options.filter((option) => option.scope !== 'local');
+  const localOptions = options.filter((option) => option.scope === 'local');
+  if (
+    stringsInValue(config.inputs).some(
+      (value) => getInvalidWorkflowVariableTokens(value, upstreamOptions).length > 0,
+    )
+  ) {
+    return INVALID_WORKFLOW_VARIABLE_REFERENCE_MESSAGE;
+  }
+  if (
+    [...stringsInValue(config.systemPrompt), ...stringsInValue(config.prompt)].some(
+      (value) => getInvalidWorkflowVariableTokens(value, localOptions).length > 0,
+    )
+  ) {
+    return '模型指令只能引用本节点输入，请先绑定上游变量';
+  }
+  if (
+    stringsInValue(data.when).some(
+      (value) => getInvalidWorkflowVariableTokens(value, upstreamOptions).length > 0,
+    )
+  ) {
+    return INVALID_WORKFLOW_VARIABLE_REFERENCE_MESSAGE;
+  }
+  return null;
+}
+
 function workflowReferences(value: unknown): string[] {
   return stringsInValue(value).flatMap((text) =>
     [...text.matchAll(WORKFLOW_REFERENCE_PATTERN)].map((match) => match[1].trim()),
@@ -103,19 +140,55 @@ function referencedNodeID(reference: string): string | null {
   return match?.[1] || null;
 }
 
+function toolCapabilityInputErrors(
+  node: Node,
+  context: WorkflowValidationContext,
+): ValidationError[] {
+  const data = node.data as unknown as WorkflowNodeData;
+  if (data.nodeType !== 'tool') return [];
+  const config = data.config || {};
+  const capabilityID = String(config.capabilityId || '');
+  const capabilities = context.toolCapabilities;
+  if (!capabilityID || !capabilities) return [];
+  const capability = capabilities.find((item) => item.id === capabilityID);
+  if (!capability) {
+    return [
+      {
+        nodeId: node.id,
+        nodeLabel: data.label || node.id,
+        nodeType: data.nodeType,
+        message: '该工具能力当前不可用，请重新选择工具',
+      },
+    ];
+  }
+  const inputs =
+    config.inputs && typeof config.inputs === 'object'
+      ? (config.inputs as Record<string, unknown>)
+      : {};
+  return validateToolCapabilityInputs(capability, inputs).map((error) => ({
+    nodeId: node.id,
+    nodeLabel: data.label || node.id,
+    nodeType: data.nodeType,
+    message: error.message,
+    field: error.field,
+  }));
+}
+
 function validateNode(
   node: Node,
   nodes: Node[],
   edges: Edge[],
   validateReferences = true,
+  context: WorkflowValidationContext = {},
 ): ValidationError | null {
   const data = node.data as unknown as WorkflowNodeData;
   const config = data.config || {};
-  const fail = (message: string): ValidationError => ({
+  const fail = (message: string, field?: string): ValidationError => ({
     nodeId: node.id,
     nodeLabel: data.label || node.id,
     nodeType: data.nodeType,
     message,
+    field,
   });
   if (!NODE_CONFIGS[data.nodeType]) return fail('未识别的 Graph v4 节点类型');
   if (data.when) {
@@ -196,6 +269,10 @@ function validateNode(
     case 'tool':
       if (!config.capabilityId || !config.inputs || typeof config.inputs !== 'object')
         return fail('请选择工具并完成输入映射');
+      {
+        const capabilityError = toolCapabilityInputErrors(node, context)[0];
+        if (capabilityError) return capabilityError;
+      }
       break;
     case 'condition':
       if (config.left === undefined || !config.operator) return fail('请完成受控条件规则');
@@ -299,7 +376,7 @@ function validateNode(
         name,
         value,
         bindingTypes[name] as WorkflowVariableOption['type'] | undefined,
-        options,
+        data.nodeType === 'llm' ? options.filter((option) => option.scope !== 'local') : options,
       );
       if (mismatchMessage) {
         const bindingLabel = data.nodeType === 'end' ? '输出' : '输入';
@@ -307,8 +384,13 @@ function validateNode(
       }
     }
   }
+  if (validateReferences && data.nodeType === 'llm') {
+    const message = invalidLLMReferenceMessage(data, options);
+    if (message) return fail(message);
+  }
   if (
     validateReferences &&
+    data.nodeType !== 'llm' &&
     valuesWithReferences(data).some(
       (value) => getInvalidWorkflowVariableTokens(value, options).length > 0,
     )
@@ -330,13 +412,16 @@ export function getInvalidWorkflowVariableReferenceErrors(
   return outerNodes.flatMap((node) => {
     const data = node.data as unknown as WorkflowNodeData;
     const options = getUpstreamWorkflowVariables(outerNodes, outerEdges, node.id);
-    const hasInvalidReference = valuesWithReferences(data).some(
-      (value) => getInvalidWorkflowVariableTokens(value, options).length > 0,
-    );
+    const message =
+      data.nodeType === 'llm'
+        ? invalidLLMReferenceMessage(data, options)
+        : valuesWithReferences(data).some(
+              (value) => getInvalidWorkflowVariableTokens(value, options).length > 0,
+            )
+          ? INVALID_WORKFLOW_VARIABLE_REFERENCE_MESSAGE
+          : null;
 
-    return hasInvalidReference
-      ? [workflowError(INVALID_WORKFLOW_VARIABLE_REFERENCE_MESSAGE, node)]
-      : [];
+    return message ? [workflowError(message, node)] : [];
   });
 }
 
@@ -373,9 +458,13 @@ function validateOptionalEndOutputs(nodes: Node[]): ValidationError[] {
   });
 }
 
-export function validateWorkflowConfig(nodes: Node[], edges: Edge[] = []): ValidationError[] {
+export function validateWorkflowConfig(
+  nodes: Node[],
+  edges: Edge[] = [],
+  context: WorkflowValidationContext = {},
+): ValidationError[] {
   const errors = nodes
-    .map((node) => validateNode(node, nodes, edges))
+    .map((node) => validateNode(node, nodes, edges, true, context))
     .filter((error): error is ValidationError => error !== null);
   if (nodes.length > 30)
     errors.unshift({
@@ -398,7 +487,11 @@ function workflowError(message: string, node?: Node): ValidationError {
 }
 
 /** Mirrors the graph-shape checks that block server persistence without running tools. */
-export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): ValidationError[] {
+export function validateWorkflowDraft(
+  nodes: Node[],
+  edges: Edge[] = [],
+  context: WorkflowValidationContext = {},
+): ValidationError[] {
   const outerNodes = nodes.filter((node) => {
     const data = node.data as unknown as WorkflowNodeData;
     return !data.isLoopBody && !data.loopParentId;
@@ -406,7 +499,7 @@ export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): Valida
   const outerIDs = new Set(outerNodes.map((node) => node.id));
   const outerEdges = edges.filter((edge) => outerIDs.has(edge.source) && outerIDs.has(edge.target));
   const errors = [
-    ...validateWorkflowConfig(outerNodes, outerEdges),
+    ...validateWorkflowConfig(outerNodes, outerEdges, context),
     ...validateOptionalEndOutputs(outerNodes),
   ];
   const nodeById = new Map(outerNodes.map((node) => [node.id, node]));
@@ -503,12 +596,23 @@ export function validateWorkflowDraft(nodes: Node[], edges: Edge[] = []): Valida
   return errors;
 }
 
-export function validateSingleNode(data: WorkflowNodeData): ValidationError | null {
+export function getWorkflowToolInputErrors(
+  nodes: Node[],
+  context: WorkflowValidationContext,
+): ValidationError[] {
+  return nodes.flatMap((node) => toolCapabilityInputErrors(node, context));
+}
+
+export function validateSingleNode(
+  data: WorkflowNodeData,
+  context: WorkflowValidationContext = {},
+): ValidationError | null {
   return validateNode(
     { id: 'temp', data: data as unknown as Record<string, unknown>, position: { x: 0, y: 0 } },
     [],
     [],
     false,
+    context,
   );
 }
 export function hasUnconfiguredNodes(nodes: Node[]): boolean {

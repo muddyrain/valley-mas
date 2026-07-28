@@ -1,15 +1,6 @@
-import { CircleAlert, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
 import { TypedVariableBindingPicker } from '../TypedVariableBindingPicker';
 import type { WorkflowValueType } from '../types';
 import { VariableReferencePicker } from '../VariableReferencePicker';
@@ -23,6 +14,7 @@ import {
   type WorkflowVariableOption,
 } from '../workflowVariables';
 import { RecordKeyInput } from './RecordKeyInput';
+import { WorkflowIOField } from './WorkflowIOField';
 
 const defaultValueTypes: WorkflowValueType[] = [
   'string',
@@ -45,32 +37,6 @@ interface VariableBindingEditorProps {
   valueMode?: 'inline' | 'explicit' | 'reference';
 }
 
-function BindingErrorInfo({ message }: { message: string }) {
-  return (
-    <Popover>
-      <PopoverTrigger
-        render={
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="absolute -right-2 -top-2 z-10 rounded-full border border-destructive/30 bg-background text-destructive shadow-xs hover:bg-destructive/10 hover:text-destructive"
-            aria-label="查看配置错误"
-          >
-            <CircleAlert />
-          </Button>
-        }
-      />
-      <PopoverContent side="bottom" align="start" className="w-80 gap-2">
-        <PopoverHeader>
-          <PopoverTitle>配置提示</PopoverTitle>
-          <PopoverDescription>{message}</PopoverDescription>
-        </PopoverHeader>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 export function VariableBindingEditor({
   values,
   types,
@@ -86,13 +52,6 @@ export function VariableBindingEditor({
 
   return (
     <div className="space-y-3">
-      {valueMode === 'reference' && names.length > 0 ? (
-        <div className="grid grid-cols-[minmax(96px,0.7fr)_minmax(0,1.3fr)_auto] gap-2 px-1 text-xs text-muted-foreground">
-          <span>变量名</span>
-          <span>变量值</span>
-          <span className="sr-only">操作</span>
-        </div>
-      ) : null}
       {Object.entries(values).map(([name, value]) => (
         <VariableBindingField
           key={name}
@@ -192,20 +151,19 @@ function VariableBindingField({
 
   if (valueMode === 'reference') {
     return (
-      <div
-        aria-invalid={Boolean(fieldErrorMessage) || undefined}
-        className={cn(
-          'relative space-y-2',
-          fieldErrorMessage && 'rounded-lg border border-destructive/70 bg-destructive/5 px-2 py-2',
-        )}
-      >
-        <div className="grid grid-cols-[minmax(96px,0.7fr)_minmax(0,1.3fr)_auto] items-center gap-2">
+      <WorkflowIOField
+        name={name}
+        type={types[name] || 'string'}
+        error={fieldErrorMessage || undefined}
+        nameControl={
           <RecordKeyInput
             name={name}
             names={names}
             ariaLabel={nameAriaLabel}
             onCommit={renameVariable}
           />
+        }
+        valueControl={
           <VariableReferencePicker
             ariaLabel={`${name} 变量值`}
             className="w-full"
@@ -222,6 +180,8 @@ function VariableBindingField({
             options={variableOptions}
             placeholder="选择上游变量"
           />
+        }
+        actions={
           <Button
             type="button"
             variant="ghost"
@@ -231,27 +191,24 @@ function VariableBindingField({
           >
             <Trash2 className="size-4" />
           </Button>
-        </div>
-        {fieldErrorMessage ? <BindingErrorInfo message={fieldErrorMessage} /> : null}
-      </div>
+        }
+      />
     );
   }
 
   return (
-    <div
-      aria-invalid={Boolean(fieldErrorMessage) || undefined}
-      className={cn(
-        'relative space-y-2 rounded-lg border border-border p-3',
-        fieldErrorMessage && 'border-destructive/70 bg-destructive/5',
-      )}
-    >
-      <div className="grid grid-cols-[minmax(0,1fr)_110px_auto] items-center gap-2">
+    <WorkflowIOField
+      name={name}
+      error={fieldErrorMessage || undefined}
+      nameControl={
         <RecordKeyInput
           name={name}
           names={names}
           ariaLabel={nameAriaLabel}
           onCommit={renameVariable}
         />
+      }
+      typeControl={
         <Select
           value={types[name] || 'string'}
           onValueChange={(type) =>
@@ -267,6 +224,8 @@ function VariableBindingField({
             ))}
           </SelectContent>
         </Select>
+      }
+      actions={
         <Button
           type="button"
           variant="ghost"
@@ -276,36 +235,37 @@ function VariableBindingField({
         >
           <Trash2 className="size-4" />
         </Button>
-      </div>
-      {valueMode === 'explicit' ? (
-        <TypedVariableBindingPicker
-          ariaLabel={`${name} 变量值`}
-          type={types[name] || 'string'}
-          value={value}
-          onChange={(nextValue) => onChange({ ...values, [name]: nextValue }, types)}
-          options={variableOptions}
-          showType={false}
-        />
-      ) : (
-        <VariableTokenEditor
-          ariaLabel={`${name} 变量值`}
-          compact
-          value={stringValue}
-          onChange={(nextValue) => {
-            const selected = variableOptions.find((option) => option.token === nextValue);
-            const selectedType = selected?.type;
-            onChange(
-              { ...values, [name]: nextValue },
-              selectedType && selectedType !== 'unknown'
-                ? { ...types, [name]: selectedType }
-                : types,
-            );
-          }}
-          options={variableOptions}
-          placeholder="输入固定值或选择上游变量"
-        />
-      )}
-      {fieldErrorMessage ? <BindingErrorInfo message={fieldErrorMessage} /> : null}
-    </div>
+      }
+      valueControl={
+        valueMode === 'explicit' ? (
+          <TypedVariableBindingPicker
+            ariaLabel={`${name} 变量值`}
+            type={types[name] || 'string'}
+            value={value}
+            onChange={(nextValue) => onChange({ ...values, [name]: nextValue }, types)}
+            options={variableOptions}
+            showType={false}
+          />
+        ) : (
+          <VariableTokenEditor
+            ariaLabel={`${name} 变量值`}
+            compact
+            value={stringValue}
+            onChange={(nextValue) => {
+              const selected = variableOptions.find((option) => option.token === nextValue);
+              const selectedType = selected?.type;
+              onChange(
+                { ...values, [name]: nextValue },
+                selectedType && selectedType !== 'unknown'
+                  ? { ...types, [name]: selectedType }
+                  : types,
+              );
+            }}
+            options={variableOptions}
+            placeholder="输入固定值或选择上游变量"
+          />
+        )
+      }
+    />
   );
 }
