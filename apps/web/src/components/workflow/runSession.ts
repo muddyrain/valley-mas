@@ -1,4 +1,4 @@
-import type { WorkflowRunEvent, WorkflowRunEventData } from '@/api/workflow';
+import type { WorkflowNodeRun, WorkflowRunEvent, WorkflowRunEventData } from '@/api/workflow';
 
 export type NodeRunStatus = 'idle' | 'running' | 'success' | 'error' | 'skipped' | 'cancelled';
 
@@ -31,7 +31,7 @@ export interface WorkflowRunSession {
 }
 
 export type WorkflowRunSessionAction =
-  | { type: 'begin'; generation: number }
+  | { type: 'begin'; generation: number; nodes?: Record<string, NodeRunSnapshot> }
   | { type: 'cancelled'; generation: number }
   | { type: 'event'; generation: number; event: WorkflowRunEvent }
   | {
@@ -65,6 +65,7 @@ export function workflowRunSessionReducer(
         ...createWorkflowRunSession(),
         generation: action.generation,
         status: 'running',
+        nodes: action.nodes || {},
       };
     case 'error':
       if (action.generation !== session.generation) return session;
@@ -100,6 +101,41 @@ export function workflowRunSessionReducer(
     case 'event':
       return applyWorkflowRunEvent(session, action.generation, action.event);
   }
+}
+
+export function workflowRunSnapshotsFromNodeRuns(
+  nodeRuns: WorkflowNodeRun[],
+): Record<string, NodeRunSnapshot> {
+  return Object.fromEntries(
+    nodeRuns.map((nodeRun) => [
+      nodeRun.nodeId,
+      {
+        status: nodeRun.status === 'waiting_approval' ? 'running' : nodeRun.status,
+        input: parseObject(nodeRun.input),
+        output: parseObject(nodeRun.output),
+        error: nodeRun.status === 'error' ? nodeRun.errorCode : undefined,
+        errorCode: nodeRun.errorCode,
+        durationMs: nodeRun.durationMs,
+        startedAt: parseStartedAt(nodeRun.startedAt),
+      },
+    ]),
+  );
+}
+
+function parseObject(value: string): Record<string, unknown> | undefined {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseStartedAt(value: string): number | undefined {
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? undefined : timestamp;
 }
 
 function closeRunningNodes(

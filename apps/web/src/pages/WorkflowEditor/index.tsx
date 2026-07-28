@@ -118,6 +118,7 @@ import {
   createWorkflowRunSession,
   type WorkflowRunSession,
   workflowRunSessionReducer,
+  workflowRunSnapshotsFromNodeRuns,
 } from '@/components/workflow/runSession';
 import type { WorkflowNodeData } from '@/components/workflow/types';
 import { useWorkflowHistory } from '@/components/workflow/useWorkflowHistory';
@@ -2256,7 +2257,13 @@ export default function WorkflowEditorPage() {
       setPendingValidationFocusNodeID(null);
       const generation = runGenerationRef.current + 1;
       runGenerationRef.current = generation;
-      dispatchRunSession({ type: 'begin', generation });
+      dispatchRunSession({
+        type: 'begin',
+        generation,
+        nodes: resumeSourceRun
+          ? workflowRunSnapshotsFromNodeRuns(resumeSourceRun.nodes)
+          : undefined,
+      });
 
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
