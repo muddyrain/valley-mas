@@ -853,6 +853,8 @@ func runWorkflowGraphWithResume(
 	// actual number of requests, so the owner context only coordinates cancel.
 	executionContext, releaseRun := activeWorkflowRuns.Start(run.ID.String(), 0)
 	defer releaseRun()
+	stopCancellationWatch := watchWorkflowRunCancellation(run.ID.String())
+	defer stopCancellationWatch()
 	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: runtimeState.Outputs, CompletedNodes: workflowCompletedNodes(runtimeState), ResumeFromNodeID: resumeFromNodeID, KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion), ContentSearcher: workflowContentSearcher(model.Int64String(userID)), NotionSearcher: workflowNotionSearcher(model.Int64String(userID)), CoverGenerator: workflowCoverGenerator(), AIImageGenerator: workflowAIImageGenerator(), AIImageUnderstander: workflowAIImageUnderstander(), AIImageResourceSaver: workflowAIImageResourceSaver(), NotificationSender: workflowNotificationSender(), SubworkflowRunner: workflowSubworkflowRunner(model.Int64String(userID)), ApprovalGate: workflowApprovalGate(run), SkillInstructionResolver: workflowAISkillInstructionResolver(model.Int64String(userID)), RegisterNodeCancellation: func(nodeID string, cancel func()) func() {
 		return activeWorkflowRuns.RegisterNodeCancel(run.ID.String(), nodeID, cancel)
 	}}, func(event workflow.Event) {
@@ -975,6 +977,7 @@ func AdminListWorkflowRuns(c *gin.Context) {
 		Error(c, http.StatusNotFound, "工作流不存在")
 		return
 	}
+	reconcileStaleWorkflowRunCancellations(model.Int64String(userID))
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
 	if page < 1 {
@@ -1017,6 +1020,7 @@ func AdminGetWorkflowRun(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "无效的运行 ID")
 		return
 	}
+	reconcileStaleWorkflowRunCancellations(model.Int64String(userID))
 	var run model.WorkflowRun
 	if err := database.DB.Where("id = ? AND workflow_id = ? AND user_id = ?", runID, workflowID, userID).First(&run).Error; err != nil {
 		Error(c, http.StatusNotFound, "运行记录不存在")
@@ -1075,15 +1079,31 @@ func CancelWorkflowRun(c *gin.Context) {
 		Error(c, http.StatusConflict, "该运行已结束，不能取消")
 		return
 	}
-	if !activeWorkflowRuns.Cancel(run.ID.String()) {
-		Error(c, http.StatusConflict, "该运行不在当前服务进程中，不能取消")
-		return
-	}
-	if err := database.DB.Model(&run).Update("status", "cancelling").Error; err != nil {
+	now := time.Now()
+	result := database.DB.Model(&run).
+		Where("status = ?", string(workflow.StatusRunning)).
+		Updates(map[string]any{"status": "cancelling", "cancel_requested_at": &now})
+	if result.Error != nil {
 		Error(c, http.StatusInternalServerError, "更新取消状态失败")
 		return
 	}
+	if result.RowsAffected == 0 {
+		Error(c, http.StatusConflict, "该运行已结束，不能取消")
+		return
+	}
+	activeWorkflowRuns.Cancel(run.ID.String())
 	Success(c, gin.H{"status": "cancelling"})
+}
+
+func reconcileStaleWorkflowRunCancellations(userID model.Int64String) {
+	cutoff := time.Now().Add(-5 * time.Minute)
+	finished := time.Now()
+	_ = database.DB.Model(&model.WorkflowRun{}).
+		Where("user_id = ? AND status = ? AND cancel_requested_at IS NOT NULL AND cancel_requested_at < ?", userID, "cancelling", cutoff).
+		Updates(map[string]any{
+			"status": string(workflow.StatusCancelled), "result": `{"error":"WORKFLOW_CANCELLED"}`,
+			"runtime_state": "", "finished_at": &finished,
+		}).Error
 }
 
 func CancelWorkflowRunNode(c *gin.Context) {

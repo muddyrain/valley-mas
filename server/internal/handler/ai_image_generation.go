@@ -212,8 +212,16 @@ func ListAIImageGenerations(c *gin.Context) {
 	if limit > 50 {
 		limit = 50
 	}
+	query := database.GetDB().Where("user_id = ?", userID)
+	if source := strings.TrimSpace(c.Query("source")); source != "" {
+		if !service.IsAIImageGenerationSource(source) {
+			Error(c, http.StatusBadRequest, "图片生成来源无效")
+			return
+		}
+		query = query.Where("source = ?", source)
+	}
 	var generations []model.AIImageGeneration
-	if err := database.GetDB().Where("user_id = ?", userID).Order("created_at DESC").Limit(limit).Find(&generations).Error; err != nil {
+	if err := query.Order("created_at DESC").Limit(limit).Find(&generations).Error; err != nil {
 		ErrorWithDetail(c, http.StatusInternalServerError, "读取图片生成记录失败", err)
 		return
 	}

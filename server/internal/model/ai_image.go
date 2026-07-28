@@ -13,7 +13,8 @@ import (
 // scoped and are deliberately never persisted.
 type AIImageGeneration struct {
 	ID                       Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID                   Int64String    `gorm:"index:idx_ai_image_generations_owner_created;not null" json:"userId"`
+	UserID                   Int64String    `gorm:"index:idx_ai_image_generations_owner_created;index:idx_ai_image_generations_owner_source_created,priority:1;not null" json:"userId"`
+	Source                   string         `gorm:"size:20;not null;default:'studio';index:idx_ai_image_generations_owner_source_created,priority:2" json:"source"`
 	ModelCatalogID           Int64String    `gorm:"index;not null" json:"modelCatalogId"`
 	Provider                 string         `gorm:"size:40;not null" json:"provider"`
 	Model                    string         `gorm:"size:180;not null" json:"model"`
@@ -48,7 +49,7 @@ type AIImageGeneration struct {
 	ErrorMessage             string         `gorm:"size:500" json:"errorMessage"`
 	StartedAt                *time.Time     `json:"startedAt,omitempty"`
 	FinishedAt               *time.Time     `json:"finishedAt,omitempty"`
-	CreatedAt                time.Time      `gorm:"index:idx_ai_image_generations_owner_created,priority:2" json:"createdAt"`
+	CreatedAt                time.Time      `gorm:"index:idx_ai_image_generations_owner_created,priority:2;index:idx_ai_image_generations_owner_source_created,priority:3" json:"createdAt"`
 	UpdatedAt                time.Time      `json:"updatedAt"`
 	DeletedAt                gorm.DeletedAt `gorm:"index" json:"-"`
 }

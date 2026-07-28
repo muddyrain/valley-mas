@@ -501,13 +501,16 @@ export default function AIImageStudio() {
     setActiveGeneration(
       (current) =>
         current ??
-        generations.find((item) => item.status === 'queued' || item.status === 'running') ??
+        generations.find(
+          (item) =>
+            item.source === 'studio' && (item.status === 'queued' || item.status === 'running'),
+        ) ??
         null,
     );
   }, []);
 
   const loadHistory = useCallback(async () => {
-    const result = await listAIImageGenerations(50);
+    const result = await listAIImageGenerations(50, 'studio');
     applyHistory(result.list);
   }, [applyHistory]);
 
@@ -516,7 +519,7 @@ export default function AIImageStudio() {
     setLoading(true);
     void Promise.all([
       listAIImageCreationOptions(),
-      listAIImageGenerations(50),
+      listAIImageGenerations(50, 'studio'),
       getCurrentAIImageConversation(),
       listAIImageConversations(),
     ])

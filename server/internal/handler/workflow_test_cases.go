@@ -286,6 +286,8 @@ func executeWorkflowTestCase(requestContext context.Context, testCase model.Work
 	// controller context only coordinates user cancellation for a test run.
 	executionContext, releaseRun := activeWorkflowRuns.Start(run.ID.String(), 0)
 	defer releaseRun()
+	stopCancellationWatch := watchWorkflowRunCancellation(run.ID.String())
+	defer stopCancellationWatch()
 	if requestContext != nil {
 		go func() {
 			select {

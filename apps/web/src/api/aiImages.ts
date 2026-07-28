@@ -2,6 +2,7 @@ import request from '@/utils/request';
 
 export type AIImageGenerationStatus = 'queued' | 'running' | 'paused' | 'succeeded' | 'failed';
 export type AIImageGenerationStage = 'preparing' | 'generating' | 'storing' | 'completed';
+export type AIImageGenerationSource = 'studio' | 'workflow';
 
 export interface AIImageRecipe {
   id: string;
@@ -50,6 +51,7 @@ export interface AIImageStyleAnalysis {
 
 export interface AIImageGeneration {
   id: string;
+  source: AIImageGenerationSource;
   modelCatalogId: string;
   provider: string;
   model: string;
@@ -141,9 +143,9 @@ export const generateAIImageRecipeSamples = (recipeId: string, excludedPrompts: 
     { excludedPrompts },
   );
 
-export const listAIImageGenerations = (limit = 24) =>
+export const listAIImageGenerations = (limit = 24, source?: AIImageGenerationSource) =>
   request.get<unknown, { list: AIImageGeneration[] }>('/ai/image-generations', {
-    params: { limit },
+    params: { limit, ...(source ? { source } : {}) },
   });
 
 export const createAIImageGeneration = (data: CreateAIImageGenerationInput) =>

@@ -161,6 +161,8 @@ func executeWorkflowRunJob(parent context.Context, db *gorm.DB, job *model.Workf
 	var persistenceErr error
 	executionContext, releaseRun := activeWorkflowRuns.Start(run.ID.String(), 0)
 	defer releaseRun()
+	stopCancellationWatch := watchWorkflowRunCancellation(run.ID.String())
+	defer stopCancellationWatch()
 	executeErr := workflow.Execute(
 		executionContext,
 		graph,
@@ -220,6 +222,11 @@ func executeWorkflowRunJob(parent context.Context, db *gorm.DB, job *model.Workf
 		}
 		if failureCode == "" {
 			failureCode = "WORKFLOW_NODE_FAILED"
+		}
+		if failureCode == "WORKFLOW_CANCELLED" {
+			_ = finishWorkflowRun(&run, string(workflow.StatusCancelled), map[string]any{"error": failureCode})
+			persistWorkflowAIAppRun(app, version, run, "cancelled", nil, failureCode)
+			return failWorkflowRunJob(db, job, failureCode, executeErr)
 		}
 		_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": failureCode})
 		persistWorkflowAIAppRun(app, version, run, "failed", nil, failureCode)

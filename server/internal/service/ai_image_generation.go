@@ -34,6 +34,9 @@ const (
 	MaxAIImageReferences     = 3
 	MaxAIImageReferenceBytes = 5 << 20
 	MaxGeneratedAIImageBytes = 30 << 20
+
+	AIImageGenerationSourceStudio   = "studio"
+	AIImageGenerationSourceWorkflow = "workflow"
 )
 
 var AIImageSizes = map[string]map[string]string{
@@ -118,6 +121,22 @@ type AIImageGenerationService struct {
 	recordUsage      func(aiusage.Entry)
 	now              func() time.Time
 	enqueue          func(func())
+}
+
+func AIImageGenerationSourceForFeature(feature string) string {
+	if strings.TrimSpace(feature) == "workflow-image-generation" {
+		return AIImageGenerationSourceWorkflow
+	}
+	return AIImageGenerationSourceStudio
+}
+
+func IsAIImageGenerationSource(source string) bool {
+	switch strings.TrimSpace(source) {
+	case AIImageGenerationSourceStudio, AIImageGenerationSourceWorkflow:
+		return true
+	default:
+		return false
+	}
 }
 
 func NewAIImageGenerationService(db *gorm.DB) *AIImageGenerationService {
@@ -261,6 +280,7 @@ func (s *AIImageGenerationService) prepare(ctx context.Context, input AIImageGen
 	}
 	generation := model.AIImageGeneration{
 		UserID:                   input.UserID,
+		Source:                   AIImageGenerationSourceForFeature(input.Feature),
 		ModelCatalogID:           invocation.Model.ID,
 		Provider:                 invocation.Provider.Provider,
 		Model:                    invocation.Model.ModelID,

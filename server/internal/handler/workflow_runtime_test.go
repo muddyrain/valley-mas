@@ -873,6 +873,61 @@ func TestCancelWorkflowRunCancelsActiveOwnerRun(t *testing.T) {
 	if err := database.DB.First(&run, run.ID).Error; err != nil || run.Status != "cancelling" {
 		t.Fatalf("run=%+v err=%v", run, err)
 	}
+	if run.CancelRequestedAt == nil {
+		t.Fatalf("cancel request timestamp was not persisted: %+v", run)
+	}
+}
+
+func TestCancelWorkflowRunPersistsRequestWithoutLocalOwner(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	run := model.WorkflowRun{
+		WorkflowID:    definition.ID,
+		UserID:        101,
+		Status:        string(workflow.StatusRunning),
+		GraphSnapshot: definition.Graph,
+		StartedAt:     time.Now(),
+	}
+	if err := database.DB.Create(&run).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/runs/"+run.ID.String()+"/cancel", nil)
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if responseCode(recorder) != 0 {
+		t.Fatalf("body=%s", recorder.Body.String())
+	}
+	if err := database.DB.First(&run, run.ID).Error; err != nil || run.Status != "cancelling" || run.CancelRequestedAt == nil {
+		t.Fatalf("run=%+v err=%v", run, err)
+	}
+}
+
+func TestWatchWorkflowRunCancellationCancelsLocalExecution(t *testing.T) {
+	_, definition := setupWorkflowRuntimeTestRouter(t)
+	run := model.WorkflowRun{
+		WorkflowID:    definition.ID,
+		UserID:        101,
+		Status:        string(workflow.StatusRunning),
+		GraphSnapshot: definition.Graph,
+		StartedAt:     time.Now(),
+	}
+	if err := database.DB.Create(&run).Error; err != nil {
+		t.Fatal(err)
+	}
+	ctx, release := activeWorkflowRuns.Start(run.ID.String(), time.Minute)
+	defer release()
+	stopWatch := watchWorkflowRunCancellation(run.ID.String())
+	defer stopWatch()
+	now := time.Now()
+	if err := database.DB.Model(&run).Updates(map[string]any{"status": "cancelling", "cancel_requested_at": &now}).Error; err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-ctx.Done():
+	case <-time.After(2 * time.Second):
+		t.Fatal("persisted cancellation did not reach local execution")
+	}
 }
 
 func TestCancelWorkflowRunNodeCancelsOnlyActiveNode(t *testing.T) {

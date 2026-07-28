@@ -4,6 +4,9 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"valley-server/internal/database"
+	"valley-server/internal/model"
 )
 
 type workflowRunController struct {
@@ -76,3 +79,35 @@ func (controller *workflowRunController) CancelNode(runID, nodeID string) bool {
 
 var activeWorkflowRuns workflowRunController
 var activeCopilotRuns workflowRunController
+
+const workflowRunCancellationPollInterval = 500 * time.Millisecond
+
+// watchWorkflowRunCancellation turns a persisted cancellation request into a
+// local context cancellation. This lets the request be accepted by any server
+// instance while the instance actually executing the run stops the provider call.
+func watchWorkflowRunCancellation(runID string) func() {
+	stop := make(chan struct{})
+	var once sync.Once
+	go func() {
+		ticker := time.NewTicker(workflowRunCancellationPollInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ticker.C:
+				var run model.WorkflowRun
+				if err := database.GetDB().Select("status").Where("id = ?", runID).First(&run).Error; err != nil {
+					continue
+				}
+				if run.Status == "cancelling" {
+					activeWorkflowRuns.Cancel(runID)
+					return
+				}
+			}
+		}
+	}()
+	return func() {
+		once.Do(func() { close(stop) })
+	}
+}

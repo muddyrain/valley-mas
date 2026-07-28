@@ -88,6 +88,9 @@ func TestAIImageGenerationServiceGeneratePersistsStoredResult(t *testing.T) {
 	if result.Status != "succeeded" || result.ResultURL != "https://cdn.example.com/generated.png" {
 		t.Fatalf("unexpected generation result: %+v", result)
 	}
+	if result.Source != AIImageGenerationSourceWorkflow {
+		t.Fatalf("workflow generation source was not persisted: %+v", result)
+	}
 	if result.ResultWidth != 1 || result.ResultHeight != 1 || result.ModelCatalogID != 7 {
 		t.Fatalf("generation metadata was not persisted: %+v", result)
 	}

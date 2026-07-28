@@ -206,6 +206,8 @@ func resumeWorkflowApproval(parent context.Context, db *gorm.DB, approval model.
 	var persistenceErr error
 	executionContext, releaseRun := activeWorkflowRuns.Start(run.ID.String(), 0)
 	defer releaseRun()
+	stopCancellationWatch := watchWorkflowRunCancellation(run.ID.String())
+	defer stopCancellationWatch()
 	executeErr := workflow.Execute(
 		executionContext,
 		graph,
@@ -254,6 +256,12 @@ func resumeWorkflowApproval(parent context.Context, db *gorm.DB, approval model.
 	if executeErr != nil {
 		if failureCode == "" {
 			failureCode = "WORKFLOW_APPROVAL_RESUME_FAILED"
+		}
+		if failureCode == "WORKFLOW_CANCELLED" {
+			_ = finishWorkflowRun(&run, string(workflow.StatusCancelled), map[string]any{"error": failureCode})
+			persistWorkflowAIAppRun(app, version, run, "cancelled", nil, failureCode)
+			_ = finishTriggeredApprovalJob(db, run.ID, "error", failureCode)
+			return executeErr
 		}
 		_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": failureCode})
 		persistWorkflowAIAppRun(app, version, run, "failed", nil, failureCode)

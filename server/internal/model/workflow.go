@@ -29,23 +29,24 @@ func (w *Workflow) BeforeCreate(tx *gorm.DB) error {
 }
 
 type WorkflowRun struct {
-	ID            Int64String    `gorm:"primaryKey;autoIncrement:false;index:idx_workflow_runs_workflow_user_started,priority:4" json:"id"`
-	WorkflowID    Int64String    `gorm:"index;not null;index:idx_workflow_runs_workflow_user_started,priority:1" json:"workflowId"`
-	UserID        Int64String    `gorm:"index;not null;index:idx_workflow_runs_workflow_user_started,priority:2" json:"userId"`
-	AppID         Int64String    `gorm:"index" json:"appId,omitempty"`
-	VersionID     Int64String    `gorm:"index" json:"versionId,omitempty"`
-	Status        string         `gorm:"size:20;not null;default:'running';index" json:"status"`
-	Inputs        string         `gorm:"type:json" json:"inputs,omitempty"`
-	GraphSnapshot string         `gorm:"type:json;not null" json:"graphSnapshot"`
-	SourceRunID   *Int64String   `gorm:"index" json:"sourceRunId,omitempty"`
-	TriggerID     *Int64String   `gorm:"index" json:"triggerId,omitempty"`
-	RunJobID      *Int64String   `gorm:"uniqueIndex" json:"runJobId,omitempty"`
-	RuntimeState  string         `gorm:"type:text" json:"-"`
-	Result        string         `gorm:"type:json" json:"result,omitempty"`
-	StartedAt     time.Time      `gorm:"index:idx_workflow_runs_workflow_user_started,priority:3" json:"startedAt"`
-	FinishedAt    *time.Time     `json:"finishedAt,omitempty"`
-	CreatedAt     time.Time      `json:"createdAt"`
-	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                Int64String    `gorm:"primaryKey;autoIncrement:false;index:idx_workflow_runs_workflow_user_started,priority:4" json:"id"`
+	WorkflowID        Int64String    `gorm:"index;not null;index:idx_workflow_runs_workflow_user_started,priority:1" json:"workflowId"`
+	UserID            Int64String    `gorm:"index;not null;index:idx_workflow_runs_workflow_user_started,priority:2" json:"userId"`
+	AppID             Int64String    `gorm:"index" json:"appId,omitempty"`
+	VersionID         Int64String    `gorm:"index" json:"versionId,omitempty"`
+	Status            string         `gorm:"size:20;not null;default:'running';index" json:"status"`
+	Inputs            string         `gorm:"type:json" json:"inputs,omitempty"`
+	GraphSnapshot     string         `gorm:"type:json;not null" json:"graphSnapshot"`
+	SourceRunID       *Int64String   `gorm:"index" json:"sourceRunId,omitempty"`
+	TriggerID         *Int64String   `gorm:"index" json:"triggerId,omitempty"`
+	RunJobID          *Int64String   `gorm:"uniqueIndex" json:"runJobId,omitempty"`
+	RuntimeState      string         `gorm:"type:text" json:"-"`
+	CancelRequestedAt *time.Time     `gorm:"index" json:"cancelRequestedAt,omitempty"`
+	Result            string         `gorm:"type:json" json:"result,omitempty"`
+	StartedAt         time.Time      `gorm:"index:idx_workflow_runs_workflow_user_started,priority:3" json:"startedAt"`
+	FinishedAt        *time.Time     `json:"finishedAt,omitempty"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 type WorkflowApproval struct {
