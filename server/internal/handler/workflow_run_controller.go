@@ -7,7 +7,16 @@ import (
 )
 
 type workflowRunController struct {
-	cancels sync.Map
+	runs sync.Map
+}
+
+type workflowRunControl struct {
+	cancel      context.CancelFunc
+	nodeCancels sync.Map
+}
+
+type workflowNodeCancel struct {
+	cancel func()
 }
 
 func (controller *workflowRunController) Start(runID string, timeout time.Duration) (context.Context, func()) {
@@ -18,19 +27,50 @@ func (controller *workflowRunController) Start(runID string, timeout time.Durati
 	} else {
 		ctx, cancel = context.WithCancel(context.Background())
 	}
-	controller.cancels.Store(runID, cancel)
+	control := &workflowRunControl{cancel: cancel}
+	controller.runs.Store(runID, control)
 	return ctx, func() {
-		controller.cancels.Delete(runID)
+		controller.runs.Delete(runID)
+		control.nodeCancels.Range(func(_, value any) bool {
+			value.(*workflowNodeCancel).cancel()
+			return true
+		})
 		cancel()
 	}
 }
 
 func (controller *workflowRunController) Cancel(runID string) bool {
-	value, ok := controller.cancels.Load(runID)
+	value, ok := controller.runs.Load(runID)
 	if !ok {
 		return false
 	}
-	value.(context.CancelFunc)()
+	value.(*workflowRunControl).cancel()
+	return true
+}
+
+func (controller *workflowRunController) RegisterNodeCancel(runID, nodeID string, cancel func()) func() {
+	value, ok := controller.runs.Load(runID)
+	if !ok {
+		return func() {}
+	}
+	control := value.(*workflowRunControl)
+	nodeCancel := &workflowNodeCancel{cancel: cancel}
+	control.nodeCancels.Store(nodeID, nodeCancel)
+	return func() {
+		control.nodeCancels.CompareAndDelete(nodeID, nodeCancel)
+	}
+}
+
+func (controller *workflowRunController) CancelNode(runID, nodeID string) bool {
+	value, ok := controller.runs.Load(runID)
+	if !ok {
+		return false
+	}
+	nodeCancel, ok := value.(*workflowRunControl).nodeCancels.Load(nodeID)
+	if !ok {
+		return false
+	}
+	nodeCancel.(*workflowNodeCancel).cancel()
 	return true
 }
 

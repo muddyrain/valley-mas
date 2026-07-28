@@ -19,3 +19,21 @@ func TestWorkflowRunControllerAllowsCancelOnlyContext(t *testing.T) {
 		t.Fatalf("context error = %v, want %v", err, context.Canceled)
 	}
 }
+
+func TestWorkflowRunControllerCancelsOnlyRequestedNode(t *testing.T) {
+	controller := workflowRunController{}
+	_, release := controller.Start("run", 0)
+	defer release()
+	var firstCancelled, secondCancelled bool
+	firstRelease := controller.RegisterNodeCancel("run", "first", func() { firstCancelled = true })
+	defer firstRelease()
+	secondRelease := controller.RegisterNodeCancel("run", "second", func() { secondCancelled = true })
+	defer secondRelease()
+
+	if !controller.CancelNode("run", "second") {
+		t.Fatal("expected running node to be cancellable")
+	}
+	if firstCancelled || !secondCancelled {
+		t.Fatalf("first=%v second=%v", firstCancelled, secondCancelled)
+	}
+}

@@ -9,6 +9,7 @@ export interface NodeRunIterationSnapshot {
   error?: string;
   errorCode?: string;
   durationMs?: number;
+  startedAt?: number;
   loopIteration?: number;
   loopDepth?: number;
 }
@@ -254,6 +255,7 @@ function snapshotFromEvent(
       loopIteration: data?.loopIteration,
       loopDepth: data?.loopDepth,
       iterations: current.iterations,
+      startedAt: current.startedAt ?? Date.now(),
     };
   }
   const nextStatus: NodeRunStatus =
@@ -266,6 +268,7 @@ function snapshotFromEvent(
     error: nextError,
     errorCode: data?.error ?? current.errorCode,
     durationMs: data?.durationMs ?? current.durationMs,
+    startedAt: current.startedAt,
     loopIteration: data?.loopIteration ?? current.loopIteration,
     loopDepth: data?.loopDepth ?? current.loopDepth,
     iterations: current.iterations,

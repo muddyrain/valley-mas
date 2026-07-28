@@ -74,7 +74,9 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	auth.GET("/:id/runs/:runId", AdminGetWorkflowRun)
 	auth.GET("/:id/runs/:runId/events", StreamWorkflowRunEvents)
 	auth.POST("/:id/runs/:runId/cancel", CancelWorkflowRun)
+	auth.POST("/:id/runs/:runId/nodes/:nodeId/cancel", CancelWorkflowRunNode)
 	auth.POST("/:id/runs/:runId/retry", RetryWorkflowRun)
+	auth.POST("/:id/runs/:runId/resume", ResumeWorkflowRun)
 	auth.GET("/:id/approvals", ListWorkflowApprovals)
 	auth.POST("/:id/approvals/:approvalId/decision", DecideWorkflowApproval)
 	auth.PUT("/:id", AdminUpdateWorkflow)
@@ -873,6 +875,50 @@ func TestCancelWorkflowRunCancelsActiveOwnerRun(t *testing.T) {
 	}
 }
 
+func TestCancelWorkflowRunNodeCancelsOnlyActiveNode(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	run := model.WorkflowRun{
+		WorkflowID:    definition.ID,
+		UserID:        101,
+		Status:        string(workflow.StatusRunning),
+		GraphSnapshot: definition.Graph,
+		StartedAt:     time.Now(),
+	}
+	if err := database.DB.Create(&run).Error; err != nil {
+		t.Fatal(err)
+	}
+	nodeRun := model.WorkflowNodeRun{
+		WorkflowRunID: run.ID,
+		NodeID:        "end",
+		NodeType:      string(workflow.NodeTypeEnd),
+		Status:        string(workflow.StatusRunning),
+		StartedAt:     time.Now(),
+	}
+	if err := database.DB.Create(&nodeRun).Error; err != nil {
+		t.Fatal(err)
+	}
+	_, release := activeWorkflowRuns.Start(run.ID.String(), time.Minute)
+	defer release()
+	cancelled := make(chan struct{}, 1)
+	removeNodeCancel := activeWorkflowRuns.RegisterNodeCancel(run.ID.String(), nodeRun.NodeID, func() {
+		cancelled <- struct{}{}
+	})
+	defer removeNodeCancel()
+
+	request := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/runs/"+run.ID.String()+"/nodes/"+nodeRun.NodeID+"/cancel", nil)
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if responseCode(recorder) != 0 {
+		t.Fatalf("body=%s", recorder.Body.String())
+	}
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("node cancellation callback was not invoked")
+	}
+}
+
 func TestRetryWorkflowRunCreatesNewRunFromSnapshot(t *testing.T) {
 	router, definition := setupWorkflowRuntimeTestRouter(t)
 	firstRequest := workflowMultipartRequest(t, "/workflows/"+definition.ID.String()+"/run", `{"title":"first"}`)
@@ -902,6 +948,54 @@ func TestRetryWorkflowRunCreatesNewRunFromSnapshot(t *testing.T) {
 	}
 	if runs[1].GraphSnapshot != source.GraphSnapshot {
 		t.Fatalf("retry must preserve graph snapshot: source=%s retry=%s", source.GraphSnapshot, runs[1].GraphSnapshot)
+	}
+}
+
+func TestResumeWorkflowRunRetriesOnlyFailedNode(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	definition.Graph = `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","position":{"x":0,"y":0},"config":{"inputs":{"title":{"type":"string","required":true}}}},{"id":"request","type":"http","label":"请求","position":{"x":180,"y":0},"config":{"method":"GET","url":"https://127.0.0.1","params":[],"headers":[],"bodyType":"none","body":"","timeoutSeconds":1,"retryCount":0,"ignoreError":false}},{"id":"end","type":"end","label":"结束","position":{"x":360,"y":0},"config":{"outputs":{"body":"{{request.output.body}}"}}}],"edges":[{"source":"start","sourceHandle":"output","target":"request","targetHandle":"input"},{"source":"request","sourceHandle":"output","target":"end","targetHandle":"input"}]}`
+	if err := database.DB.Model(&definition).Update("graph", definition.Graph).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	firstRequest := workflowMultipartRequest(t, "/workflows/"+definition.ID.String()+"/run", `{"title":"first"}`)
+	firstRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	firstRecorder := httptest.NewRecorder()
+	router.ServeHTTP(firstRecorder, firstRequest)
+	if responseCode(firstRecorder) != 0 {
+		t.Fatalf("first run: %s", firstRecorder.Body.String())
+	}
+	var source model.WorkflowRun
+	if err := database.DB.Where("workflow_id = ?", definition.ID).First(&source).Error; err != nil {
+		t.Fatal(err)
+	}
+	if source.Status != string(workflow.StatusFailed) || source.RuntimeState == "" {
+		t.Fatalf("source run is not resumable: %+v", source)
+	}
+
+	resumeRequest := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/runs/"+source.ID.String()+"/resume", nil)
+	resumeRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	resumeRecorder := httptest.NewRecorder()
+	router.ServeHTTP(resumeRecorder, resumeRequest)
+	if responseCode(resumeRecorder) != 0 {
+		t.Fatalf("resume: %s", resumeRecorder.Body.String())
+	}
+
+	var runs []model.WorkflowRun
+	if err := database.DB.Where("workflow_id = ?", definition.ID).Order("created_at ASC").Find(&runs).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 2 || runs[1].Status != string(workflow.StatusFailed) || runs[1].SourceRunID == nil || *runs[1].SourceRunID != source.ID {
+		t.Fatalf("unexpected resumed runs: %+v", runs)
+	}
+	var resumedNodes []model.WorkflowNodeRun
+	if err := database.DB.Where("workflow_run_id = ?", runs[1].ID).Find(&resumedNodes).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, node := range resumedNodes {
+		if node.NodeID == "start" {
+			t.Fatalf("successful start node must not be replayed: %+v", resumedNodes)
+		}
 	}
 }
 

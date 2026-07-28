@@ -555,6 +555,132 @@ func RetryWorkflowRun(c *gin.Context) {
 	runWorkflowGraph(c, userID, role, definition, graph, app, appVersion, &sourceRunID)
 }
 
+// ResumeWorkflowRun retries the failed top-level node and continues using the
+// encrypted checkpoint of the source run, without replaying successful nodes.
+func ResumeWorkflowRun(c *gin.Context) {
+	userID, role, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+	workflowID, err := parsePathInt64(c, "id")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的 ID")
+		return
+	}
+	runID, err := parsePathInt64(c, "runId")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的运行 ID")
+		return
+	}
+	var sourceRun model.WorkflowRun
+	if err := database.DB.Where("id = ? AND workflow_id = ? AND user_id = ?", runID, workflowID, userID).First(&sourceRun).Error; err != nil {
+		Error(c, http.StatusNotFound, "运行记录不存在")
+		return
+	}
+	if sourceRun.Status != string(workflow.StatusFailed) {
+		Error(c, http.StatusConflict, "只有失败的运行可以从失败节点继续")
+		return
+	}
+	graph, err := decodeWorkflowGraph(sourceRun.GraphSnapshot)
+	if err != nil {
+		Error(c, http.StatusBadRequest, "历史工作流格式错误")
+		return
+	}
+	registry := workflowRuntimeRegistry()
+	failedNodeID, requiresConfirmation, eligibilityErr := workflowResumeEligibility(sourceRun, graph, registry)
+	if eligibilityErr != nil {
+		Error(c, http.StatusConflict, eligibilityErr.Error())
+		return
+	}
+	if requiresConfirmation && c.GetHeader("X-Workflow-Resume-Confirmed") != "true" {
+		Error(c, http.StatusConflict, "重试该节点可能再次执行写入或生成操作，请确认后继续")
+		return
+	}
+	state, err := decryptWorkflowRunResumeState(sourceRun.RuntimeState)
+	if err != nil {
+		Error(c, http.StatusConflict, "无法恢复该运行，请重新运行工作流")
+		return
+	}
+	if err := restoreWorkflowFileInputs(graph, state.Inputs); err != nil {
+		Error(c, http.StatusConflict, "恢复运行输入失败，请重新运行工作流")
+		return
+	}
+	var definition model.Workflow
+	if err := database.DB.Where("id = ? AND user_id = ?", workflowID, userID).First(&definition).Error; err != nil {
+		Error(c, http.StatusNotFound, "工作流不存在")
+		return
+	}
+	app, appVersion, found := workflowRunAIAppVersion(sourceRun.ID, model.Int64String(userID))
+	if !found {
+		if err := database.DB.Transaction(func(tx *gorm.DB) error {
+			var syncErr error
+			app, appVersion, syncErr = syncWorkflowAIAppWithoutSnapshot(tx, definition)
+			return syncErr
+		}); err != nil {
+			Error(c, http.StatusInternalServerError, "同步工作流应用失败")
+			return
+		}
+	}
+	sourceRunID := sourceRun.ID
+	runWorkflowGraphWithResume(c, userID, role, definition, graph, app, appVersion, &sourceRunID, &workflowRunResumeState{
+		Inputs: state.Inputs, Outputs: state.Outputs, Completed: state.Completed,
+	}, failedNodeID)
+}
+
+func workflowResumeEligibility(sourceRun model.WorkflowRun, graph workflow.Graph, registry *workflow.Registry) (string, bool, error) {
+	if len(graph.Nodes) == 0 {
+		return "", false, fmt.Errorf("历史工作流没有可恢复的节点")
+	}
+	for _, node := range graph.Nodes {
+		if node.Type == workflow.NodeTypeLoop {
+			return "", false, fmt.Errorf("包含循环节点的运行暂不支持从失败节点继续")
+		}
+	}
+	if validationErrors := workflow.ValidateGraph(graph, registry); len(validationErrors) > 0 {
+		return "", false, fmt.Errorf("历史工作流已不符合当前运行规则: %s", strings.Join(validationErrors, "；"))
+	}
+	var failedNodes []model.WorkflowNodeRun
+	if err := database.DB.Where("workflow_run_id = ? AND status = ?", sourceRun.ID, string(workflow.StatusFailed)).Find(&failedNodes).Error; err != nil {
+		return "", false, fmt.Errorf("查询失败节点失败")
+	}
+	if len(failedNodes) != 1 {
+		return "", false, fmt.Errorf("未找到唯一的失败节点，无法继续运行")
+	}
+	failedNodeID := failedNodes[0].NodeID
+	for _, node := range graph.Nodes {
+		if node.ID != failedNodeID {
+			continue
+		}
+		return failedNodeID, workflowNodeRetryRequiresConfirmation(node, registry), nil
+	}
+	return "", false, fmt.Errorf("失败节点已不在历史工作流中")
+}
+
+func workflowNodeRetryRequiresConfirmation(node workflow.Node, registry *workflow.Registry) bool {
+	if node.Type == workflow.NodeTypeHTTP {
+		var config struct {
+			Method string `json:"method"`
+		}
+		return json.Unmarshal(node.Config, &config) == nil && !isIdempotentWorkflowHTTPMethod(config.Method)
+	}
+	if node.Type != workflow.NodeTypeTool {
+		return false
+	}
+	var config struct {
+		CapabilityID string `json:"capabilityId"`
+	}
+	if json.Unmarshal(node.Config, &config) != nil {
+		return false
+	}
+	capability, _, found := registry.Capability(config.CapabilityID)
+	return found && (capability.SideEffect == "write" || capability.SideEffect == "model_and_storage")
+}
+
+func isIdempotentWorkflowHTTPMethod(method string) bool {
+	return strings.EqualFold(strings.TrimSpace(method), http.MethodGet) || strings.EqualFold(strings.TrimSpace(method), http.MethodHead)
+}
+
 func workflowRunAIAppVersion(workflowRunID, userID model.Int64String) (model.AIApp, model.AIAppVersion, bool) {
 	var appRun model.AIAppRun
 	if err := database.DB.Where("workflow_run_id = ? AND user_id = ?", workflowRunID, userID).Order("created_at DESC").First(&appRun).Error; err != nil {
@@ -573,17 +699,7 @@ func workflowRunAIAppVersion(workflowRunID, userID model.Int64String) (model.AIA
 
 func workflowRetryRequiresConfirmation(graph workflow.Graph, registry *workflow.Registry) bool {
 	for _, node := range graph.Nodes {
-		if node.Type != workflow.NodeTypeTool {
-			continue
-		}
-		var config struct {
-			CapabilityID string `json:"capabilityId"`
-		}
-		if json.Unmarshal(node.Config, &config) != nil {
-			continue
-		}
-		capability, _, found := registry.Capability(config.CapabilityID)
-		if found && (capability.SideEffect == "write" || capability.SideEffect == "model_and_storage") {
+		if workflowNodeRetryRequiresConfirmation(node, registry) {
 			return true
 		}
 	}
@@ -608,23 +724,53 @@ func runWorkflowGraph(
 	appVersion model.AIAppVersion,
 	sourceRunID *model.Int64String,
 ) {
+	runWorkflowGraphWithResume(c, userID, role, definition, graph, app, appVersion, sourceRunID, nil, "")
+}
+
+func runWorkflowGraphWithResume(
+	c *gin.Context,
+	userID int64,
+	role string,
+	definition model.Workflow,
+	graph workflow.Graph,
+	app model.AIApp,
+	appVersion model.AIAppVersion,
+	sourceRunID *model.Int64String,
+	resumeState *workflowRunResumeState,
+	resumeFromNodeID string,
+) {
 	registry := workflowRuntimeRegistry()
 	fileInputs, err := declaredStartFileInputs(graph)
 	if err != nil {
 		Error(c, http.StatusBadRequest, "工作流文件输入配置无效")
 		return
 	}
-	inputs, err := readWorkflowRunInputs(c, fileInputs)
-	if err != nil {
-		Error(c, http.StatusBadRequest, "运行输入无效: "+err.Error())
-		return
+	inputs := map[string]any{}
+	if resumeState != nil {
+		inputs = resumeState.Inputs
+	} else {
+		inputs, err = readWorkflowRunInputs(c, fileInputs)
+		if err != nil {
+			Error(c, http.StatusBadRequest, "运行输入无效: "+err.Error())
+			return
+		}
 	}
 	inputsJSON, err := json.Marshal(safeWorkflowRunInputs(inputs))
 	if err != nil {
 		Error(c, http.StatusInternalServerError, "运行记录序列化失败")
 		return
 	}
-	run := model.WorkflowRun{WorkflowID: definition.ID, UserID: model.Int64String(userID), AppID: app.ID, VersionID: appVersion.ID, Status: string(workflow.StatusRunning), Inputs: string(inputsJSON), GraphSnapshot: mustEncodeWorkflowGraph(graph, definition.Graph), SourceRunID: sourceRunID, StartedAt: time.Now()}
+	runtimeState := workflowRunResumeState{Inputs: inputs, Outputs: map[string]map[string]any{}, Completed: map[string]workflowResumeNode{}}
+	if resumeState != nil {
+		runtimeState.Outputs = resumeState.Outputs
+		runtimeState.Completed = resumeState.Completed
+	}
+	encryptedState, err := encryptWorkflowRunResumeState(runtimeState)
+	if err != nil {
+		Error(c, http.StatusInternalServerError, "创建运行检查点失败")
+		return
+	}
+	run := model.WorkflowRun{WorkflowID: definition.ID, UserID: model.Int64String(userID), AppID: app.ID, VersionID: appVersion.ID, Status: string(workflow.StatusRunning), Inputs: string(inputsJSON), GraphSnapshot: mustEncodeWorkflowGraph(graph, definition.Graph), SourceRunID: sourceRunID, RuntimeState: encryptedState, StartedAt: time.Now()}
 	if err := database.DB.Create(&run).Error; err != nil {
 		Error(c, http.StatusInternalServerError, "创建运行记录失败")
 		return
@@ -707,9 +853,22 @@ func runWorkflowGraph(
 	// actual number of requests, so the owner context only coordinates cancel.
 	executionContext, releaseRun := activeWorkflowRuns.Start(run.ID.String(), 0)
 	defer releaseRun()
-	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: make(map[string]map[string]any), KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion), ContentSearcher: workflowContentSearcher(model.Int64String(userID)), NotionSearcher: workflowNotionSearcher(model.Int64String(userID)), CoverGenerator: workflowCoverGenerator(), AIImageGenerator: workflowAIImageGenerator(), AIImageUnderstander: workflowAIImageUnderstander(), AIImageResourceSaver: workflowAIImageResourceSaver(), NotificationSender: workflowNotificationSender(), SubworkflowRunner: workflowSubworkflowRunner(model.Int64String(userID)), ApprovalGate: workflowApprovalGate(run)}, func(event workflow.Event) {
+	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: runtimeState.Outputs, CompletedNodes: workflowCompletedNodes(runtimeState), ResumeFromNodeID: resumeFromNodeID, KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion), ContentSearcher: workflowContentSearcher(model.Int64String(userID)), NotionSearcher: workflowNotionSearcher(model.Int64String(userID)), CoverGenerator: workflowCoverGenerator(), AIImageGenerator: workflowAIImageGenerator(), AIImageUnderstander: workflowAIImageUnderstander(), AIImageResourceSaver: workflowAIImageResourceSaver(), NotificationSender: workflowNotificationSender(), SubworkflowRunner: workflowSubworkflowRunner(model.Int64String(userID)), ApprovalGate: workflowApprovalGate(run), RegisterNodeCancellation: func(nodeID string, cancel func()) func() {
+		return activeWorkflowRuns.RegisterNodeCancel(run.ID.String(), nodeID, cancel)
+	}}, func(event workflow.Event) {
 		if persistenceErr == nil {
+			if event.Status == workflow.StatusSucceeded || event.Status == workflow.StatusSkipped {
+				runtimeState.Completed[event.NodeID] = workflowResumeNode{ActivateOutgoing: event.Status == workflow.StatusSucceeded || event.Message == "执行条件未满足"}
+			}
+			state, stateErr := encryptWorkflowRunResumeState(runtimeState)
+			if stateErr != nil {
+				persistenceErr = stateErr
+				return
+			}
 			event, persistenceErr = persistNodeEvent(event)
+			if persistenceErr == nil {
+				persistenceErr = database.DB.Model(&run).Update("runtime_state", state).Error
+			}
 			if persistenceErr == nil {
 				send(event, string(event.Status))
 			}
@@ -880,7 +1039,15 @@ func AdminGetWorkflowRun(c *gin.Context) {
 	if graph, graphErr := decodeWorkflowGraph(run.GraphSnapshot); graphErr == nil {
 		retry["requiresConfirmation"] = workflowRetryRequiresConfirmation(graph, workflowRuntimeRegistry())
 	}
-	Success(c, gin.H{"run": run, "nodes": nodes, "events": events, "retry": retry})
+	resume := gin.H{"allowed": false, "requiresConfirmation": false}
+	if graph, graphErr := decodeWorkflowGraph(run.GraphSnapshot); graphErr == nil && run.RuntimeState != "" {
+		if failedNodeID, requiresConfirmation, eligibilityErr := workflowResumeEligibility(run, graph, workflowRuntimeRegistry()); eligibilityErr == nil {
+			resume["allowed"] = true
+			resume["requiresConfirmation"] = requiresConfirmation
+			resume["failedNodeId"] = failedNodeID
+		}
+	}
+	Success(c, gin.H{"run": run, "nodes": nodes, "events": events, "retry": retry, "resume": resume})
 }
 
 func CancelWorkflowRun(c *gin.Context) {
@@ -914,6 +1081,48 @@ func CancelWorkflowRun(c *gin.Context) {
 	}
 	if err := database.DB.Model(&run).Update("status", "cancelling").Error; err != nil {
 		Error(c, http.StatusInternalServerError, "更新取消状态失败")
+		return
+	}
+	Success(c, gin.H{"status": "cancelling"})
+}
+
+func CancelWorkflowRunNode(c *gin.Context) {
+	userID, _, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+	workflowID, err := parsePathInt64(c, "id")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的 ID")
+		return
+	}
+	runID, err := parsePathInt64(c, "runId")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的运行 ID")
+		return
+	}
+	nodeID := strings.TrimSpace(c.Param("nodeId"))
+	if nodeID == "" {
+		Error(c, http.StatusBadRequest, "无效的节点 ID")
+		return
+	}
+	var run model.WorkflowRun
+	if err := database.DB.Where("id = ? AND workflow_id = ? AND user_id = ?", runID, workflowID, userID).First(&run).Error; err != nil {
+		Error(c, http.StatusNotFound, "运行记录不存在")
+		return
+	}
+	if run.Status != string(workflow.StatusRunning) {
+		Error(c, http.StatusConflict, "该运行已结束，不能取消节点")
+		return
+	}
+	var nodeRun model.WorkflowNodeRun
+	if err := database.DB.Where("workflow_run_id = ? AND node_id = ? AND status = ?", run.ID, nodeID, string(workflow.StatusRunning)).First(&nodeRun).Error; err != nil {
+		Error(c, http.StatusConflict, "该节点当前不在运行中")
+		return
+	}
+	if !activeWorkflowRuns.CancelNode(run.ID.String(), nodeID) {
+		Error(c, http.StatusConflict, "该节点不在当前服务进程中，不能取消")
 		return
 	}
 	Success(c, gin.H{"status": "cancelling"})
@@ -1636,7 +1845,12 @@ func finishWorkflowRun(run *model.WorkflowRun, status string, result map[string]
 	}
 	now := time.Now()
 	run.Status, run.Result, run.FinishedAt = status, string(encoded), &now
-	return database.DB.Model(run).Updates(map[string]any{"status": status, "result": run.Result, "finished_at": &now}).Error
+	updates := map[string]any{"status": status, "result": run.Result, "finished_at": &now}
+	if status == string(workflow.StatusSucceeded) || status == string(workflow.StatusCancelled) {
+		run.RuntimeState = ""
+		updates["runtime_state"] = ""
+	}
+	return database.DB.Model(run).Updates(updates).Error
 }
 
 func workflowOwnedBy(workflowID, userID int64) bool {

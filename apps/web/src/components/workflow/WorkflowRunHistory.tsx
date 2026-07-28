@@ -59,10 +59,12 @@ export function WorkflowRunHistory({
   workflowId,
   open,
   onRetry,
+  onResume,
 }: {
   workflowId: string | null;
   open: boolean;
   onRetry: (run: WorkflowRunDetail) => void;
+  onResume: (run: WorkflowRunDetail) => void;
 }) {
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
   const [loading, setLoading] = useState(false);
@@ -231,6 +233,17 @@ export function WorkflowRunHistory({
                     snapshot={nodeSnapshot(selectedRun, node.nodeId)}
                     variant="panel"
                   />
+                  {node.status === 'error' && selectedRun.resume?.allowed ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full"
+                      onClick={() => onResume(selectedRun)}
+                    >
+                      重试此节点并继续
+                    </Button>
+                  ) : null}
                 </div>
               ))}
             </div>

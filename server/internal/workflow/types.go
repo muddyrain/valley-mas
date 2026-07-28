@@ -3,9 +3,12 @@ package workflow
 import (
 	"context"
 	"encoding/json"
+	"errors"
 )
 
 const SchemaVersion = 4
+
+var ErrNodeCancelled = errors.New("workflow node cancelled")
 
 type NodeType string
 
@@ -88,21 +91,33 @@ const (
 )
 
 type RunContext struct {
-	ID                   string
-	Actor                Actor
-	Inputs               map[string]any
-	Outputs              map[string]map[string]any
-	KnowledgeRetriever   KnowledgeRetriever
-	ContentSearcher      ContentSearcher
-	NotionSearcher       NotionSearcher
-	CoverGenerator       CoverGenerator
-	AIImageGenerator     AIImageGenerator
-	AIImageUnderstander  AIImageUnderstander
-	AIImageResourceSaver AIImageResourceSaver
-	NotificationSender   NotificationSender
-	SubworkflowRunner    SubworkflowRunner
-	ApprovalGate         ApprovalGate
-	Emitter              func(Event)
+	ID                       string
+	Actor                    Actor
+	Inputs                   map[string]any
+	Outputs                  map[string]map[string]any
+	CompletedNodes           map[string]CompletedNode
+	ResumeFromNodeID         string
+	KnowledgeRetriever       KnowledgeRetriever
+	ContentSearcher          ContentSearcher
+	NotionSearcher           NotionSearcher
+	CoverGenerator           CoverGenerator
+	AIImageGenerator         AIImageGenerator
+	AIImageUnderstander      AIImageUnderstander
+	AIImageResourceSaver     AIImageResourceSaver
+	NotificationSender       NotificationSender
+	SubworkflowRunner        SubworkflowRunner
+	ApprovalGate             ApprovalGate
+	SkillInstructionResolver SkillInstructionResolver
+	RegisterNodeCancellation func(nodeID string, cancel func()) func()
+	Emitter                  func(Event)
+}
+
+type SkillInstructionResolver func(context.Context, []string) (string, error)
+
+// CompletedNode records the branch decision for a node restored from a prior
+// failed run. It is runtime-only state and is never included in public traces.
+type CompletedNode struct {
+	ActivateOutgoing bool
 }
 
 type Actor struct {

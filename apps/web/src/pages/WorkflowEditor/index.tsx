@@ -56,11 +56,14 @@ import {
 import type { CopilotProposal } from '@/api/workbenchCopilot';
 import {
   cancelWorkflowRun,
+  cancelWorkflowRunNode,
   createWorkflow,
   getWorkflow,
   getWorkflowPlatform,
+  getWorkflowRun,
   publishWorkflowVersion,
   restoreWorkflowVersion,
+  resumeWorkflowRun,
   retryWorkflowRun,
   runWorkflow,
   updateWorkflow,
@@ -501,6 +504,7 @@ export default function WorkflowEditorPage() {
   const [showRunPanel, setShowRunPanel] = useState(false);
   const [retryRun, setRetryRun] = useState<WorkflowRunDetail | null>(null);
   const [pendingRetryRun, setPendingRetryRun] = useState<WorkflowRunDetail | null>(null);
+  const [pendingResumeRun, setPendingResumeRun] = useState<WorkflowRunDetail | null>(null);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
   const [serverValidationErrors, setServerValidationErrors] = useState<ValidationError[]>([]);
   const [pendingValidationFocusNodeID, setPendingValidationFocusNodeID] = useState<string | null>(
@@ -2225,10 +2229,19 @@ export default function WorkflowEditorPage() {
     }
   }, [applyServerValidationError, persistLatestWorkflow, refreshWorkflowMeta]);
 
-  const handleRunConfirm = useCallback(
-    async ({ inputs, files }: WorkflowRunInput) => {
+  const startWorkflowRun = useCallback(
+    async ({
+      inputs = {},
+      files,
+      sourceRun,
+      resumeSourceRun,
+    }: {
+      inputs?: Record<string, unknown>;
+      files?: Record<string, File>;
+      sourceRun?: WorkflowRunDetail | null;
+      resumeSourceRun?: WorkflowRunDetail | null;
+    }) => {
       const id = workflowId;
-      const sourceRun = retryRun;
       const session = editorSessionRef.current;
       if (!id || !isActiveWorkflowSession(session, id)) return;
       if (abortControllerRef.current) {
@@ -2285,7 +2298,12 @@ export default function WorkflowEditorPage() {
             setIsRunning(false);
           },
         };
-        if (sourceRun) {
+        if (resumeSourceRun) {
+          await resumeWorkflowRun(id, resumeSourceRun.run.id, handlers, {
+            confirmedSideEffects: resumeSourceRun.resume?.requiresConfirmation === true,
+            signal: abortController.signal,
+          });
+        } else if (sourceRun) {
           await retryWorkflowRun(id, sourceRun.run.id, { inputs, files }, handlers, {
             confirmedSideEffects: sourceRun.retry?.requiresConfirmation === true,
             signal: abortController.signal,
@@ -2306,7 +2324,25 @@ export default function WorkflowEditorPage() {
         }
       }
     },
-    [applyServerValidationError, isActiveWorkflowSession, retryRun, workflowId],
+    [applyServerValidationError, isActiveWorkflowSession, workflowId],
+  );
+
+  const handleRunConfirm = useCallback(
+    ({ inputs, files }: WorkflowRunInput) =>
+      startWorkflowRun({ inputs, files, sourceRun: retryRun }),
+    [retryRun, startWorkflowRun],
+  );
+
+  const handleResumeFromHistory = useCallback(
+    (run: WorkflowRunDetail) => {
+      if (run.resume?.requiresConfirmation) {
+        setPendingResumeRun(run);
+        return;
+      }
+      setShowHistory(false);
+      void startWorkflowRun({ resumeSourceRun: run });
+    },
+    [startWorkflowRun],
   );
 
   const focusValidationNode = useCallback((nodeID: string) => {
@@ -2403,6 +2439,38 @@ export default function WorkflowEditorPage() {
       toast.error(getAPIErrorMessage(error, '取消运行失败'));
     }
   }, [workflowId]);
+
+  const handleCancelWorkflowNode = useCallback(
+    async (nodeId: string) => {
+      const id = workflowId;
+      const runID = activeRunIDRef.current;
+      if (!id || !runID) return;
+      try {
+        await cancelWorkflowRunNode(id, runID, nodeId);
+        toast.message('正在取消节点');
+      } catch (error) {
+        toast.error(getAPIErrorMessage(error, '取消节点失败'));
+      }
+    },
+    [workflowId],
+  );
+
+  const handleResumeFailedRun = useCallback(
+    async (runId: string) => {
+      if (!workflowId) return;
+      try {
+        const run = await getWorkflowRun(workflowId, runId);
+        if (!run.resume?.allowed) {
+          toast.message('正在保存取消结果，请稍后重试');
+          return;
+        }
+        handleResumeFromHistory(run);
+      } catch (error) {
+        toast.error(getAPIErrorMessage(error, '加载运行详情失败'));
+      }
+    },
+    [handleResumeFromHistory, workflowId],
+  );
 
   const handleExport = useCallback(() => {
     const workflow = { nodes, edges };
@@ -2579,6 +2647,8 @@ export default function WorkflowEditorPage() {
     () => ({
       session: runSession,
       isRunning,
+      cancelNode: handleCancelWorkflowNode,
+      resumeFailedRun: handleResumeFailedRun,
       validationErrors: nodeValidationMessages,
       copyNode: handleCopyNode,
       deleteNode: handleDeleteNode,
@@ -2596,6 +2666,8 @@ export default function WorkflowEditorPage() {
       handleInsertAfter,
       handleInsertOnEdge,
       handleAddLoopBodyNode,
+      handleCancelWorkflowNode,
+      handleResumeFailedRun,
       outputPickerNodeId,
       connectingOutputNodeId,
       openOutputPicker,
@@ -2958,6 +3030,36 @@ export default function WorkflowEditorPage() {
             </AlertDialogContent>
           </AlertDialog>
 
+          <AlertDialog
+            open={Boolean(pendingResumeRun)}
+            onOpenChange={(open) => {
+              if (!open) setPendingResumeRun(null);
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>确认重试失败节点？</AlertDialogTitle>
+                <AlertDialogDescription>
+                  该节点可能再次执行写入或生成操作。已成功的节点不会重新运行。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>取消</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    if (pendingResumeRun) {
+                      setShowHistory(false);
+                      void startWorkflowRun({ resumeSourceRun: pendingResumeRun });
+                    }
+                    setPendingResumeRun(null);
+                  }}
+                >
+                  重试并继续
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           <Sheet open={showHistory} onOpenChange={setShowHistory}>
             <SheetContent side="right" className="w-full gap-0 sm:max-w-md">
               <SheetHeader className="border-b pr-14">
@@ -2973,6 +3075,7 @@ export default function WorkflowEditorPage() {
                       workflowId={workflowId}
                       open={showHistory}
                       onRetry={handleRetryFromHistory}
+                      onResume={handleResumeFromHistory}
                     />
                   </section>
                   <section className="mb-6 border-t border-border pt-5">

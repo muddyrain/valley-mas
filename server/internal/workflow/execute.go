@@ -121,6 +121,16 @@ func Execute(ctx context.Context, graph Graph, registry *Registry, run RunContex
 
 	for _, node := range ordered {
 		capabilityID := capabilityIDForNode(node)
+		if completed, ok := run.CompletedNodes[node.ID]; ok && node.ID != run.ResumeFromNodeID {
+			output, outputExists := run.Outputs[node.ID]
+			if !outputExists {
+				return fmt.Errorf("恢复运行缺少节点 %s 的输出", node.ID)
+			}
+			if completed.ActivateOutgoing {
+				activateOutgoingEdges(node, output, graph.Edges, outgoing[node.ID], activeEdges)
+			}
+			continue
+		}
 		if node.Type != NodeTypeStart && !hasActiveIncoming(incoming[node.ID], activeEdges) {
 			output := nullOutput(outputFields[node.ID])
 			run.Outputs[node.ID] = output
@@ -146,24 +156,41 @@ func Execute(ctx context.Context, graph Graph, registry *Registry, run RunContex
 			activateOutgoingEdges(node, output, graph.Edges, outgoing[node.ID], activeEdges)
 			continue
 		}
+		nodeContext, cancelNode := context.WithCancelCause(ctx)
+		releaseNodeCancel := func() {}
+		if run.RegisterNodeCancellation != nil {
+			releaseNodeCancel = run.RegisterNodeCancellation(node.ID, func() {
+				cancelNode(ErrNodeCancelled)
+			})
+		}
 		emitEvent(emit, Event{RunID: run.ID, NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Status: StatusRunning, Input: input})
 		executor := registry.Executor(node.Type)
 		if executor == nil {
+			releaseNodeCancel()
+			cancelNode(nil)
 			return emitFailure(emit, run.ID, node, capabilityID, input, fmt.Errorf("节点类型 %s 没有执行器", node.Type), startedAt)
 		}
 		config, _ := decodeConfig(node.Config)
 		policy, policyErr := executionPolicyFromConfig(node, config, registry)
 		if policyErr != nil {
+			releaseNodeCancel()
+			cancelNode(nil)
 			return emitFailure(emit, run.ID, node, capabilityID, input, policyErr, startedAt)
 		}
 		result, attempts, executeErr := executeNodeWithPolicy(
-			ctx,
+			nodeContext,
 			executor,
 			run,
 			NodeExecution{NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID, Input: input},
 			policy,
 		)
+		nodeCancelCause := context.Cause(nodeContext)
+		releaseNodeCancel()
+		cancelNode(nil)
 		if executeErr != nil {
+			if errors.Is(nodeCancelCause, ErrNodeCancelled) {
+				return emitNodeCancelled(emit, run.ID, node, capabilityID, input, startedAt)
+			}
 			if policy.ErrorAction == "continue" && !errors.Is(executeErr, context.Canceled) {
 				message, code := publicExecutionError(node, executeErr)
 				output := nullOutput(outputFields[node.ID])
@@ -188,6 +215,15 @@ func Execute(ctx context.Context, graph Graph, registry *Registry, run RunContex
 		activateOutgoingEdges(node, result.Output, graph.Edges, outgoing[node.ID], activeEdges)
 	}
 	return nil
+}
+
+func emitNodeCancelled(emit func(Event), runID string, node Node, capabilityID string, input map[string]any, startedAt time.Time) error {
+	emitEvent(emit, Event{
+		RunID: runID, NodeID: node.ID, NodeType: node.Type, CapabilityID: capabilityID,
+		Status: StatusFailed, Input: input, Message: "节点已取消", Error: "WORKFLOW_NODE_CANCELLED",
+		DurationMs: time.Since(startedAt).Milliseconds(),
+	})
+	return ErrNodeCancelled
 }
 
 func evaluateWhen(rule *Rule, outputs map[string]map[string]any) (bool, error) {

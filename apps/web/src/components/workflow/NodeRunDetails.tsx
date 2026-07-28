@@ -84,12 +84,30 @@ function durationText(durationMs: number | undefined) {
   return durationMs >= 1000 ? `${(durationMs / 1000).toFixed(2)}s` : `${durationMs}ms`;
 }
 
+function useLiveDuration(snapshot: NodeRunSnapshot) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (snapshot.status !== 'running' || snapshot.startedAt == null) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 100);
+    return () => window.clearInterval(timer);
+  }, [snapshot.startedAt, snapshot.status]);
+
+  if (snapshot.status === 'running' && snapshot.startedAt != null) {
+    return Math.max(0, now - snapshot.startedAt);
+  }
+  return snapshot.durationMs;
+}
+
 function RunDetailsBody({
   snapshot,
   compact,
+  onResume,
 }: {
   snapshot: NodeRunIterationSnapshot;
   compact: boolean;
+  onResume?: () => void;
 }) {
   return (
     <div className={cn('space-y-3', compact ? 'p-3' : 'p-4')}>
@@ -116,6 +134,11 @@ function RunDetailsBody({
           ) : null}
         </section>
       ) : null}
+      {snapshot.status === 'error' && onResume ? (
+        <Button type="button" size="sm" variant="outline" className="w-full" onClick={onResume}>
+          重试此节点并继续
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -123,9 +146,11 @@ function RunDetailsBody({
 function LoopIterationDetails({
   snapshot,
   compact,
+  onResume,
 }: {
   snapshot: NodeRunSnapshot;
   compact: boolean;
+  onResume?: () => void;
 }) {
   const [selectedIteration, setSelectedIteration] = useState(snapshot.loopIteration);
   const [errorsOnly, setErrorsOnly] = useState(false);
@@ -137,7 +162,8 @@ function LoopIterationDetails({
     if (snapshot.loopIteration != null) setSelectedIteration(snapshot.loopIteration);
   }, [snapshot.loopIteration]);
 
-  if (entries.length === 0) return <RunDetailsBody snapshot={snapshot} compact={compact} />;
+  if (entries.length === 0)
+    return <RunDetailsBody snapshot={snapshot} compact={compact} onResume={onResume} />;
 
   const visibleEntries = errorsOnly
     ? entries.filter((entry) => entry.snapshot.status === 'error')
@@ -190,7 +216,7 @@ function LoopIterationDetails({
 function RunStatus({ snapshot }: { snapshot: NodeRunSnapshot }) {
   const meta = statusMeta(snapshot.status);
   const Icon = meta.icon;
-  const duration = durationText(snapshot.durationMs);
+  const duration = durationText(useLiveDuration(snapshot));
   const iteration = snapshot.loopIteration == null ? null : `第 ${snapshot.loopIteration + 1} 轮`;
   return (
     <>
@@ -210,9 +236,11 @@ function RunStatus({ snapshot }: { snapshot: NodeRunSnapshot }) {
 export function NodeRunDetails({
   snapshot,
   variant = 'canvas',
+  onResume,
 }: {
   snapshot: NodeRunSnapshot;
   variant?: 'canvas' | 'panel';
+  onResume?: () => void;
 }) {
   const [open, setOpen] = useState(snapshot.status === 'error');
 
@@ -226,7 +254,7 @@ export function NodeRunDetails({
         <div className="flex items-center gap-2">
           <RunStatus snapshot={snapshot} />
         </div>
-        <LoopIterationDetails snapshot={snapshot} compact={false} />
+        <LoopIterationDetails snapshot={snapshot} compact={false} onResume={onResume} />
       </div>
     );
   }
@@ -258,7 +286,7 @@ export function NodeRunDetails({
         />
       </CollapsibleTrigger>
       <CollapsibleContent className="border-t border-border">
-        <LoopIterationDetails snapshot={snapshot} compact />
+        <LoopIterationDetails snapshot={snapshot} compact onResume={onResume} />
       </CollapsibleContent>
     </Collapsible>
   );

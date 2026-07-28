@@ -40,6 +40,7 @@ type WorkflowRun struct {
 	SourceRunID   *Int64String   `gorm:"index" json:"sourceRunId,omitempty"`
 	TriggerID     *Int64String   `gorm:"index" json:"triggerId,omitempty"`
 	RunJobID      *Int64String   `gorm:"uniqueIndex" json:"runJobId,omitempty"`
+	RuntimeState  string         `gorm:"type:text" json:"-"`
 	Result        string         `gorm:"type:json" json:"result,omitempty"`
 	StartedAt     time.Time      `gorm:"index:idx_workflow_runs_workflow_user_started,priority:3" json:"startedAt"`
 	FinishedAt    *time.Time     `json:"finishedAt,omitempty"`

@@ -11,6 +11,18 @@ type flakyTemplateExecutor struct {
 	calls    int
 }
 
+type blockingTemplateExecutor struct {
+	started chan struct{}
+}
+
+func (executor blockingTemplateExecutor) Type() NodeType { return NodeTypeTemplate }
+
+func (executor blockingTemplateExecutor) Execute(ctx context.Context, _ RunContext, _ NodeExecution) (NodeResult, error) {
+	close(executor.started)
+	<-ctx.Done()
+	return NodeResult{}, ctx.Err()
+}
+
 func (executor *flakyTemplateExecutor) Type() NodeType { return NodeTypeTemplate }
 
 func (executor *flakyTemplateExecutor) Execute(context.Context, RunContext, NodeExecution) (NodeResult, error) {
@@ -77,6 +89,77 @@ func TestExecutionPolicyCanContinueWithStableErrorOutput(t *testing.T) {
 	}
 	if final["failed"] != true || final["code"] != "WORKFLOW_NODE_FAILED" {
 		t.Fatalf("unexpected final output: %#v", final)
+	}
+}
+
+func TestExecuteResumeSkipsCompletedNodesAndContinuesFromFailure(t *testing.T) {
+	executor := &flakyTemplateExecutor{}
+	registry := policyTestRegistry(t, executor)
+	graph := Graph{SchemaVersion: 4, Nodes: []Node{
+		node("start", NodeTypeStart, `{"inputs":{}}`),
+		node("task", NodeTypeTemplate, `{"template":"ignored"}`),
+		node("end", NodeTypeEnd, `{"outputs":{"text":"{{task.output.text}}"}}`),
+	}, Edges: []Edge{{Source: "start", Target: "task"}, {Source: "task", Target: "end"}}}
+	var startEvents int
+	var final map[string]any
+	err := Execute(context.Background(), graph, registry, RunContext{
+		Outputs:          map[string]map[string]any{"start": {}},
+		CompletedNodes:   map[string]CompletedNode{"start": {ActivateOutgoing: true}},
+		ResumeFromNodeID: "task",
+	}, func(event Event) {
+		if event.NodeID == "start" {
+			startEvents++
+		}
+		if event.NodeID == "end" && event.Status == StatusSucceeded {
+			final = event.Output
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if startEvents != 0 || executor.calls != 1 || final["text"] != "ok" {
+		t.Fatalf("startEvents=%d calls=%d final=%#v", startEvents, executor.calls, final)
+	}
+}
+
+func TestExecuteMarksExplicitNodeCancellationAsResumableFailure(t *testing.T) {
+	started := make(chan struct{})
+	registry := policyTestRegistry(t, blockingTemplateExecutor{started: started})
+	graph := Graph{SchemaVersion: 4, Nodes: []Node{
+		node("start", NodeTypeStart, `{"inputs":{}}`),
+		node("task", NodeTypeTemplate, `{"template":"ignored"}`),
+		node("end", NodeTypeEnd, `{"outputs":{"text":"{{task.output.text}}"}}`),
+	}, Edges: []Edge{{Source: "start", Target: "task"}, {Source: "task", Target: "end"}}}
+	var cancel func()
+	events := make(chan Event, 4)
+	done := make(chan error, 1)
+	go func() {
+		done <- Execute(context.Background(), graph, registry, RunContext{
+			RegisterNodeCancellation: func(nodeID string, next func()) func() {
+				if nodeID == "task" {
+					cancel = next
+				}
+				return func() {}
+			},
+		}, func(event Event) { events <- event })
+	}()
+	<-started
+	if cancel == nil {
+		t.Fatal("expected task cancellation callback")
+	}
+	cancel()
+	if err := <-done; !errors.Is(err, ErrNodeCancelled) {
+		t.Fatalf("err=%v", err)
+	}
+	close(events)
+	var cancelled Event
+	for event := range events {
+		if event.NodeID == "task" && event.Status == StatusFailed {
+			cancelled = event
+		}
+	}
+	if cancelled.Error != "WORKFLOW_NODE_CANCELLED" || cancelled.Message != "节点已取消" {
+		t.Fatalf("unexpected cancellation event: %#v", cancelled)
 	}
 }
 

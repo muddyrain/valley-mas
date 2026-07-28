@@ -186,6 +186,11 @@ export interface WorkflowRunDetail {
     allowed: boolean;
     requiresConfirmation: boolean;
   };
+  resume?: {
+    allowed: boolean;
+    requiresConfirmation: boolean;
+    failedNodeId?: string;
+  };
 }
 
 export type WorkflowTestAssertionOperator =
@@ -623,11 +628,40 @@ export function retryWorkflowRun(
   });
 }
 
+export function resumeWorkflowRun(
+  workflowId: string,
+  sourceRunId: string,
+  handlers: {
+    onEvent: (event: WorkflowRunEvent) => void;
+    onError: (msg: string) => void;
+  },
+  options: { confirmedSideEffects: boolean; signal?: AbortSignal },
+): Promise<void> {
+  return streamWorkflow(
+    workflowId,
+    `/runs/${sourceRunId}/resume`,
+    { inputs: {} },
+    handlers,
+    options.signal,
+    {
+      'X-Workflow-Resume-Confirmed': String(options.confirmedSideEffects),
+    },
+  );
+}
+
 export function cancelWorkflowRun(
   workflowId: string,
   runId: string,
 ): Promise<{ status: 'cancelling' }> {
   return request.post(`/workflows/${workflowId}/runs/${runId}/cancel`);
+}
+
+export function cancelWorkflowRunNode(
+  workflowId: string,
+  runId: string,
+  nodeId: string,
+): Promise<{ status: 'cancelling' }> {
+  return request.post(`/workflows/${workflowId}/runs/${runId}/nodes/${nodeId}/cancel`);
 }
 
 export function listWorkflowRuns(

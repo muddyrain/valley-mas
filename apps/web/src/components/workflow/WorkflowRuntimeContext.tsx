@@ -5,6 +5,8 @@ import type { WorkflowRunSession } from './runSession';
 interface WorkflowRuntimeContextValue {
   session: WorkflowRunSession;
   isRunning: boolean;
+  cancelNode: (nodeId: string) => void;
+  resumeFailedRun: (runId: string) => void;
   validationErrors: ReadonlyMap<string, string>;
   copyNode: (nodeId: string) => void;
   deleteNode: (nodeId: string) => void;

@@ -358,6 +358,8 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
   const {
     session,
     isRunning,
+    cancelNode,
+    resumeFailedRun,
     validationErrors,
     copyNode,
     deleteNode,
@@ -549,7 +551,20 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
                 </DropdownMenu>
               ) : null}
               {runningState === 'running' ? (
-                <Loader2 className="size-4 animate-spin text-primary" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-primary hover:text-destructive"
+                  aria-label="取消节点"
+                  title="取消节点"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    cancelNode(id);
+                  }}
+                >
+                  <Loader2 className="size-4 animate-spin" />
+                </Button>
               ) : null}
               {runningState === 'success' ? (
                 <CheckCircle2 className="size-4 text-emerald-500" />
@@ -709,7 +724,14 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
       </div>
       {snapshot ? (
         <div className="absolute left-0 top-full z-40 w-full">
-          <NodeRunDetails snapshot={snapshot} />
+          <NodeRunDetails
+            snapshot={snapshot}
+            onResume={
+              snapshot.status === 'error' && session.runId
+                ? () => resumeFailedRun(session.runId as string)
+                : undefined
+            }
+          />
         </div>
       ) : null}
     </div>
