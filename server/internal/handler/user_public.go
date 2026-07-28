@@ -133,6 +133,7 @@ func GetMyDownloads(c *gin.Context) {
 	query := db.Model(&model.DownloadRecord{}).Where("user_id = ?", userID)
 	query.Count(&total)
 	query.Preload("Resource").
+		Preload("Resource.User").
 		Preload("User").
 		Offset(offset).
 		Limit(pageSize).

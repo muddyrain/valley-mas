@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import {
   favoriteResource,
   getAllResources,
+  getUserResources,
   type Resource,
   unfavoriteResource,
 } from '@/api/resource';
@@ -46,6 +47,7 @@ const RESOURCE_QUERY_SCHEMA = {
   keyword: stringParam('', { resetPageOnChange: true }),
   type: enumParam(['', 'wallpaper', 'avatar'] as const, '', { resetPageOnChange: true }),
   tag: stringParam('', { resetPageOnChange: true }),
+  userId: stringParam('', { resetPageOnChange: true }),
 };
 
 export default function Resources() {
@@ -55,7 +57,13 @@ export default function Resources() {
   const { user } = useAuthStore();
   const isLoggedIn = !!user;
   const {
-    values: { page: currentPage, keyword: currentKeyword, type: activeType, tag: currentTag },
+    values: {
+      page: currentPage,
+      keyword: currentKeyword,
+      type: activeType,
+      tag: currentTag,
+      userId: selectedUserId,
+    },
     setValue,
   } = useUrlQueryState(RESOURCE_QUERY_SCHEMA, { pageKey: 'page' });
 
@@ -73,8 +81,9 @@ export default function Resources() {
 
   const [refreshing, setRefreshing] = useState(false);
   const listCacheKey = useMemo(
-    () => `${currentPage}|${activeType || ''}|${currentKeyword || ''}|${currentTag || ''}`,
-    [activeType, currentKeyword, currentPage, currentTag],
+    () =>
+      `${currentPage}|${activeType || ''}|${currentKeyword || ''}|${currentTag || ''}|${selectedUserId || ''}`,
+    [activeType, currentKeyword, currentPage, currentTag, selectedUserId],
   );
   const scrollStorageKey = useMemo(
     () => `${RESOURCE_LIST_SCROLL_STORAGE_PREFIX}:${location.pathname}${location.search}`,
@@ -117,14 +126,23 @@ export default function Resources() {
       setRefreshing(true);
     }
 
-    getAllResources({
-      page: currentPage,
-      pageSize: PAGE_SIZE,
-      type: activeType || undefined,
-      keyword: currentKeyword || undefined,
-      tag: currentTag || undefined,
-      includeTags: true,
-    })
+    const loadResources = selectedUserId
+      ? getUserResources(selectedUserId, {
+          page: currentPage,
+          pageSize: PAGE_SIZE,
+          type: activeType || undefined,
+          keyword: currentKeyword || undefined,
+        })
+      : getAllResources({
+          page: currentPage,
+          pageSize: PAGE_SIZE,
+          type: activeType || undefined,
+          keyword: currentKeyword || undefined,
+          tag: currentTag || undefined,
+          includeTags: true,
+        });
+
+    loadResources
       .then((data) => {
         if (cancelled) return;
         const list = data.list ?? [];
@@ -156,7 +174,7 @@ export default function Resources() {
     return () => {
       cancelled = true;
     };
-  }, [currentPage, activeType, currentKeyword, listCacheKey, currentTag]);
+  }, [currentPage, activeType, currentKeyword, listCacheKey, currentTag, selectedUserId]);
 
   const handleSearch = () => {
     setValue('keyword', inputValue);
@@ -172,14 +190,21 @@ export default function Resources() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const data = await getAllResources({
-        page: currentPage,
-        pageSize: PAGE_SIZE,
-        type: activeType || undefined,
-        keyword: currentKeyword || undefined,
-        tag: currentTag || undefined,
-        includeTags: true,
-      });
+      const data = selectedUserId
+        ? await getUserResources(selectedUserId, {
+            page: currentPage,
+            pageSize: PAGE_SIZE,
+            type: activeType || undefined,
+            keyword: currentKeyword || undefined,
+          })
+        : await getAllResources({
+            page: currentPage,
+            pageSize: PAGE_SIZE,
+            type: activeType || undefined,
+            keyword: currentKeyword || undefined,
+            tag: currentTag || undefined,
+            includeTags: true,
+          });
       const list = data.list ?? [];
       setResources(list);
       setTotal(data.total ?? 0);
@@ -281,9 +306,13 @@ export default function Resources() {
                     <Sparkles className="h-3.5 w-3.5" />
                     RESOURCES
                   </div>
-                  <CardTitle className="text-3xl font-semibold md:text-4xl">资源整理</CardTitle>
+                  <CardTitle className="text-3xl font-semibold md:text-4xl">
+                    {selectedUserId ? '创作者公开资源' : '资源整理'}
+                  </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    壁纸、头像和最近整理出的图像资源都会先汇在这里，方便继续浏览、筛选和收藏。
+                    {selectedUserId
+                      ? '浏览这位创作者公开的壁纸、头像和图像资源。'
+                      : '壁纸、头像和最近整理出的图像资源都会先汇在这里，方便继续浏览、筛选和收藏。'}
                   </p>
                 </div>
 
@@ -342,68 +371,70 @@ export default function Resources() {
                     }}
                   />
 
-                  <div className="relative">
-                    {currentTag ? (
-                      <div className="flex items-center gap-1.5 rounded-full border border-accent bg-accent/50 px-3 py-2 text-sm font-medium text-primary">
-                        <Hash className="h-4 w-4" />
-                        {currentTag}
-                        <Button
-                          size="icon-sm"
-                          variant="ghost"
-                          className="ml-0.5 rounded-full p-0.5 hover:bg-accent"
-                          onClick={() => setValue('tag', '')}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setTagDropdownOpen(true);
-                          setTagInput('');
-                          setTimeout(() => tagInputRef.current?.focus(), 50);
-                        }}
-                      >
-                        <Hash className="h-4 w-4 mr-1.5" />
-                        按标签筛选
-                      </Button>
-                    )}
-
-                    {tagDropdownOpen && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-10"
-                          onClick={() => setTagDropdownOpen(false)}
-                        />
-                        <div className="absolute right-0 top-full z-20 mt-1.5 w-64 rounded-xl border border-border bg-background shadow-lg overflow-hidden">
-                          <div className="p-3">
-                            <div className="relative">
-                              <Hash className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                              <input
-                                ref={tagInputRef}
-                                value={tagInput}
-                                onChange={(e) => setTagInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    if (tagInput.trim()) applyTagFilter(tagInput);
-                                  } else if (e.key === 'Escape') {
-                                    setTagDropdownOpen(false);
-                                  }
-                                }}
-                                placeholder="输入标签名后回车"
-                                className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-                              />
-                            </div>
-                            <p className="mt-2 px-1 text-xs text-muted-foreground">
-                              按标签名精确筛选资源，回车确认。
-                            </p>
-                          </div>
+                  {!selectedUserId ? (
+                    <div className="relative">
+                      {currentTag ? (
+                        <div className="flex items-center gap-1.5 rounded-full border border-accent bg-accent/50 px-3 py-2 text-sm font-medium text-primary">
+                          <Hash className="h-4 w-4" />
+                          {currentTag}
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            className="ml-0.5 rounded-full p-0.5 hover:bg-accent"
+                            onClick={() => setValue('tag', '')}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
-                      </>
-                    )}
-                  </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setTagDropdownOpen(true);
+                            setTagInput('');
+                            setTimeout(() => tagInputRef.current?.focus(), 50);
+                          }}
+                        >
+                          <Hash className="h-4 w-4 mr-1.5" />
+                          按标签筛选
+                        </Button>
+                      )}
+
+                      {tagDropdownOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setTagDropdownOpen(false)}
+                          />
+                          <div className="absolute right-0 top-full z-20 mt-1.5 w-64 rounded-xl border border-border bg-background shadow-lg overflow-hidden">
+                            <div className="p-3">
+                              <div className="relative">
+                                <Hash className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                  ref={tagInputRef}
+                                  value={tagInput}
+                                  onChange={(e) => setTagInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      if (tagInput.trim()) applyTagFilter(tagInput);
+                                    } else if (e.key === 'Escape') {
+                                      setTagDropdownOpen(false);
+                                    }
+                                  }}
+                                  placeholder="输入标签名后回车"
+                                  className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                                />
+                              </div>
+                              <p className="mt-2 px-1 text-xs text-muted-foreground">
+                                按标签名精确筛选资源，回车确认。
+                              </p>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : null}
 
                   <Button
                     variant="outline"

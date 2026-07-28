@@ -75,14 +75,16 @@ const parseNotificationExtraData = (raw?: string): NotificationExtraData | null 
   }
 };
 
+const isInternalPath = (value: string) => value.startsWith('/') && !value.startsWith('//');
+
 export const resolveNotificationTarget = (notification: NotificationNavigationInput) => {
   const extra = parseNotificationExtraData(notification.extraData);
   const normalizedType = notification.type.toLowerCase();
 
-  if (extra?.redirectUrl) {
+  if (extra?.redirectUrl && isInternalPath(extra.redirectUrl)) {
     return extra.redirectUrl;
   }
-  if (extra?.path) {
+  if (extra?.path && isInternalPath(extra.path)) {
     return extra.path;
   }
 
@@ -99,7 +101,7 @@ export const resolveNotificationTarget = (notification: NotificationNavigationIn
     return `/resource/${extra.resourceSlug}`;
   }
   if (extra?.userId) {
-    return `/user/${extra.userId}`;
+    return `/resources?userId=${encodeURIComponent(extra.userId)}`;
   }
 
   if (normalizedType.includes('blog')) {
@@ -109,7 +111,7 @@ export const resolveNotificationTarget = (notification: NotificationNavigationIn
     return '/resources';
   }
   if (normalizedType.includes('user')) {
-    return '/users';
+    return '/follows';
   }
 
   if (notification.type === 'application_review') {
