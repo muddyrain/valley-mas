@@ -386,6 +386,8 @@ func autoMigrateModelsByName() map[string]any {
 	return map[string]any{
 		"user":                                 &model.User{},
 		"user_preference":                      &model.UserPreference{},
+		"email_verification_code":              &model.EmailVerificationCode{},
+		"email_verification_rate_limit":        &model.EmailVerificationRateLimit{},
 		"mail_account":                         &model.MailAccount{},
 		"mail_message":                         &model.MailMessage{},
 		"external_connection":                  &model.ExternalConnection{},
@@ -561,6 +563,8 @@ func coreMigrationModels() []any {
 	return []any{
 		&model.User{},
 		&model.UserPreference{},
+		&model.EmailVerificationCode{},
+		&model.EmailVerificationRateLimit{},
 		&model.MailAccount{},
 		&model.MailMessage{},
 		&model.ExternalConnection{},

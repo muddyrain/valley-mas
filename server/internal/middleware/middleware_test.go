@@ -179,3 +179,44 @@ func TestAuthReturnsForbiddenForInactiveUser(t *testing.T) {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusForbidden, resp.Code, resp.Body.String())
 	}
 }
+
+func TestAuthRejectsRevokedSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.User{}); err != nil {
+		t.Fatalf("migrate user: %v", err)
+	}
+	if err := db.Create(&model.User{ID: 456, Username: "tester", Role: "user", IsActive: true, TokenVersion: 2}).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	previousDB := database.DB
+	database.DB = db
+	t.Cleanup(func() {
+		database.DB = previousDB
+		if sqlDB, sqlErr := db.DB(); sqlErr == nil {
+			_ = sqlDB.Close()
+		}
+	})
+
+	cfg := &config.Config{JWT: config.JWTConfig{Secret: "test-secret"}}
+	token, err := utils.GenerateTokenWithSessionVersion("456", "tester", "user", 1, cfg.JWT.Secret, 1)
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+
+	router := gin.New()
+	router.GET("/private", Auth(cfg), func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	req := httptest.NewRequest(http.MethodGet, "/private", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusUnauthorized, resp.Code, resp.Body.String())
+	}
+}

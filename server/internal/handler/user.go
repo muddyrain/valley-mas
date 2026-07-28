@@ -231,7 +231,11 @@ func ChangePassword(c *gin.Context) {
 
 	hashed := utils.HashPassword(req.NewPassword)
 
-	if err := db.Model(&user).Update("password", hashed).Error; err != nil {
+	nextTokenVersion := user.TokenVersion
+	if nextTokenVersion < 1 {
+		nextTokenVersion = 1
+	}
+	if err := db.Model(&user).Updates(map[string]interface{}{"password": hashed, "token_version": nextTokenVersion + 1}).Error; err != nil {
 		logger.Log.WithField("error", err).Error("ChangePassword update failed")
 		Error(c, 500, "修改密码失败："+err.Error())
 		return

@@ -17,6 +17,7 @@ import ClimberLab from './pages/ClimberLab';
 import Downloads from './pages/Downloads';
 import Favorites from './pages/Favorites';
 import Follows from './pages/Follows';
+import ForgotPassword from './pages/ForgotPassword';
 import FormatTools from './pages/FormatTools';
 import Home from './pages/Home';
 import ImageTextCreate from './pages/ImageTextCreate';
@@ -122,6 +123,8 @@ function RouteTitle() {
       title = '登录 | Valley';
     } else if (pathname === '/register') {
       title = '注册 | Valley';
+    } else if (pathname === '/forgot-password') {
+      title = '找回密码 | Valley';
     } else {
       title = '页面未找到 | Valley';
     }
@@ -257,7 +260,7 @@ function App() {
           <Route path="blog/:id" element={<BlogPost />} />
           <Route path="*" element={<NotFound />} />
         </Route>
-        <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
       </Routes>

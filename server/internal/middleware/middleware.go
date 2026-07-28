@@ -17,6 +17,7 @@ import (
 
 var (
 	errInactiveUser     = errors.New("inactive user")
+	errSessionRevoked   = errors.New("auth session revoked")
 	errAuthUserNotFound = errors.New("auth user not found")
 )
 
@@ -87,7 +88,7 @@ func loadAuthUserFromToken(token string, cfg *config.Config) (int64, string, str
 			err:  errors.New("database is not initialized"),
 		}
 	}
-	if err := db.Select("id", "username", "role", "is_active").First(&user, userID).Error; err != nil {
+	if err := db.Select("id", "username", "role", "is_active", "token_version").First(&user, userID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, "", "", errAuthUserNotFound
 		}
@@ -96,6 +97,17 @@ func loadAuthUserFromToken(token string, cfg *config.Config) (int64, string, str
 
 	if !user.IsActive {
 		return 0, "", "", errInactiveUser
+	}
+	version := user.TokenVersion
+	if version < 1 {
+		version = 1
+	}
+	claimVersion := claims.SessionVersion
+	if claimVersion < 1 {
+		claimVersion = 1
+	}
+	if claimVersion != version {
+		return 0, "", "", errSessionRevoked
 	}
 
 	return userID, user.Username, user.Role, nil

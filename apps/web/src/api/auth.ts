@@ -44,9 +44,18 @@ export const register = async (data: {
   return res;
 };
 
-export const sendEmailCode = async (data: { email: string; purpose: 'login' | 'register' }) => {
+export const sendEmailCode = async (data: {
+  email: string;
+  purpose: 'login' | 'register' | 'reset';
+}) => {
   return http.post<unknown, { message: string }>('/email-code/send', data);
 };
+
+export const resetPassword = (data: {
+  email: string;
+  verificationCode: string;
+  newPassword: string;
+}) => http.post<void>('/password/reset', data);
 
 // 登出
 export const logout = async () => {
@@ -86,6 +95,10 @@ export interface DownloadHistoryItem {
     url: string;
     thumbnailUrl?: string;
     size?: number;
+    user?: {
+      nickname?: string;
+      avatar?: string;
+    };
   };
 }
 

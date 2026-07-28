@@ -104,15 +104,36 @@ type User struct {
 
 	// 管理后台登录字段
 	Username string `gorm:"size:50;uniqueIndex" json:"username,omitempty"` // 登录用户名（管理员必填）
-	Password string `gorm:"size:255" json:"-"`                             // 密码（MD5加密，不返回给前端）
+	Password string `gorm:"size:255" json:"-"`                             // 密码哈希，不返回给前端
 
-	Role      string         `gorm:"size:20;default:'user'" json:"role"` // user, admin
-	IsActive  bool           `gorm:"default:true" json:"isActive"`
-	Phone     string         `gorm:"size:20" json:"phone,omitempty"`  // 手机号（可选）
-	Email     string         `gorm:"size:100" json:"email,omitempty"` // 邮箱（可选）
-	CreatedAt time.Time      `json:"createdAt"`
-	UpdatedAt time.Time      `json:"updatedAt"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Role         string         `gorm:"size:20;default:'user'" json:"role"` // user, admin
+	IsActive     bool           `gorm:"default:true" json:"isActive"`
+	Phone        string         `gorm:"size:20" json:"phone,omitempty"`  // 手机号（可选）
+	Email        string         `gorm:"size:100" json:"email,omitempty"` // 邮箱（可选）
+	TokenVersion int            `gorm:"not null;default:1" json:"-"`
+	CreatedAt    time.Time      `json:"createdAt"`
+	UpdatedAt    time.Time      `json:"updatedAt"`
+	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// EmailVerificationCode persists a short-lived, one-time verification code across server instances.
+type EmailVerificationCode struct {
+	Email      string    `gorm:"primaryKey;size:100"`
+	Purpose    string    `gorm:"primaryKey;size:20"`
+	CodeHash   string    `gorm:"size:255;not null"`
+	ExpiresAt  time.Time `gorm:"index;not null"`
+	LastSentAt time.Time `gorm:"not null"`
+	Attempts   int       `gorm:"not null;default:0"`
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+// EmailVerificationRateLimit tracks a hashed requester IP to limit code delivery abuse.
+type EmailVerificationRateLimit struct {
+	KeyHash      string    `gorm:"primaryKey;size:64"`
+	WindowStart  time.Time `gorm:"not null"`
+	RequestCount int       `gorm:"not null;default:0"`
+	UpdatedAt    time.Time
 }
 
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID

@@ -32,12 +32,13 @@ type LoginResponse struct {
 var usernameSanitizer = regexp.MustCompile(`[^a-z0-9_]+`)
 
 func issueTokenForUser(c *gin.Context, cfg *config.Config, user model.User) (string, error) {
-	token, err := utils.GenerateToken(
-		strconv.FormatInt(int64(user.ID), 10),
-		user.Username,
-		user.Role,
-		cfg.JWT.Secret,
-		cfg.JWT.Expire,
+	tokenVersion := user.TokenVersion
+	if tokenVersion < 1 {
+		tokenVersion = 1
+	}
+	token, err := utils.GenerateTokenWithSessionVersion(
+		strconv.FormatInt(int64(user.ID), 10), user.Username, user.Role, tokenVersion,
+		cfg.JWT.Secret, cfg.JWT.Expire,
 	)
 	if err != nil {
 		return "", err
@@ -158,6 +159,12 @@ func Login(cfg *config.Config) gin.HandlerFunc {
 			if !utils.CheckPassword(req.Password, user.Password) {
 				Error(c, http.StatusUnauthorized, "用户名或密码错误")
 				return
+			}
+			if utils.IsLegacyPasswordHash(user.Password) {
+				if err := db.Model(&user).Update("password", utils.HashPassword(req.Password)).Error; err != nil {
+					Error(c, http.StatusInternalServerError, "登录失败，请稍后重试")
+					return
+				}
 			}
 		} else {
 			verifyEmail := email
@@ -356,4 +363,45 @@ func Register(cfg *config.Config) gin.HandlerFunc {
 			"userInfo": userInfoPayload(user),
 		})
 	}
+}
+
+// ResetPassword 使用邮箱验证码重置密码。
+func ResetPassword(c *gin.Context) {
+	var req struct {
+		Email            string `json:"email" binding:"required,email,max=100"`
+		VerificationCode string `json:"verificationCode" binding:"required,len=6"`
+		NewPassword      string `json:"newPassword" binding:"required,min=6"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Error(c, http.StatusBadRequest, "参数错误：新密码至少6位")
+		return
+	}
+
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if err := consumeEmailVerificationCode(email, emailCodePurposeReset, req.VerificationCode); err != nil {
+		Error(c, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	db := database.GetDB()
+	var user model.User
+	if err := db.Where("LOWER(email) = ?", email).First(&user).Error; err != nil {
+		Error(c, http.StatusNotFound, "用户不存在")
+		return
+	}
+	if !user.IsActive {
+		Error(c, http.StatusForbidden, "账号已被禁用")
+		return
+	}
+
+	nextTokenVersion := user.TokenVersion
+	if nextTokenVersion < 1 {
+		nextTokenVersion = 1
+	}
+	if err := db.Model(&user).Updates(map[string]interface{}{"password": utils.HashPassword(req.NewPassword), "token_version": nextTokenVersion + 1}).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "重置密码失败，请稍后重试")
+		return
+	}
+
+	Success(c, nil)
 }

@@ -94,6 +94,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 		api.POST("/login", handler.Login(cfg))
 		api.POST("/register", handler.Register(cfg))
+		api.POST("/password/reset", handler.ResetPassword)
 		api.POST("/email-code/send", handler.SendEmailVerificationCode(cfg))
 		api.GET("/user/mail/accounts/gmail/callback", handler.GmailOAuthCallback(cfg))
 

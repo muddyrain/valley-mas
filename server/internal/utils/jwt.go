@@ -9,18 +9,27 @@ import (
 
 // Claims JWT 声明
 type Claims struct {
-	UserID   string `json:"userId"` // 使用字符串避免JavaScript精度丢失
-	Username string `json:"username"`
-	Role     string `json:"role"`
+	UserID         string `json:"userId"` // 使用字符串避免JavaScript精度丢失
+	Username       string `json:"username"`
+	Role           string `json:"role"`
+	SessionVersion int    `json:"sv,omitempty"`
 	jwt.RegisteredClaims
 }
 
 // GenerateToken 生成 JWT token
 func GenerateToken(userID string, username, role, secret string, expireHours int64) (string, error) {
+	return GenerateTokenWithSessionVersion(userID, username, role, 1, secret, expireHours)
+}
+
+func GenerateTokenWithSessionVersion(userID string, username, role string, sessionVersion int, secret string, expireHours int64) (string, error) {
+	if sessionVersion < 1 {
+		sessionVersion = 1
+	}
 	claims := Claims{
-		UserID:   userID, // 直接使用字符串
-		Username: username,
-		Role:     role,
+		UserID:         userID, // 直接使用字符串
+		Username:       username,
+		Role:           role,
+		SessionVersion: sessionVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * time.Duration(expireHours))),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

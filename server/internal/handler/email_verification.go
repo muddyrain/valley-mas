@@ -2,16 +2,17 @@ package handler
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/big"
 	"net/smtp"
 	"strings"
-	"sync"
 	"time"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
+	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -20,28 +21,13 @@ import (
 const (
 	emailCodePurposeLogin    = "login"
 	emailCodePurposeRegister = "register"
+	emailCodePurposeReset    = "reset"
 	emailCodeTTL             = 10 * time.Minute
 	emailCodeResendInterval  = 60 * time.Second
 	emailCodeMaxAttempts     = 5
+	emailCodeIPWindow        = 15 * time.Minute
+	emailCodeIPMaxRequests   = 8
 )
-
-type emailCodeEntry struct {
-	Code       string
-	ExpiresAt  time.Time
-	LastSentAt time.Time
-	Attempts   int
-}
-
-var emailCodeCache = struct {
-	mu      sync.Mutex
-	entries map[string]emailCodeEntry
-}{
-	entries: make(map[string]emailCodeEntry),
-}
-
-func emailCodeKey(email, purpose string) string {
-	return fmt.Sprintf("%s|%s", strings.ToLower(strings.TrimSpace(email)), purpose)
-}
 
 func generateNumericCode(length int) (string, error) {
 	if length <= 0 {
@@ -167,39 +153,76 @@ func consumeEmailVerificationCode(email, purpose, code string) error {
 		return errors.New("验证码参数错误")
 	}
 
-	now := time.Now()
-	key := emailCodeKey(email, purpose)
-
-	emailCodeCache.mu.Lock()
-	defer emailCodeCache.mu.Unlock()
-
-	entry, ok := emailCodeCache.entries[key]
-	if !ok {
-		return errors.New("请先获取验证码")
+	db := database.GetDB()
+	var entry model.EmailVerificationCode
+	if err := db.Where("email = ? AND purpose = ?", email, purpose).First(&entry).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("请先获取验证码")
+		}
+		return errors.New("验证码校验失败，请稍后重试")
 	}
-	if now.After(entry.ExpiresAt) {
-		delete(emailCodeCache.entries, key)
+	if time.Now().After(entry.ExpiresAt) {
+		_ = db.Where("email = ? AND purpose = ?", email, purpose).Delete(&model.EmailVerificationCode{}).Error
 		return errors.New("验证码已过期，请重新获取")
 	}
-	if entry.Code != code {
+	if !utils.CheckPassword(code, entry.CodeHash) {
 		entry.Attempts++
 		if entry.Attempts >= emailCodeMaxAttempts {
-			delete(emailCodeCache.entries, key)
+			_ = db.Where("email = ? AND purpose = ?", email, purpose).Delete(&model.EmailVerificationCode{}).Error
 			return errors.New("验证码错误次数过多，请重新获取")
 		}
-		emailCodeCache.entries[key] = entry
+		if err := db.Model(&entry).Update("attempts", entry.Attempts).Error; err != nil {
+			return errors.New("验证码校验失败，请稍后重试")
+		}
 		return errors.New("验证码错误")
 	}
 
-	delete(emailCodeCache.entries, key)
+	result := db.Where("email = ? AND purpose = ? AND code_hash = ?", email, purpose, entry.CodeHash).Delete(&model.EmailVerificationCode{})
+	if result.Error != nil {
+		return errors.New("验证码校验失败，请稍后重试")
+	}
+	if result.RowsAffected != 1 {
+		return errors.New("请先获取验证码")
+	}
 	return nil
 }
 
-// SendEmailVerificationCode 发送邮箱验证码（用于登录/注册）
+func reserveEmailCodeIP(db *gorm.DB, ip string) error {
+	hash := sha256.Sum256([]byte(strings.TrimSpace(ip)))
+	keyHash := fmt.Sprintf("%x", hash[:])
+	now := time.Now()
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		var limit model.EmailVerificationRateLimit
+		err := tx.Where("key_hash = ?", keyHash).First(&limit).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return tx.Create(&model.EmailVerificationRateLimit{
+				KeyHash:      keyHash,
+				WindowStart:  now,
+				RequestCount: 1,
+			}).Error
+		}
+		if err != nil {
+			return err
+		}
+		if now.Sub(limit.WindowStart) >= emailCodeIPWindow {
+			return tx.Model(&limit).Updates(map[string]interface{}{
+				"window_start":  now,
+				"request_count": 1,
+			}).Error
+		}
+		if limit.RequestCount >= emailCodeIPMaxRequests {
+			return errors.New("验证码发送过于频繁，请稍后再试")
+		}
+		return tx.Model(&limit).Update("request_count", limit.RequestCount+1).Error
+	})
+}
+
+// SendEmailVerificationCode 发送邮箱验证码（用于登录、注册或找回密码）
 func SendEmailVerificationCode(cfg *config.Config) gin.HandlerFunc {
 	type request struct {
 		Email   string `json:"email" binding:"required,email,max=100"`
-		Purpose string `json:"purpose" binding:"required,oneof=login register"`
+		Purpose string `json:"purpose" binding:"required,oneof=login register reset"`
 	}
 
 	return func(c *gin.Context) {
@@ -212,6 +235,14 @@ func SendEmailVerificationCode(cfg *config.Config) gin.HandlerFunc {
 		email := strings.ToLower(strings.TrimSpace(req.Email))
 		purpose := strings.TrimSpace(req.Purpose)
 		db := database.GetDB()
+		if err := reserveEmailCodeIP(db, c.ClientIP()); err != nil {
+			if err.Error() == "验证码发送过于频繁，请稍后再试" {
+				Error(c, 429, err.Error())
+				return
+			}
+			Error(c, 500, "验证码服务暂时不可用")
+			return
+		}
 
 		var user model.User
 		err := db.Where("LOWER(email) = ?", email).First(&user).Error
@@ -235,45 +266,57 @@ func SendEmailVerificationCode(cfg *config.Config) gin.HandlerFunc {
 				return
 			}
 		}
+		if purpose == emailCodePurposeReset && (errors.Is(err, gorm.ErrRecordNotFound) || (err == nil && !user.IsActive)) {
+			Success(c, gin.H{"message": "如该邮箱已注册，验证码将发送至邮箱"})
+			return
+		}
+		if purpose == emailCodePurposeReset && err != nil {
+			Error(c, 500, "校验邮箱失败")
+			return
+		}
 
 		now := time.Now()
-		key := emailCodeKey(email, purpose)
-
-		emailCodeCache.mu.Lock()
-		if old, ok := emailCodeCache.entries[key]; ok {
+		var old model.EmailVerificationCode
+		if err := db.Where("email = ? AND purpose = ?", email, purpose).First(&old).Error; err == nil {
 			if now.Sub(old.LastSentAt) < emailCodeResendInterval {
 				wait := int(emailCodeResendInterval.Seconds() - now.Sub(old.LastSentAt).Seconds())
-				emailCodeCache.mu.Unlock()
 				Error(c, 429, fmt.Sprintf("发送过于频繁，请 %d 秒后重试", wait))
 				return
 			}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(c, 500, "验证码服务暂时不可用")
+			return
 		}
 
 		code, codeErr := generateNumericCode(6)
 		if codeErr != nil {
-			emailCodeCache.mu.Unlock()
 			Error(c, 500, "生成验证码失败")
 			return
 		}
-		emailCodeCache.entries[key] = emailCodeEntry{
-			Code:       code,
+		entry := model.EmailVerificationCode{
+			Email:      email,
+			Purpose:    purpose,
+			CodeHash:   utils.HashPassword(code),
 			ExpiresAt:  now.Add(emailCodeTTL),
 			LastSentAt: now,
 			Attempts:   0,
 		}
-		emailCodeCache.mu.Unlock()
+		if err := db.Save(&entry).Error; err != nil {
+			Error(c, 500, "验证码服务暂时不可用")
+			return
+		}
 
 		subject := "Valley Verification Code"
 		action := "登录"
 		if purpose == emailCodePurposeRegister {
 			action = "注册"
+		} else if purpose == emailCodePurposeReset {
+			action = "重置密码"
 		}
 		textBody, htmlBody := buildVerificationEmailBodies(code, action)
 
 		if err := sendSMTPEmail(cfg, email, subject, textBody, htmlBody); err != nil {
-			emailCodeCache.mu.Lock()
-			delete(emailCodeCache.entries, key)
-			emailCodeCache.mu.Unlock()
+			_ = db.Where("email = ? AND purpose = ?", email, purpose).Delete(&model.EmailVerificationCode{}).Error
 			Error(c, 500, "发送验证码失败: "+err.Error())
 			return
 		}
