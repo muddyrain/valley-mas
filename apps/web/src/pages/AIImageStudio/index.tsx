@@ -64,6 +64,7 @@ import {
 import { AIImageGenerationImage } from '@/components/ai-images/AIImageGenerationImage';
 import { GenerationOverlay, GenerationPreview } from '@/components/ai-images/GenerationOverlay';
 import { SketchCanvas, type SketchCanvasHandle } from '@/components/ai-images/SketchCanvas';
+import { StyleRecognitionDialog } from '@/components/ai-images/StyleRecognitionDialog';
 import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
 import ImagePreviewDialog from '@/components/ImagePreviewDialog';
 import {
@@ -417,6 +418,7 @@ export default function AIImageStudio() {
   const [pendingPromptResource, setPendingPromptResource] = useState<AIPrompt | null>(null);
   const [styleProfiles, setStyleProfiles] = useState<AIImageStyleProfile[]>([]);
   const [stylePickerOpen, setStylePickerOpen] = useState(false);
+  const [styleRecognitionOpen, setStyleRecognitionOpen] = useState(false);
   const [styleQuery, setStyleQuery] = useState('');
   const [selectedStyleProfile, setSelectedStyleProfile] = useState<AIImageStyleProfile | null>(
     null,
@@ -1365,6 +1367,19 @@ export default function AIImageStudio() {
     }
     commitPromptResource(promptResource, 'replace');
   };
+  const applyRecognizedStyle = (stylePrompt: string) => {
+    const current = studioMode === 'conversation' ? conversationInput : prompt;
+    const maxLength =
+      studioMode === 'conversation' ? MAX_CONVERSATION_INPUT_LENGTH : MAX_IMAGE_PROMPT_LENGTH;
+    const next = current.trim() ? `${current.trim()}\n\n${stylePrompt.trim()}` : stylePrompt.trim();
+    if (next.length > maxLength) {
+      toast.error(`填入后将超过 ${maxLength.toLocaleString()} 字，请先精简当前内容`);
+      return;
+    }
+    applyPresetSamplePrompt(next);
+    setStyleRecognitionOpen(false);
+    toast.success('已追加识别出的风格提示词');
+  };
   const selectStyleProfile = (profile: AIImageStyleProfile) => {
     setSelectedStyleProfile(profile);
     setStylePickerOpen(false);
@@ -1728,6 +1743,16 @@ export default function AIImageStudio() {
                                 type="button"
                                 size="sm"
                                 variant="outline"
+                                onClick={() => setStyleRecognitionOpen(true)}
+                                disabled={isBusy}
+                              >
+                                <ImageIcon />
+                                识别风格
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
                                 onClick={() => {
                                   setStyleQuery('');
                                   setStylePickerOpen(true);
@@ -1961,6 +1986,16 @@ export default function AIImageStudio() {
                         >
                           <FileText />
                           插入描述
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setStyleRecognitionOpen(true)}
+                          disabled={isBusy}
+                        >
+                          <ImageIcon />
+                          识别风格
                         </Button>
                         <Button
                           type="button"
@@ -2891,6 +2926,17 @@ export default function AIImageStudio() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+      <StyleRecognitionDialog
+        open={styleRecognitionOpen}
+        onOpenChange={setStyleRecognitionOpen}
+        onApply={applyRecognizedStyle}
+        onPromptSaved={(savedPrompt) => {
+          setPromptResources((current) => [
+            savedPrompt,
+            ...current.filter((item) => item.id !== savedPrompt.id),
+          ]);
+        }}
+      />
       <AlertDialog
         open={Boolean(pendingPromptResource)}
         onOpenChange={(open) => {

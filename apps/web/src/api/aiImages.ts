@@ -27,6 +27,27 @@ export interface AIImageCreationOptions {
   sizes: Record<string, Record<string, string>>;
 }
 
+export interface AIImageStyleAnalysisResult {
+  name: string;
+  description: string;
+  tags: string[];
+  stylePrompt: string;
+  observations: {
+    palette: string;
+    lighting: string;
+    composition: string;
+    material: string;
+    rendering: string;
+  };
+  commonalityNote: string;
+}
+
+export interface AIImageStyleAnalysis {
+  model: string;
+  sourceCount: number;
+  result: AIImageStyleAnalysisResult;
+}
+
 export interface AIImageGeneration {
   id: string;
   modelCatalogId: string;
@@ -108,6 +129,11 @@ export interface AIImageConversationCreatedPayload {
 
 export const listAIImageCreationOptions = () =>
   request.get<unknown, AIImageCreationOptions>('/ai/image-options');
+
+export const analyzeAIImageStyle = (data: FormData) =>
+  request.post<unknown, AIImageStyleAnalysis>('/ai/image-style-analyses', data, {
+    timeout: 180000,
+  });
 
 export const generateAIImageRecipeSamples = (recipeId: string, excludedPrompts: string[]) =>
   request.post<unknown, { list: string[]; model: string }>(

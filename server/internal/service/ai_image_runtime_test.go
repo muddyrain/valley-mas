@@ -360,3 +360,41 @@ func TestAIImageUnderstandingServiceReturnsAuditedText(t *testing.T) {
 		t.Fatalf("unexpected usage audit: %+v", usages)
 	}
 }
+
+func TestAIImageStyleAnalysisServiceAnalyzesMultipleImagesAndAuditsResult(t *testing.T) {
+	db := newAIImageRuntimeTestDB(t)
+	var usages []aiusage.Entry
+	service := NewAIImageStyleAnalysisService(db)
+	service.resolve = func(*gorm.DB, string, string, time.Duration) (aimodel.Invocation, error) {
+		return aimodel.Invocation{Model: model.AIModel{ID: 9, ModelID: "test-vision"}, Provider: aimodel.ProviderConfig{Provider: "test"}}, nil
+	}
+	service.chat = func(_ context.Context, _ aimodel.Invocation, request aiclient.CompatibleChatRequest) (aiclient.CompatibleChatResponse, error) {
+		if len(request.Messages) != 2 {
+			t.Fatalf("message count=%d", len(request.Messages))
+		}
+		parts, ok := request.Messages[1].Content.([]map[string]any)
+		if !ok || len(parts) != 3 || parts[0]["type"] != "image_url" || parts[1]["type"] != "image_url" || parts[2]["type"] != "text" {
+			t.Fatalf("unexpected multimodal request: %#v", request.Messages[1].Content)
+		}
+		var response aiclient.CompatibleChatResponse
+		if err := json.Unmarshal([]byte(`{"model":"test-vision","choices":[{"message":{"role":"assistant","content":"{\"name\":\"低饱和电影感\",\"description\":\"冷暖对比与安静叙事氛围\",\"tags\":[\"电影感\",\"电影感\",\"低饱和\"],\"stylePrompt\":\"低饱和蓝灰与暖橙点光，电影感环境光和稳定纵深构图\",\"observations\":{\"palette\":\"蓝灰与暖橙\",\"lighting\":\"柔和侧逆光\",\"composition\":\"前中后景纵深\",\"material\":\"细腻颗粒\",\"rendering\":\"电影化插画\"},\"commonalityNote\":\"两张图片的光线和色彩语言一致。\"}"}}],"usage":{"total_tokens":18}}`), &response); err != nil {
+			t.Fatal(err)
+		}
+		return response, nil
+	}
+	service.recordUsage = func(entry aiusage.Entry) { usages = append(usages, entry) }
+
+	result, err := service.Analyze(context.Background(), AIImageStyleAnalysisInput{
+		UserID: 1, ModelID: "9", Hint: "用于文章封面",
+		Images: []AIImageStyleAnalysisImage{{Content: []byte("first"), MIMEType: "image/png"}, {Content: []byte("second"), MIMEType: "image/jpeg"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Model != "test-vision" || result.SourceCount != 2 || result.Result.Name != "低饱和电影感" || len(result.Result.Tags) != 2 {
+		t.Fatalf("unexpected analysis result: %+v", result)
+	}
+	if len(usages) != 1 || usages[0].Feature != aiImageStyleAnalysisFeature || usages[0].Status != aiusage.StatusSuccess {
+		t.Fatalf("unexpected usage audit: %+v", usages)
+	}
+}
