@@ -85,6 +85,34 @@ export const getResourceDetail = (id: string, config?: RequestConfig) => {
   return http.get<unknown, Resource>(`/public/resources/${id}`, config);
 };
 
+export type ResourceProvenanceNodeType = 'resource' | 'generation' | 'album' | 'post';
+export type ResourceProvenanceDirection = 'source' | 'current' | 'derived';
+
+export interface ResourceProvenanceNode {
+  id: string;
+  type: ResourceProvenanceNodeType;
+  label: string;
+  detail?: string;
+  direction: ResourceProvenanceDirection;
+  href?: string;
+}
+
+export interface ResourceProvenanceEdge {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  label: string;
+}
+
+export interface ResourceProvenance {
+  nodes: ResourceProvenanceNode[];
+  edges: ResourceProvenanceEdge[];
+}
+
+export const getResourceProvenance = (id: string, config?: RequestConfig) => {
+  return http.get<unknown, ResourceProvenance>(`/public/resources/${id}/provenance`, config);
+};
+
 // 搜索资源
 export const searchResources = (
   keyword: string,

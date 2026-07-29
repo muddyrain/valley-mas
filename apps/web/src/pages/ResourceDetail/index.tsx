@@ -17,10 +17,13 @@ import {
   favoriteResource,
   getMyResources,
   getResourceDetail,
+  getResourceProvenance,
   type MyResource,
   type Resource,
+  type ResourceProvenance,
   unfavoriteResource,
 } from '@/api/resource';
+import ContentProvenanceGraph from '@/components/ContentProvenanceGraph';
 import ImagePreviewDialog from '@/components/ImagePreviewDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -91,10 +94,13 @@ export default function ResourceDetail() {
   const [downloading, setDownloading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [provenance, setProvenance] = useState<ResourceProvenance>({ nodes: [], edges: [] });
+  const [provenanceLoading, setProvenanceLoading] = useState(false);
 
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo || '/resources';
   const returnLabel =
     (location.state as { returnLabel?: string } | null)?.returnLabel || '返回资源列表';
+  const previewAspectClass = resource?.type === 'avatar' ? 'aspect-square' : 'aspect-video';
 
   const handleReturn = useCallback(() => {
     navigateBackOrFallback(navigate, returnTo);
@@ -132,6 +138,29 @@ export default function ResourceDetail() {
 
     void load();
   }, [id, user]);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+
+    const loadProvenance = async () => {
+      setProvenanceLoading(true);
+      try {
+        const data = await getResourceProvenance(id, { suppressErrorToast: true });
+        if (!cancelled) setProvenance(data);
+      } catch (error) {
+        console.error('Failed to load resource provenance:', error);
+        if (!cancelled) setProvenance({ nodes: [], edges: [] });
+      } finally {
+        if (!cancelled) setProvenanceLoading(false);
+      }
+    };
+
+    void loadProvenance();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   const handleFavorite = async () => {
     if (!isAuthenticated) {
@@ -194,14 +223,14 @@ export default function ResourceDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-muted via-primary/5 to-accent/5">
-        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="min-h-[calc(100vh-4rem)] bg-background">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           <Skeleton className="mb-6 h-8 w-24" />
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
-            <div className="lg:col-span-3">
-              <Skeleton className="aspect-square w-full rounded-2xl" />
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.85fr)]">
+            <div>
+              <Skeleton className="aspect-video w-full rounded-2xl" />
             </div>
-            <div className="space-y-4 lg:col-span-2">
+            <div className="space-y-4">
               <Skeleton className="h-8 w-3/4" />
               <Skeleton className="h-5 w-1/2" />
               <Skeleton className="h-4 w-full" />
@@ -235,14 +264,8 @@ export default function ResourceDetail() {
   }
 
   return (
-    <div
-      className="min-h-[calc(100vh-4rem)]"
-      style={{
-        background:
-          'linear-gradient(135deg, var(--background), hsl(var(--primary) / 0.15) 50%, var(--background))',
-      }}
-    >
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-[calc(100vh-4rem)] bg-background">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={handleReturn}
@@ -252,17 +275,17 @@ export default function ResourceDetail() {
           {returnLabel}
         </button>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
-          <div className="lg:col-span-3">
+        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.85fr)]">
+          <div className="lg:sticky lg:top-6">
             <div
-              className="relative aspect-square cursor-zoom-in overflow-hidden rounded-2xl bg-black shadow-2xl"
+              className={`relative ${previewAspectClass} cursor-zoom-in overflow-hidden rounded-2xl border border-border bg-muted shadow-xl`}
               onClick={() => setPreviewOpen(true)}
             >
               <img
                 src={resource.thumbnailUrl ?? resource.url}
                 alt=""
                 aria-hidden
-                className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover scale-110 blur-2xl opacity-50"
+                className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover scale-110 blur-2xl opacity-35"
               />
               <img
                 src={toInlineUrl(resource.url)}
@@ -270,22 +293,18 @@ export default function ResourceDetail() {
                 className={`relative h-full w-full object-contain transition-opacity duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
                 onLoad={() => setImgLoaded(true)}
               />
-              {!imgLoaded && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-foreground/60" />
-                </div>
-              )}
+              {!imgLoaded && <Skeleton className="absolute inset-0 rounded-none" />}
               <div className="absolute left-3 top-3">
-                <Badge className="border-0 bg-black/60 px-2.5 py-1 text-xs text-foreground backdrop-blur-sm">
+                <Badge className="border border-white/15 bg-black/80 px-2.5 py-1 text-xs text-white shadow-sm">
                   {TYPE_LABEL[resource.type] ?? resource.type}
                 </Badge>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col gap-5 lg:col-span-2">
+          <div className="flex flex-col gap-4">
             <div>
-              <h1 className="mb-2 text-2xl font-bold leading-tight text-foreground">
+              <h1 className="mb-1.5 text-2xl font-bold leading-tight text-foreground">
                 {resource.title}
               </h1>
               {resource.description && (
@@ -311,8 +330,8 @@ export default function ResourceDetail() {
               <User className="h-4 w-4 shrink-0 text-primary" />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="flex min-h-20 items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
                 <div className="rounded-lg bg-accent p-1.5">
                   <Download className="h-4 w-4 text-primary" />
                 </div>
@@ -321,7 +340,7 @@ export default function ResourceDetail() {
                   <p className="text-base font-bold text-foreground">{resource.downloadCount}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
+              <div className="flex min-h-20 items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
                 <div className="rounded-lg bg-accent p-1.5">
                   <Heart className="h-4 w-4 text-primary" />
                 </div>
@@ -332,7 +351,7 @@ export default function ResourceDetail() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
+              <div className="flex min-h-20 items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
                 <div className="rounded-lg bg-accent p-1.5">
                   <FileImage className="h-4 w-4 text-primary" />
                 </div>
@@ -342,7 +361,7 @@ export default function ResourceDetail() {
                 </div>
               </div>
               {resource.width && resource.height ? (
-                <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
+                <div className="flex min-h-20 items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
                   <div className="rounded-lg bg-accent p-1.5">
                     <MonitorSmartphone className="h-4 w-4 text-primary" />
                   </div>
@@ -355,7 +374,7 @@ export default function ResourceDetail() {
                 </div>
               ) : null}
               {resource.extension ? (
-                <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
+                <div className="col-span-2 flex min-h-20 items-center gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm">
                   <div className="rounded-lg bg-accent p-1.5">
                     <FileImage className="h-4 w-4 text-primary" />
                   </div>
@@ -369,12 +388,12 @@ export default function ResourceDetail() {
               ) : null}
             </div>
 
-            <div className="flex items-center gap-2 px-1 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 px-1 pt-0.5 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4 shrink-0" />
               <span>上传于 {formatDate(resource.createdAt)}</span>
             </div>
 
-            <div className="mt-auto flex gap-3 pt-2">
+            <div className="flex gap-3 pt-1">
               <Button
                 onClick={handleDownload}
                 disabled={downloading}
@@ -439,6 +458,14 @@ export default function ResourceDetail() {
               </Button>
             </div>
           </div>
+        </div>
+
+        <div className="mt-8">
+          <ContentProvenanceGraph
+            provenance={provenance}
+            loading={provenanceLoading}
+            onNavigate={navigate}
+          />
         </div>
       </div>
 
