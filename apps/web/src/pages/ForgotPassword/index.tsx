@@ -8,13 +8,11 @@ import CaptchaDialog from '@/components/CaptchaDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useThemeStore } from '@/stores/useThemeStore';
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
-  const setMode = useThemeStore((state) => state.setMode);
   const [formData, setFormData] = useState({
     email: '',
     verificationCode: '',
@@ -27,10 +25,6 @@ export default function ForgotPassword() {
   const [sendingCode, setSendingCode] = useState(false);
   const [codeCountdown, setCodeCountdown] = useState(0);
   const [captchaOpen, setCaptchaOpen] = useState(false);
-
-  useEffect(() => {
-    setMode('light');
-  }, [setMode]);
 
   useEffect(() => {
     if (codeCountdown <= 0) return;

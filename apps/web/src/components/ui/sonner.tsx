@@ -7,18 +7,18 @@ import {
   OctagonXIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { useTheme } from 'next-themes';
 import { createPortal } from 'react-dom';
 import { Toaster as Sonner, type ToasterProps } from 'sonner';
+import { useTheme } from '@/hooks/useTheme';
 
 const toastLayerZIndex = 2_147_483_647;
 
 const Toaster = ({ style, ...props }: ToasterProps) => {
-  const { theme = 'system' } = useTheme();
+  const { mode } = useTheme();
 
   const toaster = (
     <Sonner
-      theme={theme as ToasterProps['theme']}
+      theme={mode}
       position="top-center"
       className="toaster group"
       icons={{

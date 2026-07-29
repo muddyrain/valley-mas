@@ -12,7 +12,7 @@
 
 - 应用路由入口：`src/App.tsx`。
 - 页面目录：`src/pages`；博客相关页面集中在 `src/pages/blog`。
-- 布局入口：`src/layouts/Layout.tsx`、`src/layouts/Header.tsx`。
+- 布局入口：`src/layouts/WorkbenchLayout.tsx`、`src/layouts/Sidebar.tsx`。
 - API 封装：`src/api`；请求工具：`src/utils/request.ts`。
 - 登录状态：`src/stores/useAuthStore.ts`；主题状态：`src/stores/useThemeStore.ts`。
 - 常用复用组件：`src/components`、`src/components/ui`、`src/components/blog`、`src/components/page`。

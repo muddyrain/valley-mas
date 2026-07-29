@@ -399,7 +399,7 @@ export default function ImagePreviewDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange} disablePointerDismissal>
       <DialogContent
-        className="!top-0 !left-0 !h-screen !max-h-screen !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-none bg-transparent p-0 shadow-none [&>button]:hidden"
+        className="group/image-preview !top-0 !left-0 !h-screen !max-h-screen !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-none bg-transparent p-0 shadow-none duration-300 motion-reduce:animate-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 [&>button]:hidden"
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
@@ -407,7 +407,7 @@ export default function ImagePreviewDialog({
       >
         {/* 毛玻璃背景遮罩 */}
         <div
-          className="absolute inset-0 bg-black/80 backdrop-blur-xl"
+          className="absolute inset-0 bg-black/80 backdrop-blur-xl duration-300 motion-reduce:animate-none group-data-open/image-preview:animate-in group-data-open/image-preview:fade-in-0 group-data-closed/image-preview:animate-out group-data-closed/image-preview:fade-out-0"
           onClick={(e) => {
             e.stopPropagation();
             onOpenChange(false);
@@ -456,35 +456,37 @@ export default function ImagePreviewDialog({
           >
             {canPreview ? (
               <>
-                <img
-                  src={inlineSrc}
-                  alt={displayTitle}
-                  draggable={false}
-                  className={`pointer-events-none select-none rounded-xl shadow-[0_32px_80px_hsl(var(--foreground)/0.7)] transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
-                  onLoad={(e) => {
-                    setImageSize({
-                      width: e.currentTarget.naturalWidth,
-                      height: e.currentTarget.naturalHeight,
-                    });
-                    setImageLoading(false);
-                    updateStageSize();
-                  }}
-                  onError={() => setImageLoading(false)}
-                  onDragStart={(e) => e.preventDefault()}
-                  style={{
-                    maxWidth: '84vw',
-                    maxHeight: '72vh',
-                    width: 'auto',
-                    height: 'auto',
-                    transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale}) rotate(${rotate}deg)`,
-                    transformOrigin: 'center center',
-                    transition:
-                      dragging || momentumRunning
-                        ? 'none'
-                        : 'transform 260ms cubic-bezier(0.22,1,0.36,1)',
-                    willChange: 'transform',
-                  }}
-                />
+                <div className="origin-center duration-300 motion-reduce:animate-none group-data-open/image-preview:animate-in group-data-open/image-preview:fade-in-0 group-data-open/image-preview:zoom-in-95">
+                  <img
+                    src={inlineSrc}
+                    alt={displayTitle}
+                    draggable={false}
+                    className={`pointer-events-none select-none rounded-xl shadow-[0_32px_80px_hsl(var(--foreground)/0.7)] transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
+                    onLoad={(e) => {
+                      setImageSize({
+                        width: e.currentTarget.naturalWidth,
+                        height: e.currentTarget.naturalHeight,
+                      });
+                      setImageLoading(false);
+                      updateStageSize();
+                    }}
+                    onError={() => setImageLoading(false)}
+                    onDragStart={(e) => e.preventDefault()}
+                    style={{
+                      maxWidth: '84vw',
+                      maxHeight: '72vh',
+                      width: 'auto',
+                      height: 'auto',
+                      transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale}) rotate(${rotate}deg)`,
+                      transformOrigin: 'center center',
+                      transition:
+                        dragging || momentumRunning
+                          ? 'none'
+                          : 'transform 260ms cubic-bezier(0.22,1,0.36,1)',
+                      willChange: 'transform',
+                    }}
+                  />
+                </div>
                 {imageLoading && (
                   <BoxLoadingOverlay
                     show={imageLoading}

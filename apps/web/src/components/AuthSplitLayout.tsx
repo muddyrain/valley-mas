@@ -1,6 +1,9 @@
+import { Moon, Sun } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import BrandLogo from '@/components/BrandLogo';
+import { Button } from '@/components/ui/button';
+import { useTheme } from '@/hooks/useTheme';
 
 interface AuthSplitLayoutProps {
   badge: string;
@@ -25,8 +28,23 @@ export default function AuthSplitLayout({
   footer,
   bottomNote,
 }: AuthSplitLayoutProps) {
+  const { isDark, toggleMode } = useTheme();
+
   return (
     <div className="relative min-h-screen bg-muted lg:flex">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={toggleMode}
+        className="absolute top-4 right-4 z-10"
+        aria-label={isDark ? '切换为浅色模式' : '切换为深色模式'}
+        aria-pressed={isDark}
+        title={isDark ? '切换为浅色模式' : '切换为深色模式'}
+      >
+        {isDark ? <Sun /> : <Moon />}
+      </Button>
+
       <div className="hidden lg:flex lg:w-[44%] lg:flex-col lg:justify-between lg:overflow-hidden lg:bg-card lg:px-14 lg:py-12">
         <Link to="/blog" className="relative flex w-fit items-center gap-3 group">
           <BrandLogo

@@ -9,7 +9,6 @@ import {
   type Resource,
   unfavoriteResource,
 } from '@/api/resource';
-import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import EmptyState from '@/components/EmptyState';
 import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
 import TypeFilterBar from '@/components/TypeFilterBar';
@@ -454,7 +453,7 @@ export default function Resources() {
         <Card className="border-border/50 mt-6">
           <CardContent className="p-5">
             <div className="relative min-h-[280px]">
-              {loading && resources.length === 0 ? (
+              {loading || refreshing ? (
                 <div className="grid grid-cols-2 gap-5 sm:grid-cols-2 md:grid-cols-3">
                   {Array.from({ length: PAGE_SIZE }).map((_, i) => (
                     <ResourceCardSkeleton
@@ -521,11 +520,6 @@ export default function Resources() {
                   </div>
                 </>
               )}
-              <BoxLoadingOverlay
-                show={(loading && resources.length > 0) || refreshing}
-                title={refreshing ? '正在刷新资源列表...' : '正在加载资源列表...'}
-                hint={refreshing ? '最新内容同步中' : '筛选结果更新中'}
-              />
             </div>
 
             {totalPages > 1 && (

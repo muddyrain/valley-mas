@@ -3,7 +3,8 @@ import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import { GlobalScrollButton } from '@/components/GlobalScrollButton';
 import { Toaster } from '@/components/ui/sonner';
-import { applyThemeToDocument, useThemeStore } from '@/stores/useThemeStore';
+import { useTheme } from '@/hooks/useTheme';
+import { applyThemeToDocument } from '@/stores/useThemeStore';
 import WorkbenchLayout from './layouts/WorkbenchLayout';
 import AIAppConversation from './pages/AIAppConversation';
 import AIAppEditor from './pages/AIAppEditor';
@@ -136,11 +137,11 @@ function RouteTitle() {
 }
 
 function ThemeController() {
-  const mode = useThemeStore((state) => state.mode);
+  const { resolvedMode } = useTheme();
 
   useEffect(() => {
-    applyThemeToDocument(mode);
-  }, [mode]);
+    applyThemeToDocument(resolvedMode);
+  }, [resolvedMode]);
 
   return null;
 }

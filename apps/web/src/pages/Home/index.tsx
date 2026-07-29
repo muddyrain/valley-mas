@@ -274,7 +274,7 @@ export default function Home() {
                 <div className="grid gap-5 lg:grid-cols-[1.54fr_0.72fr]">
                   <div className="space-y-5">
                     {featuredWallpaper && (
-                      <article className="group relative w-full overflow-hidden rounded-xl border border-border bg-card text-left transition hover:shadow">
+                      <article className="group relative w-full overflow-hidden rounded-xl border border-border bg-card text-left transition-shadow hover:shadow-md">
                         <ResourcePreviewLink
                           resourceId={featuredWallpaper.id}
                           title={featuredWallpaper.title}
@@ -285,8 +285,7 @@ export default function Home() {
                             alt={featuredWallpaper.title}
                             className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
-                          <div className="absolute left-5 top-5 inline-flex items-center rounded-full bg-card px-3 py-1 text-xs font-medium text-primary">
+                          <div className="absolute left-5 top-5 inline-flex items-center rounded-full border border-background/60 bg-background/85 px-3 py-1 text-xs font-medium text-primary shadow-sm backdrop-blur-sm">
                             热门壁纸
                           </div>
                           <div className="pointer-events-auto absolute right-5 top-5 z-20">
@@ -296,17 +295,17 @@ export default function Home() {
                               size="md"
                             />
                           </div>
-                          <div className="absolute inset-x-0 bottom-0 p-5 text-foreground">
-                            <div className="text-2xl font-semibold leading-tight sm:text-[30px]">
-                              {featuredWallpaper.title}
-                            </div>
-                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-                              <span>{featuredWallpaper.userName}</span>
-                              <span className="inline-flex items-center gap-1">
-                                <Download className="h-3.5 w-3.5" />
-                                {featuredWallpaper.downloadCount} 次下载
-                              </span>
-                            </div>
+                        </div>
+                        <div className="pointer-events-none relative z-10 border-t border-border bg-card px-5 py-4">
+                          <div className="line-clamp-1 text-xl font-semibold leading-tight text-foreground sm:text-2xl">
+                            {featuredWallpaper.title}
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+                            <span>{featuredWallpaper.userName}</span>
+                            <span className="inline-flex items-center gap-1">
+                              <Download className="h-3.5 w-3.5" />
+                              {featuredWallpaper.downloadCount} 次下载
+                            </span>
                           </div>
                         </div>
                       </article>

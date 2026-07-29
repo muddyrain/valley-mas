@@ -1,6 +1,8 @@
 import {
   BookOpen,
   Bot,
+  Check,
+  ChevronDown,
   Download,
   Heart,
   Home,
@@ -8,10 +10,13 @@ import {
   LibraryBig,
   LogIn,
   LogOut,
+  Monitor,
+  Moon,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
   Sparkles,
+  Sun,
   User,
   Users,
 } from 'lucide-react';
@@ -29,8 +34,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useTheme } from '@/hooks/useTheme';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useLayoutStore } from '@/stores/useLayoutStore';
+import type { ThemeMode } from '@/stores/useThemeStore';
+
+const themeOptions: Array<{ mode: ThemeMode; label: string; icon: typeof Monitor }> = [
+  { mode: 'system', label: '跟随系统', icon: Monitor },
+  { mode: 'light', label: '浅色模式', icon: Sun },
+  { mode: 'dark', label: '深色模式', icon: Moon },
+];
 
 const navGroups = [
   {
@@ -57,6 +70,9 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout: logoutStore } = useAuthStore();
+  const { mode, setMode } = useTheme();
+  const currentTheme = themeOptions.find((option) => option.mode === mode) ?? themeOptions[0];
+  const CurrentThemeIcon = currentTheme.icon;
 
   const isActive = (to: string) => {
     if (to === '/') return location.pathname === '/';
@@ -184,8 +200,53 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* User area */}
       <div className="border-t border-border p-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size={collapsed ? 'icon' : 'default'}
+                aria-label={`主题：${currentTheme.label}`}
+                title={`主题：${currentTheme.label}`}
+                className={
+                  collapsed
+                    ? 'h-10 w-10'
+                    : 'h-10 w-full justify-start gap-3 px-3 text-muted-foreground hover:text-foreground max-md:size-8 max-md:justify-center max-md:px-0'
+                }
+              >
+                <CurrentThemeIcon className="h-4 w-4" />
+                {!collapsed && <span className="max-md:sr-only">{currentTheme.label}</span>}
+                {!collapsed && <ChevronDown className="ml-auto h-4 w-4 max-md:hidden" />}
+              </Button>
+            }
+          />
+          <DropdownMenuContent
+            align="start"
+            side={collapsed ? 'right' : 'top'}
+            className="w-40 border-border bg-popover p-1"
+          >
+            {themeOptions.map((option) => {
+              const Icon = option.icon;
+              return (
+                <DropdownMenuItem
+                  key={option.mode}
+                  onClick={() => setMode(option.mode)}
+                  className="gap-2 rounded-lg py-2"
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{option.label}</span>
+                  {mode === option.mode && <Check className="ml-auto h-4 w-4 text-primary" />}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* User area */}
+      <div className="flex px-2 pb-2">
         {isAuthenticated ? (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -269,7 +330,7 @@ export function Sidebar() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handleLogout}
-                className="gap-2 rounded-lg py-2 text-destructive"
+                className="gap-2 rounded-lg bg-destructive/10 py-2 text-destructive hover:bg-destructive/15 hover:text-destructive focus:bg-destructive/15 focus:text-destructive"
               >
                 <LogOut className="h-4 w-4" />
                 <span>退出登录</span>
@@ -290,7 +351,7 @@ export function Sidebar() {
             <TooltipContent side="right">登录 / 注册</TooltipContent>
           </Tooltip>
         ) : (
-          <Link to="/login" className="max-md:flex max-md:justify-center">
+          <Link to="/login" className="w-full max-md:flex max-md:justify-center">
             <Button variant="outline" className="w-full max-md:size-8 max-md:p-0">
               <LogIn className="mr-2 h-4 w-4" />
               <span className="max-md:sr-only">登录 / 注册</span>

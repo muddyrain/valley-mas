@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-export type ThemeMode = 'dark' | 'light';
+export type ThemeMode = 'dark' | 'light' | 'system';
+export type ResolvedThemeMode = Exclude<ThemeMode, 'system'>;
 
 interface ThemeState {
   mode: ThemeMode;
@@ -11,19 +12,27 @@ interface ThemeState {
 
 export const applyThemeToDocument = (mode: ThemeMode) => {
   if (typeof document === 'undefined') return;
-  document.documentElement.classList.toggle('dark', mode === 'dark');
+  const resolvedMode = resolveThemeMode(mode);
+  document.documentElement.classList.toggle('dark', resolvedMode === 'dark');
+  document.documentElement.style.colorScheme = resolvedMode;
+};
+
+export const resolveThemeMode = (mode: ThemeMode): ResolvedThemeMode => {
+  if (mode !== 'system') return mode;
+  if (typeof window === 'undefined') return 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
 
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      mode: 'light',
+      mode: 'system',
       setMode: (mode) => {
         applyThemeToDocument(mode);
         set({ mode });
       },
       toggleMode: () => {
-        const next = get().mode === 'dark' ? 'light' : 'dark';
+        const next = resolveThemeMode(get().mode) === 'dark' ? 'light' : 'dark';
         applyThemeToDocument(next);
         set({ mode: next });
       },
@@ -34,12 +43,12 @@ export const useThemeStore = create<ThemeState>()(
       migrate: (persisted: unknown) => {
         const p = persisted as Record<string, unknown>;
         if (p && typeof p === 'object' && 'mode' in p) {
-          return { mode: p.mode as ThemeMode };
+          const mode = p.mode;
+          if (mode === 'dark' || mode === 'light' || mode === 'system') {
+            return { mode };
+          }
         }
-        if (p && typeof p === 'object') {
-          return { mode: 'light' as ThemeMode };
-        }
-        return { mode: 'light' as ThemeMode };
+        return { mode: 'system' as ThemeMode };
       },
     },
   ),

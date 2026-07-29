@@ -28,7 +28,6 @@ import {
   type ResourceVisibility,
 } from '@/api/resource';
 import BatchUploadResourceDialog from '@/components/BatchUploadResourceDialog';
-import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import EditResourceDialog from '@/components/EditResourceDialog';
 import EmptyState from '@/components/EmptyState';
 import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
@@ -69,7 +68,7 @@ export default function MyResources() {
     values: { page: currentPage, type: activeType, albumId: activeAlbumId },
     setValue,
   } = useUrlQueryState(MY_RESOURCES_QUERY_SCHEMA, { pageKey: 'page' });
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
 
   const [resources, setResources] = useState<MyResource[]>([]);
   const [total, setTotal] = useState(0);
@@ -545,9 +544,14 @@ export default function MyResources() {
                       {resources.map((resource, i) => (
                         <ResourceCard
                           key={resource.id}
-                          resource={resource}
+                          resource={{
+                            ...resource,
+                            userName: user?.nickname || user?.username,
+                            userAvatar: user?.avatar,
+                          }}
                           onDelete={batchMode ? undefined : setDeleteTarget}
                           onEdit={batchMode ? undefined : handleOpenEdit}
+                          showUser={Boolean(user?.nickname || user?.username)}
                           showSize
                           showDate
                           showVisibilityTag
@@ -594,11 +598,6 @@ export default function MyResources() {
                     )}
                   </>
                 )}
-                <BoxLoadingOverlay
-                  show={loading}
-                  title={resources.length > 0 ? '正在同步资源列表...' : '正在加载资源列表...'}
-                  hint={resources.length > 0 ? '分页和筛选结果更新中' : '首次加载可能稍慢，请稍候'}
-                />
               </div>
             </div>
           </div>

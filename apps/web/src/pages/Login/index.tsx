@@ -9,20 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { useThemeStore } from '@/stores/useThemeStore';
 
 export default function Login() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
-  const setMode = useThemeStore((state) => state.setMode);
   const [searchParams] = useSearchParams();
   const redirectPath = searchParams.get('redirect') || '/';
   const safeRedirectPath =
     redirectPath && redirectPath.startsWith('/') && redirectPath !== '/login' ? redirectPath : '/';
-
-  useEffect(() => {
-    setMode('light');
-  }, [setMode]);
 
   const [formData, setFormData] = useState({
     email: '',

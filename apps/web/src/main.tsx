@@ -5,20 +5,19 @@ import App from './App';
 import './index.css';
 import './components/blog/code-theme.css';
 import './components/blog/mdx-editor.css';
-import { applyThemeToDocument } from './stores/useThemeStore';
+import { applyThemeToDocument, type ThemeMode } from './stores/useThemeStore';
 
 if (typeof window !== 'undefined') {
   const savedTheme = localStorage.getItem('valley_theme');
-  let mode: 'dark' | 'light' = 'light';
+  let mode: ThemeMode = 'system';
   if (savedTheme) {
     try {
       const parsed = JSON.parse(savedTheme);
-      if (parsed.state?.mode === 'dark') {
-        mode = 'dark';
+      const savedMode = parsed.state?.mode;
+      if (savedMode === 'dark' || savedMode === 'light' || savedMode === 'system') {
+        mode = savedMode;
       }
-    } catch {
-      mode = 'light';
-    }
+    } catch {}
   }
   applyThemeToDocument(mode);
 }
