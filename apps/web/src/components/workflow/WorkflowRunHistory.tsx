@@ -203,12 +203,14 @@ function TraceEventRow({
 export function WorkflowRunHistory({
   workflowId,
   open,
+  terminalRunID,
   onRetry,
   onResume,
   nodeLabels = {},
 }: {
   workflowId: string | null;
   open: boolean;
+  terminalRunID?: string;
   onRetry: (run: WorkflowRunDetail) => void;
   onResume: (run: WorkflowRunDetail) => void;
   nodeLabels?: Record<string, string>;
@@ -239,6 +241,11 @@ export function WorkflowRunHistory({
     if (!open || !workflowId) return;
     void loadRuns();
   }, [loadRuns, open, workflowId]);
+
+  useEffect(() => {
+    if (!open || !workflowId || !terminalRunID) return;
+    void loadRuns(false);
+  }, [loadRuns, open, terminalRunID, workflowId]);
 
   useEffect(() => {
     if (!open) setSelectedRun(null);
@@ -281,7 +288,7 @@ export function WorkflowRunHistory({
           ? { ...previous, run: { ...previous.run, status: 'cancelling' } }
           : previous,
       );
-      toast.success('已请求取消运行');
+      toast.message('正在取消运行');
     } catch (error) {
       toast.error(getAPIErrorMessage(error, '取消运行失败'));
     } finally {

@@ -64,17 +64,14 @@ export function PropertyFormBase({
       {runContent ? (
         <Tabs
           value={activeTab}
-          onValueChange={(value) => {
-            if (configLocked && value === 'config') return;
-            onActiveTabChange?.(value as 'config' | 'run');
-          }}
+          onValueChange={(value) => onActiveTabChange?.(value as 'config' | 'run')}
           className="min-h-0 flex-1 gap-0"
         >
           <TabsList
             className="w-full rounded-none border-b border-border bg-card px-4"
             variant="line"
           >
-            <TabsTrigger value="config" className="flex-none px-3" disabled={configLocked}>
+            <TabsTrigger value="config" className="flex-none px-3">
               配置
             </TabsTrigger>
             {runContent ? (
@@ -88,6 +85,7 @@ export function PropertyFormBase({
               selectedNode={selectedNode}
               configLabel={config?.label}
               onUpdateNode={configLocked ? () => undefined : onUpdateNode}
+              locked={configLocked}
             >
               {children}
             </PropertyConfigContent>
@@ -103,6 +101,7 @@ export function PropertyFormBase({
           selectedNode={selectedNode}
           configLabel={config?.label}
           onUpdateNode={configLocked ? () => undefined : onUpdateNode}
+          locked={configLocked}
         >
           {children}
         </PropertyConfigContent>
@@ -115,44 +114,48 @@ function PropertyConfigContent({
   selectedNode,
   configLabel,
   onUpdateNode,
+  locked = false,
   children,
 }: {
   selectedNode: PropertyFormBaseProps['selectedNode'];
   configLabel: string | undefined;
   onUpdateNode: PropertyFormBaseProps['onUpdateNode'];
+  locked?: boolean;
   children: ReactNode;
 }) {
   return (
     <ScrollArea className="h-full bg-muted/20">
-      <div className="space-y-4 p-4">
-        <section className="space-y-4 rounded-lg border border-border bg-card p-4">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">基础设置</h2>
-            <p className="mt-1 text-xs text-muted-foreground">名称会显示在工作流画布中。</p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="node-label">节点名称</Label>
-            <Input
-              id="node-label"
-              value={selectedNode.data.label}
-              onChange={(e) => onUpdateNode(selectedNode.id, { label: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>节点类型</Label>
-            <div className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
-              {configLabel}
+      <fieldset disabled={locked} className="contents">
+        <div className="space-y-4 p-4">
+          <section className="space-y-4 rounded-lg border border-border bg-card p-4">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">基础设置</h2>
+              <p className="mt-1 text-xs text-muted-foreground">名称会显示在工作流画布中。</p>
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>节点 ID</Label>
-            <div className="rounded-lg border border-border bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
-              {selectedNode.id}
+            <div className="space-y-2">
+              <Label htmlFor="node-label">节点名称</Label>
+              <Input
+                id="node-label"
+                value={selectedNode.data.label}
+                onChange={(e) => onUpdateNode(selectedNode.id, { label: e.target.value })}
+              />
             </div>
-          </div>
-        </section>
-        <div className="space-y-4">{children}</div>
-      </div>
+            <div className="space-y-2">
+              <Label>节点类型</Label>
+              <div className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+                {configLabel}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>节点 ID</Label>
+              <div className="rounded-lg border border-border bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
+                {selectedNode.id}
+              </div>
+            </div>
+          </section>
+          <div className="space-y-4">{children}</div>
+        </div>
+      </fieldset>
     </ScrollArea>
   );
 }

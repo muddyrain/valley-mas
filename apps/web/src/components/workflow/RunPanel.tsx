@@ -133,6 +133,10 @@ export function RunPanel({
   const [groups, setGroups] = useState<Group[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [activeTab, setActiveTab] = useState<'run' | 'records' | 'tests'>('run');
+  const terminalRunID =
+    session.status === 'success' || session.status === 'error' || session.status === 'cancelled'
+      ? session.runId || undefined
+      : undefined;
 
   useEffect(() => {
     if (!open) return;
@@ -530,6 +534,7 @@ export function RunPanel({
           <WorkflowRunHistory
             workflowId={workflowId}
             open={open && activeTab === 'records'}
+            terminalRunID={terminalRunID}
             nodeLabels={nodeLabels}
             onRetry={onRetry}
             onResume={onResume}

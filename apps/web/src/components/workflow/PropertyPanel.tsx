@@ -66,17 +66,14 @@ export const PropertyPanel = memo(function PropertyPanel({
         </div>
         <Tabs
           value={activeTab || 'config'}
-          onValueChange={(value) => {
-            if (isRunning && value === 'config') return;
-            onActiveTabChange?.(value as PropertyPanelTab);
-          }}
+          onValueChange={(value) => onActiveTabChange?.(value as PropertyPanelTab)}
           className="min-h-0 flex-1 gap-0"
         >
           <TabsList
             className="w-full rounded-none border-b border-border bg-card px-4"
             variant="line"
           >
-            <TabsTrigger value="config" className="flex-none px-3" disabled={isRunning}>
+            <TabsTrigger value="config" className="flex-none px-3">
               配置
             </TabsTrigger>
             <TabsTrigger value="run" className="flex-none px-3">
