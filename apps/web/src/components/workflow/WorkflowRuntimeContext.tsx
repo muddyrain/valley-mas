@@ -1,13 +1,14 @@
 import { createContext, type ReactNode, useContext } from 'react';
 import type { NodePickerItem } from './NodePicker';
 import type { WorkflowRunSession } from './runSession';
+import type { ValidationError } from './validateWorkflowConfig';
 
 interface WorkflowRuntimeContextValue {
   session: WorkflowRunSession;
   isRunning: boolean;
   cancelNode: (nodeId: string) => void;
   resumeFailedRun: (runId: string) => void;
-  validationErrors: ReadonlyMap<string, string>;
+  validationErrors: ReadonlyMap<string, readonly ValidationError[]>;
   copyNode: (nodeId: string) => void;
   deleteNode: (nodeId: string) => void;
   insertAfter: (nodeId: string, item: NodePickerItem) => void;

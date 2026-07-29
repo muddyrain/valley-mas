@@ -1550,7 +1550,10 @@ func workflowAIImageGenerator() workflow.AIImageGenerator {
 			},
 		)
 		if err != nil {
-			return workflow.GeneratedAIImage{}, err
+			return workflow.GeneratedAIImage{}, workflow.NewPublicExecutionFailure(
+				workflowAIImageFailureMessage(generation.ErrorCode),
+				workflowAIImageFailureCode(generation.ErrorCode),
+			)
 		}
 		return workflow.GeneratedAIImage{
 			GenerationID: generation.ID.String(),
@@ -1561,6 +1564,28 @@ func workflowAIImageGenerator() workflow.AIImageGenerator {
 			Size:         generation.RequestedSize,
 		}, nil
 	})
+}
+
+func workflowAIImageFailureCode(code string) string {
+	switch strings.TrimSpace(code) {
+	case "IMAGE_GENERATION_FAILED", "IMAGE_DOWNLOAD_FAILED", "IMAGE_DIMENSIONS_TOO_SMALL", "IMAGE_STORAGE_FAILED":
+		return strings.TrimSpace(code)
+	default:
+		return "IMAGE_GENERATION_FAILED"
+	}
+}
+
+func workflowAIImageFailureMessage(code string) string {
+	switch workflowAIImageFailureCode(code) {
+	case "IMAGE_DOWNLOAD_FAILED":
+		return "图片已生成，但读取结果失败，请稍后重试"
+	case "IMAGE_DIMENSIONS_TOO_SMALL":
+		return "图片服务返回的尺寸不符合要求，请切换模型或尺寸后重试"
+	case "IMAGE_STORAGE_FAILED":
+		return "图片已生成，但转存失败，请检查存储服务"
+	default:
+		return "图片模型未能生成结果，请稍后重试或切换模型"
+	}
 }
 
 func workflowAIImageUnderstander() workflow.AIImageUnderstander {
@@ -1812,7 +1837,7 @@ func persistWorkflowNodeEvent(db *gorm.DB, runID model.Int64String, nodeType wor
 			Assign(model.WorkflowNodeRun{
 				NodeType: string(nodeType), CapabilityID: event.CapabilityID,
 				Status: string(event.Status), Input: string(input), Output: "{}",
-				ErrorCode: "", DurationMs: 0, StartedAt: now, FinishedAt: nil,
+				ErrorCode: "", ErrorMessage: "", DurationMs: 0, StartedAt: now, FinishedAt: nil,
 			}).
 			FirstOrCreate(&row, model.WorkflowNodeRun{
 				WorkflowRunID: runID, NodeID: event.NodeID,
@@ -1834,6 +1859,9 @@ func persistWorkflowNodeEvent(db *gorm.DB, runID model.Int64String, nodeType wor
 	}
 	if event.Error != "" {
 		updates["error_code"] = event.Error
+	}
+	if event.Status == workflow.StatusFailed && event.Message != "" {
+		updates["error_message"] = event.Message
 	}
 	return db.Model(&model.WorkflowNodeRun{}).Where("workflow_run_id = ? AND node_id = ?", runID, event.NodeID).Updates(updates).Error
 }

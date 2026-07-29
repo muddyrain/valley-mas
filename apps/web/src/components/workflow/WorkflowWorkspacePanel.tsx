@@ -31,10 +31,17 @@ export const WorkflowWorkspacePanel = memo(function WorkflowWorkspacePanel({
             AI 协作
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="node" className="min-h-0 flex-1 overflow-hidden [&>div]:border-l-0">
+        <TabsContent
+          value="node"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden [&>div]:border-l-0"
+        >
           {nodeContent}
         </TabsContent>
-        <TabsContent value="ai" keepMounted className="min-h-0 flex-1 overflow-hidden">
+        <TabsContent
+          value="ai"
+          keepMounted
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
           {copilotContent}
         </TabsContent>
       </Tabs>

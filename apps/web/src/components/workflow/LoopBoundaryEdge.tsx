@@ -25,9 +25,8 @@ export function LoopBoundaryEdge(props: EdgeProps) {
   const isLoopBodyLink = props.sourceHandleId === 'body' && props.targetHandleId === 'loop-entry';
   const interactive = !isLoopBodyLink && !isRunning;
   const stroke = props.style?.stroke ?? '#3b82f6';
-  const selectedStroke = '#7c3aed';
-  const hoverStroke = '#22c7f3';
-  const sourceHandleRadius = 14;
+  const selectedStroke = '#2563eb';
+  const hoverStroke = '#0ea5e9';
   const edgePositions = isLoopBodyLink
     ? {
         sourcePosition: Position.Bottom,
@@ -39,11 +38,7 @@ export function LoopBoundaryEdge(props: EdgeProps) {
       };
   const [path, labelX, labelY] = getBezierPath({
     ...props,
-    ...(isLoopBodyLink
-      ? {}
-      : {
-          sourceX: isBodyEntry ? props.sourceX + sourceHandleRadius : props.sourceX,
-        }),
+    sourceX: props.sourceX,
     ...edgePositions,
     curvature: 0.2,
   });
@@ -110,7 +105,7 @@ export function LoopBoundaryEdge(props: EdgeProps) {
                     type="button"
                     variant="default"
                     size="icon-sm"
-                    className="rounded-full border border-background bg-cyan-500 text-white shadow-md hover:bg-cyan-600"
+                    className="rounded-full border border-background bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
                     aria-label="在连线中插入节点"
                   >
                     <Plus className="size-4" />

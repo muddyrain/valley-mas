@@ -147,6 +147,7 @@ export interface WorkflowNodeRun {
   input: string;
   output: string;
   errorCode?: string;
+  errorMessage?: string;
   durationMs?: number;
   startedAt: string;
   finishedAt?: string;

@@ -113,7 +113,7 @@ export function workflowRunSnapshotsFromNodeRuns(
         status: nodeRun.status === 'waiting_approval' ? 'running' : nodeRun.status,
         input: parseObject(nodeRun.input),
         output: parseObject(nodeRun.output),
-        error: nodeRun.status === 'error' ? nodeRun.errorCode : undefined,
+        error: nodeRun.status === 'error' ? nodeRun.errorMessage || nodeRun.errorCode : undefined,
         errorCode: nodeRun.errorCode,
         durationMs: nodeRun.durationMs,
         startedAt: parseStartedAt(nodeRun.startedAt),

@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -12,24 +13,13 @@ import {
 import {
   normalizeStartInputs,
   renameStartInput,
-  type WorkflowStartInputControl,
   type WorkflowValueType,
   workflowStartInputControlType,
 } from '../types';
 import type { PropertyFormProps } from './index';
 import { RecordKeyInput } from './RecordKeyInput';
+import { StartInputControlPicker } from './StartInputControlPicker';
 import { WorkflowIOField } from './WorkflowIOField';
-
-const inputControls: Array<{
-  value: WorkflowStartInputControl;
-  label: string;
-}> = [
-  { value: 'default', label: '默认输入' },
-  { value: 'markdown_file', label: 'Markdown 文件' },
-  { value: 'blog_tags', label: '博客标签' },
-  { value: 'blog_group', label: '博客分组' },
-  { value: 'visibility', label: '可见范围' },
-];
 
 const valueTypes: WorkflowValueType[] = [
   'string',
@@ -51,6 +41,7 @@ export function StartPropertyForm({ config, onUpdateConfig, onRenameInput }: Pro
             key={input.id || name}
             name={name}
             required={input.required}
+            layout="compact"
             nameControl={
               <RecordKeyInput
                 name={name}
@@ -66,24 +57,29 @@ export function StartPropertyForm({ config, onUpdateConfig, onRenameInput }: Pro
               />
             }
             typeControl={
-              <Select
-                value={input.type}
-                disabled={input.control !== 'default'}
-                onValueChange={(type) =>
-                  update({ ...inputs, [name]: { ...input, type: type as WorkflowValueType } })
-                }
-              >
-                <SelectTrigger aria-label={`${name} 输入类型`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {valueTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              input.control === 'default' ? (
+                <Select
+                  value={input.type}
+                  onValueChange={(type) =>
+                    update({ ...inputs, [name]: { ...input, type: type as WorkflowValueType } })
+                  }
+                >
+                  <SelectTrigger aria-label={`${name} 输入类型`} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {valueTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Badge variant="secondary" className="w-full justify-center font-mono font-normal">
+                  {input.type}
+                </Badge>
+              )
             }
             actions={
               <div className="flex items-center gap-1">
@@ -111,11 +107,11 @@ export function StartPropertyForm({ config, onUpdateConfig, onRenameInput }: Pro
                 </Button>
               </div>
             }
-            valueControl={
-              <Select
+            accessory={
+              <StartInputControlPicker
+                compact
                 value={input.control}
-                onValueChange={(control) => {
-                  const nextControl = control as WorkflowStartInputControl;
+                onValueChange={(nextControl) =>
                   update({
                     ...inputs,
                     [name]: {
@@ -123,22 +119,9 @@ export function StartPropertyForm({ config, onUpdateConfig, onRenameInput }: Pro
                       control: nextControl,
                       type: workflowStartInputControlType(nextControl, input.type),
                     },
-                  });
-                }}
-              >
-                <SelectTrigger aria-label={`${name} 输入方式`}>
-                  <SelectValue>
-                    {inputControls.find((control) => control.value === input.control)?.label}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {inputControls.map((control) => (
-                    <SelectItem key={control.value} value={control.value}>
-                      {control.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  })
+                }
+              />
             }
           />
         ))}

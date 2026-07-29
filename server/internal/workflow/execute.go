@@ -412,11 +412,30 @@ func emitFailure(emit func(Event), runID string, node Node, capabilityID string,
 	return err
 }
 
+// PublicExecutionFailure carries a reviewed, user-safe failure summary from a
+// capability adapter. The original cause must remain in server logs only.
+type PublicExecutionFailure struct {
+	Message string
+	Code    string
+}
+
+func (e *PublicExecutionFailure) Error() string {
+	return e.Message
+}
+
+func NewPublicExecutionFailure(message, code string) error {
+	return &PublicExecutionFailure{Message: message, Code: code}
+}
+
 func publicExecutionError(node Node, err error) (string, string) {
 	var bodyErr *loopBodyExecutionError
 	if errors.As(err, &bodyErr) {
 		message, code := publicExecutionError(bodyErr.node, bodyErr.err)
 		return fmt.Sprintf("循环体节点 %s 执行失败：%s", bodyErr.node.Label, message), code
+	}
+	var publicErr *PublicExecutionFailure
+	if errors.As(err, &publicErr) && strings.TrimSpace(publicErr.Message) != "" && strings.TrimSpace(publicErr.Code) != "" {
+		return publicErr.Message, publicErr.Code
 	}
 	if errors.Is(err, context.Canceled) {
 		return "运行已取消", "WORKFLOW_CANCELLED"

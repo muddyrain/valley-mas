@@ -48,8 +48,8 @@ export function PropertyFormBase({
   const config = NODE_CONFIGS[selectedNode.data.nodeType];
 
   return (
-    <div className="h-full flex flex-col border-l border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+    <div className="h-full flex flex-col border-l border-border/80 bg-card shadow-[-12px_0_28px_-24px_hsl(var(--foreground)/0.45)]">
+      <div className="flex items-center justify-between border-b border-border/80 px-5 py-3.5">
         <div className="flex items-center gap-2">
           <Badge variant="outline">{config?.label}</Badge>
           <span className="truncate text-sm font-semibold text-foreground">
@@ -68,7 +68,7 @@ export function PropertyFormBase({
           className="min-h-0 flex-1 gap-0"
         >
           <TabsList
-            className="w-full rounded-none border-b border-border bg-card px-4"
+            className="h-12 w-full rounded-none border-b border-border/80 bg-muted/25 px-5"
             variant="line"
           >
             <TabsTrigger value="config" className="flex-none px-3">
@@ -92,7 +92,7 @@ export function PropertyFormBase({
           </TabsContent>
           {runContent ? (
             <TabsContent value="run" className="min-h-0">
-              <ScrollArea className="h-full bg-muted/20">{runContent}</ScrollArea>
+              <ScrollArea className="h-full bg-muted/25">{runContent}</ScrollArea>
             </TabsContent>
           ) : null}
         </Tabs>
@@ -124,7 +124,7 @@ function PropertyConfigContent({
   children: ReactNode;
 }) {
   return (
-    <ScrollArea className="h-full bg-muted/20">
+    <ScrollArea className="h-full bg-muted/25">
       <fieldset disabled={locked} className="contents">
         <div className="space-y-4 p-4">
           <section className="space-y-4 rounded-lg border border-border bg-card p-4">

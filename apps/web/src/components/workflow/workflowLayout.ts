@@ -5,6 +5,7 @@ import type { WorkflowNodeData } from './types';
 export const WORKFLOW_NODE_WIDTH = 264;
 export const WORKFLOW_NODE_HEIGHT = 144;
 export const WORKFLOW_NODE_GAP = 96;
+const WORKFLOW_AUTO_LAYOUT_NODE_GAP = 144;
 const WORKFLOW_LAYOUT_MARGIN = 80;
 const WORKFLOW_NODE_VERTICAL_GAP = 80;
 const LOOP_BODY_MIN_WIDTH = 560;
@@ -73,7 +74,7 @@ function layoutScope(
     rankdir: 'LR',
     ranker: 'network-simplex',
     acyclicer: 'greedy',
-    ranksep: WORKFLOW_NODE_GAP,
+    ranksep: WORKFLOW_AUTO_LAYOUT_NODE_GAP,
     nodesep: WORKFLOW_NODE_VERTICAL_GAP,
     edgesep: 24,
     marginx: 0,

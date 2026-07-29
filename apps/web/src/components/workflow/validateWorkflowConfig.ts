@@ -98,6 +98,40 @@ function valuesWithReferences(data: WorkflowNodeData): string[] {
   return [...stringsInValue(data.config), ...stringsInValue(data.when)];
 }
 
+interface WorkflowValidationIssue {
+  field: string;
+  message: string;
+}
+
+function isEmptyInputBinding(value: unknown) {
+  return value === undefined || value === null || (typeof value === 'string' && !value.trim());
+}
+
+function getLLMInputBindingIssues(data: WorkflowNodeData): WorkflowValidationIssue[] {
+  const inputs = data.config?.inputs;
+  if (!inputs || typeof inputs !== 'object') return [];
+
+  return Object.entries(inputs as Record<string, unknown>).flatMap(([name, value]) => {
+    if (!name.trim() || !isEmptyInputBinding(value)) return [];
+    return [{ field: name, message: `输入变量“${name}”尚未绑定值` }];
+  });
+}
+
+function getInvalidLLMInputReferenceIssues(
+  data: WorkflowNodeData,
+  options: WorkflowVariableOption[],
+): WorkflowValidationIssue[] {
+  const inputs = data.config?.inputs;
+  if (!inputs || typeof inputs !== 'object') return [];
+  const upstreamOptions = options.filter((option) => option.scope !== 'local');
+
+  return Object.entries(inputs as Record<string, unknown>).flatMap(([name, value]) =>
+    getInvalidWorkflowVariableTokens(String(value ?? ''), upstreamOptions).length > 0
+      ? [{ field: name, message: INVALID_WORKFLOW_VARIABLE_REFERENCE_MESSAGE }]
+      : [],
+  );
+}
+
 function invalidLLMReferenceMessage(
   data: WorkflowNodeData,
   options: WorkflowVariableOption[],
@@ -225,8 +259,10 @@ function validateNode(
         return fail('请为每个循环输出选择变量');
       break;
     }
-    case 'llm':
+    case 'llm': {
       if (!config.prompt) return fail('请填写用户提示词');
+      const inputBindingIssue = getLLMInputBindingIssues(data)[0];
+      if (inputBindingIssue) return fail(inputBindingIssue.message, inputBindingIssue.field);
       if (
         config.outputMode === 'json' &&
         (!config.outputSchema ||
@@ -235,6 +271,7 @@ function validateNode(
       )
         return fail('请至少声明一个 JSON 输出字段');
       break;
+    }
     case 'template':
       if (!String(config.template || '').trim()) return fail('请填写文本模板');
       break;
@@ -417,6 +454,18 @@ export function getInvalidWorkflowVariableReferenceErrors(
   return outerNodes.flatMap((node) => {
     const data = node.data as unknown as WorkflowNodeData;
     const options = getUpstreamWorkflowVariables(outerNodes, outerEdges, node.id);
+    if (data.nodeType === 'llm') {
+      const inputIssues = [
+        ...getLLMInputBindingIssues(data),
+        ...getInvalidLLMInputReferenceIssues(data, options),
+      ];
+      if (inputIssues.length) {
+        return inputIssues.map((issue) => ({
+          ...workflowError(issue.message, node),
+          field: issue.field,
+        }));
+      }
+    }
     const message =
       data.nodeType === 'llm'
         ? invalidLLMReferenceMessage(data, options)

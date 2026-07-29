@@ -514,6 +514,7 @@ export default function WorkflowEditorPage() {
   const [saveRevision, setSaveRevision] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [showRunPanel, setShowRunPanel] = useState(false);
+  const [isPreparingRun, setIsPreparingRun] = useState(false);
   const [retryRun, setRetryRun] = useState<WorkflowRunDetail | null>(null);
   const [pendingRetryRun, setPendingRetryRun] = useState<WorkflowRunDetail | null>(null);
   const [pendingResumeRun, setPendingResumeRun] = useState<WorkflowRunDetail | null>(null);
@@ -2499,6 +2500,7 @@ export default function WorkflowEditorPage() {
   }, [focusValidationNode, pendingValidationFocusNodeID]);
 
   const handleRun = useCallback(async () => {
+    if (isPreparingRun) return;
     const state = workflowStateRef.current;
     if (state.nodes.length === 0) {
       toast.warning('请先添加节点');
@@ -2526,14 +2528,18 @@ export default function WorkflowEditorPage() {
     setShowValidationErrors(false);
     setServerValidationErrors([]);
     setPendingValidationFocusNodeID(null);
-
-    if (!(await persistLatestWorkflow({ createIfMissing: true }))) {
-      return;
-    }
-
     setRetryRun(null);
     setShowRunPanel(true);
+    setIsPreparingRun(true);
+
+    const saved = await persistLatestWorkflow({ createIfMissing: true });
+    setIsPreparingRun(false);
+    if (!saved) {
+      setShowRunPanel(false);
+      return;
+    }
   }, [
+    isPreparingRun,
     persistLatestWorkflow,
     validationContext,
     workflowCapabilities.error,
@@ -2736,7 +2742,7 @@ export default function WorkflowEditorPage() {
           return {
             ...edge,
             animated: true,
-            style: runtimeEdgeStyle(edge, 'hsl(var(--primary))'),
+            style: runtimeEdgeStyle(edge, '#3b82f6'),
           };
         }
         if (source === 'success' && target === 'success') {
@@ -2776,17 +2782,18 @@ export default function WorkflowEditorPage() {
     ];
   }, [serverValidationErrors, showValidationErrors, validationContext, validationGraph]);
 
-  const nodeValidationMessages = useMemo(() => {
-    const messages = new Map<string, string>();
+  const nodeValidationErrors = useMemo(() => {
+    const errorsByNode = new Map<string, ValidationError[]>();
+    const seenErrors = new Set<string>();
     for (const error of visibleValidationErrors) {
-      messages.set(
-        error.nodeId,
-        messages.has(error.nodeId)
-          ? `${messages.get(error.nodeId)}；${error.message}`
-          : error.message,
-      );
+      const errorKey = `${error.nodeId}:${error.field || ''}:${error.message}`;
+      if (seenErrors.has(errorKey)) continue;
+      seenErrors.add(errorKey);
+      const errors = errorsByNode.get(error.nodeId) || [];
+      errors.push(error);
+      errorsByNode.set(error.nodeId, errors);
     }
-    return messages;
+    return errorsByNode;
   }, [visibleValidationErrors]);
 
   const runtimeValue = useMemo(
@@ -2795,7 +2802,7 @@ export default function WorkflowEditorPage() {
       isRunning,
       cancelNode: handleCancelWorkflowNode,
       resumeFailedRun: handleResumeFailedRun,
-      validationErrors: nodeValidationMessages,
+      validationErrors: nodeValidationErrors,
       copyNode: handleCopyNode,
       deleteNode: handleDeleteNode,
       insertAfter: handleInsertAfter,
@@ -2820,7 +2827,7 @@ export default function WorkflowEditorPage() {
       closeOutputPicker,
       runSession,
       isRunning,
-      nodeValidationMessages,
+      nodeValidationErrors,
     ],
   );
 
@@ -2914,6 +2921,24 @@ export default function WorkflowEditorPage() {
     ),
     [activeWorkspaceTab, copilot, propertyPanel],
   );
+  const runPanel = (
+    <RunPanel
+      open={showRunPanel}
+      onOpenChange={handleRunPanelOpenChange}
+      workflowId={workflowId}
+      versions={platform?.versions || []}
+      nodes={retryRun ? retryInputNodes(retryRun.run.graphSnapshot) || nodes : nodes}
+      onRun={handleRunConfirm}
+      onCancel={handleCancelRun}
+      onRetry={handleRetryFromHistory}
+      onResume={handleResumeFromHistory}
+      isRunning={isRunning}
+      preparing={isPreparingRun}
+      session={runSession}
+      runError={runError}
+      retrying={Boolean(retryRun)}
+    />
+  );
 
   if (isLoadingWorkflow) {
     return <WorkflowEditorLoadingSkeleton isMobile={isMobile} rightPanelWidth={rightPanelWidth} />;
@@ -2923,12 +2948,17 @@ export default function WorkflowEditorPage() {
     <WorkflowRuntimeProvider value={runtimeValue}>
       <ReactFlowProvider>
         <div className="h-screen flex flex-col bg-background">
-          <div className="flex items-center justify-between gap-4 border-b border-border bg-card px-4 py-3 shadow-xs">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/workbench/workflows')}>
+          <div className="flex min-h-16 items-center justify-between gap-6 border-b border-border/80 bg-card/95 px-5 py-2.5 shadow-sm backdrop-blur">
+            <div className="flex min-w-0 items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="shrink-0"
+                onClick={() => navigate('/workbench/workflows')}
+              >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <div className="flex items-center gap-1">
+              <div className="flex min-w-0 items-center gap-1">
                 {isEditingName ? (
                   <input
                     value={workflowName}
@@ -2971,13 +3001,13 @@ export default function WorkflowEditorPage() {
                   <Edit2 className="h-3 w-3" />
                 </Button>
               </div>
-              <span className="text-xs text-muted-foreground">
+              <span className="hidden whitespace-nowrap text-xs text-muted-foreground lg:inline">
                 {nodes.length} 节点 · {edges.length} 连接
                 {saveStatusText && <span className="ml-2">· {saveStatusText}</span>}
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5 rounded-xl border border-border/70 bg-muted/30 p-1.5 shadow-xs">
               <Button
                 variant="outline"
                 size="icon"
@@ -3100,7 +3130,7 @@ export default function WorkflowEditorPage() {
               <Button
                 size="sm"
                 onClick={() => void handleRun()}
-                disabled={isRunning || saveStatus === 'creating'}
+                disabled={isRunning || isPreparingRun || saveStatus === 'creating'}
               >
                 <Play className="h-4 w-4 mr-2" />
                 {isRunning ? '运行中...' : '运行'}
@@ -3242,7 +3272,7 @@ export default function WorkflowEditorPage() {
           </Sheet>
 
           <div className="flex flex-1 overflow-hidden">
-            <div ref={reactFlowWrapper} className="relative flex-1 bg-muted/20">
+            <div ref={reactFlowWrapper} className="relative flex-1 bg-background">
               <ReactFlow
                 className={
                   isCanvasInteracting ? 'workflow-canvas is-interacting' : 'workflow-canvas'
@@ -3267,6 +3297,7 @@ export default function WorkflowEditorPage() {
                 nodeTypes={workflowNodeTypes}
                 edgeTypes={workflowEdgeTypes}
                 defaultEdgeOptions={defaultEdgeOptions}
+                proOptions={{ hideAttribution: true }}
                 deleteKeyCode={null}
                 minZoom={0.2}
                 maxZoom={2}
@@ -3311,15 +3342,20 @@ export default function WorkflowEditorPage() {
                   />
                 </div>
               ) : null}
-              {showRunPanel ? (
+              {isMobile ? (
                 <div
                   ref={runPanelRef}
+                  aria-hidden={!showRunPanel}
                   style={runPanelHeight ? { height: `${runPanelHeight}px` } : undefined}
-                  className={`absolute inset-x-4 bottom-4 z-30 overflow-hidden rounded-lg border border-border bg-card shadow-lg ${
+                  className={`absolute inset-x-4 bottom-4 z-30 overflow-hidden rounded-xl border border-border bg-card shadow-lg ${
                     isRunPanelResizing
                       ? 'transition-none'
-                      : 'transition-[height] duration-200 motion-reduce:transition-none'
-                  } ${runPanelHeight ? '' : 'h-[min(360px,48vh)]'}`}
+                      : 'transition-[height,opacity,transform] duration-200 ease-out motion-reduce:transition-none'
+                  } ${runPanelHeight ? '' : 'h-[min(420px,62vh)]'} ${
+                    showRunPanel
+                      ? 'translate-y-0 opacity-100'
+                      : 'pointer-events-none translate-y-6 opacity-0'
+                  }`}
                 >
                   <div
                     role="separator"
@@ -3330,21 +3366,7 @@ export default function WorkflowEditorPage() {
                   >
                     <span className="absolute left-1/2 top-1 h-0.5 w-10 -translate-x-1/2 rounded-full bg-border transition-colors group-hover:bg-primary/60" />
                   </div>
-                  <RunPanel
-                    open={showRunPanel}
-                    onOpenChange={handleRunPanelOpenChange}
-                    workflowId={workflowId}
-                    versions={platform?.versions || []}
-                    nodes={retryRun ? retryInputNodes(retryRun.run.graphSnapshot) || nodes : nodes}
-                    onRun={handleRunConfirm}
-                    onCancel={handleCancelRun}
-                    onRetry={handleRetryFromHistory}
-                    onResume={handleResumeFromHistory}
-                    isRunning={isRunning}
-                    session={runSession}
-                    runError={runError}
-                    retrying={Boolean(retryRun)}
-                  />
+                  {runPanel}
                 </div>
               ) : null}
             </div>
@@ -3358,7 +3380,13 @@ export default function WorkflowEditorPage() {
                   <div className="h-8 w-0.5 rounded bg-muted-foreground/40" />
                 </div>
                 <div style={{ width: `${rightPanelWidth}px` }} className="flex-shrink-0">
-                  {workspacePanel}
+                  {showRunPanel ? (
+                    <div className="h-full animate-in fade-in-0 slide-in-from-right-2 duration-200 motion-reduce:animate-none">
+                      {runPanel}
+                    </div>
+                  ) : (
+                    workspacePanel
+                  )}
                 </div>
               </div>
             ) : null}

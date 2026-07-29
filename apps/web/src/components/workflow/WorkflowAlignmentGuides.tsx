@@ -18,7 +18,7 @@ export function WorkflowAlignmentGuides({ alignment }: { alignment: WorkflowAlig
             x2={alignment.vertical.position}
             y1={alignment.vertical.start}
             y2={alignment.vertical.end}
-            stroke="hsl(var(--primary))"
+            stroke="#3b82f6"
             strokeDasharray="5 4"
             strokeLinecap="round"
             strokeOpacity="0.8"
@@ -32,7 +32,7 @@ export function WorkflowAlignmentGuides({ alignment }: { alignment: WorkflowAlig
             x2={alignment.horizontal.end}
             y1={alignment.horizontal.position}
             y2={alignment.horizontal.position}
-            stroke="hsl(var(--primary))"
+            stroke="#3b82f6"
             strokeDasharray="5 4"
             strokeLinecap="round"
             strokeOpacity="0.8"

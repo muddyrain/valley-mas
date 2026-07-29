@@ -1,4 +1,4 @@
-import { Handle, type NodeProps, Position } from '@xyflow/react';
+import { Handle, type NodeProps, Position, useViewport } from '@xyflow/react';
 import {
   AlertCircle,
   CheckCircle2,
@@ -15,6 +15,7 @@ import {
   MoreHorizontal,
   Plus,
   Repeat2,
+  RotateCcw,
   Send,
   ShieldCheck,
   Trash2,
@@ -34,13 +35,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { DeferredNodePicker } from './NodePicker';
 import { NodeRunDetails } from './NodeRunDetails';
 import { getNodeConfigSummary, NODE_CONFIGS } from './nodeConfig';
 import type { WorkflowNodeData } from './types';
-import { validateSingleNode } from './validateWorkflowConfig';
+import {
+  INVALID_WORKFLOW_VARIABLE_REFERENCE_MESSAGE,
+  type ValidationError,
+  validateSingleNode,
+} from './validateWorkflowConfig';
+import { WorkflowFieldTag } from './WorkflowFieldTag';
 import { useWorkflowRuntime } from './WorkflowRuntimeContext';
 import { getWorkflowRunBranchHandle } from './workflowRunBranches';
 import { getWorkflowSideEffectLabel } from './workflowSideEffects';
@@ -67,24 +74,24 @@ const iconMap = {
   delay: Clock3,
 };
 const colors = {
-  start: 'bg-blue-500/10 text-blue-600',
-  end: 'bg-emerald-500/10 text-emerald-600',
-  llm: 'bg-violet-500/10 text-violet-600',
-  template: 'bg-sky-500/10 text-sky-600',
-  http: 'bg-blue-500/10 text-blue-600',
-  tool: 'bg-orange-500/10 text-orange-600',
-  condition: 'bg-green-500/10 text-green-600',
-  switch: 'bg-green-500/10 text-green-600',
-  merge: 'bg-teal-500/10 text-teal-600',
-  variable: 'bg-cyan-500/10 text-cyan-600',
-  subworkflow: 'bg-indigo-500/10 text-indigo-600',
-  intent: 'bg-cyan-500/10 text-cyan-600',
-  set_loop_variable: 'bg-teal-500/10 text-teal-600',
-  continue_loop: 'bg-teal-500/10 text-teal-600',
-  terminate_loop: 'bg-teal-500/10 text-teal-600',
-  approval: 'bg-amber-500/10 text-amber-700',
-  delay: 'bg-blue-500/10 text-blue-600',
-  loop: 'bg-teal-500/10 text-teal-600',
+  start: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  end: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+  llm: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
+  template: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
+  http: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  tool: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
+  condition: 'bg-green-500/10 text-green-600 dark:text-green-400',
+  switch: 'bg-green-500/10 text-green-600 dark:text-green-400',
+  merge: 'bg-teal-500/10 text-teal-600 dark:text-teal-400',
+  variable: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+  subworkflow: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+  intent: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+  set_loop_variable: 'bg-teal-500/10 text-teal-600 dark:text-teal-400',
+  continue_loop: 'bg-teal-500/10 text-teal-600 dark:text-teal-400',
+  terminate_loop: 'bg-teal-500/10 text-teal-600 dark:text-teal-400',
+  approval: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  delay: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  loop: 'bg-teal-500/10 text-teal-600 dark:text-teal-400',
 } as const;
 
 const textModelNames = new Map<string, string>();
@@ -183,37 +190,150 @@ function uniqueLabels(values: string[]) {
   return [...new Set(values.filter(Boolean))];
 }
 
+interface WorkflowNodeFieldTagItem {
+  key: string;
+  label: string;
+  error?: string;
+  type?: string;
+}
+
+function WorkflowNodeFieldPreview({
+  fields,
+  ariaLabel,
+}: {
+  fields: readonly WorkflowNodeFieldTagItem[];
+  ariaLabel: string;
+}) {
+  const { zoom } = useViewport();
+  const fieldListRef = useRef<HTMLDivElement>(null);
+  const [hasOverflow, setHasOverflow] = useState(false);
+  const fieldSignature = fields.map((field) => `${field.key}:${field.label}`).join('|');
+  const visibleFields = fields.slice(0, 3);
+  const hasMore = fields.length > visibleFields.length || hasOverflow;
+
+  useEffect(() => {
+    if (!fieldSignature) {
+      setHasOverflow(false);
+      return;
+    }
+
+    const fieldList = fieldListRef.current;
+    if (!fieldList) return;
+
+    const checkOverflow = () => {
+      setHasOverflow(fieldList.scrollWidth > fieldList.clientWidth + 1);
+    };
+    checkOverflow();
+
+    const observer = new ResizeObserver(checkOverflow);
+    observer.observe(fieldList);
+    return () => observer.disconnect();
+  }, [fieldSignature]);
+
+  return (
+    <div className="relative min-w-0 flex-1">
+      <div
+        ref={fieldListRef}
+        className={cn('flex min-w-0 items-center gap-1 overflow-hidden', hasMore && 'pr-6')}
+      >
+        {visibleFields.map((field) => (
+          <WorkflowFieldTag
+            key={field.key}
+            label={field.label}
+            error={field.error}
+            className="max-w-20"
+            wrapperClassName="shrink-0"
+          />
+        ))}
+      </div>
+      {hasMore ? (
+        <div className="absolute inset-y-0 right-0 flex items-center bg-gradient-to-r from-transparent via-background/75 to-background/95 pl-3">
+          <Popover>
+            <PopoverTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="nodrag nopan size-6 shrink-0 rounded-md border border-border/70 bg-background/90 text-foreground shadow-xs hover:bg-muted hover:text-foreground"
+                  aria-label={ariaLabel}
+                  onClick={(event) => event.stopPropagation()}
+                />
+              }
+            >
+              <MoreHorizontal className="size-4" />
+            </PopoverTrigger>
+            <PopoverContent side="bottom" align="start" className="w-64 gap-2 p-2" style={{ zoom }}>
+              <div className="flex flex-wrap gap-1">
+                {fields.map((field) => (
+                  <WorkflowFieldTag
+                    key={field.key}
+                    label={
+                      field.type ? (
+                        <>
+                          <span className="text-muted-foreground">{field.type}.</span>
+                          {field.label}
+                        </>
+                      ) : (
+                        field.label
+                      )
+                    }
+                    error={field.error}
+                  />
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function LLMNodeDetailRow({
   label,
   values,
   emptyLabel,
   model,
+  issues = [],
 }: {
   label: string;
   values: string[];
   emptyLabel: string;
   model?: boolean;
+  issues?: readonly ValidationError[];
 }) {
+  const fields = [
+    ...values.map((value) => ({
+      key: value,
+      label: value,
+      error: issues.find((candidate) => candidate.field === value)?.message,
+    })),
+    ...issues
+      .filter((issue) => !issue.field || !values.includes(issue.field))
+      .map((issue) => ({
+        key: `${issue.field || issue.message}-${issue.message}`,
+        label:
+          issue.message === INVALID_WORKFLOW_VARIABLE_REFERENCE_MESSAGE
+            ? '未定义'
+            : issue.message.includes('尚未绑定值')
+              ? '未绑定'
+              : '待完善',
+        error: issue.message,
+      })),
+  ];
+
   return (
-    <div className="flex min-h-5 items-center gap-2">
-      <span className="w-7 shrink-0 text-muted-foreground">{label}</span>
-      {values.length ? (
-        <div className="flex min-w-0 flex-wrap items-center gap-1">
-          {values.map((value) =>
-            model ? (
-              <span key={value} className="min-w-0 truncate text-foreground">
-                {value}
-              </span>
-            ) : (
-              <span
-                key={value}
-                className="max-w-full truncate rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground"
-              >
-                {value}
-              </span>
-            ),
-          )}
-        </div>
+    <div className="flex min-h-6 items-center gap-2">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      {model ? (
+        values.length ? (
+          <span className="min-w-0 truncate text-foreground">{values[0]}</span>
+        ) : (
+          <span className="text-muted-foreground/70">{emptyLabel}</span>
+        )
+      ) : fields.length ? (
+        <WorkflowNodeFieldPreview fields={fields} ariaLabel={`查看全部${label}字段`} />
       ) : (
         <span className="text-muted-foreground/70">{emptyLabel}</span>
       )}
@@ -225,20 +345,17 @@ function LLMNodeSummary({
   config,
   outputFields,
   modelName,
+  inputIssues,
 }: {
   config?: Record<string, unknown>;
   outputFields: ReadonlyArray<readonly [string, string]>;
   modelName: string;
+  inputIssues: readonly ValidationError[];
 }) {
   const inputEntries = config?.inputs;
   const inputVariables =
     inputEntries && typeof inputEntries === 'object'
-      ? uniqueLabels(
-          Object.entries(inputEntries as Record<string, unknown>).flatMap(([name, value]) => {
-            const references = getTemplateVariableReferences(value);
-            return references.length ? references : name.trim() ? [name.trim()] : [];
-          }),
-        )
+      ? Object.keys(inputEntries).filter((name) => name.trim())
       : [];
   const promptVariables = uniqueLabels([
     ...getTemplateVariableReferences(config?.systemPrompt),
@@ -247,12 +364,13 @@ function LLMNodeSummary({
 
   return (
     <div className="space-y-1.5 border-t border-border bg-muted/10 px-4 py-2 text-xs">
-      <LLMNodeDetailRow label="输入" values={inputVariables} emptyLabel="未配置" />
       <LLMNodeDetailRow
-        label="输出"
-        values={outputFields.map(([name]) => name)}
+        label="输入"
+        values={inputVariables}
         emptyLabel="未配置"
+        issues={inputIssues}
       />
+      <NodeOutputPreview outputFields={outputFields} />
       <LLMNodeDetailRow label="变量" values={promptVariables} emptyLabel="未引用" />
       <LLMNodeDetailRow
         label="模型"
@@ -264,6 +382,56 @@ function LLMNodeSummary({
   );
 }
 
+function ToolNodeSummary({
+  config,
+  outputFields,
+  inputIssues,
+}: {
+  config?: Record<string, unknown>;
+  outputFields: ReadonlyArray<readonly [string, string]>;
+  inputIssues: readonly ValidationError[];
+}) {
+  const inputEntries = config?.inputs;
+  const inputVariables =
+    inputEntries && typeof inputEntries === 'object'
+      ? Object.keys(inputEntries).filter((name) => name.trim())
+      : [];
+
+  return (
+    <div className="space-y-1.5 border-t border-border bg-muted/10 px-4 py-2 text-xs">
+      <LLMNodeDetailRow
+        label="输入"
+        values={inputVariables}
+        emptyLabel="未配置"
+        issues={inputIssues}
+      />
+      <NodeOutputPreview outputFields={outputFields} />
+    </div>
+  );
+}
+
+function NodeOutputPreview({
+  outputFields,
+  className,
+}: {
+  outputFields: ReadonlyArray<readonly [string, string]>;
+  className?: string;
+}) {
+  return (
+    <div className={cn('flex min-h-5 items-center gap-2', className)}>
+      <span className="shrink-0 text-muted-foreground">输出</span>
+      {outputFields.length ? (
+        <WorkflowNodeFieldPreview
+          fields={outputFields.map(([name, type]) => ({ key: name, label: name, type }))}
+          ariaLabel="查看全部输出字段"
+        />
+      ) : (
+        <span className="text-muted-foreground/70">未配置</span>
+      )}
+    </div>
+  );
+}
+
 function LoopVariableRow({ label, values }: { label: string; values: string[] }) {
   return (
     <div className="flex min-h-5 items-center gap-2">
@@ -271,12 +439,7 @@ function LoopVariableRow({ label, values }: { label: string; values: string[] })
       {values.length ? (
         <div className="flex min-w-0 flex-wrap gap-1">
           {values.map((value) => (
-            <span
-              key={value}
-              className="max-w-full truncate rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground"
-            >
-              {value}
-            </span>
+            <WorkflowFieldTag key={value} label={value} />
           ))}
         </div>
       ) : (
@@ -315,7 +478,7 @@ function LoopVariableSummary({ config }: { config?: Record<string, unknown> }) {
     <div className="space-y-1.5 border-t border-border bg-muted/10 px-4 py-2 text-xs">
       <LoopVariableRow label="输入" values={input ? [input] : []} />
       <LoopVariableRow label="中间变量" values={['item', 'index', ...middleVariables]} />
-      <LoopVariableRow label="输出" values={outputs} />
+      <NodeOutputPreview outputFields={outputs.map((name) => [name, 'unknown'] as const)} />
     </div>
   );
 }
@@ -390,10 +553,35 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
   const activeBranchID =
     runningState === 'success' ? getWorkflowRunBranchHandle(nodeType, snapshot?.output) : null;
   const hasOutput = definition?.handles.output && branchOutputs.length === 0;
-  const draftValidationMessage = validationErrors.get(id);
+  const draftValidationErrors = validationErrors.get(id) || [];
+  const draftValidationMessage = draftValidationErrors[0]?.message;
   const validationError = draftValidationMessage ? null : validateSingleNode(nodeData);
   const validationMessage = draftValidationMessage || validationError?.message;
-  const hasDraftValidationError = Boolean(draftValidationMessage);
+  const hasDraftValidationError = draftValidationErrors.length > 0;
+  const llmInputIssues =
+    nodeType === 'llm'
+      ? draftValidationErrors.filter((error) => {
+          const inputs = config?.inputs;
+          return Boolean(
+            error.field &&
+              inputs &&
+              typeof inputs === 'object' &&
+              error.field in (inputs as Record<string, unknown>),
+          );
+        })
+      : [];
+  const toolInputIssues =
+    nodeType === 'tool'
+      ? draftValidationErrors.filter((error) => {
+          const inputs = config?.inputs;
+          return Boolean(
+            error.field &&
+              inputs &&
+              typeof inputs === 'object' &&
+              error.field in (inputs as Record<string, unknown>),
+          );
+        })
+      : [];
   const incomplete = Boolean(validationError);
   const textModelName = useTextModelName(
     nodeType === 'llm' ? config?.modelId : undefined,
@@ -436,7 +624,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
         ) : null}
         <div
           className={cn(
-            'workflow-node-card overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-colors duration-100 hover:border-primary/35 hover:bg-card',
+            'workflow-node-card overflow-hidden rounded-xl border border-border/90 bg-card shadow-[0_10px_24px_-18px_hsl(var(--foreground)/0.55)] transition-[border-color,box-shadow,background-color] duration-150 hover:border-primary/45 hover:bg-card hover:shadow-md',
             incomplete && !runningState && 'border-amber-500/45 hover:border-amber-500/60',
             hasDraftValidationError &&
               !runningState &&
@@ -449,7 +637,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
             runningState === 'skipped' && 'opacity-60',
             selected &&
               !hasDraftValidationError &&
-              'border-primary/65 ring-1 ring-primary/25 shadow-sm',
+              'border-primary/70 ring-2 ring-primary/20 shadow-md',
           )}
         >
           <div className="flex min-h-[88px] items-start gap-3 px-4 py-3.5">
@@ -583,24 +771,27 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
               config={config}
               outputFields={outputFields}
               modelName={textModelName || summary}
+              inputIssues={llmInputIssues}
             />
           ) : null}
-          {nodeType !== 'loop' && nodeType !== 'llm' && outputFields.length > 0 ? (
-            <div className="flex min-h-10 items-center gap-2 border-t border-border bg-muted/20 px-4 py-2 text-xs">
-              <span className="shrink-0 text-muted-foreground">输出</span>
-              <span className="min-w-0 truncate font-mono font-medium text-foreground">
-                {outputFields[0][0]}
-              </span>
-              <Badge variant="secondary" className="ml-auto shrink-0 px-1.5 font-mono text-[10px]">
-                {outputFields[0][1]}
-              </Badge>
-              {outputFields.length > 1 ? (
-                <span className="shrink-0 text-muted-foreground">+{outputFields.length - 1}</span>
-              ) : null}
-            </div>
+          {nodeType === 'tool' ? (
+            <ToolNodeSummary
+              config={config}
+              outputFields={outputFields}
+              inputIssues={toolInputIssues}
+            />
+          ) : null}
+          {nodeType !== 'loop' &&
+          nodeType !== 'llm' &&
+          nodeType !== 'tool' &&
+          outputFields.length > 0 ? (
+            <NodeOutputPreview
+              outputFields={outputFields}
+              className="min-h-10 border-t border-border bg-muted/35 px-4 py-2 text-xs"
+            />
           ) : null}
           {(nodeType === 'intent' || nodeType === 'switch') && branchOutputs.length ? (
-            <div className="space-y-1 border-t border-border bg-muted/10 px-4 py-1.5 text-xs">
+            <div className="space-y-1 border-t border-border bg-muted/25 px-4 py-1.5 text-xs">
               {branchOutputs.map((branch, index) => {
                 const isActiveBranch = activeBranchID === branch.id;
                 return (
@@ -632,6 +823,35 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
               })}
             </div>
           ) : null}
+          {hasDraftValidationError ? (
+            <div className="flex min-h-9 items-center gap-1.5 border-t border-destructive/20 bg-destructive/5 px-4 py-1.5 text-xs text-destructive">
+              <AlertCircle className="size-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">{draftValidationMessage}</span>
+              {draftValidationErrors.length > 1 ? (
+                <span className="shrink-0 rounded-full bg-destructive/10 px-1.5 py-0.5 font-medium">
+                  +{draftValidationErrors.length - 1}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+          {runningState === 'error' && session.runId ? (
+            <div className="border-t border-border bg-destructive/5 p-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="nodrag nopan h-7 w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                disabled={isRunning}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  resumeFailedRun(session.runId as string);
+                }}
+              >
+                <RotateCcw className="mr-1.5 size-3.5" />
+                重试并继续
+              </Button>
+            </div>
+          ) : null}
         </div>
         {hasOutput ? (
           <Handle
@@ -645,14 +865,22 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
             }}
             isConnectable={!isRunning}
             className={cn(
-              '!z-30 !flex !size-3 !-right-1.5 !items-center !justify-center !rounded-full !border-2 !border-blue-500 !bg-blue-500 !transition-[width,height,right,background-color,border-color] !duration-150',
-              'group-hover/node:!size-8 group-hover/node:!-right-1.5 group-hover/node:!border-0 group-hover/node:!bg-primary',
-              outputConnecting && '!size-3 !-right-1.5 !border-2 !border-blue-500 !bg-blue-500',
+              '!z-30 group/handle !flex !size-3 !-right-1.5 !cursor-pointer !items-center !justify-center !border-0 !bg-transparent',
+              outputConnecting && '!cursor-default',
             )}
           >
+            <span
+              aria-hidden="true"
+              className={cn(
+                'pointer-events-none absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-blue-500 bg-blue-500 transition-[width,height,background-color,box-shadow] duration-150',
+                'group-hover/node:size-8 group-hover/node:border-0 group-hover/node:shadow-md',
+                'group-hover/handle:bg-blue-600 group-hover/handle:ring-4 group-hover/handle:ring-blue-500/20',
+                outputConnecting && 'size-3 border-2 border-blue-500 bg-blue-500 shadow-none',
+              )}
+            />
             <Plus
               className={cn(
-                'pointer-events-none size-4 scale-75 text-primary-foreground opacity-0 transition-[opacity,transform] duration-150',
+                'pointer-events-none relative size-4 scale-75 text-primary-foreground opacity-0 transition-[opacity,transform] duration-150',
                 'group-hover/node:scale-100 group-hover/node:opacity-100',
                 outputConnecting && 'opacity-0',
               )}
@@ -713,9 +941,15 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
             side="right"
             align="center"
             trigger={
-              <span
-                aria-hidden="true"
-                className="nodrag nopan pointer-events-none absolute right-0 top-1/2 z-20 size-8 -translate-y-1/2 translate-x-1/2"
+              <button
+                type="button"
+                aria-label={`在 ${label} 后添加节点`}
+                className="nodrag nopan absolute right-0 top-1/2 z-40 size-8 -translate-y-1/2 translate-x-1/2 cursor-pointer"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (!isRunning && !outputConnecting) openOutputPicker(id);
+                }}
               />
             }
             onSelect={(item) => insertAfter(id, item)}

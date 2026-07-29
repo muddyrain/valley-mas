@@ -1,10 +1,11 @@
-import { Braces } from 'lucide-react';
+import { Braces, X } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -88,9 +89,16 @@ export function VariableReferencePicker({
       </SelectTrigger>
       <SelectContent align="start" alignItemWithTrigger={false} className="min-w-0">
         {selected ? (
-          <SelectItem value={CLEAR_VALUE} className="text-muted-foreground">
-            清除选择
-          </SelectItem>
+          <>
+            <SelectItem
+              value={CLEAR_VALUE}
+              className="h-8 bg-muted/40 text-xs font-medium text-muted-foreground focus:bg-destructive/10 focus:text-destructive"
+            >
+              <X className="size-3.5" />
+              清除当前引用
+            </SelectItem>
+            <SelectSeparator />
+          </>
         ) : null}
         {options.length === 0 ? (
           <SelectItem value="__workflow_variable_option_empty__" disabled className="h-auto py-3">

@@ -84,6 +84,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 			public.GET("/hot-resources", middleware.OptionalAuth(cfg), handler.GetHotResources)
 			public.GET("/resources", middleware.OptionalAuth(cfg), handler.GetAllResources)
+			public.GET("/resources/:id/provenance", middleware.OptionalAuth(cfg), handler.GetResourceProvenance)
 			public.GET("/users/:id/resources", middleware.OptionalAuth(cfg), handler.GetUserResourcesList)
 			public.GET("/users/:id/albums", handler.ListUserAlbums)
 			public.GET("/resources/:id", middleware.OptionalAuth(cfg), handler.GetResourceDetail)

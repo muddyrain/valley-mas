@@ -15,7 +15,7 @@ export const LoopBodyNode = memo(function LoopBodyNode({ data }: NodeProps) {
         type="target"
         position={Position.Top}
         id="loop-entry"
-        className="!z-30 !size-3 !-top-1.5 !border-2 !border-blue-500 !bg-blue-500"
+        className="!z-30 !size-3 !-top-1.5 !border-2 !border-primary !bg-primary"
         isConnectable={false}
       />
       <Handle
@@ -23,7 +23,7 @@ export const LoopBodyNode = memo(function LoopBodyNode({ data }: NodeProps) {
         position={Position.Left}
         id="entry"
         isConnectable={!isRunning}
-        className="!z-30 !size-3 !-left-1.5 !border-2 !border-blue-500 !bg-blue-500"
+        className="!z-30 !size-3 !-left-1.5 !border-2 !border-primary !bg-primary"
       />
       <div className="flex h-14 items-center gap-2 border-b border-primary/15 px-4 text-sm font-semibold text-foreground">
         <span className="flex size-7 items-center justify-center rounded-md bg-teal-500/10 text-teal-600">

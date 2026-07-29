@@ -707,6 +707,56 @@ func TestWorkflowRunPersistsGraphV4NodeTypes(t *testing.T) {
 	}
 }
 
+func TestPersistWorkflowNodeEventStoresSafeFailureMessage(t *testing.T) {
+	_, definition := setupWorkflowRuntimeTestRouter(t)
+	run := model.WorkflowRun{
+		WorkflowID:    definition.ID,
+		UserID:        101,
+		Status:        string(workflow.StatusRunning),
+		GraphSnapshot: definition.Graph,
+		StartedAt:     time.Now(),
+	}
+	if err := database.DB.Create(&run).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := persistWorkflowNodeEvent(database.DB, run.ID, workflow.NodeTypeTool, workflow.Event{
+		NodeID: "image",
+		Status: workflow.StatusRunning,
+		Input:  map[string]any{"prompt": "test"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := persistWorkflowNodeEvent(database.DB, run.ID, workflow.NodeTypeTool, workflow.Event{
+		NodeID:     "image",
+		Status:     workflow.StatusFailed,
+		Message:    "图片已生成，但转存失败，请检查存储服务",
+		Error:      "IMAGE_STORAGE_FAILED",
+		DurationMs: 42,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var nodeRun model.WorkflowNodeRun
+	if err := database.DB.Where("workflow_run_id = ? AND node_id = ?", run.ID, "image").First(&nodeRun).Error; err != nil {
+		t.Fatal(err)
+	}
+	if nodeRun.ErrorCode != "IMAGE_STORAGE_FAILED" || nodeRun.ErrorMessage != "图片已生成，但转存失败，请检查存储服务" {
+		t.Fatalf("node run=%+v", nodeRun)
+	}
+}
+
+func TestWorkflowAIImageFailureMessageUsesSafeCategory(t *testing.T) {
+	if message := workflowAIImageFailureMessage("IMAGE_DOWNLOAD_FAILED"); message != "图片已生成，但读取结果失败，请稍后重试" {
+		t.Fatalf("message=%q", message)
+	}
+	if message := workflowAIImageFailureMessage("IMAGE_DIMENSIONS_TOO_SMALL"); message != "图片服务返回的尺寸不符合要求，请切换模型或尺寸后重试" {
+		t.Fatalf("message=%q", message)
+	}
+	if code := workflowAIImageFailureCode("unexpected"); code != "IMAGE_GENERATION_FAILED" {
+		t.Fatalf("code=%q", code)
+	}
+}
+
 func TestWorkflowRunPersistsLoopBodyTraceWithoutDuplicatingNodeRuns(t *testing.T) {
 	router, definition := setupWorkflowRuntimeTestRouter(t)
 	definition.Graph = `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","config":{"inputs":{"items":{"type":"array","required":true}}}},{"id":"loop","type":"loop","label":"循环","config":{"mode":"array","input":"{{start.output.items}}","middleVariables":[],"outputs":[{"name":"results","type":"string","source":"{{copy.output.value}}"}],"body":{"nodes":[{"id":"copy","type":"variable","label":"复制当前项","position":{"x":0,"y":0},"config":{"assignments":[{"name":"value","type":"string","value":"{{item}}"}]}}],"edges":[]}}},{"id":"end","type":"end","label":"结束","config":{"outputs":{"results":"{{loop.output.results}}"},"outputTypes":{"results":"array"}}}],"edges":[{"source":"start","target":"loop"},{"source":"loop","target":"end"}]}`

@@ -117,6 +117,7 @@ function VariableBindingField({
   const availableTypes = allowedTypes || defaultValueTypes;
   const hasInvalidReference =
     getInvalidWorkflowVariableTokens(stringValue, variableOptions).length > 0;
+  const hasMissingReferenceBinding = valueMode === 'reference' && !stringValue.trim();
   const typeMismatchMessage = getWorkflowBindingTypeMismatchMessage(
     name,
     value,
@@ -125,7 +126,9 @@ function VariableBindingField({
   );
   const fieldErrorMessage = hasInvalidReference
     ? INVALID_WORKFLOW_VARIABLE_REFERENCE_MESSAGE
-    : typeMismatchMessage;
+    : hasMissingReferenceBinding
+      ? `输入变量“${name}”尚未绑定值`
+      : typeMismatchMessage;
   const renameVariable = (nextName: string) => {
     const nextValues = Object.fromEntries(
       Object.entries(values).map(([currentName, currentValue]) => [

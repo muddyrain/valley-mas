@@ -1,33 +1,17 @@
 import type { Node } from '@xyflow/react';
-import { AlertCircle, CheckCircle2, FileText, Loader2, Play, X } from 'lucide-react';
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, CheckCircle2, Loader2, Play, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { type Group, getGroups, getTags, type Tag } from '@/api/blog';
 import type { WorkflowRunDetail, WorkflowVersion } from '@/api/workflow';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
 import { workflowRunErrorGuidance } from './runErrorGuidance';
 import type { WorkflowRunSession } from './runSession';
-import {
-  normalizeStartInputs,
-  type StartInputDefinition,
-  type WorkflowStartInputControl,
-} from './types';
+import { normalizeStartInputs, type StartInputDefinition } from './types';
 import { WorkflowRunHistory } from './WorkflowRunHistory';
+import { WorkflowRunInputFields } from './WorkflowRunInputFields';
 import { WorkflowTestCases } from './WorkflowTestCases';
 
 export interface WorkflowRunInput {
@@ -44,56 +28,12 @@ interface RunPanelProps {
   isRunning: boolean;
   session: WorkflowRunSession;
   runError: string | null;
+  preparing?: boolean;
   retrying?: boolean;
   workflowId: string | null;
   versions: WorkflowVersion[];
   onRetry: (run: WorkflowRunDetail) => void;
   onResume: (run: WorkflowRunDetail) => void;
-}
-
-const customInputCopy: Record<string, { label: string; placeholder?: string }> = {
-  topic: {
-    label: '写作主题',
-    placeholder: '例如：个人创作者如何建立内容素材库',
-  },
-  audience: {
-    label: '目标读者',
-    placeholder: '例如：独立开发者和内容创作者',
-  },
-  style: {
-    label: '风格',
-    placeholder: '例如：简洁、专业、科技感',
-  },
-  generateCover: {
-    label: '生成封面',
-  },
-};
-
-const inputControlCopy: Record<Exclude<WorkflowStartInputControl, 'default'>, { label: string }> = {
-  markdown_file: { label: 'Markdown 文件' },
-  blog_tags: { label: '博客标签' },
-  blog_group: { label: '博客分组' },
-  visibility: { label: '可见范围' },
-};
-
-function InputLabel({
-  children,
-  htmlFor,
-  required,
-}: {
-  children: ReactNode;
-  htmlFor?: string;
-  required: boolean;
-}) {
-  return (
-    <Label htmlFor={htmlFor} className="flex items-center gap-2">
-      <span>
-        {children}
-        {required && <span className="ml-0.5 text-destructive">*</span>}
-      </span>
-      <Badge variant={required ? 'secondary' : 'outline'}>{required ? '必填' : '可选'}</Badge>
-    </Label>
-  );
 }
 
 function startInputs(nodes: Node[]): Record<string, StartInputDefinition> {
@@ -113,6 +53,7 @@ export function RunPanel({
   isRunning,
   session,
   runError,
+  preparing = false,
   retrying = false,
   workflowId,
   versions,
@@ -196,13 +137,6 @@ export function RunPanel({
   }, [definitionEntries, open]);
   const setValue = (name: string, value: unknown) =>
     setValues((current) => ({ ...current, [name]: value }));
-  const toggleTag = (name: string, id: string, checked: boolean) =>
-    setValue(
-      name,
-      checked
-        ? [...((values[name] as string[]) || []), id]
-        : ((values[name] as string[]) || []).filter((value) => value !== id),
-    );
   const handleRun = useCallback(() => {
     const runValues: Record<string, unknown> = {};
     const runFiles: Record<string, File> = {};
@@ -284,201 +218,24 @@ export function RunPanel({
           <div className="space-y-5">
             <section className="space-y-3">
               <p className="text-xs font-medium text-muted-foreground">运行输入</p>
-              {definitionEntries.map(([name, definition]) => {
-                const inputID = `workflow-input-${name}`;
-                const copy = customInputCopy[name];
-                const label =
-                  definition.control === 'default'
-                    ? copy?.label || name
-                    : inputControlCopy[definition.control].label;
-                if (definition.control === 'markdown_file') {
-                  return (
-                    <div key={definition.id || name} className="space-y-1.5">
-                      <InputLabel htmlFor={inputID} required={definition.required}>
-                        {label}
-                      </InputLabel>
-                      <Input
-                        id={inputID}
-                        type="file"
-                        accept=".md,.markdown,text/markdown"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          setFiles((current) => {
-                            if (file) return { ...current, [name]: file };
-                            const next = { ...current };
-                            delete next[name];
-                            return next;
-                          });
-                        }}
-                      />
-                      {files[name] ? (
-                        <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <FileText className="h-3.5 w-3.5" />
-                          {files[name].name}
-                        </p>
-                      ) : null}
-                    </div>
-                  );
+              <WorkflowRunInputFields
+                definitions={definitions}
+                values={values}
+                files={files}
+                tags={tags}
+                groups={groups}
+                loadingOptions={loadingOptions}
+                onValueChange={setValue}
+                onFileChange={(name, file) =>
+                  setFiles((current) => {
+                    if (file) return { ...current, [name]: file };
+                    const next = { ...current };
+                    delete next[name];
+                    return next;
+                  })
                 }
-                if (definition.control === 'blog_tags') {
-                  const selectedTagIds = (values[name] as string[]) || [];
-                  return (
-                    <div key={definition.id || name} className="space-y-2">
-                      <InputLabel required={definition.required}>{label}</InputLabel>
-                      {loadingOptions ? (
-                        <Skeleton className="h-16 w-full" />
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {tags.map((tag) => (
-                            <label
-                              key={tag.id}
-                              className={cn(
-                                'flex cursor-pointer items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs',
-                                selectedTagIds.includes(tag.id) &&
-                                  'border-primary bg-primary/10 text-primary',
-                              )}
-                            >
-                              <Checkbox
-                                checked={selectedTagIds.includes(tag.id)}
-                                onCheckedChange={(checked) =>
-                                  toggleTag(name, tag.id, Boolean(checked))
-                                }
-                              />
-                              {tag.name}
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-                if (definition.control === 'blog_group') {
-                  const selectedGroup = groups.find((group) => group.id === values[name]);
-                  return (
-                    <div key={definition.id || name} className="space-y-1.5">
-                      <InputLabel required={definition.required}>{label}</InputLabel>
-                      <Select
-                        value={(values[name] as string) || '_none'}
-                        onValueChange={(groupId) =>
-                          setValue(name, groupId === '_none' ? '' : groupId)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="不指定分组">
-                            {selectedGroup?.name || '不指定分组'}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="_none">不指定分组</SelectItem>
-                          {groups.map((group) => (
-                            <SelectItem key={group.id} value={group.id}>
-                              {group.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  );
-                }
-                if (definition.control === 'visibility') {
-                  return (
-                    <div key={definition.id || name} className="space-y-1.5">
-                      <InputLabel required={definition.required}>{label}</InputLabel>
-                      <Select
-                        value={(values[name] as string) || 'private'}
-                        onValueChange={(visibility) => setValue(name, visibility)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="private">私密</SelectItem>
-                          <SelectItem value="shared">共享</SelectItem>
-                          <SelectItem value="public">公开</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  );
-                }
-                if (definition.type === 'boolean') {
-                  return (
-                    <div key={definition.id || name} className="flex items-center gap-2">
-                      <Checkbox
-                        id={inputID}
-                        checked={values[name] === true}
-                        onCheckedChange={(checked) => setValue(name, checked === true)}
-                      />
-                      <InputLabel htmlFor={inputID} required={definition.required}>
-                        {label}
-                      </InputLabel>
-                    </div>
-                  );
-                }
-                if (definition.type === 'file') {
-                  return (
-                    <div key={definition.id || name} className="space-y-1.5">
-                      <InputLabel htmlFor={inputID} required={definition.required}>
-                        {label}
-                      </InputLabel>
-                      <Input
-                        id={inputID}
-                        type="file"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          setFiles((current) => {
-                            if (file) return { ...current, [name]: file };
-                            const next = { ...current };
-                            delete next[name];
-                            return next;
-                          });
-                        }}
-                      />
-                    </div>
-                  );
-                }
-                return (
-                  <div key={definition.id || name} className="space-y-1.5">
-                    <InputLabel htmlFor={inputID} required={definition.required}>
-                      {label}
-                    </InputLabel>
-                    <Input
-                      id={inputID}
-                      type={definition.type === 'number' ? 'number' : 'text'}
-                      value={String(values[name] || '')}
-                      placeholder={
-                        copy?.placeholder ||
-                        (definition.type === 'string[]' ? '以逗号分隔' : undefined)
-                      }
-                      onChange={(event) => {
-                        const raw = event.target.value;
-                        if (definition.type === 'number') {
-                          setValue(name, raw === '' ? '' : Number(raw));
-                        } else if (definition.type === 'string[]') {
-                          setValue(
-                            name,
-                            raw
-                              .split(',')
-                              .map((item) => item.trim())
-                              .filter(Boolean),
-                          );
-                        } else {
-                          setValue(name, raw);
-                        }
-                      }}
-                    />
-                  </div>
-                );
-              })}
+              />
             </section>
-            <Button className="w-full" onClick={handleRun} disabled={isRunning}>
-              <Play className="mr-2 h-4 w-4" />
-              {isRunning ? '运行中…' : '开始运行'}
-            </Button>
-            {isRunning && (
-              <Button variant="outline" className="w-full" onClick={onCancel}>
-                停止运行
-              </Button>
-            )}
             {isRunning && (
               <section className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -548,6 +305,25 @@ export function RunPanel({
           />
         </TabsContent>
       </Tabs>
+      {activeTab === 'run' ? (
+        <div className="border-t border-border/80 bg-card px-4 py-3">
+          <div className="space-y-2">
+            <Button className="w-full" onClick={handleRun} disabled={isRunning || preparing}>
+              {preparing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-2 h-4 w-4" />
+              )}
+              {preparing ? '正在准备…' : isRunning ? '运行中…' : '开始运行'}
+            </Button>
+            {isRunning ? (
+              <Button variant="outline" className="w-full" onClick={onCancel}>
+                停止运行
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

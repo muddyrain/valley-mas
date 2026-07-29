@@ -12,7 +12,7 @@ export const LoopBodyExitNode = memo(function LoopBodyExitNode(_: NodeProps) {
         position={Position.Left}
         id="input"
         isConnectable={!isRunning}
-        className="!z-30 !size-3 !-left-1.5 !rounded-full !border-2 !border-blue-500 !bg-blue-500"
+        className="!z-30 !size-3 !-left-1.5 !rounded-full !border-2 !border-primary !bg-primary"
       />
     </div>
   );

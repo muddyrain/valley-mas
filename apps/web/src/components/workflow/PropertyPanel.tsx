@@ -60,8 +60,8 @@ export const PropertyPanel = memo(function PropertyPanel({
 }: PropertyPanelProps) {
   if (!selectedNode) {
     return (
-      <div className="h-full flex flex-col border-l border-border bg-card">
-        <div className="border-b border-border px-4 py-3">
+      <div className="h-full flex flex-col border-l border-border/80 bg-card shadow-[-12px_0_28px_-24px_hsl(var(--foreground)/0.45)]">
+        <div className="border-b border-border/80 px-5 py-3.5">
           <h2 className="text-sm font-semibold text-foreground">当前节点</h2>
         </div>
         <Tabs
@@ -70,7 +70,7 @@ export const PropertyPanel = memo(function PropertyPanel({
           className="min-h-0 flex-1 gap-0"
         >
           <TabsList
-            className="w-full rounded-none border-b border-border bg-card px-4"
+            className="h-12 w-full rounded-none border-b border-border/80 bg-muted/25 px-5"
             variant="line"
           >
             <TabsTrigger value="config" className="flex-none px-3">
@@ -80,10 +80,10 @@ export const PropertyPanel = memo(function PropertyPanel({
               运行
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="config" className="min-h-0">
+          <TabsContent value="config" className="min-h-0 bg-muted/10">
             <EmptyPanel message="选择一个节点开始配置" />
           </TabsContent>
-          <TabsContent value="run" className="min-h-0">
+          <TabsContent value="run" className="min-h-0 bg-muted/10">
             <ScrollArea className="h-full">
               <EmptyPanel message="运行后查看节点详情" />
             </ScrollArea>
@@ -224,11 +224,11 @@ export const PropertyPanel = memo(function PropertyPanel({
 
 function EmptyPanel({ message }: { message: string }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-      <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-muted/50">
+    <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+      <div className="mb-4 flex size-14 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
         <Settings className="size-6 text-muted-foreground" />
       </div>
-      <p className="mb-2 text-sm text-muted-foreground">{message}</p>
+      <p className="mb-2 text-sm font-medium text-muted-foreground">{message}</p>
     </div>
   );
 }

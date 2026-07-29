@@ -144,7 +144,8 @@ func (r *WorkflowRun) BeforeCreate(tx *gorm.DB) error {
 }
 
 // WorkflowNodeRun is the safe, user-visible state for one node execution.
-// Raw files, prompts and upstream error text are never written to this table.
+// Raw files, prompts and upstream error text are never written to this table;
+// ErrorMessage is a reviewed, normalized summary for retry and history views.
 type WorkflowNodeRun struct {
 	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	WorkflowRunID Int64String    `gorm:"index;not null;uniqueIndex:uidx_workflow_run_node" json:"workflowRunId"`
@@ -155,6 +156,7 @@ type WorkflowNodeRun struct {
 	Input         string         `gorm:"type:json" json:"input,omitempty"`
 	Output        string         `gorm:"type:json" json:"output,omitempty"`
 	ErrorCode     string         `gorm:"size:80" json:"errorCode,omitempty"`
+	ErrorMessage  string         `gorm:"size:500" json:"errorMessage,omitempty"`
 	DurationMs    int64          `json:"durationMs,omitempty"`
 	StartedAt     time.Time      `json:"startedAt"`
 	FinishedAt    *time.Time     `json:"finishedAt,omitempty"`

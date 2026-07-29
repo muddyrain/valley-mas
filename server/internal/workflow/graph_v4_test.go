@@ -750,6 +750,14 @@ func TestLLMNodeAllowsEmptySystemPromptAndReportsSafeErrors(t *testing.T) {
 	if code != "AI_CONFIGURATION_UNAVAILABLE" || !strings.Contains(message, "Provider 密钥") {
 		t.Fatalf("message=%q code=%q", message, code)
 	}
+
+	message, code = publicExecutionError(
+		Node{Type: NodeTypeTool},
+		NewPublicExecutionFailure("图片已生成，但转存失败，请检查存储服务", "IMAGE_STORAGE_FAILED"),
+	)
+	if message != "图片已生成，但转存失败，请检查存储服务" || code != "IMAGE_STORAGE_FAILED" {
+		t.Fatalf("message=%q code=%q", message, code)
+	}
 }
 
 func TestLLMNodeAddsResolvedSkillInstructions(t *testing.T) {
