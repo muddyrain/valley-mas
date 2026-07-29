@@ -141,6 +141,11 @@ func ValidateGraph(graph Graph, registry *Registry) []string {
 				errs = append(errs, fmt.Sprintf("工具节点 %s 的 capabilityId %s 未开放", node.ID, capabilityID))
 				break
 			}
+			if capabilityID == CapabilityGenerateAIImage {
+				if _, err := imageGenerationTimeoutSeconds(config["timeoutSeconds"]); err != nil {
+					errs = append(errs, fmt.Sprintf("图片生成节点 %s %v", node.ID, err))
+				}
+			}
 			inputs, ok := config["inputs"].(map[string]any)
 			if !ok {
 				errs = append(errs, fmt.Sprintf("工具节点 %s inputs 必须为对象", node.ID))

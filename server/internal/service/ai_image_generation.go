@@ -29,11 +29,13 @@ import (
 )
 
 const (
-	AIImageGenerationTimeout = 240 * time.Second
-	MaxAIImagePromptRunes    = 48_000
-	MaxAIImageReferences     = 3
-	MaxAIImageReferenceBytes = 5 << 20
-	MaxGeneratedAIImageBytes = 30 << 20
+	AIImageGenerationTimeout    = 240 * time.Second
+	MinAIImageGenerationTimeout = time.Minute
+	MaxAIImageGenerationTimeout = 10 * time.Minute
+	MaxAIImagePromptRunes       = 48_000
+	MaxAIImageReferences        = 3
+	MaxAIImageReferenceBytes    = 5 << 20
+	MaxGeneratedAIImageBytes    = 30 << 20
 
 	AIImageGenerationSourceStudio   = "studio"
 	AIImageGenerationSourceWorkflow = "workflow"
@@ -48,6 +50,16 @@ var AIImageSizes = map[string]map[string]string{
 }
 
 var ErrAIImageStorageUnavailable = errors.New("图片存储服务未配置")
+
+func aiImageGenerationTimeout(timeoutSeconds int) (time.Duration, error) {
+	if timeoutSeconds == 0 {
+		return AIImageGenerationTimeout, nil
+	}
+	if timeoutSeconds < int(MinAIImageGenerationTimeout/time.Second) || timeoutSeconds > int(MaxAIImageGenerationTimeout/time.Second) {
+		return 0, &AIImageGenerationInputError{Message: "图片生成超时必须在 60 到 600 秒之间"}
+	}
+	return time.Duration(timeoutSeconds) * time.Second, nil
+}
 
 var activeAIImageGenerationCancels = struct {
 	sync.Mutex
@@ -100,6 +112,7 @@ type AIImageGenerationInput struct {
 	References            []string
 	ReferenceGenerationID string
 	Feature               string
+	TimeoutSeconds        int
 }
 
 type aiImageGenerationJob struct {
@@ -165,12 +178,16 @@ func NewAIImageGenerationService(db *gorm.DB) *AIImageGenerationService {
 // Queue creates a durable owner-scoped generation and runs it asynchronously.
 // Reference image bytes remain request-scoped and are never persisted.
 func (s *AIImageGenerationService) Queue(ctx context.Context, input AIImageGenerationInput) (model.AIImageGeneration, error) {
-	job, err := s.prepare(ctx, input)
+	timeout, err := aiImageGenerationTimeout(input.TimeoutSeconds)
+	if err != nil {
+		return model.AIImageGeneration{}, err
+	}
+	job, err := s.prepare(ctx, input, timeout)
 	if err != nil {
 		return model.AIImageGeneration{}, err
 	}
 	s.enqueue(func() {
-		runCtx, cancel := context.WithTimeout(context.Background(), AIImageGenerationTimeout)
+		runCtx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		unregister := registerAIImageGenerationCancel(job.generation.ID, cancel)
 		defer unregister()
@@ -182,16 +199,20 @@ func (s *AIImageGenerationService) Queue(ctx context.Context, input AIImageGener
 // Generate uses the same durable execution path as Queue but waits for the
 // final stored result, which is the behavior workflow nodes require.
 func (s *AIImageGenerationService) Generate(ctx context.Context, input AIImageGenerationInput) (model.AIImageGeneration, error) {
-	job, err := s.prepare(ctx, input)
+	timeout, err := aiImageGenerationTimeout(input.TimeoutSeconds)
 	if err != nil {
 		return model.AIImageGeneration{}, err
 	}
-	runCtx, cancel := context.WithTimeout(ctx, AIImageGenerationTimeout)
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	job, err := s.prepare(runCtx, input, timeout)
+	if err != nil {
+		return model.AIImageGeneration{}, err
+	}
 	return s.run(runCtx, job)
 }
 
-func (s *AIImageGenerationService) prepare(ctx context.Context, input AIImageGenerationInput) (aiImageGenerationJob, error) {
+func (s *AIImageGenerationService) prepare(ctx context.Context, input AIImageGenerationInput, timeout time.Duration) (aiImageGenerationJob, error) {
 	if s == nil || s.db == nil {
 		return aiImageGenerationJob{}, errors.New("图片生成服务未配置")
 	}
@@ -216,7 +237,7 @@ func (s *AIImageGenerationService) prepare(ctx context.Context, input AIImageGen
 	if !ok {
 		return aiImageGenerationJob{}, &AIImageGenerationInputError{Message: "请选择有效的目标分辨率"}
 	}
-	invocation, err := s.resolve(s.db, strings.TrimSpace(input.ModelID), "image_generation", AIImageGenerationTimeout)
+	invocation, err := s.resolve(s.db, strings.TrimSpace(input.ModelID), "image_generation", timeout)
 	if err != nil {
 		return aiImageGenerationJob{}, err
 	}

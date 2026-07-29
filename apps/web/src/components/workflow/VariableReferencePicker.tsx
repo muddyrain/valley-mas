@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
@@ -125,6 +126,7 @@ interface VariableValueEditorProps {
   className?: string;
   defaultMode?: 'reference' | 'fixed';
   referenceEmptyText?: string;
+  multiline?: boolean;
 }
 
 // Input and output mappings deliberately choose either one reference or one
@@ -138,6 +140,7 @@ export function VariableValueEditor({
   className,
   defaultMode = 'reference',
   referenceEmptyText,
+  multiline = false,
 }: VariableValueEditorProps) {
   const hasReference = options.some((option) => option.token === value);
   const [mode, setMode] = useState<'reference' | 'fixed'>(
@@ -150,7 +153,7 @@ export function VariableValueEditor({
   }, [hasReference, value]);
 
   return (
-    <div className={cn('flex gap-2', className)}>
+    <div className={cn('flex gap-2', multiline && 'items-start', className)}>
       <Select
         value={mode}
         onValueChange={(nextMode) => {
@@ -180,6 +183,14 @@ export function VariableValueEditor({
           options={options}
           placeholder="选择上游变量"
           emptyText={referenceEmptyText}
+        />
+      ) : multiline ? (
+        <Textarea
+          aria-label={ariaLabel}
+          className="min-h-28 min-w-0 flex-1 resize-y"
+          value={value}
+          placeholder={fixedPlaceholder}
+          onChange={(event) => onChange(event.target.value)}
         />
       ) : (
         <Input

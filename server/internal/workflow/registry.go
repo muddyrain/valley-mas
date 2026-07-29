@@ -152,7 +152,7 @@ func RegisterWorkflowCapabilities(registry *Registry) error {
 	quality := inputField("string", "目标分辨率", "最终可用档位由所选模型决定。", "1K")
 	quality["enum"] = []string{"1K", "2K", "3K", "4K"}
 	quality["default"] = "1K"
-	imagePrompt := inputField("string", "画面描述", "描述主体、场景、风格和构图，可引用上游文本，也可以直接填写固定内容。", "例如：云海中的未来图书馆")
+	imagePrompt := inputField("string", "提示词描述", "描述主体、场景、风格和构图，可引用上游文本，也可以直接填写固定内容。", "例如：云海中的未来图书馆")
 	imagePrompt["allowFixedValue"] = true
 	citationStyle := inputField("string", "引用样式", "选择 Markdown 引用或普通编号列表。", "markdown")
 	citationStyle["enum"] = []string{"markdown", "numbered"}

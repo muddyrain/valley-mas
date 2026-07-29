@@ -269,6 +269,11 @@ function validateNode(
     case 'tool':
       if (!config.capabilityId || !config.inputs || typeof config.inputs !== 'object')
         return fail('请选择工具并完成输入映射');
+      if (config.capabilityId === 'image.generate') {
+        const timeoutSeconds = Number(config.timeoutSeconds ?? 240);
+        if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 60 || timeoutSeconds > 600)
+          return fail('图片生成超时必须在 60 到 600 秒之间', 'timeoutSeconds');
+      }
       {
         const capabilityError = toolCapabilityInputErrors(node, context)[0];
         if (capabilityError) return capabilityError;

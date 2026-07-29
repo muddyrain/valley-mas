@@ -112,6 +112,41 @@ func TestAIImageGenerationServiceGeneratePersistsStoredResult(t *testing.T) {
 	}
 }
 
+func TestAIImageGenerationServiceUsesConfiguredTimeout(t *testing.T) {
+	db := newAIImageRuntimeTestDB(t)
+	var resolvedTimeout time.Duration
+	service := NewAIImageGenerationService(db)
+	service.resolve = func(_ *gorm.DB, _ string, _ string, timeout time.Duration) (aimodel.Invocation, error) {
+		resolvedTimeout = timeout
+		return testImageInvocation(), nil
+	}
+	service.generate = func(ctx context.Context, _ aimodel.Invocation, _ aiclient.ImageGenerationRequest) (string, error) {
+		deadline, ok := ctx.Deadline()
+		if !ok || time.Until(deadline) > 2*time.Minute || time.Until(deadline) < time.Minute+55*time.Second {
+			t.Fatalf("unexpected generation deadline: %v (configured timeout: %v)", deadline, resolvedTimeout)
+		}
+		return "", context.DeadlineExceeded
+	}
+	service.storageAvailable = func() bool { return true }
+
+	_, err := service.Generate(context.Background(), AIImageGenerationInput{
+		UserID: 1, ModelID: "7", Brief: "超时测试", AspectRatio: "1:1", Quality: "1K", TimeoutSeconds: 120,
+	})
+	if err == nil || resolvedTimeout != 120*time.Second {
+		t.Fatalf("err=%v timeout=%v", err, resolvedTimeout)
+	}
+}
+
+func TestAIImageGenerationServiceRejectsOutOfRangeTimeout(t *testing.T) {
+	service := NewAIImageGenerationService(newAIImageRuntimeTestDB(t))
+	_, err := service.Generate(context.Background(), AIImageGenerationInput{
+		UserID: 1, ModelID: "7", Brief: "超时测试", AspectRatio: "1:1", Quality: "1K", TimeoutSeconds: 30,
+	})
+	if err == nil || err.Error() != "图片生成超时必须在 60 到 600 秒之间" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestAIImageGenerationServicePauseCancelsActiveRequest(t *testing.T) {
 	db := newAIImageRuntimeTestDB(t)
 	started := make(chan struct{})

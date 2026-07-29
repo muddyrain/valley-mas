@@ -17,6 +17,7 @@ interface WorkflowVariableBindingFieldProps {
   ariaLabel?: string;
   allowFixed?: boolean;
   fixedPlaceholder?: string;
+  multiline?: boolean;
 }
 
 // Shared binding card for fields whose name and type are defined by the caller.
@@ -34,6 +35,7 @@ export function WorkflowVariableBindingField({
   ariaLabel,
   allowFixed = false,
   fixedPlaceholder,
+  multiline = false,
 }: WorkflowVariableBindingFieldProps) {
   return (
     <WorkflowIOField
@@ -52,6 +54,7 @@ export function WorkflowVariableBindingField({
             onChange={onChange}
             options={options}
             fixedPlaceholder={fixedPlaceholder}
+            multiline={multiline}
           />
         ) : (
           <TypedVariableBindingPicker

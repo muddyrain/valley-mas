@@ -307,6 +307,7 @@ function NodePickerPopover({
         config: {
           capabilityId: item.id,
           capabilityName: item.name,
+          ...(item.id === 'image.generate' ? { timeoutSeconds: 240 } : {}),
           inputs: Object.fromEntries(
             (item.inputSchema.required || []).map((name) => [
               name,

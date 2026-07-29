@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 )
 
@@ -157,6 +158,10 @@ func (executor ToolNodeExecutor) Execute(ctx context.Context, run RunContext, ex
 	inputs, ok := execution.Input["inputs"].(map[string]any)
 	if !ok {
 		return NodeResult{}, fmt.Errorf("工具节点 inputs 必须为对象")
+	}
+	if capabilityID == CapabilityGenerateAIImage {
+		inputs = maps.Clone(inputs)
+		inputs["timeoutSeconds"] = execution.Input["timeoutSeconds"]
 	}
 	execution.CapabilityID = capabilityID
 	execution.Input = inputs

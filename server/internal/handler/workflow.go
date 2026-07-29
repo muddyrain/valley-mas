@@ -1529,6 +1529,7 @@ func workflowAIImageGenerator() workflow.AIImageGenerator {
 		aspectRatio string,
 		quality string,
 		referenceImage string,
+		timeoutSeconds int,
 	) (workflow.GeneratedAIImage, error) {
 		references := []string(nil)
 		if strings.TrimSpace(referenceImage) != "" {
@@ -1537,14 +1538,15 @@ func workflowAIImageGenerator() workflow.AIImageGenerator {
 		generation, err := service.NewAIImageGenerationService(database.GetDB()).Generate(
 			ctx,
 			service.AIImageGenerationInput{
-				UserID:      model.Int64String(userID),
-				ModelID:     modelID,
-				RecipeID:    "free",
-				Brief:       prompt,
-				AspectRatio: aspectRatio,
-				Quality:     quality,
-				References:  references,
-				Feature:     "workflow-image-generation",
+				UserID:         model.Int64String(userID),
+				ModelID:        modelID,
+				RecipeID:       "free",
+				Brief:          prompt,
+				AspectRatio:    aspectRatio,
+				Quality:        quality,
+				TimeoutSeconds: timeoutSeconds,
+				References:     references,
+				Feature:        "workflow-image-generation",
 			},
 		)
 		if err != nil {

@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"unicode"
 )
@@ -14,6 +15,12 @@ type GenerateAIImageCapabilityAdapter struct{}
 type UnderstandAIImageCapabilityAdapter struct{}
 
 type SaveAIImageResourceCapabilityAdapter struct{}
+
+const (
+	DefaultAIImageGenerationTimeoutSeconds = 240
+	MinAIImageGenerationTimeoutSeconds     = 60
+	MaxAIImageGenerationTimeoutSeconds     = 600
+)
 
 func (CoverGenerateCapabilityAdapter) Execute(ctx context.Context, run RunContext, execution NodeExecution) (NodeResult, error) {
 	if run.CoverGenerator == nil {
@@ -58,6 +65,10 @@ func (GenerateAIImageCapabilityAdapter) Execute(ctx context.Context, run RunCont
 	if quality == "" {
 		quality = "1K"
 	}
+	timeoutSeconds, err := imageGenerationTimeoutSeconds(execution.Input["timeoutSeconds"])
+	if err != nil {
+		return NodeResult{}, err
+	}
 	image, err := run.AIImageGenerator.GenerateAIImage(
 		ctx,
 		run.Actor.UserID,
@@ -66,6 +77,7 @@ func (GenerateAIImageCapabilityAdapter) Execute(ctx context.Context, run RunCont
 		aspectRatio,
 		quality,
 		strings.TrimSpace(stringFromValue(execution.Input["referenceImage"])),
+		timeoutSeconds,
 	)
 	if err != nil {
 		return NodeResult{}, err
@@ -82,6 +94,17 @@ func (GenerateAIImageCapabilityAdapter) Execute(ctx context.Context, run RunCont
 		"model":        image.Model,
 		"size":         image.Size,
 	}}, nil
+}
+
+func imageGenerationTimeoutSeconds(value any) (int, error) {
+	if value == nil {
+		return DefaultAIImageGenerationTimeoutSeconds, nil
+	}
+	seconds := numberFromValue(value)
+	if seconds != math.Trunc(seconds) || seconds < MinAIImageGenerationTimeoutSeconds || seconds > MaxAIImageGenerationTimeoutSeconds {
+		return 0, fmt.Errorf("图片生成超时必须在 %d 到 %d 秒之间", MinAIImageGenerationTimeoutSeconds, MaxAIImageGenerationTimeoutSeconds)
+	}
+	return int(seconds), nil
 }
 
 func (UnderstandAIImageCapabilityAdapter) Execute(ctx context.Context, run RunContext, execution NodeExecution) (NodeResult, error) {

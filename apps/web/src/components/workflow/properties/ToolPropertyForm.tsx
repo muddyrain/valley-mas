@@ -3,6 +3,7 @@ import { ModelPicker } from '@/components/ai/ModelPicker';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -356,11 +357,13 @@ export function ToolPropertyForm({
             );
           }
           const type = toWorkflowValueType(schema.type);
+          const isImagePrompt = capability.id === 'image.generate' && name === 'prompt';
+          const label = isImagePrompt ? '提示词描述' : schema.title || name;
           return (
             <WorkflowVariableBindingField
               key={name}
               name={name}
-              label={schema.title || name}
+              label={label}
               type={type}
               value={inputs[name]}
               onChange={(value) => onUpdateConfig({ inputs: { ...inputs, [name]: value } })}
@@ -368,13 +371,29 @@ export function ToolPropertyForm({
               description={schema.description}
               required={capability.inputSchema.required?.includes(name)}
               error={fieldErrors[name]}
-              ariaLabel={`${schema.title || name} 输入值`}
+              ariaLabel={`${label} 输入值`}
               allowFixed={schema.allowFixedValue}
               fixedPlaceholder={schema.placeholder}
+              multiline={isImagePrompt}
             />
           );
         })}
       </EditorSection>
+      {capability.id === 'image.generate' ? (
+        <EditorSection title="超时设置（秒）" description="60 到 600 秒，默认 240 秒。">
+          <Input
+            aria-label="图片生成超时（秒）"
+            type="number"
+            min={60}
+            max={600}
+            step={1}
+            value={Number(config.timeoutSeconds || 240)}
+            onChange={(event) =>
+              onUpdateConfig({ timeoutSeconds: Number(event.target.value) || 240 })
+            }
+          />
+        </EditorSection>
+      ) : null}
       <EditorSection title="输出" description="输出字段由工具能力固定，下游节点可直接引用。">
         <WorkflowOutputFieldList
           outputs={outputs}

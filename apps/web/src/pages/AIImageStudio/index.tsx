@@ -402,6 +402,7 @@ export default function AIImageStudio() {
   const conversationScrollRootRef = useRef<HTMLDivElement | null>(null);
   const conversationScrollBehaviorRef = useRef<ScrollBehavior>('smooth');
   const creatingRef = useRef(false);
+  const invalidatedGenerationIDsRef = useRef(new Set<string>());
   const [searchParams, setSearchParams] = useSearchParams();
   const currentUserID = useAuthStore((state) => state.user?.id);
   const legacyConversationKey = legacyConversationStorageKey(currentUserID);
@@ -619,10 +620,12 @@ export default function AIImageStudio() {
     }
     let cancelled = false;
     let timeoutID: number | undefined;
+    const pollingInvalidated = () =>
+      cancelled || invalidatedGenerationIDsRef.current.has(activeGeneration.id);
     const poll = async () => {
       try {
         const result = await getAIImageGeneration(activeGeneration.id);
-        if (cancelled) return;
+        if (pollingInvalidated()) return;
         setActiveGeneration(result.generation);
         setHistory((current) => [
           result.generation,
@@ -647,7 +650,7 @@ export default function AIImageStudio() {
         }
         timeoutID = window.setTimeout(poll, 1500);
       } catch (error) {
-        if (!cancelled) {
+        if (!pollingInvalidated()) {
           toast.error(getAPIErrorMessage(error, '读取生成进度失败'));
           timeoutID = window.setTimeout(poll, 3000);
         }
@@ -1106,6 +1109,7 @@ export default function AIImageStudio() {
   const pauseGeneration = async (generation: AIImageGeneration) => {
     if (generation.status !== 'queued' && generation.status !== 'running') return;
     setPausingGenerationID(generation.id);
+    invalidatedGenerationIDsRef.current.add(generation.id);
     try {
       const result = await pauseAIImageGeneration(generation.id);
       setHistory((current) => [
@@ -1116,6 +1120,8 @@ export default function AIImageStudio() {
       toast.success('已暂停生成');
       scheduleConversationScroll();
     } catch (error) {
+      invalidatedGenerationIDsRef.current.delete(generation.id);
+      setActiveGeneration((current) => (current?.id === generation.id ? { ...current } : current));
       toast.error(getAPIErrorMessage(error, '暂停生成失败'));
     } finally {
       setPausingGenerationID(undefined);

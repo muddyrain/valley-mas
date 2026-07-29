@@ -189,9 +189,10 @@ func TestGenerateAIImageCapabilityUsesConfiguredModel(t *testing.T) {
 				aspectRatio string,
 				quality string,
 				referenceImage string,
+				timeoutSeconds int,
 			) (GeneratedAIImage, error) {
 				if userID != 42 || modelID != "7" || prompt != "山谷图书馆" ||
-					aspectRatio != "16:9" || quality != "2K" || referenceImage != "" {
+					aspectRatio != "16:9" || quality != "2K" || referenceImage != "" || timeoutSeconds != DefaultAIImageGenerationTimeoutSeconds {
 					t.Fatalf("unexpected image generation input")
 				}
 				return GeneratedAIImage{
@@ -209,6 +210,18 @@ func TestGenerateAIImageCapabilityUsesConfiguredModel(t *testing.T) {
 	}
 	if result.Output["generationId"] != "1001" || result.Output["width"] != 2048 {
 		t.Fatalf("unexpected output: %#v", result.Output)
+	}
+}
+
+func TestGraphV4RejectsInvalidImageGenerationTimeout(t *testing.T) {
+	registry := testRegistry(t)
+	graph := Graph{SchemaVersion: 4, Nodes: []Node{
+		node("start", NodeTypeStart, `{"inputs":{}}`),
+		node("image", NodeTypeTool, `{"capabilityId":"image.generate","timeoutSeconds":30,"inputs":{"modelId":"7","prompt":"山谷","aspectRatio":"1:1","quality":"1K"}}`),
+		node("end", NodeTypeEnd, `{"outputs":{}}`),
+	}, Edges: []Edge{{Source: "start", Target: "image"}, {Source: "image", Target: "end"}}}
+	if errs := ValidateGraph(graph, registry); !containsError(errs, "超时必须在 60 到 600 秒之间") {
+		t.Fatalf("unexpected errors: %v", errs)
 	}
 }
 
