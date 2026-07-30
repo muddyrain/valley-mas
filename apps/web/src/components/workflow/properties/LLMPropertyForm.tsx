@@ -1,10 +1,10 @@
-import { BookOpen, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { type AISkill, getAPIErrorMessage, listAISkills } from '@/api/aiWorkbench';
 import { ModelPicker } from '@/components/ai/ModelPicker';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
-import { PromptLibraryDialog } from '@/components/ai-workbench/PromptLibraryDialog';
+import { PromptLibraryInsertButton } from '@/components/ai-workbench/PromptLibraryInsertButton';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -29,7 +29,6 @@ export function LLMPropertyForm({
   variableOptions = [],
 }: PropertyFormProps) {
   const [showAssistant, setShowAssistant] = useState(false);
-  const [showPromptLibrary, setShowPromptLibrary] = useState(false);
   const [skills, setSkills] = useState<AISkill[]>([]);
   const [skillLoadError, setSkillLoadError] = useState('');
   const systemPrompt = (config.systemPrompt as string) || '';
@@ -126,10 +125,16 @@ export function LLMPropertyForm({
           <div className="flex items-center justify-between gap-2">
             <Label htmlFor="llm-system-prompt">系统指令</Label>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => setShowPromptLibrary(true)}>
-                <BookOpen className="mr-2 size-3.5" />
-                提示词库
-              </Button>
+              <PromptLibraryInsertButton
+                targetLabel="系统指令"
+                onInsert={(content) =>
+                  onUpdateConfig({
+                    systemPrompt: [systemPrompt.trim(), content.trim()]
+                      .filter(Boolean)
+                      .join('\n\n'),
+                  })
+                }
+              />
               <Button
                 size="sm"
                 variant="outline"
@@ -300,15 +305,6 @@ export function LLMPropertyForm({
           )}
         </div>
       </EditorSection>
-      <PromptLibraryDialog
-        open={showPromptLibrary}
-        onOpenChange={setShowPromptLibrary}
-        onInsert={(content) =>
-          onUpdateConfig({
-            systemPrompt: [systemPrompt.trim(), content.trim()].filter(Boolean).join('\n\n'),
-          })
-        }
-      />
       <PromptAssistantDialog
         open={showAssistant}
         onOpenChange={setShowAssistant}

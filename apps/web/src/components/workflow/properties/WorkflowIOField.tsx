@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
+export type WorkflowIOFieldLayout = 'default' | 'compact' | 'editor';
+
 interface WorkflowIOFieldProps {
   name: string;
   label?: string;
@@ -16,7 +18,7 @@ interface WorkflowIOFieldProps {
   accessory?: ReactNode;
   valueControl?: ReactNode;
   actions?: ReactNode;
-  layout?: 'default' | 'compact';
+  layout?: WorkflowIOFieldLayout;
   className?: string;
 }
 
@@ -42,6 +44,7 @@ export function WorkflowIOField({
 }: WorkflowIOFieldProps) {
   const displayLabel = label && label !== name ? label : undefined;
   const compact = layout === 'compact';
+  const editor = layout === 'editor';
 
   return (
     <div className={cn('space-y-1.5', className)}>
@@ -49,6 +52,7 @@ export function WorkflowIOField({
         aria-invalid={Boolean(error) || undefined}
         className={cn(
           'min-w-0 rounded-xl border border-border bg-card p-3 shadow-xs transition-[background-color,border-color,box-shadow] duration-200',
+          editor && 'p-4',
           'hover:border-primary/25 hover:bg-muted/10 focus-within:border-primary/45 focus-within:ring-2 focus-within:ring-primary/10',
           error && 'border-destructive/70 bg-destructive/5 focus-within:border-destructive/70',
         )}
@@ -56,16 +60,31 @@ export function WorkflowIOField({
         <div
           className={cn(
             'min-w-0 items-center gap-2',
-            compact ? 'grid grid-cols-[minmax(0,1fr)_4.75rem_2rem_auto]' : 'flex',
+            compact
+              ? 'grid grid-cols-[minmax(0,1fr)_4.75rem_2rem_auto]'
+              : editor
+                ? 'grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-2'
+                : 'flex',
           )}
         >
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
               {nameControl || (
-                <span className="truncate font-mono text-sm font-medium text-foreground">
-                  {name}
+                <span
+                  className={cn(
+                    'truncate text-sm font-medium text-foreground',
+                    !editor && 'font-mono',
+                    editor && 'font-semibold',
+                  )}
+                >
+                  {editor && displayLabel ? displayLabel : name}
                 </span>
               )}
+              {editor && displayLabel && !nameControl ? (
+                <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground">
+                  {name}
+                </span>
+              ) : null}
               {required ? <span className="shrink-0 text-destructive">*</span> : null}
               {description ? (
                 <Tooltip>
@@ -86,7 +105,7 @@ export function WorkflowIOField({
                 </Tooltip>
               ) : null}
             </div>
-            {displayLabel ? (
+            {displayLabel && !editor ? (
               <p className="mt-0.5 truncate text-xs text-muted-foreground">{displayLabel}</p>
             ) : null}
           </div>
@@ -96,7 +115,11 @@ export function WorkflowIOField({
                 (type ? (
                   <Badge
                     variant="secondary"
-                    className={cn('font-mono font-normal', compact && 'w-full justify-center')}
+                    className={cn(
+                      'font-mono font-normal',
+                      compact && 'w-full justify-center',
+                      editor && 'border border-border/70 bg-muted/50',
+                    )}
                   >
                     {type}
                   </Badge>
@@ -104,10 +127,19 @@ export function WorkflowIOField({
             </div>
           ) : null}
           {accessory ? <div className="flex shrink-0 justify-center">{accessory}</div> : null}
-          {actions ? <div className="flex shrink-0 justify-self-end">{actions}</div> : null}
+          {actions ? (
+            <div className={cn('flex shrink-0 justify-self-end', editor && 'col-span-2')}>
+              {actions}
+            </div>
+          ) : null}
         </div>
         {valueControl ? (
-          <div className="mt-3 flex min-w-0 items-center border-t border-dashed border-border/80 pt-2.5">
+          <div
+            className={cn(
+              'mt-3 min-w-0 border-t border-dashed border-border/80 pt-2.5',
+              editor ? 'block pt-3' : 'flex items-center',
+            )}
+          >
             {valueControl}
           </div>
         ) : null}

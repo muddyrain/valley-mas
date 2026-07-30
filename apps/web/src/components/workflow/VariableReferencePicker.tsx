@@ -135,6 +135,7 @@ interface VariableValueEditorProps {
   defaultMode?: 'reference' | 'fixed';
   referenceEmptyText?: string;
   multiline?: boolean;
+  layout?: 'inline' | 'stacked';
 }
 
 // Input and output mappings deliberately choose either one reference or one
@@ -149,8 +150,10 @@ export function VariableValueEditor({
   defaultMode = 'reference',
   referenceEmptyText,
   multiline = false,
+  layout = 'inline',
 }: VariableValueEditorProps) {
   const hasReference = options.some((option) => option.token === value);
+  const stacked = multiline && layout === 'stacked';
   const [mode, setMode] = useState<'reference' | 'fixed'>(
     hasReference ? 'reference' : value ? 'fixed' : defaultMode,
   );
@@ -161,7 +164,13 @@ export function VariableValueEditor({
   }, [hasReference, value]);
 
   return (
-    <div className={cn('flex gap-2', multiline && 'items-start', className)}>
+    <div
+      className={cn(
+        stacked ? 'flex flex-col gap-3' : 'flex gap-2',
+        !stacked && multiline && 'items-start',
+        className,
+      )}
+    >
       <Select
         value={mode}
         onValueChange={(nextMode) => {
@@ -169,7 +178,10 @@ export function VariableValueEditor({
           onChange('');
         }}
       >
-        <SelectTrigger aria-label={`${ariaLabel || '变量值'}来源`} className="w-28 shrink-0">
+        <SelectTrigger
+          aria-label={`${ariaLabel || '变量值'}来源`}
+          className={cn('w-28 shrink-0', stacked && 'w-32 self-start')}
+        >
           {mode === 'reference' ? '引用变量' : '固定值'}
         </SelectTrigger>
         <SelectContent align="start" alignItemWithTrigger={false} className="min-w-28">
@@ -180,7 +192,7 @@ export function VariableValueEditor({
       {mode === 'reference' ? (
         <VariableReferencePicker
           ariaLabel={ariaLabel}
-          className="min-w-0 flex-1"
+          className={cn('min-w-0 flex-1', stacked && 'w-full')}
           value={value}
           onChange={(nextValue) =>
             onChange(
@@ -195,7 +207,11 @@ export function VariableValueEditor({
       ) : multiline ? (
         <Textarea
           aria-label={ariaLabel}
-          className="min-h-28 min-w-0 flex-1 resize-y"
+          className={cn(
+            'min-h-28 min-w-0 flex-1 resize-y',
+            stacked &&
+              'min-h-44 max-h-96 w-full overflow-y-auto rounded-lg bg-background leading-6',
+          )}
           value={value}
           placeholder={fixedPlaceholder}
           onChange={(event) => onChange(event.target.value)}

@@ -1,4 +1,5 @@
-import { WorkflowIOField } from './properties/WorkflowIOField';
+import type { ReactNode } from 'react';
+import { WorkflowIOField, type WorkflowIOFieldLayout } from './properties/WorkflowIOField';
 import { TypedVariableBindingPicker } from './TypedVariableBindingPicker';
 import { TypedVariableValueEditor } from './TypedVariableValueEditor';
 import type { WorkflowValueType } from './types';
@@ -18,6 +19,8 @@ interface WorkflowVariableBindingFieldProps {
   allowFixed?: boolean;
   fixedPlaceholder?: string;
   multiline?: boolean;
+  actions?: ReactNode;
+  layout?: WorkflowIOFieldLayout;
 }
 
 // Shared binding card for fields whose name and type are defined by the caller.
@@ -36,6 +39,8 @@ export function WorkflowVariableBindingField({
   allowFixed = false,
   fixedPlaceholder,
   multiline = false,
+  actions,
+  layout = 'default',
 }: WorkflowVariableBindingFieldProps) {
   return (
     <WorkflowIOField
@@ -45,6 +50,8 @@ export function WorkflowVariableBindingField({
       required={required}
       description={description}
       error={error}
+      actions={actions}
+      layout={layout}
       valueControl={
         allowFixed ? (
           <TypedVariableValueEditor
@@ -55,6 +62,7 @@ export function WorkflowVariableBindingField({
             options={options}
             fixedPlaceholder={fixedPlaceholder}
             multiline={multiline}
+            layout={layout === 'editor' ? 'stacked' : 'inline'}
           />
         ) : (
           <TypedVariableBindingPicker

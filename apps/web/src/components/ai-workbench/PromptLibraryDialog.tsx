@@ -19,9 +19,15 @@ interface PromptLibraryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onInsert: (content: string) => void;
+  targetLabel?: string;
 }
 
-export function PromptLibraryDialog({ open, onOpenChange, onInsert }: PromptLibraryDialogProps) {
+export function PromptLibraryDialog({
+  open,
+  onOpenChange,
+  onInsert,
+  targetLabel = '提示词',
+}: PromptLibraryDialogProps) {
   const [prompts, setPrompts] = useState<AIPrompt[]>([]);
   const [selectedID, setSelectedID] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -72,7 +78,7 @@ export function PromptLibraryDialog({ open, onOpenChange, onInsert }: PromptLibr
       <DialogContent className="flex h-[min(46rem,86vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
         <DialogHeader className="border-b border-border px-6 py-5">
           <DialogTitle>提示词库</DialogTitle>
-          <DialogDescription>选择一条提示词，插入到当前节点的系统提示词末尾。</DialogDescription>
+          <DialogDescription>选择一条提示词，插入到当前节点的{targetLabel}末尾。</DialogDescription>
         </DialogHeader>
         <div className="grid min-h-0 flex-1 grid-cols-[18rem_minmax(0,1fr)]">
           <div className="flex min-h-0 flex-col border-r border-border">

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { ModelPicker } from '@/components/ai/ModelPicker';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
+import { PromptLibraryInsertButton } from '@/components/ai-workbench/PromptLibraryInsertButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -375,6 +376,23 @@ export function ToolPropertyForm({
               allowFixed={schema.allowFixedValue}
               fixedPlaceholder={schema.placeholder}
               multiline={isImagePrompt}
+              layout={isImagePrompt ? 'editor' : 'default'}
+              actions={
+                isImagePrompt ? (
+                  <PromptLibraryInsertButton
+                    targetLabel={label}
+                    onInsert={(content) => {
+                      const current = typeof inputs[name] === 'string' ? inputs[name].trim() : '';
+                      onUpdateConfig({
+                        inputs: {
+                          ...inputs,
+                          [name]: [current, content.trim()].filter(Boolean).join('\n\n'),
+                        },
+                      });
+                    }}
+                  />
+                ) : undefined
+              }
             />
           );
         })}

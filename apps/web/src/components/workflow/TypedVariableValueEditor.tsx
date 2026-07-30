@@ -95,6 +95,7 @@ interface TypedVariableValueEditorProps {
   className?: string;
   defaultMode?: 'reference' | 'fixed';
   multiline?: boolean;
+  layout?: 'inline' | 'stacked';
 }
 
 // A value binding is always constrained by its declared type. Callers own the
@@ -110,6 +111,7 @@ export function TypedVariableValueEditor({
   className,
   defaultMode = 'reference',
   multiline = false,
+  layout = 'inline',
 }: TypedVariableValueEditorProps) {
   const compatibleOptions = options.filter((option) => option.type === type);
   if (type === 'file') {
@@ -135,6 +137,7 @@ export function TypedVariableValueEditor({
       defaultMode={defaultMode}
       referenceEmptyText={`暂无可引用的${workflowValueTypeLabel(type)}变量`}
       multiline={multiline}
+      layout={layout}
     />
   );
 }
