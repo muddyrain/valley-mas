@@ -275,6 +275,8 @@ export function ToolPropertyForm({
     if (rightIndex === -1) return -1;
     return leftIndex - rightIndex;
   });
+  const connectionUI = capability.ui?.connection;
+  const numberConfig = capability.ui?.numberConfig;
   return (
     <div className="space-y-4">
       <EditorSection title="输入" description={capability.description}>
@@ -283,15 +285,15 @@ export function ToolPropertyForm({
           <Badge variant="outline">{capability.id}</Badge>
           {sideEffectLabel ? <Badge variant="secondary">{sideEffectLabel}</Badge> : null}
         </div>
-        {capability.id === 'notion.search' ? (
+        {connectionUI?.path ? (
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-            <span>仅搜索已连接工作区中的页面和数据源。</span>
+            <span>{connectionUI.description}</span>
             <Button
               variant="link"
               size="sm"
-              onClick={() => navigate('/workbench/resources?tab=tools')}
+              onClick={() => navigate(connectionUI.path || '/workbench')}
             >
-              管理 Notion 连接
+              {connectionUI.actionLabel}
             </Button>
           </div>
         ) : null}
@@ -358,8 +360,9 @@ export function ToolPropertyForm({
             );
           }
           const type = toWorkflowValueType(schema.type);
-          const isImagePrompt = capability.id === 'image.generate' && name === 'prompt';
-          const label = isImagePrompt ? '提示词描述' : schema.title || name;
+          const fieldUI = capability.ui?.fields?.[name];
+          const isMultiline = fieldUI?.editor === 'multiline';
+          const label = fieldUI?.label || schema.title || name;
           return (
             <WorkflowVariableBindingField
               key={name}
@@ -375,10 +378,10 @@ export function ToolPropertyForm({
               ariaLabel={`${label} 输入值`}
               allowFixed={schema.allowFixedValue}
               fixedPlaceholder={schema.placeholder}
-              multiline={isImagePrompt}
-              layout={isImagePrompt ? 'editor' : 'default'}
+              multiline={isMultiline}
+              layout={isMultiline ? 'editor' : 'default'}
               actions={
-                isImagePrompt ? (
+                fieldUI?.action === 'prompt_library' ? (
                   <PromptLibraryInsertButton
                     targetLabel={label}
                     onInsert={(content) => {
@@ -397,17 +400,22 @@ export function ToolPropertyForm({
           );
         })}
       </EditorSection>
-      {capability.id === 'image.generate' ? (
-        <EditorSection title="超时设置（秒）" description="60 到 600 秒，默认 240 秒。">
+      {numberConfig?.key ? (
+        <EditorSection
+          title={numberConfig.label || '数值设置'}
+          description={numberConfig.description}
+        >
           <Input
-            aria-label="图片生成超时（秒）"
+            aria-label={numberConfig.label || '数值设置'}
             type="number"
-            min={60}
-            max={600}
+            min={numberConfig.min}
+            max={numberConfig.max}
             step={1}
-            value={Number(config.timeoutSeconds || 240)}
+            value={Number(config[numberConfig.key] || numberConfig.default || 0)}
             onChange={(event) =>
-              onUpdateConfig({ timeoutSeconds: Number(event.target.value) || 240 })
+              onUpdateConfig({
+                [numberConfig.key as string]: Number(event.target.value) || numberConfig.default,
+              })
             }
           />
         </EditorSection>

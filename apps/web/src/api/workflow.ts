@@ -296,6 +296,24 @@ export interface WorkflowToolCapability {
   };
   outputSchema: Record<string, string>;
   aiUsage: string;
+  ui?: {
+    connection?: { description?: string; actionLabel?: string; path?: string };
+    fields?: Record<string, { editor?: 'multiline'; action?: 'prompt_library'; label?: string }>;
+    numberConfig?: {
+      key?: string;
+      label?: string;
+      description?: string;
+      min?: number;
+      max?: number;
+      default?: number;
+    };
+    when?: {
+      title?: string;
+      description?: string;
+      enabledLabel?: string;
+      variablePlaceholder?: string;
+    };
+  };
 }
 
 export function listWorkflowCapabilities(): Promise<{

@@ -9,6 +9,7 @@ import { ErrorHandlingPropertyForm } from './properties/ErrorHandlingPropertyFor
 import { PropertyFormBase } from './properties/PropertyFormBase';
 import { WhenPropertyForm } from './properties/WhenPropertyForm';
 import type { NodeRunSnapshot } from './runSession';
+import { useWorkflowCapabilities } from './useWorkflowCapabilities';
 import type { ValidationError } from './validateWorkflowConfig';
 import { getLoopOutputVariables, getUpstreamWorkflowVariables } from './workflowVariables';
 
@@ -94,6 +95,7 @@ export const PropertyPanel = memo(function PropertyPanel({
   }
 
   const { nodeType, config, when } = selectedNode.data;
+  const capabilities = useWorkflowCapabilities();
   const FormComponent = PROPERTY_FORM_MAP[nodeType as keyof typeof PROPERTY_FORM_MAP];
   const variableOptions = useMemo(
     () => getUpstreamWorkflowVariables(nodes, edges, selectedNode.id),
@@ -107,8 +109,10 @@ export const PropertyPanel = memo(function PropertyPanel({
     () => (nodeType === 'loop' ? getLoopOutputVariables(nodes, selectedNode.id) : []),
     [nodeType, nodes, selectedNode.id],
   );
-  const isCoverGenerationNode =
-    nodeType === 'tool' && config?.capabilityId === 'image.generateCover';
+  const whenUI =
+    nodeType === 'tool'
+      ? capabilities.toolCapabilities.find((item) => item.id === config?.capabilityId)?.ui?.when
+      : undefined;
   const supportsErrorHandling =
     nodeType === 'llm' ||
     nodeType === 'template' ||
@@ -212,10 +216,10 @@ export const PropertyPanel = memo(function PropertyPanel({
             if (!isRunning) onUpdateNode(selectedNode.id, { when: nextWhen });
           }}
           variableOptions={upstreamVariableOptions}
-          title={isCoverGenerationNode ? '生成条件' : undefined}
-          description={isCoverGenerationNode ? '未设置时，每次运行都会生成封面。' : undefined}
-          enabledLabel={isCoverGenerationNode ? '根据上游变量决定是否生成' : undefined}
-          variablePlaceholder={isCoverGenerationNode ? '选择上游布尔变量' : undefined}
+          title={whenUI?.title}
+          description={whenUI?.description}
+          enabledLabel={whenUI?.enabledLabel}
+          variablePlaceholder={whenUI?.variablePlaceholder}
         />
       ) : null}
     </PropertyFormBase>

@@ -306,10 +306,20 @@ function validateNode(
     case 'tool':
       if (!config.capabilityId || !config.inputs || typeof config.inputs !== 'object')
         return fail('请选择工具并完成输入映射');
-      if (config.capabilityId === 'image.generate') {
-        const timeoutSeconds = Number(config.timeoutSeconds ?? 240);
-        if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 60 || timeoutSeconds > 600)
-          return fail('图片生成超时必须在 60 到 600 秒之间', 'timeoutSeconds');
+      {
+        const capability = context.toolCapabilities?.find(
+          (item) => item.id === config.capabilityId,
+        );
+        const numberConfig = capability?.ui?.numberConfig;
+        if (numberConfig?.key) {
+          const value = Number(config[numberConfig.key] ?? numberConfig.default);
+          if (
+            !Number.isInteger(value) ||
+            value < (numberConfig.min ?? 0) ||
+            value > (numberConfig.max ?? Infinity)
+          )
+            return fail(`${numberConfig.label || numberConfig.key}超出允许范围`, numberConfig.key);
+        }
       }
       {
         const capabilityError = toolCapabilityInputErrors(node, context)[0];
