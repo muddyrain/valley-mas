@@ -1,5 +1,5 @@
 ﻿import { Bell, CheckCheck, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -9,7 +9,7 @@ import {
   type UserNotification,
 } from '@/api/notification';
 import EmptyState from '@/components/EmptyState';
-import PageBanner from '@/components/PageBanner';
+import PersonalPageHeader from '@/components/PersonalPageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,11 +23,6 @@ import {
 } from '@/utils/notification';
 
 const PAGE_SIZE = 20;
-
-const PAGE_BACKGROUND = {
-  background:
-    'linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, hsl(var(--primary) / 0.15) 28%, hsl(var(--background))) 46%, var(--background) 100%)',
-};
 
 export default function Notifications() {
   const navigate = useNavigate();
@@ -46,7 +41,7 @@ export default function Notifications() {
     emitNotificationStateChanged({ unreadCount: nextUnreadCount });
   }, [items]);
 
-  const loadNotificationsToPage = async (targetPage: number) => {
+  const loadNotificationsToPage = useCallback(async (targetPage: number) => {
     try {
       setLoading(true);
       let merged: UserNotification[] = [];
@@ -63,7 +58,7 @@ export default function Notifications() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -72,7 +67,7 @@ export default function Notifications() {
       return;
     }
     void loadNotificationsToPage(currentPage);
-  }, [hasHydrated, isAuthenticated, navigate, currentPage]);
+  }, [hasHydrated, isAuthenticated, navigate, currentPage, loadNotificationsToPage]);
 
   const handleMarkOneRead = async (item: UserNotification) => {
     if (item.isRead) return true;
@@ -126,27 +121,19 @@ export default function Notifications() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
-      <PageBanner padding="py-10" maxWidth="max-w-5xl">
-        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="rounded-2xl border border-foreground/15 bg-foreground/10 p-3 shadow-lg backdrop-blur-md">
-              <Bell className="h-7 w-7 text-primary-foreground" />
-            </div>
-            <div className="text-primary-foreground">
-              <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">通知中心</h1>
-              <p className="mt-1 text-sm text-primary-foreground/82">
-                {loading ? '正在整理你的最新动态...' : `共 ${total} 条通知，未读 ${unreadCount} 条`}
-              </p>
-            </div>
-          </div>
-
+    <div className="min-h-[calc(100vh-4rem)]">
+      <PersonalPageHeader
+        icon={Bell}
+        title="通知中心"
+        description={
+          loading ? '正在整理你的最新动态...' : `共 ${total} 条通知，未读 ${unreadCount} 条`
+        }
+        actions={
           <Button
             type="button"
-            variant="outline"
             onClick={handleMarkAllRead}
             disabled={unreadCount <= 0 || markingAll}
-            className="rounded-2xl border-primary-foreground/28 bg-primary-foreground/16 px-5 text-primary-foreground shadow-lg backdrop-blur-md hover:bg-primary-foreground/22 hover:text-primary-foreground disabled:border-primary-foreground/18 disabled:bg-primary-foreground/12 disabled:text-primary-foreground/68"
+            className="rounded-xl px-5"
           >
             {markingAll ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -155,8 +142,8 @@ export default function Notifications() {
             )}
             全部设为已读
           </Button>
-        </div>
-      </PageBanner>
+        }
+      />
 
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         {loading ? (
@@ -164,7 +151,7 @@ export default function Notifications() {
             {Array.from({ length: 6 }).map((_, index) => (
               <Card
                 key={index}
-                className="overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm"
+                className="overflow-hidden rounded-2xl border border-border bg-card"
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-4">
@@ -180,7 +167,7 @@ export default function Notifications() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="rounded-[28px] border border-border bg-card/72 px-6 shadow-[0_20px_50px_hsl(var(--primary) / 0.10)] backdrop-blur-sm">
+          <div className="rounded-2xl border border-border bg-card px-6">
             <EmptyState
               icon={Bell}
               title="还没有收到通知"
@@ -200,10 +187,8 @@ export default function Notifications() {
                 return (
                   <Card
                     key={item.id}
-                    className={`overflow-hidden rounded-2xl border bg-card/86 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_hsl(var(--primary) / 0.16)] ${
-                      item.isRead
-                        ? 'border-border shadow-[0_16px_36px_hsl(var(--foreground)/0.08)]'
-                        : 'border-border shadow-[0_18px_44px_hsl(var(--primary) / 0.14)]'
+                    className={`overflow-hidden rounded-2xl border bg-card transition-[border-color,box-shadow] duration-200 hover:border-foreground/25 hover:shadow-sm ${
+                      item.isRead ? 'border-border' : 'border-foreground/20 shadow-sm'
                     }`}
                   >
                     <CardContent className="p-5">
@@ -246,7 +231,7 @@ export default function Notifications() {
                             size="sm"
                             onClick={() => void handleOpenNotificationTarget(item)}
                             disabled={!target}
-                            className="rounded-xl border-accent bg-card/75 text-primary hover:bg-accent disabled:border-border disabled:bg-muted disabled:text-muted-foreground"
+                            className="rounded-xl border-border bg-card text-foreground hover:bg-accent disabled:border-border disabled:bg-muted disabled:text-muted-foreground"
                           >
                             查看详情
                           </Button>
@@ -256,7 +241,7 @@ export default function Notifications() {
                             size="sm"
                             onClick={() => void handleMarkOneRead(item)}
                             disabled={item.isRead}
-                            className="rounded-xl border-accent bg-card/75 text-primary hover:bg-accent disabled:border-border disabled:bg-muted disabled:text-muted-foreground"
+                            className="rounded-xl border-border bg-card text-foreground hover:bg-accent disabled:border-border disabled:bg-muted disabled:text-muted-foreground"
                           >
                             {item.isRead ? '已处理' : '标记已读'}
                           </Button>
@@ -274,7 +259,7 @@ export default function Notifications() {
                   variant="outline"
                   onClick={() => setPage(currentPage + 1)}
                   disabled={loading}
-                  className="rounded-xl border-accent bg-card/80 px-10 text-primary hover:bg-accent"
+                  className="rounded-xl border-border bg-card px-10 text-foreground hover:bg-accent"
                 >
                   {loading ? (
                     <>

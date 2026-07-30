@@ -42,7 +42,6 @@ import BlogSortDialog from '@/components/blog/BlogSortDialog';
 import { BlogWorkflowDialog } from '@/components/blog/BlogWorkflowDialog';
 import PostGroupDropdown from '@/components/blog/PostGroupDropdown';
 import { PublicWallpaperPickerDialog } from '@/components/blog/PublicWallpaperPickerDialog';
-import PanelLoadingOverlay from '@/components/PanelLoadingOverlay';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -122,8 +121,6 @@ export default function MyPosts() {
     () => [...blogPosts, ...imageTextPosts],
     [blogPosts, imageTextPosts],
   );
-  const hasLoadedPosts = visiblePosts.length > 0;
-  const showPostLoadingOverlay = loadingPosts && hasLoadedPosts;
   const selectedCount = selectedIds.size;
   const selectedBlogDraftIds = useMemo(
     () =>
@@ -691,7 +688,7 @@ export default function MyPosts() {
                 <Button
                   variant="outline"
                   onClick={() => setWorkflowDialogOpen(true)}
-                  className="rounded-xl border-primary text-primary hover:bg-accent"
+                  className="rounded-xl"
                 >
                   <Sparkles className="mr-1.5 h-4 w-4" />
                   AI 工作流
@@ -811,7 +808,7 @@ export default function MyPosts() {
               />
             </div>
 
-            {loadingBlogPosts && blogPosts.length === 0 ? (
+            {loadingBlogPosts ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: BLOG_PAGE_SIZE }).map((_, i) => (
                   <Skeleton key={i} className="h-44 rounded-2xl" />
@@ -886,7 +883,7 @@ export default function MyPosts() {
               />
             </div>
 
-            {loadingImageTextPosts && imageTextPosts.length === 0 ? (
+            {loadingImageTextPosts ? (
               <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                 {Array.from({ length: IMAGE_TEXT_PAGE_SIZE }).map((_, i) => (
                   <Skeleton key={i} className="h-44 rounded-2xl" />
@@ -940,13 +937,6 @@ export default function MyPosts() {
               </>
             )}
           </div>
-
-          <PanelLoadingOverlay
-            show={showPostLoadingOverlay}
-            title="正在同步内容列表..."
-            hint="分页和筛选结果更新中"
-            className="rounded-[30px]"
-          />
         </div>
       </div>
 

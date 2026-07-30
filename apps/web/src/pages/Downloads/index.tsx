@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { type DownloadHistoryItem, getMyDownloads } from '@/api/auth';
 import EmptyState from '@/components/EmptyState';
-import PageBanner from '@/components/PageBanner';
+import PersonalPageHeader from '@/components/PersonalPageHeader';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,11 +13,6 @@ import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_SIZE = 20;
-
-const PAGE_BACKGROUND = {
-  background:
-    'linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, var(--muted) 58%, hsl(var(--background))) 44%, var(--background) 100%)',
-};
 
 export default function Downloads() {
   const navigate = useNavigate();
@@ -59,20 +54,12 @@ export default function Downloads() {
   const hasMore = items.length < total;
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
-      <PageBanner padding="py-10" maxWidth="max-w-5xl">
-        <div className="flex items-center gap-4">
-          <div className="rounded-2xl border border-foreground/15 bg-foreground/10 p-3 shadow-lg backdrop-blur-md">
-            <Download className="h-7 w-7 text-foreground" />
-          </div>
-          <div className="text-foreground">
-            <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">下载记录</h1>
-            <p className="mt-1 text-sm text-foreground/82">
-              {loading ? '正在整理你的下载历史...' : `累计下载 ${total} 次`}
-            </p>
-          </div>
-        </div>
-      </PageBanner>
+    <div className="min-h-[calc(100vh-4rem)]">
+      <PersonalPageHeader
+        icon={Download}
+        title="下载记录"
+        description={loading ? '正在整理你的下载历史...' : `累计下载 ${total} 次`}
+      />
 
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         {loading ? (
@@ -80,7 +67,7 @@ export default function Downloads() {
             {Array.from({ length: 6 }).map((_, index) => (
               <Card
                 key={index}
-                className="overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm"
+                className="overflow-hidden rounded-2xl border border-border bg-card"
               >
                 <CardContent className="p-4">
                   <div className="flex gap-4">
@@ -96,7 +83,7 @@ export default function Downloads() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="rounded-[28px] border border-border bg-card/72 px-6 shadow-[0_20px_50px_hsl(var(--primary) / 0.10)] backdrop-blur-sm">
+          <div className="rounded-2xl border border-border bg-card px-6">
             <EmptyState
               icon={Download}
               title="还没有下载记录"
@@ -115,7 +102,7 @@ export default function Downloads() {
                 return (
                   <Card
                     key={item.id}
-                    className="overflow-hidden rounded-2xl border border-border bg-card/86 shadow-[0_18px_40px_hsl(var(--primary) / 0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_hsl(var(--primary) / 0.16)]"
+                    className="overflow-hidden rounded-2xl border border-border bg-card transition-[border-color,box-shadow] duration-200 hover:border-foreground/25 hover:shadow-sm"
                   >
                     <CardContent className="p-4">
                       <div className="flex flex-col gap-4 sm:flex-row">
@@ -160,7 +147,7 @@ export default function Downloads() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="shrink-0 rounded-xl border-accent bg-card/70 text-primary hover:bg-accent"
+                              className="shrink-0 rounded-xl border-border bg-card text-foreground hover:bg-accent"
                               onClick={() => resource && navigate(`/resource/${resource.id}`)}
                               disabled={!resource?.id}
                             >
@@ -170,7 +157,7 @@ export default function Downloads() {
                           </div>
 
                           <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                            <Avatar className="h-6 w-6 border border-accent">
+                            <Avatar className="h-6 w-6 border border-border">
                               <AvatarImage src={resource?.user?.avatar} alt={uploaderName} />
                               <AvatarFallback className="bg-accent text-[10px] font-semibold text-primary">
                                 {uploaderName[0]?.toUpperCase() || 'U'}
@@ -192,7 +179,7 @@ export default function Downloads() {
                   variant="outline"
                   onClick={() => setPage(currentPage + 1)}
                   disabled={loading}
-                  className="rounded-xl border-accent bg-card/80 px-10 text-primary hover:bg-accent"
+                  className="rounded-xl border-border bg-card px-10 text-foreground hover:bg-accent"
                 >
                   {loading ? (
                     <>

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { getMyFavorites, type Resource, unfavoriteResource } from '@/api/resource';
 import EmptyState from '@/components/EmptyState';
-import PageBanner from '@/components/PageBanner';
+import PersonalPageHeader from '@/components/PersonalPageHeader';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -95,19 +95,12 @@ export default function Favorites() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)]">
-      <PageBanner padding="py-10" maxWidth="max-w-5xl">
-        <div className="flex items-center gap-4">
-          <div className="rounded-2xl border border-foreground/15 bg-foreground/10 p-3">
-            <Heart className="h-7 w-7 fill-foreground text-foreground" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground md:text-3xl">我的收藏</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {loading ? '正在整理你收藏的内容...' : `共收藏 ${total} 个资源`}
-            </p>
-          </div>
-        </div>
-      </PageBanner>
+      <PersonalPageHeader
+        icon={Heart}
+        iconClassName="fill-current"
+        title="我的收藏"
+        description={loading ? '正在整理你收藏的内容...' : `共收藏 ${total} 个资源`}
+      />
 
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         {loading ? (
@@ -146,7 +139,7 @@ export default function Favorites() {
               return (
                 <Card
                   key={item.id}
-                  className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-0.5"
+                  className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card transition-[border-color,box-shadow] duration-200 hover:border-foreground/25 hover:shadow-sm"
                   onClick={() => resource && navigate(`/resource/${resource.id}`)}
                 >
                   <div className="relative aspect-square overflow-hidden bg-muted">
@@ -182,7 +175,7 @@ export default function Favorites() {
                     </div>
 
                     {resource?.type ? (
-                      <div className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-xs font-medium text-foreground backdrop-blur-sm">
+                      <div className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
                         {formatResourceType(resource.type)}
                       </div>
                     ) : null}

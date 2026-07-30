@@ -12,6 +12,7 @@ import {
 } from '@/api/blog';
 import PanelLoadingOverlay from '@/components/PanelLoadingOverlay';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -170,45 +171,62 @@ export default function BlogGroupManage() {
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-background px-4 py-8 md:px-8">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="mb-2 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setValue('type', 'blog')}
-                className={`rounded-full px-3 py-1 text-xs transition ${
-                  groupType === 'blog'
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'bg-card text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                博客分组
-              </button>
-              <button
-                type="button"
-                onClick={() => setValue('type', 'image_text')}
-                className={`rounded-full px-3 py-1 text-xs transition ${
-                  groupType === 'image_text'
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'bg-card text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                图文分组
-              </button>
+        <Card className="mb-6 rounded-2xl border border-border bg-card shadow-sm">
+          <CardContent className="p-6 sm:p-7">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div className="min-w-0">
+                <div className="mb-4 inline-flex rounded-xl border border-border bg-muted/35 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setValue('type', 'blog')}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      groupType === 'blog'
+                        ? 'bg-foreground text-background shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    博客分组
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setValue('type', 'image_text')}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      groupType === 'image_text'
+                        ? 'bg-foreground text-background shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    图文分组
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                    {meta.title}
+                  </h1>
+                  {!loading ? (
+                    <span className="text-sm text-muted-foreground">{groups.length} 个分组</span>
+                  ) : null}
+                </div>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                  {meta.description}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/my-space')}
+                  className="rounded-xl border-border"
+                >
+                  返回创作空间
+                </Button>
+                <Button onClick={() => setCreateOpen(true)} className="rounded-xl">
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  新建分组
+                </Button>
+              </div>
             </div>
-            <h1 className="text-2xl font-semibold text-foreground">{meta.title}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{meta.description}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => navigate('/my-space')} className="rounded-xl">
-              返回创作空间
-            </Button>
-            <Button onClick={() => setCreateOpen(true)} className="rounded-xl">
-              <Plus className="mr-1.5 h-4 w-4" />
-              新建分组
-            </Button>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         <div className="relative">
           {loading && groups.length === 0 ? (
@@ -227,32 +245,36 @@ export default function BlogGroupManage() {
               {groups.map((group) => (
                 <div
                   key={group.id}
-                  className="rounded-2xl border border-border bg-card p-5 shadow-[0_8px_22px_hsl(var(--primary)/0.06)]"
+                  className="group flex min-h-52 flex-col rounded-2xl border border-border bg-card p-5 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-foreground/25 hover:shadow-sm"
                 >
-                  <div className="mb-3 flex items-start justify-between gap-2">
-                    <div>
-                      <div className="mb-2">
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                          {meta.manageLabel}
-                        </span>
-                      </div>
-                      <h3 className="text-lg font-semibold text-foreground">{group.name}</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        内容数：{group.postCount || 0}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
-                      ID {group.id}
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                      {meta.manageLabel}
+                    </span>
+                    <span
+                      title={`ID ${group.id}`}
+                      className="max-w-22 truncate text-xs text-muted-foreground"
+                    >
+                      #{group.id.slice(-6)}
                     </span>
                   </div>
-                  <p className="line-clamp-2 min-h-[40px] text-sm text-muted-foreground">
+                  <div className="mt-5">
+                    <h3 className="truncate text-lg font-semibold text-foreground">{group.name}</h3>
+                    <div className="mt-2 flex items-baseline gap-1.5">
+                      <span className="text-2xl font-semibold tabular-nums text-foreground">
+                        {group.postCount || 0}
+                      </span>
+                      <span className="text-xs text-muted-foreground">篇内容</span>
+                    </div>
+                  </div>
+                  <p className="mt-4 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">
                     {group.description || '暂未填写分组说明'}
                   </p>
-                  <div className="mt-4 flex items-center gap-2">
+                  <div className="mt-auto flex items-center gap-1 border-t border-border pt-4">
                     <Button
                       size="sm"
-                      variant="outline"
-                      className="rounded-lg"
+                      variant="ghost"
+                      className="rounded-lg text-foreground hover:bg-muted"
                       onClick={() => {
                         setEditTarget(group);
                         setEditName(group.name);
@@ -264,8 +286,8 @@ export default function BlogGroupManage() {
                     </Button>
                     <Button
                       size="sm"
-                      variant="outline"
-                      className="rounded-lg border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      variant="ghost"
+                      className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
                       onClick={() => openDeleteConfirm(group)}
                     >
                       <Trash2 className="mr-1 h-3.5 w-3.5" />

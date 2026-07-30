@@ -1,9 +1,9 @@
-import { ArrowRight, Loader2, Users } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Loader2, Users } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { type FollowItem, getMyFollows } from '@/api/follow';
 import EmptyState from '@/components/EmptyState';
-import PageBanner from '@/components/PageBanner';
+import PersonalPageHeader from '@/components/PersonalPageHeader';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,11 +12,6 @@ import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_SIZE = 20;
-
-const PAGE_BACKGROUND = {
-  background:
-    'linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, hsl(var(--primary) / 0.15) 34%, hsl(var(--background))) 48%, var(--background) 100%)',
-};
 
 export default function Follows() {
   const navigate = useNavigate();
@@ -27,7 +22,7 @@ export default function Follows() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const loadFollowsToPage = async (targetPage: number) => {
+  const loadFollowsToPage = useCallback(async (targetPage: number) => {
     try {
       setLoading(true);
       let merged: FollowItem[] = [];
@@ -44,7 +39,7 @@ export default function Follows() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -58,20 +53,12 @@ export default function Follows() {
   const hasMore = items.length < total;
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
-      <PageBanner padding="py-10" maxWidth="max-w-5xl">
-        <div className="flex items-center gap-4">
-          <div className="rounded-2xl border border-foreground/15 bg-foreground/10 p-3 shadow-lg backdrop-blur-md">
-            <Users className="h-7 w-7 text-foreground" />
-          </div>
-          <div className="text-foreground">
-            <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">我的关注</h1>
-            <p className="mt-1 text-sm text-foreground/82">
-              {loading ? '正在整理你关注的用户...' : `已关注 ${total} 位用户`}
-            </p>
-          </div>
-        </div>
-      </PageBanner>
+    <div className="min-h-[calc(100vh-4rem)]">
+      <PersonalPageHeader
+        icon={Users}
+        title="我的关注"
+        description={loading ? '正在整理你关注的用户...' : `已关注 ${total} 位用户`}
+      />
 
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         {loading ? (
@@ -112,11 +99,11 @@ export default function Follows() {
                 return (
                   <Card
                     key={item.id}
-                    className="overflow-hidden rounded-2xl border border-border transition-all duration-300 hover:shadow-md"
+                    className="overflow-hidden rounded-2xl border border-border bg-card transition-[border-color,box-shadow] duration-200 hover:border-foreground/25 hover:shadow-sm"
                   >
                     <CardContent className="p-5">
                       <div className="flex items-start gap-4">
-                        <Avatar className="h-14 w-14 border border-accent shadow-sm">
+                        <Avatar className="h-14 w-14 border border-border shadow-sm">
                           <AvatarImage src={followedUser?.avatar} alt={name} />
                           <AvatarFallback className="bg-accent font-semibold text-primary">
                             {name[0]?.toUpperCase() || 'U'}
@@ -130,15 +117,6 @@ export default function Follows() {
                                 {name}
                               </div>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="shrink-0 rounded-xl border-accent bg-card/70 text-primary hover:bg-accent"
-                              disabled
-                            >
-                              查看主页
-                              <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                            </Button>
                           </div>
 
                           <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">
@@ -167,7 +145,7 @@ export default function Follows() {
                   variant="outline"
                   onClick={() => setPage(currentPage + 1)}
                   disabled={loading}
-                  className="rounded-xl border-accent px-10 text-primary hover:bg-accent"
+                  className="rounded-xl border-border bg-card px-10 text-foreground hover:bg-accent"
                 >
                   {loading ? (
                     <>

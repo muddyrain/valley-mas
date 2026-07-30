@@ -22,7 +22,6 @@ import {
   updateMyProfile,
   uploadAvatar,
 } from '@/api/auth';
-import PageBanner from '@/components/PageBanner';
 import AvatarBeadEditorDialog from '@/components/profile/AvatarBeadEditorDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -195,331 +194,355 @@ export default function Profile() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)]">
-      <PageBanner padding="py-10" maxWidth="max-w-4xl">
-        <div className="flex flex-wrap items-center gap-6">
-          <div className="relative shrink-0">
-            {loading ? (
-              <Skeleton className="h-24 w-24 rounded-full" />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setAvatarEditorOpen(true)}
-                className="group relative focus:outline-none"
-                title="点击更换头像"
-                disabled={avatarUploading}
-              >
-                <Avatar className="h-24 w-24 border-4 border-border ring-4 ring-foreground/10">
-                  <AvatarImage src={profile?.avatar} className="object-cover" />
-                  <AvatarFallback className="bg-primary text-primary-foreground text-3xl font-bold">
-                    {avatarFallbackText}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                  {avatarUploading ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-foreground" />
-                  ) : (
-                    <Camera className="h-6 w-6 text-foreground" />
-                  )}
-                </div>
-              </button>
-            )}
-          </div>
-
-          <div className="min-w-0 flex-1">
-            {loading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-8 w-40" />
-                <Skeleton className="h-4 w-28" />
-              </div>
-            ) : (
-              <>
-                <div className="mb-2 flex flex-wrap items-center gap-3">
-                  <h1 className="text-2xl font-bold text-foreground md:text-3xl">{displayName}</h1>
-                  <Badge className={`${roleInfo.badgeClass} border-0 px-3 py-1 font-medium`}>
-                    {roleInfo.label}
-                  </Badge>
-                </div>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  <Mail className="mr-1 inline h-3.5 w-3.5" />
-                  {profile?.email || '未绑定邮箱'}
-                </p>
-                <div className="flex flex-wrap gap-4">
-                  <div className="rounded-xl border border-border bg-card px-5 py-3">
-                    <div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                      <Download className="h-3.5 w-3.5" />
-                      <span>累计下载</span>
+      <div className="mx-auto max-w-5xl px-4 pt-6 sm:px-6 lg:px-8">
+        <Card className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+              <div className="relative shrink-0">
+                {loading ? (
+                  <Skeleton className="h-24 w-24 rounded-full" />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarEditorOpen(true)}
+                    className="group relative focus:outline-none"
+                    title="点击更换头像"
+                    disabled={avatarUploading}
+                  >
+                    <Avatar className="h-24 w-24 border-4 border-border ring-4 ring-foreground/10">
+                      <AvatarImage src={profile?.avatar} className="object-cover" />
+                      <AvatarFallback className="bg-primary text-primary-foreground text-3xl font-bold">
+                        {avatarFallbackText}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                      {avatarUploading ? (
+                        <Loader2 className="h-6 w-6 animate-spin text-foreground" />
+                      ) : (
+                        <Camera className="h-6 w-6 text-foreground" />
+                      )}
                     </div>
-                    <div className="text-2xl font-bold text-foreground">
-                      {profile?.downloadCount ?? 0}
+                  </button>
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                {loading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-8 w-40" />
+                    <Skeleton className="h-4 w-28" />
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-end justify-between gap-6">
+                    <div>
+                      <p className="mb-2 text-xs font-medium tracking-[0.16em] text-muted-foreground">
+                        账户设置
+                      </p>
+                      <div className="mb-2 flex flex-wrap items-center gap-3">
+                        <h1 className="text-2xl font-bold text-foreground md:text-3xl">
+                          {displayName}
+                        </h1>
+                        <Badge className={`${roleInfo.badgeClass} border-0 px-3 py-1 font-medium`}>
+                          {roleInfo.label}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        <Mail className="mr-1 inline h-3.5 w-3.5" />
+                        {profile?.email || '未绑定邮箱'}
+                      </p>
+                    </div>
+                    <div className="min-w-32 rounded-xl border border-border bg-muted/30 px-5 py-3">
+                      <div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                        <Download className="h-3.5 w-3.5" />
+                        <span>累计下载</span>
+                      </div>
+                      <div className="text-2xl font-bold text-foreground">
+                        {profile?.downloadCount ?? 0}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </PageBanner>
-
-      <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-        <Card className="rounded-2xl border border-border bg-card">
-          <div className="border-b border-border px-6 py-4">
-            <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-accent p-2">
-                <User className="h-4 w-4 text-primary" />
+                )}
               </div>
-              <h2 className="font-bold text-foreground">基本信息</h2>
             </div>
-          </div>
-          <CardContent className="p-6">
-            {loading ? (
-              <div className="space-y-5">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <div key={index} className="space-y-2">
-                    <Skeleton className="h-4 w-16" />
-                    <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 md:py-8 lg:px-8">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(19rem,0.7fr)]">
+          <div className="space-y-6">
+            <Card className="rounded-2xl border border-border bg-card">
+              <div className="border-b border-border px-6 py-4">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-accent p-2">
+                    <User className="h-4 w-4 text-primary" />
                   </div>
-                ))}
+                  <h2 className="font-bold text-foreground">基本信息</h2>
+                </div>
               </div>
-            ) : (
-              <div className="space-y-5">
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <Label className="block text-sm font-medium text-foreground">
-                      昵称 <span className="text-destructive">*</span>
+              <CardContent className="p-6">
+                {loading ? (
+                  <div className="space-y-5">
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="space-y-2">
+                        <Skeleton className="h-4 w-16" />
+                        <Skeleton className="h-10 w-full" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <Label className="block text-sm font-medium text-foreground">
+                          昵称 <span className="text-destructive">*</span>
+                        </Label>
+                        <Button
+                          size="sm"
+                          variant="link"
+                          className="px-0 text-primary hover:text-primary"
+                          onClick={() => {
+                            setInfoForm((form) => ({
+                              ...form,
+                              nickname: createRandomCnNickname(),
+                            }));
+                          }}
+                        >
+                          换一个
+                        </Button>
+                      </div>
+                      <Input
+                        value={infoForm.nickname}
+                        onChange={(event) =>
+                          setInfoForm((form) => ({ ...form, nickname: event.target.value }))
+                        }
+                        placeholder="请输入昵称"
+                        className="h-10"
+                        maxLength={50}
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="mb-1.5 block text-sm font-medium text-foreground">
+                        <Mail className="mr-1 inline h-3.5 w-3.5" />
+                        邮箱 <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        type="email"
+                        value={infoForm.email}
+                        onChange={(event) =>
+                          setInfoForm((form) => ({ ...form, email: event.target.value }))
+                        }
+                        disabled
+                        placeholder="请输入登录邮箱"
+                        className="h-10"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        该邮箱用于登录与接收验证码
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label className="mb-1.5 block text-sm font-medium text-foreground">
+                        <Phone className="mr-1 inline h-3.5 w-3.5" />
+                        手机号
+                      </Label>
+                      <Input
+                        type="tel"
+                        value={infoForm.phone}
+                        onChange={(event) =>
+                          setInfoForm((form) => ({ ...form, phone: event.target.value }))
+                        }
+                        placeholder="请输入手机号"
+                        className="h-10"
+                        maxLength={20}
+                      />
+                    </div>
+
+                    <div className="pt-1">
+                      <Button
+                        onClick={handleInfoSave}
+                        disabled={infoSaving}
+                        className="px-8 font-semibold"
+                      >
+                        {infoSaving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            保存中...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            保存修改
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl border border-border bg-card">
+              <div className="border-b border-border px-6 py-4">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-accent p-2">
+                    <KeyRound className="h-4 w-4 text-primary" />
+                  </div>
+                  <h2 className="font-bold text-foreground">修改密码</h2>
+                </div>
+              </div>
+              <CardContent className="p-6">
+                <div className="space-y-5">
+                  <div>
+                    <Label className="mb-1.5 block text-sm font-medium text-foreground">
+                      原密码
                     </Label>
+                    <div className="relative">
+                      <Input
+                        type={showOld ? 'text' : 'password'}
+                        value={pwdForm.oldPassword}
+                        onChange={(event) =>
+                          setPwdForm((form) => ({ ...form, oldPassword: event.target.value }))
+                        }
+                        placeholder="请输入原密码"
+                        className="h-10 pr-12"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowOld((value) => !value)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary"
+                      >
+                        {showOld ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="mb-1.5 block text-sm font-medium text-foreground">
+                      新密码
+                      <span className="ml-1 font-normal text-muted-foreground">（至少 6 位）</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        type={showNew ? 'text' : 'password'}
+                        value={pwdForm.newPassword}
+                        onChange={(event) =>
+                          setPwdForm((form) => ({ ...form, newPassword: event.target.value }))
+                        }
+                        placeholder="请输入新密码"
+                        className="h-10 pr-12"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNew((value) => !value)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary"
+                      >
+                        {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="mb-1.5 block text-sm font-medium text-foreground">
+                      确认新密码
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        type={showConfirm ? 'text' : 'password'}
+                        value={pwdForm.confirmPassword}
+                        onChange={(event) =>
+                          setPwdForm((form) => ({ ...form, confirmPassword: event.target.value }))
+                        }
+                        placeholder="请再次输入新密码"
+                        className={`h-10 pr-12 ${
+                          pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword
+                            ? 'border-destructive/40 focus-visible:border-destructive/40 focus-visible:ring-destructive/30'
+                            : ''
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirm((value) => !value)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary"
+                      >
+                        {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword ? (
+                      <p className="mt-1 text-xs text-destructive">两次输入的密码不一致</p>
+                    ) : null}
+                  </div>
+
+                  <div className="pt-1">
                     <Button
-                      size="sm"
-                      variant="link"
-                      className="px-0 text-primary hover:text-primary"
-                      onClick={() => {
-                        setInfoForm((form) => ({ ...form, nickname: createRandomCnNickname() }));
-                      }}
+                      onClick={handlePasswordSave}
+                      disabled={pwdSaving}
+                      className="px-8 font-semibold"
                     >
-                      换一个
+                      {pwdSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          修改中...
+                        </>
+                      ) : (
+                        <>
+                          <Shield className="mr-2 h-4 w-4" />
+                          修改密码
+                        </>
+                      )}
                     </Button>
                   </div>
-                  <Input
-                    value={infoForm.nickname}
-                    onChange={(event) =>
-                      setInfoForm((form) => ({ ...form, nickname: event.target.value }))
-                    }
-                    placeholder="请输入昵称"
-                    className="h-10"
-                    maxLength={50}
-                  />
                 </div>
-
-                <div>
-                  <Label className="mb-1.5 block text-sm font-medium text-foreground">
-                    <Mail className="mr-1 inline h-3.5 w-3.5" />
-                    邮箱 <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    type="email"
-                    value={infoForm.email}
-                    onChange={(event) =>
-                      setInfoForm((form) => ({ ...form, email: event.target.value }))
-                    }
-                    disabled
-                    placeholder="请输入登录邮箱"
-                    className="h-10"
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">该邮箱用于登录与接收验证码</p>
-                </div>
-
-                <div>
-                  <Label className="mb-1.5 block text-sm font-medium text-foreground">
-                    <Phone className="mr-1 inline h-3.5 w-3.5" />
-                    手机号
-                  </Label>
-                  <Input
-                    type="tel"
-                    value={infoForm.phone}
-                    onChange={(event) =>
-                      setInfoForm((form) => ({ ...form, phone: event.target.value }))
-                    }
-                    placeholder="请输入手机号"
-                    className="h-10"
-                    maxLength={20}
-                  />
-                </div>
-
-                <div className="pt-1">
-                  <Button
-                    onClick={handleInfoSave}
-                    disabled={infoSaving}
-                    className="px-8 font-semibold"
-                  >
-                    {infoSaving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        保存中...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        保存修改
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border border-border bg-card">
-          <div className="border-b border-border px-6 py-4">
-            <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-accent p-2">
-                <KeyRound className="h-4 w-4 text-primary" />
-              </div>
-              <h2 className="font-bold text-foreground">修改密码</h2>
-            </div>
+              </CardContent>
+            </Card>
           </div>
-          <CardContent className="p-6">
-            <div className="space-y-5">
-              <div>
-                <Label className="mb-1.5 block text-sm font-medium text-foreground">原密码</Label>
-                <div className="relative">
-                  <Input
-                    type={showOld ? 'text' : 'password'}
-                    value={pwdForm.oldPassword}
-                    onChange={(event) =>
-                      setPwdForm((form) => ({ ...form, oldPassword: event.target.value }))
-                    }
-                    placeholder="请输入原密码"
-                    className="h-10 pr-12"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowOld((value) => !value)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary"
-                  >
-                    {showOld ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
 
-              <div>
-                <Label className="mb-1.5 block text-sm font-medium text-foreground">
-                  新密码
-                  <span className="ml-1 font-normal text-muted-foreground">（至少 6 位）</span>
-                </Label>
-                <div className="relative">
-                  <Input
-                    type={showNew ? 'text' : 'password'}
-                    value={pwdForm.newPassword}
-                    onChange={(event) =>
-                      setPwdForm((form) => ({ ...form, newPassword: event.target.value }))
-                    }
-                    placeholder="请输入新密码"
-                    className="h-10 pr-12"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNew((value) => !value)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary"
-                  >
-                    {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+          <aside className="lg:sticky lg:top-6 lg:self-start">
+            {!loading && profile ? (
+              <Card className="rounded-2xl border border-border bg-card shadow-sm">
+                <div className="border-b border-border px-6 py-4">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-lg bg-accent p-2">
+                      <Shield className="h-4 w-4 text-primary" />
+                    </div>
+                    <h2 className="font-bold text-foreground">账号信息</h2>
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <Label className="mb-1.5 block text-sm font-medium text-foreground">
-                  确认新密码
-                </Label>
-                <div className="relative">
-                  <Input
-                    type={showConfirm ? 'text' : 'password'}
-                    value={pwdForm.confirmPassword}
-                    onChange={(event) =>
-                      setPwdForm((form) => ({ ...form, confirmPassword: event.target.value }))
-                    }
-                    placeholder="请再次输入新密码"
-                    className={`h-10 pr-12 ${
-                      pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword
-                        ? 'border-destructive/40 focus-visible:border-destructive/40 focus-visible:ring-destructive/30'
-                        : ''
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirm((value) => !value)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary"
-                  >
-                    {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                {pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword ? (
-                  <p className="mt-1 text-xs text-destructive">两次输入的密码不一致</p>
-                ) : null}
-              </div>
-
-              <div className="pt-1">
-                <Button
-                  onClick={handlePasswordSave}
-                  disabled={pwdSaving}
-                  className="px-8 font-semibold"
-                >
-                  {pwdSaving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      修改中...
-                    </>
-                  ) : (
-                    <>
-                      <Shield className="mr-2 h-4 w-4" />
-                      修改密码
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {!loading && profile ? (
-          <Card className="rounded-2xl border border-border bg-card">
-            <div className="border-b border-border px-6 py-4">
-              <div className="flex items-center gap-2">
-                <div className="rounded-lg bg-accent p-2">
-                  <Shield className="h-4 w-4 text-primary" />
-                </div>
-                <h2 className="font-bold text-foreground">账号信息</h2>
-              </div>
-            </div>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-                <div className="flex items-center justify-between rounded-xl bg-accent p-3 sm:col-span-2">
-                  <span className="text-muted-foreground">登录邮箱</span>
-                  <span className="font-medium text-foreground">{profile.email || '-'}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-xl bg-accent p-3">
-                  <span className="text-muted-foreground">账号角色</span>
-                  <Badge className={`${roleInfo.badgeClass} border-0`}>{roleInfo.label}</Badge>
-                </div>
-                <div className="flex items-center justify-between rounded-xl bg-accent p-3">
-                  <span className="text-muted-foreground">累计下载</span>
-                  <span className="font-semibold text-foreground">{profile.downloadCount} 次</span>
-                </div>
-                <div className="flex items-center justify-between rounded-xl bg-accent p-3 sm:col-span-2">
-                  <span className="text-muted-foreground">注册时间</span>
-                  <span className="font-medium text-foreground">
-                    {profile.createdAt
-                      ? new Date(profile.createdAt).toLocaleDateString('zh-CN', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })
-                      : '-'}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
+                <CardContent className="p-6">
+                  <div className="grid gap-3 text-sm">
+                    <div className="flex items-center justify-between gap-4 rounded-xl bg-accent p-3">
+                      <span className="text-muted-foreground">登录邮箱</span>
+                      <span className="font-medium text-foreground">{profile.email || '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 rounded-xl bg-accent p-3">
+                      <span className="text-muted-foreground">账号角色</span>
+                      <Badge className={`${roleInfo.badgeClass} border-0`}>{roleInfo.label}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 rounded-xl bg-accent p-3">
+                      <span className="text-muted-foreground">累计下载</span>
+                      <span className="font-semibold text-foreground">
+                        {profile.downloadCount} 次
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 rounded-xl bg-accent p-3">
+                      <span className="text-muted-foreground">注册时间</span>
+                      <span className="font-medium text-foreground">
+                        {profile.createdAt
+                          ? new Date(profile.createdAt).toLocaleDateString('zh-CN', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })
+                          : '-'}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+          </aside>
+        </div>
       </div>
 
       <AvatarBeadEditorDialog
