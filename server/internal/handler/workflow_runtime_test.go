@@ -1077,6 +1077,10 @@ func TestResumeWorkflowRunRetriesOnlyFailedNode(t *testing.T) {
 	if source.Status != string(workflow.StatusFailed) || source.RuntimeState == "" {
 		t.Fatalf("source run is not resumable: %+v", source)
 	}
+	definition.Graph = strings.Replace(definition.Graph, `"timeoutSeconds":1`, `"timeoutSeconds":2`, 1)
+	if err := database.DB.Model(&definition).Update("graph", definition.Graph).Error; err != nil {
+		t.Fatal(err)
+	}
 
 	resumeRequest := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/runs/"+source.ID.String()+"/resume", nil)
 	resumeRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
@@ -1092,6 +1096,28 @@ func TestResumeWorkflowRunRetriesOnlyFailedNode(t *testing.T) {
 	}
 	if len(runs) != 2 || runs[1].Status != string(workflow.StatusFailed) || runs[1].SourceRunID == nil || *runs[1].SourceRunID != source.ID {
 		t.Fatalf("unexpected resumed runs: %+v", runs)
+	}
+	resumedGraph, err := decodeWorkflowGraph(runs[1].GraphSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundRequest := false
+	for _, node := range resumedGraph.Nodes {
+		if node.ID != "request" {
+			continue
+		}
+		foundRequest = true
+		var config map[string]any
+		if err := json.Unmarshal(node.Config, &config); err != nil {
+			t.Fatal(err)
+		}
+		if timeout, ok := config["timeoutSeconds"].(float64); !ok || timeout != 2 {
+			t.Fatalf("resumed timeout=%v, want 2", config["timeoutSeconds"])
+		}
+		break
+	}
+	if !foundRequest {
+		t.Fatal("resumed graph is missing request node")
 	}
 	var resumedNodes []model.WorkflowNodeRun
 	if err := database.DB.Where("workflow_run_id = ?", runs[1].ID).Find(&resumedNodes).Error; err != nil {

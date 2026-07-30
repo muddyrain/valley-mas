@@ -588,12 +588,36 @@ func ResumeWorkflowRun(c *gin.Context) {
 		return
 	}
 	registry := workflowRuntimeRegistry()
-	failedNodeID, requiresConfirmation, eligibilityErr := workflowResumeEligibility(sourceRun, graph, registry)
+	failedNodeID, _, eligibilityErr := workflowResumeEligibility(sourceRun, graph, registry)
 	if eligibilityErr != nil {
 		Error(c, http.StatusConflict, eligibilityErr.Error())
 		return
 	}
-	if requiresConfirmation && c.GetHeader("X-Workflow-Resume-Confirmed") != "true" {
+	var definition model.Workflow
+	if err := database.DB.Where("id = ? AND user_id = ?", workflowID, userID).First(&definition).Error; err != nil {
+		Error(c, http.StatusNotFound, "工作流不存在")
+		return
+	}
+	currentGraph, err := decodeWorkflowGraph(definition.Graph)
+	if err != nil {
+		Error(c, http.StatusConflict, "当前工作流格式错误，请重新运行工作流")
+		return
+	}
+	resumedNode, err := workflowApplyCurrentResumeNodeConfig(&graph, currentGraph, failedNodeID)
+	if err != nil {
+		Error(c, http.StatusConflict, err.Error())
+		return
+	}
+	if validationErrors := workflow.ValidateGraph(graph, registry); len(validationErrors) > 0 {
+		Error(c, http.StatusConflict, "当前失败节点配置无效: "+strings.Join(validationErrors, "；"))
+		return
+	}
+	budget := workflowExecutionBudget{}
+	if err := validateSubworkflowReferences(database.DB, graph, model.Int64String(userID), model.Int64String(workflowID), map[string]bool{}, &budget); err != nil {
+		Error(c, http.StatusConflict, "当前失败节点配置无效: "+err.Error())
+		return
+	}
+	if workflowNodeRetryRequiresConfirmation(resumedNode, registry) && c.GetHeader("X-Workflow-Resume-Confirmed") != "true" {
 		Error(c, http.StatusConflict, "重试该节点可能再次执行写入或生成操作，请确认后继续")
 		return
 	}
@@ -604,11 +628,6 @@ func ResumeWorkflowRun(c *gin.Context) {
 	}
 	if err := restoreWorkflowFileInputs(graph, state.Inputs); err != nil {
 		Error(c, http.StatusConflict, "恢复运行输入失败，请重新运行工作流")
-		return
-	}
-	var definition model.Workflow
-	if err := database.DB.Where("id = ? AND user_id = ?", workflowID, userID).First(&definition).Error; err != nil {
-		Error(c, http.StatusNotFound, "工作流不存在")
 		return
 	}
 	app, appVersion, found := workflowRunAIAppVersion(sourceRun.ID, model.Int64String(userID))
@@ -626,6 +645,54 @@ func ResumeWorkflowRun(c *gin.Context) {
 	runWorkflowGraphWithResume(c, userID, role, definition, graph, app, appVersion, &sourceRunID, &workflowRunResumeState{
 		Inputs: state.Inputs, Outputs: state.Outputs, Completed: state.Completed,
 	}, failedNodeID)
+}
+
+// workflowApplyCurrentResumeNodeConfig keeps the checkpoint and graph shape of
+// a failed run, while applying the saved configuration of the failed node.
+// This lets a user correct a node setting (such as an image timeout) without
+// replaying successful upstream nodes with a different graph.
+func workflowApplyCurrentResumeNodeConfig(
+	historical *workflow.Graph,
+	current workflow.Graph,
+	failedNodeID string,
+) (workflow.Node, error) {
+	var currentNode *workflow.Node
+	for index := range current.Nodes {
+		if current.Nodes[index].ID == failedNodeID {
+			currentNode = &current.Nodes[index]
+			break
+		}
+	}
+	if currentNode == nil {
+		return workflow.Node{}, fmt.Errorf("当前工作流中找不到失败节点 %s，请重新运行工作流", failedNodeID)
+	}
+
+	for index := range historical.Nodes {
+		historicalNode := &historical.Nodes[index]
+		if historicalNode.ID != failedNodeID {
+			continue
+		}
+		if historicalNode.Type != currentNode.Type {
+			return workflow.Node{}, fmt.Errorf("失败节点类型已变更，请重新运行工作流")
+		}
+		if historicalNode.Type == workflow.NodeTypeTool {
+			var historicalConfig struct {
+				CapabilityID string `json:"capabilityId"`
+			}
+			var currentConfig struct {
+				CapabilityID string `json:"capabilityId"`
+			}
+			if json.Unmarshal(historicalNode.Config, &historicalConfig) != nil ||
+				json.Unmarshal(currentNode.Config, &currentConfig) != nil ||
+				historicalConfig.CapabilityID != currentConfig.CapabilityID {
+				return workflow.Node{}, fmt.Errorf("失败节点的工具能力已变更，请重新运行工作流")
+			}
+		}
+		historicalNode.Config = append(json.RawMessage(nil), currentNode.Config...)
+		return *historicalNode, nil
+	}
+
+	return workflow.Node{}, fmt.Errorf("历史运行中找不到失败节点 %s，请重新运行工作流", failedNodeID)
 }
 
 func workflowResumeEligibility(sourceRun model.WorkflowRun, graph workflow.Graph, registry *workflow.Registry) (string, bool, error) {
