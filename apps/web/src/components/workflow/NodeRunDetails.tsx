@@ -104,10 +104,12 @@ function RunDetailsBody({
   snapshot,
   compact,
   onResume,
+  resuming = false,
 }: {
   snapshot: NodeRunIterationSnapshot;
   compact: boolean;
   onResume?: () => void;
+  resuming?: boolean;
 }) {
   return (
     <div className={cn('space-y-3', compact ? 'p-3' : 'p-4')}>
@@ -135,8 +137,16 @@ function RunDetailsBody({
         </section>
       ) : null}
       {snapshot.status === 'error' && onResume ? (
-        <Button type="button" size="sm" variant="outline" className="w-full" onClick={onResume}>
-          重试此节点并继续
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="w-full"
+          disabled={resuming}
+          onClick={onResume}
+        >
+          {resuming ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : null}
+          {resuming ? '正在重试…' : '重试此节点并继续'}
         </Button>
       ) : null}
     </div>
@@ -147,10 +157,12 @@ function LoopIterationDetails({
   snapshot,
   compact,
   onResume,
+  resuming = false,
 }: {
   snapshot: NodeRunSnapshot;
   compact: boolean;
   onResume?: () => void;
+  resuming?: boolean;
 }) {
   const [selectedIteration, setSelectedIteration] = useState(snapshot.loopIteration);
   const [errorsOnly, setErrorsOnly] = useState(false);
@@ -163,7 +175,14 @@ function LoopIterationDetails({
   }, [snapshot.loopIteration]);
 
   if (entries.length === 0)
-    return <RunDetailsBody snapshot={snapshot} compact={compact} onResume={onResume} />;
+    return (
+      <RunDetailsBody
+        snapshot={snapshot}
+        compact={compact}
+        onResume={onResume}
+        resuming={resuming}
+      />
+    );
 
   const visibleEntries = errorsOnly
     ? entries.filter((entry) => entry.snapshot.status === 'error')
@@ -205,7 +224,7 @@ function LoopIterationDetails({
         ))}
       </div>
       {activeEntry ? (
-        <RunDetailsBody snapshot={activeEntry.snapshot} compact={compact} />
+        <RunDetailsBody snapshot={activeEntry.snapshot} compact={compact} resuming={resuming} />
       ) : (
         <p className="text-xs text-muted-foreground">当前没有失败轮次。</p>
       )}
@@ -237,10 +256,12 @@ export function NodeRunDetails({
   snapshot,
   variant = 'canvas',
   onResume,
+  resuming = false,
 }: {
   snapshot: NodeRunSnapshot;
   variant?: 'canvas' | 'panel';
   onResume?: () => void;
+  resuming?: boolean;
 }) {
   const [open, setOpen] = useState(snapshot.status === 'error');
 
@@ -254,7 +275,12 @@ export function NodeRunDetails({
         <div className="flex items-center gap-2">
           <RunStatus snapshot={snapshot} />
         </div>
-        <LoopIterationDetails snapshot={snapshot} compact={false} onResume={onResume} />
+        <LoopIterationDetails
+          snapshot={snapshot}
+          compact={false}
+          onResume={onResume}
+          resuming={resuming}
+        />
       </div>
     );
   }
@@ -286,7 +312,7 @@ export function NodeRunDetails({
         />
       </CollapsibleTrigger>
       <CollapsibleContent className="border-t border-border">
-        <LoopIterationDetails snapshot={snapshot} compact onResume={onResume} />
+        <LoopIterationDetails snapshot={snapshot} compact onResume={onResume} resuming={resuming} />
       </CollapsibleContent>
     </Collapsible>
   );

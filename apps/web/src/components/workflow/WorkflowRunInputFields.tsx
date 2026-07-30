@@ -37,6 +37,7 @@ interface WorkflowRunInputFieldsProps {
   tags: readonly NamedOption[];
   groups: readonly NamedOption[];
   loadingOptions: boolean;
+  disabled?: boolean;
   onValueChange: (name: string, value: unknown) => void;
   onFileChange: (name: string, file: File | undefined) => void;
 }
@@ -123,12 +124,14 @@ function FilePicker({
   inputID,
   label,
   onChange,
+  disabled = false,
 }: {
   accept?: string;
   file?: File;
   inputID: string;
   label: string;
   onChange: (file: File | undefined) => void;
+  disabled?: boolean;
 }) {
   const [inputKey, setInputKey] = useState(0);
   const helperText = accept ? '支持 .md、.markdown 格式' : '选择一个文件';
@@ -141,6 +144,7 @@ function FilePicker({
         className="sr-only"
         type="file"
         accept={accept}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.files?.[0])}
       />
       <div className="flex min-h-12 items-center gap-3">
@@ -155,7 +159,10 @@ function FilePicker({
         </div>
         <Label
           htmlFor={inputID}
-          className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-accent"
+          className={cn(
+            'inline-flex h-8 shrink-0 items-center rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground shadow-xs transition-colors',
+            disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-accent',
+          )}
         >
           {file ? '替换' : '选择'}
         </Label>
@@ -165,6 +172,7 @@ function FilePicker({
             variant="ghost"
             size="icon-xs"
             aria-label={`移除${label}`}
+            disabled={disabled}
             onClick={() => {
               onChange(undefined);
               setInputKey((current) => current + 1);
@@ -192,11 +200,13 @@ function TagPicker({
   selectedTagIds,
   tags,
   onValueChange,
+  disabled = false,
 }: {
   name: string;
   selectedTagIds: string[];
   tags: readonly NamedOption[];
   onValueChange: (name: string, value: string[]) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex flex-wrap gap-2" role="group" aria-label="博客标签">
@@ -206,12 +216,16 @@ function TagPicker({
           <label
             key={tag.id}
             className={cn(
-              'flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground transition-[background-color,border-color,color] hover:border-primary/35 hover:bg-muted/50',
+              'flex min-h-9 items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground transition-[background-color,border-color,color]',
+              disabled
+                ? 'cursor-not-allowed opacity-60'
+                : 'cursor-pointer hover:border-primary/35 hover:bg-muted/50',
               checked && 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15',
             )}
           >
             <Checkbox
               checked={checked}
+              disabled={disabled}
               onCheckedChange={(nextChecked) =>
                 onValueChange(
                   name,
@@ -236,6 +250,7 @@ export function WorkflowRunInputFields({
   tags,
   groups,
   loadingOptions,
+  disabled = false,
   onValueChange,
   onFileChange,
 }: WorkflowRunInputFieldsProps) {
@@ -266,6 +281,7 @@ export function WorkflowRunInputFields({
                 label={label}
                 accept=".md,.markdown,text/markdown"
                 file={files[name]}
+                disabled={disabled}
                 onChange={(file) => onFileChange(name, file)}
               />
             </RunInputField>
@@ -288,6 +304,7 @@ export function WorkflowRunInputFields({
                   name={name}
                   selectedTagIds={selectedTagIds}
                   tags={tags}
+                  disabled={disabled}
                   onValueChange={onValueChange}
                 />
               )}
@@ -301,6 +318,7 @@ export function WorkflowRunInputFields({
             <RunInputField key={key} label={label} required={definition.required}>
               <Select
                 value={(values[name] as string) || '_none'}
+                disabled={disabled}
                 onValueChange={(groupId) => onValueChange(name, groupId === '_none' ? '' : groupId)}
               >
                 <SelectTrigger aria-label={label} className="w-full bg-muted/20 hover:bg-muted/40">
@@ -338,6 +356,7 @@ export function WorkflowRunInputFields({
             <RunInputField key={key} label={label} required={definition.required}>
               <Select
                 value={visibility}
+                disabled={disabled}
                 onValueChange={(nextVisibility) => onValueChange(name, nextVisibility)}
               >
                 <SelectTrigger aria-label={label} className="w-full bg-muted/20 hover:bg-muted/40">
@@ -370,6 +389,7 @@ export function WorkflowRunInputFields({
               <Checkbox
                 id={inputID}
                 checked={values[name] === true}
+                disabled={disabled}
                 onCheckedChange={(checked) => onValueChange(name, checked === true)}
               />
               <span className="min-w-0 flex-1 text-sm font-medium text-foreground">{label}</span>
@@ -393,6 +413,7 @@ export function WorkflowRunInputFields({
                 inputID={inputID}
                 label={label}
                 file={files[name]}
+                disabled={disabled}
                 onChange={(file) => onFileChange(name, file)}
               />
             </RunInputField>
@@ -405,6 +426,7 @@ export function WorkflowRunInputFields({
               id={inputID}
               className="bg-muted/20 hover:bg-muted/40 focus-visible:bg-background"
               type={definition.type === 'number' ? 'number' : 'text'}
+              disabled={disabled}
               value={String(values[name] || '')}
               placeholder={
                 copy?.placeholder || (definition.type === 'string[]' ? '以逗号分隔' : undefined)

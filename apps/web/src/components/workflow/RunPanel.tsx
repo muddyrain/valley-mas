@@ -1,6 +1,14 @@
 import type { Node } from '@xyflow/react';
 import { AlertCircle, CheckCircle2, Loader2, Play, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type Dispatch,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { type Group, getGroups, getTags, type Tag } from '@/api/blog';
@@ -20,10 +28,23 @@ export interface WorkflowRunInput {
   files: Record<string, File>;
 }
 
+export interface WorkflowRunInputOptions {
+  tags: Tag[];
+  groups: Group[];
+  tagsLoaded: boolean;
+  groupsLoaded: boolean;
+}
+
 interface RunPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nodes: Node[];
+  values: Record<string, unknown>;
+  files: Record<string, File>;
+  onValuesChange: Dispatch<SetStateAction<Record<string, unknown>>>;
+  onFilesChange: Dispatch<SetStateAction<Record<string, File>>>;
+  options: WorkflowRunInputOptions;
+  onOptionsChange: Dispatch<SetStateAction<WorkflowRunInputOptions>>;
   onRun: (input: WorkflowRunInput) => void;
   onCancel: () => void;
   isRunning: boolean;
@@ -31,6 +52,7 @@ interface RunPanelProps {
   runError: string | null;
   preparing?: boolean;
   retrying?: boolean;
+  resuming?: boolean;
   workflowId: string | null;
   versions: WorkflowVersion[];
   onRetry: (run: WorkflowRunDetail) => void;
@@ -65,6 +87,12 @@ export function RunPanel({
   open,
   onOpenChange,
   nodes,
+  values,
+  files,
+  onValuesChange,
+  onFilesChange,
+  options,
+  onOptionsChange,
   onRun,
   onCancel,
   isRunning,
@@ -72,6 +100,7 @@ export function RunPanel({
   runError,
   preparing = false,
   retrying = false,
+  resuming = false,
   workflowId,
   versions,
   onRetry,
@@ -85,12 +114,10 @@ export function RunPanel({
   const hasBlogGroups = definitionEntries.some(
     ([, definition]) => definition.provider === 'blog.groups',
   );
-  const [values, setValues] = useState<Record<string, unknown>>({});
-  const [files, setFiles] = useState<Record<string, File>>({});
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [activeTab, setActiveTab] = useState<'run' | 'records' | 'tests'>('run');
+  const valuesRef = useRef(values);
+  const optionsRef = useRef(options);
   const terminalRunID =
     session.status === 'success' || session.status === 'error' || session.status === 'cancelled'
       ? session.runId || undefined
@@ -101,23 +128,64 @@ export function RunPanel({
   );
 
   useEffect(() => {
+    valuesRef.current = values;
+  }, [values]);
+
+  useEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
+
+  useEffect(() => {
     if (!open) return;
     if (!hasBlogTags && !hasBlogGroups) {
-      setTags([]);
-      setGroups([]);
       setLoadingOptions(false);
       return;
     }
     let active = true;
-    setLoadingOptions(true);
+    const cachedOptions = optionsRef.current;
+    const hasCachedOptions =
+      (!hasBlogTags || cachedOptions.tagsLoaded) && (!hasBlogGroups || cachedOptions.groupsLoaded);
+    setLoadingOptions(!hasCachedOptions);
     Promise.all([
       hasBlogTags ? getTags() : Promise.resolve([]),
       hasBlogGroups ? getGroups({ groupType: 'blog' }) : Promise.resolve([]),
     ])
       .then(([nextTags, nextGroups]) => {
         if (!active) return;
-        setTags(nextTags);
-        setGroups(nextGroups);
+        onOptionsChange((current) => ({
+          tags: hasBlogTags ? nextTags : current.tags,
+          groups: hasBlogGroups ? nextGroups : current.groups,
+          tagsLoaded: hasBlogTags || current.tagsLoaded,
+          groupsLoaded: hasBlogGroups || current.groupsLoaded,
+        }));
+        const nextValues = { ...valuesRef.current };
+        let removedInvalidOption = false;
+        for (const [name, definition] of definitionEntries) {
+          if (definition.provider === 'blog.tags') {
+            const selectedIDs = Array.isArray(nextValues[name])
+              ? nextValues[name].filter((id): id is string => typeof id === 'string')
+              : [];
+            const availableIDs = new Set(nextTags.map((tag) => tag.id));
+            const validIDs = selectedIDs.filter((id) => availableIDs.has(id));
+            if (validIDs.length !== selectedIDs.length) {
+              nextValues[name] = validIDs;
+              removedInvalidOption = true;
+            }
+          }
+          if (
+            definition.provider === 'blog.groups' &&
+            typeof nextValues[name] === 'string' &&
+            nextValues[name] !== '' &&
+            !nextGroups.some((group) => group.id === nextValues[name])
+          ) {
+            nextValues[name] = '';
+            removedInvalidOption = true;
+          }
+        }
+        if (removedInvalidOption) {
+          onValuesChange(nextValues);
+          toast.warning('已清除不可用的标签或分组');
+        }
       })
       .catch(() => {
         if (active) toast.error('加载博客标签或分组失败');
@@ -128,13 +196,13 @@ export function RunPanel({
     return () => {
       active = false;
     };
-  }, [hasBlogGroups, hasBlogTags, open]);
+  }, [definitionEntries, hasBlogGroups, hasBlogTags, onOptionsChange, onValuesChange, open]);
   useEffect(() => {
     if (open) setActiveTab('run');
   }, [open]);
   useEffect(() => {
     if (!open) return;
-    setValues((current) =>
+    onValuesChange((current) =>
       Object.fromEntries(
         definitionEntries.map(([name, definition]) => [
           name,
@@ -148,16 +216,16 @@ export function RunPanel({
         ]),
       ),
     );
-    setFiles((current) =>
+    onFilesChange((current) =>
       Object.fromEntries(
         definitionEntries.flatMap(([name, definition]) =>
           definition.type === 'file' && current[name] ? [[name, current[name]]] : [],
         ),
       ),
     );
-  }, [definitionEntries, open]);
+  }, [definitionEntries, onFilesChange, onValuesChange, open]);
   const setValue = (name: string, value: unknown) =>
-    setValues((current) => ({ ...current, [name]: value }));
+    onValuesChange((current) => ({ ...current, [name]: value }));
   const handleRun = useCallback(() => {
     const runValues: Record<string, unknown> = {};
     const runFiles: Record<string, File> = {};
@@ -195,6 +263,7 @@ export function RunPanel({
     ? nodes.find((node) => node.id === session.failedNodeId)
     : null;
   const failureMessage = runError || session.error || null;
+  const runPending = preparing || isRunning;
   const failedNodeLabel =
     failedNode && typeof failedNode.data?.label === 'string'
       ? failedNode.data.label
@@ -243,12 +312,13 @@ export function RunPanel({
                 definitions={definitions}
                 values={values}
                 files={files}
-                tags={tags}
-                groups={groups}
+                tags={options.tags}
+                groups={options.groups}
                 loadingOptions={loadingOptions}
+                disabled={runPending}
                 onValueChange={setValue}
                 onFileChange={(name, file) =>
-                  setFiles((current) => {
+                  onFilesChange((current) => {
                     if (file) return { ...current, [name]: file };
                     const next = { ...current };
                     delete next[name];
@@ -257,11 +327,15 @@ export function RunPanel({
                 }
               />
             </section>
-            {isRunning && (
+            {runPending && (
               <section className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
                 <span>
-                  {activeNode ? `正在执行：${String(activeNode.data.label)}` : '正在准备运行…'}
+                  {preparing
+                    ? '正在准备运行…'
+                    : activeNode
+                      ? `正在执行：${String(activeNode.data.label)}`
+                      : '正在连接运行服务…'}
                 </span>
               </section>
             )}
@@ -321,6 +395,7 @@ export function RunPanel({
             nodeLabels={nodeLabels}
             onRetry={onRetry}
             onResume={onResume}
+            resuming={isRunning || resuming}
           />
         </TabsContent>
         <TabsContent value="tests" className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -334,8 +409,8 @@ export function RunPanel({
       {activeTab === 'run' ? (
         <div className="border-t border-border/80 bg-card px-4 py-3">
           <div className="space-y-2">
-            <Button className="w-full" onClick={handleRun} disabled={isRunning || preparing}>
-              {preparing ? (
+            <Button className="w-full" onClick={handleRun} disabled={runPending}>
+              {runPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Play className="mr-2 h-4 w-4" />

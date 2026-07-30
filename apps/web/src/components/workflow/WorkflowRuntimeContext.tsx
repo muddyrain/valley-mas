@@ -6,6 +6,7 @@ import type { ValidationError } from './validateWorkflowConfig';
 interface WorkflowRuntimeContextValue {
   session: WorkflowRunSession;
   isRunning: boolean;
+  isResuming: boolean;
   cancelNode: (nodeId: string) => void;
   resumeFailedRun: (runId: string) => void;
   validationErrors: ReadonlyMap<string, readonly ValidationError[]>;

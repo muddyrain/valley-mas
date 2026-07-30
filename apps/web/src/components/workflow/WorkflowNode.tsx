@@ -521,6 +521,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
   const {
     session,
     isRunning,
+    isResuming,
     cancelNode,
     resumeFailedRun,
     validationErrors,
@@ -536,6 +537,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
   const { label, nodeType, config } = nodeData;
   const snapshot = session.nodes[id];
   const runningState = snapshot?.status;
+  const retryPending = isRunning || isResuming;
   const definition = NODE_CONFIGS[nodeType];
   const Icon = iconMap[nodeType] || MessageSquare;
   const hasInput = definition?.handles.input;
@@ -841,14 +843,18 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
                 variant="outline"
                 size="sm"
                 className="nodrag nopan h-7 w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                disabled={isRunning}
+                disabled={retryPending}
                 onClick={(event) => {
                   event.stopPropagation();
                   resumeFailedRun(session.runId as string);
                 }}
               >
-                <RotateCcw className="mr-1.5 size-3.5" />
-                重试并继续
+                {retryPending ? (
+                  <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="mr-1.5 size-3.5" />
+                )}
+                {retryPending ? '正在重试…' : '重试并继续'}
               </Button>
             </div>
           ) : null}
@@ -965,6 +971,7 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
                 ? () => resumeFailedRun(session.runId as string)
                 : undefined
             }
+            resuming={retryPending}
           />
         </div>
       ) : null}

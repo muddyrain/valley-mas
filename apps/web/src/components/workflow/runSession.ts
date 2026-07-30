@@ -291,7 +291,9 @@ function snapshotFromEvent(
       loopIteration: data?.loopIteration,
       loopDepth: data?.loopDepth,
       iterations: current.iterations,
-      startedAt: current.startedAt ?? Date.now(),
+      // A resumed node starts a new attempt. Reusing the failed attempt's start
+      // time would make the live timer include the time spent waiting to retry.
+      startedAt: current.status === 'running' ? current.startedAt : Date.now(),
     };
   }
   const nextStatus: NodeRunStatus =

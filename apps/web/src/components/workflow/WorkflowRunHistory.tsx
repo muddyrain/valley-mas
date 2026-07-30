@@ -206,6 +206,7 @@ export function WorkflowRunHistory({
   terminalRunID,
   onRetry,
   onResume,
+  resuming = false,
   nodeLabels = {},
 }: {
   workflowId: string | null;
@@ -213,6 +214,7 @@ export function WorkflowRunHistory({
   terminalRunID?: string;
   onRetry: (run: WorkflowRunDetail) => void;
   onResume: (run: WorkflowRunDetail) => void;
+  resuming?: boolean;
   nodeLabels?: Record<string, string>;
 }) {
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
@@ -354,6 +356,7 @@ export function WorkflowRunHistory({
                     <NodeRunDetails
                       snapshot={nodeSnapshot(selectedRun, node.nodeId)}
                       variant="panel"
+                      resuming={resuming}
                     />
                     {node.status === 'error' && selectedRun.resume?.allowed ? (
                       <Button
@@ -361,9 +364,11 @@ export function WorkflowRunHistory({
                         variant="outline"
                         size="sm"
                         className="mt-3 w-full"
+                        disabled={resuming}
                         onClick={() => onResume(selectedRun)}
                       >
-                        重试此节点并继续
+                        {resuming ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : null}
+                        {resuming ? '正在重试…' : '重试此节点并继续'}
                       </Button>
                     ) : null}
                   </div>

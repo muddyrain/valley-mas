@@ -112,7 +112,7 @@ import { LoopBoundaryEdge } from '@/components/workflow/LoopBoundaryEdge';
 import { NodePicker, type NodePickerItem } from '@/components/workflow/NodePicker';
 import { NODE_CONFIGS } from '@/components/workflow/nodeConfig';
 import { PropertyPanel, type PropertyPanelTab } from '@/components/workflow/PropertyPanel';
-import type { WorkflowRunInput } from '@/components/workflow/RunPanel';
+import type { WorkflowRunInput, WorkflowRunInputOptions } from '@/components/workflow/RunPanel';
 import { RunPanel } from '@/components/workflow/RunPanel';
 import {
   createWorkflowRunSession,
@@ -514,7 +514,16 @@ export default function WorkflowEditorPage() {
   const [saveRevision, setSaveRevision] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [showRunPanel, setShowRunPanel] = useState(false);
+  const [runInputValues, setRunInputValues] = useState<Record<string, unknown>>({});
+  const [runInputFiles, setRunInputFiles] = useState<Record<string, File>>({});
+  const [runInputOptions, setRunInputOptions] = useState<WorkflowRunInputOptions>({
+    tags: [],
+    groups: [],
+    tagsLoaded: false,
+    groupsLoaded: false,
+  });
   const [isPreparingRun, setIsPreparingRun] = useState(false);
+  const [isResumingFailedRun, setIsResumingFailedRun] = useState(false);
   const [retryRun, setRetryRun] = useState<WorkflowRunDetail | null>(null);
   const [pendingRetryRun, setPendingRetryRun] = useState<WorkflowRunDetail | null>(null);
   const [pendingResumeRun, setPendingResumeRun] = useState<WorkflowRunDetail | null>(null);
@@ -2371,12 +2380,13 @@ export default function WorkflowEditorPage() {
       setPendingValidationFocusNodeID(null);
       const generation = runGenerationRef.current + 1;
       runGenerationRef.current = generation;
+      const resumeSnapshots = resumeSourceRun
+        ? workflowRunSnapshotsFromNodeRuns(resumeSourceRun.nodes)
+        : undefined;
       dispatchRunSession({
         type: 'begin',
         generation,
-        nodes: resumeSourceRun
-          ? workflowRunSnapshotsFromNodeRuns(resumeSourceRun.nodes)
-          : undefined,
+        nodes: resumeSnapshots,
       });
 
       const abortController = new AbortController();
@@ -2605,7 +2615,8 @@ export default function WorkflowEditorPage() {
 
   const handleResumeFailedRun = useCallback(
     async (runId: string) => {
-      if (!workflowId) return;
+      if (!workflowId || isResumingFailedRun) return;
+      setIsResumingFailedRun(true);
       try {
         const run = await getWorkflowRun(workflowId, runId);
         if (!run.resume?.allowed) {
@@ -2615,9 +2626,11 @@ export default function WorkflowEditorPage() {
         handleResumeFromHistory(run);
       } catch (error) {
         toast.error(getAPIErrorMessage(error, '加载运行详情失败'));
+      } finally {
+        setIsResumingFailedRun(false);
       }
     },
-    [handleResumeFromHistory, workflowId],
+    [handleResumeFromHistory, isResumingFailedRun, workflowId],
   );
 
   const handleExport = useCallback(() => {
@@ -2800,6 +2813,7 @@ export default function WorkflowEditorPage() {
     () => ({
       session: runSession,
       isRunning,
+      isResuming: isResumingFailedRun,
       cancelNode: handleCancelWorkflowNode,
       resumeFailedRun: handleResumeFailedRun,
       validationErrors: nodeValidationErrors,
@@ -2827,6 +2841,7 @@ export default function WorkflowEditorPage() {
       closeOutputPicker,
       runSession,
       isRunning,
+      isResumingFailedRun,
       nodeValidationErrors,
     ],
   );
@@ -2928,12 +2943,19 @@ export default function WorkflowEditorPage() {
       workflowId={workflowId}
       versions={platform?.versions || []}
       nodes={retryRun ? retryInputNodes(retryRun.run.graphSnapshot) || nodes : nodes}
+      values={runInputValues}
+      files={runInputFiles}
+      onValuesChange={setRunInputValues}
+      onFilesChange={setRunInputFiles}
+      options={runInputOptions}
+      onOptionsChange={setRunInputOptions}
       onRun={handleRunConfirm}
       onCancel={handleCancelRun}
       onRetry={handleRetryFromHistory}
       onResume={handleResumeFromHistory}
       isRunning={isRunning}
       preparing={isPreparingRun}
+      resuming={isResumingFailedRun}
       session={runSession}
       runError={runError}
       retrying={Boolean(retryRun)}
