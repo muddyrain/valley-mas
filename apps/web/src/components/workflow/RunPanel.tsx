@@ -7,6 +7,7 @@ import { type Group, getGroups, getTags, type Tag } from '@/api/blog';
 import type { WorkflowRunDetail, WorkflowVersion } from '@/api/workflow';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { normalizeWorkflowResultActions } from './properties/ResultActionEditor';
 import { workflowRunErrorGuidance } from './runErrorGuidance';
 import type { WorkflowRunSession } from './runSession';
 import { normalizeStartInputs, type StartInputDefinition } from './types';
@@ -44,6 +45,22 @@ function startInputs(nodes: Node[]): Record<string, StartInputDefinition> {
   );
 }
 
+function resultActions(nodes: Node[], finalOutput: Record<string, unknown>) {
+  const endNode = nodes.find((item) => (item.data as { nodeType?: string }).nodeType === 'end');
+  const config = (endNode?.data as { config?: Record<string, unknown> } | undefined)?.config;
+  const configured = normalizeWorkflowResultActions(config?.resultActions).flatMap((action) => {
+    const path = finalOutput[action.output];
+    return typeof path === 'string' && path.startsWith('/') && action.label.trim()
+      ? [{ id: action.id, label: action.label.trim(), path }]
+      : [];
+  });
+  if (configured.length > 0) return configured;
+  const legacyPath = finalOutput.editPath;
+  return typeof legacyPath === 'string' && legacyPath.startsWith('/')
+    ? [{ id: 'legacy-edit-path', label: '打开结果', path: legacyPath }]
+    : [];
+}
+
 export function RunPanel({
   open,
   onOpenChange,
@@ -78,6 +95,10 @@ export function RunPanel({
     session.status === 'success' || session.status === 'error' || session.status === 'cancelled'
       ? session.runId || undefined
       : undefined;
+  const completedActions = useMemo(
+    () => (session.finalOutput ? resultActions(nodes, session.finalOutput) : []),
+    [nodes, session.finalOutput],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -275,13 +296,18 @@ export function RunPanel({
                 <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-background p-2 text-xs text-foreground">
                   {JSON.stringify(finalOutput, null, 2)}
                 </pre>
-                {typeof finalOutput.editPath === 'string' && finalOutput.editPath ? (
-                  <Link
-                    className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
-                    to={finalOutput.editPath}
-                  >
-                    打开结果
-                  </Link>
+                {completedActions.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {completedActions.map((action) => (
+                      <Link
+                        key={action.id}
+                        className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
+                        to={action.path}
+                      >
+                        {action.label}
+                      </Link>
+                    ))}
+                  </div>
                 ) : null}
               </section>
             )}

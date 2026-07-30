@@ -68,9 +68,11 @@ const WORKFLOW_TEMPLATE_GRAPHS: Record<string, WorkflowTemplateGraph> = {
         outputs: {
           postId: '{{create-draft.output.postId}}',
           title: '{{create-draft.output.title}}',
-          editPath: '{{create-draft.output.editPath}}',
+          draftEditorUrl: '{{create-draft.output.editPath}}',
           tagIds: '{{create-draft.output.tagIds}}',
         },
+        outputTypes: { draftEditorUrl: 'string' },
+        resultActions: [{ id: 'edit-draft', label: '编辑草稿', output: 'draftEditorUrl' }],
       }),
     ],
     edges: [
@@ -131,8 +133,10 @@ const WORKFLOW_TEMPLATE_GRAPHS: Record<string, WorkflowTemplateGraph> = {
         outputs: {
           postId: '{{create-draft.output.postId}}',
           title: '{{create-draft.output.title}}',
-          editPath: '{{create-draft.output.editPath}}',
+          draftEditorUrl: '{{create-draft.output.editPath}}',
         },
+        outputTypes: { draftEditorUrl: 'string' },
+        resultActions: [{ id: 'edit-draft', label: '编辑草稿', output: 'draftEditorUrl' }],
       }),
     ],
     edges: [
