@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"valley-server/internal/database"
+	"valley-server/internal/model"
 	"valley-server/internal/service/blogworkflow"
 )
 
@@ -45,6 +46,7 @@ func (BlogCreateDraftCapabilityAdapter) Execute(ctx context.Context, run RunCont
 	if err := ctx.Err(); err != nil {
 		return NodeResult{}, err
 	}
+	coverURL := coverURLFromValue(execution.Input["cover"])
 	manualTagIDs, err := stringListFromValue(execution.Input["tags"])
 	if err != nil {
 		return NodeResult{}, fmt.Errorf("草稿节点 tags 无效: %w", err)
@@ -62,17 +64,18 @@ func (BlogCreateDraftCapabilityAdapter) Execute(ctx context.Context, run RunCont
 		tagMode = blogworkflow.TagModeMerge
 	}
 	draft, err := blogworkflow.CreateDraft(database.DB.WithContext(ctx), blogworkflow.CreateDraftInput{
-		Title:         stringFromValue(execution.Input["title"]),
-		Content:       stringFromValue(execution.Input["content"]),
-		Excerpt:       stringFromValue(execution.Input["excerpt"]),
-		Cover:         coverURLFromValue(execution.Input["cover"]),
-		ManualTagIDs:  manualTagIDs,
-		SuggestedTags: suggestedTags,
-		TagMode:       tagMode,
-		Visibility:    stringFromValue(execution.Input["visibility"]),
-		GroupID:       groupID,
-		AuthorID:      run.Actor.UserID,
-		ActorRole:     run.Actor.Role,
+		Title:           stringFromValue(execution.Input["title"]),
+		Content:         stringFromValue(execution.Input["content"]),
+		Excerpt:         stringFromValue(execution.Input["excerpt"]),
+		Cover:           coverURL,
+		CoverStorageKey: ownedGeneratedCoverStorageKey(ctx, run.Actor.UserID, coverURL),
+		ManualTagIDs:    manualTagIDs,
+		SuggestedTags:   suggestedTags,
+		TagMode:         tagMode,
+		Visibility:      stringFromValue(execution.Input["visibility"]),
+		GroupID:         groupID,
+		AuthorID:        run.Actor.UserID,
+		ActorRole:       run.Actor.Role,
 	})
 	if err != nil {
 		return NodeResult{}, err
@@ -83,6 +86,23 @@ func (BlogCreateDraftCapabilityAdapter) Execute(ctx context.Context, run RunCont
 		"editPath": "/my-space/blog-edit/" + draft.PostID,
 		"tagIds":   draft.TagIDs,
 	}}, nil
+}
+
+func ownedGeneratedCoverStorageKey(ctx context.Context, userID int64, coverURL string) string {
+	if database.DB == nil || userID <= 0 || coverURL == "" {
+		return ""
+	}
+
+	var generation model.AIImageGeneration
+	err := database.DB.WithContext(ctx).
+		Select("result_storage_key").
+		Where("user_id = ? AND result_url = ? AND result_storage_key <> ''", userID, coverURL).
+		Order("created_at DESC").
+		First(&generation).Error
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(generation.ResultStorageKey)
 }
 
 func fileFromValue(value any) (FileInput, error) {

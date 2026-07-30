@@ -59,17 +59,18 @@ func ParseMarkdown(fileName string, content []byte) (ParsedMarkdown, error) {
 }
 
 type CreateDraftInput struct {
-	Title         string
-	Content       string
-	Excerpt       string
-	Cover         string
-	ManualTagIDs  []string
-	SuggestedTags []string
-	TagMode       string
-	Visibility    string
-	GroupID       int64
-	AuthorID      int64
-	ActorRole     string
+	Title           string
+	Content         string
+	Excerpt         string
+	Cover           string
+	CoverStorageKey string
+	ManualTagIDs    []string
+	SuggestedTags   []string
+	TagMode         string
+	Visibility      string
+	GroupID         int64
+	AuthorID        int64
+	ActorRole       string
 }
 
 type Draft struct {
@@ -135,23 +136,24 @@ func CreateDraft(db *gorm.DB, input CreateDraftInput) (Draft, error) {
 		}
 		postID := model.Int64String(utils.GenerateID())
 		post := model.Post{
-			ID:             postID,
-			Title:          strings.TrimSpace(input.Title),
-			Slug:           postID.String(),
-			PostType:       "blog",
-			Visibility:     normalizeVisibility(input.Visibility),
-			Content:        strings.TrimSpace(input.Content),
-			HTMLContent:    strings.TrimSpace(input.Content),
-			Excerpt:        strings.TrimSpace(input.Excerpt),
-			Cover:          strings.TrimSpace(input.Cover),
-			AuthorID:       model.Int64String(input.AuthorID),
-			GroupID:        groupID,
-			CategoryID:     categoryID,
-			Status:         "draft",
-			ImageTextData:  "{}",
-			TemplateData:   "{}",
-			SortOrder:      nextSort,
-			GroupSortOrder: nextGroupSort,
+			ID:              postID,
+			Title:           strings.TrimSpace(input.Title),
+			Slug:            postID.String(),
+			PostType:        "blog",
+			Visibility:      normalizeVisibility(input.Visibility),
+			Content:         strings.TrimSpace(input.Content),
+			HTMLContent:     strings.TrimSpace(input.Content),
+			Excerpt:         strings.TrimSpace(input.Excerpt),
+			Cover:           strings.TrimSpace(input.Cover),
+			CoverStorageKey: strings.TrimSpace(input.CoverStorageKey),
+			AuthorID:        model.Int64String(input.AuthorID),
+			GroupID:         groupID,
+			CategoryID:      categoryID,
+			Status:          "draft",
+			ImageTextData:   "{}",
+			TemplateData:    "{}",
+			SortOrder:       nextSort,
+			GroupSortOrder:  nextGroupSort,
 		}
 		if err := tx.Create(&post).Error; err != nil {
 			return err

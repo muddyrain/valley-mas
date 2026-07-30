@@ -25,14 +25,15 @@ func TestCreateDraftRetainsManualTags(t *testing.T) {
 	}
 
 	draft, err := CreateDraft(db, CreateDraftInput{
-		Title:         "Imported",
-		Content:       "# Imported\nContent",
-		ManualTagIDs:  []string{"11"},
-		SuggestedTags: []string{"Automatic"},
-		TagMode:       TagModeMerge,
-		Visibility:    "private",
-		AuthorID:      101,
-		ActorRole:     "user",
+		Title:           "Imported",
+		Content:         "# Imported\nContent",
+		CoverStorageKey: "ai-images/101/generated.png",
+		ManualTagIDs:    []string{"11"},
+		SuggestedTags:   []string{"Automatic"},
+		TagMode:         TagModeMerge,
+		Visibility:      "private",
+		AuthorID:        101,
+		ActorRole:       "user",
 	})
 	if err != nil {
 		t.Fatalf("CreateDraft() error = %v", err)
@@ -49,6 +50,9 @@ func TestCreateDraftRetainsManualTags(t *testing.T) {
 	}
 	if post.Status != "draft" || post.AuthorID != 101 {
 		t.Fatalf("post = %+v, want user draft", post)
+	}
+	if post.CoverStorageKey != "ai-images/101/generated.png" {
+		t.Fatalf("cover storage key = %q", post.CoverStorageKey)
 	}
 }
 
