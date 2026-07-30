@@ -34,6 +34,14 @@ export type WorkflowStartInputControl =
   | 'blog_group'
   | 'visibility';
 
+export type WorkflowStartInputProvider = 'blog.tags' | 'blog.groups' | 'static.visibility';
+
+const startInputProviders = new Set<WorkflowStartInputProvider>([
+  'blog.tags',
+  'blog.groups',
+  'static.visibility',
+]);
+
 export interface WorkflowRule {
   left: unknown;
   operator: 'equals' | 'notEquals' | 'contains' | 'isEmpty' | 'greaterThan' | 'lessThan';
@@ -71,6 +79,7 @@ export interface StartInputDefinition {
   type: WorkflowValueType;
   required: boolean;
   control: WorkflowStartInputControl;
+  provider?: WorkflowStartInputProvider;
 }
 
 const startInputControls = new Set<WorkflowStartInputControl>([
@@ -87,6 +96,18 @@ const legacyStartInputControls: Record<string, WorkflowStartInputControl> = {
   groupId: 'blog_group',
   visibility: 'visibility',
 };
+
+const legacyStartInputProviders: Partial<
+  Record<WorkflowStartInputControl, WorkflowStartInputProvider>
+> = {
+  blog_tags: 'blog.tags',
+  blog_group: 'blog.groups',
+  visibility: 'static.visibility',
+};
+
+export function workflowStartInputProviderForControl(control: WorkflowStartInputControl) {
+  return legacyStartInputProviders[control];
+}
 
 export function workflowStartInputControlType(
   control: WorkflowStartInputControl,
@@ -134,6 +155,12 @@ export function normalizeStartInputs(inputs: unknown): Record<string, StartInput
               type: workflowStartInputControlType(control, value.type),
               required: value.required === true,
               control,
+              ...(typeof value.provider === 'string' &&
+              startInputProviders.has(value.provider as WorkflowStartInputProvider)
+                ? { provider: value.provider as WorkflowStartInputProvider }
+                : legacyStartInputProviders[control]
+                  ? { provider: legacyStartInputProviders[control] }
+                  : {}),
             },
           ],
         ];

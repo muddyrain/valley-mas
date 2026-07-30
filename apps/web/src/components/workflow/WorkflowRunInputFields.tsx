@@ -272,7 +272,7 @@ export function WorkflowRunInputFields({
           );
         }
 
-        if (definition.control === 'blog_tags') {
+        if (definition.provider === 'blog.tags') {
           const selectedTagIds = (values[name] as string[]) || [];
           return (
             <RunInputField
@@ -295,7 +295,7 @@ export function WorkflowRunInputFields({
           );
         }
 
-        if (definition.control === 'blog_group') {
+        if (definition.provider === 'blog.groups') {
           const selectedGroup = groups.find((group) => group.id === values[name]);
           return (
             <RunInputField key={key} label={label} required={definition.required}>
@@ -323,7 +323,7 @@ export function WorkflowRunInputFields({
           );
         }
 
-        if (definition.control === 'visibility') {
+        if (definition.provider === 'static.visibility') {
           const visibility = (values[name] as string) || 'private';
           const visibilityOptions = {
             private: { icon: LockKeyhole, label: '私密' },

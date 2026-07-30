@@ -80,10 +80,10 @@ export function RunPanel({
   const definitions = useMemo(() => startInputs(nodes), [nodes]);
   const definitionEntries = useMemo(() => Object.entries(definitions), [definitions]);
   const hasBlogTags = definitionEntries.some(
-    ([, definition]) => definition.control === 'blog_tags',
+    ([, definition]) => definition.provider === 'blog.tags',
   );
   const hasBlogGroups = definitionEntries.some(
-    ([, definition]) => definition.control === 'blog_group',
+    ([, definition]) => definition.provider === 'blog.groups',
   );
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [files, setFiles] = useState<Record<string, File>>({});
@@ -140,9 +140,9 @@ export function RunPanel({
           name,
           current[name] !== undefined
             ? current[name]
-            : definition.control === 'blog_tags'
+            : definition.provider === 'blog.tags'
               ? []
-              : definition.control === 'visibility'
+              : definition.provider === 'static.visibility'
                 ? 'private'
                 : '',
         ]),

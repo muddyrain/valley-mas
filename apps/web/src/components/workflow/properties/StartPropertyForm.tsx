@@ -15,6 +15,7 @@ import {
   renameStartInput,
   type WorkflowValueType,
   workflowStartInputControlType,
+  workflowStartInputProviderForControl,
 } from '../types';
 import type { PropertyFormProps } from './index';
 import { RecordKeyInput } from './RecordKeyInput';
@@ -118,6 +119,7 @@ export function StartPropertyForm({ config, onUpdateConfig, onRenameInput }: Pro
                       ...input,
                       control: nextControl,
                       type: workflowStartInputControlType(nextControl, input.type),
+                      provider: workflowStartInputProviderForControl(nextControl),
                     },
                   })
                 }
