@@ -64,6 +64,10 @@
   color: hsl(var(--muted-foreground));
 }
 
+.ai-image-generation-caption {
+  white-space: nowrap;
+}
+
 .ai-image-generation-elapsed {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -84,6 +88,10 @@
   bottom: 0.625rem;
   left: 0.75rem;
   right: 0.75rem;
+  display: grid;
+  grid-template-columns: max-content max-content;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 .ai-image-generation-pulse.is-compact .ai-image-generation-caption,

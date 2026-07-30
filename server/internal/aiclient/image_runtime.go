@@ -14,11 +14,12 @@ import (
 )
 
 const (
-	maxCompatibleImageResponseBytes = 48 << 20
-	maxCompatibleGeneratedImageSize = 30 << 20
+	// A 128MiB image encoded as Base64 needs roughly 171MiB before JSON framing.
+	maxCompatibleImageResponseBytes = 176 << 20
+	maxCompatibleGeneratedImageSize = 128 << 20
 	// Browser-uploaded references are capped at 5MB by the handler. The larger
 	// limit is for an already-generated 4K image reused by conversation editing.
-	maxCompatibleReferenceSize = 30 << 20
+	maxCompatibleReferenceSize = 128 << 20
 )
 
 // ImageGenerationRequest is the provider-neutral image generation interface.
@@ -330,8 +331,8 @@ func normalizeCompatibleImageBase64(encoded string) (string, error) {
 	if err != nil || len(content) == 0 || len(content) > maxCompatibleGeneratedImageSize {
 		return "", errors.New("AI 生图返回的 Base64 图片无效或过大")
 	}
-	mimeType := http.DetectContentType(content)
-	if !isCompatibleImageMIME(mimeType) {
+	mimeType := DetectCompatibleImageMIME(content)
+	if mimeType == "" {
 		return "", errors.New("AI 生图返回了不支持的图片格式")
 	}
 	return "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(content), nil
@@ -349,22 +350,53 @@ func DecodeImageDataURL(raw string, maxBytes int64) ([]byte, string, error) {
 		!strings.HasSuffix(strings.ToLower(header), ";base64") {
 		return nil, "", errors.New("图片必须是 Base64 data URL")
 	}
-	mimeType := strings.TrimSuffix(strings.TrimPrefix(strings.ToLower(header), "data:"), ";base64")
-	if !isCompatibleImageMIME(mimeType) {
-		return nil, "", errors.New("图片仅支持 JPG、PNG 或 WebP")
+	mimeType := NormalizeCompatibleImageMIME(strings.TrimSuffix(strings.TrimPrefix(strings.ToLower(header), "data:"), ";base64"))
+	if mimeType == "" {
+		return nil, "", errors.New("图片仅支持 JPG、PNG、WebP、GIF、AVIF 或 BMP")
 	}
 	content, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil || len(content) == 0 || (maxBytes > 0 && int64(len(content)) > maxBytes) {
 		return nil, "", errors.New("图片内容无效或过大")
 	}
-	if http.DetectContentType(content) != mimeType {
+	if DetectCompatibleImageMIME(content) != mimeType {
 		return nil, "", errors.New("图片格式与内容不一致")
 	}
 	return content, mimeType, nil
 }
 
-func isCompatibleImageMIME(value string) bool {
-	return value == "image/png" || value == "image/jpeg" || value == "image/webp"
+func NormalizeCompatibleImageMIME(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	switch normalized {
+	case "image/jpeg", "image/jpg":
+		return "image/jpeg"
+	case "image/png", "image/webp", "image/gif", "image/avif", "image/bmp", "image/x-ms-bmp":
+		if normalized == "image/x-ms-bmp" {
+			return "image/bmp"
+		}
+		return normalized
+	default:
+		return ""
+	}
+}
+
+func IsCompatibleImageMIME(value string) bool {
+	return NormalizeCompatibleImageMIME(value) != ""
+}
+
+// DetectCompatibleImageMIME identifies safe raster formats that modern
+// browsers can render. SVG is intentionally excluded because it can contain
+// executable markup when served directly from object storage.
+func DetectCompatibleImageMIME(content []byte) string {
+	if mimeType := NormalizeCompatibleImageMIME(http.DetectContentType(content)); mimeType != "" {
+		return mimeType
+	}
+	if len(content) >= 12 && string(content[4:8]) == "ftyp" {
+		switch string(content[8:12]) {
+		case "avif", "avis":
+			return "image/avif"
+		}
+	}
+	return ""
 }
 
 func extensionForImageMIME(mimeType string) string {
@@ -373,6 +405,12 @@ func extensionForImageMIME(mimeType string) string {
 		return ".jpg"
 	case "image/webp":
 		return ".webp"
+	case "image/gif":
+		return ".gif"
+	case "image/avif":
+		return ".avif"
+	case "image/bmp":
+		return ".bmp"
 	default:
 		return ".png"
 	}

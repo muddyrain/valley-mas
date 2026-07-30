@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
@@ -35,7 +36,8 @@ const (
 	MaxAIImagePromptRunes       = 48_000
 	MaxAIImageReferences        = 3
 	MaxAIImageReferenceBytes    = 5 << 20
-	MaxGeneratedAIImageBytes    = 30 << 20
+	MaxGeneratedAIImageSizeMB   = 128
+	MaxGeneratedAIImageBytes    = MaxGeneratedAIImageSizeMB << 20
 
 	AIImageGenerationSourceStudio   = "studio"
 	AIImageGenerationSourceWorkflow = "workflow"
@@ -620,7 +622,7 @@ func FetchAIImageSource(ctx context.Context, source string) ([]byte, string, err
 			return nil, "", err
 		}
 		if !SupportedAIImageMIME(mimeType) {
-			return nil, "", errors.New("图片格式必须是 JPG、PNG 或 WebP")
+			return nil, "", errors.New("图片格式必须是 JPG、PNG、WebP、GIF、AVIF 或 BMP")
 		}
 		return content, mimeType, nil
 	}
@@ -644,9 +646,9 @@ func FetchAIImageSource(ctx context.Context, source string) ([]byte, string, err
 	if err != nil || len(content) == 0 || len(content) > MaxGeneratedAIImageBytes {
 		return nil, "", errors.New("图片内容无效或过大")
 	}
-	mimeType := http.DetectContentType(content)
+	mimeType := aiclient.DetectCompatibleImageMIME(content)
 	if !SupportedAIImageMIME(mimeType) {
-		return nil, "", errors.New("图片格式必须是 JPG、PNG 或 WebP")
+		return nil, "", errors.New("图片格式必须是 JPG、PNG、WebP、GIF、AVIF 或 BMP")
 	}
 	return content, mimeType, nil
 }
@@ -656,7 +658,11 @@ func AIImageDataURL(content []byte, mimeType string) string {
 }
 
 func SupportedAIImageMIME(value string) bool {
-	return value == "image/jpeg" || value == "image/png" || value == "image/webp"
+	return aiclient.IsCompatibleImageMIME(value)
+}
+
+func AIImageStorageExtensions() []string {
+	return []string{".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".bmp"}
 }
 
 func AIImageExtension(mimeType string) string {
@@ -665,6 +671,12 @@ func AIImageExtension(mimeType string) string {
 		return ".jpg"
 	case "image/webp":
 		return ".webp"
+	case "image/gif":
+		return ".gif"
+	case "image/avif":
+		return ".avif"
+	case "image/bmp":
+		return ".bmp"
 	default:
 		return ".png"
 	}

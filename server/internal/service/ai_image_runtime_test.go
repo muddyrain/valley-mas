@@ -112,6 +112,26 @@ func TestAIImageGenerationServiceGeneratePersistsStoredResult(t *testing.T) {
 	}
 }
 
+func TestFetchAIImageSourceSupportsGIFDataURL(t *testing.T) {
+	content, err := base64.StdEncoding.DecodeString("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fetched, mimeType, err := FetchAIImageSource(
+		context.Background(),
+		AIImageDataURL(content, "image/gif"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(fetched) != string(content) || mimeType != "image/gif" {
+		t.Fatalf("fetched = %q, mime = %q", fetched, mimeType)
+	}
+	if AIImageExtension(mimeType) != ".gif" {
+		t.Fatalf("gif extension = %q", AIImageExtension(mimeType))
+	}
+}
+
 func TestAIImageGenerationServiceUsesConfiguredTimeout(t *testing.T) {
 	db := newAIImageRuntimeTestDB(t)
 	var resolvedTimeout time.Duration

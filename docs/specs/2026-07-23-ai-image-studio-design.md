@@ -30,7 +30,7 @@
 
 服务端生成任务使用 `queued`、`running`、`succeeded`、`failed` 状态，并提供 `preparing`、`generating`、`storing`、`completed` 阶段。前端轮询任务状态，在画布上展示与当前阶段对应的骨架占位和短状态文案，不伪造百分比进度；页面初次加载与创作历史加载也使用与最终布局同构的骨架屏，避免内容跳变。
 
-提交前在设置栏显示本次请求摘要：模型、目标尺寸、参考图来源和费用边界。选择 4K 时，摘要必须与实际接口尺寸一致；请求提交后，服务商可能已按一次调用计费。失败任务只允许用户恢复原参数后主动再次提交，系统不得自动重试。
+提交前在设置栏显示本次请求摘要：模型、目标尺寸、参考图来源和费用边界。选择 4K 时，摘要必须与实际接口尺寸一致；请求提交后，服务商可能已按一次调用计费。系统不得自动重试；图片对话中的失败气泡允许用户手动重试，按原任务参数创建新任务，可能产生新的调用费用。其他历史任务仍可恢复原参数后主动再次提交。
 
 画布与对话 Tab 的选中指示器使用短时 FLIP 布局过渡，图片卡片只保留轻量的预览缩放和边框、阴影反馈。表现动效只表达真实状态或空间关系，不声称展示模型扩散中间帧，不使用持续漂浮、颗粒噪点或装饰性扫描线。所有持续动画必须响应 `prefers-reduced-motion`；任务失败后停止动画并提供可重试信息。
 
@@ -39,7 +39,7 @@
 - `GET /ai/image-options`：返回受控创作类型、内置与 owner 私有视觉风格、比例和尺寸选项；旧 `/ai/image-presets` 暂时保留兼容。
 - `POST /ai/image-recipes/:recipeId/sample-prompts`：从对应创作类型的受控候选池轮换三条快速示例；请求可携带当前展示项以避免立即重复，响应中的 `model` 固定为 `local-curated`；旧模板路径暂时保留兼容。
 - `GET /ai/image-generations`：返回当前用户最近的生成记录。
-- `POST /ai/image-generations`：创建异步生成任务，输入模型目录 ID、`recipeId`、可选 `styleProfileId`、`brief`、比例、清晰度、最多三张 data URL 参考图，或传入一条当前用户已有的 `referenceGenerationId` 作为上一张图片参考；用户直接提交的单张参考图限制为 5MB，服务端已持久化的生成结果按 30MB 下载上限复用，不套用上传限制；旧 `presetId/skillId/prompt` 字段暂时保留兼容。
+- `POST /ai/image-generations`：创建异步生成任务，输入模型目录 ID、`recipeId`、可选 `styleProfileId`、`brief`、比例、清晰度、最多三张 data URL 参考图，或传入一条当前用户已有的 `referenceGenerationId` 作为上一张图片参考；用户直接提交的单张参考图限制为 5MB，服务端已持久化的生成结果按 128MiB 下载上限复用，不套用上传限制；生成结果支持 JPG、PNG、WebP、GIF、AVIF 与 BMP 等安全栅格格式，SVG 不接纳；旧 `presetId/skillId/prompt` 字段暂时保留兼容。
 - `GET /ai/image-generations/:generationId`：读取单条任务状态。
 - `PATCH /ai/image-generations/:generationId/favorite`：更新当前用户单条生成记录的收藏状态。
 - `DELETE /ai/image-generations/:generationId`：删除当前用户已完成或失败的生成记录及其历史图片；生成中的任务暂不允许删除。

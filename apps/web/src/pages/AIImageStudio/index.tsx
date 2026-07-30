@@ -448,6 +448,7 @@ export default function AIImageStudio() {
     useState<ConversationReferenceMode>('latest');
   const [lockedConversationReferenceID, setLockedConversationReferenceID] = useState<string>();
   const [conversationSending, setConversationSending] = useState(false);
+  const [retryingGenerationID, setRetryingGenerationID] = useState<string>();
   const [conversationStarting, setConversationStarting] = useState(false);
   const [conversationLoading, setConversationLoading] = useState(false);
   const [conversationHistoryOpen, setConversationHistoryOpen] = useState(false);
@@ -955,6 +956,67 @@ export default function AIImageStudio() {
       scheduleConversationScroll();
       toast.error(errorMessage);
     } finally {
+      setConversationSending(false);
+    }
+  };
+
+  const retryConversationGeneration = async (generation: AIImageGeneration) => {
+    if (creatingRef.current || isBusy || generation.status !== 'failed') return;
+    if (!conversationID) {
+      toast.error('当前对话不可重试，请恢复参数后重新提交');
+      return;
+    }
+    creatingRef.current = true;
+    setRetryingGenerationID(generation.id);
+    setConversationSending(true);
+    try {
+      let references: string[] = [];
+      if (generation.referenceCount > 0 && !generation.parentGenerationId) {
+        if (!generation.canvasSnapshotUrl) {
+          throw new Error('原始参考图已不可恢复，请恢复参数后重新提交');
+        }
+        references = [await readImageAsDataURL(generation.canvasSnapshotUrl)];
+      }
+      const result = await createAIImageGeneration({
+        modelId: generation.modelCatalogId,
+        recipeId: generation.presetId,
+        styleProfileId: generation.styleProfileId || undefined,
+        brief: generation.prompt,
+        aspectRatio: generation.aspectRatio,
+        quality: generation.quality,
+        references,
+        referenceGenerationId: generation.parentGenerationId,
+      });
+      const savedAssistantMessage = await addAIImageConversationMessage(conversationID, {
+        role: 'assistant',
+        content: '正在重新生成图片。',
+        generationId: result.generation.id,
+      });
+      setConversations((items) => [
+        savedAssistantMessage.conversation,
+        ...items.filter((item) => item.id !== savedAssistantMessage.conversation.id),
+      ]);
+      setConversationMessages((items) => [
+        ...items,
+        {
+          id: savedAssistantMessage.message.id,
+          role: savedAssistantMessage.message.role,
+          content: savedAssistantMessage.message.content,
+          createdAt: savedAssistantMessage.message.createdAt,
+          generationId: savedAssistantMessage.message.generationId,
+        },
+      ]);
+      scheduleConversationScroll();
+      setActiveGeneration(result.generation);
+      setHistory((current) => [
+        result.generation,
+        ...current.filter((item) => item.id !== result.generation.id),
+      ]);
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '重新生成失败，请稍后重试'));
+    } finally {
+      creatingRef.current = false;
+      setRetryingGenerationID(undefined);
       setConversationSending(false);
     }
   };
@@ -1664,7 +1726,28 @@ export default function AIImageStudio() {
                                               ) : null}
                                               {generation.status === 'failed' ? (
                                                 <div className="w-full min-w-0 rounded-md border border-destructive/20 bg-destructive/10 px-2.5 py-2 text-xs leading-5 text-destructive break-words whitespace-pre-wrap [overflow-wrap:anywhere]">
-                                                  {generation.errorMessage || '生成失败'}
+                                                  <p>{generation.errorMessage || '生成失败'}</p>
+                                                  <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="mt-2 h-7 border-destructive/30 bg-background/80 px-2 text-xs text-foreground hover:bg-background"
+                                                    aria-label="重新生成图片"
+                                                    onClick={() =>
+                                                      void retryConversationGeneration(generation)
+                                                    }
+                                                    disabled={isBusy}
+                                                  >
+                                                    <RefreshCw
+                                                      className={cn(
+                                                        retryingGenerationID === generation.id &&
+                                                          'animate-spin',
+                                                      )}
+                                                    />
+                                                    {retryingGenerationID === generation.id
+                                                      ? '重试中'
+                                                      : '重试'}
+                                                  </Button>
                                                 </div>
                                               ) : generation.status === 'paused' ? (
                                                 <div className="w-[min(100%,20rem)] rounded-md border border-border bg-background/70 px-2.5 py-2 text-xs text-muted-foreground">
@@ -1974,7 +2057,7 @@ export default function AIImageStudio() {
                     </p>
                   ) : null}
                   <p className="text-xs leading-5 text-muted-foreground">
-                    请求提交后，服务商可能已经按一次调用计费；失败任务不会自动重试或再次扣费。
+                    请求提交后，服务商可能已经按一次调用计费；失败任务不会自动重试，手动重试可能产生新的调用费用。
                   </p>
                 </section>
 

@@ -29,6 +29,18 @@ func TestLifeTraceUploadConfigAndStoragePath(t *testing.T) {
 	}
 }
 
+func TestAIImageWallpaperStorageConfigSupportsHighResolutionRasterImages(t *testing.T) {
+	config := GetDefaultConfig(UploadTypeWallpaper)
+	if config.MaxSize != MaxGeneratedAIImageSizeMB {
+		t.Fatalf("expected %dMB wallpaper max size, got %d", MaxGeneratedAIImageSizeMB, config.MaxSize)
+	}
+	for _, extension := range []string{".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".bmp"} {
+		if !strings.Contains(strings.Join(config.AllowedExts, ","), extension) {
+			t.Fatalf("expected wallpaper config to allow %s: %+v", extension, config.AllowedExts)
+		}
+	}
+}
+
 func TestValidateLifeTraceUploadFile(t *testing.T) {
 	service := &UploadService{}
 	config := GetDefaultConfig(UploadTypeLifeTrace)

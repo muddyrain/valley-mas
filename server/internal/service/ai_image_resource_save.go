@@ -40,9 +40,9 @@ type SaveAIImageGenerationResourceResult struct {
 }
 
 var (
-	ErrAIImageGenerationNotFound = errors.New("AI image generation not found")
-	ErrAIImageGenerationNotReady = errors.New("AI image generation is not ready")
-	ErrAIImageAlreadySaved       = errors.New("AI image generation is already saved")
+	ErrAIImageGenerationNotFound  = errors.New("AI image generation not found")
+	ErrAIImageGenerationNotReady  = errors.New("AI image generation is not ready")
+	ErrAIImageAlreadySaved        = errors.New("AI image generation is already saved")
 	ErrAIImageMetadataUnavailable = errors.New("AI image metadata generator is unavailable")
 )
 
@@ -86,7 +86,8 @@ func (s AIImageResourceSaver) Save(ctx context.Context, input SaveAIImageGenerat
 	uploadConfig := GetDefaultConfig(UploadType(resourceTypeForAIImage(generation)))
 	uploadConfig.UserID = int64(input.UserID)
 	// Generated images can be high-resolution even when they are square.
-	uploadConfig.MaxSize = 30
+	uploadConfig.MaxSize = MaxGeneratedAIImageSizeMB
+	uploadConfig.AllowedExts = AIImageStorageExtensions()
 	stored, err := NewUploadService().UploadBytesWithContext(ctx, "saved-ai-image"+aiImageExtension(mimeType), content, uploadConfig)
 	if err != nil {
 		return SaveAIImageGenerationResourceResult{}, fmt.Errorf("upload generated image: %w", err)
@@ -182,12 +183,5 @@ func truncateAIImageText(value string, limit int) string {
 }
 
 func aiImageExtension(mimeType string) string {
-	switch mimeType {
-	case "image/jpeg":
-		return ".jpg"
-	case "image/webp":
-		return ".webp"
-	default:
-		return ".png"
-	}
+	return AIImageExtension(mimeType)
 }

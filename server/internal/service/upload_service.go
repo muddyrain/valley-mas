@@ -76,8 +76,8 @@ func GetDefaultConfig(uploadType UploadType) UploadConfig {
 		},
 		UploadTypeWallpaper: {
 			Type:        UploadTypeWallpaper,
-			MaxSize:     30, // 30MB
-			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
+			MaxSize:     MaxGeneratedAIImageSizeMB,
+			AllowedExts: AIImageStorageExtensions(),
 		},
 		UploadTypeCover: {
 			Type:        UploadTypeCover,

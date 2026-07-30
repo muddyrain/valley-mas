@@ -372,7 +372,7 @@ func SaveAIImageGenerationResource(c *gin.Context) {
 	}
 	if err != nil {
 		if strings.Contains(err.Error(), "文件过大") {
-			Error(c, http.StatusRequestEntityTooLarge, "生成图片文件过大，最大支持 30MB")
+			Error(c, http.StatusRequestEntityTooLarge, fmt.Sprintf("生成图片文件过大，最大支持 %dMB", service.MaxGeneratedAIImageSizeMB))
 			return
 		}
 		if strings.Contains(err.Error(), "当前没有已验证的可用视觉模型") {
