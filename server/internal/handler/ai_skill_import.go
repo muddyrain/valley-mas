@@ -47,6 +47,7 @@ type aiSkillImportSource struct {
 	ReferenceCount   int
 	ScriptContent    string
 	ScriptCount      int
+	IgnoredFileCount int
 	Tags             []string
 	URL              string
 	Author           string

@@ -1,6 +1,7 @@
 import {
   Download,
   ExternalLink,
+  FileArchive,
   FileCode2,
   FileText,
   FolderOpen,
@@ -47,8 +48,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const suggestedSkillTags = ['通用', '智能体', '工作流', '写作', '生图', '数据'];
+const maxSkillZipBytes = 32 * 1024 * 1024;
+
+type InstallSourceType = 'github' | 'zip';
 
 function parseSkillTags(value: string) {
   return Array.from(
@@ -70,7 +75,9 @@ export default function SkillResources() {
   const [skills, setSkills] = useState<AISkill[]>([]);
   const [loading, setLoading] = useState(true);
   const [installOpen, setInstallOpen] = useState(false);
+  const [installSourceType, setInstallSourceType] = useState<InstallSourceType>('github');
   const [installURL, setInstallURL] = useState('');
+  const [installFile, setInstallFile] = useState<File | null>(null);
   const [installPreview, setInstallPreview] = useState<AISkillImportPreview | null>(null);
   const [selectedInstallPaths, setSelectedInstallPaths] = useState<string[]>([]);
   const [resolvingInstall, setResolvingInstall] = useState(false);
@@ -148,21 +155,31 @@ export default function SkillResources() {
   };
 
   const resetInstallFlow = () => {
+    setInstallSourceType('github');
     setInstallURL('');
+    setInstallFile(null);
     setInstallPreview(null);
     setSelectedInstallPaths([]);
     setResolvingInstall(false);
     setInstalling(false);
   };
 
+  const resetInstallPreview = () => {
+    setInstallPreview(null);
+    setSelectedInstallPaths([]);
+  };
+
+  const getInstallSource = () => (installSourceType === 'zip' ? installFile : installURL.trim());
+
   const previewInstall = async () => {
-    if (!installURL.trim()) {
-      toast.error('请输入 GitHub 仓库链接');
+    const source = getInstallSource();
+    if (!source) {
+      toast.error(installSourceType === 'zip' ? '请选择 ZIP 技能包' : '请输入 GitHub 仓库链接');
       return;
     }
     try {
       setResolvingInstall(true);
-      const preview = await previewAISkillImport(installURL.trim());
+      const preview = await previewAISkillImport(source);
       setInstallPreview(preview);
       setSelectedInstallPaths(preview.skills.map((skill) => skill.path));
     } catch (error) {
@@ -183,7 +200,12 @@ export default function SkillResources() {
     }
     try {
       setInstalling(true);
-      const result = await installAISkill(installURL.trim(), selectedInstallPaths);
+      const source = getInstallSource();
+      if (!source) {
+        toast.error('技能来源已失效，请重新选择');
+        return;
+      }
+      const result = await installAISkill(source, selectedInstallPaths);
       setSkills((items) => [
         ...result.list,
         ...items.filter((item) => !result.list.some((skill) => skill.id === item.id)),
@@ -371,16 +393,23 @@ export default function SkillResources() {
                   <Badge variant="outline">+{skill.tags.length - 2}</Badge>
                 ) : null}
                 {skill.tags.length === 0 ? <Badge variant="outline">未分类</Badge> : null}
-                <a
-                  href={skill.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="ml-auto inline-flex items-center gap-1 text-primary hover:underline"
-                >
-                  <Github className="size-3.5" />
-                  {skill.sourceAuthor || '来源'}
-                  <ExternalLink className="size-3" />
-                </a>
+                {skill.sourceUrl.startsWith('http') ? (
+                  <a
+                    href={skill.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ml-auto inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    <Github className="size-3.5" />
+                    {skill.sourceAuthor || '来源'}
+                    <ExternalLink className="size-3" />
+                  </a>
+                ) : (
+                  <span className="ml-auto inline-flex items-center gap-1">
+                    <FileArchive className="size-3.5" />
+                    {skill.sourceAuthor || 'ZIP 文件'}
+                  </span>
+                )}
               </div>
             </article>
           ))}
@@ -490,16 +519,23 @@ export default function SkillResources() {
             {skillDetail ? (
               <>
                 <span>{detailFiles.length} 个已导入文件</span>
-                <a
-                  href={skillDetail.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-primary hover:underline"
-                >
-                  <Github className="size-3.5" />
-                  查看来源
-                  <ExternalLink className="size-3" />
-                </a>
+                {skillDetail.sourceUrl.startsWith('http') ? (
+                  <a
+                    href={skillDetail.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    <Github className="size-3.5" />
+                    查看来源
+                    <ExternalLink className="size-3" />
+                  </a>
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    <FileArchive className="size-3.5" />
+                    ZIP 文件
+                  </span>
+                )}
               </>
             ) : null}
           </div>
@@ -574,24 +610,61 @@ export default function SkillResources() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>安装技能</DialogTitle>
-            <DialogDescription>
-              粘贴公开 GitHub 仓库、目录链接，或 npx skills add 命令，选择要安装的 SKILL.md。
-            </DialogDescription>
+            <DialogDescription>从公开 GitHub 来源或 ZIP 技能包安装 SKILL.md。</DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label htmlFor="ai-skill-install-url">技能来源</Label>
-            <Input
-              id="ai-skill-install-url"
-              value={installURL}
-              onChange={(event) => {
-                setInstallURL(event.target.value);
-                setInstallPreview(null);
-                setSelectedInstallPaths([]);
-              }}
-              placeholder="npx skills add owner/repository --skill skill-name"
-              disabled={installing || resolvingInstall}
-            />
-          </div>
+          <Tabs
+            value={installSourceType}
+            onValueChange={(value) => {
+              setInstallSourceType(value as InstallSourceType);
+              resetInstallPreview();
+            }}
+            className="py-2"
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="github">
+                <Github />
+                GitHub
+              </TabsTrigger>
+              <TabsTrigger value="zip">
+                <FileArchive />
+                ZIP 文件
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="github" className="space-y-2 pt-2">
+              <Label htmlFor="ai-skill-install-url">技能来源</Label>
+              <Input
+                id="ai-skill-install-url"
+                value={installURL}
+                onChange={(event) => {
+                  setInstallURL(event.target.value);
+                  resetInstallPreview();
+                }}
+                placeholder="npx skills add owner/repository --skill skill-name"
+                disabled={installing || resolvingInstall}
+              />
+            </TabsContent>
+            <TabsContent value="zip" className="space-y-2 pt-2">
+              <Label htmlFor="ai-skill-install-file">ZIP 技能包</Label>
+              <Input
+                id="ai-skill-install-file"
+                type="file"
+                accept=".zip,application/zip"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  if (file && file.size > maxSkillZipBytes) {
+                    toast.error('ZIP 文件不能超过 32MB');
+                    event.target.value = '';
+                    setInstallFile(null);
+                  } else {
+                    setInstallFile(file);
+                  }
+                  resetInstallPreview();
+                }}
+                disabled={installing || resolvingInstall}
+              />
+              <p className="text-xs text-muted-foreground">最大 32MB</p>
+            </TabsContent>
+          </Tabs>
           {installPreview ? (
             <div className="space-y-3 border-t border-border pt-4">
               <div className="flex items-center justify-between gap-3">
@@ -636,14 +709,14 @@ export default function SkillResources() {
                         <span className="mt-1 block line-clamp-2 text-xs leading-5 text-muted-foreground">
                           {skill.description || skill.path}
                         </span>
-                        {skill.referenceCount > 0 ? (
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          将导入 SKILL.md
+                          {skill.referenceCount > 0 ? `、${skill.referenceCount} 份参考资料` : ''}
+                          {skill.scriptCount > 0 ? `、${skill.scriptCount} 个脚本` : ''}
+                        </span>
+                        {skill.ignoredFileCount > 0 ? (
                           <span className="mt-1 block text-xs text-muted-foreground">
-                            含 {skill.referenceCount} 份参考资料
-                          </span>
-                        ) : null}
-                        {skill.scriptCount > 0 ? (
-                          <span className="mt-1 block text-xs text-muted-foreground">
-                            含 {skill.scriptCount} 个脚本
+                            忽略 {skill.ignoredFileCount} 个不支持的文件
                           </span>
                         ) : null}
                       </span>
@@ -662,7 +735,11 @@ export default function SkillResources() {
               取消
             </Button>
             <Button
-              disabled={installing || resolvingInstall || !installURL.trim()}
+              disabled={
+                installing ||
+                resolvingInstall ||
+                (installSourceType === 'zip' ? !installFile : !installURL.trim())
+              }
               onClick={() => void install()}
             >
               {installing || resolvingInstall ? <Spinner /> : <Download />}

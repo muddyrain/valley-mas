@@ -243,6 +243,7 @@ export interface AISkillImportCandidate {
   description: string;
   referenceCount: number;
   scriptCount: number;
+  ignoredFileCount: number;
   sourceUrl: string;
 }
 
@@ -716,12 +717,34 @@ export function getAISkill(skillId: string): Promise<AISkillDetail> {
   return request.get(`/ai/skills/${skillId}`);
 }
 
-export function previewAISkillImport(url: string): Promise<AISkillImportPreview> {
-  return request.post('/ai/skills/preview', { url });
+export type AISkillImportSource = string | File;
+
+export function previewAISkillImport(source: AISkillImportSource): Promise<AISkillImportPreview> {
+  if (typeof source === 'string') {
+    return request.post('/ai/skills/preview', { url: source });
+  }
+  const formData = new FormData();
+  formData.set('file', source, source.name);
+  return request.post('/ai/skills/preview', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
 }
 
-export function installAISkill(url: string, paths: string[]): Promise<{ list: AISkill[] }> {
-  return request.post('/ai/skills/install', { url, paths });
+export function installAISkill(
+  source: AISkillImportSource,
+  paths: string[],
+): Promise<{ list: AISkill[] }> {
+  if (typeof source === 'string') {
+    return request.post('/ai/skills/install', { url: source, paths });
+  }
+  const formData = new FormData();
+  formData.set('file', source, source.name);
+  paths.forEach((path) => {
+    formData.append('paths', path);
+  });
+  return request.post('/ai/skills/install', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
 }
 
 export function archiveAISkill(skillId: string): Promise<void> {

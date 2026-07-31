@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"io/fs"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -216,6 +218,155 @@ func TestPreviewAISkillImportReturnsReferencesAndSelectedInstallStoresThem(t *te
 	if len(installed.List) != 1 || installed.List[0].Name != "skill-b" {
 		t.Fatalf("installed=%+v", installed)
 	}
+}
+
+func TestPreviewAndInstallAISkillFromZip(t *testing.T) {
+	router := setupAISkillTestRouter(t)
+	archive := buildAISkillTestZip(t, []aiSkillTestZipEntry{
+		{Name: "yier-bubu-creative/SKILL.md", Content: "---\nname: yier-bubu-creative\ndescription: 一二和布布视觉创作\ntags: [生图]\n---\n# Skill"},
+		{Name: "yier-bubu-creative/references/character.md", Content: "一二是熊猫，布布是棕熊。"},
+		{Name: "yier-bubu-creative/references/images/model.png", Content: "not-a-real-png"},
+		{Name: "yier-bubu-creative/scripts/build_prompt.py", Content: "print('prompt')"},
+		{Name: "yier-bubu-creative/assets/template.md", Content: "# Template"},
+		{Name: "yier-bubu-creative/agents/openai.yaml", Content: "interface: {}"},
+	})
+
+	previewRecorder := httptest.NewRecorder()
+	router.ServeHTTP(previewRecorder, aiSkillZipRequest(t, http.MethodPost, "/ai/skills/preview", archive, nil))
+	preview := decodeAIPromptData[aiSkillImportPreviewView](t, previewRecorder)
+	if preview.Author != "ZIP 文件" || len(preview.Skills) != 1 {
+		t.Fatalf("preview=%+v", preview)
+	}
+	candidate := preview.Skills[0]
+	if candidate.Path != "yier-bubu-creative/SKILL.md" || candidate.ReferenceCount != 1 ||
+		candidate.ScriptCount != 1 || candidate.IgnoredFileCount != 3 {
+		t.Fatalf("candidate=%+v", candidate)
+	}
+
+	installRecorder := httptest.NewRecorder()
+	router.ServeHTTP(installRecorder, aiSkillZipRequest(t, http.MethodPost, "/ai/skills/install", archive, []string{candidate.Path}))
+	installed := decodeAIPromptData[struct {
+		List []aiSkillView `json:"list"`
+	}](t, installRecorder)
+	if len(installed.List) != 1 || installed.List[0].Name != "yier-bubu-creative" ||
+		installed.List[0].SourceAuthor != "ZIP 文件" || !strings.HasPrefix(installed.List[0].SourceURL, "zip://") {
+		t.Fatalf("installed=%+v", installed)
+	}
+
+	var stored model.AISkill
+	if err := database.GetDB().First(&stored, installed.List[0].ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stored.ReferenceContent, "一二是熊猫") ||
+		!strings.Contains(stored.ScriptContent, "print('prompt')") ||
+		strings.Contains(stored.ReferenceContent, "not-a-real-png") ||
+		strings.Contains(stored.ReferenceContent, "Template") {
+		t.Fatalf("stored=%+v", stored)
+	}
+
+	reinstallRecorder := httptest.NewRecorder()
+	router.ServeHTTP(reinstallRecorder, aiSkillZipRequest(t, http.MethodPost, "/ai/skills/install", archive, []string{candidate.Path}))
+	reinstalled := decodeAIPromptData[struct {
+		List []aiSkillView `json:"list"`
+	}](t, reinstallRecorder)
+	if len(reinstalled.List) != 1 || reinstalled.List[0].ID != installed.List[0].ID {
+		t.Fatalf("same ZIP should update the installed skill: first=%+v second=%+v", installed, reinstalled)
+	}
+}
+
+func TestDiscoverZipAISkillSourcesRejectsUnsafeArchives(t *testing.T) {
+	tests := []struct {
+		name    string
+		entries []aiSkillTestZipEntry
+	}{
+		{
+			name: "path traversal",
+			entries: []aiSkillTestZipEntry{
+				{Name: "../SKILL.md", Content: "# unsafe"},
+			},
+		},
+		{
+			name: "symbolic link",
+			entries: []aiSkillTestZipEntry{
+				{Name: "skill/SKILL.md", Content: "# Skill"},
+				{Name: "skill/references/link.md", Content: "target", Mode: fs.ModeSymlink | 0o777},
+			},
+		},
+		{
+			name: "invalid UTF-8",
+			entries: []aiSkillTestZipEntry{
+				{Name: "skill/SKILL.md", Content: string([]byte{0xff, 0xfe})},
+			},
+		},
+		{
+			name: "missing SKILL.md",
+			entries: []aiSkillTestZipEntry{
+				{Name: "skill/README.md", Content: "# Readme"},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			archive := buildAISkillTestZip(t, test.entries)
+			if _, err := discoverZipAISkillSources(archive, "skill.zip"); err == nil {
+				t.Fatal("expected archive to be rejected")
+			}
+		})
+	}
+}
+
+type aiSkillTestZipEntry struct {
+	Name    string
+	Content string
+	Mode    fs.FileMode
+}
+
+func buildAISkillTestZip(t *testing.T, entries []aiSkillTestZipEntry) []byte {
+	t.Helper()
+	var buffer bytes.Buffer
+	writer := zip.NewWriter(&buffer)
+	for _, entry := range entries {
+		header := &zip.FileHeader{Name: entry.Name, Method: zip.Deflate}
+		if entry.Mode != 0 {
+			header.SetMode(entry.Mode)
+		}
+		file, err := writer.CreateHeader(header)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := file.Write([]byte(entry.Content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buffer.Bytes()
+}
+
+func aiSkillZipRequest(t *testing.T, method, requestPath string, archive []byte, paths []string) *http.Request {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	file, err := writer.CreateFormFile("file", "skill.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.Write(archive); err != nil {
+		t.Fatal(err)
+	}
+	for _, skillPath := range paths {
+		if err := writer.WriteField("paths", skillPath); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(method, requestPath, &body)
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	return request
 }
 
 func TestGetAISkillShowsImportedDirectoryFiles(t *testing.T) {

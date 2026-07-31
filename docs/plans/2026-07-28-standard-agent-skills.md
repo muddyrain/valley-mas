@@ -8,7 +8,8 @@
 
 ## 本期范围
 
-- 兼容公开 GitHub 链接和 `npx skills add owner/repository --skill skill-name` 的来源语法；服务端只解析来源，不执行 `npx`。
+- 兼容公开 GitHub 链接、`npx skills add owner/repository --skill skill-name` 来源语法和本地 ZIP 技能包；服务端只解析来源，不执行 `npx` 或包内脚本。
+- ZIP 安装沿用现有技能文件范围，预览导入与忽略数量，并校验压缩包大小、解压规模、文件数量、路径和 UTF-8 文本；图片、`assets/`、`agents/` 与其他不支持文件暂不导入。
 - 保存并编辑技能标签，资源页支持标签筛选。
 - 智能体版本配置和工作流 LLM 节点可选择最多 8 个 owner 私有技能。
 - 运行时仅加载 `SKILL.md` 与 `references/`；`scripts/` 继续只读保存、展示，绝不执行或注入模型。

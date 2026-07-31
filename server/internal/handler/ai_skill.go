@@ -38,12 +38,13 @@ type updateAISkillPayload struct {
 }
 
 type aiSkillImportCandidateView struct {
-	Path           string `json:"path"`
-	Name           string `json:"name"`
-	Description    string `json:"description"`
-	ReferenceCount int    `json:"referenceCount"`
-	ScriptCount    int    `json:"scriptCount"`
-	SourceURL      string `json:"sourceUrl"`
+	Path             string `json:"path"`
+	Name             string `json:"name"`
+	Description      string `json:"description"`
+	ReferenceCount   int    `json:"referenceCount"`
+	ScriptCount      int    `json:"scriptCount"`
+	IgnoredFileCount int    `json:"ignoredFileCount"`
+	SourceURL        string `json:"sourceUrl"`
 }
 
 type aiSkillImportPreviewView struct {
@@ -124,12 +125,7 @@ func PreviewAISkillImport(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var payload installAISkillPayload
-	if c.ShouldBindJSON(&payload) != nil {
-		Error(c, http.StatusBadRequest, "技能链接无效")
-		return
-	}
-	sources, err := discoverAISkillSources(c.Request.Context(), payload.URL)
+	sources, _, err := readAISkillImportRequest(c)
 	if err != nil {
 		Error(c, http.StatusBadRequest, err.Error())
 		return
@@ -138,7 +134,8 @@ func PreviewAISkillImport(c *gin.Context) {
 	for _, source := range sources {
 		candidates = append(candidates, aiSkillImportCandidateView{
 			Path: source.Path, Name: source.Name, Description: source.Description,
-			ReferenceCount: source.ReferenceCount, ScriptCount: source.ScriptCount, SourceURL: source.URL,
+			ReferenceCount: source.ReferenceCount, ScriptCount: source.ScriptCount,
+			IgnoredFileCount: source.IgnoredFileCount, SourceURL: source.URL,
 		})
 	}
 	Success(c, aiSkillImportPreviewView{
@@ -153,17 +150,12 @@ func InstallAISkill(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var payload installAISkillPayload
-	if c.ShouldBindJSON(&payload) != nil {
-		Error(c, http.StatusBadRequest, "技能链接无效")
-		return
-	}
-	sources, err := discoverAISkillSources(c.Request.Context(), payload.URL)
+	sources, paths, err := readAISkillImportRequest(c)
 	if err != nil {
 		Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	selectedSources, err := selectAISkillImportSources(sources, payload.Paths)
+	selectedSources, err := selectAISkillImportSources(sources, paths)
 	if err != nil {
 		Error(c, http.StatusBadRequest, err.Error())
 		return
