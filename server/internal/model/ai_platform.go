@@ -141,20 +141,25 @@ func (c *AIAppConversation) BeforeCreate(tx *gorm.DB) error {
 }
 
 type AIAppConversationMessage struct {
-	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID         Int64String    `gorm:"index;not null" json:"userId"`
-	AppID          Int64String    `gorm:"index;not null" json:"appId"`
-	ConversationID Int64String    `gorm:"index;not null" json:"conversationId"`
-	RunID          *Int64String   `gorm:"index" json:"runId,omitempty"`
-	Role           string         `gorm:"size:20;not null;index" json:"role"`
-	Content        string         `gorm:"type:text;not null" json:"content"`
-	CreatedAt      time.Time      `json:"createdAt"`
-	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                  Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID              Int64String    `gorm:"index;not null" json:"userId"`
+	AppID               Int64String    `gorm:"index;not null" json:"appId"`
+	ConversationID      Int64String    `gorm:"index;not null" json:"conversationId"`
+	RunID               *Int64String   `gorm:"index" json:"runId,omitempty"`
+	Role                string         `gorm:"size:20;not null;index" json:"role"`
+	Content             string         `gorm:"type:text;not null" json:"content"`
+	ReferenceImageCount int            `gorm:"not null;default:0" json:"referenceImageCount"`
+	ImageGenerationIDs  string         `gorm:"type:text;not null;default:'[]'" json:"imageGenerationIds"`
+	CreatedAt           time.Time      `json:"createdAt"`
+	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (m *AIAppConversationMessage) BeforeCreate(tx *gorm.DB) error {
 	if m.ID == 0 {
 		m.ID = Int64String(utils.GenerateID())
+	}
+	if m.ImageGenerationIDs == "" {
+		m.ImageGenerationIDs = "[]"
 	}
 	return nil
 }

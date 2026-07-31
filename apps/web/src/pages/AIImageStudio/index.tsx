@@ -19,7 +19,6 @@ import {
   RefreshCw,
   Save,
   Search,
-  Send,
   SlidersHorizontal,
   Sparkles,
   Trash2,
@@ -54,6 +53,10 @@ import {
   updateAIImageGenerationFavorite,
 } from '@/api/aiImages';
 import { type AIPrompt, getAPIErrorMessage, listAIPrompts } from '@/api/aiWorkbench';
+import {
+  ConversationComposer,
+  type ConversationComposerReferenceImage,
+} from '@/components/ai/ConversationComposer';
 import { ConversationMessageBubble } from '@/components/ai/ConversationMessageBubble';
 import { ModelPicker } from '@/components/ai/ModelPicker';
 import {
@@ -441,6 +444,9 @@ export default function AIImageStudio() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [conversationInput, setConversationInput] = useState('');
+  const [conversationReferenceImages, setConversationReferenceImages] = useState<
+    ConversationComposerReferenceImage[]
+  >([]);
   const [conversationID, setConversationID] = useState<string>();
   const [conversations, setConversations] = useState<AIImageConversation[]>([]);
   const [conversationMessages, setConversationMessages] = useState<ImageConversationMessage[]>([]);
@@ -852,7 +858,16 @@ export default function AIImageStudio() {
   const sendConversationMessage = async () => {
     const content = conversationInput.trim();
     if (!content || isBusy || !modelID) return;
-    if (selectedPreset?.requiresReference && !conversationReferenceGeneration) {
+    const currentReferenceImages = conversationReferenceImages;
+    if (currentReferenceImages.length > 0 && !supportsReference) {
+      toast.error('当前图片模型不支持参考图，请切换支持参考图的模型');
+      return;
+    }
+    if (
+      selectedPreset?.requiresReference &&
+      !conversationReferenceGeneration &&
+      currentReferenceImages.length === 0
+    ) {
       toast.error('当前创作类型需要先生成一张图片作为参考');
       return;
     }
@@ -861,12 +876,15 @@ export default function AIImageStudio() {
       .reverse()
       .find((message) => message.role === 'user')?.content;
     const referenceGenerationId =
-      selectedReferenceGeneration && supportsReference ? selectedReferenceGeneration.id : undefined;
+      currentReferenceImages.length === 0 && selectedReferenceGeneration && supportsReference
+        ? selectedReferenceGeneration.id
+        : undefined;
     const generationPrompt =
-      selectedReferenceGeneration && !supportsReference
+      currentReferenceImages.length === 0 && selectedReferenceGeneration && !supportsReference
         ? `参考图片描述：${latestConversationRequest || selectedReferenceGeneration.prompt}\n本轮修改要求：${content}`
         : content;
     setConversationInput('');
+    setConversationReferenceImages([]);
     setActiveGeneration(null);
     setConversationSending(true);
     let activeConversationID = conversationID;
@@ -906,7 +924,7 @@ export default function AIImageStudio() {
         brief: generationPrompt,
         aspectRatio,
         quality,
-        references: [],
+        references: currentReferenceImages.map((image) => image.dataUrl),
         referenceGenerationId,
       });
       const assistantContent = referenceGenerationId
@@ -933,7 +951,11 @@ export default function AIImageStudio() {
         result.generation,
         ...current.filter((item) => item.id !== result.generation.id),
       ]);
-      if (selectedReferenceGeneration && !supportsReference) {
+      if (
+        currentReferenceImages.length === 0 &&
+        selectedReferenceGeneration &&
+        !supportsReference
+      ) {
         toast.info('当前模型不支持参考图，本轮会按文字重新生成');
       }
     } catch (error) {
@@ -1273,6 +1295,7 @@ export default function AIImageStudio() {
       !keyword || `${profile.name} ${profile.description}`.toLocaleLowerCase().includes(keyword)
     );
   });
+  const conversationSkills = styleProfiles.filter((profile) => profile.source === 'skill');
   const latestConversationGeneration = [...conversationMessages]
     .reverse()
     .map((message) =>
@@ -1301,7 +1324,10 @@ export default function AIImageStudio() {
   );
   const showConversationGenerationPlaceholder =
     conversationSending && !hasActiveConversationGenerationMessage;
-  const usesReferenceInput = usesCanvasReference || usesConversationReference;
+  const usesReferenceInput =
+    usesCanvasReference ||
+    usesConversationReference ||
+    (studioMode === 'conversation' && conversationReferenceImages.length > 0);
   const imageQualities =
     selectedModel?.imageQualities && selectedModel.imageQualities.length > 0
       ? selectedModel.imageQualities
@@ -1787,7 +1813,7 @@ export default function AIImageStudio() {
                           </ScrollArea>
                         </div>
                         <div className="border-t border-border bg-card p-3">
-                          {selectedStyleProfile ? (
+                          {selectedStyleProfile?.source === 'builtin' ? (
                             <div className="mb-2 flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-2 text-xs text-foreground">
                               <WandSparkles className="size-3.5 text-primary" />
                               <span className="min-w-0 flex-1 truncate">
@@ -1806,95 +1832,96 @@ export default function AIImageStudio() {
                               </Button>
                             </div>
                           ) : null}
-                          <Textarea
+                          <ConversationComposer
                             value={conversationInput}
-                            placeholder="描述图片，或继续修改上一张结果"
-                            disabled={isBusy || !modelID}
-                            className="min-h-20 resize-none border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
-                            onChange={(event) => setConversationInput(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter' && !event.shiftKey) {
-                                event.preventDefault();
-                                void sendConversationMessage();
-                              }
-                            }}
+                            onValueChange={setConversationInput}
+                            onSubmit={() => void sendConversationMessage()}
+                            disabled={isBusy}
+                            canSubmit={Boolean(modelID)}
+                            placeholder="描述图片，输入 / 选择技能，或附加参考图"
                             maxLength={MAX_CONVERSATION_INPUT_LENGTH}
+                            skills={conversationSkills}
+                            activeSkillId={
+                              selectedStyleProfile?.source === 'skill'
+                                ? selectedStyleProfile.id
+                                : undefined
+                            }
+                            onActiveSkillChange={(skillID) =>
+                              setSelectedStyleProfile(
+                                skillID
+                                  ? styleProfiles.find((profile) => profile.id === skillID) || null
+                                  : null,
+                              )
+                            }
+                            referenceImages={conversationReferenceImages}
+                            onReferenceImagesChange={setConversationReferenceImages}
+                            footer={
+                              <>
+                                <ModelPicker
+                                  value={modelID}
+                                  onValueChange={handleImageModelChange}
+                                  capability="image_generation"
+                                  label="图片模型"
+                                  compact
+                                  compactLabel="模型："
+                                  compactTrigger
+                                />
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setStyleRecognitionOpen(true)}
+                                  disabled={isBusy}
+                                >
+                                  <ImageIcon />
+                                  识别风格
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setStyleQuery('');
+                                    setStylePickerOpen(true);
+                                  }}
+                                  disabled={isBusy}
+                                >
+                                  <WandSparkles />
+                                  视觉风格
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setPromptResourceQuery('');
+                                    setPromptResourcePickerOpen(true);
+                                  }}
+                                  disabled={isBusy}
+                                >
+                                  <FileText />
+                                  插入描述
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => void clearConversationContext()}
+                                  disabled={isBusy || conversationMessages.length === 0}
+                                >
+                                  <Trash2 />
+                                  清空上下文
+                                </Button>
+                                <span className="hidden text-xs text-muted-foreground xl:inline">
+                                  {latestConversationGeneration
+                                    ? supportsReference
+                                      ? '下一轮会参考上一张图片'
+                                      : '当前模型不支持参考图，将按文字继续生成'
+                                    : '首条消息会直接生成图片'}
+                                </span>
+                              </>
+                            }
                           />
-                          <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-2">
-                            <div className="flex min-w-0 flex-wrap items-center gap-2">
-                              <ModelPicker
-                                value={modelID}
-                                onValueChange={handleImageModelChange}
-                                capability="image_generation"
-                                label="图片模型"
-                                compact
-                                compactLabel="模型："
-                                compactTrigger
-                              />
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setStyleRecognitionOpen(true)}
-                                disabled={isBusy}
-                              >
-                                <ImageIcon />
-                                识别风格
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setStyleQuery('');
-                                  setStylePickerOpen(true);
-                                }}
-                                disabled={isBusy}
-                              >
-                                <WandSparkles />
-                                视觉风格
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setPromptResourceQuery('');
-                                  setPromptResourcePickerOpen(true);
-                                }}
-                                disabled={isBusy}
-                              >
-                                <FileText />
-                                插入描述
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => void clearConversationContext()}
-                                disabled={isBusy || conversationMessages.length === 0}
-                              >
-                                <Trash2 />
-                                清空上下文
-                              </Button>
-                            </div>
-                            <span className="min-w-0 truncate text-xs text-muted-foreground">
-                              {latestConversationGeneration
-                                ? supportsReference
-                                  ? '下一轮会参考上一张图片'
-                                  : '当前模型不支持参考图，将按文字继续生成'
-                                : '首条消息会直接生成图片'}
-                            </span>
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={() => void sendConversationMessage()}
-                              disabled={isBusy || !conversationInput.trim() || !modelID}
-                            >
-                              <Send />
-                              {conversationSending ? '生成中' : '发送'}
-                            </Button>
-                          </div>
                         </div>
                       </div>
                     )}

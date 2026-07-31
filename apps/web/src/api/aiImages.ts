@@ -2,7 +2,7 @@ import request from '@/utils/request';
 
 export type AIImageGenerationStatus = 'queued' | 'running' | 'paused' | 'succeeded' | 'failed';
 export type AIImageGenerationStage = 'preparing' | 'generating' | 'storing' | 'completed';
-export type AIImageGenerationSource = 'studio' | 'workflow';
+export type AIImageGenerationSource = 'studio' | 'workflow' | 'agent';
 
 export interface AIImageRecipe {
   id: string;

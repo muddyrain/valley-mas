@@ -9,12 +9,14 @@ import (
 
 	"valley-server/internal/ai/agent"
 	"valley-server/internal/ai/tools/content"
+	imagetool "valley-server/internal/ai/tools/image"
 	"valley-server/internal/aiapp"
 	"valley-server/internal/aiclient"
 	"valley-server/internal/aimodel"
 	"valley-server/internal/database"
 	"valley-server/internal/logger"
 	"valley-server/internal/model"
+	"valley-server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -35,6 +37,64 @@ func buildAIAppConversationSystemPrompt(customPrompt, knowledgeContext string) s
 	}
 	parts = append(parts, aiAppConversationRuntimePrompt)
 	return strings.Join(parts, "\n\n")
+}
+
+func appendAIAppConversationImageContext(system string, referenceCount int, styleProfileID string) string {
+	parts := []string{strings.TrimSpace(system)}
+	if referenceCount > 0 {
+		parts = append(parts, "本轮用户上传了参考图。若用户要求生成图片且图片工具可用，请把它作为参考图；参考图的结构、主体与材质优先于视觉风格描述。")
+	}
+	if strings.TrimSpace(styleProfileID) != "" {
+		parts = append(parts, "本轮用户显式选择了一个已绑定技能作为视觉风格。若调用图片工具，必须保留该技能对应的视觉风格，不要把它误解为用户已经要求执行其他任务。")
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+func selectedAIAppImageStyle(config aiapp.Config, selected []string) (string, error) {
+	if len(selected) == 0 {
+		return "", nil
+	}
+	if len(selected) > 1 {
+		return "", errors.New("一次只能选择一个视觉技能")
+	}
+	id := strings.TrimSpace(selected[0])
+	for _, boundID := range config.SkillIDs {
+		if id == boundID {
+			return "skill:" + id, nil
+		}
+	}
+	return "", errors.New("所选技能未绑定到当前智能体")
+}
+
+func imageGenerationIDsFromToolResult(toolName string, result json.RawMessage) []string {
+	if toolName != imagetool.ToolName {
+		return nil
+	}
+	var payload struct {
+		OK           bool   `json:"ok"`
+		GenerationID string `json:"generationId"`
+	}
+	if json.Unmarshal(result, &payload) != nil || !payload.OK || strings.TrimSpace(payload.GenerationID) == "" {
+		return nil
+	}
+	return []string{payload.GenerationID}
+}
+
+func uniqueAIAppGenerationIDs(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, raw := range values {
+		id := strings.TrimSpace(raw)
+		if id == "" {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result
 }
 
 func findAIAppConversation(db *gorm.DB, userID, appID, conversationID model.Int64String) (model.AIAppConversation, bool) {
@@ -210,17 +270,27 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		return
 	}
 	var payload struct {
-		Message string `json:"message"`
-		ModelID string `json:"modelId"`
-		Stream  bool   `json:"stream"`
+		Message         string   `json:"message"`
+		ModelID         string   `json:"modelId"`
+		Stream          bool     `json:"stream"`
+		ReferenceImages []string `json:"referenceImages"`
+		ActiveSkillIDs  []string `json:"activeSkillIds"`
 	}
+	// Three 5MB images expand to roughly 20MB when sent as data URLs. Keep the
+	// same bounded request envelope as the image studio while never persisting
+	// the raw attachment.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 22<<20)
 	if c.ShouldBindJSON(&payload) != nil || strings.TrimSpace(payload.Message) == "" || strings.TrimSpace(payload.ModelID) == "" {
 		Error(c, 400, "请输入消息并选择文本模型")
 		return
 	}
 	message := truncateAIAgentRunes(payload.Message, 12000)
 	run := model.AIAppRun{AppID: app.ID, VersionID: conversation.VersionID, ConversationID: &conversation.ID, UserID: userID, Status: "running", Input: aiclient.TrimRunes(message, 1000)}
-	userMessage := model.AIAppConversationMessage{UserID: userID, AppID: app.ID, ConversationID: conversation.ID, RunID: &run.ID, Role: "user", Content: message}
+	if len(payload.ReferenceImages) > service.MaxAIImageReferences {
+		Error(c, http.StatusBadRequest, "最多支持 3 张参考图")
+		return
+	}
+	userMessage := model.AIAppConversationMessage{UserID: userID, AppID: app.ID, ConversationID: conversation.ID, RunID: &run.ID, Role: "user", Content: message, ReferenceImageCount: len(payload.ReferenceImages)}
 	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&run).Error; err != nil {
 			return err
@@ -255,6 +325,11 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		fail(400, "APP_CONFIG_INVALID", "智能体版本配置无效", errors.New("invalid AI App version config"))
 		return
 	}
+	styleProfileID, styleErr := selectedAIAppImageStyle(config, payload.ActiveSkillIDs)
+	if styleErr != nil {
+		fail(http.StatusBadRequest, "SKILL_SELECTION_INVALID", styleErr.Error(), styleErr)
+		return
+	}
 	skillInstructions, skillErr := resolveAISkillRuntimeInstructions(database.GetDB(), userID, config.SkillIDs)
 	if skillErr != nil {
 		fail(http.StatusBadRequest, "APP_SKILLS_UNAVAILABLE", "已绑定技能不可用", skillErr)
@@ -274,6 +349,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		return
 	}
 	system := buildAIAppConversationSystemPrompt(config.SystemPrompt, knowledgeContext)
+	system = appendAIAppConversationImageContext(system, len(payload.ReferenceImages), styleProfileID)
 	if skillInstructions != "" {
 		system = strings.TrimSpace(system + "\n\n" + skillInstructions)
 	}
@@ -284,6 +360,19 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	}
 	if !aimodel.HasCapabilities(invocation.Model, []string{"tool_call"}) {
 		toolNames = nil
+	}
+	if len(payload.ReferenceImages) > 0 {
+		hasImageTool := false
+		for _, name := range toolNames {
+			if name == imagetool.ToolName {
+				hasImageTool = true
+				break
+			}
+		}
+		if !hasImageTool {
+			fail(http.StatusBadRequest, "IMAGE_TOOL_UNAVAILABLE", "当前智能体未启用图片生成能力", errors.New("image tool is unavailable"))
+			return
+		}
 	}
 	system = appendContentSearchDateContext(system, toolNames, time.Now())
 
@@ -302,7 +391,9 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		messages = append(messages, agent.Message{Role: role, Content: item.Content})
 	}
 	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
-	events, loopErr := loop.RunStream(content.WithOwner(c.Request.Context(), userID), agent.Spec{Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench-conversation"}, messages)
+	runContext := content.WithOwner(c.Request.Context(), userID)
+	runContext = imagetool.WithRequestInput(runContext, userID, payload.ReferenceImages, styleProfileID)
+	events, loopErr := loop.RunStream(runContext, agent.Spec{Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench-conversation"}, messages)
 	if loopErr != nil {
 		fail(http.StatusBadGateway, "AI_AGENT_RUN_FAILED", "智能体工具调用失败", loopErr)
 		return
@@ -319,6 +410,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	var reply strings.Builder
 	var result agent.Result
 	var runErr error
+	imageGenerationIDs := make([]string, 0, 1)
 	for event := range events {
 		switch event.Type {
 		case agent.EventDelta:
@@ -331,6 +423,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 				_ = writer.Send(gin.H{"type": "tool_call", "toolName": event.ToolName})
 			}
 		case agent.EventToolResult:
+			imageGenerationIDs = append(imageGenerationIDs, imageGenerationIDsFromToolResult(event.ToolName, event.ToolResult)...)
 			ok := !strings.Contains(string(event.ToolResult), `"ok":false`)
 			status := "succeeded"
 			if !ok {
@@ -393,7 +486,9 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	run.References = string(referenceSummary)
 	run.DurationMs = time.Since(started).Milliseconds()
 	_ = database.GetDB().Model(&run).Updates(map[string]any{"status": run.Status, "model": run.Model, "output": run.Output, "references": run.References, "duration_ms": run.DurationMs}).Error
-	assistantMessage := model.AIAppConversationMessage{UserID: userID, AppID: app.ID, ConversationID: conversation.ID, RunID: &run.ID, Role: "assistant", Content: strings.TrimSpace(result.Reply)}
+	imageGenerationIDs = uniqueAIAppGenerationIDs(imageGenerationIDs)
+	serializedImageGenerationIDs, _ := json.Marshal(imageGenerationIDs)
+	assistantMessage := model.AIAppConversationMessage{UserID: userID, AppID: app.ID, ConversationID: conversation.ID, RunID: &run.ID, Role: "assistant", Content: strings.TrimSpace(result.Reply), ImageGenerationIDs: string(serializedImageGenerationIDs)}
 	if database.GetDB().Create(&assistantMessage).Error != nil {
 		run.Status = "failed"
 		run.ErrorCode = "ASSISTANT_MESSAGE_PERSISTENCE_FAILED"

@@ -32,6 +32,11 @@ export interface AgentConfig {
   openingMessage: string;
   exampleQuestions: string[];
   skillIds: string[];
+  imageGeneration?: {
+    modelId: string;
+    aspectRatio: '1:1' | '4:3' | '3:4' | '16:9' | '9:16';
+    quality: '1K' | '2K' | '3K' | '4K';
+  };
 }
 
 export interface AgentProposal {
@@ -101,6 +106,8 @@ export interface AIAppConversationMessage {
   runId?: string;
   role: 'user' | 'assistant';
   content: string;
+  referenceImageCount: number;
+  imageGenerationIds: string;
   createdAt: string;
 }
 
@@ -526,6 +533,7 @@ export async function streamAIAppConversation(
   conversationId: string,
   message: string,
   modelId: string,
+  options: { referenceImages?: string[]; activeSkillIds?: string[] } = {},
   handlers: {
     onDelta: (chunk: string) => void;
     onToolCall?: (toolName: string) => void;
@@ -554,7 +562,7 @@ export async function streamAIAppConversation(
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     },
-    body: JSON.stringify({ message, modelId, stream: true }),
+    body: JSON.stringify({ message, modelId, stream: true, ...options }),
     signal,
   });
   if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream')) {

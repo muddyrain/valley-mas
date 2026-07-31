@@ -41,6 +41,7 @@ const (
 
 	AIImageGenerationSourceStudio   = "studio"
 	AIImageGenerationSourceWorkflow = "workflow"
+	AIImageGenerationSourceAgent    = "agent"
 )
 
 var AIImageSizes = map[string]map[string]string{
@@ -139,15 +140,19 @@ type AIImageGenerationService struct {
 }
 
 func AIImageGenerationSourceForFeature(feature string) string {
-	if strings.TrimSpace(feature) == "workflow-image-generation" {
+	switch strings.TrimSpace(feature) {
+	case "workflow-image-generation":
 		return AIImageGenerationSourceWorkflow
+	case "ai-agent-image-generation":
+		return AIImageGenerationSourceAgent
+	default:
+		return AIImageGenerationSourceStudio
 	}
-	return AIImageGenerationSourceStudio
 }
 
 func IsAIImageGenerationSource(source string) bool {
 	switch strings.TrimSpace(source) {
-	case AIImageGenerationSourceStudio, AIImageGenerationSourceWorkflow:
+	case AIImageGenerationSourceStudio, AIImageGenerationSourceWorkflow, AIImageGenerationSourceAgent:
 		return true
 	default:
 		return false

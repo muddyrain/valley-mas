@@ -45,6 +45,15 @@ func testImageInvocation() aimodel.Invocation {
 	}
 }
 
+func TestAIImageGenerationSourceForAgentFeature(t *testing.T) {
+	if got := AIImageGenerationSourceForFeature("ai-agent-image-generation"); got != AIImageGenerationSourceAgent {
+		t.Fatalf("agent image generation source = %q", got)
+	}
+	if !IsAIImageGenerationSource(AIImageGenerationSourceAgent) {
+		t.Fatal("agent image source should be valid")
+	}
+}
+
 func TestAIImageGenerationServiceGeneratePersistsStoredResult(t *testing.T) {
 	db := newAIImageRuntimeTestDB(t)
 	prompt := strings.Repeat("complete imported skill content\n", 500)

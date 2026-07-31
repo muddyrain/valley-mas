@@ -18,12 +18,30 @@ const (
 	MaxSkillBindings           = 8
 )
 
+var supportedImageAspectRatios = map[string]struct{}{
+	"1:1": {}, "4:3": {}, "3:4": {}, "16:9": {}, "9:16": {},
+}
+
+var supportedImageQualities = map[string]struct{}{
+	"1K": {}, "2K": {}, "3K": {}, "4K": {},
+}
+
+// ImageGenerationConfig keeps the agent's approved defaults for the image
+// generation tool. The tool cannot arbitrarily switch to a different catalog
+// model during a conversation.
+type ImageGenerationConfig struct {
+	ModelID     string `json:"modelId"`
+	AspectRatio string `json:"aspectRatio"`
+	Quality     string `json:"quality"`
+}
+
 type Config struct {
-	ModelProfile     string   `json:"modelProfile"`
-	SystemPrompt     string   `json:"systemPrompt"`
-	OpeningMessage   string   `json:"openingMessage"`
-	ExampleQuestions []string `json:"exampleQuestions"`
-	SkillIDs         []string `json:"skillIds"`
+	ModelProfile     string                 `json:"modelProfile"`
+	SystemPrompt     string                 `json:"systemPrompt"`
+	OpeningMessage   string                 `json:"openingMessage"`
+	ExampleQuestions []string               `json:"exampleQuestions"`
+	SkillIDs         []string               `json:"skillIds"`
+	ImageGeneration  *ImageGenerationConfig `json:"imageGeneration,omitempty"`
 }
 
 func DefaultConfig() Config {
@@ -56,6 +74,11 @@ func Normalize(config Config) Config {
 	}
 	config.SystemPrompt = strings.TrimSpace(config.SystemPrompt)
 	config.OpeningMessage = strings.TrimSpace(config.OpeningMessage)
+	if config.ImageGeneration != nil {
+		config.ImageGeneration.ModelID = strings.TrimSpace(config.ImageGeneration.ModelID)
+		config.ImageGeneration.AspectRatio = strings.TrimSpace(config.ImageGeneration.AspectRatio)
+		config.ImageGeneration.Quality = strings.TrimSpace(config.ImageGeneration.Quality)
+	}
 	seen := make(map[string]struct{}, len(config.ExampleQuestions))
 	questions := make([]string, 0, min(len(config.ExampleQuestions), MaxExampleQuestions))
 	for _, item := range config.ExampleQuestions {
@@ -133,6 +156,17 @@ func ValidateEditable(config Config) error {
 		id, err := strconv.ParseInt(strings.TrimSpace(rawID), 10, 64)
 		if err != nil || id <= 0 {
 			return fmt.Errorf("技能 ID 无效")
+		}
+	}
+	if image := config.ImageGeneration; image != nil {
+		if image.ModelID == "" {
+			return fmt.Errorf("图片生成需要选择图片模型")
+		}
+		if _, ok := supportedImageAspectRatios[image.AspectRatio]; !ok {
+			return fmt.Errorf("图片生成比例无效")
+		}
+		if _, ok := supportedImageQualities[image.Quality]; !ok {
+			return fmt.Errorf("图片生成清晰度无效")
 		}
 	}
 	return nil

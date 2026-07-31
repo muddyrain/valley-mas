@@ -13,7 +13,6 @@ import {
   Search,
   Send,
   Settings2,
-  Square,
   Trash2,
   UserRound,
   X,
@@ -22,6 +21,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { type AvailableAIModel, listAvailableAIModels } from '@/api/ai';
+import { type AIImageGeneration, getAIImageGeneration } from '@/api/aiImages';
 import {
   type AgentConfig,
   type AIApp,
@@ -31,17 +31,25 @@ import {
   type AIAppRun,
   type AIAppVersion,
   type AIKnowledgeReference,
+  type AISkill,
   createAIAppConversation,
   deleteAIAppConversation,
   getAIApp,
   getAIAppConversation,
   getAPIErrorMessage,
   listAIAppConversations,
+  listAISkills,
   publishAIApp,
   saveAIAppVersion,
   streamAIAppConversation,
 } from '@/api/aiWorkbench';
+import {
+  ConversationComposer,
+  type ConversationComposerReferenceImage,
+} from '@/components/ai/ConversationComposer';
 import { ConversationMessageBubble } from '@/components/ai/ConversationMessageBubble';
+import { AIImageGenerationImage } from '@/components/ai-images/AIImageGenerationImage';
+import { GenerationPreview } from '@/components/ai-images/GenerationOverlay';
 import { AgentAvatar } from '@/components/ai-workbench/AgentAvatar';
 import { AIResponseContext } from '@/components/ai-workbench/AIResponseContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -105,7 +113,20 @@ const defaultConfig: AgentConfig = {
 type ConversationStreamState = {
   reply: string;
   toolStatus: string | null;
+  imageGenerating: boolean;
 };
+
+function parseImageGenerationIDs(value?: string) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 function parseAgentConfig(version?: AIAppVersion): AgentConfig {
   try {
@@ -429,6 +450,10 @@ export default function AIAppConversationPage() {
   const [runs, setRuns] = useState<AIAppRun[]>([]);
   const [references, setReferences] = useState<AIKnowledgeReference[]>([]);
   const [input, setInput] = useState('');
+  const [referenceImages, setReferenceImages] = useState<ConversationComposerReferenceImage[]>([]);
+  const [skills, setSkills] = useState<AISkill[]>([]);
+  const [activeSkillIds, setActiveSkillIds] = useState<string[]>([]);
+  const [imageGenerations, setImageGenerations] = useState<Record<string, AIImageGeneration>>({});
   const [initialLoading, setInitialLoading] = useState(true);
   const [conversationLoading, setConversationLoading] = useState(false);
   const [conversationStreams, setConversationStreams] = useState<
@@ -457,6 +482,51 @@ export default function AIAppConversationPage() {
   const sending = Boolean(activeStream);
   const streamingReply = activeStream?.reply || '';
   const toolStatus = activeStream?.toolStatus || null;
+  const conversationConfig = parseAgentConfig(
+    versions.find((item) => item.id === conversation?.versionId),
+  );
+  const boundSkills = skills.filter((skill) => conversationConfig.skillIds.includes(skill.id));
+
+  useEffect(() => {
+    let active = true;
+    void listAISkills()
+      .then((result) => {
+        if (active) setSkills(result.list);
+      })
+      .catch(() => {
+        if (active) setSkills([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const generationIds = [
+      ...new Set(
+        messages.flatMap((message) => parseImageGenerationIDs(message.imageGenerationIds)),
+      ),
+    ];
+    const pending = generationIds.filter((id) => !imageGenerations[id]);
+    if (pending.length === 0) return;
+    let active = true;
+    void Promise.all(
+      pending.map((id) => getAIImageGeneration(id).then((result) => result.generation)),
+    )
+      .then((items) => {
+        if (!active) return;
+        setImageGenerations((current) => ({
+          ...current,
+          ...Object.fromEntries(items.map((item) => [item.id, item])),
+        }));
+      })
+      .catch(() => {
+        // The message remains available even if a historical image was removed.
+      });
+    return () => {
+      active = false;
+    };
+  }, [imageGenerations, messages]);
 
   useEffect(() => {
     settingsOpenRef.current = settingsOpen;
@@ -730,9 +800,6 @@ export default function AIAppConversationPage() {
     setRuns((items) => [run, ...items.filter((item) => item.id !== run.id)]);
   };
 
-  const conversationConfig = parseAgentConfig(
-    versions.find((item) => item.id === conversation?.versionId),
-  );
   const starterQuestions =
     conversationConfig.exampleQuestions.length > 0
       ? conversationConfig.exampleQuestions
@@ -766,19 +833,25 @@ export default function AIAppConversationPage() {
     )
       return;
     const content = input.trim();
+    const currentReferenceImages = referenceImages;
+    const currentActiveSkillIds = activeSkillIds;
     const localUserMessage: AIAppConversationMessage = {
       id: `local-user-${Date.now()}`,
       conversationId: targetConversationId,
       role: 'user',
       content,
+      referenceImageCount: currentReferenceImages.length,
+      imageGenerationIds: '[]',
       createdAt: new Date().toISOString(),
     };
     setInput('');
+    setReferenceImages([]);
+    setActiveSkillIds([]);
     setMessages((items) => [...items, localUserMessage]);
     setReferences([]);
     setConversationStreams((items) => ({
       ...items,
-      [targetConversationId]: { reply: '', toolStatus: null },
+      [targetConversationId]: { reply: '', toolStatus: null, imageGenerating: false },
     }));
     const controller = new AbortController();
     streamControllersRef.current.set(targetConversationId, controller);
@@ -798,6 +871,10 @@ export default function AIAppConversationPage() {
         content,
         textModelId,
         {
+          referenceImages: currentReferenceImages.map((item) => item.dataUrl),
+          activeSkillIds: currentActiveSkillIds,
+        },
+        {
           onDelta: (chunk) =>
             setConversationStreams((items) => {
               const current = items[targetConversationId];
@@ -815,7 +892,13 @@ export default function AIAppConversationPage() {
                 ...items,
                 [targetConversationId]: {
                   ...current,
-                  toolStatus: name === 'content.search' ? '正在搜索内容' : '正在调用工具',
+                  toolStatus:
+                    name === 'content.search'
+                      ? '正在搜索内容'
+                      : name === 'image.generate'
+                        ? '正在生成图片'
+                        : '正在调用工具',
+                  imageGenerating: name === 'image.generate',
                 },
               };
             }),
@@ -829,6 +912,7 @@ export default function AIAppConversationPage() {
                   ...current,
                   toolStatus:
                     name === 'content.search' ? (ok ? '内容搜索完成' : '内容搜索失败') : null,
+                  imageGenerating: name === 'image.generate' ? false : current.imageGenerating,
                 },
               };
             });
@@ -909,55 +993,30 @@ export default function AIAppConversationPage() {
   if (!conversation || !appId) return null;
 
   const conversationComposer = (className?: string) => (
-    <div className={cn('w-full max-w-[42rem]', className)} data-agent-reveal="composer">
-      <div className="rounded-xl border border-border bg-card shadow-sm transition-shadow duration-200 focus-within:shadow-md">
-        <div className="px-4 pt-3">
-          <Textarea
-            value={input}
-            placeholder="继续对话，或输入一个新任务"
-            disabled={sending}
-            className="min-h-24 resize-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                void send();
-              }
-            }}
-          />
-        </div>
-        <div className="flex items-center justify-between gap-3 border-t border-border/70 px-3 py-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <ConversationModelControl value={textModelId} onValueChange={setTextModelId} />
-            <span className="hidden text-xs text-muted-foreground sm:inline">
-              Enter 发送 · Shift + Enter 换行
-            </span>
-          </div>
-          {sending ? (
-            <Button
-              size="icon"
-              variant="outline"
-              onClick={stop}
-              aria-label="停止生成"
-              title="停止生成"
-            >
-              <Square />
-            </Button>
-          ) : (
-            <Button
-              size="icon"
-              className="rounded-full"
-              onClick={() => void send()}
-              disabled={!input.trim() || !textModelId}
-              aria-label="发送消息"
-              title="发送消息"
-            >
-              <Send />
-            </Button>
-          )}
-        </div>
-      </div>
-    </div>
+    <ConversationComposer
+      value={input}
+      onValueChange={setInput}
+      onSubmit={() => void send()}
+      disabled={sending}
+      canSubmit={Boolean(textModelId)}
+      placeholder="继续对话，输入 / 选择技能，或附加参考图"
+      skills={boundSkills}
+      activeSkillId={activeSkillIds[0]}
+      onActiveSkillChange={(skillId) => setActiveSkillIds(skillId ? [skillId] : [])}
+      referenceImages={referenceImages}
+      onReferenceImagesChange={setReferenceImages}
+      footer={
+        <>
+          <ConversationModelControl value={textModelId} onValueChange={setTextModelId} />
+          <span className="hidden text-xs text-muted-foreground sm:inline">
+            Enter 发送 · Shift + Enter 换行
+          </span>
+        </>
+      }
+      onStop={stop}
+      className={cn('max-w-[42rem]', className)}
+      revealAttribute="composer"
+    />
   );
 
   return (
@@ -1277,8 +1336,49 @@ export default function AIAppConversationPage() {
                                 role={message.role}
                                 content={message.content}
                                 createdAt={message.createdAt}
+                                footer={
+                                  message.role === 'user' && message.referenceImageCount > 0 ? (
+                                    <Badge variant="secondary" className="font-normal">
+                                      附加 {message.referenceImageCount} 张参考图
+                                    </Badge>
+                                  ) : undefined
+                                }
                               />
                             </div>
+                            {message.role === 'assistant'
+                              ? parseImageGenerationIDs(message.imageGenerationIds).map(
+                                  (generationID) => {
+                                    const generation = imageGenerations[generationID];
+                                    if (!generation?.resultUrl) return null;
+                                    return (
+                                      <div
+                                        key={generationID}
+                                        className="ml-11 max-w-[min(85%,28rem)] overflow-hidden rounded-xl border border-border bg-card p-2 shadow-xs"
+                                      >
+                                        <AIImageGenerationImage
+                                          generationId={generation.id}
+                                          src={generation.resultUrl}
+                                          alt="智能体生成的图片"
+                                          className="aspect-square w-full rounded-lg object-cover"
+                                        />
+                                        <div className="flex items-center justify-between gap-2 px-1 pt-2 text-xs text-muted-foreground">
+                                          <span>
+                                            智能体生成 · {generation.aspectRatio} ·{' '}
+                                            {generation.quality}
+                                          </span>
+                                          <Button
+                                            size="xs"
+                                            variant="ghost"
+                                            onClick={() => navigate('/workbench/images')}
+                                          >
+                                            继续编辑
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    );
+                                  },
+                                )
+                              : null}
                             {failedRun ? (
                               <div className="flex items-start gap-3" role="status">
                                 <AgentAvatar name={app?.name || '智能体'} src={app?.avatarUrl} />
@@ -1303,9 +1403,15 @@ export default function AIAppConversationPage() {
                       {sending ? (
                         <div className="flex items-start gap-3">
                           <AgentAvatar name={app?.name || '智能体'} src={app?.avatarUrl} />
-                          <div className="max-w-[min(85%,42rem)] rounded-xl bg-muted px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
-                            {streamingReply || '正在思考…'}
-                          </div>
+                          {activeStream?.imageGenerating ? (
+                            <div className="w-[min(100%,20rem)] rounded-xl border border-border/70 bg-card p-3">
+                              <GenerationPreview compact stage="generating" />
+                            </div>
+                          ) : (
+                            <div className="max-w-[min(85%,42rem)] rounded-xl bg-muted px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+                              {streamingReply || '正在思考…'}
+                            </div>
+                          )}
                         </div>
                       ) : null}
                       <AIResponseContext

@@ -1,8 +1,12 @@
 package handler
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
+
+	imagetool "valley-server/internal/ai/tools/image"
+	"valley-server/internal/aiapp"
 )
 
 func TestBuildAIAppConversationSystemPromptSeparatesRuntimeIntentFromAgentInstructions(t *testing.T) {
@@ -26,5 +30,27 @@ func TestBuildAIAppConversationSystemPromptAlwaysIncludesRuntimeGuidance(t *test
 	system := buildAIAppConversationSystemPrompt("", "")
 	if system != aiAppConversationRuntimePrompt {
 		t.Fatalf("expected runtime guidance only, got %q", system)
+	}
+}
+
+func TestSelectedAIAppImageStyleRequiresBoundSkill(t *testing.T) {
+	config := aiapp.Config{SkillIDs: []string{"11"}}
+	styleID, err := selectedAIAppImageStyle(config, []string{"11"})
+	if err != nil || styleID != "skill:11" {
+		t.Fatalf("selectedAIAppImageStyle() = %q, %v", styleID, err)
+	}
+	if _, err := selectedAIAppImageStyle(config, []string{"12"}); err == nil {
+		t.Fatal("selectedAIAppImageStyle() accepted an unbound skill")
+	}
+}
+
+func TestImageGenerationIDsFromToolResult(t *testing.T) {
+	payload, _ := json.Marshal(map[string]any{"ok": true, "generationId": "42"})
+	ids := imageGenerationIDsFromToolResult(imagetool.ToolName, payload)
+	if len(ids) != 1 || ids[0] != "42" {
+		t.Fatalf("imageGenerationIDsFromToolResult() = %#v", ids)
+	}
+	if got := imageGenerationIDsFromToolResult("content.search", payload); len(got) != 0 {
+		t.Fatalf("unexpected IDs from another tool: %#v", got)
 	}
 }

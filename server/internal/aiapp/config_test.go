@@ -24,6 +24,19 @@ func TestParseRejectsUnknownFieldsAndTooManyQuestions(t *testing.T) {
 	}
 }
 
+func TestParseNormalizesImageGenerationConfig(t *testing.T) {
+	config, err := Parse(`{"imageGeneration":{"modelId":" 17 ","aspectRatio":"3:4","quality":"2K"}}`)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if config.ImageGeneration == nil || config.ImageGeneration.ModelID != "17" || config.ImageGeneration.AspectRatio != "3:4" || config.ImageGeneration.Quality != "2K" {
+		t.Fatalf("image config = %#v", config.ImageGeneration)
+	}
+	if _, err := Parse(`{"imageGeneration":{"modelId":"17","aspectRatio":"2:3","quality":"2K"}}`); err == nil {
+		t.Fatal("Parse() accepted an unsupported image aspect ratio")
+	}
+}
+
 func TestValidateGeneratedRejectsEmptyPrompt(t *testing.T) {
 	if err := ValidateGenerated(DefaultConfig()); err == nil {
 		t.Fatal("ValidateGenerated() error = nil")

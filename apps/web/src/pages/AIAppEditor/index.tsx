@@ -101,6 +101,11 @@ interface AgentConfig {
   openingMessage: string;
   exampleQuestions: string[];
   skillIds: string[];
+  imageGeneration?: {
+    modelId: string;
+    aspectRatio: '1:1' | '4:3' | '3:4' | '9:16' | '16:9';
+    quality: '1K' | '2K' | '3K' | '4K';
+  };
 }
 
 const AVATAR_IMAGE_MODEL_PREFERENCE_KEY = 'valley.ai-workbench.avatar-image-model';
@@ -189,6 +194,12 @@ function parseAgentConfig(version?: AIAppVersion): AgentConfig {
       skillIds: Array.isArray(value.skillIds)
         ? value.skillIds.filter((item): item is string => typeof item === 'string').slice(0, 8)
         : [],
+      imageGeneration:
+        value.imageGeneration &&
+        typeof value.imageGeneration === 'object' &&
+        typeof value.imageGeneration.modelId === 'string'
+          ? value.imageGeneration
+          : undefined,
     };
   } catch {
     return defaultConfig;
@@ -516,7 +527,9 @@ while (true) {
   }
 }`;
   const activeAPIKeys = apiKeys.filter((key) => key.status === 'active');
-  const agentSelectableTools = tools.filter((tool) => tool.permission === 'read');
+  const agentSelectableTools = tools.filter(
+    (tool) => tool.permission === 'read' || tool.name === 'image.generate',
+  );
 
   const generateAvatar = async () => {
     if (!appId) return;
@@ -965,7 +978,7 @@ while (true) {
                 <TabsContent value="tools" className="w-full">
                   <EditorSection
                     title="工具"
-                    description="选择智能体可调用的只读工具；写入或模型工具请在工作流中编排。"
+                    description="选择智能体可调用的工具。图片生成会使用版本中明确配置的模型，并创建可审计的图片资产。"
                     className="border-0 bg-transparent p-0"
                     action={
                       <Button
@@ -1012,6 +1025,31 @@ while (true) {
                         })}
                       </div>
                     )}
+                    {boundTools.includes('image.generate') ? (
+                      <div className="mt-4 rounded-xl border border-border bg-background/70 p-3">
+                        <p className="text-sm font-medium">图片生成默认设置</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          智能体只能使用这里选定的模型；会话中可按用户要求调整比例和清晰度。
+                        </p>
+                        <div className="mt-3">
+                          <ModelPicker
+                            value={config.imageGeneration?.modelId}
+                            onValueChange={(modelId) =>
+                              setConfig((current) => ({
+                                ...current,
+                                imageGeneration: {
+                                  modelId,
+                                  aspectRatio: current.imageGeneration?.aspectRatio || '1:1',
+                                  quality: current.imageGeneration?.quality || '1K',
+                                },
+                              }))
+                            }
+                            capability="image_generation"
+                            label="图片模型"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
                   </EditorSection>
                 </TabsContent>
                 <TabsContent value="skills" className="w-full">

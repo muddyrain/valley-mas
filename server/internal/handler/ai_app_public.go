@@ -8,6 +8,7 @@ import (
 	"valley-server/internal/ai/agent"
 	"valley-server/internal/ai/tools"
 	"valley-server/internal/ai/tools/content"
+	imagetool "valley-server/internal/ai/tools/image"
 	"valley-server/internal/aiapp"
 	"valley-server/internal/aiclient"
 	"valley-server/internal/aimodel"
@@ -135,6 +136,7 @@ func publicAIAppChatWithTools(c *gin.Context, stream bool, invocation aimodel.In
 	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
 	spec := agent.Spec{Provider: invocation.Provider.Provider, Model: modelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench-public"}
 	ctx := content.WithOwner(c.Request.Context(), key.UserID)
+	ctx = imagetool.WithRequestInput(ctx, key.UserID, nil, "")
 	if !stream {
 		result, err := loop.Run(ctx, spec, []agent.Message{{Role: agent.RoleUser, Content: message}})
 		if err != nil || strings.TrimSpace(result.Reply) == "" {

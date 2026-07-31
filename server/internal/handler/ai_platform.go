@@ -17,6 +17,7 @@ import (
 	"valley-server/internal/ai/agent"
 	"valley-server/internal/ai/tools"
 	"valley-server/internal/ai/tools/content"
+	imagetool "valley-server/internal/ai/tools/image"
 	"valley-server/internal/aiapp"
 	"valley-server/internal/aiclient"
 	"valley-server/internal/aimodel"
@@ -70,6 +71,7 @@ func consumeAIAPIKeyDailyUsage(db *gorm.DB, apiKeyID model.Int64String, usageDat
 
 var builtInAITools = []gin.H{
 	{"name": "content.search", "description": "搜索当前用户可访问的内容", "permission": "read"},
+	{"name": imagetool.ToolName, "description": "使用当前智能体配置的图片模型生成一张图片", "permission": "model"},
 	{"name": "blog.create_draft", "description": "创建当前用户的博客草稿", "permission": "write"},
 	{"name": "blog.update_draft", "description": "更新当前用户的博客草稿", "permission": "write"},
 	{"name": "resource.create_draft", "description": "创建当前用户的资源草稿", "permission": "write"},
@@ -493,8 +495,8 @@ func validateInitialAIAppTools(values []string) ([]string, error) {
 		if name == "" {
 			continue
 		}
-		if name != "content.search" {
-			return nil, errors.New("首期仅允许绑定只读工具 content.search")
+		if name != "content.search" && name != imagetool.ToolName {
+			return nil, errors.New("包含未审核的工具")
 		}
 		if _, exists := seen[name]; exists {
 			continue
@@ -754,6 +756,7 @@ func debugAIAppWithTools(c *gin.Context, stream bool, invocation aimodel.Invocat
 	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
 	spec := agent.Spec{Provider: invocation.Provider.Provider, Model: modelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench"}
 	ctx := content.WithOwner(c.Request.Context(), userID)
+	ctx = imagetool.WithRequestInput(ctx, userID, nil, "")
 	if !stream {
 		result, err := loop.Run(ctx, spec, []agent.Message{{Role: agent.RoleUser, Content: message}})
 		if err != nil {
@@ -1162,7 +1165,7 @@ func ReplaceAIAppTools(c *gin.Context) {
 		Error(c, 400, "工具参数错误")
 		return
 	}
-	allowed := map[string]bool{"content.search": true}
+	allowed := map[string]bool{"content.search": true, imagetool.ToolName: true}
 	seen := map[string]bool{}
 	bindings := make([]model.AIAppVersionToolBinding, 0, len(payload.Tools))
 	for _, name := range payload.Tools {
@@ -1483,6 +1486,15 @@ func resolveAIAppTools(db *gorm.DB, appID model.Int64String, version model.AIApp
 		case "content.search":
 			if registry.Get(binding.ToolName) == nil {
 				registry.MustRegister(content.NewSearchTool(db))
+			}
+			allowed = append(allowed, binding.ToolName)
+		case imagetool.ToolName:
+			config, err := aiapp.Parse(version.Config)
+			if err != nil {
+				return registry, nil, err
+			}
+			if registry.Get(binding.ToolName) == nil {
+				registry.MustRegister(imagetool.NewGenerateTool(db, config.ImageGeneration))
 			}
 			allowed = append(allowed, binding.ToolName)
 		}
