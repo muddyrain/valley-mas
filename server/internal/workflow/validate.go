@@ -466,6 +466,13 @@ func validateMergeConfig(nodeID string, config map[string]any) []string {
 		if !validValueType(ValueType(stringFromValue(field["type"]))) {
 			return []string{fmt.Sprintf("合并节点 %s 字段类型无效", nodeID)}
 		}
+		strategy := stringFromValue(field["strategy"])
+		if strategy == "" {
+			strategy = "first"
+		}
+		if strategy != "first" && strategy != "array" && strategy != "text" && strategy != "object" {
+			return []string{fmt.Sprintf("合并节点 %s 聚合策略无效", nodeID)}
+		}
 	}
 	return nil
 }
@@ -631,8 +638,18 @@ func validateBindingTypes(nodes []Node, outputFields map[string]map[string]Value
 			fields, _ := config["fields"].([]any)
 			for _, raw := range fields {
 				field, _ := raw.(map[string]any)
+				strategy := stringFromValue(field["strategy"])
+				if strategy == "" {
+					strategy = "first"
+				}
 				expected := ValueType(stringFromValue(field["type"]))
+				if strategy == "object" {
+					expected = ValueTypeObject
+				}
 				sources, _ := field["sources"].([]any)
+				if strategy == "array" || strategy == "text" {
+					continue
+				}
 				for _, source := range sources {
 					errs = append(errs, validateBoundValueType(node.ID, stringFromValue(field["name"]), source, expected, outputFields)...)
 				}
@@ -796,7 +813,7 @@ func buildOutputFields(nodes map[string]Node, startInputs map[string]InputDefini
 			if mergeFields, ok := config["fields"].([]any); ok {
 				for _, raw := range mergeFields {
 					if mergeField, ok := raw.(map[string]any); ok {
-						result[id][stringFromValue(mergeField["name"])] = ValueType(stringFromValue(mergeField["type"]))
+						result[id][stringFromValue(mergeField["name"])] = mergeOutputValueType(mergeField)
 					}
 				}
 			}
@@ -841,6 +858,19 @@ func buildOutputFields(nodes map[string]Node, startInputs map[string]InputDefini
 		result[id] = addExecutionPolicyOutputFields(result[id], policy)
 	}
 	return result
+}
+
+func mergeOutputValueType(field map[string]any) ValueType {
+	switch stringFromValue(field["strategy"]) {
+	case "array":
+		return ValueTypeArray
+	case "text":
+		return ValueTypeString
+	case "object":
+		return ValueTypeObject
+	default:
+		return ValueType(stringFromValue(field["type"]))
+	}
 }
 
 func validateApprovalTopology(graph Graph) []string {

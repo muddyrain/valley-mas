@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -83,6 +84,51 @@ func TestWorkflowCapabilitiesExposeInputGuidance(t *testing.T) {
 	prompt, ok := imageProperties["prompt"].(map[string]any)
 	if !ok || prompt["allowFixedValue"] != true {
 		t.Fatalf("image prompt fixed-value guidance=%+v", prompt)
+	}
+	knowledgeWrite, _, ok := registry.Capability(CapabilityWriteKnowledge)
+	if !ok {
+		t.Fatal("knowledge write capability is missing")
+	}
+	knowledgeProperties, ok := knowledgeWrite.InputSchema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("knowledge properties=%T", knowledgeWrite.InputSchema["properties"])
+	}
+	for _, key := range []string{"name", "content"} {
+		field, ok := knowledgeProperties[key].(map[string]any)
+		if !ok || field["allowFixedValue"] != true {
+			t.Fatalf("knowledge %s fixed-value guidance=%+v", key, field)
+		}
+	}
+	fileOutput, _, ok := registry.Capability(CapabilityCreateFile)
+	if !ok || fileOutput.WriteCost != 1 || fileOutput.OutputSchema["url"] != ValueTypeString {
+		t.Fatalf("file output capability=%+v ok=%v", fileOutput, ok)
+	}
+}
+
+func TestFileCreateCapabilityValidatesAndWritesPrivateArtifact(t *testing.T) {
+	adapter := FileCreateCapabilityAdapter{}
+	result, err := adapter.Execute(context.Background(), RunContext{
+		Actor: Actor{UserID: 42},
+		FileWriter: FileWriterFunc(func(_ context.Context, userID int64, request FileWriteRequest) (FileWriteResult, error) {
+			if userID != 42 || request.FileName != "report.json" || request.Format != "json" || request.Content != `{"title":"report"}` {
+				t.Fatalf("unexpected file request: %+v user=%d", request, userID)
+			}
+			return FileWriteResult{ResourceID: "2002", FileName: request.FileName, URL: "https://example.test/report.json", ContentType: "application/json; charset=utf-8", Size: 18}, nil
+		}),
+	}, NodeExecution{Input: map[string]any{"fileName": "report", "format": "json", "content": `{"title":"report"}`}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Output["resourceId"] != "2002" || result.Output["fileName"] != "report.json" || result.Output["size"] != int64(18) {
+		t.Fatalf("unexpected output: %#v", result.Output)
+	}
+
+	_, err = adapter.Execute(context.Background(), RunContext{FileWriter: FileWriterFunc(func(context.Context, int64, FileWriteRequest) (FileWriteResult, error) {
+		t.Fatal("invalid JSON must not be persisted")
+		return FileWriteResult{}, nil
+	})}, NodeExecution{Input: map[string]any{"fileName": "bad", "format": "json", "content": "not-json"}})
+	if err == nil || !strings.Contains(err.Error(), "JSON") {
+		t.Fatalf("expected JSON validation error, got %v", err)
 	}
 }
 
@@ -323,6 +369,55 @@ func TestGraphV4MergeUsesFirstActiveBranch(t *testing.T) {
 		if final["value"] != test.want {
 			t.Fatalf("enabled=%v output=%v", test.enabled, final)
 		}
+	}
+}
+
+func TestMergeExecutorAggregatesArraysTextAndObjects(t *testing.T) {
+	run := RunContext{Outputs: map[string]map[string]any{
+		"left":  {"value": "甲", "object": map[string]any{"title": "左", "shared": "left"}},
+		"right": {"value": "乙", "object": map[string]any{"summary": "右", "shared": "right"}},
+	}}
+	result, err := (MergeExecutor{}).Execute(context.Background(), run, NodeExecution{Input: map[string]any{
+		"fields": []any{
+			map[string]any{"name": "values", "type": "string", "strategy": "array", "sources": []any{"{{left.output.value}}", "{{right.output.value}}"}},
+			map[string]any{"name": "text", "type": "string", "strategy": "text", "delimiter": " / ", "sources": []any{"{{left.output.value}}", "{{right.output.value}}"}},
+			map[string]any{"name": "object", "type": "object", "strategy": "object", "sources": []any{"{{left.output.object}}", "{{right.output.object}}"}},
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := result.Output["values"]; !reflect.DeepEqual(got, []any{"甲", "乙"}) {
+		t.Fatalf("array aggregation=%#v", got)
+	}
+	if got := result.Output["text"]; got != "甲 / 乙" {
+		t.Fatalf("text aggregation=%#v", got)
+	}
+	if got := result.Output["object"]; !reflect.DeepEqual(got, map[string]any{"title": "左", "summary": "右", "shared": "right"}) {
+		t.Fatalf("object aggregation=%#v", got)
+	}
+}
+
+func TestKnowledgeWriteCapabilityDelegatesToOwnerScopedWriter(t *testing.T) {
+	registry := testRegistry(t)
+	capability, _, ok := registry.Capability(CapabilityWriteKnowledge)
+	if !ok || capability.SideEffect != "write" || capability.WriteCost != 1 {
+		t.Fatalf("capability=%+v ok=%v", capability, ok)
+	}
+	result, err := (KnowledgeWriteCapabilityAdapter{}).Execute(context.Background(), RunContext{
+		Actor: Actor{UserID: 42},
+		KnowledgeWriter: KnowledgeWriterFunc(func(_ context.Context, userID int64, request KnowledgeWriteRequest) (KnowledgeWriteResult, error) {
+			if userID != 42 || request.KnowledgeBaseID != "100" || request.Name != "周报" || request.Content != "本周完成节点扩展" {
+				t.Fatalf("request=%+v userID=%d", request, userID)
+			}
+			return KnowledgeWriteResult{DocumentID: "200", Status: "pending_embedding", ChunkCount: 2}, nil
+		}),
+	}, NodeExecution{Input: map[string]any{"knowledgeBaseId": "100", "name": "周报", "content": "本周完成节点扩展"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Output["documentId"] != "200" || result.Output["chunkCount"] != 2 {
+		t.Fatalf("output=%#v", result.Output)
 	}
 }
 

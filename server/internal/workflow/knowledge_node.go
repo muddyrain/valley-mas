@@ -27,6 +27,43 @@ func (KnowledgeRetrieveCapabilityAdapter) Execute(ctx context.Context, run RunCo
 	return NodeResult{Output: map[string]any{"context": result.Context, "references": result.References}}, nil
 }
 
+// KnowledgeWriteCapabilityAdapter creates an owner-private document and
+// delegates its asynchronous indexing to the handler-provided writer.
+type KnowledgeWriteCapabilityAdapter struct{}
+
+func (KnowledgeWriteCapabilityAdapter) Execute(
+	ctx context.Context,
+	run RunContext,
+	execution NodeExecution,
+) (NodeResult, error) {
+	if run.KnowledgeWriter == nil {
+		return NodeResult{}, fmt.Errorf("知识库写入未配置")
+	}
+	request := KnowledgeWriteRequest{
+		KnowledgeBaseID: strings.TrimSpace(stringFromValue(execution.Input["knowledgeBaseId"])),
+		Name:            strings.TrimSpace(stringFromValue(execution.Input["name"])),
+		Content:         strings.TrimSpace(stringFromValue(execution.Input["content"])),
+	}
+	if request.KnowledgeBaseID == "" {
+		return NodeResult{}, fmt.Errorf("目标知识库不能为空")
+	}
+	if request.Name == "" {
+		return NodeResult{}, fmt.Errorf("知识库文档名称不能为空")
+	}
+	if request.Content == "" {
+		return NodeResult{}, fmt.Errorf("知识库文档内容不能为空")
+	}
+	result, err := run.KnowledgeWriter.Write(ctx, run.Actor.UserID, request)
+	if err != nil {
+		return NodeResult{}, err
+	}
+	return NodeResult{Output: map[string]any{
+		"documentId": result.DocumentID,
+		"status":     result.Status,
+		"chunkCount": result.ChunkCount,
+	}}, nil
+}
+
 const maxKnowledgeReferenceExcerptRunes = 240
 
 // KnowledgeFormatReferencesCapabilityAdapter turns retrieval metadata into

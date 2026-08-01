@@ -216,6 +216,8 @@ func resumeWorkflowApproval(parent context.Context, db *gorm.DB, approval model.
 			ID: run.ID.String(), Actor: workflow.Actor{UserID: int64(run.UserID), Role: user.Role},
 			Inputs: inputs, Outputs: make(map[string]map[string]any),
 			KnowledgeRetriever:       workflowKnowledgeRetriever(run.UserID, version),
+			KnowledgeWriter:          workflowKnowledgeWriter(),
+			FileWriter:               workflowFileWriter(),
 			ContentSearcher:          workflowContentSearcher(run.UserID),
 			NotionSearcher:           workflowNotionSearcher(run.UserID),
 			CoverGenerator:           workflowCoverGenerator(),

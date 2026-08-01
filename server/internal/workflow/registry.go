@@ -10,6 +10,8 @@ const (
 	CapabilityExtractDocument     = "content.extractDocument"
 	CapabilityExtractStructured   = "content.extractStructured"
 	CapabilityKnowledge           = "knowledge.retrieve"
+	CapabilityWriteKnowledge      = "knowledge.write"
+	CapabilityCreateFile          = "file.create"
 	CapabilityFormatReferences    = "knowledge.formatReferences"
 	CapabilityParseJSON           = "data.parseJSON"
 	CapabilityChunkList           = "data.chunkList"
@@ -158,6 +160,19 @@ func RegisterWorkflowCapabilities(registry *Registry) error {
 	citationStyle := inputField("string", "引用样式", "选择 Markdown 引用或普通编号列表。", "markdown")
 	citationStyle["enum"] = []string{"markdown", "numbered"}
 	citationStyle["default"] = "markdown"
+	knowledgeBase := inputField("string", "目标知识库", "选择当前账户已有的私有知识库。", "选择知识库")
+	knowledgeBase["resource"] = "knowledge_base"
+	knowledgeDocumentName := inputField("string", "文档名称", "保存到知识库后的文档名称；也可以直接填写固定名称。", "例如：2026-08 工作流总结")
+	knowledgeDocumentName["allowFixedValue"] = true
+	knowledgeDocumentContent := inputField("string", "文档内容", "绑定上游生成或提取出的纯文本；也可以直接填写固定内容，最多 2MB。", "输入内容或选择上游文本变量")
+	knowledgeDocumentContent["allowFixedValue"] = true
+	fileName := inputField("string", "文件名", "文件将保存到当前所有者的私有资源中；扩展名会按所选格式自动补齐。", "例如：8月内容总结")
+	fileName["allowFixedValue"] = true
+	fileContent := inputField("string", "文件内容", "绑定上游文本；JSON 格式需要是有效 JSON，CSV 格式需要是有效 CSV。", "选择上游文本变量或填写固定内容")
+	fileContent["allowFixedValue"] = true
+	fileFormat := inputField("string", "文件格式", "首期支持 Markdown、JSON 和 CSV。", "markdown")
+	fileFormat["enum"] = []string{"markdown", "json", "csv"}
+	fileFormat["default"] = "markdown"
 	batchSize := inputField("number", "每批数量", "把输入数组切成每批 1 到 100 项。", "10")
 	batchSize["default"] = 10
 	listOperation := inputField("string", "处理方式", "选择筛选、字段映射、稳定排序或去重。", "filter")
@@ -180,6 +195,8 @@ func RegisterWorkflowCapabilities(registry *Registry) error {
 		{ToolCapability{ID: CapabilityExtractDocument, Name: "文档提取", Description: "从 PDF、文本与常见文档格式中确定性提取正文", Category: "content", SideEffect: "none", InputSchema: schemaWithFields([]string{"fileInput"}, map[string]map[string]any{"fileInput": inputField("file", "文档文件", "支持 PDF、TXT、Markdown、HTML、JSON、CSV、YAML 和 XML。", "选择开始节点上传的文档")}), OutputSchema: fields(field("text", ValueTypeString), field("pages", ValueTypeArray), field("format", ValueTypeString), field("pageCount", ValueTypeNumber), field("characterCount", ValueTypeNumber)), AIUsage: "需要先把上传文档转换为可检索或可提取的纯文本时使用；扫描 PDF 请改用图片理解或知识库 OCR"}, DocumentExtractCapabilityAdapter{}},
 		{ToolCapability{ID: CapabilityExtractStructured, Name: "结构化提取", Description: "按声明字段从文本中提取并校验 JSON 对象", Category: "content", SideEffect: "model", ModelCost: 1, InputSchema: schemaWithFields([]string{"modelId", "text", "schema"}, map[string]map[string]any{"modelId": textModel, "text": inputField("string", "待提取文本", "绑定文档正文、图片理解结果或其他上游文本。", "选择上游文本变量"), "schema": inputField("object", "字段结构", "使用字段名到类型的 JSON 对象，最多 20 个字段。", `例如：{"title":"string","tags":"string[]"}`), "instruction": inputField("string", "提取要求", "可选，补充字段含义和缺失值处理规则。", "例如：只提取原文明确出现的信息")}), OutputSchema: fields(field("data", ValueTypeObject), field("model", ValueTypeString), field("tokenUsage", ValueTypeNumber)), AIUsage: "需要把非结构化文本转换为严格 JSON 对象时使用"}, StructuredExtractCapabilityAdapter{}},
 		{ToolCapability{ID: CapabilityKnowledge, Name: "知识库检索", Description: "检索当前工作流绑定的私有资料库", Category: "knowledge", SideEffect: "read", InputSchema: schemaWithFields([]string{"query"}, map[string]map[string]any{"query": inputField("string", "检索问题", "描述希望从知识库中找到的信息。", "例如：介绍 AI 工作流的最佳实践")}), OutputSchema: fields(field("context", ValueTypeString), field("references", ValueTypeObject)), AIUsage: "需要引用用户私有知识时使用"}, KnowledgeRetrieveCapabilityAdapter{}},
+		{ToolCapability{ID: CapabilityWriteKnowledge, Name: "知识库写入", Description: "把工作流文本写入当前账户的私有知识库并开始索引", Category: "knowledge", SideEffect: "write", WriteCost: 1, InputSchema: schemaWithFields([]string{"knowledgeBaseId", "name", "content"}, map[string]map[string]any{"knowledgeBaseId": knowledgeBase, "name": knowledgeDocumentName, "content": knowledgeDocumentContent}), OutputSchema: fields(field("documentId", ValueTypeString), field("status", ValueTypeString), field("chunkCount", ValueTypeNumber)), AIUsage: "将生成结果沉淀到 owner 私有知识库时使用；索引在后台继续，完成后状态会变为 ready", UI: map[string]any{"fields": map[string]any{"content": map[string]any{"editor": "multiline", "label": "文档内容"}}, "connection": map[string]any{"description": "只能写入当前账户已有的私有知识库。", "actionLabel": "管理知识库", "path": "/workbench/resources?tab=knowledge"}}}, KnowledgeWriteCapabilityAdapter{}},
+		{ToolCapability{ID: CapabilityCreateFile, Name: "文件产出", Description: "将工作流文本保存为可下载的 Markdown、JSON 或 CSV 私有文件", Category: "content", SideEffect: "write", WriteCost: 1, InputSchema: schemaWithFields([]string{"fileName", "format", "content"}, map[string]map[string]any{"fileName": fileName, "format": fileFormat, "content": fileContent}), OutputSchema: fields(field("resourceId", ValueTypeString), field("fileName", ValueTypeString), field("url", ValueTypeString), field("contentType", ValueTypeString), field("size", ValueTypeNumber)), AIUsage: "需要把工作流最终文本交付为下载文件时使用；文件只保存到当前 owner 的私有资源中", UI: map[string]any{"fields": map[string]any{"content": map[string]any{"editor": "multiline", "label": "文件内容"}}}}, FileCreateCapabilityAdapter{}},
 		{ToolCapability{ID: CapabilityFormatReferences, Name: "知识引用整理", Description: "去重并整理知识检索来源为可引用文本和结构化列表", Category: "knowledge", SideEffect: "none", InputSchema: schemaWithFields([]string{"references"}, map[string]map[string]any{"references": inputField("object", "来源引用", "绑定知识库检索节点的 references 输出。", "选择知识库检索 · references"), "style": citationStyle}), OutputSchema: fields(field("citationText", ValueTypeString), field("referenceList", ValueTypeArray), field("count", ValueTypeNumber)), AIUsage: "需要把知识检索来源附加到文章、报告或模型上下文时使用"}, KnowledgeFormatReferencesCapabilityAdapter{}},
 		{ToolCapability{ID: CapabilityParseJSON, Name: "解析 JSON", Description: "校验 JSON 文本并输出根对象", Category: "logic", SideEffect: "none", InputSchema: schemaWithFields([]string{"text"}, map[string]map[string]any{"text": inputField("string", "JSON 文本", "绑定 HTTP 或模型返回的 JSON 文本。", "选择上游文本变量")}), OutputSchema: fields(field("value", ValueTypeObject)), AIUsage: "需要把 JSON 文本转换为可绑定对象时使用"}, JSONParseCapabilityAdapter{}},
 		{ToolCapability{ID: CapabilityChunkList, Name: "列表切批", Description: "把数组切成多个批次，交给循环节点逐批处理", Category: "logic", SideEffect: "none", InputSchema: schemaWithFields([]string{"items", "batchSize"}, map[string]map[string]any{"items": inputField("array", "项目数组", "绑定需要批量处理的数组。", "选择上游数组变量"), "batchSize": batchSize}), OutputSchema: fields(field("batches", ValueTypeArray), field("batchCount", ValueTypeNumber), field("itemCount", ValueTypeNumber)), AIUsage: "大量项目需要按固定批次交给循环节点处理时使用"}, ChunkListCapabilityAdapter{}},

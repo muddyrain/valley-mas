@@ -360,15 +360,19 @@ function validateNode(
     }
     case 'merge': {
       const fields = Array.isArray(config.fields)
-        ? (config.fields as Array<{ name?: string; sources?: unknown[] }>)
+        ? (config.fields as Array<{ name?: string; sources?: unknown[]; strategy?: unknown }>)
         : [];
       if (
         !fields.length ||
         fields.some(
-          (field) => !field.name || !Array.isArray(field.sources) || field.sources.length < 2,
+          (field) =>
+            !field.name ||
+            !Array.isArray(field.sources) ||
+            field.sources.length < 2 ||
+            !['first', 'array', 'text', 'object'].includes(String(field.strategy || 'first')),
         )
       )
-        return fail('每个合并字段至少需要两个候选引用');
+        return fail('请完成聚合字段、策略和至少两个候选引用');
       break;
     }
     case 'variable': {

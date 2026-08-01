@@ -188,10 +188,14 @@ export interface WorkflowVariableAssignment {
   value: unknown;
 }
 
+export type WorkflowMergeStrategy = 'first' | 'array' | 'text' | 'object';
+
 export interface WorkflowMergeField {
   name: string;
   type: WorkflowValueType;
   sources: string[];
+  strategy?: WorkflowMergeStrategy;
+  delimiter?: string;
 }
 
 export interface WorkflowIntentDefinition {

@@ -922,7 +922,7 @@ func runWorkflowGraphWithResume(
 	defer releaseRun()
 	stopCancellationWatch := watchWorkflowRunCancellation(run.ID.String())
 	defer stopCancellationWatch()
-	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: runtimeState.Outputs, CompletedNodes: workflowCompletedNodes(runtimeState), ResumeFromNodeID: resumeFromNodeID, KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion), ContentSearcher: workflowContentSearcher(model.Int64String(userID)), NotionSearcher: workflowNotionSearcher(model.Int64String(userID)), CoverGenerator: workflowCoverGenerator(), AIImageGenerator: workflowAIImageGenerator(), AIImageUnderstander: workflowAIImageUnderstander(), AIImageResourceSaver: workflowAIImageResourceSaver(), NotificationSender: workflowNotificationSender(), SubworkflowRunner: workflowSubworkflowRunner(model.Int64String(userID)), ApprovalGate: workflowApprovalGate(run), SkillInstructionResolver: workflowAISkillInstructionResolver(model.Int64String(userID)), RegisterNodeCancellation: func(nodeID string, cancel func()) func() {
+	executeErr := workflow.Execute(executionContext, graph, registry, workflow.RunContext{ID: run.ID.String(), Actor: workflow.Actor{UserID: userID, Role: role}, Inputs: inputs, Outputs: runtimeState.Outputs, CompletedNodes: workflowCompletedNodes(runtimeState), ResumeFromNodeID: resumeFromNodeID, KnowledgeRetriever: workflowKnowledgeRetriever(model.Int64String(userID), appVersion), KnowledgeWriter: workflowKnowledgeWriter(), FileWriter: workflowFileWriter(), ContentSearcher: workflowContentSearcher(model.Int64String(userID)), NotionSearcher: workflowNotionSearcher(model.Int64String(userID)), CoverGenerator: workflowCoverGenerator(), AIImageGenerator: workflowAIImageGenerator(), AIImageUnderstander: workflowAIImageUnderstander(), AIImageResourceSaver: workflowAIImageResourceSaver(), NotificationSender: workflowNotificationSender(), SubworkflowRunner: workflowSubworkflowRunner(model.Int64String(userID)), ApprovalGate: workflowApprovalGate(run), SkillInstructionResolver: workflowAISkillInstructionResolver(model.Int64String(userID)), RegisterNodeCancellation: func(nodeID string, cancel func()) func() {
 		return activeWorkflowRuns.RegisterNodeCancel(run.ID.String(), nodeID, cancel)
 	}}, func(event workflow.Event) {
 		if persistenceErr == nil {
@@ -1746,7 +1746,7 @@ func workflowSubworkflowRunner(ownerID model.Int64String) workflow.SubworkflowRu
 		}
 		var final map[string]any
 		executionContext := context.WithValue(ctx, subworkflowStackContextKey{}, nextStack)
-		err = workflow.Execute(executionContext, graph, workflowRuntimeRegistry(), workflow.RunContext{ID: request.VersionID, Actor: actor, Inputs: request.Inputs, Outputs: map[string]map[string]any{}, KnowledgeRetriever: workflowKnowledgeRetriever(ownerID, version), ContentSearcher: workflowContentSearcher(ownerID), NotionSearcher: workflowNotionSearcher(ownerID), CoverGenerator: workflowCoverGenerator(), AIImageGenerator: workflowAIImageGenerator(), AIImageUnderstander: workflowAIImageUnderstander(), AIImageResourceSaver: workflowAIImageResourceSaver(), NotificationSender: workflowNotificationSender(), SubworkflowRunner: runner, SkillInstructionResolver: workflowAISkillInstructionResolver(ownerID)}, func(event workflow.Event) {
+		err = workflow.Execute(executionContext, graph, workflowRuntimeRegistry(), workflow.RunContext{ID: request.VersionID, Actor: actor, Inputs: request.Inputs, Outputs: map[string]map[string]any{}, KnowledgeRetriever: workflowKnowledgeRetriever(ownerID, version), KnowledgeWriter: workflowKnowledgeWriter(), FileWriter: workflowFileWriter(), ContentSearcher: workflowContentSearcher(ownerID), NotionSearcher: workflowNotionSearcher(ownerID), CoverGenerator: workflowCoverGenerator(), AIImageGenerator: workflowAIImageGenerator(), AIImageUnderstander: workflowAIImageUnderstander(), AIImageResourceSaver: workflowAIImageResourceSaver(), NotificationSender: workflowNotificationSender(), SubworkflowRunner: runner, SkillInstructionResolver: workflowAISkillInstructionResolver(ownerID)}, func(event workflow.Event) {
 			if event.NodeType == workflow.NodeTypeEnd && event.Status == workflow.StatusSucceeded {
 				final = event.Output
 			}
@@ -1788,6 +1788,102 @@ func workflowKnowledgeRetriever(userID model.Int64String, version model.AIAppVer
 		}
 		return result, nil
 	})
+}
+
+func workflowKnowledgeWriter() workflow.KnowledgeWriter {
+	return workflow.KnowledgeWriterFunc(func(
+		ctx context.Context,
+		userID int64,
+		request workflow.KnowledgeWriteRequest,
+	) (workflow.KnowledgeWriteResult, error) {
+		if err := ctx.Err(); err != nil {
+			return workflow.KnowledgeWriteResult{}, err
+		}
+		knowledgeBaseID, err := strconv.ParseInt(strings.TrimSpace(request.KnowledgeBaseID), 10, 64)
+		if err != nil || knowledgeBaseID <= 0 {
+			return workflow.KnowledgeWriteResult{}, workflow.NewPublicExecutionFailure("目标知识库无效", "KNOWLEDGE_BASE_INVALID")
+		}
+		document, err := createAIKnowledgeTextDocument(
+			database.GetDB(),
+			model.Int64String(userID),
+			model.Int64String(knowledgeBaseID),
+			request.Name,
+			request.Content,
+			"text/plain; charset=utf-8",
+			int64(len([]byte(request.Content))),
+		)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return workflow.KnowledgeWriteResult{}, workflow.NewPublicExecutionFailure("目标知识库不存在或无权写入", "KNOWLEDGE_BASE_NOT_FOUND")
+			}
+			return workflow.KnowledgeWriteResult{}, workflow.NewPublicExecutionFailure("知识库文档创建失败，请检查内容和索引服务", "KNOWLEDGE_WRITE_FAILED")
+		}
+		scheduleAIKnowledgeDocumentIndexing(document.ID)
+		return workflow.KnowledgeWriteResult{
+			DocumentID: document.ID.String(),
+			Status:     document.Status,
+			ChunkCount: document.ChunkCount,
+		}, nil
+	})
+}
+
+func workflowFileWriter() workflow.FileWriter {
+	return workflow.FileWriterFunc(func(
+		ctx context.Context,
+		userID int64,
+		request workflow.FileWriteRequest,
+	) (workflow.FileWriteResult, error) {
+		if err := ctx.Err(); err != nil {
+			return workflow.FileWriteResult{}, err
+		}
+		uploadConfig := service.WorkflowOutputUploadConfig(userID)
+		uploadConfig.CustomFolder = fmt.Sprintf("workflow-outputs/%d", userID)
+		stored, err := service.NewUploadService().UploadBytesWithContext(
+			ctx,
+			request.FileName,
+			[]byte(request.Content),
+			uploadConfig,
+		)
+		if err != nil {
+			return workflow.FileWriteResult{}, workflow.NewPublicExecutionFailure("文件保存失败，请稍后重试", "FILE_WRITE_FAILED")
+		}
+		resource := model.Resource{
+			UserID:      model.Int64String(userID),
+			Type:        "workflow_file",
+			Visibility:  "private",
+			Title:       strings.TrimSuffix(request.FileName, stored.Ext),
+			Description: "工作流生成文件",
+			URL:         stored.URL,
+			StorageKey:  stored.Key,
+			Size:        stored.Size,
+			Extension:   strings.TrimPrefix(stored.Ext, "."),
+		}
+		if resource.Title == "" {
+			resource.Title = request.FileName
+		}
+		if err := database.GetDB().WithContext(ctx).Create(&resource).Error; err != nil {
+			_ = service.NewUploadService().DeleteByKey(stored.Key)
+			return workflow.FileWriteResult{}, workflow.NewPublicExecutionFailure("文件记录创建失败，请稍后重试", "FILE_WRITE_FAILED")
+		}
+		return workflow.FileWriteResult{
+			ResourceID:  resource.ID.String(),
+			FileName:    request.FileName,
+			URL:         stored.URL,
+			ContentType: workflowOutputContentType(request.Format),
+			Size:        stored.Size,
+		}, nil
+	})
+}
+
+func workflowOutputContentType(format string) string {
+	switch format {
+	case "json":
+		return "application/json; charset=utf-8"
+	case "csv":
+		return "text/csv; charset=utf-8"
+	default:
+		return "text/markdown; charset=utf-8"
+	}
 }
 
 func workflowRequiresARKImage(graph workflow.Graph) bool {

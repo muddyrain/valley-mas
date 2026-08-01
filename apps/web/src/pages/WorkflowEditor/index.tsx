@@ -245,6 +245,22 @@ function workflowCanvasNodeZIndex(
   return snapshot ? 20 : 0;
 }
 
+function nextWorkflowNodeLabel(label: string, nodes: Node[]) {
+  const baseLabel = label.replace(/_\d+$/, '') || label;
+  const pattern = new RegExp(`^${baseLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:_(\\d+))?$`);
+  let hasBaseLabel = false;
+  let largestSuffix = 0;
+  for (const node of nodes) {
+    const currentLabel = (node.data as { label?: unknown }).label;
+    if (typeof currentLabel !== 'string') continue;
+    const match = currentLabel.match(pattern);
+    if (!match) continue;
+    if (match[1] === undefined) hasBaseLabel = true;
+    else largestSuffix = Math.max(largestSuffix, Number(match[1]));
+  }
+  return hasBaseLabel || largestSuffix > 0 ? `${baseLabel}_${largestSuffix + 1}` : baseLabel;
+}
+
 function hasSameValidationGraph(
   previousNodes: Node[],
   nextNodes: Node[],
@@ -1143,7 +1159,7 @@ export default function WorkflowEditorPage() {
       type: item.nodeType,
       position,
       data: {
-        label: item.label,
+        label: nextWorkflowNodeLabel(item.label, workflowStateRef.current.nodes),
         nodeType: item.nodeType,
         config: { ...item.config, ...(item.sideEffect ? { sideEffect: item.sideEffect } : {}) },
       },
@@ -1920,10 +1936,31 @@ export default function WorkflowEditorPage() {
           x: node.position.x + 50,
           y: node.position.y + 50,
         },
+        selected: true,
+        data: {
+          ...node.data,
+          label: nextWorkflowNodeLabel(
+            String((node.data as { label?: string }).label || nodeType),
+            workflowStateRef.current.nodes,
+          ),
+        },
       };
-      const nextNodes = [...workflowStateRef.current.nodes, newNode];
+      const nextNodes = [
+        ...workflowStateRef.current.nodes.map((candidate) => ({ ...candidate, selected: false })),
+        newNode,
+      ];
       setNodes(nextNodes);
       markWorkflowDirty({ nodes: nextNodes });
+      setSelectedNode({
+        id: newNode.id,
+        type: newNode.type || '',
+        data: newNode.data as {
+          label: string;
+          nodeType: string;
+          config?: Record<string, unknown>;
+          when?: import('@/api/workflow').WorkflowRule;
+        },
+      });
     },
     [isRunning, markWorkflowDirty],
   );
@@ -2970,7 +3007,7 @@ export default function WorkflowEditorPage() {
     <WorkflowRuntimeProvider value={runtimeValue}>
       <ReactFlowProvider>
         <div className="h-screen flex flex-col bg-background">
-          <div className="flex min-h-16 items-center justify-between gap-6 border-b border-border/80 bg-card/95 px-5 py-2.5 shadow-sm backdrop-blur">
+          <div className="flex min-h-16 flex-col gap-3 border-b border-border/80 bg-card/95 px-3 py-2.5 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div className="flex min-w-0 items-center gap-3">
               <Button
                 variant="ghost"
@@ -3029,7 +3066,7 @@ export default function WorkflowEditorPage() {
               </span>
             </div>
 
-            <div className="flex shrink-0 items-center gap-1.5 rounded-xl border border-border/70 bg-muted/30 p-1.5 shadow-xs">
+            <div className="flex w-full shrink-0 flex-wrap items-center gap-1 rounded-xl border border-border/70 bg-muted/30 p-1 shadow-xs sm:w-auto sm:flex-nowrap sm:gap-1.5 sm:p-1.5">
               <Button
                 variant="outline"
                 size="icon"
@@ -3053,12 +3090,13 @@ export default function WorkflowEditorPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-9 w-9 px-0 sm:w-auto sm:px-2.5"
                 onClick={handleAutoLayout}
                 disabled={isRunning || nodes.length < 2}
                 title="自动整理节点"
               >
-                <LayoutDashboard className="mr-2 h-4 w-4" />
-                整理
+                <LayoutDashboard className="size-4 sm:mr-2" />
+                <span className="hidden sm:inline">整理</span>
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger
@@ -3090,20 +3128,70 @@ export default function WorkflowEditorPage() {
                     <Trash2 className="mr-2 h-4 w-4" />
                     清空
                   </DropdownMenuItem>
+                  {isMobile ? (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => void handleSave()}>
+                        <Save />
+                        立即保存
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={
+                          isPublishing ||
+                          saveStatus === 'creating' ||
+                          saveStatus === 'saving' ||
+                          (Boolean(workflowId) &&
+                            platform?.app.publishedVersionId === platform?.app.draftVersionId)
+                        }
+                        onClick={() => void handlePublish()}
+                      >
+                        <Upload />
+                        {platform?.app.publishedVersionId === platform?.app.draftVersionId
+                          ? '已发布'
+                          : '发布'}
+                      </DropdownMenuItem>
+                      {workflowId ? (
+                        <DropdownMenuItem
+                          disabled={!platform?.app.publishedVersionId}
+                          onClick={() => setShowTriggers(true)}
+                        >
+                          <Clock3 />
+                          定时
+                        </DropdownMenuItem>
+                      ) : null}
+                      {workflowId ? (
+                        <DropdownMenuItem onClick={() => void openHistory()}>
+                          <History />
+                          历史
+                        </DropdownMenuItem>
+                      ) : null}
+                      {workflowId ? (
+                        <DropdownMenuItem
+                          disabled={!platform}
+                          onClick={() => void openKnowledgeBaseBindings()}
+                        >
+                          <Database />
+                          资料库
+                        </DropdownMenuItem>
+                      ) : null}
+                    </>
+                  ) : null}
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button
                 variant="outline"
                 size="sm"
+                className="h-9 w-9 px-0 sm:w-auto sm:px-2.5"
                 onClick={() => void handleSave()}
                 disabled={saveStatus === 'creating' || saveStatus === 'saving' || isPublishing}
               >
-                <Save className="h-4 w-4 mr-2" />
-                立即保存
+                <Save className="size-4 sm:mr-2" />
+                <span className="hidden sm:inline">立即保存</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
+                className="hidden sm:inline-flex"
                 onClick={() => void handlePublish()}
                 disabled={
                   isPublishing ||
@@ -3113,7 +3201,7 @@ export default function WorkflowEditorPage() {
                     platform?.app.publishedVersionId === platform?.app.draftVersionId)
                 }
               >
-                <Upload className="h-4 w-4 mr-2" />
+                <Upload className="mr-2 h-4 w-4" />
                 {platform?.app.publishedVersionId === platform?.app.draftVersionId
                   ? '已发布'
                   : '发布'}
@@ -3122,6 +3210,7 @@ export default function WorkflowEditorPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="hidden sm:inline-flex"
                   disabled={!platform?.app.publishedVersionId}
                   title={
                     platform?.app.publishedVersionId ? '管理定时触发' : '发布工作流后可配置定时触发'
@@ -3133,7 +3222,12 @@ export default function WorkflowEditorPage() {
                 </Button>
               )}
               {workflowId && (
-                <Button variant="outline" size="sm" onClick={() => void openHistory()}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="hidden sm:inline-flex"
+                  onClick={() => void openHistory()}
+                >
                   <History className="mr-2 h-4 w-4" />
                   历史
                 </Button>
@@ -3142,6 +3236,7 @@ export default function WorkflowEditorPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="hidden sm:inline-flex"
                   disabled={!platform}
                   onClick={() => void openKnowledgeBaseBindings()}
                 >
@@ -3151,10 +3246,11 @@ export default function WorkflowEditorPage() {
               )}
               <Button
                 size="sm"
+                className="h-9 flex-1 sm:h-8 sm:flex-none"
                 onClick={() => void handleRun()}
                 disabled={isRunning || isPreparingRun || saveStatus === 'creating'}
               >
-                <Play className="h-4 w-4 mr-2" />
+                <Play className="mr-2 h-4 w-4" />
                 {isRunning ? '运行中...' : '运行'}
               </Button>
             </div>

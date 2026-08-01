@@ -91,18 +91,59 @@ func (MergeExecutor) Execute(_ context.Context, run RunContext, execution NodeEx
 		if name == "" {
 			return NodeResult{}, fmt.Errorf("合并字段名称不能为空")
 		}
-		output[name] = nil
+		strategy := stringFromValue(fieldConfig["strategy"])
+		if strategy == "" {
+			strategy = "first"
+		}
 		sources, _ := fieldConfig["sources"].([]any)
+		values := make([]any, 0, len(sources))
 		for _, rawSource := range sources {
 			source := stringFromValue(rawSource)
 			value, err := resolveTemplate(source, run.Outputs, execution.Locals)
 			if err == nil && value != nil {
-				output[name] = value
-				break
+				values = append(values, value)
 			}
 		}
+		delimiter, _ := fieldConfig["delimiter"].(string)
+		value, err := aggregateMergeValues(strategy, delimiter, values)
+		if err != nil {
+			return NodeResult{}, fmt.Errorf("聚合字段 %s：%w", name, err)
+		}
+		output[name] = value
 	}
 	return NodeResult{Output: output}, nil
+}
+
+func aggregateMergeValues(strategy, delimiter string, values []any) (any, error) {
+	switch strategy {
+	case "first":
+		if len(values) == 0 {
+			return nil, nil
+		}
+		return values[0], nil
+	case "array":
+		return values, nil
+	case "text":
+		parts := make([]string, 0, len(values))
+		for _, value := range values {
+			parts = append(parts, fmt.Sprint(value))
+		}
+		return strings.Join(parts, delimiter), nil
+	case "object":
+		result := map[string]any{}
+		for _, value := range values {
+			object, ok := value.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("对象合并只接受对象输入")
+			}
+			for key, item := range object {
+				result[key] = item
+			}
+		}
+		return result, nil
+	default:
+		return nil, fmt.Errorf("不支持的聚合策略 %s", strategy)
+	}
 }
 
 type VariableExecutor struct{}
