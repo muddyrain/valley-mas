@@ -9,6 +9,8 @@
     "lint": "biome lint src/",
     "format": "biome format --write src/",
     "check": "biome check src/",
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --config vitest.config.ts",
     "test:ai-workbench-sse": "node scripts/test-ai-workbench-sse.mjs",
     "test:workflow-variables": "node --experimental-strip-types scripts/test-workflow-variable-model.ts",
     "preview": "vite preview",
@@ -65,6 +67,7 @@
     "shadcn": "^4.0.5",
     "tailwindcss": "catalog:tailwind-4",
     "typescript": "catalog:ts-tooling",
-    "vite": "catalog:vite-6"
+    "vite": "catalog:vite-6",
+    "vitest": "catalog:test"
   }
 }

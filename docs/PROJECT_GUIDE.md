@@ -89,7 +89,7 @@ cd server && go run ./cmd/migrate bootstrap --apply
 | 服务 | 默认端口 |
 | --- | --- |
 | Go API | 8080 |
-| Web | 5174 |
+| Web | 5000 |
 | Admin | 3000 |
 | Life Trace | 5178 |
 | Life Trace preview | 4178 |
@@ -148,6 +148,7 @@ pnpm build
 
 # 前端应用定向检查
 pnpm --filter @valley/web exec tsc --noEmit
+pnpm --filter @valley/web test
 pnpm --filter @valley/admin exec tsc --noEmit
 pnpm --filter @valley/life-trace check
 pnpm --filter @valley/desktop-os typecheck
