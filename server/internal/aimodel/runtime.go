@@ -127,6 +127,13 @@ func HasVerifiedCapability(item model.AIModel, capability string) bool {
 	)
 }
 
+// HasVerifiedCapabilities requires every requested capability to have passed
+// the model connection probe. Editing has a billable side effect and must not
+// rely only on an administrator's declaration.
+func HasVerifiedCapabilities(item model.AIModel, required []string) bool {
+	return HasCapabilities(model.AIModel{Capabilities: item.VerifiedCapabilities}, required)
+}
+
 // ImageGenerationQualities returns declared target tiers for known models.
 // Provider selection only controls transport; capability belongs to the model
 // itself. The image studio records returned pixels after storing the result,

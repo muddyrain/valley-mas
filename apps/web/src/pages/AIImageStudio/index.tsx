@@ -1,6 +1,7 @@
 import gsap from 'gsap';
 import { Flip } from 'gsap/Flip';
 import {
+  Brush,
   Check,
   CirclePause,
   Download,
@@ -39,11 +40,13 @@ import {
   addAIImageConversationMessage,
   clearAIImageConversation,
   createAIImageConversation,
+  createAIImageEdit,
   createAIImageGeneration,
   deleteAIImageGeneration,
   generateAIImageRecipeSamples,
   getAIImageConversation,
   getAIImageGeneration,
+  getAIImageGenerationImageData,
   getCurrentAIImageConversation,
   listAIImageConversations,
   listAIImageCreationOptions,
@@ -64,7 +67,9 @@ import {
   type SaveResourceProgress,
   type SaveResourceVisibility,
 } from '@/components/ai/SaveResourceDialog';
+import { AIImageEditDialog } from '@/components/ai-images/AIImageEditDialog';
 import { AIImageGenerationImage } from '@/components/ai-images/AIImageGenerationImage';
+import { AIImageResultActions } from '@/components/ai-images/AIImageResultActions';
 import { GenerationOverlay, GenerationPreview } from '@/components/ai-images/GenerationOverlay';
 import { SketchCanvas, type SketchCanvasHandle } from '@/components/ai-images/SketchCanvas';
 import { StyleRecognitionDialog } from '@/components/ai-images/StyleRecognitionDialog';
@@ -442,6 +447,7 @@ export default function AIImageStudio() {
   const [activeGeneration, setActiveGeneration] = useState<AIImageGeneration | null>(null);
   const [pausingGenerationID, setPausingGenerationID] = useState<string>();
   const [loading, setLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [conversationInput, setConversationInput] = useState('');
   const [conversationReferenceImages, setConversationReferenceImages] = useState<
@@ -473,6 +479,10 @@ export default function AIImageStudio() {
   const [favoriteUpdatingID, setFavoriteUpdatingID] = useState<string>();
   const [variantSource, setVariantSource] = useState<AIImageGeneration | null>(null);
   const [variantInstruction, setVariantInstruction] = useState('');
+  const [editSource, setEditSource] = useState<AIImageGeneration | null>(null);
+  const [editSourceImage, setEditSourceImage] = useState('');
+  const [editSourceLoading, setEditSourceLoading] = useState(false);
+  const [editingGeneration, setEditingGeneration] = useState(false);
 
   const handleImageModelChange = useCallback((nextModelID: string) => {
     setModelID(nextModelID);
@@ -518,26 +528,52 @@ export default function AIImageStudio() {
   }, []);
 
   const loadHistory = useCallback(async () => {
-    const result = await listAIImageGenerations(50, 'studio');
-    applyHistory(result.list);
+    setHistoryLoading(true);
+    try {
+      const result = await listAIImageGenerations(50, 'studio');
+      applyHistory(result.list);
+    } finally {
+      setHistoryLoading(false);
+    }
   }, [applyHistory]);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    void Promise.all([
-      listAIImageCreationOptions(),
-      listAIImageGenerations(50, 'studio'),
-      getCurrentAIImageConversation(),
-      listAIImageConversations(),
-    ])
-      .then(async ([catalog, generations, conversation, conversationHistory]) => {
+    void listAIImageCreationOptions()
+      .then((catalog) => {
         if (!active) return;
         setPresets(catalog.recipes);
         setStyleProfiles(catalog.styleProfiles);
         setAspectRatios(catalog.aspectRatios);
         setSizes(catalog.sizes ?? {});
-        applyHistory(generations.list);
+      })
+      .catch((error) => {
+        if (active) toast.error(getAPIErrorMessage(error, '加载图片创作选项失败'));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void loadHistory().catch((error) => {
+      if (active) toast.error(getAPIErrorMessage(error, '加载创作历史失败'));
+    });
+    return () => {
+      active = false;
+    };
+  }, [loadHistory]);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([getCurrentAIImageConversation(), listAIImageConversations()])
+      .then(async ([conversation, conversationHistory]) => {
+        if (!active) return;
         setConversations(conversationHistory.list);
         if (conversation.conversation) {
           setConversationID(conversation.conversation.id);
@@ -591,15 +627,12 @@ export default function AIImageStudio() {
         }
       })
       .catch((error) => {
-        if (active) toast.error(getAPIErrorMessage(error, '加载图片创作数据失败'));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+        if (active) toast.error(getAPIErrorMessage(error, '加载图片对话失败'));
       });
     return () => {
       active = false;
     };
-  }, [applyHistory, currentUserID, legacyConversationKey, scheduleConversationScroll]);
+  }, [currentUserID, legacyConversationKey, scheduleConversationScroll]);
 
   useEffect(() => {
     let active = true;
@@ -795,6 +828,49 @@ export default function AIImageStudio() {
     setVariantSource(generation);
   };
 
+  const startLocalEdit = async (generation: AIImageGeneration) => {
+    if (isBusy || editSourceLoading) return;
+    const verified = new Set(selectedModel?.verifiedCapabilities ?? []);
+    if (!selectedModel?.capabilities.includes('masked_edit') || !verified.has('masked_edit')) {
+      toast.error('请先选择已验证支持局部编辑的图片模型');
+      return;
+    }
+    setEditSourceLoading(true);
+    try {
+      const result = await getAIImageGenerationImageData(generation.id);
+      setEditSourceImage(result.imageBase64);
+      setEditSource(generation);
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '读取历史图片失败'));
+    } finally {
+      setEditSourceLoading(false);
+    }
+  };
+
+  const createLocalEdit = async (
+    generationId: string,
+    input: Parameters<typeof createAIImageEdit>[1],
+  ) => {
+    setEditingGeneration(true);
+    try {
+      const result = await createAIImageEdit(generationId, input);
+      setActiveGeneration(result.generation);
+      setHistory((current) => [
+        result.generation,
+        ...current.filter((item) => item.id !== result.generation.id),
+      ]);
+      setEditSource(null);
+      setEditSourceImage('');
+      toast.success('已创建图片编辑任务');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '创建图片编辑任务失败'));
+      throw error;
+    } finally {
+      setEditingGeneration(false);
+    }
+  };
+
   const createGenerationVariant = async () => {
     const source = variantSource;
     const instruction = variantInstruction.trim();
@@ -983,7 +1059,12 @@ export default function AIImageStudio() {
   };
 
   const retryConversationGeneration = async (generation: AIImageGeneration) => {
-    if (creatingRef.current || isBusy || generation.status !== 'failed') return;
+    if (
+      creatingRef.current ||
+      isBusy ||
+      (generation.status !== 'failed' && generation.status !== 'succeeded')
+    )
+      return;
     if (!conversationID) {
       toast.error('当前对话不可重试，请恢复参数后重新提交');
       return;
@@ -1525,7 +1606,7 @@ export default function AIImageStudio() {
                   toast.error(getAPIErrorMessage(error, '刷新创作历史失败')),
                 )
               }
-              disabled={loading}
+              disabled={loading || historyLoading}
             >
               <RefreshCw />
               刷新
@@ -1695,22 +1776,34 @@ export default function AIImageStudio() {
                                           role={message.role}
                                           content={message.content}
                                           createdAt={message.createdAt}
+                                          className={
+                                            generation && generation.status !== 'succeeded'
+                                              ? 'w-[min(100%,20rem)]'
+                                              : undefined
+                                          }
                                           footer={
                                             generation?.status === 'succeeded' ? (
-                                              <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="ghost"
-                                                className="h-7 px-2 text-xs"
-                                                onClick={() => setSaveTarget(generation)}
-                                                disabled={
-                                                  Boolean(generation.resourceId) ||
-                                                  savingID === generation.id
+                                              <AIImageResultActions
+                                                onRegenerate={() =>
+                                                  void retryConversationGeneration(generation)
                                                 }
-                                              >
-                                                <Save />
-                                                {generation.resourceId ? '已保存' : '保存图片'}
-                                              </Button>
+                                                onDownload={() =>
+                                                  window.open(
+                                                    generation.resultUrl,
+                                                    '_blank',
+                                                    'noopener,noreferrer',
+                                                  )
+                                                }
+                                                onContinueEdit={() =>
+                                                  void reuseGeneration(generation)
+                                                }
+                                                onSave={() => setSaveTarget(generation)}
+                                                regenerating={
+                                                  retryingGenerationID === generation.id
+                                                }
+                                                saving={savingID === generation.id}
+                                                saved={Boolean(generation.resourceId)}
+                                              />
                                             ) : generation?.status === 'queued' ||
                                               generation?.status === 'running' ? (
                                               <Button
@@ -1733,7 +1826,7 @@ export default function AIImageStudio() {
                                               generation.resultUrl ? (
                                                 <button
                                                   type="button"
-                                                  className="block max-w-full overflow-hidden rounded-xl border border-border/70 bg-background text-left outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                                  className="block max-w-full overflow-hidden rounded-xl border border-border/70 bg-background text-left outline-none transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.1)]"
                                                   onClick={() =>
                                                     setHistoryPreview({
                                                       src: generation.resultUrl,
@@ -1800,6 +1893,7 @@ export default function AIImageStudio() {
                                       <ConversationMessageBubble
                                         role="assistant"
                                         content="我正在根据你的描述生成图片。"
+                                        className="w-[min(100%,20rem)]"
                                       >
                                         <div className="mt-3 w-[min(100%,20rem)]">
                                           <GenerationPreview compact stage="preparing" />
@@ -2472,17 +2566,21 @@ export default function AIImageStudio() {
                 />
                 仅看收藏
               </Button>
-              <Badge variant="outline">{visibleHistory.length} 条</Badge>
+              {historyLoading ? (
+                <Skeleton className="h-6 w-12 rounded-full" />
+              ) : (
+                <Badge variant="outline">{visibleHistory.length} 条</Badge>
+              )}
             </div>
           </div>
 
-          {loading ? (
+          {historyLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {Array.from({ length: HISTORY_CARD_SKELETON_COUNT }).map((_, index) => (
                 <HistoryCardSkeleton key={index} />
               ))}
             </div>
-          ) : !loading && visibleHistory.length === 0 ? (
+          ) : visibleHistory.length === 0 ? (
             <Card>
               <CardContent className="flex min-h-40 flex-col items-center justify-center text-center">
                 <LibraryBig className="size-8 text-muted-foreground" />
@@ -2520,7 +2618,7 @@ export default function AIImageStudio() {
                       {generation.resultUrl ? (
                         <button
                           type="button"
-                          className="group h-full w-full cursor-zoom-in outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 focus-visible:ring-inset"
+                          className="group h-full w-full cursor-zoom-in outline-none transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset focus-visible:shadow-[inset_0_0_0_3px_hsl(var(--primary)/0.14)]"
                           onClick={() =>
                             setHistoryPreview({
                               src: generation.resultUrl,
@@ -2733,6 +2831,13 @@ export default function AIImageStudio() {
                                   >
                                     <Eye />
                                     预览
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => void startLocalEdit(generation)}
+                                    disabled={isBusy || editSourceLoading}
+                                  >
+                                    <Brush />
+                                    局部编辑
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => setSaveTarget(generation)}
@@ -3105,6 +3210,28 @@ export default function AIImageStudio() {
           if (!open) setHistoryPreview(undefined);
         }}
       />
+      <AIImageEditDialog
+        generation={editSource}
+        sourceImage={editSourceImage}
+        modelId={modelID}
+        recipeId={presetID}
+        styleProfileId={selectedStyleProfile?.id}
+        aspectRatio={aspectRatio}
+        quality={quality}
+        open={Boolean(editSource)}
+        creating={editingGeneration}
+        supportsOutpainting={Boolean(
+          selectedModel?.capabilities.includes('outpainting') &&
+            selectedModel.verifiedCapabilities.includes('outpainting'),
+        )}
+        onOpenChange={(open) => {
+          if (!open && !editingGeneration) {
+            setEditSource(null);
+            setEditSourceImage('');
+          }
+        }}
+        onSubmit={createLocalEdit}
+      />
       <Dialog
         open={Boolean(variantSource)}
         onOpenChange={(open) => {
@@ -3215,7 +3342,7 @@ export default function AIImageStudio() {
                 {historyDetailTarget.resultUrl ? (
                   <button
                     type="button"
-                    className="group relative block w-full overflow-hidden rounded-lg border border-border bg-muted/30 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="group relative block w-full overflow-hidden rounded-lg border border-border bg-muted/30 outline-none transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.1)]"
                     onClick={() =>
                       setHistoryPreview({
                         src: historyDetailTarget.resultUrl,

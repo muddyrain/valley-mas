@@ -52,6 +52,18 @@ type createAIImageGenerationRequest struct {
 	ReferenceGenerationID string   `json:"referenceGenerationId"`
 }
 
+type createAIImageEditRequest struct {
+	ModelID        string `json:"modelId"`
+	RecipeID       string `json:"recipeId"`
+	StyleProfileID string `json:"styleProfileId"`
+	Brief          string `json:"brief"`
+	AspectRatio    string `json:"aspectRatio"`
+	Quality        string `json:"quality"`
+	Mode           string `json:"mode"`
+	EditImage      string `json:"editImage"`
+	Mask           string `json:"mask"`
+}
+
 func (payload createAIImageGenerationRequest) effectiveRecipeID() string {
 	id := strings.TrimSpace(payload.RecipeID)
 	if id == "" {
@@ -197,6 +209,78 @@ func CreateAIImageGeneration(c *gin.Context) {
 		return
 	}
 	Success(c, gin.H{"generation": generation})
+}
+
+// CreateAIImageEdit creates an immutable child generation from an owned
+// completed image. The raster edit canvas and its mask are request-scoped.
+func CreateAIImageEdit(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 22<<20)
+	var payload createAIImageEditRequest
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		Error(c, http.StatusBadRequest, "图片编辑参数错误")
+		return
+	}
+	if !service.IsAIImageEditMode(payload.Mode) {
+		Error(c, http.StatusBadRequest, "请选择有效的图片编辑方式")
+		return
+	}
+	editImage, err := normalizeAIImageEditImage(payload.EditImage, "编辑画布")
+	if err != nil {
+		Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	mask, err := normalizeAIImageEditMask(payload.Mask)
+	if err != nil {
+		Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	generation, found := findAIImageGeneration(c, userID)
+	if !found {
+		return
+	}
+	if generation.Status != "succeeded" || strings.TrimSpace(generation.ResultURL) == "" {
+		Error(c, http.StatusConflict, "只能编辑已完成的图片")
+		return
+	}
+	result, err := service.NewAIImageGenerationService(database.GetDB()).Queue(
+		c.Request.Context(),
+		service.AIImageGenerationInput{
+			UserID:                userID,
+			ModelID:               payload.ModelID,
+			RecipeID:              payload.RecipeID,
+			StyleProfileID:        payload.StyleProfileID,
+			Brief:                 payload.Brief,
+			AspectRatio:           payload.AspectRatio,
+			Quality:               payload.Quality,
+			ReferenceGenerationID: generation.ID.String(),
+			EditMode:              payload.Mode,
+			EditImage:             editImage,
+			EditMask:              mask,
+			Feature:               "ai-image-studio-edit",
+		},
+	)
+	if err != nil {
+		var inputErr *service.AIImageGenerationInputError
+		if errors.As(err, &inputErr) {
+			Error(c, http.StatusBadRequest, inputErr.Error())
+			return
+		}
+		if errors.Is(err, service.ErrAIImageStorageUnavailable) {
+			Error(c, http.StatusServiceUnavailable, err.Error())
+			return
+		}
+		if errors.Is(err, aimodel.ErrModelNotAvailable) || strings.Contains(err.Error(), "AI 服务未配置") {
+			respondCatalogModelError(c, err)
+			return
+		}
+		ErrorWithDetail(c, http.StatusInternalServerError, "创建图片编辑任务失败", err)
+		return
+	}
+	Success(c, gin.H{"generation": result})
 }
 
 func ListAIImageGenerations(c *gin.Context) {
@@ -648,6 +732,30 @@ func normalizeAIImageReference(raw string) (string, error) {
 		return "", errors.New("参考图格式与内容不一致")
 	}
 	return "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(content), nil
+}
+
+func normalizeAIImageEditImage(raw, label string) (string, error) {
+	value, err := normalizeAIImageReference(raw)
+	if err != nil {
+		return "", fmt.Errorf("%s无效：%w", label, err)
+	}
+	return value, nil
+}
+
+func normalizeAIImageEditMask(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	header, encoded, ok := strings.Cut(raw, ",")
+	if !ok || strings.ToLower(header) != "data:image/png;base64" {
+		return "", errors.New("编辑选区必须是 PNG 图片")
+	}
+	content, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil || len(content) == 0 || len(content) > maxAIImageReferenceBytes {
+		return "", errors.New("编辑选区内容无效或超过 5MB")
+	}
+	if http.DetectContentType(content) != "image/png" {
+		return "", errors.New("编辑选区格式与内容不一致")
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(content), nil
 }
 
 func aiImageReferenceDataURL(content []byte, mimeType string) string {

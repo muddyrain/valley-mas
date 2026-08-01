@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -42,6 +43,10 @@ const (
 	AIImageGenerationSourceStudio   = "studio"
 	AIImageGenerationSourceWorkflow = "workflow"
 	AIImageGenerationSourceAgent    = "agent"
+
+	AIImageEditModeInpaint      = "inpaint"
+	AIImageEditModeEraseReplace = "erase_replace"
+	AIImageEditModeOutpaint     = "outpaint"
 )
 
 var AIImageSizes = map[string]map[string]string{
@@ -114,6 +119,9 @@ type AIImageGenerationInput struct {
 	Quality               string
 	References            []string
 	ReferenceGenerationID string
+	EditMode              string
+	EditImage             string
+	EditMask              string
 	Feature               string
 	TimeoutSeconds        int
 }
@@ -123,20 +131,22 @@ type aiImageGenerationJob struct {
 	invocation aimodel.Invocation
 	prompt     string
 	references []string
+	mask       string
 	feature    string
 }
 
 type AIImageGenerationService struct {
-	db               *gorm.DB
-	resolve          func(*gorm.DB, string, string, time.Duration) (aimodel.Invocation, error)
-	generate         func(context.Context, aimodel.Invocation, aiclient.ImageGenerationRequest) (string, error)
-	fetch            func(context.Context, string) ([]byte, string, error)
-	upload           func(context.Context, model.Int64String, string, string, []byte) (*UploadResult, error)
-	deleteStored     func(string) error
-	storageAvailable func() bool
-	recordUsage      func(aiusage.Entry)
-	now              func() time.Time
-	enqueue          func(func())
+	db                *gorm.DB
+	resolve           func(*gorm.DB, string, string, time.Duration) (aimodel.Invocation, error)
+	generate          func(context.Context, aimodel.Invocation, aiclient.ImageGenerationRequest) (string, error)
+	fetch             func(context.Context, string) ([]byte, string, error)
+	upload            func(context.Context, model.Int64String, string, string, []byte) (*UploadResult, error)
+	deleteStored      func(string) error
+	skillReferenceURL func(string) (string, error)
+	storageAvailable  func() bool
+	recordUsage       func(aiusage.Entry)
+	now               func() time.Time
+	enqueue           func(func())
 }
 
 func AIImageGenerationSourceForFeature(feature string) string {
@@ -174,11 +184,12 @@ func NewAIImageGenerationService(db *gorm.DB) *AIImageGenerationService {
 			config.CustomFolder = folder
 			return NewUploadService().UploadBytesWithContext(ctx, filename, content, config)
 		},
-		deleteStored:     uploader.DeleteByKey,
-		storageAvailable: func() bool { return utils.GetTOSUploader() != nil },
-		recordUsage:      aiusage.Record,
-		now:              time.Now,
-		enqueue:          func(run func()) { go run() },
+		deleteStored:      uploader.DeleteByKey,
+		skillReferenceURL: uploader.PublicURL,
+		storageAvailable:  func() bool { return utils.GetTOSUploader() != nil },
+		recordUsage:       aiusage.Record,
+		now:               time.Now,
+		enqueue:           func(run func()) { go run() },
 	}
 }
 
@@ -254,11 +265,46 @@ func (s *AIImageGenerationService) prepare(ctx context.Context, input AIImageGen
 	if !s.storageAvailable() {
 		return aiImageGenerationJob{}, ErrAIImageStorageUnavailable
 	}
+	editMode := strings.TrimSpace(input.EditMode)
+	if editMode != "" && !IsAIImageEditMode(editMode) {
+		return aiImageGenerationJob{}, &AIImageGenerationInputError{Message: "图片编辑方式无效"}
+	}
 
 	references, err := s.resolveReferences(ctx, input)
 	if err != nil {
 		return aiImageGenerationJob{}, err
 	}
+	editMask := ""
+	if editMode != "" {
+		if !aimodel.HasCapabilities(invocation.Model, []string{"masked_edit"}) ||
+			!aimodel.HasVerifiedCapabilities(invocation.Model, []string{"masked_edit"}) {
+			return aiImageGenerationJob{}, &AIImageGenerationInputError{Message: "所选图片模型尚未验证蒙版编辑能力"}
+		}
+		if editMode == AIImageEditModeOutpaint &&
+			(!aimodel.HasCapabilities(invocation.Model, []string{"outpainting"}) ||
+				!aimodel.HasVerifiedCapabilities(invocation.Model, []string{"outpainting"})) {
+			return aiImageGenerationJob{}, &AIImageGenerationInputError{Message: "所选图片模型尚未验证扩图能力"}
+		}
+		if len(references) != 1 {
+			return aiImageGenerationJob{}, &AIImageGenerationInputError{Message: "局部编辑需要一张编辑画布"}
+		}
+		editMask, err = s.resolveEditMask(ctx, input.EditMask, references[0])
+		if err != nil {
+			return aiImageGenerationJob{}, err
+		}
+	}
+	// A selected skill can carry durable visual references. They are resolved
+	// server-side after ownership validation, so a browser never has to receive
+	// the storage URL or manufacture an untrusted data URL.
+	remainingReferences := MaxAIImageReferences - len(references)
+	if editMode != "" {
+		remainingReferences = 0
+	}
+	skillReferences, err := s.resolveSkillReferenceImages(ctx, input.UserID, input.StyleProfileID, remainingReferences)
+	if err != nil {
+		return aiImageGenerationJob{}, err
+	}
+	references = append(references, skillReferences...)
 	var parentGenerationID *model.Int64String
 	if rawParentID := strings.TrimSpace(input.ReferenceGenerationID); rawParentID != "" {
 		parsedParentID, parseErr := strconv.ParseInt(rawParentID, 10, 64)
@@ -326,6 +372,7 @@ func (s *AIImageGenerationService) prepare(ctx context.Context, input AIImageGen
 		RequestedSize:            size,
 		ReferenceCount:           len(references),
 		ParentGenerationID:       parentGenerationID,
+		EditMode:                 editMode,
 		CanvasSnapshotURL:        snapshot.URL,
 		CanvasSnapshotStorageKey: snapshot.StorageKey,
 		CanvasSnapshotWidth:      snapshot.Width,
@@ -344,6 +391,7 @@ func (s *AIImageGenerationService) prepare(ctx context.Context, input AIImageGen
 		invocation: invocation,
 		prompt:     plan.Prompt,
 		references: references,
+		mask:       editMask,
 		feature:    fallbackString(strings.TrimSpace(input.Feature), "ai-image-studio"),
 	}, nil
 }
@@ -363,6 +411,9 @@ func (s *AIImageGenerationService) resolveReferences(ctx context.Context, input 
 		}
 		references = append(references, AIImageDataURL(content, mimeType))
 		return nil
+	}
+	if strings.TrimSpace(input.EditMode) != "" && len(input.References) > 0 {
+		return nil, &AIImageGenerationInputError{Message: "局部编辑不能同时添加额外参考图"}
 	}
 	for _, source := range input.References {
 		if err := appendReference(source, MaxAIImageReferenceBytes, "单张上传参考图不能超过 5MB"); err != nil {
@@ -387,7 +438,14 @@ func (s *AIImageGenerationService) resolveReferences(ctx context.Context, input 
 		if generation.Status != "succeeded" || strings.TrimSpace(generation.ResultURL) == "" {
 			return nil, &AIImageGenerationInputError{Message: "上一张图片尚未生成完成"}
 		}
-		if err := appendReference(
+		if strings.TrimSpace(input.EditMode) != "" {
+			if strings.TrimSpace(input.EditImage) == "" {
+				return nil, &AIImageGenerationInputError{Message: "编辑画布不能为空"}
+			}
+			if err := appendReference(input.EditImage, MaxGeneratedAIImageBytes, "编辑画布超过服务端参考图上限"); err != nil {
+				return nil, err
+			}
+		} else if err := appendReference(
 			generation.ResultURL,
 			MaxGeneratedAIImageBytes,
 			"上一张生成图片超过服务端参考图上限",
@@ -395,7 +453,106 @@ func (s *AIImageGenerationService) resolveReferences(ctx context.Context, input 
 			return nil, err
 		}
 	}
+	if strings.TrimSpace(input.EditMode) != "" && referenceGenerationID == "" {
+		return nil, &AIImageGenerationInputError{Message: "请选择要编辑的历史图片"}
+	}
 	return references, nil
+}
+
+func (s *AIImageGenerationService) resolveEditMask(ctx context.Context, rawMask, source string) (string, error) {
+	content, mimeType, err := s.fetch(ctx, rawMask)
+	if err != nil {
+		return "", &AIImageGenerationInputError{Message: "编辑选区内容无效"}
+	}
+	if mimeType != "image/png" {
+		return "", &AIImageGenerationInputError{Message: "编辑选区必须是 PNG 图片"}
+	}
+	maskConfig, _, err := image.DecodeConfig(bytes.NewReader(content))
+	if err != nil || maskConfig.Width <= 0 || maskConfig.Height <= 0 {
+		return "", &AIImageGenerationInputError{Message: "编辑选区尺寸无效"}
+	}
+	sourceContent, _, err := s.fetch(ctx, source)
+	if err != nil {
+		return "", &AIImageGenerationInputError{Message: "编辑画布内容无效"}
+	}
+	sourceConfig, _, err := image.DecodeConfig(bytes.NewReader(sourceContent))
+	if err != nil || sourceConfig.Width != maskConfig.Width || sourceConfig.Height != maskConfig.Height {
+		return "", &AIImageGenerationInputError{Message: "编辑选区必须与编辑画布尺寸一致"}
+	}
+	return AIImageDataURL(content, mimeType), nil
+}
+
+func IsAIImageEditMode(mode string) bool {
+	switch strings.TrimSpace(mode) {
+	case AIImageEditModeInpaint, AIImageEditModeEraseReplace, AIImageEditModeOutpaint:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *AIImageGenerationService) resolveSkillReferenceImages(
+	ctx context.Context,
+	userID model.Int64String,
+	styleProfileID string,
+	remaining int,
+) ([]string, error) {
+	if remaining <= 0 || s == nil || s.db == nil || !strings.HasPrefix(strings.TrimSpace(styleProfileID), "skill:") {
+		return nil, nil
+	}
+	rawID := strings.TrimPrefix(strings.TrimSpace(styleProfileID), "skill:")
+	skillID, err := strconv.ParseInt(rawID, 10, 64)
+	if err != nil || skillID <= 0 {
+		return nil, &AIImageGenerationInputError{Message: "请选择有效的视觉风格"}
+	}
+	var files []model.AISkillFile
+	if err := s.db.WithContext(ctx).
+		Where("skill_id = ? AND user_id = ? AND kind = ? AND storage_key <> ''", skillID, userID, "reference_image").
+		Order("path ASC").
+		Find(&files).Error; err != nil {
+		return nil, fmt.Errorf("读取技能参考图片失败: %w", err)
+	}
+	if len(files) == 0 {
+		return nil, nil
+	}
+	sort.SliceStable(files, func(i, j int) bool {
+		leftRank := aiSkillReferenceImageRank(files[i].Path)
+		rightRank := aiSkillReferenceImageRank(files[j].Path)
+		return leftRank < rightRank
+	})
+	if len(files) > remaining {
+		files = files[:remaining]
+	}
+	references := make([]string, 0, len(files))
+	for _, file := range files {
+		sourceURL, err := s.skillReferenceURL(file.StorageKey)
+		if err != nil {
+			return nil, ErrAIImageStorageUnavailable
+		}
+		content, mimeType, err := s.fetch(ctx, sourceURL)
+		if err != nil {
+			return nil, &AIImageGenerationInputError{Message: "技能参考图片读取失败: " + err.Error()}
+		}
+		if len(content) > MaxAIImageReferenceBytes {
+			return nil, &AIImageGenerationInputError{Message: "技能参考图片超过 5MB"}
+		}
+		references = append(references, AIImageDataURL(content, mimeType))
+	}
+	return references, nil
+}
+
+// aiSkillReferenceImageRank makes multi-view/model-sheet references win the
+// provider's small reference-image budget, then scene images, then crops.
+// Path ordering remains deterministic within the same category.
+func aiSkillReferenceImageRank(path string) int {
+	name := strings.ToLower(path)
+	if strings.Contains(name, "model-sheet") || strings.Contains(name, "model_sheet") || strings.Contains(name, "turnaround") {
+		return 0
+	}
+	if strings.Contains(name, "face") || strings.Contains(name, "crop") || strings.Contains(name, "closeup") {
+		return 2
+	}
+	return 1
 }
 
 func (s *AIImageGenerationService) run(ctx context.Context, job aiImageGenerationJob) (model.AIImageGeneration, error) {
@@ -410,6 +567,7 @@ func (s *AIImageGenerationService) run(ctx context.Context, job aiImageGeneratio
 		Prompt:   job.prompt,
 		Size:     job.generation.RequestedSize,
 		Images:   job.references,
+		Mask:     job.mask,
 	})
 	if err != nil {
 		if s.isPaused(job.generation.ID) {

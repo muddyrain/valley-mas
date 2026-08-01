@@ -152,6 +152,8 @@ export type AIModelCapability =
   | 'vision'
   | 'image_generation'
   | 'reference_image'
+  | 'masked_edit'
+  | 'outpainting'
   | 'embedding'
   | 'tool_call';
 

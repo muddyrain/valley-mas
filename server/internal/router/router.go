@@ -158,6 +158,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/ai/image-presets/:presetId/sample-prompts", handler.GenerateAIImageRecipeSamples)
 			auth.GET("/ai/image-generations", handler.ListAIImageGenerations)
 			auth.POST("/ai/image-generations", handler.CreateAIImageGeneration)
+			auth.POST("/ai/image-generations/:generationId/edits", handler.CreateAIImageEdit)
 			auth.GET("/ai/image-generations/:generationId/image-data", handler.GetAIImageGenerationImageData)
 			auth.GET("/ai/image-generations/:generationId", handler.GetAIImageGeneration)
 			auth.POST("/ai/image-generations/:generationId/pause", handler.PauseAIImageGeneration)
@@ -174,6 +175,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			// AI Workbench platform assets. Legacy /ai/agents and /workflows remain supported.
 			auth.GET("/ai/apps", handler.ListAIApps)
 			auth.POST("/ai/apps", handler.CreateAIApp)
+			auth.DELETE("/ai/apps/:appId", handler.DeleteAIApp)
 			auth.POST("/ai/app-assistant/proposals", handler.CreateAIAppProposal)
 			auth.POST("/ai/prompt-assistant/suggestions", handler.CreatePromptAssistantSuggestion)
 			auth.GET("/ai/workbench/copilot/session", handler.GetWorkbenchCopilotSession)
@@ -210,6 +212,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.PATCH("/ai/prompts/:promptId", handler.UpdateAIPrompt)
 			auth.DELETE("/ai/prompts/:promptId", handler.ArchiveAIPrompt)
 			auth.GET("/ai/skills", handler.ListAISkills)
+			auth.GET("/ai/skills/:skillId/files/:fileId/image-data", handler.GetAISkillFileImageData)
 			auth.GET("/ai/skills/:skillId", handler.GetAISkill)
 			auth.PATCH("/ai/skills/:skillId", handler.UpdateAISkill)
 			auth.POST("/ai/skills/preview", handler.PreviewAISkillImport)

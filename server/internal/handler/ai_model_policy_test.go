@@ -18,6 +18,7 @@ type fakeAIModelProbeClient struct {
 	imagePrompt     string
 	imageSize       string
 	imageReferences []string
+	imageMask       string
 	chatResponse    string
 	embedding       []float32
 	err             error
@@ -61,6 +62,7 @@ func (client *fakeAIModelProbeClient) GenerateImageWithRequest(
 	client.imagePrompt = request.Prompt
 	client.imageSize = request.Size
 	client.imageReferences = request.Images
+	client.imageMask = request.Mask
 	if client.err != nil {
 		return "", client.err
 	}
@@ -123,6 +125,25 @@ func TestProbeAIModelUsesReferenceImageWhenDeclared(t *testing.T) {
 		t.Fatalf("reference probe missing: %+v", client.imageReferences)
 	}
 	if !slices.Equal(result.VerifiedCapabilities, []string{"image_generation", "reference_image"}) {
+		t.Fatalf("verified capabilities = %+v", result.VerifiedCapabilities)
+	}
+}
+
+func TestProbeAIModelUsesMaskForDeclaredMaskedEdit(t *testing.T) {
+	client := &fakeAIModelProbeClient{}
+	result, err := probeAIModel(
+		context.Background(),
+		client,
+		"gpt-image-2",
+		[]string{"image_generation", "reference_image", "masked_edit", "outpainting"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(client.imageMask, "data:image/png;base64,") {
+		t.Fatalf("mask probe missing: %q", client.imageMask)
+	}
+	if !slices.Equal(result.VerifiedCapabilities, []string{"image_generation", "reference_image", "masked_edit", "outpainting"}) {
 		t.Fatalf("verified capabilities = %+v", result.VerifiedCapabilities)
 	}
 }

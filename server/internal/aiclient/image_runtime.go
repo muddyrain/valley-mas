@@ -10,6 +10,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"strings"
 )
 
@@ -31,6 +32,10 @@ type ImageGenerationRequest struct {
 	Prompt   string
 	Size     string
 	Images   []string
+	// Mask is a same-sized PNG that constrains an image edit. It is intentionally
+	// separate from Images so provider adapters cannot silently treat a mask as
+	// another visual reference.
+	Mask string
 }
 
 type CompatibleImageUsage struct {
@@ -134,6 +139,9 @@ func (siliconFlowImageAdapter) Generate(
 	client *CompatibleClient,
 	request ImageGenerationRequest,
 ) (ImageGenerationResult, error) {
+	if strings.TrimSpace(request.Mask) != "" {
+		return ImageGenerationResult{}, errors.New("SiliconFlow 当前图片协议不支持蒙版编辑")
+	}
 	if len(request.Images) > 0 {
 		return ImageGenerationResult{}, errors.New("SiliconFlow 当前图片协议不支持参考图输入")
 	}
@@ -149,6 +157,12 @@ func (openAIImagesAdapter) Generate(
 	client *CompatibleClient,
 	request ImageGenerationRequest,
 ) (ImageGenerationResult, error) {
+	if strings.TrimSpace(request.Mask) != "" {
+		if len(request.Images) != 1 {
+			return ImageGenerationResult{}, errors.New("蒙版编辑需要且只能使用一张源图")
+		}
+		return generateOpenAIImageEdit(ctx, client, request)
+	}
 	if len(request.Images) > 0 {
 		return generateOpenAIImageEdit(ctx, client, request)
 	}
@@ -164,6 +178,9 @@ func (arkImageAdapter) Generate(
 	client *CompatibleClient,
 	request ImageGenerationRequest,
 ) (ImageGenerationResult, error) {
+	if strings.TrimSpace(request.Mask) != "" {
+		return ImageGenerationResult{}, errors.New("ARK 当前图片协议不支持蒙版编辑")
+	}
 	payload := baseImageJSONPayload(request)
 	if size := strings.TrimSpace(request.Size); size != "" {
 		payload["size"] = size
@@ -206,6 +223,9 @@ func generateOpenAIImageEdit(
 	client *CompatibleClient,
 	request ImageGenerationRequest,
 ) (ImageGenerationResult, error) {
+	if strings.TrimSpace(request.Mask) != "" && len(request.Images) != 1 {
+		return ImageGenerationResult{}, errors.New("蒙版编辑需要且只能使用一张源图")
+	}
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	fields := map[string]string{
@@ -233,6 +253,25 @@ func generateOpenAIImageEdit(
 			fieldName,
 			fmt.Sprintf("reference-%d%s", index+1, extensionForImageMIME(mimeType)),
 		)
+		if err != nil {
+			return ImageGenerationResult{}, err
+		}
+		if _, err := part.Write(content); err != nil {
+			return ImageGenerationResult{}, err
+		}
+	}
+	if rawMask := strings.TrimSpace(request.Mask); rawMask != "" {
+		content, mimeType, err := decodeCompatibleReference(rawMask)
+		if err != nil {
+			return ImageGenerationResult{}, fmt.Errorf("蒙版内容无效: %w", err)
+		}
+		if mimeType != "image/png" {
+			return ImageGenerationResult{}, errors.New("蒙版必须是 PNG 图片")
+		}
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Disposition", `form-data; name="mask"; filename="mask.png"`)
+		header.Set("Content-Type", "image/png")
+		part, err := writer.CreatePart(header)
 		if err != nil {
 			return ImageGenerationResult{}, err
 		}
