@@ -22,6 +22,7 @@ const (
 	maxAISkillReferenceContentBytes = 96 * 1024
 	maxAISkillReferenceDepth        = 3
 	maxAISkillRepositoryArchiveSize = 32 * 1024 * 1024
+	maxAISkillReferenceImageBytes   = 5 << 20
 )
 
 type gitHubAISkillLocation struct {
@@ -51,6 +52,15 @@ type aiSkillImportSource struct {
 	Tags             []string
 	URL              string
 	Author           string
+	Files            []aiSkillImportFile
+}
+
+type aiSkillImportFile struct {
+	Path     string
+	Kind     string
+	Content  string
+	Binary   []byte
+	MimeType string
 }
 
 // discoverGitHubAISkillSources accepts a repository URL or a GitHub tree/blob

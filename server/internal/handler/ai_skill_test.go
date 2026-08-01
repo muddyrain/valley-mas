@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"io/fs"
@@ -18,6 +19,7 @@ import (
 	"valley-server/internal/logger"
 	"valley-server/internal/middleware"
 	"valley-server/internal/model"
+	"valley-server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -33,7 +35,7 @@ func setupAISkillTestRouter(t *testing.T) *gin.Engine {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.User{}, &model.AISkill{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.AISkill{}, &model.AISkillFile{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Create(&model.User{ID: 101, Username: "skill-owner", Role: "user", IsActive: true}).Error; err != nil {
@@ -52,6 +54,7 @@ func setupAISkillTestRouter(t *testing.T) *gin.Engine {
 	auth.Use(middleware.Auth(&config.Config{JWT: config.JWTConfig{Secret: workflowRuntimeTestSecret}}))
 	auth.GET("/skills", ListAISkills)
 	auth.GET("/skills/:skillId", GetAISkill)
+	auth.GET("/skills/:skillId/files/:fileId/image-data", GetAISkillFileImageData)
 	auth.POST("/skills/preview", PreviewAISkillImport)
 	auth.POST("/skills/install", InstallAISkill)
 	auth.PATCH("/skills/:skillId", UpdateAISkill)
@@ -222,10 +225,19 @@ func TestPreviewAISkillImportReturnsReferencesAndSelectedInstallStoresThem(t *te
 
 func TestPreviewAndInstallAISkillFromZip(t *testing.T) {
 	router := setupAISkillTestRouter(t)
+	imageBytes, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+	if err != nil {
+		t.Fatal(err)
+	}
+	previousPersist := persistAISkillImage
+	persistAISkillImage = func(_ context.Context, _ model.Int64String, _ string, content []byte) (*service.UploadResult, error) {
+		return &service.UploadResult{Key: "ai-skills/test.png", Size: int64(len(content)), FileHash: "test"}, nil
+	}
+	t.Cleanup(func() { persistAISkillImage = previousPersist })
 	archive := buildAISkillTestZip(t, []aiSkillTestZipEntry{
 		{Name: "yier-bubu-creative/SKILL.md", Content: "---\nname: yier-bubu-creative\ndescription: 一二和布布视觉创作\ntags: [生图]\n---\n# Skill"},
 		{Name: "yier-bubu-creative/references/character.md", Content: "一二是熊猫，布布是棕熊。"},
-		{Name: "yier-bubu-creative/references/images/model.png", Content: "not-a-real-png"},
+		{Name: "yier-bubu-creative/references/images/model.png", Binary: imageBytes},
 		{Name: "yier-bubu-creative/scripts/build_prompt.py", Content: "print('prompt')"},
 		{Name: "yier-bubu-creative/assets/template.md", Content: "# Template"},
 		{Name: "yier-bubu-creative/agents/openai.yaml", Content: "interface: {}"},
@@ -239,7 +251,7 @@ func TestPreviewAndInstallAISkillFromZip(t *testing.T) {
 	}
 	candidate := preview.Skills[0]
 	if candidate.Path != "yier-bubu-creative/SKILL.md" || candidate.ReferenceCount != 1 ||
-		candidate.ScriptCount != 1 || candidate.IgnoredFileCount != 3 {
+		candidate.ReferenceImageCount != 1 || candidate.ScriptCount != 1 || candidate.AssetCount != 1 || candidate.IgnoredFileCount != 1 {
 		t.Fatalf("candidate=%+v", candidate)
 	}
 
@@ -259,9 +271,12 @@ func TestPreviewAndInstallAISkillFromZip(t *testing.T) {
 	}
 	if !strings.Contains(stored.ReferenceContent, "一二是熊猫") ||
 		!strings.Contains(stored.ScriptContent, "print('prompt')") ||
-		strings.Contains(stored.ReferenceContent, "not-a-real-png") ||
 		strings.Contains(stored.ReferenceContent, "Template") {
 		t.Fatalf("stored=%+v", stored)
+	}
+	var storedFiles []model.AISkillFile
+	if err := database.GetDB().Where("skill_id = ?", stored.ID).Find(&storedFiles).Error; err != nil || len(storedFiles) != 4 {
+		t.Fatalf("stored files=%+v err=%v", storedFiles, err)
 	}
 
 	reinstallRecorder := httptest.NewRecorder()
@@ -318,6 +333,7 @@ func TestDiscoverZipAISkillSourcesRejectsUnsafeArchives(t *testing.T) {
 type aiSkillTestZipEntry struct {
 	Name    string
 	Content string
+	Binary  []byte
 	Mode    fs.FileMode
 }
 
@@ -334,7 +350,11 @@ func buildAISkillTestZip(t *testing.T, entries []aiSkillTestZipEntry) []byte {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := file.Write([]byte(entry.Content)); err != nil {
+		content := entry.Binary
+		if content == nil {
+			content = []byte(entry.Content)
+		}
+		if _, err := file.Write(content); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -389,6 +409,28 @@ func TestGetAISkillShowsImportedDirectoryFiles(t *testing.T) {
 		detail.Files[2].Path != "references/examples/portrait.mdx" ||
 		detail.Files[3].Path != "scripts/crop.py" || detail.Files[3].Kind != "script" {
 		t.Fatalf("detail=%+v", detail)
+	}
+}
+
+func TestGetAISkillFileImageDataRejectsAnotherOwner(t *testing.T) {
+	router := setupAISkillTestRouter(t)
+	if err := database.GetDB().Create(&model.User{ID: 202, Username: "other-owner", Role: "user", IsActive: true}).Error; err != nil {
+		t.Fatal(err)
+	}
+	skill := model.AISkill{UserID: 101, Name: "owner skill", Content: "# Skill", SourceURL: "zip://owner"}
+	if err := database.GetDB().Create(&skill).Error; err != nil {
+		t.Fatal(err)
+	}
+	file := model.AISkillFile{SkillID: skill.ID, UserID: 101, Path: "references/images/model.png", Kind: "reference_image", MimeType: "image/png", StorageKey: "ai-skills/owner/model.png"}
+	if err := database.GetDB().Create(&file).Error; err != nil {
+		t.Fatal(err)
+	}
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/ai/skills/"+skill.ID.String()+"/files/"+file.ID.String()+"/image-data", nil)
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "202"))
+	router.ServeHTTP(recorder, request)
+	if !strings.Contains(recorder.Body.String(), `"code":404`) {
+		t.Fatalf("foreign owner image response=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 }
 

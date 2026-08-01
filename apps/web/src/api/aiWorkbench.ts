@@ -28,6 +28,7 @@ export interface AIApp {
 
 export interface AgentConfig {
   modelProfile: 'ark-text-default';
+  modelId?: string;
   systemPrompt: string;
   openingMessage: string;
   exampleQuestions: string[];
@@ -228,9 +229,12 @@ export interface AISkill {
 }
 
 export interface AISkillFile {
+  id?: string;
   path: string;
-  kind: 'skill' | 'reference' | 'script';
+  kind: 'skill' | 'reference' | 'reference_image' | 'asset' | 'asset_image' | 'script';
   content: string;
+  mimeType?: string;
+  sizeBytes?: number;
 }
 
 export interface AISkillDetail extends AISkill {
@@ -242,7 +246,9 @@ export interface AISkillImportCandidate {
   name: string;
   description: string;
   referenceCount: number;
+  referenceImageCount: number;
   scriptCount: number;
+  assetCount: number;
   ignoredFileCount: number;
   sourceUrl: string;
 }
@@ -521,12 +527,17 @@ export function getAIAppConversation(
   messages: AIAppConversationMessage[];
   toolTraces: AIAppConversationToolTrace[];
   runs: AIAppRun[];
+  referencesByRunId: Record<string, AIKnowledgeReference[]>;
 }> {
   return request.get(`/ai/apps/${appId}/conversations/${conversationId}`);
 }
 
 export function deleteAIAppConversation(appId: string, conversationId: string): Promise<void> {
   return request.delete(`/ai/apps/${appId}/conversations/${conversationId}`);
+}
+
+export function deleteAIApp(appId: string): Promise<void> {
+  return request.delete(`/ai/apps/${appId}`);
 }
 
 export async function streamAIAppConversation(
@@ -715,6 +726,15 @@ export function listAISkills(): Promise<{ list: AISkill[] }> {
 
 export function getAISkill(skillId: string): Promise<AISkillDetail> {
   return request.get(`/ai/skills/${skillId}`);
+}
+
+export function getAISkillFileImageData(
+  skillId: string,
+  fileId: string,
+): Promise<{ imageBase64: string }> {
+  return request.get<unknown, { imageBase64: string }>(
+    `/ai/skills/${skillId}/files/${fileId}/image-data`,
+  );
 }
 
 export type AISkillImportSource = string | File;

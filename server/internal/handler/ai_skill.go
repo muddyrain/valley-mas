@@ -1,9 +1,13 @@
 package handler
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	pathpkg "path"
+	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +16,7 @@ import (
 	"valley-server/internal/aiclient"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
+	"valley-server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -42,7 +47,9 @@ type aiSkillImportCandidateView struct {
 	Name             string `json:"name"`
 	Description      string `json:"description"`
 	ReferenceCount   int    `json:"referenceCount"`
+	ReferenceImageCount int `json:"referenceImageCount"`
 	ScriptCount      int    `json:"scriptCount"`
+	AssetCount       int    `json:"assetCount"`
 	IgnoredFileCount int    `json:"ignoredFileCount"`
 	SourceURL        string `json:"sourceUrl"`
 }
@@ -54,9 +61,12 @@ type aiSkillImportPreviewView struct {
 }
 
 type aiSkillFileView struct {
-	Path    string `json:"path"`
-	Kind    string `json:"kind"`
-	Content string `json:"content"`
+	ID        model.Int64String `json:"id,omitempty"`
+	Path      string            `json:"path"`
+	Kind      string            `json:"kind"`
+	Content   string            `json:"content"`
+	MimeType  string            `json:"mimeType,omitempty"`
+	SizeBytes int64             `json:"sizeBytes,omitempty"`
 }
 
 type aiSkillDetailView struct {
@@ -65,6 +75,13 @@ type aiSkillDetailView struct {
 }
 
 var discoverAISkillSources = discoverGitHubAISkillSources
+
+var persistAISkillImage = func(ctx context.Context, userID model.Int64String, sourcePath string, content []byte) (*service.UploadResult, error) {
+	config := service.GetDefaultConfig(service.UploadTypeCover)
+	config.UserID = int64(userID)
+	config.CustomFolder = fmt.Sprintf("ai-skills/%s", userID.String())
+	return service.NewUploadService().UploadBytesWithContext(ctx, filepath.Base(sourcePath), content, config)
+}
 
 const (
 	maxAISkillRuntimeInstructions      = 16_000
@@ -117,7 +134,12 @@ func GetAISkill(c *gin.Context) {
 		ErrorWithDetail(c, http.StatusInternalServerError, "加载技能详情失败", err)
 		return
 	}
-	Success(c, aiSkillDetailView{aiSkillView: viewAISkill(skill), Files: viewAISkillFiles(skill)})
+	files, err := viewAISkillFiles(database.GetDB(), skill)
+	if err != nil {
+		ErrorWithDetail(c, http.StatusInternalServerError, "加载技能文件失败", err)
+		return
+	}
+	Success(c, aiSkillDetailView{aiSkillView: viewAISkill(skill), Files: files})
 }
 
 func PreviewAISkillImport(c *gin.Context) {
@@ -135,6 +157,8 @@ func PreviewAISkillImport(c *gin.Context) {
 		candidates = append(candidates, aiSkillImportCandidateView{
 			Path: source.Path, Name: source.Name, Description: source.Description,
 			ReferenceCount: source.ReferenceCount, ScriptCount: source.ScriptCount,
+			ReferenceImageCount: countAISkillImportFiles(source.Files, "reference_image"),
+			AssetCount: countAISkillImportFiles(source.Files, "asset", "asset_image"),
 			IgnoredFileCount: source.IgnoredFileCount, SourceURL: source.URL,
 		})
 	}
@@ -188,6 +212,10 @@ func InstallAISkill(c *gin.Context) {
 			existing.ScriptContent = source.ScriptContent
 			existing.Tags = encodeAIPromptTags(mergeAISkillTags(decodeAIPromptTags(existing.Tags), source.Tags))
 			existing.SourceAuthor = source.Author
+			if err := syncAISkillFiles(c.Request.Context(), existing, source); err != nil {
+				ErrorWithDetail(c, http.StatusInternalServerError, "保存技能附带文件失败", err)
+				return
+			}
 			installed = append(installed, viewAISkill(existing))
 			continue
 		}
@@ -202,6 +230,11 @@ func InstallAISkill(c *gin.Context) {
 		}
 		if err := database.GetDB().Create(&skill).Error; err != nil {
 			Error(c, http.StatusInternalServerError, "安装技能失败")
+			return
+		}
+		if err := syncAISkillFiles(c.Request.Context(), skill, source); err != nil {
+			_ = database.GetDB().Unscoped().Delete(&skill).Error
+			ErrorWithDetail(c, http.StatusInternalServerError, "保存技能附带文件失败", err)
 			return
 		}
 		installed = append(installed, viewAISkill(skill))
@@ -383,10 +416,88 @@ func extractAISkillDescription(content string) string {
 	return ""
 }
 
-func viewAISkillFiles(skill model.AISkill) []aiSkillFileView {
+func countAISkillImportFiles(files []aiSkillImportFile, kinds ...string) int {
+	count := 0
+	for _, file := range files {
+		if slices.Contains(kinds, file.Kind) { count++ }
+	}
+	return count
+}
+
+func syncAISkillFiles(ctx context.Context, skill model.AISkill, source aiSkillImportSource) error {
+	if source.Files == nil { return nil }
+	stored := make([]model.AISkillFile, 0, len(source.Files))
+	newStorageKeys := make([]string, 0)
+	cleanupNewStorage := func() {
+		for _, key := range newStorageKeys {
+			_ = service.NewUploadService().DeleteByKey(key)
+		}
+	}
+	for _, sourceFile := range source.Files {
+		file := model.AISkillFile{SkillID: skill.ID, UserID: skill.UserID, Path: strings.TrimSpace(sourceFile.Path), Kind: sourceFile.Kind, Content: sourceFile.Content, MimeType: sourceFile.MimeType, SizeBytes: int64(len(sourceFile.Content))}
+		if len(sourceFile.Binary) > 0 {
+			result, err := persistAISkillImage(ctx, skill.UserID, sourceFile.Path, sourceFile.Binary)
+			if err != nil {
+				cleanupNewStorage()
+				return err
+			}
+			file.StorageKey, file.FileHash, file.SizeBytes = result.Key, result.FileHash, result.Size
+			newStorageKeys = append(newStorageKeys, result.Key)
+		}
+		stored = append(stored, file)
+	}
+	var oldFiles []model.AISkillFile
+	if err := database.GetDB().WithContext(ctx).Where("skill_id = ?", skill.ID).Find(&oldFiles).Error; err != nil {
+		cleanupNewStorage()
+		return err
+	}
+	if err := database.GetDB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Where("skill_id = ?", skill.ID).Delete(&model.AISkillFile{}).Error; err != nil { return err }
+		if len(stored) == 0 { return nil }
+		return tx.Create(&stored).Error
+	}); err != nil {
+		cleanupNewStorage()
+		return err
+	}
+	for _, old := range oldFiles {
+		if old.StorageKey != "" { _ = service.NewUploadService().DeleteByKey(old.StorageKey) }
+	}
+	return nil
+}
+
+func viewAISkillFiles(db *gorm.DB, skill model.AISkill) ([]aiSkillFileView, error) {
+	var stored []model.AISkillFile
+	if err := db.Where("skill_id = ? AND user_id = ?", skill.ID, skill.UserID).Order("path ASC").Find(&stored).Error; err != nil { return nil, err }
+	if len(stored) > 0 {
+		files := []aiSkillFileView{{Path: "SKILL.md", Kind: "skill", Content: strings.TrimSpace(skill.Content)}}
+		for _, file := range stored {
+			files = append(files, aiSkillFileView{ID: file.ID, Path: normalizeAISkillBundledPath(file.Path, file.Kind), Kind: file.Kind, Content: strings.TrimSpace(file.Content), MimeType: file.MimeType, SizeBytes: file.SizeBytes})
+		}
+		return files, nil
+	}
 	files := []aiSkillFileView{{Path: "SKILL.md", Kind: "skill", Content: strings.TrimSpace(skill.Content)}}
 	files = appendAISkillBundledFiles(files, skill.ReferenceContent, "## 参考资料：", "reference")
-	return appendAISkillBundledFiles(files, skill.ScriptContent, "## 脚本：", "script")
+	return appendAISkillBundledFiles(files, skill.ScriptContent, "## 脚本：", "script"), nil
+}
+
+func GetAISkillFileImageData(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok { return }
+	skillID, err := parsePathInt64(c, "skillId")
+	if err != nil || skillID <= 0 { Error(c, http.StatusBadRequest, "无效的技能 ID"); return }
+	fileID, err := parsePathInt64(c, "fileId")
+	if err != nil || fileID <= 0 { Error(c, http.StatusBadRequest, "无效的技能文件 ID"); return }
+	var file model.AISkillFile
+	if err := database.GetDB().Where("id = ? AND skill_id = ? AND user_id = ? AND kind IN ?", fileID, skillID, userID, []string{"reference_image", "asset_image"}).First(&file).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) { Error(c, http.StatusNotFound, "参考图片不存在或不可用"); return }
+		ErrorWithDetail(c, http.StatusInternalServerError, "加载参考图片失败", err); return
+	}
+	if file.StorageKey == "" { Error(c, http.StatusNotFound, "参考图片文件不存在"); return }
+	sourceURL, err := service.NewUploadService().PublicURL(file.StorageKey)
+	if err != nil { Error(c, http.StatusServiceUnavailable, err.Error()); return }
+	content, mimeType, err := service.FetchAIImageSource(c.Request.Context(), sourceURL)
+	if err != nil { ErrorWithDetail(c, http.StatusBadGateway, "读取参考图片失败", err); return }
+	Success(c, gin.H{"imageBase64": aiImageReferenceDataURL(content, mimeType)})
 }
 
 func appendAISkillBundledFiles(files []aiSkillFileView, bundledContent, marker, kind string) []aiSkillFileView {

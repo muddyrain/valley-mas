@@ -381,6 +381,35 @@ func (s *AISkill) BeforeCreate(tx *gorm.DB) error {
 
 func (AISkill) TableName() string { return "ai_skills" }
 
+// AISkillFile preserves the original supported files that accompany an
+// installed skill. Text remains queryable without object storage while image
+// bytes live in private storage and are always resolved through an owner
+// scoped handler.
+type AISkillFile struct {
+	ID         Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	SkillID    Int64String    `gorm:"index:uidx_ai_skill_file_path,unique;not null" json:"skillId"`
+	UserID     Int64String    `gorm:"index;not null" json:"userId"`
+	Path       string         `gorm:"size:512;uniqueIndex:uidx_ai_skill_file_path,not null" json:"path"`
+	Kind       string         `gorm:"size:32;index;not null" json:"kind"`
+	Content    string         `gorm:"type:text;not null;default:''" json:"-"`
+	MimeType   string         `gorm:"size:120;not null;default:''" json:"mimeType,omitempty"`
+	SizeBytes  int64          `gorm:"not null;default:0" json:"sizeBytes"`
+	StorageKey string         `gorm:"size:500;not null;default:''" json:"-"`
+	FileHash   string         `gorm:"size:64;not null;default:''" json:"fileHash,omitempty"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	UpdatedAt  time.Time      `json:"updatedAt"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (f *AISkillFile) BeforeCreate(tx *gorm.DB) error {
+	if f.ID == 0 {
+		f.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+func (AISkillFile) TableName() string { return "ai_skill_files" }
+
 func (k *AIKnowledgeBase) BeforeCreate(tx *gorm.DB) error {
 	if k.ID == 0 {
 		k.ID = Int64String(utils.GenerateID())

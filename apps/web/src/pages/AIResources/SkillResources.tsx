@@ -3,6 +3,7 @@ import {
   ExternalLink,
   FileArchive,
   FileCode2,
+  FileImage,
   FileText,
   FolderOpen,
   Github,
@@ -21,6 +22,7 @@ import {
   type AISkillImportPreview,
   archiveAISkill,
   getAISkill,
+  getAISkillFileImageData,
   getAPIErrorMessage,
   installAISkill,
   listAISkills,
@@ -87,6 +89,8 @@ export default function SkillResources() {
   const [skillDetail, setSkillDetail] = useState<AISkillDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedFilePath, setSelectedFilePath] = useState('SKILL.md');
+  const [selectedImageData, setSelectedImageData] = useState('');
+  const [selectedImageLoading, setSelectedImageLoading] = useState(false);
   const [tagEditorSkill, setTagEditorSkill] = useState<AISkill | null>(null);
   const [tagText, setTagText] = useState('');
   const [savingTags, setSavingTags] = useState(false);
@@ -260,6 +264,7 @@ export default function SkillResources() {
     setDetailSkill(skill);
     setSkillDetail(null);
     setSelectedFilePath('SKILL.md');
+    setSelectedImageData('');
     setDetailOpen(true);
     try {
       setDetailLoading(true);
@@ -276,7 +281,37 @@ export default function SkillResources() {
   const selectedFile = detailFiles.find((file) => file.path === selectedFilePath) ?? detailFiles[0];
   const skillFile = detailFiles.find((file) => file.kind === 'skill');
   const referenceFiles = detailFiles.filter((file) => file.kind === 'reference');
+  const referenceImageFiles = detailFiles.filter((file) => file.kind === 'reference_image');
+  const assetFiles = detailFiles.filter((file) => file.kind === 'asset');
+  const assetImageFiles = detailFiles.filter((file) => file.kind === 'asset_image');
   const scriptFiles = detailFiles.filter((file) => file.kind === 'script');
+
+  useEffect(() => {
+    if (
+      !skillDetail ||
+      !selectedFile?.id ||
+      !['reference_image', 'asset_image'].includes(selectedFile.kind)
+    ) {
+      setSelectedImageData('');
+      setSelectedImageLoading(false);
+      return;
+    }
+    let active = true;
+    setSelectedImageLoading(true);
+    void getAISkillFileImageData(skillDetail.id, selectedFile.id)
+      .then(({ imageBase64 }) => {
+        if (active) setSelectedImageData(imageBase64);
+      })
+      .catch((error) => {
+        if (active) toast.error(getAPIErrorMessage(error, '加载参考图片失败'));
+      })
+      .finally(() => {
+        if (active) setSelectedImageLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedFile?.id, selectedFile?.kind, skillDetail]);
 
   return (
     <div className="space-y-5">
@@ -477,6 +512,54 @@ export default function SkillResources() {
                       ))}
                     </div>
                   ) : null}
+                  {referenceImageFiles.length > 0 ? (
+                    <div className="pt-1">
+                      <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                        <FolderOpen className="size-3.5" />
+                        reference images
+                      </div>
+                      {referenceImageFiles.map((file) => (
+                        <Button
+                          key={file.path}
+                          variant={selectedFile.path === file.path ? 'secondary' : 'ghost'}
+                          size="sm"
+                          className="w-full justify-start gap-2 truncate"
+                          onClick={() => setSelectedFilePath(file.path)}
+                        >
+                          <FileImage className="size-3.5 shrink-0" />
+                          <span className="truncate pl-2">
+                            {file.path.replace(/^references\/images\//, '')}
+                          </span>
+                        </Button>
+                      ))}
+                    </div>
+                  ) : null}
+                  {assetFiles.length > 0 || assetImageFiles.length > 0 ? (
+                    <div className="pt-1">
+                      <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                        <FolderOpen className="size-3.5" />
+                        assets
+                      </div>
+                      {[...assetFiles, ...assetImageFiles].map((file) => (
+                        <Button
+                          key={file.path}
+                          variant={selectedFile.path === file.path ? 'secondary' : 'ghost'}
+                          size="sm"
+                          className="w-full justify-start gap-2 truncate"
+                          onClick={() => setSelectedFilePath(file.path)}
+                        >
+                          {file.kind === 'asset_image' ? (
+                            <FileImage className="size-3.5 shrink-0" />
+                          ) : (
+                            <FileText className="size-3.5 shrink-0" />
+                          )}
+                          <span className="truncate pl-2">
+                            {file.path.replace(/^assets\//, '')}
+                          </span>
+                        </Button>
+                      ))}
+                    </div>
+                  ) : null}
                   {scriptFiles.length > 0 ? (
                     <div className="pt-1">
                       <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground">
@@ -505,9 +588,23 @@ export default function SkillResources() {
                 <div className="border-b border-border px-4 py-3 text-xs font-medium text-muted-foreground">
                   {selectedFile.path}
                 </div>
-                <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-5 text-foreground">
-                  {selectedFile.content}
-                </pre>
+                {selectedFile.kind === 'reference_image' || selectedFile.kind === 'asset_image' ? (
+                  <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-muted/20 p-4">
+                    {selectedImageLoading ? (
+                      <Spinner />
+                    ) : selectedImageData ? (
+                      <img
+                        src={selectedImageData}
+                        alt={selectedFile.path}
+                        className="max-h-full max-w-full rounded-md object-contain"
+                      />
+                    ) : null}
+                  </div>
+                ) : (
+                  <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-5 text-foreground">
+                    {selectedFile.content}
+                  </pre>
+                )}
               </div>
             </div>
           ) : (
@@ -712,6 +809,10 @@ export default function SkillResources() {
                         <span className="mt-1 block text-xs text-muted-foreground">
                           将导入 SKILL.md
                           {skill.referenceCount > 0 ? `、${skill.referenceCount} 份参考资料` : ''}
+                          {skill.referenceImageCount > 0
+                            ? `、${skill.referenceImageCount} 张参考图`
+                            : ''}
+                          {skill.assetCount > 0 ? `、${skill.assetCount} 个素材` : ''}
                           {skill.scriptCount > 0 ? `、${skill.scriptCount} 个脚本` : ''}
                         </span>
                         {skill.ignoredFileCount > 0 ? (

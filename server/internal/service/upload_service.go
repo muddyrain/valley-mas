@@ -61,6 +61,15 @@ func NewUploadService() *UploadService {
 	}
 }
 
+// PublicURL resolves an internally stored object key for server-side reads.
+// Callers must enforce their own ownership check before exposing any bytes.
+func (s *UploadService) PublicURL(key string) (string, error) {
+	if s == nil || s.uploader == nil {
+		return "", fmt.Errorf("文件上传服务未配置")
+	}
+	return s.uploader.GetPublicURL(strings.TrimSpace(key)), nil
+}
+
 // GetDefaultConfig 获取默认配置
 func GetDefaultConfig(uploadType UploadType) UploadConfig {
 	configs := map[UploadType]UploadConfig{
