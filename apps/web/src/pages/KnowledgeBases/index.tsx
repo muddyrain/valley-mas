@@ -542,7 +542,7 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
           </Card>
 
           <Card className="overflow-hidden border-border shadow-none">
-            <CardHeader className="flex-row items-start justify-between gap-4 border-b border-border px-6 py-5">
+            <CardHeader className="flex-col gap-4 border-b border-border px-4 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
               <div className="flex min-w-0 items-center gap-4">
                 <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <BookOpenText className="size-6" />
@@ -564,8 +564,12 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                 </div>
               </div>
               {selectedBase && (
-                <div className="flex shrink-0 gap-2">
-                  <Button variant="outline" onClick={openRetrievalTest}>
+                <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-nowrap">
+                  <Button
+                    variant="outline"
+                    className="flex-1 sm:flex-none"
+                    onClick={openRetrievalTest}
+                  >
                     <FlaskConical className="mr-2 size-4" />
                     检索试验台
                   </Button>
@@ -579,7 +583,10 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                     }
                     disabled={uploading}
                   >
-                    <SelectTrigger aria-label="PDF 视觉解析模型" className="max-w-52">
+                    <SelectTrigger
+                      aria-label="PDF 视觉解析模型"
+                      className="min-w-40 flex-1 sm:max-w-52"
+                    >
                       <SelectValue
                         placeholder={selectedVisionModel?.displayName || 'PDF 基础解析'}
                       />
@@ -604,6 +611,7 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                   <Button
                     render={<label htmlFor="knowledge-document-upload" />}
                     disabled={uploading}
+                    className="flex-1 sm:flex-none"
                   >
                     <Upload className="mr-2 size-4" />
                     {uploading ? '上传中...' : '上传文档'}
@@ -611,7 +619,7 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                 </div>
               )}
             </CardHeader>
-            <div className="flex flex-col gap-3 border-b border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div className="relative w-full sm:max-w-72">
                 <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -638,18 +646,116 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                 <p className="text-sm text-muted-foreground">暂无文档</p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="px-6">文档名称</TableHead>
-                    <TableHead>类型</TableHead>
-                    <TableHead>处理状态</TableHead>
-                    <TableHead>大小</TableHead>
-                    <TableHead>更新时间</TableHead>
-                    <TableHead className="w-24 text-right">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="px-6">文档名称</TableHead>
+                        <TableHead>类型</TableHead>
+                        <TableHead>处理状态</TableHead>
+                        <TableHead>大小</TableHead>
+                        <TableHead>更新时间</TableHead>
+                        <TableHead className="w-24 text-right">操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visibleDocuments.map((document) => {
+                        const canStartIndexing =
+                          document.status === 'pending_embedding' ||
+                          document.status === 'pending_parse' ||
+                          (document.status === 'failed' &&
+                            document.errorCode !== 'DOCUMENT_PARSE_FAILED');
+                        const isIndexing =
+                          document.status === 'pending' ||
+                          document.status === 'pending_parse' ||
+                          document.status === 'pending_embedding' ||
+                          document.status === 'indexing';
+                        const completedIndexing = completionProgresses[document.id] !== undefined;
+                        return (
+                          <TableRow key={document.id}>
+                            <TableCell className="max-w-0 px-6">
+                              <div className="flex min-w-0 items-center gap-3">
+                                <FileText className="size-5 shrink-0 text-primary" />
+                                <div className="min-w-0">
+                                  <p className="truncate font-medium text-foreground">
+                                    {document.name}
+                                  </p>
+                                  {isIndexing && (
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                      {document.status === 'pending_parse'
+                                        ? '正在解析 PDF'
+                                        : '正在建立索引'}
+                                    </p>
+                                  )}
+                                  {completedIndexing && !isIndexing && (
+                                    <p className="mt-0.5 text-xs text-muted-foreground">索引完成</p>
+                                  )}
+                                  {document.status === 'failed' && (
+                                    <p className="mt-0.5 text-xs text-destructive">
+                                      {documentFailureMessage[document.errorCode] || '资料处理失败'}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {getDocumentType(document)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={getDocumentStatus(document).variant}>
+                                {getDocumentStatus(document).label}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {formatFileSize(document.sizeBytes)}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {formatDate(document.updatedAt)}
+                            </TableCell>
+                            <TableCell className="pr-4 text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label={`查看 ${document.name} 详情`}
+                                  onClick={() =>
+                                    setPreviewTarget({ knowledgeBaseID: selectedBase.id, document })
+                                  }
+                                >
+                                  <Eye />
+                                </Button>
+                                {canStartIndexing && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    aria-label={`处理 ${document.name}`}
+                                    disabled={retryingID === document.id}
+                                    onClick={() => void handleRetry(document.id)}
+                                  >
+                                    <RotateCw
+                                      className={retryingID === document.id ? 'animate-spin' : ''}
+                                    />
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label={`删除 ${document.name}`}
+                                  disabled={deletingID === document.id}
+                                  onClick={() => setDeleteTarget(document)}
+                                >
+                                  <Trash2 />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="divide-y divide-border md:hidden">
                   {visibleDocuments.map((document) => {
                     const canStartIndexing =
                       document.status === 'pending_embedding' ||
@@ -663,48 +769,28 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                       document.status === 'indexing';
                     const completedIndexing = completionProgresses[document.id] !== undefined;
                     return (
-                      <TableRow key={document.id}>
-                        <TableCell className="max-w-0 px-6">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <FileText className="size-5 shrink-0 text-primary" />
-                            <div className="min-w-0">
-                              <p className="truncate font-medium text-foreground">
-                                {document.name}
+                      <article key={document.id} className="space-y-3 px-4 py-4">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <FileText className="mt-0.5 size-5 shrink-0 text-primary" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium text-foreground">{document.name}</p>
+                            {isIndexing ? (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {document.status === 'pending_parse'
+                                  ? '正在解析 PDF'
+                                  : '正在建立索引'}
                               </p>
-                              {isIndexing && (
-                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                  {document.status === 'pending_parse'
-                                    ? '正在解析 PDF'
-                                    : '正在建立索引'}
-                                </p>
-                              )}
-                              {completedIndexing && !isIndexing && (
-                                <p className="mt-0.5 text-xs text-muted-foreground">索引完成</p>
-                              )}
-                              {document.status === 'failed' && (
-                                <p className="mt-0.5 text-xs text-destructive">
-                                  {documentFailureMessage[document.errorCode] || '资料处理失败'}
-                                </p>
-                              )}
-                            </div>
+                            ) : null}
+                            {completedIndexing && !isIndexing ? (
+                              <p className="mt-1 text-xs text-muted-foreground">索引完成</p>
+                            ) : null}
+                            {document.status === 'failed' ? (
+                              <p className="mt-1 text-xs text-destructive">
+                                {documentFailureMessage[document.errorCode] || '资料处理失败'}
+                              </p>
+                            ) : null}
                           </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {getDocumentType(document)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getDocumentStatus(document).variant}>
-                            {getDocumentStatus(document).label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatFileSize(document.sizeBytes)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDate(document.updatedAt)}
-                        </TableCell>
-                        <TableCell className="pr-4 text-right">
-                          <div className="flex justify-end gap-1">
+                          <div className="flex shrink-0 gap-1">
                             <Button
                               variant="ghost"
                               size="icon-sm"
@@ -715,7 +801,7 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                             >
                               <Eye />
                             </Button>
-                            {canStartIndexing && (
+                            {canStartIndexing ? (
                               <Button
                                 variant="ghost"
                                 size="icon-sm"
@@ -727,7 +813,7 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                                   className={retryingID === document.id ? 'animate-spin' : ''}
                                 />
                               </Button>
-                            )}
+                            ) : null}
                             <Button
                               variant="ghost"
                               size="icon-sm"
@@ -738,15 +824,23 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                               <Trash2 />
                             </Button>
                           </div>
-                        </TableCell>
-                      </TableRow>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-8 text-xs text-muted-foreground">
+                          <span>{getDocumentType(document)}</span>
+                          <Badge variant={getDocumentStatus(document).variant}>
+                            {getDocumentStatus(document).label}
+                          </Badge>
+                          <span>{formatFileSize(document.sizeBytes)}</span>
+                          <span>{formatDate(document.updatedAt)}</span>
+                        </div>
+                      </article>
                     );
                   })}
-                </TableBody>
-              </Table>
+                </div>
+              </>
             )}
             {selectedBase && documents.length > 0 && (
-              <div className="border-t border-border px-6 py-4 text-sm text-muted-foreground">
+              <div className="border-t border-border px-4 py-4 text-sm text-muted-foreground sm:px-6">
                 共 {visibleDocuments.length} 个文档
               </div>
             )}

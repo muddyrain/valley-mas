@@ -12,6 +12,7 @@ import {
   ImagePlus,
   Loader2,
   Lock,
+  MoreHorizontal,
   Pencil,
   Send,
   Sparkles,
@@ -44,6 +45,12 @@ import PostGroupDropdown from '@/components/blog/PostGroupDropdown';
 import { PublicWallpaperPickerDialog } from '@/components/blog/PublicWallpaperPickerDialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { numberParam, stringParam, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -674,75 +681,145 @@ export default function MyPosts() {
             <p className="mt-1 text-sm text-muted-foreground">管理你的全部博客与图文内容</p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 md:w-auto">
             {!batchMode ? (
               <>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate('/my-space/blog-create')}
-                  className="rounded-xl"
-                >
-                  <FileText className="mr-1.5 h-4 w-4" />
-                  新建博客
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setWorkflowDialogOpen(true)}
-                  className="rounded-xl"
-                >
-                  <Sparkles className="mr-1.5 h-4 w-4" />
-                  AI 工作流
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setBatchImportDialogOpen(true)}
-                  className="rounded-xl"
-                >
-                  <FileUp className="mr-1.5 h-4 w-4" />
-                  批量导入 MD
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate('/my-space/image-text')}
-                  className="rounded-xl"
-                >
-                  <ImageIcon className="mr-1.5 h-4 w-4" />
-                  新建图文
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setBlogSortDialogOpen(true)}
-                  disabled={loadingPosts || blogTotal === 0}
-                  className="rounded-xl"
-                >
-                  <ArrowUpDown className="mr-1.5 h-4 w-4" />
-                  排序博客
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate('/my-space/blog-groups?type=blog')}
-                  className="rounded-xl"
-                >
-                  <FolderTree className="mr-1.5 h-4 w-4" />
-                  博客分组
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate('/my-space/blog-groups?type=image_text')}
-                  className="rounded-xl"
-                >
-                  <FolderTree className="mr-1.5 h-4 w-4" />
-                  图文分组
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleOpenBatchSettings}
-                  disabled={loadingPosts || visiblePosts.length === 0}
-                  className="rounded-xl"
-                >
-                  <CheckSquare className="mr-1.5 h-4 w-4" />
-                  批量设置博客
-                </Button>
+                <div className="hidden items-center gap-2 md:flex">
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/my-space/blog-create')}
+                    className="rounded-xl"
+                  >
+                    <FileText className="mr-1.5 h-4 w-4" />
+                    新建博客
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setWorkflowDialogOpen(true)}
+                    className="rounded-xl"
+                  >
+                    <Sparkles className="mr-1.5 h-4 w-4" />
+                    AI 工作流
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setBatchImportDialogOpen(true)}
+                    className="rounded-xl"
+                  >
+                    <FileUp className="mr-1.5 h-4 w-4" />
+                    批量导入 MD
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/my-space/image-text')}
+                    className="rounded-xl"
+                  >
+                    <ImageIcon className="mr-1.5 h-4 w-4" />
+                    新建图文
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setBlogSortDialogOpen(true)}
+                    disabled={loadingPosts || blogTotal === 0}
+                    className="rounded-xl"
+                  >
+                    <ArrowUpDown className="mr-1.5 h-4 w-4" />
+                    排序博客
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/my-space/blog-groups?type=blog')}
+                    className="rounded-xl"
+                  >
+                    <FolderTree className="mr-1.5 h-4 w-4" />
+                    博客分组
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/my-space/blog-groups?type=image_text')}
+                    className="rounded-xl"
+                  >
+                    <FolderTree className="mr-1.5 h-4 w-4" />
+                    图文分组
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleOpenBatchSettings}
+                    disabled={loadingPosts || visiblePosts.length === 0}
+                    className="rounded-xl"
+                  >
+                    <CheckSquare className="mr-1.5 h-4 w-4" />
+                    批量设置博客
+                  </Button>
+                </div>
+                <div className="flex w-full items-center gap-2 md:hidden">
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/my-space/blog-create')}
+                    className="min-w-0 flex-1 rounded-xl"
+                  >
+                    <FileText className="mr-1.5 h-4 w-4 shrink-0" />
+                    <span className="truncate">新建博客</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/my-space/image-text')}
+                    className="min-w-0 flex-1 rounded-xl"
+                  >
+                    <ImageIcon className="mr-1.5 h-4 w-4 shrink-0" />
+                    <span className="truncate">新建图文</span>
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0 rounded-xl"
+                          aria-label="更多内容操作"
+                          title="更多内容操作"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      }
+                    />
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => setWorkflowDialogOpen(true)}>
+                        <Sparkles />
+                        AI 工作流
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBatchImportDialogOpen(true)}>
+                        <FileUp />
+                        批量导入 MD
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setBlogSortDialogOpen(true)}
+                        disabled={loadingPosts || blogTotal === 0}
+                      >
+                        <ArrowUpDown />
+                        排序博客
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate('/my-space/blog-groups?type=blog')}>
+                        <FolderTree />
+                        博客分组
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => navigate('/my-space/blog-groups?type=image_text')}
+                      >
+                        <FolderTree />
+                        图文分组
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handleOpenBatchSettings}
+                        disabled={loadingPosts || visiblePosts.length === 0}
+                      >
+                        <CheckSquare />
+                        批量设置博客
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </>
             ) : (
               <Button variant="outline" onClick={handleExitBatchMode} className="rounded-xl">

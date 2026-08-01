@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useLayoutStore } from '@/stores/useLayoutStore';
 
@@ -54,6 +55,7 @@ export function AIPanel() {
   const open = useLayoutStore((s) => s.aiPanelOpen);
   const setOpen = useLayoutStore((s) => s.setAIPanelOpen);
   const width = useLayoutStore((s) => s.aiPanelWidth);
+  const isMobile = useIsMobile();
   const { isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
 
@@ -200,10 +202,10 @@ export function AIPanel() {
 
   return (
     <aside
-      className="hidden h-screen flex-col border-l border-border bg-card md:flex"
-      style={{ width }}
+      className="fixed inset-0 z-50 flex h-svh flex-col bg-card md:static md:z-auto md:h-screen md:border-l md:border-border"
+      style={isMobile ? undefined : { width }}
     >
-      <div className="flex h-14 items-center justify-between border-b border-border px-4">
+      <div className="flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between border-b border-border px-4 pt-[env(safe-area-inset-top)] md:h-14 md:pt-0">
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
           <span className="text-sm font-semibold text-foreground">快速助手</span>
@@ -314,7 +316,7 @@ export function AIPanel() {
             </div>
           </ScrollArea>
 
-          <div className="border-t border-border p-3">
+          <div className="border-t border-border px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:p-3">
             <div className="flex items-end gap-2">
               <Textarea
                 ref={inputRef}

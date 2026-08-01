@@ -49,7 +49,7 @@ export default function AIResources() {
                   key={value}
                   value={value}
                   disabled={disabled}
-                  className="h-11 flex-none rounded-none px-1 text-base text-muted-foreground data-active:text-primary data-active:after:bg-primary data-active:after:opacity-100"
+                  className="h-11 flex-none rounded-t-md border border-transparent px-3 text-base text-muted-foreground transition-colors hover:text-foreground group-data-[variant=line]/tabs-list:data-active:bg-primary/[0.12] data-active:font-semibold data-active:text-primary data-active:after:bottom-0 data-active:after:h-[3px] data-active:after:rounded-full data-active:after:bg-primary data-active:after:opacity-100"
                 >
                   {label}
                 </TabsTrigger>

@@ -8,6 +8,7 @@ import {
   Layers,
   Loader2,
   Lock,
+  MoreHorizontal,
   Plus,
   RefreshCw,
   Square,
@@ -35,6 +36,12 @@ import TypeFilterBar from '@/components/TypeFilterBar';
 import UploadResourceDialog from '@/components/UploadResourceDialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   enumParam,
   numberParam,
@@ -283,41 +290,90 @@ export default function MyResources() {
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             {!batchMode ? (
               <>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    loadResource();
-                  }}
-                  disabled={refreshing || loading}
-                  className="w-full gap-2 border-border text-muted-foreground hover:border-accent hover:text-primary sm:w-auto"
-                >
-                  <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                  刷新
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setBatchMode(true)}
-                  className="w-full gap-2 border-border text-muted-foreground hover:border-accent hover:text-primary sm:w-auto"
-                  disabled={resources.length === 0}
-                >
-                  <CheckSquare className="h-4 w-4" />
-                  批量操作
-                </Button>
-                <Button
-                  onClick={() => setUploadOpen(true)}
-                  className="w-full gap-2 font-semibold shadow-md sm:w-auto"
-                >
-                  <Plus className="h-4 w-4" />
-                  上传新资源
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setBatchUploadOpen(true)}
-                  className="w-full gap-2 border-border text-muted-foreground hover:border-accent hover:text-primary sm:w-auto"
-                >
-                  <Layers className="h-4 w-4" />
-                  批量上传
-                </Button>
+                <div className="hidden w-full flex-wrap items-center gap-3 sm:flex sm:w-auto">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      loadResource();
+                    }}
+                    disabled={refreshing || loading}
+                    className="w-full gap-2 border-border text-muted-foreground hover:border-accent hover:text-primary sm:w-auto"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                    刷新
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setBatchMode(true)}
+                    className="w-full gap-2 border-border text-muted-foreground hover:border-accent hover:text-primary sm:w-auto"
+                    disabled={resources.length === 0}
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    批量操作
+                  </Button>
+                  <Button
+                    onClick={() => setUploadOpen(true)}
+                    className="w-full gap-2 font-semibold shadow-md sm:w-auto"
+                  >
+                    <Plus className="h-4 w-4" />
+                    上传新资源
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setBatchUploadOpen(true)}
+                    className="w-full gap-2 border-border text-muted-foreground hover:border-accent hover:text-primary sm:w-auto"
+                  >
+                    <Layers className="h-4 w-4" />
+                    批量上传
+                  </Button>
+                </div>
+                <div className="flex w-full items-center gap-2 sm:hidden">
+                  <Button
+                    onClick={() => setUploadOpen(true)}
+                    className="min-w-0 flex-1 gap-2 font-semibold"
+                  >
+                    <Plus className="h-4 w-4 shrink-0" />
+                    <span className="truncate">上传新资源</span>
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0"
+                          aria-label="更多资源操作"
+                          title="更多资源操作"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      }
+                    />
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          loadResource();
+                        }}
+                        disabled={refreshing || loading}
+                      >
+                        <RefreshCw className={refreshing ? 'animate-spin' : undefined} />
+                        刷新
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setBatchMode(true)}
+                        disabled={resources.length === 0}
+                      >
+                        <CheckSquare />
+                        批量操作
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBatchUploadOpen(true)}>
+                        <Layers />
+                        批量上传
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </>
             ) : (
               <Button

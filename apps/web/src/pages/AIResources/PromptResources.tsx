@@ -268,65 +268,125 @@ export default function PromptResources() {
           </p>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="px-3">资源</TableHead>
-              <TableHead>来源</TableHead>
-              <TableHead>编辑时间</TableHead>
-              <TableHead className="w-24 text-right">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visiblePrompts.map((prompt) => (
-              <TableRow
-                key={prompt.id}
-                className="cursor-pointer"
-                onClick={() => openEditor(prompt)}
-              >
-                <TableCell className="max-w-0 px-3">
-                  <div className="flex min-w-0 items-center gap-3 py-1">
-                    <FileText className="size-5 shrink-0 text-primary" />
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium text-foreground">
-                        {prompt.name}
-                      </span>
-                      {prompt.description ? (
-                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                          {prompt.description}
-                        </span>
-                      ) : null}
-                      {prompt.tags.length > 0 ? (
-                        <span className="mt-1.5 flex flex-wrap gap-1">
-                          {prompt.tags.slice(0, 3).map((tag) => (
-                            <Badge key={tag} variant="secondary">
-                              {tag}
-                            </Badge>
-                          ))}
-                          {prompt.tags.length > 3 ? (
-                            <Badge variant="outline">+{prompt.tags.length - 3}</Badge>
+        <>
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="px-3">资源</TableHead>
+                  <TableHead>来源</TableHead>
+                  <TableHead>编辑时间</TableHead>
+                  <TableHead className="w-24 text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visiblePrompts.map((prompt) => (
+                  <TableRow
+                    key={prompt.id}
+                    className="cursor-pointer"
+                    onClick={() => openEditor(prompt)}
+                  >
+                    <TableCell className="max-w-0 px-3">
+                      <div className="flex min-w-0 items-center gap-3 py-1">
+                        <FileText className="size-5 shrink-0 text-primary" />
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium text-foreground">
+                            {prompt.name}
+                          </span>
+                          {prompt.description ? (
+                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                              {prompt.description}
+                            </span>
+                          ) : null}
+                          {prompt.tags.length > 0 ? (
+                            <span className="mt-1.5 flex flex-wrap gap-1">
+                              {prompt.tags.slice(0, 3).map((tag) => (
+                                <Badge key={tag} variant="secondary">
+                                  {tag}
+                                </Badge>
+                              ))}
+                              {prompt.tags.length > 3 ? (
+                                <Badge variant="outline">+{prompt.tags.length - 3}</Badge>
+                              ) : null}
+                            </span>
                           ) : null}
                         </span>
-                      ) : null}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {prompt.sourceUrl ? '链接导入' : '自己创建'}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {formatPromptDate(prompt.updatedAt)}
-                </TableCell>
-                <TableCell className="pr-3 text-right">
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {prompt.sourceUrl ? '链接导入' : '自己创建'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatPromptDate(prompt.updatedAt)}
+                    </TableCell>
+                    <TableCell className="pr-3 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`操作 ${prompt.name}`}
+                              onClick={(event) => event.stopPropagation()}
+                            />
+                          }
+                        >
+                          <MoreHorizontal />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditor(prompt)}>
+                            <Pencil />
+                            编辑
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => void handleArchive(prompt)}
+                          >
+                            <Trash2 />
+                            归档
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="divide-y divide-border md:hidden">
+            {visiblePrompts.map((prompt) => (
+              <article key={prompt.id} className="px-3 py-4">
+                <div className="flex items-start gap-3">
+                  <FileText className="mt-0.5 size-5 shrink-0 text-primary" />
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => openEditor(prompt)}
+                  >
+                    <p className="truncate font-medium text-foreground">{prompt.name}</p>
+                    {prompt.description ? (
+                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                        {prompt.description}
+                      </p>
+                    ) : null}
+                    {prompt.tags.length > 0 ? (
+                      <span className="mt-2 flex flex-wrap gap-1">
+                        {prompt.tags.slice(0, 3).map((tag) => (
+                          <Badge key={tag} variant="secondary">
+                            {tag}
+                          </Badge>
+                        ))}
+                        {prompt.tags.length > 3 ? (
+                          <Badge variant="outline">+{prompt.tags.length - 3}</Badge>
+                        ) : null}
+                      </span>
+                    ) : null}
+                  </button>
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`操作 ${prompt.name}`}
-                          onClick={(event) => event.stopPropagation()}
-                        />
+                        <Button variant="ghost" size="icon-sm" aria-label={`操作 ${prompt.name}`} />
                       }
                     >
                       <MoreHorizontal />
@@ -346,11 +406,15 @@ export default function PromptResources() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </TableCell>
-              </TableRow>
+                </div>
+                <p className="mt-3 pl-8 text-xs text-muted-foreground">
+                  {prompt.sourceUrl ? '链接导入' : '自己创建'} ·{' '}
+                  {formatPromptDate(prompt.updatedAt)}
+                </p>
+              </article>
             ))}
-          </TableBody>
-        </Table>
+          </div>
+        </>
       )}
 
       {!loading && prompts.length > 0 ? (

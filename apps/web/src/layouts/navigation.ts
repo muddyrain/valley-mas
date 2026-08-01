@@ -1,0 +1,37 @@
+import { BookOpen, Bot, Home, ImageIcon, LibraryBig, Sparkles } from 'lucide-react';
+
+export const navigationGroups = [
+  {
+    label: '浏览',
+    items: [
+      { to: '/', label: '首页', icon: Home },
+      { to: '/blog', label: '博客', icon: BookOpen },
+      { to: '/resources', label: '资源', icon: ImageIcon },
+    ],
+  },
+  {
+    label: '创作',
+    items: [
+      { to: '/workbench', label: '智能体', icon: Bot },
+      { to: '/workbench/images', label: 'AI 图片', icon: Sparkles },
+      { to: '/workbench/resources', label: 'AI 资源', icon: LibraryBig },
+    ],
+  },
+] as const;
+
+export function isNavigationActive(pathname: string, to: string) {
+  if (to === '/') return pathname === '/';
+  if (to === '/workbench') {
+    return pathname === to || pathname.startsWith('/workbench/apps/');
+  }
+  if (to === '/workbench/images') return pathname === to;
+  if (to === '/workbench/resources') {
+    return (
+      pathname === to ||
+      pathname === '/workbench/create' ||
+      pathname.startsWith('/workbench/edit/') ||
+      pathname.startsWith('/workbench/templates/')
+    );
+  }
+  return pathname.startsWith(to);
+}
