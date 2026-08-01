@@ -44,12 +44,14 @@ export function ConversationComposer({
   skills = [],
   activeSkillId,
   onActiveSkillChange,
+  emptySkillAction,
   referenceImages,
   onReferenceImagesChange,
   footer,
   onStop,
   className,
   revealAttribute,
+  presentation = 'default',
 }: {
   value: string;
   onValueChange: (value: string) => void;
@@ -61,12 +63,16 @@ export function ConversationComposer({
   skills?: ConversationComposerSkill[];
   activeSkillId?: string;
   onActiveSkillChange?: (skillId?: string) => void;
+  emptySkillAction?: {
+    onClick: () => void;
+  };
   referenceImages?: ConversationComposerReferenceImage[];
   onReferenceImagesChange?: (images: ConversationComposerReferenceImage[]) => void;
   footer?: ReactNode;
   onStop?: () => void;
   className?: string;
   revealAttribute?: string;
+  presentation?: 'default' | 'workspace';
 }) {
   const referenceInputRef = useRef<HTMLInputElement>(null);
   const activeSkill = skills.find((skill) => skill.id === activeSkillId);
@@ -79,6 +85,8 @@ export function ConversationComposer({
         .includes(skillQuery.toLocaleLowerCase('zh-CN')),
     )
     .slice(0, 6);
+  const showEmptySkillState = Boolean(skillMatch && skills.length === 0 && emptySkillAction);
+  const isWorkspace = presentation === 'workspace';
 
   const addReferenceImages = async (files: FileList | null) => {
     if (!files || !referenceImages || !onReferenceImagesChange) return;
@@ -117,10 +125,25 @@ export function ConversationComposer({
 
   return (
     <div className={cn('relative w-full', className)} data-agent-reveal={revealAttribute}>
-      <div className="relative rounded-xl border border-border bg-card shadow-sm transition-shadow duration-200 focus-within:shadow-md">
-        {skillMatch && visibleSkills.length > 0 ? (
+      <div
+        className={cn(
+          'relative rounded-xl border border-border bg-card shadow-sm transition-shadow duration-200 focus-within:shadow-md',
+          isWorkspace &&
+            'rounded-2xl bg-background shadow-none focus-within:border-primary/40 focus-within:shadow-sm',
+        )}
+      >
+        {skillMatch && (visibleSkills.length > 0 || showEmptySkillState) ? (
           <div className="absolute inset-x-0 bottom-full z-20 mb-2 max-h-[min(24rem,calc(100vh-8rem))] overflow-y-auto rounded-xl border border-border bg-popover p-2 shadow-lg">
-            <p className="px-2 py-1 text-xs font-medium text-muted-foreground">选择本轮技能</p>
+            {showEmptySkillState ? (
+              <div className="flex items-center justify-between gap-3 px-2 py-2">
+                <p className="text-sm text-muted-foreground">未绑定技能</p>
+                <Button type="button" size="sm" onClick={emptySkillAction?.onClick}>
+                  去配置
+                </Button>
+              </div>
+            ) : (
+              <p className="px-2 py-1 text-xs font-medium text-muted-foreground">选择本轮技能</p>
+            )}
             {visibleSkills.map((skill) => (
               <Button
                 key={skill.id}
@@ -181,12 +204,15 @@ export function ConversationComposer({
             ))}
           </div>
         ) : null}
-        <div className="px-4 pt-3">
+        <div className={cn('px-4 pt-3', isWorkspace && 'px-4 pt-2.5 sm:px-5')}>
           <Textarea
             value={value}
             placeholder={placeholder}
             disabled={disabled}
-            className="min-h-24 resize-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+            className={cn(
+              'min-h-24 resize-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0',
+              isWorkspace && 'min-h-[3.5rem] text-sm leading-6',
+            )}
             onChange={(event) => onValueChange(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -197,7 +223,12 @@ export function ConversationComposer({
             maxLength={maxLength}
           />
         </div>
-        <div className="flex items-center justify-between gap-3 border-t border-border/70 px-3 py-2">
+        <div
+          className={cn(
+            'flex items-center justify-between gap-3 border-t border-border/70 px-3 py-2',
+            isWorkspace && 'px-3.5 py-2 sm:px-4',
+          )}
+        >
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             {referenceImages && onReferenceImagesChange ? (
               <>

@@ -98,6 +98,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth := router.Group("/ai")
 	auth.Use(middleware.Auth(&config.Config{JWT: config.JWTConfig{Secret: aiPlatformTestSecret}}))
 	auth.POST("/apps", CreateAIApp)
+	auth.DELETE("/apps/:appId", DeleteAIApp)
 	auth.POST("/app-assistant/proposals", CreateAIAppProposal)
 	auth.POST("/prompt-assistant/suggestions", CreatePromptAssistantSuggestion)
 	auth.GET("/workbench/copilot/session", GetWorkbenchCopilotSession)
@@ -155,6 +156,119 @@ func createAIPlatformCatalogModel(t *testing.T, db *gorm.DB, capabilities ...str
 		t.Fatalf("seed catalog model: %v", err)
 	}
 	return item
+}
+
+func TestCreateAIKnowledgeTextDocumentSharesWorkflowIngestionContract(t *testing.T) {
+	_, db := setupAIPlatformTestRouter(t)
+	base := model.AIKnowledgeBase{UserID: 101, Name: "工作流资料"}
+	if err := db.Create(&base).Error; err != nil {
+		t.Fatal(err)
+	}
+	content := "第一段内容。\n\n第二段内容。"
+	document, err := createAIKnowledgeTextDocument(
+		db,
+		101,
+		base.ID,
+		"自动生成总结",
+		content,
+		"text/plain; charset=utf-8",
+		int64(len(content)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if document.Status != "pending_embedding" || document.ChunkCount == 0 {
+		t.Fatalf("document=%+v", document)
+	}
+	var chunks []model.AIKnowledgeChunk
+	if err := db.Where("document_id = ?", document.ID).Find(&chunks).Error; err != nil || len(chunks) != document.ChunkCount {
+		t.Fatalf("chunks=%d err=%v", len(chunks), err)
+	}
+	if _, err := createAIKnowledgeTextDocument(db, 202, base.ID, "越权", "不应写入", "text/plain", 12); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("cross-owner err=%v", err)
+	}
+}
+
+func TestDeleteAIAppRemovesOnlyOwnedAgentAndItsAppRecords(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "delete-me"}
+	otherApp := model.AIApp{UserID: 202, Type: aiAppTypeAgent, Name: "keep-me"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&otherApp).Error; err != nil {
+		t.Fatal(err)
+	}
+	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{}`}
+	conversation := model.AIAppConversation{UserID: 101, AppID: app.ID, VersionID: version.ID, Title: "history"}
+	key := model.AIAPIKey{UserID: 101, Name: "delete-key", KeyPrefix: "delete", KeyHash: "hash", Status: "active"}
+	if err := db.Create(&version).Error; err != nil {
+		t.Fatal(err)
+	}
+	conversation.VersionID = version.ID
+	if err := db.Create(&conversation).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&key).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range []any{
+		&model.AIAppVersionKnowledgeBase{AppVersionID: version.ID, KnowledgeBaseID: 1},
+		&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: "content.search"},
+		&model.AIAppKnowledgeBase{AppID: app.ID, KnowledgeBaseID: 1},
+		&model.AIAPIKeyAppBinding{APIKeyID: key.ID, AppID: app.ID},
+		&model.AIAppConversationMessage{UserID: 101, AppID: app.ID, ConversationID: conversation.ID, Role: "user", Content: "hello"},
+		&model.AIAppConversationToolTrace{UserID: 101, AppID: app.ID, ConversationID: conversation.ID, RunID: 1, ToolName: "content.search", Status: "succeeded"},
+		&model.AIAppRun{AppID: app.ID, VersionID: version.ID, ConversationID: &conversation.ID, UserID: 101, Status: "succeeded", Model: "test", Input: "hello"},
+		&model.AIAppPublicInvocation{UserID: 101, AppID: app.ID, VersionID: version.ID, APIKeyID: key.ID, Status: "succeeded"},
+	} {
+		if err := db.Create(item).Error; err != nil {
+			t.Fatalf("seed dependent record: %v", err)
+		}
+	}
+
+	foreign := httptest.NewRequest(http.MethodDelete, "/ai/apps/"+app.ID.String(), nil)
+	foreign.Header.Set("Authorization", aiPlatformAuthHeaderFor(t, "202", "other-user"))
+	foreignRecorder := httptest.NewRecorder()
+	router.ServeHTTP(foreignRecorder, foreign)
+	if responseCode(foreignRecorder) != http.StatusNotFound {
+		t.Fatalf("foreign delete response=%s", foreignRecorder.Body.String())
+	}
+
+	request := httptest.NewRequest(http.MethodDelete, "/ai/apps/"+app.ID.String(), nil)
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("delete response=%s", recorder.Body.String())
+	}
+
+	assertNoAppRows := func(label string, entity any) {
+		t.Helper()
+		var count int64
+		if err := db.Model(entity).Where("app_id = ?", app.ID).Count(&count).Error; err != nil || count != 0 {
+			t.Fatalf("%s count=%d err=%v", label, count, err)
+		}
+	}
+	assertNoAppRows("versions", &model.AIAppVersion{})
+	assertNoAppRows("conversations", &model.AIAppConversation{})
+	assertNoAppRows("messages", &model.AIAppConversationMessage{})
+	assertNoAppRows("tool traces", &model.AIAppConversationToolTrace{})
+	assertNoAppRows("runs", &model.AIAppRun{})
+	assertNoAppRows("public invocations", &model.AIAppPublicInvocation{})
+	assertNoAppRows("api key bindings", &model.AIAPIKeyAppBinding{})
+	assertNoAppRows("knowledge bindings", &model.AIAppKnowledgeBase{})
+	var versionBindingCount int64
+	if err := db.Model(&model.AIAppVersionKnowledgeBase{}).Where("app_version_id = ?", version.ID).Count(&versionBindingCount).Error; err != nil || versionBindingCount != 0 {
+		t.Fatalf("knowledge snapshot count=%d err=%v", versionBindingCount, err)
+	}
+	if err := db.Model(&model.AIAppVersionToolBinding{}).Where("app_version_id = ?", version.ID).Count(&versionBindingCount).Error; err != nil || versionBindingCount != 0 {
+		t.Fatalf("tool snapshot count=%d err=%v", versionBindingCount, err)
+	}
+	var retained int64
+	if err := db.Model(&model.AIApp{}).Where("id = ?", otherApp.ID).Count(&retained).Error; err != nil || retained != 1 {
+		t.Fatalf("other app count=%d err=%v", retained, err)
+	}
 }
 
 func TestCancelWorkbenchCopilotRunRequiresOwnerAndSignalsActiveRun(t *testing.T) {
@@ -991,6 +1105,44 @@ func TestAIAppConversationStreamsOwnerScopedToolTraceWithoutRawResults(t *testin
 	}
 	if requestCount != 2 {
 		t.Fatalf("catalog provider request count = %d, want 2", requestCount)
+	}
+	var persistedRun model.AIAppRun
+	if err := db.Where("conversation_id = ?", conversation.ID).First(&persistedRun).Error; err != nil {
+		t.Fatalf("load persisted run: %v", err)
+	}
+	referenceSummary, err := json.Marshal([]aiKnowledgeReference{{
+		DocumentName: "P8 私有资料",
+		ChunkID:      model.Int64String(8),
+		Excerpt:      "仅 owner 可见",
+	}})
+	if err != nil {
+		t.Fatalf("marshal persisted references: %v", err)
+	}
+	if err := db.Model(&persistedRun).Update("references", string(referenceSummary)).Error; err != nil {
+		t.Fatalf("persist references: %v", err)
+	}
+	historyRequest := httptest.NewRequest(http.MethodGet, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String(), nil)
+	historyRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	historyRecorder := httptest.NewRecorder()
+	router.ServeHTTP(historyRecorder, historyRequest)
+	if historyRecorder.Code != http.StatusOK {
+		t.Fatalf("conversation history = %d body=%s", historyRecorder.Code, historyRecorder.Body.String())
+	}
+	var historyPayload struct {
+		Data struct {
+			Runs              []model.AIAppRun                  `json:"runs"`
+			ReferencesByRunID map[string][]aiKnowledgeReference `json:"referencesByRunId"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(historyRecorder.Body.Bytes(), &historyPayload); err != nil {
+		t.Fatalf("decode conversation history: %v", err)
+	}
+	if len(historyPayload.Data.Runs) != 1 {
+		t.Fatalf("history runs = %#v", historyPayload.Data.Runs)
+	}
+	references := historyPayload.Data.ReferencesByRunID[historyPayload.Data.Runs[0].ID.String()]
+	if len(references) != 1 || references[0].DocumentName != "P8 私有资料" {
+		t.Fatalf("history references = %#v", historyPayload.Data.ReferencesByRunID)
 	}
 }
 

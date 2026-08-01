@@ -37,6 +37,7 @@ type ImageGenerationConfig struct {
 
 type Config struct {
 	ModelProfile     string                 `json:"modelProfile"`
+	ModelID          string                 `json:"modelId,omitempty"`
 	SystemPrompt     string                 `json:"systemPrompt"`
 	OpeningMessage   string                 `json:"openingMessage"`
 	ExampleQuestions []string               `json:"exampleQuestions"`
@@ -72,6 +73,7 @@ func Normalize(config Config) Config {
 	if config.ModelProfile == "" {
 		config.ModelProfile = ModelProfileARKTextDefault
 	}
+	config.ModelID = strings.TrimSpace(config.ModelID)
 	config.SystemPrompt = strings.TrimSpace(config.SystemPrompt)
 	config.OpeningMessage = strings.TrimSpace(config.OpeningMessage)
 	if config.ImageGeneration != nil {

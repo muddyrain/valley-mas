@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"valley-server/internal/ai/agent"
 	"valley-server/internal/ai/tools"
@@ -547,6 +548,63 @@ func GetAIApp(c *gin.Context) {
 	Success(c, gin.H{"app": app, "versions": versions})
 }
 
+// DeleteAIApp removes an owner-owned agent and its app-scoped records. Workflow
+// apps mirror legacy workflow definitions and must continue to be deleted from
+// the workflow surface instead.
+func DeleteAIApp(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	app, found := findAIApp(c, userID)
+	if !found {
+		return
+	}
+	if app.Type != aiAppTypeAgent {
+		Error(c, http.StatusBadRequest, "工作流请在工作流页面删除")
+		return
+	}
+
+	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		var versionIDs []model.Int64String
+		if err := tx.Model(&model.AIAppVersion{}).Where("app_id = ?", app.ID).Pluck("id", &versionIDs).Error; err != nil {
+			return err
+		}
+		if len(versionIDs) > 0 {
+			if err := tx.Where("app_version_id IN ?", versionIDs).Delete(&model.AIAppVersionKnowledgeBase{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("app_version_id IN ?", versionIDs).Delete(&model.AIAppVersionToolBinding{}).Error; err != nil {
+				return err
+			}
+		}
+		for _, item := range []any{
+			&model.AIAppConversationToolTrace{},
+			&model.AIAppConversationMessage{},
+			&model.AIAppConversation{},
+			&model.AIAppRun{},
+			&model.AIAppPublicInvocation{},
+			&model.AIAPIKeyAppBinding{},
+			&model.AIAppKnowledgeBase{},
+		} {
+			if err := tx.Where("app_id = ?", app.ID).Delete(item).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("app_id = ?", app.ID).Delete(&model.AIAppVersion{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ? AND user_id = ?", app.ID, userID).Delete(&model.AIApp{}).Error
+	}); err != nil {
+		Error(c, http.StatusInternalServerError, "删除智能体失败")
+		return
+	}
+	if app.AvatarStorageKey != "" {
+		_ = deleteManagedAIAppAvatar(c.Request.Context(), app.AvatarStorageKey)
+	}
+	Success(c, gin.H{})
+}
+
 func SaveAIAppVersion(c *gin.Context) {
 	userID, ok := currentAIAppUser(c)
 	if !ok {
@@ -817,6 +875,9 @@ func debugAIAppWithTools(c *gin.Context, stream bool, invocation aimodel.Invocat
 }
 
 func retrieveAIKnowledgeContext(ctx context.Context, userID model.Int64String, version model.AIAppVersion, message string) (string, []aiKnowledgeReference, error) {
+	if !shouldRetrieveAIKnowledge(message) {
+		return "", nil, nil
+	}
 	db := database.GetDB()
 	if db == nil {
 		return "", nil, nil
@@ -868,6 +929,22 @@ func retrieveAIKnowledgeContext(ctx context.Context, userID model.Int64String, v
 		}
 	}
 	return strings.TrimSpace(contextBuilder.String()), references, nil
+}
+
+func shouldRetrieveAIKnowledge(message string) bool {
+	var normalized strings.Builder
+	for _, character := range strings.ToLower(strings.TrimSpace(message)) {
+		if unicode.IsLetter(character) || unicode.IsDigit(character) {
+			normalized.WriteRune(character)
+		}
+	}
+
+	switch normalized.String() {
+	case "hi", "hello", "hey", "hihi", "hellohello", "你好", "您好", "嗨", "哈喽", "哈囉", "在吗", "在么", "有人吗", "早上好", "下午好", "晚上好", "你好吗":
+		return false
+	default:
+		return true
+	}
 }
 
 func searchAIKnowledgeChunks(ctx context.Context, userID model.Int64String, knowledgeBaseIDs []model.Int64String, config aiAppRetrievalConfig, query string) ([]aiKnowledgeSearchRow, error) {
@@ -1615,22 +1692,65 @@ func UploadAIKnowledgeDocument(c *gin.Context) {
 		Error(c, 400, "文档没有可解析文本")
 		return
 	}
-	chunks := splitKnowledgeText(text)
-	if len(chunks) == 0 || len(chunks) > knowledgeChunkMaxCount {
-		Error(c, 400, "文档分段数量超出限制")
+	document, err := createAIKnowledgeTextDocument(
+		database.GetDB(),
+		userID,
+		model.Int64String(id),
+		file.Filename,
+		text,
+		file.Header.Get("Content-Type"),
+		file.Size,
+	)
+	if err != nil {
+		Error(c, 500, "保存知识库文档失败")
 		return
 	}
+	scheduleAIKnowledgeDocumentIndexing(document.ID)
+	Success(c, gin.H{"document": presentAIKnowledgeDocument(document)})
+}
+
+// createAIKnowledgeTextDocument is shared by manual uploads and workflow
+// output ingestion. It persists the same pending_embedding document contract
+// so both paths use one chunking and background-indexing pipeline.
+func createAIKnowledgeTextDocument(
+	db *gorm.DB,
+	userID model.Int64String,
+	knowledgeBaseID model.Int64String,
+	name string,
+	text string,
+	mimeType string,
+	sizeBytes int64,
+) (model.AIKnowledgeDocument, error) {
+	if db == nil {
+		return model.AIKnowledgeDocument{}, errors.New("知识库数据库不可用")
+	}
+	name = strings.TrimSpace(name)
+	text = strings.TrimSpace(text)
+	if name == "" || len(name) > 255 {
+		return model.AIKnowledgeDocument{}, errors.New("知识库文档名称无效")
+	}
+	if text == "" || len([]byte(text)) > knowledgeDocumentMaxBytes {
+		return model.AIKnowledgeDocument{}, errors.New("知识库文档内容大小无效")
+	}
+	var base model.AIKnowledgeBase
+	if err := db.Where("id = ? AND user_id = ?", knowledgeBaseID, userID).First(&base).Error; err != nil {
+		return model.AIKnowledgeDocument{}, err
+	}
+	chunks := splitKnowledgeText(text)
+	if len(chunks) == 0 || len(chunks) > knowledgeChunkMaxCount {
+		return model.AIKnowledgeDocument{}, errors.New("文档分段数量超出限制")
+	}
 	document := model.AIKnowledgeDocument{
-		KnowledgeBaseID: model.Int64String(id),
+		KnowledgeBaseID: knowledgeBaseID,
 		UserID:          userID,
-		Name:            file.Filename,
+		Name:            name,
 		Status:          "pending_embedding",
 		ChunkCount:      len(chunks),
-		MimeType:        file.Header.Get("Content-Type"),
-		SizeBytes:       file.Size,
+		MimeType:        mimeType,
+		SizeBytes:       sizeBytes,
 		ParsedText:      text,
 	}
-	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+	if err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&document).Error; err != nil {
 			return err
 		}
@@ -1646,11 +1766,9 @@ func UploadAIKnowledgeDocument(c *gin.Context) {
 		}
 		return tx.Create(&rows).Error
 	}); err != nil {
-		Error(c, 500, "保存知识库文档失败")
-		return
+		return model.AIKnowledgeDocument{}, err
 	}
-	scheduleAIKnowledgeDocumentIndexing(document.ID)
-	Success(c, gin.H{"document": presentAIKnowledgeDocument(document)})
+	return document, nil
 }
 
 func RetryAIKnowledgeDocument(c *gin.Context) {

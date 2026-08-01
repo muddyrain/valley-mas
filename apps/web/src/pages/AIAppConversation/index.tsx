@@ -1,27 +1,32 @@
 import { gsap } from 'gsap';
 import {
   ArrowLeft,
+  BrainCircuit,
   Check,
   ChevronDown,
+  ChevronRight,
   Ellipsis,
   History,
   MessageCirclePlus,
   MessageSquareText,
-  PanelRightClose,
-  PanelRightOpen,
   Save,
   Search,
   Send,
   Settings2,
   Trash2,
   UserRound,
+  Wrench,
   X,
 } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { type AvailableAIModel, listAvailableAIModels } from '@/api/ai';
-import { type AIImageGeneration, getAIImageGeneration } from '@/api/aiImages';
+import {
+  type AIImageGeneration,
+  getAIImageGeneration,
+  saveAIImageGenerationResource,
+} from '@/api/aiImages';
 import {
   type AgentConfig,
   type AIApp,
@@ -48,13 +53,20 @@ import {
   type ConversationComposerReferenceImage,
 } from '@/components/ai/ConversationComposer';
 import { ConversationMessageBubble } from '@/components/ai/ConversationMessageBubble';
+import {
+  SaveResourceDialog,
+  type SaveResourceVisibility,
+} from '@/components/ai/SaveResourceDialog';
 import { AIImageGenerationImage } from '@/components/ai-images/AIImageGenerationImage';
+import { AIImageResultActions } from '@/components/ai-images/AIImageResultActions';
 import { GenerationPreview } from '@/components/ai-images/GenerationOverlay';
 import { AgentAvatar } from '@/components/ai-workbench/AgentAvatar';
 import { AIResponseContext } from '@/components/ai-workbench/AIResponseContext';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import ImagePreviewDialog from '@/components/ImagePreviewDialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Dialog,
   DialogContent,
@@ -94,6 +106,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import {
+  buildAssistantExecutionSteps,
+  formatAssistantExecution,
+  formatAssistantToolName,
+  hasAssistantExecutionDetails,
+  shouldShowAssistantExecutionReferences,
+} from '@/pages/AIAppConversation/execution';
+import { loadAvailableConversationImages } from '@/pages/AIAppConversation/history';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const quickPrompts = [
   '介绍一下你的能力',
@@ -113,6 +134,7 @@ const defaultConfig: AgentConfig = {
 type ConversationStreamState = {
   reply: string;
   toolStatus: string | null;
+  toolName: string | null;
   imageGenerating: boolean;
 };
 
@@ -133,6 +155,7 @@ function parseAgentConfig(version?: AIAppVersion): AgentConfig {
     const parsed = JSON.parse(version?.config || '{}') as Partial<AgentConfig>;
     return {
       modelProfile: 'ark-text-default',
+      modelId: typeof parsed.modelId === 'string' ? parsed.modelId : undefined,
       systemPrompt: typeof parsed.systemPrompt === 'string' ? parsed.systemPrompt : '',
       openingMessage: typeof parsed.openingMessage === 'string' ? parsed.openingMessage : '',
       exampleQuestions: Array.isArray(parsed.exampleQuestions)
@@ -205,11 +228,89 @@ function formatRunFailure(run: AIAppRun) {
   }
 }
 
+function AssistantExecutionHeader({
+  run,
+  traces,
+  references,
+  onReferenceOpen,
+}: {
+  run: AIAppRun | null;
+  traces: AIAppConversationToolTrace[];
+  references: AIKnowledgeReference[];
+  onReferenceOpen: (reference: AIKnowledgeReference) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const visibleReferences = shouldShowAssistantExecutionReferences(run, references)
+    ? references
+    : [];
+  const hasDetails = hasAssistantExecutionDetails(run, traces, visibleReferences);
+  const executionSteps = buildAssistantExecutionSteps(traces);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="group flex w-full items-center gap-1.5 border-b border-border/70 pb-2.5 text-left text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset">
+        <span>{formatAssistantExecution(run)}</span>
+        {hasDetails ? (
+          <ChevronRight
+            className={cn(
+              'size-3.5 transition-transform duration-200 ease-out',
+              open && 'rotate-90',
+            )}
+          />
+        ) : null}
+      </CollapsibleTrigger>
+      {hasDetails ? (
+        <CollapsibleContent className="space-y-3 border-b border-border/70 py-2.5">
+          <ol className="space-y-3 text-xs">
+            {executionSteps.map((step) => (
+              <li key={step.id} className="flex gap-2.5">
+                <span
+                  className={cn(
+                    'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full',
+                    step.failed
+                      ? 'bg-destructive/10 text-destructive'
+                      : step.kind === 'thinking'
+                        ? 'bg-primary/10 text-primary'
+                        : 'bg-muted text-muted-foreground',
+                  )}
+                >
+                  {step.kind === 'thinking' ? (
+                    <BrainCircuit className="size-3" />
+                  ) : step.kind === 'tool' ? (
+                    <Wrench className="size-3" />
+                  ) : (
+                    <Check className="size-3" />
+                  )}
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-medium text-foreground">{step.label}</span>
+                  <span className="mt-0.5 block text-muted-foreground">{step.detail}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+          {visibleReferences.length > 0 ? (
+            <AIResponseContext
+              className={traces.length > 0 ? 'mt-3' : undefined}
+              references={visibleReferences}
+              onReferenceOpen={onReferenceOpen}
+              presentation="workspace"
+              showProcess={false}
+            />
+          ) : null}
+        </CollapsibleContent>
+      ) : null}
+    </Collapsible>
+  );
+}
+
 function ConversationModelControl({
   value,
+  defaultValue,
   onValueChange,
 }: {
   value: string;
+  defaultValue?: string;
   onValueChange: (modelID: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -241,6 +342,7 @@ function ConversationModelControl({
 
   const selected = models.find((item) => item.id === value);
   const label = selected?.displayName || (loading ? '正在加载模型' : '选择模型');
+  const isTemporaryOverride = Boolean(defaultValue && value && value !== defaultValue);
 
   useEffect(() => {
     if (!value && models[0]) onValueChange(models[0].id);
@@ -257,7 +359,10 @@ function ConversationModelControl({
             className="h-8 rounded-full px-3 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label="选择对话模型"
           >
-            <span className="max-w-44 truncate">{label}</span>
+            <span className="max-w-44 truncate">
+              {label}
+              {isTemporaryOverride ? ' · 临时' : ''}
+            </span>
             <ChevronDown className="size-3.5" />
           </Button>
         }
@@ -320,7 +425,7 @@ function ConversationContentSkeleton() {
   return (
     <>
       <div className="min-h-0 flex-1 overflow-hidden" aria-hidden="true">
-        <div className="mx-auto flex min-h-full w-full max-w-[46rem] flex-col gap-7 px-6 py-10 sm:px-8 lg:py-12">
+        <div className="mx-auto flex min-h-full w-full max-w-[54rem] flex-col gap-6 px-6 py-8 sm:px-8 lg:py-10">
           <div className="flex items-start justify-end gap-3">
             <div className="w-48 max-w-[70%] rounded-xl bg-muted/60 px-4 py-4">
               <Skeleton className="h-4 w-full rounded-full" />
@@ -350,7 +455,7 @@ function ConversationContentSkeleton() {
           </div>
         </div>
       </div>
-      <div className="mx-auto w-full max-w-[46rem] px-5 pb-6 pt-3 sm:px-8" aria-hidden="true">
+      <div className="mx-auto w-full max-w-[54rem] px-5 pb-6 pt-3 sm:px-8" aria-hidden="true">
         <div className="rounded-xl border border-border bg-card px-4 pt-4 shadow-sm">
           <div className="space-y-2 pb-8">
             <Skeleton className="h-4 w-2/3 rounded-full" />
@@ -402,7 +507,7 @@ function AIAppConversationSkeleton() {
         </aside>
         <section className="flex min-h-0 flex-col">
           <div className="flex min-h-0 flex-1 items-center overflow-hidden">
-            <div className="mx-auto flex w-full max-w-[46rem] flex-col gap-5 px-6 py-10 sm:px-8">
+            <div className="mx-auto flex w-full max-w-[54rem] flex-col gap-5 px-6 py-10 sm:px-8">
               <div className="space-y-3">
                 <Skeleton className="h-8 w-80 max-w-full rounded-md" />
                 <Skeleton className="h-4 w-[34rem] max-w-full rounded-full" />
@@ -440,6 +545,7 @@ export default function AIAppConversationPage() {
   const { appId, conversationId } = useParams<{ appId: string; conversationId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const currentUser = useAuthStore((state) => state.user);
   const [conversations, setConversations] = useState<AIAppConversation[]>([]);
   const [app, setApp] = useState<AIApp | null>(null);
   const [conversation, setConversation] = useState<AIAppConversation | null>(null);
@@ -448,12 +554,17 @@ export default function AIAppConversationPage() {
   const [messages, setMessages] = useState<AIAppConversationMessage[]>([]);
   const [toolTraces, setToolTraces] = useState<AIAppConversationToolTrace[]>([]);
   const [runs, setRuns] = useState<AIAppRun[]>([]);
-  const [references, setReferences] = useState<AIKnowledgeReference[]>([]);
+  const [referencesByRunId, setReferencesByRunId] = useState<
+    Record<string, AIKnowledgeReference[]>
+  >({});
   const [input, setInput] = useState('');
   const [referenceImages, setReferenceImages] = useState<ConversationComposerReferenceImage[]>([]);
   const [skills, setSkills] = useState<AISkill[]>([]);
   const [activeSkillIds, setActiveSkillIds] = useState<string[]>([]);
   const [imageGenerations, setImageGenerations] = useState<Record<string, AIImageGeneration>>({});
+  const [imagePreview, setImagePreview] = useState<{ src: string; title: string } | null>(null);
+  const [saveTarget, setSaveTarget] = useState<AIImageGeneration | null>(null);
+  const [savingImageResourceId, setSavingImageResourceId] = useState<string | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [conversationLoading, setConversationLoading] = useState(false);
   const [conversationStreams, setConversationStreams] = useState<
@@ -479,13 +590,16 @@ export default function AIAppConversationPage() {
   activeConversationIdRef.current = conversationId;
 
   const activeStream = conversationId ? conversationStreams[conversationId] : undefined;
+  const activeToolName = activeStream?.toolName ?? null;
   const sending = Boolean(activeStream);
-  const streamingReply = activeStream?.reply || '';
-  const toolStatus = activeStream?.toolStatus || null;
   const conversationConfig = parseAgentConfig(
     versions.find((item) => item.id === conversation?.versionId),
   );
   const boundSkills = skills.filter((skill) => conversationConfig.skillIds.includes(skill.id));
+
+  useEffect(() => {
+    setTextModelId(conversationConfig.modelId || '');
+  }, [conversationConfig.modelId]);
 
   useEffect(() => {
     let active = true;
@@ -510,10 +624,12 @@ export default function AIAppConversationPage() {
     const pending = generationIds.filter((id) => !imageGenerations[id]);
     if (pending.length === 0) return;
     let active = true;
-    void Promise.all(
-      pending.map((id) => getAIImageGeneration(id).then((result) => result.generation)),
+    void loadAvailableConversationImages(
+      pending,
+      async (id) => (await getAIImageGeneration(id)).generation,
     )
       .then((items) => {
+        if (items.length === 0) return;
         if (!active) return;
         setImageGenerations((current) => ({
           ...current,
@@ -618,7 +734,7 @@ export default function AIAppConversationPage() {
     } else {
       setConversationLoading(true);
     }
-    setReferences([]);
+    setReferencesByRunId({});
     getAIAppConversation(appId, conversationId)
       .then((result) => {
         if (!active) return;
@@ -627,6 +743,7 @@ export default function AIAppConversationPage() {
         setMessages(result.messages);
         setToolTraces(result.toolTraces);
         setRuns(result.runs);
+        setReferencesByRunId(result.referencesByRunId);
       })
       .catch((error) => {
         if (!active) return;
@@ -646,36 +763,38 @@ export default function AIAppConversationPage() {
   useEffect(() => {
     if (initialLoading || !conversation || messages.length > 0 || !welcomeRef.current) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const welcome = welcomeRef.current;
     const context = gsap.context(() => {
+      const select = gsap.utils.selector(welcome);
+      const intro = select('[data-agent-reveal="intro"]');
+      const quickStart = select('[data-agent-reveal="quick-start"]');
+      const composer = select('[data-agent-reveal="composer"]');
+      const quickPrompts = select('[data-agent-quick-prompt]');
       const timeline = gsap.timeline({
         defaults: { duration: 0.52, ease: 'power2.out' },
       });
-      timeline
-        .fromTo(
-          '[data-agent-reveal="intro"]',
-          { autoAlpha: 0, y: 18 },
-          { autoAlpha: 1, y: 0, clearProps: 'all' },
-        )
-        .fromTo(
-          '[data-agent-reveal="meta"]',
+      if (intro.length) {
+        timeline.fromTo(intro, { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, clearProps: 'all' });
+      }
+      if (quickStart.length) {
+        timeline.fromTo(
+          quickStart,
           { autoAlpha: 0, y: 14 },
           { autoAlpha: 1, y: 0, clearProps: 'all' },
           '-=0.32',
-        )
-        .fromTo(
-          '[data-agent-reveal="composer"]',
+        );
+      }
+      if (composer.length) {
+        timeline.fromTo(
+          composer,
           { autoAlpha: 0, scale: 0.985, y: 12 },
           { autoAlpha: 1, scale: 1, y: 0, clearProps: 'all' },
           '-=0.3',
-        )
-        .fromTo(
-          '[data-agent-reveal="quick-start"]',
-          { autoAlpha: 0, y: 10 },
-          { autoAlpha: 1, y: 0, clearProps: 'all' },
-          '-=0.28',
-        )
-        .fromTo(
-          '[data-agent-quick-prompt]',
+        );
+      }
+      if (quickPrompts.length) {
+        timeline.fromTo(
+          quickPrompts,
           { autoAlpha: 0, y: 12 },
           {
             autoAlpha: 1,
@@ -686,7 +805,8 @@ export default function AIAppConversationPage() {
           },
           '-=0.32',
         );
-    }, welcomeRef);
+      }
+    }, welcome);
     return () => context.revert();
   }, [conversation, initialLoading, messages.length]);
 
@@ -822,17 +942,35 @@ export default function AIAppConversationPage() {
     setSettingsOpen(true);
   };
 
-  const send = async () => {
+  const saveGenerationToResources = async (visibility: SaveResourceVisibility) => {
+    if (!saveTarget) return;
+    try {
+      setSavingImageResourceId(saveTarget.id);
+      const result = await saveAIImageGenerationResource(saveTarget.id, { visibility });
+      setImageGenerations((items) => ({
+        ...items,
+        [saveTarget.id]: { ...saveTarget, resourceId: result.resource.id },
+      }));
+      setSaveTarget(null);
+      toast.success(visibility === 'public' ? '已保存并公开访问' : '已保存到私有资源库');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '保存到资源库失败'));
+    } finally {
+      setSavingImageResourceId(null);
+    }
+  };
+
+  const send = async (contentOverride?: string) => {
     const targetConversationId = conversationId;
+    const content = (contentOverride ?? input).trim();
     if (
       !appId ||
       !targetConversationId ||
-      !input.trim() ||
+      !content ||
       !textModelId ||
       streamControllersRef.current.has(targetConversationId)
     )
       return;
-    const content = input.trim();
     const currentReferenceImages = referenceImages;
     const currentActiveSkillIds = activeSkillIds;
     const localUserMessage: AIAppConversationMessage = {
@@ -848,10 +986,14 @@ export default function AIAppConversationPage() {
     setReferenceImages([]);
     setActiveSkillIds([]);
     setMessages((items) => [...items, localUserMessage]);
-    setReferences([]);
     setConversationStreams((items) => ({
       ...items,
-      [targetConversationId]: { reply: '', toolStatus: null, imageGenerating: false },
+      [targetConversationId]: {
+        reply: '',
+        toolStatus: null,
+        toolName: null,
+        imageGenerating: false,
+      },
     }));
     const controller = new AbortController();
     streamControllersRef.current.set(targetConversationId, controller);
@@ -892,6 +1034,7 @@ export default function AIAppConversationPage() {
                 ...items,
                 [targetConversationId]: {
                   ...current,
+                  toolName: name,
                   toolStatus:
                     name === 'content.search'
                       ? '正在搜索内容'
@@ -903,6 +1046,18 @@ export default function AIAppConversationPage() {
               };
             }),
           onToolResult: (name, ok) => {
+            setToolTraces((items) => [
+              ...items,
+              {
+                id: `local-tool-${targetConversationId}-${name}-${Date.now()}`,
+                conversationId: targetConversationId,
+                runId: 'pending',
+                toolName: name,
+                status: ok ? 'succeeded' : 'failed',
+                durationMs: 0,
+                createdAt: new Date().toISOString(),
+              },
+            ]);
             setConversationStreams((items) => {
               const current = items[targetConversationId];
               if (!current) return items;
@@ -910,6 +1065,7 @@ export default function AIAppConversationPage() {
                 ...items,
                 [targetConversationId]: {
                   ...current,
+                  toolName: name,
                   toolStatus:
                     name === 'content.search' ? (ok ? '内容搜索完成' : '内容搜索失败') : null,
                   imageGenerating: name === 'image.generate' ? false : current.imageGenerating,
@@ -936,7 +1092,10 @@ export default function AIAppConversationPage() {
                 result.assistantMessage,
               ]);
               upsertRun(result.run);
-              setReferences(result.references);
+              setReferencesByRunId((items) => ({
+                ...items,
+                [result.run.id]: result.references,
+              }));
             }
           },
           onError: ({ message, run, userMessage }) => {
@@ -1003,19 +1162,25 @@ export default function AIAppConversationPage() {
       skills={boundSkills}
       activeSkillId={activeSkillIds[0]}
       onActiveSkillChange={(skillId) => setActiveSkillIds(skillId ? [skillId] : [])}
+      emptySkillAction={{ onClick: () => navigate(`/workbench/apps/${appId}/settings`) }}
       referenceImages={referenceImages}
       onReferenceImagesChange={setReferenceImages}
       footer={
         <>
-          <ConversationModelControl value={textModelId} onValueChange={setTextModelId} />
+          <ConversationModelControl
+            value={textModelId}
+            defaultValue={conversationConfig.modelId}
+            onValueChange={setTextModelId}
+          />
           <span className="hidden text-xs text-muted-foreground sm:inline">
             Enter 发送 · Shift + Enter 换行
           </span>
         </>
       }
       onStop={stop}
-      className={cn('max-w-[42rem]', className)}
+      className={cn('max-w-[60rem]', className)}
       revealAttribute="composer"
+      presentation="workspace"
     />
   );
 
@@ -1124,38 +1289,38 @@ export default function AIAppConversationPage() {
             ) : null}
           </div>
           <ScrollArea className="mt-2 min-h-36 flex-1">
-            <div className="flex flex-col gap-1.5 pr-2">
+            <div className="flex flex-col gap-2 pr-2">
               {visibleConversations.map((item) => (
                 <div
                   key={item.id}
                   className={cn(
-                    'group relative flex min-h-14 items-center rounded-lg border border-transparent transition-colors hover:bg-sidebar-accent focus-within:bg-sidebar-accent',
+                    'group relative flex min-h-[4.25rem] items-center rounded-xl border border-transparent transition-[background-color,border-color,box-shadow] hover:border-sidebar-border hover:bg-sidebar-accent/70 focus-within:border-sidebar-ring/30 focus-within:bg-sidebar-accent',
                     item.id === conversationId &&
-                      'border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground shadow-xs before:absolute before:inset-y-3 before:left-0 before:w-0.5 before:rounded-full before:bg-primary',
+                      'border-primary/20 bg-primary/5 text-sidebar-accent-foreground shadow-xs before:absolute before:inset-y-3 before:left-0 before:w-0.5 before:rounded-r-full before:bg-primary',
                   )}
                 >
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto min-w-0 flex-1 justify-start gap-2.5 bg-transparent px-2.5 py-2 text-left font-normal hover:bg-transparent"
+                    className="h-auto min-w-0 flex-1 justify-start gap-3 bg-transparent px-3 py-2.5 text-left font-normal hover:bg-transparent"
                     onClick={() => navigate(`/workbench/apps/${appId}/conversations/${item.id}`)}
                     aria-current={item.id === conversationId ? 'page' : undefined}
                   >
                     <span
                       className={cn(
-                        'flex size-8 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground ring-1 ring-border/70',
-                        item.id === conversationId && 'text-foreground',
+                        'flex size-9 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground ring-1 ring-border/70 transition-colors',
+                        item.id === conversationId && 'bg-primary/10 text-primary ring-primary/20',
                       )}
                     >
                       <MessageSquareText className="size-4" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex min-w-0 items-center gap-1.5">
-                        <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[-0.01em]">
                           {item.title}
                         </span>
                       </span>
-                      <span className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                         {conversationStreams[item.id] ? (
                           <span className="inline-flex items-center gap-1.5 text-foreground">
                             <span className="size-1.5 rounded-full bg-primary motion-safe:animate-pulse" />
@@ -1165,12 +1330,7 @@ export default function AIAppConversationPage() {
                           formatConversationUpdatedAt(item.updatedAt)
                         )}
                         {item.id === conversationId ? (
-                          <Badge
-                            variant="secondary"
-                            className="h-4 shrink-0 px-1 text-[9px] leading-none"
-                          >
-                            当前
-                          </Badge>
+                          <span className="shrink-0 font-medium text-primary">当前</span>
                         ) : null}
                       </span>
                     </span>
@@ -1181,7 +1341,10 @@ export default function AIAppConversationPage() {
                         <Button
                           size="icon-xs"
                           variant="ghost"
-                          className="mr-1 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                          className={cn(
+                            'mr-1 shrink-0 opacity-45 transition-opacity hover:opacity-100 focus-visible:opacity-100',
+                            item.id === conversationId && 'opacity-70',
+                          )}
                           aria-label="会话操作"
                           title="会话操作"
                         >
@@ -1250,188 +1413,254 @@ export default function AIAppConversationPage() {
           ) : (
             <>
               <div className="min-h-0 flex-1 overflow-y-auto">
-                <div className="mx-auto flex min-h-full w-full max-w-[46rem] flex-col gap-7 px-6 py-10 sm:px-8 lg:py-12">
+                <div className="mx-auto flex min-h-full w-full max-w-[64rem] flex-col gap-7 px-6 py-8 sm:px-8 lg:py-10">
                   {messages.length === 0 ? (
                     <div
                       ref={welcomeRef}
-                      className="flex w-full max-w-[42rem] flex-1 flex-col items-start justify-center gap-5 py-10 text-left sm:py-14"
+                      className="flex w-full max-w-[52rem] flex-1 flex-col items-center justify-center py-10 text-center sm:py-14"
                     >
-                      <div data-agent-reveal="intro">
-                        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                      <div className="max-w-2xl" data-agent-reveal="intro">
+                        <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
                           你好，我是 {app?.name || '智能体'}
                         </h2>
-                        <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
                           {conversationConfig.openingMessage || '有什么想一起完成的？'}
                         </p>
                       </div>
                       <div
-                        className="grid w-full grid-cols-2 overflow-hidden rounded-lg border border-border bg-card text-left shadow-xs sm:grid-cols-3"
-                        data-agent-reveal="meta"
+                        className="mt-6 flex max-w-[64rem] flex-wrap justify-center gap-2"
+                        data-agent-reveal="quick-start"
                       >
-                        <div className="border-b border-border px-3 py-3 sm:border-b-0 sm:border-r">
-                          <p className="text-xs text-muted-foreground">智能体</p>
-                          <p className="mt-1 truncate text-sm font-medium">
-                            {app?.name || '当前智能体'}
-                          </p>
-                        </div>
-                        <div className="border-r border-border px-3 py-3">
-                          <p className="text-xs text-muted-foreground">会话</p>
-                          <p className="mt-1 truncate text-sm font-medium">{conversation.title}</p>
-                        </div>
-                        <div className="px-3 py-3">
-                          <p className="text-xs text-muted-foreground">访问范围</p>
-                          <p className="mt-1 text-sm font-medium">仅自己可见</p>
-                        </div>
+                        {boundSkills.length > 0
+                          ? boundSkills.slice(0, 5).map((skill) => (
+                              <Button
+                                key={skill.id}
+                                size="sm"
+                                variant={activeSkillIds[0] === skill.id ? 'secondary' : 'outline'}
+                                className="rounded-lg font-normal"
+                                onClick={() => setActiveSkillIds([skill.id])}
+                                data-agent-quick-prompt
+                              >
+                                {skill.name}
+                              </Button>
+                            ))
+                          : starterQuestions.map((prompt) => (
+                              <Button
+                                key={prompt}
+                                size="sm"
+                                variant={input === prompt ? 'secondary' : 'outline'}
+                                className="h-auto max-w-full min-w-0 rounded-lg px-3 py-2 text-left font-normal whitespace-normal transition-colors"
+                                onClick={() => setInput(prompt)}
+                                data-agent-quick-prompt
+                              >
+                                {prompt}
+                              </Button>
+                            ))}
                       </div>
-                      {conversationComposer('mt-1')}
-                      <div className="w-full pt-1 text-left">
-                        <div
-                          className="mb-2 flex items-center justify-between"
-                          data-agent-reveal="quick-start"
-                        >
-                          <p className="text-sm font-medium">快速开始</p>
-                          <span className="text-xs text-muted-foreground">选择一个任务</span>
-                        </div>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {starterQuestions.map((prompt) => (
-                            <Button
-                              key={prompt}
-                              size="sm"
-                              variant={input === prompt ? 'secondary' : 'outline'}
-                              className="h-auto min-h-16 min-w-0 justify-start overflow-hidden rounded-lg px-3 py-3 text-left leading-5 font-normal whitespace-normal break-words transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-sm"
-                              onClick={() => setInput(prompt)}
-                              data-agent-quick-prompt
-                            >
-                              {prompt}
-                            </Button>
-                          ))}
-                        </div>
+                      <div
+                        className="relative mt-10 w-full max-w-[60rem]"
+                        data-agent-reveal="composer"
+                      >
+                        <AgentAvatar
+                          name={app?.name || '智能体'}
+                          src={app?.avatarUrl}
+                          className="absolute -top-12 left-1/2 z-10 size-16 -translate-x-1/2 border-4 border-background shadow-sm"
+                        />
+                        {conversationComposer()}
                       </div>
                     </div>
                   ) : (
                     <>
-                      {messages.map((message) => {
+                      {messages.map((message, index) => {
                         const run = message.runId
-                          ? runs.find((item) => item.id === message.runId)
+                          ? (runs.find((item) => item.id === message.runId) ?? null)
                           : null;
                         const failedRun = run && run.status !== 'succeeded' ? run : null;
                         return (
                           <Fragment key={message.id}>
-                            <div
-                              className={cn(
-                                'flex items-start gap-3',
-                                message.role === 'user' && 'flex-row-reverse',
-                              )}
-                            >
-                              {message.role === 'user' ? (
-                                <Avatar>
-                                  <AvatarFallback>
-                                    <UserRound />
-                                  </AvatarFallback>
-                                </Avatar>
-                              ) : (
-                                <AgentAvatar name={app?.name || '智能体'} src={app?.avatarUrl} />
-                              )}
-                              <ConversationMessageBubble
-                                role={message.role}
-                                content={message.content}
-                                createdAt={message.createdAt}
-                                footer={
-                                  message.role === 'user' && message.referenceImageCount > 0 ? (
-                                    <Badge variant="secondary" className="font-normal">
-                                      附加 {message.referenceImageCount} 张参考图
-                                    </Badge>
-                                  ) : undefined
-                                }
-                              />
-                            </div>
-                            {message.role === 'assistant'
-                              ? parseImageGenerationIDs(message.imageGenerationIds).map(
-                                  (generationID) => {
-                                    const generation = imageGenerations[generationID];
-                                    if (!generation?.resultUrl) return null;
-                                    return (
-                                      <div
-                                        key={generationID}
-                                        className="ml-11 max-w-[min(85%,28rem)] overflow-hidden rounded-xl border border-border bg-card p-2 shadow-xs"
-                                      >
-                                        <AIImageGenerationImage
-                                          generationId={generation.id}
-                                          src={generation.resultUrl}
-                                          alt="智能体生成的图片"
-                                          className="aspect-square w-full rounded-lg object-cover"
-                                        />
-                                        <div className="flex items-center justify-between gap-2 px-1 pt-2 text-xs text-muted-foreground">
-                                          <span>
-                                            智能体生成 · {generation.aspectRatio} ·{' '}
-                                            {generation.quality}
-                                          </span>
-                                          <Button
-                                            size="xs"
-                                            variant="ghost"
-                                            onClick={() => navigate('/workbench/images')}
-                                          >
-                                            继续编辑
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    );
-                                  },
-                                )
-                              : null}
-                            {failedRun ? (
-                              <div className="flex items-start gap-3" role="status">
-                                <AgentAvatar name={app?.name || '智能体'} src={app?.avatarUrl} />
-                                <div className="max-w-[min(85%,42rem)] rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-foreground">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <Badge variant="outline">
-                                      {failedRun.status === 'cancelled' ? '已停止' : '未完成'}
-                                    </Badge>
-                                    {failedRun.errorCode ? (
-                                      <span className="font-mono text-xs text-muted-foreground">
-                                        {failedRun.errorCode}
-                                      </span>
+                            <div className={cn(message.role === 'assistant' && 'space-y-3')}>
+                              <div
+                                className={cn(
+                                  'flex items-start gap-3',
+                                  message.role === 'user' && 'flex-row-reverse',
+                                )}
+                              >
+                                {message.role === 'user' ? (
+                                  <Avatar className="size-8 shrink-0 ring-1 ring-border/70">
+                                    {currentUser?.avatar ? (
+                                      <AvatarImage
+                                        src={currentUser.avatar}
+                                        alt={`${currentUser.nickname || currentUser.username || '用户'}的头像`}
+                                        className="object-cover"
+                                      />
                                     ) : null}
-                                  </div>
-                                  <p className="mt-1">{formatRunFailure(failedRun)}</p>
-                                </div>
+                                    <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
+                                      {currentUser?.nickname?.trim().slice(0, 1) ||
+                                        currentUser?.username?.trim().slice(0, 1) || (
+                                          <UserRound className="size-4" />
+                                        )}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                ) : (
+                                  <AgentAvatar name={app?.name || '智能体'} src={app?.avatarUrl} />
+                                )}
+                                <ConversationMessageBubble
+                                  role={message.role}
+                                  content={message.content}
+                                  createdAt={message.createdAt}
+                                  showActions={index === messages.length - 1}
+                                  presentation="workspace"
+                                  header={
+                                    message.role === 'assistant' ? (
+                                      <AssistantExecutionHeader
+                                        run={run}
+                                        traces={
+                                          run
+                                            ? toolTraces.filter((trace) => trace.runId === run.id)
+                                            : []
+                                        }
+                                        references={run ? referencesByRunId[run.id] || [] : []}
+                                        onReferenceOpen={() => navigate('/workbench/knowledge')}
+                                      />
+                                    ) : undefined
+                                  }
+                                  className={
+                                    message.role === 'assistant'
+                                      ? '!max-w-[min(94%,52rem)]'
+                                      : '!max-w-[min(82%,40rem)]'
+                                  }
+                                  footer={
+                                    message.role === 'user' && message.referenceImageCount > 0 ? (
+                                      <Badge variant="secondary" className="font-normal">
+                                        附加 {message.referenceImageCount} 张参考图
+                                      </Badge>
+                                    ) : undefined
+                                  }
+                                />
                               </div>
-                            ) : null}
+                              {message.role === 'assistant'
+                                ? parseImageGenerationIDs(message.imageGenerationIds).map(
+                                    (generationID) => {
+                                      const generation = imageGenerations[generationID];
+                                      if (!generation?.resultUrl) return null;
+                                      return (
+                                        <div
+                                          key={generationID}
+                                          className="ml-11 w-[calc(100%-2.75rem)] max-w-[42rem] overflow-hidden rounded-xl border border-border bg-card p-2 shadow-xs"
+                                        >
+                                          <button
+                                            type="button"
+                                            className="block w-full cursor-zoom-in overflow-hidden rounded-lg outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.1)]"
+                                            onClick={() =>
+                                              setImagePreview({
+                                                src: generation.resultUrl,
+                                                title: '智能体生成图片预览',
+                                              })
+                                            }
+                                            aria-label="预览智能体生成图片"
+                                          >
+                                            <AIImageGenerationImage
+                                              generationId={generation.id}
+                                              src={generation.resultUrl}
+                                              alt="智能体生成的图片"
+                                              className="w-full object-cover"
+                                              style={{
+                                                aspectRatio: generation.aspectRatio.replace(
+                                                  ':',
+                                                  ' / ',
+                                                ),
+                                              }}
+                                            />
+                                          </button>
+                                          <div className="flex flex-col gap-2 px-1 pt-2 text-xs text-muted-foreground">
+                                            <span>
+                                              智能体生成 · {generation.aspectRatio} ·{' '}
+                                              {generation.quality}
+                                            </span>
+                                            <AIImageResultActions
+                                              onRegenerate={() =>
+                                                void send(
+                                                  '请重新生成刚才这张图片，保持相同的主体、构图和比例。',
+                                                )
+                                              }
+                                              onDownload={() =>
+                                                window.open(
+                                                  generation.resultUrl,
+                                                  '_blank',
+                                                  'noopener,noreferrer',
+                                                )
+                                              }
+                                              onContinueEdit={() => navigate('/workbench/images')}
+                                              onSave={() => setSaveTarget(generation)}
+                                              regenerating={sending}
+                                              saving={savingImageResourceId === generation.id}
+                                              saved={Boolean(generation.resourceId)}
+                                            />
+                                          </div>
+                                        </div>
+                                      );
+                                    },
+                                  )
+                                : null}
+                              {failedRun ? (
+                                <div className="flex items-start gap-3" role="status">
+                                  <AgentAvatar name={app?.name || '智能体'} src={app?.avatarUrl} />
+                                  <div className="max-w-[min(85%,42rem)] rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-foreground">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Badge variant="outline">
+                                        {failedRun.status === 'cancelled' ? '已停止' : '未完成'}
+                                      </Badge>
+                                      {failedRun.errorCode ? (
+                                        <span className="font-mono text-xs text-muted-foreground">
+                                          {failedRun.errorCode}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <p className="mt-1">{formatRunFailure(failedRun)}</p>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
                           </Fragment>
                         );
                       })}
                       {sending ? (
                         <div className="flex items-start gap-3">
                           <AgentAvatar name={app?.name || '智能体'} src={app?.avatarUrl} />
-                          {activeStream?.imageGenerating ? (
-                            <div className="w-[min(100%,20rem)] rounded-xl border border-border/70 bg-card p-3">
-                              <GenerationPreview compact stage="generating" />
+                          <div className="min-w-0 space-y-2 pt-1" role="status">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <BrainCircuit className="size-4 animate-pulse text-primary" />
+                              <span>
+                                {activeToolName === 'image.generate'
+                                  ? '正在生成图片'
+                                  : activeToolName
+                                    ? '正在使用工具'
+                                    : '正在思考'}
+                              </span>
                             </div>
-                          ) : (
-                            <div className="max-w-[min(85%,42rem)] rounded-xl bg-muted px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
-                              {streamingReply || '正在思考…'}
-                            </div>
-                          )}
+                            {activeToolName ? (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Wrench className="size-3.5" />
+                                使用工具：{formatAssistantToolName(activeToolName)}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-muted-foreground">分析请求</div>
+                            )}
+                            {activeStream?.imageGenerating ? (
+                              <div className="w-[min(100%,20rem)] pt-1">
+                                <GenerationPreview compact stage="generating" />
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                       ) : null}
-                      <AIResponseContext
-                        className="ml-11 max-w-[min(85%,42rem)]"
-                        toolStatus={toolStatus}
-                        toolTraces={toolTraces.map((trace) => ({
-                          id: trace.id,
-                          name: trace.toolName,
-                          status: trace.status === 'succeeded' ? 'succeeded' : 'failed',
-                          durationMs: trace.durationMs,
-                        }))}
-                        references={references}
-                      />
                     </>
                   )}
                 </div>
               </div>
               {messages.length > 0 ? (
-                <div className="mx-auto w-full max-w-[46rem] px-5 pb-6 pt-3 sm:px-8">
-                  {conversationComposer()}
+                <div className="shrink-0 bg-background px-5 py-3 sm:px-8 sm:py-4">
+                  <div className="mx-auto w-full max-w-[60rem]">{conversationComposer()}</div>
                 </div>
               ) : null}
             </>
@@ -1547,20 +1776,6 @@ export default function AIAppConversationPage() {
             </div>
           </aside>
         ) : null}
-        <Button
-          variant="outline"
-          size="icon-sm"
-          className={cn(
-            'absolute top-1/2 z-30 hidden -translate-y-1/2 rounded-full bg-background shadow-sm active:not-aria-[haspopup]:!-translate-y-1/2 motion-safe:transition-[right] motion-safe:duration-300 motion-safe:ease-out lg:inline-flex',
-            inspectorOpen ? 'right-[21rem]' : 'right-3',
-          )}
-          onClick={() => setInspectorOpen((current) => !current)}
-          data-agent-inspector-toggle
-          aria-label={inspectorOpen ? '收起配置面板' : '展开配置面板'}
-          title={inspectorOpen ? '收起配置面板' : '展开配置面板'}
-        >
-          {inspectorOpen ? <PanelRightClose /> : <PanelRightOpen />}
-        </Button>
       </div>
       <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
         <SheetContent className="gap-0 p-0 sm:max-w-md">
@@ -1691,6 +1906,22 @@ export default function AIAppConversationPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ImagePreviewDialog
+        open={Boolean(imagePreview)}
+        src={imagePreview?.src}
+        title={imagePreview?.title}
+        onOpenChange={(open) => {
+          if (!open) setImagePreview(null);
+        }}
+      />
+      <SaveResourceDialog
+        open={Boolean(saveTarget)}
+        onOpenChange={(open) => {
+          if (!open && !savingImageResourceId) setSaveTarget(null);
+        }}
+        pending={Boolean(savingImageResourceId)}
+        onConfirm={saveGenerationToResources}
+      />
       <Drawer
         open={mobileActionsOpen}
         onOpenChange={setMobileActionsOpen}

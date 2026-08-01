@@ -190,7 +190,25 @@ func GetAIAppConversation(c *gin.Context) {
 		Error(c, 500, "加载会话运行记录失败")
 		return
 	}
-	Success(c, gin.H{"conversation": conversation, "messages": messages, "toolTraces": traces, "runs": runs})
+	Success(c, gin.H{
+		"conversation":      conversation,
+		"messages":          messages,
+		"toolTraces":        traces,
+		"runs":              runs,
+		"referencesByRunId": aiAppConversationReferencesByRunID(runs),
+	})
+}
+
+func aiAppConversationReferencesByRunID(runs []model.AIAppRun) map[string][]aiKnowledgeReference {
+	referencesByRunID := make(map[string][]aiKnowledgeReference)
+	for _, run := range runs {
+		var references []aiKnowledgeReference
+		if json.Unmarshal([]byte(run.References), &references) != nil || len(references) == 0 {
+			continue
+		}
+		referencesByRunID[run.ID.String()] = references
+	}
+	return referencesByRunID
 }
 
 func writeAIAppConversationFailure(
@@ -280,8 +298,8 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	// same bounded request envelope as the image studio while never persisting
 	// the raw attachment.
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 22<<20)
-	if c.ShouldBindJSON(&payload) != nil || strings.TrimSpace(payload.Message) == "" || strings.TrimSpace(payload.ModelID) == "" {
-		Error(c, 400, "请输入消息并选择文本模型")
+	if c.ShouldBindJSON(&payload) != nil || strings.TrimSpace(payload.Message) == "" {
+		Error(c, 400, "请输入消息")
 		return
 	}
 	message := truncateAIAgentRunes(payload.Message, 12000)
@@ -325,6 +343,14 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		fail(400, "APP_CONFIG_INVALID", "智能体版本配置无效", errors.New("invalid AI App version config"))
 		return
 	}
+	selectedModelID := strings.TrimSpace(payload.ModelID)
+	if selectedModelID == "" {
+		selectedModelID = config.ModelID
+	}
+	if selectedModelID == "" {
+		fail(http.StatusBadRequest, "MODEL_NOT_SELECTED", "请先为智能体选择默认模型或在会话中临时选择模型", errors.New("no default model configured"))
+		return
+	}
 	styleProfileID, styleErr := selectedAIAppImageStyle(config, payload.ActiveSkillIDs)
 	if styleErr != nil {
 		fail(http.StatusBadRequest, "SKILL_SELECTION_INVALID", styleErr.Error(), styleErr)
@@ -335,7 +361,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		fail(http.StatusBadRequest, "APP_SKILLS_UNAVAILABLE", "已绑定技能不可用", skillErr)
 		return
 	}
-	invocation, invocationErr := aimodel.ResolveInvocation(database.GetDB(), payload.ModelID, "text", 60*time.Second)
+	invocation, invocationErr := aimodel.ResolveInvocation(database.GetDB(), selectedModelID, "text", 60*time.Second)
 	if invocationErr != nil {
 		fail(http.StatusServiceUnavailable, "MODEL_NOT_CONFIGURED", "所选模型暂不可用", invocationErr)
 		return
