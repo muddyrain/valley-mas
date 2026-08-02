@@ -1,6 +1,10 @@
-import { ImagePlus, Send, Sparkles, Square, X } from 'lucide-react';
+import { ImagePlus, Paperclip, Send, Sparkles, Square, X } from 'lucide-react';
 import { type ReactNode, useRef } from 'react';
 import { toast } from 'sonner';
+import {
+  ConversationAttachmentCard,
+  type ConversationAttachmentStatus,
+} from '@/components/ai/ConversationAttachmentCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,6 +24,15 @@ export type ConversationComposerSkill = {
   id: string;
   name: string;
   description?: string;
+};
+
+export type ConversationComposerFile = {
+  id: string;
+  name: string;
+  sizeBytes: number;
+  mimeType?: string;
+  previewUrl?: string;
+  status?: ConversationAttachmentStatus;
 };
 
 const readReferenceImage = (file: File) =>
@@ -47,8 +60,13 @@ export function ConversationComposer({
   emptySkillAction,
   referenceImages,
   onReferenceImagesChange,
+  files,
+  onFilesSelected,
+  onFileRemove,
+  uploadingFiles = false,
   footer,
   onStop,
+  stopDisabled = false,
   className,
   revealAttribute,
   presentation = 'default',
@@ -68,13 +86,19 @@ export function ConversationComposer({
   };
   referenceImages?: ConversationComposerReferenceImage[];
   onReferenceImagesChange?: (images: ConversationComposerReferenceImage[]) => void;
+  files?: ConversationComposerFile[];
+  onFilesSelected?: (files: File[]) => void;
+  onFileRemove?: (file: ConversationComposerFile) => void;
+  uploadingFiles?: boolean;
   footer?: ReactNode;
   onStop?: () => void;
+  stopDisabled?: boolean;
   className?: string;
   revealAttribute?: string;
   presentation?: 'default' | 'workspace';
 }) {
   const referenceInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const activeSkill = skills.find((skill) => skill.id === activeSkillId);
   const skillMatch = value.match(/(?:^|\s)\/([^\s]*)$/);
   const skillQuery = skillMatch?.[1] ?? '';
@@ -87,6 +111,7 @@ export function ConversationComposer({
     .slice(0, 6);
   const showEmptySkillState = Boolean(skillMatch && skills.length === 0 && emptySkillAction);
   const isWorkspace = presentation === 'workspace';
+  const hasSubmittableContent = Boolean(value.trim() || (files?.length ?? 0) > 0);
 
   const addReferenceImages = async (files: FileList | null) => {
     if (!files || !referenceImages || !onReferenceImagesChange) return;
@@ -166,7 +191,7 @@ export function ConversationComposer({
             ))}
           </div>
         ) : null}
-        {activeSkill || (referenceImages?.length ?? 0) > 0 ? (
+        {activeSkill || (referenceImages?.length ?? 0) > 0 || (files?.length ?? 0) > 0 ? (
           <div className="flex flex-wrap gap-2 px-4 pt-3">
             {activeSkill ? (
               <Badge variant="secondary" className="gap-1.5 py-1">
@@ -202,6 +227,17 @@ export function ConversationComposer({
                 </button>
               </div>
             ))}
+            {files?.map((file) => (
+              <ConversationAttachmentCard
+                key={file.id}
+                name={file.name}
+                sizeBytes={file.sizeBytes}
+                mimeType={file.mimeType}
+                previewUrl={file.previewUrl}
+                status={file.status}
+                onRemove={file.status === 'uploading' ? undefined : () => onFileRemove?.(file)}
+              />
+            ))}
           </div>
         ) : null}
         <div className={cn('px-4 pt-3', isWorkspace && 'px-4 pt-2.5 sm:px-5')}>
@@ -214,10 +250,17 @@ export function ConversationComposer({
               isWorkspace && 'min-h-[3.5rem] text-sm leading-6',
             )}
             onChange={(event) => onValueChange(event.target.value)}
+            onPaste={(event) => {
+              const pastedFiles = Array.from(event.clipboardData.files || []);
+              if (pastedFiles.length === 0 || !onFilesSelected) return;
+              event.preventDefault();
+              onFilesSelected(pastedFiles);
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault();
-                if (!disabled && value.trim() && canSubmit) onSubmit();
+                if (!disabled && (value.trim() || (files?.length ?? 0) > 0) && canSubmit)
+                  onSubmit();
               }
             }}
             maxLength={maxLength}
@@ -253,13 +296,40 @@ export function ConversationComposer({
                 </Button>
               </>
             ) : null}
+            {files && onFilesSelected ? (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,.md,.markdown,.txt,.pdf,.json,.csv"
+                  multiple
+                  className="sr-only"
+                  onChange={(event) => {
+                    onFilesSelected(Array.from(event.target.files || []));
+                    event.target.value = '';
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  disabled={disabled || uploadingFiles || files.length >= 3}
+                  onClick={() => fileInputRef.current?.click()}
+                  aria-label="附加文件"
+                  title="附加文件"
+                >
+                  <Paperclip />
+                </Button>
+              </>
+            ) : null}
             {footer}
           </div>
-          {disabled && onStop ? (
+          {onStop && !hasSubmittableContent ? (
             <Button
               size="icon"
               variant="outline"
               onClick={onStop}
+              disabled={stopDisabled}
               aria-label="停止生成"
               title="停止生成"
             >
@@ -270,7 +340,7 @@ export function ConversationComposer({
               size="icon"
               className="rounded-full"
               onClick={onSubmit}
-              disabled={disabled || !value.trim() || !canSubmit}
+              disabled={disabled || !hasSubmittableContent || !canSubmit}
               aria-label="发送消息"
               title="发送消息"
             >

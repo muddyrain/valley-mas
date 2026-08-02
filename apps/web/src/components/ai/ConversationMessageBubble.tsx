@@ -16,6 +16,13 @@ interface ConversationMessageBubbleProps {
   showActions?: boolean;
   presentation?: 'bubble' | 'workspace';
   className?: string;
+  citations?: Array<{
+    index: number;
+    documentName: string;
+    excerpt?: string;
+    pageNumber?: number;
+  }>;
+  onCitationClick?: (index: number) => void;
 }
 
 function formatMessageTime(value?: string) {
@@ -30,8 +37,12 @@ function formatMessageTime(value?: string) {
   }).format(date);
 }
 
-function renderAssistantContent(content: string) {
-  return content.split(/(\*\*[^*\n]+\*\*|`[^`\n]+`)/g).map((part, index) => {
+function renderAssistantContent(
+  content: string,
+  citations: NonNullable<ConversationMessageBubbleProps['citations']>,
+  onCitationClick?: ConversationMessageBubbleProps['onCitationClick'],
+) {
+  return content.split(/(\*\*[^*\n]+\*\*|`[^`\n]+`|\[\d+\])/g).map((part, index) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return <strong key={index}>{part.slice(2, -2)}</strong>;
     }
@@ -41,6 +52,26 @@ function renderAssistantContent(content: string) {
           {part.slice(1, -1)}
         </code>
       );
+    }
+    const citationMatch = part.match(/^\[(\d+)\]$/);
+    if (citationMatch) {
+      const citationIndex = Number(citationMatch[1]);
+      const citation = citations.find((item) => item.index === citationIndex);
+      if (citation) {
+        const pageLabel = citation.pageNumber ? `，第 ${citation.pageNumber} 页` : '';
+        return (
+          <button
+            key={index}
+            type="button"
+            className="mx-0.5 inline-flex translate-y-[-0.08em] items-center rounded bg-primary/10 px-1 py-0.5 text-[0.75em] font-medium leading-none text-primary hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            title={`${citation.documentName}${pageLabel}${citation.excerpt ? `：${citation.excerpt}` : ''}`}
+            aria-label={`查看引用 ${citationIndex}：${citation.documentName}${pageLabel}`}
+            onClick={() => onCitationClick?.(citationIndex)}
+          >
+            {citationIndex}
+          </button>
+        );
+      }
     }
     return part;
   });
@@ -56,6 +87,8 @@ export function ConversationMessageBubble({
   showActions = false,
   presentation = 'bubble',
   className,
+  citations = [],
+  onCitationClick,
 }: ConversationMessageBubbleProps) {
   const isUser = role === 'user';
   const isWorkspace = presentation === 'workspace';
@@ -74,13 +107,14 @@ export function ConversationMessageBubble({
       <div
         className={cn(
           'min-w-0 rounded-xl px-4 py-3 text-sm leading-6 break-words whitespace-pre-wrap [overflow-wrap:anywhere]',
+          isUser && !content.trim() && !children && !footer && 'hidden',
           isWorkspace && !isUser && 'rounded-none bg-transparent px-0 py-0 text-foreground',
           isWorkspace && isUser && 'rounded-2xl bg-muted/75 text-foreground',
           !isWorkspace &&
             (isUser ? 'bg-foreground text-background' : 'bg-muted/75 text-foreground'),
         )}
       >
-        {isUser ? content : renderAssistantContent(content)}
+        {isUser ? content : renderAssistantContent(content, citations, onCitationClick)}
         {children}
         {footer ? (
           <div className={cn('mt-3 border-t border-border/60 pt-2', isWorkspace && 'mt-2')}>

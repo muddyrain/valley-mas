@@ -23,12 +23,20 @@ export interface AIApp {
   status: 'draft' | 'published';
   draftVersionId: string;
   publishedVersionId: string;
+  createdAt: string;
   updatedAt: string;
 }
 
 export interface AgentConfig {
   modelProfile: 'ark-text-default';
   modelId?: string;
+  /** @deprecated 图片理解由 modelId 对应模型的 vision 能力决定。 */
+  visionModelId?: string;
+  identity?: string;
+  userProfile?: string;
+  soul?: string;
+  agentInstructions?: string;
+  /** Legacy fields remain readable while existing agents migrate to profiles. */
   systemPrompt: string;
   openingMessage: string;
   exampleQuestions: string[];
@@ -77,12 +85,13 @@ export interface AIAppVersion {
 export interface AIAppDetail {
   app: AIApp;
   versions: AIAppVersion[];
+  stats: { conversationCount: number; taskCount: number };
 }
 
 export interface AIAppRun {
   id: string;
   versionId: string;
-  status: 'succeeded' | 'failed' | 'cancelled';
+  status: 'running' | 'succeeded' | 'failed' | 'cancelled';
   model: string;
   input: string;
   output: string;
@@ -117,8 +126,74 @@ export interface AIAppConversationToolTrace {
   conversationId: string;
   runId: string;
   toolName: string;
+  narration?: string;
   status: 'succeeded' | 'failed';
   durationMs: number;
+  createdAt: string;
+}
+
+export interface AIAppConversationAttachment {
+  id: string;
+  conversationId: string;
+  messageId?: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  status: 'ready';
+  createdAt: string;
+}
+
+export interface AIAppArtifact {
+  id: string;
+  conversationId: string;
+  runId: string;
+  taskId?: string;
+  resourceId: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  url: string;
+  createdAt: string;
+}
+
+export interface AIAppOutputImage {
+  id: string;
+  prompt: string;
+  resultUrl: string;
+  resultWidth: number;
+  resultHeight: number;
+  createdAt: string;
+}
+
+export interface AIAppTask {
+  id: string;
+  conversationId: string;
+  runId: string;
+  userMessageId: string;
+  title: string;
+  status: 'queued' | 'running' | 'waiting_approval' | 'succeeded' | 'failed' | 'cancelled';
+  progress: number;
+  queuePosition?: number;
+  statusMessage: string;
+  partialOutput: string;
+  errorCode?: string;
+  cancelRequestedAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AIAppToolApproval {
+  id: string;
+  taskId: string;
+  runId: string;
+  toolName: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  summary: string;
+  status: 'pending' | 'approved' | 'rejected';
+  note?: string;
+  decidedAt?: string;
   createdAt: string;
 }
 
@@ -156,9 +231,21 @@ export interface AIAppPublicInvocation {
 }
 
 export interface AIKnowledgeReference {
+  index: number;
   documentName: string;
   chunkId: string;
   excerpt: string;
+  score: number;
+  pageNumber?: number;
+}
+
+export interface AIAppRetrievalConfig {
+  topK: number;
+  minScore: number;
+  citeSources: boolean;
+  searchMode: 'semantic' | 'hybrid';
+  keywordWeight: number;
+  maxContextChars: number;
 }
 
 export interface AIKnowledgeBase {
@@ -262,7 +349,13 @@ export interface AISkillImportPreview {
 export interface AIAppTool {
   name: string;
   description: string;
-  permission: 'read' | 'write';
+  permission: 'read' | 'model' | 'write';
+  riskLevel: 'low' | 'medium' | 'high';
+}
+
+export interface AIAppToolBinding {
+  toolName: string;
+  approvalMode: 'auto' | 'always';
 }
 
 export interface NotionConnectionStatus {
@@ -278,6 +371,7 @@ type AIAppSSEEvent = {
   type?: string;
   chunk?: string;
   toolName?: string;
+  narration?: string;
   ok?: boolean;
   durationMs?: number;
   message?: string;
@@ -434,6 +528,12 @@ export function getAIApp(appId: string): Promise<AIAppDetail> {
   return request.get(`/ai/apps/${appId}`);
 }
 
+export function listAIAppOutputs(
+  appId: string,
+): Promise<{ artifacts: AIAppArtifact[]; images: AIAppOutputImage[] }> {
+  return request.get(`/ai/apps/${appId}/outputs`);
+}
+
 export function saveAIAppVersion(
   appId: string,
   data: { name: string; description: string; config: object },
@@ -528,6 +628,8 @@ export function getAIAppConversation(
   toolTraces: AIAppConversationToolTrace[];
   runs: AIAppRun[];
   referencesByRunId: Record<string, AIKnowledgeReference[]>;
+  attachments: AIAppConversationAttachment[];
+  artifacts: AIAppArtifact[];
 }> {
   return request.get(`/ai/apps/${appId}/conversations/${conversationId}`);
 }
@@ -545,11 +647,11 @@ export async function streamAIAppConversation(
   conversationId: string,
   message: string,
   modelId: string,
-  options: { referenceImages?: string[]; activeSkillIds?: string[] } = {},
+  options: { referenceImages?: string[]; activeSkillIds?: string[]; attachmentIds?: string[] } = {},
   handlers: {
     onDelta: (chunk: string) => void;
-    onToolCall?: (toolName: string) => void;
-    onToolResult?: (toolName: string, ok: boolean, durationMs: number) => void;
+    onToolCall?: (toolName: string, narration: string) => void;
+    onToolResult?: (toolName: string, ok: boolean, durationMs: number, narration: string) => void;
     onDone: (payload: {
       run: AIAppRun;
       conversation: AIAppConversation;
@@ -598,9 +700,15 @@ export async function streamAIAppConversation(
   }
   const read = await consumeAIAppSSE(response, (event) => {
     if (event.type === 'delta' && event.chunk) handlers.onDelta(event.chunk);
-    if (event.type === 'tool_call' && event.toolName) handlers.onToolCall?.(event.toolName);
+    if (event.type === 'tool_call' && event.toolName)
+      handlers.onToolCall?.(event.toolName, event.narration || '');
     if (event.type === 'tool_result' && event.toolName)
-      handlers.onToolResult?.(event.toolName, event.ok === true, event.durationMs || 0);
+      handlers.onToolResult?.(
+        event.toolName,
+        event.ok === true,
+        event.durationMs || 0,
+        event.narration || '',
+      );
     if (event.type === 'error') {
       handlers.onError({
         message: event.message || '会话发送失败',
@@ -679,12 +787,114 @@ export function disconnectNotion(): Promise<{ remoteRevoked: boolean }> {
   return request.delete('/integrations/notion');
 }
 
-export function listAIAppToolBindings(appId: string): Promise<{ tools: string[] }> {
+export function listAIAppToolBindings(
+  appId: string,
+): Promise<{ tools: string[]; bindings: AIAppToolBinding[] }> {
   return request.get(`/ai/apps/${appId}/tools`);
 }
 
-export function replaceAIAppTools(appId: string, tools: string[]): Promise<{ tools: string[] }> {
-  return request.put(`/ai/apps/${appId}/tools`, { tools });
+export function replaceAIAppTools(
+  appId: string,
+  tools: string[],
+  policies: AIAppToolBinding[] = [],
+): Promise<{ tools: string[]; bindings: AIAppToolBinding[] }> {
+  return request.put(`/ai/apps/${appId}/tools`, { tools, policies });
+}
+
+export function getAIAppRetrievalConfig(
+  appId: string,
+): Promise<{ retrievalConfig: AIAppRetrievalConfig }> {
+  return request.get(`/ai/apps/${appId}/retrieval-config`);
+}
+
+export function updateAIAppRetrievalConfig(
+  appId: string,
+  config: AIAppRetrievalConfig,
+): Promise<{ retrievalConfig: AIAppRetrievalConfig; version: AIAppVersion }> {
+  return request.put(`/ai/apps/${appId}/retrieval-config`, config);
+}
+
+export function uploadAIAppConversationAttachment(
+  appId: string,
+  conversationId: string,
+  file: File,
+): Promise<{ attachment: AIAppConversationAttachment }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  return request.post(`/ai/apps/${appId}/conversations/${conversationId}/attachments`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+}
+
+export function deleteAIAppConversationAttachment(
+  appId: string,
+  conversationId: string,
+  attachmentId: string,
+): Promise<void> {
+  return request.delete(
+    `/ai/apps/${appId}/conversations/${conversationId}/attachments/${attachmentId}`,
+  );
+}
+
+export async function getAIAppConversationAttachmentBlob(
+  appId: string,
+  conversationId: string,
+  attachmentId: string,
+): Promise<Blob> {
+  const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+  const response = await fetch(
+    `${base}/ai/apps/${appId}/conversations/${conversationId}/attachments/${attachmentId}`,
+    { headers: { Authorization: `Bearer ${useAuthStore.getState().token}` } },
+  );
+  if (!response.ok) throw new Error('读取会话文件失败');
+  return response.blob();
+}
+
+export async function downloadAIAppConversationAttachment(
+  appId: string,
+  conversationId: string,
+  attachment: AIAppConversationAttachment,
+): Promise<void> {
+  const href = URL.createObjectURL(
+    await getAIAppConversationAttachmentBlob(appId, conversationId, attachment.id),
+  );
+  const anchor = document.createElement('a');
+  anchor.href = href;
+  anchor.download = attachment.name;
+  anchor.click();
+  URL.revokeObjectURL(href);
+}
+
+export function createAIAppConversationTask(
+  appId: string,
+  conversationId: string,
+  data: { message: string; modelId?: string; activeSkillIds?: string[]; attachmentIds?: string[] },
+): Promise<{ task: AIAppTask; run: AIAppRun; userMessage: AIAppConversationMessage }> {
+  return request.post(`/ai/apps/${appId}/conversations/${conversationId}/tasks`, data);
+}
+
+export function listAIAppTasks(
+  appId: string,
+  conversationId?: string,
+): Promise<{ list: AIAppTask[]; approvals: AIAppToolApproval[] }> {
+  return request.get(`/ai/apps/${appId}/tasks`, {
+    params: conversationId ? { conversationId } : undefined,
+  });
+}
+
+export function decideAIAppToolApproval(
+  appId: string,
+  taskId: string,
+  approvalId: string,
+  decision: 'approve' | 'reject',
+): Promise<{ approval: AIAppToolApproval }> {
+  return request.post(`/ai/apps/${appId}/tasks/${taskId}/approvals/${approvalId}/decision`, {
+    decision,
+  });
+}
+
+export function cancelAIAppTask(appId: string, taskId: string): Promise<void> {
+  return request.post(`/ai/apps/${appId}/tasks/${taskId}/cancel`);
 }
 
 export function listAIKnowledgeBases(): Promise<{ list: AIKnowledgeBase[] }> {
