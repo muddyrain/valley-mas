@@ -21,6 +21,7 @@ import (
 
 func Setup(cfg *config.Config) *gin.Engine {
 	handler.StartWorkflowTriggerWorker(context.Background())
+	handler.StartAIAppTaskWorker(context.Background())
 	r := gin.Default()
 
 	r.Use(logger.RequestLogger())
@@ -194,11 +195,19 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/ai/apps/:appId/avatar/generate", handler.GenerateAIAppAvatar)
 			auth.POST("/ai/apps/:appId/avatar", handler.UploadAIAppAvatar)
 			auth.GET("/ai/apps/:appId/runs", handler.ListAIAppRuns)
+			auth.GET("/ai/apps/:appId/outputs", handler.ListAIAppOutputs)
 			auth.GET("/ai/apps/:appId/conversations", handler.ListAIAppConversations)
 			auth.POST("/ai/apps/:appId/conversations", handler.CreateAIAppConversation)
 			auth.GET("/ai/apps/:appId/conversations/:conversationId", handler.GetAIAppConversation)
 			auth.DELETE("/ai/apps/:appId/conversations/:conversationId", handler.DeleteAIAppConversation)
 			auth.POST("/ai/apps/:appId/conversations/:conversationId/chat", handler.ChatWithAIAppConversation)
+			auth.POST("/ai/apps/:appId/conversations/:conversationId/attachments", handler.UploadAIAppConversationAttachment)
+			auth.GET("/ai/apps/:appId/conversations/:conversationId/attachments/:attachmentId", handler.DownloadAIAppConversationAttachment)
+			auth.DELETE("/ai/apps/:appId/conversations/:conversationId/attachments/:attachmentId", handler.DeleteAIAppConversationAttachment)
+			auth.POST("/ai/apps/:appId/conversations/:conversationId/tasks", handler.CreateAIAppConversationTask)
+			auth.GET("/ai/apps/:appId/tasks", handler.ListAIAppTasks)
+			auth.POST("/ai/apps/:appId/tasks/:taskId/cancel", handler.CancelAIAppTask)
+			auth.POST("/ai/apps/:appId/tasks/:taskId/approvals/:approvalId/decision", handler.DecideAIAppToolApproval)
 			auth.GET("/ai/apps/:appId/tools", handler.ListAIAppToolBindings)
 			auth.PUT("/ai/apps/:appId/tools", handler.ReplaceAIAppTools)
 			auth.GET("/ai/apps/:appId/knowledge-bases", handler.ListAIAppKnowledgeBases)

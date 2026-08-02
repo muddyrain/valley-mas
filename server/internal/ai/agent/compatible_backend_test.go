@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -28,6 +29,23 @@ func TestCompatibleBackendParsesToolCalls(t *testing.T) {
 	}
 	if len(response.Message.ToolCalls) != 1 || response.Message.ToolCalls[0].Name != "lookup" || !strings.Contains(string(response.Message.ToolCalls[0].Args), "hello") {
 		t.Fatalf("tool calls = %#v", response.Message.ToolCalls)
+	}
+}
+
+func TestCompatibleAgentMessagesEncodeVisionInput(t *testing.T) {
+	messages := compatibleAgentMessages([]Message{{
+		Role: RoleUser, Content: "分析图片", Images: []string{"data:image/png;base64,AAAA"},
+	}})
+	if len(messages) != 1 {
+		t.Fatalf("messages = %#v", messages)
+	}
+	encoded, err := json.Marshal(messages[0].Content)
+	if err != nil {
+		t.Fatalf("marshal content: %v", err)
+	}
+	content := string(encoded)
+	if !strings.Contains(content, `"type":"text"`) || !strings.Contains(content, `"type":"image_url"`) || !strings.Contains(content, "data:image/png;base64,AAAA") {
+		t.Fatalf("multimodal content = %s", content)
 	}
 }
 
@@ -76,6 +94,26 @@ func TestCompatibleBackendStreamsTextDeltas(t *testing.T) {
 	}
 	if response.Message.Content != "first second" || response.Model != "catalog-text" {
 		t.Fatalf("response = %#v", response)
+	}
+}
+
+func TestCompatibleBackendReturnsTypedEmptyStreamError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "text/event-stream")
+		_, _ = writer.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer server.Close()
+
+	backend := NewCompatibleBackend(aiclient.NewCompatibleClient(server.URL, "test-key", 0))
+	_, err := backend.ChatStream(
+		context.Background(),
+		Spec{Model: "catalog-text"},
+		[]Message{{Role: RoleUser, Content: "hello"}},
+		nil,
+		nil,
+	)
+	if !errors.Is(err, ErrEmptyStreamResponse) {
+		t.Fatalf("ChatStream() error = %v, want ErrEmptyStreamResponse", err)
 	}
 }
 

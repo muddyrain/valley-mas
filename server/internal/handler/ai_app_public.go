@@ -107,7 +107,7 @@ func PublicAIAppChat(c *gin.Context) {
 		writePublicAIAppError(c, http.StatusBadGateway, code, publicMessage)
 		return
 	}
-	system := strings.TrimSpace(config.SystemPrompt)
+	system := strings.TrimSpace(config.SystemInstructions())
 	if knowledgeContext != "" {
 		system = strings.TrimSpace(system + "\n\n以下是与当前问题相关的私有参考资料。请优先依据这些资料回答；资料不足时明确说明。\n" + knowledgeContext)
 	}

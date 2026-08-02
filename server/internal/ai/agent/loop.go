@@ -166,7 +166,18 @@ func (l *LocalLoop) run(
 		// 依次执行 tool。
 		for i := range resp.Message.ToolCalls {
 			tc := resp.Message.ToolCalls[i]
-			out <- Event{Type: EventToolCall, ToolCall: &tc, ToolName: tc.Name}
+			narration := ""
+			if i == 0 {
+				narration = strings.TrimSpace(resp.Message.Content)
+			}
+			out <- Event{Type: EventToolCall, ToolCall: &tc, ToolName: tc.Name, Narration: narration}
+			if spec.ToolGate != nil {
+				if err := spec.ToolGate.Authorize(ctx, tc); err != nil {
+					emitError(out, err)
+					recordRun(ctx, spec, steps, modelName, runStart, err)
+					return
+				}
+			}
 			result, durationMs := runTool(ctx, spec, toolIndex, tc)
 			buf = append(buf, Message{
 				Role:       RoleTool,

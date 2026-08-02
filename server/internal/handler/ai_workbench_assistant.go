@@ -424,7 +424,7 @@ func CreateAIAppProposal(c *gin.Context) {
 	}
 	catalog, _ := json.Marshal(knowledgeBases)
 	current, _ := json.Marshal(payload.Current)
-	systemPrompt := `你是 Valley 智能体设计助手。根据用户需求生成一个可编辑提案。严格只输出 JSON，字段必须且只能是：name、description、config、avatarPrompt、toolSuggestions、knowledgeBaseSuggestions。config 必须包含 modelProfile="ark-text-default"、systemPrompt、openingMessage、exampleQuestions；exampleQuestions 最多 4 条。toolSuggestions 只能推荐 content.search，且仅在确有搜索需求时推荐。知识库只能从给定目录选择，不能虚构 ID。提示词要明确角色、目标、约束、工作步骤、异常处理和输出格式。avatarPrompt 只描述无文字、方形、简洁统一风格的头像视觉概念。`
+	systemPrompt := `你是 Valley 智能体设计助手。根据用户需求生成一个可编辑提案。严格只输出 JSON，字段必须且只能是：name、description、config、avatarPrompt、toolSuggestions、knowledgeBaseSuggestions。config 必须包含 modelProfile="ark-text-default"、identity、userProfile、soul、agentInstructions、systemPrompt=""、openingMessage=""、exampleQuestions=[]、skillIds=[]。identity 是 IDENTITY.md，定义智能伙伴的名字、性格和身份；userProfile 是 USER.md，只写已知用户信息与沟通偏好，未知时明确尚未记录；soul 是 SOUL.md，定义安全底线和核心价值观；agentInstructions 是 AGENTS.md，定义执行与协作约定。toolSuggestions 只能推荐 content.search，且仅在确有搜索需求时推荐。知识库只能从给定目录选择，不能虚构 ID。avatarPrompt 必须描述无文字、方形、适合小尺寸展示的精致二次元角色头像，可以是动漫少女、动漫少年或符合身份的拟人动漫角色；禁止机器人、机械吉祥物、真人照片、文字、Logo 和多人画面。`
 	userPrompt := fmt.Sprintf("用户需求：\n%s\n\n当前提案（可能为空）：\n%s\n\n可选知识库目录：\n%s", description, current, catalog)
 	var proposal agentProposal
 	err := runStructuredWorkbenchAIWithCatalog(c.Request.Context(), featureAIAppProposal, userID, payload.ModelID, systemPrompt, userPrompt, &proposal, func() error {

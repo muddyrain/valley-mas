@@ -1,14 +1,43 @@
 package aiapp
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseNormalizesAgentConfig(t *testing.T) {
 	config, err := Parse(`{"systemPrompt":"  你是助手  ","openingMessage":" 你好 ","exampleQuestions":["问题一","问题一"," ","问题二"],"skillIds":["1","1"," 2 "]}`)
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
 	}
-	if config.ModelProfile != ModelProfileARKTextDefault || config.SystemPrompt != "你是助手" || len(config.ExampleQuestions) != 2 || len(config.SkillIDs) != 2 || config.SkillIDs[1] != "2" {
+	if config.ModelProfile != ModelProfileARKTextDefault || config.Identity != "你是助手" || len(config.ExampleQuestions) != 2 || len(config.SkillIDs) != 2 || config.SkillIDs[1] != "2" {
 		t.Fatalf("unexpected config: %#v", config)
+	}
+}
+
+func TestParseProvidesFourDefaultProfileDocuments(t *testing.T) {
+	config, err := Parse(`{}`)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if config.Identity == "" || config.UserProfile == "" || config.Soul == "" || config.AgentInstructions == "" {
+		t.Fatalf("profile defaults missing: %#v", config)
+	}
+	combined := config.SystemInstructions()
+	for _, marker := range []string{"IDENTITY.md", "USER.md", "SOUL.md", "AGENTS.md"} {
+		if !strings.Contains(combined, marker) {
+			t.Fatalf("SystemInstructions() missing %s: %s", marker, combined)
+		}
+	}
+}
+
+func TestParseNormalizesVisionModel(t *testing.T) {
+	config, err := Parse(`{"visionModelId":" 42 "}`)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if config.VisionModelID != "42" {
+		t.Fatalf("VisionModelID = %q", config.VisionModelID)
 	}
 }
 
@@ -37,8 +66,8 @@ func TestParseNormalizesImageGenerationConfig(t *testing.T) {
 	}
 }
 
-func TestValidateGeneratedRejectsEmptyPrompt(t *testing.T) {
-	if err := ValidateGenerated(DefaultConfig()); err == nil {
-		t.Fatal("ValidateGenerated() error = nil")
+func TestValidateGeneratedAcceptsDefaultIdentity(t *testing.T) {
+	if err := ValidateGenerated(DefaultConfig()); err != nil {
+		t.Fatalf("ValidateGenerated() error = %v", err)
 	}
 }

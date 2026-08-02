@@ -9,6 +9,7 @@ import (
 
 	"valley-server/internal/ai/agent"
 	"valley-server/internal/ai/tools/content"
+	filetool "valley-server/internal/ai/tools/file"
 	imagetool "valley-server/internal/ai/tools/image"
 	"valley-server/internal/aiapp"
 	"valley-server/internal/aiclient"
@@ -33,7 +34,7 @@ func buildAIAppConversationSystemPrompt(customPrompt, knowledgeContext string) s
 		parts = append(parts, "智能体自定义指令：\n"+customPrompt)
 	}
 	if knowledgeContext = strings.TrimSpace(knowledgeContext); knowledgeContext != "" {
-		parts = append(parts, "以下是与当前问题相关的私有参考资料。请优先依据这些资料回答；资料不足时明确说明。\n"+knowledgeContext)
+		parts = append(parts, "以下是与当前问题相关的私有参考资料。请优先依据这些资料回答；资料不足时明确说明。引用资料中的事实时，在对应句子后保留资料编号，例如 [1]；不要编造不存在的编号。\n"+knowledgeContext)
 	}
 	parts = append(parts, aiAppConversationRuntimePrompt)
 	return strings.Join(parts, "\n\n")
@@ -42,7 +43,7 @@ func buildAIAppConversationSystemPrompt(customPrompt, knowledgeContext string) s
 func appendAIAppConversationImageContext(system string, referenceCount int, styleProfileID string) string {
 	parts := []string{strings.TrimSpace(system)}
 	if referenceCount > 0 {
-		parts = append(parts, "本轮用户上传了参考图。若用户要求生成图片且图片工具可用，请把它作为参考图；参考图的结构、主体与材质优先于视觉风格描述。")
+		parts = append(parts, "本轮用户上传了图片，图片内容已直接提供给视觉模型。请先理解图片并回答用户的真实问题；只有用户明确要求生成、重绘或编辑图片时，才调用图片生成工具，并把上传图片作为参考图。")
 	}
 	if strings.TrimSpace(styleProfileID) != "" {
 		parts = append(parts, "本轮用户显式选择了一个已绑定技能作为视觉风格。若调用图片工具，必须保留该技能对应的视觉风格，不要把它误解为用户已经要求执行其他任务。")
@@ -143,13 +144,17 @@ func CreateAIAppConversation(c *gin.Context) {
 		Title string `json:"title"`
 	}
 	_ = c.ShouldBindJSON(&payload)
-	if app.PublishedVersionID == 0 {
-		Error(c, http.StatusBadRequest, "请先发布智能体配置")
+	versionID := app.DraftVersionID
+	if versionID == 0 {
+		versionID = app.PublishedVersionID
+	}
+	if versionID == 0 {
+		Error(c, http.StatusBadRequest, "请先保存智能体配置")
 		return
 	}
 	var version model.AIAppVersion
-	if database.GetDB().Where("id = ? AND app_id = ? AND published_at IS NOT NULL", app.PublishedVersionID, app.ID).First(&version).Error != nil {
-		Error(c, http.StatusBadRequest, "已发布配置不存在")
+	if database.GetDB().Where("id = ? AND app_id = ?", versionID, app.ID).First(&version).Error != nil {
+		Error(c, http.StatusBadRequest, "智能体配置不存在")
 		return
 	}
 	conversation := model.AIAppConversation{UserID: userID, AppID: app.ID, VersionID: version.ID, Title: truncateAIAgentRunes(payload.Title, 120)}
@@ -178,6 +183,8 @@ func GetAIAppConversation(c *gin.Context) {
 	var messages []model.AIAppConversationMessage
 	var traces []model.AIAppConversationToolTrace
 	var runs []model.AIAppRun
+	var attachments []model.AIAppConversationAttachment
+	var artifacts []model.AIAppArtifact
 	if err := database.GetDB().Where("user_id = ? AND app_id = ? AND conversation_id = ?", userID, app.ID, conversation.ID).Order("created_at ASC").Find(&messages).Error; err != nil {
 		Error(c, 500, "加载会话消息失败")
 		return
@@ -190,12 +197,22 @@ func GetAIAppConversation(c *gin.Context) {
 		Error(c, 500, "加载会话运行记录失败")
 		return
 	}
+	if err := database.GetDB().Where("user_id = ? AND app_id = ? AND conversation_id = ?", userID, app.ID, conversation.ID).Order("created_at ASC").Find(&attachments).Error; err != nil {
+		Error(c, 500, "加载会话文件失败")
+		return
+	}
+	if err := database.GetDB().Where("user_id = ? AND app_id = ? AND conversation_id = ?", userID, app.ID, conversation.ID).Order("created_at ASC").Find(&artifacts).Error; err != nil {
+		Error(c, 500, "加载成果文件失败")
+		return
+	}
 	Success(c, gin.H{
 		"conversation":      conversation,
 		"messages":          messages,
 		"toolTraces":        traces,
 		"runs":              runs,
 		"referencesByRunId": aiAppConversationReferencesByRunID(runs),
+		"attachments":       attachments,
+		"artifacts":         artifacts,
 	})
 }
 
@@ -254,10 +271,28 @@ func DeleteAIAppConversation(c *gin.Context) {
 	}
 	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
 		query := "user_id = ? AND app_id = ? AND conversation_id = ?"
+		var taskIDs []model.Int64String
+		if err := tx.Model(&model.AIAppTask{}).Where(query, userID, app.ID, conversation.ID).Pluck("id", &taskIDs).Error; err != nil {
+			return err
+		}
+		if len(taskIDs) > 0 {
+			if err := tx.Where("user_id = ? AND task_id IN ?", userID, taskIDs).Delete(&model.AIAppToolApproval{}).Error; err != nil {
+				return err
+			}
+		}
 		if err := tx.Where(query, userID, app.ID, conversation.ID).Delete(&model.AIAppConversationMessage{}).Error; err != nil {
 			return err
 		}
 		if err := tx.Where(query, userID, app.ID, conversation.ID).Delete(&model.AIAppConversationToolTrace{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where(query, userID, app.ID, conversation.ID).Delete(&model.AIAppConversationAttachment{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where(query, userID, app.ID, conversation.ID).Delete(&model.AIAppArtifact{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where(query, userID, app.ID, conversation.ID).Delete(&model.AIAppTask{}).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("user_id = ? AND app_id = ? AND conversation_id = ?", userID, app.ID, conversation.ID).Delete(&model.AIAppRun{}).Error; err != nil {
@@ -293,6 +328,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		Stream          bool     `json:"stream"`
 		ReferenceImages []string `json:"referenceImages"`
 		ActiveSkillIDs  []string `json:"activeSkillIds"`
+		AttachmentIDs   []string `json:"attachmentIds"`
 	}
 	// Three 5MB images expand to roughly 20MB when sent as data URLs. Keep the
 	// same bounded request envelope as the image studio while never persisting
@@ -303,6 +339,11 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		return
 	}
 	message := truncateAIAgentRunes(payload.Message, 12000)
+	attachments, attachmentContext, attachmentErr := resolveAIAppConversationAttachments(database.GetDB(), userID, app.ID, conversation.ID, payload.AttachmentIDs)
+	if attachmentErr != nil {
+		Error(c, http.StatusBadRequest, attachmentErr.Error())
+		return
+	}
 	run := model.AIAppRun{AppID: app.ID, VersionID: conversation.VersionID, ConversationID: &conversation.ID, UserID: userID, Status: "running", Input: aiclient.TrimRunes(message, 1000)}
 	if len(payload.ReferenceImages) > service.MaxAIImageReferences {
 		Error(c, http.StatusBadRequest, "最多支持 3 张参考图")
@@ -314,7 +355,17 @@ func ChatWithAIAppConversation(c *gin.Context) {
 			return err
 		}
 		userMessage.RunID = &run.ID
-		return tx.Create(&userMessage).Error
+		if err := tx.Create(&userMessage).Error; err != nil {
+			return err
+		}
+		if len(attachments) > 0 {
+			ids := make([]model.Int64String, 0, len(attachments))
+			for _, attachment := range attachments {
+				ids = append(ids, attachment.ID)
+			}
+			return tx.Model(&model.AIAppConversationAttachment{}).Where("id IN ?", ids).Update("message_id", userMessage.ID).Error
+		}
+		return nil
 	}); err != nil {
 		Error(c, 500, "创建会话运行记录失败")
 		return
@@ -334,21 +385,13 @@ func ChatWithAIAppConversation(c *gin.Context) {
 
 	var version model.AIAppVersion
 	if err := database.GetDB().Where("id = ? AND app_id = ?", conversation.VersionID, app.ID).First(&version).Error; err != nil {
-		fail(http.StatusBadRequest, "CONVERSATION_VERSION_NOT_FOUND", "会话版本不存在", err)
+		fail(http.StatusBadRequest, "CONVERSATION_VERSION_NOT_FOUND", "会话配置不存在", err)
 		return
 	}
 
 	config, configParseErr := aiapp.Parse(version.Config)
 	if configParseErr != nil {
-		fail(400, "APP_CONFIG_INVALID", "智能体版本配置无效", errors.New("invalid AI App version config"))
-		return
-	}
-	selectedModelID := strings.TrimSpace(payload.ModelID)
-	if selectedModelID == "" {
-		selectedModelID = config.ModelID
-	}
-	if selectedModelID == "" {
-		fail(http.StatusBadRequest, "MODEL_NOT_SELECTED", "请先为智能体选择默认模型或在会话中临时选择模型", errors.New("no default model configured"))
+		fail(400, "APP_CONFIG_INVALID", "智能体配置无效", errors.New("invalid AI App config"))
 		return
 	}
 	styleProfileID, styleErr := selectedAIAppImageStyle(config, payload.ActiveSkillIDs)
@@ -361,9 +404,21 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		fail(http.StatusBadRequest, "APP_SKILLS_UNAVAILABLE", "已绑定技能不可用", skillErr)
 		return
 	}
-	invocation, invocationErr := aimodel.ResolveInvocation(database.GetDB(), selectedModelID, "text", 60*time.Second)
+	selectedModelID, requiredCapability, missingModelCode := selectAIAppConversationModel(config, payload.ModelID, len(payload.ReferenceImages) > 0)
+	if selectedModelID == "" {
+		message := "请先为智能体选择对话模型"
+		fail(http.StatusBadRequest, missingModelCode, message, errors.New("no compatible model configured"))
+		return
+	}
+	invocation, invocationErr := aimodel.ResolveInvocation(database.GetDB(), selectedModelID, requiredCapability, 60*time.Second)
 	if invocationErr != nil {
-		fail(http.StatusServiceUnavailable, "MODEL_NOT_CONFIGURED", "所选模型暂不可用", invocationErr)
+		code := "MODEL_NOT_CONFIGURED"
+		message := "所选对话模型暂不可用"
+		if requiredCapability == "vision" {
+			code = "VISION_MODEL_NOT_CONFIGURED"
+			message = "所选对话模型不支持图片理解，请切换模型"
+		}
+		fail(http.StatusServiceUnavailable, code, message, invocationErr)
 		return
 	}
 	run.Model = invocation.Model.ModelID
@@ -374,7 +429,10 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		fail(http.StatusServiceUnavailable, code, publicMessage, retrievalErr)
 		return
 	}
-	system := buildAIAppConversationSystemPrompt(config.SystemPrompt, knowledgeContext)
+	system := buildAIAppConversationSystemPrompt(config.SystemInstructions(), knowledgeContext)
+	if attachmentContext != "" {
+		system = strings.TrimSpace(system + "\n\n以下是用户本轮明确附加的文件内容。回答时应结合文件；若文件内容与用户要求冲突，以用户最新要求为准。\n" + attachmentContext)
+	}
 	system = appendAIAppConversationImageContext(system, len(payload.ReferenceImages), styleProfileID)
 	if skillInstructions != "" {
 		system = strings.TrimSpace(system + "\n\n" + skillInstructions)
@@ -384,21 +442,19 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		fail(500, "AI_TOOL_REGISTRY_UNAVAILABLE", "加载智能体工具失败", toolErr)
 		return
 	}
-	if !aimodel.HasCapabilities(invocation.Model, []string{"tool_call"}) {
-		toolNames = nil
+	toolPolicies, policyErr := loadAIAppToolPolicies(database.GetDB(), version)
+	if policyErr != nil {
+		fail(500, "AI_TOOL_POLICY_UNAVAILABLE", "加载工具授权策略失败", policyErr)
+		return
 	}
-	if len(payload.ReferenceImages) > 0 {
-		hasImageTool := false
-		for _, name := range toolNames {
-			if name == imagetool.ToolName {
-				hasImageTool = true
-				break
-			}
-		}
-		if !hasImageTool {
-			fail(http.StatusBadRequest, "IMAGE_TOOL_UNAVAILABLE", "当前智能体未启用图片生成能力", errors.New("image tool is unavailable"))
+	for _, toolName := range toolNames {
+		if toolPolicies[toolName] == "always" {
+			fail(http.StatusConflict, "TOOL_APPROVAL_REQUIRED", "当前智能体包含需要确认的工具，请使用后台执行", agent.ErrToolApprovalRequired)
 			return
 		}
+	}
+	if !aimodel.HasCapabilities(invocation.Model, []string{"tool_call"}) {
+		toolNames = nil
 	}
 	system = appendContentSearchDateContext(system, toolNames, time.Now())
 
@@ -414,11 +470,16 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		if item.Role == "assistant" {
 			role = agent.RoleAssistant
 		}
-		messages = append(messages, agent.Message{Role: role, Content: item.Content})
+		message := agent.Message{Role: role, Content: item.Content}
+		if item.ID == userMessage.ID {
+			message.Images = payload.ReferenceImages
+		}
+		messages = append(messages, message)
 	}
 	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
 	runContext := content.WithOwner(c.Request.Context(), userID)
 	runContext = imagetool.WithRequestInput(runContext, userID, payload.ReferenceImages, styleProfileID)
+	runContext = filetool.WithRequestContext(runContext, filetool.RequestContext{UserID: userID, AppID: app.ID, ConversationID: conversation.ID, RunID: run.ID})
 	events, loopErr := loop.RunStream(runContext, agent.Spec{Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench-conversation"}, messages)
 	if loopErr != nil {
 		fail(http.StatusBadGateway, "AI_AGENT_RUN_FAILED", "智能体工具调用失败", loopErr)
@@ -437,6 +498,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	var result agent.Result
 	var runErr error
 	imageGenerationIDs := make([]string, 0, 1)
+	pendingToolNarrations := make([]string, 0, 1)
 	for event := range events {
 		switch event.Type {
 		case agent.EventDelta:
@@ -445,20 +507,26 @@ func ChatWithAIAppConversation(c *gin.Context) {
 				_ = writer.Send(gin.H{"type": "delta", "chunk": event.Delta})
 			}
 		case agent.EventToolCall:
+			pendingToolNarrations = append(pendingToolNarrations, event.Narration)
 			if writer != nil {
-				_ = writer.Send(gin.H{"type": "tool_call", "toolName": event.ToolName})
+				_ = writer.Send(gin.H{"type": "tool_call", "toolName": event.ToolName, "narration": event.Narration})
 			}
 		case agent.EventToolResult:
+			narration := ""
+			if len(pendingToolNarrations) > 0 {
+				narration = pendingToolNarrations[0]
+				pendingToolNarrations = pendingToolNarrations[1:]
+			}
 			imageGenerationIDs = append(imageGenerationIDs, imageGenerationIDsFromToolResult(event.ToolName, event.ToolResult)...)
 			ok := !strings.Contains(string(event.ToolResult), `"ok":false`)
 			status := "succeeded"
 			if !ok {
 				status = "failed"
 			}
-			trace := model.AIAppConversationToolTrace{UserID: userID, AppID: app.ID, ConversationID: conversation.ID, RunID: run.ID, ToolName: event.ToolName, Status: status, DurationMs: event.ToolDurationMs}
+			trace := model.AIAppConversationToolTrace{UserID: userID, AppID: app.ID, ConversationID: conversation.ID, RunID: run.ID, ToolName: event.ToolName, Narration: narration, Status: status, DurationMs: event.ToolDurationMs}
 			_ = database.GetDB().Create(&trace).Error
 			if writer != nil {
-				_ = writer.Send(gin.H{"type": "tool_result", "toolName": event.ToolName, "ok": ok, "durationMs": event.ToolDurationMs})
+				_ = writer.Send(gin.H{"type": "tool_result", "toolName": event.ToolName, "narration": narration, "ok": ok, "durationMs": event.ToolDurationMs})
 			}
 		case agent.EventDone:
 			if event.Result != nil {
