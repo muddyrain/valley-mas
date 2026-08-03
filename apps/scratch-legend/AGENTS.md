@@ -51,6 +51,23 @@
 - 改动存档结构时考虑已有 `localStorage` 数据兼容和迁移。
 - 随机结算、成本收益、解锁和 Prestige 等规则变化必须补充与风险相称的自动化测试；纯样式和文案微调不强制新增单测。
 
+## AI Coding 约束（行为改动默认顺序）
+
+- 行为改动（随机结算、阶段流、解锁、存档、存档迁移）默认按以下顺序执行：
+  1. 先补齐/更新测试用例。
+  2. 先跑受影响测试，确认先失败可见。
+  3. 实现改动。
+  4. 再跑受影响测试并确认通过。
+- 仅文案/纯样式且无行为边界的改动可以写明豁免原因。
+
+## 本地 Preflight 约束（AI Coding 默认前置）
+
+- 行为任务在实现前先跑：
+  1. `pnpm --filter @valley/scratch-legend check`。
+  2. `pnpm --filter @valley/scratch-legend typecheck`。
+  3. 可用测试时跑 `pnpm --filter @valley/scratch-legend exec vitest run` 的最小范围。
+- 玩法/数值改动后补跑关键回归并同步记录。
+
 ## 常用命令
 
 ```bash
@@ -58,5 +75,11 @@ pnpm --filter @valley/scratch-legend typecheck
 pnpm --filter @valley/scratch-legend check
 pnpm --filter @valley/scratch-legend build
 ```
+
+## 行为类高风险提测前最小门禁
+
+- `pnpm --filter @valley/scratch-legend check`
+- `pnpm --filter @valley/scratch-legend typecheck`
+- 可观测行为改动再补一次受影响测试（或 `pnpm --filter @valley/scratch-legend exec vitest run` 对应最小范围）
 
 涉及拖动刮卡、动画、响应式、解锁流程或本地持久化时，还需按根规则取得运行时证据；无法自动验证时说明具体未验证范围和人工验收步骤。

@@ -28,6 +28,16 @@
 
 ## 单元测试约定
 
+### 交付前置约束（AI Coding 默认执行顺序）
+
+- 行为改动（包括权限分支、请求参数映射、状态机、错误处理、列表/筛选排序分页、上传下载、保存/发布/删除等）默认按以下顺序执行：
+  1. 编写或更新对应单元测试 / 组件测试（最小可复现行为）。
+  2. 先运行受影响测试，确保失败到通过。
+  3. 完成代码修改。
+  4. 再次运行受影响测试并确认通过。
+- 不能跳过“先补测试再改实现”的流程，除非该行为变化无可测试点（需在提交说明中写明“无对应测试边界”）。
+- 每次改动涉及新行为时，优先补齐同目录同名 `*.test`；不能找到就地测试时，补齐当前目录内最邻近测试文件。
+
 - 新增或修改功能时，默认同时新增或更新与改动风险相称的单元测试；测试应验证用户可观察的结果、数据契约或状态变化，而不是实现细节或无断言快照。
 - 下列行为必须有测试：输入校验与数据转换、权限和状态分支、请求参数/响应映射、错误与重试处理、列表筛选/排序/分页、上传下载限制，以及会影响提交、保存、发布或删除结果的交互逻辑。
 - 每个自研 React 组件（包括 `src/components`、页面和布局）都必须有对应的 `*.test.tsx` 组件测试；纯展示组件也不豁免，至少验证稳定的渲染内容、可访问语义或关键 props 契约。仅直接再导出、未改造的第三方组件可不单独测试。
@@ -63,7 +73,19 @@ pnpm --filter @valley/web test:watch
 pnpm --filter @valley/web build
 ```
 
+## 本地 Preflight 约束（AI Coding 默认前置）
+
+- 约定行为改动任务在进入实现前先跑：
+  1. `pnpm --filter @valley/web check`（lint/format 前置）。
+  2. `pnpm --filter @valley/web exec tsc --noEmit`（类型基础线）。
+  3. 受影响行为测试：用最小范围先跑，要求先看到失败再改实现。
+- 若改动了跨模块边界（如路由、状态共享、请求封装）再补跑一次完整 `pnpm --filter @valley/web test`。
+
 ## 校验要求
+
+- AI Coding 约束：实现前必须先有“相关测试文件变更”，实现后至少跑一轮受影响的单元/组件测试。
+- 默认以 `pnpm --filter @valley/web test:cov` 为“提测前最小可复验门槛”（允许在局部修复场景先跑定向测试）。
+- 行为类高风险改动提测前，至少需通过：`pnpm --filter @valley/web exec tsc --noEmit` + `pnpm --filter @valley/web check` + `pnpm --filter @valley/web test`（或更小范围受影响测试）+ `pnpm --filter @valley/web test:cov`。
 
 - 仅类型或逻辑改动：至少运行 `pnpm --filter @valley/web exec tsc --noEmit`。
 - 样式、格式、lint 相关改动：运行 `pnpm --filter @valley/web check`。

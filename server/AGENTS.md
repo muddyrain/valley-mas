@@ -37,6 +37,22 @@
 - Mind Arena 接口改动要同步检查前端 `apps/ai-mind-arena/lib/api.ts`、`lib/types.ts` 和 SSE 事件处理。
 - 不在源码、日志、测试或示例配置中写真实密钥、真实 token、真实 SMTP 密码或云资源凭据。
 
+## AI Coding 约束（行为改动默认顺序）
+
+- 行为改动（路由、handler、模型、迁移、AI tool call、权限与状态分支）默认按以下顺序执行：
+  1. 先补齐/更新对应 Go 测试（优先受影响包）。
+  2. 先跑受影响测试，确认先失败。
+  3. 实现改动。
+  4. 再跑受影响测试并确认通过。
+- 无法覆盖的行为改动需在提交说明写清替代验证与风险。
+
+## 本地 Preflight 约束（AI Coding 默认前置）
+
+- 进入实现前先跑：
+  1. `cd server && go test ./...`（优先确认受影响链路范围）。
+  2. 若仅改动特定服务/模块，可先缩小到目标包测试。
+  3. 路由/配置/权限改动后再联动跑对应端到端验证范围。
+
 ## 环境变量提示
 
 - 常规服务：`ENV`、`PORT`、`DB_*`、`JWT_SECRET`、`SMTP_*`。
@@ -63,3 +79,7 @@ cd server && air
 - 路由、handler、模型、配置或中间件改动：检查对应前端 API 调用和 `.env.example` 是否需要同步。
 - AI/Mind Arena 服务端改动：补充或运行相关 `internal/ai`、`internal/mindarena` 测试，并说明真实模型调用是否未验证。
 - 仅改服务端协作文档且包含 CJK/非 ASCII 文本时，运行定向 encoding 检查；不需要跑 Go 编译时在最终回复说明原因。
+- 行为类高风险提测前最小门禁：
+  1. `cd server && go test ./...` 或受影响受测集合至少一次通过。
+  2. 涉及路由/权限/迁移改动需同步前端或调用方联调确认。
+  3. AI/Mind Arena 改动补跑 `internal/ai`、`internal/mindarena` 对应测试；无法直连真实模型时写明 mock/桩验证范围。

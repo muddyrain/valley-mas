@@ -26,6 +26,23 @@
 - 涉及列表、筛选、分页、刷新或回退一致性时，遵守根目录的 Web UI skill 路由并启用 `web-ui-consistency-guard`。
 - 不在源码或示例配置中写真实密钥、真实 token 或个人账号凭据。
 
+## AI Coding 约束（行为改动默认顺序）
+
+- 行为改动（状态变更、权限分支、列表筛选、审核动作、请求参数映射、导出/导入）默认按以下顺序执行：
+  1. 先补齐或更新相关测试；没有测试时补齐最邻近可测模块的最小用例。
+  2. 先运行受影响测试，确认能看到失败和断言差异。
+  3. 实现改动。
+  4. 再运行受影响测试并确认通过。
+- 仅文案/纯样式且无可观测行为边界的改动，可在交付说明中明确豁免原因，不作为行为改动。
+
+## 本地 Preflight 约束（AI Coding 默认前置）
+
+- 进入实现前先跑：
+  1. `pnpm --filter @valley/admin check`。
+  2. `pnpm --filter @valley/admin exec tsc --noEmit`。
+  3. 受影响行为测试（`pnpm --filter @valley/admin test` 或对应受影响最小测试）。
+- 处理跨模块改动（路由/权限/共享 API 封装）后再补跑一次受影响的行为回归范围。
+
 ## 常用命令
 
 ```bash
@@ -39,4 +56,8 @@ pnpm --filter @valley/admin build
 
 - 仅类型或逻辑改动：至少运行 `pnpm --filter @valley/admin exec tsc --noEmit`。
 - 样式、格式、lint 相关改动：运行 `pnpm --filter @valley/admin check`。
-- 管理端路由、权限、表单提交或审核流程改动：联动检查对应服务端 handler/API，并在最终回复说明验证范围。
+- 行为类高风险提测前最小门禁：
+  1. `pnpm --filter @valley/admin exec tsc --noEmit`。
+  2. `pnpm --filter @valley/admin check`。
+  3. 受影响行为测试通过（优先 `pnpm --filter @valley/admin test`，无该脚本时补齐并说明）。
+  4. 管理端路由、权限、表单提交或审核流程改动：联动检查对应服务端 handler/API，并在最终回复说明验证范围。

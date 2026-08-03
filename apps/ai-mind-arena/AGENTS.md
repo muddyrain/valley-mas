@@ -28,6 +28,23 @@
 - 不要把本应用改成白底、扁平化、通用 SaaS 风格，也不要随意改三列对战布局。
 - 优先精修既有组件和 Tailwind class；除非任务明确要求，不整体重写组件或改变主要 DOM 结构。
 
+## AI Coding 约束（行为改动默认顺序）
+
+- 行为改动（对话流程、SSE 处理、分数计算、人格切换、请求映射）默认按以下顺序执行：
+  1. 先补齐或更新对应测试。
+  2. 先运行受影响测试并确认先有可观测失败。
+  3. 实现改动。
+  4. 再运行受影响测试并确认通过。
+- 仅文案/样式且无明显行为边界的改动可写明豁免原因，不当作行为改动。
+
+## 本地 Preflight 约束（AI Coding 默认前置）
+
+- 行为任务在实现前先跑：
+  1. `pnpm --filter @valley/ai-mind-arena check`。
+  2. `pnpm --filter @valley/ai-mind-arena typecheck`。
+  3. 受影响行为测试（有测试脚本时先跑最小范围）。
+- 涉及人格与辩论链路变更，补跑更大范围回归并同步说明受影响服务端接口。
+
 ## 常用命令
 
 ```bash
@@ -43,3 +60,8 @@ pnpm --filter @valley/ai-mind-arena build
 - 样式、格式、lint 相关改动：运行 `pnpm --filter @valley/ai-mind-arena check`。
 - 对战流程、SSE、人格或分数逻辑改动：同时检查 `lib/api.ts`、`lib/debateEvents.ts`、`lib/types.ts` 和服务端 `server/internal/mindarena` 的接口契约。
 - 视觉改动需要浏览器检查桌面和移动视口，确认主要内容不重叠、不溢出、发光与暗色氛围仍然成立。
+- 行为类高风险提测前最小门禁：
+  1. `pnpm --filter @valley/ai-mind-arena check`。
+  2. `pnpm --filter @valley/ai-mind-arena typecheck`。
+  3. 受影响行为测试通过（如有 `test` 脚本用 `pnpm --filter @valley/ai-mind-arena test`；无脚本时说明并补齐最小可复现验证）。
+  4. `lib/api.ts`、`lib/debateEvents.ts`、`lib/types.ts` 与服务端 `server/internal/mindarena` 接口联动确认。

@@ -28,6 +28,23 @@
 - UI 文案、操作入口和快捷键变更要同步检查 `src/ui` 相关面板，确保 HUD、Sidebar 和 ReplayBar 状态一致。
 - 不修改 `dist`、`.turbo`、`tsconfig.tsbuildinfo`、`node_modules` 等生成或依赖目录。
 
+## AI Coding 约束（行为改动默认顺序）
+
+- 行为改动（地图生成、模拟参数、前线判定、回放序列、编辑器规则）默认按以下顺序执行：
+  1. 先补齐或更新测试。
+  2. 先跑受影响测试，确认先有失败。
+  3. 实现改动。
+  4. 再跑受影响测试并确认通过。
+- 行为问题涉及共享文档或平衡链路时，优先补充最小复现回归用例。
+
+## 本地 Preflight 约束（AI Coding 默认前置）
+
+- 行为任务在实现前先跑：
+  1. `pnpm --filter @valley/world-sim check`。
+  2. `pnpm --filter @valley/world-sim typecheck`。
+  3. `pnpm --filter @valley/world-sim exec vitest run`（先做受影响范围）。
+- 涉及 map/sim/战斗路径改动再补 `pnpm --filter @valley/world-sim test:stability`。
+
 ## 常用命令
 
 ```bash
@@ -46,3 +63,8 @@ pnpm --filter @valley/world-sim test:longrun
 - UI、样式或 lint 相关改动：运行 `pnpm --filter @valley/world-sim check`。
 - 地图、模拟、前线、回放或平衡逻辑改动：运行相关 vitest；范围不确定时跑 `pnpm --filter @valley/world-sim exec vitest run`。
 - 仅改协作文档或设计文档且包含中文时，运行 encoding 定向检查；无需跑应用级编译时在最终回复说明原因。
+- 行为类高风险提测前最小门禁：
+  1. `pnpm --filter @valley/world-sim check`。
+  2. `pnpm --filter @valley/world-sim typecheck`。
+  3. `pnpm --filter @valley/world-sim exec vitest run`（最小受影响）。
+  4. 地图/模拟/稳定性改动再补 `pnpm --filter @valley/world-sim test:balance` 或 `pnpm --filter @valley/world-sim test:stability`。

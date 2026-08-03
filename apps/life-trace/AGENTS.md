@@ -19,6 +19,15 @@
 
 ## 开发规范
 
+### 交付前置约束（AI Coding 默认执行顺序）
+
+- 行为改动（尤其涉及状态流、提醒触发、AI 产出、时间/列表筛选、表单提交、权限判断）默认执行：
+  1. 先补齐/更新对应测试；
+  2. 先跑受影响测试并确认；
+  3. 再改实现；
+  4. 再跑受影响测试兜底。
+- 不能跳过测试步骤，除非改动仅为文案/样式且无可观测行为边界。
+
 - 任何 Life Trace 用户可见 UI、文案、设置项、按钮、说明语、空状态、Badge 改动，必须启用 `ui-copy-boundary-guard`。
 - Life Trace 页面样式、loading、交互状态改动，优先对照现有组件和页面模式，不要把开发者分析、实现解释或“页面说明”写进用户界面。
 - 设置页和概览页优先展示状态、摘要和动作，不写“这里会影响哪里”“这个入口已经被整理到哪里”这类元说明。
@@ -34,7 +43,19 @@ pnpm --filter @valley/life-trace check
 pnpm --filter @valley/life-trace exec vitest run
 ```
 
+## 本地 Preflight 约束（AI Coding 默认前置）
+
+- 约定行为改动任务在进入实现前先跑：
+  1. `pnpm --filter @valley/life-trace check`（静态检查）。
+  2. `pnpm --filter @valley/life-trace exec tsc --noEmit`（类型基础线）。
+  3. 受影响行为测试：先跑定向 `pnpm --filter @valley/life-trace exec vitest run`，确保先有可观测失败。
+- 触及 `src` 共享边界（store/api/lib）后，补跑一次更大范围测试集合。
+
 ## 校验要求
+
+- AI Coding 约束：实现前必须先有“相关测试文件变更”，实现后至少跑一轮受影响测试。
+- 以 `pnpm --filter @valley/life-trace exec vitest run` 作为行为改动的基本验证入口；高风险改动跑更大范围。
+- 行为类高风险改动提测前最小门禁：`pnpm --filter @valley/life-trace check` + `pnpm --filter @valley/life-trace exec tsc --noEmit` + `pnpm --filter @valley/life-trace exec vitest run`（或与改动等价的最小受影响范围）。
 
 - 仅类型或逻辑改动：至少运行 `pnpm --filter @valley/life-trace exec tsc --noEmit`。
 - 页面交互、状态或业务行为变化：补充与风险相称的测试，并运行针对性 vitest。

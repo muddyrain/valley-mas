@@ -63,6 +63,23 @@ apps/toy-climb-arena/
 - 不要在未完成 v0.1 工程稳定前添加 v0.2+ 的复杂视觉/网络功能
 - `ClimberArcadeExperience.tsx` 已完成主体拆分，后续保持其编排职责；只有出现新的独立职责或重复逻辑时再提取组件，不因历史行数机械重构
 
+## AI Coding 约束（行为改动默认顺序）
+
+- 行为改动（跳跃判定、关卡加载、碰撞、解锁、持久化）默认按以下顺序执行：
+  1. 先补齐/更新测试。
+  2. 先跑受影响测试并确认先失败。
+  3. 实现改动。
+  4. 再跑受影响测试并确认通过。
+- 无法覆盖的行为改动需给出替代人工验证清单后再提测。
+
+## 本地 Preflight 约束（AI Coding 默认前置）
+
+- 行为改动进入实现前先跑：
+  1. `pnpm --filter @valley/toy-climb-arena check`。
+  2. `pnpm --filter @valley/toy-climb-arena typecheck`。
+  3. `pnpm --filter @valley/toy-climb-arena exec vitest run`（有测试时先做最小范围；无测试脚本时说明并给出人工验证）。
+- 修改关卡、碰撞、物理路径后补跑运行时截图/日志复核。
+
 ### 资源修改
 - 新增或删除模型文件必须同步更新 `docs/ASSET_GUIDE.md`
 - 新增 setpiece 必须在 `setpieceCatalog.ts` 中注册
@@ -89,3 +106,10 @@ pnpm --filter @valley/toy-climb-arena check
 # 构建
 pnpm --filter @valley/toy-climb-arena build
 ```
+
+## 行为类高风险提测前最小门禁
+
+- `pnpm --filter @valley/toy-climb-arena check`
+- `pnpm --filter @valley/toy-climb-arena typecheck`
+- 受影响行为测试通过（如有可测脚本）
+- 关卡/物理改动补做运行时验收与 `ClimberJumpClearanceReport` 复核

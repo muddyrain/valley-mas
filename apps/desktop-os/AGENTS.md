@@ -48,6 +48,23 @@
 - 资源、天气、博客、邮件等重数据按窗口或面板激活时再加载；Spotlight / Safari / Finder 不在关闭态订阅资源列表。
 - 拖拽和缩放通过 `requestAnimationFrame` 合并写入，本地持久化用 debounce 写 `localStorage`，避免在 scroll 事件中同步落盘。
 
+## AI Coding 约束（行为改动默认顺序）
+
+- 行为改动（窗口生命周期、store 变更、权限边界、AI 命令、Mini App 接口）默认按以下顺序执行：
+  1. 先补齐/更新对应测试。
+  2. 先跑受影响测试，确认先可观测失败。
+  3. 实现改动。
+  4. 再跑受影响测试并确认通过。
+- 仅视觉微调且无行为边界的改动可在交付说明里给出豁免原因。
+
+## 本地 Preflight 约束（AI Coding 默认前置）
+
+- 行为改动进入实现前先跑：
+  1. `pnpm --filter @valley/desktop-os check`。
+  2. `pnpm --filter @valley/desktop-os typecheck`。
+  3. `pnpm --filter @valley/desktop-os exec vitest run` 的最小受影响范围，先看到失败再改。
+- 触及共享状态、`api`、窗口系统、`PlushPrimitives` 时，补跑一次完整 `pnpm --filter @valley/desktop-os exec vitest run`。
+
 ## 目录结构
 
 ```
@@ -114,6 +131,14 @@ pnpm --filter @valley/desktop-os exec vitest run
 ```
 
 涉及共享包的改动还需运行对应包的 `test` / `typecheck` / `check` / `build`，以 `apps/desktop-os/docs/PLAN.md` 的验收标准为准。
+
+## 校验要求
+
+- 行为类高风险提测前最小门禁：
+  1. `pnpm --filter @valley/desktop-os check`。
+  2. `pnpm --filter @valley/desktop-os typecheck`。
+  3. 受影响行为测试通过（优先 `pnpm --filter @valley/desktop-os exec vitest run` 最小范围）。
+  4. 关键交互场景再补一次对应模块回归（或完整测试）。
 
 ## 计划同步
 
