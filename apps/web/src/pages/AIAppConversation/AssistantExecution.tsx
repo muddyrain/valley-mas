@@ -151,7 +151,7 @@ export function AssistantExecutionHeader({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="group flex w-full items-center gap-1.5 border-b-2 border-border pb-2.5 text-left text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset">
+      <CollapsibleTrigger className="group flex w-full items-center gap-1.5 border-b border-border pb-2.5 text-left text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset">
         <span>{formatAssistantExecution(run)}</span>
         <ChevronRight
           className={cn('size-3.5 transition-transform duration-200', open && 'rotate-90')}
@@ -225,7 +225,7 @@ export function AssistantActiveExecution({
     <Collapsible open={open} onOpenChange={setOpen} className="min-w-0 w-full max-w-[52rem] pt-1">
       <div role="status" aria-live="polite">
         <CollapsibleTrigger
-          className="group flex w-full items-center gap-2 border-b-2 border-border pb-2.5 text-left text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset"
+          className="group flex w-full items-center gap-2 border-b border-border pb-2.5 text-left text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset"
           aria-label={open ? '收起执行过程' : '展开执行过程'}
         >
           <LoaderCircle className="size-4 animate-spin text-primary" />

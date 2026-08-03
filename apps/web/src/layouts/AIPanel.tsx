@@ -308,7 +308,7 @@ export function AIPanel() {
                   >
                     <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
                     {msg.pending && (
-                      <span className="mt-1 inline-block h-4 w-1 animate-pulse bg-primary" />
+                      <span className="mt-1 inline-block h-4 w-px animate-pulse rounded-full bg-primary" />
                     )}
                   </div>
                 </div>

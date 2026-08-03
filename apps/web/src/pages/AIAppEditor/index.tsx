@@ -154,8 +154,60 @@ function EditorSkeleton() {
       className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-[1440px] gap-6 p-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:p-10"
       aria-busy="true"
     >
-      <Skeleton className="h-[38rem] rounded-2xl" />
-      <Skeleton className="h-[42rem] rounded-2xl" />
+      <section className="space-y-3">
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-4 rounded-full" />
+          <Skeleton className="h-5 w-20" />
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="mt-4 h-10 rounded-lg" />
+            <Skeleton className="h-10 rounded-lg" />
+            <Skeleton className="h-10 rounded-lg" />
+            <Skeleton className="h-10 rounded-lg" />
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="mt-4 h-32 rounded-lg" />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="space-y-3">
+            <Skeleton className="h-6 w-56" />
+            <Skeleton className="h-3 w-72" />
+            <Skeleton className="h-10 rounded-lg" />
+            <Skeleton className="h-24 rounded-lg" />
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Skeleton className="h-10" />
+            <Skeleton className="h-10" />
+            <Skeleton className="h-10 sm:col-span-2" />
+            <Skeleton className="h-28 sm:col-span-2 rounded-lg" />
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="space-y-3">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-3 w-64" />
+            <Skeleton className="h-36 rounded-lg" />
+            <div className="flex flex-wrap gap-2">
+              <Skeleton className="h-8 w-20 rounded-full" />
+              <Skeleton className="h-8 w-20 rounded-full" />
+              <Skeleton className="h-8 w-20 rounded-full" />
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
