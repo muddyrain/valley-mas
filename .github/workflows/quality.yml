@@ -45,6 +45,9 @@ jobs:
       - name: Test Web
         run: pnpm --filter @valley/web test
 
+      - name: Test Web Coverage Gate
+        run: pnpm --filter @valley/web test:cov
+
   server:
     name: Go Test
     runs-on: ubuntu-latest

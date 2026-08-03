@@ -10,6 +10,7 @@
     "format": "biome format --write src/",
     "check": "biome check src/",
     "test": "vitest run --config vitest.config.ts",
+    "test:cov": "vitest run --config vitest.config.ts --coverage",
     "test:watch": "vitest --config vitest.config.ts",
     "test:ai-workbench-sse": "node scripts/test-ai-workbench-sse.mjs",
     "test:workflow-variables": "node --experimental-strip-types scripts/test-workflow-variable-model.ts",
