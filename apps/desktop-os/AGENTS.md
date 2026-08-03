@@ -1,5 +1,11 @@
 # Desktop OS · AI 协作入口
 
+## AI 任务最小上下文入口（本文件）
+
+- `AGENTS.md` -> `apps/desktop-os/AGENTS.md` -> `apps/desktop-os/src/App.tsx` -> `apps/desktop-os/src/apps/desktopApps.ts` -> `apps/desktop-os/src/ui/PlushPrimitives.tsx`
+- 文档治理/约束变更任务：补读 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
+
+
 本文件是 AI 在 `apps/desktop-os` 目录内工作的局部协作入口。
 全局规则、skill 选择和 Git 约定仍以根目录 `AGENTS.md` 为准；项目级技术栈和环境变量见 `docs/PROJECT_GUIDE.md`。
 

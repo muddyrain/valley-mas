@@ -1,5 +1,11 @@
 # WorldSim AGENTS
 
+## AI 任务最小上下文入口（本文件）
+
+- `AGENTS.md` -> `apps/world-sim/AGENTS.md` -> `apps/world-sim/src/App.tsx` -> `apps/world-sim/src/ui/layout/AppLayout.tsx` -> `apps/world-sim/docs/TDD.md`
+- 文档治理/约束变更任务：补读 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
+
+
 本文件只补充 `apps/world-sim` 的局部协作规则。全局规则、skill 选择、Git 规则和完成标准继承根目录 `AGENTS.md`。
 
 ## 功能定位

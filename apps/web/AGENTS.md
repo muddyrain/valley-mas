@@ -1,5 +1,11 @@
 # Web 前台 AGENTS
 
+## AI 任务最小上下文入口（本文件）
+
+- `AGENTS.md` -> `apps/web/AGENTS.md` -> `apps/web/src/App.tsx` -> `server/internal/router/router.go` -> `apps/web/src/api`
+- 文档治理/约束变更任务：补读 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
+
+
 本文件只补充 `apps/web` 的局部协作规则。全局规则、skill 选择、Git 规则和完成标准继承根目录 `AGENTS.md`。
 
 ## 功能定位

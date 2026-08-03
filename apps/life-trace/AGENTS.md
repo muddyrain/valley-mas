@@ -1,5 +1,11 @@
 # Life Trace AGENTS
 
+## AI 任务最小上下文入口（本文件）
+
+- `AGENTS.md` -> `apps/life-trace/AGENTS.md` -> `apps/life-trace/src/App.tsx` -> `apps/life-trace/src/api` -> `server/internal/lifetrace`
+- 文档治理/约束变更任务：补读 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
+
+
 本文件只补充 `apps/life-trace` 的局部协作规则。全局规则、通用 skill、Git 规则和完成标准继承根目录 `AGENTS.md`。
 
 ## 功能定位

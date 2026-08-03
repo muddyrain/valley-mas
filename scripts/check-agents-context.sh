@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="${AGENTS_CHECK_ROOT:-$SCRIPT_ROOT}"
+
+AGENTS_CHECK_ROOT="$ROOT" python3 <<'PY'
+from pathlib import Path
+import os
+import re
+import sys
+
+root = Path(os.environ["AGENTS_CHECK_ROOT"]).resolve()
+docs_required = ("docs/README.md", "docs/PROJECT_GUIDE.md", "docs/HARNESS_ENGINEERING.md")
+agents_files = sorted(root.rglob("AGENTS.md"))
+
+errors: list[str] = []
+heading_re = re.compile(r"^##\s*AI 任务最小上下文入口", re.M)
+
+
+def section_lines(text: str, heading_name: str) -> list[str]:
+    lines = text.splitlines()
+    start = None
+    for idx, line in enumerate(lines):
+        if line.startswith("## ") and heading_name in line:
+            start = idx + 1
+            break
+    if start is None:
+        return []
+    section: list[str] = []
+    for line in lines[start:]:
+        if line.startswith("## "):
+            break
+        section.append(line)
+    return section
+
+
+for path in agents_files:
+    if "node_modules" in path.parts or ".git" in path.parts:
+        continue
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        errors.append(f"{path}: encoding error (must be UTF-8)")
+        continue
+
+    rel = path.relative_to(root)
+
+    if not heading_re.search(text):
+        errors.append(f"{rel}: missing section 'AI 任务最小上下文入口'")
+        continue
+
+    section = section_lines(text, "AI 任务最小上下文入口")
+    bullets = [line.strip() for line in section if line.startswith("- ")]
+    chain_lines = [line for line in bullets if "->" in line]
+    doc_lines = [line for line in section if "文档治理/约束变更任务" in line]
+
+    if len(chain_lines) < 1:
+        errors.append(f"{rel}: missing route chain under context section (need at least 1 line with `->`)")
+
+    if "AGENTS.md" not in text:
+        errors.append(f"{rel}: missing AGENTS.md reference in context content")
+
+    for required in docs_required:
+        if required not in text:
+            errors.append(f"{rel}: missing required doc reference {required}")
+
+    if not doc_lines and rel.name != "AGENTS.md":
+        errors.append(f"{rel}: missing 文档治理/约束变更提示 line in context section")
+
+    # 至少提供 2 条信息链路（1 条本地上下文链 + 1 条治理提示）
+    if len(chain_lines) + len(doc_lines) < 2:
+        errors.append(f"{rel}: context section needs at least 2 route lines, currently {len(chain_lines) + len(doc_lines)}")
+
+if not agents_files:
+    errors.append("no AGENTS.md found under repository root")
+
+if errors:
+    print("FAIL: AGENTS context check", file=sys.stderr)
+    for item in errors:
+        print(f"- {item}", file=sys.stderr)
+    raise SystemExit(1)
+
+print(f"PASS: AGENTS context entry check ({len(agents_files)} files)")
+PY

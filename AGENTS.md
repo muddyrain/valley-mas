@@ -14,6 +14,20 @@
 
 只装载当前任务需要的上下文。普通任务不要求全文读取所有长期文档或所有 skills。
 
+## AI 任务最小上下文入口（建议按任务类型先读）
+
+- Web 前台：`AGENTS.md` -> `apps/web/AGENTS.md` -> `docs/PROJECT_GUIDE.md` -> `apps/web/src/App.tsx`。
+- Admin 后台：`AGENTS.md` -> `apps/admin/AGENTS.md` -> `apps/admin/src/App.tsx` -> `server/internal/router/router.go`。
+- Life Trace：`AGENTS.md` -> `apps/life-trace/AGENTS.md` -> `apps/life-trace/src/App.tsx` -> `server/internal/lifetrace`。
+- Desktop OS：`AGENTS.md` -> `apps/desktop-os/AGENTS.md` -> `apps/desktop-os/src/App.tsx` -> `apps/desktop-os/src/apps/desktopApps.ts`。
+- AI Mind Arena：`AGENTS.md` -> `apps/ai-mind-arena/AGENTS.md` -> `apps/ai-mind-arena/app/page.tsx` -> `server/internal/mindarena`。
+- WorldSim：`AGENTS.md` -> `apps/world-sim/AGENTS.md` -> `apps/world-sim/src/App.tsx` -> `apps/world-sim/docs/TDD.md`。
+- Scratch Legend：`AGENTS.md` -> `apps/scratch-legend/AGENTS.md` -> `apps/scratch-legend/docs/scratch-legend-task.md` -> `apps/scratch-legend/lib/game-store.ts`。
+- Toy Climb Arena：`AGENTS.md` -> `apps/toy-climb-arena/AGENTS.md` -> `apps/toy-climb-arena/docs/TASKS.md` -> `apps/toy-climb-arena/src/main.tsx`。
+- Go 服务端：`AGENTS.md` -> `server/AGENTS.md` -> `server/internal/router/router.go` -> `server/.env.example`。
+
+若任务与文档治理/约束体系相关，再增加顺序：`docs/README.md` -> 对应文件 -> `docs/HARNESS_ENGINEERING.md`。
+
 ## 子项目路由
 
 | 子项目 | 局部协作入口 | 适用范围 |
@@ -78,6 +92,7 @@
 
 - 修改前先阅读相关代码和文档，遵循现有风格和边界。
 - 必须运行与改动范围匹配的校验并读取结果；完整命令见 `docs/PROJECT_GUIDE.md`。
+- 涉及文档约束（含 AGENTS、SKILL、plans、ARCHIVE/PLAN）改动，建议同时运行 `pnpm check:docs-links`。
 - 不在源码、文档或示例配置中写入真实密钥。
 - 不修改 `node_modules`、`dist`、`.next`、`.turbo` 等依赖或生成目录，除非任务明确要求。
 - 不执行 `git reset --hard`、`git checkout --`、大批量删除等破坏性操作，除非用户明确授权。

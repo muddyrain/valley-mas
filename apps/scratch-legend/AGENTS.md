@@ -1,5 +1,11 @@
 # Scratch Legend · AI 协作入口
 
+## AI 任务最小上下文入口（本文件）
+
+- `AGENTS.md` -> `apps/scratch-legend/AGENTS.md` -> `apps/scratch-legend/docs/scratch-legend-task.md` -> `apps/scratch-legend/lib/game-store.ts`
+- 文档治理/约束变更任务：补读 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
+
+
 本文件只补充 `apps/scratch-legend` 的局部规则。全局安全边界、skill 路由、Git 规则和完成标准继承根目录 `AGENTS.md`。
 
 ## 项目定位

@@ -1,5 +1,11 @@
 # Server AGENTS
 
+## AI 任务最小上下文入口（本文件）
+
+- `AGENTS.md` -> `server/AGENTS.md` -> `server/internal/router/router.go` -> `server/internal/config/config.go` -> `server/.env.example`
+- 文档治理/约束变更任务：补读 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
+
+
 本文件只补充 `server` 的局部协作规则。全局规则、skill 选择、Git 规则和完成标准继承根目录 `AGENTS.md`。
 
 ## 功能定位

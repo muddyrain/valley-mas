@@ -141,6 +141,7 @@ Go API 启动时会优先使用 `PORT`（默认 `8080`）。如果该端口已�
 # Harness 配置与 fixture
 pnpm check:harness
 pnpm check:harness:test
+pnpm check:docs-links
 
 # 全 workspace 静态检查与构建
 pnpm check

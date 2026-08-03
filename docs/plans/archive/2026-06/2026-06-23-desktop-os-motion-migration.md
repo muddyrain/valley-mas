@@ -10,7 +10,7 @@
 
 **Tech Stack:** React 19、`motion@12.40.0`(`motion/react`)、Vite 6、TypeScript、vitest + @testing-library/react、Tailwind 4、zustand。
 
-**Spec:** [docs/specs/2026-06-23-desktop-os-motion-migration-design.md](file:///Users/bytedance/Desktop/study/valley-mas/docs/specs/2026-06-23-desktop-os-motion-migration-design.md)
+**Spec:** [docs/specs/2026-06-23-desktop-os-motion-migration-design.md](../../../../docs/specs/2026-06-23-desktop-os-motion-migration-design.md)
 
 ---
 
@@ -271,7 +271,7 @@ Expected: 全绿,89 + 4 = 93 用例通过(若现有用例数有变,以基线数 
 - [ ] **Step 6:** 跑 build 记录基线
 
 Run: `pnpm --filter @valley/desktop-os build`
-Expected: build 成功;把 `dist/` 体积(`du -sh apps/desktop-os/dist`)写入 [本 plan](file:///Users/bytedance/Desktop/study/valley-mas/docs/plans/2026-06-23-desktop-os-motion-migration.md) 末尾「实施后记 · P1 体积基线」。
+Expected: build 成功;把 `dist/` 体积(`du -sh apps/desktop-os/dist`)写入 [本 plan](../../../../docs/plans/2026-06-23-desktop-os-motion-migration.md) 末尾「实施后记 · P1 体积基线」。
 
 - [ ] **Step 7:** 跑 mojibake 检查
 
@@ -291,13 +291,13 @@ git commit -m "feat(desktop-os): motion P1 - PlushMotion primitives"
 - Modify: `apps/desktop-os/AGENTS.md`
 - Modify: `apps/desktop-os/docs/PLAN.md`
 
-- [ ] **Step 1:** 在 [apps/desktop-os/AGENTS.md](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/AGENTS.md) 「设计系统约束」段落末尾追加一条:
+- [ ] **Step 1:** 在 [apps/desktop-os/AGENTS.md](../../../../apps/desktop-os/AGENTS.md) 「设计系统约束」段落末尾追加一条:
 
 ```markdown
 - 进出场 / layout 动画统一通过 `PlushMotion`(`PlushPresence` / `PlushPop` / `PlushFade` / `PlushSlide`)接入,业务组件不直接 `import 'motion/react'`。装饰类 `@keyframes`(loading / shimmer / spin / cloud-drift / 控件 pop)与 rAF 拖拽缩放路径不在 motion 治理范围内。
 ```
 
-- [ ] **Step 2:** 在 [apps/desktop-os/docs/PLAN.md](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/docs/PLAN.md) 立条「动画统一迁移到 motion」(只记长期能力状态,不抄具体 task):
+- [ ] **Step 2:** 在 [apps/desktop-os/docs/PLAN.md](../../../../apps/desktop-os/docs/PLAN.md) 立条「动画统一迁移到 motion」(只记长期能力状态,不抄具体 task):
 
 ```markdown
 ## 动画统一迁移到 motion
@@ -327,7 +327,7 @@ git commit -m "docs(desktop-os): motion P1 - sync AGENTS / PLAN"
 
 ## Phase 2 · 窗口层(Window / Spotlight / Dock 菜单)
 
-> **rAF 块只读不改**:[Window.tsx](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/components/window/Window.tsx) 的 `startDrag` / `flushMove` / `onMove` 块、[Dock.tsx](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/components/Dock.tsx) 的 magnification rAF 块、[ResizeHandles.tsx](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/ui/ResizeHandles.tsx) 的 resize rAF 块,本 Phase 一律不修改。
+> **rAF 块只读不改**:[Window.tsx](../../../../apps/desktop-os/src/components/window/Window.tsx) 的 `startDrag` / `flushMove` / `onMove` 块、[Dock.tsx](../../../../apps/desktop-os/src/components/Dock.tsx) 的 magnification rAF 块、[ResizeHandles.tsx](../../../../apps/desktop-os/src/ui/ResizeHandles.tsx) 的 resize rAF 块,本 Phase 一律不修改。
 
 ### Task 2.1: Window 关闭 / 最小化进出场(TDD 红)
 
@@ -340,7 +340,7 @@ git commit -m "docs(desktop-os): motion P1 - sync AGENTS / PLAN"
 - [ ] **Step 1:** 先看 WindowManager 入口在哪
 
 Run: `rg -n "WindowManager|<Window " apps/desktop-os/src --type tsx`
-确认列表渲染入口位置(可能是 `WindowManager.tsx` 或直接在 [App.tsx](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/App.tsx) 内 map),记下文件 + 行号供 Step 4 使用。
+确认列表渲染入口位置(可能是 `WindowManager.tsx` 或直接在 [App.tsx](../../../../apps/desktop-os/src/App.tsx) 内 map),记下文件 + 行号供 Step 4 使用。
 
 - [ ] **Step 2:** 写失败测试
 
@@ -392,7 +392,7 @@ import { PlushPresence } from '../../ui/PlushMotion';
 </PlushPresence>
 ```
 
-- [ ] **Step 5:** 重写 [Window.tsx](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/components/window/Window.tsx) 的关闭逻辑
+- [ ] **Step 5:** 重写 [Window.tsx](../../../../apps/desktop-os/src/components/window/Window.tsx) 的关闭逻辑
 
 把第 15 行 `const CLOSE_ANIM_MS = 220;`、第 33–34 行的 `closingRef` / `isClosing` state、第 36–41 行的 `handleClose` 改成:
 
@@ -420,7 +420,7 @@ return (
 
 (`is-minimized` className 如果在 store 控制就保留,只删 `is-closing`。)
 
-- [ ] **Step 6:** 修改 [Window.css](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/components/window/Window.css)
+- [ ] **Step 6:** 修改 [Window.css](../../../../apps/desktop-os/src/components/window/Window.css)
 
 删除以下区块:
 - 第 12 行 `animation: window-pop 0.32s var(--ease-spring);`
@@ -484,7 +484,7 @@ describe('Spotlight AnimatePresence', () => {
 Run: `pnpm --filter @valley/desktop-os exec vitest run tests/spotlightPresence.test.tsx`
 Expected: FAIL。
 
-- [ ] **Step 3:** 改 [Spotlight.tsx](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/spotlight/Spotlight.tsx)
+- [ ] **Step 3:** 改 [Spotlight.tsx](../../../../apps/desktop-os/src/spotlight/Spotlight.tsx)
 
 把第 12–16 行 `SpotlightGate` 改为:
 
@@ -505,7 +505,7 @@ export default function SpotlightGate() {
 }
 ```
 
-- [ ] **Step 4:** 改 [Spotlight.css](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/spotlight/Spotlight.css)
+- [ ] **Step 4:** 改 [Spotlight.css](../../../../apps/desktop-os/src/spotlight/Spotlight.css)
 
 删除:
 - `@keyframes spotlight-fade`(第 15 行附近)与对应 `animation` 引用。
@@ -543,7 +543,7 @@ git commit -m "feat(desktop-os): motion P2 - spotlight presence"
 - Modify: `apps/desktop-os/src/components/Dock.tsx`(只动菜单 / 子菜单渲染部分,**magnification rAF 块不动**)
 - Modify: `apps/desktop-os/src/components/Dock.css`
 
-- [ ] **Step 1:** 在 [Dock.tsx](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/components/Dock.tsx) 内定位菜单渲染位置
+- [ ] **Step 1:** 在 [Dock.tsx](../../../../apps/desktop-os/src/components/Dock.tsx) 内定位菜单渲染位置
 
 Run: `rg -n "dock-menu|submenu|context-menu" apps/desktop-os/src/components/Dock.tsx`
 记下菜单 / 子菜单条件渲染的行号区间。
@@ -603,7 +603,7 @@ import { PlushPop, PlushPresence } from '../ui/PlushMotion';
 
 **magnification rAF 块**(`hoverFrameRef.current = window.requestAnimationFrame(...)` 附近)**不要改**。
 
-- [ ] **Step 5:** 改 [Dock.css](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/components/Dock.css)
+- [ ] **Step 5:** 改 [Dock.css](../../../../apps/desktop-os/src/components/Dock.css)
 
 删除:
 - `@keyframes dock-menu-pop`(第 267 行附近)。
@@ -630,7 +630,7 @@ Expected: 全绿。
 
 - [ ] **Step 8:** 人工验收(Phase 2 收尾)
 
-按 spec § 4 Phase 2 「人工验收清单」逐条复核:5 个 App 开关、Spotlight ⌘空格、Dock 右键菜单 + 二级、系统设置开启「减少动画」复测。把异常写入 [本 plan](file:///Users/bytedance/Desktop/study/valley-mas/docs/plans/2026-06-23-desktop-os-motion-migration.md) 末尾「实施后记 · P2 人工验收记录」。
+按 spec § 4 Phase 2 「人工验收清单」逐条复核:5 个 App 开关、Spotlight ⌘空格、Dock 右键菜单 + 二级、系统设置开启「减少动画」复测。把异常写入 [本 plan](../../../../docs/plans/2026-06-23-desktop-os-motion-migration.md) 末尾「实施后记 · P2 人工验收记录」。
 
 - [ ] **Step 9:** Commit
 
@@ -687,7 +687,7 @@ describe('Panel slide AnimatePresence', () => {
 Run: `pnpm --filter @valley/desktop-os exec vitest run tests/panelSlide.test.tsx`
 Expected: FAIL(两条都红)。
 
-- [ ] **Step 3:** 改 [ControlCenter.tsx](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/components/ControlCenter.tsx)
+- [ ] **Step 3:** 改 [ControlCenter.tsx](../../../../apps/desktop-os/src/components/ControlCenter.tsx)
 
 把面板根渲染从「`isOpen` 条件直接渲染 + CSS 动画」改成 `PlushPresence + PlushSlide`:
 
@@ -705,7 +705,7 @@ return (
 );
 ```
 
-- [ ] **Step 4:** 改 [ControlCenter.css](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/components/ControlCenter.css)
+- [ ] **Step 4:** 改 [ControlCenter.css](../../../../apps/desktop-os/src/components/ControlCenter.css)
 
 删除:
 - `@keyframes cc-pop`(第 23 行附近)。
@@ -730,7 +730,7 @@ git commit -m "feat(desktop-os): motion P3 - control center slide"
 - Modify: `apps/desktop-os/src/components/NotificationCenter.tsx`
 - Modify: `apps/desktop-os/src/components/NotificationCenter.css`
 
-- [ ] **Step 1:** 改 [NotificationCenter.tsx](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/components/NotificationCenter.tsx)
+- [ ] **Step 1:** 改 [NotificationCenter.tsx](../../../../apps/desktop-os/src/components/NotificationCenter.tsx)
 
 外层面板:
 
@@ -755,7 +755,7 @@ return (
 );
 ```
 
-- [ ] **Step 2:** 改 [NotificationCenter.css](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/components/NotificationCenter.css)
+- [ ] **Step 2:** 改 [NotificationCenter.css](../../../../apps/desktop-os/src/components/NotificationCenter.css)
 
 删除:
 - `@keyframes nc-pop`(第 35 行附近)及对应 `animation:` 引用。
@@ -817,7 +817,7 @@ describe('Launchpad AnimatePresence', () => {
 Run: `pnpm --filter @valley/desktop-os exec vitest run tests/launchpadPresence.test.tsx`
 Expected: FAIL。
 
-- [ ] **Step 3:** 改 [Launchpad.tsx](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/components/Launchpad.tsx)
+- [ ] **Step 3:** 改 [Launchpad.tsx](../../../../apps/desktop-os/src/components/Launchpad.tsx)
 
 **第一步先把现有 motion 用法迁到 PlushMotion**(R7 缓解):
 - 第 2 行 `import { AnimatePresence, motion, useReducedMotion } from 'motion/react';` 改为 `import { PlushPop, PlushPresence } from '../ui/PlushMotion';`。
@@ -917,7 +917,7 @@ describe('AICommandCenter AnimatePresence', () => {
 Run: `pnpm --filter @valley/desktop-os exec vitest run tests/aiCommandPresence.test.tsx`
 Expected: FAIL。
 
-- [ ] **Step 3:** 改 [AICommandCenterWindow.tsx](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/apps/AICommandCenterWindow.tsx)
+- [ ] **Step 3:** 改 [AICommandCenterWindow.tsx](../../../../apps/desktop-os/src/apps/AICommandCenterWindow.tsx)
 
 定位消息列表渲染:
 
@@ -950,7 +950,7 @@ const prefersReducedAutoScroll = window.matchMedia('(prefers-reduced-motion: red
 
 并把所有引用同步改名;**该值不得再用于动画分支**,动画统一交给 `PlushFade` 内部的 `useReducedMotion()`。
 
-- [ ] **Step 4:** 改 [AICommandCenterWindow.css](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/apps/AICommandCenterWindow.css)
+- [ ] **Step 4:** 改 [AICommandCenterWindow.css](../../../../apps/desktop-os/src/apps/AICommandCenterWindow.css)
 
 删除以下 5 处 `@keyframes` 与对应 `animation:` 引用:
 - `@keyframes ai-command-thread-in`(第 1031 行附近)
@@ -988,14 +988,14 @@ git commit -m "feat(desktop-os): motion P4 - ai command messages fade"
 **Files:**
 - Modify: `apps/desktop-os/src/components/Launchpad.tsx`(P3 已切顶层 Presence,这里只接翻页内部位移)
 
-- [ ] **Step 1:** 在 [Launchpad.tsx](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/src/components/Launchpad.tsx) 内定位翻页渲染
+- [ ] **Step 1:** 在 [Launchpad.tsx](../../../../apps/desktop-os/src/components/Launchpad.tsx) 内定位翻页渲染
 
 Run: `rg -n "pageDirection|pageIndex|pages\[" apps/desktop-os/src/components/Launchpad.tsx`
 找到当前页 `currentPage` 的渲染区块。
 
 - [ ] **Step 2:** 用 `motion.div layout` 接翻页位移
 
-(P3 把 motion 直接 import 拿掉了,这里**仅在翻页内部**重新引入 `motion`,而不再走 PlushMotion 包装层 —— 因为 layout 动画对 `motion.div` 原生 API 依赖较强,包装层会把语义模糊化。在 [AGENTS.md](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/AGENTS.md) 「设计系统约束」段补一行豁免:**例外**:layout / shared layout 动画允许在组件内直接使用 `motion.div`,但仍优先用 `PlushMotion` 原语。)
+(P3 把 motion 直接 import 拿掉了,这里**仅在翻页内部**重新引入 `motion`,而不再走 PlushMotion 包装层 —— 因为 layout 动画对 `motion.div` 原生 API 依赖较强,包装层会把语义模糊化。在 [AGENTS.md](../../../../apps/desktop-os/AGENTS.md) 「设计系统约束」段补一行豁免:**例外**:layout / shared layout 动画允许在组件内直接使用 `motion.div`,但仍优先用 `PlushMotion` 原语。)
 
 ```tsx
 import { motion } from 'motion/react';
@@ -1014,7 +1014,7 @@ import { MOTION_TOKENS } from '../ui/PlushMotion';
 </motion.div>
 ```
 
-- [ ] **Step 3:** 同步 [AGENTS.md](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/AGENTS.md) 豁免一行
+- [ ] **Step 3:** 同步 [AGENTS.md](../../../../apps/desktop-os/AGENTS.md) 豁免一行
 
 在「设计系统约束」段已有的 motion 约束句末追加:
 
@@ -1108,7 +1108,7 @@ git commit -m "docs(desktop-os): motion migration complete"
 
 - [ ] 4 Phase 全部 commit 完成,每条 commit 都能单独 revert。
 - [ ] `pnpm --filter @valley/desktop-os typecheck && check && exec vitest run` 全绿,新增 7 个测试文件全部通过。
-- [ ] [apps/desktop-os/docs/PLAN.md](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/docs/PLAN.md) 「动画统一迁移到 motion」条目 P1–P4 ✅。
-- [ ] [apps/desktop-os/AGENTS.md](file:///Users/bytedance/Desktop/study/valley-mas/apps/desktop-os/AGENTS.md) 「设计系统约束」补充行 + layout 例外行均落地。
+- [ ] [apps/desktop-os/docs/PLAN.md](../../../../apps/desktop-os/docs/PLAN.md) 「动画统一迁移到 motion」条目 P1–P4 ✅。
+- [ ] [apps/desktop-os/AGENTS.md](../../../../apps/desktop-os/AGENTS.md) 「设计系统约束」补充行 + layout 例外行均落地。
 - [ ] 实施后记 4 段全部填完,体积差未超预算。
-- [ ] [docs/specs/2026-06-23-desktop-os-motion-migration-design.md](file:///Users/bytedance/Desktop/study/valley-mas/docs/specs/2026-06-23-desktop-os-motion-migration-design.md) 与 [本 plan](file:///Users/bytedance/Desktop/study/valley-mas/docs/plans/2026-06-23-desktop-os-motion-migration.md) 由 owner 决定是否清理（C 档临时产物）。
+- [ ] [docs/specs/2026-06-23-desktop-os-motion-migration-design.md](../../../../docs/specs/2026-06-23-desktop-os-motion-migration-design.md) 与 [本 plan](../../../../docs/plans/2026-06-23-desktop-os-motion-migration.md) 由 owner 决定是否清理（C 档临时产物）。

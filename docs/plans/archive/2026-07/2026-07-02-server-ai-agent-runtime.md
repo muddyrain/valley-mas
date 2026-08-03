@@ -13,7 +13,7 @@
 现状（2026-07-02）：
 
 - `internal/lifetrace/ai/prompts/*` 已经有十几个 `PromptContract`（image_analysis、pantry、recipe、outfit、weekly_review、today_advice、assistant…），全都是"组装数据 → 拼 prompt → 调一次模型 → 解析 JSON"。
-- 唯一接近 agent 的是 [assistant_caller.go](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/lifetrace/ai/assistant_caller.go)，但它只允许挂一个 tool、且调完就结束，本质是"tool-call 结构化输出"。
+- 唯一接近 agent 的是 [assistant_caller.go](../../../../server/internal/lifetrace/ai/assistant_caller.go)，但它只允许挂一个 tool、且调完就结束，本质是"tool-call 结构化输出"。
 - Handler 层直接决定"要查哪些数据、拼什么 prompt、调什么模型"，模型没有决策权，用户没法追问、没法自主查询。
 
 痛点：
@@ -32,7 +32,7 @@
 
 1. 新增 `internal/ai/agent` 包，暴露 `AgentRuntime` 接口，隐藏 loop 实现。
 2. 新增 `internal/ai/tools` 包（或子目录），提供 `Tool` 抽象与注册表。
-3. Life Trace 助理（[assistant_handler.go](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/lifetrace/assistant_handler.go)）改为通过 `AgentRuntime.RunStream` 驱动，其余 handler 不动。
+3. Life Trace 助理（[assistant_handler.go](../../../../server/internal/lifetrace/assistant_handler.go)）改为通过 `AgentRuntime.RunStream` 驱动，其余 handler 不动。
 4. 至少落地 5 个 tool（见 §Tool 清单）；模型在合适场景下能自动调用其中至少 2 个（可通过日志或 test 观察 tool_call 事件）。
 5. `AgentRuntime`、`Tool`、`Message`、`Result` 四个类型完全不依赖 ARK/OpenAI SDK 的类型（这是未来迁 eino/其他框架的核心保障）。
 6. 现有 Life Trace 助理接口路径（`POST /api/life-trace/assistant/stream`）、请求体、响应字段（reply / action / done 语义）完全不变；前端零改动。
@@ -47,7 +47,7 @@
 - **不迁**其他 handler（blog / creator / desktop-os / admin），只准备好抽象。
 - **不做**并行 tool call、子 agent、图状态、中断-恢复。这些是阶段 B（eino）之后的事。
 - **不改**现有 `PromptContract` 类型形状；tool 内部调用现有 contract。
-- **不动** [aiclient](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/aiclient) 已定型的 provider 抽象、SSE writer、tool_call 双轨 helper。
+- **不动** [aiclient](../../../../server/internal/aiclient) 已定型的 provider 抽象、SSE writer、tool_call 双轨 helper。
 
 ---
 
@@ -349,7 +349,7 @@ func (r *Registry) Filter(scope string, names []string) []Tool
 | 风险 | 影响 | 缓解 |
 |---|---|---|
 | `create_*` tool 需要 handler 实例，形成隐式依赖 | 可能循环 import | 用 `RegisterWithDeps` 显式注入，tool 子包只在 handler 构造后被拉起 |
-| tool_call 双轨（ARK / OpenAI）在 loop 里混用容易走岔 | 上游报错难查 | 复用现有 [assistant_caller.go](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/lifetrace/ai/assistant_caller.go) 的双轨 helper，不重造 |
+| tool_call 双轨（ARK / OpenAI）在 loop 里混用容易走岔 | 上游报错难查 | 复用现有 [assistant_caller.go](../../../../server/internal/lifetrace/ai/assistant_caller.go) 的双轨 helper，不重造 |
 | 模型可能反复调 tool 触发死循环 | 空转 / 高成本 | `MaxSteps=6` 硬上限；超上限 fallback 到"直接输出 model 最后一次 assistant 内容" |
 | feature flag 遗留 | 分支膨胀 | 阶段 A 结束后 30 天内切默认值 true 并做移除计划 |
 | tool 内部错误反噬 loop | 用户看到英文错误 | tool 错误统一序列化为 `{"ok":false,"error":"..."}`，模型能识别并解释 |

@@ -76,16 +76,16 @@ internal/handler                 ← 保持，但 ARK 直接接入逐步换成 a
 
 **Steps:**
 - [ ] **Step 1：用 git 单独提交"搬运"**
-  - 用 `git mv` 把 [server/internal/ai](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/ai) 整个移动到 `server/internal/mindarena/ai`，让 git 把它识别成 rename。
+  - 用 `git mv` 把 [server/internal/ai](../../../../server/internal/ai) 整个移动到 `server/internal/mindarena/ai`，让 git 把它识别成 rename。
 - [ ] **Step 2：清理被搬运文件内部 import**
   - 打开搬入的每个文件，把 `import "valley-server/internal/mindarena"` 改成相对包内访问。
   - 由于现在 `internal/mindarena/ai` 在 `internal/mindarena` 子目录下，可以让 `ai` 包反向 import `mindarena` 的方式仍合法（子包 → 父包），但**循环已被打破**：原来的循环来自 `mindarena.Service` 想用 `ai.AIService`，现在 `ai` 是 `mindarena` 的子包，依赖单向 `mindarena → mindarena/ai`，再无成环。
-  - 验证 [server/internal/ai/service.go#L7](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/ai/service.go#L7) 等处的反向引用都改干净。
+  - 验证 [server/internal/ai/service.go#L7](../../../../server/internal/ai/service.go#L7) 等处的反向引用都改干净。
 - [ ] **Step 3：修改 mindarena 包内对 `ai` 的引用**
-  - [server/internal/mindarena/service.go](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/mindarena/service.go) 等如有 `valley-server/internal/ai`，改为 `valley-server/internal/mindarena/ai`。
+  - [server/internal/mindarena/service.go](../../../../server/internal/mindarena/service.go) 等如有 `valley-server/internal/ai`，改为 `valley-server/internal/mindarena/ai`。
 - [ ] **Step 4：修改 router 引用**
-  - [server/internal/router/router.go#L4](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/router/router.go#L4)：`"valley-server/internal/ai"` → `"valley-server/internal/mindarena/ai"`。
-  - [server/internal/router/router.go#L37](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/router/router.go#L37)：`ai.NewServiceFromEnv()` 仍然能调到，仅 import 路径改变。
+  - [server/internal/router/router.go#L4](../../../../server/internal/router/router.go#L4)：`"valley-server/internal/ai"` → `"valley-server/internal/mindarena/ai"`。
+  - [server/internal/router/router.go#L37](../../../../server/internal/router/router.go#L37)：`ai.NewServiceFromEnv()` 仍然能调到，仅 import 路径改变。
 - [ ] **Step 5：搜剩余引用兜底**
   - `rg 'valley-server/internal/ai\b' server` 必须无结果。
   - `rg '"valley-server/internal/mindarena/ai"' server` 至少 1 处（router）。
@@ -94,14 +94,14 @@ internal/handler                 ← 保持，但 ARK 直接接入逐步换成 a
 
 - [ ] **Step 1：`cd server && go build ./...` 通过**
 - [ ] **Step 2：`cd server && go test ./...` 全绿**
-  - 重点关注 [server/internal/mindarena/ai/service_test.go](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/mindarena/ai/service_test.go)、`fallback_test.go`、`judge_test.go` 等。
+  - 重点关注 [server/internal/mindarena/ai/service_test.go](../../../../server/internal/mindarena/ai/service_test.go)、`fallback_test.go`、`judge_test.go` 等。
 - [ ] **Step 3：grep 心智检查**
   - `rg 'package ai' server`：确认仍叫 `package ai`，避免误改包名引发隐式破坏。
   - `rg 'NewServiceFromEnv' server`：唯一调用点是 router，签名未变。
 
 ### Task 1.3：文档同步
 
-- [ ] **Step 1：更新 [server/AGENTS.md](file:///Users/bytedance/Desktop/study/valley-mas/server/AGENTS.md)**
+- [ ] **Step 1：更新 [server/AGENTS.md](../../../../server/AGENTS.md)**
   - 把"AI 能力：`internal/ai`"改为"Mind Arena AI：`internal/mindarena/ai`（仅服务 Mind Arena）"。
   - 在路由入口段落加一句"通用 AI 接入见 `internal/aiclient`（Phase 2 引入）"占位，提醒读者后续会有第二个根。
 - [ ] **Step 2：encoding-guard 定向检查**
@@ -127,18 +127,18 @@ internal/handler                 ← 保持，但 ARK 直接接入逐步换成 a
 
 **Steps:**
 - [ ] **Step 1：`ark.go` — ARK client 单例 + 配置读取**
-  - 抽自 [handler/blog_ai.go#L138-L163](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/handler/blog_ai.go#L138-L163) 与 [lifetrace/ai/client.go#L54-L68](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/lifetrace/ai/client.go#L54-L68)。
+  - 抽自 [handler/blog_ai.go#L138-L163](../../../../server/internal/handler/blog_ai.go#L138-L163) 与 [lifetrace/ai/client.go#L54-L68](../../../../server/internal/lifetrace/ai/client.go#L54-L68)。
   - 暴露 `func ARKClient(timeout time.Duration) (*arkruntime.Client, ARKConfig, error)`，内部 `sync.Once`，但允许传不同 timeout（`map[time.Duration]*arkruntime.Client` 复用）。
-  - 暴露 `func ReadARKTextConfig() (ARKConfig, error)`、`ReadARKVisionConfig`、`ReadARKImageConfig`（替代 [lifetrace/ai/config.go#L57-L134](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/lifetrace/ai/config.go#L57-L134) 与 handler 内重复版）。
+  - 暴露 `func ReadARKTextConfig() (ARKConfig, error)`、`ReadARKVisionConfig`、`ReadARKImageConfig`（替代 [lifetrace/ai/config.go#L57-L134](../../../../server/internal/lifetrace/ai/config.go#L57-L134) 与 handler 内重复版）。
   - 错误返回 `error`，不返回 string，调用方决定包装成什么 HTTP 文案。
 - [ ] **Step 2：`openai.go` — OpenAI 兼容 client + 配置**
-  - 抽自 [lifetrace/ai/config.go#L152-L176](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/lifetrace/ai/config.go#L152-L176)。
+  - 抽自 [lifetrace/ai/config.go#L152-L176](../../../../server/internal/lifetrace/ai/config.go#L152-L176)。
   - 支持环境变量优先级链：`LIFE_TRACE_AI_API_KEY` → `OPENAI_API_KEY`（并通过参数让上层选）。
   - 暴露 `ReadOpenAIConfig(opts OpenAIConfigOpts) (OpenAIConfig, bool)`，让 lifetrace / mindarena 各自传不同 env 名前缀。
 - [ ] **Step 3：`gemini.go` — Gemini Vision client + 配置**
-  - 抽自 [lifetrace/ai/config.go#L178-L201](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/lifetrace/ai/config.go#L178-L201)（先只搬 Vision，Text 没人用）。
+  - 抽自 [lifetrace/ai/config.go#L178-L201](../../../../server/internal/lifetrace/ai/config.go#L178-L201)（先只搬 Vision，Text 没人用）。
 - [ ] **Step 4：`stream.go` — 通用 SSE helper**
-  - 抽自 [handler/admin_ai_chat.go#L214-L300](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/handler/admin_ai_chat.go) 的流式骨架。
+  - 抽自 [handler/admin_ai_chat.go#L214-L300](../../../../server/internal/handler/admin_ai_chat.go) 的流式骨架。
   - API 草案：
     ```go
     type SSEWriter struct { /* gin.Context + flusher */ }
@@ -148,9 +148,9 @@ internal/handler                 ← 保持，但 ARK 直接接入逐步换成 a
     ```
   - **不**写"如何消费 ARK stream"，只写"如何把任意 payload 推到客户端"。具体的 `for stream.Recv()` 循环留在调用方，因为不同 provider 不一样。
 - [ ] **Step 5：`jsonparse.go` / `textutil.go`**
-  - 把 [lifetrace/ai/contract.go#L54-L67](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/lifetrace/ai/contract.go#L54-L67) 的 `extractJSONObject` 搬过来；
-  - 把 [handler/blog_ai.go#L38-L58](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/handler/blog_ai.go#L38-L58) 的 `normalizeAITextOutput` / `truncateAIText` 搬过来；
-  - 把 `extractARKMessageText`（[admin_ai_chat.go#L79-L98](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/handler/admin_ai_chat.go#L79-L98)）搬过来。
+  - 把 [lifetrace/ai/contract.go#L54-L67](../../../../server/internal/lifetrace/ai/contract.go#L54-L67) 的 `extractJSONObject` 搬过来；
+  - 把 [handler/blog_ai.go#L38-L58](../../../../server/internal/handler/blog_ai.go#L38-L58) 的 `normalizeAITextOutput` / `truncateAIText` 搬过来；
+  - 把 `extractARKMessageText`（[admin_ai_chat.go#L79-L98](../../../../server/internal/handler/admin_ai_chat.go#L79-L98)）搬过来。
 - [ ] **Step 6：`usage.go` — aiusage 薄封装**
   - 暴露 `RecordSuccess(feature, model, ...)` / `RecordError(feature, model, err)` / 常量 `FeatureValleyAIChat = "valley-ai-chat"` 等。
   - Feature 字符串现状散落（`"desktop-ai-agent-chat"`、`"valley-ai-chat"`、各 lifetrace feature），先把已有的列举成常量，新功能必须用常量。
@@ -213,7 +213,7 @@ internal/handler                 ← 保持，但 ARK 直接接入逐步换成 a
 
 ### Task 2.5：文档同步
 
-- [ ] **Step 1：更新 [server/AGENTS.md](file:///Users/bytedance/Desktop/study/valley-mas/server/AGENTS.md)**
+- [ ] **Step 1：更新 [server/AGENTS.md](../../../../server/AGENTS.md)**
 - "路由与代码入口"段落新增：`通用 AI 客户端：internal/aiclient`。
 - "开发规范"补充：新增用户主动发起的 AI 接入应通过模型目录解析能力并复用 `internal/aiclient`，禁止再由 handler 直接 `os.Getenv("ARK_*")` 读取配置。
 - [ ] **Step 2：在 `internal/aiclient/doc.go` 写包级注释**
@@ -231,7 +231,7 @@ internal/handler                 ← 保持，但 ARK 直接接入逐步换成 a
 | `internal/mindarena/ai` 与 `internal/mindarena` 父子包仍可能形成隐式耦合 | 父包 `mindarena` 单向 import 子包 `mindarena/ai`，禁止反向；CI 可加 `import-restrictions` 检查（本计划不做） |
 | aiclient 的 `ARKClient(timeout)` 多 client 实例 | 现状各 handler 写死不同 timeout（25s/35s/60s/90s），aiclient 用 `map[duration]*client` + `sync.Mutex` 复用，避免 N 个 client；不强求收敛 timeout 值 |
 | shim 长期不清理变成新一层垃圾 | 在 `blog_ai.go` 等保留 shim 的位置统一加 `// TODO(aiclient-migration)`，附 issue 链接（owner 创建后回填） |
-| 旧 env 变量优先级链改动导致现网行为变化 | aiclient 的 `ReadOpenAIConfig` 必须 1:1 复刻 [lifetrace/ai/config.go#L152-L176](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/lifetrace/ai/config.go#L152-L176) 的优先级；写表格驱动测试覆盖每条 env 链路 |
+| 旧 env 变量优先级链改动导致现网行为变化 | aiclient 的 `ReadOpenAIConfig` 必须 1:1 复刻 [lifetrace/ai/config.go#L152-L176](../../../../server/internal/lifetrace/ai/config.go#L152-L176) 的优先级；写表格驱动测试覆盖每条 env 链路 |
 
 ---
 
@@ -240,7 +240,7 @@ internal/handler                 ← 保持，但 ARK 直接接入逐步换成 a
 - [ ] `rg 'valley-server/internal/ai\b' server` 无结果
 - [ ] `rg 'valley-server/internal/aiclient' server | wc -l` ≥ 4（router 之外至少 admin_ai_chat、blog_ai shim、lifetrace/ai/client、lifetrace/ai/config）
 - [ ] `cd server && go test ./...` 全绿
-- [ ] [server/AGENTS.md](file:///Users/bytedance/Desktop/study/valley-mas/server/AGENTS.md) 已同步
+- [ ] [server/AGENTS.md](../../../../server/AGENTS.md) 已同步
 - [ ] 手动接口冒烟通过（admin AI 聊天、blog ask、life-trace today advice）
 - [ ] 后续 handler 迁移单独立计划，不混入本计划
 
