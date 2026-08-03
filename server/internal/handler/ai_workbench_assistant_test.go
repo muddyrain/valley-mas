@@ -22,7 +22,7 @@ import (
 func TestValidateAgentProposalRestrictsResources(t *testing.T) {
 	proposal := agentProposal{
 		Name: "资料助手", Description: "回答内部资料问题",
-		Config:                   aiapp.Config{ModelProfile: aiapp.ModelProfileARKTextDefault, SystemPrompt: "仅依据授权资料回答。"},
+		Config:                   aiapp.Config{ModelProfile: aiapp.ModelProfileARKTextDefault, Identity: "# IDENTITY.md\n\n仅依据授权资料回答。"},
 		ToolSuggestions:          []agentToolSuggestion{{Name: "content.search", Reason: "需要检索内容"}},
 		KnowledgeBaseSuggestions: []agentKnowledgeSuggestion{{ID: 10, Name: "伪造名称", Reason: "需求相关"}},
 	}
@@ -32,6 +32,9 @@ func TestValidateAgentProposalRestrictsResources(t *testing.T) {
 	}
 	if proposal.KnowledgeBaseSuggestions[0].Name != "产品资料" {
 		t.Fatalf("knowledge name = %q, want owner catalog name", proposal.KnowledgeBaseSuggestions[0].Name)
+	}
+	if proposal.Config.UserProfile == "" || proposal.Config.Soul == "" || proposal.Config.AgentInstructions == "" {
+		t.Fatalf("proposal profiles were not normalized: %#v", proposal.Config)
 	}
 	proposal.ToolSuggestions[0].Name = "blog.create_draft"
 	if err := validateAgentProposal(&proposal, catalog); err == nil {
@@ -322,7 +325,7 @@ func TestStructuredRepairRequestIncludesOriginalContract(t *testing.T) {
 
 func TestBuildAIAppAvatarPromptRequiresChibiAgentCharacter(t *testing.T) {
 	prompt := buildAIAppAvatarPrompt(model.AIApp{Name: "英语训练智能体", Description: "练习日常英语对话"}, "你是一位英语教练")
-	for _, expected := range []string{"chibi anime avatar", "robot mascot", "Never create an isolated object"} {
+	for _, expected := range []string{"anime-style avatar", "anime girl", "Do not create a robot"} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("avatar prompt missing %q: %s", expected, prompt)
 		}

@@ -68,6 +68,7 @@ export interface AIImageGeneration {
   requestedSize: string;
   referenceCount: number;
   parentGenerationId?: string;
+  editMode: '' | 'inpaint' | 'erase_replace' | 'outpaint';
   isFavorited: boolean;
   status: AIImageGenerationStatus;
   stage: AIImageGenerationStage;
@@ -96,6 +97,18 @@ export interface CreateAIImageGenerationInput {
   quality: string;
   references: string[];
   referenceGenerationId?: string;
+}
+
+export interface CreateAIImageEditInput {
+  modelId: string;
+  recipeId: string;
+  styleProfileId?: string;
+  brief: string;
+  aspectRatio: string;
+  quality: string;
+  mode: 'inpaint' | 'erase_replace' | 'outpaint';
+  editImage: string;
+  mask: string;
 }
 
 export type AIImageConversationMessageRole = 'user' | 'assistant';
@@ -152,6 +165,13 @@ export const createAIImageGeneration = (data: CreateAIImageGenerationInput) =>
   request.post<unknown, { generation: AIImageGeneration }>('/ai/image-generations', data, {
     timeout: 30000,
   });
+
+export const createAIImageEdit = (generationId: string, data: CreateAIImageEditInput) =>
+  request.post<unknown, { generation: AIImageGeneration }>(
+    `/ai/image-generations/${generationId}/edits`,
+    data,
+    { timeout: 30000 },
+  );
 
 export const getAIImageGeneration = (generationId: string) =>
   request.get<unknown, { generation: AIImageGeneration }>(`/ai/image-generations/${generationId}`);

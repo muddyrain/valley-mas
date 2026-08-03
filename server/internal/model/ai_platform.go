@@ -69,12 +69,16 @@ type AIAppVersionToolBinding struct {
 	ID           Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	AppVersionID Int64String `gorm:"uniqueIndex:uidx_ai_app_version_tool;not null" json:"appVersionId"`
 	ToolName     string      `gorm:"size:100;uniqueIndex:uidx_ai_app_version_tool;not null" json:"toolName"`
+	ApprovalMode string      `gorm:"size:20;not null;default:'auto'" json:"approvalMode"`
 	CreatedAt    time.Time   `json:"createdAt"`
 }
 
 func (b *AIAppVersionToolBinding) BeforeCreate(tx *gorm.DB) error {
 	if b.ID == 0 {
 		b.ID = Int64String(utils.GenerateID())
+	}
+	if b.ApprovalMode == "" {
+		b.ApprovalMode = "auto"
 	}
 	return nil
 }
@@ -173,6 +177,7 @@ type AIAppConversationToolTrace struct {
 	ConversationID Int64String    `gorm:"index;not null" json:"conversationId"`
 	RunID          Int64String    `gorm:"index;not null" json:"runId"`
 	ToolName       string         `gorm:"size:100;not null" json:"toolName"`
+	Narration      string         `gorm:"type:text;not null;default:''" json:"narration"`
 	Status         string         `gorm:"size:20;not null" json:"status"`
 	DurationMs     int64          `gorm:"not null;default:0" json:"durationMs"`
 	CreatedAt      time.Time      `json:"createdAt"`
@@ -380,6 +385,155 @@ func (s *AISkill) BeforeCreate(tx *gorm.DB) error {
 }
 
 func (AISkill) TableName() string { return "ai_skills" }
+
+// AISkillFile preserves the original supported files that accompany an
+// installed skill. Text remains queryable without object storage while image
+// bytes live in private storage and are always resolved through an owner
+// scoped handler.
+type AISkillFile struct {
+	ID         Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	SkillID    Int64String    `gorm:"index:uidx_ai_skill_file_path,unique;not null" json:"skillId"`
+	UserID     Int64String    `gorm:"index;not null" json:"userId"`
+	Path       string         `gorm:"size:512;uniqueIndex:uidx_ai_skill_file_path,not null" json:"path"`
+	Kind       string         `gorm:"size:32;index;not null" json:"kind"`
+	Content    string         `gorm:"type:text;not null;default:''" json:"-"`
+	MimeType   string         `gorm:"size:120;not null;default:''" json:"mimeType,omitempty"`
+	SizeBytes  int64          `gorm:"not null;default:0" json:"sizeBytes"`
+	StorageKey string         `gorm:"size:500;not null;default:''" json:"-"`
+	FileHash   string         `gorm:"size:64;not null;default:''" json:"fileHash,omitempty"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	UpdatedAt  time.Time      `json:"updatedAt"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// AIAppTask is the durable queue record behind long-running agent work.
+// Its payload only contains owner-private attachment IDs and bounded user input.
+type AIAppTask struct {
+	ID                Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID            Int64String    `gorm:"index;not null" json:"userId"`
+	AppID             Int64String    `gorm:"index;not null" json:"appId"`
+	ConversationID    Int64String    `gorm:"index;not null" json:"conversationId"`
+	RunID             Int64String    `gorm:"uniqueIndex;not null" json:"runId"`
+	UserMessageID     Int64String    `gorm:"index;not null" json:"userMessageId"`
+	Title             string         `gorm:"size:160;not null" json:"title"`
+	Status            string         `gorm:"size:24;index;not null;default:'queued'" json:"status"`
+	Payload           string         `gorm:"type:text;not null" json:"-"`
+	Progress          int            `gorm:"not null;default:0" json:"progress"`
+	StatusMessage     string         `gorm:"size:500;not null;default:''" json:"statusMessage"`
+	PartialOutput     string         `gorm:"type:text;not null;default:''" json:"partialOutput"`
+	QueuePosition     int            `gorm:"-" json:"queuePosition,omitempty"`
+	ErrorCode         string         `gorm:"size:80;not null;default:''" json:"errorCode,omitempty"`
+	CancelRequestedAt *time.Time     `gorm:"index" json:"cancelRequestedAt,omitempty"`
+	StartedAt         *time.Time     `json:"startedAt,omitempty"`
+	FinishedAt        *time.Time     `json:"finishedAt,omitempty"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	UpdatedAt         time.Time      `json:"updatedAt"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (t *AIAppTask) BeforeCreate(tx *gorm.DB) error {
+	if t.ID == 0 {
+		t.ID = Int64String(utils.GenerateID())
+	}
+	if t.Status == "" {
+		t.Status = "queued"
+	}
+	return nil
+}
+
+// AIAppToolApproval stores a single owner decision for a concrete, hashed
+// tool invocation. Arguments are retained only in this owner-private audit
+// record and never returned from owner-facing task APIs.
+type AIAppToolApproval struct {
+	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	TaskID      Int64String    `gorm:"index;not null" json:"taskId"`
+	RunID       Int64String    `gorm:"index;not null" json:"runId"`
+	UserID      Int64String    `gorm:"index;not null" json:"userId"`
+	ToolName    string         `gorm:"size:100;not null" json:"toolName"`
+	RiskLevel   string         `gorm:"size:20;not null" json:"riskLevel"`
+	Fingerprint string         `gorm:"size:64;uniqueIndex:uidx_ai_app_tool_approval;not null" json:"-"`
+	Summary     string         `gorm:"size:500;not null" json:"summary"`
+	Arguments   string         `gorm:"type:text;not null" json:"-"`
+	Status      string         `gorm:"size:20;index;not null;default:'pending'" json:"status"`
+	Note        string         `gorm:"size:500;not null;default:''" json:"note,omitempty"`
+	DecidedAt   *time.Time     `json:"decidedAt,omitempty"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (a *AIAppToolApproval) BeforeCreate(tx *gorm.DB) error {
+	if a.ID == 0 {
+		a.ID = Int64String(utils.GenerateID())
+	}
+	if a.Status == "" {
+		a.Status = "pending"
+	}
+	return nil
+}
+
+// AIAppConversationAttachment keeps a bounded, parsed copy of a user file.
+// SourceContent enables owner-scoped re-download without exposing object-store
+// URLs; ParsedText is the only content injected into the model context.
+type AIAppConversationAttachment struct {
+	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID         Int64String    `gorm:"index;not null" json:"userId"`
+	AppID          Int64String    `gorm:"index;not null" json:"appId"`
+	ConversationID Int64String    `gorm:"index;not null" json:"conversationId"`
+	MessageID      *Int64String   `gorm:"index" json:"messageId,omitempty"`
+	Name           string         `gorm:"size:255;not null" json:"name"`
+	MimeType       string         `gorm:"size:120;not null" json:"mimeType"`
+	SizeBytes      int64          `gorm:"not null" json:"sizeBytes"`
+	ParsedText     string         `gorm:"type:text;not null" json:"-"`
+	SourceContent  []byte         `gorm:"type:bytea" json:"-"`
+	Status         string         `gorm:"size:20;index;not null;default:'ready'" json:"status"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (a *AIAppConversationAttachment) BeforeCreate(tx *gorm.DB) error {
+	if a.ID == 0 {
+		a.ID = Int64String(utils.GenerateID())
+	}
+	if a.Status == "" {
+		a.Status = "ready"
+	}
+	return nil
+}
+
+// AIAppArtifact links a generated file resource back to the exact task and
+// conversation turn that produced it.
+type AIAppArtifact struct {
+	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID         Int64String    `gorm:"index;not null" json:"userId"`
+	AppID          Int64String    `gorm:"index;not null" json:"appId"`
+	ConversationID Int64String    `gorm:"index;not null" json:"conversationId"`
+	RunID          Int64String    `gorm:"index;not null" json:"runId"`
+	TaskID         *Int64String   `gorm:"index" json:"taskId,omitempty"`
+	ResourceID     Int64String    `gorm:"index;not null" json:"resourceId"`
+	FileName       string         `gorm:"size:255;not null" json:"fileName"`
+	ContentType    string         `gorm:"size:120;not null" json:"contentType"`
+	SizeBytes      int64          `gorm:"not null" json:"sizeBytes"`
+	URL            string         `gorm:"size:1000;not null" json:"url"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (a *AIAppArtifact) BeforeCreate(tx *gorm.DB) error {
+	if a.ID == 0 {
+		a.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+func (f *AISkillFile) BeforeCreate(tx *gorm.DB) error {
+	if f.ID == 0 {
+		f.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+func (AISkillFile) TableName() string { return "ai_skill_files" }
 
 func (k *AIKnowledgeBase) BeforeCreate(tx *gorm.DB) error {
 	if k.ID == 0 {

@@ -28,7 +28,7 @@ func newAIImageRuntimeTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.AIImageGeneration{}, &model.AISkill{}); err != nil {
+	if err := db.AutoMigrate(&model.AIImageGeneration{}, &model.AISkill{}, &model.AISkillFile{}); err != nil {
 		t.Fatal(err)
 	}
 	return db
@@ -118,6 +118,43 @@ func TestAIImageGenerationServiceGeneratePersistsStoredResult(t *testing.T) {
 	}
 	if len(usages) != 1 || usages[0].Feature != "workflow-image-generation" || usages[0].Status != aiusage.StatusSuccess {
 		t.Fatalf("unexpected usage audit: %+v", usages)
+	}
+}
+
+func TestAIImageGenerationServiceSendsSelectedSkillReferenceImagesToModel(t *testing.T) {
+	db := newAIImageRuntimeTestDB(t)
+	imageBytes, err := base64.StdEncoding.DecodeString(onePixelPNGBase64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	skill := model.AISkill{ID: 21, UserID: 1, Name: "角色参考", Content: "保持角色一致", SourceURL: "zip://test"}
+	if err := db.Create(&skill).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&model.AISkillFile{SkillID: skill.ID, UserID: 1, Path: "references/images/model.png", Kind: "reference_image", MimeType: "image/png", StorageKey: "ai-skills/test.png", SizeBytes: int64(len(imageBytes))}).Error; err != nil {
+		t.Fatal(err)
+	}
+	service := NewAIImageGenerationService(db)
+	service.resolve = func(*gorm.DB, string, string, time.Duration) (aimodel.Invocation, error) {
+		invocation := testImageInvocation()
+		invocation.Model.Capabilities = `["image_generation","reference_image"]`
+		return invocation, nil
+	}
+	service.skillReferenceURL = func(string) (string, error) { return AIImageDataURL(imageBytes, "image/png"), nil }
+	service.storageAvailable = func() bool { return true }
+	service.upload = func(_ context.Context, _ model.Int64String, _, filename string, _ []byte) (*UploadResult, error) {
+		return &UploadResult{URL: "https://cdn.example.com/" + filename, Key: "stored/" + filename}, nil
+	}
+	var received []string
+	service.generate = func(_ context.Context, _ aimodel.Invocation, request aiclient.ImageGenerationRequest) (string, error) {
+		received = request.Images
+		return AIImageDataURL(imageBytes, "image/png"), nil
+	}
+	if _, err := service.Generate(context.Background(), AIImageGenerationInput{UserID: 1, ModelID: "7", RecipeID: "free", StyleProfileID: "skill:21", Brief: "角色在公园野餐", AspectRatio: "1:1", Quality: "1K"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(received) != 1 || !strings.HasPrefix(received[0], "data:image/png;base64,") {
+		t.Fatalf("skill reference image did not reach model: %#v", received)
 	}
 }
 

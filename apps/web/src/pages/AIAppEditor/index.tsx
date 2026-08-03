@@ -1,203 +1,130 @@
 import {
-  Activity,
+  ArrowLeft,
   Bot,
-  Copy,
-  History,
+  CheckCircle2,
+  FileText,
+  ImageIcon,
   ImagePlus,
-  KeyRound,
+  LoaderCircle,
   MessageCircle,
-  Play,
-  RotateCcw,
+  Pencil,
   Save,
-  Send,
+  ShieldCheck,
   Sparkles,
-  Square,
-  Trash2,
   Upload,
+  UserRound,
+  Wrench,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  type AIAPIKey,
-  type AIAPIKeyDailyUsage,
+  type AgentConfig,
   type AIApp,
-  type AIAppPublicInvocation,
-  type AIAppRun,
-  type AIAppTool,
+  type AIAppArtifact,
+  type AIAppOutputImage,
+  type AIAppToolBinding,
   type AIAppVersion,
   type AIKnowledgeBase,
-  type AIKnowledgeReference,
   type AISkill,
-  createAIAPIKey,
   createAIAppConversation,
-  createPromptAssistantSuggestion,
   generateAIAppAvatar,
-  getAIAPIKeyDailyUsage,
   getAIApp,
   getAPIErrorMessage,
-  listAIAPIKeyAppBindings,
-  listAIAPIKeys,
   listAIAppKnowledgeBases,
-  listAIAppPublicInvocations,
-  listAIAppRuns,
+  listAIAppOutputs,
   listAIAppToolBindings,
-  listAIAppTools,
   listAIKnowledgeBases,
   listAISkills,
-  type PromptAssistantField,
   publishAIApp,
-  replaceAIAPIKeyAppBindings,
   replaceAIAppKnowledgeBases,
   replaceAIAppTools,
-  restoreAIAppVersion,
-  revokeAIAPIKey,
   saveAIAppVersion,
-  streamDebugAIApp,
   uploadAIAppAvatar,
 } from '@/api/aiWorkbench';
-import type { CopilotProposal } from '@/api/workbenchCopilot';
 import { ModelPicker } from '@/components/ai/ModelPicker';
 import { AgentAvatar } from '@/components/ai-workbench/AgentAvatar';
-import { AIResponseContext } from '@/components/ai-workbench/AIResponseContext';
-import { EditorPageHeader } from '@/components/ai-workbench/EditorPageHeader';
-import { EditorSection } from '@/components/ai-workbench/EditorSection';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import ImagePreviewDialog from '@/components/ImagePreviewDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { KnowledgeBaseBindings } from '@/components/workbench/KnowledgeBaseBindings';
-import { MobileCopilotSheet } from '@/components/workbench/MobileCopilotSheet';
-import { WorkbenchCopilot } from '@/components/workbench/WorkbenchCopilot';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
-interface AgentConfig {
-  modelProfile: 'ark-text-default';
-  systemPrompt: string;
-  openingMessage: string;
-  exampleQuestions: string[];
+const DEFAULT_IDENTITY =
+  '# IDENTITY.md\n\n你是一位可靠、友善、具备独立判断力的智能伙伴。请保持清晰、自然和有温度的表达。';
+const DEFAULT_USER =
+  '# USER.md\n\n尚未记录用户档案。请在交流中尊重用户的表达习惯、目标和沟通偏好。';
+const DEFAULT_SOUL =
+  '# SOUL.md\n\n诚实说明能力边界；保护用户隐私；不伪造事实或执行结果；遇到高风险操作先确认。';
+const DEFAULT_AGENTS =
+  '# AGENTS.md\n\n优先理解用户真正想完成的目标；需要工具时说明正在做什么；完成后给出可验证的结果。';
+
+export interface EditableAgentConfig extends AgentConfig {
+  identity: string;
+  userProfile: string;
+  soul: string;
+  agentInstructions: string;
   skillIds: string[];
-  imageGeneration?: {
-    modelId: string;
-    aspectRatio: '1:1' | '4:3' | '3:4' | '9:16' | '16:9';
-    quality: '1K' | '2K' | '3K' | '4K';
-  };
 }
 
-const AVATAR_IMAGE_MODEL_PREFERENCE_KEY = 'valley.ai-workbench.avatar-image-model';
-
-function readAvatarImageModelPreference() {
-  try {
-    return window.localStorage.getItem(AVATAR_IMAGE_MODEL_PREFERENCE_KEY) || '';
-  } catch {
-    return '';
-  }
-}
-
-function saveAvatarImageModelPreference(modelID: string) {
-  try {
-    window.localStorage.setItem(AVATAR_IMAGE_MODEL_PREFERENCE_KEY, modelID);
-  } catch {
-    // Ignore unavailable browser storage; model selection still works for this session.
-  }
-}
-
-const defaultConfig: AgentConfig = {
+const defaultConfig: EditableAgentConfig = {
   modelProfile: 'ark-text-default',
   systemPrompt: '',
   openingMessage: '',
   exampleQuestions: [],
+  identity: DEFAULT_IDENTITY,
+  userProfile: DEFAULT_USER,
+  soul: DEFAULT_SOUL,
+  agentInstructions: DEFAULT_AGENTS,
   skillIds: [],
 };
 
-function AgentEditorSkeleton() {
-  return (
-    <div className="mx-auto max-w-[1440px] space-y-6 p-4 pb-16 pt-8 sm:p-8" aria-busy="true">
-      <div className="flex items-center justify-between gap-4 border-b border-border bg-card px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-3">
-          <Skeleton className="size-9 rounded-md" />
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-36" />
-            <Skeleton className="h-3 w-20" />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Skeleton className="h-9 w-20" />
-          <Skeleton className="h-9 w-20" />
-        </div>
-      </div>
-      <Card className="gap-0 py-0 shadow-xs">
-        <CardHeader className="border-b border-border/70 px-6 py-5 sm:px-8">
-          <Skeleton className="h-5 w-32" />
-        </CardHeader>
-        <CardContent className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <div className="space-y-5">
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-28 w-full" />
-            <Skeleton className="h-56 w-full" />
-          </div>
-          <div className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
-            <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-28 w-full" />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-async function copyText(value: string, successMessage: string) {
-  try {
-    await navigator.clipboard.writeText(value);
-    toast.success(successMessage);
-  } catch {
-    toast.error('复制失败，请手动复制');
-  }
-}
-
-function parseAgentConfig(version?: AIAppVersion): AgentConfig {
+export function parseAIAppAgentConfig(version?: AIAppVersion): EditableAgentConfig {
   if (!version) return defaultConfig;
   try {
     const value = JSON.parse(version.config) as Partial<AgentConfig>;
     return {
       modelProfile: 'ark-text-default',
-      systemPrompt: typeof value.systemPrompt === 'string' ? value.systemPrompt : '',
-      openingMessage: typeof value.openingMessage === 'string' ? value.openingMessage : '',
-      exampleQuestions: Array.isArray(value.exampleQuestions)
-        ? value.exampleQuestions.filter((item): item is string => typeof item === 'string')
-        : [],
+      modelId: typeof value.modelId === 'string' ? value.modelId : undefined,
+      identity:
+        typeof value.identity === 'string' && value.identity.trim()
+          ? value.identity
+          : typeof value.systemPrompt === 'string' && value.systemPrompt.trim()
+            ? value.systemPrompt
+            : DEFAULT_IDENTITY,
+      userProfile:
+        typeof value.userProfile === 'string' && value.userProfile.trim()
+          ? value.userProfile
+          : DEFAULT_USER,
+      soul: typeof value.soul === 'string' && value.soul.trim() ? value.soul : DEFAULT_SOUL,
+      agentInstructions:
+        typeof value.agentInstructions === 'string' && value.agentInstructions.trim()
+          ? value.agentInstructions
+          : DEFAULT_AGENTS,
+      systemPrompt: '',
+      openingMessage: '',
+      exampleQuestions: [],
       skillIds: Array.isArray(value.skillIds)
         ? value.skillIds.filter((item): item is string => typeof item === 'string').slice(0, 8)
         : [],
       imageGeneration:
-        value.imageGeneration &&
-        typeof value.imageGeneration === 'object' &&
-        typeof value.imageGeneration.modelId === 'string'
+        value.imageGeneration && typeof value.imageGeneration.modelId === 'string'
           ? value.imageGeneration
           : undefined,
     };
@@ -206,356 +133,251 @@ function parseAgentConfig(version?: AIAppVersion): AgentConfig {
   }
 }
 
+function formatCount(value: number) {
+  return new Intl.NumberFormat('zh-CN').format(value);
+}
+
+function formatBytes(value: number) {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function companionDays(createdAt?: string) {
+  if (!createdAt) return 1;
+  return Math.max(1, Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000) + 1);
+}
+
+function EditorSkeleton() {
+  return (
+    <main
+      className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-[1440px] gap-6 p-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:p-10"
+      aria-busy="true"
+    >
+      <Skeleton className="h-[38rem] rounded-2xl" />
+      <Skeleton className="h-[42rem] rounded-2xl" />
+    </main>
+  );
+}
+
+function ProfileEditor({
+  title,
+  description,
+  icon: Icon,
+  value,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  icon: typeof Bot;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-5">
+      <div className="flex items-start gap-3">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+          <Icon className="size-4" />
+        </div>
+        <div>
+          <h3 className="font-medium">{title}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      <Textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-4 min-h-44 resize-y font-mono text-sm leading-6"
+        aria-label={title}
+      />
+    </div>
+  );
+}
+
 export default function AIAppEditor() {
   const { appId } = useParams<{ appId: string }>();
   const navigate = useNavigate();
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const [app, setApp] = useState<AIApp | null>(null);
-  const [versions, setVersions] = useState<AIAppVersion[]>([]);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [config, setConfig] = useState<AgentConfig>(defaultConfig);
+  const [config, setConfig] = useState<EditableAgentConfig>(defaultConfig);
+  const [stats, setStats] = useState({ conversationCount: 0, taskCount: 0 });
+  const [skills, setSkills] = useState<AISkill[]>([]);
+  const [boundTools, setBoundTools] = useState<string[]>([]);
+  const [toolBindings, setToolBindings] = useState<AIAppToolBinding[]>([]);
+  const [knowledgeBases, setKnowledgeBases] = useState<AIKnowledgeBase[]>([]);
+  const [boundKnowledgeBaseIDs, setBoundKnowledgeBaseIDs] = useState<string[]>([]);
+  const [artifacts, setArtifacts] = useState<AIAppArtifact[]>([]);
+  const [images, setImages] = useState<AIAppOutputImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
-  const [showVersionHistory, setShowVersionHistory] = useState(false);
-  const [debugMessage, setDebugMessage] = useState('');
-  const [debugModelId, setDebugModelId] = useState('');
-  const [debugReply, setDebugReply] = useState('');
-  const [debugToolStatus, setDebugToolStatus] = useState<string | null>(null);
-  const [debugReferences, setDebugReferences] = useState<AIKnowledgeReference[]>([]);
-  const [debugging, setDebugging] = useState(false);
-  const [runs, setRuns] = useState<AIAppRun[]>([]);
-  const [knowledgeBases, setKnowledgeBases] = useState<AIKnowledgeBase[]>([]);
-  const [boundKnowledgeBaseIDs, setBoundKnowledgeBaseIDs] = useState<string[]>([]);
-  const [savingKnowledgeBases, setSavingKnowledgeBases] = useState(false);
-  const [tools, setTools] = useState<AIAppTool[]>([]);
-  const [boundTools, setBoundTools] = useState<string[]>([]);
-  const [savingTools, setSavingTools] = useState(false);
-  const [skills, setSkills] = useState<AISkill[]>([]);
-  const [apiKeys, setAPIKeys] = useState<AIAPIKey[]>([]);
-  const [keyAppBindings, setKeyAppBindings] = useState<Record<string, string[]>>({});
-  const [keyUsage, setKeyUsage] = useState<Record<string, AIAPIKeyDailyUsage>>({});
-  const [savingAPIKeyId, setSavingAPIKeyId] = useState<string | null>(null);
-  const [revokingAPIKeyId, setRevokingAPIKeyId] = useState<string | null>(null);
-  const [newAPIKeyName, setNewAPIKeyName] = useState('');
-  const [creatingAPIKey, setCreatingAPIKey] = useState(false);
-  const [generatedAPIKey, setGeneratedAPIKey] = useState<string | null>(null);
-  const [revokeTarget, setRevokeTarget] = useState<AIAPIKey | null>(null);
-  const [publicInvocations, setPublicInvocations] = useState<AIAppPublicInvocation[]>([]);
-  const [rightWorkspaceTab, setRightWorkspaceTab] = useState<'debug' | 'ai'>('debug');
-  const [generatingField, setGeneratingField] = useState<PromptAssistantField | null>(null);
-  const [showMobileCopilot, setShowMobileCopilot] = useState(false);
+  const [identityDialogOpen, setIdentityDialogOpen] = useState(false);
+  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
   const [avatarAction, setAvatarAction] = useState<'generate' | 'upload' | null>(null);
-  const [imageModelId, setImageModelId] = useState(readAvatarImageModelPreference);
-  const isMobile = useIsMobile();
-  const abortDebugRef = useRef<AbortController | null>(null);
-  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const [avatarModelId, setAvatarModelId] = useState('');
+  const [draftName, setDraftName] = useState('');
+  const [draftDescription, setDraftDescription] = useState('');
+  const [imagePreview, setImagePreview] = useState<AIAppOutputImage | null>(null);
 
   useEffect(() => {
     if (!appId) return;
-    getAIApp(appId)
-      .then((detail) => {
+    let active = true;
+    void Promise.all([
+      getAIApp(appId),
+      listAISkills(),
+      listAIAppToolBindings(appId),
+      listAIKnowledgeBases(),
+      listAIAppKnowledgeBases(appId),
+      listAIAppOutputs(appId),
+    ])
+      .then(([detail, skillResult, toolResult, kbResult, boundKBResult, outputResult]) => {
+        if (!active) return;
         if (detail.app.type === 'workflow' && detail.app.workflowId) {
           navigate(`/workbench/edit?id=${detail.app.workflowId}`, { replace: true });
-          return null;
+          return;
         }
+        const currentVersion =
+          detail.versions.find((item) => item.id === detail.app.draftVersionId) ??
+          detail.versions[0];
+        const parsed = parseAIAppAgentConfig(currentVersion);
         setApp(detail.app);
-        setVersions(detail.versions);
         setName(detail.app.name);
         setDescription(detail.app.description);
-        setConfig(parseAgentConfig(detail.versions[0]));
-        setLoading(false);
-        void Promise.all([
-          listAIAppRuns(appId),
-          listAIKnowledgeBases(),
-          listAIAppKnowledgeBases(appId),
-          listAIAppTools(),
-          listAIAppToolBindings(appId),
-          listAISkills(),
-          listAIAPIKeys(),
-          listAIAppPublicInvocations(appId),
-        ])
-          .then((data) => {
-            const [
-              runResult,
-              knowledgeBaseResult,
-              bindingResult,
-              toolResult,
-              toolBindingResult,
-              skillResult,
-              keyResult,
-              invocationResult,
-            ] = data;
-            setRuns(runResult.list);
-            setKnowledgeBases(knowledgeBaseResult.list);
-            setBoundKnowledgeBaseIDs(bindingResult.list.map((base) => base.id));
-            setTools(toolResult.list);
-            setBoundTools(toolBindingResult.tools);
-            setSkills(skillResult.list);
-            setAPIKeys(keyResult.list);
-            setPublicInvocations(invocationResult.list);
-            void Promise.all(
-              keyResult.list.map(async (key) => {
-                const [binding, usage] = await Promise.all([
-                  listAIAPIKeyAppBindings(key.id),
-                  getAIAPIKeyDailyUsage(key.id),
-                ]);
-                return { keyId: key.id, appIds: binding.list.map((item) => item.appId), usage };
-              }),
-            )
-              .then((items) => {
-                setKeyAppBindings(
-                  Object.fromEntries(items.map((item) => [item.keyId, item.appIds])),
-                );
-                setKeyUsage(Object.fromEntries(items.map((item) => [item.keyId, item.usage])));
-              })
-              .catch((error) => toast.error(getAPIErrorMessage(error, '加载 API Key 权限失败')));
-          })
-          .catch((error) => toast.error(getAPIErrorMessage(error, '加载编辑器辅助数据失败')));
+        setDraftName(detail.app.name);
+        setDraftDescription(detail.app.description);
+        setConfig(parsed);
+        setAvatarModelId(parsed.imageGeneration?.modelId || '');
+        setStats(detail.stats);
+        setSkills(skillResult.list);
+        setBoundTools(toolResult.tools);
+        setToolBindings(toolResult.bindings);
+        setKnowledgeBases(kbResult.list);
+        setBoundKnowledgeBaseIDs(boundKBResult.list.map((item) => item.id));
+        setArtifacts(outputResult.artifacts);
+        setImages(outputResult.images);
       })
-      .catch((error) => toast.error(getAPIErrorMessage(error, '加载 AI 应用失败')))
-      .finally(() => setLoading(false));
+      .catch((error) => toast.error(getAPIErrorMessage(error, '加载智能体失败')))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
   }, [appId, navigate]);
 
-  const save = async () => {
-    if (!appId || !name.trim()) {
-      toast.error('请输入应用名称');
-      return;
+  const selectedSkills = useMemo(
+    () => skills.filter((skill) => config.skillIds.includes(skill.id)),
+    [config.skillIds, skills],
+  );
+
+  const persist = async (
+    nextConfig = config,
+    nextName = name,
+    nextDescription = description,
+    showToast = true,
+  ) => {
+    if (!appId || !nextName.trim()) {
+      toast.error('请输入智能体名称');
+      return undefined;
     }
+    setSaving(true);
     try {
-      setSaving(true);
-      const { version } = await saveAIAppVersion(appId, {
-        name: name.trim(),
-        description: description.trim(),
-        config,
+      const result = await saveAIAppVersion(appId, {
+        name: nextName.trim(),
+        description: nextDescription.trim(),
+        config: nextConfig,
       });
-      setVersions((items) => [version, ...items]);
+      setName(nextName.trim());
+      setDescription(nextDescription.trim());
+      setConfig(nextConfig);
       setApp((current) =>
-        current ? { ...current, name: name.trim(), description: description.trim() } : current,
+        current
+          ? {
+              ...current,
+              name: nextName.trim(),
+              description: nextDescription.trim(),
+              draftVersionId: result.version.id,
+            }
+          : current,
       );
-      toast.success(`已保存版本 v${version.number}`);
+      if (showToast) toast.success('智能体设置已保存');
+      return result.version.id;
     } catch (error) {
-      toast.error(getAPIErrorMessage(error, '保存版本失败'));
+      toast.error(getAPIErrorMessage(error, '保存智能体设置失败'));
+      return undefined;
     } finally {
       setSaving(false);
     }
   };
 
+  const saveEverything = async () => {
+    if (boundTools.includes('image.generate') && !config.imageGeneration?.modelId) {
+      toast.error('启用图片生成后需要选择图片生成模型');
+      return;
+    }
+    const savedVersionID = await persist();
+    if (!savedVersionID || !appId) return;
+    try {
+      const policies = boundTools.map((toolName) => ({
+        toolName,
+        approvalMode:
+          toolBindings.find((binding) => binding.toolName === toolName)?.approvalMode || 'auto',
+      }));
+      await replaceAIAppTools(appId, boundTools, policies);
+      await replaceAIAppKnowledgeBases(appId, boundKnowledgeBaseIDs);
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '部分能力设置保存失败'));
+    }
+  };
+
   const publish = async () => {
     if (!appId) return;
+    setPublishing(true);
     try {
-      setPublishing(true);
-      const versionId = versions[0]?.id;
-      await publishAIApp(appId, versionId);
+      const versionID = await persist(config, name, description, false);
+      if (!versionID) return;
+      await publishAIApp(appId, versionID);
       setApp((current) =>
-        current
-          ? { ...current, status: 'published', publishedVersionId: versionId || '' }
-          : current,
+        current ? { ...current, status: 'published', publishedVersionId: versionID } : current,
       );
-      toast.success('已发布当前版本');
+      toast.success('智能体已发布');
     } catch (error) {
-      toast.error(getAPIErrorMessage(error, '发布失败，请先保存有效版本'));
+      toast.error(getAPIErrorMessage(error, '发布失败'));
     } finally {
       setPublishing(false);
     }
   };
 
-  const createConversation = async () => {
+  const startConversation = async () => {
     if (!appId) return;
     try {
       const result = await createAIAppConversation(appId);
       navigate(`/workbench/apps/${appId}/conversations/${result.conversation.id}`);
     } catch (error) {
-      toast.error(getAPIErrorMessage(error, '创建私有会话失败'));
+      toast.error(getAPIErrorMessage(error, '创建会话失败'));
     }
   };
-
-  const ensureDraftVersion = async (): Promise<string> => {
-    if (!appId) throw new Error('应用不存在');
-    if (app?.draftVersionId && app.draftVersionId !== '0') return app.draftVersionId;
-    const { version } = await saveAIAppVersion(appId, {
-      name: name.trim() || '未命名智能体',
-      description: description.trim(),
-      config,
-    });
-    setVersions((items) => [version, ...items]);
-    setApp((current) => (current ? { ...current, draftVersionId: version.id } : current));
-    return version.id;
-  };
-
-  const restoreVersion = async (source: AIAppVersion) => {
-    if (!appId || source.id === app?.draftVersionId) return;
-    try {
-      setRestoringVersionId(source.id);
-      const { version } = await restoreAIAppVersion(appId, source.id);
-      setVersions((items) => [version, ...items]);
-      setConfig(parseAgentConfig(version));
-      setApp((current) => (current ? { ...current, draftVersionId: version.id } : current));
-      toast.success(`已将 v${source.number} 恢复为新草稿 v${version.number}`);
-    } catch (error) {
-      toast.error(getAPIErrorMessage(error, '恢复历史版本失败'));
-    } finally {
-      setRestoringVersionId(null);
-    }
-  };
-
-  const updateKnowledgeBaseBindings = async (knowledgeBaseIDs: string[]) => {
-    if (!appId) return;
-    try {
-      setSavingKnowledgeBases(true);
-      const result = await replaceAIAppKnowledgeBases(appId, knowledgeBaseIDs);
-      setBoundKnowledgeBaseIDs(result.knowledgeBaseIds);
-      toast.success('资料库已更新');
-    } catch (error) {
-      toast.error(getAPIErrorMessage(error, '更新资料库失败'));
-    } finally {
-      setSavingKnowledgeBases(false);
-    }
-  };
-
-  const updateToolBindings = async (nextTools: string[]) => {
-    if (!appId) return;
-    try {
-      setSavingTools(true);
-      const result = await replaceAIAppTools(appId, nextTools);
-      setBoundTools(result.tools);
-      toast.success('工具已更新');
-    } catch (error) {
-      toast.error(getAPIErrorMessage(error, '更新工具失败'));
-    } finally {
-      setSavingTools(false);
-    }
-  };
-
-  const updateAPIKeyAppBinding = async (key: AIAPIKey, checked: boolean) => {
-    if (!appId) return;
-    const current = keyAppBindings[key.id] || [];
-    const next = checked ? [...current, appId] : current.filter((id) => id !== appId);
-    try {
-      setSavingAPIKeyId(key.id);
-      const result = await replaceAIAPIKeyAppBindings(key.id, next);
-      setKeyAppBindings((items) => ({ ...items, [key.id]: result.appIds }));
-      toast.success(checked ? '已授权此 Key 调用当前应用' : '已取消此 Key 的应用权限');
-    } catch (error) {
-      toast.error(getAPIErrorMessage(error, '更新 API Key 应用权限失败'));
-    } finally {
-      setSavingAPIKeyId(null);
-    }
-  };
-
-  const createAPIKey = async () => {
-    if (!newAPIKeyName.trim()) {
-      toast.error('请输入 Key 名称');
-      return;
-    }
-    try {
-      setCreatingAPIKey(true);
-      const result = await createAIAPIKey({ name: newAPIKeyName.trim() });
-      setAPIKeys((items) => [result.key, ...items]);
-      setKeyAppBindings((items) => ({ ...items, [result.key.id]: [] }));
-      setKeyUsage((items) => ({
-        ...items,
-        [result.key.id]: { limit: 100, count: 0, remaining: 100 },
-      }));
-      setGeneratedAPIKey(result.secret);
-      setNewAPIKeyName('');
-      toast.success('API Key 已创建');
-    } catch (error) {
-      toast.error(getAPIErrorMessage(error, '创建 API Key 失败'));
-    } finally {
-      setCreatingAPIKey(false);
-    }
-  };
-
-  const revokeAPIKey = async (key: AIAPIKey) => {
-    if (key.status !== 'active') {
-      return;
-    }
-    try {
-      setRevokingAPIKeyId(key.id);
-      await revokeAIAPIKey(key.id);
-      setAPIKeys((items) => items.filter((item) => item.id !== key.id));
-      setKeyAppBindings((items) => ({ ...items, [key.id]: [] }));
-      toast.success('API Key 已撤销');
-    } catch (error) {
-      toast.error(getAPIErrorMessage(error, '撤销 API Key 失败'));
-    } finally {
-      setRevokingAPIKeyId(null);
-      setRevokeTarget(null);
-    }
-  };
-
-  const publicAPIPath = `/api/v1/public/ai/apps/${appId}/chat`;
-  const publicAPICurl = `curl -X POST "YOUR_API_BASE_URL${publicAPIPath}" -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d '{"message":"你好","modelId":"YOUR_MODEL_ID","stream":false}'`;
-  const publicAPIJavaScriptJSON = `const response = await fetch("YOUR_API_BASE_URL${publicAPIPath}", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer YOUR_API_KEY",
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({ message: "你好", modelId: "YOUR_MODEL_ID", stream: false })
-});
-
-const data = await response.json();
-console.log(data.reply);`;
-  const publicAPIJavaScriptSSE = `const response = await fetch("YOUR_API_BASE_URL${publicAPIPath}", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer YOUR_API_KEY",
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({ message: "你好", modelId: "YOUR_MODEL_ID", stream: true })
-});
-
-const reader = response.body.getReader();
-const decoder = new TextDecoder();
-let buffer = "";
-
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
-  buffer += decoder.decode(value, { stream: true });
-  const records = buffer.split("\\n\\n");
-  buffer = records.pop() || "";
-  for (const record of records) {
-    const line = record.split("\\n").find((item) => item.startsWith("data: "));
-    if (!line) continue;
-    const event = JSON.parse(line.slice(6));
-    if (event.type === "delta") console.log(event.chunk);
-    if (event.type === "done") console.log("完成", event);
-  }
-}`;
-  const activeAPIKeys = apiKeys.filter((key) => key.status === 'active');
-  const agentSelectableTools = tools.filter(
-    (tool) => tool.permission === 'read' || tool.name === 'image.generate',
-  );
 
   const generateAvatar = async () => {
-    if (!appId) return;
-    if (!imageModelId) {
-      toast.error('请选择图片生成模型');
+    if (!appId || !avatarModelId) {
+      toast.error('请选择头像生成模型');
       return;
     }
     setAvatarAction('generate');
     try {
-      const result = await generateAIAppAvatar(appId, imageModelId, {
+      const result = await generateAIAppAvatar(appId, avatarModelId, {
         name,
         description,
-        systemPrompt: config.systemPrompt,
+        systemPrompt: config.identity,
       });
       setApp(result.app);
-      toast.success('头像已生成');
+      setAvatarDialogOpen(false);
+      toast.success('动漫头像已生成');
     } catch (error) {
       toast.error(getAPIErrorMessage(error, '头像生成失败'));
     } finally {
       setAvatarAction(null);
     }
-  };
-
-  const handleImageModelChange = (modelID: string) => {
-    setImageModelId(modelID);
-    saveAvatarImageModelPreference(modelID);
   };
 
   const uploadAvatar = async (file?: File) => {
@@ -564,965 +386,530 @@ while (true) {
     try {
       const result = await uploadAIAppAvatar(appId, file);
       setApp(result.app);
+      setAvatarDialogOpen(false);
       toast.success('头像已更新');
     } catch (error) {
       toast.error(getAPIErrorMessage(error, '头像上传失败'));
     } finally {
       setAvatarAction(null);
-      if (avatarInputRef.current) avatarInputRef.current.value = '';
     }
   };
 
-  const debug = async () => {
-    if (!appId || !debugMessage.trim()) {
-      toast.error('请输入调试消息');
-      return;
-    }
-    if (!debugModelId) {
-      toast.error('请选择文本模型');
-      return;
-    }
-    try {
-      setDebugging(true);
-      setDebugReply('');
-      setDebugToolStatus(null);
-      setDebugReferences([]);
-      await ensureDraftVersion();
-      const controller = new AbortController();
-      abortDebugRef.current = controller;
-      await streamDebugAIApp(
-        appId,
-        debugMessage.trim(),
-        debugModelId,
-        {
-          onDelta: (chunk) => setDebugReply((reply) => reply + chunk),
-          onToolCall: (toolName) => {
-            setDebugToolStatus(toolName === 'content.search' ? '正在搜索内容' : '正在调用工具');
-          },
-          onToolResult: (toolName, ok) => {
-            if (toolName === 'content.search') {
-              setDebugToolStatus(ok ? '内容搜索完成' : '内容搜索失败');
-            }
-          },
-          onDone: (run, reply, references) => {
-            setDebugReply(reply);
-            setDebugReferences(references);
-            setRuns((items) => [run, ...items]);
-          },
-          onError: (message, run) => {
-            if (run) setRuns((items) => [run, ...items]);
-            toast.error(message);
-          },
-        },
-        controller.signal,
-      );
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      toast.error(getAPIErrorMessage(error, '调试运行失败'));
-    } finally {
-      abortDebugRef.current = null;
-      setDebugging(false);
-    }
-  };
-
-  const generateAgentField = async (field: PromptAssistantField) => {
-    if (!appId || generatingField) return;
-    const currentPrompt =
-      field === 'description'
-        ? description
-        : field === 'system_prompt'
-          ? config.systemPrompt
-          : field === 'opening_message'
-            ? config.openingMessage
-            : config.exampleQuestions.join('\n');
-    setRightWorkspaceTab('debug');
-    setShowMobileCopilot(false);
-    setGeneratingField(field);
-    try {
-      const { suggestion } = await createPromptAssistantSuggestion({
-        target: 'agent',
-        field,
-        mode: 'auto',
-        appId,
-        quick: true,
-        currentPrompt,
-        agentContext: {
-          name,
-          description,
-          systemPrompt: config.systemPrompt,
-          openingMessage: config.openingMessage,
-          exampleQuestions: config.exampleQuestions,
-        },
-      });
-      if (field === 'description') {
-        setDescription(suggestion.description || '');
-      } else if (field === 'system_prompt') {
-        setConfig((value) => ({ ...value, systemPrompt: suggestion.optimizedPrompt }));
-      } else if (field === 'opening_message') {
-        setConfig((value) => ({ ...value, openingMessage: suggestion.openingMessage || '' }));
-      } else {
-        setConfig((value) => ({ ...value, exampleQuestions: suggestion.exampleQuestions || [] }));
-      }
-      toast.success('AI 内容已生成');
-    } catch (error) {
-      toast.error(getAPIErrorMessage(error, 'AI 生成失败'));
-    } finally {
-      setGeneratingField(null);
-    }
-  };
-
-  const applyCopilotProposal = (proposal: CopilotProposal) => {
-    const candidate = proposal.candidate as Partial<{
-      name: string;
-      description: string;
-      config: Partial<AgentConfig>;
-    }>;
-    if (proposal.targetType !== 'agent' || !candidate || typeof candidate !== 'object') {
-      throw new Error('提案不是有效的智能体草稿');
-    }
-    if (typeof candidate.name === 'string') setName(candidate.name);
-    if (typeof candidate.description === 'string') setDescription(candidate.description);
-    if (candidate.config && typeof candidate.config === 'object') {
-      setConfig((current) => ({
-        ...current,
-        ...candidate.config,
-        modelProfile: 'ark-text-default',
-        exampleQuestions: Array.isArray(candidate.config?.exampleQuestions)
-          ? candidate.config.exampleQuestions.filter(
-              (item): item is string => typeof item === 'string',
-            )
-          : current.exampleQuestions,
-      }));
-    }
-  };
-
-  if (loading) {
-    return <AgentEditorSkeleton />;
-  }
+  if (loading) return <EditorSkeleton />;
   if (!app) return null;
-  if (app.type !== 'agent') {
-    return (
-      <div className="mx-auto max-w-4xl space-y-4 p-8">
-        <p className="text-sm text-muted-foreground">
-          该工作流尚未完成关联，请返回工作台后重新打开。
-        </p>
-        <Button variant="outline" onClick={() => navigate('/workbench')}>
-          返回工作台
-        </Button>
-      </div>
-    );
-  }
-
-  const copilot = (
-    <WorkbenchCopilot
-      context={{
-        scope: 'agent',
-        targetId: appId,
-        draft: {
-          name,
-          description,
-          config,
-        },
-        runId: runs[0]?.id,
-      }}
-      suggestions={[
-        '检查当前智能体草稿并给出改进提案',
-        runs[0]?.status === 'failed' ? '根据最近失败生成修复提案' : '让开场白和示例问题更一致',
-      ]}
-      onApplyProposal={applyCopilotProposal}
-    />
-  );
 
   return (
-    <div className="mx-auto max-w-[1440px] space-y-6 p-4 pb-16 pt-8 sm:p-8">
-      <EditorPageHeader
-        title={name || '未命名智能体'}
-        description="私有智能体"
-        onBack={() => navigate('/workbench')}
-        status={
-          <Badge variant={app.status === 'published' ? 'default' : 'outline'}>
-            {app.status === 'published' ? '已发布' : '草稿'}
-          </Badge>
-        }
-        actions={
-          <>
-            <Button variant="outline" onClick={() => void createConversation()}>
-              <MessageCircle className="mr-2 h-4 w-4" />
-              私有会话
+    <main className="min-h-[calc(100vh-4rem)] bg-muted/20">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-4 sm:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => navigate(-1)}
+              aria-label="返回上一页"
+            >
+              <ArrowLeft />
             </Button>
-            <Button variant="outline" onClick={() => setShowVersionHistory(true)}>
-              <History className="mr-2 h-4 w-4" />
-              版本
-            </Button>
-            <Button variant="outline" disabled={saving || publishing} onClick={save}>
-              <Save className="mr-2 h-4 w-4" />
-              保存版本
-            </Button>
-            <Button disabled={saving || publishing} onClick={publish}>
-              <Send className="mr-2 h-4 w-4" />
-              发布
-            </Button>
-          </>
-        }
-      />
-      <Card className="gap-0 py-0 shadow-xs">
-        <CardHeader className="border-b border-border/70 px-6 py-5 sm:px-8">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Bot className="h-5 w-5 text-primary" />
-            编排与调试
-          </CardTitle>
-          <CardDescription>编辑当前草稿，并即时查看模型、工具和资料来源。</CardDescription>
-        </CardHeader>
-        <CardContent className="px-0">
-          <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)]">
-            <div className="min-w-0 p-6 sm:p-8">
-              <Tabs defaultValue="compose" className="gap-5">
-                <TabsList className="self-start max-w-full overflow-x-auto">
-                  <TabsTrigger value="compose" className="flex-none px-3">
-                    编排
-                  </TabsTrigger>
-                  <TabsTrigger value="knowledge" className="flex-none px-3">
-                    知识库
-                  </TabsTrigger>
-                  <TabsTrigger value="tools" className="flex-none px-3">
-                    工具
-                  </TabsTrigger>
-                  <TabsTrigger value="skills" className="flex-none px-3">
-                    技能
-                  </TabsTrigger>
-                  <TabsTrigger value="publish" className="flex-none px-3">
-                    发布
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="compose" className="w-full">
-                  <FieldGroup>
-                    <Field>
-                      <FieldLabel>头像</FieldLabel>
-                      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/20 p-3">
-                        <AgentAvatar name={name} src={app.avatarUrl} className="size-16" />
-                        <div className="min-w-56 flex-1">
-                          <p className="text-sm font-medium text-foreground">智能体头像</p>
-                          <ModelPicker
-                            value={imageModelId || undefined}
-                            onValueChange={handleImageModelChange}
-                            capability="image_generation"
-                            label="图片模型"
-                            compact
-                            autoSelectFirst
-                          />
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={avatarAction !== null || !imageModelId}
-                            onClick={() => void generateAvatar()}
-                          >
-                            <ImagePlus className="mr-2 size-4" />
-                            {avatarAction === 'generate'
-                              ? 'AI 生成中…'
-                              : `AI ${app.avatarUrl ? '重新生成' : '生成'}`}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={avatarAction !== null}
-                            onClick={() => avatarInputRef.current?.click()}
-                          >
-                            <Upload className="mr-2 size-4" />
-                            {avatarAction === 'upload' ? '上传中…' : '上传图片'}
-                          </Button>
-                          <input
-                            ref={avatarInputRef}
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            className="sr-only"
-                            onChange={(event) => void uploadAvatar(event.target.files?.[0])}
-                          />
-                        </div>
-                      </div>
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="app-name">名称</FieldLabel>
-                      <Input
-                        id="app-name"
-                        value={name}
-                        maxLength={100}
-                        onChange={(event) => setName(event.target.value)}
-                      />
-                    </Field>
-                    <Field>
-                      <div className="flex items-center justify-between gap-3">
-                        <FieldLabel htmlFor="app-description">简介</FieldLabel>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={generatingField !== null}
-                          onClick={() => void generateAgentField('description')}
-                        >
-                          <Sparkles className="mr-2 size-4" />
-                          {generatingField === 'description' ? 'AI 生成中…' : 'AI 生成'}
-                        </Button>
-                      </div>
-                      <Input
-                        id="app-description"
-                        value={description}
-                        maxLength={500}
-                        onChange={(event) => setDescription(event.target.value)}
-                      />
-                    </Field>
-                    <Field>
-                      <div className="flex items-center justify-between gap-3">
-                        <FieldLabel htmlFor="system-prompt">系统提示词</FieldLabel>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={generatingField !== null}
-                          onClick={() => void generateAgentField('system_prompt')}
-                        >
-                          <Sparkles className="mr-2 size-4" />
-                          {generatingField === 'system_prompt' ? 'AI 优化中…' : 'AI 优化'}
-                        </Button>
-                      </div>
-                      <Textarea
-                        id="system-prompt"
-                        value={config.systemPrompt}
-                        placeholder="说明智能体的角色、边界和输出要求"
-                        onChange={(event) =>
-                          setConfig((value) => ({ ...value, systemPrompt: event.target.value }))
-                        }
-                      />
-                    </Field>
-                    <Field>
-                      <div className="flex items-center justify-between gap-3">
-                        <FieldLabel htmlFor="opening-message">开场白</FieldLabel>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={generatingField !== null}
-                          onClick={() => void generateAgentField('opening_message')}
-                        >
-                          <Sparkles className="mr-2 size-4" />
-                          {generatingField === 'opening_message' ? 'AI 生成中…' : 'AI 生成'}
-                        </Button>
-                      </div>
-                      <Textarea
-                        id="opening-message"
-                        value={config.openingMessage}
-                        placeholder="首次对话时显示的欢迎语"
-                        onChange={(event) =>
-                          setConfig((value) => ({ ...value, openingMessage: event.target.value }))
-                        }
-                      />
-                    </Field>
-                    <Field>
-                      <div className="flex items-center justify-between gap-3">
-                        <FieldLabel>示例问题（最多 4 条）</FieldLabel>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={generatingField !== null}
-                          onClick={() => void generateAgentField('example_questions')}
-                        >
-                          <Sparkles className="mr-2 size-4" />
-                          {generatingField === 'example_questions' ? 'AI 生成中…' : 'AI 生成'}
-                        </Button>
-                      </div>
-                      <div className="space-y-2">
-                        {Array.from({ length: 4 }, (_, index) => (
-                          <Input
-                            key={index}
-                            value={config.exampleQuestions[index] || ''}
-                            maxLength={120}
-                            placeholder={`示例问题 ${index + 1}`}
-                            onChange={(event) =>
-                              setConfig((value) => {
-                                const next = [...value.exampleQuestions];
-                                next[index] = event.target.value;
-                                return {
-                                  ...value,
-                                  exampleQuestions: next.filter(
-                                    (item, itemIndex) => itemIndex <= index || item.trim(),
-                                  ),
-                                };
-                              })
-                            }
-                          />
-                        ))}
-                      </div>
-                    </Field>
-                  </FieldGroup>
-                </TabsContent>
-                <TabsContent value="knowledge" className="w-full">
-                  <EditorSection
-                    title="资料库"
-                    description="已索引的资料会在调试时作为参考。"
-                    className="border-0 bg-transparent p-0"
-                  >
-                    <KnowledgeBaseBindings
-                      knowledgeBases={knowledgeBases}
-                      boundKnowledgeBaseIDs={boundKnowledgeBaseIDs}
-                      disabled={savingKnowledgeBases}
-                      onChange={(knowledgeBaseIDs) => {
-                        void updateKnowledgeBaseBindings(knowledgeBaseIDs);
-                      }}
-                    />
-                  </EditorSection>
-                </TabsContent>
-                <TabsContent value="tools" className="w-full">
-                  <EditorSection
-                    title="工具"
-                    description="选择智能体可调用的工具。图片生成会使用版本中明确配置的模型，并创建可审计的图片资产。"
-                    className="border-0 bg-transparent p-0"
-                    action={
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => navigate('/workbench/resources?tab=tools')}
-                      >
-                        工具目录
-                      </Button>
-                    }
-                  >
-                    {agentSelectableTools.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">暂无可用工具</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {agentSelectableTools.map((tool) => {
-                          const checked = boundTools.includes(tool.name);
-                          return (
-                            <label
-                              key={tool.name}
-                              className="flex cursor-pointer items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
-                            >
-                              <Checkbox
-                                checked={checked}
-                                disabled={savingTools}
-                                onCheckedChange={(nextChecked) => {
-                                  const next = nextChecked
-                                    ? [...boundTools, tool.name]
-                                    : boundTools.filter((name) => name !== tool.name);
-                                  void updateToolBindings(next);
-                                }}
-                              />
-                              <span className="min-w-0">
-                                <span className="block text-sm font-medium">
-                                  {tool.name === 'content.search' ? '内容搜索' : tool.name}
-                                </span>
-                                <span className="block text-xs text-muted-foreground">
-                                  {tool.description}
-                                </span>
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {boundTools.includes('image.generate') ? (
-                      <div className="mt-4 rounded-xl border border-border bg-background/70 p-3">
-                        <p className="text-sm font-medium">图片生成默认设置</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          智能体只能使用这里选定的模型；会话中可按用户要求调整比例和清晰度。
-                        </p>
-                        <div className="mt-3">
-                          <ModelPicker
-                            value={config.imageGeneration?.modelId}
-                            onValueChange={(modelId) =>
-                              setConfig((current) => ({
-                                ...current,
-                                imageGeneration: {
-                                  modelId,
-                                  aspectRatio: current.imageGeneration?.aspectRatio || '1:1',
-                                  quality: current.imageGeneration?.quality || '1K',
-                                },
-                              }))
-                            }
-                            capability="image_generation"
-                            label="图片模型"
-                          />
-                        </div>
-                      </div>
-                    ) : null}
-                  </EditorSection>
-                </TabsContent>
-                <TabsContent value="skills" className="w-full">
-                  <EditorSection
-                    title="技能"
-                    description="所选技能会随当前版本保存，并在对话运行时提供说明与参考资料。"
-                    className="border-0 bg-transparent p-0"
-                    action={
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => navigate('/workbench/resources?tab=skills')}
-                      >
-                        技能目录
-                      </Button>
-                    }
-                  >
-                    {skills.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">暂无已安装技能</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {skills.map((skill) => {
-                          const checked = config.skillIds.includes(skill.id);
-                          return (
-                            <label
-                              key={skill.id}
-                              className="flex cursor-pointer items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
-                            >
-                              <Checkbox
-                                checked={checked}
-                                onCheckedChange={(nextChecked) => {
-                                  setConfig((value) => ({
-                                    ...value,
-                                    skillIds:
-                                      nextChecked === true
-                                        ? [...value.skillIds, skill.id].slice(0, 8)
-                                        : value.skillIds.filter((id) => id !== skill.id),
-                                  }));
-                                }}
-                              />
-                              <span className="min-w-0">
-                                <span className="block text-sm font-medium">{skill.name}</span>
-                                <span className="block text-xs text-muted-foreground">
-                                  {skill.description || '未提供技能说明'}
-                                </span>
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </EditorSection>
-                </TabsContent>
-                <TabsContent value="publish" className="w-full">
-                  <EditorSection
-                    title="公开 API"
-                    description="发布后可通过 API Key 调用当前版本。"
-                    className="border-0 bg-transparent p-0"
-                  >
-                    <div>
-                      <p className="flex items-center gap-2 text-sm font-medium">
-                        <KeyRound className="h-4 w-4 text-primary" />
-                        公开 API
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        仅已发布版本可被调用。每个 Key 每日最多 100 次，未勾选不会获得当前应用权限。
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/70 px-3 py-2">
-                      <p className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
-                        POST {publicAPIPath}
-                      </p>
-                      <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        aria-label="复制接口地址"
-                        title="复制接口地址"
-                        onClick={() => void copyText(publicAPIPath, '接口地址已复制')}
-                      >
-                        <Copy />
-                      </Button>
-                    </div>
-                    <Button
-                      className="w-full justify-start"
-                      variant="outline"
-                      onClick={() => void copyText(publicAPICurl, 'curl 示例已复制')}
-                    >
-                      <Copy className="mr-2 h-4 w-4" />
-                      复制 curl 示例
-                    </Button>
-                    <div className="space-y-2 rounded-xl border border-border/70 bg-background/50 p-3">
-                      <p className="text-xs font-medium text-muted-foreground">JavaScript 示例</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            void copyText(publicAPIJavaScriptJSON, 'JSON fetch 示例已复制')
-                          }
-                        >
-                          <Copy className="mr-1.5 h-3.5 w-3.5" />
-                          复制 JSON fetch
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            void copyText(publicAPIJavaScriptSSE, 'SSE fetch 示例已复制')
-                          }
-                        >
-                          <Copy className="mr-1.5 h-3.5 w-3.5" />
-                          复制 SSE fetch
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Input
-                        value={newAPIKeyName}
-                        placeholder="新 Key 名称"
-                        maxLength={100}
-                        onChange={(event) => setNewAPIKeyName(event.target.value)}
-                      />
-                      <Button variant="outline" disabled={creatingAPIKey} onClick={createAPIKey}>
-                        {creatingAPIKey ? '创建中…' : '创建 Key'}
-                      </Button>
-                    </div>
-                    {generatedAPIKey && (
-                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-xs font-medium">请立即保存此 Key，它不会再次显示。</p>
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            onClick={() => void copyText(generatedAPIKey, 'API Key 已复制')}
-                          >
-                            <Copy className="mr-1 h-3.5 w-3.5" />
-                            复制 Key
-                          </Button>
-                        </div>
-                        <code className="mt-2 block break-all text-xs text-muted-foreground">
-                          {generatedAPIKey}
-                        </code>
-                      </div>
-                    )}
-                    {activeAPIKeys.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">还没有 API Key</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {activeAPIKeys.map((key) => {
-                          const checked = (keyAppBindings[key.id] || []).includes(appId || '');
-                          const usage = keyUsage[key.id];
-                          return (
-                            <div
-                              key={key.id}
-                              className="flex items-center gap-3 rounded-xl bg-background/70 px-3 py-2.5"
-                            >
-                              <Checkbox
-                                checked={checked}
-                                disabled={key.status !== 'active' || savingAPIKeyId === key.id}
-                                onCheckedChange={(nextChecked) =>
-                                  void updateAPIKeyAppBinding(key, nextChecked === true)
-                                }
-                              />
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-medium">
-                                  {key.name}
-                                </span>
-                                <span className="block text-xs text-muted-foreground">
-                                  {key.keyPrefix}… · 仅显示前缀 ·{' '}
-                                  {usage ? `今日 ${usage.count}/${usage.limit}` : '加载配额中'}
-                                </span>
-                              </span>
-                              {savingAPIKeyId === key.id && (
-                                <span className="text-xs text-muted-foreground">
-                                  {checked ? '授权中…' : '取消授权中…'}
-                                </span>
-                              )}
-                              <Badge variant="outline">可用</Badge>
-                              <Button
-                                size="icon-xs"
-                                variant="ghost"
-                                disabled={revokingAPIKeyId === key.id}
-                                aria-label={`撤销 ${key.name}`}
-                                title="撤销 Key"
-                                onClick={() => setRevokeTarget(key)}
-                              >
-                                <Trash2 />
-                              </Button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </EditorSection>
-                </TabsContent>
-              </Tabs>
+            <div>
+              <p className="text-sm font-semibold">智能体详情</p>
+              <p className="text-xs text-muted-foreground">个性、能力与产物</p>
             </div>
-            <aside className="flex flex-col gap-4 bg-muted/25 p-5 sm:p-6 lg:border-l lg:border-border/70">
-              <Tabs
-                value={rightWorkspaceTab}
-                onValueChange={(value) => setRightWorkspaceTab(value as 'debug' | 'ai')}
-                className="min-h-[620px] gap-4"
-              >
-                <TabsList className="self-start">
-                  <TabsTrigger value="debug">在线调试</TabsTrigger>
-                  <TabsTrigger value="ai">AI 协作</TabsTrigger>
-                </TabsList>
-                <TabsContent value="debug" className="space-y-4">
-                  <Card size="sm" className="gap-0 shadow-none">
-                    <CardHeader className="border-b border-border bg-muted/30">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-start gap-3">
-                          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background ring-1 ring-border">
-                            <Bot className="size-4 text-primary" />
-                          </div>
-                          <div>
-                            <CardTitle>在线调试</CardTitle>
-                            <CardDescription>直接测试当前草稿</CardDescription>
-                          </div>
-                        </div>
-                        <Badge variant="secondary">草稿</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3 pt-4">
-                      <ModelPicker
-                        value={debugModelId || undefined}
-                        onValueChange={setDebugModelId}
-                        capability="text"
-                        label="文本模型"
-                      />
-                      <Textarea
-                        value={debugMessage}
-                        className="min-h-28 resize-y bg-background"
-                        placeholder="输入一条消息，看看智能体会如何回答"
-                        onChange={(event) => setDebugMessage(event.target.value)}
-                      />
-                      {config.exampleQuestions.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {config.exampleQuestions.slice(0, 2).map((question) => (
-                            <Button
-                              key={question}
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="max-w-full justify-start font-normal"
-                              disabled={debugging}
-                              onClick={() => setDebugMessage(question)}
-                            >
-                              <span className="truncate">{question}</span>
-                            </Button>
-                          ))}
-                        </div>
-                      ) : null}
-                      <div className="flex justify-end">
-                        <Button
-                          variant={debugging ? 'outline' : 'default'}
-                          disabled={!debugging && !debugMessage.trim()}
-                          onClick={() => {
-                            if (debugging) {
-                              abortDebugRef.current?.abort();
-                            } else {
-                              void debug();
-                            }
-                          }}
-                        >
-                          {debugging ? (
-                            <Square data-icon="inline-start" />
-                          ) : (
-                            <Play data-icon="inline-start" />
-                          )}
-                          {debugging ? '停止生成' : '开始调试'}
-                        </Button>
-                      </div>
-                      {debugging && !debugReply ? (
-                        <div className="space-y-3 rounded-lg bg-muted/50 p-3" aria-live="polite">
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Bot className="size-3.5" />
-                            智能体正在思考
-                          </div>
-                          <Skeleton className="h-3 w-full" />
-                          <Skeleton className="h-3 w-4/5" />
-                        </div>
-                      ) : null}
-                      {debugReply ? (
-                        <div className="overflow-hidden rounded-lg border border-border bg-background">
-                          <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
-                            <AgentAvatar name={name} src={app.avatarUrl} className="size-5" />
-                            {name || '智能体'}的回复
-                          </div>
-                          <div className="whitespace-pre-wrap px-3 py-3 text-sm leading-6">
-                            {debugReply}
-                          </div>
-                        </div>
-                      ) : null}
-                      <AIResponseContext
-                        toolStatus={debugToolStatus}
-                        references={debugReferences}
-                      />
-                    </CardContent>
-                  </Card>
-                  <Separator />
-                  <div className="flex flex-col gap-3">
-                    <p className="text-sm font-semibold">最近运行</p>
-                    <div className="flex flex-col gap-3">
-                      {runs.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">暂无运行记录</p>
-                      ) : (
-                        runs.slice(0, 3).map((run) => (
-                          <div
-                            key={run.id}
-                            className="rounded-2xl border border-border/70 bg-background/60 p-3 text-sm"
-                          >
-                            <div className="flex justify-between">
-                              <span>
-                                {run.status === 'succeeded'
-                                  ? '成功'
-                                  : run.status === 'cancelled'
-                                    ? '已停止'
-                                    : '失败'}
-                              </span>
-                              <span className="text-muted-foreground">{run.durationMs} ms</span>
-                            </div>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              v
-                              {versions.find((version) => version.id === run.versionId)?.number ??
-                                '—'}{' '}
-                              · {run.model || '模型信息不可用'}
-                            </p>
-                            <p className="mt-2 line-clamp-2 text-muted-foreground">
-                              {run.output || run.errorCode || run.input}
-                            </p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                  <Separator />
-                  <div className="flex flex-col gap-3">
-                    <p className="flex items-center gap-2 text-sm font-semibold">
-                      <Activity className="h-4 w-4 text-primary" />
-                      公开调用记录
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      仅记录状态、耗时和配额次数，不保存外部消息或回复。
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      {publicInvocations.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">暂无公开调用记录</p>
-                      ) : (
-                        publicInvocations.slice(0, 5).map((invocation) => (
-                          <div
-                            key={invocation.id}
-                            className="rounded-xl border border-border/70 bg-background/60 px-3 py-2 text-xs"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span>
-                                {invocation.status === 'succeeded'
-                                  ? '成功'
-                                  : invocation.status === 'rejected'
-                                    ? '已拒绝'
-                                    : '失败'}
-                              </span>
-                              <span className="text-muted-foreground">
-                                {invocation.durationMs} ms
-                              </span>
-                            </div>
-                            <p className="mt-1 text-muted-foreground">
-                              第 {invocation.dailyCallNumber} 次 ·{' '}
-                              {invocation.stream ? '流式' : 'JSON'}
-                              {invocation.errorCode ? ` · ${invocation.errorCode}` : ''}
-                            </p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </TabsContent>
-                <TabsContent
-                  value="ai"
-                  className="min-h-0 overflow-hidden rounded-xl border border-border bg-card"
-                >
-                  {isMobile ? (
-                    <div className="flex min-h-40 items-center justify-center p-6">
-                      <Button onClick={() => setShowMobileCopilot(true)}>打开 AI 协作</Button>
-                    </div>
-                  ) : (
-                    copilot
-                  )}
-                </TabsContent>
-              </Tabs>
-            </aside>
           </div>
-        </CardContent>
-      </Card>
-      {isMobile ? (
-        <MobileCopilotSheet
-          open={showMobileCopilot}
-          onOpenChange={setShowMobileCopilot}
-          title="智能体 AI 协作"
-        >
-          {copilot}
-        </MobileCopilotSheet>
-      ) : null}
-      <Dialog open={showVersionHistory} onOpenChange={setShowVersionHistory}>
-        <DialogContent className="max-h-[calc(100vh-2rem)] max-w-2xl gap-4 overflow-hidden">
-          <DialogHeader className="pr-10">
-            <DialogTitle>版本历史</DialogTitle>
-            <DialogDescription>可随时恢复历史配置，恢复后会创建新的草稿。</DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[min(720px,calc(100vh-12rem))]">
-            <div className="space-y-3 pr-4">
-              {versions.map((version) => {
-                const isDraft = version.id === app.draftVersionId;
-                const isPublished = version.id === app.publishedVersionId;
-                return (
-                  <article
-                    key={version.id}
-                    className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-foreground">v{version.number}</p>
-                        {isDraft ? <Badge variant="outline">当前草稿</Badge> : null}
-                        {isPublished ? <Badge variant="secondary">已发布</Badge> : null}
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        创建于 {new Date(version.createdAt).toLocaleString('zh-CN')}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant={isDraft ? 'outline' : 'secondary'}
-                      disabled={isDraft || restoringVersionId !== null}
-                      onClick={() => restoreVersion(version)}
-                    >
-                      <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                      {restoringVersionId === version.id ? '恢复中…' : '恢复为草稿'}
-                    </Button>
-                  </article>
-                );
-              })}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => void saveEverything()} disabled={saving}>
+              {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
+              {saving ? '保存中' : '保存'}
+            </Button>
+            <Button onClick={() => void publish()} disabled={publishing || saving}>
+              {publishing ? <LoaderCircle className="animate-spin" /> : <CheckCircle2 />}
+              {publishing ? '发布中' : '发布'}
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto grid max-w-[1440px] gap-6 p-4 sm:p-8 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
+        <Card className="overflow-hidden py-0 lg:sticky lg:top-24">
+          <CardContent className="p-6 text-center">
+            <div className="group relative mx-auto size-32">
+              <AgentAvatar
+                name={name}
+                src={app.avatarUrl}
+                className="size-32 border-4 border-background shadow-sm"
+              />
+              <div className="absolute inset-0 flex items-center justify-center gap-2 rounded-full bg-foreground/65 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                <Button
+                  size="icon-sm"
+                  variant="secondary"
+                  onClick={() => setAvatarDialogOpen(true)}
+                  aria-label="AI 生成头像"
+                  title="AI 生成头像"
+                >
+                  <Sparkles />
+                </Button>
+                <Button
+                  size="icon-sm"
+                  variant="secondary"
+                  onClick={() => avatarInputRef.current?.click()}
+                  aria-label="上传头像"
+                  title="上传头像"
+                >
+                  <Upload />
+                </Button>
+              </div>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(event) => void uploadAvatar(event.target.files?.[0])}
+              />
             </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
-      <AlertDialog
-        open={revokeTarget !== null}
-        onOpenChange={(open) => {
-          if (!open && revokingAPIKeyId === null) setRevokeTarget(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>撤销 API Key？</AlertDialogTitle>
-            <AlertDialogDescription>
-              「{revokeTarget?.name}」撤销后将无法继续调用公开 API，历史调用记录会保留。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={revokingAPIKeyId !== null}>取消</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={revokingAPIKeyId !== null}
+
+            <button
+              type="button"
+              className="group/name mt-5 inline-flex max-w-full items-center gap-1.5 rounded-md px-2 py-1 text-xl font-semibold tracking-tight hover:bg-muted"
               onClick={() => {
-                if (revokeTarget) void revokeAPIKey(revokeTarget);
+                setDraftName(name);
+                setDraftDescription(description);
+                setIdentityDialogOpen(true);
               }}
             >
-              {revokingAPIKeyId !== null ? '撤销中…' : '确认撤销'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+              <span className="truncate">{name}</span>
+              <Pencil className="size-3.5 opacity-0 transition-opacity group-hover/name:opacity-100" />
+            </button>
+            <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground">
+              {description || '还没有添加描述'}
+            </p>
+            <Badge variant={app.status === 'published' ? 'default' : 'secondary'} className="mt-4">
+              {app.status === 'published' ? '已发布' : '未发布'}
+            </Badge>
+            <div className="mt-6 grid grid-cols-3 gap-2 border-y border-border py-5">
+              {[
+                [companionDays(app.createdAt), '陪伴天数'],
+                [formatCount(stats.conversationCount), '对话次数'],
+                [formatCount(stats.taskCount), '任务次数'],
+              ].map(([value, label]) => (
+                <div key={label}>
+                  <p className="text-lg font-semibold tabular-nums">{value}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
+                </div>
+              ))}
+            </div>
+            <Button className="mt-6 w-full" onClick={() => void startConversation()}>
+              <MessageCircle />
+              开始对话
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="min-w-0 overflow-hidden py-0">
+          <Tabs defaultValue="profile">
+            <div className="overflow-x-auto border-b border-border p-4 sm:px-6">
+              <TabsList className="h-11 min-w-max gap-1 rounded-xl bg-muted p-1">
+                <TabsTrigger
+                  className="min-w-24 rounded-lg px-5 data-active:ring-1 data-active:ring-border"
+                  value="profile"
+                >
+                  个性化
+                </TabsTrigger>
+                <TabsTrigger
+                  className="min-w-24 rounded-lg px-5 data-active:ring-1 data-active:ring-border"
+                  value="outputs"
+                >
+                  产物
+                </TabsTrigger>
+                <TabsTrigger
+                  className="min-w-24 rounded-lg px-5 data-active:ring-1 data-active:ring-border"
+                  value="skills"
+                >
+                  技能
+                </TabsTrigger>
+                <TabsTrigger
+                  className="min-w-24 rounded-lg px-5 data-active:ring-1 data-active:ring-border"
+                  value="models"
+                >
+                  模型
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="profile" className="m-0 p-4 sm:p-6">
+              <div className="grid gap-4 xl:grid-cols-2">
+                <ProfileEditor
+                  title="IDENTITY.md"
+                  description="智能伙伴的名字、性格和身份定义"
+                  icon={Bot}
+                  value={config.identity}
+                  onChange={(identity) => setConfig((current) => ({ ...current, identity }))}
+                />
+                <ProfileEditor
+                  title="USER.md"
+                  description="用户基本信息和沟通偏好"
+                  icon={UserRound}
+                  value={config.userProfile}
+                  onChange={(userProfile) => setConfig((current) => ({ ...current, userProfile }))}
+                />
+                <ProfileEditor
+                  title="SOUL.md"
+                  description="底线规则、安全框架和核心价值观"
+                  icon={ShieldCheck}
+                  value={config.soul}
+                  onChange={(soul) => setConfig((current) => ({ ...current, soul }))}
+                />
+                <ProfileEditor
+                  title="AGENTS.md"
+                  description="智能体执行任务时遵循的协作约定"
+                  icon={FileText}
+                  value={config.agentInstructions}
+                  onChange={(agentInstructions) =>
+                    setConfig((current) => ({ ...current, agentInstructions }))
+                  }
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="outputs" className="m-0 p-4 sm:p-6">
+              {images.length === 0 && artifacts.length === 0 ? (
+                <div className="py-20 text-center">
+                  <ImagePlus className="mx-auto size-8 text-muted-foreground" />
+                  <p className="mt-4 font-medium">还没有产物</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    智能体生成的图片和文件会出现在这里
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {images.length > 0 ? (
+                    <section>
+                      <div className="mb-4 flex items-center gap-2">
+                        <ImageIcon className="size-4" />
+                        <h3 className="font-medium">图片</h3>
+                        <Badge variant="secondary">{images.length}</Badge>
+                      </div>
+                      <div className="space-y-2">
+                        {images.map((image) => (
+                          <button
+                            type="button"
+                            key={image.id}
+                            onClick={() => setImagePreview(image)}
+                            className="group flex w-full items-center gap-4 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                            aria-label={`预览图片：${image.prompt || '智能体生成图片'}`}
+                          >
+                            <img
+                              src={image.resultUrl}
+                              alt={image.prompt || '智能体生成图片'}
+                              className="size-16 shrink-0 rounded-lg border border-border object-cover"
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">
+                                {image.prompt || '智能体生成图片'}
+                              </span>
+                              <span className="mt-1 block text-xs text-muted-foreground">
+                                {image.resultWidth > 0 && image.resultHeight > 0
+                                  ? `${image.resultWidth} × ${image.resultHeight} · `
+                                  : ''}
+                                {new Intl.DateTimeFormat('zh-CN', {
+                                  year: 'numeric',
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                }).format(new Date(image.createdAt))}
+                              </span>
+                            </span>
+                            <ImageIcon className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                  {artifacts.length > 0 ? (
+                    <section>
+                      <div className="mb-4 flex items-center gap-2">
+                        <FileText className="size-4" />
+                        <h3 className="font-medium">文件</h3>
+                        <Badge variant="secondary">{artifacts.length}</Badge>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {artifacts.map((artifact) => (
+                          <a
+                            key={artifact.id}
+                            href={artifact.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-3 rounded-xl border border-border p-4 hover:bg-muted/50"
+                          >
+                            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                              <FileText className="size-5 text-muted-foreground" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{artifact.fileName}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {formatBytes(artifact.sizeBytes)}
+                              </p>
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="skills" className="m-0 p-4 sm:p-6">
+              <div className="space-y-8">
+                <section>
+                  <div className="mb-4 flex items-center gap-2">
+                    <Sparkles className="size-4" />
+                    <h3 className="font-medium">已安装技能</h3>
+                    <Badge variant="secondary">{selectedSkills.length}</Badge>
+                  </div>
+                  {skills.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                      还没有安装技能
+                    </p>
+                  ) : (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {skills.map((skill) => {
+                        const checked = config.skillIds.includes(skill.id);
+                        return (
+                          <label
+                            key={skill.id}
+                            className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-4"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(next) =>
+                                setConfig((current) => ({
+                                  ...current,
+                                  skillIds: next
+                                    ? [...current.skillIds, skill.id].slice(0, 8)
+                                    : current.skillIds.filter((id) => id !== skill.id),
+                                }))
+                              }
+                            />
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-medium">
+                                {skill.name}
+                              </span>
+                              <span className="mt-1 block line-clamp-2 text-xs text-muted-foreground">
+                                {skill.description || '自定义技能'}
+                              </span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+
+                <section>
+                  <div className="mb-4 flex items-center gap-2">
+                    <Wrench className="size-4" />
+                    <h3 className="font-medium">工具能力</h3>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {[
+                      ['content.search', '内容搜索', '搜索私有内容和知识'],
+                      ['file.create', '成果文件', '生成 Markdown、JSON、CSV 文件'],
+                      ['image.generate', '图片生成', '按需生成或编辑图片'],
+                    ].map(([toolName, label, helper]) => (
+                      <div
+                        key={toolName}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-border p-4"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{label}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{helper}</p>
+                        </div>
+                        <Switch
+                          checked={boundTools.includes(toolName)}
+                          onCheckedChange={(checked) =>
+                            setBoundTools((current) =>
+                              checked
+                                ? [...current, toolName]
+                                : current.filter((name) => name !== toolName),
+                            )
+                          }
+                          aria-label={label}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="font-medium">知识库</h3>
+                  <p className="mb-4 mt-1 text-sm text-muted-foreground">
+                    回答时检索已绑定的私有资料
+                  </p>
+                  <KnowledgeBaseBindings
+                    knowledgeBases={knowledgeBases}
+                    boundKnowledgeBaseIDs={boundKnowledgeBaseIDs}
+                    onChange={setBoundKnowledgeBaseIDs}
+                  />
+                </section>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="models" className="m-0 p-4 sm:p-6">
+              <div className="mx-auto max-w-3xl space-y-6">
+                <div className="rounded-xl border border-border p-5">
+                  <h3 className="font-medium">对话模型</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    处理对话、知识检索和工具调用；带“图片理解”能力时可直接分析附件图片
+                  </p>
+                  <div className="mt-4">
+                    <ModelPicker
+                      value={config.modelId}
+                      onValueChange={(modelId) => setConfig((current) => ({ ...current, modelId }))}
+                      capability="text"
+                      label="对话模型"
+                    />
+                  </div>
+                </div>
+                <div
+                  className={cn(
+                    'rounded-xl border border-border p-5',
+                    !boundTools.includes('image.generate') && 'opacity-65',
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h3 className="font-medium">图片生成模型</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        仅在用户明确要求生成或编辑图片时调用
+                      </p>
+                    </div>
+                    <Switch
+                      checked={boundTools.includes('image.generate')}
+                      onCheckedChange={(checked) =>
+                        setBoundTools((current) =>
+                          checked
+                            ? [...current, 'image.generate']
+                            : current.filter((item) => item !== 'image.generate'),
+                        )
+                      }
+                      aria-label="图片生成能力"
+                    />
+                  </div>
+                  {boundTools.includes('image.generate') ? (
+                    <div className="mt-4">
+                      <ModelPicker
+                        value={config.imageGeneration?.modelId}
+                        onValueChange={(modelId) =>
+                          setConfig((current) => ({
+                            ...current,
+                            imageGeneration: {
+                              modelId,
+                              aspectRatio: current.imageGeneration?.aspectRatio || '1:1',
+                              quality: current.imageGeneration?.quality || '1K',
+                            },
+                          }))
+                        }
+                        capability="image_generation"
+                        label="图片生成模型"
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </Card>
+      </div>
+
+      <Dialog open={identityDialogOpen} onOpenChange={setIdentityDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>修改智能体信息</DialogTitle>
+            <DialogDescription>名称和描述会显示在详情与对话页面。</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="agent-name">名称</Label>
+              <Input
+                id="agent-name"
+                className="mt-2"
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="agent-description">描述</Label>
+              <Textarea
+                id="agent-description"
+                className="mt-2 min-h-28"
+                value={draftDescription}
+                onChange={(event) => setDraftDescription(event.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIdentityDialogOpen(false)}>
+              取消
+            </Button>
+            <Button
+              onClick={() =>
+                void persist(config, draftName, draftDescription).then(
+                  (id) => id && setIdentityDialogOpen(false),
+                )
+              }
+              disabled={saving}
+            >
+              {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
+              保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>AI 生成动漫头像</DialogTitle>
+            <DialogDescription>
+              根据智能体的名称、描述和身份档案生成二次元角色头像。
+            </DialogDescription>
+          </DialogHeader>
+          <ModelPicker
+            value={avatarModelId}
+            onValueChange={setAvatarModelId}
+            capability="image_generation"
+            label="头像生成模型"
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={avatarAction !== null}
+            >
+              <Upload />
+              上传图片
+            </Button>
+            <Button
+              onClick={() => void generateAvatar()}
+              disabled={avatarAction !== null || !avatarModelId}
+            >
+              {avatarAction === 'generate' ? (
+                <LoaderCircle className="animate-spin" />
+              ) : (
+                <Sparkles />
+              )}
+              {avatarAction === 'generate' ? '生成中' : '生成头像'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <ImagePreviewDialog
+        open={Boolean(imagePreview)}
+        src={imagePreview?.resultUrl}
+        title={imagePreview?.prompt || '智能体生成图片'}
+        onOpenChange={(open) => !open && setImagePreview(null)}
+      />
+    </main>
   );
 }

@@ -171,6 +171,8 @@ func executeWorkflowRunJob(parent context.Context, db *gorm.DB, job *model.Workf
 			ID: run.ID.String(), Actor: workflow.Actor{UserID: int64(job.UserID), Role: user.Role},
 			Inputs: inputs, Outputs: make(map[string]map[string]any),
 			KnowledgeRetriever:       workflowKnowledgeRetriever(job.UserID, version),
+			KnowledgeWriter:          workflowKnowledgeWriter(),
+			FileWriter:               workflowFileWriter(),
 			ContentSearcher:          workflowContentSearcher(job.UserID),
 			NotionSearcher:           workflowNotionSearcher(job.UserID),
 			CoverGenerator:           workflowCoverGenerator(),

@@ -8,15 +8,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"valley-server/internal/ai/agent"
 	"valley-server/internal/ai/tools"
 	"valley-server/internal/ai/tools/content"
+	filetool "valley-server/internal/ai/tools/file"
 	imagetool "valley-server/internal/ai/tools/image"
 	"valley-server/internal/aiapp"
 	"valley-server/internal/aiclient"
@@ -70,17 +73,21 @@ func consumeAIAPIKeyDailyUsage(db *gorm.DB, apiKeyID model.Int64String, usageDat
 }
 
 var builtInAITools = []gin.H{
-	{"name": "content.search", "description": "搜索当前用户可访问的内容", "permission": "read"},
-	{"name": imagetool.ToolName, "description": "使用当前智能体配置的图片模型生成一张图片", "permission": "model"},
-	{"name": "blog.create_draft", "description": "创建当前用户的博客草稿", "permission": "write"},
-	{"name": "blog.update_draft", "description": "更新当前用户的博客草稿", "permission": "write"},
-	{"name": "resource.create_draft", "description": "创建当前用户的资源草稿", "permission": "write"},
+	{"name": "content.search", "description": "搜索当前用户可访问的内容", "permission": "read", "riskLevel": "low"},
+	{"name": imagetool.ToolName, "description": "使用当前智能体配置的图片模型生成一张图片", "permission": "model", "riskLevel": "medium"},
+	{"name": "file.create", "description": "创建 Markdown、JSON 或 CSV 成果文件", "permission": "write", "riskLevel": "high"},
+	{"name": "blog.create_draft", "description": "创建当前用户的博客草稿", "permission": "write", "riskLevel": "high"},
+	{"name": "blog.update_draft", "description": "更新当前用户的博客草稿", "permission": "write", "riskLevel": "high"},
+	{"name": "resource.create_draft", "description": "创建当前用户的资源草稿", "permission": "write", "riskLevel": "high"},
 }
 
 type aiKnowledgeReference struct {
+	Index        int               `json:"index"`
 	DocumentName string            `json:"documentName"`
 	ChunkID      model.Int64String `json:"chunkId"`
 	Excerpt      string            `json:"excerpt"`
+	Score        float64           `json:"score"`
+	PageNumber   int               `json:"pageNumber,omitempty"`
 }
 
 type aiKnowledgeSearchRow struct {
@@ -88,6 +95,7 @@ type aiKnowledgeSearchRow struct {
 	DocumentName string            `gorm:"column:document_name"`
 	Content      string            `gorm:"column:content"`
 	Score        float64           `gorm:"column:score"`
+	PageNumber   int               `gorm:"column:page_number"`
 }
 
 type aiKnowledgeDocumentResponse struct {
@@ -133,14 +141,30 @@ type aiAppPayload struct {
 	KnowledgeBaseIDs []model.Int64String `json:"knowledgeBaseIds"`
 }
 
+func selectAIAppConversationModel(config aiapp.Config, requestedModelID string, hasImages bool) (modelID, capability, missingCode string) {
+	modelID = strings.TrimSpace(requestedModelID)
+	if modelID == "" {
+		modelID = strings.TrimSpace(config.ModelID)
+	}
+	capability = "text"
+	missingCode = "MODEL_NOT_SELECTED"
+	if hasImages {
+		capability = "vision"
+	}
+	return modelID, capability, missingCode
+}
+
 type aiAppRetrievalConfig struct {
-	TopK        int     `json:"topK"`
-	MinScore    float64 `json:"minScore"`
-	CiteSources bool    `json:"citeSources"`
+	TopK            int     `json:"topK"`
+	MinScore        float64 `json:"minScore"`
+	CiteSources     bool    `json:"citeSources"`
+	SearchMode      string  `json:"searchMode"`
+	KeywordWeight   float64 `json:"keywordWeight"`
+	MaxContextChars int     `json:"maxContextChars"`
 }
 
 func defaultAIAppRetrievalConfig() aiAppRetrievalConfig {
-	return aiAppRetrievalConfig{TopK: 4, MinScore: 0.45, CiteSources: true}
+	return aiAppRetrievalConfig{TopK: 4, MinScore: 0.45, CiteSources: true, SearchMode: "hybrid", KeywordWeight: 0.2, MaxContextChars: 4500}
 }
 
 func parseAIAppRetrievalConfig(raw string) (aiAppRetrievalConfig, error) {
@@ -151,10 +175,18 @@ func parseAIAppRetrievalConfig(raw string) (aiAppRetrievalConfig, error) {
 	if err := json.Unmarshal([]byte(raw), &config); err != nil {
 		return aiAppRetrievalConfig{}, err
 	}
-	if config.TopK < 1 || config.TopK > 8 || config.MinScore < 0.20 || config.MinScore > 0.80 {
+	if !validAIAppRetrievalConfig(config) {
 		return aiAppRetrievalConfig{}, errors.New("retrieval config out of range")
 	}
 	return config, nil
+}
+
+func validAIAppRetrievalConfig(config aiAppRetrievalConfig) bool {
+	return config.TopK >= 1 && config.TopK <= 8 &&
+		config.MinScore >= 0.20 && config.MinScore <= 0.80 &&
+		(config.SearchMode == "semantic" || config.SearchMode == "hybrid") &&
+		config.KeywordWeight >= 0 && config.KeywordWeight <= 0.5 &&
+		config.MaxContextChars >= 1500 && config.MaxContextChars <= 8000
 }
 
 // aiKnowledgeRetrievalFailure converts internal RAG failures into a stable
@@ -244,7 +276,7 @@ func copyAIAppVersionToolSnapshot(tx *gorm.DB, app model.AIApp, source, target m
 	}
 	bindings := make([]model.AIAppVersionToolBinding, 0, len(sourceBindings))
 	for _, binding := range sourceBindings {
-		bindings = append(bindings, model.AIAppVersionToolBinding{AppVersionID: target.ID, ToolName: binding.ToolName})
+		bindings = append(bindings, model.AIAppVersionToolBinding{AppVersionID: target.ID, ToolName: binding.ToolName, ApprovalMode: binding.ApprovalMode})
 	}
 	if len(bindings) > 0 {
 		return tx.Create(&bindings).Error
@@ -495,7 +527,7 @@ func validateInitialAIAppTools(values []string) ([]string, error) {
 		if name == "" {
 			continue
 		}
-		if name != "content.search" && name != imagetool.ToolName {
+		if name != "content.search" && name != imagetool.ToolName && name != "file.create" {
 			return nil, errors.New("包含未审核的工具")
 		}
 		if _, exists := seen[name]; exists {
@@ -544,7 +576,80 @@ func GetAIApp(c *gin.Context) {
 	}
 	var versions []model.AIAppVersion
 	_ = database.GetDB().Where("app_id = ?", app.ID).Order("number DESC").Find(&versions).Error
-	Success(c, gin.H{"app": app, "versions": versions})
+	var conversationCount int64
+	var taskCount int64
+	_ = database.GetDB().Model(&model.AIAppConversation{}).Where("user_id = ? AND app_id = ?", userID, app.ID).Count(&conversationCount).Error
+	_ = database.GetDB().Model(&model.AIAppTask{}).Where("user_id = ? AND app_id = ?", userID, app.ID).Count(&taskCount).Error
+	Success(c, gin.H{"app": app, "versions": versions, "stats": gin.H{"conversationCount": conversationCount, "taskCount": taskCount}})
+}
+
+// DeleteAIApp removes an owner-owned agent and its app-scoped records. Workflow
+// apps mirror legacy workflow definitions and must continue to be deleted from
+// the workflow surface instead.
+func DeleteAIApp(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	app, found := findAIApp(c, userID)
+	if !found {
+		return
+	}
+	if app.Type != aiAppTypeAgent {
+		Error(c, http.StatusBadRequest, "工作流请在工作流页面删除")
+		return
+	}
+
+	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		var versionIDs []model.Int64String
+		if err := tx.Model(&model.AIAppVersion{}).Where("app_id = ?", app.ID).Pluck("id", &versionIDs).Error; err != nil {
+			return err
+		}
+		if len(versionIDs) > 0 {
+			if err := tx.Where("app_version_id IN ?", versionIDs).Delete(&model.AIAppVersionKnowledgeBase{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("app_version_id IN ?", versionIDs).Delete(&model.AIAppVersionToolBinding{}).Error; err != nil {
+				return err
+			}
+		}
+		var taskIDs []model.Int64String
+		if err := tx.Model(&model.AIAppTask{}).Where("app_id = ?", app.ID).Pluck("id", &taskIDs).Error; err != nil {
+			return err
+		}
+		if len(taskIDs) > 0 {
+			if err := tx.Where("task_id IN ?", taskIDs).Delete(&model.AIAppToolApproval{}).Error; err != nil {
+				return err
+			}
+		}
+		for _, item := range []any{
+			&model.AIAppArtifact{},
+			&model.AIAppConversationAttachment{},
+			&model.AIAppTask{},
+			&model.AIAppConversationToolTrace{},
+			&model.AIAppConversationMessage{},
+			&model.AIAppConversation{},
+			&model.AIAppRun{},
+			&model.AIAppPublicInvocation{},
+			&model.AIAPIKeyAppBinding{},
+			&model.AIAppKnowledgeBase{},
+		} {
+			if err := tx.Where("app_id = ?", app.ID).Delete(item).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("app_id = ?", app.ID).Delete(&model.AIAppVersion{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ? AND user_id = ?", app.ID, userID).Delete(&model.AIApp{}).Error
+	}); err != nil {
+		Error(c, http.StatusInternalServerError, "删除智能体失败")
+		return
+	}
+	if app.AvatarStorageKey != "" {
+		_ = deleteManagedAIAppAvatar(c.Request.Context(), app.AvatarStorageKey)
+	}
+	Success(c, gin.H{})
 }
 
 func SaveAIAppVersion(c *gin.Context) {
@@ -734,7 +839,7 @@ func DebugAIApp(c *gin.Context) {
 		Error(c, http.StatusServiceUnavailable, publicMessage)
 		return
 	}
-	system := strings.TrimSpace(config.SystemPrompt)
+	system := strings.TrimSpace(config.SystemInstructions())
 	if knowledgeContext != "" {
 		system = strings.TrimSpace(system + "\n\n以下是与当前问题相关的私有参考资料。请优先依据这些资料回答；资料不足时明确说明。\n" + knowledgeContext)
 	}
@@ -743,6 +848,19 @@ func DebugAIApp(c *gin.Context) {
 		persistAIAppRun(app, version, userID, "failed", invocation.Model.ModelID, message, "", "AI_TOOL_REGISTRY_UNAVAILABLE", started)
 		Error(c, http.StatusInternalServerError, "加载智能体工具失败")
 		return
+	}
+	toolPolicies, policyErr := loadAIAppToolPolicies(database.GetDB(), version)
+	if policyErr != nil {
+		persistAIAppRun(app, version, userID, "failed", invocation.Model.ModelID, message, "", "AI_TOOL_POLICY_UNAVAILABLE", started)
+		Error(c, http.StatusInternalServerError, "加载工具授权策略失败")
+		return
+	}
+	for _, toolName := range toolNames {
+		if toolPolicies[toolName] == "always" {
+			persistAIAppRun(app, version, userID, "rejected", invocation.Model.ModelID, message, "", "TOOL_APPROVAL_REQUIRED", started)
+			Error(c, http.StatusConflict, "当前配置包含需要人工确认的工具，请在会话中使用后台执行")
+			return
+		}
 	}
 	if !aimodel.HasCapabilities(invocation.Model, []string{"tool_call"}) {
 		toolNames = nil
@@ -817,6 +935,9 @@ func debugAIAppWithTools(c *gin.Context, stream bool, invocation aimodel.Invocat
 }
 
 func retrieveAIKnowledgeContext(ctx context.Context, userID model.Int64String, version model.AIAppVersion, message string) (string, []aiKnowledgeReference, error) {
+	if !shouldRetrieveAIKnowledge(message) {
+		return "", nil, nil
+	}
 	db := database.GetDB()
 	if db == nil {
 		return "", nil, nil
@@ -852,22 +973,43 @@ func retrieveAIKnowledgeContext(ctx context.Context, userID model.Int64String, v
 	}
 	var contextBuilder strings.Builder
 	references := make([]aiKnowledgeReference, 0, len(rows))
-	const maxKnowledgeContextRunes = 4500
+	referenceIndex := 0
 	for _, row := range rows {
 		content := aiclient.TrimRunes(strings.TrimSpace(row.Content), 1600)
-		if content == "" || len([]rune(contextBuilder.String()))+len([]rune(content)) > maxKnowledgeContextRunes {
+		if content == "" || len([]rune(contextBuilder.String()))+len([]rune(content)) > config.MaxContextChars {
 			continue
 		}
-		contextBuilder.WriteString("[资料：")
+		referenceIndex++
+		index := referenceIndex
+		contextBuilder.WriteString(fmt.Sprintf("[%d] 来源：", index))
 		contextBuilder.WriteString(row.DocumentName)
-		contextBuilder.WriteString("]\n")
+		if row.PageNumber > 0 {
+			contextBuilder.WriteString(fmt.Sprintf("（第 %d 页）", row.PageNumber))
+		}
+		contextBuilder.WriteString("\n")
 		contextBuilder.WriteString(content)
 		contextBuilder.WriteString("\n\n")
 		if config.CiteSources {
-			references = append(references, aiKnowledgeReference{DocumentName: row.DocumentName, ChunkID: row.ChunkID, Excerpt: aiclient.TrimRunes(content, 240)})
+			references = append(references, aiKnowledgeReference{Index: index, DocumentName: row.DocumentName, ChunkID: row.ChunkID, Excerpt: aiclient.TrimRunes(content, 240), Score: row.Score, PageNumber: row.PageNumber})
 		}
 	}
 	return strings.TrimSpace(contextBuilder.String()), references, nil
+}
+
+func shouldRetrieveAIKnowledge(message string) bool {
+	var normalized strings.Builder
+	for _, character := range strings.ToLower(strings.TrimSpace(message)) {
+		if unicode.IsLetter(character) || unicode.IsDigit(character) {
+			normalized.WriteRune(character)
+		}
+	}
+
+	switch normalized.String() {
+	case "hi", "hello", "hey", "hihi", "hellohello", "你好", "您好", "嗨", "哈喽", "哈囉", "在吗", "在么", "有人吗", "早上好", "下午好", "晚上好", "你好吗":
+		return false
+	default:
+		return true
+	}
 }
 
 func searchAIKnowledgeChunks(ctx context.Context, userID model.Int64String, knowledgeBaseIDs []model.Int64String, config aiAppRetrievalConfig, query string) ([]aiKnowledgeSearchRow, error) {
@@ -895,18 +1037,24 @@ func searchAIKnowledgeChunks(ctx context.Context, userID model.Int64String, know
 	if err != nil {
 		return nil, err
 	}
+	keywordWeight := 0.0
+	if config.SearchMode == "hybrid" {
+		keywordWeight = config.KeywordWeight
+	}
+	keywordPattern := "%" + strings.TrimSpace(query) + "%"
 	var rows []aiKnowledgeSearchRow
 	err = db.Raw(`
-		SELECT chunks.id AS chunk_id, documents.name AS document_name, chunks.content,
-		       1 - (chunks.embedding <=> ?::vector) AS score
+		SELECT chunks.id AS chunk_id, documents.name AS document_name, chunks.content, chunks.page_number,
+		       ((1 - ?) * (1 - (chunks.embedding <=> ?::vector)) +
+		       ? * CASE WHEN chunks.content ILIKE ? OR documents.name ILIKE ? THEN 1 ELSE 0 END) AS score
 		FROM ai_knowledge_chunks AS chunks
 		JOIN ai_knowledge_documents AS documents ON documents.id = chunks.document_id
 		JOIN ai_knowledge_bases AS knowledge_bases ON knowledge_bases.id = documents.knowledge_base_id
 		WHERE chunks.user_id = ? AND documents.user_id = ? AND knowledge_bases.user_id = ?
 		  AND documents.knowledge_base_id IN ? AND documents.status = 'ready'
 		  AND chunks.embedding IS NOT NULL
-		ORDER BY chunks.embedding <=> ?::vector
-	LIMIT ?`, string(queryVector), userID, userID, userID, knowledgeBaseIDs, string(queryVector), config.TopK).Scan(&rows).Error
+		ORDER BY score DESC, chunks.embedding <=> ?::vector
+	LIMIT ?`, keywordWeight, string(queryVector), keywordWeight, keywordPattern, keywordPattern, userID, userID, userID, knowledgeBaseIDs, string(queryVector), config.TopK).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
@@ -976,7 +1124,7 @@ func ListAIAppToolBindings(c *gin.Context) {
 	for _, binding := range bindings {
 		names = append(names, binding.ToolName)
 	}
-	Success(c, gin.H{"tools": names})
+	Success(c, gin.H{"tools": names, "bindings": bindings})
 }
 
 func ListAIAppKnowledgeBases(c *gin.Context) {
@@ -1122,8 +1270,8 @@ func UpdateAIAppRetrievalConfig(c *gin.Context) {
 	if !found {
 		return
 	}
-	var config aiAppRetrievalConfig
-	if c.ShouldBindJSON(&config) != nil || config.TopK < 1 || config.TopK > 8 || config.MinScore < 0.20 || config.MinScore > 0.80 {
+	config := defaultAIAppRetrievalConfig()
+	if c.ShouldBindJSON(&config) != nil || !validAIAppRetrievalConfig(config) {
 		Error(c, http.StatusBadRequest, "检索配置无效")
 		return
 	}
@@ -1159,13 +1307,26 @@ func ReplaceAIAppTools(c *gin.Context) {
 		return
 	}
 	var payload struct {
-		Tools []string `json:"tools"`
+		Tools    []string `json:"tools"`
+		Policies []struct {
+			ToolName     string `json:"toolName"`
+			ApprovalMode string `json:"approvalMode"`
+		} `json:"policies"`
 	}
 	if c.ShouldBindJSON(&payload) != nil {
 		Error(c, 400, "工具参数错误")
 		return
 	}
-	allowed := map[string]bool{"content.search": true, imagetool.ToolName: true}
+	allowed := map[string]bool{"content.search": true, imagetool.ToolName: true, "file.create": true}
+	policyByTool := make(map[string]string, len(payload.Policies))
+	for _, policy := range payload.Policies {
+		mode := strings.TrimSpace(policy.ApprovalMode)
+		if mode != "auto" && mode != "always" {
+			Error(c, 400, "工具授权策略无效")
+			return
+		}
+		policyByTool[strings.TrimSpace(policy.ToolName)] = mode
+	}
 	seen := map[string]bool{}
 	bindings := make([]model.AIAppVersionToolBinding, 0, len(payload.Tools))
 	for _, name := range payload.Tools {
@@ -1176,7 +1337,11 @@ func ReplaceAIAppTools(c *gin.Context) {
 		}
 		if !seen[name] {
 			seen[name] = true
-			bindings = append(bindings, model.AIAppVersionToolBinding{ToolName: name})
+			mode := policyByTool[name]
+			if mode == "" {
+				mode = "auto"
+			}
+			bindings = append(bindings, model.AIAppVersionToolBinding{ToolName: name, ApprovalMode: mode})
 		}
 	}
 	var version model.AIAppVersion
@@ -1210,7 +1375,7 @@ func ReplaceAIAppTools(c *gin.Context) {
 		Error(c, 500, "保存工具绑定失败")
 		return
 	}
-	Success(c, gin.H{"tools": payload.Tools, "version": version})
+	Success(c, gin.H{"tools": payload.Tools, "bindings": bindings, "version": version})
 }
 
 func ListAIKnowledgeBases(c *gin.Context) {
@@ -1497,6 +1662,11 @@ func resolveAIAppTools(db *gorm.DB, appID model.Int64String, version model.AIApp
 				registry.MustRegister(imagetool.NewGenerateTool(db, config.ImageGeneration))
 			}
 			allowed = append(allowed, binding.ToolName)
+		case filetool.ToolName:
+			if registry.Get(binding.ToolName) == nil {
+				registry.MustRegister(filetool.NewCreateTool(db))
+			}
+			allowed = append(allowed, binding.ToolName)
 		}
 	}
 	return registry, allowed, nil
@@ -1615,22 +1785,65 @@ func UploadAIKnowledgeDocument(c *gin.Context) {
 		Error(c, 400, "文档没有可解析文本")
 		return
 	}
-	chunks := splitKnowledgeText(text)
-	if len(chunks) == 0 || len(chunks) > knowledgeChunkMaxCount {
-		Error(c, 400, "文档分段数量超出限制")
+	document, err := createAIKnowledgeTextDocument(
+		database.GetDB(),
+		userID,
+		model.Int64String(id),
+		file.Filename,
+		text,
+		file.Header.Get("Content-Type"),
+		file.Size,
+	)
+	if err != nil {
+		Error(c, 500, "保存知识库文档失败")
 		return
 	}
+	scheduleAIKnowledgeDocumentIndexing(document.ID)
+	Success(c, gin.H{"document": presentAIKnowledgeDocument(document)})
+}
+
+// createAIKnowledgeTextDocument is shared by manual uploads and workflow
+// output ingestion. It persists the same pending_embedding document contract
+// so both paths use one chunking and background-indexing pipeline.
+func createAIKnowledgeTextDocument(
+	db *gorm.DB,
+	userID model.Int64String,
+	knowledgeBaseID model.Int64String,
+	name string,
+	text string,
+	mimeType string,
+	sizeBytes int64,
+) (model.AIKnowledgeDocument, error) {
+	if db == nil {
+		return model.AIKnowledgeDocument{}, errors.New("知识库数据库不可用")
+	}
+	name = strings.TrimSpace(name)
+	text = strings.TrimSpace(text)
+	if name == "" || len(name) > 255 {
+		return model.AIKnowledgeDocument{}, errors.New("知识库文档名称无效")
+	}
+	if text == "" || len([]byte(text)) > knowledgeDocumentMaxBytes {
+		return model.AIKnowledgeDocument{}, errors.New("知识库文档内容大小无效")
+	}
+	var base model.AIKnowledgeBase
+	if err := db.Where("id = ? AND user_id = ?", knowledgeBaseID, userID).First(&base).Error; err != nil {
+		return model.AIKnowledgeDocument{}, err
+	}
+	chunks := splitKnowledgeText(text)
+	if len(chunks) == 0 || len(chunks) > knowledgeChunkMaxCount {
+		return model.AIKnowledgeDocument{}, errors.New("文档分段数量超出限制")
+	}
 	document := model.AIKnowledgeDocument{
-		KnowledgeBaseID: model.Int64String(id),
+		KnowledgeBaseID: knowledgeBaseID,
 		UserID:          userID,
-		Name:            file.Filename,
+		Name:            name,
 		Status:          "pending_embedding",
 		ChunkCount:      len(chunks),
-		MimeType:        file.Header.Get("Content-Type"),
-		SizeBytes:       file.Size,
+		MimeType:        mimeType,
+		SizeBytes:       sizeBytes,
 		ParsedText:      text,
 	}
-	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+	if err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&document).Error; err != nil {
 			return err
 		}
@@ -1646,11 +1859,9 @@ func UploadAIKnowledgeDocument(c *gin.Context) {
 		}
 		return tx.Create(&rows).Error
 	}); err != nil {
-		Error(c, 500, "保存知识库文档失败")
-		return
+		return model.AIKnowledgeDocument{}, err
 	}
-	scheduleAIKnowledgeDocumentIndexing(document.ID)
-	Success(c, gin.H{"document": presentAIKnowledgeDocument(document)})
+	return document, nil
 }
 
 func RetryAIKnowledgeDocument(c *gin.Context) {

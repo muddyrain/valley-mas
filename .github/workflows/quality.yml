@@ -39,6 +39,9 @@ jobs:
       - name: Check workspace
         run: pnpm check
 
+      - name: Test Web
+        run: pnpm --filter @valley/web test
+
       - name: Build workspace
         run: pnpm build
 

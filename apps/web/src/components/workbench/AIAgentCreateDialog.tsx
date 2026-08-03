@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
+  type AgentConfig,
   type AgentProposal,
   createAIApp,
   createAIAppProposal,
@@ -25,6 +26,29 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+
+export const AGENT_PROFILE_FIELDS = [
+  ['identity', 'IDENTITY.md', '智能伙伴的名字、性格和身份定义'],
+  ['userProfile', 'USER.md', '用户基本信息和沟通偏好'],
+  ['soul', 'SOUL.md', '底线规则、安全框架和核心价值观'],
+  ['agentInstructions', 'AGENTS.md', '智能体执行任务时遵循的协作约定'],
+] as const;
+
+export function createDefaultAgentConfig(): AgentConfig {
+  return {
+    modelProfile: 'ark-text-default',
+    systemPrompt: '',
+    openingMessage: '',
+    exampleQuestions: [],
+    identity:
+      '# IDENTITY.md\n\n你是一位可靠、友善、具备独立判断力的智能伙伴。请保持清晰、自然和有温度的表达。',
+    userProfile: '# USER.md\n\n尚未记录用户档案。请在交流中尊重用户的表达习惯、目标和沟通偏好。',
+    soul: '# SOUL.md\n\n诚实说明能力边界；保护用户隐私；不伪造事实或执行结果；遇到高风险操作先确认。',
+    agentInstructions:
+      '# AGENTS.md\n\n优先理解用户真正想完成的目标；需要工具时说明正在做什么；完成后给出可验证的结果。',
+    skillIds: [],
+  };
+}
 
 export function AIAgentCreateDialog({
   open,
@@ -82,14 +106,9 @@ export function AIAgentCreateDialog({
         type: 'agent',
         name,
         description: standardDescription.trim(),
-        config: {
-          modelProfile: 'ark-text-default',
-          systemPrompt: '',
-          openingMessage: '',
-          exampleQuestions: [],
-        },
+        config: createDefaultAgentConfig(),
       });
-      toast.success('智能体草稿已创建');
+      toast.success('智能体已创建');
       finishCreation(result.app.id);
     } catch (error) {
       toast.error(getAPIErrorMessage(error, '创建智能体失败'));
@@ -141,7 +160,7 @@ export function AIAgentCreateDialog({
         toolNames: selectedTools,
         knowledgeBaseIds: selectedKnowledge,
       });
-      toast.success('智能体草稿已创建，正在生成头像');
+      toast.success('智能体已创建，正在生成头像');
       finishCreation(result.app.id);
     } catch (error) {
       toast.error(getAPIErrorMessage(error, '创建智能体失败'));
@@ -159,8 +178,8 @@ export function AIAgentCreateDialog({
           <DialogTitle>创建智能体</DialogTitle>
           <DialogDescription className={mode === 'standard' ? 'sr-only' : undefined}>
             {mode === 'standard'
-              ? '填写名称和功能介绍后创建智能体草稿。'
-              : '生成可编辑预览后再创建智能体草稿。'}
+              ? '填写名称和功能介绍后创建智能体。'
+              : '生成可编辑预览后再创建智能体。'}
           </DialogDescription>
         </DialogHeader>
         <Tabs value={mode} onValueChange={(value) => setMode(value as 'standard' | 'ai')}>
@@ -250,48 +269,23 @@ export function AIAgentCreateDialog({
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="proposal-prompt">系统提示词</Label>
-                    <Textarea
-                      id="proposal-prompt"
-                      value={proposal.config.systemPrompt}
-                      className="min-h-56 font-mono text-xs leading-5"
-                      onChange={(event) =>
-                        setProposal({
-                          ...proposal,
-                          config: { ...proposal.config, systemPrompt: event.target.value },
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="proposal-opening">开场白</Label>
-                    <Textarea
-                      id="proposal-opening"
-                      value={proposal.config.openingMessage}
-                      onChange={(event) =>
-                        setProposal({
-                          ...proposal,
-                          config: { ...proposal.config, openingMessage: event.target.value },
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>示例问题</Label>
-                    {proposal.config.exampleQuestions.map((question, index) => (
-                      <Input
-                        key={index}
-                        value={question}
-                        onChange={(event) => {
-                          const next = [...proposal.config.exampleQuestions];
-                          next[index] = event.target.value;
-                          setProposal({
-                            ...proposal,
-                            config: { ...proposal.config, exampleQuestions: next },
-                          });
-                        }}
-                      />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {AGENT_PROFILE_FIELDS.map(([field, title, help]) => (
+                      <div key={field} className="space-y-2 rounded-lg border border-border p-3">
+                        <Label htmlFor={`proposal-${field}`}>{title}</Label>
+                        <p className="text-xs text-muted-foreground">{help}</p>
+                        <Textarea
+                          id={`proposal-${field}`}
+                          value={proposal.config[field] || ''}
+                          className="min-h-36 font-mono text-xs leading-5"
+                          onChange={(event) =>
+                            setProposal({
+                              ...proposal,
+                              config: { ...proposal.config, [field]: event.target.value },
+                            })
+                          }
+                        />
+                      </div>
                     ))}
                   </div>
                   {proposal.toolSuggestions.map((item) => (

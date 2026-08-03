@@ -175,7 +175,9 @@ func buildZipAISkillImportSource(
 		skillDirectory = ""
 	}
 	referenceFiles := make([]*zip.File, 0, maxAISkillReferenceFiles)
+	referenceImageFiles := make([]*zip.File, 0, maxAISkillReferenceFiles)
 	scriptFiles := make([]*zip.File, 0, maxAISkillReferenceFiles)
+	assetFiles := make([]*zip.File, 0, maxAISkillReferenceFiles)
 	ignoredFileCount := 0
 	for filePath, file := range files {
 		if filePath == skillPath || belongsToAnotherArchivedSkill(filePath, skillPath, skillPaths) {
@@ -191,6 +193,8 @@ func buildZipAISkillImportSource(
 			if bundledPath != "" && strings.Count(bundledPath, "/") <= maxAISkillReferenceDepth &&
 				isSupportedAISkillReferenceFile(bundledPath) {
 				referenceFiles = append(referenceFiles, file)
+			} else if bundledPath != "" && strings.Count(bundledPath, "/") <= maxAISkillReferenceDepth && isSupportedAISkillReferenceImage(bundledPath) {
+				referenceImageFiles = append(referenceImageFiles, file)
 			} else {
 				ignoredFileCount++
 			}
@@ -199,6 +203,13 @@ func buildZipAISkillImportSource(
 			if bundledPath != "" && strings.Count(bundledPath, "/") <= maxAISkillReferenceDepth &&
 				isSupportedAISkillScriptFile(bundledPath) {
 				scriptFiles = append(scriptFiles, file)
+			} else {
+				ignoredFileCount++
+			}
+		case strings.HasPrefix(relativePath, "assets/"):
+			bundledPath := strings.TrimPrefix(relativePath, "assets/")
+			if bundledPath != "" && strings.Count(bundledPath, "/") <= maxAISkillReferenceDepth && isSupportedAISkillAssetFile(bundledPath) {
+				assetFiles = append(assetFiles, file)
 			} else {
 				ignoredFileCount++
 			}
@@ -216,6 +227,11 @@ func buildZipAISkillImportSource(
 		return aiSkillImportSource{}, err
 	}
 	ignoredFileCount += ignoredReferences + ignoredScripts
+	importedFiles, ignoredFiles, err := buildZipAISkillFiles(referenceFiles, referenceImageFiles, scriptFiles, assetFiles)
+	if err != nil {
+		return aiSkillImportSource{}, err
+	}
+	ignoredFileCount += ignoredFiles
 
 	fallbackName := strings.TrimSuffix(fileName, pathpkg.Ext(fileName))
 	if skillDirectory != "" {
@@ -236,7 +252,84 @@ func buildZipAISkillImportSource(
 		Tags:             extractAISkillTags(content),
 		URL:              archiveURL + "/" + escapeGitHubRepositoryPath(skillPath),
 		Author:           "ZIP 文件",
+		Files:            importedFiles,
 	}, nil
+}
+
+func isSupportedAISkillReferenceImage(fileName string) bool {
+	switch strings.ToLower(pathpkg.Ext(fileName)) {
+	case ".jpg", ".jpeg", ".png", ".webp":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSupportedAISkillAssetFile(fileName string) bool {
+	return isSupportedAISkillReferenceFile(fileName) || isSupportedAISkillReferenceImage(fileName)
+}
+
+func buildZipAISkillFiles(referenceFiles, referenceImageFiles, scriptFiles, assetFiles []*zip.File) ([]aiSkillImportFile, int, error) {
+	files := make([]aiSkillImportFile, 0, len(referenceFiles)+len(referenceImageFiles)+len(scriptFiles)+len(assetFiles))
+	ignored := 0
+	appendText := func(entries []*zip.File, kind string) error {
+		sort.Slice(entries, func(left, right int) bool { return entries[left].Name < entries[right].Name })
+		for _, entry := range entries {
+			content, err := readAISkillArchiveText(entry, maxAIPromptImportSkillSize)
+			if err != nil {
+				return err
+			}
+			if strings.TrimSpace(content) == "" {
+				ignored++
+				continue
+			}
+			files = append(files, aiSkillImportFile{Path: entry.Name, Kind: kind, Content: strings.TrimSpace(content), MimeType: "text/plain"})
+		}
+		return nil
+	}
+	if err := appendText(referenceFiles, "reference"); err != nil { return nil, ignored, err }
+	if err := appendText(scriptFiles, "script"); err != nil { return nil, ignored, err }
+	textAssets := make([]*zip.File, 0, len(assetFiles))
+	imageAssets := make([]*zip.File, 0, len(assetFiles))
+	for _, entry := range assetFiles {
+		if isSupportedAISkillReferenceImage(entry.Name) { imageAssets = append(imageAssets, entry) } else { textAssets = append(textAssets, entry) }
+	}
+	if err := appendText(textAssets, "asset"); err != nil { return nil, ignored, err }
+	appendImage := func(entries []*zip.File, kind string) error {
+		sort.Slice(entries, func(left, right int) bool { return entries[left].Name < entries[right].Name })
+		for _, entry := range entries {
+			content, mimeType, err := readAISkillArchiveImage(entry)
+			if err != nil { return err }
+			files = append(files, aiSkillImportFile{Path: entry.Name, Kind: kind, Binary: content, MimeType: mimeType})
+		}
+		return nil
+	}
+	if err := appendImage(referenceImageFiles, "reference_image"); err != nil { return nil, ignored, err }
+	if err := appendImage(imageAssets, "asset_image"); err != nil { return nil, ignored, err }
+	return files, ignored, nil
+}
+
+func readAISkillArchiveImage(file *zip.File) ([]byte, string, error) {
+	if file == nil || file.UncompressedSize64 == 0 || file.UncompressedSize64 > maxAISkillReferenceImageBytes {
+		return nil, "", errors.New("参考图片必须小于 5MB")
+	}
+	reader, err := file.Open()
+	if err != nil { return nil, "", errors.New("无法打开参考图片") }
+	content, readErr := io.ReadAll(io.LimitReader(reader, maxAISkillReferenceImageBytes+1))
+	closeErr := reader.Close()
+	if readErr != nil || closeErr != nil || len(content) == 0 || len(content) > maxAISkillReferenceImageBytes {
+		return nil, "", errors.New("读取参考图片失败")
+	}
+	mimeType := http.DetectContentType(content)
+	if !isSupportedAISkillImageMIME(mimeType) { return nil, "", errors.New("参考图片必须是 JPG、PNG 或 WebP") }
+	return content, mimeType, nil
+}
+
+func isSupportedAISkillImageMIME(mimeType string) bool {
+	switch mimeType {
+	case "image/jpeg", "image/png", "image/webp": return true
+	default: return false
+	}
 }
 
 func relativeAISkillArchivePath(filePath, skillDirectory string) (string, bool) {

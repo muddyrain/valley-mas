@@ -206,7 +206,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
 
   return (
     <Card
-      className={`group h-64 py-0 cursor-pointer overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
+      className={`group h-44 py-0 cursor-pointer overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:h-64 ${
         selected
           ? 'border-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.16)]'
           : 'border-border hover:border-accent/80'
@@ -450,7 +450,7 @@ export function ResourceCardSkeleton({
       : getAspectClass(type ?? '', wideWallpaperOnDesktop);
 
   return (
-    <div className="h-64 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+    <div className="h-44 overflow-hidden rounded-2xl border border-border bg-card shadow-sm sm:h-64">
       <Skeleton className={`${mediaAspectClass} h-full w-full`} />
     </div>
   );

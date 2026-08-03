@@ -141,6 +141,47 @@ func TestLocalLoopExecutesToolThenFinal(t *testing.T) {
 	}
 }
 
+func TestLocalLoopAttachesNarrationToToolCall(t *testing.T) {
+	tool := &countingTool{name: "query_traces", scope: "life-trace"}
+	backend := &scriptedBackend{responses: []BackendResponse{
+		{
+			Message: Message{
+				Role:    RoleAssistant,
+				Content: "第一次失败，我再查询一次。",
+				ToolCalls: []ToolCall{{
+					ID:   "call-1",
+					Name: "query_traces",
+					Args: json.RawMessage(`{"days":1}`),
+				}, {
+					ID:   "call-2",
+					Name: "query_traces",
+					Args: json.RawMessage(`{"days":7}`),
+				}},
+			},
+		},
+		{Message: Message{Role: RoleAssistant, Content: "done"}},
+	}}
+	loop := NewLocalLoop(backend, newTestRegistry(tool))
+
+	events, err := loop.RunStream(context.Background(), Spec{
+		Feature: "unit-test",
+		Tools:   []string{"query_traces"},
+	}, []Message{{Role: RoleUser, Content: "hi"}})
+	if err != nil {
+		t.Fatalf("RunStream: %v", err)
+	}
+
+	var narrations []string
+	for event := range events {
+		if event.Type == EventToolCall {
+			narrations = append(narrations, event.Narration)
+		}
+	}
+	if len(narrations) != 2 || narrations[0] != "第一次失败，我再查询一次。" || narrations[1] != "" {
+		t.Fatalf("tool call narrations = %#v", narrations)
+	}
+}
+
 func TestLocalLoopHitsMaxSteps(t *testing.T) {
 	tool := &countingTool{name: "loop_tool", scope: "life-trace"}
 	backend := &scriptedBackend{
@@ -241,6 +282,47 @@ func TestLocalLoopUnknownToolName(t *testing.T) {
 	}
 	if !strings.Contains(string(toolResult), "not_registered") {
 		t.Fatalf("expected tool name in error, got %s", string(toolResult))
+	}
+}
+
+type rejectingToolGate struct{ calls int }
+
+func (gate *rejectingToolGate) Authorize(_ context.Context, _ ToolCall) error {
+	gate.calls++
+	return ErrToolApprovalRejected
+}
+
+func TestLocalLoopToolGateBlocksExecution(t *testing.T) {
+	tool := &countingTool{name: "protected_tool", scope: "unit-test"}
+	backend := &scriptedBackend{responses: []BackendResponse{{
+		Message: Message{Role: RoleAssistant, ToolCalls: []ToolCall{{
+			ID: "call-protected", Name: tool.name, Args: json.RawMessage(`{}`),
+		}}},
+		Model: "m1",
+	}}}
+	gate := &rejectingToolGate{}
+	loop := NewLocalLoop(backend, newTestRegistry(tool))
+
+	events, err := loop.RunStream(context.Background(), Spec{
+		Feature: "unit-test", Tools: []string{tool.name}, ToolGate: gate,
+	}, []Message{{Role: RoleUser, Content: "run it"}})
+	if err != nil {
+		t.Fatalf("RunStream: %v", err)
+	}
+	var gotErr error
+	for event := range events {
+		if event.Type == EventError {
+			gotErr = event.Err
+		}
+	}
+	if !errors.Is(gotErr, ErrToolApprovalRejected) {
+		t.Fatalf("error = %v, want ErrToolApprovalRejected", gotErr)
+	}
+	if gate.calls != 1 {
+		t.Fatalf("gate calls = %d, want 1", gate.calls)
+	}
+	if tool.invoked != 0 {
+		t.Fatalf("tool invoked = %d, want 0", tool.invoked)
 	}
 }
 

@@ -288,6 +288,7 @@ export interface WorkflowToolCapability {
         description?: string;
         placeholder?: string;
         modelCapability?: string;
+        resource?: 'knowledge_base';
         allowFixedValue?: boolean;
         enum?: string[];
         default?: unknown;

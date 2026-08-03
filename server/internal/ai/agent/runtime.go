@@ -21,10 +21,11 @@ const (
 //
 //   - assistant 消息可能带 ToolCalls（表示模型请求调用工具）。
 //   - tool 消息必须带 ToolCallID 与 ToolName（表示对应 tool 的执行结果）。
-//   - system/user 消息只使用 Content。
+//   - user 消息可携带 Images；backend 会把它们编码成多模态内容。
 type Message struct {
 	Role       Role
 	Content    string
+	Images     []string
 	ToolCalls  []ToolCall
 	ToolCallID string
 	ToolName   string
@@ -65,6 +66,13 @@ type Spec struct {
 	Temperature float32
 	// Feature 用于 aiusage 打点归类，例如 "life-trace-assistant"。
 	Feature string
+	// ToolGate may pause or reject a concrete tool invocation before execution.
+	// It is request-scoped and is never sent to the model.
+	ToolGate ToolGate
+}
+
+type ToolGate interface {
+	Authorize(context.Context, ToolCall) error
 }
 
 // EventType 是 RunStream 分发的事件类型。
@@ -85,6 +93,7 @@ type Event struct {
 	Delta          string
 	ToolCall       *ToolCall
 	ToolName       string
+	Narration      string
 	ToolResult     json.RawMessage
 	ToolDurationMs int64
 	Result         *Result
@@ -108,3 +117,6 @@ type AgentRuntime interface {
 // ErrMaxStepsExceeded 表示 loop 达到 Spec.MaxSteps 上限仍未收敛。
 // 上层可以选择返回最后一次 assistant 消息作为兜底文本。
 var ErrMaxStepsExceeded = errors.New("agent: max steps exceeded")
+var ErrToolApprovalRequired = errors.New("agent: tool approval required")
+var ErrToolApprovalRejected = errors.New("agent: tool approval rejected")
+var ErrEmptyStreamResponse = errors.New("agent: upstream stream response was empty")

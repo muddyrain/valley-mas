@@ -947,15 +947,9 @@ export const WorkflowNode = memo(function WorkflowNode({ id, data, selected }: N
             side="right"
             align="center"
             trigger={
-              <button
-                type="button"
-                aria-label={`在 ${label} 后添加节点`}
-                className="nodrag nopan absolute right-0 top-1/2 z-40 size-8 -translate-y-1/2 translate-x-1/2 cursor-pointer"
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (!isRunning && !outputConnecting) openOutputPicker(id);
-                }}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute right-0 top-1/2 size-8 -translate-y-1/2 translate-x-1/2"
               />
             }
             onSelect={(item) => insertAfter(id, item)}

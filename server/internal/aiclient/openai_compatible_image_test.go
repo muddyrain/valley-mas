@@ -205,3 +205,43 @@ func TestAmuxImageAdapterUsesMultipartEditForReferences(t *testing.T) {
 		t.Fatalf("source = %q", source)
 	}
 }
+
+func TestAmuxImageAdapterSendsPNGMaskForMaskedEdit(t *testing.T) {
+	client := NewProviderCompatibleClient("amux", "https://provider.test/v1", "test-key", time.Second)
+	client.Client.Transport = roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path != "/v1/images/edits" {
+			t.Fatalf("path = %q", request.URL.Path)
+		}
+		_, parameters, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		form, err := multipart.NewReader(request.Body, parameters["boundary"]).ReadForm(6 << 20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer form.RemoveAll()
+		if len(form.File["image"]) != 1 || len(form.File["mask"]) != 1 {
+			t.Fatalf("expected source and mask files, got %+v", form.File)
+		}
+		if form.File["mask"][0].Header.Get("Content-Type") != "image/png" {
+			t.Fatalf("mask content type = %q", form.File["mask"][0].Header.Get("Content-Type"))
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"data":[{"url":"https://example.com/edited.png"}]}`)),
+			Request:    request,
+		}, nil
+	})
+	_, err := client.GenerateImageWithRequest(context.Background(), ImageGenerationRequest{
+		ModelID: "gpt-image-2",
+		Prompt:  "replace the blue square",
+		Size:    "1024x1024",
+		Images:  []string{"data:image/png;base64," + compatibleOnePixelPNGBase64},
+		Mask:    "data:image/png;base64," + compatibleOnePixelPNGBase64,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

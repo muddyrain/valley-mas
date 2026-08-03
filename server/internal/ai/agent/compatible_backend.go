@@ -125,7 +125,7 @@ func (b *CompatibleBackend) ChatStream(
 		return BackendResponse{}, err
 	}
 	if !sawChoice {
-		return BackendResponse{}, errors.New("AI 上游流响应为空")
+		return BackendResponse{}, ErrEmptyStreamResponse
 	}
 
 	var toolCalls any
@@ -218,7 +218,21 @@ func compatibleAgentMessages(messages []Message) []aiclient.CompatibleMessage {
 		case RoleTool:
 			role = "tool"
 		}
-		item := aiclient.CompatibleMessage{Role: role, Content: message.Content, ToolCallID: message.ToolCallID}
+		content := any(message.Content)
+		if role == "user" && len(message.Images) > 0 {
+			parts := make([]map[string]any, 0, len(message.Images)+1)
+			if strings.TrimSpace(message.Content) != "" {
+				parts = append(parts, map[string]any{"type": "text", "text": message.Content})
+			}
+			for _, imageURL := range message.Images {
+				if strings.TrimSpace(imageURL) == "" {
+					continue
+				}
+				parts = append(parts, map[string]any{"type": "image_url", "image_url": map[string]any{"url": imageURL}})
+			}
+			content = parts
+		}
+		item := aiclient.CompatibleMessage{Role: role, Content: content, ToolCallID: message.ToolCallID}
 		if len(message.ToolCalls) > 0 {
 			calls := make([]map[string]any, 0, len(message.ToolCalls))
 			for _, call := range message.ToolCalls {

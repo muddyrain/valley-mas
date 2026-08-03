@@ -1,13 +1,8 @@
 import {
-  BookOpen,
-  Bot,
   Check,
   ChevronDown,
   Download,
   Heart,
-  Home,
-  ImageIcon,
-  LibraryBig,
   LogIn,
   LogOut,
   Monitor,
@@ -38,30 +33,12 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useLayoutStore } from '@/stores/useLayoutStore';
 import type { ThemeMode } from '@/stores/useThemeStore';
+import { isNavigationActive, navigationGroups } from './navigation';
 
 const themeOptions: Array<{ mode: ThemeMode; label: string; icon: typeof Monitor }> = [
   { mode: 'system', label: '跟随系统', icon: Monitor },
   { mode: 'light', label: '浅色模式', icon: Sun },
   { mode: 'dark', label: '深色模式', icon: Moon },
-];
-
-const navGroups = [
-  {
-    label: '浏览',
-    items: [
-      { to: '/', label: '首页', icon: Home },
-      { to: '/blog', label: '博客', icon: BookOpen },
-      { to: '/resources', label: '资源', icon: ImageIcon },
-    ],
-  },
-  {
-    label: '创作',
-    items: [
-      { to: '/workbench', label: '智能体', icon: Bot },
-      { to: '/workbench/images', label: 'AI 图片', icon: Sparkles },
-      { to: '/workbench/resources', label: 'AI 资源', icon: LibraryBig },
-    ],
-  },
 ];
 
 export function Sidebar() {
@@ -73,25 +50,6 @@ export function Sidebar() {
   const { mode, setMode } = useTheme();
   const currentTheme = themeOptions.find((option) => option.mode === mode) ?? themeOptions[0];
   const CurrentThemeIcon = currentTheme.icon;
-
-  const isActive = (to: string) => {
-    if (to === '/') return location.pathname === '/';
-    if (to === '/workbench') {
-      return location.pathname === to || location.pathname.startsWith('/workbench/apps/');
-    }
-    if (to === '/workbench/images') {
-      return location.pathname === to;
-    }
-    if (to === '/workbench/resources') {
-      return (
-        location.pathname === to ||
-        location.pathname === '/workbench/create' ||
-        location.pathname.startsWith('/workbench/edit/') ||
-        location.pathname.startsWith('/workbench/templates/')
-      );
-    }
-    return location.pathname.startsWith(to);
-  };
 
   const handleLogout = async () => {
     try {
@@ -112,7 +70,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`relative flex h-screen shrink-0 flex-col border-r border-border bg-card transition-[width] duration-200 ${
+      className={`relative hidden h-screen shrink-0 flex-col border-r border-border bg-card transition-[width] duration-200 md:flex ${
         collapsed ? 'w-14' : 'w-56 max-md:w-12'
       }`}
     >
@@ -157,7 +115,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 space-y-5 px-2 py-4">
-        {navGroups.map((group) => (
+        {navigationGroups.map((group) => (
           <div key={group.label} className="space-y-1">
             {!collapsed && (
               <p className="px-2.5 text-xs font-medium text-muted-foreground max-md:hidden">
@@ -166,7 +124,7 @@ export function Sidebar() {
             )}
             {group.items.map((item) => {
               const Icon = item.icon;
-              const active = isActive(item.to);
+              const active = isNavigationActive(location.pathname, item.to);
               const link = (
                 <Link
                   key={item.to}

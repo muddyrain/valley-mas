@@ -303,6 +303,8 @@ func executeWorkflowTestCase(requestContext context.Context, testCase model.Work
 		Inputs:                   inputs,
 		Outputs:                  map[string]map[string]any{},
 		KnowledgeRetriever:       workflowKnowledgeRetriever(testCase.UserID, version),
+		KnowledgeWriter:          workflowKnowledgeWriter(),
+		FileWriter:               workflowFileWriter(),
 		ContentSearcher:          workflowContentSearcher(testCase.UserID),
 		NotionSearcher:           workflowNotionSearcher(testCase.UserID),
 		CoverGenerator:           workflowCoverGenerator(),

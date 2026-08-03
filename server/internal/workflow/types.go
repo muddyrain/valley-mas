@@ -98,6 +98,8 @@ type RunContext struct {
 	CompletedNodes           map[string]CompletedNode
 	ResumeFromNodeID         string
 	KnowledgeRetriever       KnowledgeRetriever
+	KnowledgeWriter          KnowledgeWriter
+	FileWriter               FileWriter
 	ContentSearcher          ContentSearcher
 	NotionSearcher           NotionSearcher
 	CoverGenerator           CoverGenerator
@@ -182,6 +184,66 @@ type KnowledgeRetrieverFunc func(context.Context, string) (KnowledgeResult, erro
 
 func (fn KnowledgeRetrieverFunc) Retrieve(ctx context.Context, query string) (KnowledgeResult, error) {
 	return fn(ctx, query)
+}
+
+// KnowledgeWriteRequest is the owner-scoped text payload that a workflow can
+// submit to an existing knowledge base. The handler owns persistence and
+// indexing so the workflow package never accesses application data directly.
+type KnowledgeWriteRequest struct {
+	KnowledgeBaseID string
+	Name            string
+	Content         string
+}
+
+type KnowledgeWriteResult struct {
+	DocumentID string
+	Status     string
+	ChunkCount int
+}
+
+type KnowledgeWriter interface {
+	Write(context.Context, int64, KnowledgeWriteRequest) (KnowledgeWriteResult, error)
+}
+
+type KnowledgeWriterFunc func(context.Context, int64, KnowledgeWriteRequest) (KnowledgeWriteResult, error)
+
+func (fn KnowledgeWriterFunc) Write(
+	ctx context.Context,
+	userID int64,
+	request KnowledgeWriteRequest,
+) (KnowledgeWriteResult, error) {
+	return fn(ctx, userID, request)
+}
+
+// FileWriteRequest is a bounded text artifact requested by a workflow. The
+// workflow package validates its extension and content format before the
+// handler stores it as an owner-private resource.
+type FileWriteRequest struct {
+	FileName string
+	Format   string
+	Content  string
+}
+
+type FileWriteResult struct {
+	ResourceID  string
+	FileName    string
+	URL         string
+	ContentType string
+	Size        int64
+}
+
+type FileWriter interface {
+	WriteFile(context.Context, int64, FileWriteRequest) (FileWriteResult, error)
+}
+
+type FileWriterFunc func(context.Context, int64, FileWriteRequest) (FileWriteResult, error)
+
+func (fn FileWriterFunc) WriteFile(
+	ctx context.Context,
+	userID int64,
+	request FileWriteRequest,
+) (FileWriteResult, error) {
+	return fn(ctx, userID, request)
 }
 
 type ContentSearchItem struct {

@@ -98,6 +98,7 @@ export default function BlogList() {
   const [groupKeyword, setGroupKeyword] = useState('');
   const [postKeywordInput, setPostKeywordInput] = useState('');
   const [showAllGroups, setShowAllGroups] = useState(false);
+  const [mobileGroupsOpen, setMobileGroupsOpen] = useState(false);
   const [aiRecommendOpen, setAIRecommendOpen] = useState(false);
   const [aiPrompt, setAIPrompt] = useState('');
   const [textModelId, setTextModelId] = useState('');
@@ -491,8 +492,20 @@ export default function BlogList() {
           </CardContent>
         </Card>
 
+        <Button
+          variant="outline"
+          className="mt-4 flex w-full items-center justify-between rounded-xl px-4 xl:hidden"
+          onClick={() => setMobileGroupsOpen(true)}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <FolderTree className="h-4 w-4 shrink-0 text-primary" />
+            <span className="truncate">{selectedGroupName || '全部分组'}</span>
+          </span>
+          <span className="text-xs font-normal text-muted-foreground">分组筛选</span>
+        </Button>
+
         <div className="mt-6 grid gap-7 xl:grid-cols-[330px_minmax(0,1fr)]">
-          <aside className="space-y-4 xl:sticky xl:top-20 xl:self-start">
+          <aside className="hidden space-y-4 xl:sticky xl:top-20 xl:self-start xl:block">
             <Card className="border-border/50">
               <CardContent className="p-5">
                 <div className="flex items-center gap-2 mb-3 text-foreground">
@@ -776,6 +789,85 @@ export default function BlogList() {
                 这次没有推荐结果，可以换个更具体的意图再试试。
               </p>
             ) : null}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={mobileGroupsOpen} onOpenChange={setMobileGroupsOpen}>
+        <SheetContent
+          side="bottom"
+          className="flex max-h-[82svh] flex-col gap-0 overflow-hidden rounded-t-2xl p-0 xl:hidden"
+        >
+          <SheetHeader className="border-b border-border px-5 py-4 text-left">
+            <SheetTitle className="inline-flex items-center gap-2 text-base">
+              <FolderTree className="h-4 w-4 text-primary" />
+              分组筛选
+            </SheetTitle>
+          </SheetHeader>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
+            {metaLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <Skeleton key={index} className="h-11 rounded-lg" />
+                ))}
+              </div>
+            ) : groupData.length === 0 ? (
+              <p className="text-sm text-muted-foreground">还没有可用分组。</p>
+            ) : (
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={groupKeyword}
+                    onChange={(event) => setGroupKeyword(event.target.value)}
+                    placeholder="搜索分组"
+                    className="h-10 pl-9"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setValue('groupId', '');
+                    setMobileGroupsOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm transition ${
+                    !selectedGroupId
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-muted-foreground hover:bg-accent'
+                  }`}
+                >
+                  <span className="font-medium">全部</span>
+                  <span className="text-xs opacity-70">{allPostsTotal}</span>
+                </button>
+
+                <div className="space-y-2">
+                  {filteredGroupData.map((group) => (
+                    <button
+                      type="button"
+                      key={group.id}
+                      onClick={() => {
+                        handleGroupClick(group.id);
+                        setMobileGroupsOpen(false);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm transition ${
+                        selectedGroupId === group.id
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary text-muted-foreground hover:bg-accent'
+                      }`}
+                    >
+                      <span className="min-w-0 truncate pr-2 font-medium">{group.name}</span>
+                      <span className="text-xs opacity-70">{group.count}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {filteredGroupData.length === 0 && (
+                  <p className="text-sm text-muted-foreground">未找到匹配分组。</p>
+                )}
+              </div>
+            )}
           </div>
         </SheetContent>
       </Sheet>

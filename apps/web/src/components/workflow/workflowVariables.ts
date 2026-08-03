@@ -109,6 +109,11 @@ const TOOL_OUTPUT_FIELDS: Record<string, ReadonlyArray<readonly [string, Workflo
     ['referenceList', 'array'],
     ['count', 'number'],
   ],
+  'knowledge.write': [
+    ['documentId', 'string'],
+    ['status', 'string'],
+    ['chunkCount', 'number'],
+  ],
   'data.parseJSON': [['value', 'object']],
   'data.chunkList': [
     ['batches', 'array'],
@@ -295,7 +300,7 @@ function getWorkflowNodeOutputFieldsBase(
             ? [
                 [
                   String((item as { name: string }).name),
-                  String((item as { type?: unknown }).type || 'unknown') as WorkflowVariableType,
+                  mergeOutputType(item as { type?: unknown; strategy?: unknown }),
                 ] as const,
               ]
             : [],
@@ -317,6 +322,19 @@ function getWorkflowNodeOutputFieldsBase(
     );
   }
   return NODE_OUTPUT_FIELDS[nodeType] || [];
+}
+
+function mergeOutputType(field: { type?: unknown; strategy?: unknown }): WorkflowVariableType {
+  switch (field.strategy) {
+    case 'array':
+      return 'array';
+    case 'text':
+      return 'string';
+    case 'object':
+      return 'object';
+    default:
+      return String(field.type || 'unknown') as WorkflowVariableType;
+  }
 }
 
 function getOutputFields(node: Node): ReadonlyArray<WorkflowOutputField> {

@@ -245,7 +245,7 @@ export default function WorkflowsPage({ embedded = false }: { embedded?: boolean
           </Card>
 
           <Card className="overflow-hidden border-border shadow-none">
-            <CardHeader className="flex-row items-start justify-between gap-4 border-b border-border px-6 py-5">
+            <CardHeader className="flex-col gap-4 border-b border-border px-4 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
               <div className="flex items-center gap-4">
                 <span className="flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Workflow className="size-6" />
@@ -255,19 +255,23 @@ export default function WorkflowsPage({ embedded = false }: { embedded?: boolean
                   <p className="mt-1 text-sm text-muted-foreground">创建和管理自动化流程</p>
                 </div>
               </div>
-              <div className="flex shrink-0 gap-2">
-                <Button variant="outline" onClick={() => setShowAICreate(true)}>
+              <div className="flex w-full gap-2 sm:w-auto">
+                <Button
+                  variant="outline"
+                  className="flex-1 sm:flex-none"
+                  onClick={() => setShowAICreate(true)}
+                >
                   <Sparkles className="mr-2 size-4" />
                   AI 创建
                 </Button>
-                <Button onClick={() => setShowCreate(true)}>
+                <Button className="flex-1 sm:flex-none" onClick={() => setShowCreate(true)}>
                   <Plus className="mr-2 size-4" />
                   新建工作流
                 </Button>
               </div>
             </CardHeader>
-            <div className="border-b border-border px-6 py-4">
-              <div className="relative max-w-72">
+            <div className="border-b border-border px-4 py-4 sm:px-6">
+              <div className="relative w-full sm:max-w-72">
                 <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={workflowSearch}
@@ -289,49 +293,83 @@ export default function WorkflowsPage({ embedded = false }: { embedded?: boolean
                 <p className="text-sm text-muted-foreground">还没有工作流</p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="px-6">工作流名称</TableHead>
-                    <TableHead>节点数</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>更新时间</TableHead>
-                    <TableHead className="w-24 text-right">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="px-6">工作流名称</TableHead>
+                        <TableHead>节点数</TableHead>
+                        <TableHead>状态</TableHead>
+                        <TableHead>更新时间</TableHead>
+                        <TableHead className="w-24 text-right">操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visibleWorkflows.map((workflow) => (
+                        <TableRow key={workflow.id}>
+                          <TableCell className="max-w-0 px-6">
+                            <Link
+                              to={`/workbench/edit?id=${workflow.id}`}
+                              className="flex min-w-0 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <LayoutDashboard className="size-5 shrink-0 text-primary" />
+                              <span className="min-w-0">
+                                <span className="block truncate font-medium text-foreground">
+                                  {workflow.name}
+                                </span>
+                                {workflow.description && (
+                                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                                    {workflow.description}
+                                  </span>
+                                )}
+                              </span>
+                            </Link>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {getNodeCount(workflow)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={workflow.status === 'published' ? 'default' : 'secondary'}
+                            >
+                              {workflow.status === 'published' ? '已发布' : '草稿'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatWorkflowDate(workflow.updatedAt)}
+                          </TableCell>
+                          <TableCell className="pr-4 text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`删除 ${workflow.name}`}
+                              onClick={() => setDeleteTarget(workflow)}
+                            >
+                              <Trash2 />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="divide-y divide-border md:hidden">
                   {visibleWorkflows.map((workflow) => (
-                    <TableRow key={workflow.id}>
-                      <TableCell className="max-w-0 px-6">
+                    <article key={workflow.id} className="space-y-3 px-4 py-4">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <LayoutDashboard className="mt-0.5 size-5 shrink-0 text-primary" />
                         <Link
                           to={`/workbench/edit?id=${workflow.id}`}
-                          className="flex min-w-0 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                          <LayoutDashboard className="size-5 shrink-0 text-primary" />
-                          <span className="min-w-0">
-                            <span className="block truncate font-medium text-foreground">
-                              {workflow.name}
-                            </span>
-                            {workflow.description && (
-                              <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                                {workflow.description}
-                              </span>
-                            )}
-                          </span>
+                          <p className="truncate font-medium text-foreground">{workflow.name}</p>
+                          {workflow.description ? (
+                            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                              {workflow.description}
+                            </p>
+                          ) : null}
                         </Link>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {getNodeCount(workflow)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={workflow.status === 'published' ? 'default' : 'secondary'}>
-                          {workflow.status === 'published' ? '已发布' : '草稿'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatWorkflowDate(workflow.updatedAt)}
-                      </TableCell>
-                      <TableCell className="pr-4 text-right">
                         <Button
                           variant="ghost"
                           size="icon-sm"
@@ -340,14 +378,21 @@ export default function WorkflowsPage({ embedded = false }: { embedded?: boolean
                         >
                           <Trash2 />
                         </Button>
-                      </TableCell>
-                    </TableRow>
+                      </div>
+                      <div className="flex items-center gap-3 pl-8 text-xs text-muted-foreground">
+                        <span>{getNodeCount(workflow)} 个节点</span>
+                        <Badge variant={workflow.status === 'published' ? 'default' : 'secondary'}>
+                          {workflow.status === 'published' ? '已发布' : '草稿'}
+                        </Badge>
+                        <span className="ml-auto">{formatWorkflowDate(workflow.updatedAt)}</span>
+                      </div>
+                    </article>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+              </>
             )}
             {workflows.length > 0 && (
-              <div className="border-t border-border px-6 py-4 text-sm text-muted-foreground">
+              <div className="border-t border-border px-4 py-4 text-sm text-muted-foreground sm:px-6">
                 共 {visibleWorkflows.length} 个工作流
               </div>
             )}

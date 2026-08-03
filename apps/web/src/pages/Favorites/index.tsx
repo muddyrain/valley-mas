@@ -155,7 +155,7 @@ export default function Favorites() {
                       </div>
                     )}
 
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition-all duration-300 group-hover:bg-black/30 group-hover:opacity-100">
+                    <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-100 transition-all duration-300 md:bg-black/0 md:opacity-0 md:group-hover:bg-black/30 md:group-hover:opacity-100">
                       <button
                         type="button"
                         onClick={(event) => {

@@ -33,6 +33,19 @@ func TestBuildAIAppConversationSystemPromptAlwaysIncludesRuntimeGuidance(t *test
 	}
 }
 
+func TestShouldRetrieveAIKnowledgeSkipsStandaloneGreetings(t *testing.T) {
+	for _, message := range []string{"你好", "Hello 👋", "在吗？"} {
+		if shouldRetrieveAIKnowledge(message) {
+			t.Fatalf("shouldRetrieveAIKnowledge(%q) = true, want false", message)
+		}
+	}
+	for _, message := range []string{"你好，请根据资料回答", "hello, summarize the documents", "介绍一下知识库内容"} {
+		if !shouldRetrieveAIKnowledge(message) {
+			t.Fatalf("shouldRetrieveAIKnowledge(%q) = false, want true", message)
+		}
+	}
+}
+
 func TestSelectedAIAppImageStyleRequiresBoundSkill(t *testing.T) {
 	config := aiapp.Config{SkillIDs: []string{"11"}}
 	styleID, err := selectedAIAppImageStyle(config, []string{"11"})

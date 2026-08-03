@@ -33,6 +33,8 @@ const capabilityOptions: Array<{ value: AIModelCapability; label: string }> = [
   { value: 'vision', label: '视觉' },
   { value: 'image_generation', label: '生图' },
   { value: 'reference_image', label: '支持参考图' },
+  { value: 'masked_edit', label: '局部重绘 / 擦除替换' },
+  { value: 'outpainting', label: '扩图' },
   { value: 'embedding', label: '向量' },
   { value: 'tool_call', label: '工具调用' },
 ];
@@ -318,17 +320,27 @@ export default function AIModelPolicies() {
             <Select
               mode="multiple"
               options={capabilityOptions.map((item) =>
-                item.value === 'reference_image'
+                ['reference_image', 'masked_edit', 'outpainting'].includes(item.value)
                   ? { ...item, disabled: !probesImageGeneration }
                   : item,
               )}
               onChange={(values: AIModelCapability[]) => {
+                let capabilities = values;
                 if (!values.includes('image_generation')) {
-                  modelForm.setFieldValue(
-                    'capabilities',
-                    values.filter((value) => value !== 'reference_image'),
+                  capabilities = values.filter(
+                    (value) =>
+                      value !== 'reference_image' &&
+                      value !== 'masked_edit' &&
+                      value !== 'outpainting',
                   );
+                } else if (!values.includes('reference_image')) {
+                  capabilities = values.filter(
+                    (value) => value !== 'masked_edit' && value !== 'outpainting',
+                  );
+                } else if (!values.includes('masked_edit')) {
+                  capabilities = values.filter((value) => value !== 'outpainting');
                 }
+                modelForm.setFieldValue('capabilities', capabilities);
                 if (!values.includes('embedding')) {
                   modelForm.setFieldValue('embeddingDimension', undefined);
                 }

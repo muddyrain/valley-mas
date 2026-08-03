@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { type AIKnowledgeBase, listAIKnowledgeBases } from '@/api/aiWorkbench';
 import { ModelPicker } from '@/components/ai/ModelPicker';
 import { EditorSection } from '@/components/ai-workbench/EditorSection';
 import { PromptLibraryInsertButton } from '@/components/ai-workbench/PromptLibraryInsertButton';
@@ -64,6 +66,30 @@ const toolOutputPresentations: Record<
       citationText: '引用文本',
       referenceList: '结构化引用',
       count: '引用数量',
+    },
+  },
+  'knowledge.write': {
+    order: ['documentId', 'status', 'chunkCount'],
+    labels: {
+      documentId: '知识库文档 ID',
+      status: '索引状态',
+      chunkCount: '分段数量',
+    },
+    descriptions: {
+      status: '文档先进入后台索引，完成后会变为 ready',
+    },
+  },
+  'file.create': {
+    order: ['resourceId', 'fileName', 'url', 'contentType', 'size'],
+    labels: {
+      resourceId: '资源 ID',
+      fileName: '文件名',
+      url: '下载地址',
+      contentType: '文件类型',
+      size: '文件大小（字节）',
+    },
+    descriptions: {
+      url: '文件保存在当前所有者的私有资源中，可作为后续通知或接口调用的链接。',
     },
   },
   'data.parseJSON': {
@@ -205,6 +231,7 @@ const listOperationFields: Record<string, string[]> = {
 
 const toolInputOrders: Record<string, string[]> = {
   'notification.send': ['status', 'title', 'content', 'path'],
+  'file.create': ['fileName', 'format', 'content'],
 };
 
 function ToolPropertyFormLoadingSkeleton() {
@@ -239,6 +266,27 @@ export function ToolPropertyForm({
   const capability = capabilities.toolCapabilities.find((item) => item.id === config.capabilityId);
   const inputs = (config.inputs as Record<string, unknown>) || {};
   const sideEffectLabel = getWorkflowSideEffectLabel(capability?.sideEffect);
+  const [knowledgeBases, setKnowledgeBases] = useState<AIKnowledgeBase[]>([]);
+  const [loadingKnowledgeBases, setLoadingKnowledgeBases] = useState(false);
+
+  useEffect(() => {
+    if (capability?.id !== 'knowledge.write') return;
+    let active = true;
+    setLoadingKnowledgeBases(true);
+    void listAIKnowledgeBases()
+      .then(({ list }) => {
+        if (active) setKnowledgeBases(list);
+      })
+      .catch(() => {
+        if (active) setKnowledgeBases([]);
+      })
+      .finally(() => {
+        if (active) setLoadingKnowledgeBases(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [capability?.id]);
 
   if (capabilities.loading) return <ToolPropertyFormLoadingSkeleton />;
 
@@ -319,6 +367,43 @@ export function ToolPropertyForm({
                     compact
                     compactTrigger
                   />
+                }
+              />
+            );
+          }
+          if (schema.resource === 'knowledge_base') {
+            return (
+              <WorkflowIOField
+                key={name}
+                name={name}
+                label={schema.title}
+                type="string"
+                required={capability.inputSchema.required?.includes(name)}
+                description={schema.description}
+                error={fieldErrors[name]}
+                valueControl={
+                  loadingKnowledgeBases ? (
+                    <Skeleton className="h-9 w-full" />
+                  ) : (
+                    <Select
+                      value={typeof inputs[name] === 'string' ? inputs[name] : ''}
+                      onValueChange={(value) =>
+                        onUpdateConfig({ inputs: { ...inputs, [name]: value } })
+                      }
+                      disabled={!knowledgeBases.length}
+                    >
+                      <SelectTrigger aria-label={schema.title || name}>
+                        <SelectValue placeholder="选择知识库" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {knowledgeBases.map((base) => (
+                          <SelectItem key={base.id} value={base.id}>
+                            {base.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )
                 }
               />
             );

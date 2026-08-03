@@ -370,7 +370,7 @@ export const WorkbenchCopilot = memo(function WorkbenchCopilot({
             <p className="truncate text-xs text-muted-foreground">
               {context.scope === 'workflow'
                 ? context.selectedNodeId
-                  ? `当前节点：${context.selectedNodeId}`
+                  ? `当前节点：${context.nodeLabels?.[context.selectedNodeId] || context.selectedNodeId}`
                   : '已读取当前工作流草稿'
                 : context.scope === 'agent'
                   ? '已读取当前智能体草稿'

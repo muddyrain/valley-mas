@@ -55,6 +55,7 @@ type aiModelOption struct {
 	ModelID                 string   `json:"modelId"`
 	DisplayName             string   `json:"displayName"`
 	Capabilities            []string `json:"capabilities"`
+	VerifiedCapabilities    []string `json:"verifiedCapabilities"`
 	EmbeddingDimension      int      `json:"embeddingDimension,omitempty"`
 	ImageQualities          []string `json:"imageQualities,omitempty"`
 	ImageReferenceQualities []string `json:"imageReferenceQualities,omitempty"`
@@ -292,11 +293,27 @@ func probeAIModel(
 			request.Images = []string{reference}
 			imageVerified = append(imageVerified, "reference_image")
 		}
+		if aimodel.HasCapabilities(item, []string{"masked_edit"}) {
+			reference, err := buildAIModelProbeReference()
+			if err != nil {
+				return aiModelProbeResult{}, err
+			}
+			mask, err := buildAIModelProbeMask()
+			if err != nil {
+				return aiModelProbeResult{}, err
+			}
+			request.Images = []string{reference}
+			request.Mask = mask
+			imageVerified = append(imageVerified, "reference_image", "masked_edit")
+			if aimodel.HasCapabilities(item, []string{"outpainting"}) {
+				imageVerified = append(imageVerified, "outpainting")
+			}
+		}
 		_, err := client.GenerateImageWithRequest(ctx, request)
 		if err != nil {
 			return aiModelProbeResult{Latency: time.Since(startedAt), VerifiedCapabilities: verified}, err
 		}
-		verified = append(verified, imageVerified...)
+		verified = append(verified, aimodel.DecodeStrings(mustEncodeStringSlice(imageVerified))...)
 	}
 	if aimodel.HasCapabilities(item, []string{"embedding"}) {
 		response, err := client.Embeddings(ctx, modelID, []string{"ping"})
@@ -412,7 +429,8 @@ func ListAvailableAIModels(c *gin.Context) {
 		option := aiModelOption{
 			ID: item.ID.String(), Provider: item.Provider, ModelID: item.ModelID,
 			DisplayName: item.DisplayName, Capabilities: aimodel.DecodeStrings(item.Capabilities),
-			EmbeddingDimension: item.EmbeddingDimension,
+			VerifiedCapabilities: aimodel.DecodeStrings(item.VerifiedCapabilities),
+			EmbeddingDimension:   item.EmbeddingDimension,
 		}
 		if aimodel.HasCapabilities(item, []string{"image_generation"}) {
 			option.ImageQualities = aimodel.ImageGenerationQualities(item)
@@ -438,8 +456,16 @@ func newAIModel(req adminAIModelRequest) (model.AIModel, error) {
 	if len(capabilities) == 0 {
 		return model.AIModel{}, errors.New("请至少配置一种模型能力")
 	}
-	if slices.Contains(capabilities, "reference_image") && !slices.Contains(capabilities, "image_generation") {
-		return model.AIModel{}, errors.New("支持参考图需要同时启用生图能力")
+	for _, capability := range []string{"reference_image", "masked_edit", "outpainting"} {
+		if slices.Contains(capabilities, capability) && !slices.Contains(capabilities, "image_generation") {
+			return model.AIModel{}, errors.New("图片编辑能力需要同时启用生图能力")
+		}
+	}
+	if slices.Contains(capabilities, "masked_edit") && !slices.Contains(capabilities, "reference_image") {
+		return model.AIModel{}, errors.New("蒙版编辑需要同时启用参考图能力")
+	}
+	if slices.Contains(capabilities, "outpainting") && !slices.Contains(capabilities, "masked_edit") {
+		return model.AIModel{}, errors.New("扩图需要同时启用蒙版编辑能力")
 	}
 	displayName := strings.TrimSpace(req.DisplayName)
 	if displayName == "" {
@@ -502,6 +528,25 @@ func buildAIModelProbeReference() (string, error) {
 	for y := 18; y < 46; y++ {
 		for x := 18; x < 46; x++ {
 			canvas.Set(x, y, color.RGBA{R: 37, G: 99, B: 235, A: 255})
+		}
+	}
+	var output bytes.Buffer
+	if err := png.Encode(&output, canvas); err != nil {
+		return "", err
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(output.Bytes()), nil
+}
+
+func buildAIModelProbeMask() (string, error) {
+	canvas := image.NewRGBA(image.Rect(0, 0, 64, 64))
+	for y := 0; y < 64; y++ {
+		for x := 0; x < 64; x++ {
+			canvas.Set(x, y, color.RGBA{A: 255})
+		}
+	}
+	for y := 24; y < 40; y++ {
+		for x := 24; x < 40; x++ {
+			canvas.Set(x, y, color.RGBA{})
 		}
 	}
 	var output bytes.Buffer

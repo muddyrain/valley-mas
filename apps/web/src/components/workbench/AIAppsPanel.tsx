@@ -1,12 +1,28 @@
-import { ArrowUpRight, Bot, Clock3, Plus } from 'lucide-react';
+import { ArrowUpRight, Bot, Clock3, Ellipsis, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { type AIApp, listAIApps } from '@/api/aiWorkbench';
+import { type AIApp, deleteAIApp, listAIApps } from '@/api/aiWorkbench';
 import { AgentAvatar } from '@/components/ai-workbench/AgentAvatar';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AIAgentCreateDialog } from './AIAgentCreateDialog';
 
@@ -38,15 +54,15 @@ function formatUpdatedAt(value: string) {
   }).format(new Date(value));
 }
 
-function AgentCard({ app }: { app: AIApp }) {
+function AgentCard({ app, onDelete }: { app: AIApp; onDelete: (app: AIApp) => void }) {
   return (
     <Card
       size="sm"
-      className="group/agent min-h-44 gap-0 py-0 ring-border/70 transition-[box-shadow,ring-color] duration-200 hover:shadow-md hover:ring-foreground/20 focus-within:ring-2 focus-within:ring-ring"
+      className="group/agent relative min-h-44 gap-0 py-0 ring-border/70 transition-[box-shadow,ring-color] duration-200 hover:shadow-md hover:ring-foreground/20 focus-within:ring-2 focus-within:ring-ring"
     >
       <Link
         to={`/workbench/apps/${app.id}`}
-        className="flex h-full min-h-44 cursor-pointer flex-col p-4 outline-none"
+        className="flex h-full min-h-44 cursor-pointer flex-col p-4 pr-11 outline-none"
       >
         <div className="flex items-start gap-3">
           <AgentAvatar name={app.name} src={app.avatarUrl} className="size-12" />
@@ -72,6 +88,27 @@ function AgentCard({ app }: { app: AIApp }) {
           </Badge>
         </div>
       </Link>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"
+              aria-label={`${app.name} 操作`}
+            >
+              <Ellipsis />
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem variant="destructive" onClick={() => onDelete(app)}>
+            <Trash2 />
+            删除智能体
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </Card>
   );
 }
@@ -80,6 +117,8 @@ export function AIAppsPanel() {
   const [apps, setApps] = useState<AIApp[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AIApp | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const agents = apps.filter((app) => app.type === 'agent');
 
   useEffect(() => {
@@ -88,6 +127,21 @@ export function AIAppsPanel() {
       .catch(() => toast.error('加载 AI 应用失败'))
       .finally(() => setLoading(false));
   }, []);
+
+  const removeAgent = async () => {
+    if (!deleteTarget || deleting) return;
+    try {
+      setDeleting(true);
+      await deleteAIApp(deleteTarget.id);
+      setApps((items) => items.filter((item) => item.id !== deleteTarget.id));
+      toast.success('智能体已删除');
+      setDeleteTarget(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '删除智能体失败，请稍后重试');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <section className="mb-6">
@@ -124,7 +178,7 @@ export function AIAppsPanel() {
       ) : (
         <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
           {agents.map((app) => (
-            <AgentCard key={app.id} app={app} />
+            <AgentCard key={app.id} app={app} onDelete={setDeleteTarget} />
           ))}
         </div>
       )}
@@ -135,6 +189,31 @@ export function AIAppsPanel() {
           void listAIApps().then(({ list }) => setApps(list));
         }}
       />
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除智能体？</AlertDialogTitle>
+            <AlertDialogDescription>
+              将删除“{deleteTarget?.name}”及其版本、会话和运行记录，此操作无法撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deleting}
+              onClick={() => void removeAgent()}
+            >
+              {deleting ? '删除中…' : '删除智能体'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
