@@ -145,6 +145,7 @@ const IMAGE_MODEL_PREFERENCE_KEY = 'valley.ai-image-studio.image-model';
 const MAX_CONVERSATION_MESSAGES = 100;
 const MAX_IMAGE_PROMPT_LENGTH = 48_000;
 const MAX_CONVERSATION_INPUT_LENGTH = 20_000;
+const RETRY_CONVERSATION_MESSAGE = '正在重新生成图片。';
 
 function readAIImageModelPreference() {
   try {
@@ -224,6 +225,23 @@ const readLegacyConversationMessages = (key: string): ImageConversationMessage[]
 const isObsoleteCanvasSnapshotError = (
   message: Pick<ImageConversationMessage, 'role' | 'content'>,
 ) => message.role === 'assistant' && message.content === '画布快照保存失败，请稍后重试';
+
+const getConversationMessageContent = (
+  message: ImageConversationMessage,
+  generation?: Pick<AIImageGeneration, 'status'>,
+) => {
+  if (message.content !== RETRY_CONVERSATION_MESSAGE) return message.content;
+  switch (generation?.status) {
+    case 'succeeded':
+      return '图片已重新生成。';
+    case 'failed':
+      return '重新生成失败。';
+    case 'paused':
+      return '已暂停重新生成。';
+    default:
+      return RETRY_CONVERSATION_MESSAGE;
+  }
+};
 
 const STATUS_LABELS: Record<AIImageGeneration['status'], string> = {
   queued: '等待生成',
@@ -1011,7 +1029,7 @@ export default function AIImageStudio() {
       });
       const savedAssistantMessage = await addAIImageConversationMessage(conversationID, {
         role: 'assistant',
-        content: '正在重新生成图片。',
+        content: RETRY_CONVERSATION_MESSAGE,
         generationId: result.generation.id,
       });
       setConversations((items) => [
@@ -1693,8 +1711,12 @@ export default function AIImageStudio() {
                                       >
                                         <ConversationMessageBubble
                                           role={message.role}
-                                          content={message.content}
+                                          content={getConversationMessageContent(
+                                            message,
+                                            generation,
+                                          )}
                                           createdAt={message.createdAt}
+                                          className={generation ? 'w-[min(100%,20rem)]' : undefined}
                                           footer={
                                             generation?.status === 'succeeded' ? (
                                               <Button
@@ -1800,6 +1822,7 @@ export default function AIImageStudio() {
                                       <ConversationMessageBubble
                                         role="assistant"
                                         content="我正在根据你的描述生成图片。"
+                                        className="w-[min(100%,20rem)]"
                                       >
                                         <div className="mt-3 w-[min(100%,20rem)]">
                                           <GenerationPreview compact stage="preparing" />
