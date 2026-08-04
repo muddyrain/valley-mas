@@ -55,6 +55,7 @@
 | `gsap-plugins` | 外部参考 | Flip、Draggable、ScrollTo、SplitText、MorphSVG 等插件 |
 | `gsap-frameworks` | 外部参考 | Vue、Svelte、Astro 等非 React 框架中的 GSAP 生命周期 |
 | `web-design-engineer` | 外部参考 | 用户明确要求完整视觉原型、dashboard、slide、动效 demo 或 UI mockup |
+| `make-interfaces-feel-better` | 外部参考 | 用户明确要求界面打磨、微交互、动效、排版、图标、阴影或视觉细节评审 |
 | `ui-ux-pro-max` | 外部参考，需确认 | 用户明确要求设计方案、风格、配色、字体或 UX 评审 |
 
 ## UI 组合上限
