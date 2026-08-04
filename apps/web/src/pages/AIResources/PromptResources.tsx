@@ -21,6 +21,16 @@ import {
   updateAIPrompt,
 } from '@/api/aiWorkbench';
 import { PromptAssistantDialog } from '@/components/ai-workbench/PromptAssistantDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -87,6 +97,8 @@ export default function PromptResources() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<AIPrompt | null>(null);
+  const [pendingArchivePrompt, setPendingArchivePrompt] = useState<AIPrompt | null>(null);
+  const [archiving, setArchiving] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
@@ -199,6 +211,23 @@ export default function PromptResources() {
     setTagText(
       formatPromptTags(tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag]),
     );
+  };
+
+  const requestArchivePrompt = (prompt: AIPrompt) => {
+    setPendingArchivePrompt(prompt);
+  };
+
+  const executeArchivePrompt = async () => {
+    if (!pendingArchivePrompt) {
+      return;
+    }
+    try {
+      setArchiving(true);
+      await handleArchive(pendingArchivePrompt);
+      setPendingArchivePrompt(null);
+    } finally {
+      setArchiving(false);
+    }
   };
 
   const handleArchive = async (prompt: AIPrompt) => {
@@ -341,7 +370,10 @@ export default function PromptResources() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive"
-                            onClick={() => void handleArchive(prompt)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              requestArchivePrompt(prompt);
+                            }}
                           >
                             <Trash2 />
                             归档
@@ -399,7 +431,10 @@ export default function PromptResources() {
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         className="text-destructive"
-                        onClick={() => void handleArchive(prompt)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          requestArchivePrompt(prompt);
+                        }}
                       >
                         <Trash2 />
                         归档
@@ -518,7 +553,8 @@ export default function PromptResources() {
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
                 placeholder="例如：你是一个测试助手，用于各种 AI 测试。"
-                className="min-h-80"
+                rows={10}
+                className="max-h-64 min-h-48 overflow-y-auto resize-y"
               />
             </div>
           </div>
@@ -533,6 +569,30 @@ export default function PromptResources() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={!!pendingArchivePrompt}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingArchivePrompt(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认归档这个提示词？</AlertDialogTitle>
+            <AlertDialogDescription>
+              归档后该提示词将从当前列表移除，是否继续？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={archiving}>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void executeArchivePrompt()} disabled={archiving}>
+              {archiving ? '归档中…' : '确认归档'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <PromptAssistantDialog
         open={assistantOpen}

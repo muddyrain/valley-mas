@@ -1,5 +1,5 @@
-import { Check, ChevronsUpDown, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Check, ChevronsUpDown, Loader2, RefreshCw, Search } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type AvailableAIModel, listAvailableAIModels } from '@/api/ai';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -58,27 +58,29 @@ export function ModelPicker({
   const [failed, setFailed] = useState(false);
   const [query, setQuery] = useState('');
 
-  useEffect(() => {
-    let active = true;
+  const refreshModels = useCallback(() => {
     setLoading(true);
     setFailed(false);
-    void listAvailableAIModels(capability, catalog)
+    return listAvailableAIModels(capability, catalog)
       .then((result) => {
-        if (active) setModels(result.list);
+        setModels(result.list);
       })
       .catch(() => {
-        if (active) {
-          setModels([]);
-          setFailed(true);
-        }
+        setModels([]);
+        setFailed(true);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        setLoading(false);
       });
-    return () => {
-      active = false;
-    };
   }, [capability, catalog]);
+
+  const handleRefreshModels = useCallback(() => {
+    void refreshModels();
+  }, [refreshModels]);
+
+  useEffect(() => {
+    void refreshModels();
+  }, [refreshModels]);
 
   const selectedModel = models.find((item) => item.id === value);
 
@@ -166,7 +168,25 @@ export function ModelPicker({
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="flex h-[min(42rem,82vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
           <DialogHeader className="border-b border-border px-6 py-5">
-            <DialogTitle>选择模型</DialogTitle>
+            <div className="flex items-center justify-between gap-3 pr-10">
+              <DialogTitle>选择模型</DialogTitle>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label="刷新模型列表"
+                onClick={handleRefreshModels}
+                disabled={loading}
+                className="h-8 gap-1.5"
+              >
+                {loading ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3.5" />
+                )}
+                刷新
+              </Button>
+            </div>
             <DialogDescription>仅展示已启用且适合当前任务的模型。</DialogDescription>
           </DialogHeader>
           <div className="border-b border-border p-4">

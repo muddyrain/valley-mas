@@ -185,15 +185,18 @@ type AIAppConversationToolTrace struct {
 }
 
 // AIWorkbenchCopilotSession is one owner-private collaboration thread for a workbench target.
-// A target may have multiple sessions; the most recently updated session is the default.
+// Workflow targets use one canonical timeline; older multi-session data remains archived and readable.
 type AIWorkbenchCopilotSession struct {
-	ID        Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID    Int64String `gorm:"index:idx_workbench_copilot_target;not null" json:"userId"`
-	Scope     string      `gorm:"size:20;index:idx_workbench_copilot_target;not null" json:"scope"`
-	TargetID  string      `gorm:"size:80;index:idx_workbench_copilot_target;not null;default:''" json:"targetId"`
-	Title     string      `gorm:"size:120;not null;default:'AI 协作'" json:"title"`
-	CreatedAt time.Time   `json:"createdAt"`
-	UpdatedAt time.Time   `json:"updatedAt"`
+	ID             Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID         Int64String `gorm:"index:idx_workbench_copilot_target;not null" json:"userId"`
+	Scope          string      `gorm:"size:20;index:idx_workbench_copilot_target;not null" json:"scope"`
+	TargetID       string      `gorm:"size:80;index:idx_workbench_copilot_target;not null;default:''" json:"targetId"`
+	Title          string      `gorm:"size:120;not null;default:'AI 协作'" json:"title"`
+	Canonical      bool        `gorm:"not null;default:false;index" json:"canonical"`
+	ArchivedAt     *time.Time  `gorm:"index" json:"archivedAt,omitempty"`
+	ContextResetAt *time.Time  `json:"contextResetAt,omitempty"`
+	CreatedAt      time.Time   `json:"createdAt"`
+	UpdatedAt      time.Time   `json:"updatedAt"`
 }
 
 func (s *AIWorkbenchCopilotSession) BeforeCreate(tx *gorm.DB) error {

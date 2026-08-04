@@ -53,7 +53,6 @@ import {
   listAIKnowledgeBases,
   replaceAIAppKnowledgeBases,
 } from '@/api/aiWorkbench';
-import type { CopilotProposal } from '@/api/workbenchCopilot';
 import {
   cancelWorkflowRun,
   cancelWorkflowRunNode,
@@ -67,6 +66,7 @@ import {
   retryWorkflowRun,
   runWorkflow,
   updateWorkflow,
+  type WorkflowItem,
   type WorkflowPlatformData,
   type WorkflowRunDetail,
   type WorkflowVersion,
@@ -103,8 +103,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { KnowledgeBaseBindings } from '@/components/workbench/KnowledgeBaseBindings';
 import { MobileCopilotSheet } from '@/components/workbench/MobileCopilotSheet';
-import { WorkbenchCopilot } from '@/components/workbench/WorkbenchCopilot';
-import { isAIWorkflowDraft, workflowDraftToCanvas } from '@/components/workbench/workflowDraft';
+import { WorkflowCollaborationAgent } from '@/components/workbench/WorkflowCollaborationAgent';
 import { InsertableEdge } from '@/components/workflow/InsertableEdge';
 import { LoopBodyExitNode } from '@/components/workflow/LoopBodyExitNode';
 import { LoopBodyNode } from '@/components/workflow/LoopBodyNode';
@@ -522,6 +521,7 @@ export default function WorkflowEditorPage() {
   const [workflowName, setWorkflowName] = useState('未命名工作流');
   const [workflowDescription, setWorkflowDescription] = useState('');
   const [workflowId, setWorkflowId] = useState<string | null>(null);
+  const [workflowServerRevision, setWorkflowServerRevision] = useState(0);
   const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(() => Boolean(searchParams.get('id')));
   const [isEditingName, setIsEditingName] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -609,6 +609,7 @@ export default function WorkflowEditorPage() {
   const saveRevisionRef = useRef(0);
   const persistedRevisionRef = useRef(0);
   const persistedGraphHashRef = useRef('');
+  const persistedServerRevisionRef = useRef(0);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const createPromiseRef = useRef<Promise<boolean> | null>(null);
   const pendingCreatedWorkflowIdRef = useRef<string | null>(null);
@@ -905,6 +906,7 @@ export default function WorkflowEditorPage() {
                 name: snapshot.name,
                 graph: snapshot.graph,
                 baseHash: persistedGraphHashRef.current || undefined,
+                baseRevision: persistedServerRevisionRef.current || undefined,
                 recordHistory: shouldRecordHistory,
               },
               { suppressErrorToast: true },
@@ -917,6 +919,8 @@ export default function WorkflowEditorPage() {
               return false;
             persistedRevisionRef.current = snapshot.revision;
             persistedGraphHashRef.current = result.graphHash;
+            persistedServerRevisionRef.current = result.revision;
+            setWorkflowServerRevision(result.revision);
             shouldForce = false;
             shouldRecordHistory = false;
           }
@@ -980,6 +984,8 @@ export default function WorkflowEditorPage() {
           pendingCreatedWorkflowIdRef.current = result.id;
           persistedRevisionRef.current = snapshot.revision;
           persistedGraphHashRef.current = result.graphHash || '';
+          persistedServerRevisionRef.current = result.revision || 1;
+          setWorkflowServerRevision(result.revision || 1);
 
           const saved = await enqueueWorkflowUpdate();
           if (!saved) return false;
@@ -1046,6 +1052,8 @@ export default function WorkflowEditorPage() {
       pendingCreatedWorkflowIdRef.current = null;
       persistedRevisionRef.current = 0;
       persistedGraphHashRef.current = '';
+      persistedServerRevisionRef.current = 0;
+      setWorkflowServerRevision(0);
       saveRevisionRef.current = 0;
       saveQueueRef.current = Promise.resolve();
       createPromiseRef.current = null;
@@ -1089,6 +1097,8 @@ export default function WorkflowEditorPage() {
           setWorkflowDescription(data.description || '');
           setLastAutoSavedAt(data.updatedAt || null);
           persistedGraphHashRef.current = data.graphHash || '';
+          persistedServerRevisionRef.current = data.revision || 1;
+          setWorkflowServerRevision(data.revision || 1);
           try {
             const graph = JSON.parse(data.graph);
             const nextNodes = Array.isArray(graph.nodes)
@@ -2202,26 +2212,58 @@ export default function WorkflowEditorPage() {
     };
   }, [copilotDraftVersion, workflowName]);
 
-  const applyCopilotProposal = useCallback(
-    (proposal: CopilotProposal) => {
-      if (proposal.targetType !== 'workflow' || !isAIWorkflowDraft(proposal.candidate)) {
-        throw new Error('提案不是有效的工作流草稿');
-      }
-      const canvas = workflowDraftToCanvas(proposal.candidate);
-      const migratedNodes = migrateLLMPromptBindings(canvas.nodes, canvas.edges);
-      setWorkflowName(proposal.candidate.name);
+  const applyCollaborationWorkflowUpdate = useCallback((data: WorkflowItem): boolean => {
+    if (saveRevisionRef.current > persistedRevisionRef.current) return false;
+    try {
+      const graph = JSON.parse(data.graph) as {
+        nodes?: Array<
+          Node & {
+            label?: string;
+            config?: Record<string, unknown>;
+            when?: import('@/api/workflow').WorkflowRule;
+          }
+        >;
+        edges?: Edge[];
+      };
+      const nextNodes = Array.isArray(graph.nodes)
+        ? graph.nodes.map((node) => ({
+            id: node.id,
+            type: node.type,
+            position: node.position,
+            data: {
+              label: node.label || node.id,
+              nodeType: node.type || 'llm',
+              config: node.config || {},
+              when: node.when,
+            },
+          }))
+        : [];
+      const nextEdges = Array.isArray(graph.edges) ? normalizeWorkflowEdges(graph.edges) : [];
+      const expanded = expandLoopCanvas(nextNodes, nextEdges);
+      const migratedNodes = migrateLLMPromptBindings(expanded.nodes, expanded.edges);
+      const localRevision = saveRevisionRef.current;
+      workflowStateRef.current = { name: data.name, nodes: migratedNodes, edges: expanded.edges };
+      workflowSnapshotRef.current = {
+        name: data.name,
+        graph: serializeWorkflowGraph(migratedNodes, expanded.edges),
+        revision: localRevision,
+      };
+      persistedRevisionRef.current = localRevision;
+      persistedGraphHashRef.current = data.graphHash || '';
+      persistedServerRevisionRef.current = data.revision;
+      setWorkflowServerRevision(data.revision);
+      setWorkflowName(data.name);
+      setWorkflowDescription(data.description || '');
       setNodes(migratedNodes);
-      setEdges(canvas.edges);
-      setSelectedNode(null);
-      requestFitView();
-      markWorkflowDirty({
-        name: proposal.candidate.name,
-        nodes: migratedNodes,
-        edges: canvas.edges,
-      });
-    },
-    [markWorkflowDirty, requestFitView],
-  );
+      setEdges(expanded.edges);
+      setLastAutoSavedAt(data.updatedAt || new Date().toISOString());
+      setSaveStatus('saved');
+      return true;
+    } catch {
+      toast.error('AI 返回的工作流草稿无法加载');
+      return false;
+    }
+  }, []);
 
   const onUpdateNode = useCallback(
     (
@@ -2909,8 +2951,16 @@ export default function WorkflowEditorPage() {
       selectedNodeId: selectedNode?.id,
       nodeLabels: copilotNodeLabels,
       runId: runSession.runId || undefined,
+      serverRevision: workflowServerRevision,
     }),
-    [copilotDraft, copilotNodeLabels, runSession.runId, selectedNode?.id, workflowId],
+    [
+      copilotDraft,
+      copilotNodeLabels,
+      runSession.runId,
+      selectedNode?.id,
+      workflowId,
+      workflowServerRevision,
+    ],
   );
 
   const copilotSuggestions = useMemo(
@@ -2923,13 +2973,25 @@ export default function WorkflowEditorPage() {
 
   const copilot = useMemo(
     () => (
-      <WorkbenchCopilot
+      <WorkflowCollaborationAgent
         context={copilotContext}
         suggestions={copilotSuggestions}
-        onApplyProposal={applyCopilotProposal}
+        onBeforeSubmit={() => persistLatestWorkflow({ force: true })}
+        onWorkflowUpdated={applyCollaborationWorkflowUpdate}
+        onLocateNode={(nodeId) => {
+          if (nodeId) focusValidationNode(nodeId);
+          else requestFitView();
+        }}
       />
     ),
-    [applyCopilotProposal, copilotContext, copilotSuggestions],
+    [
+      applyCollaborationWorkflowUpdate,
+      copilotContext,
+      copilotSuggestions,
+      focusValidationNode,
+      persistLatestWorkflow,
+      requestFitView,
+    ],
   );
 
   const propertyPanel = useMemo(

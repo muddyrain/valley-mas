@@ -648,6 +648,10 @@ func runCopilotPlanningWithActivity(
 }
 
 func runCopilotAgentStructured(ctx context.Context, userID model.Int64String, invocation aimodel.Invocation, systemPrompt, userPrompt string, payload copilotMessageRequest, draft any, target any, validate func() error) error {
+	return runCopilotAgentStructuredWithImages(ctx, userID, invocation, systemPrompt, userPrompt, nil, payload, draft, target, validate)
+}
+
+func runCopilotAgentStructuredWithImages(ctx context.Context, userID model.Int64String, invocation aimodel.Invocation, systemPrompt, userPrompt string, images []string, payload copilotMessageRequest, draft any, target any, validate func() error) error {
 	registry := copilotToolRegistry(userID, payload, draft)
 	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
 	spec := agent.Spec{
@@ -664,7 +668,7 @@ func runCopilotAgentStructured(ctx context.Context, userID model.Int64String, in
 		spec.Tools = nil
 	}
 	ctx = aiusage.WithAudit(ctx, featureWorkbenchCopilot, userID.String())
-	result, err := loop.Run(ctx, spec, []agent.Message{{Role: agent.RoleUser, Content: userPrompt}})
+	result, err := loop.Run(ctx, spec, []agent.Message{{Role: agent.RoleUser, Content: userPrompt, Images: images}})
 	return completeCopilotStructuredResult(ctx, result, err, target, validate, func(ctx context.Context, reply string, outputErr error) (agent.Result, error) {
 		repairSystem, repairUser := buildStructuredRepairRequest(systemPrompt, userPrompt, reply, outputErr)
 		spec.System = repairSystem

@@ -120,6 +120,29 @@ func AdminListWorkflows(c *gin.Context) {
 		Error(c, http.StatusInternalServerError, "查询失败: "+err.Error())
 		return
 	}
+	workflowIDs := make([]model.Int64String, 0, len(workflows))
+	for _, definition := range workflows {
+		workflowIDs = append(workflowIDs, definition.ID)
+	}
+	if len(workflowIDs) > 0 {
+		var collaborationTasks []model.WorkflowCollaborationTask
+		if err := database.DB.Where("user_id = ? AND workflow_id IN ?", userID, workflowIDs).
+			Order("updated_at DESC, id DESC").Find(&collaborationTasks).Error; err == nil {
+			latestByWorkflow := make(map[model.Int64String]model.WorkflowCollaborationTask, len(workflows))
+			for _, task := range collaborationTasks {
+				if _, exists := latestByWorkflow[task.WorkflowID]; !exists {
+					latestByWorkflow[task.WorkflowID] = task
+				}
+			}
+			for index := range workflows {
+				if task, exists := latestByWorkflow[workflows[index].ID]; exists {
+					workflows[index].CollaborationStatus = task.Status
+					updatedAt := task.UpdatedAt
+					workflows[index].CollaborationUpdatedAt = &updatedAt
+				}
+			}
+		}
+	}
 
 	Success(c, gin.H{
 		"list":     workflows,
@@ -185,10 +208,14 @@ func reconcileWorkflowEditorDraft(tx *gorm.DB, definition *model.Workflow) error
 
 	// The versioned draft is newer (for example a draft saved by an older editor
 	// path). Restore the editable table from it, without touching publication.
-	if err := tx.Model(definition).Update("graph", draft.Config).Error; err != nil {
+	if err := tx.Model(definition).Updates(map[string]any{
+		"graph":    draft.Config,
+		"revision": gorm.Expr("revision + ?", 1),
+	}).Error; err != nil {
 		return err
 	}
 	definition.Graph = draft.Config
+	definition.Revision++
 	return nil
 }
 
@@ -212,6 +239,7 @@ func AdminUpdateWorkflow(c *gin.Context) {
 		Graph         *string `json:"graph"`
 		Status        *string `json:"status"`
 		BaseHash      *string `json:"baseHash"`
+		BaseRevision  *int64  `json:"baseRevision"`
 		RecordHistory bool    `json:"recordHistory"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -248,6 +276,9 @@ func AdminUpdateWorkflow(c *gin.Context) {
 			!strings.EqualFold(strings.TrimSpace(*req.BaseHash), workflowGraphHash(definition.Graph)) {
 			return errWorkflowSaveConflict
 		}
+		if req.BaseRevision != nil && *req.BaseRevision != definition.Revision {
+			return errWorkflowSaveConflict
+		}
 		graphToPersist := definition.Graph
 		if req.Graph != nil {
 			graphToPersist = *req.Graph
@@ -255,6 +286,7 @@ func AdminUpdateWorkflow(c *gin.Context) {
 		if err := validateWorkflowDraftForPersistence(graphToPersist); err != nil {
 			return fmt.Errorf("%w: %v", errWorkflowDraftInvalid, err)
 		}
+		updates["revision"] = gorm.Expr("revision + ?", 1)
 		if err := tx.Model(&definition).Updates(updates).Error; err != nil {
 			return err
 		}
@@ -282,7 +314,7 @@ func AdminUpdateWorkflow(c *gin.Context) {
 	}
 
 	definition.GraphHash = workflowGraphHash(definition.Graph)
-	Success(c, gin.H{"graphHash": definition.GraphHash})
+	Success(c, gin.H{"graphHash": definition.GraphHash, "revision": definition.Revision})
 }
 
 func GetWorkflowPlatform(c *gin.Context) {
@@ -340,7 +372,11 @@ func RestoreWorkflowVersion(c *gin.Context) {
 		if createErr != nil {
 			return createErr
 		}
-		return tx.Model(&definition).Updates(map[string]any{"graph": restored.Config, "status": "draft"}).Error
+		return tx.Model(&definition).Updates(map[string]any{
+			"graph":    restored.Config,
+			"status":   "draft",
+			"revision": gorm.Expr("revision + ?", 1),
+		}).Error
 	}); err != nil {
 		Error(c, 400, "恢复历史版本失败")
 		return

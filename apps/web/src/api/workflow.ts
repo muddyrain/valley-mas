@@ -53,6 +53,7 @@ export interface WorkflowItem {
   description: string;
   graph: string;
   graphHash?: string;
+  revision: number;
   status: 'draft' | 'published';
   createdAt: string;
   updatedAt: string;
@@ -395,10 +396,11 @@ export async function updateWorkflow(
     graph: string;
     status: string;
     baseHash: string;
+    baseRevision: number;
     recordHistory: boolean;
   }>,
   config?: RequestConfig,
-): Promise<{ graphHash: string }> {
+): Promise<{ graphHash: string; revision: number }> {
   return request.put(`/workflows/${id}`, data, config);
 }
 

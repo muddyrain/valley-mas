@@ -195,6 +195,10 @@ export default function MyPosts() {
     await Promise.all([loadBlogPostsPage(), loadImageTextPostsPage()]);
   }, [loadBlogPostsPage, loadImageTextPostsPage]);
 
+  const handleRefreshPosts = useCallback(() => {
+    void loadAllPostsPage();
+  }, [loadAllPostsPage]);
+
   useEffect(() => {
     if (!isAuthenticated) return;
     void loadGroups();
@@ -725,6 +729,15 @@ export default function MyPosts() {
                   >
                     <ArrowUpDown className="mr-1.5 h-4 w-4" />
                     排序博客
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleRefreshPosts}
+                    disabled={loadingPosts}
+                    className="rounded-xl"
+                  >
+                    {loadingPosts ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+                    刷新
                   </Button>
                   <Button
                     variant="outline"

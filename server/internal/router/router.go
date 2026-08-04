@@ -22,6 +22,7 @@ import (
 func Setup(cfg *config.Config) *gin.Engine {
 	handler.StartWorkflowTriggerWorker(context.Background())
 	handler.StartAIAppTaskWorker(context.Background())
+	handler.StartWorkflowCollaborationWorker(context.Background())
 	r := gin.Default()
 
 	r.Use(logger.RequestLogger())
@@ -277,6 +278,15 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.GET("/workflows/:id/platform", handler.GetWorkflowPlatform)
 			auth.POST("/workflows/:id/restore", handler.RestoreWorkflowVersion)
 			auth.POST("/workflows/:id/publish", handler.PublishWorkflowVersion)
+			auth.GET("/workflows/:id/collaboration", handler.GetWorkflowCollaboration)
+			auth.POST("/workflows/:id/collaboration/tasks", handler.CreateWorkflowCollaborationTask)
+			auth.POST("/workflows/:id/collaboration/attachments", handler.UploadWorkflowCollaborationAttachment)
+			auth.DELETE("/workflows/:id/collaboration/attachments/:attachmentId", handler.DeleteWorkflowCollaborationAttachment)
+			auth.GET("/workflows/:id/collaboration/tasks/:taskId", handler.GetWorkflowCollaborationTask)
+			auth.POST("/workflows/:id/collaboration/tasks/:taskId/cancel", handler.CancelWorkflowCollaborationTask)
+			auth.POST("/workflows/:id/collaboration/tasks/:taskId/approvals/:approvalId/decision", handler.DecideWorkflowCollaborationApproval)
+			auth.POST("/workflows/:id/collaboration/context/reset", handler.ResetWorkflowCollaborationContext)
+			auth.POST("/workflows/:id/collaboration/changes/:changeId/revert", handler.RevertWorkflowCollaborationChange)
 			auth.DELETE("/workflows/:id", handler.AdminDeleteWorkflow)
 			auth.POST("/workflows/:id/run", handler.AdminRunWorkflow)
 			auth.GET("/workflows/:id/triggers", handler.ListWorkflowTriggers)

@@ -9,16 +9,151 @@ import (
 )
 
 type Workflow struct {
+	ID                     Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID                 Int64String    `gorm:"index;not null" json:"userId"`
+	Name                   string         `gorm:"size:100;not null" json:"name"`
+	Description            string         `gorm:"size:500" json:"description"`
+	Graph                  string         `gorm:"type:json;not null" json:"graph"`
+	GraphHash              string         `gorm:"-" json:"graphHash,omitempty"`
+	Revision               int64          `gorm:"not null;default:1" json:"revision"`
+	Status                 string         `gorm:"size:20;not null;default:'draft';index" json:"status"`
+	CreatedAt              time.Time      `json:"createdAt"`
+	UpdatedAt              time.Time      `json:"updatedAt"`
+	CollaborationStatus    string         `gorm:"-" json:"collaborationStatus,omitempty"`
+	CollaborationUpdatedAt *time.Time     `gorm:"-" json:"collaborationUpdatedAt,omitempty"`
+	DeletedAt              gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// WorkflowCollaborationTask is the durable queue record for the workflow-only
+// collaboration agent. Messages stay in the canonical workbench session while
+// this record owns execution, cancellation and direct draft mutation state.
+type WorkflowCollaborationTask struct {
+	ID                Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID            Int64String    `gorm:"index;not null" json:"userId"`
+	WorkflowID        Int64String    `gorm:"index;not null" json:"workflowId"`
+	SessionID         Int64String    `gorm:"index;not null" json:"sessionId"`
+	UserMessageID     Int64String    `gorm:"index;not null" json:"userMessageId"`
+	ChangeID          *Int64String   `gorm:"index" json:"changeId,omitempty"`
+	Title             string         `gorm:"size:160;not null" json:"title"`
+	Status            string         `gorm:"size:24;index;not null;default:'queued'" json:"status"`
+	Payload           string         `gorm:"type:text;not null" json:"-"`
+	Progress          int            `gorm:"not null;default:0" json:"progress"`
+	StatusMessage     string         `gorm:"size:500;not null;default:''" json:"statusMessage"`
+	PartialOutput     string         `gorm:"type:text;not null;default:''" json:"partialOutput"`
+	QueuePosition     int            `gorm:"-" json:"queuePosition,omitempty"`
+	ErrorCode         string         `gorm:"size:80;not null;default:''" json:"errorCode,omitempty"`
+	BaseRevision      int64          `gorm:"not null" json:"baseRevision"`
+	BaseHash          string         `gorm:"size:64;not null" json:"baseHash"`
+	IdempotencyKey    string         `gorm:"size:100;not null;uniqueIndex" json:"-"`
+	CancelRequestedAt *time.Time     `gorm:"index" json:"cancelRequestedAt,omitempty"`
+	StartedAt         *time.Time     `json:"startedAt,omitempty"`
+	FinishedAt        *time.Time     `json:"finishedAt,omitempty"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	UpdatedAt         time.Time      `json:"updatedAt"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (task *WorkflowCollaborationTask) BeforeCreate(tx *gorm.DB) error {
+	if task.ID == 0 {
+		task.ID = Int64String(utils.GenerateID())
+	}
+	if task.Status == "" {
+		task.Status = "queued"
+	}
+	return nil
+}
+
+// WorkflowCollaborationAttachment stores the bounded source and parsed text
+// for one workflow collaboration turn. ParsedText is never returned directly.
+type WorkflowCollaborationAttachment struct {
+	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID        Int64String    `gorm:"index;not null" json:"userId"`
+	WorkflowID    Int64String    `gorm:"index;not null" json:"workflowId"`
+	SessionID     Int64String    `gorm:"index;not null" json:"sessionId"`
+	MessageID     *Int64String   `gorm:"index" json:"messageId,omitempty"`
+	Name          string         `gorm:"size:255;not null" json:"name"`
+	MimeType      string         `gorm:"size:120;not null" json:"mimeType"`
+	SizeBytes     int64          `gorm:"not null" json:"sizeBytes"`
+	ParsedText    string         `gorm:"type:text;not null" json:"-"`
+	SourceContent []byte         `gorm:"type:bytea" json:"-"`
+	Status        string         `gorm:"size:20;index;not null;default:'ready'" json:"status"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (attachment *WorkflowCollaborationAttachment) BeforeCreate(tx *gorm.DB) error {
+	if attachment.ID == 0 {
+		attachment.ID = Int64String(utils.GenerateID())
+	}
+	if attachment.Status == "" {
+		attachment.Status = "ready"
+	}
+	return nil
+}
+
+// WorkflowCollaborationApproval holds an owner decision for one risky action.
+// Arguments remain server-only and approval is scoped to a stable fingerprint.
+type WorkflowCollaborationApproval struct {
 	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	TaskID      Int64String    `gorm:"index;not null" json:"taskId"`
 	UserID      Int64String    `gorm:"index;not null" json:"userId"`
-	Name        string         `gorm:"size:100;not null" json:"name"`
-	Description string         `gorm:"size:500" json:"description"`
-	Graph       string         `gorm:"type:json;not null" json:"graph"`
-	GraphHash   string         `gorm:"-" json:"graphHash,omitempty"`
-	Status      string         `gorm:"size:20;not null;default:'draft';index" json:"status"`
+	WorkflowID  Int64String    `gorm:"index;not null" json:"workflowId"`
+	Action      string         `gorm:"size:100;not null" json:"action"`
+	RiskLevel   string         `gorm:"size:20;not null" json:"riskLevel"`
+	Fingerprint string         `gorm:"size:64;uniqueIndex:uidx_workflow_collaboration_approval;not null" json:"-"`
+	Summary     string         `gorm:"size:500;not null" json:"summary"`
+	Arguments   string         `gorm:"type:text;not null" json:"-"`
+	Status      string         `gorm:"size:20;index;not null;default:'pending'" json:"status"`
+	Note        string         `gorm:"size:500;not null;default:''" json:"note,omitempty"`
+	DecidedAt   *time.Time     `json:"decidedAt,omitempty"`
 	CreatedAt   time.Time      `json:"createdAt"`
 	UpdatedAt   time.Time      `json:"updatedAt"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (approval *WorkflowCollaborationApproval) BeforeCreate(tx *gorm.DB) error {
+	if approval.ID == 0 {
+		approval.ID = Int64String(utils.GenerateID())
+	}
+	if approval.Status == "" {
+		approval.Status = "pending"
+	}
+	return nil
+}
+
+// WorkflowCollaborationChange is the server-side source of truth for one
+// direct AI draft mutation and its all-or-nothing inverse operation sequence.
+type WorkflowCollaborationChange struct {
+	ID                Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID            Int64String    `gorm:"index;not null" json:"userId"`
+	WorkflowID        Int64String    `gorm:"index;not null" json:"workflowId"`
+	SessionID         Int64String    `gorm:"index;not null" json:"sessionId"`
+	TaskID            Int64String    `gorm:"index;not null;uniqueIndex" json:"taskId"`
+	BaseRevision      int64          `gorm:"not null" json:"baseRevision"`
+	AppliedRevision   int64          `gorm:"not null" json:"appliedRevision"`
+	RevertedRevision  *int64         `json:"revertedRevision,omitempty"`
+	BaseHash          string         `gorm:"size:64;not null" json:"baseHash"`
+	AppliedHash       string         `gorm:"size:64;not null" json:"appliedHash"`
+	AppliedGraph      string         `gorm:"type:text;not null" json:"-"`
+	ForwardOperations string         `gorm:"type:text;not null" json:"forwardOperations"`
+	InverseOperations string         `gorm:"type:text;not null" json:"-"`
+	Diff              string         `gorm:"type:text;not null;default:'{}'" json:"diff"`
+	ConflictPaths     string         `gorm:"type:text;not null;default:'[]'" json:"conflictPaths,omitempty"`
+	Status            string         `gorm:"size:20;index;not null;default:'applied'" json:"status"`
+	RevertedAt        *time.Time     `json:"revertedAt,omitempty"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	UpdatedAt         time.Time      `json:"updatedAt"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (change *WorkflowCollaborationChange) BeforeCreate(tx *gorm.DB) error {
+	if change.ID == 0 {
+		change.ID = Int64String(utils.GenerateID())
+	}
+	if change.Status == "" {
+		change.Status = "applied"
+	}
+	return nil
 }
 
 func (w *Workflow) BeforeCreate(tx *gorm.DB) error {

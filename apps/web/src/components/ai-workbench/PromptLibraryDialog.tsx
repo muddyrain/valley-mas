@@ -331,7 +331,8 @@ export function PromptLibraryDialog({
                       setDraft((current) => ({ ...current, content: event.target.value }))
                     }
                     placeholder="输入提示词正文"
-                    className="min-h-64 resize-y"
+                    rows={10}
+                    className="max-h-64 min-h-48 overflow-y-auto resize-y"
                   />
                 </div>
               </div>

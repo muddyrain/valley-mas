@@ -23,6 +23,7 @@
 
 ## 当前活跃计划
 
+- [2026-08-04-workflow-collaboration-agent.md](2026-08-04-workflow-collaboration-agent.md)：工作流固定协作智能体、单时间线、后台直接修改、冲突合并与持久撤销。
 - [2026-08-02-ai-agent-operations-files.md](2026-08-02-ai-agent-operations-files.md)：智能体后台任务、工具人工确认、知识检索引用和成果文件。
 - [2026-07-28-auth-security-hardening.md](2026-07-28-auth-security-hardening.md)：会话失效、持久化验证码、频率限制与密码哈希升级。
 - [2026-07-28-standard-agent-skills.md](2026-07-28-standard-agent-skills.md)：标准技能包导入、分类与智能体/工作流复用。

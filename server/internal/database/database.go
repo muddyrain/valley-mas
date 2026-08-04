@@ -483,6 +483,10 @@ func autoMigrateModelsByName() map[string]any {
 		"workflow_trigger":                     &model.WorkflowTrigger{},
 		"workflow_run_job":                     &model.WorkflowRunJob{},
 		"workflow_approval":                    &model.WorkflowApproval{},
+		"workflow_collaboration_task":          &model.WorkflowCollaborationTask{},
+		"workflow_collaboration_attachment":    &model.WorkflowCollaborationAttachment{},
+		"workflow_collaboration_approval":      &model.WorkflowCollaborationApproval{},
+		"workflow_collaboration_change":        &model.WorkflowCollaborationChange{},
 	}
 }
 
@@ -651,6 +655,10 @@ func contentDomainMigrationModels() []any {
 		&model.WorkflowTrigger{},
 		&model.WorkflowRunJob{},
 		&model.WorkflowApproval{},
+		&model.WorkflowCollaborationTask{},
+		&model.WorkflowCollaborationAttachment{},
+		&model.WorkflowCollaborationApproval{},
+		&model.WorkflowCollaborationChange{},
 	}
 }
 

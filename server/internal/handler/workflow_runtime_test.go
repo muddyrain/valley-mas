@@ -81,6 +81,16 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	auth.POST("/:id/approvals/:approvalId/decision", DecideWorkflowApproval)
 	auth.PUT("/:id", AdminUpdateWorkflow)
 	auth.POST("/:id/publish", PublishWorkflowVersion)
+	auth.GET("/:id/collaboration", GetWorkflowCollaboration)
+	auth.POST("/:id/collaboration/tasks", CreateWorkflowCollaborationTask)
+	auth.POST("/:id/collaboration/attachments", UploadWorkflowCollaborationAttachment)
+	auth.DELETE("/:id/collaboration/attachments/:attachmentId", DeleteWorkflowCollaborationAttachment)
+	auth.GET("/:id/collaboration/tasks/:taskId", GetWorkflowCollaborationTask)
+	auth.POST("/:id/collaboration/tasks/:taskId/cancel", CancelWorkflowCollaborationTask)
+	auth.POST("/:id/collaboration/tasks/:taskId/approvals/:approvalId/decision", DecideWorkflowCollaborationApproval)
+	auth.POST("/:id/collaboration/context/reset", ResetWorkflowCollaborationContext)
+	auth.POST("/:id/collaboration/changes/:changeId/revert", RevertWorkflowCollaborationChange)
+	auth.GET("", AdminListWorkflows)
 	return router, definition
 }
 
@@ -436,6 +446,32 @@ func TestAdminUpdateWorkflowRejectsStaleBaseHash(t *testing.T) {
 	}
 	if response := request(definition.Graph); responseCode(response) != http.StatusConflict {
 		t.Fatalf("stale save: %s", response.Body.String())
+	}
+}
+
+func TestAdminUpdateWorkflowAdvancesRevisionAndRejectsStaleRevision(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	if definition.Revision != 1 {
+		t.Fatalf("initial revision=%d", definition.Revision)
+	}
+	updated := strings.Replace(definition.Graph, `"title":"{{start.output.title}}"`, `"renamed":"{{start.output.title}}"`, 1)
+	request := func(graph, hash string, revision int64) *httptest.ResponseRecorder {
+		body, _ := json.Marshal(map[string]any{"graph": graph, "baseHash": hash, "baseRevision": revision})
+		req := httptest.NewRequest(http.MethodPut, "/workflows/"+definition.ID.String(), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, req)
+		return recorder
+	}
+
+	first := request(updated, workflowGraphHash(definition.Graph), definition.Revision)
+	if responseCode(first) != 0 || !strings.Contains(first.Body.String(), `"revision":2`) {
+		t.Fatalf("first save: %s", first.Body.String())
+	}
+	stale := request(updated, workflowGraphHash(updated), definition.Revision)
+	if responseCode(stale) != http.StatusConflict {
+		t.Fatalf("stale revision save: %s", stale.Body.String())
 	}
 }
 

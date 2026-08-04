@@ -13,6 +13,7 @@
 - [交互式 AI 模型目录全量迁移](./specs/2026-07-21-interactive-ai-model-catalog-migration-design.md)：所有用户主动触发的文本、视觉与生图 AI 统一按能力选择模型目录记录。
 - [AI 图片创作工作台](./specs/2026-07-23-ai-image-studio-design.md)：独立画布、参考素材、受控模板、异步生成状态和私有图片历史。
 - [工作流节点目录与扩展顺序](./specs/2026-07-26-workflow-node-catalog-design.md)：服务端驱动的节点目录、Valley 内容/图片/知识节点优先级和通用节点对齐边界。
+- [工作流专用协作智能体](./specs/2026-08-04-workflow-collaboration-agent-design.md)：单一协作时间线、后台任务、服务端直接修改、冲突合并、持久撤销和统一智能体交互。
 - [Harness Engineering](./HARNESS_ENGINEERING.md)：AI coding agent 在本仓库中的上下文入口、工具边界、验证命令、评审回路和回归证据。
 - [架构决策指南](./ARCHITECTURE_GUIDE.md)：共享模块、跨应用复用、协议迁移和复杂状态协调的轻量判断准则。
 - [测试治理策略](./TESTING_STRATEGY.md)：新增改动的测试要求、历史测试债治理、运行时证据边界与覆盖率推进条件。
