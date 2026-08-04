@@ -49,6 +49,18 @@ func TestCopilotMessageUsesDefaultModelInsteadOfRequiringSelection(t *testing.T)
 	}
 }
 
+func TestCopilotMessageRejectsUnavailableSelectedModel(t *testing.T) {
+	router, _ := setupAIPlatformTestRouter(t)
+	request := httptest.NewRequest(http.MethodPost, "/ai/workbench/copilot/messages/stream", bytes.NewBufferString(`{"scope":"workbench","modelId":"999","message":"检查当前草稿"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if code := responseCode(response); code != http.StatusBadRequest {
+		t.Fatalf("code = %d, want 400; body = %s", code, response.Body.String())
+	}
+}
+
 func TestDefaultWorkbenchTextModelUsesAdminSortOrder(t *testing.T) {
 	_, db := setupAIPlatformTestRouter(t)
 	for _, item := range []model.AIModel{
@@ -65,6 +77,48 @@ func TestDefaultWorkbenchTextModelUsesAdminSortOrder(t *testing.T) {
 	}
 	if selected.ModelID != "first" {
 		t.Fatalf("selected %q, want first sorted model", selected.ModelID)
+	}
+	fallback, err := selectWorkbenchTextModel(db, "")
+	if err != nil {
+		t.Fatalf("select fallback text model: %v", err)
+	}
+	if fallback.ID != selected.ID {
+		t.Fatalf("fallback selected %s, want %s", fallback.ID, selected.ID)
+	}
+}
+
+func TestSelectWorkbenchTextModelUsesRequestedEnabledTextModel(t *testing.T) {
+	_, db := setupAIPlatformTestRouter(t)
+	first := model.AIModel{Provider: "siliconflow", ModelID: "first", DisplayName: "First", Capabilities: aimodel.EncodeStrings([]string{"text"}), Enabled: true, SortOrder: 10}
+	requested := model.AIModel{Provider: "siliconflow", ModelID: "requested", DisplayName: "Requested", Capabilities: aimodel.EncodeStrings([]string{"text"}), Enabled: true, SortOrder: 20}
+	for _, item := range []*model.AIModel{&first, &requested} {
+		if err := db.Create(item).Error; err != nil {
+			t.Fatalf("seed model: %v", err)
+		}
+	}
+
+	selected, err := selectWorkbenchTextModel(db, requested.ID.String())
+	if err != nil {
+		t.Fatalf("select requested text model: %v", err)
+	}
+	if selected.ID != requested.ID {
+		t.Fatalf("selected %s, want requested %s", selected.ID, requested.ID)
+	}
+}
+
+func TestSelectWorkbenchTextModelRejectsUnavailableRequestedModel(t *testing.T) {
+	_, db := setupAIPlatformTestRouter(t)
+	item := model.AIModel{Provider: "siliconflow", ModelID: "disabled", DisplayName: "Disabled", Capabilities: aimodel.EncodeStrings([]string{"text"}), Enabled: true}
+	if err := db.Create(&item).Error; err != nil {
+		t.Fatalf("seed disabled model: %v", err)
+	}
+	if err := db.Model(&item).Update("enabled", false).Error; err != nil {
+		t.Fatalf("disable model: %v", err)
+	}
+
+	_, err := selectWorkbenchTextModel(db, item.ID.String())
+	if !errors.Is(err, aimodel.ErrModelNotAvailable) {
+		t.Fatalf("error = %v, want unavailable model error", err)
 	}
 }
 

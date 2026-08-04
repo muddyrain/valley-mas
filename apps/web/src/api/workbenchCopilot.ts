@@ -182,12 +182,37 @@ export function cancelCopilotRun(runId: string): Promise<{ status: 'cancelling' 
   );
 }
 
+export function buildCopilotMessagePayload(
+  context: CopilotContext,
+  message: string,
+  sessionId: string,
+  modelId: string,
+  baseHash: string,
+) {
+  const selectedModelId = modelId.trim();
+  return {
+    scope: context.scope,
+    targetId: context.targetId || '',
+    sessionId,
+    message,
+    ...(selectedModelId ? { modelId: selectedModelId } : {}),
+    context: {
+      draft: context.draft,
+      selectedNodeId: context.selectedNodeId || '',
+      nodeLabels: context.nodeLabels || {},
+      runId: context.runId || '',
+      baseHash,
+    },
+  };
+}
+
 export async function streamCopilotMessage(
   context: CopilotContext,
   message: string,
   sessionId: string,
   handlers: { onEvent: (event: CopilotStreamEvent) => void; onReconnect?: () => void },
   signal?: AbortSignal,
+  modelId = '',
 ): Promise<void> {
   const token = useAuthStore.getState().token;
   const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -199,19 +224,9 @@ export async function streamCopilotMessage(
       Accept: 'text/event-stream',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({
-      scope: context.scope,
-      targetId: context.targetId || '',
-      sessionId,
-      message,
-      context: {
-        draft: context.draft,
-        selectedNodeId: context.selectedNodeId || '',
-        nodeLabels: context.nodeLabels || {},
-        runId: context.runId || '',
-        baseHash,
-      },
-    }),
+    body: JSON.stringify(
+      buildCopilotMessagePayload(context, message, sessionId, modelId, baseHash),
+    ),
     signal,
   });
   if (!isCopilotSSE(response)) throw new Error(await readCopilotStreamError(response));

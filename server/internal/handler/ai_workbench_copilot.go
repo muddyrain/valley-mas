@@ -86,6 +86,7 @@ type copilotMessageRequest struct {
 	Scope     string                `json:"scope"`
 	TargetID  string                `json:"targetId"`
 	SessionID string                `json:"sessionId"`
+	ModelID   string                `json:"modelId"`
 	Message   string                `json:"message"`
 	Context   copilotContextPayload `json:"context"`
 }
@@ -107,6 +108,14 @@ func defaultWorkbenchTextModel(db *gorm.DB) (model.AIModel, error) {
 		return model.AIModel{}, errors.New("no enabled text model")
 	}
 	return items[0], nil
+}
+
+func selectWorkbenchTextModel(db *gorm.DB, requestedID string) (model.AIModel, error) {
+	requestedID = strings.TrimSpace(requestedID)
+	if requestedID == "" {
+		return defaultWorkbenchTextModel(db)
+	}
+	return aimodel.FindEnabledModel(db, requestedID, "text")
 }
 
 func GetWorkbenchCopilotSession(c *gin.Context) {
@@ -218,6 +227,7 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	payload.Scope = strings.TrimSpace(payload.Scope)
 	payload.TargetID = strings.TrimSpace(payload.TargetID)
 	payload.SessionID = strings.TrimSpace(payload.SessionID)
+	payload.ModelID = strings.TrimSpace(payload.ModelID)
 	payload.Message = truncateAIAgentRunes(strings.TrimSpace(payload.Message), 4000)
 	if payload.Message == "" {
 		Error(c, http.StatusBadRequest, "请输入要讨论的内容")
@@ -228,14 +238,18 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 		Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	defaultModel, err := defaultWorkbenchTextModel(database.GetDB())
+	selectedModel, err := selectWorkbenchTextModel(database.GetDB(), payload.ModelID)
 	if err != nil {
+		if payload.ModelID != "" {
+			respondCatalogModelError(c, err)
+			return
+		}
 		Error(c, http.StatusServiceUnavailable, "当前没有可用的文本模型，请在模型目录启用并排序")
 		return
 	}
-	invocation, err := aimodel.ResolveInvocation(database.GetDB(), defaultModel.ID.String(), "text", copilotPlanningTimeout)
+	invocation, err := aimodel.ResolveInvocation(database.GetDB(), selectedModel.ID.String(), "text", copilotPlanningTimeout)
 	if err != nil {
-		aiusage.Record(aiusage.Entry{Feature: featureWorkbenchCopilot, Provider: "unknown", Model: defaultModel.ModelID, UserID: ownerID.String(), Status: aiusage.StatusFailed, ErrorMessage: err.Error()})
+		aiusage.Record(aiusage.Entry{Feature: featureWorkbenchCopilot, Provider: "unknown", Model: selectedModel.ModelID, UserID: ownerID.String(), Status: aiusage.StatusFailed, ErrorMessage: err.Error()})
 		respondCatalogModelError(c, err)
 		return
 	}

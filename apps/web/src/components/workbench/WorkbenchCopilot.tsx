@@ -28,6 +28,7 @@ import {
   streamCopilotMessage,
   updateCopilotProposal,
 } from '@/api/workbenchCopilot';
+import { ModelPicker } from '@/components/ai/ModelPicker';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -76,6 +77,7 @@ export const WorkbenchCopilot = memo(function WorkbenchCopilot({
   const [requestError, setRequestError] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [modelId, setModelId] = useState('');
   const controllerRef = useRef<AbortController | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const targetReady = isCopilotTargetReady(context.scope, context.targetId);
@@ -280,6 +282,7 @@ export const WorkbenchCopilot = memo(function WorkbenchCopilot({
           onReconnect: () => setActivity('正在恢复连接'),
         },
         controller.signal,
+        modelId,
       );
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -379,7 +382,16 @@ export const WorkbenchCopilot = memo(function WorkbenchCopilot({
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Badge variant="outline">AI</Badge>
+          <ModelPicker
+            value={modelId || undefined}
+            onValueChange={setModelId}
+            capability="text"
+            label="协作模型"
+            compact
+            compactLabel="模型："
+            compactTrigger
+            autoSelectFirst
+          />
           <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
             <PopoverTrigger
               render={
