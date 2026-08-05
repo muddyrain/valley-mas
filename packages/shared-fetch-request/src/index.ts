@@ -5,7 +5,8 @@ export interface ApiResponse<T = unknown> {
   errorCode?: string;
 }
 
-export interface ApiRequestInit extends RequestInit {
+export interface ApiRequestInit extends Omit<RequestInit, 'body'> {
+  body?: unknown;
   suppressErrorToast?: boolean;
   errorToastMessage?: string;
   retryOnTransientFailure?: boolean;
@@ -166,7 +167,7 @@ export function createFetchRequest<TError extends Error = Error>(
         response = await fetch(`${baseURL}${path}`, {
           headers: requestHeaders,
           credentials,
-          body: normalizedBody,
+          body: normalizedBody as BodyInit | null | undefined,
           ...init,
         });
       } catch (error) {
