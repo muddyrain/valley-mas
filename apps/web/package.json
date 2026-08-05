@@ -15,7 +15,8 @@
     "test:ai-workbench-sse": "node scripts/test-ai-workbench-sse.mjs",
     "test:workflow-variables": "node --experimental-strip-types scripts/test-workflow-variable-model.ts",
     "preview": "vite preview",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "check:coverage-surface": "node scripts/check-coverage-surface.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
@@ -29,13 +30,15 @@
     "@types/dagre": "^0.7.54",
     "@valley/browser-media": "workspace:*",
     "@valley/format-tools": "workspace:*",
+    "@valley/shared-utils": "workspace:*",
     "@valley/shared-format": "workspace:*",
-    "@valley/shared-request": "workspace:*",
+    "@valley/shared-request-web": "workspace:*",
     "@valley/shared-router": "workspace:*",
+    "@valley/devbox-inspector-runtime": "workspace:*",
+    "@valley/devbox-inspector-vite": "workspace:*",
     "@xyflow/react": "^12.11.1",
     "axios": "catalog:shared-runtime",
     "class-variance-authority": "^0.7.1",
-    "clsx": "catalog:shared-runtime",
     "cmdk": "^1.1.1",
     "dagre": "^0.8.5",
     "date-fns": "^4.4.0",
@@ -52,7 +55,6 @@
     "react-router-dom": "catalog:shared-runtime",
     "recharts": "3.8.0",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^2.6.1",
     "tw-animate-css": "^1.4.0",
     "unique-names-generator": "^4.7.1",
     "zustand": "catalog:shared-runtime"

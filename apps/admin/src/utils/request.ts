@@ -1,9 +1,9 @@
 import {
   type ApiResponse,
-  createHttpClient,
+  createWebHttpClient,
   type ErrorMessageResolver,
   type RequestConfig,
-} from '@valley/shared-request';
+} from '@valley/shared-request-web';
 import { message } from 'antd';
 
 export type { ApiResponse, RequestConfig };
@@ -38,10 +38,11 @@ const resolveErrorMessage: ErrorMessageResolver = (error, fallback) => {
   return fallback;
 };
 
-const http = createHttpClient({
+const http = createWebHttpClient({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 30000,
   withCredentials: true,
+  defaultSuppressErrorToast: false,
   getToken: () => localStorage.getItem('admin_token'),
   clearAuth: () => {
     localStorage.removeItem('admin_token');
