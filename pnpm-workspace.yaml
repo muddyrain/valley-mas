@@ -20,7 +20,7 @@ catalogs:
     vite-plugin-dts: 4.3.0
     vite-plugin-no-bundle: 4.0.0
     vite-plugin-svgr: 4.3.0
-    "@vitejs/plugin-react-swc": 3.7.0
+    "@vitejs/plugin-react-swc": 4.0.0
   tailwind-3:
     tailwindcss: ^3.4.17
     postcss: ^8.4.49
