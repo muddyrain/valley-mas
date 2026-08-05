@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -131,6 +132,28 @@ func DeleteWorkflowCollaborationAttachment(c *gin.Context) {
 		return
 	}
 	Success(c, gin.H{"deletedId": fmt.Sprint(attachmentID)})
+}
+
+func DownloadWorkflowCollaborationAttachment(c *gin.Context) {
+	userID, _, ok := currentUser(c)
+	if !ok {
+		return
+	}
+	workflowID, workflowErr := parsePathInt64(c, "id")
+	attachmentID, attachmentErr := parsePathInt64(c, "attachmentId")
+	if workflowErr != nil || attachmentErr != nil {
+		Error(c, http.StatusBadRequest, "无效的文件 ID")
+		return
+	}
+	var attachment model.WorkflowCollaborationAttachment
+	if err := database.GetDB().Where(
+		"id = ? AND workflow_id = ? AND user_id = ?", attachmentID, workflowID, userID,
+	).First(&attachment).Error; err != nil {
+		Error(c, http.StatusNotFound, "协作文件不存在")
+		return
+	}
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename*=UTF-8''%s", url.PathEscape(attachment.Name)))
+	c.Data(http.StatusOK, attachment.MimeType, attachment.SourceContent)
 }
 
 func resolveWorkflowCollaborationAttachments(

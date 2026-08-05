@@ -14,9 +14,11 @@ type scriptedBackend struct {
 	responses []BackendResponse
 	err       error
 	calls     int
+	toolsSeen [][]ToolDescriptor
 }
 
-func (b *scriptedBackend) Chat(_ context.Context, _ Spec, _ []Message, _ []ToolDescriptor) (BackendResponse, error) {
+func (b *scriptedBackend) Chat(_ context.Context, _ Spec, _ []Message, descriptors []ToolDescriptor) (BackendResponse, error) {
+	b.toolsSeen = append(b.toolsSeen, append([]ToolDescriptor(nil), descriptors...))
 	if b.err != nil {
 		return BackendResponse{}, b.err
 	}
@@ -31,6 +33,28 @@ func (b *scriptedBackend) Chat(_ context.Context, _ Spec, _ []Message, _ []ToolD
 	resp := b.responses[b.calls]
 	b.calls++
 	return resp, nil
+}
+
+func TestLocalLoopEmptyToolWhitelistDisablesTools(t *testing.T) {
+	tool := &countingTool{name: "query_traces", scope: "life-trace"}
+	backend := &scriptedBackend{responses: []BackendResponse{{
+		Message: Message{Role: RoleAssistant, Content: "done"},
+	}}}
+	loop := NewLocalLoop(backend, newTestRegistry(tool))
+
+	_, err := loop.Run(context.Background(), Spec{
+		Feature: "unit-test",
+		Tools:   []string{},
+	}, []Message{{Role: RoleUser, Content: "hi"}})
+	if err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+	if len(backend.toolsSeen) != 1 {
+		t.Fatalf("backend tool descriptor calls = %d, want 1", len(backend.toolsSeen))
+	}
+	if got := len(backend.toolsSeen[0]); got != 0 {
+		t.Fatalf("tool descriptors = %d, want 0 when Spec.Tools is empty", got)
+	}
 }
 
 // countingTool 记录被调用次数与最后一次参数。

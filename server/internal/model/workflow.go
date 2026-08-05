@@ -170,6 +170,7 @@ type WorkflowRun struct {
 	AppID             Int64String    `gorm:"index" json:"appId,omitempty"`
 	VersionID         Int64String    `gorm:"index" json:"versionId,omitempty"`
 	Status            string         `gorm:"size:20;not null;default:'running';index" json:"status"`
+	RunMode           string         `gorm:"size:16;not null;default:''" json:"runMode,omitempty"`
 	Inputs            string         `gorm:"type:json" json:"inputs,omitempty"`
 	GraphSnapshot     string         `gorm:"type:json;not null" json:"graphSnapshot"`
 	SourceRunID       *Int64String   `gorm:"index" json:"sourceRunId,omitempty"`

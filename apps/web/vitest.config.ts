@@ -19,6 +19,7 @@ const TESTED_CORE_SOURCES = {
     'src/components/ai/ConversationMessageBubble.tsx',
     'src/components/blog/BatchMarkdownImportDialog.tsx',
     'src/components/workbench/AIAgentCreateDialog.tsx',
+    'src/components/workflow/runSession.ts',
   ],
   // TODO: keep in sync with test surface; add/remove paths together with *.test.ts/tsx.
 } as const;

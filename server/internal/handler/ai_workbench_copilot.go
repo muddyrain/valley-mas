@@ -16,6 +16,7 @@ import (
 
 	"valley-server/internal/ai/agent"
 	"valley-server/internal/ai/tools"
+	"valley-server/internal/aiclient"
 	"valley-server/internal/aimodel"
 	"valley-server/internal/aiusage"
 	"valley-server/internal/database"
@@ -196,6 +197,10 @@ func CreateWorkbenchCopilotSession(c *gin.Context) {
 	}
 	payload.Scope = strings.TrimSpace(payload.Scope)
 	payload.TargetID = strings.TrimSpace(payload.TargetID)
+	if payload.Scope == "workflow" {
+		Error(c, http.StatusConflict, "工作流 AI 协作已迁移到专用时间线，旧会话仅支持读取")
+		return
+	}
 	ownerID := model.Int64String(userID)
 	if err := validateCopilotTarget(ownerID, payload.Scope, payload.TargetID); err != nil {
 		Error(c, http.StatusBadRequest, err.Error())
@@ -229,6 +234,10 @@ func StreamWorkbenchCopilotMessage(c *gin.Context) {
 	payload.SessionID = strings.TrimSpace(payload.SessionID)
 	payload.ModelID = strings.TrimSpace(payload.ModelID)
 	payload.Message = truncateAIAgentRunes(strings.TrimSpace(payload.Message), 4000)
+	if payload.Scope == "workflow" {
+		Error(c, http.StatusConflict, "工作流 AI 协作已迁移到专用后台任务，旧接口仅支持读取")
+		return
+	}
 	if payload.Message == "" {
 		Error(c, http.StatusBadRequest, "请输入要讨论的内容")
 		return
@@ -651,19 +660,26 @@ func runCopilotAgentStructured(ctx context.Context, userID model.Int64String, in
 	return runCopilotAgentStructuredWithImages(ctx, userID, invocation, systemPrompt, userPrompt, nil, payload, draft, target, validate)
 }
 
-func runCopilotAgentStructuredWithImages(ctx context.Context, userID model.Int64String, invocation aimodel.Invocation, systemPrompt, userPrompt string, images []string, payload copilotMessageRequest, draft any, target any, validate func() error) error {
-	registry := copilotToolRegistry(userID, payload, draft)
-	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
+func newCopilotAgentSpec(provider, modelID, systemPrompt, scope string) agent.Spec {
 	spec := agent.Spec{
-		Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, System: systemPrompt,
+		Provider: provider, Model: modelID, System: systemPrompt,
 		Tools:    []string{"workbench.current", "workflow.capabilities", "workflow.runSummary", "workflow.validateDraft"},
 		MaxSteps: 3, MaxTokens: 4096, Temperature: 0.2, Feature: featureWorkbenchCopilot,
 	}
-	if payload.Scope == "workflow" {
-		spec.MaxTokens = 1500
+	if scope == "workflow" {
+		// Workflow collaboration already injects the complete draft, node labels,
+		// capability catalog and recent history. Advertising the same read-only
+		// tools turns one edit into a slow multi-call loop on tool-happy models.
+		spec.Tools = nil
 		spec.MaxSteps = 1
-		spec.Tools = []string{"workbench.current", "workflow.capabilities", "workflow.runSummary"}
 	}
+	return spec
+}
+
+func runCopilotAgentStructuredWithImages(ctx context.Context, userID model.Int64String, invocation aimodel.Invocation, systemPrompt, userPrompt string, images []string, payload copilotMessageRequest, draft any, target any, validate func() error) error {
+	registry := copilotToolRegistry(userID, payload, draft)
+	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
+	spec := newCopilotAgentSpec(invocation.Provider.Provider, invocation.Model.ModelID, systemPrompt, payload.Scope)
 	if !aimodel.HasCapabilities(invocation.Model, []string{"tool_call"}) {
 		spec.Tools = nil
 	}
@@ -689,7 +705,7 @@ func completeCopilotStructuredResult(
 	if runErr != nil {
 		return runErr
 	}
-	outputErr := decodeStructuredWorkbenchOutput(result.Reply, target)
+	outputErr := decodeCopilotStructuredOutput(result.Reply, target)
 	if outputErr == nil && validate != nil {
 		outputErr = validate()
 	}
@@ -704,11 +720,34 @@ func completeCopilotStructuredResult(
 	if repairErr != nil {
 		return repairErr
 	}
-	if err := decodeStructuredWorkbenchOutput(repaired.Reply, target); err != nil {
+	if err := decodeCopilotStructuredOutput(repaired.Reply, target); err != nil {
 		return err
 	}
 	if validate != nil {
 		return validate()
+	}
+	return nil
+}
+
+// decodeCopilotStructuredOutput keeps the generic structured decoder strict,
+// but lets workflow Copilot ignore harmless model-authored metadata. Typed
+// operation fields and the resulting Graph are still validated before apply.
+func decodeCopilotStructuredOutput(raw string, target any) error {
+	strictErr := decodeStructuredWorkbenchOutput(raw, target)
+	if strictErr == nil {
+		return nil
+	}
+	envelope, ok := target.(*copilotAIEnvelope)
+	if !ok || envelope == nil {
+		return strictErr
+	}
+	object := strings.TrimSpace(aiclient.ExtractJSONObject(raw))
+	if object == "" {
+		return strictErr
+	}
+	*envelope = copilotAIEnvelope{}
+	if err := json.Unmarshal([]byte(object), envelope); err != nil {
+		return strictErr
 	}
 	return nil
 }
@@ -778,6 +817,15 @@ func UpdateWorkbenchCopilotProposal(c *gin.Context) {
 	if c.ShouldBindJSON(&payload) != nil || (payload.Status != "accepted" && payload.Status != "rejected" && payload.Status != "reverted") {
 		Error(c, http.StatusBadRequest, "提案状态无效")
 		return
+	}
+	var proposal model.AIWorkbenchChangeProposal
+	if err := database.GetDB().Where("id = ? AND user_id = ?", id, userID).First(&proposal).Error; err == nil {
+		var session model.AIWorkbenchCopilotSession
+		_ = database.GetDB().Select("scope").First(&session, proposal.SessionID).Error
+		if session.Scope == "workflow" {
+			Error(c, http.StatusConflict, "旧版工作流提案已归档，不能再接受、拒绝或撤销")
+			return
+		}
 	}
 	now := time.Now()
 	query := database.GetDB().Model(&model.AIWorkbenchChangeProposal{}).Where("id = ? AND user_id = ?", id, userID)

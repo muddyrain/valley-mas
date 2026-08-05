@@ -8,6 +8,7 @@ interface WorkflowWorkspacePanelProps {
   onActiveTabChange: (tab: WorkflowWorkspaceTab) => void;
   copilotContent: ReactNode;
   nodeContent: ReactNode;
+  aiUnread?: boolean;
 }
 
 export const WorkflowWorkspacePanel = memo(function WorkflowWorkspacePanel({
@@ -15,6 +16,7 @@ export const WorkflowWorkspacePanel = memo(function WorkflowWorkspacePanel({
   onActiveTabChange,
   copilotContent,
   nodeContent,
+  aiUnread = false,
 }: WorkflowWorkspacePanelProps) {
   return (
     <div className="h-full border-l border-border bg-card">
@@ -29,6 +31,12 @@ export const WorkflowWorkspacePanel = memo(function WorkflowWorkspacePanel({
           </TabsTrigger>
           <TabsTrigger value="ai" className="flex-1">
             AI 协作
+            {aiUnread ? (
+              <>
+                <span className="ml-1.5 size-1.5 rounded-full bg-primary" aria-hidden="true" />
+                <span className="sr-only">有新的 AI 协作状态</span>
+              </>
+            ) : null}
           </TabsTrigger>
         </TabsList>
         <TabsContent

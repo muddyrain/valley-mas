@@ -517,6 +517,12 @@ export default function WorkflowEditorPage() {
     };
   } | null>(null);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkflowWorkspaceTab>('node');
+  const [workflowAIUnread, setWorkflowAIUnread] = useState(false);
+  const [workflowAIDraftRequest, setWorkflowAIDraftRequest] = useState<{
+    id: string;
+    prompt: string;
+    context: { selectedNodeId?: string; nodeLabels?: Record<string, string> };
+  }>();
   const [activePropertyTab, setActivePropertyTab] = useState<PropertyPanelTab>('config');
   const [workflowName, setWorkflowName] = useState('未命名工作流');
   const [workflowDescription, setWorkflowDescription] = useState('');
@@ -2241,11 +2247,16 @@ export default function WorkflowEditorPage() {
       const nextEdges = Array.isArray(graph.edges) ? normalizeWorkflowEdges(graph.edges) : [];
       const expanded = expandLoopCanvas(nextNodes, nextEdges);
       const migratedNodes = migrateLLMPromptBindings(expanded.nodes, expanded.edges);
+      const previousGraphSnapshot = serializeWorkflowGraph(
+        workflowStateRef.current.nodes,
+        workflowStateRef.current.edges,
+      );
+      const nextGraphSnapshot = serializeWorkflowGraph(migratedNodes, expanded.edges);
       const localRevision = saveRevisionRef.current;
       workflowStateRef.current = { name: data.name, nodes: migratedNodes, edges: expanded.edges };
       workflowSnapshotRef.current = {
         name: data.name,
-        graph: serializeWorkflowGraph(migratedNodes, expanded.edges),
+        graph: nextGraphSnapshot,
         revision: localRevision,
       };
       persistedRevisionRef.current = localRevision;
@@ -2256,6 +2267,9 @@ export default function WorkflowEditorPage() {
       setWorkflowDescription(data.description || '');
       setNodes(migratedNodes);
       setEdges(expanded.edges);
+      if (nextGraphSnapshot !== previousGraphSnapshot) {
+        dispatchRunSession({ type: 'graphChanged' });
+      }
       setLastAutoSavedAt(data.updatedAt || new Date().toISOString());
       setSaveStatus('saved');
       return true;
@@ -2978,6 +2992,9 @@ export default function WorkflowEditorPage() {
         suggestions={copilotSuggestions}
         onBeforeSubmit={() => persistLatestWorkflow({ force: true })}
         onWorkflowUpdated={applyCollaborationWorkflowUpdate}
+        visible={activeWorkspaceTab === 'ai'}
+        draftRequest={workflowAIDraftRequest}
+        onUnreadChange={setWorkflowAIUnread}
         onLocateNode={(nodeId) => {
           if (nodeId) focusValidationNode(nodeId);
           else requestFitView();
@@ -2986,11 +3003,13 @@ export default function WorkflowEditorPage() {
     ),
     [
       applyCollaborationWorkflowUpdate,
+      activeWorkspaceTab,
       copilotContext,
       copilotSuggestions,
       focusValidationNode,
       persistLatestWorkflow,
       requestFitView,
+      workflowAIDraftRequest,
     ],
   );
 
@@ -3008,6 +3027,21 @@ export default function WorkflowEditorPage() {
         activeTab={activePropertyTab}
         onActiveTabChange={setActivePropertyTab}
         isRunning={isRunning}
+        onAskAI={
+          selectedNode
+            ? () => {
+                setWorkflowAIDraftRequest({
+                  id: `${selectedNode.id}-${Date.now()}`,
+                  prompt: `请检查并优化节点「${selectedNode.data.label}」的配置。`,
+                  context: {
+                    selectedNodeId: selectedNode.id,
+                    nodeLabels: { ...copilotNodeLabels },
+                  },
+                });
+                setActiveWorkspaceTab('ai');
+              }
+            : undefined
+        }
       />
     ),
     [
@@ -3018,6 +3052,7 @@ export default function WorkflowEditorPage() {
       onUpdateNode,
       runSession.nodes,
       selectedNode,
+      copilotNodeLabels,
       validationGraph.edges,
       validationGraph.nodes,
       visibleValidationErrors,
@@ -3029,11 +3064,12 @@ export default function WorkflowEditorPage() {
       <WorkflowWorkspacePanel
         activeTab={activeWorkspaceTab}
         onActiveTabChange={setActiveWorkspaceTab}
+        aiUnread={workflowAIUnread}
         copilotContent={copilot}
         nodeContent={propertyPanel}
       />
     ),
-    [activeWorkspaceTab, copilot, propertyPanel],
+    [activeWorkspaceTab, copilot, propertyPanel, workflowAIUnread],
   );
   const runPanel = (
     <RunPanel

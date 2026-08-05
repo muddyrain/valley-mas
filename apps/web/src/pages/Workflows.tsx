@@ -56,6 +56,17 @@ function formatWorkflowDate(value: string) {
   }).format(new Date(value));
 }
 
+function collaborationStatusLabel(status: WorkflowItem['collaborationStatus']) {
+  if (status === 'queued') return 'AI 排队中';
+  if (status === 'running') return 'AI 处理中';
+  if (status === 'waiting_approval') return 'AI 待确认';
+  if (status === 'succeeded') return 'AI 已完成';
+  if (status === 'conflicted') return 'AI 有冲突';
+  if (status === 'failed') return 'AI 失败';
+  if (status === 'cancelled') return 'AI 已停止';
+  return '';
+}
+
 export default function WorkflowsPage({ embedded = false }: { embedded?: boolean }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
@@ -98,10 +109,23 @@ export default function WorkflowsPage({ embedded = false }: { embedded?: boolean
   };
 
   useEffect(() => {
-    listWorkflows({ page: 1, pageSize: 20 })
-      .then((data) => setWorkflows(data.list))
-      .catch(() => toast.error('加载工作流列表失败'))
-      .finally(() => setLoading(false));
+    let active = true;
+    const load = async (showError: boolean) => {
+      try {
+        const data = await listWorkflows({ page: 1, pageSize: 20 });
+        if (active) setWorkflows(data.list);
+      } catch {
+        if (showError) toast.error('加载工作流列表失败');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    void load(true);
+    const timer = window.setInterval(() => void load(false), 5000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, []);
 
   useEffect(
@@ -329,12 +353,17 @@ export default function WorkflowsPage({ embedded = false }: { embedded?: boolean
                           <TableCell className="text-muted-foreground">
                             {getNodeCount(workflow)}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="space-x-1.5">
                             <Badge
                               variant={workflow.status === 'published' ? 'default' : 'secondary'}
                             >
                               {workflow.status === 'published' ? '已发布' : '草稿'}
                             </Badge>
+                            {workflow.collaborationStatus ? (
+                              <Badge variant="outline">
+                                {collaborationStatusLabel(workflow.collaborationStatus)}
+                              </Badge>
+                            ) : null}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {formatWorkflowDate(workflow.updatedAt)}
@@ -384,6 +413,11 @@ export default function WorkflowsPage({ embedded = false }: { embedded?: boolean
                         <Badge variant={workflow.status === 'published' ? 'default' : 'secondary'}>
                           {workflow.status === 'published' ? '已发布' : '草稿'}
                         </Badge>
+                        {workflow.collaborationStatus ? (
+                          <Badge variant="outline">
+                            {collaborationStatusLabel(workflow.collaborationStatus)}
+                          </Badge>
+                        ) : null}
                         <span className="ml-auto">{formatWorkflowDate(workflow.updatedAt)}</span>
                       </div>
                     </article>

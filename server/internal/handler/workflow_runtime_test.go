@@ -82,8 +82,10 @@ func setupWorkflowRuntimeTestRouter(t *testing.T) (*gin.Engine, model.Workflow) 
 	auth.PUT("/:id", AdminUpdateWorkflow)
 	auth.POST("/:id/publish", PublishWorkflowVersion)
 	auth.GET("/:id/collaboration", GetWorkflowCollaboration)
+	auth.GET("/:id/collaboration/archived-sessions/:sessionId", GetArchivedWorkflowCollaborationSession)
 	auth.POST("/:id/collaboration/tasks", CreateWorkflowCollaborationTask)
 	auth.POST("/:id/collaboration/attachments", UploadWorkflowCollaborationAttachment)
+	auth.GET("/:id/collaboration/attachments/:attachmentId", DownloadWorkflowCollaborationAttachment)
 	auth.DELETE("/:id/collaboration/attachments/:attachmentId", DeleteWorkflowCollaborationAttachment)
 	auth.GET("/:id/collaboration/tasks/:taskId", GetWorkflowCollaborationTask)
 	auth.POST("/:id/collaboration/tasks/:taskId/cancel", CancelWorkflowCollaborationTask)
@@ -1084,11 +1086,206 @@ func TestRetryWorkflowRunCreatesNewRunFromSnapshot(t *testing.T) {
 	if err := database.DB.Where("workflow_id = ?", definition.ID).Order("created_at ASC").Find(&runs).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(runs) != 2 || runs[1].SourceRunID == nil || *runs[1].SourceRunID != source.ID {
+	if len(runs) != 2 || runs[1].SourceRunID == nil || *runs[1].SourceRunID != source.ID || runs[1].RunMode != workflowRunModeRetry {
 		t.Fatalf("runs=%+v", runs)
 	}
 	if runs[1].GraphSnapshot != source.GraphSnapshot {
 		t.Fatalf("retry must preserve graph snapshot: source=%s retry=%s", source.GraphSnapshot, runs[1].GraphSnapshot)
+	}
+}
+
+func TestGetWorkflowRunMergesNodeSnapshotsAcrossResumeChain(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	now := time.Now()
+	root := model.WorkflowRun{
+		WorkflowID:    definition.ID,
+		UserID:        101,
+		Status:        string(workflow.StatusFailed),
+		RunMode:       "run",
+		Inputs:        `{}`,
+		GraphSnapshot: definition.Graph,
+		Result:        `{}`,
+		StartedAt:     now,
+	}
+	if err := database.DB.Create(&root).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Create(&[]model.WorkflowNodeRun{
+		{
+			WorkflowRunID: root.ID,
+			NodeID:        "start",
+			NodeType:      "start",
+			Status:        string(workflow.StatusSucceeded),
+			Input:         `{}`,
+			Output:        `{"title":"kept"}`,
+			StartedAt:     now,
+		},
+		{
+			WorkflowRunID: root.ID,
+			NodeID:        "request",
+			NodeType:      "http",
+			Status:        string(workflow.StatusFailed),
+			Input:         `{}`,
+			Output:        `{}`,
+			ErrorCode:     "FIRST_ATTEMPT_FAILED",
+			StartedAt:     now.Add(time.Second),
+		},
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	rootID := root.ID
+	middle := model.WorkflowRun{
+		WorkflowID:    definition.ID,
+		UserID:        101,
+		Status:        string(workflow.StatusFailed),
+		RunMode:       "resume",
+		Inputs:        `{}`,
+		GraphSnapshot: definition.Graph,
+		SourceRunID:   &rootID,
+		Result:        `{}`,
+		StartedAt:     now.Add(2 * time.Second),
+	}
+	if err := database.DB.Create(&middle).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Create(&model.WorkflowNodeRun{
+		WorkflowRunID: middle.ID,
+		NodeID:        "request",
+		NodeType:      "http",
+		Status:        string(workflow.StatusSucceeded),
+		Input:         `{}`,
+		Output:        `{"status":200}`,
+		StartedAt:     now.Add(3 * time.Second),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	middleID := middle.ID
+	latest := model.WorkflowRun{
+		WorkflowID:    definition.ID,
+		UserID:        101,
+		Status:        string(workflow.StatusSucceeded),
+		RunMode:       "resume",
+		Inputs:        `{}`,
+		GraphSnapshot: definition.Graph,
+		SourceRunID:   &middleID,
+		Result:        `{}`,
+		StartedAt:     now.Add(4 * time.Second),
+	}
+	if err := database.DB.Create(&latest).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Create(&model.WorkflowNodeRun{
+		WorkflowRunID: latest.ID,
+		NodeID:        "end",
+		NodeType:      "end",
+		Status:        string(workflow.StatusSucceeded),
+		Input:         `{}`,
+		Output:        `{"title":"kept"}`,
+		StartedAt:     now.Add(5 * time.Second),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/workflows/"+definition.ID.String()+"/runs/"+latest.ID.String(), nil)
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if responseCode(recorder) != 0 {
+		t.Fatalf("body=%s", recorder.Body.String())
+	}
+	var response struct {
+		Data struct {
+			Nodes []model.WorkflowNodeRun `json:"nodes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Data.Nodes) != 3 {
+		t.Fatalf("nodes=%+v, want snapshots for all three resume-chain nodes", response.Data.Nodes)
+	}
+	byNodeID := make(map[string]model.WorkflowNodeRun, len(response.Data.Nodes))
+	for _, node := range response.Data.Nodes {
+		byNodeID[node.NodeID] = node
+	}
+	if byNodeID["start"].Status != string(workflow.StatusSucceeded) {
+		t.Fatalf("start=%+v, want root snapshot", byNodeID["start"])
+	}
+	if byNodeID["request"].Status != string(workflow.StatusSucceeded) || byNodeID["request"].ErrorCode != "" {
+		t.Fatalf("request=%+v, want latest attempt to replace the root failure", byNodeID["request"])
+	}
+	if byNodeID["end"].Status != string(workflow.StatusSucceeded) {
+		t.Fatalf("end=%+v, want latest snapshot", byNodeID["end"])
+	}
+}
+
+func TestGetWorkflowRunDoesNotMergeNodeSnapshotsFromFullRetry(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	now := time.Now()
+	source := model.WorkflowRun{
+		WorkflowID:    definition.ID,
+		UserID:        101,
+		Status:        string(workflow.StatusFailed),
+		RunMode:       "run",
+		Inputs:        `{}`,
+		GraphSnapshot: definition.Graph,
+		Result:        `{}`,
+		StartedAt:     now,
+	}
+	if err := database.DB.Create(&source).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Create(&[]model.WorkflowNodeRun{
+		{WorkflowRunID: source.ID, NodeID: "start", NodeType: "start", Status: string(workflow.StatusSucceeded), StartedAt: now},
+		{WorkflowRunID: source.ID, NodeID: "end", NodeType: "end", Status: string(workflow.StatusFailed), StartedAt: now.Add(time.Second)},
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	sourceID := source.ID
+	retry := model.WorkflowRun{
+		WorkflowID:    definition.ID,
+		UserID:        101,
+		Status:        string(workflow.StatusFailed),
+		RunMode:       "retry",
+		Inputs:        `{}`,
+		GraphSnapshot: definition.Graph,
+		SourceRunID:   &sourceID,
+		Result:        `{}`,
+		StartedAt:     now.Add(2 * time.Second),
+	}
+	if err := database.DB.Create(&retry).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Create(&model.WorkflowNodeRun{
+		WorkflowRunID: retry.ID,
+		NodeID:        "start",
+		NodeType:      "start",
+		Status:        string(workflow.StatusFailed),
+		StartedAt:     now.Add(3 * time.Second),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/workflows/"+definition.ID.String()+"/runs/"+retry.ID.String(), nil)
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if responseCode(recorder) != 0 {
+		t.Fatalf("body=%s", recorder.Body.String())
+	}
+	var response struct {
+		Data struct {
+			Nodes []model.WorkflowNodeRun `json:"nodes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Data.Nodes) != 1 || response.Data.Nodes[0].NodeID != "start" || response.Data.Nodes[0].Status != string(workflow.StatusFailed) {
+		t.Fatalf("nodes=%+v, full retry must expose only its own attempt", response.Data.Nodes)
 	}
 }
 
@@ -1130,7 +1327,7 @@ func TestResumeWorkflowRunRetriesOnlyFailedNode(t *testing.T) {
 	if err := database.DB.Where("workflow_id = ?", definition.ID).Order("created_at ASC").Find(&runs).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(runs) != 2 || runs[1].Status != string(workflow.StatusFailed) || runs[1].SourceRunID == nil || *runs[1].SourceRunID != source.ID {
+	if len(runs) != 2 || runs[1].Status != string(workflow.StatusFailed) || runs[1].SourceRunID == nil || *runs[1].SourceRunID != source.ID || runs[1].RunMode != workflowRunModeResume {
 		t.Fatalf("unexpected resumed runs: %+v", runs)
 	}
 	resumedGraph, err := decodeWorkflowGraph(runs[1].GraphSnapshot)

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"valley-server/internal/ai/agent"
 	"valley-server/internal/aiclient"
 	"valley-server/internal/aimodel"
 	"valley-server/internal/database"
@@ -21,6 +22,21 @@ import (
 )
 
 const workflowCollaborationPollInterval = 2 * time.Second
+
+func workflowCollaborationSystemPrompt() string {
+	return `你是 Valley 工作流专用协作智能体。严格只输出 JSON，字段只能是 mode、message、targetType、questions、operations、workflow、agent。mode 只能是 answer、clarify、proposal。修改工作流时 targetType 必须是 workflow，proposal 只能返回 operations，不得返回完整候选图。operations 只能使用 startInput.upsert、startInput.remove、node.insert、node.update、node.remove、edge.connect、edge.disconnect。你已收到完整草稿、节点名称、能力目录和最近对话，直接生成修改，不要调用工具。节点不唯一时先澄清；不得运行、发布或修改触发器。草稿修改必须保持 Graph v4 有效，优先局部布局。tool 节点的 config.capabilityId 必须逐字使用能力目录中的真实 ID，不得编造。`
+}
+
+func workflowCollaborationOperationContract() string {
+	return `每个 operation 只使用对应字段：
+- startInput.upsert: {"type":"startInput.upsert","inputName":"变量名","input":{"type":"string","required":false}}
+- startInput.remove: {"type":"startInput.remove","inputName":"变量名"}
+- node.insert: {"type":"node.insert","afterNodeId":"上游节点ID","beforeNodeId":"可选下游节点ID","node":{"id":"新且唯一的ID","type":"llm|template|tool|其他目录节点类型","label":"节点名称","position":{"x":0,"y":0},"config":{}}}。优先使用 afterNodeId/beforeNodeId 自动重连，不要额外断开并重建同一路径。
+- node.update: {"type":"node.update","nodeId":"已有节点ID","patch":{"label":"可选新名称","config":{"待修改字段":"新值"}}}
+- node.remove: {"type":"node.remove","nodeId":"已有节点ID"}
+- edge.connect/edge.disconnect: {"type":"edge.connect","edge":{"source":"上游节点ID","sourceHandle":"output","target":"下游节点ID","targetHandle":"input"}}
+LLM 节点 config 至少包含 prompt，可通过 inputs 与 inputTypes 绑定上游变量，例如 {"inputs":{"sourceTitle":"{{parse.output.title}}"},"inputTypes":{"sourceTitle":"string"},"systemPrompt":"规范文章标题","prompt":"原标题：{{sourceTitle}}"}。prompt 和 systemPrompt 只能引用本节点 inputs 的短名称，不得直接引用 {{上游节点.output.字段}}。tool 节点 config 必须包含能力目录中的 capabilityId 和对应 inputs。不得输出注释、占位符、额外字段或完整 workflow。`
+}
 
 var (
 	workflowCollaborationWorkerOnce sync.Once
@@ -209,7 +225,7 @@ func executeWorkflowCollaborationTask(parent context.Context, db *gorm.DB, task 
 	historyJSON := workflowCollaborationHistoryJSON(db, task)
 	capabilities, _ := json.Marshal(compactCopilotCapabilities(workflowRuntimeRegistry()))
 	labelsJSON, _ := json.Marshal(payload.Context.NodeLabels)
-	systemPrompt := `你是 Valley 工作流专用协作智能体。严格只输出 JSON，字段只能是 mode、message、targetType、questions、operations、workflow、agent。mode 只能是 answer、clarify、proposal。修改工作流时 targetType 必须是 workflow，proposal 只能返回 operations，不得返回完整候选图。operations 只能使用 startInput.upsert、startInput.remove、node.insert、node.update、node.remove、edge.connect、edge.disconnect。节点不唯一或存在高风险意图时先澄清；不得运行、发布或修改触发器。草稿修改必须保持 Graph v4 有效，优先局部布局。`
+	systemPrompt := workflowCollaborationSystemPrompt()
 	if payload.ActiveSkillID != "" {
 		skillInstructions, skillErr := resolveAISkillRuntimeInstructions(db, task.UserID, []string{payload.ActiveSkillID})
 		if skillErr != nil {
@@ -222,7 +238,7 @@ func executeWorkflowCollaborationTask(parent context.Context, db *gorm.DB, task 
 	if attachmentContext := workflowCollaborationAttachmentContext(attachments); attachmentContext != "" {
 		systemPrompt = strings.TrimSpace(systemPrompt + "\n\n以下是用户本轮明确附加的文件内容。生成或修改工作流时应结合这些内容：\n" + attachmentContext)
 	}
-	userPrompt := fmt.Sprintf("工作流 ID：%s\n选中节点：%s\n节点名称映射：%s\n能力目录：%s\n上下文重置后的最近对话：%s\n任务开始时草稿：%s\n\n用户消息：%s", task.WorkflowID, payload.Context.SelectedNodeID, labelsJSON, capabilities, historyJSON, draftJSON, payload.Message)
+	userPrompt := fmt.Sprintf("工作流 ID：%s\n选中节点：%s\n节点名称映射：%s\n能力目录：%s\noperation 契约：\n%s\n上下文重置后的最近对话：%s\n任务开始时草稿：%s\n\n用户消息：%s", task.WorkflowID, payload.Context.SelectedNodeID, labelsJSON, capabilities, workflowCollaborationOperationContract(), historyJSON, draftJSON, payload.Message)
 	_ = db.Model(task).Updates(map[string]any{"progress": 25, "status_message": "正在理解需求"}).Error
 
 	var envelope copilotAIEnvelope
@@ -242,9 +258,9 @@ func executeWorkflowCollaborationTask(parent context.Context, db *gorm.DB, task 
 			return cancelWorkflowCollaborationTask(db, task)
 		}
 		if errors.Is(err, context.DeadlineExceeded) {
-			return failWorkflowCollaborationTask(db, task, "WORKFLOW_TASK_TIMEOUT", "AI 协作超时", err)
+			return failWorkflowCollaborationTask(db, task, "WORKFLOW_TASK_TIMEOUT", workflowCollaborationModelFailureMessage(err), err)
 		}
-		return failWorkflowCollaborationTask(db, task, "WORKFLOW_TASK_FAILED", "AI 未返回可用的工作流变更", err)
+		return failWorkflowCollaborationTask(db, task, "WORKFLOW_TASK_FAILED", workflowCollaborationModelFailureMessage(err), err)
 	}
 
 	if envelope.Mode == "proposal" {
@@ -279,6 +295,20 @@ func executeWorkflowCollaborationTask(parent context.Context, db *gorm.DB, task 
 	}
 	createWorkflowCollaborationNotification(db, task, "succeeded", envelope.Message)
 	return nil
+}
+
+func workflowCollaborationModelFailureMessage(err error) string {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "模型响应超时。画布没有变化，请重试或换个模型。"
+	}
+	if errors.Is(err, agent.ErrMaxStepsExceeded) {
+		return "AI 已读取工作流，但没有完成修改。画布没有变化，请重试或换个模型。"
+	}
+	if isCopilotValidationError(err) || strings.Contains(strings.ToLower(err.Error()), "structured") ||
+		strings.Contains(err.Error(), "结构化输出") || strings.Contains(err.Error(), "JSON") {
+		return "AI 生成的修改格式不完整。画布没有变化，请重试或换个模型。"
+	}
+	return "模型调用失败。画布没有变化，请重试或换个模型。"
 }
 
 func selectWorkflowCollaborationModel(db *gorm.DB, requestedID, capability string) (model.AIModel, error) {

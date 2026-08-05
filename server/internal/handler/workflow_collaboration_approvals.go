@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -27,22 +28,37 @@ func workflowCollaborationRequestedAction(message string) string {
 		return ""
 	}
 	if strings.Contains(normalized, "触发器") || strings.Contains(normalized, "trigger") {
-		if strings.Contains(normalized, "停用") || strings.Contains(normalized, "禁用") || strings.Contains(normalized, "disable") {
+		if containsWorkflowActionRequest(normalized, "停用", "禁用", "disable") {
 			return "triggers.disable"
 		}
-		if strings.Contains(normalized, "启用") || strings.Contains(normalized, "开启") || strings.Contains(normalized, "enable") {
+		if containsWorkflowActionRequest(normalized, "启用", "开启", "enable") {
 			return "triggers.enable"
 		}
 	}
-	if (strings.Contains(normalized, "发布") || strings.Contains(normalized, "publish")) &&
-		!strings.Contains(normalized, "发布节点") {
+	if containsWorkflowActionRequest(normalized, "发布", "publish") &&
+		!strings.Contains(normalized, "节点") {
 		return "publish"
 	}
-	if strings.Contains(normalized, "试运行") || strings.Contains(normalized, "运行当前工作流") ||
-		strings.Contains(normalized, "运行这个工作流") || strings.Contains(normalized, "runworkflow") {
+	if containsWorkflowActionRequest(normalized, "试运行", "运行当前工作流", "运行这个工作流", "runworkflow") {
 		return "run"
 	}
 	return ""
+}
+
+func containsWorkflowActionRequest(message string, actions ...string) bool {
+	prefixes := []string{"请", "帮我", "现在", "立即", "直接", "确认", "/"}
+	for _, action := range actions {
+		for _, prefix := range prefixes {
+			if strings.Contains(message, prefix+action) {
+				return true
+			}
+		}
+		if strings.HasPrefix(message, action+"当前") || strings.HasPrefix(message, action+"这个") ||
+			message == action+"触发器" {
+			return true
+		}
+	}
+	return false
 }
 
 func handleWorkflowCollaborationRequestedAction(db *gorm.DB, task *model.WorkflowCollaborationTask, action string) error {
@@ -158,19 +174,35 @@ func DecideWorkflowCollaborationApproval(c *gin.Context) {
 		if approval.Status != "pending" || task.Status != "waiting_approval" {
 			return errWorkflowCollaborationApprovalDecided
 		}
-		if err := tx.Model(&approval).Updates(map[string]any{
+		approvalResult := tx.Model(&model.WorkflowCollaborationApproval{}).
+			Where("id = ? AND status = ?", approval.ID, "pending").Updates(map[string]any{
 			"status": request.Decision, "note": truncateAIAgentRunes(strings.TrimSpace(request.Note), 500), "decided_at": &now,
-		}).Error; err != nil {
-			return err
+		})
+		if approvalResult.Error != nil {
+			return approvalResult.Error
 		}
+		if approvalResult.RowsAffected != 1 {
+			return errWorkflowCollaborationApprovalDecided
+		}
+		var taskResult *gorm.DB
 		if request.Decision == "approved" {
-			return tx.Model(&task).Updates(map[string]any{
+			taskResult = tx.Model(&model.WorkflowCollaborationTask{}).
+				Where("id = ? AND status = ?", task.ID, "waiting_approval").Updates(map[string]any{
 				"status": "queued", "progress": 0, "status_message": "已确认，等待执行", "started_at": nil,
-			}).Error
+			})
+		} else {
+			taskResult = tx.Model(&model.WorkflowCollaborationTask{}).
+				Where("id = ? AND status = ?", task.ID, "waiting_approval").Updates(map[string]any{
+				"status": "cancelled", "progress": 100, "status_message": "已拒绝", "finished_at": &now,
+			})
 		}
-		return tx.Model(&task).Updates(map[string]any{
-			"status": "cancelled", "progress": 100, "status_message": "已拒绝", "finished_at": &now,
-		}).Error
+		if taskResult.Error != nil {
+			return taskResult.Error
+		}
+		if taskResult.RowsAffected != 1 {
+			return errWorkflowCollaborationApprovalDecided
+		}
+		return nil
 	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		Error(c, http.StatusNotFound, "确认记录不存在")
@@ -223,7 +255,7 @@ func publishOwnedWorkflow(db *gorm.DB, userID, workflowID model.Int64String) err
 			return err
 		}
 		if err := validateWorkflowDraftForSave(tx, definition.Graph, int64(userID), int64(workflowID)); err != nil {
-			return err
+			return fmt.Errorf("%w: %v", errWorkflowDraftInvalid, err)
 		}
 		app, version, err := syncWorkflowAIApp(tx, definition)
 		if err != nil {
@@ -265,10 +297,15 @@ func runOwnedWorkflowForCollaboration(db *gorm.DB, userID, workflowID model.Int6
 	if err := validateSubworkflowReferences(db, graph, userID, workflowID, map[string]bool{}, &budget); err != nil {
 		return "", err
 	}
+	var requestBody bytes.Buffer
+	multipartWriter := multipart.NewWriter(&requestBody)
+	if err := multipartWriter.Close(); err != nil {
+		return "", err
+	}
 	recorder := httptest.NewRecorder()
 	runContext, _ := gin.CreateTestContext(recorder)
-	runContext.Request = httptest.NewRequest(http.MethodPost, "/internal/workflow-collaboration/run", bytes.NewBufferString(`{}`))
-	runContext.Request.Header.Set("Content-Type", "application/json")
+	runContext.Request = httptest.NewRequest(http.MethodPost, "/internal/workflow-collaboration/run", &requestBody)
+	runContext.Request.Header.Set("Content-Type", multipartWriter.FormDataContentType())
 	startedAt := time.Now()
 	runWorkflowGraph(runContext, int64(userID), "user", definition, graph, app, version, nil)
 	var run model.WorkflowRun
@@ -276,7 +313,7 @@ func runOwnedWorkflowForCollaboration(db *gorm.DB, userID, workflowID model.Int6
 		return "", fmt.Errorf("试运行未创建运行记录: %w", err)
 	}
 	if run.Status == string(workflow.StatusFailed) {
-		return "", fmt.Errorf("试运行失败，运行记录 %s", run.ID)
+		return "", fmt.Errorf("试运行失败，运行记录 %s：%s", run.ID, truncateAIAgentRunes(run.Result, 300))
 	}
 	if run.Status == string(workflow.StatusWaiting) {
 		return fmt.Sprintf("试运行 %s 已启动，当前等待运行节点确认。", run.ID), nil

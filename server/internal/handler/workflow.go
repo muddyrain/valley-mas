@@ -27,6 +27,9 @@ import (
 
 const (
 	workflowRunRequestMaxBytes = 6 * 1024 * 1024
+	workflowRunModeRun         = "run"
+	workflowRunModeRetry       = "retry"
+	workflowRunModeResume      = "resume"
 )
 
 var (
@@ -394,27 +397,7 @@ func PublishWorkflowVersion(c *gin.Context) {
 		Error(c, 400, "无效的 ID")
 		return
 	}
-	if err := database.DB.Transaction(func(tx *gorm.DB) error {
-		var definition model.Workflow
-		if err := tx.Where("id = ? AND user_id = ?", id, userID).First(&definition).Error; err != nil {
-			return err
-		}
-		if err := validateWorkflowDraftForSave(tx, definition.Graph, userID, id); err != nil {
-			return fmt.Errorf("%w: %v", errWorkflowDraftInvalid, err)
-		}
-		app, version, err := syncWorkflowAIApp(tx, definition)
-		if err != nil {
-			return err
-		}
-		if err := tx.Model(&definition).Update("status", "published").Error; err != nil {
-			return err
-		}
-		now := time.Now()
-		if err := tx.Model(&model.AIAppVersion{}).Where("id = ? AND app_id = ?", version.ID, app.ID).Update("published_at", now).Error; err != nil {
-			return err
-		}
-		return tx.Model(&app).Updates(map[string]any{"status": "published", "published_version_id": version.ID}).Error
-	}); err != nil {
+	if err := publishOwnedWorkflow(database.DB, model.Int64String(userID), model.Int64String(id)); err != nil {
 		if errors.Is(err, errWorkflowDraftInvalid) {
 			Error(c, http.StatusBadRequest, "工作流配置无效: "+strings.TrimPrefix(err.Error(), errWorkflowDraftInvalid.Error()+": "))
 			return
@@ -873,7 +856,14 @@ func runWorkflowGraphWithResume(
 		Error(c, http.StatusInternalServerError, "创建运行检查点失败")
 		return
 	}
-	run := model.WorkflowRun{WorkflowID: definition.ID, UserID: model.Int64String(userID), AppID: app.ID, VersionID: appVersion.ID, Status: string(workflow.StatusRunning), Inputs: string(inputsJSON), GraphSnapshot: mustEncodeWorkflowGraph(graph, definition.Graph), SourceRunID: sourceRunID, RuntimeState: encryptedState, StartedAt: time.Now()}
+	runMode := workflowRunModeRun
+	if sourceRunID != nil {
+		runMode = workflowRunModeRetry
+	}
+	if resumeState != nil {
+		runMode = workflowRunModeResume
+	}
+	run := model.WorkflowRun{WorkflowID: definition.ID, UserID: model.Int64String(userID), AppID: app.ID, VersionID: appVersion.ID, Status: string(workflow.StatusRunning), RunMode: runMode, Inputs: string(inputsJSON), GraphSnapshot: mustEncodeWorkflowGraph(graph, definition.Graph), SourceRunID: sourceRunID, RuntimeState: encryptedState, StartedAt: time.Now()}
 	if err := database.DB.Create(&run).Error; err != nil {
 		Error(c, http.StatusInternalServerError, "创建运行记录失败")
 		return
@@ -1129,8 +1119,8 @@ func AdminGetWorkflowRun(c *gin.Context) {
 		Error(c, http.StatusNotFound, "运行记录不存在")
 		return
 	}
-	var nodes []model.WorkflowNodeRun
-	if err := database.DB.Where("workflow_run_id = ?", run.ID).Order("created_at ASC").Find(&nodes).Error; err != nil {
+	nodes, err := effectiveWorkflowNodeRuns(database.DB, run)
+	if err != nil {
 		Error(c, http.StatusInternalServerError, "查询节点记录失败")
 		return
 	}
@@ -1155,6 +1145,57 @@ func AdminGetWorkflowRun(c *gin.Context) {
 		}
 	}
 	Success(c, gin.H{"run": run, "nodes": nodes, "events": events, "retry": retry, "resume": resume})
+}
+
+func effectiveWorkflowNodeRuns(db *gorm.DB, run model.WorkflowRun) ([]model.WorkflowNodeRun, error) {
+	const maxLineageDepth = 100
+
+	lineage := []model.WorkflowRun{run}
+	seen := map[model.Int64String]struct{}{run.ID: {}}
+	current := run
+	for current.SourceRunID != nil && (current.RunMode == "" || current.RunMode == workflowRunModeResume) {
+		if len(lineage) >= maxLineageDepth {
+			return nil, fmt.Errorf("workflow run lineage exceeds %d attempts", maxLineageDepth)
+		}
+		sourceRunID := *current.SourceRunID
+		if _, exists := seen[sourceRunID]; exists {
+			return nil, fmt.Errorf("workflow run lineage contains a cycle")
+		}
+		var source model.WorkflowRun
+		if err := db.Where(
+			"id = ? AND workflow_id = ? AND user_id = ?",
+			sourceRunID,
+			run.WorkflowID,
+			run.UserID,
+		).First(&source).Error; err != nil {
+			return nil, err
+		}
+		seen[source.ID] = struct{}{}
+		lineage = append(lineage, source)
+		current = source
+	}
+
+	for left, right := 0, len(lineage)-1; left < right; left, right = left+1, right-1 {
+		lineage[left], lineage[right] = lineage[right], lineage[left]
+	}
+
+	merged := make([]model.WorkflowNodeRun, 0)
+	positions := make(map[string]int)
+	for _, attempt := range lineage {
+		var nodes []model.WorkflowNodeRun
+		if err := db.Where("workflow_run_id = ?", attempt.ID).Order("created_at ASC, id ASC").Find(&nodes).Error; err != nil {
+			return nil, err
+		}
+		for _, node := range nodes {
+			if position, exists := positions[node.NodeID]; exists {
+				merged[position] = node
+				continue
+			}
+			positions[node.NodeID] = len(merged)
+			merged = append(merged, node)
+		}
+	}
+	return merged, nil
 }
 
 func CancelWorkflowRun(c *gin.Context) {

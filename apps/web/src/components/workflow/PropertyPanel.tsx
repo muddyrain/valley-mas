@@ -44,6 +44,7 @@ interface PropertyPanelProps {
   activeTab?: PropertyPanelTab;
   onActiveTabChange?: (tab: PropertyPanelTab) => void;
   isRunning?: boolean;
+  onAskAI?: () => void;
 }
 
 export const PropertyPanel = memo(function PropertyPanel({
@@ -58,6 +59,7 @@ export const PropertyPanel = memo(function PropertyPanel({
   activeTab,
   onActiveTabChange,
   isRunning = false,
+  onAskAI,
 }: PropertyPanelProps) {
   if (!selectedNode) {
     return (
@@ -165,6 +167,7 @@ export const PropertyPanel = memo(function PropertyPanel({
       onActiveTabChange={onActiveTabChange}
       runContent={showRunTab ? runContent : undefined}
       configLocked={isRunning}
+      onAskAI={onAskAI}
     >
       {FormComponent && (
         <FormComponent

@@ -32,6 +32,7 @@ export interface WorkflowRunSession {
 
 export type WorkflowRunSessionAction =
   | { type: 'begin'; generation: number; nodes?: Record<string, NodeRunSnapshot> }
+  | { type: 'graphChanged' }
   | { type: 'cancelled'; generation: number }
   | { type: 'event'; generation: number; event: WorkflowRunEvent }
   | {
@@ -66,6 +67,11 @@ export function workflowRunSessionReducer(
         generation: action.generation,
         status: 'running',
         nodes: action.nodes || {},
+      };
+    case 'graphChanged':
+      return {
+        ...createWorkflowRunSession(),
+        generation: session.generation + 1,
       };
     case 'error':
       if (action.generation !== session.generation) return session;

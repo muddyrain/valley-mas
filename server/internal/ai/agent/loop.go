@@ -80,8 +80,11 @@ func (l *LocalLoop) RunStream(ctx context.Context, spec Spec, msgs []Message) (<
 	}
 	buf = append(buf, msgs...)
 
-	// 白名单过滤 tool。
-	toolList := l.Registry.Filter("", spec.Tools)
+	// Spec.Tools 是显式白名单；空列表表示不向模型暴露任何工具。
+	toolList := []tools.Tool{}
+	if len(spec.Tools) > 0 {
+		toolList = l.Registry.Filter("", spec.Tools)
+	}
 	descriptors := make([]ToolDescriptor, 0, len(toolList))
 	toolIndex := make(map[string]tools.Tool, len(toolList))
 	for _, t := range toolList {

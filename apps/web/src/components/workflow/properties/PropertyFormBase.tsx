@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ interface PropertyFormBaseProps {
   activeTab?: 'config' | 'run';
   onActiveTabChange?: (tab: 'config' | 'run') => void;
   configLocked?: boolean;
+  onAskAI?: () => void;
 }
 
 export function PropertyFormBase({
@@ -44,6 +45,7 @@ export function PropertyFormBase({
   activeTab = 'config',
   onActiveTabChange,
   configLocked = false,
+  onAskAI,
 }: PropertyFormBaseProps) {
   const config = NODE_CONFIGS[selectedNode.data.nodeType];
 
@@ -56,9 +58,17 @@ export function PropertyFormBase({
             {selectedNode.data.label}
           </span>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          {onAskAI ? (
+            <Button variant="ghost" size="sm" onClick={onAskAI}>
+              <Sparkles />
+              询问 AI
+            </Button>
+          ) : null}
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="关闭节点信息">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {runContent ? (

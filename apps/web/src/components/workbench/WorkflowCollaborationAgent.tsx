@@ -5,27 +5,36 @@ import {
   Clock3,
   LocateFixed,
   RotateCcw,
+  ShieldAlert,
   Sparkles,
   TimerReset,
 } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { type AISkill, listAISkills } from '@/api/aiWorkbench';
 import type { CopilotContext } from '@/api/workbenchCopilot';
 import { getWorkflow, type WorkflowItem } from '@/api/workflow';
 import {
+  type ArchivedWorkflowCollaborationData,
   cancelWorkflowCollaborationTask,
   createWorkflowCollaborationTask,
+  decideWorkflowCollaborationApproval,
   deleteWorkflowCollaborationAttachment,
+  downloadWorkflowCollaborationAttachment,
+  getArchivedWorkflowCollaborationSession,
   getWorkflowCollaboration,
   parseWorkflowCollaborationDiff,
   resetWorkflowCollaborationContext,
   revertWorkflowCollaborationChange,
   uploadWorkflowCollaborationAttachment,
+  type WorkflowCollaborationApproval,
   type WorkflowCollaborationAttachment,
   type WorkflowCollaborationChange,
   type WorkflowCollaborationMessage,
+  type WorkflowCollaborationSession,
   type WorkflowCollaborationTask,
 } from '@/api/workflowCollaboration';
+import { ConversationAttachmentCard } from '@/components/ai/ConversationAttachmentCard';
 import {
   ConversationComposer,
   type ConversationComposerFile,
@@ -44,6 +53,13 @@ interface WorkflowCollaborationAgentProps {
   onBeforeSubmit?: () => Promise<boolean | undefined> | boolean | undefined;
   onWorkflowUpdated: (workflow: WorkflowItem) => boolean | undefined;
   onLocateNode?: (nodeId?: string) => void;
+  visible?: boolean;
+  draftRequest?: {
+    id: string;
+    prompt: string;
+    context: { selectedNodeId?: string; nodeLabels?: Record<string, string> };
+  };
+  onUnreadChange?: (unread: boolean) => void;
 }
 
 const ACTIVE_STATUSES = new Set(['queued', 'running', 'waiting_approval']);
@@ -73,22 +89,36 @@ export const WorkflowCollaborationAgent = memo(function WorkflowCollaborationAge
   onBeforeSubmit,
   onWorkflowUpdated,
   onLocateNode,
+  visible = true,
+  draftRequest,
+  onUnreadChange,
 }: WorkflowCollaborationAgentProps) {
   const workflowId = context.targetId || '';
   const [messages, setMessages] = useState<WorkflowCollaborationMessage[]>([]);
   const [tasks, setTasks] = useState<WorkflowCollaborationTask[]>([]);
   const [changes, setChanges] = useState<WorkflowCollaborationChange[]>([]);
-  const [archivedCount, setArchivedCount] = useState(0);
+  const [approvals, setApprovals] = useState<WorkflowCollaborationApproval[]>([]);
+  const [skills, setSkills] = useState<AISkill[]>([]);
+  const [activeSkillId, setActiveSkillId] = useState<string>();
+  const [archivedSessions, setArchivedSessions] = useState<WorkflowCollaborationSession[]>([]);
+  const [archivedTimelines, setArchivedTimelines] = useState<
+    Record<string, ArchivedWorkflowCollaborationData>
+  >({});
+  const [loadingArchivedId, setLoadingArchivedId] = useState<string>();
   const [input, setInput] = useState('');
   const [modelId, setModelId] = useState('');
   const [attachments, setAttachments] = useState<WorkflowCollaborationAttachment[]>([]);
+  const [sentAttachments, setSentAttachments] = useState<WorkflowCollaborationAttachment[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [revertingId, setRevertingId] = useState<string | null>(null);
+  const [decidingApprovalId, setDecidingApprovalId] = useState<string | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const syncingRef = useRef(false);
+  const pendingContextRef = useRef<WorkflowCollaborationAgentProps['draftRequest']>(undefined);
+  const taskStateSignatureRef = useRef('');
   const syncedRevisionRef = useRef(context.serverRevision || 0);
   const onWorkflowUpdatedRef = useRef(onWorkflowUpdated);
   onWorkflowUpdatedRef.current = onWorkflowUpdated;
@@ -127,7 +157,22 @@ export const WorkflowCollaborationAgent = memo(function WorkflowCollaborationAge
         setMessages(result.messages || []);
         setTasks(result.tasks || []);
         setChanges(result.changes || []);
-        setArchivedCount(result.archivedSessions?.length || 0);
+        setApprovals(result.approvals || []);
+        setSentAttachments(result.attachments || []);
+        setArchivedSessions(result.archivedSessions || []);
+        const taskStateSignature = (result.tasks || [])
+          .map((task) => `${task.id}:${task.status}:${task.updatedAt}`)
+          .join('|');
+        if (
+          taskStateSignatureRef.current !== taskStateSignature &&
+          !visible &&
+          (result.tasks || []).some((task) =>
+            ['waiting_approval', 'succeeded', 'failed', 'conflicted'].includes(task.status),
+          )
+        ) {
+          onUnreadChange?.(true);
+        }
+        taskStateSignatureRef.current = taskStateSignature;
         await syncAppliedWorkflow(result.changes || []);
       } catch {
         if (showLoading) toast.error('加载工作流 AI 协作记录失败');
@@ -135,7 +180,23 @@ export const WorkflowCollaborationAgent = memo(function WorkflowCollaborationAge
         if (showLoading) setLoading(false);
       }
     },
-    [syncAppliedWorkflow, workflowId],
+    [onUnreadChange, syncAppliedWorkflow, visible, workflowId],
+  );
+
+  const loadArchivedSession = useCallback(
+    async (sessionId: string) => {
+      if (!workflowId || archivedTimelines[sessionId] || loadingArchivedId === sessionId) return;
+      setLoadingArchivedId(sessionId);
+      try {
+        const result = await getArchivedWorkflowCollaborationSession(workflowId, sessionId);
+        setArchivedTimelines((current) => ({ ...current, [sessionId]: result }));
+      } catch {
+        toast.error('加载旧会话失败');
+      } finally {
+        setLoadingArchivedId((current) => (current === sessionId ? undefined : current));
+      }
+    },
+    [archivedTimelines, loadingArchivedId, workflowId],
   );
 
   useEffect(() => {
@@ -147,6 +208,22 @@ export const WorkflowCollaborationAgent = memo(function WorkflowCollaborationAge
     const timer = window.setInterval(() => void refresh(false), 1800);
     return () => window.clearInterval(timer);
   }, [refresh, workflowId]);
+
+  useEffect(() => {
+    void listAISkills()
+      .then((result) => setSkills(result.list || []))
+      .catch(() => setSkills([]));
+  }, []);
+
+  useEffect(() => {
+    if (visible) onUnreadChange?.(false);
+  }, [onUnreadChange, visible]);
+
+  useEffect(() => {
+    if (!draftRequest) return;
+    setInput(draftRequest.prompt);
+    pendingContextRef.current = draftRequest;
+  }, [draftRequest]);
 
   const activeTask = tasks.find((task) => ACTIVE_STATUSES.has(task.status));
   const latestTasks = useMemo(
@@ -173,11 +250,17 @@ export const WorkflowCollaborationAgent = memo(function WorkflowCollaborationAge
       const result = await createWorkflowCollaborationTask(workflowId, {
         message,
         modelId: modelId || undefined,
+        activeSkillId,
         attachmentIds: attachments.map((attachment) => attachment.id),
-        context: { selectedNodeId: context.selectedNodeId, nodeLabels: context.nodeLabels },
+        context: pendingContextRef.current?.context || {
+          selectedNodeId: context.selectedNodeId,
+          nodeLabels: context.nodeLabels,
+        },
       });
       setInput('');
       setAttachments([]);
+      setActiveSkillId(undefined);
+      pendingContextRef.current = undefined;
       setMessages((current) => [...current, result.message]);
       setTasks((current) => [result.task, ...current]);
       toast.success('任务已进入后台队列，离开页面也会继续执行');
@@ -185,6 +268,33 @@ export const WorkflowCollaborationAgent = memo(function WorkflowCollaborationAge
       toast.error(error instanceof Error ? error.message : '创建工作流 AI 任务失败');
     } finally {
       setSending(false);
+    }
+  };
+
+  const decideApproval = async (
+    approval: WorkflowCollaborationApproval,
+    decision: 'approved' | 'rejected',
+  ) => {
+    if (decidingApprovalId) return;
+    setDecidingApprovalId(approval.id);
+    try {
+      const result = await decideWorkflowCollaborationApproval(
+        workflowId,
+        approval.taskId,
+        approval.id,
+        decision,
+      );
+      setApprovals((current) => current.filter((item) => item.id !== approval.id));
+      setTasks((current) =>
+        current.map((item) => (item.id === result.task.id ? result.task : item)),
+      );
+      toast.success(
+        decision === 'approved' ? '已确认，任务将继续执行' : '已拒绝，本次操作不会执行',
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '处理确认失败');
+    } finally {
+      setDecidingApprovalId(null);
     }
   };
 
@@ -288,10 +398,62 @@ export const WorkflowCollaborationAgent = memo(function WorkflowCollaborationAge
       <div ref={timelineRef} className="relative min-h-0 flex-1 overflow-y-auto">
         <BoxLoadingOverlay show={loading} title="正在加载协作记录" compact />
         <div className="flex min-h-full flex-col gap-4 px-4 py-4">
-          {archivedCount > 0 ? (
-            <p className="text-center text-xs text-muted-foreground">
-              已保留 {archivedCount} 个旧会话为只读记录
-            </p>
+          {archivedSessions.length > 0 ? (
+            <div className="rounded-xl border border-border bg-muted/30 p-3">
+              <p className="mb-2 text-xs text-muted-foreground">
+                已保留 {archivedSessions.length} 个旧会话为只读记录
+              </p>
+              <div className="space-y-2">
+                {archivedSessions.map((session) => {
+                  const timeline = archivedTimelines[session.id];
+                  return (
+                    <details
+                      key={session.id}
+                      className="group rounded-lg border border-border bg-background px-3 py-2"
+                      onToggle={(event) => {
+                        if (event.currentTarget.open) void loadArchivedSession(session.id);
+                      }}
+                    >
+                      <summary className="cursor-pointer list-none text-xs font-medium">
+                        <span>{session.title || '旧会话'}</span>
+                        <span className="ml-2 font-normal text-muted-foreground">
+                          {new Date(session.updatedAt).toLocaleDateString()}
+                        </span>
+                      </summary>
+                      <div className="mt-3 space-y-3 border-t border-border pt-3">
+                        {loadingArchivedId === session.id ? (
+                          <p className="text-xs text-muted-foreground">正在读取旧记录…</p>
+                        ) : null}
+                        {timeline?.messages.map((message) => (
+                          <ConversationMessageBubble
+                            key={message.id}
+                            role={message.role}
+                            content={message.content}
+                            createdAt={message.createdAt}
+                            presentation="workspace"
+                          />
+                        ))}
+                        {timeline?.proposals.map((proposal) => (
+                          <div
+                            key={proposal.id}
+                            className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground"
+                          >
+                            {proposal.summary}
+                          </div>
+                        ))}
+                        {timeline &&
+                        timeline.messages.length === 0 &&
+                        timeline.proposals.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">
+                            这个旧会话没有可显示的记录。
+                          </p>
+                        ) : null}
+                      </div>
+                    </details>
+                  );
+                })}
+              </div>
+            </div>
           ) : null}
           {messages.length === 0 && latestTasks.length === 0 ? (
             <div className="my-auto flex flex-col items-center gap-3 py-10 text-center">
@@ -323,7 +485,61 @@ export const WorkflowCollaborationAgent = memo(function WorkflowCollaborationAge
               content={message.content}
               createdAt={message.createdAt}
               presentation="workspace"
+              header={
+                message.role === 'user' &&
+                sentAttachments.some((attachment) => attachment.messageId === message.id) ? (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {sentAttachments
+                      .filter((attachment) => attachment.messageId === message.id)
+                      .map((attachment) => (
+                        <ConversationAttachmentCard
+                          key={attachment.id}
+                          name={attachment.name}
+                          mimeType={attachment.mimeType}
+                          sizeBytes={attachment.sizeBytes}
+                          onOpen={() =>
+                            void downloadWorkflowCollaborationAttachment(
+                              workflowId,
+                              attachment,
+                            ).catch(() => toast.error('下载协作文件失败'))
+                          }
+                        />
+                      ))}
+                  </div>
+                ) : undefined
+              }
             />
+          ))}
+          {approvals.map((approval) => (
+            <div
+              key={approval.id}
+              className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3"
+            >
+              <div className="flex items-start gap-2">
+                <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">需要你的确认</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{approval.summary}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={decidingApprovalId === approval.id}
+                  onClick={() => void decideApproval(approval, 'rejected')}
+                >
+                  拒绝
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={decidingApprovalId === approval.id}
+                  onClick={() => void decideApproval(approval, 'approved')}
+                >
+                  确认执行
+                </Button>
+              </div>
+            </div>
           ))}
           {latestTasks.map((task) => {
             const change = changesByTask.get(task.id);
@@ -399,6 +615,9 @@ export const WorkflowCollaborationAgent = memo(function WorkflowCollaborationAge
           onFilesSelected={(files) => void uploadFiles(files)}
           onFileRemove={(file) => void removeFile(file)}
           uploadingFiles={uploadingFiles}
+          skills={skills}
+          activeSkillId={activeSkillId}
+          onActiveSkillChange={setActiveSkillId}
           onStop={activeTask ? () => void stopTask() : undefined}
           footer={
             <ModelPicker

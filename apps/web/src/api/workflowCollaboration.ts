@@ -1,4 +1,5 @@
 import type { WorkflowItem } from '@/api/workflow';
+import { useAuthStore } from '@/stores/useAuthStore';
 import request, { type RequestConfig } from '@/utils/request';
 
 const collaborationRequestConfig: RequestConfig = { suppressErrorToast: true };
@@ -26,6 +27,7 @@ export interface WorkflowCollaborationMessage {
 
 export interface WorkflowCollaborationAttachment {
   id: string;
+  messageId?: string;
   name: string;
   mimeType: string;
   sizeBytes: number;
@@ -83,14 +85,61 @@ export interface WorkflowCollaborationChange {
   revertedAt?: string;
 }
 
+export interface WorkflowCollaborationApproval {
+  id: string;
+  taskId: string;
+  workflowId: string;
+  action: 'publish' | 'run' | 'triggers.enable' | 'triggers.disable';
+  riskLevel: 'high';
+  summary: string;
+  status: 'pending' | 'approved' | 'rejected';
+  note?: string;
+  decidedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface WorkflowCollaborationData {
   enabled: boolean;
   session: WorkflowCollaborationSession;
   messages: WorkflowCollaborationMessage[];
   tasks: WorkflowCollaborationTask[];
   changes: WorkflowCollaborationChange[];
-  approvals: unknown[];
+  approvals: WorkflowCollaborationApproval[];
+  attachments: WorkflowCollaborationAttachment[];
   archivedSessions: WorkflowCollaborationSession[];
+}
+
+export interface ArchivedWorkflowCollaborationProposal {
+  id: string;
+  status: string;
+  summary: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ArchivedWorkflowCollaborationData {
+  session: WorkflowCollaborationSession;
+  messages: WorkflowCollaborationMessage[];
+  proposals: ArchivedWorkflowCollaborationProposal[];
+}
+
+export async function downloadWorkflowCollaborationAttachment(
+  workflowId: string,
+  attachment: WorkflowCollaborationAttachment,
+): Promise<void> {
+  const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+  const response = await fetch(
+    `${base}/workflows/${workflowId}/collaboration/attachments/${attachment.id}`,
+    { headers: { Authorization: `Bearer ${useAuthStore.getState().token}` } },
+  );
+  if (!response.ok) throw new Error('读取协作文件失败');
+  const href = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement('a');
+  anchor.href = href;
+  anchor.download = attachment.name;
+  anchor.click();
+  URL.revokeObjectURL(href);
 }
 
 export function parseWorkflowCollaborationDiff(
@@ -108,11 +157,22 @@ export function getWorkflowCollaboration(workflowId: string): Promise<WorkflowCo
   return request.get(`/workflows/${workflowId}/collaboration`, collaborationRequestConfig);
 }
 
+export function getArchivedWorkflowCollaborationSession(
+  workflowId: string,
+  sessionId: string,
+): Promise<ArchivedWorkflowCollaborationData> {
+  return request.get(
+    `/workflows/${workflowId}/collaboration/archived-sessions/${sessionId}`,
+    collaborationRequestConfig,
+  );
+}
+
 export function createWorkflowCollaborationTask(
   workflowId: string,
   data: {
     message: string;
     modelId?: string;
+    activeSkillId?: string;
     attachmentIds?: string[];
     context?: { selectedNodeId?: string; nodeLabels?: Record<string, string> };
   },
@@ -124,6 +184,22 @@ export function createWorkflowCollaborationTask(
   return request.post(
     `/workflows/${workflowId}/collaboration/tasks`,
     data,
+    collaborationRequestConfig,
+  );
+}
+
+export function decideWorkflowCollaborationApproval(
+  workflowId: string,
+  taskId: string,
+  approvalId: string,
+  decision: 'approved' | 'rejected',
+): Promise<{
+  task: WorkflowCollaborationTask;
+  approval: WorkflowCollaborationApproval;
+}> {
+  return request.post(
+    `/workflows/${workflowId}/collaboration/tasks/${taskId}/approvals/${approvalId}/decision`,
+    { decision },
     collaborationRequestConfig,
   );
 }

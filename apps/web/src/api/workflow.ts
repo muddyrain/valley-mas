@@ -55,6 +55,15 @@ export interface WorkflowItem {
   graphHash?: string;
   revision: number;
   status: 'draft' | 'published';
+  collaborationStatus?:
+    | 'queued'
+    | 'running'
+    | 'waiting_approval'
+    | 'succeeded'
+    | 'failed'
+    | 'cancelled'
+    | 'conflicted';
+  collaborationUpdatedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -95,6 +104,7 @@ export interface WorkflowRun {
   id: string;
   workflowId: string;
   status: 'running' | 'waiting_approval' | 'cancelling' | 'success' | 'error' | 'cancelled';
+  runMode?: 'run' | 'retry' | 'resume';
   inputs: string;
   graphSnapshot: string;
   sourceRunId?: string;

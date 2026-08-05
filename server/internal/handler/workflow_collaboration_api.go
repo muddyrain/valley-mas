@@ -33,6 +33,14 @@ type workflowCollaborationTaskPayload struct {
 	Context         workflowCollaborationTaskContext `json:"context"`
 }
 
+type archivedWorkflowCollaborationProposal struct {
+	ID        model.Int64String `json:"id"`
+	Status    string            `json:"status"`
+	Summary   string            `json:"summary"`
+	CreatedAt time.Time         `json:"createdAt"`
+	UpdatedAt time.Time         `json:"updatedAt"`
+}
+
 func GetWorkflowCollaboration(c *gin.Context) {
 	userID, _, ok := currentUser(c)
 	if !ok {
@@ -71,6 +79,9 @@ func GetWorkflowCollaboration(c *gin.Context) {
 	var changes []model.WorkflowCollaborationChange
 	_ = database.GetDB().Where("session_id = ? AND user_id = ?", session.ID, ownerID).
 		Order("created_at DESC, id DESC").Limit(30).Find(&changes).Error
+	var attachments []model.WorkflowCollaborationAttachment
+	_ = database.GetDB().Where("session_id = ? AND user_id = ? AND message_id IS NOT NULL", session.ID, ownerID).
+		Order("created_at ASC, id ASC").Limit(100).Find(&attachments).Error
 	var approvals []model.WorkflowCollaborationApproval
 	_ = database.GetDB().Where("workflow_id = ? AND user_id = ? AND status = ?", workflowID, ownerID, "pending").
 		Order("created_at ASC, id ASC").Find(&approvals).Error
@@ -79,8 +90,71 @@ func GetWorkflowCollaboration(c *gin.Context) {
 		Order("updated_at DESC, id DESC").Find(&archivedSessions).Error
 	Success(c, gin.H{
 		"enabled": true, "session": session, "messages": messages, "tasks": tasks,
-		"changes": changes, "approvals": approvals, "archivedSessions": archivedSessions,
+		"changes": changes, "approvals": approvals, "attachments": attachments, "archivedSessions": archivedSessions,
 	})
+}
+
+// GetArchivedWorkflowCollaborationSession exposes legacy workflow conversations
+// as owner-only, read-only records. Candidate and baseline drafts remain server-side.
+func GetArchivedWorkflowCollaborationSession(c *gin.Context) {
+	userID, _, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+	workflowID, workflowErr := parsePathInt64(c, "id")
+	sessionID, sessionErr := parsePathInt64(c, "sessionId")
+	if workflowErr != nil || sessionErr != nil {
+		Error(c, http.StatusBadRequest, "无效的旧会话 ID")
+		return
+	}
+	ownerID := model.Int64String(userID)
+	workflowKey := model.Int64String(workflowID)
+	if err := requireOwnedWorkflow(database.GetDB(), ownerID, workflowKey); err != nil {
+		Error(c, http.StatusNotFound, "工作流不存在")
+		return
+	}
+
+	var session model.AIWorkbenchCopilotSession
+	if err := database.GetDB().Where(
+		"id = ? AND user_id = ? AND scope = ? AND target_id = ? AND archived_at IS NOT NULL",
+		sessionID, ownerID, "workflow", workflowKey.String(),
+	).First(&session).Error; err != nil {
+		Error(c, http.StatusNotFound, "旧会话不存在")
+		return
+	}
+	var messages []model.AIWorkbenchCopilotMessage
+	if err := database.GetDB().Where("session_id = ? AND user_id = ?", session.ID, ownerID).
+		Order("created_at DESC, id DESC").Limit(200).Find(&messages).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "加载旧会话消息失败")
+		return
+	}
+	reverseWorkflowCollaborationMessages(messages)
+	var legacyProposals []model.AIWorkbenchChangeProposal
+	if err := database.GetDB().Where("session_id = ? AND user_id = ?", session.ID, ownerID).
+		Order("created_at ASC, id ASC").Find(&legacyProposals).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "加载旧版变更记录失败")
+		return
+	}
+	proposals := make([]archivedWorkflowCollaborationProposal, 0, len(legacyProposals))
+	for _, proposal := range legacyProposals {
+		summary := "旧版变更记录"
+		switch proposal.Status {
+		case "pending":
+			summary = "旧版未应用变更"
+		case "accepted":
+			summary = "旧版已应用变更"
+		case "rejected":
+			summary = "旧版已拒绝变更"
+		case "superseded":
+			summary = "旧版变更已被后续记录替代"
+		}
+		proposals = append(proposals, archivedWorkflowCollaborationProposal{
+			ID: proposal.ID, Status: proposal.Status, Summary: summary,
+			CreatedAt: proposal.CreatedAt, UpdatedAt: proposal.UpdatedAt,
+		})
+	}
+	Success(c, gin.H{"session": session, "messages": messages, "proposals": proposals})
 }
 
 func CreateWorkflowCollaborationTask(c *gin.Context) {

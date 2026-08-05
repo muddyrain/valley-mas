@@ -49,6 +49,22 @@ func TestCopilotMessageUsesDefaultModelInsteadOfRequiringSelection(t *testing.T)
 	}
 }
 
+func TestLegacyWorkflowCopilotWriteEndpointsAreReadOnly(t *testing.T) {
+	router, _ := setupAIPlatformTestRouter(t)
+	for _, request := range []*http.Request{
+		httptest.NewRequest(http.MethodPost, "/ai/workbench/copilot/sessions", bytes.NewBufferString(`{"scope":"workflow","targetId":"42"}`)),
+		httptest.NewRequest(http.MethodPost, "/ai/workbench/copilot/messages/stream", bytes.NewBufferString(`{"scope":"workflow","targetId":"42","message":"修改工作流"}`)),
+	} {
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		if code := responseCode(response); code != http.StatusConflict {
+			t.Fatalf("code = %d, want 409; body = %s", code, response.Body.String())
+		}
+	}
+}
+
 func TestCopilotMessageRejectsUnavailableSelectedModel(t *testing.T) {
 	router, _ := setupAIPlatformTestRouter(t)
 	request := httptest.NewRequest(http.MethodPost, "/ai/workbench/copilot/messages/stream", bytes.NewBufferString(`{"scope":"workbench","modelId":"999","message":"检查当前草稿"}`))
@@ -168,6 +184,30 @@ func TestCopilotStructuredResultRepairsInvalidOutputOnce(t *testing.T) {
 	}
 	if repairCalls != 1 || target.Value != "repaired" {
 		t.Fatalf("unexpected repair result calls=%d value=%q", repairCalls, target.Value)
+	}
+}
+
+func TestDecodeCopilotStructuredOutputIgnoresHarmlessMetadata(t *testing.T) {
+	var envelope copilotAIEnvelope
+	raw := `{"mode":"proposal","message":"已新增节点","targetType":"workflow","questions":[],"operations":[{"type":"node.insert","afterNodeId":"parse","reason":"规范标题","node":{"id":"normalize","type":"llm","label":"规范标题","position":{"x":0,"y":0},"config":{"prompt":"检查标题"}}}],"workflow":null,"agent":null,"reasoning":"用户明确要求"}`
+	if err := decodeCopilotStructuredOutput(raw, &envelope); err != nil {
+		t.Fatalf("decode copilot output: %v", err)
+	}
+	if len(envelope.Operations) != 1 || envelope.Operations[0].AfterNodeID != "parse" {
+		t.Fatalf("unexpected envelope: %+v", envelope)
+	}
+}
+
+func TestWorkflowCopilotSpecAvoidsRedundantToolRoundTrip(t *testing.T) {
+	spec := newCopilotAgentSpec("siliconflow", "deepseek-ai/DeepSeek-V4-Flash", "system", "workflow")
+	if len(spec.Tools) != 0 {
+		t.Fatalf("workflow copilot already receives draft and capabilities, tools=%v", spec.Tools)
+	}
+	if spec.MaxSteps != 1 {
+		t.Fatalf("workflow copilot MaxSteps=%d, want one structured generation", spec.MaxSteps)
+	}
+	if spec.MaxTokens < 3000 {
+		t.Fatalf("workflow copilot MaxTokens=%d, want enough room for structured operations", spec.MaxTokens)
 	}
 }
 

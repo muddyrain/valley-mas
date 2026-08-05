@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +15,27 @@ import (
 	"valley-server/internal/model"
 	"valley-server/internal/workflow"
 )
+
+func TestWorkflowCollaborationPromptDefinesOperationContract(t *testing.T) {
+	prompt := workflowCollaborationSystemPrompt()
+	contract := workflowCollaborationOperationContract()
+	for _, expected := range []string{"node.insert", "afterNodeId", "nodeId", "patch", "capabilityId", "{{sourceTitle}}", "不得直接引用"} {
+		if !strings.Contains(prompt+contract, expected) {
+			t.Fatalf("workflow collaboration prompt is missing %q", expected)
+		}
+	}
+}
+
+func TestWorkflowCollaborationFailureMessageIsActionable(t *testing.T) {
+	message := workflowCollaborationModelFailureMessage(copilotValidationError{err: errors.New("invalid operation")})
+	if !strings.Contains(message, "画布没有变化") || !strings.Contains(message, "重试") {
+		t.Fatalf("failure message is not actionable: %q", message)
+	}
+	timeoutMessage := workflowCollaborationModelFailureMessage(context.DeadlineExceeded)
+	if !strings.Contains(timeoutMessage, "响应超时") || !strings.Contains(timeoutMessage, "画布没有变化") {
+		t.Fatalf("timeout message is not actionable: %q", timeoutMessage)
+	}
+}
 
 func TestCreateWorkflowCollaborationTaskUsesCanonicalTimeline(t *testing.T) {
 	router, definition := setupWorkflowRuntimeTestRouter(t)
@@ -43,6 +65,7 @@ func migrateWorkflowCollaborationTestModels(t *testing.T) {
 	if err := database.DB.AutoMigrate(
 		&model.AIWorkbenchCopilotSession{},
 		&model.AIWorkbenchCopilotMessage{},
+		&model.AIWorkbenchChangeProposal{},
 		&model.WorkflowCollaborationTask{},
 		&model.WorkflowCollaborationAttachment{},
 		&model.WorkflowCollaborationApproval{},
@@ -92,8 +115,8 @@ func TestCreateWorkflowCollaborationTaskKeepsOneTurnSkillInPayload(t *testing.T)
 	badRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
 	badRecorder := httptest.NewRecorder()
 	router.ServeHTTP(badRecorder, badRequest)
-	if badRecorder.Code != http.StatusBadRequest {
-		t.Fatalf("cross-owner skill status=%d body=%s", badRecorder.Code, badRecorder.Body.String())
+	if responseCode(badRecorder) != http.StatusBadRequest {
+		t.Fatalf("cross-owner skill status=%d body=%s", responseCode(badRecorder), badRecorder.Body.String())
 	}
 }
 
@@ -135,8 +158,8 @@ func TestWorkflowCollaborationRiskApprovalResumesOnlyOwnedTask(t *testing.T) {
 	otherRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "202"))
 	otherRecorder := httptest.NewRecorder()
 	router.ServeHTTP(otherRecorder, otherRequest)
-	if otherRecorder.Code != http.StatusNotFound {
-		t.Fatalf("cross-owner decision status=%d body=%s", otherRecorder.Code, otherRecorder.Body.String())
+	if responseCode(otherRecorder) != http.StatusNotFound {
+		t.Fatalf("cross-owner decision status=%d body=%s", responseCode(otherRecorder), otherRecorder.Body.String())
 	}
 
 	decisionRequest := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/collaboration/tasks/"+task.ID.String()+"/approvals/"+approval.ID.String()+"/decision", bytes.NewBufferString(`{"decision":"approved"}`))
@@ -146,6 +169,36 @@ func TestWorkflowCollaborationRiskApprovalResumesOnlyOwnedTask(t *testing.T) {
 	router.ServeHTTP(decisionRecorder, decisionRequest)
 	if responseCode(decisionRecorder) != 0 || !strings.Contains(decisionRecorder.Body.String(), `"status":"queued"`) {
 		t.Fatalf("approve: %s", decisionRecorder.Body.String())
+	}
+	repeatedRecorder := httptest.NewRecorder()
+	repeatedRequest := httptest.NewRequest(http.MethodPost, "/workflows/"+definition.ID.String()+"/collaboration/tasks/"+task.ID.String()+"/approvals/"+approval.ID.String()+"/decision", bytes.NewBufferString(`{"decision":"rejected"}`))
+	repeatedRequest.Header.Set("Content-Type", "application/json")
+	repeatedRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	router.ServeHTTP(repeatedRecorder, repeatedRequest)
+	if responseCode(repeatedRecorder) != http.StatusConflict {
+		t.Fatalf("repeated decision: %s", repeatedRecorder.Body.String())
+	}
+	if strings.Contains(decisionRecorder.Body.String(), `"arguments"`) || strings.Contains(decisionRecorder.Body.String(), `"fingerprint"`) {
+		t.Fatalf("approval leaked server-only fields: %s", decisionRecorder.Body.String())
+	}
+	if err := database.DB.First(&task, task.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := executeWorkflowCollaborationTask(context.Background(), database.DB, &task); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.First(&task, task.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if task.Status != "succeeded" {
+		t.Fatalf("approved task status=%s message=%s", task.Status, task.StatusMessage)
+	}
+	var published model.Workflow
+	if err := database.DB.First(&published, definition.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if published.Status != "published" {
+		t.Fatalf("workflow status=%s", published.Status)
 	}
 }
 
@@ -170,6 +223,96 @@ func TestWorkflowListIncludesLatestCollaborationStatus(t *testing.T) {
 	router.ServeHTTP(recorder, request)
 	if responseCode(recorder) != 0 || !strings.Contains(recorder.Body.String(), `"collaborationStatus":"running"`) {
 		t.Fatalf("list workflows: %s", recorder.Body.String())
+	}
+}
+
+func TestWorkflowCollaborationApprovedActionsExecute(t *testing.T) {
+	_, definition := setupWorkflowRuntimeTestRouter(t)
+	migrateWorkflowCollaborationTestModels(t)
+	definition.Graph = strings.Replace(definition.Graph, `"required":true`, `"required":false`, 1)
+	definition.Graph = strings.Replace(definition.Graph, `{{start.output.title}}`, `测试完成`, 1)
+	if err := database.DB.Model(&definition).Update("graph", definition.Graph).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	runMessage, err := runOwnedWorkflowForCollaboration(database.DB, 101, definition.ID)
+	if err != nil || !strings.Contains(runMessage, "已完成") {
+		t.Fatalf("run message=%q err=%v", runMessage, err)
+	}
+	var run model.WorkflowRun
+	if err := database.DB.Where("workflow_id = ?", definition.ID).Order("started_at DESC").First(&run).Error; err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != string(workflow.StatusSucceeded) {
+		t.Fatalf("run status=%s result=%s", run.Status, run.Result)
+	}
+
+	trigger := model.WorkflowTrigger{
+		WorkflowID: definition.ID, UserID: 101, Type: "cron", CronExpression: "*/5 * * * *",
+		Timezone: "Asia/Shanghai", Status: "disabled",
+	}
+	if err := database.DB.Create(&trigger).Error; err != nil {
+		t.Fatal(err)
+	}
+	count, err := setOwnedWorkflowTriggersStatus(database.DB, 101, definition.ID, "active")
+	if err != nil || count != 1 {
+		t.Fatalf("enable triggers count=%d err=%v", count, err)
+	}
+	if err := database.DB.First(&trigger, trigger.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if trigger.Status != "active" || trigger.NextRunAt == nil {
+		t.Fatalf("trigger=%+v", trigger)
+	}
+}
+
+func TestDownloadWorkflowCollaborationAttachmentKeepsOwnerBoundary(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	migrateWorkflowCollaborationTestModels(t)
+	session, err := resolveCanonicalWorkflowSession(database.DB, 101, definition.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attachment := model.WorkflowCollaborationAttachment{
+		UserID: 101, WorkflowID: definition.ID, SessionID: session.ID, Name: "notes.txt",
+		MimeType: "text/plain", SizeBytes: 5, ParsedText: "hello", SourceContent: []byte("hello"),
+	}
+	if err := database.DB.Create(&attachment).Error; err != nil {
+		t.Fatal(err)
+	}
+	path := "/workflows/" + definition.ID.String() + "/collaboration/attachments/" + attachment.ID.String()
+	request := httptest.NewRequest(http.MethodGet, path, nil)
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK || recorder.Body.String() != "hello" {
+		t.Fatalf("download status=%d body=%q", recorder.Code, recorder.Body.String())
+	}
+
+	otherRequest := httptest.NewRequest(http.MethodGet, path, nil)
+	otherRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "202"))
+	otherRecorder := httptest.NewRecorder()
+	router.ServeHTTP(otherRecorder, otherRequest)
+	if responseCode(otherRecorder) != http.StatusNotFound {
+		t.Fatalf("cross-owner download: %s", otherRecorder.Body.String())
+	}
+}
+
+func TestWorkflowCollaborationRequestedActionIsExplicit(t *testing.T) {
+	tests := map[string]string{
+		"请发布当前工作流":      "publish",
+		"请试运行一次":        "run",
+		"启用这个工作流的触发器":   "triggers.enable",
+		"停用触发器":         "triggers.disable",
+		"增加一个名为发布结果的节点": "",
+		"调整运行节点的名称":     "",
+		"如何发布当前工作流":     "",
+		"启用触发器有什么风险":    "",
+	}
+	for message, expected := range tests {
+		if actual := workflowCollaborationRequestedAction(message); actual != expected {
+			t.Errorf("message=%q action=%q expected=%q", message, actual, expected)
+		}
 	}
 }
 
@@ -204,6 +347,52 @@ func TestResolveCanonicalWorkflowSessionMigratesLatestTimeline(t *testing.T) {
 	}
 	if archived.ArchivedAt == nil || archived.Canonical {
 		t.Fatalf("older session was not archived: %+v", archived)
+	}
+}
+
+func TestArchivedWorkflowCollaborationSessionIsReadableWithoutCandidateDraft(t *testing.T) {
+	router, definition := setupWorkflowRuntimeTestRouter(t)
+	migrateWorkflowCollaborationTestModels(t)
+	now := time.Now()
+	archived := model.AIWorkbenchCopilotSession{
+		UserID: 101, Scope: "workflow", TargetID: definition.ID.String(), Title: "旧会话", ArchivedAt: &now,
+	}
+	if err := database.DB.Create(&archived).Error; err != nil {
+		t.Fatal(err)
+	}
+	message := model.AIWorkbenchCopilotMessage{
+		SessionID: archived.ID, UserID: 101, Role: "user", Kind: "text", Content: "旧消息内容",
+	}
+	if err := database.DB.Create(&message).Error; err != nil {
+		t.Fatal(err)
+	}
+	proposal := model.AIWorkbenchChangeProposal{
+		SessionID: archived.ID, UserID: 101, TargetType: "workflow", TargetID: definition.ID.String(),
+		BaseHash: "base", BaseDraft: `{"secret":"base"}`, Candidate: `{"secret":"candidate"}`,
+		CandidateHash: "candidate", Diff: `{}`, Status: "pending",
+	}
+	if err := database.DB.Create(&proposal).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	path := "/workflows/" + definition.ID.String() + "/collaboration/archived-sessions/" + archived.ID.String()
+	request := httptest.NewRequest(http.MethodGet, path, nil)
+	request.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "101"))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if responseCode(recorder) != 0 || !strings.Contains(recorder.Body.String(), "旧消息内容") || !strings.Contains(recorder.Body.String(), "旧版未应用变更") {
+		t.Fatalf("archived session response: %s", recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "secret") || strings.Contains(recorder.Body.String(), "candidateDraft") {
+		t.Fatalf("legacy candidate leaked: %s", recorder.Body.String())
+	}
+
+	otherRequest := httptest.NewRequest(http.MethodGet, path, nil)
+	otherRequest.Header.Set("Authorization", workflowRuntimeAuthHeader(t, "202"))
+	otherRecorder := httptest.NewRecorder()
+	router.ServeHTTP(otherRecorder, otherRequest)
+	if responseCode(otherRecorder) != http.StatusNotFound {
+		t.Fatalf("cross-owner archived session: %s", otherRecorder.Body.String())
 	}
 }
 
