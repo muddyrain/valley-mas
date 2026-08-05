@@ -1,8 +1,12 @@
-import { type ApiResponse, createWebHttpClient } from '@valley/shared-request-web';
+import {
+  type ApiResponse,
+  createWebHttpClient,
+  type RequestConfig,
+} from '@valley/shared-request-web';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/useAuthStore';
 
-export type { ApiResponse };
+export type { ApiResponse, RequestConfig };
 
 const GLOBAL_ERROR_TOAST_ID = 'global-error-toast';
 
