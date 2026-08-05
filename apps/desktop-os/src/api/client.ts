@@ -1,8 +1,9 @@
-export interface ApiResponse<T> {
-  code: number;
-  message: string;
-  data: T;
-}
+import {
+  createFetchRequest,
+  type ApiResponse as SharedApiResponse,
+} from '@valley/shared-fetch-request';
+
+export type ApiResponse<T> = SharedApiResponse<T>;
 
 export class ApiError extends Error {
   status?: number;
@@ -22,6 +23,15 @@ interface RequestOptions {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 
+const apiRequestWithOptions = createFetchRequest<ApiError>({
+  baseURL: API_BASE_URL,
+  showError: () => {},
+  createError: (message, _init, context) => new ApiError(message, context?.status),
+  resolveNetworkMessage: () => '无法连接到服务器',
+  resolveHttpMessage: (_status, payloadMessage) => payloadMessage || '请求失败',
+  resolveBusinessMessage: (payload, fallback) => payload.message || fallback,
+});
+
 export function getApiBaseUrl() {
   return API_BASE_URL;
 }
@@ -31,32 +41,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
   if (options.body !== undefined) headers.set('Content-Type', 'application/json');
   if (options.token) headers.set('Authorization', `Bearer ${options.token}`);
 
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      method: options.method ?? 'GET',
-      headers,
-      credentials: 'include',
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    });
-  } catch {
-    throw new ApiError('无法连接到服务器');
-  }
-
-  let payload: Partial<ApiResponse<T>> | null = null;
-  try {
-    payload = (await response.json()) as Partial<ApiResponse<T>>;
-  } catch {
-    payload = null;
-  }
-
-  if (!response.ok) {
-    throw new ApiError(payload?.message || '请求失败', response.status);
-  }
-
-  if (payload?.code !== 0) {
-    throw new ApiError(payload?.message || '请求失败', payload?.code);
-  }
-
-  return payload.data as T;
+  return apiRequestWithOptions<T>(path, {
+    method: options.method,
+    headers,
+    body: options.body,
+    token: options.token,
+    // 注意：不启用重试，保持行为一致
+    retryOnTransientFailure: false,
+  });
 }
