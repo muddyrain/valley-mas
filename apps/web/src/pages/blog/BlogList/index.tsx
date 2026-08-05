@@ -107,10 +107,6 @@ export default function BlogList() {
   const [aiRecommendResult, setAIRecommendResult] = useState<BlogRecommendResponse | null>(null);
   const firstLoadRef = useRef(true);
   const scrollRestoredRef = useRef(false);
-  const scrollStorageKey = useMemo(
-    () => `${BLOG_LIST_SCROLL_STORAGE_PREFIX}:${location.pathname}${location.search}`,
-    [location.pathname, location.search],
-  );
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -199,6 +195,8 @@ export default function BlogList() {
   }, [loadPosts]);
 
   useEffect(() => {
+    scrollRestoredRef.current = false;
+    const scrollStorageKey = `${BLOG_LIST_SCROLL_STORAGE_PREFIX}:${location.pathname}${location.search}`;
     const saveScroll = () => {
       sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
     };
@@ -207,13 +205,10 @@ export default function BlogList() {
       window.removeEventListener('scroll', saveScroll);
       saveScroll();
     };
-  }, [scrollStorageKey]);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
-    scrollRestoredRef.current = false;
-  }, [scrollStorageKey]);
-
-  useEffect(() => {
+    const scrollStorageKey = `${BLOG_LIST_SCROLL_STORAGE_PREFIX}:${location.pathname}${location.search}`;
     if (navigationType !== 'POP') return;
     if (loading) return;
     if (scrollRestoredRef.current) return;
@@ -235,7 +230,7 @@ export default function BlogList() {
       scrollRestoredRef.current = true;
     });
     return () => window.cancelAnimationFrame(rafId);
-  }, [loading, navigationType, scrollStorageKey]);
+  }, [loading, navigationType, location.pathname, location.search]);
 
   const handleGroupClick = (targetGroupId: string) => {
     if (!targetGroupId) return;
@@ -263,6 +258,11 @@ export default function BlogList() {
   const handleSortChange = (nextSort: 'oldest' | 'newest') => {
     if (nextSort === currentSort) return;
     setValue('sort', nextSort);
+  };
+
+  const handleGroupKeywordChange = (nextKeyword: string) => {
+    setGroupKeyword(nextKeyword);
+    setShowAllGroups(false);
   };
 
   const handleAIRecommend = async () => {
@@ -334,10 +334,6 @@ export default function BlogList() {
 
   const hiddenGroupCount = Math.max(filteredGroupData.length - visibleGroupData.length, 0);
   const showEmptyRefreshingState = refreshing && posts.length === 0;
-
-  useEffect(() => {
-    setShowAllGroups(false);
-  }, [groupKeyword]);
 
   useEffect(() => {
     if (!aiRecommendOpen) return;
@@ -529,7 +525,7 @@ export default function BlogList() {
                       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         value={groupKeyword}
-                        onChange={(event) => setGroupKeyword(event.target.value)}
+                        onChange={(event) => handleGroupKeywordChange(event.target.value)}
                         placeholder="搜索分组"
                         className="h-10 pl-9"
                       />
@@ -820,7 +816,7 @@ export default function BlogList() {
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={groupKeyword}
-                    onChange={(event) => setGroupKeyword(event.target.value)}
+                    onChange={(event) => handleGroupKeywordChange(event.target.value)}
                     placeholder="搜索分组"
                     className="h-10 pl-9"
                   />

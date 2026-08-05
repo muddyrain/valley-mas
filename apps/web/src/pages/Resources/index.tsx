@@ -84,11 +84,6 @@ export default function Resources() {
       `${currentPage}|${activeType || ''}|${currentKeyword || ''}|${currentTag || ''}|${selectedUserId || ''}`,
     [activeType, currentKeyword, currentPage, currentTag, selectedUserId],
   );
-  const scrollStorageKey = useMemo(
-    () => `${RESOURCE_LIST_SCROLL_STORAGE_PREFIX}:${location.pathname}${location.search}`,
-    [location.pathname, location.search],
-  );
-
   useEffect(() => {
     setInputValue(currentKeyword);
   }, [currentKeyword]);
@@ -227,6 +222,8 @@ export default function Resources() {
   };
 
   useEffect(() => {
+    scrollRestoredRef.current = false;
+    const scrollStorageKey = `${RESOURCE_LIST_SCROLL_STORAGE_PREFIX}:${location.pathname}${location.search}`;
     const saveScroll = () => {
       sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
     };
@@ -235,13 +232,10 @@ export default function Resources() {
       window.removeEventListener('scroll', saveScroll);
       saveScroll();
     };
-  }, [scrollStorageKey]);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
-    scrollRestoredRef.current = false;
-  }, [scrollStorageKey]);
-
-  useEffect(() => {
+    const scrollStorageKey = `${RESOURCE_LIST_SCROLL_STORAGE_PREFIX}:${location.pathname}${location.search}`;
     if (navigationType !== 'POP') return;
     if (loading) return;
     if (scrollRestoredRef.current) return;
@@ -263,7 +257,7 @@ export default function Resources() {
       scrollRestoredRef.current = true;
     });
     return () => window.cancelAnimationFrame(rafId);
-  }, [loading, navigationType, scrollStorageKey]);
+  }, [loading, navigationType, location.pathname, location.search]);
 
   const handleFavorite = async (e: React.MouseEvent, resource: Resource) => {
     e.stopPropagation();

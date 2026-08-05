@@ -8,7 +8,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
@@ -126,41 +126,47 @@ export default function ImagePreviewDialog({
   // 转为 inline URL：加 TOS 图片处理参数后浏览器新标签可直接展示（不触发下载）
   const inlineSrc = useMemo(() => toInlineUrl(src), [src]);
 
-  const syncOffset = (nextOffset: Offset) => {
+  const syncOffset = useCallback((nextOffset: Offset) => {
     offsetRef.current = nextOffset;
     setOffset(nextOffset);
-  };
+  }, []);
 
-  const syncScale = (nextScale: number) => {
+  const syncScale = useCallback((nextScale: number) => {
     scaleRef.current = nextScale;
     setScale(nextScale);
-  };
+  }, []);
 
-  const syncRotate = (nextRotate: number) => {
+  const syncRotate = useCallback((nextRotate: number) => {
     rotateRef.current = nextRotate;
     setRotate(nextRotate);
-  };
+  }, []);
 
-  const getOffsetBounds = (nextScale = scaleRef.current, nextRotate = rotateRef.current) => {
-    const fitted = getFittedImageSize(imageSize, stageSize);
-    if (!fitted.width || !fitted.height) return { maxX: 0, maxY: 0 };
+  const getOffsetBounds = useCallback(
+    (nextScale = scaleRef.current, nextRotate = rotateRef.current) => {
+      const fitted = getFittedImageSize(imageSize, stageSize);
+      if (!fitted.width || !fitted.height) return { maxX: 0, maxY: 0 };
 
-    const rotated = isQuarterTurn(nextRotate)
-      ? { width: fitted.height * nextScale, height: fitted.width * nextScale }
-      : { width: fitted.width * nextScale, height: fitted.height * nextScale };
+      const rotated = isQuarterTurn(nextRotate)
+        ? { width: fitted.height * nextScale, height: fitted.width * nextScale }
+        : { width: fitted.width * nextScale, height: fitted.height * nextScale };
 
-    return {
-      maxX: Math.max((rotated.width - stageSize.width) / 2, 0),
-      maxY: Math.max((rotated.height - stageSize.height) / 2, 0),
-    };
-  };
+      return {
+        maxX: Math.max((rotated.width - stageSize.width) / 2, 0),
+        maxY: Math.max((rotated.height - stageSize.height) / 2, 0),
+      };
+    },
+    [imageSize, stageSize],
+  );
 
-  const clampOffsetToBounds = (nextOffset: Offset, bounds = getOffsetBounds()): Offset => ({
-    x: clamp(nextOffset.x, -bounds.maxX, bounds.maxX),
-    y: clamp(nextOffset.y, -bounds.maxY, bounds.maxY),
-  });
+  const clampOffsetToBounds = useCallback(
+    (nextOffset: Offset, bounds = getOffsetBounds()): Offset => ({
+      x: clamp(nextOffset.x, -bounds.maxX, bounds.maxX),
+      y: clamp(nextOffset.y, -bounds.maxY, bounds.maxY),
+    }),
+    [getOffsetBounds],
+  );
 
-  const stopMomentum = (resetVelocity = true) => {
+  const stopMomentum = useCallback((resetVelocity = true) => {
     if (animationFrameRef.current !== null) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
@@ -169,9 +175,9 @@ export default function ImagePreviewDialog({
     if (resetVelocity) {
       velocityRef.current = { x: 0, y: 0 };
     }
-  };
+  }, []);
 
-  const startMomentum = () => {
+  const startMomentum = useCallback(() => {
     if (!canPreview) return;
     if (Math.hypot(velocityRef.current.x, velocityRef.current.y) < MOMENTUM_MIN_VELOCITY) {
       syncOffset(clampOffsetToBounds(offsetRef.current));
@@ -232,37 +238,43 @@ export default function ImagePreviewDialog({
     };
 
     animationFrameRef.current = requestAnimationFrame(step);
-  };
+  }, [canPreview, clampOffsetToBounds, getOffsetBounds, stopMomentum, syncOffset]);
 
-  const zoomTo = (nextScaleValue: number, anchor: Offset = { x: 0, y: 0 }) => {
-    const safeScale = clamp(nextScaleValue, MIN_SCALE, MAX_SCALE);
-    if (safeScale === scaleRef.current) return;
+  const zoomTo = useCallback(
+    (nextScaleValue: number, anchor: Offset = { x: 0, y: 0 }) => {
+      const safeScale = clamp(nextScaleValue, MIN_SCALE, MAX_SCALE);
+      if (safeScale === scaleRef.current) return;
 
-    stopMomentum();
-    const ratio = safeScale / scaleRef.current;
-    const rawOffset = {
-      x: anchor.x - ratio * (anchor.x - offsetRef.current.x),
-      y: anchor.y - ratio * (anchor.y - offsetRef.current.y),
-    };
+      stopMomentum();
+      const ratio = safeScale / scaleRef.current;
+      const rawOffset = {
+        x: anchor.x - ratio * (anchor.x - offsetRef.current.x),
+        y: anchor.y - ratio * (anchor.y - offsetRef.current.y),
+      };
 
-    syncScale(safeScale);
-    syncOffset(clampOffsetToBounds(rawOffset, getOffsetBounds(safeScale, rotateRef.current)));
-  };
+      syncScale(safeScale);
+      syncOffset(clampOffsetToBounds(rawOffset, getOffsetBounds(safeScale, rotateRef.current)));
+    },
+    [clampOffsetToBounds, getOffsetBounds, syncOffset, syncScale, stopMomentum],
+  );
 
-  const rotateBy = (delta: number) => {
-    stopMomentum();
-    const nextRotate = rotateRef.current + delta;
-    syncRotate(nextRotate);
-    syncOffset(
-      clampOffsetToBounds(offsetRef.current, getOffsetBounds(scaleRef.current, nextRotate)),
-    );
-  };
+  const rotateBy = useCallback(
+    (delta: number) => {
+      stopMomentum();
+      const nextRotate = rotateRef.current + delta;
+      syncRotate(nextRotate);
+      syncOffset(
+        clampOffsetToBounds(offsetRef.current, getOffsetBounds(scaleRef.current, nextRotate)),
+      );
+    },
+    [clampOffsetToBounds, getOffsetBounds, stopMomentum, syncOffset, syncRotate],
+  );
 
-  const updateStageSize = () => {
+  const updateStageSize = useCallback(() => {
     const rect = previewStageRef.current?.getBoundingClientRect();
     if (!rect) return;
     setStageSize({ width: rect.width, height: rect.height });
-  };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -273,13 +285,13 @@ export default function ImagePreviewDialog({
     setImageSize({ width: 0, height: 0 });
     setDragging(false);
     setImageLoading(Boolean(src));
-  }, [open, src]);
+  }, [open, src, stopMomentum, syncOffset, syncRotate, syncScale]);
 
   useEffect(() => {
     if (!open) {
       stopMomentum();
     }
-  }, [open]);
+  }, [open, stopMomentum]);
 
   useEffect(() => {
     if (!open) return;
@@ -295,7 +307,7 @@ export default function ImagePreviewDialog({
       observer.disconnect();
       window.removeEventListener('resize', updateStageSize);
     };
-  }, [open]);
+  }, [open, updateStageSize]);
 
   useEffect(
     () => () => {
@@ -309,7 +321,7 @@ export default function ImagePreviewDialog({
   useEffect(() => {
     if (!open) return;
     syncOffset(clampOffsetToBounds(offsetRef.current));
-  }, [open, imageSize, stageSize, scale, rotate]);
+  }, [open, clampOffsetToBounds, syncOffset]);
 
   const reset = () => {
     stopMomentum();

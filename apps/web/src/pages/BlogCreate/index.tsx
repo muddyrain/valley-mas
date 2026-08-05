@@ -11,7 +11,7 @@ import {
   Sparkles,
   Wand2,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -127,7 +127,7 @@ export default function BlogCreate() {
     currentEditingIdRef.current = editingId;
   }, [editingId]);
 
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     try {
       const list = await getAdminGroups({ groupType: 'blog' });
       setGroups(list || []);
@@ -137,53 +137,41 @@ export default function BlogCreate() {
     } catch {
       toast.error('加载分组失败');
     }
-  };
+  }, [groupId, isEditMode]);
 
-  const loadPost = async (postId: string) => {
-    try {
-      setLoadingPost(true);
-      const detail = await getAdminPostDetail(postId);
-      if (currentEditingIdRef.current !== postId) return;
-      if (detail.postType !== 'blog') {
-        toast.error('当前仅支持编辑博客类型内容');
+  const loadPost = useCallback(
+    async (postId: string) => {
+      try {
+        setLoadingPost(true);
+        const detail = await getAdminPostDetail(postId);
+        if (currentEditingIdRef.current !== postId) return;
+        if (detail.postType !== 'blog') {
+          toast.error('当前仅支持编辑博客类型内容');
+          navigate('/my-space');
+          return;
+        }
+        setTitle(detail.title || '');
+        setExcerpt(detail.excerpt || '');
+        setCover(detail.cover || '');
+        setCoverStorageKey(detail.coverStorageKey || '');
+        setPendingCoverRemoteUrl('');
+        setPendingUnsplashDownloadLocation('');
+        setAiPickExcludedIds([]);
+        setContent(detail.content || '');
+        setGroupId(detail.groupId || '');
+        setVisibility(detail.visibility || 'private');
+        setLoadedPostStatus(detail.status || 'draft');
+      } catch {
+        toast.error('加载博客内容失败');
         navigate('/my-space');
-        return;
+      } finally {
+        if (currentEditingIdRef.current === postId) {
+          setLoadingPost(false);
+        }
       }
-      setTitle(detail.title || '');
-      setExcerpt(detail.excerpt || '');
-      setCover(detail.cover || '');
-      setCoverStorageKey(detail.coverStorageKey || '');
-      setPendingCoverRemoteUrl('');
-      setPendingUnsplashDownloadLocation('');
-      setAiPickExcludedIds([]);
-      setContent(detail.content || '');
-      setGroupId(detail.groupId || '');
-      setVisibility(detail.visibility || 'private');
-      setLoadedPostStatus(detail.status || 'draft');
-    } catch {
-      toast.error('加载博客内容失败');
-      navigate('/my-space');
-    } finally {
-      if (currentEditingIdRef.current === postId) {
-        setLoadingPost(false);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-
-    void loadGroups();
-    if (editingId) {
-      void loadPost(editingId);
-    } else {
-      resetCreateForm();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, navigate, editingId]);
+    },
+    [navigate],
+  );
 
   useEffect(() => {
     // 彻底禁用本地草稿缓存，并清理历史遗留数据
@@ -193,29 +181,6 @@ export default function BlogCreate() {
   }, [isEditMode]);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
-        event.preventDefault();
-        void handleSubmit('draft', { stayOnPage: isEditMode, fromShortcut: true });
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    title,
-    content,
-    excerpt,
-    cover,
-    coverStorageKey,
-    groupId,
-    visibility,
-    isEditMode,
-    editingId,
-    coverFile,
-  ]);
-
-  useEffect(() => {
     return () => {
       if (coverObjectUrl) {
         URL.revokeObjectURL(coverObjectUrl);
@@ -223,7 +188,7 @@ export default function BlogCreate() {
     };
   }, [coverObjectUrl]);
 
-  const resetLocalCoverEditing = () => {
+  const resetLocalCoverEditing = useCallback(() => {
     if (coverObjectUrl) {
       URL.revokeObjectURL(coverObjectUrl);
     }
@@ -233,7 +198,7 @@ export default function BlogCreate() {
     setCoverZoom(1);
     setCoverOffsetX(0);
     setCoverOffsetY(0);
-  };
+  }, [coverObjectUrl]);
 
   const applyTemporaryCoverFile = async (file: File) => {
     const objectUrl = URL.createObjectURL(file);
@@ -277,7 +242,7 @@ export default function BlogCreate() {
     await applyTemporaryCoverFile(file);
   };
 
-  const resetCreateForm = () => {
+  const resetCreateForm = useCallback(() => {
     setTitle('');
     setExcerpt('');
     setCover('');
@@ -291,9 +256,23 @@ export default function BlogCreate() {
     setLoadingPost(false);
     setLoadedPostStatus('draft');
     resetLocalCoverEditing();
-  };
+  }, [resetLocalCoverEditing]);
 
-  const renderCoverToBlob = async (): Promise<Blob | null> => {
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
+    void loadGroups();
+    if (editingId) {
+      void loadPost(editingId);
+    } else {
+      resetCreateForm();
+    }
+  }, [isAuthenticated, navigate, editingId, loadGroups, loadPost, resetCreateForm]);
+
+  const renderCoverToBlob = useCallback(async (): Promise<Blob | null> => {
     if (!coverFile || !coverImageMeta) return null;
     const viewport = coverViewportRef.current;
     if (!viewport) return null;
@@ -356,37 +335,60 @@ export default function BlogCreate() {
       renderH * boxScaleY,
     );
     return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.95));
-  };
+  }, [coverFile, coverImageMeta, coverOffsetX, coverOffsetY, coverObjectUrl, coverZoom]);
 
-  const uploadCoverIfNeeded = async (shouldUpload: boolean) => {
-    if (!shouldUpload) {
-      if (pendingCoverRemoteUrl) {
-        return {
-          cover: '',
-          coverStorageKey: '',
-        };
-      }
-      return {
-        cover: cover.trim(),
-        coverStorageKey: coverStorageKey.trim(),
-      };
-    }
-
-    if (!coverFile || !coverObjectUrl) {
-      const remoteCoverUrl = pendingCoverRemoteUrl || (!coverStorageKey ? cover.trim() : '');
-      if (!remoteCoverUrl) {
+  const uploadCoverIfNeeded = useCallback(
+    async (shouldUpload: boolean) => {
+      if (!shouldUpload) {
+        if (pendingCoverRemoteUrl) {
+          return {
+            cover: '',
+            coverStorageKey: '',
+          };
+        }
         return {
           cover: cover.trim(),
           coverStorageKey: coverStorageKey.trim(),
         };
       }
 
+      if (!coverFile || !coverObjectUrl) {
+        const remoteCoverUrl = pendingCoverRemoteUrl || (!coverStorageKey ? cover.trim() : '');
+        if (!remoteCoverUrl) {
+          return {
+            cover: cover.trim(),
+            coverStorageKey: coverStorageKey.trim(),
+          };
+        }
+
+        setCoverUploading(true);
+        try {
+          const result = await uploadBlogCoverByUrl({ url: remoteCoverUrl });
+          setCover(result.url);
+          setCoverStorageKey(result.storageKey);
+          setPendingCoverRemoteUrl('');
+          return {
+            cover: result.url,
+            coverStorageKey: result.storageKey,
+          };
+        } finally {
+          setCoverUploading(false);
+        }
+      }
+
       setCoverUploading(true);
       try {
-        const result = await uploadBlogCoverByUrl({ url: remoteCoverUrl });
+        const blob = await renderCoverToBlob();
+        if (!blob) throw new Error('cover process failed');
+        const formData = new FormData();
+        const uploadName = coverFile.name.replace(/\.[^.]+$/, '') || 'blog-cover';
+        const uploadFile = new File([blob], `${uploadName}.jpg`, { type: 'image/jpeg' });
+        formData.append('file', uploadFile);
+        const result = await uploadBlogCover(formData);
         setCover(result.url);
         setCoverStorageKey(result.storageKey);
         setPendingCoverRemoteUrl('');
+        resetLocalCoverEditing();
         return {
           cover: result.url,
           coverStorageKey: result.storageKey,
@@ -394,29 +396,17 @@ export default function BlogCreate() {
       } finally {
         setCoverUploading(false);
       }
-    }
-
-    setCoverUploading(true);
-    try {
-      const blob = await renderCoverToBlob();
-      if (!blob) throw new Error('cover process failed');
-      const formData = new FormData();
-      const uploadName = coverFile.name.replace(/\.[^.]+$/, '') || 'blog-cover';
-      const uploadFile = new File([blob], `${uploadName}.jpg`, { type: 'image/jpeg' });
-      formData.append('file', uploadFile);
-      const result = await uploadBlogCover(formData);
-      setCover(result.url);
-      setCoverStorageKey(result.storageKey);
-      setPendingCoverRemoteUrl('');
-      resetLocalCoverEditing();
-      return {
-        cover: result.url,
-        coverStorageKey: result.storageKey,
-      };
-    } finally {
-      setCoverUploading(false);
-    }
-  };
+    },
+    [
+      cover,
+      coverFile,
+      coverObjectUrl,
+      coverStorageKey,
+      pendingCoverRemoteUrl,
+      renderCoverToBlob,
+      resetLocalCoverEditing,
+    ],
+  );
 
   const handleAIGenerateExcerpt = async () => {
     const trimmedContent = content.trim();
@@ -536,89 +526,116 @@ export default function BlogCreate() {
     }
   };
 
-  const handleSubmit = async (
-    status: 'draft' | 'published',
-    options?: { stayOnPage?: boolean; fromShortcut?: boolean },
-  ) => {
-    const trimmedTitle = title.trim();
-    const trimmedContent = content.trim();
-    if (!trimmedTitle) {
-      toast.error('请输入标题');
-      return;
-    }
-    if (!trimmedContent) {
-      toast.error('请输入正文内容');
-      return;
-    }
-
-    try {
-      setSubmitIntent(status);
-      setSubmitting(true);
-      const shouldTriggerUnsplashDownload =
-        status === 'published' && !!pendingUnsplashDownloadLocation;
-      const unsplashDownloadLocation = pendingUnsplashDownloadLocation;
-      const resolvedCover = await uploadCoverIfNeeded(status === 'published');
-      if (shouldTriggerUnsplashDownload && resolvedCover.coverStorageKey) {
-        void triggerUnsplashDownload(unsplashDownloadLocation).catch(() => undefined);
-        setPendingUnsplashDownloadLocation('');
+  const handleSubmit = useCallback(
+    async (
+      status: 'draft' | 'published',
+      options?: { stayOnPage?: boolean; fromShortcut?: boolean },
+    ) => {
+      const trimmedTitle = title.trim();
+      const trimmedContent = content.trim();
+      if (!trimmedTitle) {
+        toast.error('请输入标题');
+        return;
       }
-      const resolvedExcerpt =
-        status === 'published' ? createAutoExcerpt(excerpt, trimmedContent) : excerpt.trim();
-      if (isEditMode && editingId) {
-        await updatePost(editingId, {
-          title: trimmedTitle,
-          postType: 'blog',
-          content: trimmedContent,
-          excerpt: resolvedExcerpt,
-          cover: resolvedCover.cover || '',
-          coverStorageKey: resolvedCover.coverStorageKey || '',
-          groupId: groupId || '0',
-          visibility,
-          status,
-        });
-        if (status === 'published') {
-          setLoadedPostStatus('published');
-          toast.success('博客更新并发布成功');
-        } else if (loadedPostStatus === 'published') {
-          toast.success('草稿已保存，当前线上正文未受影响');
-        } else if (options?.fromShortcut) {
-          toast.success('草稿已快捷保存（未离开当前页面）');
-        } else {
-          toast.success('博客更新成功');
+      if (!trimmedContent) {
+        toast.error('请输入正文内容');
+        return;
+      }
+
+      try {
+        setSubmitIntent(status);
+        setSubmitting(true);
+        const shouldTriggerUnsplashDownload =
+          status === 'published' && !!pendingUnsplashDownloadLocation;
+        const unsplashDownloadLocation = pendingUnsplashDownloadLocation;
+        const resolvedCover = await uploadCoverIfNeeded(status === 'published');
+        if (shouldTriggerUnsplashDownload && resolvedCover.coverStorageKey) {
+          void triggerUnsplashDownload(unsplashDownloadLocation).catch(() => undefined);
+          setPendingUnsplashDownloadLocation('');
         }
-      } else {
-        await createPost({
-          title: trimmedTitle,
-          postType: 'blog',
-          content: trimmedContent,
-          excerpt: resolvedExcerpt,
-          cover: resolvedCover.cover || undefined,
-          coverStorageKey: resolvedCover.coverStorageKey || undefined,
-          groupId: groupId || undefined,
-          visibility,
-          status,
-          publishNow: status === 'published',
-        });
-        setLoadedPostStatus(status);
-        toast.success(status === 'published' ? '博客发布成功' : '草稿保存成功');
-      }
-
-      if (!options?.stayOnPage) {
-        if (isEditMode) {
-          navigate(returnTo, {
-            state: { refreshPostsAt: Date.now() },
+        const resolvedExcerpt =
+          status === 'published' ? createAutoExcerpt(excerpt, trimmedContent) : excerpt.trim();
+        if (isEditMode && editingId) {
+          await updatePost(editingId, {
+            title: trimmedTitle,
+            postType: 'blog',
+            content: trimmedContent,
+            excerpt: resolvedExcerpt,
+            cover: resolvedCover.cover || '',
+            coverStorageKey: resolvedCover.coverStorageKey || '',
+            groupId: groupId || '0',
+            visibility,
+            status,
           });
+          if (status === 'published') {
+            setLoadedPostStatus('published');
+            toast.success('博客更新并发布成功');
+          } else if (loadedPostStatus === 'published') {
+            toast.success('草稿已保存，当前线上正文未受影响');
+          } else if (options?.fromShortcut) {
+            toast.success('草稿已快捷保存（未离开当前页面）');
+          } else {
+            toast.success('博客更新成功');
+          }
         } else {
-          navigateBackOrFallback(navigate, '/my-space/posts');
+          await createPost({
+            title: trimmedTitle,
+            postType: 'blog',
+            content: trimmedContent,
+            excerpt: resolvedExcerpt,
+            cover: resolvedCover.cover || undefined,
+            coverStorageKey: resolvedCover.coverStorageKey || undefined,
+            groupId: groupId || undefined,
+            visibility,
+            status,
+            publishNow: status === 'published',
+          });
+          setLoadedPostStatus(status);
+          toast.success(status === 'published' ? '博客发布成功' : '草稿保存成功');
         }
+
+        if (!options?.stayOnPage) {
+          if (isEditMode) {
+            navigate(returnTo, {
+              state: { refreshPostsAt: Date.now() },
+            });
+          } else {
+            navigateBackOrFallback(navigate, '/my-space/posts');
+          }
+        }
+      } catch {
+        toast.error(status === 'published' ? '提交失败，请稍后重试' : '保存失败，请稍后重试');
+      } finally {
+        setSubmitting(false);
+        setSubmitIntent(null);
       }
-    } catch {
-      toast.error(status === 'published' ? '提交失败，请稍后重试' : '保存失败，请稍后重试');
-    } finally {
-      setSubmitting(false);
-      setSubmitIntent(null);
-    }
-  };
+    },
+    [
+      title,
+      content,
+      excerpt,
+      loadedPostStatus,
+      pendingUnsplashDownloadLocation,
+      groupId,
+      visibility,
+      isEditMode,
+      editingId,
+      uploadCoverIfNeeded,
+      navigate,
+      returnTo,
+    ],
+  );
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void handleSubmit('draft', { stayOnPage: isEditMode, fromShortcut: true });
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleSubmit, isEditMode]);
 
   const handleSelectLocalCover = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

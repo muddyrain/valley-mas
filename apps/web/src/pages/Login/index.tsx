@@ -16,7 +16,7 @@ export default function Login() {
   const [searchParams] = useSearchParams();
   const redirectPath = searchParams.get('redirect') || '/';
   const safeRedirectPath =
-    redirectPath && redirectPath.startsWith('/') && redirectPath !== '/login' ? redirectPath : '/';
+    redirectPath?.startsWith('/') && redirectPath !== '/login' ? redirectPath : '/';
 
   const [formData, setFormData] = useState({
     email: '',

@@ -48,6 +48,9 @@ jobs:
       - name: Test Web
         run: pnpm --filter @valley/web test
 
+      - name: Check Web Coverage Surface
+        run: pnpm --filter @valley/web check:coverage-surface
+
       - name: Test Web Coverage Gate
         run: pnpm --filter @valley/web test:cov
 

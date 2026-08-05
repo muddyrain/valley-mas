@@ -158,6 +158,11 @@ export default function MyResources() {
     }
   }, [activeAlbumId, activeType, isAuthenticated, loadResources, currentPage]);
 
+  // 打开编辑弹窗
+  const handleOpenEdit = useCallback((resource: MyResource) => {
+    setEditTarget(resource);
+  }, []);
+
   // 从详情页跳转过来时自动打开编辑弹框
   useEffect(() => {
     const editId = (location.state as { editResourceId?: string } | null)?.editResourceId;
@@ -168,8 +173,7 @@ export default function MyResources() {
       // 清掉 state，防止刷新再次触发
       navigate(location.pathname, { replace: true, state: {} });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resources, location.state]);
+  }, [handleOpenEdit, location.pathname, location.state, navigate, resources]);
 
   // 删除资源
   const handleDelete = async () => {
@@ -252,11 +256,6 @@ export default function MyResources() {
     } finally {
       setBatchUpdatingVisibility(false);
     }
-  };
-
-  // 打开编辑弹窗
-  const handleOpenEdit = (resource: MyResource) => {
-    setEditTarget(resource);
   };
 
   if (!isAuthenticated) return null;

@@ -22,7 +22,11 @@ describe('BatchMarkdownImportDialog', () => {
 
     await act(async () => {
       root.render(
-        <BatchMarkdownImportDialog open={false} onOpenChange={() => undefined} groups={[]} />,
+        React.createElement(BatchMarkdownImportDialog, {
+          open: false,
+          onOpenChange: () => undefined,
+          groups: [],
+        }),
       );
       await new Promise((resolve) => window.setTimeout(resolve, 50));
     });

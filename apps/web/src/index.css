@@ -194,7 +194,7 @@ button {
 /* Keep drag and pan on the compositor path: edge hit testing and visual transitions
  * are not useful while the canvas is already moving. */
 .workflow-canvas.is-interacting .react-flow__edge-hover-target {
-  pointer-events: none !important;
+  pointer-events: none;
 }
 
 .workflow-canvas.is-interacting .react-flow__edge-path,

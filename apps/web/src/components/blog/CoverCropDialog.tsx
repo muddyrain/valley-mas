@@ -1,5 +1,5 @@
 import { ImagePlus, Loader2, Move, ZoomIn } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BLOG_COVER_ASPECT_CLASS,
   BLOG_COVER_OUTPUT_HEIGHT,
@@ -60,19 +60,22 @@ export function CoverCropDialog({
     };
   }, [open, imageUrl]);
 
-  const getRenderRect = (boxW: number, boxH: number, nextZoom = zoom) => {
-    const img = loadedImageRef.current;
-    if (!img || !boxW || !boxH) {
-      return { drawX: 0, drawY: 0, drawW: 0, drawH: 0 };
-    }
-    const base = Math.max(boxW / img.naturalWidth, boxH / img.naturalHeight);
-    const scale = base * nextZoom;
-    const drawW = img.naturalWidth * scale;
-    const drawH = img.naturalHeight * scale;
-    const drawX = (boxW - drawW) / 2 + offsetX;
-    const drawY = (boxH - drawH) / 2 + offsetY;
-    return { drawX, drawY, drawW, drawH };
-  };
+  const getRenderRect = useCallback(
+    (boxW: number, boxH: number, nextZoom = zoom) => {
+      const img = loadedImageRef.current;
+      if (!img || !boxW || !boxH) {
+        return { drawX: 0, drawY: 0, drawW: 0, drawH: 0 };
+      }
+      const base = Math.max(boxW / img.naturalWidth, boxH / img.naturalHeight);
+      const scale = base * nextZoom;
+      const drawW = img.naturalWidth * scale;
+      const drawH = img.naturalHeight * scale;
+      const drawX = (boxW - drawW) / 2 + offsetX;
+      const drawY = (boxH - drawH) / 2 + offsetY;
+      return { drawX, drawY, drawW, drawH };
+    },
+    [offsetX, offsetY, zoom],
+  );
 
   useEffect(() => {
     const canvas = canvasRef.current;

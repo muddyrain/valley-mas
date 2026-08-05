@@ -1,3 +1,4 @@
+import { InspectorRuntime } from '@valley/devbox-inspector-runtime';
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
@@ -265,6 +266,10 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
       </Routes>
+      <InspectorRuntime
+        enabled={import.meta.env.DEV}
+        workspaceRoot={import.meta.env.VITE_INSPECTOR_WORKSPACE_ROOT || ''}
+      />
       <GlobalScrollButton />
       <Toaster />
     </>
