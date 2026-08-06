@@ -9,17 +9,16 @@ import {
   Save,
   Send,
   Sparkles,
-  Wand2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { createAIImageGeneration, getAIImageGeneration } from '@/api/aiImages';
 import {
   createGroup,
   createPost,
   type ExternalCoverImage,
   type Group,
-  generateBlogCover,
   generateBlogExcerpt,
   getAdminGroups,
   getAdminPostDetail,
@@ -32,12 +31,18 @@ import {
 } from '@/api/blog';
 import type { Resource } from '@/api/resource';
 import AiImageLoading from '@/components/AiImageLoading';
-import { ModelPicker } from '@/components/ai/ModelPicker';
 import {
   BLOG_COVER_ASPECT_CLASS,
   BLOG_COVER_OUTPUT_HEIGHT,
   BLOG_COVER_OUTPUT_WIDTH,
 } from '@/components/blog';
+import {
+  AICoverAssistantDialog,
+  type AICoverAssistantPayload,
+  BLOG_COVER_AI_ASPECT_RATIO,
+  BLOG_COVER_AI_PROMPT,
+  BLOG_COVER_AI_QUALITY,
+} from '@/components/blog/AICoverAssistantDialog';
 import { BatchMarkdownImportDialog } from '@/components/blog/BatchMarkdownImportDialog';
 import { BlogWorkflowDialog } from '@/components/blog/BlogWorkflowDialog';
 import { CoverCropDialog } from '@/components/blog/CoverCropDialog';
@@ -49,7 +54,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { createAutoExcerpt, parseMarkdownImport } from '@/utils/blogImport';
 import { navigateBackOrFallback } from '@/utils/navigation';
-import { base64ToImageFile, waitNextPaint } from './utils';
+import { waitNextPaint } from './utils';
 
 type CoverImageMeta = {
   width: number;
@@ -63,6 +68,10 @@ const BLOG_EDITOR_HEADING_OPTIONS = [
   { label: '标题 3', level: 3 },
   { label: '标题 4', level: 4 },
 ];
+const BLOG_COVER_AI_RECIPE_ID = 'cover';
+const BLOG_COVER_AI_POLL_INTERVAL_MS = 1500;
+const BLOG_COVER_AI_POLL_ERROR_INTERVAL_MS = 3000;
+const BLOG_COVER_AI_POLL_TIMEOUT_MS = 120000;
 
 export default function BlogCreate() {
   const navigate = useNavigate();
@@ -100,7 +109,6 @@ export default function BlogCreate() {
   const [submitIntent, setSubmitIntent] = useState<'draft' | 'published' | null>(null);
   const [aiExcerptLoading, setAiExcerptLoading] = useState(false);
   const [aiCoverLoading, setAiCoverLoading] = useState(false);
-  const [coverModelID, setCoverModelID] = useState('');
   const [aiCoverSource, setAiCoverSource] = useState<'manual' | 'import'>('manual');
   const [importingMarkdown, setImportingMarkdown] = useState(false);
   const [batchImportDialogOpen, setBatchImportDialogOpen] = useState(false);
@@ -122,6 +130,8 @@ export default function BlogCreate() {
 
   const coverViewportRef = useRef<HTMLDivElement | null>(null);
   const markdownImportInputRef = useRef<HTMLInputElement | null>(null);
+  const aiCoverGenerationTimerRef = useRef<number>();
+  const aiCoverGenerationSessionRef = useRef(0);
 
   useEffect(() => {
     currentEditingIdRef.current = editingId;
@@ -187,6 +197,15 @@ export default function BlogCreate() {
       }
     };
   }, [coverObjectUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (aiCoverGenerationTimerRef.current) {
+        window.clearTimeout(aiCoverGenerationTimerRef.current);
+      }
+      aiCoverGenerationSessionRef.current += 1;
+    };
+  }, []);
 
   const resetLocalCoverEditing = useCallback(() => {
     if (coverObjectUrl) {
@@ -437,58 +456,122 @@ export default function BlogCreate() {
     excerpt?: string;
     content?: string;
     source?: 'manual' | 'import';
+    modelId?: string;
+    aspectRatio?: string;
+    quality?: string;
+    prompt?: string;
   }) => {
     const trimmedContent = (payload?.content ?? content).trim();
     if (!trimmedContent) return;
-    if (!coverModelID) {
+    const modelId = (payload?.modelId || '').trim();
+    if (!modelId) {
       toast.error('请先选择生图模型');
       return;
+    }
+    const aspectRatio = payload?.aspectRatio || BLOG_COVER_AI_ASPECT_RATIO;
+    const quality = payload?.quality || BLOG_COVER_AI_QUALITY;
+    const generationPrompt =
+      (payload?.prompt || BLOG_COVER_AI_PROMPT).trim() || BLOG_COVER_AI_PROMPT;
+    const sessionId = ++aiCoverGenerationSessionRef.current;
+    if (aiCoverGenerationTimerRef.current) {
+      window.clearTimeout(aiCoverGenerationTimerRef.current);
+      aiCoverGenerationTimerRef.current = undefined;
     }
 
     try {
       setAiCoverSource(payload?.source ?? 'manual');
       setAiCoverLoading(true);
-      const result = await generateBlogCover({
-        title: (payload?.title ?? title).trim(),
-        excerpt: (payload?.excerpt ?? excerpt).trim(),
-        content: trimmedContent,
-        modelId: coverModelID,
+      const result = await createAIImageGeneration({
+        modelId,
+        recipeId: BLOG_COVER_AI_RECIPE_ID,
+        brief: generationPrompt,
+        aspectRatio,
+        quality,
+        references: [],
       });
+      const generationId = result.generation.id;
+      const startedAt = Date.now();
 
-      if (result.imageBase64) {
-        const mimeType = result.mimeType || 'image/jpeg';
-        const fileExt = mimeType.includes('png') ? 'png' : 'jpg';
-        const nextCoverFile = base64ToImageFile(
-          result.imageBase64,
-          mimeType,
-          `ai-blog-cover-${Date.now()}.${fileExt}`,
-        );
-        await applyTemporaryCoverFile(nextCoverFile);
-        toast.success('AI 封面已生成（临时预览，发布时上传）');
-        return;
-      }
-
-      if (result.imageUrl) {
-        try {
-          await importRemoteCoverAsLocalFile(result.imageUrl);
-        } catch {
-          if (coverFile || coverObjectUrl) {
-            resetLocalCoverEditing();
+      await new Promise<void>((resolve) => {
+        const poll = async () => {
+          if (sessionId !== aiCoverGenerationSessionRef.current) {
+            resolve();
+            return;
           }
-          setCover(result.imageUrl);
-          setCoverStorageKey('');
-          setPendingCoverRemoteUrl(result.imageUrl);
-        }
-        toast.success('AI 封面已生成（临时预览，发布时上传）');
-        return;
-      }
 
-      toast.error('AI 未返回可用封面图');
+          if (Date.now() - startedAt >= BLOG_COVER_AI_POLL_TIMEOUT_MS) {
+            if (sessionId === aiCoverGenerationSessionRef.current) {
+              toast.error('AI 生成超时，请稍后重试');
+            }
+            resolve();
+            return;
+          }
+
+          try {
+            const generationResult = await getAIImageGeneration(generationId);
+            if (sessionId !== aiCoverGenerationSessionRef.current) {
+              resolve();
+              return;
+            }
+            const generation = generationResult.generation;
+            if (generation.status === 'succeeded') {
+              if (!generation.resultUrl) {
+                toast.error('AI 未返回可用封面图');
+                resolve();
+                return;
+              }
+              try {
+                await importRemoteCoverAsLocalFile(generation.resultUrl);
+              } catch {
+                if (coverFile || coverObjectUrl) {
+                  resetLocalCoverEditing();
+                }
+                setCover(generation.resultUrl);
+                setCoverStorageKey('');
+                setPendingCoverRemoteUrl(generation.resultUrl);
+              }
+              toast.success('AI 生图完成（临时预览，发布时上传）');
+              resolve();
+              return;
+            }
+
+            if (generation.status === 'failed') {
+              toast.error(generation.errorMessage || 'AI 生图失败');
+              resolve();
+              return;
+            }
+
+            if (generation.status === 'paused') {
+              toast.error('AI 生图任务已暂停，请稍后重试');
+              resolve();
+              return;
+            }
+
+            aiCoverGenerationTimerRef.current = window.setTimeout(() => {
+              void poll();
+            }, BLOG_COVER_AI_POLL_INTERVAL_MS);
+          } catch {
+            if (sessionId !== aiCoverGenerationSessionRef.current) {
+              resolve();
+              return;
+            }
+            aiCoverGenerationTimerRef.current = window.setTimeout(() => {
+              void poll();
+            }, BLOG_COVER_AI_POLL_ERROR_INTERVAL_MS);
+          }
+        };
+
+        aiCoverGenerationTimerRef.current = window.setTimeout(() => {
+          void poll();
+        }, 1000);
+      });
     } catch {
       // 请求层已统一处理并展示后端错误信息（例如模型配置错误）
     } finally {
-      setAiCoverLoading(false);
-      setAiCoverSource('manual');
+      if (sessionId === aiCoverGenerationSessionRef.current) {
+        setAiCoverLoading(false);
+        setAiCoverSource('manual');
+      }
     }
   };
 
@@ -769,6 +852,30 @@ export default function BlogCreate() {
     }
   };
 
+  const handleAICoverAssistantConfirm = async (payload: AICoverAssistantPayload) => {
+    if (isContentEmpty) {
+      toast.error('请先输入正文内容');
+      return;
+    }
+    if (payload.mode === 'generate' && !payload.modelId) {
+      toast.error('请先选择生图模型');
+      return;
+    }
+
+    if (payload.mode === 'pick') {
+      await handleAIPickCover();
+      return;
+    }
+
+    await handleAIGenerateCover({
+      modelId: payload.modelId,
+      aspectRatio: payload.aspectRatio,
+      quality: payload.quality,
+      prompt: payload.prompt,
+      source: 'manual',
+    });
+  };
+
   const handleCreateGroup = async () => {
     const name = newGroupName.trim();
     if (!name) {
@@ -1008,71 +1115,29 @@ export default function BlogCreate() {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs text-muted-foreground">封面 URL（可选）</span>
                     <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => void handleAIPickCover()}
-                        disabled={
-                          isContentEmpty ||
-                          aiPickLoading ||
-                          aiCoverLoading ||
-                          coverUploading ||
-                          submitting
+                      <AICoverAssistantDialog
+                        disabled={actionBusy || loadingPost}
+                        isContentEmpty={isContentEmpty}
+                        busy={aiPickLoading || aiCoverLoading || submitting}
+                        onConfirm={handleAICoverAssistantConfirm}
+                        trigger={
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={actionBusy || loadingPost}
+                            className="rounded-xl"
+                          >
+                            {aiCoverLoading || aiPickLoading ? (
+                              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Sparkles className="mr-1.5 h-4 w-4" />
+                            )}
+                            AI 封面助手
+                          </Button>
                         }
-                        className="inline-flex h-6 items-center gap-1 rounded-lg border border-primary/30 bg-accent px-1.5 text-xs font-medium text-primary transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-45"
-                        title={
-                          isContentEmpty
-                            ? '请先输入正文内容'
-                            : aiPickExcludedIds.length > 0
-                              ? '换一张：从资源池再挑一张不重复的封面'
-                              : 'AI 从我的资源池挑一张封面'
-                        }
-                      >
-                        {aiPickLoading ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Wand2 className="h-3.5 w-3.5" />
-                        )}
-                        {aiPickLoading
-                          ? '选图中'
-                          : aiPickExcludedIds.length > 0
-                            ? '换一张'
-                            : 'AI 选图'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleAIGenerateCover()}
-                        disabled={
-                          isContentEmpty ||
-                          !coverModelID ||
-                          aiCoverLoading ||
-                          coverUploading ||
-                          submitting
-                        }
-                        className="inline-flex h-6 items-center gap-1 rounded-lg border border-primary/30 bg-accent px-1.5 text-xs font-medium text-primary transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-45"
-                        title={
-                          isContentEmpty
-                            ? '请先输入正文内容'
-                            : !coverModelID
-                              ? '请先选择生图模型'
-                              : 'AI 自动配图为封面'
-                        }
-                      >
-                        {aiCoverLoading ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <ImagePlus className="h-3.5 w-3.5" />
-                        )}
-                        {aiCoverLoading ? '配图中' : 'AI配图封面'}
-                      </button>
+                      />
                     </div>
-                  </div>
-                  <div className="mb-3">
-                    <ModelPicker
-                      value={coverModelID || undefined}
-                      onValueChange={setCoverModelID}
-                      capability="image_generation"
-                      label="生图模型"
-                    />
                   </div>
                   <div className="flex gap-2">
                     <Input
@@ -1119,8 +1184,8 @@ export default function BlogCreate() {
                     show={aiCoverLoading}
                     title={
                       aiCoverSource === 'import'
-                        ? '正在根据导入内容生成封面图...'
-                        : 'AI 正在生成封面图...'
+                        ? 'AI 生图工具正在根据导入内容生成封面图...'
+                        : 'AI 生图工具正在生成封面图...'
                     }
                   />
                   {(!!cover || !!coverObjectUrl) && (

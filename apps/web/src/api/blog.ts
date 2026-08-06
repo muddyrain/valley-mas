@@ -440,6 +440,7 @@ export function getAdminPosts(
     status?: string;
     postType?: PostType;
     groupId?: string;
+    sort?: 'newest' | 'oldest' | 'created';
   } = {},
 ) {
   return request.get<unknown, PostListData>('/admin/blog/posts', { params });

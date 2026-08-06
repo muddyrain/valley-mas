@@ -163,6 +163,7 @@ export default function MyPosts() {
         pageSize: BLOG_PAGE_SIZE,
         postType: 'blog',
         groupId: blogGroupFilter || undefined,
+        sort: 'created',
       });
       setBlogPosts(blogData.list || []);
       setBlogTotal(blogData.total || 0);

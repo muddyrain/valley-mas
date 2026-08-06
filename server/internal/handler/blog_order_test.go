@@ -27,3 +27,21 @@ func TestBuildPostTimelineOrderExprUsesStableTiebreakers(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildAdminPostListOrderExprSupportsCreatedSort(t *testing.T) {
+	gotCreated := buildAdminPostListOrderExpr("created")
+	if gotCreated != "is_top DESC, created_at DESC, id DESC" {
+		t.Fatalf("buildAdminPostListOrderExpr(%q) = %q, want %q", "created", gotCreated, "is_top DESC, created_at DESC, id DESC")
+	}
+
+	gotCreatedUpper := buildAdminPostListOrderExpr("CREATED")
+	if gotCreatedUpper != "is_top DESC, created_at DESC, id DESC" {
+		t.Fatalf("buildAdminPostListOrderExpr(%q) = %q, want %q", "CREATED", gotCreatedUpper, "is_top DESC, created_at DESC, id DESC")
+	}
+
+	gotDefault := buildAdminPostListOrderExpr("")
+	wantDefault := buildPostTimelineOrderExpr("")
+	if gotDefault != wantDefault {
+		t.Fatalf("buildAdminPostListOrderExpr(%q) = %q, want %q", "", gotDefault, wantDefault)
+	}
+}

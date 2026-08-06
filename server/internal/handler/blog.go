@@ -36,6 +36,14 @@ func buildPostTimelineOrderExpr(sort string) string {
 	return orderExpr
 }
 
+func buildAdminPostListOrderExpr(sort string) string {
+	normalizedSort := strings.TrimSpace(strings.ToLower(sort))
+	if normalizedSort == "created" {
+		return "is_top DESC, created_at DESC, id DESC"
+	}
+	return buildPostTimelineOrderExpr(normalizedSort)
+}
+
 func buildScopedPostOrderExpr(groupScoped bool) string {
 	orderField := "sort_order"
 	if groupScoped {
@@ -1354,6 +1362,7 @@ func AdminGetPosts(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
 	status := c.Query("status")
 	groupIDRaw := strings.TrimSpace(c.Query("groupId"))
+	sort := c.Query("sort")
 	postType := ""
 	if raw := strings.TrimSpace(c.Query("postType")); raw != "" {
 		postType = normalizePostType(raw)
@@ -1395,7 +1404,7 @@ func AdminGetPosts(c *gin.Context) {
 	query.Count(&total)
 
 	var posts []model.Post
-	query = applyPostListOrder(query, "")
+	query = query.Order(buildAdminPostListOrderExpr(sort))
 	applyPostListQueryShape(query).
 		Limit(pageSize).
 		Offset(offset).
