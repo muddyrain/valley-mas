@@ -226,7 +226,12 @@ export function AICoverAssistantDialog({
                     >
                       宽高比
                     </Label>
-                    <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                    <Select
+                      value={aspectRatio}
+                      onValueChange={(nextValue) =>
+                        setAspectRatio(nextValue || BLOG_COVER_AI_ASPECT_RATIO)
+                      }
+                    >
                       <SelectTrigger id="blog-cover-assistant-aspect" className="w-full rounded-xl">
                         <SelectValue placeholder="选择宽高比" />
                       </SelectTrigger>
@@ -246,7 +251,10 @@ export function AICoverAssistantDialog({
                     >
                       清晰度
                     </Label>
-                    <Select value={quality} onValueChange={setQuality}>
+                    <Select
+                      value={quality}
+                      onValueChange={(nextValue) => setQuality(nextValue || BLOG_COVER_AI_QUALITY)}
+                    >
                       <SelectTrigger
                         id="blog-cover-assistant-quality"
                         className="w-full rounded-xl"

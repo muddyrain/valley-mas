@@ -130,7 +130,7 @@ export default function BlogCreate() {
 
   const coverViewportRef = useRef<HTMLDivElement | null>(null);
   const markdownImportInputRef = useRef<HTMLInputElement | null>(null);
-  const aiCoverGenerationTimerRef = useRef<number>();
+  const aiCoverGenerationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiCoverGenerationSessionRef = useRef(0);
 
   useEffect(() => {
@@ -475,7 +475,7 @@ export default function BlogCreate() {
     const sessionId = ++aiCoverGenerationSessionRef.current;
     if (aiCoverGenerationTimerRef.current) {
       window.clearTimeout(aiCoverGenerationTimerRef.current);
-      aiCoverGenerationTimerRef.current = undefined;
+      aiCoverGenerationTimerRef.current = null;
     }
 
     try {
