@@ -1,4 +1,6 @@
 import {
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   FileText,
   MoreHorizontal,
@@ -61,6 +63,25 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 
+const STYLE_PROMPT_SEED_PATH = '/blog-cover-style-prompts.json';
+const PROMPT_PAGE_SIZE = 10;
+
+interface StylePromptSeed {
+  name: string;
+  description: string;
+  content: string;
+  tags: string[];
+}
+
+async function loadStylePromptSeeds(): Promise<StylePromptSeed[]> {
+  const response = await fetch(STYLE_PROMPT_SEED_PATH);
+  if (!response.ok) {
+    throw new Error('读取提示词库模板失败');
+  }
+  const result = (await response.json()) as StylePromptSeed[];
+  return result.filter((item) => item.name?.trim() && item.content?.trim());
+}
+
 function formatPromptDate(value: string) {
   return new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric',
@@ -89,11 +110,16 @@ function formatPromptTags(tags: string[]) {
   return tags.join('，');
 }
 
+function normalizePromptName(value: string) {
+  return value.trim().toLocaleLowerCase();
+}
+
 export default function PromptResources() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [prompts, setPrompts] = useState<AIPrompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [seedingPrompts, setSeedingPrompts] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<AIPrompt | null>(null);
@@ -105,6 +131,7 @@ export default function PromptResources() {
   const [tagText, setTagText] = useState('');
   const keyword = searchParams.get('prompt_search') || '';
   const activeTag = searchParams.get('prompt_tag') || '';
+  const currentPage = Math.max(1, Number.parseInt(searchParams.get('prompt_page') || '1', 10) || 1);
 
   const visiblePrompts = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLocaleLowerCase();
@@ -117,6 +144,22 @@ export default function PromptResources() {
       return matchesKeyword && (!activeTag || prompt.tags.includes(activeTag));
     });
   }, [activeTag, keyword, prompts]);
+  const totalPromptPages = Math.max(1, Math.ceil(visiblePrompts.length / PROMPT_PAGE_SIZE));
+  const pagedPrompts = useMemo(() => {
+    const start = (currentPage - 1) * PROMPT_PAGE_SIZE;
+    return visiblePrompts.slice(start, start + PROMPT_PAGE_SIZE);
+  }, [currentPage, visiblePrompts]);
+
+  const updatePage = (value: number) => {
+    const next = new URLSearchParams(searchParams);
+    const nextPage = Math.max(1, value);
+    if (nextPage <= 1) {
+      next.delete('prompt_page');
+    } else {
+      next.set('prompt_page', String(nextPage));
+    }
+    setSearchParams(next, { replace: true });
+  };
   const tagFilters = useMemo(
     () =>
       Array.from(
@@ -156,6 +199,7 @@ export default function PromptResources() {
     const next = new URLSearchParams(searchParams);
     if (value.trim()) next.set('prompt_search', value);
     else next.delete('prompt_search');
+    next.delete('prompt_page');
     setSearchParams(next, { replace: true });
   };
 
@@ -168,9 +212,79 @@ export default function PromptResources() {
     setEditorOpen(true);
   };
 
+  const handleSeedStylePrompts = async () => {
+    if (seedingPrompts) return;
+
+    const normalizedPromptName = (value: string) => value.trim().toLocaleLowerCase();
+    const existingPromptNames = new Set(prompts.map((prompt) => normalizedPromptName(prompt.name)));
+    const existsByContent = new Set(prompts.map((prompt) => prompt.content.trim()));
+
+    let seedCandidates: StylePromptSeed[];
+    try {
+      seedCandidates = await loadStylePromptSeeds();
+    } catch {
+      toast.error('读取生图风格提示词资源失败，请稍后重试');
+      return;
+    }
+
+    const availableSeedCandidates = seedCandidates.filter(
+      (seed) =>
+        !existingPromptNames.has(normalizedPromptName(seed.name)) &&
+        !existsByContent.has(seed.content.trim()),
+    );
+
+    if (availableSeedCandidates.length === 0) {
+      toast.info('提示词库中已包含全部生图风格模板');
+      return;
+    }
+
+    setSeedingPrompts(true);
+    try {
+      const inserted: AIPrompt[] = [];
+      const existingAfterCreate = new Set(existingPromptNames);
+      for (const seed of availableSeedCandidates) {
+        const normalizedName = normalizedPromptName(seed.name);
+        if (existingAfterCreate.has(normalizedName)) {
+          continue;
+        }
+
+        const payload = {
+          name: seed.name,
+          description: seed.description,
+          content: seed.content,
+          tags: Array.from(new Set([...seed.tags, '生图'])),
+        };
+        const saved = await createAIPrompt(payload);
+        inserted.push(saved);
+        existingAfterCreate.add(normalizedName);
+      }
+
+      if (inserted.length === 0) {
+        toast.info('无可新增的生图风格提示词');
+        return;
+      }
+
+      setPrompts((items) => [...inserted, ...items]);
+      toast.success(`已新增 ${inserted.length} 个生图风格提示词`);
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '新增生图风格提示词失败'));
+    } finally {
+      setSeedingPrompts(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!name.trim()) {
       toast.error('请输入提示词名称');
+      return;
+    }
+    const normalizedName = normalizePromptName(name);
+    const duplicatedTitle = prompts.some(
+      (prompt) =>
+        prompt.id !== editingPrompt?.id && normalizePromptName(prompt.name) === normalizedName,
+    );
+    if (duplicatedTitle) {
+      toast.error('提示词名称已存在，请使用其他名称');
       return;
     }
     if (!content.trim()) {
@@ -203,6 +317,7 @@ export default function PromptResources() {
     const next = new URLSearchParams(searchParams);
     if (tag) next.set('prompt_tag', tag);
     else next.delete('prompt_tag');
+    next.delete('prompt_page');
     setSearchParams(next, { replace: true });
   };
 
@@ -240,6 +355,18 @@ export default function PromptResources() {
     }
   };
 
+  useEffect(() => {
+    if (currentPage > totalPromptPages) {
+      const next = new URLSearchParams(searchParams);
+      if (totalPromptPages <= 1) {
+        next.delete('prompt_page');
+      } else {
+        next.set('prompt_page', String(totalPromptPages));
+      }
+      setSearchParams(next, { replace: true });
+    }
+  }, [currentPage, searchParams, setSearchParams, totalPromptPages]);
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -256,6 +383,14 @@ export default function PromptResources() {
           <Button onClick={() => openEditor(null)}>
             <Plus className="mr-2 size-4" />
             新建提示词
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => void handleSeedStylePrompts()}
+            disabled={loading || seedingPrompts}
+          >
+            <Sparkles className="mr-2 size-4" />
+            {seedingPrompts ? '导入中…' : '导入 AI 生图风格提示词'}
           </Button>
         </div>
       </div>
@@ -309,7 +444,7 @@ export default function PromptResources() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visiblePrompts.map((prompt) => (
+                {pagedPrompts.map((prompt) => (
                   <TableRow
                     key={prompt.id}
                     className="cursor-pointer"
@@ -387,7 +522,7 @@ export default function PromptResources() {
             </Table>
           </div>
           <div className="divide-y divide-border md:hidden">
-            {visiblePrompts.map((prompt) => (
+            {pagedPrompts.map((prompt) => (
               <article key={prompt.id} className="px-3 py-4">
                 <div className="flex items-start gap-3">
                   <FileText className="mt-0.5 size-5 shrink-0 text-primary" />
@@ -452,9 +587,33 @@ export default function PromptResources() {
         </>
       )}
 
-      {!loading && prompts.length > 0 ? (
+      {!loading && visiblePrompts.length > 0 ? (
         <div className="border-t border-border px-3 py-4 text-sm text-muted-foreground">
-          共 {visiblePrompts.length} 个提示词
+          第 {Math.min(currentPage, totalPromptPages)} / {totalPromptPages} 页 · 共{' '}
+          {visiblePrompts.length} 个提示词
+          {totalPromptPages > 1 ? (
+            <span className="mt-3 block">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={currentPage <= 1 || loading}
+                onClick={() => updatePage(currentPage - 1)}
+                className="mr-2"
+              >
+                <ChevronLeft className="mr-1 size-4" />
+                上一页
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={currentPage >= totalPromptPages || loading}
+                onClick={() => updatePage(currentPage + 1)}
+              >
+                下一页
+                <ChevronRight className="ml-1 size-4" />
+              </Button>
+            </span>
+          ) : null}
         </div>
       ) : null}
 
