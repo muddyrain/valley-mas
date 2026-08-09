@@ -35,6 +35,103 @@ func TestManagedDialectsHaveMatchingVersions(t *testing.T) {
 	}
 }
 
+func TestAIAppRunKnowledgeStatusMigrationAddsDegradationObservability(t *testing.T) {
+	for _, driver := range []string{"postgres", "mysql"} {
+		content, err := migrationFiles.ReadFile(driver + "/202608090003_add_ai_app_run_knowledge_status.sql")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, expected := range []string{"knowledge_status", "knowledge_error_code"} {
+			if !strings.Contains(string(content), expected) {
+				t.Fatalf("%s AI app run knowledge migration does not contain %s", driver, expected)
+			}
+		}
+	}
+}
+
+func TestAIMotionStickerImageModeMigrationAddsDualModeContract(t *testing.T) {
+	for _, driver := range []string{"postgres", "mysql"} {
+		content, err := migrationFiles.ReadFile(driver + "/202608090002_add_ai_motion_sticker_image_mode.sql")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, expected := range []string{"generation_mode", "image_protocol", "frame_count"} {
+			if !strings.Contains(string(content), expected) {
+				t.Fatalf("%s motion sticker image migration does not contain %s", driver, expected)
+			}
+		}
+	}
+}
+
+func TestAIKnowledgeEmbeddingIdentityMigrationInvalidatesLegacyVectors(t *testing.T) {
+	for _, driver := range []string{"postgres", "mysql"} {
+		content, err := migrationFiles.ReadFile(driver + "/202608090001_add_ai_knowledge_embedding_identity.sql")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sqlText := string(content)
+		for _, expected := range []string{"embedding_model_id", "embedding_dimension"} {
+			if !strings.Contains(sqlText, expected) {
+				t.Fatalf("%s knowledge embedding identity migration does not contain %s", driver, expected)
+			}
+		}
+	}
+	postgres, err := migrationFiles.ReadFile("postgres/202608090001_add_ai_knowledge_embedding_identity.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"RAG_EMBEDDING_REINDEX_REQUIRED", "ai_knowledge_chunks"} {
+		if !strings.Contains(string(postgres), expected) {
+			t.Fatalf("postgres knowledge embedding identity migration does not contain %s", expected)
+		}
+	}
+}
+
+func TestAIMotionStickerMigrationCreatesDurableJobSchema(t *testing.T) {
+	for _, driver := range []string{"postgres", "mysql"} {
+		content, err := migrationFiles.ReadFile(driver + "/202608080005_add_ai_motion_stickers.sql")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sqlText := string(content)
+		for _, expected := range []string{"video_protocol", "ai_motion_sticker_generations", "provider_task_id", "gif_storage_key"} {
+			if !strings.Contains(sqlText, expected) {
+				t.Fatalf("%s motion sticker migration does not contain %s", driver, expected)
+			}
+		}
+	}
+}
+
+func TestAIAppTaskInteractionMigrationPersistsClarificationsAndToolErrors(t *testing.T) {
+	for _, driver := range []string{"postgres", "mysql"} {
+		content, err := migrationFiles.ReadFile(driver + "/202608080006_add_ai_app_task_interactions.sql")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sqlText := string(content)
+		for _, expected := range []string{"ai_app_task_clarifications", "request_id", "error_code", "error_message", "retryable"} {
+			if !strings.Contains(sqlText, expected) {
+				t.Fatalf("%s task interaction migration does not contain %s", driver, expected)
+			}
+		}
+	}
+}
+
+func TestAICanvasDocumentMigrationPersistsOneRevisionedWorkspacePerOwner(t *testing.T) {
+	for _, driver := range []string{"postgres", "mysql"} {
+		content, err := migrationFiles.ReadFile(driver + "/202608080007_add_ai_canvas_documents.sql")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sqlText := string(content)
+		for _, expected := range []string{"ai_canvas_documents", "document_json", "revision", "uidx_ai_canvas_documents_user"} {
+			if !strings.Contains(sqlText, expected) {
+				t.Fatalf("%s AI canvas migration does not contain %s", driver, expected)
+			}
+		}
+	}
+}
+
 func TestAIImageVariationRepairMigrationRestoresEveryManagedColumn(t *testing.T) {
 	for _, driver := range []string{"postgres", "mysql"} {
 		content, err := migrationFiles.ReadFile(driver + "/202608080003_repair_ai_image_variation_columns.sql")

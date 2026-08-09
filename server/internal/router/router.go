@@ -170,6 +170,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.PATCH("/ai/image-generations/:generationId/favorite", handler.UpdateAIImageGenerationFavorite)
 			auth.DELETE("/ai/image-generations/:generationId", handler.DeleteAIImageGeneration)
 			auth.POST("/ai/image-generations/:generationId/resource", handler.SaveAIImageGenerationResource)
+			auth.GET("/ai/canvas-document", handler.GetAICanvasDocument)
+			auth.PUT("/ai/canvas-document", handler.SaveAICanvasDocument)
 			auth.GET("/ai/image-conversations", handler.ListAIImageConversations)
 			auth.GET("/ai/image-conversations/current", handler.GetCurrentAIImageConversation)
 			auth.DELETE("/ai/image-conversations/current", handler.ClearCurrentAIImageConversation)
