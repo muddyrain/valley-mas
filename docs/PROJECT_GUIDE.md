@@ -6,7 +6,7 @@
 
 - Valley MAS 是一个包含个人内容展示、创作者空间、内容管理、生活记录、AI 辅助能力、毛毡桌面壳层和实验应用的 monorepo。
 - 用户侧主站在 `apps/web`，管理后台在 `apps/admin`，Go API 服务在 `server`。
-- Life Trace、AI Mind Arena、Desktop OS、WorldSim、Toy Climb Arena、Scratch Legend 是当前仓库内的独立产品或实验应用。
+- Life Trace、AI Mind Arena、Desktop OS、Screen Recorder、WorldSim、Toy Climb Arena、Scratch Legend 是当前仓库内的独立产品或实验应用。
 - 共享类型、请求、路由和格式化能力放在 `packages/*`。
 
 ## 技术栈地图
@@ -17,6 +17,7 @@
 | Admin 后台 | `apps/admin` | React 19 + Vite 6 + Ant Design 6 + Pro Components，覆盖用户、内容、资源、互动、Life Trace 和审计的运营管理后台。 |
 | Life Trace | `apps/life-trace` | React 19 + Vite 6 + Tailwind 4，生活计划、踪迹、提醒和 PWA 能力。 |
 | Desktop OS | `apps/desktop-os` | React 19 + Vite 6 + Tailwind 4 + shadcn/`@base-ui/react` + zustand + `motion` + `overlayscrollbars`，毛毡 macOS 风桌面壳层，承载 Finder、Safari、Mail、Blog、Music、AI Command Center 与 Mini Apps；3D 骰盅使用 `three` + `@react-three/fiber`。 |
+| Screen Recorder | `apps/screen-recorder` | Electron + React 19 + Vite 6 + TypeScript，Windows/macOS 托盘或菜单栏单实例常驻的完全本地 PNG 截图标注、带实时拼接预览的选区滚动长截图与 WebM/原生 MP4 屏幕/单显示器区域录制应用；再次启动会唤起已有控制台；托盘左键直接截图、右键打开菜单，截图/录屏共用后台预热的纯选区控制器，Windows 可吸附可见客户端窗口，截图编辑同窗无缩放交接，默认可移动选区，支持带 Tooltip 的 shadcn 风格工具条、方框/圆框/箭头/画笔共享样式、三档马赛克、可移动缩放文字、默认 HEX 且按住 Shift 临时切换 RGB 的吸色、固定置顶图片、默认保存复制或另存为；现代偏好设置使用固定标题栏和隐藏式内容滚动，设置可见时仍可触发捕获快捷键且不会被第三方截图工具排除，并支持三组快捷键、快捷键安全录入、开机自启动、默认关闭的系统通知与自定义录屏目录；录屏设置支持 Windows 默认系统声音及音量、跨平台麦克风、摄像头画中画和鼠标开关，并在面板内提前反馈缺失设备，设置阶段可移动和八向缩放当前选区，停止后提供播放和打开所在文件夹入口；Electron main/preload 由 tsup 构建，electron-builder 生成使用 7z 载荷且只保留中英文 Electron 语言包的 Windows NSIS，以及 macOS DMG/ZIP。macOS 系统声音因 Electron loopback 限制暂不支持。 |
 | AI Mind Arena | `apps/ai-mind-arena` | Next.js 15 + React 19 + Tailwind 3，多人格辩论决策应用，默认端口 5175。 |
 | Scratch Legend | `apps/scratch-legend` | Next.js + React，刮刮卡增量游戏实验，默认端口 5176。 |
 | Toy Climb Arena | `apps/toy-climb-arena` | Vite 6 + TypeScript + Three.js，玩具世界攀爬游戏，默认端口 5175。 |
@@ -66,6 +67,9 @@ pnpm --filter @valley/life-trace dev
 # 启动 Desktop OS
 pnpm --filter @valley/desktop-os dev
 
+# 启动 Screen Recorder（Electron + 本机 Vite 5179）
+pnpm --filter @valley/screen-recorder dev
+
 # 启动 AI Mind Arena / Scratch Legend
 pnpm --filter @valley/ai-mind-arena dev
 pnpm --filter @valley/scratch-legend dev
@@ -94,6 +98,7 @@ cd server && go run ./cmd/migrate bootstrap --apply
 | Life Trace | 5178 |
 | Life Trace preview | 4178 |
 | Desktop OS | 5177 |
+| Screen Recorder | 5179 |
 | AI Mind Arena | 5175 |
 | Toy Climb Arena | 5175 |
 | Scratch Legend | 5176 |
@@ -125,6 +130,7 @@ Go API 启动时会优先使用 `PORT`（默认 `8080`）。如果该端口已�
 - Admin 路由：`apps/admin/src/App.tsx`。
 - Life Trace 路由：`apps/life-trace/src/App.tsx`。
 - Desktop OS 入口：`apps/desktop-os/src/App.tsx`；窗口编排和应用清单看 `apps/desktop-os/src/apps/desktopApps.ts` 与 `apps/desktop-os/src/store/windowStore.ts`；公共 UI 在 `apps/desktop-os/src/ui/PlushPrimitives.tsx`。
+- Screen Recorder 入口：`apps/screen-recorder/electron/main.ts`、`apps/screen-recorder/electron/preload.ts`、`apps/screen-recorder/src/App.tsx`；捕获浮层见 `apps/screen-recorder/src/SelectionOverlay.tsx`、`apps/screen-recorder/src/SelectionSurface.tsx`、`apps/screen-recorder/src/ColorPickerOverlay.tsx`、`apps/screen-recorder/src/ScreenshotEditor.tsx`、`apps/screen-recorder/src/LongScreenshotControl.tsx` 与 `apps/screen-recorder/src/RecordingSetup.tsx`；截图/录屏共享选区手势见 `apps/screen-recorder/src/core/selection-controller.ts`，区域换算见 `apps/screen-recorder/src/core/geometry.ts`，Windows 窗口候选换算见 `apps/screen-recorder/src/core/window-target.ts`，长截图拼接见 `apps/screen-recorder/src/core/long-screenshot.ts`，录制运行时见 `apps/screen-recorder/src/renderer/recorder-runtime.ts`。
 - AI Mind Arena 页面：`apps/ai-mind-arena/app`。
 - 服务端路由：`server/internal/router/router.go`。
 - 服务端配置：`server/internal/config/config.go`。
@@ -155,6 +161,15 @@ pnpm --filter @valley/life-trace check
 pnpm --filter @valley/desktop-os typecheck
 pnpm --filter @valley/desktop-os check
 pnpm --filter @valley/desktop-os exec vitest run
+pnpm --filter @valley/screen-recorder typecheck
+pnpm --filter @valley/screen-recorder check
+pnpm --filter @valley/screen-recorder test
+pnpm --filter @valley/screen-recorder build:renderer
+pnpm --filter @valley/screen-recorder build:electron
+pnpm --filter @valley/screen-recorder package:dir
+pnpm --filter @valley/screen-recorder package:win
+pnpm --filter @valley/screen-recorder package:mac
+pnpm --filter @valley/screen-recorder runtime:probe-video -- "C:\\path\\recording.webm" 400 300 audio
 pnpm --filter @valley/ai-mind-arena typecheck
 pnpm --filter @valley/scratch-legend typecheck
 pnpm --filter @valley/world-sim typecheck
