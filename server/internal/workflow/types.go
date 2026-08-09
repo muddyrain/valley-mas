@@ -316,23 +316,30 @@ type GeneratedAIImage struct {
 	Size         string
 }
 
-type AIImageGenerator interface {
-	GenerateAIImage(context.Context, int64, string, string, string, string, string, int) (GeneratedAIImage, error)
+type AIImageGenerationRequest struct {
+	ModelID        string
+	RecipeID       string
+	Brief          string
+	SubjectContext string
+	AspectRatio    string
+	Quality        string
+	VariationMode  string
+	ReferenceImage string
+	TimeoutSeconds int
 }
 
-type AIImageGeneratorFunc func(context.Context, int64, string, string, string, string, string, int) (GeneratedAIImage, error)
+type AIImageGenerator interface {
+	GenerateAIImage(context.Context, int64, AIImageGenerationRequest) (GeneratedAIImage, error)
+}
+
+type AIImageGeneratorFunc func(context.Context, int64, AIImageGenerationRequest) (GeneratedAIImage, error)
 
 func (fn AIImageGeneratorFunc) GenerateAIImage(
 	ctx context.Context,
 	userID int64,
-	modelID string,
-	prompt string,
-	aspectRatio string,
-	quality string,
-	referenceImage string,
-	timeoutSeconds int,
+	request AIImageGenerationRequest,
 ) (GeneratedAIImage, error) {
-	return fn(ctx, userID, modelID, prompt, aspectRatio, quality, referenceImage, timeoutSeconds)
+	return fn(ctx, userID, request)
 }
 
 type UnderstoodAIImage struct {

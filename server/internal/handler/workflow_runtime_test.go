@@ -795,6 +795,22 @@ func TestWorkflowAIImageFailureMessageUsesSafeCategory(t *testing.T) {
 	}
 }
 
+func TestWorkflowCoverGenerationInputUsesCanonicalCoverPlan(t *testing.T) {
+	input := workflowCoverAIImageGenerationInput(42, "7", "元数据标记", "介绍 tags 和 token", "minimal")
+	if input.UserID != 42 || input.ModelID != "7" || input.RecipeID != "cover" {
+		t.Fatalf("unexpected cover generation identity: %+v", input)
+	}
+	if input.SubjectContext != "文章标题：元数据标记\n文章摘要：介绍 tags 和 token" {
+		t.Fatalf("subject context=%q", input.SubjectContext)
+	}
+	if input.Brief != "使用简洁几何构图和充足留白" || input.VariationMode != "balanced" {
+		t.Fatalf("cover plan=%+v", input)
+	}
+	if input.AspectRatio != "16:9" || input.Quality != "2K" || input.Feature != "workflow-cover-generation" {
+		t.Fatalf("cover output settings=%+v", input)
+	}
+}
+
 func TestWorkflowRunPersistsLoopBodyTraceWithoutDuplicatingNodeRuns(t *testing.T) {
 	router, definition := setupWorkflowRuntimeTestRouter(t)
 	definition.Graph = `{"schemaVersion":4,"nodes":[{"id":"start","type":"start","label":"开始","config":{"inputs":{"items":{"type":"array","required":true}}}},{"id":"loop","type":"loop","label":"循环","config":{"mode":"array","input":"{{start.output.items}}","middleVariables":[],"outputs":[{"name":"results","type":"string","source":"{{copy.output.value}}"}],"body":{"nodes":[{"id":"copy","type":"variable","label":"复制当前项","position":{"x":0,"y":0},"config":{"assignments":[{"name":"value","type":"string","value":"{{item}}"}]}}],"edges":[]}}},{"id":"end","type":"end","label":"结束","config":{"outputs":{"results":"{{loop.output.results}}"},"outputTypes":{"results":"array"}}}],"edges":[{"source":"start","target":"loop"},{"source":"loop","target":"end"}]}`

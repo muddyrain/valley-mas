@@ -242,7 +242,7 @@ func executeWorkflowTestCase(requestContext context.Context, testCase model.Work
 	if err := validateWorkflowTestInputs(graph, inputs); err != nil {
 		return persistWorkflowTestResult(testCase, nil, workflowTestStatusRejected, nil, nil, "TEST_INPUT_INVALID", startedAt)
 	}
-	if workflowRequiresARKImage(graph) {
+	if workflowContainsLegacyCover(graph) {
 		return persistWorkflowTestResult(testCase, nil, workflowTestStatusRejected, nil, nil, "TEST_SIDE_EFFECT_FORBIDDEN", startedAt)
 	}
 	encodedInputs, err := json.Marshal(safeWorkflowRunInputs(inputs))
@@ -372,6 +372,22 @@ func executeWorkflowTestCase(requestContext context.Context, testCase model.Work
 		status = workflowTestStatusFailed
 	}
 	return persistWorkflowTestResult(testCase, &run.ID, status, finalOutput, assertionResults, "", startedAt)
+}
+
+func workflowContainsLegacyCover(graph workflow.Graph) bool {
+	for _, node := range graph.Nodes {
+		if node.Type != workflow.NodeTypeTool {
+			continue
+		}
+		var config struct {
+			CapabilityID string `json:"capabilityId"`
+		}
+		_ = json.Unmarshal(node.Config, &config)
+		if config.CapabilityID == workflow.CapabilityGenerateCover {
+			return true
+		}
+	}
+	return false
 }
 
 func persistWorkflowTestResult(testCase model.WorkflowTestCase, runID *model.Int64String, status string, output map[string]any, assertions []workflowTestAssertionResult, errorCode string, startedAt time.Time) (model.WorkflowTestResult, error) {

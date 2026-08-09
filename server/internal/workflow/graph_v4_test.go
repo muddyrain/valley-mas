@@ -85,6 +85,21 @@ func TestWorkflowCapabilitiesExposeInputGuidance(t *testing.T) {
 	if !ok || prompt["allowFixedValue"] != true {
 		t.Fatalf("image prompt fixed-value guidance=%+v", prompt)
 	}
+	recipeID, ok := imageProperties["recipeId"].(map[string]any)
+	if !ok || recipeID["default"] != "free" || !stringSliceContains(recipeID["enum"], "cover") {
+		t.Fatalf("image recipe guidance=%+v", recipeID)
+	}
+	subjectContext, ok := imageProperties["subjectContext"].(map[string]any)
+	if !ok || subjectContext["allowFixedValue"] != true || subjectContext["title"] != "文章内容" {
+		t.Fatalf("image subject context guidance=%+v", subjectContext)
+	}
+	if stringSliceContains(imageCapability.InputSchema["required"], "prompt") {
+		t.Fatalf("image prompt should be optional when subject context is provided: %+v", imageCapability.InputSchema["required"])
+	}
+	variationMode, ok := imageProperties["variationMode"].(map[string]any)
+	if !ok || variationMode["default"] != "balanced" || len(variationMode["enum"].([]string)) != 3 {
+		t.Fatalf("image variation guidance=%+v", variationMode)
+	}
 	knowledgeWrite, _, ok := registry.Capability(CapabilityWriteKnowledge)
 	if !ok {
 		t.Fatal("knowledge write capability is missing")
@@ -230,16 +245,13 @@ func TestGenerateAIImageCapabilityUsesConfiguredModel(t *testing.T) {
 			AIImageGenerator: AIImageGeneratorFunc(func(
 				_ context.Context,
 				userID int64,
-				modelID string,
-				prompt string,
-				aspectRatio string,
-				quality string,
-				referenceImage string,
-				timeoutSeconds int,
+				request AIImageGenerationRequest,
 			) (GeneratedAIImage, error) {
-				if userID != 42 || modelID != "7" || prompt != "山谷图书馆" ||
-					aspectRatio != "16:9" || quality != "2K" || referenceImage != "" || timeoutSeconds != DefaultAIImageGenerationTimeoutSeconds {
-					t.Fatalf("unexpected image generation input")
+				if userID != 42 || request.ModelID != "7" || request.RecipeID != "cover" ||
+					request.Brief != "山谷图书馆" || request.SubjectContext != "文章标题：理解 React 错误边界" ||
+					request.AspectRatio != "16:9" || request.Quality != "2K" || request.VariationMode != "exploratory" ||
+					request.ReferenceImage != "" || request.TimeoutSeconds != DefaultAIImageGenerationTimeoutSeconds {
+					t.Fatalf("unexpected image generation input: %+v", request)
 				}
 				return GeneratedAIImage{
 					GenerationID: "1001", URL: "https://example.test/image.png",
@@ -248,7 +260,7 @@ func TestGenerateAIImageCapabilityUsesConfiguredModel(t *testing.T) {
 			}),
 		},
 		NodeExecution{Input: map[string]any{
-			"modelId": "7", "prompt": "山谷图书馆", "aspectRatio": "16:9", "quality": "2K",
+			"modelId": "7", "recipeId": "cover", "prompt": "山谷图书馆", "subjectContext": "文章标题：理解 React 错误边界", "aspectRatio": "16:9", "quality": "2K", "variationMode": "exploratory",
 		}},
 	)
 	if err != nil {
@@ -256,6 +268,53 @@ func TestGenerateAIImageCapabilityUsesConfiguredModel(t *testing.T) {
 	}
 	if result.Output["generationId"] != "1001" || result.Output["width"] != 2048 {
 		t.Fatalf("unexpected output: %#v", result.Output)
+	}
+}
+
+func TestGenerateAIImageCapabilityAllowsCoverContextWithoutBrief(t *testing.T) {
+	called := false
+	_, err := (GenerateAIImageCapabilityAdapter{}).Execute(
+		context.Background(),
+		RunContext{
+			Actor: Actor{UserID: 42},
+			AIImageGenerator: AIImageGeneratorFunc(func(_ context.Context, _ int64, request AIImageGenerationRequest) (GeneratedAIImage, error) {
+				called = true
+				if request.RecipeID != "cover" || request.Brief != "" || request.SubjectContext != "文章标题：元数据标记" {
+					t.Fatalf("unexpected image generation request: %+v", request)
+				}
+				return GeneratedAIImage{GenerationID: "1001", URL: "https://example.test/image.png"}, nil
+			}),
+		},
+		NodeExecution{Input: map[string]any{
+			"modelId": "7", "recipeId": "cover", "subjectContext": "文章标题：元数据标记", "aspectRatio": "16:9", "quality": "2K",
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !called {
+		t.Fatal("image generator was not called")
+	}
+}
+
+func TestGenerateAIImageCapabilityDefaultsExistingNodesToFreeRecipe(t *testing.T) {
+	_, err := (GenerateAIImageCapabilityAdapter{}).Execute(
+		context.Background(),
+		RunContext{
+			Actor: Actor{UserID: 42},
+			AIImageGenerator: AIImageGeneratorFunc(func(_ context.Context, _ int64, request AIImageGenerationRequest) (GeneratedAIImage, error) {
+				if request.RecipeID != "free" || request.Brief != "山谷图书馆" {
+					t.Fatalf("unexpected existing-node request: %+v", request)
+				}
+				return GeneratedAIImage{GenerationID: "1001", URL: "https://example.test/image.png"}, nil
+			}),
+		},
+		NodeExecution{Input: map[string]any{
+			"modelId": "7", "prompt": "山谷图书馆", "aspectRatio": "1:1", "quality": "1K",
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -957,6 +1016,19 @@ func TestLLMInputAliasIsValidAndResolvesInsidePrompts(t *testing.T) {
 func containsError(errs []string, text string) bool {
 	for _, err := range errs {
 		if strings.Contains(err, text) {
+			return true
+		}
+	}
+	return false
+}
+
+func stringSliceContains(value any, expected string) bool {
+	items, ok := value.([]string)
+	if !ok {
+		return false
+	}
+	for _, item := range items {
+		if item == expected {
 			return true
 		}
 	}

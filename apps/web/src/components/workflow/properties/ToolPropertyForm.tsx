@@ -19,6 +19,10 @@ import { toWorkflowValueType } from '../TypedVariableValueEditor';
 import { useWorkflowCapabilities } from '../useWorkflowCapabilities';
 import { WorkflowVariableBindingField } from '../WorkflowVariableBindingField';
 import { getWorkflowSideEffectLabel } from '../workflowSideEffects';
+import {
+  getImageGenerationEnumLabel,
+  imageGenerationInputOrder,
+} from './imageGenerationToolPresentation';
 import type { PropertyFormProps } from './index';
 import { WorkflowIOField } from './WorkflowIOField';
 import { WorkflowOutputFieldList } from './WorkflowOutputFieldList';
@@ -230,6 +234,7 @@ const listOperationFields: Record<string, string[]> = {
 };
 
 const toolInputOrders: Record<string, string[]> = {
+  'image.generate': [...imageGenerationInputOrder],
   'notification.send': ['status', 'title', 'content', 'path'],
   'file.create': ['fileName', 'format', 'content'],
 };
@@ -427,15 +432,22 @@ export function ToolPropertyForm({
                   >
                     <SelectTrigger aria-label={schema.title || name}>
                       <SelectValue>
-                        {toolEnumLabels[capability.id]?.[name]?.[
-                          String(inputs[name] ?? schema.default ?? '')
-                        ] || String(inputs[name] ?? schema.default ?? '')}
+                        {capability.id === 'image.generate'
+                          ? getImageGenerationEnumLabel(
+                              name,
+                              String(inputs[name] ?? schema.default ?? ''),
+                            )
+                          : toolEnumLabels[capability.id]?.[name]?.[
+                              String(inputs[name] ?? schema.default ?? '')
+                            ] || String(inputs[name] ?? schema.default ?? '')}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {schema.enum.map((option) => (
                         <SelectItem key={option} value={option}>
-                          {toolEnumLabels[capability.id]?.[name]?.[option] || option}
+                          {capability.id === 'image.generate'
+                            ? getImageGenerationEnumLabel(name, option)
+                            : toolEnumLabels[capability.id]?.[name]?.[option] || option}
                         </SelectItem>
                       ))}
                     </SelectContent>

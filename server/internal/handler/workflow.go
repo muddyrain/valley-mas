@@ -12,12 +12,12 @@ import (
 	"time"
 	contenttool "valley-server/internal/ai/tools/content"
 	"valley-server/internal/aiclient"
+	"valley-server/internal/aimodel"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
 	"valley-server/internal/integration/notion"
 	"valley-server/internal/model"
 	"valley-server/internal/service"
-	"valley-server/internal/utils"
 	"valley-server/internal/workflow"
 
 	"github.com/gin-gonic/gin"
@@ -868,21 +868,6 @@ func runWorkflowGraphWithResume(
 		Error(c, http.StatusInternalServerError, "创建运行记录失败")
 		return
 	}
-	if workflowRequiresARKImage(graph) {
-		if _, _, configErr := aiclient.ReadARKImageConfig(); configErr != "" {
-			_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": "ARK_IMAGE_NOT_CONFIGURED"})
-			persistWorkflowAIAppRun(app, appVersion, run, "failed", nil, "ARK_IMAGE_NOT_CONFIGURED")
-			Error(c, http.StatusServiceUnavailable, "AI 生图服务未配置：请检查 ARK_API_KEY 和 ARK_IMAGE_MODEL")
-			return
-		}
-		if utils.GetTOSUploader() == nil {
-			_ = finishWorkflowRun(&run, string(workflow.StatusFailed), map[string]any{"error": "IMAGE_STORAGE_NOT_CONFIGURED"})
-			persistWorkflowAIAppRun(app, appVersion, run, "failed", nil, "IMAGE_STORAGE_NOT_CONFIGURED")
-			Error(c, http.StatusServiceUnavailable, "封面存储服务未配置")
-			return
-		}
-	}
-
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
@@ -1640,55 +1625,83 @@ func workflowNotionSearcher(userID model.Int64String) workflow.NotionSearcher {
 
 func workflowCoverGenerator() workflow.CoverGenerator {
 	return workflow.CoverGeneratorFunc(func(ctx context.Context, userID int64, title, summary, style string) (workflow.GeneratedCover, error) {
-		image, err := aiclient.GenerateARKImage(ctx, workflow.BuildCoverPrompt(title, summary, style), "3072x1536", "2560x1280", "2048x1024", "1536x768", "adaptive")
+		models, err := aimodel.ListEnabledModels(database.GetDB(), "image_generation")
 		if err != nil {
 			return workflow.GeneratedCover{}, err
 		}
-		extension := ".png"
-		switch strings.ToLower(strings.TrimSpace(image.MIMEType)) {
-		case "image/jpeg", "image/jpg":
-			extension = ".jpg"
-		case "image/webp":
-			extension = ".webp"
+		if len(models) == 0 {
+			return workflow.GeneratedCover{}, workflow.NewPublicExecutionFailure(
+				"暂无可用的图片生成模型，请先在模型目录启用一个图片模型",
+				"AI_CONFIGURATION_UNAVAILABLE",
+			)
 		}
-		key := fmt.Sprintf("workflow-covers/%d/%s/%d%s", userID, time.Now().Format("20060102"), time.Now().UnixNano(), extension)
-		uploader := utils.GetTOSUploader()
-		if uploader == nil {
-			return workflow.GeneratedCover{}, fmt.Errorf("封面存储服务未配置")
-		}
-		url, err := uploader.UploadBytesWithPathContext(ctx, key, image.Bytes)
+		generation, err := service.NewAIImageGenerationService(database.GetDB()).Generate(
+			ctx,
+			workflowCoverAIImageGenerationInput(userID, models[0].ID.String(), title, summary, style),
+		)
 		if err != nil {
-			return workflow.GeneratedCover{}, fmt.Errorf("封面上传失败: %w", err)
+			return workflow.GeneratedCover{}, workflow.NewPublicExecutionFailure(
+				workflowAIImageFailureMessage(generation.ErrorCode),
+				workflowAIImageFailureCode(generation.ErrorCode),
+			)
 		}
-		return workflow.GeneratedCover{URL: url, StorageKey: key, Model: image.Model, Size: image.Size}, nil
+		return workflow.GeneratedCover{
+			URL:   generation.ResultURL,
+			Model: generation.Model,
+			Size:  generation.RequestedSize,
+		}, nil
 	})
+}
+
+func workflowCoverAIImageGenerationInput(userID int64, modelID, title, summary, style string) service.AIImageGenerationInput {
+	subjectParts := make([]string, 0, 2)
+	if value := strings.TrimSpace(title); value != "" {
+		subjectParts = append(subjectParts, "文章标题："+value)
+	}
+	if value := strings.TrimSpace(summary); value != "" {
+		subjectParts = append(subjectParts, "文章摘要："+value)
+	}
+	styleBrief := map[string]string{
+		"illustration": "使用富有表现力的现代数字插画",
+		"minimal":      "使用简洁几何构图和充足留白",
+		"cinematic":    "使用电影感光线和空间纵深",
+	}[strings.TrimSpace(style)]
+	return service.AIImageGenerationInput{
+		UserID:         model.Int64String(userID),
+		ModelID:        modelID,
+		RecipeID:       "cover",
+		VariationMode:  "balanced",
+		Brief:          styleBrief,
+		SubjectContext: strings.Join(subjectParts, "\n"),
+		AspectRatio:    "16:9",
+		Quality:        "2K",
+		TimeoutSeconds: workflow.DefaultAIImageGenerationTimeoutSeconds,
+		Feature:        "workflow-cover-generation",
+	}
 }
 
 func workflowAIImageGenerator() workflow.AIImageGenerator {
 	return workflow.AIImageGeneratorFunc(func(
 		ctx context.Context,
 		userID int64,
-		modelID string,
-		prompt string,
-		aspectRatio string,
-		quality string,
-		referenceImage string,
-		timeoutSeconds int,
+		request workflow.AIImageGenerationRequest,
 	) (workflow.GeneratedAIImage, error) {
 		references := []string(nil)
-		if strings.TrimSpace(referenceImage) != "" {
-			references = []string{referenceImage}
+		if strings.TrimSpace(request.ReferenceImage) != "" {
+			references = []string{request.ReferenceImage}
 		}
 		generation, err := service.NewAIImageGenerationService(database.GetDB()).Generate(
 			ctx,
 			service.AIImageGenerationInput{
 				UserID:         model.Int64String(userID),
-				ModelID:        modelID,
-				RecipeID:       "free",
-				Brief:          prompt,
-				AspectRatio:    aspectRatio,
-				Quality:        quality,
-				TimeoutSeconds: timeoutSeconds,
+				ModelID:        request.ModelID,
+				RecipeID:       request.RecipeID,
+				VariationMode:  request.VariationMode,
+				Brief:          request.Brief,
+				SubjectContext: request.SubjectContext,
+				AspectRatio:    request.AspectRatio,
+				Quality:        request.Quality,
+				TimeoutSeconds: request.TimeoutSeconds,
 				References:     references,
 				Feature:        "workflow-image-generation",
 			},
@@ -1961,22 +1974,6 @@ func workflowOutputContentType(format string) string {
 	default:
 		return "text/markdown; charset=utf-8"
 	}
-}
-
-func workflowRequiresARKImage(graph workflow.Graph) bool {
-	for _, node := range graph.Nodes {
-		if node.Type == workflow.NodeTypeTool {
-			var config struct {
-				CapabilityID string `json:"capabilityId"`
-			}
-			_ = json.Unmarshal(node.Config, &config)
-			if config.CapabilityID != workflow.CapabilityGenerateCover {
-				continue
-			}
-			return true
-		}
-	}
-	return false
 }
 
 func declaredStartFileInputs(graph workflow.Graph) (map[string]struct{}, error) {
