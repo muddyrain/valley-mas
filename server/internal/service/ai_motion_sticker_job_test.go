@@ -212,6 +212,7 @@ func TestAIMotionStickerImageProcessPersistsGIFWithoutMP4(t *testing.T) {
 	service.fetchImage = func(_ context.Context, source string) ([]byte, string, error) {
 		return []byte(source), "image/png", nil
 	}
+	service.validateFrames = func(motionStickerFrame, []motionStickerFrame) error { return nil }
 	service.encodeFrames = func(_ context.Context, frames []motionStickerFrame) ([]byte, int, int, error) {
 		if len(frames) != 3 {
 			t.Fatalf("frames = %d", len(frames))
@@ -234,6 +235,49 @@ func TestAIMotionStickerImageProcessPersistsGIFWithoutMP4(t *testing.T) {
 	}
 	if client.request.OutputCount != 3 || len(client.request.Images) != 1 {
 		t.Fatalf("unexpected image request: %+v", client.request)
+	}
+}
+
+func TestAIMotionStickerImageProcessRejectsIdentityMismatchBeforeEncoding(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:motion-sticker-identity-%s?mode=memory&cache=shared", t.Name())), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&model.AIMotionStickerGeneration{}); err != nil {
+		t.Fatal(err)
+	}
+	generation := model.AIMotionStickerGeneration{
+		UserID: 351, ModelCatalogID: 352, Provider: "volcengine", Model: "doubao-seedream-5-0-260128",
+		GenerationMode: AIMotionStickerModeImage, ImageProtocol: "ark_images", FrameCount: 3,
+		Action: "坐在沙发上玩手机", Prompt: CompileAIMotionStickerImagePrompt("坐在沙发上玩手机", 3),
+		ReferenceURL: "https://cdn.test/ref.png", ReferenceStorageKey: "motion/ref.png",
+	}
+	if err := db.Create(&generation).Error; err != nil {
+		t.Fatal(err)
+	}
+	client := &fakeMotionStickerImageClient{result: aiclient.ImageGenerationResult{Sources: []string{"frame-1", "frame-2", "frame-3"}}}
+	service := NewAIMotionStickerService(db)
+	service.imageClient = func(model.AIMotionStickerGeneration) (motionStickerImageClient, error) { return client, nil }
+	service.fetchImage = func(_ context.Context, source string) ([]byte, string, error) {
+		return []byte(source), "image/png", nil
+	}
+	service.validateFrames = func(motionStickerFrame, []motionStickerFrame) error {
+		return errors.New("生成结果中的角色与参考图不一致")
+	}
+	service.encodeFrames = func(context.Context, []motionStickerFrame) ([]byte, int, int, error) {
+		t.Fatal("identity mismatch must stop before GIF encoding")
+		return nil, 0, 0, nil
+	}
+	service.notify = func(model.AIMotionStickerGeneration) {}
+
+	if err := service.ProcessOne(context.Background(), generation.ID); err == nil {
+		t.Fatal("identity mismatch must fail the generation")
+	}
+	if err := db.First(&generation, generation.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if generation.Status != AIMotionStickerStatusFailed || generation.ErrorCode != "identity_mismatch" {
+		t.Fatalf("unexpected identity mismatch result: %+v", generation)
 	}
 }
 

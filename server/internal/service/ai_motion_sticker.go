@@ -39,14 +39,15 @@ type AIMotionStickerQueueInput struct {
 }
 
 type AIMotionStickerService struct {
-	db           *gorm.DB
-	imageClient  func(model.AIMotionStickerGeneration) (motionStickerImageClient, error)
-	videoClient  func(model.AIMotionStickerGeneration) (motionStickerVideoClient, error)
-	fetchImage   func(context.Context, string) ([]byte, string, error)
-	encodeFrames func(context.Context, []motionStickerFrame) ([]byte, int, int, error)
-	upload       func(context.Context, model.Int64String, string, []byte) (*UploadResult, error)
-	transcode    func(context.Context, []byte) ([]byte, int, int, error)
-	notify       func(model.AIMotionStickerGeneration)
+	db             *gorm.DB
+	imageClient    func(model.AIMotionStickerGeneration) (motionStickerImageClient, error)
+	videoClient    func(model.AIMotionStickerGeneration) (motionStickerVideoClient, error)
+	fetchImage     func(context.Context, string) ([]byte, string, error)
+	validateFrames func(motionStickerFrame, []motionStickerFrame) error
+	encodeFrames   func(context.Context, []motionStickerFrame) ([]byte, int, int, error)
+	upload         func(context.Context, model.Int64String, string, []byte) (*UploadResult, error)
+	transcode      func(context.Context, []byte) ([]byte, int, int, error)
+	notify         func(model.AIMotionStickerGeneration)
 }
 
 func NewAIMotionStickerService(db *gorm.DB) *AIMotionStickerService {
@@ -54,6 +55,7 @@ func NewAIMotionStickerService(db *gorm.DB) *AIMotionStickerService {
 	service.imageClient = newMotionStickerImageClient
 	service.videoClient = newMotionStickerVideoClient
 	service.fetchImage = FetchAIImageSource
+	service.validateFrames = validateMotionStickerFrameIdentity
 	service.encodeFrames = encodeMotionStickerFrames
 	service.upload = uploadMotionStickerOutput
 	service.transcode = transcodeMotionSticker
@@ -203,9 +205,11 @@ func CompileAIMotionStickerImagePrompt(action string, frameCount int) string {
 		frameCount = AIMotionStickerFrameCount
 	}
 	return strings.Join([]string{
-		fmt.Sprintf("参考输入角色，生成按动作时间顺序排列的 %d 张独立正方形动画帧。", frameCount),
+		fmt.Sprintf("以图一中的唯一角色为身份基准，生成按动作时间顺序排列的 %d 张独立正方形动画帧。图一是角色身份基准，不是画风参考，不能只模仿画风。", frameCount),
 		"角色动作：" + action + "。",
-		"严格保持每一张中的角色一致，包括脸型、五官比例、身体比例、线条粗细、主色、服饰和标志性配件。",
+		"动作描述中的他、她、它或角色，都只指图一中的唯一角色，不得据此新建人物或替换主体。",
+		"每一张都必须保留图一角色的物种、脸型、头部轮廓、耳朵位置、五官比例、身体比例、线条粗细、主色、服饰和标志性配件；禁止改成人类或其他物种。",
+		"新增场景和道具只能围绕图一角色展开，不得用更符合动作文字的其他角色替代图一角色。",
 		"固定镜头、构图和背景；每张只推进少量动作，动作阶段连续清晰。",
 		"第一张从自然初始姿势开始，最后一张回到与第一张接近的姿势，便于默认无缝循环。",
 		"用户未明确背景时使用简洁纯色背景，只加入完成动作必需的少量道具。",

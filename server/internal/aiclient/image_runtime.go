@@ -186,11 +186,16 @@ func (arkImageAdapter) Generate(
 		return ImageGenerationResult{}, errors.New("ARK 当前图片协议不支持蒙版编辑")
 	}
 	payload := baseImageJSONPayload(request)
+	// ARK controls related output count through its sequential-image fields.
+	// Sending the OpenAI-compatible n field alongside them is undocumented and
+	// can make gateways select the wrong generation path.
+	delete(payload, "n")
 	if size := strings.TrimSpace(request.Size); size != "" {
 		payload["size"] = size
 	}
 	if len(request.Images) > 0 {
 		payload["image"] = request.Images
+		payload["guidance_scale"] = 8.0
 	}
 	if request.OutputCount > 1 {
 		payload["sequential_image_generation"] = "auto"

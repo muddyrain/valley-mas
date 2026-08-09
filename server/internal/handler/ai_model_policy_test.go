@@ -1,8 +1,13 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
+	"image"
+	"image/color"
+	"image/png"
 	"slices"
 	"strings"
 	"testing"
@@ -21,6 +26,7 @@ type fakeAIModelProbeClient struct {
 	imageMask       string
 	chatResponse    string
 	embedding       []float32
+	imageResult     string
 	err             error
 }
 
@@ -66,7 +72,28 @@ func (client *fakeAIModelProbeClient) GenerateImageWithRequest(
 	if client.err != nil {
 		return "", client.err
 	}
+	if client.imageResult != "" {
+		return client.imageResult, nil
+	}
+	if len(request.Images) > 0 {
+		return request.Images[0], nil
+	}
 	return "https://provider.test/image.png", nil
+}
+
+func solidProbeImageDataURL(t *testing.T, fill color.RGBA) string {
+	t.Helper()
+	canvas := image.NewRGBA(image.Rect(0, 0, 64, 64))
+	for y := 0; y < 64; y++ {
+		for x := 0; x < 64; x++ {
+			canvas.SetRGBA(x, y, fill)
+		}
+	}
+	var output bytes.Buffer
+	if err := png.Encode(&output, canvas); err != nil {
+		t.Fatal(err)
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(output.Bytes())
 }
 
 func TestProbeAIModelUsesMinimalInferenceRequest(t *testing.T) {
@@ -137,6 +164,19 @@ func TestProbeAIModelUsesReferenceImageWhenDeclared(t *testing.T) {
 	}
 	if !slices.Equal(result.VerifiedCapabilities, []string{"image_generation", "reference_image"}) {
 		t.Fatalf("verified capabilities = %+v", result.VerifiedCapabilities)
+	}
+}
+
+func TestProbeAIModelRejectsReferenceImageResultThatIgnoresReference(t *testing.T) {
+	client := &fakeAIModelProbeClient{imageResult: solidProbeImageDataURL(t, color.RGBA{A: 255})}
+	_, err := probeAIModel(
+		context.Background(),
+		client,
+		"gpt-image-2",
+		[]string{"image_generation", "reference_image"},
+	)
+	if err == nil || !strings.Contains(err.Error(), "参考图") {
+		t.Fatalf("expected reference preservation failure, got %v", err)
 	}
 }
 

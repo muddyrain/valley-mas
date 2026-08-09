@@ -181,7 +181,7 @@ func (service *AIMotionStickerService) processImage(ctx context.Context, generat
 	if len(sources) < 2 {
 		return service.fail(ctx, generation, "insufficient_frames", "生图模型返回的连贯帧不足，请重试或切换模型")
 	}
-	if err := service.db.WithContext(ctx).Model(generation).Update("stage", "encoding_gif").Error; err != nil {
+	if err := service.db.WithContext(ctx).Model(generation).Update("stage", "validating_identity").Error; err != nil {
 		return err
 	}
 	frames := make([]motionStickerFrame, 0, len(sources))
@@ -191,6 +191,13 @@ func (service *AIMotionStickerService) processImage(ctx context.Context, generat
 			return service.fail(ctx, generation, "frame_download", fetchErr.Error())
 		}
 		frames = append(frames, motionStickerFrame{Content: content, MIMEType: mimeType})
+	}
+	if err := service.validateFrames(motionStickerFrame{Content: referenceContent, MIMEType: referenceMIME}, frames); err != nil {
+		service.recordImageUsage(*generation, result, aiusage.StatusFailed, err.Error())
+		return service.fail(ctx, generation, "identity_mismatch", "生成结果未保持参考角色，请重试或切换模型")
+	}
+	if err := service.db.WithContext(ctx).Model(generation).Update("stage", "encoding_gif").Error; err != nil {
+		return err
 	}
 	gifContent, width, height, err := service.encodeFrames(ctx, frames)
 	if err != nil {

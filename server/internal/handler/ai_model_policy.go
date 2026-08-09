@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	_ "image/jpeg"
 	"image/png"
 	"net/http"
 	"slices"
@@ -19,6 +20,7 @@ import (
 	"valley-server/internal/aimodel"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
+	"valley-server/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -288,7 +290,7 @@ func probeAIModel(
 	if aimodel.HasCapabilities(item, []string{"image_generation"}) {
 		request := aiclient.ImageGenerationRequest{
 			ModelID: modelID,
-			Prompt:  "A small blue circle on a white background.",
+			Prompt:  "Reproduce the attached reference image exactly. Preserve every color, position, boundary, and quadrant. Do not add, remove, or reinterpret anything.",
 			Size:    aimodel.ImageGenerationProbeSize(modelID),
 		}
 		imageVerified := []string{"image_generation"}
@@ -316,9 +318,14 @@ func probeAIModel(
 				imageVerified = append(imageVerified, "outpainting")
 			}
 		}
-		_, err := client.GenerateImageWithRequest(ctx, request)
+		source, err := client.GenerateImageWithRequest(ctx, request)
 		if err != nil {
 			return aiModelProbeResult{Latency: time.Since(startedAt), VerifiedCapabilities: verified}, err
+		}
+		if aimodel.HasCapabilities(item, []string{"reference_image"}) {
+			if err := validateAIModelReferenceProbeOutput(ctx, source); err != nil {
+				return aiModelProbeResult{Latency: time.Since(startedAt), VerifiedCapabilities: verified}, err
+			}
 		}
 		verified = append(verified, aimodel.DecodeStrings(mustEncodeStringSlice(imageVerified))...)
 	}
@@ -542,15 +549,23 @@ func normalizeVideoProtocol(value string) string {
 }
 
 func buildAIModelProbeReference() (string, error) {
-	canvas := image.NewRGBA(image.Rect(0, 0, 64, 64))
-	for y := 0; y < 64; y++ {
-		for x := 0; x < 64; x++ {
-			canvas.Set(x, y, color.RGBA{R: 255, G: 255, B: 255, A: 255})
-		}
+	canvas := image.NewRGBA(image.Rect(0, 0, 256, 256))
+	quadrants := [4]color.RGBA{
+		{R: 220, G: 50, B: 50, A: 255},
+		{R: 50, G: 100, B: 220, A: 255},
+		{R: 50, G: 180, B: 90, A: 255},
+		{R: 230, G: 200, B: 50, A: 255},
 	}
-	for y := 18; y < 46; y++ {
-		for x := 18; x < 46; x++ {
-			canvas.Set(x, y, color.RGBA{R: 37, G: 99, B: 235, A: 255})
+	for y := 0; y < 256; y++ {
+		for x := 0; x < 256; x++ {
+			quadrant := 0
+			if x >= 128 {
+				quadrant++
+			}
+			if y >= 128 {
+				quadrant += 2
+			}
+			canvas.SetRGBA(x, y, quadrants[quadrant])
 		}
 	}
 	var output bytes.Buffer
@@ -560,15 +575,79 @@ func buildAIModelProbeReference() (string, error) {
 	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(output.Bytes()), nil
 }
 
+func validateAIModelReferenceProbeOutput(ctx context.Context, source string) error {
+	content, _, err := service.FetchAIImageSource(ctx, source)
+	if err != nil {
+		return fmt.Errorf("参考图能力检测无法读取生成结果: %w", err)
+	}
+	decoded, _, err := image.Decode(bytes.NewReader(content))
+	if err != nil {
+		return fmt.Errorf("参考图能力检测无法解析生成结果: %w", err)
+	}
+	bounds := decoded.Bounds()
+	if bounds.Dx() < 8 || bounds.Dy() < 8 {
+		return errors.New("参考图能力检测结果尺寸异常")
+	}
+	colors := [4]color.RGBA{
+		averageProbePatch(decoded, 1, 1),
+		averageProbePatch(decoded, 3, 1),
+		averageProbePatch(decoded, 1, 3),
+		averageProbePatch(decoded, 3, 3),
+	}
+	if !isProbeRed(colors[0]) || !isProbeBlue(colors[1]) ||
+		!isProbeGreen(colors[2]) || !isProbeYellow(colors[3]) {
+		return errors.New("模型返回了图片，但没有保留参考图内容")
+	}
+	return nil
+}
+
+func averageProbePatch(source image.Image, xQuarter, yQuarter int) color.RGBA {
+	bounds := source.Bounds()
+	centerX := bounds.Min.X + bounds.Dx()*xQuarter/4
+	centerY := bounds.Min.Y + bounds.Dy()*yQuarter/4
+	radiusX := max(1, bounds.Dx()/16)
+	radiusY := max(1, bounds.Dy()/16)
+	var red, green, blue, count uint64
+	for y := max(bounds.Min.Y, centerY-radiusY); y < min(bounds.Max.Y, centerY+radiusY); y++ {
+		for x := max(bounds.Min.X, centerX-radiusX); x < min(bounds.Max.X, centerX+radiusX); x++ {
+			r, g, b, _ := source.At(x, y).RGBA()
+			red += uint64(r >> 8)
+			green += uint64(g >> 8)
+			blue += uint64(b >> 8)
+			count++
+		}
+	}
+	if count == 0 {
+		return color.RGBA{}
+	}
+	return color.RGBA{R: uint8(red / count), G: uint8(green / count), B: uint8(blue / count), A: 255}
+}
+
+func isProbeRed(value color.RGBA) bool {
+	return int(value.R) > int(value.G)+50 && int(value.R) > int(value.B)+50
+}
+
+func isProbeBlue(value color.RGBA) bool {
+	return int(value.B) > int(value.R)+50 && int(value.B) > int(value.G)+30
+}
+
+func isProbeGreen(value color.RGBA) bool {
+	return int(value.G) > int(value.R)+40 && int(value.G) > int(value.B)+20
+}
+
+func isProbeYellow(value color.RGBA) bool {
+	return value.R > 150 && value.G > 130 && int(value.B)+60 < min(int(value.R), int(value.G))
+}
+
 func buildAIModelProbeMask() (string, error) {
-	canvas := image.NewRGBA(image.Rect(0, 0, 64, 64))
-	for y := 0; y < 64; y++ {
-		for x := 0; x < 64; x++ {
+	canvas := image.NewRGBA(image.Rect(0, 0, 256, 256))
+	for y := 0; y < 256; y++ {
+		for x := 0; x < 256; x++ {
 			canvas.Set(x, y, color.RGBA{A: 255})
 		}
 	}
-	for y := 24; y < 40; y++ {
-		for x := 24; x < 40; x++ {
+	for y := 96; y < 160; y++ {
+		for x := 96; x < 160; x++ {
 			canvas.Set(x, y, color.RGBA{})
 		}
 	}

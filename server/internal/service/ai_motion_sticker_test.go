@@ -16,8 +16,11 @@ func TestCompileAIMotionStickerPromptPreservesActionAndLoopContract(t *testing.T
 }
 
 func TestCompileAIMotionStickerImagePromptRequestsOrderedLoopFrames(t *testing.T) {
-	prompt := CompileAIMotionStickerImagePrompt("坐在沙发上玩手机", 6)
-	for _, expected := range []string{"坐在沙发上玩手机", "6 张", "角色一致", "第一张", "最后一张", "不要添加文字"} {
+	prompt := CompileAIMotionStickerImagePrompt("让他坐在沙发上玩手机", 6)
+	for _, expected := range []string{
+		"让他坐在沙发上玩手机", "6 张", "图一中的唯一角色", "身份基准", "不是画风参考",
+		"他、她、它", "禁止改成人类或其他物种", "第一张", "最后一张", "不要添加文字",
+	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("image prompt missing %q: %s", expected, prompt)
 		}

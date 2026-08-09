@@ -269,6 +269,12 @@ func TestVolcengineSequentialImageGenerationReturnsAllFrames(t *testing.T) {
 	if payload["sequential_image_generation"] != "auto" {
 		t.Fatalf("sequential generation missing: %#v", payload)
 	}
+	if payload["n"] != nil {
+		t.Fatalf("ARK sequential request must not send unsupported n: %#v", payload)
+	}
+	if guidance, ok := payload["guidance_scale"].(float64); !ok || guidance < 7 {
+		t.Fatalf("ARK reference request must strengthen prompt adherence: %#v", payload)
+	}
 	options, ok := payload["sequential_image_generation_options"].(map[string]any)
 	if !ok || options["max_images"] != float64(3) {
 		t.Fatalf("sequential options = %#v", payload["sequential_image_generation_options"])
