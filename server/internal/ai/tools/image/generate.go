@@ -65,6 +65,17 @@ func (t *GenerateTool) Description() string {
 	return "根据用户明确的画面需求生成一张图片。用户本轮上传参考图或选择视觉技能时，应在确有帮助时使用；一次只能生成一张图片。"
 }
 
+func (t *GenerateTool) ToolContract() tools.Contract {
+	return tools.Contract{
+		OutputSchema: map[string]any{
+			"type":     "object",
+			"required": []string{"generationId", "imageUrl", "width", "height"},
+		},
+		RiskLevel: tools.RiskMedium, Confirmation: tools.ConfirmationNever,
+		ResultCard: tools.ResultCardImage,
+	}
+}
+
 func (t *GenerateTool) Schema() map[string]any {
 	return map[string]any{
 		"type":     "object",

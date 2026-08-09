@@ -30,7 +30,7 @@ func TestManagedDialectsHaveMatchingVersions(t *testing.T) {
 		t.Fatal("expected embedded managed migrations")
 	}
 	latestVersion := versionsByDriver["postgres"][len(versionsByDriver["postgres"])-1]
-	if latestVersion != 202608090002 {
+	if latestVersion != 202608090003 {
 		t.Fatalf("unexpected latest managed migration version: %d", latestVersion)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"valley-server/internal/ai/clarification"
 	"valley-server/internal/ai/tools"
 )
 
@@ -347,6 +348,57 @@ func TestLocalLoopToolGateBlocksExecution(t *testing.T) {
 	}
 	if tool.invoked != 0 {
 		t.Fatalf("tool invoked = %d, want 0", tool.invoked)
+	}
+}
+
+type clarificationTool struct{}
+
+func (clarificationTool) Name() string           { return "clarification.ask" }
+func (clarificationTool) Description() string    { return "ask" }
+func (clarificationTool) Schema() map[string]any { return map[string]any{"type": "object"} }
+func (clarificationTool) Scope() string          { return "unit-test" }
+func (clarificationTool) Run(context.Context, json.RawMessage) (json.RawMessage, error) {
+	request, err := clarification.NewRequest(clarification.Input{
+		ID: "request-1", Question: "请选择格式", Reason: "缺少目标格式",
+		AnswerType:        clarification.AnswerSingleSelect,
+		Suggestions:       []clarification.Suggestion{{Label: "PNG", Value: "png"}},
+		AllowCustomAnswer: true, Blocking: true, Complexity: clarification.ComplexitySimple, Round: 1,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return nil, clarification.Require(request)
+}
+
+func TestLocalLoopEmitsClarificationAndStopsBeforeAnotherModelStep(t *testing.T) {
+	tool := clarificationTool{}
+	backend := &scriptedBackend{responses: []BackendResponse{
+		{Message: Message{Role: RoleAssistant, ToolCalls: []ToolCall{{ID: "call-1", Name: tool.Name(), Args: json.RawMessage(`{}`)}}}, Model: "m1"},
+		{Message: Message{Role: RoleAssistant, Content: "must not continue"}, Model: "m1"},
+	}}
+	loop := NewLocalLoop(backend, newTestRegistry(tool))
+	events, err := loop.RunStream(context.Background(), Spec{Feature: "unit-test", Tools: []string{tool.Name()}}, []Message{{Role: RoleUser, Content: "convert"}})
+	if err != nil {
+		t.Fatalf("RunStream: %v", err)
+	}
+	var request *clarification.Request
+	var gotErr error
+	for event := range events {
+		if event.Type == EventClarification {
+			request = event.Clarification
+		}
+		if event.Type == EventError {
+			gotErr = event.Err
+		}
+	}
+	if request == nil || request.ID != "request-1" {
+		t.Fatalf("clarification = %#v", request)
+	}
+	if !errors.Is(gotErr, ErrClarificationRequired) {
+		t.Fatalf("error = %v, want ErrClarificationRequired", gotErr)
+	}
+	if backend.calls != 1 {
+		t.Fatalf("backend calls = %d, want 1", backend.calls)
 	}
 }
 

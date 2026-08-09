@@ -10,6 +10,7 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"valley-server/internal/ai/tools"
 	"valley-server/internal/model"
@@ -51,6 +52,17 @@ func (t *CreateTool) Name() string          { return ToolName }
 func (t *CreateTool) Scope() string         { return toolScope }
 func (t *CreateTool) Description() string {
 	return "把用户需要保留或下载的结果创建为 Markdown、JSON 或 CSV 文件。仅在用户明确要求成果文件时调用。"
+}
+
+func (t *CreateTool) ToolContract() tools.Contract {
+	return tools.Contract{
+		OutputSchema: map[string]any{
+			"type":     "object",
+			"required": []string{"artifactId", "fileName", "contentType", "size", "expiresAt"},
+		},
+		RiskLevel: tools.RiskLow, Confirmation: tools.ConfirmationNever,
+		ResultCard: tools.ResultCardFile,
+	}
 }
 
 func (t *CreateTool) Schema() map[string]any {
@@ -95,8 +107,10 @@ func (t *CreateTool) Run(ctx context.Context, raw json.RawMessage) (json.RawMess
 	artifact := model.AIAppArtifact{
 		UserID: input.UserID, AppID: input.AppID, ConversationID: input.ConversationID,
 		RunID: input.RunID, TaskID: input.TaskID, FileName: name, ContentType: contentType,
-		SizeBytes: stored.Size, URL: stored.URL,
+		SizeBytes: stored.Size, URL: stored.URL, StorageKey: stored.Key,
 	}
+	expiresAt := service.NewAIAppArtifactExpiry(time.Now())
+	artifact.ExpiresAt = &expiresAt
 	if err := t.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&resource).Error; err != nil {
 			return err
@@ -110,6 +124,7 @@ func (t *CreateTool) Run(ctx context.Context, raw json.RawMessage) (json.RawMess
 	return json.Marshal(map[string]any{
 		"ok": true, "artifactId": artifact.ID.String(), "resourceId": resource.ID.String(),
 		"fileName": name, "contentType": contentType, "size": stored.Size, "url": stored.URL,
+		"expiresAt": expiresAt,
 	})
 }
 

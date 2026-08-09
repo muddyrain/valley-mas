@@ -3,9 +3,11 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+	"valley-server/internal/ai/clarification"
 	"valley-server/internal/ai/tools"
 	"valley-server/internal/aiusage"
 )
@@ -181,7 +183,7 @@ func (l *LocalLoop) run(
 					return
 				}
 			}
-			result, durationMs := runTool(ctx, spec, toolIndex, tc)
+			result, durationMs, clarificationRequest := runTool(ctx, spec, toolIndex, tc)
 			buf = append(buf, Message{
 				Role:       RoleTool,
 				Content:    string(result),
@@ -189,6 +191,12 @@ func (l *LocalLoop) run(
 				ToolName:   tc.Name,
 			})
 			out <- Event{Type: EventToolResult, ToolName: tc.Name, ToolResult: result, ToolDurationMs: durationMs}
+			if clarificationRequest != nil {
+				out <- Event{Type: EventClarification, ToolName: tc.Name, Clarification: clarificationRequest}
+				emitError(out, ErrClarificationRequired)
+				recordRun(ctx, spec, steps, modelName, runStart, ErrClarificationRequired)
+				return
+			}
 		}
 	}
 
@@ -210,19 +218,24 @@ func runTool(
 	spec Spec,
 	toolIndex map[string]tools.Tool,
 	tc ToolCall,
-) (json.RawMessage, int64) {
+) (json.RawMessage, int64, *clarification.Request) {
 	stepStart := time.Now()
 
 	tool, ok := toolIndex[tc.Name]
 	if !ok {
 		payload := errorPayload(fmt.Sprintf("tool %q not found", tc.Name))
 		recordStep(ctx, spec, tc.Name, stepStart, fmt.Errorf("tool %q not found", tc.Name))
-		return payload, time.Since(stepStart).Milliseconds()
+		return payload, time.Since(stepStart).Milliseconds(), nil
 	}
 	result, err := tool.Run(ctx, tc.Args)
 	if err != nil {
 		recordStep(ctx, spec, tc.Name, stepStart, err)
-		return errorPayload(err.Error()), time.Since(stepStart).Milliseconds()
+		var required *clarification.RequiredError
+		if errors.As(err, &required) {
+			payload, _ := json.Marshal(map[string]any{"ok": false, "errorCode": "CLARIFICATION_REQUIRED"})
+			return payload, time.Since(stepStart).Milliseconds(), &required.Request
+		}
+		return errorPayload(err.Error()), time.Since(stepStart).Milliseconds(), nil
 	}
 	if len(result) == 0 {
 		result = json.RawMessage(`{"ok":true}`)
@@ -231,7 +244,7 @@ func runTool(
 		result = json.RawMessage(string(result[:toolResultCharsMax]))
 	}
 	recordStep(ctx, spec, tc.Name, stepStart, nil)
-	return result, time.Since(stepStart).Milliseconds()
+	return result, time.Since(stepStart).Milliseconds(), nil
 }
 
 func errorPayload(message string) json.RawMessage {

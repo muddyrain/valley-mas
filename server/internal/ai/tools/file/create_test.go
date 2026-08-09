@@ -1,6 +1,20 @@
 package file
 
-import "testing"
+import (
+	"testing"
+
+	"valley-server/internal/ai/tools"
+)
+
+func TestCreateToolContractUsesPrivateFileCard(t *testing.T) {
+	contract := tools.ContractFor(NewCreateTool(nil))
+	if contract.ResultCard != tools.ResultCardFile || contract.RiskLevel != tools.RiskLow {
+		t.Fatalf("unexpected contract: %#v", contract)
+	}
+	if contract.Confirmation != tools.ConfirmationNever {
+		t.Fatalf("file generation must not require confirmation: %#v", contract)
+	}
+}
 
 func TestNormalizeFile(t *testing.T) {
 	tests := []struct {

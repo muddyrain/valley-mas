@@ -13,6 +13,7 @@ import (
 	"valley-server/internal/aiclient"
 	"valley-server/internal/aimodel"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -99,17 +100,20 @@ func PublicAIAppChat(c *gin.Context) {
 	}
 
 	message := truncateAIAgentRunes(payload.Message, 12000)
-	knowledgeContext, _, retrievalErr := retrieveAIKnowledgeContext(c.Request.Context(), key.UserID, version, message)
+	knowledge, retrievalErr := retrieveAIKnowledgeAugmentation(c.Request.Context(), key.UserID, version, message)
 	if retrievalErr != nil {
-		code, publicMessage := aiKnowledgeRetrievalFailure(retrievalErr)
-		logAIKnowledgeRetrievalFailure(c, retrievalErr, logrus.Fields{"app_id": app.ID, "version_id": version.ID, "feature": "ai-workbench-public"})
-		persistAIAppPublicInvocation(app, version.ID, *key, "failed", payload.Stream, code, dailyCallNumber, started)
-		writePublicAIAppError(c, http.StatusBadGateway, code, publicMessage)
+		persistAIAppPublicInvocation(app, version.ID, *key, "failed", payload.Stream, "RUN_CANCELLED", dailyCallNumber, started)
+		writePublicAIAppError(c, http.StatusRequestTimeout, "RUN_CANCELLED", "调用已停止")
 		return
 	}
+	if knowledge.Status == aiKnowledgeStatusDegraded {
+		logger.Log.WithFields(logrus.Fields{
+			"app_id": app.ID, "version_id": version.ID, "feature": "ai-workbench-public", "error_code": knowledge.ErrorCode,
+		}).WithError(knowledge.Cause).Warn("public AI app knowledge augmentation degraded")
+	}
 	system := strings.TrimSpace(config.SystemInstructions())
-	if knowledgeContext != "" {
-		system = strings.TrimSpace(system + "\n\n以下是与当前问题相关的私有参考资料。请优先依据这些资料回答；资料不足时明确说明。\n" + knowledgeContext)
+	if knowledge.Context != "" {
+		system = strings.TrimSpace(system + "\n\n以下是与当前问题相关的私有参考资料。请优先依据这些资料回答；资料不足时明确说明。\n" + knowledge.Context)
 	}
 	registry, toolNames, toolErr := resolveAIAppTools(database.GetDB(), app.ID, version)
 	if toolErr != nil {
@@ -120,7 +124,7 @@ func PublicAIAppChat(c *gin.Context) {
 	if !aimodel.HasCapabilities(invocation.Model, []string{"tool_call"}) {
 		toolNames = nil
 	}
-	publicAIAppChatWithTools(c, payload.Stream, invocation, system, message, app, version, *key, registry, toolNames, dailyCallNumber, started)
+	publicAIAppChatWithTools(c, payload.Stream, invocation, system, message, app, version, *key, registry, toolNames, knowledge, dailyCallNumber, started)
 }
 
 func publicAIAPIKeyFromRequest(c *gin.Context) (*model.AIAPIKey, bool) {
@@ -131,7 +135,7 @@ func publicAIAPIKeyFromRequest(c *gin.Context) (*model.AIAPIKey, bool) {
 	return VerifyAIAPIKey(strings.TrimSpace(strings.TrimPrefix(authorization, "Bearer ")))
 }
 
-func publicAIAppChatWithTools(c *gin.Context, stream bool, invocation aimodel.Invocation, system, message string, app model.AIApp, version model.AIAppVersion, key model.AIAPIKey, registry *tools.Registry, toolNames []string, dailyCallNumber int, started time.Time) {
+func publicAIAppChatWithTools(c *gin.Context, stream bool, invocation aimodel.Invocation, system, message string, app model.AIApp, version model.AIAppVersion, key model.AIAPIKey, registry *tools.Registry, toolNames []string, knowledge aiKnowledgeAugmentation, dailyCallNumber int, started time.Time) {
 	modelID := invocation.Model.ModelID
 	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
 	spec := agent.Spec{Provider: invocation.Provider.Provider, Model: modelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench-public"}
@@ -148,7 +152,10 @@ func publicAIAppChatWithTools(c *gin.Context, stream bool, invocation aimodel.In
 			result.Model = modelID
 		}
 		persistAIAppPublicInvocation(app, version.ID, key, "succeeded", false, "", dailyCallNumber, started)
-		c.JSON(http.StatusOK, gin.H{"reply": result.Reply, "model": result.Model, "versionId": version.ID})
+		c.JSON(http.StatusOK, gin.H{
+			"reply": result.Reply, "model": result.Model, "versionId": version.ID,
+			"knowledgeStatus": knowledge.Status, "knowledgeErrorCode": knowledge.ErrorCode,
+		})
 		return
 	}
 	events, err := loop.RunStream(ctx, spec, []agent.Message{{Role: agent.RoleUser, Content: message}})
@@ -183,7 +190,10 @@ func publicAIAppChatWithTools(c *gin.Context, stream bool, invocation aimodel.In
 		result.Model = modelID
 	}
 	persistAIAppPublicInvocation(app, version.ID, key, "succeeded", true, "", dailyCallNumber, started)
-	_ = writer.Send(gin.H{"type": "done", "model": result.Model, "versionId": version.ID})
+	_ = writer.Send(gin.H{
+		"type": "done", "model": result.Model, "versionId": version.ID,
+		"knowledgeStatus": knowledge.Status, "knowledgeErrorCode": knowledge.ErrorCode,
+	})
 }
 
 func persistAIAppPublicInvocation(app model.AIApp, versionID model.Int64String, key model.AIAPIKey, status string, stream bool, errorCode string, dailyCallNumber int, started time.Time) {

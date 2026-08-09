@@ -100,21 +100,23 @@ func (v *AIAppVersion) BeforeCreate(tx *gorm.DB) error {
 // AIAppRun records a safe summary of an interactive app debug run. It never
 // stores raw files, credentials, or the full system prompt.
 type AIAppRun struct {
-	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	AppID          Int64String    `gorm:"index;not null" json:"appId"`
-	VersionID      Int64String    `gorm:"index;not null" json:"versionId"`
-	WorkflowRunID  *Int64String   `gorm:"index" json:"workflowRunId,omitempty"`
-	ConversationID *Int64String   `gorm:"index" json:"conversationId,omitempty"`
-	UserID         Int64String    `gorm:"index;not null" json:"userId"`
-	Status         string         `gorm:"size:20;index;not null" json:"status"`
-	Model          string         `gorm:"size:160" json:"model"`
-	Input          string         `gorm:"type:text;not null" json:"input"`
-	Output         string         `gorm:"type:text" json:"output"`
-	ErrorCode      string         `gorm:"size:80" json:"errorCode"`
-	References     string         `gorm:"type:text;not null;default:'[]'" json:"-"`
-	DurationMs     int64          `json:"durationMs"`
-	CreatedAt      time.Time      `json:"createdAt"`
-	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                 Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	AppID              Int64String    `gorm:"index;not null" json:"appId"`
+	VersionID          Int64String    `gorm:"index;not null" json:"versionId"`
+	WorkflowRunID      *Int64String   `gorm:"index" json:"workflowRunId,omitempty"`
+	ConversationID     *Int64String   `gorm:"index" json:"conversationId,omitempty"`
+	UserID             Int64String    `gorm:"index;not null" json:"userId"`
+	Status             string         `gorm:"size:20;index;not null" json:"status"`
+	Model              string         `gorm:"size:160" json:"model"`
+	Input              string         `gorm:"type:text;not null" json:"input"`
+	Output             string         `gorm:"type:text" json:"output"`
+	ErrorCode          string         `gorm:"size:80" json:"errorCode"`
+	KnowledgeStatus    string         `gorm:"size:24;not null;default:'not_used'" json:"knowledgeStatus"`
+	KnowledgeErrorCode string         `gorm:"size:80;not null;default:''" json:"knowledgeErrorCode,omitempty"`
+	References         string         `gorm:"type:text;not null;default:'[]'" json:"-"`
+	DurationMs         int64          `json:"durationMs"`
+	CreatedAt          time.Time      `json:"createdAt"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // AIAppConversation is an owner-private chat pinned to one immutable app version.
@@ -178,6 +180,9 @@ type AIAppConversationToolTrace struct {
 	ToolName       string         `gorm:"size:100;not null" json:"toolName"`
 	Narration      string         `gorm:"type:text;not null;default:''" json:"narration"`
 	Status         string         `gorm:"size:20;not null" json:"status"`
+	ErrorCode      string         `gorm:"size:80;not null;default:''" json:"errorCode,omitempty"`
+	ErrorMessage   string         `gorm:"size:500;not null;default:''" json:"errorMessage,omitempty"`
+	Retryable      bool           `gorm:"not null;default:false" json:"retryable"`
 	DurationMs     int64          `gorm:"not null;default:0" json:"durationMs"`
 	CreatedAt      time.Time      `json:"createdAt"`
 	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
@@ -474,6 +479,46 @@ func (a *AIAppToolApproval) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+// AIAppTaskClarification is a durable, owner-scoped request for missing input.
+// Suggested answers are stored as JSON but presented through a typed handler DTO.
+type AIAppTaskClarification struct {
+	ID                Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	TaskID            Int64String    `gorm:"index;not null" json:"taskId"`
+	RunID             Int64String    `gorm:"index;not null" json:"runId"`
+	UserID            Int64String    `gorm:"index;not null" json:"-"`
+	AppID             Int64String    `gorm:"index;not null" json:"-"`
+	ConversationID    Int64String    `gorm:"index;not null" json:"conversationId"`
+	RequestID         string         `gorm:"size:80;uniqueIndex:uidx_ai_app_task_clarification_request;not null" json:"requestId"`
+	Question          string         `gorm:"size:500;not null" json:"question"`
+	Reason            string         `gorm:"size:500;not null" json:"reason"`
+	AnswerType        string         `gorm:"size:32;not null" json:"answerType"`
+	Suggestions       string         `gorm:"type:text;not null;default:'[]'" json:"-"`
+	AllowCustomAnswer bool           `gorm:"not null;default:false" json:"allowCustomAnswer"`
+	Blocking          bool           `gorm:"not null;default:true" json:"blocking"`
+	Round             int            `gorm:"not null" json:"round"`
+	MaxRounds         int            `gorm:"not null" json:"maxRounds"`
+	Status            string         `gorm:"size:20;index;not null;default:'pending'" json:"status"`
+	Decision          string         `gorm:"size:20;not null;default:''" json:"decision,omitempty"`
+	Answer            string         `gorm:"type:text;not null;default:''" json:"-"`
+	ResolvedAt        *time.Time     `json:"resolvedAt,omitempty"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	UpdatedAt         time.Time      `json:"updatedAt"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (request *AIAppTaskClarification) BeforeCreate(tx *gorm.DB) error {
+	if request.ID == 0 {
+		request.ID = Int64String(utils.GenerateID())
+	}
+	if request.Status == "" {
+		request.Status = "pending"
+	}
+	if request.Suggestions == "" {
+		request.Suggestions = "[]"
+	}
+	return nil
+}
+
 // AIAppConversationAttachment keeps a bounded, parsed copy of a user file.
 // SourceContent enables owner-scoped re-download without exposing object-store
 // URLs; ParsedText is the only content injected into the model context.
@@ -515,10 +560,24 @@ type AIAppArtifact struct {
 	ResourceID     Int64String    `gorm:"index;not null" json:"resourceId"`
 	FileName       string         `gorm:"size:255;not null" json:"fileName"`
 	ContentType    string         `gorm:"size:120;not null" json:"contentType"`
+	Kind           string         `gorm:"size:30;not null;default:'file'" json:"kind"`
+	SourceFormat   string         `gorm:"size:20;not null;default:''" json:"sourceFormat,omitempty"`
+	TargetFormat   string         `gorm:"size:20;not null;default:''" json:"targetFormat,omitempty"`
 	SizeBytes      int64          `gorm:"not null" json:"sizeBytes"`
-	URL            string         `gorm:"size:1000;not null" json:"url"`
+	URL            string         `gorm:"size:1000;not null" json:"-"`
+	StorageKey     string         `gorm:"size:500;not null;default:''" json:"-"`
+	ExpiresAt      *time.Time     `gorm:"index" json:"expiresAt,omitempty"`
+	PersistedAt    *time.Time     `json:"persistedAt,omitempty"`
 	CreatedAt      time.Time      `json:"createdAt"`
 	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (a AIAppArtifact) IsTemporary() bool {
+	return a.ExpiresAt != nil && a.PersistedAt == nil
+}
+
+func (a AIAppArtifact) IsExpired(now time.Time) bool {
+	return a.IsTemporary() && !now.Before(*a.ExpiresAt)
 }
 
 func (a *AIAppArtifact) BeforeCreate(tx *gorm.DB) error {

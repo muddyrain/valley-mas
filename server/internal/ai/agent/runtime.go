@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+
+	"valley-server/internal/ai/clarification"
 )
 
 // Role 是消息发送方的角色。
@@ -79,11 +81,12 @@ type ToolGate interface {
 type EventType string
 
 const (
-	EventDelta      EventType = "delta"
-	EventToolCall   EventType = "tool_call"
-	EventToolResult EventType = "tool_result"
-	EventDone       EventType = "done"
-	EventError      EventType = "error"
+	EventDelta         EventType = "delta"
+	EventToolCall      EventType = "tool_call"
+	EventToolResult    EventType = "tool_result"
+	EventClarification EventType = "clarification"
+	EventDone          EventType = "done"
+	EventError         EventType = "error"
 )
 
 // Event 是 RunStream 通过 channel 分发的中间事件。
@@ -96,6 +99,7 @@ type Event struct {
 	Narration      string
 	ToolResult     json.RawMessage
 	ToolDurationMs int64
+	Clarification  *clarification.Request
 	Result         *Result
 	Err            error
 }
@@ -119,4 +123,5 @@ type AgentRuntime interface {
 var ErrMaxStepsExceeded = errors.New("agent: max steps exceeded")
 var ErrToolApprovalRequired = errors.New("agent: tool approval required")
 var ErrToolApprovalRejected = errors.New("agent: tool approval rejected")
+var ErrClarificationRequired = errors.New("agent: clarification required")
 var ErrEmptyStreamResponse = errors.New("agent: upstream stream response was empty")

@@ -14,7 +14,12 @@ import (
 	"time"
 
 	"valley-server/internal/ai/agent"
+	clarificationprotocol "valley-server/internal/ai/clarification"
+	"valley-server/internal/ai/tools"
+	"valley-server/internal/ai/tools/artifact"
+	blogtool "valley-server/internal/ai/tools/blog"
 	"valley-server/internal/ai/tools/content"
+	documenttool "valley-server/internal/ai/tools/document"
 	filetool "valley-server/internal/ai/tools/file"
 	imagetool "valley-server/internal/ai/tools/image"
 	"valley-server/internal/aiapp"
@@ -40,10 +45,17 @@ const (
 var errAIAppAgentEmptyReply = errors.New("agent returned empty reply")
 
 type aiAppTaskPayload struct {
-	Message        string   `json:"message"`
-	ModelID        string   `json:"modelId"`
-	ActiveSkillIDs []string `json:"activeSkillIds"`
-	AttachmentIDs  []string `json:"attachmentIds"`
+	Message              string                     `json:"message"`
+	ModelID              string                     `json:"modelId"`
+	ActiveSkillIDs       []string                   `json:"activeSkillIds"`
+	AttachmentIDs        []string                   `json:"attachmentIds"`
+	ClarificationAnswers []aiAppClarificationAnswer `json:"clarificationAnswers,omitempty"`
+}
+
+type aiAppClarificationAnswer struct {
+	Question string `json:"question"`
+	Decision string `json:"decision"`
+	Answer   string `json:"answer,omitempty"`
 }
 
 var (
@@ -292,7 +304,7 @@ func CreateAIAppConversationTask(c *gin.Context) {
 	}
 	var unfinishedCount int64
 	if err := database.GetDB().Model(&model.AIAppTask{}).
-		Where("user_id = ? AND status IN ?", userID, []string{"queued", "running", "waiting_approval"}).
+		Where("user_id = ? AND status IN ?", userID, []string{"queued", "running", "waiting_approval", "needs_input"}).
 		Count(&unfinishedCount).Error; err != nil {
 		Error(c, http.StatusInternalServerError, "检查任务队列失败")
 		return
@@ -382,8 +394,10 @@ func ListAIAppTasks(c *gin.Context) {
 		taskIDs = append(taskIDs, task.ID)
 	}
 	approvals := []model.AIAppToolApproval{}
+	clarifications := []model.AIAppTaskClarification{}
 	if len(taskIDs) > 0 {
 		_ = database.GetDB().Where("user_id = ? AND task_id IN ?", userID, taskIDs).Order("created_at ASC").Find(&approvals).Error
+		_ = database.GetDB().Where("user_id = ? AND task_id IN ?", userID, taskIDs).Order("created_at ASC").Find(&clarifications).Error
 	}
 	var queued []model.AIAppTask
 	if err := database.GetDB().Where("user_id = ? AND status = ?", userID, "queued").Order("created_at ASC, id ASC").Find(&queued).Error; err == nil {
@@ -395,7 +409,11 @@ func ListAIAppTasks(c *gin.Context) {
 			tasks[index].QueuePosition = positions[tasks[index].ID]
 		}
 	}
-	Success(c, gin.H{"list": tasks, "approvals": approvals})
+	presentedClarifications := make([]gin.H, 0, len(clarifications))
+	for _, request := range clarifications {
+		presentedClarifications = append(presentedClarifications, presentAIAppTaskClarification(request))
+	}
+	Success(c, gin.H{"list": tasks, "approvals": approvals, "clarifications": presentedClarifications})
 }
 
 func DecideAIAppToolApproval(c *gin.Context) {
@@ -453,6 +471,321 @@ func DecideAIAppToolApproval(c *gin.Context) {
 	Success(c, gin.H{"approval": approval})
 }
 
+func DecideAIAppTaskClarification(c *gin.Context) {
+	userID, app, ok := aiAppConversationContext(c)
+	if !ok {
+		return
+	}
+	taskID, taskErr := parsePathInt64(c, "taskId")
+	clarificationID, clarificationErr := parsePathInt64(c, "clarificationId")
+	if taskErr != nil || clarificationErr != nil {
+		Error(c, http.StatusBadRequest, "无效的澄清请求")
+		return
+	}
+	var payload struct {
+		Decision      clarificationprotocol.Decision `json:"decision"`
+		Answer        string                         `json:"answer"`
+		AttachmentIDs []string                       `json:"attachmentIds"`
+	}
+	if c.ShouldBindJSON(&payload) != nil {
+		Error(c, http.StatusBadRequest, "澄清回答无效")
+		return
+	}
+	var task model.AIAppTask
+	if err := database.GetDB().Where("id = ? AND user_id = ? AND app_id = ?", taskID, userID, app.ID).First(&task).Error; err != nil {
+		Error(c, http.StatusNotFound, "澄清请求不存在")
+		return
+	}
+	attachments, _, err := resolveAIAppConversationAttachments(database.GetDB(), userID, app.ID, task.ConversationID, payload.AttachmentIDs)
+	if err != nil {
+		Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if payload.Decision == clarificationprotocol.DecisionAnswer && strings.TrimSpace(payload.Answer) == "" && len(attachments) > 0 {
+		names := make([]string, 0, len(attachments))
+		for _, attachment := range attachments {
+			names = append(names, attachment.Name)
+		}
+		payload.Answer = "已补充文件：" + strings.Join(names, "、")
+	}
+	resolved, answerMessage, task, err := resolveAIAppTaskClarificationWithAttachments(
+		database.GetDB(), userID, app.ID, task.ID, model.Int64String(clarificationID),
+		payload.Decision, payload.Answer, attachments,
+	)
+	if err != nil {
+		Error(c, http.StatusConflict, "澄清请求已处理或回答无效")
+		return
+	}
+	if task.Status == "queued" {
+		notifyAIAppTaskWorker()
+	}
+	Success(c, gin.H{
+		"clarification": presentAIAppTaskClarification(resolved),
+		"userMessage":   answerMessage,
+		"task":          task,
+	})
+}
+
+func resolveAIAppTaskClarification(
+	db *gorm.DB,
+	userID, appID, taskID, clarificationID model.Int64String,
+	decision clarificationprotocol.Decision,
+	answer string,
+) (model.AIAppTaskClarification, model.AIAppConversationMessage, error) {
+	request, message, _, err := resolveAIAppTaskClarificationWithAttachments(db, userID, appID, taskID, clarificationID, decision, answer, nil)
+	return request, message, err
+}
+
+func resolveAIAppTaskClarificationWithAttachments(
+	db *gorm.DB,
+	userID, appID, taskID, clarificationID model.Int64String,
+	decision clarificationprotocol.Decision,
+	answer string,
+	attachments []model.AIAppConversationAttachment,
+) (model.AIAppTaskClarification, model.AIAppConversationMessage, model.AIAppTask, error) {
+	var resolved model.AIAppTaskClarification
+	var answerMessage model.AIAppConversationMessage
+	var task model.AIAppTask
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where(
+			"id = ? AND task_id = ? AND user_id = ? AND app_id = ? AND status = ?",
+			clarificationID, taskID, userID, appID, "pending",
+		).First(&resolved).Error; err != nil {
+			return err
+		}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where(
+			"id = ? AND user_id = ? AND app_id = ? AND status = ?", taskID, userID, appID, "needs_input",
+		).First(&task).Error; err != nil {
+			return err
+		}
+		var suggestions []clarificationprotocol.Suggestion
+		_ = json.Unmarshal([]byte(resolved.Suggestions), &suggestions)
+		request := clarificationprotocol.Request{
+			ID: resolved.RequestID, Question: resolved.Question, Reason: resolved.Reason,
+			AnswerType: clarificationprotocol.AnswerType(resolved.AnswerType), Suggestions: suggestions,
+			AllowCustomAnswer: resolved.AllowCustomAnswer, Blocking: resolved.Blocking,
+			Round: resolved.Round, MaxRounds: resolved.MaxRounds,
+		}
+		resolution, err := clarificationprotocol.Resolve(request, decision, answer)
+		if err != nil {
+			return err
+		}
+		now := time.Now()
+		status := "answered"
+		if decision == clarificationprotocol.DecisionSkip {
+			status = "skipped"
+		} else if decision == clarificationprotocol.DecisionDecline {
+			status = "declined"
+		}
+		if err := tx.Model(&resolved).Updates(map[string]any{
+			"status": status, "decision": decision, "answer": resolution.Answer, "resolved_at": now,
+		}).Error; err != nil {
+			return err
+		}
+		resolved.Status = status
+		resolved.Decision = string(decision)
+		resolved.Answer = resolution.Answer
+		resolved.ResolvedAt = &now
+
+		var payload aiAppTaskPayload
+		if err := json.Unmarshal([]byte(task.Payload), &payload); err != nil {
+			return err
+		}
+		answerValue := resolution.Answer
+		if resolution.UsedDefault {
+			answerValue = "未提供，使用安全默认值"
+		}
+		payload.ClarificationAnswers = append(payload.ClarificationAnswers, aiAppClarificationAnswer{
+			Question: resolved.Question, Decision: string(decision), Answer: answerValue,
+		})
+		for _, attachment := range attachments {
+			id := attachment.ID.String()
+			if !containsString(payload.AttachmentIDs, id) {
+				payload.AttachmentIDs = append(payload.AttachmentIDs, id)
+			}
+		}
+		serializedPayload, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		if !resolution.CanContinue {
+			code := "CLARIFICATION_DECLINED"
+			explanation := "由于你选择不提供这项必需信息，本次任务已停止。准备好后可直接发送所需内容或文件，我会重新为你处理。"
+			if decision == clarificationprotocol.DecisionSkip {
+				code = "CLARIFICATION_SKIPPED"
+				explanation = "这项信息是继续任务所必需的，暂时无法跳过，本次任务已停止。请直接发送所需内容或文件，我会重新为你处理。"
+			}
+			answerMessage = model.AIAppConversationMessage{
+				UserID: userID, AppID: appID, ConversationID: task.ConversationID,
+				RunID: &task.RunID, Role: "assistant", Content: explanation,
+			}
+			if err := tx.Create(&answerMessage).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&task).Updates(map[string]any{
+				"status": "failed", "progress": 100, "status_message": "缺少必要信息，任务已停止",
+				"error_code": code, "payload": string(serializedPayload), "finished_at": now,
+			}).Error; err != nil {
+				return err
+			}
+			task.Status = "failed"
+			task.Progress = 100
+			task.StatusMessage = "缺少必要信息，任务已停止"
+			task.ErrorCode = code
+			if err := tx.Model(&model.AIAppRun{}).Where("id = ?", task.RunID).Updates(map[string]any{"status": "failed", "error_code": code}).Error; err != nil {
+				return err
+			}
+			return tx.Model(&model.AIAppConversation{}).Where("id = ?", task.ConversationID).Update("updated_at", now).Error
+		}
+		if decision == clarificationprotocol.DecisionAnswer {
+			answerMessage = model.AIAppConversationMessage{
+				UserID: userID, AppID: appID, ConversationID: task.ConversationID,
+				RunID: &task.RunID, Role: "user", Content: strings.TrimSpace(answer),
+			}
+			if err := tx.Create(&answerMessage).Error; err != nil {
+				return err
+			}
+			if len(attachments) > 0 {
+				ids := make([]model.Int64String, 0, len(attachments))
+				for _, attachment := range attachments {
+					ids = append(ids, attachment.ID)
+				}
+				if err := tx.Model(&model.AIAppConversationAttachment{}).Where("id IN ?", ids).Update("message_id", answerMessage.ID).Error; err != nil {
+					return err
+				}
+			}
+		}
+		if err := tx.Model(&task).Updates(map[string]any{
+			"status": "queued", "progress": 0, "status_message": "已补充信息，等待恢复执行",
+			"partial_output": "", "error_code": "", "payload": string(serializedPayload), "started_at": nil, "finished_at": nil,
+		}).Error; err != nil {
+			return err
+		}
+		task.Status = "queued"
+		task.Progress = 0
+		task.StatusMessage = "已补充信息，等待恢复执行"
+		task.PartialOutput = ""
+		task.ErrorCode = ""
+		task.Payload = string(serializedPayload)
+		return tx.Model(&model.AIAppConversation{}).Where("id = ?", task.ConversationID).Update("updated_at", now).Error
+	})
+	return resolved, answerMessage, task, err
+}
+
+func presentAIAppTaskClarification(request model.AIAppTaskClarification) gin.H {
+	suggestions := []clarificationprotocol.Suggestion{}
+	_ = json.Unmarshal([]byte(request.Suggestions), &suggestions)
+	return gin.H{
+		"id": request.ID, "taskId": request.TaskID, "runId": request.RunID,
+		"conversationId": request.ConversationID, "requestId": request.RequestID,
+		"question": request.Question, "reason": request.Reason, "answerType": request.AnswerType,
+		"suggestions": suggestions, "allowCustomAnswer": request.AllowCustomAnswer,
+		"blocking": request.Blocking, "round": request.Round, "maxRounds": request.MaxRounds,
+		"status": request.Status, "decision": request.Decision, "answer": request.Answer,
+		"resolvedAt": request.ResolvedAt, "createdAt": request.CreatedAt,
+	}
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func excludeAIAppToolName(values []string, target string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value != target {
+			result = append(result, value)
+		}
+	}
+	return result
+}
+
+func RetryAIAppTask(c *gin.Context) {
+	userID, app, ok := aiAppConversationContext(c)
+	if !ok {
+		return
+	}
+	taskID, err := parsePathInt64(c, "taskId")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的任务 ID")
+		return
+	}
+	task, run, err := retryAIAppTask(database.GetDB(), userID, app.ID, model.Int64String(taskID))
+	if err != nil {
+		Error(c, http.StatusConflict, "当前失败不可直接重试，请补充信息后重新发送")
+		return
+	}
+	startedTask, started, startErr := claimAIAppTaskByID(context.Background(), database.GetDB(), &task.ID)
+	if startErr == nil && started {
+		task = startedTask
+		run.Status = "running"
+		aiAppTaskLauncher(context.Background(), database.GetDB(), task)
+	} else {
+		setAIAppTaskQueuePosition(database.GetDB(), &task)
+		notifyAIAppTaskWorker()
+	}
+	Success(c, gin.H{"task": task, "run": run})
+}
+
+func retryAIAppTask(db *gorm.DB, userID, appID, taskID model.Int64String) (model.AIAppTask, model.AIAppRun, error) {
+	var source model.AIAppTask
+	var retryTask model.AIAppTask
+	var retryRun model.AIAppRun
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ? AND user_id = ? AND app_id = ?", taskID, userID, appID).First(&source).Error; err != nil {
+			return err
+		}
+		var retryableFailures int64
+		if err := tx.Model(&model.AIAppConversationToolTrace{}).Where("run_id = ? AND user_id = ? AND retryable = ?", source.RunID, userID, true).Count(&retryableFailures).Error; err != nil {
+			return err
+		}
+		if retryableFailures == 0 && !retryableAIAppTaskError(source.ErrorCode) {
+			return errors.New("task is not retryable")
+		}
+		var sourceRun model.AIAppRun
+		if err := tx.Where("id = ? AND user_id = ?", source.RunID, userID).First(&sourceRun).Error; err != nil {
+			return err
+		}
+		retryRun = model.AIAppRun{
+			AppID: source.AppID, VersionID: sourceRun.VersionID, ConversationID: &source.ConversationID,
+			UserID: source.UserID, Status: "queued", Input: sourceRun.Input,
+		}
+		if err := tx.Create(&retryRun).Error; err != nil {
+			return err
+		}
+		messageUpdate := tx.Model(&model.AIAppConversationMessage{}).
+			Where("id = ? AND user_id = ? AND app_id = ? AND conversation_id = ?", source.UserMessageID, source.UserID, source.AppID, source.ConversationID).
+			Update("run_id", retryRun.ID)
+		if messageUpdate.Error != nil {
+			return messageUpdate.Error
+		}
+		if messageUpdate.RowsAffected != 1 {
+			return errors.New("retry source message not found")
+		}
+		retryTask = model.AIAppTask{
+			UserID: source.UserID, AppID: source.AppID, ConversationID: source.ConversationID,
+			RunID: retryRun.ID, UserMessageID: source.UserMessageID, Title: source.Title,
+			Status: "queued", Payload: source.Payload, StatusMessage: "等待重试",
+		}
+		return tx.Create(&retryTask).Error
+	})
+	return retryTask, retryRun, err
+}
+
+func retryableAIAppTaskError(code string) bool {
+	switch code {
+	case "AI_AGENT_RUN_FAILED", "RAG_QUERY_FAILED", "RAG_EMBEDDING_FAILED", "AI_TOOL_REGISTRY_UNAVAILABLE":
+		return true
+	default:
+		return false
+	}
+}
+
 func CancelAIAppTask(c *gin.Context) {
 	userID, app, ok := aiAppConversationContext(c)
 	if !ok {
@@ -469,7 +802,7 @@ func CancelAIAppTask(c *gin.Context) {
 		return
 	}
 	now := time.Now()
-	result := database.GetDB().Model(&model.AIAppTask{}).Where("id = ? AND user_id = ? AND app_id = ? AND status IN ?", taskID, userID, app.ID, []string{"queued", "running", "waiting_approval"}).Updates(map[string]any{
+	result := database.GetDB().Model(&model.AIAppTask{}).Where("id = ? AND user_id = ? AND app_id = ? AND status IN ?", taskID, userID, app.ID, []string{"queued", "running", "waiting_approval", "needs_input"}).Updates(map[string]any{
 		"status": "cancelled", "status_message": "已停止", "cancel_requested_at": now, "finished_at": now,
 	})
 	if result.Error != nil || result.RowsAffected == 0 {
@@ -535,7 +868,13 @@ func executeAIAppTask(parent context.Context, db *gorm.DB, task *model.AIAppTask
 		return failAIAppTask(db, task, "APP_SKILLS_UNAVAILABLE", err)
 	}
 	var attachments []model.AIAppConversationAttachment
-	if err := db.Where("user_id = ? AND app_id = ? AND conversation_id = ? AND message_id = ?", task.UserID, task.AppID, task.ConversationID, task.UserMessageID).Order("created_at ASC").Find(&attachments).Error; err != nil {
+	if len(payload.AttachmentIDs) > 0 {
+		resolved, _, attachmentErr := resolveAIAppConversationAttachments(db, task.UserID, task.AppID, task.ConversationID, payload.AttachmentIDs)
+		if attachmentErr != nil {
+			return failAIAppTask(db, task, "ATTACHMENTS_UNAVAILABLE", attachmentErr)
+		}
+		attachments = resolved
+	} else if err := db.Where("user_id = ? AND app_id = ? AND conversation_id = ? AND message_id = ?", task.UserID, task.AppID, task.ConversationID, task.UserMessageID).Order("created_at ASC").Find(&attachments).Error; err != nil {
 		return failAIAppTask(db, task, "ATTACHMENTS_UNAVAILABLE", err)
 	}
 	referenceImages := aiAppAttachmentReferenceImages(attachments)
@@ -557,11 +896,20 @@ func executeAIAppTask(parent context.Context, db *gorm.DB, task *model.AIAppTask
 		effectiveMessage = "请理解并处理本轮附加的文件，提取重要信息并给出有用结果。"
 	}
 	_ = updateAIAppTask(db, task.ID, "running", 15, "正在检索资料")
-	knowledgeContext, references, err := retrieveAIKnowledgeContext(ctx, task.UserID, version, effectiveMessage)
+	knowledge, err := retrieveAIKnowledgeAugmentation(ctx, task.UserID, version, effectiveMessage)
 	if err != nil {
-		return failAIAppTask(db, task, "RAG_QUERY_FAILED", err)
+		return failAIAppTask(db, task, "RUN_CANCELLED", err)
 	}
-	system := buildAIAppConversationSystemPrompt(config.SystemInstructions(), knowledgeContext)
+	if knowledge.Status == aiKnowledgeStatusDegraded {
+		logger.Log.Warnf("AI app task %s knowledge augmentation degraded: %s: %v", task.ID, knowledge.ErrorCode, knowledge.Cause)
+	}
+	if err := db.Model(&model.AIAppRun{}).Where("id = ?", task.RunID).Updates(map[string]any{
+		"knowledge_status": knowledge.Status, "knowledge_error_code": knowledge.ErrorCode,
+	}).Error; err != nil {
+		return failAIAppTask(db, task, "RESULT_PERSISTENCE_FAILED", err)
+	}
+	references := knowledge.References
+	system := buildAIAppConversationSystemPrompt(config.SystemInstructions(), knowledge.Context)
 	if attachmentContext := buildAIAppAttachmentContext(attachments); attachmentContext != "" {
 		system = strings.TrimSpace(system + "\n\n以下是用户本轮明确附加的文件内容。回答时应结合文件；若文件内容与用户要求冲突，以用户最新要求为准。\n" + attachmentContext)
 	}
@@ -569,13 +917,46 @@ func executeAIAppTask(parent context.Context, db *gorm.DB, task *model.AIAppTask
 	if skillInstructions != "" {
 		system = strings.TrimSpace(system + "\n\n" + skillInstructions)
 	}
+	if len(payload.ClarificationAnswers) > 0 {
+		lines := make([]string, 0, len(payload.ClarificationAnswers))
+		for _, item := range payload.ClarificationAnswers {
+			lines = append(lines, fmt.Sprintf("问题：%s\n用户补充：%s", strings.TrimSpace(item.Question), strings.TrimSpace(item.Answer)))
+		}
+		system = strings.TrimSpace(system + "\n\n以下是用户对本任务澄清问题的正式补充。继续原任务，不要重复追问已经回答的内容。\n" + strings.Join(lines, "\n\n"))
+	}
 	registry, toolNames, err := resolveAIAppTools(db, app.ID, version)
 	if err != nil {
 		return failAIAppTask(db, task, "AI_TOOL_REGISTRY_UNAVAILABLE", err)
 	}
+	boundToolNames := append([]string(nil), toolNames...)
 	if !aimodel.HasCapabilities(invocation.Model, []string{"tool_call"}) {
 		toolNames = nil
 	}
+	if containsString(boundToolNames, documenttool.SaveToolName) || containsString(boundToolNames, documenttool.OverwriteToolName) {
+		workspaceContext, workspaceErr := buildAIAppCreatorWorkspaceContext(db, task.UserID, app.ID, time.Now())
+		if workspaceErr != nil {
+			return failAIAppTask(db, task, "CREATOR_WORKSPACE_UNAVAILABLE", workspaceErr)
+		}
+		if workspaceContext != "" {
+			system = strings.TrimSpace(system + "\n\n" + workspaceContext)
+		}
+	}
+	var clarificationCount int64
+	_ = db.Model(&model.AIAppTaskClarification{}).Where("task_id = ? AND user_id = ?", task.ID, task.UserID).Count(&clarificationCount).Error
+	if request, ok := buildAIAppConversionClarification(
+		task.ID,
+		payload.Message,
+		attachments,
+		payload.ClarificationAnswers,
+		boundToolNames,
+		int(clarificationCount)+1,
+	); ok {
+		if err := persistAIAppTaskClarification(db, task, request); err != nil {
+			return failAIAppTask(db, task, "CLARIFICATION_PERSISTENCE_FAILED", err)
+		}
+		return nil
+	}
+	system = appendAIAppClarificationInstructions(system, toolNames)
 	for _, toolName := range toolNames {
 		if toolName == filetool.ToolName {
 			system = strings.TrimSpace(system + "\n\n当用户要求生成 Markdown、JSON 或 CSV 等可下载文件时，必须调用 file.create 创建成果文件；不要只在回复中展示代码块或声称已经保存。")
@@ -583,8 +964,8 @@ func executeAIAppTask(parent context.Context, db *gorm.DB, task *model.AIAppTask
 		}
 	}
 	system = appendContentSearchDateContext(system, toolNames, time.Now())
-	var history []model.AIAppConversationMessage
-	if err := db.Where("user_id = ? AND app_id = ? AND conversation_id = ? AND id <= ?", task.UserID, app.ID, conversation.ID, task.UserMessageID).Order("created_at DESC").Limit(aiAppConversationHistoryLimit).Find(&history).Error; err != nil {
+	history, err := loadAIAppTaskConversationHistory(db, *task)
+	if err != nil {
 		return failAIAppTask(db, task, "CONVERSATION_HISTORY_UNAVAILABLE", err)
 	}
 	messages := make([]agent.Message, 0, len(history))
@@ -607,11 +988,32 @@ func executeAIAppTask(parent context.Context, db *gorm.DB, task *model.AIAppTask
 	if err != nil {
 		return failAIAppTask(db, task, "AI_TOOL_POLICY_UNAVAILABLE", err)
 	}
-	gate := &aiAppToolApprovalGate{db: db, task: task, policies: policies}
+	confirmations := make(map[string]tools.ConfirmationPolicy, len(boundToolNames))
+	for _, toolName := range boundToolNames {
+		if registered := registry.Get(toolName); registered != nil {
+			confirmations[toolName] = tools.ContractFor(registered).Confirmation
+		}
+	}
+	gate := &aiAppToolApprovalGate{db: db, task: task, policies: policies, confirmations: confirmations}
 	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
 	runContext := content.WithOwner(ctx, task.UserID)
 	runContext = imagetool.WithRequestInput(runContext, task.UserID, referenceImages, styleProfileID)
 	runContext = filetool.WithRequestContext(runContext, filetool.RequestContext{UserID: task.UserID, AppID: app.ID, ConversationID: conversation.ID, RunID: task.RunID, TaskID: &task.ID})
+	runContext = artifact.WithRequestContext(runContext, aiAppArtifactRequestContext(task.UserID, app.ID, conversation.ID, task.RunID, &task.ID, attachments))
+	runContext = clarificationprotocol.WithRound(runContext, int(clarificationCount)+1)
+	if call, deterministicReply, ok := buildDeterministicCreatorToolCall(effectiveMessage, boundToolNames); ok {
+		if err := executeDeterministicCreatorToolCall(runContext, db, task, app, conversation, registry, gate, call, deterministicReply, invocation.Model.ModelID); err != nil {
+			code := "TOOL_EXECUTION_FAILED"
+			if errors.Is(err, agent.ErrToolApprovalRejected) {
+				code = "TOOL_APPROVAL_REJECTED"
+			}
+			if errors.Is(err, context.Canceled) {
+				code = "RUN_CANCELLED"
+			}
+			return failAIAppTask(db, task, code, err)
+		}
+		return nil
+	}
 	spec := agent.Spec{Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench-background-task", ToolGate: gate}
 	var reply strings.Builder
 	partialWriter := newAIAppTaskPartialWriter(db, task.ID)
@@ -641,6 +1043,9 @@ func executeAIAppTask(parent context.Context, db *gorm.DB, task *model.AIAppTask
 					pendingNarrations = append(pendingNarrations, event.Narration)
 					_ = updateAIAppTask(db, task.ID, "running", 55, "正在调用 "+humanAIAppToolName(event.ToolName))
 				case agent.EventToolResult:
+					if event.ToolName == clarificationprotocol.ToolName {
+						continue
+					}
 					narration := ""
 					if len(pendingNarrations) > 0 {
 						narration = pendingNarrations[0]
@@ -648,16 +1053,30 @@ func executeAIAppTask(parent context.Context, db *gorm.DB, task *model.AIAppTask
 					}
 					imageGenerationIDs = append(imageGenerationIDs, imageGenerationIDsFromToolResult(event.ToolName, event.ToolResult)...)
 					status := "succeeded"
-					if strings.Contains(string(event.ToolResult), `"ok":false`) {
+					errorCode, errorMessage, retryable := classifyAIAppToolFailure(event.ToolName, event.ToolResult)
+					if errorCode != "" {
 						status = "failed"
 					}
-					_ = db.Create(&model.AIAppConversationToolTrace{UserID: task.UserID, AppID: app.ID, ConversationID: conversation.ID, RunID: task.RunID, ToolName: event.ToolName, Narration: narration, Status: status, DurationMs: event.ToolDurationMs}).Error
+					_ = db.Create(&model.AIAppConversationToolTrace{
+						UserID: task.UserID, AppID: app.ID, ConversationID: conversation.ID, RunID: task.RunID,
+						ToolName: event.ToolName, Narration: narration, Status: status,
+						ErrorCode: errorCode, ErrorMessage: errorMessage, Retryable: retryable,
+						DurationMs: event.ToolDurationMs,
+					}).Error
+				case agent.EventClarification:
+					if event.Clarification != nil {
+						if err := persistAIAppTaskClarification(db, task, *event.Clarification); err != nil {
+							runErr = err
+						}
+					}
 				case agent.EventDone:
 					if event.Result != nil {
 						result = *event.Result
 					}
 				case agent.EventError:
-					runErr = event.Err
+					if runErr == nil {
+						runErr = event.Err
+					}
 				}
 			}
 		}
@@ -680,6 +1099,9 @@ func executeAIAppTask(parent context.Context, db *gorm.DB, task *model.AIAppTask
 		}
 	}
 	_ = partialWriter.Flush()
+	if errors.Is(runErr, agent.ErrClarificationRequired) {
+		return nil
+	}
 	if runErr != nil || strings.TrimSpace(result.Reply) == "" {
 		code := "AI_AGENT_RUN_FAILED"
 		if errors.Is(runErr, agent.ErrToolApprovalRejected) {
@@ -689,6 +1111,15 @@ func executeAIAppTask(parent context.Context, db *gorm.DB, task *model.AIAppTask
 			code = "RUN_CANCELLED"
 		}
 		return failAIAppTask(db, task, code, runErr)
+	}
+	clarificationRound := int(clarificationCount) + 1
+	if notice, ok := buildAIAppReplyClarificationLimitNotice(result.Reply, clarificationRound); ok {
+		result.Reply = notice
+	} else if request, ok := buildAIAppReplyClarification(task.ID, result.Reply, clarificationRound); ok {
+		if err := persistAIAppTaskClarification(db, task, request); err != nil {
+			return failAIAppTask(db, task, "CLARIFICATION_PERSISTENCE_FAILED", err)
+		}
+		return nil
 	}
 	modelName := result.Model
 	if modelName == "" {
@@ -714,7 +1145,11 @@ func executeAIAppTask(parent context.Context, db *gorm.DB, task *model.AIAppTask
 		if err := tx.Create(&assistantMessage).Error; err != nil {
 			return err
 		}
-		if err := tx.Model(&model.AIAppRun{}).Where("id = ?", task.RunID).Updates(map[string]any{"status": "succeeded", "model": modelName, "output": aiclient.TrimRunes(result.Reply, 2000), "references": string(referenceSummary), "duration_ms": durationMs}).Error; err != nil {
+		if err := tx.Model(&model.AIAppRun{}).Where("id = ?", task.RunID).Updates(map[string]any{
+			"status": "succeeded", "model": modelName, "output": aiclient.TrimRunes(result.Reply, 2000),
+			"references": string(referenceSummary), "duration_ms": durationMs,
+			"knowledge_status": knowledge.Status, "knowledge_error_code": knowledge.ErrorCode,
+		}).Error; err != nil {
 			return err
 		}
 		return tx.Model(&model.AIAppTask{}).Where("id = ?", task.ID).Updates(map[string]any{"status": "succeeded", "progress": 100, "status_message": "已完成", "partial_output": strings.TrimSpace(result.Reply), "finished_at": finishedAt}).Error
@@ -725,6 +1160,117 @@ func executeAIAppTask(parent context.Context, db *gorm.DB, task *model.AIAppTask
 		return failAIAppTask(db, task, "RESULT_PERSISTENCE_FAILED", err)
 	}
 	return nil
+}
+
+func loadAIAppTaskConversationHistory(db *gorm.DB, task model.AIAppTask) ([]model.AIAppConversationMessage, error) {
+	history := []model.AIAppConversationMessage{}
+	if err := db.Where(
+		"user_id = ? AND app_id = ? AND conversation_id = ? AND (id <= ? OR run_id = ?)",
+		task.UserID, task.AppID, task.ConversationID, task.UserMessageID, task.RunID,
+	).Order("created_at DESC, id DESC").Limit(aiAppConversationHistoryLimit).Find(&history).Error; err != nil {
+		return nil, err
+	}
+	assistantRunIDs := make(map[model.Int64String]struct{})
+	runIDs := make([]model.Int64String, 0, len(history))
+	seenRunIDs := make(map[model.Int64String]struct{}, len(history))
+	for _, message := range history {
+		if message.RunID == nil || *message.RunID == 0 {
+			continue
+		}
+		if message.Role == "assistant" {
+			assistantRunIDs[*message.RunID] = struct{}{}
+		}
+		if _, exists := seenRunIDs[*message.RunID]; !exists {
+			seenRunIDs[*message.RunID] = struct{}{}
+			runIDs = append(runIDs, *message.RunID)
+		}
+	}
+	if len(runIDs) == 0 {
+		return history, nil
+	}
+	var runs []model.AIAppRun
+	if err := db.Select("id", "status").Where("id IN ?", runIDs).Find(&runs).Error; err != nil {
+		return nil, err
+	}
+	statuses := make(map[model.Int64String]string, len(runs))
+	for _, run := range runs {
+		statuses[run.ID] = run.Status
+	}
+	filtered := make([]model.AIAppConversationMessage, 0, len(history))
+	for _, message := range history {
+		if message.ID == task.UserMessageID || message.RunID == nil || *message.RunID == task.RunID {
+			filtered = append(filtered, message)
+			continue
+		}
+		status := statuses[*message.RunID]
+		_, hasAssistantReply := assistantRunIDs[*message.RunID]
+		if (status == "failed" || status == "cancelled") && !hasAssistantReply {
+			continue
+		}
+		filtered = append(filtered, message)
+	}
+	return filtered, nil
+}
+
+func persistAIAppTaskClarification(db *gorm.DB, task *model.AIAppTask, request clarificationprotocol.Request) error {
+	suggestions, err := json.Marshal(request.Suggestions)
+	if err != nil {
+		return err
+	}
+	record := model.AIAppTaskClarification{
+		TaskID: task.ID, RunID: task.RunID, UserID: task.UserID, AppID: task.AppID,
+		ConversationID: task.ConversationID, RequestID: request.ID,
+		Question: request.Question, Reason: request.Reason, AnswerType: string(request.AnswerType),
+		Suggestions: string(suggestions), AllowCustomAnswer: request.AllowCustomAnswer,
+		Blocking: request.Blocking, Round: request.Round, MaxRounds: request.MaxRounds, Status: "pending",
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "request_id"}}, DoNothing: true}).Create(&record).Error; err != nil {
+			return err
+		}
+		return tx.Model(&model.AIAppTask{}).Where("id = ? AND status = ?", task.ID, "running").Updates(map[string]any{
+			"status": "needs_input", "progress": 50, "status_message": "等待补充信息", "partial_output": "",
+		}).Error
+	})
+}
+
+func classifyAIAppToolFailure(toolName string, raw json.RawMessage) (code, message string, retryable bool) {
+	var envelope struct {
+		OK        *bool  `json:"ok"`
+		Error     string `json:"error"`
+		ErrorCode string `json:"errorCode"`
+		Retryable bool   `json:"retryable"`
+	}
+	if json.Unmarshal(raw, &envelope) != nil || envelope.OK == nil || *envelope.OK {
+		return "", "", false
+	}
+	if envelope.ErrorCode != "" && envelope.ErrorCode != "CLARIFICATION_REQUIRED" {
+		return envelope.ErrorCode, publicAIAppToolFailureMessage(toolName, envelope.ErrorCode), envelope.Retryable
+	}
+	lower := strings.ToLower(envelope.Error)
+	switch {
+	case strings.Contains(lower, "storage") || strings.Contains(lower, "upload") || strings.Contains(lower, "persist") || strings.Contains(lower, "service unavailable"):
+		return "ARTIFACT_STORAGE_UNAVAILABLE", "工具服务暂不可用，请稍后重试。", true
+	case strings.Contains(lower, "invalid") || strings.Contains(lower, "required") || strings.Contains(lower, "supported") || strings.Contains(lower, "identical") || strings.Contains(lower, "attachment"):
+		return "TOOL_INPUT_INVALID", "缺少或不支持的参数，请补充后重新发送。", false
+	case strings.Contains(lower, "decode") || strings.Contains(lower, "cannot be read") || strings.Contains(lower, "no extractable text") || strings.Contains(lower, "empty"):
+		return "FILE_CONVERSION_FAILED", "文件无法转换，请检查文件是否完整或换一个文件。", false
+	default:
+		return "TOOL_EXECUTION_FAILED", "工具执行失败，请检查输入后再试。", false
+	}
+}
+
+func publicAIAppToolFailureMessage(toolName, code string) string {
+	switch code {
+	case "ARTIFACT_STORAGE_UNAVAILABLE":
+		return "工具服务暂不可用，请稍后重试。"
+	case "TOOL_INPUT_INVALID":
+		return "缺少或不支持的参数，请补充后重新发送。"
+	case "FILE_CONVERSION_FAILED":
+		return "文件无法转换，请检查文件是否完整或换一个文件。"
+	default:
+		return humanAIAppToolName(toolName) + "执行失败，请检查输入后再试。"
+	}
 }
 
 func shouldRetryAIAppAgentRun(err error, emittedOutput bool, invokedTool bool) bool {
@@ -770,11 +1316,16 @@ func isAIAppTaskActive(taskID model.Int64String) bool {
 func buildAIAppAttachmentContext(attachments []model.AIAppConversationAttachment) string {
 	var builder strings.Builder
 	for index, attachment := range attachments {
+		header := fmt.Sprintf("[用户文件 %d：%s；附件 ID：%s]", index+1, attachment.Name, attachment.ID)
 		text := aiclient.TrimRunes(strings.TrimSpace(attachment.ParsedText), 5000)
-		if text == "" || len([]rune(builder.String()))+len([]rune(text)) > aiAppAttachmentContextRunes {
-			continue
+		entry := header
+		if text != "" {
+			entry += "\n" + text
 		}
-		builder.WriteString(fmt.Sprintf("[用户文件 %d：%s]\n%s\n\n", index+1, attachment.Name, text))
+		if len([]rune(builder.String()))+len([]rune(entry)) > aiAppAttachmentContextRunes {
+			entry = header
+		}
+		builder.WriteString(entry + "\n\n")
 	}
 	return strings.TrimSpace(builder.String())
 }
@@ -790,6 +1341,23 @@ func aiAppAttachmentReferenceImages(attachments []model.AIAppConversationAttachm
 	return images
 }
 
+func aiAppArtifactRequestContext(
+	userID, appID, conversationID, runID model.Int64String,
+	taskID *model.Int64String,
+	attachments []model.AIAppConversationAttachment,
+) artifact.RequestContext {
+	attachmentIDs := make([]model.Int64String, 0, len(attachments))
+	for _, attachment := range attachments {
+		if attachment.ID > 0 {
+			attachmentIDs = append(attachmentIDs, attachment.ID)
+		}
+	}
+	return artifact.RequestContext{
+		UserID: userID, AppID: appID, ConversationID: conversationID, RunID: runID,
+		TaskID: taskID, AttachmentIDs: attachmentIDs,
+	}
+}
+
 func loadAIAppToolPolicies(db *gorm.DB, version model.AIAppVersion) (map[string]string, error) {
 	var bindings []model.AIAppVersionToolBinding
 	if err := db.Where("app_version_id = ?", version.ID).Find(&bindings).Error; err != nil {
@@ -803,13 +1371,14 @@ func loadAIAppToolPolicies(db *gorm.DB, version model.AIAppVersion) (map[string]
 }
 
 type aiAppToolApprovalGate struct {
-	db       *gorm.DB
-	task     *model.AIAppTask
-	policies map[string]string
+	db            *gorm.DB
+	task          *model.AIAppTask
+	policies      map[string]string
+	confirmations map[string]tools.ConfirmationPolicy
 }
 
 func (gate *aiAppToolApprovalGate) Authorize(ctx context.Context, call agent.ToolCall) error {
-	if gate == nil || gate.policies[call.Name] != "always" {
+	if gate == nil || !aiAppToolRequiresApproval(call.Name, gate.policies[call.Name], gate.confirmations[call.Name]) {
 		return nil
 	}
 	fingerprintSource := gate.task.ID.String() + "\n" + call.Name + "\n" + string(call.Args)
@@ -854,6 +1423,18 @@ func summarizeAIAppToolCall(call agent.ToolCall) string {
 		return "生成图片：" + aiclient.TrimRunes(fmt.Sprint(values["prompt"]), 160)
 	case filetool.ToolName:
 		return fmt.Sprintf("创建成果文件：%s（%s）", aiclient.TrimRunes(fmt.Sprint(values["fileName"]), 120), fmt.Sprint(values["format"]))
+	case imagetool.ConvertToolName:
+		return fmt.Sprintf("转换图片为 %s", fmt.Sprint(values["targetFormat"]))
+	case documenttool.ToolName:
+		return "将 PDF 转换为 DOCX"
+	case documenttool.ExportToolName:
+		return fmt.Sprintf("导出文档：%s（%s）", aiclient.TrimRunes(fmt.Sprint(values["fileName"]), 120), fmt.Sprint(values["format"]))
+	case documenttool.SaveToolName:
+		return fmt.Sprintf("长期保存成果文件 %s", fmt.Sprint(values["artifactId"]))
+	case documenttool.OverwriteToolName:
+		return fmt.Sprintf("用成果文件 %s 覆盖文档 %s", fmt.Sprint(values["artifactId"]), fmt.Sprint(values["targetResourceId"]))
+	case blogtool.ToolName:
+		return fmt.Sprintf("发布博客《%s》（%s）", aiclient.TrimRunes(fmt.Sprint(values["title"]), 120), fmt.Sprint(values["visibility"]))
 	case "content.search":
 		return "搜索内容：" + aiclient.TrimRunes(fmt.Sprint(values["query"]), 160)
 	default:
@@ -869,9 +1450,30 @@ func humanAIAppToolName(name string) string {
 		return "图片生成"
 	case filetool.ToolName:
 		return "成果文件"
+	case imagetool.ConvertToolName:
+		return "图片转换"
+	case documenttool.ToolName:
+		return "文档转换"
+	case documenttool.ExportToolName:
+		return "文档导出"
+	case documenttool.SaveToolName:
+		return "保存文档"
+	case documenttool.OverwriteToolName:
+		return "覆盖文档"
+	case blogtool.ToolName:
+		return "发布博客"
 	default:
 		return name
 	}
+}
+
+func appendAIAppClarificationInstructions(system string, toolNames []string) string {
+	if !containsString(toolNames, clarificationprotocol.ToolName) {
+		return system
+	}
+	return strings.TrimSpace(system + `
+
+当你需要用户补充信息、确认偏好或在多个方向中做选择，才能给出真正有用的下一步时，必须调用 clarification.ask 显示结构化问题。即使不需要调用其他工具，这条规则也同样适用。不要在普通回复中列出一组问题，也不要先输出问题列表再调用工具；普通回复中不得包含要求用户回答的问句，包括结尾处的可选追问。如果希望用户继续选择或补充，就改为调用 clarification.ask。一次只问一个最能推进任务的问题，并给出少量可直接选择的建议，同时允许用户自由补充。用户已经回答过的内容不得重复追问；如果当前信息足以直接提供有用结果，就给出自足的回答并以结论收尾，不要为了展示卡片而追问。非阻塞偏好可以使用安全默认值。`)
 }
 
 func aiAppToolRisk(name string) string {
@@ -880,13 +1482,75 @@ func aiAppToolRisk(name string) string {
 		return "low"
 	case imagetool.ToolName:
 		return "medium"
+	case imagetool.ConvertToolName, documenttool.ToolName, documenttool.ExportToolName, filetool.ToolName:
+		return "low"
+	case documenttool.SaveToolName, documenttool.OverwriteToolName:
+		return "medium"
 	default:
 		return "high"
 	}
 }
 
+func aiAppToolRequiresApproval(name, mode string, confirmations ...tools.ConfirmationPolicy) bool {
+	if len(confirmations) > 0 && confirmations[0] == tools.ConfirmationBeforeWrite {
+		return true
+	}
+	if mode != "always" {
+		return false
+	}
+	switch name {
+	case "content.search", imagetool.ToolName, imagetool.ConvertToolName, documenttool.ToolName, filetool.ToolName:
+		return false
+	default:
+		return true
+	}
+}
+
+func buildAIAppCreatorWorkspaceContext(db *gorm.DB, userID, appID model.Int64String, now time.Time) (string, error) {
+	if db == nil || userID <= 0 || appID <= 0 {
+		return "", nil
+	}
+	var artifacts []model.AIAppArtifact
+	if err := db.Where(
+		"user_id = ? AND app_id = ? AND (expires_at IS NULL OR expires_at > ?)",
+		userID, appID, now,
+	).Order("created_at DESC").Limit(20).Find(&artifacts).Error; err != nil {
+		return "", err
+	}
+	var documents []model.Resource
+	if err := db.Where("user_id = ? AND visibility = ? AND type = ?", userID, "private", "document").
+		Order("updated_at DESC").Limit(20).Find(&documents).Error; err != nil {
+		return "", err
+	}
+	if len(artifacts) == 0 && len(documents) == 0 {
+		return "", nil
+	}
+	lines := []string{"以下是当前用户可操作的成果和私有文档。只能使用这里列出的 ID；找不到目标时先澄清，不得猜测 ID。"}
+	seen := make(map[model.Int64String]struct{}, len(artifacts))
+	for _, item := range artifacts {
+		status := "临时成果"
+		if item.PersistedAt != nil {
+			status = "长期保存"
+		}
+		lines = append(lines, fmt.Sprintf("- 成果 ID %s：%s；资源 ID %s；状态：%s", item.ID, item.FileName, item.ResourceID, status))
+		seen[item.ResourceID] = struct{}{}
+	}
+	for _, item := range documents {
+		if _, exists := seen[item.ID]; exists {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("- 私有文档资源 ID %s：%s.%s", item.ID, item.Title, item.Extension))
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
 func updateAIAppTask(db *gorm.DB, taskID model.Int64String, status string, progress int, message string) error {
 	return db.Model(&model.AIAppTask{}).Where("id = ? AND status <> ?", taskID, "cancelled").Updates(map[string]any{"status": status, "progress": progress, "status_message": message}).Error
+}
+
+func aiAppTaskKnowledgeRetrievalFailureCode(err error) string {
+	code, _ := aiKnowledgeRetrievalFailure(err)
+	return code
 }
 
 func failAIAppTask(db *gorm.DB, task *model.AIAppTask, code string, cause error) error {

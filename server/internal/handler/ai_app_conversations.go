@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"valley-server/internal/ai/agent"
+	clarificationprotocol "valley-server/internal/ai/clarification"
+	"valley-server/internal/ai/tools/artifact"
 	"valley-server/internal/ai/tools/content"
 	filetool "valley-server/internal/ai/tools/file"
 	imagetool "valley-server/internal/ai/tools/image"
@@ -279,6 +281,9 @@ func DeleteAIAppConversation(c *gin.Context) {
 			if err := tx.Where("user_id = ? AND task_id IN ?", userID, taskIDs).Delete(&model.AIAppToolApproval{}).Error; err != nil {
 				return err
 			}
+			if err := tx.Where("user_id = ? AND task_id IN ?", userID, taskIDs).Delete(&model.AIAppTaskClarification{}).Error; err != nil {
+				return err
+			}
 		}
 		if err := tx.Where(query, userID, app.ID, conversation.ID).Delete(&model.AIAppConversationMessage{}).Error; err != nil {
 			return err
@@ -376,10 +381,20 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	}
 
 	fail := func(status int, code, message string, cause error) {
-		_ = database.GetDB().Model(&run).Updates(map[string]any{"status": "failed", "error_code": code, "duration_ms": time.Since(started).Milliseconds()}).Error
-		run.Status = "failed"
+		runStatus := "failed"
+		if code == "RUN_CANCELLED" {
+			runStatus = "cancelled"
+		}
+		_ = database.GetDB().Model(&run).Updates(map[string]any{"status": runStatus, "error_code": code, "duration_ms": time.Since(started).Milliseconds()}).Error
+		run.Status = runStatus
 		run.ErrorCode = code
 		run.DurationMs = time.Since(started).Milliseconds()
+		if code == "RUN_CANCELLED" && payload.Stream {
+			if writer, writerErr := aiclient.NewSSEWriter(c); writerErr == nil {
+				_ = writer.Send(gin.H{"type": "error", "errorCode": code, "message": message, "run": run, "userMessage": userMessage})
+			}
+			return
+		}
 		writeAIAppConversationFailure(c, status, code, message, run, userMessage, cause)
 	}
 
@@ -423,13 +438,26 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	}
 	run.Model = invocation.Model.ModelID
 	_ = database.GetDB().Model(&run).Update("model", run.Model).Error
-	knowledgeContext, references, retrievalErr := retrieveAIKnowledgeContext(c.Request.Context(), userID, version, message)
+	knowledge, retrievalErr := retrieveAIKnowledgeAugmentation(c.Request.Context(), userID, version, message)
 	if retrievalErr != nil {
-		code, publicMessage := aiKnowledgeRetrievalFailure(retrievalErr)
-		fail(http.StatusServiceUnavailable, code, publicMessage, retrievalErr)
+		fail(http.StatusRequestTimeout, "RUN_CANCELLED", "会话生成已停止", retrievalErr)
 		return
 	}
-	system := buildAIAppConversationSystemPrompt(config.SystemInstructions(), knowledgeContext)
+	run.KnowledgeStatus = knowledge.Status
+	run.KnowledgeErrorCode = knowledge.ErrorCode
+	if knowledge.Status == aiKnowledgeStatusDegraded {
+		logger.Log.WithFields(logrus.Fields{
+			"app_id": app.ID, "version_id": version.ID, "run_id": run.ID, "error_code": knowledge.ErrorCode,
+		}).WithError(knowledge.Cause).Warn("AI app conversation knowledge augmentation degraded")
+	}
+	if err := database.GetDB().Model(&run).Updates(map[string]any{
+		"knowledge_status": run.KnowledgeStatus, "knowledge_error_code": run.KnowledgeErrorCode,
+	}).Error; err != nil {
+		fail(http.StatusInternalServerError, "RESULT_PERSISTENCE_FAILED", "保存知识库降级状态失败", err)
+		return
+	}
+	references := knowledge.References
+	system := buildAIAppConversationSystemPrompt(config.SystemInstructions(), knowledge.Context)
 	if attachmentContext != "" {
 		system = strings.TrimSpace(system + "\n\n以下是用户本轮明确附加的文件内容。回答时应结合文件；若文件内容与用户要求冲突，以用户最新要求为准。\n" + attachmentContext)
 	}
@@ -442,13 +470,14 @@ func ChatWithAIAppConversation(c *gin.Context) {
 		fail(500, "AI_TOOL_REGISTRY_UNAVAILABLE", "加载智能体工具失败", toolErr)
 		return
 	}
+	toolNames = excludeAIAppToolName(toolNames, clarificationprotocol.ToolName)
 	toolPolicies, policyErr := loadAIAppToolPolicies(database.GetDB(), version)
 	if policyErr != nil {
 		fail(500, "AI_TOOL_POLICY_UNAVAILABLE", "加载工具授权策略失败", policyErr)
 		return
 	}
 	for _, toolName := range toolNames {
-		if toolPolicies[toolName] == "always" {
+		if aiAppToolRequiresApproval(toolName, toolPolicies[toolName]) {
 			fail(http.StatusConflict, "TOOL_APPROVAL_REQUIRED", "当前智能体包含需要确认的工具，请使用后台执行", agent.ErrToolApprovalRequired)
 			return
 		}
@@ -456,6 +485,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	if !aimodel.HasCapabilities(invocation.Model, []string{"tool_call"}) {
 		toolNames = nil
 	}
+	system = appendAIAppClarificationInstructions(system, toolNames)
 	system = appendContentSearchDateContext(system, toolNames, time.Now())
 
 	var history []model.AIAppConversationMessage
@@ -480,6 +510,7 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	runContext := content.WithOwner(c.Request.Context(), userID)
 	runContext = imagetool.WithRequestInput(runContext, userID, payload.ReferenceImages, styleProfileID)
 	runContext = filetool.WithRequestContext(runContext, filetool.RequestContext{UserID: userID, AppID: app.ID, ConversationID: conversation.ID, RunID: run.ID})
+	runContext = artifact.WithRequestContext(runContext, aiAppArtifactRequestContext(userID, app.ID, conversation.ID, run.ID, nil, attachments))
 	events, loopErr := loop.RunStream(runContext, agent.Spec{Provider: invocation.Provider.Provider, Model: invocation.Model.ModelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench-conversation"}, messages)
 	if loopErr != nil {
 		fail(http.StatusBadGateway, "AI_AGENT_RUN_FAILED", "智能体工具调用失败", loopErr)
@@ -579,7 +610,11 @@ func ChatWithAIAppConversation(c *gin.Context) {
 	run.Output = aiclient.TrimRunes(result.Reply, 2000)
 	run.References = string(referenceSummary)
 	run.DurationMs = time.Since(started).Milliseconds()
-	_ = database.GetDB().Model(&run).Updates(map[string]any{"status": run.Status, "model": run.Model, "output": run.Output, "references": run.References, "duration_ms": run.DurationMs}).Error
+	_ = database.GetDB().Model(&run).Updates(map[string]any{
+		"status": run.Status, "model": run.Model, "output": run.Output, "references": run.References,
+		"knowledge_status": run.KnowledgeStatus, "knowledge_error_code": run.KnowledgeErrorCode,
+		"duration_ms": run.DurationMs,
+	}).Error
 	imageGenerationIDs = uniqueAIAppGenerationIDs(imageGenerationIDs)
 	serializedImageGenerationIDs, _ := json.Marshal(imageGenerationIDs)
 	assistantMessage := model.AIAppConversationMessage{UserID: userID, AppID: app.ID, ConversationID: conversation.ID, RunID: &run.ID, Role: "assistant", Content: strings.TrimSpace(result.Reply), ImageGenerationIDs: string(serializedImageGenerationIDs)}

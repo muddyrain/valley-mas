@@ -182,11 +182,16 @@ func resolveAIAppConversationAttachments(db *gorm.DB, userID, appID, conversatio
 	}
 	var contextBuilder strings.Builder
 	for index, attachment := range attachments {
+		header := fmt.Sprintf("[用户文件 %d：%s；附件 ID：%s]", index+1, attachment.Name, attachment.ID)
 		text := aiclient.TrimRunes(strings.TrimSpace(attachment.ParsedText), 5000)
-		if text == "" || len([]rune(contextBuilder.String()))+len([]rune(text)) > aiAppAttachmentContextRunes {
-			continue
+		entry := header
+		if text != "" {
+			entry += "\n" + text
 		}
-		contextBuilder.WriteString(fmt.Sprintf("[用户文件 %d：%s]\n%s\n\n", index+1, attachment.Name, text))
+		if len([]rune(contextBuilder.String()))+len([]rune(entry)) > aiAppAttachmentContextRunes {
+			entry = header
+		}
+		contextBuilder.WriteString(entry + "\n\n")
 	}
 	return attachments, strings.TrimSpace(contextBuilder.String()), nil
 }

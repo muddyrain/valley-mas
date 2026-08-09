@@ -58,6 +58,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		&model.AIAppConversationToolTrace{},
 		&model.AIAppTask{},
 		&model.AIAppToolApproval{},
+		&model.AIAppTaskClarification{},
 		&model.AIAppConversationAttachment{},
 		&model.AIAppArtifact{},
 		&model.AIAppRun{},
@@ -106,6 +107,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.POST("/apps", CreateAIApp)
 	auth.GET("/apps/:appId", GetAIApp)
 	auth.GET("/apps/:appId/outputs", ListAIAppOutputs)
+	auth.GET("/apps/:appId/artifacts/:artifactId/download-url", GetAIAppArtifactDownloadURL)
 	auth.DELETE("/apps/:appId", DeleteAIApp)
 	auth.POST("/app-assistant/proposals", CreateAIAppProposal)
 	auth.POST("/prompt-assistant/suggestions", CreatePromptAssistantSuggestion)
@@ -145,6 +147,8 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.POST("/apps/:appId/conversations/:conversationId/tasks", CreateAIAppConversationTask)
 	auth.GET("/apps/:appId/tasks", ListAIAppTasks)
 	auth.POST("/apps/:appId/tasks/:taskId/approvals/:approvalId/decision", DecideAIAppToolApproval)
+	auth.POST("/apps/:appId/tasks/:taskId/clarifications/:clarificationId/decision", DecideAIAppTaskClarification)
+	auth.POST("/apps/:appId/tasks/:taskId/retry", RetryAIAppTask)
 	auth.POST("/apps/:appId/tasks/:taskId/cancel", CancelAIAppTask)
 	auth.GET("/image-conversations", ListAIImageConversations)
 	auth.GET("/image-conversations/current", GetCurrentAIImageConversation)

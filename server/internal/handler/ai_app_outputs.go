@@ -3,6 +3,8 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
+	"time"
 
 	"valley-server/internal/database"
 	"valley-server/internal/model"
@@ -59,4 +61,36 @@ func ListAIAppOutputs(c *gin.Context) {
 		}
 	}
 	Success(c, gin.H{"artifacts": artifacts, "images": images})
+}
+
+// GetAIAppArtifactDownloadURL releases the backing object URL only after an
+// owner and expiry check. Artifact list responses never expose this URL.
+func GetAIAppArtifactDownloadURL(c *gin.Context) {
+	userID, ok := currentAIAppUser(c)
+	if !ok {
+		return
+	}
+	app, found := findAIApp(c, userID)
+	if !found {
+		return
+	}
+	artifactID, err := parsePathInt64(c, "artifactId")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "无效的成果文件 ID")
+		return
+	}
+	var artifact model.AIAppArtifact
+	if err := database.GetDB().Where("id = ? AND user_id = ? AND app_id = ?", artifactID, userID, app.ID).First(&artifact).Error; err != nil {
+		Error(c, http.StatusNotFound, "成果文件不存在")
+		return
+	}
+	if artifact.IsExpired(time.Now()) {
+		Error(c, http.StatusGone, "成果文件已过期")
+		return
+	}
+	if strings.TrimSpace(artifact.URL) == "" {
+		Error(c, http.StatusNotFound, "成果文件不存在")
+		return
+	}
+	Success(c, gin.H{"url": artifact.URL, "expiresAt": artifact.ExpiresAt})
 }
