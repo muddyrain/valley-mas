@@ -8,6 +8,7 @@ import {
   Menu,
   Monitor,
   Moon,
+  Search,
   Settings,
   Sparkles,
   Sun,
@@ -55,7 +56,7 @@ const bottomItems = [
   navigationGroups[1].items[1],
 ];
 
-export function MobileNavigation() {
+export function MobileNavigation({ onSearchOpen }: { onSearchOpen: () => void }) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -81,35 +82,47 @@ export function MobileNavigation() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur md:hidden">
+      <header className="fixed inset-x-0 top-0 z-40 grid h-14 grid-cols-[1fr_auto_1fr] items-center border-b border-border bg-background/95 px-4 backdrop-blur md:hidden">
         <Button
           type="button"
           variant="ghost"
           size="icon"
           aria-label="打开导航"
           onClick={() => setOpen(true)}
+          className="justify-self-start"
         >
           <Menu />
         </Button>
-        <Link to="/" className="flex items-center" aria-label="Valley 首页">
+        <Link to="/" className="flex items-center justify-self-center" aria-label="Valley 首页">
           <BrandLogo iconClassName="size-6" showWordmark={false} />
         </Link>
-        <Link
-          to={isAuthenticated ? '/my-space' : '/login'}
-          aria-label={isAuthenticated ? '我的创作空间' : '登录'}
-          className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        >
-          {isAuthenticated ? (
-            <Avatar className="size-8">
-              <AvatarImage src={user?.avatar} alt={userName} />
-              <AvatarFallback className="bg-primary text-primary-foreground">
-                {avatarFallback}
-              </AvatarFallback>
-            </Avatar>
-          ) : (
-            <LogIn className="size-5" />
-          )}
-        </Link>
+        <div className="flex items-center justify-self-end">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="搜索 Valley"
+            onClick={onSearchOpen}
+          >
+            <Search />
+          </Button>
+          <Link
+            to={isAuthenticated ? '/my-space' : '/login'}
+            aria-label={isAuthenticated ? '我的创作空间' : '登录'}
+            className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            {isAuthenticated ? (
+              <Avatar className="size-8">
+                <AvatarImage src={user?.avatar} alt={userName} />
+                <AvatarFallback className="bg-primary text-primary-foreground">
+                  {avatarFallback}
+                </AvatarFallback>
+              </Avatar>
+            ) : (
+              <LogIn className="size-5" />
+            )}
+          </Link>
+        </div>
       </header>
 
       <Sheet open={open} onOpenChange={setOpen}>

@@ -113,24 +113,6 @@ export const getResourceProvenance = (id: string, config?: RequestConfig) => {
   return http.get<unknown, ResourceProvenance>(`/public/resources/${id}/provenance`, config);
 };
 
-// 搜索资源
-export const searchResources = (
-  keyword: string,
-  params: {
-    page?: number;
-    pageSize?: number;
-    type?: string;
-  } = {},
-) => {
-  const { page = 1, pageSize = 20, type } = params;
-  let url = `/public/search?keyword=${encodeURIComponent(
-    keyword,
-  )}&page=${page}&pageSize=${pageSize}`;
-  if (type) url += `&type=${type}`;
-
-  return http.get<unknown, ListResponse<Resource>>(url);
-};
-
 // 下载资源
 export const downloadResource = (id: string) => {
   return http.post<unknown, { downloadUrl: string }>(`/public/resource/${id}/download`);

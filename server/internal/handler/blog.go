@@ -201,7 +201,7 @@ func GetPosts(c *gin.Context) {
 	groupSlug := strings.TrimSpace(c.Query("group"))
 	categorySlug := c.Query("category")
 	tagSlug := c.Query("tag")
-	keyword := c.Query("keyword")
+	keyword := strings.TrimSpace(c.Query("keyword"))
 	sort := strings.TrimSpace(c.Query("sort"))
 	postType := ""
 	if raw := strings.TrimSpace(c.Query("postType")); raw != "" {
@@ -247,7 +247,8 @@ func GetPosts(c *gin.Context) {
 	}
 
 	if keyword != "" {
-		query = query.Where("title LIKE ? OR excerpt LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+		like := "%" + keyword + "%"
+		query = query.Where("title LIKE ? OR excerpt LIKE ? OR content LIKE ?", like, like, like)
 	}
 	if postType != "" {
 		query = query.Where("post_type = ?", postType)

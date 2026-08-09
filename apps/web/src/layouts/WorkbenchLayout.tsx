@@ -1,6 +1,7 @@
 import { MessageCircle } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import { GlobalCommandPalette } from '@/components/search/GlobalCommandPalette';
 import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -10,6 +11,7 @@ import { Sidebar } from '@/layouts/Sidebar';
 import { useLayoutStore } from '@/stores/useLayoutStore';
 
 export default function WorkbenchLayout() {
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const aiPanelOpen = useLayoutStore((s) => s.aiPanelOpen);
   const toggleAIPanel = useLayoutStore((s) => s.toggleAIPanel);
   const setAIPanelOpen = useLayoutStore((s) => s.setAIPanelOpen);
@@ -38,8 +40,12 @@ export default function WorkbenchLayout() {
   return (
     <TooltipProvider>
       <div className="flex h-svh overflow-hidden bg-background">
-        {!isWorkflowEditor && !isAgentWorkspace && <Sidebar />}
-        {hasMobileNavigation ? <MobileNavigation /> : null}
+        {!isWorkflowEditor && !isAgentWorkspace && (
+          <Sidebar onSearchOpen={() => setCommandPaletteOpen(true)} />
+        )}
+        {hasMobileNavigation ? (
+          <MobileNavigation onSearchOpen={() => setCommandPaletteOpen(true)} />
+        ) : null}
 
         {/* Main Content */}
         <main
@@ -67,6 +73,8 @@ export default function WorkbenchLayout() {
             </Button>
           </div>
         )}
+
+        <GlobalCommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
       </div>
     </TooltipProvider>
   );

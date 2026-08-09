@@ -9,6 +9,7 @@ import {
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  Search,
   Settings,
   Sparkles,
   Sun,
@@ -28,6 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -41,7 +43,7 @@ const themeOptions: Array<{ mode: ThemeMode; label: string; icon: typeof Monitor
   { mode: 'dark', label: '深色模式', icon: Moon },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onSearchOpen }: { onSearchOpen: () => void }) {
   const collapsed = useLayoutStore((s) => s.sidebarCollapsed);
   const toggle = useLayoutStore((s) => s.toggleSidebar);
   const location = useLocation();
@@ -111,6 +113,42 @@ export function Sidebar() {
         >
           {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
         </Button>
+      </div>
+
+      <div className="px-2 pt-3">
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="搜索 Valley"
+                  onClick={onSearchOpen}
+                  className="size-8 text-muted-foreground hover:text-foreground"
+                >
+                  <Search />
+                </Button>
+              }
+            />
+            <TooltipContent side="right" sideOffset={8}>
+              搜索
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            aria-label="搜索 Valley"
+            onClick={onSearchOpen}
+            className="h-9 w-full justify-start gap-2 px-2.5 text-muted-foreground"
+          >
+            <Search />
+            <span>搜索</span>
+            <Kbd className="ml-auto">Ctrl K</Kbd>
+          </Button>
+        )}
       </div>
 
       {/* Nav */}

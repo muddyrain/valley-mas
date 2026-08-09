@@ -33,6 +33,7 @@
 - 创作者与创作空间：`apps/web/src/pages/Creator*`、`apps/web/src/pages/MySpace`、`apps/admin/src/pages/Creator*`、`server/internal/handler/creator*.go`。
 - 资源库：`apps/web/src/pages/Resources`、`apps/web/src/pages/ResourceDetail`、`apps/web/src/components/ResourceCard.tsx`、`apps/admin/src/pages/admin-ops/ResourceTags.tsx`、`server/internal/handler/*resource*.go`。
 - 博客与图文：`apps/web/src/pages/blog`、`apps/web/src/pages/BlogCreate`、`apps/web/src/components/blog`、`apps/admin/src/pages/Blog*`、`apps/admin/src/pages/admin-ops/BlogTaxonomy.tsx`、`apps/admin/src/pages/admin-ops/BlogComments.tsx`、`server/internal/handler/blog*.go`。
+- 全站搜索：Web `/search` 搜索公开博客、图文、公开资源及站内页面命令；桌面端可用 `Ctrl+K` / `⌘K` 打开命令面板，移动端顶部栏提供同一入口。内容与资源搜索复用现有 `/public/blog/posts`、`/public/resources` 的 `keyword` 参数，不新增聚合 API；不搜索私有 AI 数据、Life Trace 私有数据或 Admin 数据。
 - 后台运营与审计：`apps/admin/src/pages/admin-ops`、`apps/admin/src/api/operations.ts`、`server/internal/handler/admin_operations.go`，包括 AI 调用审计和存储资产只读治理。
 - Life Trace：`apps/life-trace/src`、`server/internal/lifetrace`。
 - AI Mind Arena：`apps/ai-mind-arena`、`apps/admin/src/pages/admin-ops/MindArenaDebates.tsx`、`server/internal/mindarena`、`server/internal/model/mind_arena.go`、`server/internal/ai`。

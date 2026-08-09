@@ -34,6 +34,7 @@ import Register from './pages/Register';
 import ResourceDetail from './pages/ResourceDetail';
 import Resources from './pages/Resources';
 import ScratchLegendLab from './pages/ScratchLegendLab';
+import SearchPage from './pages/Search';
 import Workbench from './pages/Workbench';
 import WorkflowEditor from './pages/WorkflowEditor';
 import WorkflowTemplateDetail from './pages/WorkflowTemplateDetail';
@@ -93,6 +94,8 @@ function RouteTitle() {
       title = '内容详情 | Valley';
     } else if (pathname === '/resources') {
       title = '资源整理 | Valley';
+    } else if (pathname === '/search') {
+      title = '全站搜索 | Valley';
     } else if (pathname.startsWith('/resource/')) {
       title = '资源详情 | Valley';
     } else if (pathname === '/my-space') {
@@ -237,6 +240,7 @@ function App() {
           />
           <Route path="resources" element={<Resources />} />
           <Route path="resource/:id" element={<ResourceDetail />} />
+          <Route path="search" element={<SearchPage />} />
           <Route path="my-space" element={<MySpace />} />
           <Route path="my-space/image-text" element={<ImageTextCreate />} />
           <Route path="my-space/image-text-edit/:id" element={<ImageTextCreate />} />

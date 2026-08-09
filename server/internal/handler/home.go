@@ -576,7 +576,7 @@ func GetAllResources(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
 	resourceType := c.Query("type")
-	keyword := c.Query("keyword")
+	keyword := strings.TrimSpace(c.Query("keyword"))
 	tagName := strings.TrimSpace(c.Query("tag"))
 	sort := strings.TrimSpace(c.Query("sort"))
 	if page < 1 {
@@ -616,7 +616,7 @@ func GetAllResources(c *gin.Context) {
 	}
 	if keyword != "" {
 		like := "%" + keyword + "%"
-		query = query.Where("title LIKE ? OR description LIKE ?", like, like)
+		query = query.Where("title LIKE ? OR description LIKE ? OR resources.tags LIKE ?", like, like, like)
 	}
 	if tagName != "" {
 		// resources.tags 是 JSON 字符串数组，用 LIKE 匹配 "标签名"
