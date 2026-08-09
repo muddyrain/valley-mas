@@ -1,29 +1,30 @@
-import { message } from 'antd';
+import { message, Spin } from 'antd';
 import axios from 'axios';
-import { useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { reqGetCurrentUser } from './api/auth';
-import Layout from './layouts/Layout';
-import AIModelPolicies from './pages/admin-ops/AIModelPolicies';
-import AIUsageLogs from './pages/admin-ops/AIUsageLogs';
-import AuditLogs from './pages/admin-ops/AuditLogs';
-import BlogComments from './pages/admin-ops/BlogComments';
-import BlogTaxonomy from './pages/admin-ops/BlogTaxonomy';
-import GuestbookMessages from './pages/admin-ops/GuestbookMessages';
-import LifeTraceOps from './pages/admin-ops/LifeTraceOps';
-import MindArenaDebates from './pages/admin-ops/MindArenaDebates';
-import Notifications from './pages/admin-ops/Notifications';
-import Relations from './pages/admin-ops/Relations';
-import ResourceTags from './pages/admin-ops/ResourceTags';
-import BlogPostEdit from './pages/BlogPostEdit';
-import BlogPosts from './pages/BlogPosts';
-import Dashboard from './pages/Dashboard';
-import Feedbacks from './pages/Feedbacks';
-import LifeTrace from './pages/LifeTrace';
-import Login from './pages/Login';
-import Records from './pages/Records';
-import Resources from './pages/Resources';
-import Users from './pages/Users';
+
+const Layout = lazy(() => import('./layouts/Layout'));
+const AIModelPolicies = lazy(() => import('./pages/admin-ops/AIModelPolicies'));
+const AIUsageLogs = lazy(() => import('./pages/admin-ops/AIUsageLogs'));
+const AuditLogs = lazy(() => import('./pages/admin-ops/AuditLogs'));
+const BlogComments = lazy(() => import('./pages/admin-ops/BlogComments'));
+const BlogTaxonomy = lazy(() => import('./pages/admin-ops/BlogTaxonomy'));
+const GuestbookMessages = lazy(() => import('./pages/admin-ops/GuestbookMessages'));
+const LifeTraceOps = lazy(() => import('./pages/admin-ops/LifeTraceOps'));
+const MindArenaDebates = lazy(() => import('./pages/admin-ops/MindArenaDebates'));
+const Notifications = lazy(() => import('./pages/admin-ops/Notifications'));
+const Relations = lazy(() => import('./pages/admin-ops/Relations'));
+const ResourceTags = lazy(() => import('./pages/admin-ops/ResourceTags'));
+const BlogPostEdit = lazy(() => import('./pages/BlogPostEdit'));
+const BlogPosts = lazy(() => import('./pages/BlogPosts'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Feedbacks = lazy(() => import('./pages/Feedbacks'));
+const LifeTrace = lazy(() => import('./pages/LifeTrace'));
+const Login = lazy(() => import('./pages/Login'));
+const Records = lazy(() => import('./pages/Records'));
+const Resources = lazy(() => import('./pages/Resources'));
+const Users = lazy(() => import('./pages/Users'));
 
 const isConfirmedAuthFailure = (error: unknown) => {
   if (!axios.isAxiosError(error)) return false;
@@ -100,62 +101,64 @@ function App() {
   return (
     <BrowserRouter>
       <TokenValidator />
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="/"
-          element={
-            <PrivateRoute>
-              <Layout />
-            </PrivateRoute>
-          }
-        >
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="users" element={<Users />} />
-          <Route path="feedbacks" element={<Feedbacks />} />
-          <Route path="life-trace" element={<LifeTrace />} />
-          <Route path="resources" element={<Resources />} />
-          <Route path="records" element={<Records />} />
-          <Route path="system-updates" element={<Navigate to="/dashboard" replace />} />
-          <Route path="blog-posts" element={<BlogPosts />} />
-          <Route path="blog-posts/create" element={<BlogPostEdit />} />
-          <Route path="blog-posts/edit/:id" element={<BlogPostEdit />} />
-          <Route path="blog-groups" element={<BlogTaxonomy kind="groups" />} />
-          <Route path="blog-categories" element={<BlogTaxonomy kind="categories" />} />
-          <Route path="blog-tags" element={<BlogTaxonomy kind="tags" />} />
-          <Route path="blog-comments" element={<BlogComments />} />
-          <Route path="guestbook" element={<GuestbookMessages />} />
-          <Route path="resource-tags" element={<ResourceTags />} />
-          <Route path="notifications" element={<Notifications />} />
-          <Route path="relations/favorites" element={<Relations kind="favorites" />} />
-          <Route path="relations/follows" element={<Relations kind="follows" />} />
-          <Route path="audit/operation-logs" element={<AuditLogs kind="operation-logs" />} />
-          <Route path="audit/code-access-logs" element={<AuditLogs kind="code-access-logs" />} />
-          <Route path="audit/storage-assets" element={<AuditLogs kind="storage-assets" />} />
-          <Route path="ai/usage-logs" element={<AIUsageLogs />} />
-          <Route path="ai/models" element={<AIModelPolicies />} />
-          <Route path="ai/model-policies" element={<Navigate to="/ai/models" replace />} />
-          <Route path="life-trace/households" element={<LifeTraceOps kind="households" />} />
+      <Suspense fallback={<Spin fullscreen size="large" />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
           <Route
-            path="life-trace/push-subscriptions"
-            element={<LifeTraceOps kind="push-subscriptions" />}
-          />
-          <Route
-            path="life-trace/push-deliveries"
-            element={<LifeTraceOps kind="push-deliveries" />}
-          />
-          <Route
-            path="life-trace/ai-conversations"
-            element={<LifeTraceOps kind="ai-conversations" />}
-          />
-          <Route
-            path="life-trace/holiday-calendars"
-            element={<LifeTraceOps kind="holiday-calendars" />}
-          />
-          <Route path="mind-arena/debates" element={<MindArenaDebates />} />
-        </Route>
-      </Routes>
+            path="/"
+            element={
+              <PrivateRoute>
+                <Layout />
+              </PrivateRoute>
+            }
+          >
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="users" element={<Users />} />
+            <Route path="feedbacks" element={<Feedbacks />} />
+            <Route path="life-trace" element={<LifeTrace />} />
+            <Route path="resources" element={<Resources />} />
+            <Route path="records" element={<Records />} />
+            <Route path="system-updates" element={<Navigate to="/dashboard" replace />} />
+            <Route path="blog-posts" element={<BlogPosts />} />
+            <Route path="blog-posts/create" element={<BlogPostEdit />} />
+            <Route path="blog-posts/edit/:id" element={<BlogPostEdit />} />
+            <Route path="blog-groups" element={<BlogTaxonomy kind="groups" />} />
+            <Route path="blog-categories" element={<BlogTaxonomy kind="categories" />} />
+            <Route path="blog-tags" element={<BlogTaxonomy kind="tags" />} />
+            <Route path="blog-comments" element={<BlogComments />} />
+            <Route path="guestbook" element={<GuestbookMessages />} />
+            <Route path="resource-tags" element={<ResourceTags />} />
+            <Route path="notifications" element={<Notifications />} />
+            <Route path="relations/favorites" element={<Relations kind="favorites" />} />
+            <Route path="relations/follows" element={<Relations kind="follows" />} />
+            <Route path="audit/operation-logs" element={<AuditLogs kind="operation-logs" />} />
+            <Route path="audit/code-access-logs" element={<AuditLogs kind="code-access-logs" />} />
+            <Route path="audit/storage-assets" element={<AuditLogs kind="storage-assets" />} />
+            <Route path="ai/usage-logs" element={<AIUsageLogs />} />
+            <Route path="ai/models" element={<AIModelPolicies />} />
+            <Route path="ai/model-policies" element={<Navigate to="/ai/models" replace />} />
+            <Route path="life-trace/households" element={<LifeTraceOps kind="households" />} />
+            <Route
+              path="life-trace/push-subscriptions"
+              element={<LifeTraceOps kind="push-subscriptions" />}
+            />
+            <Route
+              path="life-trace/push-deliveries"
+              element={<LifeTraceOps kind="push-deliveries" />}
+            />
+            <Route
+              path="life-trace/ai-conversations"
+              element={<LifeTraceOps kind="ai-conversations" />}
+            />
+            <Route
+              path="life-trace/holiday-calendars"
+              element={<LifeTraceOps kind="holiday-calendars" />}
+            />
+            <Route path="mind-arena/debates" element={<MindArenaDebates />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

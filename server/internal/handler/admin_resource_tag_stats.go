@@ -19,17 +19,11 @@ type ResourceTagStatItem struct {
 }
 
 // AdminGetResourceTagStats 统计当前 resources.tags 字段中的标签使用次数
-// GET /admin/resource-tags/stats?keyword=&limit=
+// GET /admin/resource-tags/stats?keyword=&page=&pageSize=
 // 由于标签存在 resources.tags (JSON string) 中，跨库统一在 Go 侧解码聚合。
 func AdminGetResourceTagStats(c *gin.Context) {
 	keyword := strings.TrimSpace(c.Query("keyword"))
-	limit := GetIntQuery(c, "limit", 200)
-	if limit <= 0 {
-		limit = 200
-	}
-	if limit > 1000 {
-		limit = 1000
-	}
+	page := parseAdminPage(c, 20, 200)
 
 	db := database.GetDB()
 	var rows []struct {
@@ -78,12 +72,14 @@ func AdminGetResourceTagStats(c *gin.Context) {
 		return items[i].Name < items[j].Name
 	})
 	total := int64(len(items))
-	if len(items) > limit {
-		items = items[:limit]
+	lastPage := 1
+	if total > 0 {
+		lastPage = (int(total) + page.PageSize - 1) / page.PageSize
 	}
-
-	Success(c, gin.H{
-		"list":  items,
-		"total": total,
-	})
+	if page.Page > lastPage {
+		page.Page = lastPage
+		page.Offset = (lastPage - 1) * page.PageSize
+	}
+	end := min(page.Offset+page.PageSize, len(items))
+	adminListResponse(c, items[page.Offset:end], total, page)
 }

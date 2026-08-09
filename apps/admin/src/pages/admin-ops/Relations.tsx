@@ -7,8 +7,8 @@ import {
   type RelationFavorite,
   type RelationFollow,
 } from '@/api/operations';
+import { formatDateTime, useAdminList } from '@/hooks/useAdminList';
 import type { AdminListParams, AdminListResponse } from '@/types/api';
-import { formatDateTime, useAdminList } from './shared';
 
 type RelationKind = 'favorites' | 'follows';
 type RelationRow = RelationFavorite | RelationFollow;

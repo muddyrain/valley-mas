@@ -3,26 +3,16 @@ import {
   EditOutlined,
   EyeOutlined,
   PlusOutlined,
-  SearchOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import {
-  Button,
-  Card,
-  Input,
-  message,
-  Popconfirm,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd';
+import { Button, Card, message, Popconfirm, Select, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Post, PostType } from '@/api/blog';
 import { deletePost, getAdminPosts } from '@/api/blog';
+import { useAdminList } from '@/hooks/useAdminList';
+import { toBlogPostListParams } from '@/utils/adminListParams';
 
 const { Title } = Typography;
 
@@ -33,43 +23,21 @@ const postTypeMap: Record<PostType, { color: string; text: string }> = {
 
 export default function BlogPosts() {
   const navigate = useNavigate();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [total, setTotal] = useState(0);
-  const [status, setStatus] = useState<string>('');
-  const [postType, setPostType] = useState<PostType | ''>('');
-  const [keyword, setKeyword] = useState('');
-
-  const loadPosts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getAdminPosts({
-        page,
-        pageSize,
-        status: status || undefined,
-        postType: postType || undefined,
-      });
-      setPosts(data.list || []);
-      setTotal(data.total || 0);
-    } catch (error) {
-      console.error('Failed to load posts:', error);
-      message.error('加载内容列表失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize, postType, status]);
-
-  useEffect(() => {
-    void loadPosts();
-  }, [loadPosts]);
+  const loadPosts = useCallback(
+    (params: Parameters<typeof toBlogPostListParams>[0]) =>
+      getAdminPosts(toBlogPostListParams(params)),
+    [],
+  );
+  const ops = useAdminList<Post>(loadPosts, {
+    defaultPageSize: 10,
+    searchPlaceholder: '搜索标题或摘要',
+  });
 
   const handleDelete = async (id: string) => {
     try {
       await deletePost(id);
       message.success('删除成功');
-      void loadPosts();
+      void ops.fetchData();
     } catch (error) {
       console.error('Failed to delete post:', error);
       message.error('删除失败');
@@ -95,16 +63,6 @@ export default function BlogPosts() {
     const config = visibilityMap[value] || { color: 'default', text: value || '-' };
     return <Tag color={config.color}>{config.text}</Tag>;
   };
-
-  const filteredPosts = useMemo(() => {
-    if (!keyword.trim()) return posts;
-    const lower = keyword.toLowerCase();
-    return posts.filter(
-      (post) =>
-        post.title.toLowerCase().includes(lower) ||
-        (post.excerpt || '').toLowerCase().includes(lower),
-    );
-  }, [keyword, posts]);
 
   const columns: ColumnsType<Post> = [
     {
@@ -224,19 +182,12 @@ export default function BlogPosts() {
           </Button>
         </div>
 
-        <div className="mb-6 flex gap-4">
-          <Input
-            placeholder="搜索标题或摘要"
-            prefix={<SearchOutlined />}
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            className="max-w-md"
-            allowClear
-          />
+        <div className="mb-6 flex flex-wrap gap-4">
+          {ops.searchTools}
           <Select
             placeholder="全部类型"
-            value={postType}
-            onChange={(v) => setPostType((v || '') as PostType | '')}
+            value={ops.type || undefined}
+            onChange={(value) => ops.updateQuery({ type: value || undefined, page: 1 })}
             allowClear
             className="w-36"
             options={[
@@ -247,8 +198,8 @@ export default function BlogPosts() {
           />
           <Select
             placeholder="全部状态"
-            value={status}
-            onChange={(v) => setStatus(v || '')}
+            value={ops.status || undefined}
+            onChange={(value) => ops.updateQuery({ status: value || undefined, page: 1 })}
             allowClear
             className="w-36"
             options={[
@@ -262,20 +213,17 @@ export default function BlogPosts() {
 
         <Table
           columns={columns}
-          dataSource={filteredPosts}
+          dataSource={ops.data}
           rowKey="id"
-          loading={loading}
+          loading={ops.loading}
           pagination={{
-            current: page,
-            pageSize,
-            total,
+            current: ops.page,
+            pageSize: ops.pageSize,
+            total: ops.total,
             showSizeChanger: true,
             showTotal: (count) => `共 ${count} 条`,
-            onChange: (nextPage, nextPageSize) => {
-              setPage(nextPage);
-              setPageSize(nextPageSize || 10);
-            },
           }}
+          onChange={ops.handleTableChange}
         />
       </Card>
     </div>

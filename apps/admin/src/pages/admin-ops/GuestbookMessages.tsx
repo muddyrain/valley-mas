@@ -9,7 +9,7 @@ import {
   updateGuestbookPin,
   updateGuestbookStatus,
 } from '@/api/operations';
-import { formatDateTime, useAdminList } from './shared';
+import { formatDateTime, useAdminList } from '@/hooks/useAdminList';
 
 const statusOptions: Array<{ value: GuestbookMessage['status']; label: string }> = [
   { value: 'approved', label: '已通过' },

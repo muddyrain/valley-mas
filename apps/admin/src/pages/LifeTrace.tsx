@@ -208,7 +208,7 @@ export default function LifeTrace() {
         width: 240,
         render: (_, record) => (
           <div className="flex min-w-0 items-center">
-            <Avatar src={record.avatar} size={40}>
+            <Avatar src={record.avatar || undefined} size={40}>
               {displayUserName(record).charAt(0)}
             </Avatar>
             <div className="ml-2 min-w-0">
@@ -451,8 +451,8 @@ export default function LifeTrace() {
                         title="推送异常"
                         value={overview?.pushErrors || 0}
                         prefix={<BellOutlined />}
-                        valueStyle={{
-                          color: overview?.pushErrors ? '#cf1322' : undefined,
+                        styles={{
+                          content: { color: overview?.pushErrors ? '#cf1322' : undefined },
                         }}
                       />
                     </Card>

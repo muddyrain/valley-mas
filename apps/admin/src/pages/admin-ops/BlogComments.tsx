@@ -3,7 +3,7 @@ import { Button, Card, message, Popconfirm, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useMemo } from 'react';
 import { type BlogComment, deleteBlogComment, listBlogComments } from '@/api/operations';
-import { formatDateTime, useAdminList } from './shared';
+import { formatDateTime, useAdminList } from '@/hooks/useAdminList';
 
 export default function BlogComments() {
   const ops = useAdminList<BlogComment>(listBlogComments);

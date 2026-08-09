@@ -1,4 +1,4 @@
-import { EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { EyeOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   Avatar,
   Button,
@@ -18,9 +18,12 @@ import {
   Tag,
   Tooltip,
 } from 'antd';
-import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ColumnsType } from 'antd/es/table';
+import { useCallback, useMemo, useState } from 'react';
 import { type AdminUserOperations, getUserOperations } from '@/api/operations';
+import { useAdminList } from '@/hooks/useAdminList';
+import type { AdminListParams } from '@/types/api';
+import { toUserListParams } from '@/utils/adminListParams';
 import type { User } from '../api/user';
 import {
   reqCreateUser,
@@ -33,14 +36,6 @@ import {
 const countValue = (value: number | undefined) => value || 0;
 
 export default function Users() {
-  const [data, setData] = useState<User[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [keyword, setKeyword] = useState('');
-  const [platformFilter, setPlatformFilter] = useState<string>('');
-  const [roleFilter, setRoleFilter] = useState<string>('');
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState('新增用户');
   const [form] = Form.useForm();
@@ -50,67 +45,33 @@ export default function Users() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [userOperations, setUserOperations] = useState<AdminUserOperations | null>(null);
 
-  // 获取用户列表
-  const fetchUsers = useCallback(
-    async (page = 1, pageSize = 10, kw = '') => {
-      setLoading(true);
-      try {
-        const res = await reqGetUserList({
-          page,
-          pageSize,
-          keyword: kw,
-          platform: platformFilter || undefined,
-          role: roleFilter || undefined,
-        });
-        setData(res.list || []);
-        setTotal(res.total || 0);
-        setPagination({ current: page, pageSize });
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [platformFilter, roleFilter],
-  );
+  const loadUsers = useCallback(async (params: AdminListParams) => {
+    const result = await reqGetUserList(toUserListParams(params));
+    return {
+      ...result,
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+    };
+  }, []);
+  const ops = useAdminList<User>(loadUsers, {
+    defaultPageSize: 10,
+    searchPlaceholder: '搜索用户昵称/OpenID',
+  });
 
-  // 筛选条件变化时，重置到第一页
-  useEffect(() => {
-    void fetchUsers(1, pagination.pageSize, keyword);
-  }, [fetchUsers, keyword, pagination.pageSize]);
-
-  // 初始加载
-  useEffect(() => {
-    void fetchUsers(1, 10, '');
-  }, [fetchUsers]);
-
-  const handleTableChange = useCallback(
-    (pag: TablePaginationConfig) => {
-      const current = pag.current || 1;
-      const pageSize = pag.pageSize || 10;
-      setPagination({ current, pageSize });
-      void fetchUsers(current, pageSize, keyword);
-    },
-    [fetchUsers, keyword],
-  );
-
-  const handleSearch = useCallback(() => {
-    setPagination({ ...pagination, current: 1 });
-    void fetchUsers(1, pagination.pageSize, keyword);
-  }, [fetchUsers, keyword, pagination]);
+  const reloadUsers = useCallback(() => void ops.fetchData(), [ops.fetchData]);
 
   const toggleStatus = useCallback(
     async (id: string, checked: boolean) => {
       try {
         await reqUpdateUserStatus(id, checked);
         message.success('状态更新成功');
-        void fetchUsers();
+        reloadUsers();
       } catch (e) {
         console.error('Update status failed', e);
         message.error('状态更新失败');
       }
     },
-    [fetchUsers],
+    [reloadUsers],
   );
 
   const handleDelete = useCallback(
@@ -118,13 +79,13 @@ export default function Users() {
       try {
         await reqDeleteUser(id);
         message.success('删除成功');
-        void fetchUsers();
+        reloadUsers();
       } catch (e) {
         console.error('Delete failed', e);
         message.error('删除失败');
       }
     },
-    [fetchUsers],
+    [reloadUsers],
   );
 
   const openModal = useCallback(
@@ -157,11 +118,11 @@ export default function Users() {
         message.success('创建成功');
       }
       setIsModalOpen(false);
-      void fetchUsers();
+      reloadUsers();
     } catch (error) {
       console.error('Submit failed', error);
     }
-  }, [editId, fetchUsers, form]);
+  }, [editId, form, reloadUsers]);
 
   const openDetail = useCallback(async (record: User) => {
     setDetailOpen(true);
@@ -206,7 +167,7 @@ export default function Users() {
         width: 150,
         render: (_, record) => (
           <div className="w-full flex items-center">
-            <Avatar src={record.avatar} size={40} className="flex-shrink-0">
+            <Avatar src={record.avatar || undefined} size={40} className="flex-shrink-0">
               {record.nickname?.charAt(0)}
             </Avatar>
             <div className="flex-1 overflow-hidden ml-2">
@@ -287,21 +248,13 @@ export default function Users() {
       <h2 className="text-2xl font-bold mb-6">用户管理</h2>
       <Card>
         <div className="mb-4 flex justify-between items-center">
-          <Space>
-            <Input
-              placeholder="搜索用户昵称/OpenID"
-              prefix={<SearchOutlined />}
-              className="w-64"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              onPressEnter={handleSearch}
-              allowClear
-            />
+          <Space wrap>
+            {ops.searchTools}
             <Select
               placeholder="选择平台"
               className="w-32"
-              value={platformFilter}
-              onChange={setPlatformFilter}
+              value={ops.platform || undefined}
+              onChange={(value) => ops.updateQuery({ platform: value || undefined, page: 1 })}
               allowClear
               options={[
                 { value: '', label: '全部平台' },
@@ -313,8 +266,8 @@ export default function Users() {
             <Select
               placeholder="选择角色"
               className="w-32"
-              value={roleFilter}
-              onChange={setRoleFilter}
+              value={ops.role || undefined}
+              onChange={(value) => ops.updateQuery({ role: value || undefined, page: 1 })}
               allowClear
               options={[
                 { value: '', label: '全部角色' },
@@ -322,12 +275,6 @@ export default function Users() {
                 { value: 'admin', label: '管理员' },
               ]}
             />
-            <Button icon={<SearchOutlined />} type="primary" onClick={handleSearch}>
-              搜索
-            </Button>
-            <Button icon={<ReloadOutlined />} onClick={() => void fetchUsers()}>
-              刷新
-            </Button>
           </Space>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
             新增用户
@@ -335,17 +282,17 @@ export default function Users() {
         </div>
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={ops.data}
           rowKey="id"
-          loading={loading}
+          loading={ops.loading}
           pagination={{
-            current: pagination.current,
-            pageSize: pagination.pageSize,
-            total: total,
+            current: ops.page,
+            pageSize: ops.pageSize,
+            total: ops.total,
             showSizeChanger: true,
             showTotal: (total) => `共 ${total} 条`,
           }}
-          onChange={handleTableChange}
+          onChange={ops.handleTableChange}
           scroll={{ x: 1200 }}
         />
       </Card>
@@ -467,7 +414,7 @@ export default function Users() {
       <Drawer
         title="用户运营详情"
         open={detailOpen}
-        width={760}
+        size={760}
         onClose={() => setDetailOpen(false)}
         loading={detailLoading}
       >
@@ -554,7 +501,7 @@ export default function Users() {
                 key: 'comments',
                 label: '留言/评论',
                 children: (
-                  <Space direction="vertical" className="w-full">
+                  <Space orientation="vertical" className="w-full">
                     <Table
                       size="small"
                       rowKey="id"

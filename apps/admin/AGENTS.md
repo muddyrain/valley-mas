@@ -11,7 +11,7 @@
 ## 功能定位
 
 - `apps/admin` 是 Valley MAS 的管理后台，负责仪表盘、用户管理、创作者管理、创作者空间、创作者申请审核、资源管理、下载记录、博客/图文内容管理等运营工作流。
-- 技术栈为 React 19 + Vite 6 + React Router 7 + Ant Design 6 + Pro Components。
+- 技术栈为 React 19 + Vite 6 + React Router 7 + Ant Design 6。
 - Admin API 地址来自 `VITE_API_BASE_URL`，示例见 `.env.example`。
 
 ## 路由与代码入口
@@ -26,7 +26,7 @@
 ## 开发规范
 
 - 管理端是高频操作后台，界面应保持信息密度、表格/表单可扫描性和稳定操作路径，不做营销式 hero 或装饰性大版面。
-- 优先使用 Ant Design、Pro Components 和已有 API 封装；不要为单个页面引入新的 UI 体系。
+- 优先使用 Ant Design 和已有 API 封装；不要为单个页面引入新的 UI 体系。
 - 新增管理页时同步检查 `src/App.tsx` 路由、`src/layouts/Layout.tsx` 菜单入口、对应 `src/api/*` 和服务端 `/api/v1/admin/*` 路由。
 - 权限边界必须跟服务端中间件保持一致；不要只依赖前端隐藏按钮表达权限。
 - 涉及列表、筛选、分页、刷新或回退一致性时，遵守根目录的 Web UI skill 路由并启用 `web-ui-consistency-guard`。

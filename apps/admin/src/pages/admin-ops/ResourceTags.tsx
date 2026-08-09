@@ -2,31 +2,10 @@ import { Card, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useMemo } from 'react';
 import { listResourceTagStats, type ResourceTagStat } from '@/api/operations';
-import type { AdminListParams, AdminListResponse } from '@/types/api';
-import { useAdminList } from './shared';
-
-const listResourceTagStatsAdapter = async (
-  params: AdminListParams,
-): Promise<AdminListResponse<ResourceTagStat>> => {
-  const result = await listResourceTagStats({
-    keyword: params.keyword,
-    limit: params.pageSize && params.pageSize > 0 ? params.pageSize * 10 : 200,
-  });
-  const page = params.page ?? 1;
-  const pageSize = params.pageSize ?? 20;
-  const list = result.list ?? [];
-  const start = (page - 1) * pageSize;
-  const paged = list.slice(start, start + pageSize);
-  return {
-    list: paged,
-    total: result.total ?? list.length,
-    page,
-    pageSize,
-  };
-};
+import { useAdminList } from '@/hooks/useAdminList';
 
 export default function ResourceTags() {
-  const ops = useAdminList<ResourceTagStat>(listResourceTagStatsAdapter);
+  const ops = useAdminList<ResourceTagStat>(listResourceTagStats);
 
   const columns: ColumnsType<ResourceTagStat> = useMemo(
     () => [

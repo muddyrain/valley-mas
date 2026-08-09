@@ -110,7 +110,7 @@ export default function Dashboard() {
               title="用户总数"
               value={stats?.overview.userCount || 0}
               prefix={<UserOutlined />}
-              valueStyle={{ color: '#3f8600' }}
+              styles={{ content: { color: '#3f8600' } }}
             />
           </Card>
         </Col>
@@ -120,7 +120,7 @@ export default function Dashboard() {
               title="资源总数"
               value={stats?.overview.resourceCount || 0}
               prefix={<PictureOutlined />}
-              valueStyle={{ color: '#1890ff' }}
+              styles={{ content: { color: '#1890ff' } }}
             />
           </Card>
         </Col>
@@ -130,7 +130,7 @@ export default function Dashboard() {
               title="下载次数"
               value={stats?.overview.downloadCount || 0}
               prefix={<DownloadOutlined />}
-              valueStyle={{ color: '#722ed1' }}
+              styles={{ content: { color: '#722ed1' } }}
             />
           </Card>
         </Col>

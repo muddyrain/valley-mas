@@ -2,8 +2,8 @@ import { Card, Select, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useMemo } from 'react';
 import { type LifeTraceOpsRecord, listLifeTraceOps } from '@/api/operations';
+import { formatDateTime, useAdminList } from '@/hooks/useAdminList';
 import type { AdminListParams } from '@/types/api';
-import { formatDateTime, useAdminList } from './shared';
 
 type LifeTraceOpsKind =
   | 'households'

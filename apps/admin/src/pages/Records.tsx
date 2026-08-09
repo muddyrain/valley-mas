@@ -137,7 +137,7 @@ export default function Records() {
       width: 150,
       render: (_, record) => (
         <Space>
-          <Avatar src={record.user?.avatar} size="small">
+          <Avatar src={record.user?.avatar || undefined} size="small">
             {record.user?.nickname?.[0] || '匿'}
           </Avatar>
           <div className="leading-5">

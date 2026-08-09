@@ -8,8 +8,8 @@ import {
   type UserNotification,
   updateNotificationReadState,
 } from '@/api/operations';
+import { formatDateTime, useAdminList } from '@/hooks/useAdminList';
 import type { AdminListParams } from '@/types/api';
-import { formatDateTime, useAdminList } from './shared';
 
 export default function Notifications() {
   const [form] = Form.useForm();

@@ -210,7 +210,7 @@ export default function Layout() {
 
           <Dropdown menu={userMenu} placement="bottomRight">
             <div className="flex items-center cursor-pointer">
-              <Avatar src={userInfo.avatar} icon={<UserOutlined />} />
+              <Avatar src={userInfo.avatar || undefined} icon={<UserOutlined />} />
               <span className="ml-2">{userInfo.nickname || userInfo.username || '用户'}</span>
             </div>
           </Dropdown>

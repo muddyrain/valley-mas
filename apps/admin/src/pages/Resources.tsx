@@ -1,10 +1,4 @@
-import {
-  DeleteOutlined,
-  EyeOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-  UploadOutlined,
-} from '@ant-design/icons';
+import { DeleteOutlined, EyeOutlined, UploadOutlined } from '@ant-design/icons';
 import { formatFileSize } from '@valley/shared';
 import type { UploadFile, UploadProps } from 'antd';
 import {
@@ -13,7 +7,6 @@ import {
   Descriptions,
   Drawer,
   Image,
-  Input,
   Modal,
   message,
   Select,
@@ -23,9 +16,12 @@ import {
   Upload,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { type AdminResourceOperations, getResourceOperations } from '@/api/operations';
 import { UserCardInfo } from '@/components/UserCardInfo';
+import { useAdminList } from '@/hooks/useAdminList';
+import type { AdminListParams } from '@/types/api';
+import { toResourceListParams } from '@/utils/adminListParams';
 import {
   type Resource,
   type ResourceType,
@@ -49,13 +45,6 @@ const visibilityColorMap: Record<ResourceVisibility, string> = {
 };
 
 export default function Resources() {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<Resource[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [typeFilter, setTypeFilter] = useState<ResourceType | ''>('');
-  const [keyword, setKeyword] = useState('');
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadType, setUploadType] = useState<ResourceType>('avatar');
   const [uploadVisibility, setUploadVisibility] = useState<ResourceVisibility>('private');
@@ -67,33 +56,19 @@ export default function Resources() {
     null,
   );
 
-  const fetchResources = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params: {
-        page: number;
-        pageSize: number;
-        type?: ResourceType;
-        keyword?: string;
-      } = { page, pageSize };
+  const loadResources = useCallback(async (params: AdminListParams) => {
+    const result = await reqGetResourceList(toResourceListParams(params));
+    return {
+      ...result,
+      page: params.page || 1,
+      pageSize: params.pageSize || 20,
+    };
+  }, []);
+  const ops = useAdminList<Resource>(loadResources, {
+    searchPlaceholder: '搜索资源标题',
+  });
 
-      if (typeFilter) params.type = typeFilter;
-      if (keyword) params.keyword = keyword;
-
-      const response = await reqGetResourceList(params);
-      setData(response.list || []);
-      setTotal(response.total || 0);
-    } catch (error) {
-      console.error('Failed to load resources:', error);
-      message.error('获取资源列表失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize, typeFilter, keyword]);
-
-  useEffect(() => {
-    void fetchResources();
-  }, [fetchResources]);
+  const reloadResources = useCallback(() => void ops.fetchData(), [ops.fetchData]);
 
   const handleDelete = async (id: string) => {
     Modal.confirm({
@@ -106,7 +81,7 @@ export default function Resources() {
         try {
           await reqDeleteResource(id);
           message.success('删除成功');
-          void fetchResources();
+          reloadResources();
         } catch (error) {
           console.error('Failed to delete resource:', error);
           message.error('删除失败');
@@ -162,7 +137,7 @@ export default function Resources() {
       setUploadModalOpen(false);
       setFileList([]);
       setUploadVisibility('private');
-      void fetchResources();
+      reloadResources();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       message.error(err.response?.data?.message || '上传失败');
@@ -188,7 +163,7 @@ export default function Resources() {
     try {
       await reqUpdateResource(resource.id, { visibility });
       message.success('可见范围已更新');
-      setData((prev) =>
+      ops.setData((prev) =>
         prev.map((item) => (item.id === resource.id ? { ...item, visibility } : item)),
       );
     } catch (error) {
@@ -325,34 +300,21 @@ export default function Resources() {
       <h2 className="mb-6 text-2xl font-bold">资源管理</h2>
       <Card>
         <div className="mb-4 flex justify-between">
-          <Space>
-            <Input
-              placeholder="搜索资源标题"
-              prefix={<SearchOutlined />}
-              className="w-48"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              onPressEnter={() => void fetchResources()}
-            />
+          <Space wrap>
+            {ops.searchTools}
             <Select
               placeholder="类型"
               className="w-28"
               allowClear
-              value={typeFilter || undefined}
-              onChange={(value) => setTypeFilter(value || '')}
+              value={ops.type || undefined}
+              onChange={(value) => ops.updateQuery({ type: value || undefined, page: 1 })}
               options={[
                 { label: '头像', value: 'avatar' },
                 { label: '壁纸', value: 'wallpaper' },
               ]}
             />
-            <Button icon={<SearchOutlined />} type="primary" onClick={() => void fetchResources()}>
-              搜索
-            </Button>
           </Space>
           <Space>
-            <Button icon={<ReloadOutlined />} onClick={() => void fetchResources()}>
-              刷新
-            </Button>
             <Button
               type="primary"
               icon={<UploadOutlined />}
@@ -365,21 +327,18 @@ export default function Resources() {
 
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={ops.data}
           rowKey="id"
-          loading={loading}
+          loading={ops.loading}
           pagination={{
-            current: page,
-            pageSize,
-            total,
+            current: ops.page,
+            pageSize: ops.pageSize,
+            total: ops.total,
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (count) => `共 ${count} 条`,
-            onChange: (nextPage, nextPageSize) => {
-              setPage(nextPage);
-              setPageSize(nextPageSize);
-            },
           }}
+          onChange={ops.handleTableChange}
         />
       </Card>
 
@@ -431,7 +390,7 @@ export default function Resources() {
       <Drawer
         title="资源运营详情"
         open={detailOpen}
-        width={760}
+        size={760}
         onClose={() => setDetailOpen(false)}
         loading={detailLoading}
       >
@@ -468,7 +427,7 @@ export default function Resources() {
                 </Space>
               </Descriptions.Item>
               <Descriptions.Item label="所属专辑">
-                <Space direction="vertical" size={2}>
+                <Space orientation="vertical" size={2}>
                   {resourceOperations.albums.length
                     ? resourceOperations.albums.map((album) => (
                         <span key={album.id}>{album.name}</span>

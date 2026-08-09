@@ -372,7 +372,7 @@ export function deleteGuestbookMessage(id: string) {
   return http.delete<unknown, { deleted: boolean }>(`/admin/guestbook/messages/${id}`);
 }
 
-export function listResourceTagStats(params: { keyword?: string; limit?: number }) {
+export function listResourceTagStats(params: AdminListParams) {
   return http.get<unknown, AdminListResponse<ResourceTagStat>>('/admin/resource-tags/stats', {
     params,
   });

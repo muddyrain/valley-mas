@@ -1,9 +1,14 @@
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import { Button, Input, Space } from 'antd';
 import type { TablePaginationConfig } from 'antd/es/table';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { AdminListParams, AdminListResponse } from '@/types/api';
+
+interface UseAdminListOptions {
+  defaultPageSize?: number;
+  searchPlaceholder?: string;
+}
 
 export function formatDateTime(value?: string) {
   if (!value) return '-';
@@ -17,21 +22,26 @@ export function parsePositiveNumber(value: string | null, fallback: number) {
 
 export function useAdminList<T>(
   loader: (params: AdminListParams) => Promise<AdminListResponse<T>>,
+  options: UseAdminListOptions = {},
 ) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState<T[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [keywordDraft, setKeywordDraft] = useState(searchParams.get('keyword') ?? '');
+  const requestSequenceRef = useRef(0);
 
   const page = parsePositiveNumber(searchParams.get('page'), 1);
-  const pageSize = parsePositiveNumber(searchParams.get('pageSize'), 20);
+  const defaultPageSize = options.defaultPageSize ?? 20;
+  const pageSize = parsePositiveNumber(searchParams.get('pageSize'), defaultPageSize);
   const keyword = searchParams.get('keyword') ?? '';
   const status = searchParams.get('status') ?? '';
   const type = searchParams.get('type') ?? '';
   const userId = searchParams.get('userId') ?? '';
   const resourceId = searchParams.get('resourceId') ?? '';
   const risk = searchParams.get('risk') ?? '';
+  const platform = searchParams.get('platform') ?? '';
+  const role = searchParams.get('role') ?? '';
 
   const updateQuery = useCallback(
     (updates: Record<string, string | number | undefined>) => {
@@ -49,6 +59,8 @@ export function useAdminList<T>(
   );
 
   const fetchData = useCallback(async () => {
+    const requestSequence = requestSequenceRef.current + 1;
+    requestSequenceRef.current = requestSequence;
     setLoading(true);
     try {
       const result = await loader({
@@ -60,13 +72,37 @@ export function useAdminList<T>(
         userId: userId || undefined,
         resourceId: resourceId || undefined,
         risk: risk || undefined,
+        platform: platform || undefined,
+        role: role || undefined,
       });
+      if (requestSequence !== requestSequenceRef.current) return;
+      const lastPage = Math.max(1, Math.ceil((result.total || 0) / pageSize));
+      const resolvedPage = Math.min(result.page || page, lastPage);
+      if (resolvedPage !== page) {
+        updateQuery({ page: resolvedPage });
+        return;
+      }
       setData(result.list || []);
       setTotal(result.total || 0);
+    } catch {
+      // 请求层已经提供统一错误提示；保留当前数据，避免短暂失败清空列表。
     } finally {
-      setLoading(false);
+      if (requestSequence === requestSequenceRef.current) setLoading(false);
     }
-  }, [keyword, loader, page, pageSize, resourceId, risk, status, type, userId]);
+  }, [
+    keyword,
+    loader,
+    page,
+    pageSize,
+    platform,
+    resourceId,
+    risk,
+    role,
+    status,
+    type,
+    updateQuery,
+    userId,
+  ]);
 
   useEffect(() => {
     setKeywordDraft(keyword);
@@ -79,7 +115,7 @@ export function useAdminList<T>(
   const handleTableChange = (pagination: TablePaginationConfig) => {
     updateQuery({
       page: pagination.current || 1,
-      pageSize: pagination.pageSize || 20,
+      pageSize: pagination.pageSize || defaultPageSize,
     });
   };
 
@@ -89,7 +125,7 @@ export function useAdminList<T>(
         className="w-72"
         allowClear
         prefix={<SearchOutlined />}
-        placeholder="搜索关键词"
+        placeholder={options.searchPlaceholder ?? '搜索关键词'}
         value={keywordDraft}
         onChange={(event) => setKeywordDraft(event.target.value)}
         onPressEnter={() => updateQuery({ keyword: keywordDraft.trim() || undefined, page: 1 })}
@@ -119,6 +155,8 @@ export function useAdminList<T>(
     userId,
     resourceId,
     risk,
+    platform,
+    role,
     updateQuery,
     fetchData,
     handleTableChange,

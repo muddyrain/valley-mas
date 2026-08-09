@@ -8,8 +8,8 @@ import {
   getAIUsageSummary,
   listAIUsageLogs,
 } from '@/api/operations';
+import { formatDateTime, useAdminList } from '@/hooks/useAdminList';
 import type { AdminListParams } from '@/types/api';
-import { formatDateTime, useAdminList } from './shared';
 
 const statusColor: Record<string, string> = {
   success: 'green',
@@ -86,7 +86,7 @@ export default function AIUsageLogs() {
   return (
     <div>
       <h2 className="mb-6 text-2xl font-bold">AI 调用审计</h2>
-      <Space direction="vertical" className="w-full" size="large">
+      <Space orientation="vertical" className="w-full" size="large">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <Card>
             <Statistic title="调用数" value={summary?.calls || 0} />
@@ -157,12 +157,7 @@ export default function AIUsageLogs() {
         </Card>
       </Space>
 
-      <Drawer
-        title="AI 调用详情"
-        width={640}
-        open={Boolean(detail)}
-        onClose={() => setDetail(null)}
-      >
+      <Drawer title="AI 调用详情" size={640} open={Boolean(detail)} onClose={() => setDetail(null)}>
         {detail ? (
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="功能">{detail.feature}</Descriptions.Item>

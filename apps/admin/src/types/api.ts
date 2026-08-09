@@ -24,6 +24,8 @@ export interface AdminListParams extends PaginationParams, DateRangeParams {
   userId?: string;
   resourceId?: string;
   risk?: string;
+  platform?: string;
+  role?: string;
 }
 
 export interface AdminListResponse<T> extends PaginationResponse<T> {

@@ -3,8 +3,8 @@ import { Button, Card, Descriptions, Drawer, message, Select, Space, Table, Tag 
 import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useMemo, useState } from 'react';
 import { getMindArenaDebate, listMindArenaDebates, type MindArenaDebate } from '@/api/operations';
+import { formatDateTime, useAdminList } from '@/hooks/useAdminList';
 import type { AdminListParams } from '@/types/api';
-import { formatDateTime, useAdminList } from './shared';
 
 const statusColor: Record<string, string> = {
   created: 'default',
@@ -129,13 +129,13 @@ export default function MindArenaDebates() {
 
       <Drawer
         title="辩论详情"
-        width={820}
+        size={820}
         open={detailOpen}
         loading={detailLoading}
         onClose={() => setDetailOpen(false)}
       >
         {detail ? (
-          <Space direction="vertical" className="w-full" size="large">
+          <Space orientation="vertical" className="w-full" size="large">
             <Descriptions column={1} bordered size="small">
               <Descriptions.Item label="议题">{detail.topic}</Descriptions.Item>
               <Descriptions.Item label="状态">

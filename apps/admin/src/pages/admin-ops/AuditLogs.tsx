@@ -9,8 +9,8 @@ import {
   type OperationLog,
   type StorageAsset,
 } from '@/api/operations';
+import { formatDateTime, useAdminList } from '@/hooks/useAdminList';
 import type { AdminListParams, AdminListResponse } from '@/types/api';
-import { formatDateTime, useAdminList } from './shared';
 
 type AuditKind = 'operation-logs' | 'code-access-logs' | 'storage-assets';
 type AuditRow = OperationLog | CodeAccessLog | StorageAsset;
@@ -162,7 +162,7 @@ export default function AuditLogs({ kind }: { kind: AuditKind }) {
       </Card>
       <Drawer
         title="存储资产详情"
-        width={640}
+        size={640}
         open={Boolean(assetDetail)}
         onClose={() => setAssetDetail(null)}
       >

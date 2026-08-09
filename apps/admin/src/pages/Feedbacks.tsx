@@ -133,7 +133,7 @@ export default function Feedbacks() {
         width: 190,
         render: (_, record) => (
           <div className="flex min-w-0 items-center">
-            <Avatar src={record.user?.avatar} size={36}>
+            <Avatar src={record.user?.avatar || undefined} size={36}>
               {getUserName(record).charAt(0)}
             </Avatar>
             <div className="ml-2 min-w-0 flex-1">

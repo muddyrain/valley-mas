@@ -33,7 +33,8 @@ import {
   updateBlogGroup,
   updateBlogTag,
 } from '@/api/operations';
-import { formatDateTime, useAdminList } from './shared';
+import { formatDateTime, useAdminList } from '@/hooks/useAdminList';
+import { matchesKeyword, paginateLocalList } from '@/utils/adminList';
 
 type TaxonomyKind = 'categories' | 'tags' | 'groups';
 
@@ -53,7 +54,10 @@ export default function BlogTaxonomy({ kind }: { kind: TaxonomyKind }) {
       if (kind === 'tags') return listBlogTags(params);
       if (kind === 'groups') {
         const list = await listBlogGroups({ groupType: params.type });
-        return { list, total: list.length, page: 1, pageSize: list.length || 20 };
+        const filtered = list.filter((group) =>
+          matchesKeyword(params.keyword, [group.name, group.slug, group.description]),
+        );
+        return paginateLocalList(filtered, params.page, params.pageSize);
       }
       return listBlogCategories(params);
     },
