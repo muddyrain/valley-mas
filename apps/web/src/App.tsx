@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import { GlobalScrollButton } from '@/components/GlobalScrollButton';
 import { Toaster } from '@/components/ui/sonner';
+import { isDevInspectorEnabled } from '@/config/devInspector';
 import { useTheme } from '@/hooks/useTheme';
 import { applyThemeToDocument } from '@/stores/useThemeStore';
 import WorkbenchLayout from './layouts/WorkbenchLayout';
@@ -282,7 +283,10 @@ function App() {
         <Route path="/register" element={<Register />} />
       </Routes>
       <InspectorRuntime
-        enabled={import.meta.env.DEV}
+        enabled={
+          import.meta.env.DEV &&
+          isDevInspectorEnabled(import.meta.env.VITE_DEVBOX_INSPECTOR_ENABLED)
+        }
         workspaceRoot={import.meta.env.VITE_INSPECTOR_WORKSPACE_ROOT || ''}
       />
       <GlobalScrollButton />
