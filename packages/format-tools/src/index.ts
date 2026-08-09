@@ -182,6 +182,186 @@ function jsonToQuery(input: string): string {
   return search.toString();
 }
 
+function parseCsvRows(input: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+    if (quoted) {
+      if (char === '"' && input[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (char === '"' && field.length === 0) {
+      quoted = true;
+    } else if (char === ',') {
+      row.push(field);
+      field = '';
+    } else if (char === '\n' || char === '\r') {
+      if (char === '\r' && input[index + 1] === '\n') index += 1;
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+    } else {
+      field += char;
+    }
+  }
+
+  if (quoted) throw new Error('CSV 中存在未闭合的引号。');
+  if (field || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows.filter((item) => item.some((value) => value.length > 0));
+}
+
+function csvToJson(input: string): string {
+  const [header, ...rows] = parseCsvRows(input.trim());
+  if (!header?.length) throw new Error('请输入包含表头的 CSV 内容。');
+  const normalizedHeader = header.map((value) => value.trim());
+  if (normalizedHeader.some((value) => !value)) throw new Error('CSV 表头不能为空。');
+  if (new Set(normalizedHeader).size !== normalizedHeader.length) {
+    throw new Error('CSV 表头不能包含重复字段。');
+  }
+
+  const result = rows.map((row, rowIndex) => {
+    if (row.length > normalizedHeader.length) {
+      throw new Error(`CSV 第 ${rowIndex + 2} 行的字段数量超过表头。`);
+    }
+    return Object.fromEntries(normalizedHeader.map((key, index) => [key, row[index] ?? '']));
+  });
+  return toJsonString(result);
+}
+
+function escapeCsvField(value: unknown): string {
+  const text = value === null || value === undefined ? '' : String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function jsonToCsv(input: string): string {
+  const parsed = tryParseJson(input);
+  if (!Array.isArray(parsed)) throw new Error('请输入由对象组成的 JSON 数组。');
+  if (parsed.length === 0) return '';
+  if (parsed.some((item) => !item || typeof item !== 'object' || Array.isArray(item))) {
+    throw new Error('JSON 数组中的每一项都必须是对象。');
+  }
+
+  const headers: string[] = [];
+  const seen = new Set<string>();
+  for (const item of parsed as Array<Record<string, unknown>>) {
+    for (const key of Object.keys(item)) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+      headers.push(key);
+    }
+  }
+  const lines = [headers.map(escapeCsvField).join(',')];
+  for (const item of parsed as Array<Record<string, unknown>>) {
+    lines.push(
+      headers
+        .map((key) => {
+          const value = item[key];
+          return escapeCsvField(
+            typeof value === 'object' && value !== null ? JSON.stringify(value) : value,
+          );
+        })
+        .join(','),
+    );
+  }
+  return lines.join('\n');
+}
+
+function jsonLinesToJson(input: string): string {
+  const lines = normalizeLines(input).filter((line) => line.trim());
+  if (lines.length === 0) throw new Error('请输入每行一条 JSON 的内容。');
+  return toJsonString(
+    lines.map((line, index) => {
+      try {
+        return tryParseJson(line);
+      } catch {
+        throw new Error(`第 ${index + 1} 行不是有效的 JSON。`);
+      }
+    }),
+  );
+}
+
+function jsonToJsonLines(input: string): string {
+  const parsed = tryParseJson(input);
+  if (!Array.isArray(parsed)) throw new Error('请输入 JSON 数组。');
+  return parsed.map((item) => JSON.stringify(item)).join('\n');
+}
+
+function inspectUrl(input: string): string {
+  let url: URL;
+  try {
+    url = new URL(input.trim());
+  } catch {
+    throw new Error('请输入包含协议的完整 URL，例如 https://example.com/path。');
+  }
+
+  const query: Record<string, string | string[]> = {};
+  url.searchParams.forEach((value, key) => {
+    const current = query[key];
+    query[key] =
+      current === undefined
+        ? value
+        : Array.isArray(current)
+          ? [...current, value]
+          : [current, value];
+  });
+  return toJsonString({
+    protocol: url.protocol,
+    username: url.username,
+    password: url.password,
+    hostname: url.hostname,
+    port: url.port,
+    pathname: url.pathname,
+    search: url.search,
+    hash: url.hash,
+    origin: url.origin,
+    query,
+  });
+}
+
+function textStatistics(input: string): string {
+  const characters = Array.from(input);
+  const segmenter = (
+    Intl as typeof Intl & {
+      Segmenter?: new (
+        locale?: string,
+        options?: { granularity: 'word' },
+      ) => {
+        segment: (value: string) => Iterable<{ isWordLike?: boolean }>;
+      };
+    }
+  ).Segmenter;
+  const words = segmenter
+    ? Array.from(new segmenter('zh-CN', { granularity: 'word' }).segment(input)).filter(
+        (segment) => segment.isWordLike,
+      ).length
+    : (input.match(/[\p{L}\p{N}]+/gu) ?? []).length;
+
+  return toJsonString({
+    characters: characters.length,
+    charactersWithoutSpaces: characters.filter((character) => !/\s/u.test(character)).length,
+    words,
+    lines: normalizeLines(input).length,
+    paragraphs: input.trim() ? input.trim().split(/\n\s*\n/u).length : 0,
+    bytes: new TextEncoder().encode(input).length,
+  });
+}
+
 function base64UrlEncode(input: string): string {
   return encodeBase64(input).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
@@ -396,6 +576,45 @@ export const FORMAT_CONVERTER_LIST: FormatConverter[] = [
       direction === 'reverse' ? jsonToQuery(input) : queryToJson(input),
   },
   {
+    id: 'csv-json',
+    name: 'CSV 与 JSON',
+    description: '在带表头的 CSV 和 JSON 对象数组之间双向转换。',
+    category: 'data',
+    keywords: ['csv', 'json', '表格', '数据转换'],
+    supportsReverse: true,
+    forwardActionLabel: 'CSV 转 JSON',
+    reverseActionLabel: 'JSON 转 CSV',
+    inputPlaceholder: 'name,role\nValley,creator',
+    outputPlaceholder: '这里会显示转换结果',
+    convert: (input, direction) => (direction === 'reverse' ? jsonToCsv(input) : csvToJson(input)),
+  },
+  {
+    id: 'jsonl-json',
+    name: 'JSON Lines 与 JSON',
+    description: '在逐行 JSON（JSONL）和标准 JSON 数组之间转换。',
+    category: 'data',
+    keywords: ['jsonl', 'ndjson', 'json lines', '日志'],
+    supportsReverse: true,
+    forwardActionLabel: 'JSONL 转 JSON',
+    reverseActionLabel: 'JSON 转 JSONL',
+    inputPlaceholder: '{"id":1}\n{"id":2}',
+    outputPlaceholder: '这里会显示转换结果',
+    convert: (input, direction) =>
+      direction === 'reverse' ? jsonToJsonLines(input) : jsonLinesToJson(input),
+  },
+  {
+    id: 'url-inspect',
+    name: 'URL 解析',
+    description: '拆解协议、主机、路径、查询参数和锚点。',
+    category: 'data',
+    keywords: ['url', 'host', 'path', 'query', '链接解析'],
+    supportsReverse: false,
+    forwardActionLabel: '解析 URL',
+    inputPlaceholder: 'https://example.com/docs?q=valley#intro',
+    outputPlaceholder: '这里会显示 URL 结构',
+    convert: (input) => inspectUrl(input),
+  },
+  {
     id: 'markdown-plain',
     name: 'Markdown 转纯文本',
     description: '去除 Markdown 标记，得到可复制的纯文本。',
@@ -523,6 +742,18 @@ export const FORMAT_CONVERTER_LIST: FormatConverter[] = [
     inputPlaceholder: '每行一条内容',
     outputPlaceholder: '这里会显示转换结果',
     convert: (input) => dedupeLines(input),
+  },
+  {
+    id: 'text-statistics',
+    name: '文本统计',
+    description: '统计字符、字词、行、段落和 UTF-8 字节数。',
+    category: 'text',
+    keywords: ['字符数', '字数', '词数', '行数', 'bytes'],
+    supportsReverse: false,
+    forwardActionLabel: '统计文本',
+    inputPlaceholder: '输入需要统计的文本',
+    outputPlaceholder: '这里会显示统计结果',
+    convert: (input) => textStatistics(input),
   },
   {
     id: 'xml-format',

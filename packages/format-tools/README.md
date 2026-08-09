@@ -1,6 +1,8 @@
 # `@valley/format-tools`
 
-Dependency-free text, encoding, structured-data, date, hash, and utility functions that work in browsers and modern Node runtimes.
+Dependency-free text, encoding, structured-data, tabular-data, URL, date, hash, and utility functions that work in browsers and modern Node runtimes.
+
+The converter catalog includes JSON/XML formatting, CSV ↔ JSON, JSON Lines ↔ JSON, URL inspection, query-string conversion, Base64 and Unicode codecs, date conversion, line tools, text statistics, hashes, and JWT inspection.
 
 ## Structured helpers
 
@@ -33,4 +35,4 @@ const result = await runFormatTool({
 });
 ```
 
-The existing `FORMAT_CONVERTER_LIST` remains the Web page's curated UI list. Structured tools are separate so package growth does not silently change a product page; a page can opt in when its UX is ready.
+`FORMAT_CONVERTER_LIST` is the curated catalog used by the Web tool page. Structured tools remain a separate list, and consumers can combine either list with the same stable runner.
