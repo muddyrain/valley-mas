@@ -6,7 +6,7 @@
 
 - Valley MAS 是一个包含个人内容展示、创作者空间、内容管理、生活记录、AI 辅助能力、毛毡桌面壳层和实验应用的 monorepo。
 - 用户侧主站在 `apps/web`，管理后台在 `apps/admin`，Go API 服务在 `server`。
-- Life Trace、AI Mind Arena、Desktop OS、WorldSim、Toy Climb Arena、Scratch Legend 是当前仓库内的独立产品或实验应用。
+- Life Trace、AI Mind Arena、Desktop OS、WorldSim、Toy Climb Arena、Scratch Legend、Ambient Forge 是当前仓库内的独立产品或实验应用。
 - 共享类型、请求、路由和格式化能力放在 `packages/*`。
 
 ## 技术栈地图
@@ -20,6 +20,7 @@
 | AI Mind Arena | `apps/ai-mind-arena` | Next.js 15 + React 19 + Tailwind 3，多人格辩论决策应用，默认端口 5175。 |
 | Scratch Legend | `apps/scratch-legend` | Next.js + React，刮刮卡增量游戏实验，默认端口 5176。 |
 | Toy Climb Arena | `apps/toy-climb-arena` | Vite 6 + TypeScript + Three.js，玩具世界攀爬游戏，默认端口 5175。 |
+| Ambient Forge | `apps/ambient-forge` | React 19 + Vite 6 + TypeScript + 直接 Three.js + Web Audio，程序化浮空群岛环境场景，默认端口 5181。 |
 | WorldSim | `apps/world-sim` | React 19 + Vite 6 + TypeScript + Pixi.js + Zustand，沙盒文明模拟游戏。 |
 | Go 服务端 | `server` | Gin + GORM，入口在 `server/cmd/server`，路由集中在 `server/internal/router/router.go`。 |
 | 共享包 | `packages/*` | `shared`、`shared-request`、`shared-router`、`shared-format`、`format-tools`、`browser-media`、`mini-games` 等 workspace 包。 |
@@ -74,6 +75,9 @@ pnpm --filter @valley/scratch-legend dev
 pnpm --filter @valley/toy-climb-arena dev
 pnpm --filter @valley/world-sim dev
 
+# 启动 Ambient Forge
+pnpm --filter @valley/ambient-forge dev
+
 # 启动 Go 服务
 cd server && go run ./cmd/server
 
@@ -97,6 +101,7 @@ cd server && go run ./cmd/migrate bootstrap --apply
 | AI Mind Arena | 5175 |
 | Toy Climb Arena | 5175 |
 | Scratch Legend | 5176 |
+| Ambient Forge | 5181 |
 
 Go API 启动时会优先使用 `PORT`（默认 `8080`）。如果该端口已被占用，服务端会自动顺延尝试后续端口，并在启动日志里打印实际端口。前端本地 Vite 代理默认仍指向 `http://localhost:8080`；如果 Go API 顺延到了 `8081` 等端口，需要同步调整前端 API 代理或 `VITE_API_BASE_URL`，避免继续请求旧分支服务。
 
@@ -132,6 +137,7 @@ Go API 启动时会优先使用 `PORT`（默认 `8080`）。如果该端口已�
 - Web API 封装：`apps/web/src/api`。
 - Admin API 封装：`apps/admin/src/api`。
 - Desktop OS API 封装：`apps/desktop-os/src/api`。
+- Ambient Forge 入口：`apps/ambient-forge/src/App.tsx`；标准输入与信号映射见 `apps/ambient-forge/src/core`，Three.js 与 Web Audio 生命周期分别见 `apps/ambient-forge/src/engine`、`apps/ambient-forge/src/audio`。
 
 ## 常用校验
 
@@ -159,6 +165,10 @@ pnpm --filter @valley/ai-mind-arena typecheck
 pnpm --filter @valley/scratch-legend typecheck
 pnpm --filter @valley/world-sim typecheck
 pnpm --filter @valley/toy-climb-arena typecheck
+pnpm --filter @valley/ambient-forge test
+pnpm --filter @valley/ambient-forge typecheck
+pnpm --filter @valley/ambient-forge check
+pnpm --filter @valley/ambient-forge build
 
 # Go 服务
 cd server && go test ./...

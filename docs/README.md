@@ -33,6 +33,7 @@
 - WorldSim：`apps/world-sim/AGENTS.md`、`apps/world-sim/docs/*`。
 - Toy Climb Arena：`apps/toy-climb-arena/AGENTS.md`、`apps/toy-climb-arena/docs/*`。
 - Scratch Legend：`apps/scratch-legend/AGENTS.md`、`apps/scratch-legend/docs/*`。
+- Ambient Forge：`apps/ambient-forge/AGENTS.md`、`apps/ambient-forge/README.md`、`apps/ambient-forge/docs/PLAN.md`。
 
 ## 维护规则
 

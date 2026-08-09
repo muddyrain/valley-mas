@@ -24,6 +24,7 @@
 - WorldSim：`AGENTS.md` -> `apps/world-sim/AGENTS.md` -> `apps/world-sim/src/App.tsx` -> `apps/world-sim/docs/TDD.md`。
 - Scratch Legend：`AGENTS.md` -> `apps/scratch-legend/AGENTS.md` -> `apps/scratch-legend/docs/scratch-legend-task.md` -> `apps/scratch-legend/lib/game-store.ts`。
 - Toy Climb Arena：`AGENTS.md` -> `apps/toy-climb-arena/AGENTS.md` -> `apps/toy-climb-arena/docs/TASKS.md` -> `apps/toy-climb-arena/src/main.tsx`。
+- Ambient Forge：`AGENTS.md` -> `apps/ambient-forge/AGENTS.md` -> `apps/ambient-forge/docs/PLAN.md` -> `apps/ambient-forge/src/App.tsx`。
 - Go 服务端：`AGENTS.md` -> `server/AGENTS.md` -> `server/internal/router/router.go` -> `server/.env.example`。
 
 若任务与文档治理/约束体系相关，再增加顺序：`docs/README.md` -> 对应文件 -> `docs/HARNESS_ENGINEERING.md`。
@@ -40,6 +41,7 @@
 | WorldSim | `apps/world-sim/AGENTS.md` | 沙盒文明模拟、玩法参数和设计文档 |
 | Scratch Legend | `apps/scratch-legend/AGENTS.md` | 刮刮卡成长游戏和阶段任务 |
 | Toy Climb Arena | `apps/toy-climb-arena/AGENTS.md` | Three.js 攀爬游戏、关卡、资源和物理验证 |
+| Ambient Forge | `apps/ambient-forge/AGENTS.md` | 程序化 3D 浮空岛、昼夜天气、音乐响应、环境声和 WebM 导出 |
 | Go 服务端 | `server/AGENTS.md` | Gin/GORM API、认证、模型、AI 与业务服务 |
 
 ## 计划文档同步

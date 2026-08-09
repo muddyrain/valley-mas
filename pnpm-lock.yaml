@@ -220,6 +220,43 @@ importers:
         specifier: catalog:ts-tooling
         version: 5.9.3
 
+  apps/ambient-forge:
+    dependencies:
+      lucide-react:
+        specifier: catalog:shared-runtime
+        version: 0.460.0(react@19.2.4)
+      react:
+        specifier: catalog:react-19
+        version: 19.2.4
+      react-dom:
+        specifier: catalog:react-19
+        version: 19.2.4(react@19.2.4)
+      three:
+        specifier: ^0.184.0
+        version: 0.184.0
+    devDependencies:
+      '@types/react':
+        specifier: catalog:react-19
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: catalog:react-19
+        version: 19.2.3(@types/react@19.2.14)
+      '@types/three':
+        specifier: ^0.184.1
+        version: 0.184.1
+      '@vitejs/plugin-react-swc':
+        specifier: catalog:vite-6
+        version: 4.0.0(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
+      typescript:
+        specifier: catalog:ts-tooling
+        version: 5.9.3
+      vite:
+        specifier: catalog:vite-6
+        version: 6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
+      vitest:
+        specifier: catalog:test
+        version: 4.1.6(@types/node@22.19.13)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
+
   apps/desktop-os:
     dependencies:
       '@base-ui/react':
