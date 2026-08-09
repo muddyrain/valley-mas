@@ -14,6 +14,7 @@
 - GORM model 改动必须同时新增 PostgreSQL 与 MySQL 的同版本迁移，并考虑默认值、索引和已有数据兼容。
 - 迁移使用唯一时间戳版本，例如 `202607260010_add_xxx.sql`；两个方言目录的版本集合必须一致。
 - 迁移版本一旦在任一持久数据库中记录为 `applied` 就不可变；不得在同版本文件中追加或改写 SQL。遗漏和修正必须新增更高版本的双方言修复迁移。
+- 当前最新 managed 迁移为 `202608090003_add_ai_app_run_knowledge_status`，新增智能体运行的知识检索降级状态与稳定错误码。
 - 本地 `air` 只执行待处理迁移；普通热重载只查询版本表，不做全量 GORM schema introspection。
 - 生产服务进程不隐式修改结构；部署在服务重启前显式执行迁移，失败即停止发布。
 - MySQL 的 managed baseline 会创建 `valley_managed_add_column_if_missing` 与 `valley_managed_add_index_if_missing` 两个受控 helper；后续 MySQL 迁移用它们兼容已由 GORM 建好的旧库。
