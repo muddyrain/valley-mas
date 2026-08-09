@@ -56,14 +56,29 @@ describe('AssistantExecution', () => {
     );
 
     expect(markup).toContain('正在执行');
-    expect(markup).toContain('aria-label="展开执行过程"');
-    expect(markup).toContain('aria-expanded="false"');
-    expect(markup).not.toContain('好的，我开始生成图片。');
+    expect(markup).toContain('aria-label="收起执行过程"');
+    expect(markup).toContain('aria-expanded="true"');
+    expect(markup).toContain('好的，我开始生成图片。');
     expect(markup).toContain('第一次失败，我再重试一次。');
-    expect(markup).not.toContain('调用 1 次工具 · 图片生成');
-    expect(markup).not.toContain('执行命令 生成图片');
+    expect(markup).toContain('调用 1 次工具 · 图片生成');
+    expect(markup).toContain('执行命令 生成图片');
     expect(markup).not.toContain('data-execution-result-separator');
     expect(markup).toContain('当前执行结果');
+  });
+
+  it('keeps partial output visible while a completed task is being finalized', () => {
+    const markup = renderToStaticMarkup(
+      <AssistantActiveExecution
+        startedAt={Date.now() - 5000}
+        reply="这是已经生成的完整回答"
+        tools={[]}
+        phase="finalizing"
+      />,
+    );
+
+    expect(markup).toContain('正在完成');
+    expect(markup).toContain('这是已经生成的完整回答');
+    expect(markup).not.toContain('正在思考');
   });
 
   it('renders no completed process header for a direct answer', () => {

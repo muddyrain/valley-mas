@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  CircleAlert,
   Clock3,
   Ellipsis,
   MessageCirclePlus,
@@ -11,7 +12,6 @@ import {
   Send,
   Settings2,
   Trash2,
-  UserRound,
 } from 'lucide-react';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -32,6 +32,7 @@ import {
   type AIAppConversationToolTrace,
   type AIAppRun,
   type AIAppTask,
+  type AIAppTaskClarification,
   type AIAppToolApproval,
   type AIAppVersion,
   type AIKnowledgeReference,
@@ -39,11 +40,13 @@ import {
   cancelAIAppTask,
   createAIAppConversation,
   createAIAppConversationTask,
+  decideAIAppTaskClarification,
   decideAIAppToolApproval,
   deleteAIAppConversation,
   deleteAIAppConversationAttachment,
   downloadAIAppConversationAttachment,
   getAIApp,
+  getAIAppArtifactDownloadURL,
   getAIAppConversation,
   getAIAppConversationAttachmentBlob,
   getAPIErrorMessage,
@@ -51,15 +54,16 @@ import {
   listAIAppTasks,
   listAISkills,
   publishAIApp,
+  retryAIAppTask,
   streamAIAppConversation,
   uploadAIAppConversationAttachment,
 } from '@/api/aiWorkbench';
-import { ConversationAttachmentCard } from '@/components/ai/ConversationAttachmentCard';
 import {
   ConversationComposer,
   type ConversationComposerFile,
 } from '@/components/ai/ConversationComposer';
-import { ConversationMessageBubble } from '@/components/ai/ConversationMessageBubble';
+import { ConversationMessage } from '@/components/ai/ConversationMessage';
+import { ConversationToolCard } from '@/components/ai/ConversationToolCard';
 import {
   SaveResourceDialog,
   type SaveResourceVisibility,
@@ -69,7 +73,6 @@ import { AIImageResultActions } from '@/components/ai-images/AIImageResultAction
 import { GenerationPreview } from '@/components/ai-images/GenerationOverlay';
 import { AgentAvatar } from '@/components/ai-workbench/AgentAvatar';
 import ImagePreviewDialog from '@/components/ImagePreviewDialog';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -111,14 +114,21 @@ import {
   getConversationActivityKey,
   hasAssistantMessageForRun,
   hasTerminalConversationRun,
+  isConversationNearLatest,
   isConversationUserMessagePending,
+  isLastMessageForRun,
+  isLastUserMessageForRun,
   mergePersistedConversationMessages,
   modelSupportsImageUnderstanding,
   orderConversationMessages,
   replaceOptimisticConversationMessage,
+  resolveConversationTurnPhase,
+  retargetConversationMessageRun,
   scrollConversationToLatest,
-  shouldShowActiveConversationTask,
+  shouldRefreshConversationDetail,
+  shouldShowMessageStartingIndicator,
   shouldShowMessageWaitingIndicator,
+  shouldShowTaskWaitingSummary,
 } from '@/pages/AIAppConversation/conversationView';
 import {
   type AssistantStreamTool,
@@ -128,6 +138,13 @@ import {
   shouldShowAssistantExecutionReferences,
 } from '@/pages/AIAppConversation/execution';
 import { loadAvailableConversationImages } from '@/pages/AIAppConversation/history';
+import {
+  getPendingClarification,
+  groupConversationClarificationsByMessage,
+  toClarificationToolCard,
+  toToolErrorCard,
+} from '@/pages/AIAppConversation/interactionCards';
+import { toArtifactToolCard } from '@/pages/AIAppConversation/toolCards';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const quickPrompts = [
@@ -158,8 +175,18 @@ type ConversationStreamState = {
   startedAt: number;
 };
 
+type ResolvingClarificationState = {
+  taskId: string;
+  clarificationId: string;
+  decision: 'answer' | 'skip' | 'decline';
+  answer: string;
+};
+
 const isTaskActive = (task: AIAppTask) =>
-  task.status === 'queued' || task.status === 'running' || task.status === 'waiting_approval';
+  task.status === 'queued' ||
+  task.status === 'running' ||
+  task.status === 'waiting_approval' ||
+  task.status === 'needs_input';
 
 function parseImageGenerationIDs(value?: string) {
   if (!value) return [];
@@ -214,7 +241,7 @@ function formatConversationUpdatedAt(value: string) {
   ).format(date);
 }
 
-function formatRunFailure(run: AIAppRun) {
+export function formatRunFailure(run: AIAppRun) {
   switch (run.errorCode) {
     case 'RAG_POSTGRES_REQUIRED':
       return '知识库检索需要 PostgreSQL 数据库';
@@ -228,8 +255,18 @@ function formatRunFailure(run: AIAppRun) {
       return '知识库数据库结构未迁移，请执行服务端迁移';
     case 'RAG_DATABASE_UNAVAILABLE':
       return '知识库数据库暂不可用，请稍后重试';
+    case 'RAG_EMBEDDING_MODEL_UNAVAILABLE':
+      return '没有可用的知识库向量模型，请联系管理员';
+    case 'RAG_EMBEDDING_REINDEX_REQUIRED':
+      return '知识库向量已升级，请先重新索引文档';
+    case 'RAG_EMBEDDING_MODEL_MISMATCH':
+      return '知识库使用了不同的向量模型，请重新索引全部文档';
+    case 'RAG_EMBEDDING_PROVIDER_UNAVAILABLE':
+      return '知识库向量模型服务尚未配置，请联系管理员';
+    case 'RAG_EMBEDDING_FAILED':
+      return '知识库向量服务调用失败，请稍后重试';
     case 'ARK_EMBEDDING_NOT_CONFIGURED':
-      return '知识库向量模型未配置';
+      return '知识库向量能力正在迁移，请稍后再试';
     case 'ARK_EMBEDDING_FAILED':
       return '知识库向量服务调用失败';
     case 'RAG_CONFIG_INVALID':
@@ -251,6 +288,34 @@ function formatRunFailure(run: AIAppRun) {
     default:
       return run.status === 'cancelled' ? '已停止生成' : '本次回复未完成';
   }
+}
+
+export function isRetryableTaskFailureCode(code?: string) {
+  return (
+    code === 'AI_AGENT_RUN_FAILED' ||
+    code === 'RAG_QUERY_FAILED' ||
+    code === 'RAG_EMBEDDING_FAILED' ||
+    code === 'AI_TOOL_REGISTRY_UNAVAILABLE'
+  );
+}
+
+export function AIKnowledgeFallbackNotice({ run }: { run: AIAppRun }) {
+  if (run.status !== 'succeeded' || run.knowledgeStatus !== 'degraded') return null;
+  return (
+    <div
+      role="status"
+      className="ml-11 flex w-[calc(100%-2.75rem)] max-w-[42rem] items-start gap-2.5 rounded-lg border border-border/70 bg-muted/35 px-3 py-2.5 text-sm"
+      data-agent-knowledge-status="degraded"
+    >
+      <CircleAlert className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <div className="min-w-0">
+        <p className="font-medium text-foreground">已跳过知识库</p>
+        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+          知识库暂时不可用，本次回复未使用私有资料。
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function ConversationModelControl({
@@ -381,39 +446,42 @@ function ConversationContentSkeleton() {
   return (
     <>
       <div className="min-h-0 flex-1 overflow-hidden" aria-hidden="true">
-        <div className="mx-auto flex min-h-full w-full max-w-[54rem] flex-col gap-6 px-6 py-8 sm:px-8 lg:py-10">
+        <div className="mx-auto flex min-h-full w-full max-w-[58rem] flex-col gap-8 px-4 py-6 sm:px-6 lg:py-8">
           <div className="flex items-start justify-end gap-3">
-            <div className="w-48 max-w-[70%] rounded-xl bg-muted/60 px-4 py-4">
+            <div className="w-48 max-w-[70%] rounded-2xl bg-muted/70 px-4 py-3 ring-1 ring-border/50">
               <Skeleton className="h-4 w-full rounded-full" />
             </div>
             <Skeleton className="size-8 shrink-0 rounded-full" />
           </div>
           <div className="flex items-start gap-3">
             <Skeleton className="size-8 shrink-0 rounded-full" />
-            <div className="w-full max-w-lg space-y-2 rounded-xl bg-muted/60 px-4 py-4">
+            <div className="w-full max-w-lg space-y-2 py-2">
               <Skeleton className="h-4 w-4/5 max-w-full rounded-full" />
               <Skeleton className="h-4 w-full rounded-full" />
               <Skeleton className="h-4 w-3/5 max-w-full rounded-full" />
             </div>
           </div>
           <div className="flex items-start justify-end gap-3">
-            <div className="w-56 max-w-[70%] rounded-xl bg-muted/60 px-4 py-4">
+            <div className="w-56 max-w-[70%] rounded-2xl bg-muted/70 px-4 py-3 ring-1 ring-border/50">
               <Skeleton className="h-4 w-full rounded-full" />
             </div>
             <Skeleton className="size-8 shrink-0 rounded-full" />
           </div>
           <div className="flex items-start gap-3">
             <Skeleton className="size-8 shrink-0 rounded-full" />
-            <div className="w-full max-w-md space-y-2 rounded-xl bg-muted/60 px-4 py-4">
+            <div className="w-full max-w-md space-y-2 py-2">
               <Skeleton className="h-4 w-full rounded-full" />
               <Skeleton className="h-4 w-2/3 max-w-full rounded-full" />
             </div>
           </div>
         </div>
       </div>
-      <div className="mx-auto w-full max-w-[54rem] px-5 pb-6 pt-3 sm:px-8" aria-hidden="true">
-        <div className="rounded-xl border border-border bg-card px-4 pt-4 shadow-sm">
-          <div className="space-y-2 pb-8">
+      <div
+        className="w-full shrink-0 border-t border-border/60 bg-background/95 px-4 pb-4 pt-3 sm:px-6"
+        aria-hidden="true"
+      >
+        <div className="mx-auto w-full max-w-[52rem] rounded-[1.25rem] border border-border bg-card px-4 pt-4 shadow-sm">
+          <div className="space-y-2 pb-7">
             <Skeleton className="h-4 w-2/3 rounded-full" />
             <Skeleton className="h-4 w-2/5 rounded-full" />
           </div>
@@ -429,59 +497,53 @@ function ConversationContentSkeleton() {
 
 function AIAppConversationSkeleton() {
   return (
-    <div className="flex h-screen min-h-0 flex-col bg-background" aria-busy="true">
-      <header className="flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-border/70 px-4 sm:px-6">
+    <div className="flex h-screen min-h-0 flex-col bg-muted/20" aria-busy="true">
+      <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-background px-3 sm:px-4">
         <div className="flex items-center gap-2">
           <Skeleton className="size-8 rounded-md" />
-          <Skeleton className="size-7 rounded-full" />
+          <Skeleton className="size-8 rounded-full" />
           <Skeleton className="h-4 w-28" />
-          <Skeleton className="hidden h-5 w-14 rounded-full sm:block" />
+          <Skeleton className="hidden h-3 w-14 rounded-full md:block" />
         </div>
         <div className="flex items-center gap-2">
-          <Skeleton className="h-8 w-18 rounded-md" />
-          <Skeleton className="h-8 w-14 rounded-md" />
-          <Skeleton className="h-8 w-12 rounded-md" />
+          <Skeleton className="hidden h-8 w-24 rounded-md lg:block" />
+          <Skeleton className="hidden h-8 w-16 rounded-md lg:block" />
+          <Skeleton className="size-8 rounded-md lg:hidden" />
         </div>
       </header>
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[18rem_minmax(0,1fr)]">
-        <aside className="hidden min-h-0 flex-col border-r border-sidebar-border bg-sidebar p-4 lg:flex">
-          <div className="flex items-center justify-between gap-3">
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[17rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)]">
+        <aside className="hidden min-h-0 flex-col border-r border-sidebar-border bg-sidebar px-3 py-3 lg:flex">
+          <div className="flex items-center justify-between gap-3 px-1.5">
             <div className="space-y-1">
               <Skeleton className="h-4 w-20 rounded-full" />
               <Skeleton className="h-3 w-14 rounded-full" />
             </div>
             <Skeleton className="size-8 rounded-md" />
           </div>
-          <Skeleton className="mt-5 h-9 w-full rounded-md" />
-          <div className="mt-5 space-y-2">
-            <Skeleton className="h-14 w-full rounded-lg" />
-            <Skeleton className="h-14 w-full rounded-lg" />
-            <Skeleton className="h-14 w-full rounded-lg" />
-            <Skeleton className="h-14 w-full rounded-lg" />
+          <Skeleton className="mt-3 h-10 w-full rounded-lg" />
+          <div className="mt-8 space-y-1">
+            <Skeleton className="h-15 w-full rounded-lg" />
+            <Skeleton className="h-15 w-full rounded-lg" />
+            <Skeleton className="h-15 w-full rounded-lg" />
+            <Skeleton className="h-15 w-full rounded-lg" />
           </div>
-          <Skeleton className="mt-auto h-14 w-full rounded-lg" />
+          <Skeleton className="mt-auto h-13 w-full rounded-lg" />
         </aside>
-        <section className="flex min-h-0 flex-col">
+        <section className="flex min-h-0 flex-col bg-muted/20">
           <div className="flex min-h-0 flex-1 items-center overflow-hidden">
-            <div className="mx-auto flex w-full max-w-[54rem] flex-col gap-5 px-6 py-10 sm:px-8">
+            <div className="mx-auto flex w-full max-w-[52rem] flex-col gap-5 px-4 py-10 sm:px-6">
               <div className="space-y-3">
-                <Skeleton className="h-8 w-80 max-w-full rounded-md" />
+                <Skeleton className="h-7 w-80 max-w-full rounded-md" />
                 <Skeleton className="h-4 w-[34rem] max-w-full rounded-full" />
                 <Skeleton className="h-4 w-96 max-w-full rounded-full" />
               </div>
-              <Skeleton className="h-20 w-full rounded-lg" />
-              <div className="rounded-xl border border-border bg-card p-4">
-                <Skeleton className="h-20 w-full rounded-lg" />
+              <Skeleton className="h-18 w-full rounded-xl" />
+              <div className="rounded-[1.25rem] border border-border bg-card p-4 shadow-sm">
+                <Skeleton className="h-16 w-full rounded-lg" />
                 <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3">
                   <Skeleton className="h-8 w-28 rounded-full" />
                   <Skeleton className="size-9 rounded-full" />
                 </div>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Skeleton className="h-16 rounded-lg" />
-                <Skeleton className="h-16 rounded-lg" />
-                <Skeleton className="h-16 rounded-lg" />
-                <Skeleton className="h-16 rounded-lg" />
               </div>
             </div>
           </div>
@@ -499,6 +561,7 @@ export default function AIAppConversationPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentUser = useAuthStore((state) => state.user);
+  const currentUserName = currentUser?.nickname || currentUser?.username || '用户';
   const [conversations, setConversations] = useState<AIAppConversation[]>([]);
   const [app, setApp] = useState<AIApp | null>(null);
   const [conversation, setConversation] = useState<AIAppConversation | null>(null);
@@ -514,11 +577,15 @@ export default function AIAppConversationPage() {
   const [artifacts, setArtifacts] = useState<AIAppArtifact[]>([]);
   const [tasks, setTasks] = useState<AIAppTask[]>([]);
   const [approvals, setApprovals] = useState<AIAppToolApproval[]>([]);
+  const [clarifications, setClarifications] = useState<AIAppTaskClarification[]>([]);
   const [uploadItems, setUploadItems] = useState<ConversationComposerFile[]>([]);
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
   const [pendingTaskCreations, setPendingTaskCreations] = useState<Record<string, number>>({});
   const [decidingApprovalId, setDecidingApprovalId] = useState<string | null>(null);
   const [cancellingTaskId, setCancellingTaskId] = useState<string | null>(null);
+  const [retryingTaskId, setRetryingTaskId] = useState<string | null>(null);
+  const [resolvingClarification, setResolvingClarification] =
+    useState<ResolvingClarificationState | null>(null);
   const [input, setInput] = useState('');
   const [skills, setSkills] = useState<AISkill[]>([]);
   const [activeSkillIds, setActiveSkillIds] = useState<string[]>([]);
@@ -535,16 +602,23 @@ export default function AIAppConversationPage() {
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null);
+  const [showScrollToLatest, setShowScrollToLatest] = useState(false);
   const streamControllersRef = useRef(new Map<string, AbortController>());
   const taskStatusesRef = useRef(new Map<string, AIAppTask['status']>());
   const activeConversationIdRef = useRef(conversationId);
+  const messagesRef = useRef(messages);
+  const runsRef = useRef(runs);
   const attachmentPreviewUrlsRef = useRef<Record<string, string>>({});
   const loadedAppIdRef = useRef<string | null>(null);
   const welcomeRef = useRef<HTMLDivElement | null>(null);
   const conversationScrollRef = useRef<HTMLDivElement | null>(null);
   const taskDetailRefreshAtRef = useRef(0);
   const taskCreationChainRef = useRef<Promise<void>>(Promise.resolve());
+  const resolvingClarificationRef = useRef(false);
+  const followingConversationRef = useRef(true);
   activeConversationIdRef.current = conversationId;
+  messagesRef.current = messages;
+  runsRef.current = runs;
   const creatingTask = Boolean(conversationId && (pendingTaskCreations[conversationId] ?? 0) > 0);
   const sending = creatingTask;
   const conversationConfig = parseAgentConfig(
@@ -561,17 +635,39 @@ export default function AIAppConversationPage() {
       !hasTerminalConversationRun(runsById.get(task.runId)) &&
       !hasAssistantMessageForRun(messages, task.runId),
   );
-  const visibleConversationTasks = activeConversationTasks.filter((task) =>
-    shouldShowActiveConversationTask(task, messages),
+  const continuingConversationTasks = tasks.filter(
+    (task) =>
+      task.conversationId === conversationId &&
+      !hasAssistantMessageForRun(messages, task.runId) &&
+      resolveConversationTurnPhase({
+        isLocalPending: false,
+        creatingTask: false,
+        hasAssistantMessage: false,
+        taskStatus: task.status,
+        queuePosition: task.queuePosition,
+        runStatus: runsById.get(task.runId)?.status,
+      }) !== 'idle',
   );
-  const renderedConversationTasks = visibleConversationTasks.filter(
-    (task) => task.status !== 'queued',
+  const renderedTasksByRunId = new Map(
+    continuingConversationTasks.map((task) => [task.runId, task]),
   );
-  const renderedTasksByRunId = new Map(renderedConversationTasks.map((task) => [task.runId, task]));
   const currentExecutingTask = activeConversationTasks.find(
     (task) => task.status === 'running' || task.status === 'waiting_approval',
   );
-  const shouldPollTasksRapidly = activeConversationTasks.length > 0 || creatingTask;
+  const pendingClarification = getPendingClarification(tasks, clarifications, conversationId || '');
+  const clarificationsByMessageId = groupConversationClarificationsByMessage(
+    orderedMessages,
+    clarifications,
+    conversationId || '',
+  );
+  const shouldPollTasksRapidly =
+    continuingConversationTasks.some((task) =>
+      shouldRefreshConversationDetail({
+        taskStatus: task.status,
+        runStatus: runsById.get(task.runId)?.status,
+        hasAssistantMessage: hasAssistantMessageForRun(messages, task.runId),
+      }),
+    ) || creatingTask;
   const conversationActivityKey = getConversationActivityKey(
     messages,
     activeConversationTasks,
@@ -582,6 +678,12 @@ export default function AIAppConversationPage() {
   useEffect(() => {
     setTextModelId(conversationConfig.modelId || '');
   }, [conversationConfig.modelId]);
+
+  useEffect(() => {
+    if (!conversationId) return;
+    followingConversationRef.current = true;
+    setShowScrollToLatest(false);
+  }, [conversationId]);
 
   useEffect(() => {
     let active = true;
@@ -781,17 +883,32 @@ export default function AIAppConversationPage() {
         const hasActiveCurrentTask = result.list.some(
           (task) => task.conversationId === conversationId && isTaskActive(task),
         );
+        const currentRunsById = new Map(runsRef.current.map((run) => [run.id, run]));
+        const hasUnresolvedCurrentTask = result.list.some(
+          (task) =>
+            task.conversationId === conversationId &&
+            shouldRefreshConversationDetail({
+              taskStatus: task.status,
+              runStatus: currentRunsById.get(task.runId)?.status,
+              hasAssistantMessage: hasAssistantMessageForRun(messagesRef.current, task.runId),
+            }),
+        );
         const completedCurrentTask = result.list.some((task) => {
           const previous = taskStatusesRef.current.get(task.id);
           return (
             task.conversationId === conversationId &&
             previous !== undefined &&
-            (previous === 'queued' || previous === 'running' || previous === 'waiting_approval') &&
+            (previous === 'queued' ||
+              previous === 'running' ||
+              previous === 'waiting_approval' ||
+              previous === 'needs_input') &&
             !isTaskActive(task)
           );
         });
+        const detailRefreshInterval = hasActiveCurrentTask ? 1200 : 300;
         const shouldRefreshActiveDetail =
-          hasActiveCurrentTask && Date.now() - taskDetailRefreshAtRef.current >= 2500;
+          hasUnresolvedCurrentTask &&
+          Date.now() - taskDetailRefreshAtRef.current >= detailRefreshInterval;
         if (completedCurrentTask || shouldRefreshActiveDetail) {
           const detail = await getAIAppConversation(appId, conversationId);
           if (!active) return;
@@ -809,6 +926,7 @@ export default function AIAppConversationPage() {
         taskStatusesRef.current = new Map(result.list.map((task) => [task.id, task.status]));
         setTasks(result.list);
         setApprovals(result.approvals);
+        setClarifications(result.clarifications || []);
       } catch {
         // 任务列表短暂不可用时保留当前会话，不打断用户输入。
       } finally {
@@ -832,7 +950,14 @@ export default function AIAppConversationPage() {
       return;
     const viewport = conversationScrollRef.current;
     if (!viewport) return;
-    const frame = window.requestAnimationFrame(() => scrollConversationToLatest(viewport));
+    if (!followingConversationRef.current) {
+      setShowScrollToLatest(true);
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      scrollConversationToLatest(viewport);
+      setShowScrollToLatest(false);
+    });
     return () => window.cancelAnimationFrame(frame);
   }, [conversationActivityKey, conversationId, conversationLoading, initialLoading]);
 
@@ -846,6 +971,10 @@ export default function AIAppConversationPage() {
     if (!hasLoadedConversationImage) return;
     const viewport = conversationScrollRef.current;
     if (!viewport) return;
+    if (!followingConversationRef.current) {
+      setShowScrollToLatest(true);
+      return;
+    }
     const frame = window.requestAnimationFrame(() => scrollConversationToLatest(viewport));
     return () => window.cancelAnimationFrame(frame);
   }, [conversationId, conversationLoading, imageGenerations, initialLoading, messages]);
@@ -1008,13 +1137,23 @@ export default function AIAppConversationPage() {
       mimeType: file.type,
       previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
       status: 'uploading' as const,
+      progress: 0,
       source: file,
     }));
     setUploadItems((items) => [...items, ...uploadBatch]);
     for (const upload of uploadBatch) {
       try {
         const file = upload.source;
-        const result = await uploadAIAppConversationAttachment(appId, conversationId, file);
+        const result = await uploadAIAppConversationAttachment(
+          appId,
+          conversationId,
+          file,
+          (progress) => {
+            setUploadItems((items) =>
+              items.map((item) => (item.id === upload.id ? { ...item, progress } : item)),
+            );
+          },
+        );
         setAttachments((items) => [...items, result.attachment]);
         if (upload.previewUrl) {
           attachmentPreviewUrlsRef.current = {
@@ -1102,6 +1241,124 @@ export default function AIAppConversationPage() {
     }
   };
 
+  const resolveClarification = async (
+    task: AIAppTask,
+    clarification: AIAppTaskClarification,
+    decision: 'answer' | 'skip' | 'decline',
+    answer = '',
+    attachmentIds: string[] = [],
+  ) => {
+    if (!appId || resolvingClarificationRef.current) return;
+    resolvingClarificationRef.current = true;
+    const targetConversationId = task.conversationId;
+    const trimmedAnswer = answer.trim();
+    const attachedNames = attachments
+      .filter((attachment) => attachmentIds.includes(attachment.id))
+      .map((attachment) => attachment.name);
+    const optimisticMessage =
+      decision === 'answer'
+        ? {
+            id: `local-user-clarification-${crypto.randomUUID()}`,
+            conversationId: targetConversationId,
+            runId: task.runId,
+            role: 'user' as const,
+            content:
+              trimmedAnswer ||
+              (attachedNames.length > 0 ? `已补充文件：${attachedNames.join('、')}` : ''),
+            referenceImageCount: 0,
+            imageGenerationIds: '[]',
+            createdAt: new Date().toISOString(),
+          }
+        : null;
+    try {
+      followingConversationRef.current = true;
+      setShowScrollToLatest(false);
+      setResolvingClarification({
+        taskId: task.id,
+        clarificationId: clarification.id,
+        decision,
+        answer: trimmedAnswer,
+      });
+      if (optimisticMessage) {
+        setMessages((items) => [...items, optimisticMessage]);
+        setAttachments((items) =>
+          items.map((attachment) =>
+            attachmentIds.includes(attachment.id)
+              ? { ...attachment, messageId: optimisticMessage.id }
+              : attachment,
+          ),
+        );
+      }
+      const result = await decideAIAppTaskClarification(appId, task.id, clarification.id, {
+        decision,
+        answer: trimmedAnswer,
+        attachmentIds,
+      });
+      if (activeConversationIdRef.current !== targetConversationId) return;
+      setClarifications((items) =>
+        items.map((item) => (item.id === clarification.id ? result.clarification : item)),
+      );
+      setTasks((items) => items.map((item) => (item.id === task.id ? result.task : item)));
+      taskStatusesRef.current.set(task.id, result.task.status);
+      if (result.userMessage?.id) {
+        setMessages((items) =>
+          optimisticMessage
+            ? replaceOptimisticConversationMessage(
+                items,
+                optimisticMessage.id,
+                result.userMessage as AIAppConversationMessage,
+              )
+            : [...items, result.userMessage as AIAppConversationMessage],
+        );
+        setAttachments((items) =>
+          items.map((attachment) =>
+            attachmentIds.includes(attachment.id)
+              ? { ...attachment, messageId: result.userMessage?.id }
+              : attachment,
+          ),
+        );
+      }
+      if (decision === 'answer') toast.success('已补充，任务将继续执行');
+      else if (decision === 'skip') toast.success('将使用默认值继续执行');
+      else toast.success('已停止当前任务');
+    } catch (error) {
+      if (optimisticMessage) {
+        setMessages((items) => items.filter((item) => item.id !== optimisticMessage.id));
+        setAttachments((items) =>
+          items.map((attachment) =>
+            attachmentIds.includes(attachment.id) && attachment.messageId === optimisticMessage.id
+              ? { ...attachment, messageId: undefined }
+              : attachment,
+          ),
+        );
+      }
+      toast.error(getAPIErrorMessage(error, '提交回答失败'));
+      throw error;
+    } finally {
+      resolvingClarificationRef.current = false;
+      setResolvingClarification(null);
+    }
+  };
+
+  const retryTask = async (task: AIAppTask) => {
+    if (!appId || retryingTaskId) return;
+    try {
+      setRetryingTaskId(task.id);
+      const result = await retryAIAppTask(appId, task.id);
+      setTasks((items) => [result.task, ...items.filter((item) => item.id !== result.task.id)]);
+      setMessages((items) =>
+        retargetConversationMessageRun(items, result.task.userMessageId, result.run.id),
+      );
+      taskStatusesRef.current.set(result.task.id, result.task.status);
+      upsertRun(result.run);
+      toast.success('已重新开始执行');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '重试失败'));
+    } finally {
+      setRetryingTaskId(null);
+    }
+  };
+
   const saveGenerationToResources = async (visibility: SaveResourceVisibility) => {
     if (!saveTarget) return;
     try {
@@ -1123,13 +1380,24 @@ export default function AIAppConversationPage() {
   const send = async (contentOverride?: string) => {
     const targetConversationId = conversationId;
     const content = (contentOverride ?? input).trim();
-    if (
-      !appId ||
-      !targetConversationId ||
-      (!content && pendingAttachments.length === 0) ||
-      !textModelId
-    )
+    if (!appId || !targetConversationId || (!content && pendingAttachments.length === 0)) return;
+    if (pendingClarification) {
+      const attachmentIds = pendingAttachments.map((attachment) => attachment.id);
+      setInput('');
+      try {
+        await resolveClarification(
+          pendingClarification.task,
+          pendingClarification.clarification,
+          'answer',
+          content,
+          attachmentIds,
+        );
+      } catch {
+        setInput(content);
+      }
       return;
+    }
+    if (!textModelId) return;
     const currentReferenceImages: Array<{ dataUrl: string }> = [];
     const useBackgroundTask = true;
     const currentAttachments = pendingAttachments;
@@ -1152,6 +1420,8 @@ export default function AIAppConversationPage() {
       createdAt: new Date().toISOString(),
     };
     const pendingRunId = `pending:${targetConversationId}:${localUserMessage.id}`;
+    followingConversationRef.current = true;
+    setShowScrollToLatest(false);
     setInput('');
     setActiveSkillIds([]);
     setMessages((items) => [...items, localUserMessage]);
@@ -1401,6 +1671,7 @@ export default function AIAppConversationPage() {
           input: content,
           output: '',
           errorCode: 'RUN_CANCELLED',
+          knowledgeStatus: 'not_used',
           durationMs: 0,
           createdAt: new Date().toISOString(),
         };
@@ -1432,47 +1703,161 @@ export default function AIAppConversationPage() {
   }
   if (!conversation || !appId) return null;
 
-  const renderConversationTask = (task: AIAppTask) => (
-    <div key={task.id} className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3">
-      <AgentAvatar name={app?.name || '智能体'} src={app?.avatarUrl} />
+  const renderConversationClarification = (clarification: AIAppTaskClarification) => {
+    const task = tasks.find((item) => item.id === clarification.taskId);
+    const optimisticResolution =
+      resolvingClarification?.clarificationId === clarification.id ? resolvingClarification : null;
+    const presentedClarification: AIAppTaskClarification = optimisticResolution
+      ? {
+          ...clarification,
+          status:
+            optimisticResolution.decision === 'answer'
+              ? 'answered'
+              : optimisticResolution.decision === 'skip'
+                ? 'skipped'
+                : 'declined',
+          decision: optimisticResolution.decision,
+          answer: optimisticResolution.answer,
+        }
+      : clarification;
+    const canResolve =
+      clarification.status === 'pending' &&
+      task?.status === 'needs_input' &&
+      !resolvingClarification;
+
+    return (
       <div
-        className={cn(
-          'col-start-2 min-w-0 w-full max-w-[52rem]',
-          task.status === 'running' && 'hidden',
-        )}
+        key={clarification.id}
+        className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3"
+        data-clarification-id={clarification.id}
+        data-clarification-status={presentedClarification.status}
       >
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Clock3
-            className={cn('size-4 text-primary', task.status === 'running' && 'animate-spin')}
+        <AgentAvatar name={app?.name || '智能体'} src={app?.avatarUrl} />
+        <div className="col-start-2 min-w-0 w-full max-w-[50rem]">
+          <ConversationToolCard
+            card={toClarificationToolCard(presentedClarification)}
+            onSuggestion={
+              canResolve && task
+                ? (_, value) => void resolveClarification(task, clarification, 'answer', value)
+                : undefined
+            }
+            onClarificationDecision={
+              canResolve && task
+                ? (_, decision) => void resolveClarification(task, clarification, decision)
+                : undefined
+            }
           />
-          {task.status === 'waiting_approval' ? '等待你的确认' : '正在后台执行'}
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {task.statusMessage || '可以离开当前页面，任务会继续运行。'}
-        </p>
       </div>
-      {task.status === 'running' ? (
-        <div className="col-start-2 min-w-0 w-full max-w-[52rem]">
-          <AssistantActiveExecution
-            startedAt={new Date(task.startedAt || task.createdAt).getTime()}
-            reply={task.partialOutput}
-            tools={toolTraces
-              .filter((trace) => trace.runId === task.runId)
-              .map((trace) => ({ ...trace, narration: trace.narration || '' }))}
-          >
-            {task.statusMessage.includes('图片') ? (
-              <div className="w-[min(100%,20rem)] pt-1">
-                <GenerationPreview compact stage="generating" />
+    );
+  };
+
+  const renderConversationTask = (task: AIAppTask) => {
+    const taskRun = runsById.get(task.runId) ?? null;
+    const phase = resolveConversationTurnPhase({
+      isLocalPending: false,
+      creatingTask: false,
+      hasAssistantMessage: hasAssistantMessageForRun(messages, task.runId),
+      taskStatus: task.status,
+      queuePosition: task.queuePosition,
+      runStatus: taskRun?.status,
+      resumingClarification: resolvingClarification?.taskId === task.id,
+    });
+    if (phase === 'queued' || phase === 'complete' || phase === 'idle' || phase === 'needs_input') {
+      return null;
+    }
+
+    const taskTools = toolTraces
+      .filter((trace) => trace.runId === task.runId)
+      .map((trace) => ({ ...trace, narration: trace.narration || '' }));
+    const pendingApprovals = approvals.filter(
+      (approval) => approval.taskId === task.id && approval.status === 'pending',
+    );
+
+    return (
+      <div
+        key={task.id}
+        className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3"
+        data-assistant-turn={phase}
+      >
+        <AgentAvatar name={app?.name || '智能体'} src={app?.avatarUrl} />
+        <div className="col-start-2 min-w-0 w-full max-w-[50rem]">
+          {phase === 'starting' ? (
+            <AssistantActiveExecution
+              startedAt={new Date(task.startedAt || task.createdAt).getTime()}
+              reply=""
+              tools={[]}
+              phase="thinking"
+            />
+          ) : null}
+          {phase === 'running' ? (
+            task.statusMessage.includes('转换') ? (
+              <ConversationToolCard
+                card={{
+                  type: 'tool_progress',
+                  toolName: task.statusMessage.includes('文档')
+                    ? 'document.convert'
+                    : 'image.convert',
+                  title: '正在转换文件',
+                  statusMessage: task.statusMessage,
+                  progress: task.progress,
+                  cancellable: true,
+                }}
+                onCancel={() => void cancelTask(task)}
+              />
+            ) : (
+              <AssistantActiveExecution
+                startedAt={new Date(task.startedAt || task.createdAt).getTime()}
+                reply={task.partialOutput}
+                tools={taskTools}
+              >
+                {task.statusMessage.includes('图片') ? (
+                  <div className="w-[min(100%,20rem)] pt-1">
+                    <GenerationPreview compact stage="generating" />
+                  </div>
+                ) : null}
+              </AssistantActiveExecution>
+            )
+          ) : null}
+          {phase === 'finalizing' ? (
+            <AssistantActiveExecution
+              startedAt={new Date(task.startedAt || task.createdAt).getTime()}
+              reply={task.partialOutput || taskRun?.output || ''}
+              tools={taskTools}
+              phase="finalizing"
+            />
+          ) : null}
+          {phase === 'failed' || phase === 'cancelled' ? (
+            <AssistantFailureState
+              agentName={app?.name || '智能体'}
+              avatarUrl={app?.avatarUrl}
+              cancelled={phase === 'cancelled'}
+              message={taskRun ? formatRunFailure(taskRun) : task.statusMessage || '任务暂时未完成'}
+              showAvatar={false}
+              onRetry={
+                phase === 'failed' && isRetryableTaskFailureCode(task.errorCode)
+                  ? () => void retryTask(task)
+                  : undefined
+              }
+              retrying={retryingTaskId === task.id}
+            />
+          ) : null}
+          {shouldShowTaskWaitingSummary(phase, pendingApprovals.length > 0) ? (
+            <div className="mb-3 rounded-xl bg-muted/40 px-3.5 py-3 ring-1 ring-border/60">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Clock3 className="size-4 text-primary" />
+                等待你的确认
               </div>
-            ) : null}
-          </AssistantActiveExecution>
-        </div>
-      ) : null}
-      <div className="col-start-2 min-w-0 w-full max-w-[52rem]">
-        {approvals
-          .filter((approval) => approval.taskId === task.id && approval.status === 'pending')
-          .map((approval) => (
-            <div key={approval.id} className="mt-3 rounded-xl border border-border bg-muted/40 p-3">
+              <p className="mt-1.5 text-xs leading-5 text-muted-foreground text-pretty">
+                {task.statusMessage || '完成后会从这里继续。'}
+              </p>
+            </div>
+          ) : null}
+          {pendingApprovals.map((approval) => (
+            <div
+              key={approval.id}
+              className="mt-3 rounded-xl bg-card p-4 shadow-xs ring-1 ring-border/70"
+            >
               <div className="flex items-center gap-2 text-sm font-medium">
                 <span>{approval.toolName}</span>
                 <Badge variant="outline">
@@ -1483,7 +1868,9 @@ export default function AIAppConversationPage() {
                       : '低风险'}
                 </Badge>
               </div>
-              <p className="mt-2 text-sm text-muted-foreground">{approval.summary}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground text-pretty">
+                {approval.summary}
+              </p>
               <div className="mt-3 flex gap-2">
                 <Button
                   size="sm"
@@ -1503,19 +1890,29 @@ export default function AIAppConversationPage() {
               </div>
             </div>
           ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const conversationComposer = (className?: string) => (
     <ConversationComposer
       value={input}
       onValueChange={setInput}
       onSubmit={() => void send()}
+      disabled={Boolean(resolvingClarification)}
       onStop={currentExecutingTask ? () => void cancelTask(currentExecutingTask) : undefined}
       stopDisabled={cancellingTaskId === currentExecutingTask?.id}
-      canSubmit={Boolean(textModelId) && uploadItems.length === 0}
-      placeholder="继续对话，粘贴或附加文件，也可以只发送附件"
+      canSubmit={
+        !resolvingClarification &&
+        (Boolean(textModelId) || Boolean(pendingClarification)) &&
+        uploadItems.length === 0
+      }
+      placeholder={
+        pendingClarification
+          ? '直接回答上面的问题，也可以附加所需文件'
+          : '继续对话，粘贴或附加文件，也可以只发送附件'
+      }
       skills={boundSkills}
       activeSkillId={activeSkillIds[0]}
       onActiveSkillChange={(skillId) => setActiveSkillIds(skillId ? [skillId] : [])}
@@ -1536,15 +1933,15 @@ export default function AIAppConversationPage() {
           </span>
         </>
       }
-      className={cn('max-w-[60rem]', className)}
+      className={cn('max-w-[52rem]', className)}
       revealAttribute="composer"
       presentation="workspace"
     />
   );
 
   return (
-    <div className="flex h-screen min-h-0 flex-col bg-background">
-      <header className="flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-border/70 px-4 sm:px-6">
+    <div className="flex h-screen min-h-0 flex-col bg-muted/20 antialiased">
+      <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-background px-3 sm:px-4">
         <div className="flex min-w-0 items-center gap-2">
           <Button
             variant="ghost"
@@ -1555,8 +1952,8 @@ export default function AIAppConversationPage() {
           >
             <ArrowLeft />
           </Button>
-          <AgentAvatar name={app?.name || '智能体'} src={app?.avatarUrl} className="size-7" />
-          <h1 className="truncate text-sm font-semibold tracking-tight">
+          <AgentAvatar name={app?.name || '智能体'} src={app?.avatarUrl} className="size-8" />
+          <h1 className="truncate text-sm font-semibold tracking-[-0.01em]">
             {app?.name || conversation.title}
           </h1>
           <span className="hidden items-center gap-1.5 text-xs text-muted-foreground md:flex">
@@ -1603,9 +2000,9 @@ export default function AIAppConversationPage() {
           </Button>
         </div>
       </header>
-      <div className="relative grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[18rem_minmax(0,1fr)]">
-        <aside className="hidden min-h-0 flex-col border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground lg:flex">
-          <div className="flex items-center justify-between gap-3 px-1">
+      <div className="relative grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[17rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)]">
+        <aside className="hidden min-h-0 flex-col border-r border-sidebar-border bg-sidebar px-3 py-3 text-sidebar-foreground lg:flex">
+          <div className="flex items-center justify-between gap-3 px-1.5">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold tracking-tight">会话历史</p>
               <p className="mt-0.5 text-xs text-muted-foreground">{conversations.length} 个会话</p>
@@ -1621,17 +2018,17 @@ export default function AIAppConversationPage() {
               <MessageCirclePlus />
             </Button>
           </div>
-          <div className="relative mt-5">
+          <div className="relative mt-3">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={conversationQuery}
               onChange={(event) => updateConversationQuery(event.target.value)}
               placeholder="搜索会话"
               aria-label="搜索会话"
-              className="h-9 pl-9 text-xs"
+              className="h-10 rounded-lg bg-sidebar-accent/40 pl-9 text-xs"
             />
           </div>
-          <div className="mt-5 flex items-center justify-between px-2">
+          <div className="mt-4 flex items-center justify-between px-2">
             <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               最近
             </p>
@@ -1647,35 +2044,27 @@ export default function AIAppConversationPage() {
             ) : null}
           </div>
           <ScrollArea className="mt-2 min-h-36 flex-1">
-            <div className="flex flex-col gap-2 pr-2">
+            <div className="flex flex-col gap-1 pr-2">
               {visibleConversations.map((item) => (
                 <div
                   key={item.id}
                   className={cn(
-                    'group relative flex min-h-[4.25rem] items-center rounded-xl border border-transparent transition-[background-color,border-color,box-shadow] hover:border-sidebar-border hover:bg-sidebar-accent/70 focus-within:border-sidebar-ring/30 focus-within:bg-sidebar-accent',
+                    'group relative flex min-h-[3.75rem] items-center rounded-lg border border-transparent transition-[background-color,border-color,box-shadow] duration-150 hover:border-sidebar-border hover:bg-sidebar-accent/70 focus-within:border-sidebar-ring/30 focus-within:bg-sidebar-accent',
                     item.id === conversationId &&
-                      'border-primary/20 bg-primary/5 text-sidebar-accent-foreground shadow-xs before:absolute before:inset-y-3 before:left-0 before:w-0.5 before:rounded-r-full before:bg-primary',
+                      'border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground shadow-xs before:absolute before:inset-y-3 before:left-0 before:w-0.5 before:rounded-r-full before:bg-primary',
                   )}
                 >
                   <ConversationDeletingOverlay active={deletingConversationId === item.id} />
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto min-w-0 flex-1 justify-start gap-3 bg-transparent px-3 py-2.5 text-left font-normal hover:bg-transparent"
+                    className="h-auto min-w-0 flex-1 justify-start bg-transparent px-3 py-2.5 text-left font-normal hover:bg-transparent"
                     onClick={() => {
                       if (deletingConversationId !== item.id)
                         navigate(`/workbench/apps/${appId}/conversations/${item.id}`);
                     }}
                     aria-current={item.id === conversationId ? 'page' : undefined}
                   >
-                    <span
-                      className={cn(
-                        'flex size-9 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground ring-1 ring-border/70 transition-colors',
-                        item.id === conversationId && 'bg-primary/10 text-primary ring-primary/20',
-                      )}
-                    >
-                      <MessageSquareText className="size-4" />
-                    </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex min-w-0 items-center gap-1.5">
                         <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[-0.01em]">
@@ -1706,7 +2095,7 @@ export default function AIAppConversationPage() {
                           size="icon-xs"
                           variant="ghost"
                           className={cn(
-                            'mr-1 shrink-0 opacity-45 transition-opacity hover:opacity-100 focus-visible:opacity-100',
+                            'mr-1 size-10 shrink-0 opacity-45 transition-opacity hover:opacity-100 focus-visible:opacity-100',
                             item.id === conversationId && 'opacity-70',
                           )}
                           aria-label="会话操作"
@@ -1759,7 +2148,7 @@ export default function AIAppConversationPage() {
             </div>
           </ScrollArea>
           <Separator className="my-3 bg-sidebar-border" />
-          <div className="flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar-accent/60 p-3">
+          <div className="flex items-center gap-3 rounded-lg bg-sidebar-accent/50 px-3 py-2.5 ring-1 ring-sidebar-border/80">
             <AgentAvatar
               name={app?.name || '智能体'}
               src={app?.avatarUrl}
@@ -1767,12 +2156,14 @@ export default function AIAppConversationPage() {
             />
             <div className="min-w-0">
               <p className="truncate text-xs font-medium">{app?.name || '当前智能体'}</p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">仅自己可见</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {app?.status === 'published' ? '已发布' : '仅自己可见'}
+              </p>
             </div>
           </div>
         </aside>
         <section
-          className="relative flex min-h-0 flex-col bg-background"
+          className="relative flex min-h-0 flex-col bg-muted/20"
           aria-busy={conversationLoading}
         >
           {conversationLoading ? (
@@ -1781,33 +2172,38 @@ export default function AIAppConversationPage() {
             <>
               <div
                 ref={conversationScrollRef}
-                className="min-h-0 flex-1 overflow-y-auto"
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
                 data-conversation-scroll-viewport
+                onScroll={(event) => {
+                  const nearLatest = isConversationNearLatest(event.currentTarget);
+                  followingConversationRef.current = nearLatest;
+                  if (nearLatest) setShowScrollToLatest(false);
+                }}
               >
-                <div className="mx-auto flex min-h-full w-full max-w-[64rem] flex-col gap-7 px-6 py-8 sm:px-8 lg:py-10">
+                <div className="mx-auto flex min-h-full w-full max-w-[58rem] flex-col gap-8 px-4 py-6 sm:px-6 lg:py-8">
                   {messages.length === 0 ? (
                     <div
                       ref={welcomeRef}
-                      className="flex w-full max-w-[52rem] flex-1 flex-col items-center justify-center py-10 text-center sm:py-14"
+                      className="mx-auto flex w-full max-w-[52rem] flex-1 flex-col items-center justify-center py-10 text-center sm:py-14"
                     >
                       <div className="max-w-2xl" data-agent-reveal="intro">
                         <AgentAvatar
                           name={app?.name || '智能体'}
                           src={app?.avatarUrl}
-                          className="mx-auto size-20 border-4 border-background shadow-sm"
+                          className="mx-auto size-16 shadow-sm ring-4 ring-background"
                         />
-                        <h2 className="mt-5 text-2xl font-semibold tracking-tight sm:text-3xl">
+                        <h2 className="mt-5 text-balance text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">
                           让 {app?.name || '智能伙伴'} 帮你做点什么？
                         </h2>
                       </div>
                       <div
-                        className="relative mt-10 w-full max-w-[48rem]"
+                        className="relative mt-8 w-full max-w-[48rem]"
                         data-agent-reveal="composer"
                       >
                         {conversationComposer()}
                       </div>
                       <div
-                        className="mt-8 flex max-w-[48rem] flex-wrap justify-center gap-2"
+                        className="mt-6 flex max-w-[48rem] flex-wrap justify-center gap-2"
                         data-agent-reveal="quick-start"
                       >
                         {boundSkills.length > 0
@@ -1845,6 +2241,16 @@ export default function AIAppConversationPage() {
                       const messageTraces = run
                         ? toolTraces.filter((trace) => trace.runId === run.id)
                         : [];
+                      const messageToolErrors = messageTraces
+                        .map((trace) => ({ trace, card: toToolErrorCard(trace) }))
+                        .filter(
+                          (
+                            item,
+                          ): item is {
+                            trace: AIAppConversationToolTrace;
+                            card: NonNullable<typeof item.card>;
+                          } => item.card !== null,
+                        );
                       const messageReferences = run ? referencesByRunId[run.id] || [] : [];
                       const messageAttachments = attachments.filter(
                         (attachment) => attachment.messageId === message.id,
@@ -1862,7 +2268,10 @@ export default function AIAppConversationPage() {
                         messageTraces,
                         visibleMessageReferences,
                       );
-                      const failedRun = isAssistantRunFailure(run) ? run : null;
+                      const failedRun =
+                        isAssistantRunFailure(run) && isLastMessageForRun(orderedMessages, index)
+                          ? run
+                          : null;
                       const messageTask = message.runId
                         ? tasksByRunId.get(message.runId)
                         : undefined;
@@ -1891,116 +2300,94 @@ export default function AIAppConversationPage() {
                           queuePosition: messageTask?.queuePosition,
                           hasEarlierPendingMessage,
                         });
-                      const renderedMessageTask = message.runId
-                        ? renderedTasksByRunId.get(message.runId)
-                        : undefined;
-                      const showStartingIndicator =
-                        message.role === 'user' &&
-                        !hasEarlierPendingMessage &&
-                        !renderedMessageTask &&
-                        ((message.id.startsWith('local-user-') && creatingTask) ||
-                          (messageTask?.status === 'queued' &&
-                            (messageTask.queuePosition ?? 0) === 0));
+                      const renderedMessageTask =
+                        message.runId && isLastUserMessageForRun(orderedMessages, index)
+                          ? renderedTasksByRunId.get(message.runId)
+                          : undefined;
+                      const showStartingIndicator = shouldShowMessageStartingIndicator({
+                        isUserMessage: message.role === 'user',
+                        isLocalPending: message.id.startsWith('local-user-'),
+                        creatingTask,
+                        taskStatus: messageTask?.status,
+                        queuePosition: messageTask?.queuePosition,
+                        hasEarlierPendingMessage,
+                        hasRenderedTaskForRun: Boolean(
+                          message.runId && renderedTasksByRunId.has(message.runId),
+                        ),
+                      });
+                      const messageClarifications = clarificationsByMessageId.get(message.id) ?? [];
                       return (
                         <Fragment key={message.id}>
                           <div className={cn(message.role === 'assistant' && 'space-y-3')}>
-                            <div
-                              className={cn(
-                                'flex items-start gap-3',
-                                message.role === 'user' && 'flex-row-reverse',
-                              )}
-                            >
-                              {message.role === 'user' ? (
-                                <Avatar className="size-8 shrink-0 ring-1 ring-border/70">
-                                  {currentUser?.avatar ? (
-                                    <AvatarImage
-                                      src={currentUser.avatar}
-                                      alt={`${currentUser.nickname || currentUser.username || '用户'}的头像`}
-                                      className="object-cover"
-                                    />
-                                  ) : null}
-                                  <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
-                                    {currentUser?.nickname?.trim().slice(0, 1) ||
-                                      currentUser?.username?.trim().slice(0, 1) || (
-                                        <UserRound className="size-4" />
-                                      )}
-                                  </AvatarFallback>
-                                </Avatar>
-                              ) : (
-                                <AgentAvatar name={app?.name || '智能体'} src={app?.avatarUrl} />
-                              )}
-                              <ConversationMessageBubble
-                                role={message.role}
-                                content={message.content}
-                                citations={message.role === 'assistant' ? messageReferences : []}
-                                onCitationClick={() => navigate('/workbench/knowledge')}
-                                createdAt={message.createdAt}
-                                showActions={index === orderedMessages.length - 1}
-                                presentation="workspace"
-                                header={
-                                  message.role === 'user' && messageAttachments.length > 0 ? (
-                                    <div className="flex flex-wrap justify-end gap-2">
-                                      {messageAttachments.map((attachment) => (
-                                        <ConversationAttachmentCard
-                                          key={attachment.id}
-                                          name={attachment.name}
-                                          mimeType={attachment.mimeType}
-                                          sizeBytes={attachment.sizeBytes}
-                                          previewUrl={attachmentPreviewUrls[attachment.id]}
-                                          secondary={new Intl.DateTimeFormat('zh-CN', {
-                                            month: '2-digit',
-                                            day: '2-digit',
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                          }).format(new Date(attachment.createdAt))}
-                                          onOpen={() =>
-                                            void downloadAIAppConversationAttachment(
-                                              appId,
-                                              conversation.id,
-                                              attachment,
-                                            ).catch((error) =>
-                                              toast.error(
-                                                getAPIErrorMessage(error, '下载文件失败'),
-                                              ),
-                                            )
-                                          }
-                                        />
-                                      ))}
-                                    </div>
-                                  ) : message.role === 'assistant' && hasExecutionDetails ? (
-                                    <AssistantExecutionHeader
-                                      run={run}
-                                      traces={messageTraces}
-                                      references={messageReferences}
-                                      onReferenceOpen={() => navigate('/workbench/knowledge')}
-                                    />
-                                  ) : undefined
-                                }
-                                className={
-                                  message.role === 'assistant'
-                                    ? '!max-w-[min(94%,52rem)]'
-                                    : '!max-w-[min(82%,40rem)]'
-                                }
-                              >
-                                {showWaitingIndicator ? (
-                                  <div
-                                    className={cn(
-                                      'flex justify-end',
-                                      message.content.trim() && 'mt-2',
-                                    )}
-                                  >
-                                    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-background/80 px-2 py-1 text-xs leading-4 text-muted-foreground shadow-sm ring-1 ring-border/60">
-                                      <AgentAvatar
-                                        name={app?.name || '智能体'}
-                                        src={app?.avatarUrl}
-                                        className="size-4"
-                                      />
-                                      <span className="truncate">等待 {app?.name || '智能体'}</span>
+                            <ConversationMessage
+                              messageRole={message.role}
+                              content={message.content}
+                              user={{ name: currentUserName, avatarUrl: currentUser?.avatar }}
+                              assistant={{
+                                name: app?.name || '智能体',
+                                avatarUrl: app?.avatarUrl,
+                              }}
+                              attachments={
+                                message.role === 'user'
+                                  ? messageAttachments.map((attachment) => ({
+                                      id: attachment.id,
+                                      name: attachment.name,
+                                      mimeType: attachment.mimeType,
+                                      sizeBytes: attachment.sizeBytes,
+                                      previewUrl: attachmentPreviewUrls[attachment.id],
+                                      secondary: new Intl.DateTimeFormat('zh-CN', {
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      }).format(new Date(attachment.createdAt)),
+                                      onOpen: () =>
+                                        void downloadAIAppConversationAttachment(
+                                          appId,
+                                          conversation.id,
+                                          attachment,
+                                        ).catch((error) =>
+                                          toast.error(getAPIErrorMessage(error, '下载文件失败')),
+                                        ),
+                                    }))
+                                  : []
+                              }
+                              citations={message.role === 'assistant' ? messageReferences : []}
+                              onCitationClick={() => navigate('/workbench/knowledge')}
+                              createdAt={message.createdAt}
+                              showActions={index === orderedMessages.length - 1}
+                              presentation="workspace"
+                              status={
+                                showWaitingIndicator ? (
+                                  <>
+                                    <Clock3 className="size-3.5" aria-hidden="true" />
+                                    <span>
+                                      {(messageTask?.queuePosition ?? 0) > 0
+                                        ? `排队中 · 前面还有 ${messageTask?.queuePosition} 条`
+                                        : `排队中 · 等待 ${app?.name || '智能体'}`}
                                     </span>
-                                  </div>
-                                ) : null}
-                              </ConversationMessageBubble>
-                            </div>
+                                  </>
+                                ) : undefined
+                              }
+                              header={
+                                message.role === 'assistant' && hasExecutionDetails ? (
+                                  <AssistantExecutionHeader
+                                    run={run}
+                                    traces={messageTraces}
+                                    references={messageReferences}
+                                    onReferenceOpen={() => navigate('/workbench/knowledge')}
+                                  />
+                                ) : undefined
+                              }
+                              className={
+                                message.role === 'assistant'
+                                  ? '!max-w-[min(94%,50rem)]'
+                                  : '!max-w-[min(82%,38rem)]'
+                              }
+                            />
+                            {message.role === 'assistant' && run ? (
+                              <AIKnowledgeFallbackNotice run={run} />
+                            ) : null}
                             {message.role === 'assistant'
                               ? parseImageGenerationIDs(message.imageGenerationIds).map(
                                   (generationID) => {
@@ -2066,22 +2453,40 @@ export default function AIAppConversationPage() {
                                 )
                               : null}
                             {message.role === 'assistant' && messageArtifacts.length > 0 ? (
-                              <div className="ml-11 grid w-[calc(100%-2.75rem)] max-w-[42rem] gap-2 sm:grid-cols-2">
+                              <div className="ml-11 grid w-[calc(100%-2.75rem)] max-w-[42rem] gap-2">
                                 {messageArtifacts.map((artifact) => (
-                                  <ConversationAttachmentCard
+                                  <ConversationToolCard
                                     key={artifact.id}
-                                    name={artifact.fileName}
-                                    mimeType={artifact.contentType}
-                                    sizeBytes={artifact.sizeBytes}
-                                    secondary="成果文件"
-                                    onOpen={() =>
-                                      window.open(artifact.url, '_blank', 'noopener,noreferrer')
+                                    card={toArtifactToolCard(artifact)}
+                                    onOpenArtifact={() =>
+                                      void getAIAppArtifactDownloadURL(appId, artifact.id)
+                                        .then(({ url }) =>
+                                          window.open(url, '_blank', 'noopener,noreferrer'),
+                                        )
+                                        .catch((error) =>
+                                          toast.error(getAPIErrorMessage(error, '下载文件失败')),
+                                        )
                                     }
                                   />
                                 ))}
                               </div>
                             ) : null}
-                            {failedRun ? (
+                            {message.role === 'assistant' && messageToolErrors.length > 0 ? (
+                              <div className="ml-11 grid w-[calc(100%-2.75rem)] max-w-[42rem] gap-2">
+                                {messageToolErrors.map(({ trace, card }) => (
+                                  <ConversationToolCard
+                                    key={trace.id}
+                                    card={card}
+                                    onRetry={
+                                      card.retryable && messageTask
+                                        ? () => void retryTask(messageTask)
+                                        : undefined
+                                    }
+                                  />
+                                ))}
+                              </div>
+                            ) : null}
+                            {failedRun && !messageTask ? (
                               <AssistantFailureState
                                 agentName={app?.name || '智能体'}
                                 avatarUrl={app?.avatarUrl}
@@ -2090,6 +2495,7 @@ export default function AIAppConversationPage() {
                               />
                             ) : null}
                           </div>
+                          {messageClarifications.map(renderConversationClarification)}
                           {renderedMessageTask ? (
                             renderConversationTask(renderedMessageTask)
                           ) : showStartingIndicator ? (
@@ -2109,8 +2515,28 @@ export default function AIAppConversationPage() {
                 </div>
               </div>
               {messages.length > 0 ? (
-                <div className="shrink-0 bg-background px-5 py-3 sm:px-8 sm:py-4">
-                  <div className="mx-auto w-full max-w-[60rem]">{conversationComposer()}</div>
+                <div className="shrink-0 border-t border-border/50 bg-background px-4 py-3 sm:px-6 sm:py-4">
+                  <div className="relative mx-auto w-full max-w-[52rem]">
+                    {showScrollToLatest ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-lg"
+                        className="absolute -top-14 left-1/2 z-10 -translate-x-1/2 rounded-full bg-background shadow-md transition-transform duration-150 ease-out active:scale-[0.96]"
+                        aria-label="回到最新消息"
+                        title="回到最新消息"
+                        onClick={() => {
+                          followingConversationRef.current = true;
+                          setShowScrollToLatest(false);
+                          const viewport = conversationScrollRef.current;
+                          if (viewport) scrollConversationToLatest(viewport);
+                        }}
+                      >
+                        <ChevronDown />
+                      </Button>
+                    ) : null}
+                    {conversationComposer()}
+                  </div>
                 </div>
               ) : null}
             </>

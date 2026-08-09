@@ -65,6 +65,8 @@ describe('AI app conversation execution details', () => {
     );
     expect(formatAssistantToolAction('content.search')).toBe('搜索内容');
     expect(formatAssistantToolAction('image.generate')).toBe('生成图片');
+    expect(formatAssistantToolAction('image.convert')).toBe('转换图片');
+    expect(formatAssistantToolAction('document.convert')).toBe('转换文档');
     expect(formatAssistantToolAction('custom.tool')).toBe('custom.tool');
   });
 

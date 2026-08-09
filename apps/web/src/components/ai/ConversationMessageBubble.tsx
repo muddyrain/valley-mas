@@ -6,13 +6,14 @@ import { cn } from '@/lib/utils';
 
 export type ConversationMessageRole = 'user' | 'assistant';
 
-interface ConversationMessageBubbleProps {
+export interface ConversationMessageBubbleProps {
   role: ConversationMessageRole;
   content: string;
   createdAt?: string;
   children?: ReactNode;
   footer?: ReactNode;
   header?: ReactNode;
+  status?: ReactNode;
   showActions?: boolean;
   presentation?: 'bubble' | 'workspace';
   className?: string;
@@ -84,6 +85,7 @@ export function ConversationMessageBubble({
   children,
   footer,
   header,
+  status,
   showActions = false,
   presentation = 'bubble',
   className,
@@ -106,10 +108,10 @@ export function ConversationMessageBubble({
       {header ? <div className="mb-1.5">{header}</div> : null}
       <div
         className={cn(
-          'min-w-0 rounded-xl px-4 py-3 text-sm leading-6 break-words whitespace-pre-wrap [overflow-wrap:anywhere]',
+          'min-w-0 rounded-2xl px-4 py-2.5 text-[15px] leading-7 break-words whitespace-pre-wrap [overflow-wrap:anywhere]',
           isUser && !content.trim() && !children && !footer && 'hidden',
           isWorkspace && !isUser && 'rounded-none bg-transparent px-0 py-0 text-foreground',
-          isWorkspace && isUser && 'rounded-2xl bg-muted/75 text-foreground',
+          isWorkspace && isUser && 'bg-muted/70 text-foreground shadow-xs ring-1 ring-border/45',
           !isWorkspace &&
             (isUser ? 'bg-foreground text-background' : 'bg-muted/75 text-foreground'),
         )}
@@ -122,6 +124,17 @@ export function ConversationMessageBubble({
           </div>
         ) : null}
       </div>
+      {status ? (
+        <div
+          data-slot="conversation-message-status"
+          className={cn(
+            'mt-1.5 flex items-center gap-1.5 px-1 text-xs text-muted-foreground',
+            isUser && 'justify-end',
+          )}
+        >
+          {status}
+        </div>
+      ) : null}
       {createdAt || !isUser ? (
         <div
           className={cn(

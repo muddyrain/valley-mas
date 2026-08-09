@@ -18,6 +18,8 @@ export type ConversationComposerReferenceImage = {
   id: string;
   name: string;
   dataUrl: string;
+  mimeType?: string;
+  sizeBytes?: number;
 };
 
 export type ConversationComposerSkill = {
@@ -33,6 +35,7 @@ export type ConversationComposerFile = {
   mimeType?: string;
   previewUrl?: string;
   status?: ConversationAttachmentStatus;
+  progress?: number;
 };
 
 const readReferenceImage = (file: File) =>
@@ -113,7 +116,7 @@ export function ConversationComposer({
   const isWorkspace = presentation === 'workspace';
   const hasSubmittableContent = Boolean(value.trim() || (files?.length ?? 0) > 0);
 
-  const addReferenceImages = async (files: FileList | null) => {
+  const addReferenceImages = async (files: FileList | File[] | null) => {
     if (!files || !referenceImages || !onReferenceImagesChange) return;
     const candidates = Array.from(files).slice(
       0,
@@ -139,6 +142,8 @@ export function ConversationComposer({
           id: `${file.name}-${Date.now()}-${index}`,
           name: file.name,
           dataUrl: dataUrls[index],
+          mimeType: file.type,
+          sizeBytes: file.size,
         })),
       ]);
     } catch {
@@ -152,9 +157,9 @@ export function ConversationComposer({
     <div className={cn('relative w-full', className)} data-agent-reveal={revealAttribute}>
       <div
         className={cn(
-          'relative rounded-xl border border-border bg-card shadow-sm transition-shadow duration-200 focus-within:shadow-md',
+          'relative rounded-xl border border-border bg-card shadow-sm transition-[border-color,box-shadow] duration-150 focus-within:border-ring/50 focus-within:shadow-md',
           isWorkspace &&
-            'rounded-2xl bg-background shadow-none focus-within:border-primary/40 focus-within:shadow-sm',
+            'rounded-[1.25rem] border-border/80 bg-card shadow-[0_10px_35px_-24px_oklch(0_0_0/0.45)] focus-within:border-ring/60 focus-within:shadow-[0_14px_42px_-24px_oklch(0_0_0/0.5)]',
         )}
       >
         {skillMatch && (visibleSkills.length > 0 || showEmptySkillState) ? (
@@ -235,6 +240,7 @@ export function ConversationComposer({
                 mimeType={file.mimeType}
                 previewUrl={file.previewUrl}
                 status={file.status}
+                progress={file.progress}
                 onRemove={file.status === 'uploading' ? undefined : () => onFileRemove?.(file)}
               />
             ))}
@@ -247,12 +253,18 @@ export function ConversationComposer({
             disabled={disabled}
             className={cn(
               'min-h-24 resize-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0',
-              isWorkspace && 'min-h-[3.5rem] text-sm leading-6',
+              isWorkspace && 'min-h-[3.25rem] max-h-52 text-[15px] leading-6',
             )}
             onChange={(event) => onValueChange(event.target.value)}
             onPaste={(event) => {
               const pastedFiles = Array.from(event.clipboardData.files || []);
-              if (pastedFiles.length === 0 || !onFilesSelected) return;
+              if (pastedFiles.length === 0) return;
+              if (referenceImages && onReferenceImagesChange) {
+                event.preventDefault();
+                void addReferenceImages(pastedFiles);
+                return;
+              }
+              if (!onFilesSelected) return;
               event.preventDefault();
               onFilesSelected(pastedFiles);
             }}
@@ -285,7 +297,7 @@ export function ConversationComposer({
                 />
                 <Button
                   type="button"
-                  size="icon-sm"
+                  size="icon-lg"
                   variant="ghost"
                   disabled={disabled || referenceImages.length >= MAX_REFERENCE_IMAGES}
                   onClick={() => referenceInputRef.current?.click()}
@@ -311,7 +323,7 @@ export function ConversationComposer({
                 />
                 <Button
                   type="button"
-                  size="icon-sm"
+                  size="icon-lg"
                   variant="ghost"
                   disabled={disabled || uploadingFiles || files.length >= 3}
                   onClick={() => fileInputRef.current?.click()}
@@ -326,7 +338,7 @@ export function ConversationComposer({
           </div>
           {onStop && !hasSubmittableContent ? (
             <Button
-              size="icon"
+              size="icon-lg"
               variant="outline"
               onClick={onStop}
               disabled={stopDisabled}
@@ -337,8 +349,8 @@ export function ConversationComposer({
             </Button>
           ) : (
             <Button
-              size="icon"
-              className="rounded-full"
+              size="icon-lg"
+              className="rounded-full transition-transform duration-150 ease-out active:scale-[0.96]"
               onClick={onSubmit}
               disabled={disabled || !hasSubmittableContent || !canSubmit}
               aria-label="发送消息"

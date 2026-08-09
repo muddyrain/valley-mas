@@ -30,6 +30,7 @@ import {
   createAIAppConversation,
   generateAIAppAvatar,
   getAIApp,
+  getAIAppArtifactDownloadURL,
   getAPIErrorMessage,
   listAIAppKnowledgeBases,
   listAIAppOutputs,
@@ -272,6 +273,16 @@ export default function AIAppEditor() {
   const [draftName, setDraftName] = useState('');
   const [draftDescription, setDraftDescription] = useState('');
   const [imagePreview, setImagePreview] = useState<AIAppOutputImage | null>(null);
+
+  const openArtifact = async (artifactId: string) => {
+    if (!appId) return;
+    try {
+      const { url } = await getAIAppArtifactDownloadURL(appId, artifactId);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      toast.error(getAPIErrorMessage(error, '下载文件失败'));
+    }
+  };
 
   useEffect(() => {
     if (!appId) return;
@@ -686,12 +697,11 @@ export default function AIAppEditor() {
                       </div>
                       <div className="grid gap-3 md:grid-cols-2">
                         {artifacts.map((artifact) => (
-                          <a
+                          <button
+                            type="button"
                             key={artifact.id}
-                            href={artifact.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center gap-3 rounded-xl border border-border p-4 hover:bg-muted/50"
+                            className="flex items-center gap-3 rounded-xl border border-border p-4 text-left hover:bg-muted/50"
+                            onClick={() => void openArtifact(artifact.id)}
                           >
                             <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                               <FileText className="size-5 text-muted-foreground" />
@@ -702,7 +712,7 @@ export default function AIAppEditor() {
                                 {formatBytes(artifact.sizeBytes)}
                               </p>
                             </div>
-                          </a>
+                          </button>
                         ))}
                       </div>
                     </section>

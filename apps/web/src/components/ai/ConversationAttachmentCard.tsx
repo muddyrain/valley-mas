@@ -17,6 +17,7 @@ export function ConversationAttachmentCard({
   sizeBytes,
   previewUrl,
   status = 'ready',
+  progress,
   secondary,
   onOpen,
   onRemove,
@@ -27,15 +28,24 @@ export function ConversationAttachmentCard({
   sizeBytes?: number;
   previewUrl?: string;
   status?: ConversationAttachmentStatus;
+  progress?: number;
   secondary?: string;
   onOpen?: () => void;
   onRemove?: () => void;
   className?: string;
 }) {
   const isImage = Boolean(previewUrl || mimeType?.startsWith('image/'));
+  const measuredProgress =
+    typeof progress === 'number' && Number.isFinite(progress)
+      ? Math.min(100, Math.max(0, Math.round(progress)))
+      : undefined;
   const details =
     status === 'uploading'
-      ? '上传中'
+      ? measuredProgress === 100
+        ? '处理中'
+        : measuredProgress === undefined
+          ? '上传中'
+          : `上传中 ${measuredProgress}%`
       : status === 'failed'
         ? '上传失败'
         : secondary || formatAttachmentSize(sizeBytes);
@@ -48,15 +58,23 @@ export function ConversationAttachmentCard({
         className,
       )}
     >
-      {status === 'uploading' ? (
+      {status === 'uploading' && measuredProgress !== undefined ? (
         <div
-          className="pointer-events-none absolute inset-y-0 left-0 w-2/3 animate-pulse bg-muted/80"
-          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-0 bg-muted/80 transition-[width] duration-150"
+          style={{ width: `${measuredProgress}%` }}
+          role="progressbar"
+          aria-label={`${name} 上传进度`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={measuredProgress}
         />
       ) : null}
       <button
         type="button"
-        className="relative flex min-w-0 flex-1 items-center gap-3 p-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset disabled:cursor-default"
+        className={cn(
+          'relative flex min-w-0 flex-1 items-center gap-3 p-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset disabled:cursor-default',
+          onOpen && previewUrl && isImage && 'cursor-zoom-in',
+        )}
         onClick={onOpen}
         disabled={!onOpen}
         aria-label={onOpen ? `打开文件 ${name}` : undefined}

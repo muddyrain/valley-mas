@@ -4,14 +4,22 @@ import {
   getConversationActivityKey,
   hasAssistantMessageForRun,
   hasTerminalConversationRun,
+  isConversationNearLatest,
   isConversationUserMessagePending,
+  isLastMessageForRun,
+  isLastUserMessageForRun,
   mergePersistedConversationMessages,
   modelSupportsImageUnderstanding,
   orderConversationMessages,
   replaceOptimisticConversationMessage,
+  resolveConversationTurnPhase,
+  retargetConversationMessageRun,
   scrollConversationToLatest,
+  shouldRefreshConversationDetail,
   shouldShowActiveConversationTask,
+  shouldShowMessageStartingIndicator,
   shouldShowMessageWaitingIndicator,
+  shouldShowTaskWaitingSummary,
 } from './conversationView';
 
 describe('AI app conversation view', () => {
@@ -25,6 +33,23 @@ describe('AI app conversation view', () => {
     scrollConversationToLatest({ scrollHeight: 1280, scrollTo });
 
     expect(scrollTo).toHaveBeenCalledWith({ top: 1280, behavior: 'auto' });
+  });
+
+  it('only follows new output while the reader is already near the latest message', () => {
+    expect(
+      isConversationNearLatest({
+        scrollHeight: 1400,
+        scrollTop: 760,
+        clientHeight: 600,
+      }),
+    ).toBe(true);
+    expect(
+      isConversationNearLatest({
+        scrollHeight: 1400,
+        scrollTop: 400,
+        clientHeight: 600,
+      }),
+    ).toBe(false);
   });
 
   it('keeps each assistant result with the user turn that created it', () => {
@@ -41,6 +66,50 @@ describe('AI app conversation view', () => {
     ]);
   });
 
+  it('renders a resumed run once after its latest clarification answer', () => {
+    const messages = [
+      { id: 'user-original', role: 'user', runId: 'run-1' },
+      { id: 'user-answer', role: 'user', runId: 'run-1' },
+      { id: 'assistant-result', role: 'assistant', runId: 'run-1' },
+    ];
+
+    const ordered = orderConversationMessages(messages);
+    expect(ordered.map((message) => message.id)).toEqual([
+      'user-original',
+      'user-answer',
+      'assistant-result',
+    ]);
+    expect(isLastUserMessageForRun(ordered, 0)).toBe(false);
+    expect(isLastUserMessageForRun(ordered, 1)).toBe(true);
+    expect(isLastUserMessageForRun(ordered, 2)).toBe(false);
+    expect(isLastMessageForRun(ordered, 0)).toBe(false);
+    expect(isLastMessageForRun(ordered, 1)).toBe(false);
+    expect(isLastMessageForRun(ordered, 2)).toBe(true);
+  });
+
+  it('does not render a second thinking placeholder on the original message after clarification', () => {
+    expect(
+      shouldShowMessageStartingIndicator({
+        isUserMessage: true,
+        isLocalPending: false,
+        creatingTask: false,
+        taskStatus: 'queued',
+        queuePosition: 0,
+        hasEarlierPendingMessage: false,
+        hasRenderedTaskForRun: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowMessageStartingIndicator({
+        isUserMessage: true,
+        isLocalPending: true,
+        creatingTask: true,
+        hasEarlierPendingMessage: false,
+        hasRenderedTaskForRun: false,
+      }),
+    ).toBe(true);
+  });
+
   it('replaces an optimistic message without moving it behind later messages', () => {
     const messages = [
       { id: 'local-summer', content: '夏天' },
@@ -55,6 +124,18 @@ describe('AI app conversation view', () => {
     ).toEqual([
       { id: 'server-summer', content: '夏天' },
       { id: 'local-spring', content: '春天' },
+    ]);
+  });
+
+  it('retargets the original user bubble to the retry run immediately', () => {
+    const messages = [
+      { id: 'user-failed', role: 'user', runId: 'run-failed' },
+      { id: 'user-later', role: 'user', runId: 'run-later' },
+    ];
+
+    expect(retargetConversationMessageRun(messages, 'user-failed', 'run-retry')).toEqual([
+      { id: 'user-failed', role: 'user', runId: 'run-retry' },
+      { id: 'user-later', role: 'user', runId: 'run-later' },
     ]);
   });
 
@@ -263,6 +344,13 @@ describe('AI app conversation view', () => {
       isConversationUserMessagePending({
         isLocalPending: false,
         hasAssistantMessage: false,
+        taskStatus: 'needs_input',
+      }),
+    ).toBe(true);
+    expect(
+      isConversationUserMessagePending({
+        isLocalPending: false,
+        hasAssistantMessage: false,
       }),
     ).toBe(true);
     expect(
@@ -294,5 +382,109 @@ describe('AI app conversation view', () => {
         verifiedCapabilities: ['text', 'vision'],
       }),
     ).toBe(true);
+  });
+
+  it('keeps one continuous assistant turn while a task moves from start to completion', () => {
+    expect(
+      resolveConversationTurnPhase({
+        isLocalPending: true,
+        creatingTask: true,
+        hasAssistantMessage: false,
+      }),
+    ).toBe('starting');
+    expect(
+      resolveConversationTurnPhase({
+        isLocalPending: false,
+        creatingTask: false,
+        hasAssistantMessage: false,
+        taskStatus: 'queued',
+        queuePosition: 2,
+      }),
+    ).toBe('queued');
+    expect(
+      resolveConversationTurnPhase({
+        isLocalPending: false,
+        creatingTask: false,
+        hasAssistantMessage: false,
+        taskStatus: 'running',
+      }),
+    ).toBe('running');
+    expect(
+      resolveConversationTurnPhase({
+        isLocalPending: false,
+        creatingTask: false,
+        hasAssistantMessage: false,
+        taskStatus: 'succeeded',
+        runStatus: 'succeeded',
+      }),
+    ).toBe('finalizing');
+    expect(
+      resolveConversationTurnPhase({
+        isLocalPending: false,
+        creatingTask: false,
+        hasAssistantMessage: true,
+        taskStatus: 'succeeded',
+        runStatus: 'succeeded',
+      }),
+    ).toBe('complete');
+  });
+
+  it('immediately resumes one assistant turn after a clarification answer is submitted', () => {
+    expect(
+      resolveConversationTurnPhase({
+        isLocalPending: false,
+        creatingTask: false,
+        hasAssistantMessage: false,
+        taskStatus: 'needs_input',
+        resumingClarification: true,
+      }),
+    ).toBe('starting');
+
+    expect(shouldShowTaskWaitingSummary('needs_input')).toBe(false);
+    expect(shouldShowTaskWaitingSummary('waiting_approval')).toBe(true);
+    expect(shouldShowTaskWaitingSummary('waiting_approval', true)).toBe(false);
+  });
+
+  it('keeps refreshing a terminal task until its persisted reply is visible', () => {
+    expect(
+      shouldRefreshConversationDetail({
+        taskStatus: 'succeeded',
+        runStatus: 'succeeded',
+        hasAssistantMessage: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldRefreshConversationDetail({
+        taskStatus: 'succeeded',
+        runStatus: 'succeeded',
+        hasAssistantMessage: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRefreshConversationDetail({
+        taskStatus: 'running',
+        runStatus: 'running',
+        hasAssistantMessage: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('turns terminal failures into stable states without waiting for an assistant message', () => {
+    expect(
+      resolveConversationTurnPhase({
+        isLocalPending: false,
+        creatingTask: false,
+        hasAssistantMessage: false,
+        taskStatus: 'failed',
+      }),
+    ).toBe('failed');
+    expect(
+      resolveConversationTurnPhase({
+        isLocalPending: false,
+        creatingTask: false,
+        hasAssistantMessage: false,
+        runStatus: 'cancelled',
+      }),
+    ).toBe('cancelled');
   });
 });

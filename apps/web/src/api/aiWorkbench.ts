@@ -1,3 +1,4 @@
+import type { AxiosProgressEvent } from 'axios';
 import { useAuthStore } from '@/stores/useAuthStore';
 import request from '@/utils/request';
 
@@ -96,6 +97,8 @@ export interface AIAppRun {
   input: string;
   output: string;
   errorCode: string;
+  knowledgeStatus: 'not_used' | 'used' | 'degraded';
+  knowledgeErrorCode?: string;
   durationMs: number;
   createdAt: string;
 }
@@ -128,6 +131,9 @@ export interface AIAppConversationToolTrace {
   toolName: string;
   narration?: string;
   status: 'succeeded' | 'failed';
+  errorCode?: string;
+  errorMessage?: string;
+  retryable?: boolean;
   durationMs: number;
   createdAt: string;
 }
@@ -151,8 +157,12 @@ export interface AIAppArtifact {
   resourceId: string;
   fileName: string;
   contentType: string;
+  kind: 'file' | 'conversion';
+  sourceFormat?: string;
+  targetFormat?: string;
   sizeBytes: number;
-  url: string;
+  expiresAt?: string;
+  persistedAt?: string;
   createdAt: string;
 }
 
@@ -171,7 +181,14 @@ export interface AIAppTask {
   runId: string;
   userMessageId: string;
   title: string;
-  status: 'queued' | 'running' | 'waiting_approval' | 'succeeded' | 'failed' | 'cancelled';
+  status:
+    | 'queued'
+    | 'running'
+    | 'waiting_approval'
+    | 'needs_input'
+    | 'succeeded'
+    | 'failed'
+    | 'cancelled';
   progress: number;
   queuePosition?: number;
   statusMessage: string;
@@ -194,6 +211,27 @@ export interface AIAppToolApproval {
   status: 'pending' | 'approved' | 'rejected';
   note?: string;
   decidedAt?: string;
+  createdAt: string;
+}
+
+export interface AIAppTaskClarification {
+  id: string;
+  taskId: string;
+  runId: string;
+  conversationId: string;
+  requestId: string;
+  question: string;
+  reason: string;
+  answerType: 'single_select' | 'multi_select' | 'text' | 'file';
+  suggestions: Array<{ label: string; value: string; description?: string }>;
+  allowCustomAnswer: boolean;
+  blocking: boolean;
+  round: number;
+  maxRounds: number;
+  status: 'pending' | 'answered' | 'skipped' | 'declined';
+  decision?: 'answer' | 'skip' | 'decline';
+  answer?: string;
+  resolvedAt?: string;
   createdAt: string;
 }
 
@@ -534,6 +572,13 @@ export function listAIAppOutputs(
   return request.get(`/ai/apps/${appId}/outputs`);
 }
 
+export function getAIAppArtifactDownloadURL(
+  appId: string,
+  artifactId: string,
+): Promise<{ url: string; expiresAt?: string }> {
+  return request.get(`/ai/apps/${appId}/artifacts/${artifactId}/download-url`);
+}
+
 export function saveAIAppVersion(
   appId: string,
   data: { name: string; description: string; config: object },
@@ -797,7 +842,7 @@ export function replaceAIAppTools(
   appId: string,
   tools: string[],
   policies: AIAppToolBinding[] = [],
-): Promise<{ tools: string[]; bindings: AIAppToolBinding[] }> {
+): Promise<{ tools: string[]; bindings: AIAppToolBinding[]; version: AIAppVersion }> {
   return request.put(`/ai/apps/${appId}/tools`, { tools, policies });
 }
 
@@ -818,11 +863,22 @@ export function uploadAIAppConversationAttachment(
   appId: string,
   conversationId: string,
   file: File,
+  onProgress?: (progress: number) => void,
 ): Promise<{ attachment: AIAppConversationAttachment }> {
   const formData = new FormData();
   formData.append('file', file);
   return request.post(`/ai/apps/${appId}/conversations/${conversationId}/attachments`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (event: AxiosProgressEvent) => {
+      const ratio =
+        typeof event.progress === 'number'
+          ? event.progress
+          : event.total && event.total > 0
+            ? event.loaded / event.total
+            : undefined;
+      if (ratio === undefined || !Number.isFinite(ratio)) return;
+      onProgress?.(Math.min(100, Math.max(0, Math.round(ratio * 100))));
+    },
   });
 }
 
@@ -876,10 +932,41 @@ export function createAIAppConversationTask(
 export function listAIAppTasks(
   appId: string,
   conversationId?: string,
-): Promise<{ list: AIAppTask[]; approvals: AIAppToolApproval[] }> {
+): Promise<{
+  list: AIAppTask[];
+  approvals: AIAppToolApproval[];
+  clarifications: AIAppTaskClarification[];
+}> {
   return request.get(`/ai/apps/${appId}/tasks`, {
     params: conversationId ? { conversationId } : undefined,
   });
+}
+
+export function decideAIAppTaskClarification(
+  appId: string,
+  taskId: string,
+  clarificationId: string,
+  data: {
+    decision: 'answer' | 'skip' | 'decline';
+    answer?: string;
+    attachmentIds?: string[];
+  },
+): Promise<{
+  clarification: AIAppTaskClarification;
+  task: AIAppTask;
+  userMessage?: AIAppConversationMessage;
+}> {
+  return request.post(
+    `/ai/apps/${appId}/tasks/${taskId}/clarifications/${clarificationId}/decision`,
+    data,
+  );
+}
+
+export function retryAIAppTask(
+  appId: string,
+  taskId: string,
+): Promise<{ task: AIAppTask; run: AIAppRun }> {
+  return request.post(`/ai/apps/${appId}/tasks/${taskId}/retry`);
 }
 
 export function decideAIAppToolApproval(
@@ -1042,6 +1129,6 @@ export function listAIAppKnowledgeBases(appId: string): Promise<{ list: AIKnowle
 export function replaceAIAppKnowledgeBases(
   appId: string,
   knowledgeBaseIds: string[],
-): Promise<{ knowledgeBaseIds: string[] }> {
+): Promise<{ knowledgeBaseIds: string[]; version: AIAppVersion }> {
   return request.put(`/ai/apps/${appId}/knowledge-bases`, { knowledgeBaseIds });
 }

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import type { AIAppConversationToolTrace, AIAppRun, AIKnowledgeReference } from '@/api/aiWorkbench';
+import ThinkingOrbs from '@/components/ThinkingOrbs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import {
@@ -50,7 +51,7 @@ function ExecutionToolList({ tools, live = false }: { tools: ExecutionTool[]; li
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="group flex min-w-0 items-center gap-1.5 rounded-sm py-1 text-left text-xs font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+      <CollapsibleTrigger className="group flex min-h-10 min-w-0 items-center gap-1.5 rounded-lg px-2 py-1 text-left text-xs font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
         <Wrench className="size-3.5" />
         <span className="truncate">
           {formatAssistantToolSummary(tools.map((tool) => tool.toolName))}
@@ -60,7 +61,7 @@ function ExecutionToolList({ tools, live = false }: { tools: ExecutionTool[]; li
         />
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <ol className="mt-1 space-y-2.5 text-xs text-muted-foreground">
+        <ol className="mt-1 space-y-2.5 px-2 pb-1 text-xs text-muted-foreground">
           {tools.map((tool) => (
             <li key={tool.id} className="space-y-1.5 py-0.5">
               {tool.narration?.trim() ? (
@@ -101,7 +102,7 @@ function ExecutionReferences({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="group flex items-center gap-1.5 rounded-sm py-1 text-left text-xs font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+      <CollapsibleTrigger className="group flex min-h-10 items-center gap-1.5 rounded-lg px-2 py-1 text-left text-xs font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
         <BookOpen className="size-3.5" />
         <span>参考 {references.length} 个知识片段</span>
         <ChevronDown
@@ -109,7 +110,7 @@ function ExecutionReferences({
         />
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <ol className="mt-1 space-y-1">
+        <ol className="mt-1 space-y-1 px-1 pb-1">
           {references.map((reference) => (
             <li key={`${reference.documentName}-${reference.chunkId}`}>
               <button
@@ -151,13 +152,13 @@ export function AssistantExecutionHeader({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="group flex w-full items-center gap-1.5 border-b border-border pb-2.5 text-left text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset">
+      <CollapsibleTrigger className="group flex min-h-10 w-full items-center gap-1.5 rounded-lg px-2 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset">
         <span>{formatAssistantExecution(run)}</span>
         <ChevronRight
           className={cn('size-3.5 transition-transform duration-200', open && 'rotate-90')}
         />
       </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-2 border-b-2 border-border py-3">
+      <CollapsibleContent className="mt-1 space-y-2 rounded-xl bg-muted/30 px-2 py-2 ring-1 ring-border/50">
         <ExecutionToolList tools={traces} />
         <ExecutionReferences references={visibleReferences} onReferenceOpen={onReferenceOpen} />
       </CollapsibleContent>
@@ -169,49 +170,48 @@ export function AssistantActiveExecution({
   startedAt,
   reply,
   tools,
+  phase,
   children,
 }: {
   startedAt: number;
   reply: string;
   tools: AssistantStreamTool[];
+  phase?: 'thinking' | 'running' | 'finalizing';
   children?: ReactNode;
 }) {
   const elapsedSeconds = useElapsedSeconds(startedAt);
   const executing = tools.length > 0;
   const hasReply = Boolean(reply.trim());
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => tools.length > 0);
+  const activePhase = phase ?? (executing ? 'running' : 'thinking');
 
   if (!executing && !hasReply) {
     return (
-      <div
-        className="flex min-w-0 w-full max-w-[52rem] items-center gap-2 pt-1 text-sm font-medium text-muted-foreground"
-        role="status"
-        aria-live="polite"
-      >
-        <span className="relative flex size-4 items-center justify-center" aria-hidden="true">
-          <span className="absolute size-3 animate-ping rounded-full bg-primary/20" />
-          <span className="size-1.5 rounded-full bg-primary" />
-        </span>
-        <span>正在思考</span>
-      </div>
+      <ThinkingOrbs
+        compact
+        title={activePhase === 'finalizing' ? '正在完成' : '正在思考'}
+        className="min-w-0 w-full max-w-[50rem] pt-1 text-muted-foreground"
+      />
     );
   }
 
-  const statusLabel = `${executing ? '正在执行' : '正在思考'} ${elapsedSeconds} 秒`;
+  const statusLabel = `${
+    activePhase === 'finalizing' ? '正在完成' : activePhase === 'running' ? '正在执行' : '正在思考'
+  } ${elapsedSeconds} 秒`;
 
   if (!executing) {
     return (
-      <div className="min-w-0 w-full max-w-[52rem] pt-1">
+      <div className="min-w-0 w-full max-w-[50rem] pt-1">
         <div
-          className="flex w-full items-center gap-2 border-b-2 border-border pb-2.5 text-sm font-medium text-muted-foreground"
+          className="flex w-full items-center gap-2 border-b border-border/70 pb-2.5 text-sm font-medium text-muted-foreground"
           role="status"
           aria-live="polite"
         >
-          <LoaderCircle className="size-4 animate-spin text-primary" />
+          <ThinkingOrbs compact hideText title={statusLabel} />
           <span>{statusLabel}</span>
         </div>
         <p
-          className="pt-3 text-sm leading-6 whitespace-pre-wrap text-foreground"
+          className="pt-3 text-[15px] leading-7 whitespace-pre-wrap text-foreground"
           aria-live="polite"
         >
           {reply.trim()}
@@ -222,26 +222,26 @@ export function AssistantActiveExecution({
   }
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="min-w-0 w-full max-w-[52rem] pt-1">
+    <Collapsible open={open} onOpenChange={setOpen} className="min-w-0 w-full max-w-[50rem] pt-1">
       <div role="status" aria-live="polite">
         <CollapsibleTrigger
-          className="group flex w-full items-center gap-2 border-b border-border pb-2.5 text-left text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset"
+          className="group flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset"
           aria-label={open ? '收起执行过程' : '展开执行过程'}
         >
-          <LoaderCircle className="size-4 animate-spin text-primary" />
+          <ThinkingOrbs compact hideText title={statusLabel} />
           <span>{statusLabel}</span>
           <ChevronDown
             className={cn('size-3.5 transition-transform duration-200', open && 'rotate-180')}
           />
         </CollapsibleTrigger>
       </div>
-      <CollapsibleContent className="py-3">
+      <CollapsibleContent className="mt-1 rounded-xl bg-muted/30 px-2 py-2 ring-1 ring-border/50">
         <ExecutionToolList tools={tools} live />
       </CollapsibleContent>
       {hasReply ? (
         <p
           className={cn(
-            'text-sm leading-6 whitespace-pre-wrap text-foreground',
+            'text-[15px] leading-7 whitespace-pre-wrap text-foreground',
             open ? 'pt-1' : 'pt-3',
           )}
           aria-live="polite"

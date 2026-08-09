@@ -50,4 +50,18 @@ describe('ConversationMessageBubble', () => {
     expect(markup).toContain('等待智能体');
     expect(markup).not.toContain(' hidden');
   });
+
+  it('renders queue state as message metadata instead of changing the bubble content', () => {
+    const markup = renderToStaticMarkup(
+      // biome-ignore lint/a11y/useValidAriaRole: role is the conversation component's domain prop.
+      <ConversationMessageBubble
+        role="user"
+        content="继续补充"
+        status={<span>排队中 · 前面还有 2 条</span>}
+      />,
+    );
+
+    expect(markup).toContain('data-slot="conversation-message-status"');
+    expect(markup).toContain('排队中 · 前面还有 2 条');
+  });
 });

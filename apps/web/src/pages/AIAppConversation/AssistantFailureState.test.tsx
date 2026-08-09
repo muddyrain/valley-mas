@@ -25,4 +25,31 @@ describe('AssistantFailureState', () => {
 
     expect(markup).toContain('已停止');
   });
+
+  it('can join an existing assistant row without rendering a second avatar', () => {
+    const markup = renderToStaticMarkup(
+      <AssistantFailureState
+        agentName="测试智能体"
+        cancelled={false}
+        message="执行失败"
+        showAvatar={false}
+      />,
+    );
+
+    expect(markup).toContain('执行失败');
+    expect(markup).not.toContain('测试智能体头像');
+  });
+
+  it('offers an inline retry for recoverable failures', () => {
+    const markup = renderToStaticMarkup(
+      <AssistantFailureState
+        agentName="测试智能体"
+        cancelled={false}
+        message="知识库检索服务异常"
+        onRetry={() => undefined}
+      />,
+    );
+
+    expect(markup).toContain('>重试<');
+  });
 });

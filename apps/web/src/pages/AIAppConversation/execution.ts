@@ -43,12 +43,18 @@ function isStandaloneGreeting(message: string) {
 export function formatAssistantToolName(toolName: string) {
   if (toolName === 'content.search') return '内容搜索';
   if (toolName === 'image.generate') return '图片生成';
+  if (toolName === 'image.convert') return '图片转换';
+  if (toolName === 'document.convert') return '文档转换';
+  if (toolName === 'file.create') return '成果文件';
   return toolName;
 }
 
 export function formatAssistantToolAction(toolName: string) {
   if (toolName === 'content.search') return '搜索内容';
   if (toolName === 'image.generate') return '生成图片';
+  if (toolName === 'image.convert') return '转换图片';
+  if (toolName === 'document.convert') return '转换文档';
+  if (toolName === 'file.create') return '生成文件';
   return formatAssistantToolName(toolName);
 }
 
