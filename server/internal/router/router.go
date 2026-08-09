@@ -99,7 +99,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 		api.POST("/register", handler.Register(cfg))
 		api.POST("/password/reset", handler.ResetPassword)
 		api.POST("/email-code/send", handler.SendEmailVerificationCode(cfg))
-		api.GET("/user/mail/accounts/gmail/callback", handler.GmailOAuthCallback(cfg))
 
 		user := api.Group("/user")
 		user.Use(middleware.Auth(cfg))
@@ -107,9 +106,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 			user.GET("/stats", handler.GetMyStats)
 			user.GET("/downloads", handler.GetMyDownloads)
 			user.GET("/info", handler.GetUserInfo)
-			user.GET("/preferences/:namespace", handler.GetUserPreference)
-			user.PUT("/preferences/:namespace", handler.UpsertUserPreference)
-			handler.RegisterUserMailRoutes(user, cfg)
 			user.POST("/refresh-token", handler.RefreshToken(cfg))
 			user.PUT("/profile", handler.UpdateMyProfile)
 			user.PUT("/password", handler.ChangePassword)
@@ -174,7 +170,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.GET("/ai/image-conversations/:conversationId", handler.GetAIImageConversation)
 			auth.DELETE("/ai/image-conversations/:conversationId/messages", handler.ClearAIImageConversation)
 			auth.POST("/ai/image-conversations/:conversationId/messages", handler.AddAIImageConversationMessage)
-			// AI Workbench platform assets. Legacy /ai/agents and /workflows remain supported.
+			// AI Workbench platform assets.
 			auth.GET("/ai/apps", handler.ListAIApps)
 			auth.POST("/ai/apps", handler.CreateAIApp)
 			auth.DELETE("/ai/apps/:appId", handler.DeleteAIApp)
@@ -244,16 +240,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.PUT("/ai/api-keys/:keyId/apps", handler.ReplaceAIAPIKeyAppBindings)
 			auth.GET("/ai/api-keys/:keyId/usage", handler.GetAIAPIKeyDailyUsage)
 			auth.GET("/ai/apps/:appId/public-invocations", handler.ListAIAppPublicInvocations)
-			auth.GET("/ai/agents", handler.ListAIAgents)
-			auth.POST("/ai/agents", handler.CreateAIAgent)
-			auth.GET("/ai/agents/:agentId", handler.GetAIAgent)
-			auth.PATCH("/ai/agents/:agentId", handler.UpdateAIAgent)
-			auth.DELETE("/ai/agents/:agentId", handler.DeleteAIAgent)
-			auth.GET("/ai/agents/:agentId/conversations", handler.ListAIConversations)
-			auth.POST("/ai/agents/:agentId/conversations", handler.CreateAIConversation)
-			auth.GET("/ai/agents/:agentId/conversations/:conversationId", handler.GetAIConversation)
-			auth.DELETE("/ai/agents/:agentId/conversations/:conversationId", handler.DeleteAIConversation)
-			auth.POST("/ai/agents/:agentId/conversations/:conversationId/chat", handler.ChatWithAIAgent)
 			auth.POST("/blog/posts/:id/comments", handler.CreatePostComment)
 			auth.DELETE("/blog/comments/:commentId", handler.DeletePostComment)
 

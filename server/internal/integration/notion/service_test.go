@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 	"valley-server/internal/config"
-	mailvault "valley-server/internal/mail"
 	"valley-server/internal/model"
+	"valley-server/internal/secretvault"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -106,7 +106,7 @@ func TestNotionOAuthStoresEncryptedOwnerPrivateConnectionAndRevokes(t *testing.T
 func TestNotionConnectionWithRotatedTokenKeyRequiresReconnectAndCanBeCleanedUp(t *testing.T) {
 	db := openTestDB(t)
 	service := newTestService(t, db)
-	oldVault, err := mailvault.NewCredentialVault("abcdefghijklmnopqrstuvwxzy123456")
+	oldVault, err := secretvault.NewCredentialVault("abcdefghijklmnopqrstuvwxzy123456")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func TestNotionSearchUsesEncryptedOwnerConnectionAndReturnsSafeResults(t *testin
 
 func seedSearchConnection(t *testing.T, db *gorm.DB, service *Service, userID int64) {
 	t.Helper()
-	vault, err := mailvault.NewCredentialVault(service.cfg.TokenKey)
+	vault, err := secretvault.NewCredentialVault(service.cfg.TokenKey)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -37,8 +37,6 @@
 
 ## 已归档（2026-06）
 
-- [archive/2026-06/2026-06-22-desktop-os-plush-control-migration.md](archive/2026-06/2026-06-22-desktop-os-plush-control-migration.md)
-- [archive/2026-06/2026-06-23-desktop-os-motion-migration.md](archive/2026-06/2026-06-23-desktop-os-motion-migration.md)
 - [archive/2026-06/2026-06-26-life-trace-calendar-selection.md](archive/2026-06/2026-06-26-life-trace-calendar-selection.md)
 - [archive/2026-06/2026-06-30-pantry-drawer-ai-augment.md](archive/2026-06/2026-06-30-pantry-drawer-ai-augment.md)
 - [archive/2026-06/2026-06-30-pantry-shelf-life-validation.md](archive/2026-06/2026-06-30-pantry-shelf-life-validation.md)

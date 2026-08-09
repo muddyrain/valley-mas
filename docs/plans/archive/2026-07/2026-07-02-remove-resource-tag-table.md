@@ -55,12 +55,6 @@
 - `pages/Resources.tsx`：详情列表里的标签 chip 用字符串本身；
 - `layouts/Layout.tsx`：菜单文案从"资源标签"改为"资源标签统计"。
 
-### apps/desktop-os（Finder / Spotlight）
-- `store/resourceStore.ts`：移除 `tags` selector（旧的独立标签列表）；
-- `store/finderStore.ts`：`activeTagId → activeTag: string | null`；`setTagId → setTag`；
-- `apps/FinderWindow.tsx`：侧栏 tags 循环由 `useResourceStore.tags` 改成 `useMemo` 聚合出 `tagOptions = [{name, count}]`；`buildSavedSearchName`、`openPath`、`openSavedSearch`、`saveCurrentSearch` 全部改传字符串；
-- `finder/data.ts`、`spotlight/data.ts`：`resource.tags?.map(t => t.name)` 改为 `resource.tags?.map(t => t.trim())` / 直接 `resource.tags ?? []`。
-
 ## Phase & 状态
 
 | Phase | 内容 | 状态 |
@@ -69,8 +63,7 @@
 | 2 | 后端 Handler + 路由 | ✅ |
 | 3 | apps/web 端 | ✅ |
 | 4 | apps/admin 端 | ✅ |
-| 5 | apps/desktop-os 端 | ✅ |
-| 6 | 校验 + 计划文档 + 交付摘要 | ✅ |
+| 5 | 校验 + 计划文档 + 交付摘要 | ✅ |
 
 ## 校验结果
 
@@ -78,10 +71,7 @@
 - `cd server && go test ./internal/handler/...` ✅（`ok valley-server/internal/handler 1.135s`）
 - `pnpm --filter @valley/web exec tsc --noEmit` ✅
 - `pnpm --filter @valley/admin exec tsc --noEmit` ✅
-- `pnpm --filter @valley/desktop-os typecheck` ✅
-- `pnpm --filter @valley/desktop-os check` ✅
 - `pnpm --filter @valley/admin check` ✅
-- `pnpm --filter @valley/desktop-os exec vitest run` ✅（25 files / 146 tests）
 - `pnpm --filter @valley/web check` ⚠️ 剩 2 个既有 baseline 错误（`UploadResourceDialog.tsx:65:7` non-null assertion、`src/index.css` linear-gradient 格式），已通过 `git show HEAD:...` 确认属于 `daf1cc61 feat(blog): 支持 AI 选图与外部图源封面` 提交遗留，非本任务引入。
 - `python3 .agents/skills/encoding-guard/scripts/check_mojibake.py <改动文件>` ✅
 

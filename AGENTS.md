@@ -19,7 +19,6 @@
 - Web 前台：`AGENTS.md` -> `apps/web/AGENTS.md` -> `docs/PROJECT_GUIDE.md` -> `apps/web/src/App.tsx`。
 - Admin 后台：`AGENTS.md` -> `apps/admin/AGENTS.md` -> `apps/admin/src/App.tsx` -> `server/internal/router/router.go`。
 - Life Trace：`AGENTS.md` -> `apps/life-trace/AGENTS.md` -> `apps/life-trace/src/App.tsx` -> `server/internal/lifetrace`。
-- Desktop OS：`AGENTS.md` -> `apps/desktop-os/AGENTS.md` -> `apps/desktop-os/src/App.tsx` -> `apps/desktop-os/src/apps/desktopApps.ts`。
 - AI Mind Arena：`AGENTS.md` -> `apps/ai-mind-arena/AGENTS.md` -> `apps/ai-mind-arena/app/page.tsx` -> `server/internal/mindarena`。
 - WorldSim：`AGENTS.md` -> `apps/world-sim/AGENTS.md` -> `apps/world-sim/src/App.tsx` -> `apps/world-sim/docs/TDD.md`。
 - Scratch Legend：`AGENTS.md` -> `apps/scratch-legend/AGENTS.md` -> `apps/scratch-legend/docs/scratch-legend-task.md` -> `apps/scratch-legend/lib/game-store.ts`。
@@ -35,7 +34,6 @@
 | Life Trace | `apps/life-trace/AGENTS.md` | Today、计划、AI、踪迹、Pantry、提醒、家庭空间和个人设置 |
 | Web 前台 | `apps/web/AGENTS.md` | 用户侧页面、创作者空间、资源、博客、个人空间和 Web API |
 | Admin 后台 | `apps/admin/AGENTS.md` | 管理后台、审核流程、Ant Design 组件和 Admin API |
-| Desktop OS | `apps/desktop-os/AGENTS.md` | 毛毡桌面、窗口系统、内置应用和 Mini Apps |
 | AI Mind Arena | `apps/ai-mind-arena/AGENTS.md` | Next.js 前端、人格辩论 UI、SSE 和分享体验 |
 | WorldSim | `apps/world-sim/AGENTS.md` | 沙盒文明模拟、玩法参数和设计文档 |
 | Scratch Legend | `apps/scratch-legend/AGENTS.md` | 刮刮卡成长游戏和阶段任务 |
@@ -47,7 +45,6 @@
 实现前按真实长期影响判断改动是否属于当前计划，不把临时调试和一次性总结写进长期计划。只有实际同步了计划、改动可能改变指定计划入口中的长期状态，或不说明会造成状态误解时，才需要在收尾说明计划同步情况；普通局部修复无需机械声明。
 
 - Life Trace：`apps/life-trace/docs/PLAN.md`。
-- Desktop OS：`apps/desktop-os/docs/PLAN.md`。
 - WorldSim：按 `apps/world-sim/AGENTS.md` 同步 `docs/TDD.md` 或受影响的设计文档。
 - 根长期文档索引：`docs/README.md`。
 - 必须同步：功能状态、页面入口、接口路径、依赖策略、数据模型、产品方向、长期文档索引或验收标准发生变化。

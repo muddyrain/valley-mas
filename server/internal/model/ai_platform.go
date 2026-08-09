@@ -117,8 +117,7 @@ type AIAppRun struct {
 	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-// AIAppConversation is an owner-private chat pinned to one immutable app
-// version. It is intentionally separate from the legacy AIAgent conversations.
+// AIAppConversation is an owner-private chat pinned to one immutable app version.
 type AIAppConversation struct {
 	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID    Int64String    `gorm:"index:idx_ai_app_conversation_owner;not null" json:"userId"`

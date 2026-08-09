@@ -4,7 +4,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL：使用 `executing-plans` 或 `subagent-driven-development` 按 task 顺序推进。每个 step 都用 `- [ ]`，落地一项勾一项。AI 接入遵循当前 `server/AGENTS.md` 中模型目录与 `internal/aiclient` 的约束。
 >
-> **本计划只覆盖阶段 A**：从"prompt-as-a-function"演进到"tool loop 驱动的 agent"。**不引入外部框架**（不用 langchaingo、暂不引入 CloudWeGo eino）。落地范围先限定 Life Trace 生活助理一个入口，跑通闭环之后再横向铺 blog / creator / desktop-os。
+> **本计划只覆盖阶段 A**：从"prompt-as-a-function"演进到"tool loop 驱动的 agent"。**不引入外部框架**（不用 langchaingo、暂不引入 CloudWeGo eino）。落地范围先限定 Life Trace 生活助理一个入口，跑通闭环之后再横向铺 blog / creator。
 
 ---
 
@@ -44,7 +44,7 @@
 - **不引入外部 AI 框架**（不引 langchaingo、eino、任何依赖）。
 - **不拆** `assistant_handler.go` 的其他分支逻辑（fallback draft、SSE writer 等），只在最外层引入 loop。
 - **不改**任何前端代码，也不改前端 SSE 事件字段。
-- **不迁**其他 handler（blog / creator / desktop-os / admin），只准备好抽象。
+- **不迁**其他 handler（blog / creator / admin），只准备好抽象。
 - **不做**并行 tool call、子 agent、图状态、中断-恢复。这些是阶段 B（eino）之后的事。
 - **不改**现有 `PromptContract` 类型形状；tool 内部调用现有 contract。
 - **不动** [aiclient](../../../../server/internal/aiclient) 已定型的 provider 抽象、SSE writer、tool_call 双轨 helper。
@@ -358,7 +358,7 @@ func (r *Registry) Filter(scope string, names []string) []Tool
 
 ## Out of Scope（延后事项）
 
-- Blog / Creator / Desktop-OS / Admin 场景的 agent 化 → 阶段 A 完成后再单独立计划。
+- Blog / Creator / Admin 场景的 agent 化 → 阶段 A 完成后再单独立计划。
 - 并行 tool_call、子 agent、图状态机 → 阶段 B（迁 eino 时一并规划）。
 - 用户可视化配置 tool / 权限模型 → 阶段 C（Coze 级平台能力，暂无立项）。
 - 外部 Coze / Dify bot 接入 → 独立正交话题，阶段 A 完全不涉及。

@@ -220,106 +220,6 @@ importers:
         specifier: catalog:ts-tooling
         version: 5.9.3
 
-  apps/desktop-os:
-    dependencies:
-      '@base-ui/react':
-        specifier: ^1.2.0
-        version: 1.2.0(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@react-three/fiber':
-        specifier: ^9.6.1
-        version: 9.6.1(@types/react@19.2.14)(immer@11.1.4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(three@0.184.0)
-      '@valley/browser-media':
-        specifier: workspace:*
-        version: link:../../packages/browser-media
-      '@valley/calendar':
-        specifier: workspace:*
-        version: link:../../packages/calendar
-      '@valley/format-tools':
-        specifier: workspace:*
-        version: link:../../packages/format-tools
-      '@valley/mini-games':
-        specifier: workspace:*
-        version: link:../../packages/mini-games
-      '@valley/shared-fetch-request':
-        specifier: workspace:*
-        version: link:../../packages/shared-fetch-request
-      '@valley/shared-utils':
-        specifier: workspace:*
-        version: link:../../packages/shared-utils
-      class-variance-authority:
-        specifier: ^0.7.1
-        version: 0.7.1
-      dayjs:
-        specifier: ^1.11.19
-        version: 1.11.19
-      dompurify:
-        specifier: ^3.4.11
-        version: 3.4.11
-      lucide-react:
-        specifier: catalog:shared-runtime
-        version: 0.460.0(react@19.2.4)
-      motion:
-        specifier: ^12.40.0
-        version: 12.40.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      overlayscrollbars:
-        specifier: ^2.16.0
-        version: 2.16.0
-      overlayscrollbars-react:
-        specifier: ^0.5.6
-        version: 0.5.6(overlayscrollbars@2.16.0)(react@19.2.4)
-      react:
-        specifier: catalog:react-19
-        version: 19.2.4
-      react-dom:
-        specifier: catalog:react-19
-        version: 19.2.4(react@19.2.4)
-      react-markdown:
-        specifier: 9.0.3
-        version: 9.0.3(@types/react@19.2.14)(react@19.2.4)
-      remark-gfm:
-        specifier: 4.0.1
-        version: 4.0.1
-      three:
-        specifier: ^0.184.0
-        version: 0.184.0
-      tw-animate-css:
-        specifier: ^1.4.0
-        version: 1.4.0
-      zustand:
-        specifier: catalog:shared-runtime
-        version: 5.0.11(@types/react@19.2.14)(immer@11.1.4)(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
-    devDependencies:
-      '@tailwindcss/vite':
-        specifier: ^4.0.0
-        version: 4.3.1(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
-      '@types/node':
-        specifier: catalog:node-22
-        version: 22.19.13
-      '@types/react':
-        specifier: catalog:react-19
-        version: 19.2.14
-      '@types/react-dom':
-        specifier: catalog:react-19
-        version: 19.2.3(@types/react@19.2.14)
-      '@types/three':
-        specifier: ^0.184.1
-        version: 0.184.1
-      '@vitejs/plugin-react-swc':
-        specifier: catalog:vite-6
-        version: 4.0.0(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
-      tailwindcss:
-        specifier: catalog:tailwind-4
-        version: 4.2.1
-      typescript:
-        specifier: catalog:ts-tooling
-        version: 5.9.3
-      vite:
-        specifier: catalog:vite-6
-        version: 6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
-      vitest:
-        specifier: catalog:test
-        version: 4.1.6(@types/node@22.19.13)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
-
   apps/life-trace:
     dependencies:
       '@base-ui/react':
@@ -791,18 +691,6 @@ importers:
         version: 5.9.3
 
   packages/format-tools:
-    devDependencies:
-      tsup:
-        specifier: catalog:ts-tooling
-        version: 8.5.1(@swc/core@1.15.17)(jiti@2.7.0)(postcss@8.5.10)(typescript@5.9.3)(yaml@2.8.2)
-      typescript:
-        specifier: catalog:ts-tooling
-        version: 5.9.3
-      vitest:
-        specifier: catalog:test
-        version: 4.1.6(@types/node@22.19.13)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
-
-  packages/mini-games:
     devDependencies:
       tsup:
         specifier: catalog:ts-tooling

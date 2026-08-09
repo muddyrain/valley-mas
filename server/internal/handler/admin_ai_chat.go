@@ -79,8 +79,7 @@ func buildARKChatMessages(req aiChatRequest) []*arkmodel.ChatCompletionMessage {
 	return messages
 }
 
-// arkChatRequest 是 handler 内部 shim，转调 aiclient.NewARKChatRequest，
-// 保留同名函数让 ai_agent.go 等旧调用点不变。
+// arkChatRequest 是 handler 内部 shim，转调 aiclient.NewARKChatRequest。
 func arkChatRequest(modelID string, messages []*arkmodel.ChatCompletionMessage) arkmodel.CreateChatCompletionRequest {
 	return aiclient.NewARKChatRequest(modelID, messages)
 }

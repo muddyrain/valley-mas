@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 	"valley-server/internal/config"
-	mailvault "valley-server/internal/mail"
 	"valley-server/internal/model"
+	"valley-server/internal/secretvault"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -103,7 +103,7 @@ func (s *Service) IsConfigured() bool {
 		strings.TrimSpace(s.cfg.TokenKey) == "" {
 		return false
 	}
-	_, err := mailvault.NewCredentialVault(s.cfg.TokenKey)
+	_, err := secretvault.NewCredentialVault(s.cfg.TokenKey)
 	return err == nil
 }
 
@@ -127,7 +127,7 @@ func (s *Service) Status(ctx context.Context, userID int64) (ConnectionDTO, erro
 	if !result.Connected || !result.Configured {
 		return result, nil
 	}
-	vault, err := mailvault.NewCredentialVault(s.cfg.TokenKey)
+	vault, err := secretvault.NewCredentialVault(s.cfg.TokenKey)
 	if err != nil {
 		return result, nil
 	}
@@ -188,7 +188,7 @@ func (s *Service) Complete(ctx context.Context, state string, code string) error
 		_ = s.writeAudit(s.db.WithContext(ctx), userID, 0, auditConnected, auditFailed, "token_exchange_failed")
 		return err
 	}
-	vault, err := mailvault.NewCredentialVault(s.cfg.TokenKey)
+	vault, err := secretvault.NewCredentialVault(s.cfg.TokenKey)
 	if err != nil {
 		return err
 	}
@@ -246,7 +246,7 @@ func (s *Service) Disconnect(ctx context.Context, userID int64) (DisconnectResul
 	if err := s.db.WithContext(ctx).Where("user_id = ? AND provider = ?", userID, Provider).First(&connection).Error; err != nil {
 		return DisconnectResult{}, err
 	}
-	vault, err := mailvault.NewCredentialVault(s.cfg.TokenKey)
+	vault, err := secretvault.NewCredentialVault(s.cfg.TokenKey)
 	if err != nil {
 		return DisconnectResult{}, err
 	}
@@ -303,7 +303,7 @@ func (s *Service) Search(ctx context.Context, userID int64, query string, limit 
 		}
 		return SearchResult{}, err
 	}
-	vault, err := mailvault.NewCredentialVault(s.cfg.TokenKey)
+	vault, err := secretvault.NewCredentialVault(s.cfg.TokenKey)
 	if err != nil {
 		return SearchResult{}, err
 	}

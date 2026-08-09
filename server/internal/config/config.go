@@ -13,7 +13,6 @@ type Config struct {
 	TOS            TOSConfig
 	JWT            JWTConfig
 	SMTP           SMTPConfig
-	Mail           MailConfig
 	NotionOAuth    NotionOAuthConfig
 	QWeather       QWeatherConfig
 	WebPush        WebPushConfig
@@ -59,18 +58,9 @@ type SMTPConfig struct {
 	FromAddress string
 }
 
-type MailConfig struct {
-	SecretKey           string
-	PublicBaseURL       string
-	FrontendRedirectURL string
-	GmailClientID       string
-	GmailClientSecret   string
-	GmailRedirectURL    string
-}
-
 // NotionOAuthConfig keeps the server-only credentials required to connect a
-// user's Notion workspace. TokenKey is deliberately separate from mail
-// credentials so either connector can be rotated independently.
+// user's Notion workspace. TokenKey is deliberately isolated so connector
+// credentials can be rotated independently.
 type NotionOAuthConfig struct {
 	ClientID     string
 	ClientSecret string
@@ -162,14 +152,6 @@ func Load() *Config {
 			Pass:        getEnv("SMTP_PASS", ""),
 			FromName:    getEnv("SMTP_FROM_NAME", "Valley"),
 			FromAddress: getEnv("SMTP_FROM_ADDRESS", ""),
-		},
-		Mail: MailConfig{
-			SecretKey:           getEnv("MAIL_SECRET_KEY", ""),
-			PublicBaseURL:       strings.TrimRight(getEnv("MAIL_PUBLIC_BASE_URL", ""), "/"),
-			FrontendRedirectURL: getEnv("MAIL_FRONTEND_REDIRECT_URL", ""),
-			GmailClientID:       getEnv("GMAIL_CLIENT_ID", ""),
-			GmailClientSecret:   getEnv("GMAIL_CLIENT_SECRET", ""),
-			GmailRedirectURL:    getEnv("GMAIL_REDIRECT_URL", ""),
 		},
 		NotionOAuth: NotionOAuthConfig{
 			ClientID:     strings.TrimSpace(getEnv("NOTION_OAUTH_CLIENT_ID", "")),
