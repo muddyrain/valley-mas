@@ -34,6 +34,28 @@ const MOMENTUM_MIN_VELOCITY = 30;
 
 type Offset = { x: number; y: number };
 type Size = { width: number; height: number };
+type ImageLoadSnapshot = Pick<HTMLImageElement, 'complete' | 'naturalWidth' | 'naturalHeight'>;
+type ImagePreviewCloseType = 'mouse' | 'touch' | 'pen' | 'keyboard' | '';
+
+export function shouldRestoreImagePreviewFocus(closeType: ImagePreviewCloseType): boolean {
+  return closeType === 'keyboard';
+}
+
+export function resolveInitialImageLoadState(
+  src: string | undefined,
+  image: ImageLoadSnapshot | null,
+): { loading: boolean; size: Size | null } {
+  if (!src || !image?.complete) {
+    return { loading: Boolean(src), size: null };
+  }
+  if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+    return { loading: false, size: null };
+  }
+  return {
+    loading: false,
+    size: { width: image.naturalWidth, height: image.naturalHeight },
+  };
+}
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
@@ -101,6 +123,7 @@ export default function ImagePreviewDialog({
   const [imageSize, setImageSize] = useState<Size>({ width: 0, height: 0 });
   const [stageSize, setStageSize] = useState<Size>({ width: 0, height: 0 });
   const previewStageRef = useRef<HTMLDivElement | null>(null);
+  const previewImageRef = useRef<HTMLImageElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const scaleRef = useRef(1);
   const rotateRef = useRef(0);
@@ -282,9 +305,10 @@ export default function ImagePreviewDialog({
     syncScale(1);
     syncRotate(0);
     syncOffset({ x: 0, y: 0 });
-    setImageSize({ width: 0, height: 0 });
+    const initialLoadState = resolveInitialImageLoadState(src, previewImageRef.current);
+    setImageSize(initialLoadState.size || { width: 0, height: 0 });
     setDragging(false);
-    setImageLoading(Boolean(src));
+    setImageLoading(initialLoadState.loading);
   }, [open, src, stopMomentum, syncOffset, syncRotate, syncScale]);
 
   useEffect(() => {
@@ -412,6 +436,7 @@ export default function ImagePreviewDialog({
     <Dialog open={open} onOpenChange={onOpenChange} disablePointerDismissal>
       <DialogContent
         className="group/image-preview !top-0 !left-0 !h-screen !max-h-screen !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-none bg-transparent p-0 shadow-none duration-300 motion-reduce:animate-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 [&>button]:hidden"
+        finalFocus={shouldRestoreImagePreviewFocus}
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
@@ -470,6 +495,7 @@ export default function ImagePreviewDialog({
               <>
                 <div className="origin-center duration-300 motion-reduce:animate-none group-data-open/image-preview:animate-in group-data-open/image-preview:fade-in-0 group-data-open/image-preview:zoom-in-95">
                   <img
+                    ref={previewImageRef}
                     src={inlineSrc}
                     alt={displayTitle}
                     draggable={false}
