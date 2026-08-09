@@ -133,7 +133,9 @@ type AIImageGenerationInput struct {
 	ModelID               string
 	RecipeID              string
 	StyleProfileID        string
+	VariationMode         string
 	Brief                 string
+	SubjectContext        string
 	AspectRatio           string
 	Quality               string
 	References            []string
@@ -257,12 +259,23 @@ func (s *AIImageGenerationService) prepare(ctx context.Context, input AIImageGen
 		return aiImageGenerationJob{}, &AIImageGenerationInputError{Message: "用户 ID 无效"}
 	}
 	brief := strings.TrimSpace(input.Brief)
-	if brief == "" {
+	subjectContext := strings.TrimSpace(input.SubjectContext)
+	if brief == "" && subjectContext == "" {
 		return aiImageGenerationJob{}, &AIImageGenerationInputError{Message: "请输入画面描述"}
 	}
 	if utf8.RuneCountInString(brief) > MaxAIImagePromptRunes {
 		return aiImageGenerationJob{}, &AIImageGenerationInputError{
 			Message: fmt.Sprintf("画面描述不能超过 %d 个字符", MaxAIImagePromptRunes),
+		}
+	}
+	if utf8.RuneCountInString(subjectContext) > MaxAIImagePromptRunes {
+		return aiImageGenerationJob{}, &AIImageGenerationInputError{
+			Message: fmt.Sprintf("主题上下文不能超过 %d 个字符", MaxAIImagePromptRunes),
+		}
+	}
+	if utf8.RuneCountInString(brief)+utf8.RuneCountInString(subjectContext) > MaxAIImagePromptRunes {
+		return aiImageGenerationJob{}, &AIImageGenerationInputError{
+			Message: fmt.Sprintf("画面描述与主题上下文合计不能超过 %d 个字符", MaxAIImagePromptRunes),
 		}
 	}
 	qualityMap, ok := AIImageSizes[strings.TrimSpace(input.AspectRatio)]
@@ -347,7 +360,9 @@ func (s *AIImageGenerationService) prepare(ctx context.Context, input AIImageGen
 		RecipeID:       input.RecipeID,
 		StyleProfileID: input.StyleProfileID,
 		Brief:          brief,
+		SubjectContext: subjectContext,
 		HasReference:   len(references) > 0,
+		VariationMode:  input.VariationMode,
 	})
 	if err != nil {
 		return aiImageGenerationJob{}, &AIImageGenerationInputError{Message: err.Error()}
@@ -386,6 +401,10 @@ func (s *AIImageGenerationService) prepare(ctx context.Context, input AIImageGen
 		StyleProfileID:           styleProfileID,
 		StyleProfileSource:       styleProfileSource,
 		StyleProfilePrompt:       styleProfilePrompt,
+		VariationMode:            plan.VariationMode,
+		VariationSeed:            plan.VariationSeed,
+		VariationPrompt:          plan.VariationPrompt,
+		SubjectContext:           subjectContext,
 		Prompt:                   brief,
 		AspectRatio:              strings.TrimSpace(input.AspectRatio),
 		Quality:                  quality,

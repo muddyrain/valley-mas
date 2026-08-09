@@ -26,6 +26,10 @@ type AIImageGeneration struct {
 	StyleProfileID           string         `gorm:"size:120;not null;default:''" json:"styleProfileId"`
 	StyleProfileSource       string         `gorm:"size:20;not null;default:''" json:"styleProfileSource"`
 	StyleProfilePrompt       string         `gorm:"type:text;not null;default:''" json:"-"`
+	VariationMode            string         `gorm:"size:20;not null;default:'precise'" json:"variationMode"`
+	VariationSeed            string         `gorm:"size:40;not null;default:''" json:"-"`
+	VariationPrompt          string         `gorm:"type:text;not null;default:''" json:"-"`
+	SubjectContext           string         `gorm:"type:text;not null;default:''" json:"-"`
 	Prompt                   string         `gorm:"type:text;not null" json:"prompt"`
 	AspectRatio              string         `gorm:"size:10;not null" json:"aspectRatio"`
 	Quality                  string         `gorm:"size:10;not null" json:"quality"`

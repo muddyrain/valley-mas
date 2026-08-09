@@ -35,6 +35,21 @@ func TestManagedDialectsHaveMatchingVersions(t *testing.T) {
 	}
 }
 
+func TestAIImageVariationRepairMigrationRestoresEveryManagedColumn(t *testing.T) {
+	for _, driver := range []string{"postgres", "mysql"} {
+		content, err := migrationFiles.ReadFile(driver + "/202608080003_repair_ai_image_variation_columns.sql")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sqlText := string(content)
+		for _, column := range []string{"variation_mode", "variation_seed", "variation_prompt", "subject_context"} {
+			if !strings.Contains(sqlText, column) {
+				t.Fatalf("%s repair migration does not restore %s", driver, column)
+			}
+		}
+	}
+}
+
 func TestApplyPendingSkipsUpWhenCurrent(t *testing.T) {
 	migrationProvider := &fakeProvider{
 		pending: false,

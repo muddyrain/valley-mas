@@ -3,6 +3,7 @@ import request from '@/utils/request';
 export type AIImageGenerationStatus = 'queued' | 'running' | 'paused' | 'succeeded' | 'failed';
 export type AIImageGenerationStage = 'preparing' | 'generating' | 'storing' | 'completed';
 export type AIImageGenerationSource = 'studio' | 'workflow' | 'agent';
+export type AIImageVariationMode = 'precise' | 'balanced' | 'exploratory';
 
 export interface AIImageRecipe {
   id: string;
@@ -62,6 +63,7 @@ export interface AIImageGeneration {
   skillName: string;
   styleProfileId: string;
   styleProfileSource: 'builtin' | 'skill' | '';
+  variationMode: AIImageVariationMode;
   prompt: string;
   aspectRatio: string;
   quality: string;
@@ -92,6 +94,8 @@ export interface CreateAIImageGenerationInput {
   modelId: string;
   recipeId: string;
   styleProfileId?: string;
+  variationMode?: AIImageVariationMode;
+  subjectContext?: string;
   brief: string;
   aspectRatio: string;
   quality: string;

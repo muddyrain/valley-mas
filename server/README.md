@@ -62,6 +62,17 @@ go run ./cmd/migrate up
 
 只修改 model 不会自动改变数据库结构。`go run ./cmd/migrate bootstrap --apply` 仅用于第一次初始化全新的空开发库，已有数据库会拒绝执行。
 
+迁移版本一旦在任一本地、测试或生产持久数据库中显示为 `applied`，对应 SQL 就不能再修改。即使后来向同一文件追加字段，`air` 和 `go run ./cmd/migrate up` 也只会读取版本记录，不会重新执行该版本。遗漏字段或修正 SQL 时，必须在两个方言目录新增更高版本的修复迁移；不要删除 `schema_migrations` 记录，也不要靠重跑旧迁移修复结构漂移。
+
+迁移完成不能只看版本状态，还应验证目标字段、索引或最小业务写入链路。建议顺序：
+
+```bash
+cd server
+go run ./cmd/migrate status   # 新版本应先显示 pending
+go run ./cmd/migrate up       # 也可重启 air 自动应用 pending 版本
+go run ./cmd/migrate status   # 确认新版本已 applied
+```
+
 ## 知识库 PDF 解析环境
 
 知识库的基础 PDF 文本提取不依赖系统工具；用户选择视觉模型上传 PDF 时，服务会调用 Poppler 的 `pdftocairo` 把页面渲染为图片，用于扫描件 OCR、表格 Markdown 化和图片说明。开发机、测试机与线上服务必须安装同一项依赖。
@@ -254,6 +265,7 @@ cd server && go run ./cmd/sync-schema --apply --scope all
 - 环境变量缺失：对照 `server/.env.example` 补齐本地 `.env`。
 - 数据库结构不一致：先运行 `go run ./cmd/migrate status` 查看版本；已有开发库运行 `go run ./cmd/migrate up`，空开发库运行一次 `go run ./cmd/migrate bootstrap --apply`。`sync-schema` 仅保留作定向应急修复，不属于日常启动或生产发布流程。
 - AI 调用失败：先确认功能归属。Valley/Blog/Creator 默认看 `ARK_*`；Life Trace 文本 AI 若配置了 `LIFE_TRACE_AI_*` 会优先使用它，否则回退 `ARK_TEXT_MODEL`；AI Mind Arena 看 `MIND_ARENA_AI_*`，默认复用 `ARK_TEXT_MODEL`，只有单独切模型时才配置 `MIND_ARENA_AI_MODEL`。配置缺失或上游失败时应回退 mock，旧 `OPENAI_API_*` 和 `AI_*` 仅作兼容。
+- 日志报 `column ... does not exist`，但对应迁移已是 `applied`：通常是已执行的迁移文件后来又被修改。单纯重启 `air` 无效；应保留旧版本不动，新增更高版本的幂等修复迁移，执行 `go run ./cmd/migrate up` 后再验证实际字段或最小写入链路。
 
 ## 相关入口
 

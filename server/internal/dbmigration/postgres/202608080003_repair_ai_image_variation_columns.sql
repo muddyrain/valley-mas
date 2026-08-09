@@ -1,0 +1,6 @@
+-- +goose Up
+ALTER TABLE ai_image_generations
+  ADD COLUMN IF NOT EXISTS variation_mode VARCHAR(20) NOT NULL DEFAULT 'precise',
+  ADD COLUMN IF NOT EXISTS variation_seed VARCHAR(40) NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS variation_prompt TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS subject_context TEXT NOT NULL DEFAULT '';

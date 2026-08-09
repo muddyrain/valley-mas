@@ -42,6 +42,8 @@ type createAIImageGenerationRequest struct {
 	ModelID               string   `json:"modelId"`
 	RecipeID              string   `json:"recipeId"`
 	StyleProfileID        string   `json:"styleProfileId"`
+	VariationMode         string   `json:"variationMode"`
+	SubjectContext        string   `json:"subjectContext"`
 	Brief                 string   `json:"brief"`
 	PresetID              string   `json:"presetId"` // Legacy request compatibility.
 	SkillID               string   `json:"skillId"`  // Legacy request compatibility.
@@ -184,6 +186,8 @@ func CreateAIImageGeneration(c *gin.Context) {
 			ModelID:               payload.ModelID,
 			RecipeID:              payload.effectiveRecipeID(),
 			StyleProfileID:        payload.effectiveStyleProfileID(),
+			VariationMode:         payload.VariationMode,
+			SubjectContext:        payload.SubjectContext,
 			Brief:                 payload.effectiveBrief(),
 			AspectRatio:           payload.AspectRatio,
 			Quality:               payload.Quality,
@@ -604,11 +608,18 @@ func validateAIImageGenerationRequest(
 		return aiImagePreset{}, "", nil, errors.New("请选择有效的创作类型")
 	}
 	prompt := payload.effectiveBrief()
-	if prompt == "" {
+	subjectContext := strings.TrimSpace(payload.SubjectContext)
+	if prompt == "" && subjectContext == "" {
 		return aiImagePreset{}, "", nil, errors.New("请输入画面描述")
 	}
 	if utf8.RuneCountInString(prompt) > maxAIImagePromptRunes {
 		return aiImagePreset{}, "", nil, fmt.Errorf("画面描述不能超过 %d 个字符", maxAIImagePromptRunes)
+	}
+	if utf8.RuneCountInString(subjectContext) > maxAIImagePromptRunes {
+		return aiImagePreset{}, "", nil, fmt.Errorf("主题上下文不能超过 %d 个字符", maxAIImagePromptRunes)
+	}
+	if utf8.RuneCountInString(prompt)+utf8.RuneCountInString(subjectContext) > maxAIImagePromptRunes {
+		return aiImagePreset{}, "", nil, fmt.Errorf("画面描述与主题上下文合计不能超过 %d 个字符", maxAIImagePromptRunes)
 	}
 	qualityMap, ok := aiImageSizes[payload.AspectRatio]
 	if !ok {

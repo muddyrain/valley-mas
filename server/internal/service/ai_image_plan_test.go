@@ -65,6 +65,69 @@ func TestAIImagePlannerFreeRecipeIsNeutral(t *testing.T) {
 	}
 }
 
+func TestAIImagePlannerCompilesRequestScopedVariation(t *testing.T) {
+	planner := NewAIImagePlanner(nil)
+	first, err := planner.Resolve(context.Background(), 1, AIImagePlanIntent{
+		RecipeID: "cover", Brief: "React 元数据标记文章封面",
+		VariationMode: AIImageVariationModeBalanced, VariationSeed: "variation-a",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := planner.Resolve(context.Background(), 1, AIImagePlanIntent{
+		RecipeID: "cover", Brief: "React 元数据标记文章封面",
+		VariationMode: AIImageVariationModeBalanced, VariationSeed: "variation-b",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.VariationMode != AIImageVariationModeBalanced || first.VariationSeed != "variation-a" {
+		t.Fatalf("variation snapshot was not preserved: %+v", first)
+	}
+	if first.VariationPrompt == "" || !strings.Contains(first.Prompt, "[CREATIVE VARIATION]") {
+		t.Fatalf("compiled prompt is missing variation guidance: %s", first.Prompt)
+	}
+	if first.Prompt == second.Prompt {
+		t.Fatal("different request variation seeds must not compile to the same prompt")
+	}
+}
+
+func TestAIImagePlannerPreciseModeDoesNotInjectVariation(t *testing.T) {
+	plan, err := NewAIImagePlanner(nil).Resolve(context.Background(), 1, AIImagePlanIntent{
+		RecipeID: "cover", Brief: "保持指定的蓝色正面构图",
+		VariationMode: AIImageVariationModePrecise, VariationSeed: "ignored",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.VariationPrompt != "" || strings.Contains(plan.Prompt, "[CREATIVE VARIATION]") {
+		t.Fatalf("precise mode must preserve the brief without automatic variation: %s", plan.Prompt)
+	}
+}
+
+func TestAIImagePlannerSeparatesSubjectContextFromUserInstructions(t *testing.T) {
+	plan, err := NewAIImagePlanner(nil).Resolve(context.Background(), 1, AIImagePlanIntent{
+		RecipeID: "cover", SubjectContext: "文章标题：元数据标记\n正文要点：介绍 tags 和 token",
+		Brief: "使用编辑插画，不要人物", VariationMode: AIImageVariationModePrecise,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(plan.Prompt, "[SUBJECT CONTEXT]") ||
+		!strings.Contains(plan.Prompt, "[USER BRIEF]\n使用编辑插画，不要人物") {
+		t.Fatalf("subject context and user brief were not compiled separately: %s", plan.Prompt)
+	}
+}
+
+func TestAIImagePlannerRejectsUnknownVariationMode(t *testing.T) {
+	_, err := NewAIImagePlanner(nil).Resolve(context.Background(), 1, AIImagePlanIntent{
+		RecipeID: "free", Brief: "山谷", VariationMode: "random",
+	})
+	if err == nil || !strings.Contains(err.Error(), "画面变化幅度") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestAIImagePlannerRejectsAnotherOwnersSkill(t *testing.T) {
 	db := newAIImagePlannerTestDB(t)
 	if err := db.Create(&model.AISkill{

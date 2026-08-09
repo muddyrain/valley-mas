@@ -113,6 +113,10 @@ func TestAIImageGenerationServiceGeneratePersistsStoredResult(t *testing.T) {
 		!strings.Contains(result.StyleProfilePrompt, "优先留白与旧纸张质感") {
 		t.Fatalf("style profile snapshot was not persisted: %+v", result)
 	}
+	if result.VariationMode != AIImageVariationModeBalanced || result.VariationSeed == "" ||
+		result.VariationPrompt == "" || !strings.Contains(generatedPrompt, "[CREATIVE VARIATION]") {
+		t.Fatalf("request variation snapshot was not persisted: %+v", result)
+	}
 	if !strings.Contains(generatedPrompt, "优先留白与旧纸张质感") || !strings.Contains(generatedPrompt, strings.TrimSpace(prompt)) {
 		t.Fatalf("skill and user prompt must both reach image model: %s", generatedPrompt)
 	}
@@ -209,6 +213,18 @@ func TestAIImageGenerationServiceRejectsOutOfRangeTimeout(t *testing.T) {
 		UserID: 1, ModelID: "7", Brief: "超时测试", AspectRatio: "1:1", Quality: "1K", TimeoutSeconds: 30,
 	})
 	if err == nil || err.Error() != "图片生成超时必须在 60 到 600 秒之间" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAIImageGenerationServiceRejectsOversizedCombinedPromptContext(t *testing.T) {
+	service := NewAIImageGenerationService(newAIImageRuntimeTestDB(t))
+	_, err := service.Generate(context.Background(), AIImageGenerationInput{
+		UserID: 1, ModelID: "7", Brief: strings.Repeat("a", MaxAIImagePromptRunes/2+1),
+		SubjectContext: strings.Repeat("b", MaxAIImagePromptRunes/2+1),
+		AspectRatio:    "1:1", Quality: "1K",
+	})
+	if err == nil || !strings.Contains(err.Error(), "合计不能超过") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -38,6 +38,7 @@
 - 新增或修改接口时，先定位 `internal/router/router.go` 的路由分组，再按 handler、model/service、middleware、前端 API 封装的顺序联动检查。
 - 权限逻辑优先放在中间件或明确的服务端判断中，前端隐藏入口不能作为权限依据。
 - GORM model 改动要同步新增 `internal/dbmigration/{postgres,mysql}` 版本化迁移，并考虑默认值、索引和现有数据兼容；生产服务启动不隐式执行 DDL。
+- 版本化迁移一旦在任一持久数据库显示为 `applied`，对应版本即视为不可变：不得继续向同版本 SQL 追加字段或改写语句。遗漏或修正必须新增更高版本的 PostgreSQL/MySQL 修复迁移；不得通过删除 `schema_migrations` 记录或强制重跑旧迁移掩盖漂移。本地 `air` 只执行待处理版本，重启不会重跑已应用迁移。
 - 新增用户主动发起的 AI 接入优先通过 `aimodel.ResolveInvocation` 从模型目录解析能力，并复用 `internal/aiclient`；不在 handler 里直接 `os.Getenv("ARK_*")` 或 `arkruntime.NewClientWithApiKey(...)`。
 - 需要多轮推理、追问、按需查询数据的 AI 场景优先落成 `internal/ai/tools/<domain>` 下的 Tool，通过 `internal/ai/agent.AgentRuntime` 驱动;只有单次 prompt 就能收敛的场景（摘要 / 翻译 / 单图分析）才继续走现有 `PromptContract` 直调路径。
 - Mind Arena 接口改动要同步检查前端 `apps/ai-mind-arena/lib/api.ts`、`lib/types.ts` 和 SSE 事件处理。
@@ -74,6 +75,7 @@
 ```bash
 cd server && go run ./cmd/server
 cd server && go run ./cmd/migrate status
+cd server && go run ./cmd/migrate up
 cd server && go test ./...
 cd server && go build ./cmd/server ./cmd/migrate
 cd server && air
@@ -83,6 +85,7 @@ cd server && air
 
 - Go 代码改动：运行 `cd server && go test ./...`。
 - 路由、handler、模型、配置或中间件改动：检查对应前端 API 调用和 `.env.example` 是否需要同步。
+- 迁移改动：先用 `go run ./cmd/migrate status` 确认新版本为 pending，再在本地或测试库执行 `go run ./cmd/migrate up`（或重启 `air`），最后验证目标字段/索引或最小写入链路；仅看到版本为 `applied` 不能替代实际结构验证。
 - AI/Mind Arena 服务端改动：补充或运行相关 `internal/ai`、`internal/mindarena` 测试，并说明真实模型调用是否未验证。
 - 仅改服务端协作文档且包含 CJK/非 ASCII 文本时，运行定向 encoding 检查；不需要跑 Go 编译时在最终回复说明原因。
 - 行为类高风险提测前最小门禁：
