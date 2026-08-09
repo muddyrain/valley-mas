@@ -151,6 +151,7 @@ export type AIModelCapability =
   | 'text'
   | 'vision'
   | 'image_generation'
+  | 'video_generation'
   | 'reference_image'
   | 'masked_edit'
   | 'outpainting'
@@ -159,7 +160,8 @@ export type AIModelCapability =
 
 export type AIModelVerificationStatus = 'unverified' | 'partial' | 'verified' | 'failed';
 export type AIImageProtocol = 'auto' | 'siliconflow_images' | 'openai_images' | 'ark_images';
-export type AIModelProvider = 'siliconflow' | 'amux' | 'pipixia' | 'ark';
+export type AIVideoProtocol = 'auto' | 'amux_video';
+export type AIModelProvider = 'siliconflow' | 'amux' | 'pipixia' | 'volcengine';
 
 export interface AdminAIModel {
   id: string;
@@ -168,6 +170,7 @@ export interface AdminAIModel {
   displayName: string;
   capabilities: AIModelCapability[];
   imageProtocol: AIImageProtocol;
+  videoProtocol: AIVideoProtocol;
   verifiedCapabilities: AIModelCapability[];
   verificationStatus: AIModelVerificationStatus;
   verificationMessage: string;
@@ -191,6 +194,7 @@ export type AdminAIModelInput = Pick<
   | 'displayName'
   | 'capabilities'
   | 'imageProtocol'
+  | 'videoProtocol'
   | 'contextWindowTokens'
   | 'maxOutputTokens'
   | 'embeddingDimension'
@@ -429,7 +433,10 @@ export function updateAIModel(id: string, payload: AdminAIModelInput) {
 }
 
 export function testAIModelConnection(
-  payload: Pick<AdminAIModel, 'provider' | 'modelId' | 'capabilities' | 'imageProtocol'> & {
+  payload: Pick<
+    AdminAIModel,
+    'provider' | 'modelId' | 'capabilities' | 'imageProtocol' | 'videoProtocol'
+  > & {
     catalogId?: string;
   },
 ) {

@@ -109,6 +109,17 @@ func TestProbeAIModelUsesImageGenerationEndpoint(t *testing.T) {
 	}
 }
 
+func TestProbeAIModelUsesSeedream5MinimumSize(t *testing.T) {
+	client := &fakeAIModelProbeClient{}
+	_, err := probeAIModel(context.Background(), client, "doubao-seedream-5-0-260128", []string{"image_generation"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.imageSize != "2K" {
+		t.Fatalf("Seedream 5 probe size = %q", client.imageSize)
+	}
+}
+
 func TestProbeAIModelUsesReferenceImageWhenDeclared(t *testing.T) {
 	client := &fakeAIModelProbeClient{}
 	result, err := probeAIModel(
@@ -216,6 +227,41 @@ func TestNewAIModelRequiresImageGenerationForReferenceImage(t *testing.T) {
 		Capabilities: []string{"image_generation", "reference_image"}, Enabled: true,
 	}); err != nil {
 		t.Fatalf("valid image model rejected: %v", err)
+	}
+}
+
+func TestNewAIModelAcceptsReferenceVideoGeneration(t *testing.T) {
+	item, err := newAIModel(adminAIModelRequest{
+		Provider: "amux", ModelID: "doubao-seedance-2.0-fast",
+		Capabilities: []string{"video_generation", "reference_image"}, VideoProtocol: "amux_video", Enabled: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.VideoProtocol != "amux_video" {
+		t.Fatalf("unexpected video protocol: %s", item.VideoProtocol)
+	}
+}
+
+func TestNewAIModelAcceptsVolcengineProvider(t *testing.T) {
+	item, err := newAIModel(adminAIModelRequest{
+		Provider: "volcengine", ModelID: "doubao-seed-2-0-lite-260215",
+		Capabilities: []string{"text"}, Enabled: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Provider != "volcengine" {
+		t.Fatalf("unexpected provider: %s", item.Provider)
+	}
+}
+
+func TestNewAIModelRejectsLegacyARKProvider(t *testing.T) {
+	_, err := newAIModel(adminAIModelRequest{
+		Provider: "ark", ModelID: "ep-legacy", Capabilities: []string{"text"}, Enabled: true,
+	})
+	if err == nil {
+		t.Fatal("expected legacy ark provider to be rejected for new catalog entries")
 	}
 }
 

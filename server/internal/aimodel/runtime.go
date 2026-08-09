@@ -57,19 +57,30 @@ func ProviderFromEnv(provider string) (ProviderConfig, error) {
 			return ProviderConfig{}, errors.New("AI 服务未配置：缺少 PIPIXIA_BASE_URL")
 		}
 		return ProviderConfig{Provider: "pipixia", APIKey: key, BaseURL: baseURL}, nil
-	case "ark":
-		key := strings.TrimSpace(os.Getenv("ARK_API_KEY"))
+	case "volcengine", "ark":
+		key := firstProviderEnv("VOLCENGINE_API_KEY", "ARK_API_KEY")
 		if key == "" {
-			return ProviderConfig{}, errors.New("AI 服务未配置：缺少 ARK_API_KEY")
+			return ProviderConfig{}, errors.New("AI 服务未配置：缺少 VOLCENGINE_API_KEY")
 		}
-		baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("ARK_BASE_URL")), "/")
+		baseURL := strings.TrimRight(firstProviderEnv("VOLCENGINE_BASE_URL", "ARK_BASE_URL"), "/")
 		if baseURL == "" {
 			baseURL = "https://ark.cn-beijing.volces.com/api/v3"
 		}
-		return ProviderConfig{Provider: "ark", APIKey: key, BaseURL: baseURL}, nil
+		// "ark" is a read-only compatibility alias for historical catalog rows.
+		// New entries are saved as "volcengine" by the Admin model catalog.
+		return ProviderConfig{Provider: "volcengine", APIKey: key, BaseURL: baseURL}, nil
 	default:
 		return ProviderConfig{}, fmt.Errorf("不支持的 AI Provider：%s", provider)
 	}
+}
+
+func firstProviderEnv(keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func DecodeStrings(raw string) []string {
@@ -141,12 +152,32 @@ func HasVerifiedCapabilities(item model.AIModel, required []string) bool {
 func ImageGenerationQualities(item model.AIModel) []string {
 	modelID := strings.ToLower(strings.TrimSpace(item.ModelID))
 	switch {
+	case strings.HasPrefix(modelID, "doubao-seedream-5-0"):
+		return []string{"2K", "3K", "4K"}
 	case strings.HasPrefix(modelID, "doubao-seedream-4-0"):
 		return []string{"1K", "2K", "3K", "4K"}
 	case modelID == "gpt-image-2":
 		return []string{"1K", "2K", "4K"}
 	}
 	return []string{"1K", "2K"}
+}
+
+// ImageGenerationProbeSize returns a low-cost size that still satisfies the
+// model's published minimum output contract.
+func ImageGenerationProbeSize(modelID string) string {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(modelID)), "doubao-seedream-5-0") {
+		return "2K"
+	}
+	return "1024x1024"
+}
+
+// ImageGenerationMinimumPixels exposes model constraints needed when a caller
+// requests an explicit width and height instead of a provider-defined tier.
+func ImageGenerationMinimumPixels(item model.AIModel) int64 {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(item.ModelID)), "doubao-seedream-5-0") {
+		return 3_686_400
+	}
+	return 0
 }
 
 // ImageGenerationReferenceQualities returns target tiers available when a

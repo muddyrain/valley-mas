@@ -86,6 +86,32 @@ pdftocairo -v
 
 没有该命令时，普通文本 PDF 仍按原有方式处理；选择视觉模型的 PDF 会标记为“PDF 解析组件未安装”，可在安装完成后从知识库重试。服务会把渲染页写入受限临时目录，任务结束立即清理；不要把用户 PDF 放入长期共享临时目录。
 
+## AI 动态表情转码环境
+
+动态表情 worker 需要 `ffprobe` 校验视频流，并调用 `ffmpeg` 将视频派生为循环 GIF。开发机、测试机和线上服务必须安装同一版本族的 FFmpeg，并确保服务账号可从 `PATH` 找到两个命令。
+
+```bash
+# macOS
+brew install ffmpeg
+
+# Debian / Ubuntu
+sudo apt-get update && sudo apt-get install -y ffmpeg
+
+# Rocky / AlmaLinux / CentOS
+sudo dnf install -y ffmpeg
+```
+
+发布前验证：
+
+```bash
+command -v ffmpeg
+command -v ffprobe
+ffmpeg -version
+ffprobe -version
+```
+
+缺少命令时，视频模型任务仍可能完成并保存 MP4，但 GIF 派生会进入失败状态并在历史中保留错误信息。部署前还需应用 `202608080005_add_ai_motion_stickers` 迁移，并在 Admin 模型目录为 AMUX Seedance 模型启用 `video_generation`、`reference_image` 和 `amux_video`。
+
 ## 国内服务器自动部署
 
 当前推荐用于国内云服务器的部署链路：

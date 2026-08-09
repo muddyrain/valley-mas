@@ -2,6 +2,7 @@ import {
   ArrowUpRight,
   BookOpen,
   Bot,
+  Film,
   FolderOpen,
   ImageIcon,
   LayoutDashboard,
@@ -55,6 +56,12 @@ const creationTools = [
     title: 'AI 图片',
     description: '生成和编辑图像',
     href: '/workbench/images',
+  },
+  {
+    icon: Film,
+    title: '动态表情',
+    description: '把角色图片变成循环 GIF',
+    href: '/workbench/gifs',
   },
   {
     icon: FolderOpen,

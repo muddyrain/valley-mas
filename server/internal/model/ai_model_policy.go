@@ -16,6 +16,7 @@ type AIModel struct {
 	DisplayName          string      `gorm:"size:180;not null" json:"displayName"`
 	Capabilities         string      `gorm:"type:text;not null;default:'[]'" json:"capabilities"`
 	ImageProtocol        string      `gorm:"size:40;not null;default:'auto'" json:"imageProtocol"`
+	VideoProtocol        string      `gorm:"size:40;not null;default:'auto'" json:"videoProtocol"`
 	VerifiedCapabilities string      `gorm:"type:text;not null;default:'[]'" json:"verifiedCapabilities"`
 	VerificationStatus   string      `gorm:"size:20;index;not null;default:'unverified'" json:"verificationStatus"`
 	VerificationMessage  string      `gorm:"size:500;not null;default:''" json:"verificationMessage"`
@@ -46,6 +47,9 @@ func (m *AIModel) BeforeCreate(tx *gorm.DB) error {
 	}
 	if m.ImageProtocol == "" {
 		m.ImageProtocol = "auto"
+	}
+	if m.VideoProtocol == "" {
+		m.VideoProtocol = "auto"
 	}
 	return nil
 }

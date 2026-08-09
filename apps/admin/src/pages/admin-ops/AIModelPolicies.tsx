@@ -32,6 +32,7 @@ const capabilityOptions: Array<{ value: AIModelCapability; label: string }> = [
   { value: 'text', label: '文本' },
   { value: 'vision', label: '视觉' },
   { value: 'image_generation', label: '生图' },
+  { value: 'video_generation', label: '视频生成' },
   { value: 'reference_image', label: '支持参考图' },
   { value: 'masked_edit', label: '局部重绘 / 擦除替换' },
   { value: 'outpainting', label: '扩图' },
@@ -44,6 +45,11 @@ const imageProtocolOptions = [
   { value: 'siliconflow_images', label: 'SiliconFlow Images JSON' },
   { value: 'openai_images', label: 'OpenAI Images（生成 / 编辑）' },
   { value: 'ark_images', label: 'ARK Images JSON' },
+];
+
+const videoProtocolOptions = [
+  { value: 'auto', label: '自动匹配 Provider（推荐）' },
+  { value: 'amux_video', label: 'AMUX 通用视频任务 API' },
 ];
 
 type ModelForm = AdminAIModelInput;
@@ -71,6 +77,7 @@ export default function AIModelPolicies() {
   const [modelForm] = Form.useForm<ModelForm>();
   const selectedCapabilities = Form.useWatch('capabilities', modelForm) || [];
   const probesImageGeneration = selectedCapabilities.includes('image_generation');
+  const probesVideoGeneration = selectedCapabilities.includes('video_generation');
   const isEmbeddingModel = selectedCapabilities.includes('embedding');
 
   const reload = useCallback(async () => {
@@ -194,6 +201,7 @@ export default function AIModelPolicies() {
         provider: 'siliconflow',
         capabilities: ['text'],
         imageProtocol: 'auto',
+        videoProtocol: 'auto',
         enabled: true,
         sortOrder: models.length + 1,
       });
@@ -224,6 +232,7 @@ export default function AIModelPolicies() {
         modelId: selected.modelId,
         capabilities: selected.capabilities,
         imageProtocol: selected.imageProtocol,
+        videoProtocol: selected.videoProtocol,
       });
       message.success(
         `${selected.displayName} 调用正常（${result.latencyMs}ms，${
@@ -306,7 +315,7 @@ export default function AIModelPolicies() {
                 { value: 'siliconflow', label: 'SiliconFlow' },
                 { value: 'amux', label: 'Amux' },
                 { value: 'pipixia', label: 'pipixia' },
-                { value: 'ark', label: 'ARK（仅 Legacy）' },
+                { value: 'volcengine', label: '火山引擎' },
               ]}
             />
           </Form.Item>
@@ -320,16 +329,18 @@ export default function AIModelPolicies() {
             <Select
               mode="multiple"
               options={capabilityOptions.map((item) =>
-                ['reference_image', 'masked_edit', 'outpainting'].includes(item.value)
-                  ? { ...item, disabled: !probesImageGeneration }
-                  : item,
+                item.value === 'reference_image'
+                  ? { ...item, disabled: !probesImageGeneration && !probesVideoGeneration }
+                  : ['masked_edit', 'outpainting'].includes(item.value)
+                    ? { ...item, disabled: !probesImageGeneration }
+                    : item,
               )}
               onChange={(values: AIModelCapability[]) => {
                 let capabilities = values;
                 if (!values.includes('image_generation')) {
                   capabilities = values.filter(
                     (value) =>
-                      value !== 'reference_image' &&
+                      (value !== 'reference_image' || values.includes('video_generation')) &&
                       value !== 'masked_edit' &&
                       value !== 'outpainting',
                   );
@@ -365,6 +376,16 @@ export default function AIModelPolicies() {
               extra="自动模式按 Provider 选择默认协议；仅在模型文档明确要求时手动指定。"
             >
               <Select options={imageProtocolOptions} />
+            </Form.Item>
+          ) : null}
+          {probesVideoGeneration ? (
+            <Form.Item
+              name="videoProtocol"
+              label="视频协议"
+              rules={[{ required: true }]}
+              extra="AMUX 的 Seedance 视频模型使用通用异步视频任务协议。"
+            >
+              <Select options={videoProtocolOptions} />
             </Form.Item>
           ) : null}
           <Form.Item name="sortOrder" label="排序">

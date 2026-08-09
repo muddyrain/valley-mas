@@ -71,6 +71,10 @@ func TestImageGenerationQualitiesFollowModelRatherThanProvider(t *testing.T) {
 	if values := ImageGenerationQualities(seedream); !slices.Equal(values, []string{"1K", "2K", "3K", "4K"}) {
 		t.Fatalf("qualities = %#v", values)
 	}
+	seedream5 := model.AIModel{Provider: "volcengine", ModelID: "doubao-seedream-5-0-260128"}
+	if values := ImageGenerationQualities(seedream5); !slices.Equal(values, []string{"2K", "3K", "4K"}) {
+		t.Fatalf("Seedream 5 qualities = %#v", values)
+	}
 	gptImage := model.AIModel{Provider: "siliconflow", ModelID: "gpt-image-2"}
 	if values := ImageGenerationQualities(gptImage); !slices.Equal(values, []string{"1K", "2K", "4K"}) {
 		t.Fatalf("qualities = %#v", values)
@@ -78,6 +82,15 @@ func TestImageGenerationQualitiesFollowModelRatherThanProvider(t *testing.T) {
 	legacy := model.AIModel{Provider: "siliconflow", ModelID: "Kwai-Kolors/Kolors"}
 	if values := ImageGenerationQualities(legacy); !slices.Equal(values, []string{"1K", "2K"}) {
 		t.Fatalf("qualities = %#v", values)
+	}
+}
+
+func TestImageGenerationProbeSizeUsesSeedream5Minimum(t *testing.T) {
+	if size := ImageGenerationProbeSize("doubao-seedream-5-0-260128"); size != "2K" {
+		t.Fatalf("Seedream 5 probe size = %q", size)
+	}
+	if size := ImageGenerationProbeSize("Kwai-Kolors/Kolors"); size != "1024x1024" {
+		t.Fatalf("default probe size = %q", size)
 	}
 }
 
@@ -166,6 +179,45 @@ func TestProviderFromEnvRequiresPipixiaBaseURL(t *testing.T) {
 
 	if _, err := ProviderFromEnv("pipixia"); err == nil {
 		t.Fatal("expected missing PIPIXIA_BASE_URL error")
+	}
+}
+
+func TestProviderFromEnvUsesVolcengineCompatibleConfig(t *testing.T) {
+	t.Setenv("VOLCENGINE_API_KEY", "test-key")
+	t.Setenv("VOLCENGINE_BASE_URL", "https://ark.example/api/v3/")
+
+	provider, err := ProviderFromEnv("volcengine")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider.Provider != "volcengine" || provider.APIKey != "test-key" || provider.BaseURL != "https://ark.example/api/v3" {
+		t.Fatalf("unexpected volcengine provider config: %+v", provider)
+	}
+}
+
+func TestProviderFromEnvUsesOfficialVolcengineBaseURLByDefault(t *testing.T) {
+	t.Setenv("VOLCENGINE_API_KEY", "test-key")
+	t.Setenv("VOLCENGINE_BASE_URL", "")
+
+	provider, err := ProviderFromEnv("volcengine")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider.BaseURL != "https://ark.cn-beijing.volces.com/api/v3" {
+		t.Fatalf("unexpected default base URL: %s", provider.BaseURL)
+	}
+}
+
+func TestProviderFromEnvCanonicalizesLegacyARKProvider(t *testing.T) {
+	t.Setenv("VOLCENGINE_API_KEY", "test-key")
+	t.Setenv("VOLCENGINE_BASE_URL", "https://ark.example/api/v3")
+
+	provider, err := ProviderFromEnv("ark")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider.Provider != "volcengine" {
+		t.Fatalf("legacy provider was not canonicalized: %+v", provider)
 	}
 }
 

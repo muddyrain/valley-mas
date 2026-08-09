@@ -10,6 +10,7 @@ import WorkbenchLayout from './layouts/WorkbenchLayout';
 import AIAppConversation from './pages/AIAppConversation';
 import AIAppEditor from './pages/AIAppEditor';
 import AIImageStudio from './pages/AIImageStudio';
+import AIMotionStickers from './pages/AIMotionStickers';
 import AIResources from './pages/AIResources';
 import BlogCreate from './pages/BlogCreate';
 import BlogGroupManage from './pages/BlogGroupManage';
@@ -72,6 +73,8 @@ function RouteTitle() {
       title = '项目 | Valley';
     } else if (pathname === '/workbench/images') {
       title = 'AI 图片 | Valley';
+    } else if (pathname === '/workbench/gifs') {
+      title = 'AI 动态表情 | Valley';
     } else if (pathname === '/workbench/resources') {
       title = 'AI 资源 | Valley';
     } else if (pathname.startsWith('/workbench/templates/')) {
@@ -179,6 +182,14 @@ function App() {
             element={
               <RequireAuth>
                 <AIImageStudio />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="workbench/gifs"
+            element={
+              <RequireAuth>
+                <AIMotionStickers />
               </RequireAuth>
             }
           />

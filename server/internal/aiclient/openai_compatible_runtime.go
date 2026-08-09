@@ -17,6 +17,7 @@ import (
 type CompatibleClient struct {
 	Provider      string
 	ImageProtocol string
+	VideoProtocol string
 	BaseURL       string
 	APIKey        string
 	Client        *http.Client
@@ -85,6 +86,7 @@ func NewProviderCompatibleClient(provider, baseURL, apiKey string, timeout time.
 	return &CompatibleClient{
 		Provider:      strings.TrimSpace(provider),
 		ImageProtocol: "auto",
+		VideoProtocol: "auto",
 		BaseURL:       strings.TrimRight(strings.TrimSpace(baseURL), "/"),
 		APIKey:        strings.TrimSpace(apiKey),
 		Client:        &http.Client{Timeout: timeout},

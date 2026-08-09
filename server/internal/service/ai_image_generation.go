@@ -57,6 +57,25 @@ var AIImageSizes = map[string]map[string]string{
 	"9:16": {"1K": "720x1280", "2K": "1152x2048", "3K": "1728x3072", "4K": "2304x4096"},
 }
 
+var seedream5TwoKSizes = map[string]string{
+	"1:1":  "2048x2048",
+	"4:3":  "2304x1728",
+	"3:4":  "1728x2304",
+	"16:9": "2560x1440",
+	"9:16": "1440x2560",
+}
+
+func resolveAIImageRequestedSize(item model.AIModel, aspectRatio, quality string) string {
+	size := AIImageSizes[strings.TrimSpace(aspectRatio)][strings.TrimSpace(quality)]
+	if strings.TrimSpace(quality) != "2K" || aimodel.ImageGenerationMinimumPixels(item) == 0 {
+		return size
+	}
+	if adjusted := seedream5TwoKSizes[strings.TrimSpace(aspectRatio)]; adjusted != "" {
+		return adjusted
+	}
+	return size
+}
+
 var ErrAIImageStorageUnavailable = errors.New("图片存储服务未配置")
 
 func aiImageGenerationTimeout(timeoutSeconds int) (time.Duration, error) {
@@ -259,6 +278,7 @@ func (s *AIImageGenerationService) prepare(ctx context.Context, input AIImageGen
 	if err != nil {
 		return aiImageGenerationJob{}, err
 	}
+	size = resolveAIImageRequestedSize(invocation.Model, input.AspectRatio, quality)
 	if !slices.Contains(aimodel.ImageGenerationQualities(invocation.Model), quality) {
 		return aiImageGenerationJob{}, &AIImageGenerationInputError{Message: "所选图片模型不支持该目标分辨率"}
 	}

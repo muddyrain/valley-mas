@@ -206,6 +206,78 @@ func TestAmuxImageAdapterUsesMultipartEditForReferences(t *testing.T) {
 	}
 }
 
+func TestVolcengineAutoImageProtocolUsesARKImagesContract(t *testing.T) {
+	var payload map[string]any
+	client := NewProviderCompatibleClient("volcengine", "https://ark.example/api/v3", "test-key", time.Second)
+	client.Client.Transport = roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path != "/api/v3/images/generations" {
+			t.Fatalf("path = %q", request.URL.Path)
+		}
+		if request.Header.Get("Authorization") != "Bearer test-key" {
+			t.Fatalf("authorization = %q", request.Header.Get("Authorization"))
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"data":[{"url":"https://example.com/volcengine.png"}]}`)),
+			Request:    request,
+		}, nil
+	})
+	result, err := client.GenerateImageResult(context.Background(), ImageGenerationRequest{
+		ModelID: "doubao-seedream-4-0-250828",
+		Prompt:  "draw a cat",
+		Size:    "1024x1024",
+		Images:  []string{"data:image/png;base64,AA=="},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Source != "https://example.com/volcengine.png" || payload["size"] != "1024x1024" {
+		t.Fatalf("unexpected volcengine image result: result=%+v payload=%#v", result, payload)
+	}
+	if images, ok := payload["image"].([]any); !ok || len(images) != 1 {
+		t.Fatalf("volcengine payload must include reference images: %#v", payload)
+	}
+}
+
+func TestVolcengineSequentialImageGenerationReturnsAllFrames(t *testing.T) {
+	var payload map[string]any
+	client := NewProviderCompatibleClient("volcengine", "https://ark.example/api/v3", "test-key", time.Second)
+	client.Client.Transport = roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body: io.NopCloser(strings.NewReader(
+				`{"data":[{"url":"https://example.com/frame-1.png"},{"url":"https://example.com/frame-2.png"},{"url":"https://example.com/frame-3.png"}]}`,
+			)),
+			Request: request,
+		}, nil
+	})
+	result, err := client.GenerateImageResult(context.Background(), ImageGenerationRequest{
+		ModelID: "doubao-seedream-5-0-260128", Prompt: "three loop frames", Size: "2048x2048",
+		Images: []string{"data:image/png;base64,AA=="}, OutputCount: 3,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payload["sequential_image_generation"] != "auto" {
+		t.Fatalf("sequential generation missing: %#v", payload)
+	}
+	options, ok := payload["sequential_image_generation_options"].(map[string]any)
+	if !ok || options["max_images"] != float64(3) {
+		t.Fatalf("sequential options = %#v", payload["sequential_image_generation_options"])
+	}
+	if len(result.Sources) != 3 || result.Source != result.Sources[0] {
+		t.Fatalf("unexpected sequential result: %+v", result)
+	}
+}
+
 func TestAmuxImageAdapterSendsPNGMaskForMaskedEdit(t *testing.T) {
 	client := NewProviderCompatibleClient("amux", "https://provider.test/v1", "test-key", time.Second)
 	client.Client.Transport = roundTripperFunc(func(request *http.Request) (*http.Response, error) {

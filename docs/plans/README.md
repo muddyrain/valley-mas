@@ -23,6 +23,7 @@
 
 ## 当前活跃计划
 
+- [2026-08-08-ai-motion-stickers.md](2026-08-08-ai-motion-stickers.md)：参考图驱动的 owner 私有动态表情、AMUX 视频任务、MP4/GIF 双资产与共享工具契约。
 - [2026-08-04-workflow-collaboration-agent.md](2026-08-04-workflow-collaboration-agent.md)：工作流固定协作智能体、单时间线、后台直接修改、冲突合并与持久撤销。
 - [2026-08-02-ai-agent-operations-files.md](2026-08-02-ai-agent-operations-files.md)：智能体后台任务、工具人工确认、知识检索引用和成果文件。
 - [2026-07-28-auth-security-hardening.md](2026-07-28-auth-security-hardening.md)：会话失效、持久化验证码、频率限制与密码哈希升级。

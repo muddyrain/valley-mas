@@ -34,6 +34,7 @@ type adminAIModelRequest struct {
 	DisplayName         string   `json:"displayName"`
 	Capabilities        []string `json:"capabilities"`
 	ImageProtocol       string   `json:"imageProtocol"`
+	VideoProtocol       string   `json:"videoProtocol"`
 	ContextWindowTokens int      `json:"contextWindowTokens"`
 	MaxOutputTokens     int      `json:"maxOutputTokens"`
 	EmbeddingDimension  int      `json:"embeddingDimension"`
@@ -47,6 +48,7 @@ type aiModelConnectionTestRequest struct {
 	ModelID       string   `json:"modelId"`
 	Capabilities  []string `json:"capabilities"`
 	ImageProtocol string   `json:"imageProtocol"`
+	VideoProtocol string   `json:"videoProtocol"`
 }
 
 type aiModelOption struct {
@@ -70,6 +72,7 @@ type adminAIModelResponse struct {
 	DisplayName          string     `json:"displayName"`
 	Capabilities         []string   `json:"capabilities"`
 	ImageProtocol        string     `json:"imageProtocol"`
+	VideoProtocol        string     `json:"videoProtocol"`
 	VerifiedCapabilities []string   `json:"verifiedCapabilities"`
 	VerificationStatus   string     `json:"verificationStatus"`
 	VerificationMessage  string     `json:"verificationMessage"`
@@ -141,7 +144,7 @@ func AdminUpdateAIModel(c *gin.Context) {
 	}
 	updates := map[string]any{
 		"provider": item.Provider, "model_id": item.ModelID, "display_name": item.DisplayName,
-		"capabilities": item.Capabilities, "image_protocol": item.ImageProtocol,
+		"capabilities": item.Capabilities, "image_protocol": item.ImageProtocol, "video_protocol": item.VideoProtocol,
 		"context_window_tokens": item.ContextWindowTokens, "max_output_tokens": item.MaxOutputTokens,
 		"embedding_dimension": item.EmbeddingDimension,
 		"enabled":             item.Enabled, "sort_order": item.SortOrder,
@@ -150,6 +153,7 @@ func AdminUpdateAIModel(c *gin.Context) {
 		existing.ModelID != item.ModelID ||
 		existing.Capabilities != item.Capabilities ||
 		existing.ImageProtocol != item.ImageProtocol ||
+		existing.VideoProtocol != item.VideoProtocol ||
 		existing.EmbeddingDimension != item.EmbeddingDimension {
 		updates["verified_capabilities"] = "[]"
 		updates["verification_status"] = "unverified"
@@ -187,6 +191,7 @@ func AdminTestAIModelConnection(c *gin.Context) {
 		modelID,
 		req.Capabilities,
 		req.ImageProtocol,
+		req.VideoProtocol,
 	)
 	capabilities := profile.Capabilities
 	config, err := aimodel.ProviderFromEnv(provider)
@@ -208,6 +213,7 @@ func AdminTestAIModelConnection(c *gin.Context) {
 		probeTimeout,
 	)
 	probeClient.ImageProtocol = profile.ImageProtocol
+	probeClient.VideoProtocol = profile.VideoProtocol
 	probe, err := probeAIModel(
 		contextWithTimeout,
 		probeClient,
@@ -265,6 +271,7 @@ type aiModelProbeResult struct {
 type aiModelProbeProfile struct {
 	Capabilities       []string
 	ImageProtocol      string
+	VideoProtocol      string
 	EmbeddingDimension int
 }
 
@@ -282,7 +289,7 @@ func probeAIModel(
 		request := aiclient.ImageGenerationRequest{
 			ModelID: modelID,
 			Prompt:  "A small blue circle on a white background.",
-			Size:    "1024x1024",
+			Size:    aimodel.ImageGenerationProbeSize(modelID),
 		}
 		imageVerified := []string{"image_generation"}
 		if aimodel.HasCapabilities(item, []string{"reference_image"}) {
@@ -385,7 +392,7 @@ func isValidVisionProbeAnswer(value string) bool {
 func adminAIModelResponseFromModel(item model.AIModel) adminAIModelResponse {
 	return adminAIModelResponse{
 		ID: item.ID.String(), Provider: item.Provider, ModelID: item.ModelID, DisplayName: item.DisplayName,
-		Capabilities: aimodel.DecodeStrings(item.Capabilities), ImageProtocol: item.ImageProtocol,
+		Capabilities: aimodel.DecodeStrings(item.Capabilities), ImageProtocol: item.ImageProtocol, VideoProtocol: item.VideoProtocol,
 		VerifiedCapabilities: aimodel.DecodeStrings(item.VerifiedCapabilities),
 		VerificationStatus:   item.VerificationStatus, VerificationMessage: item.VerificationMessage,
 		LastVerifiedAt:      item.LastVerifiedAt,
@@ -445,8 +452,8 @@ func ListAvailableAIModels(c *gin.Context) {
 
 func newAIModel(req adminAIModelRequest) (model.AIModel, error) {
 	provider := strings.TrimSpace(req.Provider)
-	if provider != "siliconflow" && provider != "amux" && provider != "pipixia" && provider != "ark" {
-		return model.AIModel{}, errors.New("Provider 仅支持 siliconflow、amux、pipixia 或兼容期 ark")
+	if provider != "siliconflow" && provider != "amux" && provider != "pipixia" && provider != "volcengine" {
+		return model.AIModel{}, errors.New("Provider 仅支持 siliconflow、amux、pipixia 或 volcengine")
 	}
 	modelID := strings.TrimSpace(req.ModelID)
 	if modelID == "" {
@@ -456,7 +463,11 @@ func newAIModel(req adminAIModelRequest) (model.AIModel, error) {
 	if len(capabilities) == 0 {
 		return model.AIModel{}, errors.New("请至少配置一种模型能力")
 	}
-	for _, capability := range []string{"reference_image", "masked_edit", "outpainting"} {
+	if slices.Contains(capabilities, "reference_image") &&
+		!slices.Contains(capabilities, "image_generation") && !slices.Contains(capabilities, "video_generation") {
+		return model.AIModel{}, errors.New("参考图能力需要同时启用生图或视频生成能力")
+	}
+	for _, capability := range []string{"masked_edit", "outpainting"} {
 		if slices.Contains(capabilities, capability) && !slices.Contains(capabilities, "image_generation") {
 			return model.AIModel{}, errors.New("图片编辑能力需要同时启用生图能力")
 		}
@@ -472,11 +483,15 @@ func newAIModel(req adminAIModelRequest) (model.AIModel, error) {
 		displayName = modelID
 	}
 	imageProtocol := normalizeImageProtocol(req.ImageProtocol)
+	videoProtocol := normalizeVideoProtocol(req.VideoProtocol)
 	if !slices.Contains(
 		[]string{"auto", "siliconflow_images", "openai_images", "ark_images"},
 		imageProtocol,
 	) {
 		return model.AIModel{}, errors.New("请选择有效的图片协议")
+	}
+	if !slices.Contains([]string{"auto", "amux_video"}, videoProtocol) {
+		return model.AIModel{}, errors.New("请选择有效的视频协议")
 	}
 	if req.ContextWindowTokens < 0 || req.MaxOutputTokens < 0 {
 		return model.AIModel{}, errors.New("模型规格不能小于 0")
@@ -490,7 +505,7 @@ func newAIModel(req adminAIModelRequest) (model.AIModel, error) {
 	}
 	return model.AIModel{
 		Provider: provider, ModelID: modelID, DisplayName: displayName,
-		Capabilities: aimodel.EncodeStrings(capabilities), ImageProtocol: imageProtocol,
+		Capabilities: aimodel.EncodeStrings(capabilities), ImageProtocol: imageProtocol, VideoProtocol: videoProtocol,
 		ContextWindowTokens: req.ContextWindowTokens, MaxOutputTokens: req.MaxOutputTokens,
 		EmbeddingDimension: embeddingDimension,
 		Enabled:            req.Enabled, SortOrder: req.SortOrder,
@@ -511,6 +526,14 @@ func mustEncodeStringSlice(values []string) string {
 }
 
 func normalizeImageProtocol(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "auto"
+	}
+	return value
+}
+
+func normalizeVideoProtocol(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return "auto"
@@ -626,10 +649,12 @@ func resolveAIModelProbeProfile(
 	modelID string,
 	requested []string,
 	requestedImageProtocol string,
+	requestedVideoProtocol string,
 ) aiModelProbeProfile {
 	fallback := aiModelProbeProfile{
 		Capabilities:  aimodel.DecodeStrings(mustEncodeStringSlice(requested)),
 		ImageProtocol: normalizeImageProtocol(requestedImageProtocol),
+		VideoProtocol: normalizeVideoProtocol(requestedVideoProtocol),
 	}
 	catalogID, ok := parseModelID(rawCatalogID)
 	if !ok {
@@ -644,6 +669,7 @@ func resolveAIModelProbeProfile(
 	return aiModelProbeProfile{
 		Capabilities:       aimodel.DecodeStrings(item.Capabilities),
 		ImageProtocol:      normalizeImageProtocol(item.ImageProtocol),
+		VideoProtocol:      normalizeVideoProtocol(item.VideoProtocol),
 		EmbeddingDimension: item.EmbeddingDimension,
 	}
 }

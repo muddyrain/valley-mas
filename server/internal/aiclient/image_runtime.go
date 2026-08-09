@@ -32,6 +32,9 @@ type ImageGenerationRequest struct {
 	Prompt   string
 	Size     string
 	Images   []string
+	// OutputCount requests a related image set. Adapters translate this into
+	// either the provider's sequential-image contract or the common n field.
+	OutputCount int
 	// Mask is a same-sized PNG that constrains an image edit. It is intentionally
 	// separate from Images so provider adapters cannot silently treat a mask as
 	// another visual reference.
@@ -46,6 +49,7 @@ type CompatibleImageUsage struct {
 
 type ImageGenerationResult struct {
 	Source         string
+	Sources        []string
 	ResponseFormat string
 	Usage          CompatibleImageUsage
 }
@@ -118,7 +122,7 @@ func imageAdapterFor(provider, protocol string) (imageProviderAdapter, error) {
 			protocol = "siliconflow_images"
 		case "amux", "pipixia":
 			protocol = "openai_images"
-		case "ark":
+		case "volcengine", "ark":
 			protocol = "ark_images"
 		}
 	}
@@ -188,14 +192,23 @@ func (arkImageAdapter) Generate(
 	if len(request.Images) > 0 {
 		payload["image"] = request.Images
 	}
+	if request.OutputCount > 1 {
+		payload["sequential_image_generation"] = "auto"
+		payload["sequential_image_generation_options"] = map[string]any{"max_images": request.OutputCount}
+		payload["stream"] = false
+	}
 	return generateImageJSON(ctx, client, payload)
 }
 
 func baseImageJSONPayload(request ImageGenerationRequest) map[string]any {
+	count := request.OutputCount
+	if count <= 0 {
+		count = 1
+	}
 	return map[string]any{
 		"model":  strings.TrimSpace(request.ModelID),
 		"prompt": strings.TrimSpace(request.Prompt),
-		"n":      1,
+		"n":      count,
 	}
 }
 
@@ -231,6 +244,9 @@ func generateOpenAIImageEdit(
 	fields := map[string]string{
 		"model":  strings.TrimSpace(request.ModelID),
 		"prompt": strings.TrimSpace(request.Prompt),
+	}
+	if request.OutputCount > 1 {
+		fields["n"] = fmt.Sprintf("%d", request.OutputCount)
 	}
 	if size := strings.TrimSpace(request.Size); size != "" {
 		fields["size"] = size
@@ -336,21 +352,31 @@ func (c *CompatibleClient) doMultipart(
 
 func normalizeCompatibleImageResponse(response compatibleImageResponse) (ImageGenerationResult, error) {
 	items := append(append([]compatibleImageData{}, response.Images...), response.Data...)
+	sources := make([]string, 0, len(items))
+	responseFormat := ""
 	for _, item := range items {
 		if source := strings.TrimSpace(item.URL); source != "" {
-			return ImageGenerationResult{
-				Source: source, ResponseFormat: "url", Usage: response.Usage,
-			}, nil
+			sources = append(sources, source)
+			if responseFormat == "" {
+				responseFormat = "url"
+			}
+			continue
 		}
 		if encoded := strings.TrimSpace(item.B64JSON); encoded != "" {
 			source, err := normalizeCompatibleImageBase64(encoded)
 			if err != nil {
 				return ImageGenerationResult{}, err
 			}
-			return ImageGenerationResult{
-				Source: source, ResponseFormat: "b64_json", Usage: response.Usage,
-			}, nil
+			sources = append(sources, source)
+			if responseFormat == "" {
+				responseFormat = "b64_json"
+			}
 		}
+	}
+	if len(sources) > 0 {
+		return ImageGenerationResult{
+			Source: sources[0], Sources: sources, ResponseFormat: responseFormat, Usage: response.Usage,
+		}, nil
 	}
 	return ImageGenerationResult{}, errors.New("AI 生图返回空图片结果")
 }
