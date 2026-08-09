@@ -10,7 +10,7 @@
 
 - `PORT`：默认 `8080`。
 - `DB_DRIVER`、`DB_DSN`、`DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME`：数据库配置。
-- `JWT_SECRET`、`SMTP_*`、`TOS_*`、`ARK_*`、`AI_*`、`QWEATHER_*`、`WEB_PUSH_*`：业务能力配置。
+- `JWT_SECRET`、`SMTP_*`、`TOS_*`、`VOLCENGINE_*`、`AI_*`、`QWEATHER_*`、`WEB_PUSH_*`：业务能力配置。
 - `WEB_PUSH_WORKER_ENABLED`：是否启动服务进程内置 Web Push 扫描 worker。当前服务按长驻服务器部署，本地或生产默认可保留 `true`；若另接外部 Cron 扫描，再按需设为 `false` 避免重复扫描。
 
 不要在文档、示例、日志或测试中写入真实密钥、真实 token、真实云资源标识或个人账号凭据。
@@ -264,8 +264,8 @@ cd server && go run ./cmd/sync-schema --apply --scope all
 - 端口被占用：检查是否已有服务监听 `:8080`，或通过 `PORT` 改端口。
 - 环境变量缺失：对照 `server/.env.example` 补齐本地 `.env`。
 - 数据库结构不一致：先运行 `go run ./cmd/migrate status` 查看版本；已有开发库运行 `go run ./cmd/migrate up`，空开发库运行一次 `go run ./cmd/migrate bootstrap --apply`。`sync-schema` 仅保留作定向应急修复，不属于日常启动或生产发布流程。
-- AI 调用失败：先确认功能归属。Valley/Blog/Creator 默认看 `ARK_*`；Life Trace 文本 AI 若配置了 `LIFE_TRACE_AI_*` 会优先使用它，否则回退 `ARK_TEXT_MODEL`；AI Mind Arena 看 `MIND_ARENA_AI_*`，默认复用 `ARK_TEXT_MODEL`，只有单独切模型时才配置 `MIND_ARENA_AI_MODEL`。配置缺失或上游失败时应回退 mock，旧 `OPENAI_API_*` 和 `AI_*` 仅作兼容。
 - 日志报 `column ... does not exist`，但对应迁移已是 `applied`：通常是已执行的迁移文件后来又被修改。单纯重启 `air` 无效；应保留旧版本不动，新增更高版本的幂等修复迁移，执行 `go run ./cmd/migrate up` 后再验证实际字段或最小写入链路。
+- AI 调用失败：模型目录中的火山引擎模型检查 `VOLCENGINE_API_KEY`、`VOLCENGINE_BASE_URL` 与目录模型 ID；不再配置 `ARK_TEXT_MODEL`、`ARK_VISION_MODEL`、`ARK_IMAGE_MODEL` 或 `ARK_EMBEDDING_MODEL`。知识库索引自动使用已启用且验证通过的 Embedding 目录模型；升级前生成的旧向量需在知识库页面重新索引一次。尚未迁移的其他旧直连入口会提示功能正在迁移。Life Trace 自有兼容配置看 `LIFE_TRACE_AI_*`；AI Mind Arena 需要完整的 `MIND_ARENA_AI_*`，缺失或上游失败时回退 mock，旧 `OPENAI_API_*` 和 `AI_*` 仅作兼容。
 
 ## 相关入口
 

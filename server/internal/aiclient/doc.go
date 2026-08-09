@@ -10,8 +10,8 @@
 //
 // 三 Provider 环境变量来源：
 //
-//   - ARK：ARK_API_KEY、ARK_BASE_URL（缺省 https://ark.cn-beijing.volces.com/api/v3）、
-//     ARK_TEXT_MODEL、ARK_VISION_MODEL、ARK_IMAGE_MODEL、ARK_IMAGE_MODEL_FALLBACK。
+//   - 火山引擎模型目录 Provider：VOLCENGINE_API_KEY、VOLCENGINE_BASE_URL
+//     （缺省 https://ark.cn-beijing.volces.com/api/v3）；模型 ID 由数据库目录提供。
 //     模型字段必须使用以 "ep-" 开头的接入点 ID。
 //   - OpenAI 兼容：通过 ReadOpenAIConfig(opts) 自定义 env 链，
 //     典型：LIFE_TRACE_AI_* > OPENAI_API_*；缺省 base https://api.openai.com/v1。
@@ -21,7 +21,7 @@
 //
 // 新增 AI 功能的接入入口：
 //
-//   - 文本：调用 ReadARKTextConfig 拿配置，再用 ARKClient(timeout) 取共享 client，
+//   - Legacy 文本：调用 ReadARKTextConfig 拿配置，再用 ARKClient(timeout) 取共享 client，
 //     然后用 NewARKChatRequest 构造请求；流式响应用 NewSSEWriter 包装。
 //   - 视觉：调用 ReadARKVisionConfig 或 ReadGeminiVisionConfig；图像数据先用
 //     NormalizeImageInput 归一化。

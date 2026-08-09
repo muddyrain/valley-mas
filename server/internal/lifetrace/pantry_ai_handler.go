@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 	lifeai "valley-server/internal/lifetrace/ai"
@@ -308,28 +307,6 @@ func pantryThumbnailFileExtension(mimeType string) string {
 	}
 }
 
-func lifeTraceImageModelCandidates(primary string) []string {
-	seen := make(map[string]struct{}, 4)
-	models := make([]string, 0, 4)
-	add := func(raw string) {
-		value := strings.TrimSpace(raw)
-		if value == "" {
-			return
-		}
-		if _, exists := seen[value]; exists {
-			return
-		}
-		seen[value] = struct{}{}
-		models = append(models, value)
-	}
-
-	add(primary)
-	for _, item := range strings.Split(os.Getenv("ARK_IMAGE_MODEL_FALLBACK"), ",") {
-		add(item)
-	}
-	return models
-}
-
 func lifeTraceImageModelCapabilityError(raw string) bool {
 	lower := strings.ToLower(strings.TrimSpace(raw))
 	if lower == "" {
@@ -373,7 +350,7 @@ func lifeTraceImageResponseFormatUnsupportedError(raw string) bool {
 }
 
 func lifeTraceImageModelMisconfiguredMessage(model, upstream string) string {
-	msg := fmt.Sprintf("ARK_IMAGE_MODEL=%s 不是可用的生图接入点。", model)
+	msg := fmt.Sprintf("火山引擎生图模型 %s 暂不可用。", model)
 	if trimmed := strings.TrimSpace(upstream); trimmed != "" {
 		msg += " 上游返回：" + trimRunes(trimmed, 220)
 	}

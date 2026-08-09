@@ -2,9 +2,8 @@ export function workflowRunErrorGuidance(code?: string) {
   switch (code) {
     case 'AI_CONFIGURATION_UNAVAILABLE':
     case 'ARK_NOT_CONFIGURED':
-      return '检查 ARK_API_KEY 与 ARK_TEXT_MODEL 是否已配置。';
     case 'ARK_IMAGE_NOT_CONFIGURED':
-      return '检查 ARK_API_KEY 与 ARK_IMAGE_MODEL 是否已配置。';
+      return '该节点正在迁移到新的模型服务，请稍后再试。';
     case 'AI_UPSTREAM_TIMEOUT':
     case 'WORKFLOW_NODE_TIMEOUT':
       return '服务响应超时，可稍后重试并适当缩短输入。';

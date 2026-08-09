@@ -76,6 +76,49 @@ const DEFAULT_SOUL =
 const DEFAULT_AGENTS =
   '# AGENTS.md\n\n优先理解用户真正想完成的目标；需要工具时说明正在做什么；完成后给出可验证的结果。';
 
+export const agentToolOptions = [
+  { name: 'content.search', label: '内容搜索', helper: '搜索私有内容和知识' },
+  { name: 'file.create', label: '成果文件', helper: '生成 Markdown、JSON、CSV 文件' },
+  { name: 'image.generate', label: '图片生成', helper: '按需生成或编辑图片' },
+  { name: 'image.convert', label: '图片转换', helper: '转换 WebP、JPG、PNG 图片' },
+  { name: 'document.convert', label: '文档转换', helper: '将 PDF 转换为 DOCX' },
+  { name: 'document.export', label: '文档导出', helper: '导出 Markdown、PDF、DOCX 文件' },
+  { name: 'document.save', label: '长期保存', helper: '确认后将临时成果保存为私有文档' },
+  { name: 'document.overwrite', label: '覆盖文档', helper: '确认后覆盖已有私有文档' },
+  { name: 'blog.publish', label: '发布博客', helper: '确认后创建并发布博客文章' },
+] as const;
+
+type SaveAIAppCapabilitiesInput = {
+  appId: string;
+  tools: string[];
+  bindings: AIAppToolBinding[];
+  knowledgeBaseIds: string[];
+};
+
+type SaveAIAppCapabilitiesDependencies = {
+  replaceTools: (
+    appId: string,
+    tools: string[],
+    bindings: AIAppToolBinding[],
+  ) => Promise<{ version: { id: string } }>;
+  replaceKnowledgeBases: (
+    appId: string,
+    knowledgeBaseIds: string[],
+  ) => Promise<{ version: { id: string } }>;
+};
+
+export async function saveAIAppCapabilities(
+  input: SaveAIAppCapabilitiesInput,
+  dependencies: SaveAIAppCapabilitiesDependencies = {
+    replaceTools: replaceAIAppTools,
+    replaceKnowledgeBases: replaceAIAppKnowledgeBases,
+  },
+) {
+  await dependencies.replaceTools(input.appId, input.tools, input.bindings);
+  const result = await dependencies.replaceKnowledgeBases(input.appId, input.knowledgeBaseIds);
+  return result.version.id;
+}
+
 export interface EditableAgentConfig extends AgentConfig {
   identity: string;
   userProfile: string;
@@ -373,23 +416,34 @@ export default function AIAppEditor() {
     }
   };
 
-  const saveEverything = async () => {
+  const saveEverything = async (showToast = true) => {
     if (boundTools.includes('image.generate') && !config.imageGeneration?.modelId) {
       toast.error('启用图片生成后需要选择图片生成模型');
-      return;
+      return undefined;
     }
-    const savedVersionID = await persist();
-    if (!savedVersionID || !appId) return;
+    const savedVersionID = await persist(config, name, description, false);
+    if (!savedVersionID || !appId) return undefined;
+    setSaving(true);
     try {
       const policies = boundTools.map((toolName) => ({
         toolName,
         approvalMode:
           toolBindings.find((binding) => binding.toolName === toolName)?.approvalMode || 'auto',
       }));
-      await replaceAIAppTools(appId, boundTools, policies);
-      await replaceAIAppKnowledgeBases(appId, boundKnowledgeBaseIDs);
+      const finalVersionID = await saveAIAppCapabilities({
+        appId,
+        tools: boundTools,
+        bindings: policies,
+        knowledgeBaseIds: boundKnowledgeBaseIDs,
+      });
+      setApp((current) => (current ? { ...current, draftVersionId: finalVersionID } : current));
+      if (showToast) toast.success('智能体设置已保存');
+      return finalVersionID;
     } catch (error) {
       toast.error(getAPIErrorMessage(error, '部分能力设置保存失败'));
+      return undefined;
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -397,7 +451,7 @@ export default function AIAppEditor() {
     if (!appId) return;
     setPublishing(true);
     try {
-      const versionID = await persist(config, name, description, false);
+      const versionID = await saveEverything(false);
       if (!versionID) return;
       await publishAIApp(appId, versionID);
       setApp((current) =>
@@ -774,11 +828,7 @@ export default function AIAppEditor() {
                     <h3 className="font-medium">工具能力</h3>
                   </div>
                   <div className="grid gap-3 md:grid-cols-3">
-                    {[
-                      ['content.search', '内容搜索', '搜索私有内容和知识'],
-                      ['file.create', '成果文件', '生成 Markdown、JSON、CSV 文件'],
-                      ['image.generate', '图片生成', '按需生成或编辑图片'],
-                    ].map(([toolName, label, helper]) => (
+                    {agentToolOptions.map(({ name: toolName, label, helper }) => (
                       <div
                         key={toolName}
                         className="flex items-center justify-between gap-3 rounded-xl border border-border p-4"

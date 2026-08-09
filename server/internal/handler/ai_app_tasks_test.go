@@ -3,12 +3,135 @@ package handler
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"valley-server/internal/ai/agent"
+	"valley-server/internal/ai/tools"
+	"valley-server/internal/aimodel"
 	"valley-server/internal/model"
 )
+
+func TestAIAppTaskKnowledgeRetrievalFailureKeepsSpecificCode(t *testing.T) {
+	if got := aiAppTaskKnowledgeRetrievalFailureCode(aimodel.ErrEmbeddingModelUnavailable); got != "RAG_EMBEDDING_MODEL_UNAVAILABLE" {
+		t.Fatalf("retrieval failure code = %q", got)
+	}
+	if retryableAIAppTaskError("RAG_EMBEDDING_MODEL_UNAVAILABLE") {
+		t.Fatal("missing catalog model is not retryable without a configuration change")
+	}
+	if !retryableAIAppTaskError("RAG_EMBEDDING_FAILED") {
+		t.Fatal("temporary embedding provider failures should be retryable")
+	}
+}
+
+func TestResolveAIKnowledgeAugmentationDegradesWithoutAbortingConversation(t *testing.T) {
+	augmentation, err := resolveAIKnowledgeAugmentation(context.Background(), func(context.Context) (string, []aiKnowledgeReference, error) {
+		return "", nil, aimodel.ErrEmbeddingModelUnavailable
+	})
+	if err != nil {
+		t.Fatalf("knowledge failure must not abort conversation: %v", err)
+	}
+	if augmentation.Status != aiKnowledgeStatusDegraded {
+		t.Fatalf("status = %q, want %q", augmentation.Status, aiKnowledgeStatusDegraded)
+	}
+	if augmentation.ErrorCode != "RAG_EMBEDDING_MODEL_UNAVAILABLE" {
+		t.Fatalf("error code = %q", augmentation.ErrorCode)
+	}
+	if augmentation.Context != "" || len(augmentation.References) != 0 {
+		t.Fatalf("degraded augmentation leaked context: %#v", augmentation)
+	}
+}
+
+func TestResolveAIKnowledgeAugmentationPreservesUserCancellation(t *testing.T) {
+	parent, cancel := context.WithCancel(context.Background())
+	cancel()
+	augmentation, err := resolveAIKnowledgeAugmentation(parent, func(context.Context) (string, []aiKnowledgeReference, error) {
+		return "", nil, context.Canceled
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancellation error = %v", err)
+	}
+	if augmentation.Status != "" {
+		t.Fatalf("cancelled augmentation must not be persisted: %#v", augmentation)
+	}
+}
+
+func TestResolveAIKnowledgeAugmentationKeepsRetrievedContext(t *testing.T) {
+	references := []aiKnowledgeReference{{Index: 1, DocumentName: "旅行资料.md"}}
+	augmentation, err := resolveAIKnowledgeAugmentation(context.Background(), func(context.Context) (string, []aiKnowledgeReference, error) {
+		return "周末可去西湖。", references, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if augmentation.Status != aiKnowledgeStatusUsed || augmentation.Context != "周末可去西湖。" {
+		t.Fatalf("augmentation = %#v", augmentation)
+	}
+	if len(augmentation.References) != 1 || augmentation.References[0].DocumentName != "旅行资料.md" {
+		t.Fatalf("references = %#v", augmentation.References)
+	}
+}
+
+func TestLoadAIAppTaskConversationHistorySkipsUnansweredFailedTurn(t *testing.T) {
+	_, db := setupAIPlatformTestRouter(t)
+	const userID model.Int64String = 101
+	const appID model.Int64String = 200
+	conversationID := model.Int64String(300)
+	runs := []model.AIAppRun{
+		{UserID: userID, AppID: appID, ConversationID: &conversationID, Status: "failed"},
+		{UserID: userID, AppID: appID, ConversationID: &conversationID, Status: "succeeded"},
+		{UserID: userID, AppID: appID, ConversationID: &conversationID, Status: "queued"},
+	}
+	if err := db.Create(&runs).Error; err != nil {
+		t.Fatal(err)
+	}
+	failedUser := model.AIAppConversationMessage{UserID: userID, AppID: appID, ConversationID: conversationID, RunID: &runs[0].ID, Role: "user", Content: "旧失败问题"}
+	succeededUser := model.AIAppConversationMessage{UserID: userID, AppID: appID, ConversationID: conversationID, RunID: &runs[1].ID, Role: "user", Content: "已完成问题"}
+	succeededAssistant := model.AIAppConversationMessage{UserID: userID, AppID: appID, ConversationID: conversationID, RunID: &runs[1].ID, Role: "assistant", Content: "已完成回答"}
+	currentUser := model.AIAppConversationMessage{UserID: userID, AppID: appID, ConversationID: conversationID, RunID: &runs[2].ID, Role: "user", Content: "当前问题"}
+	for _, message := range []*model.AIAppConversationMessage{&failedUser, &succeededUser, &succeededAssistant, &currentUser} {
+		if err := db.Create(message).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	task := model.AIAppTask{
+		UserID: userID, AppID: appID, ConversationID: conversationID,
+		RunID: runs[2].ID, UserMessageID: currentUser.ID,
+	}
+
+	history, err := loadAIAppTaskConversationHistory(db, task)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents := make([]string, 0, len(history))
+	for _, message := range history {
+		contents = append(contents, message.Content)
+	}
+	if slices.Contains(contents, failedUser.Content) {
+		t.Fatalf("unanswered failed turn leaked into history: %#v", contents)
+	}
+	for _, expected := range []string{succeededUser.Content, succeededAssistant.Content, currentUser.Content} {
+		if !slices.Contains(contents, expected) {
+			t.Fatalf("history is missing %q: %#v", expected, contents)
+		}
+	}
+
+	retryTask := task
+	retryTask.UserMessageID = failedUser.ID
+	retryHistory, err := loadAIAppTaskConversationHistory(db, retryTask)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retryContents := make([]string, 0, len(retryHistory))
+	for _, message := range retryHistory {
+		retryContents = append(retryContents, message.Content)
+	}
+	if !slices.Contains(retryContents, failedUser.Content) {
+		t.Fatalf("explicit retry lost its source user message: %#v", retryContents)
+	}
+}
 
 func TestShouldRetryAIAppAgentRunOnlyBeforeObservableWork(t *testing.T) {
 	transient := errors.New("agent: backend chat failed at step 1: AI 上游返回 503: busy")
@@ -32,6 +155,21 @@ func TestShouldRetryAIAppAgentRunOnlyBeforeObservableWork(t *testing.T) {
 	}
 	if shouldRetryAIAppAgentRun(context.Canceled, false, false) {
 		t.Fatal("must not retry cancellation")
+	}
+}
+
+func TestAppendAIAppClarificationInstructionsCoversConversationalFollowUp(t *testing.T) {
+	got := appendAIAppClarificationInstructions("基础指令", []string{"clarification.ask"})
+	for _, expected := range []string{
+		"即使不需要调用其他工具",
+		"必须调用 clarification.ask",
+		"不要在普通回复中列出一组问题",
+		"普通回复中不得包含要求用户回答的问句",
+		"一次只问一个最能推进任务的问题",
+	} {
+		if !strings.Contains(got, expected) {
+			t.Fatalf("clarification instructions missing %q: %s", expected, got)
+		}
 	}
 }
 
@@ -190,6 +328,80 @@ func TestAIAppAttachmentReferenceImages(t *testing.T) {
 	images := aiAppAttachmentReferenceImages(attachments)
 	if len(images) != 1 || images[0] != "data:image/png;base64,cG5n" {
 		t.Fatalf("reference images = %#v", images)
+	}
+}
+
+func TestAIAppArtifactRequestContextLimitsToolsToCurrentAttachments(t *testing.T) {
+	taskID := model.Int64String(14)
+	attachments := []model.AIAppConversationAttachment{{ID: 21}, {ID: 22}}
+	input := aiAppArtifactRequestContext(101, 11, 12, 13, &taskID, attachments)
+	if input.UserID != 101 || input.AppID != 11 || input.ConversationID != 12 || input.RunID != 13 {
+		t.Fatalf("unexpected request context: %#v", input)
+	}
+	if input.TaskID == nil || *input.TaskID != taskID {
+		t.Fatalf("task id was not retained: %#v", input.TaskID)
+	}
+	if len(input.AttachmentIDs) != 2 || input.AttachmentIDs[0] != 21 || input.AttachmentIDs[1] != 22 {
+		t.Fatalf("attachment ids = %#v", input.AttachmentIDs)
+	}
+}
+
+func TestGeneratedAndConvertedOutputsNeverPauseForApproval(t *testing.T) {
+	for _, name := range []string{"image.generate", "image.convert", "document.convert", "file.create", "content.search"} {
+		if aiAppToolRequiresApproval(name, "always") {
+			t.Fatalf("%s must run without approval", name)
+		}
+	}
+	if !aiAppToolRequiresApproval("blog.create_draft", "always") {
+		t.Fatal("durable blog writes must keep approval")
+	}
+	if aiAppToolRequiresApproval("blog.create_draft", "auto") {
+		t.Fatal("auto policy must not pause")
+	}
+	for _, name := range []string{"document.save", "document.overwrite", "blog.publish"} {
+		if !aiAppToolRequiresApproval(name, "auto", tools.ConfirmationBeforeWrite) {
+			t.Fatalf("%s must require confirmation from its tool contract", name)
+		}
+	}
+}
+
+func TestBuildAIAppAttachmentContextIncludesIDsForToolSelection(t *testing.T) {
+	contextText := buildAIAppAttachmentContext([]model.AIAppConversationAttachment{
+		{ID: 21, Name: "cover.webp", MimeType: "image/webp"},
+		{ID: 22, Name: "report.pdf", MimeType: "application/pdf", ParsedText: "Quarterly summary"},
+	})
+	for _, expected := range []string{"cover.webp", "附件 ID：21", "report.pdf", "附件 ID：22", "Quarterly summary"} {
+		if !strings.Contains(contextText, expected) {
+			t.Fatalf("attachment context does not contain %q: %s", expected, contextText)
+		}
+	}
+}
+
+func TestBuildAIAppCreatorWorkspaceContextIsOwnerScopedAndOmitsExpiredArtifacts(t *testing.T) {
+	_, db := setupAIPlatformTestRouter(t)
+	now := time.Now()
+	ownedResource := model.Resource{UserID: 101, Type: "agent_file", Visibility: "private", Title: "报告", URL: "owned", StorageKey: "owned-key"}
+	foreignResource := model.Resource{UserID: 202, Type: "document", Visibility: "private", Title: "他人文档", URL: "foreign", StorageKey: "foreign-key"}
+	_ = db.Create(&ownedResource).Error
+	_ = db.Create(&foreignResource).Error
+	expires := now.Add(time.Hour)
+	expired := now.Add(-time.Hour)
+	_ = db.Create(&model.AIAppArtifact{UserID: 101, AppID: 11, ConversationID: 12, RunID: 13, ResourceID: ownedResource.ID, FileName: "report.pdf", ContentType: "application/pdf", SizeBytes: 12, URL: "owned", ExpiresAt: &expires}).Error
+	_ = db.Create(&model.AIAppArtifact{UserID: 101, AppID: 11, ConversationID: 12, RunID: 14, ResourceID: ownedResource.ID, FileName: "expired.pdf", ContentType: "application/pdf", SizeBytes: 12, URL: "owned", ExpiresAt: &expired}).Error
+
+	contextText, err := buildAIAppCreatorWorkspaceContext(db, 101, 11, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"report.pdf", "成果 ID", ownedResource.ID.String()} {
+		if !strings.Contains(contextText, expected) {
+			t.Fatalf("context missing %q: %s", expected, contextText)
+		}
+	}
+	for _, forbidden := range []string{"expired.pdf", "他人文档", foreignResource.ID.String()} {
+		if strings.Contains(contextText, forbidden) {
+			t.Fatalf("context leaked %q: %s", forbidden, contextText)
+		}
 	}
 }
 

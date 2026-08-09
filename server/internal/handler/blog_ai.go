@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -13,7 +14,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -111,39 +111,6 @@ func isImageResponseFormatUnsupportedError(raw string) bool {
 		return true
 	}
 	return false
-}
-
-func imageModelMisconfiguredMessage(model, upstream string) string {
-	msg := fmt.Sprintf(
-		"AI image model misconfigured: ARK_IMAGE_MODEL=%s is not a valid image generation endpoint.",
-		model,
-	)
-	if trimmed := strings.TrimSpace(upstream); trimmed != "" {
-		msg += " Upstream: " + truncateAIText(trimmed, 220)
-	}
-	return msg
-}
-
-func imageModelCandidates(primary string) []string {
-	seen := make(map[string]struct{}, 4)
-	models := make([]string, 0, 4)
-	add := func(raw string) {
-		m := strings.TrimSpace(raw)
-		if m == "" {
-			return
-		}
-		if _, exists := seen[m]; exists {
-			return
-		}
-		seen[m] = struct{}{}
-		models = append(models, m)
-	}
-
-	add(primary)
-	for _, item := range strings.Split(os.Getenv("ARK_IMAGE_MODEL_FALLBACK"), ",") {
-		add(item)
-	}
-	return models
 }
 
 func readArkTextModelConfig() (apiKey, arkBaseURL, textModel string, errMsg string) {
@@ -542,26 +509,15 @@ func buildCoverPromptByTextModel(client *arkruntime.Client, textModel string, re
 // generateBlogCoverInternal generates an AI cover image and uploads it to storage.
 // Returns the cover URL, storage key, model used, and any error.
 func generateBlogCoverInternal(title, excerpt, content string, userID int64) (coverURL string, coverStorageKey string, model string, err error) {
-	apiKey := strings.TrimSpace(os.Getenv("ARK_API_KEY"))
-	imageModel := strings.TrimSpace(os.Getenv("ARK_IMAGE_MODEL"))
-	textModel := strings.TrimSpace(os.Getenv("ARK_TEXT_MODEL"))
-	arkBaseURL := strings.TrimSpace(os.Getenv("ARK_BASE_URL"))
-	if arkBaseURL == "" {
-		arkBaseURL = "https://ark.cn-beijing.volces.com/api/v3"
-	}
-	if apiKey == "" {
-		return "", "", "", fmt.Errorf("AI is not configured: missing ARK_API_KEY")
+	config, candidateModels, configErr := aiclient.ReadARKImageConfig()
+	if configErr != "" {
+		return "", "", "", errors.New(configErr)
 	}
 
-	candidateModels := imageModelCandidates(imageModel)
-	if len(candidateModels) == 0 {
-		return "", "", "", fmt.Errorf("AI is not configured: missing ARK_IMAGE_MODEL")
-	}
-
-	client := ensureSharedArkClient(apiKey, arkBaseURL)
+	client := ensureSharedArkClient(config.APIKey, config.BaseURL)
 	req := blogAICoverRequest{Title: title, Excerpt: excerpt, Content: content}
 
-	coverPrompt := buildCoverPromptByTextModel(client, textModel, req)
+	coverPrompt := buildCoverPromptByTextModel(client, "", req)
 	if coverPrompt == "" {
 		coverPrompt = buildDeterministicCoverPrompt(req)
 	}

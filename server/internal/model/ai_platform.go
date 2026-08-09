@@ -604,27 +604,29 @@ func (k *AIKnowledgeBase) BeforeCreate(tx *gorm.DB) error {
 }
 
 type AIKnowledgeDocument struct {
-	ID              Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	KnowledgeBaseID Int64String    `gorm:"index;not null" json:"knowledgeBaseId"`
-	UserID          Int64String    `gorm:"index;not null" json:"userId"`
-	Name            string         `gorm:"size:255;not null" json:"name"`
-	Status          string         `gorm:"size:20;index;not null;default:'pending'" json:"status"`
-	ErrorCode       string         `gorm:"size:80" json:"errorCode"`
-	IndexProgress   int            `gorm:"not null;default:0" json:"indexProgress"`
-	ChunkCount      int            `json:"chunkCount"`
-	MimeType        string         `gorm:"size:120" json:"mimeType"`
-	SizeBytes       int64          `json:"sizeBytes"`
-	SourceKey       string         `gorm:"size:500" json:"-"`
-	ParsedText      string         `gorm:"type:text" json:"-"`
-	VisionModelID   string         `gorm:"size:40;not null;default:''" json:"visionModelId,omitempty"`
-	SourceContent   []byte         `gorm:"type:bytea" json:"-"`
-	CreatedAt       time.Time      `json:"createdAt"`
-	UpdatedAt       time.Time      `json:"updatedAt"`
-	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                 Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	KnowledgeBaseID    Int64String    `gorm:"index;not null" json:"knowledgeBaseId"`
+	UserID             Int64String    `gorm:"index;not null" json:"userId"`
+	Name               string         `gorm:"size:255;not null" json:"name"`
+	Status             string         `gorm:"size:20;index;not null;default:'pending'" json:"status"`
+	ErrorCode          string         `gorm:"size:80" json:"errorCode"`
+	IndexProgress      int            `gorm:"not null;default:0" json:"indexProgress"`
+	ChunkCount         int            `json:"chunkCount"`
+	MimeType           string         `gorm:"size:120" json:"mimeType"`
+	SizeBytes          int64          `json:"sizeBytes"`
+	SourceKey          string         `gorm:"size:500" json:"-"`
+	ParsedText         string         `gorm:"type:text" json:"-"`
+	VisionModelID      string         `gorm:"size:40;not null;default:''" json:"visionModelId,omitempty"`
+	EmbeddingModelID   Int64String    `gorm:"not null;default:0" json:"-"`
+	EmbeddingDimension int            `gorm:"not null;default:0" json:"-"`
+	SourceContent      []byte         `gorm:"type:bytea" json:"-"`
+	CreatedAt          time.Time      `json:"createdAt"`
+	UpdatedAt          time.Time      `json:"updatedAt"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // AIKnowledgeChunk contains the minimum data needed for owner-scoped RAG.
-// Embedding is populated only after the ARK embedding stage succeeds. The
+// Embedding is populated only after the catalog embedding stage succeeds. The
 // pgvector column is owned exclusively by the reviewed SQL migration so local
 // GORM AutoMigrate never makes startup depend on an optional DB extension.
 type AIKnowledgeChunk struct {

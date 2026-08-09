@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"valley-server/internal/aiapp"
+	"valley-server/internal/aiclient"
 	"valley-server/internal/aimodel"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
@@ -207,8 +208,57 @@ func TestListAIAppOutputsReturnsOnlyLinkedOwnerOutputs(t *testing.T) {
 	if strings.Contains(recorder.Body.String(), "foreign.md") || strings.Contains(recorder.Body.String(), "foreign.png") {
 		t.Fatalf("outputs leaked foreign records: %s", recorder.Body.String())
 	}
+	if strings.Contains(recorder.Body.String(), "/owned.md") {
+		t.Fatalf("outputs exposed the backing object URL: %s", recorder.Body.String())
+	}
 	if strings.Count(recorder.Body.String(), "owned.png") != 1 {
 		t.Fatalf("linked image was not deduplicated: %s", recorder.Body.String())
+	}
+}
+
+func TestGetAIAppArtifactDownloadURLIsOwnerScopedAndRejectsExpiredOutput(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "Artifact owner"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	future := time.Now().Add(time.Hour)
+	artifact := model.AIAppArtifact{
+		UserID: 101, AppID: app.ID, ConversationID: 12, RunID: 13, ResourceID: 14,
+		FileName: "report.docx", ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		SizeBytes: 20, URL: "https://example.invalid/private/report.docx", ExpiresAt: &future,
+	}
+	if err := db.Create(&artifact).Error; err != nil {
+		t.Fatalf("create artifact: %v", err)
+	}
+
+	path := fmt.Sprintf("/ai/apps/%s/artifacts/%s/download-url", app.ID, artifact.ID)
+	owned := httptest.NewRequest(http.MethodGet, path, nil)
+	owned.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	ownedRecorder := httptest.NewRecorder()
+	router.ServeHTTP(ownedRecorder, owned)
+	if ownedRecorder.Code != http.StatusOK || !strings.Contains(ownedRecorder.Body.String(), artifact.URL) {
+		t.Fatalf("owner download URL = %d body=%s", ownedRecorder.Code, ownedRecorder.Body.String())
+	}
+
+	foreign := httptest.NewRequest(http.MethodGet, path, nil)
+	foreign.Header.Set("Authorization", aiPlatformAuthHeaderFor(t, "202", "other-user"))
+	foreignRecorder := httptest.NewRecorder()
+	router.ServeHTTP(foreignRecorder, foreign)
+	if foreignRecorder.Code != http.StatusOK || !strings.Contains(foreignRecorder.Body.String(), `"code":404`) {
+		t.Fatalf("foreign artifact access was not rejected: %d body=%s", foreignRecorder.Code, foreignRecorder.Body.String())
+	}
+
+	past := time.Now().Add(-time.Minute)
+	if err := db.Model(&artifact).Update("expires_at", past).Error; err != nil {
+		t.Fatalf("expire artifact: %v", err)
+	}
+	expired := httptest.NewRequest(http.MethodGet, path, nil)
+	expired.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	expiredRecorder := httptest.NewRecorder()
+	router.ServeHTTP(expiredRecorder, expired)
+	if expiredRecorder.Code != http.StatusOK || !strings.Contains(expiredRecorder.Body.String(), `"code":410`) {
+		t.Fatalf("expired artifact response = %d body=%s", expiredRecorder.Code, expiredRecorder.Body.String())
 	}
 }
 
@@ -490,6 +540,83 @@ func TestPublicAIAppChatRejectsUnboundKeyAndWritesMetadataOnlyLog(t *testing.T) 
 	}
 	if invocation.Status != "rejected" || invocation.ErrorCode != "API_KEY_APP_NOT_BOUND" {
 		t.Fatalf("unexpected invocation metadata: %+v", invocation)
+	}
+}
+
+func TestPublicAIAppChatDegradesKnowledgeRetrievalInsteadOfFailing(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Stream bool `json:"stream"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		if payload.Stream {
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"content\":\"public fallback reply\"}}]}\n\n"))
+			_, _ = w.Write([]byte("data: [DONE]\n\n"))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"model":"ep-test","choices":[{"message":{"role":"assistant","content":"public fallback reply"}}]}`))
+	}))
+	defer providerServer.Close()
+	t.Setenv("SILICONFLOW_API_KEY", "test-siliconflow-key")
+	t.Setenv("SILICONFLOW_BASE_URL", providerServer.URL)
+	catalogModel := createAIPlatformCatalogModel(t, db, "text")
+
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "公开知识降级助手"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatal(err)
+	}
+	publishedAt := time.Now()
+	version := model.AIAppVersion{
+		AppID: app.ID, Number: 1, Config: `{"systemPrompt":"优先参考知识库"}`,
+		ToolSnapshot: true, KnowledgeBaseSnapshot: true, PublishedAt: &publishedAt,
+	}
+	if err := db.Create(&version).Error; err != nil {
+		t.Fatal(err)
+	}
+	knowledgeBase := model.AIKnowledgeBase{UserID: 101, Name: "公开调用资料"}
+	if err := db.Create(&knowledgeBase).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&model.AIAppVersionKnowledgeBase{AppVersionID: version.ID, KnowledgeBaseID: knowledgeBase.ID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&app).Updates(map[string]any{"published_version_id": version.ID, "status": "published"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	rawKey := "valley_public-degraded-test-key"
+	digest := sha256.Sum256([]byte(rawKey))
+	key := model.AIAPIKey{UserID: 101, Name: "public-degraded-key", KeyPrefix: "valley_public", KeyHash: fmt.Sprintf("%x", digest), Status: "active"}
+	if err := db.Create(&key).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&model.AIAPIKeyAppBinding{APIKeyID: key.ID, AppID: app.ID}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	body, _ := json.Marshal(map[string]any{"message": "请结合资料回答", "modelId": catalogModel.ID.String()})
+	request := httptest.NewRequest(http.MethodPost, "/public/ai/apps/"+app.ID.String()+"/chat", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+rawKey)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK ||
+		!strings.Contains(recorder.Body.String(), "public fallback reply") ||
+		!strings.Contains(recorder.Body.String(), `"knowledgeStatus":"degraded"`) {
+		t.Fatalf("degraded public response = %d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var invocation model.AIAppPublicInvocation
+	if err := db.Where("api_key_id = ? AND app_id = ?", key.ID, app.ID).Order("created_at DESC").First(&invocation).Error; err != nil {
+		t.Fatal(err)
+	}
+	if invocation.Status != "succeeded" || invocation.ErrorCode != "" {
+		t.Fatalf("degraded public invocation = %+v", invocation)
 	}
 }
 
@@ -825,11 +952,115 @@ func TestResolveAIAppToolsReturnsOnlyBoundContentSearch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve tools: %v", err)
 	}
-	if len(names) != 1 || names[0] != "content.search" {
+	if strings.Join(names, ",") != "content.search,clarification.ask" {
 		t.Fatalf("names = %#v", names)
 	}
-	if got := registry.Filter("workbench", names); len(got) != 1 || got[0].Name() != "content.search" {
+	if got := registry.Filter("workbench", names); len(got) != 2 || got[0].Name() != "clarification.ask" || got[1].Name() != "content.search" {
 		t.Fatalf("resolved tools = %#v", got)
+	}
+}
+
+func TestResolveAIAppToolsAlwaysIncludesRuntimeClarification(t *testing.T) {
+	_, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "普通对话助手"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatal(err)
+	}
+	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{}`, ToolSnapshot: true}
+	if err := db.Create(&version).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	registry, names, err := resolveAIAppTools(db, app.ID, version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(names, ",") != "clarification.ask" {
+		t.Fatalf("names = %#v", names)
+	}
+	if registry.Get("clarification.ask") == nil {
+		t.Fatal("runtime clarification tool was not registered")
+	}
+}
+
+func TestResolveAIAppToolsRegistersConversionTools(t *testing.T) {
+	_, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "Conversion agent"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{}`, ToolSnapshot: true}
+	if err := db.Create(&version).Error; err != nil {
+		t.Fatalf("create version: %v", err)
+	}
+	for _, name := range []string{"image.convert", "document.convert"} {
+		if err := db.Create(&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: name}).Error; err != nil {
+			t.Fatalf("bind %s: %v", name, err)
+		}
+	}
+
+	registry, names, err := resolveAIAppTools(db, app.ID, version)
+	if err != nil {
+		t.Fatalf("resolve conversion tools: %v", err)
+	}
+	if strings.Join(names, ",") != "document.convert,image.convert,clarification.ask" {
+		t.Fatalf("resolved names = %#v", names)
+	}
+	for _, name := range names {
+		if registry.Get(name) == nil {
+			t.Fatalf("tool %s was not registered", name)
+		}
+	}
+}
+
+func TestResolveAIAppToolsRegistersCreatorClosureTools(t *testing.T) {
+	_, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "Creator agent"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatal(err)
+	}
+	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{}`, ToolSnapshot: true}
+	if err := db.Create(&version).Error; err != nil {
+		t.Fatal(err)
+	}
+	expected := []string{"blog.publish", "document.export", "document.overwrite", "document.save"}
+	for _, name := range expected {
+		if err := db.Create(&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: name}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	registry, names, err := resolveAIAppTools(db, app.ID, version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(names, ",") != strings.Join(append(expected, "clarification.ask"), ",") {
+		t.Fatalf("names = %#v", names)
+	}
+	for _, name := range names {
+		if registry.Get(name) == nil {
+			t.Fatalf("tool %s was not registered", name)
+		}
+	}
+}
+
+func TestValidateInitialAIAppToolsAcceptsReviewedConversions(t *testing.T) {
+	names, err := validateInitialAIAppTools([]string{"image.convert", "document.convert"})
+	if err != nil {
+		t.Fatalf("validate conversion tools: %v", err)
+	}
+	if strings.Join(names, ",") != "image.convert,document.convert" {
+		t.Fatalf("validated names = %#v", names)
+	}
+}
+
+func TestValidateInitialAIAppToolsAcceptsCreatorClosureTools(t *testing.T) {
+	want := []string{"document.export", "document.save", "document.overwrite", "blog.publish"}
+	names, err := validateInitialAIAppTools(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(names, ",") != strings.Join(want, ",") {
+		t.Fatalf("names = %#v", names)
 	}
 }
 
@@ -985,6 +1216,54 @@ func TestCreateAIAppVersionSnapshotCopiesToolAllowlist(t *testing.T) {
 	}
 }
 
+func TestReplaceAIAppKnowledgeBasesPreservesDraftToolBindings(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "创作助手"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatalf("create app: %v", err)
+	}
+	source := model.AIAppVersion{
+		AppID: app.ID, Number: 1, Config: `{}`, RetrievalConfig: `{}`,
+		KnowledgeBaseSnapshot: true, ToolSnapshot: true,
+	}
+	if err := db.Create(&source).Error; err != nil {
+		t.Fatalf("create source version: %v", err)
+	}
+	if err := db.Create(&model.AIAppVersionToolBinding{AppVersionID: source.ID, ToolName: "image.convert", ApprovalMode: "auto"}).Error; err != nil {
+		t.Fatalf("create source tool binding: %v", err)
+	}
+	knowledgeBase := model.AIKnowledgeBase{UserID: 101, Name: "创作资料"}
+	if err := db.Create(&knowledgeBase).Error; err != nil {
+		t.Fatalf("create knowledge base: %v", err)
+	}
+	if err := db.Model(&app).Update("draft_version_id", source.ID).Error; err != nil {
+		t.Fatalf("set draft version: %v", err)
+	}
+
+	request := httptest.NewRequest(
+		http.MethodPut,
+		"/ai/apps/"+app.ID.String()+"/knowledge-bases",
+		strings.NewReader(`{"knowledgeBaseIds":["`+knowledgeBase.ID.String()+`"]}`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("replace knowledge bases = %d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if err := db.First(&app, app.ID).Error; err != nil {
+		t.Fatalf("reload app: %v", err)
+	}
+	var bindings []model.AIAppVersionToolBinding
+	if err := db.Where("app_version_id = ?", app.DraftVersionID).Find(&bindings).Error; err != nil {
+		t.Fatalf("load copied tool bindings: %v", err)
+	}
+	if len(bindings) != 1 || bindings[0].ToolName != "image.convert" || bindings[0].ApprovalMode != "auto" {
+		t.Fatalf("tool bindings were lost: %#v", bindings)
+	}
+}
+
 func TestAIAppConversationIsOwnerScopedAndRetainsUserMessageOnConfigFailure(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
 	t.Setenv("SILICONFLOW_API_KEY", "")
@@ -1107,7 +1386,14 @@ func TestAIKnowledgeRetrievalFailureUsesStablePublicCodes(t *testing.T) {
 		{errors.New("ERROR: operator does not exist: vector <=> vector (SQLSTATE 42883)"), "RAG_VECTOR_OPERATOR_UNAVAILABLE"},
 		{errors.New("ERROR: relation \"ai_knowledge_chunks\" does not exist (SQLSTATE 42P01)"), "RAG_SCHEMA_OUTDATED"},
 		{errors.New("failed to connect to database"), "RAG_DATABASE_UNAVAILABLE"},
+		{aimodel.ErrEmbeddingModelUnavailable, "RAG_EMBEDDING_MODEL_UNAVAILABLE"},
+		{aimodel.ErrEmbeddingMetadataUnavailable, "RAG_EMBEDDING_REINDEX_REQUIRED"},
+		{aimodel.ErrEmbeddingIdentityMismatch, "RAG_EMBEDDING_MODEL_MISMATCH"},
+		{fmt.Errorf("%w: missing provider key", aimodel.ErrEmbeddingProviderUnavailable), "RAG_EMBEDDING_PROVIDER_UNAVAILABLE"},
+		{fmt.Errorf("%w: provider timeout", aimodel.ErrEmbeddingRequestFailed), "RAG_EMBEDDING_FAILED"},
+		{fmt.Errorf("%w: stored=1024", aimodel.ErrEmbeddingDimensionUnavailable), "RAG_VECTOR_DIMENSION_MISMATCH"},
 		{errors.New("AI 未配置：ARK_EMBEDDING_MODEL 必须以 ep- 开头"), "ARK_EMBEDDING_NOT_CONFIGURED"},
+		{errors.New(aiclient.LegacyARKModelUnavailableMessage), "ARK_EMBEDDING_NOT_CONFIGURED"},
 		{errors.New("ARK embedding 调用失败: upstream"), "ARK_EMBEDDING_FAILED"},
 		{errors.New("unexpected database error"), "RAG_QUERY_FAILED"},
 	}
@@ -1116,6 +1402,66 @@ func TestAIKnowledgeRetrievalFailureUsesStablePublicCodes(t *testing.T) {
 		code, message := aiKnowledgeRetrievalFailure(test.err)
 		if code != test.code || message == "" {
 			t.Fatalf("retrieval error %q = (%q, %q)", test.err, code, message)
+		}
+	}
+}
+
+func TestCurrentAIKnowledgeEmbeddingIdentityRequiresOneKnownModel(t *testing.T) {
+	t.Setenv("SILICONFLOW_API_KEY", "test-key")
+	_, db := setupAIPlatformTestRouter(t)
+	embeddingModel := model.AIModel{
+		ID: 22, Provider: "siliconflow", ModelID: "stored-model", DisplayName: "Stored model",
+		Capabilities: aimodel.EncodeStrings([]string{"embedding"}), VerifiedCapabilities: aimodel.EncodeStrings([]string{"embedding"}),
+		EmbeddingDimension: 1024, Enabled: true,
+	}
+	if err := db.Create(&embeddingModel).Error; err != nil {
+		t.Fatal(err)
+	}
+	base := model.AIKnowledgeBase{UserID: 101, Name: "Identity base"}
+	if err := db.Create(&base).Error; err != nil {
+		t.Fatal(err)
+	}
+	documents := []model.AIKnowledgeDocument{
+		{KnowledgeBaseID: base.ID, UserID: 101, Name: "one.md", Status: "ready", EmbeddingModelID: 22, EmbeddingDimension: 1024},
+		{KnowledgeBaseID: base.ID, UserID: 101, Name: "two.md", Status: "ready", EmbeddingModelID: 22, EmbeddingDimension: 1024},
+	}
+	if err := db.Create(&documents).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	modelID, dimension, err := currentAIKnowledgeEmbeddingIdentity(db, 101, []model.Int64String{base.ID})
+	if err != nil || modelID != 22 || dimension != 1024 {
+		t.Fatalf("identity = model %s dimension %d err=%v", modelID, dimension, err)
+	}
+	pendingDocument := model.AIKnowledgeDocument{KnowledgeBaseID: base.ID, UserID: 101, Name: "new.md", Status: "pending_embedding"}
+	invocation, err := resolveAIKnowledgeIndexInvocation(db, pendingDocument)
+	if err != nil || invocation.Model.ID != 22 {
+		t.Fatalf("index invocation = model %s err=%v", invocation.Model.ID, err)
+	}
+
+	if err := db.Model(&documents[1]).Updates(map[string]any{"embedding_model_id": 23, "embedding_dimension": 1024}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := currentAIKnowledgeEmbeddingIdentity(db, 101, []model.Int64String{base.ID}); !errors.Is(err, aimodel.ErrEmbeddingIdentityMismatch) {
+		t.Fatalf("mixed model identity error = %v", err)
+	}
+
+	if err := db.Model(&documents[1]).Updates(map[string]any{"embedding_model_id": 0, "embedding_dimension": 0}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := currentAIKnowledgeEmbeddingIdentity(db, 101, []model.Int64String{base.ID}); !errors.Is(err, aimodel.ErrEmbeddingMetadataUnavailable) {
+		t.Fatalf("missing model identity error = %v", err)
+	}
+}
+
+func TestAIKnowledgeSearchQueryExcludesSoftDeletedRows(t *testing.T) {
+	for _, scope := range []string{
+		"chunks.deleted_at IS NULL",
+		"documents.deleted_at IS NULL",
+		"knowledge_bases.deleted_at IS NULL",
+	} {
+		if !strings.Contains(aiKnowledgeSearchQuery, scope) {
+			t.Fatalf("knowledge search query is missing owner-visible scope %q", scope)
 		}
 	}
 }
@@ -1252,6 +1598,69 @@ func TestAIAppConversationStreamsOwnerScopedToolTraceWithoutRawResults(t *testin
 	references := historyPayload.Data.ReferencesByRunID[historyPayload.Data.Runs[0].ID.String()]
 	if len(references) != 1 || references[0].DocumentName != "P8 私有资料" {
 		t.Fatalf("history references = %#v", historyPayload.Data.ReferencesByRunID)
+	}
+}
+
+func TestAIAppConversationDegradesKnowledgeRetrievalInsteadOfFailing(t *testing.T) {
+	router, db := setupAIPlatformTestRouter(t)
+	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"content\":\"fallback reply\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer providerServer.Close()
+	t.Setenv("SILICONFLOW_API_KEY", "test-siliconflow-key")
+	t.Setenv("SILICONFLOW_BASE_URL", providerServer.URL)
+	catalogModel := createAIPlatformCatalogModel(t, db, "text")
+
+	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "知识降级助手"}
+	if err := db.Create(&app).Error; err != nil {
+		t.Fatal(err)
+	}
+	publishedAt := time.Now()
+	version := model.AIAppVersion{
+		AppID: app.ID, Number: 1, Config: `{"systemPrompt":"优先参考知识库"}`,
+		ToolSnapshot: true, KnowledgeBaseSnapshot: true, PublishedAt: &publishedAt,
+	}
+	if err := db.Create(&version).Error; err != nil {
+		t.Fatal(err)
+	}
+	knowledgeBase := model.AIKnowledgeBase{UserID: 101, Name: "会触发 SQLite 检索失败的资料"}
+	if err := db.Create(&knowledgeBase).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&model.AIAppVersionKnowledgeBase{AppVersionID: version.ID, KnowledgeBaseID: knowledgeBase.ID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&app).Updates(map[string]any{
+		"draft_version_id": version.ID, "published_version_id": version.ID, "status": "published",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	conversation := model.AIAppConversation{UserID: 101, AppID: app.ID, VersionID: version.ID, Title: "降级会话"}
+	if err := db.Create(&conversation).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	chatRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String()+"/chat",
+		strings.NewReader(`{"message":"请结合资料回答","modelId":"`+catalogModel.ID.String()+`","stream":true}`),
+	)
+	chatRequest.Header.Set("Content-Type", "application/json")
+	chatRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
+	chatRecorder := httptest.NewRecorder()
+	router.ServeHTTP(chatRecorder, chatRequest)
+
+	if chatRecorder.Code != http.StatusOK || !strings.Contains(chatRecorder.Body.String(), `"type":"done"`) {
+		t.Fatalf("degraded chat response = %d body=%s", chatRecorder.Code, chatRecorder.Body.String())
+	}
+	var run model.AIAppRun
+	if err := db.Where("conversation_id = ?", conversation.ID).Order("created_at DESC").First(&run).Error; err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != "succeeded" || run.KnowledgeStatus != aiKnowledgeStatusDegraded || run.KnowledgeErrorCode != "RAG_POSTGRES_REQUIRED" {
+		t.Fatalf("degraded run = %+v", run)
 	}
 }
 

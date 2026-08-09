@@ -64,11 +64,11 @@
 
 - 常规服务：`ENV`、`PORT`、`DB_*`、`JWT_SECRET`、`SMTP_*`。
 - TOS 上传：`TOS_ACCESS_KEY`、`TOS_SECRET_KEY`、`TOS_BUCKET`、`TOS_ENDPOINT`、`TOS_REGION`。
-- Valley/Blog/Creator 默认 ARK 能力：`ARK_API_KEY`、`ARK_BASE_URL`、`ARK_TEXT_MODEL`、`ARK_VISION_MODEL`、`ARK_IMAGE_MODEL`。
-- Life Trace Pantry AI 拍照分析优先使用 Gemini：`GEMINI_API_KEY`、`GEMINI_API_BASE_URL`、`GEMINI_VISION_MODEL`、`LIFE_TRACE_PANTRY_PHOTO_AI_PROVIDER`、`LIFE_TRACE_PANTRY_PHOTO_AI_TIMEOUT_SECONDS`；未配置时回退 ARK 图片/文本模型。
-- Life Trace 文本 AI 可选覆盖：`LIFE_TRACE_AI_API_KEY`、`LIFE_TRACE_AI_BASE_URL`、`LIFE_TRACE_AI_MODEL`、`LIFE_TRACE_AI_TIMEOUT_SECONDS`；配置后优先于 `ARK_TEXT_MODEL`，旧 `OPENAI_API_*` 仅作兼容。
+- 火山引擎 Provider：`VOLCENGINE_API_KEY`、`VOLCENGINE_BASE_URL`；模型 ID 只在模型目录维护。旧 `ARK_*_MODEL` 不再属于部署配置。
+- Life Trace Pantry AI 拍照分析优先使用 Gemini：`GEMINI_API_KEY`、`GEMINI_API_BASE_URL`、`GEMINI_VISION_MODEL`、`LIFE_TRACE_PANTRY_PHOTO_AI_PROVIDER`、`LIFE_TRACE_PANTRY_PHOTO_AI_TIMEOUT_SECONDS`；未迁移的 ARK 直连入口应返回明确的暂不可用提示。
+- Life Trace 文本 AI 可选覆盖：`LIFE_TRACE_AI_API_KEY`、`LIFE_TRACE_AI_BASE_URL`、`LIFE_TRACE_AI_MODEL`、`LIFE_TRACE_AI_TIMEOUT_SECONDS`；旧 `OPENAI_API_*` 仅作兼容。
 - Life Trace 生活助理 Agent 灰度：`LIFE_TRACE_ASSISTANT_USE_AGENT`（默认 false）。设为 `true`/`1`/`yes`/`on` 时走 `internal/ai/agent` 手写 tool loop（可自主调 5 个 life-trace tool）;其他值一律回退旧的结构化 tool-call 单次调用 + fallback 路径。
-- AI Mind Arena：`MIND_ARENA_AI_PROVIDER`、`MIND_ARENA_AI_BASE_URL`、`MIND_ARENA_AI_API_KEY`；默认复用 `ARK_TEXT_MODEL`，只有需要单独切换脑内会议室模型时才配置 `MIND_ARENA_AI_MODEL`。缺失或调用失败时应能回退 mock，旧 `AI_*` 仅作兼容。
+- AI Mind Arena：`MIND_ARENA_AI_PROVIDER`、`MIND_ARENA_AI_BASE_URL`、`MIND_ARENA_AI_API_KEY`、`MIND_ARENA_AI_MODEL`；配置缺失或调用失败时应能回退 mock，旧 `AI_*` 仅作兼容。
 
 ## 常用命令
 

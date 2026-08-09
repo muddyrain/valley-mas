@@ -51,7 +51,7 @@ func TestNewServiceFromEnv(t *testing.T) {
 		}
 	})
 
-	t.Run("falls back to shared ark text model", func(t *testing.T) {
+	t.Run("does not reuse legacy ark text model", func(t *testing.T) {
 		t.Setenv("MIND_ARENA_AI_PROVIDER", "doubao")
 		t.Setenv("MIND_ARENA_AI_API_KEY", "mind-key")
 		t.Setenv("MIND_ARENA_AI_BASE_URL", "")
@@ -59,16 +59,8 @@ func TestNewServiceFromEnv(t *testing.T) {
 		t.Setenv("ARK_TEXT_MODEL", "ep-shared-text")
 
 		service := NewServiceFromEnv()
-		fallback, ok := service.(*FallbackService)
-		if !ok {
-			t.Fatalf("expected *FallbackService, got %T", service)
-		}
-		primary, ok := fallback.primary.(*OpenAICompatibleService)
-		if !ok {
-			t.Fatalf("expected primary *OpenAICompatibleService, got %T", fallback.primary)
-		}
-		if primary.model != "ep-shared-text" {
-			t.Fatalf("expected shared ARK text model, got %q", primary.model)
+		if _, ok := service.(*MockAIService); !ok {
+			t.Fatalf("expected *MockAIService without MIND_ARENA_AI_MODEL, got %T", service)
 		}
 	})
 

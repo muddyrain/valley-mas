@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 	"valley-server/internal/aiclient"
@@ -56,19 +55,8 @@ func respondLifeTraceCatalogModelError(c *gin.Context, err error) {
 }
 
 func readLifeTraceArkTextConfig() (apiKey, arkBaseURL, textModel string, errMsg string) {
-	apiKey = strings.TrimSpace(os.Getenv("ARK_API_KEY"))
-	textModel = strings.TrimSpace(os.Getenv("ARK_TEXT_MODEL"))
-	arkBaseURL = strings.TrimSpace(os.Getenv("ARK_BASE_URL"))
-	if arkBaseURL == "" {
-		arkBaseURL = "https://ark.cn-beijing.volces.com/api/v3"
-	}
-	if apiKey == "" {
-		return "", "", "", "AI 未配置：缺少 ARK_API_KEY"
-	}
-	if !strings.HasPrefix(textModel, "ep-") {
-		return "", "", "", "AI 未配置：ARK_TEXT_MODEL 必须以 ep- 开头"
-	}
-	return apiKey, arkBaseURL, textModel, ""
+	cfg, msg := aiclient.ReadARKTextConfig()
+	return cfg.APIKey, cfg.BaseURL, cfg.Model, msg
 }
 
 func ensureLifeTraceArkClient(apiKey, arkBaseURL string) *arkruntime.Client {

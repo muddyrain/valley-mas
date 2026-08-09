@@ -413,7 +413,7 @@ func loadOwnedWorkflowCollaborationTask(c *gin.Context, userID model.Int64String
 }
 
 func workflowCollaborationUnfinishedLimitExceeded(db *gorm.DB, userID model.Int64String) (bool, error) {
-	statuses := []string{"queued", "running", "waiting_approval"}
+	statuses := []string{"queued", "running", "waiting_approval", "needs_input"}
 	var workflowCount, appCount int64
 	if err := db.Model(&model.WorkflowCollaborationTask{}).Where("user_id = ? AND status IN ?", userID, statuses).Count(&workflowCount).Error; err != nil {
 		return false, err

@@ -25,12 +25,13 @@ func NewServiceFromEnv() AIService {
 	mock := NewMockAIService()
 	provider := normalizeAIProvider(firstEnv("MIND_ARENA_AI_PROVIDER", "AI_PROVIDER"))
 	apiKey := firstEnv("MIND_ARENA_AI_API_KEY", "AI_API_KEY")
-	if isOpenAICompatibleProvider(provider) && apiKey != "" {
+	modelID := firstEnv("MIND_ARENA_AI_MODEL", "AI_MODEL")
+	if isOpenAICompatibleProvider(provider) && apiKey != "" && modelID != "" {
 		primary := NewOpenAICompatibleService(OpenAICompatibleConfig{
 			Provider: provider,
 			BaseURL:  firstEnv("MIND_ARENA_AI_BASE_URL", "AI_BASE_URL"),
 			APIKey:   apiKey,
-			Model:    firstEnv("MIND_ARENA_AI_MODEL", "AI_MODEL", "ARK_TEXT_MODEL"),
+			Model:    modelID,
 		})
 		return NewFallbackService(primary, mock)
 	}

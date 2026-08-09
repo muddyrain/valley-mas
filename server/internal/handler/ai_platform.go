@@ -17,8 +17,11 @@ import (
 	"unicode"
 
 	"valley-server/internal/ai/agent"
+	clarificationprotocol "valley-server/internal/ai/clarification"
 	"valley-server/internal/ai/tools"
+	blogtool "valley-server/internal/ai/tools/blog"
 	"valley-server/internal/ai/tools/content"
+	documenttool "valley-server/internal/ai/tools/document"
 	filetool "valley-server/internal/ai/tools/file"
 	imagetool "valley-server/internal/ai/tools/image"
 	"valley-server/internal/aiapp"
@@ -75,7 +78,13 @@ func consumeAIAPIKeyDailyUsage(db *gorm.DB, apiKeyID model.Int64String, usageDat
 var builtInAITools = []gin.H{
 	{"name": "content.search", "description": "搜索当前用户可访问的内容", "permission": "read", "riskLevel": "low"},
 	{"name": imagetool.ToolName, "description": "使用当前智能体配置的图片模型生成一张图片", "permission": "model", "riskLevel": "medium"},
-	{"name": "file.create", "description": "创建 Markdown、JSON 或 CSV 成果文件", "permission": "write", "riskLevel": "high"},
+	{"name": imagetool.ConvertToolName, "description": "将 WebP、JPG、PNG 图片转换为其他支持格式", "permission": "write", "riskLevel": "low"},
+	{"name": documenttool.ToolName, "description": "将文本型 PDF 尽力转换为 DOCX", "permission": "write", "riskLevel": "low"},
+	{"name": documenttool.ExportToolName, "description": "将文本导出为 Markdown、PDF 或 DOCX", "permission": "write", "riskLevel": "low"},
+	{"name": documenttool.SaveToolName, "description": "将临时成果保存为长期私有文档", "permission": "write", "riskLevel": "medium"},
+	{"name": documenttool.OverwriteToolName, "description": "使用临时成果覆盖已有私有文档", "permission": "write", "riskLevel": "medium"},
+	{"name": blogtool.ToolName, "description": "创建并发布当前用户的博客文章", "permission": "write", "riskLevel": "high"},
+	{"name": "file.create", "description": "创建 Markdown、JSON 或 CSV 成果文件", "permission": "write", "riskLevel": "low"},
 	{"name": "blog.create_draft", "description": "创建当前用户的博客草稿", "permission": "write", "riskLevel": "high"},
 	{"name": "blog.update_draft", "description": "更新当前用户的博客草稿", "permission": "write", "riskLevel": "high"},
 	{"name": "resource.create_draft", "description": "创建当前用户的资源草稿", "permission": "write", "riskLevel": "high"},
@@ -189,6 +198,20 @@ func validAIAppRetrievalConfig(config aiAppRetrievalConfig) bool {
 		config.MaxContextChars >= 1500 && config.MaxContextChars <= 8000
 }
 
+const aiKnowledgeSearchQuery = `
+	SELECT chunks.id AS chunk_id, documents.name AS document_name, chunks.content, chunks.page_number,
+	       ((1 - ?) * (1 - (chunks.embedding <=> ?::vector)) +
+	       ? * CASE WHEN chunks.content ILIKE ? OR documents.name ILIKE ? THEN 1 ELSE 0 END) AS score
+	FROM ai_knowledge_chunks AS chunks
+	JOIN ai_knowledge_documents AS documents ON documents.id = chunks.document_id
+	JOIN ai_knowledge_bases AS knowledge_bases ON knowledge_bases.id = documents.knowledge_base_id
+	WHERE chunks.user_id = ? AND documents.user_id = ? AND knowledge_bases.user_id = ?
+	  AND chunks.deleted_at IS NULL AND documents.deleted_at IS NULL AND knowledge_bases.deleted_at IS NULL
+	  AND documents.knowledge_base_id IN ? AND documents.status = 'ready'
+	  AND chunks.embedding IS NOT NULL
+	ORDER BY score DESC, chunks.embedding <=> ?::vector
+	LIMIT ?`
+
 // aiKnowledgeRetrievalFailure converts internal RAG failures into a stable
 // public contract. The original error is kept for structured server logs only.
 func aiKnowledgeRetrievalFailure(err error) (code, message string) {
@@ -199,6 +222,18 @@ func aiKnowledgeRetrievalFailure(err error) (code, message string) {
 	value := err.Error()
 	lowerValue := strings.ToLower(value)
 	switch {
+	case errors.Is(err, aimodel.ErrEmbeddingModelUnavailable):
+		return "RAG_EMBEDDING_MODEL_UNAVAILABLE", "没有可用且验证通过的知识库向量模型"
+	case errors.Is(err, aimodel.ErrEmbeddingMetadataUnavailable):
+		return "RAG_EMBEDDING_REINDEX_REQUIRED", "知识库向量已升级，请先重新索引文档"
+	case errors.Is(err, aimodel.ErrEmbeddingIdentityMismatch):
+		return "RAG_EMBEDDING_MODEL_MISMATCH", "知识库包含不同向量模型，请重新索引全部文档"
+	case errors.Is(err, aimodel.ErrEmbeddingProviderUnavailable):
+		return "RAG_EMBEDDING_PROVIDER_UNAVAILABLE", "知识库向量模型的 Provider 未配置"
+	case errors.Is(err, aimodel.ErrEmbeddingRequestFailed):
+		return "RAG_EMBEDDING_FAILED", "知识库向量服务调用失败，请稍后重试"
+	case errors.Is(err, aimodel.ErrEmbeddingDimensionUnavailable):
+		return "RAG_VECTOR_DIMENSION_MISMATCH", "知识库向量维度不匹配，请重新索引全部文档"
 	case strings.Contains(value, "RAG requires PostgreSQL"):
 		return "RAG_POSTGRES_REQUIRED", "知识库检索需要 PostgreSQL 数据库"
 	case strings.Contains(value, "pgvector extension is not installed"):
@@ -207,15 +242,17 @@ func aiKnowledgeRetrievalFailure(err error) (code, message string) {
 		return "RAG_VECTOR_DIMENSION_MISMATCH", "知识库向量维度不匹配，请重新索引全部文档"
 	case strings.Contains(lowerValue, "operator does not exist") && strings.Contains(lowerValue, "vector"):
 		return "RAG_VECTOR_OPERATOR_UNAVAILABLE", "知识库向量检索不可用，请检查 pgvector 与数据库迁移"
-	case strings.Contains(lowerValue, "relation \"ai_knowledge_") || strings.Contains(lowerValue, "column \"embedding\""):
+	case strings.Contains(lowerValue, "relation \"ai_knowledge_") ||
+		strings.Contains(lowerValue, "column \"embedding\"") ||
+		strings.Contains(lowerValue, "column \"embedding_model_id\""):
 		return "RAG_SCHEMA_OUTDATED", "知识库数据库结构未迁移，请执行服务端迁移"
 	case strings.Contains(lowerValue, "connection refused") ||
 		strings.Contains(lowerValue, "failed to connect") ||
 		strings.Contains(lowerValue, "connection reset") ||
 		strings.Contains(lowerValue, "database is closed"):
 		return "RAG_DATABASE_UNAVAILABLE", "知识库数据库暂不可用，请稍后重试"
-	case strings.Contains(value, "ARK_EMBEDDING_MODEL"):
-		return "ARK_EMBEDDING_NOT_CONFIGURED", "知识库向量模型未配置"
+	case strings.Contains(value, "ARK_EMBEDDING_MODEL") || value == aiclient.LegacyARKModelUnavailableMessage:
+		return "ARK_EMBEDDING_NOT_CONFIGURED", "知识库向量能力正在迁移"
 	case strings.Contains(value, "ARK embedding"):
 		return "ARK_EMBEDDING_FAILED", "知识库向量服务调用失败"
 	case strings.Contains(value, "retrieval config"):
@@ -527,7 +564,7 @@ func validateInitialAIAppTools(values []string) ([]string, error) {
 		if name == "" {
 			continue
 		}
-		if name != "content.search" && name != imagetool.ToolName && name != "file.create" {
+		if !isReviewedAIAppTool(name) {
 			return nil, errors.New("包含未审核的工具")
 		}
 		if _, exists := seen[name]; exists {
@@ -537,6 +574,17 @@ func validateInitialAIAppTools(values []string) ([]string, error) {
 		result = append(result, name)
 	}
 	return result, nil
+}
+
+func isReviewedAIAppTool(name string) bool {
+	switch name {
+	case "content.search", imagetool.ToolName, imagetool.ConvertToolName,
+		documenttool.ToolName, documenttool.ExportToolName, documenttool.SaveToolName,
+		documenttool.OverwriteToolName, blogtool.ToolName, filetool.ToolName:
+		return true
+	default:
+		return false
+	}
 }
 
 func validateInitialAIAppKnowledgeBases(db *gorm.DB, userID model.Int64String, values []model.Int64String) ([]model.Int64String, error) {
@@ -619,6 +667,9 @@ func DeleteAIApp(c *gin.Context) {
 		}
 		if len(taskIDs) > 0 {
 			if err := tx.Where("task_id IN ?", taskIDs).Delete(&model.AIAppToolApproval{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("task_id IN ?", taskIDs).Delete(&model.AIAppTaskClarification{}).Error; err != nil {
 				return err
 			}
 		}
@@ -831,17 +882,17 @@ func DebugAIApp(c *gin.Context) {
 		respondCatalogModelError(c, err)
 		return
 	}
-	knowledgeContext, references, retrievalErr := retrieveAIKnowledgeContext(c.Request.Context(), userID, version, message)
+	knowledge, retrievalErr := retrieveAIKnowledgeAugmentation(c.Request.Context(), userID, version, message)
 	if retrievalErr != nil {
-		code, publicMessage := aiKnowledgeRetrievalFailure(retrievalErr)
-		logAIKnowledgeRetrievalFailure(c, retrievalErr, logrus.Fields{"app_id": app.ID, "version_id": version.ID, "feature": "ai-workbench-debug"})
-		persistAIAppRun(app, version, userID, "failed", invocation.Model.ModelID, message, "", code, started)
-		Error(c, http.StatusServiceUnavailable, publicMessage)
+		persistAIAppRun(app, version, userID, "cancelled", invocation.Model.ModelID, message, "", "RUN_CANCELLED", started)
 		return
 	}
+	if knowledge.Status == aiKnowledgeStatusDegraded {
+		logAIKnowledgeRetrievalFailure(c, knowledge.Cause, logrus.Fields{"app_id": app.ID, "version_id": version.ID, "feature": "ai-workbench-debug", "degraded": true})
+	}
 	system := strings.TrimSpace(config.SystemInstructions())
-	if knowledgeContext != "" {
-		system = strings.TrimSpace(system + "\n\n以下是与当前问题相关的私有参考资料。请优先依据这些资料回答；资料不足时明确说明。\n" + knowledgeContext)
+	if knowledge.Context != "" {
+		system = strings.TrimSpace(system + "\n\n以下是与当前问题相关的私有参考资料。请优先依据这些资料回答；资料不足时明确说明。\n" + knowledge.Context)
 	}
 	registry, toolNames, toolErr := resolveAIAppTools(database.GetDB(), app.ID, version)
 	if toolErr != nil {
@@ -866,10 +917,10 @@ func DebugAIApp(c *gin.Context) {
 		toolNames = nil
 	}
 	system = appendContentSearchDateContext(system, toolNames, time.Now())
-	debugAIAppWithTools(c, payload.Stream, invocation, system, message, app, version, userID, registry, toolNames, references, started)
+	debugAIAppWithTools(c, payload.Stream, invocation, system, message, app, version, userID, registry, toolNames, knowledge, started)
 }
 
-func debugAIAppWithTools(c *gin.Context, stream bool, invocation aimodel.Invocation, system, message string, app model.AIApp, version model.AIAppVersion, userID model.Int64String, registry *tools.Registry, toolNames []string, references []aiKnowledgeReference, started time.Time) {
+func debugAIAppWithTools(c *gin.Context, stream bool, invocation aimodel.Invocation, system, message string, app model.AIApp, version model.AIAppVersion, userID model.Int64String, registry *tools.Registry, toolNames []string, knowledge aiKnowledgeAugmentation, started time.Time) {
 	modelID := invocation.Model.ModelID
 	loop := agent.NewLocalLoop(agent.NewCompatibleBackend(invocation.Client), registry)
 	spec := agent.Spec{Provider: invocation.Provider.Provider, Model: modelID, System: system, Tools: toolNames, MaxSteps: 6, MaxTokens: 1200, Feature: "ai-workbench"}
@@ -885,8 +936,8 @@ func debugAIAppWithTools(c *gin.Context, stream bool, invocation aimodel.Invocat
 		if result.Model == "" {
 			result.Model = modelID
 		}
-		run := persistAIAppRunWithReferences(app, version, userID, "succeeded", result.Model, message, result.Reply, "", references, started)
-		Success(c, gin.H{"run": run, "reply": result.Reply, "model": result.Model, "versionId": version.ID, "references": references})
+		run := persistAIAppRunWithReferences(app, version, userID, "succeeded", result.Model, message, result.Reply, "", knowledge.References, knowledge, started)
+		Success(c, gin.H{"run": run, "reply": result.Reply, "model": result.Model, "versionId": version.ID, "references": knowledge.References})
 		return
 	}
 	events, err := loop.RunStream(ctx, spec, []agent.Message{{Role: agent.RoleUser, Content: message}})
@@ -930,8 +981,8 @@ func debugAIAppWithTools(c *gin.Context, stream bool, invocation aimodel.Invocat
 	if result.Model == "" {
 		result.Model = modelID
 	}
-	run := persistAIAppRunWithReferences(app, version, userID, "succeeded", result.Model, message, result.Reply, "", references, started)
-	_ = writer.Send(gin.H{"type": "done", "run": run, "reply": result.Reply, "references": references})
+	run := persistAIAppRunWithReferences(app, version, userID, "succeeded", result.Model, message, result.Reply, "", knowledge.References, knowledge, started)
+	_ = writer.Send(gin.H{"type": "done", "run": run, "reply": result.Reply, "references": knowledge.References})
 }
 
 func retrieveAIKnowledgeContext(ctx context.Context, userID model.Int64String, version model.AIAppVersion, message string) (string, []aiKnowledgeReference, error) {
@@ -1029,7 +1080,15 @@ func searchAIKnowledgeChunks(ctx context.Context, userID model.Int64String, know
 	if readyDocumentCount == 0 {
 		return []aiKnowledgeSearchRow{}, nil
 	}
-	queryVectors, err := aiclient.CreateARKEmbeddings(ctx, []string{query})
+	storedModelID, storedDimension, err := currentAIKnowledgeEmbeddingIdentity(db, userID, knowledgeBaseIDs)
+	if err != nil {
+		return nil, err
+	}
+	invocation, err := aimodel.ResolveStoredEmbeddingInvocation(db, storedModelID, storedDimension, knowledgeEmbeddingTimeout)
+	if err != nil {
+		return nil, err
+	}
+	queryVectors, err := aimodel.CreateEmbeddingsWithProgress(ctx, invocation, []string{query}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1043,18 +1102,20 @@ func searchAIKnowledgeChunks(ctx context.Context, userID model.Int64String, know
 	}
 	keywordPattern := "%" + strings.TrimSpace(query) + "%"
 	var rows []aiKnowledgeSearchRow
-	err = db.Raw(`
-		SELECT chunks.id AS chunk_id, documents.name AS document_name, chunks.content, chunks.page_number,
-		       ((1 - ?) * (1 - (chunks.embedding <=> ?::vector)) +
-		       ? * CASE WHEN chunks.content ILIKE ? OR documents.name ILIKE ? THEN 1 ELSE 0 END) AS score
-		FROM ai_knowledge_chunks AS chunks
-		JOIN ai_knowledge_documents AS documents ON documents.id = chunks.document_id
-		JOIN ai_knowledge_bases AS knowledge_bases ON knowledge_bases.id = documents.knowledge_base_id
-		WHERE chunks.user_id = ? AND documents.user_id = ? AND knowledge_bases.user_id = ?
-		  AND documents.knowledge_base_id IN ? AND documents.status = 'ready'
-		  AND chunks.embedding IS NOT NULL
-		ORDER BY score DESC, chunks.embedding <=> ?::vector
-	LIMIT ?`, keywordWeight, string(queryVector), keywordWeight, keywordPattern, keywordPattern, userID, userID, userID, knowledgeBaseIDs, string(queryVector), config.TopK).Scan(&rows).Error
+	err = db.Raw(
+		aiKnowledgeSearchQuery,
+		keywordWeight,
+		string(queryVector),
+		keywordWeight,
+		keywordPattern,
+		keywordPattern,
+		userID,
+		userID,
+		userID,
+		knowledgeBaseIDs,
+		string(queryVector),
+		config.TopK,
+	).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
@@ -1085,12 +1146,15 @@ func ListAIAppRuns(c *gin.Context) {
 }
 
 func persistAIAppRun(app model.AIApp, version model.AIAppVersion, userID model.Int64String, status, modelName, input, output, errorCode string, started time.Time) model.AIAppRun {
-	return persistAIAppRunWithReferences(app, version, userID, status, modelName, input, output, errorCode, nil, started)
+	return persistAIAppRunWithReferences(app, version, userID, status, modelName, input, output, errorCode, nil, aiKnowledgeAugmentation{Status: aiKnowledgeStatusNotUsed}, started)
 }
 
-func persistAIAppRunWithReferences(app model.AIApp, version model.AIAppVersion, userID model.Int64String, status, modelName, input, output, errorCode string, references []aiKnowledgeReference, started time.Time) model.AIAppRun {
+func persistAIAppRunWithReferences(app model.AIApp, version model.AIAppVersion, userID model.Int64String, status, modelName, input, output, errorCode string, references []aiKnowledgeReference, knowledge aiKnowledgeAugmentation, started time.Time) model.AIAppRun {
 	referenceSummary, _ := json.Marshal(references)
-	run := model.AIAppRun{AppID: app.ID, VersionID: version.ID, UserID: userID, Status: status, Model: modelName, Input: aiclient.TrimRunes(input, 1000), Output: aiclient.TrimRunes(output, 2000), ErrorCode: errorCode, References: string(referenceSummary), DurationMs: time.Since(started).Milliseconds()}
+	if knowledge.Status == "" {
+		knowledge.Status = aiKnowledgeStatusNotUsed
+	}
+	run := model.AIAppRun{AppID: app.ID, VersionID: version.ID, UserID: userID, Status: status, Model: modelName, Input: aiclient.TrimRunes(input, 1000), Output: aiclient.TrimRunes(output, 2000), ErrorCode: errorCode, KnowledgeStatus: knowledge.Status, KnowledgeErrorCode: knowledge.ErrorCode, References: string(referenceSummary), DurationMs: time.Since(started).Milliseconds()}
 	_ = database.GetDB().Create(&run).Error
 	return run
 }
@@ -1211,7 +1275,7 @@ func ReplaceAIAppKnowledgeBases(c *gin.Context) {
 			return err
 		}
 		var createErr error
-		version, createErr = createAIAppVersionSnapshot(tx, app, source.Config, retrievalConfig, model.AIAppVersion{})
+		version, createErr = createAIAppVersionSnapshot(tx, app, source.Config, retrievalConfig, source)
 		if createErr != nil {
 			return createErr
 		}
@@ -1317,7 +1381,6 @@ func ReplaceAIAppTools(c *gin.Context) {
 		Error(c, 400, "工具参数错误")
 		return
 	}
-	allowed := map[string]bool{"content.search": true, imagetool.ToolName: true, "file.create": true}
 	policyByTool := make(map[string]string, len(payload.Policies))
 	for _, policy := range payload.Policies {
 		mode := strings.TrimSpace(policy.ApprovalMode)
@@ -1331,7 +1394,7 @@ func ReplaceAIAppTools(c *gin.Context) {
 	bindings := make([]model.AIAppVersionToolBinding, 0, len(payload.Tools))
 	for _, name := range payload.Tools {
 		name = strings.TrimSpace(name)
-		if !allowed[name] {
+		if !isReviewedAIAppTool(name) {
 			Error(c, 400, "包含未审核的工具")
 			return
 		}
@@ -1662,6 +1725,36 @@ func resolveAIAppTools(db *gorm.DB, appID model.Int64String, version model.AIApp
 				registry.MustRegister(imagetool.NewGenerateTool(db, config.ImageGeneration))
 			}
 			allowed = append(allowed, binding.ToolName)
+		case imagetool.ConvertToolName:
+			if registry.Get(binding.ToolName) == nil {
+				registry.MustRegister(imagetool.NewConvertTool(db))
+			}
+			allowed = append(allowed, binding.ToolName)
+		case documenttool.ToolName:
+			if registry.Get(binding.ToolName) == nil {
+				registry.MustRegister(documenttool.NewConvertTool(db))
+			}
+			allowed = append(allowed, binding.ToolName)
+		case documenttool.ExportToolName:
+			if registry.Get(binding.ToolName) == nil {
+				registry.MustRegister(documenttool.NewExportTool(db))
+			}
+			allowed = append(allowed, binding.ToolName)
+		case documenttool.SaveToolName:
+			if registry.Get(binding.ToolName) == nil {
+				registry.MustRegister(documenttool.NewSaveTool(db))
+			}
+			allowed = append(allowed, binding.ToolName)
+		case documenttool.OverwriteToolName:
+			if registry.Get(binding.ToolName) == nil {
+				registry.MustRegister(documenttool.NewOverwriteTool(db))
+			}
+			allowed = append(allowed, binding.ToolName)
+		case blogtool.ToolName:
+			if registry.Get(binding.ToolName) == nil {
+				registry.MustRegister(blogtool.NewPublishTool(db))
+			}
+			allowed = append(allowed, binding.ToolName)
 		case filetool.ToolName:
 			if registry.Get(binding.ToolName) == nil {
 				registry.MustRegister(filetool.NewCreateTool(db))
@@ -1669,6 +1762,8 @@ func resolveAIAppTools(db *gorm.DB, appID model.Int64String, version model.AIApp
 			allowed = append(allowed, binding.ToolName)
 		}
 	}
+	registry.MustRegister(clarificationprotocol.NewAskTool())
+	allowed = append(allowed, clarificationprotocol.ToolName)
 	return registry, allowed, nil
 }
 
@@ -1951,8 +2046,13 @@ func indexAIKnowledgeDocument(documentID model.Int64String) {
 		markAIKnowledgeDocumentFailed(documentID, "PGVECTOR_NOT_INSTALLED")
 		return
 	}
-	if _, errMsg := aiclient.ReadARKEmbeddingConfig(); errMsg != "" {
-		markAIKnowledgeDocumentFailed(documentID, knowledgeEmbeddingErrorCode(errMsg))
+	var document model.AIKnowledgeDocument
+	if err := db.Select("id", "user_id", "knowledge_base_id").First(&document, documentID).Error; err != nil {
+		return
+	}
+	invocation, err := resolveAIKnowledgeIndexInvocation(db, document)
+	if err != nil {
+		markAIKnowledgeDocumentFailed(documentID, knowledgeEmbeddingErrorCode(err))
 		return
 	}
 	if err := db.Model(&model.AIKnowledgeDocument{}).Where("id = ?", documentID).Updates(map[string]any{"status": "indexing", "error_code": "", "index_progress": 5}).Error; err != nil {
@@ -1974,12 +2074,12 @@ func indexAIKnowledgeDocument(documentID model.Int64String) {
 	updateAIKnowledgeDocumentProgress(db, documentID, 10)
 	ctx, cancel := context.WithTimeout(context.Background(), knowledgeEmbeddingTimeout)
 	defer cancel()
-	vectors, err := aiclient.CreateARKEmbeddingsWithProgress(ctx, inputs, func(completed, total int) {
+	vectors, err := aimodel.CreateEmbeddingsWithProgress(ctx, invocation, inputs, func(completed, total int) {
 		progress := 10 + completed*70/total
 		updateAIKnowledgeDocumentProgress(db, documentID, progress)
 	})
 	if err != nil || len(vectors) != len(chunks) {
-		markAIKnowledgeDocumentFailed(documentID, "ARK_EMBEDDING_FAILED")
+		markAIKnowledgeDocumentFailed(documentID, knowledgeEmbeddingErrorCode(err))
 		return
 	}
 	if err := db.Transaction(func(tx *gorm.DB) error {
@@ -1992,7 +2092,13 @@ func indexAIKnowledgeDocument(documentID model.Int64String) {
 				return err
 			}
 		}
-		return tx.Model(&model.AIKnowledgeDocument{}).Where("id = ?", documentID).Updates(map[string]any{"status": "ready", "error_code": "", "index_progress": 100}).Error
+		return tx.Model(&model.AIKnowledgeDocument{}).Where("id = ?", documentID).Updates(map[string]any{
+			"status":              "ready",
+			"error_code":          "",
+			"index_progress":      100,
+			"embedding_model_id":  invocation.Model.ID,
+			"embedding_dimension": invocation.Model.EmbeddingDimension,
+		}).Error
 	}); err != nil {
 		markAIKnowledgeDocumentFailed(documentID, "KNOWLEDGE_VECTOR_STORE_FAILED")
 	}
@@ -2030,11 +2136,68 @@ func hasPGVectorExtension(db *gorm.DB) bool {
 	return available
 }
 
-func knowledgeEmbeddingErrorCode(message string) string {
-	if strings.Contains(message, "ARK_EMBEDDING_MODEL") {
-		return "ARK_EMBEDDING_NOT_CONFIGURED"
+func currentAIKnowledgeEmbeddingIdentity(
+	db *gorm.DB,
+	userID model.Int64String,
+	knowledgeBaseIDs []model.Int64String,
+) (model.Int64String, int, error) {
+	var rows []struct {
+		ModelID   model.Int64String `gorm:"column:embedding_model_id"`
+		Dimension int               `gorm:"column:embedding_dimension"`
 	}
-	return "ARK_NOT_CONFIGURED"
+	if err := db.Model(&model.AIKnowledgeDocument{}).
+		Distinct("embedding_model_id", "embedding_dimension").
+		Where("user_id = ? AND knowledge_base_id IN ? AND status = ?", userID, knowledgeBaseIDs, "ready").
+		Order("embedding_model_id ASC, embedding_dimension ASC").
+		Find(&rows).Error; err != nil {
+		return 0, 0, err
+	}
+	if len(rows) == 0 {
+		return 0, 0, aimodel.ErrEmbeddingMetadataUnavailable
+	}
+	for _, row := range rows {
+		if row.ModelID == 0 || row.Dimension <= 0 {
+			return 0, 0, aimodel.ErrEmbeddingMetadataUnavailable
+		}
+	}
+	if len(rows) > 1 {
+		return 0, 0, fmt.Errorf("%w: found %d stored identities", aimodel.ErrEmbeddingIdentityMismatch, len(rows))
+	}
+	return rows[0].ModelID, rows[0].Dimension, nil
+}
+
+func resolveAIKnowledgeIndexInvocation(db *gorm.DB, document model.AIKnowledgeDocument) (aimodel.Invocation, error) {
+	var readyDocumentCount int64
+	if err := db.Model(&model.AIKnowledgeDocument{}).
+		Where(
+			"user_id = ? AND knowledge_base_id = ? AND status = ?",
+			document.UserID,
+			document.KnowledgeBaseID,
+			"ready",
+		).
+		Count(&readyDocumentCount).Error; err != nil {
+		return aimodel.Invocation{}, err
+	}
+	if readyDocumentCount == 0 {
+		return aimodel.ResolveDefaultEmbeddingInvocation(db, knowledgeEmbeddingTimeout)
+	}
+	modelID, dimension, err := currentAIKnowledgeEmbeddingIdentity(
+		db,
+		document.UserID,
+		[]model.Int64String{document.KnowledgeBaseID},
+	)
+	if err != nil {
+		return aimodel.Invocation{}, err
+	}
+	return aimodel.ResolveStoredEmbeddingInvocation(db, modelID, dimension, knowledgeEmbeddingTimeout)
+}
+
+func knowledgeEmbeddingErrorCode(err error) string {
+	if err == nil {
+		return "RAG_EMBEDDING_FAILED"
+	}
+	code, _ := aiKnowledgeRetrievalFailure(err)
+	return code
 }
 
 func splitKnowledgeText(text string) []string {

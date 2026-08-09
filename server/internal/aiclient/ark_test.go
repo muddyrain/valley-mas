@@ -6,10 +6,11 @@ import (
 )
 
 func TestReadARKTextConfigMissingAPIKey(t *testing.T) {
+	t.Setenv("VOLCENGINE_API_KEY", "")
 	t.Setenv("ARK_API_KEY", "")
 	t.Setenv("ARK_TEXT_MODEL", "ep-text")
 	cfg, errMsg := ReadARKTextConfig()
-	if errMsg != "AI 未配置：缺少 ARK_API_KEY" {
+	if errMsg != "AI 服务未配置：缺少 VOLCENGINE_API_KEY" {
 		t.Fatalf("unexpected error: %q", errMsg)
 	}
 	if cfg.APIKey != "" {
@@ -21,7 +22,7 @@ func TestReadARKTextConfigInvalidModel(t *testing.T) {
 	t.Setenv("ARK_API_KEY", "key")
 	t.Setenv("ARK_TEXT_MODEL", "doubao")
 	_, errMsg := ReadARKTextConfig()
-	if errMsg != "AI 未配置：ARK_TEXT_MODEL 必须以 ep- 开头" {
+	if errMsg != LegacyARKModelUnavailableMessage {
 		t.Fatalf("unexpected error: %q", errMsg)
 	}
 }
@@ -43,7 +44,7 @@ func TestReadARKEmbeddingConfigRequiresDedicatedEndpoint(t *testing.T) {
 	t.Setenv("ARK_API_KEY", "key")
 	t.Setenv("ARK_EMBEDDING_MODEL", "")
 	_, errMsg := ReadARKEmbeddingConfig()
-	if errMsg != "AI 未配置：ARK_EMBEDDING_MODEL 必须以 ep- 开头" {
+	if errMsg != LegacyARKModelUnavailableMessage {
 		t.Fatalf("unexpected error: %q", errMsg)
 	}
 }
@@ -90,7 +91,7 @@ func TestReadARKVisionConfigNoModel(t *testing.T) {
 	t.Setenv("ARK_VISION_MODEL", "")
 	t.Setenv("ARK_TEXT_MODEL", "")
 	_, errMsg := ReadARKVisionConfig()
-	if errMsg != "AI 未配置：ARK_VISION_MODEL 或 ARK_TEXT_MODEL 必须以 ep- 开头" {
+	if errMsg != LegacyARKModelUnavailableMessage {
 		t.Fatalf("unexpected error: %q", errMsg)
 	}
 }
@@ -122,8 +123,21 @@ func TestReadARKImageConfigMissingPrimary(t *testing.T) {
 	t.Setenv("ARK_IMAGE_MODEL", "")
 	t.Setenv("ARK_IMAGE_MODEL_FALLBACK", "")
 	_, _, errMsg := ReadARKImageConfig()
-	if errMsg != "AI 未配置：缺少 ARK_IMAGE_MODEL" {
+	if errMsg != LegacyARKModelUnavailableMessage {
 		t.Fatalf("unexpected error: %q", errMsg)
+	}
+}
+
+func TestARKClientUsesVolcengineCredential(t *testing.T) {
+	ResetForTest()
+	t.Cleanup(ResetForTest)
+	t.Setenv("VOLCENGINE_API_KEY", "key")
+	t.Setenv("VOLCENGINE_BASE_URL", "https://ark.example/api/v3")
+	t.Setenv("ARK_API_KEY", "")
+	t.Setenv("ARK_BASE_URL", "")
+
+	if client := ARKClient(35 * time.Second); client == nil {
+		t.Fatal("expected client from VOLCENGINE_API_KEY")
 	}
 }
 

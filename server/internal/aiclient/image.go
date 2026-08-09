@@ -32,7 +32,7 @@ func GenerateARKImage(ctx context.Context, prompt string, sizeCandidates ...stri
 	}
 	client := ARKClient(90 * time.Second)
 	if client == nil {
-		return GeneratedImage{}, errors.New("AI 未配置：缺少 ARK_API_KEY")
+		return GeneratedImage{}, errors.New("AI 服务未配置：缺少 VOLCENGINE_API_KEY")
 	}
 	if len(sizeCandidates) == 0 {
 		sizeCandidates = []string{"1024x1024", "adaptive"}

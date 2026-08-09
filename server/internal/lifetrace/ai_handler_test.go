@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"valley-server/internal/aiclient"
 	"valley-server/internal/aimodel"
 	"valley-server/internal/database"
 	lifeai "valley-server/internal/lifetrace/ai"
@@ -253,7 +254,7 @@ func TestAnalyzeImageRequiresAIConfig(t *testing.T) {
 	if resp.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d: %s", resp.Code, resp.Body.String())
 	}
-	if !strings.Contains(resp.Body.String(), "ARK_API_KEY") {
+	if !strings.Contains(resp.Body.String(), "VOLCENGINE_API_KEY") {
 		t.Fatalf("expected config message, got %s", resp.Body.String())
 	}
 }
@@ -272,7 +273,7 @@ func TestGeneratePantryThumbnailRequiresAIConfig(t *testing.T) {
 	if resp.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d: %s", resp.Code, resp.Body.String())
 	}
-	if !strings.Contains(resp.Body.String(), "ARK_API_KEY") {
+	if !strings.Contains(resp.Body.String(), "VOLCENGINE_API_KEY") {
 		t.Fatalf("expected config message, got %s", resp.Body.String())
 	}
 }
@@ -989,7 +990,7 @@ func TestReadLifeTraceArkTextConfigValidatesModel(t *testing.T) {
 
 	_, _, _, errMsg := readLifeTraceArkTextConfig()
 
-	if !strings.Contains(errMsg, "ARK_TEXT_MODEL") {
+	if errMsg != aiclient.LegacyARKModelUnavailableMessage {
 		t.Fatalf("expected model validation error, got %q", errMsg)
 	}
 }

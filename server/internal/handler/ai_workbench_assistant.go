@@ -208,7 +208,7 @@ var callWorkbenchStructuredAI = func(ctx context.Context, systemPrompt, userProm
 	}
 	client := aiclient.ARKClient(75 * time.Second)
 	if client == nil {
-		return structuredAIResult{}, errors.New("AI 未配置：缺少 ARK_API_KEY")
+		return structuredAIResult{}, errors.New("AI 服务未配置：缺少 VOLCENGINE_API_KEY")
 	}
 	messages := []*arkmodel.ChatCompletionMessage{
 		{Role: arkmodel.ChatMessageRoleSystem, Content: textARKMessageContent(systemPrompt)},

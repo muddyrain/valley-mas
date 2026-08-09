@@ -128,12 +128,14 @@ describe('advice api', () => {
       ok: false,
       json: async () => ({
         code: 503,
-        message: 'AI 未配置：缺少 ARK_API_KEY',
+        message: 'AI 服务未配置：缺少 VOLCENGINE_API_KEY',
       }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(generateWeeklyReview(token)).rejects.toThrow('AI 未配置：缺少 ARK_API_KEY');
+    await expect(generateWeeklyReview(token)).rejects.toThrow(
+      'AI 服务未配置：缺少 VOLCENGINE_API_KEY',
+    );
   });
 
   it('deletes weekly reviews with bearer token', async () => {

@@ -1,7 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import AIAppEditor, { parseAIAppAgentConfig } from './index';
+import AIAppEditor, {
+  agentToolOptions,
+  parseAIAppAgentConfig,
+  saveAIAppCapabilities,
+} from './index';
 
 describe('AIAppEditor', () => {
   it('renders a loading shell with accessible busy state', () => {
@@ -40,5 +44,44 @@ describe('AIAppEditor', () => {
 
     expect(config.modelId).toBe('chat-model');
     expect(config.visionModelId).toBeUndefined();
+  });
+
+  it('offers image and document conversion tools in the agent editor', () => {
+    expect(agentToolOptions.map((tool) => tool.name)).toEqual([
+      'content.search',
+      'file.create',
+      'image.generate',
+      'image.convert',
+      'document.convert',
+      'document.export',
+      'document.save',
+      'document.overwrite',
+      'blog.publish',
+    ]);
+  });
+
+  it('returns the final draft version after saving tools and knowledge bases', async () => {
+    const calls: string[] = [];
+    const replaceTools = async () => {
+      calls.push('tools');
+      return { tools: ['image.convert'], bindings: [], version: { id: 'tool-version' } };
+    };
+    const replaceKnowledgeBases = async () => {
+      calls.push('knowledge-bases');
+      return { knowledgeBaseIds: [], version: { id: 'final-version' } };
+    };
+
+    const versionID = await saveAIAppCapabilities(
+      {
+        appId: 'app-1',
+        tools: ['image.convert'],
+        bindings: [],
+        knowledgeBaseIds: [],
+      },
+      { replaceTools, replaceKnowledgeBases },
+    );
+
+    expect(calls).toEqual(['tools', 'knowledge-bases']);
+    expect(versionID).toBe('final-version');
   });
 });

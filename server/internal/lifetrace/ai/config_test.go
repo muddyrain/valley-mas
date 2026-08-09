@@ -11,7 +11,7 @@ func TestReadTextConfigRequiresARKTextModel(t *testing.T) {
 	t.Setenv("ARK_TEXT_MODEL", "doubao")
 
 	_, errMsg := ReadTextConfig(30 * time.Second)
-	if errMsg != "AI 未配置：ARK_TEXT_MODEL 必须以 ep- 开头" {
+	if errMsg != "AI 功能暂不可用：该功能正在迁移到新的模型服务" {
 		t.Fatalf("unexpected error message: %q", errMsg)
 	}
 }

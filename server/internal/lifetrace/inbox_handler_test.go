@@ -420,6 +420,7 @@ func TestOrganizeInboxItemErrorPaths(t *testing.T) {
 
 	t.Run("missing ai config", func(t *testing.T) {
 		t.Setenv("OPENAI_API_KEY", "")
+		t.Setenv("VOLCENGINE_API_KEY", "")
 		t.Setenv("ARK_API_KEY", "")
 		router := setupTraceTestRouter(t, 101)
 		item := model.LifeTraceInboxItem{
@@ -437,7 +438,7 @@ func TestOrganizeInboxItemErrorPaths(t *testing.T) {
 		router.ServeHTTP(resp, req)
 
 		payload := decodeTraceErrorPayload(t, resp)
-		if payload["message"] != "AI 未配置：缺少 ARK_API_KEY" {
+		if payload["message"] != "AI 服务未配置：缺少 VOLCENGINE_API_KEY" {
 			t.Fatalf("expected missing config message, got %+v", payload)
 		}
 	})
