@@ -1,4 +1,4 @@
-import { BookOpen, Bot, Home, ImageIcon, LibraryBig, Sparkles } from 'lucide-react';
+import { BookOpen, Bot, Home, ImageIcon, LibraryBig, Sparkles, Wrench } from 'lucide-react';
 
 export const navigationGroups = [
   {
@@ -16,6 +16,10 @@ export const navigationGroups = [
       { to: '/workbench/images', label: 'AI 图片', icon: Sparkles },
       { to: '/workbench/resources', label: 'AI 资源', icon: LibraryBig },
     ],
+  },
+  {
+    label: '工具',
+    items: [{ to: '/tools/format', label: '实用工具', icon: Wrench }],
   },
 ] as const;
 

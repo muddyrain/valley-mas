@@ -85,7 +85,7 @@ function RouteTitle() {
     } else if (pathname === '/blog') {
       title = '博客与图文 | Valley';
     } else if (pathname === '/tools/format') {
-      title = '格式转换工具 | Valley';
+      title = '实用工具 | Valley';
     } else if (pathname === '/labs/climber') {
       title = '玩具攀爬实验场 | Valley';
     } else if (pathname === '/labs/scratch-legend') {
