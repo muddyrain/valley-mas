@@ -30,20 +30,16 @@ import {
   type Visibility,
 } from '@/api/blog';
 import type { Resource } from '@/api/resource';
-import AiImageLoading from '@/components/AiImageLoading';
-import {
-  BLOG_COVER_ASPECT_CLASS,
-  BLOG_COVER_OUTPUT_HEIGHT,
-  BLOG_COVER_OUTPUT_WIDTH,
-} from '@/components/blog';
+import BlockingLoadingSurface from '@/components/BlockingLoadingSurface';
+import { BLOG_COVER_OUTPUT_HEIGHT, BLOG_COVER_OUTPUT_WIDTH } from '@/components/blog';
 import {
   AICoverAssistantDialog,
   type AICoverAssistantPayload,
   BLOG_COVER_AI_ASPECT_RATIO,
-  BLOG_COVER_AI_PROMPT,
   BLOG_COVER_AI_QUALITY,
 } from '@/components/blog/AICoverAssistantDialog';
 import { BatchMarkdownImportDialog } from '@/components/blog/BatchMarkdownImportDialog';
+import { BlogCoverPreview } from '@/components/blog/BlogCoverPreview';
 import { BlogWorkflowDialog } from '@/components/blog/BlogWorkflowDialog';
 import { CoverCropDialog } from '@/components/blog/CoverCropDialog';
 import { CoverPickerDialog } from '@/components/blog/CoverPickerDialog';
@@ -54,11 +50,22 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { createAutoExcerpt, parseMarkdownImport } from '@/utils/blogImport';
 import { navigateBackOrFallback } from '@/utils/navigation';
+import { buildBlogCoverSubjectContext } from './blogCoverGeneration';
+import {
+  clearBlogCoverGenerationRecovery,
+  readBlogCoverGenerationRecovery,
+  writeBlogCoverGenerationRecovery,
+} from './blogCoverGenerationRecovery';
 import { waitNextPaint } from './utils';
 
 type CoverImageMeta = {
   width: number;
   height: number;
+};
+
+type CoverRecoveryTransition = {
+  previousSrc: string;
+  revealCurrent: boolean;
 };
 
 const BLOG_EDITOR_HEADING_OPTIONS = [
@@ -72,12 +79,24 @@ const BLOG_COVER_AI_RECIPE_ID = 'cover';
 const BLOG_COVER_AI_POLL_INTERVAL_MS = 1500;
 const BLOG_COVER_AI_POLL_ERROR_INTERVAL_MS = 3000;
 const BLOG_COVER_AI_POLL_TIMEOUT_MS = 120000;
+const BLOG_COVER_RECOVERY_TRANSITION_MS = 500;
+const BLOG_COVER_RECOVERY_NOTICE_MS = 3200;
+
+async function preloadCoverImage(src: string) {
+  const image = new Image();
+  image.src = src;
+  try {
+    await image.decode();
+  } catch {
+    // The preview still gets a chance to load through the browser's regular image pipeline.
+  }
+}
 
 export default function BlogCreate() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id: editingId } = useParams<{ id?: string }>();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const isEditMode = Boolean(editingId);
   const navigationState = (location.state as {
     returnTo?: string;
@@ -110,6 +129,10 @@ export default function BlogCreate() {
   const [aiExcerptLoading, setAiExcerptLoading] = useState(false);
   const [aiCoverLoading, setAiCoverLoading] = useState(false);
   const [aiCoverSource, setAiCoverSource] = useState<'manual' | 'import'>('manual');
+  const [recoveringCover, setRecoveringCover] = useState(false);
+  const [coverRecoveryTransition, setCoverRecoveryTransition] =
+    useState<CoverRecoveryTransition | null>(null);
+  const [showCoverRecoveryNotice, setShowCoverRecoveryNotice] = useState(false);
   const [importingMarkdown, setImportingMarkdown] = useState(false);
   const [batchImportDialogOpen, setBatchImportDialogOpen] = useState(false);
   const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
@@ -117,6 +140,7 @@ export default function BlogCreate() {
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
   const [loadingPost, setLoadingPost] = useState(false);
+  const [loadedEditorScope, setLoadedEditorScope] = useState('');
   const [coverUploading, setCoverUploading] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
@@ -131,7 +155,10 @@ export default function BlogCreate() {
   const coverViewportRef = useRef<HTMLDivElement | null>(null);
   const markdownImportInputRef = useRef<HTMLInputElement | null>(null);
   const aiCoverGenerationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const coverRecoveryTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const coverRecoveryNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiCoverGenerationSessionRef = useRef(0);
+  const recoveredEditorScopeRef = useRef('');
 
   useEffect(() => {
     currentEditingIdRef.current = editingId;
@@ -141,13 +168,13 @@ export default function BlogCreate() {
     try {
       const list = await getAdminGroups({ groupType: 'blog' });
       setGroups(list || []);
-      if ((!groupId || !isEditMode) && list?.[0]?.id) {
-        setGroupId(list[0].id);
+      if (list?.[0]?.id) {
+        setGroupId((current) => (!current || !isEditMode ? list[0].id : current));
       }
     } catch {
       toast.error('加载分组失败');
     }
-  }, [groupId, isEditMode]);
+  }, [isEditMode]);
 
   const loadPost = useCallback(
     async (postId: string) => {
@@ -171,6 +198,7 @@ export default function BlogCreate() {
         setGroupId(detail.groupId || '');
         setVisibility(detail.visibility || 'private');
         setLoadedPostStatus(detail.status || 'draft');
+        setLoadedEditorScope(postId);
       } catch {
         toast.error('加载博客内容失败');
         navigate('/my-space');
@@ -186,7 +214,11 @@ export default function BlogCreate() {
   useEffect(() => {
     // 彻底禁用本地草稿缓存，并清理历史遗留数据
     if (!isEditMode) {
-      localStorage.removeItem('valley-blog-create-draft-v3');
+      try {
+        localStorage.removeItem('valley-blog-create-draft-v3');
+      } catch {
+        // 浏览器禁用存储时仍允许继续创作和生成封面。
+      }
     }
   }, [isEditMode]);
 
@@ -203,63 +235,27 @@ export default function BlogCreate() {
       if (aiCoverGenerationTimerRef.current) {
         window.clearTimeout(aiCoverGenerationTimerRef.current);
       }
+      if (coverRecoveryTransitionTimerRef.current) {
+        window.clearTimeout(coverRecoveryTransitionTimerRef.current);
+      }
+      if (coverRecoveryNoticeTimerRef.current) {
+        window.clearTimeout(coverRecoveryNoticeTimerRef.current);
+      }
       aiCoverGenerationSessionRef.current += 1;
     };
   }, []);
 
   const resetLocalCoverEditing = useCallback(() => {
-    if (coverObjectUrl) {
-      URL.revokeObjectURL(coverObjectUrl);
-    }
     setCoverFile(null);
-    setCoverObjectUrl('');
+    setCoverObjectUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return '';
+    });
     setCoverImageMeta(null);
     setCoverZoom(1);
     setCoverOffsetX(0);
     setCoverOffsetY(0);
-  }, [coverObjectUrl]);
-
-  const applyTemporaryCoverFile = async (file: File) => {
-    const objectUrl = URL.createObjectURL(file);
-    const meta = await new Promise<CoverImageMeta>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-      img.onerror = () => reject(new Error('read cover failed'));
-      img.src = objectUrl;
-    });
-
-    if (coverObjectUrl) {
-      URL.revokeObjectURL(coverObjectUrl);
-    }
-
-    setCoverFile(file);
-    setCoverObjectUrl(objectUrl);
-    setCoverImageMeta(meta);
-    setCoverZoom(1);
-    setCoverOffsetX(0);
-    setCoverOffsetY(0);
-    setCover('');
-    setCoverStorageKey('');
-    setPendingCoverRemoteUrl('');
-  };
-
-  const importRemoteCoverAsLocalFile = async (url: string, filePrefix = 'ai-blog-cover') => {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error('remote cover fetch failed');
-    }
-    const blob = await response.blob();
-    if (!blob.size) {
-      throw new Error('remote cover is empty');
-    }
-
-    const mimeType = blob.type || 'image/jpeg';
-    const extension = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
-    const file = new File([blob], `${filePrefix}-${Date.now()}.${extension}`, {
-      type: mimeType,
-    });
-    await applyTemporaryCoverFile(file);
-  };
+  }, []);
 
   const resetCreateForm = useCallback(() => {
     setTitle('');
@@ -274,6 +270,7 @@ export default function BlogCreate() {
     setGroupId('');
     setLoadingPost(false);
     setLoadedPostStatus('draft');
+    setLoadedEditorScope('new');
     resetLocalCoverEditing();
   }, [resetLocalCoverEditing]);
 
@@ -285,11 +282,215 @@ export default function BlogCreate() {
 
     void loadGroups();
     if (editingId) {
+      setLoadedEditorScope('');
       void loadPost(editingId);
     } else {
       resetCreateForm();
     }
   }, [isAuthenticated, navigate, editingId, loadGroups, loadPost, resetCreateForm]);
+
+  const editorRecoveryScope = editingId || 'new';
+
+  const rememberCoverGeneration = useCallback(
+    (generationId: string) => {
+      if (!user?.id) return;
+      writeBlogCoverGenerationRecovery(localStorage, user.id, editorRecoveryScope, {
+        generationId,
+        createdAt: Date.now(),
+      });
+    },
+    [editorRecoveryScope, user?.id],
+  );
+
+  const clearRememberedCoverGeneration = useCallback(() => {
+    if (!user?.id) return;
+    clearBlogCoverGenerationRecovery(localStorage, user.id, editorRecoveryScope);
+  }, [editorRecoveryScope, user?.id]);
+
+  const resetCoverRecoveryFeedback = useCallback(() => {
+    if (coverRecoveryTransitionTimerRef.current) {
+      window.clearTimeout(coverRecoveryTransitionTimerRef.current);
+      coverRecoveryTransitionTimerRef.current = null;
+    }
+    if (coverRecoveryNoticeTimerRef.current) {
+      window.clearTimeout(coverRecoveryNoticeTimerRef.current);
+      coverRecoveryNoticeTimerRef.current = null;
+    }
+    setCoverRecoveryTransition(null);
+    setShowCoverRecoveryNotice(false);
+  }, []);
+
+  useEffect(() => {
+    if (editorRecoveryScope) resetCoverRecoveryFeedback();
+  }, [editorRecoveryScope, resetCoverRecoveryFeedback]);
+
+  const discardCoverGeneration = useCallback(() => {
+    clearRememberedCoverGeneration();
+    resetCoverRecoveryFeedback();
+    aiCoverGenerationSessionRef.current += 1;
+    if (aiCoverGenerationTimerRef.current) {
+      window.clearTimeout(aiCoverGenerationTimerRef.current);
+      aiCoverGenerationTimerRef.current = null;
+    }
+    setAiCoverLoading(false);
+    setAiCoverSource('manual');
+    setRecoveringCover(false);
+  }, [clearRememberedCoverGeneration, resetCoverRecoveryFeedback]);
+
+  const applyGeneratedCover = useCallback(
+    (resultUrl: string) => {
+      resetLocalCoverEditing();
+      setCover(resultUrl);
+      setCoverStorageKey('');
+      setPendingCoverRemoteUrl(resultUrl);
+      setPendingUnsplashDownloadLocation('');
+    },
+    [resetLocalCoverEditing],
+  );
+
+  const monitorCoverGeneration = useCallback(
+    async (generationId: string, options: { source: 'manual' | 'import'; recovered?: boolean }) => {
+      const sessionId = ++aiCoverGenerationSessionRef.current;
+      let recoveredCoverReady = false;
+      if (aiCoverGenerationTimerRef.current) {
+        window.clearTimeout(aiCoverGenerationTimerRef.current);
+        aiCoverGenerationTimerRef.current = null;
+      }
+
+      resetCoverRecoveryFeedback();
+      setAiCoverSource(options.source);
+      setRecoveringCover(Boolean(options.recovered));
+      setAiCoverLoading(true);
+      const startedAt = Date.now();
+
+      try {
+        await new Promise<void>((resolve) => {
+          const poll = async () => {
+            if (sessionId !== aiCoverGenerationSessionRef.current) {
+              resolve();
+              return;
+            }
+
+            if (Date.now() - startedAt >= BLOG_COVER_AI_POLL_TIMEOUT_MS) {
+              toast.error('AI 生成仍在处理中，稍后返回页面会自动继续恢复');
+              resolve();
+              return;
+            }
+
+            try {
+              const generationResult = await getAIImageGeneration(generationId);
+              if (sessionId !== aiCoverGenerationSessionRef.current) {
+                resolve();
+                return;
+              }
+
+              const generation = generationResult.generation;
+              if (generation.status === 'succeeded') {
+                if (!generation.resultUrl) {
+                  clearRememberedCoverGeneration();
+                  toast.error('AI 未返回可用封面图');
+                  resolve();
+                  return;
+                }
+                if (options.recovered) {
+                  await preloadCoverImage(generation.resultUrl);
+                  if (sessionId !== aiCoverGenerationSessionRef.current) {
+                    resolve();
+                    return;
+                  }
+                  setCoverRecoveryTransition({
+                    previousSrc: coverObjectUrl ? '' : cover,
+                    revealCurrent: false,
+                  });
+                  applyGeneratedCover(generation.resultUrl);
+                  recoveredCoverReady = true;
+                } else {
+                  applyGeneratedCover(generation.resultUrl);
+                  toast.success('AI 生图完成，保存草稿或发布时会自动转存');
+                }
+                resolve();
+                return;
+              }
+
+              if (generation.status === 'failed') {
+                clearRememberedCoverGeneration();
+                toast.error(generation.errorMessage || 'AI 生图失败');
+                resolve();
+                return;
+              }
+
+              if (generation.status === 'paused') {
+                clearRememberedCoverGeneration();
+                toast.error('AI 生图任务已暂停，请稍后重试');
+                resolve();
+                return;
+              }
+
+              aiCoverGenerationTimerRef.current = window.setTimeout(() => {
+                void poll();
+              }, BLOG_COVER_AI_POLL_INTERVAL_MS);
+            } catch {
+              if (sessionId !== aiCoverGenerationSessionRef.current) {
+                resolve();
+                return;
+              }
+              aiCoverGenerationTimerRef.current = window.setTimeout(() => {
+                void poll();
+              }, BLOG_COVER_AI_POLL_ERROR_INTERVAL_MS);
+            }
+          };
+
+          void poll();
+        });
+      } finally {
+        if (sessionId === aiCoverGenerationSessionRef.current) {
+          setAiCoverLoading(false);
+          setAiCoverSource('manual');
+          setRecoveringCover(false);
+
+          if (recoveredCoverReady) {
+            await waitNextPaint();
+            if (sessionId === aiCoverGenerationSessionRef.current) {
+              setCoverRecoveryTransition((current) =>
+                current ? { ...current, revealCurrent: true } : current,
+              );
+              setShowCoverRecoveryNotice(true);
+              coverRecoveryTransitionTimerRef.current = window.setTimeout(() => {
+                setCoverRecoveryTransition(null);
+                coverRecoveryTransitionTimerRef.current = null;
+              }, BLOG_COVER_RECOVERY_TRANSITION_MS);
+              coverRecoveryNoticeTimerRef.current = window.setTimeout(() => {
+                setShowCoverRecoveryNotice(false);
+                coverRecoveryNoticeTimerRef.current = null;
+              }, BLOG_COVER_RECOVERY_NOTICE_MS);
+            }
+          }
+        }
+      }
+    },
+    [
+      applyGeneratedCover,
+      clearRememberedCoverGeneration,
+      cover,
+      coverObjectUrl,
+      resetCoverRecoveryFeedback,
+    ],
+  );
+
+  useEffect(() => {
+    if (!user?.id || loadedEditorScope !== editorRecoveryScope) return;
+    const recoveryAttemptKey = `${user.id}:${editorRecoveryScope}`;
+    if (recoveredEditorScopeRef.current === recoveryAttemptKey) return;
+    recoveredEditorScopeRef.current = recoveryAttemptKey;
+
+    const recovery = readBlogCoverGenerationRecovery(localStorage, user.id, editorRecoveryScope);
+    if (recovery) {
+      void monitorCoverGeneration(recovery.generationId, {
+        source: 'manual',
+        recovered: true,
+      });
+    }
+  }, [editorRecoveryScope, loadedEditorScope, monitorCoverGeneration, user?.id]);
 
   const renderCoverToBlob = useCallback(async (): Promise<Blob | null> => {
     if (!coverFile || !coverImageMeta) return null;
@@ -356,58 +557,22 @@ export default function BlogCreate() {
     return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.95));
   }, [coverFile, coverImageMeta, coverOffsetX, coverOffsetY, coverObjectUrl, coverZoom]);
 
-  const uploadCoverIfNeeded = useCallback(
-    async (shouldUpload: boolean) => {
-      if (!shouldUpload) {
-        if (pendingCoverRemoteUrl) {
-          return {
-            cover: '',
-            coverStorageKey: '',
-          };
-        }
+  const uploadCoverIfNeeded = useCallback(async () => {
+    if (!coverFile || !coverObjectUrl) {
+      const remoteCoverUrl = pendingCoverRemoteUrl || (!coverStorageKey ? cover.trim() : '');
+      if (!remoteCoverUrl) {
         return {
           cover: cover.trim(),
           coverStorageKey: coverStorageKey.trim(),
         };
       }
 
-      if (!coverFile || !coverObjectUrl) {
-        const remoteCoverUrl = pendingCoverRemoteUrl || (!coverStorageKey ? cover.trim() : '');
-        if (!remoteCoverUrl) {
-          return {
-            cover: cover.trim(),
-            coverStorageKey: coverStorageKey.trim(),
-          };
-        }
-
-        setCoverUploading(true);
-        try {
-          const result = await uploadBlogCoverByUrl({ url: remoteCoverUrl });
-          setCover(result.url);
-          setCoverStorageKey(result.storageKey);
-          setPendingCoverRemoteUrl('');
-          return {
-            cover: result.url,
-            coverStorageKey: result.storageKey,
-          };
-        } finally {
-          setCoverUploading(false);
-        }
-      }
-
       setCoverUploading(true);
       try {
-        const blob = await renderCoverToBlob();
-        if (!blob) throw new Error('cover process failed');
-        const formData = new FormData();
-        const uploadName = coverFile.name.replace(/\.[^.]+$/, '') || 'blog-cover';
-        const uploadFile = new File([blob], `${uploadName}.jpg`, { type: 'image/jpeg' });
-        formData.append('file', uploadFile);
-        const result = await uploadBlogCover(formData);
+        const result = await uploadBlogCoverByUrl({ url: remoteCoverUrl });
         setCover(result.url);
         setCoverStorageKey(result.storageKey);
         setPendingCoverRemoteUrl('');
-        resetLocalCoverEditing();
         return {
           cover: result.url,
           coverStorageKey: result.storageKey,
@@ -415,17 +580,37 @@ export default function BlogCreate() {
       } finally {
         setCoverUploading(false);
       }
-    },
-    [
-      cover,
-      coverFile,
-      coverObjectUrl,
-      coverStorageKey,
-      pendingCoverRemoteUrl,
-      renderCoverToBlob,
-      resetLocalCoverEditing,
-    ],
-  );
+    }
+
+    setCoverUploading(true);
+    try {
+      const blob = await renderCoverToBlob();
+      if (!blob) throw new Error('cover process failed');
+      const formData = new FormData();
+      const uploadName = coverFile.name.replace(/\.[^.]+$/, '') || 'blog-cover';
+      const uploadFile = new File([blob], `${uploadName}.jpg`, { type: 'image/jpeg' });
+      formData.append('file', uploadFile);
+      const result = await uploadBlogCover(formData);
+      setCover(result.url);
+      setCoverStorageKey(result.storageKey);
+      setPendingCoverRemoteUrl('');
+      resetLocalCoverEditing();
+      return {
+        cover: result.url,
+        coverStorageKey: result.storageKey,
+      };
+    } finally {
+      setCoverUploading(false);
+    }
+  }, [
+    cover,
+    coverFile,
+    coverObjectUrl,
+    coverStorageKey,
+    pendingCoverRemoteUrl,
+    renderCoverToBlob,
+    resetLocalCoverEditing,
+  ]);
 
   const handleAIGenerateExcerpt = async () => {
     const trimmedContent = content.trim();
@@ -459,6 +644,7 @@ export default function BlogCreate() {
     modelId?: string;
     aspectRatio?: string;
     quality?: string;
+    variationMode?: AICoverAssistantPayload['variationMode'];
     prompt?: string;
   }) => {
     const trimmedContent = (payload?.content ?? content).trim();
@@ -470,105 +656,35 @@ export default function BlogCreate() {
     }
     const aspectRatio = payload?.aspectRatio || BLOG_COVER_AI_ASPECT_RATIO;
     const quality = payload?.quality || BLOG_COVER_AI_QUALITY;
-    const generationPrompt =
-      (payload?.prompt || BLOG_COVER_AI_PROMPT).trim() || BLOG_COVER_AI_PROMPT;
-    const sessionId = ++aiCoverGenerationSessionRef.current;
-    if (aiCoverGenerationTimerRef.current) {
-      window.clearTimeout(aiCoverGenerationTimerRef.current);
-      aiCoverGenerationTimerRef.current = null;
-    }
-
+    const generationPrompt = (payload?.prompt || '').trim();
+    const subjectContext = buildBlogCoverSubjectContext({
+      title: payload?.title ?? title,
+      excerpt: payload?.excerpt ?? excerpt,
+      content: trimmedContent,
+    });
+    const source = payload?.source ?? 'manual';
+    let monitoringStarted = false;
     try {
-      setAiCoverSource(payload?.source ?? 'manual');
+      setAiCoverSource(source);
       setAiCoverLoading(true);
       const result = await createAIImageGeneration({
         modelId,
         recipeId: BLOG_COVER_AI_RECIPE_ID,
         brief: generationPrompt,
+        subjectContext,
+        variationMode: payload?.variationMode || 'balanced',
         aspectRatio,
         quality,
         references: [],
       });
       const generationId = result.generation.id;
-      const startedAt = Date.now();
-
-      await new Promise<void>((resolve) => {
-        const poll = async () => {
-          if (sessionId !== aiCoverGenerationSessionRef.current) {
-            resolve();
-            return;
-          }
-
-          if (Date.now() - startedAt >= BLOG_COVER_AI_POLL_TIMEOUT_MS) {
-            if (sessionId === aiCoverGenerationSessionRef.current) {
-              toast.error('AI 生成超时，请稍后重试');
-            }
-            resolve();
-            return;
-          }
-
-          try {
-            const generationResult = await getAIImageGeneration(generationId);
-            if (sessionId !== aiCoverGenerationSessionRef.current) {
-              resolve();
-              return;
-            }
-            const generation = generationResult.generation;
-            if (generation.status === 'succeeded') {
-              if (!generation.resultUrl) {
-                toast.error('AI 未返回可用封面图');
-                resolve();
-                return;
-              }
-              try {
-                await importRemoteCoverAsLocalFile(generation.resultUrl);
-              } catch {
-                if (coverFile || coverObjectUrl) {
-                  resetLocalCoverEditing();
-                }
-                setCover(generation.resultUrl);
-                setCoverStorageKey('');
-                setPendingCoverRemoteUrl(generation.resultUrl);
-              }
-              toast.success('AI 生图完成（临时预览，发布时上传）');
-              resolve();
-              return;
-            }
-
-            if (generation.status === 'failed') {
-              toast.error(generation.errorMessage || 'AI 生图失败');
-              resolve();
-              return;
-            }
-
-            if (generation.status === 'paused') {
-              toast.error('AI 生图任务已暂停，请稍后重试');
-              resolve();
-              return;
-            }
-
-            aiCoverGenerationTimerRef.current = window.setTimeout(() => {
-              void poll();
-            }, BLOG_COVER_AI_POLL_INTERVAL_MS);
-          } catch {
-            if (sessionId !== aiCoverGenerationSessionRef.current) {
-              resolve();
-              return;
-            }
-            aiCoverGenerationTimerRef.current = window.setTimeout(() => {
-              void poll();
-            }, BLOG_COVER_AI_POLL_ERROR_INTERVAL_MS);
-          }
-        };
-
-        aiCoverGenerationTimerRef.current = window.setTimeout(() => {
-          void poll();
-        }, 1000);
-      });
+      rememberCoverGeneration(generationId);
+      monitoringStarted = true;
+      await monitorCoverGeneration(generationId, { source });
     } catch {
       // 请求层已统一处理并展示后端错误信息（例如模型配置错误）
     } finally {
-      if (sessionId === aiCoverGenerationSessionRef.current) {
+      if (!monitoringStarted) {
         setAiCoverLoading(false);
         setAiCoverSource('manual');
       }
@@ -597,6 +713,7 @@ export default function BlogCreate() {
       setCover('');
       setCoverStorageKey('');
       setPendingCoverRemoteUrl('');
+      discardCoverGeneration();
 
       await waitNextPaint();
       toast.success('MD 导入成功');
@@ -631,7 +748,7 @@ export default function BlogCreate() {
         const shouldTriggerUnsplashDownload =
           status === 'published' && !!pendingUnsplashDownloadLocation;
         const unsplashDownloadLocation = pendingUnsplashDownloadLocation;
-        const resolvedCover = await uploadCoverIfNeeded(status === 'published');
+        const resolvedCover = await uploadCoverIfNeeded();
         if (shouldTriggerUnsplashDownload && resolvedCover.coverStorageKey) {
           void triggerUnsplashDownload(unsplashDownloadLocation).catch(() => undefined);
           setPendingUnsplashDownloadLocation('');
@@ -677,6 +794,8 @@ export default function BlogCreate() {
           toast.success(status === 'published' ? '博客发布成功' : '草稿保存成功');
         }
 
+        clearRememberedCoverGeneration();
+
         if (!options?.stayOnPage) {
           if (isEditMode) {
             navigate(returnTo, {
@@ -704,6 +823,7 @@ export default function BlogCreate() {
       isEditMode,
       editingId,
       uploadCoverIfNeeded,
+      clearRememberedCoverGeneration,
       navigate,
       returnTo,
     ],
@@ -764,6 +884,7 @@ export default function BlogCreate() {
       setCover('');
       setCoverStorageKey('');
       setPendingCoverRemoteUrl('');
+      discardCoverGeneration();
       // 清理 pending 状态
       if (pendingCropUrl) URL.revokeObjectURL(pendingCropUrl);
       setPendingCropFile(null);
@@ -786,6 +907,7 @@ export default function BlogCreate() {
     setCoverStorageKey('');
     setPendingCoverRemoteUrl(selectedUrl);
     setPendingUnsplashDownloadLocation('');
+    discardCoverGeneration();
     setAiPickExcludedIds((prev) => (prev.includes(resource.id) ? prev : [...prev, resource.id]));
     setWallpaperPickerOpen(false);
     toast.success('已选择公用壁纸，发布时会自动转存为你的博客封面');
@@ -803,6 +925,7 @@ export default function BlogCreate() {
     setCover(selectedUrl);
     setCoverStorageKey('');
     setPendingCoverRemoteUrl(selectedUrl);
+    discardCoverGeneration();
     if (image.attribution.provider === 'unsplash' && image.downloadLocation) {
       setPendingUnsplashDownloadLocation(image.downloadLocation);
     } else {
@@ -839,6 +962,7 @@ export default function BlogCreate() {
       setCoverStorageKey('');
       setPendingCoverRemoteUrl(selectedUrl);
       setPendingUnsplashDownloadLocation('');
+      discardCoverGeneration();
       setAiPickExcludedIds((prev) => (prev.includes(resource.id) ? prev : [...prev, resource.id]));
       if (result.matchedKeywords && result.matchedKeywords.length > 0) {
         toast.success(`已按关键词「${result.matchedKeywords.join('、')}」选择封面`);
@@ -871,6 +995,7 @@ export default function BlogCreate() {
       modelId: payload.modelId,
       aspectRatio: payload.aspectRatio,
       quality: payload.quality,
+      variationMode: payload.variationMode,
       prompt: payload.prompt,
       source: 'manual',
     });
@@ -907,6 +1032,14 @@ export default function BlogCreate() {
   const isContentEmpty = !content.trim();
   const actionBusy =
     submitting || coverUploading || aiExcerptLoading || aiCoverLoading || importingMarkdown;
+  const coverAssistantBusy = aiPickLoading || aiCoverLoading;
+  const coverAssistantBusyTitle = recoveringCover
+    ? '正在恢复上次生成的封面...'
+    : aiPickLoading
+      ? 'AI 正在从资源池挑选封面...'
+      : aiCoverSource === 'import'
+        ? 'AI 生图工具正在根据导入内容生成封面图...'
+        : 'AI 生图工具正在生成封面图...';
   const isEditBootLoading = isEditMode && loadingPost && !title && !content;
 
   if (isEditBootLoading) {
@@ -1077,7 +1210,12 @@ export default function BlogCreate() {
           </section>
 
           <section className="min-w-0 space-y-4 lg:sticky lg:top-20 lg:self-start">
-            <div className="rounded-2xl border-border/50 bg-card/95 p-4 shadow-sm md:p-5">
+            <BlockingLoadingSurface
+              show={coverAssistantBusy}
+              title={coverAssistantBusyTitle}
+              hint="你可以继续编辑正文，完成后会自动更新预览。"
+              className="rounded-2xl border-border/50 bg-card/95 p-4 shadow-sm md:p-5"
+            >
               <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
                 <Sparkles className="text-primary h-4 w-4" />
                 发布设置
@@ -1148,6 +1286,7 @@ export default function BlogCreate() {
                         setCoverStorageKey('');
                         setPendingCoverRemoteUrl('');
                         setPendingUnsplashDownloadLocation('');
+                        discardCoverGeneration();
                       }}
                       placeholder="https://..."
                       maxLength={500}
@@ -1175,49 +1314,17 @@ export default function BlogCreate() {
                       选择封面
                     </Button>
                   </div>
-                  <AiImageLoading
-                    show={aiPickLoading}
-                    title="AI 正在从资源池挑选封面..."
-                    hint="你可以继续编辑正文，选图完成后会自动更新预览。"
-                  />
-                  <AiImageLoading
-                    show={aiCoverLoading}
-                    title={
-                      aiCoverSource === 'import'
-                        ? 'AI 生图工具正在根据导入内容生成封面图...'
-                        : 'AI 生图工具正在生成封面图...'
-                    }
-                  />
                   {(!!cover || !!coverObjectUrl) && (
-                    <div className="mt-3 overflow-hidden rounded-xl border-border/50 border bg-muted">
-                      <div
-                        ref={coverViewportRef}
-                        className={`relative w-full overflow-hidden ${BLOG_COVER_ASPECT_CLASS}`}
-                      >
-                        <img
-                          src={coverObjectUrl || cover}
-                          alt=""
-                          aria-hidden
-                          className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-55 blur-3xl"
-                        />
-                        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,hsl(var(--background)_/_0.34),hsl(var(--background)_/_0.06)_48%,transparent_78%)]" />
-                        <img
-                          src={coverObjectUrl || cover}
-                          alt="博客封面预览"
-                          className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
-                          draggable={false}
-                        />
-                      </div>
-                      {/* 可见范围标签 */}
-                      <div className="px-3 py-1 text-xs text-muted-foreground">
-                        当前可见范围：
-                        {visibility === 'public'
-                          ? '公开'
-                          : visibility === 'shared'
-                            ? '共享'
-                            : '私密'}
-                      </div>
-                    </div>
+                    <BlogCoverPreview
+                      src={coverObjectUrl || cover}
+                      previousSrc={coverRecoveryTransition?.previousSrc}
+                      revealCurrent={coverRecoveryTransition?.revealCurrent}
+                      showRecoveryNotice={showCoverRecoveryNotice}
+                      visibilityLabel={
+                        visibility === 'public' ? '公开' : visibility === 'shared' ? '共享' : '私密'
+                      }
+                      viewportRef={coverViewportRef}
+                    />
                   )}
                 </div>
 
@@ -1331,7 +1438,7 @@ export default function BlogCreate() {
                   )}
                 </div>
               </div>
-            </div>
+            </BlockingLoadingSurface>
           </section>
         </div>
       </div>

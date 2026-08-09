@@ -1,4 +1,6 @@
 /** @vitest-environment jsdom */
+
+import type { ButtonHTMLAttributes, HTMLAttributes, LabelHTMLAttributes, ReactNode } from 'react';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
@@ -10,20 +12,22 @@ import {
 } from './AICoverAssistantDialog';
 
 vi.mock('@/components/ui/button', () => ({
-  Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+  Button: ({ children, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) => (
+    <button {...props}>{children}</button>
+  ),
 }));
 
 vi.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ children }: any) => <div>{children}</div>,
-  DialogContent: ({ children }: any) => <div>{children}</div>,
-  DialogDescription: ({ children }: any) => <p>{children}</p>,
-  DialogFooter: ({ children }: any) => <div>{children}</div>,
-  DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <h2>{children}</h2>,
+  Dialog: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DialogContent: ({ children }: HTMLAttributes<HTMLDivElement>) => <div>{children}</div>,
+  DialogDescription: ({ children }: HTMLAttributes<HTMLParagraphElement>) => <p>{children}</p>,
+  DialogFooter: ({ children }: HTMLAttributes<HTMLDivElement>) => <div>{children}</div>,
+  DialogHeader: ({ children }: HTMLAttributes<HTMLDivElement>) => <div>{children}</div>,
+  DialogTitle: ({ children }: HTMLAttributes<HTMLHeadingElement>) => <h2>{children}</h2>,
 }));
 
 vi.mock('@/components/ui/label', () => ({
-  Label: ({ children, htmlFor, ...props }: any) => (
+  Label: ({ children, htmlFor, ...props }: LabelHTMLAttributes<HTMLLabelElement>) => (
     <label htmlFor={htmlFor} {...props}>
       {children}
     </label>
@@ -35,7 +39,13 @@ vi.mock('@/components/ui/separator', () => ({
 }));
 
 vi.mock('@/components/ai/ModelPicker', () => ({
-  ModelPicker: ({ onValueChange, value }: any) => (
+  ModelPicker: ({
+    onValueChange,
+    value,
+  }: {
+    onValueChange: (value: string) => void;
+    value?: string;
+  }) => (
     <select
       value={value}
       onChange={(event) => onValueChange((event.target as HTMLSelectElement).value)}
@@ -48,7 +58,7 @@ vi.mock('@/components/ai/ModelPicker', () => ({
 }));
 
 vi.mock('@/components/ai-workbench/PromptLibraryInsertButton', () => ({
-  PromptLibraryInsertButton: ({ onInsert }: any) => (
+  PromptLibraryInsertButton: ({ onInsert }: { onInsert: (value: string) => void }) => (
     <button type="button" onClick={() => onInsert('extra prompt')}>
       选择提示词
     </button>
@@ -98,6 +108,7 @@ describe('AICoverAssistantDialog', () => {
       modelId: 'model-1',
       aspectRatio: '4:3',
       quality: '2K',
+      variationMode: 'balanced',
       prompt: '起始提示词',
     });
 

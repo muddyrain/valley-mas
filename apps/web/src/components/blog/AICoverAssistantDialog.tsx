@@ -7,6 +7,7 @@ import {
   useCallback,
   useState,
 } from 'react';
+import type { AIImageVariationMode } from '@/api/aiImages';
 import { ModelPicker } from '@/components/ai/ModelPicker';
 import { PromptLibraryInsertButton } from '@/components/ai-workbench/PromptLibraryInsertButton';
 import { Button } from '@/components/ui/button';
@@ -34,16 +35,7 @@ export const BLOG_COVER_AI_QUALITY = '4K';
 export const BLOG_COVER_AI_ASPECT_OPTIONS = ['16:9', '4:3', '1:1'];
 export const BLOG_COVER_AI_QUALITY_OPTIONS = ['2K', '4K'];
 
-export const BLOG_COVER_AI_PROMPT = `随机创作一张 4K 高清二次元游戏角色壁纸，角色风格偏向原神、鸣潮、崩坏：星穹铁道那种高品质二游角色设计。
-角色 1~3 人，人物必须精致好看，五官清晰，发型有设计感，服装复杂且有层次，配饰丰富，角色气质鲜明，具有强烈的游戏角色感。
-可为幻想、都市、科幻、东方、学院、冒险等题材，角色身份随机，如剑士、法师、旅者、机能少女、星际角色、学院角色等。
-构图可为半身、全身、双人互动、动态动作，不要普通站桩头像。
-画面重点放在角色设计，不要只突出特效和氛围。
-色彩避免连续使用红紫、蓝紫、暗红等相近色系，优先使用清新明亮、自然协调的配色。
-背景要有完整场景，如城市、遗迹、森林、学院、车站、星舰、街区等，并与角色气质统一。
-日系二次元插画，精致立绘感，画面干净，高细节，高完成度，4k，no text，no logo，no watermark。`;
-export const BLOG_COVER_AI_PROMPT_PLACEHOLDER =
-  '可在此补充更具体的角色元素、构图要求或场景细节（可留空）';
+export const BLOG_COVER_AI_PROMPT_PLACEHOLDER = '可选：补充主体、构图、配色或不希望出现的元素';
 
 type AICoverAssistantMode = 'pick' | 'generate';
 
@@ -52,6 +44,7 @@ export interface AICoverAssistantPayload {
   modelId: string;
   aspectRatio: string;
   quality: string;
+  variationMode: AIImageVariationMode;
   prompt: string;
 }
 
@@ -64,6 +57,7 @@ interface AICoverAssistantDialogProps {
   defaultModelId?: string;
   defaultAspectRatio?: string;
   defaultQuality?: string;
+  defaultVariationMode?: AIImageVariationMode;
   defaultPrompt?: string;
   onConfirm: (payload: AICoverAssistantPayload) => void | Promise<void>;
 }
@@ -72,6 +66,15 @@ const COVER_TABS = [
   { mode: 'pick' as const, label: 'AI 选图' },
   { mode: 'generate' as const, label: 'AI 生图' },
 ] as const;
+
+const VARIATION_OPTIONS: Array<{
+  value: AIImageVariationMode;
+  label: string;
+}> = [
+  { value: 'precise', label: '精确遵循' },
+  { value: 'balanced', label: '均衡变化' },
+  { value: 'exploratory', label: '大胆探索' },
+];
 
 function defaultButtonLabel(isBusy: boolean) {
   return (
@@ -91,7 +94,8 @@ export function AICoverAssistantDialog({
   defaultModelId = '',
   defaultAspectRatio = BLOG_COVER_AI_ASPECT_RATIO,
   defaultQuality = BLOG_COVER_AI_QUALITY,
-  defaultPrompt = BLOG_COVER_AI_PROMPT,
+  defaultVariationMode = 'balanced',
+  defaultPrompt = '',
   onConfirm,
 }: AICoverAssistantDialogProps) {
   const [open, setOpen] = useState(false);
@@ -99,6 +103,7 @@ export function AICoverAssistantDialog({
   const [modelId, setModelId] = useState(defaultModelId);
   const [aspectRatio, setAspectRatio] = useState(defaultAspectRatio);
   const [quality, setQuality] = useState(defaultQuality);
+  const [variationMode, setVariationMode] = useState<AIImageVariationMode>(defaultVariationMode);
   const [prompt, setPrompt] = useState(defaultPrompt);
 
   const isBusy = disabled || busy;
@@ -108,8 +113,16 @@ export function AICoverAssistantDialog({
     setModelId(defaultModelId);
     setAspectRatio(defaultAspectRatio);
     setQuality(defaultQuality);
-    setPrompt(defaultPrompt.trim() || BLOG_COVER_AI_PROMPT);
-  }, [defaultMode, defaultModelId, defaultAspectRatio, defaultQuality, defaultPrompt]);
+    setVariationMode(defaultVariationMode);
+    setPrompt(defaultPrompt.trim());
+  }, [
+    defaultMode,
+    defaultModelId,
+    defaultAspectRatio,
+    defaultQuality,
+    defaultVariationMode,
+    defaultPrompt,
+  ]);
 
   const handleOpen = () => {
     if (isBusy) return;
@@ -134,7 +147,8 @@ export function AICoverAssistantDialog({
       modelId,
       aspectRatio,
       quality,
-      prompt: (prompt || BLOG_COVER_AI_PROMPT).trim() || BLOG_COVER_AI_PROMPT,
+      variationMode,
+      prompt: prompt.trim(),
     });
   };
 
@@ -181,7 +195,7 @@ export function AICoverAssistantDialog({
           <DialogHeader>
             <DialogTitle>AI 封面助手</DialogTitle>
             <DialogDescription className="leading-6 text-sm text-muted-foreground">
-              合并 AI 选图和 AI 生图能力，在一个弹窗内完成模型选择与参数配置，确认后直接生成封面。
+              根据文章内容选择图片，或生成一张新封面。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -214,6 +228,37 @@ export function AICoverAssistantDialog({
                     capability="image_generation"
                     label="生图模型"
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="blog-cover-assistant-variation"
+                    className="text-xs text-muted-foreground"
+                  >
+                    画面变化
+                  </Label>
+                  <Select
+                    value={variationMode}
+                    onValueChange={(nextValue) =>
+                      setVariationMode((nextValue || 'balanced') as AIImageVariationMode)
+                    }
+                  >
+                    <SelectTrigger
+                      id="blog-cover-assistant-variation"
+                      className="w-full rounded-xl"
+                    >
+                      <SelectValue placeholder="选择变化幅度">
+                        {VARIATION_OPTIONS.find((option) => option.value === variationMode)?.label}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VARIATION_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <Separator />
@@ -298,7 +343,7 @@ export function AICoverAssistantDialog({
                     className="rounded-xl"
                   />
                   <p className="text-xs leading-5 text-muted-foreground">
-                    当前已设置默认高品质日系二次元角色壁纸提示词，可按需补充更多细节。
+                    默认根据文章内容构思封面；留空也可直接生成。
                   </p>
                 </div>
               </>

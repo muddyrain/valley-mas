@@ -1,0 +1,31 @@
+@keyframes thinking-orb {
+  0%,
+  60%,
+  100% {
+    opacity: 0.32;
+    filter: blur(0.6px);
+    transform: translateY(0) scale(0.72);
+  }
+
+  30% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(-0.22rem) scale(1);
+  }
+}
+
+.thinking-orb {
+  animation: thinking-orb 1.2s cubic-bezier(0.2, 0, 0, 1) infinite;
+  transform-origin: center;
+  will-change: transform, opacity, filter;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking-orb {
+    animation: none;
+    filter: none;
+    opacity: 0.72;
+    transform: none;
+    will-change: auto;
+  }
+}
