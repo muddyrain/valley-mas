@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ColorPickerOverlay } from './ColorPickerOverlay';
-import { getSelectionSurfaceMode } from './core/selection-surface';
+import { getSelectionSurfaceLayers, getSelectionSurfaceMode } from './core/selection-surface';
 import { ScreenshotEditor } from './ScreenshotEditor';
 import { SelectionOverlay } from './SelectionOverlay';
 import type { RecorderSnapshot } from './shared/contracts';
@@ -14,6 +14,7 @@ export function SelectionSurface() {
       ? 'selection'
       : getSelectionSurfaceMode(snapshot?.screenshot.state ?? 'idle');
   const isColorPicker = snapshot?.selectionPurpose === 'color-picker';
+  const layers = getSelectionSurfaceLayers(surfaceMode, editorReady);
 
   useEffect(() => {
     void window.screenRecorder.getSnapshot().then(setSnapshot);
@@ -29,10 +30,8 @@ export function SelectionSurface() {
 
   return (
     <>
-      {surfaceMode === 'selection' && !editorReady && <SelectionOverlay />}
-      {surfaceMode === 'screenshot-editor' && (
-        <ScreenshotEditor visible={editorReady} onCanvasReady={revealEditor} />
-      )}
+      {layers.showSelection && <SelectionOverlay interactive={surfaceMode === 'selection'} />}
+      {layers.showEditor && <ScreenshotEditor visible={editorReady} onCanvasReady={revealEditor} />}
     </>
   );
 }

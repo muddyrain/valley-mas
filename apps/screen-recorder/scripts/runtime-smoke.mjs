@@ -413,6 +413,8 @@ async function assertSelectionLayerIsTransparent(client) {
         activeMode: document.querySelector('.capture-mode-toolbar [aria-selected="true"]')?.textContent?.trim(),
         rootBackground: getComputedStyle(document.documentElement).backgroundColor,
         overlayBackground: getComputedStyle(document.querySelector('.selection-overlay')).backgroundColor,
+        maskCount: document.querySelectorAll('.selection-mask').length,
+        maskBackground: getComputedStyle(document.querySelector('.selection-mask')).backgroundColor,
         opacity: getComputedStyle(document.querySelector('.selection-overlay')).opacity,
         transitionDuration: getComputedStyle(document.querySelector('.selection-overlay')).transitionDuration,
         viewport: { width: window.innerWidth, height: window.innerHeight },
@@ -504,7 +506,7 @@ async function leftClick(client, rect) {
 
 async function selectWithMask(client, rect, initialSnapshot) {
   const initial = initialSnapshot ?? (await assertSelectionLayerIsTransparent(client));
-  if (initial.overlayBackground === 'rgba(0, 0, 0, 0)') {
+  if (initial.maskCount !== 1 || initial.maskBackground === 'rgba(0, 0, 0, 0)') {
     throw new Error(`选区前缺少全屏遮罩：${JSON.stringify(initial)}`);
   }
   await client.send('Input.dispatchMouseEvent', {
@@ -531,13 +533,15 @@ async function selectWithMask(client, rect, initialSnapshot) {
           hasSelection: overlay?.classList.contains('selection-overlay-has-selection'),
           overlayBackground: overlay ? getComputedStyle(overlay).backgroundColor : undefined,
           boxShadow: box ? getComputedStyle(box).boxShadow : undefined,
+          maskCount: document.querySelectorAll('.selection-mask').length,
           frame: box?.getBoundingClientRect().toJSON(),
         };
       })()`),
     (value) =>
       value?.hasSelection &&
       value.overlayBackground === 'rgba(0, 0, 0, 0)' &&
-      value.boxShadow?.includes('9999px'),
+      value.maskCount === 4 &&
+      !value.boxShadow?.includes('9999px'),
   );
   await client.send('Input.dispatchMouseEvent', {
     type: 'mouseReleased',
@@ -880,6 +884,48 @@ async function inspectScreenshotEditor(port) {
   };
 }
 
+async function startScreenshotHandoffProbe(client) {
+  await client.evaluate(`(() => {
+    const result = { frames: [], done: false };
+    window.__valleyScreenshotHandoffProbe = result;
+    const sample = () => {
+      const selectionVisible = Boolean(document.querySelector('.selection-overlay'));
+      const editor = document.querySelector('.screenshot-editor-overlay');
+      const editorVisible = Boolean(
+        editor &&
+          getComputedStyle(editor).visibility !== 'hidden' &&
+          getComputedStyle(editor).opacity !== '0'
+      );
+      result.frames.push({ editorVisible, selectionVisible, timestamp: performance.now() });
+      if (editorVisible) {
+        result.done = true;
+        return;
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+    return true;
+  })()`);
+}
+
+async function readScreenshotHandoffProbe(client) {
+  const result = await waitFor(
+    '截图选区到编辑器连续交接',
+    () => client.evaluate('window.__valleyScreenshotHandoffProbe'),
+    (value) => value?.done === true,
+  );
+  const blankFrames = result.frames.filter(
+    (frame) => !frame.selectionVisible && !frame.editorVisible,
+  );
+  if (blankFrames.length > 0) {
+    throw new Error(`截图编辑器出现前露出了桌面：${JSON.stringify({ blankFrames, result })}`);
+  }
+  return {
+    blankFrames: blankFrames.length,
+    sampledFrames: result.frames.length,
+  };
+}
+
 async function inspectConfiguredSelection(port, initialRect) {
   const selection = await connectTarget(port, 'selection');
   try {
@@ -895,6 +941,7 @@ async function inspectConfiguredSelection(port, initialRect) {
             handles: document.querySelectorAll('[data-selection-handle]').length,
             help: document.querySelector('.selection-help')?.textContent?.trim(),
             boxShadow: box ? getComputedStyle(box).boxShadow : undefined,
+            maskCount: document.querySelectorAll('.selection-mask').length,
             handleCenters: Object.fromEntries([...document.querySelectorAll('[data-selection-handle]')].map((item) => {
               const rect = item.getBoundingClientRect();
               return [item.dataset.selectionHandle, { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }];
@@ -906,7 +953,8 @@ async function inspectConfiguredSelection(port, initialRect) {
         value.handles === 8 &&
         value.frame?.width === initialRect.width &&
         value.frame?.height === initialRect.height &&
-        value.boxShadow?.includes('9999px'),
+        value.maskCount === 4 &&
+        !value.boxShadow?.includes('9999px'),
     );
     const tolerance = 0.6;
     const expectedCenters = {
@@ -1346,9 +1394,11 @@ async function inspectCurrentFixes(app, port) {
       value?.height === snapTarget.rect.height,
   );
   console.error('[runtime] fixes window snap complete');
+  await startScreenshotHandoffProbe(selection);
   await selection.evaluate(
     'void window.screenRecorder.confirmSelection({ x: 100, y: 100, width: 320, height: 240 }); true',
   );
+  const handoff = await readScreenshotHandoffProbe(selection);
   selection.close();
   const editor = await inspectScreenshotEditor(port);
   console.error('[runtime] fixes live selection complete');
@@ -1359,9 +1409,32 @@ async function inspectCurrentFixes(app, port) {
     windowTargetsMilliseconds,
     windowTargetResponseMilliseconds: responseTimes,
     windowSnap,
+    handoff,
     editor,
     pinnedScreenshot,
   };
+}
+
+async function inspectScreenshotHandoff(app, port) {
+  const existingSelectionTargets = await targetIdsForMode(port, 'selection');
+  await app.main.evaluate("window.screenRecorder.startScreenshot('region')");
+  const selection = await connectTarget(port, 'selection', existingSelectionTargets);
+  const initial = await assertSelectionLayerIsTransparent(selection);
+  await startScreenshotHandoffProbe(selection);
+  const selectionAppearance = await selectWithMask(
+    selection,
+    { x: 100, y: 100, width: 320, height: 240 },
+    initial,
+  );
+  const handoff = await readScreenshotHandoffProbe(selection);
+  const plan = await selection.evaluate('window.screenRecorder.getScreenshotEditPlan()');
+  if (!plan?.operationId) throw new Error('截图编辑任务缺少 operationId');
+  await selection.evaluate(
+    `setTimeout(() => window.screenRecorder.cancelScreenshotEdit(${JSON.stringify(plan.operationId)}), 0); true`,
+  );
+  selection.close();
+  await waitForScreenshotState(app.main, 'idle', 10_000);
+  return { ...handoff, selectionAppearance };
 }
 
 async function measureShortcutSurfaceActivation(app, port, purpose) {
@@ -1390,6 +1463,23 @@ async function measureShortcutSurfaceActivation(app, port, purpose) {
     5_000,
   );
   const milliseconds = Math.round(performance.now() - startedAt);
+  const frameTiming = await surface.evaluate(`new Promise((resolve) => {
+    const timestamps = [];
+    const startedAt = performance.now();
+    const sample = (timestamp) => {
+      timestamps.push(timestamp);
+      if (timestamp - startedAt < 180) {
+        requestAnimationFrame(sample);
+        return;
+      }
+      const intervals = timestamps.slice(1).map((value, index) => value - timestamps[index]);
+      resolve({
+        frames: timestamps.length,
+        maxFrameInterval: Math.max(0, ...intervals),
+      });
+    };
+    requestAnimationFrame(sample);
+  })`);
   console.error(`[runtime] ${purpose} activation ${milliseconds}ms`);
   await surface.evaluate('void window.screenRecorder.cancelSelection(); true');
   retiredSelectionTargetIds.add(surface.targetId);
@@ -1397,7 +1487,10 @@ async function measureShortcutSurfaceActivation(app, port, purpose) {
   if (milliseconds > 120) {
     throw new Error(`${purpose} 快捷捕获激活过慢：${milliseconds}ms`);
   }
-  return milliseconds;
+  if (purpose === 'screenshot' && frameTiming.maxFrameInterval > 50) {
+    throw new Error(`截图遮罩首帧卡顿：${JSON.stringify(frameTiming)}`);
+  }
+  return { frameTiming, milliseconds };
 }
 
 async function inspectShiftColorPicker(app, port) {
@@ -1760,6 +1853,11 @@ async function runCoreScenarios() {
 
     if (scenario === 'settings-surface-only') {
       results.settingsSurface = await inspectSettingsSurface(app);
+      return results;
+    }
+
+    if (scenario === 'screenshot-handoff-only') {
+      results.screenshotHandoff = await inspectScreenshotHandoff(app, 9333);
       return results;
     }
 
@@ -2387,6 +2485,10 @@ if (scenario === 'activation-surfaces-only') {
   process.exit(0);
 }
 if (scenario === 'settings-surface-only') {
+  console.log(JSON.stringify({ core: await runCoreScenarios() }, null, 2));
+  process.exit(0);
+}
+if (scenario === 'screenshot-handoff-only') {
   console.log(JSON.stringify({ core: await runCoreScenarios() }, null, 2));
   process.exit(0);
 }

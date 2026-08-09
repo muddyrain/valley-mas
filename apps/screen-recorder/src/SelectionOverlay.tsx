@@ -7,13 +7,16 @@ import {
   updateSelectionGesture,
 } from './core/selection-controller';
 import { canStartSelectionGesture } from './core/selection-gesture';
+import { createSelectionMaskRects } from './core/selection-mask';
 import { findWindowTargetAt, type WindowTarget } from './core/window-target';
 
 const HANDLES: SelectionHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
-export function SelectionOverlay() {
+export function SelectionOverlay({ interactive = true }: { interactive?: boolean }) {
   const gestureRef = useRef<SelectionGesture | undefined>(undefined);
   const hoverPointRef = useRef<Point | undefined>(undefined);
+  const pendingSelectionRef = useRef<Rectangle | undefined>(undefined);
+  const selectionFrameRef = useRef<number | undefined>(undefined);
   const [selection, setSelection] = useState<Rectangle>();
   const [error, setError] = useState<string>();
   const [purpose, setPurpose] = useState<'recording' | 'screenshot'>('recording');
@@ -24,6 +27,15 @@ export function SelectionOverlay() {
   useLayoutEffect(() => {
     window.screenRecorder.selectionReady();
   }, []);
+
+  useEffect(
+    () => () => {
+      if (selectionFrameRef.current !== undefined) {
+        cancelAnimationFrame(selectionFrameRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (configuring) return;
@@ -96,12 +108,31 @@ export function SelectionOverlay() {
     height: window.innerHeight,
   });
 
+  const scheduleSelection = (rect: Rectangle | undefined) => {
+    pendingSelectionRef.current = rect;
+    if (selectionFrameRef.current !== undefined) return;
+    selectionFrameRef.current = requestAnimationFrame(() => {
+      selectionFrameRef.current = undefined;
+      setSelection(pendingSelectionRef.current);
+    });
+  };
+
+  const flushSelection = (rect: Rectangle | undefined) => {
+    if (selectionFrameRef.current !== undefined) {
+      cancelAnimationFrame(selectionFrameRef.current);
+      selectionFrameRef.current = undefined;
+    }
+    pendingSelectionRef.current = rect;
+    setSelection(rect);
+  };
+
   const pointFromEvent = (event: React.PointerEvent): Point => ({
     x: Math.min(Math.max(0, event.clientX), window.innerWidth),
     y: Math.min(Math.max(0, event.clientY), window.innerHeight),
   });
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!interactive) return;
     if (!canStartSelectionGesture(event.button, event.isPrimary)) return;
     if ((event.target as HTMLElement).closest('.capture-mode-toolbar')) return;
     const point = pointFromEvent(event);
@@ -145,29 +176,31 @@ export function SelectionOverlay() {
     updateSelectionGesture(gesture, point, bounds());
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!interactive) return;
     const gesture = gestureRef.current;
     const point = pointFromEvent(event);
     hoverPointRef.current = point;
     if (gesture) {
       setSuggestedTarget(undefined);
-      setSelection(selectionForGesture(gesture, point));
+      scheduleSelection(selectionForGesture(gesture, point));
       return;
     }
     if (!configuring) {
       const target = findWindowTargetAt(windowTargets, point);
       setSuggestedTarget(target);
-      setSelection(target?.rect);
+      scheduleSelection(target?.rect);
     }
   };
 
   const onPointerUp = async (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!interactive) return;
     if (!canStartSelectionGesture(event.button, event.isPrimary)) return;
     const gesture = gestureRef.current;
     gestureRef.current = undefined;
     if (!gesture) return;
     const rect = selectionForGesture(gesture, pointFromEvent(event));
     setSuggestedTarget(undefined);
-    setSelection(rect);
+    flushSelection(rect);
     try {
       validateSelection(rect);
       if (configuring) await window.screenRecorder.updateConfiguredSelection(rect);
@@ -179,20 +212,31 @@ export function SelectionOverlay() {
 
   const cancelFromRightClick = (event: React.MouseEvent) => {
     event.preventDefault();
+    if (!interactive) return;
     gestureRef.current = undefined;
-    setSelection(undefined);
+    flushSelection(undefined);
     if (configuring) void window.screenRecorder.cancelConfiguredRecording();
     else void window.screenRecorder.cancelSelection();
   };
 
+  const maskRects = createSelectionMaskRects(bounds(), selection);
+
   return (
     <div
-      className={`selection-overlay selection-overlay-ready${selection ? ' selection-overlay-has-selection' : ''}${configuring ? ' selection-overlay-configuring' : ''}`}
+      className={`selection-overlay selection-overlay-ready${selection ? ' selection-overlay-has-selection' : ''}${configuring ? ' selection-overlay-configuring' : ''}${interactive ? '' : ' selection-overlay-handoff'}`}
       onContextMenu={cancelFromRightClick}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={(event) => void onPointerUp(event)}
     >
+      {maskRects.map((rect, index) => (
+        <div
+          className="selection-mask"
+          // The mask rectangles keep a stable DOM layer while pointer movement only updates geometry.
+          key={index}
+          style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
+        />
+      ))}
       {!configuring && (
         <div className="capture-mode-toolbar" role="tablist" aria-label="捕获模式">
           <button

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getSelectionSurfaceMode } from './selection-surface';
+import { getSelectionSurfaceLayers, getSelectionSurfaceMode } from './selection-surface';
 
 describe('getSelectionSurfaceMode', () => {
   it('reuses the selection window for screenshot editing', () => {
@@ -13,5 +13,20 @@ describe('getSelectionSurfaceMode', () => {
     expect(getSelectionSurfaceMode('idle')).toBe('empty');
     expect(getSelectionSurfaceMode('completed')).toBe('empty');
     expect(getSelectionSurfaceMode('error')).toBe('empty');
+  });
+
+  it('keeps the selection frame covering the desktop until the editor canvas is ready', () => {
+    expect(getSelectionSurfaceLayers('selection', false)).toEqual({
+      showEditor: false,
+      showSelection: true,
+    });
+    expect(getSelectionSurfaceLayers('screenshot-editor', false)).toEqual({
+      showEditor: true,
+      showSelection: true,
+    });
+    expect(getSelectionSurfaceLayers('screenshot-editor', true)).toEqual({
+      showEditor: true,
+      showSelection: false,
+    });
   });
 });

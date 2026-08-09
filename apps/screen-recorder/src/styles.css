@@ -707,7 +707,7 @@ button:active:not(:disabled) {
   inset: 0;
   overflow: hidden;
   cursor: crosshair;
-  background: rgb(5 7 11 / 48%);
+  background: transparent;
   opacity: 0;
   user-select: none;
 }
@@ -716,8 +716,17 @@ button:active:not(:disabled) {
   opacity: 1;
 }
 
-.selection-overlay-has-selection {
-  background: transparent;
+.selection-overlay-handoff {
+  cursor: default;
+  pointer-events: none;
+}
+
+.selection-mask {
+  position: absolute;
+  z-index: 0;
+  contain: strict;
+  background: rgb(5 7 11 / 52%);
+  pointer-events: none;
 }
 
 .selection-help,
@@ -879,11 +888,10 @@ button:active:not(:disabled) {
 
 .selection-box {
   position: absolute;
+  z-index: 1;
   border: 2px solid #9a84ff;
   background: transparent;
-  box-shadow:
-    0 0 0 1px rgb(255 255 255 / 52%),
-    0 0 0 9999px rgb(5 7 11 / 52%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 52%);
   pointer-events: none;
 }
 

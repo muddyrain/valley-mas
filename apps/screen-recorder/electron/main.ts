@@ -91,6 +91,8 @@ const FORCE_WRITE_FAILURE = process.env.VALLEY_SCREEN_RECORDER_TEST_WRITE_FAILUR
 const SHOW_LONG_SCREENSHOT_FIXTURE =
   process.env.VALLEY_SCREEN_RECORDER_TEST_LONG_SCREENSHOT_FIXTURE === '1';
 const TEST_AUTO_STOP_MS = Number(process.env.VALLEY_SCREEN_RECORDER_TEST_AUTO_STOP_MS ?? 0);
+// desktopCapturer can briefly occupy the compositor; let the shortcut overlay settle first.
+const SCREENSHOT_CAPTURE_PRIME_DELAY_MS = 300;
 
 let mainWindow: BrowserWindow | undefined;
 let selectionWindow: BrowserWindow | undefined;
@@ -1194,6 +1196,20 @@ function primeScreenshotCapture(display: Display): void {
   void screenshotSourcePromise.catch(() => undefined);
 }
 
+function primeScreenshotCaptureAfterFirstPaint(task: { display: Display }): void {
+  setTimeout(() => {
+    if (
+      screenshotTask !== task ||
+      selectionPurpose !== 'screenshot' ||
+      screenshotSession.state !== 'selecting' ||
+      screenshotSourcePromise
+    ) {
+      return;
+    }
+    primeScreenshotCapture(task.display);
+  }, SCREENSHOT_CAPTURE_PRIME_DELAY_MS);
+}
+
 async function captureScreenshotImage(): Promise<NativeImage> {
   const task = screenshotTask;
   if (!task) {
@@ -2072,7 +2088,7 @@ function registerIpc(): void {
       !screenshotSourcePromise &&
       screenshotSession.state === 'selecting'
     ) {
-      primeScreenshotCapture(screenshotTask.display);
+      primeScreenshotCaptureAfterFirstPaint(screenshotTask);
     }
   });
 
