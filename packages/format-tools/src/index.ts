@@ -1,3 +1,9 @@
+import {
+  getStructuredFormatToolById,
+  runStructuredFormatTool,
+  STRUCTURED_FORMAT_TOOL_LIST,
+} from './structured-tools';
+
 export type ConverterCategory = 'data' | 'encoding' | 'text' | 'crypto';
 export type ConverterDirection = 'forward' | 'reverse';
 
@@ -13,6 +19,30 @@ export interface FormatConverter {
   inputPlaceholder: string;
   outputPlaceholder: string;
   convert: (input: string, direction: ConverterDirection) => string | Promise<string>;
+}
+
+export interface FormatToolManifest {
+  name: 'format.convert';
+  description: string;
+  converters: Array<{
+    id: string;
+    name: string;
+    description: string;
+    category: ConverterCategory;
+    keywords: string[];
+    supportsReverse: boolean;
+    optionsSchema?: Record<string, unknown>;
+  }>;
+  inputSchema: {
+    type: 'object';
+    required: string[];
+    properties: {
+      toolId: { type: 'string'; enum: string[] };
+      input: { type: 'string' };
+      direction: { type: 'string'; enum: ConverterDirection[] };
+      options: { type: 'object'; additionalProperties: true };
+    };
+  };
 }
 
 export const FORMAT_CONVERTER_CATEGORIES: Record<ConverterCategory, string> = {
@@ -542,4 +572,62 @@ export async function runFormatConverter(params: {
   }
 }
 
+export function getFormatToolManifest(): FormatToolManifest {
+  const structuredConverters = STRUCTURED_FORMAT_TOOL_LIST.map((tool) => ({
+    id: tool.id,
+    name: tool.name,
+    description: tool.description,
+    category: tool.category,
+    keywords: [...tool.keywords],
+    supportsReverse: false,
+    optionsSchema: tool.optionsSchema,
+  }));
+  const converters = [
+    ...FORMAT_CONVERTER_LIST.map((converter) => ({
+      id: converter.id,
+      name: converter.name,
+      description: converter.description,
+      category: converter.category,
+      keywords: [...converter.keywords],
+      supportsReverse: converter.supportsReverse,
+    })),
+    ...structuredConverters,
+  ];
+  const ids = converters.map((converter) => converter.id);
+
+  return {
+    name: 'format.convert',
+    description:
+      'Convert, parse, format, encode, normalize, hash, or inspect text and structured data.',
+    converters,
+    inputSchema: {
+      type: 'object',
+      required: ['toolId', 'input'],
+      properties: {
+        toolId: { type: 'string', enum: ids },
+        input: { type: 'string' },
+        direction: { type: 'string', enum: ['forward', 'reverse'] },
+        options: { type: 'object', additionalProperties: true },
+      },
+    },
+  };
+}
+
+export async function runFormatTool(params: {
+  toolId: string;
+  input: string;
+  direction?: ConverterDirection;
+  options?: Record<string, unknown>;
+}): Promise<{ ok: boolean; output: string; error?: string }> {
+  if (getStructuredFormatToolById(params.toolId)) {
+    return runStructuredFormatTool(params);
+  }
+  return runFormatConverter({
+    converterId: params.toolId,
+    input: params.input,
+    direction: params.direction,
+  });
+}
+
+export * from './structured-tools';
 export * from './toolbox';
