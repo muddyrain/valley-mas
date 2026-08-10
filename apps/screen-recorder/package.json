@@ -1,0 +1,120 @@
+{
+  "name": "@valley/screen-recorder",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local screenshot and screen recording app for Windows and macOS",
+  "author": "Valley MAS",
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "pnpm build:renderer && pnpm build:electron",
+    "build:renderer": "vite build",
+    "build:electron": "tsup --config tsup.config.ts",
+    "package:dir": "pnpm build && node scripts/package-dir.mjs",
+    "package:win": "pnpm build && node scripts/package-platform.mjs win",
+    "package:mac": "pnpm build && node scripts/package-platform.mjs mac",
+    "runtime:smoke": "node scripts/runtime-smoke.mjs",
+    "runtime:probe-video": "electron scripts/probe-video.cjs",
+    "typecheck": "tsc --noEmit",
+    "check": "biome check src electron scripts vite.config.ts vitest.config.ts tsup.config.ts index.html package.json tsconfig.json",
+    "test": "vitest run",
+    "clean": "node scripts/clean.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "catalog:node-22",
+    "@types/react": "catalog:react-19",
+    "@types/react-dom": "catalog:react-19",
+    "@vitejs/plugin-react-swc": "catalog:vite-6",
+    "electron": "43.3.0",
+    "electron-builder": "26.15.3",
+    "lucide-react": "catalog:shared-runtime",
+    "react": "catalog:react-19",
+    "react-dom": "catalog:react-19",
+    "tsup": "catalog:ts-tooling",
+    "typescript": "catalog:ts-tooling",
+    "vite": "catalog:vite-6",
+    "vitest": "catalog:test"
+  },
+  "build": {
+    "appId": "com.valley.screenrecorder",
+    "productName": "Valley Screen Recorder",
+    "directories": {
+      "output": "package-output",
+      "buildResources": "assets"
+    },
+    "files": [
+      "assets/**/*",
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
+    "win": {
+      "icon": "assets/logo.svg",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "useZip": false,
+      "differentialPackage": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "icon": "assets/logo.svg",
+      "category": "public.app-category.utilities",
+      "identity": null,
+      "hardenedRuntime": false,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Valley Screen Recorder 需要访问麦克风以将讲解声音录入视频。",
+        "NSCameraUsageDescription": "Valley Screen Recorder 需要访问摄像头以在录屏中显示画中画。",
+        "NSScreenCaptureUsageDescription": "Valley Screen Recorder 需要访问屏幕以完成本地截图和录屏。"
+      }
+    },
+    "dmg": {
+      "title": "Valley Screen Recorder ${version}",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  }
+}

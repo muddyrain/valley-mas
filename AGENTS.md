@@ -19,6 +19,7 @@
 - Web 前台：`AGENTS.md` -> `apps/web/AGENTS.md` -> `docs/PROJECT_GUIDE.md` -> `apps/web/src/App.tsx`。
 - Admin 后台：`AGENTS.md` -> `apps/admin/AGENTS.md` -> `apps/admin/src/App.tsx` -> `server/internal/router/router.go`。
 - Life Trace：`AGENTS.md` -> `apps/life-trace/AGENTS.md` -> `apps/life-trace/src/App.tsx` -> `server/internal/lifetrace`。
+- Screen Recorder：`AGENTS.md` -> `apps/screen-recorder/AGENTS.md` -> `apps/screen-recorder/README.md` -> `apps/screen-recorder/electron/main.ts` -> `apps/screen-recorder/src/App.tsx`。
 - AI Mind Arena：`AGENTS.md` -> `apps/ai-mind-arena/AGENTS.md` -> `apps/ai-mind-arena/app/page.tsx` -> `server/internal/mindarena`。
 - WorldSim：`AGENTS.md` -> `apps/world-sim/AGENTS.md` -> `apps/world-sim/src/App.tsx` -> `apps/world-sim/docs/TDD.md`。
 - Scratch Legend：`AGENTS.md` -> `apps/scratch-legend/AGENTS.md` -> `apps/scratch-legend/docs/scratch-legend-task.md` -> `apps/scratch-legend/lib/game-store.ts`。
@@ -35,6 +36,7 @@
 | Life Trace | `apps/life-trace/AGENTS.md` | Today、计划、AI、踪迹、Pantry、提醒、家庭空间和个人设置 |
 | Web 前台 | `apps/web/AGENTS.md` | 用户侧页面、创作者空间、资源、博客、个人空间和 Web API |
 | Admin 后台 | `apps/admin/AGENTS.md` | 管理后台、审核流程、Ant Design 组件和 Admin API |
+| Screen Recorder | `apps/screen-recorder/AGENTS.md` | Windows/macOS 本地截图与屏幕/区域录制、媒体设备、Electron 生命周期、快捷键、DPI 裁剪、安装包和文件写入 |
 | AI Mind Arena | `apps/ai-mind-arena/AGENTS.md` | Next.js 前端、人格辩论 UI、SSE 和分享体验 |
 | WorldSim | `apps/world-sim/AGENTS.md` | 沙盒文明模拟、玩法参数和设计文档 |
 | Scratch Legend | `apps/scratch-legend/AGENTS.md` | 刮刮卡成长游戏和阶段任务 |
