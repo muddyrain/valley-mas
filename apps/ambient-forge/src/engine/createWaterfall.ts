@@ -9,6 +9,7 @@ import {
   Group,
   IcosahedronGeometry,
   Mesh,
+  MeshPhysicalMaterial,
   MeshStandardMaterial,
   PlaneGeometry,
   Points,
@@ -18,6 +19,7 @@ import {
 } from 'three';
 import type { QualityProfile } from '../core/quality';
 import type { SceneSignals } from '../core/scene-signals';
+import { createRippleWaves, stepRippleWaves } from '../core/water-ripples';
 import { createRadialAlphaTexture } from './createRadialAlphaTexture';
 
 export interface WaterfallAssembly {
@@ -25,6 +27,14 @@ export interface WaterfallAssembly {
   update: (signals: SceneSignals, elapsed: number) => void;
   setQuality: (profile: QualityProfile) => void;
   getParticleCount: () => number;
+  getState: () => WaterfallRuntimeState;
+}
+
+export interface WaterfallRuntimeState {
+  refractionStrength: number;
+  foamEnergy: number;
+  rippleEnergy: number;
+  wetStreakStrength: number;
 }
 
 function seededRandom(seed: number): () => number {
@@ -65,6 +75,28 @@ export function createWaterfall(profile: QualityProfile): WaterfallAssembly {
   channel.rotation.z = -0.04;
   root.add(channel);
 
+  const meltwaterMaterial = new MeshStandardMaterial({
+    color: '#91c3c0',
+    emissive: '#386b70',
+    emissiveIntensity: 0.22,
+    roughness: 0.16,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: DoubleSide,
+  });
+  const meltwaterRivulets = new Group();
+  meltwaterRivulets.name = 'meltwater-rivulets';
+  for (let index = 0; index < 3; index += 1) {
+    const rivulet = new Mesh(new PlaneGeometry(0.1 + index * 0.025, 1.45, 2, 8), meltwaterMaterial);
+    rivulet.position.set(-3.58 - index * 0.28, 0.574 + index * 0.002, 1.46 - index * 0.3);
+    rivulet.rotation.x = -Math.PI / 2;
+    rivulet.rotation.z = -0.18 + index * 0.16;
+    rivulet.renderOrder = 4;
+    meltwaterRivulets.add(rivulet);
+  }
+  root.add(meltwaterRivulets);
+
   const ripples: Array<{ mesh: Mesh; material: MeshStandardMaterial; phase: number }> = [];
   for (let index = 0; index < 3; index += 1) {
     const rippleMaterial = new MeshStandardMaterial({
@@ -91,6 +123,9 @@ export function createWaterfall(profile: QualityProfile): WaterfallAssembly {
     side: DoubleSide,
     uniforms: {
       uWetness: { value: 0.5 },
+      uTime: { value: 0 },
+      uFlow: { value: 0 },
+      uIce: { value: 0 },
       uColor: { value: new Color('#27494e') },
     },
     vertexShader: `
@@ -102,17 +137,23 @@ export function createWaterfall(profile: QualityProfile): WaterfallAssembly {
     `,
     fragmentShader: `
       uniform float uWetness;
+      uniform float uTime;
+      uniform float uFlow;
+      uniform float uIce;
       uniform vec3 uColor;
       varying vec2 vUv;
       void main() {
         float edge = smoothstep(0.0, 0.18, vUv.x) * (1.0 - smoothstep(0.82, 1.0, vUv.x));
         float vertical = smoothstep(0.0, 0.12, vUv.y) * (1.0 - smoothstep(0.9, 1.0, vUv.y));
-        float streak = 0.72 + sin(vUv.y * 31.0 + sin(vUv.x * 17.0) * 2.0) * 0.18;
-        gl_FragColor = vec4(uColor, edge * vertical * streak * uWetness * 0.42);
+        float channel = smoothstep(0.22, 0.92, 0.5 + 0.5 * sin(vUv.x * 37.0 + sin(vUv.x * 11.0) * 2.0));
+        float travel = 0.55 + 0.45 * sin(vUv.y * 42.0 - uTime * (1.2 + uFlow * 3.0) + vUv.x * 9.0);
+        float streak = mix(0.45, channel * travel, 0.72 + uFlow * 0.28);
+        gl_FragColor = vec4(uColor, edge * vertical * streak * uWetness * (1.0 - uIce * 0.7) * 0.56);
       }
     `,
   });
   const wetStain = new Mesh(new PlaneGeometry(1.48, 3.9, 6, 18), wetStainMaterial);
+  wetStain.name = 'cliff-wet-streaks';
   wetStain.position.set(-4.75, -1.38, 0.785);
   wetStain.rotation.y = -0.08;
   wetStain.renderOrder = 1;
@@ -171,7 +212,24 @@ export function createWaterfall(profile: QualityProfile): WaterfallAssembly {
   waterfall.position.set(-4.74, -1.38, 0.82);
   waterfall.rotation.y = -0.08;
   waterfall.renderOrder = 2;
-  root.add(waterfall);
+  const refractionMaterial = new MeshPhysicalMaterial({
+    color: '#74aeb4',
+    roughness: 0.08,
+    metalness: 0,
+    transmission: 0.58,
+    thickness: 0.32,
+    ior: 1.333,
+    transparent: true,
+    opacity: 0.42,
+    depthWrite: false,
+    side: DoubleSide,
+  });
+  const refractionLayer = new Mesh(new PlaneGeometry(1.32, 3.86, 10, 28), refractionMaterial);
+  refractionLayer.name = 'waterfall-refraction';
+  refractionLayer.position.set(-4.742, -1.38, 0.807);
+  refractionLayer.rotation.y = -0.08;
+  refractionLayer.renderOrder = 1;
+  root.add(refractionLayer, waterfall);
 
   const foamMaterial = new ShaderMaterial({
     transparent: true,
@@ -363,45 +421,104 @@ export function createWaterfall(profile: QualityProfile): WaterfallAssembly {
 
   let sprayBudget = 96;
   let activeSprayCount = 96;
+  let refractionEnabled = true;
   const setQuality = (nextProfile: QualityProfile) => {
     sprayBudget = Math.min(96, Math.max(28, Math.ceil(nextProfile.weatherParticles * 0.11)));
     sprayGeometry.setDrawRange(0, sprayBudget);
     sprayMaterial.size = nextProfile.dprCap > 1.5 ? 0.075 : 0.095;
+    refractionEnabled = nextProfile.dprCap > 1;
+    refractionLayer.visible = refractionEnabled;
   };
   setQuality(profile);
 
   const baseWater = new Color('#6ba1a4');
   const stormWater = new Color('#4d747b');
+  let pondWaves = createRippleWaves(ripples.length);
+  let impactWaves = createRippleWaves(impactRings.length);
+  let lastElapsed = 0;
+  let runtimeState: WaterfallRuntimeState = {
+    refractionStrength: 0,
+    foamEnergy: 0,
+    rippleEnergy: 0,
+    wetStreakStrength: 0,
+  };
   return {
     root,
     setQuality,
     getParticleCount: () => activeSprayCount,
+    getState: () => ({ ...runtimeState }),
     update(signals, elapsed) {
-      const flow = Math.max(0.5, 0.72 + signals.rain * 0.28 - signals.snow * 0.18);
+      const delta = Math.min(0.1, Math.max(0, elapsed - lastElapsed));
+      lastElapsed = elapsed;
+      const flow = Math.max(
+        0.34,
+        0.68 +
+          signals.rain * 0.24 +
+          signals.meltwaterFlow * 0.38 -
+          signals.snow * 0.16 -
+          signals.iceCover * 0.32,
+      );
+      const foamEnergy = Math.min(
+        1,
+        flow * 0.72 + signals.rain * 0.2 + signals.meltwaterFlow * 0.32,
+      );
+      const wetStreakStrength = Math.min(
+        1,
+        0.22 + signals.wetness * 0.62 + signals.meltwaterFlow * 0.42,
+      );
       waterfallMaterial.uniforms.uTime.value = elapsed;
       waterfallMaterial.uniforms.uWind.value = signals.windStrength * signals.motionScale;
       waterfallMaterial.uniforms.uOpacity.value = flow;
       foamMaterial.uniforms.uTime.value = elapsed;
-      foamMaterial.uniforms.uFlow.value = flow;
-      wetStainMaterial.uniforms.uWetness.value = 0.42 + signals.wetness * 0.58;
+      foamMaterial.uniforms.uFlow.value = foamEnergy;
+      wetStainMaterial.uniforms.uTime.value = elapsed;
+      wetStainMaterial.uniforms.uFlow.value = signals.meltwaterFlow;
+      wetStainMaterial.uniforms.uIce.value = signals.iceCover;
+      wetStainMaterial.uniforms.uWetness.value = wetStreakStrength;
+      meltwaterMaterial.opacity = signals.meltwaterFlow * (0.42 + signals.daylight * 0.18);
+      for (let index = 0; index < meltwaterRivulets.children.length; index += 1) {
+        const rivulet = meltwaterRivulets.children[index];
+        if (!rivulet) continue;
+        rivulet.scale.y = 0.72 + Math.sin(elapsed * 2.4 + index * 1.7) * 0.16;
+      }
+      const refractionStrength = refractionEnabled
+        ? (1 - signals.iceCover * 0.82) * (0.34 + flow * 0.34)
+        : 0;
+      refractionMaterial.opacity = refractionStrength;
+      refractionMaterial.transmission = 0.42 + refractionStrength * 0.32;
       surfaceMaterial.color.copy(baseWater).lerp(stormWater, signals.wetness * 0.72);
       surfaceMaterial.opacity = 0.66 + signals.rain * 0.14;
       plungePoolMaterial.color.copy(baseWater).lerp(stormWater, signals.wetness * 0.8);
       plungePoolMaterial.opacity = 0.7 + flow * 0.12;
       plungePool.rotation.z = Math.sin(elapsed * 0.22) * 0.018 * signals.motionScale;
-      lipFoamMaterial.opacity = 0.46 + flow * 0.24;
+      lipFoamMaterial.opacity = 0.34 + foamEnergy * 0.38;
       iceMaterial.opacity = signals.snowCover * 0.86;
       pond.rotation.z = Math.sin(elapsed * 0.3) * 0.012 * signals.motionScale;
-      for (const ripple of ripples) {
-        const phase = (elapsed * (0.16 + flow * 0.08) + ripple.phase) % 1;
-        ripple.mesh.scale.setScalar(0.8 + phase * 5.2);
-        ripple.material.opacity = (1 - phase) * (0.12 + signals.rain * 0.1);
+      pondWaves = stepRippleWaves(
+        pondWaves,
+        Math.min(1, 0.18 + signals.rain * 0.48 + signals.meltwaterFlow * 0.52),
+        signals.iceCover,
+        delta,
+      );
+      impactWaves = stepRippleWaves(impactWaves, foamEnergy, signals.iceCover, delta);
+      for (let index = 0; index < ripples.length; index += 1) {
+        const ripple = ripples[index];
+        const wave = pondWaves[index];
+        if (!ripple || !wave) continue;
+        ripple.mesh.scale.setScalar(wave.radius * 2.6);
+        ripple.material.opacity = wave.amplitude * 0.3;
       }
-      for (const ring of impactRings) {
-        const phase = (elapsed * (0.3 + flow * 0.18) + ring.phase) % 1;
-        ring.mesh.scale.set(0.7 + phase * 5.4, (0.7 + phase * 5.4) * 0.72, 1);
-        ring.material.opacity = (1 - phase) * (0.16 + flow * 0.18);
+      for (let index = 0; index < impactRings.length; index += 1) {
+        const ring = impactRings[index];
+        const wave = impactWaves[index];
+        if (!ring || !wave) continue;
+        ring.mesh.scale.set(wave.radius * 2.8, wave.radius * 2.8 * 0.72, 1);
+        ring.material.opacity = wave.amplitude * 0.36;
       }
+      const rippleEnergy =
+        [...pondWaves, ...impactWaves].reduce((sum, wave) => sum + wave.amplitude, 0) /
+        Math.max(1, pondWaves.length + impactWaves.length);
+      runtimeState = { refractionStrength, foamEnergy, rippleEnergy, wetStreakStrength };
       activeSprayCount = Math.floor(sprayBudget * flow);
       sprayGeometry.setDrawRange(0, activeSprayCount);
       sprayMaterial.opacity = 0.34 + flow * 0.28;

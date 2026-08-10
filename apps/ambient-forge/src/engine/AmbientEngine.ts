@@ -14,9 +14,12 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import {
+  type AdaptiveQualityState,
+  createAdaptiveQualityState,
+  setAdaptiveQualityPreference,
+  stepAdaptiveQuality,
+} from '../core/adaptive-quality';
 import { type AmbientInputs, clampAmbientInputs, type WeatherMode } from '../core/ambient-inputs';
 import {
   type CameraOrbitState,
@@ -35,6 +38,16 @@ import {
   getCameraTransitionProgress,
   setCameraTourEnabled,
 } from '../core/camera-tour';
+import {
+  exitNpcView as createExitedNpcViewState,
+  DEFAULT_NPC_CAMERA_STATE,
+  type NpcCameraState,
+  type NpcId,
+  type NpcSnapshot,
+  type NpcViewMode,
+  selectNpc,
+  setNpcViewMode,
+} from '../core/npc';
 import { getPhotoFilterStyle, type PhotoFilter } from '../core/photo-mode';
 import { getQualityProfile, type QualityLevel, type QualityProfile } from '../core/quality';
 import { shouldResizeRendererForQuality } from '../core/quality-runtime';
@@ -47,13 +60,21 @@ import {
   stepWeatherTransition,
   type WeatherTargets,
 } from '../core/weather';
+import {
+  createWeatherLifecycleState,
+  stepWeatherLifecycle,
+  type ThunderEvent,
+  type WeatherLifecycleState,
+} from '../core/weather-lifecycle';
 import { type ArchipelagoAssembly, createArchipelago } from './createArchipelago';
 import { type CloudSeaAssembly, createCloudSea } from './createCloudSea';
 import { createIsland, type IslandAssembly } from './createIsland';
 import { createLifestyleIslands, type LifestyleIslandsAssembly } from './createLifestyleIslands';
 import { createSky, type SkyAssembly } from './createSky';
 import { createWorldExpansion, type WorldExpansionAssembly } from './createWorldExpansion';
+import { createThreeDepthOfFieldBackend, LazyDepthOfFieldPipeline } from './DepthOfFieldPipeline';
 import { releaseRenderer } from './dispose';
+import { createNpcSystem, type NpcSystemAssembly } from './NpcSystem';
 import { WeatherSystem } from './WeatherSystem';
 
 export interface AmbientDebugStats {
@@ -66,6 +87,9 @@ export interface AmbientDebugStats {
   audioHigh: number;
   cameraView: CameraViewId;
   autoTour: boolean;
+  npcView: NpcViewMode;
+  quality: QualityLevel;
+  preferredQuality: QualityLevel;
 }
 
 export interface AmbientEngineOptions {
@@ -74,6 +98,8 @@ export interface AmbientEngineOptions {
   getInputs: () => AmbientInputs;
   onStats?: (stats: AmbientDebugStats) => void;
   onCameraState?: (state: CameraTourState) => void;
+  onNpcCameraState?: (state: NpcCameraState) => void;
+  onThunder?: (event: ThunderEvent) => void;
 }
 
 export interface AmbientSceneState {
@@ -81,15 +107,20 @@ export interface AmbientSceneState {
   camera: {
     view: CameraViewId;
     autoTour: boolean;
+    mode: NpcViewMode;
+    npcId: NpcId | null;
     position: [number, number, number];
     target: [number, number, number];
     targetGoal: [number, number, number];
     distance: number;
   };
   landmarks: readonly CameraViewId[];
+  residents: readonly NpcSnapshot[];
   weather: WeatherMode;
   quality: QualityLevel;
+  preferredQuality: QualityLevel;
   surface: SurfaceAccumulation;
+  lifecycle: Pick<WeatherLifecycleState, 'stormFront' | 'stormEnergy' | 'lightningFlash'>;
   photo: {
     enabled: boolean;
     depthOfField: boolean;
@@ -103,6 +134,13 @@ interface ActiveCameraTransition {
   toOrbit: CameraOrbitState;
   fromTarget: Vector3;
   toTarget: Vector3;
+}
+
+interface ActiveCameraReturn {
+  startedAt: number;
+  duration: number;
+  fromPosition: Vector3;
+  fromTarget: Vector3;
 }
 
 const continuousKeys = [
@@ -120,8 +158,7 @@ export class AmbientEngine {
   private readonly scene = new Scene();
   private readonly camera = new PerspectiveCamera(34, 1, 0.1, 120);
   private readonly renderer: WebGLRenderer;
-  private readonly composer: EffectComposer;
-  private readonly bokehPass: BokehPass;
+  private readonly depthOfField: LazyDepthOfFieldPipeline;
   private readonly hemisphere = new HemisphereLight('#aac6cf', '#32382e', 1);
   private readonly sunLight = new DirectionalLight('#ffe0ad', 1.2);
   private readonly rimLight = new DirectionalLight('#83a8c6', 0.42);
@@ -129,6 +166,7 @@ export class AmbientEngine {
   private readonly archipelago: ArchipelagoAssembly;
   private readonly worldExpansion: WorldExpansionAssembly;
   private readonly lifestyleIslands: LifestyleIslandsAssembly;
+  private readonly npcs: NpcSystemAssembly;
   private readonly sky: SkyAssembly;
   private readonly clouds: CloudSeaAssembly;
   private readonly weather: WeatherSystem;
@@ -136,6 +174,9 @@ export class AmbientEngine {
   private readonly cameraTarget = new Vector3(0, -0.7, 0);
   private readonly cameraTargetGoal = new Vector3(0, -0.7, 0);
   private readonly cameraLookTarget = new Vector3(0, -0.7, 0);
+  private readonly orbitLookTarget = new Vector3(0, -0.7, 0);
+  private readonly desiredCameraPosition = new Vector3();
+  private readonly desiredCameraTarget = new Vector3();
   private readonly raycaster = new Raycaster();
   private readonly pointerNdc = new Vector2();
   private readonly handlePointerDown: (event: PointerEvent) => void;
@@ -148,6 +189,7 @@ export class AmbientEngine {
   private smoothedInputs: AmbientInputs;
   private weatherTransition: WeatherTargets;
   private surfaceAccumulation = createSurfaceAccumulation();
+  private weatherLifecycle = createWeatherLifecycleState();
   private pointerX = 0;
   private pointerY = 0;
   private orbitTarget: CameraOrbitState = { ...DEFAULT_CAMERA_ORBIT };
@@ -157,21 +199,27 @@ export class AmbientEngine {
   private orbitPointerY = 0;
   private orbitDragDistance = 0;
   private cameraTourState: CameraTourState = { ...DEFAULT_CAMERA_TOUR_STATE };
+  private npcCameraState: NpcCameraState = { ...DEFAULT_NPC_CAMERA_STATE };
   private cameraTransition: ActiveCameraTransition | null = null;
+  private cameraReturn: ActiveCameraReturn | null = null;
   private rafId: number | null = null;
   private disposed = false;
   private lastFrame = performance.now();
   private elapsed = 0;
   private lastStatsAt = 0;
   private fpsAverage = 60;
+  private preferredQuality: QualityLevel;
   private quality: QualityLevel;
   private profile: QualityProfile;
+  private adaptiveQuality: AdaptiveQualityState;
   private photoMode = false;
   private photoDepthOfField = false;
 
   constructor(private readonly options: AmbientEngineOptions) {
+    this.preferredQuality = options.quality;
     this.quality = options.quality;
     this.profile = getQualityProfile(options.quality);
+    this.adaptiveQuality = createAdaptiveQualityState(options.quality);
     this.renderer = new WebGLRenderer({
       antialias: this.profile.antialias,
       alpha: false,
@@ -186,15 +234,13 @@ export class AmbientEngine {
     this.renderer.domElement.className = 'ambient-canvas';
     this.renderer.domElement.setAttribute('aria-label', '随时间、天气与音乐变化的浮空群岛场景');
     options.mount.appendChild(this.renderer.domElement);
-    this.composer = new EffectComposer(this.renderer);
-    this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bokehPass = new BokehPass(this.scene, this.camera, {
-      focus: 24,
-      aperture: 0.000035,
-      maxblur: 0.008,
-    });
-    this.bokehPass.enabled = false;
-    this.composer.addPass(this.bokehPass);
+    this.depthOfField = new LazyDepthOfFieldPipeline(() =>
+      createThreeDepthOfFieldBackend(this.renderer, this.scene, this.camera),
+    );
+    this.renderer.domElement.dataset.quality = this.quality;
+    this.renderer.domElement.dataset.preferredQuality = this.preferredQuality;
+    this.renderer.domElement.dataset.postprocessing = 'idle';
+    this.renderer.domElement.dataset.postprocessingScale = '0.5';
 
     this.camera.position.set(12.4, 7.4, 21);
     this.camera.lookAt(this.cameraTarget);
@@ -213,6 +259,7 @@ export class AmbientEngine {
     this.archipelago = createArchipelago(this.profile);
     this.worldExpansion = createWorldExpansion(this.profile);
     this.lifestyleIslands = createLifestyleIslands(this.profile);
+    this.npcs = createNpcSystem(this.profile);
     this.weather = new WeatherSystem(this.scene, this.profile);
     this.scene.add(
       this.sky.root,
@@ -221,6 +268,7 @@ export class AmbientEngine {
       this.archipelago.root,
       this.worldExpansion.root,
       this.lifestyleIslands.root,
+      this.npcs.root,
     );
 
     this.smoothedInputs = clampAmbientInputs(options.getInputs());
@@ -249,6 +297,7 @@ export class AmbientEngine {
         this.orbitPointerY = event.clientY;
         this.orbitDragDistance += Math.hypot(deltaX, deltaY);
         if (this.orbitDragDistance > 2) {
+          this.leaveNpcView();
           this.cancelCameraTransition();
           this.disableAutoTour();
         }
@@ -274,6 +323,7 @@ export class AmbientEngine {
     };
     this.handleWheel = (event) => {
       event.preventDefault();
+      this.leaveNpcView();
       this.cancelCameraTransition();
       this.disableAutoTour();
       this.orbitTarget = zoomCameraOrbit(this.orbitTarget, event.deltaY);
@@ -300,11 +350,30 @@ export class AmbientEngine {
     this.resizeObserver.observe(options.mount);
     this.resize();
     this.options.onCameraState?.({ ...this.cameraTourState });
+    this.options.onNpcCameraState?.({ ...this.npcCameraState });
     this.start();
   }
 
   private emitCameraState(): void {
     this.options.onCameraState?.({ ...this.cameraTourState });
+  }
+
+  private emitNpcCameraState(): void {
+    this.options.onNpcCameraState?.({ ...this.npcCameraState });
+  }
+
+  private leaveNpcView(): boolean {
+    if (this.npcCameraState.mode === 'orbit') return false;
+    this.cameraReturn = {
+      startedAt: performance.now(),
+      duration: this.smoothedInputs.reducedMotion ? 420 : 900,
+      fromPosition: this.camera.position.clone(),
+      fromTarget: this.cameraLookTarget.clone(),
+    };
+    this.npcCameraState = createExitedNpcViewState();
+    this.npcs.setSelected(null);
+    this.emitNpcCameraState();
+    return true;
   }
 
   private applyCameraView(view: CameraViewId): void {
@@ -347,6 +416,7 @@ export class AmbientEngine {
     this.raycaster.setFromCamera(this.pointerNdc, this.camera);
     const intersections = this.raycaster.intersectObjects(
       [
+        this.npcs.root,
         this.island.root,
         this.archipelago.root,
         this.worldExpansion.root,
@@ -357,6 +427,11 @@ export class AmbientEngine {
     for (const intersection of intersections) {
       let object = intersection.object;
       while (object) {
+        const npcId = object.userData.npcId as NpcId | undefined;
+        if (npcId) {
+          this.focusNpc(npcId);
+          return;
+        }
         const view = object.userData.cameraView as CameraViewId | undefined;
         if (view && CAMERA_VIEW_PRESETS[view]) {
           this.focusCameraView(view);
@@ -387,8 +462,11 @@ export class AmbientEngine {
     this.camera.updateProjectionMatrix();
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.profile.dprCap));
     this.renderer.setSize(width, height, false);
-    this.composer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.profile.dprCap));
-    this.composer.setSize(width, height);
+    this.depthOfField.resize(
+      width,
+      height,
+      Math.min(window.devicePixelRatio || 1, this.profile.dprCap),
+    );
   }
 
   private start(): void {
@@ -426,6 +504,14 @@ export class AmbientEngine {
       delta,
       1.1,
     );
+    const lifecycleStep = stepWeatherLifecycle(
+      this.weatherLifecycle,
+      this.weatherTransition,
+      raw.wind,
+      delta,
+    );
+    this.weatherLifecycle = lifecycleStep.state;
+    if (lifecycleStep.thunder) this.options.onThunder?.(lifecycleStep.thunder);
     this.surfaceAccumulation = stepSurfaceAccumulation(
       this.surfaceAccumulation,
       this.weatherTransition,
@@ -435,6 +521,7 @@ export class AmbientEngine {
       this.smoothedInputs,
       this.weatherTransition,
       this.surfaceAccumulation,
+      this.weatherLifecycle,
     );
 
     const nextTourState = advanceCameraTour(this.cameraTourState, delta);
@@ -452,6 +539,7 @@ export class AmbientEngine {
     this.archipelago.update(signals, this.elapsed);
     this.worldExpansion.update(signals, this.elapsed, delta);
     this.lifestyleIslands.update(signals, this.elapsed, delta);
+    this.npcs.update(signals, this.elapsed, delta);
     this.weather.update(signals, this.elapsed, delta);
     this.hemisphere.intensity = 0.18 + signals.ambientLight * 1.08;
     this.hemisphere.color.setRGB(...signals.horizonColor);
@@ -495,31 +583,91 @@ export class AmbientEngine {
       const targetEase = getCameraTransitionEase(delta, 8);
       this.cameraTarget.lerp(this.cameraTargetGoal, targetEase);
     }
-    this.cameraLookTarget.set(
+    this.orbitLookTarget.set(
       this.cameraTarget.x + signals.pointerX * 0.12,
       this.cameraTarget.y + signals.pointerY * 0.08,
       this.cameraTarget.z,
     );
-    const cameraPosition = orbitCameraPosition(this.orbitCurrent, [
-      this.cameraLookTarget.x,
-      this.cameraLookTarget.y,
-      this.cameraLookTarget.z,
+    const orbitCamera = orbitCameraPosition(this.orbitCurrent, [
+      this.orbitLookTarget.x,
+      this.orbitLookTarget.y,
+      this.orbitLookTarget.z,
     ]);
-    this.camera.position.set(...cameraPosition);
-    this.camera.lookAt(this.cameraLookTarget);
-    if (this.photoMode && this.photoDepthOfField) {
-      const uniforms = this.bokehPass.uniforms as { focus: { value: number } };
-      uniforms.focus.value = this.camera.position.distanceTo(this.cameraLookTarget);
-      this.composer.render();
+    this.desiredCameraPosition.set(...orbitCamera);
+    this.desiredCameraTarget.copy(this.orbitLookTarget);
+    let targetFov = 34;
+    const npcPose =
+      this.npcCameraState.npcId && this.npcCameraState.mode !== 'orbit'
+        ? this.npcs.getCameraPose(this.npcCameraState.npcId, this.npcCameraState.mode)
+        : null;
+    if (npcPose) {
+      this.cameraReturn = null;
+      this.desiredCameraPosition.set(...npcPose.position);
+      this.desiredCameraTarget.set(
+        npcPose.target[0] + signals.pointerX * 0.55,
+        npcPose.target[1] + signals.pointerY * 0.38,
+        npcPose.target[2],
+      );
+      targetFov = npcPose.fov;
+      const followEase = getCameraTransitionEase(delta, signals.motionScale < 0.5 ? 12 : 6.8);
+      this.camera.position.lerp(this.desiredCameraPosition, followEase);
+      this.cameraLookTarget.lerp(this.desiredCameraTarget, followEase);
+    } else if (this.cameraReturn) {
+      const progress = getCameraTransitionProgress(
+        this.cameraReturn.startedAt,
+        timestamp,
+        this.cameraReturn.duration,
+      );
+      const eased = 1 - (1 - progress) ** 3;
+      this.camera.position.lerpVectors(
+        this.cameraReturn.fromPosition,
+        this.desiredCameraPosition,
+        eased,
+      );
+      this.cameraLookTarget.lerpVectors(
+        this.cameraReturn.fromTarget,
+        this.desiredCameraTarget,
+        eased,
+      );
+      if (progress >= 1) this.cameraReturn = null;
     } else {
+      this.camera.position.copy(this.desiredCameraPosition);
+      this.cameraLookTarget.copy(this.desiredCameraTarget);
+    }
+    const fovEase = getCameraTransitionEase(delta, 7);
+    const nextFov = this.camera.fov + (targetFov - this.camera.fov) * fovEase;
+    if (Math.abs(nextFov - this.camera.fov) > 0.001) {
+      this.camera.fov = nextFov;
+      this.camera.updateProjectionMatrix();
+    }
+    this.camera.lookAt(this.cameraLookTarget);
+    if (
+      !this.photoMode ||
+      !this.photoDepthOfField ||
+      !this.depthOfField.render(this.camera.position.distanceTo(this.cameraLookTarget))
+    ) {
       this.renderer.render(this.scene, this.camera);
     }
 
     const frameFps = 1 / delta;
     this.fpsAverage += (frameFps - this.fpsAverage) * 0.06;
+    const nextAdaptiveQuality = stepAdaptiveQuality(this.adaptiveQuality, this.fpsAverage, delta);
+    if (nextAdaptiveQuality.effective !== this.adaptiveQuality.effective) {
+      this.applyQuality(nextAdaptiveQuality.effective);
+    }
+    this.adaptiveQuality = nextAdaptiveQuality;
     if (this.options.onStats && timestamp - this.lastStatsAt >= 500) {
       this.lastStatsAt = timestamp;
       this.renderer.domElement.dataset.cameraView = this.cameraTourState.view;
+      this.renderer.domElement.dataset.npcView = this.npcCameraState.mode;
+      this.renderer.domElement.dataset.npcId = this.npcCameraState.npcId ?? '';
+      this.renderer.domElement.dataset.npcPositions = this.npcs
+        .getSnapshots()
+        .map(
+          (npc) =>
+            `${npc.id}:${npc.position.map((value) => value.toFixed(2)).join(',')}:${npc.activity}`,
+        )
+        .join('|');
       this.renderer.domElement.dataset.cameraTarget = [
         this.cameraLookTarget.x,
         this.cameraLookTarget.y,
@@ -536,6 +684,12 @@ export class AmbientEngine {
         .join(',');
       this.renderer.domElement.dataset.surfaceWetness = this.surfaceAccumulation.wetness.toFixed(3);
       this.renderer.domElement.dataset.snowCover = this.surfaceAccumulation.snowCover.toFixed(3);
+      this.renderer.domElement.dataset.puddleDepth =
+        this.surfaceAccumulation.puddleDepth.toFixed(3);
+      this.renderer.domElement.dataset.iceCover = this.surfaceAccumulation.iceCover.toFixed(3);
+      this.renderer.domElement.dataset.meltwaterFlow =
+        this.surfaceAccumulation.meltwaterFlow.toFixed(3);
+      this.renderer.domElement.dataset.stormFront = this.weatherLifecycle.stormFront.toFixed(3);
       this.options.onStats({
         fps: Math.round(this.fpsAverage),
         dpr: this.renderer.getPixelRatio(),
@@ -545,6 +699,7 @@ export class AmbientEngine {
           this.archipelago.getEffectCount() +
           this.worldExpansion.getEffectCount() +
           this.lifestyleIslands.getEffectCount() +
+          this.npcs.getSnapshots().length +
           this.clouds.getVisibleCount(),
         weather: raw.weather,
         audioLow: raw.audioLow,
@@ -552,12 +707,15 @@ export class AmbientEngine {
         audioHigh: raw.audioHigh,
         cameraView: this.cameraTourState.view,
         autoTour: this.cameraTourState.enabled,
+        npcView: this.npcCameraState.mode,
+        quality: this.quality,
+        preferredQuality: this.preferredQuality,
       });
     }
     this.start();
   };
 
-  setQuality(quality: QualityLevel): void {
+  private applyQuality(quality: QualityLevel): void {
     if (quality === this.quality) return;
     const startedAt = performance.now();
     this.quality = quality;
@@ -573,6 +731,7 @@ export class AmbientEngine {
     this.archipelago.setQuality(this.profile);
     this.worldExpansion.setQuality(this.profile);
     this.lifestyleIslands.setQuality(this.profile);
+    this.npcs.setQuality(this.profile);
     this.weather.setQuality(this.profile);
     if (
       shouldResizeRendererForQuality(
@@ -583,7 +742,16 @@ export class AmbientEngine {
     ) {
       this.resize();
     }
+    this.renderer.domElement.dataset.quality = quality;
     this.renderer.domElement.dataset.qualitySwitchMs = (performance.now() - startedAt).toFixed(1);
+  }
+
+  setQuality(quality: QualityLevel): void {
+    if (quality === this.preferredQuality && this.quality === quality) return;
+    this.preferredQuality = quality;
+    this.adaptiveQuality = setAdaptiveQualityPreference(this.adaptiveQuality, quality);
+    this.renderer.domElement.dataset.preferredQuality = quality;
+    this.applyQuality(quality);
   }
 
   getCanvas(): HTMLCanvasElement {
@@ -593,13 +761,28 @@ export class AmbientEngine {
   setPhotoMode(enabled: boolean, depthOfField: boolean): void {
     this.photoMode = enabled;
     this.photoDepthOfField = enabled && depthOfField;
-    this.bokehPass.enabled = this.photoDepthOfField;
     this.renderer.domElement.dataset.photoMode = enabled ? 'true' : 'false';
+    this.renderer.domElement.dataset.postprocessing = this.photoDepthOfField ? 'loading' : 'idle';
+    void this.depthOfField
+      .setEnabled(this.photoDepthOfField)
+      .then(() => {
+        if (this.disposed) return;
+        this.renderer.domElement.dataset.postprocessing = this.photoDepthOfField ? 'ready' : 'idle';
+      })
+      .catch(() => {
+        if (this.disposed) return;
+        this.renderer.domElement.dataset.postprocessing = 'unavailable';
+      });
   }
 
   async capturePhoto(filter: PhotoFilter): Promise<Blob | null> {
-    if (this.photoMode && this.photoDepthOfField) this.composer.render();
-    else this.renderer.render(this.scene, this.camera);
+    if (
+      !this.photoMode ||
+      !this.photoDepthOfField ||
+      !this.depthOfField.render(this.camera.position.distanceTo(this.cameraLookTarget))
+    ) {
+      this.renderer.render(this.scene, this.camera);
+    }
     const source = this.renderer.domElement;
     const output = document.createElement('canvas');
     output.width = source.width;
@@ -615,12 +798,18 @@ export class AmbientEngine {
     return { ...this.cameraTourState };
   }
 
+  getNpcCameraState(): NpcCameraState {
+    return { ...this.npcCameraState };
+  }
+
   getSceneState(): AmbientSceneState {
     return {
       coordinateSystem: '+X 向右，+Y 向上，+Z 朝默认镜头；单位为 Three.js 世界单位',
       camera: {
         view: this.cameraTourState.view,
         autoTour: this.cameraTourState.enabled,
+        mode: this.npcCameraState.mode,
+        npcId: this.npcCameraState.npcId,
         position: [this.camera.position.x, this.camera.position.y, this.camera.position.z],
         target: [this.cameraLookTarget.x, this.cameraLookTarget.y, this.cameraLookTarget.z],
         targetGoal: [this.cameraTargetGoal.x, this.cameraTargetGoal.y, this.cameraTargetGoal.z],
@@ -636,9 +825,16 @@ export class AmbientEngine {
         'harbor',
         'greenhouse',
       ],
+      residents: this.npcs.getSnapshots(),
       weather: this.smoothedInputs.weather,
       quality: this.quality,
+      preferredQuality: this.preferredQuality,
       surface: { ...this.surfaceAccumulation },
+      lifecycle: {
+        stormFront: this.weatherLifecycle.stormFront,
+        stormEnergy: this.weatherLifecycle.stormEnergy,
+        lightningFlash: this.weatherLifecycle.lightningFlash,
+      },
       photo: {
         enabled: this.photoMode,
         depthOfField: this.photoDepthOfField,
@@ -647,17 +843,39 @@ export class AmbientEngine {
   }
 
   focusCameraView(view: CameraViewId): void {
+    this.leaveNpcView();
     this.cameraTourState = { enabled: false, view, elapsed: 0 };
     this.applyCameraView(view);
     this.emitCameraState();
   }
 
   setAutoTour(enabled: boolean): void {
+    if (enabled) this.leaveNpcView();
     const nextState = setCameraTourEnabled(this.cameraTourState, enabled);
     const viewChanged = nextState.view !== this.cameraTourState.view;
     this.cameraTourState = nextState;
     if (viewChanged) this.applyCameraView(nextState.view);
     this.emitCameraState();
+  }
+
+  focusNpc(id: NpcId): void {
+    this.cameraTransition = null;
+    this.cameraReturn = null;
+    this.disableAutoTour();
+    this.npcCameraState = selectNpc(this.npcCameraState, id);
+    this.npcs.setSelected(id);
+    this.emitNpcCameraState();
+  }
+
+  setNpcCameraMode(mode: Exclude<NpcViewMode, 'orbit'>): void {
+    if (!this.npcCameraState.npcId) return;
+    this.cameraReturn = null;
+    this.npcCameraState = setNpcViewMode(this.npcCameraState, mode);
+    this.emitNpcCameraState();
+  }
+
+  exitNpcView(): void {
+    if (this.leaveNpcView()) this.applyCameraView(this.cameraTourState.view);
   }
 
   dispose(): void {
@@ -681,7 +899,8 @@ export class AmbientEngine {
     this.archipelago.dispose();
     this.worldExpansion.dispose();
     this.lifestyleIslands.dispose();
-    this.composer.dispose();
+    this.npcs.dispose();
+    this.depthOfField.dispose();
     this.scene.clear();
     releaseRenderer(this.renderer);
     this.renderer.domElement.remove();

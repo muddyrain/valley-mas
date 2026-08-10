@@ -1,3 +1,4 @@
+import { InstancedMesh } from 'three';
 import { describe, expect, it } from 'vitest';
 import { getQualityProfile } from '../core/quality';
 import { createArchipelago } from './createArchipelago';
@@ -16,6 +17,8 @@ describe('createArchipelago', () => {
       'ruins',
     );
     expect(archipelago.root.getObjectByName('garden-suspension-bridge')).toBeTruthy();
+    expect(archipelago.root.getObjectByName('distant-island-rocks')).toBeInstanceOf(InstancedMesh);
+    expect(archipelago.root.getObjectByName('distant-island-caps')).toBeInstanceOf(InstancedMesh);
     expect(archipelago.getEffectCount()).toBe(5);
 
     archipelago.setQuality(getQualityProfile('low'));

@@ -12,6 +12,8 @@ describe('quality profiles', () => {
     expect(high.dprCap).toBe(2);
     expect(low.weatherParticles).toBeLessThan(medium.weatherParticles);
     expect(medium.fireflies).toBeLessThan(high.fireflies);
+    expect(low.grassBlades).toBeLessThan(medium.grassBlades);
+    expect(medium.grassBlades).toBeLessThan(high.grassBlades);
     expect(low.shadows).toBe(false);
     expect(high.shadowMapSize).toBeGreaterThan(medium.shadowMapSize);
   });

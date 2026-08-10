@@ -57,4 +57,19 @@ describe('deriveSceneSignals', () => {
 
     expect(rain.fireflyActivity).toBeLessThan(clear.fireflyActivity * 0.45);
   });
+
+  it('把积水、冰层、融雪水流与风暴前沿传递给场景系统', () => {
+    const signals = deriveSceneSignals(
+      { ...createDefaultAmbientInputs(), weather: 'snow', weatherIntensity: 1 },
+      undefined,
+      { wetness: 0.8, snowCover: 0.9, puddleDepth: 0.7, iceCover: 0.6, meltwaterFlow: 0.4 },
+      { stormFront: 0.75, stormEnergy: 0.8, lightningFlash: 0.5 },
+    );
+
+    expect(signals.puddleDepth).toBe(0.7);
+    expect(signals.iceCover).toBe(0.6);
+    expect(signals.meltwaterFlow).toBe(0.4);
+    expect(signals.stormFront).toBe(0.75);
+    expect(signals.lightningFlash).toBe(0.5);
+  });
 });

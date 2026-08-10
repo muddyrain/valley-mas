@@ -126,6 +126,7 @@ export class WeatherSystem {
     this.splashes.frustumCulled = false;
 
     this.lightning.position.set(-9, 15, -12);
+    this.lightning.name = 'weather-lightning';
     this.scene.add(this.rain, this.snow, this.splashes, this.lightning);
     this.particleBudget = profile.weatherParticles;
     this.setQuality(profile);
@@ -153,10 +154,8 @@ export class WeatherSystem {
     this.snowMaterial.opacity = signals.snow * (0.72 + signals.snow * 0.22);
     this.snowMaterial.size = this.baseSnowSize * (1 + signals.snow * 1.65);
     this.splashMaterial.opacity = signals.rain * 0.48;
-    const stormStrength = Math.max(0, signals.rain - 0.72) * signals.windStrength;
-    const primaryFlash = Math.max(0, Math.sin(elapsed * 0.47 + 0.8)) ** 90;
-    const echoFlash = Math.max(0, Math.sin(elapsed * 0.47 + 1.04)) ** 130;
-    this.lightning.intensity = stormStrength * (primaryFlash * 18 + echoFlash * 7);
+    this.lightning.intensity = signals.stormEnergy * signals.lightningFlash * 18;
+    this.lightning.position.x = -11 + signals.stormFront * 18;
 
     const rainMotion = derivePrecipitationMotion({
       wind: signals.windStrength,

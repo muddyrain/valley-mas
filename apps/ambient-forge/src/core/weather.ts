@@ -7,15 +7,19 @@ export interface WeatherTargets {
   desaturation: number;
   cloudCover: number;
   wetness: number;
+  temperature: number;
 }
 
 export interface SurfaceAccumulation {
   wetness: number;
   snowCover: number;
+  puddleDepth: number;
+  iceCover: number;
+  meltwaterFlow: number;
 }
 
 export function createSurfaceAccumulation(): SurfaceAccumulation {
-  return { wetness: 0, snowCover: 0 };
+  return { wetness: 0, snowCover: 0, puddleDepth: 0, iceCover: 0, meltwaterFlow: 0 };
 }
 
 const approach = (current: number, target: number, rate: number, deltaSeconds: number): number => {
@@ -33,14 +37,48 @@ export function stepSurfaceAccumulation(
   const wetTarget = raining ? Math.max(weather.wetness, weather.rain) : weather.wetness * 0.4;
   const wetRate = raining ? 0.17 + weather.rain * 0.08 : 0.018 + weather.snow * 0.012;
   const meltRate = 0.055 + weather.rain * 0.16 + weather.wetness * 0.04;
+  const wetness = approach(current.wetness, wetTarget, wetRate, deltaSeconds);
+  const snowCover = approach(
+    current.snowCover,
+    snowing ? weather.snow : 0,
+    snowing ? 0.11 + weather.snow * 0.04 : meltRate,
+    deltaSeconds,
+  );
+  const snowMelt = Math.max(0, current.snowCover - snowCover);
+  const freezing = clamp(-weather.temperature);
+  const thawing = clamp(weather.temperature);
+  const preliminaryPuddleTarget = raining
+    ? Math.max(weather.rain * 0.94, wetness * 0.72)
+    : snowMelt > 0.002
+      ? Math.max(current.puddleDepth * 0.82, snowMelt * 5)
+      : 0;
+  const puddleDepth = approach(
+    current.puddleDepth,
+    preliminaryPuddleTarget,
+    raining ? 0.16 + weather.rain * 0.08 : 0.022,
+    deltaSeconds,
+  );
+  const iceTarget = freezing > 0.05 ? puddleDepth * (0.4 + freezing * 0.6) : 0;
+  const iceCover = approach(
+    current.iceCover,
+    iceTarget,
+    freezing > 0.05 ? 0.1 + freezing * 0.13 : 0.12 + thawing * 0.24,
+    deltaSeconds,
+  );
+  const iceMelt = Math.max(0, current.iceCover - iceCover);
+  const meltwaterTarget = clamp(snowMelt * 5 + iceMelt * 3 + weather.rain * thawing * 0.16);
+  const meltwaterFlow = approach(
+    current.meltwaterFlow,
+    meltwaterTarget,
+    meltwaterTarget > current.meltwaterFlow ? 1.25 : 0.28,
+    deltaSeconds,
+  );
   return {
-    wetness: approach(current.wetness, wetTarget, wetRate, deltaSeconds),
-    snowCover: approach(
-      current.snowCover,
-      snowing ? weather.snow : 0,
-      snowing ? 0.11 + weather.snow * 0.04 : meltRate,
-      deltaSeconds,
-    ),
+    wetness,
+    snowCover,
+    puddleDepth: clamp(puddleDepth + meltwaterFlow * 0.08),
+    iceCover,
+    meltwaterFlow,
   };
 }
 
@@ -54,6 +92,7 @@ export function getWeatherTargets(mode: WeatherMode, intensity: number): Weather
       desaturation: value * 0.42,
       cloudCover: 0.35 + value * 0.65,
       wetness: value,
+      temperature: 0.45,
     };
   }
   if (mode === 'snow') {
@@ -64,6 +103,7 @@ export function getWeatherTargets(mode: WeatherMode, intensity: number): Weather
       desaturation: value * 0.2,
       cloudCover: 0.25 + value * 0.52,
       wetness: value * 0.18,
+      temperature: -0.8,
     };
   }
   if (mode === 'fog') {
@@ -74,6 +114,7 @@ export function getWeatherTargets(mode: WeatherMode, intensity: number): Weather
       desaturation: value * 0.34,
       cloudCover: 0.38 + value * 0.5,
       wetness: value * 0.12,
+      temperature: 0.08,
     };
   }
   return {
@@ -83,6 +124,7 @@ export function getWeatherTargets(mode: WeatherMode, intensity: number): Weather
     desaturation: 0,
     cloudCover: 0.18 + value * 0.08,
     wetness: 0,
+    temperature: 0.62,
   };
 }
 
@@ -100,5 +142,6 @@ export function stepWeatherTransition(
     desaturation: current.desaturation + (target.desaturation - current.desaturation) * amount,
     cloudCover: current.cloudCover + (target.cloudCover - current.cloudCover) * amount,
     wetness: current.wetness + (target.wetness - current.wetness) * amount,
+    temperature: current.temperature + (target.temperature - current.temperature) * amount,
   };
 }

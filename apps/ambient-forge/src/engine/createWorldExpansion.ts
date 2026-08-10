@@ -54,6 +54,13 @@ interface PuddleRipple {
   phase: number;
 }
 
+interface PuddleSurface {
+  water: Mesh;
+  ice: Mesh;
+  scaleX: number;
+  scaleZ: number;
+}
+
 const UP = new Vector3(0, 1, 0);
 
 function seededRandom(seed: number): () => number {
@@ -232,6 +239,7 @@ export function createWorldExpansion(profile: QualityProfile): WorldExpansionAss
   const floatingFeatures: FloatingFeature[] = [];
   const birds: Bird[] = [];
   const puddleRipples: PuddleRipple[] = [];
+  const puddleSurfaces: PuddleSurface[] = [];
 
   const groundMaterial = new MeshStandardMaterial({
     color: '#66805f',
@@ -425,6 +433,10 @@ export function createWorldExpansion(profile: QualityProfile): WorldExpansionAss
 
   const puddleField = new Group();
   puddleField.name = 'weather-puddle-field';
+  const puddleWaterSurfaces = new Group();
+  puddleWaterSurfaces.name = 'puddle-water-surfaces';
+  const puddleIceLayer = new Group();
+  puddleIceLayer.name = 'puddle-ice-layer';
   const puddleMaterial = new MeshStandardMaterial({
     color: '#416f72',
     emissive: '#203e44',
@@ -436,6 +448,18 @@ export function createWorldExpansion(profile: QualityProfile): WorldExpansionAss
     depthWrite: false,
     side: DoubleSide,
   });
+  const puddleIceMaterial = new MeshStandardMaterial({
+    color: '#c2dcda',
+    emissive: '#6e9ca0',
+    emissiveIntensity: 0.18,
+    roughness: 0.2,
+    metalness: 0.08,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: DoubleSide,
+  });
+  puddleField.add(puddleWaterSurfaces, puddleIceLayer);
   for (const [x, z, sx, sz] of [
     [-1.7, 1.2, 1.15, 0.48],
     [0.92, 1.72, 0.82, 0.42],
@@ -449,7 +473,14 @@ export function createWorldExpansion(profile: QualityProfile): WorldExpansionAss
     puddle.rotation.x = -Math.PI / 2;
     puddle.scale.set(sx, sz, 1);
     puddle.renderOrder = 4;
-    puddleField.add(puddle);
+    puddleWaterSurfaces.add(puddle);
+    const ice = new Mesh(new CircleGeometry(0.42, 20), puddleIceMaterial);
+    ice.position.set(x, 0.657, z);
+    ice.rotation.x = -Math.PI / 2;
+    ice.scale.set(sx, sz, 1);
+    ice.renderOrder = 5;
+    puddleIceLayer.add(ice);
+    puddleSurfaces.push({ water: puddle, ice, scaleX: sx, scaleZ: sz });
     const rippleMaterial = new MeshBasicMaterial({
       color: '#acd0cc',
       transparent: true,
@@ -461,6 +492,7 @@ export function createWorldExpansion(profile: QualityProfile): WorldExpansionAss
     ripple.position.set(x, 0.653, z);
     ripple.rotation.x = -Math.PI / 2;
     ripple.renderOrder = 5;
+    ripple.name = `puddle-ripple-${puddleRipples.length}`;
     puddleField.add(ripple);
     puddleRipples.push({ mesh: ripple, material: rippleMaterial, phase: random() });
   }
@@ -591,12 +623,19 @@ export function createWorldExpansion(profile: QualityProfile): WorldExpansionAss
         delta * (0.08 + signals.sparkleBrightness * 0.16) * signals.motionScale;
       celestialRings.rotation.x = Math.sin(elapsed * 0.18) * 0.16 * signals.motionScale;
 
-      puddleMaterial.opacity = signals.wetness * 0.68;
-      puddleMaterial.roughness = 0.22 - signals.wetness * 0.12;
+      const puddleGrowth = 0.35 + signals.puddleDepth * 0.75;
+      puddleMaterial.opacity = signals.puddleDepth * (1 - signals.iceCover * 0.45) * 0.68;
+      puddleMaterial.roughness = 0.22 - signals.puddleDepth * 0.12;
+      puddleIceMaterial.opacity = signals.iceCover * 0.82;
+      puddleIceMaterial.roughness = 0.28 - signals.iceCover * 0.12;
+      for (const surface of puddleSurfaces) {
+        surface.water.scale.set(surface.scaleX * puddleGrowth, surface.scaleZ * puddleGrowth, 1);
+        surface.ice.scale.copy(surface.water.scale).multiplyScalar(1.015);
+      }
       for (const ripple of puddleRipples) {
         const phase = (elapsed * (0.42 + signals.rain * 0.9) + ripple.phase) % 1;
         ripple.mesh.scale.setScalar(0.7 + phase * 5.2);
-        ripple.material.opacity = signals.rain * (1 - phase) * 0.34;
+        ripple.material.opacity = signals.rain * (1 - phase) * 0.34 * (1 - signals.iceCover) ** 2;
       }
       cloudShadowMaterial.opacity = signals.cloudCover * signals.daylight * 0.11;
       for (let index = 0; index < cloudShadowGroup.children.length; index += 1) {

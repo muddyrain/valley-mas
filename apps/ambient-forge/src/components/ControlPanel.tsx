@@ -3,6 +3,8 @@ import {
   CloudFog,
   CloudRain,
   Expand,
+  Eye,
+  Footprints,
   Gauge,
   Leaf,
   Map as MapIcon,
@@ -13,13 +15,16 @@ import {
   Route,
   Snowflake,
   Sun,
+  UserRound,
   Volume2,
   VolumeX,
+  X,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { WeatherMode } from '../core/ambient-inputs';
 import { CAMERA_VIEW_PRESETS, type CameraTourState, type CameraViewId } from '../core/camera-tour';
 import { ENVIRONMENT_PRESETS, type EnvironmentPresetId } from '../core/environment-presets';
+import { NPC_PROFILES, type NpcCameraState, type NpcId, type NpcViewMode } from '../core/npc';
 import type { AmbientPreferences } from '../core/preferences';
 import type { QualityLevel } from '../core/quality';
 
@@ -35,8 +40,12 @@ interface ControlPanelProps {
   onFullscreen: () => void;
   onReset: () => void;
   cameraState: CameraTourState;
+  npcCameraState: NpcCameraState;
   onCameraView: (view: CameraViewId) => void;
   onAutoTour: (enabled: boolean) => void;
+  onNpcSelect: (id: NpcId) => void;
+  onNpcViewMode: (mode: Exclude<NpcViewMode, 'orbit'>) => void;
+  onNpcExit: () => void;
   onPhotoMode: () => void;
   activeEnvironmentPreset: EnvironmentPresetId | null;
   onEnvironmentPreset: (preset: EnvironmentPresetId) => void;
@@ -96,12 +105,17 @@ export function ControlPanel({
   onFullscreen,
   onReset,
   cameraState,
+  npcCameraState,
   onCameraView,
   onAutoTour,
+  onNpcSelect,
+  onNpcViewMode,
+  onNpcExit,
   onPhotoMode,
   activeEnvironmentPreset,
   onEnvironmentPreset,
 }: ControlPanelProps) {
+  const selectedNpc = NPC_PROFILES.find((profile) => profile.id === npcCameraState.npcId);
   if (!preferences.panelOpen) {
     return (
       <button
@@ -206,6 +220,63 @@ export function ControlPanel({
             <Camera size={15} aria-hidden="true" />
             摄影模式
           </button>
+        </section>
+
+        <section className="panel-section" aria-labelledby="residents-heading">
+          <div className="section-heading">
+            <UserRound size={15} aria-hidden="true" />
+            <h2 id="residents-heading">居民</h2>
+            <output className="section-value">{selectedNpc ? selectedNpc.name : '3 位'}</output>
+          </div>
+          <div className="npc-list" role="group" aria-label="场景居民">
+            {NPC_PROFILES.map((profile) => (
+              <button
+                key={profile.id}
+                type="button"
+                className={npcCameraState.npcId === profile.id ? 'active' : undefined}
+                aria-pressed={npcCameraState.npcId === profile.id}
+                onClick={() => onNpcSelect(profile.id)}
+              >
+                <UserRound size={15} aria-hidden="true" />
+                <span>
+                  {profile.name}
+                  <small>{profile.role}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+          {selectedNpc ? (
+            <>
+              <div className="segmented npc-view-options" role="group" aria-label="居民视角">
+                <button
+                  type="button"
+                  className={npcCameraState.mode === 'follow' ? 'active' : undefined}
+                  aria-pressed={npcCameraState.mode === 'follow'}
+                  onClick={() => onNpcViewMode('follow')}
+                >
+                  <Footprints size={14} aria-hidden="true" />
+                  跟随
+                </button>
+                <button
+                  type="button"
+                  className={npcCameraState.mode === 'pov' ? 'active' : undefined}
+                  aria-pressed={npcCameraState.mode === 'pov'}
+                  onClick={() => onNpcViewMode('pov')}
+                >
+                  <Eye size={14} aria-hidden="true" />
+                  第一视角
+                </button>
+              </div>
+              <button
+                type="button"
+                className="wide-button secondary npc-exit-button"
+                onClick={onNpcExit}
+              >
+                <X size={14} aria-hidden="true" />
+                返回自由镜头
+              </button>
+            </>
+          ) : null}
         </section>
 
         <section className="panel-section" aria-labelledby="weather-heading">

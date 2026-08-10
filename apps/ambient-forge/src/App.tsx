@@ -18,6 +18,12 @@ import {
 } from './core/camera-tour';
 import { type EnvironmentPresetId, getEnvironmentPresetChanges } from './core/environment-presets';
 import {
+  DEFAULT_NPC_CAMERA_STATE,
+  type NpcCameraState,
+  type NpcId,
+  type NpcViewMode,
+} from './core/npc';
+import {
   DEFAULT_PHOTO_MODE_STATE,
   type PhotoModeState,
   setPhotoModeEnabled,
@@ -37,6 +43,7 @@ import {
   selectWebmMimeType,
 } from './core/recording';
 import { getTimeOfDayState } from './core/time-of-day';
+import type { ThunderEvent } from './core/weather-lifecycle';
 import type { AmbientDebugStats, AmbientEngine } from './engine/AmbientEngine';
 
 const INITIAL_AUDIO_STATE: AudioUiState = {
@@ -94,6 +101,9 @@ export default function App() {
   const [debugStats, setDebugStats] = useState<AmbientDebugStats | null>(null);
   const [cameraState, setCameraState] = useState<CameraTourState>(() => ({
     ...DEFAULT_CAMERA_TOUR_STATE,
+  }));
+  const [npcCameraState, setNpcCameraState] = useState<NpcCameraState>(() => ({
+    ...DEFAULT_NPC_CAMERA_STATE,
   }));
   const [activeEnvironmentPreset, setActiveEnvironmentPreset] =
     useState<EnvironmentPresetId | null>(null);
@@ -241,6 +251,7 @@ export default function App() {
         setPhotoMode((current) => setPhotoModeEnabled(current, !current.enabled));
       } else if (event.key === 'Escape') {
         setPhotoMode((current) => setPhotoModeEnabled(current, false));
+        engineRef.current?.exitNpcView();
       }
     };
     window.addEventListener('keydown', handlePhotoShortcut);
@@ -266,7 +277,14 @@ export default function App() {
 
   const handleEngineReady = useCallback((engine: AmbientEngine | null) => {
     engineRef.current = engine;
-    if (engine) setCameraState(engine.getCameraTourState());
+    if (engine) {
+      setCameraState(engine.getCameraTourState());
+      setNpcCameraState(engine.getNpcCameraState());
+    }
+  }, []);
+
+  const handleThunder = useCallback((event: ThunderEvent) => {
+    audioEngineRef.current?.triggerThunder(event);
   }, []);
 
   const focusCameraView = useCallback((view: CameraViewId) => {
@@ -275,6 +293,18 @@ export default function App() {
 
   const setAutoTour = useCallback((enabled: boolean) => {
     engineRef.current?.setAutoTour(enabled);
+  }, []);
+
+  const focusNpc = useCallback((id: NpcId) => {
+    engineRef.current?.focusNpc(id);
+  }, []);
+
+  const setNpcCameraMode = useCallback((mode: Exclude<NpcViewMode, 'orbit'>) => {
+    engineRef.current?.setNpcCameraMode(mode);
+  }, []);
+
+  const exitNpcCamera = useCallback(() => {
+    engineRef.current?.exitNpcView();
   }, []);
 
   const handleStats = useCallback(
@@ -479,6 +509,8 @@ export default function App() {
         onReady={handleEngineReady}
         onStats={handleStats}
         onCameraState={setCameraState}
+        onNpcCameraState={setNpcCameraState}
+        onThunder={handleThunder}
       />
       <div className="sky-vignette" aria-hidden="true" />
       <header className="scene-status">
@@ -504,8 +536,12 @@ export default function App() {
         onFullscreen={() => void toggleFullscreen()}
         onReset={handleReset}
         cameraState={cameraState}
+        npcCameraState={npcCameraState}
         onCameraView={focusCameraView}
         onAutoTour={setAutoTour}
+        onNpcSelect={focusNpc}
+        onNpcViewMode={setNpcCameraMode}
+        onNpcExit={exitNpcCamera}
         onPhotoMode={() => setPhotoMode((current) => setPhotoModeEnabled(current, true))}
         activeEnvironmentPreset={activeEnvironmentPreset}
         onEnvironmentPreset={applyEnvironmentPreset}

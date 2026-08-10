@@ -40,4 +40,20 @@ describe('weather transitions', () => {
     const melting = stepSurfaceAccumulation(snowed, getWeatherTargets('rain', 0.8), 5);
     expect(melting.snowCover).toBeLessThan(snowed.snowCover);
   });
+
+  it('积水会随降雨增长、在寒冷降雪中冻结，并在回暖时形成融雪水流', () => {
+    const soaked = stepSurfaceAccumulation(
+      createSurfaceAccumulation(),
+      getWeatherTargets('rain', 1),
+      18,
+    );
+    expect(soaked.puddleDepth).toBeGreaterThan(0.65);
+
+    const frozen = stepSurfaceAccumulation(soaked, getWeatherTargets('snow', 1), 20);
+    expect(frozen.iceCover).toBeGreaterThan(0.35);
+
+    const thawed = stepSurfaceAccumulation(frozen, getWeatherTargets('rain', 0.7), 8);
+    expect(thawed.iceCover).toBeLessThan(frozen.iceCover);
+    expect(thawed.meltwaterFlow).toBeGreaterThan(0.1);
+  });
 });

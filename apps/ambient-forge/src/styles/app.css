@@ -451,6 +451,74 @@ input[type="range"]:disabled {
   margin-top: 9px;
 }
 
+.npc-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.npc-list button {
+  display: flex;
+  min-width: 0;
+  min-height: 54px;
+  cursor: pointer;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(238, 246, 240, 0.045);
+  color: var(--faint);
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.npc-list button:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.npc-list button.active {
+  border-color: rgba(193, 217, 171, 0.24);
+  background: rgba(168, 193, 143, 0.16);
+  color: var(--moss-strong);
+}
+
+.npc-list button:active {
+  transform: translateY(1px) scale(0.985);
+}
+
+.npc-list button > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.npc-list small {
+  overflow: hidden;
+  color: var(--faint);
+  font-size: 8px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.npc-view-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 9px;
+}
+
+.npc-exit-button {
+  min-height: 34px;
+  margin-top: 7px;
+}
+
 .environment-presets {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

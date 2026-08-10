@@ -1,4 +1,4 @@
-import { type PointsMaterial, Scene } from 'three';
+import { PointLight, type PointsMaterial, Scene } from 'three';
 import { describe, expect, it } from 'vitest';
 import { createDefaultAmbientInputs } from '../core/ambient-inputs';
 import { getQualityProfile } from '../core/quality';
@@ -42,6 +42,24 @@ describe('WeatherSystem', () => {
 
     expect(weather.snow.geometry.drawRange.count).toBeGreaterThan(profile.weatherParticles);
     expect((weather.snow.material as PointsMaterial).size).toBeGreaterThan(0.14);
+    weather.dispose();
+  });
+
+  it('使用天气生命周期的闪电脉冲而不是固定周期闪烁', () => {
+    const scene = new Scene();
+    const weather = new WeatherSystem(scene, getQualityProfile('high'));
+    const signals = deriveSceneSignals({
+      ...createDefaultAmbientInputs(),
+      weather: 'rain',
+      weatherIntensity: 1,
+      wind: 1,
+    });
+    const lightning = scene.getObjectByName('weather-lightning');
+
+    weather.update({ ...signals, lightningFlash: 1, stormEnergy: 1 }, 0, 1 / 60);
+
+    expect(lightning).toBeInstanceOf(PointLight);
+    expect((lightning as PointLight).intensity).toBeGreaterThan(10);
     weather.dispose();
   });
 });

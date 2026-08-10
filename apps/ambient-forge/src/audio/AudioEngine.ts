@@ -1,5 +1,6 @@
 import { clamp, type WeatherMode } from '../core/ambient-inputs';
 import { type AudioBands, calculateBandEnergies, smoothAudioBands } from '../core/audio-analysis';
+import type { ThunderEvent } from '../core/weather-lifecycle';
 import { ProceduralSoundscape } from './proceduralSoundscape';
 
 export interface AudioUiState {
@@ -174,6 +175,11 @@ export class AudioEngine {
   updateSoundscape(mode: WeatherMode, intensity: number, night: number, volume: number): void {
     if (!this.environmentEnabled) return;
     this.soundscape?.setMix(mode, intensity, night, volume);
+  }
+
+  triggerThunder(event: Readonly<ThunderEvent>): void {
+    if (!this.environmentEnabled) return;
+    this.soundscape?.triggerThunder(event);
   }
 
   getRecordingAudioTrack(): MediaStreamTrack | null {

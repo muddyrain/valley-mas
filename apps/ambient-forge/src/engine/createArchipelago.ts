@@ -16,6 +16,7 @@ import {
 } from 'three';
 import type { QualityProfile } from '../core/quality';
 import type { SceneSignals } from '../core/scene-signals';
+import { createInstancedDistantIslands } from './createInstancedDistantIslands';
 import { disposeObject3D } from './dispose';
 
 export interface ArchipelagoAssembly {
@@ -212,7 +213,6 @@ export function createArchipelago(profile: QualityProfile): ArchipelagoAssembly 
   const floatingIslands: FloatingIsland[] = [];
   const swayingTrees: SwayingTree[] = [];
   const lanternLights: PointLight[] = [];
-  const farIslands: Group[] = [];
 
   const rockMaterial = new MeshStandardMaterial({
     color: '#596563',
@@ -403,40 +403,14 @@ export function createArchipelago(profile: QualityProfile): ArchipelagoAssembly 
   );
   root.add(bridge);
 
-  const farSpecs = [
-    [-10.8, -6.2, -4.55, 0.68, 1.8],
-    [10.6, -8.6, -4.8, 0.72, 0.4],
-    [-3.7, -11.2, -5.05, 0.58, 2.9],
-    [11.2, -7.4, -5.25, 0.62, 4.2],
-    [-12.2, 1.8, -5.4, 0.52, 5.3],
-  ] as const;
-  for (let index = 0; index < farSpecs.length; index += 1) {
-    const spec = farSpecs[index];
-    if (!spec) continue;
-    const [x, z, y, radius, phase] = spec;
-    const farIsland = createIslandBase(
-      `distant-island-${index + 1}`,
-      radius,
-      1.5 + radius,
-      groundMaterial,
-      rockMaterial,
-      snowMaterial,
-      random,
-    );
-    farIsland.position.set(x, y, z);
-    const marker = new Mesh(
-      index % 2 === 0
-        ? new ConeGeometry(radius * 0.18, 0.56 + radius * 0.38, 6)
-        : new CylinderGeometry(radius * 0.1, radius * 0.14, 0.5 + radius * 0.32, 7),
-      index % 2 === 0 ? foliageMaterial : stoneMaterial,
-    );
-    marker.position.y = 0.64;
-    farIsland.add(marker);
-    farIslands.push(farIsland);
-    floatingIslands.push({ root: farIsland, baseY: y, phase });
-  }
-
-  root.add(garden, crystalIsland, ruinIsland, ...farIslands);
+  const distantIslands = createInstancedDistantIslands(
+    groundMaterial,
+    rockMaterial,
+    snowMaterial,
+    foliageMaterial,
+    stoneMaterial,
+  );
+  root.add(garden, crystalIsland, ruinIsland, distantIslands.root);
 
   const baseGround = new Color('#6f875f');
   const wetGround = new Color('#425c48');
@@ -447,13 +421,8 @@ export function createArchipelago(profile: QualityProfile): ArchipelagoAssembly 
   const wetFoliage = new Color('#36533f');
   const frostFoliage = new Color('#92a797');
 
-  let visibleFarCount = farIslands.length;
   const setQuality = (nextProfile: QualityProfile) => {
-    visibleFarCount = nextProfile.dprCap > 1.5 ? farIslands.length : nextProfile.dprCap > 1 ? 4 : 3;
-    for (let index = 0; index < farIslands.length; index += 1) {
-      const island = farIslands[index];
-      if (island) island.visible = index < visibleFarCount;
-    }
+    distantIslands.setQuality(nextProfile);
     setShadows(root, nextProfile.shadows);
   };
   setQuality(profile);
@@ -461,7 +430,7 @@ export function createArchipelago(profile: QualityProfile): ArchipelagoAssembly 
   return {
     root,
     setQuality,
-    getEffectCount: () => visibleFarCount,
+    getEffectCount: () => distantIslands.getVisibleCount(),
     update(signals, elapsed) {
       for (const island of floatingIslands) {
         island.root.position.y =
@@ -469,6 +438,7 @@ export function createArchipelago(profile: QualityProfile): ArchipelagoAssembly 
         island.root.rotation.z =
           Math.sin(elapsed * 0.18 + island.phase * 1.4) * 0.006 * signals.motionScale;
       }
+      distantIslands.update(elapsed, signals.motionScale);
       for (const tree of swayingTrees) {
         tree.root.rotation.z =
           -signals.windStrength * 0.045 +

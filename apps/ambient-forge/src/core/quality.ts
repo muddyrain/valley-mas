@@ -6,6 +6,9 @@ export interface QualityProfile {
   weatherParticles: number;
   fireflies: number;
   stars: number;
+  grassBlades: number;
+  treeLeafClusters: number;
+  distantIslands: number;
   shadows: boolean;
   shadowMapSize: number;
   antialias: boolean;
@@ -18,6 +21,9 @@ const PROFILES: Record<QualityLevel, QualityProfile> = {
     weatherParticles: 220,
     fireflies: 28,
     stars: 320,
+    grassBlades: 96,
+    treeLeafClusters: 3,
+    distantIslands: 3,
     shadows: false,
     shadowMapSize: 0,
     antialias: false,
@@ -28,6 +34,9 @@ const PROFILES: Record<QualityLevel, QualityProfile> = {
     weatherParticles: 480,
     fireflies: 54,
     stars: 620,
+    grassBlades: 160,
+    treeLeafClusters: 4,
+    distantIslands: 4,
     shadows: true,
     shadowMapSize: 1024,
     antialias: true,
@@ -38,6 +47,9 @@ const PROFILES: Record<QualityLevel, QualityProfile> = {
     weatherParticles: 840,
     fireflies: 88,
     stars: 960,
+    grassBlades: 220,
+    treeLeafClusters: 6,
+    distantIslands: 5,
     shadows: true,
     shadowMapSize: 2048,
     antialias: true,

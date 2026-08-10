@@ -335,7 +335,8 @@ export function createCloudSea(profile: QualityProfile): CloudSeaAssembly {
         .setRGB(...signals.fogColor)
         .lerp(stormShadow, 0.52 + signals.rain * 0.3 + signals.snow * 0.08);
       const stormOpacity =
-        Math.max(0, signals.cloudCover - 0.22) * 0.38 + signals.rain * 0.24 + signals.snow * 0.1;
+        (Math.max(0, signals.cloudCover - 0.22) * 0.38 + signals.rain * 0.24 + signals.snow * 0.1) *
+        (0.36 + signals.stormFront * 0.64);
       for (let index = 0; index < stormMaterials.length; index += 1) {
         const material = stormMaterials[index];
         if (!material) continue;
@@ -343,6 +344,9 @@ export function createCloudSea(profile: QualityProfile): CloudSeaAssembly {
         material.opacity = stormOpacity * (0.96 - index * 0.2);
       }
       stormRoot.visible = stormOpacity > 0.015;
+      stormRoot.position.x = 18 - signals.stormFront * 21;
+      stormRoot.position.z = -12 + signals.stormFront * 9;
+      stormRoot.scale.setScalar(0.78 + signals.stormFront * 0.22);
       stormRoot.rotation.y += delta * (0.018 + signals.windStrength * 0.045) * signals.motionScale;
       updateLayerMatrices(
         stormMeshes,

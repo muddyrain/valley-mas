@@ -1,6 +1,7 @@
 import { type AmbientInputs, clamp, clampAmbientInputs } from './ambient-inputs';
 import { getTimeOfDayState, type Rgb } from './time-of-day';
 import { getWeatherTargets, type SurfaceAccumulation, type WeatherTargets } from './weather';
+import type { WeatherLifecycleSnapshot } from './weather-lifecycle';
 
 export interface SceneSignals {
   skyColor: Rgb;
@@ -21,6 +22,12 @@ export interface SceneSignals {
   snow: number;
   snowCover: number;
   wetness: number;
+  puddleDepth: number;
+  iceCover: number;
+  meltwaterFlow: number;
+  stormFront: number;
+  stormEnergy: number;
+  lightningFlash: number;
   islandBreath: number;
   plantSway: number;
   fireflyActivity: number;
@@ -43,6 +50,7 @@ export function deriveSceneSignals(
   rawInputs: AmbientInputs,
   weatherTargets?: WeatherTargets,
   surfaceAccumulation?: SurfaceAccumulation,
+  lifecycleSnapshot?: WeatherLifecycleSnapshot,
 ): SceneSignals {
   const inputs = clampAmbientInputs(rawInputs);
   const time = getTimeOfDayState(inputs.timeOfDay);
@@ -50,6 +58,11 @@ export function deriveSceneSignals(
   const motionScale = inputs.reducedMotion ? 0.24 : 1;
   const particleScale = inputs.reducedMotion ? 0.42 : 1;
   const totalEnergy = clamp((inputs.audioLow + inputs.audioMid + inputs.audioHigh) / 3);
+  const lifecycle = lifecycleSnapshot ?? {
+    stormFront: weather.rain,
+    stormEnergy: clamp((weather.rain - 0.42) / 0.58),
+    lightningFlash: 0,
+  };
 
   return {
     skyColor: desaturate(time.sky, weather.desaturation),
@@ -70,6 +83,12 @@ export function deriveSceneSignals(
     snow: weather.snow,
     snowCover: surfaceAccumulation?.snowCover ?? weather.snow,
     wetness: surfaceAccumulation?.wetness ?? weather.wetness,
+    puddleDepth: surfaceAccumulation?.puddleDepth ?? weather.rain * weather.wetness,
+    iceCover: surfaceAccumulation?.iceCover ?? 0,
+    meltwaterFlow: surfaceAccumulation?.meltwaterFlow ?? 0,
+    stormFront: clamp(lifecycle.stormFront),
+    stormEnergy: clamp(lifecycle.stormEnergy),
+    lightningFlash: clamp(lifecycle.lightningFlash),
     islandBreath: Math.min(0.02, inputs.audioLow * 0.016 * motionScale),
     plantSway: (0.025 + inputs.wind * 0.08 + inputs.audioMid * 0.13) * motionScale,
     fireflyActivity: clamp(

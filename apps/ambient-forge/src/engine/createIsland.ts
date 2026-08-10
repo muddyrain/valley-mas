@@ -22,6 +22,7 @@ import {
 } from 'three';
 import type { QualityProfile } from '../core/quality';
 import type { SceneSignals } from '../core/scene-signals';
+import { createInstancedTreeBatch } from './createInstancedTrees';
 import { createIslandDetails } from './createIslandDetails';
 import { createRadialAlphaTexture } from './createRadialAlphaTexture';
 import { createWaterfall } from './createWaterfall';
@@ -196,54 +197,6 @@ function createWindow(
   return window;
 }
 
-function createTree(
-  x: number,
-  z: number,
-  scale: number,
-  phase: number,
-  trunkMaterial: MeshStandardMaterial,
-  leafMaterials: MeshStandardMaterial[],
-  leafGeometry: IcosahedronGeometry,
-): Group {
-  const tree = new Group();
-  tree.position.set(x, 0.46, z);
-  tree.scale.setScalar(scale);
-  tree.userData.phase = phase;
-
-  const trunk = new Mesh(new CylinderGeometry(0.095, 0.19, 1.48, 8), trunkMaterial);
-  trunk.position.y = 0.74;
-  tree.add(trunk);
-  for (const direction of [-1, 1]) {
-    const branch = new Mesh(new CylinderGeometry(0.035, 0.07, 0.64, 7), trunkMaterial);
-    branch.position.set(direction * 0.19, 1.18, 0.02);
-    branch.rotation.z = direction * -0.82;
-    branch.rotation.x = direction * 0.12;
-    tree.add(branch);
-  }
-
-  const crown = new Group();
-  crown.position.y = 1.5;
-  const clusters = [
-    [-0.38, 0.02, 0.04, 0.68, 0],
-    [0.34, 0.08, 0.08, 0.64, 1],
-    [0, 0.42, -0.08, 0.73, 2],
-    [-0.08, -0.12, 0.38, 0.55, 1],
-    [0.08, -0.04, -0.42, 0.58, 0],
-    [0.02, 0.12, 0.02, 0.72, 2],
-  ] as const;
-  for (const [cx, cy, cz, radius, materialIndex] of clusters) {
-    const material = leafMaterials[materialIndex] ?? leafMaterials[0];
-    if (!material) continue;
-    const leaf = new Mesh(leafGeometry, material);
-    leaf.position.set(cx, cy, cz);
-    leaf.scale.set(radius, radius * 1.04, radius * 0.94);
-    leaf.rotation.set(cy * 0.4, cx * 0.7, cz * 0.35);
-    crown.add(leaf);
-  }
-  tree.add(crown);
-  return tree;
-}
-
 function createBladeGeometry(): BufferGeometry {
   const geometry = new BufferGeometry();
   geometry.setAttribute(
@@ -337,6 +290,21 @@ export function createIsland(profile: QualityProfile): IslandAssembly {
     polygonOffset: true,
     polygonOffsetFactor: -2,
   });
+  const puddleIceMaterial = new MeshStandardMaterial({
+    color: '#c8dedd',
+    emissive: '#789fa2',
+    emissiveIntensity: 0.18,
+    roughness: 0.2,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: DoubleSide,
+  });
+  const puddleGroup = new Group();
+  puddleGroup.name = 'main-island-puddles';
+  const puddleIceGroup = new Group();
+  puddleIceGroup.name = 'main-island-puddle-ice';
+  const puddleSurfaces: Array<{ water: Mesh; ice: Mesh; stretch: number }> = [];
   for (const [x, z, radius, stretch, rotation] of [
     [-3.42, 1.18, 0.72, 0.5, 0.18],
     [-2.42, 2.28, 0.62, 0.42, -0.34],
@@ -350,8 +318,16 @@ export function createIsland(profile: QualityProfile): IslandAssembly {
     puddle.rotation.set(-Math.PI / 2, 0, rotation);
     puddle.scale.y = stretch;
     puddle.renderOrder = 2;
-    breathingRoot.add(puddle);
+    puddleGroup.add(puddle);
+    const ice = new Mesh(new CircleGeometry(radius, 18), puddleIceMaterial);
+    ice.position.set(x, 0.596, z);
+    ice.rotation.set(-Math.PI / 2, 0, rotation);
+    ice.scale.y = stretch;
+    ice.renderOrder = 3;
+    puddleIceGroup.add(ice);
+    puddleSurfaces.push({ water: puddle, ice, stretch });
   }
+  breathingRoot.add(puddleGroup, puddleIceGroup);
 
   const snowMaterial = new MeshStandardMaterial({
     color: '#e3ece8',
@@ -551,7 +527,6 @@ export function createIsland(profile: QualityProfile): IslandAssembly {
         flatShading: true,
       }),
   );
-  const leafGeometry = new IcosahedronGeometry(1, 1);
   const treeSpecs = [
     [-2.6, -0.72, 1.04, 0.4],
     [-1.72, -1.94, 0.76, 2.1],
@@ -559,24 +534,14 @@ export function createIsland(profile: QualityProfile): IslandAssembly {
     [3.12, 1.26, 0.53, 5.5],
     [-3.42, 1.25, 0.57, 3.3],
   ] as const;
-  const trees = treeSpecs.map(([x, z, scale, phase]) =>
-    createTree(x, z, scale, phase, trunkMaterial, leafMaterials, leafGeometry),
+  const treeBatch = createInstancedTreeBatch(
+    treeSpecs.map(([x, z, scale, phase]) => ({ x, y: 0.46, z, scale, phase })),
+    trunkMaterial,
+    leafMaterials,
+    snowAccentMaterial,
   );
-  for (const tree of trees) breathingRoot.add(tree);
+  breathingRoot.add(treeBatch.root);
   const canopySnowGeometry = new SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2);
-  for (const [x, z, scale] of treeSpecs) {
-    for (const [offsetX, offsetY, offsetZ, radius] of [
-      [-0.3, 2.0, 0.04, 0.46],
-      [0.3, 2.04, 0.06, 0.43],
-      [0, 2.38, -0.08, 0.5],
-    ] as const) {
-      const cap = new Mesh(canopySnowGeometry, snowAccentMaterial);
-      cap.position.set(x + offsetX * scale, 0.46 + offsetY * scale, z + offsetZ * scale);
-      cap.scale.set(radius * scale, radius * scale * 0.22, radius * scale * 0.84);
-      cap.rotation.y = (x + z + offsetY) * 0.7;
-      breathingRoot.add(cap);
-    }
-  }
 
   const bladeMaterial = new MeshStandardMaterial({
     color: '#82a269',
@@ -607,6 +572,7 @@ export function createIsland(profile: QualityProfile): IslandAssembly {
     });
   }
   const grassBlades = new InstancedMesh(createBladeGeometry(), bladeMaterial, bladePoses.length);
+  grassBlades.name = 'grass-blades';
   const bladeDummy = new Object3D();
   for (let index = 0; index < bladePoses.length; index += 1) {
     const pose = bladePoses[index];
@@ -720,6 +686,8 @@ export function createIsland(profile: QualityProfile): IslandAssembly {
     fireflyGeometry.setDrawRange(0, fireflyCount);
     details.setQuality(nextProfile);
     waterfall.setQuality(nextProfile);
+    treeBatch.setQuality(nextProfile);
+    grassBlades.count = Math.min(bladePoses.length, nextProfile.grassBlades);
     enableShadows(breathingRoot, nextProfile.shadows);
     cabinLight.castShadow = false;
   };
@@ -751,18 +719,9 @@ export function createIsland(profile: QualityProfile): IslandAssembly {
       details.update(signals, elapsed);
       waterfall.update(signals, elapsed);
 
-      for (let index = 0; index < trees.length; index += 1) {
-        const tree = trees[index];
-        if (!tree) continue;
-        const phase = Number(tree.userData.phase ?? index);
-        const gust =
-          signals.windStrength * 0.055 +
-          Math.sin(elapsed * (1.18 + signals.windStrength * 1.4) + phase) * signals.plantSway;
-        tree.rotation.z = -gust;
-        tree.rotation.x = Math.cos(elapsed * 0.82 + phase * 0.7) * signals.plantSway * 0.28;
-      }
+      treeBatch.update(signals, elapsed);
 
-      for (let index = 0; index < bladePoses.length; index += 1) {
+      for (let index = 0; index < grassBlades.count; index += 1) {
         const pose = bladePoses[index];
         if (!pose) continue;
         const wave =
@@ -816,9 +775,14 @@ export function createIsland(profile: QualityProfile): IslandAssembly {
       stoneMaterial.roughness = 0.96 - signals.wetness * 0.3;
       pathMaterial.color.copy(basePath).lerp(wetPath, signals.wetness * 0.9);
       pathMaterial.roughness = 0.98 - signals.wetness * 0.52;
-      puddleMaterial.opacity =
-        Math.max(signals.rain * 0.46, signals.wetness * 0.34) * (1 - signals.snowCover);
+      const puddleGrowth = 0.4 + signals.puddleDepth * 0.7;
+      puddleMaterial.opacity = signals.puddleDepth * (1 - signals.iceCover * 0.52) * 0.58;
       puddleMaterial.emissiveIntensity = 0.07 + signals.daylight * 0.08;
+      puddleIceMaterial.opacity = signals.iceCover * 0.84;
+      for (const surface of puddleSurfaces) {
+        surface.water.scale.set(puddleGrowth, surface.stretch * puddleGrowth, 1);
+        surface.ice.scale.set(puddleGrowth * 1.015, surface.stretch * puddleGrowth * 1.015, 1);
+      }
       snowMaterial.opacity = signals.snowCover * 0.9;
       snowAccentMaterial.opacity = signals.snowCover * 0.96;
       for (let index = 0; index < leafMaterials.length; index += 1) {

@@ -1,10 +1,12 @@
 import { clamp, type WeatherMode } from '../core/ambient-inputs';
+import { getThunderProfile, type ThunderCue } from '../core/thunder';
 
 export class ProceduralSoundscape {
   private readonly windGain: GainNode;
   private readonly rainGain: GainNode;
   private readonly nightGain: GainNode;
   private readonly outputGain: GainNode;
+  private readonly noiseBuffer: AudioBuffer;
   private readonly sources: AudioBufferSourceNode[] = [];
   private readonly nodes: AudioNode[] = [];
   private disposed = false;
@@ -14,6 +16,7 @@ export class ProceduralSoundscape {
     destination: AudioNode,
   ) {
     const buffer = context.createBuffer(1, context.sampleRate * 4, context.sampleRate);
+    this.noiseBuffer = buffer;
     const data = buffer.getChannelData(0);
     let filtered = 0;
     for (let index = 0; index < data.length; index += 1) {
@@ -77,6 +80,40 @@ export class ProceduralSoundscape {
     this.windGain.gain.setTargetAtTime(wind, now, 0.32);
     this.rainGain.gain.setTargetAtTime(rain, now, 0.22);
     this.nightGain.gain.setTargetAtTime(nightAir, now, 0.45);
+  }
+
+  triggerThunder(cue: Readonly<ThunderCue>): void {
+    if (this.disposed) return;
+    const profile = getThunderProfile(cue);
+    const source = this.context.createBufferSource();
+    const filter = this.context.createBiquadFilter();
+    const gain = this.context.createGain();
+    const startsAt = this.context.currentTime + profile.delaySeconds;
+    const attackSeconds = cue.distance === 'near' ? 0.035 : 0.18;
+    source.buffer = this.noiseBuffer;
+    source.loop = true;
+    source.playbackRate.value = cue.distance === 'near' ? 0.62 : 0.38;
+    filter.type = 'lowpass';
+    filter.frequency.value = profile.lowpassHz;
+    filter.Q.value = cue.distance === 'near' ? 0.72 : 0.46;
+    gain.gain.setValueAtTime(0.0001, startsAt);
+    gain.gain.exponentialRampToValueAtTime(
+      Math.max(0.0001, profile.gain),
+      startsAt + attackSeconds,
+    );
+    gain.gain.exponentialRampToValueAtTime(0.0001, startsAt + profile.durationSeconds);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.outputGain);
+    source.start(startsAt);
+    source.stop(startsAt + profile.durationSeconds);
+    source.addEventListener('ended', () => {
+      source.disconnect();
+      filter.disconnect();
+      gain.disconnect();
+    });
+    this.sources.push(source);
+    this.nodes.push(source, filter, gain);
   }
 
   fadeOut(): void {

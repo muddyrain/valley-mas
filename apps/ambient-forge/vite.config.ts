@@ -19,6 +19,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (id.includes('/three/examples/jsm/postprocessing/')) return 'three-postprocessing';
           if (id.includes('/three/')) return 'three';
           if (id.includes('/lucide-react/')) return 'icons';
           if (id.includes('/react/') || id.includes('/react-dom/')) return 'react';
