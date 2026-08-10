@@ -5,6 +5,7 @@ import type {
   RecordingConfiguration,
   RecordingOptions,
 } from '../core/recording-options';
+import type { ScreenCapturePermissionStatus } from '../core/screen-capture-permission';
 import type { ScreenshotMode, ScreenshotState } from '../core/screenshot-state';
 import type { RecordingMode } from '../core/session';
 import type { ShortcutSettings } from '../core/shortcuts';
@@ -36,10 +37,14 @@ export const IPC_CHANNELS = {
   hideSettings: 'screen-recorder:hide-settings',
   updateShortcuts: 'screen-recorder:update-shortcuts',
   setShortcutCaptureActive: 'screen-recorder:set-shortcut-capture-active',
+  requestScreenCapturePermission: 'screen-recorder:request-screen-capture-permission',
+  openScreenCaptureSettings: 'screen-recorder:open-screen-capture-settings',
+  restartForScreenCapturePermission: 'screen-recorder:restart-for-screen-capture-permission',
   chooseRecordingDirectory: 'screen-recorder:choose-recording-directory',
   setAutoLaunch: 'screen-recorder:set-auto-launch',
   setNotificationsEnabled: 'screen-recorder:set-notifications-enabled',
   getWindowTargets: 'screen-recorder:get-window-targets',
+  setSelectionGestureActive: 'screen-recorder:set-selection-gesture-active',
   selectionReady: 'screen-recorder:selection-ready',
   getColorPickerFrame: 'screen-recorder:get-color-picker-frame',
   completeColorPicker: 'screen-recorder:complete-color-picker',
@@ -89,6 +94,7 @@ export type RecorderSnapshot = {
   autoLaunch: boolean;
   notificationsEnabled: boolean;
   shortcutCaptureActive: boolean;
+  screenCapturePermission: ScreenCapturePermissionStatus;
   outputPath?: string;
   startedAt?: number;
   error?: string;
@@ -114,6 +120,7 @@ export type RecorderSnapshot = {
     previewDataUrl?: string;
   };
   selectionPurpose?: 'recording' | 'screenshot' | 'color-picker';
+  selectionDisplay?: DisplayGeometry;
   plan?: CapturePlan;
 };
 
@@ -141,10 +148,14 @@ export type RecorderApi = {
   hideSettings(): Promise<void>;
   updateShortcuts(settings: ShortcutSettings): Promise<void>;
   setShortcutCaptureActive(active: boolean): Promise<void>;
+  requestScreenCapturePermission(): Promise<ScreenCapturePermissionStatus>;
+  openScreenCaptureSettings(): Promise<void>;
+  restartForScreenCapturePermission(): void;
   chooseRecordingDirectory(): Promise<{ changed: boolean }>;
   setAutoLaunch(enabled: boolean): Promise<void>;
   setNotificationsEnabled(enabled: boolean): Promise<void>;
   getWindowTargets(): Promise<WindowTarget[]>;
+  setSelectionGestureActive(active: boolean): void;
   selectionReady(): void;
   getColorPickerFrame(): Promise<ColorPickerFrame>;
   completeColorPicker(value: string): Promise<void>;

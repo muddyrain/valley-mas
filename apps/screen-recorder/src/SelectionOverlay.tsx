@@ -7,22 +7,29 @@ import {
   updateSelectionGesture,
 } from './core/selection-controller';
 import { canStartSelectionGesture } from './core/selection-gesture';
+import { shouldShowSelectionLabel } from './core/selection-label';
 import { createSelectionMaskRects } from './core/selection-mask';
-import { findWindowTargetAt, type WindowTarget } from './core/window-target';
+import { findWindowTargetAtOrDisplay, type WindowTarget } from './core/window-target';
 
 const HANDLES: SelectionHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+
+function getDisplayBounds(): Rectangle {
+  return { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
+}
 
 export function SelectionOverlay({ interactive = true }: { interactive?: boolean }) {
   const gestureRef = useRef<SelectionGesture | undefined>(undefined);
   const hoverPointRef = useRef<Point | undefined>(undefined);
   const pendingSelectionRef = useRef<Rectangle | undefined>(undefined);
   const selectionFrameRef = useRef<number | undefined>(undefined);
+  const selectionDisplayIdRef = useRef<string | undefined>(undefined);
   const [selection, setSelection] = useState<Rectangle>();
   const [error, setError] = useState<string>();
   const [purpose, setPurpose] = useState<'recording' | 'screenshot'>('recording');
   const [configuring, setConfiguring] = useState(false);
   const [windowTargets, setWindowTargets] = useState<WindowTarget[]>([]);
   const [suggestedTarget, setSuggestedTarget] = useState<WindowTarget>();
+  const [activeDisplayId, setActiveDisplayId] = useState<string>();
 
   useLayoutEffect(() => {
     window.screenRecorder.selectionReady();
@@ -33,12 +40,13 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
       if (selectionFrameRef.current !== undefined) {
         cancelAnimationFrame(selectionFrameRef.current);
       }
+      window.screenRecorder.setSelectionGestureActive(false);
     },
     [],
   );
 
   useEffect(() => {
-    if (configuring) return;
+    if (configuring || !activeDisplayId) return;
     let active = true;
     let refreshCount = 0;
     const loadTargets = () =>
@@ -49,7 +57,7 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
           setWindowTargets(targets);
           const hoverPoint = hoverPointRef.current;
           if (hoverPoint && !gestureRef.current) {
-            const target = findWindowTargetAt(targets, hoverPoint);
+            const target = findWindowTargetAtOrDisplay(targets, hoverPoint, getDisplayBounds());
             setSuggestedTarget(target);
             setSelection(target?.rect);
           }
@@ -65,12 +73,27 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
       active = false;
       window.clearInterval(refreshTimer);
     };
-  }, [configuring]);
+  }, [activeDisplayId, configuring]);
 
   useEffect(() => {
     const applySnapshot = (
       snapshot: Awaited<ReturnType<typeof window.screenRecorder.getSnapshot>>,
     ) => {
+      const nextDisplayId = snapshot.selectionDisplay?.id;
+      if (selectionDisplayIdRef.current !== nextDisplayId) {
+        gestureRef.current = undefined;
+        hoverPointRef.current = undefined;
+        pendingSelectionRef.current = undefined;
+        if (selectionFrameRef.current !== undefined) {
+          cancelAnimationFrame(selectionFrameRef.current);
+          selectionFrameRef.current = undefined;
+        }
+        setSelection(undefined);
+        setSuggestedTarget(undefined);
+        setWindowTargets([]);
+        setActiveDisplayId(nextDisplayId);
+      }
+      selectionDisplayIdRef.current = nextDisplayId;
       if (snapshot.selectionPurpose === 'recording' || snapshot.selectionPurpose === 'screenshot') {
         setPurpose(snapshot.selectionPurpose);
       }
@@ -100,13 +123,6 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [configuring]);
-
-  const bounds = (): Rectangle => ({
-    x: 0,
-    y: 0,
-    width: window.innerWidth,
-    height: window.innerHeight,
-  });
 
   const scheduleSelection = (rect: Rectangle | undefined) => {
     pendingSelectionRef.current = rect;
@@ -151,12 +167,15 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
         selection,
       });
     } else {
+      const target = findWindowTargetAtOrDisplay(windowTargets, point, getDisplayBounds());
       gestureRef.current = beginSelectionGesture({
         point,
-        suggestedSelection: suggestedTarget?.rect,
+        suggestedSelection: target.rect,
       });
-      setSelection(suggestedTarget?.rect);
+      setSuggestedTarget(target);
+      setSelection(target.rect);
     }
+    window.screenRecorder.setSelectionGestureActive(true);
     event.currentTarget.setPointerCapture(event.pointerId);
     setError(undefined);
   };
@@ -173,7 +192,7 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
   };
 
   const selectionForGesture = (gesture: SelectionGesture, point: Point): Rectangle =>
-    updateSelectionGesture(gesture, point, bounds());
+    updateSelectionGesture(gesture, point, getDisplayBounds());
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!interactive) return;
@@ -186,7 +205,7 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
       return;
     }
     if (!configuring) {
-      const target = findWindowTargetAt(windowTargets, point);
+      const target = findWindowTargetAtOrDisplay(windowTargets, point, getDisplayBounds());
       setSuggestedTarget(target);
       scheduleSelection(target?.rect);
     }
@@ -207,6 +226,8 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
       else await window.screenRecorder.confirmSelection(rect);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '选区无效');
+    } finally {
+      window.screenRecorder.setSelectionGestureActive(false);
     }
   };
 
@@ -214,12 +235,13 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
     event.preventDefault();
     if (!interactive) return;
     gestureRef.current = undefined;
+    window.screenRecorder.setSelectionGestureActive(false);
     flushSelection(undefined);
     if (configuring) void window.screenRecorder.cancelConfiguredRecording();
     else void window.screenRecorder.cancelSelection();
   };
 
-  const maskRects = createSelectionMaskRects(bounds(), selection);
+  const maskRects = createSelectionMaskRects(getDisplayBounds(), selection);
 
   return (
     <div
@@ -228,6 +250,12 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={(event) => void onPointerUp(event)}
+      onPointerCancel={() => {
+        gestureRef.current = undefined;
+        window.screenRecorder.setSelectionGestureActive(false);
+        setSuggestedTarget(undefined);
+        flushSelection(undefined);
+      }}
     >
       {maskRects.map((rect, index) => (
         <div
@@ -272,10 +300,12 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
             height: selection.height,
           }}
         >
-          <span className="selection-size">
-            {suggestedTarget ? `${suggestedTarget.title} · ` : ''}
-            {Math.round(selection.width)} × {Math.round(selection.height)}
-          </span>
+          {shouldShowSelectionLabel(selection, suggestedTarget !== undefined) && (
+            <span className="selection-size">
+              {suggestedTarget ? `${suggestedTarget.title} · ` : ''}
+              {Math.round(selection.width)} × {Math.round(selection.height)}
+            </span>
+          )}
           {configuring &&
             HANDLES.map((handle) => (
               <i

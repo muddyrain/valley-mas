@@ -45,6 +45,7 @@ import {
 } from '../src/core/long-screenshot';
 import { getLongScreenshotSelectionFrame } from '../src/core/long-screenshot-view';
 import { RECORDING_MIME_CANDIDATES, type RecordingContainer } from '../src/core/mime';
+import { getDisplayOverlayWindowOptions } from '../src/core/overlay-window';
 import { getPinnedScreenshotWindowBounds } from '../src/core/pinned-screenshot';
 import { isValidPng } from '../src/core/png';
 import { PreparedWindowSlot } from '../src/core/prepared-window';
@@ -54,8 +55,16 @@ import {
   parseRecordingConfiguration,
   type RecordingConfiguration,
 } from '../src/core/recording-options';
+import {
+  createSingleFlightScreenCapturePermissionRequest,
+  requestScreenCapturePermissionStatus,
+  resolveScreenCapturePermissionStatus,
+  runAfterScreenCapturePermission,
+  type ScreenCapturePermissionStatus,
+} from '../src/core/screen-capture-permission';
 import { canRevealScreenshotEditor } from '../src/core/screenshot-handoff';
 import { type ScreenshotMode, ScreenshotSession } from '../src/core/screenshot-state';
+import { findSelectionDisplayChange } from '../src/core/selection-display';
 import { RecordingSession } from '../src/core/session';
 import {
   DEFAULT_SHORTCUTS,
@@ -79,7 +88,9 @@ import {
 } from '../src/shared/contracts';
 import { RecordingFileWriter } from './file-writer';
 import {
+  createExecutableWindowQueryHost,
   createPowerShellWindowQueryHost,
+  type QueryHost,
   RefreshingQueryCache,
   ReusableQueryHost,
 } from './window-target-query';
@@ -93,6 +104,13 @@ const SHOW_LONG_SCREENSHOT_FIXTURE =
 const TEST_AUTO_STOP_MS = Number(process.env.VALLEY_SCREEN_RECORDER_TEST_AUTO_STOP_MS ?? 0);
 // desktopCapturer can briefly occupy the compositor; let the shortcut overlay settle first.
 const SCREENSHOT_CAPTURE_PRIME_DELAY_MS = 300;
+const SELECTION_DISPLAY_FOLLOW_INTERVAL_MS = 80;
+const SCREENSHOT_PERMISSION_DENIED_MESSAGE =
+  '屏幕捕获权限不可用。请允许 Valley Screen Recorder 录制屏幕；已授权时请重启应用。';
+const RECORDING_PERMISSION_DENIED_MESSAGE =
+  '屏幕录制权限不可用。请允许 Valley Screen Recorder 录制屏幕；已授权时请重启应用。';
+const MAC_SCREEN_CAPTURE_SETTINGS_URL =
+  'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture';
 
 let mainWindow: BrowserWindow | undefined;
 let selectionWindow: BrowserWindow | undefined;
@@ -111,8 +129,11 @@ let completionPreviewDataUrl: string | undefined;
 let longScreenshotFixtureWindow: BrowserWindow | undefined;
 let selectionDisplay: Display | undefined;
 let selectionPurpose: 'recording' | 'screenshot' | 'color-picker' | undefined;
+let selectionDisplayWatcher: NodeJS.Timeout | undefined;
+let selectionGestureActive = false;
 let tray: Tray | undefined;
 let isQuitting = false;
+let nativeScreenCaptureVerified = false;
 let captureGranted = false;
 let activePlan: CapturePlan | undefined;
 let outputPath: string | undefined;
@@ -155,6 +176,10 @@ const screenshotDirectory = path.join(app.getPath('pictures'), 'Valley Screensho
 const shortcutSettingsPath = path.join(app.getPath('userData'), 'shortcuts.json');
 const appSettingsPath = path.join(app.getPath('userData'), 'settings.json');
 const appIconPath = path.join(__dirname, '../assets/logo.png');
+const trayTemplateIconPath = path.join(__dirname, '../assets/trayTemplate.png');
+const macOSWindowQueryPath = app.isPackaged
+  ? path.join(process.resourcesPath, 'native/macos-window-query')
+  : path.join(__dirname, 'native/macos-window-query');
 const fileWriter = new RecordingFileWriter(saveDirectory, FORCE_WRITE_FAILURE);
 const recorderSession = new RecordingSession((mimeType) => fileWriter.begin(mimeType));
 const screenshotSession = new ScreenshotSession(captureScreenshotFile);
@@ -208,9 +233,17 @@ while (($command = [Console]::In.ReadLine()) -ne $null) {
 }
 `;
 
-const windowTargetQueries = new ReusableQueryHost(() =>
-  createPowerShellWindowQueryHost(WINDOWS_WINDOW_QUERY, 15_000),
-);
+function createWindowTargetQueryHost(): QueryHost {
+  if (process.platform === 'win32') {
+    return createPowerShellWindowQueryHost(WINDOWS_WINDOW_QUERY, 15_000);
+  }
+  if (process.platform === 'darwin') {
+    return createExecutableWindowQueryHost(macOSWindowQueryPath, [], 5_000);
+  }
+  throw new Error('当前平台不支持窗口识别');
+}
+
+const windowTargetQueries = new ReusableQueryHost(createWindowTargetQueryHost);
 const windowTargetCache = new RefreshingQueryCache(async () => {
   const stdout = await windowTargetQueries.query();
   const parsed = JSON.parse(stdout.trim() || '[]') as unknown;
@@ -226,13 +259,13 @@ function toDisplayGeometry(display: Display) {
 }
 
 async function detectWindowTargets(display: Display): Promise<WindowTarget[]> {
-  if (process.platform !== 'win32') return [];
+  if (process.platform !== 'win32' && process.platform !== 'darwin') return [];
   try {
     const values = await windowTargetCache.readOr([]);
     return mapWindowTargetsToDisplay(
       values,
       display.bounds,
-      (rect) => screen.screenToDipRect(null, rect),
+      (rect) => (process.platform === 'win32' ? screen.screenToDipRect(null, rect) : rect),
       process.pid,
     );
   } catch (error) {
@@ -295,6 +328,7 @@ function snapshot(): RecorderSnapshot {
     autoLaunch: getAutoLaunchEnabled(),
     notificationsEnabled,
     shortcutCaptureActive,
+    screenCapturePermission: getScreenCapturePermissionStatus(),
     outputPath,
     startedAt,
     error: errorMessage,
@@ -324,6 +358,7 @@ function snapshot(): RecorderSnapshot {
       ? { kind: completionKind, previewDataUrl: completionPreviewDataUrl }
       : undefined,
     selectionPurpose,
+    selectionDisplay: selectionDisplay ? toDisplayGeometry(selectionDisplay) : undefined,
     plan: activePlan,
   };
 }
@@ -489,6 +524,7 @@ function fail(message: string): void {
   selectionWindow?.destroy();
   selectionWindow = undefined;
   selectionDisplay = undefined;
+  stopSelectionDisplayWatcher();
   destroyRecordingWindowSoon();
   destroyIndicatorWindowSoon();
   destroyLongScreenshotIndicatorWindow();
@@ -654,7 +690,7 @@ function secureWebPreferences() {
 }
 
 function fitOverlayToDisplay(window: BrowserWindow, display: Display): void {
-  window.setContentBounds(display.bounds);
+  window.setBounds(display.bounds);
 }
 
 function createMainWindow(): void {
@@ -839,6 +875,7 @@ function createControlWindow(display: Display): void {
 function createSelectionBrowserWindow(display: Display): BrowserWindow {
   const nextSelectionWindow = new BrowserWindow({
     ...display.bounds,
+    ...getDisplayOverlayWindowOptions(process.platform),
     useContentSize: true,
     show: false,
     transparent: true,
@@ -852,6 +889,9 @@ function createSelectionBrowserWindow(display: Display): BrowserWindow {
     webPreferences: secureWebPreferences(),
   });
   nextSelectionWindow.setAlwaysOnTop(true, 'screen-saver');
+  if (process.platform === 'darwin') {
+    nextSelectionWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  }
   nextSelectionWindow.setContentProtection(shouldProtectWindowContent('capture-overlay'));
   nextSelectionWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   nextSelectionWindow.on('closed', () => {
@@ -861,12 +901,66 @@ function createSelectionBrowserWindow(display: Display): BrowserWindow {
       selectionDisplay = undefined;
       selectionPurpose = undefined;
       windowTargetsPromise = undefined;
+      stopSelectionDisplayWatcher();
     }
     if (screenshotEditorWindow === nextSelectionWindow) screenshotEditorWindow = undefined;
     schedulePreparedSelectionWindow();
   });
   loadLocalRenderer(nextSelectionWindow, 'selection');
   return nextSelectionWindow;
+}
+
+function stopSelectionDisplayWatcher(): void {
+  if (selectionDisplayWatcher) clearInterval(selectionDisplayWatcher);
+  selectionDisplayWatcher = undefined;
+  selectionGestureActive = false;
+}
+
+function followSelectionDisplayAtCursor(): void {
+  const currentDisplay = selectionDisplay;
+  const currentWindow = selectionWindow;
+  if (
+    !currentDisplay ||
+    !currentWindow ||
+    currentWindow.isDestroyed() ||
+    (selectionPurpose === 'recording' && recorderSession.state !== 'selecting') ||
+    (selectionPurpose === 'screenshot' && screenshotSession.state !== 'selecting') ||
+    selectionPurpose === 'color-picker'
+  ) {
+    return;
+  }
+
+  const displays = screen.getAllDisplays();
+  const nextGeometry = findSelectionDisplayChange(
+    displays.map(toDisplayGeometry),
+    String(currentDisplay.id),
+    screen.getCursorScreenPoint(),
+    selectionGestureActive,
+  );
+  if (!nextGeometry) return;
+  const nextDisplay = displays.find((display) => String(display.id) === nextGeometry.id);
+  if (!nextDisplay) return;
+
+  selectionDisplay = nextDisplay;
+  windowTargetsPromise = detectWindowTargets(nextDisplay);
+  fitOverlayToDisplay(currentWindow, nextDisplay);
+  currentWindow.moveTop();
+  if (selectionPurpose === 'screenshot') {
+    const nextTask = { display: nextDisplay };
+    screenshotTask = nextTask;
+    screenshotSourcePromise = undefined;
+    screenshotDisplayImage = undefined;
+    primeScreenshotCaptureAfterFirstPaint(nextTask);
+  }
+  broadcast();
+}
+
+function startSelectionDisplayWatcher(): void {
+  stopSelectionDisplayWatcher();
+  selectionDisplayWatcher = setInterval(
+    followSelectionDisplayAtCursor,
+    SELECTION_DISPLAY_FOLLOW_INTERVAL_MS,
+  );
 }
 
 function ensurePreparedSelectionWindow(): void {
@@ -908,6 +1002,7 @@ function createSelectionWindow(
   if (!nextSelectionWindow.webContents.isLoadingMainFrame()) {
     nextSelectionWindow.webContents.send(IPC_CHANNELS.snapshot, snapshot());
   }
+  startSelectionDisplayWatcher();
 }
 
 function reuseSelectionWindowForScreenshotEditor(): void {
@@ -919,6 +1014,7 @@ function reuseSelectionWindowForScreenshotEditor(): void {
   selectionDisplay = undefined;
   selectionPurpose = undefined;
   windowTargetsPromise = undefined;
+  stopSelectionDisplayWatcher();
 }
 
 function getRecordingSetupBounds(display: Display, selection?: Rectangle) {
@@ -1168,7 +1264,7 @@ async function captureDisplayImage(
   settleForHiddenOverlays = true,
 ): Promise<NativeImage> {
   if (FORCE_PERMISSION_DENIED) {
-    throw new Error('屏幕截图权限被拒绝。请在系统隐私设置中允许 Valley Screen Recorder 捕获屏幕。');
+    throw new Error(SCREENSHOT_PERMISSION_DENIED_MESSAGE);
   }
   mainWindow?.hide();
   recordingSetupWindow?.hide();
@@ -1189,6 +1285,47 @@ async function captureDisplayImage(
     throw new Error('找不到目标显示器的截图源');
   }
   return source.thumbnail;
+}
+
+function getScreenCapturePermissionStatus(): ScreenCapturePermissionStatus {
+  const reportedStatus = FORCE_PERMISSION_DENIED
+    ? 'denied'
+    : process.platform === 'darwin'
+      ? systemPreferences.getMediaAccessStatus('screen')
+      : 'granted';
+  return resolveScreenCapturePermissionStatus(
+    process.platform,
+    reportedStatus,
+    nativeScreenCaptureVerified,
+  );
+}
+
+async function performNativeScreenCapturePermissionRequest(): Promise<void> {
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: { width: 1, height: 1 },
+    fetchWindowIcons: false,
+  });
+  if (sources.length === 0) throw new Error('No screen capture sources available');
+  nativeScreenCaptureVerified = true;
+  void windowTargetCache.refresh().catch(() => undefined);
+}
+
+const requestNativeScreenCapturePermission = createSingleFlightScreenCapturePermissionRequest(
+  performNativeScreenCapturePermissionRequest,
+);
+
+function runWithScreenCapturePermission<T>(
+  deniedMessage: string,
+  run: () => T | Promise<T>,
+): Promise<T> {
+  return runAfterScreenCapturePermission({
+    platform: process.platform,
+    getStatus: getScreenCapturePermissionStatus,
+    requestPermission: requestNativeScreenCapturePermission,
+    deniedMessage,
+    run,
+  });
 }
 
 function primeScreenshotCapture(display: Display): void {
@@ -1571,72 +1708,82 @@ async function finishScreenshot(): Promise<void> {
   }
 }
 
-function beginRecording(mode: 'screen' | 'region'): void {
+async function beginRecording(mode: 'screen' | 'region'): Promise<void> {
   if (isScreenshotBusy()) {
     throw new Error('请先完成或取消当前截图');
   }
-  recorderSession.begin(mode);
-  errorMessage = undefined;
-  outputPath = undefined;
-  startedAt = undefined;
-  captureGranted = false;
-  destroyCompletionWindow();
-  concealMainWindow();
-  if (mode === 'screen') {
-    const display = screen.getPrimaryDisplay();
-    pendingRecording = { mode: 'screen', display };
-    activePlan = createPlan(
-      'screen',
-      display,
-      undefined,
-      'webm',
-      getDefaultRecordingOptions(process.platform),
-    );
-    createIndicatorWindow(display);
-    createRecordingSetupWindow(display);
-  } else {
-    activePlan = undefined;
-    createSelectionWindow(pickDisplayAtCursor(), 'recording');
-  }
-  broadcast();
+  await runWithScreenCapturePermission(RECORDING_PERMISSION_DENIED_MESSAGE, () => {
+    if (isScreenshotBusy()) throw new Error('请先完成或取消当前截图');
+    recorderSession.begin(mode);
+    errorMessage = undefined;
+    outputPath = undefined;
+    startedAt = undefined;
+    captureGranted = false;
+    destroyCompletionWindow();
+    concealMainWindow();
+    if (mode === 'screen') {
+      const display = screen.getPrimaryDisplay();
+      pendingRecording = { mode: 'screen', display };
+      activePlan = createPlan(
+        'screen',
+        display,
+        undefined,
+        'webm',
+        getDefaultRecordingOptions(process.platform),
+      );
+      createIndicatorWindow(display);
+      createRecordingSetupWindow(display);
+    } else {
+      activePlan = undefined;
+      createSelectionWindow(pickDisplayAtCursor(), 'recording');
+    }
+    broadcast();
+  });
 }
 
 async function beginScreenshot(mode: ScreenshotMode): Promise<void> {
   if (isRecordingBusy()) {
     throw new Error('请先完成或取消当前录制');
   }
-  screenshotSession.begin(mode);
-  screenshotOutputPath = undefined;
-  screenshotCopiedToClipboard = false;
-  errorMessage = undefined;
-  destroyCompletionWindow();
-  concealMainWindow();
-  const display = mode === 'screen' ? screen.getPrimaryDisplay() : pickDisplayAtCursor();
-  screenshotTask = { display };
-  if (mode === 'region') {
-    createSelectionWindow(display, 'screenshot');
+  await runWithScreenCapturePermission(SCREENSHOT_PERMISSION_DENIED_MESSAGE, async () => {
+    if (isRecordingBusy()) throw new Error('请先完成或取消当前录制');
+    screenshotSession.begin(mode);
+    screenshotOutputPath = undefined;
+    screenshotCopiedToClipboard = false;
+    errorMessage = undefined;
+    destroyCompletionWindow();
+    concealMainWindow();
+    const display = mode === 'screen' ? screen.getPrimaryDisplay() : pickDisplayAtCursor();
+    screenshotTask = { display };
+    if (mode === 'region') {
+      createSelectionWindow(display, 'screenshot');
+      broadcast();
+      return;
+    }
+    primeScreenshotCapture(display);
     broadcast();
-    return;
-  }
-  primeScreenshotCapture(display);
-  broadcast();
-  await finishScreenshot();
+    await finishScreenshot();
+  });
 }
 
-function beginColorPicker(): void {
+async function beginColorPicker(): Promise<void> {
   if (isRecordingBusy()) throw new Error('请先完成或取消当前录制');
   if (isScreenshotBusy()) throw new Error('请先完成或取消当前截图');
-  screenshotSession.begin('region');
-  screenshotOutputPath = undefined;
-  screenshotCopiedToClipboard = false;
-  errorMessage = undefined;
-  destroyCompletionWindow();
-  concealMainWindow();
-  const display = pickDisplayAtCursor();
-  screenshotTask = { display };
-  primeScreenshotCapture(display);
-  createSelectionWindow(display, 'color-picker');
-  broadcast();
+  await runWithScreenCapturePermission(SCREENSHOT_PERMISSION_DENIED_MESSAGE, () => {
+    if (isRecordingBusy()) throw new Error('请先完成或取消当前录制');
+    if (isScreenshotBusy()) throw new Error('请先完成或取消当前截图');
+    screenshotSession.begin('region');
+    screenshotOutputPath = undefined;
+    screenshotCopiedToClipboard = false;
+    errorMessage = undefined;
+    destroyCompletionWindow();
+    concealMainWindow();
+    const display = pickDisplayAtCursor();
+    screenshotTask = { display };
+    primeScreenshotCapture(display);
+    createSelectionWindow(display, 'color-picker');
+    broadcast();
+  });
 }
 
 function switchSelectionPurpose(purpose: 'recording' | 'screenshot'): void {
@@ -1799,11 +1946,7 @@ function registerShortcutSettings(settings: ShortcutSettings): boolean {
         void requestStop();
         return;
       }
-      try {
-        beginRecording('region');
-      } catch (error) {
-        handleShortcutError(error);
-      }
+      void beginRecording('region').catch(handleShortcutError);
     });
     if (!recordingRegistered) {
       globalShortcut.unregister(settings.screenshot);
@@ -1817,11 +1960,7 @@ function registerShortcutSettings(settings: ShortcutSettings): boolean {
         })
       )
         return;
-      try {
-        beginColorPicker();
-      } catch (error) {
-        handleShortcutError(error);
-      }
+      void beginColorPicker().catch(handleShortcutError);
     });
     if (!colorPickerRegistered) {
       globalShortcut.unregisterAll();
@@ -1957,7 +2096,7 @@ async function updateNotificationsEnabled(enabled: boolean): Promise<void> {
 async function loadShortcutSettings(): Promise<void> {
   try {
     const raw = await readFile(shortcutSettingsPath, 'utf8');
-    shortcutSettings = validateShortcutSettings(JSON.parse(raw));
+    shortcutSettings = validateShortcutSettings(JSON.parse(raw), process.platform);
   } catch (error) {
     const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
     if (code !== 'ENOENT') {
@@ -1968,7 +2107,7 @@ async function loadShortcutSettings(): Promise<void> {
 }
 
 async function updateShortcutSettings(value: unknown): Promise<void> {
-  const next = validateShortcutSettings(value);
+  const next = validateShortcutSettings(value, process.platform);
   const previous = shortcutSettings;
   shortcutCaptureActive = false;
   globalShortcut.unregisterAll();
@@ -2007,24 +2146,12 @@ function rebuildTrayMenu(): void {
     {
       label: `区域录屏（${shortcutSettings.recording}）`,
       enabled: !isRecordingBusy() && !isScreenshotBusy(),
-      click: () => {
-        try {
-          beginRecording('region');
-        } catch (error) {
-          handleShortcutError(error);
-        }
-      },
+      click: () => void beginRecording('region').catch(handleShortcutError),
     },
     {
       label: `吸色（${shortcutSettings.colorPicker}）`,
       enabled: !isRecordingBusy() && !isScreenshotBusy(),
-      click: () => {
-        try {
-          beginColorPicker();
-        } catch (error) {
-          handleShortcutError(error);
-        }
-      },
+      click: () => void beginColorPicker().catch(handleShortcutError),
     },
     { type: 'separator' },
     {
@@ -2053,7 +2180,11 @@ function rebuildTrayMenu(): void {
 }
 
 function createTray(): void {
-  const icon = getAppIcon().resize({ width: 16, height: 16, quality: 'best' });
+  const icon =
+    process.platform === 'darwin'
+      ? nativeImage.createFromPath(trayTemplateIconPath)
+      : getAppIcon().resize({ width: 16, height: 16, quality: 'best' });
+  if (icon.isEmpty()) throw new Error('菜单栏图标资源无法读取');
   if (process.platform === 'darwin') icon.setTemplateImage(true);
   tray = new Tray(icon);
   tray.setToolTip('Valley Screen Recorder');
@@ -2123,12 +2254,12 @@ function registerIpc(): void {
     scheduleWindowDestroy(pinnedWindow);
   });
 
-  ipcMain.handle(IPC_CHANNELS.start, (event, mode: unknown) => {
+  ipcMain.handle(IPC_CHANNELS.start, async (event, mode: unknown) => {
     assertMainSender(event);
     if (mode !== 'screen' && mode !== 'region') {
       throw new Error('录制模式无效');
     }
-    beginRecording(mode);
+    await beginRecording(mode);
   });
 
   ipcMain.handle(IPC_CHANNELS.startScreenshot, async (event, mode: unknown) => {
@@ -2139,9 +2270,9 @@ function registerIpc(): void {
     await beginScreenshot(mode);
   });
 
-  ipcMain.handle(IPC_CHANNELS.startColorPicker, (event) => {
+  ipcMain.handle(IPC_CHANNELS.startColorPicker, async (event) => {
     assertMainSender(event);
-    beginColorPicker();
+    await beginColorPicker();
   });
 
   ipcMain.handle(IPC_CHANNELS.switchSelectionPurpose, (event, purpose: unknown) => {
@@ -2355,6 +2486,30 @@ function registerIpc(): void {
     else deactivateShortcutCapture();
   });
 
+  ipcMain.handle(IPC_CHANNELS.requestScreenCapturePermission, async (event) => {
+    assertMainSender(event);
+    const status = await requestScreenCapturePermissionStatus({
+      platform: process.platform,
+      getStatus: getScreenCapturePermissionStatus,
+      requestPermission: requestNativeScreenCapturePermission,
+    });
+    if (status === 'granted') errorMessage = undefined;
+    broadcast();
+    return status;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.openScreenCaptureSettings, async (event) => {
+    assertMainSender(event);
+    if (process.platform !== 'darwin') throw new Error('当前平台无需屏幕录制权限设置');
+    await shell.openExternal(MAC_SCREEN_CAPTURE_SETTINGS_URL);
+  });
+
+  ipcMain.on(IPC_CHANNELS.restartForScreenCapturePermission, (event) => {
+    if (!mainWindow || event.sender.id !== mainWindow.webContents.id) return;
+    app.relaunch();
+    app.quit();
+  });
+
   ipcMain.handle(IPC_CHANNELS.chooseRecordingDirectory, async (event) => {
     assertMainSender(event);
     return chooseRecordingDirectory();
@@ -2382,6 +2537,12 @@ function registerIpc(): void {
     const targetsPromise = windowTargetsPromise ?? detectWindowTargets(selectionDisplay);
     windowTargetsPromise = undefined;
     return (await targetsPromise) ?? [];
+  });
+
+  ipcMain.on(IPC_CHANNELS.setSelectionGestureActive, (event, value: unknown) => {
+    if (!selectionWindow || event.sender.id !== selectionWindow.webContents.id) return;
+    if (typeof value !== 'boolean') return;
+    selectionGestureActive = value;
   });
 
   ipcMain.handle(IPC_CHANNELS.getColorPickerFrame, async (event) => {
@@ -2430,6 +2591,7 @@ function registerIpc(): void {
       throw new Error('目标显示器不存在');
     }
     const { global: globalSelection } = parseDisplaySelection(selectionDisplay, value);
+    stopSelectionDisplayWatcher();
     if (selectionPurpose === 'screenshot') {
       screenshotSession.confirmSelection();
       screenshotTask = { display: selectionDisplay, selection: globalSelection };
@@ -2448,6 +2610,7 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.cancelSelection, (event) => {
     assertSelectionSender(event);
+    stopSelectionDisplayWatcher();
     if (selectionPurpose === 'screenshot') {
       screenshotSession.cancelSelection();
       screenshotTask = undefined;
@@ -2621,7 +2784,7 @@ function configureCaptureHandler(): void {
     const isExpectedFrame = request.frame?.top === recordingWindow?.webContents.mainFrame;
     if (FORCE_PERMISSION_DENIED) {
       captureGranted = false;
-      fail('屏幕录制权限被拒绝。请在系统隐私设置中允许 Valley Screen Recorder 录制屏幕。');
+      fail(RECORDING_PERMISSION_DENIED_MESSAGE);
       try {
         callback({});
       } catch {
@@ -2687,6 +2850,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  stopSelectionDisplayWatcher();
   clearLongScreenshotCapture();
   destroyLongScreenshotIndicatorWindow();
   destroyLongScreenshotControlWindow();

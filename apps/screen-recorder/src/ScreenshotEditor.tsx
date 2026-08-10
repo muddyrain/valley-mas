@@ -38,6 +38,7 @@ import {
 } from './core/annotation';
 import { colorFormatForShift, formatPickedColor, type RgbColor, rgbToHex } from './core/color';
 import type { Point, Rectangle } from './core/geometry';
+import { getScreenshotToolbarPosition } from './core/screenshot-toolbar';
 import { adjustSelection } from './core/selection-adjustment';
 import type { ScreenshotEditPlan } from './shared/contracts';
 import { useShiftColorFormat } from './useShiftColorFormat';
@@ -592,18 +593,10 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
   }
 
   const visibleSelection = selectionPreview ?? plan.selection;
-  const toolbarTop =
-    visibleSelection.y + visibleSelection.height + 12 + 54 <= window.innerHeight
-      ? visibleSelection.y + visibleSelection.height + 12
-      : Math.max(12, visibleSelection.y - 58);
-  const toolbarWidth = 608;
-  const toolbarLeft = Math.max(
-    12,
-    Math.min(
-      window.innerWidth - toolbarWidth - 12,
-      visibleSelection.x + (visibleSelection.width - toolbarWidth) / 2,
-    ),
-  );
+  const toolbarPosition = getScreenshotToolbarPosition(visibleSelection, {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
   const selectedText = history[selectedTextIndex];
   const selectedTextSize =
     selectedText?.type === 'text' ? measureTextAnnotation(selectedText) : undefined;
@@ -692,7 +685,7 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
 
       <div
         className="screenshot-toolbar"
-        style={{ left: toolbarLeft, top: toolbarTop }}
+        style={toolbarPosition}
         onPointerDown={(event) => event.stopPropagation()}
       >
         <ToolbarButton

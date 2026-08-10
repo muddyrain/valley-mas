@@ -1,4 +1,5 @@
 import {
+  GripHorizontal,
   Mic,
   MicOff,
   MousePointer,
@@ -119,6 +120,9 @@ export function RecordingSetup() {
 
   return (
     <main className="recording-setup-card" onContextMenu={cancelFromRightClick}>
+      <div className="recording-setup-drag-handle" aria-hidden="true">
+        <GripHorizontal size={20} strokeWidth={1.8} />
+      </div>
       <button
         type="button"
         className="recording-setup-start"

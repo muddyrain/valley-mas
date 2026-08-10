@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SHORTCUTS,
+  preserveShortcutDraft,
   shortcutFromKeyboardInput,
   validateShortcutSettings,
 } from './shortcuts';
@@ -68,9 +69,62 @@ describe('shortcut settings', () => {
     expect(
       shortcutFromKeyboardInput({ key: 'F9', ctrlKey: false, shiftKey: false, altKey: false }),
     ).toBe('F9');
+    expect(
+      shortcutFromKeyboardInput({
+        key: '¡',
+        code: 'Digit1',
+        ctrlKey: false,
+        shiftKey: true,
+        altKey: true,
+      }),
+    ).toBe('Alt+Shift+1');
+  });
+
+  it('uses the macOS Command accelerator name for the Command key', () => {
+    expect(
+      shortcutFromKeyboardInput(
+        {
+          key: 'a',
+          code: 'KeyA',
+          ctrlKey: true,
+          shiftKey: false,
+          altKey: false,
+          metaKey: true,
+        },
+        'darwin',
+      ),
+    ).toBe('Control+Command+A');
+  });
+
+  it('migrates a saved macOS Super shortcut to the Command accelerator name', () => {
+    expect(
+      validateShortcutSettings(
+        {
+          screenshot: 'Control+Super+A',
+          recording: 'Control+Alt+R',
+          colorPicker: 'Control+Alt+C',
+        },
+        'darwin',
+      ),
+    ).toEqual({
+      screenshot: 'Control+Command+A',
+      recording: 'Control+Alt+R',
+      colorPicker: 'Control+Alt+C',
+    });
   });
 
   it('provides separate defaults for all three capture actions', () => {
     expect(new Set(Object.values(DEFAULT_SHORTCUTS))).toHaveLength(3);
+  });
+
+  it('keeps an unsaved shortcut draft when the main process broadcasts persisted settings', () => {
+    const draft = {
+      screenshot: 'Control+Alt+Shift+8',
+      recording: 'Control+Alt+Shift+2',
+      colorPicker: 'Control+Alt+Shift+3',
+    };
+
+    expect(preserveShortcutDraft(draft, DEFAULT_SHORTCUTS)).toBe(draft);
+    expect(preserveShortcutDraft(undefined, DEFAULT_SHORTCUTS)).toEqual(DEFAULT_SHORTCUTS);
   });
 });

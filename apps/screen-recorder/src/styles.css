@@ -422,11 +422,32 @@ button:active:not(:disabled) {
 }
 
 .settings-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 9px 11px;
   border-radius: 9px;
   color: #ddd9ff;
   background: rgb(111 76 255 / 14%);
   font-size: 11px;
+}
+
+.settings-message > span {
+  min-width: 0;
+  text-wrap: pretty;
+}
+
+.settings-message-actions {
+  display: flex;
+  flex: none;
+  gap: 7px;
+}
+
+.settings-message-actions button {
+  height: 30px;
+  border-radius: 8px;
+  white-space: nowrap;
 }
 
 .settings-footer {
@@ -889,9 +910,9 @@ button:active:not(:disabled) {
 .selection-box {
   position: absolute;
   z-index: 1;
-  border: 2px solid #9a84ff;
+  border: 1px solid #9a84ff;
   background: transparent;
-  box-shadow: 0 0 0 1px rgb(255 255 255 / 52%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 24%);
   pointer-events: none;
 }
 
@@ -1711,7 +1732,7 @@ button:active:not(:disabled) {
   width: calc(100vw - 16px);
   height: calc(100vh - 16px);
   margin: 8px;
-  padding: 20px;
+  padding: 30px 20px 20px;
   border-radius: 18px;
   color: #252a33;
   background: rgb(250 251 253 / 97%);
@@ -1719,6 +1740,23 @@ button:active:not(:disabled) {
     0 22px 60px rgb(0 0 0 / 25%),
     0 0 0 1px rgb(0 0 0 / 8%);
   -webkit-font-smoothing: antialiased;
+}
+
+.recording-setup-drag-handle {
+  position: absolute;
+  top: 7px;
+  right: 88px;
+  left: 88px;
+  display: grid;
+  place-items: center;
+  height: 20px;
+  color: #a5abb5;
+  cursor: grab;
+  -webkit-app-region: drag;
+}
+
+.recording-setup-drag-handle:active {
+  cursor: grabbing;
 }
 
 .recording-setup-start {

@@ -17,6 +17,7 @@ const baseSnapshot: RecorderSnapshot = {
   },
   notificationsEnabled: false,
   shortcutCaptureActive: false,
+  screenCapturePermission: 'granted',
   screenshot: { state: 'idle', saveDirectory: 'C:\\Pictures', copiedToClipboard: false },
 };
 

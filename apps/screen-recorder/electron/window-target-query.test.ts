@@ -1,11 +1,25 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  createExecutableWindowQueryHost,
   createPowerShellWindowQueryHost,
   RefreshingQueryCache,
   ReusableQueryHost,
 } from './window-target-query';
 
 describe('reusable window target query host', () => {
+  it('keeps a native line-query executable responsive across requests', async () => {
+    const host = createExecutableWindowQueryHost(process.execPath, [
+      '-e',
+      "process.stdin.setEncoding('utf8');let value='';process.stdin.on('data',chunk=>{value+=chunk;for(;;){const newline=value.indexOf('\\n');if(newline<0)break;const line=value.slice(0,newline);value=value.slice(newline+1);if(line==='query')process.stdout.write('[]\\n')}})",
+    ]);
+    try {
+      await expect(host.query()).resolves.toBe('[]');
+      await expect(host.query()).resolves.toBe('[]');
+    } finally {
+      host.dispose();
+    }
+  });
+
   it.runIf(process.platform === 'win32')(
     'keeps a PowerShell line-query process responsive across requests',
     async () => {

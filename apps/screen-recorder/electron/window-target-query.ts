@@ -94,7 +94,7 @@ type PendingQuery = {
   timer: NodeJS.Timeout;
 };
 
-class PowerShellLineQueryHost implements QueryHost {
+class LineQueryHost implements QueryHost {
   private buffer = '';
   private readonly pending: PendingQuery[] = [];
   private failure: Error | undefined;
@@ -160,9 +160,21 @@ class PowerShellLineQueryHost implements QueryHost {
   }
 }
 
+export function createExecutableWindowQueryHost(
+  executablePath: string,
+  args: readonly string[] = [],
+  timeoutMs = 5_000,
+): QueryHost {
+  const child = spawn(executablePath, [...args], {
+    windowsHide: true,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  return new LineQueryHost(child, timeoutMs);
+}
+
 export function createPowerShellWindowQueryHost(script: string, timeoutMs = 5_000): QueryHost {
   const encodedCommand = Buffer.from(script, 'utf16le').toString('base64');
-  const child = spawn(
+  return createExecutableWindowQueryHost(
     'powershell.exe',
     [
       '-NoProfile',
@@ -172,7 +184,6 @@ export function createPowerShellWindowQueryHost(script: string, timeoutMs = 5_00
       '-EncodedCommand',
       encodedCommand,
     ],
-    { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] },
+    timeoutMs,
   );
-  return new PowerShellLineQueryHost(child, timeoutMs);
 }

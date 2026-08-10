@@ -10,7 +10,7 @@
     "dev": "node scripts/dev.mjs",
     "build": "pnpm build:renderer && pnpm build:electron",
     "build:renderer": "vite build",
-    "build:electron": "tsup --config tsup.config.ts",
+    "build:electron": "tsup --config tsup.config.ts && node scripts/build-native-helpers.mjs",
     "package:dir": "pnpm build && node scripts/package-dir.mjs",
     "package:win": "pnpm build && node scripts/package-platform.mjs win",
     "package:mac": "pnpm build && node scripts/package-platform.mjs mac",
@@ -48,6 +48,7 @@
       "assets/**/*",
       "dist/**/*",
       "dist-electron/**/*",
+      "!dist-electron/native/**/*",
       "package.json",
       "!node_modules/**/*"
     ],
@@ -56,7 +57,7 @@
       "en-US"
     ],
     "win": {
-      "icon": "assets/logo.svg",
+      "icon": "assets/logo.png",
       "target": [
         {
           "target": "nsis",
@@ -75,10 +76,15 @@
       "createStartMenuShortcut": true
     },
     "mac": {
-      "icon": "assets/logo.svg",
+      "icon": "assets/logo.png",
       "category": "public.app-category.utilities",
-      "identity": null,
       "hardenedRuntime": false,
+      "extraResources": [
+        {
+          "from": "dist-electron/native/macos-window-query",
+          "to": "native/macos-window-query"
+        }
+      ],
       "target": [
         {
           "target": "dmg",

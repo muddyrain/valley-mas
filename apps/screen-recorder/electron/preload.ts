@@ -42,11 +42,18 @@ const api: RecorderApi = {
     ipcRenderer.invoke(IPC_CHANNELS.updateShortcuts, settings),
   setShortcutCaptureActive: (active: boolean) =>
     ipcRenderer.invoke(IPC_CHANNELS.setShortcutCaptureActive, active),
+  requestScreenCapturePermission: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.requestScreenCapturePermission),
+  openScreenCaptureSettings: () => ipcRenderer.invoke(IPC_CHANNELS.openScreenCaptureSettings),
+  restartForScreenCapturePermission: () =>
+    ipcRenderer.send(IPC_CHANNELS.restartForScreenCapturePermission),
   chooseRecordingDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.chooseRecordingDirectory),
   setAutoLaunch: (enabled: boolean) => ipcRenderer.invoke(IPC_CHANNELS.setAutoLaunch, enabled),
   setNotificationsEnabled: (enabled: boolean) =>
     ipcRenderer.invoke(IPC_CHANNELS.setNotificationsEnabled, enabled),
   getWindowTargets: () => ipcRenderer.invoke(IPC_CHANNELS.getWindowTargets),
+  setSelectionGestureActive: (active: boolean) =>
+    ipcRenderer.send(IPC_CHANNELS.setSelectionGestureActive, active),
   selectionReady: () => ipcRenderer.send(IPC_CHANNELS.selectionReady),
   getColorPickerFrame: () => ipcRenderer.invoke(IPC_CHANNELS.getColorPickerFrame),
   completeColorPicker: (value: string) =>

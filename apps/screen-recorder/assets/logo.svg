@@ -1,17 +1,87 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Valley Capture">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Valley Capture red panda</title>
+  <desc id="desc">A warm, friendly red panda mascot with teal eyes and a small sparkle.</desc>
   <defs>
-    <linearGradient id="surface" x1="88" y1="52" x2="430" y2="468" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#8C6CFF"/>
-      <stop offset="0.54" stop-color="#5A43E8"/>
-      <stop offset="1" stop-color="#2D67E8"/>
+    <linearGradient id="background" x1="140" y1="40" x2="870" y2="970" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffdf7"/>
+      <stop offset=".56" stop-color="#fffaf0"/>
+      <stop offset="1" stop-color="#f6ead7"/>
     </linearGradient>
-    <linearGradient id="valley" x1="160" y1="174" x2="342" y2="346" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#DDE8FF"/>
+    <linearGradient id="fur" x1="512" y1="252" x2="512" y2="816" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f06a22"/>
+      <stop offset=".58" stop-color="#e55518"/>
+      <stop offset="1" stop-color="#cf4311"/>
     </linearGradient>
+    <linearGradient id="darkFur" x1="512" y1="468" x2="512" y2="835" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4b1c09"/>
+      <stop offset="1" stop-color="#231006"/>
+    </linearGradient>
+    <radialGradient id="cream" cx="42%" cy="30%" r="85%">
+      <stop stop-color="#fffef9"/>
+      <stop offset="1" stop-color="#f6ead2"/>
+    </radialGradient>
+    <linearGradient id="iris" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#1bb9bd"/>
+      <stop offset="1" stop-color="#08777d"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#2d1308" flood-opacity=".12"/>
+    </filter>
+    <path id="ear" d="M173 430C150 372 145 270 180 224c39-51 126-30 220 67l-69 126c-52 14-105 19-158 13Z"/>
+    <path id="innerEar" d="M216 388c-11-53-6-111 19-126 31-18 77 19 111 66l-54 74c-25 1-51-4-76-14Z"/>
+    <path id="cheek" d="M183 646c36-105 105-169 190-178 59-6 104 29 130 87l-47 190c-63 34-157 40-231 3l28-36c-30-13-55-35-70-66Z"/>
+    <path id="eyePatch" d="M275 616c9-66 49-117 99-118 54-1 96 51 101 121 5 69-26 139-77 160-45 19-96-14-122-70l22-7c-22-19-31-50-23-86Z"/>
+    <path id="brow" d="M302 457c31-33 82-39 119-15 21 14 34 39 35 68-19-12-38-17-58-14 21 13 34 33 38 57-37-25-83-27-126-5-2-23 10-46 31-66-17-3-30-11-39-25Z"/>
+    <g id="eye">
+      <ellipse cx="391" cy="608" rx="43" ry="55" fill="#fff"/>
+      <ellipse cx="402" cy="613" rx="31" ry="44" fill="url(#iris)"/>
+      <ellipse cx="410" cy="616" rx="23" ry="36" fill="#1c100a"/>
+      <ellipse cx="388" cy="585" rx="12" ry="17" fill="#fff"/>
+      <ellipse cx="418" cy="638" rx="8" ry="11" fill="#fff" opacity=".75"/>
+    </g>
   </defs>
-  <rect x="28" y="28" width="456" height="456" rx="120" fill="url(#surface)"/>
-  <path d="M130 155v-20c0-18 15-33 33-33h42M307 102h42c18 0 33 15 33 33v20M382 357v20c0 18-15 33-33 33h-42M205 410h-42c-18 0-33-15-33-33v-20" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
-  <path d="M156 190l78 150c9 18 35 18 44 0l78-150" fill="none" stroke="url(#valley)" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="383" cy="129" r="35" fill="#FF4966" stroke="#FFFFFF" stroke-width="12"/>
+
+  <g data-logo-motif="red-panda">
+    <rect x="4" y="4" width="1016" height="1016" rx="210" fill="url(#background)"/>
+    <g filter="url(#softShadow)" stroke="#381608" stroke-width="23" stroke-linejoin="round">
+      <use href="#ear" fill="url(#cream)"/>
+      <use href="#ear" transform="translate(1024 0) scale(-1 1)" fill="url(#cream)"/>
+      <use href="#innerEar" fill="url(#darkFur)" stroke-width="13"/>
+      <use href="#innerEar" transform="translate(1024 0) scale(-1 1)" fill="url(#darkFur)" stroke-width="13"/>
+    </g>
+
+    <path
+      d="M279 352l-27-10 39-27c43-32 100-54 166-64 7-20 11-42 10-67 26 8 48 29 54 54 5-15 4-30 0-46 29 17 43 42 36 70 71 12 131 39 176 80l39 28-29 13c48 51 78 112 87 179l31 27-25 15c12 25 26 49 42 70-17 22-36 37-58 45l18 30c-49 67-134 102-231 113-31 4-63 6-95 6s-64-2-95-6c-97-11-182-46-231-113l18-30c-22-8-41-23-58-45 16-21 30-45 42-70l-25-15 31-27c9-67 39-128 87-179l-29-13 37-18Z"
+      fill="url(#fur)"
+      stroke="#381608"
+      stroke-width="25"
+      stroke-linejoin="round"
+    />
+
+    <g fill="url(#cream)">
+      <use href="#cheek"/>
+      <use href="#cheek" transform="translate(1024 0) scale(-1 1)"/>
+      <use href="#brow"/>
+      <use href="#brow" transform="translate(1024 0) scale(-1 1)"/>
+    </g>
+
+    <g fill="url(#darkFur)">
+      <use href="#eyePatch"/>
+      <use href="#eyePatch" transform="translate(1024 0) scale(-1 1)"/>
+      <path d="M242 750c59 30 116 49 171 58 33 6 66 9 99 9s66-3 99-9c55-9 112-28 171-58-43 79-144 118-270 118S285 829 242 750Z"/>
+    </g>
+
+    <use href="#eye"/>
+    <use href="#eye" transform="translate(1024 0) scale(-1 1)"/>
+
+    <ellipse cx="512" cy="710" rx="135" ry="112" fill="url(#cream)"/>
+    <path d="M468 690c10-32 78-32 88 0-6 31-25 46-44 46s-38-15-44-46Z" fill="url(#darkFur)"/>
+    <g fill="none" stroke="#381608" stroke-width="16" stroke-linecap="round">
+      <path d="M512 733v26"/>
+      <path d="M512 759c-22 28-54 28-72 3"/>
+      <path d="M512 759c22 28 54 28 72 3"/>
+    </g>
+
+    <path d="M906 209c0 30-14 46-45 50 31 5 45 21 45 51 5-30 20-46 48-51-28-4-43-20-48-50Z" fill="#0b878c"/>
+  </g>
 </svg>

@@ -1,5 +1,10 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { findWindowTargetAt, mapWindowTargetsToDisplay } from './window-target';
+import {
+  findWindowTargetAt,
+  findWindowTargetAtOrDisplay,
+  mapWindowTargetsToDisplay,
+} from './window-target';
 
 describe('desktop window selection targets', () => {
   it('maps physical Windows rectangles into a negative-coordinate display and clips overflow', () => {
@@ -30,5 +35,53 @@ describe('desktop window selection targets', () => {
       99,
     );
     expect(findWindowTargetAt(targets, { x: 200, y: 200 })?.id).toBe('top');
+  });
+
+  it('keeps compact macOS menu bar items as selectable targets', () => {
+    const targets = mapWindowTargetsToDisplay(
+      [
+        {
+          id: 'wechat-status-item',
+          title: '微信',
+          processId: 22,
+          kind: 'system-ui',
+          x: 2400,
+          y: 0,
+          width: 12,
+          height: 25,
+        },
+      ],
+      { x: 0, y: 0, width: 2560, height: 1440 },
+      (rect) => rect,
+      99,
+    );
+
+    expect(targets).toEqual([
+      {
+        id: 'wechat-status-item',
+        title: '微信',
+        rect: { x: 2400, y: 0, width: 12, height: 25 },
+      },
+    ]);
+  });
+
+  it('falls back to the full current display when the pointer is over desktop space', () => {
+    const displayBounds = { x: 0, y: 0, width: 2560, height: 1440 };
+
+    expect(findWindowTargetAtOrDisplay([], { x: 1200, y: 1200 }, displayBounds)).toEqual({
+      id: '__display__',
+      title: '全屏',
+      rect: displayBounds,
+    });
+  });
+
+  it('enumerates macOS main-menu and status-item window levels', async () => {
+    const helperSource = await readFile(
+      new URL('../../native/macos-window-query.m', import.meta.url),
+      'utf8',
+    );
+
+    expect(helperSource).toContain('kCGMainMenuWindowLevelKey');
+    expect(helperSource).toContain('kCGStatusWindowLevelKey');
   });
 });

@@ -1,18 +1,27 @@
 import { Bell, FolderOpen, Keyboard, Power, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import logoUrl from '../assets/logo.svg';
+import logoUrl from '../assets/logo.png';
 import { Button } from './components/ui/button';
 import { Switch } from './components/ui/switch';
-import { type ShortcutSettings, shortcutFromKeyboardInput } from './core/shortcuts';
+import {
+  getScreenCapturePermissionRecoveryAction,
+  shouldOfferScreenCapturePermissionRecovery,
+} from './core/screen-capture-permission';
+import {
+  preserveShortcutDraft,
+  type ShortcutSettings,
+  shortcutFromKeyboardInput,
+} from './core/shortcuts';
 import type { RecorderSnapshot } from './shared/contracts';
 
 type ShortcutFieldProps = {
   label: string;
+  platform: RecorderSnapshot['platform'];
   value: string;
   onChange(value: string): void;
 };
 
-function ShortcutField({ label, value, onChange }: ShortcutFieldProps) {
+function ShortcutField({ label, platform, value, onChange }: ShortcutFieldProps) {
   const [listening, setListening] = useState(false);
   const cancelOnClickRef = useRef(false);
   useEffect(() => {
@@ -34,7 +43,9 @@ function ShortcutField({ label, value, onChange }: ShortcutFieldProps) {
         onFocus={() => setCaptureActive(true)}
         onBlur={() => setCaptureActive(false)}
         onPointerDown={(event) => {
-          cancelOnClickRef.current = listening && document.activeElement === event.currentTarget;
+          const cancelOnClick = listening && document.activeElement === event.currentTarget;
+          cancelOnClickRef.current = cancelOnClick;
+          if (!cancelOnClick) event.currentTarget.focus();
         }}
         onClick={(event) => {
           if (cancelOnClickRef.current) event.currentTarget.blur();
@@ -46,7 +57,7 @@ function ShortcutField({ label, value, onChange }: ShortcutFieldProps) {
             event.currentTarget.blur();
             return;
           }
-          const shortcut = shortcutFromKeyboardInput(event);
+          const shortcut = shortcutFromKeyboardInput(event, platform);
           if (shortcut) {
             onChange(shortcut);
             event.currentTarget.blur();
@@ -63,12 +74,14 @@ export function App() {
   const [snapshot, setSnapshot] = useState<RecorderSnapshot>();
   const [draft, setDraft] = useState<ShortcutSettings>();
   const [message, setMessage] = useState<string>();
-  const [busyAction, setBusyAction] = useState<'directory' | 'startup' | 'notifications'>();
+  const [busyAction, setBusyAction] = useState<
+    'directory' | 'startup' | 'notifications' | 'permission'
+  >();
 
   useEffect(() => {
     const applySnapshot = (next: RecorderSnapshot) => {
       setSnapshot(next);
-      setDraft(next.shortcuts);
+      setDraft((current) => preserveShortcutDraft(current, next.shortcuts));
     };
     void window.screenRecorder.getSnapshot().then(applySnapshot);
     return window.screenRecorder.onSnapshot(applySnapshot);
@@ -126,6 +139,49 @@ export function App() {
     }
   };
 
+  const openScreenCaptureSettings = async () => {
+    setMessage(undefined);
+    setBusyAction('permission');
+    try {
+      await window.screenRecorder.openScreenCaptureSettings();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : '无法打开屏幕录制权限设置');
+    } finally {
+      setBusyAction(undefined);
+    }
+  };
+
+  const requestScreenCapturePermission = async () => {
+    setMessage(undefined);
+    setBusyAction('permission');
+    try {
+      const status = await window.screenRecorder.requestScreenCapturePermission();
+      if (status === 'granted') setMessage('屏幕录制权限已开启');
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : '无法请求屏幕录制权限');
+    } finally {
+      setBusyAction(undefined);
+    }
+  };
+
+  const permissionRecoveryVisible = Boolean(
+    snapshot &&
+      shouldOfferScreenCapturePermissionRecovery(
+        snapshot.platform,
+        snapshot.screenCapturePermission,
+      ),
+  );
+  const permissionRecoveryAction = snapshot
+    ? getScreenCapturePermissionRecoveryAction(snapshot.platform, snapshot.screenCapturePermission)
+    : undefined;
+  const permissionSettingsAvailable =
+    snapshot?.screenCapturePermission === 'denied' ||
+    snapshot?.screenCapturePermission === 'restricted';
+  const visibleMessage =
+    message ??
+    snapshot?.warning ??
+    (snapshot?.error?.includes('权限') ? undefined : snapshot?.error);
+
   return (
     <main className="settings-shell">
       <header className="settings-titlebar">
@@ -162,16 +218,19 @@ export function App() {
             <div className="settings-fields">
               <ShortcutField
                 label="区域截图"
+                platform={snapshot?.platform ?? 'other'}
                 value={draft.screenshot}
                 onChange={(screenshot) => setDraft({ ...draft, screenshot })}
               />
               <ShortcutField
                 label="屏幕吸色"
+                platform={snapshot?.platform ?? 'other'}
                 value={draft.colorPicker}
                 onChange={(colorPicker) => setDraft({ ...draft, colorPicker })}
               />
               <ShortcutField
                 label="区域录屏"
+                platform={snapshot?.platform ?? 'other'}
                 value={draft.recording}
                 onChange={(recording) => setDraft({ ...draft, recording })}
               />
@@ -231,9 +290,46 @@ export function App() {
           </div>
         </section>
 
-        {(message || snapshot?.warning || snapshot?.error) && (
-          <div className="settings-message">{message ?? snapshot?.warning ?? snapshot?.error}</div>
+        {permissionRecoveryVisible && (
+          <div className="settings-message">
+            <span>
+              {permissionRecoveryAction === 'request'
+                ? '截图前需要屏幕录制权限'
+                : '屏幕录制权限尚未开启'}
+            </span>
+            <div className="settings-message-actions">
+              {permissionRecoveryAction === 'request' && (
+                <Button
+                  size="sm"
+                  disabled={busyAction === 'permission'}
+                  onClick={() => void requestScreenCapturePermission()}
+                >
+                  请求权限
+                </Button>
+              )}
+              {permissionSettingsAvailable && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busyAction === 'permission'}
+                    onClick={() => void openScreenCaptureSettings()}
+                  >
+                    打开系统设置
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => window.screenRecorder.restartForScreenCapturePermission()}
+                  >
+                    重启应用
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
         )}
+
+        {visibleMessage && <div className="settings-message">{visibleMessage}</div>}
       </div>
 
       <footer className="settings-footer">
