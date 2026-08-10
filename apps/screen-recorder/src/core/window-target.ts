@@ -5,6 +5,8 @@ export type NativeWindowTarget = Rectangle & {
   title: string;
   processId: number;
   kind?: 'window' | 'system-ui';
+  isToolWindow?: boolean;
+  isCloaked?: boolean;
 };
 
 export type WindowTarget = {
@@ -24,6 +26,8 @@ export function mapWindowTargetsToDisplay(
     const minimumSize = value.kind === 'system-ui' ? 8 : 16;
     if (
       value.processId === ownProcessId ||
+      value.isToolWindow ||
+      value.isCloaked ||
       !value.id ||
       !value.title.trim() ||
       ![value.x, value.y, value.width, value.height].every(Number.isFinite) ||

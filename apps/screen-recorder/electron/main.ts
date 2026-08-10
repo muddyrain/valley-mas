@@ -194,10 +194,12 @@ public static class ValleyWindows {
   [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc callback, IntPtr param);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hwnd);
+  [DllImport("user32.dll", EntryPoint="GetWindowLongW")] public static extern int GetWindowLong(IntPtr hwnd, int index);
   [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hwnd, System.Text.StringBuilder text, int count);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
   [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out RECT value, int size);
+  [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
   public static object[] Read() {
     try { SetProcessDpiAwarenessContext(new IntPtr(-4)); } catch {}
     var rows = new List<object>();
@@ -210,8 +212,11 @@ public static class ValleyWindows {
       if (DwmGetWindowAttribute(hwnd, 9, out rect, Marshal.SizeOf(typeof(RECT))) != 0) return true;
       var width = rect.Right - rect.Left; var height = rect.Bottom - rect.Top;
       if (width < 16 || height < 16) return true;
+      var exStyle = GetWindowLong(hwnd, -20);
+      var cloaked = 0;
+      var isCloaked = DwmGetWindowAttribute(hwnd, 14, out cloaked, Marshal.SizeOf(typeof(int))) == 0 && cloaked != 0;
       uint pid; GetWindowThreadProcessId(hwnd, out pid);
-      rows.Add(new { id=hwnd.ToInt64().ToString(), title=title.ToString(), processId=pid, x=rect.Left, y=rect.Top, width, height });
+      rows.Add(new { id=hwnd.ToInt64().ToString(), title=title.ToString(), processId=pid, x=rect.Left, y=rect.Top, width, height, isToolWindow=(exStyle & 0x00000080) != 0, isCloaked });
       return true;
     }, IntPtr.Zero);
     return rows.ToArray();
@@ -690,7 +695,11 @@ function secureWebPreferences() {
 }
 
 function fitOverlayToDisplay(window: BrowserWindow, display: Display): void {
-  window.setBounds(display.bounds);
+  if (process.platform === 'darwin') {
+    window.setBounds(display.bounds);
+    return;
+  }
+  window.setContentBounds(display.bounds);
 }
 
 function createMainWindow(): void {

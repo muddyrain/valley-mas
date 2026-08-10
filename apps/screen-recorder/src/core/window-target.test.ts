@@ -37,6 +37,52 @@ describe('desktop window selection targets', () => {
     expect(findWindowTargetAt(targets, { x: 200, y: 200 })?.id).toBe('top');
   });
 
+  it('skips Windows utility and cloaked overlays before finding the client window', async () => {
+    const targets = mapWindowTargetsToDisplay(
+      [
+        {
+          id: 'nvidia-overlay',
+          title: 'NVIDIA GeForce Overlay',
+          processId: 22,
+          isToolWindow: true,
+          x: 0,
+          y: 0,
+          width: 3440,
+          height: 1440,
+        },
+        {
+          id: 'input-experience',
+          title: 'Windows Input Experience',
+          processId: 33,
+          isCloaked: true,
+          x: 0,
+          y: 0,
+          width: 3440,
+          height: 1440,
+        },
+        {
+          id: 'chatgpt',
+          title: 'ChatGPT',
+          processId: 44,
+          x: 746,
+          y: 167,
+          width: 1498,
+          height: 1102,
+        },
+      ],
+      { x: 0, y: 0, width: 3440, height: 1440 },
+      (rect) => rect,
+      99,
+    );
+
+    expect(findWindowTargetAt(targets, { x: 1200, y: 600 })?.id).toBe('chatgpt');
+
+    const mainSource = await readFile(new URL('../../electron/main.ts', import.meta.url), 'utf8');
+    expect(mainSource).toContain('GetWindowLongW');
+    expect(mainSource).toContain('isToolWindow');
+    expect(mainSource).toContain('isCloaked');
+  });
+
   it('keeps compact macOS menu bar items as selectable targets', () => {
     const targets = mapWindowTargetsToDisplay(
       [

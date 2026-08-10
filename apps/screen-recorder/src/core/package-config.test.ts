@@ -41,7 +41,7 @@ describe('desktop installer configuration', () => {
     });
   });
 
-  it('lets electron-builder resolve the Electron runtime for each target architecture', async () => {
+  it('pins host packaging to the installed Electron runtime', async () => {
     const scriptUrls = [
       new URL('../../scripts/package-dir.mjs', import.meta.url),
       new URL('../../scripts/package-platform.mjs', import.meta.url),
@@ -50,9 +50,15 @@ describe('desktop installer configuration', () => {
     for (const scriptUrl of scriptUrls) {
       const script = await readFile(scriptUrl, 'utf8');
 
-      expect(script).not.toContain('config.electronDist');
-      expect(script).not.toContain("require.resolve('electron/package.json')");
+      expect(script).toContain('config.electronDist');
+      expect(script).toContain("require.resolve('electron/package.json')");
     }
+
+    const platformScript = await readFile(
+      new URL('../../scripts/package-platform.mjs', import.meta.url),
+      'utf8',
+    );
+    expect(platformScript).toContain("requestedPlatform === 'win'");
   });
 
   it('builds the macOS window helper and only falls back to ad-hoc signing without an identity', async () => {
@@ -70,7 +76,7 @@ describe('desktop installer configuration', () => {
     expect(packageScript).toContain('--config.mac.identity=-');
   });
 
-  it('uses full-display macOS overlay options and dedicated tray template images', async () => {
+  it('uses macOS window bounds without changing the Windows overlay content coordinate system', async () => {
     const mainSource = await readFile(new URL('../../electron/main.ts', import.meta.url), 'utf8');
     const traySource = await readFile(
       new URL('../../assets/trayTemplate.svg', import.meta.url),
@@ -84,9 +90,15 @@ describe('desktop installer configuration', () => {
     const trayIcon = await readFile(new URL('../../assets/trayTemplate.png', import.meta.url));
     const trayIcon2x = await readFile(new URL('../../assets/trayTemplate@2x.png', import.meta.url));
 
+    const fitOverlaySource = mainSource.slice(
+      mainSource.indexOf('function fitOverlayToDisplay'),
+      mainSource.indexOf('function createMainWindow'),
+    );
+
     expect(mainSource).toContain('getDisplayOverlayWindowOptions(process.platform)');
-    expect(mainSource).toContain('window.setBounds(display.bounds)');
-    expect(mainSource).not.toContain('window.setContentBounds(display.bounds)');
+    expect(fitOverlaySource).toContain("process.platform === 'darwin'");
+    expect(fitOverlaySource).toContain('window.setBounds(display.bounds)');
+    expect(fitOverlaySource).toContain('window.setContentBounds(display.bounds)');
     expect(mainSource).toContain('nextSelectionWindow.setVisibleOnAllWorkspaces');
     expect(mainSource).toContain('trayTemplate.png');
     expect(traySource).toContain('data-logo-motif="red-panda"');
