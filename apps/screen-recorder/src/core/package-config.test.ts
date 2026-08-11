@@ -76,6 +76,53 @@ describe('desktop installer configuration', () => {
     expect(packageScript).toContain('--config.mac.identity=-');
   });
 
+  it('requires hardened Developer ID signing and notarization for macOS release builds', async () => {
+    const packageJson = JSON.parse(
+      await readFile(new URL('../../package.json', import.meta.url), 'utf8'),
+    );
+    const packageScript = await readFile(
+      new URL('../../scripts/package-platform.mjs', import.meta.url),
+      'utf8',
+    );
+    const verifyScript = await readFile(
+      new URL('../../scripts/verify-macos-release.mjs', import.meta.url),
+      'utf8',
+    );
+    const appEntitlements = await readFile(
+      new URL('../../assets/entitlements.mac.plist', import.meta.url),
+      'utf8',
+    );
+    const inheritedEntitlements = await readFile(
+      new URL('../../assets/entitlements.mac.inherit.plist', import.meta.url),
+      'utf8',
+    );
+
+    expect(packageJson.scripts['package:mac:release']).toContain('--release');
+    expect(packageJson.scripts['package:mac:release']).toContain('verify-macos-release.mjs');
+    expect(packageJson.build.mac).toMatchObject({
+      hardenedRuntime: true,
+      notarize: true,
+      entitlements: 'assets/entitlements.mac.plist',
+      entitlementsInherit: 'assets/entitlements.mac.inherit.plist',
+    });
+    expect(packageScript).toContain('Developer ID Application');
+    expect(packageScript).toContain('APPLE_API_KEY');
+    expect(packageScript).toContain('APPLE_KEYCHAIN_PROFILE');
+    expect(packageScript).toContain('APPLE_APP_SPECIFIC_PASSWORD');
+    expect(packageScript).toContain('--config.forceCodeSigning=true');
+    expect(appEntitlements).toContain('com.apple.security.device.audio-input');
+    expect(appEntitlements).toContain('com.apple.security.device.camera');
+    expect(appEntitlements).toContain('com.apple.security.cs.allow-jit');
+    expect(appEntitlements).not.toContain('com.apple.security.get-task-allow');
+    expect(inheritedEntitlements).toContain('com.apple.security.cs.allow-jit');
+    expect(inheritedEntitlements).toContain(
+      'com.apple.security.cs.allow-unsigned-executable-memory',
+    );
+    expect(verifyScript).toContain("'codesign'");
+    expect(verifyScript).toContain("'spctl'");
+    expect(verifyScript).toContain("'stapler'");
+  });
+
   it('uses macOS window bounds without changing the Windows overlay content coordinate system', async () => {
     const mainSource = await readFile(new URL('../../electron/main.ts', import.meta.url), 'utf8');
     const traySource = await readFile(

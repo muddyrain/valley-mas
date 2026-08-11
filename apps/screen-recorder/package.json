@@ -14,6 +14,7 @@
     "package:dir": "pnpm build && node scripts/package-dir.mjs",
     "package:win": "pnpm build && node scripts/package-platform.mjs win",
     "package:mac": "pnpm build && node scripts/package-platform.mjs mac",
+    "package:mac:release": "pnpm build && node scripts/package-platform.mjs mac --release && node scripts/verify-macos-release.mjs",
     "runtime:smoke": "node scripts/runtime-smoke.mjs",
     "runtime:probe-video": "electron scripts/probe-video.cjs",
     "typecheck": "tsc --noEmit",
@@ -78,7 +79,10 @@
     "mac": {
       "icon": "assets/logo.png",
       "category": "public.app-category.utilities",
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
+      "notarize": true,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.inherit.plist",
       "extraResources": [
         {
           "from": "dist-electron/native/macos-window-query",
