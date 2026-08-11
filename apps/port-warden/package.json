@@ -1,0 +1,95 @@
+{
+  "name": "@valley/port-warden",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cross-platform local TCP port and process inspector",
+  "author": "Valley MAS",
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "pnpm build:renderer && pnpm build:electron",
+    "build:renderer": "vite build",
+    "build:electron": "tsup --config tsup.config.ts",
+    "package:dir": "pnpm build && electron-builder --dir",
+    "package:win": "pnpm build && electron-builder --win nsis --x64",
+    "package:mac": "pnpm build && electron-builder --mac dmg zip --x64 --arm64",
+    "typecheck": "tsc --noEmit",
+    "check": "biome check src electron scripts vite.config.ts vitest.config.ts tsup.config.ts index.html package.json tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
+    "@types/node": "catalog:node-22",
+    "@types/react": "catalog:react-19",
+    "@types/react-dom": "catalog:react-19",
+    "@vitejs/plugin-react-swc": "catalog:vite-6",
+    "electron": "43.3.0",
+    "electron-builder": "26.15.3",
+    "lucide-react": "catalog:shared-runtime",
+    "react": "catalog:react-19",
+    "react-dom": "catalog:react-19",
+    "tsup": "catalog:ts-tooling",
+    "typescript": "catalog:ts-tooling",
+    "vite": "catalog:vite-6",
+    "vitest": "catalog:test"
+  },
+  "build": {
+    "appId": "com.valley.portwarden",
+    "productName": "Port Warden",
+    "directories": {
+      "output": "package-output"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "assets/port-warden-logo.png",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
+    "win": {
+      "icon": "assets/port-warden.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "assets/port-warden.icns",
+      "minimumSystemVersion": "13.0.0",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    }
+  }
+}

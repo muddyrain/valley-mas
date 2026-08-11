@@ -336,6 +336,51 @@ importers:
         specifier: catalog:test
         version: 4.1.6(@types/node@22.19.13)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.3.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
 
+  apps/port-warden:
+    devDependencies:
+      '@biomejs/biome':
+        specifier: ^2.4.4
+        version: 2.4.4
+      '@types/node':
+        specifier: catalog:node-22
+        version: 22.19.13
+      '@types/react':
+        specifier: catalog:react-19
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: catalog:react-19
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react-swc':
+        specifier: catalog:vite-6
+        version: 4.0.0(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
+      electron:
+        specifier: 43.3.0
+        version: 43.3.0
+      electron-builder:
+        specifier: 26.15.3
+        version: 26.15.3(electron-builder-squirrel-windows@26.15.3)
+      lucide-react:
+        specifier: catalog:shared-runtime
+        version: 0.460.0(react@19.2.4)
+      react:
+        specifier: catalog:react-19
+        version: 19.2.4
+      react-dom:
+        specifier: catalog:react-19
+        version: 19.2.4(react@19.2.4)
+      tsup:
+        specifier: catalog:ts-tooling
+        version: 8.5.1(@swc/core@1.15.17)(jiti@2.7.0)(postcss@8.5.10)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: catalog:ts-tooling
+        version: 5.9.3
+      vite:
+        specifier: catalog:vite-6
+        version: 6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
+      vitest:
+        specifier: catalog:test
+        version: 4.1.6(@types/node@22.19.13)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.3.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
+
   apps/scratch-legend:
     dependencies:
       next:

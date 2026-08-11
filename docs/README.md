@@ -31,6 +31,7 @@
 - Go 服务端：`server/AGENTS.md`、`server/README.md`、`server/migrations/README.md`。
 - Life Trace：`apps/life-trace/README.md`、`apps/life-trace/docs/PLAN.md`。
 - Screen Recorder：`apps/screen-recorder/AGENTS.md`、`apps/screen-recorder/README.md`；Windows/macOS 本地截图标注/吸色/另存为/长截图、Windows 窗口吸附、屏幕与区域录制、媒体设备、快捷键、通知与开机设置、自定义录屏目录、安装包构建和运行时验收入口。
+- Port Warden：`apps/port-warden/AGENTS.md`、`apps/port-warden/README.md`；macOS/Windows 本地 TCP 监听端口、进程与项目归属、精确 PID 身份复核、安全停止、双平台构建与运行时验收入口。
 - AI Mind Arena：`apps/ai-mind-arena/AGENTS.md`、`apps/ai-mind-arena/README.md`、`server/internal/model/mind_arena.go`。
 - WorldSim：`apps/world-sim/AGENTS.md`、`apps/world-sim/docs/*`。
 - Toy Climb Arena：`apps/toy-climb-arena/AGENTS.md`、`apps/toy-climb-arena/docs/*`。

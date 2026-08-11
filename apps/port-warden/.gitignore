@@ -1,0 +1,5 @@
+/artifacts/
+/dist/
+/dist-electron/
+/node_modules/
+/package-output/

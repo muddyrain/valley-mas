@@ -1,0 +1,48 @@
+{
+  "connections": [
+    {
+      "LocalAddress": "::",
+      "LocalPort": 5173,
+      "OwningProcess": 9000
+    },
+    {
+      "LocalAddress": "0.0.0.0",
+      "LocalPort": 5173,
+      "OwningProcess": 9000
+    },
+    {
+      "LocalAddress": "127.0.0.1",
+      "LocalPort": 3000,
+      "OwningProcess": 9100
+    }
+  ],
+  "processes": [
+    {
+      "ProcessId": 9000,
+      "ParentProcessId": 8000,
+      "SessionId": 1,
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Program Files\\nodejs\\node.exe",
+      "CommandLine": "\"C:\\Program Files\\nodejs\\node.exe\" C:\\work\\portal\\node_modules\\vite\\bin\\vite.js",
+      "CreationDate": "2026-08-11T01:02:03.000000+000"
+    },
+    {
+      "ProcessId": 9100,
+      "ParentProcessId": 8000,
+      "SessionId": 0,
+      "Name": "System",
+      "ExecutablePath": null,
+      "CommandLine": null,
+      "CreationDate": null
+    },
+    {
+      "ProcessId": 9200,
+      "ParentProcessId": 720,
+      "SessionId": 0,
+      "Name": "custom-service.exe",
+      "ExecutablePath": "C:\\Tools\\custom-service.exe",
+      "CommandLine": "C:\\Tools\\custom-service.exe --service",
+      "CreationDate": "2026-08-11T00:00:00.000000+000"
+    }
+  ]
+}

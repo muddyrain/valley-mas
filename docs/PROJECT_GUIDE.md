@@ -6,7 +6,7 @@
 
 - Valley MAS 是一个包含个人内容展示、创作者空间、内容管理、生活记录、AI 辅助能力和实验应用的 monorepo。
 - 用户侧主站在 `apps/web`，管理后台在 `apps/admin`，Go API 服务在 `server`。
-- Life Trace、AI Mind Arena、Screen Recorder、WorldSim、Toy Climb Arena、Scratch Legend、Ambient Forge 是当前仓库内的独立产品或实验应用。
+- Life Trace、AI Mind Arena、Screen Recorder、Port Warden、WorldSim、Toy Climb Arena、Scratch Legend、Ambient Forge 是当前仓库内的独立产品或实验应用。
 - 共享类型、请求、路由和格式化能力放在 `packages/*`。
 
 ## 技术栈地图
@@ -17,6 +17,7 @@
 | Admin 后台 | `apps/admin` | React 19 + Vite 6 + Ant Design 6，覆盖用户、内容、资源、互动、Life Trace 和审计的运营管理后台。 |
 | Life Trace | `apps/life-trace` | React 19 + Vite 6 + Tailwind 4，生活计划、踪迹、提醒和 PWA 能力。 |
 | Screen Recorder | `apps/screen-recorder` | Electron + React 19 + Vite 6 + TypeScript，Windows/macOS 托盘或菜单栏单实例常驻的完全本地 PNG 截图标注、带实时拼接预览的选区滚动长截图与 WebM/原生 MP4 屏幕/单显示器区域录制应用；再次启动会唤起已有控制台；托盘左键直接截图、右键打开菜单，截图/录屏共用后台预热的纯选区控制器，未拖拽时选区层可随鼠标跨显示器切换，Windows 与 macOS 均可吸附当前显示器的可见客户端窗口，macOS 额外支持菜单栏背景与状态图标，桌面空白区域回退当前显示器全屏；截图编辑同窗无缩放交接，默认可移动选区，支持带 Tooltip 的 shadcn 风格工具条、方框/圆框/箭头/画笔共享样式、三档马赛克、可移动缩放文字、默认 HEX 且按住 Shift 临时切换 RGB 的吸色、保留原选区位置且可被后续截图捕获的固定置顶图片、固定图片原生复制/下载/关闭菜单、默认保存复制或另存为；现代偏好设置使用固定标题栏和隐藏式内容滚动，设置可见时仍可触发捕获快捷键且不会被第三方截图工具排除，并支持三组快捷键、快捷键安全录入、开机自启动、默认关闭的系统通知与自定义录屏目录；macOS 启动时不主动请求屏幕权限，首次捕获时合并并发授权请求；录屏设置支持 Windows 默认系统声音及音量、跨平台麦克风、摄像头画中画和鼠标开关，并在面板内提前反馈缺失设备，设置面板可拖拽，设置阶段可移动和八向缩放当前选区，停止后提供播放和打开所在文件夹入口；Electron main/preload 由 tsup 构建，electron-builder 生成使用 7z 载荷且只保留中英文 Electron 语言包的 Windows NSIS，以及带原生窗口查询 helper 的 macOS DMG/ZIP。macOS 系统声音因 Electron loopback 限制暂不支持。 |
+| Port Warden | `apps/port-warden` | Electron + React 19 + Vite 6 + TypeScript，macOS 13+ 与 Windows 10/11 x64 本地 TCP LISTEN 端口管家；批量关联端口、进程、命令、工作目录与项目标志，合并同 PID/端口的 IPv4/IPv6 监听，提供搜索、自动刷新、变更提示、父子进程树、精确/推断归属和两阶段 PID 身份复核停止；主进程使用 lsof/ps 或结构化 PowerShell，Renderer 只经窄类型 IPC 访问。开发端口 5182。 |
 | AI Mind Arena | `apps/ai-mind-arena` | Next.js 15 + React 19 + Tailwind 3，多人格辩论决策应用，默认端口 5175。 |
 | Scratch Legend | `apps/scratch-legend` | Next.js + React，刮刮卡增量游戏实验，默认端口 5176。 |
 | Toy Climb Arena | `apps/toy-climb-arena` | Vite 6 + TypeScript + Three.js，玩具世界攀爬游戏，默认端口 5175。 |
@@ -70,6 +71,9 @@ pnpm --filter @valley/life-trace dev
 # 启动 Screen Recorder（Electron + 本机 Vite 5179）
 pnpm --filter @valley/screen-recorder dev
 
+# 启动 Port Warden（Electron + 本机 Vite 5182）
+pnpm --filter @valley/port-warden dev
+
 # 启动 AI Mind Arena / Scratch Legend
 pnpm --filter @valley/ai-mind-arena dev
 pnpm --filter @valley/scratch-legend dev
@@ -101,6 +105,7 @@ cd server && go run ./cmd/migrate bootstrap --apply
 | Life Trace | 5178 |
 | Life Trace preview | 4178 |
 | Screen Recorder | 5179 |
+| Port Warden | 5182 |
 | AI Mind Arena | 5175 |
 | Toy Climb Arena | 5175 |
 | Scratch Legend | 5176 |
@@ -131,6 +136,7 @@ Go API 启动时会优先使用 `PORT`（默认 `8080`）。如果该端口已�
 - Admin 路由：`apps/admin/src/App.tsx`。
 - Life Trace 路由：`apps/life-trace/src/App.tsx`。
 - Screen Recorder 入口：`apps/screen-recorder/electron/main.ts`、`apps/screen-recorder/electron/preload.ts`、`apps/screen-recorder/src/App.tsx`；捕获浮层见 `apps/screen-recorder/src/SelectionOverlay.tsx`、`apps/screen-recorder/src/SelectionSurface.tsx`、`apps/screen-recorder/src/ColorPickerOverlay.tsx`、`apps/screen-recorder/src/ScreenshotEditor.tsx`、`apps/screen-recorder/src/LongScreenshotControl.tsx` 与 `apps/screen-recorder/src/RecordingSetup.tsx`；截图/录屏共享选区手势见 `apps/screen-recorder/src/core/selection-controller.ts`，区域换算见 `apps/screen-recorder/src/core/geometry.ts`，Windows 窗口候选换算见 `apps/screen-recorder/src/core/window-target.ts`，长截图拼接见 `apps/screen-recorder/src/core/long-screenshot.ts`，录制运行时见 `apps/screen-recorder/src/renderer/recorder-runtime.ts`。
+- Port Warden 入口：`apps/port-warden/electron/main.ts`、`apps/port-warden/electron/preload.ts`、`apps/port-warden/electron/services/port-service.ts`、`apps/port-warden/src/shared/domain.ts` 与 `apps/port-warden/src/App.tsx`；平台适配器见 `apps/port-warden/electron/platform/macos`、`apps/port-warden/electron/platform/windows`，进程身份与停止保护见 `apps/port-warden/src/domain/process-identity.ts`、`apps/port-warden/src/domain/stop-coordinator.ts`。
 - AI Mind Arena 页面：`apps/ai-mind-arena/app`。
 - 服务端路由：`server/internal/router/router.go`。
 - 服务端配置：`server/internal/config/config.go`。
@@ -168,6 +174,13 @@ pnpm --filter @valley/screen-recorder package:win
 pnpm --filter @valley/screen-recorder package:mac
 pnpm --filter @valley/screen-recorder package:mac:release
 pnpm --filter @valley/screen-recorder exec node scripts/verify-macos-release.mjs
+pnpm --filter @valley/port-warden typecheck
+pnpm --filter @valley/port-warden check
+pnpm --filter @valley/port-warden test
+pnpm --filter @valley/port-warden build
+pnpm --filter @valley/port-warden package:dir
+pnpm --filter @valley/port-warden package:win
+pnpm --filter @valley/port-warden package:mac
 pnpm --filter @valley/screen-recorder runtime:probe-video -- "C:\\path\\recording.webm" 400 300 audio
 pnpm --filter @valley/ai-mind-arena typecheck
 pnpm --filter @valley/scratch-legend typecheck

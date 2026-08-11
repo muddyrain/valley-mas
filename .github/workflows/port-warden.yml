@@ -1,0 +1,57 @@
+name: Port Warden
+
+on:
+  push:
+    paths:
+      - 'apps/port-warden/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/port-warden.yml'
+  pull_request:
+    paths:
+      - 'apps/port-warden/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/port-warden.yml'
+
+concurrency:
+  group: port-warden-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --filter @valley/port-warden typecheck
+
+      - name: Check
+        run: pnpm --filter @valley/port-warden check
+
+      - name: Test
+        run: pnpm --filter @valley/port-warden test
+
+      - name: Build
+        run: pnpm --filter @valley/port-warden build
