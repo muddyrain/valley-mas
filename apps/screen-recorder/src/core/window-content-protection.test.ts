@@ -9,4 +9,8 @@ describe('window content protection', () => {
   it('still excludes recorder-owned overlays from captured output', () => {
     expect(shouldProtectWindowContent('capture-overlay')).toBe(true);
   });
+
+  it('allows pinned screenshots to appear in later captures', () => {
+    expect(shouldProtectWindowContent('pinned-screenshot')).toBe(false);
+  });
 });

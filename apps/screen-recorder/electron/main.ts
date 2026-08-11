@@ -45,8 +45,18 @@ import {
 } from '../src/core/long-screenshot';
 import { getLongScreenshotSelectionFrame } from '../src/core/long-screenshot-view';
 import { RECORDING_MIME_CANDIDATES, type RecordingContainer } from '../src/core/mime';
-import { getDisplayOverlayWindowOptions } from '../src/core/overlay-window';
-import { getPinnedScreenshotWindowBounds } from '../src/core/pinned-screenshot';
+import {
+  getAlwaysOnTopRelativeLevel,
+  getDisplayOverlayWindowOptions,
+} from '../src/core/overlay-window';
+import {
+  createPinnedScreenshotMenuIconBitmap,
+  createPinnedScreenshotMenuItems,
+  getPinnedScreenshotMenuDisplayLabel,
+  getPinnedScreenshotWindowBounds,
+  type PinnedScreenshotMenuAction,
+  tryCreatePinnedScreenshotMenuIcon,
+} from '../src/core/pinned-screenshot';
 import { isValidPng } from '../src/core/png';
 import { PreparedWindowSlot } from '../src/core/prepared-window';
 import {
@@ -169,7 +179,13 @@ let shortcutCaptureActive = false;
 let notificationsEnabled = false;
 let windowTargetsPromise: Promise<WindowTarget[]> | undefined;
 let trayMenu: Menu | undefined;
-const pinnedScreenshots = new Map<number, { dataUrl: string; window: BrowserWindow }>();
+type PinnedScreenshotEntry = {
+  dataUrl: string;
+  image: NativeImage;
+  window: BrowserWindow;
+};
+
+const pinnedScreenshots = new Map<number, PinnedScreenshotEntry>();
 
 let saveDirectory = path.join(app.getPath('videos'), 'Valley Screen Recordings');
 const screenshotDirectory = path.join(app.getPath('pictures'), 'Valley Screenshots');
@@ -587,6 +603,59 @@ function assertPinnedScreenshotSender(event: IpcMainInvokeEvent) {
   return pinned;
 }
 
+function runPinnedScreenshotAction(
+  pinned: PinnedScreenshotEntry,
+  action: () => void | Promise<void>,
+): void {
+  void Promise.resolve()
+    .then(action)
+    .catch((error) => {
+      if (pinned.window.isDestroyed()) return;
+      void dialog.showMessageBox(pinned.window, {
+        type: 'error',
+        title: '固定图片',
+        message: '操作失败',
+        detail: error instanceof Error ? error.message : '未知错误',
+      });
+    });
+}
+
+function getPinnedScreenshotMenuIcon(action: PinnedScreenshotMenuAction): NativeImage | undefined {
+  return tryCreatePinnedScreenshotMenuIcon(action, (menuAction) => {
+    const bitmap = createPinnedScreenshotMenuIconBitmap(menuAction);
+    const icon = nativeImage.createFromBitmap(Buffer.from(bitmap.data), {
+      width: bitmap.width,
+      height: bitmap.height,
+      scaleFactor: bitmap.scaleFactor,
+    });
+    if (icon.isEmpty()) return undefined;
+    if (process.platform === 'darwin') icon.setTemplateImage(true);
+    return icon;
+  });
+}
+
+function showPinnedScreenshotMenu(pinned: PinnedScreenshotEntry): void {
+  const items = createPinnedScreenshotMenuItems({
+    copy: () => runPinnedScreenshotAction(pinned, () => clipboard.writeImage(pinned.image)),
+    download: () => runPinnedScreenshotAction(pinned, () => downloadPinnedScreenshot(pinned)),
+    close: () => scheduleWindowDestroy(pinned.window),
+  });
+  const template: MenuItemConstructorOptions[] = items.map((item) => {
+    if (item.type === 'separator') {
+      return item;
+    }
+    const icon = getPinnedScreenshotMenuIcon(item.action);
+    return {
+      type: item.type,
+      label: getPinnedScreenshotMenuDisplayLabel(item.label),
+      click: item.click,
+      ...(icon ? { icon } : {}),
+    };
+  });
+  const menu = Menu.buildFromTemplate(template);
+  menu.popup({ window: pinned.window });
+}
+
 function assertRecordingConfigurationSender(event: IpcMainInvokeEvent): void {
   if (
     !isAllowedIpcSender(event.sender.id, [
@@ -741,11 +810,11 @@ function createMainWindow(): void {
 function createPinnedScreenshotWindow(
   image: NativeImage,
   display: Display,
-  displaySize: { width: number; height: number },
+  selection: Rectangle,
 ): void {
   const imageSize = image.getSize();
   const inset = 12;
-  const bounds = getPinnedScreenshotWindowBounds(displaySize, display.workArea, inset);
+  const bounds = getPinnedScreenshotWindowBounds(selection, display.bounds, inset);
   const pinnedWindow = new BrowserWindow({
     ...bounds.window,
     minWidth: Math.min(160 + inset * 2, bounds.window.width),
@@ -766,16 +835,30 @@ function createPinnedScreenshotWindow(
     width: inset * 2,
     height: inset * 2,
   });
-  pinnedWindow.setAlwaysOnTop(true, 'screen-saver');
-  pinnedWindow.setContentProtection(true);
+  pinnedWindow.setAlwaysOnTop(
+    true,
+    'screen-saver',
+    getAlwaysOnTopRelativeLevel('pinned-screenshot'),
+  );
+  pinnedWindow.setContentProtection(shouldProtectWindowContent('pinned-screenshot'));
   pinnedWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   pinnedWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   const webContentsId = pinnedWindow.webContents.id;
   pinnedScreenshots.set(webContentsId, {
     dataUrl: image.toDataURL(),
+    image,
     window: pinnedWindow,
   });
-  pinnedWindow.once('ready-to-show', () => pinnedWindow.showInactive());
+  pinnedWindow.webContents.on('context-menu', (event) => {
+    event.preventDefault();
+    const pinned = pinnedScreenshots.get(webContentsId);
+    if (pinned && !pinned.window.isDestroyed()) showPinnedScreenshotMenu(pinned);
+  });
+  pinnedWindow.once('ready-to-show', () => {
+    if (pinnedWindow.isDestroyed()) return;
+    pinnedWindow.setBounds(bounds.window);
+    pinnedWindow.showInactive();
+  });
   pinnedWindow.on('closed', () => pinnedScreenshots.delete(webContentsId));
   loadLocalRenderer(pinnedWindow, 'pinned-screenshot');
 }
@@ -897,7 +980,11 @@ function createSelectionBrowserWindow(display: Display): BrowserWindow {
     backgroundColor: '#00000000',
     webPreferences: secureWebPreferences(),
   });
-  nextSelectionWindow.setAlwaysOnTop(true, 'screen-saver');
+  nextSelectionWindow.setAlwaysOnTop(
+    true,
+    'screen-saver',
+    getAlwaysOnTopRelativeLevel('capture-overlay'),
+  );
   if (process.platform === 'darwin') {
     nextSelectionWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   }
@@ -1407,7 +1494,9 @@ async function writeScreenshotPng(png: Uint8Array, requestedPath?: string): Prom
   }
 }
 
-async function chooseScreenshotSavePath(): Promise<string | undefined> {
+async function chooseScreenshotSavePath(
+  owner: BrowserWindow | undefined = screenshotEditorWindow,
+): Promise<string | undefined> {
   await mkdir(screenshotDirectory, { recursive: true });
   const defaultPath = await createAvailableScreenshotPath();
   const options = {
@@ -1416,10 +1505,17 @@ async function chooseScreenshotSavePath(): Promise<string | undefined> {
     filters: [{ name: 'PNG 图像', extensions: ['png'] }],
     properties: ['showOverwriteConfirmation' as const, 'createDirectory' as const],
   };
-  const result = screenshotEditorWindow
-    ? await dialog.showSaveDialog(screenshotEditorWindow, options)
-    : await dialog.showSaveDialog(options);
+  const result =
+    owner && !owner.isDestroyed()
+      ? await dialog.showSaveDialog(owner, options)
+      : await dialog.showSaveDialog(options);
   return result.canceled || !result.filePath ? undefined : ensurePngExtension(result.filePath);
+}
+
+async function downloadPinnedScreenshot(pinned: PinnedScreenshotEntry): Promise<void> {
+  const targetPath = await chooseScreenshotSavePath(pinned.window);
+  if (!targetPath) return;
+  await writeScreenshotPng(pinned.image.toPNG(), targetPath);
 }
 
 function bitmapFrameFromImage(image: NativeImage): BitmapFrame {
