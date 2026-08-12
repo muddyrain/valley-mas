@@ -151,7 +151,7 @@ importers:
         version: 19.2.3(@types/react@19.2.14)
       '@vitejs/plugin-react-swc':
         specifier: catalog:vite-6
-        version: 4.0.0(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
+        version: 4.0.0(vite@6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
       autoprefixer:
         specifier: catalog:tailwind-3
         version: 10.4.27(postcss@8.5.10)
@@ -166,10 +166,10 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:vite-6
-        version: 6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
+        version: 6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
       vitest:
         specifier: catalog:test
-        version: 4.1.6(@types/node@22.19.13)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.3.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
+        version: 4.1.6(@types/node@22.19.13)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.3.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
 
   apps/ai-mind-arena:
     dependencies:
@@ -184,7 +184,7 @@ importers:
         version: 0.460.0(react@19.2.4)
       next:
         specifier: catalog:next-15
-        version: 15.5.15(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3)
+        version: 15.5.15(@playwright/test@1.62.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3)
       react:
         specifier: catalog:react-19
         version: 19.2.4
@@ -238,6 +238,46 @@ importers:
       '@types/three':
         specifier: ^0.184.1
         version: 0.184.1
+      '@vitejs/plugin-react-swc':
+        specifier: catalog:vite-6
+        version: 4.0.0(vite@6.3.5(@types/node@24.13.3)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
+      typescript:
+        specifier: catalog:ts-tooling
+        version: 5.9.3
+      vite:
+        specifier: catalog:vite-6
+        version: 6.3.5(@types/node@24.13.3)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
+      vitest:
+        specifier: catalog:test
+        version: 4.1.6(@types/node@24.13.3)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.3.0))(msw@2.12.10(@types/node@24.13.3)(typescript@5.9.3))(vite@6.3.5(@types/node@24.13.3)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
+
+  apps/eon-vale:
+    dependencies:
+      lucide-react:
+        specifier: catalog:shared-runtime
+        version: 0.460.0(react@19.2.4)
+      pixi.js:
+        specifier: ^8.13.0
+        version: 8.19.0
+      react:
+        specifier: catalog:react-19
+        version: 19.2.4
+      react-dom:
+        specifier: catalog:react-19
+        version: 19.2.4(react@19.2.4)
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1.55.0
+        version: 1.62.1
+      '@types/react':
+        specifier: catalog:react-19
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: catalog:react-19
+        version: 19.2.3(@types/react@19.2.14)
       '@vitejs/plugin-react-swc':
         specifier: catalog:vite-6
         version: 4.0.0(vite@6.3.5(@types/node@24.13.3)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
@@ -385,7 +425,7 @@ importers:
     dependencies:
       next:
         specifier: catalog:next-15
-        version: 15.5.15(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3)
+        version: 15.5.15(@playwright/test@1.62.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3)
       react:
         specifier: catalog:react-19
         version: 19.2.4
@@ -2389,6 +2429,11 @@ packages:
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
+
+  '@playwright/test@1.62.1':
+    resolution: {integrity: sha512-DTcUc8qii+cpHvtOwggMtBRMjKZHXYWdw8syRYu2vtzuq4Wxphqq4NfCs5Zt44L6mA8rfDfj+PHnxFc/FeK6mQ==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@protobufjs/aspromise@1.1.2':
     resolution: {integrity: sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==}
@@ -5153,6 +5198,11 @@ packages:
   fs.realpath@1.0.0:
     resolution: {integrity: sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==}
 
+  fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -6557,6 +6607,16 @@ packages:
     peerDependencies:
       react: '>=18'
       react-dom: '>=18'
+
+  playwright-core@1.62.1:
+    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.62.1:
+    resolution: {integrity: sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   plist@3.1.0:
     resolution: {integrity: sha512-uysumyrvkUX0rX/dEVqt8gC3sTBzd4zoWfLeS29nb53imdaXVvLINYXTI2GNqzaMuvacNx4uJQ8+b3zXR0pkgQ==}
@@ -9731,6 +9791,10 @@ snapshots:
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
+  '@playwright/test@1.62.1':
+    dependencies:
+      playwright: 1.62.1
+
   '@protobufjs/aspromise@1.1.2': {}
 
   '@protobufjs/base64@1.1.2': {}
@@ -11356,6 +11420,14 @@ snapshots:
 
   '@ungap/structured-clone@1.3.0': {}
 
+  '@vitejs/plugin-react-swc@4.0.0(vite@6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))':
+    dependencies:
+      '@rolldown/pluginutils': 1.0.0-beta.30
+      '@swc/core': 1.15.17
+      vite: 6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
+    transitivePeerDependencies:
+      - '@swc/helpers'
+
   '@vitejs/plugin-react-swc@4.0.0(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))':
     dependencies:
       '@rolldown/pluginutils': 1.0.0-beta.30
@@ -11384,7 +11456,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@types/node@22.19.13)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.3.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
+      vitest: 4.1.6(@types/node@22.19.13)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.3.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
 
   '@vitest/expect@4.1.6':
     dependencies:
@@ -11394,6 +11466,15 @@ snapshots:
       '@vitest/utils': 4.1.6
       chai: 6.2.2
       tinyrainbow: 3.1.0
+
+  '@vitest/mocker@4.1.6(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))':
+    dependencies:
+      '@vitest/spy': 4.1.6
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      msw: 2.12.10(@types/node@22.19.13)(typescript@5.9.3)
+      vite: 6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
 
   '@vitest/mocker@4.1.6(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))':
     dependencies:
@@ -12718,6 +12799,9 @@ snapshots:
       universalify: 2.0.1
 
   fs.realpath@1.0.0: {}
+
+  fsevents@2.3.2:
+    optional: true
 
   fsevents@2.3.3:
     optional: true
@@ -14098,7 +14182,7 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  next@15.5.15(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3):
+  next@15.5.15(@playwright/test@1.62.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3):
     dependencies:
       '@next/env': 15.5.15
       '@swc/helpers': 0.5.15
@@ -14116,6 +14200,7 @@ snapshots:
       '@next/swc-linux-x64-musl': 15.5.15
       '@next/swc-win32-arm64-msvc': 15.5.15
       '@next/swc-win32-x64-msvc': 15.5.15
+      '@playwright/test': 1.62.1
       sass: 1.97.3
       sharp: 0.34.5
     transitivePeerDependencies:
@@ -14369,6 +14454,14 @@ snapshots:
       react-dom: 19.2.4(react@19.2.4)
     transitivePeerDependencies:
       - '@emotion/is-prop-valid'
+
+  playwright-core@1.62.1: {}
+
+  playwright@1.62.1:
+    dependencies:
+      playwright-core: 1.62.1
+    optionalDependencies:
+      fsevents: 2.3.2
 
   plist@3.1.0:
     dependencies:
@@ -15879,6 +15972,25 @@ snapshots:
       d3-time: 3.1.0
       d3-timer: 3.0.1
 
+  vite@6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2):
+    dependencies:
+      esbuild: 0.25.12
+      fdir: 6.5.0(picomatch@4.0.3)
+      picomatch: 4.0.3
+      postcss: 8.5.10
+      rollup: 4.59.0
+      tinyglobby: 0.2.15
+    optionalDependencies:
+      '@types/node': 22.19.13
+      fsevents: 2.3.3
+      jiti: 1.21.7
+      less: 3.13.1
+      lightningcss: 1.32.0
+      sass: 1.97.3
+      stylus: 0.64.0
+      terser: 5.46.0
+      yaml: 2.8.2
+
   vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2):
     dependencies:
       esbuild: 0.25.12
@@ -15916,6 +16028,35 @@ snapshots:
       stylus: 0.64.0
       terser: 5.46.0
       yaml: 2.8.2
+
+  vitest@4.1.6(@types/node@22.19.13)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.3.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)):
+    dependencies:
+      '@vitest/expect': 4.1.6
+      '@vitest/mocker': 4.1.6(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
+      '@vitest/pretty-format': 4.1.6
+      '@vitest/runner': 4.1.6
+      '@vitest/snapshot': 4.1.6
+      '@vitest/spy': 4.1.6
+      '@vitest/utils': 4.1.6
+      es-module-lexer: 2.1.0
+      expect-type: 1.3.0
+      magic-string: 0.30.21
+      obug: 2.1.1
+      pathe: 2.0.3
+      picomatch: 4.0.3
+      std-env: 4.1.0
+      tinybench: 2.9.0
+      tinyexec: 1.0.2
+      tinyglobby: 0.2.15
+      tinyrainbow: 3.1.0
+      vite: 6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
+      why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@types/node': 22.19.13
+      '@vitest/coverage-v8': 4.1.6(vitest@4.1.6)
+      jsdom: 29.1.1(@noble/hashes@2.3.0)
+    transitivePeerDependencies:
+      - msw
 
   vitest@4.1.6(@types/node@22.19.13)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.3.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@2.7.0)(less@3.13.1)(lightningcss@1.32.0)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)):
     dependencies:
