@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { AmbientInputs } from '../core/ambient-inputs';
-import type { CameraTourState } from '../core/camera-tour';
-import type { NpcCameraState } from '../core/npc';
+import type { NpcInteractionHudState } from '../core/npc-interactions';
+import type { WorldControlState } from '../core/playable-world';
 import type { QualityLevel } from '../core/quality';
 import type { ThunderEvent } from '../core/weather-lifecycle';
 import { type AmbientDebugStats, AmbientEngine } from '../engine/AmbientEngine';
@@ -13,22 +13,24 @@ declare global {
 }
 
 interface AmbientCanvasProps {
+  debug: boolean;
   quality: QualityLevel;
   getInputs: () => AmbientInputs;
   onReady: (engine: AmbientEngine | null) => void;
   onStats: (stats: AmbientDebugStats) => void;
-  onCameraState: (state: CameraTourState) => void;
-  onNpcCameraState: (state: NpcCameraState) => void;
+  onWorldControlState: (state: WorldControlState) => void;
+  onNpcInteractionState: (state: NpcInteractionHudState) => void;
   onThunder: (event: ThunderEvent) => void;
 }
 
 export function AmbientCanvas({
+  debug,
   quality,
   getInputs,
   onReady,
   onStats,
-  onCameraState,
-  onNpcCameraState,
+  onWorldControlState,
+  onNpcInteractionState,
   onThunder,
 }: AmbientCanvasProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -36,13 +38,13 @@ export function AmbientCanvas({
   const initialQualityRef = useRef(quality);
   const getInputsRef = useRef(getInputs);
   const onStatsRef = useRef(onStats);
-  const onCameraStateRef = useRef(onCameraState);
-  const onNpcCameraStateRef = useRef(onNpcCameraState);
+  const onWorldControlStateRef = useRef(onWorldControlState);
+  const onNpcInteractionStateRef = useRef(onNpcInteractionState);
   const onThunderRef = useRef(onThunder);
   getInputsRef.current = getInputs;
   onStatsRef.current = onStats;
-  onCameraStateRef.current = onCameraState;
-  onNpcCameraStateRef.current = onNpcCameraState;
+  onWorldControlStateRef.current = onWorldControlState;
+  onNpcInteractionStateRef.current = onNpcInteractionState;
   onThunderRef.current = onThunder;
 
   useEffect(() => {
@@ -50,11 +52,12 @@ export function AmbientCanvas({
     if (!mount) return;
     const engine = new AmbientEngine({
       mount,
+      debug,
       quality: initialQualityRef.current,
       getInputs: () => getInputsRef.current(),
       onStats: (stats) => onStatsRef.current(stats),
-      onCameraState: (state) => onCameraStateRef.current(state),
-      onNpcCameraState: (state) => onNpcCameraStateRef.current(state),
+      onWorldControlState: (state) => onWorldControlStateRef.current(state),
+      onNpcInteractionState: (state) => onNpcInteractionStateRef.current(state),
       onThunder: (event) => onThunderRef.current(event),
     });
     engineRef.current = engine;
@@ -66,7 +69,7 @@ export function AmbientCanvas({
       engine.dispose();
       engineRef.current = null;
     };
-  }, [onReady]);
+  }, [debug, onReady]);
 
   useEffect(() => {
     engineRef.current?.setQuality(quality);

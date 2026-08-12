@@ -14,6 +14,12 @@ export function DebugOverlay({ stats }: DebugOverlayProps) {
       <span>{stats.weather.toUpperCase()}</span>
       <span>{stats.autoTour ? 'TOUR' : stats.cameraView.toUpperCase()}</span>
       <span>
+        NPC {stats.residentCount} · CAR {stats.vehicleCount}
+      </span>
+      <span>
+        {stats.controlMode.toUpperCase()} · {stats.controlledMotion.toUpperCase()}
+      </span>
+      <span>
         L {stats.audioLow.toFixed(2)} · M {stats.audioMid.toFixed(2)} · H{' '}
         {stats.audioHigh.toFixed(2)}
       </span>

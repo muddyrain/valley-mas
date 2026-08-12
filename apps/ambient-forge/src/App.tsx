@@ -5,30 +5,26 @@ import { AudioControls } from './components/AudioControls';
 import { ControlPanel } from './components/ControlPanel';
 import { DebugOverlay } from './components/DebugOverlay';
 import { PhotoModeOverlay } from './components/PhotoModeOverlay';
+import { PlayerHud } from './components/PlayerHud';
 import { RecordingControls } from './components/RecordingControls';
 import {
   type AmbientInputs,
   createDefaultAmbientInputs,
   getLocalTimeOfDay,
 } from './core/ambient-inputs';
-import {
-  type CameraTourState,
-  type CameraViewId,
-  DEFAULT_CAMERA_TOUR_STATE,
-} from './core/camera-tour';
 import { type EnvironmentPresetId, getEnvironmentPresetChanges } from './core/environment-presets';
+import { createGameSessionState, reduceGameSession } from './core/game-session';
 import {
-  DEFAULT_NPC_CAMERA_STATE,
-  type NpcCameraState,
-  type NpcId,
-  type NpcViewMode,
-} from './core/npc';
+  EMPTY_NPC_INTERACTION_HUD_STATE,
+  type NpcInteractionHudState,
+} from './core/npc-interactions';
 import {
   DEFAULT_PHOTO_MODE_STATE,
   type PhotoModeState,
   setPhotoModeEnabled,
   updatePhotoModeSettings,
 } from './core/photo-mode';
+import { createWorldControlState, type WorldControlState } from './core/playable-world';
 import {
   type AmbientPreferences,
   DEFAULT_PREFERENCES,
@@ -90,6 +86,7 @@ export default function App() {
   const downloadUrlRef = useRef<string | null>(null);
   const recordingFailedRef = useRef(false);
   const unmountedRef = useRef(false);
+  const gameSessionRef = useRef(createGameSessionState());
 
   const [preferences, setPreferences] = useState<AmbientPreferences>(loadPreferences);
   const [realTime, setRealTime] = useState(() => getLocalTimeOfDay());
@@ -99,12 +96,13 @@ export default function App() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [debugStats, setDebugStats] = useState<AmbientDebugStats | null>(null);
-  const [cameraState, setCameraState] = useState<CameraTourState>(() => ({
-    ...DEFAULT_CAMERA_TOUR_STATE,
+  const [worldControlState, setWorldControlState] =
+    useState<WorldControlState>(createWorldControlState);
+  const [npcInteractionState, setNpcInteractionState] = useState<NpcInteractionHudState>(() => ({
+    ...EMPTY_NPC_INTERACTION_HUD_STATE,
   }));
-  const [npcCameraState, setNpcCameraState] = useState<NpcCameraState>(() => ({
-    ...DEFAULT_NPC_CAMERA_STATE,
-  }));
+  const [gameSession, setGameSession] = useState(createGameSessionState);
+  gameSessionRef.current = gameSession;
   const [activeEnvironmentPreset, setActiveEnvironmentPreset] =
     useState<EnvironmentPresetId | null>(null);
   const [photoMode, setPhotoMode] = useState<PhotoModeState>(() => ({
@@ -238,8 +236,17 @@ export default function App() {
   }, [photoMode.depthOfField, photoMode.enabled]);
 
   useEffect(() => {
-    const handlePhotoShortcut = (event: KeyboardEvent) => {
+    const handleGameShortcut = (event: KeyboardEvent) => {
       const target = event.target;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (photoMode.enabled) {
+          setPhotoMode((current) => setPhotoModeEnabled(current, false));
+        } else {
+          setGameSession((current) => reduceGameSession(current, { type: 'toggle-pause' }));
+        }
+        return;
+      }
       if (
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
@@ -247,16 +254,23 @@ export default function App() {
       ) {
         return;
       }
-      if (event.key.toLowerCase() === 'p' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      if (
+        event.key.toLowerCase() === 'p' &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !gameSession.paused
+      ) {
         setPhotoMode((current) => setPhotoModeEnabled(current, !current.enabled));
-      } else if (event.key === 'Escape') {
-        setPhotoMode((current) => setPhotoModeEnabled(current, false));
-        engineRef.current?.exitNpcView();
       }
     };
-    window.addEventListener('keydown', handlePhotoShortcut);
-    return () => window.removeEventListener('keydown', handlePhotoShortcut);
-  }, []);
+    window.addEventListener('keydown', handleGameShortcut);
+    return () => window.removeEventListener('keydown', handleGameShortcut);
+  }, [gameSession.paused, photoMode.enabled]);
+
+  useEffect(() => {
+    engineRef.current?.setPaused(gameSession.paused);
+  }, [gameSession.paused]);
 
   const getInputs = useCallback((): AmbientInputs => {
     const current = preferencesRef.current;
@@ -278,33 +292,14 @@ export default function App() {
   const handleEngineReady = useCallback((engine: AmbientEngine | null) => {
     engineRef.current = engine;
     if (engine) {
-      setCameraState(engine.getCameraTourState());
-      setNpcCameraState(engine.getNpcCameraState());
+      setWorldControlState(engine.getWorldControlState());
+      setNpcInteractionState(engine.getNpcInteractionState());
+      engine.setPaused(gameSessionRef.current.paused);
     }
   }, []);
 
   const handleThunder = useCallback((event: ThunderEvent) => {
     audioEngineRef.current?.triggerThunder(event);
-  }, []);
-
-  const focusCameraView = useCallback((view: CameraViewId) => {
-    engineRef.current?.focusCameraView(view);
-  }, []);
-
-  const setAutoTour = useCallback((enabled: boolean) => {
-    engineRef.current?.setAutoTour(enabled);
-  }, []);
-
-  const focusNpc = useCallback((id: NpcId) => {
-    engineRef.current?.focusNpc(id);
-  }, []);
-
-  const setNpcCameraMode = useCallback((mode: Exclude<NpcViewMode, 'orbit'>) => {
-    engineRef.current?.setNpcCameraMode(mode);
-  }, []);
-
-  const exitNpcCamera = useCallback(() => {
-    engineRef.current?.exitNpcView();
   }, []);
 
   const handleStats = useCallback(
@@ -494,7 +489,6 @@ export default function App() {
     setPreferences(DEFAULT_PREFERENCES);
     setActiveEnvironmentPreset(null);
     setPhotoMode({ ...DEFAULT_PHOTO_MODE_STATE });
-    engineRef.current?.focusCameraView('overview');
     setNotice('已恢复默认设置。');
   }, []);
 
@@ -504,12 +498,13 @@ export default function App() {
       className={`ambient-app photo-filter-${photoMode.filter}${photoMode.enabled ? ' is-photo-mode' : ''}`}
     >
       <AmbientCanvas
+        debug={debugEnabled}
         quality={preferences.quality}
         getInputs={getInputs}
         onReady={handleEngineReady}
         onStats={handleStats}
-        onCameraState={setCameraState}
-        onNpcCameraState={setNpcCameraState}
+        onWorldControlState={setWorldControlState}
+        onNpcInteractionState={setNpcInteractionState}
         onThunder={handleThunder}
       />
       <div className="sky-vignette" aria-hidden="true" />
@@ -518,7 +513,7 @@ export default function App() {
           <span />
         </div>
         <div>
-          <span className="scene-title">AMBIENT FORGE</span>
+          <span className="scene-title">AMBIENT FORGE · 溪谷镇</span>
           <p>
             {formatClock(displayTime)} · {weatherNames[preferences.weather]}
             {audioState.playing ? ' · 音乐响应中' : ''}
@@ -526,53 +521,56 @@ export default function App() {
         </div>
       </header>
 
-      <ControlPanel
-        preferences={preferences}
-        displayTime={displayTime}
-        fullscreen={fullscreen}
-        fullscreenSupported={fullscreenSupported}
-        onChange={updatePreferences}
-        onEnvironmentToggle={(enabled) => void handleEnvironmentToggle(enabled)}
-        onFullscreen={() => void toggleFullscreen()}
-        onReset={handleReset}
-        cameraState={cameraState}
-        npcCameraState={npcCameraState}
-        onCameraView={focusCameraView}
-        onAutoTour={setAutoTour}
-        onNpcSelect={focusNpc}
-        onNpcViewMode={setNpcCameraMode}
-        onNpcExit={exitNpcCamera}
-        onPhotoMode={() => setPhotoMode((current) => setPhotoModeEnabled(current, true))}
-        activeEnvironmentPreset={activeEnvironmentPreset}
-        onEnvironmentPreset={applyEnvironmentPreset}
-        audioControls={
-          <AudioControls
-            state={audioState}
-            musicVolume={preferences.musicVolume}
-            responseStrength={preferences.musicResponse}
-            onFile={(file) => audioEngineRef.current?.loadFile(file)}
-            onToggle={() => {
-              void audioEngineRef.current?.togglePlayback().catch((error: unknown) => {
-                setNotice(error instanceof Error ? error.message : '音乐无法播放。');
-              });
-            }}
-            onSeek={(progress) => audioEngineRef.current?.seek(progress)}
-            onVolume={(musicVolume) => updatePreferences({ musicVolume })}
-            onResponse={(musicResponse) => updatePreferences({ musicResponse })}
-            onClear={() => audioEngineRef.current?.clearFile()}
-          />
-        }
-        recordingControls={
-          <RecordingControls
-            supported={recordingSupported}
-            state={recordingState}
-            includesAudio={recordingIncludesAudio}
-            fileName={recordingFileName}
-            onStart={startRecording}
-            onStop={stopRecording}
-          />
-        }
-      />
+      <PlayerHud state={worldControlState} interactionState={npcInteractionState} />
+
+      {gameSession.paused ? (
+        <ControlPanel
+          preferences={preferences}
+          displayTime={displayTime}
+          fullscreen={fullscreen}
+          fullscreenSupported={fullscreenSupported}
+          onChange={updatePreferences}
+          onEnvironmentToggle={(enabled) => void handleEnvironmentToggle(enabled)}
+          onFullscreen={() => void toggleFullscreen()}
+          onReset={handleReset}
+          onResume={() =>
+            setGameSession((current) => reduceGameSession(current, { type: 'resume' }))
+          }
+          onPhotoMode={() => {
+            setGameSession((current) => reduceGameSession(current, { type: 'resume' }));
+            setPhotoMode((current) => setPhotoModeEnabled(current, true));
+          }}
+          activeEnvironmentPreset={activeEnvironmentPreset}
+          onEnvironmentPreset={applyEnvironmentPreset}
+          audioControls={
+            <AudioControls
+              state={audioState}
+              musicVolume={preferences.musicVolume}
+              responseStrength={preferences.musicResponse}
+              onFile={(file) => audioEngineRef.current?.loadFile(file)}
+              onToggle={() => {
+                void audioEngineRef.current?.togglePlayback().catch((error: unknown) => {
+                  setNotice(error instanceof Error ? error.message : '音乐无法播放。');
+                });
+              }}
+              onSeek={(progress) => audioEngineRef.current?.seek(progress)}
+              onVolume={(musicVolume) => updatePreferences({ musicVolume })}
+              onResponse={(musicResponse) => updatePreferences({ musicResponse })}
+              onClear={() => audioEngineRef.current?.clearFile()}
+            />
+          }
+          recordingControls={
+            <RecordingControls
+              supported={recordingSupported}
+              state={recordingState}
+              includesAudio={recordingIncludesAudio}
+              fileName={recordingFileName}
+              onStart={startRecording}
+              onStop={stopRecording}
+            />
+          }
+        />
+      ) : null}
 
       <PhotoModeOverlay
         state={photoMode}

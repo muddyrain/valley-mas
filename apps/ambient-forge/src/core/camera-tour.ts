@@ -1,4 +1,5 @@
 import type { CameraOrbitState } from './camera-orbit';
+import { scaleTownVec3, TOWN_LAYOUT_SCALE } from './town-layout';
 
 export type CameraViewId =
   | 'overview'
@@ -8,7 +9,10 @@ export type CameraViewId =
   | 'crystal'
   | 'ruins'
   | 'harbor'
-  | 'greenhouse';
+  | 'greenhouse'
+  | 'eastDistrict'
+  | 'southRiverside'
+  | 'westCoast';
 
 export interface CameraViewPreset {
   label: string;
@@ -31,46 +35,68 @@ const orbitFromOffset = (x: number, y: number, z: number): Readonly<CameraOrbitS
   });
 };
 
+const orbitFromTownOffset = (x: number, y: number, z: number): Readonly<CameraOrbitState> =>
+  orbitFromOffset(
+    x * TOWN_LAYOUT_SCALE * 0.9,
+    y * TOWN_LAYOUT_SCALE * 0.84,
+    z * TOWN_LAYOUT_SCALE * 0.9,
+  );
+
 export const CAMERA_VIEW_PRESETS: Readonly<Record<CameraViewId, CameraViewPreset>> = Object.freeze({
   overview: {
-    label: '总览',
-    target: [0, -0.7, 0],
-    orbit: orbitFromOffset(12.4, 8.1, 21),
+    label: '全镇',
+    target: scaleTownVec3([0, 0, 14]),
+    orbit: orbitFromTownOffset(38, 32, 46),
   },
   observatory: {
-    label: '天文台',
-    target: [-5.2, 5.25, -5.8],
-    orbit: orbitFromOffset(-10.5, 6.2, -10.5),
+    label: '北街',
+    target: scaleTownVec3([0, 1.2, -11]),
+    orbit: orbitFromTownOffset(13, 10, 15),
   },
   cavern: {
-    label: '瀑布洞穴',
-    target: [5.8, -4.05, 6],
-    orbit: orbitFromOffset(8, 5, 8),
+    label: '南街',
+    target: scaleTownVec3([0, 1.1, 11]),
+    orbit: orbitFromTownOffset(-13, 9, 15),
   },
   garden: {
-    label: '灯笼庭院',
-    target: [8.05, -0.45, 1.12],
-    orbit: orbitFromOffset(8.5, 5.5, 7.5),
+    label: '中心广场',
+    target: [0, 0.8, 0],
+    orbit: orbitFromTownOffset(11, 8, 13),
   },
   crystal: {
-    label: '晶石林',
-    target: [-7.7, -0.95, 3.45],
-    orbit: orbitFromOffset(-8, 5, 8),
+    label: '住宅区',
+    target: scaleTownVec3([4, 1.2, -14]),
+    orbit: orbitFromTownOffset(11, 8, 12),
   },
   ruins: {
-    label: '遗迹水池',
-    target: [2.35, -1.25, -8.15],
-    orbit: orbitFromOffset(7, 5, -10),
+    label: '环城路',
+    target: scaleTownVec3([-11.5, 0.7, 0]),
+    orbit: orbitFromTownOffset(-10, 9, 14),
   },
   harbor: {
-    label: '空中港口',
-    target: [-10.2, 0.55, -2.1],
-    orbit: orbitFromOffset(-9, 5.6, 9),
+    label: '港口工坊',
+    target: scaleTownVec3([-23, 2.5, 4.5]),
+    orbit: orbitFromTownOffset(-18, 13, 23),
   },
   greenhouse: {
-    label: '玻璃温室',
-    target: [9.4, 1.65, -5.4],
-    orbit: orbitFromOffset(9, 5.4, -9),
+    label: '花园温室',
+    target: scaleTownVec3([21, 1.4, 6]),
+    orbit: orbitFromTownOffset(11, 8, -13),
+  },
+  eastDistrict: {
+    label: '东部生活街区',
+    target: scaleTownVec3([40, 1.2, 0]),
+    orbit: orbitFromTownOffset(16, 12, 18),
+  },
+  southRiverside: {
+    label: '南部河岸街区',
+    target: scaleTownVec3([0, 1.2, 43]),
+    orbit: orbitFromTownOffset(-16, 12, 18),
+  },
+  westCoast: {
+    label: '西部滨海街区',
+    target: scaleTownVec3([-44, 1.2, 0]),
+    orbit: orbitFromTownOffset(-16, 12, 18),
   },
 });
 
@@ -82,6 +108,9 @@ export const CAMERA_TOUR_ORDER: readonly CameraViewId[] = Object.freeze([
   'ruins',
   'harbor',
   'greenhouse',
+  'eastDistrict',
+  'southRiverside',
+  'westCoast',
   'overview',
 ]);
 

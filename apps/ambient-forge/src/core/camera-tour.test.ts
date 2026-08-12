@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { orbitCameraPosition } from './camera-orbit';
+import { MAX_CAMERA_DISTANCE, orbitCameraPosition } from './camera-orbit';
 import {
   advanceCameraTour,
   CAMERA_TOUR_ORDER,
@@ -11,7 +11,7 @@ import {
 } from './camera-tour';
 
 describe('camera tour', () => {
-  it('为总览和七处地标提供有边界的镜头预设', () => {
+  it('为总览和十处地标提供有边界的镜头预设', () => {
     expect(Object.keys(CAMERA_VIEW_PRESETS)).toEqual([
       'overview',
       'observatory',
@@ -21,6 +21,9 @@ describe('camera tour', () => {
       'ruins',
       'harbor',
       'greenhouse',
+      'eastDistrict',
+      'southRiverside',
+      'westCoast',
     ]);
 
     for (const preset of Object.values(CAMERA_VIEW_PRESETS)) {
@@ -32,7 +35,7 @@ describe('camera tour', () => {
       );
       expect(distance).toBeCloseTo(preset.orbit.distance, 5);
       expect(distance).toBeGreaterThanOrEqual(12);
-      expect(distance).toBeLessThanOrEqual(40);
+      expect(distance).toBeLessThanOrEqual(MAX_CAMERA_DISTANCE);
     }
   });
 
@@ -45,12 +48,18 @@ describe('camera tour', () => {
       'ruins',
       'harbor',
       'greenhouse',
+      'eastDistrict',
+      'southRiverside',
+      'westCoast',
       'overview',
     ]);
     expect(getNextCameraView('overview')).toBe('observatory');
     expect(getNextCameraView('observatory')).toBe('cavern');
     expect(getNextCameraView('ruins')).toBe('harbor');
-    expect(getNextCameraView('greenhouse')).toBe('overview');
+    expect(getNextCameraView('greenhouse')).toBe('eastDistrict');
+    expect(getNextCameraView('eastDistrict')).toBe('southRiverside');
+    expect(getNextCameraView('southRiverside')).toBe('westCoast');
+    expect(getNextCameraView('westCoast')).toBe('overview');
   });
 
   it('开启后立即进入下一站，并只在停留时间到达后继续', () => {
