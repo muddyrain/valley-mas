@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { birthPressure, calculateCarryingCapacity, resolveShortageStage } from './demographics';
+import { ResidentSex } from '@/shared/gameTypes';
+import {
+  birthPressure,
+  calculateCarryingCapacity,
+  chooseNewbornSex,
+  resolveShortageStage,
+} from './demographics';
 
 describe('dynamic population capacity', () => {
   it('grows with housing and durable food production instead of a global cap', () => {
@@ -52,6 +58,21 @@ describe('dynamic population capacity', () => {
     );
     expect(resolveShortageStage({ storedFood: 0, population: 20, shortageTicks: 2_000 })).toBe(
       'famine',
+    );
+  });
+
+  it('balances the next generation independently of recycled entity slot parity', () => {
+    expect(chooseNewbornSex({ femaleChildren: 1, maleChildren: 4, randomValue: 0.9 })).toBe(
+      ResidentSex.Female,
+    );
+    expect(chooseNewbornSex({ femaleChildren: 5, maleChildren: 2, randomValue: 0.1 })).toBe(
+      ResidentSex.Male,
+    );
+    expect(chooseNewbornSex({ femaleChildren: 3, maleChildren: 3, randomValue: 0.1 })).toBe(
+      ResidentSex.Female,
+    );
+    expect(chooseNewbornSex({ femaleChildren: 3, maleChildren: 3, randomValue: 0.9 })).toBe(
+      ResidentSex.Male,
     );
   });
 });

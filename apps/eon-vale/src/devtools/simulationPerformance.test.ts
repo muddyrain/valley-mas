@@ -57,7 +57,7 @@ describe('simulation performance regressions', () => {
     expect(elapsedMs).toBeLessThan(15_000);
   });
 
-  it('moves two armies through shared flow fields and damages a target village', () => {
+  it('moves two armies through shared flow fields and resolves guard combat first', () => {
     const simulation = createWorldSimulation({ seed: 'field-battle', initialHumans: 240 });
     const first = simulation.ensureVillageAt(40, 64, 120);
     const second = simulation.ensureVillageAt(88, 64, 120);
@@ -69,12 +69,20 @@ describe('simulation performance regressions', () => {
     }
     formKingdoms(simulation.state);
     setDiplomacy(simulation.state, 1, 2, DiplomacyState.War);
-    const healthBefore = second.health;
+    const guardHealthBefore = Array.from(simulation.state.entities.health.slice(0, 240)).reduce(
+      (sum, health) => sum + health,
+      0,
+    );
     const elapsedMs = timeScenario('two-kingdom-field-battle', () => {
       for (let tick = 0; tick < 1_200; tick += 1) simulation.step();
     });
 
-    expect(second.health).toBeLessThan(healthBefore);
+    const guardHealthAfter = Array.from(simulation.state.entities.health.slice(0, 240)).reduce(
+      (sum, health) => sum + health,
+      0,
+    );
+    expect(guardHealthAfter).toBeLessThan(guardHealthBefore);
+    expect(second.health).toBeGreaterThanOrEqual(650);
     expect(elapsedMs).toBeLessThan(15_000);
   });
 

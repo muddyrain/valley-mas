@@ -12,7 +12,19 @@ import {
   TerrainType,
   type WorldSettings,
 } from '@/shared/gameTypes';
+import {
+  attackThrustFrame,
+  combatHealthBar,
+  shouldEmitDeathPuff,
+  shouldFlashFromDamage,
+} from './combatFeedback';
 import { humanAgeScale } from './entityAppearance';
+import {
+  buildingInteractionGeometry,
+  entityInteractionGeometry,
+  type InteractionGeometry,
+  interactionStrokeWidth,
+} from './interactionFeedback';
 import { buildingFeedback, shouldEmitAttackHit } from './mapFeedback';
 import {
   createPixelCamera,
@@ -138,7 +150,7 @@ interface TransientEffect {
   color: number;
   startedAt: number;
   duration: number;
-  kind: 'power' | 'attack';
+  kind: 'power' | 'attack' | 'death';
 }
 
 interface CameraTween {
@@ -262,6 +274,7 @@ export class EonValeEngine {
   private readonly buildingLayer = new Container();
   private readonly entityLayer = new Container();
   private readonly statusLayer = new Graphics({ roundPixels: true });
+  private readonly combatStatusLayer = new Graphics({ roundPixels: true });
   private readonly interactionLayer = new Graphics({ roundPixels: true });
   private readonly effectLayer = new Graphics({ roundPixels: true });
   private readonly labelLayer = new Container();
@@ -275,6 +288,9 @@ export class EonValeEngine {
   private readonly settlementLabels = new Map<number, Text>();
   private readonly lastAttackFeedbackTicks = new Map<number, number>();
   private readonly transientEffects: TransientEffect[] = [];
+  private readonly damageFlashUntil = new Map<number, number>();
+  private previousEntityActive = new Uint8Array();
+  private previousEntityHealth = new Uint16Array();
   private readonly initializePromise: Promise<void>;
   private map: WorldMapSnapshot | null = null;
   private snapshot: WorldRenderSnapshot | null = null;
@@ -332,6 +348,7 @@ export class EonValeEngine {
   }
 
   pushSnapshot(snapshot: RenderSnapshot): void {
+    if ('buildings' in snapshot) this.collectCombatTransitions(snapshot as WorldRenderSnapshot);
     this.interpolator.push(snapshot);
     this.canvas.dataset.population = String(snapshot.population);
     this.canvas.dataset.tick = String(snapshot.tick);
@@ -627,6 +644,7 @@ export class EonValeEngine {
       this.buildingLayer,
       this.entityLayer,
       this.statusLayer,
+      this.combatStatusLayer,
       this.interactionLayer,
       this.effectLayer,
     );
@@ -659,6 +677,7 @@ export class EonValeEngine {
     this.updateCameraTween(now);
     this.updateWorldTransform();
     this.updateEntities(now);
+    this.redrawCombatStatus();
     this.updateSettlementLabelPositions();
     this.redrawInteraction();
     this.redrawEffects(now);
@@ -936,8 +955,14 @@ export class EonValeEngine {
         this.viewLevel === 'resident' && moving && (Math.floor(now / 160) + entityId) % 2 === 0
           ? -0.25
           : 0;
-      sprite.position.set(sample.x * WORLD_PIXELS_PER_CELL, sample.z * WORLD_PIXELS_PER_CELL + bob);
       const facing = Math.sin(sample.heading) < -0.08 ? -1 : 1;
+      const attackFrame = attackThrustFrame(sample.state, latest.tick, entityId);
+      const thrust = attackFrame * facing * 0.45;
+      sprite.position.set(
+        sample.x * WORLD_PIXELS_PER_CELL + thrust,
+        sample.z * WORLD_PIXELS_PER_CELL + bob,
+      );
+      sprite.rotation = attackFrame ? facing * 0.045 : 0;
       const ageScale = kind === EntityKind.Human ? humanAgeScale(latest.ages?.[entityId] ?? 18) : 1;
       const viewScale = this.viewLevel === 'resident' ? 1 : 0.52;
       sprite.scale.set(
@@ -945,6 +970,7 @@ export class EonValeEngine {
         ENTITY_SOURCE_SCALE * ageScale * viewScale,
       );
       sprite.alpha = (latest.infected?.[entityId] ?? 0) > 0 ? 0.78 : 1;
+      sprite.tint = (this.damageFlashUntil.get(entityId) ?? 0) > now ? 0xff6d62 : 0xffffff;
       textureSet.add(sprite.texture.uid);
       visible += 1;
       if (this.viewLevel === 'settlement') strategic += 1;
@@ -953,6 +979,83 @@ export class EonValeEngine {
     this.canvas.dataset.residentVisible = String(visible);
     this.canvas.dataset.entityTextures = String(textureSet.size);
     this.canvas.dataset.strategicIcons = String(strategic);
+  }
+
+  private collectCombatTransitions(snapshot: WorldRenderSnapshot): void {
+    const now = performance.now();
+    let flashes = 0;
+    let deathPuffs = 0;
+    let attackFrames = 0;
+    for (let entityId = 0; entityId < snapshot.population; entityId += 1) {
+      const active = snapshot.active[entityId] ?? 0;
+      const health = snapshot.health[entityId] ?? 0;
+      const previousActive = this.previousEntityActive[entityId] ?? active;
+      const previousHealth = this.previousEntityHealth[entityId] ?? health;
+      if (snapshot.states[entityId] === AgentState.Attack) attackFrames += 1;
+      if (shouldFlashFromDamage(previousHealth, health)) {
+        this.damageFlashUntil.set(entityId, now + 180);
+        flashes += 1;
+      }
+      if (
+        shouldEmitDeathPuff(
+          previousActive,
+          active,
+          (snapshot.kinds[entityId] ?? EntityKind.Human) as EntityKind,
+        )
+      ) {
+        this.transientEffects.push({
+          x: snapshot.positionsX[entityId] ?? 0,
+          z: snapshot.positionsZ[entityId] ?? 0,
+          radius: 0.7,
+          color: 0xc6b9a0,
+          startedAt: now,
+          duration: 420,
+          kind: 'death',
+        });
+        deathPuffs += 1;
+      }
+    }
+    this.previousEntityActive = snapshot.active.slice();
+    this.previousEntityHealth = snapshot.health.slice();
+    this.canvas.dataset.damageFlashes = String(
+      Number(this.canvas.dataset.damageFlashes ?? 0) + flashes,
+    );
+    this.canvas.dataset.deathPuffs = String(
+      Number(this.canvas.dataset.deathPuffs ?? 0) + deathPuffs,
+    );
+    this.canvas.dataset.attackFrames = String(attackFrames);
+  }
+
+  private redrawCombatStatus(): void {
+    this.combatStatusLayer.clear();
+    const latest = this.interpolator.latest;
+    if (!latest || this.viewLevel === 'world') {
+      this.canvas.dataset.combatHealthBars = '0';
+      return;
+    }
+    const thickness = 1 / Math.max(0.25, this.camera.zoom);
+    let visible = 0;
+    for (let entityId = 0; entityId < latest.population; entityId += 1) {
+      if ((latest.active?.[entityId] ?? 0) !== 1) continue;
+      const feedback = combatHealthBar(
+        (latest.professions?.[entityId] ?? Profession.Forager) as Profession,
+        (latest.states[entityId] ?? AgentState.Idle) as AgentState,
+        latest.health?.[entityId] ?? 1_000,
+      );
+      if (!feedback.visible) continue;
+      const x = (latest.positionsX[entityId] ?? 0) * WORLD_PIXELS_PER_CELL;
+      const z = (latest.positionsZ[entityId] ?? 0) * WORLD_PIXELS_PER_CELL - 5;
+      this.combatStatusLayer.rect(x - 2.25, z, 4.5, thickness).fill({
+        color: 0x2b2825,
+        alpha: 0.82,
+      });
+      this.combatStatusLayer.rect(x - 2.25, z, 4.5 * feedback.ratio, thickness).fill({
+        color: feedback.ratio > 0.5 ? 0x83d16f : feedback.ratio > 0.25 ? 0xe1b75b : 0xe26455,
+        alpha: 1,
+      });
+      visible += 1;
+    }
+    this.canvas.dataset.combatHealthBars = String(visible);
   }
 
   private updateBuildings(): void {
@@ -1181,6 +1284,14 @@ export class EonValeEngine {
           .moveTo(x + radius, z - radius)
           .lineTo(x - radius, z + radius)
           .stroke({ color: effect.color, width: 0.8, alpha: 1 - progress });
+      } else if (effect.kind === 'death') {
+        for (let puff = 0; puff < 4; puff += 1) {
+          const angle = (Math.PI * 2 * puff) / 4;
+          const distance = radius * progress * 0.9;
+          this.effectLayer
+            .circle(x + Math.cos(angle) * distance, z + Math.sin(angle) * distance, radius * 0.18)
+            .fill({ color: effect.color, alpha: 1 - progress });
+        }
       } else {
         this.effectLayer
           .circle(x, z, radius)
@@ -1201,52 +1312,86 @@ export class EonValeEngine {
         .fill({ color: 0xdaf49c, alpha: 0.12 })
         .stroke({ color: 0xdaf49c, width: 0.8, alpha: 0.95 });
     }
-    const drawTarget = (target: WorldSelection | null, color: number, width: number) => {
+    const drawTarget = (
+      target: WorldSelection | null,
+      color: number,
+      tone: 'hover' | 'selected',
+    ) => {
       const point = this.targetPosition(target);
       if (!point) return false;
-      this.interactionLayer
-        .circle(
-          point.x * WORLD_PIXELS_PER_CELL,
-          point.z * WORLD_PIXELS_PER_CELL,
-          point.radius * WORLD_PIXELS_PER_CELL,
-        )
-        .stroke({ color, width, alpha: 0.95 });
+      const x = (point.x + point.geometry.offsetX) * WORLD_PIXELS_PER_CELL;
+      const z = (point.z + point.geometry.offsetZ) * WORLD_PIXELS_PER_CELL;
+      if (point.geometry.shape === 'ellipse') {
+        this.interactionLayer.ellipse(
+          x,
+          z,
+          point.geometry.radiusX * WORLD_PIXELS_PER_CELL,
+          point.geometry.radiusZ * WORLD_PIXELS_PER_CELL,
+        );
+      } else {
+        this.interactionLayer.circle(x, z, point.geometry.radiusX * WORLD_PIXELS_PER_CELL);
+      }
+      this.interactionLayer.stroke({
+        color,
+        width: interactionStrokeWidth(this.camera.zoom, tone),
+        alpha: 0.95,
+      });
       return true;
     };
-    const hover = !this.brushVisible && drawTarget(this.hoveredTarget, 0x8fe49a, 0.8);
-    const selected = drawTarget(this.selectedTarget, 0xffd86a, 1.2);
+    const hover = !this.brushVisible && drawTarget(this.hoveredTarget, 0x8fe49a, 'hover');
+    const selected = drawTarget(this.selectedTarget, 0xffd86a, 'selected');
     this.canvas.dataset.hoverHighlight = String(hover);
     this.canvas.dataset.selectionOutline = String(selected);
+    this.canvas.dataset.hoverStrokePx = '1';
+    this.canvas.dataset.selectionStrokePx = '1.5';
   }
 
   private targetPosition(
     target: WorldSelection | null,
-  ): { x: number; z: number; radius: number } | null {
+  ): { x: number; z: number; geometry: InteractionGeometry } | null {
     if (!target) return null;
     if (target.kind === 'entity') {
+      if (this.viewLevel !== 'resident') return null;
       const latest = this.interpolator.latest;
       if (!latest || target.id >= latest.population) return null;
       return {
         x: latest.positionsX[target.id] ?? 0,
         z: latest.positionsZ[target.id] ?? 0,
-        radius: 0.9,
+        geometry: entityInteractionGeometry(),
       };
     }
     if (target.kind === 'building') {
+      if (this.viewLevel === 'world') return null;
       const building = this.snapshot?.buildings.find((candidate) => candidate.id === target.id);
-      return building ? { x: building.x, z: building.z, radius: 2.2 } : null;
+      return building
+        ? { x: building.x, z: building.z, geometry: buildingInteractionGeometry(building.type) }
+        : null;
     }
     if (target.kind === 'resource') {
+      if (this.viewLevel === 'world') return null;
       const resources = this.resourceNodes;
       if (!resources || resources.active[target.id] !== 1) return null;
       return {
         x: resources.positionsX[target.id] ?? 0,
         z: resources.positionsZ[target.id] ?? 0,
-        radius: 0.7,
+        geometry: {
+          shape: 'ellipse',
+          offsetX: 0,
+          offsetZ: -0.08,
+          radiusX: 0.62,
+          radiusZ: 0.34,
+        },
       };
     }
     const village = this.snapshot?.villages.find((candidate) => candidate.id === target.id);
-    return village ? { x: village.x, z: village.z, radius: 3.2 + village.tier } : null;
+    const radius = village ? 3.2 + village.tier : 0;
+    return village
+      ? {
+          x: village.x,
+          z: village.z,
+          geometry: { shape: 'circle', offsetX: 0, offsetZ: 0, radiusX: radius, radiusZ: radius },
+        }
+      : null;
   }
 
   private updateWorldTransform(): void {
@@ -1545,7 +1690,7 @@ export class EonValeEngine {
     this.canvas.dataset.cameraNorth = 'fixed';
     this.canvas.dataset.humanStyle = 'layered-pixel-sprites';
     this.canvas.dataset.animalStyle = 'pixel-side-profiles';
-    this.canvas.dataset.animalStyles = '6';
+    this.canvas.dataset.animalStyles = '7';
     this.canvas.dataset.kingdomPalette = 'residents-buildings-flags';
     this.canvas.dataset.buildingStyle = 'functional-pixel-buildings';
     this.canvas.dataset.viewLevels = 'world-settlement-resident';

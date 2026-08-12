@@ -303,6 +303,8 @@ export interface Village {
   shortageTicks: number;
   lastBirthTick: number;
   pioneerReadyAtTick: number;
+  captureKingdomId?: number;
+  captureProgress?: number;
 }
 
 export type ShortageStage = 'stable' | 'rationing' | 'migration' | 'famine';
@@ -342,6 +344,53 @@ export interface PopulationDiagnostics {
   history: PopulationHistoryPoint[];
 }
 
+export interface WorldLaws {
+  naturalAnimalReturn: boolean;
+  civilizationAwakening: boolean;
+}
+
+export type AnimalEcologyStatus =
+  | 'not-introduced'
+  | 'stable'
+  | 'endangered'
+  | 'extinct'
+  | 'waiting-habitat'
+  | 'return-cooldown'
+  | 'returning';
+
+export interface SpeciesEcologyDiagnostics {
+  kind: EntityKind;
+  count: number;
+  capacity: number;
+  status: AnimalEcologyStatus;
+  everPresent: boolean;
+  lastReturnTick: number;
+}
+
+export interface EcologyDiagnostics {
+  animals: number;
+  species: SpeciesEcologyDiagnostics[];
+  nextReturnTicks: number[];
+  extinctSinceTicks: number[];
+}
+
+export interface WarCampaign {
+  firstKingdomId: number;
+  secondKingdomId: number;
+  startedAtTick: number;
+  initialMilitaryPower: Record<number, number>;
+  lastProgressTick: number;
+  capturedVillageIds: number[];
+  score: Record<number, number>;
+  fatigue: Record<number, number>;
+}
+
+export interface TruceRecord {
+  firstKingdomId: number;
+  secondKingdomId: number;
+  untilTick: number;
+}
+
 export interface PioneerExpedition {
   id: number;
   originVillageId: number;
@@ -352,6 +401,7 @@ export interface PioneerExpedition {
   targetCell: number;
   startedAtTick: number;
   supplies: number;
+  destinationVillageId?: number;
 }
 
 export interface Kingdom {
@@ -386,7 +436,10 @@ export interface WorldEvent {
     | 'extinction'
     | 'promotion'
     | 'death'
-    | 'equipment';
+    | 'equipment'
+    | 'ecology'
+    | 'awakening'
+    | 'conquest';
   message: string;
 }
 
@@ -407,6 +460,11 @@ export interface WorldState {
   nextEventId: number;
   forcedPeaceUntil: number;
   population: PopulationDiagnostics;
+  worldLaws: WorldLaws;
+  ecology: EcologyDiagnostics;
+  humanExtinctSinceTick: number;
+  wars: WarCampaign[];
+  truces: TruceRecord[];
   expeditions: PioneerExpedition[];
   nextFamilyId: number;
   nextExpeditionId: number;

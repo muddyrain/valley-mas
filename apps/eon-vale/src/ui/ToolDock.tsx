@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   CloudRain,
   Cross,
+  Fish,
   Flame,
   HeartPulse,
   LandPlot,
@@ -56,6 +57,7 @@ const LIFE_TOOLS: Array<ToolItem<MapTool>> = [
   { id: 'spawn-deer', label: '鹿群', icon: <PawPrint size={17} /> },
   { id: 'spawn-wolf', label: '狼群', icon: <Bone size={17} /> },
   { id: 'spawn-bear', label: '熊', icon: <ShieldAlert size={17} /> },
+  { id: 'spawn-fish', label: '鱼群', icon: <Fish size={17} /> },
 ];
 
 const POWER_TOOLS: Array<ToolItem<GodPower>> = [

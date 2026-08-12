@@ -1,9 +1,11 @@
 import type {
   Building,
+  EcologyDiagnostics,
   Kingdom,
   PopulationDiagnostics,
   Village,
   WorldEvent,
+  WorldLaws,
   WorldPreset,
   WorldSettings,
 } from '@/shared/gameTypes';
@@ -60,6 +62,8 @@ export interface WorldRenderSnapshot extends RenderSnapshot {
   events: WorldEvent[];
   settings: WorldSettings;
   demographics: PopulationDiagnostics;
+  worldLaws: WorldLaws;
+  ecology: EcologyDiagnostics;
 }
 
 export interface WorldMapSnapshot {

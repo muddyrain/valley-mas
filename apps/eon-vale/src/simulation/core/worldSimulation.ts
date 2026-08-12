@@ -42,10 +42,19 @@ import {
 import {
   birthPressure,
   calculateCarryingCapacity,
+  chooseNewbornSex,
   createPopulationDiagnostics,
   emptyDeathCauses,
   resolveShortageStage,
 } from '../systems/demographics';
+import {
+  ANIMAL_SPECIES,
+  ANIMAL_SPECIES_NAMES,
+  createEcologyDiagnostics,
+  habitatCells,
+  refreshEcologyDiagnostics,
+  speciesReturnGroup,
+} from '../systems/ecology';
 import {
   advanceConstruction,
   applyConstructionWork,
@@ -142,6 +151,45 @@ function createEntityArrays(capacity = MAX_ENTITIES): EntityArrays {
     names: [],
     paths: Array.from({ length: capacity }, () => null),
   };
+}
+
+function collectReferencedEntitySlots(state: WorldState): Uint8Array {
+  const referenced = new Uint8Array(state.entities.count);
+  for (let candidateId = 0; candidateId < state.entities.count; candidateId += 1) {
+    if (!state.entities.active[candidateId]) continue;
+    for (const entityId of [
+      state.entities.partnerIds[candidateId],
+      state.entities.parentAIds[candidateId],
+      state.entities.parentBIds[candidateId],
+    ]) {
+      if (entityId !== undefined && entityId < referenced.length) referenced[entityId] = 1;
+    }
+  }
+  for (const kingdom of state.kingdoms) {
+    if (!kingdom.extinct && kingdom.leaderId < referenced.length) {
+      referenced[kingdom.leaderId] = 1;
+    }
+  }
+  for (const expedition of state.expeditions) {
+    for (const entityId of expedition.memberIds) {
+      if (entityId < referenced.length) referenced[entityId] = 1;
+    }
+  }
+  return referenced;
+}
+
+function acquireEntitySlot(state: WorldState, referenced: Uint8Array | null): number {
+  if (state.entities.count < state.entities.capacity) {
+    const entityId = state.entities.count;
+    state.entities.count += 1;
+    return entityId;
+  }
+  for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
+    if (!state.entities.active[entityId] && referenced?.[entityId] !== 1) {
+      return entityId;
+    }
+  }
+  return -1;
 }
 
 function findNearestWalkable(state: WorldState, x: number, z: number): number {
@@ -298,6 +346,8 @@ function makeVillage(state: WorldState, x: number, z: number, population: number
     shortageTicks: 0,
     lastBirthTick: state.tick,
     pioneerReadyAtTick: state.tick + 1_440,
+    captureKingdomId: 0,
+    captureProgress: 0,
   };
   state.villages.push(village);
   addEvent(state, 'village', `${village.name}建立了营地`);
@@ -311,7 +361,7 @@ function createInitialState(options: CreateWorldOptions): WorldState {
     options.preset ?? 'archipelago',
   );
   return {
-    version: 4,
+    version: 5,
     seed: options.seed,
     tick: 0,
     year: 1,
@@ -327,6 +377,11 @@ function createInitialState(options: CreateWorldOptions): WorldState {
     nextEventId: 0,
     forcedPeaceUntil: 0,
     population: createPopulationDiagnostics(),
+    worldLaws: { naturalAnimalReturn: true, civilizationAwakening: false },
+    ecology: createEcologyDiagnostics(),
+    humanExtinctSinceTick: 0,
+    wars: [],
+    truces: [],
     expeditions: [],
     nextFamilyId: 0,
     nextExpeditionId: 0,
@@ -476,6 +531,7 @@ export function createWorldSimulation(options: CreateWorldOptions): WorldSimulat
   if (state.map.preset !== 'ocean') {
     for (const [kind, x, z, count] of wildlife) simulation.spawn(kind, x, z, count);
   }
+  refreshEcologyDiagnostics(state);
   return simulation;
 }
 
@@ -486,25 +542,24 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
 
   const spawn = (kind: EntityKind, x: number, z: number, count = 1): number[] => {
     const spawned: number[] = [];
-    for (
-      let index = 0;
-      index < count && state.entities.count < state.entities.capacity;
-      index += 1
-    ) {
-      const entityId = state.entities.count;
+    const referenced =
+      state.entities.count >= state.entities.capacity ? collectReferencedEntitySlots(state) : null;
+    for (let index = 0; index < count; index += 1) {
+      const entityId = acquireEntitySlot(state, referenced);
+      if (entityId < 0) break;
       const spawnX = x + (random() - 0.5) * 5;
       const spawnZ = z + (random() - 0.5) * 5;
       const cell =
         kind === EntityKind.Fish
           ? findNearestTerrain(state, spawnX, spawnZ, TerrainType.Ocean)
           : findNearestWalkable(state, spawnX, spawnZ);
-      state.entities.count += 1;
       state.entities.active[entityId] = 1;
       state.entities.kind[entityId] = kind;
       state.entities.positionsX[entityId] = (cell % state.map.size) + 0.5 + (random() - 0.5) * 0.4;
       state.entities.positionsZ[entityId] =
         Math.floor(cell / state.map.size) + 0.5 + (random() - 0.5) * 0.4;
       state.entities.health[entityId] = 1_000;
+      state.entities.headings[entityId] = 0;
       state.entities.hunger[entityId] = randomInt(random, 80, 420);
       state.entities.energy[entityId] = randomInt(random, 600, 1_000);
       state.entities.age[entityId] =
@@ -522,8 +577,18 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       state.entities.carriedResourceKinds[entityId] = 0;
       state.entities.states[entityId] = AgentState.Wander;
       state.entities.professions[entityId] = entityId % 7;
+      state.entities.villageIds[entityId] = 0;
+      state.entities.kingdomIds[entityId] = 0;
+      state.entities.targetCells[entityId] = NO_TARGET;
       state.entities.levels[entityId] = 1;
       state.entities.roles[entityId] = ResidentRole.Citizen;
+      state.entities.infected[entityId] = 0;
+      state.entities.blessed[entityId] = 0;
+      state.entities.enraged[entityId] = 0;
+      state.entities.experience[entityId] = 0;
+      state.entities.contribution[entityId] = 0;
+      state.entities.weaponTiers[entityId] = 0;
+      state.entities.armorTiers[entityId] = 0;
       state.entities.traits[entityId] = randomInt(random, 0, 7);
       state.entities.speed[entityId] =
         kind === EntityKind.Human ? 1.25 + (entityId % 9) * 0.025 : 1.45;
@@ -531,6 +596,11 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         kind === EntityKind.Human
           ? `${FIRST_NAMES[entityId % FIRST_NAMES.length]}·${Math.floor(entityId / FIRST_NAMES.length) + 1}`
           : `${EntityKind[kind]} ${entityId + 1}`;
+      state.entities.paths[entityId] = null;
+      if (kind !== EntityKind.Human) {
+        const diagnostics = state.ecology.species[kind];
+        if (diagnostics) diagnostics.everPresent = true;
+      }
       spawned.push(entityId);
     }
     return spawned;
@@ -763,6 +833,25 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     state.entities.parentAIds[newborn] = mother;
     state.entities.parentBIds[newborn] = father;
     state.entities.familyIds[newborn] = state.entities.familyIds[mother] ?? 0;
+    let femaleChildren = 0;
+    let maleChildren = 0;
+    for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
+      if (
+        !isLivingHuman(state, entityId) ||
+        entityId === newborn ||
+        (state.entities.age[entityId] ?? 0) >= 18 ||
+        state.entities.kingdomIds[entityId] !== village.kingdomId
+      ) {
+        continue;
+      }
+      if (state.entities.sex[entityId] === ResidentSex.Female) femaleChildren += 1;
+      else maleChildren += 1;
+    }
+    state.entities.sex[newborn] = chooseNewbornSex({
+      femaleChildren,
+      maleChildren,
+      randomValue: random(),
+    });
     state.entities.lastBirthTicks[mother] = state.tick;
     village.lastBirthTick = state.tick;
     village.resources.food = Math.max(0, village.resources.food - 2);
@@ -879,12 +968,115 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     addEvent(state, 'village', `${village.name}派出了一支拓荒队`);
   };
 
+  const tryLaunchPopulationRelocation = (): void => {
+    if (state.tick % 720 !== 0) return;
+    const relocatingIds = new Set(state.expeditions.flatMap((expedition) => expedition.memberIds));
+    const villageResidents = new Map<number, number[]>();
+    for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
+      if (!isLivingHuman(state, entityId) || relocatingIds.has(entityId)) continue;
+      const villageId = state.entities.villageIds[entityId] ?? 0;
+      if (!villageId) continue;
+      const residents = villageResidents.get(villageId) ?? [];
+      residents.push(entityId);
+      villageResidents.set(villageId, residents);
+    }
+    const smallVillages = state.villages
+      .filter(
+        (village) =>
+          village.health > 0 &&
+          village.kingdomId > 0 &&
+          (villageResidents.get(village.id)?.length ?? 0) > 0 &&
+          (villageResidents.get(village.id)?.length ?? 0) <= 8,
+      )
+      .sort(
+        (first, second) =>
+          (villageResidents.get(first.id)?.length ?? 0) -
+            (villageResidents.get(second.id)?.length ?? 0) || first.id - second.id,
+      );
+    const isAvailableAdult = (entityId: number): boolean => {
+      const age = state.entities.age[entityId] ?? 0;
+      return (
+        state.entities.partnerIds[entityId] === NO_ENTITY &&
+        (state.entities.carriedResources[entityId] ?? 0) === 0 &&
+        age >= 18 &&
+        (state.entities.sex[entityId] === ResidentSex.Female ? age <= 44 : age <= 58)
+      );
+    };
+    for (const source of smallVillages) {
+      const sourceAdults = (villageResidents.get(source.id) ?? []).filter(isAvailableAdult);
+      for (const residentId of sourceAdults) {
+        const residentSex = state.entities.sex[residentId] as ResidentSex;
+        const destinations = state.villages
+          .filter(
+            (candidate) =>
+              candidate.id !== source.id &&
+              candidate.health > 0 &&
+              candidate.kingdomId === source.kingdomId &&
+              (villageResidents.get(candidate.id) ?? []).some(
+                (candidateId) =>
+                  isAvailableAdult(candidateId) && state.entities.sex[candidateId] !== residentSex,
+              ),
+          )
+          .sort(
+            (first, second) =>
+              Math.hypot(first.x - source.x, first.z - source.z) -
+                Math.hypot(second.x - source.x, second.z - source.z) || first.id - second.id,
+          );
+        let destination: Village | undefined;
+        let targetCell = -1;
+        for (const candidate of destinations) {
+          const candidateCell = findNearestWalkable(state, candidate.x, candidate.z);
+          const field = createFlowField(state.map.navigation, candidateCell);
+          if ((field.distance[entityCell(state, residentId)] ?? 0xffff_ffff) === 0xffff_ffff) {
+            continue;
+          }
+          destination = candidate;
+          targetCell = candidateCell;
+          break;
+        }
+        if (!destination || targetCell < 0) continue;
+        state.nextExpeditionId += 1;
+        const relocation: PioneerExpedition = {
+          id: state.nextExpeditionId,
+          originVillageId: source.id,
+          destinationVillageId: destination.id,
+          kingdomId: source.kingdomId,
+          memberIds: [residentId],
+          targetX: (targetCell % state.map.size) + 0.5,
+          targetZ: Math.floor(targetCell / state.map.size) + 0.5,
+          targetCell,
+          startedAtTick: state.tick,
+          supplies: 0,
+        };
+        state.entities.expeditionIds[residentId] = relocation.id;
+        state.entities.paths[residentId] = null;
+        state.entities.targetCells[residentId] = targetCell;
+        state.expeditions.push(relocation);
+        addEvent(
+          state,
+          'village',
+          `${state.entities.names[residentId] || '一名居民'}从${source.name}启程迁居${destination.name}`,
+        );
+        return;
+      }
+    }
+  };
+
   const updatePioneerExpeditions = (): void => {
     for (let index = state.expeditions.length - 1; index >= 0; index -= 1) {
       const expedition = state.expeditions[index];
       if (!expedition) continue;
       const living = expedition.memberIds.filter((entityId) => isLivingHuman(state, entityId));
-      if (living.length < 4) {
+      const destination = expedition.destinationVillageId
+        ? state.villages.find(
+            (village) =>
+              village.id === expedition.destinationVillageId &&
+              village.health > 0 &&
+              village.kingdomId === expedition.kingdomId,
+          )
+        : undefined;
+      const minimumLiving = expedition.destinationVillageId ? 1 : 4;
+      if (living.length < minimumLiving || (expedition.destinationVillageId && !destination)) {
         for (const memberId of living) state.entities.expeditionIds[memberId] = 0;
         state.expeditions.splice(index, 1);
         continue;
@@ -917,7 +1109,24 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         const nextCell = nextFlowCell(cached.field, entityCell(state, memberId));
         moveTowardCell(state, memberId, nextCell, 0.075);
       }
-      if (arrived < Math.ceil(living.length * 0.75)) continue;
+      if (arrived < (destination ? living.length : Math.ceil(living.length * 0.75))) continue;
+      if (destination) {
+        for (const memberId of living) {
+          state.entities.villageIds[memberId] = destination.id;
+          state.entities.kingdomIds[memberId] = destination.kingdomId;
+          state.entities.expeditionIds[memberId] = 0;
+          state.entities.targetCells[memberId] = NO_TARGET;
+        }
+        state.population.totalMigrations += living.length;
+        state.population.migrationsThisYear += living.length;
+        addEvent(
+          state,
+          'village',
+          `${state.entities.names[living[0] ?? 0] || '一名居民'}迁入了${destination.name}`,
+        );
+        state.expeditions.splice(index, 1);
+        continue;
+      }
       const village = makeVillage(state, expedition.targetX, expedition.targetZ, living.length);
       village.kingdomId = expedition.kingdomId;
       village.resources.wood = 12;
@@ -1191,15 +1400,9 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
   };
 
   const updateAnimalEcology = (): void => {
-    const species = [
-      EntityKind.Chicken,
-      EntityKind.Sheep,
-      EntityKind.Cow,
-      EntityKind.Deer,
-      EntityKind.Wolf,
-      EntityKind.Bear,
-    ];
-    for (const kind of species) {
+    for (const kind of ANIMAL_SPECIES) {
+      const diagnostics = state.ecology.species[kind];
+      if (diagnostics && state.tick - diagnostics.lastReturnTick < 720) continue;
       const members: number[] = [];
       for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
         if (state.entities.active[entityId] && state.entities.kind[entityId] === kind) {
@@ -1218,6 +1421,94 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       )[0];
       if (newborn !== undefined) state.entities.age[newborn] = 0;
     }
+    refreshEcologyDiagnostics(state);
+  };
+
+  const findNaturalReturnCell = (kind: EntityKind): number => {
+    const candidates = habitatCells(state, kind);
+    if (candidates.length === 0) return -1;
+    const stride = Math.max(1, Math.floor(candidates.length / 192));
+    let bestCell = candidates[0] ?? -1;
+    let bestDistance = -1;
+    for (let index = 0; index < candidates.length; index += stride) {
+      const cell = candidates[index];
+      if (cell === undefined) continue;
+      const x = cell % state.map.size;
+      const z = Math.floor(cell / state.map.size);
+      let nearestSettlement = state.map.size;
+      for (const village of state.villages) {
+        if (village.health <= 0) continue;
+        nearestSettlement = Math.min(nearestSettlement, Math.hypot(village.x - x, village.z - z));
+      }
+      if (nearestSettlement > bestDistance) {
+        bestDistance = nearestSettlement;
+        bestCell = cell;
+      }
+    }
+    return bestCell;
+  };
+
+  const updateNaturalAnimalReturn = (): void => {
+    refreshEcologyDiagnostics(state);
+    if (!state.worldLaws.naturalAnimalReturn) return;
+    for (const kind of ANIMAL_SPECIES) {
+      const diagnostics = state.ecology.species[kind];
+      if (
+        !diagnostics?.everPresent ||
+        diagnostics.capacity <= 0 ||
+        diagnostics.count > Math.max(0, Math.floor(diagnostics.capacity * 0.2)) ||
+        state.tick < (state.ecology.nextReturnTicks[kind] ?? 0)
+      ) {
+        continue;
+      }
+      const cell = findNaturalReturnCell(kind);
+      if (cell < 0) continue;
+      const [minimum, maximum] = speciesReturnGroup(kind);
+      const desired = randomInt(random, minimum, maximum);
+      const count = Math.min(desired, Math.max(0, diagnostics.capacity - diagnostics.count));
+      if (count <= 0) continue;
+      const wasExtinct = diagnostics.count === 0;
+      const spawned = spawn(kind, cell % state.map.size, Math.floor(cell / state.map.size), count);
+      if (spawned.length === 0) continue;
+      diagnostics.lastReturnTick = state.tick;
+      state.ecology.nextReturnTicks[kind] = state.tick + randomInt(random, 2_160, 4_320);
+      if (wasExtinct) addEvent(state, 'ecology', `${ANIMAL_SPECIES_NAMES[kind]}重新出现在荒野中`);
+    }
+    refreshEcologyDiagnostics(state);
+  };
+
+  const updateCivilizationAwakening = (): void => {
+    let humans = 0;
+    for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
+      if (isLivingHuman(state, entityId)) humans += 1;
+    }
+    if (humans > 0) {
+      state.humanExtinctSinceTick = 0;
+      return;
+    }
+    if (!state.humanExtinctSinceTick) state.humanExtinctSinceTick = state.tick;
+    if (
+      !state.worldLaws.civilizationAwakening ||
+      state.tick - state.humanExtinctSinceTick < 14_400
+    ) {
+      return;
+    }
+    const cell = findNearestWalkable(state, state.map.size / 2, state.map.size / 2);
+    const x = (cell % state.map.size) + 0.5;
+    const z = Math.floor(cell / state.map.size) + 0.5;
+    const founders = spawn(EntityKind.Human, x, z, 8);
+    if (founders.length !== 8) return;
+    const ages = [18, 20, 22, 24, 26, 28, 30, 34] as const;
+    const village = makeVillage(state, x, z, founders.length);
+    village.lastBirthTick = state.tick + 720;
+    founders.forEach((entityId, index) => {
+      state.entities.sex[entityId] = index % 2 === 0 ? ResidentSex.Female : ResidentSex.Male;
+      state.entities.age[entityId] = ages[index] ?? 24;
+      state.entities.villageIds[entityId] = village.id;
+    });
+    state.humanExtinctSinceTick = 0;
+    addEvent(state, 'awakening', `${village.name}迎来了八位文明奠基者`);
+    refreshPopulationDiagnostics(state);
   };
 
   const moveEntities = (): void => {
@@ -1387,6 +1678,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       tryVillageBirth(village, assigned);
       tryLaunchPioneerExpedition(village, assigned);
     }
+    tryLaunchPopulationRelocation();
     assignResidentRoles(state);
     refreshPopulationDiagnostics(state);
   };
@@ -1401,14 +1693,208 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     if (state.tick > 700 && state.tick >= state.forcedPeaceUntil && active.length >= 2) {
       const first = active[0];
       const second = active[1];
-      if (first && second && first.relations[second.id] === DiplomacyState.Peace) {
+      const underTruce = state.truces.some(
+        (truce) =>
+          truce.untilTick > state.tick &&
+          ((truce.firstKingdomId === first?.id && truce.secondKingdomId === second?.id) ||
+            (truce.firstKingdomId === second?.id && truce.secondKingdomId === first?.id)),
+      );
+      if (first && second && !underTruce && first.relations[second.id] === DiplomacyState.Peace) {
         setDiplomacy(state, first.id, second.id, DiplomacyState.War);
         addEvent(state, 'war', `${first.name}向${second.name}宣战`);
       }
     }
   };
 
+  const ensureWarCampaign = (firstKingdomId: number, secondKingdomId: number) => {
+    const firstId = Math.min(firstKingdomId, secondKingdomId);
+    const secondId = Math.max(firstKingdomId, secondKingdomId);
+    const existing = state.wars.find(
+      (war) => war.firstKingdomId === firstId && war.secondKingdomId === secondId,
+    );
+    if (existing) return existing;
+    const campaign = {
+      firstKingdomId: firstId,
+      secondKingdomId: secondId,
+      startedAtTick: state.tick,
+      initialMilitaryPower: {
+        [firstId]: Math.max(1, countKingdomGuards(state, firstId)),
+        [secondId]: Math.max(1, countKingdomGuards(state, secondId)),
+      },
+      lastProgressTick: state.tick,
+      capturedVillageIds: [],
+      score: { [firstId]: 0, [secondId]: 0 },
+      fatigue: { [firstId]: 0, [secondId]: 0 },
+    };
+    state.wars.push(campaign);
+    return campaign;
+  };
+
+  const endWar = (firstKingdomId: number, secondKingdomId: number, reason: string): void => {
+    const first = state.kingdoms.find((kingdom) => kingdom.id === firstKingdomId);
+    const second = state.kingdoms.find((kingdom) => kingdom.id === secondKingdomId);
+    if (first) first.relations[secondKingdomId] = DiplomacyState.Peace;
+    if (second) second.relations[firstKingdomId] = DiplomacyState.Peace;
+    state.wars = state.wars.filter(
+      (war) =>
+        !(
+          war.firstKingdomId === Math.min(firstKingdomId, secondKingdomId) &&
+          war.secondKingdomId === Math.max(firstKingdomId, secondKingdomId)
+        ),
+    );
+    state.truces = state.truces.filter(
+      (truce) =>
+        !(
+          truce.firstKingdomId === Math.min(firstKingdomId, secondKingdomId) &&
+          truce.secondKingdomId === Math.max(firstKingdomId, secondKingdomId)
+        ),
+    );
+    state.truces.push({
+      firstKingdomId: Math.min(firstKingdomId, secondKingdomId),
+      secondKingdomId: Math.max(firstKingdomId, secondKingdomId),
+      untilTick: state.tick + 10_800,
+    });
+    const firstName = first?.name ?? '一方';
+    const secondName = second?.name ?? '另一方';
+    addEvent(state, 'peace', `${firstName}与${secondName}停战：${reason}`);
+  };
+
+  const nearestEnemyGuard = (entityId: number, candidates: number[], radius: number): number => {
+    let nearest = -1;
+    let nearestDistance = radius;
+    for (const candidateId of candidates) {
+      if (!state.entities.active[candidateId]) continue;
+      const distance = Math.hypot(
+        (state.entities.positionsX[candidateId] ?? 0) - (state.entities.positionsX[entityId] ?? 0),
+        (state.entities.positionsZ[candidateId] ?? 0) - (state.entities.positionsZ[entityId] ?? 0),
+      );
+      if (distance < nearestDistance) {
+        nearest = candidateId;
+        nearestDistance = distance;
+      }
+    }
+    return nearest;
+  };
+
+  const attackGuard = (
+    attackerId: number,
+    defenderId: number,
+    campaign: ReturnType<typeof ensureWarCampaign>,
+  ): void => {
+    const distance = Math.hypot(
+      (state.entities.positionsX[defenderId] ?? 0) - (state.entities.positionsX[attackerId] ?? 0),
+      (state.entities.positionsZ[defenderId] ?? 0) - (state.entities.positionsZ[attackerId] ?? 0),
+    );
+    if (distance > 1.35) {
+      state.entities.states[attackerId] = AgentState.Chase;
+      moveTowardCell(state, attackerId, entityCell(state, defenderId), 0.1);
+      return;
+    }
+    state.entities.states[attackerId] = AgentState.Attack;
+    if ((Math.floor(state.tick / 2) + attackerId) % 4 !== 0) return;
+    const weapon = state.entities.weaponTiers[attackerId] ?? 0;
+    const armor = state.entities.armorTiers[defenderId] ?? 0;
+    const damage = Math.max(
+      10,
+      24 + weapon * 7 + (state.entities.enraged[attackerId] ? 8 : 0) - armor * 4,
+    );
+    state.entities.health[defenderId] = Math.max(
+      0,
+      (state.entities.health[defenderId] ?? 0) - damage,
+    );
+    campaign.lastProgressTick = state.tick;
+    const attackerKingdomId = state.entities.kingdomIds[attackerId] ?? 0;
+    campaign.score[attackerKingdomId] = (campaign.score[attackerKingdomId] ?? 0) + damage;
+    if ((state.entities.health[defenderId] ?? 0) <= 0) {
+      recordResidentDeath(state, defenderId, 'violence');
+      campaign.score[attackerKingdomId] = (campaign.score[attackerKingdomId] ?? 0) + 100;
+    }
+  };
+
+  const captureVillage = (
+    village: Village,
+    attackerKingdomId: number,
+    campaign: ReturnType<typeof ensureWarCampaign>,
+  ): void => {
+    const defenderKingdomId = village.kingdomId;
+    if (!defenderKingdomId || defenderKingdomId === attackerKingdomId) return;
+    const defender = state.kingdoms.find((kingdom) => kingdom.id === defenderKingdomId);
+    const attacker = state.kingdoms.find((kingdom) => kingdom.id === attackerKingdomId);
+    if (!attacker) return;
+    if (defender) defender.villageIds = defender.villageIds.filter((id) => id !== village.id);
+    if (!attacker.villageIds.includes(village.id)) attacker.villageIds.push(village.id);
+    village.kingdomId = attackerKingdomId;
+    village.captureKingdomId = 0;
+    village.captureProgress = 0;
+    village.health = Math.max(650, village.health);
+    for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
+      if (state.entities.active[entityId] && state.entities.villageIds[entityId] === village.id) {
+        state.entities.kingdomIds[entityId] = attackerKingdomId;
+      }
+    }
+    campaign.capturedVillageIds.push(village.id);
+    campaign.score[attackerKingdomId] = (campaign.score[attackerKingdomId] ?? 0) + 1_000;
+    campaign.lastProgressTick = state.tick;
+    addEvent(state, 'conquest', `${attacker.name}占领了${village.name}`);
+  };
+
+  const updateWarCampaignFatigue = (): void => {
+    for (const campaign of [...state.wars]) {
+      const first = state.kingdoms.find((kingdom) => kingdom.id === campaign.firstKingdomId);
+      const second = state.kingdoms.find((kingdom) => kingdom.id === campaign.secondKingdomId);
+      if (!first || !second || first.extinct || second.extinct) {
+        endWar(campaign.firstKingdomId, campaign.secondKingdomId, '一方已无力继续战争');
+        continue;
+      }
+      const duration = state.tick - campaign.startedAtTick;
+      for (const kingdomId of [campaign.firstKingdomId, campaign.secondKingdomId]) {
+        const initial = Math.max(1, campaign.initialMilitaryPower[kingdomId] ?? 1);
+        const remaining = countKingdomGuards(state, kingdomId);
+        campaign.fatigue[kingdomId] = Math.min(
+          100,
+          Math.round((duration / 14_400) * 60 + (1 - remaining / initial) * 40),
+        );
+      }
+      const depleted = [campaign.firstKingdomId, campaign.secondKingdomId].some((kingdomId) => {
+        const initial = Math.max(1, campaign.initialMilitaryPower[kingdomId] ?? 1);
+        return countKingdomGuards(state, kingdomId) < initial * 0.4;
+      });
+      const noProgress = state.tick - campaign.lastProgressTick >= 3_600;
+      const negotiated =
+        duration >= 3_600 && (depleted || campaign.capturedVillageIds.length > 0 || noProgress);
+      if (duration >= 14_400 || negotiated) {
+        endWar(
+          campaign.firstKingdomId,
+          campaign.secondKingdomId,
+          duration >= 14_400 ? '战争已持续二十年' : '双方因战损与疲劳议和',
+        );
+      }
+    }
+    state.truces = state.truces.filter((truce) => truce.untilTick > state.tick);
+  };
+
   const updateWar = (): void => {
+    const guardsByKingdom = new Map<number, number[]>();
+    for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
+      if (
+        !state.entities.active[entityId] ||
+        state.entities.kind[entityId] !== EntityKind.Human ||
+        state.entities.professions[entityId] !== Profession.Guard
+      ) {
+        continue;
+      }
+      const kingdomId = state.entities.kingdomIds[entityId] ?? 0;
+      const guards = guardsByKingdom.get(kingdomId) ?? [];
+      guards.push(entityId);
+      guardsByKingdom.set(kingdomId, guards);
+    }
+    for (const kingdom of state.kingdoms) {
+      for (const [enemyId, relation] of Object.entries(kingdom.relations)) {
+        if (relation === DiplomacyState.War && kingdom.id < Number(enemyId)) {
+          ensureWarCampaign(kingdom.id, Number(enemyId));
+        }
+      }
+    }
     for (const kingdom of state.kingdoms) {
       if (kingdom.extinct) continue;
       const enemyId = Number(
@@ -1424,6 +1910,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         (village) => enemy?.villageIds.includes(village.id) && village.health > 0,
       );
       if (!targetVillage) continue;
+      const campaign = ensureWarCampaign(kingdom.id, enemyId);
       const targetCell = findNearestWalkable(state, targetVillage.x, targetVillage.z);
       let cached = flowFields.get(kingdom.id);
       if (
@@ -1446,18 +1933,43 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         ) {
           continue;
         }
+        const enemyGuards = guardsByKingdom.get(enemyId) ?? [];
+        const enemyGuard = nearestEnemyGuard(entityId, enemyGuards, 12);
+        if (enemyGuard >= 0) {
+          attackGuard(entityId, enemyGuard, campaign);
+          continue;
+        }
         const distance = Math.hypot(
           targetVillage.x - (state.entities.positionsX[entityId] ?? 0),
           targetVillage.z - (state.entities.positionsZ[entityId] ?? 0),
         );
         if (distance <= 2.1) {
           state.entities.states[entityId] = AgentState.Attack;
-          const damage = state.entities.enraged[entityId] ? 0.2 : 0.08;
-          targetVillage.health = Math.max(0, targetVillage.health - damage);
-          const building = state.buildings.find(
-            (candidate) => candidate.villageId === targetVillage.id && candidate.health > 0,
+          const defendersRemain = enemyGuards.some(
+            (defenderId) =>
+              state.entities.active[defenderId] === 1 &&
+              Math.hypot(
+                (state.entities.positionsX[defenderId] ?? 0) - targetVillage.x,
+                (state.entities.positionsZ[defenderId] ?? 0) - targetVillage.z,
+              ) <= 8,
           );
-          if (building) building.health = Math.max(0, building.health - damage * 0.45);
+          if (defendersRemain) continue;
+          if (targetVillage.captureKingdomId !== kingdom.id) {
+            targetVillage.captureKingdomId = kingdom.id;
+            targetVillage.captureProgress = 0;
+          }
+          targetVillage.captureProgress = (targetVillage.captureProgress ?? 0) + 0.45;
+          targetVillage.health = Math.max(650, targetVillage.health - 0.12);
+          campaign.lastProgressTick = state.tick;
+          if (state.tick % 12 === 0) {
+            const building = state.buildings.find(
+              (candidate) => candidate.villageId === targetVillage.id && candidate.health > 65,
+            );
+            if (building) building.health = Math.max(65, building.health - 0.5);
+          }
+          if ((targetVillage.captureProgress ?? 0) >= 100) {
+            captureVillage(targetVillage, kingdom.id, campaign);
+          }
           continue;
         }
         state.entities.states[entityId] = AgentState.Chase;
@@ -1468,6 +1980,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       }
     }
     resolveKingdomExtinctions(state);
+    updateWarCampaignFatigue();
   };
 
   const step = (): void => {
@@ -1479,7 +1992,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     moveEntities();
     updateAnimals();
     advanceConstruction(state);
-    updateWar();
+    if (state.tick % 2 === 0) updateWar();
     if (state.tick % 20 === 0) {
       stepEnvironment(state);
       advanceResourceRegrowth(state.resourceNodes, state.map, state.tick, 96);
@@ -1489,6 +2002,10 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     if (state.tick % 60 === 0) formSettlements();
     if (state.tick % 100 === 0) updateDiplomacy();
     if (state.tick % 800 === 0) updateAnimalEcology();
+    if (state.tick % 360 === 0) {
+      updateNaturalAnimalReturn();
+      updateCivilizationAwakening();
+    }
     if (state.tick % 720 === 0) {
       for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
         if (!state.entities.active[entityId]) continue;

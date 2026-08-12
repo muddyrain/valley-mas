@@ -7,6 +7,7 @@ import {
   Globe2,
   Menu,
   Pause,
+  PawPrint,
   Play,
   RotateCcw,
   Save,
@@ -41,6 +42,7 @@ import {
   type SaveRepository,
   type StoredWorldSave,
 } from './simulation/persistence/saveSlots';
+import { EcologyPanel } from './ui/EcologyPanel';
 import { InspectorPanel } from './ui/InspectorPanel';
 import { PerformancePanel } from './ui/PerformancePanel';
 import { PopulationPanel } from './ui/PopulationPanel';
@@ -113,6 +115,7 @@ function spawnKind(tool: MapTool): EntityKind | null {
   if (tool === 'spawn-deer') return EntityKind.Deer;
   if (tool === 'spawn-wolf') return EntityKind.Wolf;
   if (tool === 'spawn-bear') return EntityKind.Bear;
+  if (tool === 'spawn-fish') return EntityKind.Fish;
   return null;
 }
 
@@ -122,6 +125,7 @@ function spawnCount(kind: EntityKind): number {
     return 6;
   if (kind === EntityKind.Cow) return 4;
   if (kind === EntityKind.Wolf) return 3;
+  if (kind === EntityKind.Fish) return 6;
   return 1;
 }
 
@@ -161,6 +165,7 @@ export function App() {
   const [viewLevel, setViewLevel] = useState<WorldViewLevel>('world');
   const [chronicleOpen, setChronicleOpen] = useState(false);
   const [populationOpen, setPopulationOpen] = useState(false);
+  const [ecologyOpen, setEcologyOpen] = useState(false);
   const [resourceHover, setResourceHover] = useState<ResourceHoverInfo | null>(null);
   const clickHandlerRef = useRef<(click: WorldClick) => void>(() => undefined);
   const snapshotRef = useRef<WorldRenderSnapshot | null>(null);
@@ -204,18 +209,22 @@ export function App() {
     }
     if (click.entityId !== undefined) {
       setPopulationOpen(false);
+      setEcologyOpen(false);
       engineRef.current?.setSelection({ kind: 'entity', id: click.entityId });
       worker.inspect('entity', click.entityId);
     } else if (click.resourceNodeId !== undefined) {
       setPopulationOpen(false);
+      setEcologyOpen(false);
       engineRef.current?.setSelection({ kind: 'resource', id: click.resourceNodeId });
       setInspection(null);
     } else if (click.buildingId !== undefined && click.villageId !== undefined) {
       setPopulationOpen(false);
+      setEcologyOpen(false);
       engineRef.current?.setSelection({ kind: 'building', id: click.buildingId });
       worker.inspect('village', click.villageId);
     } else if (click.villageId !== undefined) {
       setPopulationOpen(false);
+      setEcologyOpen(false);
       engineRef.current?.setSelection({ kind: 'village', id: click.villageId });
       worker.inspect('village', click.villageId);
     } else {
@@ -379,6 +388,7 @@ export function App() {
     engineRef.current?.setSelection(null);
     setChronicleOpen(false);
     setPopulationOpen(false);
+    setEcologyOpen(false);
     setStressPopulation(null);
     setPaused(false);
     workerRef.current?.initializeWorld(
@@ -402,6 +412,7 @@ export function App() {
     engineRef.current?.setSelection(null);
     setChronicleOpen(false);
     setPopulationOpen(false);
+    setEcologyOpen(false);
     engineRef.current?.returnToWorld();
     workerRef.current?.loadSave(save.encoded);
     setSeed(save.seed);
@@ -439,6 +450,7 @@ export function App() {
     engineRef.current?.setSelection(null);
     setChronicleOpen(false);
     setPopulationOpen(false);
+    setEcologyOpen(false);
     engineRef.current?.returnToWorld();
     setShowMetrics(true);
     workerRef.current?.initializeStress(population, `browser-stress-${population}`);
@@ -496,6 +508,7 @@ export function App() {
             aria-expanded={populationOpen}
             onClick={() => {
               setPopulationOpen((value) => !value);
+              setEcologyOpen(false);
               setChronicleOpen(false);
               setInspection(null);
               engineRef.current?.setSelection(null);
@@ -506,6 +519,25 @@ export function App() {
               {stats.humans}
               {stats.populationTrend > 0 && <TrendingUp size={11} />}
               {stats.populationTrend < 0 && <TrendingDown size={11} />}
+            </b>
+          </button>
+          <button
+            type="button"
+            className="ecology-stat"
+            data-testid="ecology-stat"
+            aria-expanded={ecologyOpen}
+            onClick={() => {
+              setEcologyOpen((value) => !value);
+              setPopulationOpen(false);
+              setChronicleOpen(false);
+              setInspection(null);
+              engineRef.current?.setSelection(null);
+            }}
+          >
+            <small>动物</small>
+            <b>
+              <PawPrint size={11} />
+              {stats.animals}
             </b>
           </button>
           <span>
@@ -556,6 +588,7 @@ export function App() {
                 engineRef.current?.setSelection(null);
                 setInspection(null);
                 setChronicleOpen(false);
+                setEcologyOpen(false);
               }}
             >
               <Globe2 size={14} />
@@ -607,18 +640,27 @@ export function App() {
         />
       )}
 
-      {!inspection && !populationOpen && !stressPopulation && snapshot && !chronicleOpen && (
-        <button
-          type="button"
-          className="chronicle-toggle"
-          data-testid="chronicle-toggle"
-          onClick={() => setChronicleOpen(true)}
-          aria-label="展开世界局势"
-        >
-          <Sparkles size={17} />
-          {stats.wars > 0 && <b>{stats.wars}</b>}
-        </button>
+      {!inspection && ecologyOpen && snapshot && (
+        <EcologyPanel ecology={snapshot.ecology} onClose={() => setEcologyOpen(false)} />
       )}
+
+      {!inspection &&
+        !populationOpen &&
+        !ecologyOpen &&
+        !stressPopulation &&
+        snapshot &&
+        !chronicleOpen && (
+          <button
+            type="button"
+            className="chronicle-toggle"
+            data-testid="chronicle-toggle"
+            onClick={() => setChronicleOpen(true)}
+            aria-label="展开世界局势"
+          >
+            <Sparkles size={17} />
+            {stats.wars > 0 && <b>{stats.wars}</b>}
+          </button>
+        )}
 
       {!inspection && !stressPopulation && snapshot && chronicleOpen && (
         <aside className="chronicle-panel">
@@ -807,6 +849,39 @@ export function App() {
                 ))}
               </div>
             </fieldset>
+            {snapshot && !stressPopulation && (
+              <fieldset>
+                <legend>世界法则</legend>
+                <div className="choice-row world-law-row" data-testid="world-law-options">
+                  <button
+                    type="button"
+                    className={snapshot.worldLaws.naturalAnimalReturn ? 'active' : ''}
+                    onClick={() =>
+                      workerRef.current?.setWorldLaw(
+                        'naturalAnimalReturn',
+                        !snapshot.worldLaws.naturalAnimalReturn,
+                      )
+                    }
+                  >
+                    动物自然回归
+                    <small>{snapshot.worldLaws.naturalAnimalReturn ? '开启' : '关闭'}</small>
+                  </button>
+                  <button
+                    type="button"
+                    className={snapshot.worldLaws.civilizationAwakening ? 'active' : ''}
+                    onClick={() =>
+                      workerRef.current?.setWorldLaw(
+                        'civilizationAwakening',
+                        !snapshot.worldLaws.civilizationAwakening,
+                      )
+                    }
+                  >
+                    文明自然觉醒
+                    <small>{snapshot.worldLaws.civilizationAwakening ? '开启' : '关闭'}</small>
+                  </button>
+                </div>
+              </fieldset>
+            )}
             <button
               type="button"
               className="primary-action"

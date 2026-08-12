@@ -9,13 +9,17 @@ describe('world persistence', () => {
     const encoded = serializeWorld(simulation.state);
     const restored = loadWorldSave(encoded);
 
-    expect(JSON.parse(encoded).version).toBe(4);
+    expect(JSON.parse(encoded).version).toBe(5);
     expect(restored.seed).toBe(simulation.state.seed);
     expect(restored.tick).toBe(simulation.state.tick);
     expect(restored.entities.count).toBe(simulation.state.entities.count);
     expect(restored.entities.sex).toEqual(simulation.state.entities.sex);
     expect(restored.entities.familyIds).toEqual(simulation.state.entities.familyIds);
     expect(restored.population).toEqual(simulation.state.population);
+    expect(restored.worldLaws).toEqual(simulation.state.worldLaws);
+    expect(restored.ecology).toEqual(simulation.state.ecology);
+    expect(restored.wars).toEqual(simulation.state.wars);
+    expect(restored.truces).toEqual(simulation.state.truces);
     expect(restored.map.terrain).toEqual(simulation.state.map.terrain);
     expect(restored.resourceNodes.count).toBe(simulation.state.resourceNodes.count);
     expect(restored.resourceNodes.kind.slice(0, restored.resourceNodes.count)).toEqual(

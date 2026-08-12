@@ -10,7 +10,7 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   await expect(canvas).toHaveAttribute('data-no-rotation', 'true');
   await expect(canvas).toHaveAttribute('data-human-style', 'layered-pixel-sprites');
   await expect(canvas).toHaveAttribute('data-animal-style', 'pixel-side-profiles');
-  await expect(canvas).toHaveAttribute('data-animal-styles', '6');
+  await expect(canvas).toHaveAttribute('data-animal-styles', '7');
   await expect(canvas).toHaveAttribute('data-building-style', 'functional-pixel-buildings');
   await expect(canvas).toHaveAttribute('data-kingdom-palette', 'residents-buildings-flags');
   await expect(canvas).toHaveAttribute('data-strategic-icons', '0');
@@ -38,12 +38,29 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   );
   await expect(canvas).toHaveAttribute('data-hover-highlight', 'true');
   await expect(canvas).toHaveAttribute('data-hover-target', /^village:/);
+  await expect(canvas).toHaveAttribute('data-hover-stroke-px', '1');
+
+  await page.getByTestId('ecology-stat').click();
+  const ecologyPanel = page.getByTestId('ecology-panel');
+  await expect(ecologyPanel).toBeVisible();
+  await expect(ecologyPanel).toContainText('鱼');
+  await ecologyPanel.getByRole('button', { name: '收起生态图鉴' }).click();
 
   const rebuildsBeforeFrames = Number(await canvas.getAttribute('data-full-rebuilds'));
   await page.waitForTimeout(1_200);
   expect(Number(await canvas.getAttribute('data-full-rebuilds'))).toBe(rebuildsBeforeFrames);
 
   await page.getByRole('button', { name: '世界菜单' }).click();
+  const worldLaws = page.getByTestId('world-law-options');
+  const animalReturnLaw = worldLaws.locator('button').first();
+  const civilizationLaw = worldLaws.locator('button').nth(1);
+  await expect(animalReturnLaw).toContainText('动物自然回归');
+  await expect(animalReturnLaw).toHaveClass(/active/);
+  await expect(civilizationLaw).toContainText('文明自然觉醒');
+  await expect(civilizationLaw).not.toHaveClass(/active/);
+  await animalReturnLaw.click();
+  await expect(animalReturnLaw).not.toHaveClass(/active/);
+  await animalReturnLaw.click();
   await page.getByLabel('世界种子').fill('E2E-PIXEL-WORLD');
   await page.getByTestId('world-size-options').getByRole('button', { name: /中型/ }).click();
   await page.getByTestId('world-preset-options').getByRole('button', { name: '群岛' }).click();
@@ -67,6 +84,13 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   await expect
     .poll(async () => Number(await canvas.getAttribute('data-population')))
     .toBeGreaterThan(populationBefore);
+
+  const populationBeforeFish = Number(await canvas.getAttribute('data-population'));
+  await page.getByTestId('tool-spawn-fish').click();
+  await canvas.click({ position: { x: 120, y: 700 } });
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-population')))
+    .toBeGreaterThan(populationBeforeFish);
 
   await page.getByRole('button', { name: '8×' }).click();
   await page.getByRole('button', { name: '暂停' }).click();
@@ -110,6 +134,7 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   await expect.poll(async () => canvas.getAttribute('data-view-level')).toBe('settlement');
   await expect(canvas).toHaveAttribute('data-terrain-lod', 'districts-4px');
   await expect(canvas).toHaveAttribute('data-selection-outline', 'true');
+  await expect(canvas).toHaveAttribute('data-selection-stroke-px', '1.5');
   await expect(canvas).toHaveAttribute('data-selected-target', 'village:1');
   await page.getByTestId('village-inspector').getByRole('button', { name: '关闭' }).click();
   await expect(canvas).toHaveAttribute('data-selection-outline', 'false');
@@ -120,7 +145,7 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   const firstSlot = page.locator('.save-slot').first();
   await firstSlot.getByRole('button', { name: '保存' }).click();
   await expect(page.getByText('世界已保存到档案 1')).toBeVisible();
-  await page.getByRole('dialog').getByRole('button', { name: '关闭' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
   await page.reload();
   await page.getByRole('button', { name: '世界菜单' }).click();
   await page.locator('.save-slot').first().getByRole('button', { name: '载入' }).click();

@@ -83,6 +83,7 @@ select:focus-visible {
 .performance-panel,
 .inspector-panel,
 .population-panel,
+.ecology-panel,
 .chronicle-panel,
 .chronicle-toggle,
 .view-navigation,
@@ -415,6 +416,7 @@ select:focus-visible {
 .performance-panel,
 .inspector-panel,
 .population-panel,
+.ecology-panel,
 .chronicle-panel {
   right: 14px;
   width: 254px;
@@ -558,6 +560,125 @@ select:focus-visible {
   width: 274px;
   padding: 14px;
   border-radius: 18px;
+}
+
+.ecology-panel {
+  top: 94px;
+  right: 14px;
+  width: 274px;
+  padding: 14px;
+  border-radius: 18px;
+}
+
+.ecology-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.ecology-heading > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.ecology-heading small {
+  margin-bottom: 3px;
+  color: #8da096;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+
+.ecology-heading strong {
+  font-size: 15px;
+}
+
+.ecology-heading button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  color: #9eb0a5;
+  background: rgba(255, 255, 255, 0.045);
+  cursor: pointer;
+}
+
+.ecology-species {
+  display: grid;
+  gap: 6px;
+  margin-top: 13px;
+}
+
+.ecology-species-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ecology-species-row > i {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  color: #bddd86;
+  background: rgba(189, 221, 134, 0.09);
+}
+
+.ecology-species-row > span {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 6px;
+}
+
+.ecology-species-row b,
+.ecology-species-row small,
+.ecology-species-row > strong {
+  font-size: 8px;
+}
+
+.ecology-species-row small {
+  color: #8fa197;
+}
+
+.ecology-species-row > strong {
+  color: #dce9db;
+  font-variant-numeric: tabular-nums;
+}
+
+.ecology-species-row span > em {
+  display: block;
+  height: 4px;
+  grid-column: 1 / -1;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.ecology-species-row span > em > em {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #a9d36a;
+}
+
+.ecology-species-row.extinct > i,
+.ecology-species-row.waiting-habitat > i,
+.ecology-species-row.not-introduced > i {
+  color: #84938b;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.world-stats .ecology-stat b {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .population-heading {
@@ -1331,7 +1452,8 @@ select:focus-visible {
     top: 142px;
   }
 
-  .population-panel {
+  .population-panel,
+  .ecology-panel {
     top: 142px;
   }
 
@@ -1380,6 +1502,8 @@ select:focus-visible {
 
   .performance-panel,
   .inspector-panel,
+  .population-panel,
+  .ecology-panel,
   .chronicle-panel {
     right: 8px;
     bottom: 72px;
@@ -1387,7 +1511,9 @@ select:focus-visible {
   }
 
   .performance-panel,
-  .inspector-panel {
+  .inspector-panel,
+  .population-panel,
+  .ecology-panel {
     top: auto;
   }
 
@@ -1850,7 +1976,9 @@ select:focus-visible {
   }
 
   .performance-panel,
-  .inspector-panel {
+  .inspector-panel,
+  .population-panel,
+  .ecology-panel {
     top: 112px;
   }
 }
@@ -1867,6 +1995,8 @@ select:focus-visible {
 
   .performance-panel,
   .inspector-panel,
+  .population-panel,
+  .ecology-panel,
   .chronicle-panel {
     right: 8px;
     bottom: 112px;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DiplomacyState, VillageTier } from '@/shared/gameTypes';
+import { VillageTier } from '@/shared/gameTypes';
 import { createWorldSimulation } from './worldSimulation';
 
 describe('civilization gameplay loop', () => {
@@ -25,10 +25,6 @@ describe('civilization gameplay loop', () => {
       true,
     );
     expect(simulation.state.kingdoms.length).toBeGreaterThanOrEqual(2);
-    expect(
-      simulation.state.kingdoms.some((kingdom) =>
-        Object.values(kingdom.relations).includes(DiplomacyState.War),
-      ),
-    ).toBe(true);
+    expect(simulation.state.wars.length + simulation.state.truces.length).toBeGreaterThan(0);
   });
 });

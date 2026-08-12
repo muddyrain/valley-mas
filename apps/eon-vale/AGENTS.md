@@ -11,6 +11,13 @@
 - 地图、寻路、经济、王国和存档：`src/simulation/{map,navigation,systems,kingdoms,persistence}`。
 - 浏览器验收：`e2e/game.spec.ts`。
 
+## WorldBox 设计参照
+
+- 设计或迭代玩法功能时，先说明 WorldBox 对应系统的实际规则、相关世界法则和关键边界，再明确 Eon Vale 是沿用、简化还是有意采用不同方案；若没有直接对应机制，也要明确说明。
+- 需求访谈与方案选择题应包含“WorldBox 怎么做”、该做法解决的问题及其取舍，避免在缺少具体参照时直接决定产品方向。
+- 涉及可能随版本变化的 WorldBox 事实时，优先核对官方更新记录或官方 Wiki，并区分已确认规则与基于资料的推断，不凭旧记忆下结论。
+- WorldBox 只作为玩法方向参照，不覆盖 Eon Vale 当前计划、架构约束、性能目标和已确认的产品取舍。
+
 ## 架构约束
 
 - 20 Hz 固定步长模拟运行在 Web Worker；React 不承载逐帧居民状态。

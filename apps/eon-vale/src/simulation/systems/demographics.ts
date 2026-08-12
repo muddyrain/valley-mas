@@ -1,4 +1,9 @@
-import type { DeathCauseCounts, PopulationDiagnostics, ShortageStage } from '@/shared/gameTypes';
+import {
+  type DeathCauseCounts,
+  type PopulationDiagnostics,
+  ResidentSex,
+  type ShortageStage,
+} from '@/shared/gameTypes';
 
 export interface CapacityInputs {
   housingCapacity: number;
@@ -40,6 +45,20 @@ export function birthPressure({
   if (occupancy >= 0.9) return 0;
   if (occupancy <= 0.58) return 1;
   return Math.max(0, (0.9 - occupancy) / 0.32);
+}
+
+export function chooseNewbornSex({
+  femaleChildren,
+  maleChildren,
+  randomValue,
+}: {
+  femaleChildren: number;
+  maleChildren: number;
+  randomValue: number;
+}): ResidentSex {
+  if (femaleChildren < maleChildren) return ResidentSex.Female;
+  if (maleChildren < femaleChildren) return ResidentSex.Male;
+  return randomValue < 0.5 ? ResidentSex.Female : ResidentSex.Male;
 }
 
 export function resolveShortageStage({

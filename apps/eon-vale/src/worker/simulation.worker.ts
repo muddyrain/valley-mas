@@ -170,6 +170,8 @@ function createWorldSnapshot(tickMs: number): WorldRenderSnapshot | null {
     events: structuredClone(state.events),
     settings: { ...state.settings },
     demographics: structuredClone(state.population),
+    worldLaws: { ...state.worldLaws },
+    ecology: structuredClone(state.ecology),
     metrics: {
       tickMs,
       averageTickMs: measuredTicks > 0 ? totalTickMs / measuredTicks : 0,
@@ -305,6 +307,9 @@ workerScope.addEventListener('message', (event: MessageEvent<WorkerCommand>) => 
     }
     if (command.type === 'set-paused') paused = command.paused;
     if (command.type === 'set-speed') speed = command.speed;
+    if (command.type === 'set-world-law' && world) {
+      world.state.worldLaws[command.law] = command.enabled;
+    }
     if (command.type === 'map-edit' && world) {
       const changedChunks = editTerrain(
         world.state.map,

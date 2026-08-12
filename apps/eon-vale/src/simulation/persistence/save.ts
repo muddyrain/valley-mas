@@ -1,14 +1,18 @@
 import { z } from 'zod';
 import type {
   Building,
+  EcologyDiagnostics,
   EntityArrays,
   Kingdom,
   PioneerExpedition,
   PopulationDiagnostics,
   ResourceNodeKind,
   ResourceNodeStage,
+  TruceRecord,
   Village,
+  WarCampaign,
   WorldEvent,
+  WorldLaws,
   WorldSettings,
   WorldState,
 } from '@/shared/gameTypes';
@@ -16,7 +20,7 @@ import { navigationCostForTerrain } from '../map/generateWorldMap';
 import { createNavigationGrid } from '../navigation/grid';
 import { addResourceNode, createResourceNodeStore } from '../resources/resourceNodes';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 const numberArray = z.array(z.number());
 const saveSchema = z.object({
@@ -113,6 +117,11 @@ const saveSchema = z.object({
   nextEventId: z.number().int().nonnegative(),
   forcedPeaceUntil: z.number().int().nonnegative(),
   population: z.unknown(),
+  worldLaws: z.unknown(),
+  ecology: z.unknown(),
+  humanExtinctSinceTick: z.number().int().nonnegative(),
+  wars: z.array(z.unknown()),
+  truces: z.array(z.unknown()),
   expeditions: z.array(z.unknown()),
   nextFamilyId: z.number().int().nonnegative(),
   nextExpeditionId: z.number().int().nonnegative(),
@@ -214,6 +223,11 @@ export function serializeWorld(state: WorldState): string {
     nextEventId: state.nextEventId,
     forcedPeaceUntil: state.forcedPeaceUntil,
     population: state.population,
+    worldLaws: state.worldLaws,
+    ecology: state.ecology,
+    humanExtinctSinceTick: state.humanExtinctSinceTick,
+    wars: state.wars,
+    truces: state.truces,
     expeditions: state.expeditions,
     nextFamilyId: state.nextFamilyId,
     nextExpeditionId: state.nextExpeditionId,
@@ -308,6 +322,11 @@ function restoreWorld(save: ParsedSave): WorldState {
     nextEventId: save.nextEventId,
     forcedPeaceUntil: save.forcedPeaceUntil,
     population: save.population as PopulationDiagnostics,
+    worldLaws: save.worldLaws as WorldLaws,
+    ecology: save.ecology as EcologyDiagnostics,
+    humanExtinctSinceTick: save.humanExtinctSinceTick,
+    wars: save.wars as WarCampaign[],
+    truces: save.truces as TruceRecord[],
     expeditions: save.expeditions as PioneerExpedition[],
     nextFamilyId: save.nextFamilyId,
     nextExpeditionId: save.nextExpeditionId,
