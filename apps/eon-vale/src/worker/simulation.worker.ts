@@ -1,0 +1,409 @@
+/// <reference lib="webworker" />
+
+import type {
+  Inspection,
+  ResourceNodeSnapshot,
+  WorldMapDelta,
+  WorldMapSnapshot,
+  WorldRenderSnapshot,
+} from '@/render/renderTypes';
+import { EntityKind, type WorldMap } from '@/shared/gameTypes';
+import {
+  createPrototypeSimulation,
+  type PrototypeSimulation,
+} from '@/simulation/core/prototypeSimulation';
+import {
+  createWorldSimulation,
+  createWorldSimulationFromState,
+  type WorldSimulation,
+} from '@/simulation/core/worldSimulation';
+import { activeWars } from '@/simulation/kingdoms/kingdoms';
+import { generateWorldMap } from '@/simulation/map/generateWorldMap';
+import { editTerrain } from '@/simulation/map/terrainEditing';
+import { loadWorldSave, serializeWorld } from '@/simulation/persistence/save';
+import { createResourceNodeStore } from '@/simulation/resources/resourceNodes';
+import { applyGodPower } from '@/simulation/systems/environment';
+import { drainWorldMapDelta } from './mapDeltaSync';
+import { type MapSyncReason, mapSyncRequiresFullRebuild } from './mapSyncPolicy';
+import type { WorkerCommand, WorkerEvent } from './protocol';
+import { createFullResourceSnapshot, drainResourceNodeDelta } from './resourceSync';
+
+const workerScope: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
+let prototype: PrototypeSimulation | null = null;
+let world: WorldSimulation | null = null;
+let mode: 'world' | 'stress' = 'world';
+let paused = false;
+let speed: 1 | 2 | 4 | 8 = 1;
+let lastSnapshotAt = 0;
+let lastMapAt = 0;
+let totalTickMs = 0;
+let measuredTicks = 0;
+const godCooldowns = new Map<string, number>();
+
+function emit(event: WorkerEvent, transfers: Transferable[] = []): void {
+  workerScope.postMessage(event, transfers);
+}
+
+function emitMap(
+  source: WorldMap,
+  changedChunks: number[],
+  reason: MapSyncReason = 'periodic',
+): void {
+  const map: WorldMapSnapshot = {
+    size: source.size,
+    preset: source.preset,
+    terrain: source.terrain.slice(),
+    height: source.height.slice(),
+    moisture: source.moisture.slice(),
+    temperature: source.temperature.slice(),
+    resourceFood: source.resourceFood.slice(),
+    fire: source.fire.slice(),
+    rain: source.rain.slice(),
+    plague: source.plague.slice(),
+    crops: source.crops.slice(),
+    craters: source.craters.slice(),
+    roads: source.roads.slice(),
+    changedChunks,
+    fullRebuild: mapSyncRequiresFullRebuild(reason),
+  };
+  source.dirtyMapCells.length = 0;
+  emit({ type: 'world-map', map }, [
+    map.terrain.buffer,
+    map.height.buffer,
+    map.moisture.buffer,
+    map.temperature.buffer,
+    map.resourceFood.buffer,
+    map.fire.buffer,
+    map.rain.buffer,
+    map.plague.buffer,
+    map.crops.buffer,
+    map.craters.buffer,
+    map.roads.buffer,
+  ]);
+}
+
+function emitMapDelta(delta: WorldMapDelta): void {
+  emit({ type: 'world-map-delta', delta }, [
+    delta.cells.buffer,
+    delta.terrain.buffer,
+    delta.height.buffer,
+    delta.moisture.buffer,
+    delta.temperature.buffer,
+    delta.resourceFood.buffer,
+    delta.fire.buffer,
+    delta.rain.buffer,
+    delta.plague.buffer,
+    delta.crops.buffer,
+    delta.craters.buffer,
+    delta.roads.buffer,
+  ]);
+}
+
+function emitResourceSnapshot(resources: ResourceNodeSnapshot): void {
+  emit({ type: 'world-resources', resources }, [
+    resources.nodeIds.buffer,
+    resources.active.buffer,
+    resources.kind.buffer,
+    resources.positionsX.buffer,
+    resources.positionsZ.buffer,
+    resources.amount.buffer,
+    resources.stage.buffer,
+    resources.variant.buffer,
+  ]);
+}
+
+function emitWorldDeltas(): void {
+  if (!world) return;
+  const mapDelta = drainWorldMapDelta(world.state.map);
+  if (mapDelta) emitMapDelta(mapDelta);
+  const resourceDelta = drainResourceNodeDelta(world.state.resourceNodes);
+  if (resourceDelta) emitResourceSnapshot(resourceDelta);
+}
+
+function emitWorldMap(changedChunks: number[], reason: MapSyncReason = 'periodic'): void {
+  if (!world) return;
+  emitMap(world.state.map, changedChunks, reason);
+}
+
+function createWorldSnapshot(tickMs: number): WorldRenderSnapshot | null {
+  if (!world) return null;
+  const state = world.state;
+  const count = state.entities.count;
+  let humans = 0;
+  let animals = 0;
+  for (let entityId = 0; entityId < count; entityId += 1) {
+    if (!state.entities.active[entityId]) continue;
+    if (state.entities.kind[entityId] === EntityKind.Human) humans += 1;
+    else animals += 1;
+  }
+  return {
+    tick: state.tick,
+    year: state.year,
+    population: count,
+    active: state.entities.active.slice(0, count),
+    positionsX: state.entities.positionsX.slice(0, count),
+    positionsZ: state.entities.positionsZ.slice(0, count),
+    headings: state.entities.headings.slice(0, count),
+    states: state.entities.states.slice(0, count),
+    kinds: state.entities.kind.slice(0, count),
+    kingdomIds: state.entities.kingdomIds.slice(0, count),
+    health: state.entities.health.slice(0, count),
+    infected: state.entities.infected.slice(0, count),
+    professions: state.entities.professions.slice(0, count),
+    levels: state.entities.levels.slice(0, count),
+    roles: state.entities.roles.slice(0, count),
+    weaponTiers: state.entities.weaponTiers.slice(0, count),
+    armorTiers: state.entities.armorTiers.slice(0, count),
+    ages: state.entities.age.slice(0, count),
+    stats: {
+      year: state.year,
+      humans,
+      animals,
+      villages: state.villages.filter((village) => village.health > 0).length,
+      kingdoms: state.kingdoms.filter((kingdom) => !kingdom.extinct).length,
+      wars: activeWars(state),
+      populationTrend: state.population.trend,
+    },
+    villages: structuredClone(state.villages),
+    kingdoms: structuredClone(state.kingdoms),
+    buildings: structuredClone(state.buildings),
+    events: structuredClone(state.events),
+    settings: { ...state.settings },
+    demographics: structuredClone(state.population),
+    metrics: {
+      tickMs,
+      averageTickMs: measuredTicks > 0 ? totalTickMs / measuredTicks : 0,
+      completedPaths: 0,
+      pathQueue: 0,
+      neighbourCandidates: 0,
+    },
+  };
+}
+
+function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspection | null {
+  if (!world) return null;
+  const state = world.state;
+  if (command.target === 'entity') {
+    const id = command.id;
+    if (id < 0 || id >= state.entities.count || !state.entities.active[id]) return null;
+    const village = state.villages.find(
+      (candidate) => candidate.id === state.entities.villageIds[id],
+    );
+    const kingdom = state.kingdoms.find(
+      (candidate) => candidate.id === state.entities.kingdomIds[id],
+    );
+    const target = state.entities.targetCells[id];
+    return {
+      type: 'entity',
+      id,
+      name: state.entities.names[id] ?? `居民 ${id + 1}`,
+      kind: state.entities.kind[id] ?? 0,
+      age: state.entities.age[id] ?? 0,
+      health: state.entities.health[id] ?? 0,
+      hunger: state.entities.hunger[id] ?? 0,
+      energy: state.entities.energy[id] ?? 0,
+      profession: state.entities.professions[id] ?? 0,
+      state: state.entities.states[id] ?? 0,
+      villageName: village?.name ?? '无',
+      kingdomName: kingdom?.name ?? '无',
+      targetCell: target === undefined || target === 0xffff_ffff ? null : target,
+      traits: state.entities.traits[id] ?? 0,
+      level: state.entities.levels[id] ?? 1,
+      experience: state.entities.experience[id] ?? 0,
+      contribution: state.entities.contribution[id] ?? 0,
+      role: state.entities.roles[id] ?? 0,
+      weaponTier: state.entities.weaponTiers[id] ?? 0,
+      armorTier: state.entities.armorTiers[id] ?? 0,
+      sex: state.entities.sex[id] ?? 0,
+      familyId: state.entities.familyIds[id] ?? 0,
+      partnerName:
+        (state.entities.partnerIds[id] ?? 0xffff_ffff) === 0xffff_ffff
+          ? '无'
+          : (state.entities.names[state.entities.partnerIds[id] ?? 0xffff_ffff] ?? '无'),
+      parentNames: [state.entities.parentAIds[id], state.entities.parentBIds[id]].flatMap(
+        (parentId) =>
+          parentId === undefined || parentId === 0xffff_ffff
+            ? []
+            : [state.entities.names[parentId] ?? `居民 ${parentId + 1}`],
+      ),
+      malnutrition: state.entities.malnutrition[id] ?? 0,
+      history: state.events
+        .filter((event) => event.message.includes(state.entities.names[id] ?? '\u0000'))
+        .slice(-12)
+        .map((event) => ({ tick: event.tick, message: event.message })),
+    };
+  }
+  if (command.target === 'village') {
+    const village = state.villages.find((candidate) => candidate.id === command.id);
+    if (!village) return null;
+    const kingdom = state.kingdoms.find((candidate) => candidate.id === village.kingdomId);
+    return {
+      type: 'village',
+      id: village.id,
+      village: structuredClone(village),
+      completedBuildings: village.buildingIds.filter((id) => state.buildings[id - 1]?.completed)
+        .length,
+      kingdomName: kingdom?.name ?? '无',
+    };
+  }
+  const kingdom = state.kingdoms.find((candidate) => candidate.id === command.id);
+  if (!kingdom) return null;
+  const villages = state.villages.filter((village) => kingdom.villageIds.includes(village.id));
+  return {
+    type: 'kingdom',
+    id: kingdom.id,
+    kingdom: structuredClone(kingdom),
+    population: villages.reduce((sum, village) => sum + village.population, 0),
+    resources: villages.reduce(
+      (sum, village) => ({
+        food: sum.food + village.resources.food,
+        wood: sum.wood + village.resources.wood,
+        stone: sum.stone + village.resources.stone,
+      }),
+      { food: 0, wood: 0, stone: 0 },
+    ),
+  };
+}
+
+workerScope.addEventListener('message', (event: MessageEvent<WorkerCommand>) => {
+  const command = event.data;
+  try {
+    if (command.type === 'initialize-stress') {
+      mode = 'stress';
+      world = null;
+      prototype = createPrototypeSimulation({
+        population: command.population,
+        seed: command.seed,
+        pathBudget: command.population >= 1_000 ? 10 : 14,
+      });
+      totalTickMs = 0;
+      measuredTicks = 0;
+      emit({ type: 'ready', mode, population: command.population, seed: command.seed });
+      emitMap(
+        generateWorldMap(`${command.seed}:representative-map`, 128, 'archipelago'),
+        [],
+        'initialize',
+      );
+      emitResourceSnapshot(createFullResourceSnapshot(createResourceNodeStore(128)));
+      return;
+    }
+    if (command.type === 'initialize-world') {
+      mode = 'world';
+      prototype = null;
+      world = createWorldSimulation({
+        seed: command.seed,
+        initialHumans: command.initialHumans,
+        mapSize: command.mapSize,
+        preset: command.preset,
+      });
+      totalTickMs = 0;
+      measuredTicks = 0;
+      emit({ type: 'ready', mode, population: command.initialHumans, seed: command.seed });
+      emitWorldMap([], 'initialize');
+      emitResourceSnapshot(createFullResourceSnapshot(world.state.resourceNodes));
+      return;
+    }
+    if (command.type === 'set-paused') paused = command.paused;
+    if (command.type === 'set-speed') speed = command.speed;
+    if (command.type === 'map-edit' && world) {
+      const changedChunks = editTerrain(
+        world.state.map,
+        {
+          kind: command.tool,
+          cell: command.cell,
+          radius: command.radius,
+        },
+        world.state.resourceNodes,
+      );
+      void changedChunks;
+      emitWorldDeltas();
+    }
+    if (command.type === 'spawn' && world) {
+      const x = command.cell % world.state.map.size;
+      const z = Math.floor(command.cell / world.state.map.size);
+      world.spawn(command.kind, x, z, command.count);
+    }
+    if (command.type === 'god-power' && world) {
+      const availableAt = godCooldowns.get(command.power) ?? 0;
+      if (world.state.tick < availableAt) {
+        emit({ type: 'notice', level: 'info', message: '神力尚未恢复' });
+        return;
+      }
+      applyGodPower(world.state, command.power, command.cell, command.radius);
+      godCooldowns.set(command.power, world.state.tick + 80);
+      emitWorldDeltas();
+    }
+    if (command.type === 'inspect') emit({ type: 'inspection', inspection: inspect(command) });
+    if (command.type === 'request-save' && world)
+      emit({ type: 'save-data', encoded: serializeWorld(world.state) });
+    if (command.type === 'load-save') {
+      const restored = loadWorldSave(command.encoded);
+      mode = 'world';
+      prototype = null;
+      world = createWorldSimulationFromState(restored);
+      emit({ type: 'ready', mode, population: restored.entities.count, seed: restored.seed });
+      emitWorldMap([], 'load');
+      emitResourceSnapshot(createFullResourceSnapshot(world.state.resourceNodes));
+      emit({ type: 'notice', level: 'info', message: '世界已载入' });
+    }
+  } catch (error) {
+    emit({
+      type: 'notice',
+      level: 'error',
+      message: error instanceof Error ? error.message : '操作失败',
+    });
+  }
+});
+
+setInterval(() => {
+  if (paused) return;
+  const startedAt = performance.now();
+  if (mode === 'stress' && prototype) {
+    for (let step = 0; step < speed; step += 1) prototype.step();
+  }
+  if (mode === 'world' && world) {
+    for (let step = 0; step < speed; step += 1) world.step();
+  }
+  const tickMs = performance.now() - startedAt;
+  totalTickMs += tickMs;
+  measuredTicks += 1;
+  const now = performance.now();
+  if (now - lastSnapshotAt >= 80) {
+    lastSnapshotAt = now;
+    if (mode === 'stress' && prototype) {
+      const snapshot = prototype.snapshot();
+      emit({ type: 'snapshot', snapshot }, [
+        snapshot.positionsX.buffer,
+        snapshot.positionsZ.buffer,
+        snapshot.headings.buffer,
+        snapshot.states.buffer,
+      ]);
+    }
+    if (mode === 'world') {
+      const snapshot = createWorldSnapshot(tickMs);
+      if (snapshot) {
+        emit({ type: 'world-snapshot', snapshot }, [
+          snapshot.positionsX.buffer,
+          snapshot.active.buffer,
+          snapshot.positionsZ.buffer,
+          snapshot.headings.buffer,
+          snapshot.states.buffer,
+          snapshot.kinds.buffer,
+          snapshot.kingdomIds.buffer,
+          snapshot.health.buffer,
+          snapshot.infected.buffer,
+          snapshot.professions.buffer,
+          snapshot.levels.buffer,
+          snapshot.roles.buffer,
+          snapshot.weaponTiers.buffer,
+          snapshot.armorTiers.buffer,
+          snapshot.ages.buffer,
+        ]);
+      }
+    }
+  }
+  if (mode === 'world' && world && now - lastMapAt >= 120) {
+    lastMapAt = now;
+    emitWorldDeltas();
+  }
+}, 50);

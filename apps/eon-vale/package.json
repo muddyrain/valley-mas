@@ -1,0 +1,37 @@
+{
+  "name": "@valley/eon-vale",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --port 4184",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "benchmark": "vitest run src/devtools/performance.test.ts --reporter=verbose",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint src/ e2e/",
+    "check": "biome check src/ e2e/",
+    "format": "biome format --write src/ e2e/",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "lucide-react": "catalog:shared-runtime",
+    "pixi.js": "^8.13.0",
+    "react": "catalog:react-19",
+    "react-dom": "catalog:react-19",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/react": "catalog:react-19",
+    "@types/react-dom": "catalog:react-19",
+    "@vitejs/plugin-react-swc": "catalog:vite-6",
+    "typescript": "catalog:ts-tooling",
+    "vite": "catalog:vite-6",
+    "vitest": "catalog:test"
+  }
+}

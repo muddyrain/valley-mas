@@ -1,0 +1,36 @@
+import { describe, expect, it } from 'vitest';
+import { createWorldSimulation } from '../core/worldSimulation';
+import { loadWorldSave, serializeWorld } from './save';
+
+describe('world persistence', () => {
+  it('round-trips the current world without tick history', () => {
+    const simulation = createWorldSimulation({ seed: 'archive', initialHumans: 48 });
+    for (let tick = 0; tick < 300; tick += 1) simulation.step();
+    const encoded = serializeWorld(simulation.state);
+    const restored = loadWorldSave(encoded);
+
+    expect(JSON.parse(encoded).version).toBe(4);
+    expect(restored.seed).toBe(simulation.state.seed);
+    expect(restored.tick).toBe(simulation.state.tick);
+    expect(restored.entities.count).toBe(simulation.state.entities.count);
+    expect(restored.entities.sex).toEqual(simulation.state.entities.sex);
+    expect(restored.entities.familyIds).toEqual(simulation.state.entities.familyIds);
+    expect(restored.population).toEqual(simulation.state.population);
+    expect(restored.map.terrain).toEqual(simulation.state.map.terrain);
+    expect(restored.resourceNodes.count).toBe(simulation.state.resourceNodes.count);
+    expect(restored.resourceNodes.kind.slice(0, restored.resourceNodes.count)).toEqual(
+      simulation.state.resourceNodes.kind.slice(0, simulation.state.resourceNodes.count),
+    );
+    expect(restored.resourceNodes.chunkHeads.some((nodeId) => nodeId >= 0)).toBe(true);
+    expect(restored.entities.carriedResourceKinds).toEqual(
+      simulation.state.entities.carriedResourceKinds,
+    );
+    expect(encoded).not.toContain('tickHistory');
+  });
+
+  it('fails safely for damaged and unsupported saves', () => {
+    expect(() => loadWorldSave('{broken')).toThrow(/存档损坏/);
+    expect(() => loadWorldSave(JSON.stringify({ version: 1 }))).toThrow(/存档版本/);
+    expect(() => loadWorldSave(JSON.stringify({ version: 999 }))).toThrow(/存档版本/);
+  });
+});
