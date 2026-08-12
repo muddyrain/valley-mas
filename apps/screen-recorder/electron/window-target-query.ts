@@ -169,6 +169,7 @@ export function createExecutableWindowQueryHost(
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
+  child.stderr.resume();
   return new LineQueryHost(child, timeoutMs);
 }
 

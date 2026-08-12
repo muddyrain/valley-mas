@@ -147,6 +147,7 @@ async function targetIdsForMode(port, mode) {
         const client = await CdpClient.connect(target.webSocketDebuggerUrl);
         try {
           const isActive = await client.evaluate(`Boolean(
+            document.visibilityState === 'visible' &&
             document.querySelector('.selection-overlay, .color-picker-overlay, .screenshot-editor-overlay')
           )`);
           return isActive ? target.id : undefined;
@@ -164,13 +165,28 @@ async function targetIdsForMode(port, mode) {
 async function connectTarget(port, mode, excludedTargetIds = new Set()) {
   const target = await waitFor(
     `${mode} renderer`,
-    async () =>
-      (await targets(port)).find(
+    async () => {
+      const candidates = (await targets(port)).filter(
         (item) =>
           item.type === 'page' &&
           item.url.includes(`mode=${mode}`) &&
           !excludedTargetIds.has(item.id),
-      ),
+      );
+      if (mode !== 'selection') return candidates[0];
+      for (const candidate of candidates) {
+        const client = await CdpClient.connect(candidate.webSocketDebuggerUrl);
+        try {
+          const isActive = await client.evaluate(`Boolean(
+            document.visibilityState === 'visible' &&
+            document.querySelector('.selection-overlay, .color-picker-overlay, .screenshot-editor-overlay')
+          )`);
+          if (isActive) return candidate;
+        } finally {
+          client.close();
+        }
+      }
+      return undefined;
+    },
     Boolean,
   );
   const client = await CdpClient.connect(target.webSocketDebuggerUrl);
@@ -314,6 +330,9 @@ async function launch(port, extraEnvironment = {}) {
       stdio: ['ignore', 'inherit', 'inherit'],
     },
   );
+  child.on('exit', (code, signal) => {
+    console.error(`[runtime] app exit code=${String(code)} signal=${String(signal)}`);
+  });
   try {
     await delay(2_000);
     const main = await connectTarget(port, 'main');
@@ -1149,48 +1168,6 @@ async function inspectCompletion(port) {
   }
 }
 
-async function inspectScreenshotCompletion(port) {
-  const completion = await connectTarget(port, 'screenshot-completion');
-  try {
-    const view = await waitFor(
-      '长截图完成反馈挂载',
-      () =>
-        completion.evaluate(`({
-          visible: Boolean(document.querySelector('.screenshot-completion-card')),
-          title: document.querySelector('.screenshot-completion-card header strong')?.textContent?.trim(),
-          path: document.querySelector('.screenshot-completion-card code')?.textContent?.trim(),
-          preview: (() => {
-            const image = document.querySelector('.screenshot-completion-card img');
-            return image ? {
-              complete: image.complete,
-              naturalWidth: image.naturalWidth,
-              naturalHeight: image.naturalHeight,
-              rendered: image.getBoundingClientRect().toJSON(),
-            } : undefined;
-          })(),
-          actions: [...document.querySelectorAll('.screenshot-completion-card footer button')]
-            .map((item) => item.textContent?.trim()),
-        })`),
-      (value) =>
-        value?.visible &&
-        value.title === '长截图已保存' &&
-        value.path &&
-        value.preview?.complete &&
-        value.preview.naturalWidth > 0 &&
-        value.preview.naturalHeight > value.preview.naturalWidth &&
-        value.preview.rendered?.height > 0 &&
-        value.actions?.includes('打开截图') &&
-        value.actions?.includes('打开所在文件夹'),
-    );
-    await completion.evaluate(
-      "setTimeout(() => document.querySelector('.screenshot-completion-close')?.click(), 0); true",
-    );
-    return view;
-  } finally {
-    completion.close();
-  }
-}
-
 async function inspectLongScreenshotIndicator(port, expectedRect) {
   const indicator = await connectTarget(port, 'long-screenshot-indicator');
   try {
@@ -1664,13 +1641,25 @@ async function runCoreScenarios() {
       const before = await listPngFiles();
       const fixture = await connectTargetByTitle(9333, 'Valley Long Screenshot Fixture');
       const fixtureGeometry = await fixture.evaluate(`({
-        x: window.screenX,
-        y: window.screenY,
-        width: window.innerWidth,
-        height: window.innerHeight,
-      })`);
+          x: window.screenX,
+          y: window.screenY,
+          width: window.innerWidth,
+          height: window.innerHeight,
+        })`);
+      await fixture.evaluate(`(() => {
+          window.__valleyLongScreenshotAutoScroll = setTimeout(() => {
+            let remaining = 5;
+            const timer = setInterval(() => {
+              window.scrollBy({ top: 120, behavior: 'instant' });
+              remaining -= 1;
+              if (remaining === 0) clearInterval(timer);
+            }, 900);
+          }, 6_000);
+        })()`);
+      const existingSelectionTargets = await targetIdsForMode(9333, 'selection');
       await app.main.evaluate("window.screenRecorder.startScreenshot('region')");
-      const selection = await connectTarget(9333, 'selection');
+      const selection = await connectTarget(9333, 'selection', existingSelectionTargets);
+      console.error('[runtime] long screenshot selection connected');
       const selectionOrigin = await selection.evaluate(
         `({ x: window.screenX, y: window.screenY })`,
       );
@@ -1683,6 +1672,7 @@ async function runCoreScenarios() {
       await selection.evaluate(
         `void window.screenRecorder.confirmSelection(${JSON.stringify(rect)}); true`,
       );
+      console.error('[runtime] long screenshot selection confirmed');
       await waitFor(
         '无窗口切换的截图编辑器',
         () =>
@@ -1694,10 +1684,13 @@ async function runCoreScenarios() {
         (value) =>
           value?.editorVisible === 'visible' && value.oldSelectionRemoved && value.hasLongButton,
       );
+      console.error('[runtime] long screenshot editor ready');
       await selection.evaluate(
         `document.querySelector('.screenshot-toolbar button[aria-label="长截图"]')?.click()`,
       );
+      console.error('[runtime] long screenshot command sent');
       const control = await connectTarget(9333, 'long-screenshot-control');
+      console.error('[runtime] long screenshot control connected');
       const initialCapture = await waitFor(
         '长截图控制条',
         () => snapshot(control),
@@ -1710,64 +1703,71 @@ async function runCoreScenarios() {
             visible: Boolean(document.querySelector('.long-screenshot-preview')),
             images: document.querySelectorAll('.long-screenshot-preview-scroll img').length,
             viewport: document.querySelector('.long-screenshot-preview-scroll')?.getBoundingClientRect().toJSON(),
+            actions: [...document.querySelectorAll('.long-screenshot-actions button')]
+              .map((item) => item.getAttribute('aria-label')),
           })`),
-        (value) => value?.visible && value.images === 1 && value.viewport?.height > 100,
+        (value) =>
+          value?.visible &&
+          value.images === 1 &&
+          value.viewport?.height > 100 &&
+          value.actions?.join(',') === '取消长截图,完成并复制长截图',
       );
+      console.error('[runtime] long screenshot initial preview ready');
+      await control.evaluate(`(() => {
+        window.__valleyLongScreenshotHiddenTransitions = 0;
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'hidden') {
+            window.__valleyLongScreenshotHiddenTransitions += 1;
+          }
+        });
+      })()`);
       const longIndicator = await inspectLongScreenshotIndicator(
         9333,
         initialCapture.screenshot.longCapture.selectionFrame,
       );
-      const snapshotLatencies = [];
-      for (let index = 0; index < 5; index += 1) {
-        await fixture.evaluate('window.scrollBy({ top: 120, behavior: "instant" }); true');
-        await delay(750);
-        const snapshotStartedAt = Date.now();
-        await snapshot(control);
-        snapshotLatencies.push(Date.now() - snapshotStartedAt);
-      }
-      if (Math.max(...snapshotLatencies) > 500) {
-        throw new Error(`长截图期间主进程响应过慢：${JSON.stringify(snapshotLatencies)}`);
-      }
-      const stitched = await waitFor(
-        '长截图自动拼接',
-        () => snapshot(control),
-        (value) =>
-          value?.screenshot?.longCapture?.frames >= 3 &&
-          value.screenshot.longCapture.pixelHeight >
-            initialCapture.screenshot.longCapture.pixelHeight,
-        20_000,
-      );
-      const stitchedPreview = await waitFor(
-        '长截图实时拼接预览更新',
-        () =>
-          control.evaluate(`(() => {
+      console.error('[runtime] long screenshot indicator ready');
+      await control.evaluate(`(() => {
+        window.__valleyLongScreenshotFinishTimer = setTimeout(() => {
             const scroll = document.querySelector('.long-screenshot-preview-scroll');
-            return {
+          localStorage.setItem('valley-long-screenshot-smoke', JSON.stringify({
               images: scroll?.querySelectorAll('img').length,
               scrollHeight: scroll?.scrollHeight,
               clientHeight: scroll?.clientHeight,
               scrollTop: scroll?.scrollTop,
-            };
-          })()`),
+            visibility: document.visibilityState,
+            hiddenTransitions: window.__valleyLongScreenshotHiddenTransitions,
+          }));
+          document.querySelector('button[aria-label="完成并复制长截图"]')?.click();
+        }, 13_000);
+      })()`);
+      await delay(15_000);
+      await waitForScreenshotState(app.main, 'completed', 25_000);
+      const completed = await waitFor(
+        '长截图复制到剪贴板',
+        () => snapshot(app.main),
         (value) =>
-          value?.images >= 3 &&
-          value.scrollHeight > value.clientHeight &&
-          value.scrollTop + value.clientHeight >= value.scrollHeight - 2,
+          value?.screenshot?.state === 'completed' &&
+          value.screenshot.copiedToClipboard === true &&
+          !value.screenshot.outputPath &&
+          !value.completion,
       );
-      await control.evaluate(`document.querySelector('button[aria-label="完成长截图"]')?.click()`);
-      await waitForScreenshotState(app.main, 'completed', 20_000);
-      const output = await waitForNewScreenshot(before);
-      if (output.size.width !== 400 || output.size.height <= 420) {
-        throw new Error(`长截图尺寸错误：${JSON.stringify(output.size)}`);
+      const afterComplete = await listPngFiles();
+      const createdFiles = afterComplete.filter((file) => !before.includes(file));
+      if (createdFiles.length > 0) {
+        throw new Error(`长截图完成不应自动写入文件：${JSON.stringify(createdFiles)}`);
       }
-      const completion = await inspectScreenshotCompletion(9333);
       control.close();
       selection.close();
 
       console.error('[runtime] long screenshot cancel start');
       const beforeCancel = await listPngFiles();
+      const existingCancelSelectionTargets = await targetIdsForMode(9333, 'selection');
       await app.main.evaluate("window.screenRecorder.startScreenshot('region')");
-      const cancelSelection = await connectTarget(9333, 'selection');
+      const cancelSelection = await connectTarget(
+        9333,
+        'selection',
+        existingCancelSelectionTargets,
+      );
       await cancelSelection.evaluate(
         `void window.screenRecorder.confirmSelection(${JSON.stringify(rect)}); true`,
       );
@@ -1783,24 +1783,41 @@ async function runCoreScenarios() {
         `document.querySelector('.screenshot-toolbar button[aria-label="长截图"]')?.click()`,
       );
       const cancelControl = await connectTarget(9333, 'long-screenshot-control');
-      await rightClick(cancelControl, 24, 24);
+      const stitchedPreview = await cancelControl.evaluate(
+        `JSON.parse(localStorage.getItem('valley-long-screenshot-smoke') ?? 'null')`,
+      );
+      if (
+        stitchedPreview?.images < 3 ||
+        stitchedPreview.scrollHeight <= stitchedPreview.clientHeight ||
+        stitchedPreview.scrollTop + stitchedPreview.clientHeight <
+          stitchedPreview.scrollHeight - 2 ||
+        stitchedPreview.visibility !== 'visible' ||
+        stitchedPreview.hiddenTransitions !== 0
+      ) {
+        throw new Error(`长截图实时预览或稳定性不符合预期：${JSON.stringify(stitchedPreview)}`);
+      }
+      await cancelControl.evaluate(
+        `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); true`,
+      );
       await waitForScreenshotState(app.main, 'idle', 10_000);
       const afterCancel = await listPngFiles();
       cancelControl.close();
       cancelSelection.close();
-      fixture.close();
+      fixture?.close();
       console.error('[runtime] long screenshot complete');
       return {
         longScreenshot: {
           selection: rect,
-          frames: stitched.screenshot.longCapture.frames,
-          stitchedPixelHeight: stitched.screenshot.longCapture.pixelHeight,
+          frames: stitchedPreview.images,
           indicator: longIndicator,
           preview: { initial: initialPreview, stitched: stitchedPreview },
-          snapshotLatencies,
-          completion,
-          output,
-          cancelledBy: 'right-click',
+          captureUiStability: {
+            visibility: stitchedPreview.visibility,
+            hiddenTransitions: stitchedPreview.hiddenTransitions,
+          },
+          copiedToClipboard: completed.screenshot.copiedToClipboard,
+          createdFiles,
+          cancelledBy: 'Escape',
           cancelCreatedFiles: afterCancel.filter((file) => !beforeCancel.includes(file)),
         },
       };

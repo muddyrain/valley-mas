@@ -1,12 +1,12 @@
 import { Check, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { RecorderSnapshot } from './shared/contracts';
 
 export function LongScreenshotControl() {
   const [snapshot, setSnapshot] = useState<RecorderSnapshot>();
   const [finishing, setFinishing] = useState(false);
-  const [error, setError] = useState<string>();
   const previewRef = useRef<HTMLDivElement>(null);
+  const scrollIdleTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const capture = snapshot?.screenshot.longCapture;
   const previewCount = capture?.previewSlices.length ?? 0;
 
@@ -15,7 +15,7 @@ export function LongScreenshotControl() {
     return window.screenRecorder.onSnapshot(setSnapshot);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (previewCount < 1) return;
     const preview = previewRef.current;
     if (preview) preview.scrollTop = preview.scrollHeight;
@@ -29,16 +29,33 @@ export function LongScreenshotControl() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  useEffect(
+    () => () => {
+      if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+    },
+    [],
+  );
+
   const finish = async () => {
     setFinishing(true);
-    setError(undefined);
     try {
       await window.screenRecorder.finishLongScreenshot();
-    } catch (caught) {
+    } catch {
       setFinishing(false);
-      setError(caught instanceof Error ? caught.message : '无法完成长截图');
     }
   };
+
+  const revealScrollbarWhileScrolling = () => {
+    const preview = previewRef.current;
+    if (!preview) return;
+    preview.classList.add('long-screenshot-preview-scrolling');
+    if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+    scrollIdleTimerRef.current = setTimeout(() => {
+      preview.classList.remove('long-screenshot-preview-scrolling');
+    }, 500);
+  };
+
+  if (!capture) return null;
 
   return (
     <main
@@ -48,38 +65,13 @@ export function LongScreenshotControl() {
         void window.screenRecorder.cancelLongScreenshot();
       }}
     >
-      <span className="long-screenshot-capturing-dot" />
-      <div className="long-screenshot-summary">
-        <strong>长截图捕获中</strong>
-        <small>
-          {capture ? `${capture.frames} 段 · ${capture.pixelHeight}px · 滚动目标内容` : '正在准备'}
-        </small>
-      </div>
-      <button
-        type="button"
-        className="long-screenshot-finish"
-        title="完成长截图"
-        aria-label="完成长截图"
-        disabled={finishing}
-        onClick={() => void finish()}
-      >
-        <Check aria-hidden="true" size={18} strokeWidth={2} />
-      </button>
-      <button
-        type="button"
-        title="取消长截图"
-        aria-label="取消长截图"
-        onClick={() => void window.screenRecorder.cancelLongScreenshot()}
-      >
-        <X aria-hidden="true" size={18} strokeWidth={2} />
-      </button>
       <section className="long-screenshot-preview" aria-label="长截图实时预览">
-        <header>
-          <strong>实时预览</strong>
-          <span>{capture ? `${capture.pixelHeight}px` : '准备中'}</span>
-        </header>
-        <div ref={previewRef} className="long-screenshot-preview-scroll">
-          {capture?.previewSlices.map((slice, index) => (
+        <div
+          ref={previewRef}
+          className="long-screenshot-preview-scroll"
+          onScroll={revealScrollbarWhileScrolling}
+        >
+          {capture.previewSlices.map((slice, index) => (
             <img
               key={`${index}-${slice.pixelHeight}`}
               src={slice.dataUrl}
@@ -87,12 +79,29 @@ export function LongScreenshotControl() {
               draggable={false}
             />
           ))}
-          {!previewCount && <span className="long-screenshot-preview-empty">等待首帧</span>}
         </div>
       </section>
-      {(capture?.notice || error) && (
-        <div className="long-screenshot-notice">{error || capture?.notice}</div>
-      )}
+      <div className="long-screenshot-actions">
+        <button
+          type="button"
+          className="long-screenshot-cancel"
+          title="取消长截图"
+          aria-label="取消长截图"
+          onClick={() => void window.screenRecorder.cancelLongScreenshot()}
+        >
+          <X aria-hidden="true" size={23} strokeWidth={2} />
+        </button>
+        <button
+          type="button"
+          className="long-screenshot-finish"
+          title="完成并复制长截图"
+          aria-label="完成并复制长截图"
+          disabled={finishing}
+          onClick={() => void finish()}
+        >
+          <Check aria-hidden="true" size={25} strokeWidth={2} />
+        </button>
+      </div>
     </main>
   );
 }

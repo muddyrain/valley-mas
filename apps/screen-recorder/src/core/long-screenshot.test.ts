@@ -49,6 +49,32 @@ describe('long screenshot stitching', () => {
     expect(Math.ceil(1_000 / getVerticalShiftSearchStep(1_000))).toBeLessThanOrEqual(100);
   });
 
+  it('matches a Retina-sized scrolling frame without blocking the main process', () => {
+    const width = 800;
+    const height = 840;
+    const shift = 240;
+    const createFrame = (offset: number): BitmapFrame => {
+      const data = new Uint8Array(width * height * 4);
+      for (let y = 0; y < height; y += 1) {
+        const sourceY = y + offset;
+        for (let x = 0; x < width; x += 1) {
+          const pixel = (y * width + x) * 4;
+          data[pixel] = (sourceY * 17 + x * 3) % 256;
+          data[pixel + 1] = (sourceY * 7 + x * 11) % 256;
+          data[pixel + 2] = (sourceY * 13 + x * 5) % 256;
+          data[pixel + 3] = 255;
+        }
+      }
+      return { width, height, data };
+    };
+    const previous = createFrame(0);
+    const current = createFrame(shift);
+    const startedAt = performance.now();
+
+    expect(detectVerticalShift(previous, current)?.shift).toBe(shift);
+    expect(performance.now() - startedAt).toBeLessThan(500);
+  });
+
   it('rejects incompatible frames and excessive output height', () => {
     expect(() =>
       composeLongScreenshot([

@@ -225,6 +225,7 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
   const [selectedTextIndex, setSelectedTextIndex] = useState(-1);
   const [error, setError] = useState<string>();
   const [working, setWorking] = useState(false);
+  const [longScreenshotStarting, setLongScreenshotStarting] = useState(false);
   const [pickedColor, setPickedColor] = useState<{
     color: RgbColor;
     local: Point;
@@ -563,12 +564,14 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
   const startLongScreenshot = async () => {
     if (!plan) return;
     setWorking(true);
+    setLongScreenshotStarting(true);
     setError(undefined);
     try {
       await prepareAnnotationsForExport();
       await window.screenRecorder.startLongScreenshot(plan.operationId, await createPng());
     } catch (caught) {
       setWorking(false);
+      setLongScreenshotStarting(false);
       setError(caught instanceof Error ? caught.message : '无法开始长截图');
     }
   };
@@ -603,7 +606,7 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
 
   return (
     <div
-      className={`screenshot-editor-overlay${visible ? '' : ' screenshot-editor-pending'}`}
+      className={`screenshot-editor-overlay${visible ? '' : ' screenshot-editor-pending'}${longScreenshotStarting ? ' screenshot-editor-long-starting' : ''}`}
       onContextMenu={(event) => {
         event.preventDefault();
         void window.screenRecorder.cancelScreenshotEdit(plan.operationId);

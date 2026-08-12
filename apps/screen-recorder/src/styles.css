@@ -1024,6 +1024,11 @@ button:active:not(:disabled) {
   visibility: hidden;
 }
 
+.screenshot-editor-long-starting {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .screenshot-canvas-wrap {
   position: absolute;
   z-index: 2;
@@ -1386,143 +1391,117 @@ button:active:not(:disabled) {
 .long-screenshot-control {
   position: relative;
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
-  grid-template-rows: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
   height: calc(100vh - 12px);
   margin: 6px;
-  padding: 10px 12px;
-  border-radius: 15px;
-  color: #f7f8fb;
-  background: rgb(19 22 29 / 96%);
-  box-shadow:
-    0 18px 48px rgb(0 0 0 / 34%),
-    inset 0 0 0 1px rgb(255 255 255 / 10%);
+  min-height: 0;
   -webkit-font-smoothing: antialiased;
 }
 
-.long-screenshot-summary {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
 .long-screenshot-preview {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-rows: auto minmax(0, 1fr);
-  align-self: stretch;
   min-height: 0;
   overflow: hidden;
-  border-radius: 11px;
-  background: #0d0f14;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 8%);
-}
-
-.long-screenshot-preview header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 34px;
-  padding: 0 11px;
-  color: #aeb5c3;
-  background: #181b22;
-}
-
-.long-screenshot-preview header strong {
-  color: #dfe3eb;
-  font-size: 11px;
-}
-
-.long-screenshot-preview header span {
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: 0 14px 38px rgb(0 0 0 / 28%);
 }
 
 .long-screenshot-preview-scroll {
-  position: relative;
+  height: 100%;
   min-height: 0;
-  padding: 10px 48px 14px;
-  overflow: hidden auto;
-  scrollbar-color: #464d5c transparent;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: transparent transparent;
   scrollbar-width: thin;
+}
+
+.long-screenshot-preview-scroll.long-screenshot-preview-scrolling {
+  scrollbar-color: rgb(92 99 112 / 72%) transparent;
+}
+
+.long-screenshot-preview-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 0;
+  background: transparent;
+}
+
+.long-screenshot-preview-scroll::-webkit-scrollbar-track,
+.long-screenshot-preview-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.long-screenshot-preview-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: transparent;
+}
+
+.long-screenshot-preview-scroll.long-screenshot-preview-scrolling::-webkit-scrollbar-thumb {
+  background: rgb(92 99 112 / 72%);
 }
 
 .long-screenshot-preview-scroll img {
   display: block;
   width: 100%;
   height: auto;
-  outline: 1px solid rgb(255 255 255 / 10%);
+  image-rendering: auto;
   pointer-events: none;
 }
 
-.long-screenshot-preview-empty {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  color: #747c8c;
-  font-size: 11px;
-  transform: translate(-50%, -50%);
-}
-
-.long-screenshot-control strong {
-  font-size: 13px;
-}
-
-.long-screenshot-control small {
-  color: #aeb5c3;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
+.long-screenshot-actions {
+  display: flex;
+  justify-self: center;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid rgb(24 27 33 / 8%);
+  border-radius: 13px;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 24%);
 }
 
 .long-screenshot-control button {
   display: grid;
   place-items: center;
-  width: 40px;
+  width: 42px;
   height: 40px;
-  border-radius: 10px;
-  color: #c8ced9;
-  background: #303540;
+  border-radius: 9px;
+  background: transparent;
   cursor: pointer;
 }
 
 .long-screenshot-control button:hover {
-  color: white;
-  background: #3a404d;
+  background: #f1f2f4;
+}
+
+.long-screenshot-control .long-screenshot-cancel {
+  color: #ef4d52;
 }
 
 .long-screenshot-control .long-screenshot-finish {
-  color: white;
-  background: #397cff;
+  color: #37a55b;
 }
 
 .long-screenshot-control .long-screenshot-finish:hover {
-  background: #4a88ff;
+  background: #eef8f1;
 }
 
-.long-screenshot-capturing-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #ff4964;
-  box-shadow: 0 0 0 5px rgb(255 73 100 / 14%);
+@media (max-height: 220px) {
+  .long-screenshot-control button {
+    width: 36px;
+    height: 34px;
+  }
+
+  .long-screenshot-actions {
+    padding: 3px;
+  }
 }
 
-.long-screenshot-notice {
-  position: absolute;
-  right: 8px;
-  bottom: 10px;
-  left: 8px;
-  overflow: hidden;
-  padding: 6px 9px;
-  border-radius: 7px;
-  color: #ffd18b;
-  background: rgb(15 17 22 / 88%);
-  font-size: 11px;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+@media (max-width: 210px) {
+  .long-screenshot-control button {
+    width: 38px;
+  }
 }
 
 .long-screenshot-indicator {

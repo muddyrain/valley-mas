@@ -43,7 +43,21 @@ import {
   extractAppendedFrame,
   type LongScreenshotSlice,
 } from '../src/core/long-screenshot';
-import { getLongScreenshotSelectionFrame } from '../src/core/long-screenshot-view';
+import { registerLongScreenshotEscape } from '../src/core/long-screenshot-escape';
+import {
+  getLongScreenshotControlBoundsForContent,
+  getLongScreenshotControlLayout,
+  getLongScreenshotPreviewSize,
+  getLongScreenshotSelectionFrame,
+  type LongScreenshotControlLayout,
+} from '../src/core/long-screenshot-view';
+import { showLongScreenshotWindow } from '../src/core/long-screenshot-window';
+import {
+  buildMacOSLongScreenshotCaptureArgs,
+  parseMacOSLongScreenshotCapture,
+  parseMediaSourceWindowId,
+  shouldUseNativeMacOSLongScreenshotCapture,
+} from '../src/core/macos-long-screenshot-capture';
 import { RECORDING_MIME_CANDIDATES, type RecordingContainer } from '../src/core/mime';
 import {
   getAlwaysOnTopRelativeLevel,
@@ -130,6 +144,7 @@ let controlWindow: BrowserWindow | undefined;
 let screenshotEditorWindow: BrowserWindow | undefined;
 let longScreenshotControlWindow: BrowserWindow | undefined;
 let longScreenshotIndicatorWindow: BrowserWindow | undefined;
+let disposeLongScreenshotEscape: (() => void) | undefined;
 let recordingSetupWindow: BrowserWindow | undefined;
 let completionWindow: BrowserWindow | undefined;
 const preparedSelectionWindows = new PreparedWindowSlot<BrowserWindow>();
@@ -161,12 +176,14 @@ let longScreenshotCapture:
       operationId: string;
       display: Display;
       selection: Rectangle;
+      controlLayout: LongScreenshotControlLayout;
       slices: LongScreenshotSlice[];
       lastFrame: BitmapFrame;
       pixelHeight: number;
       previewSlices: Array<{ dataUrl: string; pixelHeight: number }>;
       startedAt: number;
-      timer: NodeJS.Timeout;
+      timer?: NodeJS.Timeout;
+      captureHost?: QueryHost;
       sampling: boolean;
       notice?: string;
     }
@@ -1174,34 +1191,17 @@ function createRecordingSetupWindow(display: Display, selection?: Rectangle): vo
   loadLocalRenderer(nextWindow, 'recording-setup');
 }
 
-function getLongScreenshotControlBounds(display: Display, selection: Rectangle) {
-  const width = Math.min(360, display.workArea.width - 24);
-  const height = Math.min(340, display.workArea.height - 24);
-  const gap = 12;
-  const area = display.workArea;
-  const candidates = [
-    { x: selection.x + selection.width + gap, y: selection.y },
-    { x: selection.x - width - gap, y: selection.y },
-    { x: selection.x, y: selection.y + selection.height + gap },
-    { x: selection.x, y: selection.y - height - gap },
-  ];
-  const position = candidates.find(
-    ({ x, y }) =>
-      x >= area.x &&
-      y >= area.y &&
-      x + width <= area.x + area.width &&
-      y + height <= area.y + area.height,
-  ) ?? {
-    x: area.x + area.width - width - gap,
-    y: area.y + area.height - height - gap,
-  };
-  return { ...position, width, height };
+function usesNativeMacOSLongScreenshotCapture(): boolean {
+  return shouldUseNativeMacOSLongScreenshotCapture(
+    process.platform,
+    process.platform === 'darwin' ? process.getSystemVersion() : '',
+  );
 }
 
-function createLongScreenshotControlWindow(display: Display, selection: Rectangle): void {
+function createLongScreenshotControlWindow(layout: LongScreenshotControlLayout): BrowserWindow {
   destroyLongScreenshotControlWindow();
   const nextWindow = new BrowserWindow({
-    ...getLongScreenshotControlBounds(display, selection),
+    ...layout.bounds,
     show: false,
     transparent: true,
     frame: false,
@@ -1215,7 +1215,7 @@ function createLongScreenshotControlWindow(display: Display, selection: Rectangl
   });
   longScreenshotControlWindow = nextWindow;
   nextWindow.setAlwaysOnTop(true, 'screen-saver', 2);
-  nextWindow.setContentProtection(true);
+  nextWindow.setContentProtection(!usesNativeMacOSLongScreenshotCapture());
   nextWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   nextWindow.webContents.on('context-menu', (event) => {
     event.preventDefault();
@@ -1226,16 +1226,15 @@ function createLongScreenshotControlWindow(display: Display, selection: Rectangl
       cancelLongScreenshot();
     }
   });
-  nextWindow.once('ready-to-show', () => {
-    if (longScreenshotControlWindow === nextWindow) nextWindow.showInactive();
-  });
+  showLongScreenshotWindow(nextWindow);
   nextWindow.on('closed', () => {
     if (longScreenshotControlWindow === nextWindow) longScreenshotControlWindow = undefined;
   });
   loadLocalRenderer(nextWindow, 'long-screenshot-control');
+  return nextWindow;
 }
 
-function createLongScreenshotIndicatorWindow(display: Display): void {
+function createLongScreenshotIndicatorWindow(display: Display): BrowserWindow {
   destroyLongScreenshotIndicatorWindow();
   const nextWindow = new BrowserWindow({
     ...display.bounds,
@@ -1253,13 +1252,12 @@ function createLongScreenshotIndicatorWindow(display: Display): void {
   });
   longScreenshotIndicatorWindow = nextWindow;
   nextWindow.setAlwaysOnTop(true, 'screen-saver', 1);
-  nextWindow.setContentProtection(true);
+  nextWindow.setContentProtection(!usesNativeMacOSLongScreenshotCapture());
   nextWindow.setIgnoreMouseEvents(true, { forward: true });
   nextWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  nextWindow.once('ready-to-show', () => {
+  showLongScreenshotWindow(nextWindow, () => {
     if (longScreenshotIndicatorWindow === nextWindow) {
       fitOverlayToDisplay(nextWindow, display);
-      nextWindow.showInactive();
     }
   });
   nextWindow.on('closed', () => {
@@ -1268,6 +1266,26 @@ function createLongScreenshotIndicatorWindow(display: Display): void {
     }
   });
   loadLocalRenderer(nextWindow, 'long-screenshot-indicator');
+  return nextWindow;
+}
+
+function waitForWindowToShow(window: BrowserWindow): Promise<void> {
+  if (window.isVisible()) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    let timer: NodeJS.Timeout;
+    const finish = (error?: Error) => {
+      clearTimeout(timer);
+      window.removeListener('show', onShow);
+      window.removeListener('closed', onClosed);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onShow = () => finish();
+    const onClosed = () => finish(new Error('长截图浮层已关闭'));
+    timer = setTimeout(() => finish(new Error('长截图浮层显示超时')), 5_000);
+    window.once('show', onShow);
+    window.once('closed', onClosed);
+  });
 }
 
 function createCompletionWindow(
@@ -1534,8 +1552,9 @@ function createLongScreenshotPreviewSlice(frame: BitmapFrame) {
     scaleFactor: 1,
   });
   if (image.isEmpty()) throw new Error('无法生成长截图预览');
+  const previewSize = getLongScreenshotPreviewSize(frame.width, frame.height);
   return {
-    dataUrl: image.resize({ width: Math.min(180, frame.width), quality: 'good' }).toDataURL(),
+    dataUrl: image.resize({ ...previewSize, quality: 'best' }).toDataURL(),
     pixelHeight: frame.height,
   };
 }
@@ -1582,14 +1601,21 @@ async function captureLongScreenshotFrame(): Promise<void> {
   capture.sampling = true;
   let changed = false;
   try {
-    const thumbnail = await captureDisplayImage(capture.display, false);
-    const image = thumbnail.crop(
-      dipRectToVideoPixels(
-        capture.selection,
-        toDisplayGeometry(capture.display),
-        thumbnail.getSize(),
-      ),
-    );
+    let image: NativeImage;
+    if (capture.captureHost) {
+      image = nativeImage.createFromBuffer(
+        parseMacOSLongScreenshotCapture(await capture.captureHost.query()),
+      );
+    } else {
+      const thumbnail = await captureDisplayImage(capture.display, false);
+      image = thumbnail.crop(
+        dipRectToVideoPixels(
+          capture.selection,
+          toDisplayGeometry(capture.display),
+          thumbnail.getSize(),
+        ),
+      );
+    }
     if (image.isEmpty()) throw new Error('长截图没有捕获到有效画面');
     const current = bitmapFrameFromImage(image);
     const match = detectVerticalShift(capture.lastFrame, current);
@@ -1610,6 +1636,15 @@ async function captureLongScreenshotFrame(): Promise<void> {
     capture.previewSlices.push(createLongScreenshotPreviewSlice(appendedFrame));
     capture.lastFrame = current;
     capture.pixelHeight += match.shift;
+    const controlBounds = getLongScreenshotControlBoundsForContent(
+      capture.display.workArea,
+      capture.selection,
+      capture.controlLayout,
+      { width: current.width, height: capture.pixelHeight },
+    );
+    if (longScreenshotControlWindow && !longScreenshotControlWindow.isDestroyed()) {
+      longScreenshotControlWindow.setBounds(controlBounds, false);
+    }
     capture.notice = undefined;
     changed = true;
   } catch (error) {
@@ -1624,7 +1659,12 @@ async function captureLongScreenshotFrame(): Promise<void> {
 }
 
 function clearLongScreenshotCapture(): void {
-  if (longScreenshotCapture) clearInterval(longScreenshotCapture.timer);
+  disposeLongScreenshotEscape?.();
+  disposeLongScreenshotEscape = undefined;
+  if (longScreenshotCapture) {
+    if (longScreenshotCapture.timer) clearInterval(longScreenshotCapture.timer);
+    longScreenshotCapture.captureHost?.dispose();
+  }
   longScreenshotCapture = undefined;
 }
 
@@ -1644,24 +1684,57 @@ async function startLongScreenshot(operationId: string, firstPng: Uint8Array): P
   const firstImage = nativeImage.createFromBuffer(Buffer.from(firstPng));
   if (firstImage.isEmpty()) throw new Error('长截图首帧无法读取');
   const firstFrame = bitmapFrameFromImage(firstImage);
-  const timer = setInterval(() => void captureLongScreenshotFrame(), 650);
+  const controlLayout = getLongScreenshotControlLayout(task.display.workArea, selection);
+  screenshotSession.beginLongCapture();
+  screenshotEditorWindow?.hide();
   longScreenshotCapture = {
     operationId,
     display: task.display,
     selection,
+    controlLayout,
     slices: [{ frame: firstFrame, appendRows: firstFrame.height }],
     lastFrame: firstFrame,
     pixelHeight: firstFrame.height,
     previewSlices: [createLongScreenshotPreviewSlice(firstFrame)],
     startedAt: Date.now(),
-    timer,
     sampling: false,
   };
-  screenshotSession.beginLongCapture();
-  screenshotEditorWindow?.hide();
-  createLongScreenshotIndicatorWindow(task.display);
-  createLongScreenshotControlWindow(task.display, selection);
+  disposeLongScreenshotEscape = registerLongScreenshotEscape(globalShortcut, () => {
+    if (screenshotSession.state === 'long-capturing') cancelLongScreenshot();
+  });
   broadcast();
+  try {
+    const indicator = createLongScreenshotIndicatorWindow(task.display);
+    const control = createLongScreenshotControlWindow(controlLayout);
+    await Promise.all([waitForWindowToShow(indicator), waitForWindowToShow(control)]);
+    const excludedWindowIds = [indicator, control]
+      .map((window) =>
+        window && !window.isDestroyed()
+          ? parseMediaSourceWindowId(window.getMediaSourceId())
+          : undefined,
+      )
+      .filter((windowId): windowId is string => Boolean(windowId));
+    longScreenshotCapture.captureHost = usesNativeMacOSLongScreenshotCapture()
+      ? createExecutableWindowQueryHost(
+          macOSWindowQueryPath,
+          buildMacOSLongScreenshotCaptureArgs({
+            displayId: task.display.id,
+            displayBounds: task.display.bounds,
+            selection,
+            pixelSize: { width: firstFrame.width, height: firstFrame.height },
+            excludedWindowIds,
+          }),
+          5_000,
+        )
+      : undefined;
+    longScreenshotCapture.timer = setInterval(() => void captureLongScreenshotFrame(), 650);
+  } catch (error) {
+    screenshotSession.cancelEditing();
+    clearLongScreenshotCapture();
+    destroyLongScreenshotIndicatorWindow();
+    destroyLongScreenshotControlWindow();
+    throw error;
+  }
 }
 
 async function finishLongScreenshot(): Promise<void> {
@@ -1669,7 +1742,7 @@ async function finishLongScreenshot(): Promise<void> {
   if (!capture || screenshotSession.state !== 'long-capturing') {
     throw new Error('长截图任务已失效');
   }
-  clearInterval(capture.timer);
+  if (capture.timer) clearInterval(capture.timer);
   while (capture.sampling) await new Promise((resolve) => setTimeout(resolve, 20));
   await captureLongScreenshotFrame();
   try {
@@ -1681,14 +1754,19 @@ async function finishLongScreenshot(): Promise<void> {
     });
     if (image.isEmpty()) throw new Error('无法生成长截图');
     const png = image.toPNG();
-    const preview = image.resize({ width: 440, quality: 'best' }).toDataURL();
-    const completedDisplay = toDisplayGeometry(capture.display);
-    await persistCompletedScreenshot(png);
+    await copyScreenshot(png);
+    screenshotOutputPath = undefined;
+    screenshotSession.complete();
+    screenshotTask = undefined;
+    screenshotSourcePromise = undefined;
+    screenshotDisplayImage = undefined;
+    screenshotEditPlan = undefined;
+    warningMessage = undefined;
+    errorMessage = undefined;
     clearLongScreenshotCapture();
     destroyLongScreenshotIndicatorWindow();
     destroyLongScreenshotControlWindow();
     destroyScreenshotEditorWindow();
-    createCompletionWindow(completedDisplay, 'screenshot', preview);
     broadcast();
   } catch (error) {
     screenshotSession.fail();
@@ -1696,7 +1774,7 @@ async function finishLongScreenshot(): Promise<void> {
     destroyLongScreenshotIndicatorWindow();
     destroyLongScreenshotControlWindow();
     destroyScreenshotEditorWindow();
-    errorMessage = `无法保存长截图：${error instanceof Error ? error.message : '未知错误'}`;
+    errorMessage = `无法复制长截图：${error instanceof Error ? error.message : '未知错误'}`;
     notify('长截图失败', errorMessage);
     broadcast();
     throw error;
