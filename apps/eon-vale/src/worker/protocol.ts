@@ -5,8 +5,9 @@ import type {
   WorldMapSnapshot,
   WorldRenderSnapshot,
 } from '@/render/renderTypes';
-import type { EntityKind, GodPower, MapTool, WorldLaws, WorldPreset } from '@/shared/gameTypes';
+import type { EntityKind, GodPower, MapTool, WorldPreset } from '@/shared/gameTypes';
 import type { PrototypeMetrics, PrototypeSnapshot } from '@/simulation/core/prototypeSimulation';
+import type { WorldLawId } from '@/simulation/rules/worldLawCatalog';
 
 export type WorkerCommand =
   | { type: 'initialize-stress'; population: number; seed: string }
@@ -19,7 +20,7 @@ export type WorkerCommand =
     }
   | { type: 'set-paused'; paused: boolean }
   | { type: 'set-speed'; speed: 1 | 2 | 4 | 8 }
-  | { type: 'set-world-law'; law: keyof WorldLaws; enabled: boolean }
+  | { type: 'set-world-law'; law: WorldLawId; enabled: boolean }
   | { type: 'map-edit'; tool: MapTool; cell: number; radius: number }
   | { type: 'spawn'; kind: EntityKind; cell: number; count: number }
   | { type: 'god-power'; power: GodPower; cell: number; radius: number }

@@ -5,8 +5,9 @@ import type {
   WorldMapSnapshot,
   WorldRenderSnapshot,
 } from '@/render/renderTypes';
-import type { EntityKind, GodPower, MapTool, WorldLaws, WorldPreset } from '@/shared/gameTypes';
+import type { EntityKind, GodPower, MapTool, WorldPreset } from '@/shared/gameTypes';
 import type { PrototypeSnapshot } from '@/simulation/core/prototypeSimulation';
+import type { WorldLawId } from '@/simulation/rules/worldLawCatalog';
 import type { WorkerCommand, WorkerEvent } from './protocol';
 
 export interface WorkerClientListeners {
@@ -62,7 +63,7 @@ export class SimulationWorkerClient {
     this.send({ type: 'set-speed', speed });
   }
 
-  setWorldLaw(law: keyof WorldLaws, enabled: boolean): void {
+  setWorldLaw(law: WorldLawId, enabled: boolean): void {
     this.send({ type: 'set-world-law', law, enabled });
   }
 

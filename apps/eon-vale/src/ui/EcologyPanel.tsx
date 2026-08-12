@@ -31,6 +31,15 @@ const STATUS_LABELS = {
   returning: '正在恢复',
 } as const;
 
+const DEATH_CAUSE_LABELS = {
+  age: '老死',
+  hunger: '饥饿',
+  predation: '捕食',
+  hunting: '狩猎',
+  disease: '疾病',
+  disaster: '灾害',
+} as const;
+
 export function EcologyPanel({
   ecology,
   onClose,
@@ -55,6 +64,13 @@ export function EcologyPanel({
           if (!species) return null;
           const ratio =
             species.capacity <= 0 ? 0 : Math.min(100, (species.count / species.capacity) * 100);
+          const deathSummary = Object.entries(species.deathCauses)
+            .filter(([, count]) => count > 0)
+            .map(
+              ([cause, count]) =>
+                `${DEATH_CAUSE_LABELS[cause as keyof typeof DEATH_CAUSE_LABELS]} ${count}`,
+            )
+            .join(' · ');
           return (
             <div key={kind} className={`ecology-species-row ${species.status}`}>
               <i>{kind === EntityKind.Fish ? <Leaf size={13} /> : <PawPrint size={13} />}</i>
@@ -67,6 +83,9 @@ export function EcologyPanel({
               </span>
               <strong>
                 {species.count} / {species.capacity}
+                <small title={deathSummary || '暂无死亡记录'}>
+                  出生 {species.births} · 死亡 {species.deaths}
+                </small>
               </strong>
             </div>
           );

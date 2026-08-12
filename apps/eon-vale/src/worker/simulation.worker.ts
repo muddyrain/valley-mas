@@ -22,6 +22,7 @@ import { generateWorldMap } from '@/simulation/map/generateWorldMap';
 import { editTerrain } from '@/simulation/map/terrainEditing';
 import { loadWorldSave, serializeWorld } from '@/simulation/persistence/save';
 import { createResourceNodeStore } from '@/simulation/resources/resourceNodes';
+import { simulationTickIntervalMs } from '@/simulation/rules/runtimeRules';
 import { applyGodPower } from '@/simulation/systems/environment';
 import { drainWorldMapDelta } from './mapDeltaSync';
 import { type MapSyncReason, mapSyncRequiresFullRebuild } from './mapSyncPolicy';
@@ -38,6 +39,7 @@ let lastSnapshotAt = 0;
 let lastMapAt = 0;
 let totalTickMs = 0;
 let measuredTicks = 0;
+let nextTickAt = performance.now();
 const godCooldowns = new Map<string, number>();
 
 function emit(event: WorkerEvent, transfers: Transferable[] = []): void {
@@ -305,10 +307,16 @@ workerScope.addEventListener('message', (event: MessageEvent<WorkerCommand>) => 
       emitResourceSnapshot(createFullResourceSnapshot(world.state.resourceNodes));
       return;
     }
-    if (command.type === 'set-paused') paused = command.paused;
-    if (command.type === 'set-speed') speed = command.speed;
+    if (command.type === 'set-paused') {
+      paused = command.paused;
+      nextTickAt = performance.now();
+    }
+    if (command.type === 'set-speed') {
+      speed = command.speed;
+      nextTickAt = performance.now();
+    }
     if (command.type === 'set-world-law' && world) {
-      world.state.worldLaws[command.law] = command.enabled;
+      world.setWorldLaw(command.law, command.enabled);
     }
     if (command.type === 'map-edit' && world) {
       const changedChunks = editTerrain(
@@ -360,14 +368,18 @@ workerScope.addEventListener('message', (event: MessageEvent<WorkerCommand>) => 
   }
 });
 
-setInterval(() => {
-  if (paused) return;
+function runSimulationTick(): void {
+  if (paused) {
+    nextTickAt = performance.now();
+    setTimeout(runSimulationTick, 10);
+    return;
+  }
   const startedAt = performance.now();
   if (mode === 'stress' && prototype) {
-    for (let step = 0; step < speed; step += 1) prototype.step();
+    prototype.step();
   }
   if (mode === 'world' && world) {
-    for (let step = 0; step < speed; step += 1) world.step();
+    world.step();
   }
   const tickMs = performance.now() - startedAt;
   totalTickMs += tickMs;
@@ -411,4 +423,10 @@ setInterval(() => {
     lastMapAt = now;
     emitWorldDeltas();
   }
-}, 50);
+  const interval = simulationTickIntervalMs(speed);
+  nextTickAt = Math.max(nextTickAt + interval, now - interval);
+  setTimeout(runSimulationTick, Math.max(0, nextTickAt - performance.now()));
+}
+
+nextTickAt = performance.now();
+runSimulationTick();

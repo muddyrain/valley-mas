@@ -39,6 +39,12 @@ import {
   reserveResourceNode,
   resourceNodeAvoidance,
 } from '../resources/resourceNodes';
+import { ANIMAL_LIFECYCLE_RULES, ECOLOGY_BALANCE_RULES } from '../rules/ecologyRules';
+import {
+  createDefaultWorldLaws,
+  WORLD_LAW_CATALOG,
+  type WorldLawId,
+} from '../rules/worldLawCatalog';
 import {
   birthPressure,
   calculateCarryingCapacity,
@@ -52,7 +58,10 @@ import {
   ANIMAL_SPECIES_NAMES,
   createEcologyDiagnostics,
   habitatCells,
+  recordAnimalBirth,
+  recordAnimalDeath,
   refreshEcologyDiagnostics,
+  speciesCapacity,
   speciesReturnGroup,
 } from '../systems/ecology';
 import {
@@ -96,6 +105,7 @@ export interface WorldSimulation {
   step(): void;
   spawn(kind: EntityKind, x: number, z: number, count?: number): number[];
   ensureVillageAt(x: number, z: number, population: number): Village;
+  setWorldLaw(law: WorldLawId, enabled: boolean): void;
 }
 
 function createEntityArrays(capacity = MAX_ENTITIES): EntityArrays {
@@ -361,7 +371,7 @@ function createInitialState(options: CreateWorldOptions): WorldState {
     options.preset ?? 'archipelago',
   );
   return {
-    version: 5,
+    version: 6,
     seed: options.seed,
     tick: 0,
     year: 1,
@@ -377,7 +387,7 @@ function createInitialState(options: CreateWorldOptions): WorldState {
     nextEventId: 0,
     forcedPeaceUntil: 0,
     population: createPopulationDiagnostics(),
-    worldLaws: { naturalAnimalReturn: true, civilizationAwakening: false },
+    worldLaws: createDefaultWorldLaws(),
     ecology: createEcologyDiagnostics(),
     humanExtinctSinceTick: 0,
     wars: [],
@@ -467,15 +477,18 @@ function refreshPopulationDiagnostics(state: WorldState): void {
   state.population.adults = adults;
   state.population.elders = elders;
   state.population.carryingCapacity = state.villages.reduce(
-    (sum, village) => sum + (village.health > 0 ? village.carryingCapacity : 0),
+    (sum, village) =>
+      sum + (village.health > 0 && village.population > 0 ? village.carryingCapacity : 0),
     0,
   );
   state.population.housingCapacity = state.villages.reduce(
-    (sum, village) => sum + (village.health > 0 ? village.housingCapacity : 0),
+    (sum, village) =>
+      sum + (village.health > 0 && village.population > 0 ? village.housingCapacity : 0),
     0,
   );
   state.population.storedFood = state.villages.reduce(
-    (sum, village) => sum + (village.health > 0 ? village.resources.food : 0),
+    (sum, village) =>
+      sum + (village.health > 0 && village.population > 0 ? village.resources.food : 0),
     0,
   );
   state.population.trend = state.population.birthsLastYear - state.population.deathsLastYear;
@@ -562,8 +575,11 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       state.entities.headings[entityId] = 0;
       state.entities.hunger[entityId] = randomInt(random, 80, 420);
       state.entities.energy[entityId] = randomInt(random, 600, 1_000);
+      const lifecycle = ANIMAL_LIFECYCLE_RULES[kind as keyof typeof ANIMAL_LIFECYCLE_RULES];
       state.entities.age[entityId] =
-        kind === EntityKind.Human ? randomInt(random, 18, 40) : randomInt(random, 1, 12);
+        kind === EntityKind.Human
+          ? randomInt(random, 18, 40)
+          : randomInt(random, 1, Math.max(1, Math.min(12, lifecycle.lifespanYears - 2)));
       state.entities.sex[entityId] = entityId % 2;
       state.entities.familyIds[entityId] = 0;
       state.entities.partnerIds[entityId] = NO_ENTITY;
@@ -785,7 +801,12 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
   };
 
   const tryVillageBirth = (village: Village, assigned: number): void => {
-    if (state.tick % 180 !== 0 || state.tick - village.lastBirthTick < 120) return;
+    if (
+      !state.worldLaws.humanReproduction ||
+      state.tick % 180 !== 0 ||
+      state.tick - village.lastBirthTick < 120
+    )
+      return;
     const pressure = birthPressure({
       population: assigned,
       carryingCapacity: village.carryingCapacity,
@@ -980,6 +1001,114 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       residents.push(entityId);
       villageResidents.set(villageId, residents);
     }
+    const crowdedVillages = state.villages
+      .filter((village) => {
+        const population = villageResidents.get(village.id)?.length ?? 0;
+        return (
+          village.health > 0 &&
+          village.kingdomId > 0 &&
+          village.carryingCapacity > 0 &&
+          population / village.carryingCapacity >= 0.85
+        );
+      })
+      .sort(
+        (first, second) =>
+          (villageResidents.get(second.id)?.length ?? 0) / second.carryingCapacity -
+            (villageResidents.get(first.id)?.length ?? 0) / first.carryingCapacity ||
+          first.id - second.id,
+      );
+    for (const source of crowdedVillages) {
+      const sourceResidents = villageResidents.get(source.id) ?? [];
+      const mothers = sourceResidents.filter((entityId) => {
+        const age = state.entities.age[entityId] ?? 0;
+        const partnerId = state.entities.partnerIds[entityId] ?? NO_ENTITY;
+        return (
+          state.entities.sex[entityId] === ResidentSex.Female &&
+          age >= 18 &&
+          age <= 40 &&
+          partnerId !== NO_ENTITY &&
+          sourceResidents.includes(partnerId) &&
+          !state.entities.expeditionIds[partnerId] &&
+          !state.entities.expeditionIds[entityId]
+        );
+      });
+      for (const mother of mothers) {
+        const father = state.entities.partnerIds[mother] ?? NO_ENTITY;
+        const children = sourceResidents.filter(
+          (entityId) =>
+            (state.entities.age[entityId] ?? 0) < 18 &&
+            ((state.entities.parentAIds[entityId] === mother &&
+              state.entities.parentBIds[entityId] === father) ||
+              (state.entities.parentAIds[entityId] === father &&
+                state.entities.parentBIds[entityId] === mother)),
+        );
+        const family = [mother, father, ...children];
+        if (
+          family.some(
+            (entityId) =>
+              state.entities.expeditionIds[entityId] ||
+              (state.entities.carriedResources[entityId] ?? 0) > 0,
+          )
+        ) {
+          continue;
+        }
+        const destinations = state.villages
+          .filter((candidate) => {
+            const population = villageResidents.get(candidate.id)?.length ?? 0;
+            return (
+              candidate.id !== source.id &&
+              candidate.health > 0 &&
+              candidate.kingdomId === source.kingdomId &&
+              candidate.carryingCapacity - population >= family.length &&
+              population / Math.max(1, candidate.carryingCapacity) <= 0.45
+            );
+          })
+          .sort(
+            (first, second) =>
+              (villageResidents.get(first.id)?.length ?? 0) / first.carryingCapacity -
+                (villageResidents.get(second.id)?.length ?? 0) / second.carryingCapacity ||
+              Math.hypot(first.x - source.x, first.z - source.z) -
+                Math.hypot(second.x - source.x, second.z - source.z) ||
+              first.id - second.id,
+          );
+        let destination: Village | undefined;
+        let targetCell = -1;
+        for (const candidate of destinations) {
+          const candidateCell = findNearestWalkable(state, candidate.x, candidate.z);
+          const field = createFlowField(state.map.navigation, candidateCell);
+          if ((field.distance[entityCell(state, mother)] ?? 0xffff_ffff) === 0xffff_ffff) continue;
+          destination = candidate;
+          targetCell = candidateCell;
+          break;
+        }
+        if (!destination || targetCell < 0) continue;
+        state.nextExpeditionId += 1;
+        const relocation: PioneerExpedition = {
+          id: state.nextExpeditionId,
+          originVillageId: source.id,
+          destinationVillageId: destination.id,
+          kingdomId: source.kingdomId,
+          memberIds: family,
+          targetX: (targetCell % state.map.size) + 0.5,
+          targetZ: Math.floor(targetCell / state.map.size) + 0.5,
+          targetCell,
+          startedAtTick: state.tick,
+          supplies: 0,
+        };
+        for (const memberId of family) {
+          state.entities.expeditionIds[memberId] = relocation.id;
+          state.entities.paths[memberId] = null;
+          state.entities.targetCells[memberId] = targetCell;
+        }
+        state.expeditions.push(relocation);
+        addEvent(
+          state,
+          'village',
+          `${state.entities.names[mother] || '一名居民'}迁入了${destination.name}`,
+        );
+        return;
+      }
+    }
     const smallVillages = state.villages
       .filter(
         (village) =>
@@ -1111,6 +1240,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       }
       if (arrived < (destination ? living.length : Math.ceil(living.length * 0.75))) continue;
       if (destination) {
+        const leadResidentName = state.entities.names[living[0] || 0] || '一名居民';
         for (const memberId of living) {
           state.entities.villageIds[memberId] = destination.id;
           state.entities.kingdomIds[memberId] = destination.kingdomId;
@@ -1119,11 +1249,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         }
         state.population.totalMigrations += living.length;
         state.population.migrationsThisYear += living.length;
-        addEvent(
-          state,
-          'village',
-          `${state.entities.names[living[0] ?? 0] || '一名居民'}迁入了${destination.name}`,
-        );
+        addEvent(state, 'village', `${leadResidentName}迁入了${destination.name}`);
         state.expeditions.splice(index, 1);
         continue;
       }
@@ -1177,6 +1303,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       );
       if ((state.entities.blessed[entityId] ?? 0) > 0) state.entities.blessed[entityId] -= 1;
       if ((state.entities.enraged[entityId] ?? 0) > 0) state.entities.enraged[entityId] -= 1;
+      const wasHauling = state.entities.states[entityId] === AgentState.Haul;
       const village = state.villages.find(
         (candidate) => candidate.id === state.entities.villageIds[entityId],
       );
@@ -1232,8 +1359,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         else nextState = AgentState.Haul;
       }
       if ((state.entities.carriedResources[entityId] ?? 0) > 0) {
-        nextState =
-          state.entities.states[entityId] === AgentState.Haul ? AgentState.Haul : AgentState.Home;
+        nextState = wasHauling ? AgentState.Haul : AgentState.Home;
       }
       if (nextState === AgentState.Rest) {
         state.entities.energy[entityId] = Math.min(
@@ -1262,6 +1388,8 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
           cursor: 1,
           mapVersion: state.map.navigation.mapVersion,
         };
+      } else if (result.path.length === 1) {
+        completeEntityAction(state, result.agentId, result.destinationCell);
       } else state.entities.targetCells[result.agentId] = NO_TARGET;
     }
   };
@@ -1291,8 +1419,23 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       if (!state.entities.active[entityId]) continue;
       const kind = state.entities.kind[entityId] as EntityKind;
       if (kind === EntityKind.Human) continue;
+      const lifecycle = ANIMAL_LIFECYCLE_RULES[kind as keyof typeof ANIMAL_LIFECYCLE_RULES];
       const currentCell = entityCell(state, entityId);
       state.entities.hunger[entityId] = Math.min(1_000, (state.entities.hunger[entityId] ?? 0) + 1);
+      if (
+        state.worldLaws.hunger &&
+        (state.entities.hunger[entityId] ?? 0) >= 1_000 &&
+        state.tick % 20 === entityId % 20
+      ) {
+        state.entities.health[entityId] = Math.max(
+          0,
+          (state.entities.health[entityId] ?? 0) - lifecycle.starvationDamage,
+        );
+        if ((state.entities.health[entityId] ?? 0) === 0) {
+          recordAnimalDeath(state, entityId, 'hunger');
+          continue;
+        }
+      }
       if (state.tick % 10 === entityId % 10) {
         if (kind === EntityKind.Fish) {
           const neighbours = [
@@ -1381,7 +1524,10 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         state.entities.hunger[entityId] = Math.max(0, (state.entities.hunger[entityId] ?? 0) - 500);
         state.entities.states[entityId] = AgentState.Eat;
       }
-      if (kind === EntityKind.Wolf || kind === EntityKind.Bear) {
+      if (
+        state.worldLaws.animalPredation &&
+        (kind === EntityKind.Wolf || kind === EntityKind.Bear)
+      ) {
         const prey = findPredatorPrey(entityId, 1.4);
         if (prey >= 0) {
           state.entities.states[entityId] = AgentState.Attack;
@@ -1393,6 +1539,13 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
             0,
             (state.entities.hunger[entityId] ?? 0) - 220,
           );
+          if ((state.entities.health[prey] ?? 0) === 0) {
+            if (state.entities.kind[prey] === EntityKind.Human) {
+              recordResidentDeath(state, prey, 'violence');
+            } else {
+              recordAnimalDeath(state, prey, 'predation');
+            }
+          }
         }
       }
       state.entities.targetCells[entityId] = NO_TARGET;
@@ -1400,6 +1553,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
   };
 
   const updateAnimalEcology = (): void => {
+    if (!state.worldLaws.animalReproduction) return;
     for (const kind of ANIMAL_SPECIES) {
       const diagnostics = state.ecology.species[kind];
       if (diagnostics && state.tick - diagnostics.lastReturnTick < 720) continue;
@@ -1409,17 +1563,35 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
           members.push(entityId);
         }
       }
-      const cap = kind === EntityKind.Wolf || kind === EntityKind.Bear ? 18 : 48;
+      const cap = speciesCapacity(state, kind);
       if (members.length < 2 || members.length >= cap) continue;
-      if (stableNoise(state.tick * 17 + kind * 101 + members.length) < 0.58) continue;
-      const parent = members[Math.floor(random() * members.length)];
+      const lifecycle = ANIMAL_LIFECYCLE_RULES[kind];
+      const breedingMembers = members.filter(
+        (entityId) =>
+          (state.entities.age[entityId] ?? 0) >= lifecycle.maturityYears &&
+          (state.entities.hunger[entityId] ?? 0) <= lifecycle.maximumBreedingHunger,
+      );
+      const females = breedingMembers.filter(
+        (entityId) => state.entities.sex[entityId] === ResidentSex.Female,
+      );
+      const hasMale = breedingMembers.some(
+        (entityId) => state.entities.sex[entityId] === ResidentSex.Male,
+      );
+      if (females.length === 0 || !hasMale) continue;
+      const capacityPressure = members.length / Math.max(1, cap);
+      const chance = lifecycle.reproductionChance * Math.max(0.2, 1 - capacityPressure);
+      if (stableNoise(state.tick * 17 + kind * 101 + members.length) >= chance) continue;
+      const parent = females[Math.floor(random() * females.length)];
       if (parent === undefined) continue;
       const newborn = spawn(
         kind,
         state.entities.positionsX[parent] ?? 0,
         state.entities.positionsZ[parent] ?? 0,
       )[0];
-      if (newborn !== undefined) state.entities.age[newborn] = 0;
+      if (newborn !== undefined) {
+        state.entities.age[newborn] = 0;
+        recordAnimalBirth(state, kind);
+      }
     }
     refreshEcologyDiagnostics(state);
   };
@@ -1456,7 +1628,11 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       if (
         !diagnostics?.everPresent ||
         diagnostics.capacity <= 0 ||
-        diagnostics.count > Math.max(0, Math.floor(diagnostics.capacity * 0.2)) ||
+        diagnostics.count >
+          Math.max(
+            0,
+            Math.floor(diagnostics.capacity * ECOLOGY_BALANCE_RULES.naturalReturnThresholdRatio),
+          ) ||
         state.tick < (state.ecology.nextReturnTicks[kind] ?? 0)
       ) {
         continue;
@@ -1471,13 +1647,14 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       const spawned = spawn(kind, cell % state.map.size, Math.floor(cell / state.map.size), count);
       if (spawned.length === 0) continue;
       diagnostics.lastReturnTick = state.tick;
-      state.ecology.nextReturnTicks[kind] = state.tick + randomInt(random, 2_160, 4_320);
+      state.ecology.nextReturnTicks[kind] =
+        state.tick + randomInt(random, ...ECOLOGY_BALANCE_RULES.naturalReturnCooldownTicks);
       if (wasExtinct) addEvent(state, 'ecology', `${ANIMAL_SPECIES_NAMES[kind]}重新出现在荒野中`);
     }
     refreshEcologyDiagnostics(state);
   };
 
-  const updateCivilizationAwakening = (): void => {
+  const updateCivilizationRestart = (): void => {
     let humans = 0;
     for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
       if (isLivingHuman(state, entityId)) humans += 1;
@@ -1487,10 +1664,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       return;
     }
     if (!state.humanExtinctSinceTick) state.humanExtinctSinceTick = state.tick;
-    if (
-      !state.worldLaws.civilizationAwakening ||
-      state.tick - state.humanExtinctSinceTick < 14_400
-    ) {
+    if (!state.worldLaws.civilizationRestart || state.tick - state.humanExtinctSinceTick < 14_400) {
       return;
     }
     const cell = findNearestWalkable(state, state.map.size / 2, state.map.size / 2);
@@ -1586,7 +1760,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     for (const village of state.villages) {
       if (village.health <= 0) continue;
       const assigned = countVillageResidents(state, village.id);
-      if (assigned > 0) village.population = assigned;
+      village.population = assigned;
       const completed = village.buildingIds.reduce((count, buildingId) => {
         return count + (state.buildings[buildingId - 1]?.completed ? 1 : 0);
       }, 0);
@@ -2004,15 +2178,28 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     if (state.tick % 800 === 0) updateAnimalEcology();
     if (state.tick % 360 === 0) {
       updateNaturalAnimalReturn();
-      updateCivilizationAwakening();
+      updateCivilizationRestart();
     }
     if (state.tick % 720 === 0) {
       for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
         if (!state.entities.active[entityId]) continue;
         state.entities.age[entityId] = Math.min(255, (state.entities.age[entityId] ?? 0) + 1);
-        if (state.entities.kind[entityId] !== EntityKind.Human) continue;
+        if (state.entities.kind[entityId] !== EntityKind.Human) {
+          const kind = state.entities.kind[entityId] as keyof typeof ANIMAL_LIFECYCLE_RULES;
+          if (
+            state.worldLaws.naturalOldAge &&
+            (state.entities.age[entityId] ?? 0) > ANIMAL_LIFECYCLE_RULES[kind].lifespanYears
+          ) {
+            recordAnimalDeath(state, entityId, 'age');
+          }
+          continue;
+        }
         const lifespan = 78 + ((state.entities.traits[entityId] ?? 0) % 12);
-        if ((state.entities.age[entityId] ?? 0) <= lifespan || state.entities.blessed[entityId])
+        if (
+          !state.worldLaws.naturalOldAge ||
+          (state.entities.age[entityId] ?? 0) <= lifespan ||
+          state.entities.blessed[entityId]
+        )
           continue;
         recordResidentDeath(state, entityId, 'age');
       }
@@ -2020,7 +2207,17 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     }
   };
 
-  return { state, step, spawn, ensureVillageAt };
+  const setWorldLaw = (law: WorldLawId, enabled: boolean): void => {
+    if (state.worldLaws[law] === enabled) return;
+    state.worldLaws[law] = enabled;
+    addEvent(
+      state,
+      'law',
+      `世界法则“${WORLD_LAW_CATALOG[law].title}”已${enabled ? '开启' : '关闭'}`,
+    );
+  };
+
+  return { state, step, spawn, ensureVillageAt, setWorldLaw };
 }
 
 function entityCell(state: WorldState, entityId: number): number {
@@ -2168,7 +2365,12 @@ function planVillageBuilding(state: WorldState, village: Village, completed: num
     BuildingType.Home,
     BuildingType.Farm,
   ];
-  if (completed >= sequence.length) return;
+  const needsMoreHousing =
+    village.population > 0 &&
+    village.carryingCapacity > 0 &&
+    village.population / village.carryingCapacity >= 0.82 &&
+    village.housingCapacity < Math.ceil(village.population / 0.72);
+  if (completed >= sequence.length && !needsMoreHousing) return;
   const type = sequence[completed] ?? BuildingType.Home;
   const occupied = village.buildingIds.flatMap((buildingId) => {
     const building = state.buildings[buildingId - 1];
@@ -2294,7 +2496,7 @@ function applyEnvironmentDamage(state: WorldState): void {
     }
     if ((state.entities.health[entityId] ?? 0) !== 0) continue;
     if (state.entities.kind[entityId] !== EntityKind.Human) {
-      state.entities.active[entityId] = 0;
+      recordAnimalDeath(state, entityId, burning ? 'disaster' : diseased ? 'disease' : 'hunger');
       continue;
     }
     const cause: DeathCause = burning

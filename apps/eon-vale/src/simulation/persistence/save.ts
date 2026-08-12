@@ -12,15 +12,24 @@ import type {
   Village,
   WarCampaign,
   WorldEvent,
-  WorldLaws,
   WorldSettings,
   WorldState,
 } from '@/shared/gameTypes';
 import { navigationCostForTerrain } from '../map/generateWorldMap';
 import { createNavigationGrid } from '../navigation/grid';
 import { addResourceNode, createResourceNodeStore } from '../resources/resourceNodes';
+import { WORLD_LAW_IDS, type WorldLawId } from '../rules/worldLawCatalog';
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
+
+const worldLawSchema = z
+  .object(
+    Object.fromEntries(WORLD_LAW_IDS.map((law) => [law, z.boolean()])) as Record<
+      WorldLawId,
+      z.ZodBoolean
+    >,
+  )
+  .strict();
 
 const numberArray = z.array(z.number());
 const saveSchema = z.object({
@@ -117,7 +126,7 @@ const saveSchema = z.object({
   nextEventId: z.number().int().nonnegative(),
   forcedPeaceUntil: z.number().int().nonnegative(),
   population: z.unknown(),
-  worldLaws: z.unknown(),
+  worldLaws: worldLawSchema,
   ecology: z.unknown(),
   humanExtinctSinceTick: z.number().int().nonnegative(),
   wars: z.array(z.unknown()),
@@ -322,7 +331,7 @@ function restoreWorld(save: ParsedSave): WorldState {
     nextEventId: save.nextEventId,
     forcedPeaceUntil: save.forcedPeaceUntil,
     population: save.population as PopulationDiagnostics,
-    worldLaws: save.worldLaws as WorldLaws,
+    worldLaws: save.worldLaws,
     ecology: save.ecology as EcologyDiagnostics,
     humanExtinctSinceTick: save.humanExtinctSinceTick,
     wars: save.wars as WarCampaign[],

@@ -1,5 +1,80 @@
 import { expect, test } from '@playwright/test';
 
+const longEightTimesMinutes = Number(process.env.EON_EIGHT_TIMES_SOAK_MINUTES ?? 0);
+
+test.describe('long 8x browser soak', () => {
+  test.skip(longEightTimesMinutes <= 0, 'set EON_EIGHT_TIMES_SOAK_MINUTES to enable');
+  test.setTimeout(Math.max(90_000, longEightTimesMinutes * 70_000));
+
+  test('keeps the complete world responsive without changing player speed', async ({ page }) => {
+    await page.goto('/?worldStress=1000&mapSize=384');
+    const canvas = page.getByLabel('纪元谷像素世界');
+    await expect
+      .poll(async () => Number(await canvas.getAttribute('data-resource-nodes')))
+      .toBeGreaterThan(25_000);
+    await page.keyboard.press('4');
+    const eightTimes = page.getByRole('button', { name: '8×', exact: true });
+    await expect(eightTimes).toHaveClass(/active/);
+    await page.getByRole('button', { name: '性能监视' }).click();
+
+    let previousTick = Number(await canvas.getAttribute('data-tick'));
+    for (let minute = 1; minute <= longEightTimesMinutes; minute += 1) {
+      await page.waitForTimeout(60_000);
+      const currentTick = Number(await canvas.getAttribute('data-tick'));
+      const metrics = await page.evaluate(() => window.__EON_METRICS__);
+      const redraws = await canvas.evaluate((element) => ({
+        mapDeltaCells: element.dataset.mapDeltaCells,
+        mapDeltaRedrawChunks: element.dataset.mapDeltaRedrawChunks,
+        mapDeltaRedrawMs: element.dataset.mapDeltaRedrawMs,
+        mapDeltaRedrawMaxMs: element.dataset.mapDeltaRedrawMaxMs,
+        resourceRedrawChunks: element.dataset.resourceRedrawChunks,
+        resourceRedrawMs: element.dataset.resourceRedrawMs,
+        resourceRedrawMaxMs: element.dataset.resourceRedrawMaxMs,
+      }));
+      console.info(
+        JSON.stringify({
+          scenario: 'long-8x-browser',
+          minute,
+          tick: currentTick,
+          ...metrics,
+          ...redraws,
+        }),
+      );
+      expect(currentTick).toBeGreaterThan(previousTick);
+      await expect(eightTimes).toHaveClass(/active/);
+      expect(metrics?.fps ?? 0).toBeGreaterThanOrEqual(60);
+      expect(metrics?.frameP95Ms ?? 999).toBeLessThanOrEqual(25);
+      expect(metrics?.averageTickMs ?? 999).toBeLessThanOrEqual(4);
+      previousTick = currentTick;
+    }
+  });
+});
+
+test('controls pause and speed from the keyboard without hijacking dialogs', async ({ page }) => {
+  await page.goto('/');
+  const canvas = page.getByLabel('纪元谷像素世界');
+  await expect.poll(async () => Number(await canvas.getAttribute('data-tick'))).toBeGreaterThan(10);
+
+  await page.keyboard.press('4');
+  await expect(page.getByRole('button', { name: '8×', exact: true })).toHaveClass(/active/);
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('button', { name: '继续' })).toBeVisible();
+  const pausedTick = Number(await canvas.getAttribute('data-tick'));
+  await page.waitForTimeout(350);
+  expect(Number(await canvas.getAttribute('data-tick'))).toBeLessThanOrEqual(pausedTick + 8);
+
+  await page.getByRole('button', { name: '世界菜单' }).click();
+  await page.getByLabel('世界种子').focus();
+  await page.keyboard.press('1');
+  await expect(page.getByRole('button', { name: '8×', exact: true })).toHaveClass(/active/);
+  await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
+
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('button', { name: '暂停' })).toBeVisible();
+  await page.keyboard.press('1');
+  await expect(page.getByRole('button', { name: '1×', exact: true })).toHaveClass(/active/);
+});
+
 test('creates, shapes, follows, saves and reloads a living pixel world', async ({ page }) => {
   await page.goto('/');
   const canvas = page.getByLabel('纪元谷像素世界');
@@ -44,6 +119,7 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   const ecologyPanel = page.getByTestId('ecology-panel');
   await expect(ecologyPanel).toBeVisible();
   await expect(ecologyPanel).toContainText('鱼');
+  await expect(ecologyPanel).toContainText(/出生 \d+ · 死亡 \d+/);
   await ecologyPanel.getByRole('button', { name: '收起生态图鉴' }).click();
 
   const rebuildsBeforeFrames = Number(await canvas.getAttribute('data-full-rebuilds'));
@@ -56,7 +132,7 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   const civilizationLaw = worldLaws.locator('button').nth(1);
   await expect(animalReturnLaw).toContainText('动物自然回归');
   await expect(animalReturnLaw).toHaveClass(/active/);
-  await expect(civilizationLaw).toContainText('文明自然觉醒');
+  await expect(civilizationLaw).toContainText('文明重启');
   await expect(civilizationLaw).not.toHaveClass(/active/);
   await animalReturnLaw.click();
   await expect(animalReturnLaw).not.toHaveClass(/active/);
@@ -186,8 +262,10 @@ test('runs the complete 384 world with 1000 residents and independent resource n
   await expect(resourceHover).toBeVisible();
   await expect(resourceHover).toContainText(/树木|露天石料|金属矿脉/);
   await expect(canvas).toHaveAttribute('data-hover-target', /^resource:/);
+  await page.keyboard.press('4');
+  await expect(page.getByRole('button', { name: '8×', exact: true })).toHaveClass(/active/);
   await page.getByRole('button', { name: '性能监视' }).click();
-  await page.waitForTimeout(3_000);
+  await page.waitForTimeout(6_000);
   const metrics = await page.evaluate(() => window.__EON_METRICS__);
   console.info(JSON.stringify({ scenario: 'complete-384-world', ...metrics }));
   expect(metrics).toBeTruthy();

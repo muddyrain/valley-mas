@@ -42,9 +42,9 @@ export function birthPressure({
 }): number {
   if (storedFood < 4 || carryingCapacity <= 0) return 0;
   const occupancy = population / carryingCapacity;
-  if (occupancy >= 0.9) return 0;
-  if (occupancy <= 0.58) return 1;
-  return Math.max(0, (0.9 - occupancy) / 0.32);
+  if (occupancy >= 0.83) return 0;
+  if (occupancy <= 0.55) return 1;
+  return Math.max(0, (0.83 - occupancy) / 0.28);
 }
 
 export function chooseNewbornSex({

@@ -24,11 +24,16 @@ describe.runIf(enabled)('two-thousand-year world soak', () => {
 
       let humans = 0;
       let animals = 0;
+      const humanAges: number[] = [];
       for (let entityId = 0; entityId < simulation.state.entities.count; entityId += 1) {
         if (!simulation.state.entities.active[entityId]) continue;
-        if (simulation.state.entities.kind[entityId] === EntityKind.Human) humans += 1;
-        else animals += 1;
+        if (simulation.state.entities.kind[entityId] === EntityKind.Human) {
+          humans += 1;
+          humanAges.push(simulation.state.entities.age[entityId] ?? 0);
+        } else animals += 1;
       }
+      const carryingCapacity = simulation.state.population.carryingCapacity;
+      const populationRatio = carryingCapacity > 0 ? humans / carryingCapacity : 0;
       const result = {
         seed,
         fullTickYears,
@@ -42,6 +47,11 @@ describe.runIf(enabled)('two-thousand-year world soak', () => {
         births: simulation.state.population.totalBirths,
         deaths: simulation.state.population.totalDeaths,
         deathCauses: simulation.state.population.deathCauses,
+        children: humanAges.filter((age) => age < 16).length,
+        reproductiveAdults: humanAges.filter((age) => age >= 18 && age <= 44).length,
+        elders: humanAges.filter((age) => age >= 60).length,
+        carryingCapacity,
+        populationRatio,
       };
       console.info(`EON_SOAK_RESULT ${JSON.stringify(result)}`);
 
@@ -50,6 +60,13 @@ describe.runIf(enabled)('two-thousand-year world soak', () => {
         simulation.state.entities.capacity,
       );
       expect(animals).toBeGreaterThan(0);
+      if (fullTickYears >= 250) {
+        expect(result.children).toBeGreaterThan(0);
+        expect(result.reproductiveAdults).toBeGreaterThan(1);
+        expect(result.elders).toBeGreaterThan(0);
+        expect(result.populationRatio).toBeGreaterThanOrEqual(0.6);
+        expect(result.populationRatio).toBeLessThanOrEqual(0.85);
+      }
       if (humans === 0) {
         expect(simulation.state.population.totalDeaths).toBeGreaterThan(0);
         expect(

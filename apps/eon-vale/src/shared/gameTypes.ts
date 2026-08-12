@@ -1,4 +1,7 @@
 import type { NavigationGrid } from '@/simulation/navigation/grid';
+import type { WorldLaws } from '@/simulation/rules/worldLawCatalog';
+
+export type { WorldLaws } from '@/simulation/rules/worldLawCatalog';
 
 export enum TerrainType {
   DeepOcean = 0,
@@ -344,11 +347,6 @@ export interface PopulationDiagnostics {
   history: PopulationHistoryPoint[];
 }
 
-export interface WorldLaws {
-  naturalAnimalReturn: boolean;
-  civilizationAwakening: boolean;
-}
-
 export type AnimalEcologyStatus =
   | 'not-introduced'
   | 'stable'
@@ -358,6 +356,10 @@ export type AnimalEcologyStatus =
   | 'return-cooldown'
   | 'returning';
 
+export type AnimalDeathCause = 'age' | 'hunger' | 'predation' | 'hunting' | 'disease' | 'disaster';
+
+export type AnimalDeathCauseCounts = Record<AnimalDeathCause, number>;
+
 export interface SpeciesEcologyDiagnostics {
   kind: EntityKind;
   count: number;
@@ -365,6 +367,9 @@ export interface SpeciesEcologyDiagnostics {
   status: AnimalEcologyStatus;
   everPresent: boolean;
   lastReturnTick: number;
+  births: number;
+  deaths: number;
+  deathCauses: AnimalDeathCauseCounts;
 }
 
 export interface EcologyDiagnostics {
@@ -438,6 +443,7 @@ export interface WorldEvent {
     | 'death'
     | 'equipment'
     | 'ecology'
+    | 'law'
     | 'awakening'
     | 'conquest';
   message: string;

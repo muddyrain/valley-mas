@@ -84,12 +84,12 @@ describe('long-running ecology recovery', () => {
       mapSize: 128,
     });
     deactivateKind(simulation, EntityKind.Human);
-    simulation.state.worldLaws.civilizationAwakening = false;
+    simulation.state.worldLaws.civilizationRestart = false;
 
     for (let tick = 0; tick < 15_120; tick += 1) simulation.step();
     expect(livingKind(simulation, EntityKind.Human)).toHaveLength(0);
 
-    simulation.state.worldLaws.civilizationAwakening = true;
+    simulation.state.worldLaws.civilizationRestart = true;
     for (let tick = 0; tick < 720; tick += 1) simulation.step();
 
     const founders = livingKind(simulation, EntityKind.Human);

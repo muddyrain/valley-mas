@@ -23,6 +23,7 @@
 - Port Warden：`AGENTS.md` -> `apps/port-warden/AGENTS.md` -> `apps/port-warden/README.md` -> `apps/port-warden/src/shared/domain.ts` -> `apps/port-warden/electron/services/port-service.ts` -> `apps/port-warden/src/App.tsx`。
 - AI Mind Arena：`AGENTS.md` -> `apps/ai-mind-arena/AGENTS.md` -> `apps/ai-mind-arena/app/page.tsx` -> `server/internal/mindarena`。
 - WorldSim：`AGENTS.md` -> `apps/world-sim/AGENTS.md` -> `apps/world-sim/src/App.tsx` -> `apps/world-sim/docs/TDD.md`。
+- Eon Vale：`AGENTS.md` -> `apps/eon-vale/AGENTS.md` -> `apps/eon-vale/docs/GAME_RULES.md` -> `apps/eon-vale/docs/PLAN.md` -> `apps/eon-vale/src/App.tsx`。
 - Scratch Legend：`AGENTS.md` -> `apps/scratch-legend/AGENTS.md` -> `apps/scratch-legend/docs/scratch-legend-task.md` -> `apps/scratch-legend/lib/game-store.ts`。
 - Toy Climb Arena：`AGENTS.md` -> `apps/toy-climb-arena/AGENTS.md` -> `apps/toy-climb-arena/docs/TASKS.md` -> `apps/toy-climb-arena/src/main.tsx`。
 - Ambient Forge：`AGENTS.md` -> `apps/ambient-forge/AGENTS.md` -> `apps/ambient-forge/docs/PLAN.md` -> `apps/ambient-forge/src/App.tsx`。
@@ -41,6 +42,7 @@
 | Port Warden | `apps/port-warden/AGENTS.md` | macOS/Windows 本地 TCP 监听扫描、进程与项目识别、精确 PID 身份复核、安全停止和 Electron IPC |
 | AI Mind Arena | `apps/ai-mind-arena/AGENTS.md` | Next.js 前端、人格辩论 UI、SSE 和分享体验 |
 | WorldSim | `apps/world-sim/AGENTS.md` | 沙盒文明模拟、玩法参数和设计文档 |
+| Eon Vale | `apps/eon-vale/AGENTS.md` | 2D 像素神明沙盒、活世界规则、模拟、渲染、性能和存档 |
 | Scratch Legend | `apps/scratch-legend/AGENTS.md` | 刮刮卡成长游戏和阶段任务 |
 | Toy Climb Arena | `apps/toy-climb-arena/AGENTS.md` | Three.js 攀爬游戏、关卡、资源和物理验证 |
 | Ambient Forge | `apps/ambient-forge/AGENTS.md` | 程序化 3D 浮空岛、昼夜天气、音乐响应、环境声和 WebM 导出 |
@@ -52,6 +54,7 @@
 
 - Life Trace：`apps/life-trace/docs/PLAN.md`。
 - WorldSim：按 `apps/world-sim/AGENTS.md` 同步 `docs/TDD.md` 或受影响的设计文档。
+- Eon Vale：玩法语义、默认值、阈值、例外和验收标准同步 `apps/eon-vale/docs/GAME_RULES.md`；已交付状态、架构和性能基线同步 `apps/eon-vale/docs/PLAN.md`。
 - 根长期文档索引：`docs/README.md`。
 - 必须同步：功能状态、页面入口、接口路径、依赖策略、数据模型、产品方向、长期文档索引或验收标准发生变化。
 - 通常无需同步：临时调试、格式化、拼写、注释、局部样式微调和不改变长期状态的协作规则收敛。

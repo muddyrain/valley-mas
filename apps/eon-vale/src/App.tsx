@@ -42,6 +42,9 @@ import {
   type SaveRepository,
   type StoredWorldSave,
 } from './simulation/persistence/saveSlots';
+import { resolvePlaybackShortcut } from './simulation/rules/playbackShortcuts';
+import { SIMULATION_SPEEDS } from './simulation/rules/runtimeRules';
+import { WORLD_LAW_CATALOG, WORLD_LAW_UI_IDS } from './simulation/rules/worldLawCatalog';
 import { EcologyPanel } from './ui/EcologyPanel';
 import { InspectorPanel } from './ui/InspectorPanel';
 import { PerformancePanel } from './ui/PerformancePanel';
@@ -49,7 +52,7 @@ import { PopulationPanel } from './ui/PopulationPanel';
 import { ToolDock } from './ui/ToolDock';
 import { SimulationWorkerClient } from './worker/SimulationWorkerClient';
 
-const SPEED_OPTIONS = [1, 2, 4, 8] as const;
+const SPEED_OPTIONS = SIMULATION_SPEEDS;
 const WORLD_SIZES = [128, 256, 384] as const;
 
 const EMPTY_METRICS: RuntimeMetrics = {
@@ -352,6 +355,50 @@ export function App() {
   useEffect(() => {
     workerRef.current?.setSpeed(speed);
   }, [speed]);
+
+  useEffect(() => {
+    const renderGameToText = () => {
+      const currentStats = snapshot && snapshot.stats;
+      return JSON.stringify({
+        coordinateSystem: 'world origin is top-left; +x points right; +z points down',
+        tick: (snapshot && snapshot.tick) || 0,
+        year: (snapshot && snapshot.year) || 1,
+        population: (currentStats && currentStats.humans) || (snapshot && snapshot.population) || 0,
+        animals: (currentStats && currentStats.animals) || 0,
+        villages: (currentStats && currentStats.villages) || 0,
+        kingdoms: (currentStats && currentStats.kingdoms) || 0,
+        playback: { paused, speed },
+        viewLevel,
+      });
+    };
+    window.render_game_to_text = renderGameToText;
+    return () => {
+      if (window.render_game_to_text === renderGameToText) delete window.render_game_to_text;
+    };
+  }, [paused, snapshot, speed, viewLevel]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      const action = resolvePlaybackShortcut({
+        key: event.key,
+        code: event.code,
+        repeat: event.repeat,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        altKey: event.altKey,
+        targetTagName: target ? target.tagName : undefined,
+        targetIsContentEditable: Boolean(target && target.isContentEditable),
+        dialogOpen: showNewWorld || showSettings,
+      });
+      if (!action) return;
+      event.preventDefault();
+      if (action.type === 'toggle-pause') setPaused((current) => !current);
+      else setSpeed(action.speed);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showNewWorld, showSettings]);
 
   useEffect(() => {
     engineRef.current?.setBrush(
@@ -853,32 +900,20 @@ export function App() {
               <fieldset>
                 <legend>世界法则</legend>
                 <div className="choice-row world-law-row" data-testid="world-law-options">
-                  <button
-                    type="button"
-                    className={snapshot.worldLaws.naturalAnimalReturn ? 'active' : ''}
-                    onClick={() =>
-                      workerRef.current?.setWorldLaw(
-                        'naturalAnimalReturn',
-                        !snapshot.worldLaws.naturalAnimalReturn,
-                      )
-                    }
-                  >
-                    动物自然回归
-                    <small>{snapshot.worldLaws.naturalAnimalReturn ? '开启' : '关闭'}</small>
-                  </button>
-                  <button
-                    type="button"
-                    className={snapshot.worldLaws.civilizationAwakening ? 'active' : ''}
-                    onClick={() =>
-                      workerRef.current?.setWorldLaw(
-                        'civilizationAwakening',
-                        !snapshot.worldLaws.civilizationAwakening,
-                      )
-                    }
-                  >
-                    文明自然觉醒
-                    <small>{snapshot.worldLaws.civilizationAwakening ? '开启' : '关闭'}</small>
-                  </button>
+                  {WORLD_LAW_UI_IDS.map((law) => {
+                    const enabled = snapshot.worldLaws[law];
+                    return (
+                      <button
+                        key={law}
+                        type="button"
+                        className={enabled ? 'active' : ''}
+                        onClick={() => workerRef.current?.setWorldLaw(law, !enabled)}
+                      >
+                        {WORLD_LAW_CATALOG[law].title}
+                        <small>{enabled ? '开启' : '关闭'}</small>
+                      </button>
+                    );
+                  })}
                 </div>
               </fieldset>
             )}

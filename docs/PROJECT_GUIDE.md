@@ -22,6 +22,7 @@
 | Scratch Legend | `apps/scratch-legend` | Next.js + React，刮刮卡增量游戏实验，默认端口 5176。 |
 | Toy Climb Arena | `apps/toy-climb-arena` | Vite 6 + TypeScript + Three.js，玩具世界攀爬游戏，默认端口 5175。 |
 | Ambient Forge | `apps/ambient-forge` | React 19 + Vite 6 + TypeScript + 直接 Three.js + Web Audio，程序化浮空群岛环境场景，默认端口 5181。 |
+| Eon Vale | `apps/eon-vale` | React 19 + Vite 6 + TypeScript + PixiJS 8 + Web Worker，浏览器单机 2D 像素神明沙盒，默认端口 5184。 |
 | WorldSim | `apps/world-sim` | React 19 + Vite 6 + TypeScript + Pixi.js + Zustand，沙盒文明模拟游戏。 |
 | Go 服务端 | `server` | Gin + GORM，入口在 `server/cmd/server`，路由集中在 `server/internal/router/router.go`。 |
 | 共享包 | `packages/*` | `shared`、`shared-request`、`shared-router`、`shared-format`、`format-tools`、`browser-media`、`mini-games` 等 workspace 包。 |
@@ -85,6 +86,9 @@ pnpm --filter @valley/world-sim dev
 # 启动 Ambient Forge
 pnpm --filter @valley/ambient-forge dev
 
+# 启动 Eon Vale
+pnpm --filter @valley/eon-vale dev
+
 # 启动 Go 服务
 cd server && go run ./cmd/server
 
@@ -110,6 +114,7 @@ cd server && go run ./cmd/migrate bootstrap --apply
 | Toy Climb Arena | 5175 |
 | Scratch Legend | 5176 |
 | Ambient Forge | 5181 |
+| Eon Vale | 5184（preview 4184） |
 
 Go API 启动时会优先使用 `PORT`（默认 `8080`）。如果该端口已被占用，服务端会自动顺延尝试后续端口，并在启动日志里打印实际端口。前端本地 Vite 代理默认仍指向 `http://localhost:8080`；如果 Go API 顺延到了 `8081` 等端口，需要同步调整前端 API 代理或 `VITE_API_BASE_URL`，避免继续请求旧分支服务。
 

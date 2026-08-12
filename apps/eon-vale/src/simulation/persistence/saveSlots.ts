@@ -21,7 +21,7 @@ interface SaveEnvelope {
   savedAt: number;
 }
 
-const PREFIX = 'eon-vale.world.v3';
+const PREFIX = 'eon-vale.world.v6';
 const AUTO_SLOTS = 3;
 const MANUAL_SLOTS = 3;
 
@@ -118,7 +118,7 @@ export function createSaveRepository(storage: SaveStorage): SaveRepository {
   };
 }
 
-const DATABASE_NAME = 'eon-vale-saves-v3';
+const DATABASE_NAME = 'eon-vale-saves-v6';
 const DATABASE_STORE = 'world-saves';
 
 function waitForRequest<T>(request: IDBRequest<T>): Promise<T> {

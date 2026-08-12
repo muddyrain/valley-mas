@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findPath } from './astar';
+import { createPathSearchWorkspace, findPath } from './astar';
 import { createNavigationGrid, setCellCost } from './grid';
 import { PathQueue } from './pathQueue';
 import { simplifyPath } from './simplifyPath';
@@ -33,6 +33,21 @@ describe('grid navigation', () => {
 
     expect(simplified.length).toBeLessThan(path.length);
     expect(simplified).toEqual(expect.arrayContaining([0, 35]));
+  });
+
+  it('reuses one search workspace without leaking a previous route', () => {
+    const grid = createNavigationGrid(12, 12);
+    const workspace = createPathSearchWorkspace(grid.width * grid.height);
+
+    const first = findPath(grid, 0, 143, 12_000, workspace);
+    setCellCost(grid, 5, 5, 0);
+    const second = findPath(grid, 11, 132, 12_000, workspace);
+
+    expect(first[0]).toBe(0);
+    expect(first.at(-1)).toBe(143);
+    expect(second[0]).toBe(11);
+    expect(second.at(-1)).toBe(132);
+    expect(second).not.toContain(5 * 12 + 5);
   });
 });
 

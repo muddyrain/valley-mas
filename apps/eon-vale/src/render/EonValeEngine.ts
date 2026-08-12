@@ -86,9 +86,19 @@ export interface EonValeEngineOptions {
   onResourceHover?: (info: ResourceHoverInfo | null) => void;
 }
 
-const RENDER_CHUNK_SIZE = 64;
+const RENDER_CHUNK_SIZE = 24;
 const SOURCE_PIXELS_PER_CELL = 4;
 const ENTITY_SOURCE_SCALE = WORLD_PIXELS_PER_CELL / 16;
+const LOD_MASKS: Record<WorldViewLevel, number> = {
+  world: 0b001,
+  settlement: 0b010,
+  resident: 0b100,
+};
+
+function lodMask(level: WorldViewLevel): number {
+  return LOD_MASKS[level];
+}
+
 const KINGDOM_COLORS = [
   '#d6c195',
   '#dd6257',
@@ -141,6 +151,7 @@ interface TerrainChunkRecord {
   residentCanvas: HTMLCanvasElement;
   residentTexture: Texture;
   residentSprite: Sprite;
+  dirtyLodMask: number;
 }
 
 interface TransientEffect {
@@ -418,7 +429,15 @@ export class EonValeEngine {
     this.canvas.dataset.activeFire = String(countActive(map.fire));
     this.canvas.dataset.activeRain = String(countActive(map.rain));
     if (!this.ready) return;
+    const redrawStartedAt = performance.now();
     this.redrawRenderChunkTargets(targets);
+    const redrawMs = performance.now() - redrawStartedAt;
+    this.canvas.dataset.mapDeltaRedrawChunks = String(targets.size);
+    this.canvas.dataset.mapDeltaRedrawMs = redrawMs.toFixed(2);
+    this.canvas.dataset.mapDeltaRedrawMaxMs = Math.max(
+      redrawMs,
+      Number(this.canvas.dataset.mapDeltaRedrawMaxMs ?? 0),
+    ).toFixed(2);
   }
 
   setResourceNodes(snapshot: ResourceNodeSnapshot): void {
@@ -482,11 +501,19 @@ export class EonValeEngine {
       Number(this.canvas.dataset.resourceDeltaUpdates ?? 0) + (snapshot.full ? 0 : 1),
     );
     if (!this.ready) return;
+    const redrawStartedAt = performance.now();
     if (snapshot.full) {
       for (const record of this.terrainChunks.values()) this.drawTerrainChunk(record);
     } else {
       this.redrawRenderChunkTargets(changedTargets);
     }
+    const redrawMs = performance.now() - redrawStartedAt;
+    this.canvas.dataset.resourceRedrawChunks = String(changedTargets.size);
+    this.canvas.dataset.resourceRedrawMs = redrawMs.toFixed(2);
+    this.canvas.dataset.resourceRedrawMaxMs = Math.max(
+      redrawMs,
+      Number(this.canvas.dataset.resourceRedrawMaxMs ?? 0),
+    ).toFixed(2);
   }
 
   private addResourceBucket(nodeId: number): void {
@@ -514,8 +541,14 @@ export class EonValeEngine {
   private redrawRenderChunkTargets(targets: Set<number>): void {
     for (const target of targets) {
       const record = this.terrainChunks.get(target);
-      if (record) this.drawTerrainChunk(record);
+      if (record) this.redrawVisibleTerrainChunk(record);
     }
+  }
+
+  private redrawVisibleTerrainChunk(record: TerrainChunkRecord): void {
+    record.dirtyLodMask = 0b111;
+    this.drawTerrainChunk(record, this.viewLevel);
+    record.dirtyLodMask &= ~lodMask(this.viewLevel);
   }
 
   setBrush(radius: number, visible: boolean): void {
@@ -758,6 +791,7 @@ export class EonValeEngine {
           residentCanvas,
           residentTexture,
           residentSprite,
+          dirtyLodMask: 0,
         };
         this.terrainChunks.set(index, record);
         this.drawTerrainChunk(record);
@@ -786,23 +820,34 @@ export class EonValeEngine {
     }
     for (const target of targets) {
       const record = this.terrainChunks.get(target);
-      if (record) this.drawTerrainChunk(record);
+      if (record) this.redrawVisibleTerrainChunk(record);
     }
   }
 
-  private drawTerrainChunk(record: TerrainChunkRecord): void {
+  private drawTerrainChunk(record: TerrainChunkRecord, level?: WorldViewLevel): void {
     const map = this.map;
     if (!map) return;
-    const context = record.canvas.getContext('2d');
-    const overviewContext = record.overviewCanvas.getContext('2d');
-    const residentContext = record.residentCanvas.getContext('2d');
-    if (!context || !overviewContext || !residentContext) return;
-    context.imageSmoothingEnabled = false;
-    overviewContext.imageSmoothingEnabled = false;
-    residentContext.imageSmoothingEnabled = false;
-    context.clearRect(0, 0, record.canvas.width, record.canvas.height);
-    overviewContext.clearRect(0, 0, record.overviewCanvas.width, record.overviewCanvas.height);
-    residentContext.clearRect(0, 0, record.residentCanvas.width, record.residentCanvas.height);
+    const drawSettlement = level === undefined || level === 'settlement';
+    const drawWorld = level === undefined || level === 'world';
+    const drawResident = level === undefined || level === 'resident';
+    const context = drawSettlement ? record.canvas.getContext('2d') : null;
+    const overviewContext = drawWorld ? record.overviewCanvas.getContext('2d') : null;
+    const residentContext = drawResident ? record.residentCanvas.getContext('2d') : null;
+    if (drawSettlement && !context) return;
+    if (drawWorld && !overviewContext) return;
+    if (drawResident && !residentContext) return;
+    if (context) {
+      context.imageSmoothingEnabled = false;
+      context.clearRect(0, 0, record.canvas.width, record.canvas.height);
+    }
+    if (overviewContext) {
+      overviewContext.imageSmoothingEnabled = false;
+      overviewContext.clearRect(0, 0, record.overviewCanvas.width, record.overviewCanvas.height);
+    }
+    if (residentContext) {
+      residentContext.imageSmoothingEnabled = false;
+      residentContext.clearRect(0, 0, record.residentCanvas.width, record.residentCanvas.height);
+    }
     for (let localZ = 0; localZ < record.cellsHigh; localZ += 1) {
       for (let localX = 0; localX < record.cellsWide; localX += 1) {
         const x = record.x + localX;
@@ -811,37 +856,43 @@ export class EonValeEngine {
         const terrain = map.terrain[cell] as TerrainType;
         const variation = ((x * 17 + z * 31) % 7) - 3;
         const terrainColor = overlayTerrainColor(map, cell, this.overlay, variation);
-        context.fillStyle = terrainColor;
-        residentContext.fillStyle = terrainColor;
-        overviewContext.fillStyle = overlayTerrainColor(map, cell, this.overlay, 0);
-        overviewContext.fillRect(localX, localZ, 1, 1);
-        context.fillRect(
-          localX * SOURCE_PIXELS_PER_CELL,
-          localZ * SOURCE_PIXELS_PER_CELL,
-          SOURCE_PIXELS_PER_CELL,
-          SOURCE_PIXELS_PER_CELL,
-        );
-        residentContext.fillRect(
-          localX * SOURCE_PIXELS_PER_CELL,
-          localZ * SOURCE_PIXELS_PER_CELL,
-          SOURCE_PIXELS_PER_CELL,
-          SOURCE_PIXELS_PER_CELL,
-        );
-        drawTerrainDetail(context, map, cell, terrain, localX, localZ, 'districts');
-        drawTerrainDetail(residentContext, map, cell, terrain, localX, localZ, 'resident');
+        if (overviewContext) {
+          overviewContext.fillStyle = overlayTerrainColor(map, cell, this.overlay, 0);
+          overviewContext.fillRect(localX, localZ, 1, 1);
+        }
+        if (context) {
+          context.fillStyle = terrainColor;
+          context.fillRect(
+            localX * SOURCE_PIXELS_PER_CELL,
+            localZ * SOURCE_PIXELS_PER_CELL,
+            SOURCE_PIXELS_PER_CELL,
+            SOURCE_PIXELS_PER_CELL,
+          );
+          drawTerrainDetail(context, map, cell, terrain, localX, localZ, 'districts');
+        }
+        if (residentContext) {
+          residentContext.fillStyle = terrainColor;
+          residentContext.fillRect(
+            localX * SOURCE_PIXELS_PER_CELL,
+            localZ * SOURCE_PIXELS_PER_CELL,
+            SOURCE_PIXELS_PER_CELL,
+            SOURCE_PIXELS_PER_CELL,
+          );
+          drawTerrainDetail(residentContext, map, cell, terrain, localX, localZ, 'resident');
+        }
       }
     }
     this.drawResourceNodes(record, context, overviewContext, residentContext);
-    record.texture.source.update();
-    record.overviewTexture.source.update();
-    record.residentTexture.source.update();
+    if (context) record.texture.source.update();
+    if (overviewContext) record.overviewTexture.source.update();
+    if (residentContext) record.residentTexture.source.update();
   }
 
   private drawResourceNodes(
     record: TerrainChunkRecord,
-    settlementContext: CanvasRenderingContext2D,
-    overviewContext: CanvasRenderingContext2D,
-    residentContext: CanvasRenderingContext2D,
+    settlementContext: CanvasRenderingContext2D | null,
+    overviewContext: CanvasRenderingContext2D | null,
+    residentContext: CanvasRenderingContext2D | null,
   ): void {
     const resources = this.resourceNodes;
     const map = this.map;
@@ -865,13 +916,14 @@ export class EonValeEngine {
           const variant = resources.variant[nodeId] ?? 0;
           const sourceX = Math.floor((x - record.x) * SOURCE_PIXELS_PER_CELL);
           const sourceZ = Math.floor((z - record.z) * SOURCE_PIXELS_PER_CELL) + 2;
-          drawResourceNodeGlyph(residentContext, kind, stage, variant, sourceX, sourceZ, true);
+          if (residentContext)
+            drawResourceNodeGlyph(residentContext, kind, stage, variant, sourceX, sourceZ, true);
           const sampleRate =
             kind === ResourceNodeKind.Tree ? 3 : kind === ResourceNodeKind.Stone ? 2 : 1;
-          if ((nodeId * 17 + variant * 7) % sampleRate === 0) {
+          if (settlementContext && (nodeId * 17 + variant * 7) % sampleRate === 0) {
             drawResourceNodeGlyph(settlementContext, kind, stage, variant, sourceX, sourceZ, false);
           }
-          if (this.overlay === 'resources') {
+          if (overviewContext && this.overlay === 'resources') {
             overviewContext.fillStyle =
               kind === ResourceNodeKind.Tree
                 ? '#2d7745'
@@ -1420,6 +1472,11 @@ export class EonValeEngine {
     if (this.canvas.dataset.terrainLod === next) return;
     this.canvas.dataset.terrainLod = next;
     for (const record of this.terrainChunks.values()) {
+      const mask = lodMask(this.viewLevel);
+      if ((record.dirtyLodMask & mask) !== 0) {
+        this.drawTerrainChunk(record, this.viewLevel);
+        record.dirtyLodMask &= ~mask;
+      }
       record.overviewSprite.visible = this.viewLevel === 'world';
       record.sprite.visible = this.viewLevel === 'settlement';
       record.residentSprite.visible = this.viewLevel === 'resident';

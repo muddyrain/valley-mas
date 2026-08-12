@@ -1,4 +1,4 @@
-import { findPath } from './astar';
+import { createPathSearchWorkspace, findPath, type PathSearchWorkspace } from './astar';
 import type { NavigationGrid } from './grid';
 import { simplifyPath } from './simplifyPath';
 
@@ -18,6 +18,7 @@ export interface PathResult extends PathRequest {
 
 export class PathQueue {
   private readonly requests: PathRequest[] = [];
+  private workspace: PathSearchWorkspace | null = null;
 
   get size(): number {
     return this.requests.length;
@@ -35,17 +36,23 @@ export class PathQueue {
   }
 
   process(grid: NavigationGrid, searchBudget: number): PathResult[] {
+    const cellCount = grid.width * grid.height;
+    if (this.workspace?.cellCount !== cellCount) {
+      this.workspace = createPathSearchWorkspace(cellCount);
+    }
     this.requests.sort(
       (left, right) =>
         right.priority - left.priority || left.requestedAtTick - right.requestedAtTick,
     );
     const count = Math.min(Math.max(0, Math.floor(searchBudget)), this.requests.length);
+    const selected = this.requests.splice(0, count);
     const completed: PathResult[] = [];
-    for (let index = 0; index < count; index += 1) {
-      const request = this.requests.shift();
-      if (!request) break;
+    for (const request of selected) {
       if (request.mapVersion > grid.mapVersion) continue;
-      const path = simplifyPath(grid, findPath(grid, request.startCell, request.destinationCell));
+      const path = simplifyPath(
+        grid,
+        findPath(grid, request.startCell, request.destinationCell, 12_000, this.workspace),
+      );
       completed.push({ ...request, path });
     }
     return completed;

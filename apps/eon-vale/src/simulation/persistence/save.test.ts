@@ -9,7 +9,7 @@ describe('world persistence', () => {
     const encoded = serializeWorld(simulation.state);
     const restored = loadWorldSave(encoded);
 
-    expect(JSON.parse(encoded).version).toBe(5);
+    expect(JSON.parse(encoded).version).toBe(6);
     expect(restored.seed).toBe(simulation.state.seed);
     expect(restored.tick).toBe(simulation.state.tick);
     expect(restored.entities.count).toBe(simulation.state.entities.count);
@@ -36,5 +36,18 @@ describe('world persistence', () => {
     expect(() => loadWorldSave('{broken')).toThrow(/存档损坏/);
     expect(() => loadWorldSave(JSON.stringify({ version: 1 }))).toThrow(/存档版本/);
     expect(() => loadWorldSave(JSON.stringify({ version: 999 }))).toThrow(/存档版本/);
+  });
+
+  it('strictly validates the persisted world-law state', () => {
+    const simulation = createWorldSimulation({ seed: 'world-laws-save', initialHumans: 24 });
+    const missingLaw = JSON.parse(serializeWorld(simulation.state));
+    delete missingLaw.worldLaws.naturalAnimalReturn;
+
+    expect(() => loadWorldSave(JSON.stringify(missingLaw))).toThrow(/数据校验失败/);
+
+    const invalidLaw = JSON.parse(serializeWorld(simulation.state));
+    invalidLaw.worldLaws.civilizationRestart = 'enabled';
+
+    expect(() => loadWorldSave(JSON.stringify(invalidLaw))).toThrow(/数据校验失败/);
   });
 });

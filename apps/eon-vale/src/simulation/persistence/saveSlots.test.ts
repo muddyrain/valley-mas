@@ -33,12 +33,12 @@ describe('save repository', () => {
     expect((await repository.readManual(1))?.encoded).toBe('stable');
   });
 
-  it('keeps V3 slots isolated from pre-release V2 saves', async () => {
+  it('keeps V6 slots isolated from pre-release V3 saves', async () => {
     const storage = createMemorySaveStorage();
     storage.setItem(
-      'eon-vale.world.v2.manual.1',
+      'eon-vale.world.v3.manual.1',
       JSON.stringify({
-        encoded: 'legacy-v2',
+        encoded: 'legacy-v3',
         summary: { seed: 'legacy', year: 9, population: 99 },
         savedAt: 1,
       }),

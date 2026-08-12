@@ -648,8 +648,18 @@ select:focus-visible {
 }
 
 .ecology-species-row > strong {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
   color: #dce9db;
   font-variant-numeric: tabular-nums;
+}
+
+.ecology-species-row > strong small {
+  color: #7f9187;
+  font-size: 7px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .ecology-species-row span > em {

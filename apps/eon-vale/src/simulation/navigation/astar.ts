@@ -5,6 +5,36 @@ interface HeapEntry {
   score: number;
 }
 
+export interface PathSearchWorkspace {
+  readonly cellCount: number;
+  readonly cameFrom: Int32Array;
+  readonly gScore: Float32Array;
+  readonly seenGeneration: Uint32Array;
+  readonly closedGeneration: Uint32Array;
+  generation: number;
+}
+
+export function createPathSearchWorkspace(cellCount: number): PathSearchWorkspace {
+  return {
+    cellCount,
+    cameFrom: new Int32Array(cellCount),
+    gScore: new Float32Array(cellCount),
+    seenGeneration: new Uint32Array(cellCount),
+    closedGeneration: new Uint32Array(cellCount),
+    generation: 0,
+  };
+}
+
+function beginSearch(workspace: PathSearchWorkspace): number {
+  workspace.generation = (workspace.generation + 1) >>> 0;
+  if (workspace.generation === 0) {
+    workspace.seenGeneration.fill(0);
+    workspace.closedGeneration.fill(0);
+    workspace.generation = 1;
+  }
+  return workspace.generation;
+}
+
 class MinHeap {
   private readonly entries: HeapEntry[] = [];
 
@@ -72,26 +102,30 @@ export function findPath(
   start: number,
   goal: number,
   maxVisited = 12_000,
+  reusableWorkspace?: PathSearchWorkspace,
 ): number[] {
   if (!isWalkable(grid, start) || !isWalkable(grid, goal)) return [];
   if (start === goal) return [start];
 
   const cellCount = grid.width * grid.height;
-  const cameFrom = new Int32Array(cellCount);
-  cameFrom.fill(-1);
-  const gScore = new Float32Array(cellCount);
-  gScore.fill(Number.POSITIVE_INFINITY);
-  const closed = new Uint8Array(cellCount);
+  const workspace =
+    reusableWorkspace?.cellCount === cellCount
+      ? reusableWorkspace
+      : createPathSearchWorkspace(cellCount);
+  const generation = beginSearch(workspace);
+  const { cameFrom, gScore, seenGeneration, closedGeneration } = workspace;
   const open = new MinHeap();
+  cameFrom[start] = -1;
   gScore[start] = 0;
+  seenGeneration[start] = generation;
   open.push({ cell: start, score: heuristic(grid, start, goal) });
   let visited = 0;
 
   while (open.size > 0 && visited < maxVisited) {
     const current = open.pop();
-    if (!current || closed[current.cell]) continue;
+    if (!current || closedGeneration[current.cell] === generation) continue;
     if (current.cell === goal) return reconstruct(cameFrom, goal);
-    closed[current.cell] = 1;
+    closedGeneration[current.cell] = generation;
     visited += 1;
 
     const x = cellX(grid, current.cell);
@@ -104,11 +138,17 @@ export function findPath(
     ];
 
     for (const neighbour of neighbours) {
-      if (neighbour < 0 || closed[neighbour] || !isWalkable(grid, neighbour)) continue;
+      if (
+        neighbour < 0 ||
+        closedGeneration[neighbour] === generation ||
+        !isWalkable(grid, neighbour)
+      )
+        continue;
       const nextScore = gScore[current.cell] + (grid.cost[neighbour] ?? 1);
-      if (nextScore >= gScore[neighbour]) continue;
+      if (seenGeneration[neighbour] === generation && nextScore >= gScore[neighbour]) continue;
       cameFrom[neighbour] = current.cell;
       gScore[neighbour] = nextScore;
+      seenGeneration[neighbour] = generation;
       open.push({ cell: neighbour, score: nextScore + heuristic(grid, neighbour, goal) });
     }
   }

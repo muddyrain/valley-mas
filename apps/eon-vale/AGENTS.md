@@ -1,10 +1,10 @@
 # Eon Vale AI 协作入口
 
-默认使用中文沟通。Eon Vale 是运行在浏览器中的单机正交俯视神明沙盒，默认开发端口为 `5184`，预览端口为 `4184`。产品状态与架构边界见 `docs/PLAN.md`，启动说明见 `README.md`。
+默认使用中文沟通。Eon Vale 是运行在浏览器中的单机正交俯视神明沙盒，默认开发端口为 `5184`，预览端口为 `4184`。游戏规则真源见 `docs/GAME_RULES.md`，产品状态与架构边界见 `docs/PLAN.md`，启动说明见 `README.md`。
 
 ## AI 任务最小上下文入口
 
-- `AGENTS.md` -> `apps/eon-vale/AGENTS.md` -> `apps/eon-vale/docs/PLAN.md` -> `apps/eon-vale/src/App.tsx` -> `apps/eon-vale/src/render/EonValeEngine.ts`。
+- `AGENTS.md` -> `apps/eon-vale/AGENTS.md` -> `apps/eon-vale/docs/GAME_RULES.md` -> `apps/eon-vale/docs/PLAN.md` -> `apps/eon-vale/src/App.tsx` -> `apps/eon-vale/src/render/EonValeEngine.ts`。
 - 文档治理/约束变更任务：继续读取 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
 
 ## 关键入口
@@ -15,6 +15,16 @@
 - 纯模拟核心：`src/simulation/core/worldSimulation.ts`。
 - 地图、寻路、经济、王国和存档：`src/simulation/{map,navigation,systems,kingdoms,persistence}`。
 - 浏览器验收：`e2e/game.spec.ts`。
+
+## 游戏规则同步
+
+- `docs/GAME_RULES.md` 是玩法语义、默认值、阈值、例外、非目标、验收标准和待决项的唯一真源；`docs/PLAN.md` 只记录已交付状态、性能基线和阶段路线。
+- 需求访谈中每接受一项玩法决定，必须在继续下一题前立即更新 `docs/GAME_RULES.md`，不能等长对话结束后凭记忆汇总。
+- 任何改变出生、死亡、需求、职业、资源、生态、领土、外交、战争、神力、时间倍率、世界创建或胜负结果的实现，都必须在同一项工作中同步 `docs/GAME_RULES.md` 和相关可执行测试。
+- 修改玩家可切换法则时同步 `src/simulation/rules/worldLawCatalog.ts`、严格存档校验和目录测试；`planned` 法则不得显示为可用开关，只有行为真正支持开启与关闭后才能标记 `active`。
+- 数值与行为保留在对应 `src/simulation/rules/*Rules.ts` 及领域模块中；禁止把所有玩法集中到一个万能规则文件或万能规则引擎。
+- 规则模型进入存档时升级当前存档版本；项目未上线期间不为旧开发档案新增迁移链。
+- 如果玩法改动同时改变已交付状态、产品阶段、架构或性能基线，再同步 `docs/PLAN.md`；不得用更新规则文档代替真实实现，也不得把计划中规则写成已交付。
 
 ## WorldBox 设计参照
 
@@ -30,7 +40,7 @@
 - 世界使用固定正北的 2D 像素相机；只允许有边界的平移和阶梯缩放，不恢复透视倾斜或自由旋转。
 - 居民和建筑共享王国主色，无王国实体使用中性色；职业、建筑类型和动物种类通过局部色与轮廓继续区分。
 - 周期地图同步只能增量更新；只有新建或载入完整世界时允许全量重建，避免可见闪烁。
-- 导航地图按 `16 × 16` Chunk 组织，渲染地图按 `64 × 64` Chunk 组织。编辑地图时只更新受影响渲染 Chunk，并同步导航版本使旧路径失效。
+- 导航地图按 `8 × 8` Chunk 组织，渲染地图按 `24 × 24` Chunk 组织。编辑地图时只更新受影响渲染 Chunk，并同步导航版本使旧路径失效；动态地形与资源只重绘当前可见 LOD，其余 LOD 标记为脏并在切换时补画。
 - 居民、经济、王国、战争与存档逻辑保持纯 TypeScript，可在无 DOM 环境运行测试和性能基准。
 - 群体远距离移动优先使用 Flow Field，个体路径使用带预算的 A* 队列；不得为每个单位每帧同步寻路。
 - 用户可见文案只描述玩家目标、世界状态和操作结果，不暴露实现说明。
@@ -58,4 +68,4 @@
 - 至少通过 `check`、`typecheck`、`test`、`build`。
 - 关键玩法行为需通过浏览器验收，不能仅凭静态代码或截图宣称完成。
 - 新增地图、实体、文明或神力行为时，应有确定性种子测试；存档模型变化时必须更新版本校验和读写往返测试。
-- 修改长期产品状态、架构、性能基线或验收标准时，同步 `docs/PLAN.md`。
+- 修改玩法语义、规则默认值、阈值、例外或验收标准时同步 `docs/GAME_RULES.md`；修改长期产品状态、架构或性能基线时同步 `docs/PLAN.md`。

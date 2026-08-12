@@ -1,4 +1,6 @@
 import {
+  type AnimalDeathCause,
+  type AnimalDeathCauseCounts,
   type AnimalEcologyStatus,
   type EcologyDiagnostics,
   EntityKind,
@@ -36,6 +38,17 @@ const HABITATS: Record<(typeof ANIMAL_SPECIES)[number], readonly TerrainType[]> 
   [EntityKind.Fish]: [TerrainType.Ocean, TerrainType.ShallowOcean],
 };
 
+export function emptyAnimalDeathCauses(): AnimalDeathCauseCounts {
+  return {
+    age: 0,
+    hunger: 0,
+    predation: 0,
+    hunting: 0,
+    disease: 0,
+    disaster: 0,
+  };
+}
+
 export function speciesHabitats(kind: EntityKind): readonly TerrainType[] {
   return HABITATS[kind as (typeof ANIMAL_SPECIES)[number]] ?? [];
 }
@@ -56,10 +69,35 @@ export function createEcologyDiagnostics(): EcologyDiagnostics {
       status: 'not-introduced' as AnimalEcologyStatus,
       everPresent: false,
       lastReturnTick: 0,
+      births: 0,
+      deaths: 0,
+      deathCauses: emptyAnimalDeathCauses(),
     })),
     nextReturnTicks: Array.from({ length: EntityKind.Fish + 1 }, () => 0),
     extinctSinceTicks: Array.from({ length: EntityKind.Fish + 1 }, () => 0),
   };
+}
+
+export function recordAnimalBirth(state: WorldState, kind: EntityKind): void {
+  const diagnostics = state.ecology.species[kind];
+  if (!diagnostics) return;
+  diagnostics.births += 1;
+}
+
+export function recordAnimalDeath(
+  state: WorldState,
+  entityId: number,
+  cause: AnimalDeathCause,
+): void {
+  if (!state.entities.active[entityId]) return;
+  const kind = state.entities.kind[entityId] as EntityKind;
+  if (kind === EntityKind.Human) return;
+  state.entities.active[entityId] = 0;
+  state.entities.paths[entityId] = null;
+  const diagnostics = state.ecology.species[kind];
+  if (!diagnostics) return;
+  diagnostics.deaths += 1;
+  diagnostics.deathCauses[cause] += 1;
 }
 
 export function habitatCells(state: WorldState, kind: EntityKind): number[] {

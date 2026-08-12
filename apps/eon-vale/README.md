@@ -14,7 +14,7 @@ pnpm --filter @valley/eon-vale dev
 
 树木、露天石料和金属矿脉是可采集、可悬停查看的独立节点。居民会按村庄需求预留节点、采集、携带并送回仓库；建筑要经历清障、分批运料和施工，矿场只能建在有限矿脉附近。资源和地图运行时都使用增量同步，不会每秒整图重绘。
 
-V5 世界档案存入独立的 IndexedDB 命名空间，提供三个手动档、三个滚动自动档，并支持 JSON 导入导出。项目尚未上线，旧开发期档案按当前产品决策不做迁移。
+V6 世界档案存入独立的 IndexedDB 命名空间，提供三个手动档、三个滚动自动档，并支持 JSON 导入导出。项目尚未上线，旧开发期档案按当前产品决策不做迁移。
 
 ## 校验
 
@@ -27,4 +27,4 @@ pnpm --filter @valley/eon-vale benchmark
 pnpm --filter @valley/eon-vale test:e2e
 ```
 
-产品状态、性能基线和架构说明见 [docs/PLAN.md](./docs/PLAN.md)。
+玩法语义、默认世界规则和待决问题见 [docs/GAME_RULES.md](./docs/GAME_RULES.md)；产品状态、性能基线和架构说明见 [docs/PLAN.md](./docs/PLAN.md)。

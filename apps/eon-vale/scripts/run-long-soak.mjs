@@ -20,9 +20,13 @@ let cursor = 0;
 
 function runSeed(seed) {
   return new Promise((resolve, reject) => {
+    const packageManagerScript = process.env.npm_execpath;
+    const command = packageManagerScript ? process.execPath : process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+    const commandArgs = packageManagerScript ? [packageManagerScript] : [];
     const child = spawn(
-      'pnpm',
+      command,
       [
+        ...commandArgs,
         'exec',
         'vitest',
         'run',
