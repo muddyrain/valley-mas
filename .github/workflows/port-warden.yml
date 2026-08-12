@@ -6,12 +6,14 @@ on:
       - 'apps/port-warden/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
+      - '.gitattributes'
       - '.github/workflows/port-warden.yml'
   pull_request:
     paths:
       - 'apps/port-warden/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
+      - '.gitattributes'
       - '.github/workflows/port-warden.yml'
 
 concurrency:
