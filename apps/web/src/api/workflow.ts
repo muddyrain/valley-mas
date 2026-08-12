@@ -540,6 +540,10 @@ async function streamWorkflow(
     handlers.onError(message);
   };
 
+  let runId: string | null = null;
+  let lastSequence = 0;
+  let receivedTerminalEvent = false;
+
   try {
     const response = await fetch(`${base}/workflows/${id}${path}`, {
       method: 'POST',
@@ -570,9 +574,6 @@ async function streamWorkflow(
 
     const decoder = new TextDecoder();
     let buffer = '';
-    let receivedTerminalEvent = false;
-    let runId: string | null = null;
-    let lastSequence = 0;
 
     const handleLines = (text: string) => {
       const lines = text.split('\n');
@@ -628,6 +629,28 @@ async function streamWorkflow(
     if (signal?.aborted) {
       reportError('运行已取消');
       return;
+    }
+    if (receivedTerminalEvent) return;
+    if (runId) {
+      try {
+        const receivedTerminalEvent = await resumeWorkflowRunEvents(
+          base,
+          token,
+          id,
+          runId,
+          lastSequence,
+          { ...handlers, onError: reportError },
+          signal,
+        );
+        if (receivedTerminalEvent) return;
+      } catch (resumeError) {
+        if (signal?.aborted) {
+          reportError('运行已取消');
+          return;
+        }
+        reportError(resumeError instanceof Error ? resumeError.message : '运行请求失败');
+        return;
+      }
     }
     reportError(error instanceof Error ? error.message : '运行请求失败');
   }

@@ -64,6 +64,24 @@ function streamResponse(chunks: string[], init: ResponseInit = {}): Response {
   return new Response(stream, { ...init, headers });
 }
 
+function interruptedStreamResponse(chunk: string, error: Error): Response {
+  const encoder = new TextEncoder();
+  let delivered = false;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (!delivered) {
+        delivered = true;
+        controller.enqueue(encoder.encode(chunk));
+        return;
+      }
+      controller.error(error);
+    },
+  });
+  return new Response(stream, {
+    headers: { 'content-type': 'text/event-stream' },
+  });
+}
+
 describe('workflow HTTP contracts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -241,6 +259,58 @@ describe('workflow SSE runtime', () => {
       },
     });
     expect(onEvent).toHaveBeenCalledTimes(2);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('resumes a run when reading the initial stream throws after the run id was received', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        interruptedStreamResponse(
+          'data: {"step":"image","sequence":7,"status":"running","data":{"runId":"run-7"}}\n',
+          new TypeError('network error'),
+        ),
+      )
+      .mockResolvedValueOnce(
+        streamResponse(['data: {"step":"workflow","sequence":8,"status":"done"}\n']),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const onEvent = vi.fn();
+    const onError = vi.fn();
+
+    await runWorkflow('workflow-1', { inputs: {} }, { onEvent, onError });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/workflows/workflow-1/runs/run-7/events');
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({
+      headers: {
+        Authorization: 'Bearer workflow-token',
+        Accept: 'text/event-stream',
+        'Last-Event-ID': '7',
+      },
+    });
+    expect(onEvent).toHaveBeenCalledTimes(2);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('keeps a received terminal result when the transport errors while closing', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        interruptedStreamResponse(
+          'data: {"step":"workflow","sequence":8,"status":"done","data":{"runId":"run-8"}}\n',
+          new TypeError('network error'),
+        ),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const onEvent = vi.fn();
+    const onError = vi.fn();
+
+    await runWorkflow('workflow-1', { inputs: {} }, { onEvent, onError });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(onEvent).toHaveBeenCalledOnce();
+    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ status: 'done' }));
     expect(onError).not.toHaveBeenCalled();
   });
 
