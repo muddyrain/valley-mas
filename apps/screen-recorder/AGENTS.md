@@ -6,6 +6,7 @@
 
 - `AGENTS.md` -> `apps/screen-recorder/AGENTS.md` -> `apps/screen-recorder/README.md` -> `electron/main.ts` -> `electron/preload.ts` -> `src/App.tsx`。
 - 区域截图/录制：继续读取 `src/SelectionOverlay.tsx`、`src/SelectionSurface.tsx`、`src/ScreenshotEditor.tsx`、`src/RecordingSetup.tsx`、`src/LongScreenshotControl.tsx`、`src/renderer/recorder-runtime.ts`、`src/core/geometry.ts` 与 `src/core/long-screenshot.ts`。
+- 文档治理/约束变更任务：继续读取 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
 
 ## 项目概述
 

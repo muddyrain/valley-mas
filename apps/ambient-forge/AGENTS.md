@@ -1,9 +1,9 @@
 # Ambient Forge · AI 协作入口
 
-## 最小上下文入口
+## AI 任务最小上下文入口
 
 - `AGENTS.md` -> `apps/ambient-forge/AGENTS.md` -> `apps/ambient-forge/docs/PLAN.md` -> `apps/ambient-forge/src/App.tsx`
-- 项目指南与完整验证命令以 `docs/PROJECT_GUIDE.md` 为唯一真源。
+- 文档治理/约束变更任务：继续读取 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
 
 ## 项目边界
 

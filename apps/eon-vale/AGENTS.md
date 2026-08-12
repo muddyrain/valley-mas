@@ -2,6 +2,11 @@
 
 默认使用中文沟通。Eon Vale 是运行在浏览器中的单机正交俯视神明沙盒，默认开发端口为 `5184`，预览端口为 `4184`。产品状态与架构边界见 `docs/PLAN.md`，启动说明见 `README.md`。
 
+## AI 任务最小上下文入口
+
+- `AGENTS.md` -> `apps/eon-vale/AGENTS.md` -> `apps/eon-vale/docs/PLAN.md` -> `apps/eon-vale/src/App.tsx` -> `apps/eon-vale/src/render/EonValeEngine.ts`。
+- 文档治理/约束变更任务：继续读取 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
+
 ## 关键入口
 
 - React 壳层与低频 UI：`src/App.tsx`、`src/ui`。

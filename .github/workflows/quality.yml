@@ -36,6 +36,9 @@ jobs:
       - name: Check agents context entry
         run: pnpm check:agents-context
 
+      - name: Test agents context checker
+        run: pnpm check:agents-context:test
+
       - name: Check plans index
         run: pnpm check:plans-index
 

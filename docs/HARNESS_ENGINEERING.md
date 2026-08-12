@@ -78,6 +78,12 @@ pnpm check:harness
 - 核心文档入口存在。
 - 根 `package.json` 包含 Harness、check 和 build 脚本。
 
+所有 `AGENTS.md` 的最小上下文入口由 `pnpm check:agents-context` 检查，fixture 回归入口为：
+
+```bash
+pnpm check:agents-context:test
+```
+
 检查器只报告可操作错误并返回非零状态，不自动修改文件。fixture 测试入口为：
 
 ```bash
@@ -89,6 +95,7 @@ pnpm check:harness:test
 `.github/workflows/quality.yml` 在 push 和 pull request 上运行：
 
 - `pnpm check:harness`
+- `pnpm check:agents-context` 与 `pnpm check:agents-context:test`
 - `pnpm check`
 - `pnpm build`
 - `cd server && go test ./...`

@@ -15,6 +15,13 @@ pre-commit:
         已自动修复并暂存可修复项；剩余问题请手动处理后再提交
         手动修复：pnpm biome check --write --files-ignore-unknown=true {staged_files}
 
+    agents-context:
+      run: pnpm check:agents-context
+      fail_text: |
+        ❌ AGENTS 最小上下文入口不完整！
+        请按 .agents/AGENTS_TEMPLATE.md 补齐本地路由与文档治理链路
+        手动检查：pnpm check:agents-context
+
     plans-index:
       run: pnpm check:plans-index
       fail_text: |

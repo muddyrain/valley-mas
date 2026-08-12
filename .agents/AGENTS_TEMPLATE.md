@@ -2,6 +2,11 @@
 
 > 用于新建/重写子项目 `AGENTS.md` 时直接套用，再按目标项目命令替换占位符。
 
+## AI 任务最小上下文入口
+
+- `AGENTS.md` -> `apps/<project>/AGENTS.md` -> `apps/<project>/README.md` -> `apps/<project>/<primary-entry>`。
+- 文档治理/约束变更任务：继续读取 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
+
 ## AI Coding 约束（行为改动默认顺序）
 
 - 行为改动（状态变更、权限分支、请求参数/响应映射、列表筛选分页、存储写入、关键交互）默认按以下顺序执行：
@@ -42,7 +47,7 @@
   - 写清项目边界、端口、启动方式和关键入口路径（如 `src/App.tsx`、`src/main.tsx`、`cmd/server/main.go`）。
   - 写清技术栈与关键外部依赖边界（UI、状态、测试框架、构建方式）。
 - 约束模块
-  - 先粘贴 `AGENTS_TEMPLATE.md` 的三大段落（行为顺序、Preflight、提测门禁）。
+  - 先粘贴 `AGENTS_TEMPLATE.md` 的最小上下文入口和三大约束段落（行为顺序、Preflight、提测门禁）。
   - 补齐项目特有约束：设计系统、共享边界、关键文案/可访问性要求。
 - 验证闭环
   - 列出“行为改动最小测试入口”与“无脚本替代验证方案”。

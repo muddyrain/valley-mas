@@ -9,11 +9,52 @@ AGENTS_CHECK_ROOT="$ROOT" python3 <<'PY'
 from pathlib import Path
 import os
 import re
+import subprocess
 import sys
 
 root = Path(os.environ["AGENTS_CHECK_ROOT"]).resolve()
 docs_required = ("docs/README.md", "docs/PROJECT_GUIDE.md", "docs/HARNESS_ENGINEERING.md")
-agents_files = sorted(root.rglob("AGENTS.md"))
+ignored_dirs = {".git", "node_modules"}
+
+
+def walk_agents_files() -> list[Path]:
+    files: list[Path] = []
+    for current_root, dirnames, filenames in os.walk(root):
+        dirnames[:] = [dirname for dirname in dirnames if dirname not in ignored_dirs]
+        if "AGENTS.md" in filenames:
+            files.append(Path(current_root) / "AGENTS.md")
+    return sorted(files)
+
+
+def find_agents_files() -> list[Path]:
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                "-z",
+                "--",
+                "*AGENTS.md",
+            ],
+            check=True,
+            capture_output=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return walk_agents_files()
+
+    return sorted(
+        root / relative_path.decode("utf-8")
+        for relative_path in result.stdout.split(b"\0")
+        if relative_path
+    )
+
+
+agents_files = find_agents_files()
 
 errors: list[str] = []
 heading_re = re.compile(r"^##\s*AI 任务最小上下文入口", re.M)
@@ -37,8 +78,6 @@ def section_lines(text: str, heading_name: str) -> list[str]:
 
 
 for path in agents_files:
-    if "node_modules" in path.parts or ".git" in path.parts:
-        continue
     try:
         text = path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
