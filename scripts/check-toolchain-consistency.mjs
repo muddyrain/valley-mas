@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const packageManagerPattern = /^pnpm@\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const setupNodePattern =
+  /^(\s*)(?:-\s*)?uses:\s*["']?actions\/setup-node@[^\s"']+["']?\s*(?:#.*)?$/;
 
 function indentation(line) {
   return (line.match(/^[\t ]*/) || [''])[0].replaceAll('\t', '  ').length;
@@ -28,16 +30,13 @@ function stepPinsVersion(lines, start, end) {
   return false;
 }
 
-function actionSetupPinsVersion(workflow) {
+function actionStepRanges(workflow, actionPattern) {
   const lines = workflow.split(/\r?\n/);
+  const ranges = [];
 
   for (let index = 0; index < lines.length; index += 1) {
     const actionLine = lines[index];
-    if (
-      !/^(\s*)(?:-\s*)?uses:\s*["']?pnpm\/action-setup@[^\s"']+["']?\s*(?:#.*)?$/.test(actionLine)
-    ) {
-      continue;
-    }
+    if (!actionPattern.test(actionLine)) continue;
 
     let stepStart = index;
     let stepIndent = indentation(actionLine);
@@ -64,18 +63,46 @@ function actionSetupPinsVersion(workflow) {
       }
     }
 
-    if (stepPinsVersion(lines, stepStart, stepEnd)) return true;
+    ranges.push({ end: stepEnd, lines, start: stepStart });
   }
 
-  return false;
+  return ranges;
+}
+
+function actionSetupPinsVersion(workflow) {
+  const actionSetupPattern =
+    /^(\s*)(?:-\s*)?uses:\s*["']?pnpm\/action-setup@[^\s"']+["']?\s*(?:#.*)?$/;
+  return actionStepRanges(workflow, actionSetupPattern).some(({ end, lines, start }) =>
+    stepPinsVersion(lines, start, end),
+  );
+}
+
+function setupNodeUsesPackageJson(workflow) {
+  return actionStepRanges(workflow, setupNodePattern).every(({ end, lines, start }) => {
+    const step = lines.slice(start, end).join('\n');
+    const hasVersionFile = /^\s*node-version-file\s*:\s*["']?package\.json["']?\s*(?:#.*)?$/m.test(
+      step,
+    );
+    const hasInlineVersion = /^\s*node-version\s*:/m.test(step);
+    return hasVersionFile && !hasInlineVersion;
+  });
+}
+
+function nodeEngineSupportsPnpm11(nodeEngine) {
+  if (typeof nodeEngine !== 'string') return false;
+  const match = nodeEngine.match(/^(?:\^|>=)?22\.(\d+)\.(\d+)(?: <23)?$/);
+  if (!match) return false;
+  return Number(match[1]) >= 13;
 }
 
 export function checkToolchainConsistency(rootDirectory) {
   const errors = [];
+  let nodeEngine;
   let packageManager;
 
   try {
     const packageJson = JSON.parse(readFileSync(resolve(rootDirectory, 'package.json'), 'utf8'));
+    nodeEngine = packageJson.engines?.node;
     packageManager = packageJson.packageManager;
   } catch (error) {
     errors.push(`package.json: cannot be read or parsed (${error.message})`);
@@ -84,6 +111,12 @@ export function checkToolchainConsistency(rootDirectory) {
   if (!packageManagerPattern.test(packageManager || '')) {
     errors.push(
       'package.json: packageManager must declare an exact pnpm version (for example pnpm@11.21.0)',
+    );
+  }
+
+  if (packageManager?.startsWith('pnpm@11.') && !nodeEngineSupportsPnpm11(nodeEngine)) {
+    errors.push(
+      'package.json: engines.node must stay on Node.js 22 and allow at least 22.13.0 for pnpm 11',
     );
   }
 
@@ -103,6 +136,11 @@ export function checkToolchainConsistency(rootDirectory) {
     if (actionSetupPinsVersion(workflow)) {
       errors.push(
         `${relativePath}: pnpm version must come only from package.json#packageManager; remove action-setup with.version`,
+      );
+    }
+    if (!setupNodeUsesPackageJson(workflow)) {
+      errors.push(
+        `${relativePath}: Node.js version must come from package.json#engines.node; use setup-node with node-version-file: package.json`,
       );
     }
   }

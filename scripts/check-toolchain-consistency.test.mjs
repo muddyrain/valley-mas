@@ -6,10 +6,17 @@ import test from 'node:test';
 
 import { checkToolchainConsistency } from './check-toolchain-consistency.mjs';
 
-function createFixture({ packageManager = 'pnpm@11.21.0', workflows = {} } = {}) {
+function createFixture({
+  nodeEngine = '>=22.13.0 <23',
+  packageManager = 'pnpm@11.21.0',
+  workflows = {},
+} = {}) {
   const root = mkdtempSync(join(tmpdir(), 'valley-toolchain-'));
   mkdirSync(join(root, '.github', 'workflows'), { recursive: true });
-  writeFileSync(join(root, 'package.json'), JSON.stringify({ packageManager }));
+  writeFileSync(
+    join(root, 'package.json'),
+    JSON.stringify({ engines: { node: nodeEngine }, packageManager }),
+  );
 
   for (const [filename, contents] of Object.entries(workflows)) {
     writeFileSync(join(root, '.github', 'workflows', filename), contents);
@@ -55,7 +62,7 @@ test('accepts packageManager as the only pnpm version source', () => {
   - uses: pnpm/action-setup@v4
   - uses: actions/setup-node@v4
     with:
-      node-version: 20
+      node-version-file: package.json
 `,
       },
     },
@@ -117,4 +124,50 @@ test('rejects a floating pnpm packageManager version', () => {
     assert.equal(errors.length, 1);
     assert.match(errors[0], /exact pnpm version/);
   });
+});
+
+test('rejects a Node.js engine that cannot run pnpm 11', () => {
+  withFixture({ nodeEngine: '>=20.0.0' }, ({ errors }) => {
+    assert.deepEqual(errors, [
+      'package.json: engines.node must stay on Node.js 22 and allow at least 22.13.0 for pnpm 11',
+    ]);
+  });
+});
+
+test('rejects a duplicated Node.js version in setup-node', () => {
+  withFixture(
+    {
+      workflows: {
+        'quality.yml': `steps:
+  - uses: actions/setup-node@v4
+    with:
+      node-version: 20
+      cache: pnpm
+`,
+      },
+    },
+    ({ errors }) => {
+      assert.deepEqual(errors, [
+        '.github/workflows/quality.yml: Node.js version must come from package.json#engines.node; use setup-node with node-version-file: package.json',
+      ]);
+    },
+  );
+});
+
+test('accepts package.json as the Node.js version source', () => {
+  withFixture(
+    {
+      workflows: {
+        'quality.yml': `steps:
+  - uses: actions/setup-node@v4
+    with:
+      node-version-file: package.json
+      cache: pnpm
+`,
+      },
+    },
+    ({ errors }) => {
+      assert.deepEqual(errors, []);
+    },
+  );
 });

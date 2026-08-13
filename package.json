@@ -34,7 +34,7 @@
   "author": "",
   "license": "MIT",
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.13.0 <23",
     "pnpm": ">=9.0.0"
   },
   "packageManager": "pnpm@11.21.0",
