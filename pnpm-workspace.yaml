@@ -2,6 +2,19 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+overrides:
+   tslib: "^2.8.1"
+
+allowBuilds:
+  '@parcel/watcher': true
+  '@swc/core': true
+  electron-winstaller: true
+  esbuild: true
+  lefthook: true
+  msw: true
+  protobufjs: true
+  sharp: true
+
 autoInstallPeers: true
 
 catalogs:
