@@ -1,6 +1,5 @@
 import {
   Bug,
-  ChevronRight,
   Crown,
   Download,
   Gauge,
@@ -16,7 +15,6 @@ import {
   TrendingDown,
   TrendingUp,
   Upload,
-  Users,
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -34,6 +32,10 @@ import {
   GodPower,
   type MapTool,
   type PlanningZoneKind,
+  type WorldHistoryArchive,
+  type WorldHistoryEntry,
+  type WorldHistoryFilter,
+  type WorldHistoryLink,
   type WorldPreset,
   type WorldSettings,
 } from './shared/gameTypes';
@@ -46,6 +48,7 @@ import {
 import { resolvePlaybackShortcut } from './simulation/rules/playbackShortcuts';
 import { SIMULATION_SPEEDS } from './simulation/rules/runtimeRules';
 import { WORLD_LAW_CATALOG, WORLD_LAW_UI_IDS } from './simulation/rules/worldLawCatalog';
+import { ChroniclePanel } from './ui/ChroniclePanel';
 import { EcologyPanel } from './ui/EcologyPanel';
 import { InspectorPanel } from './ui/InspectorPanel';
 import { PerformancePanel } from './ui/PerformancePanel';
@@ -174,6 +177,8 @@ export function App() {
   const stressPopulationRef = useRef<number | null>(null);
   const [viewLevel, setViewLevel] = useState<WorldViewLevel>('world');
   const [chronicleOpen, setChronicleOpen] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<WorldHistoryFilter>('all');
+  const [historyArchive, setHistoryArchive] = useState<WorldHistoryArchive | null>(null);
   const [populationOpen, setPopulationOpen] = useState(false);
   const [ecologyOpen, setEcologyOpen] = useState(false);
   const [resourceHover, setResourceHover] = useState<ResourceHoverInfo | null>(null);
@@ -310,6 +315,7 @@ export function App() {
       onResources: (resources) => engine.setResourceNodes(resources),
       onTerritory: (territory) => engine.setTerritory(territory),
       onInspection: setInspection,
+      onHistory: setHistoryArchive,
       onSave: async (encoded) => {
         const current = snapshotRef.current;
         const summary = {
@@ -399,15 +405,15 @@ export function App() {
 
   useEffect(() => {
     const renderGameToText = () => {
-      const currentStats = snapshot && snapshot.stats;
+      const currentStats = snapshot ? snapshot.stats : undefined;
       return JSON.stringify({
         coordinateSystem: 'world origin is top-left; +x points right; +z points down',
-        tick: (snapshot && snapshot.tick) || 0,
-        year: (snapshot && snapshot.year) || 1,
-        population: (currentStats && currentStats.humans) || (snapshot && snapshot.population) || 0,
-        animals: (currentStats && currentStats.animals) || 0,
-        villages: (currentStats && currentStats.villages) || 0,
-        kingdoms: (currentStats && currentStats.kingdoms) || 0,
+        tick: snapshot ? snapshot.tick : 0,
+        year: snapshot ? snapshot.year : 1,
+        population: currentStats ? currentStats.humans : snapshot ? snapshot.population : 0,
+        animals: currentStats ? currentStats.animals : 0,
+        villages: currentStats ? currentStats.villages : 0,
+        kingdoms: currentStats ? currentStats.kingdoms : 0,
         playback: { paused, speed },
         viewLevel,
       });
@@ -429,7 +435,7 @@ export function App() {
         metaKey: event.metaKey,
         altKey: event.altKey,
         targetTagName: target ? target.tagName : undefined,
-        targetIsContentEditable: Boolean(target && target.isContentEditable),
+        targetIsContentEditable: target ? target.isContentEditable : false,
         dialogOpen: showNewWorld || showSettings,
       });
       if (!action) return;
@@ -461,6 +467,19 @@ export function App() {
   }, [soundEnabled]);
 
   useEffect(() => {
+    if (!chronicleOpen || !snapshot) return;
+    if (
+      historyArchive &&
+      historyArchive.filter === historyFilter &&
+      historyArchive.revision === snapshot.historyRevision
+    ) {
+      return;
+    }
+    const worker = workerRef.current;
+    if (worker) worker.requestHistory(historyFilter);
+  }, [chronicleOpen, historyArchive, historyFilter, snapshot]);
+
+  useEffect(() => {
     if (!notice) return undefined;
     const timeout = window.setTimeout(() => setNotice(null), 2_800);
     return () => window.clearTimeout(timeout);
@@ -476,6 +495,7 @@ export function App() {
     setPlanningBrush(null);
     engineRef.current?.setSelection(null);
     setChronicleOpen(false);
+    setHistoryArchive(null);
     setPopulationOpen(false);
     setEcologyOpen(false);
     setStressPopulation(null);
@@ -501,6 +521,7 @@ export function App() {
     setPlanningBrush(null);
     engineRef.current?.setSelection(null);
     setChronicleOpen(false);
+    setHistoryArchive(null);
     setPopulationOpen(false);
     setEcologyOpen(false);
     engineRef.current?.returnToWorld();
@@ -555,6 +576,56 @@ export function App() {
     kingdoms: 0,
     wars: 0,
     populationTrend: 0,
+  };
+
+  const navigateHistory = (link: WorldHistoryLink, event: WorldHistoryEntry) => {
+    if (!snapshot || !link.available) return;
+    const engine = engineRef.current;
+    const worker = workerRef.current;
+    if (link.kind === 'entity' && link.id !== undefined) {
+      if (engine) {
+        engine.focusOn(
+          snapshot.positionsX[link.id] || 0,
+          snapshot.positionsZ[link.id] || 0,
+          'resident',
+        );
+        engine.setSelection({ kind: 'entity', id: link.id });
+      }
+      if (worker) worker.inspect('entity', link.id);
+      return;
+    }
+    if (link.kind === 'village' && link.id !== undefined) {
+      const village = snapshot.villages.find((candidate) => candidate.id === link.id);
+      if (!village) return;
+      if (engine) {
+        engine.focusOn(village.x, village.z, 'settlement');
+        engine.setSelection({ kind: 'village', id: village.id });
+      }
+      if (worker) worker.inspect('village', village.id);
+      return;
+    }
+    if (link.kind === 'kingdom' && link.id !== undefined) {
+      const kingdom = snapshot.kingdoms.find((candidate) => candidate.id === link.id);
+      const capital = kingdom
+        ? snapshot.villages.find((village) => village.id === kingdom.capitalVillageId)
+        : undefined;
+      if (capital && engine) engine.focusOn(capital.x, capital.z, 'settlement');
+      setOverlay('territory');
+      if (engine) engine.setSelection({ kind: 'kingdom', id: link.id });
+      if (worker) worker.inspect('kingdom', link.id);
+      return;
+    }
+    if (link.kind === 'war') {
+      const kingdomLink = event.links.find((candidate) => candidate.kind === 'kingdom');
+      if (kingdomLink) navigateHistory(kingdomLink, event);
+      return;
+    }
+    const location = event.links.find((candidate) => candidate.kind === 'location');
+    const cell = link.kind === 'location' ? link.cell : location ? location.cell : undefined;
+    if (cell !== undefined) {
+      const mapSize = worldSizeRef.current;
+      if (engine) engine.focusOn(cell % mapSize, Math.floor(cell / mapSize), 'settlement');
+    }
   };
 
   return (
@@ -712,6 +783,7 @@ export function App() {
 
       {inspection && (
         <InspectorPanel
+          key={`${inspection.type}:${inspection.id}`}
           inspection={inspection}
           onFollow={(id) => {
             if (!snapshot) return;
@@ -730,6 +802,12 @@ export function App() {
             if (!capital) return;
             engineRef.current?.focusOn(capital.x, capital.z, 'settlement');
           }}
+          onFavorite={(lifeId, favorite) => {
+            setHistoryArchive(null);
+            const worker = workerRef.current;
+            if (worker) worker.setFavorite(lifeId, favorite);
+          }}
+          onHistoryNavigate={navigateHistory}
           activePlanningZone={
             planningBrush?.villageId === inspection.id ? planningBrush.zone : null
           }
@@ -777,90 +855,21 @@ export function App() {
         )}
 
       {!inspection && !stressPopulation && snapshot && chronicleOpen && (
-        <aside className="chronicle-panel">
-          <div className="chronicle-heading">
-            <span>
-              <small>世界局势</small>
-              <strong>王国与事件</strong>
-            </span>
-            <button type="button" onClick={() => setChronicleOpen(false)} aria-label="收起世界局势">
-              <X size={15} />
-            </button>
-          </div>
-          {snapshot.kingdoms.filter((kingdom) => !kingdom.extinct).length > 0 && (
-            <div className="kingdom-row">
-              {snapshot.kingdoms
-                .filter((kingdom) => !kingdom.extinct)
-                .map((kingdom) => (
-                  <button
-                    key={kingdom.id}
-                    type="button"
-                    data-testid={`kingdom-chip-${kingdom.id}`}
-                    onClick={() => {
-                      const capital = snapshot.villages.find(
-                        (village) => village.id === kingdom.capitalVillageId,
-                      );
-                      if (capital) {
-                        engineRef.current?.focusOn(capital.x, capital.z, 'settlement');
-                      }
-                      setOverlay('territory');
-                      engineRef.current?.setSelection({ kind: 'kingdom', id: kingdom.id });
-                      workerRef.current?.inspect('kingdom', kingdom.id);
-                    }}
-                  >
-                    <i style={{ background: kingdom.color }} />
-                    <span>{kingdom.name}</span>
-                    <ChevronRight size={13} />
-                  </button>
-                ))}
-            </div>
-          )}
-          <div className="settlement-row">
-            <button
-              type="button"
-              data-testid="follow-resident"
-              onClick={() => {
-                engineRef.current?.focusOn(
-                  snapshot.positionsX[0] ?? 64,
-                  snapshot.positionsZ[0] ?? 64,
-                  'resident',
-                );
-                engineRef.current?.setSelection({ kind: 'entity', id: 0 });
-                workerRef.current?.inspect('entity', 0);
-              }}
-            >
-              <Users size={13} />
-              追随居民
-            </button>
-            {snapshot.villages.slice(0, 3).map((village) => (
-              <button
-                key={village.id}
-                type="button"
-                data-testid={`village-chip-${village.id}`}
-                onClick={() => {
-                  engineRef.current?.focusOn(village.x, village.z, 'settlement');
-                  engineRef.current?.setSelection({ kind: 'village', id: village.id });
-                  workerRef.current?.inspect('village', village.id);
-                }}
-              >
-                {village.name}
-              </button>
-            ))}
-          </div>
-          <div className="event-list">
-            {snapshot.events
-              .slice(-5)
-              .reverse()
-              .map((event) => (
-                <span key={event.id}>
-                  <i />
-                  <b>{event.message}</b>
-                  <small>第 {Math.floor(event.tick / 20)} 日</small>
-                </span>
-              ))}
-            {snapshot.events.length === 0 && <p>风吹过尚未命名的山谷。</p>}
-          </div>
-        </aside>
+        <ChroniclePanel
+          archive={
+            historyArchive && historyArchive.filter === historyFilter ? historyArchive : null
+          }
+          filter={historyFilter}
+          notifications={snapshot.events}
+          onFilter={(filter) => {
+            setHistoryFilter(filter);
+            setHistoryArchive(null);
+            const worker = workerRef.current;
+            if (worker) worker.requestHistory(filter);
+          }}
+          onNavigate={navigateHistory}
+          onClose={() => setChronicleOpen(false)}
+        />
       )}
 
       <section className="playback-bar">

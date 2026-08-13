@@ -7,6 +7,7 @@ import {
   type WorldState,
 } from '@/shared/gameTypes';
 import { stableNoise } from '@/shared/random';
+import { recordWorldEvent } from '../history/worldHistory';
 import { setDiplomacy } from '../kingdoms/kingdoms';
 import { markMapCellDirty } from '../map/mapDirty';
 import { cellX, cellZ, isInside, toCell } from '../navigation/grid';
@@ -203,6 +204,26 @@ export function applyGodPower(
       }
     }
     if (hasWar) state.forcedPeaceUntil = state.tick + 600;
+  }
+
+  const disasterNames: Partial<Record<GodPower, string>> = {
+    [GodPower.Lightning]: '雷击',
+    [GodPower.Fire]: '火灾',
+    [GodPower.Tornado]: '龙卷风',
+    [GodPower.Meteor]: '陨石坠落',
+    [GodPower.Plague]: '瘟疫',
+    [GodPower.Earthquake]: '地震',
+  };
+  const disasterName = disasterNames[power];
+  if (disasterName) {
+    recordWorldEvent(state, {
+      kind: 'disaster',
+      category: 'disaster',
+      message: `${disasterName}袭击了地图 ${center % state.map.size}, ${Math.floor(center / state.map.size)}`,
+      archive: true,
+      notification: true,
+      locationCell: center,
+    });
   }
 }
 

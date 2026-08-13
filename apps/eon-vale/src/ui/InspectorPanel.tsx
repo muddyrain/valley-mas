@@ -11,7 +11,7 @@ import {
   UserRound,
   Wheat,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Inspection } from '@/render/renderTypes';
 import {
   type ConstructionPriority,
@@ -19,6 +19,8 @@ import {
   PlanningZoneKind,
   ResidentRole,
   ResidentSex,
+  type WorldHistoryEntry,
+  type WorldHistoryLink,
 } from '@/shared/gameTypes';
 import {
   BUILDING_LABELS,
@@ -60,6 +62,8 @@ export function InspectorPanel({
   activePlanningZone,
   onPlanningZone,
   onFocusCapital,
+  onFavorite,
+  onHistoryNavigate,
 }: {
   inspection: Inspection;
   onClose: () => void;
@@ -68,25 +72,17 @@ export function InspectorPanel({
   activePlanningZone?: PlanningZoneKind | null;
   onPlanningZone?: (villageId: number, zone: PlanningZoneKind | null) => void;
   onFocusCapital?: (villageId: number) => void;
+  onFavorite?: (lifeId: number, favorite: boolean) => void;
+  onHistoryNavigate?: (link: WorldHistoryLink, event: WorldHistoryEntry) => void;
 }) {
   const [entityTab, setEntityTab] = useState<'overview' | 'growth' | 'equipment' | 'history'>(
     'overview',
   );
-  const [favorite, setFavorite] = useState(false);
-  useEffect(() => {
-    setEntityTab('overview');
-    if (inspection.type !== 'entity') return;
-    setFavorite(localStorage.getItem(`eon-vale.favorite.${inspection.id}`) === '1');
-  }, [inspection]);
-
   if (inspection.type === 'entity') {
     const weaponName = ['无', '基础', '精良', '大师'][inspection.weaponTier] || '传奇';
     const armorName = ['布衣', '皮甲', '锁甲', '板甲'][inspection.armorTier] || '王家甲胄';
     const toggleFavorite = () => {
-      const next = !favorite;
-      setFavorite(next);
-      if (next) localStorage.setItem(`eon-vale.favorite.${inspection.id}`, '1');
-      else localStorage.removeItem(`eon-vale.favorite.${inspection.id}`);
+      onFavorite?.(inspection.lifeId, !inspection.favorite);
     };
     const roleLabel =
       {
@@ -149,11 +145,11 @@ export function InspectorPanel({
           <span className="inspector-heading-actions">
             <button
               type="button"
-              className={favorite ? 'favorite active' : 'favorite'}
+              className={inspection.favorite ? 'favorite active' : 'favorite'}
               onClick={toggleFavorite}
-              aria-label={favorite ? '取消收藏' : '收藏居民'}
+              aria-label={inspection.favorite ? '取消收藏' : '收藏居民'}
             >
-              <Star size={15} fill={favorite ? 'currentColor' : 'none'} />
+              <Star size={15} fill={inspection.favorite ? 'currentColor' : 'none'} />
             </button>
             <button type="button" onClick={onClose} aria-label="关闭">
               ×
@@ -323,6 +319,20 @@ export function InspectorPanel({
                   <i />
                   <b>{event.message}</b>
                   <small>第 {Math.floor(event.tick / 20)} 日</small>
+                  {event.links.length > 0 && (
+                    <span className="history-inline-links">
+                      {event.links.map((link, index) => (
+                        <button
+                          key={`${link.kind}-${link.lifeId ?? link.id ?? link.warId ?? link.cell}-${index}`}
+                          type="button"
+                          disabled={!link.available}
+                          onClick={() => onHistoryNavigate?.(link, event)}
+                        >
+                          {link.label}
+                        </button>
+                      ))}
+                    </span>
+                  )}
                 </span>
               ))
             ) : (
@@ -488,6 +498,20 @@ export function InspectorPanel({
               <em>{hotspot.count} 人</em>
             </span>
           ))}
+        </div>
+        <div className="resident-history village-chronicle" data-testid="village-chronicle">
+          <strong>聚落纪事</strong>
+          {inspection.history.length > 0 ? (
+            inspection.history.slice(0, 10).map((event) => (
+              <span key={event.id}>
+                <i />
+                <b>{event.message}</b>
+                <small>第 {Math.floor(event.tick / 20)} 日</small>
+              </span>
+            ))
+          ) : (
+            <p>这座聚落还没有纪事。</p>
+          )}
         </div>
         {onPlanningZone && (
           <div
@@ -663,6 +687,20 @@ export function InspectorPanel({
             </em>
           </span>
         ))}
+      </div>
+      <div className="resident-history kingdom-chronicle" data-testid="kingdom-chronicle">
+        <strong>王国纪事</strong>
+        {inspection.history.length > 0 ? (
+          inspection.history.slice(0, 8).map((event) => (
+            <span key={event.id}>
+              <i />
+              <b>{event.message}</b>
+              <small>第 {Math.floor(event.tick / 20)} 日</small>
+            </span>
+          ))
+        ) : (
+          <p>这个王国还没有纪事。</p>
+        )}
       </div>
       {capital && onFocusCapital && (
         <button type="button" className="follow-action" onClick={() => onFocusCapital(capital.id)}>

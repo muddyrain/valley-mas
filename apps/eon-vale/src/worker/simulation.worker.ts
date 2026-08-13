@@ -18,6 +18,11 @@ import {
   createWorldSimulationFromState,
   type WorldSimulation,
 } from '@/simulation/core/worldSimulation';
+import {
+  querySubjectHistory,
+  queryWorldHistory,
+  recentWorldNotifications,
+} from '@/simulation/history/worldHistory';
 import { deriveKingdomObservation } from '@/simulation/kingdoms/kingdomObservation';
 import { activeWars } from '@/simulation/kingdoms/kingdoms';
 import { generateWorldMap } from '@/simulation/map/generateWorldMap';
@@ -193,7 +198,8 @@ function createWorldSnapshot(tickMs: number): WorldRenderSnapshot | null {
     villages: structuredClone(state.villages),
     kingdoms: structuredClone(state.kingdoms),
     buildings: structuredClone(state.buildings),
-    events: structuredClone(state.events),
+    events: structuredClone(recentWorldNotifications(state)),
+    historyRevision: state.nextEventId,
     settings: { ...state.settings },
     demographics: structuredClone(state.population),
     worldLaws: { ...state.worldLaws },
@@ -226,6 +232,8 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
     return {
       type: 'entity',
       id,
+      lifeId: state.entities.lifeIds[id] ?? 0,
+      favorite: state.favoriteLifeIds.includes(state.entities.lifeIds[id] ?? 0),
       name: state.entities.names[id] ?? `居民 ${id + 1}`,
       kind: state.entities.kind[id] ?? 0,
       age: state.entities.age[id] ?? 0,
@@ -257,10 +265,10 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
             : [state.entities.names[parentId] ?? `居民 ${parentId + 1}`],
       ),
       malnutrition: state.entities.malnutrition[id] ?? 0,
-      history: state.events
-        .filter((event) => event.message.includes(state.entities.names[id] ?? '\u0000'))
-        .slice(-12)
-        .map((event) => ({ tick: event.tick, message: event.message })),
+      history: querySubjectHistory(state, {
+        kind: 'entity',
+        lifeId: state.entities.lifeIds[id] ?? 0,
+      }),
       task: structuredClone(state.entities.tasks[id] ?? null),
       carriedResourceKind: state.entities.carriedResourceKinds[id] ?? 0,
       carriedResourceAmount: state.entities.carriedResources[id] ?? 0,
@@ -311,6 +319,7 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
         defense: zones[PlanningZoneKind.Defense],
       },
       workHotspots: collectVillageWorkHotspots(state, village.id),
+      history: querySubjectHistory(state, { kind: 'village', id: village.id }),
     };
   }
   if (command.target === 'building') {
@@ -433,6 +442,7 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
             ]
           : [];
       }),
+    history: querySubjectHistory(state, { kind: 'kingdom', id: kingdom.id }),
   };
 }
 
@@ -515,6 +525,27 @@ workerScope.addEventListener('message', (event: MessageEvent<WorkerCommand>) => 
       emitWorldDeltas();
     }
     if (command.type === 'inspect') emit({ type: 'inspection', inspection: inspect(command) });
+    if (command.type === 'request-history' && world) {
+      emit({
+        type: 'world-history',
+        archive: queryWorldHistory(world.state, { filter: command.filter }),
+      });
+    }
+    if (command.type === 'set-favorite' && world) {
+      const favorites = new Set(world.state.favoriteLifeIds);
+      if (command.favorite) favorites.add(command.lifeId);
+      else favorites.delete(command.lifeId);
+      world.state.favoriteLifeIds = [...favorites];
+      const entityId = Array.from(
+        world.state.entities.lifeIds.slice(0, world.state.entities.count),
+      ).indexOf(command.lifeId);
+      if (entityId >= 0) {
+        emit({
+          type: 'inspection',
+          inspection: inspect({ type: 'inspect', target: 'entity', id: entityId }),
+        });
+      }
+    }
     if (command.type === 'set-construction-priority' && world) {
       const village = world.state.villages.find((candidate) => candidate.id === command.villageId);
       if (village) village.constructionPriority = command.priority;

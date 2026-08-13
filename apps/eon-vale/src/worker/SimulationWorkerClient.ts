@@ -12,6 +12,8 @@ import type {
   GodPower,
   MapTool,
   PlanningZoneKind,
+  WorldHistoryArchive,
+  WorldHistoryFilter,
   WorldPreset,
 } from '@/shared/gameTypes';
 import type { PrototypeSnapshot } from '@/simulation/core/prototypeSimulation';
@@ -27,6 +29,7 @@ export interface WorkerClientListeners {
   onResources?: (resources: ResourceNodeSnapshot) => void;
   onTerritory?: (territory: TerritorySnapshot) => void;
   onInspection?: (inspection: Inspection | null) => void;
+  onHistory?: (archive: WorldHistoryArchive) => void;
   onSave?: (encoded: string) => void;
   onNotice?: (level: 'info' | 'error', message: string) => void;
 }
@@ -47,6 +50,7 @@ export class SimulationWorkerClient {
       if (data.type === 'world-resources') this.listeners.onResources?.(data.resources);
       if (data.type === 'world-territory') this.listeners.onTerritory?.(data.territory);
       if (data.type === 'inspection') this.listeners.onInspection?.(data.inspection);
+      if (data.type === 'world-history') this.listeners.onHistory?.(data.archive);
       if (data.type === 'save-data') this.listeners.onSave?.(data.encoded);
       if (data.type === 'notice') this.listeners.onNotice?.(data.level, data.message);
     });
@@ -91,6 +95,14 @@ export class SimulationWorkerClient {
 
   inspect(target: 'entity' | 'village' | 'building' | 'kingdom', id: number): void {
     this.send({ type: 'inspect', target, id });
+  }
+
+  requestHistory(filter: WorldHistoryFilter): void {
+    this.send({ type: 'request-history', filter });
+  }
+
+  setFavorite(lifeId: number, favorite: boolean): void {
+    this.send({ type: 'set-favorite', lifeId, favorite });
   }
 
   setConstructionPriority(villageId: number, priority: ConstructionPriority): void {

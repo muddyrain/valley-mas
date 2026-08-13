@@ -254,5 +254,14 @@ describe('environment chains', () => {
 
     applyGodPower(simulation.state, GodPower.Meteor, cell, 1);
     expect(simulation.state.resourceNodes.active[grown]).toBe(0);
+    expect(simulation.state.events.at(-1)).toMatchObject({
+      kind: 'disaster',
+      category: 'disaster',
+      archive: true,
+      notification: true,
+    });
+    expect(simulation.state.events.at(-1)?.subjects).toContainEqual(
+      expect.objectContaining({ kind: 'location', cell }),
+    );
   });
 });

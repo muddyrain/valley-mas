@@ -1,4 +1,5 @@
 import { DiplomacyState, type Kingdom, VillageTier, type WorldState } from '@/shared/gameTypes';
+import { recordWorldEvent } from '../history/worldHistory';
 
 const KINGDOM_NAMES = ['苍叶王国', '曦石同盟', '北风领', '金穗邦', '雾湾王国', '白峰城国'];
 const KINGDOM_COLORS = ['#d66b52', '#5e8fd1', '#d0a84c', '#7baf65', '#9a72c7', '#4ca89c'];
@@ -32,6 +33,17 @@ export function formKingdoms(state: WorldState): void {
       if (state.entities.villageIds[entityId] === village.id)
         state.entities.kingdomIds[entityId] = id;
     }
+    recordWorldEvent(state, {
+      kind: 'kingdom-founded',
+      category: 'kingdom',
+      message: `${kingdom.name}在${village.name}建立`,
+      archive: true,
+      notification: true,
+      entityIds: [leaderId],
+      villageIds: [village.id],
+      kingdomIds: [kingdom.id],
+      locationCell: Math.floor(village.z) * state.map.size + Math.floor(village.x),
+    });
   }
 }
 
@@ -76,6 +88,14 @@ export function resolveKingdomExtinctions(state: WorldState): void {
     kingdom.militaryPower = 0;
     for (const other of state.kingdoms)
       setDiplomacy(state, kingdom.id, other.id, DiplomacyState.Peace);
+    recordWorldEvent(state, {
+      kind: 'kingdom-extinct',
+      category: 'kingdom',
+      message: `${kingdom.name}灭亡`,
+      archive: true,
+      notification: true,
+      kingdomIds: [kingdom.id],
+    });
   }
 }
 

@@ -23,6 +23,7 @@ import {
   type WorldState,
 } from '@/shared/gameTypes';
 import { createSeededRandom, randomInt, stableNoise } from '@/shared/random';
+import { type RecordWorldEventInput, recordWorldEvent } from '../history/worldHistory';
 import {
   formKingdoms,
   refreshKingdomCapital,
@@ -160,6 +161,7 @@ function createEntityArrays(capacity = MAX_ENTITIES): EntityArrays {
   return {
     capacity,
     count: 0,
+    lifeIds: new Uint32Array(capacity),
     active: new Uint8Array(capacity),
     kind: new Uint8Array(capacity),
     positionsX: new Float32Array(capacity),
@@ -311,10 +313,50 @@ function findNearestTerrain(state: WorldState, x: number, z: number, terrain: Te
   return 0;
 }
 
-function addEvent(state: WorldState, kind: WorldEvent['kind'], message: string): void {
-  state.nextEventId += 1;
-  state.events.push({ id: state.nextEventId, tick: state.tick, kind, message });
-  if (state.events.length > 30) state.events.splice(0, state.events.length - 30);
+function addEvent(
+  state: WorldState,
+  kind: WorldEvent['kind'],
+  message: string,
+  details: Partial<Omit<RecordWorldEventInput, 'kind' | 'message'>> = {},
+): void {
+  const category =
+    kind === 'kingdom' ||
+    kind === 'kingdom-founded' ||
+    kind === 'kingdom-extinct' ||
+    kind === 'war' ||
+    kind === 'peace'
+      ? 'kingdom'
+      : kind === 'birth' ||
+          kind === 'death' ||
+          kind === 'promotion' ||
+          kind === 'family' ||
+          kind === 'migration' ||
+          kind === 'equipment' ||
+          kind === 'population-peak'
+        ? 'population'
+        : kind === 'ecology' || kind === 'extinction'
+          ? 'ecology'
+          : kind === 'disaster' || kind === 'famine'
+            ? 'disaster'
+            : kind.startsWith('village') || kind === 'construction' || kind === 'conquest'
+              ? 'village'
+              : 'world';
+  const significant = ![
+    'birth',
+    'death',
+    'promotion',
+    'equipment',
+    'construction',
+    'village',
+  ].includes(kind);
+  recordWorldEvent(state, {
+    kind,
+    category,
+    message,
+    archive: significant,
+    notification: significant,
+    ...details,
+  });
 }
 
 function grantResidentProgress(state: WorldState, entityId: number, amount: number): void {
@@ -340,6 +382,7 @@ function grantResidentProgress(state: WorldState, entityId: number, amount: numb
 }
 
 function assignResidentRoles(state: WorldState): void {
+  const previousRoles = state.entities.roles.slice(0, state.entities.count);
   for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
     if (!state.entities.active[entityId] || state.entities.kind[entityId] !== EntityKind.Human)
       continue;
@@ -400,9 +443,37 @@ function assignResidentRoles(state: WorldState): void {
     const captain = bestResident(guards.filter((entityId) => entityId !== king));
     if (captain >= 0) state.entities.roles[captain] = ResidentRole.Captain;
   }
+
+  const roleLabels = ['居民', '老兵', '大师', '队长', '领主', '国王'];
+  for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
+    const previousRole = previousRoles[entityId] ?? ResidentRole.Citizen;
+    const nextRole = state.entities.roles[entityId] ?? ResidentRole.Citizen;
+    if (!state.entities.active[entityId] || nextRole <= previousRole) continue;
+    const villageId = state.entities.villageIds[entityId] ?? 0;
+    const kingdomId = state.entities.kingdomIds[entityId] ?? 0;
+    addEvent(
+      state,
+      'promotion',
+      `${state.entities.names[entityId] || '一名居民'}成为${roleLabels[nextRole] || '重要人物'}`,
+      {
+        category: 'population',
+        archive: false,
+        notification: false,
+        entityIds: [entityId],
+        villageIds: villageId > 0 ? [villageId] : [],
+        kingdomIds: kingdomId > 0 ? [kingdomId] : [],
+      },
+    );
+  }
 }
 
-function makeVillage(state: WorldState, x: number, z: number, population: number): Village {
+function makeVillage(
+  state: WorldState,
+  x: number,
+  z: number,
+  population: number,
+  founderIds: number[] = [],
+): Village {
   const id = state.villages.length + 1;
   const village: Village = {
     id,
@@ -445,6 +516,10 @@ function makeVillage(state: WorldState, x: number, z: number, population: number
     foodConsumption: 0,
     foodTrend: 0,
     shortageTicks: 0,
+    peakPopulation: population,
+    lastRecordedPopulationPeak: population,
+    lastShortageStage: 'stable',
+    abandonedAtTick: 0,
     lastBirthTick: state.tick,
     pioneerReadyAtTick: state.tick + 1_440,
     constructionPriority: 'automatic',
@@ -454,7 +529,14 @@ function makeVillage(state: WorldState, x: number, z: number, population: number
     captureProgress: 0,
   };
   state.villages.push(village);
-  addEvent(state, 'village', `${village.name}建立了营地`);
+  addEvent(state, 'village-founded', `${village.name}建立了营地`, {
+    category: 'village',
+    archive: true,
+    notification: true,
+    entityIds: founderIds,
+    villageIds: [village.id],
+    locationCell: Math.floor(z) * state.map.size + Math.floor(x),
+  });
   return village;
 }
 
@@ -465,7 +547,7 @@ function createInitialState(options: CreateWorldOptions): WorldState {
     options.preset ?? 'archipelago',
   );
   const state: WorldState = {
-    version: 10,
+    version: 11,
     seed: options.seed,
     tick: 0,
     year: 1,
@@ -478,9 +560,11 @@ function createInitialState(options: CreateWorldOptions): WorldState {
     buildings: [],
     settings: { speed: 1, quality: 'high', overlay: 'none' },
     events: [],
+    favoriteLifeIds: [],
     nextRequestId: 0,
     nextTaskId: 0,
     nextEventId: 0,
+    nextLifeId: 0,
     forcedPeaceUntil: 0,
     population: createPopulationDiagnostics(),
     worldLaws: createDefaultWorldLaws(),
@@ -620,7 +704,17 @@ function recordResidentDeath(state: WorldState, entityId: number, cause: DeathCa
     violence: '死于袭击',
     disaster: '死于灾害',
   };
-  addEvent(state, 'death', `${state.entities.names[entityId] || '一名居民'}${labels[cause]}`);
+  const villageId = state.entities.villageIds[entityId] ?? 0;
+  const kingdomId = state.entities.kingdomIds[entityId] ?? 0;
+  addEvent(state, 'death', `${state.entities.names[entityId] || '一名居民'}${labels[cause]}`, {
+    category: cause === 'disaster' ? 'disaster' : 'population',
+    archive: false,
+    notification: false,
+    entityIds: [entityId],
+    villageIds: villageId > 0 ? [villageId] : [],
+    kingdomIds: kingdomId > 0 ? [kingdomId] : [],
+    locationCell: entityCell(state, entityId),
+  });
 }
 
 function refreshPopulationDiagnostics(state: WorldState): void {
@@ -722,6 +816,8 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     for (let index = 0; index < count; index += 1) {
       const entityId = acquireEntitySlot(state, referenced);
       if (entityId < 0) break;
+      state.nextLifeId += 1;
+      state.entities.lifeIds[entityId] = state.nextLifeId;
       const spawnX = x + (random() - 0.5) * 5;
       const spawnZ = z + (random() - 0.5) * 5;
       const cell =
@@ -1230,6 +1326,20 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       state.entities.partnerIds[second] = first;
       state.entities.familyIds[first] = state.nextFamilyId;
       state.entities.familyIds[second] = state.nextFamilyId;
+      const village = state.villages.find((candidate) => candidate.id === villageId);
+      addEvent(
+        state,
+        'family',
+        `${state.entities.names[first]}与${state.entities.names[second]}结为伴侣`,
+        {
+          category: 'population',
+          archive: false,
+          notification: false,
+          entityIds: [first, second],
+          villageIds: [villageId],
+          kingdomIds: village?.kingdomId ? [village.kingdomId] : [],
+        },
+      );
     }
   };
 
@@ -1315,6 +1425,15 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       state,
       'birth',
       `${state.entities.names[mother]}与${state.entities.names[father]}的孩子出生于${village.name}`,
+      {
+        category: 'population',
+        archive: false,
+        notification: false,
+        entityIds: [newborn, mother, father],
+        villageIds: [village.id],
+        kingdomIds: village.kingdomId > 0 ? [village.kingdomId] : [],
+        locationCell: entityCell(state, newborn),
+      },
     );
   };
 
@@ -1419,7 +1538,15 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     village.resources.food -= expedition.supplies;
     village.pioneerReadyAtTick = state.tick + 2_880;
     state.expeditions.push(expedition);
-    addEvent(state, 'village', `${village.name}派出了一支拓荒队`);
+    addEvent(state, 'migration', `${village.name}派出了一支拓荒队`, {
+      category: 'population',
+      archive: false,
+      notification: false,
+      entityIds: expedition.memberIds,
+      villageIds: [village.id],
+      kingdomIds: village.kingdomId > 0 ? [village.kingdomId] : [],
+      locationCell: targetCell,
+    });
   };
 
   const tryLaunchPopulationRelocation = (): void => {
@@ -1536,8 +1663,17 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         state.expeditions.push(relocation);
         addEvent(
           state,
-          'village',
-          `${state.entities.names[mother] || '一名居民'}迁入了${destination.name}`,
+          'migration',
+          `${state.entities.names[mother] || '一名居民'}一家启程迁往${destination.name}`,
+          {
+            category: 'population',
+            archive: false,
+            notification: false,
+            entityIds: family,
+            villageIds: [source.id, destination.id],
+            kingdomIds: [source.kingdomId],
+            locationCell: targetCell,
+          },
         );
         return;
       }
@@ -1616,8 +1752,17 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         state.expeditions.push(relocation);
         addEvent(
           state,
-          'village',
+          'migration',
           `${state.entities.names[residentId] || '一名居民'}从${source.name}启程迁居${destination.name}`,
+          {
+            category: 'population',
+            archive: false,
+            notification: false,
+            entityIds: [residentId],
+            villageIds: [source.id, destination.id],
+            kingdomIds: [source.kingdomId],
+            locationCell: targetCell,
+          },
         );
         return;
       }
@@ -1682,11 +1827,40 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         }
         state.population.totalMigrations += living.length;
         state.population.migrationsThisYear += living.length;
-        addEvent(state, 'village', `${leadResidentName}迁入了${destination.name}`);
+        addEvent(state, 'migration', `${leadResidentName}迁入了${destination.name}`, {
+          category: 'population',
+          archive: false,
+          notification: false,
+          entityIds: living,
+          villageIds: [expedition.originVillageId, destination.id],
+          kingdomIds: destination.kingdomId > 0 ? [destination.kingdomId] : [],
+          locationCell: expedition.targetCell,
+        });
+        const origin = state.villages.find(
+          (candidate) => candidate.id === expedition.originVillageId,
+        );
+        if (origin && countVillageResidents(state, origin.id) === 0) {
+          origin.abandonedAtTick = state.tick;
+          addEvent(state, 'village-merged', `${origin.name}撤并入${destination.name}`, {
+            category: 'village',
+            archive: true,
+            notification: true,
+            entityIds: living,
+            villageIds: [origin.id, destination.id],
+            kingdomIds: destination.kingdomId > 0 ? [destination.kingdomId] : [],
+            locationCell: expedition.targetCell,
+          });
+        }
         state.expeditions.splice(index, 1);
         continue;
       }
-      const village = makeVillage(state, expedition.targetX, expedition.targetZ, living.length);
+      const village = makeVillage(
+        state,
+        expedition.targetX,
+        expedition.targetZ,
+        living.length,
+        living,
+      );
       village.kingdomId = expedition.kingdomId;
       village.resources.wood = 12;
       village.resources.stone = 4;
@@ -1714,7 +1888,6 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       }
       state.population.totalMigrations += living.length;
       state.population.migrationsThisYear += living.length;
-      addEvent(state, 'village', `${village.name}由${living.length}名拓荒者建立`);
       state.expeditions.splice(index, 1);
     }
   };
@@ -2142,6 +2315,17 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       }
     }
     refreshEcologyDiagnostics(state);
+    for (const kind of ANIMAL_SPECIES) {
+      const diagnostics = state.ecology.species[kind];
+      if (!diagnostics || diagnostics.count > 0) continue;
+      if (state.ecology.extinctSinceTicks[kind] === state.tick) {
+        addEvent(state, 'extinction', `${ANIMAL_SPECIES_NAMES[kind]}在荒野中灭绝`, {
+          category: 'ecology',
+          archive: true,
+          notification: true,
+        });
+      }
+    }
   };
 
   const findNaturalReturnCell = (kind: EntityKind): number => {
@@ -2221,7 +2405,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     const founders = spawn(EntityKind.Human, x, z, 8);
     if (founders.length !== 8) return;
     const ages = [18, 20, 22, 24, 26, 28, 30, 34] as const;
-    const village = makeVillage(state, x, z, founders.length);
+    const village = makeVillage(state, x, z, founders.length, founders);
     village.lastBirthTick = state.tick + 720;
     founders.forEach((entityId, index) => {
       state.entities.sex[entityId] = index % 2 === 0 ? ResidentSex.Female : ResidentSex.Male;
@@ -2523,7 +2707,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         group.reduce((sum, id) => sum + (state.entities.positionsX[id] ?? 0), 0) / group.length;
       const z =
         group.reduce((sum, id) => sum + (state.entities.positionsZ[id] ?? 0), 0) / group.length;
-      const village = makeVillage(state, x, z, group.length);
+      const village = makeVillage(state, x, z, group.length, group);
       for (const entityId of group) state.entities.villageIds[entityId] = village.id;
     }
   };
@@ -2543,7 +2727,37 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         );
       }
       const assigned = countVillageResidents(state, village.id);
+      const previousPopulation = village.population;
       village.population = assigned;
+      if (assigned > village.peakPopulation) village.peakPopulation = assigned;
+      const significantPeak =
+        assigned >= 10 &&
+        (assigned >= village.lastRecordedPopulationPeak + 10 ||
+          assigned >= Math.ceil(village.lastRecordedPopulationPeak * 1.25));
+      if (significantPeak) {
+        village.lastRecordedPopulationPeak = assigned;
+        addEvent(state, 'population-peak', `${village.name}人口达到新高峰：${assigned} 人`, {
+          category: 'population',
+          archive: true,
+          notification: false,
+          villageIds: [village.id],
+          kingdomIds: village.kingdomId > 0 ? [village.kingdomId] : [],
+          locationCell: Math.floor(village.z) * state.map.size + Math.floor(village.x),
+        });
+      }
+      if (previousPopulation > 0 && assigned === 0 && village.abandonedAtTick === 0) {
+        village.abandonedAtTick = state.tick;
+        addEvent(state, 'village-abandoned', `${village.name}已无人定居`, {
+          category: 'village',
+          archive: true,
+          notification: true,
+          villageIds: [village.id],
+          kingdomIds: village.kingdomId > 0 ? [village.kingdomId] : [],
+          locationCell: Math.floor(village.z) * state.map.size + Math.floor(village.x),
+        });
+      } else if (assigned > 0) {
+        village.abandonedAtTick = 0;
+      }
       const operationalBuildingTypes = village.buildingIds.flatMap((buildingId) => {
         const building = state.buildings[buildingId - 1];
         return building?.completed && building.health > 0 ? [building.type] : [];
@@ -2551,12 +2765,17 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       const completed = operationalBuildingTypes.length;
       const previousTier = village.tier;
       village.tier = evaluateVillageTier(village.population, operationalBuildingTypes);
-      if (village.tier > previousTier)
-        addEvent(
-          state,
-          'village',
-          `${village.name}发展为${['营地', '村落', '城镇', '城邦'][village.tier] ?? '聚落'}`,
-        );
+      if (village.tier > previousTier) {
+        const tierLabel = ['营地', '村落', '城镇', '城邦'][village.tier] || '聚落';
+        addEvent(state, 'village-upgrade', `${village.name}发展为${tierLabel}`, {
+          category: 'village',
+          archive: true,
+          notification: true,
+          villageIds: [village.id],
+          kingdomIds: village.kingdomId > 0 ? [village.kingdomId] : [],
+          locationCell: Math.floor(village.z) * state.map.size + Math.floor(village.x),
+        });
+      }
       if (assigned === 0) continue;
       const completedFarms = village.buildingIds.filter((id) => {
         const building = state.buildings[id - 1];
@@ -2599,7 +2818,14 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
           }
           village.resources.equipment -= 1;
           const recipientName = state.entities.names[recipient] || '一名士兵';
-          addEvent(state, 'equipment', `${recipientName}获得了新装备`);
+          addEvent(state, 'equipment', `${recipientName}获得了新装备`, {
+            category: 'population',
+            archive: false,
+            notification: false,
+            entityIds: [recipient],
+            villageIds: [village.id],
+            kingdomIds: village.kingdomId > 0 ? [village.kingdomId] : [],
+          });
         }
       }
       const unfinished = village.buildingIds.some((id) => !state.buildings[id - 1]?.completed);
@@ -2626,6 +2852,17 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         shortageStage === 'stable'
           ? Math.max(0, village.shortageTicks - 60)
           : village.shortageTicks + 20;
+      if (shortageStage === 'famine' && village.lastShortageStage !== 'famine') {
+        addEvent(state, 'famine', `${village.name}进入饥荒`, {
+          category: 'disaster',
+          archive: true,
+          notification: true,
+          villageIds: [village.id],
+          kingdomIds: village.kingdomId > 0 ? [village.kingdomId] : [],
+          locationCell: Math.floor(village.z) * state.map.size + Math.floor(village.x),
+        });
+      }
+      village.lastShortageStage = shortageStage;
       pairVillageFamilies(village.id);
       tryVillageBirth(village, assigned);
       tryLaunchPioneerExpedition(village, assigned);
@@ -2653,7 +2890,14 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       );
       if (first && second && !underTruce && first.relations[second.id] === DiplomacyState.Peace) {
         setDiplomacy(state, first.id, second.id, DiplomacyState.War);
-        addEvent(state, 'war', `${first.name}向${second.name}宣战`);
+        const warId = `${Math.min(first.id, second.id)}:${Math.max(first.id, second.id)}:${state.tick}`;
+        addEvent(state, 'war', `${first.name}向${second.name}宣战`, {
+          category: 'kingdom',
+          archive: true,
+          notification: true,
+          kingdomIds: [first.id, second.id],
+          war: { id: warId, label: `${first.name}—${second.name}战争` },
+        });
       }
     }
   };
@@ -2687,6 +2931,11 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     const second = state.kingdoms.find((kingdom) => kingdom.id === secondKingdomId);
     if (first) first.relations[secondKingdomId] = DiplomacyState.Peace;
     if (second) second.relations[firstKingdomId] = DiplomacyState.Peace;
+    const campaign = state.wars.find(
+      (war) =>
+        war.firstKingdomId === Math.min(firstKingdomId, secondKingdomId) &&
+        war.secondKingdomId === Math.max(firstKingdomId, secondKingdomId),
+    );
     state.wars = state.wars.filter(
       (war) =>
         !(
@@ -2708,7 +2957,18 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     });
     const firstName = first?.name ?? '一方';
     const secondName = second?.name ?? '另一方';
-    addEvent(state, 'peace', `${firstName}与${secondName}停战：${reason}`);
+    addEvent(state, 'peace', `${firstName}与${secondName}停战：${reason}`, {
+      category: 'kingdom',
+      archive: true,
+      notification: true,
+      kingdomIds: [firstKingdomId, secondKingdomId],
+      war: campaign
+        ? {
+            id: `${campaign.firstKingdomId}:${campaign.secondKingdomId}:${campaign.startedAtTick}`,
+            label: `${firstName}—${secondName}战争`,
+          }
+        : undefined,
+    });
   };
 
   const nearestEnemyGuard = (entityId: number, candidates: number[], radius: number): number => {
@@ -2776,6 +3036,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     if (defender) defender.villageIds = defender.villageIds.filter((id) => id !== village.id);
     if (!attacker.villageIds.includes(village.id)) attacker.villageIds.push(village.id);
     village.kingdomId = attackerKingdomId;
+    village.abandonedAtTick = 0;
     village.captureKingdomId = 0;
     village.captureProgress = 0;
     village.health = Math.max(650, village.health);
@@ -2789,7 +3050,19 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     campaign.capturedVillageIds.push(village.id);
     campaign.score[attackerKingdomId] = (campaign.score[attackerKingdomId] ?? 0) + 1_000;
     campaign.lastProgressTick = state.tick;
-    addEvent(state, 'conquest', `${attacker.name}占领了${village.name}`);
+    const defenderName = defender ? defender.name : '失守一方';
+    addEvent(state, 'conquest', `${attacker.name}占领了${village.name}`, {
+      category: 'village',
+      archive: true,
+      notification: true,
+      villageIds: [village.id],
+      kingdomIds: [attackerKingdomId, defenderKingdomId],
+      war: {
+        id: `${campaign.firstKingdomId}:${campaign.secondKingdomId}:${campaign.startedAtTick}`,
+        label: `${attacker.name}—${defenderName}战争`,
+      },
+      locationCell: Math.floor(village.z) * state.map.size + Math.floor(village.x),
+    });
   };
 
   const updateWarCampaignFatigue = (): void => {

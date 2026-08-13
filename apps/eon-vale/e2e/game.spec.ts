@@ -208,7 +208,12 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
     .toBeGreaterThan(0);
 
   await page.getByTestId('chronicle-toggle').click();
-  await page.getByTestId('follow-resident').click();
+  const historyArchive = page.getByTestId('history-archive');
+  await expect(historyArchive).toBeVisible();
+  await historyArchive.getByRole('tab', { name: '村庄', exact: true }).click();
+  await expect(historyArchive.locator('[data-testid^="history-event-"]').first()).toBeVisible();
+  await historyArchive.getByRole('tab', { name: '全部', exact: true }).click();
+  await historyArchive.locator('[data-testid^="history-link-entity-"]').first().click();
   const residentInspector = page.getByTestId('entity-inspector');
   await expect(residentInspector).toBeVisible();
   await expect(residentInspector.getByText('原因', { exact: true })).toBeVisible();
@@ -228,7 +233,9 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   await expect(residentInspector.getByRole('button', { name: '取消收藏' })).toBeVisible();
   await residentInspector.getByRole('button', { name: '关闭' }).click();
 
-  await page.getByTestId('village-chip-1').click();
+  await historyArchive.getByRole('tab', { name: '收藏人物', exact: true }).click();
+  await expect(historyArchive.locator('[data-testid^="history-event-"]').first()).toBeVisible();
+  await historyArchive.locator('[data-testid^="history-link-village-"]').first().click();
   const villageInspector = page.getByTestId('village-inspector');
   await expect(villageInspector).toBeVisible();
   await expect.poll(async () => canvas.getAttribute('data-view-level')).toBe('settlement');
@@ -238,11 +245,12 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
     .toBeGreaterThan(0);
   await expect(canvas).toHaveAttribute('data-selection-outline', 'true');
   await expect(canvas).toHaveAttribute('data-selection-stroke-px', '1.5');
-  await expect(canvas).toHaveAttribute('data-selected-target', 'village:1');
+  await expect(canvas).toHaveAttribute('data-selected-target', /^village:\d+$/);
   const constructionPriority = villageInspector.getByRole('combobox', { name: '建设优先' });
   await constructionPriority.selectOption('food');
   await expect(constructionPriority).toHaveValue('food');
   await expect(page.getByTestId('village-development')).toContainText('下一阶段');
+  await expect(page.getByTestId('village-chronicle')).toContainText('聚落纪事');
   await villageInspector.getByRole('button', { name: '住宅区', exact: true }).click();
   const planningBounds = await canvas.boundingBox();
   if (!planningBounds) throw new Error('规划模式缺少地图画布');
@@ -397,12 +405,15 @@ test('observes a real kingdom through capital, borders and selection focus', asy
     .toBeGreaterThan(0);
 
   await page.getByTestId('chronicle-toggle').click();
-  await page.getByTestId('kingdom-chip-1').click();
+  const historyArchive = page.getByTestId('history-archive');
+  await historyArchive.getByRole('tab', { name: '王国', exact: true }).click();
+  await historyArchive.getByTestId('history-link-kingdom-1').first().click();
   const inspector = page.getByTestId('kingdom-inspector');
   await expect(inspector).toBeVisible();
   await expect(inspector).toContainText('首都');
   await expect(inspector).toContainText(/邻国 \d+/);
   await expect(inspector.getByRole('button', { name: '定位首都' })).toBeVisible();
+  await expect(inspector.getByTestId('kingdom-chronicle')).toContainText('王国纪事');
   await expect(canvas).toHaveAttribute('data-selected-target', 'kingdom:1');
   await expect(canvas).toHaveAttribute('data-observed-kingdom', '1');
   await expect(canvas).toHaveAttribute('data-kingdom-adjacencies', /^\d+$/);

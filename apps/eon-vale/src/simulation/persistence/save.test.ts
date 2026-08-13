@@ -9,20 +9,27 @@ describe('world persistence', () => {
   it('round-trips the current world without tick history', () => {
     const simulation = createWorldSimulation({ seed: 'archive', initialHumans: 48 });
     for (let tick = 0; tick < 300; tick += 1) simulation.step();
+    simulation.state.favoriteLifeIds = [simulation.state.entities.lifeIds[0] ?? 0].filter(
+      (lifeId) => lifeId > 0,
+    );
     const encoded = serializeWorld(simulation.state);
     const restored = loadWorldSave(encoded);
 
-    expect(JSON.parse(encoded).version).toBe(10);
+    expect(JSON.parse(encoded).version).toBe(11);
     expect(restored.seed).toBe(simulation.state.seed);
     expect(restored.tick).toBe(simulation.state.tick);
     expect(restored.entities.count).toBe(simulation.state.entities.count);
     expect(restored.entities.sex).toEqual(simulation.state.entities.sex);
     expect(restored.entities.familyIds).toEqual(simulation.state.entities.familyIds);
+    expect(restored.entities.lifeIds).toEqual(simulation.state.entities.lifeIds);
     expect(restored.population).toEqual(simulation.state.population);
     expect(restored.worldLaws).toEqual(simulation.state.worldLaws);
     expect(restored.ecology).toEqual(simulation.state.ecology);
     expect(restored.wars).toEqual(simulation.state.wars);
     expect(restored.truces).toEqual(simulation.state.truces);
+    expect(restored.events).toEqual(simulation.state.events);
+    expect(restored.nextLifeId).toBe(simulation.state.nextLifeId);
+    expect(restored.favoriteLifeIds).toEqual(simulation.state.favoriteLifeIds);
     expect(restored.map.terrain).toEqual(simulation.state.map.terrain);
     expect(restored.resourceNodes.count).toBe(simulation.state.resourceNodes.count);
     expect(restored.resourceNodes.kind.slice(0, restored.resourceNodes.count)).toEqual(
@@ -62,14 +69,14 @@ describe('world persistence', () => {
     expect(() => loadWorldSave(JSON.stringify(invalidLaw))).toThrow(/数据校验失败/);
   });
 
-  it('strictly rejects V9 and malformed V10 semantic fields', () => {
-    const simulation = createWorldSimulation({ seed: 'v10-task-save', initialHumans: 24 });
+  it('strictly rejects V10 and malformed V11 semantic fields', () => {
+    const simulation = createWorldSimulation({ seed: 'v11-task-save', initialHumans: 24 });
     simulation.step();
     const valid = JSON.parse(serializeWorld(simulation.state));
     expect(valid.entities.tasks).toHaveLength(simulation.state.entities.count);
 
-    const v9 = { ...valid, version: 9 };
-    expect(() => loadWorldSave(JSON.stringify(v9))).toThrow(/存档版本/);
+    const v10 = { ...valid, version: 10 };
+    expect(() => loadWorldSave(JSON.stringify(v10))).toThrow(/存档版本/);
 
     valid.entities.tasks[0] = { type: 'imaginary-work' };
     expect(() => loadWorldSave(JSON.stringify(valid))).toThrow(/数据校验失败/);
@@ -82,6 +89,27 @@ describe('world persistence', () => {
     const invalidTerritory = JSON.parse(serializeWorld(simulation.state));
     invalidTerritory.territory.villageIds.pop();
     expect(() => loadWorldSave(JSON.stringify(invalidTerritory))).toThrow(/地图尺寸不匹配/);
+
+    const invalidHistory = JSON.parse(serializeWorld(simulation.state));
+    invalidHistory.events[0] = { message: '缺少事实引用的旧事件' };
+    expect(() => loadWorldSave(JSON.stringify(invalidHistory))).toThrow(/数据校验失败/);
+
+    const invalidLives = JSON.parse(serializeWorld(simulation.state));
+    invalidLives.entities.lifeIds.pop();
+    expect(() => loadWorldSave(JSON.stringify(invalidLives))).toThrow(/实体数组尺寸不匹配/);
+
+    const invalidEventIds = JSON.parse(serializeWorld(simulation.state));
+    invalidEventIds.events.push({
+      id: invalidEventIds.nextEventId + 1,
+      tick: 0,
+      kind: 'law',
+      category: 'world',
+      message: '无效历史编号',
+      archive: true,
+      notification: true,
+      subjects: [],
+    });
+    expect(() => loadWorldSave(JSON.stringify(invalidEventIds))).toThrow(/历史事件标识无效/);
   });
 
   it('round-trips the durable capital and rejects malformed kingdom observation state', () => {

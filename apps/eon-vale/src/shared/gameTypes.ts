@@ -319,6 +319,7 @@ export interface TerritoryState {
 export interface EntityArrays {
   capacity: number;
   count: number;
+  lifeIds: Uint32Array;
   active: Uint8Array;
   kind: Uint8Array;
   positionsX: Float32Array;
@@ -419,6 +420,10 @@ export interface Village {
   foodConsumption: number;
   foodTrend: number;
   shortageTicks: number;
+  peakPopulation: number;
+  lastRecordedPopulationPeak: number;
+  lastShortageStage: ShortageStage;
+  abandonedAtTick: number;
   lastBirthTick: number;
   pioneerReadyAtTick: number;
   constructionPriority: ConstructionPriority;
@@ -554,26 +559,86 @@ export interface WorldSettings {
     | 'navigation';
 }
 
+export type WorldHistoryCategory =
+  | 'world'
+  | 'kingdom'
+  | 'village'
+  | 'population'
+  | 'ecology'
+  | 'disaster';
+
+export type WorldEventKind =
+  | 'birth'
+  | 'village'
+  | 'village-founded'
+  | 'village-upgrade'
+  | 'village-abandoned'
+  | 'village-merged'
+  | 'population-peak'
+  | 'family'
+  | 'migration'
+  | 'famine'
+  | 'kingdom'
+  | 'kingdom-founded'
+  | 'kingdom-extinct'
+  | 'war'
+  | 'peace'
+  | 'disaster'
+  | 'construction'
+  | 'extinction'
+  | 'promotion'
+  | 'death'
+  | 'equipment'
+  | 'ecology'
+  | 'law'
+  | 'awakening'
+  | 'conquest';
+
+export type WorldHistorySubject =
+  | { kind: 'entity'; lifeId: number; label: string }
+  | { kind: 'village'; id: number; label: string }
+  | { kind: 'kingdom'; id: number; label: string }
+  | { kind: 'war'; warId: string; label: string }
+  | { kind: 'location'; cell: number; label: string };
+
 export interface WorldEvent {
   id: number;
   tick: number;
-  kind:
-    | 'birth'
-    | 'village'
-    | 'kingdom'
-    | 'war'
-    | 'peace'
-    | 'disaster'
-    | 'construction'
-    | 'extinction'
-    | 'promotion'
-    | 'death'
-    | 'equipment'
-    | 'ecology'
-    | 'law'
-    | 'awakening'
-    | 'conquest';
+  kind: WorldEventKind;
+  category: WorldHistoryCategory;
   message: string;
+  archive: boolean;
+  notification: boolean;
+  subjects: WorldHistorySubject[];
+}
+
+export type WorldHistoryFilter =
+  | 'all'
+  | 'kingdom'
+  | 'village'
+  | 'population'
+  | 'ecology'
+  | 'disaster'
+  | 'favorites';
+
+export interface WorldHistoryLink {
+  kind: WorldHistorySubject['kind'];
+  label: string;
+  id?: number;
+  lifeId?: number;
+  warId?: string;
+  cell?: number;
+  available: boolean;
+}
+
+export interface WorldHistoryEntry extends WorldEvent {
+  links: WorldHistoryLink[];
+}
+
+export interface WorldHistoryArchive {
+  revision: number;
+  filter: WorldHistoryFilter;
+  entries: WorldHistoryEntry[];
 }
 
 export interface WorldState {
@@ -590,9 +655,11 @@ export interface WorldState {
   buildings: Building[];
   settings: WorldSettings;
   events: WorldEvent[];
+  favoriteLifeIds: number[];
   nextRequestId: number;
   nextTaskId: number;
   nextEventId: number;
+  nextLifeId: number;
   forcedPeaceUntil: number;
   population: PopulationDiagnostics;
   worldLaws: WorldLaws;

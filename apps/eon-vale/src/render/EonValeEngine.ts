@@ -35,6 +35,7 @@ import {
 } from './interactionFeedback';
 import { buildingFeedback, shouldEmitAttackHit } from './mapFeedback';
 import { estimateRenderBatches, normalizedDisplayFps } from './performanceMetrics';
+import { PixelAtlasSlotAllocator } from './pixelAtlas';
 import {
   createPixelCamera,
   type PixelCamera,
@@ -214,14 +215,23 @@ class PixelTextureFactory {
   private readonly textures = new Map<string, Texture>();
   private readonly atlasCanvas = document.createElement('canvas');
   private readonly atlasTexture: Texture;
-  private atlasCursor = 0;
+  private readonly slotAllocator: PixelAtlasSlotAllocator;
 
-  constructor() {
+  constructor(onReset: () => void) {
     this.atlasCanvas.width = PixelTextureFactory.ATLAS_SIZE;
     this.atlasCanvas.height = PixelTextureFactory.ATLAS_SIZE;
     this.atlasTexture = Texture.from(this.atlasCanvas);
     this.atlasTexture.source.scaleMode = 'nearest';
     this.atlasTexture.source.autoGenerateMipmaps = false;
+    const slotsPerAxis = Math.floor(PixelTextureFactory.ATLAS_SIZE / PixelTextureFactory.SLOT_SIZE);
+    this.slotAllocator = new PixelAtlasSlotAllocator(slotsPerAxis * slotsPerAxis, () => {
+      for (const texture of this.textures.values()) texture.destroy(false);
+      this.textures.clear();
+      const context = this.atlasCanvas.getContext('2d', { alpha: true });
+      context?.clearRect(0, 0, PixelTextureFactory.ATLAS_SIZE, PixelTextureFactory.ATLAS_SIZE);
+      this.atlasTexture.source.update();
+      onReset();
+    });
   }
 
   human(
@@ -236,7 +246,7 @@ class PixelTextureFactory {
     pose: HumanPose,
     frame: number,
   ): Texture {
-    const key = `human:${id % 12}:${profession}:${kingdomId}:${role}:${weaponTier}:${armorTier}:${carriedKind}:${facing}:${pose}:${frame}`;
+    const key = `human:${id % 12}:${profession}:${kingdomPaletteIndex(kingdomId)}:${role}:${weaponTier}:${armorTier}:${carriedKind}:${facing}:${pose}:${frame}`;
     return this.get(key, 16, 20, (context) => {
       const skin = ['#f3c7a1', '#dca77f', '#bb7d59', '#8b593e'][id % 4] ?? '#e1aa82';
       const hair =
@@ -300,7 +310,7 @@ class PixelTextureFactory {
     stage: number,
     damaged: boolean,
   ): Texture {
-    const key = `building:${type}:${kingdomId}:${tier}:${stage}:${damaged ? 1 : 0}`;
+    const key = `building:${type}:${kingdomPaletteIndex(kingdomId)}:${tier}:${stage}:${damaged ? 1 : 0}`;
     return this.get(key, 48, 44, (context) =>
       drawBuilding(context, type, kingdomColor(kingdomId), tier, stage, damaged),
     );
@@ -328,11 +338,9 @@ class PixelTextureFactory {
     context.imageSmoothingEnabled = false;
     draw(context);
     const columns = Math.floor(PixelTextureFactory.ATLAS_SIZE / PixelTextureFactory.SLOT_SIZE);
-    const atlasX = (this.atlasCursor % columns) * PixelTextureFactory.SLOT_SIZE;
-    const atlasY = Math.floor(this.atlasCursor / columns) * PixelTextureFactory.SLOT_SIZE;
-    if (atlasY + height > PixelTextureFactory.ATLAS_SIZE) {
-      throw new Error('像素动作图集容量不足');
-    }
+    const { slot } = this.slotAllocator.allocate(key);
+    const atlasX = (slot % columns) * PixelTextureFactory.SLOT_SIZE;
+    const atlasY = Math.floor(slot / columns) * PixelTextureFactory.SLOT_SIZE;
     const atlasContext = this.atlasCanvas.getContext('2d', { alpha: true });
     if (!atlasContext) throw new Error('无法创建像素图集');
     atlasContext.imageSmoothingEnabled = false;
@@ -348,7 +356,6 @@ class PixelTextureFactory {
       source: this.atlasTexture.source,
       frame: new Rectangle(atlasX, atlasY, width, height),
     });
-    this.atlasCursor += 1;
     this.textures.set(key, texture);
     return texture;
   }
@@ -371,7 +378,13 @@ export class EonValeEngine {
   private readonly effectLayer = new Graphics({ roundPixels: true });
   private readonly labelLayer = new Container();
   private readonly interpolator = new SnapshotInterpolator();
-  private readonly textureFactory = new PixelTextureFactory();
+  private readonly textureFactory = new PixelTextureFactory(() => {
+    for (const sprite of this.entitySprites) sprite.texture = Texture.EMPTY;
+    for (const sprite of this.buildingSprites.values()) sprite.texture = Texture.EMPTY;
+    this.entityTextureKeys.length = 0;
+    this.buildingTextureKeys.clear();
+    this.pixelTexturesInvalidated = true;
+  });
   private readonly terrainChunks = new Map<number, TerrainChunkRecord>();
   private readonly entitySprites: Sprite[] = [];
   private readonly entityTextureKeys: string[] = [];
@@ -416,6 +429,7 @@ export class EonValeEngine {
   private observer: PerformanceObserver | null = null;
   private visibleEntities = 0;
   private totalAttackHits = 0;
+  private pixelTexturesInvalidated = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -848,6 +862,10 @@ export class EonValeEngine {
     this.updateCameraTween(now);
     this.updateWorldTransform();
     this.updateEntities(now);
+    if (this.pixelTexturesInvalidated) {
+      this.pixelTexturesInvalidated = false;
+      this.updateBuildings();
+    }
     this.redrawCombatStatus();
     this.updateSettlementLabelPositions();
     this.redrawInteraction();
@@ -1122,6 +1140,7 @@ export class EonValeEngine {
       }
       const profession = (latest.professions?.[entityId] ?? Profession.Forager) as Profession;
       const kingdomId = latest.kingdomIds?.[entityId] ?? 0;
+      const kingdomPalette = kingdomPaletteIndex(kingdomId);
       const role = (latest.roles?.[entityId] ?? ResidentRole.Citizen) as ResidentRole;
       const weapon = latest.weaponTiers?.[entityId] ?? 0;
       const armor = latest.armorTiers?.[entityId] ?? 0;
@@ -1138,7 +1157,7 @@ export class EonValeEngine {
       );
       const visualKey =
         kind === EntityKind.Human
-          ? `h:${entityId % 12}:${profession}:${kingdomId}:${role}:${weapon}:${armor}:${carriedKind}:${facing}:${residentPose}:${frame}`
+          ? `h:${entityId % 12}:${profession}:${kingdomPalette}:${role}:${weapon}:${armor}:${carriedKind}:${facing}:${residentPose}:${frame}`
           : `a:${kind}:${entityId % 4}:${creaturePose}:${frame}`;
       if (this.entityTextureKeys[entityId] !== visualKey) {
         sprite.texture =
@@ -1287,11 +1306,12 @@ export class EonValeEngine {
       const village = snapshot.villages.find((candidate) => candidate.id === building.villageId);
       const damaged = building.health < 100;
       const tier = village?.tier ?? VillageTier.Camp;
-      const key = `${building.type}:${village?.kingdomId ?? 0}:${tier}:${building.stage}:${damaged ? 1 : 0}`;
+      const kingdomId = village?.kingdomId ?? 0;
+      const key = `${building.type}:${kingdomPaletteIndex(kingdomId)}:${tier}:${building.stage}:${damaged ? 1 : 0}`;
       if (this.buildingTextureKeys.get(building.id) !== key) {
         sprite.texture = this.textureFactory.building(
           building.type,
-          village?.kingdomId ?? 0,
+          kingdomId,
           tier,
           building.stage,
           damaged,
@@ -2401,8 +2421,12 @@ function resolvePixelView(zoom: number): WorldViewLevel {
 }
 
 function kingdomColor(kingdomId: number): string {
-  if (kingdomId <= 0) return KINGDOM_COLORS[0] ?? '#d6c195';
-  return KINGDOM_COLORS[((kingdomId - 1) % (KINGDOM_COLORS.length - 1)) + 1] ?? '#d6c195';
+  return KINGDOM_COLORS[kingdomPaletteIndex(kingdomId)] ?? '#d6c195';
+}
+
+function kingdomPaletteIndex(kingdomId: number): number {
+  if (kingdomId <= 0) return 0;
+  return ((kingdomId - 1) % (KINGDOM_COLORS.length - 1)) + 1;
 }
 
 function countActive(values: Uint8Array): number {

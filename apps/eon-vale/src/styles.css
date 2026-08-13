@@ -1164,6 +1164,130 @@ select:focus-visible {
   font-size: 9px;
 }
 
+.history-archive {
+  display: flex;
+  min-height: 300px;
+  flex-direction: column;
+}
+
+.history-notices {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+  padding: 9px;
+  border: 1px solid rgba(211, 170, 91, 0.16);
+  border-radius: 9px;
+  background: rgba(211, 170, 91, 0.05);
+}
+
+.history-notices small {
+  color: #d6bd78;
+  font-size: 7px;
+  letter-spacing: 0.12em;
+}
+
+.history-notices span {
+  color: #c9d2c6;
+  font-size: 8px;
+}
+
+.history-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.history-filters button {
+  min-height: 25px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  color: #82948a;
+  background: rgba(255, 255, 255, 0.035);
+  cursor: pointer;
+  font-size: 8px;
+}
+
+.history-filters button.active {
+  color: #e0efbd;
+  background: rgba(204, 233, 154, 0.11);
+}
+
+.history-event-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+  overflow: auto;
+}
+
+.history-event-list article {
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+  border-left: 2px solid rgba(204, 233, 154, 0.45);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.history-event-list article > strong {
+  color: #c7d3ca;
+  font-size: 9px;
+  font-weight: 550;
+}
+
+.history-event-date,
+.history-event-list > p {
+  color: #718178;
+  font-size: 7px;
+}
+
+.history-links,
+.history-inline-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.history-links button,
+.history-inline-links button {
+  display: inline-flex;
+  min-height: 21px;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  border: 1px solid rgba(174, 205, 185, 0.12);
+  border-radius: 6px;
+  color: #a9c4ad;
+  background: rgba(115, 156, 123, 0.06);
+  cursor: pointer;
+  font-size: 7px;
+}
+
+.history-links button:disabled,
+.history-inline-links button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.history-inline-links {
+  grid-column: 2;
+}
+
+.village-chronicle,
+.kingdom-chronicle {
+  margin-top: 13px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(174, 205, 185, 0.09);
+}
+
+.village-chronicle > strong,
+.kingdom-chronicle > strong {
+  margin-bottom: 3px;
+  color: #d4e6ad;
+  font-size: 9px;
+}
+
 .playback-bar {
   bottom: 18px;
   left: 50%;

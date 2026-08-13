@@ -20,7 +20,7 @@ import { createNavigationGrid } from '../navigation/grid';
 import { addResourceNode, createResourceNodeStore } from '../resources/resourceNodes';
 import { WORLD_LAW_IDS, type WorldLawId } from '../rules/worldLawCatalog';
 
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 const worldLawSchema = z
   .object(
@@ -93,6 +93,10 @@ const villageSchema = z
     foodConsumption: z.number().nonnegative(),
     foodTrend: z.number(),
     shortageTicks: z.number().int().nonnegative(),
+    peakPopulation: z.number().int().nonnegative(),
+    lastRecordedPopulationPeak: z.number().int().nonnegative(),
+    lastShortageStage: z.enum(['stable', 'rationing', 'migration', 'famine']),
+    abandonedAtTick: z.number().int().nonnegative(),
     lastBirthTick: z.number().int().nonnegative(),
     pioneerReadyAtTick: z.number().int().nonnegative(),
     constructionPriority: z.enum([
@@ -198,6 +202,65 @@ const residentTaskSchema = z
   })
   .strict();
 
+const worldHistorySubjectSchema = z.discriminatedUnion('kind', [
+  z
+    .object({ kind: z.literal('entity'), lifeId: z.number().int().positive(), label: z.string() })
+    .strict(),
+  z
+    .object({ kind: z.literal('village'), id: z.number().int().positive(), label: z.string() })
+    .strict(),
+  z
+    .object({ kind: z.literal('kingdom'), id: z.number().int().positive(), label: z.string() })
+    .strict(),
+  z.object({ kind: z.literal('war'), warId: z.string().min(1), label: z.string() }).strict(),
+  z
+    .object({
+      kind: z.literal('location'),
+      cell: z.number().int().nonnegative(),
+      label: z.string(),
+    })
+    .strict(),
+]);
+
+const worldEventSchema = z
+  .object({
+    id: z.number().int().positive(),
+    tick: z.number().int().nonnegative(),
+    kind: z.enum([
+      'birth',
+      'village',
+      'village-founded',
+      'village-upgrade',
+      'village-abandoned',
+      'village-merged',
+      'population-peak',
+      'family',
+      'migration',
+      'famine',
+      'kingdom',
+      'kingdom-founded',
+      'kingdom-extinct',
+      'war',
+      'peace',
+      'disaster',
+      'construction',
+      'extinction',
+      'promotion',
+      'death',
+      'equipment',
+      'ecology',
+      'law',
+      'awakening',
+      'conquest',
+    ]),
+    category: z.enum(['world', 'kingdom', 'village', 'population', 'ecology', 'disaster']),
+    message: z.string(),
+    archive: z.boolean(),
+    notification: z.boolean(),
+    subjects: z.array(worldHistorySubjectSchema),
+  })
+  .strict();
+
 const saveSchema = z
   .object({
     version: z.literal(SAVE_VERSION),
@@ -259,6 +322,7 @@ const saveSchema = z
       .object({
         capacity: z.number().int().positive(),
         count: z.number().int().nonnegative(),
+        lifeIds: numberArray,
         active: numberArray,
         kind: numberArray,
         positionsX: numberArray,
@@ -306,10 +370,12 @@ const saveSchema = z
     kingdoms: z.array(kingdomSchema),
     buildings: z.array(buildingSchema),
     settings: z.unknown(),
-    events: z.array(z.unknown()),
+    events: z.array(worldEventSchema),
+    favoriteLifeIds: z.array(z.number().int().positive()),
     nextRequestId: z.number().int().nonnegative(),
     nextTaskId: z.number().int().nonnegative(),
     nextEventId: z.number().int().nonnegative(),
+    nextLifeId: z.number().int().nonnegative(),
     forcedPeaceUntil: z.number().int().nonnegative(),
     population: z.unknown(),
     worldLaws: worldLawSchema,
@@ -376,6 +442,7 @@ export function serializeWorld(state: WorldState): string {
     entities: {
       capacity: state.entities.capacity,
       count: entityCount,
+      lifeIds: values(state.entities.lifeIds, entityCount),
       active: values(state.entities.active, entityCount),
       kind: values(state.entities.kind, entityCount),
       positionsX: values(state.entities.positionsX, entityCount),
@@ -423,9 +490,11 @@ export function serializeWorld(state: WorldState): string {
     buildings: state.buildings,
     settings: state.settings,
     events: state.events,
+    favoriteLifeIds: state.favoriteLifeIds,
     nextRequestId: state.nextRequestId,
     nextTaskId: state.nextTaskId,
     nextEventId: state.nextEventId,
+    nextLifeId: state.nextLifeId,
     forcedPeaceUntil: state.forcedPeaceUntil,
     population: state.population,
     worldLaws: state.worldLaws,
@@ -473,6 +542,72 @@ function restoreWorld(save: ParsedSave): WorldState {
     navigation.cost[cell] = navigationCostForTerrain(terrain[cell] ?? 0, roads[cell] > 0);
   }
   const capacity = Math.max(save.entities.capacity, save.entities.count, MAX_SAVE_ENTITIES);
+  const entityLists = [
+    save.entities.lifeIds,
+    save.entities.active,
+    save.entities.kind,
+    save.entities.positionsX,
+    save.entities.positionsZ,
+    save.entities.headings,
+    save.entities.health,
+    save.entities.hunger,
+    save.entities.energy,
+    save.entities.age,
+    save.entities.sex,
+    save.entities.familyIds,
+    save.entities.partnerIds,
+    save.entities.parentAIds,
+    save.entities.parentBIds,
+    save.entities.lastBirthTicks,
+    save.entities.malnutrition,
+    save.entities.expeditionIds,
+    save.entities.states,
+    save.entities.professions,
+    save.entities.villageIds,
+    save.entities.kingdomIds,
+    save.entities.targetCells,
+    save.entities.traits,
+    save.entities.speed,
+    save.entities.infected,
+    save.entities.blessed,
+    save.entities.enraged,
+    save.entities.experience,
+    save.entities.contribution,
+    save.entities.levels,
+    save.entities.roles,
+    save.entities.weaponTiers,
+    save.entities.armorTiers,
+    save.entities.carriedResourceKinds,
+    save.entities.carriedResources,
+    save.entities.resourceTargetIds,
+    save.entities.homeBuildingIds,
+    save.entities.workBuildingIds,
+    save.entities.names,
+    save.entities.tasks,
+    save.entities.suspendedTasks,
+  ];
+  if (
+    save.entities.count > save.entities.capacity ||
+    entityLists.some((list) => list.length !== save.entities.count)
+  ) {
+    throw new Error('存档损坏：实体数组尺寸不匹配');
+  }
+  const uniqueLifeIds = new Set(save.entities.lifeIds);
+  const maximumLifeId = Math.max(0, ...save.entities.lifeIds);
+  if (
+    uniqueLifeIds.size !== save.entities.lifeIds.length ||
+    save.entities.lifeIds.some((lifeId) => lifeId <= 0) ||
+    save.nextLifeId < maximumLifeId
+  ) {
+    throw new Error('存档损坏：人物生命标识无效');
+  }
+  const eventIds = new Set(save.events.map((event) => event.id));
+  if (
+    eventIds.size !== save.events.length ||
+    save.events.some((event) => event.id > save.nextEventId)
+  ) {
+    throw new Error('存档损坏：历史事件标识无效');
+  }
   const entities = restoreEntities(save, capacity);
   const resourceNodes = createResourceNodeStore(save.map.size, save.resourceNodes.chunkSize);
   for (let nodeId = 0; nodeId < save.resourceNodes.count; nodeId += 1) {
@@ -535,9 +670,11 @@ function restoreWorld(save: ParsedSave): WorldState {
     buildings: save.buildings as Building[],
     settings: save.settings as WorldSettings,
     events: save.events as WorldEvent[],
+    favoriteLifeIds: save.favoriteLifeIds,
     nextRequestId: save.nextRequestId,
     nextTaskId: save.nextTaskId,
     nextEventId: save.nextEventId,
+    nextLifeId: save.nextLifeId,
     forcedPeaceUntil: save.forcedPeaceUntil,
     population: save.population as PopulationDiagnostics,
     worldLaws: save.worldLaws,
@@ -565,6 +702,7 @@ function restoreEntities(save: ParsedSave, capacity: number): EntityArrays {
   return {
     capacity,
     count: save.entities.count,
+    lifeIds: makeUint32(save.entities.lifeIds),
     active: makeUint8(save.entities.active),
     kind: makeUint8(save.entities.kind),
     positionsX: makeFloat32(save.entities.positionsX),

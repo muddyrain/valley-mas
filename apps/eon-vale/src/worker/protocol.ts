@@ -12,6 +12,8 @@ import type {
   GodPower,
   MapTool,
   PlanningZoneKind,
+  WorldHistoryArchive,
+  WorldHistoryFilter,
   WorldPreset,
 } from '@/shared/gameTypes';
 import type { PrototypeMetrics, PrototypeSnapshot } from '@/simulation/core/prototypeSimulation';
@@ -33,6 +35,8 @@ export type WorkerCommand =
   | { type: 'spawn'; kind: EntityKind; cell: number; count: number }
   | { type: 'god-power'; power: GodPower; cell: number; radius: number }
   | { type: 'inspect'; target: 'entity' | 'village' | 'building' | 'kingdom'; id: number }
+  | { type: 'request-history'; filter: WorldHistoryFilter }
+  | { type: 'set-favorite'; lifeId: number; favorite: boolean }
   | { type: 'set-construction-priority'; villageId: number; priority: ConstructionPriority }
   | {
       type: 'paint-planning-zone';
@@ -53,6 +57,7 @@ export type WorkerEvent =
   | { type: 'world-resources'; resources: ResourceNodeSnapshot }
   | { type: 'world-territory'; territory: TerritorySnapshot }
   | { type: 'inspection'; inspection: Inspection | null }
+  | { type: 'world-history'; archive: WorldHistoryArchive }
   | { type: 'save-data'; encoded: string }
   | { type: 'notice'; level: 'info' | 'error'; message: string }
   | { type: 'metrics'; metrics: PrototypeMetrics };

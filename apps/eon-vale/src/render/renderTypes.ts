@@ -6,6 +6,7 @@ import type {
   ResidentTask,
   Village,
   WorldEvent,
+  WorldHistoryEntry,
   WorldLaws,
   WorldPreset,
   WorldSettings,
@@ -66,6 +67,7 @@ export interface WorldRenderSnapshot extends RenderSnapshot {
   kingdoms: Kingdom[];
   buildings: Building[];
   events: WorldEvent[];
+  historyRevision: number;
   settings: WorldSettings;
   demographics: PopulationDiagnostics;
   worldLaws: WorldLaws;
@@ -130,6 +132,8 @@ export interface TerritorySnapshot {
 export interface EntityInspection {
   type: 'entity';
   id: number;
+  lifeId: number;
+  favorite: boolean;
   name: string;
   kind: number;
   age: number;
@@ -153,7 +157,7 @@ export interface EntityInspection {
   partnerName: string;
   parentNames: string[];
   malnutrition: number;
-  history: Array<{ tick: number; message: string }>;
+  history: WorldHistoryEntry[];
   task: ResidentTask | null;
   carriedResourceKind: number;
   carriedResourceAmount: number;
@@ -175,6 +179,7 @@ export interface VillageInspection {
   };
   planningZones: { residential: number; production: number; defense: number };
   workHotspots: Array<{ kind: string; count: number; x: number; z: number }>;
+  history: WorldHistoryEntry[];
 }
 
 export interface BuildingInspection {
@@ -210,6 +215,7 @@ export interface KingdomInspection {
     sharedEdges: number;
     diagonalOnly: boolean;
   }>;
+  history: WorldHistoryEntry[];
 }
 
 export type Inspection =
