@@ -6,6 +6,13 @@ pre-commit:
   parallel: false
 
   commands:
+    toolchain-consistency:
+      run: node scripts/check-toolchain-consistency.mjs
+      fail_text: |
+        ❌ 工具链配置不一致！
+        pnpm 版本只允许在 package.json 的 packageManager 中声明
+        手动检查：pnpm check:toolchain
+
     biome-check:
       glob: "*.{js,ts,jsx,tsx,json,jsonc,css,scss}"
       run: pnpm biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}

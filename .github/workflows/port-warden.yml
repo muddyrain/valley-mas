@@ -4,15 +4,19 @@ on:
   push:
     paths:
       - 'apps/port-warden/**'
+      - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
+      - 'scripts/check-toolchain-consistency.mjs'
       - '.gitattributes'
       - '.github/workflows/port-warden.yml'
   pull_request:
     paths:
       - 'apps/port-warden/**'
+      - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
+      - 'scripts/check-toolchain-consistency.mjs'
       - '.gitattributes'
       - '.github/workflows/port-warden.yml'
 
@@ -32,10 +36,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check toolchain consistency
+        run: node scripts/check-toolchain-consistency.mjs
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

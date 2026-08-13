@@ -162,6 +162,10 @@ pnpm check:agents-context
 pnpm check:agents-context:test
 pnpm check:docs-links
 
+# Node/pnpm 工具链单一版本源与回归测试
+pnpm check:toolchain
+pnpm check:toolchain:test
+
 # 全 workspace 静态检查与构建
 pnpm check
 pnpm build
@@ -209,6 +213,6 @@ python3 .agents/skills/encoding-guard/scripts/check_mojibake.py <相关文件>
 
 ## CI 质量门禁
 
-- `.github/workflows/quality.yml` 在 push 和 pull request 上执行 Harness 检查、workspace check/build 和 Go 测试。
+- `.github/workflows/quality.yml` 在 push 和 pull request 上先校验 Node/pnpm 工具链配置，再执行 Harness 检查、workspace check/build 和 Go 测试；pnpm 版本以根 `package.json#packageManager` 为唯一真源，workflow 不重复固定版本。
 - `.github/workflows/deploy-server.yml` 只处理服务端部署：远端测试通过后构建服务与迁移程序，应用待执行迁移，成功后才重启服务。
 - 当前不使用 changed-files 第三方 action；优先保证完整验证，后续根据 CI 耗时再评估增量矩阵。
