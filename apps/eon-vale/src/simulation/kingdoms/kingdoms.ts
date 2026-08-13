@@ -15,6 +15,7 @@ export function formKingdoms(state: WorldState): void {
       name: KINGDOM_NAMES[id - 1] ?? `王国 ${id}`,
       color: KINGDOM_COLORS[id - 1] ?? '#b3b3b3',
       leaderId,
+      capitalVillageId: village.id,
       villageIds: [village.id],
       relations: {},
       militaryPower: 0,
@@ -63,6 +64,7 @@ export function setDiplomacy(
 
 export function resolveKingdomExtinctions(state: WorldState): void {
   for (const kingdom of state.kingdoms) {
+    refreshKingdomCapital(state, kingdom);
     if (kingdom.extinct) continue;
     const alive = kingdom.villageIds.some((villageId) => {
       const village = state.villages.find((candidate) => candidate.id === villageId);
@@ -70,10 +72,45 @@ export function resolveKingdomExtinctions(state: WorldState): void {
     });
     if (alive) continue;
     kingdom.extinct = true;
+    kingdom.capitalVillageId = 0;
     kingdom.militaryPower = 0;
     for (const other of state.kingdoms)
       setDiplomacy(state, kingdom.id, other.id, DiplomacyState.Peace);
   }
+}
+
+export function refreshKingdomCapital(state: WorldState, kingdom: Kingdom): void {
+  if (kingdom.extinct) {
+    kingdom.capitalVillageId = 0;
+    return;
+  }
+  const current = state.villages.find(
+    (village) =>
+      village.id === kingdom.capitalVillageId &&
+      kingdom.villageIds.includes(village.id) &&
+      village.health > 0,
+  );
+  if (current) return;
+  const candidates = state.villages
+    .filter((village) => kingdom.villageIds.includes(village.id) && village.health > 0)
+    .sort((first, second) => {
+      const firstBuildings = first.buildingIds.filter((buildingId) => {
+        const building = state.buildings[buildingId - 1];
+        return building?.completed && building.health > 0;
+      }).length;
+      const secondBuildings = second.buildingIds.filter((buildingId) => {
+        const building = state.buildings[buildingId - 1];
+        return building?.completed && building.health > 0;
+      }).length;
+      return (
+        second.tier - first.tier ||
+        second.population - first.population ||
+        secondBuildings - firstBuildings ||
+        first.foundedAtTick - second.foundedAtTick ||
+        first.id - second.id
+      );
+    });
+  kingdom.capitalVillageId = candidates[0]?.id ?? 0;
 }
 
 export function activeWars(state: WorldState): number {

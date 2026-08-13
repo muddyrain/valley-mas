@@ -138,10 +138,36 @@ describe('village economy', () => {
   });
 
   it('upgrades villages only when population and buildings qualify', () => {
-    expect(evaluateVillageTier(8, 1)).toBe(VillageTier.Camp);
-    expect(evaluateVillageTier(14, 3)).toBe(VillageTier.Hamlet);
-    expect(evaluateVillageTier(28, 7)).toBe(VillageTier.Town);
-    expect(evaluateVillageTier(50, 12)).toBe(VillageTier.CityState);
+    const hamlet = [BuildingType.TownCenter, BuildingType.Home, BuildingType.Farm];
+    const town = [
+      ...hamlet,
+      BuildingType.Home,
+      BuildingType.Farm,
+      BuildingType.Storage,
+      BuildingType.LoggingCamp,
+      BuildingType.Workshop,
+      BuildingType.Barracks,
+    ];
+    const cityState = [
+      ...town,
+      BuildingType.Home,
+      BuildingType.Home,
+      BuildingType.Storage,
+      BuildingType.CouncilHall,
+      BuildingType.Wall,
+      BuildingType.Watchtower,
+    ];
+
+    expect(evaluateVillageTier(50, [])).toBe(VillageTier.Camp);
+    expect(evaluateVillageTier(14, hamlet)).toBe(VillageTier.Hamlet);
+    expect(evaluateVillageTier(28, town)).toBe(VillageTier.Town);
+    expect(evaluateVillageTier(50, cityState)).toBe(VillageTier.CityState);
+    expect(
+      evaluateVillageTier(
+        50,
+        cityState.filter((type) => type !== BuildingType.CouncilHall),
+      ),
+    ).toBe(VillageTier.Town);
   });
 
   it('allows a mine only near a finite metal vein', () => {

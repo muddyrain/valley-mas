@@ -16,6 +16,7 @@ import type { Inspection } from '@/render/renderTypes';
 import {
   type ConstructionPriority,
   DiplomacyState,
+  PlanningZoneKind,
   ResidentRole,
   ResidentSex,
 } from '@/shared/gameTypes';
@@ -56,11 +57,17 @@ export function InspectorPanel({
   onClose,
   onFollow,
   onConstructionPriority,
+  activePlanningZone,
+  onPlanningZone,
+  onFocusCapital,
 }: {
   inspection: Inspection;
   onClose: () => void;
   onFollow?: (id: number) => void;
   onConstructionPriority?: (villageId: number, priority: ConstructionPriority) => void;
+  activePlanningZone?: PlanningZoneKind | null;
+  onPlanningZone?: (villageId: number, zone: PlanningZoneKind | null) => void;
+  onFocusCapital?: (villageId: number) => void;
 }) {
   const [entityTab, setEntityTab] = useState<'overview' | 'growth' | 'equipment' | 'history'>(
     'overview',
@@ -127,6 +134,8 @@ export function InspectorPanel({
       '装备',
       '工坊材料',
     ] as const;
+    const taskFailureReason = inspection.task?.failureReason || '无';
+    const carriedResourceLabel = carriedLabels[inspection.carriedResourceKind] || '物资';
     return (
       <aside className="inspector-panel" data-testid="entity-inspector">
         <div className="inspector-heading">
@@ -235,7 +244,7 @@ export function InspectorPanel({
               </span>
               <span>
                 <b>阻碍</b>
-                <em>{inspection.task?.failureReason ?? '无'}</em>
+                <em>{taskFailureReason}</em>
               </span>
               <span>
                 <b>预留至</b>
@@ -245,7 +254,7 @@ export function InspectorPanel({
                 <b>携带</b>
                 <em>
                   {inspection.carriedResourceAmount > 0
-                    ? `${carriedLabels[inspection.carriedResourceKind] ?? '物资'} × ${inspection.carriedResourceAmount}`
+                    ? `${carriedResourceLabel} × ${inspection.carriedResourceAmount}`
                     : '无'}
                 </em>
               </span>
@@ -427,6 +436,87 @@ export function InspectorPanel({
             </span>
           )}
         </div>
+        <div className="inspector-list" data-testid="village-development">
+          <span>
+            <b>下一阶段</b>
+            <em>
+              {inspection.development.nextTier === null
+                ? '已达城邦'
+                : TIER_LABELS[inspection.development.nextTier]}
+            </em>
+          </span>
+          {inspection.development.nextTier !== null && (
+            <span>
+              <b>人口条件</b>
+              <em>
+                {inspection.development.population} / {inspection.development.requiredPopulation}
+              </em>
+            </span>
+          )}
+          {inspection.development.buildings.map((item) => (
+            <span key={item.type}>
+              <b>{BUILDING_LABELS[item.type]}</b>
+              <em>
+                {item.current} / {item.required}
+              </em>
+            </span>
+          ))}
+        </div>
+        <div className="inspector-list" data-testid="village-work-hotspots">
+          <span>
+            <b>住宅规划</b>
+            <em>{inspection.planningZones.residential} 格</em>
+          </span>
+          <span>
+            <b>生产规划</b>
+            <em>{inspection.planningZones.production} 格</em>
+          </span>
+          <span>
+            <b>防御规划</b>
+            <em>{inspection.planningZones.defense} 格</em>
+          </span>
+          {inspection.workHotspots.slice(0, 4).map((hotspot, index) => (
+            <span key={`${hotspot.kind}-${index}`}>
+              <b>
+                {{
+                  production: '生产热点',
+                  construction: '建设热点',
+                  logistics: '运输热点',
+                  defense: '防务热点',
+                }[hotspot.kind] ?? '工作热点'}
+              </b>
+              <em>{hotspot.count} 人</em>
+            </span>
+          ))}
+        </div>
+        {onPlanningZone && (
+          <div
+            className="choice-row"
+            role="group"
+            aria-label="空间规划"
+            data-testid="planning-zone-tools"
+          >
+            {(
+              [
+                [PlanningZoneKind.Residential, '住宅区'],
+                [PlanningZoneKind.Production, '生产区'],
+                [PlanningZoneKind.Defense, '防御区'],
+                [PlanningZoneKind.None, '清除'],
+              ] as const
+            ).map(([zone, label]) => (
+              <button
+                key={zone}
+                type="button"
+                className={activePlanningZone === zone ? 'active' : ''}
+                onClick={() =>
+                  onPlanningZone(village.id, activePlanningZone === zone ? null : zone)
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         {onConstructionPriority && (
           <label className="inspector-select">
             <span>建设优先</span>
@@ -510,6 +600,7 @@ export function InspectorPanel({
     );
   }
 
+  const capital = inspection.capital;
   return (
     <aside className="inspector-panel" data-testid="kingdom-inspector">
       <div className="inspector-heading">
@@ -541,16 +632,44 @@ export function InspectorPanel({
           <small>军力</small>
         </span>
       </div>
-      <div className="inspector-list diplomacy-list">
-        {Object.entries(inspection.kingdom.relations).map(([id, relation]) => (
-          <span key={id}>
-            <b>王国 {id}</b>
-            <em className={relation === DiplomacyState.War ? 'danger' : ''}>
-              {DIPLOMACY_LABELS[relation]}
+      <div className="tag-row">
+        <span className="accent">首都 · {capital?.name || '暂无'}</span>
+        <span>邻国 {inspection.neighbours.length}</span>
+        <span>
+          战争 {Object.values(inspection.kingdom.relations).filter((value) => value === 2).length}
+        </span>
+      </div>
+      <div className="inspector-list kingdom-observation-list">
+        {inspection.neighbours.map((neighbour) => (
+          <span key={neighbour.id}>
+            <b>{neighbour.name}</b>
+            <em className={neighbour.relation === DiplomacyState.War ? 'danger' : ''}>
+              {neighbour.diagonalOnly ? '斜向相邻' : `接壤 ${neighbour.sharedEdges} 格`} ·{' '}
+              {DIPLOMACY_LABELS[neighbour.relation]}
+            </em>
+          </span>
+        ))}
+        {inspection.neighbours.length === 0 && (
+          <span>
+            <b>邻接</b>
+            <em>尚无邻国</em>
+          </span>
+        )}
+        {inspection.villages.slice(0, 6).map((village) => (
+          <span key={village.id}>
+            <b>{village.isCapital ? `♛ ${village.name}` : village.name}</b>
+            <em>
+              {TIER_LABELS[village.tier]} · {village.population} 人
             </em>
           </span>
         ))}
       </div>
+      {capital && onFocusCapital && (
+        <button type="button" className="follow-action" onClick={() => onFocusCapital(capital.id)}>
+          <Crosshair size={14} />
+          定位首都
+        </button>
+      )}
     </aside>
   );
 }

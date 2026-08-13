@@ -6,13 +6,20 @@ import {
   DiplomacyState,
   EntityKind,
   GodPower,
+  PlanningZoneKind,
   Profession,
   ResidentRole,
   ResourceNodeKind,
   ResourceNodeStage,
   TerrainType,
+  VillageTier,
   type WorldSettings,
 } from '@/shared/gameTypes';
+import {
+  deriveKingdomObservation,
+  type KingdomBorderSegment,
+  type KingdomObservation,
+} from '@/simulation/kingdoms/kingdomObservation';
 import {
   attackThrustFrame,
   combatHealthBar,
@@ -41,6 +48,7 @@ import {
 import type {
   RenderSnapshot,
   ResourceNodeSnapshot,
+  TerritorySnapshot,
   WorldMapDelta,
   WorldMapSnapshot,
   WorldRenderSnapshot,
@@ -75,11 +83,12 @@ export interface WorldClick {
   entityId?: number;
   buildingId?: number;
   villageId?: number;
+  kingdomId?: number;
   resourceNodeId?: number;
 }
 
 export interface WorldSelection {
-  kind: 'entity' | 'building' | 'village' | 'resource';
+  kind: 'entity' | 'building' | 'village' | 'kingdom' | 'resource';
   id: number;
 }
 
@@ -284,10 +293,16 @@ class PixelTextureFactory {
     return this.get(key, width, 16, (context) => drawAnimal(context, kind, variant, pose, frame));
   }
 
-  building(type: BuildingType, kingdomId: number, stage: number, damaged: boolean): Texture {
-    const key = `building:${type}:${kingdomId}:${stage}:${damaged ? 1 : 0}`;
+  building(
+    type: BuildingType,
+    kingdomId: number,
+    tier: VillageTier,
+    stage: number,
+    damaged: boolean,
+  ): Texture {
+    const key = `building:${type}:${kingdomId}:${tier}:${stage}:${damaged ? 1 : 0}`;
     return this.get(key, 48, 44, (context) =>
-      drawBuilding(context, type, kingdomColor(kingdomId), stage, damaged),
+      drawBuilding(context, type, kingdomColor(kingdomId), tier, stage, damaged),
     );
   }
 
@@ -344,6 +359,9 @@ export class EonValeEngine {
   private readonly world = new Container();
   private readonly terrainLayer = new Container();
   private readonly territoryLayer = new Graphics({ roundPixels: true });
+  private readonly planningLayer = new Graphics({ roundPixels: true });
+  private readonly settlementCoreLayer = new Graphics({ roundPixels: true });
+  private readonly hotspotLayer = new Graphics({ roundPixels: true });
   private readonly buildingLayer = new Container();
   private readonly stockpileLayer = new Graphics({ roundPixels: true });
   private readonly entityLayer = new Container();
@@ -369,6 +387,12 @@ export class EonValeEngine {
   private map: WorldMapSnapshot | null = null;
   private snapshot: WorldRenderSnapshot | null = null;
   private resourceNodes: ClientResourceNodes | null = null;
+  private territoryVillageIds: Uint16Array | null = null;
+  private territoryClaimStrength: Uint8Array | null = null;
+  private territoryPlanningZoneKinds: Uint8Array | null = null;
+  private territoryRevision = 0;
+  private kingdomObservation: KingdomObservation | null = null;
+  private kingdomObservationKey = '';
   private readonly resourceBuckets = new Map<number, number[]>();
   private camera: PixelCamera;
   private cameraTween: CameraTween | null = null;
@@ -430,8 +454,10 @@ export class EonValeEngine {
       this.snapshot = snapshot as WorldRenderSnapshot;
       if (this.ready) {
         this.updateBuildings();
+        this.redrawSettlementCores();
         this.redrawOutdoorStockpiles();
         this.updateTerritories();
+        this.updateWorkHotspots();
         this.updateSettlementLabels();
         this.collectAttackFeedback();
       }
@@ -580,6 +606,35 @@ export class EonValeEngine {
     ).toFixed(2);
   }
 
+  setTerritory(snapshot: TerritorySnapshot): void {
+    const expectedCells = this.map ? this.map.size * this.map.size : snapshot.cells.length;
+    if (
+      snapshot.full ||
+      !this.territoryVillageIds ||
+      !this.territoryClaimStrength ||
+      !this.territoryPlanningZoneKinds ||
+      this.territoryVillageIds.length !== expectedCells
+    ) {
+      this.territoryVillageIds = new Uint16Array(expectedCells);
+      this.territoryClaimStrength = new Uint8Array(expectedCells);
+      this.territoryPlanningZoneKinds = new Uint8Array(expectedCells);
+    }
+    const villageIds = this.territoryVillageIds;
+    const claimStrength = this.territoryClaimStrength;
+    const planningZoneKinds = this.territoryPlanningZoneKinds;
+    for (let index = 0; index < snapshot.cells.length; index += 1) {
+      const cell = snapshot.cells[index] ?? 0;
+      if (cell >= villageIds.length) continue;
+      villageIds[cell] = snapshot.villageIds[index] ?? 0;
+      claimStrength[cell] = snapshot.claimStrength[index] ?? 0;
+      planningZoneKinds[cell] = snapshot.planningZoneKinds[index] ?? 0;
+    }
+    this.canvas.dataset.territoryRevision = String(snapshot.revision);
+    this.canvas.dataset.territoryDeltaCells = String(snapshot.cells.length);
+    this.territoryRevision = snapshot.revision;
+    if (this.ready) this.updateTerritories();
+  }
+
   private addResourceBucket(nodeId: number): void {
     const resources = this.resourceNodes;
     const map = this.map;
@@ -638,11 +693,19 @@ export class EonValeEngine {
   }
 
   setSelection(selection: WorldSelection | null): void {
+    const previousKingdomSelection = this.selectedTarget?.kind === 'kingdom';
     this.selectedTarget = selection;
     if (selection) this.canvas.dataset.selectedTarget = `${selection.kind}:${selection.id}`;
     else delete this.canvas.dataset.selectedTarget;
     this.canvas.dataset.selectionOutline = String(Boolean(selection));
     this.redrawInteraction();
+    if (
+      this.ready &&
+      this.overlay === 'territory' &&
+      (previousKingdomSelection || selection?.kind === 'kingdom')
+    ) {
+      this.updateTerritories();
+    }
   }
 
   setQuality(quality: WorldSettings['quality']): void {
@@ -657,7 +720,11 @@ export class EonValeEngine {
   setOverlay(overlay: WorldSettings['overlay']): void {
     if (this.overlay === overlay) return;
     this.overlay = overlay;
-    if (this.ready) this.redrawTerrainChunks([]);
+    if (this.ready) {
+      this.redrawTerrainChunks([]);
+      this.updateTerritories();
+      this.updateWorkHotspots();
+    }
   }
 
   focusOn(x: number, z: number, level: Exclude<WorldViewLevel, 'world'> = 'settlement'): void {
@@ -738,9 +805,12 @@ export class EonValeEngine {
     this.world.addChild(
       this.terrainLayer,
       this.territoryLayer,
+      this.planningLayer,
+      this.settlementCoreLayer,
       this.buildingLayer,
       this.stockpileLayer,
       this.entityLayer,
+      this.hotspotLayer,
       this.statusLayer,
       this.combatStatusLayer,
       this.interactionLayer,
@@ -751,8 +821,10 @@ export class EonValeEngine {
     if (this.map) this.createTerrainChunks();
     if (this.snapshot) {
       this.updateBuildings();
+      this.redrawSettlementCores();
       this.redrawOutdoorStockpiles();
       this.updateTerritories();
+      this.updateWorkHotspots();
       this.updateSettlementLabels();
     }
     if (this.started) this.attachTicker();
@@ -1214,11 +1286,13 @@ export class EonValeEngine {
       }
       const village = snapshot.villages.find((candidate) => candidate.id === building.villageId);
       const damaged = building.health < 100;
-      const key = `${building.type}:${village?.kingdomId ?? 0}:${building.stage}:${damaged ? 1 : 0}`;
+      const tier = village?.tier ?? VillageTier.Camp;
+      const key = `${building.type}:${village?.kingdomId ?? 0}:${tier}:${building.stage}:${damaged ? 1 : 0}`;
       if (this.buildingTextureKeys.get(building.id) !== key) {
         sprite.texture = this.textureFactory.building(
           building.type,
           village?.kingdomId ?? 0,
+          tier,
           building.stage,
           damaged,
         );
@@ -1242,6 +1316,9 @@ export class EonValeEngine {
     this.canvas.dataset.detailedBuildings = String(this.viewLevel !== 'world');
     this.canvas.dataset.constructionIndicators = String(construction);
     this.canvas.dataset.damageIndicators = String(damage);
+    this.canvas.dataset.settlementMaterialTiers = String(
+      new Set(snapshot.villages.map((village) => village.tier)).size,
+    );
     this.redrawBuildingStatus();
   }
 
@@ -1311,38 +1388,380 @@ export class EonValeEngine {
     this.canvas.dataset.outdoorStockpiles = String(visible);
   }
 
-  private updateTerritories(): void {
+  private redrawSettlementCores(): void {
+    this.settlementCoreLayer.clear();
     const snapshot = this.snapshot;
-    this.territoryLayer.clear();
-    if (!snapshot || this.overlay !== 'territory') {
-      this.canvas.dataset.strategicTerritories = 'false';
-      this.canvas.dataset.warFronts = '0';
+    if (!snapshot || this.viewLevel === 'world') {
+      this.canvas.dataset.settlementTierGlyphs = '0';
       return;
     }
+    let visible = 0;
     for (const village of snapshot.villages) {
-      const color = hexNumber(kingdomColor(village.kingdomId));
-      const radius = (6 + village.tier * 2.1) * WORLD_PIXELS_PER_CELL;
-      this.territoryLayer
-        .circle(village.x * WORLD_PIXELS_PER_CELL, village.z * WORLD_PIXELS_PER_CELL, radius)
-        .fill({ color, alpha: 0.12 })
-        .stroke({ color, width: 0.8, alpha: 0.7 });
+      if (village.health <= 0) continue;
+      const x = village.x * WORLD_PIXELS_PER_CELL;
+      const z = village.z * WORLD_PIXELS_PER_CELL;
+      if (village.tier === VillageTier.Camp) {
+        this.settlementCoreLayer
+          .poly([x - 7, z + 3, x - 3, z - 4, x + 1, z + 3])
+          .fill({ color: 0xa8794f, alpha: 0.92 })
+          .stroke({ color: 0xe4c28a, width: 0.6, alpha: 0.9 });
+        this.settlementCoreLayer
+          .circle(x + 5, z + 2, 2.2)
+          .fill({ color: 0xf0a13a, alpha: 0.9 })
+          .circle(x + 5, z + 1, 0.9)
+          .fill({ color: 0xffdf6b, alpha: 1 });
+      } else if (village.tier === VillageTier.Hamlet) {
+        this.settlementCoreLayer
+          .circle(x, z, 6)
+          .stroke({ color: 0xb98b58, width: 0.9, alpha: 0.7 });
+      } else if (village.tier === VillageTier.Town) {
+        this.settlementCoreLayer
+          .rect(x - 6, z - 4, 12, 8)
+          .fill({ color: 0xb7ad95, alpha: 0.16 })
+          .stroke({ color: 0xcac1aa, width: 0.9, alpha: 0.72 });
+      } else {
+        this.settlementCoreLayer
+          .rect(x - 7, z - 5, 14, 10)
+          .stroke({ color: 0xd9d3c3, width: 1.1, alpha: 0.8 })
+          .rect(x - 4, z - 3, 8, 6)
+          .stroke({ color: 0xe9c963, width: 0.8, alpha: 0.85 });
+      }
+      visible += 1;
     }
-    let warFronts = 0;
+    this.canvas.dataset.settlementTierGlyphs = String(visible);
+  }
+
+  private updateTerritories(): void {
+    const snapshot = this.snapshot;
+    const map = this.map;
+    const territoryVillageIds = this.territoryVillageIds;
+    const territoryClaimStrength = this.territoryClaimStrength;
+    const planningZoneKinds = this.territoryPlanningZoneKinds;
+    this.territoryLayer.clear();
+    this.planningLayer.clear();
+    const resetObservation = (): void => {
+      this.canvas.dataset.kingdomBorders = '0';
+      this.canvas.dataset.villageBorders = '0';
+      this.canvas.dataset.capitalMarkers = '0';
+      this.canvas.dataset.kingdomAdjacencies = '0';
+      this.canvas.dataset.adjacencyLinks = '0';
+      this.canvas.dataset.warRelations = '0';
+      this.canvas.dataset.warFronts = '0';
+      delete this.canvas.dataset.observedKingdom;
+    };
+    if (
+      snapshot &&
+      map &&
+      territoryVillageIds &&
+      planningZoneKinds &&
+      this.overlay === 'planning'
+    ) {
+      const colors: Record<number, number> = {
+        [PlanningZoneKind.Residential]: 0x72b7d8,
+        [PlanningZoneKind.Production]: 0xd6ad55,
+        [PlanningZoneKind.Defense]: 0xd86666,
+      };
+      let visible = 0;
+      for (let z = 0; z < map.size; z += 1) {
+        let x = 0;
+        while (x < map.size) {
+          const cell = z * map.size + x;
+          const kind = planningZoneKinds[cell] ?? PlanningZoneKind.None;
+          if (kind === PlanningZoneKind.None || territoryVillageIds[cell] === 0) {
+            x += 1;
+            continue;
+          }
+          let endX = x + 1;
+          while (
+            endX < map.size &&
+            planningZoneKinds[z * map.size + endX] === kind &&
+            territoryVillageIds[z * map.size + endX] === territoryVillageIds[cell]
+          ) {
+            endX += 1;
+          }
+          this.planningLayer
+            .rect(
+              x * WORLD_PIXELS_PER_CELL,
+              z * WORLD_PIXELS_PER_CELL,
+              (endX - x) * WORLD_PIXELS_PER_CELL,
+              WORLD_PIXELS_PER_CELL,
+            )
+            .fill({ color: colors[kind] ?? 0xffffff, alpha: 0.24 });
+          visible += endX - x;
+          x = endX;
+        }
+      }
+      this.canvas.dataset.planningZoneCells = String(visible);
+      this.canvas.dataset.strategicTerritories = 'false';
+      this.canvas.dataset.strategicTerritoryCells = '0';
+      resetObservation();
+      return;
+    }
+    this.canvas.dataset.planningZoneCells = '0';
+    if (
+      !snapshot ||
+      !map ||
+      !territoryVillageIds ||
+      !territoryClaimStrength ||
+      this.overlay !== 'territory'
+    ) {
+      this.canvas.dataset.strategicTerritories = 'false';
+      this.canvas.dataset.strategicTerritoryCells = '0';
+      resetObservation();
+      return;
+    }
+    const villages = new Map(snapshot.villages.map((village) => [village.id, village]));
+    const kingdoms = new Map(snapshot.kingdoms.map((kingdom) => [kingdom.id, kingdom]));
+    const observationKey = `${map.size}:${this.territoryRevision}:${snapshot.villages
+      .map((village) => `${village.id}.${village.kingdomId}`)
+      .join(',')}:${snapshot.kingdoms
+      .map(
+        (kingdom) =>
+          `${kingdom.id}.${kingdom.capitalVillageId}.${Number(kingdom.extinct)}.${Object.entries(
+            kingdom.relations,
+          )
+            .sort(([first], [second]) => Number(first) - Number(second))
+            .map(([id, relation]) => `${id}-${relation}`)
+            .join('_')}`,
+      )
+      .join(',')}`;
+    if (!this.kingdomObservation || observationKey !== this.kingdomObservationKey) {
+      this.kingdomObservation = deriveKingdomObservation({
+        size: map.size,
+        villageIds: territoryVillageIds,
+        villages: snapshot.villages,
+        kingdoms: snapshot.kingdoms,
+      });
+      this.kingdomObservationKey = observationKey;
+    }
+    const observation = this.kingdomObservation;
+    const observedKingdomId =
+      this.selectedTarget?.kind === 'kingdom'
+        ? this.selectedTarget.id
+        : this.hoveredTarget?.kind === 'kingdom'
+          ? this.hoveredTarget.id
+          : 0;
+    if (observedKingdomId > 0) this.canvas.dataset.observedKingdom = String(observedKingdomId);
+    else delete this.canvas.dataset.observedKingdom;
+    let territoryCells = 0;
+    for (let z = 0; z < map.size; z += 1) {
+      let x = 0;
+      while (x < map.size) {
+        const cell = z * map.size + x;
+        const villageId = territoryVillageIds[cell] ?? 0;
+        if (!villageId) {
+          x += 1;
+          continue;
+        }
+        let endX = x + 1;
+        while (endX < map.size && territoryVillageIds[z * map.size + endX] === villageId) {
+          endX += 1;
+        }
+        const village = villages.get(villageId);
+        const kingdomId = village?.kingdomId ?? 0;
+        const color = hexNumber(kingdoms.get(kingdomId)?.color ?? kingdomColor(kingdomId));
+        const claimAlpha = 0.08 + ((territoryClaimStrength[cell] ?? 0) / 255) * 0.1;
+        const alpha =
+          observedKingdomId > 0
+            ? kingdomId === observedKingdomId
+              ? Math.max(0.22, claimAlpha)
+              : 0.035
+            : claimAlpha;
+        this.territoryLayer
+          .rect(
+            x * WORLD_PIXELS_PER_CELL,
+            z * WORLD_PIXELS_PER_CELL,
+            (endX - x) * WORLD_PIXELS_PER_CELL,
+            WORLD_PIXELS_PER_CELL,
+          )
+          .fill({ color, alpha });
+        territoryCells += endX - x;
+        x = endX;
+      }
+    }
+    const drawSegment = (
+      segment: KingdomBorderSegment,
+      color: number,
+      width: number,
+      alpha: number,
+    ): void => {
+      if (segment.orientation === 'vertical') {
+        this.territoryLayer
+          .moveTo(segment.line * WORLD_PIXELS_PER_CELL, segment.start * WORLD_PIXELS_PER_CELL)
+          .lineTo(segment.line * WORLD_PIXELS_PER_CELL, segment.end * WORLD_PIXELS_PER_CELL)
+          .stroke({ color, width, alpha });
+        return;
+      }
+      this.territoryLayer
+        .moveTo(segment.start * WORLD_PIXELS_PER_CELL, segment.line * WORLD_PIXELS_PER_CELL)
+        .lineTo(segment.end * WORLD_PIXELS_PER_CELL, segment.line * WORLD_PIXELS_PER_CELL)
+        .stroke({ color, width, alpha });
+    };
+    for (const segment of observation.villageBorders) {
+      const highlighted = observedKingdomId > 0 && segment.firstKingdomId === observedKingdomId;
+      drawSegment(segment, 0xe4eadc, highlighted ? 0.75 : 0.45, highlighted ? 0.72 : 0.34);
+    }
+    for (const segment of observation.kingdomBorders) {
+      const highlighted =
+        segment.firstKingdomId === observedKingdomId ||
+        segment.secondKingdomId === observedKingdomId;
+      const ownerId = segment.firstKingdomId || segment.secondKingdomId;
+      drawSegment(
+        segment,
+        highlighted ? 0xffdb73 : hexNumber(kingdoms.get(ownerId)?.color ?? kingdomColor(ownerId)),
+        highlighted ? 1.8 : 1.15,
+        observedKingdomId > 0 && !highlighted ? 0.28 : 0.9,
+      );
+    }
+    for (const segment of observation.warFronts)
+      drawSegment(segment, 0xef5f4c, 2.25, observedKingdomId > 0 ? 0.95 : 0.86);
+
+    let capitalMarkers = 0;
+    for (const kingdom of snapshot.kingdoms) {
+      if (kingdom.extinct || kingdom.capitalVillageId <= 0) continue;
+      const capital = villages.get(kingdom.capitalVillageId);
+      if (!capital) continue;
+      const x = capital.x * WORLD_PIXELS_PER_CELL;
+      const z = capital.z * WORLD_PIXELS_PER_CELL;
+      const highlighted = kingdom.id === observedKingdomId;
+      this.territoryLayer
+        .poly([x, z - 3.2, x + 3.2, z, x, z + 3.2, x - 3.2, z])
+        .fill({ color: 0xf5cd62, alpha: highlighted ? 1 : 0.9 })
+        .stroke({
+          color: highlighted ? 0xfff1a3 : 0x4a3824,
+          width: highlighted ? 1.2 : 0.8,
+        });
+      capitalMarkers += 1;
+    }
+
+    let adjacencyLinks = 0;
+    const observedKingdom = kingdoms.get(observedKingdomId);
+    const observedCapital = observedKingdom
+      ? villages.get(observedKingdom.capitalVillageId)
+      : undefined;
+    if (observedKingdom && observedCapital) {
+      for (const adjacency of observation.adjacencies) {
+        if (
+          adjacency.firstKingdomId !== observedKingdomId &&
+          adjacency.secondKingdomId !== observedKingdomId
+        )
+          continue;
+        const neighbourId =
+          adjacency.firstKingdomId === observedKingdomId
+            ? adjacency.secondKingdomId
+            : adjacency.firstKingdomId;
+        const neighbour = kingdoms.get(neighbourId);
+        const neighbourCapital = neighbour ? villages.get(neighbour.capitalVillageId) : undefined;
+        if (!neighbour || !neighbourCapital) continue;
+        const relation = observedKingdom.relations[neighbourId] ?? DiplomacyState.Peace;
+        const color =
+          relation === DiplomacyState.War
+            ? 0xef5f4c
+            : relation === DiplomacyState.Alliance
+              ? 0xf1cf68
+              : 0x78c9bd;
+        this.territoryLayer
+          .moveTo(
+            observedCapital.x * WORLD_PIXELS_PER_CELL,
+            observedCapital.z * WORLD_PIXELS_PER_CELL,
+          )
+          .lineTo(
+            neighbourCapital.x * WORLD_PIXELS_PER_CELL,
+            neighbourCapital.z * WORLD_PIXELS_PER_CELL,
+          )
+          .stroke({ color, width: adjacency.diagonalOnly ? 0.7 : 0.95, alpha: 0.58 });
+        adjacencyLinks += 1;
+      }
+    }
+
+    let warRelations = 0;
     for (const kingdom of snapshot.kingdoms) {
       for (const [enemyId, relation] of Object.entries(kingdom.relations)) {
         if (relation !== DiplomacyState.War || kingdom.id >= Number(enemyId)) continue;
-        const own = snapshot.villages.find((village) => kingdom.villageIds.includes(village.id));
-        const enemy = snapshot.villages.find((village) => village.kingdomId === Number(enemyId));
+        const own = villages.get(kingdom.capitalVillageId);
+        const enemyKingdom = kingdoms.get(Number(enemyId));
+        const enemy = enemyKingdom ? villages.get(enemyKingdom.capitalVillageId) : undefined;
         if (!own || !enemy) continue;
         this.territoryLayer
           .moveTo(own.x * WORLD_PIXELS_PER_CELL, own.z * WORLD_PIXELS_PER_CELL)
           .lineTo(enemy.x * WORLD_PIXELS_PER_CELL, enemy.z * WORLD_PIXELS_PER_CELL)
-          .stroke({ color: 0xe55f4d, width: 1.2, alpha: 0.8 });
-        warFronts += 1;
+          .stroke({ color: 0xe55f4d, width: 0.75, alpha: 0.5 });
+        warRelations += 1;
       }
     }
     this.canvas.dataset.strategicTerritories = 'true';
-    this.canvas.dataset.warFronts = String(warFronts);
+    this.canvas.dataset.strategicTerritoryCells = String(territoryCells);
+    this.canvas.dataset.kingdomBorders = String(observation.kingdomBorders.length);
+    this.canvas.dataset.villageBorders = String(observation.villageBorders.length);
+    this.canvas.dataset.capitalMarkers = String(capitalMarkers);
+    this.canvas.dataset.kingdomAdjacencies = String(observation.adjacencies.length);
+    this.canvas.dataset.adjacencyLinks = String(adjacencyLinks);
+    this.canvas.dataset.warRelations = String(warRelations);
+    this.canvas.dataset.warFronts = String(observation.warFronts.length);
+  }
+
+  private updateWorkHotspots(): void {
+    this.hotspotLayer.clear();
+    const snapshot = this.snapshot;
+    if (!snapshot || this.overlay !== 'work' || this.viewLevel === 'world') {
+      this.canvas.dataset.workHotspots = '0';
+      this.canvas.dataset.workHotspotParticipants = '0';
+      return;
+    }
+    const groups = new Map<string, { kind: string; count: number; x: number; z: number }>();
+    for (let entityId = 0; entityId < snapshot.population; entityId += 1) {
+      if (
+        snapshot.active[entityId] !== 1 ||
+        snapshot.kinds[entityId] !== EntityKind.Human ||
+        (snapshot.villageIds[entityId] ?? 0) === 0
+      ) {
+        continue;
+      }
+      const state = snapshot.states[entityId] as AgentState;
+      const kind =
+        state === AgentState.Build || state === AgentState.Repair
+          ? 'construction'
+          : state === AgentState.Haul
+            ? 'logistics'
+            : state === AgentState.Guard ||
+                state === AgentState.Chase ||
+                state === AgentState.Attack
+              ? 'defense'
+              : state === AgentState.GatherWood ||
+                  state === AgentState.GatherStone ||
+                  state === AgentState.Farm ||
+                  state === AgentState.Craft
+                ? 'production'
+                : null;
+      if (!kind) continue;
+      const x = snapshot.positionsX[entityId] ?? 0;
+      const z = snapshot.positionsZ[entityId] ?? 0;
+      const key = `${snapshot.villageIds[entityId]}:${kind}:${Math.floor(x / 6)}:${Math.floor(z / 6)}`;
+      const group = groups.get(key) ?? { kind, count: 0, x: 0, z: 0 };
+      group.count += 1;
+      group.x += x;
+      group.z += z;
+      groups.set(key, group);
+    }
+    const colors: Record<string, number> = {
+      production: 0xe0b553,
+      construction: 0x79bde0,
+      logistics: 0xb792de,
+      defense: 0xe36b66,
+    };
+    let participants = 0;
+    for (const group of groups.values()) {
+      const x = (group.x / group.count) * WORLD_PIXELS_PER_CELL;
+      const z = (group.z / group.count) * WORLD_PIXELS_PER_CELL;
+      const radius = (1.3 + Math.min(2.4, Math.sqrt(group.count) * 0.7)) * WORLD_PIXELS_PER_CELL;
+      this.hotspotLayer
+        .circle(x, z, radius)
+        .fill({ color: colors[group.kind] ?? 0xffffff, alpha: 0.18 })
+        .stroke({ color: colors[group.kind] ?? 0xffffff, width: 0.8, alpha: 0.9 });
+      participants += group.count;
+    }
+    this.canvas.dataset.workHotspots = String(groups.size);
+    this.canvas.dataset.workHotspotParticipants = String(participants);
   }
 
   private updateSettlementLabels(): void {
@@ -1582,6 +2001,25 @@ export class EonValeEngine {
         },
       };
     }
+    if (target.kind === 'kingdom') {
+      const kingdom = this.snapshot?.kingdoms.find((candidate) => candidate.id === target.id);
+      const capital = kingdom
+        ? this.snapshot?.villages.find((village) => village.id === kingdom.capitalVillageId)
+        : undefined;
+      return capital
+        ? {
+            x: capital.x,
+            z: capital.z,
+            geometry: {
+              shape: 'circle',
+              offsetX: 0,
+              offsetZ: 0,
+              radiusX: 5,
+              radiusZ: 5,
+            },
+          }
+        : null;
+    }
     const village = this.snapshot?.villages.find((candidate) => candidate.id === target.id);
     const radius = village ? 3.2 + village.tier : 0;
     return village
@@ -1653,8 +2091,10 @@ export class EonValeEngine {
     this.canvas.dataset.fullBodyResidents = String(level === 'resident');
     this.updateTerrainLod();
     this.updateBuildings();
+    this.redrawSettlementCores();
     this.redrawOutdoorStockpiles();
     this.redrawBuildingStatus();
+    this.updateWorkHotspots();
     this.updateSettlementLabelPositions();
     this.options.onViewLevelChange?.(level);
   }
@@ -1738,6 +2178,16 @@ export class EonValeEngine {
       }
     }
     if (click.resourceNodeId !== undefined) return click;
+    if (this.overlay === 'territory') {
+      const villageId = this.territoryVillageIds?.[click.cell] ?? 0;
+      const kingdomId = this.snapshot?.villages.find(
+        (village) => village.id === villageId,
+      )?.kingdomId;
+      if (kingdomId && kingdomId > 0) {
+        click.kingdomId = kingdomId;
+        return click;
+      }
+    }
     let bestVillageDistance = this.viewLevel === 'world' ? 8 : 4;
     for (const village of this.snapshot?.villages ?? []) {
       const distance = Math.hypot(village.x - world.x, village.z - world.z);
@@ -1789,6 +2239,7 @@ export class EonValeEngine {
     else if (click?.buildingId !== undefined) target = { kind: 'building', id: click.buildingId };
     else if (click?.resourceNodeId !== undefined)
       target = { kind: 'resource', id: click.resourceNodeId };
+    else if (click?.kingdomId !== undefined) target = { kind: 'kingdom', id: click.kingdomId };
     else if (click?.villageId !== undefined) target = { kind: 'village', id: click.villageId };
     this.setHoveredTarget(target, event.clientX, event.clientY);
   };
@@ -1854,10 +2305,18 @@ export class EonValeEngine {
     if (this.hoveredTarget?.kind === target?.kind && this.hoveredTarget?.id === target?.id) {
       return;
     }
+    const previousKind = this.hoveredTarget?.kind;
     this.hoveredTarget = target;
     if (target) this.canvas.dataset.hoverTarget = `${target.kind}:${target.id}`;
     else delete this.canvas.dataset.hoverTarget;
     this.redrawInteraction();
+    if (
+      this.ready &&
+      this.overlay === 'territory' &&
+      (previousKind === 'kingdom' || target?.kind === 'kingdom')
+    ) {
+      this.updateTerritories();
+    }
   }
 
   private emitMetrics(): void {
@@ -2241,6 +2700,7 @@ function drawBuilding(
   context: CanvasRenderingContext2D,
   type: BuildingType,
   kingdom: string,
+  tier: VillageTier,
   stage: number,
   damaged: boolean,
 ): void {
@@ -2262,7 +2722,8 @@ function drawBuilding(
     }
     return;
   }
-  context.fillStyle = '#79624a';
+  const wallColor = ['#89643f', '#c8a06c', '#bbb4a2', '#d7d3c5'][tier] ?? '#89643f';
+  context.fillStyle = tier >= VillageTier.Town ? '#69645c' : '#79624a';
   context.fillRect(9, 19, 30, 20);
   if (stage === 0) {
     context.fillStyle = '#b29c78';
@@ -2296,7 +2757,7 @@ function drawBuilding(
       type === BuildingType.TownCenter ||
       type === BuildingType.CouncilHall ||
       type === BuildingType.Barracks;
-    context.fillStyle = '#dbc48d';
+    context.fillStyle = wallColor;
     context.fillRect(large ? 7 : 11, large ? 17 : 21, large ? 34 : 26, large ? 22 : 18);
     context.fillStyle = kingdom;
     context.fillRect(large ? 4 : 8, large ? 11 : 15, large ? 40 : 32, 9);

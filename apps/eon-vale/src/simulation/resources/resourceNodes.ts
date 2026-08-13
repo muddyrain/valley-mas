@@ -245,6 +245,7 @@ export function findNearestAvailableResourceNode(
   kind: ResourceNodeKind,
   tick: number,
   maxRadius: number,
+  acceptNode: (nodeId: number) => boolean = () => true,
 ): number {
   const minChunkX = Math.max(0, Math.floor((x - maxRadius) / store.chunkSize));
   const maxChunkX = Math.min(store.chunkColumns - 1, Math.floor((x + maxRadius) / store.chunkSize));
@@ -259,6 +260,7 @@ export function findNearestAvailableResourceNode(
       while (nodeId >= 0) {
         if (
           store.active[nodeId] === 1 &&
+          acceptNode(nodeId) &&
           store.kind[nodeId] === kind &&
           store.stage[nodeId] === ResourceNodeStage.Mature &&
           (store.amount[nodeId] ?? 0) > 0 &&

@@ -21,6 +21,7 @@ export interface RenderSnapshot {
   headings: Float32Array;
   states: Uint8Array;
   kinds?: Uint8Array;
+  villageIds?: Uint16Array;
   kingdomIds?: Uint16Array;
   health?: Uint16Array;
   infected?: Uint8Array;
@@ -47,6 +48,7 @@ export interface WorldRenderSnapshot extends RenderSnapshot {
   year: number;
   active: Uint8Array;
   kinds: Uint8Array;
+  villageIds: Uint16Array;
   kingdomIds: Uint16Array;
   health: Uint16Array;
   infected: Uint8Array;
@@ -116,6 +118,15 @@ export interface ResourceNodeSnapshot {
   variant: Uint8Array;
 }
 
+export interface TerritorySnapshot {
+  full: boolean;
+  revision: number;
+  cells: Uint32Array;
+  villageIds: Uint16Array;
+  claimStrength: Uint8Array;
+  planningZoneKinds: Uint8Array;
+}
+
 export interface EntityInspection {
   type: 'entity';
   id: number;
@@ -156,6 +167,14 @@ export interface VillageInspection {
   village: Village;
   completedBuildings: number;
   kingdomName: string;
+  development: {
+    nextTier: number | null;
+    population: number;
+    requiredPopulation: number;
+    buildings: Array<{ type: number; current: number; required: number }>;
+  };
+  planningZones: { residential: number; production: number; defense: number };
+  workHotspots: Array<{ kind: string; count: number; x: number; z: number }>;
 }
 
 export interface BuildingInspection {
@@ -176,6 +195,21 @@ export interface KingdomInspection {
   kingdom: Kingdom;
   population: number;
   resources: { food: number; wood: number; stone: number };
+  capital: { id: number; name: string; x: number; z: number } | null;
+  villages: Array<{
+    id: number;
+    name: string;
+    population: number;
+    tier: number;
+    isCapital: boolean;
+  }>;
+  neighbours: Array<{
+    id: number;
+    name: string;
+    relation: number;
+    sharedEdges: number;
+    diagonalOnly: boolean;
+  }>;
 }
 
 export type Inspection =

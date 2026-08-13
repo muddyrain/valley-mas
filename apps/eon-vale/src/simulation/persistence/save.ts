@@ -20,7 +20,7 @@ import { createNavigationGrid } from '../navigation/grid';
 import { addResourceNode, createResourceNodeStore } from '../resources/resourceNodes';
 import { WORLD_LAW_IDS, type WorldLawId } from '../rules/worldLawCatalog';
 
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 10;
 
 const worldLawSchema = z
   .object(
@@ -107,6 +107,20 @@ const villageSchema = z
     constructionOverrideReason: z.string(),
     captureKingdomId: z.number().int().nonnegative().optional(),
     captureProgress: z.number().nonnegative().optional(),
+  })
+  .strict();
+const kingdomSchema = z
+  .object({
+    id: z.number().int().positive(),
+    name: z.string(),
+    color: z.string(),
+    leaderId: z.number().int().nonnegative(),
+    capitalVillageId: z.number().int().nonnegative(),
+    villageIds: z.array(z.number().int().positive()),
+    relations: z.record(z.string(), z.number().int().min(0).max(2)),
+    militaryPower: z.number().nonnegative(),
+    extinct: z.boolean(),
+    foundedAtTick: z.number().int().nonnegative(),
   })
   .strict();
 const residentTaskSchema = z
@@ -233,6 +247,14 @@ const saveSchema = z
         ),
       })
       .strict(),
+    territory: z
+      .object({
+        villageIds: numberArray,
+        claimStrength: numberArray,
+        planningZoneKinds: numberArray,
+        revision: z.number().int().nonnegative(),
+      })
+      .strict(),
     entities: z
       .object({
         capacity: z.number().int().positive(),
@@ -281,7 +303,7 @@ const saveSchema = z
       })
       .strict(),
     villages: z.array(villageSchema),
-    kingdoms: z.array(z.unknown()),
+    kingdoms: z.array(kingdomSchema),
     buildings: z.array(buildingSchema),
     settings: z.unknown(),
     events: z.array(z.unknown()),
@@ -344,6 +366,12 @@ export function serializeWorld(state: WorldState): string {
       reservedUntil: values(state.resourceNodes.reservedUntil, state.resourceNodes.count),
       regrowAtTick: values(state.resourceNodes.regrowAtTick, state.resourceNodes.count),
       regrowthQueue: state.resourceNodes.regrowthQueue,
+    },
+    territory: {
+      villageIds: values(state.territory.villageIds),
+      claimStrength: values(state.territory.claimStrength),
+      planningZoneKinds: values(state.territory.planningZoneKinds),
+      revision: state.territory.revision,
     },
     entities: {
       capacity: state.entities.capacity,
@@ -431,6 +459,13 @@ function restoreWorld(save: ParsedSave): WorldState {
   if (save.map.terrain.length !== expectedCells || save.map.height.length !== expectedCells) {
     throw new Error('存档损坏：地图尺寸不匹配');
   }
+  if (
+    save.territory.villageIds.length !== expectedCells ||
+    save.territory.claimStrength.length !== expectedCells ||
+    save.territory.planningZoneKinds.length !== expectedCells
+  ) {
+    throw new Error('存档损坏：领土地图尺寸不匹配');
+  }
   const navigation = createNavigationGrid(save.map.size, save.map.size);
   const terrain = Uint8Array.from(save.map.terrain);
   const roads = Uint8Array.from(save.map.roads);
@@ -487,6 +522,13 @@ function restoreWorld(save: ParsedSave): WorldState {
       dirtyMapCells: [],
     },
     resourceNodes,
+    territory: {
+      villageIds: Uint16Array.from(save.territory.villageIds),
+      claimStrength: Uint8Array.from(save.territory.claimStrength),
+      planningZoneKinds: Uint8Array.from(save.territory.planningZoneKinds),
+      dirtyCells: [],
+      revision: save.territory.revision,
+    },
     entities,
     villages: save.villages as Village[],
     kingdoms: save.kingdoms as Kingdom[],

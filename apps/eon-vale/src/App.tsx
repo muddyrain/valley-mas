@@ -33,6 +33,7 @@ import {
   EntityKind,
   GodPower,
   type MapTool,
+  type PlanningZoneKind,
   type WorldPreset,
   type WorldSettings,
 } from './shared/gameTypes';
@@ -140,6 +141,7 @@ export function App() {
   const engineRef = useRef<EonValeEngine | null>(null);
   const activeToolRef = useRef<MapTool | null>(null);
   const activePowerRef = useRef<GodPower | null>(null);
+  const planningBrushRef = useRef<{ villageId: number; zone: PlanningZoneKind } | null>(null);
   const [seed, setSeed] = useState(createSeed);
   const seedRef = useRef(seed);
   const [snapshot, setSnapshot] = useState<WorldRenderSnapshot | null>(null);
@@ -147,6 +149,10 @@ export function App() {
   const inspectionRef = useRef<Inspection | null>(null);
   const [activeTool, setActiveTool] = useState<MapTool | null>(null);
   const [activePower, setActivePower] = useState<GodPower | null>(null);
+  const [planningBrush, setPlanningBrush] = useState<{
+    villageId: number;
+    zone: PlanningZoneKind;
+  } | null>(null);
   const [paused, setPaused] = useState(false);
   const [speed, setSpeed] = useState<(typeof SPEED_OPTIONS)[number]>(1);
   const [metrics, setMetrics] = useState(EMPTY_METRICS);
@@ -182,6 +188,7 @@ export function App() {
 
   activeToolRef.current = activeTool;
   activePowerRef.current = activePower;
+  planningBrushRef.current = planningBrush;
   seedRef.current = seed;
   worldSizeRef.current = worldSize;
   worldPresetRef.current = worldPreset;
@@ -194,6 +201,12 @@ export function App() {
     if (!worker) return;
     const power = activePowerRef.current;
     const tool = activeToolRef.current;
+    const planning = planningBrushRef.current;
+    if (planning) {
+      worker.paintPlanningZone(planning.villageId, planning.zone, click.cell, 2);
+      audioRef.current?.play('create');
+      return;
+    }
     if (power) {
       const radius = toolRadius(null, power);
       engineRef.current?.playGodEffect(power, click.cell, radius);
@@ -232,6 +245,12 @@ export function App() {
       setEcologyOpen(false);
       engineRef.current?.setSelection({ kind: 'village', id: click.villageId });
       worker.inspect('village', click.villageId);
+    } else if (click.kingdomId !== undefined) {
+      setPopulationOpen(false);
+      setEcologyOpen(false);
+      setOverlay('territory');
+      engineRef.current?.setSelection({ kind: 'kingdom', id: click.kingdomId });
+      worker.inspect('kingdom', click.kingdomId);
     } else {
       engineRef.current?.setSelection(null);
       setInspection(null);
@@ -289,6 +308,7 @@ export function App() {
       },
       onMapDelta: (delta) => engine.applyWorldMapDelta(delta),
       onResources: (resources) => engine.setResourceNodes(resources),
+      onTerritory: (territory) => engine.setTerritory(territory),
       onInspection: setInspection,
       onSave: async (encoded) => {
         const current = snapshotRef.current;
@@ -328,11 +348,26 @@ export function App() {
     const stress = Number(query.get('stress'));
     const worldStress = Number(query.get('worldStress'));
     const stressMapSize = Number(query.get('mapSize'));
+    const requestedSeed = query.get('seed')?.trim();
+    const requestedHumans = Number(query.get('initialHumans'));
     if ([100, 500, 1_000].includes(stress)) {
       setStressPopulation(stress);
       worker.initializeStress(stress, `browser-stress-${stress}`);
     } else if (worldStress === 1_000 && stressMapSize === 384) {
       worker.initializeWorld('browser-complete-world', 1_000, 384, 'continent');
+    } else if (
+      requestedSeed &&
+      Number.isInteger(requestedHumans) &&
+      requestedHumans >= 0 &&
+      requestedHumans <= 1_000 &&
+      WORLD_SIZES.includes(stressMapSize as (typeof WORLD_SIZES)[number])
+    ) {
+      worker.initializeWorld(
+        requestedSeed,
+        requestedHumans,
+        stressMapSize as (typeof WORLD_SIZES)[number],
+        worldPresetRef.current,
+      );
     } else {
       worker.initializeWorld(seedRef.current, 72, worldSizeRef.current, worldPresetRef.current);
     }
@@ -408,10 +443,10 @@ export function App() {
 
   useEffect(() => {
     engineRef.current?.setBrush(
-      toolRadius(activeTool, activePower),
-      Boolean(activeTool || activePower),
+      planningBrush ? 2 : toolRadius(activeTool, activePower),
+      Boolean(activeTool || activePower || planningBrush),
     );
-  }, [activeTool, activePower]);
+  }, [activeTool, activePower, planningBrush]);
 
   useEffect(() => {
     engineRef.current?.setQuality(quality);
@@ -438,6 +473,7 @@ export function App() {
     setWorldPreset(draftWorldPreset);
     setSnapshot(null);
     setInspection(null);
+    setPlanningBrush(null);
     engineRef.current?.setSelection(null);
     setChronicleOpen(false);
     setPopulationOpen(false);
@@ -462,6 +498,7 @@ export function App() {
     }
     setStressPopulation(null);
     setInspection(null);
+    setPlanningBrush(null);
     engineRef.current?.setSelection(null);
     setChronicleOpen(false);
     setPopulationOpen(false);
@@ -655,8 +692,14 @@ export function App() {
         <ToolDock
           activeTool={activeTool}
           activePower={activePower}
-          onTool={setActiveTool}
-          onPower={setActivePower}
+          onTool={(tool) => {
+            setPlanningBrush(null);
+            setActiveTool(tool);
+          }}
+          onPower={(power) => {
+            setPlanningBrush(null);
+            setActivePower(power);
+          }}
         />
       )}
 
@@ -682,8 +725,23 @@ export function App() {
           onConstructionPriority={(villageId, priority) =>
             workerRef.current?.setConstructionPriority(villageId, priority)
           }
+          onFocusCapital={(villageId) => {
+            const capital = snapshot?.villages.find((village) => village.id === villageId);
+            if (!capital) return;
+            engineRef.current?.focusOn(capital.x, capital.z, 'settlement');
+          }}
+          activePlanningZone={
+            planningBrush?.villageId === inspection.id ? planningBrush.zone : null
+          }
+          onPlanningZone={(villageId, zone) => {
+            setActiveTool(null);
+            setActivePower(null);
+            setPlanningBrush(zone === null ? null : { villageId, zone });
+            if (zone !== null) setOverlay('planning');
+          }}
           onClose={() => {
             setInspection(null);
+            setPlanningBrush(null);
             engineRef.current?.setSelection(null);
           }}
         />
@@ -737,14 +795,16 @@ export function App() {
                   <button
                     key={kingdom.id}
                     type="button"
+                    data-testid={`kingdom-chip-${kingdom.id}`}
                     onClick={() => {
-                      const capital = snapshot.villages.find((village) =>
-                        kingdom.villageIds.includes(village.id),
+                      const capital = snapshot.villages.find(
+                        (village) => village.id === kingdom.capitalVillageId,
                       );
                       if (capital) {
                         engineRef.current?.focusOn(capital.x, capital.z, 'settlement');
-                        engineRef.current?.setSelection({ kind: 'village', id: capital.id });
                       }
+                      setOverlay('territory');
+                      engineRef.current?.setSelection({ kind: 'kingdom', id: kingdom.id });
                       workerRef.current?.inspect('kingdom', kingdom.id);
                     }}
                   >
@@ -1031,7 +1091,9 @@ export function App() {
                 onChange={(event) => setOverlay(event.target.value as WorldSettings['overlay'])}
               >
                 <option value="none">自然世界</option>
-                <option value="territory">王国领土</option>
+                <option value="territory">王国观察</option>
+                <option value="planning">空间规划</option>
+                <option value="work">工作热点</option>
                 <option value="population">人口密度</option>
                 <option value="resources">资源分布</option>
                 <option value="climate">温度与湿度</option>

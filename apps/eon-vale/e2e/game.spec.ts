@@ -101,6 +101,21 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
     .poll(async () => Number(await canvas.getAttribute('data-settlement-labels')))
     .toBeGreaterThan(0);
   await expect(canvas).toHaveAttribute('data-settlement-labels-visible', 'true');
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-territory-revision')))
+    .toBeGreaterThan(0);
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByRole('dialog').getByRole('combobox').selectOption('territory');
+  await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(canvas).toHaveAttribute('data-strategic-territories', 'true');
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-strategic-territory-cells')))
+    .toBeGreaterThan(0);
+  await expect(canvas).toHaveAttribute('data-kingdom-borders', /^\d+$/);
+  await expect(canvas).toHaveAttribute('data-village-borders', /^\d+$/);
+  await expect(canvas).toHaveAttribute('data-capital-markers', /^\d+$/);
+  await expect(canvas).toHaveAttribute('data-kingdom-adjacencies', /^\d+$/);
+  await expect(canvas).toHaveAttribute('data-war-fronts', /^\d+$/);
 
   const initialBounds = await canvas.boundingBox();
   if (!initialBounds) throw new Error('世界画布缺少可交互区域');
@@ -218,15 +233,26 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   await expect(villageInspector).toBeVisible();
   await expect.poll(async () => canvas.getAttribute('data-view-level')).toBe('settlement');
   await expect(canvas).toHaveAttribute('data-terrain-lod', 'districts-4px');
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-settlement-tier-glyphs')))
+    .toBeGreaterThan(0);
   await expect(canvas).toHaveAttribute('data-selection-outline', 'true');
   await expect(canvas).toHaveAttribute('data-selection-stroke-px', '1.5');
   await expect(canvas).toHaveAttribute('data-selected-target', 'village:1');
   const constructionPriority = villageInspector.getByRole('combobox', { name: '建设优先' });
   await constructionPriority.selectOption('food');
   await expect(constructionPriority).toHaveValue('food');
+  await expect(page.getByTestId('village-development')).toContainText('下一阶段');
+  await villageInspector.getByRole('button', { name: '住宅区', exact: true }).click();
+  const planningBounds = await canvas.boundingBox();
+  if (!planningBounds) throw new Error('规划模式缺少地图画布');
+  await canvas.click({ position: { x: planningBounds.width / 2, y: planningBounds.height / 2 } });
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-planning-zone-cells')))
+    .toBeGreaterThan(0);
+  await expect(page.getByTestId('village-work-hotspots')).toContainText('住宅规划');
   await villageInspector.getByRole('button', { name: '关闭' }).click();
   await expect(canvas).toHaveAttribute('data-selection-outline', 'false');
-  await page.getByRole('button', { name: '观察', exact: true }).click();
 
   const buildingScreen = (await canvas.getAttribute('data-first-building-screen'))
     ?.split(',')
@@ -242,6 +268,12 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   await expect(buildingInspector.getByText('输入', { exact: true })).toBeVisible();
   await expect(buildingInspector.getByText('输出', { exact: true })).toBeVisible();
   await buildingInspector.getByRole('button', { name: '关闭' }).click();
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByRole('dialog').getByRole('combobox').selectOption('work');
+  await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-work-hotspot-participants')))
+    .toBeGreaterThan(0);
   await page.getByTestId('return-to-world').click();
   await expect.poll(async () => canvas.getAttribute('data-view-level')).toBe('world');
 
@@ -290,6 +322,10 @@ test('runs the complete 384 world with 1000 residents and independent resource n
   await expect(resourceHover).toBeVisible();
   await expect(resourceHover).toContainText(/树木|露天石料|金属矿脉/);
   await expect(canvas).toHaveAttribute('data-hover-target', /^resource:/);
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByRole('dialog').getByRole('combobox').selectOption('territory');
+  await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(canvas).toHaveAttribute('data-strategic-territories', 'true');
   await page.keyboard.press('4');
   await expect(page.getByRole('button', { name: '8×', exact: true })).toHaveClass(/active/);
   await page.getByRole('button', { name: '性能监视' }).click();
@@ -342,3 +378,33 @@ for (const population of [100, 500, 1_000]) {
     expect(await canvas.getAttribute('data-metric-source')).toBe('pixi-batch-estimate');
   });
 }
+
+test('observes a real kingdom through capital, borders and selection focus', async ({ page }) => {
+  await page.goto('/?seed=civilization-loop&initialHumans=72&mapSize=128');
+  const canvas = page.getByLabel('纪元谷像素世界');
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByRole('dialog').getByRole('combobox').selectOption('territory');
+  await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
+  await page.getByRole('button', { name: '8×', exact: true }).click();
+
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-capital-markers')), {
+      timeout: 50_000,
+    })
+    .toBeGreaterThan(0);
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-kingdom-borders')))
+    .toBeGreaterThan(0);
+
+  await page.getByTestId('chronicle-toggle').click();
+  await page.getByTestId('kingdom-chip-1').click();
+  const inspector = page.getByTestId('kingdom-inspector');
+  await expect(inspector).toBeVisible();
+  await expect(inspector).toContainText('首都');
+  await expect(inspector).toContainText(/邻国 \d+/);
+  await expect(inspector.getByRole('button', { name: '定位首都' })).toBeVisible();
+  await expect(canvas).toHaveAttribute('data-selected-target', 'kingdom:1');
+  await expect(canvas).toHaveAttribute('data-observed-kingdom', '1');
+  await expect(canvas).toHaveAttribute('data-kingdom-adjacencies', /^\d+$/);
+  await expect(canvas).toHaveAttribute('data-war-fronts', /^\d+$/);
+});

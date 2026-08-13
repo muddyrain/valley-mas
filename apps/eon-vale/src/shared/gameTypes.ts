@@ -188,6 +188,22 @@ export enum VillageTier {
   CityState = 3,
 }
 
+export enum PlanningZoneKind {
+  None = 0,
+  Residential = 1,
+  Production = 2,
+  Defense = 3,
+}
+
+export type WorkHotspotKind = 'production' | 'construction' | 'logistics' | 'defense';
+
+export interface WorkHotspot {
+  kind: WorkHotspotKind;
+  count: number;
+  x: number;
+  z: number;
+}
+
 export enum DiplomacyState {
   Peace = 0,
   Alliance = 1,
@@ -290,6 +306,14 @@ export interface ResourceNodeStore {
   chunkRevisions: Uint32Array;
   dirtyNodeIds: number[];
   regrowthQueue: ResourceRegrowthEvent[];
+}
+
+export interface TerritoryState {
+  villageIds: Uint16Array;
+  claimStrength: Uint8Array;
+  planningZoneKinds: Uint8Array;
+  dirtyCells: number[];
+  revision: number;
 }
 
 export interface EntityArrays {
@@ -508,6 +532,7 @@ export interface Kingdom {
   name: string;
   color: string;
   leaderId: number;
+  capitalVillageId: number;
   villageIds: number[];
   relations: Record<number, DiplomacyState>;
   militaryPower: number;
@@ -518,7 +543,15 @@ export interface Kingdom {
 export interface WorldSettings {
   speed: 1 | 2 | 4 | 8;
   quality: 'low' | 'medium' | 'high';
-  overlay: 'none' | 'territory' | 'population' | 'resources' | 'climate' | 'navigation';
+  overlay:
+    | 'none'
+    | 'territory'
+    | 'planning'
+    | 'work'
+    | 'population'
+    | 'resources'
+    | 'climate'
+    | 'navigation';
 }
 
 export interface WorldEvent {
@@ -550,6 +583,7 @@ export interface WorldState {
   year: number;
   map: WorldMap;
   resourceNodes: ResourceNodeStore;
+  territory: TerritoryState;
   entities: EntityArrays;
   villages: Village[];
   kingdoms: Kingdom[];

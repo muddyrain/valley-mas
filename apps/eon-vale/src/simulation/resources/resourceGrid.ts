@@ -16,6 +16,7 @@ export function findNearestGridResource(
   kind: GridResourceKind,
   maxRadius = 22,
   requireLineOfSight = false,
+  acceptCell: (cell: number) => boolean = () => true,
 ): number {
   const source = resourceArray(map, kind);
   const originX = origin % map.size;
@@ -37,6 +38,7 @@ export function findNearestGridResource(
         const cell = z * map.size + x;
         if (
           (source[cell] ?? 0) === 0 ||
+          !acceptCell(cell) ||
           !isWalkable(map.navigation, cell) ||
           (requireLineOfSight && !hasLineOfSight(map.navigation, origin, cell))
         )

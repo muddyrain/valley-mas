@@ -6,6 +6,7 @@ import {
   ResourceNodeStage,
 } from '@/shared/gameTypes';
 import { createWorldSimulation } from '../core/worldSimulation';
+import { advanceTerritoryClaims } from '../territory/territory';
 import {
   collectResourceForCarrier,
   depositCarriedResource,
@@ -62,5 +63,32 @@ describe('resource logistics', () => {
 
     expect(depositCarriedResource(simulation.state, resident)).toBe(3);
     expect(village.foodProducedSinceUpdate).toBe(3);
+  });
+
+  it('prevents residents from harvesting another village territory', () => {
+    const simulation = createWorldSimulation({
+      seed: 'territory-resource-owner',
+      initialHumans: 0,
+      mapSize: 128,
+      preset: 'continent',
+    });
+    const owner = simulation.ensureVillageAt(58, 64, 12);
+    const neighbour = simulation.ensureVillageAt(78, 64, 12);
+    advanceTerritoryClaims(simulation.state, { claimStep: 255, decayStep: 255 });
+    const ownerCell = simulation.state.territory.villageIds.indexOf(owner.id);
+    expect(ownerCell).toBeGreaterThanOrEqual(0);
+    const resident = simulation.spawn(EntityKind.Human, 78, 64)[0] ?? -1;
+    simulation.state.entities.villageIds[resident] = neighbour.id;
+    const tree = addResourceNode(simulation.state.resourceNodes, {
+      kind: ResourceNodeKind.Tree,
+      x: (ownerCell % simulation.state.map.size) + 0.5,
+      z: Math.floor(ownerCell / simulation.state.map.size) + 0.5,
+      amount: 6,
+      stage: ResourceNodeStage.Mature,
+    });
+
+    expect(collectResourceForCarrier(simulation.state, resident, tree, 10)).toBe(0);
+    simulation.state.entities.villageIds[resident] = owner.id;
+    expect(collectResourceForCarrier(simulation.state, resident, tree, 10)).toBe(3);
   });
 });

@@ -10,6 +10,7 @@ import {
   type WorldState,
 } from '@/shared/gameTypes';
 import { findResourceNodesInRadius } from '../resources/resourceNodes';
+import { nextVillageTierRequirement } from '../systems/economy';
 
 const RESOURCE_KEYS = [
   'food',
@@ -221,6 +222,13 @@ export function selectNextBuildingType(
       : count(BuildingType.Mine) === 0 && hasNearbyMetal
         ? BuildingType.Mine
         : BuildingType.Workshop;
+  const nextRequirement = nextVillageTierRequirement(village.tier);
+  const developmentType =
+    nextRequirement && village.population >= nextRequirement.population
+      ? (Object.entries(nextRequirement.buildings).find(
+          ([type, required]) => count(Number(type) as BuildingType) < (required ?? 0),
+        )?.[0] ?? null)
+      : null;
   if (village.resources.food <= Math.max(4, village.population)) {
     return {
       type: BuildingType.Farm,
@@ -243,16 +251,22 @@ export function selectNextBuildingType(
           ? { type: BuildingType.Farm, decision: '扩大食物生产', overrideReason: '' }
           : count(BuildingType.Storage) === 0
             ? { type: BuildingType.Storage, decision: '保护聚落库存', overrideReason: '' }
-            : count(BuildingType.LoggingCamp) === 0
+            : developmentType !== null
               ? {
-                  type: BuildingType.LoggingCamp,
-                  decision: '建立木材生产端点',
+                  type: Number(developmentType) as BuildingType,
+                  decision: '推进聚落发展条件',
                   overrideReason: '',
                 }
-              : count(BuildingType.Workshop) === 0 ||
-                  (count(BuildingType.Mine) === 0 && hasNearbyMetal)
-                ? { type: productionType, decision: '建立生产工作端点', overrideReason: '' }
-                : null;
+              : count(BuildingType.LoggingCamp) === 0
+                ? {
+                    type: BuildingType.LoggingCamp,
+                    decision: '建立木材生产端点',
+                    overrideReason: '',
+                  }
+                : count(BuildingType.Workshop) === 0 ||
+                    (count(BuildingType.Mine) === 0 && hasNearbyMetal)
+                  ? { type: productionType, decision: '建立生产工作端点', overrideReason: '' }
+                  : null;
   if (village.constructionPriority === 'automatic') return automaticDecision;
   const decisions: Record<Exclude<ConstructionPriority, 'automatic'>, ConstructionDecision> = {
     housing: { type: BuildingType.Home, decision: '玩家优先住房', overrideReason: '' },

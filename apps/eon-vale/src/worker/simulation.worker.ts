@@ -3,11 +3,12 @@
 import type {
   Inspection,
   ResourceNodeSnapshot,
+  TerritorySnapshot,
   WorldMapDelta,
   WorldMapSnapshot,
   WorldRenderSnapshot,
 } from '@/render/renderTypes';
-import { BuildingType, EntityKind, type WorldMap } from '@/shared/gameTypes';
+import { BuildingType, EntityKind, PlanningZoneKind, type WorldMap } from '@/shared/gameTypes';
 import {
   createPrototypeSimulation,
   type PrototypeSimulation,
@@ -17,17 +18,25 @@ import {
   createWorldSimulationFromState,
   type WorldSimulation,
 } from '@/simulation/core/worldSimulation';
+import { deriveKingdomObservation } from '@/simulation/kingdoms/kingdomObservation';
 import { activeWars } from '@/simulation/kingdoms/kingdoms';
 import { generateWorldMap } from '@/simulation/map/generateWorldMap';
 import { editTerrain } from '@/simulation/map/terrainEditing';
 import { loadWorldSave, serializeWorld } from '@/simulation/persistence/save';
 import { createResourceNodeStore } from '@/simulation/resources/resourceNodes';
 import { simulationTickIntervalMs } from '@/simulation/rules/runtimeRules';
+import {
+  collectVillageWorkHotspots,
+  countVillagePlanningZones,
+  paintVillagePlanningZone,
+} from '@/simulation/settlements/spatialPlanning';
+import { nextVillageTierRequirement } from '@/simulation/systems/economy';
 import { applyGodPower } from '@/simulation/systems/environment';
 import { drainWorldMapDelta } from './mapDeltaSync';
 import { type MapSyncReason, mapSyncRequiresFullRebuild } from './mapSyncPolicy';
 import type { WorkerCommand, WorkerEvent } from './protocol';
 import { createFullResourceSnapshot, drainResourceNodeDelta } from './resourceSync';
+import { createFullTerritorySnapshot, drainTerritoryDelta } from './territorySync';
 
 const workerScope: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
 let prototype: PrototypeSimulation | null = null;
@@ -114,12 +123,23 @@ function emitResourceSnapshot(resources: ResourceNodeSnapshot): void {
   ]);
 }
 
+function emitTerritorySnapshot(territory: TerritorySnapshot): void {
+  emit({ type: 'world-territory', territory }, [
+    territory.cells.buffer,
+    territory.villageIds.buffer,
+    territory.claimStrength.buffer,
+    territory.planningZoneKinds.buffer,
+  ]);
+}
+
 function emitWorldDeltas(): void {
   if (!world) return;
   const mapDelta = drainWorldMapDelta(world.state.map);
   if (mapDelta) emitMapDelta(mapDelta);
   const resourceDelta = drainResourceNodeDelta(world.state.resourceNodes);
   if (resourceDelta) emitResourceSnapshot(resourceDelta);
+  const territoryDelta = drainTerritoryDelta(world.state.territory);
+  if (territoryDelta) emitTerritorySnapshot(territoryDelta);
 }
 
 function emitWorldMap(changedChunks: number[], reason: MapSyncReason = 'periodic'): void {
@@ -148,6 +168,7 @@ function createWorldSnapshot(tickMs: number): WorldRenderSnapshot | null {
     headings: state.entities.headings.slice(0, count),
     states: state.entities.states.slice(0, count),
     kinds: state.entities.kind.slice(0, count),
+    villageIds: state.entities.villageIds.slice(0, count),
     kingdomIds: state.entities.kingdomIds.slice(0, count),
     health: state.entities.health.slice(0, count),
     infected: state.entities.infected.slice(0, count),
@@ -257,6 +278,14 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
     const village = state.villages.find((candidate) => candidate.id === command.id);
     if (!village) return null;
     const kingdom = state.kingdoms.find((candidate) => candidate.id === village.kingdomId);
+    const operationalTypes = village.buildingIds.flatMap((buildingId) => {
+      const building = state.buildings[buildingId - 1];
+      return building?.completed && building.health > 0 ? [building.type] : [];
+    });
+    const counts = new Map<BuildingType, number>();
+    for (const type of operationalTypes) counts.set(type, (counts.get(type) ?? 0) + 1);
+    const requirement = nextVillageTierRequirement(village.tier);
+    const zones = countVillagePlanningZones(state, village.id);
     return {
       type: 'village',
       id: village.id,
@@ -264,6 +293,24 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
       completedBuildings: village.buildingIds.filter((id) => state.buildings[id - 1]?.completed)
         .length,
       kingdomName: kingdom?.name ?? '无',
+      development: {
+        nextTier: requirement?.tier ?? null,
+        population: village.population,
+        requiredPopulation: requirement?.population ?? village.population,
+        buildings: requirement
+          ? Object.entries(requirement.buildings).map(([type, required]) => ({
+              type: Number(type),
+              current: counts.get(Number(type) as BuildingType) ?? 0,
+              required: required ?? 0,
+            }))
+          : [],
+      },
+      planningZones: {
+        residential: zones[PlanningZoneKind.Residential],
+        production: zones[PlanningZoneKind.Production],
+        defense: zones[PlanningZoneKind.Defense],
+      },
+      workHotspots: collectVillageWorkHotspots(state, village.id),
     };
   }
   if (command.target === 'building') {
@@ -328,6 +375,13 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
   const kingdom = state.kingdoms.find((candidate) => candidate.id === command.id);
   if (!kingdom) return null;
   const villages = state.villages.filter((village) => kingdom.villageIds.includes(village.id));
+  const observation = deriveKingdomObservation({
+    size: state.map.size,
+    villageIds: state.territory.villageIds,
+    villages: state.villages,
+    kingdoms: state.kingdoms,
+  });
+  const capital = state.villages.find((village) => village.id === kingdom.capitalVillageId);
   return {
     type: 'kingdom',
     id: kingdom.id,
@@ -341,6 +395,44 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
       }),
       { food: 0, wood: 0, stone: 0 },
     ),
+    capital: capital ? { id: capital.id, name: capital.name, x: capital.x, z: capital.z } : null,
+    villages: villages
+      .map((village) => ({
+        id: village.id,
+        name: village.name,
+        population: village.population,
+        tier: village.tier,
+        isCapital: village.id === kingdom.capitalVillageId,
+      }))
+      .sort(
+        (first, second) =>
+          Number(second.isCapital) - Number(first.isCapital) ||
+          second.tier - first.tier ||
+          second.population - first.population,
+      ),
+    neighbours: observation.adjacencies
+      .filter(
+        (adjacency) =>
+          adjacency.firstKingdomId === kingdom.id || adjacency.secondKingdomId === kingdom.id,
+      )
+      .flatMap((adjacency) => {
+        const id =
+          adjacency.firstKingdomId === kingdom.id
+            ? adjacency.secondKingdomId
+            : adjacency.firstKingdomId;
+        const neighbour = state.kingdoms.find((candidate) => candidate.id === id);
+        return neighbour
+          ? [
+              {
+                id,
+                name: neighbour.name,
+                relation: kingdom.relations[id] ?? 0,
+                sharedEdges: adjacency.sharedEdges,
+                diagonalOnly: adjacency.diagonalOnly,
+              },
+            ]
+          : [];
+      }),
   };
 }
 
@@ -380,6 +472,7 @@ workerScope.addEventListener('message', (event: MessageEvent<WorkerCommand>) => 
       emit({ type: 'ready', mode, population: command.initialHumans, seed: command.seed });
       emitWorldMap([], 'initialize');
       emitResourceSnapshot(createFullResourceSnapshot(world.state.resourceNodes));
+      emitTerritorySnapshot(createFullTerritorySnapshot(world.state.territory));
       return;
     }
     if (command.type === 'set-paused') {
@@ -430,6 +523,25 @@ workerScope.addEventListener('message', (event: MessageEvent<WorkerCommand>) => 
         inspection: inspect({ type: 'inspect', target: 'village', id: command.villageId }),
       });
     }
+    if (command.type === 'paint-planning-zone' && world) {
+      const changed = paintVillagePlanningZone(
+        world.state,
+        command.villageId,
+        command.zone,
+        command.cell,
+        command.radius,
+      );
+      emitWorldDeltas();
+      emit({
+        type: 'notice',
+        level: 'info',
+        message: changed > 0 ? `已规划 ${changed} 格` : '只能规划本聚落的可通行领土',
+      });
+      emit({
+        type: 'inspection',
+        inspection: inspect({ type: 'inspect', target: 'village', id: command.villageId }),
+      });
+    }
     if (command.type === 'request-save' && world)
       emit({ type: 'save-data', encoded: serializeWorld(world.state) });
     if (command.type === 'load-save') {
@@ -440,6 +552,7 @@ workerScope.addEventListener('message', (event: MessageEvent<WorkerCommand>) => 
       emit({ type: 'ready', mode, population: restored.entities.count, seed: restored.seed });
       emitWorldMap([], 'load');
       emitResourceSnapshot(createFullResourceSnapshot(world.state.resourceNodes));
+      emitTerritorySnapshot(createFullTerritorySnapshot(world.state.territory));
       emit({ type: 'notice', level: 'info', message: '世界已载入' });
     }
   } catch (error) {
@@ -489,6 +602,7 @@ function runSimulationTick(): void {
           snapshot.headings.buffer,
           snapshot.states.buffer,
           snapshot.kinds.buffer,
+          snapshot.villageIds.buffer,
           snapshot.kingdomIds.buffer,
           snapshot.health.buffer,
           snapshot.infected.buffer,

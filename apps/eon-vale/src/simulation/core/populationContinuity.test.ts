@@ -29,6 +29,7 @@ describe('population continuity', () => {
       name: '续火王国',
       color: '#6ca870',
       leaderId: women[0] ?? 0,
+      capitalVillageId: firstVillage.id,
       villageIds: [firstVillage.id, secondVillage.id],
       relations: {},
       militaryPower: 0,

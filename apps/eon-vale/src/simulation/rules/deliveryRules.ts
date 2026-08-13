@@ -33,7 +33,7 @@ export const DELIVERY_BATCHES = Object.freeze([
   {
     id: 'resident-readability-slice',
     title: '居民十秒可读垂直切片',
-    status: 'planned',
+    status: 'complete',
     playableLoopRequired: true,
     backendOnlyDeliveryAllowed: false,
     decorativeOnlyDeliveryAllowed: false,
@@ -47,7 +47,7 @@ export const DELIVERY_BATCHES = Object.freeze([
   {
     id: 'settlement-and-kingdom-readability',
     title: '聚落与王国可读性',
-    status: 'planned',
+    status: 'validating',
     playableLoopRequired: true,
     backendOnlyDeliveryAllowed: false,
     decorativeOnlyDeliveryAllowed: false,

@@ -143,8 +143,9 @@ describe('accepted domain rules', () => {
       'ocean-transport-expansion',
     ]);
     expect(DELIVERY_BATCHES.every(({ playableLoopRequired }) => playableLoopRequired)).toBe(true);
-    expect(DELIVERY_BATCHES[0]?.status).toBe('complete');
-    expect(DELIVERY_BATCHES.slice(1).every(({ status }) => status === 'planned')).toBe(true);
+    expect(DELIVERY_BATCHES.slice(0, 2).every(({ status }) => status === 'complete')).toBe(true);
+    expect(DELIVERY_BATCHES[2]?.status).toBe('validating');
+    expect(DELIVERY_BATCHES.slice(3).every(({ status }) => status === 'planned')).toBe(true);
     expect(
       DELIVERY_BATCHES.every(
         ({ backendOnlyDeliveryAllowed, decorativeOnlyDeliveryAllowed }) =>

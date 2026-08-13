@@ -23,7 +23,12 @@ import {
   type WorldState,
 } from '@/shared/gameTypes';
 import { createSeededRandom, randomInt, stableNoise } from '@/shared/random';
-import { formKingdoms, resolveKingdomExtinctions, setDiplomacy } from '../kingdoms/kingdoms';
+import {
+  formKingdoms,
+  refreshKingdomCapital,
+  resolveKingdomExtinctions,
+  setDiplomacy,
+} from '../kingdoms/kingdoms';
 import { planOrganicBuildingSite, traceVillageRoad } from '../kingdoms/settlementPlanning';
 import { generateWorldMap, navigationCostForTerrain } from '../map/generateWorldMap';
 import { markMapCellDirty } from '../map/mapDirty';
@@ -62,6 +67,7 @@ import {
   decayOutdoorStockpiles,
   selectNextBuildingType,
 } from '../settlements/settlementOperations';
+import { findPreferredPlanningSite } from '../settlements/spatialPlanning';
 import {
   birthPressure,
   calculateCarryingCapacity,
@@ -99,6 +105,12 @@ import {
   renewResidentTaskLease,
   suspendResidentTask,
 } from '../tasks/residentTasks';
+import {
+  advanceTerritoryClaims,
+  canVillageUseTerritoryCell,
+  createTerritoryState,
+  territoryVillageIdAtCell,
+} from '../territory/territory';
 
 const MAX_ENTITIES = 1_200;
 const NO_TARGET = 0xffff_ffff;
@@ -453,12 +465,13 @@ function createInitialState(options: CreateWorldOptions): WorldState {
     options.preset ?? 'archipelago',
   );
   const state: WorldState = {
-    version: 7,
+    version: 10,
     seed: options.seed,
     tick: 0,
     year: 1,
     map,
     resourceNodes: generateResourceNodes(map, options.seed),
+    territory: createTerritoryState(map.size),
     entities: createEntityArrays(),
     villages: [],
     kingdoms: [],
@@ -505,6 +518,53 @@ function villageHasOperationalMine(state: WorldState, village: Village): boolean
     const building = state.buildings[buildingId - 1];
     return building?.completed && building.type === BuildingType.Mine && building.health > 0;
   });
+}
+
+function resourceNodeTerritoryOwner(state: WorldState, nodeId: number): number {
+  const x = Math.floor(state.resourceNodes.positionsX[nodeId] ?? -1);
+  const z = Math.floor(state.resourceNodes.positionsZ[nodeId] ?? -1);
+  return territoryVillageIdAtCell(state, z * state.map.size + x);
+}
+
+function findNearestVillageResourceNode(
+  state: WorldState,
+  villageId: number,
+  x: number,
+  z: number,
+  kind: ResourceNodeKind,
+  maxRadius: number,
+): number {
+  const findByOwner = (ownerVillageId: number) =>
+    findNearestAvailableResourceNode(
+      state.resourceNodes,
+      x,
+      z,
+      kind,
+      state.tick,
+      maxRadius,
+      (nodeId) => resourceNodeTerritoryOwner(state, nodeId) === ownerVillageId,
+    );
+  const owned = villageId > 0 ? findByOwner(villageId) : -1;
+  return owned >= 0 ? owned : findByOwner(0);
+}
+
+function findNearestVillageGridResource(
+  state: WorldState,
+  villageId: number,
+  origin: number,
+  maxRadius: number,
+): number {
+  const findByOwner = (ownerVillageId: number) =>
+    findNearestGridResource(
+      state.map,
+      origin,
+      'food',
+      maxRadius,
+      false,
+      (cell) => territoryVillageIdAtCell(state, cell) === ownerVillageId,
+    );
+  const owned = villageId > 0 ? findByOwner(villageId) : -1;
+  return owned >= 0 ? owned : findByOwner(0);
 }
 
 function recordResidentDeath(state: WorldState, entityId: number, cause: DeathCause): void {
@@ -808,12 +868,12 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
             : village && villageHasOperationalMine(state, village)
               ? ResourceNodeKind.Metal
               : ResourceNodeKind.Stone;
-      const nodeId = findNearestAvailableResourceNode(
-        state.resourceNodes,
+      const nodeId = findNearestVillageResourceNode(
+        state,
+        village?.id ?? 0,
         state.entities.positionsX[entityId] ?? currentX,
         state.entities.positionsZ[entityId] ?? currentZ,
         preferredKind,
-        state.tick,
         48,
       );
       if (
@@ -888,7 +948,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     } else if (stateValue === AgentState.Farm) {
       const villageId = state.entities.villageIds[entityId] ?? 0;
       if (state.entities.professions[entityId] === Profession.Forager) {
-        target = findNearestGridResource(state.map, current, 'food', 48);
+        target = findNearestVillageGridResource(state, villageId, current, 48);
       }
       const farm = state.buildings.find(
         (candidate) =>
@@ -1648,7 +1708,10 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         }
       }
       const kingdom = state.kingdoms.find((candidate) => candidate.id === expedition.kingdomId);
-      if (kingdom && !kingdom.villageIds.includes(village.id)) kingdom.villageIds.push(village.id);
+      if (kingdom && !kingdom.villageIds.includes(village.id)) {
+        kingdom.villageIds.push(village.id);
+        refreshKingdomCapital(state, kingdom);
+      }
       state.population.totalMigrations += living.length;
       state.population.migrationsThisYear += living.length;
       addEvent(state, 'village', `${village.name}由${living.length}名拓荒者建立`);
@@ -2276,6 +2339,11 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
           task.progress += 1;
           renewResidentTaskLease(task, state.tick);
           if (task.progress < 36) continue;
+          const villageId = state.entities.villageIds[entityId] ?? 0;
+          if (!canVillageUseTerritoryCell(state, villageId, cell)) {
+            failResidentTask(task, state.tick, '野外食物已归属其他聚落');
+            continue;
+          }
           const amount = harvestGridResource(state.map, cell, 'food');
           if (amount <= 0) {
             failResidentTask(task, state.tick, '野外食物已经耗尽');
@@ -2476,13 +2544,19 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       }
       const assigned = countVillageResidents(state, village.id);
       village.population = assigned;
-      const completed = village.buildingIds.reduce((count, buildingId) => {
-        return count + (state.buildings[buildingId - 1]?.completed ? 1 : 0);
-      }, 0);
+      const operationalBuildingTypes = village.buildingIds.flatMap((buildingId) => {
+        const building = state.buildings[buildingId - 1];
+        return building?.completed && building.health > 0 ? [building.type] : [];
+      });
+      const completed = operationalBuildingTypes.length;
       const previousTier = village.tier;
-      village.tier = evaluateVillageTier(village.population, completed);
+      village.tier = evaluateVillageTier(village.population, operationalBuildingTypes);
       if (village.tier > previousTier)
-        addEvent(state, 'village', `${village.name}发展为${VillageTier[village.tier]}`);
+        addEvent(
+          state,
+          'village',
+          `${village.name}发展为${['营地', '村落', '城镇', '城邦'][village.tier] ?? '聚落'}`,
+        );
       if (assigned === 0) continue;
       const completedFarms = village.buildingIds.filter((id) => {
         const building = state.buildings[id - 1];
@@ -2705,6 +2779,8 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     village.captureKingdomId = 0;
     village.captureProgress = 0;
     village.health = Math.max(650, village.health);
+    if (defender) refreshKingdomCapital(state, defender);
+    refreshKingdomCapital(state, attacker);
     for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
       if (state.entities.active[entityId] && state.entities.villageIds[entityId] === village.id) {
         state.entities.kingdomIds[entityId] = attackerKingdomId;
@@ -2821,7 +2897,10 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
           targetVillage.x - (state.entities.positionsX[entityId] ?? 0),
           targetVillage.z - (state.entities.positionsZ[entityId] ?? 0),
         );
-        if (distance <= 2.1) {
+        const guardCell = entityCell(state, entityId);
+        const insideTargetTerritory =
+          territoryVillageIdAtCell(state, guardCell) === targetVillage.id;
+        if (insideTargetTerritory || (state.territory.revision === 0 && distance <= 2.1)) {
           state.entities.states[entityId] = AgentState.Attack;
           const defendersRemain = enemyGuards.some(
             (defenderId) =>
@@ -2878,7 +2957,10 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       updateEconomy();
       applyEnvironmentDamage(state);
     }
-    if (state.tick % 60 === 0) formSettlements();
+    if (state.tick % 60 === 0) {
+      formSettlements();
+      advanceTerritoryClaims(state);
+    }
     if (state.tick % 100 === 0) updateDiplomacy();
     if (state.tick % 200 === 0) {
       updateAnimalEcology();
@@ -2988,7 +3070,10 @@ function completeEntityAction(state: WorldState, entityId: number, cell: number)
           }
         }
       }
-    } else if (harvestGridResource(state.map, cell, 'food')) {
+    } else if (
+      canVillageUseTerritoryCell(state, state.entities.villageIds[entityId] ?? 0, cell) &&
+      harvestGridResource(state.map, cell, 'food')
+    ) {
       markMapCellDirty(state.map, cell);
       state.entities.hunger[entityId] = Math.max(0, (state.entities.hunger[entityId] ?? 0) - 620);
       state.entities.states[entityId] = AgentState.Eat;
@@ -3205,13 +3290,14 @@ function planVillageBuilding(state: WorldState, village: Village, _completed: nu
     typeIndex,
     occupied,
   );
+  site = findPreferredPlanningSite(state, village, type, occupied) ?? site;
   if (type === BuildingType.Mine) {
-    const veinId = findNearestAvailableResourceNode(
-      state.resourceNodes,
+    const veinId = findNearestVillageResourceNode(
+      state,
+      village.id,
       village.x,
       village.z,
       ResourceNodeKind.Metal,
-      state.tick,
       48,
     );
     if (veinId < 0) return;

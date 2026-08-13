@@ -4,6 +4,7 @@ import {
   type Village,
   type WorldState,
 } from '@/shared/gameTypes';
+import { canVillageUseTerritoryCell } from '../territory/territory';
 import { harvestResourceNode } from './resourceNodes';
 
 const CARRY_CAPACITY = 3;
@@ -32,6 +33,11 @@ export function collectResourceForCarrier(
   maximumAmount = CARRY_CAPACITY,
 ): number {
   if (!state.entities.active[entityId]) return 0;
+  const villageId = state.entities.villageIds[entityId] ?? 0;
+  const nodeX = Math.floor(state.resourceNodes.positionsX[nodeId] ?? -1);
+  const nodeZ = Math.floor(state.resourceNodes.positionsZ[nodeId] ?? -1);
+  const nodeCell = nodeZ * state.map.size + nodeX;
+  if (!canVillageUseTerritoryCell(state, villageId, nodeCell)) return 0;
   const nodeKind = state.resourceNodes.kind[nodeId] as ResourceNodeKind;
   const carriedKind = carriedKindForNode(nodeKind);
   const currentKind = state.entities.carriedResourceKinds[entityId] as CarriedResourceKind;

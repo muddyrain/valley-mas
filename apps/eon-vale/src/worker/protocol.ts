@@ -1,6 +1,7 @@
 import type {
   Inspection,
   ResourceNodeSnapshot,
+  TerritorySnapshot,
   WorldMapDelta,
   WorldMapSnapshot,
   WorldRenderSnapshot,
@@ -10,6 +11,7 @@ import type {
   EntityKind,
   GodPower,
   MapTool,
+  PlanningZoneKind,
   WorldPreset,
 } from '@/shared/gameTypes';
 import type { PrototypeMetrics, PrototypeSnapshot } from '@/simulation/core/prototypeSimulation';
@@ -32,6 +34,13 @@ export type WorkerCommand =
   | { type: 'god-power'; power: GodPower; cell: number; radius: number }
   | { type: 'inspect'; target: 'entity' | 'village' | 'building' | 'kingdom'; id: number }
   | { type: 'set-construction-priority'; villageId: number; priority: ConstructionPriority }
+  | {
+      type: 'paint-planning-zone';
+      villageId: number;
+      zone: PlanningZoneKind;
+      cell: number;
+      radius: number;
+    }
   | { type: 'request-save' }
   | { type: 'load-save'; encoded: string };
 
@@ -42,6 +51,7 @@ export type WorkerEvent =
   | { type: 'world-map'; map: WorldMapSnapshot }
   | { type: 'world-map-delta'; delta: WorldMapDelta }
   | { type: 'world-resources'; resources: ResourceNodeSnapshot }
+  | { type: 'world-territory'; territory: TerritorySnapshot }
   | { type: 'inspection'; inspection: Inspection | null }
   | { type: 'save-data'; encoded: string }
   | { type: 'notice'; level: 'info' | 'error'; message: string }

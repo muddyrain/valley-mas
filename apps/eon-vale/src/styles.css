@@ -1015,6 +1015,18 @@ select:focus-visible {
   color: #ef8d79;
 }
 
+.kingdom-observation-list .danger {
+  color: #ef8d79;
+}
+
+.kingdom-observation-list span {
+  gap: 10px;
+}
+
+.kingdom-observation-list em {
+  text-align: right;
+}
+
 .chronicle-panel {
   right: 14px;
   bottom: 78px;

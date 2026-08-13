@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CarriedResourceKind } from '@/shared/gameTypes';
+import { CarriedResourceKind, VillageTier } from '@/shared/gameTypes';
 import { createWorldSimulation } from '../core/worldSimulation';
+import { formKingdoms } from '../kingdoms/kingdoms';
 import { beginResidentTask } from '../tasks/residentTasks';
 import { loadWorldSave, serializeWorld } from './save';
 
@@ -11,7 +12,7 @@ describe('world persistence', () => {
     const encoded = serializeWorld(simulation.state);
     const restored = loadWorldSave(encoded);
 
-    expect(JSON.parse(encoded).version).toBe(7);
+    expect(JSON.parse(encoded).version).toBe(10);
     expect(restored.seed).toBe(simulation.state.seed);
     expect(restored.tick).toBe(simulation.state.tick);
     expect(restored.entities.count).toBe(simulation.state.entities.count);
@@ -28,6 +29,12 @@ describe('world persistence', () => {
       simulation.state.resourceNodes.kind.slice(0, simulation.state.resourceNodes.count),
     );
     expect(restored.resourceNodes.chunkHeads.some((nodeId) => nodeId >= 0)).toBe(true);
+    expect(restored.territory.villageIds).toEqual(simulation.state.territory.villageIds);
+    expect(restored.territory.claimStrength).toEqual(simulation.state.territory.claimStrength);
+    expect(restored.territory.planningZoneKinds).toEqual(
+      simulation.state.territory.planningZoneKinds,
+    );
+    expect(restored.territory.dirtyCells).toEqual([]);
     expect(restored.entities.carriedResourceKinds).toEqual(
       simulation.state.entities.carriedResourceKinds,
     );
@@ -55,14 +62,14 @@ describe('world persistence', () => {
     expect(() => loadWorldSave(JSON.stringify(invalidLaw))).toThrow(/数据校验失败/);
   });
 
-  it('strictly rejects V6 and malformed V7 semantic task fields', () => {
-    const simulation = createWorldSimulation({ seed: 'v7-task-save', initialHumans: 24 });
+  it('strictly rejects V9 and malformed V10 semantic fields', () => {
+    const simulation = createWorldSimulation({ seed: 'v10-task-save', initialHumans: 24 });
     simulation.step();
     const valid = JSON.parse(serializeWorld(simulation.state));
     expect(valid.entities.tasks).toHaveLength(simulation.state.entities.count);
 
-    const v6 = { ...valid, version: 6 };
-    expect(() => loadWorldSave(JSON.stringify(v6))).toThrow(/存档版本/);
+    const v9 = { ...valid, version: 9 };
+    expect(() => loadWorldSave(JSON.stringify(v9))).toThrow(/存档版本/);
 
     valid.entities.tasks[0] = { type: 'imaginary-work' };
     expect(() => loadWorldSave(JSON.stringify(valid))).toThrow(/数据校验失败/);
@@ -71,12 +78,31 @@ describe('world persistence', () => {
     if (invalidVillage.villages[0]) delete invalidVillage.villages[0].outdoorStockpile;
     else invalidVillage.villages = [{ id: 1 }];
     expect(() => loadWorldSave(JSON.stringify(invalidVillage))).toThrow(/数据校验失败/);
+
+    const invalidTerritory = JSON.parse(serializeWorld(simulation.state));
+    invalidTerritory.territory.villageIds.pop();
+    expect(() => loadWorldSave(JSON.stringify(invalidTerritory))).toThrow(/地图尺寸不匹配/);
+  });
+
+  it('round-trips the durable capital and rejects malformed kingdom observation state', () => {
+    const simulation = createWorldSimulation({ seed: 'v10-capital-save', initialHumans: 24 });
+    const village = simulation.ensureVillageAt(64, 64, 24);
+    village.tier = VillageTier.Hamlet;
+    formKingdoms(simulation.state);
+    const encoded = serializeWorld(simulation.state);
+    const valid = JSON.parse(encoded);
+    const kingdom = valid.kingdoms[0];
+    expect(kingdom?.capitalVillageId).toBe(village.id);
+    expect(loadWorldSave(encoded).kingdoms[0]?.capitalVillageId).toBe(village.id);
+
+    delete kingdom.capitalVillageId;
+    expect(() => loadWorldSave(JSON.stringify(valid))).toThrow(/数据校验失败/);
   });
 
   it('restores every semantic task phase and durable second-batch assignment', () => {
     const phases = ['reserved', 'travel', 'pickup', 'work', 'delivery', 'suspended'] as const;
     for (const phase of phases) {
-      const simulation = createWorldSimulation({ seed: `v7-${phase}`, initialHumans: 24 });
+      const simulation = createWorldSimulation({ seed: `v8-${phase}`, initialHumans: 24 });
       const entityId = 0;
       const village = simulation.ensureVillageAt(
         simulation.state.entities.positionsX[entityId] ?? 64,

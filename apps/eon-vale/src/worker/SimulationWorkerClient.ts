@@ -1,6 +1,7 @@
 import type {
   Inspection,
   ResourceNodeSnapshot,
+  TerritorySnapshot,
   WorldMapDelta,
   WorldMapSnapshot,
   WorldRenderSnapshot,
@@ -10,6 +11,7 @@ import type {
   EntityKind,
   GodPower,
   MapTool,
+  PlanningZoneKind,
   WorldPreset,
 } from '@/shared/gameTypes';
 import type { PrototypeSnapshot } from '@/simulation/core/prototypeSimulation';
@@ -23,6 +25,7 @@ export interface WorkerClientListeners {
   onMap?: (map: WorldMapSnapshot) => void;
   onMapDelta?: (delta: WorldMapDelta) => void;
   onResources?: (resources: ResourceNodeSnapshot) => void;
+  onTerritory?: (territory: TerritorySnapshot) => void;
   onInspection?: (inspection: Inspection | null) => void;
   onSave?: (encoded: string) => void;
   onNotice?: (level: 'info' | 'error', message: string) => void;
@@ -42,6 +45,7 @@ export class SimulationWorkerClient {
       if (data.type === 'world-map') this.listeners.onMap?.(data.map);
       if (data.type === 'world-map-delta') this.listeners.onMapDelta?.(data.delta);
       if (data.type === 'world-resources') this.listeners.onResources?.(data.resources);
+      if (data.type === 'world-territory') this.listeners.onTerritory?.(data.territory);
       if (data.type === 'inspection') this.listeners.onInspection?.(data.inspection);
       if (data.type === 'save-data') this.listeners.onSave?.(data.encoded);
       if (data.type === 'notice') this.listeners.onNotice?.(data.level, data.message);
@@ -91,6 +95,10 @@ export class SimulationWorkerClient {
 
   setConstructionPriority(villageId: number, priority: ConstructionPriority): void {
     this.send({ type: 'set-construction-priority', villageId, priority });
+  }
+
+  paintPlanningZone(villageId: number, zone: PlanningZoneKind, cell: number, radius = 2): void {
+    this.send({ type: 'paint-planning-zone', villageId, zone, cell, radius });
   }
 
   requestSave(): void {

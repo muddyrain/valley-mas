@@ -23,11 +23,85 @@ const BUILDING_COSTS: Record<BuildingType, { wood: number; stone: number; progre
   [BuildingType.Watchtower]: { wood: 18, stone: 14, progress: 130 },
 };
 
-export function evaluateVillageTier(population: number, completedBuildings: number): VillageTier {
-  if (population >= 45 && completedBuildings >= 10) return VillageTier.CityState;
-  if (population >= 25 && completedBuildings >= 6) return VillageTier.Town;
-  if (population >= 12 && completedBuildings >= 3) return VillageTier.Hamlet;
+export interface VillageTierRequirement {
+  tier: VillageTier;
+  population: number;
+  buildings: Partial<Record<BuildingType, number>>;
+}
+
+export const VILLAGE_TIER_REQUIREMENTS: readonly VillageTierRequirement[] = [
+  {
+    tier: VillageTier.Hamlet,
+    population: 12,
+    buildings: {
+      [BuildingType.TownCenter]: 1,
+      [BuildingType.Home]: 1,
+      [BuildingType.Farm]: 1,
+    },
+  },
+  {
+    tier: VillageTier.Town,
+    population: 25,
+    buildings: {
+      [BuildingType.TownCenter]: 1,
+      [BuildingType.Home]: 2,
+      [BuildingType.Storage]: 1,
+      [BuildingType.Farm]: 2,
+      [BuildingType.LoggingCamp]: 1,
+      [BuildingType.Workshop]: 1,
+      [BuildingType.Barracks]: 1,
+    },
+  },
+  {
+    tier: VillageTier.CityState,
+    population: 45,
+    buildings: {
+      [BuildingType.TownCenter]: 1,
+      [BuildingType.Home]: 4,
+      [BuildingType.Storage]: 2,
+      [BuildingType.Farm]: 2,
+      [BuildingType.LoggingCamp]: 1,
+      [BuildingType.Workshop]: 1,
+      [BuildingType.Barracks]: 1,
+      [BuildingType.CouncilHall]: 1,
+      [BuildingType.Wall]: 1,
+      [BuildingType.Watchtower]: 1,
+    },
+  },
+] as const;
+
+function buildingCounts(types: readonly BuildingType[]): Map<BuildingType, number> {
+  const counts = new Map<BuildingType, number>();
+  for (const type of types) counts.set(type, (counts.get(type) ?? 0) + 1);
+  return counts;
+}
+
+export function meetsVillageTierRequirement(
+  population: number,
+  types: readonly BuildingType[],
+  requirement: VillageTierRequirement,
+): boolean {
+  if (population < requirement.population) return false;
+  const counts = buildingCounts(types);
+  return Object.entries(requirement.buildings).every(
+    ([type, required]) => (counts.get(Number(type) as BuildingType) ?? 0) >= (required ?? 0),
+  );
+}
+
+export function evaluateVillageTier(
+  population: number,
+  operationalBuildingTypes: readonly BuildingType[],
+): VillageTier {
+  for (const requirement of [...VILLAGE_TIER_REQUIREMENTS].reverse()) {
+    if (meetsVillageTierRequirement(population, operationalBuildingTypes, requirement)) {
+      return requirement.tier;
+    }
+  }
   return VillageTier.Camp;
+}
+
+export function nextVillageTierRequirement(tier: VillageTier): VillageTierRequirement | null {
+  return VILLAGE_TIER_REQUIREMENTS.find((requirement) => requirement.tier === tier + 1) ?? null;
 }
 
 export function startConstruction(
