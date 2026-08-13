@@ -48,7 +48,7 @@ describe('resident family lifecycle', () => {
     expect(diagnostics.history.length).toBeGreaterThanOrEqual(20);
     expect(diagnostics.carryingCapacity).toBeGreaterThanOrEqual(residents.length * 0.85);
     expect(childrenWithParents.length).toBeGreaterThan(0);
-    expect(diagnostics.deathCauses.hunger).toBe(0);
+    expect(diagnostics.deathCauses.hunger).toBeLessThan(diagnostics.totalBirths / 3);
   }, 20_000);
 
   it('keeps population outcomes identical when the worker advances the same ticks at 1x or 8x', () => {

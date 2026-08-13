@@ -22,6 +22,8 @@ function building(overrides: Partial<Building> = {}): Building {
     inTransitWood: 0,
     inTransitStone: 0,
     clearNodeIds: [],
+    assignedWorkerIds: [],
+    workSlots: 0,
     ...overrides,
   };
 }

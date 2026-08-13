@@ -13,8 +13,14 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Inspection } from '@/render/renderTypes';
-import { DiplomacyState, ResidentRole, ResidentSex } from '@/shared/gameTypes';
 import {
+  type ConstructionPriority,
+  DiplomacyState,
+  ResidentRole,
+  ResidentSex,
+} from '@/shared/gameTypes';
+import {
+  BUILDING_LABELS,
   DIPLOMACY_LABELS,
   ENTITY_LABELS,
   PROFESSION_LABELS,
@@ -49,10 +55,12 @@ export function InspectorPanel({
   inspection,
   onClose,
   onFollow,
+  onConstructionPriority,
 }: {
   inspection: Inspection;
   onClose: () => void;
   onFollow?: (id: number) => void;
+  onConstructionPriority?: (villageId: number, priority: ConstructionPriority) => void;
 }) {
   const [entityTab, setEntityTab] = useState<'overview' | 'growth' | 'equipment' | 'history'>(
     'overview',
@@ -82,6 +90,43 @@ export function InspectorPanel({
         [ResidentRole.Leader]: '领主',
         [ResidentRole.King]: '国王',
       }[inspection.role as ResidentRole] ?? '居民';
+    const taskPhaseLabels = {
+      reserved: '已预留',
+      travel: '前往目标',
+      pickup: '取得物资',
+      work: '持续工作',
+      delivery: '送往目的地',
+      complete: '已完成',
+      suspended: '暂时中断',
+      failed: '未能完成',
+    } as const;
+    const taskReasonLabels = {
+      none: '等待村庄安排',
+      hunger: '需要正常进食',
+      'critical-hunger': '极度饥饿',
+      fatigue: '需要回家休息',
+      'critical-fatigue': '精力耗尽',
+      danger: '附近存在危险',
+      'village-needs-food': '村庄需要食物',
+      'village-needs-wood': '村庄需要木材',
+      'village-needs-stone': '村庄需要石料',
+      'village-needs-metal': '村庄需要金属',
+      'village-needs-tools': '村庄需要工具',
+      'village-needs-equipment': '村庄需要装备',
+      'village-needs-housing': '村庄需要住房',
+      'village-construction': '工地需要推进',
+      'professional-duty': '履行职业职责',
+    } as const;
+    const carriedLabels = [
+      '无',
+      '木材',
+      '石料',
+      '金属',
+      '食物',
+      '工具',
+      '装备',
+      '工坊材料',
+    ] as const;
     return (
       <aside className="inspector-panel" data-testid="entity-inspector">
         <div className="inspector-heading">
@@ -161,6 +206,56 @@ export function InspectorPanel({
               <span>
                 <b>行动</b>
                 <em>{STATE_LABELS[inspection.state] || '行动中'}</em>
+              </span>
+              <span>
+                <b>原因</b>
+                <em>
+                  {inspection.task ? taskReasonLabels[inspection.task.reason] : '等待村庄安排'}
+                </em>
+              </span>
+              <span>
+                <b>阶段</b>
+                <em>{inspection.task ? taskPhaseLabels[inspection.task.phase] : '无当前任务'}</em>
+              </span>
+              <span>
+                <b>目的地</b>
+                <em>{inspection.task ? `地图格 #${inspection.task.targetCell}` : '—'}</em>
+              </span>
+              <span>
+                <b>进度</b>
+                <em>
+                  {inspection.task
+                    ? `${Math.floor(inspection.task.progress)} / ${Math.floor(inspection.task.requiredProgress)}`
+                    : '—'}
+                </em>
+              </span>
+              <span>
+                <b>预期结果</b>
+                <em>{inspection.task?.expectedResult ?? '—'}</em>
+              </span>
+              <span>
+                <b>阻碍</b>
+                <em>{inspection.task?.failureReason ?? '无'}</em>
+              </span>
+              <span>
+                <b>预留至</b>
+                <em>{inspection.task ? `第 ${inspection.task.leaseUntilTick} Tick` : '—'}</em>
+              </span>
+              <span>
+                <b>携带</b>
+                <em>
+                  {inspection.carriedResourceAmount > 0
+                    ? `${carriedLabels[inspection.carriedResourceKind] ?? '物资'} × ${inspection.carriedResourceAmount}`
+                    : '无'}
+                </em>
+              </span>
+              <span>
+                <b>住所</b>
+                <em>{inspection.homeName}</em>
+              </span>
+              <span>
+                <b>工位</b>
+                <em>{inspection.workplaceName}</em>
               </span>
               <span>
                 <b>伴侣</b>
@@ -302,6 +397,112 @@ export function InspectorPanel({
             <em>
               {village.foodTrend >= 0 ? '+' : ''}
               {village.foodTrend.toFixed(1)}
+            </em>
+          </span>
+          <span>
+            <b>分类仓储</b>
+            <em>
+              食物 {Math.floor(village.resources.food)}/{village.storageCapacityByKind.food} · 木材{' '}
+              {Math.floor(village.resources.wood)}/{village.storageCapacityByKind.wood} · 石料{' '}
+              {Math.floor(village.resources.stone)}/{village.storageCapacityByKind.stone}
+            </em>
+          </span>
+          <span>
+            <b>露天积存</b>
+            <em>
+              食物 {Math.floor(village.outdoorStockpile.food)} · 木材{' '}
+              {Math.floor(village.outdoorStockpile.wood)} · 石料{' '}
+              {Math.floor(village.outdoorStockpile.stone)} · 金属{' '}
+              {Math.floor(village.outdoorStockpile.metal)}
+            </em>
+          </span>
+          <span>
+            <b>建设决定</b>
+            <em>{village.constructionDecision}</em>
+          </span>
+          {village.constructionOverrideReason && (
+            <span>
+              <b>优先覆盖</b>
+              <em>{village.constructionOverrideReason}</em>
+            </span>
+          )}
+        </div>
+        {onConstructionPriority && (
+          <label className="inspector-select">
+            <span>建设优先</span>
+            <select
+              value={village.constructionPriority}
+              onChange={(event) =>
+                onConstructionPriority(village.id, event.target.value as ConstructionPriority)
+              }
+            >
+              <option value="automatic">自动</option>
+              <option value="housing">住房</option>
+              <option value="storage">储粮</option>
+              <option value="food">食物</option>
+              <option value="production">生产</option>
+              <option value="defense">防御</option>
+            </select>
+          </label>
+        )}
+      </aside>
+    );
+  }
+
+  if (inspection.type === 'building') {
+    const { building } = inspection;
+    return (
+      <aside className="inspector-panel" data-testid="building-inspector">
+        <div className="inspector-heading">
+          <span className="inspector-icon">
+            <Building2 size={19} />
+          </span>
+          <span>
+            <small>{inspection.villageName}</small>
+            <strong>{BUILDING_LABELS[building.type]}</strong>
+          </span>
+          <button type="button" onClick={onClose} aria-label="关闭">
+            ×
+          </button>
+        </div>
+        <Gauge
+          label="建筑状态"
+          value={building.health * 10}
+          tone={building.health <= 0 ? 'red' : 'green'}
+        />
+        <div className="inspector-list">
+          <span>
+            <b>能力</b>
+            <em>{inspection.capability}</em>
+          </span>
+          <span>
+            <b>工人</b>
+            <em>
+              {inspection.workerNames.length > 0 ? inspection.workerNames.join('、') : '暂无'}
+            </em>
+          </span>
+          <span>
+            <b>工位</b>
+            <em>
+              {building.assignedWorkerIds.length} / {building.workSlots}
+            </em>
+          </span>
+          <span>
+            <b>输入</b>
+            <em>{inspection.inputs}</em>
+          </span>
+          <span>
+            <b>输出</b>
+            <em>{inspection.outputs}</em>
+          </span>
+          <span>
+            <b>状态</b>
+            <em>{inspection.stopReason}</em>
+          </span>
+          <span>
+            <b>施工</b>
+            <em>
+              {Math.floor(building.progress)} / {building.requiredProgress}
             </em>
           </span>
         </div>

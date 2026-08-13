@@ -186,5 +186,6 @@ export function generateWorldMap(
 }
 
 export function navigationCostForTerrain(terrain: TerrainType, road = false): number {
-  return road ? 1 : terrainCost(terrain);
+  const baseCost = terrainCost(terrain);
+  return baseCost === 0 ? 0 : road ? 1 : baseCost;
 }

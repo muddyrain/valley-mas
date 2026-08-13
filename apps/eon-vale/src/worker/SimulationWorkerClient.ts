@@ -5,7 +5,13 @@ import type {
   WorldMapSnapshot,
   WorldRenderSnapshot,
 } from '@/render/renderTypes';
-import type { EntityKind, GodPower, MapTool, WorldPreset } from '@/shared/gameTypes';
+import type {
+  ConstructionPriority,
+  EntityKind,
+  GodPower,
+  MapTool,
+  WorldPreset,
+} from '@/shared/gameTypes';
 import type { PrototypeSnapshot } from '@/simulation/core/prototypeSimulation';
 import type { WorldLawId } from '@/simulation/rules/worldLawCatalog';
 import type { WorkerCommand, WorkerEvent } from './protocol';
@@ -79,8 +85,12 @@ export class SimulationWorkerClient {
     this.send({ type: 'god-power', power, cell, radius });
   }
 
-  inspect(target: 'entity' | 'village' | 'kingdom', id: number): void {
+  inspect(target: 'entity' | 'village' | 'building' | 'kingdom', id: number): void {
     this.send({ type: 'inspect', target, id });
+  }
+
+  setConstructionPriority(villageId: number, priority: ConstructionPriority): void {
+    this.send({ type: 'set-construction-priority', villageId, priority });
   }
 
   requestSave(): void {

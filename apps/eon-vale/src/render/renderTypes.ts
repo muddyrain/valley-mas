@@ -3,6 +3,7 @@ import type {
   EcologyDiagnostics,
   Kingdom,
   PopulationDiagnostics,
+  ResidentTask,
   Village,
   WorldEvent,
   WorldLaws,
@@ -55,6 +56,9 @@ export interface WorldRenderSnapshot extends RenderSnapshot {
   weaponTiers: Uint8Array;
   armorTiers: Uint8Array;
   ages: Uint16Array;
+  targetCells: Uint32Array;
+  carriedResourceKinds: Uint8Array;
+  carriedResources: Uint8Array;
   stats: WorldStats;
   villages: Village[];
   kingdoms: Kingdom[];
@@ -139,6 +143,11 @@ export interface EntityInspection {
   parentNames: string[];
   malnutrition: number;
   history: Array<{ tick: number; message: string }>;
+  task: ResidentTask | null;
+  carriedResourceKind: number;
+  carriedResourceAmount: number;
+  homeName: string;
+  workplaceName: string;
 }
 
 export interface VillageInspection {
@@ -149,6 +158,18 @@ export interface VillageInspection {
   kingdomName: string;
 }
 
+export interface BuildingInspection {
+  type: 'building';
+  id: number;
+  building: Building;
+  villageName: string;
+  workerNames: string[];
+  capability: string;
+  inputs: string;
+  outputs: string;
+  stopReason: string;
+}
+
 export interface KingdomInspection {
   type: 'kingdom';
   id: number;
@@ -157,4 +178,8 @@ export interface KingdomInspection {
   resources: { food: number; wood: number; stone: number };
 }
 
-export type Inspection = EntityInspection | VillageInspection | KingdomInspection;
+export type Inspection =
+  | EntityInspection
+  | VillageInspection
+  | BuildingInspection
+  | KingdomInspection;

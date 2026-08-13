@@ -35,6 +35,17 @@ describe('grid navigation', () => {
     expect(simplified).toEqual(expect.arrayContaining([0, 35]));
   });
 
+  it('preserves a lower-cost detour instead of simplifying it through expensive cells', () => {
+    const grid = createNavigationGrid(7, 5);
+    for (let x = 0; x < 7; x += 1) setCellCost(grid, x, 0, 1);
+    for (let x = 1; x < 6; x += 1) setCellCost(grid, x, 2, 12);
+
+    const path = findPath(grid, 2 * 7, 2 * 7 + 6);
+    const simplified = simplifyPath(grid, path);
+
+    expect(simplified.some((cell) => Math.floor(cell / 7) === 0)).toBe(true);
+  });
+
   it('reuses one search workspace without leaking a previous route', () => {
     const grid = createNavigationGrid(12, 12);
     const workspace = createPathSearchWorkspace(grid.width * grid.height);

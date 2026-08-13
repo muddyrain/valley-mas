@@ -1,5 +1,6 @@
 import type { WorldMap } from '@/shared/gameTypes';
 import { isWalkable } from '../navigation/grid';
+import { hasLineOfSight } from '../navigation/simplifyPath';
 
 export type GridResourceKind = 'food' | 'wood' | 'stone';
 
@@ -14,6 +15,7 @@ export function findNearestGridResource(
   origin: number,
   kind: GridResourceKind,
   maxRadius = 22,
+  requireLineOfSight = false,
 ): number {
   const source = resourceArray(map, kind);
   const originX = origin % map.size;
@@ -33,7 +35,12 @@ export function findNearestGridResource(
       ) {
         if (Math.max(Math.abs(x - originX), Math.abs(z - originZ)) !== radius) continue;
         const cell = z * map.size + x;
-        if ((source[cell] ?? 0) === 0 || !isWalkable(map.navigation, cell)) continue;
+        if (
+          (source[cell] ?? 0) === 0 ||
+          !isWalkable(map.navigation, cell) ||
+          (requireLineOfSight && !hasLineOfSight(map.navigation, origin, cell))
+        )
+          continue;
         const distance = Math.abs(x - originX) + Math.abs(z - originZ);
         if (distance < bestDistance) {
           best = cell;

@@ -7,7 +7,7 @@ import {
   TerrainType,
   VillageTier,
 } from '@/shared/gameTypes';
-import { generateWorldMap } from '../map/generateWorldMap';
+import { generateWorldMap, navigationCostForTerrain } from '../map/generateWorldMap';
 import { editTerrain } from '../map/terrainEditing';
 import { addResourceNode } from '../resources/resourceNodes';
 import {
@@ -59,6 +59,12 @@ describe('world generation', () => {
     );
     expect(changed).toEqual(changedChunks);
     expect(changed).toEqual([5]);
+  });
+
+  it('never lets a road make water or mountains passable', () => {
+    expect(navigationCostForTerrain(TerrainType.ShallowOcean, true)).toBe(0);
+    expect(navigationCostForTerrain(TerrainType.Mountain, true)).toBe(0);
+    expect(navigationCostForTerrain(TerrainType.Grass, true)).toBe(1);
   });
 
   it('forms broad contiguous biomes instead of single-cell terrain noise', () => {

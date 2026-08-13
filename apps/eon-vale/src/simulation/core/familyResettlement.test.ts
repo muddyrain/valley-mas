@@ -20,6 +20,10 @@ describe('family resettlement', () => {
     destination.carryingCapacity = 24;
     source.resources.food = 160;
     destination.resources.food = 160;
+    source.resources.wood = 0;
+    source.resources.stone = 0;
+    destination.resources.wood = 0;
+    destination.resources.stone = 0;
 
     const residents = simulation.spawn(EntityKind.Human, source.x, source.z, 8);
     for (const id of residents) {

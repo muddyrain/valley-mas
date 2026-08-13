@@ -51,4 +51,16 @@ describe('resource logistics', () => {
     village.resources.wood = 160;
     expect(villageNeedsResource(village, ResourceNodeKind.Tree)).toBe(false);
   });
+
+  it('records real food deliveries for the next economy update', () => {
+    const simulation = createWorldSimulation({ seed: 'food-throughput', initialHumans: 0 });
+    const village = simulation.ensureVillageAt(64, 64, 1);
+    const resident = simulation.spawn(EntityKind.Human, 64, 64)[0] ?? -1;
+    simulation.state.entities.villageIds[resident] = village.id;
+    simulation.state.entities.carriedResourceKinds[resident] = CarriedResourceKind.Food;
+    simulation.state.entities.carriedResources[resident] = 3;
+
+    expect(depositCarriedResource(simulation.state, resident)).toBe(3);
+    expect(village.foodProducedSinceUpdate).toBe(3);
+  });
 });

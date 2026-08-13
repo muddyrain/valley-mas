@@ -45,6 +45,7 @@ export enum AgentState {
   Chase = 13,
   Attack = 14,
   Home = 15,
+  Craft = 16,
 }
 
 export enum ResourceNodeKind {
@@ -66,6 +67,10 @@ export enum CarriedResourceKind {
   Wood = 1,
   Stone = 2,
   Metal = 3,
+  Food = 4,
+  Tools = 5,
+  Equipment = 6,
+  CraftInputs = 7,
 }
 
 export enum Profession {
@@ -93,6 +98,72 @@ export enum ResidentRole {
 export enum ResidentSex {
   Female = 0,
   Male = 1,
+}
+
+export type ResidentTaskType =
+  | 'idle'
+  | 'eat'
+  | 'sleep'
+  | 'gather'
+  | 'haul'
+  | 'build'
+  | 'farm'
+  | 'craft'
+  | 'flee'
+  | 'guard';
+
+export type ResidentTaskReason =
+  | 'none'
+  | 'hunger'
+  | 'critical-hunger'
+  | 'fatigue'
+  | 'critical-fatigue'
+  | 'danger'
+  | 'village-needs-food'
+  | 'village-needs-wood'
+  | 'village-needs-stone'
+  | 'village-needs-metal'
+  | 'village-needs-tools'
+  | 'village-needs-equipment'
+  | 'village-needs-housing'
+  | 'village-construction'
+  | 'professional-duty';
+
+export type ResidentTaskPhase =
+  | 'reserved'
+  | 'travel'
+  | 'pickup'
+  | 'work'
+  | 'delivery'
+  | 'complete'
+  | 'suspended'
+  | 'failed';
+
+export type ResidentTaskTargetKind =
+  | 'none'
+  | 'cell'
+  | 'resource-node'
+  | 'building'
+  | 'village'
+  | 'entity';
+
+export interface ResidentTask {
+  id: number;
+  type: ResidentTaskType;
+  reason: ResidentTaskReason;
+  phase: ResidentTaskPhase;
+  targetKind: ResidentTaskTargetKind;
+  targetId: number;
+  targetCell: number;
+  progress: number;
+  requiredProgress: number;
+  leaseUntilTick: number;
+  suspendedUntilTick: number;
+  startedAtTick: number;
+  finishedAtTick: number;
+  failureReason: string | null;
+  suspensionReason: ResidentTaskReason | null;
+  expectedResult: string;
 }
 
 export enum BuildingType {
@@ -260,7 +331,11 @@ export interface EntityArrays {
   carriedResourceKinds: Uint8Array;
   carriedResources: Uint8Array;
   resourceTargetIds: Uint32Array;
+  homeBuildingIds: Uint32Array;
+  workBuildingIds: Uint32Array;
   names: string[];
+  tasks: Array<ResidentTask | null>;
+  suspendedTasks: Array<ResidentTask | null>;
   paths: Array<{ cells: number[]; cursor: number; mapVersion: number } | null>;
 }
 
@@ -283,7 +358,17 @@ export interface Building {
   inTransitWood: number;
   inTransitStone: number;
   clearNodeIds: number[];
+  assignedWorkerIds: number[];
+  workSlots: number;
 }
+
+export type ConstructionPriority =
+  | 'automatic'
+  | 'housing'
+  | 'storage'
+  | 'food'
+  | 'production'
+  | 'defense';
 
 export interface Village {
   id: number;
@@ -295,17 +380,26 @@ export interface Village {
   health: number;
   resources: Resources;
   storageCapacity: number;
+  storageCapacityByKind: Resources;
+  outdoorStockpile: Resources;
+  outdoorSinceTicks: Resources;
   housingCapacity: number;
+  campHousingCapacity: number;
+  operationsInitialized: boolean;
   kingdomId: number;
   buildingIds: number[];
   foundedAtTick: number;
   carryingCapacity: number;
   foodProduction: number;
+  foodProducedSinceUpdate: number;
   foodConsumption: number;
   foodTrend: number;
   shortageTicks: number;
   lastBirthTick: number;
   pioneerReadyAtTick: number;
+  constructionPriority: ConstructionPriority;
+  constructionDecision: string;
+  constructionOverrideReason: string;
   captureKingdomId?: number;
   captureProgress?: number;
 }
@@ -463,6 +557,7 @@ export interface WorldState {
   settings: WorldSettings;
   events: WorldEvent[];
   nextRequestId: number;
+  nextTaskId: number;
   nextEventId: number;
   forcedPeaceUntil: number;
   population: PopulationDiagnostics;

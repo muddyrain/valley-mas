@@ -7,7 +7,7 @@ import type {
   WorldMapSnapshot,
   WorldRenderSnapshot,
 } from '@/render/renderTypes';
-import { EntityKind, type WorldMap } from '@/shared/gameTypes';
+import { BuildingType, EntityKind, type WorldMap } from '@/shared/gameTypes';
 import {
   createPrototypeSimulation,
   type PrototypeSimulation,
@@ -157,6 +157,9 @@ function createWorldSnapshot(tickMs: number): WorldRenderSnapshot | null {
     weaponTiers: state.entities.weaponTiers.slice(0, count),
     armorTiers: state.entities.armorTiers.slice(0, count),
     ages: state.entities.age.slice(0, count),
+    targetCells: state.entities.targetCells.slice(0, count),
+    carriedResourceKinds: state.entities.carriedResourceKinds.slice(0, count),
+    carriedResources: state.entities.carriedResources.slice(0, count),
     stats: {
       year: state.year,
       humans,
@@ -197,6 +200,8 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
       (candidate) => candidate.id === state.entities.kingdomIds[id],
     );
     const target = state.entities.targetCells[id];
+    const homeId = state.entities.homeBuildingIds[id] ?? 0;
+    const workplaceId = state.entities.workBuildingIds[id] ?? 0;
     return {
       type: 'entity',
       id,
@@ -235,6 +240,17 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
         .filter((event) => event.message.includes(state.entities.names[id] ?? '\u0000'))
         .slice(-12)
         .map((event) => ({ tick: event.tick, message: event.message })),
+      task: structuredClone(state.entities.tasks[id] ?? null),
+      carriedResourceKind: state.entities.carriedResourceKinds[id] ?? 0,
+      carriedResourceAmount: state.entities.carriedResources[id] ?? 0,
+      homeName:
+        homeId > 0
+          ? `${BuildingType[state.buildings[homeId - 1]?.type ?? 0]} #${homeId}`
+          : '无固定住所',
+      workplaceName:
+        workplaceId > 0
+          ? `${BuildingType[state.buildings[workplaceId - 1]?.type ?? 0]} #${workplaceId}`
+          : '无固定工位',
     };
   }
   if (command.target === 'village') {
@@ -248,6 +264,65 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
       completedBuildings: village.buildingIds.filter((id) => state.buildings[id - 1]?.completed)
         .length,
       kingdomName: kingdom?.name ?? '无',
+    };
+  }
+  if (command.target === 'building') {
+    const building = state.buildings[command.id - 1];
+    if (!building) return null;
+    const village = state.villages.find((candidate) => candidate.id === building.villageId);
+    const capability: Record<BuildingType, string> = {
+      [BuildingType.TownCenter]: '聚落集会、建设计划与搬运调度',
+      [BuildingType.Home]: '容纳家庭并提供完整睡眠恢复',
+      [BuildingType.Farm]: '提供 3 个农务工位，承载播种与收割',
+      [BuildingType.Storage]: '每类资源增加 120 容量并提供取送端点',
+      [BuildingType.Barracks]: '训练与集结守卫',
+      [BuildingType.Road]: '提高陆地通行效率',
+      [BuildingType.LoggingCamp]: '提供 3 个伐木工位并组织林业任务',
+      [BuildingType.Mine]: '提供 3 个矿工工位并连接金属矿脉',
+      [BuildingType.Workshop]: '提供 2 个工匠工位并制作工具与装备',
+      [BuildingType.CouncilHall]: '聚落治理与议事',
+      [BuildingType.Wall]: '延缓敌军进入聚落',
+      [BuildingType.Watchtower]: '扩展边境警戒范围',
+    };
+    const inputs =
+      building.type === BuildingType.Workshop
+        ? '木材、金属'
+        : building.type === BuildingType.Farm
+          ? '农夫时间、可耕地'
+          : building.type === BuildingType.Mine
+            ? '矿工时间、金属矿脉'
+            : '无持续输入';
+    const outputs =
+      building.type === BuildingType.Workshop
+        ? '工具、装备'
+        : building.type === BuildingType.Farm
+          ? '可搬运食物'
+          : building.type === BuildingType.Mine
+            ? '可搬运金属'
+            : building.type === BuildingType.Home
+              ? '住房与休息'
+              : building.type === BuildingType.Storage
+                ? '受保护容量'
+                : '聚落能力';
+    return {
+      type: 'building',
+      id: building.id,
+      building: structuredClone(building),
+      villageName: village?.name ?? '无所属聚落',
+      workerNames: building.assignedWorkerIds.map(
+        (entityId) => state.entities.names[entityId] ?? `居民 ${entityId + 1}`,
+      ),
+      capability: capability[building.type],
+      inputs,
+      outputs,
+      stopReason:
+        building.health <= 0
+          ? '建筑已损毁'
+          : !building.completed
+            ? `施工阶段：${building.constructionPhase}`
+            : building.workSlots > 0 && building.assignedWorkerIds.length === 0
+              ? '暂无合适工人'
+              : '正常运行',
     };
   }
   const kingdom = state.kingdoms.find((candidate) => candidate.id === command.id);
@@ -347,6 +422,14 @@ workerScope.addEventListener('message', (event: MessageEvent<WorkerCommand>) => 
       emitWorldDeltas();
     }
     if (command.type === 'inspect') emit({ type: 'inspection', inspection: inspect(command) });
+    if (command.type === 'set-construction-priority' && world) {
+      const village = world.state.villages.find((candidate) => candidate.id === command.villageId);
+      if (village) village.constructionPriority = command.priority;
+      emit({
+        type: 'inspection',
+        inspection: inspect({ type: 'inspect', target: 'village', id: command.villageId }),
+      });
+    }
     if (command.type === 'request-save' && world)
       emit({ type: 'save-data', encoded: serializeWorld(world.state) });
     if (command.type === 'load-save') {
@@ -415,6 +498,9 @@ function runSimulationTick(): void {
           snapshot.weaponTiers.buffer,
           snapshot.armorTiers.buffer,
           snapshot.ages.buffer,
+          snapshot.targetCells.buffer,
+          snapshot.carriedResourceKinds.buffer,
+          snapshot.carriedResources.buffer,
         ]);
       }
     }

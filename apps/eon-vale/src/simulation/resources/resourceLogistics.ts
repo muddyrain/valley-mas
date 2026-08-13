@@ -29,6 +29,7 @@ export function collectResourceForCarrier(
   entityId: number,
   nodeId: number,
   tick = state.tick,
+  maximumAmount = CARRY_CAPACITY,
 ): number {
   if (!state.entities.active[entityId]) return 0;
   const nodeKind = state.resourceNodes.kind[nodeId] as ResourceNodeKind;
@@ -36,7 +37,7 @@ export function collectResourceForCarrier(
   const currentKind = state.entities.carriedResourceKinds[entityId] as CarriedResourceKind;
   const currentAmount = state.entities.carriedResources[entityId] ?? 0;
   if (currentAmount > 0 && currentKind !== carriedKind) return 0;
-  const remainingCapacity = Math.max(0, CARRY_CAPACITY - currentAmount);
+  const remainingCapacity = Math.max(0, Math.min(CARRY_CAPACITY - currentAmount, maximumAmount));
   if (remainingCapacity === 0) return 0;
   const harvested = harvestResourceNode(
     state.resourceNodes,
@@ -61,6 +62,11 @@ export function depositCarriedResource(state: WorldState, entityId: number): num
   if (kind === CarriedResourceKind.Wood) village.resources.wood += amount;
   else if (kind === CarriedResourceKind.Stone) village.resources.stone += amount;
   else if (kind === CarriedResourceKind.Metal) village.resources.metal += amount;
+  else if (kind === CarriedResourceKind.Food) {
+    village.resources.food += amount;
+    village.foodProducedSinceUpdate += amount;
+  } else if (kind === CarriedResourceKind.Tools) village.resources.tools += amount;
+  else if (kind === CarriedResourceKind.Equipment) village.resources.equipment += amount;
   else return 0;
   state.entities.carriedResources[entityId] = 0;
   state.entities.carriedResourceKinds[entityId] = CarriedResourceKind.None;

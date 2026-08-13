@@ -1739,6 +1739,23 @@ select:focus-visible {
   background: rgba(240, 206, 95, 0.1);
 }
 
+.inspector-select {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  color: #9aaca1;
+  font-size: 12px;
+}
+
+.inspector-select select {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(174, 205, 185, 0.18);
+  border-radius: 9px;
+  color: #dce9df;
+  background: #17221d;
+}
+
 .inspector-tabs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

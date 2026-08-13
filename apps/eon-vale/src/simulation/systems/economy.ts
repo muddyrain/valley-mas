@@ -71,8 +71,10 @@ export function startConstruction(
       state.resourceNodes,
       x + 0.5,
       z + 0.5,
-      type === BuildingType.Road ? 0.65 : 1.25,
+      type === BuildingType.TownCenter ? 4.5 : type === BuildingType.Road ? 0.65 : 1.25,
     ),
+    assignedWorkerIds: [],
+    workSlots: 0,
   };
   if (building.clearNodeIds.length > 0) building.constructionPhase = 'clearing';
   state.buildings.push(building);

@@ -5,7 +5,13 @@ import type {
   WorldMapSnapshot,
   WorldRenderSnapshot,
 } from '@/render/renderTypes';
-import type { EntityKind, GodPower, MapTool, WorldPreset } from '@/shared/gameTypes';
+import type {
+  ConstructionPriority,
+  EntityKind,
+  GodPower,
+  MapTool,
+  WorldPreset,
+} from '@/shared/gameTypes';
 import type { PrototypeMetrics, PrototypeSnapshot } from '@/simulation/core/prototypeSimulation';
 import type { WorldLawId } from '@/simulation/rules/worldLawCatalog';
 
@@ -24,7 +30,8 @@ export type WorkerCommand =
   | { type: 'map-edit'; tool: MapTool; cell: number; radius: number }
   | { type: 'spawn'; kind: EntityKind; cell: number; count: number }
   | { type: 'god-power'; power: GodPower; cell: number; radius: number }
-  | { type: 'inspect'; target: 'entity' | 'village' | 'kingdom'; id: number }
+  | { type: 'inspect'; target: 'entity' | 'village' | 'building' | 'kingdom'; id: number }
+  | { type: 'set-construction-priority'; villageId: number; priority: ConstructionPriority }
   | { type: 'request-save' }
   | { type: 'load-save'; encoded: string };
 

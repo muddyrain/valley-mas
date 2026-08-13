@@ -1,7 +1,8 @@
-import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
+import { Application, Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import {
   AgentState,
   BuildingType,
+  CarriedResourceKind,
   DiplomacyState,
   EntityKind,
   GodPower,
@@ -26,6 +27,7 @@ import {
   interactionStrokeWidth,
 } from './interactionFeedback';
 import { buildingFeedback, shouldEmitAttackHit } from './mapFeedback';
+import { estimateRenderBatches, normalizedDisplayFps } from './performanceMetrics';
 import {
   createPixelCamera,
   type PixelCamera,
@@ -43,7 +45,17 @@ import type {
   WorldMapSnapshot,
   WorldRenderSnapshot,
 } from './renderTypes';
+import { carriedResourceColor, usesTravelPose, usesWorkPose } from './residentPresentation';
 import { SnapshotInterpolator } from './SnapshotInterpolator';
+import {
+  type AnimalPose,
+  animalPose,
+  animationFrame,
+  type HumanFacing,
+  type HumanPose,
+  humanFacing,
+  humanPose,
+} from './spriteAnimation';
 import type { WorldViewLevel } from './strategicView';
 
 export interface RuntimeMetrics {
@@ -89,6 +101,7 @@ export interface EonValeEngineOptions {
 const RENDER_CHUNK_SIZE = 24;
 const SOURCE_PIXELS_PER_CELL = 4;
 const ENTITY_SOURCE_SCALE = WORLD_PIXELS_PER_CELL / 16;
+const WORLD_SETTLEMENT_LABEL_LIMIT = 12;
 const LOD_MASKS: Record<WorldViewLevel, number> = {
   world: 0b001,
   settlement: 0b010,
@@ -187,7 +200,20 @@ interface ClientResourceNodes {
 }
 
 class PixelTextureFactory {
+  private static readonly ATLAS_SIZE = 4_096;
+  private static readonly SLOT_SIZE = 48;
   private readonly textures = new Map<string, Texture>();
+  private readonly atlasCanvas = document.createElement('canvas');
+  private readonly atlasTexture: Texture;
+  private atlasCursor = 0;
+
+  constructor() {
+    this.atlasCanvas.width = PixelTextureFactory.ATLAS_SIZE;
+    this.atlasCanvas.height = PixelTextureFactory.ATLAS_SIZE;
+    this.atlasTexture = Texture.from(this.atlasCanvas);
+    this.atlasTexture.source.scaleMode = 'nearest';
+    this.atlasTexture.source.autoGenerateMipmaps = false;
+  }
 
   human(
     id: number,
@@ -196,8 +222,12 @@ class PixelTextureFactory {
     role: ResidentRole,
     weaponTier: number,
     armorTier: number,
+    carriedKind: CarriedResourceKind,
+    facing: HumanFacing,
+    pose: HumanPose,
+    frame: number,
   ): Texture {
-    const key = `human:${id % 12}:${profession}:${kingdomId}:${role}:${weaponTier}:${armorTier}`;
+    const key = `human:${id % 12}:${profession}:${kingdomId}:${role}:${weaponTier}:${armorTier}:${carriedKind}:${facing}:${pose}:${frame}`;
     return this.get(key, 16, 20, (context) => {
       const skin = ['#f3c7a1', '#dca77f', '#bb7d59', '#8b593e'][id % 4] ?? '#e1aa82';
       const hair =
@@ -208,8 +238,9 @@ class PixelTextureFactory {
       context.fillStyle = 'rgba(20, 31, 28, 0.25)';
       context.fillRect(4, 18, 9, 2);
       context.fillStyle = pants;
-      context.fillRect(5, 13, 3, 5);
-      context.fillRect(9, 13, 3, 5);
+      const walking = pose === 'walk' || pose === 'carry';
+      context.fillRect(5, 13 + (walking && frame % 2 === 0 ? 1 : 0), 3, 5);
+      context.fillRect(9, 13 + (walking && frame % 2 === 1 ? 1 : 0), 3, 5);
       context.fillStyle = cloth;
       context.fillRect(4, 8, 9, 7);
       context.fillStyle = shade(cloth, 1.22);
@@ -228,18 +259,29 @@ class PixelTextureFactory {
       context.fillRect(5, 2, 7, 3);
       context.fillRect(4, 3, 2, 4);
       if ((id + profession) % 3 === 0) context.fillRect(11, 4, 2, 3);
-      context.fillStyle = '#25272a';
-      context.fillRect(6, 6, 1, 1);
-      context.fillRect(10, 6, 1, 1);
+      if (facing !== 'north') {
+        context.fillStyle = '#25272a';
+        if (facing === 'south') {
+          context.fillRect(6, 6, 1, 1);
+          context.fillRect(10, 6, 1, 1);
+        } else {
+          context.fillRect(10, 6, 1, 1);
+        }
+      }
+      if (pose === 'sleep') {
+        context.fillStyle = shade(cloth, 0.82);
+        context.fillRect(3, 14, 11, 3);
+      }
       drawProfession(context, profession, weaponTier);
+      drawCarriedResource(context, carriedKind);
       drawRole(context, role);
     });
   }
 
-  animal(kind: EntityKind, variant: number): Texture {
-    const key = `animal:${kind}:${variant % 4}`;
+  animal(kind: EntityKind, variant: number, pose: AnimalPose, frame: number): Texture {
+    const key = `animal:${kind}:${variant % 4}:${pose}:${frame}`;
     const width = kind === EntityKind.Bear || kind === EntityKind.Cow ? 24 : 20;
-    return this.get(key, width, 16, (context) => drawAnimal(context, kind, variant));
+    return this.get(key, width, 16, (context) => drawAnimal(context, kind, variant, pose, frame));
   }
 
   building(type: BuildingType, kingdomId: number, stage: number, damaged: boolean): Texture {
@@ -250,8 +292,9 @@ class PixelTextureFactory {
   }
 
   destroy(): void {
-    for (const texture of this.textures.values()) texture.destroy(true);
+    for (const texture of this.textures.values()) texture.destroy(false);
     this.textures.clear();
+    this.atlasTexture.destroy(true);
   }
 
   private get(
@@ -269,9 +312,28 @@ class PixelTextureFactory {
     if (!context) throw new Error('无法创建像素纹理');
     context.imageSmoothingEnabled = false;
     draw(context);
-    const texture = Texture.from(canvas);
-    texture.source.scaleMode = 'nearest';
-    texture.source.autoGenerateMipmaps = false;
+    const columns = Math.floor(PixelTextureFactory.ATLAS_SIZE / PixelTextureFactory.SLOT_SIZE);
+    const atlasX = (this.atlasCursor % columns) * PixelTextureFactory.SLOT_SIZE;
+    const atlasY = Math.floor(this.atlasCursor / columns) * PixelTextureFactory.SLOT_SIZE;
+    if (atlasY + height > PixelTextureFactory.ATLAS_SIZE) {
+      throw new Error('像素动作图集容量不足');
+    }
+    const atlasContext = this.atlasCanvas.getContext('2d', { alpha: true });
+    if (!atlasContext) throw new Error('无法创建像素图集');
+    atlasContext.imageSmoothingEnabled = false;
+    atlasContext.clearRect(
+      atlasX,
+      atlasY,
+      PixelTextureFactory.SLOT_SIZE,
+      PixelTextureFactory.SLOT_SIZE,
+    );
+    atlasContext.drawImage(canvas, atlasX, atlasY);
+    this.atlasTexture.source.update();
+    const texture = new Texture({
+      source: this.atlasTexture.source,
+      frame: new Rectangle(atlasX, atlasY, width, height),
+    });
+    this.atlasCursor += 1;
     this.textures.set(key, texture);
     return texture;
   }
@@ -283,6 +345,7 @@ export class EonValeEngine {
   private readonly terrainLayer = new Container();
   private readonly territoryLayer = new Graphics({ roundPixels: true });
   private readonly buildingLayer = new Container();
+  private readonly stockpileLayer = new Graphics({ roundPixels: true });
   private readonly entityLayer = new Container();
   private readonly statusLayer = new Graphics({ roundPixels: true });
   private readonly combatStatusLayer = new Graphics({ roundPixels: true });
@@ -367,6 +430,7 @@ export class EonValeEngine {
       this.snapshot = snapshot as WorldRenderSnapshot;
       if (this.ready) {
         this.updateBuildings();
+        this.redrawOutdoorStockpiles();
         this.updateTerritories();
         this.updateSettlementLabels();
         this.collectAttackFeedback();
@@ -675,6 +739,7 @@ export class EonValeEngine {
       this.terrainLayer,
       this.territoryLayer,
       this.buildingLayer,
+      this.stockpileLayer,
       this.entityLayer,
       this.statusLayer,
       this.combatStatusLayer,
@@ -686,6 +751,7 @@ export class EonValeEngine {
     if (this.map) this.createTerrainChunks();
     if (this.snapshot) {
       this.updateBuildings();
+      this.redrawOutdoorStockpiles();
       this.updateTerritories();
       this.updateSettlementLabels();
     }
@@ -987,38 +1053,58 @@ export class EonValeEngine {
       const role = (latest.roles?.[entityId] ?? ResidentRole.Citizen) as ResidentRole;
       const weapon = latest.weaponTiers?.[entityId] ?? 0;
       const armor = latest.armorTiers?.[entityId] ?? 0;
+      const carriedKind = (this.snapshot?.carriedResourceKinds[entityId] ??
+        0) as CarriedResourceKind;
+      const facing = humanFacing(sample.heading);
+      const residentPose = humanPose(sample.state, carriedKind);
+      const creaturePose = animalPose(kind, sample.state);
+      const frame = animationFrame(
+        kind === EntityKind.Human ? residentPose : creaturePose,
+        latest.tick,
+        entityId,
+        kind !== EntityKind.Human,
+      );
       const visualKey =
         kind === EntityKind.Human
-          ? `h:${entityId % 12}:${profession}:${kingdomId}:${role}:${weapon}:${armor}`
-          : `a:${kind}:${entityId % 4}`;
+          ? `h:${entityId % 12}:${profession}:${kingdomId}:${role}:${weapon}:${armor}:${carriedKind}:${facing}:${residentPose}:${frame}`
+          : `a:${kind}:${entityId % 4}:${creaturePose}:${frame}`;
       if (this.entityTextureKeys[entityId] !== visualKey) {
         sprite.texture =
           kind === EntityKind.Human
-            ? this.textureFactory.human(entityId, profession, kingdomId, role, weapon, armor)
-            : this.textureFactory.animal(kind, entityId);
+            ? this.textureFactory.human(
+                entityId,
+                profession,
+                kingdomId,
+                role,
+                weapon,
+                armor,
+                carriedKind,
+                facing,
+                residentPose,
+                frame,
+              )
+            : this.textureFactory.animal(kind, entityId, creaturePose, frame);
         this.entityTextureKeys[entityId] = visualKey;
       }
-      const moving =
-        sample.state === AgentState.Wander ||
-        sample.state === AgentState.Chase ||
-        sample.state === AgentState.Flee ||
-        sample.state === AgentState.Home;
+      const moving = usesTravelPose(sample.state);
       const bob =
         this.viewLevel === 'resident' && moving && (Math.floor(now / 160) + entityId) % 2 === 0
           ? -0.25
           : 0;
-      const facing = Math.sin(sample.heading) < -0.08 ? -1 : 1;
+      const horizontalFacing = facing === 'west' ? -1 : 1;
       const attackFrame = attackThrustFrame(sample.state, latest.tick, entityId);
-      const thrust = attackFrame * facing * 0.45;
+      const thrust = attackFrame * horizontalFacing * 0.45;
       sprite.position.set(
         sample.x * WORLD_PIXELS_PER_CELL + thrust,
         sample.z * WORLD_PIXELS_PER_CELL + bob,
       );
-      sprite.rotation = attackFrame ? facing * 0.045 : 0;
+      const working = usesWorkPose(sample.state);
+      const workSwing = working ? Math.sin((latest.tick + entityId * 3) * 0.55) * 0.045 : 0;
+      sprite.rotation = attackFrame ? horizontalFacing * 0.045 : workSwing;
       const ageScale = kind === EntityKind.Human ? humanAgeScale(latest.ages?.[entityId] ?? 18) : 1;
       const viewScale = this.viewLevel === 'resident' ? 1 : 0.52;
       sprite.scale.set(
-        ENTITY_SOURCE_SCALE * facing * ageScale * viewScale,
+        ENTITY_SOURCE_SCALE * horizontalFacing * ageScale * viewScale,
         ENTITY_SOURCE_SCALE * ageScale * viewScale,
       );
       sprite.alpha = (latest.infected?.[entityId] ?? 0) > 0 ? 0.78 : 1;
@@ -1196,6 +1282,35 @@ export class EonValeEngine {
     this.canvas.dataset.buildingStatusVisible = String(visible > 0);
   }
 
+  private redrawOutdoorStockpiles(): void {
+    this.stockpileLayer.clear();
+    const snapshot = this.snapshot;
+    if (!snapshot || this.viewLevel === 'world') {
+      this.canvas.dataset.outdoorStockpiles = '0';
+      return;
+    }
+    const colors = [0xd8b94d, 0x8b623c, 0x89918c, 0x637a86, 0xd3a446, 0xaab3b1, 0xd4dadd];
+    let visible = 0;
+    for (const village of snapshot.villages) {
+      const amounts = Object.values(village.outdoorStockpile);
+      if (!amounts.some((amount) => amount > 0)) continue;
+      const originX = (village.x + 2.1) * WORLD_PIXELS_PER_CELL;
+      const originZ = (village.z + 1.4) * WORLD_PIXELS_PER_CELL;
+      this.stockpileLayer
+        .ellipse(originX + 3, originZ + 2, 8, 3)
+        .fill({ color: 0x2b332e, alpha: 0.35 });
+      amounts.forEach((amount, index) => {
+        if (amount <= 0) return;
+        const column = visible % 4;
+        this.stockpileLayer
+          .rect(originX + column * 2, originZ - Math.min(4, Math.ceil(amount / 20)), 2, 4)
+          .fill({ color: colors[index] ?? 0xb7a98a, alpha: 0.95 });
+        visible += 1;
+      });
+    }
+    this.canvas.dataset.outdoorStockpiles = String(visible);
+  }
+
   private updateTerritories(): void {
     const snapshot = this.snapshot;
     this.territoryLayer.clear();
@@ -1274,6 +1389,15 @@ export class EonValeEngine {
     const snapshot = this.snapshot;
     if (!snapshot) return;
     const visible = this.viewLevel !== 'resident';
+    const worldLabelIds =
+      this.viewLevel === 'world'
+        ? new Set(
+            [...snapshot.villages]
+              .sort((left, right) => right.population - left.population || left.id - right.id)
+              .slice(0, WORLD_SETTLEMENT_LABEL_LIMIT)
+              .map((village) => village.id),
+          )
+        : null;
     for (const village of snapshot.villages) {
       const label = this.settlementLabels.get(village.id);
       if (!label) continue;
@@ -1281,6 +1405,7 @@ export class EonValeEngine {
       label.position.set(Math.round(screen.x), Math.round(screen.y - 16));
       label.visible =
         visible &&
+        (!worldLabelIds || worldLabelIds.has(village.id)) &&
         screen.x > -100 &&
         screen.x < this.camera.viewportWidth + 100 &&
         screen.y > -60 &&
@@ -1290,6 +1415,15 @@ export class EonValeEngine {
     if (first) {
       const screen = worldToScreen(this.camera, first.x, first.z);
       this.canvas.dataset.firstVillageScreen = `${screen.x.toFixed(1)},${screen.y.toFixed(1)}`;
+    }
+    const firstBuilding = snapshot.buildings.find(
+      (building) => building.health > 0 && building.villageId === first?.id,
+    );
+    if (firstBuilding) {
+      const screen = worldToScreen(this.camera, firstBuilding.x, firstBuilding.z);
+      this.canvas.dataset.firstBuildingScreen = `${screen.x.toFixed(1)},${screen.y.toFixed(1)}`;
+    } else {
+      delete this.canvas.dataset.firstBuildingScreen;
     }
     this.canvas.dataset.settlementLabelsVisible = String(visible);
   }
@@ -1392,6 +1526,19 @@ export class EonValeEngine {
     };
     const hover = !this.brushVisible && drawTarget(this.hoveredTarget, 0x8fe49a, 'hover');
     const selected = drawTarget(this.selectedTarget, 0xffd86a, 'selected');
+    if (this.selectedTarget?.kind === 'entity' && this.snapshot && this.map) {
+      const targetCell = this.snapshot.targetCells[this.selectedTarget.id];
+      const point = this.targetPosition(this.selectedTarget);
+      if (point && targetCell !== undefined && targetCell !== 0xffff_ffff) {
+        this.interactionLayer
+          .moveTo(point.x * WORLD_PIXELS_PER_CELL, point.z * WORLD_PIXELS_PER_CELL)
+          .lineTo(
+            ((targetCell % this.map.size) + 0.5) * WORLD_PIXELS_PER_CELL,
+            (Math.floor(targetCell / this.map.size) + 0.5) * WORLD_PIXELS_PER_CELL,
+          )
+          .stroke({ color: 0xffd86a, width: 0.7, alpha: 0.5 });
+      }
+    }
     this.canvas.dataset.hoverHighlight = String(hover);
     this.canvas.dataset.selectionOutline = String(selected);
     this.canvas.dataset.hoverStrokePx = '1';
@@ -1506,6 +1653,7 @@ export class EonValeEngine {
     this.canvas.dataset.fullBodyResidents = String(level === 'resident');
     this.updateTerrainLod();
     this.updateBuildings();
+    this.redrawOutdoorStockpiles();
     this.redrawBuildingStatus();
     this.updateSettlementLabelPositions();
     this.options.onViewLevelChange?.(level);
@@ -1520,6 +1668,17 @@ export class EonValeEngine {
     if (x < 0 || z < 0 || x >= map.size || z >= map.size) return null;
     const click: WorldClick = { cell: z * map.size + x };
     if (this.brushVisible) return click;
+    if (this.viewLevel !== 'world') {
+      const centeredBuilding = this.snapshot?.buildings.find(
+        (building) =>
+          building.health > 0 && Math.hypot(building.x - world.x, building.z - world.z) < 0.72,
+      );
+      if (centeredBuilding) {
+        click.buildingId = centeredBuilding.id;
+        click.villageId = centeredBuilding.villageId;
+        return click;
+      }
+    }
     const latest = this.interpolator.latest;
     let bestEntityDistance = this.viewLevel === 'resident' ? 1.6 : 1.1;
     if (latest && this.viewLevel !== 'world') {
@@ -1710,17 +1869,30 @@ export class EonValeEngine {
     const visibleLabels = [...this.settlementLabels.values()].filter(
       (label) => label.visible,
     ).length;
-    const uniqueEntityTextures = Number(this.canvas.dataset.entityTextures ?? 0);
-    const estimatedBatches =
-      Math.ceil(this.terrainChunks.size / 16) +
-      Math.ceil(Math.max(1, uniqueEntityTextures) / 16) +
-      Math.ceil(Math.max(1, this.buildingSprites.size) / 16) +
-      (this.territoryLayer.context.instructions.length > 0 ? 1 : 0) +
-      (this.statusLayer.context.instructions.length > 0 ? 1 : 0) +
-      visibleLabels;
+    let visibleTerrainChunks = 0;
+    for (const chunk of this.terrainChunks.values()) {
+      const screen = worldToScreen(this.camera, chunk.x, chunk.z);
+      const screenSize = RENDER_CHUNK_SIZE * WORLD_PIXELS_PER_CELL * this.camera.zoom;
+      if (
+        screen.x + screenSize >= 0 &&
+        screen.x <= this.camera.viewportWidth &&
+        screen.y + screenSize >= 0 &&
+        screen.y <= this.camera.viewportHeight
+      ) {
+        visibleTerrainChunks += 1;
+      }
+    }
+    const estimatedBatches = estimateRenderBatches({
+      visibleTerrainChunks,
+      visibleEntities: this.visibleEntities,
+      visibleBuildings: this.buildingSprites.size,
+      territoryVisible: this.territoryLayer.context.instructions.length > 0,
+      statusVisible: this.statusLayer.context.instructions.length > 0,
+      visibleLabels,
+    });
     const latest = this.interpolator.latest;
     const metrics: RuntimeMetrics = {
-      fps: average > 0 ? 1_000 / average : 0,
+      fps: normalizedDisplayFps(average),
       frameP95Ms: p95,
       drawCalls: estimatedBatches,
       triangles:
@@ -1957,6 +2129,19 @@ function drawProfession(
   }
 }
 
+function drawCarriedResource(context: CanvasRenderingContext2D, kind: CarriedResourceKind): void {
+  if (kind === CarriedResourceKind.None) return;
+  context.fillStyle = 'rgba(29, 25, 20, 0.4)';
+  context.fillRect(1, 11, 5, 6);
+  context.fillStyle = carriedResourceColor(kind);
+  if (kind === CarriedResourceKind.Wood) {
+    context.fillRect(1, 11, 5, 2);
+    context.fillRect(1, 14, 5, 2);
+  } else {
+    context.fillRect(2, 12, 4, 4);
+  }
+}
+
 function drawRole(context: CanvasRenderingContext2D, role: ResidentRole): void {
   if (role === ResidentRole.King || role === ResidentRole.Leader) {
     context.fillStyle = role === ResidentRole.King ? '#f4cd4f' : '#c6d1d6';
@@ -1977,7 +2162,13 @@ function drawRole(context: CanvasRenderingContext2D, role: ResidentRole): void {
   }
 }
 
-function drawAnimal(context: CanvasRenderingContext2D, kind: EntityKind, variant: number): void {
+function drawAnimal(
+  context: CanvasRenderingContext2D,
+  kind: EntityKind,
+  variant: number,
+  pose: AnimalPose,
+  frame: number,
+): void {
   const colors: Partial<Record<EntityKind, readonly [string, string, string]>> = {
     [EntityKind.Chicken]: ['#f3ead1', '#d85d45', '#d5a443'],
     [EntityKind.Sheep]: ['#eee5cf', '#88745d', '#51483e'],
@@ -2021,11 +2212,14 @@ function drawAnimal(context: CanvasRenderingContext2D, kind: EntityKind, variant
     context.fillRect(7, 7, 3, 3);
   }
   context.fillStyle = head;
-  context.fillRect(width - 7, 5, 6, 6);
+  const headX = pose === 'attack' ? width - 6 : width - 7;
+  const headY = pose === 'eat' ? 8 : 5;
+  context.fillRect(headX, headY, 6, 6);
   context.fillStyle = detail;
   context.fillRect(width - 3, 7, 1, 1);
-  context.fillRect(5, 12, 2, 4);
-  context.fillRect(width - 9, 12, 2, 4);
+  const walking = pose === 'walk' || pose === 'attack';
+  context.fillRect(5, 12 + (walking && frame % 2 === 0 ? 1 : 0), 2, 4);
+  context.fillRect(width - 9, 12 + (walking && frame % 2 === 1 ? 1 : 0), 2, 4);
   context.fillRect(1, 7, 3, 2);
   if (kind === EntityKind.Deer) {
     context.fillRect(width - 6, 2, 1, 4);

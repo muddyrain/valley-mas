@@ -45,6 +45,9 @@ test.describe('long 8x browser soak', () => {
       expect(metrics?.fps ?? 0).toBeGreaterThanOrEqual(60);
       expect(metrics?.frameP95Ms ?? 999).toBeLessThanOrEqual(25);
       expect(metrics?.averageTickMs ?? 999).toBeLessThanOrEqual(4);
+      expect(metrics?.drawCalls ?? 999).toBeLessThanOrEqual(20);
+      expect(metrics?.triangles ?? 999_999).toBeLessThan(30_000);
+      expect(metrics?.pathQueue ?? 999_999).toBeLessThan(2_000);
       previousTick = currentTick;
     }
   });
@@ -193,6 +196,11 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   await page.getByTestId('follow-resident').click();
   const residentInspector = page.getByTestId('entity-inspector');
   await expect(residentInspector).toBeVisible();
+  await expect(residentInspector.getByText('原因', { exact: true })).toBeVisible();
+  await expect(residentInspector.getByText('阶段', { exact: true })).toBeVisible();
+  await expect(residentInspector.getByText('目的地', { exact: true })).toBeVisible();
+  await expect(residentInspector.getByText('预期结果', { exact: true })).toBeVisible();
+  await expect(residentInspector.getByText('携带', { exact: true })).toBeVisible();
   await expect.poll(async () => canvas.getAttribute('data-view-level')).toBe('resident');
   await expect(canvas).toHaveAttribute('data-terrain-lod', 'resident-4px');
   await residentInspector.getByRole('tab', { name: '成长' }).click();
@@ -206,14 +214,34 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   await residentInspector.getByRole('button', { name: '关闭' }).click();
 
   await page.getByTestId('village-chip-1').click();
-  await expect(page.getByTestId('village-inspector')).toBeVisible();
+  const villageInspector = page.getByTestId('village-inspector');
+  await expect(villageInspector).toBeVisible();
   await expect.poll(async () => canvas.getAttribute('data-view-level')).toBe('settlement');
   await expect(canvas).toHaveAttribute('data-terrain-lod', 'districts-4px');
   await expect(canvas).toHaveAttribute('data-selection-outline', 'true');
   await expect(canvas).toHaveAttribute('data-selection-stroke-px', '1.5');
   await expect(canvas).toHaveAttribute('data-selected-target', 'village:1');
-  await page.getByTestId('village-inspector').getByRole('button', { name: '关闭' }).click();
+  const constructionPriority = villageInspector.getByRole('combobox', { name: '建设优先' });
+  await constructionPriority.selectOption('food');
+  await expect(constructionPriority).toHaveValue('food');
+  await villageInspector.getByRole('button', { name: '关闭' }).click();
   await expect(canvas).toHaveAttribute('data-selection-outline', 'false');
+  await page.getByRole('button', { name: '观察', exact: true }).click();
+
+  const buildingScreen = (await canvas.getAttribute('data-first-building-screen'))
+    ?.split(',')
+    .map(Number);
+  const settlementBounds = await canvas.boundingBox();
+  if (!settlementBounds || !buildingScreen || buildingScreen.some(Number.isNaN)) {
+    throw new Error('首个建筑缺少聚落层屏幕坐标');
+  }
+  await canvas.click({ position: { x: buildingScreen[0] ?? 0, y: buildingScreen[1] ?? 0 } });
+  const buildingInspector = page.getByTestId('building-inspector');
+  await expect(buildingInspector).toBeVisible();
+  await expect(buildingInspector.getByText('能力', { exact: true })).toBeVisible();
+  await expect(buildingInspector.getByText('输入', { exact: true })).toBeVisible();
+  await expect(buildingInspector.getByText('输出', { exact: true })).toBeVisible();
+  await buildingInspector.getByRole('button', { name: '关闭' }).click();
   await page.getByTestId('return-to-world').click();
   await expect.poll(async () => canvas.getAttribute('data-view-level')).toBe('world');
 
@@ -272,6 +300,8 @@ test('runs the complete 384 world with 1000 residents and independent resource n
   expect(metrics?.fps ?? 0).toBeGreaterThanOrEqual(60);
   expect(metrics?.frameP95Ms ?? 999).toBeLessThanOrEqual(25);
   expect(metrics?.averageTickMs ?? 999).toBeLessThanOrEqual(4);
+  expect(metrics?.drawCalls ?? 999).toBeLessThanOrEqual(20);
+  expect(metrics?.triangles ?? 999_999).toBeLessThan(30_000);
 });
 
 for (const population of [100, 500, 1_000]) {
@@ -302,8 +332,11 @@ for (const population of [100, 500, 1_000]) {
     const metrics = await page.evaluate(() => window.__EON_METRICS__);
     console.info(JSON.stringify({ population, visibleResidents, ...metrics }));
     expect(metrics).toBeTruthy();
-    expect(metrics?.fps ?? 0).toBeGreaterThan(20);
-    expect(metrics?.frameP95Ms ?? 999).toBeLessThan(50);
+    expect(metrics?.fps ?? 0).toBeGreaterThanOrEqual(60);
+    expect(metrics?.frameP95Ms ?? 999).toBeLessThanOrEqual(25);
+    if (population === 1_000) {
+      expect(metrics?.averageTickMs ?? 999).toBeLessThanOrEqual(2.5);
+    }
     expect(metrics?.drawCalls ?? 999).toBeLessThanOrEqual(20);
     expect(metrics?.triangles ?? 999_999).toBeLessThan(30_000);
     expect(await canvas.getAttribute('data-metric-source')).toBe('pixi-batch-estimate');

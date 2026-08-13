@@ -144,6 +144,7 @@ export function App() {
   const seedRef = useRef(seed);
   const [snapshot, setSnapshot] = useState<WorldRenderSnapshot | null>(null);
   const [inspection, setInspection] = useState<Inspection | null>(null);
+  const inspectionRef = useRef<Inspection | null>(null);
   const [activeTool, setActiveTool] = useState<MapTool | null>(null);
   const [activePower, setActivePower] = useState<GodPower | null>(null);
   const [paused, setPaused] = useState(false);
@@ -185,6 +186,7 @@ export function App() {
   worldSizeRef.current = worldSize;
   worldPresetRef.current = worldPreset;
   snapshotRef.current = snapshot;
+  inspectionRef.current = inspection;
   stressPopulationRef.current = stressPopulation;
 
   clickHandlerRef.current = (click) => {
@@ -224,7 +226,7 @@ export function App() {
       setPopulationOpen(false);
       setEcologyOpen(false);
       engineRef.current?.setSelection({ kind: 'building', id: click.buildingId });
-      worker.inspect('village', click.villageId);
+      worker.inspect('building', click.buildingId);
     } else if (click.villageId !== undefined) {
       setPopulationOpen(false);
       setEcologyOpen(false);
@@ -273,6 +275,10 @@ export function App() {
       onWorldSnapshot: (next) => {
         engine.pushSnapshot(next);
         setSnapshot(next);
+        const currentInspection = inspectionRef.current;
+        if (currentInspection && next.tick % 5 === 0) {
+          worker.inspect(currentInspection.type, currentInspection.id);
+        }
       },
       onMap: (map) => {
         engine.setWorldMap(map);
@@ -673,6 +679,9 @@ export function App() {
             );
             engineRef.current?.setSelection({ kind: 'entity', id });
           }}
+          onConstructionPriority={(villageId, priority) =>
+            workerRef.current?.setConstructionPriority(villageId, priority)
+          }
           onClose={() => {
             setInspection(null);
             engineRef.current?.setSelection(null);
