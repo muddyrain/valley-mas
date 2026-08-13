@@ -1,5 +1,6 @@
 type LongScreenshotWindowTarget = {
   isDestroyed(): boolean;
+  once(event: 'ready-to-show', listener: () => void): void;
   showInactive(): void;
 };
 
@@ -7,7 +8,9 @@ export function showLongScreenshotWindow(
   window: LongScreenshotWindowTarget,
   beforeShow?: () => void,
 ): void {
-  if (window.isDestroyed()) return;
-  beforeShow?.();
-  window.showInactive();
+  window.once('ready-to-show', () => {
+    if (window.isDestroyed()) return;
+    beforeShow?.();
+    window.showInactive();
+  });
 }

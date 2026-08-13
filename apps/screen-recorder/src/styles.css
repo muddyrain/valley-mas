@@ -1450,6 +1450,32 @@ button:active:not(:disabled) {
   pointer-events: none;
 }
 
+.long-screenshot-notice {
+  position: absolute;
+  z-index: 2;
+  right: 8px;
+  bottom: 66px;
+  left: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 9px 10px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 9px;
+  color: #fff;
+  background: rgb(24 27 34 / 94%);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 28%);
+  font-size: 11px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+
+.long-screenshot-notice svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: #ffbf3f;
+}
+
 .long-screenshot-actions {
   display: flex;
   justify-self: center;

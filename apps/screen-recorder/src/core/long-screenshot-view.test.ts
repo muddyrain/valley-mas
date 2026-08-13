@@ -66,6 +66,19 @@ describe('long screenshot control layout', () => {
     });
   });
 
+  it('uses the actual first frame aspect ratio for the initial window bounds', () => {
+    expect(
+      getLongScreenshotControlLayout(
+        { x: 0, y: 0, width: 2560, height: 1440 },
+        { x: 266, y: 357, width: 789, height: 398 },
+        { width: 1578, height: 1200 },
+      ),
+    ).toEqual({
+      placement: 'right',
+      bounds: { x: 1067, y: 478, width: 280, height: 277 },
+    });
+  });
+
   it('grows a side preview upward until it reaches the selection height', () => {
     const workArea = { x: 0, y: 0, width: 2560, height: 1440 };
     const selection = { x: 266, y: 357, width: 789, height: 398 };

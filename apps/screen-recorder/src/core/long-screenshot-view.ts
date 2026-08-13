@@ -56,6 +56,7 @@ function getSideControlY(safeArea: Rectangle, selection: Rectangle, height: numb
 export function getLongScreenshotControlLayout(
   workArea: Rectangle,
   selection: Rectangle,
+  initialContent: Size = selection,
 ): LongScreenshotControlLayout {
   const safeArea = getSafeArea(workArea);
   const safeRight = safeArea.x + safeArea.width;
@@ -66,7 +67,7 @@ export function getLongScreenshotControlLayout(
   );
   const rightX = selection.x + selection.width + CONTROL_GAP;
   const rightWidth = Math.min(CONTROL_PREFERRED_WIDTH, safeRight - rightX);
-  const rightHeight = Math.min(getControlHeight(rightWidth, selection), sideMaximumHeight);
+  const rightHeight = Math.min(getControlHeight(rightWidth, initialContent), sideMaximumHeight);
   if (rightWidth >= CONTROL_MIN_WIDTH && rightHeight >= CONTROL_MIN_HEIGHT) {
     return {
       placement: 'right',
@@ -81,7 +82,7 @@ export function getLongScreenshotControlLayout(
 
   const leftSpace = selection.x - CONTROL_GAP - safeArea.x;
   const leftWidth = Math.min(CONTROL_PREFERRED_WIDTH, leftSpace);
-  const leftHeight = Math.min(getControlHeight(leftWidth, selection), sideMaximumHeight);
+  const leftHeight = Math.min(getControlHeight(leftWidth, initialContent), sideMaximumHeight);
   if (leftWidth >= CONTROL_MIN_WIDTH && leftHeight >= CONTROL_MIN_HEIGHT) {
     return {
       placement: 'left',
@@ -96,7 +97,7 @@ export function getLongScreenshotControlLayout(
 
   const edgeWidth = Math.min(CONTROL_PREFERRED_WIDTH, safeArea.width);
   const edgeX = clamp(selection.x + selection.width - edgeWidth, safeArea.x, safeRight - edgeWidth);
-  const edgeHeight = getControlHeight(edgeWidth, selection);
+  const edgeHeight = getControlHeight(edgeWidth, initialContent);
   const bottomY = selection.y + selection.height + CONTROL_GAP;
   const bottomHeight = Math.min(edgeHeight, safeBottom - bottomY);
   if (edgeWidth >= CONTROL_MIN_WIDTH && bottomHeight >= CONTROL_MIN_HEIGHT) {
@@ -127,7 +128,7 @@ export function getLongScreenshotControlLayout(
   );
   const cornerHeight = Math.max(
     1,
-    Math.min(getControlHeight(cornerWidth, selection), cornerArea.height - CONTROL_MARGIN * 2),
+    Math.min(getControlHeight(cornerWidth, initialContent), cornerArea.height - CONTROL_MARGIN * 2),
   );
   return {
     placement: 'corner',

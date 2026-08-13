@@ -141,8 +141,15 @@ describe('desktop installer configuration', () => {
       mainSource.indexOf('function fitOverlayToDisplay'),
       mainSource.indexOf('function createMainWindow'),
     );
+    const longScreenshotIndicatorSource = mainSource.slice(
+      mainSource.indexOf('function createLongScreenshotIndicatorWindow'),
+      mainSource.indexOf('function waitForWindowToShow'),
+    );
 
     expect(mainSource).toContain('getDisplayOverlayWindowOptions(process.platform)');
+    expect(longScreenshotIndicatorSource).toContain(
+      '...getDisplayOverlayWindowOptions(process.platform)',
+    );
     expect(fitOverlaySource).toContain("process.platform === 'darwin'");
     expect(fitOverlaySource).toContain('window.setBounds(display.bounds)');
     expect(fitOverlaySource).toContain('window.setContentBounds(display.bounds)');

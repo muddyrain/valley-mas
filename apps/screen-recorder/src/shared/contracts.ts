@@ -110,6 +110,7 @@ export type RecorderSnapshot = {
       frames: number;
       pixelHeight: number;
       previewSlices: Array<{ dataUrl: string; pixelHeight: number }>;
+      latestDirection: 'up' | 'down';
       startedAt: number;
       notice?: string;
       selectionFrame: Rectangle;

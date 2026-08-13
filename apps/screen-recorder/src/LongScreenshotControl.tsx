@@ -1,6 +1,15 @@
-import { Check, X } from 'lucide-react';
+import { Check, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { RecorderSnapshot } from './shared/contracts';
+
+export function LongScreenshotNotice({ notice }: { notice: string }) {
+  return (
+    <div className="long-screenshot-notice" role="status" aria-live="polite">
+      <TriangleAlert aria-hidden="true" size={16} strokeWidth={2.2} />
+      <span>{notice}</span>
+    </div>
+  );
+}
 
 export function LongScreenshotControl() {
   const [snapshot, setSnapshot] = useState<RecorderSnapshot>();
@@ -18,8 +27,10 @@ export function LongScreenshotControl() {
   useLayoutEffect(() => {
     if (previewCount < 1) return;
     const preview = previewRef.current;
-    if (preview) preview.scrollTop = preview.scrollHeight;
-  }, [previewCount]);
+    if (preview) {
+      preview.scrollTop = capture?.latestDirection === 'up' ? 0 : preview.scrollHeight;
+    }
+  }, [capture?.latestDirection, previewCount]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -81,6 +92,7 @@ export function LongScreenshotControl() {
           ))}
         </div>
       </section>
+      {capture.notice && <LongScreenshotNotice notice={capture.notice} />}
       <div className="long-screenshot-actions">
         <button
           type="button"

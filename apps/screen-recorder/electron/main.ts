@@ -37,11 +37,19 @@ import {
 import { shouldHandleGlobalShortcut } from '../src/core/global-shortcut';
 import { isAllowedIpcSender } from '../src/core/ipc-source';
 import {
+  appendLongScreenshotMatchHistory,
   type BitmapFrame,
   composeLongScreenshot,
-  detectVerticalShift,
-  extractAppendedFrame,
+  createLongScreenshotMatchHistory,
+  detectLongScreenshotHistoryPosition,
+  extractLongScreenshotAppendedFrame,
+  extractLongScreenshotPrependedFrame,
+  getLongScreenshotFrameUpdate,
+  getLongScreenshotNoticeState,
+  type LongScreenshotMatchHistory,
+  type LongScreenshotScrollState,
   type LongScreenshotSlice,
+  prependLongScreenshotMatchHistory,
 } from '../src/core/long-screenshot';
 import { registerLongScreenshotEscape } from '../src/core/long-screenshot-escape';
 import {
@@ -129,6 +137,7 @@ const TEST_AUTO_STOP_MS = Number(process.env.VALLEY_SCREEN_RECORDER_TEST_AUTO_ST
 // desktopCapturer can briefly occupy the compositor; let the shortcut overlay settle first.
 const SCREENSHOT_CAPTURE_PRIME_DELAY_MS = 300;
 const SELECTION_DISPLAY_FOLLOW_INTERVAL_MS = 80;
+const LONG_SCREENSHOT_SAMPLE_INTERVAL_MS = 300;
 const SCREENSHOT_PERMISSION_DENIED_MESSAGE =
   '屏幕捕获权限不可用。请允许 Valley Screen Recorder 录制屏幕；已授权时请重启应用。';
 const RECORDING_PERMISSION_DENIED_MESSAGE =
@@ -179,13 +188,17 @@ let longScreenshotCapture:
       controlLayout: LongScreenshotControlLayout;
       slices: LongScreenshotSlice[];
       lastFrame: BitmapFrame;
+      matchHistory: LongScreenshotMatchHistory;
+      scrollState: LongScreenshotScrollState;
       pixelHeight: number;
       previewSlices: Array<{ dataUrl: string; pixelHeight: number }>;
+      latestDirection: 'up' | 'down';
       startedAt: number;
       timer?: NodeJS.Timeout;
       captureHost?: QueryHost;
       sampling: boolean;
       notice?: string;
+      noticeVisibleUntil?: number;
     }
   | undefined;
 let pendingRecording:
@@ -383,6 +396,7 @@ function snapshot(): RecorderSnapshot {
             frames: longScreenshotCapture.slices.length,
             pixelHeight: longScreenshotCapture.pixelHeight,
             previewSlices: longScreenshotCapture.previewSlices,
+            latestDirection: longScreenshotCapture.latestDirection,
             startedAt: longScreenshotCapture.startedAt,
             notice: longScreenshotCapture.notice,
             selectionFrame: getLongScreenshotSelectionFrame(
@@ -1226,7 +1240,11 @@ function createLongScreenshotControlWindow(layout: LongScreenshotControlLayout):
       cancelLongScreenshot();
     }
   });
-  showLongScreenshotWindow(nextWindow);
+  showLongScreenshotWindow(nextWindow, () => {
+    if (longScreenshotControlWindow === nextWindow) {
+      nextWindow.setBounds(layout.bounds, false);
+    }
+  });
   nextWindow.on('closed', () => {
     if (longScreenshotControlWindow === nextWindow) longScreenshotControlWindow = undefined;
   });
@@ -1238,6 +1256,7 @@ function createLongScreenshotIndicatorWindow(display: Display): BrowserWindow {
   destroyLongScreenshotIndicatorWindow();
   const nextWindow = new BrowserWindow({
     ...display.bounds,
+    ...getDisplayOverlayWindowOptions(process.platform),
     useContentSize: true,
     show: false,
     transparent: true,
@@ -1563,9 +1582,15 @@ function updateLongScreenshotNotice(
   capture: NonNullable<typeof longScreenshotCapture>,
   notice: string | undefined,
 ): boolean {
-  if (capture.notice === notice) return false;
-  capture.notice = notice;
-  return true;
+  const next = getLongScreenshotNoticeState(
+    { notice: capture.notice, visibleUntil: capture.noticeVisibleUntil },
+    notice,
+    Date.now(),
+  );
+  const changed = capture.notice !== next.notice;
+  capture.notice = next.notice;
+  capture.noticeVisibleUntil = next.visibleUntil;
+  return changed;
 }
 
 async function copyScreenshot(png: Uint8Array): Promise<void> {
@@ -1618,24 +1643,61 @@ async function captureLongScreenshotFrame(): Promise<void> {
     }
     if (image.isEmpty()) throw new Error('长截图没有捕获到有效画面');
     const current = bitmapFrameFromImage(image);
-    const match = detectVerticalShift(capture.lastFrame, current);
-    if (!match) {
-      changed = updateLongScreenshotNotice(capture, '未识别到连续内容，请放慢滚动');
-      return;
-    }
-    if (match.shift === 0) {
-      changed = updateLongScreenshotNotice(capture, undefined);
-      return;
-    }
-    if (capture.pixelHeight + match.shift > 30_000) {
+    const previous = capture.lastFrame;
+    const historyPosition = detectLongScreenshotHistoryPosition(capture.matchHistory, current);
+    const match = historyPosition
+      ? {
+          shift:
+            capture.scrollState.capturedStartPosition +
+            historyPosition.position -
+            capture.scrollState.position,
+          score: historyPosition.score,
+        }
+      : undefined;
+    const frameUpdate = getLongScreenshotFrameUpdate(capture.scrollState, match);
+    const addedRows = frameUpdate.prependRows ?? frameUpdate.appendRows;
+    if (addedRows && capture.pixelHeight + addedRows > 30_000) {
       changed = updateLongScreenshotNotice(capture, '已达到 30000 px 上限，请完成截图');
       return;
     }
-    const appendedFrame = extractAppendedFrame(current, match.shift);
-    capture.slices.push({ frame: appendedFrame, appendRows: appendedFrame.height });
-    capture.previewSlices.push(createLongScreenshotPreviewSlice(appendedFrame));
-    capture.lastFrame = current;
-    capture.pixelHeight += match.shift;
+    if (frameUpdate.updateReference) {
+      capture.lastFrame = current;
+      capture.scrollState = frameUpdate.nextState;
+    }
+    if (!addedRows) {
+      changed = updateLongScreenshotNotice(capture, frameUpdate.notice);
+      return;
+    }
+    if (frameUpdate.prependRows) {
+      const prependedFrame = extractLongScreenshotPrependedFrame(
+        previous,
+        current,
+        frameUpdate.prependRows,
+      );
+      capture.matchHistory = prependLongScreenshotMatchHistory(
+        capture.matchHistory,
+        current,
+        frameUpdate.prependRows,
+      );
+      capture.slices.unshift({ frame: prependedFrame, appendRows: prependedFrame.height });
+      capture.previewSlices.unshift(createLongScreenshotPreviewSlice(prependedFrame));
+      capture.latestDirection = 'up';
+    } else if (frameUpdate.appendRows) {
+      const appendedFrame = extractLongScreenshotAppendedFrame(
+        previous,
+        current,
+        frameUpdate.appendRows,
+      );
+      capture.matchHistory = appendLongScreenshotMatchHistory(
+        capture.matchHistory,
+        current,
+        frameUpdate.appendRows,
+      );
+      capture.slices.push({ frame: appendedFrame, appendRows: appendedFrame.height });
+      capture.previewSlices.push(createLongScreenshotPreviewSlice(appendedFrame));
+      capture.latestDirection = 'down';
+    }
+    capture.pixelHeight += addedRows;
     const controlBounds = getLongScreenshotControlBoundsForContent(
       capture.display.workArea,
       capture.selection,
@@ -1645,7 +1707,7 @@ async function captureLongScreenshotFrame(): Promise<void> {
     if (longScreenshotControlWindow && !longScreenshotControlWindow.isDestroyed()) {
       longScreenshotControlWindow.setBounds(controlBounds, false);
     }
-    capture.notice = undefined;
+    updateLongScreenshotNotice(capture, undefined);
     changed = true;
   } catch (error) {
     changed = updateLongScreenshotNotice(
@@ -1684,7 +1746,11 @@ async function startLongScreenshot(operationId: string, firstPng: Uint8Array): P
   const firstImage = nativeImage.createFromBuffer(Buffer.from(firstPng));
   if (firstImage.isEmpty()) throw new Error('长截图首帧无法读取');
   const firstFrame = bitmapFrameFromImage(firstImage);
-  const controlLayout = getLongScreenshotControlLayout(task.display.workArea, selection);
+  const controlLayout = getLongScreenshotControlLayout(
+    task.display.workArea,
+    selection,
+    firstFrame,
+  );
   screenshotSession.beginLongCapture();
   screenshotEditorWindow?.hide();
   longScreenshotCapture = {
@@ -1694,8 +1760,11 @@ async function startLongScreenshot(operationId: string, firstPng: Uint8Array): P
     controlLayout,
     slices: [{ frame: firstFrame, appendRows: firstFrame.height }],
     lastFrame: firstFrame,
+    matchHistory: createLongScreenshotMatchHistory(firstFrame),
+    scrollState: { position: 0, capturedStartPosition: 0, capturedPosition: 0 },
     pixelHeight: firstFrame.height,
     previewSlices: [createLongScreenshotPreviewSlice(firstFrame)],
+    latestDirection: 'down',
     startedAt: Date.now(),
     sampling: false,
   };
@@ -1727,7 +1796,10 @@ async function startLongScreenshot(operationId: string, firstPng: Uint8Array): P
           5_000,
         )
       : undefined;
-    longScreenshotCapture.timer = setInterval(() => void captureLongScreenshotFrame(), 650);
+    longScreenshotCapture.timer = setInterval(
+      () => void captureLongScreenshotFrame(),
+      LONG_SCREENSHOT_SAMPLE_INTERVAL_MS,
+    );
   } catch (error) {
     screenshotSession.cancelEditing();
     clearLongScreenshotCapture();
