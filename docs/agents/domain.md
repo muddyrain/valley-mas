@@ -2,7 +2,7 @@
 
 This file records the domain-docs configuration created by `setup-matt-pocock-skills`.
 
-Valley MAS has not yet implemented real domain docs: there is currently no root `CONTEXT-MAP.md`, no root or context `CONTEXT.md`, and no ADR directory. Treat this file as compatibility configuration for Matt Pocock engineering skills, not as a default Valley MAS development entry point.
+Valley MAS has not yet implemented real domain docs: there is currently no root `CONTEXT-MAP.md`, no root or context `CONTEXT.md`, and no ADR directory. Treat this file as configuration for the optional Matt Pocock engineering skills, not as a default Valley MAS development entry point.
 
 For ordinary Valley MAS development, use `AGENTS.md`, `docs/PROJECT_GUIDE.md`, the relevant subproject `AGENTS.md`, and the current code as the source of truth.
 
@@ -13,7 +13,9 @@ For ordinary Valley MAS development, use `AGENTS.md`, `docs/PROJECT_GUIDE.md`, t
 - **`docs/adr/`** for system-wide decisions.
 - **Context-scoped ADRs**, such as `apps/<app>/docs/adr/`, `server/docs/adr/`, or `packages/<package>/docs/adr/`, for decisions local to a subproject or package.
 
-If any of these files don't exist, **proceed silently**. Don't flag their absence and don't suggest creating them upfront unless the user explicitly asks to establish domain docs or ADRs. Do not reference `/domain-modeling` or other unavailable skills as if they already exist in this repo.
+If any of these files don't exist, **proceed silently**. During ordinary implementation, don't suggest creating them upfront.
+
+The globally installed `/domain-modeling` skill may create or update the relevant `CONTEXT.md` and ADRs when the user explicitly invokes it, or when `/triage` invokes it to resolve a request. That does not make domain-doc maintenance a prerequisite for ordinary Valley MAS development.
 
 ## File structure
 
