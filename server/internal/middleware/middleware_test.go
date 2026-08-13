@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
@@ -14,6 +15,43 @@ import (
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
+
+func TestCorsAllowsWorkflowRequestHeaders(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(Cors())
+
+	for _, testCase := range []struct {
+		name             string
+		path             string
+		method           string
+		requestedHeaders string
+	}{
+		{name: "resume event stream", path: "/api/v1/workflows/1/runs/2/events", method: http.MethodGet, requestedHeaders: "authorization,last-event-id"},
+		{name: "retry run", path: "/api/v1/workflows/1/runs/2/retry", method: http.MethodPost, requestedHeaders: "authorization,x-workflow-retry-confirmed"},
+		{name: "resume run", path: "/api/v1/workflows/1/runs/2/resume", method: http.MethodPost, requestedHeaders: "authorization,x-workflow-resume-confirmed"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodOptions, testCase.path, nil)
+			req.Header.Set("Origin", "https://www.muddyrain.top")
+			req.Header.Set("Access-Control-Request-Method", testCase.method)
+			req.Header.Set("Access-Control-Request-Headers", testCase.requestedHeaders)
+			resp := httptest.NewRecorder()
+			router.ServeHTTP(resp, req)
+
+			if resp.Code != http.StatusNoContent {
+				t.Fatalf("expected status %d, got %d: %s", http.StatusNoContent, resp.Code, resp.Body.String())
+			}
+			allowedHeaders := strings.ToLower(resp.Header().Get("Access-Control-Allow-Headers"))
+			for _, requestedHeader := range strings.Split(testCase.requestedHeaders, ",") {
+				if !strings.Contains(allowedHeaders, requestedHeader) {
+					t.Fatalf("expected %s to be allowed, got %q", requestedHeader, resp.Header().Get("Access-Control-Allow-Headers"))
+				}
+			}
+		})
+	}
+}
 
 func TestAuthReturnsServiceUnavailableWhenDatabaseFails(t *testing.T) {
 	gin.SetMode(gin.TestMode)
