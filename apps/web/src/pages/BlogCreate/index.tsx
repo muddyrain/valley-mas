@@ -1,7 +1,7 @@
 import {
   ArrowLeft,
+  CheckCircle2,
   Clock3,
-  FileStack,
   FileUp,
   ImagePlus,
   Loader2,
@@ -38,13 +38,19 @@ import {
   BLOG_COVER_AI_ASPECT_RATIO,
   BLOG_COVER_AI_QUALITY,
 } from '@/components/blog/AICoverAssistantDialog';
-import { BatchMarkdownImportDialog } from '@/components/blog/BatchMarkdownImportDialog';
 import { BlogCoverPreview } from '@/components/blog/BlogCoverPreview';
-import { BlogWorkflowDialog } from '@/components/blog/BlogWorkflowDialog';
 import { CoverCropDialog } from '@/components/blog/CoverCropDialog';
 import { CoverPickerDialog } from '@/components/blog/CoverPickerDialog';
 import { MdxMarkdownEditor } from '@/components/blog/MdxMarkdownEditor';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -56,6 +62,11 @@ import {
   readBlogCoverGenerationRecovery,
   writeBlogCoverGenerationRecovery,
 } from './blogCoverGenerationRecovery';
+import {
+  clearStudioArticleDraft,
+  readStudioArticleDraft,
+  writeStudioArticleDraft,
+} from './studioArticleDraft';
 import { waitNextPaint } from './utils';
 
 type CoverImageMeta = {
@@ -102,16 +113,19 @@ export default function BlogCreate() {
     returnTo?: string;
     returnLabel?: string;
     refreshPostsAt?: number;
+    generatedCover?: string;
+    generatedCoverId?: string;
   } | null) ?? { returnTo: '', returnLabel: '' };
-  const returnTo = navigationState.returnTo || '/my-space/posts';
+  const returnTo = navigationState.returnTo || '/studio/articles';
   const returnLabel = navigationState.returnLabel || '返回';
+  const generatedCover = navigationState.generatedCover?.trim() || '';
   const [loadedPostStatus, setLoadedPostStatus] = useState<'draft' | 'published' | 'archived'>(
     'draft',
   );
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupId, setGroupId] = useState('');
-  const [visibility, setVisibility] = useState<Visibility>('private');
+  const [visibility, setVisibility] = useState<Visibility>('public');
   const [title, setTitle] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [cover, setCover] = useState('');
@@ -134,8 +148,8 @@ export default function BlogCreate() {
     useState<CoverRecoveryTransition | null>(null);
   const [showCoverRecoveryNotice, setShowCoverRecoveryNotice] = useState(false);
   const [importingMarkdown, setImportingMarkdown] = useState(false);
-  const [batchImportDialogOpen, setBatchImportDialogOpen] = useState(false);
-  const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
+  const [publishReviewOpen, setPublishReviewOpen] = useState(false);
+  const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
@@ -159,6 +173,7 @@ export default function BlogCreate() {
   const coverRecoveryNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiCoverGenerationSessionRef = useRef(0);
   const recoveredEditorScopeRef = useRef('');
+  const restoredArticleDraftScopeRef = useRef('');
 
   useEffect(() => {
     currentEditingIdRef.current = editingId;
@@ -168,13 +183,10 @@ export default function BlogCreate() {
     try {
       const list = await getAdminGroups({ groupType: 'blog' });
       setGroups(list || []);
-      if (list?.[0]?.id) {
-        setGroupId((current) => (!current || !isEditMode ? list[0].id : current));
-      }
     } catch {
-      toast.error('加载分组失败');
+      toast.error('加载专栏失败');
     }
-  }, [isEditMode]);
+  }, []);
 
   const loadPost = useCallback(
     async (postId: string) => {
@@ -183,8 +195,8 @@ export default function BlogCreate() {
         const detail = await getAdminPostDetail(postId);
         if (currentEditingIdRef.current !== postId) return;
         if (detail.postType !== 'blog') {
-          toast.error('当前仅支持编辑博客类型内容');
-          navigate('/my-space');
+          toast.error('当前文章需要使用兼容编辑器打开');
+          navigate('/studio/articles');
           return;
         }
         setTitle(detail.title || '');
@@ -196,12 +208,12 @@ export default function BlogCreate() {
         setAiPickExcludedIds([]);
         setContent(detail.content || '');
         setGroupId(detail.groupId || '');
-        setVisibility(detail.visibility || 'private');
+        setVisibility(detail.visibility || 'public');
         setLoadedPostStatus(detail.status || 'draft');
         setLoadedEditorScope(postId);
       } catch {
-        toast.error('加载博客内容失败');
-        navigate('/my-space');
+        toast.error('加载文章失败');
+        navigate('/studio/articles');
       } finally {
         if (currentEditingIdRef.current === postId) {
           setLoadingPost(false);
@@ -212,7 +224,7 @@ export default function BlogCreate() {
   );
 
   useEffect(() => {
-    // 彻底禁用本地草稿缓存，并清理历史遗留数据
+    // 清理旧编辑器遗留的单键草稿，新的创作室草稿按用户和文章隔离。
     if (!isEditMode) {
       try {
         localStorage.removeItem('valley-blog-create-draft-v3');
@@ -266,7 +278,7 @@ export default function BlogCreate() {
     setPendingUnsplashDownloadLocation('');
     setAiPickExcludedIds([]);
     setContent('');
-    setVisibility('private');
+    setVisibility('public');
     setGroupId('');
     setLoadingPost(false);
     setLoadedPostStatus('draft');
@@ -286,10 +298,80 @@ export default function BlogCreate() {
       void loadPost(editingId);
     } else {
       resetCreateForm();
+      const restoreScope = `${user?.id || 'anonymous'}:new`;
+      if (user?.id && restoredArticleDraftScopeRef.current !== restoreScope) {
+        restoredArticleDraftScopeRef.current = restoreScope;
+        const restored = readStudioArticleDraft(localStorage, user.id, 'new');
+        if (restored) {
+          setTitle(restored.title);
+          setContent(restored.content);
+          setExcerpt(restored.excerpt);
+          setGroupId(restored.groupId);
+          setVisibility(restored.visibility);
+          setCover(restored.cover);
+          if (restored.cover) setPendingCoverRemoteUrl(restored.cover);
+          toast.info('已恢复自动保存的文章');
+        }
+      }
+      if (generatedCover) {
+        setCover(generatedCover);
+        setCoverStorageKey('');
+        setPendingCoverRemoteUrl(generatedCover);
+      }
     }
-  }, [isAuthenticated, navigate, editingId, loadGroups, loadPost, resetCreateForm]);
+  }, [
+    editingId,
+    generatedCover,
+    isAuthenticated,
+    loadGroups,
+    loadPost,
+    navigate,
+    resetCreateForm,
+    user?.id,
+  ]);
 
   const editorRecoveryScope = editingId || 'new';
+
+  const clearAutoSavedArticle = useCallback(() => {
+    if (!user?.id) return;
+    clearStudioArticleDraft(localStorage, user.id, editorRecoveryScope);
+    setAutoSaveState('idle');
+  }, [editorRecoveryScope, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !loadedEditorScope || loadingPost) return;
+    if (!title.trim() && !content.trim() && !cover.trim()) return;
+    setAutoSaveState('saving');
+    const timeoutId = window.setTimeout(() => {
+      try {
+        writeStudioArticleDraft(localStorage, user.id, editorRecoveryScope, {
+          title,
+          content,
+          excerpt,
+          groupId,
+          visibility,
+          cover: coverObjectUrl || cover,
+          savedAt: Date.now(),
+        });
+        setAutoSaveState('saved');
+      } catch {
+        setAutoSaveState('idle');
+      }
+    }, 800);
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    content,
+    cover,
+    coverObjectUrl,
+    editorRecoveryScope,
+    excerpt,
+    groupId,
+    loadedEditorScope,
+    loadingPost,
+    title,
+    user?.id,
+    visibility,
+  ]);
 
   const rememberCoverGeneration = useCallback(
     (generationId: string) => {
@@ -769,13 +851,13 @@ export default function BlogCreate() {
           });
           if (status === 'published') {
             setLoadedPostStatus('published');
-            toast.success('博客更新并发布成功');
+            toast.success('文章已更新并发布');
           } else if (loadedPostStatus === 'published') {
             toast.success('草稿已保存，当前线上正文未受影响');
           } else if (options?.fromShortcut) {
             toast.success('草稿已快捷保存（未离开当前页面）');
           } else {
-            toast.success('博客更新成功');
+            toast.success('文章草稿已更新');
           }
         } else {
           await createPost({
@@ -791,10 +873,11 @@ export default function BlogCreate() {
             publishNow: status === 'published',
           });
           setLoadedPostStatus(status);
-          toast.success(status === 'published' ? '博客发布成功' : '草稿保存成功');
+          toast.success(status === 'published' ? '文章已发布' : '草稿保存成功');
         }
 
         clearRememberedCoverGeneration();
+        clearAutoSavedArticle();
 
         if (!options?.stayOnPage) {
           if (isEditMode) {
@@ -824,6 +907,7 @@ export default function BlogCreate() {
       editingId,
       uploadCoverIfNeeded,
       clearRememberedCoverGeneration,
+      clearAutoSavedArticle,
       navigate,
       returnTo,
     ],
@@ -910,7 +994,7 @@ export default function BlogCreate() {
     discardCoverGeneration();
     setAiPickExcludedIds((prev) => (prev.includes(resource.id) ? prev : [...prev, resource.id]));
     setWallpaperPickerOpen(false);
-    toast.success('已选择公用壁纸，发布时会自动转存为你的博客封面');
+    toast.success('已选择图片，保存时会转存为文章封面');
   };
 
   const handleSelectExternalCoverImage = (image: ExternalCoverImage) => {
@@ -932,7 +1016,7 @@ export default function BlogCreate() {
       setPendingUnsplashDownloadLocation('');
     }
     setWallpaperPickerOpen(false);
-    toast.success('已选择外部图源封面，发布时会自动转存到你的博客');
+    toast.success('已选择外部图片，保存时会转存为文章封面');
   };
 
   const handleAIPickCover = async () => {
@@ -1004,7 +1088,7 @@ export default function BlogCreate() {
   const handleCreateGroup = async () => {
     const name = newGroupName.trim();
     if (!name) {
-      toast.error('请输入分组名称');
+      toast.error('请输入专栏名称');
       return;
     }
     try {
@@ -1014,14 +1098,14 @@ export default function BlogCreate() {
         groupType: 'blog',
         description: newGroupDesc.trim() || undefined,
       });
-      toast.success('分组创建成功');
+      toast.success('专栏创建成功');
       setShowCreateGroup(false);
       setNewGroupName('');
       setNewGroupDesc('');
       await loadGroups();
       setGroupId(created.id);
     } catch {
-      toast.error('分组创建失败，请稍后重试');
+      toast.error('专栏创建失败，请稍后重试');
     } finally {
       setCreatingGroup(false);
     }
@@ -1052,7 +1136,7 @@ export default function BlogCreate() {
               <span className="absolute inset-0 rounded-xl border border-primary/15" />
             </span>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">正在加载博客内容...</p>
+              <p className="text-sm font-medium text-foreground">正在加载文章...</p>
               <p className="text-xs text-muted-foreground">即将恢复编辑状态</p>
             </div>
           </div>
@@ -1094,16 +1178,20 @@ export default function BlogCreate() {
               {returnLabel}
             </Button>
             <h1 className="text-xl font-semibold text-foreground md:text-2xl">
-              {isEditMode ? '编辑博客' : '博客创作'}
+              {isEditMode ? '编辑文章' : '写文章'}
             </h1>
             <span className="bg-accent text-primary rounded-full border-border/50 border px-3 py-1 text-xs shadow-sm">
-              Markdown Pro
+              Markdown
             </span>
           </div>
           <div className="flex items-center gap-2">
             <span className="hidden items-center gap-1 rounded-lg bg-muted px-2.5 py-1 text-xs text-muted-foreground md:inline-flex">
               <Clock3 className="h-3.5 w-3.5" />
-              Ctrl/Cmd + S 草稿保存
+              {autoSaveState === 'saving'
+                ? '正在自动保存'
+                : autoSaveState === 'saved'
+                  ? '已自动保存'
+                  : 'Ctrl/Cmd + S 保存'}
             </span>
             <Button
               type="button"
@@ -1119,30 +1207,6 @@ export default function BlogCreate() {
               )}
               {importingMarkdown ? '导入中' : '导入 MD'}
             </Button>
-            {!isEditMode && (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={actionBusy || loadingPost}
-                onClick={() => setWorkflowDialogOpen(true)}
-                className="rounded-xl border-primary text-primary hover:bg-accent"
-              >
-                <Sparkles className="mr-2 h-4 w-4" />
-                AI 工作流
-              </Button>
-            )}
-            {!isEditMode && (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={actionBusy || loadingPost}
-                onClick={() => setBatchImportDialogOpen(true)}
-                className="rounded-xl"
-              >
-                <FileStack className="mr-2 h-4 w-4" />
-                批量导入 MD
-              </Button>
-            )}
             <Button
               variant="outline"
               disabled={actionBusy}
@@ -1154,21 +1218,11 @@ export default function BlogCreate() {
             </Button>
             <Button
               disabled={actionBusy}
-              onClick={() => void handleSubmit('published')}
+              onClick={() => setPublishReviewOpen(true)}
               className="rounded-xl"
             >
-              {submitIntent === 'published' && submitting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="mr-2 h-4 w-4" />
-              )}
-              {submitIntent === 'published' && submitting
-                ? isEditMode
-                  ? '更新发布中'
-                  : '发布中'
-                : isEditMode
-                  ? '更新并发布'
-                  : '发布博客'}
+              <Send className="mr-2 h-4 w-4" />
+              发布检查
             </Button>
             <input
               ref={markdownImportInputRef}
@@ -1183,7 +1237,7 @@ export default function BlogCreate() {
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.46fr)_minmax(340px,0.72fr)]">
           <section className="w-full min-w-0 rounded-2xl border-border/50 bg-card/95 p-4 shadow-sm md:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-sm text-muted-foreground">写作区</div>
+              <div className="text-sm text-muted-foreground">内容画布</div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>字数：{wordCount}</span>
                 <span>预计阅读：{readMinutes} 分钟</span>
@@ -1218,7 +1272,7 @@ export default function BlogCreate() {
             >
               <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
                 <Sparkles className="text-primary h-4 w-4" />
-                发布设置
+                文章准备
               </div>
 
               <div className="space-y-3">
@@ -1237,7 +1291,7 @@ export default function BlogCreate() {
                       ) : (
                         <Sparkles className="h-3.5 w-3.5" />
                       )}
-                      {aiExcerptLoading ? '提取中' : 'AI截取摘要'}
+                      {aiExcerptLoading ? '生成中' : 'AI 生成摘要'}
                     </button>
                   </div>
                   <Input
@@ -1332,8 +1386,7 @@ export default function BlogCreate() {
                   <div className="mb-2 text-xs text-muted-foreground">可见范围</div>
                   <div className="flex flex-wrap gap-2 rounded-xl border-border/50 border p-2">
                     {[
-                      { label: '私密', value: 'private' as const },
-                      { label: '共享', value: 'shared' as const },
+                      { label: '仅自己', value: 'private' as const },
                       { label: '公开', value: 'public' as const },
                     ].map((item) => (
                       <button
@@ -1354,14 +1407,14 @@ export default function BlogCreate() {
 
                 <div>
                   <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>文章分组</span>
+                    <span>专栏</span>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                        onClick={() => navigate('/my-space/blog-groups?type=blog')}
+                        onClick={() => navigate('/studio/columns?type=blog')}
                       >
-                        管理分组
+                        管理专栏
                       </button>
                       <button
                         type="button"
@@ -1369,7 +1422,7 @@ export default function BlogCreate() {
                         onClick={() => setShowCreateGroup((v) => !v)}
                       >
                         <Plus className="h-3 w-3" />
-                        新建分组
+                        新建专栏
                       </button>
                     </div>
                   </div>
@@ -1383,7 +1436,7 @@ export default function BlogCreate() {
                           : 'bg-card text-muted-foreground hover:bg-muted'
                       }`}
                     >
-                      未分组
+                      未设专栏
                     </button>
                     {groups.map((item) => (
                       <button
@@ -1406,13 +1459,13 @@ export default function BlogCreate() {
                       <Input
                         value={newGroupName}
                         onChange={(e) => setNewGroupName(e.target.value)}
-                        placeholder="分组名称，例如：前端思考"
+                        placeholder="专栏名称，例如：React"
                         className="mb-2 rounded-lg bg-card"
                       />
                       <Input
                         value={newGroupDesc}
                         onChange={(e) => setNewGroupDesc(e.target.value)}
-                        placeholder="分组描述（可选）"
+                        placeholder="专栏描述（可选）"
                         className="mb-2 rounded-lg bg-card"
                       />
                       <div className="flex justify-end gap-2">
@@ -1467,20 +1520,68 @@ export default function BlogCreate() {
         onSelectResource={handleSelectPublicWallpaperCover}
         onSelectExternalImage={handleSelectExternalCoverImage}
       />
-      <BatchMarkdownImportDialog
-        open={batchImportDialogOpen}
-        onOpenChange={setBatchImportDialogOpen}
-        groups={groups}
-        defaultGroupId={groupId}
-        defaultVisibility={visibility}
-      />
-      <BlogWorkflowDialog
-        open={workflowDialogOpen}
-        onOpenChange={setWorkflowDialogOpen}
-        groups={groups}
-        defaultGroupId={groupId}
-        defaultVisibility={visibility}
-      />
+      <Dialog open={publishReviewOpen} onOpenChange={setPublishReviewOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>发布检查</DialogTitle>
+            <DialogDescription>确认标题、摘要、专栏、封面与可见范围。</DialogDescription>
+          </DialogHeader>
+          <dl className="divide-y divide-border border-y border-border text-sm">
+            <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4 py-3">
+              <dt className="text-muted-foreground">标题</dt>
+              <dd className={title.trim() ? 'font-medium' : 'text-destructive'}>
+                {title.trim() || '尚未填写'}
+              </dd>
+            </div>
+            <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4 py-3">
+              <dt className="text-muted-foreground">摘要</dt>
+              <dd>{excerpt.trim() || '发布时从正文生成'}</dd>
+            </div>
+            <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4 py-3">
+              <dt className="text-muted-foreground">专栏</dt>
+              <dd>{groups.find((group) => group.id === groupId)?.name || '未设专栏'}</dd>
+            </div>
+            <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4 py-3">
+              <dt className="text-muted-foreground">封面</dt>
+              <dd>{cover || coverObjectUrl ? '已准备' : '未设置'}</dd>
+            </div>
+            <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4 py-3">
+              <dt className="text-muted-foreground">范围</dt>
+              <dd>
+                {visibility === 'public' ? '公开' : visibility === 'shared' ? '兼容共享' : '仅自己'}
+              </dd>
+            </div>
+          </dl>
+          {!content.trim() ? (
+            <p className="text-sm text-destructive">正文为空，暂时不能发布。</p>
+          ) : (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CheckCircle2 className="size-4 text-primary" />
+              正文 {wordCount} 字，预计阅读 {readMinutes} 分钟
+            </p>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPublishReviewOpen(false)}>
+              返回修改
+            </Button>
+            <Button
+              type="button"
+              disabled={actionBusy || !title.trim() || !content.trim()}
+              onClick={() => {
+                setPublishReviewOpen(false);
+                void handleSubmit('published');
+              }}
+            >
+              {submitIntent === 'published' && submitting ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Send />
+              )}
+              确认发布
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

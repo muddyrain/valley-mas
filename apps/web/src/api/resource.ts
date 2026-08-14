@@ -19,6 +19,10 @@ export interface Resource {
   userName: string;
   userAvatar: string;
   tags?: string[];
+  sourceKind?: 'original' | 'ai_generated' | 'licensed' | '';
+  sourceUrl?: string;
+  license?: 'download_allowed' | 'preview_only' | '';
+  downloadAllowed?: boolean;
   createdAt: string;
   size?: number;
   width?: number; // 图片宽度（px）
@@ -179,6 +183,10 @@ export interface MyResource {
   createdAt: string;
   storageKey: string;
   tags?: string[];
+  sourceKind?: 'original' | 'ai_generated' | 'licensed' | '';
+  sourceUrl?: string;
+  license?: 'download_allowed' | 'preview_only' | '';
+  downloadAllowed?: boolean;
 }
 
 interface MyResourcesResponse {
@@ -237,6 +245,10 @@ export const updateResource = (
     type?: string;
     visibility?: ResourceVisibility;
     tags?: string[];
+    sourceKind?: 'original' | 'ai_generated' | 'licensed';
+    sourceUrl?: string;
+    license?: 'download_allowed' | 'preview_only';
+    downloadAllowed?: boolean;
   },
 ) => {
   return http.patch<
@@ -248,6 +260,10 @@ export const updateResource = (
       type: string;
       visibility?: ResourceVisibility;
       tags?: string[];
+      sourceKind?: string;
+      sourceUrl?: string;
+      license?: string;
+      downloadAllowed?: boolean;
     }
   >(`/content/resources/${id}`, data);
 };

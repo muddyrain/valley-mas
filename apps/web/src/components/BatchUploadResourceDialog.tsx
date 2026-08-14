@@ -43,6 +43,12 @@ import {
   MAX_BATCH_RESOURCE_UPLOAD_IMAGES,
 } from '@/utils/batchResourceUpload';
 import {
+  appendResourcePolicyFormData,
+  RESOURCE_LICENSE_LABELS,
+  RESOURCE_SOURCE_LABELS,
+  type ResourcePolicy,
+} from '@/utils/resourcePolicy';
+import {
   confirmUploadResult,
   createUploadKey,
   shouldConfirmUploadResult,
@@ -83,6 +89,7 @@ export interface BatchUploadResourceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  policy?: ResourcePolicy;
 }
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
@@ -132,6 +139,7 @@ export default function BatchUploadResourceDialog({
   open,
   onOpenChange,
   onSuccess,
+  policy,
 }: BatchUploadResourceDialogProps) {
   const [items, setItems] = useState<BatchResourceItem[]>([]);
   const [uploadType, setUploadType] = useState<'wallpaper' | 'avatar'>('wallpaper');
@@ -283,6 +291,7 @@ export default function BatchUploadResourceDialog({
       formData.append('visibility', visibility);
       formData.append('title', resolveItemTitle(item));
       formData.append('uploadKey', item.uploadKey);
+      if (policy) appendResourcePolicyFormData(formData, policy);
       const { resource } = await uploadResource(formData);
       await bindResourceTags(resource?.id);
       updateItem(index, { status: 'success', error: undefined });
@@ -552,6 +561,14 @@ export default function BatchUploadResourceDialog({
         {/* 全局设置 */}
         <div className="shrink-0 border-b border-border bg-accent/40 px-6 py-3">
           <div className="flex flex-wrap items-center gap-4">
+            {policy?.sourceKind && policy.license ? (
+              <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs">
+                <span className="text-muted-foreground">本批次</span>
+                <strong>{RESOURCE_SOURCE_LABELS[policy.sourceKind]}</strong>
+                <span className="text-muted-foreground">·</span>
+                <strong>{RESOURCE_LICENSE_LABELS[policy.license]}</strong>
+              </div>
+            ) : null}
             {/* 资源类型 */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest whitespace-nowrap">

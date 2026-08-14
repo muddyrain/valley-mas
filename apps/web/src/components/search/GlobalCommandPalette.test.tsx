@@ -309,12 +309,12 @@ describe('GlobalCommandPalette', () => {
       ),
     );
 
-    const blogButton = Array.from(container.querySelectorAll('button')).find(
-      (item) => item.textContent?.trim() === '博客',
+    const articlesButton = Array.from(container.querySelectorAll('button')).find(
+      (item) => item.textContent?.trim() === '文章',
     );
-    act(() => blogButton?.click());
+    act(() => articlesButton?.click());
 
-    expect(navigate).toHaveBeenCalledWith('/blog');
+    expect(navigate).toHaveBeenCalledWith('/articles');
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     cleanup(container, root);
   });
@@ -346,7 +346,7 @@ describe('GlobalCommandPalette', () => {
         new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }),
       ),
     );
-    expect(signedOut.container.textContent).not.toContain('我的收藏');
+    expect(signedOut.container.textContent).not.toContain('文章草稿');
     cleanup(signedOut.container, signedOut.root);
 
     authState.isAuthenticated = true;
@@ -356,7 +356,7 @@ describe('GlobalCommandPalette', () => {
         new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }),
       ),
     );
-    expect(signedIn.container.textContent).toContain('我的收藏');
+    expect(signedIn.container.textContent).toContain('文章草稿');
     cleanup(signedIn.container, signedIn.root);
   });
 });

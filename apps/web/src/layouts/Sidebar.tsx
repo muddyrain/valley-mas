@@ -281,7 +281,7 @@ export function Sidebar({ onSearchOpen }: { onSearchOpen: () => void }) {
               className="w-56 border-border bg-popover p-1"
             >
               <DropdownMenuItem
-                onClick={() => navigate('/my-space')}
+                onClick={() => navigate('/studio')}
                 className="gap-2 rounded-lg py-2"
               >
                 <Sparkles className="h-4 w-4 text-primary" />

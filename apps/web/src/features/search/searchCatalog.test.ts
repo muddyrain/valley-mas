@@ -13,10 +13,10 @@ describe('searchCatalog', () => {
   });
 
   it.each([
-    ['title', '博客', '/blog'],
-    ['keyword', '文章', '/blog'],
+    ['title', '文章', '/articles'],
+    ['keyword', '博客', '/articles'],
     ['path', '/tools/format', '/tools/format'],
-    ['case-insensitive English', 'AI IMAGE', '/workbench/images'],
+    ['case-insensitive English', 'AI IMAGE', '/studio/images'],
     ['Chinese', '玩具攀爬', '/labs/climber'],
   ])('matches commands by %s', (_label, query, expectedPath) => {
     expect(
@@ -30,8 +30,8 @@ describe('searchCatalog', () => {
   });
 
   it('hides auth-only commands for signed-out users', () => {
-    expect(filterSearchCommands(searchCommandCatalog, '我的', false)).toEqual([]);
-    expect(filterSearchCommands(searchCommandCatalog, '我的', true).length).toBeGreaterThan(0);
+    expect(filterSearchCommands(searchCommandCatalog, '文章草稿', false)).toEqual([]);
+    expect(filterSearchCommands(searchCommandCatalog, '文章草稿', true).length).toBeGreaterThan(0);
   });
 
   it('deduplicates commands that resolve to the same path', () => {

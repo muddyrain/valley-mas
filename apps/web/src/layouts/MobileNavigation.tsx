@@ -41,7 +41,7 @@ const themeOptions: Array<{ mode: ThemeMode; label: string; icon: typeof Monitor
 ];
 
 const accountLinks = [
-  { to: '/my-space', label: '我的创作空间', icon: Sparkles },
+  { to: '/studio', label: '创作室', icon: Sparkles },
   { to: '/profile', label: '个人资料', icon: User },
   { to: '/favorites', label: '我的收藏', icon: Heart },
   { to: '/follows', label: '我的关注', icon: Users },
@@ -107,7 +107,7 @@ export function MobileNavigation({ onSearchOpen }: { onSearchOpen: () => void })
             <Search />
           </Button>
           <Link
-            to={isAuthenticated ? '/my-space' : '/login'}
+            to={isAuthenticated ? '/studio' : '/login'}
             aria-label={isAuthenticated ? '我的创作空间' : '登录'}
             className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
@@ -249,7 +249,7 @@ export function MobileNavigation({ onSearchOpen }: { onSearchOpen: () => void })
           );
         })}
         <Link
-          to={isAuthenticated ? '/my-space' : '/login'}
+          to={isAuthenticated ? '/studio' : '/login'}
           className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-medium transition-colors ${
             accountActive ? 'text-foreground' : 'text-muted-foreground'
           }`}

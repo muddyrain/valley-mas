@@ -31,11 +31,11 @@ const GROUP_TYPE_META: Record<
   }
 > = {
   blog: {
-    title: '博客分组管理',
-    description: '整理博客的栏目与内容归类，让创作空间和列表页更清晰。',
-    empty: '还没有博客分组，先创建一个吧。',
-    createTitle: '新建博客分组',
-    manageLabel: '博客',
+    title: '专栏管理',
+    description: '按主题整理文章，便于持续写作与浏览。',
+    empty: '还没有专栏。',
+    createTitle: '新建专栏',
+    manageLabel: '文章',
   },
   image_text: {
     title: '图文分组管理',
@@ -84,7 +84,7 @@ export default function BlogGroupManage() {
       const data = await getAdminGroups({ groupType });
       setGroups(data || []);
     } catch {
-      toast.error('加载分组失败');
+      toast.error('加载专栏失败');
     } finally {
       setLoading(false);
     }
@@ -98,7 +98,7 @@ export default function BlogGroupManage() {
   const handleCreate = async () => {
     const name = createName.trim();
     if (!name) {
-      toast.error('请输入分组名称');
+      toast.error('请输入专栏名称');
       return;
     }
     try {
@@ -108,13 +108,13 @@ export default function BlogGroupManage() {
         groupType,
         description: createDesc.trim() || undefined,
       });
-      toast.success('分组创建成功');
+      toast.success('专栏创建成功');
       setCreateOpen(false);
       setCreateName('');
       setCreateDesc('');
       await loadGroups();
     } catch {
-      toast.error('分组创建失败');
+      toast.error('专栏创建失败');
     } finally {
       setCreating(false);
     }
@@ -124,7 +124,7 @@ export default function BlogGroupManage() {
     if (!editTarget) return;
     const name = editName.trim();
     if (!name) {
-      toast.error('请输入分组名称');
+      toast.error('请输入专栏名称');
       return;
     }
     try {
@@ -133,11 +133,11 @@ export default function BlogGroupManage() {
         name,
         description: editDesc.trim() || '',
       });
-      toast.success('分组更新成功');
+      toast.success('专栏更新成功');
       setEditTarget(null);
       await loadGroups();
     } catch {
-      toast.error('分组更新失败');
+      toast.error('专栏更新失败');
     } finally {
       setUpdating(false);
     }
@@ -147,10 +147,10 @@ export default function BlogGroupManage() {
     try {
       setDeleting(true);
       await deleteGroup(target.id);
-      toast.success('分组删除成功');
+      toast.success('专栏删除成功');
       await loadGroups();
     } catch {
-      toast.error('分组删除失败');
+      toast.error('专栏删除失败');
     } finally {
       setDeleting(false);
     }
@@ -160,7 +160,7 @@ export default function BlogGroupManage() {
     if (deleting) return;
     openConfirmToast({
       title: `确认删除「${target.name}」？`,
-      description: '该分组下的内容会取消分组，不会删除内容本身。',
+      description: '该专栏下的文章会变为未设专栏，不会删除文章。',
       confirmText: '确认删除',
       cancelText: '取消',
       confirmVariant: 'danger',
@@ -185,7 +185,7 @@ export default function BlogGroupManage() {
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    博客分组
+                    文章专栏
                   </button>
                   <button
                     type="button"
@@ -196,7 +196,7 @@ export default function BlogGroupManage() {
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    图文分组
+                    旧图文分组
                   </button>
                 </div>
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -204,7 +204,7 @@ export default function BlogGroupManage() {
                     {meta.title}
                   </h1>
                   {!loading ? (
-                    <span className="text-sm text-muted-foreground">{groups.length} 个分组</span>
+                    <span className="text-sm text-muted-foreground">{groups.length} 个专栏</span>
                   ) : null}
                 </div>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -214,14 +214,14 @@ export default function BlogGroupManage() {
               <div className="flex shrink-0 items-center gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => navigate('/my-space')}
+                  onClick={() => navigate('/studio')}
                   className="rounded-xl border-border"
                 >
-                  返回创作空间
+                  返回创作室
                 </Button>
                 <Button onClick={() => setCreateOpen(true)} className="rounded-xl">
                   <Plus className="mr-1.5 h-4 w-4" />
-                  新建分组
+                  新建专栏
                 </Button>
               </div>
             </div>
@@ -268,7 +268,7 @@ export default function BlogGroupManage() {
                     </div>
                   </div>
                   <p className="mt-4 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">
-                    {group.description || '暂未填写分组说明'}
+                    {group.description || '暂未填写专栏说明'}
                   </p>
                   <div className="mt-auto flex items-center gap-1 border-t border-border pt-4">
                     <Button
@@ -301,7 +301,7 @@ export default function BlogGroupManage() {
 
           <PanelLoadingOverlay
             show={showGroupsOverlay}
-            title="正在同步分组列表..."
+            title={groupType === 'blog' ? '正在同步专栏...' : '正在同步旧图文分组...'}
             hint="变更已提交，列表马上更新"
             className="rounded-[24px]"
           />
@@ -317,12 +317,12 @@ export default function BlogGroupManage() {
             <Input
               value={createName}
               onChange={(e) => setCreateName(e.target.value)}
-              placeholder="分组名称"
+              placeholder={groupType === 'blog' ? '专栏名称' : '分组名称'}
             />
             <Input
               value={createDesc}
               onChange={(e) => setCreateDesc(e.target.value)}
-              placeholder="分组说明（可选）"
+              placeholder={groupType === 'blog' ? '专栏说明（可选）' : '分组说明（可选）'}
             />
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>
@@ -339,18 +339,18 @@ export default function BlogGroupManage() {
       <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>编辑分组</DialogTitle>
+            <DialogTitle>{groupType === 'blog' ? '编辑专栏' : '编辑分组'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <Input
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              placeholder="分组名称"
+              placeholder={groupType === 'blog' ? '专栏名称' : '分组名称'}
             />
             <Input
               value={editDesc}
               onChange={(e) => setEditDesc(e.target.value)}
-              placeholder="分组说明（可选）"
+              placeholder={groupType === 'blog' ? '专栏说明（可选）' : '分组说明（可选）'}
             />
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setEditTarget(null)} disabled={updating}>

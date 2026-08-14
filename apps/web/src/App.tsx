@@ -1,46 +1,58 @@
-import { InspectorRuntime } from '@valley/devbox-inspector-runtime';
 import type { ReactNode } from 'react';
-import { useEffect } from 'react';
-import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { Navigate, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom';
+import BlockingLoadingSurface from '@/components/BlockingLoadingSurface';
 import { GlobalScrollButton } from '@/components/GlobalScrollButton';
 import { Toaster } from '@/components/ui/sonner';
 import { isDevInspectorEnabled } from '@/config/devInspector';
 import { useTheme } from '@/hooks/useTheme';
 import { applyThemeToDocument } from '@/stores/useThemeStore';
-import WorkbenchLayout from './layouts/WorkbenchLayout';
-import AIAppConversation from './pages/AIAppConversation';
-import AIAppEditor from './pages/AIAppEditor';
-import AIImageStudio from './pages/AIImageStudio';
-import AIMotionStickers from './pages/AIMotionStickers';
-import AIResources from './pages/AIResources';
-import BlogCreate from './pages/BlogCreate';
-import BlogGroupManage from './pages/BlogGroupManage';
-import BlogList from './pages/blog/BlogList';
-import BlogPost from './pages/blog/BlogPost';
-import ClimberLab from './pages/ClimberLab';
-import Downloads from './pages/Downloads';
-import Favorites from './pages/Favorites';
-import Follows from './pages/Follows';
-import ForgotPassword from './pages/ForgotPassword';
-import FormatTools from './pages/FormatTools';
-import Home from './pages/Home';
-import ImageTextCreate from './pages/ImageTextCreate';
-import Login from './pages/Login';
-import MyPosts from './pages/MyPosts';
-import MyResources from './pages/MyResources';
-import MySpace from './pages/MySpace';
-import NotFound from './pages/NotFound';
-import Notifications from './pages/Notifications';
-import Profile from './pages/Profile';
-import Register from './pages/Register';
-import ResourceDetail from './pages/ResourceDetail';
-import Resources from './pages/Resources';
-import ScratchLegendLab from './pages/ScratchLegendLab';
-import SearchPage from './pages/Search';
-import Workbench from './pages/Workbench';
-import WorkflowEditor from './pages/WorkflowEditor';
-import WorkflowTemplateDetail from './pages/WorkflowTemplateDetail';
+import YujiPublicLayout from './layouts/YujiPublicLayout';
+import YujiHome from './pages/YujiHome';
 import { useAuthStore } from './stores/useAuthStore';
+
+const InspectorRuntime = import.meta.env.DEV
+  ? lazy(() =>
+      import('@valley/devbox-inspector-runtime').then((module) => ({
+        default: module.InspectorRuntime,
+      })),
+    )
+  : null;
+const YujiAbout = lazy(() => import('./pages/YujiAbout'));
+const YujiArticle = lazy(() => import('./pages/YujiArticle'));
+const YujiArticles = lazy(() => import('./pages/YujiArticles'));
+const YujiGallery = lazy(() => import('./pages/YujiGallery'));
+const YujiImage = lazy(() => import('./pages/YujiImage'));
+const YujiSearch = lazy(() => import('./pages/YujiSearch'));
+const WorkbenchLayout = lazy(() => import('./layouts/WorkbenchLayout'));
+const StudioLayout = lazy(() => import('./layouts/StudioLayout'));
+const AIAppConversation = lazy(() => import('./pages/AIAppConversation'));
+const AIAppEditor = lazy(() => import('./pages/AIAppEditor'));
+const AIImageStudio = lazy(() => import('./pages/AIImageStudio'));
+const AIMotionStickers = lazy(() => import('./pages/AIMotionStickers'));
+const AIResources = lazy(() => import('./pages/AIResources'));
+const BlogCreate = lazy(() => import('./pages/BlogCreate'));
+const BlogGroupManage = lazy(() => import('./pages/BlogGroupManage'));
+const ClimberLab = lazy(() => import('./pages/ClimberLab'));
+const Downloads = lazy(() => import('./pages/Downloads'));
+const Favorites = lazy(() => import('./pages/Favorites'));
+const Follows = lazy(() => import('./pages/Follows'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const FormatTools = lazy(() => import('./pages/FormatTools'));
+const ImageTextCreate = lazy(() => import('./pages/ImageTextCreate'));
+const Login = lazy(() => import('./pages/Login'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Register = lazy(() => import('./pages/Register'));
+const ScratchLegendLab = lazy(() => import('./pages/ScratchLegendLab'));
+const StudioArticles = lazy(() => import('./pages/StudioArticles'));
+const StudioHome = lazy(() => import('./pages/StudioHome'));
+const StudioImageCreator = lazy(() => import('./pages/StudioImageCreator'));
+const StudioImageImport = lazy(() => import('./pages/StudioImageImport'));
+const Workbench = lazy(() => import('./pages/Workbench'));
+const WorkflowEditor = lazy(() => import('./pages/WorkflowEditor'));
+const WorkflowTemplateDetail = lazy(() => import('./pages/WorkflowTemplateDetail'));
 
 function WorkflowEditorWithKey() {
   const location = useLocation();
@@ -61,18 +73,56 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return children;
 }
 
+function LegacyPublicDetailRedirect({ kind }: { kind: 'article' | 'image' }) {
+  const { id } = useParams<{ id: string }>();
+  const detailId = id || '';
+  const target = kind === 'article' ? `/articles/${detailId}` : `/gallery/image/${detailId}`;
+  return <Navigate to={target} replace />;
+}
+
+function LegacyStudioArticleRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/studio/articles/${id || ''}`} replace />;
+}
+
 function RouteTitle() {
   const location = useLocation();
 
   useEffect(() => {
     const pathname = location.pathname;
-    let title = 'Valley';
+    let title = '雨迹';
 
     if (pathname === '/') {
-      title = 'Valley | 内容首页';
+      title = '雨迹 · by @muddyrain | 文章与影像';
+    } else if (pathname === '/articles') {
+      title = '文章 | 雨迹';
+    } else if (pathname.startsWith('/articles/')) {
+      title = '文章 | 雨迹';
+    } else if (pathname === '/gallery') {
+      title = '图库 | 雨迹';
+    } else if (pathname.startsWith('/gallery/image/')) {
+      title = '影像 | 雨迹';
+    } else if (pathname === '/about') {
+      title = '关于 | 雨迹';
+    } else if (pathname === '/search') {
+      title = '搜索 | 雨迹';
+    } else if (pathname === '/studio') {
+      title = '创作室 | 雨迹';
+    } else if (pathname === '/studio/articles') {
+      title = '文章草稿 | 雨迹';
+    } else if (pathname === '/studio/articles/new') {
+      title = '写文章 | 雨迹';
+    } else if (pathname.startsWith('/studio/articles/')) {
+      title = '编辑文章 | 雨迹';
+    } else if (pathname === '/studio/images/import') {
+      title = '图片导入 | 雨迹';
+    } else if (pathname === '/studio/images') {
+      title = 'AI 图片 | 雨迹';
+    } else if (pathname === '/studio/columns') {
+      title = '专栏管理 | 雨迹';
     } else if (pathname === '/workbench') {
       title = '项目 | Valley';
-    } else if (pathname === '/workbench/images') {
+    } else if (pathname.startsWith('/workbench/images')) {
       title = 'AI 图片 | Valley';
     } else if (pathname === '/workbench/gifs') {
       title = 'AI 动态表情 | Valley';
@@ -86,38 +136,32 @@ function RouteTitle() {
       title = '编辑工作流 | Valley';
     } else if (pathname.startsWith('/workbench/apps/')) {
       title = pathname.endsWith('/settings') ? '智能体设置 | Valley' : '智能体对话 | Valley';
-    } else if (pathname === '/blog') {
-      title = '博客与图文 | Valley';
     } else if (pathname === '/tools/format') {
       title = '实用工具 | Valley';
     } else if (pathname === '/labs/climber') {
       title = '玩具攀爬实验场 | Valley';
     } else if (pathname === '/labs/scratch-legend') {
       title = '刮刮传说 | Valley';
-    } else if (pathname.startsWith('/blog/')) {
-      title = '内容详情 | Valley';
-    } else if (pathname === '/resources') {
-      title = '资源整理 | Valley';
-    } else if (pathname === '/search') {
-      title = '全站搜索 | Valley';
-    } else if (pathname.startsWith('/resource/')) {
-      title = '资源详情 | Valley';
     } else if (pathname === '/my-space') {
-      title = '我的创作空间 | Valley';
+      title = '创作室 | 雨迹';
     } else if (pathname === '/my-space/image-text') {
       title = '创建图文 | Valley';
     } else if (pathname.startsWith('/my-space/image-text-edit/')) {
       title = '编辑图文 | Valley';
     } else if (pathname === '/my-space/blog-create') {
-      title = '创建博客 | Valley';
+      title = '写文章 | 雨迹';
     } else if (pathname.startsWith('/my-space/blog-edit/')) {
-      title = '编辑博客 | Valley';
+      title = '编辑文章 | 雨迹';
     } else if (pathname === '/my-space/blog-groups') {
-      title = '博客分组管理 | Valley';
+      title = '专栏管理 | 雨迹';
     } else if (pathname === '/my-space/resources') {
-      title = '资源管理 | Valley';
-    } else if (pathname === '/my-space/posts') {
-      title = '内容管理 | Valley';
+      title = '图片导入 | 雨迹';
+    } else if (
+      pathname === '/my-space/posts' ||
+      pathname === '/my-space/blogs' ||
+      pathname === '/my-space/comments'
+    ) {
+      title = '文章草稿 | 雨迹';
     } else if (pathname === '/favorites') {
       title = '我的收藏 | Valley';
     } else if (pathname === '/follows') {
@@ -159,136 +203,181 @@ function App() {
     <>
       <ThemeController />
       <RouteTitle />
-      <Routes>
-        <Route path="/" element={<WorkbenchLayout />}>
-          <Route index element={<Home />} />
-          <Route
-            path="workbench"
-            element={
-              <RequireAuth>
-                <Workbench />
-              </RequireAuth>
-            }
+      <Suspense
+        fallback={
+          <BlockingLoadingSurface
+            show
+            title="正在打开页面"
+            hint="很快就好"
+            className="min-h-screen"
           />
-          <Route
-            path="workbench/create"
-            element={
-              <RequireAuth>
-                <WorkflowEditorWithKey />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="workbench/images"
-            element={
-              <RequireAuth>
-                <AIImageStudio />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="workbench/gifs"
-            element={
-              <RequireAuth>
-                <AIMotionStickers />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="workbench/resources"
-            element={
-              <RequireAuth>
-                <AIResources />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="workbench/workflows"
-            element={<Navigate to="/workbench/resources?tab=workflows" replace />}
-          />
-          <Route
-            path="workbench/templates/:templateId"
-            element={
-              <RequireAuth>
-                <WorkflowTemplateDetail />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="workbench/edit"
-            element={
-              <RequireAuth>
-                <WorkflowEditorWithKey />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="workbench/apps/:appId/conversations/:conversationId"
-            element={
-              <RequireAuth>
-                <AIAppConversation />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="workbench/apps/:appId/settings"
-            element={
-              <RequireAuth>
-                <AIAppEditor />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="workbench/apps/:appId"
-            element={
-              <RequireAuth>
-                <AIAppConversation />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="workbench/knowledge"
-            element={<Navigate to="/workbench/resources?tab=knowledge" replace />}
-          />
-          <Route path="resources" element={<Resources />} />
-          <Route path="resource/:id" element={<ResourceDetail />} />
-          <Route path="search" element={<SearchPage />} />
-          <Route path="my-space" element={<MySpace />} />
-          <Route path="my-space/image-text" element={<ImageTextCreate />} />
-          <Route path="my-space/image-text-edit/:id" element={<ImageTextCreate />} />
-          <Route path="my-space/blog-create" element={<BlogCreate />} />
-          <Route path="my-space/blog-edit/:id" element={<BlogCreate />} />
-          <Route path="my-space/blog-groups" element={<BlogGroupManage />} />
-          <Route path="my-space/resources" element={<MyResources />} />
-          <Route path="my-space/posts" element={<MyPosts />} />
-          <Route path="my-space/blogs" element={<Navigate to="/my-space/posts" replace />} />
-          <Route path="my-space/comments" element={<Navigate to="/my-space/posts" replace />} />
-          <Route path="my-space/followers" element={<Navigate to="/follows" replace />} />
-          <Route path="my-space/albums" element={<Navigate to="/my-space/resources" replace />} />
-          <Route path="profile" element={<Profile />} />
-          <Route path="favorites" element={<Favorites />} />
-          <Route path="follows" element={<Follows />} />
-          <Route path="downloads" element={<Downloads />} />
-          <Route path="notifications" element={<Notifications />} />
-          <Route path="updates" element={<Navigate to="/" replace />} />
-          <Route path="blog" element={<BlogList />} />
-          <Route path="tools/format" element={<FormatTools />} />
-          <Route path="labs/climber" element={<ClimberLab />} />
-          <Route path="labs/scratch-legend" element={<ScratchLegendLab />} />
-          <Route path="blog/:id" element={<BlogPost />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-      </Routes>
-      <InspectorRuntime
-        enabled={
-          import.meta.env.DEV &&
-          isDevInspectorEnabled(import.meta.env.VITE_DEVBOX_INSPECTOR_ENABLED)
         }
-        workspaceRoot={import.meta.env.VITE_INSPECTOR_WORKSPACE_ROOT || ''}
-      />
+      >
+        <Routes>
+          <Route path="/" element={<YujiPublicLayout />}>
+            <Route index element={<YujiHome />} />
+            <Route path="articles" element={<YujiArticles />} />
+            <Route path="articles/:id" element={<YujiArticle />} />
+            <Route path="gallery" element={<YujiGallery />} />
+            <Route path="gallery/image/:id" element={<YujiImage />} />
+            <Route path="about" element={<YujiAbout />} />
+            <Route path="search" element={<YujiSearch />} />
+          </Route>
+
+          <Route path="/blog" element={<Navigate to="/articles" replace />} />
+          <Route path="/blog/:id" element={<LegacyPublicDetailRedirect kind="article" />} />
+          <Route path="/resources" element={<Navigate to="/gallery" replace />} />
+          <Route path="/resource/:id" element={<LegacyPublicDetailRedirect kind="image" />} />
+          <Route path="/updates" element={<Navigate to="/" replace />} />
+
+          <Route
+            path="/studio"
+            element={
+              <RequireAuth>
+                <StudioLayout />
+              </RequireAuth>
+            }
+          >
+            <Route index element={<StudioHome />} />
+            <Route path="articles" element={<StudioArticles />} />
+            <Route path="articles/new" element={<BlogCreate />} />
+            <Route path="articles/:id" element={<BlogCreate />} />
+            <Route path="images/import" element={<StudioImageImport />} />
+            <Route path="images" element={<StudioImageCreator />} />
+            <Route path="columns" element={<BlogGroupManage />} />
+          </Route>
+
+          <Route element={<WorkbenchLayout />}>
+            <Route
+              path="workbench"
+              element={
+                <RequireAuth>
+                  <Workbench />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="workbench/create"
+              element={
+                <RequireAuth>
+                  <WorkflowEditorWithKey />
+                </RequireAuth>
+              }
+            />
+            <Route path="workbench/images" element={<Navigate to="/studio/images" replace />} />
+            <Route
+              path="workbench/images/advanced"
+              element={
+                <RequireAuth>
+                  <AIImageStudio />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="workbench/gifs"
+              element={
+                <RequireAuth>
+                  <AIMotionStickers />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="workbench/resources"
+              element={
+                <RequireAuth>
+                  <AIResources />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="workbench/workflows"
+              element={<Navigate to="/workbench/resources?tab=workflows" replace />}
+            />
+            <Route
+              path="workbench/templates/:templateId"
+              element={
+                <RequireAuth>
+                  <WorkflowTemplateDetail />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="workbench/edit"
+              element={
+                <RequireAuth>
+                  <WorkflowEditorWithKey />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="workbench/apps/:appId/conversations/:conversationId"
+              element={
+                <RequireAuth>
+                  <AIAppConversation />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="workbench/apps/:appId/settings"
+              element={
+                <RequireAuth>
+                  <AIAppEditor />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="workbench/apps/:appId"
+              element={
+                <RequireAuth>
+                  <AIAppConversation />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="workbench/knowledge"
+              element={<Navigate to="/workbench/resources?tab=knowledge" replace />}
+            />
+            <Route path="my-space" element={<Navigate to="/studio" replace />} />
+            <Route path="my-space/image-text" element={<ImageTextCreate />} />
+            <Route path="my-space/image-text-edit/:id" element={<ImageTextCreate />} />
+            <Route
+              path="my-space/blog-create"
+              element={<Navigate to="/studio/articles/new" replace />}
+            />
+            <Route path="my-space/blog-edit/:id" element={<LegacyStudioArticleRedirect />} />
+            <Route path="my-space/blog-groups" element={<BlogGroupManage />} />
+            <Route
+              path="my-space/resources"
+              element={<Navigate to="/studio/images/import" replace />}
+            />
+            <Route path="my-space/posts" element={<Navigate to="/studio/articles" replace />} />
+            <Route path="my-space/blogs" element={<Navigate to="/studio/articles" replace />} />
+            <Route path="my-space/comments" element={<Navigate to="/studio/articles" replace />} />
+            <Route path="my-space/followers" element={<Navigate to="/follows" replace />} />
+            <Route path="my-space/albums" element={<Navigate to="/my-space/resources" replace />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="favorites" element={<Favorites />} />
+            <Route path="follows" element={<Follows />} />
+            <Route path="downloads" element={<Downloads />} />
+            <Route path="notifications" element={<Notifications />} />
+            <Route path="tools/format" element={<FormatTools />} />
+            <Route path="labs/climber" element={<ClimberLab />} />
+            <Route path="labs/scratch-legend" element={<ScratchLegendLab />} />
+          </Route>
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+      {InspectorRuntime ? (
+        <Suspense fallback={null}>
+          <InspectorRuntime
+            enabled={isDevInspectorEnabled(import.meta.env.VITE_DEVBOX_INSPECTOR_ENABLED)}
+            workspaceRoot={import.meta.env.VITE_INSPECTOR_WORKSPACE_ROOT || ''}
+          />
+        </Suspense>
+      ) : null}
       <GlobalScrollButton />
       <Toaster />
     </>

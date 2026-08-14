@@ -1,22 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { isNavigationActive, navigationGroups } from './navigation';
 
-describe('workbench creation navigation', () => {
-  it('exposes the supported AI creation destinations without the removed canvas page', () => {
+describe('private workspace navigation', () => {
+  it('keeps daily creation in the studio and advanced tools in the private lab', () => {
     const creationItems = navigationGroups.find((group) => group.label === '创作')?.items ?? [];
 
     expect(creationItems).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ to: '/workbench/images', label: 'AI 图片' }),
-        expect.objectContaining({ to: '/workbench/gifs', label: '动态表情' }),
+        expect.objectContaining({ to: '/studio', label: '创作室' }),
+        expect.objectContaining({ to: '/workbench', label: '私有实验室' }),
       ]),
     );
-    expect(creationItems.some((item) => item.to === '/workbench/canvas')).toBe(false);
+    expect(creationItems.some((item) => item.to === '/workbench/images')).toBe(false);
   });
 
-  it('keeps the remaining creation destinations active independently', () => {
-    expect(isNavigationActive('/workbench/images', '/workbench/images')).toBe(true);
-    expect(isNavigationActive('/workbench/gifs', '/workbench/gifs')).toBe(true);
-    expect(isNavigationActive('/workbench/images', '/workbench/gifs')).toBe(false);
+  it('keeps studio and lab destinations active independently', () => {
+    expect(isNavigationActive('/studio/articles/new', '/studio')).toBe(true);
+    expect(isNavigationActive('/workbench/apps/1', '/workbench')).toBe(true);
+    expect(isNavigationActive('/studio', '/workbench')).toBe(false);
   });
 });
