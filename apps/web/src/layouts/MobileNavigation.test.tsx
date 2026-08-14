@@ -3,7 +3,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { authState } = vi.hoisted(() => ({
   authState: { user: null, isAuthenticated: false, logout: vi.fn() },
@@ -65,6 +65,11 @@ vi.mock('./navigation', async () => {
 
 import { MobileNavigation } from './MobileNavigation';
 
+beforeEach(() => {
+  authState.user = null;
+  authState.isAuthenticated = false;
+});
+
 describe('MobileNavigation search entry', () => {
   it('keeps menu, logo, search and account controls in the top bar', () => {
     const onSearchOpen = vi.fn();
@@ -81,6 +86,26 @@ describe('MobileNavigation search entry', () => {
 
     act(() => (header.querySelector('[aria-label="搜索 Valley"]') as HTMLButtonElement).click());
     expect(onSearchOpen).toHaveBeenCalledTimes(1);
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('keeps the studio entry but hides legacy account destinations', () => {
+    authState.user = { username: 'muddyrain' } as never;
+    authState.isAuthenticated = true;
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => root.render(<MobileNavigation onSearchOpen={vi.fn()} />));
+
+    expect(container.textContent).toContain('创作室');
+    expect(container.textContent).not.toContain('个人资料');
+    expect(container.textContent).not.toContain('我的收藏');
+    expect(container.textContent).not.toContain('我的关注');
+    expect(container.textContent).not.toContain('下载记录');
+    expect(container.textContent).not.toContain('通知设置');
 
     act(() => root.unmount());
     container.remove();

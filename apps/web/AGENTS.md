@@ -18,7 +18,7 @@
 
 - 应用路由入口：`src/App.tsx`。
 - 页面目录：`src/pages`；博客相关页面集中在 `src/pages/blog`。
-- 公共布局入口：`src/layouts/YujiPublicLayout.tsx`；创作室布局入口：`src/layouts/StudioLayout.tsx`；私有实验室与兼容布局入口：`src/layouts/WorkbenchLayout.tsx`、`src/layouts/Sidebar.tsx`。
+- 公共布局入口：`src/layouts/YujiPublicLayout.tsx`；创作室布局入口：`src/layouts/StudioLayout.tsx`；私有实验室布局入口：`src/layouts/PrivateLabLayout.tsx`；存量兼容页与工具布局入口：`src/layouts/WorkbenchLayout.tsx`、`src/layouts/Sidebar.tsx`。
 - 创作室主任务页：`src/pages/StudioHome`、`src/pages/StudioArticles`、`src/pages/StudioImageImport`、`src/pages/StudioImageCreator`；文章画布继续复用 `src/pages/BlogCreate`。
 - API 封装：`src/api`；请求工具：`src/utils/request.ts`。
 - 登录状态：`src/stores/useAuthStore.ts`；主题状态：`src/stores/useThemeStore.ts`。

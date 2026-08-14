@@ -68,6 +68,8 @@ function cleanup(container: HTMLElement, root: Root) {
 beforeEach(() => {
   vi.clearAllMocks();
   layoutState.sidebarCollapsed = false;
+  authState.user = null;
+  authState.isAuthenticated = false;
 });
 
 describe('Sidebar search entry', () => {
@@ -88,6 +90,21 @@ describe('Sidebar search entry', () => {
 
     expect(container.querySelector('button[aria-label="搜索 Valley"]')).not.toBeNull();
     expect(container.querySelector('[role="tooltip"]')?.textContent).toContain('搜索');
+    cleanup(container, root);
+  });
+
+  it('keeps the studio entry but hides legacy account destinations', () => {
+    authState.user = { username: 'muddyrain' } as never;
+    authState.isAuthenticated = true;
+    const { container, root } = renderSidebar();
+
+    expect(container.textContent).toContain('创作室');
+    expect(container.textContent).not.toContain('个人资料编辑');
+    expect(container.textContent).not.toContain('我的收藏');
+    expect(container.textContent).not.toContain('我的关注');
+    expect(container.textContent).not.toContain('下载记录');
+    expect(container.textContent).not.toContain('通知设置');
+
     cleanup(container, root);
   });
 });

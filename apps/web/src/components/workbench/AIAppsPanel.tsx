@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { type AIApp, deleteAIApp, listAIApps } from '@/api/aiWorkbench';
 import { AgentAvatar } from '@/components/ai-workbench/AgentAvatar';
+import { PrivateLabPageHeader } from '@/components/private-lab/PrivateLabPage';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,7 +82,7 @@ function AgentCard({ app, onDelete }: { app: AIApp; onDelete: (app: AIApp) => vo
         <div className="mt-auto flex items-center justify-between gap-3 border-t border-border/70 pt-3">
           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <Clock3 className="size-3.5 shrink-0" />
-            更新于 {formatUpdatedAt(app.updatedAt)}
+            <span className="tabular-nums">更新于 {formatUpdatedAt(app.updatedAt)}</span>
           </span>
           <Badge variant={app.status === 'published' ? 'default' : 'secondary'}>
             {app.status === 'published' ? '已发布' : '草稿'}
@@ -144,21 +145,19 @@ export function AIAppsPanel() {
   };
 
   return (
-    <section className="mb-6">
-      <div className="mb-3 flex items-end justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">智能体</h2>
-          <p className="mt-1 text-sm text-muted-foreground">配置、调试并发布可复用的 AI 能力。</p>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" onClick={() => setShowCreate(true)}>
-            <Plus className="mr-2 h-4 w-4" />
+    <section>
+      <PrivateLabPageHeader
+        title="智能体"
+        description="配置、调试并发布可复用的 AI 能力。"
+        actions={
+          <Button size="lg" onClick={() => setShowCreate(true)}>
+            <Plus className="size-4" />
             创建智能体
           </Button>
-        </div>
-      </div>
+        }
+      />
       {loading ? (
-        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           <AgentItemSkeleton />
           <AgentItemSkeleton />
           <AgentItemSkeleton />
@@ -176,7 +175,7 @@ export function AIAppsPanel() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {agents.map((app) => (
             <AgentCard key={app.id} app={app} onDelete={setDeleteTarget} />
           ))}

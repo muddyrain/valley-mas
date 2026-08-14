@@ -1,4 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
+import { PrivateLabPage, PrivateLabPageHeader } from '@/components/private-lab/PrivateLabPage';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import KnowledgeBases from '@/pages/KnowledgeBases';
 import Workflows from '@/pages/Workflows';
@@ -33,32 +34,23 @@ export default function AIResources() {
   };
 
   return (
-    <main className="min-h-full bg-background">
-      <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8 lg:px-10">
-        <header className="border-b border-border">
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-            AI 资源
-          </h1>
-          <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-7">
-            <TabsList
-              variant="line"
-              className="w-full justify-start gap-7 overflow-x-auto rounded-none px-0"
+    <PrivateLabPage>
+      <PrivateLabPageHeader title="AI 资源" />
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList className="h-10 w-full justify-start overflow-x-auto bg-muted/70 p-1">
+          {tabs.map(({ value, label, disabled }) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              disabled={disabled}
+              className="h-8 flex-none px-3 text-sm"
             >
-              {tabs.map(({ value, label, disabled }) => (
-                <TabsTrigger
-                  key={value}
-                  value={value}
-                  disabled={disabled}
-                  className="h-11 flex-none rounded-t-md border border-transparent px-3 text-base text-muted-foreground transition-colors hover:text-foreground group-data-[variant=line]/tabs-list:data-active:bg-primary/[0.12] data-active:font-semibold data-active:text-primary data-active:after:bottom-0 data-active:after:h-[3px] data-active:after:rounded-full data-active:after:bg-primary data-active:after:opacity-100"
-                >
-                  {label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        </header>
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-        <div className="pt-6">
+        <div className="pt-4">
           {activeTab === 'knowledge' ? (
             <KnowledgeBases embedded />
           ) : activeTab === 'prompts' ? (
@@ -71,7 +63,7 @@ export default function AIResources() {
             <Workflows embedded />
           )}
         </div>
-      </div>
-    </main>
+      </Tabs>
+    </PrivateLabPage>
   );
 }

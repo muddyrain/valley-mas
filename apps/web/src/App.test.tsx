@@ -2,7 +2,7 @@
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Outlet } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@valley/devbox-inspector-runtime', () => ({ InspectorRuntime: () => null }));
@@ -14,6 +14,15 @@ vi.mock('./pages/YujiHome', () => ({ default: () => <main>雨迹首页内容</ma
 vi.mock('./pages/YujiArticle', () => ({ default: () => <main>新版文章详情</main> }));
 vi.mock('./pages/StudioHome', () => ({ default: () => <main>创作室首页内容</main> }));
 vi.mock('./layouts/StudioLayout', () => ({ default: () => <main>创作室首页内容</main> }));
+vi.mock('./layouts/PrivateLabLayout', () => ({
+  default: () => (
+    <section>
+      私有实验室外壳
+      <Outlet />
+    </section>
+  ),
+}));
+vi.mock('./pages/Workbench', () => ({ default: () => <main>智能体项目内容</main> }));
 vi.mock('./pages/Login', () => ({ default: () => <main>登录页面</main> }));
 let isAuthenticated = false;
 
@@ -85,6 +94,36 @@ describe('App public routes', () => {
     });
 
     expect(container.textContent).toContain('创作室首页内容');
+
+    act(() => root.unmount());
+    container.remove();
+    isAuthenticated = false;
+  });
+
+  it('protects the private lab at the layout boundary', async () => {
+    isAuthenticated = false;
+    const { container, root } = renderAt('/workbench/resources?tab=skills');
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain('登录页面');
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('opens the dedicated private lab for the authenticated owner', async () => {
+    isAuthenticated = true;
+    const { container, root } = renderAt('/workbench');
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    });
+
+    expect(container.textContent).toContain('私有实验室外壳');
+    expect(container.textContent).toContain('智能体项目内容');
 
     act(() => root.unmount());
     container.remove();

@@ -1,19 +1,15 @@
 import {
   Check,
   ChevronRight,
-  Download,
-  Heart,
   LogIn,
   LogOut,
   Menu,
   Monitor,
   Moon,
   Search,
-  Settings,
   Sparkles,
   Sun,
   User,
-  Users,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -40,14 +36,7 @@ const themeOptions: Array<{ mode: ThemeMode; label: string; icon: typeof Monitor
   { mode: 'dark', label: '深色模式', icon: Moon },
 ];
 
-const accountLinks = [
-  { to: '/studio', label: '创作室', icon: Sparkles },
-  { to: '/profile', label: '个人资料', icon: User },
-  { to: '/favorites', label: '我的收藏', icon: Heart },
-  { to: '/follows', label: '我的关注', icon: Users },
-  { to: '/downloads', label: '下载记录', icon: Download },
-  { to: '/notifications', label: '通知设置', icon: Settings },
-];
+const accountLinks = [{ to: '/studio', label: '创作室', icon: Sparkles }];
 
 const bottomItems = [
   navigationGroups[0].items[0],
@@ -108,7 +97,7 @@ export function MobileNavigation({ onSearchOpen }: { onSearchOpen: () => void })
           </Button>
           <Link
             to={isAuthenticated ? '/studio' : '/login'}
-            aria-label={isAuthenticated ? '我的创作空间' : '登录'}
+            aria-label={isAuthenticated ? '创作室' : '登录'}
             className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             {isAuthenticated ? (

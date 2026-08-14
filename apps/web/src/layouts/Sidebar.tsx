@@ -1,8 +1,6 @@
 import {
   Check,
   ChevronDown,
-  Download,
-  Heart,
   LogIn,
   LogOut,
   Monitor,
@@ -10,11 +8,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Search,
-  Settings,
   Sparkles,
   Sun,
-  User,
-  Users,
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -285,43 +280,7 @@ export function Sidebar({ onSearchOpen }: { onSearchOpen: () => void }) {
                 className="gap-2 rounded-lg py-2"
               >
                 <Sparkles className="h-4 w-4 text-primary" />
-                <span>我的创作空间</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => navigate('/profile')}
-                className="gap-2 rounded-lg py-2"
-              >
-                <User className="h-4 w-4 text-primary" />
-                <span>个人资料编辑</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => navigate('/favorites')}
-                className="gap-2 rounded-lg py-2"
-              >
-                <Heart className="h-4 w-4 text-primary" />
-                <span>我的收藏</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => navigate('/follows')}
-                className="gap-2 rounded-lg py-2"
-              >
-                <Users className="h-4 w-4 text-primary" />
-                <span>我的关注</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => navigate('/downloads')}
-                className="gap-2 rounded-lg py-2"
-              >
-                <Download className="h-4 w-4 text-primary" />
-                <span>下载记录</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => navigate('/notifications')}
-                className="gap-2 rounded-lg py-2"
-              >
-                <Settings className="h-4 w-4 text-primary" />
-                <span>通知设置</span>
+                <span>创作室</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
