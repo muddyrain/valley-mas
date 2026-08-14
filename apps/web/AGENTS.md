@@ -10,7 +10,7 @@
 
 ## 功能定位
 
-- `apps/web` 是 Valley MAS 的用户侧前台，负责首页展示、创作者空间、资源库、博客/图文、个人空间、收藏关注、下载记录、通知、个人资料和登录注册。
+- `apps/web` 由“雨迹”公共内容站、站主私有创作/AI 工作台和存量兼容功能组成；公共站负责文章、图库、关于与搜索，私有区域继续承载内容维护、AI 能力和实验功能。
 - 技术栈为 React 19 + Vite 6 + React Router 7 + Tailwind 4，并复用 workspace 包如 `@valley/shared-request`、`@valley/shared-router`、`@valley/shared-format`。
 - Web/Admin API 地址来自 `VITE_API_BASE_URL`，示例见 `.env.example`。
 
@@ -18,7 +18,8 @@
 
 - 应用路由入口：`src/App.tsx`。
 - 页面目录：`src/pages`；博客相关页面集中在 `src/pages/blog`。
-- 布局入口：`src/layouts/WorkbenchLayout.tsx`、`src/layouts/Sidebar.tsx`。
+- 公共布局入口：`src/layouts/YujiPublicLayout.tsx`；创作室布局入口：`src/layouts/StudioLayout.tsx`；私有实验室与兼容布局入口：`src/layouts/WorkbenchLayout.tsx`、`src/layouts/Sidebar.tsx`。
+- 创作室主任务页：`src/pages/StudioHome`、`src/pages/StudioArticles`、`src/pages/StudioImageImport`、`src/pages/StudioImageCreator`；文章画布继续复用 `src/pages/BlogCreate`。
 - API 封装：`src/api`；请求工具：`src/utils/request.ts`。
 - 登录状态：`src/stores/useAuthStore.ts`；主题状态：`src/stores/useThemeStore.ts`。
 - 常用复用组件：`src/components`、`src/components/ui`、`src/components/blog`、`src/components/page`。
@@ -27,7 +28,8 @@
 
 - Web UI、主题、loading、列表分页、搜索、URL query 或浏览器回退行为发生变化时，必须启用 `web-ui-consistency-guard`。
 - 新增页面前先检查 `src/App.tsx`、相邻 `src/pages/*`、`src/components/*` 和现有 hooks，优先复用已有布局、卡片、弹窗、上传、分页和 API 模式。
-- 用户侧视觉采用纯 shadcn/ui 产品界面风格：以语义 token、默认组件变体和中性层级组织界面；不引入暖金、奶油色、纸感、装饰性渐变或单页独立色系。品牌表达仅可通过现有 Logo、内容资产与低频语义强调呈现。
+- 私有工作台、账号页与兼容功能继续采用 shadcn/ui 产品界面风格，以语义 token、默认组件变体和中性层级组织界面。
+- “雨迹”公共内容路由（首页、文章、图库、关于与搜索）使用一套共享的 `yuji-*` 品牌 token 与杂志式版式；纸张色、衬线标题和编辑式图片编排必须在整组公共路由内复用，不能退化为单页独立色系。公共站仍复用全局明暗主题状态、loading 组件、请求封装与可访问性基线。
 - 路由标题由 `RouteTitle` 维护；新增前台路由时同步考虑页面标题。
 - 需要权限的创作者/个人空间能力优先复用已有守卫、状态和请求封装，不绕过统一 request 层。
 - 不在源码或示例配置中写真实密钥、真实 token 或个人账号凭据。

@@ -32,11 +32,12 @@
 
 ## 关键业务模块
 
-- 首页与品牌入口：`apps/web/src/pages/Home`、`apps/web/src/layouts/WorkbenchLayout.tsx`、`apps/web/src/layouts/Sidebar.tsx`、`apps/web/src/components/page`。
-- 创作者与创作空间：`apps/web/src/pages/Creator*`、`apps/web/src/pages/MySpace`、`apps/admin/src/pages/Creator*`、`server/internal/handler/creator*.go`。
-- 资源库：`apps/web/src/pages/Resources`、`apps/web/src/pages/ResourceDetail`、`apps/web/src/components/ResourceCard.tsx`、`apps/admin/src/pages/admin-ops/ResourceTags.tsx`、`server/internal/handler/*resource*.go`。
-- 博客与图文：`apps/web/src/pages/blog`、`apps/web/src/pages/BlogCreate`、`apps/web/src/components/blog`、`apps/admin/src/pages/Blog*`、`apps/admin/src/pages/admin-ops/BlogTaxonomy.tsx`、`apps/admin/src/pages/admin-ops/BlogComments.tsx`、`server/internal/handler/blog*.go`。
-- 全站搜索：Web `/search` 搜索公开博客、图文、公开资源及站内页面命令；桌面端可用 `Ctrl+K` / `⌘K` 打开命令面板，移动端顶部栏提供同一入口。内容与资源搜索复用现有 `/public/blog/posts`、`/public/resources` 的 `keyword` 参数，不新增聚合 API；不搜索私有 AI 数据、Life Trace 私有数据或 Admin 数据。
+- 雨迹公共内容站：`apps/web/src/layouts/YujiPublicLayout.tsx`、`apps/web/src/pages/YujiHome`、`apps/web/src/pages/YujiArticles`、`apps/web/src/pages/YujiArticle`、`apps/web/src/pages/YujiGallery`、`apps/web/src/pages/YujiImage`、`apps/web/src/pages/YujiAbout`。公共站使用独立顶部导航与共享 `yuji-*` 品牌 token。
+- 雨迹私有创作室：`apps/web/src/layouts/StudioLayout.tsx`、`apps/web/src/pages/StudioHome`、`apps/web/src/pages/StudioArticles`、`apps/web/src/pages/StudioImageImport`、`apps/web/src/pages/StudioImageCreator` 与 `apps/web/src/pages/BlogCreate`。`/studio` 只面向登录站主，集中写文章、统一草稿、批量导入图片和 AI 图片；`/workbench` 保留为次级私有实验室。
+- 创作者与存量个人空间：`apps/web/src/pages/Creator*`、`apps/web/src/pages/MySpace`、`apps/admin/src/pages/Creator*`、`server/internal/handler/creator*.go`；旧 Web 入口通过路由跳转收敛到创作室，不删除存量数据。
+- 资源库：`apps/web/src/pages/StudioImageImport`、`apps/web/src/pages/YujiGallery`、`apps/web/src/pages/YujiImage`、`apps/web/src/components/BatchUploadResourceDialog.tsx`、`apps/admin/src/pages/admin-ops/ResourceTags.tsx`、`server/internal/handler/*resource*.go`。资源保留来源类型、原始链接、许可和下载策略；许可未确认或不允许分发时，公共单图页不提供下载。
+- 博客与图文存量模型：`apps/web/src/pages/blog`、`apps/web/src/pages/BlogCreate`、`apps/web/src/components/blog`、`apps/admin/src/pages/Blog*`、`apps/admin/src/pages/admin-ops/BlogTaxonomy.tsx`、`apps/admin/src/pages/admin-ops/BlogComments.tsx`、`server/internal/handler/blog*.go`。雨迹界面将 `blog` 和 `image_text` 统一呈现为“文章”，并将现有 `PostGroup` 显示为“专栏”，不批量改写旧绑定。
+- 公共站搜索：Web `/search` 只搜索公开文章与影像，复用现有 `/public/blog/posts`、`/public/resources` 的 `keyword` 参数，不新增聚合 API，也不暴露私有页面和 AI 工具命令。私有工作台的命令面板仍可在其布局内使用，不进入雨迹公共导航。
 - 实用工具：Web `/tools/format` 通过主导航“工具”入口访问，提供可视化图片裁剪、缩放、旋转、翻转、圆角、水印和格式导出，以及 JSON、CSV、JSON Lines、URL、文本、编码与摘要处理；工具选择与用户主动选择的分组相互独立。页面复用 `packages/browser-media` 和 `packages/format-tools`，两包同时暴露可供其他页面或智能体适配层消费的结构化工具清单与调用入口。
 - 后台运营与审计：`apps/admin/src/pages/admin-ops`、`apps/admin/src/api/operations.ts`、`server/internal/handler/admin_operations.go`，包括 AI 调用审计和存储资产只读治理。
 - Life Trace：`apps/life-trace/src`、`server/internal/lifetrace`。
