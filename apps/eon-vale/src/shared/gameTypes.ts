@@ -46,6 +46,9 @@ export enum AgentState {
   Attack = 14,
   Home = 15,
   Craft = 16,
+  Hunt = 17,
+  Butcher = 18,
+  Fish = 19,
 }
 
 export enum ResourceNodeKind {
@@ -110,7 +113,10 @@ export type ResidentTaskType =
   | 'farm'
   | 'craft'
   | 'flee'
-  | 'guard';
+  | 'guard'
+  | 'hunt'
+  | 'butcher'
+  | 'fish';
 
 export type ResidentTaskReason =
   | 'none'
@@ -145,7 +151,8 @@ export type ResidentTaskTargetKind =
   | 'resource-node'
   | 'building'
   | 'village'
-  | 'entity';
+  | 'entity'
+  | 'carcass';
 
 export interface ResidentTask {
   id: number;
@@ -483,6 +490,19 @@ export type AnimalDeathCause = 'age' | 'hunger' | 'predation' | 'hunting' | 'dis
 
 export type AnimalDeathCauseCounts = Record<AnimalDeathCause, number>;
 
+export interface AnimalCarcass {
+  id: number;
+  sourceKind: EntityKind;
+  deathCause: AnimalDeathCause;
+  x: number;
+  z: number;
+  meatRemaining: number;
+  createdAtTick: number;
+  decayAtTick: number;
+  reservedByEntityId: number | null;
+  reservedUntilTick: number;
+}
+
 export interface SpeciesEcologyDiagnostics {
   kind: EntityKind;
   count: number;
@@ -497,6 +517,10 @@ export interface SpeciesEcologyDiagnostics {
 
 export interface EcologyDiagnostics {
   animals: number;
+  carcasses: number;
+  butcheredMeat: number;
+  fishCaught: number;
+  carcassesDecayed: number;
   species: SpeciesEcologyDiagnostics[];
   nextReturnTicks: number[];
   extinctSinceTicks: number[];
@@ -664,6 +688,8 @@ export interface WorldState {
   population: PopulationDiagnostics;
   worldLaws: WorldLaws;
   ecology: EcologyDiagnostics;
+  carcasses: AnimalCarcass[];
+  nextCarcassId: number;
   humanExtinctSinceTick: number;
   wars: WarCampaign[];
   truces: TruceRecord[];

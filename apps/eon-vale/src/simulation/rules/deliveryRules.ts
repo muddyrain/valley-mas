@@ -61,7 +61,7 @@ export const DELIVERY_BATCHES = Object.freeze([
   {
     id: 'wild-ecology-and-food-loop',
     title: '完整野生生态与食物闭环',
-    status: 'planned',
+    status: 'complete',
     playableLoopRequired: true,
     backendOnlyDeliveryAllowed: false,
     decorativeOnlyDeliveryAllowed: false,

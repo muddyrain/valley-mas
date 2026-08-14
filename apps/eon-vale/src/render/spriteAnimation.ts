@@ -1,7 +1,16 @@
 import { AgentState, CarriedResourceKind, EntityKind } from '@/shared/gameTypes';
 
 export type HumanFacing = 'north' | 'south' | 'east' | 'west';
-export type HumanPose = 'idle' | 'walk' | 'carry' | 'chop' | 'mine' | 'build' | 'eat' | 'sleep';
+export type HumanPose =
+  | 'idle'
+  | 'walk'
+  | 'carry'
+  | 'chop'
+  | 'mine'
+  | 'build'
+  | 'eat'
+  | 'sleep'
+  | 'attack';
 export type AnimalPose = 'idle' | 'walk' | 'eat' | 'attack';
 
 const HUMAN_FRAME_COUNTS: Record<HumanPose, number> = {
@@ -13,6 +22,7 @@ const HUMAN_FRAME_COUNTS: Record<HumanPose, number> = {
   build: 4,
   eat: 2,
   sleep: 1,
+  attack: 3,
 };
 
 const ANIMAL_FRAME_COUNTS: Record<AnimalPose, number> = {
@@ -34,7 +44,9 @@ export function humanPose(state: AgentState, carried: CarriedResourceKind): Huma
   if (state === AgentState.Eat || state === AgentState.FindFood) return 'eat';
   if (state === AgentState.GatherWood) return 'chop';
   if (state === AgentState.GatherStone) return 'mine';
-  if (state === AgentState.Build || state === AgentState.Craft) return 'build';
+  if (state === AgentState.Build || state === AgentState.Craft || state === AgentState.Butcher)
+    return 'build';
+  if (state === AgentState.Hunt) return 'attack';
   if (carried !== CarriedResourceKind.None) return 'carry';
   if (
     state === AgentState.Wander ||
@@ -42,7 +54,8 @@ export function humanPose(state: AgentState, carried: CarriedResourceKind): Huma
     state === AgentState.Haul ||
     state === AgentState.Home ||
     state === AgentState.Flee ||
-    state === AgentState.Chase
+    state === AgentState.Chase ||
+    state === AgentState.Fish
   )
     return 'walk';
   return 'idle';

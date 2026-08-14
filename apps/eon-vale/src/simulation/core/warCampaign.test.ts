@@ -13,6 +13,7 @@ import { createWorldSimulation } from './worldSimulation';
 
 function createRivalVillages() {
   const simulation = createWorldSimulation({ seed: 'guard-war', initialHumans: 0, mapSize: 128 });
+  simulation.state.worldLaws.animalPredation = false;
   const firstIds = simulation.spawn(EntityKind.Human, 34, 64, 8);
   const secondIds = simulation.spawn(EntityKind.Human, 94, 64, 8);
   const firstVillage = simulation.ensureVillageAt(34, 64, firstIds.length);
@@ -79,6 +80,8 @@ describe('guard war campaign', () => {
     makeGuard(simulation.state, firstGuard, 64, 64);
     makeGuard(simulation.state, secondGuard, 64.8, 64);
     const civilian = secondIds[1] ?? -1;
+    simulation.state.entities.professions[civilian] = Profession.Forager;
+    simulation.state.entities.health[civilian] = 1_000;
     simulation.state.entities.positionsX[civilian] = 64.4;
     simulation.state.entities.positionsZ[civilian] = 64.3;
 

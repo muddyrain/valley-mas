@@ -199,6 +199,7 @@ function createWorldSnapshot(tickMs: number): WorldRenderSnapshot | null {
     villages: structuredClone(state.villages),
     kingdoms: structuredClone(state.kingdoms),
     buildings: structuredClone(state.buildings),
+    carcasses: structuredClone(state.carcasses),
     events: structuredClone(recentWorldNotifications(state)),
     historyRevision: state.nextEventId,
     settings: { ...state.settings },

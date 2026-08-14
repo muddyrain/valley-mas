@@ -1,4 +1,5 @@
 import type {
+  AnimalCarcass,
   Building,
   EcologyDiagnostics,
   Kingdom,
@@ -66,6 +67,7 @@ export interface WorldRenderSnapshot extends RenderSnapshot {
   villages: Village[];
   kingdoms: Kingdom[];
   buildings: Building[];
+  carcasses: AnimalCarcass[];
   events: WorldEvent[];
   historyRevision: number;
   settings: WorldSettings;

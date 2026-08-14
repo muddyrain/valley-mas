@@ -122,6 +122,28 @@ describe('functional settlement operations', () => {
     expect(advanceVillageGuardTraining(simulation.state, village)).toBe(0);
   });
 
+  it('assigns exactly one adult hunter when a living village runs out of food', () => {
+    const local = createWorldSimulation({ seed: 'food-shortage-hunter', initialHumans: 0 });
+    const residents = local.spawn(EntityKind.Human, 48, 48, 6);
+    const hungryVillage = local.ensureVillageAt(48, 48, residents.length);
+    hungryVillage.resources.food = 0;
+    for (const [index, entityId] of residents.entries()) {
+      local.state.entities.villageIds[entityId] = hungryVillage.id;
+      local.state.entities.age[entityId] = 20;
+      local.state.entities.professions[entityId] =
+        index % 2 === 0 ? Profession.Hauler : Profession.Forager;
+    }
+
+    assignVillageHomesAndWorkplaces(local.state, hungryVillage);
+    assignVillageHomesAndWorkplaces(local.state, hungryVillage);
+
+    expect(
+      residents.filter(
+        (entityId) => local.state.entities.professions[entityId] === Profession.Hunter,
+      ),
+    ).toHaveLength(1);
+  });
+
   it('moves overflow into visible stockpiles and decays exposed food and wood', () => {
     village.resources.food = 60;
     village.resources.wood = 70;

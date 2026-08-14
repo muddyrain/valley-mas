@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type {
+  AnimalCarcass,
   Building,
   EcologyDiagnostics,
   EntityArrays,
@@ -20,7 +21,7 @@ import { createNavigationGrid } from '../navigation/grid';
 import { addResourceNode, createResourceNodeStore } from '../resources/resourceNodes';
 import { WORLD_LAW_IDS, type WorldLawId } from '../rules/worldLawCatalog';
 
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 const worldLawSchema = z
   .object(
@@ -65,6 +66,20 @@ const buildingSchema = z
     clearNodeIds: z.array(z.number().int().nonnegative()),
     assignedWorkerIds: z.array(z.number().int().nonnegative()),
     workSlots: z.number().int().nonnegative(),
+  })
+  .strict();
+const animalCarcassSchema = z
+  .object({
+    id: z.number().int().positive(),
+    sourceKind: z.number().int().min(1).max(7),
+    deathCause: z.enum(['age', 'hunger', 'predation', 'hunting', 'disease', 'disaster']),
+    x: z.number(),
+    z: z.number(),
+    meatRemaining: z.number().int().nonnegative(),
+    createdAtTick: z.number().int().nonnegative(),
+    decayAtTick: z.number().int().nonnegative(),
+    reservedByEntityId: z.number().int().nonnegative().nullable(),
+    reservedUntilTick: z.number().int().nonnegative(),
   })
   .strict();
 const villageSchema = z
@@ -141,6 +156,9 @@ const residentTaskSchema = z
       'craft',
       'flee',
       'guard',
+      'hunt',
+      'butcher',
+      'fish',
     ]),
     reason: z.enum([
       'none',
@@ -169,7 +187,15 @@ const residentTaskSchema = z
       'suspended',
       'failed',
     ]),
-    targetKind: z.enum(['none', 'cell', 'resource-node', 'building', 'village', 'entity']),
+    targetKind: z.enum([
+      'none',
+      'cell',
+      'resource-node',
+      'building',
+      'village',
+      'entity',
+      'carcass',
+    ]),
     targetId: z.number().int().nonnegative(),
     targetCell: z.number().int().nonnegative(),
     progress: z.number().nonnegative(),
@@ -369,6 +395,8 @@ const saveSchema = z
     villages: z.array(villageSchema),
     kingdoms: z.array(kingdomSchema),
     buildings: z.array(buildingSchema),
+    carcasses: z.array(animalCarcassSchema),
+    nextCarcassId: z.number().int().nonnegative(),
     settings: z.unknown(),
     events: z.array(worldEventSchema),
     favoriteLifeIds: z.array(z.number().int().positive()),
@@ -488,6 +516,8 @@ export function serializeWorld(state: WorldState): string {
     villages: state.villages,
     kingdoms: state.kingdoms,
     buildings: state.buildings,
+    carcasses: state.carcasses,
+    nextCarcassId: state.nextCarcassId,
     settings: state.settings,
     events: state.events,
     favoriteLifeIds: state.favoriteLifeIds,
@@ -608,6 +638,13 @@ function restoreWorld(save: ParsedSave): WorldState {
   ) {
     throw new Error('存档损坏：历史事件标识无效');
   }
+  const carcassIds = new Set(save.carcasses.map((carcass) => carcass.id));
+  if (
+    carcassIds.size !== save.carcasses.length ||
+    save.carcasses.some((carcass) => carcass.id > save.nextCarcassId)
+  ) {
+    throw new Error('存档损坏：动物尸体标识无效');
+  }
   const entities = restoreEntities(save, capacity);
   const resourceNodes = createResourceNodeStore(save.map.size, save.resourceNodes.chunkSize);
   for (let nodeId = 0; nodeId < save.resourceNodes.count; nodeId += 1) {
@@ -668,6 +705,8 @@ function restoreWorld(save: ParsedSave): WorldState {
     villages: save.villages as Village[],
     kingdoms: save.kingdoms as Kingdom[],
     buildings: save.buildings as Building[],
+    carcasses: save.carcasses as AnimalCarcass[],
+    nextCarcassId: save.nextCarcassId,
     settings: save.settings as WorldSettings,
     events: save.events as WorldEvent[],
     favoriteLifeIds: save.favoriteLifeIds,

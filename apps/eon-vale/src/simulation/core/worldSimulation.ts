@@ -57,7 +57,12 @@ import {
   reserveResourceNode,
   resourceNodeAvoidance,
 } from '../resources/resourceNodes';
-import { ANIMAL_LIFECYCLE_RULES, ECOLOGY_BALANCE_RULES } from '../rules/ecologyRules';
+import {
+  ANIMAL_LIFECYCLE_RULES,
+  ECOLOGY_BALANCE_RULES,
+  FISHING_RULES,
+  HUNTING_RULES,
+} from '../rules/ecologyRules';
 import {
   createDefaultWorldLaws,
   WORLD_LAW_CATALOG,
@@ -83,6 +88,7 @@ import {
   ANIMAL_SPECIES,
   ANIMAL_SPECIES_NAMES,
   createEcologyDiagnostics,
+  decayAnimalCarcasses,
   habitatCells,
   recordAnimalBirth,
   recordAnimalDeath,
@@ -553,7 +559,7 @@ function createInitialState(options: CreateWorldOptions): WorldState {
     options.preset ?? 'archipelago',
   );
   const state: WorldState = {
-    version: 11,
+    version: 12,
     seed: options.seed,
     tick: 0,
     year: 1,
@@ -575,6 +581,8 @@ function createInitialState(options: CreateWorldOptions): WorldState {
     population: createPopulationDiagnostics(),
     worldLaws: createDefaultWorldLaws(),
     ecology: createEcologyDiagnostics(),
+    carcasses: [],
+    nextCarcassId: 0,
     humanExtinctSinceTick: 0,
     wars: [],
     truces: [],
@@ -607,6 +615,13 @@ function villageHasOperationalMine(state: WorldState, village: Village): boolean
   return village.buildingIds.some((buildingId) => {
     const building = state.buildings[buildingId - 1];
     return building?.completed && building.type === BuildingType.Mine && building.health > 0;
+  });
+}
+
+function villageHasOperationalFarm(state: WorldState, village: Village): boolean {
+  return village.buildingIds.some((buildingId) => {
+    const building = state.buildings[buildingId - 1];
+    return building?.completed && building.type === BuildingType.Farm && building.health > 0;
   });
 }
 
@@ -801,6 +816,7 @@ export function createWorldSimulation(options: CreateWorldOptions): WorldSimulat
     [EntityKind.Deer, size * 0.64, size * 0.62, 10],
     [EntityKind.Wolf, size * 0.28, size * 0.32, 5],
     [EntityKind.Bear, size * 0.72, size * 0.7, 3],
+    [EntityKind.Fish, size * 0.5, size * 0.5, 18],
   ];
   if (state.map.preset !== 'ocean') {
     for (const [kind, x, z, count] of wildlife) simulation.spawn(kind, x, z, count);
@@ -825,17 +841,22 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       if (entityId < 0) break;
       state.nextLifeId += 1;
       state.entities.lifeIds[entityId] = state.nextLifeId;
-      const spawnX = x + (random() - 0.5) * 5;
-      const spawnZ = z + (random() - 0.5) * 5;
+      const spawnRandom =
+        kind === EntityKind.Fish
+          ? createSeededRandom(`${state.seed}:fish:${state.nextLifeId}`)
+          : random;
+      const spawnX = x + (spawnRandom() - 0.5) * 5;
+      const spawnZ = z + (spawnRandom() - 0.5) * 5;
       const cell =
         kind === EntityKind.Fish
           ? findNearestTerrain(state, spawnX, spawnZ, TerrainType.Ocean)
           : findNearestWalkable(state, spawnX, spawnZ);
       state.entities.active[entityId] = 1;
       state.entities.kind[entityId] = kind;
-      state.entities.positionsX[entityId] = (cell % state.map.size) + 0.5 + (random() - 0.5) * 0.4;
+      state.entities.positionsX[entityId] =
+        (cell % state.map.size) + 0.5 + (spawnRandom() - 0.5) * 0.4;
       state.entities.positionsZ[entityId] =
-        Math.floor(cell / state.map.size) + 0.5 + (random() - 0.5) * 0.4;
+        Math.floor(cell / state.map.size) + 0.5 + (spawnRandom() - 0.5) * 0.4;
       if (
         kind !== EntityKind.Fish &&
         overlapsMatureTreeTrunk(
@@ -861,13 +882,13 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       }
       state.entities.health[entityId] = 1_000;
       state.entities.headings[entityId] = 0;
-      state.entities.hunger[entityId] = randomInt(random, 80, 420);
-      state.entities.energy[entityId] = randomInt(random, 600, 1_000);
+      state.entities.hunger[entityId] = randomInt(spawnRandom, 80, 420);
+      state.entities.energy[entityId] = randomInt(spawnRandom, 600, 1_000);
       const lifecycle = ANIMAL_LIFECYCLE_RULES[kind as keyof typeof ANIMAL_LIFECYCLE_RULES];
       state.entities.age[entityId] =
         kind === EntityKind.Human
-          ? randomInt(random, 18, 40)
-          : randomInt(random, 1, Math.max(1, Math.min(12, lifecycle.lifespanYears - 2)));
+          ? randomInt(spawnRandom, 18, 40)
+          : randomInt(spawnRandom, 1, Math.max(1, Math.min(12, lifecycle.lifespanYears - 2)));
       state.entities.sex[entityId] = entityId % 2;
       state.entities.familyIds[entityId] = 0;
       state.entities.partnerIds[entityId] = NO_ENTITY;
@@ -895,7 +916,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       state.entities.contribution[entityId] = 0;
       state.entities.weaponTiers[entityId] = 0;
       state.entities.armorTiers[entityId] = 0;
-      state.entities.traits[entityId] = randomInt(random, 0, 7);
+      state.entities.traits[entityId] = randomInt(spawnRandom, 0, 7);
       state.entities.speed[entityId] =
         kind === EntityKind.Human ? 1.25 + (entityId % 9) * 0.025 : 1.45;
       state.entities.names[entityId] =
@@ -937,6 +958,137 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       mapVersion: state.map.navigation.mapVersion,
       requestedAtTick: state.tick,
     });
+  };
+
+  const villageNeedsWildFood = (village: Village): boolean =>
+    village.resources.food <
+    Math.max(
+      HUNTING_RULES.minimumFoodReserve,
+      village.population * HUNTING_RULES.foodShortagePerResident,
+    );
+
+  const findAvailableCarcass = (entityId: number): WorldState['carcasses'][number] | null => {
+    let nearest: WorldState['carcasses'][number] | null = null;
+    let nearestDistance: number = HUNTING_RULES.huntRange;
+    const x = state.entities.positionsX[entityId] ?? 0;
+    const z = state.entities.positionsZ[entityId] ?? 0;
+    for (const carcass of state.carcasses) {
+      if (
+        carcass.meatRemaining <= 0 ||
+        carcass.decayAtTick <= state.tick ||
+        (carcass.reservedByEntityId !== null &&
+          carcass.reservedByEntityId !== entityId &&
+          carcass.reservedUntilTick >= state.tick)
+      ) {
+        continue;
+      }
+      const distance = Math.hypot(carcass.x - x, carcass.z - z);
+      if (distance >= nearestDistance) continue;
+      nearest = carcass;
+      nearestDistance = distance;
+    }
+    return nearest;
+  };
+
+  const findHuntPrey = (hunterId: number): number => {
+    let nearest = -1;
+    let nearestDistance: number = HUNTING_RULES.huntRange;
+    const hunterX = state.entities.positionsX[hunterId] ?? 0;
+    const hunterZ = state.entities.positionsZ[hunterId] ?? 0;
+    const reservedPreyIds = new Set<number>();
+    for (let otherId = 0; otherId < state.entities.count; otherId += 1) {
+      if (otherId === hunterId || state.entities.active[otherId] !== 1) continue;
+      const task = state.entities.tasks[otherId];
+      if (
+        task?.type === 'hunt' &&
+        task.targetKind === 'entity' &&
+        task.phase !== 'complete' &&
+        task.phase !== 'failed'
+      ) {
+        reservedPreyIds.add(task.targetId);
+      }
+    }
+    for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
+      if (!state.entities.active[entityId]) continue;
+      const kind = state.entities.kind[entityId] as EntityKind;
+      if (
+        kind !== EntityKind.Chicken &&
+        kind !== EntityKind.Sheep &&
+        kind !== EntityKind.Cow &&
+        kind !== EntityKind.Deer
+      ) {
+        continue;
+      }
+      if ((state.entities.age[entityId] ?? 0) < HUNTING_RULES.minimumPreyAge) continue;
+      if (reservedPreyIds.has(entityId)) continue;
+      const distance = Math.hypot(
+        (state.entities.positionsX[entityId] ?? 0) - hunterX,
+        (state.entities.positionsZ[entityId] ?? 0) - hunterZ,
+      );
+      if (distance >= nearestDistance) continue;
+      nearest = entityId;
+      nearestDistance = distance;
+    }
+    return nearest;
+  };
+
+  const findShoreCellForFish = (fishId: number): number => {
+    const fishX = Math.floor(state.entities.positionsX[fishId] ?? 0);
+    const fishZ = Math.floor(state.entities.positionsZ[fishId] ?? 0);
+    for (let radius = 1; radius <= FISHING_RULES.shoreRange; radius += 1) {
+      for (let offsetZ = -radius; offsetZ <= radius; offsetZ += 1) {
+        for (let offsetX = -radius; offsetX <= radius; offsetX += 1) {
+          if (Math.max(Math.abs(offsetX), Math.abs(offsetZ)) !== radius) continue;
+          const x = fishX + offsetX;
+          const z = fishZ + offsetZ;
+          if (x < 0 || z < 0 || x >= state.map.size || z >= state.map.size) continue;
+          const cell = z * state.map.size + x;
+          if (
+            isWalkable(state.map.navigation, cell) &&
+            !overlapsMatureTreeTrunk(state.resourceNodes, x + 0.5, z + 0.5)
+          ) {
+            return cell;
+          }
+        }
+      }
+    }
+    return -1;
+  };
+
+  const findFishingTarget = (fisherId: number): { fishId: number; shoreCell: number } | null => {
+    let target: { fishId: number; shoreCell: number } | null = null;
+    let nearestDistance: number = HUNTING_RULES.huntRange;
+    const fisherX = state.entities.positionsX[fisherId] ?? 0;
+    const fisherZ = state.entities.positionsZ[fisherId] ?? 0;
+    const reservedFishIds = new Set<number>();
+    for (let otherId = 0; otherId < state.entities.count; otherId += 1) {
+      if (otherId === fisherId || state.entities.active[otherId] !== 1) continue;
+      const task = state.entities.tasks[otherId];
+      if (
+        task?.type === 'fish' &&
+        task.targetKind === 'entity' &&
+        task.phase !== 'complete' &&
+        task.phase !== 'failed'
+      ) {
+        reservedFishIds.add(task.targetId);
+      }
+    }
+    for (let fishId = 0; fishId < state.entities.count; fishId += 1) {
+      if (state.entities.active[fishId] !== 1 || state.entities.kind[fishId] !== EntityKind.Fish) {
+        continue;
+      }
+      if (reservedFishIds.has(fishId)) continue;
+      const shoreCell = findShoreCellForFish(fishId);
+      if (shoreCell < 0) continue;
+      const distance = Math.hypot(
+        (shoreCell % state.map.size) + 0.5 - fisherX,
+        Math.floor(shoreCell / state.map.size) + 0.5 - fisherZ,
+      );
+      if (distance >= nearestDistance) continue;
+      target = { fishId, shoreCell };
+      nearestDistance = distance;
+    }
+    return target;
   };
 
   const chooseTarget = (entityId: number): void => {
@@ -1106,6 +1258,83 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       if (barracks?.completed && barracks.health > 0 && barracks.type === BuildingType.Barracks) {
         target = findNearestWalkable(state, barracks.x, barracks.z);
       }
+    } else if (stateValue === AgentState.Hunt) {
+      const task = state.entities.tasks[entityId];
+      const currentPrey =
+        task?.type === 'hunt' &&
+        task.targetKind === 'entity' &&
+        state.entities.active[task.targetId] === 1
+          ? task.targetId
+          : -1;
+      const preyId = currentPrey >= 0 ? currentPrey : findHuntPrey(entityId);
+      if (preyId < 0) {
+        if (task) failResidentTask(task, state.tick, '附近没有可达的成年猎物');
+        state.entities.states[entityId] = AgentState.Idle;
+        return;
+      }
+      target = findNearestWalkable(
+        state,
+        state.entities.positionsX[preyId] ?? currentX,
+        state.entities.positionsZ[preyId] ?? currentZ,
+      );
+      if (task) {
+        task.targetKind = 'entity';
+        task.targetId = preyId;
+        task.targetCell = target;
+        task.phase = 'travel';
+        task.progress = 0;
+        renewResidentTaskLease(task, state.tick);
+      }
+    } else if (stateValue === AgentState.Butcher) {
+      const task = state.entities.tasks[entityId];
+      const currentCarcass =
+        task?.type === 'butcher' && task.targetKind === 'carcass'
+          ? state.carcasses.find((carcass) => carcass.id === task.targetId)
+          : undefined;
+      const carcass = currentCarcass ?? findAvailableCarcass(entityId);
+      if (!carcass) {
+        if (task) failResidentTask(task, state.tick, '附近没有可处理的动物尸体');
+        state.entities.states[entityId] = AgentState.Idle;
+        return;
+      }
+      carcass.reservedByEntityId = entityId;
+      carcass.reservedUntilTick = state.tick + 120;
+      target = findNearestWalkable(state, carcass.x, carcass.z);
+      if (task) {
+        task.targetKind = 'carcass';
+        task.targetId = carcass.id;
+        task.targetCell = target;
+        task.phase = 'travel';
+        task.progress = 0;
+        renewResidentTaskLease(task, state.tick);
+      }
+    } else if (stateValue === AgentState.Fish) {
+      const task = state.entities.tasks[entityId];
+      const currentFishId =
+        task?.type === 'fish' &&
+        task.targetKind === 'entity' &&
+        state.entities.active[task.targetId] === 1 &&
+        state.entities.kind[task.targetId] === EntityKind.Fish
+          ? task.targetId
+          : -1;
+      const fishingTarget =
+        currentFishId >= 0
+          ? { fishId: currentFishId, shoreCell: findShoreCellForFish(currentFishId) }
+          : findFishingTarget(entityId);
+      if (!fishingTarget || fishingTarget.shoreCell < 0) {
+        if (task) failResidentTask(task, state.tick, '附近岸线没有可捕捞的鱼群');
+        state.entities.states[entityId] = AgentState.Idle;
+        return;
+      }
+      target = fishingTarget.shoreCell;
+      if (task) {
+        task.targetKind = 'entity';
+        task.targetId = fishingTarget.fishId;
+        task.targetCell = target;
+        task.phase = 'travel';
+        task.progress = 0;
+        renewResidentTaskLease(task, state.tick);
+      }
     }
     if (target < 0) {
       const village = state.villages.find(
@@ -1122,7 +1351,11 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     requestPath(
       entityId,
       target,
-      stateValue === AgentState.Flee ? 10 : stateValue === AgentState.FindFood ? 6 : 2,
+      stateValue === AgentState.Flee
+        ? 10
+        : stateValue === AgentState.FindFood || stateValue === AgentState.Hunt
+          ? 6
+          : 2,
     );
   };
 
@@ -1182,7 +1415,11 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     } else if (
       agentState === AgentState.Home &&
       currentTask &&
-      (currentTask.type === 'gather' || currentTask.type === 'farm' || currentTask.type === 'craft')
+      (currentTask.type === 'gather' ||
+        currentTask.type === 'farm' ||
+        currentTask.type === 'craft' ||
+        currentTask.type === 'butcher' ||
+        currentTask.type === 'fish')
     ) {
       type = currentTask.type;
       reason = currentTask.reason;
@@ -1232,17 +1469,29 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     } else if (agentState === AgentState.Farm) {
       type = 'farm';
       reason = 'village-needs-food';
-      const farm = state.buildings.find(
-        (candidate) =>
-          candidate.villageId === villageId &&
-          candidate.type === BuildingType.Farm &&
-          candidate.completed,
-      );
-      if (farm) {
-        targetKind = 'building';
-        targetId = farm.id;
+      const foragingCell =
+        profession === Profession.Forager &&
+        targetCell !== NO_TARGET &&
+        (state.map.resourceFood[targetCell] ?? 0) > 0 &&
+        canVillageUseTerritoryCell(state, villageId, targetCell);
+      if (foragingCell) {
+        targetKind = 'cell';
+        targetId = targetCell;
+        expectedResult = '采集野外食物并送回聚落';
+      } else {
+        const farm = state.buildings.find(
+          (candidate) =>
+            candidate.villageId === villageId &&
+            candidate.type === BuildingType.Farm &&
+            candidate.completed &&
+            candidate.health > 0,
+        );
+        if (farm) {
+          targetKind = 'building';
+          targetId = farm.id;
+        }
+        expectedResult = '完成农务并把食物送回聚落';
       }
-      expectedResult = '完成农务并把食物送回聚落';
       requiredProgress = 36;
     } else if (agentState === AgentState.Craft) {
       type = 'craft';
@@ -1271,6 +1520,42 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       } else {
         expectedResult = '守卫聚落和边境';
       }
+    } else if (agentState === AgentState.Hunt) {
+      type = 'hunt';
+      reason = 'village-needs-food';
+      if (currentTask?.type === 'hunt' && currentTask.targetKind === 'entity') {
+        targetKind = 'entity';
+        targetId = currentTask.targetId;
+      } else {
+        targetKind = 'none';
+        targetId = 0;
+      }
+      requiredProgress = HUNTING_RULES.attackIntervalTicks;
+      expectedResult = '追踪并猎杀至少三岁的野生动物';
+    } else if (agentState === AgentState.Butcher) {
+      type = 'butcher';
+      reason = 'village-needs-food';
+      if (currentTask?.type === 'butcher' && currentTask.targetKind === 'carcass') {
+        targetKind = 'carcass';
+        targetId = currentTask.targetId;
+      } else {
+        targetKind = 'none';
+        targetId = 0;
+      }
+      requiredProgress = HUNTING_RULES.butcherTicks;
+      expectedResult = '屠宰新鲜尸体并把肉送回聚落';
+    } else if (agentState === AgentState.Fish) {
+      type = 'fish';
+      reason = 'village-needs-food';
+      if (currentTask?.type === 'fish' && currentTask.targetKind === 'entity') {
+        targetKind = 'entity';
+        targetId = currentTask.targetId;
+      } else {
+        targetKind = 'none';
+        targetId = 0;
+      }
+      requiredProgress = FISHING_RULES.workTicks;
+      expectedResult = '在陆地岸边捕捞真实鱼群并送回聚落';
     }
 
     const canContinue =
@@ -1943,6 +2228,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       const cell = entityCell(state, entityId);
       const danger = (state.map.fire[cell] ?? 0) > 80 || (state.map.plague[cell] ?? 0) > 80 ? 1 : 0;
       const profession = state.entities.professions[entityId] as Profession;
+      const currentTask = state.entities.tasks[entityId];
       let nextState = selectUtilityState({
         hunger: state.entities.hunger[entityId] ?? 0,
         energy: state.entities.energy[entityId] ?? 0,
@@ -1975,8 +2261,27 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       ) {
         nextState = AgentState.Haul;
       }
+      if (
+        nextState === AgentState.Build &&
+        currentTask &&
+        (currentTask.type === 'hunt' ||
+          currentTask.type === 'butcher' ||
+          currentTask.type === 'fish') &&
+        currentTask.phase !== 'complete' &&
+        currentTask.phase !== 'failed'
+      ) {
+        nextState = previousState;
+      }
       if (nextState === AgentState.Build && profession !== Profession.Builder) {
-        if (
+        if (profession === Profession.Hunter && village && villageNeedsWildFood(village)) {
+          const searchDue =
+            state.tick % HUNTING_RULES.searchIntervalTicks ===
+            entityId % HUNTING_RULES.searchIntervalTicks;
+          if (!searchDue) nextState = AgentState.Wander;
+          else if (findAvailableCarcass(entityId)) nextState = AgentState.Butcher;
+          else if (findHuntPrey(entityId) >= 0) nextState = AgentState.Hunt;
+          else nextState = AgentState.Wander;
+        } else if (
           profession === Profession.Woodcutter &&
           village &&
           (!village.buildingIds.some((buildingId) => {
@@ -2005,7 +2310,17 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
           village &&
           village.resources.food < 36 + village.population * 4
         ) {
-          nextState = AgentState.Farm;
+          const forageCell = findNearestVillageGridResource(state, village.id, cell, 48);
+          if (forageCell >= 0) nextState = AgentState.Farm;
+          else if (
+            villageNeedsWildFood(village) &&
+            state.tick % FISHING_RULES.searchIntervalTicks ===
+              entityId % FISHING_RULES.searchIntervalTicks &&
+            findFishingTarget(entityId)
+          )
+            nextState = AgentState.Fish;
+          else if (villageHasOperationalFarm(state, village)) nextState = AgentState.Farm;
+          else nextState = AgentState.Wander;
         } else if (profession === Profession.Farmer && state.entities.workBuildingIds[entityId] > 0)
           nextState = AgentState.Farm;
         else if (
@@ -2025,7 +2340,6 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         if (carryingCraftInputs && !survivalState) nextState = AgentState.Craft;
         else if (!carryingCraftInputs) nextState = wasHauling ? AgentState.Haul : AgentState.Home;
       }
-      const currentTask = state.entities.tasks[entityId];
       const finishingSafePhase =
         currentTask &&
         currentTask.phase !== 'complete' &&
@@ -2165,15 +2479,52 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       }
       if (state.tick % 10 === entityId % 10) {
         if (kind === EntityKind.Fish) {
-          const neighbours = [
-            currentCell - 1,
-            currentCell + 1,
-            currentCell - state.map.size,
-            currentCell + state.map.size,
-          ].filter((cell) => cell >= 0 && state.map.terrain[cell] === TerrainType.Ocean);
-          const target = neighbours[Math.floor(random() * neighbours.length)];
-          if (target !== undefined) state.entities.targetCells[entityId] = target;
-          state.entities.states[entityId] = AgentState.Wander;
+          const currentX = currentCell % state.map.size;
+          const currentZ = Math.floor(currentCell / state.map.size);
+          const directionOffset = Math.floor(stableNoise(state.tick * 131 + entityId * 977) * 4);
+          for (let attempt = 0; attempt < 4; attempt += 1) {
+            const direction = (directionOffset + attempt) % 4;
+            const candidateX = currentX + (direction === 0 ? -1 : direction === 1 ? 1 : 0);
+            const candidateZ = currentZ + (direction === 2 ? -1 : direction === 3 ? 1 : 0);
+            if (
+              candidateX < 0 ||
+              candidateZ < 0 ||
+              candidateX >= state.map.size ||
+              candidateZ >= state.map.size
+            ) {
+              continue;
+            }
+            const target = candidateZ * state.map.size + candidateX;
+            const terrain = state.map.terrain[target];
+            if (terrain !== TerrainType.Ocean && terrain !== TerrainType.ShallowOcean) continue;
+            state.entities.targetCells[entityId] = target;
+            break;
+          }
+          if (
+            state.tick % FISHING_RULES.habitatFeedingIntervalTicks ===
+              entityId % FISHING_RULES.habitatFeedingIntervalTicks &&
+            (state.entities.hunger[entityId] ?? 0) > 0
+          ) {
+            const fishDiagnostics = state.ecology.species[EntityKind.Fish];
+            const habitatPressure = Math.max(
+              1,
+              (fishDiagnostics?.count ?? 1) / Math.max(1, fishDiagnostics?.capacity ?? 1),
+            );
+            const hungerReduction = Math.max(
+              1,
+              Math.round(
+                FISHING_RULES.habitatFeedingHungerReduction /
+                  habitatPressure ** FISHING_RULES.habitatFeedingPressureExponent,
+              ),
+            );
+            state.entities.hunger[entityId] = Math.max(
+              0,
+              (state.entities.hunger[entityId] ?? 0) - hungerReduction,
+            );
+            state.entities.states[entityId] = AgentState.Eat;
+          } else {
+            state.entities.states[entityId] = AgentState.Wander;
+          }
         } else if (
           kind === EntityKind.Chicken ||
           kind === EntityKind.Sheep ||
@@ -2229,7 +2580,13 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
 
       const target = state.entities.targetCells[entityId];
       if (target === undefined || target === NO_TARGET) continue;
-      if (kind === EntityKind.Fish && state.map.terrain[target] !== TerrainType.Ocean) continue;
+      if (
+        kind === EntityKind.Fish &&
+        state.map.terrain[target] !== TerrainType.Ocean &&
+        state.map.terrain[target] !== TerrainType.ShallowOcean
+      ) {
+        continue;
+      }
       if (kind === EntityKind.Fish) {
         moveTowardCell(
           state,
@@ -2327,7 +2684,14 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       const capacityPressure = members.length / Math.max(1, cap);
       const chance = lifecycle.reproductionChance * Math.max(0.2, 1 - capacityPressure);
       if (stableNoise(state.tick * 17 + kind * 101 + members.length) >= chance) continue;
-      const parent = females[Math.floor(random() * females.length)];
+      const parent =
+        females[
+          Math.floor(
+            (kind === EntityKind.Fish
+              ? stableNoise(state.tick * 37 + kind * 211 + females.length)
+              : random()) * females.length,
+          )
+        ];
       if (parent === undefined) continue;
       const newborn = spawn(
         kind,
@@ -2397,7 +2761,14 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       const cell = findNaturalReturnCell(kind);
       if (cell < 0) continue;
       const [minimum, maximum] = speciesReturnGroup(kind);
-      const desired = randomInt(random, minimum, maximum);
+      const desired =
+        kind === EntityKind.Fish
+          ? randomInt(
+              () => stableNoise(state.tick * 41 + kind * 313 + diagnostics.deaths),
+              minimum,
+              maximum,
+            )
+          : randomInt(random, minimum, maximum);
       const count = Math.min(desired, Math.max(0, diagnostics.capacity - diagnostics.count));
       if (count <= 0) continue;
       const wasExtinct = diagnostics.count === 0;
@@ -2405,7 +2776,13 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       if (spawned.length === 0) continue;
       diagnostics.lastReturnTick = state.tick;
       state.ecology.nextReturnTicks[kind] =
-        state.tick + randomInt(random, ...ECOLOGY_BALANCE_RULES.naturalReturnCooldownTicks);
+        state.tick +
+        (kind === EntityKind.Fish
+          ? randomInt(
+              () => stableNoise(state.tick * 43 + kind * 317 + diagnostics.births),
+              ...ECOLOGY_BALANCE_RULES.naturalReturnCooldownTicks,
+            )
+          : randomInt(random, ...ECOLOGY_BALANCE_RULES.naturalReturnCooldownTicks));
       if (wasExtinct) addEvent(state, 'ecology', `${ANIMAL_SPECIES_NAMES[kind]}重新出现在荒野中`);
     }
     refreshEcologyDiagnostics(state);
@@ -2485,6 +2862,127 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       }
       if (task.phase !== 'work') continue;
       const agentState = state.entities.states[entityId] as AgentState;
+      if (agentState === AgentState.Hunt) {
+        const preyId = task.targetKind === 'entity' ? task.targetId : -1;
+        if (
+          preyId < 0 ||
+          state.entities.active[preyId] !== 1 ||
+          (state.entities.age[preyId] ?? 0) < HUNTING_RULES.minimumPreyAge
+        ) {
+          failResidentTask(task, state.tick, '猎物已经离开或不符合狩猎年龄');
+          state.entities.states[entityId] = AgentState.Idle;
+          continue;
+        }
+        const distance = Math.hypot(
+          (state.entities.positionsX[preyId] ?? 0) - (state.entities.positionsX[entityId] ?? 0),
+          (state.entities.positionsZ[preyId] ?? 0) - (state.entities.positionsZ[entityId] ?? 0),
+        );
+        if (distance > 1.4) {
+          const targetCell = findNearestWalkable(
+            state,
+            state.entities.positionsX[preyId] ?? 0,
+            state.entities.positionsZ[preyId] ?? 0,
+          );
+          task.phase = 'travel';
+          task.targetCell = targetCell;
+          state.entities.paths[entityId] = null;
+          requestPath(entityId, targetCell, 7);
+          renewResidentTaskLease(task, state.tick);
+          continue;
+        }
+        task.progress += 1;
+        renewResidentTaskLease(task, state.tick);
+        if (task.progress < HUNTING_RULES.attackIntervalTicks) continue;
+        task.progress = 0;
+        const damage =
+          HUNTING_RULES.baseHuntDamage + (state.entities.weaponTiers[entityId] ?? 0) * 4;
+        state.entities.health[preyId] = Math.max(0, (state.entities.health[preyId] ?? 0) - damage);
+        if ((state.entities.health[preyId] ?? 0) > 0) continue;
+        const carcass = recordAnimalDeath(state, preyId, 'hunting');
+        if (carcass) {
+          carcass.reservedByEntityId = entityId;
+          carcass.reservedUntilTick = state.tick + 120;
+        }
+        completeResidentTask(task, state.tick);
+        state.entities.states[entityId] = AgentState.Butcher;
+        state.entities.paths[entityId] = null;
+        state.entities.targetCells[entityId] = NO_TARGET;
+        grantResidentProgress(state, entityId, 8);
+        continue;
+      }
+      if (agentState === AgentState.Butcher) {
+        const carcass =
+          task.targetKind === 'carcass'
+            ? state.carcasses.find((candidate) => candidate.id === task.targetId)
+            : undefined;
+        if (!carcass || carcass.meatRemaining <= 0 || carcass.decayAtTick <= state.tick) {
+          failResidentTask(task, state.tick, '动物尸体已经腐烂或被处理');
+          state.entities.states[entityId] = AgentState.Idle;
+          continue;
+        }
+        carcass.reservedByEntityId = entityId;
+        carcass.reservedUntilTick = state.tick + 120;
+        task.progress += 1;
+        task.requiredProgress = HUNTING_RULES.butcherTicks;
+        renewResidentTaskLease(task, state.tick);
+        if (task.progress < task.requiredProgress) continue;
+        const amount = Math.min(HUNTING_RULES.maximumCarriedMeat, carcass.meatRemaining);
+        carcass.meatRemaining -= amount;
+        carcass.reservedByEntityId = null;
+        carcass.reservedUntilTick = 0;
+        state.ecology.butcheredMeat += amount;
+        state.entities.carriedResourceKinds[entityId] = CarriedResourceKind.Food;
+        state.entities.carriedResources[entityId] = amount;
+        task.phase = 'delivery';
+        task.expectedResult = '把屠宰所得肉类送入聚落仓储';
+        state.entities.states[entityId] = AgentState.Home;
+        state.entities.paths[entityId] = null;
+        state.entities.targetCells[entityId] = NO_TARGET;
+        grantResidentProgress(state, entityId, 8);
+        continue;
+      }
+      if (agentState === AgentState.Fish) {
+        const fishId = task.targetKind === 'entity' ? task.targetId : -1;
+        const fisherCell = entityCell(state, entityId);
+        if (
+          fishId < 0 ||
+          state.entities.active[fishId] !== 1 ||
+          state.entities.kind[fishId] !== EntityKind.Fish
+        ) {
+          failResidentTask(task, state.tick, '目标鱼群已经离开或被捕捞');
+          state.entities.states[entityId] = AgentState.Idle;
+          continue;
+        }
+        if (!isWalkable(state.map.navigation, fisherCell)) {
+          failResidentTask(task, state.tick, '捕鱼者没有站在可通行岸地');
+          state.entities.states[entityId] = AgentState.Idle;
+          continue;
+        }
+        const fishDistance = Math.hypot(
+          (state.entities.positionsX[fishId] ?? 0) - (state.entities.positionsX[entityId] ?? 0),
+          (state.entities.positionsZ[fishId] ?? 0) - (state.entities.positionsZ[entityId] ?? 0),
+        );
+        if (fishDistance > FISHING_RULES.shoreRange + 0.75) {
+          failResidentTask(task, state.tick, '鱼群已经游出岸边捕捞范围');
+          state.entities.states[entityId] = AgentState.Idle;
+          continue;
+        }
+        task.progress += 1;
+        task.requiredProgress = FISHING_RULES.workTicks;
+        renewResidentTaskLease(task, state.tick);
+        if (task.progress < task.requiredProgress) continue;
+        recordAnimalDeath(state, fishId, 'hunting', { leaveCarcass: false });
+        state.ecology.fishCaught += 1;
+        state.entities.carriedResourceKinds[entityId] = CarriedResourceKind.Food;
+        state.entities.carriedResources[entityId] = FISHING_RULES.catchFood;
+        task.phase = 'delivery';
+        task.expectedResult = '把岸边捕获的鱼送入聚落仓储';
+        state.entities.states[entityId] = AgentState.Home;
+        state.entities.paths[entityId] = null;
+        state.entities.targetCells[entityId] = NO_TARGET;
+        grantResidentProgress(state, entityId, 8);
+        continue;
+      }
       if (agentState === AgentState.Rest) {
         const cell = entityCell(state, entityId);
         if ((state.map.fire[cell] ?? 0) > 80 || (state.map.plague[cell] ?? 0) > 80) {
@@ -2544,7 +3042,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       if (agentState === AgentState.Farm) {
         const cell = task.targetCell;
         const profession = state.entities.professions[entityId] as Profession;
-        if (profession === Profession.Forager) {
+        if (profession === Profession.Forager && task.targetKind === 'cell') {
           task.progress += 1;
           renewResidentTaskLease(task, state.tick);
           if (task.progress < 36) continue;
@@ -3342,6 +3840,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     moveEntities();
     advanceCropsAndResidentWork();
     updateAnimals();
+    decayAnimalCarcasses(state);
     advanceConstruction(state);
     if (state.tick % 2 === 0) updateWar();
     if (state.tick % 20 === 0) {
@@ -3495,6 +3994,15 @@ function completeEntityAction(state: WorldState, entityId: number, cell: number)
     }
   }
   if (currentState === AgentState.Guard && task) {
+    task.phase = 'work';
+    renewResidentTaskLease(task, state.tick);
+  }
+  if (
+    (currentState === AgentState.Hunt ||
+      currentState === AgentState.Butcher ||
+      currentState === AgentState.Fish) &&
+    task
+  ) {
     task.phase = 'work';
     renewResidentTaskLease(task, state.tick);
   }
@@ -3874,7 +4382,7 @@ function applyEnvironmentDamage(state: WorldState): void {
       }
       markMapCellDirty(state.map, cell);
     }
-    const hungry = (state.entities.hunger[entityId] ?? 0) >= 990;
+    const hungry = state.worldLaws.hunger && (state.entities.hunger[entityId] ?? 0) >= 990;
     if (hungry && state.entities.kind[entityId] === EntityKind.Human) {
       const village = state.villages.find(
         (candidate) => candidate.id === state.entities.villageIds[entityId],
@@ -3892,7 +4400,7 @@ function applyEnvironmentDamage(state: WorldState): void {
       if (shortage === 'famine' && (state.entities.malnutrition[entityId] ?? 0) >= 120) {
         state.entities.health[entityId] = Math.max(0, (state.entities.health[entityId] ?? 0) - 8);
       }
-    } else if (!hungry) {
+    } else if (state.worldLaws.hunger) {
       state.entities.malnutrition[entityId] = Math.max(
         0,
         (state.entities.malnutrition[entityId] ?? 0) - 10,

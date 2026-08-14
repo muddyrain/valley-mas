@@ -33,7 +33,15 @@ describe('world law catalog', () => {
       naturalDisasters: true,
       civilizationRestart: false,
     });
-    expect(WORLD_LAW_UI_IDS).toEqual(['naturalAnimalReturn', 'civilizationRestart']);
+    expect(WORLD_LAW_UI_IDS).toEqual([
+      'hunger',
+      'naturalOldAge',
+      'humanReproduction',
+      'animalReproduction',
+      'animalPredation',
+      'naturalAnimalReturn',
+      'civilizationRestart',
+    ]);
   });
 
   it('keeps accepted and unresolved gameplay states explicit', () => {
@@ -44,7 +52,7 @@ describe('world law catalog', () => {
       decisionStatus: 'accepted',
       availability: 'active',
     });
-    expect(WORLD_LAW_CATALOG.hunger.availability).toBe('planned');
+    expect(WORLD_LAW_CATALOG.hunger.availability).toBe('active');
   });
 
   it('returns a fresh state object for each world', () => {

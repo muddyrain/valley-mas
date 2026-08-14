@@ -371,6 +371,7 @@ export class EonValeEngine {
   private readonly hotspotLayer = new Graphics({ roundPixels: true });
   private readonly buildingLayer = new Container();
   private readonly stockpileLayer = new Graphics({ roundPixels: true });
+  private readonly carcassLayer = new Graphics({ roundPixels: true });
   private readonly entityLayer = new Container();
   private readonly statusLayer = new Graphics({ roundPixels: true });
   private readonly combatStatusLayer = new Graphics({ roundPixels: true });
@@ -470,6 +471,7 @@ export class EonValeEngine {
         this.updateBuildings();
         this.redrawSettlementCores();
         this.redrawOutdoorStockpiles();
+        this.redrawCarcasses();
         this.updateTerritories();
         this.updateWorkHotspots();
         this.updateSettlementLabels();
@@ -823,6 +825,7 @@ export class EonValeEngine {
       this.settlementCoreLayer,
       this.buildingLayer,
       this.stockpileLayer,
+      this.carcassLayer,
       this.entityLayer,
       this.hotspotLayer,
       this.statusLayer,
@@ -837,6 +840,7 @@ export class EonValeEngine {
       this.updateBuildings();
       this.redrawSettlementCores();
       this.redrawOutdoorStockpiles();
+      this.redrawCarcasses();
       this.updateTerritories();
       this.updateWorkHotspots();
       this.updateSettlementLabels();
@@ -1340,6 +1344,29 @@ export class EonValeEngine {
       new Set(snapshot.villages.map((village) => village.tier)).size,
     );
     this.redrawBuildingStatus();
+  }
+
+  private redrawCarcasses(): void {
+    this.carcassLayer.clear();
+    const snapshot = this.snapshot;
+    if (!snapshot) return;
+    this.canvas.dataset.carcasses = String(snapshot.carcasses.length);
+    if (this.viewLevel === 'world') return;
+    const scale = this.viewLevel === 'resident' ? 1 : 0.72;
+    for (const carcass of snapshot.carcasses) {
+      const x = carcass.x * WORLD_PIXELS_PER_CELL;
+      const z = carcass.z * WORLD_PIXELS_PER_CELL;
+      const freshness = Math.max(0.3, Math.min(1, (carcass.decayAtTick - snapshot.tick) / 360));
+      this.carcassLayer
+        .rect(x - 2.5 * scale, z - 1.1 * scale, 5 * scale, 2.2 * scale)
+        .fill({ color: 0x75483b, alpha: 0.86 * freshness });
+      this.carcassLayer
+        .rect(x - 3.1 * scale, z - 0.35 * scale, 1.4 * scale, 0.7 * scale)
+        .fill({ color: 0xd8c7a0, alpha: 0.78 * freshness });
+      this.carcassLayer
+        .rect(x + 1.7 * scale, z - 0.35 * scale, 1.4 * scale, 0.7 * scale)
+        .fill({ color: 0xd8c7a0, alpha: 0.78 * freshness });
+    }
   }
 
   private redrawBuildingStatus(): void {
@@ -2113,6 +2140,7 @@ export class EonValeEngine {
     this.updateBuildings();
     this.redrawSettlementCores();
     this.redrawOutdoorStockpiles();
+    this.redrawCarcasses();
     this.redrawBuildingStatus();
     this.updateWorkHotspots();
     this.updateSettlementLabelPositions();

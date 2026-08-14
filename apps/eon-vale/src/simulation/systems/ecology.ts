@@ -1,4 +1,5 @@
 import {
+  type AnimalCarcass,
   type AnimalDeathCause,
   type AnimalDeathCauseCounts,
   type AnimalEcologyStatus,
@@ -7,6 +8,7 @@ import {
   TerrainType,
   type WorldState,
 } from '@/shared/gameTypes';
+import { HUNTING_RULES } from '../rules/ecologyRules';
 
 export const ANIMAL_SPECIES = [
   EntityKind.Chicken,
@@ -62,6 +64,10 @@ export function speciesReturnGroup(kind: EntityKind): readonly [number, number] 
 export function createEcologyDiagnostics(): EcologyDiagnostics {
   return {
     animals: 0,
+    carcasses: 0,
+    butcheredMeat: 0,
+    fishCaught: 0,
+    carcassesDecayed: 0,
     species: Array.from({ length: EntityKind.Fish + 1 }, (_, kind) => ({
       kind: kind as EntityKind,
       count: 0,
@@ -88,16 +94,52 @@ export function recordAnimalDeath(
   state: WorldState,
   entityId: number,
   cause: AnimalDeathCause,
-): void {
-  if (!state.entities.active[entityId]) return;
+  options: { leaveCarcass?: boolean } = {},
+): AnimalCarcass | null {
+  if (!state.entities.active[entityId]) return null;
   const kind = state.entities.kind[entityId] as EntityKind;
-  if (kind === EntityKind.Human) return;
+  if (kind === EntityKind.Human) return null;
+  let carcass: AnimalCarcass | null = null;
+  if (options.leaveCarcass !== false) {
+    state.nextCarcassId += 1;
+    carcass = {
+      id: state.nextCarcassId,
+      sourceKind: kind,
+      deathCause: cause,
+      x: state.entities.positionsX[entityId] ?? 0,
+      z: state.entities.positionsZ[entityId] ?? 0,
+      meatRemaining: HUNTING_RULES.meatBySpecies[kind] ?? 1,
+      createdAtTick: state.tick,
+      decayAtTick: state.tick + HUNTING_RULES.carcassDecayTicks,
+      reservedByEntityId: null,
+      reservedUntilTick: 0,
+    };
+    state.carcasses.push(carcass);
+    state.ecology.carcasses = state.carcasses.length;
+  }
   state.entities.active[entityId] = 0;
   state.entities.paths[entityId] = null;
   const diagnostics = state.ecology.species[kind];
-  if (!diagnostics) return;
+  if (!diagnostics) return carcass;
   diagnostics.deaths += 1;
   diagnostics.deathCauses[cause] += 1;
+  return carcass;
+}
+
+export function decayAnimalCarcasses(state: WorldState): number {
+  if (state.carcasses.length === 0) return 0;
+  let writeIndex = 0;
+  for (const carcass of state.carcasses) {
+    if (carcass.meatRemaining <= 0 || carcass.decayAtTick <= state.tick) continue;
+    state.carcasses[writeIndex] = carcass;
+    writeIndex += 1;
+  }
+  const decayed = state.carcasses.length - writeIndex;
+  if (decayed === 0) return 0;
+  state.carcasses.length = writeIndex;
+  state.ecology.carcasses = state.carcasses.length;
+  state.ecology.carcassesDecayed += decayed;
+  return decayed;
 }
 
 export function habitatCells(state: WorldState, kind: EntityKind): number[] {
@@ -126,6 +168,7 @@ export function refreshEcologyDiagnostics(state: WorldState): void {
     if (kind !== EntityKind.Human) counts[kind] = (counts[kind] ?? 0) + 1;
   }
   state.ecology.animals = ANIMAL_SPECIES.reduce((sum, kind) => sum + (counts[kind] ?? 0), 0);
+  state.ecology.carcasses = state.carcasses.length;
   for (const kind of ANIMAL_SPECIES) {
     const diagnostics = state.ecology.species[kind];
     if (!diagnostics) continue;

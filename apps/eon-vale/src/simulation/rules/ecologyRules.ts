@@ -71,6 +71,24 @@ export const HUNTING_RULES = Object.freeze({
   leavesCorpse: true,
   requiresButcheringAndDelivery: true,
   husbandryInCurrentScope: false,
+  carcassDecayTicks: 360,
+  foodShortagePerResident: 2,
+  minimumFoodReserve: 4,
+  huntRange: 42,
+  attackIntervalTicks: 12,
+  baseHuntDamage: 18,
+  butcherTicks: 48,
+  maximumCarriedMeat: 8,
+  searchIntervalTicks: 40,
+  meatBySpecies: Object.freeze({
+    1: 2,
+    2: 5,
+    3: 8,
+    4: 6,
+    5: 3,
+    6: 7,
+    7: 1,
+  } as const satisfies Record<number, number>),
 });
 
 export const FISHING_RULES = Object.freeze({
@@ -85,4 +103,11 @@ export const FISHING_RULES = Object.freeze({
   overfishingCanDepleteLocalPopulation: true,
   recoveryRequiresEcologicalReproduction: true,
   dockAndBoatInCurrentPhase: false,
+  shoreRange: 4,
+  workTicks: 72,
+  catchFood: 2,
+  searchIntervalTicks: 40,
+  habitatFeedingIntervalTicks: 40,
+  habitatFeedingHungerReduction: 320,
+  habitatFeedingPressureExponent: 2,
 } as const);

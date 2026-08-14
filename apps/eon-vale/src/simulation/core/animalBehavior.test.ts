@@ -5,7 +5,7 @@ import { findResourceNodesInRadius } from '../resources/resourceNodes';
 import { createWorldSimulation } from './worldSimulation';
 
 describe('animal behaviour', () => {
-  it('starts all six terrestrial species and makes prey flee nearby predators', () => {
+  it('starts all seven species and makes terrestrial prey flee nearby predators', () => {
     const simulation = createWorldSimulation({ seed: 'wildlife', initialHumans: 0 });
     const kinds = Array.from(
       simulation.state.entities.kind.slice(0, simulation.state.entities.count),
@@ -18,6 +18,7 @@ describe('animal behaviour', () => {
         EntityKind.Deer,
         EntityKind.Wolf,
         EntityKind.Bear,
+        EntityKind.Fish,
       ]),
     );
 

@@ -138,6 +138,8 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   await expect(ecologyPanel).toBeVisible();
   await expect(ecologyPanel).toContainText('鱼');
   await expect(ecologyPanel).toContainText(/出生 \d+ · 死亡 \d+/);
+  await expect(ecologyPanel.getByTestId('ecology-food-chain')).toContainText(/新鲜尸体 \d+/);
+  await expect(ecologyPanel.getByTestId('ecology-food-chain')).toContainText(/捕获鱼 \d+/);
   await ecologyPanel.getByRole('button', { name: '收起生态图鉴' }).click();
 
   const rebuildsBeforeFrames = Number(await canvas.getAttribute('data-full-rebuilds'));
@@ -146,8 +148,10 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
 
   await page.getByRole('button', { name: '世界菜单' }).click();
   const worldLaws = page.getByTestId('world-law-options');
-  const animalReturnLaw = worldLaws.locator('button').first();
-  const civilizationLaw = worldLaws.locator('button').nth(1);
+  const hungerLaw = worldLaws.getByRole('button', { name: '饥饿' });
+  const animalReturnLaw = worldLaws.getByRole('button', { name: '动物自然回归' });
+  const civilizationLaw = worldLaws.getByRole('button', { name: '文明重启' });
+  await expect(hungerLaw).toHaveClass(/active/);
   await expect(animalReturnLaw).toContainText('动物自然回归');
   await expect(animalReturnLaw).toHaveClass(/active/);
   await expect(civilizationLaw).toContainText('文明重启');

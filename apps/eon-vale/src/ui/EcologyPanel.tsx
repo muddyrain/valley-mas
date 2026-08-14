@@ -58,6 +58,12 @@ export function EcologyPanel({
           <X size={15} />
         </button>
       </div>
+      <div className="ecology-chain-summary" data-testid="ecology-food-chain">
+        <span>新鲜尸体 {ecology.carcasses}</span>
+        <span>已屠宰 {ecology.butcheredMeat} 食物</span>
+        <span>捕获鱼 {ecology.fishCaught}</span>
+        <span>腐烂消失 {ecology.carcassesDecayed}</span>
+      </div>
       <div className="ecology-species">
         {SPECIES.map((kind) => {
           const species = ecology.species[kind];

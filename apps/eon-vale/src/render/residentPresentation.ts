@@ -11,6 +11,8 @@ export function usesTravelPose(state: AgentState): boolean {
     state === AgentState.Build ||
     state === AgentState.Craft ||
     state === AgentState.Chase ||
+    state === AgentState.Hunt ||
+    state === AgentState.Fish ||
     state === AgentState.Flee ||
     state === AgentState.Home
   );
@@ -22,7 +24,8 @@ export function usesWorkPose(state: AgentState): boolean {
     state === AgentState.GatherStone ||
     state === AgentState.Build ||
     state === AgentState.Farm ||
-    state === AgentState.Craft
+    state === AgentState.Craft ||
+    state === AgentState.Butcher
   );
 }
 

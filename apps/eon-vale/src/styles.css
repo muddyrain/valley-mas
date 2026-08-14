@@ -605,6 +605,19 @@ select:focus-visible {
   cursor: pointer;
 }
 
+.ecology-chain-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .ecology-species {
   display: grid;
   gap: 6px;

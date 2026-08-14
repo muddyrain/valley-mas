@@ -36,6 +36,9 @@ export const STATE_LABELS: Record<number, string> = {
   [AgentState.Attack]: '战斗',
   [AgentState.Home]: '回家',
   [AgentState.Craft]: '制作',
+  [AgentState.Hunt]: '追猎',
+  [AgentState.Butcher]: '屠宰',
+  [AgentState.Fish]: '岸边捕鱼',
 };
 
 export const PROFESSION_LABELS: Record<number, string> = {

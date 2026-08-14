@@ -10,6 +10,7 @@ import {
   type WorldState,
 } from '@/shared/gameTypes';
 import { findResourceNodesInRadius } from '../resources/resourceNodes';
+import { HUNTING_RULES } from '../rules/ecologyRules';
 import { nextVillageTierRequirement } from '../systems/economy';
 import { BARRACKS_GUARD_SLOTS } from './settlementCapabilities';
 
@@ -144,6 +145,25 @@ export function assignVillageHomesAndWorkplaces(state: WorldState, village: Vill
   const workplaces = operationalBuildings(state, village).filter(
     (building) => (WORK_SLOTS[building.type] ?? 0) > 0,
   );
+  const needsHunter =
+    village.health > 0 &&
+    village.population > 0 &&
+    village.resources.food <
+      Math.max(
+        HUNTING_RULES.minimumFoodReserve,
+        village.population * HUNTING_RULES.foodShortagePerResident,
+      ) &&
+    !residents.some((entityId) => state.entities.professions[entityId] === Profession.Hunter);
+  if (needsHunter) {
+    const hunter = residents.find(
+      (entityId) =>
+        (state.entities.age[entityId] ?? 0) >= 16 &&
+        (state.entities.professions[entityId] === Profession.Hauler ||
+          state.entities.professions[entityId] === Profession.Builder ||
+          state.entities.professions[entityId] === Profession.Forager),
+    );
+    if (hunter !== undefined) state.entities.professions[hunter] = Profession.Hunter;
+  }
   if (
     workplaces.some((building) => building.type === BuildingType.Workshop) &&
     !residents.some((entityId) => state.entities.professions[entityId] === Profession.Blacksmith)

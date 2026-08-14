@@ -65,6 +65,13 @@ describe('accepted domain rules', () => {
       overfishingCanDepleteLocalPopulation: true,
       recoveryRequiresEcologicalReproduction: true,
       dockAndBoatInCurrentPhase: false,
+      shoreRange: 4,
+      workTicks: 72,
+      catchFood: 2,
+      searchIntervalTicks: 40,
+      habitatFeedingIntervalTicks: 40,
+      habitatFeedingHungerReduction: 320,
+      habitatFeedingPressureExponent: 2,
     });
   });
 
@@ -144,7 +151,8 @@ describe('accepted domain rules', () => {
     ]);
     expect(DELIVERY_BATCHES.every(({ playableLoopRequired }) => playableLoopRequired)).toBe(true);
     expect(DELIVERY_BATCHES.slice(0, 3).every(({ status }) => status === 'complete')).toBe(true);
-    expect(DELIVERY_BATCHES.slice(3).every(({ status }) => status === 'planned')).toBe(true);
+    expect(DELIVERY_BATCHES[3]?.status).toBe('complete');
+    expect(DELIVERY_BATCHES.slice(4).every(({ status }) => status === 'planned')).toBe(true);
     expect(
       DELIVERY_BATCHES.every(
         ({ backendOnlyDeliveryAllowed, decorativeOnlyDeliveryAllowed }) =>

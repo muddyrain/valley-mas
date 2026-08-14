@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BuildingType, CarriedResourceKind, VillageTier } from '@/shared/gameTypes';
+import { BuildingType, CarriedResourceKind, EntityKind, VillageTier } from '@/shared/gameTypes';
 import { createWorldSimulation } from '../core/worldSimulation';
 import { formKingdoms } from '../kingdoms/kingdoms';
 import { resolveSettlementCapabilities } from '../settlements/settlementCapabilities';
@@ -8,6 +8,50 @@ import { beginResidentTask } from '../tasks/residentTasks';
 import { loadWorldSave, serializeWorld } from './save';
 
 describe('world persistence', () => {
+  it('round-trips carcasses and their active butchering reservations in V12', () => {
+    const simulation = createWorldSimulation({ seed: 'v12-carcass-save', initialHumans: 0 });
+    const resident = simulation.spawn(EntityKind.Human, 64, 64)[0] as number;
+    simulation.state.carcasses.push({
+      id: 4,
+      sourceKind: 4,
+      deathCause: 'hunting',
+      x: 62.5,
+      z: 64.5,
+      meatRemaining: 6,
+      createdAtTick: 120,
+      decayAtTick: 480,
+      reservedByEntityId: resident,
+      reservedUntilTick: 180,
+    });
+    simulation.state.nextCarcassId = 4;
+    const task = beginResidentTask(1, simulation.state.tick, {
+      type: 'butcher',
+      reason: 'village-needs-food',
+      targetKind: 'carcass',
+      targetId: 4,
+      targetCell: 128,
+      expectedResult: '屠宰新鲜尸体并把肉送回聚落',
+      requiredProgress: 48,
+    });
+    task.phase = 'work';
+    task.progress = 19;
+    simulation.state.entities.tasks[resident] = task;
+
+    const encoded = serializeWorld(simulation.state);
+    const restored = loadWorldSave(encoded);
+
+    expect(JSON.parse(encoded).version).toBe(12);
+    expect(restored.carcasses).toEqual(simulation.state.carcasses);
+    expect(restored.nextCarcassId).toBe(4);
+    expect(restored.entities.tasks[resident]).toMatchObject({
+      type: 'butcher',
+      phase: 'work',
+      targetKind: 'carcass',
+      targetId: 4,
+      progress: 19,
+    });
+  });
+
   it('round-trips the current world without tick history', () => {
     const simulation = createWorldSimulation({ seed: 'archive', initialHumans: 48 });
     for (let tick = 0; tick < 300; tick += 1) simulation.step();
@@ -17,7 +61,7 @@ describe('world persistence', () => {
     const encoded = serializeWorld(simulation.state);
     const restored = loadWorldSave(encoded);
 
-    expect(JSON.parse(encoded).version).toBe(11);
+    expect(JSON.parse(encoded).version).toBe(12);
     expect(restored.seed).toBe(simulation.state.seed);
     expect(restored.tick).toBe(simulation.state.tick);
     expect(restored.entities.count).toBe(simulation.state.entities.count);
@@ -71,14 +115,14 @@ describe('world persistence', () => {
     expect(() => loadWorldSave(JSON.stringify(invalidLaw))).toThrow(/数据校验失败/);
   });
 
-  it('strictly rejects V10 and malformed V11 semantic fields', () => {
-    const simulation = createWorldSimulation({ seed: 'v11-task-save', initialHumans: 24 });
+  it('strictly rejects V11 and malformed V12 semantic fields', () => {
+    const simulation = createWorldSimulation({ seed: 'v12-task-save', initialHumans: 24 });
     simulation.step();
     const valid = JSON.parse(serializeWorld(simulation.state));
     expect(valid.entities.tasks).toHaveLength(simulation.state.entities.count);
 
-    const v10 = { ...valid, version: 10 };
-    expect(() => loadWorldSave(JSON.stringify(v10))).toThrow(/存档版本/);
+    const v11 = { ...valid, version: 11 };
+    expect(() => loadWorldSave(JSON.stringify(v11))).toThrow(/存档版本/);
 
     valid.entities.tasks[0] = { type: 'imaginary-work' };
     expect(() => loadWorldSave(JSON.stringify(valid))).toThrow(/数据校验失败/);
@@ -129,9 +173,9 @@ describe('world persistence', () => {
     expect(() => loadWorldSave(JSON.stringify(valid))).toThrow(/数据校验失败/);
   });
 
-  it('restores operational public and defensive building capabilities from V11 facts', () => {
+  it('restores operational public and defensive building capabilities from V12 facts', () => {
     const simulation = createWorldSimulation({
-      seed: 'v11-settlement-capabilities',
+      seed: 'v12-settlement-capabilities',
       initialHumans: 0,
     });
     const village = simulation.ensureVillageAt(64, 64, 45);
