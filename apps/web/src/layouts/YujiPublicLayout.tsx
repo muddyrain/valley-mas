@@ -1,6 +1,7 @@
-import { Menu, Search, X } from 'lucide-react';
+import { Menu, PenLine, Search, X } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { useAuthStore } from '@/stores/useAuthStore';
 import '@/styles/yuji.css';
 
 const PUBLIC_NAVIGATION: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
@@ -12,6 +13,7 @@ const PUBLIC_NAVIGATION: ReadonlyArray<{ to: string; label: string; end?: boolea
 
 export default function YujiPublicLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const showStudioEntry = useAuthStore((state) => state.hasHydrated && state.isAuthenticated);
 
   return (
     <div className="yuji-site">
@@ -43,6 +45,12 @@ export default function YujiPublicLayout() {
               <Search aria-hidden="true" />
               <span>搜索</span>
             </NavLink>
+            {showStudioEntry ? (
+              <NavLink className="yuji-studio-link" to="/studio">
+                <PenLine aria-hidden="true" />
+                <span>创作室</span>
+              </NavLink>
+            ) : null}
             <a
               className="yuji-byline"
               href="https://github.com/muddyrain"
@@ -77,6 +85,11 @@ export default function YujiPublicLayout() {
           <NavLink to="/search" onClick={() => setMobileOpen(false)}>
             搜索
           </NavLink>
+          {showStudioEntry ? (
+            <NavLink to="/studio" onClick={() => setMobileOpen(false)}>
+              创作室
+            </NavLink>
+          ) : null}
         </nav>
       </header>
 

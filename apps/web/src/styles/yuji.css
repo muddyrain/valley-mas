@@ -110,6 +110,7 @@
 
 .yuji-desktop-nav a,
 .yuji-search-link,
+.yuji-studio-link,
 .yuji-byline {
   color: var(--yuji-quiet);
   font-size: 13px;
@@ -119,6 +120,7 @@
 .yuji-desktop-nav a:hover,
 .yuji-desktop-nav a.is-active,
 .yuji-search-link:hover,
+.yuji-studio-link:hover,
 .yuji-byline:hover {
   color: var(--yuji-ink);
 }
@@ -134,13 +136,15 @@
   gap: 24px;
 }
 
-.yuji-search-link {
+.yuji-search-link,
+.yuji-studio-link {
   display: inline-flex;
   align-items: center;
   gap: 7px;
 }
 
-.yuji-search-link svg {
+.yuji-search-link svg,
+.yuji-studio-link svg {
   width: 15px;
   height: 15px;
 }
@@ -1251,6 +1255,7 @@
   .yuji-brand-caption,
   .yuji-desktop-nav,
   .yuji-search-link,
+  .yuji-studio-link,
   .yuji-byline {
     display: none;
   }
