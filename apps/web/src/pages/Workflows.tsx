@@ -12,9 +12,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { deleteWorkflow, listWorkflows, type WorkflowItem } from '@/api/workflow';
+import {
+  PrivateLabCollectionPanel,
+  PrivateLabCollectionWorkspace,
+} from '@/components/private-lab/PrivateLabCollectionWorkspace';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -170,112 +174,116 @@ export default function WorkflowsPage({ embedded = false }: { embedded?: boolean
           </header>
         )}
 
-        <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
-          <Card className="overflow-hidden border-border shadow-none">
-            <CardHeader className="gap-4 border-b border-border px-5 py-5">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">工作流</CardTitle>
-                <Button
-                  size="icon-sm"
-                  variant="outline"
-                  aria-label="创建工作流"
-                  onClick={() => setShowCreate(true)}
-                >
-                  <Plus />
-                </Button>
-              </div>
-              <div className="relative">
-                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={workflowSearch}
-                  onChange={(event) => updateWorkflowQuery('workflow_search', event.target.value)}
-                  placeholder="搜索工作流"
-                  className="pl-9"
-                />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-1 px-3 py-3">
-              {[
-                { value: 'all', label: '全部工作流', count: workflows.length, icon: Workflow },
-                {
-                  value: 'draft',
-                  label: '草稿',
-                  count: workflows.filter((item) => item.status === 'draft').length,
-                  icon: FilePenLine,
-                },
-                {
-                  value: 'published',
-                  label: '已发布',
-                  count: workflows.filter((item) => item.status === 'published').length,
-                  icon: CircleCheckBig,
-                },
-              ].map((filter) => {
-                const Icon = filter.icon;
-                return (
+        <PrivateLabCollectionWorkspace
+          navigation={
+            <PrivateLabCollectionPanel variant="navigation">
+              <CardHeader className="gap-4 border-b border-border/70 px-5 py-5">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">工作流</CardTitle>
                   <Button
-                    key={filter.value}
-                    variant="ghost"
-                    className={`w-full justify-between px-3 ${
-                      workflowFilter === filter.value
-                        ? 'bg-accent text-accent-foreground hover:bg-accent'
-                        : 'hover:bg-muted'
-                    }`}
-                    onClick={() =>
-                      updateWorkflowQuery(
-                        'workflow_filter',
-                        filter.value === 'all' ? '' : filter.value,
-                      )
-                    }
+                    size="icon-sm"
+                    variant="outline"
+                    aria-label="创建工作流"
+                    onClick={() => setShowCreate(true)}
                   >
-                    <span className="flex items-center gap-2.5">
-                      <Icon
-                        className={`size-4 ${
-                          workflowFilter === filter.value ? 'text-primary' : 'text-muted-foreground'
-                        }`}
-                      />
-                      <span>{filter.label}</span>
-                    </span>
-                    <span className="text-xs font-normal text-muted-foreground">
-                      {filter.count}
-                    </span>
+                    <Plus />
                   </Button>
-                );
-              })}
-              <div className="my-3 border-t border-border" />
-              <p className="px-3 pb-2 text-xs font-medium text-muted-foreground">预置模板</p>
-              {WORKFLOW_TEMPLATE_DEFS.map((template) => {
-                const Icon = template.icon;
-                const disabled = template.enabled === false;
-                return (
-                  <Link
-                    key={template.id}
-                    to={`/workbench/templates/${template.id}`}
-                    aria-disabled={disabled}
-                    onClick={(event) => {
-                      if (disabled) event.preventDefault();
-                    }}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                      disabled
-                        ? 'cursor-not-allowed text-muted-foreground/60'
-                        : 'text-foreground hover:bg-muted'
-                    }`}
-                  >
-                    <Icon className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 truncate">{template.name}</span>
-                  </Link>
-                );
-              })}
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden border-border shadow-none">
-            <CardHeader className="flex-col gap-4 border-b border-border px-4 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
-              <div className="flex items-center gap-4">
-                <span className="flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Workflow className="size-6" />
+                </div>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={workflowSearch}
+                    onChange={(event) => updateWorkflowQuery('workflow_search', event.target.value)}
+                    placeholder="搜索工作流"
+                    className="pl-9"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-1 px-3 py-3">
+                {[
+                  { value: 'all', label: '全部工作流', count: workflows.length, icon: Workflow },
+                  {
+                    value: 'draft',
+                    label: '草稿',
+                    count: workflows.filter((item) => item.status === 'draft').length,
+                    icon: FilePenLine,
+                  },
+                  {
+                    value: 'published',
+                    label: '已发布',
+                    count: workflows.filter((item) => item.status === 'published').length,
+                    icon: CircleCheckBig,
+                  },
+                ].map((filter) => {
+                  const Icon = filter.icon;
+                  return (
+                    <Button
+                      key={filter.value}
+                      variant="ghost"
+                      className={`w-full justify-between px-3 ${
+                        workflowFilter === filter.value
+                          ? 'bg-accent text-accent-foreground hover:bg-accent'
+                          : 'hover:bg-muted'
+                      }`}
+                      onClick={() =>
+                        updateWorkflowQuery(
+                          'workflow_filter',
+                          filter.value === 'all' ? '' : filter.value,
+                        )
+                      }
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <Icon
+                          className={`size-4 ${
+                            workflowFilter === filter.value
+                              ? 'text-primary'
+                              : 'text-muted-foreground'
+                          }`}
+                        />
+                        <span>{filter.label}</span>
+                      </span>
+                      <span className="text-xs font-normal text-muted-foreground tabular-nums">
+                        {filter.count}
+                      </span>
+                    </Button>
+                  );
+                })}
+                <div className="my-3 border-t border-border" />
+                <p className="px-3 pb-2 text-xs font-medium text-muted-foreground">预置模板</p>
+                {WORKFLOW_TEMPLATE_DEFS.map((template) => {
+                  const Icon = template.icon;
+                  const disabled = template.enabled === false;
+                  return (
+                    <Link
+                      key={template.id}
+                      to={`/workbench/templates/${template.id}`}
+                      aria-disabled={disabled}
+                      onClick={(event) => {
+                        if (disabled) event.preventDefault();
+                      }}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                        disabled
+                          ? 'cursor-not-allowed text-muted-foreground/60'
+                          : 'text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      <Icon className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 truncate">{template.name}</span>
+                    </Link>
+                  );
+                })}
+              </CardContent>
+            </PrivateLabCollectionPanel>
+          }
+        >
+          <PrivateLabCollectionPanel>
+            <CardHeader className="flex-col gap-4 border-b border-border/70 px-4 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+              <div className="flex items-center gap-3.5">
+                <span className="flex size-10 items-center justify-center rounded-lg bg-primary/8 text-primary ring-1 ring-primary/10">
+                  <Workflow className="size-5" />
                 </span>
                 <div>
-                  <CardTitle className="text-xl">我的工作流</CardTitle>
+                  <CardTitle className="text-lg">我的工作流</CardTitle>
                   <p className="mt-1 text-sm text-muted-foreground">创建和管理自动化流程</p>
                 </div>
               </div>
@@ -294,17 +302,6 @@ export default function WorkflowsPage({ embedded = false }: { embedded?: boolean
                 </Button>
               </div>
             </CardHeader>
-            <div className="border-b border-border px-4 py-4 sm:px-6">
-              <div className="relative w-full sm:max-w-72">
-                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={workflowSearch}
-                  onChange={(event) => updateWorkflowQuery('workflow_search', event.target.value)}
-                  placeholder="搜索工作流"
-                  className="pl-9"
-                />
-              </div>
-            </div>
             {loading || searching ? (
               <div aria-busy="true" className="space-y-3 p-6">
                 <Skeleton className="h-14 w-full" />
@@ -350,7 +347,7 @@ export default function WorkflowsPage({ embedded = false }: { embedded?: boolean
                               </span>
                             </Link>
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="text-muted-foreground tabular-nums">
                             {getNodeCount(workflow)}
                           </TableCell>
                           <TableCell className="space-x-1.5">
@@ -365,7 +362,7 @@ export default function WorkflowsPage({ embedded = false }: { embedded?: boolean
                               </Badge>
                             ) : null}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="text-muted-foreground tabular-nums">
                             {formatWorkflowDate(workflow.updatedAt)}
                           </TableCell>
                           <TableCell className="pr-4 text-right">
@@ -408,7 +405,7 @@ export default function WorkflowsPage({ embedded = false }: { embedded?: boolean
                           <Trash2 />
                         </Button>
                       </div>
-                      <div className="flex items-center gap-3 pl-8 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-3 pl-8 text-xs text-muted-foreground tabular-nums">
                         <span>{getNodeCount(workflow)} 个节点</span>
                         <Badge variant={workflow.status === 'published' ? 'default' : 'secondary'}>
                           {workflow.status === 'published' ? '已发布' : '草稿'}
@@ -426,12 +423,12 @@ export default function WorkflowsPage({ embedded = false }: { embedded?: boolean
               </>
             )}
             {workflows.length > 0 && (
-              <div className="border-t border-border px-4 py-4 text-sm text-muted-foreground sm:px-6">
+              <div className="border-t border-border/70 px-4 py-4 text-sm text-muted-foreground tabular-nums sm:px-6">
                 共 {visibleWorkflows.length} 个工作流
               </div>
             )}
-          </Card>
-        </div>
+          </PrivateLabCollectionPanel>
+        </PrivateLabCollectionWorkspace>
       </div>
 
       <WorkflowCreateDialog open={showCreate} onOpenChange={setShowCreate} />

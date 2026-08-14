@@ -29,6 +29,10 @@ import {
   testAIKnowledgeRetrieval,
   uploadAIKnowledgeDocument,
 } from '@/api/aiWorkbench';
+import {
+  PrivateLabCollectionPanel,
+  PrivateLabCollectionWorkspace,
+} from '@/components/private-lab/PrivateLabCollectionWorkspace';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -477,88 +481,90 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
           </Card>
         )}
 
-        <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
-          <Card className="overflow-hidden border-border shadow-none">
-            <CardHeader className="gap-4 border-b border-border px-5 py-5">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">知识库</CardTitle>
-                <Button
-                  size="icon-sm"
-                  variant="outline"
-                  aria-label="新建知识库"
-                  onClick={() => setCreateOpen(true)}
-                >
-                  <FolderPlus />
-                </Button>
-              </div>
-              <div className="relative">
-                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={baseSearch}
-                  onChange={(event) => updateSearchParam('knowledge_base', event.target.value)}
-                  placeholder="搜索知识库"
-                  className="pl-9"
-                />
-              </div>
-            </CardHeader>
-            <CardContent className="min-h-96 space-y-2 px-3 py-4">
-              {loadingBases ? (
-                <>
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-16 w-full" />
-                </>
-              ) : visibleBases.length === 0 ? (
-                <p className="px-3 py-8 text-sm text-muted-foreground">没有匹配的知识库</p>
-              ) : (
-                visibleBases.map((base) => {
-                  const selected = base.id === selectedID;
-                  const documentCount = selected ? documents.length : (base.documentCount ?? 0);
-                  return (
-                    <Button
-                      key={base.id}
-                      variant="ghost"
-                      size="lg"
-                      className={`min-h-16 w-full justify-start gap-3 rounded-lg px-3.5 py-3 text-left whitespace-normal ${
-                        selected
-                          ? 'bg-primary/8 text-foreground ring-1 ring-primary/15 hover:bg-primary/10'
-                          : 'hover:bg-muted/70'
-                      }`}
-                      onClick={() => setSelectedID(base.id)}
-                    >
-                      <BookOpenText
-                        className={`size-5 shrink-0 ${selected ? 'text-primary' : 'text-muted-foreground'}`}
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium leading-5">{base.name}</span>
-                        <span className="mt-1 block truncate text-xs leading-4 font-normal text-muted-foreground">
-                          {base.description || '未添加说明'}
+        <PrivateLabCollectionWorkspace
+          navigation={
+            <PrivateLabCollectionPanel variant="navigation">
+              <CardHeader className="gap-4 border-b border-border/70 px-5 py-5">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">知识库</CardTitle>
+                  <Button
+                    size="icon-sm"
+                    variant="outline"
+                    aria-label="新建知识库"
+                    onClick={() => setCreateOpen(true)}
+                  >
+                    <FolderPlus />
+                  </Button>
+                </div>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={baseSearch}
+                    onChange={(event) => updateSearchParam('knowledge_base', event.target.value)}
+                    placeholder="搜索知识库"
+                    className="pl-9"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="min-h-72 space-y-2 px-3 py-4 lg:min-h-96">
+                {loadingBases ? (
+                  <>
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                  </>
+                ) : visibleBases.length === 0 ? (
+                  <p className="px-3 py-8 text-sm text-muted-foreground">没有匹配的知识库</p>
+                ) : (
+                  visibleBases.map((base) => {
+                    const selected = base.id === selectedID;
+                    const documentCount = selected ? documents.length : (base.documentCount ?? 0);
+                    return (
+                      <Button
+                        key={base.id}
+                        variant="ghost"
+                        size="lg"
+                        className={`min-h-16 w-full justify-start gap-3 rounded-lg px-3.5 py-3 text-left whitespace-normal ${
+                          selected
+                            ? 'bg-primary/8 text-foreground ring-1 ring-primary/15 hover:bg-primary/10'
+                            : 'hover:bg-muted/70'
+                        }`}
+                        onClick={() => setSelectedID(base.id)}
+                      >
+                        <BookOpenText
+                          className={`size-5 shrink-0 ${selected ? 'text-primary' : 'text-muted-foreground'}`}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium leading-5">{base.name}</span>
+                          <span className="mt-1 block truncate text-xs leading-4 font-normal text-muted-foreground">
+                            {base.description || '未添加说明'}
+                          </span>
+                          <span className="mt-1 block text-xs leading-4 font-normal text-muted-foreground tabular-nums">
+                            {documentCount} 个文档
+                          </span>
                         </span>
-                        <span className="mt-1 block text-xs leading-4 font-normal text-muted-foreground">
-                          {documentCount} 个文档
-                        </span>
-                      </span>
-                    </Button>
-                  );
-                })
-              )}
-            </CardContent>
-            <div className="border-t border-border px-5 py-4 text-sm text-muted-foreground">
-              共 {bases.length} 个知识库
-            </div>
-          </Card>
-
-          <Card className="overflow-hidden border-border shadow-none">
-            <CardHeader className="flex-col gap-4 border-b border-border px-4 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
-              <div className="flex min-w-0 items-center gap-4">
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <BookOpenText className="size-6" />
+                      </Button>
+                    );
+                  })
+                )}
+              </CardContent>
+              <div className="border-t border-border/70 px-5 py-4 text-sm text-muted-foreground tabular-nums">
+                共 {bases.length} 个知识库
+              </div>
+            </PrivateLabCollectionPanel>
+          }
+        >
+          <PrivateLabCollectionPanel>
+            <CardHeader className="flex-col gap-4 border-b border-border/70 px-4 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+              <div className="flex min-w-0 items-center gap-3.5">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary ring-1 ring-primary/10">
+                  <BookOpenText className="size-5" />
                 </span>
                 <div className="min-w-0">
-                  <CardTitle className="truncate text-xl">
+                  <CardTitle className="truncate text-lg">
                     {selectedBase?.name || '选择一个知识库'}
                   </CardTitle>
                   {selectedBase && (
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <p className="mt-1 text-sm text-muted-foreground tabular-nums">
                       {documents.length} 个文档 · {formatFileSize(selectedBaseSize)}
                     </p>
                   )}
@@ -608,7 +614,7 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                   </Select>
                   <Input
                     id="knowledge-document-upload"
-                    className="sr-only"
+                    hidden
                     type="file"
                     accept=".md,.markdown,.txt,.pdf,text/markdown,text/plain,application/pdf"
                     disabled={uploading}
@@ -616,6 +622,7 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                   />
                   <Button
                     render={<label htmlFor="knowledge-document-upload" />}
+                    nativeButton={false}
                     disabled={uploading}
                     className="flex-1 sm:flex-none"
                   >
@@ -625,7 +632,7 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                 </div>
               )}
             </CardHeader>
-            <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div className="relative w-full sm:max-w-72">
                 <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -713,10 +720,10 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                                 {getDocumentStatus(document).label}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-muted-foreground">
+                            <TableCell className="text-muted-foreground tabular-nums">
                               {formatFileSize(document.sizeBytes)}
                             </TableCell>
-                            <TableCell className="text-muted-foreground">
+                            <TableCell className="text-muted-foreground tabular-nums">
                               {formatDate(document.updatedAt)}
                             </TableCell>
                             <TableCell className="pr-4 text-right">
@@ -850,8 +857,8 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                 共 {visibleDocuments.length} 个文档
               </div>
             )}
-          </Card>
-        </div>
+          </PrivateLabCollectionPanel>
+        </PrivateLabCollectionWorkspace>
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
