@@ -87,6 +87,30 @@ func normalizeResourceVisibility(value string) string {
 	}
 }
 
+func normalizeResourceSourceKind(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "original":
+		return "original"
+	case "ai_generated":
+		return "ai_generated"
+	case "licensed":
+		return "licensed"
+	default:
+		return ""
+	}
+}
+
+func normalizeResourceLicense(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "download_allowed":
+		return "download_allowed"
+	case "preview_only":
+		return "preview_only"
+	default:
+		return ""
+	}
+}
+
 func normalizeUploadKey(value string) string {
 	key := truncateRunes(strings.TrimSpace(value), 80)
 	if key != "" {
@@ -258,6 +282,23 @@ func UploadResource(c *gin.Context) {
 		Error(c, 400, "资源类型必须是 avatar 或 wallpaper")
 		return
 	}
+	sourceKindRaw := strings.TrimSpace(c.PostForm("sourceKind"))
+	sourceKind := normalizeResourceSourceKind(sourceKindRaw)
+	if sourceKindRaw != "" && sourceKind == "" {
+		Error(c, 400, "图片来源无效")
+		return
+	}
+	licenseRaw := strings.TrimSpace(c.PostForm("license"))
+	license := normalizeResourceLicense(licenseRaw)
+	if licenseRaw != "" && license == "" {
+		Error(c, 400, "图片许可无效")
+		return
+	}
+	sourceURL := truncateRunes(c.PostForm("sourceUrl"), 500)
+	if sourceKind == "licensed" && sourceURL == "" {
+		Error(c, 400, "授权收藏必须填写原始出处")
+		return
+	}
 
 	// 获取上传的文件
 	file, err := c.FormFile("file")
@@ -332,21 +373,25 @@ func UploadResource(c *gin.Context) {
 	}
 
 	resource := model.Resource{
-		ID:          model.Int64String(utils.GenerateID()),
-		Type:        resourceType,
-		Visibility:  normalizeResourceVisibility(c.PostForm("visibility")),
-		URL:         result.URL,
-		StorageKey:  result.Key,
-		UploadKey:   uploadKey,
-		FileHash:    result.FileHash,
-		Title:       truncateRunes(title, 100),
-		Description: truncateRunes(description, 255),
-		Size:        file.Size,
-		Width:       result.Width,
-		Height:      result.Height,
-		Extension:   truncateRunes(strings.TrimPrefix(result.Ext, "."), 20), // 去掉前导点，并限制长度
-		UserID:      model.Int64String(userIDInt64),
-		Tags:        parseUploadTags(c),
+		ID:              model.Int64String(utils.GenerateID()),
+		Type:            resourceType,
+		Visibility:      normalizeResourceVisibility(c.PostForm("visibility")),
+		URL:             result.URL,
+		StorageKey:      result.Key,
+		SourceKind:      sourceKind,
+		SourceURL:       sourceURL,
+		License:         license,
+		DownloadAllowed: license == "download_allowed",
+		UploadKey:       uploadKey,
+		FileHash:        result.FileHash,
+		Title:           truncateRunes(title, 100),
+		Description:     truncateRunes(description, 255),
+		Size:            file.Size,
+		Width:           result.Width,
+		Height:          result.Height,
+		Extension:       truncateRunes(strings.TrimPrefix(result.Ext, "."), 20), // 去掉前导点，并限制长度
+		UserID:          model.Int64String(userIDInt64),
+		Tags:            parseUploadTags(c),
 	}
 
 	existingByHash, err := findRecentResourceByFileHash(db, userIDInt64, result.FileHash)
@@ -721,11 +766,15 @@ func UpdateResource(c *gin.Context) {
 	id := c.Param("id")
 
 	var req struct {
-		Title       string    `json:"title"`
-		Description string    `json:"description"`
-		Type        string    `json:"type"`
-		Visibility  string    `json:"visibility"`
-		Tags        *[]string `json:"tags"`
+		Title           string    `json:"title"`
+		Description     string    `json:"description"`
+		Type            string    `json:"type"`
+		Visibility      string    `json:"visibility"`
+		Tags            *[]string `json:"tags"`
+		SourceKind      string    `json:"sourceKind"`
+		SourceURL       string    `json:"sourceUrl"`
+		License         string    `json:"license"`
+		DownloadAllowed *bool     `json:"downloadAllowed"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Error(c, 400, "参数错误："+err.Error())
@@ -769,6 +818,40 @@ func UpdateResource(c *gin.Context) {
 	if req.Tags != nil {
 		updates["tags"] = normalizeResourceTagNames(*req.Tags)
 	}
+	policyTouched := strings.TrimSpace(req.SourceKind) != "" ||
+		strings.TrimSpace(req.SourceURL) != "" ||
+		strings.TrimSpace(req.License) != "" ||
+		req.DownloadAllowed != nil
+	if policyTouched {
+		nextSourceKind := resource.SourceKind
+		if strings.TrimSpace(req.SourceKind) != "" {
+			nextSourceKind = normalizeResourceSourceKind(req.SourceKind)
+			if nextSourceKind == "" {
+				Error(c, 400, "图片来源无效")
+				return
+			}
+		}
+		nextSourceURL := resource.SourceURL
+		if strings.TrimSpace(req.SourceURL) != "" {
+			nextSourceURL = truncateRunes(req.SourceURL, 500)
+		}
+		nextLicense := resource.License
+		if strings.TrimSpace(req.License) != "" {
+			nextLicense = normalizeResourceLicense(req.License)
+			if nextLicense == "" {
+				Error(c, 400, "图片许可无效")
+				return
+			}
+		}
+		if nextSourceKind == "licensed" && nextSourceURL == "" {
+			Error(c, 400, "授权收藏必须填写原始出处")
+			return
+		}
+		updates["source_kind"] = nextSourceKind
+		updates["source_url"] = nextSourceURL
+		updates["license"] = nextLicense
+		updates["download_allowed"] = nextLicense == "download_allowed"
+	}
 
 	if len(updates) == 0 {
 		Error(c, 400, "没有可更新的字段")
@@ -785,11 +868,15 @@ func UpdateResource(c *gin.Context) {
 	resource.FillThumbnailURL()
 	invalidatePublicResourceListCache()
 	Success(c, gin.H{
-		"id":          resource.ID,
-		"title":       resource.Title,
-		"description": resource.Description,
-		"type":        resource.Type,
-		"tags":        resource.Tags,
+		"id":              resource.ID,
+		"title":           resource.Title,
+		"description":     resource.Description,
+		"type":            resource.Type,
+		"tags":            resource.Tags,
+		"sourceKind":      resource.SourceKind,
+		"sourceUrl":       resource.SourceURL,
+		"license":         resource.License,
+		"downloadAllowed": resource.DownloadAllowed,
 	})
 }
 

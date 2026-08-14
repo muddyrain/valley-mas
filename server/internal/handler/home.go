@@ -241,62 +241,62 @@ func GetActiveUsers(c *gin.Context) {
 
 	offset := (page - 1) * pageSize
 
-		// 查询有资源的用户（按资源数量和下载量排序）
-		type userResourceStats struct {
-			UserID        model.Int64String
-			ResourceCount int64
-			DownloadCount int64
+	// 查询有资源的用户（按资源数量和下载量排序）
+	type userResourceStats struct {
+		UserID        model.Int64String
+		ResourceCount int64
+		DownloadCount int64
+	}
+	var stats []userResourceStats
+	err := db.Model(&model.Resource{}).
+		Select("user_id, COUNT(*) as resource_count, COALESCE(SUM(download_count), 0) as download_count").
+		Where("user_id IS NOT NULL AND user_id != '' AND user_id != '0' AND deleted_at IS NULL").
+		Group("user_id").
+		Order("resource_count DESC, download_count DESC").
+		Limit(pageSize).
+		Offset(offset).
+		Scan(&stats).Error
+
+	if err != nil {
+		c.JSON(500, gin.H{
+			"code":    500,
+			"message": "查询热门用户失败",
+			"data":    nil,
+		})
+		return
+	}
+
+	// 获取总数（有资源的用户数）
+	var total int64
+	db.Model(&model.Resource{}).
+		Where("user_id IS NOT NULL AND user_id != '' AND user_id != '0' AND deleted_at IS NULL").
+		Distinct("user_id").
+		Count(&total)
+
+	// 转换为响应格式
+	var response []HotUserResponse
+	for _, stat := range stats {
+		var user model.User
+		if err := db.Where("id = ?", stat.UserID).First(&user).Error; err != nil {
+			continue
 		}
-		var stats []userResourceStats
-		err := db.Model(&model.Resource{}).
-			Select("user_id, COUNT(*) as resource_count, COALESCE(SUM(download_count), 0) as download_count").
-			Where("user_id IS NOT NULL AND user_id != '' AND user_id != '0' AND deleted_at IS NULL").
-			Group("user_id").
-			Order("resource_count DESC, download_count DESC").
-			Limit(pageSize).
-			Offset(offset).
-			Scan(&stats).Error
 
-		if err != nil {
-			c.JSON(500, gin.H{
-				"code":    500,
-				"message": "查询热门用户失败",
-				"data":    nil,
-			})
-			return
-		}
+		var followerCount int64
+		db.Model(&model.UserFollow{}).
+			Where("followed_user_id = ?", stat.UserID).
+			Count(&followerCount)
 
-		// 获取总数（有资源的用户数）
-		var total int64
-		db.Model(&model.Resource{}).
-			Where("user_id IS NOT NULL AND user_id != '' AND user_id != '0' AND deleted_at IS NULL").
-			Distinct("user_id").
-			Count(&total)
-
-		// 转换为响应格式
-		var response []HotUserResponse
-		for _, stat := range stats {
-			var user model.User
-			if err := db.Where("id = ?", stat.UserID).First(&user).Error; err != nil {
-				continue
-			}
-
-			var followerCount int64
-			db.Model(&model.UserFollow{}).
-				Where("followed_user_id = ?", stat.UserID).
-				Count(&followerCount)
-
-			response = append(response, HotUserResponse{
-				ID:            stat.UserID.String(),
-				Name:          user.Nickname,
-				Avatar:        user.Avatar,
-				ResourceCount: int(stat.ResourceCount),
-				DownloadCount: stat.DownloadCount,
-				FollowerCount: followerCount,
-				Description:   "",
-				CreatedAt:     user.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			})
-		}
+		response = append(response, HotUserResponse{
+			ID:            stat.UserID.String(),
+			Name:          user.Nickname,
+			Avatar:        user.Avatar,
+			ResourceCount: int(stat.ResourceCount),
+			DownloadCount: stat.DownloadCount,
+			FollowerCount: followerCount,
+			Description:   "",
+			CreatedAt:     user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		})
+	}
 
 	c.JSON(200, gin.H{
 		"code":    0,
@@ -347,10 +347,10 @@ func GetResourceDetail(c *gin.Context) {
 	}
 
 	// 查询上传者信息
-		var user model.User
-		if err := db.Where("id = ? AND deleted_at IS NULL", resource.UserID).First(&user).Error; err != nil {
-			user = model.User{}
-		}
+	var user model.User
+	if err := db.Where("id = ? AND deleted_at IS NULL", resource.UserID).First(&user).Error; err != nil {
+		user = model.User{}
+	}
 
 	// 收藏状态（OptionalAuth 已解析 userId）
 	isFavorited := false
@@ -365,25 +365,29 @@ func GetResourceDetail(c *gin.Context) {
 	resource.FillThumbnailURL()
 
 	Success(c, gin.H{
-		"id":            strconv.FormatInt(int64(resource.ID), 10),
-		"title":         resource.Title,
-		"description":   resource.Description,
-		"type":          resource.Type,
-		"visibility":    visibility,
-		"url":           resource.URL,
-		"thumbnailUrl":  resource.ThumbnailURL,
-		"size":          resource.Size,
-		"width":         resource.Width,
-		"height":        resource.Height,
-		"downloadCount": resource.DownloadCount,
-		"favoriteCount": resource.FavoriteCount,
-		"extension":     resource.Extension,
-		"createdAt":     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		"userId":        fmt.Sprintf("%d", resource.UserID),
-		"userName":     user.Nickname,
-			"userAvatar":   user.Avatar,
-			"isFavorited":   isFavorited,
-		"tags":          resource.Tags,
+		"id":              strconv.FormatInt(int64(resource.ID), 10),
+		"title":           resource.Title,
+		"description":     resource.Description,
+		"type":            resource.Type,
+		"visibility":      visibility,
+		"url":             resource.URL,
+		"thumbnailUrl":    resource.ThumbnailURL,
+		"size":            resource.Size,
+		"width":           resource.Width,
+		"height":          resource.Height,
+		"downloadCount":   resource.DownloadCount,
+		"favoriteCount":   resource.FavoriteCount,
+		"extension":       resource.Extension,
+		"createdAt":       resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		"userId":          fmt.Sprintf("%d", resource.UserID),
+		"userName":        user.Nickname,
+		"userAvatar":      user.Avatar,
+		"isFavorited":     isFavorited,
+		"tags":            resource.Tags,
+		"sourceKind":      resource.SourceKind,
+		"sourceUrl":       resource.SourceURL,
+		"license":         resource.License,
+		"downloadAllowed": resource.DownloadAllowed,
 	})
 }
 
@@ -401,8 +405,8 @@ type HotResourceResponse struct {
 	DownloadCount int64    `json:"downloadCount"`
 	FavoriteCount int      `json:"favoriteCount"`
 	UserId        string   `json:"userId"`
-	UserName     string   `json:"userName"`
-	UserAvatar   string   `json:"userAvatar"`
+	UserName      string   `json:"userName"`
+	UserAvatar    string   `json:"userAvatar"`
 	CreatedAt     string   `json:"createdAt"`
 	IsFavorited   bool     `json:"isFavorited"`
 	Tags          []string `json:"tags"`
@@ -473,8 +477,8 @@ func buildHotResourceResponseList(
 			DownloadCount: int64(resource.DownloadCount),
 			FavoriteCount: resource.FavoriteCount,
 			UserId:        fmt.Sprintf("%d", resource.UserID),
-			UserName:     userName,
-				UserAvatar:   userAvatar,
+			UserName:      userName,
+			UserAvatar:    userAvatar,
 			CreatedAt:     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			IsFavorited:   favoritedSet[rid],
 			Tags:          tags,
@@ -534,9 +538,9 @@ func GetHotResources(c *gin.Context) {
 	// 查询热门资源，按下载量排序
 	var resources []model.Resource
 	err := applyResourceListQueryShape(
-			db.Where("deleted_at IS NULL AND download_count > 0").
-				Where(publicVisibilityWhere),
-		).
+		db.Where("deleted_at IS NULL AND download_count > 0").
+			Where(publicVisibilityWhere),
+	).
 		Order("download_count DESC, created_at DESC").
 		Limit(pageSize).
 		Offset(offset).

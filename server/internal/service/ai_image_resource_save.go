@@ -108,18 +108,21 @@ func (s AIImageResourceSaver) Save(ctx context.Context, input SaveAIImageGenerat
 			return ErrAIImageAlreadySaved
 		}
 		resource := model.Resource{
-			UserID:      input.UserID,
-			Type:        resourceTypeForAIImage(locked),
-			Visibility:  normalizeAIImageVisibility(input.Visibility),
-			Title:       truncateAIImageText(metadata.Title, 100),
-			Description: "AI 图片创作",
-			URL:         stored.URL,
-			StorageKey:  stored.Key,
-			Width:       locked.ResultWidth,
-			Height:      locked.ResultHeight,
-			Size:        stored.Size,
-			Extension:   strings.TrimPrefix(stored.Ext, "."),
-			Tags:        normalizeAIImageTags(metadata.Tags),
+			UserID:          input.UserID,
+			Type:            resourceTypeForAIImage(locked),
+			Visibility:      normalizeAIImageVisibility(input.Visibility),
+			Title:           truncateAIImageText(metadata.Title, 100),
+			Description:     "AI 图片创作",
+			SourceKind:      "ai_generated",
+			License:         "download_allowed",
+			DownloadAllowed: true,
+			URL:             stored.URL,
+			StorageKey:      stored.Key,
+			Width:           locked.ResultWidth,
+			Height:          locked.ResultHeight,
+			Size:            stored.Size,
+			Extension:       strings.TrimPrefix(stored.Ext, "."),
+			Tags:            normalizeAIImageTags(metadata.Tags),
 		}
 		if err := tx.Create(&resource).Error; err != nil {
 			return err

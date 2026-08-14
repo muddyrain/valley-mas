@@ -30,8 +30,26 @@ func TestManagedDialectsHaveMatchingVersions(t *testing.T) {
 		t.Fatal("expected embedded managed migrations")
 	}
 	latestVersion := versionsByDriver["postgres"][len(versionsByDriver["postgres"])-1]
-	if latestVersion != 202608090003 {
+	if latestVersion != 202608140001 {
 		t.Fatalf("unexpected latest managed migration version: %d", latestVersion)
+	}
+}
+
+func TestResourceProvenancePolicyMigrationKeepsDownloadClosedByDefault(t *testing.T) {
+	for _, driver := range []string{"postgres", "mysql"} {
+		content, err := migrationFiles.ReadFile(driver + "/202608140001_add_resource_provenance_policy.sql")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sqlText := string(content)
+		for _, expected := range []string{"source_kind", "source_url", "license", "download_allowed"} {
+			if !strings.Contains(sqlText, expected) {
+				t.Fatalf("%s resource provenance migration does not contain %s", driver, expected)
+			}
+		}
+		if !strings.Contains(strings.ToUpper(sqlText), "DEFAULT FALSE") {
+			t.Fatalf("%s resource download permission must default to false", driver)
+		}
 	}
 }
 

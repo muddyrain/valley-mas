@@ -51,6 +51,10 @@ func DownloadResource(c *gin.Context) {
 		Error(c, http.StatusNotFound, "资源不存在")
 		return
 	}
+	if !resource.DownloadAllowed || resource.License != "download_allowed" {
+		Error(c, http.StatusForbidden, "该图片仅供预览")
+		return
+	}
 
 	// 获取当前用户ID（如果已登录）
 	var userID model.Int64String
@@ -242,7 +246,7 @@ func GetUserResourcesList(c *gin.Context) {
 	}
 
 	userName := targetUser.Nickname
-		userAvatar := targetUser.Avatar
+	userAvatar := targetUser.Avatar
 
 	resourceIDs := collectResourceIDs(resources)
 	favoritedSet := loadFavoritedSetForResources(db, c, resourceIDs)
@@ -253,23 +257,27 @@ func GetUserResourcesList(c *gin.Context) {
 		resource.FillThumbnailURL()
 		rid := strconv.FormatInt(int64(resource.ID), 10)
 		resourceList = append(resourceList, gin.H{
-			"id":            resource.ID,
-			"title":         resource.Title,
-			"type":          resource.Type,
-			"url":           resource.URL,
-			"thumbnailUrl":  resource.ThumbnailURL,
-			"size":          resource.Size,
-			"width":         resource.Width,
-			"height":        resource.Height,
-			"extension":     resource.Extension,
-			"downloadCount": resource.DownloadCount,
-			"favoriteCount": resource.FavoriteCount,
-			"userId":        resource.UserID,
-			"userName":     userName,
-				"userAvatar":   userAvatar,
-			"createdAt":     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			"isFavorited":   favoritedSet[rid],
-			"tags":          resource.Tags,
+			"id":              resource.ID,
+			"title":           resource.Title,
+			"type":            resource.Type,
+			"url":             resource.URL,
+			"thumbnailUrl":    resource.ThumbnailURL,
+			"size":            resource.Size,
+			"width":           resource.Width,
+			"height":          resource.Height,
+			"extension":       resource.Extension,
+			"downloadCount":   resource.DownloadCount,
+			"favoriteCount":   resource.FavoriteCount,
+			"userId":          resource.UserID,
+			"userName":        userName,
+			"userAvatar":      userAvatar,
+			"createdAt":       resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			"isFavorited":     favoritedSet[rid],
+			"tags":            resource.Tags,
+			"sourceKind":      resource.SourceKind,
+			"sourceUrl":       resource.SourceURL,
+			"license":         resource.License,
+			"downloadAllowed": resource.DownloadAllowed,
 		})
 	}
 

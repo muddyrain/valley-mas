@@ -4,6 +4,7 @@ import "gorm.io/gorm"
 
 const resourceListSelectColumns = "" +
 	"resources.id, resources.user_id, resources.type, resources.title, resources.url, " +
+	"resources.source_kind, resources.source_url, resources.license, resources.download_allowed, " +
 	"resources.width, resources.height, resources.size, resources.extension, " +
 	"resources.download_count, resources.favorite_count, resources.created_at, resources.tags"
 
