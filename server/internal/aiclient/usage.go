@@ -17,6 +17,7 @@ const (
 	FeatureBlogRecommend      = "blog-recommend"
 	FeatureResourceTitle      = "resource-ai-title"
 	FeatureResourceTags       = "resource-ai-tags"
+	FeatureResourceMetadata   = "resource-ai-metadata"
 	FeatureKnowledgePDFVision = "ai-knowledge-pdf-vision"
 )
 

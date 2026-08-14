@@ -80,6 +80,7 @@ export interface Post {
   groupSortOrder: number;
   publishedAt?: string;
   createdAt: string;
+  updatedAt?: string;
   author?: {
     id: string;
     nickname: string;

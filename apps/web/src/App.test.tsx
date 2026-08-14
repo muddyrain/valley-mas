@@ -10,8 +10,16 @@ vi.mock('@/components/GlobalScrollButton', () => ({ GlobalScrollButton: () => nu
 vi.mock('@/components/ui/sonner', () => ({ Toaster: () => null }));
 vi.mock('@/hooks/useTheme', () => ({ useTheme: () => ({ resolvedMode: 'light' }) }));
 vi.mock('@/stores/useThemeStore', () => ({ applyThemeToDocument: vi.fn() }));
+vi.mock('@/components/BlockingLoadingSurface', () => ({
+  default: () => <div>全局页面加载</div>,
+}));
 vi.mock('./pages/YujiHome', () => ({ default: () => <main>雨迹首页内容</main> }));
+vi.mock('./pages/YujiAbout', () => ({ default: () => <main>关于页面内容</main> }));
 vi.mock('./pages/YujiArticle', () => ({ default: () => <main>新版文章详情</main> }));
+vi.mock('./pages/YujiArticles', () => ({ default: () => <main>文章列表内容</main> }));
+vi.mock('./pages/YujiGallery', () => ({ default: () => <main>图库页面内容</main> }));
+vi.mock('./pages/YujiImage', () => ({ default: () => <main>图片预览内容</main> }));
+vi.mock('./pages/YujiSearch', () => ({ default: () => <main>搜索页面内容</main> }));
 vi.mock('./pages/StudioHome', () => ({ default: () => <main>创作室首页内容</main> }));
 vi.mock('./layouts/StudioLayout', () => ({ default: () => <main>创作室首页内容</main> }));
 vi.mock('./layouts/PrivateLabLayout', () => ({
@@ -54,6 +62,16 @@ describe('App public routes', () => {
     expect(container.textContent).toContain('雨迹首页内容');
     expect(container.textContent).toContain('文章与影像');
     expect(document.title).toContain('雨迹');
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('renders public content routes without the private-app loading card', () => {
+    const { container, root } = renderAt('/articles');
+
+    expect(container.textContent).toContain('文章列表内容');
+    expect(container.textContent).not.toContain('全局页面加载');
 
     act(() => root.unmount());
     container.remove();
@@ -140,6 +158,34 @@ describe('App public routes', () => {
     });
 
     expect(document.title).toBe('创作室 | 雨迹');
+
+    act(() => root.unmount());
+    container.remove();
+    isAuthenticated = false;
+  });
+
+  it('names the owner content index as the article library', async () => {
+    isAuthenticated = true;
+    const { container, root } = renderAt('/studio/articles');
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(document.title).toBe('文章库 | 雨迹');
+
+    act(() => root.unmount());
+    container.remove();
+    isAuthenticated = false;
+  });
+
+  it('names the owner image index as the image library', async () => {
+    isAuthenticated = true;
+    const { container, root } = renderAt('/studio/images/library');
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(document.title).toBe('图片库 | 雨迹');
 
     act(() => root.unmount());
     container.remove();

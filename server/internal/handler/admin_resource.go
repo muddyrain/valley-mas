@@ -111,6 +111,15 @@ func normalizeResourceLicense(value string) string {
 	}
 }
 
+func resolveUploadResourceLicense(value string) (string, bool) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "download_allowed", true
+	}
+	license := normalizeResourceLicense(trimmed)
+	return license, license != ""
+}
+
 func normalizeUploadKey(value string) string {
 	key := truncateRunes(strings.TrimSpace(value), 80)
 	if key != "" {
@@ -206,6 +215,7 @@ func fillResourceThumbnails(resources []model.Resource) {
 // @Param        page      query  int     false  "页码"  default(1)
 // @Param        pageSize  query  int     false  "每页数量"  default(20)
 // @Param        type      query  string  false  "资源类型"  Enums(avatar, wallpaper)
+// @Param        visibility query string  false  "可见范围"  Enums(private, shared, public)
 // @Success      200  {object}  map[string]interface{}  "资源列表"
 // @Failure      401  {object}  map[string]interface{}  "未登录"
 // @Failure      403  {object}  map[string]interface{}  "无权限"
@@ -214,6 +224,7 @@ func ListResources(c *gin.Context) {
 	page := GetIntQuery(c, "page", 1)
 	pageSize := GetIntQuery(c, "pageSize", 20)
 	resourceType := c.Query("type")
+	visibility := normalizeResourceVisibilityFilter(c.Query("visibility"))
 	keyword := strings.TrimSpace(c.Query("keyword"))
 	uploaderID := strings.TrimSpace(c.Query("uploaderId"))
 	albumID := strings.TrimSpace(c.Query("albumId"))
@@ -247,6 +258,9 @@ func ListResources(c *gin.Context) {
 	if resourceType != "" {
 		query = query.Where("type = ?", resourceType)
 	}
+	if visibility != "" {
+		query = query.Where("visibility = ?", visibility)
+	}
 	if keyword != "" {
 		like := "%" + keyword + "%"
 		query = query.Where("title LIKE ? OR description LIKE ?", like, like)
@@ -261,6 +275,16 @@ func ListResources(c *gin.Context) {
 		"list":  resources,
 		"total": total,
 	})
+}
+
+func normalizeResourceVisibilityFilter(value string) string {
+	value = strings.TrimSpace(value)
+	switch value {
+	case "private", "shared", "public":
+		return value
+	default:
+		return ""
+	}
 }
 
 // UploadResource 上传资源
@@ -288,9 +312,8 @@ func UploadResource(c *gin.Context) {
 		Error(c, 400, "图片来源无效")
 		return
 	}
-	licenseRaw := strings.TrimSpace(c.PostForm("license"))
-	license := normalizeResourceLicense(licenseRaw)
-	if licenseRaw != "" && license == "" {
+	license, validLicense := resolveUploadResourceLicense(c.PostForm("license"))
+	if !validLicense {
 		Error(c, 400, "图片许可无效")
 		return
 	}

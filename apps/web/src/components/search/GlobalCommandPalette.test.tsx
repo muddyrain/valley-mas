@@ -346,7 +346,7 @@ describe('GlobalCommandPalette', () => {
         new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }),
       ),
     );
-    expect(signedOut.container.textContent).not.toContain('文章草稿');
+    expect(signedOut.container.textContent).not.toContain('文章库');
     cleanup(signedOut.container, signedOut.root);
 
     authState.isAuthenticated = true;
@@ -356,7 +356,7 @@ describe('GlobalCommandPalette', () => {
         new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }),
       ),
     );
-    expect(signedIn.container.textContent).toContain('文章草稿');
+    expect(signedIn.container.textContent).toContain('文章库');
     cleanup(signedIn.container, signedIn.root);
   });
 });

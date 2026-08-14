@@ -8,7 +8,13 @@ import { isDevInspectorEnabled } from '@/config/devInspector';
 import { useTheme } from '@/hooks/useTheme';
 import { applyThemeToDocument } from '@/stores/useThemeStore';
 import YujiPublicLayout from './layouts/YujiPublicLayout';
+import YujiAbout from './pages/YujiAbout';
+import YujiArticle from './pages/YujiArticle';
+import YujiArticles from './pages/YujiArticles';
+import YujiGallery from './pages/YujiGallery';
 import YujiHome from './pages/YujiHome';
+import YujiImage from './pages/YujiImage';
+import YujiSearch from './pages/YujiSearch';
 import { useAuthStore } from './stores/useAuthStore';
 
 const InspectorRuntime = import.meta.env.DEV
@@ -18,12 +24,6 @@ const InspectorRuntime = import.meta.env.DEV
       })),
     )
   : null;
-const YujiAbout = lazy(() => import('./pages/YujiAbout'));
-const YujiArticle = lazy(() => import('./pages/YujiArticle'));
-const YujiArticles = lazy(() => import('./pages/YujiArticles'));
-const YujiGallery = lazy(() => import('./pages/YujiGallery'));
-const YujiImage = lazy(() => import('./pages/YujiImage'));
-const YujiSearch = lazy(() => import('./pages/YujiSearch'));
 const PrivateLabLayout = lazy(() => import('./layouts/PrivateLabLayout'));
 const WorkbenchLayout = lazy(() => import('./layouts/WorkbenchLayout'));
 const StudioLayout = lazy(() => import('./layouts/StudioLayout'));
@@ -51,6 +51,7 @@ const StudioArticles = lazy(() => import('./pages/StudioArticles'));
 const StudioHome = lazy(() => import('./pages/StudioHome'));
 const StudioImageCreator = lazy(() => import('./pages/StudioImageCreator'));
 const StudioImageImport = lazy(() => import('./pages/StudioImageImport'));
+const StudioImageLibrary = lazy(() => import('./pages/StudioImageLibrary'));
 const Workbench = lazy(() => import('./pages/Workbench'));
 const WorkflowEditor = lazy(() => import('./pages/WorkflowEditor'));
 const WorkflowTemplateDetail = lazy(() => import('./pages/WorkflowTemplateDetail'));
@@ -110,13 +111,15 @@ function RouteTitle() {
     } else if (pathname === '/studio') {
       title = '创作室 | 雨迹';
     } else if (pathname === '/studio/articles') {
-      title = '文章草稿 | 雨迹';
+      title = '文章库 | 雨迹';
     } else if (pathname === '/studio/articles/new') {
       title = '写文章 | 雨迹';
     } else if (pathname.startsWith('/studio/articles/')) {
       title = '编辑文章 | 雨迹';
     } else if (pathname === '/studio/images/import') {
       title = '图片导入 | 雨迹';
+    } else if (pathname === '/studio/images/library') {
+      title = '图片库 | 雨迹';
     } else if (pathname === '/studio/images') {
       title = 'AI 图片 | 雨迹';
     } else if (pathname === '/studio/columns') {
@@ -158,13 +161,13 @@ function RouteTitle() {
     } else if (pathname === '/my-space/blog-groups') {
       title = '专栏管理 | 雨迹';
     } else if (pathname === '/my-space/resources') {
-      title = '图片导入 | 雨迹';
+      title = '图片库 | 雨迹';
     } else if (
       pathname === '/my-space/posts' ||
       pathname === '/my-space/blogs' ||
       pathname === '/my-space/comments'
     ) {
-      title = '文章草稿 | 雨迹';
+      title = '文章库 | 雨迹';
     } else if (pathname === '/favorites') {
       title = '我的收藏 | Valley';
     } else if (pathname === '/follows') {
@@ -246,6 +249,7 @@ function App() {
             <Route path="articles/new" element={<BlogCreate />} />
             <Route path="articles/:id" element={<BlogCreate />} />
             <Route path="images/import" element={<StudioImageImport />} />
+            <Route path="images/library" element={<StudioImageLibrary />} />
             <Route path="images" element={<StudioImageCreator />} />
             <Route path="columns" element={<BlogGroupManage />} />
           </Route>
@@ -294,7 +298,7 @@ function App() {
             <Route path="my-space/blog-groups" element={<BlogGroupManage />} />
             <Route
               path="my-space/resources"
-              element={<Navigate to="/studio/images/import" replace />}
+              element={<Navigate to="/studio/images/library" replace />}
             />
             <Route path="my-space/posts" element={<Navigate to="/studio/articles" replace />} />
             <Route path="my-space/blogs" element={<Navigate to="/studio/articles" replace />} />

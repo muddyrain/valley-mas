@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getPostDetailById, type PostDetail } from '@/api/blog';
-import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
+import YujiContentRevealStatus from '@/components/yuji/YujiContentRevealStatus';
+import YujiContentState from '@/components/yuji/YujiContentState';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { extractToc, renderMarkdownWithAnchors } from '@/utils/blog';
 
 function formatDate(value?: string) {
@@ -26,25 +28,36 @@ export default function YujiArticle() {
   const { id } = useParams<{ id: string }>();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const requestRef = useRef(0);
 
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
+  const loadPost = useCallback(() => {
+    if (!id) return Promise.resolve();
+    const requestId = ++requestRef.current;
     setLoading(true);
-    getPostDetailById(id, { suppressErrorToast: true })
+    setFailed(false);
+    setPost(null);
+    return getPostDetailById(id, { suppressErrorToast: true })
       .then((data) => {
-        if (!cancelled) setPost(data);
+        if (requestId === requestRef.current) setPost(data);
       })
       .catch(() => {
-        if (!cancelled) setPost(null);
+        if (requestId === requestRef.current) {
+          setPost(null);
+          setFailed(true);
+        }
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (requestId === requestRef.current) setLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
   }, [id]);
+
+  useEffect(() => {
+    void loadPost();
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [loadPost]);
 
   useEffect(() => {
     if (post?.title) document.title = `${post.title} | 雨迹`;
@@ -54,11 +67,15 @@ export default function YujiArticle() {
   const content = post ? withoutRepeatedMarkdownTitle(rawContent, post.title) : rawContent;
   const toc = useMemo(() => extractToc(content), [content]);
   const renderedContent = useMemo(() => renderMarkdownWithAnchors(content), [content]);
+  const showLoading = useDelayedLoading(loading);
 
   if (!loading && !post) {
     return (
       <main className="yuji-public-main yuji-missing-page">
-        <p>这篇文章暂时无法打开。</p>
+        <YujiContentState
+          message={failed ? '这篇文章暂时没有抵达。' : '这篇文章已经不在这里了。'}
+          onRetry={failed ? () => void loadPost() : undefined}
+        />
         <Link className="yuji-underlined-link" to="/articles">
           返回文章
         </Link>
@@ -67,8 +84,14 @@ export default function YujiArticle() {
   }
 
   return (
-    <main className="yuji-article-page yuji-loading-surface">
-      <BoxLoadingOverlay show={loading} title="正在打开文章" hint="很快就好" />
+    <main className="yuji-article-page" aria-busy={loading}>
+      {showLoading ? (
+        <YujiContentRevealStatus
+          className="yuji-article-reveal"
+          label="文章正在显影"
+          variant="article"
+        />
+      ) : null}
       {post ? (
         <article>
           <header className="yuji-article-hero">

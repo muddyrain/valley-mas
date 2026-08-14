@@ -2,16 +2,35 @@
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { suggestResourceMetadata, workspaceStore } = vi.hoisted(() => ({
+  suggestResourceMetadata: vi.fn(),
+  workspaceStore: {
+    load: vi.fn(),
+    save: vi.fn(),
+    clear: vi.fn(),
+  },
+}));
 
 vi.mock('@/components/ai/ModelPicker', () => ({
-  ModelPicker: () => <div>视觉模型</div>,
+  ModelPicker: ({ onValueChange }: { onValueChange: (value: string) => void }) => (
+    <button type="button" onClick={() => onValueChange('vision-1')}>
+      选择视觉模型
+    </button>
+  ),
 }));
 vi.mock('@/api/resource', () => ({
-  aiSuggestResourceTags: vi.fn(),
-  suggestResourceTitle: vi.fn(),
+  suggestResourceMetadata,
   updateResource: vi.fn(),
   uploadResource: vi.fn(),
+}));
+vi.mock('@/stores/useAuthStore', () => ({
+  useAuthStore: (selector: (state: { user: { id: string } }) => unknown) =>
+    selector({ user: { id: 'owner-1' } }),
+}));
+vi.mock('@/utils/batchResourceWorkspace', () => ({
+  batchResourceWorkspaceStore: workspaceStore,
 }));
 vi.mock('@/utils/resourceUpload', () => ({
   confirmUploadResult: vi.fn(),
@@ -22,27 +41,102 @@ vi.mock('@/utils/resourceUpload', () => ({
 
 import BatchUploadResourceDialog from './BatchUploadResourceDialog';
 
+async function flush() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  workspaceStore.load.mockResolvedValue(null);
+  workspaceStore.save.mockResolvedValue(undefined);
+  workspaceStore.clear.mockResolvedValue(undefined);
+  suggestResourceMetadata.mockResolvedValue({
+    title: '春日远行',
+    tags: ['春日', '旅行'],
+    model: 'vision-model',
+    provider: 'test',
+  });
+  vi.stubGlobal('URL', {
+    ...URL,
+    createObjectURL: vi.fn(() => 'blob:preview'),
+    revokeObjectURL: vi.fn(),
+  });
+});
+
 describe('BatchUploadResourceDialog', () => {
-  it('keeps the confirmed batch provenance visible while selecting files', () => {
+  it('keeps resource type, visibility and separate AI actions without provenance forms', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
     act(() => {
-      root.render(
-        <BatchUploadResourceDialog
-          open
-          onOpenChange={() => undefined}
-          policy={{
-            sourceKind: 'licensed',
-            sourceUrl: 'https://example.com/source',
-            license: 'preview_only',
-          }}
-        />,
-      );
+      root.render(<BatchUploadResourceDialog open onOpenChange={() => undefined} />);
     });
 
-    expect(document.body.textContent).toContain('授权收藏');
-    expect(document.body.textContent).toContain('仅预览并链接出处');
+    expect(document.body.textContent).toContain('资源类型');
+    expect(document.body.textContent).toContain('可见范围');
+    expect(document.body.textContent).not.toContain('来源');
+    expect(document.body.textContent).not.toContain('许可');
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('restores unfinished items and reuses one AI result for separate title and tag actions', async () => {
+    workspaceStore.load.mockResolvedValueOnce({
+      version: 1,
+      uploadType: 'wallpaper',
+      visibility: 'public',
+      visionModelId: '',
+      updatedAt: 1,
+      items: [
+        {
+          file: new File(['image'], 'spring.png', { type: 'image/png' }),
+          base64: 'data:image/png;base64,aW1hZ2U=',
+          uploadKey: 'spring-key',
+          title: 'spring',
+          tags: [],
+          status: 'pending',
+        },
+      ],
+    });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(<BatchUploadResourceDialog open onOpenChange={() => undefined} />);
+    });
+    await flush();
+
+    expect(
+      document.body.querySelector<HTMLInputElement>('input[placeholder="资源名称"]')?.value,
+    ).toBe('spring');
+    const modelButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('选择视觉模型'),
+    );
+    act(() => modelButton?.click());
+
+    const titleButton = document.body.querySelector<HTMLButtonElement>('button[title="AI 起名"]');
+    await act(async () => {
+      titleButton?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(
+      document.body.querySelector<HTMLInputElement>('input[placeholder="资源名称"]')?.value,
+    ).toBe('春日远行');
+
+    const tagButton = document.body.querySelector<HTMLButtonElement>('button[title="AI 识别标签"]');
+    await act(async () => {
+      tagButton?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(document.body.textContent).toContain('旅行');
+    expect(suggestResourceMetadata).toHaveBeenCalledTimes(1);
 
     act(() => root.unmount());
     container.remove();

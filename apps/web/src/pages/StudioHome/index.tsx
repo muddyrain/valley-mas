@@ -16,12 +16,19 @@ const primaryTasks = [
   {
     number: '02',
     title: '导入图片',
-    description: '整批确认来源、许可和标题',
+    description: '批量整理标题、标签与可见范围',
     to: '/studio/images/import',
     icon: ImagePlus,
   },
   {
     number: '03',
+    title: '管理图片',
+    description: '查看、编辑或删除已导入图片',
+    to: '/studio/images/library',
+    icon: Images,
+  },
+  {
+    number: '04',
     title: 'AI 图片',
     description: '创作文章封面或图库草稿',
     to: '/studio/images',
@@ -65,7 +72,10 @@ export default function StudioHome() {
         </p>
       </header>
 
-      <section className="mt-10 grid border-y border-border md:grid-cols-3" aria-label="开始创作">
+      <section
+        className="mt-10 grid border-y border-border md:grid-cols-2 xl:grid-cols-4"
+        aria-label="开始创作"
+      >
         {primaryTasks.map((task, index) => {
           const Icon = task.icon;
           return (
@@ -74,7 +84,11 @@ export default function StudioHome() {
               to={task.to}
               className={cn(
                 'group flex min-h-52 flex-col p-6 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-                index > 0 && 'border-t border-border md:border-t-0 md:border-l',
+                index > 0 && 'border-t border-border',
+                index % 2 === 1 && 'md:border-l',
+                index === 1 && 'md:border-t-0',
+                index > 0 && 'xl:border-l',
+                index > 1 && 'xl:border-t-0',
               )}
             >
               <div className="flex items-start justify-between">
@@ -102,7 +116,7 @@ export default function StudioHome() {
             to="/studio/articles"
             className="text-sm text-muted-foreground hover:text-foreground"
           >
-            查看全部
+            进入文章库
           </Link>
         </div>
 

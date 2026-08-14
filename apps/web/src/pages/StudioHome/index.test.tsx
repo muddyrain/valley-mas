@@ -38,7 +38,7 @@ beforeEach(() => {
 });
 
 describe('StudioHome', () => {
-  it('keeps the three primary tasks prominent and lists real drafts', async () => {
+  it('keeps the four primary tasks prominent and lists real drafts', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -57,6 +57,9 @@ describe('StudioHome', () => {
     );
     expect(container.querySelector('a[href="/studio/images/import"]')?.textContent).toContain(
       '导入图片',
+    );
+    expect(container.querySelector('a[href="/studio/images/library"]')?.textContent).toContain(
+      '管理图片',
     );
     expect(container.querySelector('a[href="/studio/images"]')?.textContent).toContain('AI 图片');
     expect(container.textContent).toContain('React 错误边界实践');

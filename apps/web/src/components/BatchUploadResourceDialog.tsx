@@ -23,9 +23,9 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  aiSuggestResourceTags,
+  type ResourceMetadataSuggestion,
   type ResourceVisibility,
-  suggestResourceTitle,
+  suggestResourceMetadata,
   updateResource,
   uploadResource,
 } from '@/api/resource';
@@ -38,16 +38,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useAuthStore } from '@/stores/useAuthStore';
 import {
+  getBatchResourceUploadOrder,
   limitBatchResourceFiles,
   MAX_BATCH_RESOURCE_UPLOAD_IMAGES,
+  runWithConcurrency,
 } from '@/utils/batchResourceUpload';
 import {
-  appendResourcePolicyFormData,
-  RESOURCE_LICENSE_LABELS,
-  RESOURCE_SOURCE_LABELS,
-  type ResourcePolicy,
-} from '@/utils/resourcePolicy';
+  type BatchResourceAIWorkspaceMetadata,
+  type BatchResourceWorkspaceItem,
+  type BatchResourceWorkspaceSnapshot,
+  batchResourceWorkspaceStore,
+} from '@/utils/batchResourceWorkspace';
 import {
   confirmUploadResult,
   createUploadKey,
@@ -81,6 +84,7 @@ type BatchResourceItem = {
   error?: string;
   aiNaming?: boolean;
   aiTagging?: boolean;
+  aiMetadata?: BatchResourceAIWorkspaceMetadata;
 };
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -89,7 +93,6 @@ export interface BatchUploadResourceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
-  policy?: ResourcePolicy;
 }
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
@@ -133,14 +136,18 @@ function getErrorText(error: unknown, fallback: string) {
   return fallback;
 }
 
+function getFileFingerprint(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
 // ─── 组件 ─────────────────────────────────────────────────────────────────────
 
 export default function BatchUploadResourceDialog({
   open,
   onOpenChange,
   onSuccess,
-  policy,
 }: BatchUploadResourceDialogProps) {
+  const workspaceOwnerId = useAuthStore((state) => state.user?.id ?? '');
   const [items, setItems] = useState<BatchResourceItem[]>([]);
   const [uploadType, setUploadType] = useState<'wallpaper' | 'avatar'>('wallpaper');
   const [visibility, setVisibility] = useState<ResourceVisibility>('private');
@@ -150,29 +157,129 @@ export default function BatchUploadResourceDialog({
   const [batchAiNaming, setBatchAiNaming] = useState(false);
   const [batchAiTagging, setBatchAiTagging] = useState(false);
   const [visionModelId, setVisionModelId] = useState('');
+  const [workspaceReady, setWorkspaceReady] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const itemsRef = useRef<BatchResourceItem[]>([]);
+  const aiRequestsRef = useRef(new Map<string, Promise<ResourceMetadataSuggestion>>());
+  const workspaceErrorShownRef = useRef(false);
+  const workspaceReadyRef = useRef(false);
+  const workspaceSnapshotRef = useRef<BatchResourceWorkspaceSnapshot | null>(null);
 
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
 
-  // ── 重置 ────────────────────────────────────────────────────────────────────
-  const reset = () => {
-    items.forEach((item) => {
-      URL.revokeObjectURL(item.previewUrl);
-    });
-    setItems([]);
-    setUploadType('wallpaper');
-    setVisibility('private');
-    setUploading(false);
-    setDone(false);
-    setPreparing(false);
-    setBatchAiNaming(false);
-    setBatchAiTagging(false);
-    setVisionModelId('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+  useEffect(() => {
+    workspaceReadyRef.current = workspaceReady;
+  }, [workspaceReady]);
+
+  useEffect(() => {
+    return () => {
+      for (const item of itemsRef.current) URL.revokeObjectURL(item.previewUrl);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!workspaceOwnerId) {
+      setWorkspaceReady(true);
+      return;
+    }
+    let active = true;
+    setWorkspaceReady(false);
+    void batchResourceWorkspaceStore
+      .load(workspaceOwnerId)
+      .then((snapshot) => {
+        if (!active || !snapshot) return;
+        for (const item of itemsRef.current) URL.revokeObjectURL(item.previewUrl);
+        setUploadType(snapshot.uploadType);
+        setVisibility(snapshot.visibility);
+        setVisionModelId(snapshot.visionModelId);
+        setItems(
+          snapshot.items.map((item) => ({
+            ...item,
+            previewUrl: URL.createObjectURL(item.file),
+            aiNaming: false,
+            aiTagging: false,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!workspaceErrorShownRef.current) {
+          workspaceErrorShownRef.current = true;
+          toast.error('无法恢复上次选择，本次仍可继续导入');
+        }
+      })
+      .finally(() => {
+        if (active) setWorkspaceReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [workspaceOwnerId]);
+
+  useEffect(() => {
+    if (!workspaceReady || !workspaceOwnerId) return;
+    const snapshotItems: BatchResourceWorkspaceItem[] = items
+      .filter((item) => item.status !== 'success')
+      .map(({ file, base64, uploadKey, title, tags, status, error, aiMetadata }) => {
+        const workspaceStatus: BatchResourceWorkspaceItem['status'] =
+          status === 'error'
+            ? 'error'
+            : status === 'running'
+              ? 'running'
+              : status === 'confirming'
+                ? 'confirming'
+                : 'pending';
+        return {
+          file,
+          base64,
+          uploadKey,
+          title,
+          tags,
+          status: workspaceStatus,
+          ...(error ? { error } : {}),
+          ...(aiMetadata ? { aiMetadata } : {}),
+        };
+      });
+    const snapshot: BatchResourceWorkspaceSnapshot = {
+      version: 1,
+      uploadType,
+      visibility,
+      visionModelId,
+      updatedAt: Date.now(),
+      items: snapshotItems,
+    };
+    workspaceSnapshotRef.current = snapshotItems.length ? snapshot : null;
+    const saveTimer = window.setTimeout(() => {
+      const operation = snapshotItems.length
+        ? batchResourceWorkspaceStore.save(workspaceOwnerId, snapshot)
+        : batchResourceWorkspaceStore.clear(workspaceOwnerId);
+      void operation.catch(() => {
+        if (!workspaceErrorShownRef.current) {
+          workspaceErrorShownRef.current = true;
+          toast.error('无法保存本次选择，请勿刷新页面');
+        }
+      });
+    }, 120);
+    return () => window.clearTimeout(saveTimer);
+  }, [items, uploadType, visibility, visionModelId, workspaceOwnerId, workspaceReady]);
+
+  useEffect(() => {
+    if (!workspaceOwnerId) return;
+    const flushWorkspace = () => {
+      if (!workspaceReadyRef.current) return;
+      const snapshot = workspaceSnapshotRef.current;
+      const operation = snapshot
+        ? batchResourceWorkspaceStore.save(workspaceOwnerId, snapshot)
+        : batchResourceWorkspaceStore.clear(workspaceOwnerId);
+      void operation.catch(() => undefined);
+    };
+    window.addEventListener('pagehide', flushWorkspace);
+    return () => {
+      window.removeEventListener('pagehide', flushWorkspace);
+      flushWorkspace();
+    };
+  }, [workspaceOwnerId]);
 
   // ── 选择文件 ────────────────────────────────────────────────────────────────
   const handleFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -291,7 +398,6 @@ export default function BatchUploadResourceDialog({
       formData.append('visibility', visibility);
       formData.append('title', resolveItemTitle(item));
       formData.append('uploadKey', item.uploadKey);
-      if (policy) appendResourcePolicyFormData(formData, policy);
       const { resource } = await uploadResource(formData);
       await bindResourceTags(resource?.id);
       updateItem(index, { status: 'success', error: undefined });
@@ -313,6 +419,44 @@ export default function BatchUploadResourceDialog({
     }
   };
 
+  const getOrRequestMetadata = async (itemKey: string) => {
+    const item = findItemByKey(itemKey);
+    if (!item || !item.base64) throw new Error('图片未准备好');
+    const fileFingerprint = getFileFingerprint(item.file);
+    if (
+      item.aiMetadata?.modelId === visionModelId &&
+      item.aiMetadata.resourceType === uploadType &&
+      item.aiMetadata.fileFingerprint === fileFingerprint
+    ) {
+      return item.aiMetadata;
+    }
+
+    const requestKey = `${itemKey}:${uploadType}:${visionModelId}:${fileFingerprint}`;
+    let request = aiRequestsRef.current.get(requestKey);
+    if (!request) {
+      request = suggestResourceMetadata({
+        imageBase64: item.base64,
+        type: uploadType,
+        modelId: visionModelId,
+      });
+      aiRequestsRef.current.set(requestKey, request);
+    }
+    try {
+      const result = await request;
+      const metadata: BatchResourceAIWorkspaceMetadata = {
+        title: result.title,
+        tags: result.tags,
+        modelId: visionModelId,
+        resourceType: uploadType,
+        fileFingerprint,
+      };
+      updateItemByKey(itemKey, { aiMetadata: metadata });
+      return metadata;
+    } finally {
+      aiRequestsRef.current.delete(requestKey);
+    }
+  };
+
   // ── 单项 AI 起名 ─────────────────────────────────────────────────────────────
   const handleAiNameItem = async (index: number) => {
     const item = items[index];
@@ -328,11 +472,11 @@ export default function BatchUploadResourceDialog({
     const itemKey = item.uploadKey;
     try {
       updateItemByKey(itemKey, { aiNaming: true });
-      const result = await suggestResourceTitle(item.base64, uploadType, visionModelId);
+      const result = await getOrRequestMetadata(itemKey);
       if (!findItemByKey(itemKey)) return;
-      if (result.titles?.length) {
-        updateItemByKey(itemKey, { title: result.titles[0], aiNaming: false });
-        toast.success(`「${result.titles[0]}」已应用`);
+      if (result.title) {
+        updateItemByKey(itemKey, { title: result.title, aiNaming: false });
+        toast.success(`「${result.title}」已应用`);
       } else {
         updateItemByKey(itemKey, { aiNaming: false });
         toast.error('AI 未返回有效名称');
@@ -356,12 +500,7 @@ export default function BatchUploadResourceDialog({
     }
     try {
       updateItemByKey(itemKey, { aiTagging: true });
-      const result = await aiSuggestResourceTags({
-        imageBase64: item.base64,
-        type: uploadType,
-        title: item.title,
-        modelId: visionModelId,
-      });
+      const result = await getOrRequestMetadata(itemKey);
       if (!findItemByKey(itemKey)) return;
       if (result.tags?.length) {
         updateItemByKey(itemKey, { tags: result.tags, aiTagging: false });
@@ -394,26 +533,23 @@ export default function BatchUploadResourceDialog({
 
     setBatchAiNaming(true);
     try {
-      // 逐个处理，避免并发过多
-      for (const itemKey of pendingKeys) {
+      await runWithConcurrency(pendingKeys, 3, async (itemKey) => {
         const item = findItemByKey(itemKey);
-        if (!item || item.status !== 'pending' || !item.base64) continue;
+        if (!item || item.status !== 'pending' || !item.base64) return;
         try {
           updateItemByKey(itemKey, { aiNaming: true });
-          const result = await suggestResourceTitle(item.base64, uploadType, visionModelId);
-          if (!findItemByKey(itemKey)) continue;
-          if (result.titles?.length) {
-            updateItemByKey(itemKey, { title: result.titles[0], aiNaming: false });
+          const result = await getOrRequestMetadata(itemKey);
+          if (!findItemByKey(itemKey)) return;
+          if (result.title) {
+            updateItemByKey(itemKey, { title: result.title, aiNaming: false });
           } else {
             updateItemByKey(itemKey, { aiNaming: false });
           }
         } catch {
-          if (!findItemByKey(itemKey)) continue;
+          if (!findItemByKey(itemKey)) return;
           updateItemByKey(itemKey, { aiNaming: false });
         }
-        // 小延迟，避免接口过载
-        await new Promise((r) => setTimeout(r, 300));
-      }
+      });
       toast.success('AI 批量起名完成');
     } finally {
       setBatchAiNaming(false);
@@ -436,29 +572,23 @@ export default function BatchUploadResourceDialog({
 
     setBatchAiTagging(true);
     try {
-      for (const itemKey of pendingKeys) {
+      await runWithConcurrency(pendingKeys, 3, async (itemKey) => {
         const item = findItemByKey(itemKey);
-        if (!item || item.status !== 'pending' || !item.base64) continue;
+        if (!item || item.status !== 'pending' || !item.base64) return;
         try {
           updateItemByKey(itemKey, { aiTagging: true });
-          const result = await aiSuggestResourceTags({
-            imageBase64: item.base64,
-            type: uploadType,
-            title: item.title,
-            modelId: visionModelId,
-          });
-          if (!findItemByKey(itemKey)) continue;
+          const result = await getOrRequestMetadata(itemKey);
+          if (!findItemByKey(itemKey)) return;
           if (result.tags?.length) {
             updateItemByKey(itemKey, { tags: result.tags, aiTagging: false });
           } else {
             updateItemByKey(itemKey, { aiTagging: false });
           }
         } catch {
-          if (!findItemByKey(itemKey)) continue;
+          if (!findItemByKey(itemKey)) return;
           updateItemByKey(itemKey, { aiTagging: false });
         }
-        await new Promise((r) => setTimeout(r, 300));
-      }
+      });
       toast.success('AI 批量标签识别完成');
     } finally {
       setBatchAiTagging(false);
@@ -467,10 +597,14 @@ export default function BatchUploadResourceDialog({
 
   // ── 批量上传 ─────────────────────────────────────────────────────────────────
   const handleBatchUpload = async ({ retryFailedOnly = false } = {}) => {
-    const targetIndexes = items
-      .map((item, i) => ({ item, i }))
-      .filter(({ item }) => (retryFailedOnly ? item.status === 'error' : item.status === 'pending'))
-      .map(({ i }) => i);
+    const targetIndexes = getBatchResourceUploadOrder(
+      items
+        .map((item, i) => ({ item, i }))
+        .filter(({ item }) =>
+          retryFailedOnly ? item.status === 'error' : item.status === 'pending',
+        )
+        .map(({ i }) => i),
+    );
 
     if (!targetIndexes.length) {
       toast.info(retryFailedOnly ? '没有可重试的失败项' : '没有待上传的文件');
@@ -482,22 +616,29 @@ export default function BatchUploadResourceDialog({
     let successCount = 0;
     let errorCount = 0;
     let confirmingCount = 0;
+    const succeededIndexes = new Set<number>();
 
     for (const index of targetIndexes) {
       const result = await uploadSingleItem(index);
-      if (result === 'success') successCount += 1;
-      else if (result === 'confirming') confirmingCount += 1;
+      if (result === 'success') {
+        successCount += 1;
+        succeededIndexes.add(index);
+      } else if (result === 'confirming') confirmingCount += 1;
       else errorCount += 1;
     }
 
     setUploading(false);
-    setDone(true);
+    if (succeededIndexes.size > 0) {
+      setItems((current) => current.filter((_, index) => !succeededIndexes.has(index)));
+    }
+    setDone(errorCount > 0 || confirmingCount > 0);
     if (successCount > 0) onSuccess?.();
 
     if (successCount > 0) {
       toast.success(
         `批量上传完成：成功 ${successCount} 项${errorCount ? `，失败 ${errorCount} 项` : ''}${confirmingCount ? `，确认中 ${confirmingCount} 项` : ''}`,
       );
+      if (errorCount === 0 && confirmingCount === 0) onOpenChange(false);
     } else if (confirmingCount > 0) {
       toast.info(`有 ${confirmingCount} 项上传结果确认中，请稍后刷新资源列表确认`);
     } else {
@@ -518,6 +659,7 @@ export default function BatchUploadResourceDialog({
     setDone(true);
 
     if (result === 'success') {
+      setItems((current) => current.filter((_, currentIndex) => currentIndex !== index));
       onSuccess?.();
       toast.success(`已重新上传「${displayTitle}」`);
     } else if (result === 'confirming') {
@@ -539,9 +681,6 @@ export default function BatchUploadResourceDialog({
       onOpenChange={(next) => {
         if (isBusy) return;
         onOpenChange(next);
-        if (!next) {
-          reset();
-        }
       }}
       disablePointerDismissal
     >
@@ -554,21 +693,13 @@ export default function BatchUploadResourceDialog({
           </DialogTitle>
           <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
             一次最多选择 {MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张图片，可批量设置 AI
-            名称和标签后统一上传。
+            名称和标签后统一上传；未导入内容会保留在当前浏览器。
           </DialogDescription>
         </DialogHeader>
 
         {/* 全局设置 */}
         <div className="shrink-0 border-b border-border bg-accent/40 px-6 py-3">
           <div className="flex flex-wrap items-center gap-4">
-            {policy?.sourceKind && policy.license ? (
-              <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs">
-                <span className="text-muted-foreground">本批次</span>
-                <strong>{RESOURCE_SOURCE_LABELS[policy.sourceKind]}</strong>
-                <span className="text-muted-foreground">·</span>
-                <strong>{RESOURCE_LICENSE_LABELS[policy.license]}</strong>
-              </div>
-            ) : null}
             {/* 资源类型 */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
@@ -632,7 +763,13 @@ export default function BatchUploadResourceDialog({
         {/* 内容区 */}
         <div className="flex-1 min-h-0 overflow-y-auto">
           {/* 空态：拖拽选择区 */}
-          {items.length === 0 && (
+          {!workspaceReady ? (
+            <div className="flex min-h-72 items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              正在恢复上次选择…
+            </div>
+          ) : null}
+          {workspaceReady && items.length === 0 && (
             <div
               className="flex min-h-72 flex-col items-center justify-center m-6 rounded-2xl border-2 border-dashed border-primary/35 bg-accent/30 px-6 text-center cursor-pointer group transition-all hover:border-primary hover:bg-accent/50"
               onDrop={(e) => void handleDrop(e)}
@@ -934,12 +1071,11 @@ export default function BatchUploadResourceDialog({
               className="rounded-xl"
               onClick={() => {
                 if (!uploading) {
-                  reset();
                   onOpenChange(false);
                 }
               }}
             >
-              {done ? '关闭' : '取消'}
+              {items.length > 0 ? '暂存并关闭' : '关闭'}
             </Button>
             {done && errorCount > 0 && (
               <Button

@@ -265,6 +265,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/content/resources/batch-visibility", handler.BatchUpdateVisibility)
 			auth.POST("/content/ai/suggest-title", handler.SuggestResourceTitle)
 			auth.POST("/content/ai/resource-tags/suggest", handler.SuggestResourceTags)
+			auth.POST("/content/ai/resource-metadata/suggest", handler.SuggestResourceMetadata)
 
 			// Workflow 工作流（用户侧）
 			auth.GET("/workflows", handler.AdminListWorkflows)

@@ -1,45 +1,65 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { downloadResource, getResourceDetail, type Resource } from '@/api/resource';
-import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
+import YujiContentRevealStatus from '@/components/yuji/YujiContentRevealStatus';
+import YujiContentState from '@/components/yuji/YujiContentState';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
+import { useYujiEditorialMotion } from '@/hooks/useYujiEditorialMotion';
 import {
   RESOURCE_LICENSE_LABELS,
   RESOURCE_SOURCE_LABELS,
   type ResourceLicense,
   type ResourceSourceKind,
 } from '@/utils/resourcePolicy';
+import { getYujiImageTransitionStyle } from '@/utils/yujiViewTransition';
 
 export default function YujiImage() {
   const { id } = useParams<{ id: string }>();
   const [resource, setResource] = useState<Resource | null>(null);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const requestRef = useRef(0);
+  const pageRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-    getResourceDetail(id, { suppressErrorToast: true })
+  const loadResource = useCallback(() => {
+    if (!id) return Promise.resolve();
+    const requestId = ++requestRef.current;
+    setLoading(true);
+    setFailed(false);
+    setResource(null);
+    return getResourceDetail(id, { suppressErrorToast: true })
       .then((data) => {
-        if (!cancelled) setResource(data);
+        if (requestId === requestRef.current) setResource(data);
       })
       .catch(() => {
-        if (!cancelled) setResource(null);
+        if (requestId === requestRef.current) {
+          setResource(null);
+          setFailed(true);
+        }
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (requestId === requestRef.current) setLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
   }, [id]);
+
+  useEffect(() => {
+    void loadResource();
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [loadResource]);
+
+  const showLoading = useDelayedLoading(loading);
+  useYujiEditorialMotion(pageRef, resource?.id || String(showLoading));
 
   const sourceLabel = resource?.sourceKind
     ? RESOURCE_SOURCE_LABELS[resource.sourceKind as ResourceSourceKind]
-    : '来源待补充';
+    : '';
   const licenseLabel = resource?.license
     ? RESOURCE_LICENSE_LABELS[resource.license as ResourceLicense]
-    : '许可尚未确认';
+    : '';
 
   const handleDownload = async () => {
     if (!resource?.downloadAllowed || downloading) return;
@@ -55,15 +75,29 @@ export default function YujiImage() {
   };
 
   return (
-    <main className="yuji-viewer yuji-loading-surface">
-      <BoxLoadingOverlay show={loading} title="正在打开影像" hint="很快就好" tone="dark" />
+    <main ref={pageRef} className="yuji-viewer" aria-busy={loading}>
+      {showLoading ? (
+        <YujiContentRevealStatus
+          className="yuji-viewer-reveal"
+          label="影像正在显影"
+          variant="viewer"
+        />
+      ) : null}
       {resource ? (
         <>
           <section className="yuji-viewer-stage" aria-label={resource.title}>
-            <img src={resource.url} alt={resource.title} />
+            <img
+              src={resource.url}
+              alt={resource.title}
+              className="yuji-shared-image"
+              data-yuji-reveal="media"
+              style={getYujiImageTransitionStyle(resource.id)}
+            />
           </section>
-          <aside className="yuji-viewer-details">
-            <Link to="/gallery">← 返回图库</Link>
+          <aside className="yuji-viewer-details" data-yuji-reveal="intro">
+            <Link to="/gallery" viewTransition>
+              ← 返回图库
+            </Link>
             <p>{resource.tags?.[0] || 'IMAGE'}</p>
             <h1>{resource.title}</h1>
             <dl>
@@ -79,14 +113,18 @@ export default function YujiImage() {
                 <dt>作者</dt>
                 <dd>{resource.userName || 'muddyrain'}</dd>
               </div>
-              <div>
-                <dt>来源</dt>
-                <dd>{sourceLabel}</dd>
-              </div>
-              <div>
-                <dt>许可</dt>
-                <dd>{licenseLabel}</dd>
-              </div>
+              {sourceLabel ? (
+                <div>
+                  <dt>来源</dt>
+                  <dd>{sourceLabel}</dd>
+                </div>
+              ) : null}
+              {licenseLabel && sourceLabel ? (
+                <div>
+                  <dt>许可</dt>
+                  <dd>{licenseLabel}</dd>
+                </div>
+              ) : null}
             </dl>
             {resource.sourceUrl ? (
               <a href={resource.sourceUrl} target="_blank" rel="noreferrer">
@@ -109,14 +147,20 @@ export default function YujiImage() {
                 ? '下载仅用于许可范围内的个人使用。'
                 : resource.sourceUrl
                   ? '请通过原始出处查看授权与获取方式。'
-                  : '确认来源与许可后开放下载或原始出处。'}
+                  : '这张图片暂未开放下载。'}
             </small>
           </aside>
         </>
       ) : !loading ? (
         <div className="yuji-viewer-missing">
-          <p>这张图片暂时无法打开。</p>
-          <Link to="/gallery">返回图库</Link>
+          <YujiContentState
+            message={failed ? '这张影像暂时没有抵达。' : '这张影像已经不在这里了。'}
+            onRetry={failed ? () => void loadResource() : undefined}
+            tone="dark"
+          />
+          <Link to="/gallery" viewTransition>
+            返回图库
+          </Link>
         </div>
       ) : null}
     </main>

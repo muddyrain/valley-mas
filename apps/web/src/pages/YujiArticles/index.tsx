@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { type Group, getGroups, getPosts, type Post } from '@/api/blog';
-import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
+import YujiContentRevealStatus from '@/components/yuji/YujiContentRevealStatus';
+import YujiContentState from '@/components/yuji/YujiContentState';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 
 function formatDate(value?: string) {
   if (!value) return '';
@@ -15,6 +17,7 @@ export default function YujiArticles() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const requestRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,31 +33,38 @@ export default function YujiArticles() {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadPosts = useCallback(() => {
+    const requestId = ++requestRef.current;
     setLoading(true);
     setFailed(false);
-    getPosts({ page: 1, pageSize: 12, ...(groupId ? { groupId } : {}) })
+    setPosts([]);
+    return getPosts({ page: 1, pageSize: 12, ...(groupId ? { groupId } : {}) })
       .then((data) => {
-        if (!cancelled) setPosts(data.list ?? []);
+        if (requestId === requestRef.current) setPosts(data.list ?? []);
       })
       .catch(() => {
-        if (!cancelled) {
+        if (requestId === requestRef.current) {
           setPosts([]);
           setFailed(true);
         }
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (requestId === requestRef.current) setLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
   }, [groupId]);
 
+  useEffect(() => {
+    void loadPosts();
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [loadPosts]);
+
+  const showLoading = useDelayedLoading(loading);
+
   return (
-    <main className="yuji-public-main yuji-index-page">
-      <header className="yuji-index-hero">
+    <main className="yuji-public-main yuji-index-page yuji-articles-page">
+      <header className="yuji-index-hero yuji-articles-hero">
         <p className="yuji-index-label">
           <span>WRITING</span>
           <span>技术与实践</span>
@@ -63,17 +73,20 @@ export default function YujiArticles() {
         <p>关于 React、TypeScript、AI 与正在学习的东西。按专栏整理，也保留理解发生变化的痕迹。</p>
       </header>
 
-      <nav className="yuji-filter-bar" aria-label="文章专栏">
-        <span>按专栏阅读</span>
-        <div>
-          <Link to="/articles" aria-current={!groupId ? 'true' : undefined}>
-            全部
+      <nav className="yuji-column-rail" aria-label="文章专栏">
+        <div className="yuji-column-rail-heading" aria-hidden="true">
+          <span>COLUMNS</span>
+          <strong>专栏</strong>
+        </div>
+        <div className="yuji-column-track">
+          <Link to="/articles" aria-current={!groupId ? 'page' : undefined}>
+            全部文章
           </Link>
           {groups.map((group) => (
             <Link
               key={group.id}
               to={`/articles?groupId=${encodeURIComponent(group.id)}`}
-              aria-current={groupId === group.id ? 'true' : undefined}
+              aria-current={groupId === group.id ? 'page' : undefined}
             >
               {group.name}
             </Link>
@@ -81,8 +94,8 @@ export default function YujiArticles() {
         </div>
       </nav>
 
-      <section className="yuji-writing-index yuji-loading-surface" aria-label="文章列表">
-        <BoxLoadingOverlay show={loading} title="正在翻阅文章" hint="很快就好" />
+      <section className="yuji-writing-index" aria-label="文章列表" aria-busy={loading}>
+        {showLoading ? <YujiContentRevealStatus label="文章正在显影" variant="writing" /> : null}
         {posts.map((post, index) => (
           <article className="yuji-writing-index-item" key={post.id}>
             <span className="yuji-writing-number">{String(index + 1).padStart(2, '0')}</span>
@@ -98,10 +111,18 @@ export default function YujiArticles() {
             </div>
             {post.cover ? (
               <figure>
-                <img src={post.cover} alt={`${post.title}封面`} />
+                <Link to={`/articles/${post.id}`} aria-label={`阅读${post.title}`}>
+                  <img
+                    src={post.cover}
+                    alt={`${post.title}封面`}
+                    decoding="async"
+                    fetchPriority={index < 2 ? 'high' : 'auto'}
+                    loading={index < 2 ? 'eager' : 'lazy'}
+                  />
+                </Link>
               </figure>
             ) : (
-              <div />
+              <div className="yuji-writing-cover-placeholder" aria-hidden="true" />
             )}
             <Link
               className="yuji-writing-open"
@@ -113,9 +134,10 @@ export default function YujiArticles() {
           </article>
         ))}
         {!loading && posts.length === 0 ? (
-          <p className="yuji-empty-copy">
-            {failed ? '文章暂时无法加载，请稍后再试。' : '这个专栏还没有公开文章。'}
-          </p>
+          <YujiContentState
+            message={failed ? '文章暂时没有抵达。' : '这个专栏还没有公开文章。'}
+            onRetry={failed ? () => void loadPosts() : undefined}
+          />
         ) : null}
       </section>
     </main>

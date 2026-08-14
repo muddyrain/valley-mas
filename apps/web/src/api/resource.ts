@@ -202,17 +202,19 @@ export const getMyResources = (
     page?: number;
     pageSize?: number;
     type?: string;
+    visibility?: ResourceVisibility;
     albumId?: string;
     keyword?: string;
   } = {},
   config?: RequestConfig,
 ) => {
-  const { page = 1, pageSize = 20, type, albumId, keyword } = params;
-  let url = `/content/resources?page=${page}&pageSize=${pageSize}`;
-  if (type) url += `&type=${type}`;
-  if (albumId) url += `&albumId=${albumId}`;
-  if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
-  return http.get<unknown, MyResourcesResponse>(url, config);
+  const { page = 1, pageSize = 20, type, visibility, albumId, keyword } = params;
+  const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (type) query.set('type', type);
+  if (visibility) query.set('visibility', visibility);
+  if (albumId) query.set('albumId', albumId);
+  if (keyword) query.set('keyword', keyword);
+  return http.get<unknown, MyResourcesResponse>(`/content/resources?${query.toString()}`, config);
 };
 
 // 上传资源
@@ -294,6 +296,24 @@ export const aiSuggestResourceTags = (data: {
 }) => {
   return http.post<unknown, { tags: string[]; model: string }>(
     '/content/ai/resource-tags/suggest',
+    data,
+  );
+};
+
+export interface ResourceMetadataSuggestion {
+  title: string;
+  tags: string[];
+  model: string;
+  provider: string;
+}
+
+export const suggestResourceMetadata = (data: {
+  imageBase64: string;
+  type: 'wallpaper' | 'avatar';
+  modelId: string;
+}) => {
+  return http.post<unknown, ResourceMetadataSuggestion>(
+    '/content/ai/resource-metadata/suggest',
     data,
   );
 };

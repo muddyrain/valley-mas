@@ -23,6 +23,8 @@
 
 ## 当前活跃计划
 
+- [2026-08-15-yuji-gallery-import-workspace.md](2026-08-15-yuji-gallery-import-workspace.md)：公共图库追加稳定列分配、可恢复的本地未导入工作区、单次视觉元数据识别与创作室完整图片库。
+- [2026-08-14-yuji-public-experience-polish.md](2026-08-14-yuji-public-experience-polish.md)：雨迹作者文章库、公共内容状态机、响应式瀑布图库与单图共享过渡的二次打磨。
 - [2026-08-08-ai-motion-stickers.md](2026-08-08-ai-motion-stickers.md)：参考图驱动的 owner 私有动态表情、AMUX 视频任务、MP4/GIF 双资产与共享工具契约。
 - [2026-08-08-creator-agent-tool-cards.md](2026-08-08-creator-agent-tool-cards.md)：智能体澄清、工具进度、图片/文件转换卡片、临时产物与写操作确认。
 - [2026-08-04-workflow-collaboration-agent.md](2026-08-04-workflow-collaboration-agent.md)：工作流固定协作智能体、单时间线、后台直接修改、冲突合并与持久撤销。

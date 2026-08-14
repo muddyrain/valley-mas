@@ -30,8 +30,9 @@ describe('searchCatalog', () => {
   });
 
   it('hides auth-only commands for signed-out users', () => {
-    expect(filterSearchCommands(searchCommandCatalog, '文章草稿', false)).toEqual([]);
-    expect(filterSearchCommands(searchCommandCatalog, '文章草稿', true).length).toBeGreaterThan(0);
+    expect(filterSearchCommands(searchCommandCatalog, '文章库', false)).toEqual([]);
+    expect(filterSearchCommands(searchCommandCatalog, '文章库', true).length).toBeGreaterThan(0);
+    expect(filterSearchCommands(searchCommandCatalog, '文章草稿', true)).toEqual([]);
   });
 
   it('deduplicates commands that resolve to the same path', () => {

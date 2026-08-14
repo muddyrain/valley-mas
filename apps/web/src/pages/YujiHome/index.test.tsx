@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { getPosts, getAllResources } = vi.hoisted(() => ({
   getPosts: vi.fn(),
@@ -12,11 +12,44 @@ const { getPosts, getAllResources } = vi.hoisted(() => ({
 
 vi.mock('@/api/blog', () => ({ getPosts }));
 vi.mock('@/api/resource', () => ({ getAllResources }));
-vi.mock('@/components/BoxLoadingOverlay', () => ({
-  default: ({ show }: { show: boolean }) => (show ? <div>加载中</div> : null),
-}));
 
 import YujiHome from '.';
+
+const postPayload = {
+  list: [
+    {
+      id: 'post-1',
+      title: '组件渲染性能优化',
+      excerpt: '让更新边界更清楚。',
+      group: { name: 'React' },
+      cover: '/cover.webp',
+      createdAt: '2026-08-06T00:00:00Z',
+    },
+  ],
+  total: 1,
+};
+
+const resourcePayload = {
+  list: [
+    {
+      id: 'image-1',
+      title: '春日摄影之旅',
+      url: '/image.webp',
+      type: 'wallpaper',
+    },
+  ],
+  total: 1,
+};
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
+}
 
 async function flush() {
   await act(async () => {
@@ -27,33 +60,63 @@ async function flush() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getPosts.mockResolvedValue({
-    list: [
-      {
-        id: 'post-1',
-        title: '组件渲染性能优化',
-        excerpt: '让更新边界更清楚。',
-        group: { name: 'React' },
-        cover: '/cover.webp',
-        createdAt: '2026-08-06T00:00:00Z',
-      },
-    ],
-    total: 1,
-  });
-  getAllResources.mockResolvedValue({
-    list: [
-      {
-        id: 'image-1',
-        title: '春日摄影之旅',
-        url: '/image.webp',
-        type: 'wallpaper',
-      },
-    ],
-    total: 1,
-  });
+  getPosts.mockResolvedValue(postPayload);
+  getAllResources.mockResolvedValue(resourcePayload);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('YujiHome', () => {
+  it('reveals posts and images independently without showing fabricated hero copy', async () => {
+    vi.useFakeTimers();
+    const postsRequest = deferred<typeof postPayload>();
+    const resourcesRequest = deferred<typeof resourcePayload>();
+    getPosts.mockReturnValueOnce(postsRequest.promise);
+    getAllResources.mockReturnValueOnce(resourcesRequest.promise);
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() =>
+      root.render(
+        <MemoryRouter>
+          <YujiHome />
+        </MemoryRouter>,
+      ),
+    );
+
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(container.textContent).not.toContain('文字与影像，慢慢留下痕迹。');
+
+    act(() => vi.advanceTimersByTime(300));
+    expect(container.querySelector('[role="status"]')?.getAttribute('aria-label')).toContain(
+      '文章与影像正在显影',
+    );
+
+    await act(async () => {
+      postsRequest.resolve(postPayload);
+      await postsRequest.promise;
+    });
+
+    expect(container.textContent).toContain('组件渲染性能优化');
+    expect(container.querySelector('[role="status"]')?.getAttribute('aria-label')).toContain(
+      '影像正在显影',
+    );
+
+    await act(async () => {
+      resourcesRequest.resolve(resourcePayload);
+      await resourcesRequest.promise;
+    });
+
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(container.textContent).toContain('春日摄影之旅');
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
   it('uses public content APIs and links featured content into the new route family', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -68,11 +131,128 @@ describe('YujiHome', () => {
     await flush();
 
     expect(getPosts).toHaveBeenCalledWith({ page: 1, pageSize: 4 });
-    expect(getAllResources).toHaveBeenCalledWith({ page: 1, pageSize: 6, includeTags: true });
+    expect(getAllResources).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 6,
+      includeTags: true,
+      type: 'wallpaper',
+    });
     expect(container.textContent).toContain('组件渲染性能优化');
     expect(container.textContent).toContain('春日摄影之旅');
     expect(container.querySelector('a[href="/articles/post-1"]')).not.toBeNull();
     expect(container.querySelector('a[href="/gallery/image/image-1"]')).not.toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('does not flash a gallery image into the article cover while posts are still loading', async () => {
+    const postsRequest = deferred<typeof postPayload>();
+    getPosts.mockReturnValueOnce(postsRequest.promise);
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() =>
+      root.render(
+        <MemoryRouter>
+          <YujiHome />
+        </MemoryRouter>,
+      ),
+    );
+    await flush();
+
+    expect(container.querySelector('.yuji-feature-media img')).toBeNull();
+
+    await act(async () => {
+      postsRequest.resolve(postPayload);
+      await postsRequest.promise;
+    });
+
+    expect(container.querySelector<HTMLImageElement>('.yuji-feature-media img')?.src).toContain(
+      '/cover.webp',
+    );
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('uses a non-overlapping editorial image grid on the home page', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() =>
+      root.render(
+        <MemoryRouter>
+          <YujiHome />
+        </MemoryRouter>,
+      ),
+    );
+    await flush();
+
+    expect(container.querySelector('.yuji-home-image-grid')).not.toBeNull();
+    expect(container.querySelector('.yuji-image-composition')).toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('shows real error copy only after both content requests fail', async () => {
+    getPosts.mockRejectedValueOnce(new Error('posts unavailable'));
+    getAllResources.mockRejectedValueOnce(new Error('resources unavailable'));
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() =>
+      root.render(
+        <MemoryRouter>
+          <YujiHome />
+        </MemoryRouter>,
+      ),
+    );
+    await flush();
+
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(container.textContent).toContain('文章暂时没有抵达。');
+    expect(container.textContent).toContain('影像暂时没有抵达。');
+    expect(container.querySelectorAll('button')).toHaveLength(2);
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('retries only the failed home section without resetting successful content', async () => {
+    getPosts
+      .mockRejectedValueOnce(new Error('posts unavailable'))
+      .mockResolvedValueOnce(postPayload);
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() =>
+      root.render(
+        <MemoryRouter>
+          <YujiHome />
+        </MemoryRouter>,
+      ),
+    );
+    await flush();
+
+    expect(container.textContent).toContain('春日摄影之旅');
+    const retry = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === '重新试试',
+    );
+    await act(async () => {
+      retry?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(getPosts).toHaveBeenCalledTimes(2);
+    expect(getAllResources).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain('组件渲染性能优化');
+    expect(container.textContent).toContain('春日摄影之旅');
 
     act(() => root.unmount());
     container.remove();

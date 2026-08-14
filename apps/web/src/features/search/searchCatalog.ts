@@ -28,7 +28,7 @@ const NAV_KEYWORDS: Record<string, readonly string[]> = {
   '/': ['主页', '内容首页', 'home'],
   '/articles': ['博客', '图文', '内容', 'blog'],
   '/gallery': ['壁纸', '动漫图片', '风景图片', 'resource'],
-  '/studio': ['写作', '文章草稿', '图片导入', 'AI 图片', 'studio'],
+  '/studio': ['写作', '文章库', '图片导入', 'AI 图片', 'studio'],
   '/workbench': ['AI', 'agent', '工作流', '技能', '知识库'],
 };
 
@@ -74,10 +74,10 @@ const additionalCommands: SearchCommand[] = [
   },
   {
     id: 'personal:posts',
-    title: '文章草稿',
+    title: '文章库',
     path: '/studio/articles',
     category: 'personal',
-    keywords: ['文章管理', '图文管理', 'posts', 'drafts'],
+    keywords: ['文章管理', '图文管理', 'posts', 'library'],
     icon: BookOpen,
     authOnly: true,
   },

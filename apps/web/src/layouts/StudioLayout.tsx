@@ -19,7 +19,8 @@ import { cn } from '@/lib/utils';
 const primaryItems = [
   { to: '/studio', label: '创作室', icon: House, exact: true },
   { to: '/studio/articles/new', label: '写文章', icon: PenLine },
-  { to: '/studio/articles', label: '文章草稿', icon: BookOpen, exact: true },
+  { to: '/studio/articles', label: '文章库', icon: BookOpen, exact: true },
+  { to: '/studio/images/library', label: '图片库', icon: Images, exact: true },
   { to: '/studio/images/import', label: '图片导入', icon: ImagePlus },
   { to: '/studio/images', label: 'AI 图片', icon: Sparkles, exact: true },
 ] as const;

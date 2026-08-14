@@ -1,28 +1,15 @@
-import { ArrowRight, ImagePlus, Link2, ShieldCheck } from 'lucide-react';
+import { ArrowRight, ImagePlus } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMyResources, type MyResource } from '@/api/resource';
 import BatchUploadResourceDialog from '@/components/BatchUploadResourceDialog';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  RESOURCE_LICENSE_LABELS,
-  RESOURCE_SOURCE_LABELS,
-  type ResourceLicense,
-  type ResourcePolicy,
-  type ResourceSourceKind,
-  validateResourcePolicy,
-} from '@/utils/resourcePolicy';
-
-const initialPolicy: ResourcePolicy = { sourceKind: '', sourceUrl: '', license: '' };
 
 export default function StudioImageImport() {
-  const [policy, setPolicy] = useState<ResourcePolicy>(initialPolicy);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [resources, setResources] = useState<MyResource[]>([]);
   const [loading, setLoading] = useState(true);
-  const policyError = validateResourcePolicy(policy);
 
   const loadRecent = useCallback(() => {
     setLoading(true);
@@ -44,93 +31,29 @@ export default function StudioImageImport() {
           一次说明，整批沿用。
         </h1>
         <p className="mt-4 text-base leading-7 text-muted-foreground">
-          先确认来源与许可，再批量检查标题和标签。
+          选择图片后，批量整理标题和标签，再统一导入图库。
         </p>
       </header>
 
-      <section className="mt-10 grid gap-5 border-y border-border py-6 lg:grid-cols-[1fr_1fr_1.2fr_auto] lg:items-end">
-        <label className="space-y-2 text-sm font-medium">
-          <span>来源</span>
-          <select
-            value={policy.sourceKind}
-            onChange={(event) =>
-              setPolicy((current) => ({
-                ...current,
-                sourceKind: event.target.value as ResourceSourceKind | '',
-              }))
-            }
-            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="">请选择来源</option>
-            {Object.entries(RESOURCE_SOURCE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="space-y-2 text-sm font-medium">
-          <span>许可</span>
-          <select
-            value={policy.license}
-            onChange={(event) =>
-              setPolicy((current) => ({
-                ...current,
-                license: event.target.value as ResourceLicense | '',
-              }))
-            }
-            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="">请选择许可</option>
-            {Object.entries(RESOURCE_LICENSE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="space-y-2 text-sm font-medium">
-          <span className="flex items-center gap-2">
-            <Link2 className="size-4 text-muted-foreground" /> 原始出处
-          </span>
-          <Input
-            value={policy.sourceUrl}
-            onChange={(event) =>
-              setPolicy((current) => ({ ...current, sourceUrl: event.target.value }))
-            }
-            placeholder={policy.sourceKind === 'licensed' ? 'https://…' : '可选'}
-            disabled={!policy.sourceKind}
-          />
-        </label>
-
-        <Button
-          type="button"
-          disabled={Boolean(policyError)}
-          onClick={() => setDialogOpen(true)}
-          className="h-10 gap-2"
-          title={policyError || undefined}
-        >
+      <section className="mt-10 flex flex-col gap-4 border-y border-border py-6 sm:flex-row sm:items-center sm:justify-between">
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+          未完成的选择会保留在当前浏览器，下次打开可以继续整理和导入。
+        </p>
+        <Button type="button" onClick={() => setDialogOpen(true)} className="h-10 shrink-0 gap-2">
           <ImagePlus className="size-4" />
           选择图片
         </Button>
       </section>
-
-      <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-        <ShieldCheck className="size-4" />
-        AI 只建议标题和标签，不判断版权或分发许可。
-      </div>
 
       <section className="relative mt-12 min-h-52">
         <BoxLoadingOverlay show={loading} title="正在读取最近图片" />
         <div className="mb-5 flex items-center justify-between gap-4">
           <h2 className="text-sm font-semibold">最近导入</h2>
           <Link
-            to="/gallery"
+            to="/studio/images/library"
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
-            查看公开图库 <ArrowRight className="size-4" />
+            进入图片库 <ArrowRight className="size-4" />
           </Link>
         </div>
         {!loading && resources.length === 0 ? (
@@ -162,9 +85,7 @@ export default function StudioImageImport() {
       <BatchUploadResourceDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        policy={policy}
         onSuccess={() => {
-          setDialogOpen(false);
           void loadRecent();
         }}
       />

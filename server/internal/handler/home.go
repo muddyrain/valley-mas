@@ -631,14 +631,9 @@ func GetAllResources(c *gin.Context) {
 	var total int64
 	query.Count(&total)
 
-	orderExpr := "created_at DESC"
-	if strings.EqualFold(sort, "oldest") {
-		orderExpr = "created_at ASC"
-	}
-
 	var resources []model.Resource
 	if err := applyResourceListQueryShape(query).
-		Order(orderExpr).
+		Order(publicResourceListOrder(sort)).
 		Limit(pageSize).
 		Offset(offset).
 		Find(&resources).Error; err != nil {
@@ -661,4 +656,11 @@ func GetAllResources(c *gin.Context) {
 		"page":     page,
 		"pageSize": pageSize,
 	})
+}
+
+func publicResourceListOrder(sort string) string {
+	if strings.EqualFold(strings.TrimSpace(sort), "oldest") {
+		return "created_at ASC, id ASC"
+	}
+	return "created_at DESC, id DESC"
 }
