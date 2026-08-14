@@ -9,7 +9,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   use: {
-    baseURL: 'http://127.0.0.1:5184',
+    baseURL: process.env.EON_E2E_BASE_URL ?? 'http://127.0.0.1:5184',
     browserName: 'chromium',
     channel: 'chrome',
     headless: true,

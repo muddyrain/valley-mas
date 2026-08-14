@@ -259,6 +259,9 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
     .poll(async () => Number(await canvas.getAttribute('data-planning-zone-cells')))
     .toBeGreaterThan(0);
   await expect(page.getByTestId('village-work-hotspots')).toContainText('住宅规划');
+  await expect(page.getByTestId('village-capabilities')).toContainText('守卫训练');
+  await expect(page.getByTestId('village-capabilities')).toContainText('城墙防线');
+  await expect(page.getByTestId('village-capabilities')).toContainText('边境警戒');
   await villageInspector.getByRole('button', { name: '关闭' }).click();
   await expect(canvas).toHaveAttribute('data-selection-outline', 'false');
 

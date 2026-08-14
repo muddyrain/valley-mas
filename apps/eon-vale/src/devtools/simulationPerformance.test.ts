@@ -35,6 +35,8 @@ describe('simulation performance regressions', () => {
     const averageTickMs = elapsedMs / 300;
     console.info(JSON.stringify({ averageTickMs: Number(averageTickMs.toFixed(3)) }));
     expect(averageTickMs).toBeLessThan(8);
+    expect(simulation.metrics.completedPaths).toBeGreaterThan(0);
+    expect(simulation.metrics.pathQueue).toBeGreaterThanOrEqual(0);
   });
 
   it('keeps 500 residents simulated while a crowd flees a disaster', () => {
@@ -120,4 +122,41 @@ describe('simulation performance regressions', () => {
     expect(simulation.state.entities.count).toBeGreaterThanOrEqual(500);
     expect(elapsedMs).toBeLessThan(20_000);
   });
+});
+
+describe.runIf(process.env.EON_LATE_WORLD_PROFILE === '1')('late-world performance profile', () => {
+  it('measures the mature 384 world used by the browser soak', () => {
+    const simulation = createWorldSimulation({
+      seed: 'browser-complete-world',
+      initialHumans: 1_000,
+      mapSize: 384,
+      preset: 'continent',
+    });
+    const samples: Array<{ endTick: number; elapsedMs: number }> = [];
+    for (let batch = 0; batch < 6; batch += 1) {
+      const startedAt = performance.now();
+      for (let tick = 0; tick < 10_000; tick += 1) simulation.step();
+      samples.push({
+        endTick: simulation.state.tick,
+        elapsedMs: Number((performance.now() - startedAt).toFixed(2)),
+      });
+    }
+    const livingHumans =
+      simulation.state.population.children +
+      simulation.state.population.adults +
+      simulation.state.population.elders;
+    console.info(
+      JSON.stringify({
+        scenario: 'late-384-world-profile',
+        samples,
+        entitySlots: simulation.state.entities.count,
+        humans: livingHumans,
+        villages: simulation.state.villages.length,
+        buildings: simulation.state.buildings.length,
+        wars: simulation.state.wars.length,
+      }),
+    );
+    expect(simulation.state.tick).toBe(60_000);
+    expect(livingHumans).toBeGreaterThan(0);
+  }, 300_000);
 });

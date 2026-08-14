@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { VillageTier } from '@/shared/gameTypes';
+import { type Building, BuildingType, VillageTier } from '@/shared/gameTypes';
 import { createWorldSimulation } from '../core/worldSimulation';
 import {
   advanceTerritoryClaims,
@@ -13,6 +13,31 @@ function ownedCells(villageIds: Uint16Array, villageId: number): number[] {
     if (villageIds[cell] === villageId) cells.push(cell);
   }
   return cells;
+}
+
+function completedBuilding(id: number, villageId: number, type: BuildingType): Building {
+  return {
+    id,
+    villageId,
+    type,
+    x: 64,
+    z: 64,
+    stage: 2,
+    progress: 100,
+    requiredProgress: 100,
+    health: 100,
+    completed: true,
+    constructionPhase: 'complete',
+    reservedWood: 0,
+    reservedStone: 0,
+    deliveredWood: 0,
+    deliveredStone: 0,
+    inTransitWood: 0,
+    inTransitStone: 0,
+    clearNodeIds: [],
+    assignedWorkerIds: [],
+    workSlots: 0,
+  };
 }
 
 describe('cell territory', () => {
@@ -85,5 +110,42 @@ describe('cell territory', () => {
       advanceTerritoryClaims(simulation.state, { claimStep: 64, decayStep: 64 });
     }
     expect(ownedCells(simulation.state.territory.villageIds, village.id)).toHaveLength(0);
+  });
+
+  it('uses the council hall and watchtower to expand and consolidate real territory', () => {
+    const baseline = createWorldSimulation({
+      seed: 'territory-governance',
+      initialHumans: 0,
+      mapSize: 128,
+      preset: 'continent',
+    });
+    const governed = createWorldSimulation({
+      seed: 'territory-governance',
+      initialHumans: 0,
+      mapSize: 128,
+      preset: 'continent',
+    });
+    const baselineVillage = baseline.ensureVillageAt(64, 64, 45);
+    const governedVillage = governed.ensureVillageAt(64, 64, 45);
+    baselineVillage.tier = VillageTier.CityState;
+    governedVillage.tier = VillageTier.CityState;
+    for (const type of [BuildingType.CouncilHall, BuildingType.Watchtower]) {
+      const building = completedBuilding(
+        governed.state.buildings.length + 1,
+        governedVillage.id,
+        type,
+      );
+      governed.state.buildings.push(building);
+      governedVillage.buildingIds.push(building.id);
+    }
+
+    advanceTerritoryClaims(baseline.state);
+    advanceTerritoryClaims(governed.state);
+
+    expect(
+      ownedCells(governed.state.territory.villageIds, governedVillage.id).length,
+    ).toBeGreaterThan(ownedCells(baseline.state.territory.villageIds, baselineVillage.id).length);
+    expect(Math.max(...governed.state.territory.claimStrength)).toBe(32);
+    expect(Math.max(...baseline.state.territory.claimStrength)).toBe(24);
   });
 });

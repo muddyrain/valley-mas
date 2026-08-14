@@ -11,6 +11,7 @@ import {
 } from '@/shared/gameTypes';
 import { findResourceNodesInRadius } from '../resources/resourceNodes';
 import { nextVillageTierRequirement } from '../systems/economy';
+import { BARRACKS_GUARD_SLOTS } from './settlementCapabilities';
 
 const RESOURCE_KEYS = [
   'food',
@@ -23,6 +24,7 @@ const RESOURCE_KEYS = [
 ] as const satisfies readonly (keyof Resources)[];
 
 const WORK_SLOTS: Partial<Record<BuildingType, number>> = {
+  [BuildingType.Barracks]: BARRACKS_GUARD_SLOTS,
   [BuildingType.Farm]: 3,
   [BuildingType.LoggingCamp]: 3,
   [BuildingType.Mine]: 3,
@@ -43,6 +45,7 @@ function matchingWorkplace(profession: Profession): BuildingType | null {
   if (profession === Profession.Woodcutter) return BuildingType.LoggingCamp;
   if (profession === Profession.Miner) return BuildingType.Mine;
   if (profession === Profession.Blacksmith) return BuildingType.Workshop;
+  if (profession === Profession.Guard) return BuildingType.Barracks;
   return null;
 }
 
@@ -167,6 +170,51 @@ export function assignVillageHomesAndWorkplaces(state: WorldState, village: Vill
   }
 }
 
+export function advanceVillageGuardTraining(state: WorldState, village: Village): number {
+  if (state.tick % 120 !== 0) return 0;
+  let trained = 0;
+  for (const buildingId of village.buildingIds) {
+    const barracks = state.buildings[buildingId - 1];
+    if (!barracks?.completed || barracks.health <= 0 || barracks.type !== BuildingType.Barracks) {
+      continue;
+    }
+    for (const entityId of barracks.assignedWorkerIds) {
+      if (
+        state.entities.active[entityId] !== 1 ||
+        state.entities.villageIds[entityId] !== village.id ||
+        state.entities.professions[entityId] !== Profession.Guard ||
+        Math.hypot(
+          (state.entities.positionsX[entityId] ?? 0) - barracks.x,
+          (state.entities.positionsZ[entityId] ?? 0) - barracks.z,
+        ) > 3
+      ) {
+        continue;
+      }
+      state.entities.experience[entityId] = Math.min(
+        0xffff_ffff,
+        (state.entities.experience[entityId] ?? 0) + 12,
+      );
+      state.entities.contribution[entityId] = Math.min(
+        0xffff_ffff,
+        (state.entities.contribution[entityId] ?? 0) + 4,
+      );
+      state.entities.levels[entityId] = Math.min(
+        10,
+        1 + Math.floor(Math.sqrt((state.entities.experience[entityId] ?? 0) / 70)),
+      );
+      const task = state.entities.tasks[entityId];
+      if (task?.type === 'guard') {
+        task.phase = 'work';
+        task.requiredProgress = 120;
+        task.progress = (task.progress + 12) % task.requiredProgress;
+        task.leaseUntilTick = state.tick + 120;
+      }
+      trained += 1;
+    }
+  }
+  return trained;
+}
+
 export function decayOutdoorStockpiles(state: WorldState, village: Village): Partial<Resources> {
   const losses: Partial<Resources> = {};
   const villageCell = Math.floor(village.z) * state.map.size + Math.max(0, Math.floor(village.x));
@@ -268,7 +316,18 @@ export function selectNextBuildingType(
                   ? { type: productionType, decision: '建立生产工作端点', overrideReason: '' }
                   : null;
   if (village.constructionPriority === 'automatic') return automaticDecision;
-  const decisions: Record<Exclude<ConstructionPriority, 'automatic'>, ConstructionDecision> = {
+  if (village.constructionPriority === 'defense') {
+    const defensiveType = [BuildingType.Barracks, BuildingType.Wall, BuildingType.Watchtower].find(
+      (type) => count(type) === 0,
+    );
+    return defensiveType === undefined
+      ? null
+      : { type: defensiveType, decision: '玩家优先防御', overrideReason: '' };
+  }
+  const decisions: Record<
+    Exclude<ConstructionPriority, 'automatic' | 'defense'>,
+    ConstructionDecision
+  > = {
     housing: { type: BuildingType.Home, decision: '玩家优先住房', overrideReason: '' },
     storage: { type: BuildingType.Storage, decision: '玩家优先储粮', overrideReason: '' },
     food: { type: BuildingType.Farm, decision: '玩家优先食物', overrideReason: '' },
@@ -277,7 +336,6 @@ export function selectNextBuildingType(
       decision: '玩家优先生产',
       overrideReason: '',
     },
-    defense: { type: BuildingType.Barracks, decision: '玩家优先防御', overrideReason: '' },
   };
   return decisions[village.constructionPriority];
 }

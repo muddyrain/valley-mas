@@ -178,6 +178,15 @@ export interface VillageInspection {
     buildings: Array<{ type: number; current: number; required: number }>;
   };
   planningZones: { residential: number; production: number; defense: number };
+  capabilities: {
+    guardTrainingSlots: number;
+    territoryReachBonus: number;
+    claimStrengthBonus: number;
+    captureBlockers: number;
+    watchtowers: number;
+    watchRange: number;
+    watchDamage: number;
+  };
   workHotspots: Array<{ kind: string; count: number; x: number; z: number }>;
   history: WorldHistoryEntry[];
 }

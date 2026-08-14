@@ -30,6 +30,7 @@ import { editTerrain } from '@/simulation/map/terrainEditing';
 import { loadWorldSave, serializeWorld } from '@/simulation/persistence/save';
 import { createResourceNodeStore } from '@/simulation/resources/resourceNodes';
 import { simulationTickIntervalMs } from '@/simulation/rules/runtimeRules';
+import { resolveSettlementCapabilities } from '@/simulation/settlements/settlementCapabilities';
 import {
   collectVillageWorkHotspots,
   countVillagePlanningZones,
@@ -207,8 +208,8 @@ function createWorldSnapshot(tickMs: number): WorldRenderSnapshot | null {
     metrics: {
       tickMs,
       averageTickMs: measuredTicks > 0 ? totalTickMs / measuredTicks : 0,
-      completedPaths: 0,
-      pathQueue: 0,
+      completedPaths: world.metrics.completedPaths,
+      pathQueue: world.metrics.pathQueue,
       neighbourCandidates: 0,
     },
   };
@@ -294,6 +295,7 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
     for (const type of operationalTypes) counts.set(type, (counts.get(type) ?? 0) + 1);
     const requirement = nextVillageTierRequirement(village.tier);
     const zones = countVillagePlanningZones(state, village.id);
+    const capabilities = resolveSettlementCapabilities(state, village);
     return {
       type: 'village',
       id: village.id,
@@ -318,6 +320,15 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
         production: zones[PlanningZoneKind.Production],
         defense: zones[PlanningZoneKind.Defense],
       },
+      capabilities: {
+        guardTrainingSlots: capabilities.guardTrainingSlots,
+        territoryReachBonus: capabilities.territoryReachBonus,
+        claimStrengthBonus: capabilities.claimStrengthBonus,
+        captureBlockers: capabilities.captureBlockers,
+        watchtowers: capabilities.watchtowers,
+        watchRange: capabilities.watchRange,
+        watchDamage: capabilities.watchDamage,
+      },
       workHotspots: collectVillageWorkHotspots(state, village.id),
       history: querySubjectHistory(state, { kind: 'village', id: village.id }),
     };
@@ -331,14 +342,14 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
       [BuildingType.Home]: '容纳家庭并提供完整睡眠恢复',
       [BuildingType.Farm]: '提供 3 个农务工位，承载播种与收割',
       [BuildingType.Storage]: '每类资源增加 120 容量并提供取送端点',
-      [BuildingType.Barracks]: '训练与集结守卫',
+      [BuildingType.Barracks]: '提供 4 个守卫训练工位',
       [BuildingType.Road]: '提高陆地通行效率',
       [BuildingType.LoggingCamp]: '提供 3 个伐木工位并组织林业任务',
       [BuildingType.Mine]: '提供 3 个矿工工位并连接金属矿脉',
       [BuildingType.Workshop]: '提供 2 个工匠工位并制作工具与装备',
-      [BuildingType.CouncilHall]: '聚落治理与议事',
-      [BuildingType.Wall]: '延缓敌军进入聚落',
-      [BuildingType.Watchtower]: '扩展边境警戒范围',
+      [BuildingType.CouncilHall]: '扩大治理范围并加快领土巩固',
+      [BuildingType.Wall]: '阻挡敌军推进占领，失守后停止生效',
+      [BuildingType.Watchtower]: '警戒边境并攻击进入射程的敌军',
     };
     const inputs =
       building.type === BuildingType.Workshop
@@ -347,7 +358,9 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
           ? '农夫时间、可耕地'
           : building.type === BuildingType.Mine
             ? '矿工时间、金属矿脉'
-            : '无持续输入';
+            : building.type === BuildingType.Barracks
+              ? '守卫训练时间'
+              : '无持续输入';
     const outputs =
       building.type === BuildingType.Workshop
         ? '工具、装备'
@@ -359,7 +372,15 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
               ? '住房与休息'
               : building.type === BuildingType.Storage
                 ? '受保护容量'
-                : '聚落能力';
+                : building.type === BuildingType.Barracks
+                  ? '守卫经验与战备'
+                  : building.type === BuildingType.CouncilHall
+                    ? '治理范围与领土巩固'
+                    : building.type === BuildingType.Wall
+                      ? '占领阻断'
+                      : building.type === BuildingType.Watchtower
+                        ? '警戒火力与领土范围'
+                        : '聚落能力';
     return {
       type: 'building',
       id: building.id,

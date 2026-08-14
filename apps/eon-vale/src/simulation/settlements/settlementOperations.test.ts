@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { type Building, BuildingType, EntityKind, Profession } from '@/shared/gameTypes';
 import { createWorldSimulation } from '../core/worldSimulation';
 import {
+  advanceVillageGuardTraining,
   assignVillageHomesAndWorkplaces,
   decayOutdoorStockpiles,
   recalculateVillageOperations,
@@ -89,6 +90,38 @@ describe('functional settlement operations', () => {
     expect(farm.workSlots).toBe(3);
   });
 
+  it('assigns guards to operational barracks and advances visible training', () => {
+    const guards = simulation.spawn(EntityKind.Human, 36, 32, 5);
+    for (const entityId of guards) {
+      simulation.state.entities.villageIds[entityId] = village.id;
+      simulation.state.entities.professions[entityId] = Profession.Guard;
+      simulation.state.entities.positionsX[entityId] = 36;
+      simulation.state.entities.positionsZ[entityId] = 32;
+    }
+    const barracks = completedBuilding(1, village.id, BuildingType.Barracks);
+    barracks.x = 36;
+    simulation.state.buildings.push(barracks);
+    village.buildingIds.push(barracks.id);
+
+    assignVillageHomesAndWorkplaces(simulation.state, village);
+    simulation.state.tick = 120;
+
+    expect(barracks.workSlots).toBe(4);
+    expect(barracks.assignedWorkerIds).toHaveLength(4);
+    expect(advanceVillageGuardTraining(simulation.state, village)).toBe(4);
+    expect(
+      barracks.assignedWorkerIds.every(
+        (entityId) => (simulation.state.entities.experience[entityId] ?? 0) > 0,
+      ),
+    ).toBe(true);
+
+    barracks.health = 0;
+    assignVillageHomesAndWorkplaces(simulation.state, village);
+    simulation.state.tick = 240;
+    expect(barracks.workSlots).toBe(0);
+    expect(advanceVillageGuardTraining(simulation.state, village)).toBe(0);
+  });
+
   it('moves overflow into visible stockpiles and decays exposed food and wood', () => {
     village.resources.food = 60;
     village.resources.wood = 70;
@@ -129,6 +162,19 @@ describe('functional settlement operations', () => {
       type: BuildingType.Farm,
       overrideReason: '断粮风险覆盖玩家优先级',
     });
+  });
+
+  it('does not build endless duplicate barracks for a persistent defense priority', () => {
+    village.population = 45;
+    village.resources.food = 200;
+    village.constructionPriority = 'defense';
+    for (const type of [BuildingType.Barracks, BuildingType.Wall, BuildingType.Watchtower]) {
+      const building = completedBuilding(simulation.state.buildings.length + 1, village.id, type);
+      simulation.state.buildings.push(building);
+      village.buildingIds.push(building.id);
+    }
+
+    expect(selectNextBuildingType(simulation.state, village)).toBeNull();
   });
 
   it('stops automatic expansion when a mature settlement has no active shortage', () => {

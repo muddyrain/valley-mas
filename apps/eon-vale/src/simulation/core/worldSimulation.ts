@@ -63,7 +63,9 @@ import {
   WORLD_LAW_CATALOG,
   type WorldLawId,
 } from '../rules/worldLawCatalog';
+import { WATCHTOWER_DAMAGE, WATCHTOWER_RANGE } from '../settlements/settlementCapabilities';
 import {
+  advanceVillageGuardTraining,
   assignVillageHomesAndWorkplaces,
   decayOutdoorStockpiles,
   selectNextBuildingType,
@@ -139,6 +141,10 @@ export interface CreateWorldOptions {
 
 export interface WorldSimulation {
   state: WorldState;
+  metrics: {
+    completedPaths: number;
+    pathQueue: number;
+  };
   step(): void;
   spawn(kind: EntityKind, x: number, z: number, count?: number): number[];
   ensureVillageAt(x: number, z: number, population: number): Village;
@@ -807,6 +813,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
   syncTreeNavigationCosts(state);
   const random = createSeededRandom(`${state.seed}:simulation`);
   const pathQueue = new PathQueue();
+  const metrics = { completedPaths: 0, pathQueue: 0 };
   const flowFields = new Map<number, { version: number; target: number; field: FlowField }>();
 
   const spawn = (kind: EntityKind, x: number, z: number, count = 1): number[] => {
@@ -1093,6 +1100,12 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
             : (storage?.z ?? village?.z ?? workshop.z),
         );
       }
+    } else if (stateValue === AgentState.Guard) {
+      const workplaceId = state.entities.workBuildingIds[entityId] ?? 0;
+      const barracks = workplaceId > 0 ? state.buildings[workplaceId - 1] : undefined;
+      if (barracks?.completed && barracks.health > 0 && barracks.type === BuildingType.Barracks) {
+        target = findNearestWalkable(state, barracks.x, barracks.z);
+      }
     }
     if (target < 0) {
       const village = state.villages.find(
@@ -1248,7 +1261,16 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     } else if (agentState === AgentState.Guard) {
       type = 'guard';
       reason = 'professional-duty';
-      expectedResult = '守卫聚落和边境';
+      const barracksId = state.entities.workBuildingIds[entityId] ?? 0;
+      const barracks = barracksId > 0 ? state.buildings[barracksId - 1] : undefined;
+      if (barracks?.completed && barracks.health > 0 && barracks.type === BuildingType.Barracks) {
+        targetKind = 'building';
+        targetId = barracks.id;
+        requiredProgress = 120;
+        expectedResult = '在兵营完成训练并保持聚落战备';
+      } else {
+        expectedResult = '守卫聚落和边境';
+      }
     }
 
     const canContinue =
@@ -2064,10 +2086,13 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
   };
 
   const processPaths = (): void => {
-    for (const result of pathQueue.process(
+    const results = pathQueue.process(
       state.map.navigation,
       state.entities.count >= 900 ? 6 : state.entities.count >= 700 ? 8 : 16,
-    )) {
+    );
+    metrics.completedPaths += results.length;
+    metrics.pathQueue = pathQueue.size;
+    for (const result of results) {
       if (!state.entities.active[result.agentId]) continue;
       if (result.path.length > 1) {
         state.entities.paths[result.agentId] = {
@@ -2716,6 +2741,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     for (const village of state.villages) {
       if (village.health <= 0) continue;
       assignVillageHomesAndWorkplaces(state, village);
+      advanceVillageGuardTraining(state, village);
       const outdoorLosses = decayOutdoorStockpiles(state, village);
       const lostFood = outdoorLosses.food ?? 0;
       const lostWood = outdoorLosses.wood ?? 0;
@@ -3065,7 +3091,16 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     });
   };
 
-  const updateWarCampaignFatigue = (): void => {
+  const guardPower = (guardsByKingdom: Map<number, number[]>, kingdomId: number): number => {
+    let power = 0;
+    for (const entityId of guardsByKingdom.get(kingdomId) ?? []) {
+      if (!state.entities.active[entityId]) continue;
+      power += Math.round((state.entities.health[entityId] ?? 0) / 100);
+    }
+    return power;
+  };
+
+  const updateWarCampaignFatigue = (guardsByKingdom: Map<number, number[]>): void => {
     for (const campaign of [...state.wars]) {
       const first = state.kingdoms.find((kingdom) => kingdom.id === campaign.firstKingdomId);
       const second = state.kingdoms.find((kingdom) => kingdom.id === campaign.secondKingdomId);
@@ -3076,7 +3111,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       const duration = state.tick - campaign.startedAtTick;
       for (const kingdomId of [campaign.firstKingdomId, campaign.secondKingdomId]) {
         const initial = Math.max(1, campaign.initialMilitaryPower[kingdomId] ?? 1);
-        const remaining = countKingdomGuards(state, kingdomId);
+        const remaining = guardPower(guardsByKingdom, kingdomId);
         campaign.fatigue[kingdomId] = Math.min(
           100,
           Math.round((duration / 14_400) * 60 + (1 - remaining / initial) * 40),
@@ -3084,7 +3119,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       }
       const depleted = [campaign.firstKingdomId, campaign.secondKingdomId].some((kingdomId) => {
         const initial = Math.max(1, campaign.initialMilitaryPower[kingdomId] ?? 1);
-        return countKingdomGuards(state, kingdomId) < initial * 0.4;
+        return guardPower(guardsByKingdom, kingdomId) < initial * 0.4;
       });
       const noProgress = state.tick - campaign.lastProgressTick >= 3_600;
       const negotiated =
@@ -3098,6 +3133,55 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       }
     }
     state.truces = state.truces.filter((truce) => truce.untilTick > state.tick);
+  };
+
+  const updateWatchtowerDefense = (guardsByKingdom: Map<number, number[]>): void => {
+    if (state.tick % 12 !== 0) return;
+    for (const village of state.villages) {
+      const defender = state.kingdoms.find(
+        (kingdom) => kingdom.id === village.kingdomId && !kingdom.extinct,
+      );
+      if (!defender) continue;
+      const enemyKingdomIds = Object.entries(defender.relations).flatMap(([kingdomId, relation]) =>
+        relation === DiplomacyState.War ? [Number(kingdomId)] : [],
+      );
+      if (enemyKingdomIds.length === 0) continue;
+      const watchtowers = village.buildingIds.flatMap((buildingId) => {
+        const building = state.buildings[buildingId - 1];
+        return building?.completed &&
+          building.health > 0 &&
+          building.type === BuildingType.Watchtower
+          ? [building]
+          : [];
+      });
+      for (const watchtower of watchtowers) {
+        let targetId = -1;
+        let nearestDistanceSquared = WATCHTOWER_RANGE * WATCHTOWER_RANGE;
+        for (const enemyKingdomId of enemyKingdomIds) {
+          for (const entityId of guardsByKingdom.get(enemyKingdomId) ?? []) {
+            if (!state.entities.active[entityId]) continue;
+            const deltaX = (state.entities.positionsX[entityId] ?? 0) - watchtower.x;
+            const deltaZ = (state.entities.positionsZ[entityId] ?? 0) - watchtower.z;
+            const distanceSquared = deltaX * deltaX + deltaZ * deltaZ;
+            if (distanceSquared >= nearestDistanceSquared) continue;
+            targetId = entityId;
+            nearestDistanceSquared = distanceSquared;
+          }
+        }
+        if (targetId < 0) continue;
+        const attackerKingdomId = state.entities.kingdomIds[targetId] ?? 0;
+        const before = state.entities.health[targetId] ?? 0;
+        state.entities.health[targetId] = Math.max(0, before - WATCHTOWER_DAMAGE);
+        const campaign = ensureWarCampaign(defender.id, attackerKingdomId);
+        campaign.lastProgressTick = state.tick;
+        campaign.score[defender.id] =
+          (campaign.score[defender.id] ?? 0) + Math.min(before, WATCHTOWER_DAMAGE);
+        if ((state.entities.health[targetId] ?? 0) <= 0) {
+          recordResidentDeath(state, targetId, 'violence');
+          campaign.score[defender.id] = (campaign.score[defender.id] ?? 0) + 100;
+        }
+      }
+    }
   };
 
   const updateWar = (): void => {
@@ -3122,6 +3206,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         }
       }
     }
+    updateWatchtowerDefense(guardsByKingdom);
     for (const kingdom of state.kingdoms) {
       if (kingdom.extinct) continue;
       const enemyId = Number(
@@ -3139,6 +3224,19 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       if (!targetVillage) continue;
       const campaign = ensureWarCampaign(kingdom.id, enemyId);
       const targetCell = findNearestWalkable(state, targetVillage.x, targetVillage.z);
+      const defendersRemainNearVillage = (guardsByKingdom.get(enemyId) ?? []).some((defenderId) => {
+        if (state.entities.active[defenderId] !== 1) return false;
+        const deltaX = (state.entities.positionsX[defenderId] ?? 0) - targetVillage.x;
+        const deltaZ = (state.entities.positionsZ[defenderId] ?? 0) - targetVillage.z;
+        return deltaX * deltaX + deltaZ * deltaZ <= 64;
+      });
+      const targetWalls = targetVillage.buildingIds.flatMap((buildingId) => {
+        const building = state.buildings[buildingId - 1];
+        return building?.completed && building.health > 0 && building.type === BuildingType.Wall
+          ? [building]
+          : [];
+      });
+      let targetWallIndex = 0;
       let cached = flowFields.get(kingdom.id);
       if (
         !cached ||
@@ -3175,15 +3273,37 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
           territoryVillageIdAtCell(state, guardCell) === targetVillage.id;
         if (insideTargetTerritory || (state.territory.revision === 0 && distance <= 2.1)) {
           state.entities.states[entityId] = AgentState.Attack;
-          const defendersRemain = enemyGuards.some(
-            (defenderId) =>
-              state.entities.active[defenderId] === 1 &&
-              Math.hypot(
-                (state.entities.positionsX[defenderId] ?? 0) - targetVillage.x,
-                (state.entities.positionsZ[defenderId] ?? 0) - targetVillage.z,
-              ) <= 8,
-          );
-          if (defendersRemain) continue;
+          if (defendersRemainNearVillage) continue;
+          while (
+            targetWallIndex < targetWalls.length &&
+            (targetWalls[targetWallIndex]?.health ?? 0) <= 0
+          ) {
+            targetWallIndex += 1;
+          }
+          const targetWall = targetWalls[targetWallIndex];
+          if (targetWall && targetWall.health > 0) {
+            targetVillage.captureKingdomId = kingdom.id;
+            targetVillage.captureProgress = 0;
+            const before = targetWall.health;
+            const weapon = state.entities.weaponTiers[entityId] ?? 0;
+            const siegeDamage = 0.75 + weapon * 0.25;
+            targetWall.health = Math.max(0, targetWall.health - siegeDamage);
+            campaign.lastProgressTick = state.tick;
+            campaign.score[kingdom.id] =
+              (campaign.score[kingdom.id] ?? 0) + Math.min(before, siegeDamage);
+            if (before > 0 && targetWall.health <= 0) {
+              addEvent(state, 'village', `${targetVillage.name}的城墙已被攻破`, {
+                category: 'village',
+                archive: true,
+                notification: true,
+                villageIds: [targetVillage.id],
+                kingdomIds: [kingdom.id, targetVillage.kingdomId],
+                locationCell:
+                  Math.floor(targetVillage.z) * state.map.size + Math.floor(targetVillage.x),
+              });
+            }
+            continue;
+          }
           if (targetVillage.captureKingdomId !== kingdom.id) {
             targetVillage.captureKingdomId = kingdom.id;
             targetVillage.captureProgress = 0;
@@ -3210,7 +3330,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       }
     }
     resolveKingdomExtinctions(state);
-    updateWarCampaignFatigue();
+    updateWarCampaignFatigue(guardsByKingdom);
   };
 
   const step = (): void => {
@@ -3280,7 +3400,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     );
   };
 
-  return { state, step, spawn, ensureVillageAt, setWorldLaw };
+  return { state, metrics, step, spawn, ensureVillageAt, setWorldLaw };
 }
 
 function entityCell(state: WorldState, entityId: number): number {
@@ -3373,6 +3493,10 @@ function completeEntityAction(state: WorldState, entityId: number, cell: number)
       task.phase = 'work';
       renewResidentTaskLease(task, state.tick);
     }
+  }
+  if (currentState === AgentState.Guard && task) {
+    task.phase = 'work';
+    renewResidentTaskLease(task, state.tick);
   }
   if (currentState === AgentState.GatherWood || currentState === AgentState.GatherStone) {
     if (task) {

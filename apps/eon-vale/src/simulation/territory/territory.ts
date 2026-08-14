@@ -1,5 +1,6 @@
 import type { TerritoryState, Village, WorldState } from '@/shared/gameTypes';
 import { isWalkable } from '../navigation/grid';
+import { resolveSettlementCapabilities } from '../settlements/settlementCapabilities';
 
 const UNREACHED = Number.POSITIVE_INFINITY;
 const DEFAULT_CLAIM_STEP = 24;
@@ -29,8 +30,12 @@ function claimBudget(state: WorldState, village: Village): number {
   }, 0);
   const populationReach = Math.min(6, Math.floor(village.population / 10));
   const buildingReach = Math.min(4, Math.floor(completedBuildings / 3));
+  const capabilities = resolveSettlementCapabilities(state, village);
   return (
-    (BASE_CLAIM_BUDGET[village.tier] ?? BASE_CLAIM_BUDGET[0]) + populationReach + buildingReach
+    (BASE_CLAIM_BUDGET[village.tier] ?? BASE_CLAIM_BUDGET[0]) +
+    populationReach +
+    buildingReach +
+    capabilities.territoryReachBonus
   );
 }
 
@@ -121,6 +126,12 @@ export function advanceTerritoryClaims(
   const claimStep = Math.max(1, Math.min(255, Math.round(options.claimStep ?? DEFAULT_CLAIM_STEP)));
   const decayStep = Math.max(1, Math.min(255, Math.round(options.decayStep ?? DEFAULT_DECAY_STEP)));
   let changed = false;
+  const claimSteps = new Map(
+    state.villages.map((village) => [
+      village.id,
+      Math.min(255, claimStep + resolveSettlementCapabilities(state, village).claimStrengthBonus),
+    ]),
+  );
   for (let cell = 0; cell < cellCount; cell += 1) {
     const currentVillageId = territory.villageIds[cell] ?? 0;
     const desiredVillageId = desiredVillageIds[cell] ?? 0;
@@ -128,15 +139,20 @@ export function advanceTerritoryClaims(
     let nextVillageId = currentVillageId;
     let nextStrength = currentStrength;
     if (currentVillageId === desiredVillageId) {
-      if (currentVillageId > 0) nextStrength = Math.min(255, currentStrength + claimStep);
+      if (currentVillageId > 0) {
+        nextStrength = Math.min(
+          255,
+          currentStrength + (claimSteps.get(currentVillageId) ?? claimStep),
+        );
+      }
     } else if (currentVillageId === 0) {
       nextVillageId = desiredVillageId;
-      nextStrength = desiredVillageId > 0 ? claimStep : 0;
+      nextStrength = desiredVillageId > 0 ? (claimSteps.get(desiredVillageId) ?? claimStep) : 0;
     } else {
       nextStrength = Math.max(0, currentStrength - decayStep);
       if (nextStrength === 0) {
         nextVillageId = desiredVillageId;
-        nextStrength = desiredVillageId > 0 ? claimStep : 0;
+        nextStrength = desiredVillageId > 0 ? (claimSteps.get(desiredVillageId) ?? claimStep) : 0;
       }
     }
     if (nextVillageId === currentVillageId && nextStrength === currentStrength) continue;

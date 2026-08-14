@@ -47,7 +47,7 @@ export const DELIVERY_BATCHES = Object.freeze([
   {
     id: 'settlement-and-kingdom-readability',
     title: '聚落与王国可读性',
-    status: 'validating',
+    status: 'complete',
     playableLoopRequired: true,
     backendOnlyDeliveryAllowed: false,
     decorativeOnlyDeliveryAllowed: false,
@@ -55,6 +55,7 @@ export const DELIVERY_BATCHES = Object.freeze([
       '逐格领土真实影响资源归属与征服',
       '四级聚落通过真实建设形成可见差异',
       '王国边界、工作热点、村庄纪事和历史定位可用',
+      '兵营、议事厅、城墙和瞭望塔具有可观察且会随损毁失效的真实能力',
     ],
   },
   {

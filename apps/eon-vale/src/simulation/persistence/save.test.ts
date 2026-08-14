@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CarriedResourceKind, VillageTier } from '@/shared/gameTypes';
+import { BuildingType, CarriedResourceKind, VillageTier } from '@/shared/gameTypes';
 import { createWorldSimulation } from '../core/worldSimulation';
 import { formKingdoms } from '../kingdoms/kingdoms';
+import { resolveSettlementCapabilities } from '../settlements/settlementCapabilities';
+import { startConstruction } from '../systems/economy';
 import { beginResidentTask } from '../tasks/residentTasks';
 import { loadWorldSave, serializeWorld } from './save';
 
@@ -125,6 +127,42 @@ describe('world persistence', () => {
 
     delete kingdom.capitalVillageId;
     expect(() => loadWorldSave(JSON.stringify(valid))).toThrow(/数据校验失败/);
+  });
+
+  it('restores operational public and defensive building capabilities from V11 facts', () => {
+    const simulation = createWorldSimulation({
+      seed: 'v11-settlement-capabilities',
+      initialHumans: 0,
+    });
+    const village = simulation.ensureVillageAt(64, 64, 45);
+    village.resources.wood = 1_000;
+    village.resources.stone = 1_000;
+    for (const [index, type] of [
+      BuildingType.Barracks,
+      BuildingType.CouncilHall,
+      BuildingType.Wall,
+      BuildingType.Watchtower,
+    ].entries()) {
+      const building = startConstruction(simulation.state, village, type, 60 + index * 2, 64);
+      expect(building).not.toBeNull();
+      if (!building) continue;
+      building.completed = true;
+      building.constructionPhase = 'complete';
+      building.progress = building.requiredProgress;
+      building.stage = 2;
+    }
+
+    const restored = loadWorldSave(serializeWorld(simulation.state));
+    const restoredVillage = restored.villages[0];
+    expect(restoredVillage).toBeDefined();
+    if (!restoredVillage) return;
+    expect(resolveSettlementCapabilities(restored, restoredVillage)).toMatchObject({
+      guardTrainingSlots: 4,
+      territoryReachBonus: 3,
+      claimStrengthBonus: 8,
+      captureBlockers: 1,
+      watchRange: 14,
+    });
   });
 
   it('restores every semantic task phase and durable second-batch assignment', () => {

@@ -499,6 +499,31 @@ export function InspectorPanel({
             </span>
           ))}
         </div>
+        <div className="inspector-list" data-testid="village-capabilities">
+          <span>
+            <b>守卫训练</b>
+            <em>{inspection.capabilities.guardTrainingSlots} 个工位</em>
+          </span>
+          <span>
+            <b>治理范围</b>
+            <em>+{inspection.capabilities.territoryReachBonus} 格</em>
+          </span>
+          <span>
+            <b>领土巩固</b>
+            <em>+{inspection.capabilities.claimStrengthBonus}</em>
+          </span>
+          <span>
+            <b>城墙防线</b>
+            <em>{inspection.capabilities.captureBlockers} 道</em>
+          </span>
+          <span>
+            <b>边境警戒</b>
+            <em>
+              {inspection.capabilities.watchtowers} 座 · 射程 {inspection.capabilities.watchRange}{' '}
+              格 · 伤害 {inspection.capabilities.watchDamage}
+            </em>
+          </span>
+        </div>
         <div className="resident-history village-chronicle" data-testid="village-chronicle">
           <strong>聚落纪事</strong>
           {inspection.history.length > 0 ? (

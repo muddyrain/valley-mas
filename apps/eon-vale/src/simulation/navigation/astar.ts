@@ -5,6 +5,8 @@ interface HeapEntry {
   score: number;
 }
 
+const PATH_HEURISTIC_WEIGHT = 1.25;
+
 export interface PathSearchWorkspace {
   readonly cellCount: number;
   readonly cameFrom: Int32Array;
@@ -118,7 +120,7 @@ export function findPath(
   cameFrom[start] = -1;
   gScore[start] = 0;
   seenGeneration[start] = generation;
-  open.push({ cell: start, score: heuristic(grid, start, goal) });
+  open.push({ cell: start, score: heuristic(grid, start, goal) * PATH_HEURISTIC_WEIGHT });
   let visited = 0;
 
   while (open.size > 0 && visited < maxVisited) {
@@ -149,7 +151,10 @@ export function findPath(
       cameFrom[neighbour] = current.cell;
       gScore[neighbour] = nextScore;
       seenGeneration[neighbour] = generation;
-      open.push({ cell: neighbour, score: nextScore + heuristic(grid, neighbour, goal) });
+      open.push({
+        cell: neighbour,
+        score: nextScore + heuristic(grid, neighbour, goal) * PATH_HEURISTIC_WEIGHT,
+      });
     }
   }
 
