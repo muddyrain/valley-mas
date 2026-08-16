@@ -9,7 +9,7 @@ import {
 
 describe('pixel camera', () => {
   it('uses the approved stepped zoom levels and keeps the pointer anchor stable', () => {
-    expect(PIXEL_ZOOM_STEPS).toEqual([0.5, 0.75, 1, 1.5, 2, 3, 4]);
+    expect(PIXEL_ZOOM_STEPS).toEqual([0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 12, 16]);
     const camera = createPixelCamera(256, 1, 1280, 720);
     const before = screenToWorldCell(camera, 900, 420);
     const zoomed = zoomCameraAt(camera, 900, 420, 1);
@@ -18,6 +18,12 @@ describe('pixel camera', () => {
     expect(zoomed.zoom).toBe(1.5);
     expect(after.x).toBeCloseTo(before.x, 5);
     expect(after.z).toBeCloseTo(before.z, 5);
+  });
+
+  it('keeps integer close-view steps so formal pixel sprites remain crisp', () => {
+    const camera = createPixelCamera(128, 4, 2048, 1135);
+
+    expect(zoomCameraAt(camera, 1024, 568, 1).zoom).toBe(6);
   });
 
   it('clamps panning so a finite island cannot be lost outside the viewport', () => {

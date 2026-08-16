@@ -28,6 +28,14 @@ import {
 } from './combatFeedback';
 import { humanAgeScale } from './entityAppearance';
 import {
+  animalVisualProfile,
+  BUILDING_VISUAL_PROFILES,
+  FORMAL_PIXEL_ASSETS,
+  resourceVisualProfile,
+  selectedTreeCanopyAlpha,
+  VISUAL_LOD_PROFILES,
+} from './fullWorldVisuals';
+import {
   buildingInteractionGeometry,
   entityInteractionGeometry,
   type InteractionGeometry,
@@ -65,7 +73,7 @@ import {
   humanFacing,
   humanPose,
 } from './spriteAnimation';
-import type { WorldViewLevel } from './strategicView';
+import { resolveViewLevel, viewZoom, visibleCellSpan, type WorldViewLevel } from './strategicView';
 
 export interface RuntimeMetrics {
   fps: number;
@@ -132,14 +140,14 @@ const KINGDOM_COLORS = [
   '#3ca79a',
 ];
 const TERRAIN_COLORS: Record<TerrainType, string> = {
-  [TerrainType.DeepOcean]: '#235a70',
-  [TerrainType.ShallowOcean]: '#3f8796',
-  [TerrainType.Beach]: '#d7bd76',
-  [TerrainType.Grass]: '#78a960',
-  [TerrainType.Forest]: '#4c7f50',
-  [TerrainType.Desert]: '#cda466',
-  [TerrainType.Snow]: '#dce8df',
-  [TerrainType.Mountain]: '#7b837a',
+  [TerrainType.DeepOcean]: '#24586d',
+  [TerrainType.ShallowOcean]: '#438696',
+  [TerrainType.Beach]: '#d4bb79',
+  [TerrainType.Grass]: '#78a461',
+  [TerrainType.Forest]: '#4d7b51',
+  [TerrainType.Desert]: '#c9a069',
+  [TerrainType.Snow]: '#dce7df',
+  [TerrainType.Mountain]: '#797f78',
 };
 const POWER_COLORS: Record<GodPower, number> = {
   [GodPower.Rain]: 0x68b9db,
@@ -247,60 +255,68 @@ class PixelTextureFactory {
     frame: number,
   ): Texture {
     const key = `human:${id % 12}:${profession}:${kingdomPaletteIndex(kingdomId)}:${role}:${weaponTier}:${armorTier}:${carriedKind}:${facing}:${pose}:${frame}`;
-    return this.get(key, 16, 20, (context) => {
-      const skin = ['#f3c7a1', '#dca77f', '#bb7d59', '#8b593e'][id % 4] ?? '#e1aa82';
-      const hair =
-        ['#3a2b25', '#65452f', '#c18a47', '#22282e'][Math.floor(id / 2) % 4] ?? '#3a2b25';
-      const kingdom = kingdomColor(kingdomId);
-      const cloth = profession === Profession.Guard ? shade(kingdom, 0.82) : kingdom;
-      const pants = armorTier > 0 ? '#596571' : '#4d5149';
-      context.fillStyle = 'rgba(20, 31, 28, 0.25)';
-      context.fillRect(4, 18, 9, 2);
-      context.fillStyle = pants;
-      const walking = pose === 'walk' || pose === 'carry';
-      context.fillRect(5, 13 + (walking && frame % 2 === 0 ? 1 : 0), 3, 5);
-      context.fillRect(9, 13 + (walking && frame % 2 === 1 ? 1 : 0), 3, 5);
-      context.fillStyle = cloth;
-      context.fillRect(4, 8, 9, 7);
-      context.fillStyle = shade(cloth, 1.22);
-      context.fillRect(5, 8, 7, 2);
-      if (armorTier > 0) {
-        context.fillStyle = armorTier >= 3 ? '#d6dce0' : armorTier === 2 ? '#9eabb2' : '#7f8b91';
-        context.fillRect(5, 9, 7, 4);
-        context.fillStyle = '#54616a';
-        context.fillRect(7, 9, 1, 4);
-      }
-      context.fillStyle = skin;
-      context.fillRect(1, 9, 3, 6);
-      context.fillRect(13, 9, 2, 6);
-      context.fillRect(5, 3, 7, 6);
-      context.fillStyle = hair;
-      context.fillRect(5, 2, 7, 3);
-      context.fillRect(4, 3, 2, 4);
-      if ((id + profession) % 3 === 0) context.fillRect(11, 4, 2, 3);
-      if (facing !== 'north') {
-        context.fillStyle = '#25272a';
-        if (facing === 'south') {
-          context.fillRect(6, 6, 1, 1);
-          context.fillRect(10, 6, 1, 1);
-        } else {
-          context.fillRect(10, 6, 1, 1);
+    return this.get(
+      key,
+      FORMAL_PIXEL_ASSETS.resident.width,
+      FORMAL_PIXEL_ASSETS.resident.height,
+      (context) => {
+        const skin = ['#f3c7a1', '#dca77f', '#bb7d59', '#8b593e'][id % 4] ?? '#e1aa82';
+        const hair =
+          ['#3a2b25', '#65452f', '#c18a47', '#22282e'][Math.floor(id / 2) % 4] ?? '#3a2b25';
+        const kingdom = kingdomColor(kingdomId);
+        const cloth = profession === Profession.Guard ? shade(kingdom, 0.82) : kingdom;
+        const pants = armorTier > 0 ? '#596571' : '#4d5149';
+        context.fillStyle = 'rgba(20, 31, 28, 0.25)';
+        context.fillRect(5, 29, 14, 2);
+        context.fillStyle = pants;
+        const walking = pose === 'walk' || pose === 'carry';
+        context.fillRect(7, 21 + (walking && frame % 2 === 0 ? 1 : 0), 4, 9);
+        context.fillRect(13, 21 + (walking && frame % 2 === 1 ? 1 : 0), 4, 9);
+        context.fillStyle = cloth;
+        context.fillRect(6, 12, 12, 11);
+        context.fillStyle = shade(cloth, 1.22);
+        context.fillRect(7, 12, 10, 3);
+        if (armorTier > 0) {
+          context.fillStyle = armorTier >= 3 ? '#d6dce0' : armorTier === 2 ? '#9eabb2' : '#7f8b91';
+          context.fillRect(7, 14, 10, 7);
+          context.fillStyle = '#54616a';
+          context.fillRect(11, 14, 2, 7);
         }
-      }
-      if (pose === 'sleep') {
-        context.fillStyle = shade(cloth, 0.82);
-        context.fillRect(3, 14, 11, 3);
-      }
-      drawProfession(context, profession, weaponTier);
-      drawCarriedResource(context, carriedKind);
-      drawRole(context, role);
-    });
+        context.fillStyle = skin;
+        context.fillRect(2, 14, 4, 9);
+        context.fillRect(18, 14, 4, 9);
+        context.fillRect(7, 4, 10, 9);
+        context.fillStyle = hair;
+        context.fillRect(7, 2, 10, 4);
+        context.fillRect(6, 4, 3, 6);
+        if ((id + profession) % 3 === 0) context.fillRect(16, 5, 3, 5);
+        if (facing !== 'north') {
+          context.fillStyle = '#25272a';
+          if (facing === 'south') {
+            context.fillRect(9, 8, 1, 1);
+            context.fillRect(14, 8, 1, 1);
+          } else {
+            context.fillRect(15, 8, 1, 1);
+          }
+        }
+        if (pose === 'sleep') {
+          context.fillStyle = shade(cloth, 0.82);
+          context.fillRect(4, 24, 16, 5);
+        }
+        drawProfession(context, profession, weaponTier);
+        drawCarriedResource(context, carriedKind);
+        drawRole(context, role);
+      },
+    );
   }
 
   animal(kind: EntityKind, variant: number, pose: AnimalPose, frame: number): Texture {
     const key = `animal:${kind}:${variant % 4}:${pose}:${frame}`;
-    const width = kind === EntityKind.Bear || kind === EntityKind.Cow ? 24 : 20;
-    return this.get(key, width, 16, (context) => drawAnimal(context, kind, variant, pose, frame));
+    const profile = animalVisualProfile(kind);
+    const asset = profile.large ? FORMAL_PIXEL_ASSETS.largeAnimal : FORMAL_PIXEL_ASSETS.animal;
+    return this.get(key, asset.width, asset.height, (context) =>
+      drawAnimal(context, kind, variant, pose, frame),
+    );
   }
 
   building(
@@ -311,8 +327,11 @@ class PixelTextureFactory {
     damaged: boolean,
   ): Texture {
     const key = `building:${type}:${kingdomPaletteIndex(kingdomId)}:${tier}:${stage}:${damaged ? 1 : 0}`;
-    return this.get(key, 48, 44, (context) =>
-      drawBuilding(context, type, kingdomColor(kingdomId), tier, stage, damaged),
+    return this.get(
+      key,
+      FORMAL_PIXEL_ASSETS.building.width,
+      FORMAL_PIXEL_ASSETS.building.height,
+      (context) => drawBuilding(context, type, kingdomColor(kingdomId), tier, stage, damaged),
     );
   }
 
@@ -368,11 +387,13 @@ export class EonValeEngine {
   private readonly territoryLayer = new Graphics({ roundPixels: true });
   private readonly planningLayer = new Graphics({ roundPixels: true });
   private readonly settlementCoreLayer = new Graphics({ roundPixels: true });
+  private readonly treeCanopyBackLayer = new Graphics({ roundPixels: true });
   private readonly hotspotLayer = new Graphics({ roundPixels: true });
   private readonly buildingLayer = new Container();
   private readonly stockpileLayer = new Graphics({ roundPixels: true });
   private readonly carcassLayer = new Graphics({ roundPixels: true });
   private readonly entityLayer = new Container();
+  private readonly treeCanopyFrontLayer = new Graphics({ roundPixels: true });
   private readonly statusLayer = new Graphics({ roundPixels: true });
   private readonly combatStatusLayer = new Graphics({ roundPixels: true });
   private readonly interactionLayer = new Graphics({ roundPixels: true });
@@ -392,6 +413,7 @@ export class EonValeEngine {
   private readonly buildingSprites = new Map<number, Sprite>();
   private readonly buildingTextureKeys = new Map<number, string>();
   private readonly settlementLabels = new Map<number, Text>();
+  private readonly activityAlertLabels = new Map<string, Text>();
   private readonly lastAttackFeedbackTicks = new Map<number, number>();
   private readonly transientEffects: TransientEffect[] = [];
   private readonly damageFlashUntil = new Map<number, number>();
@@ -411,6 +433,7 @@ export class EonValeEngine {
   private camera: PixelCamera;
   private cameraTween: CameraTween | null = null;
   private selectedTarget: WorldSelection | null = null;
+  private readonly highlightedEntityIds = new Set<number>();
   private hoveredTarget: WorldSelection | null = null;
   private overlay: WorldSettings['overlay'] = 'none';
   private brushRadius = 2;
@@ -429,6 +452,8 @@ export class EonValeEngine {
   private longTasks = 0;
   private observer: PerformanceObserver | null = null;
   private visibleEntities = 0;
+  private visibleTreeCanopies = 0;
+  private treeCanopyCameraKey = '';
   private totalAttackHits = 0;
   private pixelTexturesInvalidated = false;
 
@@ -475,6 +500,7 @@ export class EonValeEngine {
         this.updateTerritories();
         this.updateWorkHotspots();
         this.updateSettlementLabels();
+        if (this.selectedTarget?.kind === 'entity') this.redrawTreeCanopies();
         this.collectAttackFeedback();
       }
     }
@@ -492,11 +518,15 @@ export class EonValeEngine {
       this.canvas.dataset.fullRebuilds = String(Number(this.canvas.dataset.fullRebuilds ?? 0) + 1);
       this.camera = createPixelCamera(
         map.size,
-        initialZoom(map.size),
+        viewZoom('world', {
+          mapSize: map.size,
+          viewportWidth: this.camera.viewportWidth,
+          viewportHeight: this.camera.viewportHeight,
+        }),
         this.camera.viewportWidth,
         this.camera.viewportHeight,
       );
-      this.setViewLevel(resolvePixelView(this.camera.zoom));
+      this.setViewLevel('world');
       this.setSelection(null);
     }
     if (!this.ready) return;
@@ -613,6 +643,7 @@ export class EonValeEngine {
     } else {
       this.redrawRenderChunkTargets(changedTargets);
     }
+    this.redrawTreeCanopies(true);
     const redrawMs = performance.now() - redrawStartedAt;
     this.canvas.dataset.resourceRedrawChunks = String(changedTargets.size);
     this.canvas.dataset.resourceRedrawMs = redrawMs.toFixed(2);
@@ -715,6 +746,7 @@ export class EonValeEngine {
     else delete this.canvas.dataset.selectedTarget;
     this.canvas.dataset.selectionOutline = String(Boolean(selection));
     this.redrawInteraction();
+    if (this.ready && (selection?.kind === 'entity' || !selection)) this.redrawTreeCanopies(true);
     if (
       this.ready &&
       this.overlay === 'territory' &&
@@ -722,6 +754,13 @@ export class EonValeEngine {
     ) {
       this.updateTerritories();
     }
+  }
+
+  setHighlightedEntities(entityIds: number[]): void {
+    this.highlightedEntityIds.clear();
+    for (const entityId of entityIds) this.highlightedEntityIds.add(entityId);
+    this.canvas.dataset.highlightedResidents = String(this.highlightedEntityIds.size);
+    this.redrawInteraction();
   }
 
   setQuality(quality: WorldSettings['quality']): void {
@@ -752,7 +791,7 @@ export class EonValeEngine {
       fromZoom: this.camera.zoom,
       toX: clamp(x, 0, this.map?.size ?? 256),
       toZ: clamp(z, 0, this.map?.size ?? 256),
-      toZoom: level === 'resident' ? 4 : 1.5,
+      toZoom: viewZoom(level, this.camera),
     };
     this.canvas.dataset.focus = `${x.toFixed(1)},${z.toFixed(1)}`;
   }
@@ -767,7 +806,7 @@ export class EonValeEngine {
       fromZoom: this.camera.zoom,
       toX: size / 2,
       toZ: size / 2,
-      toZoom: initialZoom(size),
+      toZoom: viewZoom('world', this.camera),
     };
     this.canvas.dataset.focus = 'world';
   }
@@ -823,10 +862,12 @@ export class EonValeEngine {
       this.territoryLayer,
       this.planningLayer,
       this.settlementCoreLayer,
+      this.treeCanopyBackLayer,
       this.buildingLayer,
       this.stockpileLayer,
       this.carcassLayer,
       this.entityLayer,
+      this.treeCanopyFrontLayer,
       this.hotspotLayer,
       this.statusLayer,
       this.combatStatusLayer,
@@ -884,6 +925,7 @@ export class EonValeEngine {
     const width = Math.max(1, this.canvas.clientWidth || window.innerWidth);
     const height = Math.max(1, this.canvas.clientHeight || window.innerHeight);
     this.camera = resizePixelCamera(this.camera, width, height);
+    this.setViewLevel(resolveViewLevel(this.viewLevel, this.camera.zoom, this.camera));
     if (this.ready) this.app.renderer.resize(width, height);
     this.updateWorldTransform();
   };
@@ -959,6 +1001,7 @@ export class EonValeEngine {
     }
     this.canvas.dataset.terrainChunks = String(this.terrainChunks.size);
     this.canvas.dataset.pixelTiles = 'true';
+    this.redrawTreeCanopies(true);
   }
 
   private redrawTerrainChunks(changedNavigationChunks: number[]): void {
@@ -1014,10 +1057,15 @@ export class EonValeEngine {
         const z = record.z + localZ;
         const cell = z * map.size + x;
         const terrain = map.terrain[cell] as TerrainType;
-        const variation = ((x * 17 + z * 31) % 7) - 3;
+        const variation = ((Math.floor(x / 4) * 17 + Math.floor(z / 4) * 31) % 7) - 3;
         const terrainColor = overlayTerrainColor(map, cell, this.overlay, variation);
         if (overviewContext) {
-          overviewContext.fillStyle = overlayTerrainColor(map, cell, this.overlay, 0);
+          overviewContext.fillStyle = overlayTerrainColor(
+            map,
+            cell,
+            this.overlay,
+            variation * 0.45,
+          );
           overviewContext.fillRect(localX, localZ, 1, 1);
         }
         if (context) {
@@ -1076,25 +1124,122 @@ export class EonValeEngine {
           const variant = resources.variant[nodeId] ?? 0;
           const sourceX = Math.floor((x - record.x) * SOURCE_PIXELS_PER_CELL);
           const sourceZ = Math.floor((z - record.z) * SOURCE_PIXELS_PER_CELL) + 2;
-          if (residentContext)
-            drawResourceNodeGlyph(residentContext, kind, stage, variant, sourceX, sourceZ, true);
+          const residentProfile = resourceVisualProfile(kind, stage, 'resident');
+          if (residentContext) {
+            drawResourceNodeGlyph(
+              residentContext,
+              kind,
+              stage,
+              variant,
+              sourceX,
+              sourceZ,
+              true,
+              residentProfile.splitCanopy,
+            );
+          }
           const sampleRate =
             kind === ResourceNodeKind.Tree ? 3 : kind === ResourceNodeKind.Stone ? 2 : 1;
           if (settlementContext && (nodeId * 17 + variant * 7) % sampleRate === 0) {
             drawResourceNodeGlyph(settlementContext, kind, stage, variant, sourceX, sourceZ, false);
           }
-          if (overviewContext && this.overlay === 'resources') {
-            overviewContext.fillStyle =
-              kind === ResourceNodeKind.Tree
-                ? '#2d7745'
-                : kind === ResourceNodeKind.Stone
-                  ? '#a4aaa7'
-                  : '#5d6d78';
-            overviewContext.fillRect(Math.floor(x - record.x), Math.floor(z - record.z), 1, 1);
+          if (overviewContext) {
+            const showForestCluster =
+              kind === ResourceNodeKind.Tree &&
+              stage >= ResourceNodeStage.Young &&
+              (nodeId * 13 + variant * 7) % 3 === 0;
+            const showResourceOverlay = this.overlay === 'resources';
+            if (showForestCluster || showResourceOverlay) {
+              overviewContext.fillStyle =
+                kind === ResourceNodeKind.Tree
+                  ? stage === ResourceNodeStage.Mature
+                    ? '#285f42'
+                    : '#3f7750'
+                  : kind === ResourceNodeKind.Stone
+                    ? '#a4aaa7'
+                    : '#5d6d78';
+              overviewContext.fillRect(Math.floor(x - record.x), Math.floor(z - record.z), 1, 1);
+            }
           }
         }
       }
     }
+  }
+
+  private redrawTreeCanopies(force = false): void {
+    const resources = this.resourceNodes;
+    const map = this.map;
+    const profile = VISUAL_LOD_PROFILES[this.viewLevel];
+    const selectedEntityId = this.selectedTarget?.kind === 'entity' ? this.selectedTarget.id : -1;
+    const selectedX =
+      selectedEntityId >= 0 ? this.snapshot?.positionsX[selectedEntityId] : undefined;
+    const selectedZ =
+      selectedEntityId >= 0 ? this.snapshot?.positionsZ[selectedEntityId] : undefined;
+    const cameraKey = `${this.viewLevel}:${this.camera.centerX.toFixed(2)}:${this.camera.centerZ.toFixed(2)}:${this.camera.zoom.toFixed(2)}:${this.canvas.dataset.resourceNodes ?? 0}:${selectedEntityId}:${selectedX?.toFixed(1) ?? ''}:${selectedZ?.toFixed(1) ?? ''}`;
+    if (!force && this.treeCanopyCameraKey === cameraKey) return;
+    this.treeCanopyCameraKey = cameraKey;
+    this.treeCanopyBackLayer.clear();
+    this.treeCanopyFrontLayer.clear();
+    this.visibleTreeCanopies = 0;
+    if (!resources || !map || !profile.splitTreeCanopy) {
+      this.canvas.dataset.treeCanopyBack = '0';
+      this.canvas.dataset.treeCanopyFront = '0';
+      this.canvas.dataset.treeCanopyOcclusion = 'inactive';
+      return;
+    }
+
+    const halfCellsX = this.camera.viewportWidth / (WORLD_PIXELS_PER_CELL * this.camera.zoom) / 2;
+    const halfCellsZ = this.camera.viewportHeight / (WORLD_PIXELS_PER_CELL * this.camera.zoom) / 2;
+    const minX = Math.max(0, this.camera.centerX - halfCellsX - 4);
+    const maxX = Math.min(map.size, this.camera.centerX + halfCellsX + 4);
+    const minZ = Math.max(0, this.camera.centerZ - halfCellsZ - 6);
+    const maxZ = Math.min(map.size, this.camera.centerZ + halfCellsZ + 4);
+    const bucketColumns = Math.ceil(map.size / 8);
+    const firstBucketX = Math.floor(minX / 8);
+    const lastBucketX = Math.floor(Math.max(minX, maxX - 0.001) / 8);
+    const firstBucketZ = Math.floor(minZ / 8);
+    const lastBucketZ = Math.floor(Math.max(minZ, maxZ - 0.001) / 8);
+    const renderedNodes = new Set<number>();
+
+    for (let bucketZ = firstBucketZ; bucketZ <= lastBucketZ; bucketZ += 1) {
+      for (let bucketX = firstBucketX; bucketX <= lastBucketX; bucketX += 1) {
+        for (const nodeId of this.resourceBuckets.get(bucketZ * bucketColumns + bucketX) ?? []) {
+          if (renderedNodes.has(nodeId)) continue;
+          renderedNodes.add(nodeId);
+          if (
+            resources.active[nodeId] !== 1 ||
+            resources.kind[nodeId] !== ResourceNodeKind.Tree ||
+            resources.stage[nodeId] !== ResourceNodeStage.Mature
+          ) {
+            continue;
+          }
+          const x = resources.positionsX[nodeId] ?? 0;
+          const z = resources.positionsZ[nodeId] ?? 0;
+          if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
+          const groundX = x * WORLD_PIXELS_PER_CELL;
+          const groundY = z * WORLD_PIXELS_PER_CELL;
+          const variant = resources.variant[nodeId] ?? 0;
+          const crown = [0x285f3f, 0x32704a, 0x3b7845, 0x24644a][variant % 4] ?? 0x285f3f;
+          const highlight = [0x3d7950, 0x43875a, 0x4b8f56, 0x357d59][variant % 4] ?? 0x3d7950;
+          const frontAlpha = selectedTreeCanopyAlpha(x, z, selectedX, selectedZ);
+          this.treeCanopyBackLayer
+            .rect(groundX - 6, groundY - 15, 12, 7)
+            .rect(groundX - 4, groundY - 18, 8, 4)
+            .fill({ color: crown, alpha: 1 });
+          this.treeCanopyBackLayer
+            .rect(groundX - 4, groundY - 16, 5, 2)
+            .fill({ color: highlight, alpha: 0.95 });
+          this.treeCanopyFrontLayer
+            .rect(groundX - 7, groundY - 9, 14, 5)
+            .rect(groundX - 5, groundY - 5, 4, 2)
+            .rect(groundX + 2, groundY - 5, 4, 2)
+            .fill({ color: crown, alpha: 0.96 * frontAlpha });
+          this.visibleTreeCanopies += 1;
+        }
+      }
+    }
+    this.canvas.dataset.treeCanopyBack = String(this.visibleTreeCanopies);
+    this.canvas.dataset.treeCanopyFront = String(this.visibleTreeCanopies);
+    this.canvas.dataset.treeCanopyOcclusion = 'split-front-back';
   }
 
   private updateEntities(now: number): void {
@@ -1137,7 +1282,8 @@ export class EonValeEngine {
       if (!onScreen) continue;
       const kind = (latest.kinds?.[entityId] ?? EntityKind.Human) as EntityKind;
       const isFocused =
-        this.selectedTarget?.kind === 'entity' && this.selectedTarget.id === entityId;
+        (this.selectedTarget?.kind === 'entity' && this.selectedTarget.id === entityId) ||
+        this.highlightedEntityIds.has(entityId);
       if (this.viewLevel === 'settlement' && !isFocused && entityId % 4 !== 0) {
         sprite.visible = false;
         continue;
@@ -1848,7 +1994,45 @@ export class EonValeEngine {
     this.canvas.dataset.settlementLabelNames = snapshot.villages
       .map((village) => village.name)
       .join(',');
+    this.updateActivityAlertLabels();
     this.updateSettlementLabelPositions();
+  }
+
+  private updateActivityAlertLabels(): void {
+    const snapshot = this.snapshot;
+    if (!snapshot) return;
+    const livingKeys = new Set<string>();
+    for (const alert of snapshot.activityAlerts) {
+      const key = `${alert.villageId}:${alert.reason}`;
+      livingKeys.add(key);
+      let label = this.activityAlertLabels.get(key);
+      if (!label) {
+        label = new Text({
+          text: '',
+          anchor: 0.5,
+          roundPixels: true,
+          resolution: 1,
+          style: {
+            fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+            fontSize: 10,
+            fontWeight: '700',
+            fill: 0xffd27a,
+            stroke: { color: 0x442d1d, width: 3 },
+          },
+        });
+        this.labelLayer.addChild(label);
+        this.activityAlertLabels.set(key, label);
+      }
+      label.text =
+        alert.reason === 'critical-hunger' ? `⚠ ${alert.count} 人缺粮` : `⚠ ${alert.count} 人受阻`;
+    }
+    for (const [key, label] of this.activityAlertLabels) {
+      if (livingKeys.has(key)) continue;
+      this.labelLayer.removeChild(label);
+      label.destroy();
+      this.activityAlertLabels.delete(key);
+    }
+    this.canvas.dataset.activityAlerts = String(this.activityAlertLabels.size);
   }
 
   private updateSettlementLabelPositions(): void {
@@ -1872,6 +2056,17 @@ export class EonValeEngine {
       label.visible =
         visible &&
         (!worldLabelIds || worldLabelIds.has(village.id)) &&
+        screen.x > -100 &&
+        screen.x < this.camera.viewportWidth + 100 &&
+        screen.y > -60 &&
+        screen.y < this.camera.viewportHeight + 60;
+    }
+    for (const alert of snapshot.activityAlerts) {
+      const label = this.activityAlertLabels.get(`${alert.villageId}:${alert.reason}`);
+      if (!label) continue;
+      const screen = worldToScreen(this.camera, alert.x, alert.z);
+      label.position.set(Math.round(screen.x), Math.round(screen.y - 32));
+      label.visible =
         screen.x > -100 &&
         screen.x < this.camera.viewportWidth + 100 &&
         screen.y > -60 &&
@@ -1992,6 +2187,25 @@ export class EonValeEngine {
     };
     const hover = !this.brushVisible && drawTarget(this.hoveredTarget, 0x8fe49a, 'hover');
     const selected = drawTarget(this.selectedTarget, 0xffd86a, 'selected');
+    const latest = this.interpolator.latest;
+    if (latest && this.viewLevel !== 'world') {
+      for (const entityId of this.highlightedEntityIds) {
+        if (
+          entityId >= latest.population ||
+          (latest.active?.[entityId] ?? 0) !== 1 ||
+          (latest.health?.[entityId] ?? 0) <= 0
+        ) {
+          continue;
+        }
+        this.interactionLayer
+          .circle(
+            (latest.positionsX[entityId] ?? 0) * WORLD_PIXELS_PER_CELL,
+            (latest.positionsZ[entityId] ?? 0) * WORLD_PIXELS_PER_CELL,
+            0.62 * WORLD_PIXELS_PER_CELL,
+          )
+          .stroke({ color: 0xc9ed8d, width: 0.9, alpha: 0.9 });
+      }
+    }
     if (this.selectedTarget?.kind === 'entity' && this.snapshot && this.map) {
       const targetCell = this.snapshot.targetCells[this.selectedTarget.id];
       const point = this.targetPosition(this.selectedTarget);
@@ -2091,7 +2305,11 @@ export class EonValeEngine {
       ),
     );
     this.canvas.dataset.zoom = String(scale);
+    const visibleSpan = visibleCellSpan(scale, this.camera);
+    this.canvas.dataset.visibleCellsWidth = visibleSpan.width.toFixed(1);
+    this.canvas.dataset.visibleCellsHeight = visibleSpan.height.toFixed(1);
     this.updateTerrainLod();
+    this.redrawTreeCanopies();
   }
 
   private updateTerrainLod(): void {
@@ -2126,16 +2344,21 @@ export class EonValeEngine {
       centerZ: lerp(tween.fromZ, tween.toZ, progress),
       zoom: lerp(tween.fromZoom, tween.toZoom, progress),
     };
-    this.setViewLevel(resolvePixelView(this.camera.zoom));
+    this.setViewLevel(resolveViewLevel(this.viewLevel, this.camera.zoom, this.camera));
     if (raw >= 1) this.cameraTween = null;
   }
 
   private setViewLevel(level: WorldViewLevel): void {
     if (this.viewLevel === level && this.canvas.dataset.viewLevel) return;
     this.viewLevel = level;
+    const visualProfile = VISUAL_LOD_PROFILES[level];
     this.canvas.dataset.viewLevel = level;
     this.canvas.dataset.strategicEntities = 'false';
     this.canvas.dataset.fullBodyResidents = String(level === 'resident');
+    this.canvas.dataset.entityLod = visualProfile.entityMode;
+    this.canvas.dataset.resourceLod = visualProfile.resourceMode;
+    this.canvas.dataset.buildingLod = visualProfile.buildingMode;
+    this.treeCanopyCameraKey = '';
     this.updateTerrainLod();
     this.updateBuildings();
     this.redrawSettlementCores();
@@ -2144,6 +2367,7 @@ export class EonValeEngine {
     this.redrawBuildingStatus();
     this.updateWorkHotspots();
     this.updateSettlementLabelPositions();
+    this.redrawTreeCanopies(true);
     this.options.onViewLevelChange?.(level);
   }
 
@@ -2318,7 +2542,7 @@ export class EonValeEngine {
       event.offsetY,
       event.deltaY < 0 ? 1 : -1,
     );
-    this.setViewLevel(resolvePixelView(this.camera.zoom));
+    this.setViewLevel(resolveViewLevel(this.viewLevel, this.camera.zoom, this.camera));
     this.updateWorldTransform();
   };
 
@@ -2393,6 +2617,7 @@ export class EonValeEngine {
       visibleTerrainChunks,
       visibleEntities: this.visibleEntities,
       visibleBuildings: this.buildingSprites.size,
+      treeCanopyVisible: this.visibleTreeCanopies > 0,
       territoryVisible: this.territoryLayer.context.instructions.length > 0,
       statusVisible: this.statusLayer.context.instructions.length > 0,
       visibleLabels,
@@ -2406,6 +2631,7 @@ export class EonValeEngine {
         (this.terrainChunks.size +
           this.visibleEntities +
           this.buildingSprites.size +
+          this.visibleTreeCanopies * 6 +
           visibleLabels +
           4) *
         2,
@@ -2425,27 +2651,29 @@ export class EonValeEngine {
     this.canvas.dataset.cameraMotion = 'stepped-anchor-zoom-bounded-pan';
     this.canvas.dataset.cameraNorth = 'fixed';
     this.canvas.dataset.humanStyle = 'layered-pixel-sprites';
-    this.canvas.dataset.animalStyle = 'pixel-side-profiles';
+    this.canvas.dataset.animalStyle = 'formal-pixel-side-profiles';
     this.canvas.dataset.animalStyles = '7';
     this.canvas.dataset.kingdomPalette = 'residents-buildings-flags';
-    this.canvas.dataset.buildingStyle = 'functional-pixel-buildings';
+    this.canvas.dataset.buildingStyle = 'formal-functional-pixel-buildings';
+    this.canvas.dataset.buildingProfiles = String(Object.keys(BUILDING_VISUAL_PROFILES).length);
+    this.canvas.dataset.visualRollout = 'formal-full-world';
+    this.canvas.dataset.formalAssetSample = 'resident-deer-wolf-tree-home-storage';
+    this.canvas.dataset.residentAssetSize = `${FORMAL_PIXEL_ASSETS.resident.width}x${FORMAL_PIXEL_ASSETS.resident.height}`;
+    this.canvas.dataset.animalAssetSize = `${FORMAL_PIXEL_ASSETS.animal.width}x${FORMAL_PIXEL_ASSETS.animal.height}`;
+    this.canvas.dataset.treeAssetSize = `${FORMAL_PIXEL_ASSETS.tree.width}x${FORMAL_PIXEL_ASSETS.tree.height}`;
+    this.canvas.dataset.buildingAssetSize = `${FORMAL_PIXEL_ASSETS.building.width}x${FORMAL_PIXEL_ASSETS.building.height}`;
+    this.canvas.dataset.terrainLayers = 'terrain-height-temperature-moisture-surface';
+    this.canvas.dataset.lodResourceModes = 'cluster-simplified-detailed';
     this.canvas.dataset.viewLevels = 'world-settlement-resident';
     this.canvas.dataset.viewLevel = 'world';
+    this.canvas.dataset.entityLod = VISUAL_LOD_PROFILES.world.entityMode;
+    this.canvas.dataset.resourceLod = VISUAL_LOD_PROFILES.world.resourceMode;
+    this.canvas.dataset.buildingLod = VISUAL_LOD_PROFILES.world.buildingMode;
     this.canvas.dataset.fullRebuilds = '0';
     this.canvas.dataset.attackHits = '0';
     this.canvas.dataset.noTilt = 'true';
     this.canvas.dataset.noRotation = 'true';
   }
-}
-
-function initialZoom(size: number): number {
-  return size <= 128 ? 1 : 0.5;
-}
-
-function resolvePixelView(zoom: number): WorldViewLevel {
-  if (zoom <= 0.75) return 'world';
-  if (zoom < 3) return 'settlement';
-  return 'resident';
 }
 
 function kingdomColor(kingdomId: number): string {
@@ -2495,6 +2723,7 @@ function drawResourceNodeGlyph(
   x: number,
   groundY: number,
   detailed: boolean,
+  splitCanopy = false,
 ): void {
   if (kind === ResourceNodeKind.Tree) {
     if (stage === ResourceNodeStage.Stump) {
@@ -2506,6 +2735,11 @@ function drawResourceNodeGlyph(
     const crown = ['#285f3f', '#32704a', '#3b7845', '#24644a'][variant % 4] ?? '#285f3f';
     context.fillStyle = '#6b4930';
     context.fillRect(x, groundY - (young ? 2 : 3), 1, young ? 3 : 4);
+    if (splitCanopy) {
+      context.fillStyle = '#4c3425';
+      context.fillRect(x - 1, groundY, 3, 1);
+      return;
+    }
     context.fillStyle = crown;
     if (stage === ResourceNodeStage.Sapling) {
       context.fillRect(x - 1, groundY - 3, 3, 2);
@@ -2561,17 +2795,29 @@ function overlayTerrainColor(
       ? '#7e4b55'
       : '#70b57a';
   }
-  return shade(
-    TERRAIN_COLORS[map.terrain[cell] as TerrainType] ?? '#78a960',
-    1 + variation * 0.012,
-  );
+  const terrain = map.terrain[cell] as TerrainType;
+  const elevation = map.height[cell] ?? 0;
+  const moisture = map.moisture[cell] ?? 128;
+  let base = TERRAIN_COLORS[terrain] ?? '#78a461';
+  if (terrain === TerrainType.Mountain) {
+    base = elevation >= 6.2 ? '#aeb7b0' : elevation >= 4.8 ? '#858c84' : '#737b72';
+  } else if (terrain === TerrainType.Snow && elevation >= 5.5) {
+    base = '#edf2ec';
+  } else if (terrain === TerrainType.Grass && moisture > 175) {
+    base = '#6d9b61';
+  } else if (terrain === TerrainType.Desert && moisture < 60) {
+    base = '#c79a61';
+  }
+  const variationStrength =
+    terrain === TerrainType.DeepOcean || terrain === TerrainType.ShallowOcean ? 0.006 : 0.012;
+  return shade(base, 1 + variation * variationStrength);
 }
 
 function drawTerrainDetail(
   context: CanvasRenderingContext2D,
   map: WorldMapSnapshot,
   cell: number,
-  _terrain: TerrainType,
+  terrain: TerrainType,
   localX: number,
   localZ: number,
   detail: 'districts' | 'resident',
@@ -2579,6 +2825,32 @@ function drawTerrainDetail(
   const px = localX * SOURCE_PIXELS_PER_CELL;
   const py = localZ * SOURCE_PIXELS_PER_CELL;
   const hash = (cell * 1103515245 + 12345) >>> 0;
+  if (terrain === TerrainType.DeepOcean && hash % 29 === 0) {
+    context.fillStyle = '#347187';
+    context.fillRect(px, py + 2, detail === 'resident' ? 3 : 2, 1);
+  } else if (terrain === TerrainType.ShallowOcean && hash % 17 === 0) {
+    context.fillStyle = '#70aeb6';
+    context.fillRect(px + 1, py + 1, 3, 1);
+  } else if (terrain === TerrainType.Beach && hash % 11 === 0) {
+    context.fillStyle = '#eee0ae';
+    context.fillRect(px, py, 2, 1);
+  } else if (terrain === TerrainType.Forest && detail === 'resident' && hash % 9 === 0) {
+    context.fillStyle = '#3f6e49';
+    context.fillRect(px + 1, py + 1, 1, 1);
+    context.fillStyle = '#6b9158';
+    context.fillRect(px + 3, py + 2, 1, 1);
+  } else if (terrain === TerrainType.Mountain) {
+    const elevation = map.height[cell] ?? 0;
+    context.fillStyle = elevation >= 6.2 ? '#eef2ec' : '#9ca49d';
+    context.fillRect(px + 1, py, 2, 1);
+    if (detail === 'resident') {
+      context.fillStyle = '#616a63';
+      context.fillRect(px + 2, py + 1, 1, 3);
+    }
+  } else if (terrain === TerrainType.Snow && detail === 'resident' && hash % 13 === 0) {
+    context.fillStyle = '#f7faf7';
+    context.fillRect(px + 1, py + 1, 2, 1);
+  }
   if (detail === 'resident' && (map.resourceFood[cell] ?? 0) > 0 && hash % 23 === 0) {
     context.fillStyle = '#d7c348';
     context.fillRect(px + 2, py + 1, 1, 1);
@@ -2614,62 +2886,62 @@ function drawProfession(
 ): void {
   if (profession === Profession.Guard) {
     context.fillStyle = weaponTier >= 2 ? '#e4e8e8' : '#9da8a9';
-    context.fillRect(14, 7, 1, 8);
-    context.fillRect(13, 7, 3, 1);
+    context.fillRect(21, 10, 1, 13);
+    context.fillRect(19, 10, 4, 2);
     context.fillStyle = '#6b4d33';
-    context.fillRect(2, 10, 1, 5);
+    context.fillRect(3, 15, 2, 8);
     return;
   }
   const toolColor = profession === Profession.Farmer ? '#b69c4d' : '#879297';
   context.fillStyle = '#67492f';
-  context.fillRect(14, 8, 1, 8);
+  context.fillRect(21, 13, 2, 13);
   context.fillStyle = toolColor;
   if (profession === Profession.Builder || profession === Profession.Blacksmith) {
-    context.fillRect(12, 8, 4, 2);
+    context.fillRect(18, 12, 6, 3);
   } else if (profession === Profession.Miner) {
-    context.fillRect(12, 8, 4, 1);
-    context.fillRect(12, 9, 1, 2);
+    context.fillRect(18, 12, 6, 2);
+    context.fillRect(18, 14, 2, 3);
   } else if (profession === Profession.Woodcutter) {
-    context.fillRect(12, 8, 3, 3);
+    context.fillRect(18, 12, 5, 5);
   } else if (profession === Profession.Farmer) {
-    context.fillRect(12, 8, 4, 1);
-    context.fillRect(12, 7, 1, 3);
+    context.fillRect(18, 12, 6, 2);
+    context.fillRect(18, 10, 2, 5);
   } else if (profession === Profession.Hauler) {
     context.fillStyle = '#9a6a3d';
-    context.fillRect(12, 10, 4, 4);
+    context.fillRect(18, 16, 6, 7);
   }
 }
 
 function drawCarriedResource(context: CanvasRenderingContext2D, kind: CarriedResourceKind): void {
   if (kind === CarriedResourceKind.None) return;
   context.fillStyle = 'rgba(29, 25, 20, 0.4)';
-  context.fillRect(1, 11, 5, 6);
+  context.fillRect(1, 17, 8, 10);
   context.fillStyle = carriedResourceColor(kind);
   if (kind === CarriedResourceKind.Wood) {
-    context.fillRect(1, 11, 5, 2);
-    context.fillRect(1, 14, 5, 2);
+    context.fillRect(1, 18, 8, 3);
+    context.fillRect(1, 23, 8, 3);
   } else {
-    context.fillRect(2, 12, 4, 4);
+    context.fillRect(2, 18, 7, 8);
   }
 }
 
 function drawRole(context: CanvasRenderingContext2D, role: ResidentRole): void {
   if (role === ResidentRole.King || role === ResidentRole.Leader) {
     context.fillStyle = role === ResidentRole.King ? '#f4cd4f' : '#c6d1d6';
-    context.fillRect(5, 0, 7, 1);
-    context.fillRect(5, 0, 1, 2);
-    context.fillRect(8, 0, 1, 2);
-    context.fillRect(11, 0, 1, 2);
+    context.fillRect(7, 0, 10, 2);
+    context.fillRect(7, 0, 2, 3);
+    context.fillRect(11, 0, 2, 3);
+    context.fillRect(15, 0, 2, 3);
   }
   if (role === ResidentRole.Captain) {
     context.fillStyle = '#f0d45f';
-    context.fillRect(3, 0, 1, 7);
+    context.fillRect(3, 1, 2, 11);
     context.fillStyle = '#df6458';
-    context.fillRect(4, 0, 4, 3);
+    context.fillRect(5, 1, 7, 5);
   }
   if (role === ResidentRole.Veteran || role === ResidentRole.Master) {
     context.fillStyle = role === ResidentRole.Veteran ? '#d9c45d' : '#bdd4df';
-    context.fillRect(3, 8, 2, 2);
+    context.fillRect(4, 13, 3, 3);
   }
 }
 
@@ -2680,71 +2952,81 @@ function drawAnimal(
   pose: AnimalPose,
   frame: number,
 ): void {
-  const colors: Partial<Record<EntityKind, readonly [string, string, string]>> = {
-    [EntityKind.Chicken]: ['#f3ead1', '#d85d45', '#d5a443'],
-    [EntityKind.Sheep]: ['#eee5cf', '#88745d', '#51483e'],
-    [EntityKind.Cow]: ['#e8dcc2', '#5f4a3b', '#352c27'],
-    [EntityKind.Deer]: ['#b47b45', '#8c5a35', '#382f28'],
-    [EntityKind.Wolf]: ['#777d82', '#555e65', '#323a40'],
-    [EntityKind.Bear]: ['#805d42', '#6a4835', '#3f2d25'],
-    [EntityKind.Fish]: ['#4d9eb8', '#6db8ca', '#286f8b'],
-  };
-  const [body, head, detail] = colors[kind] ?? colors[EntityKind.Sheep] ?? ['#eee', '#888', '#444'];
+  const { colors, silhouette } = animalVisualProfile(kind);
+  const [body, head, detail] = colors;
   const width = context.canvas.width;
   context.fillStyle = 'rgba(20, 31, 28, 0.22)';
-  context.fillRect(3, 14, width - 5, 2);
+  context.fillRect(3, 21, width - 6, 2);
   if (kind === EntityKind.Chicken) {
     context.fillStyle = body;
-    context.fillRect(5, 7, 9, 7);
-    context.fillRect(12, 5, 5, 6);
+    context.fillRect(6, 11, 11, 9);
+    context.fillRect(15, 8, 6, 8);
     context.fillStyle = head;
-    context.fillRect(13, 3, 2, 3);
+    context.fillRect(16, 5, 3, 4);
     context.fillStyle = detail;
-    context.fillRect(17, 7, 2, 1);
-    context.fillRect(7, 14, 1, 2);
-    context.fillRect(12, 14, 1, 2);
+    context.fillRect(21, 11, 3, 2);
+    context.fillRect(8, 20, 2, 4);
+    context.fillRect(15, 20, 2, 4);
     return;
   }
   if (kind === EntityKind.Fish) {
     context.fillStyle = body;
-    context.fillRect(4, 6, 11, 6);
+    context.fillRect(5, 10, 13, 8);
     context.fillStyle = head;
-    context.fillRect(13, 7, 4, 4);
+    context.fillRect(16, 11, 5, 6);
     context.fillStyle = detail;
-    context.fillRect(1, 7, 4, 4);
-    context.fillRect(16, 8, 1, 1);
+    context.fillRect(1, 9, 5, 10);
+    context.fillRect(20, 12, 1, 1);
+    context.fillRect(10, 7, 5, 3);
     return;
   }
-  const bodyWidth = kind === EntityKind.Bear || kind === EntityKind.Cow ? width - 9 : width - 8;
+  const heavy = kind === EntityKind.Bear || kind === EntityKind.Cow;
+  const bodyWidth = heavy ? width - 10 : width - 9;
+  const bodyY = kind === EntityKind.Bear ? 8 : 10;
+  const bodyHeight = kind === EntityKind.Bear ? 12 : kind === EntityKind.Sheep ? 10 : 9;
   context.fillStyle = body;
-  context.fillRect(3, 6, bodyWidth, kind === EntityKind.Bear ? 8 : 7);
-  if ((kind === EntityKind.Cow || kind === EntityKind.Deer) && variant % 2 === 0) {
+  context.fillRect(4, bodyY, bodyWidth, bodyHeight);
+  if (silhouette === 'wool-cloud') {
+    context.fillRect(2, 12, 5, 6);
+    context.fillRect(8, 8, 6, 3);
+    context.fillRect(14, 9, 5, 3);
+  }
+  if (kind === EntityKind.Cow && variant % 2 === 0) {
     context.fillStyle = head;
-    context.fillRect(7, 7, 3, 3);
+    context.fillRect(9, 12, 4, 4);
   }
   context.fillStyle = head;
-  const headX = pose === 'attack' ? width - 6 : width - 7;
-  const headY = pose === 'eat' ? 8 : 5;
-  context.fillRect(headX, headY, 6, 6);
+  const headX = pose === 'attack' ? width - 7 : width - 8;
+  const headY = pose === 'eat' ? 14 : kind === EntityKind.Bear ? 9 : 8;
+  context.fillRect(headX, headY, 7, 7);
   context.fillStyle = detail;
-  context.fillRect(width - 3, 7, 1, 1);
+  context.fillRect(width - 3, headY + 2, 1, 1);
   const walking = pose === 'walk' || pose === 'attack';
-  context.fillRect(5, 12 + (walking && frame % 2 === 0 ? 1 : 0), 2, 4);
-  context.fillRect(width - 9, 12 + (walking && frame % 2 === 1 ? 1 : 0), 2, 4);
-  context.fillRect(1, 7, 3, 2);
+  context.fillRect(7, 18 + (walking && frame % 2 === 0 ? 1 : 0), 3, 6);
+  context.fillRect(width - 11, 18 + (walking && frame % 2 === 1 ? 1 : 0), 3, 6);
+  if (kind === EntityKind.Wolf) {
+    context.fillRect(1, 8, 6, 2);
+    context.fillRect(2, 6, 5, 2);
+  } else if (kind === EntityKind.Deer) {
+    context.fillRect(1, 11, 5, 3);
+  } else if (kind !== EntityKind.Bear) {
+    context.fillRect(1, 10, 4, 3);
+  }
   if (kind === EntityKind.Deer) {
-    context.fillRect(width - 6, 2, 1, 4);
-    context.fillRect(width - 3, 2, 1, 4);
-    context.fillRect(width - 7, 2, 2, 1);
-    context.fillRect(width - 3, 2, 2, 1);
+    context.fillRect(width - 7, 2, 1, 7);
+    context.fillRect(width - 3, 2, 1, 7);
+    context.fillRect(width - 9, 2, 3, 1);
+    context.fillRect(width - 3, 2, 3, 1);
+    context.fillRect(width - 8, 5, 2, 1);
+    context.fillRect(width - 3, 5, 2, 1);
   }
   if (kind === EntityKind.Wolf) {
-    context.fillRect(width - 7, 2, 2, 4);
-    context.fillRect(width - 3, 2, 2, 4);
+    context.fillRect(width - 8, 4, 3, 5);
+    context.fillRect(width - 3, 4, 3, 5);
   }
   if (kind === EntityKind.Bear) {
-    context.fillRect(width - 7, 3, 2, 3);
-    context.fillRect(width - 3, 3, 2, 3);
+    context.fillRect(width - 8, 5, 3, 4);
+    context.fillRect(width - 3, 5, 3, 4);
   }
 }
 
@@ -2756,8 +3038,9 @@ function drawBuilding(
   stage: number,
   damaged: boolean,
 ): void {
+  const profile = BUILDING_VISUAL_PROFILES[type];
   context.fillStyle = 'rgba(22, 31, 26, 0.25)';
-  context.fillRect(5, 38, 38, 4);
+  context.fillRect(5, 42, 38, 4);
   if (type === BuildingType.Road) {
     context.fillStyle = '#9e896b';
     context.fillRect(1, 29, 46, 8);
@@ -2805,33 +3088,83 @@ function drawBuilding(
     context.fillStyle = kingdom;
     context.fillRect(10, 15, 28, 10);
   } else {
-    const large =
-      type === BuildingType.TownCenter ||
-      type === BuildingType.CouncilHall ||
-      type === BuildingType.Barracks;
-    context.fillStyle = wallColor;
-    context.fillRect(large ? 7 : 11, large ? 17 : 21, large ? 34 : 26, large ? 22 : 18);
-    context.fillStyle = kingdom;
-    context.fillRect(large ? 4 : 8, large ? 11 : 15, large ? 40 : 32, 9);
-    context.fillStyle = shade(kingdom, 0.72);
-    context.fillRect(8, large ? 17 : 21, large ? 32 : 24, 3);
-    context.fillStyle = '#5c4433';
-    context.fillRect(20, 29, 8, 10);
-    if (type === BuildingType.Workshop) {
+    if (profile.silhouette === 'south-gable-home') {
+      context.fillStyle = wallColor;
+      context.fillRect(11, 22, 26, 18);
+      context.fillStyle = kingdom;
+      context.fillRect(8, 18, 32, 6);
+      context.fillRect(12, 14, 24, 5);
+      context.fillRect(17, 10, 14, 5);
+      context.fillStyle = shade(kingdom, 1.18);
+      context.fillRect(11, 18, 13, 2);
+      context.fillStyle = '#5c4433';
+      context.fillRect(21, 30, 7, 10);
+      context.fillStyle = '#f2cf73';
+      context.fillRect(14, 28, 4, 4);
+    } else if (profile.silhouette === 'raised-granary') {
+      context.fillStyle = wallColor;
+      context.fillRect(8, 20, 32, 18);
+      context.fillStyle = kingdom;
+      context.fillRect(5, 14, 38, 8);
+      context.fillStyle = shade(kingdom, 1.16);
+      context.fillRect(9, 15, 30, 2);
+      context.fillStyle = '#5a4433';
+      context.fillRect(11, 25, 26, 3);
+      context.fillRect(11, 31, 26, 3);
+      context.fillRect(13, 38, 4, 4);
+      context.fillRect(31, 38, 4, 4);
+    } else if (profile.silhouette === 'chimney-workshop') {
+      context.fillStyle = wallColor;
+      context.fillRect(9, 21, 30, 19);
+      context.fillStyle = kingdom;
+      context.fillRect(6, 15, 36, 8);
       context.fillStyle = '#6c5b51';
       context.fillRect(33, 5, 6, 17);
       context.fillStyle = '#bac2bd';
       context.fillRect(34, 2, 4, 4);
-    }
-    if (type === BuildingType.Barracks) {
+      context.fillStyle = '#d69b4f';
+      context.fillRect(13, 27, 8, 6);
+      context.fillStyle = '#5c4433';
+      context.fillRect(25, 29, 8, 11);
+    } else if (profile.silhouette === 'banner-longhouse') {
+      context.fillStyle = wallColor;
+      context.fillRect(6, 21, 36, 19);
+      context.fillStyle = kingdom;
+      context.fillRect(3, 14, 42, 9);
+      context.fillStyle = shade(kingdom, 0.72);
+      context.fillRect(8, 21, 32, 3);
+      context.fillStyle = '#5c4433';
+      context.fillRect(20, 29, 8, 11);
       context.fillStyle = '#f2d25e';
       context.fillRect(5, 5, 2, 16);
       context.fillStyle = kingdom;
       context.fillRect(7, 5, 10, 6);
-    }
-    if (type === BuildingType.TownCenter || type === BuildingType.CouncilHall) {
+    } else if (profile.silhouette === 'civic-hall-columns') {
+      context.fillStyle = wallColor;
+      context.fillRect(5, 20, 38, 20);
+      context.fillStyle = kingdom;
+      context.fillRect(3, 13, 42, 9);
+      context.fillStyle = shade(kingdom, 1.18);
+      for (const x of [10, 18, 28, 36]) context.fillRect(x, 23, 3, 17);
+      context.fillStyle = '#5c4433';
+      context.fillRect(21, 29, 7, 11);
       context.fillStyle = '#f0d36b';
-      context.fillRect(22, 5, 4, 8);
+      context.fillRect(22, 5, 4, 9);
+    } else {
+      context.fillStyle = wallColor;
+      context.fillRect(5, 19, 38, 21);
+      context.fillStyle = kingdom;
+      context.fillRect(3, 12, 42, 9);
+      context.fillStyle = shade(kingdom, 0.72);
+      context.fillRect(8, 19, 32, 3);
+      context.fillStyle = '#5c4433';
+      context.fillRect(20, 29, 8, 11);
+      context.fillStyle = '#f0d36b';
+      context.fillRect(22, 4, 4, 9);
+      context.fillStyle = '#6a4f38';
+      context.fillRect(8, 7, 4, 7);
+      context.fillStyle = '#e9dfb4';
+      context.fillRect(9, 8, 2, 2);
     }
   }
   if (stage === 1) {

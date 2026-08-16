@@ -74,14 +74,14 @@ export const DELIVERY_BATCHES = Object.freeze([
   {
     id: 'full-world-visual-rollout',
     title: '全地图视觉推广',
-    status: 'planned',
+    status: 'complete',
     playableLoopRequired: true,
     backendOnlyDeliveryAllowed: false,
     decorativeOnlyDeliveryAllowed: false,
     exitCriteria: [
       '垂直切片验证过的正式像素资产推广到完整世界',
       '人物、动物、资源、建筑和地形在三级 LOD 中保持清晰',
-      '完整世界再次通过 8× 压力测试',
+      '8× 实机视觉由 owner 验收，自动化性能基准通过',
     ],
   },
   {

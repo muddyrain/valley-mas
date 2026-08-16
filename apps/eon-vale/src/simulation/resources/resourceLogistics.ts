@@ -68,9 +68,19 @@ export function depositCarriedResource(state: WorldState, entityId: number): num
   if (kind === CarriedResourceKind.Wood) village.resources.wood += amount;
   else if (kind === CarriedResourceKind.Stone) village.resources.stone += amount;
   else if (kind === CarriedResourceKind.Metal) village.resources.metal += amount;
-  else if (kind === CarriedResourceKind.Food) {
+  else if (
+    kind === CarriedResourceKind.Food ||
+    kind === CarriedResourceKind.FarmFood ||
+    kind === CarriedResourceKind.WildFood ||
+    kind === CarriedResourceKind.MeatFood ||
+    kind === CarriedResourceKind.FishFood
+  ) {
     village.resources.food += amount;
     village.foodProducedSinceUpdate += amount;
+    if (kind === CarriedResourceKind.FarmFood) village.foodSources.farm += amount;
+    else if (kind === CarriedResourceKind.WildFood) village.foodSources.wild += amount;
+    else if (kind === CarriedResourceKind.MeatFood) village.foodSources.meat += amount;
+    else if (kind === CarriedResourceKind.FishFood) village.foodSources.fish += amount;
   } else if (kind === CarriedResourceKind.Tools) village.resources.tools += amount;
   else if (kind === CarriedResourceKind.Equipment) village.resources.equipment += amount;
   else return 0;

@@ -808,6 +808,7 @@ export function App() {
             if (worker) worker.setFavorite(lifeId, favorite);
           }}
           onHistoryNavigate={navigateHistory}
+          onHighlightResidents={(entityIds) => engineRef.current?.setHighlightedEntities(entityIds)}
           activePlanningZone={
             planningBrush?.villageId === inspection.id ? planningBrush.zone : null
           }
@@ -821,6 +822,7 @@ export function App() {
             setInspection(null);
             setPlanningBrush(null);
             engineRef.current?.setSelection(null);
+            engineRef.current?.setHighlightedEntities([]);
           }}
         />
       )}

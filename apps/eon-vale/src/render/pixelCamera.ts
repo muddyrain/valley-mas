@@ -1,4 +1,4 @@
-export const PIXEL_ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4] as const;
+export const PIXEL_ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 12, 16] as const;
 export const WORLD_PIXELS_PER_CELL = 4;
 
 export function terrainSourcePixels(zoom: number): 1 | 4 {

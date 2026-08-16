@@ -2,7 +2,10 @@ import type {
   AnimalCarcass,
   Building,
   EcologyDiagnostics,
+  GroupActivityAlert,
+  GroupActivityDiagnostics,
   Kingdom,
+  KingdomLifeStatus,
   PopulationDiagnostics,
   ResidentTask,
   Village,
@@ -74,6 +77,7 @@ export interface WorldRenderSnapshot extends RenderSnapshot {
   demographics: PopulationDiagnostics;
   worldLaws: WorldLaws;
   ecology: EcologyDiagnostics;
+  activityAlerts: GroupActivityAlert[];
 }
 
 export interface WorldMapSnapshot {
@@ -190,6 +194,7 @@ export interface VillageInspection {
     watchDamage: number;
   };
   workHotspots: Array<{ kind: string; count: number; x: number; z: number }>;
+  activity: GroupActivityDiagnostics;
   history: WorldHistoryEntry[];
 }
 
@@ -209,6 +214,8 @@ export interface KingdomInspection {
   type: 'kingdom';
   id: number;
   kingdom: Kingdom;
+  status: KingdomLifeStatus;
+  statusReason: string;
   population: number;
   resources: { food: number; wood: number; stone: number };
   capital: { id: number; name: string; x: number; z: number } | null;
@@ -226,6 +233,7 @@ export interface KingdomInspection {
     sharedEdges: number;
     diagonalOnly: boolean;
   }>;
+  activity: GroupActivityDiagnostics;
   history: WorldHistoryEntry[];
 }
 

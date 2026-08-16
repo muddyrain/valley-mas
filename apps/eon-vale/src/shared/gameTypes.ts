@@ -74,6 +74,10 @@ export enum CarriedResourceKind {
   Tools = 5,
   Equipment = 6,
   CraftInputs = 7,
+  FarmFood = 8,
+  WildFood = 9,
+  MeatFood = 10,
+  FishFood = 11,
 }
 
 export enum Profession {
@@ -209,6 +213,47 @@ export interface WorkHotspot {
   count: number;
   x: number;
   z: number;
+}
+
+export type FoodSourceKind = 'farm' | 'wild' | 'meat' | 'fish';
+
+export type FoodSourceCounts = Record<FoodSourceKind, number>;
+
+export type ResidentActivityCategory =
+  | 'survival'
+  | 'production'
+  | 'logistics'
+  | 'military'
+  | 'migration'
+  | 'idle'
+  | 'blocked';
+
+export interface ResidentActivityReasonCount {
+  reason: string;
+  count: number;
+  entityIds: number[];
+}
+
+export interface ResidentActivityCategoryCount {
+  category: ResidentActivityCategory;
+  count: number;
+  entityIds: number[];
+  reasons: ResidentActivityReasonCount[];
+}
+
+export interface GroupActivityAlert {
+  reason: string;
+  count: number;
+  entityIds: number[];
+  villageId: number;
+  x: number;
+  z: number;
+}
+
+export interface GroupActivityDiagnostics {
+  total: number;
+  categories: ResidentActivityCategoryCount[];
+  alerts: GroupActivityAlert[];
 }
 
 export enum DiplomacyState {
@@ -424,6 +469,7 @@ export interface Village {
   carryingCapacity: number;
   foodProduction: number;
   foodProducedSinceUpdate: number;
+  foodSources: FoodSourceCounts;
   foodConsumption: number;
   foodTrend: number;
   shortageTicks: number;
@@ -535,6 +581,8 @@ export interface WarCampaign {
   capturedVillageIds: number[];
   score: Record<number, number>;
   fatigue: Record<number, number>;
+  supplies: Record<number, number>;
+  rationedKingdomIds: number[];
 }
 
 export interface TruceRecord {
@@ -568,6 +616,8 @@ export interface Kingdom {
   extinct: boolean;
   foundedAtTick: number;
 }
+
+export type KingdomLifeStatus = 'active' | 'endangered' | 'exiled' | 'extinct';
 
 export interface WorldSettings {
   speed: 1 | 2 | 4 | 8;

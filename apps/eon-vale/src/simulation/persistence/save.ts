@@ -21,7 +21,7 @@ import { createNavigationGrid } from '../navigation/grid';
 import { addResourceNode, createResourceNodeStore } from '../resources/resourceNodes';
 import { WORLD_LAW_IDS, type WorldLawId } from '../rules/worldLawCatalog';
 
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
 
 const worldLawSchema = z
   .object(
@@ -42,6 +42,14 @@ const resourcesSchema = z
     gold: z.number().nonnegative(),
     tools: z.number().nonnegative(),
     equipment: z.number().nonnegative(),
+  })
+  .strict();
+const foodSourcesSchema = z
+  .object({
+    farm: z.number().nonnegative(),
+    wild: z.number().nonnegative(),
+    meat: z.number().nonnegative(),
+    fish: z.number().nonnegative(),
   })
   .strict();
 const buildingSchema = z
@@ -105,6 +113,7 @@ const villageSchema = z
     carryingCapacity: z.number().nonnegative(),
     foodProduction: z.number(),
     foodProducedSinceUpdate: z.number().nonnegative(),
+    foodSources: foodSourcesSchema,
     foodConsumption: z.number().nonnegative(),
     foodTrend: z.number(),
     shortageTicks: z.number().int().nonnegative(),
@@ -140,6 +149,42 @@ const kingdomSchema = z
     militaryPower: z.number().nonnegative(),
     extinct: z.boolean(),
     foundedAtTick: z.number().int().nonnegative(),
+  })
+  .strict();
+const nonnegativeNumberRecordSchema = z.record(z.string(), z.number().nonnegative());
+const warCampaignSchema = z
+  .object({
+    firstKingdomId: z.number().int().positive(),
+    secondKingdomId: z.number().int().positive(),
+    startedAtTick: z.number().int().nonnegative(),
+    initialMilitaryPower: nonnegativeNumberRecordSchema,
+    lastProgressTick: z.number().int().nonnegative(),
+    capturedVillageIds: z.array(z.number().int().positive()),
+    score: nonnegativeNumberRecordSchema,
+    fatigue: nonnegativeNumberRecordSchema,
+    supplies: nonnegativeNumberRecordSchema,
+    rationedKingdomIds: z.array(z.number().int().positive()),
+  })
+  .strict();
+const truceRecordSchema = z
+  .object({
+    firstKingdomId: z.number().int().positive(),
+    secondKingdomId: z.number().int().positive(),
+    untilTick: z.number().int().nonnegative(),
+  })
+  .strict();
+const pioneerExpeditionSchema = z
+  .object({
+    id: z.number().int().positive(),
+    originVillageId: z.number().int().positive(),
+    kingdomId: z.number().int().positive(),
+    memberIds: z.array(z.number().int().nonnegative()),
+    targetX: z.number(),
+    targetZ: z.number(),
+    targetCell: z.number().int().nonnegative(),
+    startedAtTick: z.number().int().nonnegative(),
+    supplies: z.number().int().nonnegative(),
+    destinationVillageId: z.number().int().positive().optional(),
   })
   .strict();
 const residentTaskSchema = z
@@ -409,9 +454,9 @@ const saveSchema = z
     worldLaws: worldLawSchema,
     ecology: z.unknown(),
     humanExtinctSinceTick: z.number().int().nonnegative(),
-    wars: z.array(z.unknown()),
-    truces: z.array(z.unknown()),
-    expeditions: z.array(z.unknown()),
+    wars: z.array(warCampaignSchema),
+    truces: z.array(truceRecordSchema),
+    expeditions: z.array(pioneerExpeditionSchema),
     nextFamilyId: z.number().int().nonnegative(),
     nextExpeditionId: z.number().int().nonnegative(),
   })

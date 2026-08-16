@@ -544,6 +544,54 @@ select:focus-visible {
   font-weight: 500;
 }
 
+.group-activity {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(222, 239, 215, 0.08);
+}
+
+.group-activity > strong {
+  color: #d8e5d8;
+  font-size: 10px;
+}
+
+.group-activity details {
+  padding: 7px 8px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.group-activity summary {
+  display: flex;
+  justify-content: space-between;
+  color: #a9b9af;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.group-activity details > div {
+  display: grid;
+  gap: 5px;
+  padding-top: 7px;
+}
+
+.group-activity details span {
+  color: #d8e5d8;
+  font-size: 9px;
+}
+
+.group-activity button {
+  min-height: 26px;
+  border: 0;
+  border-radius: 7px;
+  color: #172019;
+  background: #c9ed8d;
+  font-size: 9px;
+  cursor: pointer;
+}
+
 .telemetry-list em,
 .inspector-list em {
   color: #d8e5d8;

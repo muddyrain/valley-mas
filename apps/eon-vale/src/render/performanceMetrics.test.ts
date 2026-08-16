@@ -14,6 +14,7 @@ describe('runtime performance metrics', () => {
       visibleTerrainChunks: 96,
       visibleEntities: 100,
       visibleBuildings: 20,
+      treeCanopyVisible: true,
       territoryVisible: true,
       statusVisible: true,
       visibleLabels: 5,
@@ -22,19 +23,21 @@ describe('runtime performance metrics', () => {
       visibleTerrainChunks: 96,
       visibleEntities: 1_000,
       visibleBuildings: 200,
+      treeCanopyVisible: true,
       territoryVisible: true,
       statusVisible: true,
       visibleLabels: 5,
     });
 
     expect(expanded).toBe(baseline);
-    expect(expanded).toBe(10);
+    expect(expanded).toBe(12);
   });
 
   it('counts canvas terrain chunks as one compatible sprite batch', () => {
     const common = {
       visibleEntities: 0,
       visibleBuildings: 0,
+      treeCanopyVisible: false,
       territoryVisible: false,
       statusVisible: false,
       visibleLabels: 0,

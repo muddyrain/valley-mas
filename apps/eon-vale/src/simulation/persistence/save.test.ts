@@ -8,8 +8,8 @@ import { beginResidentTask } from '../tasks/residentTasks';
 import { loadWorldSave, serializeWorld } from './save';
 
 describe('world persistence', () => {
-  it('round-trips carcasses and their active butchering reservations in V12', () => {
-    const simulation = createWorldSimulation({ seed: 'v12-carcass-save', initialHumans: 0 });
+  it('round-trips carcasses and their active butchering reservations in V13', () => {
+    const simulation = createWorldSimulation({ seed: 'v13-carcass-save', initialHumans: 0 });
     const resident = simulation.spawn(EntityKind.Human, 64, 64)[0] as number;
     simulation.state.carcasses.push({
       id: 4,
@@ -40,7 +40,7 @@ describe('world persistence', () => {
     const encoded = serializeWorld(simulation.state);
     const restored = loadWorldSave(encoded);
 
-    expect(JSON.parse(encoded).version).toBe(12);
+    expect(JSON.parse(encoded).version).toBe(13);
     expect(restored.carcasses).toEqual(simulation.state.carcasses);
     expect(restored.nextCarcassId).toBe(4);
     expect(restored.entities.tasks[resident]).toMatchObject({
@@ -61,7 +61,7 @@ describe('world persistence', () => {
     const encoded = serializeWorld(simulation.state);
     const restored = loadWorldSave(encoded);
 
-    expect(JSON.parse(encoded).version).toBe(12);
+    expect(JSON.parse(encoded).version).toBe(13);
     expect(restored.seed).toBe(simulation.state.seed);
     expect(restored.tick).toBe(simulation.state.tick);
     expect(restored.entities.count).toBe(simulation.state.entities.count);
@@ -115,14 +115,15 @@ describe('world persistence', () => {
     expect(() => loadWorldSave(JSON.stringify(invalidLaw))).toThrow(/数据校验失败/);
   });
 
-  it('strictly rejects V11 and malformed V12 semantic fields', () => {
-    const simulation = createWorldSimulation({ seed: 'v12-task-save', initialHumans: 24 });
+  it('strictly rejects V12 and malformed V13 semantic fields', () => {
+    const simulation = createWorldSimulation({ seed: 'v13-task-save', initialHumans: 24 });
+    simulation.ensureVillageAt(64, 64, 12);
     simulation.step();
     const valid = JSON.parse(serializeWorld(simulation.state));
     expect(valid.entities.tasks).toHaveLength(simulation.state.entities.count);
 
-    const v11 = { ...valid, version: 11 };
-    expect(() => loadWorldSave(JSON.stringify(v11))).toThrow(/存档版本/);
+    const v12 = { ...valid, version: 12 };
+    expect(() => loadWorldSave(JSON.stringify(v12))).toThrow(/存档版本/);
 
     valid.entities.tasks[0] = { type: 'imaginary-work' };
     expect(() => loadWorldSave(JSON.stringify(valid))).toThrow(/数据校验失败/);
@@ -131,6 +132,10 @@ describe('world persistence', () => {
     if (invalidVillage.villages[0]) delete invalidVillage.villages[0].outdoorStockpile;
     else invalidVillage.villages = [{ id: 1 }];
     expect(() => loadWorldSave(JSON.stringify(invalidVillage))).toThrow(/数据校验失败/);
+
+    const invalidFoodSources = JSON.parse(serializeWorld(simulation.state));
+    if (invalidFoodSources.villages[0]) delete invalidFoodSources.villages[0].foodSources;
+    expect(() => loadWorldSave(JSON.stringify(invalidFoodSources))).toThrow(/数据校验失败/);
 
     const invalidTerritory = JSON.parse(serializeWorld(simulation.state));
     invalidTerritory.territory.villageIds.pop();
@@ -156,6 +161,33 @@ describe('world persistence', () => {
       subjects: [],
     });
     expect(() => loadWorldSave(JSON.stringify(invalidEventIds))).toThrow(/历史事件标识无效/);
+  });
+
+  it('strictly persists V13 campaign supplies and ration eligibility', () => {
+    const simulation = createWorldSimulation({ seed: 'v13-war-rations', initialHumans: 0 });
+    simulation.state.wars.push({
+      firstKingdomId: 1,
+      secondKingdomId: 2,
+      startedAtTick: 120,
+      initialMilitaryPower: { 1: 6, 2: 5 },
+      lastProgressTick: 120,
+      capturedVillageIds: [],
+      score: { 1: 0, 2: 0 },
+      fatigue: { 1: 0, 2: 0 },
+      supplies: { 1: 8, 2: 5 },
+      rationedKingdomIds: [1, 2],
+    });
+
+    const encoded = serializeWorld(simulation.state);
+    expect(loadWorldSave(encoded).wars[0]).toEqual(simulation.state.wars[0]);
+
+    const missingSupplies = JSON.parse(encoded);
+    delete missingSupplies.wars[0].supplies;
+    expect(() => loadWorldSave(JSON.stringify(missingSupplies))).toThrow(/数据校验失败/);
+
+    const missingEligibility = JSON.parse(encoded);
+    delete missingEligibility.wars[0].rationedKingdomIds;
+    expect(() => loadWorldSave(JSON.stringify(missingEligibility))).toThrow(/数据校验失败/);
   });
 
   it('round-trips the durable capital and rejects malformed kingdom observation state', () => {

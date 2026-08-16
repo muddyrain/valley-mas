@@ -18,6 +18,7 @@ import {
   TerrainType,
   type Village,
   VillageTier,
+  type WarCampaign,
   type WorldEvent,
   type WorldPreset,
   type WorldState,
@@ -57,12 +58,18 @@ import {
   reserveResourceNode,
   resourceNodeAvoidance,
 } from '../resources/resourceNodes';
+import { selectReachableStorage } from '../resources/storageSelection';
 import {
   ANIMAL_LIFECYCLE_RULES,
   ECOLOGY_BALANCE_RULES,
   FISHING_RULES,
   HUNTING_RULES,
 } from '../rules/ecologyRules';
+import {
+  requiredTravelRations,
+  reservableTravelRations,
+  TRAVEL_RATION_RULES,
+} from '../rules/stabilityRules';
 import {
   createDefaultWorldLaws,
   WORLD_LAW_CATALOG,
@@ -525,6 +532,7 @@ function makeVillage(
     carryingCapacity: population + 5,
     foodProduction: 0,
     foodProducedSinceUpdate: 0,
+    foodSources: { farm: 0, wild: 0, meat: 0, fish: 0 },
     foodConsumption: 0,
     foodTrend: 0,
     shortageTicks: 0,
@@ -559,7 +567,7 @@ function createInitialState(options: CreateWorldOptions): WorldState {
     options.preset ?? 'archipelago',
   );
   const state: WorldState = {
-    version: 12,
+    version: 13,
     seed: options.seed,
     tick: 0,
     year: 1,
@@ -831,6 +839,22 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
   const pathQueue = new PathQueue();
   const metrics = { completedPaths: 0, pathQueue: 0 };
   const flowFields = new Map<number, { version: number; target: number; field: FlowField }>();
+  const cachedFlowField = (cacheKey: number, target: number): FlowField => {
+    let cached = flowFields.get(cacheKey);
+    if (!cached || cached.version !== state.map.navigation.mapVersion || cached.target !== target) {
+      cached = {
+        version: state.map.navigation.mapVersion,
+        target,
+        field: createFlowField(state.map.navigation, target),
+      };
+      flowFields.set(cacheKey, cached);
+    }
+    return cached.field;
+  };
+  const selectStorage = (villageId: number, fromCell: number) =>
+    selectReachableStorage(state, villageId, fromCell, (targetCell) =>
+      cachedFlowField(40_000 + targetCell, targetCell),
+    );
 
   const spawn = (kind: EntityKind, x: number, z: number, count = 1): number[] => {
     const spawned: number[] = [];
@@ -1101,15 +1125,8 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       const village = state.villages.find(
         (candidate) => candidate.id === state.entities.villageIds[entityId],
       );
-      const storage = state.buildings.find(
-        (candidate) =>
-          candidate.villageId === village?.id &&
-          candidate.type === BuildingType.Storage &&
-          candidate.completed &&
-          candidate.health > 0,
-      );
-      if (village)
-        target = findNearestWalkable(state, storage?.x ?? village.x, storage?.z ?? village.z);
+      const storage = village ? selectStorage(village.id, current) : null;
+      if (village) target = storage?.targetCell ?? findNearestWalkable(state, village.x, village.z);
       else target = findNearestGridResource(state.map, current, 'food');
     } else if (stateValue === AgentState.GatherWood || stateValue === AgentState.GatherStone) {
       const village = state.villages.find(
@@ -1129,7 +1146,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         state.entities.positionsX[entityId] ?? currentX,
         state.entities.positionsZ[entityId] ?? currentZ,
         preferredKind,
-        48,
+        TRAVEL_RATION_RULES.ordinaryWorkMaxOneWayCells,
       );
       if (
         nodeId >= 0 &&
@@ -1160,13 +1177,8 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         (candidate) => candidate.id === state.entities.villageIds[entityId],
       );
       if (village) {
-        const storage = state.buildings.find(
-          (candidate) =>
-            candidate.villageId === village.id &&
-            candidate.type === BuildingType.Storage &&
-            candidate.completed,
-        );
-        target = findNearestWalkable(state, storage?.x ?? village.x, storage?.z ?? village.z);
+        const storage = selectStorage(village.id, current);
+        target = storage?.targetCell ?? findNearestWalkable(state, village.x, village.z);
       }
     } else if (stateValue === AgentState.Haul) {
       const villageId = state.entities.villageIds[entityId] ?? 0;
@@ -1177,18 +1189,10 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       );
       if (building) {
         if ((state.entities.carriedResources[entityId] ?? 0) === 0) {
-          const storage = state.buildings.find(
-            (candidate) =>
-              candidate.villageId === villageId &&
-              candidate.type === BuildingType.Storage &&
-              candidate.completed &&
-              candidate.health > 0,
-          );
-          target = findNearestWalkable(
-            state,
-            storage?.x ?? village?.x ?? currentX,
-            storage?.z ?? village?.z ?? currentZ,
-          );
+          const storage = selectStorage(villageId, current);
+          target =
+            storage?.targetCell ??
+            findNearestWalkable(state, village?.x ?? currentX, village?.z ?? currentZ);
         } else {
           target = findNearestWalkable(state, building.x, building.z);
         }
@@ -1203,7 +1207,12 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     } else if (stateValue === AgentState.Farm) {
       const villageId = state.entities.villageIds[entityId] ?? 0;
       if (state.entities.professions[entityId] === Profession.Forager) {
-        target = findNearestVillageGridResource(state, villageId, current, 48);
+        target = findNearestVillageGridResource(
+          state,
+          villageId,
+          current,
+          TRAVEL_RATION_RULES.ordinaryWorkMaxOneWayCells,
+        );
       }
       const farm = state.buildings.find(
         (candidate) =>
@@ -1233,23 +1242,17 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         const village = state.villages.find(
           (candidate) => candidate.id === state.entities.villageIds[entityId],
         );
-        const storage = state.buildings.find(
-          (candidate) =>
-            candidate.villageId === village?.id &&
-            candidate.type === BuildingType.Storage &&
-            candidate.completed &&
-            candidate.health > 0,
-        );
+        const storage = village ? selectStorage(village.id, current) : null;
         const carryingInputs =
           state.entities.carriedResourceKinds[entityId] === CarriedResourceKind.CraftInputs;
         target = findNearestWalkable(
           state,
           carryingInputs || state.entities.tasks[entityId]?.phase === 'work'
             ? workshop.x
-            : (storage?.x ?? village?.x ?? workshop.x),
+            : (storage?.building.x ?? village?.x ?? workshop.x),
           carryingInputs || state.entities.tasks[entityId]?.phase === 'work'
             ? workshop.z
-            : (storage?.z ?? village?.z ?? workshop.z),
+            : (storage?.building.z ?? village?.z ?? workshop.z),
         );
       }
     } else if (stateValue === AgentState.Guard) {
@@ -1435,19 +1438,13 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
           candidate.villageId === villageId && candidate.constructionPhase === 'delivery',
       );
       if (building) {
-        const storage = state.buildings.find(
-          (candidate) =>
-            candidate.villageId === villageId &&
-            candidate.type === BuildingType.Storage &&
-            candidate.completed &&
-            candidate.health > 0,
-        );
+        const storage = selectStorage(villageId, entityCell(state, entityId));
         targetKind = 'building';
         targetId =
           agentState === AgentState.Haul &&
           (state.entities.carriedResources[entityId] ?? 0) === 0 &&
           storage
-            ? storage.id
+            ? storage.building.id
             : building.id;
       }
       expectedResult =
@@ -1791,7 +1788,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       assigned < 22 ||
       village.carryingCapacity <= 0 ||
       assigned / village.carryingCapacity < 0.88 ||
-      village.resources.food < 10
+      village.resources.food < TRAVEL_RATION_RULES.settlementFoodReserve
     ) {
       return;
     }
@@ -1825,6 +1822,19 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
     if (selected.length < 6) return;
     const targetCell = findPioneerDestination(village);
     if (targetCell < 0) return;
+    const route = createFlowField(state.map.navigation, targetCell);
+    const longestDistance = Math.max(
+      ...selected
+        .slice(0, 8)
+        .map((entityId) => route.distance[entityCell(state, entityId)] ?? 0xffff_ffff),
+    );
+    if (longestDistance === 0xffff_ffff) return;
+    const supplies = reservableTravelRations(
+      village.resources.food,
+      longestDistance,
+      selected.slice(0, 8).length,
+    );
+    if (supplies <= 0) return;
     state.nextExpeditionId += 1;
     const expedition: PioneerExpedition = {
       id: state.nextExpeditionId,
@@ -1835,7 +1845,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       targetZ: Math.floor(targetCell / state.map.size) + 0.5,
       targetCell,
       startedAtTick: state.tick,
-      supplies: 8,
+      supplies,
     };
     for (const memberId of expedition.memberIds) {
       state.entities.expeditionIds[memberId] = expedition.id;
@@ -1949,6 +1959,15 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
           break;
         }
         if (!destination || targetCell < 0) continue;
+        const distance = createFlowField(state.map.navigation, targetCell).distance[
+          entityCell(state, mother)
+        ];
+        const supplies = reservableTravelRations(
+          source.resources.food,
+          distance ?? 0xffff_ffff,
+          family.length,
+        );
+        if (!distance || distance === 0xffff_ffff || supplies <= 0) continue;
         state.nextExpeditionId += 1;
         const relocation: PioneerExpedition = {
           id: state.nextExpeditionId,
@@ -1960,13 +1979,14 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
           targetZ: Math.floor(targetCell / state.map.size) + 0.5,
           targetCell,
           startedAtTick: state.tick,
-          supplies: 0,
+          supplies,
         };
         for (const memberId of family) {
           state.entities.expeditionIds[memberId] = relocation.id;
           state.entities.paths[memberId] = null;
           state.entities.targetCells[memberId] = targetCell;
         }
+        source.resources.food -= supplies;
         state.expeditions.push(relocation);
         addEvent(
           state,
@@ -2040,6 +2060,11 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
           break;
         }
         if (!destination || targetCell < 0) continue;
+        const distance = createFlowField(state.map.navigation, targetCell).distance[
+          entityCell(state, residentId)
+        ];
+        const supplies = reservableTravelRations(source.resources.food, distance ?? 0xffff_ffff, 1);
+        if (!distance || distance === 0xffff_ffff || supplies <= 0) continue;
         state.nextExpeditionId += 1;
         const relocation: PioneerExpedition = {
           id: state.nextExpeditionId,
@@ -2051,11 +2076,12 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
           targetZ: Math.floor(targetCell / state.map.size) + 0.5,
           targetCell,
           startedAtTick: state.tick,
-          supplies: 0,
+          supplies,
         };
         state.entities.expeditionIds[residentId] = relocation.id;
         state.entities.paths[residentId] = null;
         state.entities.targetCells[residentId] = targetCell;
+        source.resources.food -= supplies;
         state.expeditions.push(relocation);
         addEvent(
           state,
@@ -2111,6 +2137,16 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       }
       let arrived = 0;
       for (const memberId of living) {
+        if (
+          (state.entities.hunger[memberId] ?? 0) >= TRAVEL_RATION_RULES.mealHungerThreshold &&
+          expedition.supplies > 0
+        ) {
+          expedition.supplies -= 1;
+          state.entities.hunger[memberId] = Math.max(
+            0,
+            (state.entities.hunger[memberId] ?? 0) - TRAVEL_RATION_RULES.mealHungerReduction,
+          );
+        }
         const distance = Math.hypot(
           expedition.targetX - (state.entities.positionsX[memberId] ?? 0),
           expedition.targetZ - (state.entities.positionsZ[memberId] ?? 0),
@@ -2310,7 +2346,12 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
           village &&
           village.resources.food < 36 + village.population * 4
         ) {
-          const forageCell = findNearestVillageGridResource(state, village.id, cell, 48);
+          const forageCell = findNearestVillageGridResource(
+            state,
+            village.id,
+            cell,
+            TRAVEL_RATION_RULES.ordinaryWorkMaxOneWayCells,
+          );
           if (forageCell >= 0) nextState = AgentState.Farm;
           else if (
             villageNeedsWildFood(village) &&
@@ -2931,7 +2972,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         carcass.reservedByEntityId = null;
         carcass.reservedUntilTick = 0;
         state.ecology.butcheredMeat += amount;
-        state.entities.carriedResourceKinds[entityId] = CarriedResourceKind.Food;
+        state.entities.carriedResourceKinds[entityId] = CarriedResourceKind.MeatFood;
         state.entities.carriedResources[entityId] = amount;
         task.phase = 'delivery';
         task.expectedResult = '把屠宰所得肉类送入聚落仓储';
@@ -2973,7 +3014,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         if (task.progress < task.requiredProgress) continue;
         recordAnimalDeath(state, fishId, 'hunting', { leaveCarcass: false });
         state.ecology.fishCaught += 1;
-        state.entities.carriedResourceKinds[entityId] = CarriedResourceKind.Food;
+        state.entities.carriedResourceKinds[entityId] = CarriedResourceKind.FishFood;
         state.entities.carriedResources[entityId] = FISHING_RULES.catchFood;
         task.phase = 'delivery';
         task.expectedResult = '把岸边捕获的鱼送入聚落仓储';
@@ -3056,7 +3097,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
             failResidentTask(task, state.tick, '野外食物已经耗尽');
             continue;
           }
-          state.entities.carriedResourceKinds[entityId] = CarriedResourceKind.Food;
+          state.entities.carriedResourceKinds[entityId] = CarriedResourceKind.WildFood;
           state.entities.carriedResources[entityId] = amount;
           task.phase = 'delivery';
           state.entities.states[entityId] = AgentState.Home;
@@ -3077,7 +3118,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         if (task.progress < task.requiredProgress) continue;
         if (crop >= 180) {
           state.map.crops[cell] = 0;
-          state.entities.carriedResourceKinds[entityId] = CarriedResourceKind.Food;
+          state.entities.carriedResourceKinds[entityId] = CarriedResourceKind.FarmFood;
           state.entities.carriedResources[entityId] = 4;
           task.phase = 'delivery';
           state.entities.states[entityId] = AgentState.Home;
@@ -3143,15 +3184,11 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         (candidate) => candidate.id === state.entities.villageIds[entityId],
       );
       if (!village) continue;
-      const storage = state.buildings.find(
-        (candidate) =>
-          candidate.villageId === village.id &&
-          candidate.type === BuildingType.Storage &&
-          candidate.completed &&
-          candidate.health > 0,
-      );
-      const destinationX = (storage?.x ?? village.x) + 0.5;
-      const destinationZ = (storage?.z ?? village.z) + 0.5;
+      const storage = selectStorage(village.id, entityCell(state, entityId));
+      const destinationX = storage ? (storage.targetCell % state.map.size) + 0.5 : village.x + 0.5;
+      const destinationZ = storage
+        ? Math.floor(storage.targetCell / state.map.size) + 0.5
+        : village.z + 0.5;
       if (
         Math.hypot(
           destinationX - (state.entities.positionsX[entityId] ?? 0),
@@ -3398,6 +3435,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
 
   const updateDiplomacy = (): void => {
     formKingdoms(state);
+    resolveKingdomExtinctions(state);
     assignResidentRoles(state);
     for (const kingdom of state.kingdoms) {
       kingdom.militaryPower = countKingdomGuards(state, kingdom.id);
@@ -3433,7 +3471,7 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       (war) => war.firstKingdomId === firstId && war.secondKingdomId === secondId,
     );
     if (existing) return existing;
-    const campaign = {
+    const campaign: WarCampaign = {
       firstKingdomId: firstId,
       secondKingdomId: secondId,
       startedAtTick: state.tick,
@@ -3445,7 +3483,41 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
       capturedVillageIds: [],
       score: { [firstId]: 0, [secondId]: 0 },
       fatigue: { [firstId]: 0, [secondId]: 0 },
+      supplies: { [firstId]: 0, [secondId]: 0 },
+      rationedKingdomIds: [],
     };
+    for (const [kingdomId, enemyId] of [
+      [firstId, secondId],
+      [secondId, firstId],
+    ] as const) {
+      const kingdom = state.kingdoms.find((candidate) => candidate.id === kingdomId);
+      const enemy = state.kingdoms.find((candidate) => candidate.id === enemyId);
+      const origin = state.villages.find((candidate) => candidate.id === kingdom?.capitalVillageId);
+      const target = state.villages.find((candidate) => candidate.id === enemy?.capitalVillageId);
+      const guardIds: number[] = [];
+      for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
+        if (
+          state.entities.active[entityId] === 1 &&
+          state.entities.kingdomIds[entityId] === kingdomId &&
+          state.entities.professions[entityId] === Profession.Guard
+        ) {
+          guardIds.push(entityId);
+        }
+      }
+      if (!origin || !target || guardIds.length === 0) continue;
+      const targetCell = findNearestWalkable(state, target.x, target.z);
+      const route = createFlowField(state.map.navigation, targetCell);
+      const distance = Math.max(
+        ...guardIds.map((entityId) => route.distance[entityCell(state, entityId)] ?? 0xffff_ffff),
+      );
+      if (distance === 0xffff_ffff) continue;
+      const required = requiredTravelRations(distance, guardIds.length);
+      const supplies = reservableTravelRations(origin.resources.food, distance, guardIds.length);
+      if (required > 0 && supplies <= 0) continue;
+      origin.resources.food -= supplies;
+      campaign.supplies[kingdomId] = supplies;
+      campaign.rationedKingdomIds.push(kingdomId);
+    }
     state.wars.push(campaign);
     return campaign;
   };
@@ -3761,6 +3833,22 @@ export function createWorldSimulationFromState(state: WorldState): WorldSimulati
         if (enemyGuard >= 0) {
           attackGuard(entityId, enemyGuard, campaign);
           continue;
+        }
+        if (!campaign.rationedKingdomIds.includes(kingdom.id)) {
+          state.entities.states[entityId] = AgentState.Guard;
+          continue;
+        }
+        if ((state.entities.hunger[entityId] ?? 0) >= TRAVEL_RATION_RULES.mealHungerThreshold) {
+          const supplies = campaign.supplies[kingdom.id] ?? 0;
+          if (supplies <= 0) {
+            state.entities.states[entityId] = AgentState.Guard;
+            continue;
+          }
+          campaign.supplies[kingdom.id] = supplies - 1;
+          state.entities.hunger[entityId] = Math.max(
+            0,
+            (state.entities.hunger[entityId] ?? 0) - TRAVEL_RATION_RULES.mealHungerReduction,
+          );
         }
         const distance = Math.hypot(
           targetVillage.x - (state.entities.positionsX[entityId] ?? 0),
@@ -4203,7 +4291,7 @@ function planVillageBuilding(state: WorldState, village: Village, _completed: nu
       village.x,
       village.z,
       ResourceNodeKind.Metal,
-      48,
+      TRAVEL_RATION_RULES.ordinaryWorkMaxOneWayCells,
     );
     if (veinId < 0) return;
     const approachCell = findNearestWalkable(

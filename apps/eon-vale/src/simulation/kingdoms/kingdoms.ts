@@ -1,5 +1,13 @@
-import { DiplomacyState, type Kingdom, VillageTier, type WorldState } from '@/shared/gameTypes';
+import {
+  DiplomacyState,
+  EntityKind,
+  type Kingdom,
+  type KingdomLifeStatus,
+  VillageTier,
+  type WorldState,
+} from '@/shared/gameTypes';
 import { recordWorldEvent } from '../history/worldHistory';
+import { POPULATION_BALANCE_RULES } from '../rules/populationRules';
 
 const KINGDOM_NAMES = ['苍叶王国', '曦石同盟', '北风领', '金穗邦', '雾湾王国', '白峰城国'];
 const KINGDOM_COLORS = ['#d66b52', '#5e8fd1', '#d0a84c', '#7baf65', '#9a72c7', '#4ca89c'];
@@ -78,16 +86,20 @@ export function resolveKingdomExtinctions(state: WorldState): void {
   for (const kingdom of state.kingdoms) {
     refreshKingdomCapital(state, kingdom);
     if (kingdom.extinct) continue;
-    const alive = kingdom.villageIds.some((villageId) => {
+    for (const villageId of kingdom.villageIds) {
       const village = state.villages.find((candidate) => candidate.id === villageId);
-      return village && village.health > 0;
-    });
-    if (alive) continue;
+      if (!village || countLivingVillageCitizens(state, kingdom.id, villageId) > 0) continue;
+      if (village.abandonedAtTick === 0) village.abandonedAtTick = Math.max(1, state.tick);
+    }
+    if (kingdomLifeStatus(state, kingdom) !== 'extinct') continue;
     kingdom.extinct = true;
     kingdom.capitalVillageId = 0;
     kingdom.militaryPower = 0;
-    for (const other of state.kingdoms)
-      setDiplomacy(state, kingdom.id, other.id, DiplomacyState.Peace);
+    for (const other of state.kingdoms) {
+      if (other.id === kingdom.id) continue;
+      kingdom.relations[other.id] = DiplomacyState.Peace;
+      other.relations[kingdom.id] = DiplomacyState.Peace;
+    }
     recordWorldEvent(state, {
       kind: 'kingdom-extinct',
       category: 'kingdom',
@@ -99,6 +111,52 @@ export function resolveKingdomExtinctions(state: WorldState): void {
   }
 }
 
+function isLivingKingdomCitizen(state: WorldState, entityId: number, kingdomId: number): boolean {
+  return (
+    state.entities.active[entityId] === 1 &&
+    (state.entities.health[entityId] ?? 0) > 0 &&
+    state.entities.kind[entityId] === EntityKind.Human &&
+    state.entities.kingdomIds[entityId] === kingdomId
+  );
+}
+
+export function livingKingdomCitizenIds(state: WorldState, kingdomId: number): number[] {
+  const citizens: number[] = [];
+  for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
+    if (isLivingKingdomCitizen(state, entityId, kingdomId)) citizens.push(entityId);
+  }
+  return citizens;
+}
+
+function countLivingVillageCitizens(
+  state: WorldState,
+  kingdomId: number,
+  villageId: number,
+): number {
+  let count = 0;
+  for (let entityId = 0; entityId < state.entities.count; entityId += 1) {
+    if (
+      isLivingKingdomCitizen(state, entityId, kingdomId) &&
+      state.entities.villageIds[entityId] === villageId
+    ) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+export function kingdomLifeStatus(state: WorldState, kingdom: Kingdom): KingdomLifeStatus {
+  const citizens = livingKingdomCitizenIds(state, kingdom.id);
+  if (citizens.length === 0) return 'extinct';
+  const hasPopulatedSettlement = kingdom.villageIds.some(
+    (villageId) => countLivingVillageCitizens(state, kingdom.id, villageId) > 0,
+  );
+  if (!hasPopulatedSettlement) return 'exiled';
+  if (citizens.length < POPULATION_BALANCE_RULES.minimumViableVillagePopulation)
+    return 'endangered';
+  return 'active';
+}
+
 export function refreshKingdomCapital(state: WorldState, kingdom: Kingdom): void {
   if (kingdom.extinct) {
     kingdom.capitalVillageId = 0;
@@ -108,11 +166,17 @@ export function refreshKingdomCapital(state: WorldState, kingdom: Kingdom): void
     (village) =>
       village.id === kingdom.capitalVillageId &&
       kingdom.villageIds.includes(village.id) &&
-      village.health > 0,
+      village.health > 0 &&
+      countLivingVillageCitizens(state, kingdom.id, village.id) > 0,
   );
   if (current) return;
   const candidates = state.villages
-    .filter((village) => kingdom.villageIds.includes(village.id) && village.health > 0)
+    .filter(
+      (village) =>
+        kingdom.villageIds.includes(village.id) &&
+        village.health > 0 &&
+        countLivingVillageCitizens(state, kingdom.id, village.id) > 0,
+    )
     .sort((first, second) => {
       const firstBuildings = first.buildingIds.filter((buildingId) => {
         const building = state.buildings[buildingId - 1];

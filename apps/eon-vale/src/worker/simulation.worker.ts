@@ -24,9 +24,14 @@ import {
   recentWorldNotifications,
 } from '@/simulation/history/worldHistory';
 import { deriveKingdomObservation } from '@/simulation/kingdoms/kingdomObservation';
-import { activeWars } from '@/simulation/kingdoms/kingdoms';
+import {
+  activeWars,
+  kingdomLifeStatus,
+  livingKingdomCitizenIds,
+} from '@/simulation/kingdoms/kingdoms';
 import { generateWorldMap } from '@/simulation/map/generateWorldMap';
 import { editTerrain } from '@/simulation/map/terrainEditing';
+import { deriveGroupActivity } from '@/simulation/observation/activityDiagnostics';
 import { loadWorldSave, serializeWorld } from '@/simulation/persistence/save';
 import { createResourceNodeStore } from '@/simulation/resources/resourceNodes';
 import { simulationTickIntervalMs } from '@/simulation/rules/runtimeRules';
@@ -206,6 +211,9 @@ function createWorldSnapshot(tickMs: number): WorldRenderSnapshot | null {
     demographics: structuredClone(state.population),
     worldLaws: { ...state.worldLaws },
     ecology: structuredClone(state.ecology),
+    activityAlerts: state.villages.flatMap(
+      (village) => deriveGroupActivity(state, { villageId: village.id }).alerts,
+    ),
     metrics: {
       tickMs,
       averageTickMs: measuredTicks > 0 ? totalTickMs / measuredTicks : 0,
@@ -331,6 +339,7 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
         watchDamage: capabilities.watchDamage,
       },
       workHotspots: collectVillageWorkHotspots(state, village.id),
+      activity: deriveGroupActivity(state, { villageId: village.id }),
       history: querySubjectHistory(state, { kind: 'village', id: village.id }),
     };
   }
@@ -413,11 +422,22 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
     kingdoms: state.kingdoms,
   });
   const capital = state.villages.find((village) => village.id === kingdom.capitalVillageId);
+  const status = kingdomLifeStatus(state, kingdom);
+  const population = livingKingdomCitizenIds(state, kingdom.id).length;
   return {
     type: 'kingdom',
     id: kingdom.id,
     kingdom: structuredClone(kingdom),
-    population: villages.reduce((sum, village) => sum + village.population, 0),
+    status,
+    statusReason:
+      status === 'active'
+        ? '人口与聚落仍稳定'
+        : status === 'endangered'
+          ? `仅余 ${population} 名公民，低于稳定人口`
+          : status === 'exiled'
+            ? '仍有公民，但没有有人居住的聚落'
+            : '已无在世公民',
+    population,
     resources: villages.reduce(
       (sum, village) => ({
         food: sum.food + village.resources.food,
@@ -464,6 +484,7 @@ function inspect(command: Extract<WorkerCommand, { type: 'inspect' }>): Inspecti
             ]
           : [];
       }),
+    activity: deriveGroupActivity(state, { kingdomId: kingdom.id }),
     history: querySubjectHistory(state, { kind: 'kingdom', id: kingdom.id }),
   };
 }

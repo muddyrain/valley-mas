@@ -87,9 +87,26 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   await expect(canvas).toHaveAttribute('data-no-tilt', 'true');
   await expect(canvas).toHaveAttribute('data-no-rotation', 'true');
   await expect(canvas).toHaveAttribute('data-human-style', 'layered-pixel-sprites');
-  await expect(canvas).toHaveAttribute('data-animal-style', 'pixel-side-profiles');
+  await expect(canvas).toHaveAttribute('data-animal-style', 'formal-pixel-side-profiles');
   await expect(canvas).toHaveAttribute('data-animal-styles', '7');
-  await expect(canvas).toHaveAttribute('data-building-style', 'functional-pixel-buildings');
+  await expect(canvas).toHaveAttribute('data-building-style', 'formal-functional-pixel-buildings');
+  await expect(canvas).toHaveAttribute('data-building-profiles', '12');
+  await expect(canvas).toHaveAttribute('data-visual-rollout', 'formal-full-world');
+  await expect(canvas).toHaveAttribute(
+    'data-formal-asset-sample',
+    'resident-deer-wolf-tree-home-storage',
+  );
+  await expect(canvas).toHaveAttribute('data-resident-asset-size', '24x32');
+  await expect(canvas).toHaveAttribute('data-animal-asset-size', '24x24');
+  await expect(canvas).toHaveAttribute('data-tree-asset-size', '32x48');
+  await expect(canvas).toHaveAttribute('data-building-asset-size', '48x48');
+  await expect(canvas).toHaveAttribute(
+    'data-terrain-layers',
+    'terrain-height-temperature-moisture-surface',
+  );
+  await expect(canvas).toHaveAttribute('data-entity-lod', 'hidden');
+  await expect(canvas).toHaveAttribute('data-resource-lod', 'cluster');
+  await expect(canvas).toHaveAttribute('data-building-lod', 'settlement-outline');
   await expect(canvas).toHaveAttribute('data-kingdom-palette', 'residents-buildings-flags');
   await expect(canvas).toHaveAttribute('data-strategic-icons', '0');
   await expect(canvas).toHaveAttribute('data-map-size', '256');
@@ -227,6 +244,19 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   await expect(residentInspector.getByText('携带', { exact: true })).toBeVisible();
   await expect.poll(async () => canvas.getAttribute('data-view-level')).toBe('resident');
   await expect(canvas).toHaveAttribute('data-terrain-lod', 'resident-4px');
+  await expect(canvas).toHaveAttribute('data-entity-lod', 'full');
+  await expect(canvas).toHaveAttribute('data-resource-lod', 'detailed');
+  await expect(canvas).toHaveAttribute('data-building-lod', 'detailed');
+  await expect(canvas).toHaveAttribute('data-tree-canopy-occlusion', 'split-front-back');
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-tree-canopy-front')))
+    .toBeGreaterThan(0);
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-visible-cells-width')))
+    .toBeLessThanOrEqual(64);
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-visible-cells-height')))
+    .toBeLessThanOrEqual(36);
   await residentInspector.getByRole('tab', { name: '成长' }).click();
   await expect(residentInspector.getByText(/等级 \d+/)).toBeVisible();
   await residentInspector.getByRole('tab', { name: '装备' }).click();
@@ -244,6 +274,9 @@ test('creates, shapes, follows, saves and reloads a living pixel world', async (
   await expect(villageInspector).toBeVisible();
   await expect.poll(async () => canvas.getAttribute('data-view-level')).toBe('settlement');
   await expect(canvas).toHaveAttribute('data-terrain-lod', 'districts-4px');
+  await expect(canvas).toHaveAttribute('data-entity-lod', 'sampled');
+  await expect(canvas).toHaveAttribute('data-resource-lod', 'simplified');
+  await expect(canvas).toHaveAttribute('data-building-lod', 'simplified');
   await expect
     .poll(async () => Number(await canvas.getAttribute('data-settlement-tier-glyphs')))
     .toBeGreaterThan(0);

@@ -4,36 +4,38 @@ import {
   presentationForView,
   resolveViewLevel,
   viewZoom,
+  visibleCellSpan,
   type WorldViewLevel,
 } from './strategicView';
 
 describe('strategic world view levels', () => {
-  it('uses hysteresis so wheel noise does not flicker between levels', () => {
+  const wideViewport = { mapSize: 128, viewportWidth: 2048, viewportHeight: 1135 };
+
+  it('uses visible map span instead of raw zoom to select semantic detail', () => {
     let level: WorldViewLevel = 'world';
 
-    level = resolveViewLevel(level, 1.7);
+    level = resolveViewLevel(level, 2, wideViewport);
     expect(level).toBe('world');
-    level = resolveViewLevel(level, 1.85);
+    level = resolveViewLevel(level, 3, wideViewport);
     expect(level).toBe('settlement');
-    level = resolveViewLevel(level, 1.55);
+    level = resolveViewLevel(level, 4, wideViewport);
     expect(level).toBe('settlement');
-    level = resolveViewLevel(level, 1.4);
-    expect(level).toBe('world');
-
-    level = resolveViewLevel('settlement', 4.35);
+    level = resolveViewLevel(level, 8, wideViewport);
     expect(level).toBe('resident');
-    level = resolveViewLevel(level, 3.9);
+    level = resolveViewLevel(level, 8, wideViewport);
     expect(level).toBe('resident');
-    level = resolveViewLevel(level, 3.7);
+    level = resolveViewLevel(level, 6, wideViewport);
     expect(level).toBe('settlement');
   });
 
-  it('assigns a stable camera target to every semantic level', () => {
-    expect(viewZoom('world', 128)).toBe(1);
-    expect(viewZoom('settlement', 128)).toBeGreaterThanOrEqual(2.6);
-    expect(viewZoom('settlement', 128)).toBeLessThan(4);
-    expect(viewZoom('resident', 128)).toBeGreaterThanOrEqual(5.8);
-    expect(viewZoom('resident', 128)).toBeLessThanOrEqual(6.2);
+  it('assigns viewport-aware camera targets to every semantic level', () => {
+    expect(viewZoom('world', wideViewport)).toBe(2);
+    expect(viewZoom('settlement', wideViewport)).toBe(4);
+    expect(viewZoom('resident', wideViewport)).toBe(8);
+
+    const residentSpan = visibleCellSpan(viewZoom('resident', wideViewport), wideViewport);
+    expect(residentSpan.width).toBeLessThanOrEqual(64);
+    expect(residentSpan.height).toBeLessThanOrEqual(36);
   });
 
   it('keeps only strategic information in the global layer', () => {

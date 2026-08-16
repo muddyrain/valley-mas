@@ -16,6 +16,8 @@ import type { Inspection } from '@/render/renderTypes';
 import {
   type ConstructionPriority,
   DiplomacyState,
+  type GroupActivityDiagnostics,
+  type KingdomLifeStatus,
   PlanningZoneKind,
   ResidentRole,
   ResidentSex,
@@ -30,6 +32,78 @@ import {
   STATE_LABELS,
   TIER_LABELS,
 } from './labels';
+
+const ACTIVITY_LABELS = {
+  survival: '生存需求',
+  production: '生产',
+  logistics: '运输',
+  military: '军事与远征',
+  migration: '迁居',
+  idle: '空闲',
+  blocked: '受阻',
+} as const;
+
+const ACTIVITY_REASON_LABELS: Record<string, string> = {
+  hunger: '寻找食物',
+  'critical-hunger': '多人极度饥饿',
+  fatigue: '回家休息',
+  'critical-fatigue': '精力耗尽',
+  danger: '躲避危险',
+  'village-needs-food': '补充村庄食物',
+  'village-needs-wood': '补充木材',
+  'village-needs-stone': '补充石料',
+  'village-needs-metal': '补充金属',
+  'village-needs-tools': '制作工具',
+  'village-needs-equipment': '制作装备',
+  'village-needs-housing': '补充住房',
+  'village-construction': '推进建设',
+  'professional-duty': '职业职责',
+  expedition: '远行中',
+  idle: '等待安排',
+};
+
+const KINGDOM_STATUS_LABELS: Record<KingdomLifeStatus, string> = {
+  active: '稳定',
+  endangered: '人口濒危',
+  exiled: '流亡',
+  extinct: '灭亡',
+};
+
+function GroupActivity({
+  activity,
+  onHighlight,
+}: {
+  activity: GroupActivityDiagnostics;
+  onHighlight?: (entityIds: number[]) => void;
+}) {
+  return (
+    <div className="group-activity" data-testid="group-activity">
+      <strong>居民正在做什么</strong>
+      {activity.categories
+        .filter(({ count }) => count > 0)
+        .map((category) => (
+          <details key={category.category} open={category.category === 'blocked'}>
+            <summary>
+              <span>{ACTIVITY_LABELS[category.category]}</span>
+              <b>{category.count} 人</b>
+            </summary>
+            <div>
+              {category.reasons.map((reason) => (
+                <span key={reason.reason}>
+                  {ACTIVITY_REASON_LABELS[reason.reason] ?? reason.reason} · {reason.count} 人
+                </span>
+              ))}
+              {onHighlight && (
+                <button type="button" onClick={() => onHighlight(category.entityIds)}>
+                  在地图上高亮
+                </button>
+              )}
+            </div>
+          </details>
+        ))}
+    </div>
+  );
+}
 
 function Gauge({
   label,
@@ -64,6 +138,7 @@ export function InspectorPanel({
   onFocusCapital,
   onFavorite,
   onHistoryNavigate,
+  onHighlightResidents,
 }: {
   inspection: Inspection;
   onClose: () => void;
@@ -74,6 +149,7 @@ export function InspectorPanel({
   onFocusCapital?: (villageId: number) => void;
   onFavorite?: (lifeId: number, favorite: boolean) => void;
   onHistoryNavigate?: (link: WorldHistoryLink, event: WorldHistoryEntry) => void;
+  onHighlightResidents?: (entityIds: number[]) => void;
 }) {
   const [entityTab, setEntityTab] = useState<'overview' | 'growth' | 'equipment' | 'history'>(
     'overview',
@@ -129,6 +205,10 @@ export function InspectorPanel({
       '工具',
       '装备',
       '工坊材料',
+      '农作物',
+      '野外食物',
+      '肉类',
+      '鱼获',
     ] as const;
     const taskFailureReason = inspection.task?.failureReason || '无';
     const carriedResourceLabel = carriedLabels[inspection.carriedResourceKind] || '物资';
@@ -419,6 +499,13 @@ export function InspectorPanel({
             </em>
           </span>
           <span>
+            <b>食物来源</b>
+            <em>
+              农田 {village.foodSources.farm} · 野采 {village.foodSources.wild} · 肉类{' '}
+              {village.foodSources.meat} · 鱼获 {village.foodSources.fish}
+            </em>
+          </span>
+          <span>
             <b>分类仓储</b>
             <em>
               食物 {Math.floor(village.resources.food)}/{village.storageCapacityByKind.food} · 木材{' '}
@@ -499,6 +586,7 @@ export function InspectorPanel({
             </span>
           ))}
         </div>
+        <GroupActivity activity={inspection.activity} onHighlight={onHighlightResidents} />
         <div className="inspector-list" data-testid="village-capabilities">
           <span>
             <b>守卫训练</b>
@@ -682,10 +770,17 @@ export function InspectorPanel({
         </span>
       </div>
       <div className="tag-row">
+        <span className="accent">{KINGDOM_STATUS_LABELS[inspection.status]}</span>
         <span className="accent">首都 · {capital?.name || '暂无'}</span>
         <span>邻国 {inspection.neighbours.length}</span>
         <span>
           战争 {Object.values(inspection.kingdom.relations).filter((value) => value === 2).length}
+        </span>
+      </div>
+      <div className="inspector-list">
+        <span>
+          <b>存续状态</b>
+          <em>{inspection.statusReason}</em>
         </span>
       </div>
       <div className="inspector-list kingdom-observation-list">
@@ -713,6 +808,7 @@ export function InspectorPanel({
           </span>
         ))}
       </div>
+      <GroupActivity activity={inspection.activity} onHighlight={onHighlightResidents} />
       <div className="resident-history kingdom-chronicle" data-testid="kingdom-chronicle">
         <strong>王国纪事</strong>
         {inspection.history.length > 0 ? (

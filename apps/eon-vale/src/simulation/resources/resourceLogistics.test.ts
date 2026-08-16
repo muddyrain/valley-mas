@@ -65,6 +65,29 @@ describe('resource logistics', () => {
     expect(village.foodProducedSinceUpdate).toBe(3);
   });
 
+  it('keeps one food inventory while recording its farm, wild, meat and fish sources', () => {
+    const simulation = createWorldSimulation({ seed: 'food-sources', initialHumans: 0 });
+    const village = simulation.ensureVillageAt(64, 64, 1);
+    const resident = simulation.spawn(EntityKind.Human, 64, 64)[0] as number;
+    simulation.state.entities.villageIds[resident] = village.id;
+    const before = village.resources.food;
+    const deliveries = [
+      CarriedResourceKind.FarmFood,
+      CarriedResourceKind.WildFood,
+      CarriedResourceKind.MeatFood,
+      CarriedResourceKind.FishFood,
+    ];
+
+    for (const kind of deliveries) {
+      simulation.state.entities.carriedResourceKinds[resident] = kind;
+      simulation.state.entities.carriedResources[resident] = 2;
+      expect(depositCarriedResource(simulation.state, resident)).toBe(2);
+    }
+
+    expect(village.resources.food).toBe(before + 8);
+    expect(village.foodSources).toEqual({ farm: 2, wild: 2, meat: 2, fish: 2 });
+  });
+
   it('prevents residents from harvesting another village territory', () => {
     const simulation = createWorldSimulation({
       seed: 'territory-resource-owner',

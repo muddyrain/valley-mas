@@ -14,6 +14,7 @@ export function estimateRenderBatches({
   visibleTerrainChunks,
   visibleEntities,
   visibleBuildings,
+  treeCanopyVisible,
   territoryVisible,
   statusVisible,
   visibleLabels,
@@ -21,6 +22,7 @@ export function estimateRenderBatches({
   visibleTerrainChunks: number;
   visibleEntities: number;
   visibleBuildings: number;
+  treeCanopyVisible: boolean;
   territoryVisible: boolean;
   statusVisible: boolean;
   visibleLabels: number;
@@ -29,6 +31,7 @@ export function estimateRenderBatches({
     (visibleTerrainChunks > 0 ? 1 : 0) +
     (visibleEntities > 0 ? 1 : 0) +
     (visibleBuildings > 0 ? 1 : 0) +
+    (treeCanopyVisible ? 2 : 0) +
     (territoryVisible ? 1 : 0) +
     (statusVisible ? 1 : 0) +
     Math.max(0, visibleLabels)
