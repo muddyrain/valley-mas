@@ -220,7 +220,6 @@ export const getMyResources = (
 // 上传资源
 export const uploadResource = (formData: FormData) => {
   return http.post<unknown, { resource: MyResource }>('/content/resources/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
     timeout: RESOURCE_UPLOAD_TIMEOUT,
   });
 };

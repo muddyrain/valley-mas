@@ -31,6 +31,8 @@ func TestCorsAllowsWorkflowRequestHeaders(t *testing.T) {
 		{name: "resume event stream", path: "/api/v1/workflows/1/runs/2/events", method: http.MethodGet, requestedHeaders: "authorization,last-event-id"},
 		{name: "retry run", path: "/api/v1/workflows/1/runs/2/retry", method: http.MethodPost, requestedHeaders: "authorization,x-workflow-retry-confirmed"},
 		{name: "resume run", path: "/api/v1/workflows/1/runs/2/resume", method: http.MethodPost, requestedHeaders: "authorization,x-workflow-resume-confirmed"},
+		{name: "upload resource with multipart", path: "/api/v1/content/resources/upload", method: http.MethodPost, requestedHeaders: "authorization,content-type"},
+		{name: "upload resource with browser defaults", path: "/api/v1/content/resources/upload", method: http.MethodPost, requestedHeaders: "authorization,x-requested-with,content-type"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodOptions, testCase.path, nil)

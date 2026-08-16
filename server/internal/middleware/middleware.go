@@ -39,6 +39,8 @@ func (e *authDependencyError) Unwrap() error {
 	return e.err
 }
 
+const defaultCorsHeaders = "Origin, Content-Type, Authorization, Last-Event-ID, X-Workflow-Retry-Confirmed, X-Workflow-Resume-Confirmed"
+
 // Cors 跨域中间件
 func Cors() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -46,9 +48,13 @@ func Cors() gin.HandlerFunc {
 		if origin == "" {
 			origin = "*"
 		}
+
 		c.Header("Access-Control-Allow-Origin", origin)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, Last-Event-ID, X-Workflow-Retry-Confirmed, X-Workflow-Resume-Confirmed")
+		c.Header("Vary", "Origin")
+
+		allowedHeaders := mergeCorsAllowHeaders(c.GetHeader("Access-Control-Request-Headers"))
+		c.Header("Access-Control-Allow-Headers", allowedHeaders)
 		c.Header("Access-Control-Allow-Credentials", "true")
 
 		if c.Request.Method == "OPTIONS" {
@@ -58,6 +64,32 @@ func Cors() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func mergeCorsAllowHeaders(requestedHeaders string) string {
+	headers := make([]string, 0, 8)
+	seen := make(map[string]struct{})
+	addHeader := func(header string) {
+		h := strings.TrimSpace(header)
+		if h == "" {
+			return
+		}
+		key := strings.ToLower(h)
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		headers = append(headers, h)
+	}
+
+	for _, header := range strings.Split(defaultCorsHeaders, ",") {
+		addHeader(header)
+	}
+	for _, header := range strings.Split(requestedHeaders, ",") {
+		addHeader(header)
+	}
+
+	return strings.Join(headers, ", ")
 }
 
 func extractTokenFromRequest(c *gin.Context) string {
