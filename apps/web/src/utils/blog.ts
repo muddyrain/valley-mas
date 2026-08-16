@@ -91,7 +91,7 @@ renderer.code = (code: { text: string; lang?: string }) => {
   const lines = codeText
     .split('\n')
     .map((line) => `<span class="markdown-code-line">${highlightCode(line) || ' '}</span>`)
-    .join('');
+    .join('\n');
   const languageLabel = escapeHtml(language || 'text');
   return `<pre class="markdown-code-block"><div class="markdown-code-header"><span class="markdown-code-language">${languageLabel}</span></div><code class="language-${languageLabel}">${lines}</code></pre>`;
 };
