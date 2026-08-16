@@ -86,6 +86,57 @@ beforeEach(() => {
 });
 
 describe('BlogCreate studio article flow', () => {
+  it('can reset draft form and clear local auto draft for new article', async () => {
+    const draftKey = 'yuji-studio-article:owner-1:new';
+    window.localStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        title: '上一次未发布',
+        content: '## 草稿正文',
+        excerpt: '摘要',
+        groupId: 'react',
+        visibility: 'public',
+        cover: '',
+        savedAt: Date.now(),
+      }),
+    );
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(
+        <MemoryRouter initialEntries={['/studio/articles/new']}>
+          <Routes>
+            <Route path="/studio/articles/new" element={<BlogCreate />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+    await act(async () => Promise.resolve());
+
+    const title = container.querySelector('input[placeholder*="标题"]') as HTMLInputElement;
+    const content = container.querySelector('textarea[aria-label="正文"]') as HTMLTextAreaElement;
+
+    expect(title.value).toBe('上一次未发布');
+    expect(content.value).toBe('## 草稿正文');
+
+    const resetButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === '重置',
+    );
+    expect(resetButton).toBeDefined();
+
+    act(() => resetButton?.click());
+    await act(async () => Promise.resolve());
+
+    expect(title.value).toBe('');
+    expect(content.value).toBe('');
+    expect(window.localStorage.getItem(draftKey)).toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
   it('opens a publish review before the final publish request', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);

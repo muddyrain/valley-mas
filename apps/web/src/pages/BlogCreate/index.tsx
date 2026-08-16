@@ -6,6 +6,7 @@ import {
   ImagePlus,
   Loader2,
   Plus,
+  RotateCcw,
   Save,
   Send,
   Sparkles,
@@ -337,6 +338,16 @@ export default function BlogCreate() {
     clearStudioArticleDraft(localStorage, user.id, editorRecoveryScope);
     setAutoSaveState('idle');
   }, [editorRecoveryScope, user?.id]);
+
+  const handleResetCreateForm = useCallback(() => {
+    if (isEditMode) return;
+    resetCreateForm();
+    clearAutoSavedArticle();
+    setShowCreateGroup(false);
+    setNewGroupName('');
+    setNewGroupDesc('');
+    toast.success('已清空草稿');
+  }, [clearAutoSavedArticle, isEditMode, resetCreateForm]);
 
   useEffect(() => {
     if (!user?.id || !loadedEditorScope || loadingPost) return;
@@ -1216,6 +1227,17 @@ export default function BlogCreate() {
               <Save className="mr-2 h-4 w-4" />
               保存草稿
             </Button>
+            {!isEditMode && (
+              <Button
+                variant="outline"
+                disabled={actionBusy || loadingPost}
+                onClick={() => void handleResetCreateForm()}
+                className="rounded-xl"
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                重置
+              </Button>
+            )}
             <Button
               disabled={actionBusy}
               onClick={() => setPublishReviewOpen(true)}
