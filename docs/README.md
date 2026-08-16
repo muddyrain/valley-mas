@@ -25,7 +25,7 @@
 
 ## 子项目文档
 
-- Web 前台：`apps/web/AGENTS.md`；“雨迹”个人内容站方向见 [`apps/web/docs/YUJI_PRODUCT_SPEC.md`](../apps/web/docs/YUJI_PRODUCT_SPEC.md)，完整原型入口与打开方式见 [`apps/web/prototypes/yuji/README.md`](../apps/web/prototypes/yuji/README.md)，设计系统见 [`apps/web/prototypes/yuji/brand-spec.md`](../apps/web/prototypes/yuji/brand-spec.md)。
+- Web 前台：`apps/web/AGENTS.md`；“雨迹”个人内容站方向见 [`apps/web/docs/YUJI_PRODUCT_SPEC.md`](../apps/web/docs/YUJI_PRODUCT_SPEC.md)，液态雨膜品牌首页当前实施入口见 [`docs/plans/2026-08-15-yuji-liquid-rain-brand-homepage.md`](./plans/2026-08-15-yuji-liquid-rain-brand-homepage.md)，现有原型入口与打开方式见 [`apps/web/prototypes/yuji/README.md`](../apps/web/prototypes/yuji/README.md)，设计系统见 [`apps/web/prototypes/yuji/brand-spec.md`](../apps/web/prototypes/yuji/brand-spec.md)。
 - Admin 后台：`apps/admin/AGENTS.md`。
 - Admin 运营后台入口：`apps/admin/src/pages/admin-ops`、`apps/admin/src/api/operations.ts`；覆盖运营列表、AI 调用审计和存储资产只读治理。
 - Go 服务端：`server/AGENTS.md`、`server/README.md`、`server/migrations/README.md`。

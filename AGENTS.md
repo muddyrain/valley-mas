@@ -23,7 +23,7 @@
 - Port Warden：`AGENTS.md` -> `apps/port-warden/AGENTS.md` -> `apps/port-warden/README.md` -> `apps/port-warden/src/shared/domain.ts` -> `apps/port-warden/electron/services/port-service.ts` -> `apps/port-warden/src/App.tsx`。
 - AI Mind Arena：`AGENTS.md` -> `apps/ai-mind-arena/AGENTS.md` -> `apps/ai-mind-arena/app/page.tsx` -> `server/internal/mindarena`。
 - WorldSim：`AGENTS.md` -> `apps/world-sim/AGENTS.md` -> `apps/world-sim/src/App.tsx` -> `apps/world-sim/docs/TDD.md`。
-- Eon Vale：`AGENTS.md` -> `apps/eon-vale/AGENTS.md` -> `apps/eon-vale/docs/GAME_RULES.md` -> `apps/eon-vale/docs/PLAN.md` -> `apps/eon-vale/src/App.tsx`。
+- Eon Vale：`AGENTS.md` -> `apps/eon-vale/AGENTS.md` -> `apps/eon-vale/CONTEXT.md` -> `apps/eon-vale/docs/GAME_RULES.md` -> `apps/eon-vale/docs/PLAN.md` -> `apps/eon-vale/src/App.tsx`。
 - Scratch Legend：`AGENTS.md` -> `apps/scratch-legend/AGENTS.md` -> `apps/scratch-legend/docs/scratch-legend-task.md` -> `apps/scratch-legend/lib/game-store.ts`。
 - Toy Climb Arena：`AGENTS.md` -> `apps/toy-climb-arena/AGENTS.md` -> `apps/toy-climb-arena/docs/TASKS.md` -> `apps/toy-climb-arena/src/main.tsx`。
 - Ambient Forge：`AGENTS.md` -> `apps/ambient-forge/AGENTS.md` -> `apps/ambient-forge/docs/PLAN.md` -> `apps/ambient-forge/src/App.tsx`。

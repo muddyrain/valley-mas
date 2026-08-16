@@ -4,7 +4,7 @@
 
 ## AI 任务最小上下文入口
 
-- `AGENTS.md` -> `apps/eon-vale/AGENTS.md` -> `apps/eon-vale/docs/GAME_RULES.md` -> `apps/eon-vale/docs/PLAN.md` -> `apps/eon-vale/src/App.tsx` -> `apps/eon-vale/src/render/EonValeEngine.ts`。
+- `AGENTS.md` -> `apps/eon-vale/AGENTS.md` -> `apps/eon-vale/CONTEXT.md` -> `apps/eon-vale/docs/GAME_RULES.md` -> `apps/eon-vale/docs/PLAN.md` -> `apps/eon-vale/src/App.tsx` -> `apps/eon-vale/src/render/EonValeEngine.ts`。
 - 文档治理/约束变更任务：继续读取 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
 
 ## 关键入口
