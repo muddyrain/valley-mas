@@ -5,7 +5,22 @@ set -euo pipefail
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOT="${AGENTS_CHECK_ROOT:-$SCRIPT_ROOT}"
 
-AGENTS_CHECK_ROOT="$ROOT" python3 <<'PY'
+AGENTS_CHECK_PYTHON="${AGENTS_CHECK_PYTHON:-}"
+if [[ -z "$AGENTS_CHECK_PYTHON" ]]; then
+    for candidate in python3 python; do
+        if command -v "$candidate" >/dev/null 2>&1 && "$candidate" --version >/dev/null 2>&1; then
+            AGENTS_CHECK_PYTHON="$candidate"
+            break
+        fi
+    done
+fi
+
+if [[ -z "$AGENTS_CHECK_PYTHON" ]]; then
+    echo "FAIL: Python 3 is required for the AGENTS context check" >&2
+    exit 1
+fi
+
+AGENTS_CHECK_ROOT="$ROOT" PYTHONIOENCODING=utf-8 "$AGENTS_CHECK_PYTHON" <<'PY'
 from pathlib import Path
 import os
 import re
@@ -84,7 +99,8 @@ for path in agents_files:
         errors.append(f"{path}: encoding error (must be UTF-8)")
         continue
 
-    rel = path.relative_to(root)
+    relative_path = path.relative_to(root)
+    rel = relative_path.as_posix()
 
     if not heading_re.search(text):
         errors.append(f"{rel}: missing section 'AI 任务最小上下文入口'")
@@ -105,7 +121,7 @@ for path in agents_files:
         if required not in text:
             errors.append(f"{rel}: missing required doc reference {required}")
 
-    if not doc_lines and rel.name != "AGENTS.md":
+    if not doc_lines and relative_path.name != "AGENTS.md":
         errors.append(f"{rel}: missing 文档治理/约束变更提示 line in context section")
 
     # 至少提供 2 条信息链路（1 条本地上下文链 + 1 条治理提示）

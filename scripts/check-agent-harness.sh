@@ -5,7 +5,22 @@ set -euo pipefail
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOT="${HARNESS_ROOT:-$SCRIPT_ROOT}"
 
-HARNESS_ROOT="$ROOT" python3 <<'PY'
+HARNESS_CHECK_PYTHON="${HARNESS_CHECK_PYTHON:-}"
+if [[ -z "$HARNESS_CHECK_PYTHON" ]]; then
+    for candidate in python3 python; do
+        if command -v "$candidate" >/dev/null 2>&1 && "$candidate" --version >/dev/null 2>&1; then
+            HARNESS_CHECK_PYTHON="$candidate"
+            break
+        fi
+    done
+fi
+
+if [[ -z "$HARNESS_CHECK_PYTHON" ]]; then
+    echo "FAIL: Python 3 is required for the agent harness check" >&2
+    exit 1
+fi
+
+HARNESS_ROOT="$ROOT" PYTHONIOENCODING=utf-8 "$HARNESS_CHECK_PYTHON" <<'PY'
 import json
 import os
 import re

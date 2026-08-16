@@ -4,7 +4,22 @@ set -euo pipefail
 
 DOCS_ROOT="${DOC_LINKS_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/docs}"
 
-python3 - "$DOCS_ROOT" <<'PY'
+DOC_LINKS_CHECK_PYTHON="${DOC_LINKS_CHECK_PYTHON:-}"
+if [[ -z "$DOC_LINKS_CHECK_PYTHON" ]]; then
+    for candidate in python3 python; do
+        if command -v "$candidate" >/dev/null 2>&1 && "$candidate" --version >/dev/null 2>&1; then
+            DOC_LINKS_CHECK_PYTHON="$candidate"
+            break
+        fi
+    done
+fi
+
+if [[ -z "$DOC_LINKS_CHECK_PYTHON" ]]; then
+    echo "FAIL: Python 3 is required for the documentation link check" >&2
+    exit 1
+fi
+
+PYTHONIOENCODING=utf-8 "$DOC_LINKS_CHECK_PYTHON" - "$DOCS_ROOT" <<'PY'
 import re
 import sys
 from pathlib import Path
