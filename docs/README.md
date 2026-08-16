@@ -34,7 +34,7 @@
 - Port Warden：`apps/port-warden/AGENTS.md`、`apps/port-warden/README.md`；macOS/Windows 本地 TCP 监听端口、进程与项目归属、精确 PID 身份复核、安全停止、双平台构建与运行时验收入口。
 - AI Mind Arena：`apps/ai-mind-arena/AGENTS.md`、`apps/ai-mind-arena/README.md`、`server/internal/model/mind_arena.go`。
 - WorldSim：`apps/world-sim/AGENTS.md`、`apps/world-sim/docs/*`。
-- Eon Vale：`apps/eon-vale/AGENTS.md`、`apps/eon-vale/docs/GAME_RULES.md`、`apps/eon-vale/docs/PLAN.md`；游戏规则真源、已交付状态、2D 神明沙盒模拟与验收入口。
+- Eon Vale：`apps/eon-vale/AGENTS.md`、[`apps/eon-vale/CONTEXT.md`](../apps/eon-vale/CONTEXT.md)、[`apps/eon-vale/docs/GAME_RULES.md`](../apps/eon-vale/docs/GAME_RULES.md)、[`apps/eon-vale/docs/PLAN.md`](../apps/eon-vale/docs/PLAN.md)、[`apps/eon-vale/docs/adr/`](../apps/eon-vale/docs/adr/)；领域语言、游戏规则真源、已交付状态与关键架构决定入口。
 - Toy Climb Arena：`apps/toy-climb-arena/AGENTS.md`、`apps/toy-climb-arena/docs/*`。
 - Scratch Legend：`apps/scratch-legend/AGENTS.md`、`apps/scratch-legend/docs/*`。
 - Ambient Forge：`apps/ambient-forge/AGENTS.md`、`apps/ambient-forge/README.md`、`apps/ambient-forge/docs/PLAN.md`。
