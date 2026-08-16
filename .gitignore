@@ -49,6 +49,8 @@ coverage/
 .cache/
 .turbo
 .turbo/
+.omx/
+.playwright-cli/
 .playwright-mcp/
 __pycache__/
 
