@@ -45,8 +45,38 @@ describe('YujiPublicLayout', () => {
     expect(container.textContent).toContain('文章与影像');
     expect(container.textContent).toContain('文章列表内容');
     expect(container.querySelector('a[aria-current="page"]')?.textContent).toBe('文章');
-    expect(container.querySelector('a[href="https://github.com/muddyrain"]')).not.toBeNull();
+    expect(
+      container.querySelector('.yuji-header a[href="https://github.com/muddyrain"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('.yuji-footer a[href="https://github.com/muddyrain"]'),
+    ).not.toBeNull();
     expect(container.querySelector('a[href="/studio"]')).toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('floats over the brand stage without turning the home route into a nav item', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <MemoryRouter>
+          <Routes>
+            <Route path="/" element={<YujiPublicLayout />}>
+              <Route index element={<main>品牌首屏</main>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.querySelector('.yuji-header')?.classList.contains('is-home-stage')).toBe(true);
+    expect(container.querySelector('.yuji-desktop-nav a[href="/"]')).toBeNull();
+    expect(container.querySelector('.yuji-brand[aria-current="page"]')).not.toBeNull();
 
     act(() => root.unmount());
     container.remove();

@@ -69,7 +69,7 @@ afterEach(() => {
 });
 
 describe('YujiHome', () => {
-  it('reveals posts and images independently without showing fabricated hero copy', async () => {
+  it('keeps the brand stage available while posts and images reveal independently', async () => {
     vi.useFakeTimers();
     const postsRequest = deferred<typeof postPayload>();
     const resourcesRequest = deferred<typeof resourcePayload>();
@@ -88,12 +88,15 @@ describe('YujiHome', () => {
     );
 
     expect(container.querySelector('[role="status"]')).toBeNull();
-    expect(container.textContent).not.toContain('文字与影像，慢慢留下痕迹。');
+    expect(container.querySelector('.yuji-liquid-rain-stage')).not.toBeNull();
+    expect(container.textContent).toContain('在技术与影像之间，留下思考的痕迹。');
 
     act(() => vi.advanceTimersByTime(300));
-    expect(container.querySelector('[role="status"]')?.getAttribute('aria-label')).toContain(
-      '文章与影像正在显影',
-    );
+    expect(
+      Array.from(container.querySelectorAll('[role="status"]')).map((node) =>
+        node.getAttribute('aria-label'),
+      ),
+    ).toEqual(expect.arrayContaining(['文章正在显影', '影像正在显影']));
 
     await act(async () => {
       postsRequest.resolve(postPayload);
@@ -101,7 +104,7 @@ describe('YujiHome', () => {
     });
 
     expect(container.textContent).toContain('组件渲染性能优化');
-    expect(container.querySelector('[role="status"]')?.getAttribute('aria-label')).toContain(
+    expect(container.querySelector('[role="status"]')?.getAttribute('aria-label')).toBe(
       '影像正在显影',
     );
 
@@ -117,7 +120,7 @@ describe('YujiHome', () => {
     container.remove();
   });
 
-  it('uses public content APIs and links featured content into the new route family', async () => {
+  it('uses public content APIs only for the content that follows the brand stage', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -130,7 +133,7 @@ describe('YujiHome', () => {
     );
     await flush();
 
-    expect(getPosts).toHaveBeenCalledWith({ page: 1, pageSize: 4 });
+    expect(getPosts).toHaveBeenCalledWith({ page: 1, pageSize: 3 });
     expect(getAllResources).toHaveBeenCalledWith({
       page: 1,
       pageSize: 6,
@@ -139,6 +142,8 @@ describe('YujiHome', () => {
     });
     expect(container.textContent).toContain('组件渲染性能优化');
     expect(container.textContent).toContain('春日摄影之旅');
+    expect(container.querySelector('.yuji-liquid-rain-stage a[href="/articles"]')).not.toBeNull();
+    expect(container.querySelector('.yuji-liquid-rain-stage a[href="/gallery"]')).not.toBeNull();
     expect(container.querySelector('a[href="/articles/post-1"]')).not.toBeNull();
     expect(container.querySelector('a[href="/gallery/image/image-1"]')).not.toBeNull();
 
@@ -146,7 +151,7 @@ describe('YujiHome', () => {
     container.remove();
   });
 
-  it('does not flash a gallery image into the article cover while posts are still loading', async () => {
+  it('never promotes a post or gallery image into the stable brand stage', async () => {
     const postsRequest = deferred<typeof postPayload>();
     getPosts.mockReturnValueOnce(postsRequest.promise);
 
@@ -162,16 +167,15 @@ describe('YujiHome', () => {
     );
     await flush();
 
-    expect(container.querySelector('.yuji-feature-media img')).toBeNull();
+    expect(container.querySelector('.yuji-liquid-rain-stage img')).toBeNull();
 
     await act(async () => {
       postsRequest.resolve(postPayload);
       await postsRequest.promise;
     });
 
-    expect(container.querySelector<HTMLImageElement>('.yuji-feature-media img')?.src).toContain(
-      '/cover.webp',
-    );
+    expect(container.querySelector('.yuji-liquid-rain-stage img')).toBeNull();
+    expect(container.querySelector('.yuji-feature')).toBeNull();
 
     act(() => root.unmount());
     container.remove();
