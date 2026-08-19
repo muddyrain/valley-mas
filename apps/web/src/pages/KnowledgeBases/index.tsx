@@ -466,7 +466,7 @@ export default function KnowledgeBases({ embedded = false }: { embedded?: boolea
                   AI 工作台
                 </Badge>
                 <h1 className="mb-2 text-3xl font-semibold text-foreground">知识库</h1>
-                <p className="text-muted-foreground">整理智能体可使用的私有资料</p>
+                <p className="text-muted-foreground">整理工作流可检索的私有资料</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => navigate('/workbench')}>

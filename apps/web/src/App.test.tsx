@@ -30,7 +30,6 @@ vi.mock('./layouts/PrivateLabLayout', () => ({
     </section>
   ),
 }));
-vi.mock('./pages/Workbench', () => ({ default: () => <main>智能体项目内容</main> }));
 vi.mock('./pages/Login', () => ({ default: () => <main>登录页面</main> }));
 let isAuthenticated = false;
 
@@ -131,7 +130,7 @@ describe('App public routes', () => {
     container.remove();
   });
 
-  it('opens the dedicated private lab for the authenticated owner', async () => {
+  it('opens the dedicated private lab and redirects the workbench index to resources', async () => {
     isAuthenticated = true;
     const { container, root } = renderAt('/workbench');
     await act(async () => {
@@ -141,7 +140,6 @@ describe('App public routes', () => {
     });
 
     expect(container.textContent).toContain('私有实验室外壳');
-    expect(container.textContent).toContain('智能体项目内容');
 
     act(() => root.unmount());
     container.remove();

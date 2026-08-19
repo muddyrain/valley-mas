@@ -16,7 +16,7 @@ function renderAt(path: string) {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/workbench" element={<PrivateLabLayout />}>
-            <Route index element={<main>智能体内容</main>} />
+            <Route index element={<main>实验室首页内容</main>} />
             <Route path="resources" element={<main>资源内容</main>} />
             <Route path="edit" element={<main>编辑器内容</main>} />
           </Route>
@@ -33,11 +33,13 @@ describe('PrivateLabLayout', () => {
     const { container, root } = renderAt('/workbench/resources?tab=skills');
 
     expect(container.textContent).toContain('雨迹 · 私有实验室');
-    expect(container.textContent).toContain('智能体');
     expect(container.textContent).toContain('工作流');
     expect(container.textContent).toContain('知识库');
     expect(container.textContent).toContain('提示词');
     expect(container.textContent).toContain('技能');
+    expect(container.textContent).toContain('图片进阶');
+    expect(container.textContent).not.toContain('智能体');
+    expect(container.textContent).not.toContain('动态表情');
     expect(container.textContent).toContain('资源内容');
     expect(
       container.querySelector('a[href="/workbench/resources?tab=skills"][aria-current="page"]'),

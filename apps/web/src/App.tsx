@@ -27,10 +27,7 @@ const InspectorRuntime = import.meta.env.DEV
 const PrivateLabLayout = lazy(() => import('./layouts/PrivateLabLayout'));
 const WorkbenchLayout = lazy(() => import('./layouts/WorkbenchLayout'));
 const StudioLayout = lazy(() => import('./layouts/StudioLayout'));
-const AIAppConversation = lazy(() => import('./pages/AIAppConversation'));
-const AIAppEditor = lazy(() => import('./pages/AIAppEditor'));
 const AIImageStudio = lazy(() => import('./pages/AIImageStudio'));
-const AIMotionStickers = lazy(() => import('./pages/AIMotionStickers'));
 const AIResources = lazy(() => import('./pages/AIResources'));
 const BlogCreate = lazy(() => import('./pages/BlogCreate'));
 const BlogGroupManage = lazy(() => import('./pages/BlogGroupManage'));
@@ -52,7 +49,6 @@ const StudioHome = lazy(() => import('./pages/StudioHome'));
 const StudioImageCreator = lazy(() => import('./pages/StudioImageCreator'));
 const StudioImageImport = lazy(() => import('./pages/StudioImageImport'));
 const StudioImageLibrary = lazy(() => import('./pages/StudioImageLibrary'));
-const Workbench = lazy(() => import('./pages/Workbench'));
 const WorkflowEditor = lazy(() => import('./pages/WorkflowEditor'));
 const WorkflowTemplateDetail = lazy(() => import('./pages/WorkflowTemplateDetail'));
 
@@ -125,23 +121,17 @@ function RouteTitle() {
     } else if (pathname === '/studio/columns') {
       title = '专栏管理 | 雨迹';
     } else if (pathname === '/workbench') {
-      title = '智能体 | 雨迹实验室';
+      title = '工作流资源 | 雨迹实验室';
     } else if (pathname.startsWith('/workbench/images')) {
       title = '图片进阶 | 雨迹实验室';
-    } else if (pathname === '/workbench/gifs') {
-      title = '动态表情 | 雨迹实验室';
     } else if (pathname === '/workbench/resources') {
-      title = '资源 | 雨迹实验室';
+      title = 'AI 资源 | 雨迹实验室';
     } else if (pathname.startsWith('/workbench/templates/')) {
       title = '工作流模板 | 雨迹实验室';
     } else if (pathname.startsWith('/workbench/create')) {
       title = '创建工作流 | 雨迹实验室';
     } else if (pathname.startsWith('/workbench/edit')) {
       title = '编辑工作流 | 雨迹实验室';
-    } else if (pathname.startsWith('/workbench/apps/')) {
-      title = pathname.endsWith('/settings')
-        ? '智能体设置 | 雨迹实验室'
-        : '智能体对话 | 雨迹实验室';
     } else if (pathname === '/tools/format') {
       title = '实用工具 | Valley';
     } else if (pathname === '/labs/climber') {
@@ -262,11 +252,10 @@ function App() {
               </RequireAuth>
             }
           >
-            <Route index element={<Workbench />} />
+            <Route index element={<Navigate to="/workbench/resources?tab=workflows" replace />} />
             <Route path="create" element={<WorkflowEditorWithKey />} />
             <Route path="images" element={<Navigate to="/studio/images" replace />} />
             <Route path="images/advanced" element={<AIImageStudio />} />
-            <Route path="gifs" element={<AIMotionStickers />} />
             <Route path="resources" element={<AIResources />} />
             <Route
               path="workflows"
@@ -274,12 +263,6 @@ function App() {
             />
             <Route path="templates/:templateId" element={<WorkflowTemplateDetail />} />
             <Route path="edit" element={<WorkflowEditorWithKey />} />
-            <Route
-              path="apps/:appId/conversations/:conversationId"
-              element={<AIAppConversation />}
-            />
-            <Route path="apps/:appId/settings" element={<AIAppEditor />} />
-            <Route path="apps/:appId" element={<AIAppConversation />} />
             <Route
               path="knowledge"
               element={<Navigate to="/workbench/resources?tab=knowledge" replace />}

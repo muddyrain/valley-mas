@@ -1,7 +1,7 @@
-import { Bot, Cable, Wrench } from 'lucide-react';
+import { Cable, Wrench } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { type AIAppTool, getAPIErrorMessage, listAIAppTools } from '@/api/aiWorkbench';
+import { getAPIErrorMessage } from '@/api/aiWorkbench';
 import { listWorkflowCapabilities, type WorkflowToolCapability } from '@/api/workflow';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,17 +46,15 @@ function ToolCatalogSkeleton() {
 
 export default function ToolResources() {
   const [tools, setTools] = useState<WorkflowToolCapability[]>([]);
-  const [agentTools, setAgentTools] = useState<AIAppTool[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    void Promise.all([listWorkflowCapabilities(), listAIAppTools()])
-      .then(([capabilities, agentCatalog]) => {
+    void listWorkflowCapabilities()
+      .then((capabilities) => {
         if (!active) return;
         setTools(capabilities.toolCapabilities);
-        setAgentTools(agentCatalog.list);
       })
       .catch((loadError) => {
         if (!active) return;
@@ -72,10 +70,6 @@ export default function ToolResources() {
     };
   }, []);
 
-  const agentToolNames = new Set(
-    agentTools.filter((tool) => tool.permission === 'read').map((tool) => tool.name),
-  );
-
   return (
     <div className="space-y-8">
       <section aria-labelledby="ai-tool-catalog-title">
@@ -84,9 +78,7 @@ export default function ToolResources() {
             <h2 id="ai-tool-catalog-title" className="text-lg font-semibold text-foreground">
               工具目录
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              在智能体或工作流编辑器中选择已支持的工具。
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">在工作流编辑器中选择已支持的工具。</p>
           </div>
           {!loading && !error ? <Badge variant="outline">{tools.length} 个工具</Badge> : null}
         </div>
@@ -102,7 +94,6 @@ export default function ToolResources() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {tools.map((tool) => {
-              const agentAvailable = agentToolNames.has(tool.id);
               return (
                 <Card key={tool.id} size="sm" className="min-h-44">
                   <CardHeader>
@@ -138,12 +129,6 @@ export default function ToolResources() {
                         <Cable className="size-3" />
                         工作流可用
                       </Badge>
-                      {agentAvailable ? (
-                        <Badge variant="outline" className="gap-1">
-                          <Bot className="size-3" />
-                          智能体可用
-                        </Badge>
-                      ) : null}
                       {!tool.available ? <Badge variant="destructive">暂不可用</Badge> : null}
                     </div>
                   </CardContent>

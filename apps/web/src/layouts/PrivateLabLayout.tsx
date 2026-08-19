@@ -1,14 +1,12 @@
 import {
   ArrowLeft,
   ArrowUpRight,
-  Bot,
   BrainCircuit,
   FileText,
   GitBranch,
   ImagePlus,
   Menu,
   Puzzle,
-  Sparkles,
   X,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -20,7 +18,6 @@ const labGroups = [
   {
     label: '构建',
     items: [
-      { to: '/workbench', label: '智能体', icon: Bot, exact: true },
       {
         to: '/workbench/resources?tab=workflows',
         label: '工作流',
@@ -49,10 +46,7 @@ const labGroups = [
   },
   {
     label: '生成',
-    items: [
-      { to: '/workbench/images/advanced', label: '图片进阶', icon: ImagePlus },
-      { to: '/workbench/gifs', label: '动态表情', icon: Sparkles },
-    ],
+    items: [{ to: '/workbench/images/advanced', label: '图片进阶', icon: ImagePlus }],
   },
 ] as const;
 
@@ -64,7 +58,6 @@ function isLabItemActive(pathname: string, search: string, item: LabItem) {
     const activeTab = new URLSearchParams(search).get('tab') || 'workflows';
     return activeTab === item.resourceTab;
   }
-  if ('exact' in item && item.exact) return pathname === item.to;
   return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
@@ -107,11 +100,7 @@ function LabNavigation({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function isFullScreenWorkspace(pathname: string) {
-  return (
-    pathname.startsWith('/workbench/create') ||
-    pathname.startsWith('/workbench/edit') ||
-    pathname.startsWith('/workbench/apps/')
-  );
+  return pathname.startsWith('/workbench/create') || pathname.startsWith('/workbench/edit');
 }
 
 export default function PrivateLabLayout() {
@@ -124,7 +113,11 @@ export default function PrivateLabLayout() {
     <div className="flex h-svh overflow-hidden bg-background text-foreground">
       <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-card md:flex">
         <div className="flex h-16 items-center border-b border-border px-4">
-          <Link to="/workbench" className="flex items-center gap-3" aria-label="雨迹私有实验室首页">
+          <Link
+            to="/workbench/resources?tab=workflows"
+            className="flex items-center gap-3"
+            aria-label="雨迹私有实验室首页"
+          >
             <span className="flex size-9 items-center justify-center rounded-full border border-border bg-background font-serif text-lg">
               雨
             </span>
@@ -170,7 +163,10 @@ export default function PrivateLabLayout() {
           >
             <Menu />
           </Button>
-          <Link to="/workbench" className="font-serif text-base font-semibold">
+          <Link
+            to="/workbench/resources?tab=workflows"
+            className="font-serif text-base font-semibold"
+          >
             雨迹 · 私有实验室
           </Link>
           <Link to="/studio" aria-label="返回创作室" className="text-muted-foreground">

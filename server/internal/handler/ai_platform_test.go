@@ -2,10 +2,8 @@ package handler
 
 import (
 	"bytes"
-	"context"
-	"crypto/sha256"
-	"encoding/json"
 	"errors"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -14,11 +12,9 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
-	"valley-server/internal/aiapp"
 	"valley-server/internal/aiclient"
 	"valley-server/internal/aimodel"
 	"valley-server/internal/config"
@@ -54,22 +50,10 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		&model.AIAppVersion{},
 		&model.AIAppVersionKnowledgeBase{},
 		&model.AIAppVersionToolBinding{},
-		&model.AIAppConversation{},
-		&model.AIAppConversationMessage{},
-		&model.AIAppConversationToolTrace{},
-		&model.AIAppTask{},
-		&model.AIAppToolApproval{},
-		&model.AIAppTaskClarification{},
-		&model.AIAppConversationAttachment{},
-		&model.AIAppArtifact{},
 		&model.AIAppRun{},
 		&model.AIImageGeneration{},
 		&model.AIImageConversation{},
 		&model.AIImageConversationMessage{},
-		&model.AIAPIKey{},
-		&model.AIAPIKeyAppBinding{},
-		&model.AIAPIKeyDailyUsage{},
-		&model.AIAppPublicInvocation{},
 		&model.AIModel{},
 		&model.AIUsageLog{},
 		&model.AIKnowledgeBase{},
@@ -105,12 +89,6 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	router := gin.New()
 	auth := router.Group("/ai")
 	auth.Use(middleware.Auth(&config.Config{JWT: config.JWTConfig{Secret: aiPlatformTestSecret}}))
-	auth.POST("/apps", CreateAIApp)
-	auth.GET("/apps/:appId", GetAIApp)
-	auth.GET("/apps/:appId/outputs", ListAIAppOutputs)
-	auth.GET("/apps/:appId/artifacts/:artifactId/download-url", GetAIAppArtifactDownloadURL)
-	auth.DELETE("/apps/:appId", DeleteAIApp)
-	auth.POST("/app-assistant/proposals", CreateAIAppProposal)
 	auth.POST("/prompt-assistant/suggestions", CreatePromptAssistantSuggestion)
 	auth.GET("/workbench/copilot/session", GetWorkbenchCopilotSession)
 	auth.GET("/workbench/copilot/sessions", ListWorkbenchCopilotSessions)
@@ -119,10 +97,6 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.GET("/workbench/copilot/runs/:runId/events", StreamWorkbenchCopilotRunEvents)
 	auth.POST("/workbench/copilot/runs/:runId/cancel", CancelWorkbenchCopilotRun)
 	auth.PATCH("/workbench/copilot/proposals/:proposalId", UpdateWorkbenchCopilotProposal)
-	auth.POST("/apps/:appId/versions", SaveAIAppVersion)
-	auth.POST("/apps/:appId/restore", RestoreAIAppVersion)
-	auth.POST("/apps/:appId/debug", DebugAIApp)
-	auth.POST("/apps/:appId/avatar/generate", GenerateAIAppAvatar)
 	auth.GET("/knowledge-bases", ListAIKnowledgeBases)
 	auth.GET("/knowledge-bases/:knowledgeBaseId/documents", ListAIKnowledgeDocuments)
 	auth.GET("/knowledge-bases/:knowledgeBaseId/documents/:documentId/chunks", ListAIKnowledgeDocumentChunks)
@@ -132,25 +106,6 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.DELETE("/knowledge-bases/:knowledgeBaseId", DeleteAIKnowledgeBase)
 	auth.GET("/apps/:appId/knowledge-bases", ListAIAppKnowledgeBases)
 	auth.PUT("/apps/:appId/knowledge-bases", ReplaceAIAppKnowledgeBases)
-	auth.GET("/apps/:appId/retrieval-config", GetAIAppRetrievalConfig)
-	auth.PUT("/apps/:appId/retrieval-config", UpdateAIAppRetrievalConfig)
-	auth.GET("/api-keys/:keyId/apps", ListAIAPIKeyAppBindings)
-	auth.PUT("/api-keys/:keyId/apps", ReplaceAIAPIKeyAppBindings)
-	auth.GET("/apps/:appId/public-invocations", ListAIAppPublicInvocations)
-	auth.GET("/apps/:appId/conversations", ListAIAppConversations)
-	auth.POST("/apps/:appId/conversations", CreateAIAppConversation)
-	auth.GET("/apps/:appId/conversations/:conversationId", GetAIAppConversation)
-	auth.DELETE("/apps/:appId/conversations/:conversationId", DeleteAIAppConversation)
-	auth.POST("/apps/:appId/conversations/:conversationId/chat", ChatWithAIAppConversation)
-	auth.POST("/apps/:appId/conversations/:conversationId/attachments", UploadAIAppConversationAttachment)
-	auth.GET("/apps/:appId/conversations/:conversationId/attachments/:attachmentId", DownloadAIAppConversationAttachment)
-	auth.DELETE("/apps/:appId/conversations/:conversationId/attachments/:attachmentId", DeleteAIAppConversationAttachment)
-	auth.POST("/apps/:appId/conversations/:conversationId/tasks", CreateAIAppConversationTask)
-	auth.GET("/apps/:appId/tasks", ListAIAppTasks)
-	auth.POST("/apps/:appId/tasks/:taskId/approvals/:approvalId/decision", DecideAIAppToolApproval)
-	auth.POST("/apps/:appId/tasks/:taskId/clarifications/:clarificationId/decision", DecideAIAppTaskClarification)
-	auth.POST("/apps/:appId/tasks/:taskId/retry", RetryAIAppTask)
-	auth.POST("/apps/:appId/tasks/:taskId/cancel", CancelAIAppTask)
 	auth.GET("/image-conversations", ListAIImageConversations)
 	auth.GET("/image-conversations/current", GetCurrentAIImageConversation)
 	auth.DELETE("/image-conversations/current", ClearCurrentAIImageConversation)
@@ -158,140 +113,7 @@ func setupAIPlatformTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	auth.GET("/image-conversations/:conversationId", GetAIImageConversation)
 	auth.DELETE("/image-conversations/:conversationId/messages", ClearAIImageConversation)
 	auth.POST("/image-conversations/:conversationId/messages", AddAIImageConversationMessage)
-	public := router.Group("/public")
-	public.POST("/ai/apps/:appId/chat", PublicAIAppChat)
 	return router, db
-}
-
-func TestListAIAppOutputsReturnsOnlyLinkedOwnerOutputs(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "output-agent"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	conversation := model.AIAppConversation{UserID: 101, AppID: app.ID, VersionID: 1, Title: "outputs"}
-	if err := db.Create(&conversation).Error; err != nil {
-		t.Fatalf("create conversation: %v", err)
-	}
-	ownedImage := model.AIImageGeneration{UserID: 101, Source: "agent", ModelCatalogID: 1, Provider: "test", Model: "image", Prompt: "owned", AspectRatio: "1:1", Quality: "1K", RequestedSize: "1024x1024", Status: "succeeded", ResultURL: "https://example.com/owned.png"}
-	foreignImage := model.AIImageGeneration{UserID: 202, Source: "agent", ModelCatalogID: 1, Provider: "test", Model: "image", Prompt: "foreign", AspectRatio: "1:1", Quality: "1K", RequestedSize: "1024x1024", Status: "succeeded", ResultURL: "https://example.com/foreign.png"}
-	if err := db.Create(&ownedImage).Error; err != nil {
-		t.Fatalf("create owned image: %v", err)
-	}
-	if err := db.Create(&foreignImage).Error; err != nil {
-		t.Fatalf("create foreign image: %v", err)
-	}
-	imageIDs, _ := json.Marshal([]model.Int64String{ownedImage.ID, ownedImage.ID, foreignImage.ID})
-	message := model.AIAppConversationMessage{UserID: 101, AppID: app.ID, ConversationID: conversation.ID, Role: "assistant", Content: "done", ImageGenerationIDs: string(imageIDs)}
-	if err := db.Create(&message).Error; err != nil {
-		t.Fatalf("create message: %v", err)
-	}
-	ownedArtifact := model.AIAppArtifact{UserID: 101, AppID: app.ID, ConversationID: conversation.ID, RunID: 1, ResourceID: 1, FileName: "owned.md", ContentType: "text/markdown", SizeBytes: 5, URL: "/owned.md"}
-	foreignArtifact := model.AIAppArtifact{UserID: 202, AppID: app.ID, ConversationID: conversation.ID, RunID: 2, ResourceID: 2, FileName: "foreign.md", ContentType: "text/markdown", SizeBytes: 7, URL: "/foreign.md"}
-	if err := db.Create(&ownedArtifact).Error; err != nil {
-		t.Fatalf("create owned artifact: %v", err)
-	}
-	if err := db.Create(&foreignArtifact).Error; err != nil {
-		t.Fatalf("create foreign artifact: %v", err)
-	}
-
-	request := httptest.NewRequest(http.MethodGet, "/ai/apps/"+app.ID.String()+"/outputs", nil)
-	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("outputs response = %d body=%s", recorder.Code, recorder.Body.String())
-	}
-	if !strings.Contains(recorder.Body.String(), "owned.md") || !strings.Contains(recorder.Body.String(), "owned.png") {
-		t.Fatalf("outputs missing owner records: %s", recorder.Body.String())
-	}
-	if strings.Contains(recorder.Body.String(), "foreign.md") || strings.Contains(recorder.Body.String(), "foreign.png") {
-		t.Fatalf("outputs leaked foreign records: %s", recorder.Body.String())
-	}
-	if strings.Contains(recorder.Body.String(), "/owned.md") {
-		t.Fatalf("outputs exposed the backing object URL: %s", recorder.Body.String())
-	}
-	if strings.Count(recorder.Body.String(), "owned.png") != 1 {
-		t.Fatalf("linked image was not deduplicated: %s", recorder.Body.String())
-	}
-}
-
-func TestGetAIAppArtifactDownloadURLIsOwnerScopedAndRejectsExpiredOutput(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "Artifact owner"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	future := time.Now().Add(time.Hour)
-	artifact := model.AIAppArtifact{
-		UserID: 101, AppID: app.ID, ConversationID: 12, RunID: 13, ResourceID: 14,
-		FileName: "report.docx", ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-		SizeBytes: 20, URL: "https://example.invalid/private/report.docx", ExpiresAt: &future,
-	}
-	if err := db.Create(&artifact).Error; err != nil {
-		t.Fatalf("create artifact: %v", err)
-	}
-
-	path := fmt.Sprintf("/ai/apps/%s/artifacts/%s/download-url", app.ID, artifact.ID)
-	owned := httptest.NewRequest(http.MethodGet, path, nil)
-	owned.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	ownedRecorder := httptest.NewRecorder()
-	router.ServeHTTP(ownedRecorder, owned)
-	if ownedRecorder.Code != http.StatusOK || !strings.Contains(ownedRecorder.Body.String(), artifact.URL) {
-		t.Fatalf("owner download URL = %d body=%s", ownedRecorder.Code, ownedRecorder.Body.String())
-	}
-
-	foreign := httptest.NewRequest(http.MethodGet, path, nil)
-	foreign.Header.Set("Authorization", aiPlatformAuthHeaderFor(t, "202", "other-user"))
-	foreignRecorder := httptest.NewRecorder()
-	router.ServeHTTP(foreignRecorder, foreign)
-	if foreignRecorder.Code != http.StatusOK || !strings.Contains(foreignRecorder.Body.String(), `"code":404`) {
-		t.Fatalf("foreign artifact access was not rejected: %d body=%s", foreignRecorder.Code, foreignRecorder.Body.String())
-	}
-
-	past := time.Now().Add(-time.Minute)
-	if err := db.Model(&artifact).Update("expires_at", past).Error; err != nil {
-		t.Fatalf("expire artifact: %v", err)
-	}
-	expired := httptest.NewRequest(http.MethodGet, path, nil)
-	expired.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	expiredRecorder := httptest.NewRecorder()
-	router.ServeHTTP(expiredRecorder, expired)
-	if expiredRecorder.Code != http.StatusOK || !strings.Contains(expiredRecorder.Body.String(), `"code":410`) {
-		t.Fatalf("expired artifact response = %d body=%s", expiredRecorder.Code, expiredRecorder.Body.String())
-	}
-}
-
-func TestSelectAIAppConversationModelUsesConversationModelForVision(t *testing.T) {
-	config := aiapp.Config{ModelID: "text-model", VisionModelID: "vision-model"}
-	tests := []struct {
-		name           string
-		requested      string
-		hasImages      bool
-		wantModel      string
-		wantCapability string
-		wantCode       string
-	}{
-		{name: "text default", wantModel: "text-model", wantCapability: "text", wantCode: "MODEL_NOT_SELECTED"},
-		{name: "text override", requested: "temporary-text", wantModel: "temporary-text", wantCapability: "text", wantCode: "MODEL_NOT_SELECTED"},
-		{name: "vision uses conversation override", requested: "temporary-text", hasImages: true, wantModel: "temporary-text", wantCapability: "vision", wantCode: "MODEL_NOT_SELECTED"},
-		{name: "vision uses conversation default", hasImages: true, wantModel: "text-model", wantCapability: "vision", wantCode: "MODEL_NOT_SELECTED"},
-		{name: "vision still requires a conversation model", hasImages: true, wantModel: "", wantCapability: "vision", wantCode: "MODEL_NOT_SELECTED"},
-	}
-	configWithoutText := config
-	configWithoutText.ModelID = ""
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			current := config
-			if test.name == "vision still requires a conversation model" {
-				current = configWithoutText
-			}
-			gotModel, gotCapability, gotCode := selectAIAppConversationModel(current, test.requested, test.hasImages)
-			if gotModel != test.wantModel || gotCapability != test.wantCapability || gotCode != test.wantCode {
-				t.Fatalf("selection = (%q, %q, %q), want (%q, %q, %q)", gotModel, gotCapability, gotCode, test.wantModel, test.wantCapability, test.wantCode)
-			}
-		})
-	}
 }
 
 func createAIPlatformCatalogModel(t *testing.T, db *gorm.DB, capabilities ...string) model.AIModel {
@@ -308,6 +130,49 @@ func createAIPlatformCatalogModel(t *testing.T, db *gorm.DB, capabilities ...str
 	}
 	return item
 }
+
+
+func aiPlatformAuthHeader(t *testing.T) string {
+	return aiPlatformAuthHeaderFor(t, "101", "platform-user")
+}
+
+
+func aiPlatformAuthHeaderFor(t *testing.T, userID, username string) string {
+	t.Helper()
+	token, err := utils.GenerateToken(userID, username, "user", aiPlatformTestSecret, 1)
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+	return "Bearer " + token
+}
+
+
+func plainTextPDF(text string) []byte {
+	stream := "BT\n/F1 12 Tf\n72 720 Td\n(" + text + ") Tj\nET\n"
+	objects := []string{
+		"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+		"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+		"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n",
+		fmt.Sprintf("4 0 obj\n<< /Length %d >>\nstream\n%sendstream\nendobj\n", len(stream), stream),
+		"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+	}
+
+	var document bytes.Buffer
+	document.WriteString("%PDF-1.4\n")
+	offsets := make([]int, 0, len(objects))
+	for _, object := range objects {
+		offsets = append(offsets, document.Len())
+		document.WriteString(object)
+	}
+	xrefOffset := document.Len()
+	fmt.Fprintf(&document, "xref\n0 %d\n0000000000 65535 f \n", len(objects)+1)
+	for _, offset := range offsets {
+		fmt.Fprintf(&document, "%010d 00000 n \n", offset)
+	}
+	fmt.Fprintf(&document, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(objects)+1, xrefOffset)
+	return document.Bytes()
+}
+
 
 func TestCreateAIKnowledgeTextDocumentSharesWorkflowIngestionContract(t *testing.T) {
 	_, db := setupAIPlatformTestRouter(t)
@@ -340,87 +205,7 @@ func TestCreateAIKnowledgeTextDocumentSharesWorkflowIngestionContract(t *testing
 	}
 }
 
-func TestDeleteAIAppRemovesOnlyOwnedAgentAndItsAppRecords(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "delete-me"}
-	otherApp := model.AIApp{UserID: 202, Type: aiAppTypeAgent, Name: "keep-me"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Create(&otherApp).Error; err != nil {
-		t.Fatal(err)
-	}
-	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{}`}
-	conversation := model.AIAppConversation{UserID: 101, AppID: app.ID, VersionID: version.ID, Title: "history"}
-	key := model.AIAPIKey{UserID: 101, Name: "delete-key", KeyPrefix: "delete", KeyHash: "hash", Status: "active"}
-	if err := db.Create(&version).Error; err != nil {
-		t.Fatal(err)
-	}
-	conversation.VersionID = version.ID
-	if err := db.Create(&conversation).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Create(&key).Error; err != nil {
-		t.Fatal(err)
-	}
-	for _, item := range []any{
-		&model.AIAppVersionKnowledgeBase{AppVersionID: version.ID, KnowledgeBaseID: 1},
-		&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: "content.search"},
-		&model.AIAppKnowledgeBase{AppID: app.ID, KnowledgeBaseID: 1},
-		&model.AIAPIKeyAppBinding{APIKeyID: key.ID, AppID: app.ID},
-		&model.AIAppConversationMessage{UserID: 101, AppID: app.ID, ConversationID: conversation.ID, Role: "user", Content: "hello"},
-		&model.AIAppConversationToolTrace{UserID: 101, AppID: app.ID, ConversationID: conversation.ID, RunID: 1, ToolName: "content.search", Status: "succeeded"},
-		&model.AIAppRun{AppID: app.ID, VersionID: version.ID, ConversationID: &conversation.ID, UserID: 101, Status: "succeeded", Model: "test", Input: "hello"},
-		&model.AIAppPublicInvocation{UserID: 101, AppID: app.ID, VersionID: version.ID, APIKeyID: key.ID, Status: "succeeded"},
-	} {
-		if err := db.Create(item).Error; err != nil {
-			t.Fatalf("seed dependent record: %v", err)
-		}
-	}
 
-	foreign := httptest.NewRequest(http.MethodDelete, "/ai/apps/"+app.ID.String(), nil)
-	foreign.Header.Set("Authorization", aiPlatformAuthHeaderFor(t, "202", "other-user"))
-	foreignRecorder := httptest.NewRecorder()
-	router.ServeHTTP(foreignRecorder, foreign)
-	if responseCode(foreignRecorder) != http.StatusNotFound {
-		t.Fatalf("foreign delete response=%s", foreignRecorder.Body.String())
-	}
-
-	request := httptest.NewRequest(http.MethodDelete, "/ai/apps/"+app.ID.String(), nil)
-	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("delete response=%s", recorder.Body.String())
-	}
-
-	assertNoAppRows := func(label string, entity any) {
-		t.Helper()
-		var count int64
-		if err := db.Model(entity).Where("app_id = ?", app.ID).Count(&count).Error; err != nil || count != 0 {
-			t.Fatalf("%s count=%d err=%v", label, count, err)
-		}
-	}
-	assertNoAppRows("versions", &model.AIAppVersion{})
-	assertNoAppRows("conversations", &model.AIAppConversation{})
-	assertNoAppRows("messages", &model.AIAppConversationMessage{})
-	assertNoAppRows("tool traces", &model.AIAppConversationToolTrace{})
-	assertNoAppRows("runs", &model.AIAppRun{})
-	assertNoAppRows("public invocations", &model.AIAppPublicInvocation{})
-	assertNoAppRows("api key bindings", &model.AIAPIKeyAppBinding{})
-	assertNoAppRows("knowledge bindings", &model.AIAppKnowledgeBase{})
-	var versionBindingCount int64
-	if err := db.Model(&model.AIAppVersionKnowledgeBase{}).Where("app_version_id = ?", version.ID).Count(&versionBindingCount).Error; err != nil || versionBindingCount != 0 {
-		t.Fatalf("knowledge snapshot count=%d err=%v", versionBindingCount, err)
-	}
-	if err := db.Model(&model.AIAppVersionToolBinding{}).Where("app_version_id = ?", version.ID).Count(&versionBindingCount).Error; err != nil || versionBindingCount != 0 {
-		t.Fatalf("tool snapshot count=%d err=%v", versionBindingCount, err)
-	}
-	var retained int64
-	if err := db.Model(&model.AIApp{}).Where("id = ?", otherApp.ID).Count(&retained).Error; err != nil || retained != 1 {
-		t.Fatalf("other app count=%d err=%v", retained, err)
-	}
-}
 
 func TestCancelWorkbenchCopilotRunRequiresOwnerAndSignalsActiveRun(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
@@ -452,6 +237,8 @@ func TestCancelWorkbenchCopilotRunRequiresOwnerAndSignalsActiveRun(t *testing.T)
 		t.Fatal("copilot run context was not cancelled")
 	}
 }
+
+
 
 func TestStreamWorkbenchCopilotRunEventsReplaysMissingOwnerEvents(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
@@ -490,213 +277,7 @@ func TestStreamWorkbenchCopilotRunEventsReplaysMissingOwnerEvents(t *testing.T) 
 	}
 }
 
-func TestConsumeAIAPIKeyDailyUsageStopsAtDailyLimit(t *testing.T) {
-	_, db := setupAIPlatformTestRouter(t)
-	key := model.AIAPIKey{UserID: 101, Name: "public-api-key", KeyPrefix: "valley_test", KeyHash: "hash", Status: "active"}
-	if err := db.Create(&key).Error; err != nil {
-		t.Fatalf("create api key: %v", err)
-	}
 
-	for call := 1; call <= aiAPIKeyDailyCallLimit; call++ {
-		remaining, err := consumeAIAPIKeyDailyUsage(db, key.ID, "2026-07-14")
-		if err != nil {
-			t.Fatalf("consume call %d: %v", call, err)
-		}
-		if remaining != aiAPIKeyDailyCallLimit-call {
-			t.Fatalf("call %d remaining = %d, want %d", call, remaining, aiAPIKeyDailyCallLimit-call)
-		}
-	}
-
-	if _, err := consumeAIAPIKeyDailyUsage(db, key.ID, "2026-07-14"); err != ErrAIAPIKeyDailyQuotaExceeded {
-		t.Fatalf("101st call error = %v, want %v", err, ErrAIAPIKeyDailyQuotaExceeded)
-	}
-}
-
-func TestPublicAIAppChatRejectsUnboundKeyAndWritesMetadataOnlyLog(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "公开应用"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	rawKey := "valley_public-api-test-key"
-	digest := sha256.Sum256([]byte(rawKey))
-	key := model.AIAPIKey{UserID: 101, Name: "public-api-key", KeyPrefix: "valley_public", KeyHash: fmt.Sprintf("%x", digest)}
-	if err := db.Create(&key).Error; err != nil {
-		t.Fatalf("create api key: %v", err)
-	}
-	body, _ := json.Marshal(map[string]any{"message": "external request must not be stored"})
-	req := httptest.NewRequest(http.MethodPost, "/public/ai/apps/"+strconv.FormatInt(int64(app.ID), 10)+"/chat", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+rawKey)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("unbound key response = %d body=%s", rec.Code, rec.Body.String())
-	}
-
-	var invocation model.AIAppPublicInvocation
-	if err := db.Where("api_key_id = ? AND app_id = ?", key.ID, app.ID).First(&invocation).Error; err != nil {
-		t.Fatalf("load invocation metadata: %v", err)
-	}
-	if invocation.Status != "rejected" || invocation.ErrorCode != "API_KEY_APP_NOT_BOUND" {
-		t.Fatalf("unexpected invocation metadata: %+v", invocation)
-	}
-}
-
-func TestPublicAIAppChatDegradesKnowledgeRetrievalInsteadOfFailing(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var payload struct {
-			Stream bool `json:"stream"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			http.Error(w, "invalid request", http.StatusBadRequest)
-			return
-		}
-		if payload.Stream {
-			w.Header().Set("Content-Type", "text/event-stream")
-			_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"content\":\"public fallback reply\"}}]}\n\n"))
-			_, _ = w.Write([]byte("data: [DONE]\n\n"))
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"model":"ep-test","choices":[{"message":{"role":"assistant","content":"public fallback reply"}}]}`))
-	}))
-	defer providerServer.Close()
-	t.Setenv("SILICONFLOW_API_KEY", "test-siliconflow-key")
-	t.Setenv("SILICONFLOW_BASE_URL", providerServer.URL)
-	catalogModel := createAIPlatformCatalogModel(t, db, "text")
-
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "公开知识降级助手"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatal(err)
-	}
-	publishedAt := time.Now()
-	version := model.AIAppVersion{
-		AppID: app.ID, Number: 1, Config: `{"systemPrompt":"优先参考知识库"}`,
-		ToolSnapshot: true, KnowledgeBaseSnapshot: true, PublishedAt: &publishedAt,
-	}
-	if err := db.Create(&version).Error; err != nil {
-		t.Fatal(err)
-	}
-	knowledgeBase := model.AIKnowledgeBase{UserID: 101, Name: "公开调用资料"}
-	if err := db.Create(&knowledgeBase).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Create(&model.AIAppVersionKnowledgeBase{AppVersionID: version.ID, KnowledgeBaseID: knowledgeBase.ID}).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Model(&app).Updates(map[string]any{"published_version_id": version.ID, "status": "published"}).Error; err != nil {
-		t.Fatal(err)
-	}
-	rawKey := "valley_public-degraded-test-key"
-	digest := sha256.Sum256([]byte(rawKey))
-	key := model.AIAPIKey{UserID: 101, Name: "public-degraded-key", KeyPrefix: "valley_public", KeyHash: fmt.Sprintf("%x", digest), Status: "active"}
-	if err := db.Create(&key).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Create(&model.AIAPIKeyAppBinding{APIKeyID: key.ID, AppID: app.ID}).Error; err != nil {
-		t.Fatal(err)
-	}
-
-	body, _ := json.Marshal(map[string]any{"message": "请结合资料回答", "modelId": catalogModel.ID.String()})
-	request := httptest.NewRequest(http.MethodPost, "/public/ai/apps/"+app.ID.String()+"/chat", bytes.NewReader(body))
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", "Bearer "+rawKey)
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, request)
-
-	if recorder.Code != http.StatusOK ||
-		!strings.Contains(recorder.Body.String(), "public fallback reply") ||
-		!strings.Contains(recorder.Body.String(), `"knowledgeStatus":"degraded"`) {
-		t.Fatalf("degraded public response = %d body=%s", recorder.Code, recorder.Body.String())
-	}
-	var invocation model.AIAppPublicInvocation
-	if err := db.Where("api_key_id = ? AND app_id = ?", key.ID, app.ID).Order("created_at DESC").First(&invocation).Error; err != nil {
-		t.Fatal(err)
-	}
-	if invocation.Status != "succeeded" || invocation.ErrorCode != "" {
-		t.Fatalf("degraded public invocation = %+v", invocation)
-	}
-}
-
-func TestReplaceAIAPIKeyAppBindingsRestrictsKeysToOwnedApps(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	key := model.AIAPIKey{UserID: 101, Name: "public-api-key", KeyPrefix: "valley_test", KeyHash: "hash"}
-	if err := db.Create(&key).Error; err != nil {
-		t.Fatalf("create api key: %v", err)
-	}
-	ownedApp := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "我的应用"}
-	foreignApp := model.AIApp{UserID: 202, Type: aiAppTypeAgent, Name: "他人的应用"}
-	if err := db.Create(&ownedApp).Error; err != nil {
-		t.Fatalf("create owned app: %v", err)
-	}
-	if err := db.Create(&foreignApp).Error; err != nil {
-		t.Fatalf("create foreign app: %v", err)
-	}
-	body, _ := json.Marshal(map[string]any{"appIds": []model.Int64String{ownedApp.ID, foreignApp.ID}})
-	req := httptest.NewRequest(http.MethodPut, "/ai/api-keys/"+strconv.FormatInt(int64(key.ID), 10)+"/apps", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "\"code\":400") {
-		t.Fatalf("foreign bind response = %d body=%s", rec.Code, rec.Body.String())
-	}
-
-	body, _ = json.Marshal(map[string]any{"appIds": []model.Int64String{ownedApp.ID}})
-	req = httptest.NewRequest(http.MethodPut, "/ai/api-keys/"+strconv.FormatInt(int64(key.ID), 10)+"/apps", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("owned bind response = %d body=%s", rec.Code, rec.Body.String())
-	}
-	var binding model.AIAPIKeyAppBinding
-	if err := db.Where("api_key_id = ? AND app_id = ?", key.ID, ownedApp.ID).First(&binding).Error; err != nil {
-		t.Fatalf("load binding: %v", err)
-	}
-}
-
-func aiPlatformAuthHeader(t *testing.T) string {
-	return aiPlatformAuthHeaderFor(t, "101", "platform-user")
-}
-
-func aiPlatformAuthHeaderFor(t *testing.T, userID, username string) string {
-	t.Helper()
-	token, err := utils.GenerateToken(userID, username, "user", aiPlatformTestSecret, 1)
-	if err != nil {
-		t.Fatalf("generate token: %v", err)
-	}
-	return "Bearer " + token
-}
-
-func plainTextPDF(text string) []byte {
-	stream := "BT\n/F1 12 Tf\n72 720 Td\n(" + text + ") Tj\nET\n"
-	objects := []string{
-		"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
-		"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
-		"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n",
-		fmt.Sprintf("4 0 obj\n<< /Length %d >>\nstream\n%sendstream\nendobj\n", len(stream), stream),
-		"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
-	}
-
-	var document bytes.Buffer
-	document.WriteString("%PDF-1.4\n")
-	offsets := make([]int, 0, len(objects))
-	for _, object := range objects {
-		offsets = append(offsets, document.Len())
-		document.WriteString(object)
-	}
-	xrefOffset := document.Len()
-	fmt.Fprintf(&document, "xref\n0 %d\n0000000000 65535 f \n", len(objects)+1)
-	for _, offset := range offsets {
-		fmt.Fprintf(&document, "%010d 00000 n \n", offset)
-	}
-	fmt.Fprintf(&document, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(objects)+1, xrefOffset)
-	return document.Bytes()
-}
 
 func TestExtractAIKnowledgeDocumentTextFromPDF(t *testing.T) {
 	text, err := extractAIKnowledgeDocumentText(".pdf", plainTextPDF("PDF knowledge content"))
@@ -707,6 +288,8 @@ func TestExtractAIKnowledgeDocumentTextFromPDF(t *testing.T) {
 		t.Fatalf("text = %q, want PDF text", text)
 	}
 }
+
+
 
 func TestUploadAIKnowledgeDocumentAcceptsTextPDF(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
@@ -747,6 +330,8 @@ func TestUploadAIKnowledgeDocumentAcceptsTextPDF(t *testing.T) {
 		t.Fatalf("unexpected document = %#v", document)
 	}
 }
+
+
 
 func TestUploadAIKnowledgeDocumentQueuesPDFVisionParsing(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
@@ -797,6 +382,8 @@ func TestUploadAIKnowledgeDocumentQueuesPDFVisionParsing(t *testing.T) {
 	}
 }
 
+
+
 func TestSplitAIKnowledgeSectionsPreservesPageAndSource(t *testing.T) {
 	chunks := splitAIKnowledgeSections([]aiKnowledgeSection{
 		{pageNumber: 2, sourceType: "text", content: "第一段\n\n第二段"},
@@ -812,6 +399,8 @@ func TestSplitAIKnowledgeSectionsPreservesPageAndSource(t *testing.T) {
 		t.Fatalf("unexpected visual chunk = %#v", chunks[1])
 	}
 }
+
+
 
 func TestPrepareAIKnowledgeDocumentChunksAddsVisualPageMetadata(t *testing.T) {
 	_, db := setupAIPlatformTestRouter(t)
@@ -868,6 +457,8 @@ func TestPrepareAIKnowledgeDocumentChunksAddsVisualPageMetadata(t *testing.T) {
 	}
 }
 
+
+
 func TestRenderAIKnowledgePDFPagesWithInstalledPoppler(t *testing.T) {
 	if _, err := exec.LookPath("pdftocairo"); err != nil {
 		t.Skip("pdftocairo 未安装；部署环境安装 Poppler 后执行真实渲染验证")
@@ -880,6 +471,8 @@ func TestRenderAIKnowledgePDFPagesWithInstalledPoppler(t *testing.T) {
 		t.Fatalf("pages = %d, want one non-empty page", len(pages))
 	}
 }
+
+
 
 func TestUploadAIKnowledgeDocumentCreatesPendingChunks(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
@@ -928,267 +521,11 @@ func TestUploadAIKnowledgeDocumentCreatesPendingChunks(t *testing.T) {
 	}
 }
 
-func TestResolveAIAppToolsReturnsOnlyBoundContentSearch(t *testing.T) {
-	_, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "检索助手"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	if err := db.Create(&[]model.AIAppToolBinding{
-		{AppID: app.ID, ToolName: "content.search"},
-		{AppID: app.ID, ToolName: "unreviewed.tool"},
-	}).Error; err != nil {
-		t.Fatalf("create bindings: %v", err)
-	}
 
-	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{}`, ToolSnapshot: true}
-	if err := db.Create(&version).Error; err != nil {
-		t.Fatalf("create version: %v", err)
-	}
-	if err := db.Create(&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: "content.search"}).Error; err != nil {
-		t.Fatalf("create tool binding: %v", err)
-	}
-	registry, names, err := resolveAIAppTools(db, app.ID, version)
-	if err != nil {
-		t.Fatalf("resolve tools: %v", err)
-	}
-	if strings.Join(names, ",") != "content.search,clarification.ask" {
-		t.Fatalf("names = %#v", names)
-	}
-	if got := registry.Filter("workbench", names); len(got) != 2 || got[0].Name() != "clarification.ask" || got[1].Name() != "content.search" {
-		t.Fatalf("resolved tools = %#v", got)
-	}
-}
-
-func TestResolveAIAppToolsAlwaysIncludesRuntimeClarification(t *testing.T) {
-	_, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "普通对话助手"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatal(err)
-	}
-	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{}`, ToolSnapshot: true}
-	if err := db.Create(&version).Error; err != nil {
-		t.Fatal(err)
-	}
-
-	registry, names, err := resolveAIAppTools(db, app.ID, version)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Join(names, ",") != "clarification.ask" {
-		t.Fatalf("names = %#v", names)
-	}
-	if registry.Get("clarification.ask") == nil {
-		t.Fatal("runtime clarification tool was not registered")
-	}
-}
-
-func TestResolveAIAppToolsRegistersConversionTools(t *testing.T) {
-	_, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "Conversion agent"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{}`, ToolSnapshot: true}
-	if err := db.Create(&version).Error; err != nil {
-		t.Fatalf("create version: %v", err)
-	}
-	for _, name := range []string{"image.convert", "document.convert"} {
-		if err := db.Create(&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: name}).Error; err != nil {
-			t.Fatalf("bind %s: %v", name, err)
-		}
-	}
-
-	registry, names, err := resolveAIAppTools(db, app.ID, version)
-	if err != nil {
-		t.Fatalf("resolve conversion tools: %v", err)
-	}
-	if strings.Join(names, ",") != "document.convert,image.convert,clarification.ask" {
-		t.Fatalf("resolved names = %#v", names)
-	}
-	for _, name := range names {
-		if registry.Get(name) == nil {
-			t.Fatalf("tool %s was not registered", name)
-		}
-	}
-}
-
-func TestResolveAIAppToolsRegistersCreatorClosureTools(t *testing.T) {
-	_, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "Creator agent"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatal(err)
-	}
-	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{}`, ToolSnapshot: true}
-	if err := db.Create(&version).Error; err != nil {
-		t.Fatal(err)
-	}
-	expected := []string{"blog.publish", "document.export", "document.overwrite", "document.save"}
-	for _, name := range expected {
-		if err := db.Create(&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: name}).Error; err != nil {
-			t.Fatal(err)
-		}
-	}
-	registry, names, err := resolveAIAppTools(db, app.ID, version)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Join(names, ",") != strings.Join(append(expected, "clarification.ask"), ",") {
-		t.Fatalf("names = %#v", names)
-	}
-	for _, name := range names {
-		if registry.Get(name) == nil {
-			t.Fatalf("tool %s was not registered", name)
-		}
-	}
-}
-
-func TestValidateInitialAIAppToolsAcceptsReviewedConversions(t *testing.T) {
-	names, err := validateInitialAIAppTools([]string{"image.convert", "document.convert"})
-	if err != nil {
-		t.Fatalf("validate conversion tools: %v", err)
-	}
-	if strings.Join(names, ",") != "image.convert,document.convert" {
-		t.Fatalf("validated names = %#v", names)
-	}
-}
-
-func TestValidateInitialAIAppToolsAcceptsCreatorClosureTools(t *testing.T) {
-	want := []string{"document.export", "document.save", "document.overwrite", "blog.publish"}
-	names, err := validateInitialAIAppTools(want)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Join(names, ",") != strings.Join(want, ",") {
-		t.Fatalf("names = %#v", names)
-	}
-}
-
-func TestAppendContentSearchDateContext(t *testing.T) {
-	now := time.Date(2026, time.July, 15, 16, 5, 6, 0, time.UTC)
-	baseSystem := "仅根据私有资料回答。"
-
-	got := appendContentSearchDateContext(baseSystem, []string{"content.search"}, now)
-	want := baseSystem + "\n\n当前中国标准时间（CST，UTC+08:00）为 2026-07-16 00:05:06。调用 content.search 前，必须将用户的相对日期或未写年份、月份的日期换算为明确的 YYYY-MM-DD 日期范围后再调用工具。"
-	if got != want {
-		t.Fatalf("content.search system prompt = %q, want %q", got, want)
-	}
-
-	withoutSearch := appendContentSearchDateContext(baseSystem, []string{"blog.create_draft"}, now)
-	if withoutSearch != baseSystem {
-		t.Fatalf("system prompt without content.search = %q, want %q", withoutSearch, baseSystem)
-	}
-}
-
-func TestAIAppContentSearchDateContextReachesCatalogModelOnlyWhenBound(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	var (
-		requestMu sync.Mutex
-		systems   []string
-	)
-	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var payload struct {
-			Messages []struct {
-				Role    string `json:"role"`
-				Content string `json:"content"`
-			} `json:"messages"`
-			Stream bool `json:"stream"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			t.Errorf("decode compatible provider request: %v", err)
-			http.Error(w, "invalid request", http.StatusBadRequest)
-			return
-		}
-		for _, message := range payload.Messages {
-			if message.Role == "system" {
-				requestMu.Lock()
-				systems = append(systems, message.Content)
-				requestMu.Unlock()
-				break
-			}
-		}
-		if payload.Stream {
-			w.Header().Set("Content-Type", "text/event-stream")
-			_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"content\":\"integration reply\"}}]}\n\n"))
-			_, _ = w.Write([]byte("data: [DONE]\n\n"))
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"model":"ep-test","choices":[{"message":{"role":"assistant","content":"integration reply"}}]}`))
-	}))
-	defer providerServer.Close()
-	t.Setenv("SILICONFLOW_API_KEY", "test-siliconflow-key")
-	t.Setenv("SILICONFLOW_BASE_URL", providerServer.URL)
-	catalogModel := createAIPlatformCatalogModel(t, db, "text", "tool_call")
-
-	createAppVersion := func(name, system string, bindContentSearch bool) (model.AIApp, model.AIAppVersion) {
-		t.Helper()
-		app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: name}
-		if err := db.Create(&app).Error; err != nil {
-			t.Fatalf("create app: %v", err)
-		}
-		config, err := json.Marshal(map[string]string{"systemPrompt": system})
-		if err != nil {
-			t.Fatalf("marshal app config: %v", err)
-		}
-		version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: string(config), ToolSnapshot: true, KnowledgeBaseSnapshot: true}
-		if err := db.Create(&version).Error; err != nil {
-			t.Fatalf("create version: %v", err)
-		}
-		if bindContentSearch {
-			if err := db.Create(&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: "content.search"}).Error; err != nil {
-				t.Fatalf("bind content.search: %v", err)
-			}
-		}
-		if err := db.Model(&app).Update("draft_version_id", version.ID).Error; err != nil {
-			t.Fatalf("set draft version: %v", err)
-		}
-		return app, version
-	}
-	lastSystem := func() string {
-		t.Helper()
-		requestMu.Lock()
-		defer requestMu.Unlock()
-		if len(systems) == 0 {
-			t.Fatal("catalog provider request did not contain a system message")
-		}
-		return systems[len(systems)-1]
-	}
-	assertDateContext := func(system string) {
-		t.Helper()
-		if !strings.Contains(system, "当前中国标准时间") || !strings.Contains(system, "YYYY-MM-DD") {
-			t.Fatalf("system message missing content.search date context: %q", system)
-		}
-	}
-
-	debugApp, _ := createAppVersion("调试日期助手", "debug-system", true)
-	debugRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+debugApp.ID.String()+"/debug", strings.NewReader(`{"message":"昨天写了什么？","modelId":"`+catalogModel.ID.String()+`"}`))
-	debugRequest.Header.Set("Content-Type", "application/json")
-	debugRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	debugRecorder := httptest.NewRecorder()
-	router.ServeHTTP(debugRecorder, debugRequest)
-	if debugRecorder.Code != http.StatusOK {
-		t.Fatalf("debug response = %d body=%s", debugRecorder.Code, debugRecorder.Body.String())
-	}
-	assertDateContext(lastSystem())
-
-	unboundApp, _ := createAppVersion("无工具日期助手", "unbound-system", false)
-	unboundRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+unboundApp.ID.String()+"/debug", strings.NewReader(`{"message":"今天发布了什么？","modelId":"`+catalogModel.ID.String()+`"}`))
-	unboundRequest.Header.Set("Content-Type", "application/json")
-	unboundRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	unboundRecorder := httptest.NewRecorder()
-	router.ServeHTTP(unboundRecorder, unboundRequest)
-	if unboundRecorder.Code != http.StatusOK {
-		t.Fatalf("unbound debug response = %d body=%s", unboundRecorder.Code, unboundRecorder.Body.String())
-	}
-	if system := lastSystem(); !strings.Contains(system, "unbound-system") || strings.Contains(system, "当前日期") {
-		t.Fatalf("unbound system message = %q, want identity without date context", system)
-	}
-}
 
 func TestCreateAIAppVersionSnapshotCopiesToolAllowlist(t *testing.T) {
 	_, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "版本助手"}
+	app := model.AIApp{UserID: 101, Type: aiAppTypeWorkflow, Name: "版本助手"}
 	if err := db.Create(&app).Error; err != nil {
 		t.Fatalf("create app: %v", err)
 	}
@@ -1216,9 +553,11 @@ func TestCreateAIAppVersionSnapshotCopiesToolAllowlist(t *testing.T) {
 	}
 }
 
+
+
 func TestReplaceAIAppKnowledgeBasesPreservesDraftToolBindings(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "创作助手"}
+	app := model.AIApp{UserID: 101, Type: aiAppTypeWorkflow, Name: "创作助手"}
 	if err := db.Create(&app).Error; err != nil {
 		t.Fatalf("create app: %v", err)
 	}
@@ -1264,116 +603,7 @@ func TestReplaceAIAppKnowledgeBasesPreservesDraftToolBindings(t *testing.T) {
 	}
 }
 
-func TestAIAppConversationIsOwnerScopedAndRetainsUserMessageOnConfigFailure(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	t.Setenv("SILICONFLOW_API_KEY", "")
-	catalogModel := createAIPlatformCatalogModel(t, db, "text")
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "私有助手"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	publishedAt := time.Now()
-	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"test"}`, ToolSnapshot: true, KnowledgeBaseSnapshot: true, PublishedAt: &publishedAt}
-	if err := db.Create(&version).Error; err != nil {
-		t.Fatalf("create version: %v", err)
-	}
-	if err := db.Model(&app).Updates(map[string]any{"draft_version_id": version.ID, "published_version_id": version.ID, "status": "published"}).Error; err != nil {
-		t.Fatalf("set published version: %v", err)
-	}
 
-	createRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations", strings.NewReader(`{}`))
-	createRequest.Header.Set("Content-Type", "application/json")
-	createRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	createRecorder := httptest.NewRecorder()
-	router.ServeHTTP(createRecorder, createRequest)
-	if createRecorder.Code != http.StatusOK {
-		t.Fatalf("create conversation = %d body=%s", createRecorder.Code, createRecorder.Body.String())
-	}
-	var createPayload struct {
-		Data struct {
-			Conversation model.AIAppConversation `json:"conversation"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(createRecorder.Body.Bytes(), &createPayload); err != nil {
-		t.Fatalf("decode conversation: %v", err)
-	}
-	conversation := createPayload.Data.Conversation
-	if conversation.VersionID != version.ID {
-		t.Fatalf("conversation version = %d, want %d", conversation.VersionID, version.ID)
-	}
-
-	foreignRequest := httptest.NewRequest(http.MethodGet, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String(), nil)
-	foreignRequest.Header.Set("Authorization", aiPlatformAuthHeaderFor(t, "202", "other-user"))
-	foreignRecorder := httptest.NewRecorder()
-	router.ServeHTTP(foreignRecorder, foreignRequest)
-	if foreignRecorder.Code != http.StatusOK || !strings.Contains(foreignRecorder.Body.String(), `"code":404`) {
-		t.Fatalf("foreign conversation read = %d body=%s", foreignRecorder.Code, foreignRecorder.Body.String())
-	}
-
-	chatRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String()+"/chat", strings.NewReader(`{"message":"你好","modelId":"`+catalogModel.ID.String()+`"}`))
-	chatRequest.Header.Set("Content-Type", "application/json")
-	chatRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	chatRecorder := httptest.NewRecorder()
-	router.ServeHTTP(chatRecorder, chatRequest)
-	if chatRecorder.Code != http.StatusServiceUnavailable || !strings.Contains(chatRecorder.Body.String(), `"code":503`) || !strings.Contains(chatRecorder.Body.String(), `"errorCode":"MODEL_NOT_CONFIGURED"`) {
-		t.Fatalf("chat config failure = %d body=%s", chatRecorder.Code, chatRecorder.Body.String())
-	}
-	var messages []model.AIAppConversationMessage
-	if err := db.Where("conversation_id = ?", conversation.ID).Find(&messages).Error; err != nil {
-		t.Fatalf("load messages: %v", err)
-	}
-	if len(messages) != 1 || messages[0].Role != "user" || messages[0].Content != "你好" || messages[0].RunID == nil {
-		t.Fatalf("unexpected messages: %#v", messages)
-	}
-
-	historyRequest := httptest.NewRequest(http.MethodGet, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String(), nil)
-	historyRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	historyRecorder := httptest.NewRecorder()
-	router.ServeHTTP(historyRecorder, historyRequest)
-	if historyRecorder.Code != http.StatusOK || !strings.Contains(historyRecorder.Body.String(), `"errorCode":"MODEL_NOT_CONFIGURED"`) {
-		t.Fatalf("conversation history = %d body=%s", historyRecorder.Code, historyRecorder.Body.String())
-	}
-}
-
-func TestCreateAIAppConversationUsesLatestDraft(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "发布优先助手"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	publishedAt := time.Now()
-	published := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"published"}`, PublishedAt: &publishedAt}
-	draft := model.AIAppVersion{AppID: app.ID, Number: 2, Config: `{"systemPrompt":"draft"}`}
-	if err := db.Create(&published).Error; err != nil {
-		t.Fatalf("create published version: %v", err)
-	}
-	if err := db.Create(&draft).Error; err != nil {
-		t.Fatalf("create draft version: %v", err)
-	}
-	if err := db.Model(&app).Updates(map[string]any{"draft_version_id": draft.ID, "published_version_id": published.ID, "status": "published"}).Error; err != nil {
-		t.Fatalf("set version pointers: %v", err)
-	}
-
-	request := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations", strings.NewReader(`{}`))
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("create conversation = %d body=%s", recorder.Code, recorder.Body.String())
-	}
-	var payload struct {
-		Data struct {
-			Conversation model.AIAppConversation `json:"conversation"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode conversation: %v", err)
-	}
-	if payload.Data.Conversation.VersionID != draft.ID {
-		t.Fatalf("conversation version = %d, want draft %d", payload.Data.Conversation.VersionID, draft.ID)
-	}
-}
 
 func TestAIKnowledgeRetrievalFailureUsesStablePublicCodes(t *testing.T) {
 	tests := []struct {
@@ -1405,6 +635,8 @@ func TestAIKnowledgeRetrievalFailureUsesStablePublicCodes(t *testing.T) {
 		}
 	}
 }
+
+
 
 func TestCurrentAIKnowledgeEmbeddingIdentityRequiresOneKnownModel(t *testing.T) {
 	t.Setenv("SILICONFLOW_API_KEY", "test-key")
@@ -1454,6 +686,8 @@ func TestCurrentAIKnowledgeEmbeddingIdentityRequiresOneKnownModel(t *testing.T) 
 	}
 }
 
+
+
 func TestAIKnowledgeSearchQueryExcludesSoftDeletedRows(t *testing.T) {
 	for _, scope := range []string{
 		"chunks.deleted_at IS NULL",
@@ -1466,300 +700,7 @@ func TestAIKnowledgeSearchQueryExcludesSoftDeletedRows(t *testing.T) {
 	}
 }
 
-func TestAIAppConversationStreamsOwnerScopedToolTraceWithoutRawResults(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	var requestCount int
-	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		requestCount++
-		w.Header().Set("Content-Type", "text/event-stream")
-		if requestCount == 1 {
-			_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"content\":\"准备搜索私有资料。\"}}]}\n\n"))
-			_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call-1\",\"type\":\"function\",\"function\":{\"name\":\"content.search\",\"arguments\":\"{\\\"query\\\":\\\"P8\\\"}\"}}]}}]}\n\n"))
-			_, _ = w.Write([]byte("data: [DONE]\n\n"))
-			return
-		}
-		_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"content\":\"已找到\"}}]}\n\n"))
-		_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"content\":\"私有资料。\"}}]}\n\n"))
-		_, _ = w.Write([]byte("data: [DONE]\n\n"))
-	}))
-	defer providerServer.Close()
-	t.Setenv("SILICONFLOW_API_KEY", "test-siliconflow-key")
-	t.Setenv("SILICONFLOW_BASE_URL", providerServer.URL)
-	catalogModel := createAIPlatformCatalogModel(t, db, "text", "tool_call")
 
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "私有检索助手"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	publishedAt := time.Now()
-	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"仅回答自己的内容"}`, ToolSnapshot: true, KnowledgeBaseSnapshot: true, PublishedAt: &publishedAt}
-	if err := db.Create(&version).Error; err != nil {
-		t.Fatalf("create version: %v", err)
-	}
-	if err := db.Create(&model.AIAppVersionToolBinding{AppVersionID: version.ID, ToolName: "content.search"}).Error; err != nil {
-		t.Fatalf("create tool binding: %v", err)
-	}
-	if err := db.Model(&app).Updates(map[string]any{"draft_version_id": version.ID, "published_version_id": version.ID, "status": "published"}).Error; err != nil {
-		t.Fatalf("set published version: %v", err)
-	}
-	if err := db.Create(&[]model.Post{
-		{AuthorID: 101, Title: "P8 私有资料", Slug: "owner-p8", Excerpt: "仅 owner 可见", Content: "P8 已完成"},
-		{AuthorID: 202, Title: "P8 他人资料", Slug: "foreign-p8", Excerpt: "不得泄露", Content: "secret"},
-	}).Error; err != nil {
-		t.Fatalf("seed posts: %v", err)
-	}
-
-	createRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations", strings.NewReader(`{}`))
-	createRequest.Header.Set("Content-Type", "application/json")
-	createRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	createRecorder := httptest.NewRecorder()
-	router.ServeHTTP(createRecorder, createRequest)
-	if createRecorder.Code != http.StatusOK {
-		t.Fatalf("create conversation = %d body=%s", createRecorder.Code, createRecorder.Body.String())
-	}
-	var createPayload struct {
-		Data struct {
-			Conversation model.AIAppConversation `json:"conversation"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(createRecorder.Body.Bytes(), &createPayload); err != nil {
-		t.Fatalf("decode conversation: %v", err)
-	}
-	conversation := createPayload.Data.Conversation
-
-	chatRequest := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String()+"/chat", strings.NewReader(`{"message":"P8","modelId":"`+catalogModel.ID.String()+`","stream":true}`))
-	chatRequest.Header.Set("Content-Type", "application/json")
-	chatRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	chatRecorder := httptest.NewRecorder()
-	router.ServeHTTP(chatRecorder, chatRequest)
-	if chatRecorder.Code != http.StatusOK {
-		t.Fatalf("chat response = %d body=%s", chatRecorder.Code, chatRecorder.Body.String())
-	}
-	if !strings.Contains(chatRecorder.Body.String(), `"type":"done"`) {
-		t.Fatalf("expected SSE done event, got %s", chatRecorder.Body.String())
-	}
-	if !strings.Contains(chatRecorder.Body.String(), `"narration":"准备搜索私有资料。"`) {
-		t.Fatalf("expected safe tool narration in SSE, got %s", chatRecorder.Body.String())
-	}
-	if !strings.Contains(chatRecorder.Body.String(), `"chunk":"已找到"`) || !strings.Contains(chatRecorder.Body.String(), `"chunk":"私有资料。"`) {
-		t.Fatalf("expected separate upstream text deltas, got %s", chatRecorder.Body.String())
-	}
-	if strings.Contains(chatRecorder.Body.String(), "不得泄露") || strings.Contains(chatRecorder.Body.String(), "secret") {
-		t.Fatalf("SSE leaked foreign tool result: %s", chatRecorder.Body.String())
-	}
-	var traces []model.AIAppConversationToolTrace
-	if err := db.Where("conversation_id = ?", conversation.ID).Find(&traces).Error; err != nil {
-		t.Fatalf("load traces: %v", err)
-	}
-	if len(traces) != 1 || traces[0].ToolName != "content.search" || traces[0].Narration != "准备搜索私有资料。" || traces[0].Status != "succeeded" {
-		t.Fatalf("unexpected safe tool trace: %#v", traces)
-	}
-	if requestCount != 2 {
-		t.Fatalf("catalog provider request count = %d, want 2", requestCount)
-	}
-	var persistedRun model.AIAppRun
-	if err := db.Where("conversation_id = ?", conversation.ID).First(&persistedRun).Error; err != nil {
-		t.Fatalf("load persisted run: %v", err)
-	}
-	referenceSummary, err := json.Marshal([]aiKnowledgeReference{{
-		DocumentName: "P8 私有资料",
-		ChunkID:      model.Int64String(8),
-		Excerpt:      "仅 owner 可见",
-	}})
-	if err != nil {
-		t.Fatalf("marshal persisted references: %v", err)
-	}
-	if err := db.Model(&persistedRun).Update("references", string(referenceSummary)).Error; err != nil {
-		t.Fatalf("persist references: %v", err)
-	}
-	historyRequest := httptest.NewRequest(http.MethodGet, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String(), nil)
-	historyRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	historyRecorder := httptest.NewRecorder()
-	router.ServeHTTP(historyRecorder, historyRequest)
-	if historyRecorder.Code != http.StatusOK {
-		t.Fatalf("conversation history = %d body=%s", historyRecorder.Code, historyRecorder.Body.String())
-	}
-	var historyPayload struct {
-		Data struct {
-			Runs              []model.AIAppRun                   `json:"runs"`
-			ToolTraces        []model.AIAppConversationToolTrace `json:"toolTraces"`
-			ReferencesByRunID map[string][]aiKnowledgeReference  `json:"referencesByRunId"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(historyRecorder.Body.Bytes(), &historyPayload); err != nil {
-		t.Fatalf("decode conversation history: %v", err)
-	}
-	if len(historyPayload.Data.Runs) != 1 {
-		t.Fatalf("history runs = %#v", historyPayload.Data.Runs)
-	}
-	if len(historyPayload.Data.ToolTraces) != 1 || historyPayload.Data.ToolTraces[0].Narration != "准备搜索私有资料。" {
-		t.Fatalf("history tool traces = %#v", historyPayload.Data.ToolTraces)
-	}
-	references := historyPayload.Data.ReferencesByRunID[historyPayload.Data.Runs[0].ID.String()]
-	if len(references) != 1 || references[0].DocumentName != "P8 私有资料" {
-		t.Fatalf("history references = %#v", historyPayload.Data.ReferencesByRunID)
-	}
-}
-
-func TestAIAppConversationDegradesKnowledgeRetrievalInsteadOfFailing(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"model\":\"ep-test\",\"choices\":[{\"delta\":{\"content\":\"fallback reply\"}}]}\n\n"))
-		_, _ = w.Write([]byte("data: [DONE]\n\n"))
-	}))
-	defer providerServer.Close()
-	t.Setenv("SILICONFLOW_API_KEY", "test-siliconflow-key")
-	t.Setenv("SILICONFLOW_BASE_URL", providerServer.URL)
-	catalogModel := createAIPlatformCatalogModel(t, db, "text")
-
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "知识降级助手"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatal(err)
-	}
-	publishedAt := time.Now()
-	version := model.AIAppVersion{
-		AppID: app.ID, Number: 1, Config: `{"systemPrompt":"优先参考知识库"}`,
-		ToolSnapshot: true, KnowledgeBaseSnapshot: true, PublishedAt: &publishedAt,
-	}
-	if err := db.Create(&version).Error; err != nil {
-		t.Fatal(err)
-	}
-	knowledgeBase := model.AIKnowledgeBase{UserID: 101, Name: "会触发 SQLite 检索失败的资料"}
-	if err := db.Create(&knowledgeBase).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Create(&model.AIAppVersionKnowledgeBase{AppVersionID: version.ID, KnowledgeBaseID: knowledgeBase.ID}).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Model(&app).Updates(map[string]any{
-		"draft_version_id": version.ID, "published_version_id": version.ID, "status": "published",
-	}).Error; err != nil {
-		t.Fatal(err)
-	}
-	conversation := model.AIAppConversation{UserID: 101, AppID: app.ID, VersionID: version.ID, Title: "降级会话"}
-	if err := db.Create(&conversation).Error; err != nil {
-		t.Fatal(err)
-	}
-
-	chatRequest := httptest.NewRequest(
-		http.MethodPost,
-		"/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String()+"/chat",
-		strings.NewReader(`{"message":"请结合资料回答","modelId":"`+catalogModel.ID.String()+`","stream":true}`),
-	)
-	chatRequest.Header.Set("Content-Type", "application/json")
-	chatRequest.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	chatRecorder := httptest.NewRecorder()
-	router.ServeHTTP(chatRecorder, chatRequest)
-
-	if chatRecorder.Code != http.StatusOK || !strings.Contains(chatRecorder.Body.String(), `"type":"done"`) {
-		t.Fatalf("degraded chat response = %d body=%s", chatRecorder.Code, chatRecorder.Body.String())
-	}
-	var run model.AIAppRun
-	if err := db.Where("conversation_id = ?", conversation.ID).Order("created_at DESC").First(&run).Error; err != nil {
-		t.Fatal(err)
-	}
-	if run.Status != "succeeded" || run.KnowledgeStatus != aiKnowledgeStatusDegraded || run.KnowledgeErrorCode != "RAG_POSTGRES_REQUIRED" {
-		t.Fatalf("degraded run = %+v", run)
-	}
-}
-
-func TestAIAppConversationStreamsUpstreamFailureWithoutAssistantMessage(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "upstream unavailable", http.StatusBadGateway)
-	}))
-	defer providerServer.Close()
-	t.Setenv("SILICONFLOW_API_KEY", "test-siliconflow-key")
-	t.Setenv("SILICONFLOW_BASE_URL", providerServer.URL)
-	catalogModel := createAIPlatformCatalogModel(t, db, "text")
-
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "失败路径助手"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"test"}`, ToolSnapshot: true, KnowledgeBaseSnapshot: true}
-	if err := db.Create(&version).Error; err != nil {
-		t.Fatalf("create version: %v", err)
-	}
-	if err := db.Model(&app).Update("draft_version_id", version.ID).Error; err != nil {
-		t.Fatalf("set draft version: %v", err)
-	}
-	conversation := model.AIAppConversation{UserID: 101, AppID: app.ID, VersionID: version.ID}
-	if err := db.Create(&conversation).Error; err != nil {
-		t.Fatalf("create conversation: %v", err)
-	}
-
-	request := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String()+"/chat", strings.NewReader(`{"message":"测试失败","modelId":"`+catalogModel.ID.String()+`","stream":true}`))
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"type":"error"`) {
-		t.Fatalf("expected SSE error event, got code=%d body=%s", recorder.Code, recorder.Body.String())
-	}
-	var run model.AIAppRun
-	if err := db.Where("conversation_id = ?", conversation.ID).First(&run).Error; err != nil {
-		t.Fatalf("load run: %v", err)
-	}
-	if run.Status != "failed" || run.ErrorCode != "AI_AGENT_RUN_FAILED" {
-		t.Fatalf("unexpected upstream failure run: %#v", run)
-	}
-	var messages []model.AIAppConversationMessage
-	if err := db.Where("conversation_id = ?", conversation.ID).Find(&messages).Error; err != nil {
-		t.Fatalf("load messages: %v", err)
-	}
-	if len(messages) != 1 || messages[0].Role != "user" {
-		t.Fatalf("upstream failure must retain only user message: %#v", messages)
-	}
-}
-
-func TestAIAppConversationCancellationWritesCancelledRunWithoutAssistantMessage(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	t.Setenv("SILICONFLOW_API_KEY", "test-siliconflow-key")
-	t.Setenv("SILICONFLOW_BASE_URL", "http://127.0.0.1:1")
-	catalogModel := createAIPlatformCatalogModel(t, db, "text")
-
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "取消路径助手"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"test"}`, ToolSnapshot: true, KnowledgeBaseSnapshot: true}
-	if err := db.Create(&version).Error; err != nil {
-		t.Fatalf("create version: %v", err)
-	}
-	if err := db.Model(&app).Update("draft_version_id", version.ID).Error; err != nil {
-		t.Fatalf("set draft version: %v", err)
-	}
-	conversation := model.AIAppConversation{UserID: 101, AppID: app.ID, VersionID: version.ID}
-	if err := db.Create(&conversation).Error; err != nil {
-		t.Fatalf("create conversation: %v", err)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	request := httptest.NewRequest(http.MethodPost, "/ai/apps/"+app.ID.String()+"/conversations/"+conversation.ID.String()+"/chat", strings.NewReader(`{"message":"测试取消","modelId":"`+catalogModel.ID.String()+`","stream":true}`)).WithContext(ctx)
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "会话生成已停止") {
-		t.Fatalf("expected cancelled SSE error event, got code=%d body=%s", recorder.Code, recorder.Body.String())
-	}
-	var run model.AIAppRun
-	if err := db.Where("conversation_id = ?", conversation.ID).First(&run).Error; err != nil {
-		t.Fatalf("load run: %v", err)
-	}
-	if run.Status != "cancelled" || run.ErrorCode != "RUN_CANCELLED" {
-		t.Fatalf("unexpected cancelled run: %#v", run)
-	}
-	var messages []model.AIAppConversationMessage
-	if err := db.Where("conversation_id = ?", conversation.ID).Find(&messages).Error; err != nil {
-		t.Fatalf("load messages: %v", err)
-	}
-	if len(messages) != 1 || messages[0].Role != "user" {
-		t.Fatalf("cancellation must retain only user message: %#v", messages)
-	}
-}
 
 func TestDeleteAIKnowledgeDocumentRemovesOnlyOwnedChunks(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
@@ -1789,6 +730,8 @@ func TestDeleteAIKnowledgeDocumentRemovesOnlyOwnedChunks(t *testing.T) {
 		t.Fatalf("documentCount=%d chunkCount=%d, want both 0", documentCount, chunkCount)
 	}
 }
+
+
 
 func TestListAIKnowledgeDocumentChunksReturnsOrderedSafePreviews(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
@@ -1838,6 +781,8 @@ func TestListAIKnowledgeDocumentChunksReturnsOrderedSafePreviews(t *testing.T) {
 	}
 }
 
+
+
 func TestListAIKnowledgeDocumentChunksRejectsForeignDocument(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
 	base := model.AIKnowledgeBase{UserID: 202, Name: "他人的资料"}
@@ -1856,6 +801,8 @@ func TestListAIKnowledgeDocumentChunksRejectsForeignDocument(t *testing.T) {
 		t.Fatalf("foreign preview response = %d body=%s", rec.Code, rec.Body.String())
 	}
 }
+
+
 
 func TestListAIKnowledgeBasesIncludesOwnedDocumentCount(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
@@ -1902,6 +849,8 @@ func TestListAIKnowledgeBasesIncludesOwnedDocumentCount(t *testing.T) {
 	}
 }
 
+
+
 func TestAIKnowledgeRetrievalTestRequiresOwnedKnowledgeBaseAndReportsUnavailableStore(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
 	base := model.AIKnowledgeBase{UserID: 101, Name: "创作资料"}
@@ -1941,6 +890,8 @@ func TestAIKnowledgeRetrievalTestRequiresOwnedKnowledgeBaseAndReportsUnavailable
 	}
 }
 
+
+
 func TestKnowledgeBaseDocumentEndpointsAreOwnerScoped(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
 	base := model.AIKnowledgeBase{UserID: 202, Name: "他人的资料"}
@@ -1968,9 +919,11 @@ func TestKnowledgeBaseDocumentEndpointsAreOwnerScoped(t *testing.T) {
 	}
 }
 
+
+
 func TestReplaceAIAppKnowledgeBasesRejectsForeignKnowledgeBase(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "我的智能体"}
+	app := model.AIApp{UserID: 101, Type: aiAppTypeWorkflow, Name: "我的智能体"}
 	if err := db.Create(&app).Error; err != nil {
 		t.Fatalf("create app: %v", err)
 	}
@@ -1996,92 +949,11 @@ func TestReplaceAIAppKnowledgeBasesRejectsForeignKnowledgeBase(t *testing.T) {
 	}
 }
 
-func TestSaveAIAppVersionUpdatesDraftVersionID(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "测试智能体"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	body, _ := json.Marshal(map[string]any{"name": "测试智能体", "config": map[string]any{"systemPrompt": "你好"}})
-	req := httptest.NewRequest(http.MethodPost, "/ai/apps/"+strconv.FormatInt(int64(app.ID), 10)+"/versions", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("save response = %d body=%s", rec.Code, rec.Body.String())
-	}
-	var stored model.AIApp
-	if err := db.First(&stored, app.ID).Error; err != nil {
-		t.Fatalf("load app: %v", err)
-	}
-	if stored.DraftVersionID == 0 {
-		t.Fatal("expected saved version to become the draft version")
-	}
-	var version model.AIAppVersion
-	if err := db.First(&version, stored.DraftVersionID).Error; err != nil {
-		t.Fatalf("draft version not persisted: %v", err)
-	}
-}
 
-func TestUpdateAIAppRetrievalConfigCreatesVersionedDraftSnapshot(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "检索配置测试"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	first := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"只依据资料回答"}`}
-	if err := db.Create(&first).Error; err != nil {
-		t.Fatalf("create first version: %v", err)
-	}
-	if err := db.Model(&app).Update("draft_version_id", first.ID).Error; err != nil {
-		t.Fatalf("set draft version: %v", err)
-	}
-
-	body, _ := json.Marshal(map[string]any{"topK": 6, "minScore": 0.6, "citeSources": false})
-	req := httptest.NewRequest(http.MethodPut, "/ai/apps/"+strconv.FormatInt(int64(app.ID), 10)+"/retrieval-config", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("update response = %d body=%s", rec.Code, rec.Body.String())
-	}
-
-	var stored model.AIApp
-	if err := db.First(&stored, app.ID).Error; err != nil {
-		t.Fatalf("load app: %v", err)
-	}
-	if stored.DraftVersionID == first.ID {
-		t.Fatal("retrieval config update must create a new draft version")
-	}
-	var snapshot model.AIAppVersion
-	if err := db.First(&snapshot, stored.DraftVersionID).Error; err != nil {
-		t.Fatalf("load snapshot: %v", err)
-	}
-	if snapshot.Number != 2 || snapshot.Config != first.Config {
-		t.Fatalf("unexpected copied config: %#v", snapshot)
-	}
-	var response struct {
-		Data struct {
-			RetrievalConfig struct {
-				TopK        int     `json:"topK"`
-				MinScore    float64 `json:"minScore"`
-				CiteSources bool    `json:"citeSources"`
-			} `json:"retrievalConfig"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if response.Data.RetrievalConfig.TopK != 6 || response.Data.RetrievalConfig.MinScore != 0.6 || response.Data.RetrievalConfig.CiteSources {
-		t.Fatalf("retrieval snapshot was not returned: %s", rec.Body.String())
-	}
-}
 
 func TestReplaceAIAppKnowledgeBasesKeepsPriorVersionSnapshot(t *testing.T) {
 	router, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "资料库快照测试"}
+	app := model.AIApp{UserID: 101, Type: aiAppTypeWorkflow, Name: "资料库快照测试"}
 	if err := db.Create(&app).Error; err != nil {
 		t.Fatalf("create app: %v", err)
 	}
@@ -2134,50 +1006,7 @@ func TestReplaceAIAppKnowledgeBasesKeepsPriorVersionSnapshot(t *testing.T) {
 	}
 }
 
-func TestRestoreAIAppVersionCreatesNewDraftWithoutChangingPublishedVersion(t *testing.T) {
-	router, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "回滚测试"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	first := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"旧版本"}`}
-	second := model.AIAppVersion{AppID: app.ID, Number: 2, Config: `{"systemPrompt":"新版本"}`}
-	if err := db.Create(&first).Error; err != nil {
-		t.Fatalf("create first version: %v", err)
-	}
-	if err := db.Create(&second).Error; err != nil {
-		t.Fatalf("create second version: %v", err)
-	}
-	if err := db.Model(&app).Updates(map[string]any{"draft_version_id": second.ID, "published_version_id": first.ID, "status": "published"}).Error; err != nil {
-		t.Fatalf("set app pointers: %v", err)
-	}
-	body, _ := json.Marshal(map[string]any{"versionId": first.ID})
-	req := httptest.NewRequest(http.MethodPost, "/ai/apps/"+strconv.FormatInt(int64(app.ID), 10)+"/restore", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("restore response = %d body=%s", rec.Code, rec.Body.String())
-	}
-	var stored model.AIApp
-	if err := db.First(&stored, app.ID).Error; err != nil {
-		t.Fatalf("load app: %v", err)
-	}
-	if stored.PublishedVersionID != first.ID {
-		t.Fatalf("published version changed to %d, want %d", stored.PublishedVersionID, first.ID)
-	}
-	if stored.DraftVersionID == first.ID || stored.DraftVersionID == second.ID {
-		t.Fatalf("restore must create a new draft, got %d", stored.DraftVersionID)
-	}
-	var restored model.AIAppVersion
-	if err := db.First(&restored, stored.DraftVersionID).Error; err != nil {
-		t.Fatalf("load restored draft: %v", err)
-	}
-	if restored.Number != 3 || restored.Config != first.Config {
-		t.Fatalf("restored version = %#v, want copy of v1 as v3", restored)
-	}
-}
+
 
 func TestSyncWorkflowAIAppReusesSingleUnlinkedWorkflowApp(t *testing.T) {
 	_, db := setupAIPlatformTestRouter(t)
@@ -2209,130 +1038,5 @@ func TestSyncWorkflowAIAppReusesSingleUnlinkedWorkflowApp(t *testing.T) {
 	}
 }
 
-func TestAIAppConversationAttachmentFeedsBackgroundTask(t *testing.T) {
-	previousLauncher := aiAppTaskLauncher
-	aiAppTaskLauncher = func(context.Context, *gorm.DB, model.AIAppTask) {}
-	t.Cleanup(func() { aiAppTaskLauncher = previousLauncher })
 
-	router, db := setupAIPlatformTestRouter(t)
-	app := model.AIApp{UserID: 101, Type: aiAppTypeAgent, Name: "文件助手"}
-	if err := db.Create(&app).Error; err != nil {
-		t.Fatalf("create app: %v", err)
-	}
-	version := model.AIAppVersion{AppID: app.ID, Number: 1, Config: `{"systemPrompt":"test","modelId":"1"}`, ToolSnapshot: true, KnowledgeBaseSnapshot: true}
-	if err := db.Create(&version).Error; err != nil {
-		t.Fatalf("create version: %v", err)
-	}
-	conversation := model.AIAppConversation{UserID: 101, AppID: app.ID, VersionID: version.ID, Title: "新对话"}
-	if err := db.Create(&conversation).Error; err != nil {
-		t.Fatalf("create conversation: %v", err)
-	}
 
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	part, err := writer.CreateFormFile("file", "notes.txt")
-	if err != nil {
-		t.Fatalf("create file part: %v", err)
-	}
-	if _, err := io.WriteString(part, "订单号 A-1024，状态已完成。"); err != nil {
-		t.Fatalf("write file: %v", err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close multipart writer: %v", err)
-	}
-	upload := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/ai/apps/%s/conversations/%s/attachments", app.ID, conversation.ID), &body)
-	upload.Header.Set("Content-Type", writer.FormDataContentType())
-	upload.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	uploadRecorder := httptest.NewRecorder()
-	router.ServeHTTP(uploadRecorder, upload)
-	if uploadRecorder.Code != http.StatusOK {
-		t.Fatalf("upload attachment = %d body=%s", uploadRecorder.Code, uploadRecorder.Body.String())
-	}
-	var uploadPayload struct {
-		Data struct {
-			Attachment model.AIAppConversationAttachment `json:"attachment"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(uploadRecorder.Body.Bytes(), &uploadPayload); err != nil {
-		t.Fatalf("decode attachment: %v", err)
-	}
-	attachment := uploadPayload.Data.Attachment
-	var parsedAttachment model.AIAppConversationAttachment
-	if err := db.First(&parsedAttachment, attachment.ID).Error; err != nil {
-		t.Fatalf("load parsed attachment: %v", err)
-	}
-	if !strings.Contains(parsedAttachment.ParsedText, "A-1024") {
-		t.Fatalf("parsed text = %q", parsedAttachment.ParsedText)
-	}
-
-	foreignDownload := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/ai/apps/%s/conversations/%s/attachments/%s", app.ID, conversation.ID, attachment.ID), nil)
-	foreignDownload.Header.Set("Authorization", aiPlatformAuthHeaderFor(t, "202", "other-user"))
-	foreignRecorder := httptest.NewRecorder()
-	router.ServeHTTP(foreignRecorder, foreignDownload)
-	if foreignRecorder.Code != http.StatusOK || !strings.Contains(foreignRecorder.Body.String(), `"code":404`) {
-		t.Fatalf("foreign download was not rejected: status=%d body=%s", foreignRecorder.Code, foreignRecorder.Body.String())
-	}
-
-	taskBody := fmt.Sprintf(`{"message":"","modelId":"1","attachmentIds":["%s"]}`, attachment.ID)
-	createTask := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/ai/apps/%s/conversations/%s/tasks", app.ID, conversation.ID), strings.NewReader(taskBody))
-	createTask.Header.Set("Content-Type", "application/json")
-	createTask.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	taskRecorder := httptest.NewRecorder()
-	router.ServeHTTP(taskRecorder, createTask)
-	if taskRecorder.Code != http.StatusOK {
-		t.Fatalf("create task = %d body=%s", taskRecorder.Code, taskRecorder.Body.String())
-	}
-	var taskPayload struct {
-		Data struct {
-			Task model.AIAppTask `json:"task"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(taskRecorder.Body.Bytes(), &taskPayload); err != nil {
-		t.Fatalf("decode task: %v", err)
-	}
-	var storedAttachment model.AIAppConversationAttachment
-	if err := db.First(&storedAttachment, attachment.ID).Error; err != nil {
-		t.Fatalf("load attachment: %v", err)
-	}
-	if storedAttachment.MessageID == nil {
-		t.Fatal("attachment was not bound to the task user message")
-	}
-	var taskCount int64
-	if err := db.Model(&model.AIAppTask{}).Where("conversation_id = ? AND status = ?", conversation.ID, "running").Count(&taskCount).Error; err != nil {
-		t.Fatalf("count tasks: %v", err)
-	}
-	if taskCount != 1 {
-		t.Fatalf("running task count = %d, want 1", taskCount)
-	}
-	task := taskPayload.Data.Task
-	if task.Status != "running" {
-		t.Fatalf("created task status = %q, want running", task.Status)
-	}
-	if task.Title != attachment.Name {
-		t.Fatalf("attachment-only task title = %q, want %q", task.Title, attachment.Name)
-	}
-	if err := db.Model(&task).Updates(map[string]any{"status": "waiting_approval", "status_message": "等待确认"}).Error; err != nil {
-		t.Fatalf("set task waiting: %v", err)
-	}
-	approval := model.AIAppToolApproval{
-		TaskID: task.ID, RunID: task.RunID, UserID: 101, ToolName: "file.create",
-		RiskLevel: "high", Fingerprint: strings.Repeat("a", 64), Summary: "创建成果文件", Arguments: `{}`,
-	}
-	if err := db.Create(&approval).Error; err != nil {
-		t.Fatalf("create approval: %v", err)
-	}
-	decision := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/ai/apps/%s/tasks/%s/approvals/%s/decision", app.ID, task.ID, approval.ID), strings.NewReader(`{"decision":"approve"}`))
-	decision.Header.Set("Content-Type", "application/json")
-	decision.Header.Set("Authorization", aiPlatformAuthHeader(t))
-	decisionRecorder := httptest.NewRecorder()
-	router.ServeHTTP(decisionRecorder, decision)
-	if decisionRecorder.Code != http.StatusOK || !strings.Contains(decisionRecorder.Body.String(), `"status":"approved"`) {
-		t.Fatalf("approve tool = %d body=%s", decisionRecorder.Code, decisionRecorder.Body.String())
-	}
-	if err := db.First(&task, task.ID).Error; err != nil {
-		t.Fatalf("reload task: %v", err)
-	}
-	if task.Status != "queued" {
-		t.Fatalf("approved inactive task status = %q, want queued", task.Status)
-	}
-}

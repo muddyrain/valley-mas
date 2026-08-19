@@ -52,7 +52,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const suggestedSkillTags = ['通用', '智能体', '工作流', '写作', '生图', '数据'];
+const suggestedSkillTags = ['通用', '工作流', '写作', '生图', '数据'];
 const maxSkillZipBytes = 32 * 1024 * 1024;
 
 type InstallSourceType = 'github' | 'zip';
@@ -646,7 +646,7 @@ export default function SkillResources() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>编辑技能标签</DialogTitle>
-            <DialogDescription>用标签组织技能，方便在智能体和工作流中选择。</DialogDescription>
+            <DialogDescription>用标签组织技能，方便在工作流中选择。</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-2">
@@ -655,7 +655,7 @@ export default function SkillResources() {
                 id="ai-skill-tags"
                 value={tagText}
                 onChange={(event) => setTagText(event.target.value)}
-                placeholder="例如：智能体，写作"
+                placeholder="例如：写作，生图"
                 disabled={savingTags}
               />
             </div>

@@ -93,7 +93,7 @@ function formatPromptDate(value: string) {
   }).format(new Date(value));
 }
 
-const suggestedPromptTags = ['通用', '智能体', '工作流', '生图', '写作', '博客'];
+const suggestedPromptTags = ['通用', '工作流', '生图', '写作', '博客'];
 
 function parsePromptTags(value: string) {
   return Array.from(

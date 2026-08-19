@@ -46,12 +46,12 @@ describe('ConversationMessage', () => {
       <ConversationMessage
         messageRole="assistant"
         content="我正在生成图片。"
-        assistant={{ name: '图片智能体', avatarUrl: '/avatars/agent.png' }}
+        assistant={{ name: '图片助手', avatarUrl: '/avatars/agent.png' }}
         presentation="workspace"
       />,
     );
 
-    expect(markup).toContain('图片智能体头像');
+    expect(markup).toContain('图片助手的头像');
     expect(markup).toContain('我正在生成图片。');
     expect(markup).not.toContain('flex-row-reverse');
   });

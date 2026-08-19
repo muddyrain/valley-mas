@@ -1,6 +1,8 @@
+> [!DONE] 2026-08-19 功能已移除并归档
+
 # 创作者智能体工具卡实施计划
 
-> 状态：实施中。规格见 [创作者智能体工具卡设计](../specs/2026-08-08-creator-agent-tool-cards-design.md)。
+> 状态：实施中。规格见 [创作者智能体工具卡设计](docs/specs/2026-08-08-creator-agent-tool-cards-design.md)。
 
 ## 阶段 1：协议与生命周期
 

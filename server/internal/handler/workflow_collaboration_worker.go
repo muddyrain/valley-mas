@@ -106,7 +106,7 @@ func claimWorkflowCollaborationTask(ctx context.Context, db *gorm.DB) (model.Wor
 	for _, candidate := range candidates {
 		claimed := false
 		err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-			var earlier, workflowActive, ownerWorkflowActive, ownerAppActive int64
+			var earlier, workflowActive, ownerWorkflowActive int64
 			if err := tx.Model(&model.WorkflowCollaborationTask{}).
 				Where("workflow_id = ? AND status = ?", candidate.WorkflowID, "queued").
 				Where("created_at < ? OR (created_at = ? AND id < ?)", candidate.CreatedAt, candidate.CreatedAt, candidate.ID).
@@ -129,12 +129,7 @@ func claimWorkflowCollaborationTask(ctx context.Context, db *gorm.DB) (model.Wor
 				Count(&ownerWorkflowActive).Error; err != nil {
 				return err
 			}
-			if err := tx.Model(&model.AIAppTask{}).
-				Where("user_id = ? AND status IN ?", candidate.UserID, []string{"running", "waiting_approval"}).
-				Count(&ownerAppActive).Error; err != nil && !strings.Contains(strings.ToLower(err.Error()), "no such table") {
-				return err
-			}
-			if ownerWorkflowActive+ownerAppActive >= aiAppTaskMaxConcurrentPerUser {
+			if ownerWorkflowActive >= aiAppTaskMaxConcurrentPerUser {
 				return nil
 			}
 			now := time.Now()

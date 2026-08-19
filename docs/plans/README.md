@@ -27,10 +27,7 @@
 - [2026-08-15-eon-vale-core-rearchitecture.md](2026-08-15-eon-vale-core-rearchitecture.md)：Eon Vale 单运行时核心重构、保护/删除清单、固定 Tick、Worker/存档边界与四重退出门禁。
 - [2026-08-15-yuji-gallery-import-workspace.md](2026-08-15-yuji-gallery-import-workspace.md)：公共图库追加稳定列分配、可恢复的本地未导入工作区、单次视觉元数据识别与创作室完整图片库。
 - [2026-08-14-yuji-public-experience-polish.md](2026-08-14-yuji-public-experience-polish.md)：雨迹作者文章库、公共内容状态机、响应式瀑布图库与单图共享过渡的二次打磨。
-- [2026-08-08-ai-motion-stickers.md](2026-08-08-ai-motion-stickers.md)：参考图驱动的 owner 私有动态表情、AMUX 视频任务、MP4/GIF 双资产与共享工具契约。
-- [2026-08-08-creator-agent-tool-cards.md](2026-08-08-creator-agent-tool-cards.md)：智能体澄清、工具进度、图片/文件转换卡片、临时产物与写操作确认。
 - [2026-08-04-workflow-collaboration-agent.md](2026-08-04-workflow-collaboration-agent.md)：工作流固定协作智能体、单时间线、后台直接修改、冲突合并与持久撤销。
-- [2026-08-02-ai-agent-operations-files.md](2026-08-02-ai-agent-operations-files.md)：智能体后台任务、工具人工确认、知识检索引用和成果文件。
 - [2026-07-28-auth-security-hardening.md](2026-07-28-auth-security-hardening.md)：会话失效、持久化验证码、频率限制与密码哈希升级。
 - [2026-07-28-standard-agent-skills.md](2026-07-28-standard-agent-skills.md)：标准技能包导入、分类与智能体/工作流复用。
 - [2026-07-24-workflow-http-node.md](2026-07-24-workflow-http-node.md)：工作流 HTTP 请求节点的受控配置、执行与画布交互。
@@ -40,6 +37,12 @@
 - [2026-07-22-ai-workflow-p14-production-runtime.md](2026-07-22-ai-workflow-p14-production-runtime.md)：P14.1 工作流异步运行、定时触发与持久化调度底座。
 - [2026-07-21-blog-excerpt-model-catalog.md](2026-07-21-blog-excerpt-model-catalog.md)：博客编辑器摘要生成接入模型目录。
 - [2026-07-21-interactive-ai-model-catalog-migration.md](2026-07-21-interactive-ai-model-catalog-migration.md)：交互式 AI 功能迁移到模型目录。
+
+## 已归档（2026-08）
+
+- [archive/2026-08/2026-08-02-ai-agent-operations-files.md](archive/2026-08/2026-08-02-ai-agent-operations-files.md)：智能体后台任务、工具人工确认、知识检索引用和成果文件（功能已随智能体应用移除）。
+- [archive/2026-08/2026-08-08-ai-motion-stickers.md](archive/2026-08/2026-08-08-ai-motion-stickers.md)：参考图驱动的 owner 私有动态表情、AMUX 视频任务、MP4/GIF 双资产与共享工具契约（功能已移除）。
+- [archive/2026-08/2026-08-08-creator-agent-tool-cards.md](archive/2026-08/2026-08-08-creator-agent-tool-cards.md)：智能体澄清、工具进度、图片/文件转换卡片、临时产物与写操作确认（功能已随智能体应用移除）。
 
 ## 已归档（2026-06）
 

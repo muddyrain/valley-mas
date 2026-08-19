@@ -5,14 +5,6 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
 
-const { layoutState } = vi.hoisted(() => ({
-  layoutState: {
-    aiPanelOpen: false,
-    toggleAIPanel: vi.fn(),
-    setAIPanelOpen: vi.fn(),
-  },
-}));
-
 vi.mock('react-router-dom', () => ({
   Outlet: () => <div>页面内容</div>,
   useLocation: () => ({ pathname: '/' }),
@@ -28,8 +20,6 @@ vi.mock('@/components/ui/button', () => ({
 vi.mock('@/components/ui/tooltip', () => ({
   TooltipProvider: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
-vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
-vi.mock('@/layouts/AIPanel', () => ({ AIPanel: () => null }));
 vi.mock('@/layouts/Sidebar', () => ({
   Sidebar: ({ onSearchOpen }: { onSearchOpen: () => void }) => (
     <button type="button" onClick={onSearchOpen}>
@@ -38,9 +28,6 @@ vi.mock('@/layouts/Sidebar', () => ({
   ),
 }));
 vi.mock('@/layouts/MobileNavigation', () => ({ MobileNavigation: () => null }));
-vi.mock('@/stores/useLayoutStore', () => ({
-  useLayoutStore: (selector: (state: typeof layoutState) => unknown) => selector(layoutState),
-}));
 
 import WorkbenchLayout from './WorkbenchLayout';
 

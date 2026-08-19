@@ -26,15 +26,7 @@ export function isNavigationActive(pathname: string, to: string) {
   if (to === '/') return pathname === '/';
   if (to === '/studio') return pathname === to || pathname.startsWith('/studio/');
   if (to === '/workbench') {
-    return pathname === to || pathname.startsWith('/workbench/apps/');
-  }
-  if (to === '/workbench/resources') {
-    return (
-      pathname === to ||
-      pathname === '/workbench/create' ||
-      pathname.startsWith('/workbench/edit/') ||
-      pathname.startsWith('/workbench/templates/')
-    );
+    return pathname === to || pathname.startsWith('/workbench/');
   }
   return pathname.startsWith(to);
 }

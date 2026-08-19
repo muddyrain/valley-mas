@@ -65,7 +65,6 @@ type copilotAIEnvelope struct {
 	Questions  []copilotQuestion            `json:"questions"`
 	Operations []workflow.WorkflowOperation `json:"operations"`
 	Workflow   *aiWorkflowDraft             `json:"workflow"`
-	Agent      *agentProposal               `json:"agent"`
 }
 
 type copilotValidationError struct {
@@ -893,14 +892,6 @@ func validateCopilotTarget(userID model.Int64String, scope, targetID string) err
 		if database.GetDB().Model(&model.Workflow{}).Where("id = ? AND user_id = ?", targetID, userID).Count(&count).Error != nil || count != 1 {
 			return errors.New("工作流不存在")
 		}
-	case "agent":
-		if targetID == "" {
-			return errors.New("请选择智能体")
-		}
-		var count int64
-		if database.GetDB().Model(&model.AIApp{}).Where("id = ? AND user_id = ? AND type = ?", targetID, userID, "agent").Count(&count).Error != nil || count != 1 {
-			return errors.New("智能体不存在")
-		}
 	default:
 		return errors.New("AI 协作作用域无效")
 	}
@@ -972,9 +963,6 @@ func validateCopilotEnvelope(envelope *copilotAIEnvelope, knowledgeBases []model
 		}
 		if envelope.TargetType == "workflow" && envelope.Workflow != nil {
 			return validateAIWorkflowDraft(envelope.Workflow)
-		}
-		if envelope.TargetType == "agent" && envelope.Agent != nil {
-			return validateAgentProposal(envelope.Agent, knowledgeBases)
 		}
 		return errors.New("提案目标与候选草稿不匹配")
 	default:
@@ -1263,12 +1251,7 @@ func containsAny(value string, candidates ...string) bool {
 }
 
 func persistCopilotProposal(session model.AIWorkbenchCopilotSession, userID model.Int64String, targetID, baseHash string, base any, envelope copilotAIEnvelope) (model.AIWorkbenchChangeProposal, error) {
-	var candidate any
-	if envelope.TargetType == "workflow" {
-		candidate = envelope.Workflow
-	} else {
-		candidate = envelope.Agent
-	}
+	candidate := envelope.Workflow
 	candidateJSON, _ := json.Marshal(candidate)
 	baseJSON, _ := json.Marshal(base)
 	diffJSON, _ := json.Marshal(copilotSemanticDiff(envelope.TargetType, base, candidate, envelope.Operations))

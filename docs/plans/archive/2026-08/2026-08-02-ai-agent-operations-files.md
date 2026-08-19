@@ -1,7 +1,9 @@
+> [!DONE] 2026-08-19 功能已移除并归档
+
 # 智能体后台任务、授权、检索与文件
 
 > 状态：已完成代码、自动化与页面验收；待对象存储联调
-> 设计：[`../specs/2026-08-02-ai-agent-operations-files-design.md`](../specs/2026-08-02-ai-agent-operations-files-design.md)
+> 设计：[`../specs/2026-08-02-ai-agent-operations-files-design.md`](docs/specs/2026-08-02-ai-agent-operations-files-design.md)
 
 ## 交付清单
 

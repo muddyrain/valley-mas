@@ -2,7 +2,6 @@ import { Copy, RefreshCw, Sparkles, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  type AIAppRun,
   createPromptAssistantSuggestion,
   getAPIErrorMessage,
   type PromptAssistantField,
@@ -12,7 +11,6 @@ import {
 import { ModelPicker } from '@/components/ai/ModelPicker';
 import { AIGenerationProgress } from '@/components/ai-workbench/AIGenerationProgress';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +23,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 
-type PromptMode = 'auto' | 'instruction' | 'debug_run';
+type PromptMode = 'auto' | 'instruction';
 
 const fieldLabels: Record<PromptAssistantField, string> = {
   system_prompt: '提示词',
@@ -38,37 +36,23 @@ const fieldLabels: Record<PromptAssistantField, string> = {
 export function PromptAssistantDialog({
   open,
   onOpenChange,
-  appId,
-  target = 'agent',
+  target = 'workflow_llm',
   field = 'system_prompt',
   allowedVariables = [],
   currentPrompt,
-  agentContext,
-  runs = [],
   onReplace,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  appId?: string;
   target?: PromptAssistantTarget;
   field?: PromptAssistantField;
   allowedVariables?: string[];
   currentPrompt: string;
-  agentContext?: {
-    name: string;
-    description: string;
-    systemPrompt: string;
-    openingMessage: string;
-    exampleQuestions: string[];
-  };
-  runs?: AIAppRun[];
-  onReplace: (suggestion: PromptAssistantSuggestion, includeGreetings: boolean) => void;
+  onReplace: (suggestion: PromptAssistantSuggestion) => void;
 }) {
   const [mode, setMode] = useState<PromptMode>('auto');
   const [instruction, setInstruction] = useState('');
   const [textModelId, setTextModelId] = useState('');
-  const [selectedRuns, setSelectedRuns] = useState<string[]>([]);
-  const [includeGreetings, setIncludeGreetings] = useState(false);
   const [suggestion, setSuggestion] = useState<PromptAssistantSuggestion | null>(null);
   const [loading, setLoading] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
@@ -79,8 +63,6 @@ export function PromptAssistantDialog({
     setSuggestion(null);
     setInstruction('');
     setTextModelId('');
-    setSelectedRuns([]);
-    setIncludeGreetings(false);
     setMode('auto');
   }, [open]);
 
@@ -97,10 +79,6 @@ export function PromptAssistantDialog({
       toast.error('请填写调整要求');
       return;
     }
-    if (mode === 'debug_run' && selectedRuns.length === 0) {
-      toast.error('请选择 1–3 次调试结果');
-      return;
-    }
     if (!textModelId) {
       toast.error('请选择文本模型');
       return;
@@ -115,13 +93,9 @@ export function PromptAssistantDialog({
           modelId: textModelId,
           field,
           mode,
-          appId,
           currentPrompt,
           instruction: instruction.trim(),
-          debugRunIds: selectedRuns,
-          generateGreetings: includeGreetings,
           allowedVariables,
-          agentContext,
         },
         controller.signal,
       );
@@ -165,20 +139,17 @@ export function PromptAssistantDialog({
               [
                 ['auto', '自动优化'],
                 ['instruction', '按要求调整'],
-                ['debug_run', '根据调试结果'],
               ] as const
-            )
-              .filter(([value]) => target === 'agent' || value !== 'debug_run')
-              .map(([value, label]) => (
-                <Button
-                  key={value}
-                  size="sm"
-                  variant={mode === value ? 'default' : 'outline'}
-                  onClick={() => setMode(value)}
-                >
-                  {label}
-                </Button>
-              ))}
+            ).map(([value, label]) => (
+              <Button
+                key={value}
+                size="sm"
+                variant={mode === value ? 'default' : 'outline'}
+                onClick={() => setMode(value)}
+              >
+                {label}
+              </Button>
+            ))}
           </div>
         ) : null}
         {isSystemPrompt && mode === 'instruction' ? (
@@ -188,50 +159,6 @@ export function PromptAssistantDialog({
             placeholder="例如：强化边界条件，输出改为 Markdown 清单"
             onChange={(event) => setInstruction(event.target.value)}
           />
-        ) : null}
-        {isSystemPrompt && target === 'agent' && mode === 'debug_run' ? (
-          <ScrollArea className="max-h-44 rounded-lg border border-border p-2">
-            <div className="space-y-2">
-              {runs.slice(0, 10).map((run) => {
-                const checked = selectedRuns.includes(run.id);
-                return (
-                  <label
-                    key={run.id}
-                    className="flex items-start gap-3 rounded-md p-2 hover:bg-muted"
-                  >
-                    <Checkbox
-                      checked={checked}
-                      disabled={!checked && selectedRuns.length >= 3}
-                      onCheckedChange={(next) =>
-                        setSelectedRuns((items) =>
-                          next
-                            ? [...items, run.id].slice(0, 3)
-                            : items.filter((id) => id !== run.id),
-                        )
-                      }
-                    />
-                    <span className="min-w-0 text-sm">
-                      <span className="block font-medium">
-                        {run.status === 'succeeded' ? '成功' : '失败'} · {run.durationMs} ms
-                      </span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {run.input}
-                      </span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </ScrollArea>
-        ) : null}
-        {isSystemPrompt && target === 'agent' ? (
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={includeGreetings}
-              onCheckedChange={(value) => setIncludeGreetings(value === true)}
-            />
-            同时生成开场白和示例问题
-          </label>
         ) : null}
         <ModelPicker
           value={textModelId || undefined}
@@ -304,7 +231,7 @@ export function PromptAssistantDialog({
             disabled={!suggestion || loading}
             onClick={() => {
               if (!suggestion) return;
-              onReplace(suggestion, includeGreetings);
+              onReplace(suggestion);
               onOpenChange(false);
             }}
           >

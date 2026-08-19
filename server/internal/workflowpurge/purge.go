@@ -39,11 +39,6 @@ func Inspect(db *gorm.DB) (Report, error) {
 		{"ai_app_knowledge_bases", &model.AIAppKnowledgeBase{}, "app_id IN ?", []any{appIDs}},
 		{"ai_app_tool_bindings", &model.AIAppToolBinding{}, "app_id IN ?", []any{appIDs}},
 		{"ai_app_runs", &model.AIAppRun{}, "app_id IN ?", []any{appIDs}},
-		{"ai_app_conversations", &model.AIAppConversation{}, "app_id IN ?", []any{appIDs}},
-		{"ai_app_conversation_messages", &model.AIAppConversationMessage{}, "app_id IN ?", []any{appIDs}},
-		{"ai_app_conversation_tool_traces", &model.AIAppConversationToolTrace{}, "app_id IN ?", []any{appIDs}},
-		{"ai_api_key_app_bindings", &model.AIAPIKeyAppBinding{}, "app_id IN ?", []any{appIDs}},
-		{"ai_app_public_invocations", &model.AIAppPublicInvocation{}, "app_id IN ?", []any{appIDs}},
 	}
 	for _, query := range queries {
 		if lenSlice(query.values[0]) == 0 {
@@ -75,7 +70,7 @@ func Purge(db *gorm.DB) (Report, error) {
 			value  any
 		}{
 			{&model.AIWorkbenchChangeProposal{}, "session_id IN ?", sessionIDs}, {&model.AIWorkbenchCopilotMessage{}, "session_id IN ?", sessionIDs}, {&model.AIWorkbenchCopilotSession{}, "id IN ?", sessionIDs},
-			{&model.AIAppPublicInvocation{}, "app_id IN ?", appIDs}, {&model.AIAPIKeyAppBinding{}, "app_id IN ?", appIDs}, {&model.AIAppConversationToolTrace{}, "app_id IN ?", appIDs}, {&model.AIAppConversationMessage{}, "app_id IN ?", appIDs}, {&model.AIAppConversation{}, "app_id IN ?", appIDs}, {&model.AIAppRun{}, "app_id IN ?", appIDs},
+			{&model.AIAppRun{}, "app_id IN ?", appIDs},
 			{&model.AIAppVersionKnowledgeBase{}, "app_version_id IN ?", versionIDs}, {&model.AIAppVersionToolBinding{}, "app_version_id IN ?", versionIDs}, {&model.AIAppKnowledgeBase{}, "app_id IN ?", appIDs}, {&model.AIAppToolBinding{}, "app_id IN ?", appIDs}, {&model.AIAppVersion{}, "id IN ?", versionIDs}, {&model.AIApp{}, "id IN ?", appIDs},
 			{&model.WorkflowNodeRun{}, "workflow_run_id IN ?", runIDs}, {&model.WorkflowRun{}, "workflow_id IN ?", workflowIDs}, {&model.Workflow{}, "id IN ?", workflowIDs},
 		}
