@@ -1,4 +1,11 @@
-import { AgentState, CarriedResourceKind } from '@/shared/gameTypes';
+import { AgentState, CarriedResourceKind, Profession } from '@/shared/gameTypes';
+
+export type ResidentHandItem = 'none' | 'tool' | 'weapon';
+
+export function residentHandItem(profession: Profession, weaponTier: number): ResidentHandItem {
+  if (profession === Profession.Guard) return weaponTier > 0 ? 'weapon' : 'none';
+  return 'tool';
+}
 
 export function usesTravelPose(state: AgentState): boolean {
   return (

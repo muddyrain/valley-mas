@@ -26,6 +26,10 @@ export interface ResidentViewBounds {
   margin: number;
 }
 
+export function observationFactTotal(_level: WorldViewLevel, authoritativeTotal: number): number {
+  return authoritativeTotal;
+}
+
 const WORLD_TO_SETTLEMENT_COVERAGE = 0.78;
 const SETTLEMENT_TO_WORLD_COVERAGE = 0.9;
 const RESIDENT_MAX_LONG_AXIS_CELLS = 64;

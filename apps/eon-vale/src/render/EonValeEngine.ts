@@ -62,7 +62,12 @@ import type {
   WorldMapSnapshot,
   WorldRenderSnapshot,
 } from './renderTypes';
-import { carriedResourceColor, usesTravelPose, usesWorkPose } from './residentPresentation';
+import {
+  carriedResourceColor,
+  residentHandItem,
+  usesTravelPose,
+  usesWorkPose,
+} from './residentPresentation';
 import { SnapshotInterpolator } from './SnapshotInterpolator';
 import {
   type AnimalPose,
@@ -1281,13 +1286,6 @@ export class EonValeEngine {
       sprite.visible = onScreen;
       if (!onScreen) continue;
       const kind = (latest.kinds?.[entityId] ?? EntityKind.Human) as EntityKind;
-      const isFocused =
-        (this.selectedTarget?.kind === 'entity' && this.selectedTarget.id === entityId) ||
-        this.highlightedEntityIds.has(entityId);
-      if (this.viewLevel === 'settlement' && !isFocused && entityId % 4 !== 0) {
-        sprite.visible = false;
-        continue;
-      }
       const profession = (latest.professions?.[entityId] ?? Profession.Forager) as Profession;
       const kingdomId = latest.kingdomIds?.[entityId] ?? 0;
       const kingdomPalette = kingdomPaletteIndex(kingdomId);
@@ -2885,6 +2883,7 @@ function drawProfession(
   weaponTier: number,
 ): void {
   if (profession === Profession.Guard) {
+    if (residentHandItem(profession, weaponTier) === 'none') return;
     context.fillStyle = weaponTier >= 2 ? '#e4e8e8' : '#9da8a9';
     context.fillRect(21, 10, 1, 13);
     context.fillRect(19, 10, 4, 2);

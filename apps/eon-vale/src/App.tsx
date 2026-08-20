@@ -1,5 +1,4 @@
 import {
-  Bug,
   Crown,
   Download,
   Gauge,
@@ -17,7 +16,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProceduralAudio } from './audio/ProceduralAudio';
 import {
   EonValeEngine,
@@ -39,12 +38,14 @@ import {
   type WorldPreset,
   type WorldSettings,
 } from './shared/gameTypes';
+import { createIndexedDbWorldStorage } from './simulation/persistence/indexedDbWorldStorage';
 import {
-  createIndexedDbSaveStorage,
-  createSaveRepository,
-  type SaveRepository,
-  type StoredWorldSave,
-} from './simulation/persistence/saveSlots';
+  createWorldRepository,
+  type ManualSlot,
+  type SnapshotKind,
+  type SnapshotRecord,
+  type WorldRepository,
+} from './simulation/persistence/worldRepository';
 import { resolvePlaybackShortcut } from './simulation/rules/playbackShortcuts';
 import { SIMULATION_SPEEDS } from './simulation/rules/runtimeRules';
 import { WORLD_LAW_CATALOG, WORLD_LAW_UI_IDS } from './simulation/rules/worldLawCatalog';
@@ -58,6 +59,15 @@ import { SimulationWorkerClient } from './worker/SimulationWorkerClient';
 
 const SPEED_OPTIONS = SIMULATION_SPEEDS;
 const WORLD_SIZES = [128, 256, 384] as const;
+const PLAYBACK_RATE_STORAGE_KEY = 'eon-vale.playback-rate';
+
+function loadPlaybackRate(): (typeof SPEED_OPTIONS)[number] {
+  if (typeof window === 'undefined') return 1;
+  const stored = Number(window.localStorage.getItem(PLAYBACK_RATE_STORAGE_KEY));
+  return SPEED_OPTIONS.includes(stored as (typeof SPEED_OPTIONS)[number])
+    ? (stored as (typeof SPEED_OPTIONS)[number])
+    : 1;
+}
 
 const EMPTY_METRICS: RuntimeMetrics = {
   fps: 0,
@@ -87,9 +97,10 @@ function downloadSave(encoded: string, seed: string): void {
   URL.revokeObjectURL(url);
 }
 
-function saveCaption(save: StoredWorldSave | null): string {
+function saveCaption(save: SnapshotRecord | null): string {
   if (!save) return '空';
-  return `${save.seed} · 第 ${save.year} 年 · ${save.population} 人`;
+  if (!save.summary) return `${save.worldId} · ${save.byteLength.toLocaleString('zh-CN')} B`;
+  return `${save.summary.seed} · 第 ${save.summary.tick} 刻 · ${save.summary.humans} 人`;
 }
 
 function toolRadius(tool: MapTool | null, power: GodPower | null): number {
@@ -156,8 +167,8 @@ export function App() {
     villageId: number;
     zone: PlanningZoneKind;
   } | null>(null);
-  const [paused, setPaused] = useState(false);
-  const [speed, setSpeed] = useState<(typeof SPEED_OPTIONS)[number]>(1);
+  const [paused, setPaused] = useState(true);
+  const [speed, setSpeed] = useState<(typeof SPEED_OPTIONS)[number]>(loadPlaybackRate);
   const [metrics, setMetrics] = useState(EMPTY_METRICS);
   const [showMetrics, setShowMetrics] = useState(false);
   const [showNewWorld, setShowNewWorld] = useState(false);
@@ -173,8 +184,6 @@ export function App() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [overlay, setOverlay] = useState<WorldSettings['overlay']>('none');
   const [notice, setNotice] = useState<{ level: 'info' | 'error'; message: string } | null>(null);
-  const [stressPopulation, setStressPopulation] = useState<number | null>(null);
-  const stressPopulationRef = useRef<number | null>(null);
   const [viewLevel, setViewLevel] = useState<WorldViewLevel>('world');
   const [chronicleOpen, setChronicleOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<WorldHistoryFilter>('all');
@@ -184,12 +193,9 @@ export function App() {
   const [resourceHover, setResourceHover] = useState<ResourceHoverInfo | null>(null);
   const clickHandlerRef = useRef<(click: WorldClick) => void>(() => undefined);
   const snapshotRef = useRef<WorldRenderSnapshot | null>(null);
-  const saveRepositoryRef = useRef<SaveRepository | null>(null);
-  const saveIntentRef = useRef<
-    { kind: 'manual'; slot: 1 | 2 | 3 } | { kind: 'auto' } | { kind: 'export' }
-  >({ kind: 'manual', slot: 1 });
-  const [manualSaves, setManualSaves] = useState<Array<StoredWorldSave | null>>([null, null, null]);
-  const [autoSaves, setAutoSaves] = useState<StoredWorldSave[]>([]);
+  const saveRepositoryRef = useRef<WorldRepository | null>(null);
+  const [manualSaves, setManualSaves] = useState<Array<SnapshotRecord | null>>([null, null, null]);
+  const [autoSaves, setAutoSaves] = useState<SnapshotRecord[]>([]);
 
   activeToolRef.current = activeTool;
   activePowerRef.current = activePower;
@@ -199,7 +205,55 @@ export function App() {
   worldPresetRef.current = worldPreset;
   snapshotRef.current = snapshot;
   inspectionRef.current = inspection;
-  stressPopulationRef.current = stressPopulation;
+
+  const refreshSaves = useCallback(async (repository: WorldRepository): Promise<void> => {
+    const [manifest, records] = await Promise.all([
+      repository.readManifest(),
+      repository.listSnapshots(),
+    ]);
+    const byId = new Map(records.map((record) => [record.id, record]));
+    setManualSaves(
+      ([1, 2, 3] as const).map((slot) => byId.get(manifest.manualSlots[slot] ?? '') ?? null),
+    );
+    const autoIds = new Set(Object.values(manifest.worlds).flatMap((pointers) => pointers.autos));
+    setAutoSaves(
+      records
+        .filter((record) => autoIds.has(record.id))
+        .sort((left, right) => right.createdAt - left.createdAt),
+    );
+  }, []);
+
+  const persistWorldSnapshot = useCallback(
+    async (kind: Exclude<SnapshotKind, 'safety'>, manualSlot?: ManualSlot): Promise<void> => {
+      const worker = workerRef.current;
+      const repository = saveRepositoryRef.current;
+      if (!worker || !repository) return;
+      try {
+        const created = await worker.createSnapshot();
+        const current = snapshotRef.current;
+        await repository.save({
+          kind,
+          ...(manualSlot === undefined ? {} : { manualSlot }),
+          worldId: created.worldId,
+          snapshot: new Blob([created.encoded], { type: 'application/json' }),
+          checksum: created.checksum,
+          summary: {
+            seed: seedRef.current,
+            tick: current?.tick ?? 0,
+            humans: current?.stats.humans ?? current?.population ?? 0,
+          },
+        });
+        await refreshSaves(repository);
+        setNotice({
+          level: 'info',
+          message: kind === 'manual' ? `世界已保存到档案 ${manualSlot}` : '自动存档完成',
+        });
+      } catch {
+        setNotice({ level: 'error', message: '存储空间不足，原存档未更改' });
+      }
+    },
+    [refreshSaves],
+  );
 
   clickHandlerRef.current = (click) => {
     const worker = workerRef.current;
@@ -266,14 +320,11 @@ export function App() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
-    const saveRepository = createSaveRepository(createIndexedDbSaveStorage());
+    const saveRepository = createWorldRepository(createIndexedDbWorldStorage());
     saveRepositoryRef.current = saveRepository;
-    void Promise.all([saveRepository.listManuals(), saveRepository.listAutos()])
-      .then(([manuals, autos]) => {
-        setManualSaves(manuals);
-        setAutoSaves(autos);
-      })
-      .catch(() => setNotice({ level: 'error', message: '无法读取世界档案' }));
+    void refreshSaves(saveRepository).catch(() =>
+      setNotice({ level: 'error', message: '无法读取世界档案' }),
+    );
     const engine = new EonValeEngine(canvas, {
       onMetrics: (next) => {
         setMetrics(next);
@@ -291,11 +342,10 @@ export function App() {
     });
     const worker = new SimulationWorkerClient({
       onReady: (mode, _population, readySeed) => {
-        if (mode !== 'world') return;
+        void mode;
         setSeed(readySeed);
         setDraftSeed(readySeed);
       },
-      onStressSnapshot: (next) => engine.pushSnapshot(next),
       onWorldSnapshot: (next) => {
         engine.pushSnapshot(next);
         setSnapshot(next);
@@ -316,32 +366,15 @@ export function App() {
       onTerritory: (territory) => engine.setTerritory(territory),
       onInspection: setInspection,
       onHistory: setHistoryArchive,
-      onSave: async (encoded) => {
-        const current = snapshotRef.current;
-        const summary = {
-          seed: seedRef.current,
-          year: current?.year ?? 1,
-          population: current?.stats.humans ?? current?.population ?? 0,
-        };
-        const intent = saveIntentRef.current;
-        try {
-          if (intent.kind === 'manual') {
-            await saveRepository.writeManual(intent.slot, encoded, summary);
-            setManualSaves(await saveRepository.listManuals());
-            setNotice({ level: 'info', message: `世界已保存到档案 ${intent.slot}` });
-          } else if (intent.kind === 'auto') {
-            await saveRepository.writeAuto(encoded, summary);
-            setAutoSaves(await saveRepository.listAutos());
-            setNotice({ level: 'info', message: '自动存档完成' });
-          } else {
-            downloadSave(encoded, summary.seed);
-            setNotice({ level: 'info', message: '世界档案已导出' });
-          }
-        } catch {
-          setNotice({ level: 'error', message: '存储空间不足，原存档未更改' });
-        }
-      },
       onNotice: (level, message) => setNotice({ level, message }),
+      onDiagnostic: (diagnostic) => {
+        setPaused(diagnostic.paused);
+        canvas.dataset.kernelChecksum = diagnostic.checksum;
+        canvas.dataset.kernelTick = String(diagnostic.tick);
+        canvas.dataset.kernelPaused = String(diagnostic.paused);
+        canvas.dataset.kernelInvariantErrors = String(diagnostic.invariantErrors.length);
+        canvas.dataset.settleableRegions = String(diagnostic.settleableRegions);
+      },
     });
     engineRef.current = engine;
     workerRef.current = worker;
@@ -351,36 +384,19 @@ export function App() {
     window.addEventListener('pointerdown', unlockAudio, { once: true });
     engine.start();
     const query = new URLSearchParams(window.location.search);
-    const stress = Number(query.get('stress'));
-    const worldStress = Number(query.get('worldStress'));
-    const stressMapSize = Number(query.get('mapSize'));
+    const requestedMapSize = Number(query.get('mapSize'));
     const requestedSeed = query.get('seed')?.trim();
-    const requestedHumans = Number(query.get('initialHumans'));
-    if ([100, 500, 1_000].includes(stress)) {
-      setStressPopulation(stress);
-      worker.initializeStress(stress, `browser-stress-${stress}`);
-    } else if (worldStress === 1_000 && stressMapSize === 384) {
-      worker.initializeWorld('browser-complete-world', 1_000, 384, 'continent');
-    } else if (
-      requestedSeed &&
-      Number.isInteger(requestedHumans) &&
-      requestedHumans >= 0 &&
-      requestedHumans <= 1_000 &&
-      WORLD_SIZES.includes(stressMapSize as (typeof WORLD_SIZES)[number])
-    ) {
+    if (requestedSeed && WORLD_SIZES.includes(requestedMapSize as (typeof WORLD_SIZES)[number])) {
       worker.initializeWorld(
         requestedSeed,
-        requestedHumans,
-        stressMapSize as (typeof WORLD_SIZES)[number],
+        requestedMapSize as (typeof WORLD_SIZES)[number],
         worldPresetRef.current,
       );
     } else {
-      worker.initializeWorld(seedRef.current, 72, worldSizeRef.current, worldPresetRef.current);
+      worker.initializeWorld(seedRef.current, worldSizeRef.current, worldPresetRef.current);
     }
     const autosaveTimer = window.setInterval(() => {
-      if (stressPopulationRef.current) return;
-      saveIntentRef.current = { kind: 'auto' };
-      worker.requestSave();
+      void persistWorldSnapshot('auto');
     }, 120_000);
     return () => {
       window.clearInterval(autosaveTimer);
@@ -393,13 +409,14 @@ export function App() {
       audioRef.current = null;
       saveRepositoryRef.current = null;
     };
-  }, []);
+  }, [persistWorldSnapshot, refreshSaves]);
 
   useEffect(() => {
     workerRef.current?.setPaused(paused);
   }, [paused]);
 
   useEffect(() => {
+    window.localStorage.setItem(PLAYBACK_RATE_STORAGE_KEY, String(speed));
     workerRef.current?.setSpeed(speed);
   }, [speed]);
 
@@ -498,25 +515,37 @@ export function App() {
     setHistoryArchive(null);
     setPopulationOpen(false);
     setEcologyOpen(false);
-    setStressPopulation(null);
-    setPaused(false);
-    workerRef.current?.initializeWorld(
-      nextSeed,
-      draftWorldPreset === 'ocean' ? 0 : 72,
-      draftWorldSize,
-      draftWorldPreset,
-    );
+    setPaused(true);
+    workerRef.current?.initializeWorld(nextSeed, draftWorldSize, draftWorldPreset);
     audioRef.current?.play('create');
     setShowNewWorld(false);
     setNotice({ level: 'info', message: '新世界正在苏醒' });
   };
 
-  const loadStoredWorld = (save: StoredWorldSave | null) => {
-    if (!save) {
-      setNotice({ level: 'error', message: '还没有可载入的世界' });
-      return;
-    }
-    setStressPopulation(null);
+  const createSafetySnapshot = async (): Promise<void> => {
+    const worker = workerRef.current;
+    const repository = saveRepositoryRef.current;
+    if (!worker || !repository || !snapshotRef.current) return;
+    const created = await worker.createSnapshot();
+    const current = snapshotRef.current;
+    await repository.save({
+      kind: 'safety',
+      worldId: created.worldId,
+      snapshot: new Blob([created.encoded], { type: 'application/json' }),
+      checksum: created.checksum,
+      summary: {
+        seed: seedRef.current,
+        tick: current?.tick ?? 0,
+        humans: current?.stats.humans ?? current?.population ?? 0,
+      },
+    });
+  };
+
+  const restoreEncodedWorld = async (encoded: string): Promise<void> => {
+    const worker = workerRef.current;
+    if (!worker) return;
+    await createSafetySnapshot();
+    await worker.restoreSnapshot(encoded);
     setInspection(null);
     setPlanningBrush(null);
     engineRef.current?.setSelection(null);
@@ -525,52 +554,54 @@ export function App() {
     setPopulationOpen(false);
     setEcologyOpen(false);
     engineRef.current?.returnToWorld();
-    workerRef.current?.loadSave(save.encoded);
-    setSeed(save.seed);
-    setDraftSeed(save.seed);
     setShowNewWorld(false);
   };
 
-  const saveManual = (slot: 1 | 2 | 3) => {
-    saveIntentRef.current = { kind: 'manual', slot };
-    workerRef.current?.requestSave();
+  const loadStoredWorld = async (save: SnapshotRecord | null) => {
+    if (!save) {
+      setNotice({ level: 'error', message: '还没有可载入的世界' });
+      return;
+    }
+    try {
+      await restoreEncodedWorld(await save.snapshot.text());
+      setNotice({ level: 'info', message: '世界档案已载入' });
+    } catch {
+      setNotice({ level: 'error', message: '无法载入世界档案，当前世界未更改' });
+    }
   };
 
-  const exportWorld = () => {
-    saveIntentRef.current = { kind: 'export' };
-    workerRef.current?.requestSave();
+  const saveManual = (slot: 1 | 2 | 3) => {
+    void persistWorldSnapshot('manual', slot);
+  };
+
+  const exportWorld = async () => {
+    const worker = workerRef.current;
+    if (!worker) return;
+    try {
+      const created = await worker.createSnapshot();
+      downloadSave(created.encoded, seedRef.current);
+      setNotice({ level: 'info', message: '世界档案已导出' });
+    } catch {
+      setNotice({ level: 'error', message: '无法导出世界档案' });
+    }
   };
 
   const importWorld = async (file: File | undefined) => {
     if (!file) return;
     try {
       const encoded = await file.text();
-      workerRef.current?.loadSave(encoded);
-      setShowNewWorld(false);
+      await restoreEncodedWorld(encoded);
+      setNotice({ level: 'info', message: '世界档案已载入' });
     } catch {
-      setNotice({ level: 'error', message: '无法读取世界档案' });
+      setNotice({ level: 'error', message: '世界档案格式不受支持，当前世界未更改' });
     } finally {
       if (importRef.current) importRef.current.value = '';
     }
   };
 
-  const startStress = (population: number) => {
-    setStressPopulation(population);
-    setSnapshot(null);
-    setInspection(null);
-    engineRef.current?.setSelection(null);
-    setChronicleOpen(false);
-    setPopulationOpen(false);
-    setEcologyOpen(false);
-    engineRef.current?.returnToWorld();
-    setShowMetrics(true);
-    workerRef.current?.initializeStress(population, `browser-stress-${population}`);
-    setShowSettings(false);
-  };
-
   const stats = snapshot?.stats ?? {
     year: 1,
-    humans: stressPopulation ?? 0,
+    humans: 0,
     animals: 0,
     villages: 0,
     kingdoms: 0,
@@ -731,7 +762,7 @@ export function App() {
         </div>
       </header>
 
-      {!stressPopulation && (
+      {
         <section className={`view-navigation ${viewLevel}`} aria-label="地图层级">
           <span data-testid="view-level">
             {viewLevel === 'world'
@@ -757,9 +788,9 @@ export function App() {
             </button>
           )}
         </section>
-      )}
+      }
 
-      {!stressPopulation && (
+      {
         <ToolDock
           activeTool={activeTool}
           activePower={activePower}
@@ -772,14 +803,9 @@ export function App() {
             setActivePower(power);
           }}
         />
-      )}
+      }
 
-      {showMetrics && (
-        <PerformancePanel
-          metrics={metrics}
-          population={stressPopulation ?? snapshot?.population ?? 0}
-        />
-      )}
+      {showMetrics && <PerformancePanel metrics={metrics} population={snapshot?.population ?? 0} />}
 
       {inspection && (
         <InspectorPanel
@@ -838,25 +864,20 @@ export function App() {
         <EcologyPanel ecology={snapshot.ecology} onClose={() => setEcologyOpen(false)} />
       )}
 
-      {!inspection &&
-        !populationOpen &&
-        !ecologyOpen &&
-        !stressPopulation &&
-        snapshot &&
-        !chronicleOpen && (
-          <button
-            type="button"
-            className="chronicle-toggle"
-            data-testid="chronicle-toggle"
-            onClick={() => setChronicleOpen(true)}
-            aria-label="展开世界局势"
-          >
-            <Sparkles size={17} />
-            {stats.wars > 0 && <b>{stats.wars}</b>}
-          </button>
-        )}
+      {!inspection && !populationOpen && !ecologyOpen && snapshot && !chronicleOpen && (
+        <button
+          type="button"
+          className="chronicle-toggle"
+          data-testid="chronicle-toggle"
+          onClick={() => setChronicleOpen(true)}
+          aria-label="展开世界局势"
+        >
+          <Sparkles size={17} />
+          {stats.wars > 0 && <b>{stats.wars}</b>}
+        </button>
+      )}
 
-      {!inspection && !stressPopulation && snapshot && chronicleOpen && (
+      {!inspection && snapshot && chronicleOpen && (
         <ChroniclePanel
           archive={
             historyArchive && historyArchive.filter === historyFilter ? historyArchive : null
@@ -976,7 +997,7 @@ export function App() {
                 ))}
               </div>
             </fieldset>
-            {snapshot && !stressPopulation && (
+            {snapshot && (
               <fieldset>
                 <legend>世界法则</legend>
                 <div className="choice-row world-law-row" data-testid="world-law-options">
@@ -1015,15 +1036,15 @@ export function App() {
                       <small>{saveCaption(save)}</small>
                     </span>
                     <span>
-                      <button
-                        type="button"
-                        onClick={() => saveManual(slot)}
-                        disabled={Boolean(stressPopulation)}
-                      >
+                      <button type="button" onClick={() => saveManual(slot)}>
                         <Save size={14} />
                         保存
                       </button>
-                      <button type="button" onClick={() => loadStoredWorld(save)} disabled={!save}>
+                      <button
+                        type="button"
+                        onClick={() => void loadStoredWorld(save)}
+                        disabled={!save}
+                      >
                         载入
                       </button>
                     </span>
@@ -1035,14 +1056,14 @@ export function App() {
               <button
                 type="button"
                 className="autosave-action"
-                onClick={() => loadStoredWorld(autoSaves[0] ?? null)}
+                onClick={() => void loadStoredWorld(autoSaves[0] ?? null)}
               >
                 <RotateCcw size={14} />
                 最近自动存档 · {saveCaption(autoSaves[0] ?? null)}
               </button>
             )}
             <div className="modal-actions archive-actions">
-              <button type="button" onClick={exportWorld} disabled={Boolean(stressPopulation)}>
+              <button type="button" onClick={() => void exportWorld()}>
                 <Download size={15} />
                 导出
               </button>
@@ -1130,50 +1151,8 @@ export function App() {
                 </button>
               </div>
             </fieldset>
-            <fieldset className="developer-fieldset">
-              <legend>
-                <Bug size={14} />
-                压力场景
-              </legend>
-              <div className="choice-row">
-                {[100, 500, 1_000].map((population) => (
-                  <button
-                    key={population}
-                    type="button"
-                    data-testid={`population-${population}`}
-                    onClick={() => startStress(population)}
-                  >
-                    {population.toLocaleString('zh-CN')}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
           </section>
         </div>
-      )}
-
-      {stressPopulation && (
-        <section className="stress-banner">
-          <Bug size={15} />
-          <span>
-            <b>{stressPopulation.toLocaleString('zh-CN')} 居民压力场景</b>
-            <small>完整模拟持续运行</small>
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              setStressPopulation(null);
-              workerRef.current?.initializeWorld(
-                seedRef.current,
-                72,
-                worldSizeRef.current,
-                worldPresetRef.current,
-              );
-            }}
-          >
-            返回世界
-          </button>
-        </section>
       )}
 
       {notice && (

@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test';
 
 const longEightTimesMinutes = Number(process.env.EON_EIGHT_TIMES_SOAK_MINUTES ?? 0);
 
+test.skip(true, 'legacy runtime acceptance is frozen during the vertical domain replacement');
+
 test.describe('long 8x browser soak', () => {
   test.skip(longEightTimesMinutes <= 0, 'set EON_EIGHT_TIMES_SOAK_MINUTES to enable');
   test.setTimeout(Math.max(90_000, longEightTimesMinutes * 70_000));

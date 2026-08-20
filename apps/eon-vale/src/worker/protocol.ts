@@ -6,58 +6,129 @@ import type {
   WorldMapSnapshot,
   WorldRenderSnapshot,
 } from '@/render/renderTypes';
-import type {
-  ConstructionPriority,
-  EntityKind,
-  GodPower,
-  MapTool,
-  PlanningZoneKind,
-  WorldHistoryArchive,
-  WorldHistoryFilter,
-  WorldPreset,
-} from '@/shared/gameTypes';
-import type { PrototypeMetrics, PrototypeSnapshot } from '@/simulation/core/prototypeSimulation';
-import type { WorldLawId } from '@/simulation/rules/worldLawCatalog';
+import type { KernelDiagnosticFrame } from '@/simulation/observation/kernelDiagnostics';
+import type { NaturalContentOptions } from '@/simulation/world/worldFacts';
 
-export type WorkerCommand =
-  | { type: 'initialize-stress'; population: number; seed: string }
+export const WORKER_PROTOCOL_VERSION = 1 as const;
+
+export type TerrainEditTool = 'raise' | 'lower' | 'paint-land' | 'paint-water' | 'paint-forest';
+
+export type WorkerProtocolCommand =
   | {
       type: 'initialize-world';
+      worldId: string;
       seed: string;
-      initialHumans: number;
-      mapSize: 128 | 256 | 384;
-      preset: WorldPreset;
+      size: 128 | 256 | 384;
+      preset: 'archipelago' | 'continent' | 'ocean';
+      naturalContent?: NaturalContentOptions;
     }
   | { type: 'set-paused'; paused: boolean }
-  | { type: 'set-speed'; speed: 1 | 2 | 4 | 8 }
-  | { type: 'set-world-law'; law: WorldLawId; enabled: boolean }
-  | { type: 'map-edit'; tool: MapTool; cell: number; radius: number }
-  | { type: 'spawn'; kind: EntityKind; cell: number; count: number }
-  | { type: 'god-power'; power: GodPower; cell: number; radius: number }
+  | { type: 'set-playback-rate'; rate: 1 | 2 | 4 | 8 }
+  | { type: 'edit-terrain'; tool: TerrainEditTool; cell: number; radius: number }
   | { type: 'inspect'; target: 'entity' | 'village' | 'building' | 'kingdom'; id: number }
-  | { type: 'request-history'; filter: WorldHistoryFilter }
-  | { type: 'set-favorite'; lifeId: number; favorite: boolean }
-  | { type: 'set-construction-priority'; villageId: number; priority: ConstructionPriority }
-  | {
-      type: 'paint-planning-zone';
-      villageId: number;
-      zone: PlanningZoneKind;
-      cell: number;
-      radius: number;
-    }
-  | { type: 'request-save' }
-  | { type: 'load-save'; encoded: string };
+  | { type: 'request-keyframe'; reason: ResyncReason }
+  | { type: 'create-snapshot'; requestId: string }
+  | { type: 'restore-snapshot'; requestId: string; encoded: string };
 
-export type WorkerEvent =
-  | { type: 'ready'; mode: 'world' | 'stress'; population: number; seed: string }
-  | { type: 'snapshot'; snapshot: PrototypeSnapshot }
-  | { type: 'world-snapshot'; snapshot: WorldRenderSnapshot }
-  | { type: 'world-map'; map: WorldMapSnapshot }
-  | { type: 'world-map-delta'; delta: WorldMapDelta }
-  | { type: 'world-resources'; resources: ResourceNodeSnapshot }
-  | { type: 'world-territory'; territory: TerritorySnapshot }
-  | { type: 'inspection'; inspection: Inspection | null }
-  | { type: 'world-history'; archive: WorldHistoryArchive }
-  | { type: 'save-data'; encoded: string }
-  | { type: 'notice'; level: 'info' | 'error'; message: string }
-  | { type: 'metrics'; metrics: PrototypeMetrics };
+export interface WorkerCommandEnvelope {
+  protocolVersion: typeof WORKER_PROTOCOL_VERSION;
+  channel: 'command';
+  clientId: string;
+  commandId: string;
+  sequence: number;
+  command: WorkerProtocolCommand;
+}
+
+export type ResyncReason =
+  | 'observation-sequence-gap'
+  | 'observation-generation-mismatch'
+  | 'observation-checksum-mismatch';
+
+export type WorkerReliableEvent =
+  | {
+      type: 'command-result';
+      commandId: string;
+      commandSequence: number;
+      status: 'accepted' | 'rejected';
+      appliedTick: number;
+      code?: string;
+      expectedSequence?: number;
+    }
+  | {
+      type: 'snapshot-result';
+      requestId: string;
+      status: 'created' | 'restored' | 'rejected';
+      encoded?: string;
+      worldId?: string;
+      checksum?: string;
+      code?: string;
+    }
+  | { type: 'inspection-result'; inspection: Inspection | null }
+  | { type: 'notice'; level: 'info' | 'error'; message: string };
+
+export interface WorkerReliableEventEnvelope {
+  protocolVersion: typeof WORKER_PROTOCOL_VERSION;
+  channel: 'reliable';
+  sequence: number;
+  event: WorkerReliableEvent;
+}
+
+export interface KeyframeProjection {
+  seed: string;
+  map: WorldMapSnapshot;
+  resources: ResourceNodeSnapshot;
+  territory: TerritorySnapshot;
+  snapshot: WorldRenderSnapshot;
+  diagnostic: KernelDiagnosticFrame;
+}
+
+export type WorkerObservationEvent =
+  | { type: 'keyframe'; tick: number; checksum: string; projection?: KeyframeProjection }
+  | {
+      type: 'dynamic-frame';
+      tick: number;
+      checksum: string;
+      snapshot?: WorldRenderSnapshot;
+      diagnostic?: KernelDiagnosticFrame;
+    }
+  | { type: 'map-delta'; tick: number; checksum: string; delta?: WorldMapDelta }
+  | {
+      type: 'resource-delta';
+      tick: number;
+      checksum: string;
+      resources?: ResourceNodeSnapshot;
+    }
+  | {
+      type: 'ui-summary';
+      tick: number;
+      checksum: string;
+      paused: boolean;
+      humans: number;
+    };
+
+export interface ObservationEventEnvelope {
+  protocolVersion: typeof WORKER_PROTOCOL_VERSION;
+  channel: 'observation';
+  sequence: number;
+  previousSequence: number;
+  generation: string;
+  event: WorkerObservationEvent;
+}
+
+export type VersionedWorkerEvent = WorkerReliableEventEnvelope | ObservationEventEnvelope;
+
+export function createCommandEnvelope(
+  clientId: string,
+  sequence: number,
+  commandId: string,
+  command: WorkerProtocolCommand,
+): WorkerCommandEnvelope {
+  return {
+    protocolVersion: WORKER_PROTOCOL_VERSION,
+    channel: 'command',
+    clientId,
+    commandId,
+    sequence,
+    command,
+  };
+}
