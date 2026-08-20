@@ -20,6 +20,39 @@ describe('configured recording selection adjustment', () => {
     });
   });
 
+  it('resizes from each edge while preserving the opposite edge', () => {
+    expect(adjustSelection(selection, 'n', { x: 800, y: 120 }, bounds)).toEqual({
+      x: 400,
+      y: 120,
+      width: 640,
+      height: 440,
+    });
+    expect(adjustSelection(selection, 'e', { x: 1280, y: 400 }, bounds)).toEqual({
+      x: 400,
+      y: 200,
+      width: 880,
+      height: 360,
+    });
+    expect(adjustSelection(selection, 's', { x: 800, y: 720 }, bounds)).toEqual({
+      x: 400,
+      y: 200,
+      width: 640,
+      height: 520,
+    });
+    expect(adjustSelection(selection, 'w', { x: 280, y: 400 }, bounds)).toEqual({
+      x: 280,
+      y: 200,
+      width: 760,
+      height: 360,
+    });
+  });
+
+  it('uses pointer movement for resize handles without jumping to the handle center', () => {
+    expect(
+      adjustSelection(selection, 'se', { x: 1078, y: 586 }, bounds, { x: 1042, y: 562 }),
+    ).toEqual({ x: 400, y: 200, width: 676, height: 384 });
+  });
+
   it('normalizes a resize that crosses the opposite corner', () => {
     expect(adjustSelection(selection, 'nw', { x: 1200, y: 700 }, bounds)).toEqual({
       x: 1040,

@@ -32,10 +32,18 @@ describe('screen capture permission gate', () => {
     expect(mainSource).not.toContain('refreshScreenCapturePermission');
   });
 
-  it('requests macOS permission before directing the user to System Settings', () => {
+  it('reveals the recovery UI when a tray capture is rejected by macOS permissions', async () => {
+    const mainSource = await readFile(new URL('../../electron/main.ts', import.meta.url), 'utf8');
+    const shortcutErrorHandler = mainSource.match(/function handleShortcutError[\s\S]*?\n\}/)?.[0];
+
+    expect(shortcutErrorHandler).toContain('shouldOfferScreenCapturePermissionRecovery');
+    expect(shortcutErrorHandler).toContain('showMainWindow()');
+  });
+
+  it('opens System Settings after macOS has recorded a screen capture denial', () => {
     expect(getScreenCapturePermissionRecoveryAction('darwin', 'not-determined')).toBe('request');
     expect(getScreenCapturePermissionRecoveryAction('darwin', 'unknown')).toBe('request');
-    expect(getScreenCapturePermissionRecoveryAction('darwin', 'denied')).toBe('request');
+    expect(getScreenCapturePermissionRecoveryAction('darwin', 'denied')).toBe('settings');
     expect(getScreenCapturePermissionRecoveryAction('darwin', 'restricted')).toBe('settings');
     expect(getScreenCapturePermissionRecoveryAction('darwin', 'granted')).toBeUndefined();
     expect(getScreenCapturePermissionRecoveryAction('win32', 'denied')).toBeUndefined();
@@ -57,7 +65,7 @@ describe('screen capture permission gate', () => {
     expect(requestPermission).toHaveBeenCalledOnce();
   });
 
-  it('trusts a successful native capture probe when macOS still reports denied', async () => {
+  it('keeps an explicit macOS denial after a native capture probe returns', async () => {
     const requestPermission = vi.fn(async () => undefined);
 
     await expect(
@@ -66,13 +74,14 @@ describe('screen capture permission gate', () => {
         getStatus: () => 'denied',
         requestPermission,
       }),
-    ).resolves.toBe('granted');
+    ).resolves.toBe('denied');
     expect(requestPermission).toHaveBeenCalledOnce();
   });
 
-  it('keeps a successful native probe authoritative for later snapshots', () => {
-    expect(resolveScreenCapturePermissionStatus('darwin', 'denied', true)).toBe('granted');
+  it('keeps an explicit macOS denial authoritative for later snapshots', () => {
+    expect(resolveScreenCapturePermissionStatus('darwin', 'denied', true)).toBe('denied');
     expect(resolveScreenCapturePermissionStatus('darwin', 'denied', false)).toBe('denied');
+    expect(resolveScreenCapturePermissionStatus('darwin', 'unknown', true)).toBe('granted');
     expect(resolveScreenCapturePermissionStatus('win32', 'denied', false)).toBe('granted');
   });
 
@@ -108,7 +117,7 @@ describe('screen capture permission gate', () => {
     expect(events).toEqual(['permission', 'surface']);
   });
 
-  it('creates the capture surface after a successful native probe despite stale status', async () => {
+  it('does not create a capture surface after a native probe when macOS reports denied', async () => {
     const requestPermission = vi.fn(async () => undefined);
     const run = vi.fn();
 
@@ -120,10 +129,10 @@ describe('screen capture permission gate', () => {
         deniedMessage: 'screen capture permission denied',
         run,
       }),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow('screen capture permission denied');
 
     expect(requestPermission).toHaveBeenCalledOnce();
-    expect(run).toHaveBeenCalledOnce();
+    expect(run).not.toHaveBeenCalled();
   });
 
   it('does not create a capture surface when the native permission probe fails', async () => {
@@ -135,6 +144,25 @@ describe('screen capture permission gate', () => {
         getStatus: () => 'not-determined',
         requestPermission: async () => {
           throw new Error('Failed to get sources');
+        },
+        deniedMessage: 'screen capture permission denied',
+        run,
+      }),
+    ).rejects.toThrow('screen capture permission denied');
+
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('does not create a capture surface when the permission prompt is denied', async () => {
+    let status: ScreenCapturePermissionStatus = 'not-determined';
+    const run = vi.fn();
+
+    await expect(
+      runAfterScreenCapturePermission({
+        platform: 'darwin',
+        getStatus: () => status,
+        requestPermission: async () => {
+          status = 'denied';
         },
         deniedMessage: 'screen capture permission denied',
         run,

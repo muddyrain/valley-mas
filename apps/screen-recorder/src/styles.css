@@ -742,9 +742,22 @@ button:active:not(:disabled) {
   pointer-events: none;
 }
 
-.selection-mask {
+.screenshot-frozen-frame {
   position: absolute;
   z-index: 0;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+}
+
+.selection-mask,
+.screenshot-editor-mask {
+  position: absolute;
+  z-index: 1;
   contain: strict;
   background: rgb(5 7 11 / 52%);
   pointer-events: none;
@@ -892,6 +905,11 @@ button:active:not(:disabled) {
   box-shadow: 0 8px 20px rgb(111 76 255 / 28%);
 }
 
+.selection-overlay-gesture-active .capture-mode-toolbar,
+.selection-overlay-gesture-active .selection-help {
+  display: none;
+}
+
 .selection-help {
   top: 78px;
   padding: 8px 13px;
@@ -907,16 +925,21 @@ button:active:not(:disabled) {
   color: #ffb3ba;
 }
 
+.selection-box,
+.screenshot-canvas-wrap {
+  outline: 1px solid #9a84ff;
+  background: transparent;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 24%);
+}
+
 .selection-box {
   position: absolute;
   z-index: 1;
-  border: 1px solid #9a84ff;
-  background: transparent;
-  box-shadow: 0 0 0 1px rgb(255 255 255 / 24%);
   pointer-events: none;
 }
 
-.selection-size {
+.selection-size,
+.screenshot-size-label {
   position: absolute;
   right: -2px;
   bottom: -30px;
@@ -929,7 +952,7 @@ button:active:not(:disabled) {
 }
 
 .selection-box-configuring {
-  border-color: #4c9dff;
+  outline-color: #4c9dff;
   cursor: move;
   pointer-events: auto;
 }
@@ -1032,11 +1055,6 @@ button:active:not(:disabled) {
 .screenshot-canvas-wrap {
   position: absolute;
   z-index: 2;
-  outline: 2px solid #4c9dff;
-  background: #fff;
-  box-shadow:
-    0 18px 48px rgb(0 0 0 / 26%),
-    0 0 0 9999px rgb(8 10 14 / 46%);
 }
 
 .screenshot-canvas-wrap canvas {
@@ -1055,9 +1073,19 @@ button:active:not(:disabled) {
   background: transparent;
 }
 
+.screenshot-canvas-frozen canvas {
+  opacity: 0;
+}
+
 .screenshot-selection-moving canvas {
   opacity: 0;
   cursor: grabbing;
+}
+
+.screenshot-selection-handle {
+  border-color: #9a84ff;
+  pointer-events: auto;
+  touch-action: none;
 }
 
 .screenshot-text-selection {
@@ -1155,20 +1183,6 @@ button:active:not(:disabled) {
 
 .screenshot-canvas-tool-mosaic canvas {
   cursor: cell;
-}
-
-.screenshot-size-label {
-  position: absolute;
-  top: -29px;
-  left: -2px;
-  padding: 4px 7px;
-  border-radius: 5px;
-  color: #20242c;
-  background: #fff;
-  box-shadow: 0 6px 18px rgb(0 0 0 / 18%);
-  font-size: 11px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
 }
 
 .screenshot-text-input {

@@ -29,11 +29,27 @@ export function adjustSelection(
     };
   }
 
-  const next = clampPoint(point, bounds);
   const left = selection.x;
   const top = selection.y;
   const right = selection.x + selection.width;
   const bottom = selection.y + selection.height;
+  const next = clampPoint(
+    pointerStart
+      ? {
+          x: handle.includes('w')
+            ? left + point.x - pointerStart.x
+            : handle.includes('e')
+              ? right + point.x - pointerStart.x
+              : point.x,
+          y: handle.includes('n')
+            ? top + point.y - pointerStart.y
+            : handle.includes('s')
+              ? bottom + point.y - pointerStart.y
+              : point.y,
+        }
+      : point,
+    bounds,
+  );
   const start = {
     x: handle.includes('w') ? next.x : left,
     y: handle.includes('n') ? next.y : top,

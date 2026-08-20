@@ -436,6 +436,10 @@ async function assertSelectionLayerIsTransparent(client) {
         maskBackground: getComputedStyle(document.querySelector('.selection-mask')).backgroundColor,
         opacity: getComputedStyle(document.querySelector('.selection-overlay')).opacity,
         transitionDuration: getComputedStyle(document.querySelector('.selection-overlay')).transitionDuration,
+        frozenFrameReady: (() => {
+          const image = document.querySelector('.screenshot-frozen-frame');
+          return Boolean(image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0);
+        })(),
         viewport: { width: window.innerWidth, height: window.innerHeight },
         screen: { width: window.screen.width, height: window.screen.height },
       })`),
@@ -449,6 +453,9 @@ async function assertSelectionLayerIsTransparent(client) {
     appearance.viewport.height !== appearance.screen.height
   ) {
     throw new Error(`选区层没有覆盖完整显示器：${JSON.stringify(appearance)}`);
+  }
+  if (appearance.activeMode === '截图' && !appearance.frozenFrameReady) {
+    throw new Error(`截图选区没有显示固定画面：${JSON.stringify(appearance)}`);
   }
   return appearance;
 }
@@ -525,8 +532,8 @@ async function leftClick(client, rect) {
 
 async function selectWithMask(client, rect, initialSnapshot) {
   const initial = initialSnapshot ?? (await assertSelectionLayerIsTransparent(client));
-  if (initial.maskCount !== 1 || initial.maskBackground === 'rgba(0, 0, 0, 0)') {
-    throw new Error(`选区前缺少全屏遮罩：${JSON.stringify(initial)}`);
+  if (initial.maskCount < 1 || initial.maskBackground === 'rgba(0, 0, 0, 0)') {
+    throw new Error(`选区前缺少有效遮罩：${JSON.stringify(initial)}`);
   }
   await client.send('Input.dispatchMouseEvent', {
     type: 'mousePressed',
@@ -535,6 +542,21 @@ async function selectWithMask(client, rect, initialSnapshot) {
     button: 'left',
     clickCount: 1,
   });
+  const chromeAfterPointerDown = await client.evaluate(`(() => {
+    const isVisible = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return false;
+      const style = getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+    };
+    return {
+      toolbarVisible: isVisible('.capture-mode-toolbar'),
+      helpVisible: isVisible('.selection-help'),
+    };
+  })()`);
+  if (chromeAfterPointerDown.toolbarVisible || chromeAfterPointerDown.helpVisible) {
+    throw new Error(`鼠标按下后顶部捕获控件仍然可见：${JSON.stringify(chromeAfterPointerDown)}`);
+  }
   await client.send('Input.dispatchMouseEvent', {
     type: 'mouseMoved',
     x: rect.x + rect.width,
@@ -562,6 +584,12 @@ async function selectWithMask(client, rect, initialSnapshot) {
       value.maskCount === 4 &&
       !value.boxShadow?.includes('9999px'),
   );
+  await client.evaluate(`(() => {
+    if (window.__valleyScreenshotHandoffProbe) {
+      window.__valleyScreenshotHandoffProbe.releaseAt = performance.now();
+    }
+    return true;
+  })()`);
   await client.send('Input.dispatchMouseEvent', {
     type: 'mouseReleased',
     x: rect.x + rect.width,
@@ -569,11 +597,12 @@ async function selectWithMask(client, rect, initialSnapshot) {
     button: 'left',
     clickCount: 1,
   });
-  return { initial, selected };
+  return { initial, selected, chromeAfterPointerDown };
 }
 
 async function inspectScreenshotEditor(port) {
   const editor = await connectTarget(port, 'selection');
+  const approximately = (actual, expected) => Math.abs(actual - expected) < 1;
   const view = await waitFor(
     '截图标注工具挂载',
     () =>
@@ -621,13 +650,18 @@ async function inspectScreenshotEditor(port) {
           y: rect.y,
           moving: frame.classList.contains('screenshot-selection-moving'),
           canvasOpacity: getComputedStyle(canvas).opacity,
+          frozenFrameReady: (() => {
+            const image = document.querySelector('.screenshot-frozen-frame');
+            return Boolean(image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0);
+          })(),
         } : undefined;
       })()`),
     (value) =>
-      value?.x === view.canvas.x + 24 &&
-      value?.y === view.canvas.y + 16 &&
+      approximately(value?.x, view.canvas.x + 24) &&
+      approximately(value?.y, view.canvas.y + 16) &&
       value?.moving === true &&
-      value?.canvasOpacity === '0',
+      value?.canvasOpacity === '0' &&
+      value?.frozenFrameReady === true,
   );
   await editor.send('Input.dispatchMouseEvent', {
     type: 'mouseReleased',
@@ -637,15 +671,112 @@ async function inspectScreenshotEditor(port) {
     clickCount: 1,
   });
   const movedSelection = await waitFor(
-    '截图选区默认移动',
+    '截图选区移动提交完成',
+    () =>
+      editor.evaluate(`(() => {
+        const frame = document.querySelector('.screenshot-canvas-wrap');
+        const canvas = frame?.querySelector('canvas');
+        const rect = canvas?.getBoundingClientRect();
+        return rect && canvas ? {
+          rect: rect.toJSON(),
+          moving: frame.classList.contains('screenshot-selection-moving'),
+          canvasOpacity: getComputedStyle(canvas).opacity,
+        } : undefined;
+      })()`),
+    (value) =>
+      approximately(value?.rect?.x, view.canvas.x + 24) &&
+      approximately(value?.rect?.y, view.canvas.y + 16) &&
+      value?.moving === false &&
+      value?.canvasOpacity === '0',
+  );
+  view.canvas = movedSelection.rect;
+  view.liveSelection = liveSelection;
+  const resizeHandle = await editor.evaluate(`(() => {
+    const rect = document.querySelector('[data-screenshot-selection-handle="se"]')?.getBoundingClientRect();
+    if (!rect) return undefined;
+    const x = rect.x + rect.width / 2;
+    const y = rect.y + rect.height / 2;
+    return {
+      x,
+      y,
+      hitHandle: document.elementFromPoint(x, y)?.closest('[data-screenshot-selection-handle]')?.getAttribute('data-screenshot-selection-handle'),
+    };
+  })()`);
+  if (!resizeHandle) throw new Error('截图选区缺少东南缩放点');
+  if (resizeHandle.hitHandle !== 'se') {
+    throw new Error(`截图选区东南缩放点被其他图层遮挡：${JSON.stringify(resizeHandle)}`);
+  }
+  await editor.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x: resizeHandle.x,
+    y: resizeHandle.y,
+    button: 'left',
+    clickCount: 1,
+  });
+  await waitFor(
+    '截图选区缩放手势开始',
+    () =>
+      editor.evaluate(`(() => {
+        const frame = document.querySelector('.screenshot-canvas-wrap');
+        const canvas = frame?.querySelector('canvas');
+        return frame && canvas ? {
+          moving: frame.classList.contains('screenshot-selection-moving'),
+          canvasOpacity: getComputedStyle(canvas).opacity,
+        } : undefined;
+      })()`),
+    (value) => value?.moving === true && value?.canvasOpacity === '0',
+  );
+  await editor.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved',
+    x: resizeHandle.x + 36,
+    y: resizeHandle.y + 24,
+    button: 'left',
+    buttons: 1,
+  });
+  const liveResize = await waitFor(
+    '截图选区缩放期间保持原色',
+    () =>
+      editor.evaluate(`(() => {
+        const frame = document.querySelector('.screenshot-canvas-wrap');
+        const canvas = frame?.querySelector('canvas');
+        const rect = frame?.getBoundingClientRect();
+        return rect && canvas ? {
+          width: rect.width,
+          height: rect.height,
+          moving: frame.classList.contains('screenshot-selection-moving'),
+          canvasOpacity: getComputedStyle(canvas).opacity,
+          frozenFrameReady: (() => {
+            const image = document.querySelector('.screenshot-frozen-frame');
+            return Boolean(image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0);
+          })(),
+        } : undefined;
+      })()`),
+    (value) =>
+      approximately(value?.width, view.canvas.width + 36) &&
+      approximately(value?.height, view.canvas.height + 24) &&
+      value?.moving === true &&
+      value?.canvasOpacity === '0' &&
+      value?.frozenFrameReady === true,
+  );
+  await editor.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x: resizeHandle.x + 36,
+    y: resizeHandle.y + 24,
+    button: 'left',
+    clickCount: 1,
+  });
+  const resizedSelection = await waitFor(
+    '截图选区缩放提交',
     () =>
       editor.evaluate(
         "document.querySelector('.screenshot-canvas-wrap canvas')?.getBoundingClientRect().toJSON()",
       ),
-    (value) => value?.x === view.canvas.x + 24 && value?.y === view.canvas.y + 16,
+    (value) =>
+      approximately(value?.width, view.canvas.width + 36) &&
+      approximately(value?.height, view.canvas.height + 24),
   );
-  view.canvas = movedSelection;
-  view.liveSelection = liveSelection;
+  view.canvas = resizedSelection;
+  view.liveResize = liveResize;
   const centerY = view.canvas.y + Math.min(80, view.canvas.height / 2);
   const tools = ['方框', '圆框', '箭头', '画笔', '马赛克', '文字', '吸色'];
   if (!tools.every((tool) => view.tools.includes(tool))) {
@@ -905,18 +1036,48 @@ async function inspectScreenshotEditor(port) {
 
 async function startScreenshotHandoffProbe(client) {
   await client.evaluate(`(() => {
-    const result = { frames: [], done: false };
+    const result = {
+      frames: [],
+      done: false,
+      releaseAt: undefined,
+      lastSelection: undefined,
+      firstEditor: undefined,
+    };
+    let selectionFrozenFrameSrc;
     window.__valleyScreenshotHandoffProbe = result;
     const sample = () => {
-      const selectionVisible = Boolean(document.querySelector('.selection-overlay'));
+      const selectionOverlay = document.querySelector('.selection-overlay');
+      const selectionBox = document.querySelector('.selection-box');
+      const selectionVisible = Boolean(selectionOverlay);
       const editor = document.querySelector('.screenshot-editor-overlay');
       const editorVisible = Boolean(
         editor &&
           getComputedStyle(editor).visibility !== 'hidden' &&
           getComputedStyle(editor).opacity !== '0'
       );
+      if (selectionVisible && selectionBox) {
+        const rect = selectionBox.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          result.lastSelection = {
+            rect: rect.toJSON(),
+            borderColor: getComputedStyle(selectionBox).outlineColor,
+          };
+          selectionFrozenFrameSrc = document.querySelector('.screenshot-frozen-frame')?.getAttribute('src');
+        }
+      }
       result.frames.push({ editorVisible, selectionVisible, timestamp: performance.now() });
       if (editorVisible) {
+        const frame = document.querySelector('.screenshot-canvas-wrap');
+        const canvas = frame?.querySelector('canvas');
+        const rect = frame?.getBoundingClientRect();
+        result.firstEditor = rect && canvas ? {
+          rect: rect.toJSON(),
+          borderColor: getComputedStyle(frame).outlineColor,
+          canvasOpacity: getComputedStyle(canvas).opacity,
+          sameFrozenFrame:
+            selectionFrozenFrameSrc ===
+            document.querySelector('.screenshot-frozen-frame')?.getAttribute('src'),
+        } : undefined;
         result.done = true;
         return;
       }
@@ -939,9 +1100,43 @@ async function readScreenshotHandoffProbe(client) {
   if (blankFrames.length > 0) {
     throw new Error(`截图编辑器出现前露出了桌面：${JSON.stringify({ blankFrames, result })}`);
   }
+  const sameRect = (before, after) =>
+    before &&
+    after &&
+    Math.abs(before.x - after.x) < 1 &&
+    Math.abs(before.y - after.y) < 1 &&
+    Math.abs(before.width - after.width) < 1 &&
+    Math.abs(before.height - after.height) < 1;
+  if (!sameRect(result.lastSelection?.rect, result.firstEditor?.rect)) {
+    throw new Error(`截图松手后替换了选区几何：${JSON.stringify(result)}`);
+  }
+  if (result.lastSelection?.borderColor !== result.firstEditor?.borderColor) {
+    throw new Error(`截图松手前后边框颜色不一致：${JSON.stringify(result)}`);
+  }
+  if (result.firstEditor?.canvasOpacity !== '0' || result.firstEditor?.sameFrozenFrame !== true) {
+    throw new Error(`截图松手后替换了固定画面层：${JSON.stringify(result)}`);
+  }
+  const editorChrome = await client.evaluate(`({
+    handles: document.querySelectorAll('[data-screenshot-selection-handle]').length,
+    toolbarVisible: Boolean(document.querySelector('.screenshot-toolbar')),
+    activeTool: document.querySelector('.screenshot-toolbar .screenshot-tool-active')?.getAttribute('aria-label'),
+  })`);
+  if (
+    editorChrome.handles !== 8 ||
+    !editorChrome.toolbarVisible ||
+    editorChrome.activeTool !== '移动选区'
+  ) {
+    throw new Error(`截图松手后的工具或缩放点不完整：${JSON.stringify(editorChrome)}`);
+  }
+  const editorFrame = result.frames.find((frame) => frame.editorVisible);
   return {
     blankFrames: blankFrames.length,
     sampledFrames: result.frames.length,
+    ...editorChrome,
+    readyMilliseconds:
+      editorFrame && typeof result.releaseAt === 'number'
+        ? Math.round(editorFrame.timestamp - result.releaseAt)
+        : undefined,
   };
 }
 
@@ -1326,7 +1521,7 @@ async function inspectPinnedScreenshot(app, port) {
   return { ...pinnedView, customMenu, closed: true };
 }
 
-async function inspectCurrentFixes(app, port) {
+async function inspectCurrentFixes(app, port, { includePinnedScreenshot = true } = {}) {
   console.error('[runtime] fixes window snap start');
   const existingSelectionTargets = await targetIdsForMode(port, 'selection');
   await app.main.evaluate("window.screenRecorder.startScreenshot('region')");
@@ -1372,22 +1567,30 @@ async function inspectCurrentFixes(app, port) {
   );
   console.error('[runtime] fixes window snap complete');
   await startScreenshotHandoffProbe(selection);
-  await selection.evaluate(
-    'void window.screenRecorder.confirmSelection({ x: 100, y: 100, width: 320, height: 240 }); true',
-  );
+  const selectionAppearance = await selectWithMask(selection, {
+    x: 100,
+    y: 100,
+    width: 320,
+    height: 240,
+  });
   const handoff = await readScreenshotHandoffProbe(selection);
   selection.close();
   const editor = await inspectScreenshotEditor(port);
   console.error('[runtime] fixes live selection complete');
   await waitForScreenshotState(app.main, 'completed', 10_000);
-  const pinnedScreenshot = await inspectPinnedScreenshot(app, port);
-  console.error('[runtime] fixes pinned screenshot complete');
-  return {
+  const interactionResult = {
     windowTargetsMilliseconds,
     windowTargetResponseMilliseconds: responseTimes,
     windowSnap,
+    selectionAppearance,
     handoff,
     editor,
+  };
+  if (!includePinnedScreenshot) return interactionResult;
+  const pinnedScreenshot = await inspectPinnedScreenshot(app, port);
+  console.error('[runtime] fixes pinned screenshot complete');
+  return {
+    ...interactionResult,
     pinnedScreenshot,
   };
 }
@@ -1396,6 +1599,7 @@ async function inspectScreenshotHandoff(app, port) {
   const existingSelectionTargets = await targetIdsForMode(port, 'selection');
   await app.main.evaluate("window.screenRecorder.startScreenshot('region')");
   const selection = await connectTarget(port, 'selection', existingSelectionTargets);
+  const selectionTargetId = selection.targetId;
   const initial = await assertSelectionLayerIsTransparent(selection);
   await startScreenshotHandoffProbe(selection);
   const selectionAppearance = await selectWithMask(
@@ -1404,6 +1608,20 @@ async function inspectScreenshotHandoff(app, port) {
     initial,
   );
   const handoff = await readScreenshotHandoffProbe(selection);
+  const readyMilliseconds = handoff.readyMilliseconds;
+  const currentTargets = await targets(port);
+  const reusedSelectionSurface = currentTargets.some((item) => item.id === selectionTargetId);
+  const problems = [];
+  if (!reusedSelectionSurface) {
+    problems.push('截图编辑器没有复用已经显示的选区窗口');
+  }
+  if (typeof readyMilliseconds !== 'number' || readyMilliseconds > 150) {
+    problems.push(`选区确认到编辑状态耗时 ${readyMilliseconds}ms`);
+  }
+  if (problems.length > 0) {
+    selection.close();
+    throw new Error(`截图交接不符合预期：${problems.join('；')}`);
+  }
   const plan = await selection.evaluate('window.screenRecorder.getScreenshotEditPlan()');
   if (!plan?.operationId) throw new Error('截图编辑任务缺少 operationId');
   await selection.evaluate(
@@ -1411,7 +1629,12 @@ async function inspectScreenshotHandoff(app, port) {
   );
   selection.close();
   await waitForScreenshotState(app.main, 'idle', 10_000);
-  return { ...handoff, selectionAppearance };
+  return {
+    ...handoff,
+    selectionAppearance,
+    readyMilliseconds,
+    reusedSelectionSurface,
+  };
 }
 
 async function measureShortcutSurfaceActivation(app, port, purpose) {
@@ -1880,6 +2103,13 @@ async function runCoreScenarios() {
 
     if (scenario === 'fixes-only') {
       results.fixes = await inspectCurrentFixes(app, 9333);
+      return results;
+    }
+
+    if (scenario === 'selection-interactions-only') {
+      results.selectionInteractions = await inspectCurrentFixes(app, 9333, {
+        includePinnedScreenshot: false,
+      });
       return results;
     }
 
@@ -2490,6 +2720,10 @@ if (scenario === 'core-only') {
   process.exit(0);
 }
 if (scenario === 'fixes-only') {
+  console.log(JSON.stringify({ core: await runCoreScenarios() }, null, 2));
+  process.exit(0);
+}
+if (scenario === 'selection-interactions-only') {
   console.log(JSON.stringify({ core: await runCoreScenarios() }, null, 2));
   process.exit(0);
 }

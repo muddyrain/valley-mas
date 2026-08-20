@@ -25,6 +25,7 @@ export function resolveScreenCapturePermissionStatus(
   nativeCaptureVerified: boolean,
 ): ScreenCapturePermissionStatus {
   if (platform !== 'darwin') return 'granted';
+  if (reportedStatus === 'denied' || reportedStatus === 'restricted') return reportedStatus;
   return nativeCaptureVerified ? 'granted' : reportedStatus;
 }
 
@@ -42,7 +43,7 @@ export function getScreenCapturePermissionRecoveryAction(
   status: ScreenCapturePermissionStatus,
 ): ScreenCapturePermissionRecoveryAction | undefined {
   if (platform !== 'darwin' || status === 'granted') return undefined;
-  return status === 'restricted' ? 'settings' : 'request';
+  return status === 'denied' || status === 'restricted' ? 'settings' : 'request';
 }
 
 type ScreenCapturePermissionRequest = {
@@ -65,7 +66,7 @@ export async function requestScreenCapturePermissionStatus({
   } catch {
     return getStatus();
   }
-  return 'granted';
+  return getStatus();
 }
 
 type ScreenCapturePermissionGate<T> = {
@@ -94,5 +95,6 @@ export async function runAfterScreenCapturePermission<T>({
   } catch {
     throw new Error(deniedMessage);
   }
+  if (getStatus() !== 'granted') throw new Error(deniedMessage);
   return run();
 }

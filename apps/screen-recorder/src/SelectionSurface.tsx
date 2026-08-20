@@ -14,6 +14,7 @@ export function SelectionSurface() {
       ? 'selection'
       : getSelectionSurfaceMode(snapshot?.screenshot.state ?? 'idle');
   const isColorPicker = snapshot?.selectionPurpose === 'color-picker';
+  const selectionPurpose = snapshot?.selectionPurpose === 'recording' ? 'recording' : 'screenshot';
   const layers = getSelectionSurfaceLayers(surfaceMode, editorReady);
 
   useEffect(() => {
@@ -30,7 +31,13 @@ export function SelectionSurface() {
 
   return (
     <>
-      {layers.showSelection && <SelectionOverlay interactive={surfaceMode === 'selection'} />}
+      {layers.showSelection && (
+        <SelectionOverlay
+          interactive={surfaceMode === 'selection'}
+          purpose={selectionPurpose}
+          displayId={snapshot.selectionDisplay?.id}
+        />
+      )}
       {layers.showEditor && <ScreenshotEditor visible={editorReady} onCanvasReady={revealEditor} />}
     </>
   );

@@ -39,7 +39,8 @@ import {
 import { colorFormatForShift, formatPickedColor, type RgbColor, rgbToHex } from './core/color';
 import type { Point, Rectangle } from './core/geometry';
 import { getScreenshotToolbarPosition } from './core/screenshot-toolbar';
-import { adjustSelection } from './core/selection-adjustment';
+import { adjustSelection, type SelectionHandle } from './core/selection-adjustment';
+import { createSelectionMaskRects } from './core/selection-mask';
 import type { ScreenshotEditPlan } from './shared/contracts';
 import { useShiftColorFormat } from './useShiftColorFormat';
 
@@ -54,6 +55,16 @@ const TEXT_SIZE_OPTIONS = [
   { value: 1, label: '小', dotSize: 8 },
   { value: 1.5, label: '中', dotSize: 12 },
   { value: 2, label: '大', dotSize: 16 },
+];
+const SCREENSHOT_SELECTION_HANDLES: SelectionHandle[] = [
+  'nw',
+  'n',
+  'ne',
+  'e',
+  'se',
+  's',
+  'sw',
+  'w',
 ];
 
 function ToolbarButton({
@@ -196,7 +207,13 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
   const canvasReadyRef = useRef(false);
   const startRef = useRef<Point | undefined>(undefined);
   const selectionMoveRef = useRef<
-    { pointerStart: Point; selection: Rectangle; latest: Rectangle } | undefined
+    | {
+        handle: SelectionHandle;
+        pointerStart: Point;
+        selection: Rectangle;
+        latest: Rectangle;
+      }
+    | undefined
   >(undefined);
   const textDragRef = useRef<
     | {
@@ -333,10 +350,72 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
     return { width: ctx.measureText(action.text).width, height: fontSize };
   };
 
+  const beginSelectionAdjustment = (
+    event: React.PointerEvent<HTMLElement>,
+    handle: SelectionHandle,
+  ) => {
+    if (!plan || working || event.button !== 0 || !event.isPrimary) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    selectionMoveRef.current = {
+      handle,
+      pointerStart: { x: event.clientX, y: event.clientY },
+      selection: plan.selection,
+      latest: plan.selection,
+    };
+    setSelectionPreview(plan.selection);
+    setSelectionMoving(true);
+    setSelectedTextIndex(-1);
+  };
+
+  const updateSelectionAdjustment = (event: React.PointerEvent<HTMLElement>): boolean => {
+    const selectionMove = selectionMoveRef.current;
+    if (!selectionMove) return false;
+    const next = adjustSelection(
+      selectionMove.selection,
+      selectionMove.handle,
+      { x: event.clientX, y: event.clientY },
+      { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
+      selectionMove.pointerStart,
+    );
+    selectionMove.latest = next;
+    setSelectionPreview(next);
+    return true;
+  };
+
+  const finishSelectionAdjustment = async (event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || !event.isPrimary) return;
+    const selectionMove = selectionMoveRef.current;
+    if (!selectionMove || !plan) return;
+    selectionMoveRef.current = undefined;
+    setWorking(true);
+    try {
+      const nextPlan = await window.screenRecorder.updateScreenshotSelection(
+        plan.operationId,
+        selectionMove.latest,
+      );
+      await applyEditPlan(nextPlan);
+      setSelectionPreview(undefined);
+      setError(undefined);
+    } catch (caught) {
+      setSelectionPreview(undefined);
+      setError(caught instanceof Error ? caught.message : '无法调整截图选区');
+    } finally {
+      setSelectionMoving(false);
+      setWorking(false);
+    }
+  };
+
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (event.button !== 0 || !event.isPrimary) return;
     const point = pointFromEvent(event);
     setStylePopoverTool(undefined);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    if (tool === 'move' && plan) {
+      beginSelectionAdjustment(event, 'move');
+      return;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     if (tool === 'eyedropper') {
       const sampled = sampleCanvasColor(event.currentTarget, point);
@@ -346,18 +425,6 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
           formatPickedColor(sampled, colorFormatForShift(event.shiftKey)),
         );
       }
-      return;
-    }
-    if (tool === 'move' && plan) {
-      const pointerStart = { x: event.clientX, y: event.clientY };
-      selectionMoveRef.current = {
-        pointerStart,
-        selection: plan.selection,
-        latest: plan.selection,
-      };
-      setSelectionPreview(plan.selection);
-      setSelectionMoving(true);
-      setSelectedTextIndex(-1);
       return;
     }
     if (tool === 'text') {
@@ -395,19 +462,7 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const selectionMove = selectionMoveRef.current;
-    if (selectionMove && plan) {
-      const next = adjustSelection(
-        selectionMove.selection,
-        'move',
-        { x: event.clientX, y: event.clientY },
-        { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
-        selectionMove.pointerStart,
-      );
-      selectionMove.latest = next;
-      setSelectionPreview(next);
-      return;
-    }
+    if (updateSelectionAdjustment(event)) return;
     const point = pointFromEvent(event);
     if (tool === 'eyedropper') {
       const sampled = sampleCanvasColor(event.currentTarget, point);
@@ -449,25 +504,8 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
 
   const onPointerUp = async (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (event.button !== 0 || !event.isPrimary) return;
-    const selectionMove = selectionMoveRef.current;
-    if (selectionMove && plan) {
-      selectionMoveRef.current = undefined;
-      setWorking(true);
-      try {
-        const nextPlan = await window.screenRecorder.updateScreenshotSelection(
-          plan.operationId,
-          selectionMove.latest,
-        );
-        await applyEditPlan(nextPlan);
-        setSelectionPreview(undefined);
-        setError(undefined);
-      } catch (caught) {
-        setSelectionPreview(undefined);
-        setError(caught instanceof Error ? caught.message : '无法移动截图选区');
-      } finally {
-        setSelectionMoving(false);
-        setWorking(false);
-      }
+    if (selectionMoveRef.current) {
+      await finishSelectionAdjustment(event);
       return;
     }
     if (textDragRef.current) {
@@ -600,9 +638,14 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
     width: window.innerWidth,
     height: window.innerHeight,
   });
+  const selectionMaskRects = createSelectionMaskRects(
+    { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
+    visibleSelection,
+  );
   const selectedText = history[selectedTextIndex];
   const selectedTextSize =
     selectedText?.type === 'text' ? measureTextAnnotation(selectedText) : undefined;
+  const preserveFrozenSelection = tool === 'move' && history.length === 0;
 
   return (
     <div
@@ -612,8 +655,21 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
         void window.screenRecorder.cancelScreenshotEdit(plan.operationId);
       }}
     >
+      <img
+        className="screenshot-frozen-frame"
+        src={plan.displayImageDataUrl}
+        alt=""
+        draggable={false}
+      />
+      {selectionMaskRects.map((rect, index) => (
+        <div
+          className="screenshot-editor-mask"
+          key={index}
+          style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
+        />
+      ))}
       <div
-        className={`screenshot-canvas-wrap screenshot-canvas-tool-${tool}${selectionMoving ? ' screenshot-selection-moving' : ''}${textHovering ? ' screenshot-canvas-text-movable' : ''}${movingText ? ' screenshot-canvas-text-moving' : ''}`}
+        className={`screenshot-canvas-wrap screenshot-canvas-tool-${tool}${preserveFrozenSelection ? ' screenshot-canvas-frozen' : ''}${selectionMoving ? ' screenshot-selection-moving' : ''}${textHovering ? ' screenshot-canvas-text-movable' : ''}${movingText ? ' screenshot-canvas-text-moving' : ''}`}
         style={{
           left: visibleSelection.x,
           top: visibleSelection.y,
@@ -634,6 +690,19 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
             if (!movingText) setTextHovering(false);
           }}
         />
+        {tool === 'move' &&
+          SCREENSHOT_SELECTION_HANDLES.map((handle) => (
+            <i
+              key={handle}
+              className={`selection-handle selection-handle-${handle} screenshot-selection-handle`}
+              data-screenshot-selection-handle={handle}
+              aria-hidden="true"
+              onPointerDown={(event) => beginSelectionAdjustment(event, handle)}
+              onPointerMove={updateSelectionAdjustment}
+              onPointerUp={(event) => void finishSelectionAdjustment(event)}
+              onPointerCancel={cancelPointerGesture}
+            />
+          ))}
         {selectedText?.type === 'text' && selectedTextSize && (
           <i
             className="screenshot-text-selection"

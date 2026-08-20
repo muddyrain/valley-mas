@@ -19,6 +19,7 @@ export const IPC_CHANNELS = {
   startScreenshot: 'screen-recorder:start-screenshot',
   startColorPicker: 'screen-recorder:start-color-picker',
   switchSelectionPurpose: 'screen-recorder:switch-selection-purpose',
+  getScreenshotDisplayFrame: 'screen-recorder:get-screenshot-display-frame',
   getScreenshotEditPlan: 'screen-recorder:get-screenshot-edit-plan',
   revealScreenshotEditor: 'screen-recorder:reveal-screenshot-editor',
   updateScreenshotSelection: 'screen-recorder:update-screenshot-selection',
@@ -75,8 +76,15 @@ export type CapturePlan = {
 export type ScreenshotEditPlan = {
   operationId: string;
   imageDataUrl: string;
+  displayImageDataUrl: string;
   selection: Rectangle;
   pixelSize: { width: number; height: number };
+};
+
+export type ScreenshotDisplayFrame = {
+  imageDataUrl: string;
+  pixelSize: { width: number; height: number };
+  displaySize: { width: number; height: number };
 };
 
 export type ColorPickerFrame = {
@@ -131,6 +139,7 @@ export type RecorderApi = {
   startScreenshot(mode: ScreenshotMode): Promise<void>;
   startColorPicker(): Promise<void>;
   switchSelectionPurpose(purpose: 'recording' | 'screenshot'): Promise<void>;
+  getScreenshotDisplayFrame(): Promise<ScreenshotDisplayFrame>;
   getScreenshotEditPlan(): Promise<ScreenshotEditPlan>;
   revealScreenshotEditor(operationId: string): Promise<void>;
   updateScreenshotSelection(operationId: string, rect: Rectangle): Promise<ScreenshotEditPlan>;

@@ -13,6 +13,7 @@ const api: RecorderApi = {
   startColorPicker: () => ipcRenderer.invoke(IPC_CHANNELS.startColorPicker),
   switchSelectionPurpose: (purpose: 'recording' | 'screenshot') =>
     ipcRenderer.invoke(IPC_CHANNELS.switchSelectionPurpose, purpose),
+  getScreenshotDisplayFrame: () => ipcRenderer.invoke(IPC_CHANNELS.getScreenshotDisplayFrame),
   getScreenshotEditPlan: () => ipcRenderer.invoke(IPC_CHANNELS.getScreenshotEditPlan),
   revealScreenshotEditor: (operationId: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.revealScreenshotEditor, operationId),

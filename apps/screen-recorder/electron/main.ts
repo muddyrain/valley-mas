@@ -22,6 +22,7 @@ import {
   systemPreferences,
   Tray,
 } from 'electron';
+import { restartApplication } from '../src/core/app-restart';
 import { getLoginItemTarget, parsePersistedAppSettings } from '../src/core/app-settings';
 import { isSupportedColorText } from '../src/core/color';
 import { createScreenshotFilename, ensurePngExtension } from '../src/core/filename';
@@ -93,6 +94,7 @@ import {
   resolveScreenCapturePermissionStatus,
   runAfterScreenCapturePermission,
   type ScreenCapturePermissionStatus,
+  shouldOfferScreenCapturePermissionRecovery,
 } from '../src/core/screen-capture-permission';
 import { canRevealScreenshotEditor } from '../src/core/screenshot-handoff';
 import { type ScreenshotMode, ScreenshotSession } from '../src/core/screenshot-state';
@@ -116,6 +118,7 @@ import {
   type CapturePlan,
   IPC_CHANNELS,
   type RecorderSnapshot,
+  type ScreenshotDisplayFrame,
   type ScreenshotEditPlan,
 } from '../src/shared/contracts';
 import { RecordingFileWriter } from './file-writer';
@@ -134,8 +137,8 @@ const FORCE_WRITE_FAILURE = process.env.VALLEY_SCREEN_RECORDER_TEST_WRITE_FAILUR
 const SHOW_LONG_SCREENSHOT_FIXTURE =
   process.env.VALLEY_SCREEN_RECORDER_TEST_LONG_SCREENSHOT_FIXTURE === '1';
 const TEST_AUTO_STOP_MS = Number(process.env.VALLEY_SCREEN_RECORDER_TEST_AUTO_STOP_MS ?? 0);
-// desktopCapturer can briefly occupy the compositor; let the shortcut overlay settle first.
-const SCREENSHOT_CAPTURE_PRIME_DELAY_MS = 300;
+// Give the desktop compositor two frames to remove an already-visible capture overlay.
+const SCREENSHOT_OVERLAY_HIDE_SETTLE_MS = 32;
 const SELECTION_DISPLAY_FOLLOW_INTERVAL_MS = 80;
 const LONG_SCREENSHOT_SAMPLE_INTERVAL_MS = 300;
 const SCREENSHOT_PERMISSION_DENIED_MESSAGE =
@@ -178,6 +181,7 @@ let screenshotOutputPath: string | undefined;
 let screenshotTask: { display: Display; selection?: Rectangle } | undefined;
 let screenshotSourcePromise: Promise<NativeImage> | undefined;
 let screenshotDisplayImage: NativeImage | undefined;
+let screenshotDisplayFrame: ScreenshotDisplayFrame | undefined;
 let screenshotEditPlan: ScreenshotEditPlan | undefined;
 let screenshotCopiedToClipboard = false;
 let longScreenshotCapture:
@@ -1073,11 +1077,12 @@ function followSelectionDisplayAtCursor(): void {
   fitOverlayToDisplay(currentWindow, nextDisplay);
   currentWindow.moveTop();
   if (selectionPurpose === 'screenshot') {
-    const nextTask = { display: nextDisplay };
-    screenshotTask = nextTask;
+    screenshotTask = { display: nextDisplay };
     screenshotSourcePromise = undefined;
     screenshotDisplayImage = undefined;
-    primeScreenshotCaptureAfterFirstPaint(nextTask);
+    screenshotDisplayFrame = undefined;
+    currentWindow.hide();
+    primeScreenshotCapture(nextDisplay);
   }
   broadcast();
 }
@@ -1399,25 +1404,52 @@ async function captureDisplayImage(
   if (FORCE_PERMISSION_DENIED) {
     throw new Error(SCREENSHOT_PERMISSION_DENIED_MESSAGE);
   }
+  const restoreCaptureOverlays = hideCaptureOverlaysForScreenshotCapture();
   mainWindow?.hide();
   recordingSetupWindow?.hide();
-  if (settleForHiddenOverlays) await new Promise((resolve) => setTimeout(resolve, 32));
+  try {
+    if (settleForHiddenOverlays) {
+      await new Promise((resolve) => setTimeout(resolve, SCREENSHOT_OVERLAY_HIDE_SETTLE_MS));
+    }
 
-  const targetWidth = Math.max(1, Math.round(display.bounds.width * display.scaleFactor));
-  const targetHeight = Math.max(1, Math.round(display.bounds.height * display.scaleFactor));
-  const sources = await desktopCapturer.getSources({
-    types: ['screen'],
-    thumbnailSize: { width: targetWidth, height: targetHeight },
-    fetchWindowIcons: false,
-  });
-  const source = matchDisplaySource(
-    sources.map((item) => ({ source: item, displayId: item.display_id })),
-    toDisplayGeometry(display),
-  )?.source;
-  if (!source || source.thumbnail.isEmpty()) {
-    throw new Error('找不到目标显示器的截图源');
+    const targetWidth = Math.max(1, Math.round(display.bounds.width * display.scaleFactor));
+    const targetHeight = Math.max(1, Math.round(display.bounds.height * display.scaleFactor));
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width: targetWidth, height: targetHeight },
+      fetchWindowIcons: false,
+    });
+    const source = matchDisplaySource(
+      sources.map((item) => ({ source: item, displayId: item.display_id })),
+      toDisplayGeometry(display),
+    )?.source;
+    if (!source || source.thumbnail.isEmpty()) {
+      throw new Error('找不到目标显示器的截图源');
+    }
+    return source.thumbnail;
+  } finally {
+    restoreCaptureOverlays();
   }
-  return source.thumbnail;
+}
+
+function hideCaptureOverlaysForScreenshotCapture(): () => void {
+  const hiddenWindows = [...new Set([selectionWindow, screenshotEditorWindow])].filter(
+    (window): window is BrowserWindow =>
+      Boolean(window && !window.isDestroyed() && window.isVisible()),
+  );
+  for (const window of hiddenWindows) window.hide();
+
+  return () => {
+    for (const window of hiddenWindows) {
+      if (window.isDestroyed()) continue;
+      if (selectionWindow === window) {
+        window.show();
+        window.focus();
+      } else if (screenshotEditorWindow === window) {
+        window.showInactive();
+      }
+    }
+  };
 }
 
 function getScreenCapturePermissionStatus(): ScreenCapturePermissionStatus {
@@ -1461,23 +1493,48 @@ function runWithScreenCapturePermission<T>(
   });
 }
 
-function primeScreenshotCapture(display: Display): void {
-  screenshotSourcePromise = captureDisplayImage(display);
+function primeScreenshotCapture(
+  display: Display,
+  settleForHiddenOverlays = true,
+): Promise<NativeImage> {
+  screenshotDisplayFrame = undefined;
+  screenshotSourcePromise = captureDisplayImage(display, settleForHiddenOverlays);
   void screenshotSourcePromise.catch(() => undefined);
+  return screenshotSourcePromise;
 }
 
-function primeScreenshotCaptureAfterFirstPaint(task: { display: Display }): void {
-  setTimeout(() => {
-    if (
-      screenshotTask !== task ||
-      selectionPurpose !== 'screenshot' ||
-      screenshotSession.state !== 'selecting' ||
-      screenshotSourcePromise
-    ) {
-      return;
-    }
-    primeScreenshotCapture(task.display);
-  }, SCREENSHOT_CAPTURE_PRIME_DELAY_MS);
+function createScreenshotDisplayFrame(
+  display: Display,
+  image: NativeImage,
+): ScreenshotDisplayFrame {
+  return {
+    imageDataUrl: image.toDataURL(),
+    pixelSize: image.getSize(),
+    displaySize: {
+      width: display.bounds.width,
+      height: display.bounds.height,
+    },
+  };
+}
+
+async function getScreenshotDisplayFrame(): Promise<ScreenshotDisplayFrame> {
+  const task = screenshotTask;
+  if (
+    selectionPurpose !== 'screenshot' ||
+    !selectionDisplay ||
+    !task ||
+    String(task.display.id) !== String(selectionDisplay.id)
+  ) {
+    throw new Error('截图固定画面已失效');
+  }
+  if (screenshotDisplayFrame) return screenshotDisplayFrame;
+  const image =
+    screenshotDisplayImage ??
+    (await (screenshotSourcePromise ?? captureDisplayImage(task.display)));
+  if (task !== screenshotTask) throw new Error('截图固定画面已失效');
+  screenshotDisplayImage = image;
+  screenshotDisplayFrame = createScreenshotDisplayFrame(task.display, image);
+  return screenshotDisplayFrame;
 }
 
 async function captureScreenshotImage(): Promise<NativeImage> {
@@ -1881,10 +1938,15 @@ async function prepareScreenshotEditor(): Promise<void> {
   }
   try {
     const image = await captureScreenshotImage();
+    const displayImage = screenshotDisplayImage;
+    if (!displayImage) throw new Error('截图固定画面已失效');
     const pixelSize = image.getSize();
     screenshotEditPlan = {
       operationId: randomUUID(),
       imageDataUrl: image.toDataURL(),
+      displayImageDataUrl:
+        screenshotDisplayFrame?.imageDataUrl ??
+        createScreenshotDisplayFrame(task.display, displayImage).imageDataUrl,
       selection: {
         x: task.selection.x - task.display.bounds.x,
         y: task.selection.y - task.display.bounds.y,
@@ -1922,16 +1984,10 @@ function updateScreenshotSelection(operationId: string, value: unknown): Screens
     throw new Error('截图选区调整任务已失效');
   }
   const selection = parseDisplaySelection(task.display, value);
-  if (
-    selection.local.width !== screenshotEditPlan.selection.width ||
-    selection.local.height !== screenshotEditPlan.selection.height
-  ) {
-    throw new Error('移动截图时不能改变选区尺寸');
-  }
   const image = displayImage.crop(
     dipRectToVideoPixels(selection.global, toDisplayGeometry(task.display), displayImage.getSize()),
   );
-  if (image.isEmpty()) throw new Error('移动后的截图区域无效');
+  if (image.isEmpty()) throw new Error('调整后的截图区域无效');
   screenshotTask = { ...task, selection: selection.global };
   screenshotEditPlan = {
     ...screenshotEditPlan,
@@ -2011,6 +2067,7 @@ async function beginScreenshot(mode: ScreenshotMode): Promise<void> {
     const display = mode === 'screen' ? screen.getPrimaryDisplay() : pickDisplayAtCursor();
     screenshotTask = { display };
     if (mode === 'region') {
+      await primeScreenshotCapture(display, false);
       createSelectionWindow(display, 'screenshot');
       broadcast();
       return;
@@ -2041,7 +2098,7 @@ async function beginColorPicker(): Promise<void> {
   });
 }
 
-function switchSelectionPurpose(purpose: 'recording' | 'screenshot'): void {
+async function switchSelectionPurpose(purpose: 'recording' | 'screenshot'): Promise<void> {
   if (!selectionWindow || !selectionDisplay || !selectionPurpose) {
     throw new Error('当前没有可切换的选区任务');
   }
@@ -2053,13 +2110,15 @@ function switchSelectionPurpose(purpose: 'recording' | 'screenshot'): void {
     screenshotTask = undefined;
     screenshotSourcePromise = undefined;
     screenshotDisplayImage = undefined;
+    screenshotDisplayFrame = undefined;
     recorderSession.begin('region');
   } else {
     recorderSession.cancelSelection();
     activePlan = undefined;
     screenshotSession.begin('region');
     screenshotTask = { display: selectionDisplay };
-    primeScreenshotCapture(selectionDisplay);
+    await primeScreenshotCapture(selectionDisplay);
+    selectionWindow.hide();
   }
   selectionPurpose = purpose;
   errorMessage = undefined;
@@ -2168,6 +2227,11 @@ async function requestStop(): Promise<void> {
 function handleShortcutError(error: unknown): void {
   errorMessage = error instanceof Error ? error.message : '快捷键操作失败';
   notify('快捷键操作失败', errorMessage);
+  if (
+    shouldOfferScreenCapturePermissionRecovery(process.platform, getScreenCapturePermissionStatus())
+  ) {
+    showMainWindow();
+  }
   broadcast();
 }
 
@@ -2468,14 +2532,6 @@ function registerIpc(): void {
     fitOverlayToDisplay(selectionWindow, selectionDisplay);
     selectionWindow.show();
     selectionWindow.focus();
-    if (
-      selectionPurpose === 'screenshot' &&
-      screenshotTask &&
-      !screenshotSourcePromise &&
-      screenshotSession.state === 'selecting'
-    ) {
-      primeScreenshotCaptureAfterFirstPaint(screenshotTask);
-    }
   });
 
   ipcMain.handle(IPC_CHANNELS.getSnapshot, (event) => {
@@ -2530,12 +2586,17 @@ function registerIpc(): void {
     await beginColorPicker();
   });
 
-  ipcMain.handle(IPC_CHANNELS.switchSelectionPurpose, (event, purpose: unknown) => {
+  ipcMain.handle(IPC_CHANNELS.switchSelectionPurpose, async (event, purpose: unknown) => {
     assertSelectionSender(event);
     if (purpose !== 'recording' && purpose !== 'screenshot') {
       throw new Error('捕获模式无效');
     }
-    switchSelectionPurpose(purpose);
+    await switchSelectionPurpose(purpose);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.getScreenshotDisplayFrame, async (event) => {
+    assertSelectionSender(event);
+    return getScreenshotDisplayFrame();
   });
 
   ipcMain.handle(IPC_CHANNELS.getScreenshotEditPlan, (event) => {
@@ -2761,8 +2822,9 @@ function registerIpc(): void {
 
   ipcMain.on(IPC_CHANNELS.restartForScreenCapturePermission, (event) => {
     if (!mainWindow || event.sender.id !== mainWindow.webContents.id) return;
-    app.relaunch();
-    app.quit();
+    restartApplication(app, () => {
+      isQuitting = true;
+    });
   });
 
   ipcMain.handle(IPC_CHANNELS.chooseRecordingDirectory, async (event) => {

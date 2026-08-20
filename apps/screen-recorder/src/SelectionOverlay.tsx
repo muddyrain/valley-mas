@@ -10,6 +10,7 @@ import { canStartSelectionGesture } from './core/selection-gesture';
 import { shouldShowSelectionLabel } from './core/selection-label';
 import { createSelectionMaskRects } from './core/selection-mask';
 import { findWindowTargetAtOrDisplay, type WindowTarget } from './core/window-target';
+import type { ScreenshotDisplayFrame } from './shared/contracts';
 
 const HANDLES: SelectionHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
@@ -17,7 +18,17 @@ function getDisplayBounds(): Rectangle {
   return { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
 }
 
-export function SelectionOverlay({ interactive = true }: { interactive?: boolean }) {
+type SelectionOverlayProps = {
+  interactive?: boolean;
+  purpose: 'recording' | 'screenshot';
+  displayId?: string;
+};
+
+export function SelectionOverlay({
+  interactive = true,
+  purpose,
+  displayId,
+}: SelectionOverlayProps) {
   const gestureRef = useRef<SelectionGesture | undefined>(undefined);
   const hoverPointRef = useRef<Point | undefined>(undefined);
   const pendingSelectionRef = useRef<Rectangle | undefined>(undefined);
@@ -25,15 +36,47 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
   const selectionDisplayIdRef = useRef<string | undefined>(undefined);
   const [selection, setSelection] = useState<Rectangle>();
   const [error, setError] = useState<string>();
-  const [purpose, setPurpose] = useState<'recording' | 'screenshot'>('recording');
+  const [frozenFrame, setFrozenFrame] = useState<ScreenshotDisplayFrame>();
   const [configuring, setConfiguring] = useState(false);
+  const [gestureActive, setGestureActive] = useState(false);
   const [windowTargets, setWindowTargets] = useState<WindowTarget[]>([]);
   const [suggestedTarget, setSuggestedTarget] = useState<WindowTarget>();
   const [activeDisplayId, setActiveDisplayId] = useState<string>();
 
   useLayoutEffect(() => {
+    if (!interactive || purpose === 'screenshot') return;
+    setFrozenFrame(undefined);
     window.screenRecorder.selectionReady();
-  }, []);
+  }, [interactive, purpose]);
+
+  useEffect(() => {
+    if (!interactive || purpose !== 'screenshot' || !displayId) return;
+    let active = true;
+    setFrozenFrame(undefined);
+    void window.screenRecorder
+      .getScreenshotDisplayFrame()
+      .then(async (frame) => {
+        const image = new Image();
+        await new Promise<void>((resolve, reject) => {
+          image.onload = () => resolve();
+          image.onerror = () => reject(new Error('无法读取截图固定画面'));
+          image.src = frame.imageDataUrl;
+        });
+        if (!active) return;
+        setFrozenFrame(frame);
+        requestAnimationFrame(() => {
+          if (active) window.screenRecorder.selectionReady();
+        });
+      })
+      .catch((caught) => {
+        if (!active) return;
+        setError(caught instanceof Error ? caught.message : '无法准备截图固定画面');
+        window.screenRecorder.selectionReady();
+      });
+    return () => {
+      active = false;
+    };
+  }, [displayId, interactive, purpose]);
 
   useEffect(
     () => () => {
@@ -89,14 +132,12 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
           selectionFrameRef.current = undefined;
         }
         setSelection(undefined);
+        setGestureActive(false);
         setSuggestedTarget(undefined);
         setWindowTargets([]);
         setActiveDisplayId(nextDisplayId);
       }
       selectionDisplayIdRef.current = nextDisplayId;
-      if (snapshot.selectionPurpose === 'recording' || snapshot.selectionPurpose === 'screenshot') {
-        setPurpose(snapshot.selectionPurpose);
-      }
       const isConfiguring = snapshot.state === 'configuring' && snapshot.plan?.mode === 'region';
       setConfiguring(isConfiguring);
       if (isConfiguring && snapshot.plan?.selection && !gestureRef.current) {
@@ -118,7 +159,12 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
         ? window.screenRecorder.cancelConfiguredRecording()
         : window.screenRecorder.cancelSelection();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') void cancel();
+      if (event.key === 'Escape') {
+        gestureRef.current = undefined;
+        setGestureActive(false);
+        window.screenRecorder.setSelectionGestureActive(false);
+        void cancel();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -151,6 +197,7 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
     if (!interactive) return;
     if (!canStartSelectionGesture(event.button, event.isPrimary)) return;
     if ((event.target as HTMLElement).closest('.capture-mode-toolbar')) return;
+    event.currentTarget.classList.add('selection-overlay-gesture-active');
     const point = pointFromEvent(event);
     const handleElement = (event.target as HTMLElement).closest<HTMLElement>(
       '[data-selection-handle]',
@@ -175,6 +222,7 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
       setSuggestedTarget(target);
       setSelection(target.rect);
     }
+    setGestureActive(true);
     window.screenRecorder.setSelectionGestureActive(true);
     event.currentTarget.setPointerCapture(event.pointerId);
     setError(undefined);
@@ -227,6 +275,7 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '选区无效');
     } finally {
+      setGestureActive(false);
       window.screenRecorder.setSelectionGestureActive(false);
     }
   };
@@ -235,6 +284,7 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
     event.preventDefault();
     if (!interactive) return;
     gestureRef.current = undefined;
+    setGestureActive(false);
     window.screenRecorder.setSelectionGestureActive(false);
     flushSelection(undefined);
     if (configuring) void window.screenRecorder.cancelConfiguredRecording();
@@ -245,18 +295,27 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
 
   return (
     <div
-      className={`selection-overlay selection-overlay-ready${selection ? ' selection-overlay-has-selection' : ''}${configuring ? ' selection-overlay-configuring' : ''}${interactive ? '' : ' selection-overlay-handoff'}`}
+      className={`selection-overlay selection-overlay-ready${selection ? ' selection-overlay-has-selection' : ''}${configuring ? ' selection-overlay-configuring' : ''}${gestureActive ? ' selection-overlay-gesture-active' : ''}${interactive ? '' : ' selection-overlay-handoff'}`}
       onContextMenu={cancelFromRightClick}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={(event) => void onPointerUp(event)}
       onPointerCancel={() => {
         gestureRef.current = undefined;
+        setGestureActive(false);
         window.screenRecorder.setSelectionGestureActive(false);
         setSuggestedTarget(undefined);
         flushSelection(undefined);
       }}
     >
+      {purpose === 'screenshot' && frozenFrame && (
+        <img
+          className="screenshot-frozen-frame"
+          src={frozenFrame.imageDataUrl}
+          alt=""
+          draggable={false}
+        />
+      )}
       {maskRects.map((rect, index) => (
         <div
           className="selection-mask"
@@ -265,7 +324,7 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
           style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
         />
       ))}
-      {!configuring && (
+      {!configuring && !gestureActive && (
         <div className="capture-mode-toolbar" role="tablist" aria-label="捕获模式">
           <button
             type="button"
@@ -287,9 +346,11 @@ export function SelectionOverlay({ interactive = true }: { interactive?: boolean
           </button>
         </div>
       )}
-      <div className="selection-help">
-        {configuring ? '拖动选区或控制点调整 · 右键取消' : '拖拽选择区域 · 右键或 Esc 取消'}
-      </div>
+      {!gestureActive && (
+        <div className="selection-help">
+          {configuring ? '拖动选区或控制点调整 · 右键取消' : '拖拽选择区域 · 右键或 Esc 取消'}
+        </div>
+      )}
       {selection && (
         <div
           className={`selection-box${configuring ? ' selection-box-configuring' : ''}`}
