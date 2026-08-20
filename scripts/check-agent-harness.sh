@@ -67,6 +67,7 @@ for tool_dir in (".claude", ".codex", ".codebase", ".trae"):
         )
 
 for relative_path in (
+    "CLAUDE.md",
     "AGENTS.md",
     "docs/README.md",
     "docs/PROJECT_GUIDE.md",
@@ -75,8 +76,12 @@ for relative_path in (
     require_file(relative_path)
 
 agents_path = root / "AGENTS.md"
-if agents_path.is_file():
-    agents_text = agents_path.read_text(encoding="utf-8")
+if not agents_path.is_symlink() or os.readlink(agents_path) != "CLAUDE.md":
+    errors.append("AGENTS.md: must be a compatibility symlink to CLAUDE.md")
+
+claude_path = root / "CLAUDE.md"
+if claude_path.is_file():
+    agents_text = claude_path.read_text(encoding="utf-8")
     referenced_agents = set(re.findall(r"`([^`\n]*AGENTS\.md)`", agents_text))
     for relative_path in sorted(referenced_agents):
         if "*" in relative_path or relative_path == "AGENTS.md":
@@ -104,6 +109,6 @@ if errors:
 
 print(
     "PASS: agent harness is consistent "
-    f"({len(actual_skills)} skills, 4 compatibility links)"
+    f"({len(actual_skills)} skills, 5 compatibility links)"
 )
 PY

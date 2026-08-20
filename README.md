@@ -10,7 +10,7 @@ Valley MAS 是一个 monorepo，包含个人内容展示站点、管理后台、
 | `apps/admin` | 管理后台，包含用户、创作者、资源、博客、审核与记录管理。 |
 | `apps/life-trace` | Life Trace 生活计划与踪迹记录 PWA。 |
 | `apps/ai-mind-arena` | AI Mind Arena 脑内会议室，Next.js 多人格辩论应用。 |
-| `apps/world-sim` | Phaser + TypeScript 沙盒文明模拟游戏。 |
+| `apps/world-sim` | React + Pixi.js + TypeScript 沙盒文明模拟游戏。 |
 | `apps/toy-climb-arena` | Three.js 玩具世界攀爬游戏。 |
 | `apps/scratch-legend` | Next.js 刮刮卡增量游戏实验。 |
 | `server` | Gin + GORM Go 服务端。 |
@@ -20,8 +20,8 @@ Valley MAS 是一个 monorepo，包含个人内容展示站点、管理后台、
 ## 环境要求
 
 - Go：以 `server/go.mod` 为准。
-- Node.js：`>=20.0.0`。
-- pnpm：`>=9.0.0`，当前锁定在 `pnpm@9.15.0`。
+- Node.js：`>=22.13.0 <23`。
+- pnpm：`pnpm@11.21.0`。
 
 ## 快速启动
 
@@ -43,7 +43,7 @@ pnpm --filter @valley/admin dev
 pnpm --filter @valley/life-trace dev
 ```
 
-更多启动方式见 [QUICK_START.md](./QUICK_START.md) 和 [项目指南](./docs/PROJECT_GUIDE.md)。
+更多启动方式见 [项目指南](./docs/PROJECT_GUIDE.md)。
 
 ## 常用校验
 
@@ -56,7 +56,6 @@ cd server && go test ./...
 
 ## 文档入口
 
-- [快速启动](./QUICK_START.md)
 - [项目文档索引](./docs/README.md)
 - [项目指南](./docs/PROJECT_GUIDE.md)
-- [AI 协作约定](./AGENTS.md)
+- [AI 协作约定](./CLAUDE.md)

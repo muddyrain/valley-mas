@@ -1,50 +1,26 @@
-# Valley MAS 项目文档
+# Valley MAS 文档索引
 
-本目录只沉淀长期有价值的项目级文档。普通问答、临时分析和一次性总结不要自动写入。
+本页只负责导航；不要在此复制项目事实、执行规则、计划状态或子项目功能说明。
 
-## 核心文档
+## 项目级真源
 
-- [项目指南](./PROJECT_GUIDE.md)：项目定位、技术栈、模块地图、开发命令、端口和环境变量。
-- [计划索引（当前活跃与已归档）](./plans/README.md)：按“根目录为当前计划、归档目录为历史完成计划”维护计划清单与治理规则。
-- [AI 工作台知识库与 RAG 状态（归档）](./plans/archive/2026-07/2026-07-14-ai-workbench-platform.md)：私有资料库、ARK embedding、pgvector 检索和智能体引用状态汇总（历史完成，P12 前置）。
-- [AI 工作台后续路线图（归档）](./plans/archive/2026-07/2026-07-18-ai-workbench-next-roadmap.md)：P12 运行可靠性、P13 资源中心、P14 生产治理的范围与进入条件。
-- [选择器（Switch）节点](./specs/2026-07-20-p13-switch-node-design.md)：P13.3 对结构化字段做无模型、确定性多分支路由的规格与实施边界。
-- [博客摘要模型目录迁移](./specs/2026-07-21-blog-excerpt-model-catalog-design.md)：博客编辑器按文本能力选择模型并写入 Provider 用量审计。
-- [交互式 AI 模型目录全量迁移](./specs/2026-07-21-interactive-ai-model-catalog-migration-design.md)：所有用户主动触发的文本、视觉与生图 AI 统一按能力选择模型目录记录。
-- [AI 图片创作工作台](./specs/2026-07-23-ai-image-studio-design.md)：对话生图、异步生成状态和私有图片历史；其中旧画布实现仅作历史兼容说明。
-- [工作流节点目录与扩展顺序](./specs/2026-07-26-workflow-node-catalog-design.md)：服务端驱动的节点目录、Valley 内容/图片/知识节点优先级和通用节点对齐边界。
-- [工作流专用协作智能体](./specs/2026-08-04-workflow-collaboration-agent-design.md)：单一协作时间线、后台任务、服务端直接修改、冲突合并、持久撤销和统一智能体交互。
-- [Harness Engineering](./HARNESS_ENGINEERING.md)：AI coding agent 在本仓库中的上下文入口、工具边界、验证命令、评审回路和回归证据。
-- [架构决策指南](./ARCHITECTURE_GUIDE.md)：共享模块、跨应用复用、协议迁移和复杂状态协调的轻量判断准则。
-- [测试治理策略](./TESTING_STRATEGY.md)：新增改动的测试要求、历史测试债治理、运行时证据边界与覆盖率推进条件。
-- [Agent 常见错误模式](./patterns/agent-pitfalls.md)：只记录 Valley 已确认的失败模式，并把重复问题导向脚本、测试或 CI。
-- [Code Review 规则](../.code-review/README.md)：按 Security、correctness、Go、React/UI 风险加载的轻量 review 清单。
-- [Agent 配置](./agents/)：Matt Pocock engineering skills 使用的 issue tracker、triage 标签和 domain docs 消费规则。
+- [项目指南](./PROJECT_GUIDE.md)：技术栈、模块边界、开发命令、端口、环境变量与验证矩阵。
+- [测试治理策略](./TESTING_STRATEGY.md)：测试优先级、例外与运行时证据。
+- [Harness Engineering](./HARNESS_ENGINEERING.md)：agent 文档、skills 与确定性检查的契约。
+- [架构决策指南](./ARCHITECTURE_GUIDE.md)：共享模块、协议迁移和复杂状态协调。
+- [计划索引](./plans/README.md)：当前计划、归档计划和计划生命周期；规格与历史设计仅由相关计划按需引用。
+- [Agent 常见错误模式](./patterns/agent-pitfalls.md)：已证实且尚未自动化的失败模式。
+- [Code Review 规则](../.code-review/README.md)：按风险加载 review 清单。
 
-## 子项目文档
+## 子项目入口
 
-- Web 前台：`apps/web/AGENTS.md`；“雨迹”个人内容站方向见 [`apps/web/docs/YUJI_PRODUCT_SPEC.md`](../apps/web/docs/YUJI_PRODUCT_SPEC.md)，液态雨膜品牌首页当前实施入口见 [`docs/plans/2026-08-15-yuji-liquid-rain-brand-homepage.md`](./plans/2026-08-15-yuji-liquid-rain-brand-homepage.md)，现有原型入口与打开方式见 [`apps/web/prototypes/yuji/README.md`](../apps/web/prototypes/yuji/README.md)，设计系统见 [`apps/web/prototypes/yuji/brand-spec.md`](../apps/web/prototypes/yuji/brand-spec.md)。
-- Admin 后台：`apps/admin/AGENTS.md`。
-- Admin 运营后台入口：`apps/admin/src/pages/admin-ops`、`apps/admin/src/api/operations.ts`；覆盖运营列表、AI 调用审计和存储资产只读治理。
-- Go 服务端：`server/AGENTS.md`、`server/README.md`、`server/migrations/README.md`。
-- Life Trace：`apps/life-trace/README.md`、`apps/life-trace/docs/PLAN.md`。
-- Screen Recorder：`apps/screen-recorder/AGENTS.md`、`apps/screen-recorder/README.md`；Windows/macOS 本地截图标注/吸色/另存为/长截图、Windows 窗口吸附、屏幕与区域录制、媒体设备、快捷键、通知与开机设置、自定义录屏目录、安装包构建和运行时验收入口。
-- Port Warden：`apps/port-warden/AGENTS.md`、`apps/port-warden/README.md`；macOS/Windows 本地 TCP 监听端口、进程与项目归属、精确 PID 身份复核、安全停止、双平台构建与运行时验收入口。
-- AI Mind Arena：`apps/ai-mind-arena/AGENTS.md`、`apps/ai-mind-arena/README.md`、`server/internal/model/mind_arena.go`。
-- WorldSim：`apps/world-sim/AGENTS.md`、`apps/world-sim/docs/*`。
-- Eon Vale：`apps/eon-vale/AGENTS.md`、[`apps/eon-vale/CONTEXT.md`](../apps/eon-vale/CONTEXT.md)、[`apps/eon-vale/docs/GAME_RULES.md`](../apps/eon-vale/docs/GAME_RULES.md)、[`apps/eon-vale/docs/PLAN.md`](../apps/eon-vale/docs/PLAN.md)、[`apps/eon-vale/docs/adr/`](../apps/eon-vale/docs/adr/)；领域语言、游戏规则真源、已交付状态与关键架构决定入口。
-- Toy Climb Arena：`apps/toy-climb-arena/AGENTS.md`、`apps/toy-climb-arena/docs/*`。
-- Scratch Legend：`apps/scratch-legend/AGENTS.md`、`apps/scratch-legend/docs/*`。
-- Ambient Forge：`apps/ambient-forge/AGENTS.md`、`apps/ambient-forge/README.md`、`apps/ambient-forge/docs/PLAN.md`。
+| 范围 | 首先读取 |
+| --- | --- |
+| Web 前台 | [`apps/web/AGENTS.md`](../apps/web/AGENTS.md) |
+| Admin 后台 | [`apps/admin/AGENTS.md`](../apps/admin/AGENTS.md) |
+| Go 服务端 | [`server/AGENTS.md`](../server/AGENTS.md) |
+| Life Trace | [`apps/life-trace/AGENTS.md`](../apps/life-trace/AGENTS.md) |
+| Electron 应用 | [`apps/screen-recorder/AGENTS.md`](../apps/screen-recorder/AGENTS.md)、[`apps/port-warden/AGENTS.md`](../apps/port-warden/AGENTS.md) |
+| 实验应用 | [`apps/ai-mind-arena/AGENTS.md`](../apps/ai-mind-arena/AGENTS.md)、[`apps/world-sim/AGENTS.md`](../apps/world-sim/AGENTS.md)、[`apps/eon-vale/AGENTS.md`](../apps/eon-vale/AGENTS.md)、[`apps/scratch-legend/AGENTS.md`](../apps/scratch-legend/AGENTS.md)、[`apps/toy-climb-arena/AGENTS.md`](../apps/toy-climb-arena/AGENTS.md)、[`apps/ambient-forge/AGENTS.md`](../apps/ambient-forge/AGENTS.md) |
 
-## 维护规则
-
-- 根入口优先更新 `README.md`、`QUICK_START.md` 和本索引。
-- 项目级技术栈、端口、环境变量统一更新 [项目指南](./PROJECT_GUIDE.md)。
-- 完整验证命令只在 [项目指南](./PROJECT_GUIDE.md#常用校验) 维护，其他入口只引用或补充局部规则。
-- 子项目玩法、设计、局部协作规则放回对应 `apps/*` 目录。
-- 过期的临时任务清单和流水账不要继续扩写；确实需要保留时，应标明“历史参考”。
-
----
-
-保持项目整洁，从文档开始。
+长期文档的入口、状态或分类发生变化时更新本页；其他改动不需要同步本索引。

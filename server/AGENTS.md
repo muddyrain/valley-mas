@@ -1,94 +1,12 @@
-# Server AGENTS
+# Server 协作入口
 
-## AI 任务最小上下文入口（本文件）
+## AI 任务最小上下文入口
 
-- `AGENTS.md` -> `server/AGENTS.md` -> `server/internal/router/router.go` -> `server/internal/config/config.go` -> `server/.env.example`
-- 文档治理/约束变更任务：补读 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
+- `CLAUDE.md` -> `server/AGENTS.md` -> `internal/router/router.go` -> `internal/config/config.go` -> `.env.example`。
 
+## 服务边界
 
-本文件只补充 `server` 的局部协作规则。全局规则、skill 选择、Git 规则和完成标准继承根目录 `AGENTS.md`。
-
-## 功能定位
-
-- `server` 是 Valley MAS 的 Go 服务端，提供用户认证、创作者空间、资源、博客/图文、留言、通知、下载记录、管理后台、AI 能力和 AI Mind Arena 接口。
-- 技术栈为 Gin + GORM，入口在 `cmd/server/main.go`，启动组装在 `internal/bootstrap`，路由集中在 `internal/router/router.go`。
-- 数据库支持 PostgreSQL/MySQL，配置来自环境变量和 `.env.example`。
-
-## 路由与代码入口
-
-- 服务入口：`cmd/server/main.go`。
-- 本地辅助入口：`cmd/local/main.go`。
-- 路由注册：`internal/router/router.go`。
-- 配置读取：`internal/config/config.go`。
-- 应用组装：`internal/bootstrap`。
-- 数据库连接：`internal/database`。
-- 中间件：`internal/middleware`。
-- 日志：`internal/logger`。
-- 业务 handler：`internal/handler`。
-- 数据模型：`internal/model`。
-- 通用工具：`internal/utils`。
-- 通用 AI 客户端：`internal/aiclient`（封装 ARK / OpenAI / Gemini client、SSE writer、JSON / 文本工具）。
-- AI 能力：`internal/ai`。
-- AI Agent 运行时：`internal/ai/agent`（领域中性 tool loop 抽象）+ `internal/ai/tools`（Tool 接口与 Registry）。
-- AI Mind Arena：`internal/mindarena`。
-- 上传服务：`internal/service/upload_service.go`。
-
-## 开发规范
-
-- 新增或修改接口时，先定位 `internal/router/router.go` 的路由分组，再按 handler、model/service、middleware、前端 API 封装的顺序联动检查。
-- 权限逻辑优先放在中间件或明确的服务端判断中，前端隐藏入口不能作为权限依据。
-- GORM model 改动要同步新增 `internal/dbmigration/{postgres,mysql}` 版本化迁移，并考虑默认值、索引和现有数据兼容；生产服务启动不隐式执行 DDL。
-- 版本化迁移一旦在任一持久数据库显示为 `applied`，对应版本即视为不可变：不得继续向同版本 SQL 追加字段或改写语句。遗漏或修正必须新增更高版本的 PostgreSQL/MySQL 修复迁移；不得通过删除 `schema_migrations` 记录或强制重跑旧迁移掩盖漂移。本地 `air` 只执行待处理版本，重启不会重跑已应用迁移。
-- 新增用户主动发起的 AI 接入优先通过 `aimodel.ResolveInvocation` 从模型目录解析能力，并复用 `internal/aiclient`；不在 handler 里直接 `os.Getenv("ARK_*")` 或 `arkruntime.NewClientWithApiKey(...)`。
-- 需要多轮推理、追问、按需查询数据的 AI 场景优先落成 `internal/ai/tools/<domain>` 下的 Tool，通过 `internal/ai/agent.AgentRuntime` 驱动;只有单次 prompt 就能收敛的场景（摘要 / 翻译 / 单图分析）才继续走现有 `PromptContract` 直调路径。
-- Mind Arena 接口改动要同步检查前端 `apps/ai-mind-arena/lib/api.ts`、`lib/types.ts` 和 SSE 事件处理。
-- 不在源码、日志、测试或示例配置中写真实密钥、真实 token、真实 SMTP 密码或云资源凭据。
-
-## AI Coding 约束（行为改动默认顺序）
-
-- 行为改动（路由、handler、模型、迁移、AI tool call、权限与状态分支）默认按以下顺序执行：
-  1. 先补齐/更新对应 Go 测试（优先受影响包）。
-  2. 先跑受影响测试，确认先失败。
-  3. 实现改动。
-  4. 再跑受影响测试并确认通过。
-- 无法覆盖的行为改动需在提交说明写清替代验证与风险。
-
-## 本地 Preflight 约束（AI Coding 默认前置）
-
-- 进入实现前先跑：
-  1. `cd server && go test ./...`（优先确认受影响链路范围）。
-  2. 若仅改动特定服务/模块，可先缩小到目标包测试。
-  3. 路由/配置/权限改动后再联动跑对应端到端验证范围。
-
-## 环境变量提示
-
-- 常规服务：`ENV`、`PORT`、`DB_*`、`JWT_SECRET`、`SMTP_*`。
-- TOS 上传：`TOS_ACCESS_KEY`、`TOS_SECRET_KEY`、`TOS_BUCKET`、`TOS_ENDPOINT`、`TOS_REGION`。
-- 火山引擎 Provider：`VOLCENGINE_API_KEY`、`VOLCENGINE_BASE_URL`；模型 ID 只在模型目录维护。旧 `ARK_*_MODEL` 不再属于部署配置。
-- Life Trace Pantry AI 拍照分析优先使用 Gemini：`GEMINI_API_KEY`、`GEMINI_API_BASE_URL`、`GEMINI_VISION_MODEL`、`LIFE_TRACE_PANTRY_PHOTO_AI_PROVIDER`、`LIFE_TRACE_PANTRY_PHOTO_AI_TIMEOUT_SECONDS`；未迁移的 ARK 直连入口应返回明确的暂不可用提示。
-- Life Trace 文本 AI 可选覆盖：`LIFE_TRACE_AI_API_KEY`、`LIFE_TRACE_AI_BASE_URL`、`LIFE_TRACE_AI_MODEL`、`LIFE_TRACE_AI_TIMEOUT_SECONDS`；旧 `OPENAI_API_*` 仅作兼容。
-- Life Trace 生活助理 Agent 灰度：`LIFE_TRACE_ASSISTANT_USE_AGENT`（默认 false）。设为 `true`/`1`/`yes`/`on` 时走 `internal/ai/agent` 手写 tool loop（可自主调 5 个 life-trace tool）;其他值一律回退旧的结构化 tool-call 单次调用 + fallback 路径。
-- AI Mind Arena：`MIND_ARENA_AI_PROVIDER`、`MIND_ARENA_AI_BASE_URL`、`MIND_ARENA_AI_API_KEY`、`MIND_ARENA_AI_MODEL`；配置缺失或调用失败时应能回退 mock，旧 `AI_*` 仅作兼容。
-
-## 常用命令
-
-```bash
-cd server && go run ./cmd/server
-cd server && go run ./cmd/migrate status
-cd server && go run ./cmd/migrate up
-cd server && go test ./...
-cd server && go build ./cmd/server ./cmd/migrate
-cd server && air
-```
-
-## 校验要求
-
-- Go 代码改动：运行 `cd server && go test ./...`。
-- 路由、handler、模型、配置或中间件改动：检查对应前端 API 调用和 `.env.example` 是否需要同步。
-- 迁移改动：先用 `go run ./cmd/migrate status` 确认新版本为 pending，再在本地或测试库执行 `go run ./cmd/migrate up`（或重启 `air`），最后验证目标字段/索引或最小写入链路；仅看到版本为 `applied` 不能替代实际结构验证。
-- AI/Mind Arena 服务端改动：补充或运行相关 `internal/ai`、`internal/mindarena` 测试，并说明真实模型调用是否未验证。
-- 仅改服务端协作文档且包含 CJK/非 ASCII 文本时，运行定向 encoding 检查；不需要跑 Go 编译时在最终回复说明原因。
-- 行为类高风险提测前最小门禁：
-  1. `cd server && go test ./...` 或受影响受测集合至少一次通过。
-  2. 涉及路由/权限/迁移改动需同步前端或调用方联调确认。
-  3. AI/Mind Arena 改动补跑 `internal/ai`、`internal/mindarena` 对应测试；无法直连真实模型时写明 mock/桩验证范围。
+- 接口改动按 router、handler、model/service、middleware、调用方顺序核对；权限必须由中间件或服务端判断执行。
+- GORM model 改动新增 PostgreSQL/MySQL 版本化迁移。已应用版本不可改写；修正必须新增更高版本，并验证实际字段、索引或写入链路。
+- 用户主动发起的 AI 调用从 `aimodel.ResolveInvocation` 和 `internal/aiclient` 进入；多轮、查询型场景使用 `internal/ai/tools/<domain>` 与 `internal/ai/agent.AgentRuntime`，不在 handler 直读 Provider 密钥。
+- Mind Arena 改动同时检查 `apps/ai-mind-arena/lib/api.ts`、类型与 SSE 事件；具体测试、迁移和构建命令见 `docs/PROJECT_GUIDE.md`。

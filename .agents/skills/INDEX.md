@@ -10,7 +10,7 @@
 - `task-completion-guard` 只用于跨 3 个以上文件、多轮实施、计划驱动或完成状态容易误报的实施任务；只读分析和普通问答不触发。
 - `delivery-reporting` 只用于用户要求阶段汇报，或长期文档、功能状态、接口、依赖、数据模型、产品方向、验收标准可能变化的任务。
 - CJK/非 ASCII 文本、Markdown、skill、配置示例或批量文本改写使用 `encoding-guard` 做定向检查。
-- 外部参考 skill 不参与默认路由，不能覆盖根 `AGENTS.md`、子项目规则和现有设计系统。
+- 外部参考 skill 不参与默认路由，不能覆盖根 `CLAUDE.md`、子项目规则和现有设计系统。
 - `.codex/skills`、`.claude/skills`、`.codebase/skills`、`.trae/skills` 只作为兼容软链接，不维护副本。
 
 ## 项目必需
@@ -28,15 +28,6 @@
 | `web-performance-review` | 范围限定 | 用户明确要求性能 review、检查性能、评估性能回归或审查 Web diff 性能风险 |
 | `web-ui-consistency-guard` | 范围限定 | Web 页面主题、loading、列表、URL query、刷新和回退行为变化 |
 
-## 项目可选
-
-这些 skills 保留兼容入口，但不参与普通任务的默认流程。
-
-| 技能 | 状态 | 触发场景 |
-|---|---|---|
-| `setup-matt-pocock-skills` | 一次性配置 | 初始化外部工程 skills 所需的问题追踪、标签和领域文档配置 |
-| `skill-usage-disclosure` | 兼容保留 | 旧会话显式点名时可读取；新流程直接遵守根输出约定，不主动启用 |
-
 ## 外部参考
 
 这些 skills 来自通用方法或外部设计/动画能力。只在用户明确点名或任务明确需要时使用，后续可迁到个人或插件层；本轮不删除以避免破坏已有入口。
@@ -45,7 +36,6 @@
 |---|---|---|
 | `grill-me` | 手动触发 | 用户明确要求 `/grilling` 或高强度追问计划 |
 | `grill-with-docs` | 手动触发 | 用户明确要求追问并同步 ADR、术语表等文档 |
-| `improve-codebase-architecture` | 外部参考 | 用户明确要求架构深度审查时使用；依赖 `CONTEXT.md`、`docs/adr/` 与外部架构辅助能力，缺失时不自动启用 |
 | `gsap-core` | 外部参考 | GSAP tween、ease、stagger、matchMedia 和 reduced-motion |
 | `gsap-react` | 外部参考 | React/Next.js 中的 `useGSAP`、refs、scope 和清理 |
 | `gsap-timeline` | 外部参考 | 多步骤动画时间轴、嵌套、暂停和反转 |

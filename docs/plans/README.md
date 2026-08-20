@@ -30,7 +30,6 @@
 - [2026-08-04-workflow-collaboration-agent.md](2026-08-04-workflow-collaboration-agent.md)：工作流固定协作智能体、单时间线、后台直接修改、冲突合并与持久撤销。
 - [2026-07-28-auth-security-hardening.md](2026-07-28-auth-security-hardening.md)：会话失效、持久化验证码、频率限制与密码哈希升级。
 - [2026-07-28-standard-agent-skills.md](2026-07-28-standard-agent-skills.md)：标准技能包导入、分类与智能体/工作流复用。
-- [2026-07-24-workflow-http-node.md](2026-07-24-workflow-http-node.md)：工作流 HTTP 请求节点的受控配置、执行与画布交互。
 - [2026-07-26-workflow-node-catalog.md](2026-07-26-workflow-node-catalog.md)：服务端驱动的节点目录、Valley 内容/图片/知识节点扩展与后续通用节点对齐。
 - [2026-07-23-ai-image-studio.md](2026-07-23-ai-image-studio.md)：AI 图片对话页、任务历史与资源保存；`/workbench/canvas` 已移除，旧数据与接口仅保留兼容。
 - [2026-07-22-ai-knowledge-pdf-multimodal.md](2026-07-22-ai-knowledge-pdf-multimodal.md)：知识库 PDF 的页面渲染、视觉解析、表格与图片摄取。
@@ -53,6 +52,7 @@
 
 ## 已归档（2026-07）
 
+- [archive/2026-07/2026-07-24-workflow-http-node.md](archive/2026-07/2026-07-24-workflow-http-node.md)：工作流 HTTP 请求节点的受控配置、执行与画布交互。
 - [archive/2026-07/2026-07-26-ai-image-version-lineage.md](archive/2026-07/2026-07-26-ai-image-version-lineage.md)
 - [archive/2026-07/2026-07-26-ai-image-history-management.md](archive/2026-07/2026-07-26-ai-image-history-management.md)
 - [archive/2026-07/2026-07-26-ai-image-variations.md](archive/2026-07/2026-07-26-ai-image-variations.md)

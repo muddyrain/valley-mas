@@ -1,71 +1,11 @@
-# Eon Vale AI 协作入口
-
-默认使用中文沟通。Eon Vale 是运行在浏览器中的单机正交俯视神明沙盒，默认开发端口为 `5184`，预览端口为 `4184`。游戏规则真源见 `docs/GAME_RULES.md`，产品状态与架构边界见 `docs/PLAN.md`，启动说明见 `README.md`。
+# Eon Vale 协作入口
 
 ## AI 任务最小上下文入口
 
-- `AGENTS.md` -> `apps/eon-vale/AGENTS.md` -> `apps/eon-vale/CONTEXT.md` -> `apps/eon-vale/docs/GAME_RULES.md` -> `apps/eon-vale/docs/PLAN.md` -> `apps/eon-vale/src/App.tsx` -> `apps/eon-vale/src/render/EonValeEngine.ts`。
-- 文档治理/约束变更任务：继续读取 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
+- `CLAUDE.md` -> `apps/eon-vale/AGENTS.md` -> `CONTEXT.md` -> `docs/GAME_RULES.md` -> `docs/PLAN.md` -> `src/App.tsx` -> `src/render/EonValeEngine.ts`。
 
-## 关键入口
+## 规则与架构真源
 
-- React 壳层与低频 UI：`src/App.tsx`、`src/ui`。
-- PixiJS 8 WebGL 2D 渲染与输入：`src/render/EonValeEngine.ts`。
-- Worker 生命周期与协议：`src/worker`。
-- 纯模拟核心：`src/simulation/core/worldSimulation.ts`。
-- 地图、寻路、经济、王国和存档：`src/simulation/{map,navigation,systems,kingdoms,persistence}`。
-- 浏览器验收：`e2e/game.spec.ts`。
-
-## 游戏规则同步
-
-- `docs/GAME_RULES.md` 是玩法语义、默认值、阈值、例外、非目标、验收标准和待决项的唯一真源；`docs/PLAN.md` 只记录已交付状态、性能基线和阶段路线。
-- 需求访谈中每接受一项玩法决定，必须在继续下一题前立即更新 `docs/GAME_RULES.md`，不能等长对话结束后凭记忆汇总。
-- 任何改变出生、死亡、需求、职业、资源、生态、领土、外交、战争、神力、时间倍率、世界创建或胜负结果的实现，都必须在同一项工作中同步 `docs/GAME_RULES.md` 和相关可执行测试。
-- 修改玩家可切换法则时同步 `src/simulation/rules/worldLawCatalog.ts`、严格存档校验和目录测试；`planned` 法则不得显示为可用开关，只有行为真正支持开启与关闭后才能标记 `active`。
-- 数值与行为保留在对应 `src/simulation/rules/*Rules.ts` 及领域模块中；禁止把所有玩法集中到一个万能规则文件或万能规则引擎。
-- 规则模型进入存档时升级当前存档版本；项目未上线期间不为旧开发档案新增迁移链。
-- 如果玩法改动同时改变已交付状态、产品阶段、架构或性能基线，再同步 `docs/PLAN.md`；不得用更新规则文档代替真实实现，也不得把计划中规则写成已交付。
-
-## WorldBox 设计参照
-
-- 设计或迭代玩法功能时，先说明 WorldBox 对应系统的实际规则、相关世界法则和关键边界，再明确 Eon Vale 是沿用、简化还是有意采用不同方案；若没有直接对应机制，也要明确说明。
-- 需求访谈与方案选择题应包含“WorldBox 怎么做”、该做法解决的问题及其取舍，避免在缺少具体参照时直接决定产品方向。
-- 涉及可能随版本变化的 WorldBox 事实时，优先核对官方更新记录或官方 Wiki，并区分已确认规则与基于资料的推断，不凭旧记忆下结论。
-- WorldBox 只作为玩法方向参照，不覆盖 Eon Vale 当前计划、架构约束、性能目标和已确认的产品取舍。
-
-## 架构约束
-
-- 20 Hz 固定步长模拟运行在 Web Worker；React 不承载逐帧居民状态。
-- Worker 通过可转移 TypedArray 快照向主线程发布状态；PixiJS 在主线程插值并批量提交像素 Sprite。
-- 世界使用固定正北的 2D 像素相机；只允许有边界的平移和阶梯缩放，不恢复透视倾斜或自由旋转。
-- 居民和建筑共享王国主色，无王国实体使用中性色；职业、建筑类型和动物种类通过局部色与轮廓继续区分。
-- 周期地图同步只能增量更新；只有新建或载入完整世界时允许全量重建，避免可见闪烁。
-- 导航地图按 `8 × 8` Chunk 组织，渲染地图按 `24 × 24` Chunk 组织。编辑地图时只更新受影响渲染 Chunk，并同步导航版本使旧路径失效；动态地形与资源只重绘当前可见 LOD，其余 LOD 标记为脏并在切换时补画。
-- 居民、经济、王国、战争与存档逻辑保持纯 TypeScript，可在无 DOM 环境运行测试和性能基准。
-- 群体远距离移动优先使用 Flow Field，个体路径使用带预算的 A* 队列；不得为每个单位每帧同步寻路。
-- 用户可见文案只描述玩家目标、世界状态和操作结果，不暴露实现说明。
-
-## AI Coding 约束（行为改动默认顺序）
-
-- 行为改动默认按以下顺序执行：
-  1. 先补齐或更新同目录测试。
-  2. 先运行受影响测试，确认需求断言可观测失败。
-  3. 实现改动。
-  4. 再运行受影响测试并确认通过。
-- 仅文案、纯样式且无可观测行为边界的改动可豁免；交付时说明未测原因与替代验证。
-
-## 本地 Preflight 约束（AI Coding 默认前置）
-
-- 行为改动进入实现前后按风险运行：
-  1. `pnpm --filter @valley/eon-vale check`
-  2. `pnpm --filter @valley/eon-vale typecheck`
-  3. 受影响的 `vitest run <测试文件>`，要求先失败再通过。
-- 触及渲染、Canvas、Worker、交互或存档后，补充 `pnpm --filter @valley/eon-vale test:e2e` 或真实 Chrome 验收。
-- 触及性能热路径后，补充 `pnpm --filter @valley/eon-vale benchmark`，并至少实测 100/500/1000 居民三档。
-
-## 校验要求 / 提测前最小门禁
-
-- 至少通过 `check`、`typecheck`、`test`、`build`。
-- 关键玩法行为需通过浏览器验收，不能仅凭静态代码或截图宣称完成。
-- 新增地图、实体、文明或神力行为时，应有确定性种子测试；存档模型变化时必须更新版本校验和读写往返测试。
-- 修改玩法语义、规则默认值、阈值、例外或验收标准时同步 `docs/GAME_RULES.md`；修改长期产品状态、架构或性能基线时同步 `docs/PLAN.md`。
+- `docs/GAME_RULES.md` 定义玩法语义、默认值、阈值、例外和验收；`docs/PLAN.md` 只记录交付状态、架构与性能基线。
+- 世界规则从 `src/simulation/rules/worldLawCatalog.ts` 和 `src/simulation/core/worldSimulation.ts` 进入；渲染不得成为玩法状态的第二写入者。
+- 触及渲染、Canvas、Worker、交互或存档时补 E2E/浏览器证据；性能热路径补 benchmark，并实测 100、500、1000 居民。具体命令见 `docs/PROJECT_GUIDE.md`。

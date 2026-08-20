@@ -1,91 +1,11 @@
-# Scratch Legend · AI 协作入口
+# Scratch Legend 协作入口
 
-## AI 任务最小上下文入口（本文件）
+## AI 任务最小上下文入口
 
-- `AGENTS.md` -> `apps/scratch-legend/AGENTS.md` -> `apps/scratch-legend/docs/scratch-legend-task.md` -> `apps/scratch-legend/lib/game-store.ts`
-- 文档治理/约束变更任务：补读 `docs/README.md` -> `docs/PROJECT_GUIDE.md` -> `docs/HARNESS_ENGINEERING.md`。
+- `CLAUDE.md` -> `apps/scratch-legend/AGENTS.md` -> `docs/scratch-legend-task.md` -> `docs/scratch-legend-design.md` -> `lib/game-store.ts`。
 
+## 局部边界
 
-本文件只补充 `apps/scratch-legend` 的局部规则。全局安全边界、skill 路由、Git 规则和完成标准继承根目录 `AGENTS.md`。
-
-## 项目定位
-
-- Scratch Legend（刮出传说）是一个“洗盘子赚启动金 → 购买和拖动刮卡 → 随机结算 → 升级与自动化 → 高风险卡 → Prestige”的单页成长游戏。
-- 技术栈为 Next.js App Router + React + Tailwind CSS。
-- 游戏运行态由 `lib/game-store.ts` 使用 Zustand 管理并持久化到 `localStorage`；短生命周期、纯展示型局部状态可以使用 `useState`。
-
-## 文档路由
-
-- 核心玩法、数值、概率和解锁规则：`docs/scratch-legend-design.md`。
-- 当前阶段、任务状态和阶段验收：`docs/scratch-legend-task.md`。
-
-只读取与当前任务相关的章节：
-
-- 玩法、数值、概率、奖励、惩罚、解锁或 Prestige 变化：读取设计文档和任务文档的相关章节。
-- 阶段功能实现：确认对应任务条目与验收标准。
-- bugfix、测试、样式、文案、可访问性或工程配置：优先读取相关代码和局部文档，不强制通读或修改两份长期文档。
-- 实施中发现会改变核心循环、产品方向或阶段状态时，再补读并同步对应文档。
-
-## 执行流程
-
-1. 先判断任务属于玩法/数值变化、阶段功能，还是局部修复/工程维护。
-2. 定位相关代码、测试和必要的文档章节，确认当前实现。
-3. 玩法和数值变化必须与设计文档一致；用户已明确授权的新方向，可以在同一轮同步设计与任务文档后实施，不额外制造确认回合。
-4. 需求存在关键歧义或与设计冲突时先询问用户，不擅自选择产品方向，也不自动向任务文档写 TODO。
-5. 只有阶段状态、验收标准或长期玩法发生变化时才更新任务文档；普通修复不制造计划文档 churn。
-
-## 玩法与阶段边界
-
-- 不顺带实现用户未要求、设计文档未定义的玩法。
-- 不自行调整概率、金币、成本、奖励、惩罚或解锁条件。
-- 当前阶段之外的功能只有在用户明确要求，且相关设计与任务文档已经同步时才能实施。
-- 修复已完成阶段的缺陷、补测试和不改变玩法的重构不受“阶段隔离”限制。
-- 设计文档与任务文档冲突时，以设计文档为玩法真源；先收敛任务描述，再实施会受影响的功能。
-- 当前 MVP 保持单页、前端本地运行，不新增后端、数据库、登录、排行榜或多页面结构，除非用户明确调整产品方向并同步设计文档。
-
-## 玩家视角文案
-
-- “阶段 1 / 阶段 N”等开发阶段只用于文档、任务拆解和代码注释，不进入玩家可见 UI。
-- 玩家界面使用游戏内语言表达进度和解锁，例如“自动机已解锁”“可购买”“升级工具已解锁”。
-- 未解锁的卡、卡册、终局位、后续目标和开发状态不提前展示；达到条件后通过电话、解锁特效或新入口自然出现。
-- 不在按钮、进度条、卡片标题或提示文本中使用“进入下一阶段”“下一目标”“设计中”等开发者视角文案。
-
-## 工程边界
-
-- 优先复用 `lib/game-config.ts`、`lib/game-save.ts`、`lib/game-store.ts` 和现有规则函数，不在 UI 组件复制玩法数值。
-- 可以做聚焦的组件拆分、可读性优化、bugfix 和测试补充；不借任务之机整体重写游戏。
-- 改动存档结构时考虑已有 `localStorage` 数据兼容和迁移。
-- 随机结算、成本收益、解锁和 Prestige 等规则变化必须补充与风险相称的自动化测试；纯样式和文案微调不强制新增单测。
-
-## AI Coding 约束（行为改动默认顺序）
-
-- 行为改动（随机结算、阶段流、解锁、存档、存档迁移）默认按以下顺序执行：
-  1. 先补齐/更新测试用例。
-  2. 先跑受影响测试，确认先失败可见。
-  3. 实现改动。
-  4. 再跑受影响测试并确认通过。
-- 仅文案/纯样式且无行为边界的改动可以写明豁免原因。
-
-## 本地 Preflight 约束（AI Coding 默认前置）
-
-- 行为任务在实现前先跑：
-  1. `pnpm --filter @valley/scratch-legend check`。
-  2. `pnpm --filter @valley/scratch-legend typecheck`。
-  3. 可用测试时跑 `pnpm --filter @valley/scratch-legend exec vitest run` 的最小范围。
-- 玩法/数值改动后补跑关键回归并同步记录。
-
-## 常用命令
-
-```bash
-pnpm --filter @valley/scratch-legend typecheck
-pnpm --filter @valley/scratch-legend check
-pnpm --filter @valley/scratch-legend build
-```
-
-## 行为类高风险提测前最小门禁
-
-- `pnpm --filter @valley/scratch-legend check`
-- `pnpm --filter @valley/scratch-legend typecheck`
-- 可观测行为改动再补一次受影响测试（或 `pnpm --filter @valley/scratch-legend exec vitest run` 对应最小范围）
-
-涉及拖动刮卡、动画、响应式、解锁流程或本地持久化时，还需按根规则取得运行时证据；无法自动验证时说明具体未验证范围和人工验收步骤。
+- 玩法、数值、概率、奖励、解锁、Prestige 和阶段状态以设计与任务文档为准；普通 bugfix 不制造任务文档 churn。
+- 状态从 `lib/game-config.ts`、`lib/game-save.ts` 与 `lib/game-store.ts` 进入；存档变更必须保持迁移和旧数据恢复路径。
+- 刮卡、解锁、动画、响应式与本地持久化改动需取得运行时证据；具体检查命令见 `docs/PROJECT_GUIDE.md`。

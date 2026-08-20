@@ -18,7 +18,7 @@ Harness Engineering 是面向 AI coding agent 的工程环境层。它通过清�
 
 | 层级 | 唯一职责 |
 |---|---|
-| `AGENTS.md` | 任务入口、子项目路由、顶层红线和完成标准 |
+| `CLAUDE.md` | 根协作规则；`AGENTS.md` 是兼容软链接 |
 | `docs/PROJECT_GUIDE.md` | 项目定位、技术栈、模块地图、端口、环境变量和完整命令表 |
 | `docs/ARCHITECTURE_GUIDE.md` | 共享模块、协议迁移和复杂状态协调的按需架构判断 |
 | `.agents/skills/INDEX.md` | 项目 skills 分类、触发条件和组合上限 |
@@ -30,39 +30,7 @@ Harness Engineering 是面向 AI coding agent 的工程环境层。它通过清�
 
 `.codex/skills`、`.claude/skills`、`.codebase/skills`、`.trae/skills` 通过软链接指向 `.agents/skills`，避免多份 skill 内容漂移。
 
-## 3. 标准工作流
-
-### 3.1 任务进入
-
-1. 读取根 `AGENTS.md` 和 `.agents/skills/INDEX.md`。
-2. 确定代码或配置改动范围后，运行 `pnpm context:recent -- <相关目录>` 查看近期提交和活跃计划。
-3. 按范围读取 `docs/PROJECT_GUIDE.md` 相关章节与子项目 `AGENTS.md`。
-4. 定位相关代码、测试、文档、脚本和 `.env.example`。
-5. 区分问答、分析、文档、实现、修复、review 和提交任务。
-6. 只装载当前任务需要的上下文。
-
-### 3.2 执行边界
-
-- 修改前理解当前实现并优先复用现有模式。
-- 不写真实密钥，不修改依赖和生成目录。
-- 不回滚未知 dirty change。
-- CJK/非 ASCII 文本使用 `encoding-guard` 定向检查。
-- 功能、接口、依赖、数据模型和长期状态变化时同步指定计划文档；普通局部修复不要求机械更新或声明计划状态。
-- 全局个人 skill 仅作增强；缺失时回退普通流程，不能阻塞仓库任务。
-
-### 3.3 验证
-
-完整命令以 `docs/PROJECT_GUIDE.md` 的“常用校验”为唯一真源。无法运行时，最终回复说明原因、影响范围和剩余风险。
-
-完成证据至少包括：
-
-- 实际修改的文件和行为。
-- 实际运行的命令、退出状态和失败数量。
-- 运行时可见行为的截图、几何、控制台、网络或交互结果。
-- 未验证事项和人工验收标准。
-- 改动涉及指定计划入口或长期状态时，计划文档的同步结果。
-
-## 4. 确定性 Harness 检查
+## 3. 确定性 Harness 检查
 
 `scripts/check-agent-harness.sh` 提供只读健康检查，统一入口为：
 
@@ -74,11 +42,11 @@ pnpm check:harness
 
 - skill 目录与 `.agents/skills/INDEX.md` 双向一致。
 - 四个工具兼容入口是指向 `../.agents/skills` 的软链接。
-- 根 `AGENTS.md` 引用的具体子项目 AGENTS 文件存在。
+- `AGENTS.md -> CLAUDE.md` 兼容链接、根入口引用的子项目 AGENTS 文件均存在。
 - 核心文档入口存在。
 - 根 `package.json` 包含 Harness、check 和 build 脚本。
 
-所有 `AGENTS.md` 的最小上下文入口由 `pnpm check:agents-context` 检查，fixture 回归入口为：
+所有局部 `AGENTS.md` 的最小上下文入口由 `pnpm check:agents-context` 检查，fixture 回归入口为：
 
 ```bash
 pnpm check:agents-context:test
@@ -90,7 +58,7 @@ pnpm check:agents-context:test
 pnpm check:harness:test
 ```
 
-## 5. CI 与部署门禁
+## 4. CI 与部署门禁
 
 `.github/workflows/quality.yml` 在 push 和 pull request 上运行：
 
@@ -104,7 +72,7 @@ pnpm check:harness:test
 
 当前优先完整验证，不引入 changed-files 第三方 action 或复杂 job matrix。后续只有在 CI 时间形成稳定数据后再优化增量执行。
 
-## 6. Review 与失败反馈
+## 5. Review 与失败反馈
 
 Code review 从 `.code-review/README.md` 进入，根据改动范围加载 Security、correctness、Go 或 React/UI 规则，不默认创建固定数量的审查 Agent。
 
@@ -115,13 +83,13 @@ Code review 从 `.code-review/README.md` 进入，根据改动范围加载 Secur
 3. CI 门禁。
 4. 最后才是新增文档或 skill 提示。
 
-## 7. 浏览器与运行时证据
+## 6. 浏览器与运行时证据
 
 允许 Agent 使用当前环境可用的浏览器工具做本地运行时取证，优先复用用户当前 Chrome 会话；不可用时可使用仓库已有的 E2E、headless 浏览器或当前环境提供的等价工具，不为一次验证擅自新增浏览器依赖。响应式、动画、Canvas、Three.js、拖拽、滚动、loading 和路由行为不能只凭 JSX、CSS、类型检查或 jsdom 结论宣称通过。
 
 不要求每个 UI 改动都新增永久 E2E 测试。是否沉淀测试由回归概率、核心路径和维护成本决定。用户手动验收用于补充主观视觉与真实业务环境，但不替代可自动执行的基础验证。
 
-## 8. 暂缓能力
+## 7. 暂缓能力
 
 以下能力在有足够失败样本和运行数据前不引入：
 

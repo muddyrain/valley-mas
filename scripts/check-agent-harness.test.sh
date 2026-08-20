@@ -41,13 +41,14 @@ for tool_dir in .claude .codex .codebase .trae; do
   ln -s ../.agents/skills "$FIXTURE_ROOT/$tool_dir/skills"
 done
 
-cat > "$FIXTURE_ROOT/AGENTS.md" <<'EOF'
-# Fixture AGENTS
+cat > "$FIXTURE_ROOT/CLAUDE.md" <<'EOF'
+# Fixture CLAUDE
 
 | Project | Entry |
 |---|---|
 | Example | `apps/example/AGENTS.md` |
 EOF
+ln -s CLAUDE.md "$FIXTURE_ROOT/AGENTS.md"
 
 printf '# Child AGENTS\n' > "$FIXTURE_ROOT/apps/example/AGENTS.md"
 printf '# Docs index\n' > "$FIXTURE_ROOT/docs/README.md"

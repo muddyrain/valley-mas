@@ -28,7 +28,6 @@ import subprocess
 import sys
 
 root = Path(os.environ["AGENTS_CHECK_ROOT"]).resolve()
-docs_required = ("docs/README.md", "docs/PROJECT_GUIDE.md", "docs/HARNESS_ENGINEERING.md")
 ignored_dirs = {".git", "node_modules"}
 
 
@@ -102,6 +101,9 @@ for path in agents_files:
     relative_path = path.relative_to(root)
     rel = relative_path.as_posix()
 
+    if rel == "AGENTS.md":
+        continue
+
     if not heading_re.search(text):
         errors.append(f"{rel}: missing section 'AI 任务最小上下文入口'")
         continue
@@ -109,27 +111,14 @@ for path in agents_files:
     section = section_lines(text, "AI 任务最小上下文入口")
     bullets = [line.strip() for line in section if line.startswith("- ")]
     chain_lines = [line for line in bullets if "->" in line]
-    doc_lines = [line for line in section if "文档治理/约束变更任务" in line]
-
     if len(chain_lines) < 1:
         errors.append(f"{rel}: missing route chain under context section (need at least 1 line with `->`)")
 
-    if "AGENTS.md" not in text:
-        errors.append(f"{rel}: missing AGENTS.md reference in context content")
+    if "CLAUDE.md" not in text:
+        errors.append(f"{rel}: missing CLAUDE.md reference in context content")
 
-    for required in docs_required:
-        if required not in text:
-            errors.append(f"{rel}: missing required doc reference {required}")
-
-    if not doc_lines and relative_path.name != "AGENTS.md":
-        errors.append(f"{rel}: missing 文档治理/约束变更提示 line in context section")
-
-    # 至少提供 2 条信息链路（1 条本地上下文链 + 1 条治理提示）
-    if len(chain_lines) + len(doc_lines) < 2:
-        errors.append(f"{rel}: context section needs at least 2 route lines, currently {len(chain_lines) + len(doc_lines)}")
-
-if not agents_files:
-    errors.append("no AGENTS.md found under repository root")
+if not any(path.relative_to(root).as_posix() != "AGENTS.md" for path in agents_files):
+    errors.append("no local AGENTS.md found under repository root")
 
 if errors:
     print("FAIL: AGENTS context check", file=sys.stderr)
