@@ -123,6 +123,42 @@ describe('YujiArticles', () => {
     container.remove();
   });
 
+  it('keeps accessible DOM covers as the source of truth for the WebGL mirror', async () => {
+    getPosts.mockResolvedValueOnce({
+      list: [
+        {
+          id: 'post-cover',
+          title: '共享一块舞台',
+          excerpt: 'DOM 决定布局，WebGL 只负责增强。',
+          cover: '/cover.webp',
+          group: { name: 'WebGL' },
+          createdAt: '2026-08-20T00:00:00Z',
+        },
+      ],
+      total: 1,
+    });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() =>
+      root.render(
+        <MemoryRouter>
+          <YujiArticles />
+        </MemoryRouter>,
+      ),
+    );
+    await flush();
+
+    const cover = container.querySelector('[data-yuji-cover-id="post-cover"]');
+    expect(cover?.querySelector('img[alt="共享一块舞台封面"]')).not.toBeNull();
+    expect(
+      cover?.closest('article')?.querySelector('a[href="/articles/post-cover"]'),
+    ).not.toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
   it('offers an inline retry after the article request fails', async () => {
     getPosts
       .mockRejectedValueOnce(new Error('unavailable'))

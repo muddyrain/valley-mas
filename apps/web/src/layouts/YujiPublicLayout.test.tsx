@@ -42,7 +42,7 @@ describe('YujiPublicLayout', () => {
     });
 
     expect(container.textContent).toContain('雨迹');
-    expect(container.textContent).toContain('文章与影像');
+    expect(container.textContent).toContain('YUJI® / 2026');
     expect(container.textContent).toContain('文章列表内容');
     expect(container.querySelector('a[aria-current="page"]')?.textContent).toBe('文章');
     expect(
@@ -52,6 +52,7 @@ describe('YujiPublicLayout', () => {
       container.querySelector('.yuji-footer a[href="https://github.com/muddyrain"]'),
     ).not.toBeNull();
     expect(container.querySelector('a[href="/studio"]')).toBeNull();
+    expect(container.querySelector('.yuji-route-transition')).toBeNull();
 
     act(() => root.unmount());
     container.remove();
@@ -77,6 +78,7 @@ describe('YujiPublicLayout', () => {
     expect(container.querySelector('.yuji-header')?.classList.contains('is-home-stage')).toBe(true);
     expect(container.querySelector('.yuji-desktop-nav a[href="/"]')).toBeNull();
     expect(container.querySelector('.yuji-brand[aria-current="page"]')).not.toBeNull();
+    expect(container.textContent).toContain('YUJI® / 2026');
 
     act(() => root.unmount());
     container.remove();

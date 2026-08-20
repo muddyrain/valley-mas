@@ -1,7 +1,10 @@
 # 雨迹液态雨膜品牌首页实施计划
 
-> 状态：已实施，桌面 Chrome 自动化验收通过；Safari / iOS 实机复验待 owner 完成
-> 日期：2026-08-15
+> 状态：历史实现已完成，但产品方向已由 ADR 0017 取代；停止剩余视觉复验，待 owner 确认新公共站重构计划后归档
+> 日期：2026-08-20
+
+> [!IMPORTANT]
+> 本计划只记录现有液态雨膜版本的实施事实，不再作为下一阶段设计入口。新的公共站将移除液态雨膜和四张固定二次元品牌影像，以“高表现首页与文章索引 → 强点击转场 → 安静文章正文”为体验契约；第一阶段覆盖公共壳、首页、文章索引和文章详情，图库与关于只继承新 token 与共享转场。后续入口见 [`2026-08-20-yuji-dom-webgl-public-stage.md`](2026-08-20-yuji-dom-webgl-public-stage.md) 与 [`ADR 0017`](../../apps/web/docs/adr/0017-use-a-dom-led-webgl-stage-for-the-public-site.md)。
 
 ## 决策入口
 
@@ -10,6 +13,7 @@
 - 领域术语：[`apps/web/CONTEXT.md`](../../apps/web/CONTEXT.md)
 - 产品决策：[`ADR 0015`](../../apps/web/docs/adr/0015-use-a-stable-brand-scroll-instead-of-homepage-curation.md)
 - 渲染决策：[`ADR 0016`](../../apps/web/docs/adr/0016-render-the-liquid-rain-membrane-with-three-js.md)
+- 后续替代方向：[`ADR 0017`](../../apps/web/docs/adr/0017-use-a-dom-led-webgl-stage-for-the-public-site.md)
 
 ## 问题本质
 

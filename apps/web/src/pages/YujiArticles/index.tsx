@@ -3,12 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { type Group, getGroups, getPosts, type Post } from '@/api/blog';
 import YujiContentRevealStatus from '@/components/yuji/YujiContentRevealStatus';
 import YujiContentState from '@/components/yuji/YujiContentState';
+import YujiStageArticleCard from '@/components/yuji/YujiStageArticleCard';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
-
-function formatDate(value?: string) {
-  if (!value) return '';
-  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium' }).format(new Date(value));
-}
 
 export default function YujiArticles() {
   const [searchParams] = useSearchParams();
@@ -66,11 +62,18 @@ export default function YujiArticles() {
     <main className="yuji-public-main yuji-index-page yuji-articles-page">
       <header className="yuji-index-hero yuji-articles-hero">
         <p className="yuji-index-label">
-          <span>WRITING</span>
-          <span>技术与实践</span>
+          <span>WRITING / LIVE INDEX</span>
+          <span>YJ.ARTICLES — 2026</span>
         </p>
-        <h1>文章</h1>
-        <p>关于 React、TypeScript、AI 与正在学习的东西。按专栏整理，也保留理解发生变化的痕迹。</p>
+        <h1>
+          <span>文章</span>
+          <small>ARTICLE SIGNALS</small>
+        </h1>
+        <p>技术、工具与实践中的真实判断。每一次打开，都从同一张封面穿过，抵达安静的正文。</p>
+        <div className="yuji-index-coordinate" aria-hidden="true">
+          <span>INDEX / {String(posts.length).padStart(2, '0')}</span>
+          <span>SCROLL VELOCITY / LIVE</span>
+        </div>
       </header>
 
       <nav className="yuji-column-rail" aria-label="文章专栏">
@@ -94,44 +97,14 @@ export default function YujiArticles() {
         </div>
       </nav>
 
-      <section className="yuji-writing-index" aria-label="文章列表" aria-busy={loading}>
+      <section
+        className="yuji-writing-index yuji-stage-article-grid"
+        aria-label="文章列表"
+        aria-busy={loading}
+      >
         {showLoading ? <YujiContentRevealStatus label="文章正在显影" variant="writing" /> : null}
         {posts.map((post, index) => (
-          <article className="yuji-writing-index-item" key={post.id}>
-            <span className="yuji-writing-number">{String(index + 1).padStart(2, '0')}</span>
-            <div className="yuji-writing-copy">
-              <p className="yuji-meta-row">
-                <span>{post.group?.name || '文章'}</span>
-                <time>{formatDate(post.publishedAt || post.createdAt)}</time>
-              </p>
-              <h2>
-                <Link to={`/articles/${post.id}`}>{post.title}</Link>
-              </h2>
-              <p>{post.excerpt}</p>
-            </div>
-            {post.cover ? (
-              <figure>
-                <Link to={`/articles/${post.id}`} aria-label={`阅读${post.title}`}>
-                  <img
-                    src={post.cover}
-                    alt={`${post.title}封面`}
-                    decoding="async"
-                    fetchPriority={index < 2 ? 'high' : 'auto'}
-                    loading={index < 2 ? 'eager' : 'lazy'}
-                  />
-                </Link>
-              </figure>
-            ) : (
-              <div className="yuji-writing-cover-placeholder" aria-hidden="true" />
-            )}
-            <Link
-              className="yuji-writing-open"
-              to={`/articles/${post.id}`}
-              aria-label={`阅读${post.title}`}
-            >
-              ↗
-            </Link>
-          </article>
+          <YujiStageArticleCard index={index} key={post.id} post={post} scope="index" />
         ))}
         {!loading && posts.length === 0 ? (
           <YujiContentState

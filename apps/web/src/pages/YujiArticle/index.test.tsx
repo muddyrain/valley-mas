@@ -102,6 +102,35 @@ describe('YujiArticle', () => {
     expect(container.querySelectorAll('h1')).toHaveLength(1);
     expect(container.querySelector('.yuji-article-body h1')).toBeNull();
     expect(container.querySelector('article h2')?.id).toBe('为什么会重新渲染');
+    expect(container.querySelector('.yuji-article-note')).toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('omits the sticky table of contents for a short article', async () => {
+    getPostDetailById.mockResolvedValueOnce({
+      id: 'post-short',
+      title: '一则短记',
+      content: '只有一段安静的正文。',
+      createdAt: '2026-08-20T00:00:00Z',
+    });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(
+        <MemoryRouter initialEntries={['/articles/post-short']}>
+          <Routes>
+            <Route path="/articles/:id" element={<YujiArticle />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+    await flush();
+
+    expect(container.querySelector('.yuji-article-toc')).toBeNull();
+    expect(container.querySelector('.yuji-article-body')).not.toBeNull();
 
     act(() => root.unmount());
     container.remove();

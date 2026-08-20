@@ -69,7 +69,7 @@ afterEach(() => {
 });
 
 describe('YujiHome', () => {
-  it('keeps the brand stage available while posts and images reveal independently', async () => {
+  it('keeps the public stage available while posts and images reveal independently', async () => {
     vi.useFakeTimers();
     const postsRequest = deferred<typeof postPayload>();
     const resourcesRequest = deferred<typeof resourcePayload>();
@@ -88,8 +88,13 @@ describe('YujiHome', () => {
     );
 
     expect(container.querySelector('[role="status"]')).toBeNull();
-    expect(container.querySelector('.yuji-liquid-rain-stage')).not.toBeNull();
-    expect(container.textContent).toContain('在技术与影像之间，留下思考的痕迹。');
+    expect(container.querySelector('[data-yuji-stage="wordmark"]')).not.toBeNull();
+    const wordmarkTitle = container.querySelector('#yuji-wordmark-title') as HTMLElement;
+    expect(wordmarkTitle).not.toBeNull();
+    expect(wordmarkTitle.getAttribute('aria-label')).toBe('雨迹');
+    expect(wordmarkTitle.textContent).toBe('yuji');
+    expect(container.textContent).toContain('YUJI.DESIGN / EDITORIAL ENGINE');
+    expect(container.querySelectorAll('.yuji-sticker-field svg')).toHaveLength(6);
 
     act(() => vi.advanceTimersByTime(300));
     expect(
@@ -133,17 +138,18 @@ describe('YujiHome', () => {
     );
     await flush();
 
-    expect(getPosts).toHaveBeenCalledWith({ page: 1, pageSize: 3 });
+    expect(getPosts).toHaveBeenCalledWith({ page: 1, pageSize: 8 });
     expect(getAllResources).toHaveBeenCalledWith({
       page: 1,
-      pageSize: 6,
+      pageSize: 4,
       includeTags: true,
       type: 'wallpaper',
     });
     expect(container.textContent).toContain('组件渲染性能优化');
     expect(container.textContent).toContain('春日摄影之旅');
-    expect(container.querySelector('.yuji-liquid-rain-stage a[href="/articles"]')).not.toBeNull();
-    expect(container.querySelector('.yuji-liquid-rain-stage a[href="/gallery"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-yuji-stage="wordmark"] a[href="/articles"]'),
+    ).not.toBeNull();
     expect(container.querySelector('a[href="/articles/post-1"]')).not.toBeNull();
     expect(container.querySelector('a[href="/gallery/image/image-1"]')).not.toBeNull();
 
@@ -151,7 +157,7 @@ describe('YujiHome', () => {
     container.remove();
   });
 
-  it('never promotes a post or gallery image into the stable brand stage', async () => {
+  it('keeps the wordmark stage independent from editorial cover data', async () => {
     const postsRequest = deferred<typeof postPayload>();
     getPosts.mockReturnValueOnce(postsRequest.promise);
 
@@ -167,14 +173,14 @@ describe('YujiHome', () => {
     );
     await flush();
 
-    expect(container.querySelector('.yuji-liquid-rain-stage img')).toBeNull();
+    expect(container.querySelector('[data-yuji-stage="wordmark"] img')).toBeNull();
 
     await act(async () => {
       postsRequest.resolve(postPayload);
       await postsRequest.promise;
     });
 
-    expect(container.querySelector('.yuji-liquid-rain-stage img')).toBeNull();
+    expect(container.querySelector('[data-yuji-stage="wordmark"] img')).toBeNull();
     expect(container.querySelector('.yuji-feature')).toBeNull();
 
     act(() => root.unmount());

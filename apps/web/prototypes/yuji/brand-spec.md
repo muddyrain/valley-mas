@@ -1,8 +1,10 @@
-# 雨迹原型品牌与设计系统
+# 雨迹原型品牌与设计系统（历史液态原型）
 
-> 状态：设计系统与完整高保真原型已完成并通过运行验收
+> 状态：历史记录；液态雨膜与固定二次元品牌影像已被 ADR 0017 的 DOM / WebGL 空间舞台取代，不再作为生产视觉真源
 > 原型位置：`apps/web/prototypes/yuji`
 > v0 快照：`apps/web/prototypes/yuji-v0`
+
+当前生产公共站的视觉与交互边界以 `apps/web/docs/adr/0017-use-a-dom-led-webgl-stage-for-the-public-site.md` 和 `apps/web/docs/YUJI_PRODUCT_SPEC.md` 为准。本文件只保留 2026-08-15 液态原型的设计背景，禁止据此恢复液态雨膜、暖纸 token 或四张固定二次元品牌图。
 
 ## 品牌
 

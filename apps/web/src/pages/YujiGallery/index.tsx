@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { getAllResources, type Resource } from '@/api/resource';
 import YujiContentRevealStatus from '@/components/yuji/YujiContentRevealStatus';
 import YujiContentState from '@/components/yuji/YujiContentState';
+import { YujiTransitionLink } from '@/features/yuji-transition/YujiPublicTransition';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { useYujiEditorialMotion } from '@/hooks/useYujiEditorialMotion';
 import { distributeGalleryResources } from '@/utils/galleryMasonry';
@@ -169,15 +170,20 @@ export default function YujiGallery() {
         <h1 data-yuji-reveal="intro">图库</h1>
         <p data-yuji-reveal="intro">散落的风景、人物与想象，在这里按观看的节奏彼此相遇。</p>
         <nav className="yuji-gallery-type-filter" aria-label="影像类型" data-yuji-reveal="intro">
-          <Link to="/gallery" aria-current={resourceType === 'wallpaper' ? 'page' : undefined}>
+          <YujiTransitionLink
+            coverId="gallery-wallpaper"
+            to="/gallery"
+            aria-current={resourceType === 'wallpaper' ? 'page' : undefined}
+          >
             壁纸
-          </Link>
-          <Link
+          </YujiTransitionLink>
+          <YujiTransitionLink
+            coverId="gallery-avatar"
             to="/gallery?type=avatar"
             aria-current={resourceType === 'avatar' ? 'page' : undefined}
           >
             头像
-          </Link>
+          </YujiTransitionLink>
         </nav>
       </header>
 
@@ -207,7 +213,10 @@ export default function YujiGallery() {
                       className="yuji-gallery-item"
                       data-yuji-reveal="scroll"
                     >
-                      <Link to={`/gallery/image/${resource.id}`} viewTransition>
+                      <YujiTransitionLink
+                        coverId={`gallery:${resource.id}`}
+                        to={`/gallery/image/${resource.id}`}
+                      >
                         <img
                           src={resource.thumbnailUrl || resource.url}
                           alt={resource.title}
@@ -219,7 +228,7 @@ export default function YujiGallery() {
                           style={getYujiImageTransitionStyle(resource.id)}
                           width={resource.width}
                         />
-                      </Link>
+                      </YujiTransitionLink>
                       <figcaption>
                         <strong>{resource.title}</strong>
                       </figcaption>

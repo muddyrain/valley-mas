@@ -67,6 +67,8 @@ export default function YujiArticle() {
   const content = post ? withoutRepeatedMarkdownTitle(rawContent, post.title) : rawContent;
   const toc = useMemo(() => extractToc(content), [content]);
   const renderedContent = useMemo(() => renderMarkdownWithAnchors(content), [content]);
+  const showToc = toc.length >= 2 || content.length > 2400;
+  const readingMinutes = Math.max(1, Math.ceil(content.replace(/\s/g, '').length / 420));
   const showLoading = useDelayedLoading(loading);
 
   if (!loading && !post) {
@@ -96,12 +98,18 @@ export default function YujiArticle() {
         <article>
           <header className="yuji-article-hero">
             <Link className="yuji-back-link" to="/articles">
-              ← 返回文章
+              <span aria-hidden="true">←</span> 返回文章索引
             </Link>
+            <p className="yuji-article-signal" aria-hidden="true">
+              YJ / ARTICLE
+              <br />
+              READ MODE / QUIET
+            </p>
             <div className="yuji-article-title">
               <p className="yuji-meta-row">
                 <span>{post.group?.name || '文章'}</span>
                 <time>{formatDate(post.publishedAt || post.createdAt)}</time>
+                <span>{readingMinutes} 分钟阅读</span>
               </p>
               <h1>{post.title}</h1>
               {post.excerpt ? <p>{post.excerpt}</p> : null}
@@ -121,33 +129,53 @@ export default function YujiArticle() {
             ) : null}
           </header>
 
-          <div className="yuji-article-layout">
-            <aside className="yuji-article-toc" aria-label="文章目录">
-              <p>目录</p>
-              {toc.map((item) => (
-                <a key={item.id} href={`#${item.id}`}>
-                  {item.text}
-                </a>
-              ))}
-            </aside>
+          <div className={`yuji-article-layout ${showToc ? 'has-toc' : 'has-no-toc'}`}>
+            {showToc ? (
+              <aside className="yuji-article-toc" aria-label="文章目录">
+                <p>ON THIS PAGE / 目录</p>
+                {toc.map((item) => (
+                  <a key={item.id} href={`#${item.id}`}>
+                    {item.text}
+                  </a>
+                ))}
+              </aside>
+            ) : null}
             <div
               className="yuji-article-body"
               // Blog content is authored by the single site owner and rendered through the existing pipeline.
               dangerouslySetInnerHTML={{ __html: renderedContent }}
             />
-            <aside className="yuji-article-note">
-              <span>NOTE</span>
-              <p>在需要时记录，在理解变化后回来修订。</p>
-            </aside>
           </div>
 
-          {post.tags?.length ? (
-            <footer className="yuji-article-tags">
-              {post.tags.map((tag) => (
-                <span key={tag.id}>{tag.name}</span>
-              ))}
-            </footer>
-          ) : null}
+          <footer className="yuji-article-footer">
+            {post.tags?.length ? (
+              <div className="yuji-article-tags" role="list" aria-label="文章标签">
+                {post.tags.map((tag) => (
+                  <span key={tag.id} role="listitem">
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            {post.prevPost || post.nextPost ? (
+              <nav className="yuji-article-neighbors" aria-label="相邻文章">
+                {post.prevPost ? (
+                  <Link to={`/articles/${post.prevPost.id}`}>
+                    <span>上一篇</span>
+                    <strong>{post.prevPost.title}</strong>
+                  </Link>
+                ) : (
+                  <span />
+                )}
+                {post.nextPost ? (
+                  <Link to={`/articles/${post.nextPost.id}`}>
+                    <span>下一篇</span>
+                    <strong>{post.nextPost.title}</strong>
+                  </Link>
+                ) : null}
+              </nav>
+            ) : null}
+          </footer>
         </article>
       ) : null}
     </main>

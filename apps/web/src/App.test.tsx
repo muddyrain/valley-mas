@@ -9,7 +9,11 @@ vi.mock('@valley/devbox-inspector-runtime', () => ({ InspectorRuntime: () => nul
 vi.mock('@/components/GlobalScrollButton', () => ({ GlobalScrollButton: () => null }));
 vi.mock('@/components/ui/sonner', () => ({ Toaster: () => null }));
 vi.mock('@/hooks/useTheme', () => ({ useTheme: () => ({ resolvedMode: 'light' }) }));
-vi.mock('@/stores/useThemeStore', () => ({ applyThemeToDocument: vi.fn() }));
+vi.mock('@/stores/useThemeStore', () => ({
+  applyThemeToDocument: vi.fn(),
+  useThemeStore: (selector: (state: { mode: string; setMode: () => void }) => unknown) =>
+    selector({ mode: 'system', setMode: vi.fn() }),
+}));
 vi.mock('@/components/BlockingLoadingSurface', () => ({
   default: () => <div>全局页面加载</div>,
 }));
@@ -59,7 +63,7 @@ describe('App public routes', () => {
     const { container, root } = renderAt('/');
 
     expect(container.textContent).toContain('雨迹首页内容');
-    expect(container.textContent).toContain('文章与影像');
+    expect(container.textContent).toContain('YUJI® / 2026');
     expect(document.title).toContain('雨迹');
 
     act(() => root.unmount());
