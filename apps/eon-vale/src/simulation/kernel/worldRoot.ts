@@ -1,4 +1,14 @@
+import type { FamilyFact } from '../life/families';
+import type { HumanLifeFact } from '../life/lifeFacts';
 import type { NaturalResourceStore } from '../resources/naturalResources';
+import type {
+  LooseResourceFact,
+  SettlementBuildingFact,
+  SettlementFact,
+  SettlementInventoryFact,
+  SettlementTaskOpportunityFact,
+} from '../settlements/settlementFacts';
+import { createReservationLedger, type ReservationLedger } from '../tasks/reservations';
 import { generateWorld } from '../world/generateWorld';
 import type {
   NaturalContentOptions,
@@ -11,7 +21,21 @@ import type { KernelPhaseId } from './phases';
 
 export interface CivilizationFacts {
   humans: number;
-  settlementInventories: Array<never>;
+  nextLifeId: number;
+  nextTaskId: number;
+  life: HumanLifeFact[];
+  reservations: ReservationLedger;
+  nextSettlementId: number;
+  nextBuildingId: number;
+  nextLooseResourceId: number;
+  settlements: SettlementFact[];
+  buildings: SettlementBuildingFact[];
+  settlementInventories: SettlementInventoryFact[];
+  looseResources: LooseResourceFact[];
+  nextOpportunityId: number;
+  opportunities: SettlementTaskOpportunityFact[];
+  nextFamilyId: number;
+  families: FamilyFact[];
 }
 
 export interface KernelCommandState {
@@ -44,6 +68,27 @@ export interface CreateKernelWorldOptions {
   naturalContent?: NaturalContentOptions;
 }
 
+export function createEmptyCivilizationFacts(): CivilizationFacts {
+  return {
+    humans: 0,
+    nextLifeId: 0,
+    nextTaskId: 0,
+    life: [],
+    reservations: createReservationLedger(),
+    nextSettlementId: 0,
+    nextBuildingId: 0,
+    nextLooseResourceId: 0,
+    settlements: [],
+    buildings: [],
+    settlementInventories: [],
+    looseResources: [],
+    nextOpportunityId: 0,
+    opportunities: [],
+    nextFamilyId: 0,
+    families: [],
+  };
+}
+
 export function createKernelWorldRoot(options: CreateKernelWorldOptions): KernelWorldRoot {
   const generated = generateWorld({
     seed: options.seed,
@@ -58,7 +103,7 @@ export function createKernelWorldRoot(options: CreateKernelWorldOptions): Kernel
     paused: true,
     world: generated.world,
     resources: generated.resources,
-    civilization: { humans: 0, settlementInventories: [] },
+    civilization: createEmptyCivilizationFacts(),
     commands: { pending: [], records: [], lastSequence: 0 },
     diagnostics: { invariantErrors: [], lastPhaseTrace: [] },
   };

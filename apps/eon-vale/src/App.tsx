@@ -138,7 +138,7 @@ function spawnKind(tool: MapTool): EntityKind | null {
 }
 
 function spawnCount(kind: EntityKind): number {
-  if (kind === EntityKind.Human) return 4;
+  if (kind === EntityKind.Human) return 1;
   if (kind === EntityKind.Chicken || kind === EntityKind.Sheep || kind === EntityKind.Deer)
     return 6;
   if (kind === EntityKind.Cow) return 4;

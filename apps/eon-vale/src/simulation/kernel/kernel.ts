@@ -1,5 +1,19 @@
+import { advanceFamilyReproduction, formSettlementFamilies } from '../life/families';
+import { selectLifeIntents } from '../life/intents';
+import {
+  advanceLifeBodies,
+  deterministicHumanPlacementCells,
+  placeHumanFacts,
+} from '../life/lifeFacts';
+import { updateLifePerceptions } from '../life/perception';
+import { planConstructionProjects } from '../settlements/construction';
+import { planSettlementNeeds, selectSettlementWorkIntents } from '../settlements/settlementNeeds';
+import { expireReservations } from '../tasks/reservations';
+import { advanceLifeTaskActions } from '../tasks/taskActions';
+import { scheduleLifeTasks } from '../tasks/taskScheduler';
 import { applyWorldTerrainEdit } from '../world/worldEditing';
 import type { NaturalContentOptions, WorldPreset, WorldSize } from '../world/worldFacts';
+import { ElevationBand, elevationBandAt } from '../world/worldFacts';
 import { kernelChecksum } from './checksum';
 import type { KernelCommand, KernelCommandRecord } from './commands';
 import { validateKernelInvariants } from './invariants';
@@ -47,6 +61,48 @@ function executeCommand(state: KernelWorldRoot, command: KernelCommand): KernelC
   state.commands.lastSequence = command.sequence;
   if (command.type === 'set-paused') {
     state.paused = command.paused;
+    return { sequence: command.sequence, type: command.type, status: 'accepted' };
+  }
+  if (command.type === 'place-humans') {
+    const cellCount = state.world.size * state.world.size;
+    if (command.cell < 0 || command.cell >= cellCount) {
+      return {
+        sequence: command.sequence,
+        type: command.type,
+        status: 'rejected',
+        reason: 'cell-out-of-range',
+      };
+    }
+    if (!Number.isInteger(command.count) || command.count < 1 || command.count > 40) {
+      return {
+        sequence: command.sequence,
+        type: command.type,
+        status: 'rejected',
+        reason: 'invalid-count',
+      };
+    }
+    if (elevationBandAt(state.world.elevation[command.cell] ?? -4) !== ElevationBand.Land) {
+      return {
+        sequence: command.sequence,
+        type: command.type,
+        status: 'rejected',
+        reason: 'surface-underwater',
+      };
+    }
+    const placementCells = deterministicHumanPlacementCells(
+      state.world,
+      command.cell,
+      command.count,
+    );
+    if (placementCells.length !== command.count) {
+      return {
+        sequence: command.sequence,
+        type: command.type,
+        status: 'rejected',
+        reason: 'insufficient-land',
+      };
+    }
+    placeHumanFacts(state.civilization, state.seed, placementCells);
     return { sequence: command.sequence, type: command.type, status: 'accepted' };
   }
   const result = applyWorldTerrainEdit(state.world, state.resources, command);
@@ -103,6 +159,17 @@ export function createSimulationKernelFromState(state: KernelWorldRoot): Simulat
       }
       const phases = KERNEL_PHASES.map((phase) => phase.id);
       state.tick += 1;
+      advanceLifeBodies(state.civilization, state.tick);
+      updateLifePerceptions(state.civilization, state.resources, state.world.size, state.tick);
+      expireReservations(state.civilization.reservations, state.tick);
+      planConstructionProjects(state.civilization, state.world, state.resources, state.tick);
+      planSettlementNeeds(state.civilization, state.tick);
+      selectLifeIntents(state.civilization, state.tick);
+      selectSettlementWorkIntents(state.civilization, state.tick);
+      scheduleLifeTasks(state, state.tick);
+      advanceLifeTaskActions(state);
+      formSettlementFamilies(state.civilization, state.tick);
+      advanceFamilyReproduction(state.civilization, state.seed, state.tick);
       state.diagnostics.lastPhaseTrace = phases;
       state.diagnostics.invariantErrors = validateKernelInvariants(state);
       return {

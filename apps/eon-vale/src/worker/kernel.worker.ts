@@ -13,6 +13,7 @@ import {
 import { ElevationBand, elevationBandAt, SurfaceHabitat } from '@/simulation/world/worldFacts';
 import {
   projectEmptyTerritory,
+  projectKernelInspection,
   projectKernelMap,
   projectKernelResourceDelta,
   projectKernelResources,
@@ -270,7 +271,15 @@ function editMap(
     } else if (command.tool === 'lower') {
       kernel.enqueue({ type: 'lower-terrain', sequence: sequence(), cell, amount: 0.7 });
     } else if (command.tool === 'paint-land') {
-      if (elevationBandAt(currentElevation) !== ElevationBand.Land) {
+      const currentBand = elevationBandAt(currentElevation);
+      if (currentBand === ElevationBand.Mountain) {
+        kernel.enqueue({
+          type: 'lower-terrain',
+          sequence: sequence(),
+          cell,
+          amount: Math.max(0, currentElevation - 1),
+        });
+      } else if (currentBand !== ElevationBand.Land) {
         kernel.enqueue({
           type: 'raise-terrain',
           sequence: sequence(),
@@ -343,6 +352,24 @@ function editMap(
   emitSummary();
 }
 
+function placeHumans(
+  command: Extract<WorkerCommandEnvelope['command'], { type: 'place-humans' }>,
+): void {
+  const current = requireKernel();
+  current.enqueue({
+    type: 'place-humans',
+    sequence: sequence(),
+    cell: command.cell,
+    count: command.count,
+  });
+  const result = current.flushCommands()[0];
+  if (!result || result.status !== 'accepted') {
+    throw new Error(result?.reason ?? 'Human placement failed');
+  }
+  emitDynamicFrame();
+  emitSummary();
+}
+
 function requireKernel(): SimulationKernel {
   if (!kernel) throw new Error('World is not initialized');
   return kernel;
@@ -373,8 +400,15 @@ function handleCommand(envelope: WorkerCommandEnvelope): void {
     editMap(command);
     return;
   }
+  if (command.type === 'place-humans') {
+    placeHumans(command);
+    return;
+  }
   if (command.type === 'inspect') {
-    emitReliable({ type: 'inspection-result', inspection: null });
+    emitReliable({
+      type: 'inspection-result',
+      inspection: projectKernelInspection(requireKernel(), command.target, command.id),
+    });
     return;
   }
   if (command.type === 'request-keyframe') {

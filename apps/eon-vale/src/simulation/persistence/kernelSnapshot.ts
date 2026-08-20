@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { createSimulationKernelFromState, type SimulationKernel } from '../kernel/kernel';
-import type { KernelWorldRoot } from '../kernel/worldRoot';
+import {
+  type CivilizationFacts,
+  createEmptyCivilizationFacts,
+  type KernelWorldRoot,
+} from '../kernel/worldRoot';
 import type { NaturalResourceStore } from '../resources/naturalResources';
 import type { WorldFacts } from '../world/worldFacts';
 
@@ -67,6 +71,300 @@ const resourcesSchema = z
   })
   .strict();
 
+const resourceAmountsSchema = z
+  .object({
+    food: z.number().int().nonnegative().optional(),
+    wood: z.number().int().nonnegative().optional(),
+    stone: z.number().int().nonnegative().optional(),
+    metal: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+
+const taskSchema = z
+  .object({
+    id: z.number().int().nonnegative(),
+    kind: z.enum([
+      'establish-settlement',
+      'join-settlement',
+      'idle-wander',
+      'forage-food',
+      'eat',
+      'rest',
+      'gather-resource',
+      'deliver-resource',
+      'build',
+    ]),
+    phase: z.enum([
+      'moving-to-target',
+      'working',
+      'carrying',
+      'moving-to-delivery',
+      'consuming',
+      'resting',
+    ]),
+    targetCell: z.number().int().nonnegative(),
+    targetResourceId: z.number().int().nonnegative().nullable(),
+    targetBuildingId: z.number().int().nonnegative().nullable(),
+    settlementId: z.number().int().nonnegative().nullable(),
+    resourceKind: z.enum(['food', 'wood', 'stone', 'metal']).nullable(),
+    reservationIds: z.array(z.number().int().nonnegative()),
+    expectedResult: z.enum([
+      'primitive-camp',
+      'settlement-membership',
+      'local-activity-completed',
+      'food-consumed',
+      'resource-delivered',
+      'building-completed',
+      'body-rested',
+    ]),
+    startedAtTick: z.number().int().nonnegative(),
+    commitUntilTick: z.number().int().nonnegative(),
+    workRemaining: z.number().int().nonnegative(),
+    pathCells: z.array(z.number().int().nonnegative()),
+    pathCursor: z.number().int().nonnegative(),
+    pathWorldRevision: z.number().int().nonnegative().nullable(),
+  })
+  .strict();
+
+const taskFailureSchema = z
+  .object({
+    code: z.enum([
+      'target-disappeared',
+      'target-unreachable',
+      'resource-unavailable',
+      'reservation-expired',
+      'system-error',
+    ]),
+    atTick: z.number().int().nonnegative(),
+    retryAfterTick: z.number().int().nonnegative(),
+    targetCell: z.number().int().nonnegative().nullable(),
+  })
+  .strict();
+
+const humanSchema = z
+  .object({
+    id: z.number().int().nonnegative(),
+    active: z.boolean(),
+    name: z.string().min(1),
+    cell: z.number().int().nonnegative(),
+    ageYears: z.number().int().nonnegative(),
+    sex: z.enum(['female', 'male']),
+    health: z.number().int().min(0).max(1_000),
+    nutrition: z.number().int().min(0).max(1_000),
+    energy: z.number().int().min(0).max(1_000),
+    nutritionStage: z.enum(['healthy', 'hungry', 'starving']),
+    energyStage: z.enum(['rested', 'tired', 'exhausted']),
+    settlementId: z.number().int().nonnegative().nullable(),
+    familyId: z.number().int().nonnegative().nullable(),
+    partnerId: z.number().int().nonnegative().nullable(),
+    parentIds: z.tuple([
+      z.number().int().nonnegative().nullable(),
+      z.number().int().nonnegative().nullable(),
+    ]),
+    perception: z
+      .object({
+        observedAtTick: z.number().int().min(-1),
+        nearestFoodResourceId: z.number().int().nonnegative().nullable(),
+        nearestFoodDistance: z.number().nonnegative().nullable(),
+      })
+      .strict(),
+    intent: z
+      .object({
+        kind: z.enum([
+          'establish-settlement',
+          'find-food',
+          'eat',
+          'rest',
+          'settlement-work',
+          'idle',
+        ]),
+        reason: z.enum([
+          'newly-created',
+          'unsettled-adult',
+          'nutrition-critical',
+          'energy-critical',
+          'settlement-net-deficit',
+          'no-urgent-need',
+        ]),
+        selectedTick: z.number().int().nonnegative(),
+        opportunityId: z.number().int().nonnegative().optional(),
+      })
+      .strict(),
+    decisionRequested: z.boolean(),
+    task: taskSchema.nullable(),
+    suspendedTask: taskSchema.nullable(),
+    lastTaskFailure: taskFailureSchema.nullable(),
+    retryAfterTick: z.number().int().nonnegative(),
+    workRole: z.enum(['none', 'forager', 'woodcutter', 'miner', 'builder', 'hauler']),
+    carried: z
+      .object({
+        kind: z.enum(['food', 'wood', 'stone', 'metal']).nullable(),
+        amount: z.number().int().nonnegative(),
+      })
+      .strict(),
+    lastMealAtTick: z.number().int().min(-1),
+  })
+  .strict();
+
+const reservationTargetSchema = z.discriminatedUnion('kind', [
+  z
+    .object({ kind: z.literal('natural-resource'), resourceId: z.number().int().nonnegative() })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('settlement-inventory'),
+      settlementId: z.number().int().nonnegative(),
+      resourceKind: z.enum(['food', 'wood', 'stone', 'metal']),
+    })
+    .strict(),
+  z
+    .object({ kind: z.literal('construction-site'), buildingId: z.number().int().nonnegative() })
+    .strict(),
+]);
+
+const reservationSchema = z
+  .object({
+    id: z.number().int().nonnegative(),
+    holderLifeId: z.number().int().nonnegative(),
+    target: reservationTargetSchema,
+    quantity: z.number().int().positive(),
+    createdAtTick: z.number().int().nonnegative(),
+    expiresAtTick: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const opportunitySchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      id: z.number().int().nonnegative(),
+      settlementId: z.number().int().nonnegative(),
+      kind: z.literal('gather-resource'),
+      resourceKind: z.enum(['food', 'wood', 'stone', 'metal']),
+      shortage: z.number().int().nonnegative(),
+      maxWorkers: z.number().int().nonnegative(),
+      createdAtTick: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      id: z.number().int().nonnegative(),
+      settlementId: z.number().int().nonnegative(),
+      kind: z.literal('haul-construction'),
+      resourceKind: z.enum(['food', 'wood', 'stone', 'metal']),
+      shortage: z.number().int().nonnegative(),
+      buildingId: z.number().int().nonnegative(),
+      maxWorkers: z.number().int().nonnegative(),
+      createdAtTick: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      id: z.number().int().nonnegative(),
+      settlementId: z.number().int().nonnegative(),
+      kind: z.literal('build'),
+      buildingId: z.number().int().nonnegative(),
+      maxWorkers: z.number().int().nonnegative(),
+      createdAtTick: z.number().int().nonnegative(),
+    })
+    .strict(),
+]);
+
+const civilizationSchema = z
+  .object({
+    humans: z.number().int().nonnegative(),
+    nextLifeId: z.number().int().nonnegative(),
+    nextTaskId: z.number().int().nonnegative(),
+    life: z.array(humanSchema),
+    reservations: z
+      .object({
+        nextReservationId: z.number().int().nonnegative(),
+        active: z.array(reservationSchema),
+      })
+      .strict(),
+    nextSettlementId: z.number().int().nonnegative(),
+    nextBuildingId: z.number().int().nonnegative(),
+    nextLooseResourceId: z.number().int().nonnegative(),
+    settlements: z.array(
+      z
+        .object({
+          id: z.number().int().nonnegative(),
+          name: z.string().min(1),
+          founderLifeId: z.number().int().nonnegative(),
+          centerCell: z.number().int().nonnegative(),
+          residentIds: z.array(z.number().int().nonnegative()),
+          foundedAtTick: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+    buildings: z.array(
+      z
+        .object({
+          id: z.number().int().nonnegative(),
+          settlementId: z.number().int().nonnegative(),
+          kind: z.enum([
+            'campfire',
+            'tent',
+            'basic-storage',
+            'house',
+            'farm',
+            'logging-site',
+            'mine',
+            'workshop',
+            'barracks',
+            'village-center',
+          ]),
+          cell: z.number().int().nonnegative(),
+          completed: z.boolean(),
+          progress: z.number().int().nonnegative(),
+          requiredProgress: z.number().int().nonnegative(),
+          required: resourceAmountsSchema,
+          delivered: resourceAmountsSchema,
+        })
+        .strict(),
+    ),
+    settlementInventories: z.array(
+      z
+        .object({
+          settlementId: z.number().int().nonnegative(),
+          food: z.number().int().nonnegative(),
+          wood: z.number().int().nonnegative(),
+          stone: z.number().int().nonnegative(),
+          metal: z.number().int().nonnegative(),
+          capacity: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+    looseResources: z.array(
+      z
+        .object({
+          id: z.number().int().nonnegative(),
+          kind: z.enum(['food', 'wood', 'stone', 'metal']),
+          amount: z.number().int().positive(),
+          cell: z.number().int().nonnegative(),
+          source: z.enum(['harvest', 'cancelled-construction', 'dropped']),
+        })
+        .strict(),
+    ),
+    nextOpportunityId: z.number().int().nonnegative(),
+    opportunities: z.array(opportunitySchema),
+    nextFamilyId: z.number().int().nonnegative(),
+    families: z.array(
+      z
+        .object({
+          id: z.number().int().nonnegative(),
+          settlementId: z.number().int().nonnegative(),
+          partnerIds: z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]),
+          childIds: z.array(z.number().int().nonnegative()),
+          formedAtTick: z.number().int().nonnegative(),
+          lastBirthAtTick: z.number().int().min(-1),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+const legacyCivilizationSchema = z.object({ humans: z.literal(0) }).strict();
+
 const snapshotSchema = z
   .object({
     format: z.literal(KERNEL_SNAPSHOT_FORMAT),
@@ -78,7 +376,7 @@ const snapshotSchema = z
     checksum: z.string().regex(/^[0-9a-f]{8}$/),
     world: worldSchema,
     resources: resourcesSchema,
-    civilization: z.object({ humans: z.literal(0) }).strict(),
+    civilization: z.union([legacyCivilizationSchema, civilizationSchema]),
   })
   .strict();
 
@@ -154,6 +452,10 @@ function serializeResources(resources: NaturalResourceStore): KernelSnapshot['re
   };
 }
 
+function serializeCivilization(civilization: CivilizationFacts) {
+  return civilizationSchema.parse(civilization);
+}
+
 export function encodeKernelSnapshot(kernel: SimulationKernel, worldId: string): string {
   const body: KernelSnapshotBody = {
     format: KERNEL_SNAPSHOT_FORMAT,
@@ -164,7 +466,7 @@ export function encodeKernelSnapshot(kernel: SimulationKernel, worldId: string):
     paused: kernel.state.paused,
     world: serializeWorld(kernel.state.world),
     resources: serializeResources(kernel.state.resources),
-    civilization: { humans: 0 },
+    civilization: serializeCivilization(kernel.state.civilization),
   };
   return JSON.stringify({ ...body, checksum: snapshotChecksum(body) });
 }
@@ -249,7 +551,10 @@ export function decodeKernelSnapshot(encoded: string): DecodedKernelSnapshot {
         },
       },
       resources: restoreResources(snapshot.resources, cellCount),
-      civilization: { humans: 0, settlementInventories: [] },
+      civilization:
+        'life' in snapshot.civilization
+          ? (snapshot.civilization as unknown as CivilizationFacts)
+          : createEmptyCivilizationFacts(),
       commands: { pending: [], records: [], lastSequence: 0 },
       diagnostics: { invariantErrors: [], lastPhaseTrace: [] },
     },

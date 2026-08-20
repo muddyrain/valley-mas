@@ -13,6 +13,30 @@ function hashText(hash: number, value: string): number {
   return result;
 }
 
+function hashAuthorityValue(hash: number, value: unknown): number {
+  if (value === null) return hashNumber(hash, 0x4210);
+  if (typeof value === 'boolean') return hashNumber(hash, value ? 0x4211 : 0x4212);
+  if (typeof value === 'number') {
+    return hashNumber(hash, Number.isInteger(value) ? value : Math.round(value * 1_000));
+  }
+  if (typeof value === 'string') return hashText(hashNumber(hash, 0x4213), value);
+  if (Array.isArray(value)) {
+    let result = hashNumber(hash, value.length);
+    for (const entry of value) result = hashAuthorityValue(result, entry);
+    return result;
+  }
+  if (typeof value === 'object') {
+    let result = hash;
+    const record = value as Record<string, unknown>;
+    for (const key of Object.keys(record).sort()) {
+      result = hashText(result, key);
+      result = hashAuthorityValue(result, record[key]);
+    }
+    return result;
+  }
+  return hash;
+}
+
 export function kernelChecksum(state: KernelWorldRoot): string {
   let hash = hashText(2_166_136_261, state.seed);
   hash = hashNumber(hash, state.tick);
@@ -30,5 +54,6 @@ export function kernelChecksum(state: KernelWorldRoot): string {
     hash = hashNumber(hash, state.resources.amount[id] ?? 0);
     hash = hashNumber(hash, state.resources.stage[id] ?? 0);
   }
+  hash = hashAuthorityValue(hash, state.civilization);
   return (hash >>> 0).toString(16).padStart(8, '0');
 }

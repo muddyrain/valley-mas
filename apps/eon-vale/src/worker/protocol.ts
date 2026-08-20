@@ -24,6 +24,7 @@ export type WorkerProtocolCommand =
     }
   | { type: 'set-paused'; paused: boolean }
   | { type: 'set-playback-rate'; rate: 1 | 2 | 4 | 8 }
+  | { type: 'place-humans'; cell: number; count: number }
   | { type: 'edit-terrain'; tool: TerrainEditTool; cell: number; radius: number }
   | { type: 'inspect'; target: 'entity' | 'village' | 'building' | 'kingdom'; id: number }
   | { type: 'request-keyframe'; reason: ResyncReason }

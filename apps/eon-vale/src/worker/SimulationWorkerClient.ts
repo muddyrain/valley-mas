@@ -8,7 +8,6 @@ import type {
 } from '@/render/renderTypes';
 import type {
   ConstructionPriority,
-  EntityKind,
   GodPower,
   MapTool,
   PlanningZoneKind,
@@ -16,6 +15,7 @@ import type {
   WorldHistoryFilter,
   WorldPreset,
 } from '@/shared/gameTypes';
+import { EntityKind } from '@/shared/gameTypes';
 import type { KernelDiagnosticFrame } from '@/simulation/observation/kernelDiagnostics';
 import type { WorldLawId } from '@/simulation/rules/worldLawCatalog';
 import type { NaturalContentOptions } from '@/simulation/world/worldFacts';
@@ -112,10 +112,11 @@ export class SimulationWorkerClient {
   }
 
   spawn(kind: EntityKind, cell: number, count = 1): void {
-    void kind;
-    void cell;
-    void count;
-    this.unavailable();
+    if (kind !== EntityKind.Human) {
+      this.unavailable();
+      return;
+    }
+    this.send({ type: 'place-humans', cell, count: Math.max(1, Math.min(40, Math.floor(count))) });
   }
 
   useGodPower(power: GodPower, cell: number, radius: number): void {

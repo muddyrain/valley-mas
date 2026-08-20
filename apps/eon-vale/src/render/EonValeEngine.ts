@@ -40,6 +40,7 @@ import {
   entityInteractionGeometry,
   type InteractionGeometry,
   interactionStrokeWidth,
+  resourceInteractionGeometry,
 } from './interactionFeedback';
 import { buildingFeedback, shouldEmitAttackHit } from './mapFeedback';
 import { estimateRenderBatches, normalizedDisplayFps } from './performanceMetrics';
@@ -79,6 +80,7 @@ import {
   humanPose,
 } from './spriteAnimation';
 import { resolveViewLevel, viewZoom, visibleCellSpan, type WorldViewLevel } from './strategicView';
+import { pickWorldObject, resourceIsVisibleAtView } from './worldPicking';
 
 export interface RuntimeMetrics {
   fps: number;
@@ -1142,9 +1144,18 @@ export class EonValeEngine {
               residentProfile.splitCanopy,
             );
           }
-          const sampleRate =
-            kind === ResourceNodeKind.Tree ? 3 : kind === ResourceNodeKind.Stone ? 2 : 1;
-          if (settlementContext && (nodeId * 17 + variant * 7) % sampleRate === 0) {
+          if (
+            settlementContext &&
+            resourceIsVisibleAtView('settlement', {
+              id: nodeId,
+              x,
+              z,
+              active: true,
+              kind,
+              stage,
+              variant,
+            })
+          ) {
             drawResourceNodeGlyph(settlementContext, kind, stage, variant, sourceX, sourceZ, false);
           }
           if (overviewContext) {
@@ -2166,24 +2177,43 @@ export class EonValeEngine {
       if (!point) return false;
       const x = (point.x + point.geometry.offsetX) * WORLD_PIXELS_PER_CELL;
       const z = (point.z + point.geometry.offsetZ) * WORLD_PIXELS_PER_CELL;
-      if (point.geometry.shape === 'ellipse') {
-        this.interactionLayer.ellipse(
-          x,
-          z,
-          point.geometry.radiusX * WORLD_PIXELS_PER_CELL,
-          point.geometry.radiusZ * WORLD_PIXELS_PER_CELL,
-        );
-      } else {
-        this.interactionLayer.circle(x, z, point.geometry.radiusX * WORLD_PIXELS_PER_CELL);
+      const traceGeometry = () => {
+        if (point.geometry.shape === 'ellipse') {
+          this.interactionLayer.ellipse(
+            x,
+            z,
+            point.geometry.radiusX * WORLD_PIXELS_PER_CELL,
+            point.geometry.radiusZ * WORLD_PIXELS_PER_CELL,
+          );
+        } else {
+          this.interactionLayer.circle(x, z, point.geometry.radiusX * WORLD_PIXELS_PER_CELL);
+        }
+      };
+      if (tone === 'selected') {
+        traceGeometry();
+        this.interactionLayer.fill({ color, alpha: 0.09 });
+        traceGeometry();
+        this.interactionLayer.stroke({
+          color: 0x2c2515,
+          width: interactionStrokeWidth(this.camera.zoom, tone) + 1.25 / this.camera.zoom,
+          alpha: 0.72,
+        });
       }
+      traceGeometry();
       this.interactionLayer.stroke({
         color,
         width: interactionStrokeWidth(this.camera.zoom, tone),
-        alpha: 0.95,
+        alpha: tone === 'selected' ? 1 : 0.82,
       });
       return true;
     };
-    const hover = !this.brushVisible && drawTarget(this.hoveredTarget, 0x8fe49a, 'hover');
+    const hoverMatchesSelection =
+      this.hoveredTarget?.kind === this.selectedTarget?.kind &&
+      this.hoveredTarget?.id === this.selectedTarget?.id;
+    const hover =
+      !this.brushVisible &&
+      !hoverMatchesSelection &&
+      drawTarget(this.hoveredTarget, 0x8fe49a, 'hover');
     const selected = drawTarget(this.selectedTarget, 0xffd86a, 'selected');
     const latest = this.interpolator.latest;
     if (latest && this.viewLevel !== 'world') {
@@ -2219,8 +2249,8 @@ export class EonValeEngine {
     }
     this.canvas.dataset.hoverHighlight = String(hover);
     this.canvas.dataset.selectionOutline = String(selected);
-    this.canvas.dataset.hoverStrokePx = '1';
-    this.canvas.dataset.selectionStrokePx = '1.5';
+    this.canvas.dataset.hoverStrokePx = '1.25';
+    this.canvas.dataset.selectionStrokePx = '2.25';
   }
 
   private targetPosition(
@@ -2228,20 +2258,24 @@ export class EonValeEngine {
   ): { x: number; z: number; geometry: InteractionGeometry } | null {
     if (!target) return null;
     if (target.kind === 'entity') {
-      if (this.viewLevel !== 'resident') return null;
+      if (this.viewLevel === 'world') return null;
       const latest = this.interpolator.latest;
       if (!latest || target.id >= latest.population) return null;
       return {
         x: latest.positionsX[target.id] ?? 0,
         z: latest.positionsZ[target.id] ?? 0,
-        geometry: entityInteractionGeometry(),
+        geometry: entityInteractionGeometry(this.viewLevel),
       };
     }
     if (target.kind === 'building') {
       if (this.viewLevel === 'world') return null;
       const building = this.snapshot?.buildings.find((candidate) => candidate.id === target.id);
       return building
-        ? { x: building.x, z: building.z, geometry: buildingInteractionGeometry(building.type) }
+        ? {
+            x: building.x,
+            z: building.z,
+            geometry: buildingInteractionGeometry(building.type, this.viewLevel),
+          }
         : null;
     }
     if (target.kind === 'resource') {
@@ -2251,13 +2285,11 @@ export class EonValeEngine {
       return {
         x: resources.positionsX[target.id] ?? 0,
         z: resources.positionsZ[target.id] ?? 0,
-        geometry: {
-          shape: 'ellipse',
-          offsetX: 0,
-          offsetZ: -0.08,
-          radiusX: 0.62,
-          radiusZ: 0.34,
-        },
+        geometry: resourceInteractionGeometry(
+          resources.kind[target.id] as ResourceNodeKind,
+          resources.stage[target.id] as ResourceNodeStage,
+          this.viewLevel,
+        ),
       };
     }
     if (target.kind === 'kingdom') {
@@ -2378,76 +2410,60 @@ export class EonValeEngine {
     if (x < 0 || z < 0 || x >= map.size || z >= map.size) return null;
     const click: WorldClick = { cell: z * map.size + x };
     if (this.brushVisible) return click;
-    if (this.viewLevel !== 'world') {
-      const centeredBuilding = this.snapshot?.buildings.find(
-        (building) =>
-          building.health > 0 && Math.hypot(building.x - world.x, building.z - world.z) < 0.72,
-      );
-      if (centeredBuilding) {
-        click.buildingId = centeredBuilding.id;
-        click.villageId = centeredBuilding.villageId;
-        return click;
-      }
-    }
     const latest = this.interpolator.latest;
-    let bestEntityDistance = this.viewLevel === 'resident' ? 1.6 : 1.1;
-    if (latest && this.viewLevel !== 'world') {
-      for (let entityId = 0; entityId < latest.population; entityId += 1) {
-        if (
-          (latest.active?.[entityId] ?? 1) === 0 ||
-          (latest.health?.[entityId] ?? 1_000) <= 0 ||
-          (this.viewLevel === 'settlement' && entityId % 4 !== 0)
-        ) {
-          continue;
-        }
-        const distance = Math.hypot(
-          (latest.positionsX[entityId] ?? 0) - world.x,
-          (latest.positionsZ[entityId] ?? 0) - world.z,
-        );
-        if (distance < bestEntityDistance) {
-          bestEntityDistance = distance;
-          click.entityId = entityId;
-        }
-      }
-    }
-    if (click.entityId !== undefined) return click;
-    let bestBuildingDistance = 2.3;
-    for (const building of this.viewLevel === 'world' ? [] : (this.snapshot?.buildings ?? [])) {
-      if (building.health <= 0) continue;
-      const distance = Math.hypot(building.x - world.x, building.z - world.z);
-      if (distance < bestBuildingDistance) {
-        bestBuildingDistance = distance;
-        click.buildingId = building.id;
-        click.villageId = building.villageId;
-      }
-    }
-    if (click.buildingId !== undefined) return click;
     const resources = this.resourceNodes;
-    if (resources && this.viewLevel === 'resident') {
+    const nearbyResourceIds = new Set<number>();
+    if (resources && this.viewLevel !== 'world') {
       const columns = Math.ceil(map.size / 8);
       const bucketX = Math.floor(world.x / 8);
       const bucketZ = Math.floor(world.z / 8);
-      let bestResourceDistance = 1.15;
       for (let offsetZ = -1; offsetZ <= 1; offsetZ += 1) {
         for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
           const xIndex = bucketX + offsetX;
           const zIndex = bucketZ + offsetZ;
           if (xIndex < 0 || zIndex < 0 || xIndex >= columns || zIndex >= columns) continue;
           for (const nodeId of this.resourceBuckets.get(zIndex * columns + xIndex) ?? []) {
-            if (resources.active[nodeId] !== 1) continue;
-            const distance = Math.hypot(
-              (resources.positionsX[nodeId] ?? 0) - world.x,
-              (resources.positionsZ[nodeId] ?? 0) - world.z,
-            );
-            if (distance < bestResourceDistance) {
-              bestResourceDistance = distance;
-              click.resourceNodeId = nodeId;
-            }
+            nearbyResourceIds.add(nodeId);
           }
         }
       }
     }
-    if (click.resourceNodeId !== undefined) return click;
+    const now = performance.now();
+    const picked = pickWorldObject({
+      viewLevel: this.viewLevel,
+      point: world,
+      entities: latest
+        ? Array.from({ length: latest.population }, (_, entityId) => {
+            const sample = this.interpolator.sample(entityId, now);
+            return {
+              id: entityId,
+              x: sample?.x ?? latest.positionsX[entityId] ?? 0,
+              z: sample?.z ?? latest.positionsZ[entityId] ?? 0,
+              active: (latest.active?.[entityId] ?? 1) === 1,
+              health: latest.health?.[entityId] ?? 1_000,
+            };
+          })
+        : [],
+      buildings: this.snapshot?.buildings ?? [],
+      resources: resources
+        ? Array.from(nearbyResourceIds, (nodeId) => ({
+            id: nodeId,
+            x: resources.positionsX[nodeId] ?? 0,
+            z: resources.positionsZ[nodeId] ?? 0,
+            active: resources.active[nodeId] === 1,
+            kind: resources.kind[nodeId] as ResourceNodeKind,
+            stage: resources.stage[nodeId] as ResourceNodeStage,
+            variant: resources.variant[nodeId] ?? 0,
+          }))
+        : [],
+    });
+    if (picked?.kind === 'entity') click.entityId = picked.id;
+    if (picked?.kind === 'building') {
+      click.buildingId = picked.id;
+      click.villageId = picked.villageId;
+    }
+    if (picked?.kind === 'resource') click.resourceNodeId = picked.id;
+    if (picked) return click;
     if (this.overlay === 'territory') {
       const villageId = this.territoryVillageIds?.[click.cell] ?? 0;
       const kingdomId = this.snapshot?.villages.find(
