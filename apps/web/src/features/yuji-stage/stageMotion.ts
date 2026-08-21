@@ -1,19 +1,31 @@
 import type { StagePerformanceTier } from './stagePerformance';
 
-const HERO_EXIT_VIEWPORT_FACTOR = 0.75;
+const HERO_EXIT_VIEWPORT_FACTOR = 1.15;
 const FLUID_IDLE_DURATION_MS = 600;
 const CURL_FULL_SPEED = 800;
 const CURL_ATTACK_SECONDS = 0.025;
 const CURL_RELEASE_SECONDS = 0.175;
+const COVER_FULL_SPEED = 30;
+const COVER_ATTACK_SECONDS = 0.035;
+const COVER_RELEASE_SECONDS = 0.24;
 const STICKER_FLOW_MAX_OFFSET = 10;
 
 function clamp01(value: number) {
   return Math.min(1, Math.max(0, value));
 }
 
+function smoothstep(edge0: number, edge1: number, value: number) {
+  const progress = clamp01((value - edge0) / (edge1 - edge0));
+  return progress * progress * (3 - 2 * progress);
+}
+
 export function resolveHeroExitProgress(scroll: number, viewportHeight: number) {
   if (viewportHeight <= 0) return 0;
   return clamp01(scroll / (viewportHeight * HERO_EXIT_VIEWPORT_FACTOR));
+}
+
+export function resolveHeroSignalOpacity(exitProgress: number) {
+  return 1 - smoothstep(0.42, 0.9, exitProgress);
 }
 
 export function resolveFluidActivity(inside: boolean, lastMoveAt: number, now: number) {
@@ -27,6 +39,17 @@ export function resolveCurlTarget(velocity: number) {
 
 export function dampCurlActivity(current: number, target: number, deltaSeconds: number) {
   const duration = target > current ? CURL_ATTACK_SECONDS : CURL_RELEASE_SECONDS;
+  const alpha = 1 - Math.exp(-Math.max(0, deltaSeconds) / duration);
+  return current + (target - current) * alpha;
+}
+
+export function resolveCoverMotionTarget(velocity: number) {
+  return Math.min(1, Math.max(-1, velocity / COVER_FULL_SPEED));
+}
+
+export function dampCoverMotion(current: number, target: number, deltaSeconds: number) {
+  const duration =
+    Math.abs(target) > Math.abs(current) ? COVER_ATTACK_SECONDS : COVER_RELEASE_SECONDS;
   const alpha = 1 - Math.exp(-Math.max(0, deltaSeconds) / duration);
   return current + (target - current) * alpha;
 }

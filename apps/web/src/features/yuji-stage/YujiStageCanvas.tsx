@@ -27,7 +27,13 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import yujiInflatedModelUrl from '@/assets/yuji-stage/yuji-inflated.glb?url';
 import { StagePostProcess } from './StagePostProcess';
 import type { PointerBus, ScrollBus } from './stageBus';
-import { resolveFluidActivity, resolveHeroExitProgress } from './stageMotion';
+import {
+  dampCoverMotion,
+  resolveCoverMotionTarget,
+  resolveFluidActivity,
+  resolveHeroExitProgress,
+  resolveHeroSignalOpacity,
+} from './stageMotion';
 import type { StagePerformanceTier } from './stagePerformance';
 import type { StageCoverRegistration } from './YujiStageContext';
 
@@ -294,6 +300,7 @@ function SignalObjects({
       scrollBus.frame.scroll,
       scrollBus.frame.viewportHeight,
     );
+    const signalOpacity = resolveHeroSignalOpacity(scrollProgress);
     if (introReleased && introStartRef.current === null) {
       introStartRef.current = state.clock.elapsedTime;
     }
@@ -304,6 +311,10 @@ function SignalObjects({
         : -1;
     signalRefs.current.forEach((mesh, index) => {
       if (!mesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      materials.forEach((material) => {
+        material.opacity = signalOpacity;
+      });
       const progress = introSettled
         ? 1
         : MathUtils.clamp((introElapsed - fallDelay[index]) / 0.76, 0, 1);
@@ -322,17 +333,19 @@ function SignalObjects({
     group.position.z = -1.18 - scrollProgress * 1.2;
     group.rotation.z = Math.sin(state.clock.elapsedTime * 0.24) * 0.035;
     group.scale.setScalar(Math.min(0.66, state.viewport.width / 8.8) * (1 - scrollProgress * 0.15));
-    group.visible = scrollProgress < 0.995;
+    group.visible = signalOpacity > 0.008;
   });
 
   const dark = theme === 'dark';
   const signalSurface = {
     clearcoat: 1,
     clearcoatRoughness: 0.06,
+    depthWrite: false,
     iridescence: 1,
     iridescenceIOR: 1.34,
     metalness: 0.02,
     roughness: 0.16,
+    transparent: true,
   } as const;
 
   return (
@@ -544,11 +557,20 @@ function WordmarkScene({
 }
 
 const coverVertexShader = /* glsl */ `
+  uniform float uDepth;
+  uniform float uMotion;
   varying vec2 vUv;
+  varying float vBend;
 
   void main() {
     vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec3 transformed = position;
+    float arch = sin(vUv.x * 3.14159265);
+    float motionStrength = abs(uMotion);
+    vBend = arch * motionStrength;
+    transformed.z += arch * uDepth;
+    transformed.y += (vUv.x - 0.5) * uMotion * 0.045;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
   }
 `;
 
@@ -557,9 +579,11 @@ const coverFragmentShader = /* glsl */ `
   uniform vec2 uImageSize;
   uniform vec2 uPlaneSize;
   uniform float uHover;
+  uniform float uMotion;
   uniform float uReveal;
   uniform float uTime;
   varying vec2 vUv;
+  varying float vBend;
 
   vec2 coverUv(vec2 uv) {
     float imageAspect = uImageSize.x / max(uImageSize.y, 1.0);
@@ -581,13 +605,23 @@ const coverFragmentShader = /* glsl */ `
     float sweep = smoothstep(0.1, 0.9, vUv.x + sin(uTime * 2.0) * 0.04);
     vec3 signal = mix(vec3(0.08, 0.18, 1.0), vec3(0.35, 0.95, 1.0), sweep);
     color = mix(color, signal * (0.4 + dotMask * 0.8), uHover * 0.72);
+    color *= 0.96 + vBend * 0.09 + uMotion * (vUv.x - 0.5) * 0.08;
     gl_FragColor = vec4(color, source.a);
   }
 `;
 
-function CoverMesh({ cover }: { cover: StageCoverRegistration }) {
+function CoverMesh({
+  cover,
+  scrollBus,
+  tier,
+}: {
+  cover: StageCoverRegistration;
+  scrollBus: ScrollBus;
+  tier: StagePerformanceTier;
+}) {
   const meshRef = useRef<Mesh>(null);
   const frameRef = useRef(0);
+  const motionRef = useRef(0);
   const revealRef = useRef(0);
   const hoverRef = useRef(0);
   const [texture, setTexture] = useState<Texture | null>(null);
@@ -597,8 +631,10 @@ function CoverMesh({ cover }: { cover: StageCoverRegistration }) {
         fragmentShader: coverFragmentShader,
         transparent: true,
         uniforms: {
+          uDepth: { value: 0 },
           uHover: { value: 0 },
           uImageSize: { value: new Vector2(1, 1) },
+          uMotion: { value: 0 },
           uPlaneSize: { value: new Vector2(1, 1) },
           uReveal: { value: 0 },
           uTexture: { value: null },
@@ -634,19 +670,43 @@ function CoverMesh({ cover }: { cover: StageCoverRegistration }) {
 
   useEffect(() => {
     material.uniforms.uTexture.value = texture;
+    cover.setReady?.(Boolean(texture));
     if (texture?.image) {
       const image = texture.image as { height?: number; width?: number };
       material.uniforms.uImageSize.value.set(image.width ?? 1, image.height ?? 1);
     }
-    return () => texture?.dispose();
-  }, [material, texture]);
+    return () => {
+      cover.setReady?.(false);
+      texture?.dispose();
+    };
+  }, [cover, material, texture]);
 
   useEffect(() => () => material.dispose(), [material]);
 
-  useFrame((state) => {
+  useEffect(
+    () => () => {
+      cover.element.style.removeProperty('--yuji-cover-motion');
+      cover.element.style.removeProperty('--yuji-cover-strength');
+    },
+    [cover],
+  );
+
+  useFrame((state, delta) => {
     const mesh = meshRef.current;
-    if (!mesh || !texture || !cover.element.isConnected) {
+    if (!mesh || !cover.element.isConnected) {
       if (mesh) mesh.visible = false;
+      return;
+    }
+
+    const motionTarget = tier === 'full' ? resolveCoverMotionTarget(scrollBus.frame.velocity) : 0;
+    motionRef.current = dampCoverMotion(motionRef.current, motionTarget, delta);
+    const motion = motionRef.current;
+    const motionStrength = Math.abs(motion);
+    cover.element.style.setProperty('--yuji-cover-motion', motion.toFixed(4));
+    cover.element.style.setProperty('--yuji-cover-strength', motionStrength.toFixed(4));
+
+    if (!texture) {
+      mesh.visible = false;
       return;
     }
 
@@ -665,15 +725,20 @@ function CoverMesh({ cover }: { cover: StageCoverRegistration }) {
     mesh.position.set(
       (rect.left + rect.width / 2 - state.size.width / 2) * scaleX,
       (state.size.height / 2 - rect.top - rect.height / 2) * scaleY,
-      0,
+      motionStrength * 0.055,
     );
     mesh.scale.set(rect.width * scaleX, rect.height * scaleY, 1);
+    mesh.rotation.x = motionStrength * 0.022;
+    mesh.rotation.y = motion * -0.095;
 
     const interactive =
       cover.element.matches(':hover') || cover.element.contains(document.activeElement);
     hoverRef.current = MathUtils.lerp(hoverRef.current, interactive ? 1 : 0, 0.12);
     revealRef.current = MathUtils.lerp(revealRef.current, 1, 0.075);
     material.uniforms.uHover.value = hoverRef.current;
+    material.uniforms.uMotion.value = motion;
+    material.uniforms.uDepth.value =
+      Math.min(rect.width * scaleX, rect.height * scaleY) * 0.12 * motionStrength;
     material.uniforms.uReveal.value = revealRef.current;
     material.uniforms.uTime.value = state.clock.elapsedTime;
     material.uniforms.uPlaneSize.value.set(rect.width, rect.height);
@@ -686,11 +751,15 @@ function CoverMesh({ cover }: { cover: StageCoverRegistration }) {
   );
 }
 
-function CoverScene({ covers }: Pick<YujiStageCanvasProps, 'covers'>) {
+function CoverScene({
+  covers,
+  scrollBus,
+  tier,
+}: Pick<YujiStageCanvasProps, 'covers' | 'scrollBus' | 'tier'>) {
   return (
     <>
       {covers.map((cover) => (
-        <CoverMesh cover={cover} key={cover.id} />
+        <CoverMesh cover={cover} key={cover.id} scrollBus={scrollBus} tier={tier} />
       ))}
     </>
   );
@@ -752,7 +821,7 @@ export function YujiStageCanvas({
               tier={tier}
             />
           ) : null}
-          <CoverScene covers={covers} />
+          <CoverScene covers={covers} scrollBus={scrollBus} tier={tier} />
           {tier === 'full' ? (
             <StagePostProcess
               mode={mode}

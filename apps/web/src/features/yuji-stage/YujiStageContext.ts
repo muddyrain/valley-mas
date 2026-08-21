@@ -5,6 +5,7 @@ import type { StagePerformanceTier } from './stagePerformance';
 export interface StageCoverRegistration {
   element: HTMLElement;
   id: string;
+  setReady?: (ready: boolean) => void;
   src: string;
 }
 

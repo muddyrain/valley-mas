@@ -82,12 +82,12 @@ export default function YujiHome() {
 
       <div className="yuji-public-main yuji-home-content">
         <section className="yuji-home-statement" aria-labelledby="yuji-statement-title">
-          <p data-yuji-reveal="scroll">YJ / FIELD NOTE 01</p>
-          <h2 id="yuji-statement-title" data-yuji-reveal="scroll">
-            不追逐每一次噪声。
+          <p>YJ / FIELD NOTE 01</p>
+          <h2 id="yuji-statement-title">
+            <span className="is-lead">不追逐每一次噪声。</span>
             <span>只留下能继续生长的判断。</span>
           </h2>
-          <div className="yuji-statement-index" aria-hidden="true" data-yuji-reveal="scroll">
+          <div className="yuji-statement-index" aria-hidden="true">
             <span>TECH / 01</span>
             <span>IMAGE / 02</span>
             <span>THOUGHT / 03</span>

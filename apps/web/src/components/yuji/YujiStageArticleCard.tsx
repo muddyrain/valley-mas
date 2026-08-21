@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { Post } from '@/api/blog';
 import { useYujiStage } from '@/features/yuji-stage/YujiStageContext';
 import { YujiTransitionLink } from '@/features/yuji-transition/YujiPublicTransition';
@@ -22,13 +22,19 @@ interface YujiStageArticleCardProps {
 
 export default function YujiStageArticleCard({ index, post, scope }: YujiStageArticleCardProps) {
   const coverRef = useRef<HTMLElement>(null);
+  const [coverWebglReady, setCoverWebglReady] = useState(false);
   const stage = useYujiStage();
   const registerCover = stage?.registerCover;
 
   useLayoutEffect(() => {
     const element = coverRef.current;
     if (!element || !post.cover || !registerCover) return;
-    return registerCover({ element, id: `${scope}:${post.id}`, src: post.cover });
+    return registerCover({
+      element,
+      id: `${scope}:${post.id}`,
+      setReady: setCoverWebglReady,
+      src: post.cover,
+    });
   }, [post.cover, post.id, registerCover, scope]);
 
   const href = `/articles/${post.id}`;
@@ -57,7 +63,7 @@ export default function YujiStageArticleCard({ index, post, scope }: YujiStageAr
       {post.cover ? (
         <figure
           className="yuji-stage-cover"
-          data-webgl-ready={stage?.webglReady || undefined}
+          data-webgl-ready={coverWebglReady || undefined}
           data-yuji-cover-id={post.id}
           ref={coverRef}
         >
@@ -70,14 +76,6 @@ export default function YujiStageArticleCard({ index, post, scope }: YujiStageAr
               loading={index < 2 ? 'eager' : 'lazy'}
             />
           </YujiTransitionLink>
-          <span className="yuji-stage-cover-slice" aria-hidden="true">
-            <img src={post.cover} alt="" decoding="async" loading="lazy" />
-          </span>
-          <span className="yuji-stage-cover-dots" aria-hidden="true" />
-          <span className="yuji-stage-cover-caption" aria-hidden="true">
-            <b>{number}</b>
-            <small>OPEN ARTICLE / YUJI</small>
-          </span>
         </figure>
       ) : (
         <div className="yuji-stage-cover yuji-stage-cover-placeholder" aria-hidden="true">

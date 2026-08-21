@@ -1,20 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import {
+  dampCoverMotion,
   dampCurlActivity,
   resolveAnimatedStickerCount,
+  resolveCoverMotionTarget,
   resolveCurlTarget,
   resolveFluidActivity,
   resolveHeroExitProgress,
+  resolveHeroSignalOpacity,
   resolveStickerFlow,
 } from './stageMotion';
 
 describe('stageMotion', () => {
-  it('maps the first 0.75 viewport of scroll to a reversible hero exit progress', () => {
+  it('maps the first 1.15 viewport of scroll to a reversible hero exit progress', () => {
     expect(resolveHeroExitProgress(0, 800)).toBe(0);
-    expect(resolveHeroExitProgress(300, 800)).toBe(0.5);
-    expect(resolveHeroExitProgress(600, 800)).toBe(1);
-    expect(resolveHeroExitProgress(900, 800)).toBe(1);
+    expect(resolveHeroExitProgress(460, 800)).toBeCloseTo(0.5, 8);
+    expect(resolveHeroExitProgress(920, 800)).toBe(1);
+    expect(resolveHeroExitProgress(1_200, 800)).toBe(1);
     expect(resolveHeroExitProgress(100, 0)).toBe(0);
+  });
+
+  it('fades hero signals before the exit softness settles', () => {
+    expect(resolveHeroSignalOpacity(0.4)).toBe(1);
+    expect(resolveHeroSignalOpacity(0.66)).toBeGreaterThan(0.45);
+    expect(resolveHeroSignalOpacity(0.66)).toBeLessThan(0.55);
+    expect(resolveHeroSignalOpacity(0.9)).toBe(0);
+    expect(resolveHeroSignalOpacity(1)).toBe(0);
   });
 
   it('keeps fluid activity alive for 600ms after the last pointer movement', () => {
@@ -32,6 +43,17 @@ describe('stageMotion', () => {
     const released = dampCurlActivity(1, 0, 0.025);
     expect(attacked).toBeGreaterThan(0.6);
     expect(released).toBeGreaterThan(0.8);
+  });
+
+  it('turns signed scroll speed into a cover bend that settles softly', () => {
+    expect(resolveCoverMotionTarget(15)).toBe(0.5);
+    expect(resolveCoverMotionTarget(-15)).toBe(-0.5);
+    expect(resolveCoverMotionTarget(120)).toBe(1);
+
+    const attacked = dampCoverMotion(0, 1, 0.035);
+    const released = dampCoverMotion(1, 0, 0.035);
+    expect(attacked).toBeGreaterThan(0.6);
+    expect(released).toBeGreaterThan(0.85);
   });
 
   it('limits animated sticker entrances by performance tier', () => {
