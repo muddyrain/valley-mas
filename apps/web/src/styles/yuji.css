@@ -2530,6 +2530,7 @@ html:has(.yuji-site) {
 }
 
 .yuji-wordmark-hero {
+  --yuji-stage-exit: var(--yuji-hero-exit, 0);
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-template-rows: auto 1fr auto;
@@ -2547,6 +2548,28 @@ html:has(.yuji-site) {
       rgb(5 11 16 / 5%) calc(8.333% - 1px) 8.333%
     ),
     linear-gradient(rgb(7 24 38 / 4%) 1px, transparent 1px) 0 0 / 100% 25%;
+}
+
+.yuji-hero-exit-halftone {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, var(--yuji-bg) 0 34%, transparent 38%);
+  background-size: 8px 8px;
+  opacity: calc(var(--yuji-stage-exit) * 0.72);
+  mask-image: linear-gradient(to bottom, transparent 2%, rgb(0 0 0 / 82%) 34%, #000 100%);
+}
+
+.yuji-wordmark-brief,
+.yuji-wordmark-lockup,
+.yuji-sticker-field,
+.yuji-hero-manifesto,
+.yuji-wordmark-telemetry,
+.yuji-stage-enter {
+  translate: 0 calc(var(--yuji-stage-exit) * -3.2vh);
+  filter: blur(calc(var(--yuji-stage-exit) * 4px));
+  opacity: calc(1 - var(--yuji-stage-exit) * 0.96);
 }
 
 .yuji-site:not([data-public-theme="light"]) .yuji-wordmark-hero {
@@ -2682,40 +2705,6 @@ html:has(.yuji-site) {
   opacity: 0;
 }
 
-.yuji-wordmark-hero[data-stage-entered="true"] .yuji-wordmark-brief {
-  animation: yuji-stage-strike 540ms 20ms both cubic-bezier(0.2, 0.9, 0.2, 1);
-}
-
-.yuji-wordmark-hero[data-stage-entered="true"] .yuji-wordmark-lockup {
-  animation: yuji-stage-rise 620ms 80ms both cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.yuji-wordmark-hero[data-stage-entered="true"] .yuji-sticker-field {
-  animation: yuji-stage-sticker-in 720ms 130ms both cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.yuji-wordmark-hero[data-stage-entered="true"] .yuji-hero-manifesto span {
-  animation: yuji-stage-strike 560ms both cubic-bezier(0.2, 0.9, 0.2, 1);
-}
-
-.yuji-wordmark-hero[data-stage-entered="true"] .yuji-hero-manifesto span:nth-child(1) {
-  animation-delay: 190ms;
-}
-
-.yuji-wordmark-hero[data-stage-entered="true"] .yuji-hero-manifesto span:nth-child(2) {
-  animation-delay: 250ms;
-}
-
-.yuji-wordmark-hero[data-stage-entered="true"] .yuji-hero-manifesto span:nth-child(3) {
-  animation-delay: 310ms;
-}
-
-.yuji-wordmark-hero[data-stage-entered="true"] .yuji-wordmark-telemetry,
-.yuji-wordmark-hero[data-stage-entered="true"] .yuji-stage-enter,
-.yuji-site:has(.yuji-wordmark-hero[data-stage-entered="true"]) .yuji-header-inner {
-  animation: yuji-stage-rise 520ms 320ms both cubic-bezier(0.16, 1, 0.3, 1);
-}
-
 .yuji-site:not([data-public-theme="light"]) .yuji-wordmark-lockup h1 {
   color: rgb(74 111 255 / 18%);
   -webkit-text-stroke-color: rgb(154 216 255 / 45%);
@@ -2738,6 +2727,14 @@ html:has(.yuji-site) {
   transform-origin: center;
   animation: yuji-sticker-float 6.6s ease-in-out infinite alternate;
   will-change: transform, filter;
+}
+
+.yuji-sticker:not([data-yuji-settled="true"]) {
+  animation: none;
+}
+
+.yuji-wordmark-hero[data-yuji-motion-tier="balanced"] .yuji-sticker:nth-child(n + 4) {
+  display: none;
 }
 
 .yuji-sticker.is-eye {

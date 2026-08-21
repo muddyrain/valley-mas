@@ -23,16 +23,19 @@ import {
   type Texture,
   TextureLoader,
   Vector2,
-  Vector3,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import yujiInflatedModelUrl from '@/assets/yuji-stage/yuji-inflated.glb?url';
+import { StagePostProcess } from './StagePostProcess';
 import type { PointerBus, ScrollBus } from './stageBus';
+import { resolveFluidActivity, resolveHeroExitProgress } from './stageMotion';
 import type { StagePerformanceTier } from './stagePerformance';
 import type { StageCoverRegistration } from './YujiStageContext';
 
 interface YujiStageCanvasProps {
   covers: StageCoverRegistration[];
+  introReleased: boolean;
+  introSettled: boolean;
   mode: 'articles' | 'home';
   pointerBus: PointerBus;
   running: boolean;
@@ -82,6 +85,8 @@ const lightFieldFragmentShader = /* glsl */ `
   uniform vec2 uPointer;
   uniform float uTime;
   uniform float uDark;
+  uniform float uExit;
+  uniform float uPointerGlow;
   varying vec2 vUv;
 
   float ray(vec2 uv, float offset, float width) {
@@ -94,29 +99,41 @@ const lightFieldFragmentShader = /* glsl */ `
     float r1 = ray(uv, -0.14 + sin(uTime * 0.11) * 0.025, 0.12);
     float r2 = ray(uv, 0.28 + cos(uTime * 0.09) * 0.03, 0.08);
     float r3 = ray(uv, -0.52, 0.045);
-    float pointerGlow = exp(-10.0 * distance(uv, uPointer));
+    float pointerGlow = exp(-10.0 * distance(uv, uPointer)) * uPointerGlow;
     float horizon = smoothstep(0.08, 0.72, uv.y) * (1.0 - smoothstep(0.62, 1.0, uv.y));
     vec3 pale = mix(vec3(0.34, 0.68, 1.0), vec3(0.82, 0.96, 1.0), uv.y);
     vec3 dark = mix(vec3(0.02, 0.08, 0.42), vec3(0.15, 0.2, 1.0), uv.y);
     vec3 color = mix(pale, dark, uDark);
     float alpha = (r1 * 0.08 + r2 * 0.1 + r3 * 0.12) * horizon + pointerGlow * 0.2;
-    gl_FragColor = vec4(color, alpha);
+    gl_FragColor = vec4(color, alpha * (1.0 - uExit));
   }
 `;
 
-function LightField({ pointerBus, theme }: Pick<YujiStageCanvasProps, 'pointerBus' | 'theme'>) {
+function LightField({
+  pointerBus,
+  scrollBus,
+  theme,
+  tier,
+}: Pick<YujiStageCanvasProps, 'pointerBus' | 'scrollBus' | 'theme' | 'tier'>) {
   const materialRef = useRef<ShaderMaterial>(null);
+  const meshRef = useRef<Mesh>(null);
 
   useFrame((state) => {
     const material = materialRef.current;
     if (!material) return;
+    const displayViewport = state.viewport.getCurrentViewport(state.camera, [0, 0, -3.8]);
+    meshRef.current?.scale.set(displayViewport.width * 1.06, displayViewport.height * 1.06, 1);
     const pointer = pointerBus.frame;
     material.uniforms.uPointer.value.set(pointer.x, 1 - pointer.y);
     material.uniforms.uTime.value = state.clock.elapsedTime;
+    material.uniforms.uExit.value = resolveHeroExitProgress(
+      scrollBus.frame.scroll,
+      scrollBus.frame.viewportHeight,
+    );
   });
 
   return (
-    <mesh position={[0, 0, -3.8]} scale={[13.5, 7.7, 1]}>
+    <mesh ref={meshRef} position={[0, 0, -3.8]}>
       <planeGeometry args={[1, 1]} />
       <shaderMaterial
         ref={materialRef}
@@ -126,55 +143,14 @@ function LightField({ pointerBus, theme }: Pick<YujiStageCanvasProps, 'pointerBu
         transparent
         uniforms={{
           uDark: { value: theme === 'dark' ? 1 : 0 },
+          uExit: { value: 0 },
+          uPointerGlow: { value: tier === 'full' ? 0 : 1 },
           uPointer: { value: new Vector2(0.5, 0.5) },
           uTime: { value: 0 },
         }}
         vertexShader={lightFieldVertexShader}
       />
     </mesh>
-  );
-}
-
-function PointerTrail({ pointerBus }: Pick<YujiStageCanvasProps, 'pointerBus'>) {
-  const trailRefs = useRef<Array<Mesh | null>>([]);
-  const target = useRef(new Vector3());
-  const previous = useRef(new Vector3());
-
-  useFrame(() => {
-    const pointer = pointerBus.frame;
-    target.current.set((pointer.x - 0.5) * 10.4, (0.5 - pointer.y) * 5.8, -2.28);
-    previous.current.copy(target.current);
-    trailRefs.current.forEach((mesh, index) => {
-      if (!mesh) return;
-      const strength = pointer.inside ? 0.22 - index * 0.007 : 0.055;
-      mesh.position.lerp(previous.current, Math.max(strength, 0.04));
-      previous.current.copy(mesh.position);
-      const pulse = pointer.inside ? 1 : 0.35;
-      mesh.scale.setScalar(pulse * (1 - index / 18) + 0.08);
-    });
-  });
-
-  return (
-    <group>
-      {Array.from({ length: 14 }, (_, index) => (
-        <mesh
-          key={index}
-          ref={(mesh) => {
-            trailRefs.current[index] = mesh;
-          }}
-          position={[0, 0, -2.28 - index * 0.008]}
-        >
-          <sphereGeometry args={[0.58 - index * 0.023, 16, 16]} />
-          <meshBasicMaterial
-            blending={AdditiveBlending}
-            color={index < 4 ? '#bffaff' : '#3668ff'}
-            depthWrite={false}
-            opacity={0.18 - index * 0.008}
-            transparent
-          />
-        </mesh>
-      ))}
-    </group>
   );
 }
 
@@ -194,6 +170,7 @@ const wordmarkVertexShader = /* glsl */ `
 
 const wordmarkFragmentShader = /* glsl */ `
   uniform float uDark;
+  uniform float uFlowEnergy;
   uniform float uOpacity;
   uniform float uTime;
   uniform vec2 uPointer;
@@ -226,6 +203,7 @@ const wordmarkFragmentShader = /* glsl */ `
     vec3 color = mix(base, spectrum, colorWeight);
     color += specular * mix(vec3(0.95, 1.0, 1.0), spectrum, 0.32) * 1.25;
     color += fresnel * mix(vec3(0.16, 0.58, 1.0), vec3(0.42, 0.3, 1.0), uDark) * 0.42;
+    color += fresnel * vec3(0.32, 0.86, 1.0) * uFlowEnergy * 0.5;
     float grain = hash21(gl_FragCoord.xy + floor(uTime * 2.0)) - 0.5;
     color += grain * 0.018;
     float alpha = mix(0.84, 0.985, fresnel + specular * 0.2) * uOpacity;
@@ -294,28 +272,58 @@ function InflatedWordmark({
 }
 
 function SignalObjects({
+  introReleased,
+  introSettled,
   pointerBus,
   scrollBus,
   theme,
-}: Pick<YujiStageCanvasProps, 'pointerBus' | 'scrollBus' | 'theme'>) {
+}: Pick<
+  YujiStageCanvasProps,
+  'introReleased' | 'introSettled' | 'pointerBus' | 'scrollBus' | 'theme'
+>) {
   const groupRef = useRef<Group>(null);
+  const signalRefs = useRef<Array<Mesh | null>>([]);
+  const introStartRef = useRef<number | null>(null);
+  const landingY = [1.45, 1.18, -1.38, -1.52, -1.12, 1.76, -1.75];
+  const fallDelay = [0.15, 0.1, 0.25, 0.2, 0.3, 0.05, 0];
 
   useFrame((state) => {
     const group = groupRef.current;
     if (!group) return;
     const pointer = pointerBus.frame;
-    const scrollProgress = MathUtils.clamp(
-      scrollBus.frame.scroll / Math.max(scrollBus.frame.viewportHeight, 1),
-      0,
-      1,
+    const scrollProgress = resolveHeroExitProgress(
+      scrollBus.frame.scroll,
+      scrollBus.frame.viewportHeight,
     );
+    if (introReleased && introStartRef.current === null) {
+      introStartRef.current = state.clock.elapsedTime;
+    }
+    const introElapsed = introSettled
+      ? Number.POSITIVE_INFINITY
+      : introReleased && introStartRef.current !== null
+        ? state.clock.elapsedTime - introStartRef.current
+        : -1;
+    signalRefs.current.forEach((mesh, index) => {
+      if (!mesh) return;
+      const progress = introSettled
+        ? 1
+        : MathUtils.clamp((introElapsed - fallDelay[index]) / 0.76, 0, 1);
+      if (progress < 0.78) {
+        const fall = progress / 0.78;
+        mesh.position.y = landingY[index] + 5.4 * (1 - fall) ** 3;
+      } else {
+        const bounce = (progress - 0.78) / 0.22;
+        mesh.position.y = landingY[index] - Math.sin(bounce * Math.PI) * 0.12 * (1 - bounce);
+      }
+    });
     const targetX = pointer.inside ? (pointer.x - 0.5) * 0.42 : 0;
     const targetY = pointer.inside ? (0.5 - pointer.y) * 0.3 : 0;
     group.position.x = MathUtils.lerp(group.position.x, targetX, 0.045);
     group.position.y = MathUtils.lerp(group.position.y, targetY + scrollProgress * 0.56, 0.045);
+    group.position.z = -1.18 - scrollProgress * 1.2;
     group.rotation.z = Math.sin(state.clock.elapsedTime * 0.24) * 0.035;
-    group.scale.setScalar(Math.min(0.66, state.viewport.width / 8.8));
-    group.visible = scrollProgress < 0.98;
+    group.scale.setScalar(Math.min(0.66, state.viewport.width / 8.8) * (1 - scrollProgress * 0.15));
+    group.visible = scrollProgress < 0.995;
   });
 
   const dark = theme === 'dark';
@@ -334,7 +342,13 @@ function SignalObjects({
 
   return (
     <group ref={groupRef} position={[0, 0.24, -1.18]}>
-      <mesh position={[-3.25, 1.45, 0]} rotation={[0.72, 0.1, -0.38]}>
+      <mesh
+        ref={(mesh) => {
+          signalRefs.current[0] = mesh;
+        }}
+        position={[-3.25, 1.45, 0]}
+        rotation={[0.72, 0.1, -0.38]}
+      >
         <torusGeometry args={[0.58, 0.16, 16, 64]} />
         <meshStandardMaterial
           color={dark ? '#59e7ff' : '#0578ff'}
@@ -343,7 +357,13 @@ function SignalObjects({
           roughness={0.18}
         />
       </mesh>
-      <mesh position={[2.92, 1.18, -0.1]} rotation={[0.3, -0.2, 0.62]}>
+      <mesh
+        ref={(mesh) => {
+          signalRefs.current[1] = mesh;
+        }}
+        position={[2.92, 1.18, -0.1]}
+        rotation={[0.3, -0.2, 0.62]}
+      >
         <octahedronGeometry args={[0.66, 0]} />
         <meshStandardMaterial
           color={dark ? '#ff6bd6' : '#ff3fa4'}
@@ -352,7 +372,13 @@ function SignalObjects({
           roughness={0.24}
         />
       </mesh>
-      <mesh position={[-2.05, -1.38, 0.12]} rotation={[0.2, 0.48, 0.42]}>
+      <mesh
+        ref={(mesh) => {
+          signalRefs.current[2] = mesh;
+        }}
+        position={[-2.05, -1.38, 0.12]}
+        rotation={[0.2, 0.48, 0.42]}
+      >
         <boxGeometry args={[0.76, 0.76, 0.3]} />
         <meshStandardMaterial
           color="#d8ff3e"
@@ -361,7 +387,13 @@ function SignalObjects({
           roughness={0.28}
         />
       </mesh>
-      <mesh position={[2.18, -1.52, 0.04]} rotation={[0.6, -0.2, -0.38]}>
+      <mesh
+        ref={(mesh) => {
+          signalRefs.current[3] = mesh;
+        }}
+        position={[2.18, -1.52, 0.04]}
+        rotation={[0.6, -0.2, -0.38]}
+      >
         <torusKnotGeometry args={[0.44, 0.13, 72, 10, 2, 3]} />
         <meshStandardMaterial
           color={dark ? '#7c5cff' : '#4821ff'}
@@ -370,7 +402,14 @@ function SignalObjects({
           roughness={0.2}
         />
       </mesh>
-      <mesh position={[4.12, -1.12, 0.2]} rotation={[0.34, -0.46, -0.68]} scale={0.58}>
+      <mesh
+        ref={(mesh) => {
+          signalRefs.current[4] = mesh;
+        }}
+        position={[4.12, -1.12, 0.2]}
+        rotation={[0.34, -0.46, -0.68]}
+        scale={0.58}
+      >
         <extrudeGeometry
           args={[
             arrowShape,
@@ -396,7 +435,13 @@ function SignalObjects({
           roughness={0.12}
         />
       </mesh>
-      <mesh position={[0.52, 1.76, -0.16]} rotation={[0.2, 0.1, -0.1]}>
+      <mesh
+        ref={(mesh) => {
+          signalRefs.current[5] = mesh;
+        }}
+        position={[0.52, 1.76, -0.16]}
+        rotation={[0.2, 0.1, -0.1]}
+      >
         <coneGeometry args={[0.34, 0.86, 3]} />
         <meshStandardMaterial
           color="#ff7246"
@@ -405,7 +450,12 @@ function SignalObjects({
           roughness={0.2}
         />
       </mesh>
-      <mesh position={[-0.18, -1.75, -0.2]}>
+      <mesh
+        ref={(mesh) => {
+          signalRefs.current[6] = mesh;
+        }}
+        position={[-0.18, -1.75, -0.2]}
+      >
         <sphereGeometry args={[0.24, 24, 24]} />
         <meshStandardMaterial
           color="#ffffff"
@@ -419,6 +469,8 @@ function SignalObjects({
 }
 
 function WordmarkScene({
+  introReleased,
+  introSettled,
   pointerBus,
   scrollBus,
   setLoadProgress,
@@ -427,7 +479,14 @@ function WordmarkScene({
   tier,
 }: Pick<
   YujiStageCanvasProps,
-  'pointerBus' | 'scrollBus' | 'setLoadProgress' | 'setReady' | 'theme' | 'tier'
+  | 'introReleased'
+  | 'introSettled'
+  | 'pointerBus'
+  | 'scrollBus'
+  | 'setLoadProgress'
+  | 'setReady'
+  | 'theme'
+  | 'tier'
 >) {
   const groupRef = useRef<Group>(null);
   const material = useMemo(
@@ -440,6 +499,7 @@ function WordmarkScene({
         transparent: true,
         uniforms: {
           uDark: { value: theme === 'dark' ? 1 : 0 },
+          uFlowEnergy: { value: 0 },
           uOpacity: { value: 1 },
           uPointer: { value: new Vector2(0.5, 0.5) },
           uTime: { value: 0 },
@@ -455,23 +515,23 @@ function WordmarkScene({
     if (!group) return;
     const pointer = pointerBus.frame;
     const scroll = scrollBus.frame;
-    const scrollProgress = MathUtils.clamp(
-      scroll.scroll / Math.max(scroll.viewportHeight, 1),
-      0,
-      1,
-    );
+    const scrollProgress = resolveHeroExitProgress(scroll.scroll, scroll.viewportHeight);
     const targetX = pointer.inside ? (0.5 - pointer.y) * 0.22 : -0.03;
     const targetY = pointer.inside ? (pointer.x - 0.5) * 0.32 : 0;
     group.rotation.x = MathUtils.lerp(group.rotation.x, targetX, 0.055);
     group.rotation.y = MathUtils.lerp(group.rotation.y, targetY, 0.055);
     group.rotation.z = MathUtils.lerp(group.rotation.z, targetY * -0.05, 0.045);
     group.position.y = MathUtils.lerp(group.position.y, scrollProgress * 0.72, 0.08);
+    group.position.z = -scrollProgress * 1.2;
     const fitScale = Math.min(tier === 'full' ? 0.68 : 0.6, state.viewport.width / 8.2);
     const scale = fitScale * (1 - scrollProgress * 0.12);
     group.scale.setScalar(scale);
     material.uniforms.uOpacity.value = Math.max(0, 1 - scrollProgress * 1.25);
     material.uniforms.uPointer.value.set(pointer.x, pointer.y);
     material.uniforms.uTime.value = state.clock.elapsedTime;
+    material.uniforms.uFlowEnergy.value =
+      Math.min(1, pointer.speed / 4) *
+      resolveFluidActivity(pointer.inside, pointer.lastMoveAt, performance.now());
     group.visible = material.uniforms.uOpacity.value > 0.02;
   });
 
@@ -485,9 +545,14 @@ function WordmarkScene({
       />
       <pointLight color="#59e7ff" intensity={theme === 'light' ? 9 : 34} position={[-4, 3, 5]} />
       <pointLight color="#ff55b8" intensity={theme === 'light' ? 6 : 25} position={[4, -2, 4]} />
-      <LightField pointerBus={pointerBus} theme={theme} />
-      <PointerTrail pointerBus={pointerBus} />
-      <SignalObjects pointerBus={pointerBus} scrollBus={scrollBus} theme={theme} />
+      <LightField pointerBus={pointerBus} scrollBus={scrollBus} theme={theme} tier={tier} />
+      <SignalObjects
+        introReleased={introReleased}
+        introSettled={introSettled || tier !== 'full'}
+        pointerBus={pointerBus}
+        scrollBus={scrollBus}
+        theme={theme}
+      />
       <group ref={groupRef} position={[0, 0.54, 0]} rotation={[-0.05, 0.04, -0.025]}>
         <InflatedWordmark
           material={material}
@@ -500,16 +565,11 @@ function WordmarkScene({
 }
 
 const coverVertexShader = /* glsl */ `
-  uniform float uVelocity;
   varying vec2 vUv;
 
   void main() {
     vUv = uv;
-    vec3 transformed = position;
-    float curl = sin(uv.x * 3.14159265) * clamp(abs(uVelocity) * 0.0025, 0.0, 0.22);
-    transformed.z += curl;
-    transformed.y += curl * sign(uVelocity) * (uv.y - 0.5);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 
@@ -546,7 +606,7 @@ const coverFragmentShader = /* glsl */ `
   }
 `;
 
-function CoverMesh({ cover, scrollBus }: { cover: StageCoverRegistration; scrollBus: ScrollBus }) {
+function CoverMesh({ cover }: { cover: StageCoverRegistration }) {
   const meshRef = useRef<Mesh>(null);
   const frameRef = useRef(0);
   const revealRef = useRef(0);
@@ -564,7 +624,6 @@ function CoverMesh({ cover, scrollBus }: { cover: StageCoverRegistration; scroll
           uReveal: { value: 0 },
           uTexture: { value: null },
           uTime: { value: 0 },
-          uVelocity: { value: 0 },
         },
         vertexShader: coverVertexShader,
       }),
@@ -638,7 +697,6 @@ function CoverMesh({ cover, scrollBus }: { cover: StageCoverRegistration; scroll
     material.uniforms.uHover.value = hoverRef.current;
     material.uniforms.uReveal.value = revealRef.current;
     material.uniforms.uTime.value = state.clock.elapsedTime;
-    material.uniforms.uVelocity.value = scrollBus.frame.velocity;
     material.uniforms.uPlaneSize.value.set(rect.width, rect.height);
   });
 
@@ -649,11 +707,11 @@ function CoverMesh({ cover, scrollBus }: { cover: StageCoverRegistration; scroll
   );
 }
 
-function CoverScene({ covers, scrollBus }: Pick<YujiStageCanvasProps, 'covers' | 'scrollBus'>) {
+function CoverScene({ covers }: Pick<YujiStageCanvasProps, 'covers'>) {
   return (
     <>
       {covers.map((cover) => (
-        <CoverMesh cover={cover} key={cover.id} scrollBus={scrollBus} />
+        <CoverMesh cover={cover} key={cover.id} />
       ))}
     </>
   );
@@ -661,6 +719,8 @@ function CoverScene({ covers, scrollBus }: Pick<YujiStageCanvasProps, 'covers' |
 
 export function YujiStageCanvas({
   covers,
+  introReleased,
+  introSettled,
   mode,
   pointerBus,
   running,
@@ -703,6 +763,8 @@ export function YujiStageCanvas({
           <StageClock />
           {mode === 'home' ? (
             <WordmarkScene
+              introReleased={introReleased}
+              introSettled={introSettled}
               pointerBus={pointerBus}
               scrollBus={scrollBus}
               setLoadProgress={setLoadProgress}
@@ -711,7 +773,15 @@ export function YujiStageCanvas({
               tier={tier}
             />
           ) : null}
-          <CoverScene covers={covers} scrollBus={scrollBus} />
+          <CoverScene covers={covers} />
+          {tier === 'full' ? (
+            <StagePostProcess
+              mode={mode}
+              pointerBus={pointerBus}
+              scrollBus={scrollBus}
+              theme={theme}
+            />
+          ) : null}
         </Canvas>
       </StageErrorBoundary>
     </div>

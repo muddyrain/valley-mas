@@ -8,7 +8,12 @@ export interface ScrollFrame {
 }
 
 export interface PointerFrame {
+  deltaX: number;
+  deltaY: number;
   inside: boolean;
+  lastMoveAt: number;
+  sequence: number;
+  speed: number;
   x: number;
   y: number;
 }
@@ -63,20 +68,54 @@ export function createScrollBus() {
 }
 
 export function createPointerBus() {
-  const center: PointerFrame = { inside: false, x: 0.5, y: 0.5 };
+  const center: PointerFrame = {
+    deltaX: 0,
+    deltaY: 0,
+    inside: false,
+    lastMoveAt: 0,
+    sequence: 0,
+    speed: 0,
+    x: 0.5,
+    y: 0.5,
+  };
   const store = createStore<PointerFrame>(center);
+  let sampled = false;
+  let sequence = 0;
+  let lastTimestamp = 0;
 
   return {
     frame: store.frame,
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
-    move: (clientX: number, clientY: number, rect: StageRect) => {
+    move: (clientX: number, clientY: number, rect: StageRect, timestamp = performance.now()) => {
       if (rect.width <= 0 || rect.height <= 0) return;
       const x = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
       const y = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
-      store.publish({ inside: true, x, y });
+      const deltaX = sampled ? x - store.frame.x : 0;
+      const deltaY = sampled ? y - store.frame.y : 0;
+      const elapsed = sampled ? Math.max(timestamp - lastTimestamp, 1) : 0;
+      const speed = elapsed > 0 ? (Math.hypot(deltaX, deltaY) * 1_000) / elapsed : 0;
+
+      sampled = true;
+      lastTimestamp = timestamp;
+      sequence += 1;
+      store.publish({
+        deltaX,
+        deltaY,
+        inside: true,
+        lastMoveAt: timestamp,
+        sequence,
+        speed,
+        x,
+        y,
+      });
     },
-    reset: () => store.publish(center),
+    reset: () => {
+      sampled = false;
+      lastTimestamp = 0;
+      sequence += 1;
+      store.publish({ ...center, sequence });
+    },
   };
 }
 

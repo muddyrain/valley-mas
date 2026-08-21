@@ -1,60 +1,61 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useYujiStage } from '@/features/yuji-stage/YujiStageContext';
 import { YujiTransitionNavLink } from '@/features/yuji-transition/YujiPublicTransition';
+import { useYujiHeroIntro } from '@/hooks/useYujiHeroIntro';
 import YujiStageLoader from './YujiStageLoader';
 import YujiStickerField from './YujiStickerField';
 
 export default function YujiWordmarkHero() {
   const stage = useYujiStage();
+  const heroRef = useRef<HTMLElement>(null);
   const pointerReadoutRef = useRef<HTMLSpanElement>(null);
-  const loaderEnabled = Boolean(stage && stage.tier !== 'static');
-  const [stageEntered, setStageEntered] = useState(!loaderEnabled);
+  const loaderEnabled = Boolean(stage && stage.tier !== 'static' && !stage.introReleased);
+  const stageEntered = !loaderEnabled;
+  const tier = stage?.tier ?? 'static';
+  useYujiHeroIntro(heroRef, stageEntered, stage?.introSettled ?? true, tier);
 
   useEffect(() => {
-    if (!loaderEnabled) {
-      setStageEntered(true);
-      return;
-    }
-    setStageEntered(false);
-  }, [loaderEnabled]);
+    if (stage?.tier === 'static' && !stage.introReleased) stage.releaseIntro();
+  }, [stage]);
 
   useEffect(() => {
     let frame = 0;
-    let x = 0;
-    let y = 0;
     const paint = () => {
       frame = 0;
-      if (!pointerReadoutRef.current) return;
+      if (!pointerReadoutRef.current || !stage) return;
+      const x = Math.round(stage.pointerBus.frame.x * window.innerWidth);
+      const y = Math.round(stage.pointerBus.frame.y * window.innerHeight);
       pointerReadoutRef.current.textContent = `POINTER / ${String(x).padStart(4, '0')} X  ${String(y).padStart(4, '0')} Y`;
     };
-    const move = (event: PointerEvent) => {
-      x = Math.round(event.clientX);
-      y = Math.round(event.clientY);
+    if (!stage) return;
+    const unsubscribe = stage.pointerBus.subscribe(() => {
       if (!frame) frame = window.requestAnimationFrame(paint);
-    };
-    window.addEventListener('pointermove', move, { passive: true });
+    });
     return () => {
-      window.removeEventListener('pointermove', move);
+      unsubscribe();
       if (frame) window.cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [stage]);
 
   return (
     <>
       {loaderEnabled ? (
         <YujiStageLoader
-          onReleased={() => setStageEntered(true)}
+          onReleased={() => stage?.releaseIntro()}
           progress={stage?.loadProgress ?? 100}
           ready={stage?.webglReady ?? false}
         />
       ) : null}
       <section
+        ref={heroRef}
         className="yuji-wordmark-hero"
         data-yuji-stage="wordmark"
         data-stage-entered={stageEntered}
+        data-yuji-motion-tier={tier}
         data-webgl-ready={stage?.webglReady || undefined}
         aria-labelledby="yuji-wordmark-title"
       >
+        <div className="yuji-hero-exit-halftone" aria-hidden="true" />
         <div className="yuji-wordmark-brief">
           <p>
             <span>YUJI.DESIGN / EDITORIAL ENGINE</span>

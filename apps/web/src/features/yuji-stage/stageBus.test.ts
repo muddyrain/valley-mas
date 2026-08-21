@@ -23,12 +23,43 @@ describe('stageBus', () => {
     unsubscribe();
   });
 
-  it('normalizes pointer coordinates and resets to the center outside the stage', () => {
+  it('normalizes pointer motion into a single immutable frame and resets outside the stage', () => {
     const bus = createPointerBus();
-    bus.move(75, 25, { left: 25, top: 0, width: 100, height: 100 });
-    expect(bus.frame).toMatchObject({ inside: true, x: 0.5, y: 0.25 });
+    const rect = { left: 25, top: 0, width: 100, height: 100 };
+    bus.move(75, 25, rect, 1_000);
+    expect(bus.frame).toMatchObject({
+      deltaX: 0,
+      deltaY: 0,
+      inside: true,
+      lastMoveAt: 1_000,
+      sequence: 1,
+      speed: 0,
+      x: 0.5,
+      y: 0.25,
+    });
+
+    bus.move(100, 50, rect, 1_016);
+    expect(bus.frame).toMatchObject({
+      deltaX: 0.25,
+      deltaY: 0.25,
+      inside: true,
+      lastMoveAt: 1_016,
+      sequence: 2,
+      x: 0.75,
+      y: 0.5,
+    });
+    expect(bus.frame.speed).toBeCloseTo(22.097, 2);
 
     bus.reset();
-    expect(bus.frame).toMatchObject({ inside: false, x: 0.5, y: 0.5 });
+    expect(bus.frame).toMatchObject({
+      deltaX: 0,
+      deltaY: 0,
+      inside: false,
+      lastMoveAt: 0,
+      sequence: 3,
+      speed: 0,
+      x: 0.5,
+      y: 0.5,
+    });
   });
 });

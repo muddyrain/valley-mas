@@ -10,9 +10,12 @@ export interface StageCoverRegistration {
 
 export interface YujiStageContextValue {
   covers: StageCoverRegistration[];
+  introReleased: boolean;
+  introSettled: boolean;
   loadProgress: number;
   pointerBus: PointerBus;
   registerCover: (cover: StageCoverRegistration) => () => void;
+  releaseIntro: () => void;
   scrollBus: ScrollBus;
   tier: StagePerformanceTier;
   webglReady: boolean;

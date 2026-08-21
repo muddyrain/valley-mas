@@ -3,6 +3,7 @@ import Lenis from 'lenis';
 import { type PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { createPointerBus, createScrollBus } from './stageBus';
+import { resolveHeroExitProgress } from './stageMotion';
 import { resolveStagePerformanceTier, type StagePerformanceTier } from './stagePerformance';
 import { YujiStageCanvas } from './YujiStageCanvas';
 import {
@@ -39,6 +40,18 @@ export function YujiPublicStageProvider({
   const [documentVisible, setDocumentVisible] = useState(true);
   const [webglReady, setWebglReady] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
+  const [introReleased, setIntroReleased] = useState(false);
+  const [introSettled, setIntroSettled] = useState(false);
+
+  const releaseIntro = useCallback(() => {
+    setIntroReleased(true);
+  }, []);
+
+  useEffect(() => {
+    if (!introReleased || introSettled) return;
+    const settleTimer = window.setTimeout(() => setIntroSettled(true), 1_450);
+    return () => window.clearTimeout(settleTimer);
+  }, [introReleased, introSettled]);
 
   const registerCover = useCallback((cover: StageCoverRegistration) => {
     setCovers((current) => [...current.filter((item) => item.id !== cover.id), cover]);
@@ -111,6 +124,10 @@ export function YujiPublicStageProvider({
         velocity: lenis.velocity,
         viewportHeight: window.innerHeight,
       });
+      if (mode === 'home') {
+        const exit = resolveHeroExitProgress(scroll, window.innerHeight);
+        document.documentElement.style.setProperty('--yuji-hero-exit', exit.toFixed(4));
+      }
     });
     const handleContentResize = () => {
       lenis.resize();
@@ -164,8 +181,9 @@ export function YujiPublicStageProvider({
       lenis.destroy();
       lenisRef.current = null;
       applyPendingRestoreRef.current = null;
+      document.documentElement.style.removeProperty('--yuji-hero-exit');
     };
-  }, [scrollBus, stageRoute, tier]);
+  }, [mode, scrollBus, stageRoute, tier]);
 
   useEffect(() => {
     const handleScrollRestore = (event: Event) => {
@@ -216,8 +234,30 @@ export function YujiPublicStageProvider({
   }, [pointerBus, stageRoute]);
 
   const value = useMemo<YujiStageContextValue>(
-    () => ({ covers, loadProgress, pointerBus, registerCover, scrollBus, tier, webglReady }),
-    [covers, loadProgress, pointerBus, registerCover, scrollBus, tier, webglReady],
+    () => ({
+      covers,
+      introReleased,
+      introSettled,
+      loadProgress,
+      pointerBus,
+      registerCover,
+      releaseIntro,
+      scrollBus,
+      tier,
+      webglReady,
+    }),
+    [
+      covers,
+      introReleased,
+      introSettled,
+      loadProgress,
+      pointerBus,
+      registerCover,
+      releaseIntro,
+      scrollBus,
+      tier,
+      webglReady,
+    ],
   );
 
   return (
@@ -225,6 +265,8 @@ export function YujiPublicStageProvider({
       {stageRoute && tier !== 'static' ? (
         <YujiStageCanvas
           covers={covers}
+          introReleased={introReleased}
+          introSettled={introSettled}
           mode={mode}
           pointerBus={pointerBus}
           running={documentVisible}
