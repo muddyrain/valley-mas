@@ -53,6 +53,7 @@ describe('YujiPublicLayout', () => {
     ).not.toBeNull();
     expect(container.querySelector('a[href="/studio"]')).toBeNull();
     expect(container.querySelector('.yuji-route-transition')).toBeNull();
+    expect(container.querySelector('.yuji-pixel-trail')).toBeNull();
 
     act(() => root.unmount());
     container.remove();
@@ -79,6 +80,7 @@ describe('YujiPublicLayout', () => {
     expect(container.querySelector('.yuji-desktop-nav a[href="/"]')).toBeNull();
     expect(container.querySelector('.yuji-brand[aria-current="page"]')).not.toBeNull();
     expect(container.textContent).toContain('YUJI® / 2026');
+    expect(container.querySelector('.yuji-pixel-trail[aria-hidden="true"]')).not.toBeNull();
 
     act(() => root.unmount());
     container.remove();

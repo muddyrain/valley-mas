@@ -8,6 +8,7 @@ import YujiStageArticleCard from '@/components/yuji/YujiStageArticleCard';
 import YujiWordmarkHero from '@/components/yuji/YujiWordmarkHero';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { useYujiEditorialMotion } from '@/hooks/useYujiEditorialMotion';
+import avatarUrl from '../../../prototypes/yuji/assets/yuji-brand/avatar.png';
 
 export default function YujiHome() {
   const pageRef = useRef<HTMLElement>(null);
@@ -82,16 +83,60 @@ export default function YujiHome() {
 
       <div className="yuji-public-main yuji-home-content">
         <section className="yuji-home-statement" aria-labelledby="yuji-statement-title">
-          <p>YJ / FIELD NOTE 01</p>
-          <h2 id="yuji-statement-title">
-            <span className="is-lead">不追逐每一次噪声。</span>
-            <span>只留下能继续生长的判断。</span>
-          </h2>
-          <div className="yuji-statement-index" aria-hidden="true">
-            <span>TECH / 01</span>
-            <span>IMAGE / 02</span>
-            <span>THOUGHT / 03</span>
+          <p className="yuji-profile-kicker">YJ / PROFILE NOTE 01</p>
+          <a
+            className="yuji-profile-portrait"
+            href="https://github.com/muddyrain"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="访问 muddyrain 的 GitHub 主页"
+          >
+            <figure>
+              <img src={avatarUrl} alt="muddyrain 的 GitHub 头像" />
+              <figcaption>
+                <span>@MUDDYRAIN</span>
+                <span>HANGZHOU / CN</span>
+              </figcaption>
+            </figure>
+          </a>
+          <div className="yuji-profile-copy">
+            <p>DEVELOPER / WRITER / VISUAL COLLECTOR</p>
+            <h2 id="yuji-statement-title">
+              <span className="is-lead">把工程做成表达，</span>
+              <span>把兴趣积累成作品。</span>
+            </h2>
+            <p className="yuji-profile-intro">
+              我是 muddyrain，一名生活在杭州的开发者。写前端与 AI
+              工具，也记录技术判断、创作过程，和那些值得再看一眼的影像。
+            </p>
+            <div className="yuji-profile-links">
+              <Link className="yuji-underlined-link" to="/about">
+                ABOUT ME / 关于我 <span aria-hidden="true">→</span>
+              </Link>
+              <a
+                className="yuji-underlined-link"
+                href="https://github.com/muddyrain"
+                target="_blank"
+                rel="noreferrer"
+              >
+                GITHUB / @muddyrain <span aria-hidden="true">↗</span>
+              </a>
+            </div>
           </div>
+          <dl className="yuji-profile-index" aria-label="个人信息">
+            <div>
+              <dt>BASE</dt>
+              <dd>HANGZHOU</dd>
+            </div>
+            <div>
+              <dt>FOCUS</dt>
+              <dd>WEB · AI · VISUAL</dd>
+            </div>
+            <div>
+              <dt>STATUS</dt>
+              <dd>BUILDING IN PUBLIC</dd>
+            </div>
+          </dl>
         </section>
 
         <section className="yuji-section yuji-home-writing" aria-labelledby="yuji-recent-title">

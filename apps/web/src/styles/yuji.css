@@ -16,8 +16,9 @@ html:has(.yuji-site) {
   --yuji-indigo: #5429ff;
   --yuji-cyan: #59e7ff;
   --yuji-acid: #a8ff4f;
+  --yuji-orange: #ff6846;
   --yuji-danger: #ff5874;
-  --yuji-selection: #ff6846;
+  --yuji-selection: var(--yuji-orange);
   --yuji-shell: min(100% - 48px, 1500px);
   --yuji-reading: min(100% - 40px, 820px);
   --yuji-header-height: 76px;
@@ -72,6 +73,54 @@ html:has(.yuji-site) {
 .yuji-site a {
   color: inherit;
   text-decoration: none;
+}
+
+.yuji-pixel-trail {
+  position: fixed;
+  z-index: 260;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  contain: strict;
+}
+
+.yuji-pixel-trail i {
+  position: absolute;
+  display: block;
+  opacity: 0;
+  background: var(--yuji-orange);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--yuji-orange) 30%, transparent);
+  will-change: opacity;
+}
+
+@keyframes yuji-pixel-trail-fade-a {
+  0% {
+    opacity: 0.9;
+  }
+
+  45% {
+    opacity: 0.56;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes yuji-pixel-trail-fade-b {
+  0% {
+    opacity: 0.9;
+  }
+
+  45% {
+    opacity: 0.56;
+  }
+
+  100% {
+    opacity: 0;
+  }
 }
 
 .yuji-site button,
@@ -376,8 +425,8 @@ html:has(.yuji-site) {
   inset: 0;
   width: calc(var(--yuji-load-progress) * 1%);
   border-radius: inherit;
-  background: var(--yuji-selection);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--yuji-selection) 70%, transparent);
+  background: var(--yuji-orange);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--yuji-orange) 70%, transparent);
   transition: width 100ms linear;
 }
 
@@ -931,8 +980,8 @@ html:has(.yuji-site) {
 }
 
 .yuji-underlined-link:hover {
-  border-color: var(--yuji-acid);
-  color: var(--yuji-acid);
+  border-color: var(--yuji-orange);
+  color: var(--yuji-orange);
 }
 
 /* Article index */
@@ -2049,6 +2098,17 @@ html:has(.yuji-site) {
     display: none;
   }
 
+  .yuji-search-link span,
+  .yuji-studio-link span {
+    display: none;
+  }
+
+  .yuji-search-link,
+  .yuji-studio-link {
+    width: 34px;
+    padding: 0;
+  }
+
   .yuji-stage-article-card,
   .yuji-stage-article-card:nth-child(4n + 2),
   .yuji-stage-article-card:nth-child(4n + 3),
@@ -2397,7 +2457,7 @@ html:has(.yuji-site) {
   --yuji-indigo: #5745ef;
   --yuji-cyan: #5ee7ff;
   --yuji-acid: #c0fe04;
-  --yuji-selection: #ff6846;
+  --yuji-orange: #ff6846;
   width: 100%;
   margin: 0;
 }
@@ -2670,10 +2730,10 @@ html:has(.yuji-site) {
   margin: 0;
   color: rgb(234 250 255 / 42%);
   font-family: "Arial Rounded MT Bold", "Arial Black", sans-serif;
-  font-size: clamp(128px, 20vw, 350px);
+  font-size: clamp(62px, 10vw, 172px);
   font-weight: 900;
-  letter-spacing: -0.17em;
-  line-height: 0.72;
+  letter-spacing: -0.11em;
+  line-height: 0.78;
   -webkit-text-stroke: 1px rgb(255 255 255 / 76%);
   filter: drop-shadow(-9px 15px 22px rgb(18 65 104 / 14%))
     drop-shadow(13px -9px 20px rgb(255 255 255 / 34%));
@@ -2864,11 +2924,12 @@ html:has(.yuji-site) {
 .yuji-home-statement {
   position: relative;
   isolation: isolate;
-  grid-template-columns: minmax(90px, 0.62fr) minmax(0, 2.35fr) minmax(120px, 0.7fr);
-  min-height: 92svh;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: auto 1fr;
+  min-height: 100svh;
   align-content: center;
-  gap: clamp(32px, 4vw, 74px);
-  padding-block: clamp(132px, 15vw, 240px);
+  gap: clamp(28px, 3vw, 52px) clamp(18px, 2vw, 34px);
+  padding-block: clamp(108px, 10vw, 170px);
 }
 
 .yuji-home-statement::before,
@@ -2897,13 +2958,14 @@ html:has(.yuji-site) {
 }
 
 .yuji-home-statement h2 {
-  gap: 0.18em;
-  max-width: 14ch;
+  display: flex;
+  gap: 0.12em;
+  max-width: 12ch;
   font-family: "MgOpenModerna", "PingFang SC", sans-serif;
-  font-size: clamp(48px, 5.7vw, 94px);
+  font-size: clamp(52px, 5.2vw, 84px);
   font-weight: 700;
   letter-spacing: -0.065em;
-  line-height: 0.96;
+  line-height: 0.98;
   text-wrap: balance;
 }
 
@@ -2916,12 +2978,157 @@ html:has(.yuji-site) {
   white-space: nowrap;
 }
 
-.yuji-home-statement > p {
-  align-self: center;
+.yuji-profile-kicker {
+  grid-column: 1 / 4;
+  grid-row: 1;
+  align-self: end;
 }
 
-.yuji-home-statement .yuji-statement-index {
+.yuji-profile-portrait {
+  position: relative;
+  grid-column: 1 / 4;
+  grid-row: 2;
   align-self: center;
+  width: min(100%, 340px);
+}
+
+.yuji-profile-portrait::after {
+  position: absolute;
+  top: 18%;
+  right: -24px;
+  width: 14px;
+  height: 112px;
+  content: "";
+  background: linear-gradient(
+    to bottom,
+    var(--yuji-acid) 0 13%,
+    transparent 13% 24%,
+    var(--yuji-cyan) 24% 38%,
+    transparent 38% 50%,
+    var(--yuji-cobalt) 50% 70%,
+    transparent 70%
+  );
+}
+
+.yuji-profile-portrait figure {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
+  margin: 0;
+  border: 1px solid var(--yuji-line-strong);
+  background:
+    linear-gradient(145deg, rgb(89 231 255 / 44%), rgb(84 41 255 / 58%)), var(--yuji-bg-soft);
+}
+
+.yuji-profile-portrait img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  filter: saturate(0.92) contrast(1.04);
+  transition:
+    transform 420ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    filter 420ms ease;
+}
+
+.yuji-profile-portrait:hover img,
+.yuji-profile-portrait:focus-visible img {
+  transform: scale(1.035);
+  filter: saturate(1.08) contrast(1.08);
+}
+
+.yuji-profile-portrait figcaption {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgb(5 8 15 / 78%);
+  color: #f6fbff;
+  font-family: monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+.yuji-profile-copy {
+  display: grid;
+  grid-column: 4 / 11;
+  grid-row: 2;
+  align-content: center;
+  gap: clamp(24px, 2.3vw, 38px);
+  padding-left: clamp(18px, 2.4vw, 44px);
+}
+
+.yuji-profile-copy > p:first-child {
+  margin: 0;
+  color: var(--yuji-muted);
+  font-family: monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.yuji-profile-copy h2 {
+  margin: 0;
+}
+
+.yuji-profile-intro {
+  max-width: 48ch;
+  margin: 0;
+  color: color-mix(in srgb, var(--yuji-ink) 78%, var(--yuji-muted));
+  font-size: clamp(15px, 1.25vw, 19px);
+  line-height: 1.85;
+}
+
+.yuji-profile-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+}
+
+.yuji-profile-links .yuji-underlined-link {
+  font-family: monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.yuji-profile-index {
+  display: grid;
+  grid-column: 11 / -1;
+  grid-row: 2;
+  align-self: center;
+  gap: 0;
+}
+
+.yuji-profile-index > div {
+  display: grid;
+  gap: 6px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--yuji-line);
+  color: var(--yuji-ink);
+  font-family: monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.yuji-profile-index > div:first-child {
+  border-top: 1px solid var(--yuji-line);
+}
+
+.yuji-profile-index dt,
+.yuji-profile-index dd {
+  margin: 0;
+}
+
+.yuji-profile-index dt {
+  color: var(--yuji-cyan);
+  font-size: 8px;
+  letter-spacing: 0.14em;
 }
 
 .yuji-section-heading h2 {
@@ -2990,6 +3197,42 @@ html:has(.yuji-site) {
   font-weight: 900;
   letter-spacing: -0.085em;
   line-height: 0.88;
+}
+
+.yuji-stage-article-title {
+  position: relative;
+  display: inline-block;
+  isolation: isolate;
+  transition:
+    color 180ms ease,
+    text-shadow 180ms ease,
+    transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.yuji-stage-article-title::after {
+  position: absolute;
+  right: 0;
+  bottom: -0.12em;
+  left: 0;
+  height: 0.07em;
+  background: var(--yuji-orange);
+  content: "";
+  pointer-events: none;
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.yuji-stage-article-title:hover,
+.yuji-stage-article-title:focus-visible {
+  color: var(--yuji-orange);
+  transform: translate3d(0.025em, -0.025em, 0);
+}
+
+.yuji-stage-article-title:hover::after,
+.yuji-stage-article-title:focus-visible::after {
+  transform: scaleX(1);
+  transform-origin: left center;
 }
 
 .yuji-stage-cover {
@@ -3164,15 +3407,45 @@ html:has(.yuji-site) {
 
 @media (max-width: 900px) {
   .yuji-home-statement {
-    grid-template-columns: 1fr;
-    min-height: 86svh;
-    gap: 32px;
+    grid-template-columns: minmax(180px, 0.72fr) minmax(0, 1.28fr);
+    grid-template-rows: auto auto auto;
+    min-height: auto;
+    gap: 30px 36px;
     padding-block: 108px;
+  }
+
+  .yuji-profile-kicker {
+    grid-column: 1 / -1;
+  }
+
+  .yuji-profile-portrait {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+  }
+
+  .yuji-profile-copy {
+    grid-column: 2;
+    grid-row: 2;
+    align-content: start;
+    padding-left: 0;
+  }
+
+  .yuji-profile-index {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .yuji-profile-index > div,
+  .yuji-profile-index > div:first-child {
+    border-top: 1px solid var(--yuji-line);
   }
 
   .yuji-home-statement h2 {
     max-width: 12ch;
-    font-size: clamp(42px, 12.5vw, 68px);
+    font-size: clamp(42px, 7.2vw, 64px);
     line-height: 1.01;
   }
 
@@ -3180,14 +3453,8 @@ html:has(.yuji-site) {
     white-space: normal;
   }
 
-  .yuji-home-statement .yuji-statement-index {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-  }
-
   .yuji-header-inner {
-    display: grid;
-    grid-template-columns: 1fr auto;
+    display: flex;
   }
 
   .yuji-mobile-nav {
@@ -3223,7 +3490,7 @@ html:has(.yuji-site) {
 
   .yuji-wordmark-lockup h1,
   .yuji-site[data-public-theme="light"] .yuji-wordmark-lockup h1 {
-    font-size: clamp(130px, 39vw, 270px);
+    font-size: clamp(58px, 16vw, 120px);
   }
 
   .yuji-sticker.is-orbit {
@@ -3409,8 +3676,46 @@ html:has(.yuji-site) {
   }
 
   .yuji-home-statement {
-    min-height: 70svh;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+    min-height: auto;
+    gap: 28px;
     padding-block: 90px;
+  }
+
+  .yuji-profile-portrait {
+    grid-column: 1;
+    grid-row: 2;
+    width: min(72vw, 280px);
+  }
+
+  .yuji-profile-portrait::after {
+    right: -18px;
+  }
+
+  .yuji-profile-copy {
+    grid-column: 1;
+    grid-row: 3;
+    gap: 24px;
+  }
+
+  .yuji-home-statement h2 {
+    font-size: clamp(40px, 12.5vw, 58px);
+  }
+
+  .yuji-profile-links {
+    display: grid;
+  }
+
+  .yuji-profile-index {
+    grid-column: 1;
+    grid-row: 4;
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .yuji-profile-index > div:not(:first-child) {
+    border-top: 0;
   }
 
   .yuji-stage-article-card,

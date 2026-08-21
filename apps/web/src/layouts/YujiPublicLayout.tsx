@@ -1,6 +1,7 @@
 import { Menu, PenLine, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import YujiPixelTrail from '@/components/yuji/YujiPixelTrail';
 import {
   type YujiHeaderSurface,
   YujiPublicChromeContext,
@@ -46,6 +47,7 @@ export default function YujiPublicLayout() {
             className={`yuji-site ${isHomeStage ? 'has-home-stage' : ''}`}
             data-public-theme={publicTheme}
           >
+            {isHomeStage ? <YujiPixelTrail /> : null}
             <a className="yuji-skip-link" href="#yuji-main">
               跳到主要内容
             </a>

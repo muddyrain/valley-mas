@@ -91,9 +91,18 @@ describe('YujiHome', () => {
     expect(container.querySelector('[data-yuji-stage="wordmark"]')).not.toBeNull();
     const wordmarkTitle = container.querySelector('#yuji-wordmark-title') as HTMLElement;
     expect(wordmarkTitle).not.toBeNull();
-    expect(wordmarkTitle.getAttribute('aria-label')).toBe('雨迹');
-    expect(wordmarkTitle.textContent).toBe('yuji');
-    expect(container.textContent).toContain('YUJI.DESIGN / EDITORIAL ENGINE');
+    expect(wordmarkTitle.getAttribute('aria-label')).toBe('muddyrain');
+    expect(wordmarkTitle.textContent).toBe('muddyrain');
+    expect(container.textContent).toContain('YUJI.DESIGN / INDEPENDENT FIELD');
+    expect(container.textContent).toContain('代码开发者，现居杭州');
+    expect(container.textContent).toContain('保持好奇');
+    expect(container.textContent).toContain('允许偏航');
+    expect(container.textContent).toContain('找到自己的节奏');
+    expect(container.textContent).not.toContain('独立开发者，现居杭州');
+    expect(container.textContent).not.toContain('来自上海');
+    expect(container.textContent).toContain('把工程做成表达');
+    expect(container.querySelector('img[alt="muddyrain 的 GitHub 头像"]')).not.toBeNull();
+    expect(container.querySelector('a[href="https://github.com/muddyrain"]')).not.toBeNull();
     expect(container.querySelectorAll('.yuji-sticker-field svg')).toHaveLength(6);
     expect(container.querySelectorAll('[data-yuji-sticker]')).toHaveLength(6);
 
@@ -110,6 +119,8 @@ describe('YujiHome', () => {
     });
 
     expect(container.textContent).toContain('组件渲染性能优化');
+    const articleTitle = container.querySelector<HTMLAnchorElement>('.yuji-stage-article-title');
+    expect(articleTitle?.textContent).toBe('组件渲染性能优化');
     expect(container.querySelector('[role="status"]')?.getAttribute('aria-label')).toBe(
       '影像正在显影',
     );

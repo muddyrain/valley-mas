@@ -28,18 +28,18 @@ globalThis.FileReader ??= NodeFileReader;
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const outputPath = process.argv[2]
   ? resolve(process.cwd(), process.argv[2])
-  : resolve(scriptDirectory, '../src/assets/yuji-stage/yuji-inflated.glb');
+  : resolve(scriptDirectory, '../src/assets/yuji-stage/muddyrain-inflated.glb');
 const fontPath = fileURLToPath(
   import.meta.resolve('three/examples/fonts/optimer_bold.typeface.json'),
 );
 const font = new FontLoader().parse(JSON.parse(await readFile(fontPath, 'utf8')));
-const textGeometry = new TextGeometry('yuji', {
+const textGeometry = new TextGeometry('muddyrain', {
   bevelEnabled: true,
   bevelOffset: -0.018,
-  bevelSegments: 3,
+  bevelSegments: 2,
   bevelSize: 0.055,
   bevelThickness: 0.12,
-  curveSegments: 6,
+  curveSegments: 4,
   depth: 0.32,
   font,
   size: 1.32,
@@ -48,12 +48,16 @@ const geometry = mergeVertices(textGeometry, 1e-4);
 textGeometry.dispose();
 
 geometry.center();
-geometry.scale(1.04, 1, 1);
+geometry.computeBoundingBox();
+const bounds = geometry.boundingBox;
+const width = bounds ? bounds.max.x - bounds.min.x : 1;
+geometry.scale(7.4 / Math.max(width, 1), 1, 1);
 geometry.computeVertexNormals();
+geometry.computeBoundingBox();
 geometry.computeBoundingSphere();
 
 const mesh = new Mesh(geometry, new MeshBasicMaterial({ color: 0xffffff }));
-mesh.name = 'yuji_inflated_wordmark';
+mesh.name = 'muddyrain_inflated_wordmark';
 const gltf = await new GLTFExporter().parseAsync(mesh, {
   binary: true,
   onlyVisible: true,

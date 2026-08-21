@@ -97,39 +97,44 @@ export default function YujiWordmarkHero() {
         <div className="yuji-hero-exit-halftone" aria-hidden="true" />
         <div className="yuji-wordmark-brief">
           <p>
-            <span>YUJI.DESIGN / EDITORIAL ENGINE</span>
-            文字、代码与影像的个人档案
+            <span>YUJI.DESIGN / INDEPENDENT FIELD</span>
+            一个关于技术、审美与创造的私人现场
           </p>
           <p>
-            <span>THINKING IN SYSTEMS</span>
-            把复杂问题写得清楚，也保留它的质感
+            <span>SYSTEMS, CRAFT &amp; CURIOSITY</span>
+            把复杂变清楚，把想法做成作品
           </p>
           <p>
-            <span>DESIGNED &amp; WRITTEN BY @MUDDYRAIN</span>
-            一个持续发生的数字实验室，来自上海
+            <span>BUILT &amp; WRITTEN BY @MUDDYRAIN</span>
+            代码开发者，现居杭州
           </p>
         </div>
 
         <div className="yuji-wordmark-lockup">
-          <p>HELLO FROM SHANGHAI / MOVE YOUR POINTER</p>
-          <h1 id="yuji-wordmark-title" aria-label="雨迹">
-            <span>y</span>
+          <p>HELLO FROM HANGZHOU / MOVE YOUR POINTER</p>
+          <h1 id="yuji-wordmark-title" aria-label="muddyrain">
+            <span>m</span>
             <span>u</span>
-            <span>j</span>
+            <span>d</span>
+            <span>d</span>
+            <span>y</span>
+            <span>r</span>
+            <span>a</span>
             <span>i</span>
+            <span>n</span>
           </h1>
         </div>
 
         <YujiStickerField />
 
         <p className="yuji-hero-manifesto">
-          <span>把判断写进</span>
-          <span>代码与影像</span>
-          <span>让想法留下痕迹</span>
+          <span>保持好奇</span>
+          <span>允许偏航</span>
+          <span>找到自己的节奏</span>
         </p>
 
         <div className="yuji-wordmark-telemetry is-bottom" aria-hidden="true">
-          <span>31.2304° N / 121.4737° E</span>
+          <span>30.2741° N / 120.1551° E</span>
           <span ref={pointerReadoutRef}>POINTER / 0000 X 0000 Y</span>
           <span>SCROLL TO DISCOVER ↓</span>
         </div>

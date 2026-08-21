@@ -23,7 +23,7 @@
 
 ## 当前活跃计划
 
-- [2026-08-20-yuji-dom-webgl-public-stage.md](2026-08-20-yuji-dom-webgl-public-stage.md)：以圆角倒角 GLB `yuji` 字标、真实进度加载门、动态光场、原创信号贴纸、DOM / WebGL 文章索引、点阵路由转场和安静阅读层重构雨迹公共站；第六轮完成全画布流体纠偏，第七轮完成首屏排版与贴纸交互，第八轮收敛玻璃信号物，第九轮完成首屏—第二屏连续退场与封面速度 3D 深度，并通过本地 Chrome 桌面 / 移动首轮验收，待 Safari / iOS 与 owner 最终观感验收。
+- [2026-08-20-yuji-dom-webgl-public-stage.md](2026-08-20-yuji-dom-webgl-public-stage.md)：以圆角倒角 GLB `muddyrain` 个人签名、真实进度加载门、动态光场、原创信号贴纸、DOM / WebGL 文章索引、点阵路由转场和安静阅读层重构“雨迹 / YUJI”公共站；第六至十轮已完成流体、贴纸、信号物、连续退场、封面 3D 深度、作者介绍与橙色像素轨迹，第十一轮完成签名替换、共享橙色 token 与文章标题交互，待当前 Chrome、Safari / iOS 与 owner 最终观感验收。
 - [2026-08-15-yuji-liquid-rain-brand-homepage.md](2026-08-15-yuji-liquid-rain-brand-homepage.md)：液态雨膜历史实现已被 ADR 0017 的 DOM 主导 WebGL 公共站方向取代；待新舞台完成 owner 最终验收后归档。
 - [2026-08-15-eon-vale-core-rearchitecture.md](2026-08-15-eon-vale-core-rearchitecture.md)：Eon Vale 单运行时核心重构、保护/删除清单、固定 Tick、Worker/存档边界与四重退出门禁。
 - [2026-08-15-yuji-gallery-import-workspace.md](2026-08-15-yuji-gallery-import-workspace.md)：公共图库追加稳定列分配、可恢复的本地未导入工作区、单次视觉元数据识别与创作室完整图片库。

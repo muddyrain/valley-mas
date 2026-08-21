@@ -53,7 +53,7 @@ export default function YujiStageArticleCard({ index, post, scope }: YujiStageAr
           <time>{formatDate(post.publishedAt || post.createdAt)}</time>
         </p>
         <h2>
-          <YujiTransitionLink coverId={post.id} to={href}>
+          <YujiTransitionLink className="yuji-stage-article-title" coverId={post.id} to={href}>
             {post.title}
           </YujiTransitionLink>
         </h2>

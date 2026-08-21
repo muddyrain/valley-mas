@@ -24,7 +24,7 @@ import {
   Vector2,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import yujiInflatedModelUrl from '@/assets/yuji-stage/yuji-inflated.glb?url';
+import muddyrainInflatedModelUrl from '@/assets/yuji-stage/muddyrain-inflated.glb?url';
 import { StagePostProcess } from './StagePostProcess';
 import type { PointerBus, ScrollBus } from './stageBus';
 import {
@@ -242,7 +242,7 @@ function InflatedWordmark({
     setLoadProgress(3);
     setReady(false);
     loader.load(
-      yujiInflatedModelUrl,
+      muddyrainInflatedModelUrl,
       (gltf) => {
         const resolved = findFirstGeometry(gltf.scene);
         if (!active || !resolved) {
