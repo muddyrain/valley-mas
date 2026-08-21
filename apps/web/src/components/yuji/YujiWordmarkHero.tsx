@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { resolveStickerFlow } from '@/features/yuji-stage/stageMotion';
 import { useYujiStage } from '@/features/yuji-stage/YujiStageContext';
 import { YujiTransitionNavLink } from '@/features/yuji-transition/YujiPublicTransition';
 import { useYujiHeroIntro } from '@/hooks/useYujiHeroIntro';
@@ -22,10 +23,48 @@ export default function YujiWordmarkHero() {
     let frame = 0;
     const paint = () => {
       frame = 0;
-      if (!pointerReadoutRef.current || !stage) return;
-      const x = Math.round(stage.pointerBus.frame.x * window.innerWidth);
-      const y = Math.round(stage.pointerBus.frame.y * window.innerHeight);
-      pointerReadoutRef.current.textContent = `POINTER / ${String(x).padStart(4, '0')} X  ${String(y).padStart(4, '0')} Y`;
+      const hero = heroRef.current;
+      if (!stage || !hero) return;
+      const pointer = stage.pointerBus.frame;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const x = Math.round(pointer.x * viewportWidth);
+      const y = Math.round(pointer.y * viewportHeight);
+      const stickers = Array.from(hero.querySelectorAll<SVGSVGElement>('[data-yuji-sticker]'));
+      const stickerRects = stickers.map((sticker) => sticker.getBoundingClientRect());
+
+      if (pointerReadoutRef.current) {
+        pointerReadoutRef.current.textContent = `POINTER / ${String(x).padStart(4, '0')} X  ${String(y).padStart(4, '0')} Y`;
+      }
+
+      stickers.forEach((sticker, index) => {
+        const response = resolveStickerFlow({
+          active: pointer.inside && stage.tier !== 'static',
+          pointerX: pointer.x,
+          pointerY: pointer.y,
+          rect: stickerRects[index],
+          viewportHeight,
+          viewportWidth,
+        });
+        sticker.style.setProperty('--yuji-sticker-flow-x', `${response.offsetX.toFixed(2)}px`);
+        sticker.style.setProperty('--yuji-sticker-flow-y', `${response.offsetY.toFixed(2)}px`);
+        sticker.style.setProperty(
+          '--yuji-sticker-flow-glow',
+          `${(response.intensity * 22).toFixed(2)}px`,
+        );
+        sticker.style.setProperty(
+          '--yuji-sticker-flow-brightness',
+          (1 + response.intensity * 0.22).toFixed(3),
+        );
+        sticker.style.setProperty(
+          '--yuji-sticker-flow-saturation',
+          (1 + response.intensity * 0.28).toFixed(3),
+        );
+        sticker.style.setProperty(
+          '--yuji-sticker-flow-scale',
+          (1 + response.intensity * 0.035).toFixed(3),
+        );
+      });
     };
     if (!stage) return;
     const unsubscribe = stage.pointerBus.subscribe(() => {

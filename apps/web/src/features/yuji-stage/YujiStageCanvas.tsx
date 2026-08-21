@@ -18,7 +18,6 @@ import {
   type Object3D,
   RepeatWrapping,
   ShaderMaterial,
-  Shape,
   SRGBColorSpace,
   type Texture,
   TextureLoader,
@@ -327,18 +326,14 @@ function SignalObjects({
   });
 
   const dark = theme === 'dark';
-  const arrowShape = useMemo(() => {
-    const shape = new Shape();
-    shape.moveTo(-0.78, 0.66);
-    shape.lineTo(0.84, 0.02);
-    shape.lineTo(0.18, -0.22);
-    shape.lineTo(0.46, -0.82);
-    shape.lineTo(0.08, -0.98);
-    shape.lineTo(-0.22, -0.34);
-    shape.lineTo(-0.78, -0.62);
-    shape.closePath();
-    return shape;
-  }, []);
+  const signalSurface = {
+    clearcoat: 1,
+    clearcoatRoughness: 0.06,
+    iridescence: 1,
+    iridescenceIOR: 1.34,
+    metalness: 0.02,
+    roughness: 0.16,
+  } as const;
 
   return (
     <group ref={groupRef} position={[0, 0.24, -1.18]}>
@@ -349,12 +344,12 @@ function SignalObjects({
         position={[-3.25, 1.45, 0]}
         rotation={[0.72, 0.1, -0.38]}
       >
-        <torusGeometry args={[0.58, 0.16, 16, 64]} />
-        <meshStandardMaterial
-          color={dark ? '#59e7ff' : '#0578ff'}
-          emissive={dark ? '#1766ff' : '#0026ff'}
-          emissiveIntensity={dark ? 2.2 : 0.38}
-          roughness={0.18}
+        <torusGeometry args={[0.58, 0.12, 18, 64]} />
+        <meshPhysicalMaterial
+          {...signalSurface}
+          color={dark ? '#85e8ff' : '#8dd6ff'}
+          emissive={dark ? '#1979b7' : '#397bb8'}
+          emissiveIntensity={dark ? 0.82 : 0.14}
         />
       </mesh>
       <mesh
@@ -363,13 +358,14 @@ function SignalObjects({
         }}
         position={[2.92, 1.18, -0.1]}
         rotation={[0.3, -0.2, 0.62]}
+        scale={[1.28, 0.74, 0.56]}
       >
-        <octahedronGeometry args={[0.66, 0]} />
-        <meshStandardMaterial
-          color={dark ? '#ff6bd6' : '#ff3fa4'}
-          emissive={dark ? '#ff238a' : '#a60050'}
-          emissiveIntensity={dark ? 1.6 : 0.24}
-          roughness={0.24}
+        <sphereGeometry args={[0.48, 32, 24]} />
+        <meshPhysicalMaterial
+          {...signalSurface}
+          color={dark ? '#d9c8ff' : '#d8d5ff'}
+          emissive={dark ? '#6651a8' : '#6b75b5'}
+          emissiveIntensity={dark ? 0.68 : 0.1}
         />
       </mesh>
       <mesh
@@ -377,14 +373,14 @@ function SignalObjects({
           signalRefs.current[2] = mesh;
         }}
         position={[-2.05, -1.38, 0.12]}
-        rotation={[0.2, 0.48, 0.42]}
+        rotation={[0.35, 0.55, 1.02]}
       >
-        <boxGeometry args={[0.76, 0.76, 0.3]} />
-        <meshStandardMaterial
-          color="#d8ff3e"
-          emissive="#7ca800"
-          emissiveIntensity={dark ? 1.2 : 0.22}
-          roughness={0.28}
+        <capsuleGeometry args={[0.22, 0.5, 8, 24]} />
+        <meshPhysicalMaterial
+          {...signalSurface}
+          color={dark ? '#b8f3ff' : '#c4edff'}
+          emissive={dark ? '#278ca6' : '#3d91aa'}
+          emissiveIntensity={dark ? 0.72 : 0.11}
         />
       </mesh>
       <mesh
@@ -394,12 +390,12 @@ function SignalObjects({
         position={[2.18, -1.52, 0.04]}
         rotation={[0.6, -0.2, -0.38]}
       >
-        <torusKnotGeometry args={[0.44, 0.13, 72, 10, 2, 3]} />
-        <meshStandardMaterial
-          color={dark ? '#7c5cff' : '#4821ff'}
-          emissive="#3717ff"
-          emissiveIntensity={dark ? 1.7 : 0.25}
-          roughness={0.2}
+        <torusKnotGeometry args={[0.42, 0.11, 72, 12, 2, 3]} />
+        <meshPhysicalMaterial
+          {...signalSurface}
+          color={dark ? '#b69cff' : '#a99ee8'}
+          emissive={dark ? '#5944a6' : '#625aa8'}
+          emissiveIntensity={dark ? 0.78 : 0.12}
         />
       </mesh>
       <mesh
@@ -407,32 +403,15 @@ function SignalObjects({
           signalRefs.current[4] = mesh;
         }}
         position={[4.12, -1.12, 0.2]}
-        rotation={[0.34, -0.46, -0.68]}
-        scale={0.58}
+        rotation={[0.58, -0.46, -0.68]}
+        scale={[1, 0.72, 1]}
       >
-        <extrudeGeometry
-          args={[
-            arrowShape,
-            {
-              bevelEnabled: true,
-              bevelSegments: 8,
-              bevelSize: 0.1,
-              bevelThickness: 0.11,
-              curveSegments: 16,
-              depth: 0.28,
-            },
-          ]}
-        />
+        <torusGeometry args={[0.43, 0.07, 16, 64]} />
         <meshPhysicalMaterial
-          clearcoat={1}
-          clearcoatRoughness={0.05}
-          color={dark ? '#54c8ff' : '#087cff'}
-          emissive={dark ? '#175dff' : '#003ee8'}
-          emissiveIntensity={dark ? 1.4 : 0.18}
-          iridescence={1}
-          iridescenceIOR={1.34}
-          metalness={0.08}
-          roughness={0.12}
+          {...signalSurface}
+          color={dark ? '#87e5ff' : '#9fdcff'}
+          emissive={dark ? '#2c7899' : '#4b82a8'}
+          emissiveIntensity={dark ? 0.72 : 0.1}
         />
       </mesh>
       <mesh
@@ -440,14 +419,14 @@ function SignalObjects({
           signalRefs.current[5] = mesh;
         }}
         position={[0.52, 1.76, -0.16]}
-        rotation={[0.2, 0.1, -0.1]}
+        rotation={[0.2, 0.1, 0.44]}
       >
-        <coneGeometry args={[0.34, 0.86, 3]} />
-        <meshStandardMaterial
-          color="#ff7246"
-          emissive="#e12f00"
-          emissiveIntensity={dark ? 1.45 : 0.2}
-          roughness={0.2}
+        <capsuleGeometry args={[0.18, 0.52, 8, 24]} />
+        <meshPhysicalMaterial
+          {...signalSurface}
+          color={dark ? '#ffd0dc' : '#f5d5dc'}
+          emissive={dark ? '#a75572' : '#a86e7c'}
+          emissiveIntensity={dark ? 0.62 : 0.09}
         />
       </mesh>
       <mesh
@@ -456,12 +435,12 @@ function SignalObjects({
         }}
         position={[-0.18, -1.75, -0.2]}
       >
-        <sphereGeometry args={[0.24, 24, 24]} />
-        <meshStandardMaterial
-          color="#ffffff"
-          emissive={dark ? '#65f5ff' : '#ffffff'}
-          emissiveIntensity={dark ? 3 : 0.4}
-          roughness={0.08}
+        <sphereGeometry args={[0.24, 28, 20]} />
+        <meshPhysicalMaterial
+          {...signalSurface}
+          color={dark ? '#e5faff' : '#edf7ff'}
+          emissive={dark ? '#61bfd3' : '#8cb8ca'}
+          emissiveIntensity={dark ? 0.8 : 0.13}
         />
       </mesh>
     </group>

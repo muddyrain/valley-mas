@@ -1,8 +1,9 @@
 # Yuji stage assets
 
-`yuji-inflated.glb` 是为雨迹首页原创绘制并生成的圆角充气字标。它由仓库脚本
-`apps/web/scripts/generate-yuji-inflated-wordmark.mjs` 使用自有连续圆管手写路径生成，
-不包含 Haoqi 的 `hello.gltf`、贴纸、纹理或其他第三方站点资产。
+`yuji-inflated.glb` 是为雨迹首页生成的圆角充气字标。仓库脚本
+`apps/web/scripts/generate-yuji-inflated-wordmark.mjs` 使用 Three.js 示例字体中的
+Optimer Bold 轮廓生成并添加自有的 3D 深度与圆角参数；字体许可见
+`MGOPEN-FONT-LICENSE.txt`。它不包含 Haoqi 的 `hello.gltf`、贴纸、纹理或其他第三方站点资产。
 
 重新生成：
 

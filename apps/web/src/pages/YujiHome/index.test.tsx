@@ -95,6 +95,7 @@ describe('YujiHome', () => {
     expect(wordmarkTitle.textContent).toBe('yuji');
     expect(container.textContent).toContain('YUJI.DESIGN / EDITORIAL ENGINE');
     expect(container.querySelectorAll('.yuji-sticker-field svg')).toHaveLength(6);
+    expect(container.querySelectorAll('[data-yuji-sticker]')).toHaveLength(6);
 
     act(() => vi.advanceTimersByTime(300));
     expect(

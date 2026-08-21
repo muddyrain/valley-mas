@@ -573,7 +573,7 @@ html:has(.yuji-site) {
   gap: clamp(28px, 5vw, 88px);
   align-items: start;
   padding: clamp(110px, 14vw, 220px) 0;
-  border-top: 1px solid var(--yuji-line);
+  border-top: 0;
 }
 
 .yuji-home-statement > p,
@@ -2547,7 +2547,7 @@ html:has(.yuji-site) {
       transparent 0 calc(8.333% - 1px),
       rgb(5 11 16 / 5%) calc(8.333% - 1px) 8.333%
     ),
-    linear-gradient(rgb(7 24 38 / 4%) 1px, transparent 1px) 0 0 / 100% 25%;
+    linear-gradient(rgb(7 24 38 / 4%) 1px, transparent 1px) 0 -1px / 100% calc(25% + 1px);
 }
 
 .yuji-hero-exit-halftone {
@@ -2719,6 +2719,12 @@ html:has(.yuji-site) {
 }
 
 .yuji-sticker {
+  --yuji-sticker-flow-brightness: 1;
+  --yuji-sticker-flow-glow: 0px;
+  --yuji-sticker-flow-saturation: 1;
+  --yuji-sticker-flow-scale: 1;
+  --yuji-sticker-flow-x: 0px;
+  --yuji-sticker-flow-y: 0px;
   position: absolute;
   display: block;
   height: auto;
@@ -2768,7 +2774,7 @@ html:has(.yuji-site) {
 
 .yuji-sticker.is-smile {
   --yuji-sticker-angle: -8deg;
-  top: 48%;
+  top: 42%;
   left: 16%;
   width: clamp(66px, 5.2vw, 100px);
   border: 0;
@@ -2800,22 +2806,21 @@ html:has(.yuji-site) {
   grid-row: 2;
   flex-direction: column;
   align-self: end;
-  max-width: 9.2ch;
-  margin: 0 0 68px;
+  max-width: 11ch;
+  margin: 0 0 72px;
   color: var(--yuji-ink);
-  font-family: "Arial Black", "PingFang SC", sans-serif;
-  font-size: clamp(52px, 4.8vw, 92px);
-  font-weight: 950;
-  letter-spacing: -0.075em;
-  line-height: 1.055;
-  text-transform: uppercase;
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: clamp(50px, 4.15vw, 78px);
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  line-height: 1.14;
   text-wrap: balance;
 }
 
 .yuji-hero-manifesto span {
   display: block;
   white-space: nowrap;
-  padding-block: 0.015em 0.035em;
+  padding-block: 0.045em 0.075em;
 }
 
 .yuji-stage-enter {
@@ -3157,12 +3162,18 @@ html:has(.yuji-site) {
 
 @keyframes yuji-sticker-float {
   from {
-    transform: translate3d(0, -6px, 0) rotate(calc(var(--yuji-sticker-angle, 0deg) - 2deg));
-    filter: drop-shadow(0 13px 15px rgb(14 41 59 / 20%));
+    transform: translate3d(var(--yuji-sticker-flow-x), calc(-6px + var(--yuji-sticker-flow-y)), 0)
+      rotate(calc(var(--yuji-sticker-angle, 0deg) - 2deg)) scale(var(--yuji-sticker-flow-scale));
+    filter: drop-shadow(0 13px 15px rgb(14 41 59 / 20%))
+      drop-shadow(0 0 var(--yuji-sticker-flow-glow) rgb(81 225 255 / 88%))
+      brightness(var(--yuji-sticker-flow-brightness)) saturate(var(--yuji-sticker-flow-saturation));
   }
   to {
-    transform: translate3d(0, 8px, 0) rotate(calc(var(--yuji-sticker-angle, 0deg) + 2deg));
-    filter: drop-shadow(0 19px 20px rgb(14 41 59 / 27%));
+    transform: translate3d(var(--yuji-sticker-flow-x), calc(8px + var(--yuji-sticker-flow-y)), 0)
+      rotate(calc(var(--yuji-sticker-angle, 0deg) + 2deg)) scale(var(--yuji-sticker-flow-scale));
+    filter: drop-shadow(0 19px 20px rgb(14 41 59 / 27%))
+      drop-shadow(0 0 var(--yuji-sticker-flow-glow) rgb(81 225 255 / 88%))
+      brightness(var(--yuji-sticker-flow-brightness)) saturate(var(--yuji-sticker-flow-saturation));
   }
 }
 
@@ -3369,7 +3380,7 @@ html:has(.yuji-site) {
     grid-column: 1 / -1;
     margin-bottom: 76px;
     font-size: clamp(38px, 11.4vw, 54px);
-    line-height: 0.98;
+    line-height: 1.12;
   }
 
   .yuji-hero-manifesto span:nth-child(2),

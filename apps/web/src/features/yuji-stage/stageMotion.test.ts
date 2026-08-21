@@ -5,6 +5,7 @@ import {
   resolveCurlTarget,
   resolveFluidActivity,
   resolveHeroExitProgress,
+  resolveStickerFlow,
 } from './stageMotion';
 
 describe('stageMotion', () => {
@@ -37,5 +38,43 @@ describe('stageMotion', () => {
     expect(resolveAnimatedStickerCount('full')).toBe(6);
     expect(resolveAnimatedStickerCount('balanced')).toBe(3);
     expect(resolveAnimatedStickerCount('static')).toBe(0);
+  });
+
+  it('turns normalized pointer proximity into a bounded sticker response', () => {
+    const rect = { height: 100, left: 400, top: 250, width: 100 };
+
+    expect(
+      resolveStickerFlow({
+        active: true,
+        pointerX: 0.45,
+        pointerY: 0.375,
+        rect,
+        viewportHeight: 800,
+        viewportWidth: 1_000,
+      }),
+    ).toEqual({ intensity: 1, offsetX: 0, offsetY: 0 });
+
+    const nearby = resolveStickerFlow({
+      active: true,
+      pointerX: 0.3,
+      pointerY: 0.375,
+      rect,
+      viewportHeight: 800,
+      viewportWidth: 1_000,
+    });
+    expect(nearby.intensity).toBeCloseTo(0.25, 4);
+    expect(nearby.offsetX).toBeCloseTo(2.5, 4);
+    expect(nearby.offsetY).toBe(0);
+
+    expect(
+      resolveStickerFlow({
+        active: false,
+        pointerX: 0.45,
+        pointerY: 0.375,
+        rect,
+        viewportHeight: 800,
+        viewportWidth: 1_000,
+      }),
+    ).toEqual({ intensity: 0, offsetX: 0, offsetY: 0 });
   });
 });

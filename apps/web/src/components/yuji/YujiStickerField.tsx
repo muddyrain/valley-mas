@@ -1,7 +1,7 @@
 export default function YujiStickerField() {
   return (
     <div className="yuji-sticker-field" aria-hidden="true">
-      <svg className="yuji-sticker is-eye" viewBox="0 0 112 68">
+      <svg className="yuji-sticker is-eye" data-yuji-sticker viewBox="0 0 112 68">
         <defs>
           <linearGradient id="yuji-eye-paper" x1="0" x2="1" y1="0" y2="1">
             <stop offset="0" stopColor="#fffde7" />
@@ -19,7 +19,7 @@ export default function YujiStickerField() {
         <circle cx="63" cy="29" r="3" fill="#fff" />
       </svg>
 
-      <svg className="yuji-sticker is-orbit" viewBox="0 0 100 100">
+      <svg className="yuji-sticker is-orbit" data-yuji-sticker viewBox="0 0 100 100">
         <defs>
           <radialGradient id="yuji-orbit-fill" cx="35%" cy="25%" r="75%">
             <stop offset="0" stopColor="#a8f7ff" />
@@ -40,7 +40,7 @@ export default function YujiStickerField() {
         <circle cx="24" cy="60" r="5" fill="#ff5ea9" />
       </svg>
 
-      <svg className="yuji-sticker is-smile" viewBox="0 0 108 108">
+      <svg className="yuji-sticker is-smile" data-yuji-sticker viewBox="0 0 108 108">
         <defs>
           <pattern id="yuji-smile-dots" width="7" height="7" patternUnits="userSpaceOnUse">
             <circle cx="1.8" cy="1.8" r="1.4" fill="#0a1420" opacity="0.22" />
@@ -73,7 +73,7 @@ export default function YujiStickerField() {
         <path d="m87 17 6 4-5 5" fill="none" stroke="#ff4f98" strokeWidth="4" />
       </svg>
 
-      <svg className="yuji-sticker is-stamp" viewBox="0 0 112 112">
+      <svg className="yuji-sticker is-stamp" data-yuji-sticker viewBox="0 0 112 112">
         <defs>
           <pattern id="yuji-stamp-hatch" width="6" height="6" patternUnits="userSpaceOnUse">
             <path d="M0 6 6 0" stroke="#15304d" strokeWidth="1.4" opacity="0.28" />
@@ -114,7 +114,7 @@ export default function YujiStickerField() {
         </text>
       </svg>
 
-      <svg className="yuji-sticker is-bloom" viewBox="0 0 110 110">
+      <svg className="yuji-sticker is-bloom" data-yuji-sticker viewBox="0 0 110 110">
         <defs>
           <linearGradient id="yuji-bloom-metal" x1="0" x2="1" y1="0" y2="1">
             <stop offset="0" stopColor="#fff" />
@@ -133,7 +133,7 @@ export default function YujiStickerField() {
         <circle cx="55" cy="56" r="6" fill="#d9ff37" />
       </svg>
 
-      <svg className="yuji-sticker is-ticket" viewBox="0 0 128 76">
+      <svg className="yuji-sticker is-ticket" data-yuji-sticker viewBox="0 0 128 76">
         <path
           d="M7 8h114v17c-8 1-12 7-12 13s4 12 12 13v17H7V51c8-1 12-7 12-13S15 26 7 25V8Z"
           fill="#ff7048"
