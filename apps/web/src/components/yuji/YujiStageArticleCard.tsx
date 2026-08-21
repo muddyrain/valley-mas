@@ -41,7 +41,11 @@ export default function YujiStageArticleCard({ index, post, scope }: YujiStageAr
   const number = String(index + 1).padStart(2, '0');
 
   return (
-    <article className="yuji-stage-article-card" data-card-index={number} data-yuji-reveal="scroll">
+    <article
+      className={`yuji-stage-article-card${scope === 'index' ? ' yuji-stage-article-card--index' : ''}`}
+      data-card-index={number}
+      data-yuji-reveal="scroll"
+    >
       <div className="yuji-stage-article-signal" aria-hidden="true">
         <span>{number}</span>
         <span>{post.group?.name || 'LOG'}</span>

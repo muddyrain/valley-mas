@@ -91,10 +91,43 @@ describe('YujiArticles', () => {
     );
     await flush();
 
-    expect(getPosts).toHaveBeenCalledWith({ page: 1, pageSize: 12, groupId: 'react' });
+    expect(getPosts).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 24,
+      sort: 'created',
+      groupId: 'react',
+    });
     expect(container.textContent).toContain('错误边界');
     expect(container.querySelector('a[aria-current="page"]')?.textContent).toBe('React');
     expect(container.querySelector('a[href="/articles/post-1"]')).not.toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('uses URL-backed search and pagination when requesting the article index', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() =>
+      root.render(
+        <MemoryRouter
+          initialEntries={['/articles?groupId=react&keyword=%E8%BE%B9%E7%95%8C&page=2']}
+        >
+          <YujiArticles />
+        </MemoryRouter>,
+      ),
+    );
+    await flush();
+
+    expect(getPosts).toHaveBeenCalledWith({
+      page: 2,
+      pageSize: 24,
+      sort: 'created',
+      groupId: 'react',
+      keyword: '边界',
+    });
+    expect(container.querySelector<HTMLInputElement>('input[type="search"]')?.value).toBe('边界');
 
     act(() => root.unmount());
     container.remove();
@@ -176,7 +209,7 @@ describe('YujiArticles', () => {
     await flush();
 
     expect(container.textContent).toContain('文章暂时没有抵达。');
-    const retry = container.querySelector('button');
+    const retry = container.querySelector<HTMLButtonElement>('[role="alert"] button');
     await act(async () => {
       retry?.click();
       await Promise.resolve();

@@ -1,11 +1,11 @@
-import avatarUrl from '../../../prototypes/yuji/assets/yuji-brand/avatar.png';
+import { YUJI_GITHUB_AVATAR_URL, YUJI_GITHUB_PROFILE_URL } from '@/components/yuji/yujiAuthor';
 
 export default function YujiAbout() {
   return (
     <main className="yuji-public-main yuji-about-page">
       <header className="yuji-about-hero">
         <figure>
-          <img src={avatarUrl} alt="muddyrain 的 GitHub 头像" />
+          <img src={YUJI_GITHUB_AVATAR_URL} alt="muddyrain 的 GitHub 头像" />
         </figure>
         <div>
           <p>ABOUT / MUDDYRAIN</p>
@@ -32,7 +32,7 @@ export default function YujiAbout() {
         </div>
         <div>
           <p className="yuji-kicker">找到我</p>
-          <a href="https://github.com/muddyrain" target="_blank" rel="noreferrer">
+          <a href={YUJI_GITHUB_PROFILE_URL} target="_blank" rel="noreferrer">
             GitHub · @muddyrain ↗
           </a>
         </div>

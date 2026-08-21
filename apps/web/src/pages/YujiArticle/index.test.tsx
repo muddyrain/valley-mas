@@ -32,7 +32,8 @@ beforeEach(() => {
     id: 'post-1',
     title: '组件渲染性能优化',
     excerpt: '让更新边界更清楚。',
-    content: '# 组件渲染性能优化\n\n## 为什么会重新渲染\n\n正文内容。',
+    content:
+      '# 组件渲染性能优化\n\n## 为什么会重新渲染\n\n- 可见的无序条目\n- 第二项\n\n1. 有序条目\n2. 第二项\n\n```ts\nconst render = (count: number) => count + 1;\n```\n\n## 怎样收紧更新边界\n\n继续阅读。',
     group: { name: 'React' },
     tags: [{ id: 'tag-1', name: '性能优化', slug: 'performance' }],
     createdAt: '2026-08-06T00:00:00Z',
@@ -102,7 +103,17 @@ describe('YujiArticle', () => {
     expect(container.querySelectorAll('h1')).toHaveLength(1);
     expect(container.querySelector('.yuji-article-body h1')).toBeNull();
     expect(container.querySelector('article h2')?.id).toBe('为什么会重新渲染');
+    expect(container.querySelector('.yuji-article-toc')).not.toBeNull();
+    expect(container.querySelectorAll('.yuji-article-toc [aria-current="location"]')).toHaveLength(
+      1,
+    );
     expect(container.querySelector('.yuji-article-note')).toBeNull();
+    expect(container.querySelector('.yuji-article-body ul')).not.toBeNull();
+    expect(container.querySelector('.yuji-article-body ol')).not.toBeNull();
+    expect(container.querySelector('.yuji-article-body .markdown-code-language')?.textContent).toBe(
+      'ts',
+    );
+    expect(container.querySelector('button.yuji-code-copy')?.textContent).toBe('复制');
 
     act(() => root.unmount());
     container.remove();

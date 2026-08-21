@@ -49,7 +49,7 @@ afterEach(() => {
 });
 
 describe('YujiPixelTrail', () => {
-  it('keeps the native cursor and emits short-lived pixels behind pointer movement', () => {
+  it('keeps the native cursor and emits equally sized, grid-aligned pixels behind pointer movement', () => {
     const target = document.createElement('main');
     document.body.appendChild(target);
     Object.defineProperty(document, 'elementFromPoint', {
@@ -71,14 +71,28 @@ describe('YujiPixelTrail', () => {
 
     act(() => {
       stage.pointerBus.move(600, 320, { height: 800, left: 0, top: 0, width: 1_200 }, 16);
-      stage.pointerBus.move(680, 380, { height: 800, left: 0, top: 0, width: 1_200 }, 32);
+      stage.pointerBus.move(680, 320, { height: 800, left: 0, top: 0, width: 1_200 }, 32);
     });
 
     const activePixels = Array.from(
       container.querySelectorAll<HTMLElement>('.yuji-pixel-trail i'),
     ).filter((pixel) => pixel.style.animation.includes('yuji-pixel-trail-fade'));
     expect(activePixels.length).toBeGreaterThan(0);
-    expect(activePixels.every((pixel) => pixel.style.width === pixel.style.height)).toBe(true);
+    expect(activePixels.every((pixel) => pixel.style.width === '16px')).toBe(true);
+    expect(activePixels.every((pixel) => pixel.style.height === '16px')).toBe(true);
+    expect(
+      activePixels.every(
+        (pixel) =>
+          Number.parseInt(pixel.style.left, 10) % 16 === 0 &&
+          Number.parseInt(pixel.style.top, 10) % 16 === 0,
+      ),
+    ).toBe(true);
+    const horizontalSpacing = activePixels
+      .map((pixel) => Number.parseInt(pixel.style.left, 10))
+      .sort((left, right) => left - right);
+    expect(horizontalSpacing.slice(1)).toEqual(
+      horizontalSpacing.slice(0, -1).map((left) => left + 16),
+    );
     expect(activePixels[0]?.style.left).not.toBe('680px');
     expect(activePixels[0]?.style.opacity).toBe('0');
     expect(window.getComputedStyle(document.body).cursor).not.toBe('none');

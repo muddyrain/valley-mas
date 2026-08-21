@@ -141,7 +141,7 @@ export interface PostListParams {
   tag?: string;
   keyword?: string;
   postType?: PostType;
-  sort?: 'newest' | 'oldest';
+  sort?: 'newest' | 'oldest' | 'created';
 }
 
 export interface PostListData {

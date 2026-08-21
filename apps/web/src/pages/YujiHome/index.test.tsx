@@ -101,7 +101,10 @@ describe('YujiHome', () => {
     expect(container.textContent).not.toContain('独立开发者，现居杭州');
     expect(container.textContent).not.toContain('来自上海');
     expect(container.textContent).toContain('把工程做成表达');
-    expect(container.querySelector('img[alt="muddyrain 的 GitHub 头像"]')).not.toBeNull();
+    const githubAvatar = container.querySelector<HTMLImageElement>(
+      'img[alt="muddyrain 的 GitHub 头像"]',
+    );
+    expect(githubAvatar?.src).toBe('https://github.com/muddyrain.png?size=640');
     expect(container.querySelector('a[href="https://github.com/muddyrain"]')).not.toBeNull();
     expect(container.querySelectorAll('.yuji-sticker-field svg')).toHaveLength(6);
     expect(container.querySelectorAll('[data-yuji-sticker]')).toHaveLength(6);

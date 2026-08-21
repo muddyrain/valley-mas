@@ -1,19 +1,36 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { type Group, getGroups, getPosts, type Post } from '@/api/blog';
 import YujiContentRevealStatus from '@/components/yuji/YujiContentRevealStatus';
 import YujiContentState from '@/components/yuji/YujiContentState';
 import YujiStageArticleCard from '@/components/yuji/YujiStageArticleCard';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
+import { numberParam, stringParam, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
+
+const PAGE_SIZE = 24;
+const ARTICLE_INDEX_QUERY_SCHEMA = {
+  page: numberParam(1, { min: 1 }),
+  groupId: stringParam('', { resetPageOnChange: true }),
+  keyword: stringParam('', { resetPageOnChange: true }),
+};
 
 export default function YujiArticles() {
-  const [searchParams] = useSearchParams();
-  const groupId = searchParams.get('groupId') || '';
+  const {
+    searchParams,
+    values: { groupId, keyword, page },
+    setValue,
+  } = useUrlQueryState(ARTICLE_INDEX_QUERY_SCHEMA, { pageKey: 'page' });
   const [groups, setGroups] = useState<Group[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [total, setTotal] = useState(0);
+  const [keywordInput, setKeywordInput] = useState(keyword);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const requestRef = useRef(0);
+
+  useEffect(() => {
+    setKeywordInput(keyword);
+  }, [keyword]);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,20 +51,30 @@ export default function YujiArticles() {
     setLoading(true);
     setFailed(false);
     setPosts([]);
-    return getPosts({ page: 1, pageSize: 12, ...(groupId ? { groupId } : {}) })
+    return getPosts({
+      page,
+      pageSize: PAGE_SIZE,
+      sort: 'created',
+      ...(groupId ? { groupId } : {}),
+      ...(keyword ? { keyword } : {}),
+    })
       .then((data) => {
-        if (requestId === requestRef.current) setPosts(data.list ?? []);
+        if (requestId === requestRef.current) {
+          setPosts(data.list ?? []);
+          setTotal(data.total ?? 0);
+        }
       })
       .catch(() => {
         if (requestId === requestRef.current) {
           setPosts([]);
+          setTotal(0);
           setFailed(true);
         }
       })
       .finally(() => {
         if (requestId === requestRef.current) setLoading(false);
       });
-  }, [groupId]);
+  }, [groupId, keyword, page]);
 
   useEffect(() => {
     void loadPosts();
@@ -57,6 +84,23 @@ export default function YujiArticles() {
   }, [loadPosts]);
 
   const showLoading = useDelayedLoading(loading);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const createGroupHref = (nextGroupId: string) => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (nextGroupId) {
+      nextSearchParams.set('groupId', nextGroupId);
+    } else {
+      nextSearchParams.delete('groupId');
+    }
+    nextSearchParams.delete('page');
+    const query = nextSearchParams.toString();
+    return query ? `/articles?${query}` : '/articles';
+  };
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setValue('keyword', keywordInput.trim());
+  };
 
   return (
     <main className="yuji-public-main yuji-index-page yuji-articles-page">
@@ -71,7 +115,7 @@ export default function YujiArticles() {
         </h1>
         <p>技术、工具与实践中的真实判断。每一次打开，都从同一张封面穿过，抵达安静的正文。</p>
         <div className="yuji-index-coordinate" aria-hidden="true">
-          <span>INDEX / {String(posts.length).padStart(2, '0')}</span>
+          <span>INDEX / {String(total).padStart(2, '0')}</span>
           <span>SCROLL VELOCITY / LIVE</span>
         </div>
       </header>
@@ -82,13 +126,13 @@ export default function YujiArticles() {
           <strong>专栏</strong>
         </div>
         <div className="yuji-column-track">
-          <Link to="/articles" aria-current={!groupId ? 'page' : undefined}>
+          <Link to={createGroupHref('')} aria-current={!groupId ? 'page' : undefined}>
             全部文章
           </Link>
           {groups.map((group) => (
             <Link
               key={group.id}
-              to={`/articles?groupId=${encodeURIComponent(group.id)}`}
+              to={createGroupHref(group.id)}
               aria-current={groupId === group.id ? 'page' : undefined}
             >
               {group.name}
@@ -96,6 +140,24 @@ export default function YujiArticles() {
           ))}
         </div>
       </nav>
+
+      <section className="yuji-article-directory-toolbar" aria-label="文章检索">
+        <form onSubmit={submitSearch}>
+          <label htmlFor="yuji-article-search">搜索文章</label>
+          <input
+            id="yuji-article-search"
+            type="search"
+            value={keywordInput}
+            onChange={(event) => setKeywordInput(event.target.value)}
+            placeholder="搜索标题、摘要与正文"
+          />
+          <button type="submit">检索</button>
+        </form>
+        <p aria-live="polite">
+          <span>FOUND / {String(total).padStart(2, '0')}</span>
+          <span>{keyword ? `QUERY / ${keyword}` : 'ALL PUBLIC NOTES'}</span>
+        </p>
+      </section>
 
       <section
         className="yuji-writing-index yuji-stage-article-grid"
@@ -113,6 +175,24 @@ export default function YujiArticles() {
           />
         ) : null}
       </section>
+
+      {totalPages > 1 ? (
+        <nav className="yuji-article-pagination" aria-label="文章分页">
+          <button type="button" disabled={page <= 1} onClick={() => setValue('page', page - 1)}>
+            上一页
+          </button>
+          <span>
+            PAGE {String(page).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
+          </span>
+          <button
+            type="button"
+            disabled={page >= totalPages}
+            onClick={() => setValue('page', page + 1)}
+          >
+            下一页
+          </button>
+        </nav>
+      ) : null}
     </main>
   );
 }

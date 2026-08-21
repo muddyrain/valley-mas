@@ -4,6 +4,15 @@ html:has(.yuji-site) {
   scrollbar-gutter: auto;
 }
 
+/* `hidden` on one root axis computes the other axis to `auto`, creating a
+   scroll container that breaks sticky descendants. Clip horizontal overflow
+   without taking ownership of vertical page scrolling. */
+html:has(.yuji-site),
+body:has(.yuji-site) {
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
 .yuji-site {
   --yuji-bg: #050607;
   --yuji-bg-elevated: #0b0d10;
@@ -17,13 +26,17 @@ html:has(.yuji-site) {
   --yuji-cyan: #59e7ff;
   --yuji-acid: #a8ff4f;
   --yuji-orange: #ff6846;
+  --yuji-interactive-hover: var(--yuji-orange);
   --yuji-danger: #ff5874;
   --yuji-selection: var(--yuji-orange);
   --yuji-shell: min(100% - 48px, 1500px);
   --yuji-reading: min(100% - 40px, 820px);
   --yuji-header-height: 76px;
   min-height: 100vh;
-  overflow: clip;
+  /* Do not clip the vertical scrolling ancestor: it prevents the article TOC
+     from establishing its sticky viewport position. */
+  overflow-x: clip;
+  overflow-y: visible;
   background:
     radial-gradient(circle at 12% 8%, rgb(37 71 255 / 12%), transparent 25rem), var(--yuji-bg);
   color: var(--yuji-ink);
@@ -58,6 +71,7 @@ html:has(.yuji-site) {
   --yuji-bg-soft: #dfe6f0;
   --yuji-ink: #090b10;
   --yuji-muted: #596274;
+  --yuji-cyan: #087b9c;
   --yuji-line: rgb(19 41 91 / 18%);
   --yuji-line-strong: rgb(19 41 91 / 40%);
   background:
@@ -318,8 +332,8 @@ html:has(.yuji-site) {
 .yuji-studio-link:hover,
 .yuji-theme-button:hover,
 .yuji-menu-button:hover {
-  border-color: var(--yuji-cyan);
-  background: rgb(89 231 255 / 10%);
+  border-color: var(--yuji-interactive-hover);
+  background: color-mix(in srgb, var(--yuji-interactive-hover) 10%, transparent);
 }
 
 .yuji-menu-button,
@@ -606,7 +620,7 @@ html:has(.yuji-site) {
 
 .yuji-stage-enter:hover {
   padding-inline: 10px;
-  color: var(--yuji-acid);
+  color: var(--yuji-interactive-hover);
 }
 
 /* Home sections */
@@ -694,8 +708,8 @@ html:has(.yuji-site) {
 }
 
 .yuji-section-heading > a:hover {
-  border-color: var(--yuji-acid);
-  color: var(--yuji-acid);
+  border-color: var(--yuji-interactive-hover);
+  color: var(--yuji-interactive-hover);
 }
 
 /* Shared DOM article grid */
@@ -732,7 +746,7 @@ html:has(.yuji-site) {
 
 .yuji-stage-article-card:hover,
 .yuji-stage-article-card:focus-within {
-  background: color-mix(in srgb, var(--yuji-bg) 88%, var(--yuji-cobalt));
+  background: color-mix(in srgb, var(--yuji-bg) 88%, var(--yuji-interactive-hover));
 }
 
 .yuji-stage-article-signal {
@@ -811,12 +825,6 @@ html:has(.yuji-site) {
 .yuji-stage-cover > a {
   display: block;
   height: 100%;
-  transform: perspective(1100px) rotateX(calc(var(--yuji-cover-strength, 0) * 2.4deg))
-    rotateY(calc(var(--yuji-cover-motion, 0) * -8deg))
-    translateZ(calc(var(--yuji-cover-strength, 0) * 24px));
-  transform-origin: center;
-  transform-style: preserve-3d;
-  will-change: transform;
 }
 
 .yuji-stage-cover img {
@@ -944,7 +952,7 @@ html:has(.yuji-site) {
   padding: 9px 11px;
   background: rgb(5 6 7 / 78%);
   color: #fff;
-  font-size: 11px;
+  font-size: 14px;
   backdrop-filter: blur(12px);
 }
 
@@ -980,8 +988,8 @@ html:has(.yuji-site) {
 }
 
 .yuji-underlined-link:hover {
-  border-color: var(--yuji-orange);
-  color: var(--yuji-orange);
+  border-color: var(--yuji-interactive-hover);
+  color: var(--yuji-interactive-hover);
 }
 
 /* Article index */
@@ -1149,8 +1157,8 @@ html:has(.yuji-site) {
 }
 
 .yuji-back-link:hover {
-  border-color: var(--yuji-acid);
-  color: var(--yuji-acid);
+  border-color: var(--yuji-interactive-hover);
+  color: var(--yuji-interactive-hover);
 }
 
 .yuji-article-signal {
@@ -1254,8 +1262,8 @@ html:has(.yuji-site) {
 }
 
 .yuji-article-toc a:hover {
-  border-color: var(--yuji-acid);
-  color: var(--yuji-ink);
+  border-color: var(--yuji-interactive-hover);
+  color: var(--yuji-interactive-hover);
 }
 
 .yuji-article-body {
@@ -1348,8 +1356,7 @@ html:has(.yuji-site) {
 }
 
 .yuji-article-body :not(pre) > code {
-  padding: 0.18em 0.38em;
-  background: var(--yuji-bg-soft);
+  padding: 0 0.38em;
   color: var(--yuji-cyan);
   font-family: monospace;
   font-size: 0.86em;
@@ -2042,7 +2049,7 @@ html:has(.yuji-site) {
 }
 
 .yuji-footer-links a:hover {
-  color: var(--yuji-acid);
+  color: var(--yuji-interactive-hover);
 }
 
 @keyframes yuji-signal-pulse {
@@ -2536,7 +2543,12 @@ html:has(.yuji-site) {
   border-radius: 0;
 }
 
-.yuji-desktop-nav a:hover,
+.yuji-desktop-nav a:hover {
+  border-color: var(--yuji-interactive-hover);
+  background: transparent;
+  color: var(--yuji-interactive-hover);
+}
+
 .yuji-desktop-nav a.is-active {
   border-color: currentColor;
   background: transparent;
@@ -2571,7 +2583,7 @@ html:has(.yuji-site) {
 .yuji-theme-button:hover {
   border-color: transparent;
   background: transparent;
-  color: var(--yuji-cobalt);
+  color: var(--yuji-interactive-hover);
 }
 
 .yuji-stage-canvas {
@@ -2893,7 +2905,7 @@ html:has(.yuji-site) {
 
 .yuji-stage-enter:hover {
   padding-inline: 12px;
-  color: var(--yuji-cobalt);
+  color: var(--yuji-interactive-hover);
 }
 
 .yuji-wordmark-telemetry.is-bottom {
@@ -3161,7 +3173,7 @@ html:has(.yuji-site) {
 
 .yuji-stage-article-card:hover,
 .yuji-stage-article-card:focus-within {
-  background: color-mix(in srgb, var(--yuji-cobalt) 7%, transparent);
+  background: color-mix(in srgb, var(--yuji-interactive-hover) 7%, transparent);
 }
 
 .yuji-stage-article-card:nth-child(even) {
@@ -3215,7 +3227,7 @@ html:has(.yuji-site) {
   bottom: -0.12em;
   left: 0;
   height: 0.07em;
-  background: var(--yuji-orange);
+  background: var(--yuji-interactive-hover);
   content: "";
   pointer-events: none;
   transform: scaleX(0);
@@ -3225,7 +3237,7 @@ html:has(.yuji-site) {
 
 .yuji-stage-article-title:hover,
 .yuji-stage-article-title:focus-visible {
-  color: var(--yuji-orange);
+  color: var(--yuji-interactive-hover);
   transform: translate3d(0.025em, -0.025em, 0);
 }
 
@@ -3746,6 +3758,834 @@ html:has(.yuji-site) {
   .yuji-index-hero h1,
   .yuji-articles-hero h1 {
     font-size: clamp(90px, 30vw, 148px);
+  }
+}
+
+/* Article directory: keep the landing-page treatment, but let a large archive scan like an index. */
+.yuji-articles-hero {
+  min-height: clamp(390px, 45vw, 600px);
+  padding-block: clamp(72px, 7vw, 112px) 44px;
+}
+
+.yuji-articles-hero h1 {
+  font-size: clamp(90px, 14vw, 230px);
+}
+
+.yuji-article-directory-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px 32px;
+  align-items: center;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--yuji-line-strong);
+}
+
+.yuji-article-directory-toolbar form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0;
+  min-width: min(100%, 520px);
+}
+
+.yuji-article-directory-toolbar label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.yuji-article-directory-toolbar input {
+  min-width: 0;
+  border: 1px solid var(--yuji-line-strong);
+  border-right: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--yuji-ink);
+  font-family: monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.yuji-article-directory-toolbar input:focus {
+  border-color: var(--yuji-cobalt);
+  background: color-mix(in srgb, var(--yuji-bg-soft) 76%, transparent);
+}
+
+.yuji-article-directory-toolbar input,
+.yuji-article-directory-toolbar button {
+  min-height: 44px;
+  padding: 0 15px;
+}
+
+.yuji-article-directory-toolbar button,
+.yuji-article-pagination button {
+  border: 1px solid var(--yuji-ink);
+  border-radius: 0;
+  background: var(--yuji-ink);
+  color: var(--yuji-bg);
+  font-family: monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.yuji-article-directory-toolbar button:hover,
+.yuji-article-directory-toolbar button:focus-visible,
+.yuji-article-pagination button:not(:disabled):hover,
+.yuji-article-pagination button:not(:disabled):focus-visible {
+  background: var(--yuji-interactive-hover);
+  border-color: var(--yuji-interactive-hover);
+}
+
+.yuji-article-directory-toolbar button:active,
+.yuji-article-pagination button:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+.yuji-article-directory-toolbar p,
+.yuji-article-pagination span {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 16px;
+  margin: 0;
+  color: var(--yuji-muted);
+  font-family: monospace;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.1em;
+}
+
+.yuji-article-directory-toolbar p span:first-child {
+  color: var(--yuji-cyan);
+}
+
+.yuji-writing-index .yuji-stage-article-card,
+.yuji-writing-index .yuji-stage-article-card:nth-child(4n + 2),
+.yuji-writing-index .yuji-stage-article-card:nth-child(4n + 3),
+.yuji-writing-index .yuji-stage-article-card:nth-child(4n + 4) {
+  grid-template-columns: 44px minmax(0, 1fr) minmax(200px, 0.42fr) 52px;
+  grid-template-rows: minmax(164px, 198px);
+  min-height: 164px;
+}
+
+.yuji-writing-index .yuji-stage-article-card:nth-child(even) {
+  grid-template-columns: 44px minmax(0, 1fr) minmax(200px, 0.42fr) 52px;
+}
+
+.yuji-writing-index .yuji-stage-article-card .yuji-stage-article-copy,
+.yuji-writing-index .yuji-stage-article-card:nth-child(even) .yuji-stage-article-copy {
+  grid-column: 2;
+  align-self: center;
+  padding: 22px clamp(20px, 3vw, 44px);
+}
+
+.yuji-writing-index .yuji-stage-article-card .yuji-stage-article-copy h2 {
+  max-width: 26ch;
+  margin-bottom: 9px;
+  font-size: clamp(25px, 2.5vw, 44px);
+  line-height: 0.94;
+}
+
+.yuji-writing-index .yuji-stage-article-card .yuji-meta-row {
+  gap: 6px 14px;
+  margin-bottom: 10px;
+}
+
+.yuji-writing-index .yuji-stage-article-card .yuji-stage-article-copy > p:last-child {
+  display: -webkit-box;
+  max-width: 62ch;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.5;
+  text-wrap: pretty;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.yuji-writing-index .yuji-stage-article-card .yuji-stage-cover,
+.yuji-writing-index .yuji-stage-article-card:nth-child(even) .yuji-stage-cover {
+  grid-column: 3;
+  min-height: 0;
+  margin: 16px clamp(12px, 1.8vw, 28px);
+  overflow: hidden;
+}
+
+.yuji-writing-index .yuji-stage-article-card .yuji-stage-cover > a {
+  height: 100%;
+  box-shadow:
+    0 0 0 1px oklch(0 0 0 / 10%),
+    0 16px 32px rgb(5 16 26 / 12%);
+}
+
+.yuji-writing-index .yuji-stage-article-card .yuji-stage-cover > a > img {
+  min-height: 100%;
+}
+
+.yuji-writing-index .yuji-stage-article-card .yuji-stage-cover-placeholder {
+  padding: 14px;
+}
+
+.yuji-writing-index .yuji-stage-article-card .yuji-stage-cover-placeholder span {
+  font-size: clamp(36px, 5vw, 70px);
+}
+
+.yuji-writing-index .yuji-stage-article-card .yuji-stage-article-open {
+  grid-column: 4;
+  padding: 16px 0;
+}
+
+.yuji-article-pagination {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  padding: 28px 0 0;
+}
+
+.yuji-article-pagination button {
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.yuji-article-pagination button:last-child {
+  justify-self: end;
+}
+
+.yuji-article-pagination button:disabled {
+  cursor: not-allowed;
+  border-color: var(--yuji-line-strong);
+  background: transparent;
+  color: var(--yuji-muted);
+}
+
+/* Article detail — quiet reading, wider measure, and persistent navigation. */
+.yuji-article-page {
+  background:
+    radial-gradient(
+      circle at 76% 14%,
+      color-mix(in srgb, var(--yuji-cobalt) 9%, transparent),
+      transparent 30rem
+    ),
+    var(--yuji-bg);
+}
+
+.yuji-article-hero {
+  grid-template-columns: minmax(112px, 0.22fr) minmax(0, 1.12fr) minmax(440px, 1fr);
+  gap: clamp(34px, 5vw, 96px);
+  min-height: min(78svh, 880px);
+  padding-block: clamp(112px, 11vw, 172px) clamp(68px, 8vw, 116px);
+}
+
+.yuji-article-title {
+  max-width: 940px;
+  padding-top: 32px;
+}
+
+.yuji-article-title h1 {
+  max-width: none;
+  margin-bottom: 34px;
+  font-size: clamp(54px, 6.35vw, 106px);
+  letter-spacing: -0.072em;
+  /* Keep multi-line CJK selection highlights in separate line boxes. */
+  line-height: 1.1;
+  text-wrap: pretty;
+}
+
+.yuji-article-title > p:not(.yuji-meta-row) {
+  max-width: 56ch;
+  margin-bottom: 32px;
+  color: color-mix(in srgb, var(--yuji-ink) 72%, var(--yuji-muted));
+  font-size: clamp(16px, 1.35vw, 19px);
+  line-height: 1.8;
+  text-wrap: pretty;
+}
+
+.yuji-article-hero figure {
+  display: block;
+  align-self: center;
+  aspect-ratio: auto;
+  min-height: 0;
+  padding: 0;
+  background: var(--yuji-bg-soft);
+  transform: rotate(0.7deg);
+}
+
+.yuji-article-hero figure img {
+  width: 100%;
+  height: auto;
+  max-height: min(68svh, 760px);
+  object-fit: initial;
+  filter: saturate(0.96) contrast(1.02);
+}
+
+.yuji-article-layout {
+  grid-template-columns: minmax(210px, 0.62fr) minmax(0, 920px) minmax(100px, 0.32fr);
+  gap: clamp(34px, 4vw, 72px);
+  width: min(100% - 48px, 1640px);
+  padding-block: clamp(76px, 9vw, 138px);
+}
+
+.yuji-article-layout.has-no-toc .yuji-article-body {
+  max-width: 920px;
+}
+
+.yuji-article-toc {
+  top: calc(var(--yuji-header-height) + 22px);
+  gap: 0;
+  max-height: calc(100svh - var(--yuji-header-height) - 46px);
+  padding: 18px 0 18px 18px;
+  border-left: 1px solid var(--yuji-line-strong);
+  background: color-mix(in srgb, var(--yuji-bg) 72%, transparent);
+  scrollbar-gutter: stable;
+}
+
+.yuji-article-toc-list {
+  display: block;
+}
+
+.yuji-article-toc .yuji-article-toc-list h3 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 16px 14px 0;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--yuji-line);
+  color: var(--yuji-ink);
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.yuji-article-toc .yuji-article-toc-list h3 svg {
+  width: 15px;
+  height: 15px;
+  color: var(--yuji-interactive-hover);
+}
+
+.yuji-article-toc .yuji-article-toc-list ul {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0 14px 0 0;
+  list-style: none;
+}
+
+.yuji-article-toc .yuji-article-toc-list a {
+  min-height: 34px;
+  padding: 7px 8px 7px 12px;
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--yuji-muted);
+  font-family: Inter, "PingFang SC", sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.yuji-article-toc .yuji-article-toc-list a:hover,
+.yuji-article-toc .yuji-article-toc-list a:focus-visible {
+  background: color-mix(in srgb, var(--yuji-interactive-hover) 8%, transparent);
+  border-color: var(--yuji-interactive-hover);
+  color: var(--yuji-ink);
+}
+
+.yuji-article-toc .yuji-article-toc-list a[aria-current="location"] {
+  background: color-mix(in srgb, var(--yuji-interactive-hover) 12%, transparent);
+  border-color: var(--yuji-interactive-hover);
+  color: var(--yuji-ink);
+  font-weight: 700;
+}
+
+.yuji-article-body {
+  max-width: 920px;
+  color: color-mix(in srgb, var(--yuji-ink) 88%, var(--yuji-muted));
+  font-size: clamp(18px, 1.35vw, 21px);
+  line-height: 2;
+}
+
+.yuji-article-body::first-letter {
+  float: none;
+  margin: 0;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+
+.yuji-article-body h2 {
+  margin: 3.6em 0 1.15em;
+  padding-top: 0.88em;
+  font-size: clamp(31px, 3vw, 48px);
+  line-height: 1.12;
+}
+
+.yuji-article-body h3 {
+  margin: 2.8em 0 0.9em;
+  font-size: clamp(24px, 2.15vw, 34px);
+}
+
+.yuji-article-body p,
+.yuji-article-body ul,
+.yuji-article-body ol,
+.yuji-article-body blockquote,
+.yuji-article-body pre,
+.yuji-article-body table,
+.yuji-article-body figure {
+  margin-block: 1.85em;
+}
+
+.yuji-article-body ul,
+.yuji-article-body ol {
+  padding-left: 1.55em;
+}
+
+.yuji-article-body ul {
+  list-style: square;
+}
+
+.yuji-article-body ol {
+  list-style: decimal;
+}
+
+.yuji-article-body li {
+  padding-left: 0.22em;
+}
+
+.yuji-article-body li::marker {
+  color: var(--yuji-interactive-hover);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82em;
+  font-weight: 800;
+}
+
+.yuji-article-body li + li {
+  margin-top: 0.55em;
+}
+
+.yuji-article-body blockquote {
+  padding: 10px 0 10px 28px;
+  border-color: var(--yuji-interactive-hover);
+  color: color-mix(in srgb, var(--yuji-ink) 70%, var(--yuji-muted));
+}
+
+.yuji-article-body img,
+.yuji-article-body video {
+  width: min(100%, 1060px);
+  max-width: none;
+  margin: 2.5em auto;
+  transform: none;
+}
+
+.yuji-article-body table {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.yuji-article-body pre.yuji-code-block {
+  position: relative;
+  padding: 16px 18px 18px;
+  border-color: color-mix(in srgb, var(--yuji-cobalt) 42%, var(--yuji-line));
+  background: linear-gradient(135deg, rgb(37 71 255 / 12%), transparent 32%), #080a0e;
+  box-shadow: 10px 10px 0 rgb(37 71 255 / 13%);
+}
+
+.yuji-article-body .markdown-code-header {
+  min-height: 34px;
+  margin: 0 80px 12px 0;
+  border-bottom: 1px solid rgb(164 190 255 / 18%);
+}
+
+.yuji-article-body .markdown-code-language {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  background: rgb(89 231 255 / 10%);
+  color: #83edff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.yuji-article-body .markdown-code-grid {
+  display: grid;
+  grid-template-columns: 3.2em minmax(0, 1fr);
+  background: transparent;
+}
+
+.yuji-article-body .markdown-code-numbers {
+  grid-column: 1;
+  display: block;
+  border-right: 1px solid rgb(164 190 255 / 16%);
+  color: #71809e;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.72;
+  text-align: right;
+  user-select: none;
+  pointer-events: none;
+}
+
+.yuji-article-body .markdown-code-numbers > span {
+  display: block;
+  min-height: 24.08px;
+  padding-right: 0.7em;
+  line-height: 24.08px;
+}
+
+.yuji-article-body pre.yuji-code-block .markdown-code-grid > code {
+  grid-column: 2;
+  display: block;
+  background: transparent;
+  color: #dbe6ff;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 14px;
+  line-height: 1.72;
+}
+
+.yuji-article-body .markdown-code-content {
+  display: block;
+  min-height: 1.72em;
+  padding: 0;
+  background: transparent;
+  white-space: pre;
+}
+
+.yuji-article-body pre.yuji-code-block .markdown-code-grid > code::selection {
+  background: transparent;
+  color: inherit;
+  text-shadow: none;
+}
+
+.yuji-article-body .markdown-code-content::selection,
+.yuji-article-body .markdown-code-content *::selection {
+  background: var(--yuji-selection);
+  color: #050700;
+  text-shadow: none;
+}
+
+.yuji-article-body pre.yuji-code-block > code {
+  counter-reset: code-line;
+}
+
+.yuji-article-body .code-token-comment {
+  color: #71809e;
+}
+
+.yuji-article-body .code-token-string {
+  color: #a8ff9a;
+}
+
+.yuji-article-body .code-token-keyword {
+  color: #ff9a83;
+  font-weight: 700;
+}
+
+.yuji-article-body .code-token-function {
+  color: #8fe8ff;
+}
+
+.yuji-article-body .code-token-property {
+  color: #d5b5ff;
+}
+
+.yuji-article-body .code-token-number {
+  color: #ffd27a;
+}
+
+.yuji-code-copy {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgb(131 237 255 / 42%);
+  border-radius: 0;
+  background: rgb(8 10 14 / 82%);
+  color: #dbe6ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.yuji-code-copy:hover,
+.yuji-code-copy:focus-visible {
+  border-color: var(--yuji-interactive-hover);
+  background: var(--yuji-interactive-hover);
+  color: #090b10;
+  outline: none;
+}
+
+.yuji-article-footer {
+  width: min(100% - 48px, 1640px);
+  padding-bottom: 112px;
+}
+
+.yuji-article-tags {
+  max-width: 920px;
+  margin: 0 auto 76px;
+}
+
+.yuji-article-neighbors {
+  gap: 1px;
+  border: 1px solid var(--yuji-line-strong);
+  background: var(--yuji-line-strong);
+}
+
+.yuji-article-neighbors:has(a:only-child) {
+  grid-template-columns: 1fr;
+}
+
+.yuji-article-neighbor {
+  min-height: 220px;
+  padding: clamp(24px, 3.2vw, 48px);
+  background: var(--yuji-bg);
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.yuji-article-neighbor--next {
+  text-align: right;
+}
+
+.yuji-article-neighbor-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--yuji-interactive-hover);
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.yuji-article-neighbors .yuji-article-neighbor-label {
+  color: var(--yuji-interactive-hover);
+}
+
+.yuji-article-neighbor--next .yuji-article-neighbor-label {
+  justify-content: flex-end;
+}
+
+.yuji-article-neighbor-label i {
+  font-family: inherit;
+  font-size: 18px;
+  font-style: normal;
+}
+
+.yuji-article-neighbor strong {
+  max-width: 18ch;
+  color: var(--yuji-ink);
+  font-size: clamp(30px, 3.4vw, 56px);
+  line-height: 0.96;
+  text-wrap: balance;
+}
+
+.yuji-article-neighbor--next strong {
+  align-self: end;
+}
+
+.yuji-article-neighbor:hover,
+.yuji-article-neighbor:focus-visible {
+  background: color-mix(in srgb, var(--yuji-interactive-hover) 8%, var(--yuji-bg));
+  transform: translateY(-4px);
+}
+
+@media (max-width: 1100px) {
+  .yuji-article-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 0.52fr);
+    min-height: auto;
+  }
+
+  .yuji-article-hero .yuji-back-link,
+  .yuji-article-title {
+    grid-column: 1;
+  }
+
+  .yuji-article-hero figure {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .yuji-article-signal {
+    display: none;
+  }
+
+  .yuji-article-layout {
+    grid-template-columns: minmax(190px, 0.4fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 980px) {
+  .yuji-article-layout {
+    display: grid;
+    grid-template-columns: minmax(160px, 0.3fr) minmax(0, 1fr);
+    gap: 28px;
+    width: min(100% - 36px, 920px);
+  }
+
+  .yuji-article-toc {
+    grid-column: 1;
+    margin-bottom: 0;
+  }
+
+  .yuji-article-body {
+    grid-column: 2;
+  }
+
+  .yuji-article-footer {
+    width: min(100% - 36px, 920px);
+  }
+}
+
+@media (max-width: 680px) {
+  .yuji-article-hero {
+    grid-template-columns: 1fr;
+    padding-block: 102px 54px;
+  }
+
+  .yuji-article-hero figure {
+    grid-column: 1;
+    grid-row: auto;
+    width: min(100%, 520px);
+    justify-self: center;
+    margin-top: 8px;
+  }
+
+  .yuji-article-title {
+    padding-top: 22px;
+  }
+
+  .yuji-article-title h1 {
+    font-size: clamp(48px, 13.4vw, 74px);
+    line-height: 1.1;
+  }
+
+  .yuji-article-layout,
+  .yuji-article-footer {
+    width: min(100% - 28px, 920px);
+  }
+
+  .yuji-article-layout {
+    display: block;
+  }
+
+  .yuji-article-toc {
+    position: static;
+    width: 100%;
+    max-height: 320px;
+    margin-bottom: 52px;
+  }
+
+  .yuji-article-body {
+    font-size: 18px;
+    line-height: 1.9;
+  }
+
+  .yuji-article-neighbors {
+    grid-template-columns: 1fr;
+  }
+
+  .yuji-article-neighbor {
+    min-height: 176px;
+  }
+}
+
+@media (max-width: 900px) {
+  .yuji-articles-hero {
+    min-height: 440px;
+  }
+
+  .yuji-writing-index .yuji-stage-article-card,
+  .yuji-writing-index .yuji-stage-article-card:nth-child(4n + 2),
+  .yuji-writing-index .yuji-stage-article-card:nth-child(4n + 3),
+  .yuji-writing-index .yuji-stage-article-card:nth-child(4n + 4),
+  .yuji-writing-index .yuji-stage-article-card:nth-child(even) {
+    grid-template-columns: 42px minmax(0, 1fr) minmax(150px, 0.4fr) 50px;
+    grid-template-rows: 156px;
+    min-height: 156px;
+  }
+}
+
+@media (max-width: 620px) {
+  .yuji-articles-hero {
+    min-height: 390px;
+  }
+
+  .yuji-article-directory-toolbar {
+    grid-template-columns: 1fr;
+    padding: 16px 0;
+  }
+
+  .yuji-article-directory-toolbar p {
+    justify-content: flex-start;
+  }
+
+  .yuji-writing-index .yuji-stage-article-card,
+  .yuji-writing-index .yuji-stage-article-card:nth-child(4n + 2),
+  .yuji-writing-index .yuji-stage-article-card:nth-child(4n + 3),
+  .yuji-writing-index .yuji-stage-article-card:nth-child(4n + 4),
+  .yuji-writing-index .yuji-stage-article-card:nth-child(even) {
+    grid-template-columns: 34px minmax(0, 1fr) 84px 44px;
+    grid-template-rows: 132px;
+    min-height: 132px;
+  }
+
+  .yuji-writing-index .yuji-stage-article-card .yuji-stage-article-copy,
+  .yuji-writing-index .yuji-stage-article-card:nth-child(even) .yuji-stage-article-copy {
+    padding: 16px 14px;
+  }
+
+  .yuji-writing-index .yuji-stage-article-card .yuji-stage-article-copy h2 {
+    font-size: clamp(24px, 7.2vw, 34px);
+  }
+
+  .yuji-writing-index .yuji-stage-article-card .yuji-stage-article-copy > p:last-child {
+    display: none;
+  }
+
+  .yuji-writing-index .yuji-stage-article-card .yuji-stage-cover,
+  .yuji-writing-index .yuji-stage-article-card:nth-child(even) .yuji-stage-cover {
+    margin: 12px 8px;
+  }
+
+  .yuji-writing-index .yuji-stage-article-card .yuji-stage-article-open {
+    padding: 10px 0;
+  }
+
+  .yuji-article-pagination {
+    gap: 10px;
+  }
+
+  .yuji-article-pagination button {
+    padding: 0 12px;
+    font-size: 9px;
   }
 }
 

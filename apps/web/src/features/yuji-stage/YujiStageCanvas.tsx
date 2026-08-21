@@ -621,9 +621,13 @@ function CoverMesh({
 }) {
   const meshRef = useRef<Mesh>(null);
   const frameRef = useRef(0);
+  const nearViewportRef = useRef(false);
   const motionRef = useRef(0);
   const revealRef = useRef(0);
   const hoverRef = useRef(0);
+  const [nearViewport, setNearViewport] = useState(
+    () => typeof window === 'undefined' || !('IntersectionObserver' in window),
+  );
   const [texture, setTexture] = useState<Texture | null>(null);
   const material = useMemo(
     () =>
@@ -646,6 +650,7 @@ function CoverMesh({
   );
 
   useEffect(() => {
+    if (!nearViewport || texture) return;
     let active = true;
     const loader = new TextureLoader();
     loader.load(
@@ -666,7 +671,7 @@ function CoverMesh({
     return () => {
       active = false;
     };
-  }, [cover.src]);
+  }, [cover.src, nearViewport, texture]);
 
   useEffect(() => {
     material.uniforms.uTexture.value = texture;
@@ -683,18 +688,34 @@ function CoverMesh({
 
   useEffect(() => () => material.dispose(), [material]);
 
-  useEffect(
-    () => () => {
-      cover.element.style.removeProperty('--yuji-cover-motion');
-      cover.element.style.removeProperty('--yuji-cover-strength');
-    },
-    [cover],
-  );
+  useEffect(() => {
+    if (!('IntersectionObserver' in window)) {
+      nearViewportRef.current = true;
+      setNearViewport(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const nearViewport = entry?.isIntersecting ?? false;
+        nearViewportRef.current = nearViewport;
+        setNearViewport(nearViewport);
+        if (!nearViewport && meshRef.current) meshRef.current.visible = false;
+      },
+      { rootMargin: '100% 0px' },
+    );
+    observer.observe(cover.element);
+    return () => observer.disconnect();
+  }, [cover]);
 
   useFrame((state, delta) => {
     const mesh = meshRef.current;
-    if (!mesh || !cover.element.isConnected) {
+    if (!mesh || !cover.element.isConnected || !nearViewportRef.current) {
       if (mesh) mesh.visible = false;
+      return;
+    }
+
+    if (!texture) {
+      mesh.visible = false;
       return;
     }
 
@@ -702,13 +723,6 @@ function CoverMesh({
     motionRef.current = dampCoverMotion(motionRef.current, motionTarget, delta);
     const motion = motionRef.current;
     const motionStrength = Math.abs(motion);
-    cover.element.style.setProperty('--yuji-cover-motion', motion.toFixed(4));
-    cover.element.style.setProperty('--yuji-cover-strength', motionStrength.toFixed(4));
-
-    if (!texture) {
-      mesh.visible = false;
-      return;
-    }
 
     frameRef.current += 1;
     const rect = cover.element.getBoundingClientRect();

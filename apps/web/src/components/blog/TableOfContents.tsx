@@ -12,7 +12,7 @@ interface TableOfContentsProps {
 }
 
 function getStickyTopOffset() {
-  const stickySelectors = ['[data-global-header]', '[data-blog-post-nav]'];
+  const stickySelectors = ['[data-global-header]', '[data-blog-post-nav]', '.yuji-header'];
 
   const stickyHeight = stickySelectors.reduce((total, selector) => {
     const element = document.querySelector<HTMLElement>(selector);
@@ -115,6 +115,11 @@ export function TableOfContents({
       }
     };
 
+    if (!('IntersectionObserver' in window)) {
+      highlightCurrentHeading();
+      return;
+    }
+
     const observer = new IntersectionObserver(callback, {
       rootMargin: `-${scrollOffset}px 0px -60% 0px`,
       threshold: 0,
@@ -171,6 +176,7 @@ export function TableOfContents({
           <li key={item.id} style={{ paddingLeft: `${(item.level - 1) * 12}px` }}>
             <a
               href={`#${item.id}`}
+              aria-current={activeId === item.id ? 'location' : undefined}
               onClick={(e) => handleClick(e, item.id)}
               className={cn(
                 'block py-1.5 text-sm transition-all duration-200 rounded-md px-2 -mx-2',

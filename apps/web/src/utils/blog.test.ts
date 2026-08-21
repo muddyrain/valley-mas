@@ -52,4 +52,11 @@ describe('blog Markdown utilities', () => {
     expect(markdownToPlainText(content)).toBe('Title\nHello world!\nconst x = 1');
     expect(createPlainTextExcerpt(content, 12)).toBe('Title\nHello...');
   });
+
+  it('keeps the selectable code text separate from its line-number rail', () => {
+    const html = renderMarkdownWithAnchors('```ts\nconst value = 1;\n```');
+
+    expect(html).toContain('<span class="markdown-code-numbers" aria-hidden="true"><span>1</span>');
+    expect(html).toContain('<code class="language-ts"><span class="markdown-code-content">');
+  });
 });

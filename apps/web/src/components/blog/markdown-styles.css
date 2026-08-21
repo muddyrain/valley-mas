@@ -185,31 +185,39 @@
 
 .markdown-body pre.markdown-code-block > code {
   display: block;
-  counter-reset: code-line;
 }
 
-.markdown-code-line {
-  position: relative;
+.markdown-code-grid {
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr);
+}
+
+.markdown-code-numbers {
+  grid-column: 1;
   display: block;
-  min-height: 1.6em;
-  padding-left: 3.25rem;
-  white-space: pre;
-}
-
-.markdown-code-line::before {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 2.25rem;
-  padding-right: 0.75rem;
   border-right: 1px solid hsl(var(--border) / 0.72);
   color: var(--code-token-comment);
-  content: counter(code-line);
-  counter-increment: code-line;
   font-size: 0.9em;
-  line-height: inherit;
+  line-height: 1.6;
   text-align: right;
   user-select: none;
+  pointer-events: none;
+}
+
+.markdown-code-numbers > span {
+  display: block;
+  min-height: 1.6em;
+  padding-right: 0.75rem;
+}
+
+.markdown-body pre.markdown-code-block .markdown-code-grid > code {
+  grid-column: 2;
+}
+
+.markdown-code-content {
+  display: block;
+  min-height: 1.6em;
+  white-space: pre;
 }
 
 .markdown-body pre.markdown-code-block .copy-button {

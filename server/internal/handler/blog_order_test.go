@@ -17,6 +17,11 @@ func TestBuildPostTimelineOrderExprUsesStableTiebreakers(t *testing.T) {
 			sort: "oldest",
 			want: "is_top DESC, COALESCE(published_at, created_at) ASC, created_at ASC, id ASC",
 		},
+		{
+			name: "created",
+			sort: "created",
+			want: "is_top DESC, created_at DESC, id DESC",
+		},
 	}
 
 	for _, testCase := range testCases {

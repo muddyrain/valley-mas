@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getPostDetailById, type PostDetail } from '@/api/blog';
+import { TableOfContents } from '@/components/blog/TableOfContents';
+import YujiArticleMarkdownContent from '@/components/yuji/YujiArticleMarkdownContent';
 import YujiContentRevealStatus from '@/components/yuji/YujiContentRevealStatus';
 import YujiContentState from '@/components/yuji/YujiContentState';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
@@ -67,9 +69,14 @@ export default function YujiArticle() {
   const content = post ? withoutRepeatedMarkdownTitle(rawContent, post.title) : rawContent;
   const toc = useMemo(() => extractToc(content), [content]);
   const renderedContent = useMemo(() => renderMarkdownWithAnchors(content), [content]);
+  const [activeTocId, setActiveTocId] = useState('');
   const showToc = toc.length >= 2 || content.length > 2400;
   const readingMinutes = Math.max(1, Math.ceil(content.replace(/\s/g, '').length / 420));
   const showLoading = useDelayedLoading(loading);
+
+  useEffect(() => {
+    setActiveTocId(toc[0]?.id ?? '');
+  }, [toc]);
 
   if (!loading && !post) {
     return (
@@ -132,19 +139,15 @@ export default function YujiArticle() {
           <div className={`yuji-article-layout ${showToc ? 'has-toc' : 'has-no-toc'}`}>
             {showToc ? (
               <aside className="yuji-article-toc" aria-label="文章目录">
-                <p>ON THIS PAGE / 目录</p>
-                {toc.map((item) => (
-                  <a key={item.id} href={`#${item.id}`}>
-                    {item.text}
-                  </a>
-                ))}
+                <TableOfContents
+                  activeId={activeTocId}
+                  className="yuji-article-toc-list"
+                  onActiveIdChange={setActiveTocId}
+                  toc={toc}
+                />
               </aside>
             ) : null}
-            <div
-              className="yuji-article-body"
-              // Blog content is authored by the single site owner and rendered through the existing pipeline.
-              dangerouslySetInnerHTML={{ __html: renderedContent }}
-            />
+            <YujiArticleMarkdownContent html={renderedContent} />
           </div>
 
           <footer className="yuji-article-footer">
@@ -160,16 +163,26 @@ export default function YujiArticle() {
             {post.prevPost || post.nextPost ? (
               <nav className="yuji-article-neighbors" aria-label="相邻文章">
                 {post.prevPost ? (
-                  <Link to={`/articles/${post.prevPost.id}`}>
-                    <span>上一篇</span>
+                  <Link
+                    className="yuji-article-neighbor yuji-article-neighbor--previous"
+                    to={`/articles/${post.prevPost.id}`}
+                  >
+                    <span className="yuji-article-neighbor-label">
+                      <i aria-hidden="true">←</i>
+                      上一篇
+                    </span>
                     <strong>{post.prevPost.title}</strong>
                   </Link>
-                ) : (
-                  <span />
-                )}
+                ) : null}
                 {post.nextPost ? (
-                  <Link to={`/articles/${post.nextPost.id}`}>
-                    <span>下一篇</span>
+                  <Link
+                    className="yuji-article-neighbor yuji-article-neighbor--next"
+                    to={`/articles/${post.nextPost.id}`}
+                  >
+                    <span className="yuji-article-neighbor-label">
+                      下一篇
+                      <i aria-hidden="true">→</i>
+                    </span>
                     <strong>{post.nextPost.title}</strong>
                   </Link>
                 ) : null}

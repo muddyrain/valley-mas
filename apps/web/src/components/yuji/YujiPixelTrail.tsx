@@ -2,10 +2,10 @@ import { useEffect, useRef } from 'react';
 import { useYujiStage } from '@/features/yuji-stage/YujiStageContext';
 
 const PIXEL_COUNT = 18;
-const GRID_SIZE = 8;
-const MIN_SAMPLE_DISTANCE = 10;
-const SAMPLE_STEP = 18;
-const PIXEL_SIZES = [20, 16, 12, 16] as const;
+const PIXEL_SIZE = 16;
+const GRID_SIZE = PIXEL_SIZE;
+const SAMPLE_STEP = PIXEL_SIZE;
+const MAX_SAMPLES_PER_UPDATE = 5;
 
 function snapToGrid(value: number) {
   return Math.round(value / GRID_SIZE) * GRID_SIZE;
@@ -40,15 +40,13 @@ export default function YujiPixelTrail() {
         Math.floor(pixelIndex / pixels.length) % 2 === 0
           ? 'yuji-pixel-trail-fade-a'
           : 'yuji-pixel-trail-fade-b';
-      const phase = pixelIndex % 4;
-      const size = PIXEL_SIZES[phase] ?? 16;
       const duration = Math.round(Math.min(620, Math.max(380, 500 + speed * 7)));
 
       pixelIndex += 1;
-      pixel.style.left = `${snapToGrid(x - size / 2)}px`;
-      pixel.style.top = `${snapToGrid(y - size / 2)}px`;
-      pixel.style.width = `${size}px`;
-      pixel.style.height = `${size}px`;
+      pixel.style.left = `${snapToGrid(x - PIXEL_SIZE / 2)}px`;
+      pixel.style.top = `${snapToGrid(y - PIXEL_SIZE / 2)}px`;
+      pixel.style.width = `${PIXEL_SIZE}px`;
+      pixel.style.height = `${PIXEL_SIZE}px`;
       pixel.style.opacity = '0';
       pixel.style.animation = `${animationName} ${duration}ms steps(5, end) forwards`;
     };
@@ -77,19 +75,17 @@ export default function YujiPixelTrail() {
         return;
       }
 
-      const deltaX = x - previousX;
-      const deltaY = y - previousY;
-      const distance = Math.hypot(deltaX, deltaY);
-      if (distance < MIN_SAMPLE_DISTANCE) return;
+      for (let sample = 0; sample < MAX_SAMPLES_PER_UPDATE; sample += 1) {
+        const deltaX = x - previousX;
+        const deltaY = y - previousY;
+        const distance = Math.hypot(deltaX, deltaY);
+        if (distance < SAMPLE_STEP) break;
 
-      const sampleCount = Math.min(5, Math.max(1, Math.floor(distance / SAMPLE_STEP)));
-      for (let sample = 1; sample <= sampleCount; sample += 1) {
-        const progress = sample / (sampleCount + 1);
-        emitPixel(previousX + deltaX * progress, previousY + deltaY * progress, pointer.speed);
+        const progress = SAMPLE_STEP / distance;
+        previousX += deltaX * progress;
+        previousY += deltaY * progress;
+        emitPixel(previousX, previousY, pointer.speed);
       }
-
-      previousX = x;
-      previousY = y;
     };
 
     const unsubscribe = stage.pointerBus.subscribe(paint);

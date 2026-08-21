@@ -88,12 +88,13 @@ const renderer = new marked.Renderer();
 renderer.code = (code: { text: string; lang?: string }) => {
   const codeText = typeof code === 'string' ? code : code.text || '';
   const language = typeof code === 'string' ? '' : code.lang || 'text';
-  const lines = codeText
-    .split('\n')
-    .map((line) => `<span class="markdown-code-line">${highlightCode(line) || ' '}</span>`)
-    .join('\n');
+  const sourceLines = codeText.split('\n');
+  const lines = sourceLines
+    .map((line) => `<span class="markdown-code-content">${highlightCode(line) || ' '}</span>`)
+    .join('');
+  const lineNumbers = sourceLines.map((_, index) => `<span>${index + 1}</span>`).join('');
   const languageLabel = escapeHtml(language || 'text');
-  return `<pre class="markdown-code-block"><div class="markdown-code-header"><span class="markdown-code-language">${languageLabel}</span></div><code class="language-${languageLabel}">${lines}</code></pre>`;
+  return `<pre class="markdown-code-block"><div class="markdown-code-header"><span class="markdown-code-language">${languageLabel}</span></div><div class="markdown-code-grid"><span class="markdown-code-numbers" aria-hidden="true">${lineNumbers}</span><code class="language-${languageLabel}">${lines}</code></div></pre>`;
 };
 
 marked.setOptions({

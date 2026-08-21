@@ -30,7 +30,11 @@ const (
 
 func buildPostTimelineOrderExpr(sort string) string {
 	orderExpr := "is_top DESC, COALESCE(published_at, created_at) DESC, created_at DESC, id DESC"
-	if strings.EqualFold(strings.TrimSpace(sort), "oldest") {
+	normalizedSort := strings.TrimSpace(strings.ToLower(sort))
+	if normalizedSort == "created" {
+		return "is_top DESC, created_at DESC, id DESC"
+	}
+	if normalizedSort == "oldest" {
 		orderExpr = "is_top DESC, COALESCE(published_at, created_at) ASC, created_at ASC, id ASC"
 	}
 	return orderExpr

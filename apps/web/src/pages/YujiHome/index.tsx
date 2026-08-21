@@ -6,9 +6,9 @@ import YujiContentRevealStatus from '@/components/yuji/YujiContentRevealStatus';
 import YujiContentState from '@/components/yuji/YujiContentState';
 import YujiStageArticleCard from '@/components/yuji/YujiStageArticleCard';
 import YujiWordmarkHero from '@/components/yuji/YujiWordmarkHero';
+import { YUJI_GITHUB_AVATAR_URL, YUJI_GITHUB_PROFILE_URL } from '@/components/yuji/yujiAuthor';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { useYujiEditorialMotion } from '@/hooks/useYujiEditorialMotion';
-import avatarUrl from '../../../prototypes/yuji/assets/yuji-brand/avatar.png';
 
 export default function YujiHome() {
   const pageRef = useRef<HTMLElement>(null);
@@ -86,13 +86,13 @@ export default function YujiHome() {
           <p className="yuji-profile-kicker">YJ / PROFILE NOTE 01</p>
           <a
             className="yuji-profile-portrait"
-            href="https://github.com/muddyrain"
+            href={YUJI_GITHUB_PROFILE_URL}
             target="_blank"
             rel="noreferrer"
             aria-label="访问 muddyrain 的 GitHub 主页"
           >
             <figure>
-              <img src={avatarUrl} alt="muddyrain 的 GitHub 头像" />
+              <img src={YUJI_GITHUB_AVATAR_URL} alt="muddyrain 的 GitHub 头像" />
               <figcaption>
                 <span>@MUDDYRAIN</span>
                 <span>HANGZHOU / CN</span>
@@ -115,7 +115,7 @@ export default function YujiHome() {
               </Link>
               <a
                 className="yuji-underlined-link"
-                href="https://github.com/muddyrain"
+                href={YUJI_GITHUB_PROFILE_URL}
                 target="_blank"
                 rel="noreferrer"
               >
