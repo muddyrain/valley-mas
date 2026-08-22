@@ -13,7 +13,7 @@ import {
   YujiTransitionNavLink,
 } from '@/features/yuji-transition/YujiPublicTransition';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { useThemeStore } from '@/stores/useThemeStore';
+import { resolveThemeMode, useThemeStore } from '@/stores/useThemeStore';
 import '@/styles/yuji.css';
 
 const PUBLIC_NAVIGATION: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
@@ -32,8 +32,7 @@ export default function YujiPublicLayout() {
   const showStudioEntry = useAuthStore((state) => state.hasHydrated && state.isAuthenticated);
   const themeMode = useThemeStore((state) => state.mode);
   const setThemeMode = useThemeStore((state) => state.setMode);
-  const isArticleDetail = /^\/articles\/[^/]+/.test(location.pathname);
-  const publicTheme = themeMode === 'system' ? (isArticleDetail ? 'dark' : 'light') : themeMode;
+  const publicTheme = resolveThemeMode(themeMode);
   const toggleTheme = () => setThemeMode(publicTheme === 'dark' ? 'light' : 'dark');
   const chromeValue = useMemo(() => ({ setHeaderSurface }), []);
 

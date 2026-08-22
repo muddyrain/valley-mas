@@ -10,10 +10,20 @@ const authState = vi.hoisted(() => ({
   isAuthenticated: false,
 }));
 
+const themeState = vi.hoisted(() => ({
+  mode: 'system' as const,
+  setMode: vi.fn(),
+}));
+
 vi.mock('@/stores/useAuthStore', () => ({
   useAuthStore: (
     selector: (state: { hasHydrated: boolean; isAuthenticated: boolean }) => unknown,
   ) => selector(authState),
+}));
+
+vi.mock('@/stores/useThemeStore', () => ({
+  resolveThemeMode: (mode: 'dark' | 'light' | 'system') => (mode === 'system' ? 'light' : mode),
+  useThemeStore: (selector: (state: typeof themeState) => unknown) => selector(themeState),
 }));
 
 import YujiPublicLayout from './YujiPublicLayout';
@@ -22,6 +32,7 @@ describe('YujiPublicLayout', () => {
   beforeEach(() => {
     authState.hasHydrated = true;
     authState.isAuthenticated = false;
+    themeState.setMode.mockClear();
   });
 
   it('renders the public brand, primary navigation and child route', () => {
@@ -83,6 +94,29 @@ describe('YujiPublicLayout', () => {
     expect(container.querySelector('.yuji-brand[aria-current="page"]')).not.toBeNull();
     expect(container.textContent).toContain('YUJI® / 2026');
     expect(container.querySelector('.yuji-pixel-trail[aria-hidden="true"]')).not.toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('keeps the system theme consistent when entering an article detail', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <MemoryRouter initialEntries={['/articles/post-1']}>
+          <Routes>
+            <Route path="/" element={<YujiPublicLayout />}>
+              <Route path="articles/:id" element={<main>文章详情内容</main>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.querySelector('.yuji-site')?.getAttribute('data-public-theme')).toBe('light');
 
     act(() => root.unmount());
     container.remove();
