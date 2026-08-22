@@ -66,6 +66,7 @@ export interface Post {
   imageTextData?: string;
   excerpt: string;
   cover?: string;
+  coverThumbnail?: string;
   coverStorageKey?: string;
   groupId: string;
   group?: PostGroup;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPosts, type Post } from '@/api/blog';
 import { getAllResources, type Resource } from '@/api/resource';
+import ImagePreviewDialog from '@/components/ImagePreviewDialog';
 import YujiContentRevealStatus from '@/components/yuji/YujiContentRevealStatus';
 import YujiContentState from '@/components/yuji/YujiContentState';
 import YujiStageArticleCard from '@/components/yuji/YujiStageArticleCard';
@@ -18,6 +19,7 @@ export default function YujiHome() {
   const [loadingResources, setLoadingResources] = useState(true);
   const [postsFailed, setPostsFailed] = useState(false);
   const [resourcesFailed, setResourcesFailed] = useState(false);
+  const [previewResource, setPreviewResource] = useState<Resource | null>(null);
   const postsRequestRef = useRef(0);
   const resourcesRequestRef = useRef(0);
 
@@ -44,7 +46,7 @@ export default function YujiHome() {
     const requestId = ++resourcesRequestRef.current;
     setLoadingResources(true);
     setResourcesFailed(false);
-    return getAllResources({ page: 1, pageSize: 4, includeTags: true, type: 'wallpaper' })
+    return getAllResources({ page: 1, pageSize: 5, includeTags: true, type: 'wallpaper' })
       .then((data) => {
         if (requestId === resourcesRequestRef.current) setResources(data.list ?? []);
       })
@@ -73,7 +75,7 @@ export default function YujiHome() {
   const showResourcesLoading = useDelayedLoading(loadingResources);
 
   const recentPosts = posts.slice(0, 8);
-  const featuredImages = resources.slice(0, 4);
+  const featuredImages = resources.slice(0, 5);
   const motionRevision = `${loadingPosts}-${loadingResources}-${posts.length}-${resources.length}`;
   useYujiEditorialMotion(pageRef, motionRevision);
 
@@ -100,14 +102,13 @@ export default function YujiHome() {
             </figure>
           </a>
           <div className="yuji-profile-copy">
-            <p>DEVELOPER / WRITER / VISUAL COLLECTOR</p>
+            <p>NOTES / TOOLS / VISUAL ARCHIVE</p>
             <h2 id="yuji-statement-title">
-              <span className="is-lead">把工程做成表达，</span>
-              <span>把兴趣积累成作品。</span>
+              <span className="is-lead">把想法写下来，</span>
+              <span>把喜欢的留住。</span>
             </h2>
             <p className="yuji-profile-intro">
-              我是 muddyrain，一名生活在杭州的开发者。写前端与 AI
-              工具，也记录技术判断、创作过程，和那些值得再看一眼的影像。
+              前端、AI 工具和随手记下的判断；也收集让人愿意多看一眼的画面。
             </p>
             <div className="yuji-profile-links">
               <Link className="yuji-underlined-link" to="/about">
@@ -175,14 +176,19 @@ export default function YujiHome() {
                   className={index === 0 ? 'yuji-home-image-item is-lead' : 'yuji-home-image-item'}
                   data-yuji-reveal="scroll"
                 >
-                  <Link to={`/gallery/image/${resource.id}`}>
+                  <button
+                    className="yuji-home-image-preview-trigger"
+                    type="button"
+                    onClick={() => setPreviewResource(resource)}
+                    aria-label={`预览${resource.title}`}
+                  >
                     <img
                       src={resource.thumbnailUrl || resource.url}
                       alt={resource.title}
                       decoding="async"
                       loading="lazy"
                     />
-                  </Link>
+                  </button>
                   <figcaption>{resource.title}</figcaption>
                 </figure>
               ))}
@@ -203,13 +209,22 @@ export default function YujiHome() {
           <p>ABOUT / SIGNAL OWNER</p>
           <div>
             <h2 id="yuji-home-about-title">谁在留下这些痕迹？</h2>
-            <p>一个开发者的技术判断、影像练习，以及仍在发生的思考。</p>
+            <p>技术判断、影像练习，以及还在慢慢成形的想法。</p>
           </div>
           <Link className="yuji-underlined-link" to="/about">
             继续了解 <span aria-hidden="true">→</span>
           </Link>
         </section>
       </div>
+      <ImagePreviewDialog
+        open={Boolean(previewResource)}
+        src={previewResource?.url}
+        resourceId={previewResource?.id}
+        title={previewResource?.title}
+        onOpenChange={(open) => {
+          if (!open) setPreviewResource(null);
+        }}
+      />
     </main>
   );
 }

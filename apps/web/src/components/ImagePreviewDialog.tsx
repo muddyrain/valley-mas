@@ -435,7 +435,8 @@ export default function ImagePreviewDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange} disablePointerDismissal>
       <DialogContent
-        className="group/image-preview !top-0 !left-0 !h-screen !max-h-screen !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-none bg-transparent p-0 shadow-none duration-300 motion-reduce:animate-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 [&>button]:hidden"
+        className="group/image-preview !top-0 !left-0 !z-[301] !h-screen !max-h-screen !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-none bg-transparent p-0 shadow-none duration-300 motion-reduce:animate-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 [&>button]:hidden"
+        overlayClassName="!z-[300]"
         finalFocus={shouldRestoreImagePreviewFocus}
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}

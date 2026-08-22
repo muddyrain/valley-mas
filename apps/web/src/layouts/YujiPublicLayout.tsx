@@ -1,6 +1,7 @@
 import { Menu, PenLine, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { GlobalCommandPalette } from '@/components/search/GlobalCommandPalette';
 import YujiPixelTrail from '@/components/yuji/YujiPixelTrail';
 import {
   type YujiHeaderSurface,
@@ -16,6 +17,7 @@ import { useThemeStore } from '@/stores/useThemeStore';
 import '@/styles/yuji.css';
 
 const PUBLIC_NAVIGATION: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
+  { to: '/', label: '首页', end: true },
   { to: '/articles', label: '文章' },
   { to: '/gallery', label: '图库' },
   { to: '/about', label: '关于' },
@@ -23,6 +25,7 @@ const PUBLIC_NAVIGATION: ReadonlyArray<{ to: string; label: string; end?: boolea
 
 export default function YujiPublicLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [headerSurface, setHeaderSurface] = useState<YujiHeaderSurface>('stage');
   const location = useLocation();
   const isHomeStage = location.pathname === '/';
@@ -78,14 +81,17 @@ export default function YujiPublicLayout() {
                   <span className="yuji-live-signal" aria-hidden="true">
                     <i /> LIVE
                   </span>
-                  <YujiTransitionNavLink
+                  <button
                     className="yuji-search-link"
-                    to="/search"
+                    type="button"
+                    onClick={() => setSearchOpen(true)}
                     aria-label="搜索文章与影像"
+                    aria-expanded={searchOpen}
+                    aria-haspopup="dialog"
                   >
                     <Search aria-hidden="true" />
                     <span>搜索</span>
-                  </YujiTransitionNavLink>
+                  </button>
                   {showStudioEntry ? (
                     <NavLink className="yuji-studio-link" to="/studio">
                       <PenLine aria-hidden="true" />
@@ -129,9 +135,15 @@ export default function YujiPublicLayout() {
                     {item.label}
                   </YujiTransitionNavLink>
                 ))}
-                <YujiTransitionNavLink to="/search" onClick={() => setMobileOpen(false)}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    setSearchOpen(true);
+                  }}
+                >
                   搜索
-                </YujiTransitionNavLink>
+                </button>
                 {showStudioEntry ? (
                   <NavLink to="/studio" onClick={() => setMobileOpen(false)}>
                     创作室
@@ -165,6 +177,7 @@ export default function YujiPublicLayout() {
                 </a>
               </div>
             </footer>
+            <GlobalCommandPalette open={searchOpen} onOpenChange={setSearchOpen} variant="yuji" />
           </div>
         </YujiPublicStageProvider>
       </YujiPublicTransitionProvider>

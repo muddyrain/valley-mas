@@ -50,3 +50,40 @@ func TestBuildAdminPostListOrderExprSupportsCreatedSort(t *testing.T) {
 		t.Fatalf("buildAdminPostListOrderExpr(%q) = %q, want %q", "", gotDefault, wantDefault)
 	}
 }
+
+func TestBuildPostCoverThumbnailURL(t *testing.T) {
+	const process = "x-tos-process=image/resize,w_800,m_lfit/format,webp/quality,q_85"
+
+	testCases := []struct {
+		name       string
+		coverURL   string
+		storageKey string
+		want       string
+	}{
+		{
+			name:       "stored cover gets a compact webp variant",
+			coverURL:   "https://tos.example.com/blog/cover.png",
+			storageKey: "blog/cover.png",
+			want:       "https://tos.example.com/blog/cover.png?" + process,
+		},
+		{
+			name:       "stored cover preserves an existing query",
+			coverURL:   "https://tos.example.com/blog/cover.png?token=abc",
+			storageKey: "blog/cover.png",
+			want:       "https://tos.example.com/blog/cover.png?token=abc&" + process,
+		},
+		{
+			name:     "external cover remains unchanged",
+			coverURL: "https://images.example.com/cover.png",
+			want:     "https://images.example.com/cover.png",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := buildPostCoverThumbnailURL(testCase.coverURL, testCase.storageKey); got != testCase.want {
+				t.Fatalf("buildPostCoverThumbnailURL() = %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getAllResources, type Resource } from '@/api/resource';
+import ImagePreviewDialog from '@/components/ImagePreviewDialog';
 import YujiContentRevealStatus from '@/components/yuji/YujiContentRevealStatus';
 import YujiContentState from '@/components/yuji/YujiContentState';
 import { YujiTransitionLink } from '@/features/yuji-transition/YujiPublicTransition';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { useYujiEditorialMotion } from '@/hooks/useYujiEditorialMotion';
 import { distributeGalleryResources } from '@/utils/galleryMasonry';
-import { getYujiImageTransitionStyle } from '@/utils/yujiViewTransition';
 
 const GALLERY_PAGE_SIZE = 24;
 
@@ -46,6 +46,7 @@ export default function YujiGallery() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [failed, setFailed] = useState(false);
   const [loadMoreFailed, setLoadMoreFailed] = useState(false);
+  const [previewResource, setPreviewResource] = useState<Resource | null>(null);
   const requestRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const continuationRef = useRef<HTMLDivElement>(null);
@@ -157,6 +158,7 @@ export default function YujiGallery() {
     () => distributeGalleryResources(resources, columnCount),
     [columnCount, resources],
   );
+  const initialImageCount = columnCount * 2;
 
   useYujiEditorialMotion(pageRef, `${resourceType}-${loading}-${resources.length}`);
 
@@ -174,6 +176,7 @@ export default function YujiGallery() {
             coverId="gallery-wallpaper"
             to="/gallery"
             aria-current={resourceType === 'wallpaper' ? 'page' : undefined}
+            data-gallery-tab="01"
           >
             壁纸
           </YujiTransitionLink>
@@ -181,6 +184,7 @@ export default function YujiGallery() {
             coverId="gallery-avatar"
             to="/gallery?type=avatar"
             aria-current={resourceType === 'avatar' ? 'page' : undefined}
+            data-gallery-tab="02"
           >
             头像
           </YujiTransitionLink>
@@ -206,29 +210,31 @@ export default function YujiGallery() {
             {resourceColumns.map((column, lane) => (
               <div key={lane} className="yuji-gallery-column" data-masonry-column={lane}>
                 {column.map((resource) => {
-                  const index = resources.findIndex((item) => item.id === resource.id);
+                  const index = resources.indexOf(resource);
                   return (
                     <figure
                       key={resource.id}
                       className="yuji-gallery-item"
-                      data-yuji-reveal="scroll"
+                      data-yuji-reveal={index < columnCount ? 'media' : 'scroll'}
                     >
-                      <YujiTransitionLink
-                        coverId={`gallery:${resource.id}`}
-                        to={`/gallery/image/${resource.id}`}
+                      <button
+                        className="yuji-gallery-preview-trigger"
+                        type="button"
+                        onClick={() => setPreviewResource(resource)}
+                        aria-label={`预览${resource.title}`}
                       >
                         <img
                           src={resource.thumbnailUrl || resource.url}
                           alt={resource.title}
                           decoding="async"
-                          fetchPriority={index < 3 ? 'high' : 'auto'}
+                          fetchPriority={index < columnCount ? 'high' : 'auto'}
                           height={resource.height}
-                          loading={index < 3 ? 'eager' : 'lazy'}
+                          loading={index < initialImageCount ? 'eager' : 'lazy'}
                           className="yuji-shared-image"
-                          style={getYujiImageTransitionStyle(resource.id)}
                           width={resource.width}
                         />
-                      </YujiTransitionLink>
+                        <span aria-hidden="true">PREVIEW ↗</span>
+                      </button>
                       <figcaption>
                         <strong>{resource.title}</strong>
                       </figcaption>
@@ -256,6 +262,15 @@ export default function YujiGallery() {
           onRetry={failed ? () => void loadResources() : undefined}
         />
       )}
+      <ImagePreviewDialog
+        open={Boolean(previewResource)}
+        src={previewResource?.url}
+        resourceId={previewResource?.id}
+        title={previewResource?.title}
+        onOpenChange={(open) => {
+          if (!open) setPreviewResource(null);
+        }}
+      />
     </main>
   );
 }

@@ -156,7 +156,7 @@ describe('YujiArticles', () => {
     container.remove();
   });
 
-  it('keeps accessible DOM covers as the source of truth for the WebGL mirror', async () => {
+  it('uses compact cover thumbnails for archive cards', async () => {
     getPosts.mockResolvedValueOnce({
       list: [
         {
@@ -164,6 +164,7 @@ describe('YujiArticles', () => {
           title: '共享一块舞台',
           excerpt: 'DOM 决定布局，WebGL 只负责增强。',
           cover: '/cover.webp',
+          coverThumbnail: '/cover-thumb.webp',
           group: { name: 'WebGL' },
           createdAt: '2026-08-20T00:00:00Z',
         },
@@ -183,7 +184,9 @@ describe('YujiArticles', () => {
     await flush();
 
     const cover = container.querySelector('[data-yuji-cover-id="post-cover"]');
-    expect(cover?.querySelector('img[alt="共享一块舞台封面"]')).not.toBeNull();
+    expect(cover?.querySelector('img[alt="共享一块舞台封面"]')?.getAttribute('src')).toBe(
+      '/cover-thumb.webp',
+    );
     expect(
       cover?.closest('article')?.querySelector('a[href="/articles/post-cover"]'),
     ).not.toBeNull();

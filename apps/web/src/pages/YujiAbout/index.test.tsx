@@ -19,7 +19,7 @@ describe('YujiAbout', () => {
       ),
     );
 
-    expect(container.textContent).toContain('写代码，也收集让人停留片刻的画面');
+    expect(container.textContent).toContain('写点东西，也留住一些画面');
     expect(container.textContent).toContain('更新没有固定周期');
     expect(container.querySelector('a[href="https://github.com/muddyrain"]')).not.toBeNull();
 

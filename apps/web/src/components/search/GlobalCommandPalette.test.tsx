@@ -319,26 +319,6 @@ describe('GlobalCommandPalette', () => {
     cleanup(container, root);
   });
 
-  it('navigates to an encoded full-results URL and closes', async () => {
-    const { container, root } = renderPalette();
-    act(() =>
-      document.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }),
-      ),
-    );
-    act(() => typeInto(container.querySelector('input') as HTMLInputElement, '壁纸 & 头像'));
-    await act(async () => vi.advanceTimersByTimeAsync(280));
-
-    const button = Array.from(container.querySelectorAll('button')).find((item) =>
-      item.textContent?.includes('查看全部关于'),
-    );
-    act(() => button?.click());
-
-    expect(navigate).toHaveBeenCalledWith('/search?q=%E5%A3%81%E7%BA%B8+%26+%E5%A4%B4%E5%83%8F');
-    expect(container.querySelector('[role="dialog"]')).toBeNull();
-    cleanup(container, root);
-  });
-
   it('hides personal commands until the user is authenticated', () => {
     const signedOut = renderPalette();
     act(() =>

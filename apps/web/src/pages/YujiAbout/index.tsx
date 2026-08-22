@@ -9,8 +9,8 @@ export default function YujiAbout() {
         </figure>
         <div>
           <p>ABOUT / MUDDYRAIN</p>
-          <h1>写代码，也收集让人停留片刻的画面。</h1>
-          <p>雨迹放着技术笔记、正在学习的东西，以及我愿意再看一眼的影像。</p>
+          <h1>写点东西，也留住一些画面。</h1>
+          <p>技术笔记、还没想明白的事情，和想留下来的风景。</p>
         </div>
       </header>
 

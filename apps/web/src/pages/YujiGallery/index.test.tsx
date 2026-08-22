@@ -140,15 +140,17 @@ describe('YujiGallery', () => {
     expect(container.textContent).toContain('海拉鲁远眺');
     expect(container.textContent).not.toContain('春日头像');
     expect(container.querySelector('a[href*="collection="]')).toBeNull();
-    expect(container.querySelector('a[href="/gallery/image/image-1"]')).not.toBeNull();
-    expect(container.querySelector('a[href="/gallery/image/image-2"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="预览海拉鲁远眺"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/gallery/image/image-1"]')).toBeNull();
     expect(container.querySelector('[data-layout="stable-masonry"]')).not.toBeNull();
-    expect(
-      container
-        .querySelector<HTMLImageElement>('img[src="/one.webp"]')
-        ?.style.getPropertyValue('--yuji-image-transition-name'),
-    ).toBe('yuji-image-image-1');
-    expect(container.querySelector<HTMLImageElement>('img[src="/one.webp"]')?.width).toBe(1600);
+
+    const firstImage = container.querySelector<HTMLImageElement>('img[src="/one.webp"]');
+    expect(firstImage?.width).toBe(1600);
+    expect(firstImage?.getAttribute('loading')).toBe('eager');
+    expect(firstImage?.getAttribute('fetchpriority')).toBe('high');
+    expect(firstImage?.closest('figure')?.dataset.yujiReveal).toBe('media');
+    expect(container.querySelector('[data-gallery-tab="01"]')).not.toBeNull();
+    expect(container.querySelector('[data-gallery-tab="02"]')).not.toBeNull();
 
     act(() => root.unmount());
     container.remove();
@@ -226,7 +228,7 @@ describe('YujiGallery', () => {
       firstPage.map((resource) => [
         resource.id,
         container
-          .querySelector(`a[href="/gallery/image/${resource.id}"]`)
+          .querySelector(`button[aria-label="预览${resource.title}"]`)
           ?.closest<HTMLElement>('[data-masonry-column]')?.dataset.masonryColumn,
       ]),
     );
@@ -251,7 +253,7 @@ describe('YujiGallery', () => {
     for (const [resourceId, lane] of firstPageLanes) {
       expect(
         container
-          .querySelector(`a[href="/gallery/image/${resourceId}"]`)
+          .querySelector(`button[aria-label="预览壁纸 ${resourceId.split('-').at(-1)}"]`)
           ?.closest<HTMLElement>('[data-masonry-column]')?.dataset.masonryColumn,
       ).toBe(lane);
     }

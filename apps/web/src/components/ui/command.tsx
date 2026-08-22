@@ -29,12 +29,14 @@ function CommandDialog({
   description = 'Search for a command to run...',
   children,
   className,
+  overlayClassName,
   showCloseButton = false,
   ...props
 }: Omit<React.ComponentProps<typeof Dialog>, 'children'> & {
   title?: string;
   description?: string;
   className?: string;
+  overlayClassName?: string;
   showCloseButton?: boolean;
   children: React.ReactNode;
 }) {
@@ -49,7 +51,10 @@ function CommandDialog({
           'top-1/3 translate-y-0 overflow-hidden rounded-2xl! p-0 transition-[scale,opacity,filter] duration-200 ease-out data-starting-style:scale-[0.97] data-starting-style:opacity-0 data-starting-style:blur-[3px] data-ending-style:scale-[0.985] data-ending-style:opacity-0 data-ending-style:blur-[1px] data-ending-style:duration-150 motion-reduce:transition-none motion-reduce:duration-0',
           className,
         )}
-        overlayClassName="transition-opacity duration-200 ease-out data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-150 motion-reduce:transition-none motion-reduce:duration-0"
+        overlayClassName={cn(
+          'transition-opacity duration-200 ease-out data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-150 motion-reduce:transition-none motion-reduce:duration-0',
+          overlayClassName,
+        )}
         showCloseButton={showCloseButton}
       >
         {children}

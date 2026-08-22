@@ -105,8 +105,8 @@ export default function YujiWordmarkHero() {
             把复杂变清楚，把想法做成作品
           </p>
           <p>
-            <span>BUILT &amp; WRITTEN BY @MUDDYRAIN</span>
-            代码开发者，现居杭州
+            <span>NOTES BY @MUDDYRAIN</span>
+            前端、工具与影像
           </p>
         </div>
 

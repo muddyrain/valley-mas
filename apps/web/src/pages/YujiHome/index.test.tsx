@@ -94,13 +94,13 @@ describe('YujiHome', () => {
     expect(wordmarkTitle.getAttribute('aria-label')).toBe('muddyrain');
     expect(wordmarkTitle.textContent).toBe('muddyrain');
     expect(container.textContent).toContain('YUJI.DESIGN / INDEPENDENT FIELD');
-    expect(container.textContent).toContain('代码开发者，现居杭州');
+    expect(container.textContent).toContain('前端、工具与影像');
     expect(container.textContent).toContain('保持好奇');
     expect(container.textContent).toContain('允许偏航');
     expect(container.textContent).toContain('找到自己的节奏');
-    expect(container.textContent).not.toContain('独立开发者，现居杭州');
+    expect(container.textContent).not.toContain('代码开发者，现居杭州');
     expect(container.textContent).not.toContain('来自上海');
-    expect(container.textContent).toContain('把工程做成表达');
+    expect(container.textContent).toContain('把想法写下来');
     const githubAvatar = container.querySelector<HTMLImageElement>(
       'img[alt="muddyrain 的 GitHub 头像"]',
     );
@@ -156,7 +156,7 @@ describe('YujiHome', () => {
     expect(getPosts).toHaveBeenCalledWith({ page: 1, pageSize: 8 });
     expect(getAllResources).toHaveBeenCalledWith({
       page: 1,
-      pageSize: 4,
+      pageSize: 5,
       includeTags: true,
       type: 'wallpaper',
     });
@@ -166,7 +166,7 @@ describe('YujiHome', () => {
       container.querySelector('[data-yuji-stage="wordmark"] a[href="/articles"]'),
     ).not.toBeNull();
     expect(container.querySelector('a[href="/articles/post-1"]')).not.toBeNull();
-    expect(container.querySelector('a[href="/gallery/image/image-1"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="预览春日摄影之旅"]')).not.toBeNull();
 
     act(() => root.unmount());
     container.remove();

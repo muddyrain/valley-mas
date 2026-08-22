@@ -23,7 +23,6 @@ vi.mock('./pages/YujiArticle', () => ({ default: () => <main>新版文章详情<
 vi.mock('./pages/YujiArticles', () => ({ default: () => <main>文章列表内容</main> }));
 vi.mock('./pages/YujiGallery', () => ({ default: () => <main>图库页面内容</main> }));
 vi.mock('./pages/YujiImage', () => ({ default: () => <main>图片预览内容</main> }));
-vi.mock('./pages/YujiSearch', () => ({ default: () => <main>搜索页面内容</main> }));
 vi.mock('./pages/StudioHome', () => ({ default: () => <main>创作室首页内容</main> }));
 vi.mock('./layouts/StudioLayout', () => ({ default: () => <main>创作室首页内容</main> }));
 vi.mock('./layouts/PrivateLabLayout', () => ({

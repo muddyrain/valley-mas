@@ -1,4 +1,4 @@
-import { FileText, ImageIcon, Loader2, type LucideIcon, Search } from 'lucide-react';
+import { FileText, ImageIcon, Loader2, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getPosts, type Post } from '@/api/blog';
@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/command';
 import { Kbd } from '@/components/ui/kbd';
 import {
-  buildSearchResultUrl,
   filterSearchCommands,
   normalizeSearchQuery,
   SEARCH_COMMAND_CATEGORY_LABELS,
@@ -46,6 +45,7 @@ const EMPTY_REMOTE_STATE: RemoteSearchState = {
 interface GlobalCommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  variant?: 'default' | 'yuji';
 }
 
 function groupCommands(
@@ -71,7 +71,12 @@ function ResultType({ children }: { children: string }) {
   );
 }
 
-export function GlobalCommandPalette({ open, onOpenChange }: GlobalCommandPaletteProps) {
+export function GlobalCommandPalette({
+  open,
+  onOpenChange,
+  variant = 'default',
+}: GlobalCommandPaletteProps) {
+  const isYuji = variant === 'yuji';
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [query, setQuery] = useState('');
@@ -175,23 +180,28 @@ export function GlobalCommandPalette({ open, onOpenChange }: GlobalCommandPalett
   };
 
   const hasMatches =
-    localCommands.length > 0 || remote.posts.length > 0 || remote.resources.length > 0;
+    (!isYuji && localCommands.length > 0) || remote.posts.length > 0 || remote.resources.length > 0;
   const emptyQueryCategories: SearchCommandCategory[] = ['pages', 'create', 'personal'];
 
   return (
     <CommandDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="搜索 Valley"
-      description="搜索文章、图文、资源和页面"
-      className="top-2 h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none translate-y-0 border-border/70 bg-popover shadow-[0_32px_90px_-28px_oklch(0_0_0/0.42)] sm:top-1/2 sm:h-[min(40rem,calc(100dvh-4rem))] sm:w-[min(44rem,calc(100vw-3rem))] sm:max-w-[44rem] sm:-translate-y-1/2"
+      title={isYuji ? '搜索雨迹' : '搜索 Valley'}
+      description={isYuji ? '搜索文章与影像' : '搜索文章、图文、资源和页面'}
+      className={
+        isYuji
+          ? 'yuji-public-search-dialog !z-[301] top-[9vh] h-auto max-h-[min(46rem,calc(100dvh-4rem))] w-[calc(100vw-2rem)] max-w-[54rem] translate-y-0 border-[#59e7ff]/35 bg-[#0b1720]/96 shadow-[0_30px_100px_rgb(4_14_22_/_0.58)] backdrop-blur-2xl duration-300 sm:w-[min(54rem,calc(100vw-4rem))] sm:max-w-[min(54rem,calc(100vw-4rem))] data-starting-style:translate-y-[-18px] data-starting-style:scale-[0.98] data-starting-style:opacity-0 data-ending-style:translate-y-[-8px] data-ending-style:scale-[0.985] data-ending-style:opacity-0'
+          : 'top-2 h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none translate-y-0 border-border/70 bg-popover shadow-[0_32px_90px_-28px_oklch(0_0_0/0.42)] sm:top-1/2 sm:h-[min(40rem,calc(100dvh-4rem))] sm:w-[min(44rem,calc(100vw-3rem))] sm:max-w-[44rem] sm:-translate-y-1/2'
+      }
+      overlayClassName={isYuji ? '!z-[300] !bg-[#07111a]/72 backdrop-blur-md' : undefined}
     >
-      <Command shouldFilter={false} className="p-0">
+      <Command shouldFilter={false} className={isYuji ? 'yuji-public-search-command p-0' : 'p-0'}>
         <CommandInput
           value={query}
           onValueChange={(value) => setQuery(normalizeSearchQuery(value))}
-          placeholder="搜索文章、图文、资源和页面"
-          aria-label="搜索 Valley"
+          placeholder={isYuji ? '搜索文章与影像' : '搜索文章、图文、资源和页面'}
+          aria-label={isYuji ? '搜索雨迹' : '搜索 Valley'}
           maxLength={100}
           autoFocus
         />
@@ -208,7 +218,15 @@ export function GlobalCommandPalette({ open, onOpenChange }: GlobalCommandPalett
             </div>
           ) : null}
 
-          {!normalizedQuery
+          {isYuji && !normalizedQuery ? (
+            <div className="yuji-public-search-idle" aria-live="polite">
+              <span>SEARCH / YUJI</span>
+              <p>从文章与影像中开始。</p>
+              <small>输入关键词，结果会即时出现</small>
+            </div>
+          ) : null}
+
+          {!isYuji && !normalizedQuery
             ? emptyQueryCategories.map((category) => {
                 const commands = groupCommands(localCommands, category);
                 if (commands.length === 0) return null;
@@ -232,7 +250,7 @@ export function GlobalCommandPalette({ open, onOpenChange }: GlobalCommandPalett
               })
             : null}
 
-          {normalizedQuery && localCommands.length > 0 ? (
+          {!isYuji && normalizedQuery && localCommands.length > 0 ? (
             <CommandGroup heading="页面与功能">
               {localCommands.map((command) => {
                 const Icon = command.icon;
@@ -259,7 +277,9 @@ export function GlobalCommandPalette({ open, onOpenChange }: GlobalCommandPalett
                 <CommandItem
                   key={`post:${post.id}`}
                   value={`post:${post.id}`}
-                  onSelect={() => runNavigation(`/blog/${post.id}`)}
+                  onSelect={() =>
+                    runNavigation(isYuji ? `/articles/${post.id}` : `/blog/${post.id}`)
+                  }
                 >
                   <CommandIcon icon={FileText} />
                   <span className="truncate font-medium">{post.title}</span>
@@ -279,7 +299,11 @@ export function GlobalCommandPalette({ open, onOpenChange }: GlobalCommandPalett
                 <CommandItem
                   key={`resource:${resource.id}`}
                   value={`resource:${resource.id}`}
-                  onSelect={() => runNavigation(`/resource/${resource.id}`)}
+                  onSelect={() =>
+                    runNavigation(
+                      isYuji ? `/gallery/image/${resource.id}` : `/resource/${resource.id}`,
+                    )
+                  }
                 >
                   <CommandIcon icon={ImageIcon} />
                   <span className="truncate font-medium">{resource.title}</span>
@@ -297,24 +321,6 @@ export function GlobalCommandPalette({ open, onOpenChange }: GlobalCommandPalett
             <div role="status" className="px-4 py-8 text-center text-sm text-muted-foreground">
               没有找到相关内容
             </div>
-          ) : null}
-
-          {normalizedQuery ? (
-            <>
-              <CommandSeparator />
-              <CommandGroup>
-                <CommandItem
-                  value={`search-all:${normalizedQuery}`}
-                  onSelect={() => runNavigation(buildSearchResultUrl(normalizedQuery))}
-                  className="my-1 border border-border/60 bg-muted/30"
-                >
-                  <CommandIcon icon={Search} />
-                  <span className="truncate font-medium">
-                    查看全部关于「{normalizedQuery}」的结果
-                  </span>
-                </CommandItem>
-              </CommandGroup>
-            </>
           ) : null}
         </CommandList>
         <div className="hidden min-h-12 items-center gap-4 border-t border-border/70 bg-muted/20 px-5 text-xs text-muted-foreground sm:flex">

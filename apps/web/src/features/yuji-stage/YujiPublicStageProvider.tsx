@@ -28,8 +28,7 @@ export function YujiPublicStageProvider({
 }: PropsWithChildren<{ theme: 'dark' | 'light' }>) {
   const location = useLocation();
   const routeKey = `${location.pathname}${location.search}`;
-  const stageRoute = location.pathname === '/' || location.pathname === '/articles';
-  const mode = location.pathname === '/' ? 'home' : 'articles';
+  const stageRoute = location.pathname === '/';
   const scrollBus = useMemo(() => createScrollBus(), []);
   const pointerBus = useMemo(() => createPointerBus(), []);
   const lenisRef = useRef<Lenis | null>(null);
@@ -124,10 +123,8 @@ export function YujiPublicStageProvider({
         velocity: lenis.velocity,
         viewportHeight: window.innerHeight,
       });
-      if (mode === 'home') {
-        const exit = resolveHeroExitProgress(scroll, window.innerHeight);
-        document.documentElement.style.setProperty('--yuji-hero-exit', exit.toFixed(4));
-      }
+      const exit = resolveHeroExitProgress(scroll, window.innerHeight);
+      document.documentElement.style.setProperty('--yuji-hero-exit', exit.toFixed(4));
     });
     const handleContentResize = () => {
       lenis.resize();
@@ -183,7 +180,7 @@ export function YujiPublicStageProvider({
       applyPendingRestoreRef.current = null;
       document.documentElement.style.removeProperty('--yuji-hero-exit');
     };
-  }, [mode, scrollBus, stageRoute, tier]);
+  }, [scrollBus, stageRoute, tier]);
 
   useEffect(() => {
     const handleScrollRestore = (event: Event) => {
@@ -267,7 +264,7 @@ export function YujiPublicStageProvider({
           covers={covers}
           introReleased={introReleased}
           introSettled={introSettled}
-          mode={mode}
+          mode="home"
           pointerBus={pointerBus}
           running={documentVisible}
           scrollBus={scrollBus}

@@ -64,6 +64,20 @@ func applyPostListOrder(query *gorm.DB, sort string) *gorm.DB {
 	return query.Order(buildPostTimelineOrderExpr(sort))
 }
 
+const blogCoverThumbnailProcess = "x-tos-process=image/resize,w_800,m_lfit/format,webp/quality,q_85"
+
+func buildPostCoverThumbnailURL(coverURL, storageKey string) string {
+	coverURL = strings.TrimSpace(coverURL)
+	if coverURL == "" || strings.TrimSpace(storageKey) == "" || strings.Contains(coverURL, "x-tos-process=") {
+		return coverURL
+	}
+	separator := "?"
+	if strings.Contains(coverURL, "?") {
+		separator = "&"
+	}
+	return coverURL + separator + blogCoverThumbnailProcess
+}
+
 type PostListResponse struct {
 	ID              model.Int64String `json:"id"`
 	Title           string            `json:"title"`
@@ -75,6 +89,7 @@ type PostListResponse struct {
 	ImageTextData   string            `json:"imageTextData,omitempty"`
 	Excerpt         string            `json:"excerpt"`
 	Cover           string            `json:"cover"`
+	CoverThumbnail  string            `json:"coverThumbnail,omitempty"`
 	CoverStorageKey string            `json:"coverStorageKey,omitempty"`
 	GroupID         model.Int64String `json:"groupId"`
 	Group           *PostGroupInfo    `json:"group,omitempty"`
@@ -127,6 +142,7 @@ type PostDetailResponse struct {
 	HTMLContent     string            `json:"htmlContent"`
 	Excerpt         string            `json:"excerpt"`
 	Cover           string            `json:"cover"`
+	CoverThumbnail  string            `json:"coverThumbnail,omitempty"`
 	CoverStorageKey string            `json:"coverStorageKey,omitempty"`
 	GroupID         model.Int64String `json:"groupId"`
 	CategoryID      model.Int64String `json:"categoryId"`
@@ -1624,6 +1640,7 @@ func convertToPostListResponse(post *model.Post) PostListResponse {
 		ImageTextData:   normalizeImageTextData(post.ImageTextData, post.TemplateData),
 		Excerpt:         post.Excerpt,
 		Cover:           post.Cover,
+		CoverThumbnail:  buildPostCoverThumbnailURL(post.Cover, post.CoverStorageKey),
 		CoverStorageKey: post.CoverStorageKey,
 		GroupID:         post.GroupID,
 		CategoryID:      post.CategoryID,
@@ -1693,6 +1710,7 @@ func convertToPostDetailResponse(post *model.Post) PostDetailResponse {
 		HTMLContent:     post.HTMLContent,
 		Excerpt:         post.Excerpt,
 		Cover:           post.Cover,
+		CoverThumbnail:  buildPostCoverThumbnailURL(post.Cover, post.CoverStorageKey),
 		CoverStorageKey: post.CoverStorageKey,
 		GroupID:         post.GroupID,
 		CategoryID:      post.CategoryID,

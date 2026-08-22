@@ -25,17 +25,19 @@ export default function YujiStageArticleCard({ index, post, scope }: YujiStageAr
   const [coverWebglReady, setCoverWebglReady] = useState(false);
   const stage = useYujiStage();
   const registerCover = stage?.registerCover;
+  const coverSrc = post.coverThumbnail || post.cover;
+  const shouldMirrorCoverOnStage = scope === 'home';
 
   useLayoutEffect(() => {
     const element = coverRef.current;
-    if (!element || !post.cover || !registerCover) return;
+    if (!shouldMirrorCoverOnStage || !element || !coverSrc || !registerCover) return;
     return registerCover({
       element,
       id: `${scope}:${post.id}`,
       setReady: setCoverWebglReady,
-      src: post.cover,
+      src: coverSrc,
     });
-  }, [post.cover, post.id, registerCover, scope]);
+  }, [coverSrc, post.id, registerCover, scope, shouldMirrorCoverOnStage]);
 
   const href = `/articles/${post.id}`;
   const number = String(index + 1).padStart(2, '0');
@@ -64,7 +66,7 @@ export default function YujiStageArticleCard({ index, post, scope }: YujiStageAr
         {post.excerpt ? <p>{post.excerpt}</p> : null}
       </div>
 
-      {post.cover ? (
+      {coverSrc ? (
         <figure
           className="yuji-stage-cover"
           data-webgl-ready={coverWebglReady || undefined}
@@ -73,7 +75,7 @@ export default function YujiStageArticleCard({ index, post, scope }: YujiStageAr
         >
           <YujiTransitionLink coverId={post.id} to={href} aria-label={`阅读${post.title}`}>
             <img
-              src={post.cover}
+              src={coverSrc}
               alt={`${post.title}封面`}
               decoding="async"
               fetchPriority={index < 2 ? 'high' : 'auto'}
@@ -94,7 +96,7 @@ export default function YujiStageArticleCard({ index, post, scope }: YujiStageAr
         to={href}
         aria-label={`阅读${post.title}`}
       >
-        <span>READ</span>
+        <span>打开文章</span>
         <span aria-hidden="true">↗</span>
       </YujiTransitionLink>
     </article>

@@ -14,7 +14,6 @@ import YujiArticles from './pages/YujiArticles';
 import YujiGallery from './pages/YujiGallery';
 import YujiHome from './pages/YujiHome';
 import YujiImage from './pages/YujiImage';
-import YujiSearch from './pages/YujiSearch';
 import { useAuthStore } from './stores/useAuthStore';
 
 const InspectorRuntime = import.meta.env.DEV
@@ -102,8 +101,6 @@ function RouteTitle() {
       title = '影像 | 雨迹';
     } else if (pathname === '/about') {
       title = '关于 | 雨迹';
-    } else if (pathname === '/search') {
-      title = '搜索 | 雨迹';
     } else if (pathname === '/studio') {
       title = '创作室 | 雨迹';
     } else if (pathname === '/studio/articles') {
@@ -217,7 +214,6 @@ function App() {
             <Route path="gallery" element={<YujiGallery />} />
             <Route path="gallery/image/:id" element={<YujiImage />} />
             <Route path="about" element={<YujiAbout />} />
-            <Route path="search" element={<YujiSearch />} />
           </Route>
 
           <Route path="/blog" element={<Navigate to="/articles" replace />} />
