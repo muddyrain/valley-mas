@@ -2,7 +2,8 @@
 
 ## AI 任务最小上下文入口
 
-- `CLAUDE.md` -> `apps/admin/AGENTS.md` -> `src/App.tsx` -> `src/layouts/Layout.tsx`；接口改动再读 `server/internal/router/router.go` 与对应 `src/api/`。
+- `CLAUDE.md` -> `apps/admin/AGENTS.md` -> `src/App.tsx` -> `src/layouts/Layout.tsx`。
+- 接口改动再读 `server/internal/router/router.go` 与对应 `src/api/`。
 
 ## 局部边界
 

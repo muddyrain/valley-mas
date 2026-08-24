@@ -15,6 +15,7 @@
     "check:toolchain": "node scripts/check-toolchain-consistency.mjs",
     "check:toolchain:test": "node --test scripts/check-toolchain-consistency.test.mjs",
     "check:docs-links": "bash scripts/check-doc-links.sh",
+    "check:docs-links:test": "bash scripts/check-doc-links.test.sh",
     "check:agents-context": "bash scripts/check-agents-context.sh",
     "check:agents-context:test": "bash scripts/check-agents-context.test.sh",
     "context:recent": "node scripts/context-recent.mjs",

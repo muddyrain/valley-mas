@@ -74,6 +74,8 @@ pnpm check:harness:test
 pnpm check:agents-context
 pnpm check:agents-context:test
 pnpm check:docs-links
+pnpm check:docs-links -- --strict
+pnpm check:docs-links:test
 pnpm check:plans-index
 
 # 工具链与全仓

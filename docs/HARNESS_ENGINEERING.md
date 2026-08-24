@@ -46,7 +46,7 @@ pnpm check:harness
 - 核心文档入口存在。
 - 根 `package.json` 包含 Harness、check 和 build 脚本。
 
-所有局部 `AGENTS.md` 的最小上下文入口由 `pnpm check:agents-context` 检查，fixture 回归入口为：
+所有局部 `AGENTS.md` 的最小上下文入口由 `pnpm check:agents-context` 检查：上下文链必须以根 `CLAUDE.md` 开始、第二项指向当前局部 `AGENTS.md`，且链中声明的文件必须真实存在（可相对局部目录或仓库根）。fixture 回归入口为：
 
 ```bash
 pnpm check:agents-context:test
@@ -57,6 +57,8 @@ pnpm check:agents-context:test
 ```bash
 pnpm check:harness:test
 ```
+
+`pnpm check:docs-links` 覆盖根 `CLAUDE.md`、局部 `AGENTS.md` 与 `docs/**/*.md`：不可移植的 `file://` 或仓库绝对路径仍会失败；相对链接先以报告模式输出，待存量清零后再使用 `pnpm check:docs-links -- --strict` 将未解析链接升级为门禁。其 fixture 回归入口为 `pnpm check:docs-links:test`。
 
 ## 4. CI 与部署门禁
 
@@ -92,6 +94,16 @@ Code review 从 `.code-review/README.md` 进入，根据改动范围加载 Secur
 - 轻量浏览器探索可使用当前环境已有的 agent-browser、Playwright CLI 或等价工具；浏览器外的桌面 GUI 可使用 Computer Use 或等价桌面自动化。
 - 不为一次验证擅自新增浏览器依赖。真实设备权限、硬件、通知或真实外部服务无法由自动化代表时，补充手工验收。
 - 不得把 headless、fixture 或模拟服务的结果表述为用户当前登录 Chrome 会话中的实机结果，反之亦然。
+
+运行时证据记录（按风险采用，最短模板）：
+
+```text
+- 工具/模式：
+- 目标 URL 或 fixture：
+- viewport/设备：
+- 断言：
+- 截图或日志产物：
+```
 
 响应式、动画、Canvas、Three.js、拖拽、滚动、loading 和路由行为不能只凭 JSX、CSS、类型检查或 jsdom 结论宣称通过。永久 E2E 测试的取舍由 [`TESTING_STRATEGY.md`](./TESTING_STRATEGY.md) 统一定义。
 

@@ -2,7 +2,7 @@
 
 ## AI 任务最小上下文入口
 
-- `CLAUDE.md` -> `apps/life-trace/AGENTS.md` -> `src/App.tsx` -> `src/api` -> `server/internal/lifetrace` -> `docs/PLAN.md`。
+- `CLAUDE.md` -> `apps/life-trace/AGENTS.md` -> `src/App.tsx` -> `src/api/request.ts` -> `server/internal/lifetrace/routes.go` -> `docs/PLAN.md`。
 
 ## 局部边界
 
