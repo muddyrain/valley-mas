@@ -91,3 +91,7 @@ sysinfo.txt
 # cache
 tmp/
 .tmp/
+
+# One-off local scratch files
+/.tmp_update_modelpicker.js
+/_tmp_check.txt
