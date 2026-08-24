@@ -62,9 +62,10 @@ def find_agents_files() -> list[Path]:
         return walk_agents_files()
 
     return sorted(
-        root / relative_path.decode("utf-8")
+        path
         for relative_path in result.stdout.split(b"\0")
         if relative_path
+        if (path := root / relative_path.decode("utf-8")).is_file()
     )
 
 

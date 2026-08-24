@@ -1,13 +1,5 @@
 {
-  "cSpell.words": [
-    "AMUX",
-    "lifetrace",
-    "mindarena",
-    "Mixamo",
-    "setpieces",
-    "SILICONFLOW",
-    "topbar"
-  ],
+  "cSpell.words": ["AMUX", "lifetrace", "Mixamo", "setpieces", "SILICONFLOW", "topbar"],
   "biome.enabled": true,
   "biome.requireConfiguration": true,
   "editor.codeActionsOnSave": {

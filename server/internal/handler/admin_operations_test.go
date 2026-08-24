@@ -51,9 +51,6 @@ func setupAdminOperationsTestDB(t *testing.T) *gin.Engine {
 			&model.LifeTraceTrace{},
 			&model.LifeTracePantryItem{},
 			&model.LifeTraceAIConversation{},
-			&model.MindArenaDebateSession{},
-			&model.MindArenaDebateMessage{},
-			&model.MindArenaDebateScore{},
 		); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
@@ -78,8 +75,6 @@ func setupAdminOperationsTestDB(t *testing.T) *gin.Engine {
 	router.GET("/admin/notifications", AdminListNotifications)
 	router.GET("/admin/users/:id/operations", AdminGetUserOperations)
 	router.GET("/admin/resources/:id/operations", AdminGetResourceOperations)
-	router.GET("/admin/mind-arena/debates", AdminListMindArenaDebates)
-	router.GET("/admin/mind-arena/debates/:id", AdminGetMindArenaDebate)
 	return router
 }
 
@@ -162,7 +157,7 @@ func TestAdminAuditListsApplyKeywordAndDateFilters(t *testing.T) {
 		data := decodeResponseData(t, rec)
 		if got := int(data["total"].(float64)); got != 1 {
 			t.Fatalf("operation total=%d, want 1", got)
-		}
+	}
 	}
 
 func TestAdminAIUsageLogsFilterAndSummary(t *testing.T) {
@@ -404,28 +399,5 @@ func TestAdminGetResourceOperationsReturnsTagsAlbumsAndCounters(t *testing.T) {
 	albums := data["albums"].([]interface{})
 	if len(tags) == 0 || tags[0].(string) != "运营" || albums[0].(map[string]interface{})["name"] != "精选" {
 		t.Fatalf("unexpected tags/albums: tags=%#v albums=%#v", tags, albums)
-	}
-}
-
-func TestAdminListMindArenaDebatesFiltersStatus(t *testing.T) {
-	router := setupAdminOperationsTestDB(t)
-	if err := database.DB.Create(&[]model.MindArenaDebateSession{
-		{ID: "deb_done", Topic: "已完成议题", Mode: "funny", Status: "done", PersonaCount: 5, CurrentRound: 3},
-		{ID: "deb_running", Topic: "进行中议题", Mode: "serious", Status: "running", PersonaCount: 5, CurrentRound: 1},
-	}).Error; err != nil {
-		t.Fatalf("seed mind arena debates: %v", err)
-	}
-
-	req := httptest.NewRequest(http.MethodGet, "/admin/mind-arena/debates?status=done", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	data := decodeResponseData(t, rec)
-	if got := int(data["total"].(float64)); got != 1 {
-		t.Fatalf("debate total=%d, want 1", got)
-	}
-	list := data["list"].([]interface{})
-	if list[0].(map[string]interface{})["id"] != "deb_done" {
-		t.Fatalf("unexpected debate list: %#v", list)
 	}
 }

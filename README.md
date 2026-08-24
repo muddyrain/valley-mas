@@ -9,7 +9,6 @@ Valley MAS 是一个 monorepo，包含个人内容展示站点、管理后台、
 | `apps/web` | 用户侧前台，包含首页、创作者空间、资源库、博客/图文、留言和个人空间。 |
 | `apps/admin` | 管理后台，包含用户、创作者、资源、博客、审核与记录管理。 |
 | `apps/life-trace` | Life Trace 生活计划与踪迹记录 PWA。 |
-| `apps/ai-mind-arena` | AI Mind Arena 脑内会议室，Next.js 多人格辩论应用。 |
 | `apps/world-sim` | React + Pixi.js + TypeScript 沙盒文明模拟游戏。 |
 | `apps/toy-climb-arena` | Three.js 玩具世界攀爬游戏。 |
 | `apps/scratch-legend` | Next.js 刮刮卡增量游戏实验。 |

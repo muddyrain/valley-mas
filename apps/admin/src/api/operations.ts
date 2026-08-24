@@ -266,34 +266,6 @@ export interface AdminResourceOperations {
   favoriteCount: number;
 }
 
-export interface MindArenaDebate {
-  id: string;
-  topic: string;
-  mode: string;
-  status: string;
-  personaCount: number;
-  currentRound: number;
-  lastCompletedRound: number;
-  awaitingSupport: boolean;
-  personas: Array<{ id: string; name: string; stance?: string }>;
-  messages: Array<{
-    id: string;
-    round: number;
-    personaName: string;
-    content: string;
-    createdAt: string;
-  }>;
-  result?: {
-    winner: string;
-    finalAdvice: string;
-    quote: string;
-    scores: Array<{ persona: string; personaId?: string; score: number }>;
-  };
-  error?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export function listBlogCategories(params: AdminListParams) {
   return http.get<unknown, AdminListResponse<BlogCategory>>('/admin/blog/categories', { params });
 }
@@ -484,14 +456,4 @@ export function getUserOperations(id: string) {
 
 export function getResourceOperations(id: string) {
   return http.get<unknown, AdminResourceOperations>(`/admin/resources/${id}/operations`);
-}
-
-export function listMindArenaDebates(params: AdminListParams & { mode?: string }) {
-  return http.get<unknown, AdminListResponse<MindArenaDebate>>('/admin/mind-arena/debates', {
-    params,
-  });
-}
-
-export function getMindArenaDebate(id: string) {
-  return http.get<unknown, MindArenaDebate>(`/admin/mind-arena/debates/${id}`);
 }

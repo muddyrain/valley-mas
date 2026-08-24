@@ -7,7 +7,7 @@
 //     这是为了在阶段 B 引入 CloudWeGo eino 时，只替换 loop 实现即可，
 //     handler 与 tool 层零改动。
 //   - 单向依赖：本包只 import 标准库、internal/aiclient、internal/aiusage、
-//     internal/ai/tools。禁止 import 任何业务包（lifetrace / mindarena /
+//     internal/ai/tools。禁止 import 任何业务包（lifetrace /
 //     handler / model / database）。
 //   - 只做串行 loop：每一步等前一步 tool 全部执行完再进入下一轮。并行
 //     tool_call、子 agent、图状态机、中断-恢复均属于阶段 B。

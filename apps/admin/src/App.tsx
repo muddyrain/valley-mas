@@ -12,7 +12,6 @@ const BlogComments = lazy(() => import('./pages/admin-ops/BlogComments'));
 const BlogTaxonomy = lazy(() => import('./pages/admin-ops/BlogTaxonomy'));
 const GuestbookMessages = lazy(() => import('./pages/admin-ops/GuestbookMessages'));
 const LifeTraceOps = lazy(() => import('./pages/admin-ops/LifeTraceOps'));
-const MindArenaDebates = lazy(() => import('./pages/admin-ops/MindArenaDebates'));
 const Notifications = lazy(() => import('./pages/admin-ops/Notifications'));
 const Relations = lazy(() => import('./pages/admin-ops/Relations'));
 const ResourceTags = lazy(() => import('./pages/admin-ops/ResourceTags'));
@@ -155,7 +154,6 @@ function App() {
               path="life-trace/holiday-calendars"
               element={<LifeTraceOps kind="holiday-calendars" />}
             />
-            <Route path="mind-arena/debates" element={<MindArenaDebates />} />
           </Route>
         </Routes>
       </Suspense>

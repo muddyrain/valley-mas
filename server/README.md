@@ -213,12 +213,6 @@ cd server && go test ./...
 cd server && go build ./cmd/server
 ```
 
-只改 AI Mind Arena 服务端逻辑时，可先跑相关包：
-
-```bash
-cd server && go test ./internal/mindarena ./internal/ai
-```
-
 只改 Life Trace 服务端逻辑时，可先跑：
 
 ```bash
@@ -265,7 +259,7 @@ cd server && go run ./cmd/sync-schema --apply --scope all
 - 环境变量缺失：对照 `server/.env.example` 补齐本地 `.env`。
 - 数据库结构不一致：先运行 `go run ./cmd/migrate status` 查看版本；已有开发库运行 `go run ./cmd/migrate up`，空开发库运行一次 `go run ./cmd/migrate bootstrap --apply`。`sync-schema` 仅保留作定向应急修复，不属于日常启动或生产发布流程。
 - 日志报 `column ... does not exist`，但对应迁移已是 `applied`：通常是已执行的迁移文件后来又被修改。单纯重启 `air` 无效；应保留旧版本不动，新增更高版本的幂等修复迁移，执行 `go run ./cmd/migrate up` 后再验证实际字段或最小写入链路。
-- AI 调用失败：模型目录中的火山引擎模型检查 `VOLCENGINE_API_KEY`、`VOLCENGINE_BASE_URL` 与目录模型 ID；不再配置 `ARK_TEXT_MODEL`、`ARK_VISION_MODEL`、`ARK_IMAGE_MODEL` 或 `ARK_EMBEDDING_MODEL`。知识库索引自动使用已启用且验证通过的 Embedding 目录模型；升级前生成的旧向量需在知识库页面重新索引一次。尚未迁移的其他旧直连入口会提示功能正在迁移。Life Trace 自有兼容配置看 `LIFE_TRACE_AI_*`；AI Mind Arena 需要完整的 `MIND_ARENA_AI_*`，缺失或上游失败时回退 mock，旧 `OPENAI_API_*` 和 `AI_*` 仅作兼容。
+- AI 调用失败：模型目录中的火山引擎模型检查 `VOLCENGINE_API_KEY`、`VOLCENGINE_BASE_URL` 与目录模型 ID；不再配置 `ARK_TEXT_MODEL`、`ARK_VISION_MODEL`、`ARK_IMAGE_MODEL` 或 `ARK_EMBEDDING_MODEL`。知识库索引自动使用已启用且验证通过的 Embedding 目录模型；升级前生成的旧向量需在知识库页面重新索引一次。尚未迁移的其他旧直连入口会提示功能正在迁移。Life Trace 自有兼容配置看 `LIFE_TRACE_AI_*`；旧 `OPENAI_API_*` 和 `AI_*` 仅作兼容。
 
 ## 相关入口
 

@@ -21,6 +21,6 @@
 | Go 服务端 | [`server/AGENTS.md`](../server/AGENTS.md) |
 | Life Trace | [`apps/life-trace/AGENTS.md`](../apps/life-trace/AGENTS.md) |
 | Electron 应用 | [`apps/screen-recorder/AGENTS.md`](../apps/screen-recorder/AGENTS.md)、[`apps/port-warden/AGENTS.md`](../apps/port-warden/AGENTS.md) |
-| 实验应用 | [`apps/ai-mind-arena/AGENTS.md`](../apps/ai-mind-arena/AGENTS.md)、[`apps/world-sim/AGENTS.md`](../apps/world-sim/AGENTS.md)、[`apps/eon-vale/AGENTS.md`](../apps/eon-vale/AGENTS.md)、[`apps/scratch-legend/AGENTS.md`](../apps/scratch-legend/AGENTS.md)、[`apps/toy-climb-arena/AGENTS.md`](../apps/toy-climb-arena/AGENTS.md)、[`apps/ambient-forge/AGENTS.md`](../apps/ambient-forge/AGENTS.md) |
+| 实验应用 | [`apps/world-sim/AGENTS.md`](../apps/world-sim/AGENTS.md)、[`apps/eon-vale/AGENTS.md`](../apps/eon-vale/AGENTS.md)、[`apps/scratch-legend/AGENTS.md`](../apps/scratch-legend/AGENTS.md)、[`apps/toy-climb-arena/AGENTS.md`](../apps/toy-climb-arena/AGENTS.md)、[`apps/ambient-forge/AGENTS.md`](../apps/ambient-forge/AGENTS.md) |
 
 长期文档的入口、状态或分类发生变化时更新本页；其他改动不需要同步本索引。

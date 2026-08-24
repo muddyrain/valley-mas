@@ -3,16 +3,12 @@ package router
 import (
 	"context"
 
-	"valley-server/internal/ai"
 	"valley-server/internal/ai/tools"
-	"valley-server/internal/aimodel"
 	"valley-server/internal/config"
-	"valley-server/internal/database"
 	"valley-server/internal/handler"
 	"valley-server/internal/lifetrace"
 	"valley-server/internal/logger"
 	"valley-server/internal/middleware"
-	"valley-server/internal/mindarena"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -36,23 +32,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 	api := r.Group("/api/v1")
 	{
-		mindArenaStore := mindarena.Store(mindarena.NewMemoryStore())
-		if db := database.GetDB(); db != nil {
-			mindArenaStore = mindarena.NewGormStore(db)
-		}
-		mindArenaService := mindarena.NewServiceWithAIFactory(mindArenaStore, ai.NewServiceFromEnv(), func(provider, modelID string) (mindarena.DebateAI, error) {
-			providerConfig, err := aimodel.ProviderFromEnv(provider)
-			if err != nil {
-				return nil, err
-			}
-			return ai.NewOpenAICompatibleService(ai.OpenAICompatibleConfig{
-				Provider: ai.AIProviderOpenAICompatible,
-				BaseURL:  providerConfig.BaseURL,
-				APIKey:   providerConfig.APIKey,
-				Model:    modelID,
-			}), nil
-		})
-		mindarena.RegisterMindArenaRoutes(api, mindarena.NewHandler(mindArenaService))
 		api.POST("/workflow-hooks/:triggerId", handler.InvokeWorkflowWebhook)
 
 		lifeTraceWeatherService := lifetrace.NewWeatherService(cfg.QWeather)
@@ -324,8 +303,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.GET("/life-trace/push-deliveries", handler.ListAdminLifeTracePushDeliveries)
 				adminOnly.GET("/life-trace/ai-conversations", handler.ListAdminLifeTraceAIConversations)
 				adminOnly.GET("/life-trace/holiday-calendars", handler.ListAdminLifeTraceHolidayCalendars)
-				adminOnly.GET("/mind-arena/debates", handler.AdminListMindArenaDebates)
-				adminOnly.GET("/mind-arena/debates/:id", handler.AdminGetMindArenaDebate)
 			}
 
 			content := admin.Group("")

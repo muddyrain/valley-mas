@@ -35,19 +35,15 @@ pnpm --filter @valley/life-trace dev
 独立实验应用：
 
 ```bash
-pnpm --filter @valley/ai-mind-arena dev
 pnpm --filter @valley/scratch-legend dev
 pnpm --filter @valley/toy-climb-arena dev
 pnpm --filter @valley/world-sim dev
 ```
 
-注意：`apps/ai-mind-arena` 和 `apps/toy-climb-arena` 当前都使用 `5175` 端口，不能同时用默认端口启动。
-
 ## 5. 必要配置
 
 - Web/Admin API 地址：`apps/web/.env.example`、`apps/admin/.env.example`。
 - Life Trace API 地址：`apps/life-trace/.env.example`。
-- AI Mind Arena API 地址：`apps/ai-mind-arena/.env.example`。
 - Go 服务：`server/.env.example`。
 
 本地 Vite 应用通常通过 `/api` 代理访问 `http://localhost:8080`。

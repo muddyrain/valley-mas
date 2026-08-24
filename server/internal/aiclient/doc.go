@@ -3,7 +3,7 @@
 // 设计原则：
 //
 //   - 纯基础层：只 import 标准库、arkruntime SDK、第三方 HTTP/JSON 库与 internal/aiusage。
-//     禁止 import internal/mindarena、internal/lifetrace、internal/handler、
+//     禁止 import internal/lifetrace、internal/handler、
 //     internal/model、internal/database 等业务包，保持向上单向依赖。
 //   - 不读取任何业务上下文，env 是唯一的运行时配置来源。
 //   - 不做对外路由暴露，只提供函数 / 类型供上层 handler 与服务复用。
