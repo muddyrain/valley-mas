@@ -37,4 +37,4 @@ pnpm --filter @valley/eon-vale benchmark
 pnpm --filter @valley/eon-vale test:e2e
 ```
 
-已接受的玩法语义见 [docs/GAME_RULES.md](./docs/GAME_RULES.md)，核心领域与替换边界见 [docs/CORE_SIMULATION_REARCHITECTURE.md](./docs/CORE_SIMULATION_REARCHITECTURE.md)，产品状态见 [docs/PLAN.md](./docs/PLAN.md)，待授权的实施步骤见 [核心重构实施计划](../../docs/plans/2026-08-15-eon-vale-core-rearchitecture.md)。
+已接受的玩法语义见 [docs/GAME_RULES.md](./docs/GAME_RULES.md)，核心领域与替换边界见 [docs/CORE_SIMULATION_REARCHITECTURE.md](./docs/CORE_SIMULATION_REARCHITECTURE.md)，地图架构见 [docs/MAP_ARCHITECTURE.md](./docs/MAP_ARCHITECTURE.md)，产品状态见 [docs/PLAN.md](./docs/PLAN.md)。
