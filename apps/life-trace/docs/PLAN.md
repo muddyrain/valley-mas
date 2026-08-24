@@ -603,5 +603,3 @@ AI 返回草稿字段：
 - Life Trace 前端测试：`pnpm --filter @valley/life-trace exec vitest run`。
 - Go 服务改动：`cd server && go test ./...` 或更小范围的 `cd server && go test ./internal/lifetrace`。
 - 中文文案、Markdown、协作规则或 skill 改动：`python3 .agents/skills/encoding-guard/scripts/check_mojibake.py <相关文件>`。
-
-前端、游戏或可视交互改动不使用 Playwright 自动验收。涉及移动端布局、拍照、PWA 通知、真实模型输出或真机权限时，最终回复必须给出清晰的手动验收路径。

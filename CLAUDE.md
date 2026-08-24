@@ -22,7 +22,7 @@
 ## 实施与验证
 
 - 行为改动先建立或更新可观测验证，再实现并复跑受影响验证；纯文案、纯样式或不可测边界可说明豁免与替代验证。
-- 人工浏览器调试与产品实机验收必须先使用 `chrome:control-chrome` 连接用户当前 Chrome，并复用其中的现有标签页；仅在用户明确授权时启动独立可见浏览器或新建页面。纯本地、无状态、无登录且不读取用户浏览器资料的自动化门禁可以使用 headless Playwright，但不得打开用户可见页面，也不得把自动化结果冒充现有 Chrome 标签页中的产品实机验收。可见交互、响应式、动画、Canvas、Three.js、拖拽、滚动、loading 和路由按风险取得运行时证据。
+- 浏览器调试与运行时验证按任务选择工具，并清楚区分用户当前会话中的实机验收与自动化或 fixture 证据；具体政策见 [Harness 的浏览器与运行时证据](./docs/HARNESS_ENGINEERING.md#6-浏览器与运行时证据)。可见交互、响应式、动画、Canvas、Three.js、拖拽、滚动、loading 和路由按风险取得运行时证据。
 - 测试范围、覆盖率门槛与平台验收以 `docs/TESTING_STRATEGY.md`、局部入口及 `docs/PROJECT_GUIDE.md` 为准。
 - 修改 Markdown、skill、配置示例或其他非 ASCII 文本时，运行 `encoding-guard` 定向检查。
 

@@ -668,7 +668,6 @@ scratchCardDefaultLevel = 0
 * [x] 自动刮刮机继续只处理允许自动化的票；“步步加码”只能显示手动边界，不提供入队开关。
 * [x] 跑 `pnpm --filter @valley/scratch-legend typecheck`。
 * [x] 跑 `pnpm --filter @valley/scratch-legend check`，如只剩既有格式化差异需明确说明。
-* [x] 按项目规则提供人工验收标准，不使用 Playwright 自动验收。
 
 ### 阶段 6C：后期熟练度路线重设
 
@@ -698,7 +697,6 @@ scratchCardDefaultLevel = 0
 * [x] 跑 `pnpm --filter @valley/scratch-legend typecheck`。
 * [x] 跑 `pnpm --filter @valley/scratch-legend check`。
 * [x] 跑 encoding 检查。
-* [x] 按项目规则提供人工验收标准，不使用 Playwright 自动验收。
 
 ### 阶段 6B：终局票 / Final Chance
 
@@ -720,7 +718,6 @@ scratchCardDefaultLevel = 0
 * [x] 跑 `pnpm --filter @valley/scratch-legend check`。
 * [x] 跑终局票相关测试。
 * [x] 跑 encoding 检查。
-* [x] 按项目规则提供人工验收标准，不使用 Playwright 自动验收。
 
 ## ✅ 验收标准
 
