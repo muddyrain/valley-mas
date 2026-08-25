@@ -177,7 +177,8 @@ body:has(.yuji-site) {
 
 .yuji-header {
   position: sticky;
-  z-index: 60;
+  z-index: 100;
+  isolation: isolate;
   top: 0;
   height: var(--yuji-header-height);
   border-bottom: 1px solid var(--yuji-line);
@@ -197,6 +198,8 @@ body:has(.yuji-site) {
 }
 
 .yuji-header-inner {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
