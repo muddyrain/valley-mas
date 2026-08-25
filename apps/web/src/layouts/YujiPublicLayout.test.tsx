@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const authState = vi.hoisted(() => ({
   hasHydrated: true,
   isAuthenticated: false,
+  user: null as { username: string; nickname: string; avatar: string } | null,
+  logout: vi.fn(),
 }));
 
 const themeState = vi.hoisted(() => ({
@@ -16,9 +18,7 @@ const themeState = vi.hoisted(() => ({
 }));
 
 vi.mock('@/stores/useAuthStore', () => ({
-  useAuthStore: (
-    selector: (state: { hasHydrated: boolean; isAuthenticated: boolean }) => unknown,
-  ) => selector(authState),
+  useAuthStore: (selector: (state: typeof authState) => unknown) => selector(authState),
 }));
 
 vi.mock('@/stores/useThemeStore', () => ({
@@ -32,6 +32,8 @@ describe('YujiPublicLayout', () => {
   beforeEach(() => {
     authState.hasHydrated = true;
     authState.isAuthenticated = false;
+    authState.user = null;
+    authState.logout.mockClear();
     themeState.setMode.mockClear();
   });
 
@@ -62,7 +64,9 @@ describe('YujiPublicLayout', () => {
     expect(
       container.querySelector('.yuji-footer a[href="https://github.com/muddyrain"]'),
     ).not.toBeNull();
-    expect(container.querySelector('a[href="/studio"]')).toBeNull();
+    const loginLinks = container.querySelectorAll<HTMLAnchorElement>('a[href="/login"]');
+    expect(loginLinks).toHaveLength(2);
+    expect(Array.from(loginLinks).every((link) => link.textContent?.trim() === '登录')).toBe(true);
     expect(container.querySelector('.yuji-route-transition')).toBeNull();
     expect(container.querySelector('.yuji-pixel-trail')).toBeNull();
     expect(container.querySelector('a[href="/search"]')).toBeNull();
@@ -122,8 +126,9 @@ describe('YujiPublicLayout', () => {
     container.remove();
   });
 
-  it('shows a studio entry in desktop and mobile navigation after authentication', () => {
+  it('shows an account menu in the header and a studio entry in mobile navigation after authentication', () => {
     authState.isAuthenticated = true;
+    authState.user = { username: 'muddyrain', nickname: '雨迹', avatar: '' };
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -140,12 +145,8 @@ describe('YujiPublicLayout', () => {
       );
     });
 
-    const studioLinks = container.querySelectorAll<HTMLAnchorElement>('a[href="/studio"]');
-    expect(studioLinks).toHaveLength(2);
-    expect(Array.from(studioLinks).every((link) => link.textContent?.trim() === '创作室')).toBe(
-      true,
-    );
-    expect(container.querySelector('.yuji-header-actions a[href="/studio"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/login"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="打开雨迹的账户菜单"]')).not.toBeNull();
     expect(container.querySelector('.yuji-mobile-nav a[href="/studio"]')).not.toBeNull();
 
     act(() => root.unmount());

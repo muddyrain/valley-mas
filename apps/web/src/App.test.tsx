@@ -11,6 +11,7 @@ vi.mock('@/components/ui/sonner', () => ({ Toaster: () => null }));
 vi.mock('@/hooks/useTheme', () => ({ useTheme: () => ({ resolvedMode: 'light' }) }));
 vi.mock('@/stores/useThemeStore', () => ({
   applyThemeToDocument: vi.fn(),
+  resolveThemeMode: (mode: 'dark' | 'light' | 'system') => (mode === 'system' ? 'light' : mode),
   useThemeStore: (selector: (state: { mode: string; setMode: () => void }) => unknown) =>
     selector({ mode: 'system', setMode: vi.fn() }),
 }));

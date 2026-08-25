@@ -3,10 +3,24 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const authState = vi.hoisted(() => ({
+  user: { username: 'muddyrain', nickname: '雨迹', avatar: '' },
+  logout: vi.fn(),
+}));
+
+vi.mock('@/stores/useAuthStore', () => ({
+  useAuthStore: (selector: (state: typeof authState) => unknown) => selector(authState),
+}));
+
 import StudioLayout from './StudioLayout';
 
 describe('StudioLayout', () => {
+  beforeEach(() => {
+    authState.logout.mockClear();
+  });
+
   it('renders task-first navigation around the active studio page', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -34,6 +48,7 @@ describe('StudioLayout', () => {
     expect(
       container.querySelector('a[href="/studio/images/import"][aria-current="page"]'),
     ).not.toBeNull();
+    expect(container.querySelector('button[aria-label="打开雨迹的账户菜单"]')).not.toBeNull();
 
     act(() => root.unmount());
     container.remove();

@@ -403,17 +403,17 @@ export function MdxMarkdownEditor({
             left: floatingToolbarState.left,
           }}
         >
-          <div className="relative flex items-center gap-1.5 rounded-2xl border border-accent bg-card/96 px-2 py-2 shadow-[0_18px_40px_hsl(var(--foreground)/0.16)] backdrop-blur">
+          <div className="relative flex items-center gap-1 rounded-md border border-border bg-popover p-1 shadow-md">
             <button
               type="button"
               title="加粗"
               onMouseDown={(event) => event.preventDefault()}
               onClick={toggleBold}
               className={cn(
-                'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
+                'inline-flex size-8 items-center justify-center rounded-sm transition-colors',
                 floatingToolbarState.isBold
-                  ? 'bg-accent text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary) / 0.22)]'
-                  : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
               )}
             >
               <Bold className="h-4 w-4" />
@@ -424,40 +424,40 @@ export function MdxMarkdownEditor({
               onMouseDown={(event) => event.preventDefault()}
               onClick={toggleItalic}
               className={cn(
-                'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
+                'inline-flex size-8 items-center justify-center rounded-sm transition-colors',
                 floatingToolbarState.isItalic
-                  ? 'bg-accent text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary) / 0.22)]'
-                  : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
               )}
             >
               <Italic className="h-4 w-4" />
             </button>
-            <span className="h-6 w-px bg-accent/80" />
+            <span className="h-6 w-px bg-border" />
             <button
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => setHeadingMenuOpen((prev) => !prev)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-accent px-3 text-xs font-medium text-primary transition hover:bg-accent"
+              className="inline-flex h-8 items-center gap-1.5 rounded-sm px-2 text-xs font-medium text-foreground transition-colors hover:bg-accent"
             >
               <span>{floatingToolbarState.activeLabel}</span>
               <ChevronDown
                 className={cn(
-                  'h-3.5 w-3.5 text-primary/70 transition-transform',
+                  'h-3.5 w-3.5 text-muted-foreground transition-transform',
                   headingMenuOpen && 'rotate-180',
                 )}
               />
             </button>
-            <span className="h-6 w-px bg-accent/80" />
+            <span className="h-6 w-px bg-border" />
             <button
               type="button"
               title="行内代码"
               onMouseDown={(event) => event.preventDefault()}
               onClick={toggleInlineCode}
               className={cn(
-                'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
+                'inline-flex size-8 items-center justify-center rounded-sm transition-colors',
                 floatingToolbarState.isInlineCode
-                  ? 'bg-accent text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary) / 0.22)]'
-                  : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
               )}
             >
               <Code2 className="h-4 w-4" />
@@ -468,17 +468,17 @@ export function MdxMarkdownEditor({
               onMouseDown={(event) => event.preventDefault()}
               onClick={toggleLink}
               className={cn(
-                'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
+                'inline-flex size-8 items-center justify-center rounded-sm transition-colors',
                 floatingToolbarState.hasLink
-                  ? 'bg-accent text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary) / 0.22)]'
-                  : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
               )}
             >
               <Link2 className="h-4 w-4" />
             </button>
 
             {headingMenuOpen ? (
-              <div className="absolute left-0 top-[calc(100%+8px)] min-w-[150px] overflow-hidden rounded-2xl border border-accent bg-popover shadow-[0_20px_40px_hsl(var(--foreground)/0.18)]">
+              <div className="absolute left-0 top-[calc(100%+4px)] min-w-36 overflow-hidden rounded-md border border-border bg-popover p-1 shadow-md">
                 {headingOptions.map((option) => {
                   const active = option.label === floatingToolbarState.activeLabel;
                   return (
@@ -488,10 +488,10 @@ export function MdxMarkdownEditor({
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => applyHeading(option.level)}
                       className={cn(
-                        'flex w-full items-center justify-between px-3 py-2 text-left text-sm transition',
+                        'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm transition-colors',
                         active
-                          ? 'bg-accent text-primary'
-                          : 'text-foreground hover:bg-accent/60 hover:text-foreground',
+                          ? 'bg-accent text-accent-foreground'
+                          : 'text-foreground hover:bg-accent',
                       )}
                     >
                       <span>{option.label}</span>

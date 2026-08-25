@@ -1182,9 +1182,9 @@ export default function BlogCreate() {
   return (
     <div className="min-h-[calc(100vh-4rem)] px-4 py-6 md:px-8">
       <div className="mx-auto max-w-360">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-border/50 bg-card/75 px-4 py-3 shadow-sm backdrop-blur">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-3">
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="rounded-xl">
+            <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
               <ArrowLeft className="mr-1 h-4 w-4" />
               {returnLabel}
             </Button>
@@ -1209,7 +1209,6 @@ export default function BlogCreate() {
               variant="outline"
               disabled={actionBusy || loadingPost}
               onClick={() => markdownImportInputRef.current?.click()}
-              className="rounded-xl"
             >
               {importingMarkdown ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1222,7 +1221,6 @@ export default function BlogCreate() {
               variant="outline"
               disabled={actionBusy}
               onClick={() => void handleSubmit('draft', { stayOnPage: isEditMode })}
-              className="rounded-xl"
             >
               <Save className="mr-2 h-4 w-4" />
               保存草稿
@@ -1232,17 +1230,12 @@ export default function BlogCreate() {
                 variant="outline"
                 disabled={actionBusy || loadingPost}
                 onClick={() => void handleResetCreateForm()}
-                className="rounded-xl"
               >
                 <RotateCcw className="mr-2 h-4 w-4" />
                 重置
               </Button>
             )}
-            <Button
-              disabled={actionBusy}
-              onClick={() => setPublishReviewOpen(true)}
-              className="rounded-xl"
-            >
+            <Button disabled={actionBusy} onClick={() => setPublishReviewOpen(true)}>
               <Send className="mr-2 h-4 w-4" />
               发布检查
             </Button>
@@ -1257,7 +1250,7 @@ export default function BlogCreate() {
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.46fr)_minmax(340px,0.72fr)]">
-          <section className="w-full min-w-0 rounded-2xl border-border/50 bg-card/95 p-4 shadow-sm md:p-6">
+          <section className="w-full min-w-0 rounded-md border border-border bg-card p-4 md:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div className="text-sm text-muted-foreground">内容画布</div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -1274,7 +1267,7 @@ export default function BlogCreate() {
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="输入标题，抓住读者注意力"
                 maxLength={200}
-                className="mb-2 h-12 rounded-lg text-base border-border/50 bg-card/95"
+                className="mb-2 h-12 text-base"
               />
             )}
 

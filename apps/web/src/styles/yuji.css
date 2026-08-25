@@ -295,6 +295,7 @@ body:has(.yuji-site) {
 
 .yuji-search-link,
 .yuji-studio-link,
+.yuji-account-menu,
 .yuji-theme-button,
 .yuji-menu-button {
   display: inline-flex;
@@ -308,7 +309,8 @@ body:has(.yuji-site) {
 }
 
 .yuji-search-link,
-.yuji-studio-link {
+.yuji-studio-link,
+.yuji-account-menu {
   gap: 7px;
   padding: 0 13px;
   font-size: 12px;
@@ -316,6 +318,7 @@ body:has(.yuji-site) {
 
 .yuji-search-link svg,
 .yuji-studio-link svg,
+.yuji-account-menu > svg,
 .yuji-theme-button svg,
 .yuji-menu-button svg {
   width: 15px;
@@ -330,6 +333,7 @@ body:has(.yuji-site) {
 
 .yuji-search-link:hover,
 .yuji-studio-link:hover,
+.yuji-account-menu:hover,
 .yuji-theme-button:hover,
 .yuji-menu-button:hover {
   border-color: var(--yuji-interactive-hover);
@@ -2107,12 +2111,15 @@ body:has(.yuji-site) {
   }
 
   .yuji-search-link span,
-  .yuji-studio-link span {
+  .yuji-studio-link span,
+  .yuji-account-name,
+  .yuji-account-chevron {
     display: none;
   }
 
   .yuji-search-link,
-  .yuji-studio-link {
+  .yuji-studio-link,
+  .yuji-account-menu {
     width: 34px;
     padding: 0;
   }
@@ -2164,12 +2171,15 @@ body:has(.yuji-site) {
   .yuji-desktop-nav,
   .yuji-search-link span,
   .yuji-studio-link span,
+  .yuji-account-name,
+  .yuji-account-chevron,
   .yuji-theme-button {
     display: none;
   }
 
   .yuji-search-link,
-  .yuji-studio-link {
+  .yuji-studio-link,
+  .yuji-account-menu {
     width: 36px;
     padding: 0;
   }
@@ -2521,6 +2531,7 @@ body:has(.yuji-site) {
 .yuji-desktop-nav a,
 .yuji-search-link,
 .yuji-studio-link,
+.yuji-account-menu,
 .yuji-theme-button {
   color: var(--yuji-ink);
   font-family: "Arial Narrow", "Roboto Condensed", monospace;
@@ -2566,6 +2577,7 @@ body:has(.yuji-site) {
 
 .yuji-search-link,
 .yuji-studio-link,
+.yuji-account-menu,
 .yuji-theme-button {
   width: auto;
   min-height: 32px;
@@ -2581,6 +2593,7 @@ body:has(.yuji-site) {
 
 .yuji-search-link:hover,
 .yuji-studio-link:hover,
+.yuji-account-menu:hover,
 .yuji-theme-button:hover {
   border-color: transparent;
   background: transparent;

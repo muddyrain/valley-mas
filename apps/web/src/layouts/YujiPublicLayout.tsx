@@ -1,7 +1,9 @@
-import { Menu, PenLine, Search, X } from 'lucide-react';
+import { ChevronDown, LogIn, Menu, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { OwnerSessionMenu } from '@/components/auth/OwnerSessionMenu';
 import { GlobalCommandPalette } from '@/components/search/GlobalCommandPalette';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import YujiPixelTrail from '@/components/yuji/YujiPixelTrail';
 import {
   type YujiHeaderSurface,
@@ -29,7 +31,9 @@ export default function YujiPublicLayout() {
   const [headerSurface, setHeaderSurface] = useState<YujiHeaderSurface>('stage');
   const location = useLocation();
   const isHomeStage = location.pathname === '/';
-  const showStudioEntry = useAuthStore((state) => state.hasHydrated && state.isAuthenticated);
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const showSessionMenu = hasHydrated && isAuthenticated;
   const themeMode = useThemeStore((state) => state.mode);
   const setThemeMode = useThemeStore((state) => state.setMode);
   const publicTheme = resolveThemeMode(themeMode);
@@ -91,10 +95,27 @@ export default function YujiPublicLayout() {
                     <Search aria-hidden="true" />
                     <span>搜索</span>
                   </button>
-                  {showStudioEntry ? (
-                    <NavLink className="yuji-studio-link" to="/studio">
-                      <PenLine aria-hidden="true" />
-                      <span>创作室</span>
+                  {showSessionMenu ? (
+                    <OwnerSessionMenu
+                      trigger={({ name, avatar, avatarFallback }) => (
+                        <button
+                          type="button"
+                          className="yuji-account-menu"
+                          aria-label={`打开${name}的账户菜单`}
+                        >
+                          <Avatar className="size-6">
+                            <AvatarImage src={avatar} alt="" />
+                            <AvatarFallback>{avatarFallback}</AvatarFallback>
+                          </Avatar>
+                          <span className="yuji-account-name">{name}</span>
+                          <ChevronDown className="yuji-account-chevron" aria-hidden="true" />
+                        </button>
+                      )}
+                    />
+                  ) : hasHydrated ? (
+                    <NavLink className="yuji-studio-link" to="/login">
+                      <LogIn aria-hidden="true" />
+                      <span>登录</span>
                     </NavLink>
                   ) : null}
                   <button
@@ -143,9 +164,13 @@ export default function YujiPublicLayout() {
                 >
                   搜索
                 </button>
-                {showStudioEntry ? (
+                {showSessionMenu ? (
                   <NavLink to="/studio" onClick={() => setMobileOpen(false)}>
                     创作室
+                  </NavLink>
+                ) : hasHydrated ? (
+                  <NavLink to="/login" onClick={() => setMobileOpen(false)}>
+                    登录
                   </NavLink>
                 ) : null}
                 <button type="button" onClick={toggleTheme}>

@@ -1,6 +1,7 @@
 import {
   ArrowUpRight,
   BookOpen,
+  ChevronDown,
   FlaskConical,
   GalleryVerticalEnd,
   House,
@@ -13,6 +14,8 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
+import { OwnerSessionMenu } from '@/components/auth/OwnerSessionMenu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -60,6 +63,30 @@ function StudioNavigation({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+function StudioSessionMenu({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <OwnerSessionMenu
+      side="top"
+      align="start"
+      onNavigate={onNavigate}
+      trigger={({ name, avatar, avatarFallback }) => (
+        <button
+          type="button"
+          className="flex h-10 w-full items-center gap-3 rounded-md px-2 text-left text-sm font-medium transition-colors hover:bg-muted"
+          aria-label={`打开${name}的账户菜单`}
+        >
+          <Avatar>
+            <AvatarImage src={avatar} alt="" />
+            <AvatarFallback>{avatarFallback}</AvatarFallback>
+          </Avatar>
+          <span className="min-w-0 flex-1 truncate text-foreground">{name}</span>
+          <ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" />
+        </button>
+      )}
+    />
+  );
+}
+
 export default function StudioLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -93,6 +120,7 @@ export default function StudioLayout() {
         </div>
 
         <div className="space-y-1 border-t border-border p-3">
+          <StudioSessionMenu />
           <Link
             to="/"
             className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -151,6 +179,7 @@ export default function StudioLayout() {
             </div>
             <StudioNavigation onNavigate={() => setMobileOpen(false)} />
             <div className="mt-4 border-t border-border pt-4">
+              <StudioSessionMenu onNavigate={() => setMobileOpen(false)} />
               <Link
                 to="/workbench"
                 onClick={() => setMobileOpen(false)}

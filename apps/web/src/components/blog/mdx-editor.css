@@ -2,11 +2,11 @@
 @import "@milkdown/crepe/theme/classic.css";
 
 .valley-md-editor-shell {
-  --editor-inline-code-bg: hsl(var(--accent));
-  --editor-inline-code-border: hsl(var(--primary) / 0.24);
-  --editor-code-bg: hsl(var(--muted) / 0.8);
-  --editor-code-surface: hsl(var(--muted) / 0.9);
-  --editor-code-border: hsl(var(--primary) / 0.22);
+  --editor-inline-code-bg: hsl(var(--muted));
+  --editor-inline-code-border: hsl(var(--border));
+  --editor-code-bg: hsl(var(--muted));
+  --editor-code-surface: hsl(var(--muted));
+  --editor-code-border: hsl(var(--border));
   --editor-code-muted: hsl(var(--muted-foreground));
   --editor-code-text: hsl(var(--foreground));
   --editor-code-accent: hsl(var(--primary) / 0.48);
@@ -17,27 +17,24 @@
   --editor-selection-shadow: hsl(var(--primary) / 0.16);
   position: relative;
   overflow: hidden;
-  border: 1px solid hsl(var(--border) / 0.5);
-  border-radius: 12px;
-  background: hsl(var(--card) / 0.95);
-  box-shadow: 0 1px 3px hsl(var(--foreground) / 0.05);
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  background: hsl(var(--background));
 }
 
 .valley-md-editor-shell:has(.ProseMirror-focused) {
-  border-color: hsl(var(--primary) / 0.38);
-  box-shadow:
-    0 1px 3px hsl(var(--foreground) / 0.05),
-    0 0 0 3px hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.35);
 }
 
 .valley-md-editor-shell .milkdown {
   --crepe-color-background: transparent;
   --crepe-color-on-background: hsl(var(--foreground));
-  --crepe-color-surface: hsl(var(--accent));
-  --crepe-color-surface-low: hsl(var(--card));
+  --crepe-color-surface: hsl(var(--muted));
+  --crepe-color-surface-low: hsl(var(--background));
   --crepe-color-on-surface: hsl(var(--foreground));
   --crepe-color-on-surface-variant: hsl(var(--muted-foreground));
-  --crepe-color-outline: hsl(var(--primary) / 0.3);
+  --crepe-color-outline: hsl(var(--border));
   --crepe-color-primary: hsl(var(--primary));
   --crepe-color-secondary: hsl(var(--accent));
   --crepe-color-on-secondary: hsl(var(--primary));
@@ -53,32 +50,31 @@
   --crepe-font-code:
     "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, monospace;
-  --crepe-shadow-1: 0 12px 26px hsl(var(--primary) / 0.12), 0 0 0 1px hsl(var(--primary) / 0.08);
-  --crepe-shadow-2: 0 18px 32px hsl(var(--foreground) / 0.07), 0 0 0 1px hsl(var(--primary) / 0.08);
-  min-height: 620px;
+  --crepe-shadow-1: none;
+  --crepe-shadow-2: none;
+  min-height: 560px;
   background: transparent;
   overflow: visible;
 }
 
 .valley-md-editor-shell .milkdown .milkdown-top-bar {
-  gap: 2px;
-  padding: 8px 12px;
+  gap: 4px;
+  padding: 6px 8px;
   border-bottom: 1px solid hsl(var(--border));
-  background: hsl(var(--accent));
-  backdrop-filter: blur(10px);
+  background: hsl(var(--muted));
 }
 
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-heading-button,
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-item,
 .valley-md-editor-shell .milkdown .milkdown-toolbar .toolbar-item {
-  border-radius: 10px;
-  color: hsl(var(--primary));
+  border-radius: 4px;
+  color: hsl(var(--foreground));
 }
 
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-heading-button svg,
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-item svg,
 .valley-md-editor-shell .milkdown .milkdown-toolbar .toolbar-item svg {
-  color: hsl(var(--primary));
+  color: hsl(var(--foreground));
   fill: currentColor;
   opacity: 1;
 }
@@ -91,13 +87,13 @@
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-heading-button:hover,
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-item:hover,
 .valley-md-editor-shell .milkdown .milkdown-toolbar .toolbar-item:hover {
-  background: hsl(var(--primary) / 0.1);
+  background: hsl(var(--accent));
 }
 
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-item.active svg,
 .valley-md-editor-shell .milkdown .milkdown-toolbar .toolbar-item.active svg {
-  color: hsl(var(--primary));
-  fill: hsl(var(--primary));
+  color: hsl(var(--foreground));
+  fill: hsl(var(--foreground));
 }
 
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-heading-dropdown,
@@ -105,16 +101,15 @@
 .valley-md-editor-shell .milkdown .milkdown-link-preview > .link-preview,
 .valley-md-editor-shell .milkdown .milkdown-link-edit > .link-edit,
 .valley-md-editor-shell .milkdown .milkdown-code-block .list-wrapper {
-  border: 1px solid hsl(var(--primary) / 0.16);
-  background: hsl(var(--card) / 0.98);
-  backdrop-filter: blur(14px);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--popover));
 }
 
 .valley-md-editor-shell .milkdown .ProseMirror {
-  min-height: 620px;
-  padding: 28px 40px 36px 80px;
-  font-size: 15px;
-  line-height: 1.95;
+  min-height: 560px;
+  padding: 24px 32px 32px 56px;
+  font-size: 16px;
+  line-height: 1.8;
   color: hsl(var(--foreground));
   caret-color: hsl(var(--primary));
 }
@@ -131,18 +126,18 @@
   background: var(--editor-selection-block-bg);
   outline: 1px solid var(--editor-selection-ring);
   box-shadow: 0 0 0 3px var(--editor-selection-shadow);
-  border-radius: 14px;
+  border-radius: 6px;
 }
 
 .valley-md-editor-shell .milkdown .ProseMirror li.ProseMirror-selectednode {
   background: var(--editor-selection-block-bg);
-  border-radius: 14px;
+  border-radius: 6px;
 }
 
 .valley-md-editor-shell .milkdown .ProseMirror img.ProseMirror-selectednode {
   outline: 2px solid var(--editor-selection-ring);
   box-shadow: 0 0 0 4px var(--editor-selection-shadow);
-  border-radius: 16px;
+  border-radius: 6px;
 }
 
 .valley-md-editor-shell .milkdown .ProseMirror .selectedCell::after {
@@ -155,7 +150,7 @@
 }
 
 .valley-md-editor-shell .milkdown .milkdown-block-handle {
-  margin-left: 8px;
+  margin-left: 4px;
 }
 
 .valley-md-editor-shell .milkdown .milkdown-slash-menu {
@@ -224,8 +219,8 @@
 .valley-md-editor-shell .milkdown .ProseMirror blockquote {
   margin: 0.95rem 0;
   padding: 0.8rem 1rem 0.8rem 1.5rem;
-  border-radius: 14px;
-  background: hsl(var(--accent));
+  border-radius: 6px;
+  background: hsl(var(--muted));
 }
 
 .valley-md-editor-shell .milkdown .ProseMirror blockquote::before {
@@ -237,30 +232,23 @@
 
 .valley-md-editor-shell .milkdown .ProseMirror code {
   border: 1px solid var(--editor-inline-code-border);
-  border-radius: 7px;
-  background: linear-gradient(180deg, var(--editor-inline-code-bg), hsl(var(--accent)));
-  color: hsl(var(--primary));
-  padding: 0.12rem 0.42rem;
-  letter-spacing: 0.01em;
+  border-radius: 4px;
+  background: var(--editor-inline-code-bg);
+  color: hsl(var(--foreground));
+  padding: 0.1rem 0.32rem;
 }
 
 .valley-md-editor-shell .milkdown .milkdown-code-block {
   margin: 1rem 0;
-  padding: 12px 14px 14px;
+  padding: 12px;
   border: 1px solid var(--editor-code-border);
-  border-radius: 18px;
-  background: linear-gradient(180deg, hsl(var(--editor-code-surface)), hsl(var(--editor-code-bg)));
-  box-shadow:
-    0 18px 34px hsl(var(--foreground) / 0.12),
-    0 0 0 1px hsl(var(--border) / 0.4) inset;
+  border-radius: 6px;
+  background: var(--editor-code-bg);
 }
 
 .valley-md-editor-shell .milkdown .milkdown-code-block.selected {
   outline: 1px solid var(--editor-selection-ring);
-  box-shadow:
-    0 18px 34px hsl(var(--foreground) / 0.12),
-    0 0 0 1px hsl(var(--border) / 0.4) inset,
-    0 0 0 4px var(--editor-selection-shadow);
+  box-shadow: 0 0 0 2px var(--editor-selection-shadow);
 }
 
 .valley-md-editor-shell .milkdown .milkdown-code-block .cm-editor,
@@ -378,7 +366,7 @@
 
 .valley-md-editor-shell .milkdown .milkdown-link-preview > .link-preview,
 .valley-md-editor-shell .milkdown .milkdown-link-edit > .link-edit {
-  border-radius: 14px;
+  border-radius: 6px;
 }
 
 .valley-md-preview-body {
@@ -502,8 +490,8 @@
 
 @media (max-width: 768px) {
   .valley-md-editor-shell .milkdown .ProseMirror {
-    min-height: 540px;
-    padding: 22px 18px 28px 56px;
+    min-height: 480px;
+    padding: 20px 16px 28px 44px;
   }
 
   .valley-md-editor-shell .milkdown .milkdown-top-bar {
