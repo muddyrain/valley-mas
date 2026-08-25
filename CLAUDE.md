@@ -23,6 +23,7 @@
 
 - 行为改动先建立或更新可观测验证，再实现并复跑受影响验证；纯文案、纯样式或不可测边界可说明豁免与替代验证。
 - 浏览器调试与运行时验证按任务选择工具，并清楚区分用户当前会话中的实机验收与自动化或 fixture 证据；具体政策见 [Harness 的浏览器与运行时证据](./docs/HARNESS_ENGINEERING.md#6-浏览器与运行时证据)。可见交互、响应式、动画、Canvas、Three.js、拖拽、滚动、loading 和路由按风险取得运行时证据。
+- 通过 Chrome 验收本地 Web 页面时，先检查并接管用户已打开的目标标签，保持原始 origin；`localhost` 与 `127.0.0.1` 的会话彼此隔离。只有没有匹配标签或明确需要独立未登录场景时才新开标签；刷新前先确认该标签没有未保存输入。
 - 测试范围、覆盖率门槛与平台验收以 `docs/TESTING_STRATEGY.md`、局部入口及 `docs/PROJECT_GUIDE.md` 为准。
 - 修改 Markdown、skill、配置示例或其他非 ASCII 文本时，运行 `encoding-guard` 定向检查。
 

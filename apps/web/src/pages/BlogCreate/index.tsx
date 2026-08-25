@@ -1294,11 +1294,13 @@ export default function BlogCreate() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs text-muted-foreground">摘要（可选）</span>
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={() => void handleAIGenerateExcerpt()}
                       disabled={isContentEmpty || aiExcerptLoading || submitting}
-                      className="inline-flex h-6 items-center gap-1 rounded-lg border border-primary/30 bg-accent px-1.5 text-xs font-medium text-primary transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-45"
+                      className="h-6 rounded-lg"
                       title={isContentEmpty ? '请先输入正文内容' : 'AI 自动提取摘要'}
                     >
                       {aiExcerptLoading ? (
@@ -1307,7 +1309,7 @@ export default function BlogCreate() {
                         <Sparkles className="h-3.5 w-3.5" />
                       )}
                       {aiExcerptLoading ? '生成中' : 'AI 生成摘要'}
-                    </button>
+                    </Button>
                   </div>
                   <Input
                     value={excerpt}
@@ -1361,13 +1363,21 @@ export default function BlogCreate() {
                       maxLength={500}
                       className="rounded-xl"
                     />
-                    <label className="bg-accent text-primary hover:bg-accent inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl border-border/50 border px-2.5 text-sm whitespace-nowrap">
-                      <ImagePlus className="mr-1 h-4 w-4" />
-                      {coverUploading ? '上传中' : coverObjectUrl ? '重新选图' : '选择图片'}
+                    <label className="relative inline-flex shrink-0">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 rounded-xl whitespace-nowrap"
+                        disabled={coverUploading}
+                      >
+                        <ImagePlus className="mr-1 h-4 w-4" />
+                        {coverUploading ? '上传中' : coverObjectUrl ? '重新选图' : '选择图片'}
+                      </Button>
                       <input
                         type="file"
                         accept="image/*"
-                        className="hidden"
+                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                         disabled={coverUploading}
                         onChange={handleSelectLocalCover}
                       />
@@ -1441,7 +1451,7 @@ export default function BlogCreate() {
                       </button>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 rounded-xl border-border/50 border p-2">
+                  <div className="bg-accent/50 border-border/50 mb-0.5 flex max-h-48 min-h-14 flex-wrap content-start gap-2 overflow-y-auto rounded-xl border p-2">
                     <button
                       type="button"
                       onClick={() => setGroupId('')}

@@ -88,6 +88,18 @@
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-item:hover,
 .valley-md-editor-shell .milkdown .milkdown-toolbar .toolbar-item:hover {
   background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+}
+
+.valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-heading-button,
+.valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-item,
+.valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-heading-button svg,
+.valley-md-editor-shell .milkdown .milkdown-toolbar .toolbar-item,
+.valley-md-editor-shell .milkdown .milkdown-toolbar .toolbar-item svg {
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+  cursor: pointer;
 }
 
 .valley-md-editor-shell .milkdown .milkdown-top-bar .top-bar-item.active svg,
@@ -127,6 +139,16 @@
   outline: 1px solid var(--editor-selection-ring);
   box-shadow: 0 0 0 3px var(--editor-selection-shadow);
   border-radius: 6px;
+}
+
+.valley-md-editor-shell .milkdown .ProseMirror em,
+.valley-md-editor-shell .milkdown .ProseMirror i {
+  font-style: italic;
+}
+
+.valley-md-editor-shell .milkdown .ProseMirror strong,
+.valley-md-editor-shell .milkdown .ProseMirror b {
+  font-weight: 700;
 }
 
 .valley-md-editor-shell .milkdown .ProseMirror li.ProseMirror-selectednode {

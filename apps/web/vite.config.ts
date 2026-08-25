@@ -32,6 +32,7 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_INSPECTOR_WORKSPACE_ROOT': JSON.stringify(workspaceRoot),
     },
     resolve: {
+      dedupe: ['prosemirror-model'],
       alias: {
         '@': path.resolve(__dirname, './src'),
       },

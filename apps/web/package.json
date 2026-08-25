@@ -50,6 +50,7 @@
     "lucide-react": "catalog:shared-runtime",
     "marked": "^17.0.4",
     "playcaptcha": "^0.1.0",
+    "prosemirror-model": "1.25.4",
     "react": "catalog:react-19",
     "react-day-picker": "^10.0.1",
     "react-dom": "catalog:react-19",

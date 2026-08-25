@@ -1,39 +1,12 @@
 import { Crepe } from '@milkdown/crepe';
-import { toggleLinkCommand } from '@milkdown/kit/component/link-tooltip';
-import { commandsCtx, editorViewCtx } from '@milkdown/kit/core';
-import type { Ctx } from '@milkdown/kit/ctx';
-import {
-  emphasisSchema,
-  headingSchema,
-  inlineCodeSchema,
-  isMarkSelectedCommand,
-  linkSchema,
-  paragraphSchema,
-  setBlockTypeCommand,
-  strongSchema,
-  toggleEmphasisCommand,
-  toggleInlineCodeCommand,
-  toggleStrongCommand,
-} from '@milkdown/kit/preset/commonmark';
 import { replaceAll } from '@milkdown/kit/utils';
-import { Bold, ChevronDown, Code2, Italic, Link2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { normalizeHtmlImageTags, normalizeOrderedListStarts } from '@/utils/blog';
 
 type HeadingOption = {
   label: string;
   level: number | null;
-};
-
-type FloatingToolbarState = {
-  top: number;
-  left: number;
-  activeLabel: string;
-  isBold: boolean;
-  isItalic: boolean;
-  isInlineCode: boolean;
-  hasLink: boolean;
 };
 
 interface MdxMarkdownEditorProps {
@@ -64,18 +37,12 @@ export function MdxMarkdownEditor({
   className,
   selectionHeadingOptions,
 }: MdxMarkdownEditorProps) {
-  const shellRef = useRef<HTMLDivElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const floatingToolbarRef = useRef<HTMLDivElement | null>(null);
   const crepeRef = useRef<Crepe | null>(null);
   const latestMarkdownRef = useRef(normalizeEditorMarkdown(value));
   const valueRef = useRef(normalizeEditorMarkdown(value));
   const onChangeRef = useRef(onChange);
   const pendingSyncedMarkdownRef = useRef<string | null>(null);
-  const [floatingToolbarState, setFloatingToolbarState] = useState<FloatingToolbarState | null>(
-    null,
-  );
-  const [headingMenuOpen, setHeadingMenuOpen] = useState(false);
   const headingOptions = useMemo(
     () =>
       selectionHeadingOptions && selectionHeadingOptions.length > 0
@@ -94,153 +61,21 @@ export function MdxMarkdownEditor({
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  const hideFloatingToolbar = useCallback(() => {
-    setFloatingToolbarState(null);
-    setHeadingMenuOpen(false);
-  }, []);
-
-  const updateFloatingToolbar = useCallback(() => {
-    const shell = shellRef.current;
+  const applyTopBarTooltipTitles = useCallback(() => {
     const host = hostRef.current;
-    const crepe = crepeRef.current;
-    if (!shell || !host || !crepe) {
-      hideFloatingToolbar();
-      return;
-    }
+    if (!host) return;
 
-    let nextState: FloatingToolbarState | null = null;
-    crepe.editor.action((ctx) => {
-      const view = ctx.get(editorViewCtx);
-      const { selection } = view.state;
-      if (selection.empty) return;
+    const topBar = host.querySelector('.milkdown-top-bar');
+    if (!topBar) return;
 
-      const editorRoot = host.querySelector('.ProseMirror');
-      const domSelection = window.getSelection();
-      if (!editorRoot || !domSelection || domSelection.rangeCount === 0) return;
-
-      const anchorNode = domSelection.anchorNode;
-      const focusNode = domSelection.focusNode;
-      if (!anchorNode || !focusNode) return;
-      if (!editorRoot.contains(anchorNode) || !editorRoot.contains(focusNode)) return;
-
-      const range = domSelection.getRangeAt(0).cloneRange();
-      const rect = range.getBoundingClientRect();
-      if (!rect.width && !rect.height) return;
-
-      const shellRect = shell.getBoundingClientRect();
-      const rawLeft = rect.left + rect.width / 2 - shellRect.left;
-      const toolbarHalfWidth = 176;
-      const left = Math.min(
-        Math.max(rawLeft, toolbarHalfWidth),
-        Math.max(shellRect.width - toolbarHalfWidth, toolbarHalfWidth),
-      );
-      const top = Math.max(rect.top - shellRect.top - 14, 18);
-
-      const commands = ctx.get(commandsCtx);
-      const currentNode = selection.$from.parent;
-      const currentLevel =
-        currentNode.type === headingSchema.type(ctx) ? Number(currentNode.attrs.level || 0) : null;
-      const activeOption =
-        headingOptions.find((option) => option.level === currentLevel) || headingOptions[0];
-
-      nextState = {
-        top,
-        left,
-        activeLabel: activeOption?.label || '正文',
-        isBold: commands.call(isMarkSelectedCommand.key, strongSchema.type(ctx)),
-        isItalic: commands.call(isMarkSelectedCommand.key, emphasisSchema.type(ctx)),
-        isInlineCode: commands.call(isMarkSelectedCommand.key, inlineCodeSchema.type(ctx)),
-        hasLink: commands.call(isMarkSelectedCommand.key, linkSchema.type(ctx)),
-      };
+    const buttonLikeElements = topBar.querySelectorAll<HTMLElement>('[aria-label]');
+    buttonLikeElements.forEach((element) => {
+      const label = element.getAttribute('aria-label');
+      if (!label) return;
+      element.setAttribute('title', label);
+      element.setAttribute('data-title', label);
     });
-
-    if (!nextState) {
-      hideFloatingToolbar();
-      return;
-    }
-
-    const resolvedState = nextState as FloatingToolbarState;
-    setFloatingToolbarState((prev) => {
-      if (
-        prev &&
-        prev.top === resolvedState.top &&
-        prev.left === resolvedState.left &&
-        prev.activeLabel === resolvedState.activeLabel &&
-        prev.isBold === resolvedState.isBold &&
-        prev.isItalic === resolvedState.isItalic &&
-        prev.isInlineCode === resolvedState.isInlineCode &&
-        prev.hasLink === resolvedState.hasLink
-      ) {
-        return prev;
-      }
-      return resolvedState;
-    });
-  }, [headingOptions, hideFloatingToolbar]);
-
-  const runToolbarCommand = useCallback(
-    (commandRunner: (ctx: Ctx) => void) => {
-      const crepe = crepeRef.current;
-      if (!crepe) return;
-
-      crepe.editor.action((ctx) => {
-        commandRunner(ctx);
-        ctx.get(editorViewCtx).focus();
-      });
-
-      requestAnimationFrame(() => updateFloatingToolbar());
-    },
-    [updateFloatingToolbar],
-  );
-
-  const applyHeading = useCallback(
-    (level: number | null) => {
-      const crepe = crepeRef.current;
-      if (!crepe) return;
-
-      crepe.editor.action((ctx) => {
-        const commands = ctx.get(commandsCtx);
-        if (level === null) {
-          commands.call(setBlockTypeCommand.key, {
-            nodeType: paragraphSchema.type(ctx),
-          });
-        } else {
-          commands.call(setBlockTypeCommand.key, {
-            nodeType: headingSchema.type(ctx),
-            attrs: { level },
-          });
-        }
-        ctx.get(editorViewCtx).focus();
-      });
-
-      setHeadingMenuOpen(false);
-      requestAnimationFrame(() => updateFloatingToolbar());
-    },
-    [updateFloatingToolbar],
-  );
-
-  const toggleBold = useCallback(() => {
-    runToolbarCommand((ctx) => {
-      ctx.get(commandsCtx).call(toggleStrongCommand.key);
-    });
-  }, [runToolbarCommand]);
-
-  const toggleItalic = useCallback(() => {
-    runToolbarCommand((ctx) => {
-      ctx.get(commandsCtx).call(toggleEmphasisCommand.key);
-    });
-  }, [runToolbarCommand]);
-
-  const toggleInlineCode = useCallback(() => {
-    runToolbarCommand((ctx) => {
-      ctx.get(commandsCtx).call(toggleInlineCodeCommand.key);
-    });
-  }, [runToolbarCommand]);
-
-  const toggleLink = useCallback(() => {
-    runToolbarCommand((ctx) => {
-      ctx.get(commandsCtx).call(toggleLinkCommand.key);
-    });
-  }, [runToolbarCommand]);
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -306,7 +141,7 @@ export function MdxMarkdownEditor({
           crepe.editor.action(replaceAll(nextMarkdown, true));
         }
 
-        requestAnimationFrame(() => updateFloatingToolbar());
+        applyTopBarTooltipTitles();
       })
       .catch((error) => {
         console.error('Failed to initialize Milkdown editor.', error);
@@ -316,12 +151,10 @@ export function MdxMarkdownEditor({
       disposed = true;
       crepeRef.current = null;
       pendingSyncedMarkdownRef.current = null;
-      setFloatingToolbarState(null);
-      setHeadingMenuOpen(false);
       host.innerHTML = '';
       void crepe.destroy().catch(() => undefined);
     };
-  }, [headingOptions, updateFloatingToolbar]);
+  }, [applyTopBarTooltipTitles, headingOptions]);
 
   useEffect(() => {
     valueRef.current = normalizeEditorMarkdown(value);
@@ -338,176 +171,8 @@ export function MdxMarkdownEditor({
     crepe.editor.action(replaceAll(valueRef.current, true));
   }, [value]);
 
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-
-    const scheduleUpdate = () => {
-      requestAnimationFrame(() => updateFloatingToolbar());
-    };
-
-    const handleSelectionChange = () => {
-      const hostNode = hostRef.current;
-      const activeElement = document.activeElement;
-      const selectionAnchorNode = window.getSelection()?.anchorNode ?? null;
-      if (
-        floatingToolbarRef.current?.contains(activeElement) ||
-        floatingToolbarRef.current?.contains(document.activeElement)
-      ) {
-        return;
-      }
-      if (hostNode?.contains(activeElement) || hostNode?.contains(selectionAnchorNode)) {
-        scheduleUpdate();
-        return;
-      }
-      hideFloatingToolbar();
-    };
-
-    host.addEventListener('mouseup', scheduleUpdate);
-    host.addEventListener('keyup', scheduleUpdate);
-    host.addEventListener('focusin', scheduleUpdate);
-    window.addEventListener('resize', scheduleUpdate);
-    window.addEventListener('scroll', scheduleUpdate, true);
-    document.addEventListener('selectionchange', handleSelectionChange);
-
-    return () => {
-      host.removeEventListener('mouseup', scheduleUpdate);
-      host.removeEventListener('keyup', scheduleUpdate);
-      host.removeEventListener('focusin', scheduleUpdate);
-      window.removeEventListener('resize', scheduleUpdate);
-      window.removeEventListener('scroll', scheduleUpdate, true);
-      document.removeEventListener('selectionchange', handleSelectionChange);
-    };
-  }, [hideFloatingToolbar, updateFloatingToolbar]);
-
-  useEffect(() => {
-    if (!headingMenuOpen) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (floatingToolbarRef.current?.contains(event.target as Node)) return;
-      setHeadingMenuOpen(false);
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    return () => document.removeEventListener('pointerdown', handlePointerDown);
-  }, [headingMenuOpen]);
-
   return (
-    <div ref={shellRef} className={cn('valley-md-editor-shell', className)}>
-      {floatingToolbarState ? (
-        <div
-          ref={floatingToolbarRef}
-          className="absolute z-20 -translate-x-1/2 -translate-y-full"
-          style={{
-            top: floatingToolbarState.top,
-            left: floatingToolbarState.left,
-          }}
-        >
-          <div className="relative flex items-center gap-1 rounded-md border border-border bg-popover p-1 shadow-md">
-            <button
-              type="button"
-              title="加粗"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={toggleBold}
-              className={cn(
-                'inline-flex size-8 items-center justify-center rounded-sm transition-colors',
-                floatingToolbarState.isBold
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-              )}
-            >
-              <Bold className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              title="斜体"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={toggleItalic}
-              className={cn(
-                'inline-flex size-8 items-center justify-center rounded-sm transition-colors',
-                floatingToolbarState.isItalic
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-              )}
-            >
-              <Italic className="h-4 w-4" />
-            </button>
-            <span className="h-6 w-px bg-border" />
-            <button
-              type="button"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => setHeadingMenuOpen((prev) => !prev)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-sm px-2 text-xs font-medium text-foreground transition-colors hover:bg-accent"
-            >
-              <span>{floatingToolbarState.activeLabel}</span>
-              <ChevronDown
-                className={cn(
-                  'h-3.5 w-3.5 text-muted-foreground transition-transform',
-                  headingMenuOpen && 'rotate-180',
-                )}
-              />
-            </button>
-            <span className="h-6 w-px bg-border" />
-            <button
-              type="button"
-              title="行内代码"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={toggleInlineCode}
-              className={cn(
-                'inline-flex size-8 items-center justify-center rounded-sm transition-colors',
-                floatingToolbarState.isInlineCode
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-              )}
-            >
-              <Code2 className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              title="链接"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={toggleLink}
-              className={cn(
-                'inline-flex size-8 items-center justify-center rounded-sm transition-colors',
-                floatingToolbarState.hasLink
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-              )}
-            >
-              <Link2 className="h-4 w-4" />
-            </button>
-
-            {headingMenuOpen ? (
-              <div className="absolute left-0 top-[calc(100%+4px)] min-w-36 overflow-hidden rounded-md border border-border bg-popover p-1 shadow-md">
-                {headingOptions.map((option) => {
-                  const active = option.label === floatingToolbarState.activeLabel;
-                  return (
-                    <button
-                      key={`${option.label}-${option.level ?? 'paragraph'}`}
-                      type="button"
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => applyHeading(option.level)}
-                      className={cn(
-                        'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm transition-colors',
-                        active
-                          ? 'bg-accent text-accent-foreground'
-                          : 'text-foreground hover:bg-accent',
-                      )}
-                    >
-                      <span>{option.label}</span>
-                      {option.level === null ? (
-                        <span className="text-[11px] opacity-70">P</span>
-                      ) : (
-                        <span className="text-[11px] opacity-70">H{option.level}</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+    <div className={cn('valley-md-editor-shell', className)}>
       <div ref={hostRef} className="valley-md-editor-root" />
     </div>
   );

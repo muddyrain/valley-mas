@@ -99,3 +99,9 @@ tmp/
 # Local AI tool session artifacts
 /.superpowers/
 /.trae/documents/
+
+# Local Multica agent artifacts
+/.agent_context/
+/.multica/
+/attachments/
+/description.md
