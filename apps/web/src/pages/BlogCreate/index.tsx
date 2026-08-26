@@ -1,4 +1,5 @@
 import {
+  Archive,
   ArrowLeft,
   CheckCircle2,
   Clock3,
@@ -10,12 +11,17 @@ import {
   Save,
   Send,
   Sparkles,
+  Trash2,
+  UploadCloud,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { createAIImageGeneration, getAIImageGeneration } from '@/api/aiImages';
 import {
+  type ArticlePackage,
+  confirmArticlePackage,
+  createArticlePackageUpload,
   createGroup,
   createPost,
   type ExternalCoverImage,
@@ -26,6 +32,8 @@ import {
   pickBlogCoverFromResources,
   triggerUnsplashDownload,
   updatePost,
+  updatePostArticlePackage,
+  uploadArticlePackageToTicket,
   uploadBlogCover,
   uploadBlogCoverByUrl,
   type Visibility,
@@ -157,6 +165,13 @@ export default function BlogCreate() {
   const [loadingPost, setLoadingPost] = useState(false);
   const [loadedEditorScope, setLoadedEditorScope] = useState('');
   const [coverUploading, setCoverUploading] = useState(false);
+  const [articlePackage, setArticlePackage] = useState<ArticlePackage | null>(null);
+  const [articlePackageAction, setArticlePackageAction] = useState<'keep' | 'replace' | 'remove'>(
+    'keep',
+  );
+  const [articlePackageDirty, setArticlePackageDirty] = useState(false);
+  const [articlePackageUploading, setArticlePackageUploading] = useState(false);
+  const [articlePackageProgress, setArticlePackageProgress] = useState(0);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [pendingCropFile, setPendingCropFile] = useState<File | null>(null);
@@ -211,6 +226,9 @@ export default function BlogCreate() {
         setGroupId(detail.groupId || '');
         setVisibility(detail.visibility || 'public');
         setLoadedPostStatus(detail.status || 'draft');
+        setArticlePackage(detail.articlePackage || null);
+        setArticlePackageAction(detail.articlePackageAction || 'keep');
+        setArticlePackageDirty(false);
         setLoadedEditorScope(postId);
       } catch {
         toast.error('加载文章失败');
@@ -283,6 +301,10 @@ export default function BlogCreate() {
     setGroupId('');
     setLoadingPost(false);
     setLoadedPostStatus('draft');
+    setArticlePackage(null);
+    setArticlePackageAction('keep');
+    setArticlePackageDirty(false);
+    setArticlePackageProgress(0);
     setLoadedEditorScope('new');
     resetLocalCoverEditing();
   }, [resetLocalCoverEditing]);
@@ -834,6 +856,10 @@ export default function BlogCreate() {
         toast.error('请输入正文内容');
         return;
       }
+      if (articlePackageUploading) {
+        toast.error('请等待文章配套包上传完成');
+        return;
+      }
 
       try {
         setSubmitIntent(status);
@@ -849,6 +875,9 @@ export default function BlogCreate() {
         const resolvedExcerpt =
           status === 'published' ? createAutoExcerpt(excerpt, trimmedContent) : excerpt.trim();
         if (isEditMode && editingId) {
+          if (articlePackageDirty) {
+            await updatePostArticlePackage(editingId, articlePackageAction, articlePackage?.id);
+          }
           await updatePost(editingId, {
             title: trimmedTitle,
             postType: 'blog',
@@ -862,6 +891,7 @@ export default function BlogCreate() {
           });
           if (status === 'published') {
             setLoadedPostStatus('published');
+            setArticlePackageAction('keep');
             toast.success('文章已更新并发布');
           } else if (loadedPostStatus === 'published') {
             toast.success('草稿已保存，当前线上正文未受影响');
@@ -870,8 +900,10 @@ export default function BlogCreate() {
           } else {
             toast.success('文章草稿已更新');
           }
+          setArticlePackageDirty(false);
         } else {
-          await createPost({
+          const needsPackageBinding = articlePackageDirty && articlePackageAction === 'replace';
+          const created = await createPost({
             title: trimmedTitle,
             postType: 'blog',
             content: trimmedContent,
@@ -880,9 +912,13 @@ export default function BlogCreate() {
             coverStorageKey: resolvedCover.coverStorageKey || undefined,
             groupId: groupId || undefined,
             visibility,
-            status,
-            publishNow: status === 'published',
+            status: needsPackageBinding ? 'draft' : status,
+            publishNow: status === 'published' && !needsPackageBinding,
           });
+          if (needsPackageBinding && articlePackage) {
+            await updatePostArticlePackage(created.id, 'replace', articlePackage.id);
+            if (status === 'published') await updatePost(created.id, { status: 'published' });
+          }
           setLoadedPostStatus(status);
           toast.success(status === 'published' ? '文章已发布' : '草稿保存成功');
         }
@@ -916,6 +952,10 @@ export default function BlogCreate() {
       visibility,
       isEditMode,
       editingId,
+      articlePackage,
+      articlePackageAction,
+      articlePackageDirty,
+      articlePackageUploading,
       uploadCoverIfNeeded,
       clearRememberedCoverGeneration,
       clearAutoSavedArticle,
@@ -923,6 +963,36 @@ export default function BlogCreate() {
       returnTo,
     ],
   );
+
+  const handleSelectArticlePackage = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      toast.error('文章配套包仅支持 ZIP 文件');
+      return;
+    }
+    if (file.size <= 0 || file.size > 64 * 1024 * 1024) {
+      toast.error('文章配套包不能超过 64MB');
+      return;
+    }
+    try {
+      setArticlePackageUploading(true);
+      setArticlePackageProgress(0);
+      const ticket = await createArticlePackageUpload(file.name, file.size);
+      await uploadArticlePackageToTicket(file, ticket, setArticlePackageProgress);
+      const confirmed = await confirmArticlePackage(ticket.package.id);
+      setArticlePackage(confirmed);
+      setArticlePackageAction('replace');
+      setArticlePackageDirty(true);
+      setArticlePackageProgress(100);
+      toast.success('文章配套包已通过检查');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '文章配套包上传失败');
+    } finally {
+      setArticlePackageUploading(false);
+    }
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1126,7 +1196,12 @@ export default function BlogCreate() {
   const readMinutes = useMemo(() => Math.max(1, Math.ceil(wordCount / 500)), [wordCount]);
   const isContentEmpty = !content.trim();
   const actionBusy =
-    submitting || coverUploading || aiExcerptLoading || aiCoverLoading || importingMarkdown;
+    submitting ||
+    coverUploading ||
+    articlePackageUploading ||
+    aiExcerptLoading ||
+    aiCoverLoading ||
+    importingMarkdown;
   const coverAssistantBusy = aiPickLoading || aiCoverLoading;
   const coverAssistantBusyTitle = recoveringCover
     ? '正在恢复上次生成的封面...'
@@ -1408,6 +1483,100 @@ export default function BlogCreate() {
                 </div>
 
                 <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">文章配套包（可选）</span>
+                    <label className="relative inline-flex">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 rounded-lg"
+                        disabled={actionBusy || loadingPost}
+                      >
+                        {articlePackageUploading ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <UploadCloud className="h-3.5 w-3.5" />
+                        )}
+                        {articlePackage ? '替换 ZIP' : '选择 ZIP'}
+                      </Button>
+                      <input
+                        type="file"
+                        accept=".zip,application/zip"
+                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        disabled={actionBusy || loadingPost}
+                        onChange={(event) => void handleSelectArticlePackage(event)}
+                      />
+                    </label>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                    {articlePackageUploading ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>正在上传并检查 ZIP</span>
+                          <span>{articlePackageProgress}%</span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-primary transition-[width]"
+                            style={{ width: `${articlePackageProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : articlePackage && articlePackageAction !== 'remove' ? (
+                      <div className="flex items-center gap-3">
+                        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                          <Archive className="size-4" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">
+                            {articlePackage.originalName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {(articlePackage.size / 1024 / 1024).toFixed(1)} MB ·{' '}
+                            {articlePackage.entryCount} 个条目
+                          </p>
+                        </div>
+                        {(isEditMode || articlePackageDirty) && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:text-destructive"
+                            aria-label="移除文章配套包"
+                            onClick={() => {
+                              setArticlePackageAction('remove');
+                              setArticlePackageDirty(true);
+                            }}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ) : articlePackageAction === 'remove' ? (
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-muted-foreground">发布后将移除当前文章配套包</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setArticlePackageAction('keep');
+                            setArticlePackageDirty(true);
+                          }}
+                        >
+                          撤销
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        可上传源码、配置或素材 ZIP；最大 64MB。发布后读者可在线预览并下载。
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
                   <div className="mb-2 text-xs text-muted-foreground">可见范围</div>
                   <div className="flex flex-wrap gap-2 rounded-xl border-border/50 border p-2">
                     {[
@@ -1574,6 +1743,16 @@ export default function BlogCreate() {
               <dt className="text-muted-foreground">范围</dt>
               <dd>
                 {visibility === 'public' ? '公开' : visibility === 'shared' ? '兼容共享' : '仅自己'}
+              </dd>
+            </div>
+            <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4 py-3">
+              <dt className="text-muted-foreground">配套包</dt>
+              <dd>
+                {articlePackageAction === 'remove'
+                  ? '发布后移除'
+                  : articlePackage
+                    ? articlePackage.originalName
+                    : '未设置'}
               </dd>
             </div>
           </dl>

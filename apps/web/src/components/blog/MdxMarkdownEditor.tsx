@@ -27,6 +27,23 @@ const DEFAULT_HEADING_OPTIONS: HeadingOption[] = [
   { label: '标题 6', level: 6 },
 ];
 
+const TOP_BAR_ITEM_LABELS = [
+  '加粗',
+  '斜体',
+  '删除线',
+  '行内代码',
+  '无序列表',
+  '有序列表',
+  '任务列表',
+  '插入链接',
+  '插入图片',
+  '插入表格',
+  '插入代码块',
+  '插入公式',
+  '插入引用',
+  '插入分隔线',
+] as const;
+
 function normalizeEditorMarkdown(value: string) {
   return normalizeOrderedListStarts(normalizeHtmlImageTags(value));
 }
@@ -61,19 +78,21 @@ export function MdxMarkdownEditor({
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  const applyTopBarTooltipTitles = useCallback(() => {
+  const applyTopBarTooltips = useCallback(() => {
     const host = hostRef.current;
     if (!host) return;
 
     const topBar = host.querySelector('.milkdown-top-bar');
     if (!topBar) return;
 
-    const buttonLikeElements = topBar.querySelectorAll<HTMLElement>('[aria-label]');
-    buttonLikeElements.forEach((element) => {
-      const label = element.getAttribute('aria-label');
+    const buttons = topBar.querySelectorAll<HTMLButtonElement>('.top-bar-item');
+    buttons.forEach((button, index) => {
+      const label = TOP_BAR_ITEM_LABELS[index];
       if (!label) return;
-      element.setAttribute('title', label);
-      element.setAttribute('data-title', label);
+
+      button.setAttribute('aria-label', label);
+      button.setAttribute('data-tooltip', label);
+      button.removeAttribute('title');
     });
   }, []);
 
@@ -82,6 +101,7 @@ export function MdxMarkdownEditor({
     if (!host) return;
 
     let disposed = false;
+    let topBarObserver: MutationObserver | null = null;
     const crepe = new Crepe({
       root: host,
       defaultValue: valueRef.current,
@@ -141,7 +161,13 @@ export function MdxMarkdownEditor({
           crepe.editor.action(replaceAll(nextMarkdown, true));
         }
 
-        applyTopBarTooltipTitles();
+        applyTopBarTooltips();
+
+        const topBar = host.querySelector('.milkdown-top-bar');
+        if (topBar) {
+          topBarObserver = new MutationObserver(applyTopBarTooltips);
+          topBarObserver.observe(topBar, { childList: true, subtree: true });
+        }
       })
       .catch((error) => {
         console.error('Failed to initialize Milkdown editor.', error);
@@ -149,12 +175,13 @@ export function MdxMarkdownEditor({
 
     return () => {
       disposed = true;
+      topBarObserver?.disconnect();
       crepeRef.current = null;
       pendingSyncedMarkdownRef.current = null;
       host.innerHTML = '';
       void crepe.destroy().catch(() => undefined);
     };
-  }, [applyTopBarTooltipTitles, headingOptions]);
+  }, [applyTopBarTooltips, headingOptions]);
 
   useEffect(() => {
     valueRef.current = normalizeEditorMarkdown(value);

@@ -1,6 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getPostDetailById, type PostDetail } from '@/api/blog';
+import {
+  type ArticlePackage,
+  getPostDetailById,
+  getPublicArticlePackage,
+  type PostDetail,
+} from '@/api/blog';
+import { ArticlePackageSummaryCard } from '@/components/blog/ArticlePackageSummaryCard';
 import { TableOfContents } from '@/components/blog/TableOfContents';
 import YujiArticleMarkdownContent from '@/components/yuji/YujiArticleMarkdownContent';
 import YujiContentRevealStatus from '@/components/yuji/YujiContentRevealStatus';
@@ -26,11 +39,49 @@ function withoutRepeatedMarkdownTitle(content: string, title: string) {
   return lines.join('\n');
 }
 
+function InteractiveArticleCover({ src, title }: { src: string; title: string }) {
+  const handlePointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.pointerType === 'touch') return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) / bounds.width;
+    const y = (event.clientY - bounds.top) / bounds.height;
+
+    event.currentTarget.style.setProperty('--cover-rotate-x', `${(0.5 - y) * 5}deg`);
+    event.currentTarget.style.setProperty('--cover-rotate-y', `${(x - 0.5) * 6}deg`);
+    event.currentTarget.style.setProperty('--cover-glow-x', `${x * 100}%`);
+    event.currentTarget.style.setProperty('--cover-glow-y', `${y * 100}%`);
+    event.currentTarget.dataset.tilting = 'true';
+  };
+
+  const resetCover = (event: ReactPointerEvent<HTMLElement>) => {
+    event.currentTarget.style.removeProperty('--cover-rotate-x');
+    event.currentTarget.style.removeProperty('--cover-rotate-y');
+    event.currentTarget.style.removeProperty('--cover-glow-x');
+    event.currentTarget.style.removeProperty('--cover-glow-y');
+    delete event.currentTarget.dataset.tilting;
+  };
+
+  return (
+    <figure
+      className="yuji-article-cover"
+      onPointerMove={handlePointerMove}
+      onPointerLeave={resetCover}
+    >
+      <div className="yuji-article-cover__media">
+        <img src={src} alt={`${title}封面`} />
+        <span className="yuji-article-cover__glow" aria-hidden="true" />
+      </div>
+      <figcaption aria-hidden="true">封面 · 移动查看</figcaption>
+    </figure>
+  );
+}
+
 export default function YujiArticle() {
   const { id } = useParams<{ id: string }>();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [articlePackage, setArticlePackage] = useState<ArticlePackage | null>(null);
   const requestRef = useRef(0);
 
   const loadPost = useCallback(() => {
@@ -39,9 +90,17 @@ export default function YujiArticle() {
     setLoading(true);
     setFailed(false);
     setPost(null);
+    setArticlePackage(null);
     return getPostDetailById(id, { suppressErrorToast: true })
       .then((data) => {
-        if (requestId === requestRef.current) setPost(data);
+        if (requestId === requestRef.current) {
+          setPost(data);
+          void getPublicArticlePackage(id, { suppressErrorToast: true })
+            .then((value) => {
+              if (requestId === requestRef.current) setArticlePackage(value);
+            })
+            .catch(() => undefined);
+        }
       })
       .catch(() => {
         if (requestId === requestRef.current) {
@@ -98,20 +157,22 @@ export default function YujiArticle() {
         <YujiContentRevealStatus
           className="yuji-article-reveal"
           label="文章正在显影"
+          showLabel
           variant="article"
         />
       ) : null}
       {post ? (
         <article>
-          <header className="yuji-article-hero">
-            <Link className="yuji-back-link" to="/articles">
-              <span aria-hidden="true">←</span> 返回文章索引
-            </Link>
-            <p className="yuji-article-signal" aria-hidden="true">
-              YJ / ARTICLE
-              <br />
-              READ MODE / QUIET
-            </p>
+          <header className={`yuji-article-hero ${post.cover ? 'has-cover' : 'has-no-cover'}`}>
+            <div className="yuji-article-hero__rail">
+              <Link className="yuji-back-link" to="/articles">
+                <span aria-hidden="true">←</span> 返回文章
+              </Link>
+              <p className="yuji-article-signal" aria-hidden="true">
+                <span>文章 / 阅读模式</span>
+                <span>YUJI / 2026</span>
+              </p>
+            </div>
             <div className="yuji-article-title">
               <p className="yuji-meta-row">
                 <span>{post.group?.name || '文章'}</span>
@@ -126,14 +187,10 @@ export default function YujiArticle() {
                 target="_blank"
                 rel="noreferrer"
               >
-                by @muddyrain ↗
+                作者 @muddyrain ↗
               </a>
             </div>
-            {post.cover ? (
-              <figure>
-                <img src={post.cover} alt={`${post.title}封面`} />
-              </figure>
-            ) : null}
+            {post.cover ? <InteractiveArticleCover src={post.cover} title={post.title} /> : null}
           </header>
 
           <div className={`yuji-article-layout ${showToc ? 'has-toc' : 'has-no-toc'}`}>
@@ -151,6 +208,9 @@ export default function YujiArticle() {
           </div>
 
           <footer className="yuji-article-footer">
+            {articlePackage ? (
+              <ArticlePackageSummaryCard postId={post.id} articlePackage={articlePackage} />
+            ) : null}
             {post.tags?.length ? (
               <div className="yuji-article-tags" role="list" aria-label="文章标签">
                 {post.tags.map((tag) => (

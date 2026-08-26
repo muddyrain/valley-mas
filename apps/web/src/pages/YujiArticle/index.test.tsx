@@ -5,9 +5,12 @@ import { createRoot } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getPostDetailById } = vi.hoisted(() => ({ getPostDetailById: vi.fn() }));
+const { getPostDetailById, getPublicArticlePackage } = vi.hoisted(() => ({
+  getPostDetailById: vi.fn(),
+  getPublicArticlePackage: vi.fn(),
+}));
 
-vi.mock('@/api/blog', () => ({ getPostDetailById }));
+vi.mock('@/api/blog', () => ({ getPostDetailById, getPublicArticlePackage }));
 
 import YujiArticle from '.';
 
@@ -28,10 +31,12 @@ async function flush() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getPublicArticlePackage.mockRejectedValue(new Error('没有文章配套包'));
   getPostDetailById.mockResolvedValue({
     id: 'post-1',
     title: '组件渲染性能优化',
     excerpt: '让更新边界更清楚。',
+    cover: 'https://example.com/article-cover.jpg',
     content:
       '# 组件渲染性能优化\n\n## 为什么会重新渲染\n\n- 可见的无序条目\n- 第二项\n\n1. 有序条目\n2. 第二项\n\n```ts\nconst render = (count: number) => count + 1;\n```\n\n## 怎样收紧更新边界\n\n继续阅读。',
     group: { name: 'React' },
@@ -99,7 +104,12 @@ describe('YujiArticle', () => {
     expect(getPostDetailById).toHaveBeenCalledWith('post-1', { suppressErrorToast: true });
     expect(container.textContent).toContain('组件渲染性能优化');
     expect(container.textContent).toContain('为什么会重新渲染');
-    expect(container.textContent).toContain('by @muddyrain');
+    expect(container.textContent).toContain('作者 @muddyrain');
+    expect(container.textContent).toContain('文章 / 阅读模式');
+    expect(container.textContent).toContain('封面 · 移动查看');
+    expect(container.querySelector('.yuji-article-cover img')?.getAttribute('alt')).toBe(
+      '组件渲染性能优化封面',
+    );
     expect(container.querySelectorAll('h1')).toHaveLength(1);
     expect(container.querySelector('.yuji-article-body h1')).toBeNull();
     expect(container.querySelector('article h2')?.id).toBe('为什么会重新渲染');

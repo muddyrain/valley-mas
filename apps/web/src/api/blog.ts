@@ -92,8 +92,44 @@ export interface Post {
 export interface PostDetail extends Post {
   content: string;
   htmlContent: string;
+  articlePackage?: ArticlePackage;
+  articlePackageAction?: ArticlePackageAction;
+  packageDownloadCount?: number;
   prevPost?: Post;
   nextPost?: Post;
+}
+
+export type ArticlePackageAction = 'keep' | 'replace' | 'remove';
+export type ArticlePackagePreviewKind = 'metadata' | 'text' | 'markdown' | 'image';
+
+export interface ArticlePackageEntry {
+  path: string;
+  directory?: boolean;
+  previewKind: ArticlePackagePreviewKind;
+  sensitive?: boolean;
+  mediaType?: string;
+  size: number;
+}
+
+export interface ArticlePackage {
+  id: string;
+  status: 'uploading' | 'ready' | 'bound' | 'deleted';
+  originalName: string;
+  size: number;
+  entryCount: number;
+  expandedSize: number;
+  defaultPath?: string;
+  collapsibleRoot?: string;
+  entries?: ArticlePackageEntry[];
+  confirmedAt?: string;
+  updatedAt: string;
+}
+
+export interface ArticlePackageUploadTicket {
+  package: ArticlePackage;
+  url: string;
+  headers: Record<string, string>;
+  expiresAt: string;
 }
 
 export interface PostComment {
@@ -424,6 +460,86 @@ export function updatePost(id: string, data: Partial<CreatePostData>) {
   return request.put<unknown, null>(`/admin/blog/posts/${id}`, data);
 }
 
+export function createArticlePackageUpload(originalName: string, size: number) {
+  return request.post<unknown, ArticlePackageUploadTicket>('/admin/blog/article-packages/uploads', {
+    originalName,
+    size,
+  });
+}
+
+export function confirmArticlePackage(packageId: string) {
+  return request.post<unknown, ArticlePackage>(
+    `/admin/blog/article-packages/${packageId}/confirm`,
+    {},
+  );
+}
+
+export function updatePostArticlePackage(
+  postId: string,
+  action: ArticlePackageAction,
+  packageId?: string,
+) {
+  return request.put<unknown, { action: ArticlePackageAction; packageId?: string }>(
+    `/admin/blog/posts/${postId}/article-package`,
+    { action, packageId },
+  );
+}
+
+export function getPublicArticlePackage(postId: string, config?: RequestConfig) {
+  return request.get<unknown, ArticlePackage>(`/public/blog/posts/id/${postId}/package`, config);
+}
+
+export function requestArticlePackageDownload(postId: string) {
+  return request.post<unknown, { url: string; expiresAt: string }>(
+    `/public/blog/posts/id/${postId}/package/download`,
+    {},
+  );
+}
+
+export function getArticlePackagePreviewURL(postId: string, filePath: string) {
+  const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+  return `${baseURL}/public/blog/posts/id/${encodeURIComponent(postId)}/package/files?path=${encodeURIComponent(filePath)}`;
+}
+
+export async function fetchArticlePackagePreview(postId: string, filePath: string) {
+  const url = getArticlePackagePreviewURL(postId, filePath);
+  const token = useAuthStore.getState().token;
+  const response = await fetch(url, {
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  const contentType = response.headers.get('content-type') || 'application/octet-stream';
+  if (!response.ok || contentType.includes('application/json')) {
+    const payload = (await response.json().catch(() => null)) as {
+      message?: string;
+    } | null;
+    throw new Error(payload?.message || '文件预览失败');
+  }
+  return { blob: await response.blob(), contentType };
+}
+
+export async function uploadArticlePackageToTicket(
+  file: File,
+  ticket: ArticlePackageUploadTicket,
+  onProgress?: (percent: number) => void,
+) {
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', ticket.url);
+    for (const [name, value] of Object.entries(ticket.headers)) xhr.setRequestHeader(name, value);
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
+    });
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`上传失败（${xhr.status}）`));
+    });
+    xhr.addEventListener('error', () => reject(new Error('上传连接中断')));
+    xhr.addEventListener('abort', () => reject(new Error('上传已取消')));
+    xhr.send(file);
+  });
+}
+
 export function batchPublishPosts(postIds: string[]) {
   return request.post<unknown, { publishedIds: string[]; publishedAt: string }>(
     '/admin/blog/posts/batch/publish',
@@ -451,7 +567,9 @@ export function getAdminPosts(
 export function getAdminPostSortItems(
   params: { postType?: PostType; scope?: 'global' | 'group'; groupId?: string } = {},
 ) {
-  return request.get<unknown, PostSortItem[]>('/admin/blog/posts/sort-items', { params });
+  return request.get<unknown, PostSortItem[]>('/admin/blog/posts/sort-items', {
+    params,
+  });
 }
 
 export function sortAdminPosts(data: {

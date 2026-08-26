@@ -1,19 +1,26 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const { getMock } = vi.hoisted(() => ({
+const { getMock, postMock, putMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
+  postMock: vi.fn(),
+  putMock: vi.fn(),
 }));
 
 vi.mock('@/utils/request', () => ({
   default: {
     get: getMock,
-    post: vi.fn(),
-    put: vi.fn(),
+    post: postMock,
+    put: putMock,
     delete: vi.fn(),
   },
 }));
 
-import { getAdminPosts } from './blog';
+import {
+  confirmArticlePackage,
+  createArticlePackageUpload,
+  getAdminPosts,
+  updatePostArticlePackage,
+} from './blog';
 
 describe('api/blog', () => {
   it('passes sort param to getAdminPosts', async () => {
@@ -35,6 +42,25 @@ describe('api/blog', () => {
         groupId: '2',
         sort: 'created',
       },
+    });
+  });
+
+  it('uses the article package upload, confirmation and binding contracts', async () => {
+    postMock.mockResolvedValue({});
+    putMock.mockResolvedValue({});
+
+    await createArticlePackageUpload('源码.zip', 1024);
+    await confirmArticlePackage('501');
+    await updatePostArticlePackage('601', 'replace', '501');
+
+    expect(postMock).toHaveBeenCalledWith('/admin/blog/article-packages/uploads', {
+      originalName: '源码.zip',
+      size: 1024,
+    });
+    expect(postMock).toHaveBeenCalledWith('/admin/blog/article-packages/501/confirm', {});
+    expect(putMock).toHaveBeenCalledWith('/admin/blog/posts/601/article-package', {
+      action: 'replace',
+      packageId: '501',
     });
   });
 });

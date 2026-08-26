@@ -27,7 +27,7 @@ export function YujiPublicStageProvider({
   theme,
 }: PropsWithChildren<{ theme: 'dark' | 'light' }>) {
   const location = useLocation();
-  const routeKey = `${location.pathname}${location.search}`;
+  const routePath = location.pathname;
   const stageRoute = location.pathname === '/';
   const scrollBus = useMemo(() => createScrollBus(), []);
   const pointerBus = useMemo(() => createPointerBus(), []);
@@ -196,10 +196,10 @@ export function YujiPublicStageProvider({
   }, []);
 
   useEffect(() => {
-    if (!routeKey) return;
+    if (!routePath) return;
     lenisRef.current?.scrollTo(0, { force: true, immediate: true });
     window.scrollTo(0, 0);
-  }, [routeKey]);
+  }, [routePath]);
 
   useEffect(() => {
     if (!stageRoute) return;

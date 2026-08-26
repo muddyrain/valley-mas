@@ -16,4 +16,25 @@ describe('YujiContentRevealStatus', () => {
     expect(markup).not.toContain('YUJI / DEVELOPING');
     expect(markup).not.toContain('progressbar');
   });
+
+  it('can expose the loading label when the page needs a visible status', () => {
+    const markup = renderToStaticMarkup(
+      <YujiContentRevealStatus label="文章正在显影" showLabel variant="article" />,
+    );
+
+    expect(markup).toContain('class="yuji-reveal-label"');
+    expect(markup).toContain('文章正在显影');
+    expect(markup).not.toContain('class="sr-only"');
+  });
+
+  it('uses an article-shaped editorial skeleton for writing indexes', () => {
+    const markup = renderToStaticMarkup(
+      <YujiContentRevealStatus label="文章正在显影" variant="writing" />,
+    );
+
+    expect(markup).toContain('class="yuji-writing-reveal"');
+    expect(markup).toContain('ARTICLE INDEX / LOADING');
+    expect(markup.match(/yuji-writing-reveal-card/g)).toHaveLength(4);
+    expect(markup).not.toContain('yuji-reveal-shapes');
+  });
 });

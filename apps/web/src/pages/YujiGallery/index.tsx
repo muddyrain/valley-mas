@@ -38,6 +38,7 @@ function useGalleryColumnCount() {
 export default function YujiGallery() {
   const [searchParams] = useSearchParams();
   const resourceType = searchParams.get('type') === 'avatar' ? 'avatar' : 'wallpaper';
+  const resourceTypeLabel = resourceType === 'avatar' ? '头像' : '壁纸';
   const pageRef = useRef<HTMLElement>(null);
   const [resources, setResources] = useState<Resource[]>([]);
   const [page, setPage] = useState(1);
@@ -165,30 +166,50 @@ export default function YujiGallery() {
   return (
     <main ref={pageRef} className="yuji-public-main yuji-index-page yuji-gallery-page">
       <header className="yuji-index-hero yuji-gallery-hero">
-        <p className="yuji-index-label" data-yuji-reveal="intro">
-          <span>GALLERY</span>
-          <span>影像存档</span>
-        </p>
-        <h1 data-yuji-reveal="intro">图库</h1>
-        <p data-yuji-reveal="intro">散落的风景、人物与想象，在这里按观看的节奏彼此相遇。</p>
-        <nav className="yuji-gallery-type-filter" aria-label="影像类型" data-yuji-reveal="intro">
-          <YujiTransitionLink
-            coverId="gallery-wallpaper"
-            to="/gallery"
-            aria-current={resourceType === 'wallpaper' ? 'page' : undefined}
-            data-gallery-tab="01"
-          >
-            壁纸
-          </YujiTransitionLink>
-          <YujiTransitionLink
-            coverId="gallery-avatar"
-            to="/gallery?type=avatar"
-            aria-current={resourceType === 'avatar' ? 'page' : undefined}
-            data-gallery-tab="02"
-          >
-            头像
-          </YujiTransitionLink>
-        </nav>
+        <div className="yuji-gallery-hero__rail" data-yuji-reveal="intro">
+          <p className="yuji-index-label">
+            <span>GALLERY / 2026</span>
+            <span>影像存档</span>
+          </p>
+          <nav className="yuji-gallery-type-filter" aria-label="影像类型">
+            <YujiTransitionLink
+              coverId="gallery-wallpaper"
+              to="/gallery"
+              aria-current={resourceType === 'wallpaper' ? 'page' : undefined}
+              data-gallery-tab="01"
+            >
+              壁纸
+            </YujiTransitionLink>
+            <YujiTransitionLink
+              coverId="gallery-avatar"
+              to="/gallery?type=avatar"
+              aria-current={resourceType === 'avatar' ? 'page' : undefined}
+              data-gallery-tab="02"
+            >
+              头像
+            </YujiTransitionLink>
+          </nav>
+        </div>
+        <div className="yuji-gallery-hero__title" data-yuji-reveal="intro">
+          <p>
+            <span aria-hidden="true">01</span>
+            视觉索引
+          </p>
+          <h1>图库</h1>
+        </div>
+        <div className="yuji-gallery-hero__aside" data-yuji-reveal="intro">
+          <p>散落的风景、人物与想象，在这里按观看的节奏彼此相遇。</p>
+          <dl>
+            <div>
+              <dt>当前类别</dt>
+              <dd>{resourceTypeLabel}</dd>
+            </div>
+            <div>
+              <dt>已收录</dt>
+              <dd>{loading ? '—' : `${total} 张`}</dd>
+            </div>
+          </dl>
+        </div>
       </header>
 
       {loading ? (

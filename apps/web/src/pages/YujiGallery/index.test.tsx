@@ -139,6 +139,10 @@ describe('YujiGallery', () => {
     expect(container.textContent).not.toContain('风景与想象');
     expect(container.textContent).toContain('海拉鲁远眺');
     expect(container.textContent).not.toContain('春日头像');
+    expect(container.textContent).toContain('GALLERY / 2026');
+    expect(container.textContent).toContain('视觉索引');
+    expect(container.querySelector('.yuji-gallery-hero__aside')?.textContent).toContain('壁纸');
+    expect(container.querySelector('.yuji-gallery-hero__aside')?.textContent).toContain('1 张');
     expect(container.querySelector('a[href*="collection="]')).toBeNull();
     expect(container.querySelector('button[aria-label="预览海拉鲁远眺"]')).not.toBeNull();
     expect(container.querySelector('a[href="/gallery/image/image-1"]')).toBeNull();

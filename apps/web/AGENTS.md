@@ -10,3 +10,4 @@
 - 保持既有主题 token、布局和 loading 组件；列表的搜索、筛选、分页必须与 URL 刷新和浏览器回退一致。
 - UI 模式先查 `src/components/ui/`；确需生成 shadcn 组件时使用仓库已安装版本，并在新增依赖前取得确认。
 - 认证、路由、上传下载和公开/私有内容改动补浏览器关键路径证据；具体检查命令见 `docs/PROJECT_GUIDE.md`。
+- `apps/web` 的浏览器调试与视觉验收必须使用 `chrome:control-chrome` 控制用户现有 Chrome 会话；不得启动空白隔离浏览器或改用独立 Playwright 浏览器。Chrome 不可用时明确报告阻塞，不静默换用其他浏览器表面。
