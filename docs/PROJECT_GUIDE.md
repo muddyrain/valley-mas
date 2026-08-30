@@ -11,7 +11,7 @@
 | Life Trace | `apps/life-trace` | React、Vite、Tailwind |
 | Electron 应用 | `apps/screen-recorder`、`apps/port-warden` | Electron、React、Vite、TypeScript |
 | Next.js 实验 | `apps/scratch-legend` | Next.js、React |
-| 游戏/场景实验 | `apps/world-sim`、`apps/eon-vale`、`apps/toy-climb-arena`、`apps/ambient-forge` | Vite、TypeScript、Pixi.js 或 Three.js |
+| 游戏/场景实验 | `apps/world-sim`、`apps/toy-climb-arena`、`apps/ambient-forge` | Vite、TypeScript、Pixi.js 或 Three.js |
 | API | `server` | Go、Gin、GORM |
 | 共享能力 | `packages/*` | 类型、请求、路由、格式化、浏览器媒体与小游戏包 |
 
@@ -34,7 +34,6 @@ pnpm --filter @valley/scratch-legend dev
 pnpm --filter @valley/toy-climb-arena dev
 pnpm --filter @valley/world-sim dev
 pnpm --filter @valley/ambient-forge dev
-pnpm --filter @valley/eon-vale dev
 
 # Go 服务与迁移
 cd server && go run ./cmd/server
@@ -49,7 +48,7 @@ cd server && go run ./cmd/migrate up
 | Web / Admin / Life Trace | 5000 / 3000 / 5178 |
 | Screen Recorder / Port Warden | 5179 / 5182 |
 | Toy Climb Arena / Scratch Legend | 5175 / 5176 |
-| Ambient Forge / Eon Vale | 5181 / 5184（预览 4184） |
+| Ambient Forge | 5181 |
 
 环境变量以相应示例文件为唯一真源：`apps/*/.env.example`、`server/.env.example`。模型能力、Provider 配置和密钥不得在文档中复制；服务端读取逻辑从 `server/internal/config/config.go` 和模型目录实现定位。
 
@@ -100,7 +99,6 @@ python3 .agents/skills/encoding-guard/scripts/check_mojibake.py <相关文件>
 | Scratch Legend | `pnpm --filter @valley/scratch-legend check`、`pnpm --filter @valley/scratch-legend typecheck` | `pnpm --filter @valley/scratch-legend exec vitest run`（存在受影响测试时） |
 | Screen Recorder | `pnpm --filter @valley/screen-recorder typecheck`、`pnpm --filter @valley/screen-recorder check` | `test`；平台改动补 renderer/Electron build、打包或目标机验收 |
 | Port Warden | `pnpm --filter @valley/port-warden typecheck`、`pnpm --filter @valley/port-warden check` | `pnpm --filter @valley/port-warden test`；平台改动补 build 与目标机验收 |
-| Eon Vale | `pnpm --filter @valley/eon-vale check`、`pnpm --filter @valley/eon-vale typecheck` | `test`；渲染/交互补 `test:e2e`，热路径补 `benchmark` |
 | WorldSim | `pnpm --filter @valley/world-sim check`、`pnpm --filter @valley/world-sim typecheck` | `pnpm --filter @valley/world-sim exec vitest run`；地图/模拟补 `test:balance`、`test:stability` 或 `test:longrun` |
 | Toy Climb Arena | `pnpm --filter @valley/toy-climb-arena check`、`pnpm --filter @valley/toy-climb-arena typecheck` | 受影响 Vitest 与实际物理/关卡验收 |
 | Ambient Forge | `pnpm --filter @valley/ambient-forge check`、`pnpm --filter @valley/ambient-forge typecheck` | `pnpm --filter @valley/ambient-forge test`；视觉/声音改动补浏览器验收 |
