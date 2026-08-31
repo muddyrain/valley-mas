@@ -13,11 +13,22 @@ import (
 	"valley-server/internal/config"
 
 	"github.com/volcengine/ve-tos-golang-sdk/v2/tos"
+	"github.com/volcengine/ve-tos-golang-sdk/v2/tos/enum"
 )
 
 type TOSUploader struct {
 	client *tos.ClientV2
 	bucket string
+}
+
+type TOSSignedURL struct {
+	URL     string
+	Headers map[string]string
+}
+
+type TOSObjectInfo struct {
+	Size int64
+	ETag string
 }
 
 var tosUploader *TOSUploader
@@ -132,6 +143,102 @@ func (u *TOSUploader) GetPublicURL(key string) string {
 	// 火山引擎 TOS 公开访问 URL 格式
 	// https://{bucket}.{endpoint}/{key}
 	return fmt.Sprintf("https://%s.tos-cn-beijing.volces.com/%s", u.bucket, key)
+}
+
+// PresignPrivatePut creates a short-lived browser upload ticket. The caller
+// must forward every returned header with the PUT request.
+func (u *TOSUploader) PresignPrivatePut(key string, expires time.Duration) (TOSSignedURL, error) {
+	if u == nil || u.client == nil {
+		return TOSSignedURL{}, fmt.Errorf("TOS uploader not initialized")
+	}
+	headers := map[string]string{
+		"Content-Type": "application/zip",
+		"x-tos-acl":    string(enum.ACLPrivate),
+	}
+	output, err := u.client.PreSignedURL(&tos.PreSignedURLInput{
+		HTTPMethod: enum.HttpMethodPut,
+		Bucket:     u.bucket,
+		Key:        key,
+		Expires:    int64(expires.Seconds()),
+		Header:     headers,
+	})
+	if err != nil {
+		return TOSSignedURL{}, fmt.Errorf("sign private TOS upload: %w", err)
+	}
+	// The SDK also exposes its own User-Agent through SignedHeader. Browsers
+	// forbid setting that header, and it is not part of the query signature.
+	// Return only the two headers the browser must send.
+	return TOSSignedURL{URL: output.SignedUrl, Headers: headers}, nil
+}
+
+func (u *TOSUploader) PresignPrivateGet(key string, expires time.Duration, disposition string) (string, error) {
+	if u == nil || u.client == nil {
+		return "", fmt.Errorf("TOS uploader not initialized")
+	}
+	query := map[string]string{"response-content-type": "application/zip"}
+	if disposition != "" {
+		query["response-content-disposition"] = disposition
+	}
+	output, err := u.client.PreSignedURL(&tos.PreSignedURLInput{
+		HTTPMethod: enum.HttpMethodGet,
+		Bucket:     u.bucket,
+		Key:        key,
+		Expires:    int64(expires.Seconds()),
+		Query:      query,
+	})
+	if err != nil {
+		return "", fmt.Errorf("sign private TOS download: %w", err)
+	}
+	return output.SignedUrl, nil
+}
+
+func (u *TOSUploader) HeadPrivateObject(ctx context.Context, key string) (TOSObjectInfo, error) {
+	if u == nil || u.client == nil {
+		return TOSObjectInfo{}, fmt.Errorf("TOS uploader not initialized")
+	}
+	output, err := u.client.HeadObjectV2(ctx, &tos.HeadObjectV2Input{Bucket: u.bucket, Key: key})
+	if err != nil {
+		return TOSObjectInfo{}, fmt.Errorf("head private TOS object: %w", err)
+	}
+	return TOSObjectInfo{Size: output.ContentLength, ETag: output.ETag}, nil
+}
+
+func (u *TOSUploader) ReadPrivateRange(ctx context.Context, key, etag string, start, end int64) ([]byte, error) {
+	if u == nil || u.client == nil {
+		return nil, fmt.Errorf("TOS uploader not initialized")
+	}
+	if start < 0 || end < start {
+		return nil, fmt.Errorf("invalid TOS byte range")
+	}
+	output, err := u.client.GetObjectV2(ctx, &tos.GetObjectV2Input{
+		Bucket: u.bucket, Key: key, IfMatch: etag, Range: fmt.Sprintf("bytes=%d-%d", start, end),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read private TOS range: %w", err)
+	}
+	defer output.Content.Close()
+	content, err := ReadAllWithContext(ctx, io.LimitReader(output.Content, end-start+2))
+	if err != nil {
+		return nil, fmt.Errorf("read private TOS range body: %w", err)
+	}
+	if int64(len(content)) != end-start+1 {
+		return nil, fmt.Errorf("private TOS range length mismatch")
+	}
+	return content, nil
+}
+
+func (u *TOSUploader) CopyPrivateObject(ctx context.Context, sourceKey, destinationKey, etag string) (string, error) {
+	if u == nil || u.client == nil {
+		return "", fmt.Errorf("TOS uploader not initialized")
+	}
+	output, err := u.client.CopyObject(ctx, &tos.CopyObjectInput{
+		Bucket: u.bucket, Key: destinationKey, SrcBucket: u.bucket, SrcKey: sourceKey,
+		ACL: enum.ACLPrivate, CopySourceIfMatch: etag, ContentType: "application/zip",
+	})
+	if err != nil {
+		return "", fmt.Errorf("copy private TOS object: %w", err)
+	}
+	return output.ETag, nil
 }
 
 // DeleteFile 删除 TOS 上的文件

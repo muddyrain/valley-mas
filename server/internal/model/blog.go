@@ -39,13 +39,48 @@ type Post struct {
 	UpdatedAt       time.Time      `json:"updatedAt"`
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
 
+	ArticlePackageID     *Int64String `gorm:"index" json:"articlePackageId,omitempty"`
+	PackageDownloadCount int64        `gorm:"default:0" json:"packageDownloadCount"`
+
 	Author   *User         `gorm:"foreignKey:AuthorID" json:"author,omitempty"`
 	Group    *PostGroup    `gorm:"foreignKey:GroupID" json:"group,omitempty"`
 	Category *PostCategory `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 	Tags     []PostTag     `gorm:"many2many:post_tag_relations;" json:"tags,omitempty"`
+
+	ArticlePackage *ArticlePackage `gorm:"foreignKey:ArticlePackageID" json:"articlePackage,omitempty"`
 }
 
 func (p *Post) BeforeCreate(tx *gorm.DB) error {
+	if p.ID == 0 {
+		p.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+// ArticlePackage is one immutable, validated ZIP uploaded as supporting files
+// for an article. Post.ArticlePackageID is the only published/current pointer;
+// draft replacement intent remains in Post.DraftData until publication.
+type ArticlePackage struct {
+	ID           Int64String  `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	OwnerID      Int64String  `gorm:"index;not null" json:"ownerId"`
+	PostID       *Int64String `gorm:"index" json:"postId,omitempty"`
+	Status       string       `gorm:"size:20;not null;index" json:"status"`
+	StorageKey   string       `gorm:"size:500;not null;uniqueIndex" json:"-"`
+	OriginalName string       `gorm:"size:255;not null" json:"originalName"`
+	Size         int64        `gorm:"not null" json:"size"`
+	SHA256       string       `gorm:"size:64" json:"sha256,omitempty"`
+	ETag         string       `gorm:"column:etag;size:160" json:"-"`
+	EntryCount   int          `gorm:"not null" json:"entryCount"`
+	ExpandedSize int64        `gorm:"not null" json:"expandedSize"`
+	ManifestJSON string       `gorm:"type:text;not null" json:"-"`
+	ExpiresAt    *time.Time   `gorm:"index" json:"expiresAt,omitempty"`
+	DeleteAfter  *time.Time   `gorm:"index" json:"-"`
+	ConfirmedAt  *time.Time   `json:"confirmedAt,omitempty"`
+	CreatedAt    time.Time    `json:"createdAt"`
+	UpdatedAt    time.Time    `json:"updatedAt"`
+}
+
+func (p *ArticlePackage) BeforeCreate(tx *gorm.DB) error {
 	if p.ID == 0 {
 		p.ID = Int64String(utils.GenerateID())
 	}

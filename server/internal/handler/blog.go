@@ -13,6 +13,7 @@ import (
 	"valley-server/internal/logger"
 	"valley-server/internal/model"
 	"valley-server/internal/service"
+	"valley-server/internal/service/articlepackage"
 	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
@@ -160,6 +161,10 @@ type PostDetailResponse struct {
 	CreatedAt       time.Time         `json:"createdAt"`
 	PrevPost        *PostListResponse `json:"prevPost,omitempty"`
 	NextPost        *PostListResponse `json:"nextPost,omitempty"`
+
+	ArticlePackage       *articlepackage.PackageSummary `json:"articlePackage,omitempty"`
+	ArticlePackageAction string                         `json:"articlePackageAction,omitempty"`
+	PackageDownloadCount int64                          `json:"packageDownloadCount,omitempty"`
 }
 
 type PostSortItemResponse struct {
@@ -212,6 +217,9 @@ type postDraftPayload struct {
 	CategoryID      model.Int64String   `json:"categoryId"`
 	TagIDs          []model.Int64String `json:"tagIds,omitempty"`
 	IsTop           bool                `json:"isTop"`
+
+	ArticlePackageAction string             `json:"articlePackageAction,omitempty"`
+	ArticlePackageID     *model.Int64String `json:"articlePackageId,omitempty"`
 }
 
 func GetPosts(c *gin.Context) {
@@ -786,11 +794,29 @@ func AdminGetPostDetail(c *gin.Context) {
 		return
 	}
 
-	if draft := parsePostDraftPayload(post.DraftData); draft != nil {
+	draft := parsePostDraftPayload(post.DraftData)
+	if draft != nil {
 		applyPostDraftPayload(&post, draft)
 	}
 
-	Success(c, convertToPostDetailResponse(&post))
+	response := convertToPostDetailResponse(&post)
+	response.ArticlePackageAction = "keep"
+	packageID := post.ArticlePackageID
+	if draft != nil {
+		switch draft.ArticlePackageAction {
+		case "replace":
+			response.ArticlePackageAction = "replace"
+			packageID = draft.ArticlePackageID
+		case "remove":
+			response.ArticlePackageAction = "remove"
+		}
+	}
+	if packageID != nil && *packageID != 0 {
+		if summary, err := currentArticlePackageService().GetOwnedSummary(c.Request.Context(), post.AuthorID, *packageID); err == nil {
+			response.ArticlePackage = &summary
+		}
+	}
+	Success(c, response)
 }
 
 func AdminCreatePost(c *gin.Context) {
@@ -1096,6 +1122,11 @@ func AdminUpdatePost(c *gin.Context) {
 	}
 	imageTextData = normalizeJSONColumnValue(imageTextData)
 	existingDraft := parsePostDraftPayload(post.DraftData)
+	var publishedPackageID *model.Int64String
+	if post.ArticlePackageID != nil {
+		value := *post.ArticlePackageID
+		publishedPackageID = &value
+	}
 
 	normalizedType := normalizePostType(req.PostType)
 	normalizedVisibility := normalizeVisibility(req.Visibility)
@@ -1273,6 +1304,18 @@ func AdminUpdatePost(c *gin.Context) {
 			updates["published_at"] = &now
 		}
 		if req.Status == "published" {
+			if existingDraft != nil {
+				switch existingDraft.ArticlePackageAction {
+				case "replace":
+					if existingDraft.ArticlePackageID == nil || *existingDraft.ArticlePackageID == 0 {
+						Error(c, http.StatusBadRequest, "待发布的文章配套包尚未就绪")
+						return
+					}
+					updates["article_package_id"] = *existingDraft.ArticlePackageID
+				case "remove":
+					updates["article_package_id"] = nil
+				}
+			}
 			updates["draft_data"] = ""
 			updates["draft_updated_at"] = nil
 		}
@@ -1287,7 +1330,17 @@ func AdminUpdatePost(c *gin.Context) {
 	if req.GroupID != nil {
 		newGroupID = *req.GroupID
 	}
-	database.DB.Model(&post).Updates(updates)
+	if err := database.DB.Model(&post).Updates(updates).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "update failed")
+		return
+	}
+	if req.Status == "published" && existingDraft != nil && publishedPackageID != nil {
+		shouldDeleteOld := existingDraft.ArticlePackageAction == "remove" ||
+			(existingDraft.ArticlePackageAction == "replace" && existingDraft.ArticlePackageID != nil && *existingDraft.ArticlePackageID != *publishedPackageID)
+		if shouldDeleteOld {
+			_ = currentArticlePackageService().ScheduleDelete(c.Request.Context(), *publishedPackageID, time.Now().Add(10*time.Minute))
+		}
+	}
 	if coverChanged {
 		deletePostCoverAsync(oldCoverStorageKey, oldCoverURL)
 	}
@@ -1723,6 +1776,7 @@ func convertToPostDetailResponse(post *model.Post) PostDetailResponse {
 		PublishedAt:     post.PublishedAt,
 		CreatedAt:       post.CreatedAt,
 	}
+	resp.PackageDownloadCount = post.PackageDownloadCount
 
 	prevPost, nextPost := loadAdjacentPosts(post)
 	if prevPost != nil {

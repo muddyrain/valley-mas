@@ -18,6 +18,7 @@ import (
 func Setup(cfg *config.Config) *gin.Engine {
 	handler.StartWorkflowTriggerWorker(context.Background())
 	handler.StartWorkflowCollaborationWorker(context.Background())
+	handler.StartArticlePackageCleanupWorker(context.Background())
 	r := gin.Default()
 
 	r.Use(logger.RequestLogger())
@@ -52,6 +53,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 			public.GET("/blog/posts", middleware.OptionalAuth(cfg), handler.GetPosts)
 			public.GET("/blog/posts/id/:id", middleware.OptionalAuth(cfg), handler.GetPostDetailByID)
+			public.GET("/blog/posts/id/:id/package", middleware.OptionalAuth(cfg), handler.GetPublicArticlePackage)
+			public.GET("/blog/posts/id/:id/package/files", middleware.OptionalAuth(cfg), handler.PreviewPublicArticlePackageFile)
+			public.POST("/blog/posts/id/:id/package/download", middleware.OptionalAuth(cfg), handler.DownloadPublicArticlePackage)
 			public.GET("/blog/posts/:slug", middleware.OptionalAuth(cfg), handler.GetPostDetail)
 			public.GET("/blog/posts/id/:id/comments", middleware.OptionalAuth(cfg), handler.GetPostComments)
 			public.POST("/blog/ai/recommend", middleware.OptionalAuth(cfg), handler.RecommendBlogPosts)
@@ -311,6 +315,11 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.GET("/blog/posts/sort-items", handler.AdminListPostSortItems)
 				content.PUT("/blog/posts/sort", handler.AdminSortPosts)
 				content.GET("/blog/posts/:id", handler.AdminGetPostDetail)
+				content.POST("/blog/article-packages/uploads", handler.AdminCreateArticlePackageUpload)
+				content.POST("/blog/article-packages/:packageId/confirm", handler.AdminConfirmArticlePackage)
+				content.GET("/blog/article-packages/:packageId", handler.AdminGetArticlePackage)
+				content.GET("/blog/article-packages/:packageId/files", handler.PreviewAdminArticlePackageFile)
+				content.PUT("/blog/posts/:id/article-package", handler.AdminUpdatePostArticlePackage)
 				content.POST("/blog/cover/upload", handler.AdminUploadBlogCover)
 				content.POST("/blog/cover/upload-by-url", handler.AdminUploadBlogCoverByURL)
 				content.POST("/blog/ai/excerpt", handler.AdminAIGenerateBlogExcerpt)

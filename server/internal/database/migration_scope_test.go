@@ -68,6 +68,16 @@ func TestLifeTraceScopeIncludesAIUsageLog(t *testing.T) {
 	}
 }
 
+func TestContentScopeIncludesArticlePackage(t *testing.T) {
+	plan, err := buildAutoMigratePlan(AutoMigrateScopeContent)
+	if err != nil {
+		t.Fatalf("build content plan: %v", err)
+	}
+	if !migrationPlanHasModel(plan.models, &model.ArticlePackage{}) {
+		t.Fatal("expected content scope to include article packages")
+	}
+}
+
 func TestNormalizeAutoMigrateModelNamesRequiresAtLeastOneModel(t *testing.T) {
 	if _, err := NormalizeAutoMigrateModelNames(nil); err == nil {
 		t.Fatal("expected empty model list to be rejected")
