@@ -1,0 +1,29 @@
+; Aeon Vale - native Godot project
+config_version=5
+
+[application]
+config/name="纪元谷 · Aeon Vale"
+config/version="0.14.0"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://assets/icon.svg"
+
+[display]
+window/size/viewport_width=1440
+window/size/viewport_height=900
+window/size/window_width_override=1600
+window/size/window_height_override=1000
+window/size/min_width=1100
+window/size/min_height=720
+window/stretch/mode="canvas_items"
+window/handheld/orientation=0
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+textures/canvas_textures/default_texture_filter=0
+environment/defaults/default_clear_color=Color(0.028, 0.076, 0.12, 1)
+
+[audio]
+driver/enable_input=false

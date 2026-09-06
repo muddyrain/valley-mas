@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+<defs><linearGradient id="paper" x2=".8" y2="1"><stop stop-color="#fffbed"/><stop offset="1" stop-color="#e0e5c6"/></linearGradient><linearGradient id="leaf" x2=".8" y2="1"><stop stop-color="#c9dfa8"/><stop offset="1" stop-color="#699d7a"/></linearGradient></defs>
+<rect x="5" y="5" width="118" height="118" rx="28" fill="url(#paper)" stroke="#bdab78" stroke-width="3"/>
+<path d="M22 87 47 37 69 69 87 46 110 87Z" fill="url(#leaf)" stroke="#5a806b" stroke-width="2" stroke-linejoin="round"/>
+<path d="m37 57 10-20 14 21-14-6Z" fill="#fff9de"/><path d="M22 88q42 18 88 0" fill="none" stroke="#80b6ab" stroke-width="7" stroke-linecap="round"/>
+<path d="M64 82q16-21 14-36" fill="none" stroke="#56826a" stroke-width="3"/><path d="M77 50Q57 53 58 34 78 34 77 50 M78 48Q78 23 98 26 101 44 78 48" fill="url(#leaf)" stroke="#5a806b" stroke-width="2"/>
+<path d="m100 13 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="#d6b577"/>
+</svg>

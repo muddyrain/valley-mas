@@ -20,6 +20,7 @@
 | Admin 后台 | [`apps/admin/AGENTS.md`](../apps/admin/AGENTS.md) |
 | Go 服务端 | [`server/AGENTS.md`](../server/AGENTS.md) |
 | Life Trace | [`apps/life-trace/AGENTS.md`](../apps/life-trace/AGENTS.md) |
+| 纪元谷 · Aeon Vale | [局部入口](../apps/aeon-vale/AGENTS.md)、[运行与产品说明](../apps/aeon-vale/README.md) |
 | Electron 应用 | [`apps/screen-recorder/AGENTS.md`](../apps/screen-recorder/AGENTS.md)、[`apps/port-warden/AGENTS.md`](../apps/port-warden/AGENTS.md) |
 | 实验应用 | [`apps/world-sim/AGENTS.md`](../apps/world-sim/AGENTS.md)、[`apps/scratch-legend/AGENTS.md`](../apps/scratch-legend/AGENTS.md)、[`apps/toy-climb-arena/AGENTS.md`](../apps/toy-climb-arena/AGENTS.md)、[`apps/ambient-forge/AGENTS.md`](../apps/ambient-forge/AGENTS.md) |
 
