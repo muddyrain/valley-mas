@@ -30,9 +30,7 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			ai.POST("/outfit-suggestions", handler.GenerateOutfitSuggestions)
 			ai.POST("/transparent-cover", handler.GenerateTransparentCover)
 			ai.POST("/pantry-thumbnail", handler.GeneratePantryThumbnail)
-			ai.POST("/recipes", handler.GenerateRecipeSuggestions)
 			ai.POST("/pantry-description", handler.GeneratePantryDescription)
-			ai.POST("/recipes/render-video", handler.RenderRecipeVideo)
 			ai.GET("/actions", handler.ListAIActions)
 			ai.POST("/actions", handler.CreateAIAction)
 			ai.POST("/assistant/stream", handler.StreamAssistant)
@@ -76,58 +74,6 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			traces.POST("", handler.CreateTrace)
 			traces.PATCH("/:id", handler.UpdateTrace)
 			traces.DELETE("/:id", handler.DeleteTrace)
-		}
-
-		places := group.Group("/places")
-		places.Use(auth)
-		{
-			places.GET("", handler.ListPlaces)
-			places.POST("", handler.CreatePlace)
-			places.GET("/export", handler.ExportPlaces)
-			places.GET("/:id", handler.GetPlace)
-			places.PATCH("/:id", handler.UpdatePlace)
-			places.GET("/:id/records", handler.ListPlaceRecords)
-		}
-
-		mediaDiary := group.Group("/media-diary")
-		mediaDiary.Use(auth)
-		{
-			mediaDiary.GET("", handler.ListMediaDiaryEntries)
-			mediaDiary.POST("", handler.CreateMediaDiaryEntry)
-			mediaDiary.POST("/ai-suggest", handler.SuggestMediaDiaryEntry)
-			mediaDiary.PATCH("/:id", handler.UpdateMediaDiaryEntry)
-			mediaDiary.DELETE("/:id", handler.DeleteMediaDiaryEntry)
-		}
-
-		inbox := group.Group("/inbox")
-		inbox.Use(auth)
-		{
-			inbox.GET("", handler.ListInboxItems)
-			inbox.POST("", handler.CreateInboxItem)
-			inbox.PATCH("/:id", handler.UpdateInboxItem)
-			inbox.PATCH("/:id/status", handler.UpdateInboxItemStatus)
-			inbox.PATCH("/:id/convert", handler.ConvertInboxItem)
-			inbox.POST("/:id/organize", handler.OrganizeInboxItem)
-			inbox.DELETE("/:id", handler.DeleteInboxItem)
-		}
-
-		ledger := group.Group("/ledger")
-		ledger.Use(auth)
-		{
-			ledger.GET("", handler.ListLedgerEntries)
-			ledger.POST("", handler.CreateLedgerEntry)
-			ledger.PATCH("/:id", handler.UpdateLedgerEntry)
-			ledger.DELETE("/:id", handler.DeleteLedgerEntry)
-		}
-
-		recurringPayments := group.Group("/recurring-payments")
-		recurringPayments.Use(auth)
-		{
-			recurringPayments.GET("", handler.ListRecurringPayments)
-			recurringPayments.POST("", handler.CreateRecurringPayment)
-			recurringPayments.PATCH("/:id", handler.UpdateRecurringPayment)
-			recurringPayments.DELETE("/:id", handler.DeleteRecurringPayment)
-			recurringPayments.POST("/:id/advance", handler.AdvanceRecurringPayment)
 		}
 
 		closet := group.Group("/closet")

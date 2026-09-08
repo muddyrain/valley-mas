@@ -27,11 +27,10 @@ type checkShoppingListItemRequest struct {
 }
 
 var validShoppingSources = map[string]bool{
-	"manual":          true,
-	"pantry_used_up":  true,
-	"pantry_low":      true,
-	"pantry_discard":  true,
-	"recipe":          true,
+	"manual":         true,
+	"pantry_used_up": true,
+	"pantry_low":     true,
+	"pantry_discard": true,
 }
 
 func normalizeShoppingSource(source string) string {

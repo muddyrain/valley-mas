@@ -1,7 +1,6 @@
 import {
   CalendarDays,
   Clock,
-  Disc3,
   Image,
   MapPin,
   PackageCheck,
@@ -19,13 +18,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ImagePreview } from '@/components/ImagePreview';
 import { LifeFilterBar } from '@/components/LifeLayout';
 import { LoadErrorState } from '@/components/LoadErrorState';
-import {
-  SoftHeader,
-  SoftIconBadge,
-  SoftPage,
-  SoftPanel,
-  SoftStatGrid,
-} from '@/components/SoftDiary';
+import { SoftHeader, SoftPage, SoftPanel, SoftStatGrid } from '@/components/SoftDiary';
 import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { SyncState } from '@/components/SyncState';
@@ -36,7 +29,7 @@ import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Trace } from '@/types';
 
-type TraceFilter = 'all' | 'plan' | 'pantry' | 'media' | 'manual' | 'with-image';
+type TraceFilter = 'all' | 'plan' | 'pantry' | 'manual' | 'with-image';
 
 const traceFilters: Array<{ id: TraceFilter; label: string; emptyText: string }> = [
   {
@@ -53,11 +46,6 @@ const traceFilters: Array<{ id: TraceFilter; label: string; emptyText: string }>
     id: 'pantry',
     label: '库存',
     emptyText: '还没有库存类踪迹。拍照入库、用完或丢弃库存后会沉淀到这里。',
-  },
-  {
-    id: 'media',
-    label: '书影音',
-    emptyText: '还没有书影音踪迹。保存书影音日记后会沉淀到这里。',
   },
   {
     id: 'manual',
@@ -101,9 +89,6 @@ function filterTraces(traces: Trace[], filter: TraceFilter) {
   }
   if (filter === 'pantry') {
     return traces.filter((trace) => trace.source === '库存');
-  }
-  if (filter === 'media') {
-    return traces.filter((trace) => trace.source === '书影音');
   }
   if (filter === 'manual') {
     return traces.filter((trace) => trace.source === '手动');
@@ -478,23 +463,6 @@ export function TracesPage() {
           { label: '张照片', value: imageTraceCount, icon: Image, tone: 'weather' },
         ]}
       />
-
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-3 rounded-[1.25rem] border border-life-trace/20 bg-card/85 p-4 text-left shadow-[0_18px_54px_rgba(71,58,42,0.075)] transition hover:border-life-trace/40 hover:bg-card"
-        onClick={() => navigate('/media-diary')}
-      >
-        <span className="flex min-w-0 items-center gap-3">
-          <SoftIconBadge icon={Disc3} tone="trace" />
-          <span className="min-w-0">
-            <span className="block font-semibold">书影音日记</span>
-            <span className="mt-1 block text-sm text-muted-foreground">
-              书籍、电影、剧集、动漫和音乐
-            </span>
-          </span>
-        </span>
-        <Badge tone="trace">进入</Badge>
-      </button>
 
       <div className="rounded-[1.25rem] border border-border/70 bg-card/80 p-1">
         <LifeFilterBar className="gap-1 pb-0">

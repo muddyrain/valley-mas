@@ -5,7 +5,6 @@ import {
   Car,
   ChevronRight,
   Clock,
-  Disc3,
   Download,
   Heart,
   Leaf,
@@ -13,9 +12,7 @@ import {
   MapPin,
   MessageSquareText,
   MoonStar,
-  ReceiptText,
   RefreshCw,
-  Repeat,
   Route,
   Share2,
   ShieldCheck,
@@ -30,7 +27,6 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
-import { EntryCard } from '@/components/EntryCard';
 import { FeedbackSheet } from '@/components/FeedbackSheet';
 import { LifePage } from '@/components/LifeLayout';
 import { LocationPicker } from '@/components/LocationPicker';
@@ -545,60 +541,11 @@ export function ProfilePage() {
       </section>
 
       <section data-profile-card className="space-y-3">
-        <SectionHeader title="个人工具" meta="轻账本 / 订阅 / 采购" />
+        <SectionHeader title="个人工具" meta="采购清单" />
         <Card className="grid gap-3 p-4">
           <button
             type="button"
             className="flex w-full items-center gap-3 text-left"
-            data-scroll-anchor="profile:places"
-            onClick={() => navigate('/places')}
-          >
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-trace/10 text-life-trace">
-              <MapPin className="size-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold">地点库</h3>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                收藏常去地点，回看相关计划和踪迹。
-              </p>
-            </div>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </button>
-          <button
-            type="button"
-            className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
-            data-scroll-anchor="profile:ledger"
-            onClick={() => navigate('/ledger')}
-          >
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
-              <ReceiptText className="size-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold">轻账本</h3>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">记录支出、收入和退款。</p>
-            </div>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </button>
-          <button
-            type="button"
-            className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
-            data-scroll-anchor="profile:recurring-payments"
-            onClick={() => navigate('/recurring-payments')}
-          >
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
-              <Repeat className="size-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold">订阅与续费</h3>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                统一管理周期性支出，到期前会发提醒。
-              </p>
-            </div>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </button>
-          <button
-            type="button"
-            className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
             data-scroll-anchor="profile:shopping"
             onClick={() => navigate('/shopping')}
           >
@@ -786,19 +733,6 @@ export function ProfilePage() {
           </span>
           <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
         </button>
-      </section>
-
-      <section data-profile-card className="space-y-3">
-        <SectionHeader title="书影音" meta="日记" />
-        <EntryCard
-          icon={Disc3}
-          badge="打开"
-          title="书影音日记"
-          description="书籍、电影、剧集、动漫和音乐"
-          tone="trace"
-          data-scroll-anchor="profile:media-diary"
-          onClick={() => navigate('/media-diary')}
-        />
       </section>
 
       <section data-profile-card className="space-y-3">

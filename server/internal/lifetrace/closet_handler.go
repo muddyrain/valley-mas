@@ -936,7 +936,7 @@ func (h *Handler) AnalyzeClothingPhoto(c *gin.Context) {
 func buildClothingPhotoAnalysisPrompt(hint string, householdName string, useVision bool) string {
 	return prompts.BuildClothingPhotoAnalysisPrompt(prompts.ClothingPhotoAnalysisInput{
 		HouseholdName: householdName,
-		Hint:          emptyInboxPromptText(hint),
+		Hint:          normalizeText(strings.TrimSpace(hint), "无"),
 		UseVision:     useVision,
 	})
 }

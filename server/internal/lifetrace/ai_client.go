@@ -138,19 +138,6 @@ func buildLifeTraceAssistantToolSchema() map[string]any {
 							"note":      map[string]any{"type": "string"},
 						},
 					},
-					"ledger": map[string]any{
-						"type": "object",
-						"properties": map[string]any{
-							"amount":     map[string]any{"type": "number"},
-							"currency":   map[string]any{"type": "string"},
-							"direction":  map[string]any{"type": "string", "enum": []string{"支出", "收入", "退款", "转账备注"}},
-							"category":   map[string]any{"type": "string", "enum": []string{"吃饭", "交通", "购物", "书影音", "订阅", "家用", "礼物", "医疗", "其他"}},
-							"occurredAt": map[string]any{"type": "string"},
-							"merchant":   map[string]any{"type": "string"},
-							"location":   map[string]any{"type": "string"},
-							"note":       map[string]any{"type": "string"},
-						},
-					},
 				},
 				"required": []string{"type"},
 			},
@@ -284,7 +271,7 @@ func callLifeTraceAIWithMaxTokens(ctx context.Context, cfg lifeTraceAIConfig, pr
 	return result.Content, result.Model, err
 }
 
-// Type alias 保护：ai_handler_test.go / inbox_handler_test.go 直接断言这些私有类型。
+// Type alias 保护：ai_handler_test.go 直接断言这些私有类型。
 type lifeTraceOpenAIRequest = aiclient.OpenAIRequest
 
 type lifeTraceOpenAIMessage = aiclient.OpenAIMessage

@@ -45,12 +45,12 @@ func TestBuildAutoMigratePlanKeepsAllScopeLargest(t *testing.T) {
 }
 
 func TestNormalizeAutoMigrateModelNamesResolvesAliases(t *testing.T) {
-	names, err := NormalizeAutoMigrateModelNames([]string{"places", "ledger", "closet", "ai_usage_logs"})
+	names, err := NormalizeAutoMigrateModelNames([]string{"plans", "traces", "closet", "ai_usage_logs"})
 	if err != nil {
 		t.Fatalf("normalize model names: %v", err)
 	}
 
-	want := []string{"lifetrace_place", "lifetrace_ledger_entry", "lifetrace_closet_item", "ai_usage_log"}
+	want := []string{"lifetrace_plan", "lifetrace_trace", "lifetrace_closet_item", "ai_usage_log"}
 	for i := range want {
 		if names[i] != want[i] {
 			t.Fatalf("expected names %v, got %v", want, names)
@@ -71,6 +71,14 @@ func TestLifeTraceScopeIncludesAIUsageLog(t *testing.T) {
 func TestNormalizeAutoMigrateModelNamesRequiresAtLeastOneModel(t *testing.T) {
 	if _, err := NormalizeAutoMigrateModelNames(nil); err == nil {
 		t.Fatal("expected empty model list to be rejected")
+	}
+}
+
+func TestRetiredLifeTraceModelsCannotBeRecreatedBySchemaSync(t *testing.T) {
+	for _, name := range []string{"places", "inbox", "ledger", "media_diary", "recurring_payment", "recurring_payment_delivery"} {
+		if _, err := NormalizeAutoMigrateModelNames([]string{name}); err == nil {
+			t.Fatalf("retired model %q is still available for schema sync", name)
+		}
 	}
 }
 

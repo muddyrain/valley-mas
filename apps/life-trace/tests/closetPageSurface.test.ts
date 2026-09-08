@@ -24,7 +24,7 @@ describe('closet page surface', () => {
     expect(appSource).toContain('path="/ai/photo-clothing-analysis"');
     expect(todayPageSource).toContain('今日穿搭');
     expect(todayPageSource).toContain("navigate('/closet')");
-    expect(todayPageSource).toContain("navigate('/ai/photo-clothing-analysis')");
+    expect(aiPageSource).toContain("navigate('/ai/photo-clothing-analysis')");
     expect(aiPageSource).toContain('label="今日穿搭"');
     expect(aiPageSource).toContain('label="拍照识别衣物"');
     expect(profilePageSource).toContain("navigate('/closet')");

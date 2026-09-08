@@ -11,12 +11,7 @@ const appSource = readFileSync(resolve(__dirname, '../src/App.tsx'), 'utf8');
 
 const pagesDir = resolve(__dirname, '../src/pages');
 const pageFiles = [
-  'LedgerPage.tsx',
-  'InboxPage.tsx',
-  'RecurringPaymentsPage.tsx',
   'PantryPage.tsx',
-  'PlacesPage.tsx',
-  'MediaDiaryPage.tsx',
   'ShoppingListPage.tsx',
   'AchievementsPage.tsx',
   'ReminderSettingsPage.tsx',
@@ -145,14 +140,9 @@ describe('SubPageShell usage across pages', () => {
   });
 
   it('App.tsx registers all routes used by SubPageShell pages', () => {
-    // Routes may include dynamic segments like /places/:placeId?
+    // Routes may include dynamic segments like /pantry/:itemId
     const expectedRoutePrefixes = [
-      '/ledger',
-      '/inbox',
-      '/recurring-payments',
       '/pantry',
-      '/places',
-      '/media-diary',
       '/shopping',
       '/achievements',
       '/profile/reminders',

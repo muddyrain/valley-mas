@@ -45,7 +45,6 @@ describe('achievement card surface', () => {
     expect(achievementBadgeIconSource).toContain('first_trace: FirstTraceGlyph');
     expect(achievementBadgeIconSource).toContain('expiry_rescue: ExpiryRescueGlyph');
     expect(achievementBadgeIconSource).toContain('barcode_memory: BarcodeMemoryGlyph');
-    expect(achievementBadgeIconSource).toContain('recipe_plan: RecipePlanGlyph');
   });
 
   it('covers P7.2 expansion achievement codes with dedicated glyphs', () => {

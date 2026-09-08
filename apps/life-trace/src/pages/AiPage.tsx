@@ -74,7 +74,6 @@ import {
   groupAssistantMessagesByDate,
 } from '@/lib/aiHistory';
 import { buildAssistantFailureMessage } from '@/lib/assistantMessages';
-import { formatLedgerAmount } from '@/lib/ledger';
 import { formatLocationDisplay } from '@/lib/location';
 import {
   getPhotoItemAnalysisSummaryItems,
@@ -87,7 +86,6 @@ import {
   removePhotoItemAnalysisHistoryItem,
 } from '@/lib/photoItemAnalysisCloud';
 import { getPlanDisplayTimeParts } from '@/lib/planReminder';
-import { readRecipeHistory, type StoredRecipeSuggestion } from '@/lib/recipeHistory';
 import { cn } from '@/lib/utils';
 import { readWeatherCache } from '@/lib/weatherCache';
 import {
@@ -160,13 +158,6 @@ function formatAssistantActionMessage(event: LifeAssistantActionEvent) {
     }
     if (event.plan && event.status === 'exists') {
       return `这个计划已经在列表里了：${event.plan.title}。`;
-    }
-    return event.message;
-  }
-
-  if (event.type === 'create_ledger_entry') {
-    if (event.ledgerEntry && event.status === 'created') {
-      return `已经帮你记下这笔账：${formatLedgerAmount(event.ledgerEntry.amountCents, event.ledgerEntry.currency)} · ${event.ledgerEntry.category}。`;
     }
     return event.message;
   }
@@ -985,48 +976,6 @@ function AiCommandCard({
   );
 }
 
-function RecentRecipeHistory({
-  recipes,
-  onOpenRecipes,
-}: {
-  recipes: StoredRecipeSuggestion[];
-  onOpenRecipes: () => void;
-}) {
-  if (recipes.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-3 px-1">
-        <p className="text-xl font-semibold">最近菜谱</p>
-        <span className="text-xs font-semibold text-muted-foreground">{recipes.length} 份</span>
-      </div>
-      <div className="grid gap-2">
-        {recipes.slice(0, 3).map((recipe) => (
-          <button
-            type="button"
-            key={recipe.id}
-            className="flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-[1.25rem] border border-life-health/20 bg-card/80 px-3 py-2.5 text-left shadow-[0_10px_30px_rgba(71,58,42,0.055)] transition hover:border-life-health/35 hover:bg-life-health/5"
-            onClick={onOpenRecipes}
-          >
-            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
-              <Utensils className="size-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold">{recipe.title}</span>
-              <span className="mt-1 block truncate text-xs text-muted-foreground">
-                {recipe.householdName || '我的空间'} · {recipe.timeMinutes} 分钟
-              </span>
-            </span>
-            <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function AssistantToolRow({
   icon: Icon,
   label,
@@ -1156,7 +1105,7 @@ function AssistantToolsSheet({
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3 px-1">
           <p className="text-sm font-semibold">Pantry 智能</p>
-          <span className="text-xs text-muted-foreground">5 个入口</span>
+          <span className="text-xs text-muted-foreground">4 个入口</span>
         </div>
         <div className="space-y-2 rounded-[1.25rem] border border-border/80 bg-secondary/15 p-2.5">
           <AssistantToolRow
@@ -1165,12 +1114,7 @@ function AssistantToolsSheet({
             toneClass="text-life-ai"
             onClick={() => closeAndRun(onOpenPhotoAnalysis)}
           />
-          <AssistantToolRow
-            icon={Utensils}
-            label="智能菜谱"
-            toneClass="text-life-health"
-            onClick={() => closeAndRun(() => onQuickAction('智能菜谱'))}
-          />
+
           <AssistantToolRow
             icon={History}
             label="历史周报"
@@ -1231,7 +1175,6 @@ function AgentConversationPanel({
   weeklyReviews,
   weeklyReviewsLoading,
   photoItemHistory,
-  recentRecipes,
   quickActionLoading,
   aiActions,
   locationLabel,
@@ -1274,7 +1217,6 @@ function AgentConversationPanel({
   weeklyReviews: WeeklyReviewResponse[];
   weeklyReviewsLoading: boolean;
   photoItemHistory: PhotoItemAnalysisHistoryItem[];
-  recentRecipes: StoredRecipeSuggestion[];
   quickActionLoading: string | null;
   aiActions: AiAction[];
   locationLabel: string;
@@ -1439,16 +1381,7 @@ function AgentConversationPanel({
                       featured={false}
                       onClick={onOpenPhotoAnalysis}
                     />
-                    <AiCommandCard
-                      icon={Utensils}
-                      title="智能菜谱"
-                      description="库存优先做饭"
-                      toneClass="text-life-health"
-                      loading={false}
-                      disabled={Boolean(quickActionLoading)}
-                      featured={false}
-                      onClick={() => onQuickAction('智能菜谱')}
-                    />
+
                     <AiCommandCard
                       icon={ListChecks}
                       title="每周回顾"
@@ -1493,11 +1426,6 @@ function AgentConversationPanel({
                     })}
                   </div>
                 </div>
-
-                <RecentRecipeHistory
-                  recipes={recentRecipes}
-                  onOpenRecipes={() => onQuickAction('智能菜谱')}
-                />
               </div>
             ) : null}
 
@@ -1725,7 +1653,6 @@ function useAiPageState() {
   const addPlan = useLifeTraceStore((state) => state.addPlan);
   const receiveServerPlan = useLifeTraceStore((state) => state.receiveServerPlan);
   const receiveServerPantryItem = useLifeTraceStore((state) => state.receiveServerPantryItem);
-  const receiveServerLedgerEntry = useLifeTraceStore((state) => state.receiveServerLedgerEntry);
   const loadAchievements = useLifeTraceStore((state) => state.loadAchievements);
   const loadAiActions = useLifeTraceStore((state) => state.loadAiActions);
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
@@ -1766,7 +1693,6 @@ function useAiPageState() {
   const [assistantListening, setAssistantListening] = useState(false);
   const [assistantSpeechError, setAssistantSpeechError] = useState('');
   const [quickActionLoading, setQuickActionLoading] = useState<string | null>(null);
-  const [recentRecipes] = useState<StoredRecipeSuggestion[]>(() => readRecipeHistory());
   const [photoItemHistory, setPhotoItemHistory] = useState<PhotoItemAnalysisHistoryItem[]>(() =>
     readPhotoItemAnalysisHistory(),
   );
@@ -2186,33 +2112,6 @@ function useAiPageState() {
       return;
     }
 
-    if (event.type === 'create_ledger_entry') {
-      if (event.ledgerEntry) {
-        receiveServerLedgerEntry(
-          event.ledgerEntry,
-          event.status === 'created'
-            ? `生活助理记下了「${event.ledgerEntry.category}」账目`
-            : `生活助理识别到「${event.ledgerEntry.category}」账目`,
-        );
-      }
-
-      setResult({
-        title:
-          event.status === 'created'
-            ? '已记账'
-            : event.status === 'need_more_info'
-              ? '还差一点信息'
-              : '账目未保存',
-        detail:
-          event.ledgerEntry && event.status === 'created'
-            ? `${formatLedgerAmount(event.ledgerEntry.amountCents, event.ledgerEntry.currency)} · ${event.ledgerEntry.category}`
-            : event.message,
-        tone:
-          event.status === 'error' ? 'alert' : event.status === 'need_more_info' ? 'ai' : 'plan',
-      });
-      return;
-    }
-
     if (event.type === 'create_pantry_item') {
       if (event.pantryItem) {
         receiveServerPantryItem(
@@ -2383,11 +2282,6 @@ function useAiPageState() {
       return;
     }
 
-    if (label === '智能菜谱') {
-      navigate('/ai/recipes');
-      return;
-    }
-
     if (label === '生成今日建议') {
       if (!textModelId) {
         setResult({
@@ -2456,7 +2350,7 @@ function useAiPageState() {
 
     setResult({
       title: '暂不支持这个动作',
-      detail: '可以先使用计划、踪迹、智能菜谱或拍照分析商品。',
+      detail: '可以先使用计划、踪迹或拍照分析商品。',
       tone: 'alert',
     });
   };
@@ -2743,7 +2637,6 @@ function useAiPageState() {
     completedPlanCount,
     latestWeeklyReview,
     photoItemHistory,
-    recentRecipes,
     handleRemovePhotoItemDraft,
     locationLabel,
     weatherSummary,
@@ -2920,7 +2813,6 @@ export function AiPage() {
     weeklyReviewRegenerateTarget,
     setWeeklyReviewRegenerateTarget,
     photoItemHistory,
-    recentRecipes,
     handleRemovePhotoItemDraft,
     locationLabel,
     weatherSummary,
@@ -2963,7 +2855,6 @@ export function AiPage() {
         weeklyReviews={weeklyReviews}
         weeklyReviewsLoading={weeklyReviewsLoading}
         photoItemHistory={photoItemHistory}
-        recentRecipes={recentRecipes}
         quickActionLoading={quickActionLoading}
         aiActions={aiActions}
         locationLabel={locationLabel}

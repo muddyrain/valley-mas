@@ -125,8 +125,6 @@ var lifeTraceAchievementDefinitions = []achievementDefinition{
 	{Code: "ai_action_ten", Title: "十条建议留下来", Description: "保存十条 AI 相关生活动作。", Category: "ai", Rarity: "epic", Icon: "sparkles", Tone: "ai", Target: 10},
 	{Code: "image_to_plan", Title: "一张图变成一个计划", Description: "从图片分析创建一个计划。", Category: "ai", Rarity: "rare", Icon: "image-plus", Tone: "ai", Target: 1},
 	{Code: "ai_image_plan_three", Title: "三张图都有去处", Description: "从图片分析创建三个计划。", Category: "ai", Rarity: "epic", Icon: "images", Tone: "ai", Target: 3},
-	{Code: "recipe_plan", Title: "厨房搭子上线", Description: "把智能菜谱加入吃饭计划。", Category: "ai", Rarity: "rare", Icon: "chef-hat", Tone: "health", Target: 1},
-	{Code: "recipe_plan_three", Title: "三餐有了灵感", Description: "把三个智能菜谱加入吃饭计划。", Category: "ai", Rarity: "epic", Icon: "cooking-pot", Tone: "health", Target: 3},
 	{Code: "weekly_review", Title: "本周有复盘", Description: "生成一次每周回顾。", Category: "ai", Rarity: "common", Icon: "clipboard-list", Tone: "ai", Target: 1},
 	{Code: "weekly_review_four", Title: "一个月有复盘", Description: "生成四次每周回顾。", Category: "ai", Rarity: "epic", Icon: "calendar-check", Tone: "ai", Target: 4},
 	{Code: "review_to_plan", Title: "复盘变成行动", Description: "从周回顾行动创建一个计划。", Category: "ai", Rarity: "rare", Icon: "clipboard-check", Tone: "ai", Target: 1},
@@ -495,8 +493,6 @@ func buildAchievementProgress(snapshot achievementSnapshot) map[string]achieveme
 	progress["ai_action_ten"] = countProgress(int(snapshot.AIActionCount), "ai_action", "")
 	progress["image_to_plan"] = imageToPlanProgress(snapshot.Plans)
 	progress["ai_image_plan_three"] = imageToPlanCountProgress(snapshot.Plans)
-	progress["recipe_plan"] = recipePlanProgress(snapshot.Plans)
-	progress["recipe_plan_three"] = recipePlanCountProgress(snapshot.Plans)
 	progress["winter_meal_plan"] = winterMealPlanProgress(snapshot.Plans)
 	progress["weekly_review"] = weeklyReviewProgress(snapshot.WeeklyReviews)
 	progress["weekly_review_four"] = weeklyReviewProgress(snapshot.WeeklyReviews)
@@ -769,34 +765,6 @@ func imageToPlanCountProgress(plans []model.LifeTracePlan) achievementProgress {
 	evidenceID := ""
 	for _, plan := range plans {
 		if plan.Source != "image_ai" {
-			continue
-		}
-		progress++
-		if evidenceID == "" {
-			evidenceID = plan.ID.String()
-		}
-	}
-	return countProgress(progress, "plan", evidenceID)
-}
-
-func recipePlanProgress(plans []model.LifeTracePlan) achievementProgress {
-	for _, plan := range plans {
-		note := strings.TrimSpace(plan.Note)
-		if plan.Type == "吃饭" && plan.Source == "ai_advice" &&
-			(strings.Contains(note, "AI 智能菜谱") || strings.Contains(note, "消耗库存")) {
-			return countProgress(1, "plan", plan.ID.String())
-		}
-	}
-	return countProgress(0, "plan", "")
-}
-
-func recipePlanCountProgress(plans []model.LifeTracePlan) achievementProgress {
-	progress := 0
-	evidenceID := ""
-	for _, plan := range plans {
-		note := strings.TrimSpace(plan.Note)
-		if plan.Type != "吃饭" || plan.Source != "ai_advice" ||
-			(!strings.Contains(note, "AI 智能菜谱") && !strings.Contains(note, "消耗库存")) {
 			continue
 		}
 		progress++

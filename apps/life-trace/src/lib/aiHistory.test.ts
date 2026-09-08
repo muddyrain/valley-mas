@@ -30,7 +30,7 @@ const messages = [
 ];
 
 const actions: AiAction[] = [
-  { id: 'action-1', title: '生成了库存优先智能菜谱', timeLabel: '刚刚' },
+  { id: 'action-1', title: '添加了库存商品', timeLabel: '刚刚' },
   { id: 'action-2', title: '生活助理创建了「买牛奶」计划', timeLabel: '10 分钟前' },
   { id: 'action-3', title: '分析了晚餐照片', timeLabel: '昨天' },
 ];

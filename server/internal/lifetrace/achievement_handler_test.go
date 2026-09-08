@@ -20,12 +20,12 @@ func TestListAchievementsReturnsLockedStateForNewUser(t *testing.T) {
 
 	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
 	summary := data["summary"].(map[string]interface{})
-	if summary["unlocked"].(float64) != 0 || summary["total"].(float64) != 71 {
+	if summary["unlocked"].(float64) != 0 || summary["total"].(float64) != 69 {
 		t.Fatalf("expected locked achievement set, got %+v", summary)
 	}
 	list := data["list"].([]interface{})
-	if len(list) != 71 {
-		t.Fatalf("expected 71 definitions, got %d", len(list))
+	if len(list) != 69 {
+		t.Fatalf("expected 69 definitions, got %d", len(list))
 	}
 	first := findAchievementCard(t, list, "first_plan")
 	if first["unlocked"].(bool) {
@@ -65,7 +65,6 @@ func TestAchievementExpansionDefinitions(t *testing.T) {
 		"pantry_photo_memory",
 		"ai_action_ten",
 		"weekly_review_four",
-		"recipe_plan_three",
 		"reading_plan_done",
 		"sport_plan_done",
 		"social_plan_done",
@@ -129,7 +128,7 @@ func TestAchievementExpansionUnlocksFromExistingData(t *testing.T) {
 		if i > 0 && i <= 3 {
 			plan.Type = "吃饭"
 			plan.Source = "ai_advice"
-			plan.Note = "AI 智能菜谱，优先消耗库存。"
+			plan.Note = "AI 建议，安排晚餐。"
 		}
 		if i >= 4 && i <= 6 {
 			plan.Source = "image_ai"
@@ -350,7 +349,6 @@ func TestAchievementExpansionUnlocksFromExistingData(t *testing.T) {
 		"pantry_photo_memory",
 		"ai_action_ten",
 		"weekly_review_four",
-		"recipe_plan_three",
 		"reading_plan_done",
 		"sport_plan_done",
 		"social_plan_done",

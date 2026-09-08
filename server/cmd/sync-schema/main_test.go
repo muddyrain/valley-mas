@@ -43,12 +43,12 @@ func TestParseOptionsEnablesApplyAndProductionOverride(t *testing.T) {
 }
 
 func TestParseOptionsNormalizesModelAliases(t *testing.T) {
-	options, err := parseOptions([]string{"--models", "places, ledger,closet"}, &bytes.Buffer{})
+	options, err := parseOptions([]string{"--models", "plans, traces,closet"}, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("parse options: %v", err)
 	}
 
-	want := []string{"lifetrace_place", "lifetrace_ledger_entry", "lifetrace_closet_item"}
+	want := []string{"lifetrace_plan", "lifetrace_trace", "lifetrace_closet_item"}
 	if strings.Join(options.models, ",") != strings.Join(want, ",") {
 		t.Fatalf("expected models %v, got %v", want, options.models)
 	}
@@ -69,7 +69,7 @@ func TestValidateRunRequiresProductionOverride(t *testing.T) {
 func TestValidateRunAllowsDevelopment(t *testing.T) {
 	cfg := &config.Config{Env: "development"}
 
-	if err := validateRun(cfg, syncOptions{apply: true, models: []string{"lifetrace_place"}}); err != nil {
+	if err := validateRun(cfg, syncOptions{apply: true, models: []string{"lifetrace_plan"}}); err != nil {
 		t.Fatalf("expected development run to be allowed: %v", err)
 	}
 }
@@ -104,7 +104,7 @@ func TestValidateRunRejectsScopeAndModelsTogether(t *testing.T) {
 	err := validateRun(cfg, syncOptions{
 		apply:  true,
 		scope:  database.AutoMigrateScopeLifeTrace,
-		models: []string{"lifetrace_place"},
+		models: []string{"lifetrace_plan"},
 	})
 	if err == nil {
 		t.Fatal("expected mutually exclusive targets to be rejected")

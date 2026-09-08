@@ -15,31 +15,6 @@ func TestImageAnalysisContractParsesMarkdownJSON(t *testing.T) {
 	}
 }
 
-func TestInboxOrganizeContractFallsBackSafely(t *testing.T) {
-	parsed, err := ParseInboxOrganizeOutput(`{"title":"","summary":"","tags":[],"suggestedType":"unknown","reason":""}`, InboxOrganizeInput{
-		Title:                 "周末买菜",
-		Content:               "记得买牛奶",
-		Tags:                  []string{"生活"},
-		FallbackSuggestedType: "plan",
-	})
-	if err != nil {
-		t.Fatalf("parse inbox organize: %v", err)
-	}
-	if parsed.Title != "周末买菜" || parsed.SuggestedType != "plan" || len(parsed.Tags) != 1 {
-		t.Fatalf("unexpected inbox fallback: %+v", parsed)
-	}
-}
-
-func TestMediaDiaryContractNormalizesSuggestion(t *testing.T) {
-	parsed, err := ParseMediaDiarySuggestion(`{"originalTitle":"  Dune  ","creator":"  Frank Herbert  ","releaseYear":9999,"tags":["科幻","科幻"],"note":"  好看  "}`)
-	if err != nil {
-		t.Fatalf("parse media diary: %v", err)
-	}
-	if parsed.OriginalTitle != "Dune" || parsed.ReleaseYear != 0 || len(parsed.Tags) != 1 {
-		t.Fatalf("unexpected media diary suggestion: %+v", parsed)
-	}
-}
-
 func TestTodayAdviceContractParseFallsBackOnEmptySummary(t *testing.T) {
 	parsed, err := ParseTodayAdviceOutput(`{"summary":"","items":[{"id":"wear","detail":""}]}`)
 	if err != nil {
@@ -178,19 +153,6 @@ func TestBuildPantryPhotoAnalysisPromptFallsBackWhenEmpty(t *testing.T) {
 	}
 }
 
-func TestBuildRecipeVideoHTMLPromptIncludesHyperFramesSpec(t *testing.T) {
-	prompt := BuildRecipeVideoHTMLPrompt(RecipeVideoInput{RecipeID: "recipe-42"})
-	if !strings.Contains(prompt, "HyperFrames") {
-		t.Fatal("expected HyperFrames marker in prompt")
-	}
-	if !strings.Contains(prompt, "720x1280") {
-		t.Fatal("expected video resolution in prompt")
-	}
-	if !strings.Contains(prompt, "GSAP") {
-		t.Fatal("expected animation library hint in prompt")
-	}
-}
-
 func TestBuildPantryThumbnailPromptIncludesName(t *testing.T) {
 	prompt := BuildPantryThumbnailPrompt(PantryThumbnailInput{
 		Name:     "全脂牛奶",
@@ -200,24 +162,6 @@ func TestBuildPantryThumbnailPromptIncludesName(t *testing.T) {
 	})
 	if !strings.Contains(prompt, "全脂牛奶") {
 		t.Fatal("expected name in prompt")
-	}
-}
-
-func TestParseRecipeSuggestionOutputClampsMaxMinutes(t *testing.T) {
-	raw := `{"summary":"两道快手菜","recipes":[{"id":"","title":"番茄炒蛋","reason":"","usedItems":[],"missingItems":[],"timeMinutes":600,"difficulty":"魔鬼","servings":100,"steps":[],"tags":[]}],"warnings":[]}`
-	parsed, err := ParseRecipeSuggestionOutput(raw, RecipeSuggestionNormalizeContext{MaxMinutes: 30, Servings: 2})
-	if err != nil {
-		t.Fatalf("parse recipe suggestion: %v", err)
-	}
-	if len(parsed.Recipes) != 1 {
-		t.Fatalf("expected 1 recipe, got %d", len(parsed.Recipes))
-	}
-	r := parsed.Recipes[0]
-	if r.TimeMinutes > 30 {
-		t.Fatalf("expected time clamped to <=30, got %d", r.TimeMinutes)
-	}
-	if r.Difficulty != "简单" && r.Difficulty != "中等" {
-		t.Fatalf("expected normalized difficulty, got %q", r.Difficulty)
 	}
 }
 

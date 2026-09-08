@@ -74,7 +74,6 @@ func (h *Handler) StreamAssistant(c *gin.Context) {
 	structuredPrompt := buildLifeTraceAssistantStructuredPrompt(settings, weather, plans, traces, req, now)
 	planDraft := buildLifeTraceAssistantPlanDraft(req.Message, now)
 	pantryDraft := buildLifeTraceAssistantPantryDraft(req.Message)
-	ledgerDraft := buildLifeTraceAssistantLedgerDraft(req.Message, now)
 	if planDraft == nil {
 		planDraft = buildLifeTraceAssistantPlanFollowUpDraft(req.Message, findRecentAssistantPlanDraft(req.History, now), now)
 	}
@@ -88,11 +87,6 @@ func (h *Handler) StreamAssistant(c *gin.Context) {
 		}
 
 		switch {
-		case ledgerDraft != nil:
-			actionEventSent = true
-			send(lifeTraceAssistantStreamChunk{
-				Action: h.createAssistantLedgerEntryFromDraft(userID, *ledgerDraft),
-			})
 		case pantryDraft != nil:
 			actionEventSent = true
 			send(lifeTraceAssistantStreamChunk{
@@ -115,7 +109,7 @@ func (h *Handler) StreamAssistant(c *gin.Context) {
 		}
 	}
 
-	if err := h.streamLifeTraceAssistantStructured(c, aiCtx, aiCfg, systemPrompt, structuredPrompt, userID, now, planDraft, pantryDraft, ledgerDraft); err == nil {
+	if err := h.streamLifeTraceAssistantStructured(c, aiCtx, aiCfg, systemPrompt, structuredPrompt, userID, now, planDraft, pantryDraft); err == nil {
 		return
 	}
 
@@ -251,18 +245,6 @@ func parseLifeTraceAssistantStructuredResponse(raw string) (lifeTraceAssistantSt
 			Note:      out.Action.Pantry.Note,
 		}
 	}
-	if out.Action.Ledger != nil {
-		action.Ledger = &lifeTraceAssistantLedgerDraft{
-			Amount:     out.Action.Ledger.Amount,
-			Currency:   out.Action.Ledger.Currency,
-			Direction:  out.Action.Ledger.Direction,
-			Category:   out.Action.Ledger.Category,
-			OccurredAt: out.Action.Ledger.OccurredAt,
-			Merchant:   out.Action.Ledger.Merchant,
-			Location:   out.Action.Ledger.Location,
-			Note:       out.Action.Ledger.Note,
-		}
-	}
 	resp.Action = action
 	return resp, nil
 }
@@ -277,7 +259,6 @@ func (h *Handler) streamLifeTraceAssistantStructured(
 	now time.Time,
 	fallbackPlanDraft *lifeTraceAssistantPlanDraft,
 	fallbackPantryDraft *lifeTraceAssistantPantryDraft,
-	fallbackLedgerDraft *lifeTraceAssistantLedgerDraft,
 ) error {
 	decision, modelName, err := callLifeTraceAssistantStructuredResponse(ctx, cfg, systemPrompt, structuredPrompt)
 	if err != nil {
@@ -301,7 +282,7 @@ func (h *Handler) streamLifeTraceAssistantStructured(
 		})
 	}
 
-	if payload := h.resolveLifeTraceAssistantStructuredAction(c, userID, decision.Action, now, fallbackPlanDraft, fallbackPantryDraft, fallbackLedgerDraft); payload != nil {
+	if payload := h.resolveLifeTraceAssistantStructuredAction(c, userID, decision.Action, now, fallbackPlanDraft, fallbackPantryDraft); payload != nil {
 		send(lifeTraceAssistantStreamChunk{
 			Source: cfg.Source,
 			Model:  modelName,
@@ -320,12 +301,9 @@ func (h *Handler) resolveLifeTraceAssistantStructuredAction(
 	now time.Time,
 	fallbackPlanDraft *lifeTraceAssistantPlanDraft,
 	fallbackPantryDraft *lifeTraceAssistantPantryDraft,
-	fallbackLedgerDraft *lifeTraceAssistantLedgerDraft,
 ) *lifeTraceAssistantActionPayload {
 	if action == nil {
 		switch {
-		case fallbackLedgerDraft != nil:
-			return h.createAssistantLedgerEntryFromDraft(userID, *fallbackLedgerDraft)
 		case fallbackPantryDraft != nil:
 			return h.createAssistantPantryItemFromDraft(c, userID, *fallbackPantryDraft)
 		case fallbackPlanDraft != nil:
@@ -387,26 +365,6 @@ func (h *Handler) resolveLifeTraceAssistantStructuredAction(
 			)
 		}
 		return h.createAssistantPantryItemFromDraft(c, userID, *draft)
-	case "create_ledger_entry":
-		draft := mergeAssistantLedgerDraft(action.Ledger, fallbackLedgerDraft)
-		if draft == nil {
-			if fallbackLedgerDraft == nil {
-				return nil
-			}
-			draft = fallbackLedgerDraft
-		}
-		if amountToCents(draft.Amount) <= 0 {
-			message := action.Message
-			if strings.TrimSpace(message) == "" {
-				message = buildAssistantLedgerNeedMoreInfoMessage(draft)
-			}
-			return buildAssistantNeedMoreInfoPayload(
-				"create_ledger_entry",
-				message,
-				append(action.NeedMoreInfoFields, "amount"),
-			)
-		}
-		return h.createAssistantLedgerEntryFromDraft(userID, *draft)
 	default:
 		return nil
 	}

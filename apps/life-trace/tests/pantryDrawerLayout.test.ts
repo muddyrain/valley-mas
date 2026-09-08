@@ -148,13 +148,6 @@ describe('pantry drawer mobile layout guards', () => {
     expect(aiPageSource).toContain('onRemovePhotoItemDraft(item.id)');
   });
 
-  it('routes smart recipes to the dedicated recipe page', () => {
-    expect(appSource).toContain('AiRecipesPage');
-    expect(appSource).toContain('path="/ai/recipes"');
-    expect(aiPageSource).toContain("navigate('/ai/recipes')");
-    expect(aiPageSource).toContain("onQuickAction('智能菜谱')");
-  });
-
   it('does not stack large conversation sync skeletons under the recent recognition summary', () => {
     expect(aiPageSource).not.toContain('正在载入对话');
     expect(aiPageSource).not.toContain('正在把云端记录同步到当前设备。');

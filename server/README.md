@@ -224,16 +224,16 @@ cd server && go test ./internal/lifetrace
 如果本地或共享测试库因为历史迁移遗漏字段，出现类似“保存偏好失败”“字段不存在”的问题，可以单独运行一次 schema sync 命令，让 GORM 按指定 model 补齐缺失表和字段。日常优先指定具体 model，避免全量扫描远程 PostgreSQL 元数据：
 
 ```bash
-cd server && go run ./cmd/sync-schema --apply --models places,ledger,closet
+cd server && go run ./cmd/sync-schema --apply --models plans,traces,closet
 ```
 
 常用 Life Trace model alias：
 
 ```bash
-cd server && go run ./cmd/sync-schema --apply --models places
-cd server && go run ./cmd/sync-schema --apply --models ledger
+cd server && go run ./cmd/sync-schema --apply --models plans
+cd server && go run ./cmd/sync-schema --apply --models traces
 cd server && go run ./cmd/sync-schema --apply --models closet,outfits
-cd server && go run ./cmd/sync-schema --apply --models media_diary,inbox,traces,plans
+cd server && go run ./cmd/sync-schema --apply --models plans,traces,closet,settings
 ```
 
 如果确实需要按范围同步，可显式使用：

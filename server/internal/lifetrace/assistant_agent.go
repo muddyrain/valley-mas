@@ -23,7 +23,6 @@ var lifeTraceAssistantAgentTools = []string{
 	"query_pending_plans",
 	"create_plan",
 	"create_pantry_item",
-	"create_ledger_entry",
 }
 
 // lifeTraceAssistantAgentToolLabels 把 tool 名映射成用户可读的中文标签。
@@ -33,7 +32,6 @@ var lifeTraceAssistantAgentToolLabels = map[string]string{
 	"query_pending_plans": "查询待办计划",
 	"create_plan":         "创建计划",
 	"create_pantry_item":  "整理食材库",
-	"create_ledger_entry": "记一笔账",
 }
 
 // lifeTraceAssistantUseAgent 读取环境变量 LIFE_TRACE_ASSISTANT_USE_AGENT。
@@ -169,10 +167,10 @@ func buildLifeTraceAssistantAgentMessages(req lifeTraceAssistantRequest) []agent
 
 // extractAssistantActionPayload 尝试从 create_* tool 的 envelope 里
 // 反解出 lifeTraceAssistantActionPayload,供 SSE Action 事件复用。
-// 只识别 create_plan / create_pantry_item / create_ledger_entry,查询类 tool 忽略。
+// 只识别 create_plan / create_pantry_item,查询类 tool 忽略。
 func extractAssistantActionPayload(toolName string, raw json.RawMessage) *lifeTraceAssistantActionPayload {
 	switch toolName {
-	case "create_plan", "create_pantry_item", "create_ledger_entry":
+	case "create_plan", "create_pantry_item":
 	default:
 		return nil
 	}

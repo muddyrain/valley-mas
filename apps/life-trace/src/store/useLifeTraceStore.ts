@@ -3,23 +3,6 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { listAchievements } from '@/api/achievements';
 import { listAiActions } from '@/api/aiActions';
 import {
-  type ListInboxOptions,
-  listInboxItems,
-  convertInboxItem as requestConvertInboxItem,
-  createInboxItem as requestCreateInboxItem,
-  deleteInboxItem as requestDeleteInboxItem,
-  organizeInboxItem as requestOrganizeInboxItem,
-  updateInboxItem as requestUpdateInboxItem,
-  updateInboxItemStatus as requestUpdateInboxItemStatus,
-} from '@/api/inbox';
-import {
-  type ListLedgerOptions,
-  listLedgerEntries,
-  createLedgerEntry as requestCreateLedgerEntry,
-  deleteLedgerEntry as requestDeleteLedgerEntry,
-  updateLedgerEntry as requestUpdateLedgerEntry,
-} from '@/api/ledger';
-import {
   type ListPantryOptions,
   listPantry,
   type PantryConsumeRequest,
@@ -30,18 +13,6 @@ import {
   updatePantryItemStatus as requestUpdatePantryItemStatus,
 } from '@/api/pantry';
 import {
-  type CreatePlaceInput,
-  getPlace,
-  type ListPlacesOptions,
-  listPlaceRecords,
-  listPlaces,
-  type PlaceExport,
-  createPlace as requestCreatePlace,
-  exportPlaces as requestExportPlaces,
-  updatePlace as requestUpdatePlace,
-  type UpdatePlaceInput,
-} from '@/api/places';
-import {
   createPlan,
   deletePlan,
   type ListPlansOptions,
@@ -49,14 +20,6 @@ import {
   updatePlan,
   updatePlanStatus,
 } from '@/api/plans';
-import {
-  type ListRecurringPaymentsOptions,
-  listRecurringPayments,
-  advanceRecurringPayment as requestAdvanceRecurringPayment,
-  archiveRecurringPayment as requestArchiveRecurringPayment,
-  createRecurringPayment as requestCreateRecurringPayment,
-  updateRecurringPayment as requestUpdateRecurringPayment,
-} from '@/api/recurringPayments';
 import { getSettings, saveSettings } from '@/api/settings';
 import {
   type ListShoppingOptions,
@@ -70,7 +33,6 @@ import { createTrace, deleteTrace, listTraces, updateTrace } from '@/api/traces'
 import { findNewlyUnlockedAchievements, normalizeAchievement } from '@/lib/achievements';
 import { normalizeAiActionRecord } from '@/lib/aiHistory';
 import { getLifeTraceErrorMessage } from '@/lib/error';
-import { getDefaultLedgerMonth } from '@/lib/ledger';
 import { withMinimumLoadingTime } from '@/lib/loading';
 import { resolvePantryStatus } from '@/lib/pantry';
 import { getPantryRefreshPageSize, isSamePantryListQuery } from '@/lib/pantryListFilters';
@@ -81,28 +43,16 @@ import type {
   AchievementSummary,
   AiAction,
   AppTab,
-  InboxConvertedType,
-  InboxItem,
-  InboxItemStatus,
-  LedgerEntry,
-  LedgerSummary,
   ListPagination,
-  NewInboxItemInput,
-  NewLedgerEntryInput,
   NewPantryItemInput,
   NewPlanInput,
-  NewRecurringPaymentInput,
   NewShoppingListItemInput,
   NewTraceInput,
   PantryItem,
   PantryItemStatus,
   PantryOverview,
   PantryPreferences,
-  Place,
-  PlaceRecord,
   Plan,
-  RecurringPayment,
-  RecurringPaymentSummary,
   ShoppingListItem,
   Trace,
   UserSettings,
@@ -132,51 +82,6 @@ type LifeTraceState = {
   traceCreating: boolean;
   traceUpdatingById: Record<string, boolean>;
   traceDeletingById: Record<string, boolean>;
-  places: Place[];
-  placesLoaded: boolean;
-  placesLoading: boolean;
-  placesLoadingMore: boolean;
-  placesError: string;
-  placesPagination: ListPagination;
-  placesListOptions: ListPlacesOptions;
-  placeDetail: Place | null;
-  placeRecords: PlaceRecord[];
-  placeDetailLoading: boolean;
-  placeRecordsLoading: boolean;
-  placeCreating: boolean;
-  placeUpdatingById: Record<string, boolean>;
-  inboxItems: InboxItem[];
-  inboxLoaded: boolean;
-  inboxLoading: boolean;
-  inboxLoadingMore: boolean;
-  inboxError: string;
-  inboxPagination: ListPagination;
-  inboxListOptions: ListInboxOptions;
-  inboxCreating: boolean;
-  inboxUpdatingById: Record<string, boolean>;
-  inboxDeletingById: Record<string, boolean>;
-  ledgerEntries: LedgerEntry[];
-  ledgerLoaded: boolean;
-  ledgerLoading: boolean;
-  ledgerLoadingMore: boolean;
-  ledgerError: string;
-  ledgerPagination: ListPagination;
-  ledgerListOptions: ListLedgerOptions;
-  ledgerSummary: LedgerSummary;
-  ledgerCreating: boolean;
-  ledgerUpdatingById: Record<string, boolean>;
-  ledgerDeletingById: Record<string, boolean>;
-  recurringPayments: RecurringPayment[];
-  recurringPaymentsLoaded: boolean;
-  recurringPaymentsLoading: boolean;
-  recurringPaymentsError: string;
-  recurringPaymentsPagination: ListPagination;
-  recurringPaymentsListOptions: ListRecurringPaymentsOptions;
-  recurringPaymentsSummary: RecurringPaymentSummary;
-  recurringPaymentCreating: boolean;
-  recurringPaymentUpdatingById: Record<string, boolean>;
-  recurringPaymentArchivingById: Record<string, boolean>;
-  recurringPaymentAdvancingById: Record<string, boolean>;
   settings: UserSettings;
   settingsLoaded: boolean;
   settingsLoading: boolean;
@@ -226,16 +131,6 @@ type LifeTraceState = {
   loadMorePlans: () => Promise<void>;
   loadTraces: () => Promise<void>;
   loadMoreTraces: () => Promise<void>;
-  loadPlaces: (options?: ListPlacesOptions) => Promise<void>;
-  loadMorePlaces: () => Promise<void>;
-  loadPlaceDetail: (placeId: string) => Promise<void>;
-  addPlace: (input: CreatePlaceInput) => Promise<Place | null>;
-  editPlace: (placeId: string, input: UpdatePlaceInput) => Promise<Place | null>;
-  exportPlaces: () => Promise<PlaceExport | null>;
-  loadInboxItems: (options?: ListInboxOptions) => Promise<void>;
-  loadMoreInboxItems: () => Promise<void>;
-  loadLedgerEntries: (options?: ListLedgerOptions) => Promise<void>;
-  loadMoreLedgerEntries: () => Promise<void>;
   loadAchievements: (options?: { notifyNew?: boolean }) => Promise<void>;
   loadAiActions: () => Promise<void>;
   addPlan: (input: NewPlanInput) => Promise<Plan | null>;
@@ -258,31 +153,9 @@ type LifeTraceState = {
   removePantryItem: (itemId: string, householdId?: string) => Promise<boolean>;
   receiveServerPlan: (plan: Plan, actionTitle?: string) => void;
   receiveServerPantryItem: (item: PantryItem, actionTitle?: string) => void;
-  receiveServerLedgerEntry: (entry: LedgerEntry, actionTitle?: string) => void;
   editPlan: (planId: string, input: NewPlanInput) => Promise<Plan | null>;
   addTrace: (input: NewTraceInput) => Promise<Trace | null>;
   editTrace: (traceId: string, input: NewTraceInput) => Promise<Trace | null>;
-  addInboxItem: (input: NewInboxItemInput) => Promise<InboxItem | null>;
-  editInboxItem: (itemId: string, input: NewInboxItemInput) => Promise<InboxItem | null>;
-  updateInboxStatus: (itemId: string, status: InboxItemStatus) => Promise<InboxItem | null>;
-  convertInbox: (
-    itemId: string,
-    convertedType: InboxConvertedType,
-    convertedId: string,
-  ) => Promise<InboxItem | null>;
-  organizeInbox: (itemId: string) => Promise<InboxItem | null>;
-  removeInboxItem: (itemId: string) => Promise<boolean>;
-  addLedgerEntry: (input: NewLedgerEntryInput) => Promise<LedgerEntry | null>;
-  editLedgerEntry: (entryId: string, input: NewLedgerEntryInput) => Promise<LedgerEntry | null>;
-  removeLedgerEntry: (entryId: string) => Promise<boolean>;
-  loadRecurringPayments: (options?: ListRecurringPaymentsOptions) => Promise<void>;
-  addRecurringPayment: (input: NewRecurringPaymentInput) => Promise<RecurringPayment | null>;
-  editRecurringPayment: (
-    id: string,
-    input: NewRecurringPaymentInput,
-  ) => Promise<RecurringPayment | null>;
-  archiveRecurringPaymentAction: (id: string) => Promise<RecurringPayment | null>;
-  advanceRecurringPaymentAction: (id: string) => Promise<RecurringPayment | null>;
   loadShoppingList: (options?: ListShoppingOptions) => Promise<void>;
   addShoppingItem: (input: NewShoppingListItemInput) => Promise<ShoppingListItem | null>;
   editShoppingItem: (
@@ -318,9 +191,6 @@ const defaultSettings: UserSettings = {
   pantryReminderEnabled: true,
   pantryReminderRules: ['7d', '3d', 'same-day', 'expired'],
   pantryReminderTime: '09:00',
-  subscriptionReminderEnabled: true,
-  subscriptionReminderRules: ['7d', '3d', 'same-day', 'overdue'],
-  subscriptionReminderTime: '09:00',
   pantryListStatusFilter: 'all',
   pantryListCategoryFilter: 'all',
   pantryListSortMode: 'expiry-asc',
@@ -363,56 +233,6 @@ const defaultPantryListOptions: ListPantryOptions = {
   sort: 'expiry-asc',
 };
 
-const defaultInboxListOptions: ListInboxOptions = {
-  page: 1,
-  pageSize: 20,
-  status: 'inbox',
-  type: 'all',
-};
-
-const defaultLedgerListOptions: ListLedgerOptions = {
-  page: 1,
-  pageSize: 20,
-  month: getDefaultLedgerMonth(),
-  category: 'all',
-  direction: 'all',
-};
-
-const defaultRecurringPaymentsListOptions: ListRecurringPaymentsOptions = {
-  page: 1,
-  pageSize: 20,
-  status: 'active',
-};
-
-const defaultRecurringPaymentSummary: RecurringPaymentSummary = {
-  total: 0,
-  activeCount: 0,
-  overdueCount: 0,
-  upcomingCount: 0,
-  monthlyExpenseCents: 0,
-  monthlyExpense: 0,
-  upcomingDays: 7,
-};
-
-const defaultPlacesListOptions: ListPlacesOptions = {
-  page: 1,
-  pageSize: 20,
-  archived: false,
-};
-
-const defaultLedgerSummary: LedgerSummary = {
-  month: defaultLedgerListOptions.month ?? getDefaultLedgerMonth(),
-  expenseCents: 0,
-  incomeCents: 0,
-  refundCents: 0,
-  netCents: 0,
-  expense: 0,
-  income: 0,
-  refund: 0,
-  net: 0,
-  categories: [],
-};
-
 function formatTraceRecordedTime(value?: string) {
   const date = value ? new Date(value) : new Date();
   const validDate = Number.isNaN(date.getTime()) ? new Date() : date;
@@ -436,7 +256,6 @@ function formatTraceRecordedTime(value?: string) {
 
 const createTraceFromPlan = (plan: Plan): NewTraceInput => ({
   planId: plan.id,
-  placeId: plan.placeId,
   title: plan.title.replace(/^周[五六日]晚上?/, '').replace(/^明早\s*/, ''),
   summary: `${plan.title}，已经被记录为一条新的生活踪迹。`,
   timeLabel: formatTraceRecordedTime(plan.completedAt),
@@ -507,9 +326,6 @@ function normalizeSettings(settings: Partial<UserSettings>): UserSettings {
     pantryReminderRules: settings.pantryReminderRules?.length
       ? settings.pantryReminderRules
       : defaultSettings.pantryReminderRules,
-    subscriptionReminderRules: settings.subscriptionReminderRules?.length
-      ? settings.subscriptionReminderRules
-      : defaultSettings.subscriptionReminderRules,
     planReminderLeadMinutes:
       typeof settings.planReminderLeadMinutes === 'number'
         ? settings.planReminderLeadMinutes
@@ -635,63 +451,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       traceCreating: false,
       traceUpdatingById: {},
       traceDeletingById: {},
-      places: [],
-      placesLoaded: false,
-      placesLoading: false,
-      placesLoadingMore: false,
-      placesError: '',
-      placesPagination: {
-        ...defaultPagination,
-        pageSize: defaultPlacesListOptions.pageSize ?? 20,
-      },
-      placesListOptions: defaultPlacesListOptions,
-      placeDetail: null,
-      placeRecords: [],
-      placeDetailLoading: false,
-      placeRecordsLoading: false,
-      placeCreating: false,
-      placeUpdatingById: {},
-      inboxItems: [],
-      inboxLoaded: false,
-      inboxLoading: false,
-      inboxLoadingMore: false,
-      inboxError: '',
-      inboxPagination: {
-        ...defaultPagination,
-        pageSize: defaultInboxListOptions.pageSize ?? 20,
-      },
-      inboxListOptions: defaultInboxListOptions,
-      inboxCreating: false,
-      inboxUpdatingById: {},
-      inboxDeletingById: {},
-      ledgerEntries: [],
-      ledgerLoaded: false,
-      ledgerLoading: false,
-      ledgerLoadingMore: false,
-      ledgerError: '',
-      ledgerPagination: {
-        ...defaultPagination,
-        pageSize: defaultLedgerListOptions.pageSize ?? 20,
-      },
-      ledgerListOptions: defaultLedgerListOptions,
-      ledgerSummary: defaultLedgerSummary,
-      ledgerCreating: false,
-      ledgerUpdatingById: {},
-      ledgerDeletingById: {},
-      recurringPayments: [],
-      recurringPaymentsLoaded: false,
-      recurringPaymentsLoading: false,
-      recurringPaymentsError: '',
-      recurringPaymentsPagination: {
-        ...defaultPagination,
-        pageSize: defaultRecurringPaymentsListOptions.pageSize ?? 20,
-      },
-      recurringPaymentsListOptions: defaultRecurringPaymentsListOptions,
-      recurringPaymentsSummary: defaultRecurringPaymentSummary,
-      recurringPaymentCreating: false,
-      recurringPaymentUpdatingById: {},
-      recurringPaymentArchivingById: {},
-      recurringPaymentAdvancingById: {},
       settings: defaultSettings,
       settingsLoaded: false,
       settingsLoading: false,
@@ -1259,375 +1018,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           });
         }
       },
-      loadPlaces: async (options = {}) => {
-        const token = getToken();
-        const nextOptions = {
-          ...get().placesListOptions,
-          ...options,
-          page: 1,
-          pageSize: options.pageSize ?? get().placesListOptions.pageSize ?? 20,
-        };
-        if (!token) {
-          set({
-            places: [],
-            placesLoaded: true,
-            placesLoading: false,
-            placesLoadingMore: false,
-            placesError: '',
-            placesPagination: {
-              ...defaultPagination,
-              pageSize: nextOptions.pageSize ?? 20,
-            },
-            placesListOptions: nextOptions,
-          });
-          return;
-        }
-
-        set({ placesLoading: true, placesError: '', placesListOptions: nextOptions });
-        try {
-          const { list, pagination } = await listPlaces(token, nextOptions);
-          set({
-            places: list,
-            placesPagination: pagination ?? {
-              ...defaultPagination,
-              pageSize: nextOptions.pageSize ?? 20,
-              total: list.length,
-              hasMore: false,
-            },
-            placesLoaded: true,
-            placesLoading: false,
-            placesError: '',
-          });
-        } catch (error) {
-          set({
-            placesLoaded: true,
-            placesLoading: false,
-            placesError: getLifeTraceErrorMessage(error, '获取地点失败'),
-          });
-        }
-      },
-      loadMorePlaces: async () => {
-        const token = getToken();
-        const { placesListOptions, placesPagination, placesLoading, placesLoadingMore } = get();
-        if (!token || placesLoading || placesLoadingMore || !placesPagination.hasMore) {
-          return;
-        }
-
-        set({ placesLoadingMore: true, placesError: '' });
-        try {
-          const nextPage = placesPagination.page + 1;
-          const { list, pagination } = await listPlaces(token, {
-            ...placesListOptions,
-            page: nextPage,
-            pageSize: placesPagination.pageSize,
-          });
-          set((state) => {
-            const existingIds = new Set(state.places.map((place) => place.id));
-            const nextPlaces = list.filter((place) => !existingIds.has(place.id));
-            return {
-              places: [...state.places, ...nextPlaces],
-              placesPagination: pagination ?? {
-                page: nextPage,
-                pageSize: placesPagination.pageSize,
-                total: state.places.length + nextPlaces.length,
-                hasMore: false,
-              },
-              placesLoadingMore: false,
-              placesError: '',
-            };
-          });
-        } catch (error) {
-          set({
-            placesLoadingMore: false,
-            placesError: getLifeTraceErrorMessage(error, '加载更多地点失败'),
-          });
-        }
-      },
-      loadPlaceDetail: async (placeId) => {
-        const token = getToken();
-        if (!token) {
-          set({
-            placeDetail: null,
-            placeRecords: [],
-            placeDetailLoading: false,
-            placeRecordsLoading: false,
-            placesError: '',
-          });
-          return;
-        }
-
-        set({ placeDetailLoading: true, placeRecordsLoading: true, placesError: '' });
-        try {
-          const [place, records] = await Promise.all([
-            getPlace(token, placeId),
-            listPlaceRecords(token, placeId, { page: 1, pageSize: 50 }),
-          ]);
-          set({
-            placeDetail: place,
-            placeRecords: records.list,
-            placeDetailLoading: false,
-            placeRecordsLoading: false,
-            placesError: '',
-          });
-        } catch (error) {
-          set({
-            placeDetailLoading: false,
-            placeRecordsLoading: false,
-            placesError: getLifeTraceErrorMessage(error, '读取地点失败'),
-          });
-        }
-      },
-      addPlace: async (input) => {
-        const token = getToken();
-        if (!token) {
-          set({ placesError: '请先登录后再创建地点' });
-          return null;
-        }
-        if (get().placeCreating) {
-          return null;
-        }
-
-        set({ placeCreating: true, placesError: '' });
-        try {
-          const created = await requestCreatePlace(token, input);
-          set((state) => ({
-            places: [created, ...state.places.filter((place) => place.id !== created.id)],
-            placeDetail: created,
-            placeCreating: false,
-            placesError: '',
-          }));
-          void get().loadPlaces(get().placesListOptions);
-          return created;
-        } catch (error) {
-          set({
-            placeCreating: false,
-            placesError: getLifeTraceErrorMessage(error, '创建地点失败'),
-          });
-          return null;
-        }
-      },
-      editPlace: async (placeId, input) => {
-        const token = getToken();
-        if (!token) {
-          set({ placesError: '请先登录后再编辑地点' });
-          return null;
-        }
-        if (get().placeUpdatingById[placeId]) {
-          return null;
-        }
-
-        set((state) => ({
-          placeUpdatingById: { ...state.placeUpdatingById, [placeId]: true },
-          placesError: '',
-        }));
-        try {
-          const updated = await requestUpdatePlace(token, placeId, input);
-          set((state) => ({
-            places: state.places.map((place) => (place.id === placeId ? updated : place)),
-            placeDetail: state.placeDetail?.id === placeId ? updated : state.placeDetail,
-            placesError: '',
-          }));
-          return updated;
-        } catch (error) {
-          set({ placesError: getLifeTraceErrorMessage(error, '更新地点失败') });
-          return null;
-        } finally {
-          set((state) => ({
-            placeUpdatingById: { ...state.placeUpdatingById, [placeId]: false },
-          }));
-        }
-      },
-      exportPlaces: async () => {
-        const token = getToken();
-        if (!token) {
-          set({ placesError: '请先登录后再导出地点' });
-          return null;
-        }
-
-        try {
-          const exported = await requestExportPlaces(token);
-          set({ placesError: '' });
-          return exported;
-        } catch (error) {
-          set({ placesError: getLifeTraceErrorMessage(error, '导出地点失败') });
-          return null;
-        }
-      },
-      loadInboxItems: async (options = {}) => {
-        const token = getToken();
-        const nextOptions = {
-          ...get().inboxListOptions,
-          ...options,
-          page: 1,
-          pageSize: options.pageSize ?? get().inboxListOptions.pageSize ?? 20,
-        };
-        if (!token) {
-          set({
-            inboxItems: [],
-            inboxLoaded: true,
-            inboxLoading: false,
-            inboxLoadingMore: false,
-            inboxError: '',
-            inboxPagination: {
-              ...defaultPagination,
-              pageSize: nextOptions.pageSize ?? 20,
-            },
-            inboxListOptions: nextOptions,
-          });
-          return;
-        }
-
-        set({ inboxLoading: true, inboxError: '', inboxListOptions: nextOptions });
-        try {
-          const { list, pagination } = await listInboxItems(token, nextOptions);
-          set({
-            inboxItems: list,
-            inboxPagination: pagination ?? {
-              ...defaultPagination,
-              pageSize: nextOptions.pageSize ?? 20,
-              total: list.length,
-              hasMore: false,
-            },
-            inboxLoaded: true,
-            inboxLoading: false,
-            inboxError: '',
-          });
-        } catch (error) {
-          set({
-            inboxLoading: false,
-            inboxLoaded: true,
-            inboxError: getLifeTraceErrorMessage(error, '获取 Inbox 失败'),
-          });
-        }
-      },
-      loadMoreInboxItems: async () => {
-        const token = getToken();
-        const { inboxListOptions, inboxPagination, inboxLoading, inboxLoadingMore } = get();
-        if (!token || inboxLoading || inboxLoadingMore || !inboxPagination.hasMore) {
-          return;
-        }
-
-        set({ inboxLoadingMore: true, inboxError: '' });
-        try {
-          const nextPage = inboxPagination.page + 1;
-          const { list, pagination } = await listInboxItems(token, {
-            ...inboxListOptions,
-            page: nextPage,
-            pageSize: inboxPagination.pageSize,
-          });
-          set((state) => {
-            const existingIds = new Set(state.inboxItems.map((item) => item.id));
-            const nextItems = list.filter((item) => !existingIds.has(item.id));
-            return {
-              inboxItems: [...state.inboxItems, ...nextItems],
-              inboxPagination: pagination ?? {
-                page: nextPage,
-                pageSize: inboxPagination.pageSize,
-                total: state.inboxItems.length + nextItems.length,
-                hasMore: false,
-              },
-              inboxLoadingMore: false,
-              inboxError: '',
-            };
-          });
-        } catch (error) {
-          set({
-            inboxLoadingMore: false,
-            inboxError: getLifeTraceErrorMessage(error, '加载更多 Inbox 失败'),
-          });
-        }
-      },
-      loadLedgerEntries: async (options = {}) => {
-        const token = getToken();
-        const nextOptions = {
-          ...get().ledgerListOptions,
-          ...options,
-          page: 1,
-          pageSize: options.pageSize ?? get().ledgerListOptions.pageSize ?? 20,
-          month: options.month ?? get().ledgerListOptions.month ?? getDefaultLedgerMonth(),
-        };
-        if (!token) {
-          set({
-            ledgerEntries: [],
-            ledgerLoaded: true,
-            ledgerLoading: false,
-            ledgerLoadingMore: false,
-            ledgerError: '',
-            ledgerPagination: {
-              ...defaultPagination,
-              pageSize: nextOptions.pageSize ?? 20,
-            },
-            ledgerListOptions: nextOptions,
-            ledgerSummary: {
-              ...defaultLedgerSummary,
-              month: nextOptions.month ?? getDefaultLedgerMonth(),
-            },
-          });
-          return;
-        }
-
-        set({ ledgerLoading: true, ledgerError: '', ledgerListOptions: nextOptions });
-        try {
-          const { list, summary, pagination } = await listLedgerEntries(token, nextOptions);
-          set({
-            ledgerEntries: list,
-            ledgerSummary: summary,
-            ledgerPagination: pagination ?? {
-              ...defaultPagination,
-              pageSize: nextOptions.pageSize ?? 20,
-              total: list.length,
-              hasMore: false,
-            },
-            ledgerLoaded: true,
-            ledgerLoading: false,
-            ledgerError: '',
-          });
-        } catch (error) {
-          set({
-            ledgerLoading: false,
-            ledgerLoaded: true,
-            ledgerError: getLifeTraceErrorMessage(error, '获取账目失败'),
-          });
-        }
-      },
-      loadMoreLedgerEntries: async () => {
-        const token = getToken();
-        const { ledgerListOptions, ledgerPagination, ledgerLoading, ledgerLoadingMore } = get();
-        if (!token || ledgerLoading || ledgerLoadingMore || !ledgerPagination.hasMore) {
-          return;
-        }
-
-        set({ ledgerLoadingMore: true, ledgerError: '' });
-        try {
-          const nextPage = ledgerPagination.page + 1;
-          const { list, summary, pagination } = await listLedgerEntries(token, {
-            ...ledgerListOptions,
-            page: nextPage,
-            pageSize: ledgerPagination.pageSize,
-          });
-          set((state) => {
-            const existingIds = new Set(state.ledgerEntries.map((entry) => entry.id));
-            const nextEntries = list.filter((entry) => !existingIds.has(entry.id));
-            return {
-              ledgerEntries: [...state.ledgerEntries, ...nextEntries],
-              ledgerSummary: summary,
-              ledgerPagination: pagination ?? {
-                page: nextPage,
-                pageSize: ledgerPagination.pageSize,
-                total: state.ledgerEntries.length + nextEntries.length,
-                hasMore: false,
-              },
-              ledgerLoadingMore: false,
-              ledgerError: '',
-            };
-          });
-        } catch (error) {
-          set({
-            ledgerLoadingMore: false,
-            ledgerError: getLifeTraceErrorMessage(error, '加载更多账目失败'),
-          });
-        }
-      },
       loadAchievements: async (options = {}) => {
         const token = getToken();
         if (!token) {
@@ -1707,7 +1097,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             ],
           }));
           void get().loadAchievements({ notifyNew: true });
-          void get().loadPlaces(get().placesListOptions);
           return plan;
         } catch (error) {
           set({ plansError: error instanceof Error ? error.message : '创建计划失败' });
@@ -1991,33 +1380,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         });
         void get().loadAchievements({ notifyNew: true });
       },
-      receiveServerLedgerEntry: (entry, actionTitle) => {
-        set((state) => {
-          const exists = state.ledgerEntries.some((item) => item.id === entry.id);
-          const ledgerEntries = exists
-            ? state.ledgerEntries.map((item) => (item.id === entry.id ? entry : item))
-            : [entry, ...state.ledgerEntries];
-
-          return {
-            ledgerEntries,
-            ledgerPagination: {
-              ...state.ledgerPagination,
-              total: exists ? state.ledgerPagination.total : state.ledgerPagination.total + 1,
-            },
-            ledgerError: '',
-            aiActions: [
-              {
-                id: createActionId(),
-                title: actionTitle || `记下了「${entry.category}」账目`,
-                timeLabel: '刚刚',
-              },
-              ...getAiActions(state),
-            ],
-          };
-        });
-        void get().loadLedgerEntries(get().ledgerListOptions);
-        void get().loadAchievements({ notifyNew: true });
-      },
       editPlan: async (planId, input) => {
         const token = getToken();
         if (!token) {
@@ -2046,7 +1408,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               ...getAiActions(state),
             ],
           }));
-          void get().loadPlaces(get().placesListOptions);
           return updated;
         } catch (error) {
           set({ plansError: error instanceof Error ? error.message : '编辑计划失败' });
@@ -2080,7 +1441,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             ],
           }));
           void get().loadAchievements({ notifyNew: true });
-          void get().loadPlaces(get().placesListOptions);
           return trace;
         } catch (error) {
           set({ tracesError: error instanceof Error ? error.message : '创建踪迹失败' });
@@ -2114,7 +1474,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               ...getAiActions(state),
             ],
           }));
-          void get().loadPlaces(get().placesListOptions);
           return updated;
         } catch (error) {
           set({ tracesError: error instanceof Error ? error.message : '编辑踪迹失败' });
@@ -2122,502 +1481,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         } finally {
           set((state) => ({
             traceUpdatingById: { ...state.traceUpdatingById, [traceId]: false },
-          }));
-        }
-      },
-      addInboxItem: async (input) => {
-        const token = getToken();
-        if (!token) {
-          set({ inboxError: '请先登录后再收下内容' });
-          return null;
-        }
-        if (get().inboxCreating) {
-          return null;
-        }
-
-        set({ inboxCreating: true, inboxError: '' });
-        try {
-          const item = await requestCreateInboxItem(token, input);
-          set((state) => ({
-            inboxItems: [item, ...state.inboxItems],
-            inboxPagination: {
-              ...state.inboxPagination,
-              total: state.inboxPagination.total + 1,
-            },
-            inboxError: '',
-            aiActions: [
-              { id: createActionId(), title: `收下了「${item.title}」`, timeLabel: '刚刚' },
-              ...getAiActions(state),
-            ],
-          }));
-          return item;
-        } catch (error) {
-          set({ inboxError: getLifeTraceErrorMessage(error, '创建 Inbox 失败') });
-          return null;
-        } finally {
-          set({ inboxCreating: false });
-        }
-      },
-      editInboxItem: async (itemId, input) => {
-        const token = getToken();
-        if (!token) {
-          set({ inboxError: '请先登录后再编辑 Inbox' });
-          return null;
-        }
-        if (get().inboxUpdatingById[itemId]) {
-          return null;
-        }
-
-        set((state) => ({
-          inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: true },
-          inboxError: '',
-        }));
-        try {
-          const updated = await requestUpdateInboxItem(token, itemId, input);
-          set((state) => ({
-            inboxItems: state.inboxItems.map((item) => (item.id === itemId ? updated : item)),
-            inboxError: '',
-          }));
-          return updated;
-        } catch (error) {
-          set({ inboxError: getLifeTraceErrorMessage(error, '编辑 Inbox 失败') });
-          return null;
-        } finally {
-          set((state) => ({
-            inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: false },
-          }));
-        }
-      },
-      updateInboxStatus: async (itemId, status) => {
-        const token = getToken();
-        if (!token) {
-          set({ inboxError: '请先登录后再更新 Inbox' });
-          return null;
-        }
-        if (get().inboxUpdatingById[itemId]) {
-          return null;
-        }
-
-        set((state) => ({
-          inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: true },
-          inboxError: '',
-        }));
-        try {
-          const updated = await requestUpdateInboxItemStatus(token, itemId, status);
-          set((state) => ({
-            inboxItems: state.inboxItems.map((item) => (item.id === itemId ? updated : item)),
-            inboxError: '',
-          }));
-          return updated;
-        } catch (error) {
-          set({ inboxError: getLifeTraceErrorMessage(error, '更新 Inbox 失败') });
-          return null;
-        } finally {
-          set((state) => ({
-            inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: false },
-          }));
-        }
-      },
-      convertInbox: async (itemId, convertedType, convertedId) => {
-        const token = getToken();
-        if (!token) {
-          set({ inboxError: '请先登录后再转化 Inbox' });
-          return null;
-        }
-        if (get().inboxUpdatingById[itemId]) {
-          return null;
-        }
-
-        set((state) => ({
-          inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: true },
-          inboxError: '',
-        }));
-        try {
-          const updated = await requestConvertInboxItem(token, itemId, {
-            convertedType,
-            convertedId,
-          });
-          set((state) => ({
-            inboxItems: state.inboxItems.map((item) => (item.id === itemId ? updated : item)),
-            inboxError: '',
-            aiActions: [
-              { id: createActionId(), title: `转化了「${updated.title}」`, timeLabel: '刚刚' },
-              ...getAiActions(state),
-            ],
-          }));
-          return updated;
-        } catch (error) {
-          set({ inboxError: getLifeTraceErrorMessage(error, '转化 Inbox 失败') });
-          return null;
-        } finally {
-          set((state) => ({
-            inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: false },
-          }));
-        }
-      },
-      organizeInbox: async (itemId) => {
-        const token = getToken();
-        if (!token) {
-          set({ inboxError: '请先登录后再整理 Inbox' });
-          return null;
-        }
-        if (get().inboxUpdatingById[itemId]) {
-          return null;
-        }
-
-        set((state) => ({
-          inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: true },
-          inboxError: '',
-        }));
-        try {
-          const updated = await requestOrganizeInboxItem(token, itemId);
-          set((state) => ({
-            inboxItems: state.inboxItems.map((item) => (item.id === itemId ? updated : item)),
-            inboxError: '',
-            aiActions: [
-              { id: createActionId(), title: `整理了「${updated.title}」`, timeLabel: '刚刚' },
-              ...getAiActions(state),
-            ],
-          }));
-          return updated;
-        } catch (error) {
-          set({ inboxError: getLifeTraceErrorMessage(error, 'AI 整理 Inbox 失败') });
-          return null;
-        } finally {
-          set((state) => ({
-            inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: false },
-          }));
-        }
-      },
-      removeInboxItem: async (itemId) => {
-        const token = getToken();
-        if (!token || get().inboxDeletingById[itemId]) {
-          return false;
-        }
-
-        set((state) => ({
-          inboxDeletingById: { ...state.inboxDeletingById, [itemId]: true },
-          inboxError: '',
-        }));
-        try {
-          await requestDeleteInboxItem(token, itemId);
-          set((state) => ({
-            inboxItems: state.inboxItems.filter((item) => item.id !== itemId),
-            inboxPagination: {
-              ...state.inboxPagination,
-              total: Math.max(state.inboxPagination.total - 1, 0),
-            },
-            inboxError: '',
-          }));
-          return true;
-        } catch (error) {
-          set({ inboxError: getLifeTraceErrorMessage(error, '删除 Inbox 失败') });
-          return false;
-        } finally {
-          set((state) => ({
-            inboxDeletingById: { ...state.inboxDeletingById, [itemId]: false },
-          }));
-        }
-      },
-      addLedgerEntry: async (input) => {
-        const token = getToken();
-        if (!token) {
-          set({ ledgerError: '请先登录后再记账' });
-          return null;
-        }
-        if (get().ledgerCreating) {
-          return null;
-        }
-
-        set({ ledgerCreating: true, ledgerError: '' });
-        try {
-          const entry = await requestCreateLedgerEntry(token, input);
-          set((state) => ({
-            ledgerEntries: [entry, ...state.ledgerEntries],
-            ledgerPagination: {
-              ...state.ledgerPagination,
-              total: state.ledgerPagination.total + 1,
-            },
-            ledgerError: '',
-            aiActions: [
-              { id: createActionId(), title: `记下了「${entry.category}」账目`, timeLabel: '刚刚' },
-              ...getAiActions(state),
-            ],
-          }));
-          void get().loadLedgerEntries(get().ledgerListOptions);
-          return entry;
-        } catch (error) {
-          set({ ledgerError: getLifeTraceErrorMessage(error, '创建账目失败') });
-          return null;
-        } finally {
-          set({ ledgerCreating: false });
-        }
-      },
-      editLedgerEntry: async (entryId, input) => {
-        const token = getToken();
-        if (!token) {
-          set({ ledgerError: '请先登录后再编辑账目' });
-          return null;
-        }
-        if (get().ledgerUpdatingById[entryId]) {
-          return null;
-        }
-
-        set((state) => ({
-          ledgerUpdatingById: { ...state.ledgerUpdatingById, [entryId]: true },
-          ledgerError: '',
-        }));
-        try {
-          const updated = await requestUpdateLedgerEntry(token, entryId, input);
-          set((state) => ({
-            ledgerEntries: state.ledgerEntries.map((entry) =>
-              entry.id === entryId ? updated : entry,
-            ),
-            ledgerError: '',
-            aiActions: [
-              {
-                id: createActionId(),
-                title: `更新了「${updated.category}」账目`,
-                timeLabel: '刚刚',
-              },
-              ...getAiActions(state),
-            ],
-          }));
-          void get().loadLedgerEntries(get().ledgerListOptions);
-          return updated;
-        } catch (error) {
-          set({ ledgerError: getLifeTraceErrorMessage(error, '编辑账目失败') });
-          return null;
-        } finally {
-          set((state) => ({
-            ledgerUpdatingById: { ...state.ledgerUpdatingById, [entryId]: false },
-          }));
-        }
-      },
-      removeLedgerEntry: async (entryId) => {
-        const token = getToken();
-        if (!token || get().ledgerDeletingById[entryId]) {
-          return false;
-        }
-
-        set((state) => ({
-          ledgerDeletingById: { ...state.ledgerDeletingById, [entryId]: true },
-          ledgerError: '',
-        }));
-        try {
-          await requestDeleteLedgerEntry(token, entryId);
-          set((state) => ({
-            ledgerEntries: state.ledgerEntries.filter((entry) => entry.id !== entryId),
-            ledgerPagination: {
-              ...state.ledgerPagination,
-              total: Math.max(state.ledgerPagination.total - 1, 0),
-            },
-            ledgerError: '',
-          }));
-          void get().loadLedgerEntries(get().ledgerListOptions);
-          return true;
-        } catch (error) {
-          set({ ledgerError: getLifeTraceErrorMessage(error, '删除账目失败') });
-          return false;
-        } finally {
-          set((state) => ({
-            ledgerDeletingById: { ...state.ledgerDeletingById, [entryId]: false },
-          }));
-        }
-      },
-      loadRecurringPayments: async (options = {}) => {
-        const token = getToken();
-        const nextOptions: ListRecurringPaymentsOptions = {
-          ...get().recurringPaymentsListOptions,
-          ...options,
-          page: options.page ?? 1,
-          pageSize: options.pageSize ?? get().recurringPaymentsListOptions.pageSize ?? 20,
-          status: options.status ?? get().recurringPaymentsListOptions.status ?? 'active',
-        };
-        if (!token) {
-          set({
-            recurringPayments: [],
-            recurringPaymentsLoaded: true,
-            recurringPaymentsLoading: false,
-            recurringPaymentsError: '',
-            recurringPaymentsPagination: {
-              ...defaultPagination,
-              pageSize: nextOptions.pageSize ?? 20,
-            },
-            recurringPaymentsListOptions: nextOptions,
-            recurringPaymentsSummary: defaultRecurringPaymentSummary,
-          });
-          return;
-        }
-
-        set({
-          recurringPaymentsLoading: true,
-          recurringPaymentsError: '',
-          recurringPaymentsListOptions: nextOptions,
-        });
-        try {
-          const { list, summary, pagination } = await listRecurringPayments(token, nextOptions);
-          set({
-            recurringPayments: list,
-            recurringPaymentsSummary: summary,
-            recurringPaymentsPagination: pagination ?? {
-              ...defaultPagination,
-              pageSize: nextOptions.pageSize ?? 20,
-              total: list.length,
-              hasMore: false,
-            },
-            recurringPaymentsLoaded: true,
-            recurringPaymentsLoading: false,
-            recurringPaymentsError: '',
-          });
-        } catch (error) {
-          set({
-            recurringPaymentsLoading: false,
-            recurringPaymentsLoaded: true,
-            recurringPaymentsError: getLifeTraceErrorMessage(error, '获取订阅失败'),
-          });
-        }
-      },
-      addRecurringPayment: async (input) => {
-        const token = getToken();
-        if (!token) {
-          set({ recurringPaymentsError: '请先登录后再添加订阅' });
-          return null;
-        }
-        if (get().recurringPaymentCreating) {
-          return null;
-        }
-
-        set({ recurringPaymentCreating: true, recurringPaymentsError: '' });
-        try {
-          const item = await requestCreateRecurringPayment(token, input);
-          set((state) => ({
-            recurringPayments: [item, ...state.recurringPayments],
-            recurringPaymentsPagination: {
-              ...state.recurringPaymentsPagination,
-              total: state.recurringPaymentsPagination.total + 1,
-            },
-            recurringPaymentsError: '',
-            aiActions: [
-              { id: createActionId(), title: `订阅了「${item.name}」`, timeLabel: '刚刚' },
-              ...getAiActions(state),
-            ],
-          }));
-          void get().loadRecurringPayments(get().recurringPaymentsListOptions);
-          return item;
-        } catch (error) {
-          set({ recurringPaymentsError: getLifeTraceErrorMessage(error, '创建订阅失败') });
-          return null;
-        } finally {
-          set({ recurringPaymentCreating: false });
-        }
-      },
-      editRecurringPayment: async (id, input) => {
-        const token = getToken();
-        if (!token) {
-          set({ recurringPaymentsError: '请先登录后再编辑订阅' });
-          return null;
-        }
-        if (get().recurringPaymentUpdatingById[id]) {
-          return null;
-        }
-
-        set((state) => ({
-          recurringPaymentUpdatingById: { ...state.recurringPaymentUpdatingById, [id]: true },
-          recurringPaymentsError: '',
-        }));
-        try {
-          const updated = await requestUpdateRecurringPayment(token, id, input);
-          set((state) => ({
-            recurringPayments: state.recurringPayments.map((item) =>
-              item.id === id ? updated : item,
-            ),
-            recurringPaymentsError: '',
-          }));
-          void get().loadRecurringPayments(get().recurringPaymentsListOptions);
-          return updated;
-        } catch (error) {
-          set({ recurringPaymentsError: getLifeTraceErrorMessage(error, '更新订阅失败') });
-          return null;
-        } finally {
-          set((state) => ({
-            recurringPaymentUpdatingById: { ...state.recurringPaymentUpdatingById, [id]: false },
-          }));
-        }
-      },
-      archiveRecurringPaymentAction: async (id) => {
-        const token = getToken();
-        if (!token) {
-          set({ recurringPaymentsError: '请先登录后再归档订阅' });
-          return null;
-        }
-        if (get().recurringPaymentArchivingById[id]) {
-          return null;
-        }
-
-        set((state) => ({
-          recurringPaymentArchivingById: { ...state.recurringPaymentArchivingById, [id]: true },
-          recurringPaymentsError: '',
-        }));
-        try {
-          const archived = await requestArchiveRecurringPayment(token, id);
-          set((state) => ({
-            recurringPayments: state.recurringPayments.map((item) =>
-              item.id === id ? archived : item,
-            ),
-            recurringPaymentsError: '',
-            aiActions: [
-              { id: createActionId(), title: `归档了「${archived.name}」`, timeLabel: '刚刚' },
-              ...getAiActions(state),
-            ],
-          }));
-          void get().loadRecurringPayments(get().recurringPaymentsListOptions);
-          return archived;
-        } catch (error) {
-          set({ recurringPaymentsError: getLifeTraceErrorMessage(error, '归档订阅失败') });
-          return null;
-        } finally {
-          set((state) => ({
-            recurringPaymentArchivingById: {
-              ...state.recurringPaymentArchivingById,
-              [id]: false,
-            },
-          }));
-        }
-      },
-      advanceRecurringPaymentAction: async (id) => {
-        const token = getToken();
-        if (!token) {
-          set({ recurringPaymentsError: '请先登录后再推进订阅' });
-          return null;
-        }
-        if (get().recurringPaymentAdvancingById[id]) {
-          return null;
-        }
-
-        set((state) => ({
-          recurringPaymentAdvancingById: { ...state.recurringPaymentAdvancingById, [id]: true },
-          recurringPaymentsError: '',
-        }));
-        try {
-          const advanced = await requestAdvanceRecurringPayment(token, id);
-          set((state) => ({
-            recurringPayments: state.recurringPayments.map((item) =>
-              item.id === id ? advanced : item,
-            ),
-            recurringPaymentsError: '',
-          }));
-          void get().loadRecurringPayments(get().recurringPaymentsListOptions);
-          return advanced;
-        } catch (error) {
-          set({ recurringPaymentsError: getLifeTraceErrorMessage(error, '推进订阅失败') });
-          return null;
-        } finally {
-          set((state) => ({
-            recurringPaymentAdvancingById: {
-              ...state.recurringPaymentAdvancingById,
-              [id]: false,
-            },
           }));
         }
       },
@@ -2817,7 +1680,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             plans: state.plans.filter((plan) => plan.id !== planId),
             plansError: '',
           }));
-          void get().loadPlaces(get().placesListOptions);
         } catch (error) {
           set({ plansError: error instanceof Error ? error.message : '删除计划失败' });
         } finally {
@@ -2842,7 +1704,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             traces: state.traces.filter((trace) => trace.id !== traceId),
             tracesError: '',
           }));
-          void get().loadPlaces(get().placesListOptions);
         } catch (error) {
           set({ tracesError: error instanceof Error ? error.message : '删除踪迹失败' });
         } finally {

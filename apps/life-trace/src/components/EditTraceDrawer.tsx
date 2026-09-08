@@ -3,7 +3,6 @@ import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
 import { FormItem, SheetActions, SheetHeader, SheetSelectField } from '@/components/FormItem';
-import { PlaceSuggestions } from '@/components/PlaceSuggestions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -99,7 +98,6 @@ export function EditTraceDrawer({
 
     setForm({
       planId: trace.planId,
-      placeId: trace.placeId,
       title: trace.title,
       summary: trace.summary,
       timeLabel: trace.timeLabel,
@@ -142,7 +140,6 @@ export function EditTraceDrawer({
       summary: form.summary.trim(),
       timeLabel: form.timeLabel.trim(),
       location: form.location?.trim() || undefined,
-      placeId: form.placeId,
       imageUrl: form.imageUrl?.trim() || undefined,
       mood: form.mood.trim() || '放松',
       tags: parseTags(tagText),
@@ -232,16 +229,8 @@ export function EditTraceDrawer({
               value={form.location}
               onChange={(event) => {
                 updateField('location', event.target.value);
-                updateField('placeId', undefined);
               }}
               placeholder="可选"
-            />
-            <PlaceSuggestions
-              value={form.location}
-              onSelect={(place) => {
-                updateField('location', place.name);
-                updateField('placeId', place.id);
-              }}
             />
           </FormItem>
         </div>

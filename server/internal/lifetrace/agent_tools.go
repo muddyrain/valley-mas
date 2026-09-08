@@ -88,7 +88,7 @@ func (h *Handler) RegisterAgentTools(reg *tools.Registry) {
 		"create_plan",
 		"根据结构化字段为当前用户创建生活计划或提醒。若日期/时间缺失,返回 need_more_info 状态,请追问用户后再重试。",
 		map[string]any{
-			"type": "object",
+			"type":     "object",
 			"required": []string{"title", "scheduledDate", "scheduledTime"},
 			"properties": map[string]any{
 				"title":         map[string]any{"type": "string", "description": "计划标题"},
@@ -122,25 +122,6 @@ func (h *Handler) RegisterAgentTools(reg *tools.Registry) {
 		h.runCreatePantryItem,
 	))
 
-	reg.MustRegister(newAgentTool(
-		"create_ledger_entry",
-		"根据结构化字段为当前用户记一笔账。金额缺失或非法时返回 need_more_info。",
-		map[string]any{
-			"type":     "object",
-			"required": []string{"amount"},
-			"properties": map[string]any{
-				"amount":     map[string]any{"type": "number", "description": "金额,单位元"},
-				"currency":   map[string]any{"type": "string", "description": "币种,默认 CNY"},
-				"direction":  map[string]any{"type": "string", "enum": []string{"支出", "收入"}, "description": "方向,默认 支出"},
-				"category":   map[string]any{"type": "string", "description": "分类"},
-				"occurredAt": map[string]any{"type": "string", "description": "发生时间,RFC3339 或 YYYY-MM-DD HH:mm"},
-				"merchant":   map[string]any{"type": "string"},
-				"location":   map[string]any{"type": "string"},
-				"note":       map[string]any{"type": "string"},
-			},
-		},
-		h.runCreateLedgerEntry,
-	))
 }
 
 // agentTool 是通过闭包实现的通用 Tool 载体。
@@ -288,18 +269,6 @@ func (h *Handler) runCreatePantryItem(ctx context.Context, args json.RawMessage)
 		return marshalToolError("参数解析失败: " + err.Error()), nil
 	}
 	return marshalToolPayload(h.createAssistantPantryItemFromDraft(c, userID, draft)), nil
-}
-
-func (h *Handler) runCreateLedgerEntry(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
-	userID, err := agentToolUserID(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var draft lifeTraceAssistantLedgerDraft
-	if err := json.Unmarshal(args, &draft); err != nil {
-		return marshalToolError("参数解析失败: " + err.Error()), nil
-	}
-	return marshalToolPayload(h.createAssistantLedgerEntryFromDraft(userID, draft)), nil
 }
 
 // marshalToolPayload 把 actionPayload 序列化成 tool 结果 JSON。

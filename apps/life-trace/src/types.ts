@@ -8,7 +8,6 @@ export type PlanRecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'monthly' | 
 
 export type Plan = {
   id: string;
-  placeId?: string;
   title: string;
   type: PlanType;
   timeLabel: string;
@@ -68,9 +67,6 @@ export type UserSettings = {
   pantryReminderEnabled: boolean;
   pantryReminderRules: PantryReminderRule[];
   pantryReminderTime: string;
-  subscriptionReminderEnabled: boolean;
-  subscriptionReminderRules: SubscriptionReminderRule[];
-  subscriptionReminderTime: string;
   pantryListStatusFilter: PantryListStatusFilter;
   pantryListCategoryFilter: PantryListCategoryFilter;
   pantryListSortMode: PantrySortMode;
@@ -145,12 +141,7 @@ export type PantryPreferences = {
   defaultReminderTime: string;
 };
 
-export type ShoppingListSource =
-  | 'manual'
-  | 'pantry_used_up'
-  | 'pantry_low'
-  | 'pantry_discard'
-  | 'recipe';
+export type ShoppingListSource = 'manual' | 'pantry_used_up' | 'pantry_low' | 'pantry_discard';
 
 export type ShoppingListItem = {
   id: string;
@@ -283,9 +274,7 @@ export type HouseholdInvitePayload = {
 export type Trace = {
   id: string;
   planId?: string;
-  placeId?: string;
   pantryItemId?: string;
-  mediaDiaryId?: string;
   outfitId?: string;
   title: string;
   summary: string;
@@ -300,270 +289,6 @@ export type Trace = {
 };
 
 export type NewTraceInput = Omit<Trace, 'id' | 'createdAt' | 'updatedAt'>;
-
-export type Place = {
-  id: string;
-  name: string;
-  normalizedName: string;
-  status: PlaceStatus;
-  city?: string;
-  district?: string;
-  address?: string;
-  latitude?: number;
-  longitude?: number;
-  favorite: boolean;
-  archived: boolean;
-  note: string;
-  visitCount: number;
-  firstSeenAt?: string;
-  lastSeenAt?: string;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type PlaceStatus = 'visited' | 'want';
-
-export type PlaceRecordType = 'plan' | 'trace';
-
-export type PlaceRecord = {
-  id: string;
-  recordType: PlaceRecordType;
-  title: string;
-  timeLabel?: string;
-  location?: string;
-  imageUrl?: string;
-  source?: string;
-  completed?: boolean;
-  mood?: string;
-  tags?: string[];
-  createdAt?: string;
-};
-
-export type InboxItemType = 'text' | 'link' | 'image';
-
-export type InboxItemStatus = 'inbox' | 'converted' | 'archived';
-
-export type InboxConvertedType = 'plan' | 'trace' | 'ledger' | 'media' | 'place';
-
-export type InboxAISuggestedType = 'plan' | 'trace';
-
-export type InboxItem = {
-  id: string;
-  title: string;
-  content?: string;
-  itemType: InboxItemType;
-  linkUrl?: string;
-  imageUrl?: string;
-  tags: string[];
-  status: InboxItemStatus;
-  convertedType?: InboxConvertedType;
-  convertedId?: string;
-  convertedAt?: string;
-  aiTitle?: string;
-  aiSummary?: string;
-  aiTags?: string[];
-  aiSuggestedType?: InboxAISuggestedType;
-  aiReason?: string;
-  aiModel?: string;
-  aiOrganizedAt?: string;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type NewInboxItemInput = {
-  title: string;
-  content?: string;
-  itemType: InboxItemType;
-  linkUrl?: string;
-  imageUrl?: string;
-  tags: string[];
-};
-
-export type LedgerDirection = '支出' | '收入' | '退款' | '转账备注';
-
-export type LedgerCategory =
-  | '吃饭'
-  | '交通'
-  | '购物'
-  | '书影音'
-  | '订阅'
-  | '家用'
-  | '礼物'
-  | '医疗'
-  | '其他';
-
-export type LedgerEntry = {
-  id: string;
-  amount: number;
-  amountCents: number;
-  currency: string;
-  direction: LedgerDirection;
-  category: LedgerCategory;
-  occurredAt: string;
-  merchant?: string;
-  location?: string;
-  note: string;
-  imageUrl?: string;
-  inboxItemId?: string;
-  planId?: string;
-  traceId?: string;
-  pantryItemId?: string;
-  recurringPaymentId?: string;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type NewLedgerEntryInput = {
-  amount: number;
-  currency?: string;
-  direction: LedgerDirection;
-  category: LedgerCategory;
-  occurredAt: string;
-  merchant?: string;
-  location?: string;
-  note?: string;
-  imageUrl?: string;
-  inboxItemId?: string;
-  planId?: string;
-  traceId?: string;
-  pantryItemId?: string;
-  recurringPaymentId?: string;
-};
-
-export type LedgerCategorySummary = {
-  category: LedgerCategory;
-  amountCents: number;
-  amount: number;
-  count: number;
-};
-
-export type LedgerSummary = {
-  month: string;
-  expenseCents: number;
-  incomeCents: number;
-  refundCents: number;
-  netCents: number;
-  expense: number;
-  income: number;
-  refund: number;
-  net: number;
-  categories: LedgerCategorySummary[];
-};
-
-export type SubscriptionReminderRule = '7d' | '3d' | 'same-day' | 'overdue';
-
-export type RecurringPaymentFrequency =
-  | 'daily'
-  | 'weekly'
-  | 'monthly'
-  | 'quarterly'
-  | 'half_year'
-  | 'yearly';
-
-export type RecurringPaymentDirection = '支出' | '收入';
-
-export type RecurringPaymentReminderConfig = {
-  enabled: boolean;
-  useDefault: boolean;
-  rules: SubscriptionReminderRule[];
-  reminderTime: string;
-};
-
-export type RecurringPayment = {
-  id: string;
-  userId: string;
-  name: string;
-  category: LedgerCategory;
-  amount: number;
-  amountCents: number;
-  currency: string;
-  direction: RecurringPaymentDirection;
-  merchant?: string;
-  note: string;
-  imageUrl?: string;
-  frequency: RecurringPaymentFrequency;
-  interval: number;
-  startedAt: string;
-  nextDueAt: string;
-  endAt?: string;
-  archived: boolean;
-  canceledAt?: string;
-  reminder: RecurringPaymentReminderConfig;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type NewRecurringPaymentInput = {
-  name: string;
-  category: LedgerCategory;
-  amount: number;
-  currency?: string;
-  direction: RecurringPaymentDirection;
-  merchant?: string;
-  note?: string;
-  imageUrl?: string;
-  frequency: RecurringPaymentFrequency;
-  interval: number;
-  startedAt: string;
-  endAt?: string;
-  reminder: RecurringPaymentReminderConfig;
-};
-
-export type RecurringPaymentSummary = {
-  total: number;
-  activeCount: number;
-  overdueCount: number;
-  upcomingCount: number;
-  monthlyExpenseCents: number;
-  monthlyExpense: number;
-  upcomingDays: number;
-};
-
-export type MediaDiaryType = '书籍' | '电影' | '剧集' | '动漫' | '音乐';
-
-export type MediaDiaryStatus = '想看' | '进行中' | '已完成' | '搁置';
-
-export type MediaDiaryEntry = {
-  id: string;
-  userId: string;
-  traceId?: string;
-  mediaType: MediaDiaryType;
-  status: MediaDiaryStatus;
-  title: string;
-  originalTitle?: string;
-  creator?: string;
-  releaseYear?: number;
-  coverUrl?: string;
-  rating: number;
-  startedAt?: string;
-  finishedAt?: string;
-  note: string;
-  quote: string;
-  tags: string[];
-  source: 'manual' | 'ai_suggest';
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type NewMediaDiaryEntryInput = Omit<
-  MediaDiaryEntry,
-  'id' | 'userId' | 'traceId' | 'createdAt' | 'updatedAt'
->;
-
-export type MediaDiaryAISuggestion = {
-  originalTitle?: string;
-  creator?: string;
-  releaseYear?: number;
-  tags: string[];
-  note: string;
-};
-
-export type MediaDiarySummary = {
-  total: number;
-  completedMonth: number;
-  bestRating: number;
-  recent?: MediaDiaryEntry;
-};
 
 export type AiAction = {
   id: string;

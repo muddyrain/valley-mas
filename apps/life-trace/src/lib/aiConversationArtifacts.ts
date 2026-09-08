@@ -1,4 +1,3 @@
-import type { RecipeSuggestionResponse } from '@/api/advice';
 import type { AdvicePayload } from '@/types';
 
 const AI_CONVERSATION_ARTIFACTS_KEY = 'life-trace.ai-conversation-artifacts.v1';
@@ -9,7 +8,6 @@ export type AiConversationArtifact = {
     detail: string;
     tone: 'ai' | 'plan' | 'trace' | 'health' | 'alert';
   } | null;
-  recipeResult?: RecipeSuggestionResponse | null;
   adviceCards?: AdvicePayload[];
 };
 

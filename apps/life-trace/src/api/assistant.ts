@@ -1,5 +1,5 @@
 import { API_BASE, apiRequest } from '@/api/request';
-import type { LedgerEntry, PantryItem, Plan } from '@/types';
+import type { PantryItem, Plan } from '@/types';
 
 export type LifeAssistantMessage = {
   id?: string;
@@ -63,15 +63,9 @@ export type LifeAssistantPantryEvent = LifeAssistantActionBase & {
   pantryItem?: PantryItem;
 };
 
-export type LifeAssistantLedgerEvent = LifeAssistantActionBase & {
-  type: 'create_ledger_entry';
-  ledgerEntry?: LedgerEntry;
-};
-
 export interface LifeAssistantActionEventMap {
   create_plan: LifeAssistantPlanEvent;
   create_pantry_item: LifeAssistantPantryEvent;
-  create_ledger_entry: LifeAssistantLedgerEvent;
 }
 
 export type LifeAssistantActionEvent =

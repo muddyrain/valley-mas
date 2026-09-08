@@ -49,23 +49,23 @@ func TestBuildLifeTraceAssistantAgentMessagesTrimsEmpty(t *testing.T) {
 
 func TestExtractAssistantActionPayload(t *testing.T) {
 	payload := &lifeTraceAssistantActionPayload{
-		Type:    "create_ledger_entry",
+		Type:    "create_plan",
 		Status:  "created",
-		Message: "已经帮你记账。",
+		Message: "已经创建计划。",
 	}
 	envelope := map[string]any{
 		"ok":      true,
 		"status":  "created",
-		"message": "已经帮你记账。",
+		"message": "已经创建计划。",
 		"payload": payload,
 	}
 	raw, _ := json.Marshal(envelope)
 
-	got := extractAssistantActionPayload("create_ledger_entry", raw)
+	got := extractAssistantActionPayload("create_plan", raw)
 	if got == nil {
 		t.Fatalf("expected non-nil payload")
 	}
-	if got.Type != "create_ledger_entry" || got.Status != "created" {
+	if got.Type != "create_plan" || got.Status != "created" {
 		t.Fatalf("unexpected payload: %+v", got)
 	}
 
@@ -106,18 +106,18 @@ func TestBuildAssistantThinkingCall(t *testing.T) {
 }
 
 func TestBuildAssistantThinkingResultSuccess(t *testing.T) {
-	raw := json.RawMessage(`{"ok":true,"message":"已经帮你记账。"}`)
-	step := buildAssistantThinkingResult(3, "create_ledger_entry", raw)
+	raw := json.RawMessage(`{"ok":true,"message":"已经创建计划。"}`)
+	step := buildAssistantThinkingResult(3, "create_plan", raw)
 	if step == nil || step.Phase != "result" || step.Step != 3 {
 		t.Fatalf("unexpected step: %+v", step)
 	}
 	if step.OK == nil || !*step.OK {
 		t.Fatalf("ok flag should be true, got %+v", step.OK)
 	}
-	if step.Summary != "已经帮你记账。" {
+	if step.Summary != "已经创建计划。" {
 		t.Fatalf("summary mismatch: %q", step.Summary)
 	}
-	if step.Label != "记一笔账" {
+	if step.Label != "创建计划" {
 		t.Fatalf("label mismatch: %q", step.Label)
 	}
 }

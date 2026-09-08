@@ -83,8 +83,6 @@ const achievementGlyphMap: Record<string, AchievementGlyph> = {
   plan_triple: PlanTripleGlyph,
   plan_type_collector: PlanTypeCollectorGlyph,
   reading_plan_done: ReadingPlanDoneGlyph,
-  recipe_plan: RecipePlanGlyph,
-  recipe_plan_three: RecipePlanThreeGlyph,
   review_to_plan: ReviewToPlanGlyph,
   review_to_plan_three: ReviewToPlanThreeGlyph,
   weekly_review_to_plan_five: WeeklyReviewToPlanFiveGlyph,
@@ -695,26 +693,6 @@ function AiImagePlanThreeGlyph({ className }: AchievementGlyphProps) {
       <rect height="20" rx="5" width="24" x="22" y="28" />
       <path d="M34 22h18v30H22v-4M40 35v10M35 40h10" />
       <SparkMark />
-    </GlyphSvg>
-  );
-}
-
-function RecipePlanGlyph({ className }: AchievementGlyphProps) {
-  return (
-    <GlyphSvg className={className}>
-      <path d="M21 27a11 11 0 0 1 22 0h3a7 7 0 0 1 0 14H18a7 7 0 0 1 0-14h3z" />
-      <path d="M22 41v12h20V41M27 48h10" />
-      <path d="M47 48l6 6M53 48l-6 6" />
-    </GlyphSvg>
-  );
-}
-
-function RecipePlanThreeGlyph({ className }: AchievementGlyphProps) {
-  return (
-    <GlyphSvg className={className}>
-      <path d="M21 27a11 11 0 0 1 22 0h3a7 7 0 0 1 0 14H18a7 7 0 0 1 0-14h3z" />
-      <path d="M22 41v12h20V41M26 48h12" />
-      <path d="M48 48h.1M54 48h.1M51 54h.1" strokeWidth="6" />
     </GlyphSvg>
   );
 }

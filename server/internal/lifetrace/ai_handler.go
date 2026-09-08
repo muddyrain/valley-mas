@@ -67,17 +67,6 @@ type lifeTraceAssistantPantryDraft struct {
 	Note      string `json:"note"`
 }
 
-type lifeTraceAssistantLedgerDraft struct {
-	Amount     float64 `json:"amount"`
-	Currency   string  `json:"currency"`
-	Direction  string  `json:"direction"`
-	Category   string  `json:"category"`
-	OccurredAt string  `json:"occurredAt"`
-	Merchant   string  `json:"merchant"`
-	Location   string  `json:"location"`
-	Note       string  `json:"note"`
-}
-
 type lifeTraceAssistantActionPayload struct {
 	Type               string                     `json:"type"`
 	Status             string                     `json:"status"`
@@ -86,7 +75,6 @@ type lifeTraceAssistantActionPayload struct {
 	HouseholdName      string                     `json:"householdName,omitempty"`
 	Plan               *model.LifeTracePlan       `json:"plan,omitempty"`
 	PantryItem         *model.LifeTracePantryItem `json:"pantryItem,omitempty"`
-	LedgerEntry        *ledgerEntryResponse       `json:"ledgerEntry,omitempty"`
 }
 
 type lifeTraceAssistantStructuredAction struct {
@@ -95,11 +83,9 @@ type lifeTraceAssistantStructuredAction struct {
 	NeedMoreInfoFields []string                       `json:"needMoreInfoFields,omitempty"`
 	Plan               *lifeTraceAssistantPlanDraft   `json:"plan,omitempty"`
 	Pantry             *lifeTraceAssistantPantryDraft `json:"pantry,omitempty"`
-	Ledger             *lifeTraceAssistantLedgerDraft `json:"ledger,omitempty"`
 }
 
 type lifeTraceAssistantStructuredResponse struct {
 	Reply  string                              `json:"reply"`
 	Action *lifeTraceAssistantStructuredAction `json:"action,omitempty"`
 }
-

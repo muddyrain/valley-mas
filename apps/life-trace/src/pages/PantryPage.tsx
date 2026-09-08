@@ -11,7 +11,6 @@ import {
   PackageCheck,
   PackagePlus,
   Pill,
-  ReceiptText,
   RefreshCcw,
   Search,
   Settings2,
@@ -1057,7 +1056,7 @@ export function PantryPage() {
                           : '点这张卡片即可加入本次批量转移。'}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-4 border-t border-border/70 bg-card/80">
+                      <div className="grid grid-cols-3 border-t border-border/70 bg-card/80">
                         {showKeepAction ? (
                           <button
                             type="button"
@@ -1144,24 +1143,6 @@ export function PantryPage() {
                         >
                           <Camera className="size-4" />
                           编辑
-                        </button>
-                        <button
-                          type="button"
-                          className="flex h-12 items-center justify-center gap-1.5 text-xs font-semibold text-life-health transition hover:bg-life-health/8"
-                          onClick={() => {
-                            const params = new URLSearchParams({
-                              new: '1',
-                              pantryItemId: item.id,
-                              category: item.category === '食品' ? '吃饭' : '购物',
-                              merchant: item.name,
-                              note: `${item.name} · ${item.quantity}${item.unit}`,
-                              imageUrl: item.imageUrl || item.thumbnailUrl || '',
-                            });
-                            navigate(`/ledger?${params.toString()}`);
-                          }}
-                        >
-                          <ReceiptText className="size-4" />
-                          记账
                         </button>
                       </div>
                     )}

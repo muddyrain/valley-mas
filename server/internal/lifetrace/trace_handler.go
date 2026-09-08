@@ -15,7 +15,6 @@ import (
 
 type createTraceRequest struct {
 	PlanID    string   `json:"planId"`
-	PlaceID   string   `json:"placeId"`
 	Title     string   `json:"title"`
 	Summary   string   `json:"summary"`
 	TimeLabel string   `json:"timeLabel"`
@@ -142,16 +141,11 @@ func (h *Handler) CreateTrace(c *gin.Context) {
 		return
 	}
 
-	placeID, location, ok := resolveLifeTracePlaceInput(userID, req.PlaceID, req.Location)
-	if !ok {
-		fail(c, http.StatusBadRequest, "地点不合法")
-		return
-	}
+	location := trimRunes(strings.TrimSpace(req.Location), 120)
 
 	trace := model.LifeTraceTrace{
 		UserID:    userID,
 		PlanID:    planID,
-		PlaceID:   placeID,
 		Title:     title,
 		Summary:   summary,
 		TimeLabel: timeLabel,
@@ -177,7 +171,6 @@ func (h *Handler) CreateTrace(c *gin.Context) {
 		return
 	}
 
-	reconcileTracePlace(&trace, "")
 	evaluateAchievementsQuietly(userID)
 	success(c, trace)
 }
@@ -215,16 +208,10 @@ func (h *Handler) UpdateTrace(c *gin.Context) {
 		return
 	}
 
-	placeID, location, ok := resolveLifeTracePlaceInput(userID, req.PlaceID, req.Location)
-	if !ok {
-		fail(c, http.StatusBadRequest, "地点不合法")
-		return
-	}
-	previousLocation := trace.Location
+	location := trimRunes(strings.TrimSpace(req.Location), 120)
 
 	updates := map[string]interface{}{
 		"plan_id":    planID,
-		"place_id":   placeID,
 		"title":      title,
 		"summary":    summary,
 		"time_label": timeLabel,
@@ -245,7 +232,6 @@ func (h *Handler) UpdateTrace(c *gin.Context) {
 		return
 	}
 
-	reconcileTracePlace(&trace, previousLocation)
 	success(c, trace)
 }
 

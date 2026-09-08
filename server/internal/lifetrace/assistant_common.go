@@ -34,13 +34,6 @@ var lifeTraceAssistantActionRegistry = lifeagent.NewRegistry(
 		NeedMoreInfoFields: []string{"expiresAt"},
 		AuditScene:         "life-trace-assistant-create-pantry-item",
 	},
-	lifeagent.ActionSpec{
-		Type:               "create_ledger_entry",
-		Description:        "Create a lightweight ledger entry from assistant intent.",
-		RequiredFields:     []string{"amount"},
-		NeedMoreInfoFields: []string{"amount"},
-		AuditScene:         "life-trace-assistant-create-ledger-entry",
-	},
 )
 
 var (
@@ -58,11 +51,6 @@ var (
 	assistantOpenedAtPattern         = regexp.MustCompile(`(?:开封日期|开封于|开封)[:：是 ]*(\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?)`)
 	assistantPantryQuantityPattern   = regexp.MustCompile(`(\d+)\s*(瓶|盒|袋|包|罐|个|件|桶|支|片|听|杯|箱|条|份)`)
 	assistantPantryLeadingCount      = regexp.MustCompile(`^(?:一|1|一个|一件)?\s*(瓶|盒|袋|包|罐|个|件|桶|支|片|听|杯|箱|条|份)\s*`)
-	assistantLedgerIntentPattern     = regexp.MustCompile(`记账|记一笔|记个账|账目|消费|花了|支出|收入|退款|转账|付款|付了|买单|收款|工资|奖金|报销`)
-	assistantLedgerSymbolAmount      = regexp.MustCompile(`(?:¥|￥)\s*(\d+(?:\.\d{1,2})?)`)
-	assistantLedgerUnitAmount        = regexp.MustCompile(`(\d+(?:\.\d{1,2})?)\s*(?:元|块|块钱|rmb|RMB)`)
-	assistantLedgerIntentAmount      = regexp.MustCompile(`(?:记账|记一笔|记个账|账目|消费|花了|支出|收入|退款|转账|付款|付了|买单|收款|工资|奖金|报销)[^0-9¥￥]{0,12}(\d+(?:\.\d{1,2})?)`)
-	assistantLedgerMerchantNoise     = regexp.MustCompile(`记账|记一笔|记个账|帮我|帮忙|一下|今天|刚刚|刚才|花了|消费|支出|收入|退款|转账|付款|付了|买单|收款|工资|奖金|报销|(?:¥|￥)?\s*\d+(?:\.\d{1,2})?\s*(?:元|块|块钱|rmb|RMB)?`)
 )
 
 func normalizeAssistantDate(raw string) string {
@@ -95,7 +83,7 @@ func normalizeAssistantNeedMoreInfoFields(fields []string) []string {
 	for _, field := range fields {
 		field = strings.TrimSpace(field)
 		switch field {
-		case "expiresAt", "scheduledDate", "scheduledTime", "amount":
+		case "expiresAt", "scheduledDate", "scheduledTime":
 			if !seen[field] {
 				seen[field] = true
 				result = append(result, field)
@@ -110,13 +98,6 @@ func buildAssistantPantryNeedMoreInfoMessage(name string) string {
 		return "想帮你加入库存的话，我还需要商品名。"
 	}
 	return fmt.Sprintf("要把「%s」收进库存，我还差一个生产日期或到期日。你告诉我生产日期，我就能按保质期算到期日。", name)
-}
-
-func buildAssistantLedgerNeedMoreInfoMessage(draft *lifeTraceAssistantLedgerDraft) string {
-	if draft != nil && strings.TrimSpace(draft.Merchant) != "" {
-		return fmt.Sprintf("要记下「%s」这笔账，我还差金额。", draft.Merchant)
-	}
-	return "要帮你记这笔账，我还差金额。"
 }
 
 func assistantPantryNeedsProductionDate(draft lifeTraceAssistantPantryDraft) bool {

@@ -129,7 +129,6 @@ export default function AIUsageLogs() {
                   { value: 'valley-ai-chat', label: 'Valley AI Chat' },
                   { value: 'life-trace-today-advice', label: 'Today Advice' },
                   { value: 'life-trace-weekly-review', label: 'Weekly Review' },
-                  { value: 'life-trace-recipe', label: 'Recipe' },
                   { value: 'life-trace-image', label: 'Image' },
                   { value: 'life-trace-pantry-photo', label: 'Pantry Photo' },
                 ]}

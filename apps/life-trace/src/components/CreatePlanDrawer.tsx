@@ -3,7 +3,6 @@ import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
 import { FormItem, SheetActions, SheetHeader, SheetSelectField } from '@/components/FormItem';
-import { PlaceSuggestions } from '@/components/PlaceSuggestions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -140,7 +139,6 @@ export function CreatePlanDrawer({
         reminder: plan.reminder,
         imageUrl: plan.imageUrl ?? '',
         location: plan.location ?? '',
-        placeId: plan.placeId,
         note: plan.note,
         source: plan.source ?? 'manual',
         recurrenceFrequency: plan.recurrenceFrequency ?? 'none',
@@ -205,7 +203,6 @@ export function CreatePlanDrawer({
       ...schedule,
       imageUrl: form.imageUrl?.trim() || undefined,
       location: form.location?.trim() || undefined,
-      placeId: form.placeId,
       note: form.note.trim() || '由 Life Trace 创建的新生活计划。',
       recurrenceFrequency,
       recurrenceInterval,
@@ -326,16 +323,8 @@ export function CreatePlanDrawer({
               value={form.location}
               onChange={(event) => {
                 updateField('location', event.target.value);
-                updateField('placeId', undefined);
               }}
               placeholder="可选"
-            />
-            <PlaceSuggestions
-              value={form.location}
-              onSelect={(place) => {
-                updateField('location', place.name);
-                updateField('placeId', place.id);
-              }}
             />
           </FormItem>
           <label

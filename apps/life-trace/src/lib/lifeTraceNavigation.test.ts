@@ -94,7 +94,7 @@ function setLoadedCount(container: HTMLElement, count: number) {
 describe('life trace navigation helpers', () => {
   it('maps nested routes to the active root tab', () => {
     expect(getActiveLifeTraceTab('/plans/plan-1')).toBe('plans');
-    expect(getActiveLifeTraceTab('/ai/recipes')).toBe('ai');
+    expect(getActiveLifeTraceTab('/ai/history')).toBe('ai');
     expect(getActiveLifeTraceTab('/traces/trace-1')).toBe('traces');
     expect(getActiveLifeTraceTab('/pantry')).toBe('today');
   });
@@ -105,7 +105,7 @@ describe('life trace navigation helpers', () => {
     expect(getLifeTraceScrollMemoryKey('/traces')).toBe('tab:traces');
     expect(getLifeTraceScrollMemoryKey('/profile')).toBe('tab:profile');
     expect(getLifeTraceScrollMemoryKey('/ai')).toBeNull();
-    expect(getLifeTraceScrollMemoryKey('/ledger')).toBeNull();
+    expect(getLifeTraceScrollMemoryKey('/shopping')).toBeNull();
     expect(getLifeTraceScrollMemoryKey('/pantry', '?status=expired&q=milk')).toBe(
       'list:/pantry?q=milk&status=expired',
     );

@@ -81,7 +81,7 @@ func parseOptions(args []string, out io.Writer) (syncOptions, error) {
 	flags.BoolVar(&options.apply, "apply", false, "apply GORM AutoMigrate to the configured database")
 	flags.BoolVar(&options.allowProduction, "allow-production", false, "allow running when ENV=production")
 	flags.StringVar(&options.scope, "scope", "", "migration scope: lifetrace, content, core, or all")
-	modelNames := flags.String("models", "", "comma-separated model aliases, for example: places,ledger,closet")
+	modelNames := flags.String("models", "", "comma-separated model aliases, for example: plans,traces,closet")
 	if err := flags.Parse(args); err != nil {
 		return options, err
 	}
@@ -111,7 +111,7 @@ func validateRun(cfg *config.Config, options syncOptions) error {
 		return fmt.Errorf("choose either --models or --scope, not both")
 	}
 	if options.scope == "" && len(options.models) == 0 {
-		return fmt.Errorf("refusing to run without an explicit migration target; pass --models places,ledger or --scope lifetrace")
+		return fmt.Errorf("refusing to run without an explicit migration target; pass --models plans,traces or --scope lifetrace")
 	}
 	if options.scope != "" {
 		if _, err := database.NormalizeAutoMigrateScope(options.scope); err != nil {

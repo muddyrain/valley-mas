@@ -21,18 +21,11 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ledgerCategories } from '@/lib/ledger';
 import { getLocalISODate } from '@/lib/planSchedule';
 import { cn } from '@/lib/utils';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type {
-  LedgerCategory,
-  NewLedgerEntryInput,
-  NewShoppingListItemInput,
-  ShoppingListItem,
-  ShoppingListSource,
-} from '@/types';
+import type { NewShoppingListItemInput, ShoppingListItem, ShoppingListSource } from '@/types';
 
 type ShoppingFormErrors = Partial<Record<'name' | 'quantity', string>>;
 
@@ -58,72 +51,7 @@ const sourceLabel: Record<ShoppingListSource, string> = {
   pantry_used_up: '用完',
   pantry_low: '剩量低',
   pantry_discard: '丢弃',
-  recipe: '菜谱',
 };
-
-const LAST_LEDGER_CATEGORY_KEY = 'life-trace.shopping-list.last-ledger-category';
-const DEFAULT_LEDGER_CATEGORY: LedgerCategory = '家用';
-
-const ledgerCategoryOptions = ledgerCategories.map((category) => ({
-  label: category,
-  value: category,
-}));
-
-const shoppingCategoryToLedger: Record<string, LedgerCategory> = {
-  食品: '吃饭',
-  日用品: '家用',
-  药品: '医疗',
-  宠物: '家用',
-};
-
-function readLastLedgerCategory(): LedgerCategory {
-  if (typeof window === 'undefined') return DEFAULT_LEDGER_CATEGORY;
-  try {
-    const raw = window.localStorage.getItem(LAST_LEDGER_CATEGORY_KEY);
-    if (raw && (ledgerCategories as readonly string[]).includes(raw)) {
-      return raw as LedgerCategory;
-    }
-  } catch {
-    // ignore
-  }
-  return DEFAULT_LEDGER_CATEGORY;
-}
-
-function writeLastLedgerCategory(category: LedgerCategory) {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(LAST_LEDGER_CATEGORY_KEY, category);
-  } catch {
-    // ignore
-  }
-}
-
-function inferLedgerCategoryFromShopping(category?: string): LedgerCategory {
-  if (!category) return readLastLedgerCategory();
-  return shoppingCategoryToLedger[category] ?? readLastLedgerCategory();
-}
-
-const LEDGER_PROMPT_ENABLED_KEY = 'life-trace.shopping-list.ledger-prompt-enabled';
-
-function readLedgerPromptEnabled(): boolean {
-  if (typeof window === 'undefined') return true;
-  try {
-    const raw = window.localStorage.getItem(LEDGER_PROMPT_ENABLED_KEY);
-    if (raw === null) return true;
-    return raw === '1';
-  } catch {
-    return true;
-  }
-}
-
-function writeLedgerPromptEnabled(enabled: boolean) {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(LEDGER_PROMPT_ENABLED_KEY, enabled ? '1' : '0');
-  } catch {
-    // ignore
-  }
-}
 
 function formatCheckedDateLabel(iso: string, todayIso: string, yesterdayIso: string) {
   if (iso === todayIso) return '今天';
@@ -175,8 +103,6 @@ export function ShoppingListPage() {
   const editShoppingItem = useLifeTraceStore((state) => state.editShoppingItem);
   const toggleShoppingItem = useLifeTraceStore((state) => state.toggleShoppingItem);
   const removeShoppingItem = useLifeTraceStore((state) => state.removeShoppingItem);
-  const addLedgerEntry = useLifeTraceStore((state) => state.addLedgerEntry);
-  const ledgerCreating = useLifeTraceStore((state) => state.ledgerCreating);
   const showToast = useFeedbackToastStore((state) => state.showToast);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -187,15 +113,6 @@ export function ShoppingListPage() {
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ShoppingListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [ledgerTarget, setLedgerTarget] = useState<ShoppingListItem | null>(null);
-  const [ledgerAmount, setLedgerAmount] = useState('');
-  const [ledgerCategoryValue, setLedgerCategoryValue] =
-    useState<LedgerCategory>(DEFAULT_LEDGER_CATEGORY);
-  const [ledgerNote, setLedgerNote] = useState('');
-  const [ledgerAmountError, setLedgerAmountError] = useState('');
-  const [ledgerPromptEnabled, setLedgerPromptEnabled] = useState<boolean>(() =>
-    readLedgerPromptEnabled(),
-  );
   const initialShoppingLoading = loading && !loaded;
   const shoppingRefreshing = loading && loaded;
 
@@ -244,11 +161,6 @@ export function ShoppingListPage() {
     () => checkedGroups.reduce((sum, group) => sum + group.items.length, 0),
     [checkedGroups],
   );
-
-  const toggleLedgerPrompt = (next: boolean) => {
-    setLedgerPromptEnabled(next);
-    writeLedgerPromptEnabled(next);
-  };
 
   const openCreate = () => {
     setEditingItem(null);
@@ -311,56 +223,9 @@ export function ShoppingListPage() {
       const next = await toggleShoppingItem(item.id, willCheck);
       if (next) {
         showToast(next.checkedAt ? '已标记为已买' : '已恢复为待买', 'success');
-        if (next.checkedAt && willCheck && ledgerPromptEnabled) {
-          openLedgerSheet(next);
-        }
       }
     } finally {
       setPendingActionId((current) => (current === actionKey ? null : current));
-    }
-  };
-
-  const openLedgerSheet = (item: ShoppingListItem) => {
-    setLedgerTarget(item);
-    setLedgerAmount('');
-    setLedgerNote(item.name + (item.note ? ` · ${item.note}` : ''));
-    setLedgerCategoryValue(inferLedgerCategoryFromShopping(item.category));
-    setLedgerAmountError('');
-  };
-
-  const closeLedgerSheet = () => {
-    if (ledgerCreating) return;
-    setLedgerTarget(null);
-    setLedgerAmount('');
-    setLedgerNote('');
-    setLedgerAmountError('');
-  };
-
-  const submitLedger = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!ledgerTarget) return;
-    const value = Number(ledgerAmount);
-    if (!Number.isFinite(value) || value <= 0) {
-      setLedgerAmountError('请输入大于 0 的金额');
-      return;
-    }
-    setLedgerAmountError('');
-    const input: NewLedgerEntryInput = {
-      amount: value,
-      currency: 'CNY',
-      direction: '支出',
-      category: ledgerCategoryValue,
-      occurredAt: new Date().toISOString(),
-      merchant: ledgerTarget.name,
-      note: ledgerNote.trim(),
-    };
-    const saved = await addLedgerEntry(input);
-    if (saved) {
-      writeLastLedgerCategory(ledgerCategoryValue);
-      showToast(`已记下 ${ledgerCategoryValue} ${value.toFixed(2)} 元`, 'success');
-      setLedgerTarget(null);
-      setLedgerAmount('');
-      setLedgerNote('');
     }
   };
 
@@ -461,21 +326,6 @@ export function ShoppingListPage() {
         {householdName ? (
           <p className="text-xs text-muted-foreground">当前空间：{householdName}</p>
         ) : null}
-
-        <label className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/85 px-4 py-3 text-sm">
-          <span className="min-w-0 flex-1">
-            <span className="block font-medium">勾选已买时弹出记一笔</span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">
-              关闭后勾选只会记录"已买"，不再弹账本
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            className="size-5 shrink-0 accent-life-health"
-            checked={ledgerPromptEnabled}
-            onChange={(event) => toggleLedgerPrompt(event.target.checked)}
-          />
-        </label>
 
         {error ? (
           <Card className="border-life-alert/30 bg-life-alert/10 p-4 text-sm text-life-alert">
@@ -644,88 +494,6 @@ export function ShoppingListPage() {
         }}
         onConfirm={() => void handleConfirmDelete()}
       />
-
-      <BottomSheet
-        open={Boolean(ledgerTarget)}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeLedgerSheet();
-          }
-        }}
-        overlayLabel="关闭顺手记账"
-        zIndexClassName="z-[80]"
-        closeDisabled={ledgerCreating}
-        spacing="compact"
-      >
-        <SheetHeader
-          title="顺手记一笔"
-          description={ledgerTarget ? `为「${ledgerTarget.name}」记下支出，可跳过` : '可跳过'}
-          onClose={closeLedgerSheet}
-          closeDisabled={ledgerCreating}
-          className="mb-4"
-        />
-        <form className="space-y-3.5" onSubmit={submitLedger}>
-          <FormItem
-            label="金额"
-            required
-            htmlFor="shopping-ledger-amount"
-            error={ledgerAmountError || undefined}
-            density="compact"
-          >
-            <Input
-              id="shopping-ledger-amount"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              placeholder="0.00"
-              value={ledgerAmount}
-              onChange={(event) => {
-                setLedgerAmount(event.target.value);
-                if (ledgerAmountError) {
-                  setLedgerAmountError('');
-                }
-              }}
-              autoFocus
-              aria-invalid={Boolean(ledgerAmountError)}
-            />
-          </FormItem>
-
-          <SheetSelectField
-            label="分类"
-            density="compact"
-            value={ledgerCategoryValue}
-            options={ledgerCategoryOptions}
-            pickerTitle="选择分类"
-            onValueChange={(next) => setLedgerCategoryValue(next as LedgerCategory)}
-          />
-
-          <FormItem label="备注" htmlFor="shopping-ledger-note" density="compact">
-            <Textarea
-              id="shopping-ledger-note"
-              rows={2}
-              placeholder="可留空"
-              value={ledgerNote}
-              onChange={(event) => setLedgerNote(event.target.value)}
-            />
-          </FormItem>
-
-          <SheetActions className="pt-1.5">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={closeLedgerSheet}
-              disabled={ledgerCreating}
-            >
-              跳过
-            </Button>
-            <Button type="submit" variant="ai" disabled={ledgerCreating}>
-              {ledgerCreating ? <ActionLoadingIcon /> : null}
-              记一笔
-            </Button>
-          </SheetActions>
-        </form>
-      </BottomSheet>
     </SubPageShell>
   );
 }

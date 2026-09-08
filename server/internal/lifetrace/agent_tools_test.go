@@ -29,7 +29,6 @@ func setupAgentToolsDB(t *testing.T) {
 		&model.LifeTracePlan{},
 		&model.LifeTraceTrace{},
 		&model.LifeTracePantryItem{},
-		&model.LifeTraceLedgerEntry{},
 		&model.LifeTraceAchievement{},
 		&model.LifeTraceAIAction{},
 		&model.LifeTraceAIMessage{},
@@ -197,27 +196,6 @@ func TestAgentToolCreatePlanNeedMoreInfo(t *testing.T) {
 	}
 }
 
-func TestAgentToolCreateLedgerEntry(t *testing.T) {
-	setupAgentToolsDB(t)
-	h := newAgentToolsHandler()
-	ctx := WithAgentToolContext(context.Background(), 101, nil)
-
-	raw, err := h.runCreateLedgerEntry(ctx, json.RawMessage(`{"amount":30,"currency":"CNY","direction":"支出","category":"吃饭","merchant":"咖啡店"}`))
-	if err != nil {
-		t.Fatalf("run: %v", err)
-	}
-	var out struct {
-		OK     bool   `json:"ok"`
-		Status string `json:"status"`
-	}
-	if err := json.Unmarshal(raw, &out); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if !out.OK || out.Status != "created" {
-		t.Fatalf("expected created, got %s", raw)
-	}
-}
-
 func TestAgentToolCreatePantryItemMissingContext(t *testing.T) {
 	setupAgentToolsDB(t)
 	h := newAgentToolsHandler()
@@ -257,7 +235,6 @@ func TestHandlerRegisterAgentTools(t *testing.T) {
 		"query_pending_plans": false,
 		"create_plan":         false,
 		"create_pantry_item":  false,
-		"create_ledger_entry": false,
 	}
 	for _, tool := range got {
 		if _, ok := expected[tool.Name()]; !ok {
