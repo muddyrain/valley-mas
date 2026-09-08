@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { type Point, type Rectangle, validateSelection } from './core/geometry';
 import type { SelectionHandle } from './core/selection-adjustment';
 import {
@@ -10,6 +11,7 @@ import { canStartSelectionGesture } from './core/selection-gesture';
 import { shouldShowSelectionLabel } from './core/selection-label';
 import { createSelectionMaskRects } from './core/selection-mask';
 import { findWindowTargetAtOrDisplay, type WindowTarget } from './core/window-target';
+import { loadScreenshotImage } from './renderer/screenshot-image';
 import type { ScreenshotDisplayFrame } from './shared/contracts';
 
 const HANDLES: SelectionHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -22,12 +24,14 @@ type SelectionOverlayProps = {
   interactive?: boolean;
   purpose: 'recording' | 'screenshot';
   displayId?: string;
+  onFrameReady?: (image: HTMLImageElement) => void;
 };
 
 export function SelectionOverlay({
   interactive = true,
   purpose,
   displayId,
+  onFrameReady,
 }: SelectionOverlayProps) {
   const gestureRef = useRef<SelectionGesture | undefined>(undefined);
   const hoverPointRef = useRef<Point | undefined>(undefined);
@@ -44,39 +48,34 @@ export function SelectionOverlay({
   const [activeDisplayId, setActiveDisplayId] = useState<string>();
 
   useLayoutEffect(() => {
-    if (!interactive || purpose === 'screenshot') return;
-    setFrozenFrame(undefined);
-    window.screenRecorder.selectionReady();
-  }, [interactive, purpose]);
+    // Capture finished before the window was activated; decoding need not delay input.
+    if (interactive && displayId) window.screenRecorder.selectionReady();
+  }, [displayId, interactive]);
 
   useEffect(() => {
-    if (!interactive || purpose !== 'screenshot' || !displayId) return;
+    if (!displayId) return;
     let active = true;
     setFrozenFrame(undefined);
     void window.screenRecorder
       .getScreenshotDisplayFrame()
       .then(async (frame) => {
-        const image = new Image();
-        await new Promise<void>((resolve, reject) => {
-          image.onload = () => resolve();
-          image.onerror = () => reject(new Error('无法读取截图固定画面'));
-          image.src = frame.imageDataUrl;
+        const image = await loadScreenshotImage(frame.imageDataUrl).catch((cause: unknown) => {
+          throw new Error('无法读取截图固定画面', { cause });
         });
         if (!active) return;
-        setFrozenFrame(frame);
-        requestAnimationFrame(() => {
-          if (active) window.screenRecorder.selectionReady();
+        flushSync(() => {
+          setFrozenFrame({ ...frame, imageDataUrl: image.src });
+          onFrameReady?.(image);
         });
       })
       .catch((caught) => {
         if (!active) return;
         setError(caught instanceof Error ? caught.message : '无法准备截图固定画面');
-        window.screenRecorder.selectionReady();
       });
     return () => {
       active = false;
     };
-  }, [displayId, interactive, purpose]);
+  }, [displayId, onFrameReady]);
 
   useEffect(
     () => () => {
@@ -122,6 +121,8 @@ export function SelectionOverlay({
     const applySnapshot = (
       snapshot: Awaited<ReturnType<typeof window.screenRecorder.getSnapshot>>,
     ) => {
+      if (snapshot.screenshot.state === 'editing' || snapshot.screenshot.state === 'long-capturing')
+        return;
       const nextDisplayId = snapshot.selectionDisplay?.id;
       if (selectionDisplayIdRef.current !== nextDisplayId) {
         gestureRef.current = undefined;
@@ -175,7 +176,8 @@ export function SelectionOverlay({
     if (selectionFrameRef.current !== undefined) return;
     selectionFrameRef.current = requestAnimationFrame(() => {
       selectionFrameRef.current = undefined;
-      setSelection(pendingSelectionRef.current);
+      // Commit geometry in this animation frame, rather than scheduling another React frame.
+      flushSync(() => setSelection(pendingSelectionRef.current));
     });
   };
 
@@ -308,9 +310,10 @@ export function SelectionOverlay({
         flushSelection(undefined);
       }}
     >
-      {purpose === 'screenshot' && frozenFrame && (
+      {frozenFrame && !onFrameReady && (
         <img
           className="screenshot-frozen-frame"
+          crossOrigin="anonymous"
           src={frozenFrame.imageDataUrl}
           alt=""
           draggable={false}

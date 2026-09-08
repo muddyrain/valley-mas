@@ -75,8 +75,8 @@ export type CapturePlan = {
 
 export type ScreenshotEditPlan = {
   operationId: string;
-  imageDataUrl: string;
   displayImageDataUrl: string;
+  sourceRect: Rectangle;
   selection: Rectangle;
   pixelSize: { width: number; height: number };
 };

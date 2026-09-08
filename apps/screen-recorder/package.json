@@ -16,6 +16,7 @@
     "package:mac": "pnpm build && node scripts/package-platform.mjs mac",
     "package:mac:release": "pnpm build && node scripts/package-platform.mjs mac --release && node scripts/verify-macos-release.mjs",
     "runtime:smoke": "node scripts/runtime-smoke.mjs",
+    "runtime:performance": "electron scripts/runtime-performance.cjs",
     "runtime:probe-video": "electron scripts/probe-video.cjs",
     "typecheck": "tsc --noEmit",
     "check": "biome check src electron scripts vite.config.ts vitest.config.ts tsup.config.ts index.html package.json tsconfig.json",

@@ -41,6 +41,7 @@ import type { Point, Rectangle } from './core/geometry';
 import { getScreenshotToolbarPosition } from './core/screenshot-toolbar';
 import { adjustSelection, type SelectionHandle } from './core/selection-adjustment';
 import { createSelectionMaskRects } from './core/selection-mask';
+import { loadScreenshotImage } from './renderer/screenshot-image';
 import type { ScreenshotEditPlan } from './shared/contracts';
 import { useShiftColorFormat } from './useShiftColorFormat';
 
@@ -197,9 +198,16 @@ function renderAction(
 type ScreenshotEditorProps = {
   visible?: boolean;
   onCanvasReady?: () => void;
+  sharedBackdrop?: boolean;
+  onImageReady?: (image: HTMLImageElement) => void;
 };
 
-export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEditorProps = {}) {
+export function ScreenshotEditor({
+  visible = true,
+  onCanvasReady,
+  sharedBackdrop = false,
+  onImageReady,
+}: ScreenshotEditorProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement | undefined>(undefined);
@@ -257,7 +265,18 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const source = plan.sourceRect;
+      ctx.drawImage(
+        image,
+        source.x,
+        source.y,
+        source.width,
+        source.height,
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      );
       const scale = canvas.width / plan.selection.width;
       for (const action of actions) renderAction(ctx, action, scale);
       if (preview) renderAction(ctx, preview, scale);
@@ -265,16 +284,19 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
     [draft, history, plan],
   );
 
-  const applyEditPlan = useCallback(async (nextPlan: ScreenshotEditPlan) => {
-    const image = new Image();
-    await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () => reject(new Error('无法读取截图画面'));
-      image.src = nextPlan.imageDataUrl;
-    });
-    imageRef.current = image;
-    setPlan(nextPlan);
-  }, []);
+  const applyEditPlan = useCallback(
+    async (nextPlan: ScreenshotEditPlan) => {
+      const image = await loadScreenshotImage(nextPlan.displayImageDataUrl).catch(
+        (cause: unknown) => {
+          throw new Error('无法读取截图画面', { cause });
+        },
+      );
+      imageRef.current = image;
+      onImageReady?.(image);
+      setPlan(nextPlan);
+    },
+    [onImageReady],
+  );
 
   useEffect(() => {
     void window.screenRecorder
@@ -285,14 +307,17 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
 
   useEffect(() => {
     if (!plan || !canvasRef.current || !imageRef.current) return;
-    canvasRef.current.width = plan.pixelSize.width;
-    canvasRef.current.height = plan.pixelSize.height;
-    redraw();
+    if (canvasRef.current.width !== plan.pixelSize.width)
+      canvasRef.current.width = plan.pixelSize.width;
+    if (canvasRef.current.height !== plan.pixelSize.height)
+      canvasRef.current.height = plan.pixelSize.height;
+    // The shared frozen backdrop already displays an unannotated selection.
+    if (tool !== 'move' || history.length > 0 || draft) redraw();
     if (!canvasReadyRef.current) {
       canvasReadyRef.current = true;
       onCanvasReady?.();
     }
-  }, [plan, redraw, onCanvasReady]);
+  }, [plan, redraw, onCanvasReady, tool, history.length, draft]);
 
   useEffect(() => {
     if (visible && plan && !revealedRef.current) {
@@ -302,10 +327,6 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
       });
     }
   }, [plan, visible]);
-
-  useEffect(() => {
-    redraw();
-  }, [redraw]);
 
   useEffect(() => {
     if (textInput) textInputRef.current?.focus();
@@ -655,12 +676,15 @@ export function ScreenshotEditor({ visible = true, onCanvasReady }: ScreenshotEd
         void window.screenRecorder.cancelScreenshotEdit(plan.operationId);
       }}
     >
-      <img
-        className="screenshot-frozen-frame"
-        src={plan.displayImageDataUrl}
-        alt=""
-        draggable={false}
-      />
+      {!sharedBackdrop && (
+        <img
+          className="screenshot-frozen-frame"
+          crossOrigin="anonymous"
+          src={plan.displayImageDataUrl}
+          alt=""
+          draggable={false}
+        />
+      )}
       {selectionMaskRects.map((rect, index) => (
         <div
           className="screenshot-editor-mask"
