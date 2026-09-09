@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('run', 'editor', 'test', 'capture', 'export')]
+    [ValidateSet('run', 'editor', 'test', 'capture', 'generation', 'boundary', 'benchmark', 'export')]
     [string]$Mode = 'run',
     [string]$GodotPath = $env:GODOT_BIN
 )
@@ -29,6 +29,15 @@ switch ($Mode) {
         # Keep synthetic viewport input separate from the player's desktop pointer.
         $gameArguments += @('--position', '-3000,-3000', '--script', 'tests/runtime.gd')
     }
+    'generation' {
+        $gameArguments += @('--position', '-3000,-3000', '--script', 'tests/generation_runtime.gd', '--', 'full')
+    }
+    'benchmark' {
+        $gameArguments += @('--position', '-3000,-3000', '--script', 'tests/generation_performance.gd')
+    }
+    'boundary' {
+        $gameArguments += @('--position', '-3000,-3000', '--script', 'tests/boundary_runtime.gd')
+    }
     'export' {
         New-Item -ItemType Directory -Path (Join-Path $PSScriptRoot 'build') -Force | Out-Null
         $gameArguments += @('--headless', '--export-release', 'Windows Desktop')
@@ -47,6 +56,8 @@ if ($Mode -eq 'test') {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $GodotPath --headless --path $PSScriptRoot --script tests/landscape.gd
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $GodotPath --headless --path $PSScriptRoot --script tests/terrain_materials.gd
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $GodotPath --headless --path $PSScriptRoot --script tests/feedback.gd
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $GodotPath --headless --path $PSScriptRoot --script tests/weather.gd
@@ -58,6 +69,12 @@ if ($Mode -eq 'test') {
     & $GodotPath --headless --path $PSScriptRoot --script tests/tempests.gd
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $GodotPath --headless --path $PSScriptRoot --script tests/earth_and_soil.gd
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $GodotPath --headless --path $PSScriptRoot --script tests/overview.gd
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $GodotPath --headless --path $PSScriptRoot --script tests/generation_shapes.gd
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $GodotPath --headless --path $PSScriptRoot --script tests/square_worlds.gd
 }
 if ($Mode -eq 'capture') {
     & $GodotPath --position -3000,-3000 --path $PSScriptRoot --script tests/interface.gd
@@ -81,5 +98,10 @@ if ($Mode -eq 'capture') {
     & $GodotPath --position -3000,-3000 --path $PSScriptRoot --script tests/tempests_runtime.gd
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $GodotPath --position -3000,-3000 --path $PSScriptRoot --script tests/earth_runtime.gd
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $GodotPath --position -3000,-3000 --path $PSScriptRoot --script tests/overview_runtime.gd
+}
+if ($Mode -eq 'generation') {
+    & $GodotPath --position -3000,-3000 --path $PSScriptRoot --script tests/generation_interaction.gd
 }
 exit $LASTEXITCODE

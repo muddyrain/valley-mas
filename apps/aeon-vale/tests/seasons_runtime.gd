@@ -76,7 +76,7 @@ func run() -> void:
 	quit(0 if failures.is_empty() else 1)
 
 func ecology_gallery() -> void:
-	var w = World.generate({"width":210,"height":112,"template":"ocean","seed":5912,"trees":0})
+	var w = Fixtures.empty({"width":210,"height":112,"seed":5912,"trees":0})
 	# Authored inspection garden. Every patch is seeded through actual game input below.
 	for row in 2:
 		for col in 7:
@@ -106,7 +106,7 @@ func ecology_gallery() -> void:
 	check(Save.decode(Save.encode(w)).world != null,"All fourteen planted habitats save together")
 
 func verify_casting() -> void:
-	var w = World.generate({"width":64,"height":64,"template":"ocean","seed":12,"trees":0})
+	var w = Fixtures.empty({"width":64,"height":64,"seed":12,"trees":0})
 	w.terrain.fill(World.FOREST); w.biomes.fill(World.TEMPERATE)
 	w.prepare_ecology(); w.advance(World.YEAR_SECONDS*6)
 	w.image = w.bake_image()

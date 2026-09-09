@@ -12,7 +12,7 @@ func run() -> void:
 	game.view.set_distance(1); await capture("151-map12-middle")
 	game.view.set_distance(2); await capture("152-map12-near")
 	game.view.show_plants=false; game.view.queue_redraw(); await capture("153-map12-ground")
-	var w=World.generate({"width":96,"height":64,"seed":3711,"template":"ocean","trees":0})
+	var w=Fixtures.empty({"width":96,"height":64,"seed":3711,"trees":0})
 	w.terrain.fill(World.GRASS)
 	for i in w.terrain.size():
 		w.biomes[i]=World.MEADOW if i%w.width<32 else (World.BIRCH if i%w.width<64 else World.SAVANNA)

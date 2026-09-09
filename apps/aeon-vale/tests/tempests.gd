@@ -1,5 +1,7 @@
 extends SceneTree
 
+const Fixtures=preload("res://tests/world_fixtures.gd")
+
 const World=preload("res://scripts/world_data.gd")
 const Save=preload("res://scripts/save_store.gd")
 var checks=0
@@ -10,7 +12,7 @@ func check(ok: bool, message: String) -> void:
 	if not ok: failures.append(message); push_error(message)
 
 func forest():
-	var w=World.generate({"width":64,"height":64,"seed":39117,"template":"ocean","trees":0})
+	var w=Fixtures.empty({"width":64,"height":64,"seed":39117,"trees":0})
 	w.terrain.fill(World.FOREST); w.biomes.fill(World.TEMPERATE)
 	w.weather_enabled=false; w.spread_enabled=false
 	for y in range(0,64,2):

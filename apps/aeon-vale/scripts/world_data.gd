@@ -33,8 +33,10 @@ const BLOSSOM = 11
 const RIVER = 12
 const HILLS = 13
 const TILE = 4
+const MAP_SIZES = [Vector2i(288,288),Vector2i(384,384),Vector2i(480,480)]
+const DEFAULT_MAP_SIZE = 1
 const NAMES = ["深海", "近海", "浅滩", "沙滩", "平原土壤", "森林土壤", "秋林", "雪原", "沙漠", "湿地", "山峰", "花林", "河流", "丘陵", "地裂"]
-const COLORS = [Color("3066ae"), Color("4389ce"), Color("79bedf"), Color("e3dca3"), Color("88aa4e"), Color("548441"), Color("bcb04b"), Color("d7e1d7"), Color("cdb25f"), Color("759879"), Color("555e59"), Color("83a651"), Color("65b1d9"), Color("6e8051"), Color("36392f")]
+const COLORS = [Color("3066ae"), Color("3d7fc6"), Color("6fb8da"), Color("d8d191"), Color("88aa4e"), Color("548441"), Color("bcb04b"), Color("d7e1d7"), Color("cdb25f"), Color("759879"), Color("555e59"), Color("83a651"), Color("65b1d9"), Color("6e8051"), Color("36392f")]
 const MEADOW = 0
 const TEMPERATE = 1
 const GOLDEN = 2
@@ -54,7 +56,9 @@ const CRYSTAL = 15
 const JADE = 16
 const SWEET = 17
 const BIOME_NAMES = ["草原", "温带森林", "金色秋林", "雪地", "干旱荒原", "湿地", "樱花林", "桦木林", "针叶林", "热带草原", "热带雨林", "竹林", "花海", "蘑菇林", "晨光果林", "水晶原野", "翡翠林", "糖霜林"]
-const BIOME_COLORS = [Color("83aa49"), Color("40733b"), Color("b4a34a"), Color("ccdcd3"), Color("cfb96d"), Color("668a77"), Color("86a750"),Color("8eae51"),Color("4d7956"),Color("bfad59"),Color("4b955f"),Color("719b72"),Color("9aad68"),Color("78858a"),Color("b8bc6c"),Color("6eadae"),Color("488c7c"),Color("c89da6")]
+# Material colour remains legible below trees and in the live overview.
+# Connected sod patches and material grain belong to Soil, not plant density.
+const BIOME_COLORS = Ground.Soil.FLOORS
 const BIOME_TOOLS = 50
 const PLANT_TOOLS = 100
 const CLEAR_PLANTS = 200
@@ -199,10 +203,10 @@ static func supports_plant(type: int, sprite: int) -> bool:
 		return sprite == 2 or sprite == 10
 	return sprite != 9 and sprite != 3
 
-static func generate(config: Dictionary, report: Callable = Callable()):
+static func create_grid(config: Dictionary):
 	var world = new()
-	world.width = clampi(int(config.get("width", 288)), 32, 512)
-	world.height = clampi(int(config.get("height", 192)), 32, 384)
+	world.width = clampi(int(config.get("width", MAP_SIZES[DEFAULT_MAP_SIZE].x)), 32, 512)
+	world.height = clampi(int(config.get("height", MAP_SIZES[DEFAULT_MAP_SIZE].y)), 32, 512)
 	world.world_seed = int(config.get("seed", 48217))
 	world.world_name = str(config.get("name", "初生之谷")).strip_edges().left(32)
 	if world.world_name.is_empty(): world.world_name = "初生之谷"
@@ -213,8 +217,18 @@ static func generate(config: Dictionary, report: Callable = Callable()):
 	world.plants.fill(0)
 	world.initialize_life_arrays()
 	world.prepare_noise()
+	return world
+
+# The simulation model can also be consumed by topology checks and map tools.
+static func create(config: Dictionary, report: Callable = Callable()):
+	var world=create_grid(config)
+	if world.template not in Landscape.Templates.IDS: world.template="continent"
 	Landscape.build(world,config,report)
 	world.prepare_ecology()
+	return world
+
+static func generate(config: Dictionary, report: Callable = Callable()):
+	var world=create(config,report)
 	world.image = world.bake_image(report)
 	if report.is_valid(): report.call(1.0, "万物就绪")
 	return world
@@ -242,6 +256,7 @@ func carve_rivers(heights: PackedFloat32Array) -> void:
 		var score = 0.0
 		for i in terrain.size():
 			if distance[i] < 6: continue
+			if template=="box_world" and not Rect2i(12,12,width-24,height-24).has_point(Vector2i(i%width,i/width)): continue
 			var near_source = false
 			for source in sources:
 				if Vector2(i % width - source % width, i / width - source / width).length() < width * 0.17:
@@ -267,11 +282,11 @@ func carve_rivers(heights: PackedFloat32Array) -> void:
 					var point = Vector2i(current % width + dx, current / width + dy)
 					if Rect2i(0, 0, width, height).has_point(point):
 						var p = point.y * width + point.x
-						if terrain[p] > SHALLOW: terrain[p] = RIVER
+						if terrain[p] > SHALLOW and not protected_frame(p): terrain[p] = RIVER
 			var next = -1
 			var lowest = INF
 			for p in neighbors8(current):
-				if visited.has(p) or distance[p] > distance[current]: continue
+				if visited.has(p) or distance[p] > distance[current] or protected_frame(p): continue
 				if sideways >= 3 and distance[p] == distance[current]: continue
 				var value = distance[p] * 0.008 + heights[p] * 0.4 + bends.get_noise_2d(p % width, p / width) * 0.14
 				if value < lowest:
@@ -285,8 +300,13 @@ func carve_rivers(heights: PackedFloat32Array) -> void:
 	for i in terrain.size():
 		if terrain[i] != RIVER: continue
 		for p in neighbors(i):
-			if not is_water(terrain[p]): banks[p] = true
+			if not is_water(terrain[p]) and not protected_frame(p): banks[p] = true
 	for i in banks: terrain[i] = BEACH
+
+func protected_frame(i: int) -> bool:
+	if template!="box_world": return false
+	var border=maxi(2,roundi(mini(width,height)*.028))
+	return i%width<border or i%width>=width-border or i/width<border or i/width>=height-border
 
 func neighbors8(index: int) -> Array[int]:
 	var result = neighbors(index)
@@ -502,9 +522,17 @@ func fertilize_cells(cells: Array[Vector2i], tool: int) -> void:
 func refresh_tiles(rect: Rect2i) -> void:
 	frontier_dirty = true
 	if image == null: return
+	# A crest can extend beyond its height sample and supporting neighbours.
+	# Redraw that finite footprint after edits, including in worker snapshots.
+	var affected=rect.grow(Ground.Mountain.INFLUENCE).intersection(Rect2i(0,0,width,height))
+	var span: int=Ground.Mountain.PATCH/Ground.PIXELS
+	for cy in range(affected.position.y/span,(affected.end.y-1)/span+1):
+		for cx in range(affected.position.x/span,(affected.end.x-1)/span+1):
+			mountain_cache.erase(Vector2i(cx,cy))
 	surface_revision += 1
-	for y in range(rect.position.y, rect.end.y):
-		for x in range(rect.position.x, rect.end.x):
+	for y in range(affected.position.y, affected.end.y):
+		for x in range(affected.position.x, affected.end.x):
+			if not rect.has_point(Vector2i(x,y)) and terrain[y*width+x]!=MOUNTAIN: continue
 			if defer_surface: surface_pending_cells[y*width+x]=true
 			else:
 				draw_tile(image, x, y)

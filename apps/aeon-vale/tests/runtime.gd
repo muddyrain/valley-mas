@@ -1,5 +1,7 @@
 extends SceneTree
 
+const Fixtures=preload("res://tests/world_fixtures.gd")
+
 const World = preload("res://scripts/world_data.gd")
 const Save = preload("res://scripts/save_store.gd")
 var game
@@ -41,7 +43,8 @@ func click_point(point: Vector2) -> void:
 	press.button_index = MOUSE_BUTTON_LEFT
 	press.pressed = true
 	root.push_input(press,true)
-	await process_frame
+	# Dispatch a click atomically; the offscreen desktop pointer must not cancel
+	# the synthetic press between down/up. Held-input tests use separate events.
 	var release = press.duplicate()
 	release.pressed = false
 	root.push_input(release,true)
@@ -105,8 +108,8 @@ func run() -> void:
 	await create_timer(0.3).timeout
 	await capture("02-new-world")
 	check_buttons_fit(game.modal)
-	await click_control(game.template_buttons["lagoon"])
-	check(game.selected_template == "lagoon", "Template button changes selection")
+	await click_control(game.template_buttons["donut"])
+	check(game.selected_template == "donut", "Template button changes selection")
 	await click_control(game.template_buttons["continent"])
 	var started = Time.get_ticks_usec()
 	await click_control(find_button(game.modal, "让世界诞生"))
@@ -260,7 +263,7 @@ func check_tool_contents() -> void:
 func verify_living_world() -> void:
 	# A real editable world is prepared empty, then advanced by the same simulation used in play.
 	if not game.paused: game._toggle_pause()
-	var garden = World.generate({"width": 192, "height": 64, "seed": 5381, "template": "ocean", "trees": 0})
+	var garden = Fixtures.empty({"width": 192, "height": 64, "seed": 5381,  "trees": 0})
 	for biome in World.BIOME_NAMES.size():
 		garden.begin_stroke()
 		garden.paint(Vector2i(12 + biome * 12, 32), 11, World.HILLS if biome == 3 else World.FOREST)
@@ -296,6 +299,10 @@ func verify_living_world() -> void:
 		game.view.camera = game.view.size / 2 - Vector2(cell) * World.TILE * game.view.zoom
 		game.view.queue_redraw()
 		await click_control(game.group_buttons[0])
+		check(game.tool_buttons.has(World.BEACH),"Terrain category opens before the habitat interaction")
+		if not game.tool_buttons.has(World.BEACH):
+			await capture("runtime-category-failed")
+			return
 		await click_control(game.tool_buttons[World.BEACH])
 		check(game.selected_tool == World.BEACH,"Habitat interaction selected beach after window resizing")
 		game.view.radius = 2
@@ -428,7 +435,7 @@ func verify_polish() -> void:
 	check_tool_contents()
 	check_buttons_fit(game.hud)
 	await capture("23-ecology-seeds")
-	for dimensions in [Vector2i(192,128),Vector2i(288,192),Vector2i(384,256)]:
+	for dimensions in World.MAP_SIZES:
 		var map = World.generate({"width":dimensions.x,"height":dimensions.y,"seed":48217,"trees":0.85,"rivers":true})
 		game.world = map
 		game.view.set_world(map)

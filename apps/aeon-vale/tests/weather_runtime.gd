@@ -78,7 +78,7 @@ func run() -> void:
 	game.paused=true; game._update_pause_buttons()
 	var loaded=Save.decode(Save.encode(island)).world
 	check(loaded!=null and loaded.rain_clouds==island.rain_clouds,"The visible moving cloud is part of the saved world")
-	var w=World.generate({"width":96,"height":64,"seed":61439,"template":"ocean","trees":0})
+	var w=Fixtures.empty({"width":96,"height":64,"seed":61439,"trees":0})
 	w.world_name="晨雨原野"
 	for i in w.terrain.size():
 		var x=i%w.width; var y=i/w.width

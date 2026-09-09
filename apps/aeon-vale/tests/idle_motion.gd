@@ -13,9 +13,10 @@ func run() -> void:
 		await process_frame
 	var args=OS.get_cmdline_user_args()
 	var tag=args[0] if not args.is_empty() else "current"
-	var w=World.generate({"width":384,"height":256,"seed":781936,"template":"continent","trees":.9})
+	var dimensions: Vector2i=World.MAP_SIZES[-1] if args.has("wide") else Vector2i(384,256)
+	var w=World.generate({"width":dimensions.x,"height":dimensions.y,"seed":781936,"template":"continent","trees":.9})
 	setup_world(w); game._select_category(-1); game._select_tool(-1)
-	game.view.set_distance(1)
+	game.view.set_distance(0 if args.has("far") else 1)
 	if args.has("no-spread"): w.spread_enabled=false
 	for frame in 45: await process_frame
 	game.paused=args.has("paused"); game.time_speed=1; game._update_pause_buttons()

@@ -1,5 +1,7 @@
 extends SceneTree
 
+const Fixtures=preload("res://tests/world_fixtures.gd")
+
 const World=preload("res://scripts/world_data.gd")
 const Save=preload("res://scripts/save_store.gd")
 var checks=0
@@ -10,7 +12,7 @@ func check(ok: bool, message: String) -> void:
 	if not ok: failures.append(message); push_error(message)
 
 func _initialize() -> void:
-	var w=World.generate({"width":32,"height":32,"seed":98417,"template":"ocean","trees":0})
+	var w=Fixtures.empty({"width":32,"height":32,"seed":98417,"trees":0})
 	for biome in World.BIOME_NAMES.size():
 		for tool in [World.TREE_FERTILIZER,World.PLANT_FERTILIZER]:
 			w.terrain.fill(World.HILLS); w.biomes.fill(biome); w.plants.fill(0); w.objects.fill(0)
@@ -61,7 +63,7 @@ func _initialize() -> void:
 		for entry in w.preview_for(cells,selected):
 			if entry[1]!=w.tool_affects(entry[0].y*w.width+entry[0].x,selected): matches=false
 		check(matches,"Batched preview preserves individual suitability, occupancy and spacing rules")
-	var routed=World.generate({"width":32,"height":32,"template":"ocean","trees":0})
+	var routed=Fixtures.empty({"width":32,"height":32,"trees":0})
 	routed.terrain.fill(World.GRASS); routed.biomes.fill(World.MEADOW); routed.prepare_ecology()
 	var path: Array[Vector2i]=[Vector2i(3,4),Vector2i(26,4),Vector2i(26,26)]
 	routed.begin_stroke(); routed.fertilize_path(path,0,0,World.TREE_FERTILIZER); routed.end_stroke()

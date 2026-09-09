@@ -1,5 +1,7 @@
 extends SceneTree
 
+const Fixtures=preload("res://tests/world_fixtures.gd")
+
 const World = preload("res://scripts/world_data.gd")
 const Save = preload("res://scripts/save_store.gd")
 var checks = 0
@@ -10,7 +12,7 @@ func check(ok: bool, message: String) -> void:
 	if not ok: failures.append(message); push_error(message)
 
 func _initialize() -> void:
-	var w = World.generate({"width":32,"height":32,"template":"ocean","trees":0})
+	var w = Fixtures.empty({"width":32,"height":32,"trees":0})
 	w.terrain.fill(World.FOREST); w.biomes.fill(World.TEMPERATE); w.prepare_ecology()
 	var i = 16*32+16
 	w.sow(i,1)
@@ -45,7 +47,7 @@ func _initialize() -> void:
 	var habitats: Dictionary = {}
 	for cell in map.terrain.size():
 		if not World.is_water(map.terrain[cell]): habitats[map.biomes[cell]] = true
-	check(habitats.size() >= 10,"A new default world visibly includes more than the original seven habitats")
+	check(habitats.size() >= 3 and habitats.size() <= 5,"A new world selects three to five large habitat provinces")
 	check(Save.decode(Save.encode(map)).world != null,"Expanded generated world is valid on disk")
 	var record = Save.encode(untreated)
 	record.version = 4
@@ -60,18 +62,18 @@ func _initialize() -> void:
 	var latest = Save.encode(map); latest.version=4
 	check(Save.decode(latest).world==null,"Old schema cannot silently accept newly appended habitats")
 	check(w.paint(Vector2i(-200,10),4,World.GRASS)==Rect2i(),"Dragging beyond the map produces an empty valid update region")
-	var clipped = World.generate({"width":32,"height":32,"template":"ocean","trees":0})
+	var clipped = Fixtures.empty({"width":32,"height":32,"trees":0})
 	var mask=clipped.brush_cells(Vector2i(4,4),30,0)
 	clipped.paint(Vector2i(4,4),30,World.GRASS,0)
 	check(clipped.terrain.count(World.GRASS)==mask.size(),"Oversized brush requests share the preview size limit at map edges")
 	# Catalog tails used to be unreachable because the birth sample was divided first.
-	var forest = World.generate({"width":80,"height":80,"template":"ocean","seed":421,"trees":0})
+	var forest = Fixtures.empty({"width":80,"height":80,"seed":421,"trees":0})
 	forest.terrain.fill(World.FOREST); forest.biomes.fill(World.TEMPERATE); forest.prepare_ecology()
 	forest.advance(World.YEAR_SECONDS*6)
 	check(forest.plants.has(50) and forest.plants.has(49),"Natural regeneration reaches fungi and shrubs at the end of the habitat catalog")
 	# Observe reproduction from one adult, independently of spontaneous ground births.
 	var parent=16*32+16
-	var grove=World.generate({"width":32,"height":32,"template":"ocean","seed":9831,"trees":0})
+	var grove=Fixtures.empty({"width":32,"height":32,"seed":9831,"trees":0})
 	grove.terrain.fill(World.FOREST); grove.biomes.fill(World.TEMPERATE); grove.prepare_ecology()
 	grove.sow(parent,1); grove.plant_stage[parent]=World.ADULT; grove.plant_age[parent]=grove.maturity(parent)
 	grove.colonizable.fill(1); grove.ecology_sites.assign([parent])

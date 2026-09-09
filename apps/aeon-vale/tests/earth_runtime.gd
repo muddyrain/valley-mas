@@ -13,7 +13,7 @@ func run() -> void:
 	await capture("earth14-menu-small"); menu_fits()
 	DisplayServer.window_set_size(Vector2i(1600,1000)); game._set_ui_scale(1)
 	await process_frame
-	var w=World.generate({"width":144,"height":96,"seed":7193,"template":"ocean","trees":0})
+	var w=Fixtures.empty({"width":144,"height":96,"seed":7193,"trees":0})
 	w.weather_enabled=false; w.spread_enabled=false; w.biomes.fill(World.MARSH)
 	for cell in [Vector2i(26,48),Vector2i(116,48)]:
 		w.begin_stroke(); w.paint(cell,16,World.COMBO_TOOLS+World.BIRCH); w.end_stroke()
@@ -63,7 +63,7 @@ func run() -> void:
 	await cast(game.view.size/2); await capture("earth14-rain-without-cloud-near")
 	check(game.view.cloud_visibility()==0 and island.rain_clouds.size()==1,"Near rain remains active while its cloud is hidden")
 	# Actual player earthquake on a populated, uniform plateau.
-	w=World.generate({"width":144,"height":96,"seed":5,"template":"ocean","trees":0})
+	w=Fixtures.empty({"width":144,"height":96,"seed":5,"trees":0})
 	w.terrain.fill(World.GRASS); w.biomes.fill(World.BIRCH); w.elevation.fill(.1)
 	w.prepare_ecology(); World.Landscape.populate(w,.9,Callable()); w.image=w.bake_image()
 	w.weather_enabled=false; w.spread_enabled=false

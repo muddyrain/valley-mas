@@ -104,13 +104,13 @@ func run() -> void:
 func preview_races() -> void:
 	game.dirty=false; game._open_new_world(); game.selected_size=0
 	var previous=game.world.world_seed
-	await click(game.template_buttons.twin); await click(game.template_buttons.lagoon)
-	check(game.generation_thread==null and game.map_preview.texture==game.previews.lagoon,"Rapid template choices only swap bundled thumbnails")
+	await click(game.template_buttons.fjords); await click(game.template_buttons.donut)
+	check(game.generation_thread==null and game.map_preview.texture==game.previews.donut,"Rapid template choices only swap bundled thumbnails")
 	await click(find_button(game.modal,"让世界诞生"))
 	check(game.loading!=null and game.generation_thread!=null,"Creation starts a loading screen and a single world worker")
 	while game.loading!=null: await process_frame
 	game.paused=true; game._update_pause_buttons()
-	check(game.world.world_seed!=previous and game.world.width==192 and game.world.template=="lagoon","Each creation randomizes a new map and applies its selected template")
+	check(game.world.world_seed!=previous and game.world.width==World.MAP_SIZES[0].x and game.world.template=="donut","Each creation randomizes a new map and applies its selected template")
 	var camera: Vector2=game.view.camera
 	await hold_key(KEY_S,.15,true)
 	check(game.view.camera==camera and game.modal!=null,"Ctrl+S opens save without panning south")
@@ -120,7 +120,7 @@ func preview_races() -> void:
 	check(game.modal==null and game.world==retained and game.generation_thread==null,"Closing selection retains the current world without pending generation")
 
 func ecology_scene() -> void:
-	var w=World.generate({"width":80,"height":64,"template":"ocean","seed":372,"trees":0})
+	var w=Fixtures.empty({"width":80,"height":64,"seed":372,"trees":0})
 	w.terrain.fill(World.FOREST); w.warmth.fill(.49); w.moisture.fill(.60); w.elevation.fill(.1)
 	for i in w.terrain.size(): w.biomes[i]=World.BIRCH if i%w.width<40 else World.TEMPERATE
 	w.prepare_ecology(); World.Landscape.populate(w,.8,Callable()); w.image=w.bake_image()
@@ -136,7 +136,7 @@ func ecology_scene() -> void:
 	metrics.changed_tiles=w.spread_changes
 	check(w.biomes!=initial and texture!=terrain_bytes(),"Twenty-year ecology changes update the actual ground textures")
 	check(game.view.surface_revision==w.surface_revision and Save.decode(Save.encode(w)).world!=null,"Spread and newly adapted vegetation render and save together")
-	var complete=w.image.duplicate(); complete.resize(w.width*2,w.height*2,Image.INTERPOLATE_LANCZOS)
+	var complete=w.image.duplicate(); complete.resize(w.width*World.Landscape.OVERVIEW_PIXELS,w.height*World.Landscape.OVERVIEW_PIXELS,Image.INTERPOLATE_NEAREST)
 	var whole_bytes=complete.get_data(); var partial_bytes=game.view.overview_image.get_data()
 	var different=0; var largest=0
 	for i in whole_bytes.size():
@@ -150,7 +150,7 @@ func pending_surface_switch() -> void:
 	former.begin_stroke(); var area=former.paint(Vector2i(18,18),8,World.BIOME_TOOLS+World.SAKURA); former.end_stroke()
 	game.view.refresh_edit(area)
 	check(game.view.surface_thread!=null,"Painting queues a background surface update")
-	var fresh=World.generate({"width":32,"height":32,"template":"ocean","trees":0})
+	var fresh=Fixtures.empty({"width":32,"height":32,"trees":0})
 	setup_world(fresh)
 	await settle_surface()
 	check(game.view.terrain_textures[Vector2i.ZERO].get_image().get_pixel(20,20)==fresh.image.get_pixel(20,20) and game.view.world==fresh,"An older render job cannot overwrite a newly entered world")

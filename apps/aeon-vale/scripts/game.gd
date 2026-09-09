@@ -10,8 +10,9 @@ const Preferences = preload("res://scripts/ui_preferences.gd")
 const GOLD = StoryTheme.GOLD
 const CREAM = StoryTheme.INK
 const MUTED = StoryTheme.MUTED
-const TEMPLATES = ["continent", "archipelago", "lagoon", "twin", "highlands", "caldera", "wetlands", "ocean"]
-const TEMPLATE_NAMES = ["初生大陆", "星罗群岛", "翡翠环礁", "双生之地", "远古高原", "群山之环", "水泽国度", "无垠之海"]
+const Templates=preload("res://scripts/world_templates.gd")
+const TEMPLATES = Templates.IDS
+const TEMPLATE_NAMES = Templates.NAMES
 const PLANT_NAMES = World.Catalog.NAMES
 
 var world
@@ -68,7 +69,7 @@ var speed_button: Button
 var toast_label: Label
 var toast_time: float = 0
 var selected_template: String = "continent"
-var selected_size: int = 1
+var selected_size: int = World.DEFAULT_MAP_SIZE
 var template_buttons: Dictionary = {}
 var size_buttons: Array[Button] = []
 var previews: Dictionary = {}
@@ -92,6 +93,9 @@ var map_preview: TextureRect
 var preview_status: Label
 var new_world_open: bool = false
 var generation_controls: Dictionary = {}
+var generation_recipes: Dictionary = {}
+var generation_rows: Array[Control] = []
+var advanced_button: Button
 var advanced_panel: VBoxContainer
 var template_panel: VBoxContainer
 
@@ -273,7 +277,7 @@ func _build_title() -> void:
 	stack.add_child(extras)
 	card.minimum_size_changed.connect(func(): call_deferred("_layout_title"))
 	call_deferred("_layout_title")
-	var foot = label("纪元谷 · 沧海桑田   /   0.14",12,CREAM)
+	var foot = label("纪元谷 · 山海远望   /   " + str(ProjectSettings.get_setting("application/config/version")),12,CREAM)
 	foot.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	foot.offset_top = -36
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -608,6 +612,7 @@ func _new_modal(title: String, width: int = 730) -> VBoxContainer:
 	return contents
 
 func _close_modal() -> void:
+	if new_world_open: _remember_recipe()
 	new_world_open = false
 	if is_instance_valid(modal):
 		ui_root.remove_child(modal)
@@ -673,7 +678,9 @@ func _open_new_world() -> void:
 	for i in TEMPLATES.size():
 		var template_name=TEMPLATES[i]
 		var item=button("",func():
+			_remember_recipe()
 			selected_template=template_name
+			_show_recipe()
 			for key in template_buttons: selected_style(template_buttons[key],key==template_name)
 			map_preview.texture=previews.get(template_name)
 			preview_status.text=TEMPLATE_NAMES[TEMPLATES.find(template_name)]+" · 地形示意"
@@ -700,11 +707,12 @@ func _open_new_world() -> void:
 			selected_size=i
 			for j in size_buttons.size(): selected_style(size_buttons[j],j==i)
 		,Vector2(0,40))
-		item.tooltip_text=["192 × 128","288 × 192","384 × 256"][i]
+		var dimensions: Vector2i=World.MAP_SIZES[i]
+		item.tooltip_text="%d × %d" % [dimensions.x,dimensions.y]
 		item.size_flags_horizontal=Control.SIZE_EXPAND_FILL; item.add_theme_font_size_override("font_size",14)
 		size_buttons.append(item); size_row.add_child(item); selected_style(item,selected_size==i)
 	body.add_child(sizes)
-	var advanced=Button.new(); advanced.text="地形细调  ›"
+	var advanced=Button.new(); advanced_button=advanced; advanced.text="地形细调  ›"
 	advanced.custom_minimum_size.y=40; advanced.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND
 	advanced.pressed.connect(func():
 		template_panel.hide(); advanced_panel.show()
@@ -715,15 +723,8 @@ func _open_new_world() -> void:
 	pages.add_child(advanced_panel); generation_controls.clear()
 	advanced_panel.add_child(button("‹  返回地形图案",func(): advanced_panel.hide(); template_panel.show(),Vector2(0,40)))
 	advanced_panel.add_child(label("地形细调",20,CREAM))
-	for item in [["land_size","陆块大小",1,10,6],["islands","额外岛屿",0,12,4],["coast","海岸曲折",0,10,4]]:
-		var row=VBoxContainer.new(); row.add_theme_constant_override("separation",12)
-		var heading=HBoxContainer.new(); row.add_child(heading)
-		var caption=label(item[1],14,MUTED); caption.size_flags_horizontal=Control.SIZE_EXPAND_FILL; heading.add_child(caption)
-		var slider=HSlider.new(); slider.min_value=item[2]; slider.max_value=item[3]; slider.step=1; slider.value=item[4]
-		slider.custom_minimum_size.y=26; row.add_child(slider)
-		var value=label(str(item[4]),14,CREAM); value.custom_minimum_size.x=24; value.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT; heading.add_child(value)
-		slider.value_changed.connect(func(amount): value.text=str(int(amount)))
-		generation_controls[item[0]]=slider; advanced_panel.add_child(row)
+	generation_rows.clear()
+	_show_recipe()
 	advanced_panel.hide()
 	var footer=HBoxContainer.new(); footer.alignment=BoxContainer.ALIGNMENT_END
 	footer.add_theme_constant_override("separation",12)
@@ -733,14 +734,40 @@ func _open_new_world() -> void:
 	footer.add_child(create); contents.add_child(footer)
 	new_world_open=true
 
+func _remember_recipe() -> void:
+	var config=Templates.recipe(selected_template,generation_recipes.get(selected_template,{}))
+	for key in generation_controls: config[key]=int(generation_controls[key].value)
+	if is_instance_valid(density_slider): config.trees=density_slider.value
+	if is_instance_valid(rivers_toggle): config.rivers=rivers_toggle.button_pressed
+	generation_recipes[selected_template]=Templates.recipe(selected_template,config)
+
+func _show_recipe() -> void:
+	for row in generation_rows: row.free()
+	generation_rows.clear(); generation_controls.clear()
+	var config=Templates.recipe(selected_template,generation_recipes.get(selected_template,{}))
+	density_slider.value=config.trees
+	rivers_toggle.visible=selected_template in Templates.RIVER_TYPES
+	rivers_toggle.button_pressed=config.rivers
+	advanced_button.visible=not Templates.CONTROLS[selected_template].is_empty()
+	for item in Templates.CONTROLS[selected_template]:
+		var row=VBoxContainer.new(); row.add_theme_constant_override("separation",12)
+		var heading=HBoxContainer.new(); row.add_child(heading)
+		var caption=label(item[1],14,MUTED); caption.size_flags_horizontal=Control.SIZE_EXPAND_FILL; heading.add_child(caption)
+		var slider=HSlider.new(); slider.min_value=item[2]; slider.max_value=item[3]; slider.step=1; slider.value=config[item[0]]
+		slider.custom_minimum_size.y=26; row.add_child(slider)
+		var value=label(str(int(slider.value)),14,CREAM); value.custom_minimum_size.x=24; value.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT; heading.add_child(value)
+		slider.value_changed.connect(func(amount): value.text=str(int(amount)))
+		generation_controls[item[0]]=slider; advanced_panel.add_child(row); generation_rows.append(row)
+
 func _randomize_pattern() -> void:
 	var previous=map_pattern
 	while map_pattern==previous: map_pattern=randi_range(1,999999999)
 
 func _current_new_config() -> Dictionary:
-	var dimensions: Vector2i=[Vector2i(192,128),Vector2i(288,192),Vector2i(384,256)][selected_size]
-	var config={"seed":map_pattern,"name":name_input.text,"width":dimensions.x,"height":dimensions.y,"template":selected_template,"trees":density_slider.value,"rivers":rivers_toggle.button_pressed,"spread":true}
-	for key in generation_controls: config[key]=int(generation_controls[key].value)
+	var dimensions: Vector2i=World.MAP_SIZES[selected_size]
+	_remember_recipe()
+	var config=generation_recipes[selected_template].duplicate()
+	config.merge({"seed":map_pattern,"name":name_input.text,"width":dimensions.x,"height":dimensions.y,"template":selected_template,"spread":true},true)
 	return config
 
 func _submit_new_world() -> void:

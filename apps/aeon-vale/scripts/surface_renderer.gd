@@ -2,6 +2,7 @@ extends RefCounted
 
 const World=preload("res://scripts/world_data.gd")
 const CHUNK=32
+const OVERVIEW_PIXELS=World.Landscape.OVERVIEW_PIXELS
 
 static func chunk_image(w, surface: Image, coordinate: Vector2i) -> Image:
 	var area=Rect2i(coordinate*CHUNK,Vector2i.ONE*CHUNK).intersection(Rect2i(0,0,w.width,w.height))
@@ -35,7 +36,7 @@ static func build(w, source: Image, overview: Image, cells: Dictionary) -> Dicti
 		var area=Rect2i(coordinate*4,Vector2i(4,4)).intersection(Rect2i(0,0,w.width,w.height))
 		var margin=area.grow(2).intersection(Rect2i(0,0,w.width,w.height))
 		var patch=surface.get_region(Rect2i(margin.position*World.Ground.PIXELS,margin.size*World.Ground.PIXELS))
-		patch.resize(margin.size.x*2,margin.size.y*2,Image.INTERPOLATE_LANCZOS)
-		small.blit_rect(patch,Rect2i((area.position-margin.position)*2,area.size*2),area.position*2)
+		patch.resize(margin.size.x*OVERVIEW_PIXELS,margin.size.y*OVERVIEW_PIXELS,Image.INTERPOLATE_NEAREST)
+		small.blit_rect(patch,Rect2i((area.position-margin.position)*OVERVIEW_PIXELS,area.size*OVERVIEW_PIXELS),area.position*OVERVIEW_PIXELS)
 	for coordinate in chunks: chunks[coordinate]=chunk_image(w,surface,coordinate)
 	return {"surface":surface,"chunks":chunks,"overview":small}

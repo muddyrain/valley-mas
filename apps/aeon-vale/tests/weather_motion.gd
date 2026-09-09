@@ -15,7 +15,8 @@ func run() -> void:
 	if not OS.get_cmdline_user_args().has("large-window"):
 		DisplayServer.window_set_size(Vector2i(1440,900))
 		await process_frame
-	var w=World.generate({"width":384,"height":256,"seed":781936,"template":"continent","trees":.9})
+	var dimensions: Vector2i=World.MAP_SIZES[-1] if OS.get_cmdline_user_args().has("wide") else Vector2i(384,256)
+	var w=World.generate({"width":dimensions.x,"height":dimensions.y,"seed":781936,"template":"continent","trees":.9})
 	setup_world(w); game._select_category(1)
 	var spot=Vector2i(w.width/2,w.height/2)
 	var best=INF

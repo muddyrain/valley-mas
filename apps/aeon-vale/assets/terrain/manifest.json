@@ -1,0 +1,20 @@
+{
+  "id": "snow-crests",
+  "file": "snow-crests.png",
+  "source": "sources/snow-crests.png",
+  "prompt": "sources/prompt.json",
+  "provenance": "Original built-in image_gen sprites; reference game screenshots guide appearance only and are not extracted.",
+  "size": [128, 96],
+  "frames": 4,
+  "frame_size": [64, 48],
+  "pivot": "centre",
+  "collision": "none; rendered on existing mountain cells only",
+  "format": "RGBA8, six opaque colours plus zeroed transparent pixels",
+  "normalization": "Chroma key removal, 2 by 2 slicing, contained 60 by 42 content, fixed six-colour quantization without dithering; binary alpha",
+  "world_scale": "12 source pixels per terrain cell; broad crests occupy 128 by 96 source pixels at nearest 2x enlargement, narrow summits use the same 64 by 48 native frames",
+  "sampling": "nearest, lossless import, no alpha-border recolouring, no source mipmaps; shared live overview downsample",
+  "placement": "Stable jittered world anchors, selected by saved elevation and local relief; complete top/side/rock-foot shapes replace tiled white masks",
+  "dependencies": "Each footprint depends on local height and supporting mountain cells. An 11-cell halo covers these dependencies for direct and worker redraws.",
+  "replacement": "Rejected snow-rock source, raster and imports deleted. No alternate production versions or texture-fill fallback.",
+  "state": "Integrated in Windows 0.23; 26 terrain checks, 26 native checks, pixel inspection and export startup verified. User aesthetic acceptance remains separate."
+}

@@ -32,7 +32,7 @@ func run() -> void:
 	quit(0 if failures.is_empty() else 1)
 
 func garden() -> void:
-	var w = World.generate({"width":216,"height":144,"template":"ocean","seed":5912,"trees":0})
+	var w = Fixtures.empty({"width":216,"height":144,"seed":5912,"trees":0})
 	for biome in 18:
 		w.begin_stroke(); w.paint(Vector2i(18+(biome%6)*36,24+(biome/6)*48),15,World.GRASS,1); w.end_stroke()
 	setup_world(w)
@@ -57,7 +57,7 @@ func garden() -> void:
 			await capture("76-habitat-%d-%d" % [row,pair])
 
 func fertilizer() -> void:
-	var w = World.generate({"width":64,"height":48,"template":"ocean","seed":239,"trees":0})
+	var w = Fixtures.empty({"width":64,"height":48,"seed":239,"trees":0})
 	w.terrain.fill(World.FOREST); w.biomes.fill(World.BIRCH); w.prepare_ecology()
 	var seeds: Array[int] = []
 	for y in range(16,30,4):

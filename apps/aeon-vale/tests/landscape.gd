@@ -1,5 +1,7 @@
 extends SceneTree
 
+const Fixtures=preload("res://tests/world_fixtures.gd")
+
 const World=preload("res://scripts/world_data.gd")
 const Save=preload("res://scripts/save_store.gd")
 var checks=0
@@ -19,23 +21,27 @@ func _initialize() -> void:
 		var recipe=config.duplicate(); recipe.merge(change,true)
 		var alternative=World.generate(recipe)
 		check(w.terrain!=alternative.terrain,"Generator responds to "+str(change))
-	var forest_ground=0; var soil=0; var fantasy=0; var valid=true
+	var valid=true
 	for i in w.terrain.size():
-		if w.terrain[i] in [World.GRASS,World.FOREST,World.HILLS]:
-			soil+=1
-			if w.biomes[i] in [World.MEADOW,World.TEMPERATE,World.BIRCH]: forest_ground+=1
-			if w.biomes[i]>=World.CITRUS or w.biomes[i]==World.MUSHROOM: fantasy+=1
 		if w.plants[i]>0: valid=valid and w.can_live(i,w.plants[i])
-	check(forest_ground>soil*.55 and fantasy<soil*.20,"Natural provinces dominate; fantasy remains local accents")
+	var provinces={}
+	for i in w.terrain.size():
+		if not w.is_water(w.terrain[i]): provinces[w.biomes[i]]=true
+	check(provinces.size()>=3 and provinces.size()<=5,"Three to five coherent biome provinces")
 	check(valid and w.life_counts().adult>0 and w.life_counts().young>0,"Initial world mixes suitable adults and seedlings")
-	for template in ["continent","archipelago","lagoon","twin","highlands","caldera","wetlands","ocean"]:
+	for template in World.Landscape.Templates.IDS:
 		var map=World.generate({"width":48,"height":32,"template":template,"seed":7719})
-		var rim=true
-		for x in map.width: rim=rim and map.is_water(map.terrain[x]) and map.is_water(map.terrain[(map.height-1)*map.width+x])
-		for y in map.height: rim=rim and map.is_water(map.terrain[y*map.width]) and map.is_water(map.terrain[y*map.width+map.width-1])
-		check(rim and Save.decode(Save.encode(map)).world!=null,"Template has a water rim and a valid save: "+template)
+		check(Save.decode(Save.encode(map)).world!=null,"New template has a valid save: "+template)
+	for key in ["lakes","ring_width","strait_width"]:
+		var bad=Save.encode(w); bad.generation_settings[key]=99
+		check(Save.decode(bad).world==null,"Malformed optional control rejected: "+key)
+	var old_recipe=Save.encode(w)
+	for key in ["lakes","ring_width","strait_width"]: old_recipe.generation_settings.erase(key)
+	old_recipe.template="lagoon"
+	var legacy_recipe=Save.decode(old_recipe).world
+	check(legacy_recipe!=null and legacy_recipe.template=="lagoon" and legacy_recipe.terrain==w.terrain,"Historical template identifiers load actual cells without regeneration")
 
-	var front=World.generate({"width":64,"height":48,"template":"ocean","trees":0,"seed":9831})
+	var front=Fixtures.empty({"width":64,"height":48,"trees":0,"seed":9831})
 	front.terrain.fill(World.FOREST)
 	front.warmth.fill(.49); front.moisture.fill(.60); front.elevation.fill(.12)
 	for i in front.terrain.size(): front.biomes[i]=World.BIRCH if i%front.width<32 else World.TEMPERATE
@@ -54,7 +60,7 @@ func _initialize() -> void:
 	var legacy=Save.decode(old).world
 	check(legacy!=null and not legacy.spread_enabled and legacy.biomes==front.biomes and legacy.plant_stage==front.plant_stage and is_equal_approx(legacy.age/World.YEAR_SECONDS,front.age/60.0),"Old saves preserve their world and start with spreading off")
 	for barrier in [World.RIVER,World.BEACH,World.MOUNTAIN,World.RIFT]:
-		var divided=World.generate({"width":32,"height":32,"template":"ocean","trees":0})
+		var divided=Fixtures.empty({"width":32,"height":32,"trees":0})
 		divided.terrain.fill(World.FOREST); divided.biomes.fill(World.BIRCH)
 		for i in divided.terrain.size():
 			if i%32==16: divided.terrain[i]=barrier
@@ -62,7 +68,7 @@ func _initialize() -> void:
 		divided.prepare_ecology(); var borders=divided.biomes.duplicate()
 		divided.advance(1200)
 		check(divided.biomes==borders,"Spread cannot cross terrain barrier "+str(barrier))
-	var hills=World.generate({"width":32,"height":32,"template":"ocean","trees":0})
+	var hills=Fixtures.empty({"width":32,"height":32,"trees":0})
 	hills.terrain.fill(World.HILLS); hills.warmth.fill(.49); hills.moisture.fill(.60)
 	for i in hills.terrain.size(): hills.biomes[i]=World.BIRCH if i%32<16 else World.TEMPERATE
 	hills.prepare_ecology(); hills.advance(300)

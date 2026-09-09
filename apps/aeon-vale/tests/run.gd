@@ -19,7 +19,7 @@ func _initialize() -> void:
 	config.seed = 48218
 	check(first.terrain != World.generate(config).terrain, "Changing seed changes the world")
 	config.seed = 48217
-	config.template = "archipelago"
+	config.template = "islands"
 	check(first.terrain != World.generate(config).terrain, "Template changes landforms")
 	check(first.terrain.size() == 96 * 64, "Map dimensions match the requested world")
 	check(first.terrain.has(World.BEACH) and first.terrain.has(World.SHALLOW) and first.terrain.has(World.DEEP), "World has beaches and graduated water depths")
@@ -59,7 +59,7 @@ func _initialize() -> void:
 	for y in range(0, 64, 2):
 		for x in range(0, 96, 2): mix[World.hash_cell(x, y, 48217) % 2] = true
 	check(mix.size() == 2, "Even vegetation anchors still receive both shape variants")
-	config.template = "lagoon"
+	config.template = "donut"
 	var lagoon = World.generate(config)
 	check(lagoon.terrain[32 * 96 + 48] <= World.SHALLOW, "Lagoon template has a central water body")
 	config.rivers = false

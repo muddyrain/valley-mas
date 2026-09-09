@@ -1,5 +1,7 @@
 extends SceneTree
 
+const Fixtures=preload("res://tests/world_fixtures.gd")
+
 const World = preload("res://scripts/world_data.gd")
 const Save = preload("res://scripts/save_store.gd")
 var checks = 0
@@ -12,7 +14,7 @@ func check(value: bool, message: String) -> void:
 		push_error(message)
 
 func _initialize() -> void:
-	var world = World.generate({"width": 48, "height": 48, "seed": 8241, "template": "ocean", "trees": 0})
+	var world = Fixtures.empty({"width": 48, "height": 48, "seed": 8241,  "trees": 0})
 	check(world.has_method("advance"), "World time must drive plant life, not only a displayed year")
 	if not world.has_method("advance"):
 		quit(1)

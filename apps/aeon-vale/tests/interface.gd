@@ -1,5 +1,7 @@
 extends SceneTree
 
+const Fixtures=preload("res://tests/world_fixtures.gd")
+
 const World = preload("res://scripts/world_data.gd")
 const Save = preload("res://scripts/save_store.gd")
 const Preferences = preload("res://scripts/ui_preferences.gd")

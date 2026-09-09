@@ -1,0 +1,10 @@
+{
+  "size": [128, 96],
+  "frames": 4,
+  "frame_size": [64, 48],
+  "content_limit": [60, 42],
+  "colors": 7,
+  "alpha": [0, 255],
+  "palette": ["e1e8e5", "c4d1d1", "91a6b0", "657c88", "454c4c", "535954"],
+  "source_background": "magenta chroma key removed before size and palette normalization"
+}

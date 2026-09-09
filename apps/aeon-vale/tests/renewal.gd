@@ -77,7 +77,7 @@ func _initialize() -> void:
 	print("AEON VALE RENEWAL: "+JSON.stringify(result)); quit(0 if failures.is_empty() else 1)
 
 func plot(biome: int):
-	var w=World.generate({"width":32,"height":32,"seed":89721,"template":"ocean","trees":0})
+	var w=Fixtures.empty({"width":32,"height":32,"seed":89721,"trees":0})
 	w.terrain.fill(World.FOREST); w.biomes.fill(biome); w.prepare_ecology()
 	w.spread_enabled=false; w.weather_enabled=false
 	return w

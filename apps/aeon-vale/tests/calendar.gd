@@ -1,7 +1,7 @@
 extends "res://tests/landscape.gd"
 
 func _initialize() -> void:
-	var w=World.generate({"width":64,"height":48,"seed":9831,"template":"ocean","trees":0})
+	var w=Fixtures.empty({"width":64,"height":48,"seed":9831,"trees":0})
 	w.terrain.fill(World.FOREST); w.biomes.fill(World.TEMPERATE); w.prepare_ecology()
 	w.weather_enabled=false
 	check(World.YEAR_SECONDS==84,"Twelve seven-second months form one 1x year")
@@ -41,7 +41,7 @@ func _initialize() -> void:
 		var resumed=Save.decode(JSON.parse_string(JSON.stringify(Save.encode(original),"",true,true))).world
 		original.advance(8.0); resumed.advance(3.75); resumed.advance(4.25)
 		check(original.plants==resumed.plants and original.plant_age==resumed.plant_age,"Saving during a cohort never skips or repeats plant work: "+str(phase))
-	var edge=World.generate({"width":64,"height":48,"seed":9831,"template":"ocean","trees":0})
+	var edge=Fixtures.empty({"width":64,"height":48,"seed":9831,"trees":0})
 	edge.terrain.fill(World.FOREST); edge.warmth.fill(.49); edge.moisture.fill(.60)
 	for i in edge.terrain.size(): edge.biomes[i]=World.BIRCH if i%edge.width<32 else World.TEMPERATE
 	edge.prepare_ecology(); edge.advance(84*3)

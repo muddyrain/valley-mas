@@ -10,7 +10,7 @@ func run() -> void:
 	game=load("res://scenes/main.tscn").instantiate(); root.add_child(game)
 	await process_frame
 	while game.loading!=null: await process_frame
-	var w=World.generate({"width":96,"height":64,"seed":4673,"template":"ocean","trees":0})
+	var w=Fixtures.empty({"width":96,"height":64,"seed":4673,"trees":0})
 	w.terrain.fill(World.FOREST); w.biomes.fill(World.BIRCH); w.prepare_ecology(); w.image=w.bake_image()
 	setup_world(w)
 	game.view.zoom=4; game.view.camera=game.view.size/2-Vector2(48,32)*World.TILE*4

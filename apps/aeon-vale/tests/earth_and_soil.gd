@@ -1,5 +1,7 @@
 extends SceneTree
 
+const Fixtures=preload("res://tests/world_fixtures.gd")
+
 const World=preload("res://scripts/world_data.gd")
 const Save=preload("res://scripts/save_store.gd")
 var checks=0
@@ -13,7 +15,7 @@ func cast(w, tool: int, radius: int=10) -> void:
 	w.begin_stroke(); w.paint(Vector2i(32,32),radius,tool); w.end_stroke()
 
 func _initialize() -> void:
-	var w=World.generate({"width":64,"height":64,"seed":917,"template":"ocean","trees":0})
+	var w=Fixtures.empty({"width":64,"height":64,"seed":917,"trees":0})
 	w.weather_enabled=false; w.spread_enabled=false; w.biomes.fill(World.MARSH)
 	cast(w,World.GRASS)
 	var color=w.image.get_pixel(32*12+6,32*12+6)
@@ -28,7 +30,7 @@ func _initialize() -> void:
 	check(color.g>color.r,"Grass seeds establish visible green cover")
 	cast(w,World.PLANT_FERTILIZER)
 	check(w.plant_count()>0,"Fertilizer grows the seeded ecology")
-	var ocean=World.generate({"width":64,"height":64,"seed":917,"template":"ocean","trees":0})
+	var ocean=Fixtures.empty({"width":64,"height":64,"seed":917,"trees":0})
 	var changed=false
 	for n in 4:
 		var before=ocean.terrain.duplicate(); cast(ocean,World.EARTHQUAKE,12)
@@ -40,7 +42,7 @@ func _initialize() -> void:
 	quit(0 if failures.is_empty() else 1)
 
 func verify_persistence_and_ecology() -> void:
-	var w=World.generate({"width":64,"height":64,"seed":917,"template":"ocean","trees":0})
+	var w=Fixtures.empty({"width":64,"height":64,"seed":917,"trees":0})
 	w.weather_enabled=false; w.spread_enabled=false
 	cast(w,World.FOREST)
 	var original=w.bare_soil.duplicate()
@@ -77,7 +79,7 @@ func verify_persistence_and_ecology() -> void:
 	file.store_string(bytes); file.close()
 	check(Save.write_slot(old,1).is_empty() and FileAccess.get_file_as_string(Save.path(1)+".v10.bak")==bytes,"First v11 save preserves exact v10 bytes")
 	# Edge colonisation follows the existing spread switch and world clock.
-	w=World.generate({"width":64,"height":64,"seed":914,"template":"ocean","trees":0})
+	w=Fixtures.empty({"width":64,"height":64,"seed":914,"trees":0})
 	w.terrain.fill(World.GRASS); w.biomes.fill(World.MEADOW); w.bare_soil.fill(1)
 	w.warmth.fill(.53); w.moisture.fill(.48); w.elevation.fill(.1)
 	for y in 64:
@@ -97,7 +99,7 @@ func verify_faults() -> void:
 	var up=false; var down=false
 	for shape in 4:
 		for seed in range(1,5):
-			var w=World.generate({"width":64,"height":64,"seed":seed,"template":"ocean","trees":0})
+			var w=Fixtures.empty({"width":64,"height":64,"seed":seed,"trees":0})
 			w.terrain.fill(World.GRASS); w.biomes.fill(World.MEADOW); w.elevation.fill(.1)
 			var terrain=w.terrain.duplicate(); var elevations=w.elevation.duplicate()
 			w.begin_stroke(); w.paint(Vector2i(32,32),12,World.EARTHQUAKE,shape); w.end_stroke()

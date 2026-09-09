@@ -1,5 +1,7 @@
 extends SceneTree
 
+const Fixtures=preload("res://tests/world_fixtures.gd")
+
 const World = preload("res://scripts/world_data.gd")
 const Save = preload("res://scripts/save_store.gd")
 var checks = 0
@@ -10,7 +12,7 @@ func check(ok: bool, message: String) -> void:
 	if not ok: failures.append(message); push_error(message)
 
 func _initialize() -> void:
-	var w = World.generate({"width":32,"height":32,"template":"ocean","seed":12,"trees":0})
+	var w = Fixtures.empty({"width":32,"height":32,"seed":12,"trees":0})
 	check(World.BIOME_NAMES.size() == 18, "Eighteen distinct ecology environments")
 	check(w.has_method("maturity"), "Growth and calendar have a shared explicit time model")
 	if not w.has_method("maturity"): finish(); return

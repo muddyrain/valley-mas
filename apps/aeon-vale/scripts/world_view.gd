@@ -12,9 +12,10 @@ const PlantLayer = preload("res://scripts/plant_layer.gd")
 const WeatherArt = preload("res://scripts/weather_art.gd")
 const TempestArt = preload("res://scripts/tempest_art.gd")
 var map_layer: Node2D
+var vegetation_clip: Control
 var ground_sprite: Node2D
 var overview_sprite: Sprite2D
-var canopy_sprite: Sprite2D
+var canopy_sprite: Node2D
 var row_nodes: Dictionary = {}
 var canopy_dirty: Dictionary = {}
 var pending_rows: Dictionary = {}
@@ -22,6 +23,8 @@ var canopy_upload_due: bool = false
 var canopy_uploaded: float = 0
 var layout_signature: Array = []
 var plants_visibility: bool = true
+var boundary_revision: int = -1
+var boundary_solid: bool = false
 var cast_accumulator: float = 0.0
 var cast_events: Array = []
 var cast_serial: int = 0
@@ -37,7 +40,6 @@ var pending_surface_revision: int=-1
 var overview_texture: ImageTexture
 var overview_image: Image
 var canopy_image: Image
-var canopy_texture: ImageTexture
 var surface_revision: int = -1
 var fit_zoom: float = 1.0
 var tool_icon: Texture2D
@@ -83,9 +85,16 @@ func _ready() -> void:
 	for i in World.Catalog.MAX_ID: sprites.append(Flora.icon(i + 1))
 	map_layer=Node2D.new(); add_child(map_layer)
 	ground_sprite=Node2D.new(); map_layer.add_child(ground_sprite)
+	vegetation_clip=Control.new(); vegetation_clip.clip_contents=true
+	vegetation_clip.mouse_filter=Control.MOUSE_FILTER_IGNORE; map_layer.add_child(vegetation_clip)
 	ground_sprite.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
 	overview_sprite=Sprite2D.new(); overview_sprite.centered=false; map_layer.add_child(overview_sprite)
-	canopy_sprite=Sprite2D.new(); canopy_sprite.centered=false; map_layer.add_child(canopy_sprite)
+	canopy_sprite=preload("res://scripts/overview_layer.gd").new(); map_layer.add_child(canopy_sprite)
+	overview_sprite.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
+	canopy_sprite.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
+	var canopy_material=CanvasItemMaterial.new()
+	canopy_material.blend_mode=CanvasItemMaterial.BLEND_MODE_PREMULT_ALPHA
+	canopy_sprite.material=canopy_material
 	effects = Control.new()
 	effects.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
 	effects.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -102,6 +111,8 @@ func set_world(value) -> void:
 		surface_thread=null
 	if world!=null: world.defer_surface=false; world.flush_pending_surface()
 	world = value
+	boundary_revision=-1
+	vegetation_clip.size=Vector2(world.width,world.height)*World.TILE
 	world.defer_surface=true
 	if Flora.atlas_texture == null:
 		for species in range(1, World.Catalog.MAX_ID + 1): Flora.prepare_atlas_species(species)
@@ -191,16 +202,19 @@ func refresh_ecology() -> void:
 func process_plant_updates() -> void:
 	if pending_rows.is_empty() and canopy_dirty.is_empty() and not canopy_upload_due: return
 	var started=Time.get_ticks_usec()
-	while not pending_rows.is_empty() and Time.get_ticks_usec()-started<2200:
+	var redraw_budget=0
+	# queue_redraw executes later in the frame; reserve its measured cost too.
+	while not pending_rows.is_empty() and Time.get_ticks_usec()-started+redraw_budget<2200:
 		var group: int=pending_rows.keys()[0]
 		pending_rows.erase(group)
 		plant_rows[group]=build_plant_rows(group*8,mini(world.height,group*8+8))
 		refresh_row_node(group)
+		redraw_budget+=row_nodes[group].redraw_usec
 		for neighbor in range(maxi(0,group-1),mini(ceili(world.height/8.0),group+2)): canopy_dirty[neighbor]=true
-	if Time.get_ticks_usec()-started<3500: update_canopy_rows()
+	if Time.get_ticks_usec()-started+redraw_budget<3500: update_canopy_rows()
 	if canopy_upload_due and (canopy_dirty.is_empty() or real_time-canopy_uploaded>.2):
-		canopy_image.generate_mipmaps(); canopy_texture.update(canopy_image)
-		canopy_upload_due=false; canopy_uploaded=real_time
+		canopy_sprite.flush(overview_image,canopy_image)
+		canopy_upload_due=not canopy_sprite.pending.is_empty(); canopy_uploaded=real_time
 	if pending_rows.is_empty():
 		plant_draws.clear()
 		for group in plant_rows: plant_draws.append_array(plant_rows[group])
@@ -238,7 +252,9 @@ func refresh_row_node(group: int) -> void:
 	if not row_nodes.has(group):
 		var node=PlantLayer.new(); node.owner_view=self
 		node.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
-		map_layer.add_child(node); row_nodes[group]=node
+		vegetation_clip.add_child(node); row_nodes[group]=node
+		# The opaque overview composite fades above the detailed scene as one image.
+		map_layer.move_child(overview_sprite,-1); map_layer.move_child(canopy_sprite,-1)
 	row_nodes[group].entries=plant_rows.get(group,[])
 	row_nodes[group].queue_redraw()
 
@@ -250,17 +266,26 @@ func sync_map_layers() -> void:
 	plants_visibility=show_plants
 	layout_signature=signature
 	map_layer.scale=Vector2.ONE*zoom
-	var far=overview_weight()>.55
-	ground_sprite.visible=not far
-	overview_sprite.visible=far
-	canopy_sprite.visible=far and show_plants
+	var overview=overview_weight()
+	var far=overview>.5
+	# Both levels share anchors and footprint. A short fade avoids the old whole-map
+	# pop at 1.25x while every miniature still represents its actual living plant.
+	ground_sprite.visible=overview<1
+	overview_sprite.visible=overview>0 and not show_plants
+	overview_sprite.modulate.a=overview
+	canopy_sprite.visible=overview>0 and show_plants
+	# Premultiplied textures must fade RGB and alpha together, or crowns glow.
+	canopy_sprite.modulate=Color(overview,overview,overview,overview)
 	var area=Rect2(-camera/zoom,size/zoom).grow(24)
 	last_visible_plants=0
 	for group in row_nodes:
 		var node=row_nodes[group]
+		var compact=zoom<2.0
+		if node.compact!=compact:
+			node.compact=compact; node.queue_redraw()
 		node.visible=area.intersects(Rect2(0,group*8*World.TILE-24,world.width*World.TILE,8*World.TILE+48))
 		# Keep commands prepared under the overview, avoiding a full first-zoom rebuild.
-		node.modulate.a=0.0 if far else 1.0
+		node.modulate.a=0.0 if overview==1.0 else 1.0
 		if changed_plants: node.queue_redraw()
 		if node.visible: last_visible_plants+=node.entries.size()
 	if far: last_visible_plants=plant_draws.size()
@@ -272,10 +297,13 @@ func update_canopy_rows() -> void:
 	while not canopy_dirty.is_empty() and Time.get_ticks_usec()-started<1500:
 		var group: int=canopy_dirty.keys()[0]
 		canopy_dirty.erase(group)
-		var strip=Image.create(world.width*2,mini(16,world.height*2-group*16),false,Image.FORMAT_RGBA8)
+		var pixels=World.Landscape.OVERVIEW_PIXELS
+		var row_height=8*pixels
+		var strip=Image.create(world.width*pixels,mini(row_height,world.height*pixels-group*row_height),false,Image.FORMAT_RGBA8)
 		for neighbour in range(maxi(0,group-1),mini(ceili(world.height/8.0),group+2)):
-			for entry in plant_rows.get(neighbour,[]): World.Landscape.paint_crown(strip,world,entry[5],Vector2i(0,group*16))
-		canopy_image.blit_rect(strip,Rect2i(Vector2i.ZERO,strip.get_size()),Vector2i(0,group*16))
+			for entry in plant_rows.get(neighbour,[]): World.Landscape.paint_crown(strip,world,entry[5],Vector2i(0,group*row_height))
+		canopy_image.blit_rect(strip,Rect2i(Vector2i.ZERO,strip.get_size()),Vector2i(0,group*row_height))
+		canopy_sprite.mark(Rect2i(0,group*row_height,strip.get_width(),strip.get_height()))
 	canopy_upload_due=true
 
 func draw_ground_details(visible_rect: Rect2) -> void:
@@ -292,12 +320,38 @@ func draw_ground_details(visible_rect: Rect2) -> void:
 			draw_rect(Rect2(p, Vector2(0.5, 1)), color)
 			draw_rect(Rect2(p + Vector2(1, -0.5), Vector2(0.5, 1.5)), color)
 
+func draw_plant_transition(rect: Rect2, source: Rect2, tint: Color=Color.WHITE) -> void:
+	# Animated crowns obey the same world bounds as the retained plant rows.
+	var clipped=rect.intersection(Rect2(Vector2.ZERO,Vector2(world.width,world.height)*World.TILE))
+	if not clipped.has_area(): return
+	var region=Rect2(source.position+(clipped.position-rect.position)/rect.size*source.size,clipped.size/rect.size*source.size)
+	effects.draw_texture_rect_region(Flora.atlas_texture,clipped,region,tint)
+
+func world_boundary_rect() -> Rect2:
+	return Rect2((camera+quake_offset).round(),(Vector2(world.width,world.height)*World.TILE*zoom).round())
+
+func draw_world_boundary() -> void:
+	if boundary_revision!=world.surface_revision:
+		boundary_revision=world.surface_revision; boundary_solid=true
+		for x in world.width:
+			if World.is_water(world.terrain[x]) or World.is_water(world.terrain[(world.height-1)*world.width+x]): boundary_solid=false; break
+		if boundary_solid:
+			for y in world.height:
+				if World.is_water(world.terrain[y*world.width]) or World.is_water(world.terrain[y*world.width+world.width-1]): boundary_solid=false; break
+	var rect=world_boundary_rect()
+	# Draw in screen space: the frame remains fine at every observation distance.
+	if boundary_solid:
+		effects.draw_rect(rect,Color("465847"),false,1.0)
+	else:
+		var corners=[rect.position,Vector2(rect.end.x,rect.position.y),rect.end,Vector2(rect.position.x,rect.end.y)]
+		for n in 4: effects.draw_dashed_line(corners[n],corners[(n+1)%4],Color(.70,.81,.88,.52),1.0,5.0)
+
 func _draw_effects() -> void:
 	if world == null: return
 	effects.draw_set_transform(camera+quake_offset, 0, Vector2.ONE * zoom)
 	TempestArt.waves(effects,world,Rect2(-camera/zoom,size/zoom),zoom)
 	if show_plants:
-		var particle_budget=192 if distance_name()=="近景" else (96 if overview_weight()<=.55 else 32)
+		var particle_budget=192 if distance_name()=="近景" else (96 if overview_weight()<=.5 else 32)
 		var visible=Rect2(-camera/zoom,size/zoom).grow(20)
 		for event in transitions.values():
 			var progress = clampf((real_time - event.started) / event.duration, 0, 1)
@@ -305,20 +359,20 @@ func _draw_effects() -> void:
 			var sample = World.hash_cell(i % world.width, i / world.width, world.world_seed)
 			var base = World.Landscape.plant_anchor(world,i)
 			if not visible.has_point(base): continue
-			if event.kind in ["grow","appear","fertilize"] and overview_weight()<=.55 and world.plants[i]==event.species and world.plant_stage[i]==event.stage:
+			if event.kind in ["grow","appear","fertilize"] and overview_weight()<=.5 and world.plants[i]==event.species and world.plant_stage[i]==event.stage:
 				var extent=Vector2(16,19.2)*(.90+sample%5*.045)
 				if World.Catalog.is_ground_cover(event.species): extent*=.72
 				var growth=lerpf(.25 if event.get("active",false) else .86,1.0,1-pow(1-progress,3))
 				growth+=sin(progress*PI)*.10
 				var rect=Rect2(base-Vector2(extent.x/2,extent.y*.94)*growth,extent*growth)
-				effects.draw_texture_rect_region(Flora.atlas_texture,rect,Flora.atlas_region(event.species,event.stage,sample%3))
-			if event.kind in ["wither", "fade", "clear", "water", "decay"] and event.species > 0 and overview_weight()<=.55:
+				draw_plant_transition(rect,Flora.atlas_region(event.species,event.stage,sample%3))
+			if event.kind in ["wither", "fade", "clear", "water", "decay"] and event.species > 0 and overview_weight()<=.5:
 				var extent = Vector2(16, 19.2) * (0.90 + sample % 5 * 0.045)
 				if World.Catalog.is_ground_cover(event.species): extent*=.72
 				var rect = Rect2(base - Vector2(extent.x / 2, extent.y * 0.94) + Vector2(0, progress * 2), extent)
 				var tint = Color("c2aa72") if event.kind == "wither" else Color.WHITE
 				tint.a = 1 - progress
-				effects.draw_texture_rect_region(Flora.atlas_texture, rect, Flora.atlas_region(event.species, event.stage, sample % 3), tint)
+				draw_plant_transition(rect,Flora.atlas_region(event.species,event.stage,sample%3),tint)
 			var effect_color = Color("c6ca7f")
 			if event.kind in ["wither", "decay"]: effect_color = Color("b39862")
 			if event.kind == "water": effect_color = Color("a4d8e1")
@@ -327,7 +381,8 @@ func _draw_effects() -> void:
 			for n in 4:
 				if particle_budget<=0: break
 				var p = base + Vector2((n - 1.5) * (1 + progress * 4), -3 - sin(progress * PI) * (3 + n))
-				effects.draw_rect(Rect2(p, Vector2.ONE * 0.7), effect_color)
+				var particle=Rect2(p,Vector2.ONE*.7).intersection(Rect2(Vector2.ZERO,Vector2(world.width,world.height)*World.TILE))
+				if particle.has_area(): effects.draw_rect(particle,effect_color)
 				particle_budget-=1
 	_draw_disasters()
 	WeatherArt.draw(effects,world,camera,zoom,size,cloud_visibility())
@@ -347,6 +402,7 @@ func _draw_effects() -> void:
 	else:
 		preview_cells.clear(); preview_signature.clear()
 	effects.draw_set_transform(Vector2.ZERO)
+	draw_world_boundary()
 	if preview_visible() and tool_icon != null and not preview_cells.is_empty():
 		var location = cursor_position + Vector2(10,-18)
 		effects.draw_set_transform(location, -0.30)
@@ -415,6 +471,10 @@ func finish_surface(result: Dictionary) -> void:
 	pending_terrain_uploads.merge(result.chunks,true)
 	overview_image=result.overview
 	overview_texture.update(overview_image)
+	# A ground-only edit must also refresh the composed distant scene.
+	for coordinate in result.chunks:
+		canopy_sprite.mark(Rect2i(coordinate*Surface.CHUNK*World.Landscape.OVERVIEW_PIXELS,Vector2i.ONE*Surface.CHUNK*World.Landscape.OVERVIEW_PIXELS).grow(World.Landscape.OVERVIEW_PIXELS*2))
+	canopy_upload_due=true
 	pending_surface_revision=surface_job_revision
 
 func process_surface_uploads() -> void:
@@ -605,35 +665,28 @@ func _notification(what: int) -> void:
 		finish_stroke()
 
 func overview_weight() -> float:
-	# Screen-space size matters too: tiny maps already show full-sized trees when fitted.
-	return 1.0 - smoothstep(minf(fit_zoom*1.25,1.55),minf(fit_zoom*2.10,2.8),zoom)
+	# The same on-screen tile footprint uses the same detail, on every world size.
+	return 1.0 - smoothstep(4.0,6.0,zoom*World.TILE)
 
 func preview_visible() -> bool:
 	return world != null and cursor_inside and tool >= 0 and not interaction_locked and not preview_blocked and visible
 
 func rebuild_overview() -> void:
 	overview_image = world.image.duplicate()
-	overview_image.resize(world.width * 2, world.height * 2, Image.INTERPOLATE_LANCZOS)
+	overview_image.resize(world.width * World.Landscape.OVERVIEW_PIXELS, world.height * World.Landscape.OVERVIEW_PIXELS, Image.INTERPOLATE_NEAREST)
 	if overview_texture == null: overview_texture = ImageTexture.create_from_image(overview_image)
 	else: overview_texture.set_image(overview_image)
-	overview_sprite.texture=overview_texture; overview_sprite.scale=Vector2.ONE*2
+	overview_sprite.texture=overview_texture; overview_sprite.scale=Vector2.ONE*World.TILE/World.Landscape.OVERVIEW_PIXELS
 	rebuild_overview_plants()
 
 func rebuild_overview_plants() -> void:
 	# Rasterise crowns on the same overview grid, so zooming cannot make rectangles shimmer.
-	canopy_image = Image.create(world.width*2,world.height*2,false,Image.FORMAT_RGBA8)
-	canopy_image.fill(Color.TRANSPARENT)
+	canopy_image = Image.create(world.width*World.Landscape.OVERVIEW_PIXELS,world.height*World.Landscape.OVERVIEW_PIXELS,false,Image.FORMAT_RGBA8)
+	canopy_image.fill(Color(0,0,0,0))
 	for entry in plant_draws:
 		World.Landscape.paint_crown(canopy_image,world,entry[5])
-	canopy_image.generate_mipmaps()
-	if canopy_texture == null: canopy_texture = ImageTexture.create_from_image(canopy_image)
-	else: canopy_texture.set_image(canopy_image)
-	canopy_sprite.texture=canopy_texture; canopy_sprite.scale=Vector2.ONE*2
-
-func filtered_surface() -> Image:
-	var surface = world.image.duplicate()
-	surface.generate_mipmaps()
-	return surface
+	canopy_sprite.rebuild(overview_image,canopy_image)
+	canopy_sprite.scale=Vector2.ONE*World.TILE/World.Landscape.OVERVIEW_PIXELS
 
 func _draw_disasters() -> void:
 	var visible_area = Rect2(-camera/zoom,size/zoom).grow(60)

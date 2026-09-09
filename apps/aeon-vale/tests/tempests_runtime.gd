@@ -1,7 +1,7 @@
 extends "res://tests/weather_runtime.gd"
 
 func scene_world():
-	var w=World.generate({"width":128,"height":96,"seed":7937,"template":"ocean","trees":0})
+	var w=Fixtures.empty({"width":128,"height":96,"seed":7937,"trees":0})
 	w.world_name="风雨之谷"; w.spread_enabled=false; w.weather_enabled=false
 	for i in w.terrain.size():
 		var x=i%w.width; var y=i/w.width

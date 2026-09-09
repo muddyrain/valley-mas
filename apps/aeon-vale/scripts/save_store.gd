@@ -1,7 +1,7 @@
 extends RefCounted
 
 const World = preload("res://scripts/world_data.gd")
-const MAX_BYTES = 12000000
+const MAX_BYTES = 24000000
 static var directory: String = "user://worlds"
 
 static func encode(world) -> Dictionary:
@@ -46,7 +46,7 @@ static func decode(data: Variant) -> Dictionary:
 	var height = int(data.height)
 	if data.width != width or data.height != height or not is_finite(float(data.age)): return invalid
 	if not is_finite(float(data.seed)) or absf(float(data.seed)) > 999999999: return invalid
-	if width < 32 or width > 512 or height < 32 or height > 384: return invalid
+	if width < 32 or width > 512 or height < 32 or height > 512: return invalid
 	var count = width * height
 	var terrain = unpack(data, "terrain", count)
 	var plants = unpack(data, "plants", count)
@@ -147,6 +147,9 @@ static func decode(data: Variant) -> Dictionary:
 			if not numeric(settings.get(key)): return invalid
 		if not settings.get("rivers") is bool: return invalid
 		if settings.land_size<1 or settings.land_size>10 or settings.land_size!=int(settings.land_size) or settings.islands<0 or settings.islands>12 or settings.islands!=int(settings.islands) or settings.coast<0 or settings.coast>10 or settings.coast!=int(settings.coast) or settings.trees<0 or settings.trees>1: return invalid
+		for key in ["lakes","ring_width","strait_width"]:
+			if not settings.has(key): continue
+			if not numeric(settings[key]) or settings[key]!=int(settings[key]) or settings[key]<1 or settings[key]>(4 if key=="lakes" else 10): return invalid
 		var warmth = unpack(data,"warmth",count*4)
 		var moisture = unpack(data,"moisture",count*4)
 		var elevation = unpack(data,"elevation",count*4)

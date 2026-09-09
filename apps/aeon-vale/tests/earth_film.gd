@@ -15,7 +15,7 @@ func run() -> void:
 	while game.loading!=null: await process_frame
 	DisplayServer.window_set_size(Vector2i(1440,900)); await process_frame
 	await film(.8)
-	var w=World.generate({"width":144,"height":96,"seed":7193,"template":"ocean","trees":0})
+	var w=Fixtures.empty({"width":144,"height":96,"seed":7193,"trees":0})
 	w.weather_enabled=false; w.spread_enabled=false; w.biomes.fill(World.MARSH)
 	for center in [Vector2i(28,48),Vector2i(112,48)]:
 		w.begin_stroke(); w.paint(center,16,World.COMBO_TOOLS+World.BIRCH); w.end_stroke()
@@ -37,7 +37,7 @@ func run() -> void:
 	for rising in [false,true]:
 		var seed=1
 		while (World.hash_cell(72,48,seed)%2==0)!=rising: seed+=1
-		w=World.generate({"width":144,"height":96,"seed":seed,"template":"ocean","trees":0})
+		w=Fixtures.empty({"width":144,"height":96,"seed":seed,"trees":0})
 		w.terrain.fill(World.FOREST); w.biomes.fill(World.BIRCH); w.elevation.fill(.17)
 		w.prepare_ecology(); World.Landscape.populate(w,.9,Callable()); w.image=w.bake_image()
 		w.weather_enabled=false; w.spread_enabled=false
