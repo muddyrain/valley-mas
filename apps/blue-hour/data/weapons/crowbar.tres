@@ -1,0 +1,17 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "crowbar"
+display_name = "归途 · 撬棍"
+damage = 32
+cooldown = 0.85
+attack_range = 2.3
+magazine = 1
+reload_seconds = 0
+target_count = 1
+melee = true
+color = Color(0.79, 0.89, 0.99, 1)
+sound_pitch = 0.5

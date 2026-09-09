@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "yan"
+display_name = "言秋"
+trait_id = "resilient"
+color = Color(0.79, 0.52, 0.76, 1)

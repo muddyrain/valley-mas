@@ -1,0 +1,20 @@
+# Godot generated imports, editor state and local credentials
+.godot/
+.import/
+.godot.editor/
+*.translation
+export_credentials.cfg
+.DS_Store
+# Temporary exports and local verification artifacts
+build/
+exports/
+test-output/
+*.pck
+*.tmp
+*.temp
+*.bak
+*.log
+*.godot-folding-*
+__pycache__/
+*.blend1
+*.blend2

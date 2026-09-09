@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="" load_steps=2 format=3]
+[ext_resource type="Script" path="res://data/new_run_rules.gd" id="1"]
+[resource]
+script = ExtResource("1")
+starting_count = 2
+starter_pool = Array[String](["lin", "qiao", "yan"])
+starting_weapons = {"lin": "pistol", "qiao": "smg", "yan": "crowbar"}
+training_costs = Array[int]([1, 2, 3, 4])
+affix_value_bonus = 4

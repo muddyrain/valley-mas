@@ -1,0 +1,9 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://data/affix_data.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = "weighted"
+display_name = "加重"
+description = "近战伤害 +20%"
+melee_only = true
+damage_multiplier = 1.2

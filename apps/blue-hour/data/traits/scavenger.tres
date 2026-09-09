@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/trait_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "scavenger"
+display_name = "寻迹"
+description = "亲自搜索时，搜索速度 +40%"
+search_multiplier = 1.4

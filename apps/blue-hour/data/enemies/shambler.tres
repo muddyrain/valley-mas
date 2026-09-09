@@ -1,0 +1,15 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "shambler"
+display_name = "缓行者"
+max_hp = 40
+speed = 1.35
+damage = 5
+scale_factor = 1
+color = Color(0.49, 0.64, 0.56, 1)
+special = false
+perception = 13

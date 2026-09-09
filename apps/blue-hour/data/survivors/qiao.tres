@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "qiao"
+display_name = "乔安"
+trait_id = "scavenger"
+color = Color(0.98, 0.68, 0.29, 1)

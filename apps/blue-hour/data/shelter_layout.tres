@@ -1,0 +1,23 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://data/shelter_layout.gd" id="1"]
+[resource]
+script = ExtResource("1")
+camera_position = Vector3(18, 23, 27)
+camera_target = Vector3(0, 0, -1)
+camera_size = 25.0
+member_positions = Array[Vector3]([Vector3(1, 0, 4), Vector3(4, 0, 4), Vector3(4, 0, 1)])
+placements = Array[Dictionary]([{
+"asset": "BH_Building_Warehouse_01", "position": Vector3(-3, 0, -7), "yaw": 0.0
+}, {
+"asset": "BH_EvacBus_01", "position": Vector3(-5, 0, 3), "yaw": 1.570796
+}, {
+"asset": "BH_MetalCrate", "position": Vector3(6, 0, -2), "yaw": 0.0
+}, {
+"asset": "BH_Pallet", "position": Vector3(6, 0, -4), "yaw": 0.0
+}, {
+"asset": "BH_StreetLamp_01", "position": Vector3(8, 0, 0), "yaw": 0.0
+}, {
+"asset": "BH_TrafficCone", "position": Vector3(-9, 0, 5), "yaw": 0.0
+}, {
+"asset": "BH_TrafficCone", "position": Vector3(-9, 0, 2), "yaw": 0.0
+}])

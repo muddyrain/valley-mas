@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "lin"
+display_name = "林汐"
+trait_id = "steady"
+color = Color(0.31, 0.77, 0.84, 1)

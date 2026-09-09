@@ -1,0 +1,9 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://data/effect_data.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = "burst"
+display_name = "协同爆发"
+effect = "burst"
+amount = 2.0
+duration = 8.0

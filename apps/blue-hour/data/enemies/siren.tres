@@ -1,0 +1,15 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "siren"
+display_name = "鸣响者"
+max_hp = 100
+speed = 1.05
+damage = 7
+scale_factor = 1.35
+color = Color(0.94, 0.3, 0.37, 1)
+special = true
+perception = 18

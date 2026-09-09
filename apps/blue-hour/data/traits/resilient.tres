@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/trait_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "resilient"
+display_name = "坚韧"
+description = "承受伤害 -30%"
+incoming_damage_multiplier = 0.7

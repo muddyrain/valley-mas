@@ -1,0 +1,9 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://data/specialization_data.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = "combat"
+display_name = "作战"
+color = Color(0.78, 0.43, 0.3, 1)
+passive_id = "calibration"
+power_id = "burst"

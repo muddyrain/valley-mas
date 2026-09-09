@@ -1,0 +1,30 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/map_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "east_quay"
+display_name = "东岸旧街"
+initial_weapons = Array[String](["pistol", "smg", "crowbar"])
+buildings = Array[Dictionary]([
+{"id": "corner", "name": "街角杂货", "position": Vector3(-19, 0, 8), "size": Vector3(10, 5, 9), "entry": Vector3(-19, 0, 14), "search_seconds": 46.0, "food": 3, "scrap": 3},
+{"id": "garage", "name": "修车铺", "position": Vector3(19, 0, 8), "size": Vector3(10, 4, 9), "entry": Vector3(19, 0, 14), "search_seconds": 54.0, "food": 0, "scrap": 12},
+{"id": "market", "name": "北岸食集", "position": Vector3(-19, 0, -13), "size": Vector3(11, 7, 11), "entry": Vector3(-19, 0, -6), "search_seconds": 71.0, "food": 6, "scrap": 4},
+{"id": "depot", "name": "货运库房", "position": Vector3(19, 0, -13), "size": Vector3(11, 6, 11), "entry": Vector3(19, 0, -6), "search_seconds": 75.0, "food": 0, "scrap": 20},
+{"id": "pharmacy", "name": "旧日药房", "position": Vector3(0, 0, -17), "size": Vector3(9, 6, 9), "entry": Vector3(0, 0, -11), "search_seconds": 65.0, "food": 2, "scrap": 10}
+])
+vehicles = Array[Dictionary]([
+{"id": "van_south", "name": "配送面包车", "position": Vector3(9, 0, 17), "size": Vector3(2.4, 1.8, 4.3), "entry": Vector3(6, 0, 17), "search_seconds": 29.0, "food": 1, "scrap": 4},
+{"id": "car_west", "name": "废弃轿车", "position": Vector3(-8, 0, 0), "size": Vector3(2.3, 1.5, 4), "entry": Vector3(-4, 0, 0), "search_seconds": 34.0, "food": 0, "scrap": 6},
+{"id": "van_north", "name": "冷藏货车", "position": Vector3(7, 0, -7), "size": Vector3(2.5, 2.2, 4.7), "entry": Vector3(11, 0, -7), "search_seconds": 44.0, "food": 3, "scrap": 6}
+])
+initial_enemies = Array[Dictionary]([
+{"id": "shambler", "position": Vector3(-26, 0, 16)},
+{"id": "shambler", "position": Vector3(25, 0, 17)},
+{"id": "shambler", "position": Vector3(-12, 0, -3)},
+{"id": "runner", "position": Vector3(18, 0, -4)},
+{"id": "shambler", "position": Vector3(-25, 0, -4)},
+{"id": "siren", "position": Vector3(0, 0, -25)}
+])
+spawn_points = Array[Vector3]([Vector3(-31, 0, -23), Vector3(31, 0, -23), Vector3(-31, 0, 0), Vector3(31, 0, 0), Vector3(0, 0, -26), Vector3(31, 0, 24), Vector3(-31, 0, 24)])

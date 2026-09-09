@@ -1,0 +1,9 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://data/specialization_data.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = "survey"
+display_name = "勘查"
+color = Color(0.51, 0.69, 0.47, 1)
+passive_id = "early_start"
+power_id = "aid"

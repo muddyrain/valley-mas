@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/day_loop_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+end_day = 5
+initial_food = 6
+food_per_member = 1
+hunger_health_multiplier = 0.8
+shop_size = 3
+weapon_prices = {"pistol": 12, "smg": 20, "shotgun": 24, "crowbar": 10}
+reward_pools = {"garage": ["pistol", "smg", "crowbar"], "depot": ["shotgun", "smg"], "car_west": ["pistol", "crowbar"]}
