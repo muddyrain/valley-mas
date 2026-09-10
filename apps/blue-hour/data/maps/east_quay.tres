@@ -6,7 +6,7 @@
 script = ExtResource("1")
 id = "east_quay"
 display_name = "东岸旧街"
-initial_weapons = Array[String](["pistol", "smg", "crowbar"])
+initial_weapons = Array[String](["pistol", "smg", "crowbar", "pistol", "pistol"])
 buildings = Array[Dictionary]([
 {"id": "corner", "name": "街角杂货", "position": Vector3(-19, 0, 8), "size": Vector3(10, 5, 9), "entry": Vector3(-19, 0, 14), "search_seconds": 46.0, "food": 3, "scrap": 3},
 {"id": "garage", "name": "修车铺", "position": Vector3(19, 0, 8), "size": Vector3(10, 4, 9), "entry": Vector3(19, 0, 14), "search_seconds": 54.0, "food": 0, "scrap": 12},

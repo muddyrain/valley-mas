@@ -23,6 +23,12 @@ func run() -> void:
 	for choice in ["scavenge", "survey", "combat"]:
 		await click(app.screen.tabs[choice])
 		check(app.screen.selected == choice, "Tab selects " + choice)
+	await click(app.screen.tabs.scavenge)
+	check(app.screen.cards.size() == 2 and app.screen.selected_effect == 1, "Route preview exposes two selectable rewards")
+	await click(app.screen.cards[0])
+	check(app.screen.selected_effect == 0 and app.screen.tooltip_title.text == "备件复制台", "Passive card updates the detail callout")
+	await click(app.screen.cards[1])
+	check(app.screen.selected_effect == 1 and app.screen.tooltip_title.text == "疾行号令", "Skill card updates the detail callout")
 	await capture("21-specialization")
 	await click(button("取消"))
 	check(app.state == "menu" and app.campaign.data.is_empty(), "Cancel leaves no created run")

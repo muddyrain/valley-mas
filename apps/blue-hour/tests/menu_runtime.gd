@@ -22,7 +22,7 @@ func run() -> void:
 		app.show_main_menu()
 		await frames()
 	check(not FileAccess.file_exists(run_save), "Keyboard navigation does not create a save")
-	for dimensions in [Vector2i(1919,1080), Vector2i(1440,900), Vector2i(1024,640), Vector2i(2560,1080), Vector2i(1024,768)]:
+	for dimensions in [Vector2i(1672,941), Vector2i(1919,1080), Vector2i(1440,900), Vector2i(1024,640), Vector2i(2560,1080), Vector2i(1024,768)]:
 		root.size = dimensions
 		await frames(15)
 		check_buttons("title %s" % dimensions)
@@ -42,6 +42,15 @@ func run() -> void:
 		for choice in ["combat", "scavenge", "survey"]:
 			await click(app.screen.tabs[choice])
 			check(app.screen.selected == choice, "Responsive specialization selection: " + choice)
+			if dimensions == Vector2i(1672,941):
+				await capture("menu/create-1672x941-" + choice)
+		await click(app.screen.tabs.scavenge)
+		if dimensions == Vector2i(1672,941):
+			check(app.screen.selected_effect == 1 and app.screen.tooltip_title.text == "疾行号令", "Reference layout opens on the selected skill detail")
+			await click(app.screen.unlock_button)
+			check(app.screen.selected_effect == -1 and app.screen.tooltip_badge.text == "尚未解锁", "Unlock preview reports its real unavailable state")
+			await capture("menu/create-1672x941-locked")
+			await click(app.screen.cards[1])
 		check_buttons("creation %s" % dimensions)
 		await capture("menu/create-%dx%d" % [dimensions.x, dimensions.y])
 		await click(button("取消"))
@@ -70,6 +79,14 @@ func run() -> void:
 	await joy(JOY_BUTTON_A)
 	check(app.state == "new_game", "Controller confirm opens creation")
 	if app.state == "new_game":
+		check(root.gui_get_focus_owner() == app.screen.tabs.scavenge, "Creation gives the selected route initial controller focus")
+		await joy(JOY_BUTTON_DPAD_LEFT)
+		check(root.gui_get_focus_owner() == app.screen.tabs.combat, "Controller moves horizontally between route tabs")
+		await joy(JOY_BUTTON_DPAD_RIGHT)
+		await joy(JOY_BUTTON_DPAD_DOWN)
+		check(root.gui_get_focus_owner() == app.screen.cards[1], "Controller moves from the selected route to its skill card")
+		await joy(JOY_BUTTON_DPAD_DOWN)
+		check(root.gui_get_focus_owner() == app.screen.confirm_button, "Controller reaches the primary confirmation")
 		await joy(JOY_BUTTON_B)
 		check(app.state == "menu", "Controller back returns to title")
 	# A valid saved run changes the primary action without losing keyboard access.
