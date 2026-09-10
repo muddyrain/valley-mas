@@ -1,0 +1,14 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/trait_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "route_intuition"
+display_name = "路线直觉"
+description = "对废墟路线有敏锐直觉，提高搜刮发现概率"
+trait_type = 3
+params = {
+"detection_bonus": 0.15,
+"detection_bonus_per_level": 0.03
+}

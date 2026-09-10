@@ -2,12 +2,16 @@ extends RefCounted
 var survivors: Array[Resource] = [
 	preload("res://data/survivors/lin.tres"),
 	preload("res://data/survivors/qiao.tres"),
-	preload("res://data/survivors/yan.tres")
+	preload("res://data/survivors/yan.tres"),
+	preload("res://data/survivors/xia_zhiyao.tres"),
+	preload("res://data/survivors/su_wanxing.tres")
 ]
 var traits: Array[Resource] = [
 	preload("res://data/traits/steady.tres"),
 	preload("res://data/traits/scavenger.tres"),
-	preload("res://data/traits/resilient.tres")
+	preload("res://data/traits/resilient.tres"),
+	preload("res://data/traits/route_intuition.tres"),
+	preload("res://data/traits/resource_efficiency.tres")
 ]
 var weapons: Array[Resource] = [
 	preload("res://data/weapons/pistol.tres"),

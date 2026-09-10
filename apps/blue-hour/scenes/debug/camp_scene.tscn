@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cnl47jxqwxvpi"]
+
+[ext_resource type="Script" path="res://scenes/debug/camp_scene.gd" id="1_camp"]
+
+[node name="CampScene" type="Node3D"]
+script = ExtResource("1_camp")

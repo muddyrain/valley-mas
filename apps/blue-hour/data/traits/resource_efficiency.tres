@@ -1,0 +1,14 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/trait_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "resource_efficiency"
+display_name = "物尽其用"
+description = "搜刮基础物资时，有概率额外获得1份同类物资"
+trait_type = 4
+params = {
+"bonus_chance": 0.10,
+"bonus_chance_per_level": 0.02
+}

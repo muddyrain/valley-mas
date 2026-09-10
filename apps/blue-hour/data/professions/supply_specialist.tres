@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/profession_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "supply_specialist"
+display_name = "补给整备师"
+description = "物资管理专家，擅长从有限资源中获得最大收益"
+role_tags = ["后勤", "资源", "支援"]

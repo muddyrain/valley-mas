@@ -1,0 +1,3 @@
+@echo off
+echo 启动营地场景（两角色同屏）...
+"E:\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-stable_win64.exe" --path "%~dp0" "scenes/debug/camp_scene.tscn"

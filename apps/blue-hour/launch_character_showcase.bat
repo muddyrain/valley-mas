@@ -1,0 +1,3 @@
+@echo off
+echo 启动角色展示场景...
+"E:\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-stable_win64.exe" --path "%~dp0" "scenes/debug/character_showcase.tscn"

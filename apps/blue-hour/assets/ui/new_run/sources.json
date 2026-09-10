@@ -1,0 +1,330 @@
+[
+  {
+    "file": "01_logo.png",
+    "source": "01_品牌_Logo.png",
+    "width": 249,
+    "height": 107,
+    "sha256": "0B252F80C2D369DDFFD905481185DE24A6043B0A0B5B5532A3586034275B1B80",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "02_logo_tagline.png",
+    "source": "02_品牌_Logo含标语.png",
+    "width": 249,
+    "height": 170,
+    "sha256": "3C9A69DA4F363B7E42A3827931AC066E35E26678E858EF2681D224B65E22C03B",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "03_handwritten_tagline.png",
+    "source": "03_品牌_手写标语.png",
+    "width": 228,
+    "height": 60,
+    "sha256": "0F08AE3409D69DED23EB2E9E72A0AA3662A8D9ABC96AF2F0DF975590E427F806",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "04_route_title.png",
+    "source": "04_标题_选择你的专属路线.png",
+    "width": 476,
+    "height": 56,
+    "sha256": "1EC20F8B734992FC6F9B0FBFDDB457D916995D4041B670C77A1DDE6862664AF0",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "05_compass.png",
+    "source": "05_标题_指南针装饰.png",
+    "width": 327,
+    "height": 51,
+    "sha256": "9328171389012DF9321A6732009B1C7780571A651ED23278B65732C4B506F2B9",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "06_title_line_left.png",
+    "source": "06_标题_左侧装饰线.png",
+    "width": 51,
+    "height": 15,
+    "sha256": "00097CABCC14B7663BE92C29203FE128C1CF64F5CB0ED2D942444C99684EAB96",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "07_title_line_right.png",
+    "source": "07_标题_右侧装饰线.png",
+    "width": 52,
+    "height": 15,
+    "sha256": "A9E0FD5106E1F707721BEC12D49F2CD0BEB5CDA3775F23700DB1F67270FA7018",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "08_board.png",
+    "source": "08_底图_空白主纸板.png",
+    "width": 1158,
+    "height": 464,
+    "sha256": "C8F5094AA1A17CD806154D446CEA0EB6A3A17A0A500F1CAF25B8594EF6D8C495",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "09_tab_combat.png",
+    "source": "09_Tab_作战背景_无字.png",
+    "width": 300,
+    "height": 160,
+    "sha256": "BA1C308300DAB9403060057EDE71FD1F0D6785AE64D54BCCA8B3C420096FBECC",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "10_tab_scavenge.png",
+    "source": "10_Tab_搜集背景_无字.png",
+    "width": 300,
+    "height": 160,
+    "sha256": "7428D49726BA12E19926983BBBEEAC2548F739F60225B72020C158767035C4F9",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "11_tab_survey.png",
+    "source": "11_Tab_勘查背景_无字.png",
+    "width": 300,
+    "height": 160,
+    "sha256": "80EC93B059C8AAE29B2291986539DD4D6F52E1264AB264C383B86DB8AC717C79",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "12_tab_locked.png",
+    "source": "12_Tab_未解锁背景_无字.png",
+    "width": 300,
+    "height": 160,
+    "sha256": "78675D50CB64076BBF90C562C6E2D2880DE7E1FA382EAAE2D1EFACEAF8B2CD27",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "13_icon_combat.png",
+    "source": "13_图标_作战.png",
+    "width": 80,
+    "height": 80,
+    "sha256": "B78E77D16569A33727CB4B21E40132F988BE0CB74529A3C43D8414449CC353FF",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "14_icon_scavenge.png",
+    "source": "14_图标_搜集.png",
+    "width": 80,
+    "height": 80,
+    "sha256": "105B4297FE3D7009E4D4DB4EDB3423636B1565A76262DC47872FB4356EB82F35",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "15_icon_survey.png",
+    "source": "15_图标_勘查.png",
+    "width": 80,
+    "height": 80,
+    "sha256": "A8C9183B0F119E70625649E1DA9EE000D04E17DAD1763C196922D17BC21C1BBD",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "16_icon_lock.png",
+    "source": "16_图标_锁.png",
+    "width": 80,
+    "height": 80,
+    "sha256": "EBEEC29A4DAC085F7F9AE22850EAB53079B8B1CD541150082F0A63E082752F56",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "17_tab_tape.png",
+    "source": "17_Tab_角部胶带.png",
+    "width": 39,
+    "height": 41,
+    "sha256": "6D7168A120EB709522C05B4158C502C814968FA3C091CF98C48C8DAD3C722A83",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "18_tab_progress_frame.png",
+    "source": "18_Tab_进度条边框.png",
+    "width": 224,
+    "height": 24,
+    "sha256": "0131FD17DA450CCF1731EC41184012C8043892EE82FC52E89EA66F23E2383203",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "19_tab_selected.png",
+    "source": "19_Tab_选中高亮框.png",
+    "width": 300,
+    "height": 160,
+    "sha256": "210BE62AB9763775F66A5BECD6B5584949AD93AEA4819C9AE7C8AB2FFB029970",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "20_card_paper.png",
+    "source": "20_卡片_空白纸卡.png",
+    "width": 300,
+    "height": 336,
+    "sha256": "C587F84C40068E99FB089D502438A0DD2FAAF9A512FD8516D097015F677A45B3",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "21_card_brush.png",
+    "source": "21_卡片_蓝色笔刷底图.png",
+    "width": 261,
+    "height": 169,
+    "sha256": "7782DCCC502077CDA31B555E93085C426B70076A6DDC2F64709136481A6680B9",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "22_card_name_strip.png",
+    "source": "22_卡片_空白名称纸条.png",
+    "width": 189,
+    "height": 56,
+    "sha256": "F503398FF9F0C19BC7346DED4BDF6E9A417555FE8768C8419A1C22B42FD7E8E3",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "23_card_composite.png",
+    "source": "23_卡片_纸卡含笔刷底图.png",
+    "width": 300,
+    "height": 336,
+    "sha256": "BAC34AA6E408AD54A06FDF0A4988AAEF97B4DE5F5900B057578E87DB7778FE86",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "24_card_selected.png",
+    "source": "24_卡片_选中高亮框.png",
+    "width": 328,
+    "height": 352,
+    "sha256": "3E2EFD5BD7CDA4406DBF383315540513011A9BC7D317F56DC598F0B1D6FC6298",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "25_card_printer.png",
+    "source": "25_海报_便携打印机_无字.png",
+    "width": 300,
+    "height": 336,
+    "sha256": "B0ADD445CF6BCD1332C8770EF4C24FBAD5CCA1DE48D2BA2CA978E36EA29DADF3",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "26_card_speed.png",
+    "source": "26_海报_速度提升_无字.png",
+    "width": 300,
+    "height": 336,
+    "sha256": "2CA4E15175AE3E7101919EE4240D312871D5D4383BADCD3E6ED61A0D620C895A",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "27_illustration_printer.png",
+    "source": "27_插画_便携打印机.png",
+    "width": 256,
+    "height": 192,
+    "sha256": "FF93501C0E027C80DA7FE4FAADDA7365416139F1E636EECAD204E547343B36BF",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "28_illustration_shoes.png",
+    "source": "28_插画_运动鞋.png",
+    "width": 256,
+    "height": 192,
+    "sha256": "BA39CB7C9232A4D79D49A8A533C67067520AB0A7A7D448E05BFF9AA7157585C3",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "29_icon_run.png",
+    "source": "29_图标_奔跑.png",
+    "width": 80,
+    "height": 80,
+    "sha256": "A55A38FF55E905737038A4B98F47705184C0929A983197CAC55156738F4BD3A2",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "30_icon_tent.png",
+    "source": "30_图标_帐篷.png",
+    "width": 80,
+    "height": 80,
+    "sha256": "B2B7D8EB7642043282CFC84B8F981DFDCDC43266EB160422D0374BF023060DEA",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "31_tent_sticker.png",
+    "source": "31_底图_空白帐篷贴纸.png",
+    "width": 69,
+    "height": 63,
+    "sha256": "793CB40612854819A68AF113B77C3AC8E70B0FEAB72C9F3CC4AB156793F7630C",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "32_button_cancel.png",
+    "source": "32_按钮_取消背景_无字.png",
+    "width": 140,
+    "height": 57,
+    "sha256": "EA365B7CBF9EFDE776F08F97D13313A3A8AA3D134311D008A9672F4B3732260D",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "33_button_confirm.png",
+    "source": "33_按钮_确认背景_无字.png",
+    "width": 193,
+    "height": 84,
+    "sha256": "260FFA7228301E89ED8DC32CE8B118846AA5C695C1F989746C1CB3184FA467BF",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "34_button_unlock.png",
+    "source": "34_按钮_查看解锁背景_无字.png",
+    "width": 148,
+    "height": 50,
+    "sha256": "D65AA269F9E9FC46CB78C80F7E1E2DB7AB0190E4D96D29F5FABC7566A380301B",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "35_icon_confirm_arrow.png",
+    "source": "35_图标_确认右箭头.png",
+    "width": 32,
+    "height": 40,
+    "sha256": "22073803695C0F591F1C97B2E620E82D06059781170420378B7D6834A44A42B3",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "36_icon_small_arrow.png",
+    "source": "36_图标_小右箭头.png",
+    "width": 24,
+    "height": 32,
+    "sha256": "0B70FB457955DE9920AF289540005A930230D63FABFB09BE57D6E2A84A72AAFA",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "37_tooltip.png",
+    "source": "37_提示框_空白背景.png",
+    "width": 356,
+    "height": 233,
+    "sha256": "29165E617B07E5A80CE50790C2B31B17A978228E0F37174076189CFA95E0BD6A",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "38_tooltip_badge.png",
+    "source": "38_提示框_技能标签底图.png",
+    "width": 106,
+    "height": 38,
+    "sha256": "FC84F179458F71280A59FCD63924E38695CCBBD08C596A1B71A2A8DEDAAC4D41",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "39_tooltip_rule.png",
+    "source": "39_提示框_分隔线.png",
+    "width": 284,
+    "height": 12,
+    "sha256": "FAFBB0C9323CBBD80CE0850207B9741ED279F7033764A9902CDA92CDE87CB7E3",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "40_xp_track.png",
+    "source": "40_进度条_经验轨道.png",
+    "width": 717,
+    "height": 32,
+    "sha256": "103F7A0F4F89945A4EBB8DF161B19B43741A68BD5426F4F66C2D241D2CA27DB9",
+    "pixelsUnchanged": true
+  },
+  {
+    "file": "41_xp_fill.png",
+    "source": "41_进度条_经验填充.png",
+    "width": 256,
+    "height": 16,
+    "sha256": "AFF765C43B286D2C6E1E8EBEEB98C8C0320045DE48479942B57EDA75757F1FFB",
+    "pixelsUnchanged": true
+  }
+]
