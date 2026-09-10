@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/profession_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "urban_scout"
+display_name = "城市勘察员"
+description = "熟悉城市废墟的幸存者，擅长探索与搜刮发现"
+role_tags = ["探索", "搜刮", "机动"]
