@@ -2,8 +2,7 @@
 [ext_resource type="Script" path="res://data/effect_data.gd" id="1"]
 [resource]
 script = ExtResource("1")
-id = "burst"
-display_name = "协同爆发"
-effect = "burst"
-amount = 2.0
-duration = 8.0
+id = "shooting_target"
+display_name = "射击目标"
+effect = "ranged_damage"
+amount = 1.25

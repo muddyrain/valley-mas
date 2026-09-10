@@ -2,7 +2,8 @@
 [ext_resource type="Script" path="res://data/effect_data.gd" id="1"]
 [resource]
 script = ExtResource("1")
-id = "calibration"
-display_name = "校准仪"
-effect = "ranged_damage"
-amount = 1.25
+id = "rage"
+display_name = "狂怒"
+effect = "burst"
+amount = 2.0
+duration = 8.0

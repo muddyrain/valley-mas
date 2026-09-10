@@ -240,7 +240,7 @@ func select_specialization(id: String) -> void:
 		effect_descriptions[index].text = _card_description(effect.id)
 		card_plates[index].texture = _card_plate(effect.id)
 		card_art[index].texture = _effect_art(effect.id)
-		card_art[index].visible = effect.id not in ["replicator", "sprint"]
+		card_art[index].visible = effect.id not in ["replicator", "sprint", "shooting_target", "rage"]
 	_select_effect(1)
 
 func _select_effect(index: int) -> void:
@@ -278,29 +278,29 @@ func _card_plate(effect_id: String) -> Texture2D:
 
 func _effect_art(effect_id: String) -> Texture2D:
 	match effect_id:
-		"calibration": return Art.ICON_COMBAT
-		"burst": return Art.ICON_RUN
+		"shooting_target": return load("res://assets/ui/effects/shooting_target.png")
+		"rage": return load("res://assets/ui/effects/rage.png")
 		"early_start": return Art.ICON_SURVEY
 		"aid": return Art.ICON_TENT
 	return Art.ICON_SCAVENGE
 
 func _card_description(effect_id: String) -> String:
 	match effect_id:
-		"calibration": return "让每一次远程射击更有效。"
+		"shooting_target": return "让每一次远程射击更有效。"
 		"replicator": return "成功归航时，有机会复制一把武器。"
 		"early_start": return "为今天争取更长的白昼。"
-		"burst": return "短时间提高全队伤害。"
+		"rage": return "短时间提高全队伤害。"
 		"sprint": return "让全队跑得更快一些。"
 		"aid": return "恢复所有存活队员的生命。"
 	return ""
 
 func _effect_flavor(effect_id: String) -> String:
 	match effect_id:
-		"calibration": return "把枪械调整到最可靠的状态，再去面对街上的危险。"
-		"replicator": return "一次幸运的归航，也许能为营地多留下一把武器。"
-		"early_start": return "趁城市还没醒来，为今天多争取一点时间。"
-		"burst": return "最危险的几秒里，让所有人同时压上火力。"
-		"sprint": return "偶尔得跑起来，因为有时候真的得逃命了。"
+		"shooting_target": return "把枪械调整到最可靠的状态,再去面对街上的危险。"
+		"replicator": return "一次幸运的归航,也许能为营地多留下一把武器。"
+		"early_start": return "趁城市还没醒来,为今天多争取一点时间。"
+		"rage": return "最危险的几秒里,让所有人同时压上火力。"
+		"sprint": return "偶尔得跑起来,因为有时候真的得逃命了。"
 		"aid": return "先把所有人从危险边缘拉回来。"
 	return ""
 

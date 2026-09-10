@@ -3,6 +3,6 @@
 [resource]
 script = ExtResource("1")
 id = "replicator"
-display_name = "备件复制台"
+display_name = "复印机"
 effect = "weapon_copy"
 amount = 0.4

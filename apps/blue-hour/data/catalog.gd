@@ -29,8 +29,8 @@ var map: Resource = preload("res://data/maps/east_quay.tres")
 var loop: Resource = preload("res://data/day_loop.tres")
 var start_rules: Resource = preload("res://data/new_run.tres")
 var specializations: Array[Resource] = [preload("res://data/specializations/combat.tres"), preload("res://data/specializations/scavenge.tres"), preload("res://data/specializations/survey.tres")]
-var passives: Array[Resource] = [preload("res://data/effects/calibration.tres"), preload("res://data/effects/replicator.tres"), preload("res://data/effects/early_start.tres")]
-var powers: Array[Resource] = [preload("res://data/effects/burst.tres"), preload("res://data/effects/sprint.tres"), preload("res://data/effects/aid.tres")]
+var passives: Array[Resource] = [preload("res://data/effects/shooting_target.tres"), preload("res://data/effects/replicator.tres"), preload("res://data/effects/early_start.tres")]
+var powers: Array[Resource] = [preload("res://data/effects/rage.tres"), preload("res://data/effects/sprint.tres"), preload("res://data/effects/aid.tres")]
 var affixes: Array[Resource] = [preload("res://data/affixes/longbarrel.tres"), preload("res://data/affixes/extended.tres"), preload("res://data/affixes/quickload.tres"), preload("res://data/affixes/weighted.tres")]
 
 func by_id(collection: Array[Resource], id: String) -> Resource:
