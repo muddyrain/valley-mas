@@ -27,7 +27,16 @@ func setup(spec: Resource, trait_data: Resource, equipment: Resource) -> void:
 	data = spec
 	talent = trait_data
 	hp = data.max_hp
-	rig = Visuals.body(self, data.color)
+
+	# 尝试加载 GLB 模型,回退到程序化几何体
+	if data.model_path != "" and ResourceLoader.exists(data.model_path):
+		var model_scene: PackedScene = load(data.model_path)
+		rig = model_scene.instantiate()
+		add_child(rig)
+		rig.scale = Vector3.ONE * 0.5  # GLB 模型通常较大,缩小到游戏尺度
+	else:
+		rig = Visuals.body(self, data.color)
+
 	Visuals.ring(self, Vector3(0, 0.08, 0), 0.6, data.color)
 	hp_bar = Visuals.box(self, Vector3(1.15, 0.09, 0.1), Vector3(0, 2.3, 0), data.color, true)
 	name_label = Visuals.label(self, data.display_name, Vector3(0, 2.65, 0), data.color.lightened(0.25), 24)
