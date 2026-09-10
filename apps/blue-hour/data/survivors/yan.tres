@@ -6,5 +6,13 @@
 script = ExtResource("1")
 id = "yan"
 display_name = "言秋"
+profession_id = "defender"
+profession_name = "防御者"
+description = "坚韧的防御型幸存者"
+role_tags = ["防御", "生存"]
 trait_id = "resilient"
+model_path = ""
+portrait_path = ""
+max_hp = 100.0
+move_speed = 4.2
 color = Color(0.79, 0.52, 0.76, 1)

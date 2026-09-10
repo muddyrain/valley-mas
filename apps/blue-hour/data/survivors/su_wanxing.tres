@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "su_wanxing"
+display_name = "苏晚星"
+profession_id = "supply_specialist"
+profession_name = "补给整备师"
+description = "物资管理专家，擅长从有限资源中获得最大收益"
+role_tags = ["后勤", "资源收益", "出征支援"]
+trait_id = "resource_efficiency"
+model_path = "res://assets/characters/su_wanxing/model/su_wanxing.glb"
+portrait_path = ""
+max_hp = 100.0
+move_speed = 4.0
+color = Color(0.8, 0.5, 0.7, 1)
