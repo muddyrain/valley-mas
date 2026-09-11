@@ -1,0 +1,703 @@
+[gd_scene load_steps=64 format=3]
+
+[ext_resource type="NavigationMesh" path="res://scenes/camp/camp_navigation_mesh.tres" id="1_navigation"]
+[ext_resource type="PackedScene" path="res://assets/characters/xia_zhiyao/model/character_xia_zhiyao_model.glb" id="2_xia"]
+[ext_resource type="PackedScene" path="res://assets/characters/su_wanxing/model/character_su_wanxing_model.glb" id="3_su"]
+[ext_resource type="PackedScene" path="res://assets/generated/vehicle_evacuation_bus_model.glb" id="4_bus"]
+
+[sub_resource type="StandardMaterial3D" id="Material_ground"]
+albedo_color = Color(0.43, 0.48, 0.42, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Material_terrain_edge"]
+albedo_color = Color(0.25, 0.29, 0.27, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Material_surrounding_terrain"]
+albedo_color = Color(0.34, 0.39, 0.34, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Material_road"]
+albedo_color = Color(0.20, 0.22, 0.23, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Material_berth"]
+albedo_color = Color(0.29, 0.31, 0.30, 1)
+roughness = 0.98
+
+[sub_resource type="StandardMaterial3D" id="Material_forecourt"]
+albedo_color = Color(0.50, 0.49, 0.41, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Material_main_left"]
+albedo_color = Color(0.55, 0.58, 0.57, 1)
+roughness = 0.92
+
+[sub_resource type="StandardMaterial3D" id="Material_main_center"]
+albedo_color = Color(0.65, 0.66, 0.64, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="Material_main_right"]
+albedo_color = Color(0.58, 0.60, 0.58, 1)
+roughness = 0.92
+
+[sub_resource type="StandardMaterial3D" id="Material_door"]
+albedo_color = Color(0.22, 0.26, 0.27, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="Material_workshop"]
+albedo_color = Color(0.34, 0.40, 0.39, 1)
+roughness = 0.92
+
+[sub_resource type="StandardMaterial3D" id="Material_greenhouse"]
+transparency = 1
+albedo_color = Color(0.54, 0.76, 0.71, 0.26)
+roughness = 0.42
+
+[sub_resource type="StandardMaterial3D" id="Material_greenhouse_frame"]
+albedo_color = Color(0.31, 0.43, 0.39, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="Material_planter"]
+albedo_color = Color(0.33, 0.29, 0.22, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Material_table"]
+albedo_color = Color(0.50, 0.39, 0.28, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Material_chair"]
+albedo_color = Color(0.34, 0.36, 0.35, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Material_crate"]
+albedo_color = Color(0.42, 0.37, 0.29, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Material_firepit"]
+albedo_color = Color(0.25, 0.27, 0.27, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Material_ember"]
+albedo_color = Color(0.90, 0.42, 0.12, 1)
+roughness = 0.8
+
+[sub_resource type="Environment" id="Environment_day"]
+background_mode = 1
+background_color = Color(0.68, 0.77, 0.79, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.83, 0.86, 0.82, 1)
+ambient_light_energy = 0.85
+
+[sub_resource type="BoxMesh" id="Mesh_terrain_base"]
+material = SubResource("Material_terrain_edge")
+size = Vector3(24, 0.55, 18)
+
+[sub_resource type="BoxMesh" id="Mesh_surrounding_terrain"]
+material = SubResource("Material_surrounding_terrain")
+size = Vector3(50, 0.2, 46)
+
+[sub_resource type="BoxShape3D" id="Shape_terrain_base"]
+size = Vector3(24, 0.55, 18)
+
+[sub_resource type="BoxMesh" id="Mesh_ground_surface"]
+material = SubResource("Material_ground")
+size = Vector3(24, 0.08, 18)
+
+[sub_resource type="BoxMesh" id="Mesh_road"]
+material = SubResource("Material_road")
+size = Vector3(42, 0.1, 5.5)
+
+[sub_resource type="BoxShape3D" id="Shape_road"]
+size = Vector3(42, 0.1, 5.5)
+
+[sub_resource type="BoxMesh" id="Mesh_berth_pad"]
+material = SubResource("Material_berth")
+size = Vector3(4.8, 0.04, 11.5)
+
+[sub_resource type="BoxMesh" id="Mesh_forecourt"]
+material = SubResource("Material_forecourt")
+size = Vector3(6, 0.04, 2.7)
+
+[sub_resource type="BoxMesh" id="Mesh_main_wing_left"]
+material = SubResource("Material_main_left")
+size = Vector3(4, 3.3, 4.5)
+
+[sub_resource type="BoxMesh" id="Mesh_main_core"]
+material = SubResource("Material_main_center")
+size = Vector3(4, 3.8, 4.3)
+
+[sub_resource type="BoxMesh" id="Mesh_main_wing_right"]
+material = SubResource("Material_main_right")
+size = Vector3(4, 3.2, 4.5)
+
+[sub_resource type="BoxShape3D" id="Shape_main"]
+size = Vector3(12, 3.8, 4.5)
+
+[sub_resource type="BoxMesh" id="Mesh_door"]
+material = SubResource("Material_door")
+size = Vector3(1.8, 2.45, 0.1)
+
+[sub_resource type="BoxMesh" id="Mesh_canopy"]
+material = SubResource("Material_main_center")
+size = Vector3(2.8, 0.18, 1.1)
+
+[sub_resource type="BoxMesh" id="Mesh_stoop"]
+material = SubResource("Material_door")
+size = Vector3(2.8, 0.12, 1.15)
+
+[sub_resource type="BoxMesh" id="Mesh_workshop_roof"]
+material = SubResource("Material_workshop")
+size = Vector3(5, 0.22, 3.5)
+
+[sub_resource type="BoxShape3D" id="Shape_workshop_roof"]
+size = Vector3(5, 0.22, 3.5)
+
+[sub_resource type="BoxMesh" id="Mesh_workshop_back"]
+material = SubResource("Material_workshop")
+size = Vector3(5, 1.55, 0.22)
+
+[sub_resource type="BoxShape3D" id="Shape_workshop_back"]
+size = Vector3(5, 1.55, 0.22)
+
+[sub_resource type="BoxMesh" id="Mesh_workshop_post"]
+material = SubResource("Material_workshop")
+size = Vector3(0.24, 2.45, 0.24)
+
+[sub_resource type="BoxShape3D" id="Shape_workshop_post"]
+size = Vector3(0.24, 2.45, 0.24)
+
+[sub_resource type="BoxMesh" id="Mesh_workbench"]
+material = SubResource("Material_table")
+size = Vector3(3.2, 0.72, 0.7)
+
+[sub_resource type="BoxShape3D" id="Shape_workbench"]
+size = Vector3(3.2, 0.72, 0.7)
+
+[sub_resource type="BoxMesh" id="Mesh_greenhouse_front"]
+material = SubResource("Material_greenhouse")
+size = Vector3(4, 1.65, 0.1)
+
+[sub_resource type="BoxMesh" id="Mesh_greenhouse_side"]
+material = SubResource("Material_greenhouse")
+size = Vector3(0.1, 1.65, 3)
+
+[sub_resource type="BoxMesh" id="Mesh_greenhouse_roof"]
+material = SubResource("Material_greenhouse")
+size = Vector3(2.15, 0.12, 3.1)
+
+[sub_resource type="BoxMesh" id="Mesh_greenhouse_frame"]
+material = SubResource("Material_greenhouse_frame")
+size = Vector3(0.12, 2.2, 0.12)
+
+[sub_resource type="BoxMesh" id="Mesh_greenhouse_base"]
+material = SubResource("Material_greenhouse_frame")
+size = Vector3(4, 0.22, 3)
+
+[sub_resource type="BoxShape3D" id="Shape_greenhouse"]
+size = Vector3(4, 2.8, 3)
+
+[sub_resource type="BoxMesh" id="Mesh_planter"]
+material = SubResource("Material_planter")
+size = Vector3(1.25, 0.42, 2.35)
+
+[sub_resource type="BoxMesh" id="Mesh_table_top"]
+material = SubResource("Material_table")
+size = Vector3(1.6, 0.12, 0.9)
+
+[sub_resource type="BoxMesh" id="Mesh_table_leg"]
+material = SubResource("Material_table")
+size = Vector3(0.18, 0.72, 0.18)
+
+[sub_resource type="BoxShape3D" id="Shape_table"]
+size = Vector3(1.75, 0.8, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_chair_seat"]
+material = SubResource("Material_chair")
+size = Vector3(0.55, 0.1, 0.55)
+
+[sub_resource type="BoxMesh" id="Mesh_chair_back"]
+material = SubResource("Material_chair")
+size = Vector3(0.55, 0.72, 0.1)
+
+[sub_resource type="BoxMesh" id="Mesh_chair_leg"]
+material = SubResource("Material_chair")
+size = Vector3(0.12, 0.44, 0.12)
+
+[sub_resource type="BoxMesh" id="Mesh_crate"]
+material = SubResource("Material_crate")
+size = Vector3(0.75, 0.62, 0.75)
+
+[sub_resource type="BoxMesh" id="Mesh_clutter"]
+material = SubResource("Material_crate")
+size = Vector3(0.42, 0.36, 0.55)
+
+[sub_resource type="CylinderMesh" id="Mesh_firepit"]
+material = SubResource("Material_firepit")
+top_radius = 0.68
+bottom_radius = 0.74
+height = 0.18
+radial_segments = 16
+rings = 1
+
+[sub_resource type="CylinderMesh" id="Mesh_ember"]
+material = SubResource("Material_ember")
+top_radius = 0.38
+bottom_radius = 0.43
+height = 0.13
+radial_segments = 12
+rings = 1
+
+[sub_resource type="BoxMesh" id="Mesh_edge_bar"]
+material = SubResource("Material_terrain_edge")
+size = Vector3(4.5, 0.45, 0.35)
+
+[sub_resource type="BoxShape3D" id="Shape_edge_bar"]
+size = Vector3(4.5, 0.45, 0.35)
+
+[sub_resource type="BoxMesh" id="Mesh_edge_side"]
+material = SubResource("Material_terrain_edge")
+size = Vector3(0.35, 0.45, 5.5)
+
+[sub_resource type="BoxShape3D" id="Shape_edge_side"]
+size = Vector3(0.35, 0.45, 5.5)
+
+[node name="CampMain" type="Node3D"]
+metadata/layout_version = "1.3"
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_day")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.959931, -0.610865, 0)
+light_color = Color(1, 0.93, 0.80, 1)
+light_energy = 1.15
+shadow_enabled = true
+directional_shadow_max_distance = 60.0
+
+[node name="CameraRig" type="Node3D" parent="."]
+position = Vector3(0, 0, -0.4)
+rotation = Vector3(0, 0.20944, 0)
+
+[node name="PitchPivot" type="Node3D" parent="CameraRig"]
+rotation = Vector3(-0.837758, 0, 0)
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig/PitchPivot"]
+position = Vector3(0, 0, 45)
+projection = 1
+size = 20.5
+near = 0.1
+far = 100.0
+current = true
+
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
+navigation_mesh = ExtResource("1_navigation")
+
+[node name="SurroundingTerrain" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.2, 5)
+mesh = SubResource("Mesh_surrounding_terrain")
+
+[node name="NavigationSource" type="Node3D" parent="." groups=["camp_navigation_source"]]
+
+[node name="TerrainBase" type="StaticBody3D" parent="NavigationSource"]
+position = Vector3(0, -0.325, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="NavigationSource/TerrainBase"]
+mesh = SubResource("Mesh_terrain_base")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationSource/TerrainBase"]
+shape = SubResource("Shape_terrain_base")
+
+[node name="GroundSurface" type="MeshInstance3D" parent="NavigationSource"]
+position = Vector3(0, -0.04, 0)
+mesh = SubResource("Mesh_ground_surface")
+
+[node name="Road" type="StaticBody3D" parent="NavigationSource"]
+position = Vector3(0, -0.05, 11.75)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="NavigationSource/Road"]
+mesh = SubResource("Mesh_road")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationSource/Road"]
+shape = SubResource("Shape_road")
+
+[node name="BerthDriveway" type="MeshInstance3D" parent="NavigationSource"]
+position = Vector3(-6.9, 0.02, 3.75)
+rotation = Vector3(0, -0.174533, 0)
+mesh = SubResource("Mesh_berth_pad")
+
+[node name="MainForecourt" type="MeshInstance3D" parent="NavigationSource"]
+position = Vector3(0, 0.02, -3.15)
+mesh = SubResource("Mesh_forecourt")
+
+[node name="MainBuilding" type="Node3D" parent="NavigationSource"]
+position = Vector3(0, 0, -6.75)
+metadata/blockout_size = Vector3(12, 3.8, 4.5)
+
+[node name="LeftWing" type="MeshInstance3D" parent="NavigationSource/MainBuilding"]
+position = Vector3(-4, 1.65, 0)
+mesh = SubResource("Mesh_main_wing_left")
+
+[node name="EntryCore" type="MeshInstance3D" parent="NavigationSource/MainBuilding"]
+position = Vector3(0, 1.9, -0.1)
+mesh = SubResource("Mesh_main_core")
+
+[node name="RightWing" type="MeshInstance3D" parent="NavigationSource/MainBuilding"]
+position = Vector3(4, 1.6, 0)
+mesh = SubResource("Mesh_main_wing_right")
+
+[node name="FrontDoorBlockout" type="MeshInstance3D" parent="NavigationSource/MainBuilding"]
+position = Vector3(0, 1.225, 2.21)
+mesh = SubResource("Mesh_door")
+
+[node name="EntranceCanopy" type="MeshInstance3D" parent="NavigationSource/MainBuilding"]
+position = Vector3(0, 2.58, 2.65)
+mesh = SubResource("Mesh_canopy")
+
+[node name="EntranceStoop" type="MeshInstance3D" parent="NavigationSource/MainBuilding"]
+position = Vector3(0, 0.06, 2.68)
+mesh = SubResource("Mesh_stoop")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="NavigationSource/MainBuilding"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationSource/MainBuilding/StaticBody3D"]
+position = Vector3(0, 1.9, 0)
+shape = SubResource("Shape_main")
+
+[node name="Workshop" type="Node3D" parent="NavigationSource"]
+position = Vector3(-7.7, 0, -4.4)
+metadata/blockout_footprint = Vector2(5, 3.5)
+
+[node name="LeanToRoof" type="MeshInstance3D" parent="NavigationSource/Workshop"]
+position = Vector3(0, 2.62, 0)
+rotation = Vector3(0.0872665, 0, 0)
+mesh = SubResource("Mesh_workshop_roof")
+
+[node name="ServiceBack" type="MeshInstance3D" parent="NavigationSource/Workshop"]
+position = Vector3(0, 0.775, -1.64)
+mesh = SubResource("Mesh_workshop_back")
+
+[node name="FrontPostLeft" type="MeshInstance3D" parent="NavigationSource/Workshop"]
+position = Vector3(-2.35, 1.225, 1.55)
+mesh = SubResource("Mesh_workshop_post")
+
+[node name="FrontPostRight" type="MeshInstance3D" parent="NavigationSource/Workshop"]
+position = Vector3(2.35, 1.225, 1.55)
+mesh = SubResource("Mesh_workshop_post")
+
+[node name="RepairBench" type="MeshInstance3D" parent="NavigationSource/Workshop"]
+position = Vector3(0.4, 0.36, -1)
+mesh = SubResource("Mesh_workbench")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="NavigationSource/Workshop"]
+
+[node name="RoofCollision" type="CollisionShape3D" parent="NavigationSource/Workshop/StaticBody3D"]
+position = Vector3(0, 2.62, 0)
+rotation = Vector3(0.0872665, 0, 0)
+shape = SubResource("Shape_workshop_roof")
+
+[node name="BackCollision" type="CollisionShape3D" parent="NavigationSource/Workshop/StaticBody3D"]
+position = Vector3(0, 0.775, -1.64)
+shape = SubResource("Shape_workshop_back")
+
+[node name="PostLeftCollision" type="CollisionShape3D" parent="NavigationSource/Workshop/StaticBody3D"]
+position = Vector3(-2.35, 1.225, 1.55)
+shape = SubResource("Shape_workshop_post")
+
+[node name="PostRightCollision" type="CollisionShape3D" parent="NavigationSource/Workshop/StaticBody3D"]
+position = Vector3(2.35, 1.225, 1.55)
+shape = SubResource("Shape_workshop_post")
+
+[node name="WorkbenchCollision" type="CollisionShape3D" parent="NavigationSource/Workshop/StaticBody3D"]
+position = Vector3(0.4, 0.36, -1)
+shape = SubResource("Shape_workbench")
+
+[node name="Greenhouse" type="Node3D" parent="NavigationSource"]
+position = Vector3(7.45, 0, -3.25)
+metadata/blockout_footprint = Vector2(4, 3)
+
+[node name="Base" type="MeshInstance3D" parent="NavigationSource/Greenhouse"]
+position = Vector3(0, 0.11, 0)
+mesh = SubResource("Mesh_greenhouse_base")
+
+[node name="FrontGlass" type="MeshInstance3D" parent="NavigationSource/Greenhouse"]
+position = Vector3(0, 1.05, 1.45)
+cast_shadow = 0
+mesh = SubResource("Mesh_greenhouse_front")
+
+[node name="BackGlass" type="MeshInstance3D" parent="NavigationSource/Greenhouse"]
+position = Vector3(0, 1.05, -1.45)
+cast_shadow = 0
+mesh = SubResource("Mesh_greenhouse_front")
+
+[node name="LeftGlass" type="MeshInstance3D" parent="NavigationSource/Greenhouse"]
+position = Vector3(-1.95, 1.05, 0)
+cast_shadow = 0
+mesh = SubResource("Mesh_greenhouse_side")
+
+[node name="RightGlass" type="MeshInstance3D" parent="NavigationSource/Greenhouse"]
+position = Vector3(1.95, 1.05, 0)
+cast_shadow = 0
+mesh = SubResource("Mesh_greenhouse_side")
+
+[node name="RoofLeft" type="MeshInstance3D" parent="NavigationSource/Greenhouse"]
+position = Vector3(-0.98, 2.22, 0)
+rotation = Vector3(0, 0, 0.349066)
+cast_shadow = 0
+mesh = SubResource("Mesh_greenhouse_roof")
+
+[node name="RoofRight" type="MeshInstance3D" parent="NavigationSource/Greenhouse"]
+position = Vector3(0.98, 2.22, 0)
+rotation = Vector3(0, 0, -0.349066)
+cast_shadow = 0
+mesh = SubResource("Mesh_greenhouse_roof")
+
+[node name="FrameFrontLeft" type="MeshInstance3D" parent="NavigationSource/Greenhouse"]
+position = Vector3(-1.94, 1.1, 1.44)
+mesh = SubResource("Mesh_greenhouse_frame")
+
+[node name="FrameFrontRight" type="MeshInstance3D" parent="NavigationSource/Greenhouse"]
+position = Vector3(1.94, 1.1, 1.44)
+mesh = SubResource("Mesh_greenhouse_frame")
+
+[node name="FrameBackLeft" type="MeshInstance3D" parent="NavigationSource/Greenhouse"]
+position = Vector3(-1.94, 1.1, -1.44)
+mesh = SubResource("Mesh_greenhouse_frame")
+
+[node name="FrameBackRight" type="MeshInstance3D" parent="NavigationSource/Greenhouse"]
+position = Vector3(1.94, 1.1, -1.44)
+mesh = SubResource("Mesh_greenhouse_frame")
+
+[node name="PlanterLeft" type="MeshInstance3D" parent="NavigationSource/Greenhouse"]
+position = Vector3(-0.82, 0.32, 0)
+mesh = SubResource("Mesh_planter")
+
+[node name="PlanterRight" type="MeshInstance3D" parent="NavigationSource/Greenhouse"]
+position = Vector3(0.82, 0.32, 0)
+mesh = SubResource("Mesh_planter")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="NavigationSource/Greenhouse"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationSource/Greenhouse/StaticBody3D"]
+position = Vector3(0, 1.4, 0)
+shape = SubResource("Shape_greenhouse")
+
+[node name="BlueHourBerth" parent="NavigationSource" instance=ExtResource("4_bus")]
+position = Vector3(-6.9, 0, 3.05)
+rotation = Vector3(0, -0.174533, 0)
+
+[node name="CentralLivingArea" type="Node3D" parent="NavigationSource"]
+metadata/activity_size = Vector2(8, 6)
+
+[node name="TestTable" type="Node3D" parent="NavigationSource/CentralLivingArea"]
+position = Vector3(1.55, 0, 1.65)
+
+[node name="Top" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea/TestTable"]
+position = Vector3(0, 0.78, 0)
+mesh = SubResource("Mesh_table_top")
+
+[node name="Leg01" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea/TestTable"]
+position = Vector3(-0.58, 0.36, -0.25)
+mesh = SubResource("Mesh_table_leg")
+
+[node name="Leg02" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea/TestTable"]
+position = Vector3(0.58, 0.36, -0.25)
+mesh = SubResource("Mesh_table_leg")
+
+[node name="Leg03" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea/TestTable"]
+position = Vector3(-0.58, 0.36, 0.25)
+mesh = SubResource("Mesh_table_leg")
+
+[node name="Leg04" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea/TestTable"]
+position = Vector3(0.58, 0.36, 0.25)
+mesh = SubResource("Mesh_table_leg")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="NavigationSource/CentralLivingArea/TestTable"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationSource/CentralLivingArea/TestTable/StaticBody3D"]
+position = Vector3(0, 0.4, 0)
+shape = SubResource("Shape_table")
+
+[node name="TestChair01" type="Node3D" parent="NavigationSource/CentralLivingArea"]
+position = Vector3(1.55, 0, 0.72)
+
+[node name="Seat" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea/TestChair01"]
+position = Vector3(0, 0.48, 0)
+mesh = SubResource("Mesh_chair_seat")
+
+[node name="Back" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea/TestChair01"]
+position = Vector3(0, 0.8, -0.23)
+mesh = SubResource("Mesh_chair_back")
+
+[node name="Leg" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea/TestChair01"]
+position = Vector3(0, 0.22, 0)
+mesh = SubResource("Mesh_chair_leg")
+
+[node name="TestChair02" type="Node3D" parent="NavigationSource/CentralLivingArea"]
+position = Vector3(1.55, 0, 2.58)
+rotation = Vector3(0, 3.14159, 0)
+
+[node name="Seat" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea/TestChair02"]
+position = Vector3(0, 0.48, 0)
+mesh = SubResource("Mesh_chair_seat")
+
+[node name="Back" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea/TestChair02"]
+position = Vector3(0, 0.8, -0.23)
+mesh = SubResource("Mesh_chair_back")
+
+[node name="Leg" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea/TestChair02"]
+position = Vector3(0, 0.22, 0)
+mesh = SubResource("Mesh_chair_leg")
+
+[node name="CrateSeat01" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea"]
+position = Vector3(2.78, 0.31, 0.95)
+rotation = Vector3(0, 0.18, 0)
+mesh = SubResource("Mesh_crate")
+
+[node name="CrateSeat02" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea"]
+position = Vector3(2.95, 0.31, 2.1)
+rotation = Vector3(0, -0.12, 0)
+mesh = SubResource("Mesh_crate")
+
+[node name="FirepitPosition" type="Node3D" parent="NavigationSource/CentralLivingArea"]
+position = Vector3(-0.55, 0, 1.65)
+
+[node name="Basin" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea/FirepitPosition"]
+position = Vector3(0, 0.09, 0)
+mesh = SubResource("Mesh_firepit")
+
+[node name="EmberPlaceholder" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea/FirepitPosition"]
+position = Vector3(0, 0.2, 0)
+mesh = SubResource("Mesh_ember")
+
+[node name="Clutter01" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea"]
+position = Vector3(2.88, 0.18, 2.92)
+rotation = Vector3(0, 0.35, 0)
+mesh = SubResource("Mesh_clutter")
+
+[node name="Clutter02" type="MeshInstance3D" parent="NavigationSource/CentralLivingArea"]
+position = Vector3(2.45, 0.18, 3.18)
+rotation = Vector3(0, -0.28, 0)
+mesh = SubResource("Mesh_clutter")
+
+[node name="BoundaryBlockouts" type="Node3D" parent="NavigationSource"]
+
+[node name="RearLeft" type="StaticBody3D" parent="NavigationSource/BoundaryBlockouts"]
+position = Vector3(-9.35, 0.225, -8.7)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="NavigationSource/BoundaryBlockouts/RearLeft"]
+mesh = SubResource("Mesh_edge_bar")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationSource/BoundaryBlockouts/RearLeft"]
+shape = SubResource("Shape_edge_bar")
+
+[node name="RearRight" type="StaticBody3D" parent="NavigationSource/BoundaryBlockouts"]
+position = Vector3(9.35, 0.225, -8.7)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="NavigationSource/BoundaryBlockouts/RearRight"]
+mesh = SubResource("Mesh_edge_bar")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationSource/BoundaryBlockouts/RearRight"]
+shape = SubResource("Shape_edge_bar")
+
+[node name="LeftRear" type="StaticBody3D" parent="NavigationSource/BoundaryBlockouts"]
+position = Vector3(-11.7, 0.225, -4.6)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="NavigationSource/BoundaryBlockouts/LeftRear"]
+mesh = SubResource("Mesh_edge_side")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationSource/BoundaryBlockouts/LeftRear"]
+shape = SubResource("Shape_edge_side")
+
+[node name="RightMiddle" type="StaticBody3D" parent="NavigationSource/BoundaryBlockouts"]
+position = Vector3(11.7, 0.225, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="NavigationSource/BoundaryBlockouts/RightMiddle"]
+mesh = SubResource("Mesh_edge_side")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationSource/BoundaryBlockouts/RightMiddle"]
+shape = SubResource("Shape_edge_side")
+
+[node name="FrontRight01" type="StaticBody3D" parent="NavigationSource/BoundaryBlockouts"]
+position = Vector3(4.9, 0.225, 8.7)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="NavigationSource/BoundaryBlockouts/FrontRight01"]
+mesh = SubResource("Mesh_edge_bar")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationSource/BoundaryBlockouts/FrontRight01"]
+shape = SubResource("Shape_edge_bar")
+
+[node name="FrontRight02" type="StaticBody3D" parent="NavigationSource/BoundaryBlockouts"]
+position = Vector3(9.45, 0.225, 8.7)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="NavigationSource/BoundaryBlockouts/FrontRight02"]
+mesh = SubResource("Mesh_edge_bar")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationSource/BoundaryBlockouts/FrontRight02"]
+shape = SubResource("Shape_edge_bar")
+
+[node name="DecorationPlaceholders" type="Node3D" parent="."]
+
+[node name="DecorationPlaceholder_CrateA" type="MeshInstance3D" parent="DecorationPlaceholders"]
+position = Vector3(8.1, 0.31, 4.1)
+rotation = Vector3(0, 0.22, 0)
+mesh = SubResource("Mesh_crate")
+
+[node name="DecorationPlaceholder_CrateB" type="MeshInstance3D" parent="DecorationPlaceholders"]
+position = Vector3(8.72, 0.18, 4.32)
+rotation = Vector3(0, -0.18, 0)
+mesh = SubResource("Mesh_clutter")
+
+[node name="DecorationPlaceholder_LightPost" type="Node3D" parent="DecorationPlaceholders"]
+position = Vector3(10.45, 0, 6.6)
+
+[node name="Pole" type="MeshInstance3D" parent="DecorationPlaceholders/DecorationPlaceholder_LightPost"]
+position = Vector3(0, 1.225, 0)
+mesh = SubResource("Mesh_workshop_post")
+
+[node name="Head" type="MeshInstance3D" parent="DecorationPlaceholders/DecorationPlaceholder_LightPost"]
+position = Vector3(0, 2.48, 0)
+mesh = SubResource("Mesh_chair_seat")
+
+[node name="Characters" type="Node3D" parent="."]
+
+[node name="CharacterAtBus" parent="Characters" groups=["camp_scale_character"] instance=ExtResource("2_xia")]
+position = Vector3(-4.45, 0, 5.45)
+rotation = Vector3(0, -1.15, 0)
+
+[node name="CharacterAtWorkshop" parent="Characters" groups=["camp_scale_character"] instance=ExtResource("3_su")]
+position = Vector3(-4.85, 0, -2.3)
+rotation = Vector3(0, -1.9, 0)
+
+[node name="CharacterAtLivingArea" parent="Characters" groups=["camp_scale_character"] instance=ExtResource("2_xia")]
+position = Vector3(-0.05, 0, 0.25)
+rotation = Vector3(0, 1.1, 0)
+
+[node name="CharacterAtGreenhouse" parent="Characters" groups=["camp_scale_character"] instance=ExtResource("3_su")]
+position = Vector3(5.05, 0, -1.75)
+rotation = Vector3(0, 2.25, 0)
+
+[node name="PartyAssembly" type="Node3D" parent="."]
+
+[node name="PartyPoint01" type="Marker3D" parent="PartyAssembly"]
+position = Vector3(-3.75, 0, 2.8)
+
+[node name="PartyPoint02" type="Marker3D" parent="PartyAssembly"]
+position = Vector3(-2.35, 0, 2.8)
+
+[node name="PartyPoint03" type="Marker3D" parent="PartyAssembly"]
+position = Vector3(-3.55, 0, 4.15)
+
+[node name="PartyPoint04" type="Marker3D" parent="PartyAssembly"]
+position = Vector3(-2.15, 0, 4.15)
+
+[node name="ExpansionSlots" type="Node3D" parent="."]
+
+[node name="FacilitySlot_A" type="Marker3D" parent="ExpansionSlots"]
+position = Vector3(9, 0, 2)
+
+[node name="FacilitySlot_B" type="Marker3D" parent="ExpansionSlots"]
+position = Vector3(9, 0, 6)
+
+[node name="FacilitySlot_C" type="Marker3D" parent="ExpansionSlots"]
+position = Vector3(5.5, 0, 7)
