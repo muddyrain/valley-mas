@@ -33,7 +33,7 @@ func _initialize() -> void:
 	check(ResourceSaver.save(catalog.map, roundtrip_path) == OK, "Map data can be serialized for export")
 	var reloaded: Resource = ResourceLoader.load(roundtrip_path, "", ResourceLoader.CACHE_MODE_IGNORE)
 	check(reloaded.initial_weapons == catalog.map.initial_weapons, "Binary resource conversion preserves the starting loadout")
-	check(catalog.survivors.size() == 3 and catalog.traits.size() == 3, "Three survivors and three distinct traits")
+	check(catalog.survivors.size() == 5 and catalog.traits.size() == 5, "Five survivors and five distinct traits")
 	check(catalog.weapons.size() == 4 and catalog.enemies.size() == 4, "Four weapons and four enemy types")
 	var clock = clock_script.new(catalog.map)
 	clock.advance(catalog.map.day_seconds - 0.1)

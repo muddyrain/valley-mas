@@ -86,7 +86,11 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 	add_child(camera)
 	_update_camera()
 	camera.current = true
-	var member_ids: Array = catalog.survivors.map(func(member): return member.id) if campaign == null else campaign.data.members
+	var member_ids: Array
+	if campaign == null:
+		member_ids = catalog.survivors.slice(0, loadout.size()).map(func(member): return member.id)
+	else:
+		member_ids = campaign.data.members
 	for i in range(member_ids.size()):
 		var member_id: String = member_ids[i]
 		var spec: Resource = (catalog.survivors[i] if campaign == null else campaign.member_template(member_id)).duplicate()
