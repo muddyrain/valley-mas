@@ -232,9 +232,9 @@ func run() -> void:
 		"survey": "res://assets/ui/route_selection/route_selection_survey_tab_selected.png",
 	}
 	var normal_paths := {
-		"combat": "res://assets/ui/new_run/09_tab_combat.png",
-		"scavenge": "res://assets/ui/new_run/10_tab_scavenge.png",
-		"survey": "res://assets/ui/new_run/11_tab_survey.png",
+		"combat": "res://assets/ui/route_selection/route_selection_combat_tab_normal.png",
+		"scavenge": "res://assets/ui/route_selection/route_selection_scavenge_tab_normal.png",
+		"survey": "res://assets/ui/route_selection/route_selection_survey_tab_normal.png",
 	}
 	var selected_reference_bounds := alpha_bounds(load(selected_paths.combat) as Texture2D, 0.0)
 	var hover_motion := InputEventMouseMotion.new()
@@ -269,8 +269,8 @@ func run() -> void:
 	await click(app.screen.cards[1])
 	check(app.screen.tooltip_upgrade_summary.text == "全队伤害提高到 ×3.0", "Combat skill shows its concrete upgraded effect")
 	check(
-			app.screen.card_plates[0].texture.resource_path == "res://assets/ui/effects/shooting_target.png"
-			and app.screen.card_plates[1].texture.resource_path == "res://assets/ui/effects/rage.png",
+			app.screen.card_plates[0].texture.resource_path == "res://assets/items/cards/item_shooting_target_card.png"
+			and app.screen.card_plates[1].texture.resource_path == "res://assets/skills/cards/skill_rage_card.png",
 			"Combat cards use their effect artwork instead of the blue placeholder",
 	)
 	await click(app.screen.tabs.survey)

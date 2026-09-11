@@ -2,9 +2,9 @@ extends Control
 const UI = preload("res://ui/ui_style.gd")
 const Art = preload("res://ui/menu_art.gd")
 const Entry = preload("res://ui/menu_entry.gd")
-const BRAND = preload("res://assets/ui/main_menu/brand_tagline.png")
-const POSTER = preload("res://assets/ui/main_menu/poster.png")
-const SOCIAL = preload("res://assets/ui/main_menu/social_entries.png")
+const BRAND = preload("res://assets/ui/common/branding/ui_common_logo_tagline.png")
+const POSTER = preload("res://assets/ui/main_menu/main_menu_poster.png")
+const SOCIAL = preload("res://assets/ui/main_menu/main_menu_social_entries.png")
 const REFERENCE := Vector2(1919, 1080)
 var app: Node
 var menu_buttons: Array[Button] = []

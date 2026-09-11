@@ -1,9 +1,9 @@
 extends RefCounted
 const UI = preload("res://ui/ui_style.gd")
-const BACKGROUND = preload("res://assets/ui/main_menu/home_background.png")
-const LOGO = preload("res://assets/ui/main_menu/brand_tagline.png")
-const PAPER = preload("res://assets/ui/main_menu/paper_panel.png")
-const BLUE = preload("res://assets/ui/main_menu/blue_button.png")
+const BACKGROUND = preload("res://assets/ui/common/backgrounds/ui_common_background.png")
+const LOGO = preload("res://assets/ui/common/branding/ui_common_logo_tagline.png")
+const PAPER = preload("res://assets/ui/common/panels/ui_common_paper_panel.png")
+const BLUE = preload("res://assets/ui/common/buttons/ui_common_blue_button_normal.png")
 const INK := Color("#20374b")
 const MUTED := Color("#597080")
 const WHITE := Color("#f3efe4")

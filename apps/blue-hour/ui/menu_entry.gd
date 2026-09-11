@@ -1,7 +1,7 @@
 extends Button
 const Art = preload("res://ui/menu_art.gd")
-const NORMAL = preload("res://assets/ui/main_menu/icons_normal.png")
-const HOVER = preload("res://assets/ui/main_menu/icons_hover.png")
+const NORMAL = preload("res://assets/ui/main_menu/main_menu_navigation_icons_normal.png")
+const HOVER = preload("res://assets/ui/main_menu/main_menu_navigation_icons_hover.png")
 var icon_index := 0
 var lit := false
 var paper_style: StyleBoxTexture

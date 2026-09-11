@@ -1,6 +1,6 @@
 [
   {
-    "file": "home_background.png",
+    "file": "../common/backgrounds/ui_common_background.png",
     "source": "codex-clipboard-b292e7d5-be66-4934-ac2d-a020d1a8d481.png",
     "width": 1919,
     "height": 1080,
@@ -8,7 +8,7 @@
     "pixelsUnchanged": true
   },
   {
-    "file": "brand_tagline.png",
+    "file": "../common/branding/ui_common_logo_tagline.png",
     "source": "codex-clipboard-264e0e85-9b9b-4697-94ad-d186916af603.png",
     "width": 1774,
     "height": 887,
@@ -16,7 +16,7 @@
     "pixelsUnchanged": true
   },
   {
-    "file": "icons_hover.png",
+    "file": "main_menu_navigation_icons_hover.png",
     "source": "codex-clipboard-95e0eada-ea5c-40a9-8c39-41c70551abeb.png",
     "width": 128,
     "height": 768,
@@ -24,7 +24,7 @@
     "pixelsUnchanged": true
   },
   {
-    "file": "icons_normal.png",
+    "file": "main_menu_navigation_icons_normal.png",
     "source": "codex-clipboard-42c2adc7-0eb3-42f3-bf65-4c4443974da3.png",
     "width": 128,
     "height": 768,
@@ -32,7 +32,7 @@
     "pixelsUnchanged": true
   },
   {
-    "file": "social_entries.png",
+    "file": "main_menu_social_entries.png",
     "source": "codex-clipboard-e1388259-357a-4a6d-9c13-6e5bf3255bcc.png",
     "width": 2172,
     "height": 724,
@@ -40,7 +40,7 @@
     "pixelsUnchanged": true
   },
   {
-    "file": "poster.png",
+    "file": "main_menu_poster.png",
     "source": "codex-clipboard-3ee597b7-e6db-4640-92c7-af0c54c7c544.png",
     "width": 1086,
     "height": 1448,
@@ -48,7 +48,7 @@
     "pixelsUnchanged": true
   },
   {
-    "file": "paper_panel.png",
+    "file": "../common/panels/ui_common_paper_panel.png",
     "source": "codex-clipboard-a841bd08-e2cf-4386-842e-157977c344d1.png",
     "width": 2172,
     "height": 724,
@@ -56,19 +56,11 @@
     "pixelsUnchanged": true
   },
   {
-    "file": "blue_button.png",
+    "file": "../common/buttons/ui_common_blue_button_normal.png",
     "source": "codex-clipboard-a7d50cda-f13d-49b7-9852-138c0b514f14.png",
     "width": 2172,
     "height": 724,
     "sha256": "3E99BEA03FF8BCA40CA5F777626AEA1F3090EF99269612AA8AA122B830BF1386",
-    "pixelsUnchanged": true
-  },
-  {
-    "file": "logo.png",
-    "source": "codex-clipboard-9323019b-fe96-4836-b826-f72fe935c69a.png",
-    "width": 2172,
-    "height": 724,
-    "sha256": "0C52828D6F2FAE17D3C0B88A501A7605F1D496AE0DA452F3A424312758192B86",
     "pixelsUnchanged": true
   }
 ]
