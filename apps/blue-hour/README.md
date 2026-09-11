@@ -97,6 +97,8 @@ Windows 的 `run.ps1` 支持 `run`、`editor`、`art`、`import`、`test`、`smo
 
 ## 美术资产生产与检查
 
+图片与 UI 的新增归属及文件命名见 [资源目录说明](art/RESOURCE_LAYOUT.md)：游戏对象素材归对应领域，共享控件归 `assets/ui/common/`，界面专属素材归 `main_menu/` 或 `route_selection/`。目录整理历史见 [资源迁移记录](docs/ASSET_MIGRATION_2026-09-12.md)，当前 122 个资源的旧名与新名映射见 [命名迁移记录](docs/ASSET_NAMING_2026-09-12.md)。
+
 新增美术先读 [ART_BIBLE](art/ART_BIBLE.md)、[ASSET_PIPELINE](art/ASSET_PIPELINE.md) 与 [MODEL_CATALOG](art/MODEL_CATALOG.md)，优先复用现有模块。`art/build_assets.ps1` 按道路建筑、道具、车辆、枪械、感染者五批依次执行 Blender → GLB 校验 → Godot 导入与实例化，失败即停止；运行资产在 `assets/generated/`，可编辑源文件在 `art/blender/sources/`。
 
 运行 `./apps/blue-hour/run.ps1 -Mode art` 或打开 `scenes/debug/art_showcase.tscn` 可查看全部资产，按类别聚焦；Tab 切换 Day / BLUE HOUR，滚轮缩放，右键拖动旋转。`test` 和 `build` 包含模型导入与地图美术回归，`capture` 包含美术展示截图；`build` 还验证独立 EXE 中全部模型的加载。完整步骤见资产管线文档。
