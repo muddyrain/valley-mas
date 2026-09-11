@@ -10,6 +10,176 @@ func launch(_fresh: bool) -> void:
 	root.add_child(app)
 	await frames(12)
 
+func move_mouse(point: Vector2) -> void:
+	var motion := InputEventMouseMotion.new()
+	motion.device = 42
+	motion.position = point
+	root.push_input(motion, true)
+	await process_frame
+
+func set_mouse_button(point: Vector2, pressed: bool) -> void:
+	var event := InputEventMouseButton.new()
+	event.device = 42
+	event.position = point
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = pressed
+	root.push_input(event, true)
+	await process_frame
+
+func alpha_bounds(texture: Texture2D, threshold: float = 0.125) -> Rect2i:
+	var image := texture.get_image()
+	var min_x := image.get_width()
+	var min_y := image.get_height()
+	var max_x := -1
+	var max_y := -1
+	for y in range(image.get_height()):
+		for x in range(image.get_width()):
+			if image.get_pixel(x, y).a <= threshold:
+				continue
+			min_x = mini(min_x, x)
+			min_y = mini(min_y, y)
+			max_x = maxi(max_x, x)
+			max_y = maxi(max_y, y)
+	if max_x < min_x or max_y < min_y:
+		return Rect2i()
+	return Rect2i(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)
+
+func check_card_hover(card: Button, plate: TextureRect) -> void:
+	var visual := card.get_node_or_null("CardVisual") as Control
+	check(visual != null, "Cards share the reusable paper hover visual root")
+	if visual == null:
+		return
+	var effect := visual.get_node_or_null("CardHoverEffect") as TextureRect
+	check(effect != null, "Cards share the alpha-contour hover effect layer")
+	if effect == null:
+		return
+	check(effect.texture == plate.texture, "Hover contour reuses the current card PNG")
+	check(plate.material == null, "Hover shader leaves the original card colors untouched")
+	var uses_rectangular_selection := false
+	for child in card.find_children("*", "TextureRect", true, false):
+		var texture_rect := child as TextureRect
+		if texture_rect.texture != null and texture_rect.texture.resource_path.ends_with("24_card_selected.png"):
+			uses_rectangular_selection = true
+	check(not uses_rectangular_selection, "Cards no longer render the rectangular blue selection frame")
+	var base_position := visual.position
+	await move_mouse(card.get_global_rect().get_center())
+	var tooltip := app.screen.get("tooltip_panel") as Control
+	check(tooltip != null, "Effect details use a reusable animated information card")
+	if tooltip == null:
+		return
+	check(tooltip.visible and tooltip.modulate.a < 1.0 and tooltip.scale.x < 1.0, "Effect details begin with a subtle enter animation")
+	await create_timer(0.18).timeout
+	var tooltip_paper := tooltip.get_node_or_null("TooltipPaper") as Polygon2D
+	var panel_surface := tooltip.get_theme_stylebox("panel") as StyleBoxFlat
+	var pointer_is_integrated := false
+	if tooltip_paper != null:
+		for point in tooltip_paper.polygon:
+			if point.x < 0.0 or point.x > tooltip.size.x:
+				pointer_is_integrated = true
+				break
+	check(
+		panel_surface != null
+		and panel_surface.bg_color.a < 0.01
+		and tooltip_paper != null
+		and pointer_is_integrated
+		and tooltip.get_node_or_null("TooltipPointer") == null,
+		"Tooltip pointer is part of one paper silhouette without a rectangular seam",
+	)
+	check(
+		tooltip_paper != null
+		and tooltip_paper.polygon.size() >= 17
+		and not is_equal_approx(tooltip_paper.polygon[0].y, tooltip_paper.polygon[1].y)
+		and not is_equal_approx(tooltip_paper.polygon[1].y, tooltip_paper.polygon[2].y),
+		"Tooltip paper uses an irregular hand-cut perimeter instead of a rectangular card",
+	)
+	check(visual.position.is_equal_approx(base_position + Vector2.UP * 4.0), "Hover lifts the paper card by four pixels")
+	check(visual.scale.is_equal_approx(Vector2.ONE * 1.03), "Hover scales the paper card to 1.03")
+	check(tooltip.modulate.a > 0.99 and tooltip.scale.is_equal_approx(Vector2.ONE), "Effect details finish their enter animation cleanly")
+	var card_rect := card.get_global_rect()
+	var tooltip_rect := tooltip.get_global_rect()
+	if card.name == "EffectCard_0":
+		check(tooltip_rect.end.x <= card_rect.position.x and card_rect.position.x - tooltip_rect.end.x <= 24.0, "Item details open beside the item card")
+	else:
+		check(tooltip_rect.position.x >= card_rect.end.x and tooltip_rect.position.x - card_rect.end.x <= 24.0, "Skill details open beside the skill card")
+	var upgrade_summary := app.screen.get("tooltip_upgrade_summary") as Label
+	check(upgrade_summary != null and not upgrade_summary.text.is_empty(), "Every starter card exposes a concrete upgrade preview")
+	var uses_extra_rule := false
+	for child in tooltip.find_children("*", "TextureRect", true, false):
+		var texture_rect := child as TextureRect
+		if texture_rect.texture != null and texture_rect.texture.resource_path.ends_with("39_tooltip_rule.png"):
+			uses_extra_rule = true
+	check(not uses_extra_rule, "Effect details no longer stack a second decorative divider")
+	check(
+		is_equal_approx(app.screen.tooltip_prefix.global_position.y, app.screen.tooltip_summary.global_position.y)
+		and app.screen.tooltip_prefix.get_theme_font_size("font_size") == app.screen.tooltip_summary.get_theme_font_size("font_size"),
+		"Effect label and description share one aligned text row",
+	)
+	check(
+		app.screen.tooltip_summary.get_line_count() >= 2 if card.name == "EffectCard_0" else true,
+		"Long effect descriptions wrap naturally inside the information card",
+	)
+	check(
+		not app.screen.tooltip_summary.text.contains("% ") if card.name == "EffectCard_0" else true,
+		"Percentage values stay attached to the following Chinese copy",
+	)
+	check(
+		app.screen.tooltip_upgrade_prefix.global_position.y >= app.screen.tooltip_summary.get_global_rect().end.y + 10.0,
+		"Wrapped effect descriptions push the upgrade row downward without overlap",
+	)
+	var ui_scale: float = app.screen.composition.scale.x
+	var left_margin: float = (app.screen.tooltip_title.global_position.x - app.screen.tooltip_panel.global_position.x) / ui_scale
+	var bottom_margin: float = (
+		app.screen.tooltip_panel.get_global_rect().end.y
+		- app.screen.tooltip_upgrade_row.get_global_rect().end.y
+	) / ui_scale
+	check(
+		app.screen.tooltip_panel.size.y >= 196.0
+		and app.screen.tooltip_panel.size.y < 320.0
+		and left_margin >= 24.0
+		and bottom_margin >= 18.0
+		and bottom_margin <= 26.0,
+		"Effect details keep consistent paper margins while adapting their height (height=%.1f, left=%.1f, bottom=%.1f)" % [
+			app.screen.tooltip_panel.size.y,
+			left_margin,
+			bottom_margin,
+		],
+	)
+	if card.name == "EffectCard_0":
+		var original_summary: String = app.screen.tooltip_summary.text
+		var original_height: float = app.screen.tooltip_panel.size.y
+		app.screen.tooltip_summary.text = original_summary + "。这是一段用于验证未来更长效果说明仍会继续向下排布的文字。"
+		app.screen.call("_refresh_tooltip_layout")
+		await process_frame
+		await process_frame
+		check(
+			app.screen.tooltip_summary.get_line_count() >= 3
+			and app.screen.tooltip_panel.size.y > original_height
+			and app.screen.tooltip_upgrade_prefix.global_position.y >= app.screen.tooltip_summary.get_global_rect().end.y + 10.0,
+			"Three-line descriptions expand the paper card and keep the upgrade row below",
+		)
+		app.screen.tooltip_summary.text = original_summary
+		app.screen.call("_refresh_tooltip_layout")
+		await process_frame
+		await process_frame
+	var material := effect.material as ShaderMaterial
+	check(material != null and float(material.get_shader_parameter("hover_amount")) > 0.99, "Hover fades in the alpha-contour shader")
+	if card.name == "EffectCard_0":
+		await capture("21-card-hover")
+	else:
+		await capture("21-skill-hover")
+	await set_mouse_button(card.get_global_rect().get_center(), true)
+	await create_timer(0.10).timeout
+	await process_frame
+	check(visual.scale.is_equal_approx(Vector2.ONE * 0.98), "Press feedback scales the hovered card to 0.98")
+	await set_mouse_button(card.get_global_rect().get_center(), false)
+	await create_timer(0.16).timeout
+	check(visual.scale.is_equal_approx(Vector2.ONE * 1.03), "Releasing restores the hover scale")
+	await move_mouse(app.screen.tooltip_title.get_global_rect().get_center())
+	await create_timer(0.18).timeout
+	check(visual.position.is_equal_approx(base_position) and visual.scale.is_equal_approx(Vector2.ONE), "Mouse exit smoothly restores the card transform")
+	check(float(material.get_shader_parameter("hover_amount")) < 0.01, "Mouse exit fades out the alpha-contour shader")
+	check(not tooltip.visible, "Effect details leave with the card hover state")
+
 func run() -> void:
 	create_timer(60).timeout.connect(func(): printerr("NEW RUN UI TIMEOUT"); quit(2))
 	root.unfocusable = true
@@ -20,15 +190,132 @@ func run() -> void:
 	check(not FileAccess.file_exists(run_save), "Menu alone never writes a run")
 	await capture("20-main-menu")
 	await click(button("开始游戏"))
+	var route_tabs: Array[Button] = [
+		app.screen.tabs.combat,
+		app.screen.tabs.scavenge,
+		app.screen.tabs.survey,
+		app.screen.composition.get_node("Route_locked") as Button,
+	]
+	for tab in route_tabs:
+		var title_row := tab.get_node_or_null("TabTitleRow") as HBoxContainer
+		var icon_view := tab.get_node_or_null("TabTitleRow/TabIcon") as TextureRect
+		var progress_text := tab.get_node_or_null("TabProgressText") as Label
+		var progress_bar := tab.get_node_or_null("TabProgress") as TextureRect
+		var description := tab.get_node_or_null("TabDescription") as Label
+		check(
+			title_row != null
+			and is_equal_approx(title_row.position.x + title_row.size.x * 0.5, tab.size.x * 0.5),
+			"Tab icon and title form one centered visual group: " + tab.name,
+		)
+		check(
+			icon_view != null
+			and icon_view.size.x <= 46.0
+			and title_row.position.y >= 13.0,
+			"Tab icon keeps a safe optical inset from the top edge: " + tab.name,
+		)
+		check(
+			progress_text != null
+			and progress_bar != null
+			and is_equal_approx(progress_bar.position.x + progress_bar.size.x * 0.5, tab.size.x * 0.5),
+			"Tab progress value and track share a centered column: " + tab.name,
+		)
+		check(
+			description != null
+			and description.position.y + description.size.y <= 127.0,
+			"Tab description stays above the overlapping paper board: " + tab.name,
+		)
+	for index in range(app.screen.cards.size()):
+		await check_card_hover(app.screen.cards[index], app.screen.card_plates[index])
+	var selected_paths := {
+		"combat": "res://assets/ui/route_selection/route_selection_combat_tab_selected.png",
+		"scavenge": "res://assets/ui/route_selection/route_selection_scavenge_tab_selected.png",
+		"survey": "res://assets/ui/route_selection/route_selection_survey_tab_selected.png",
+	}
+	var normal_paths := {
+		"combat": "res://assets/ui/new_run/09_tab_combat.png",
+		"scavenge": "res://assets/ui/new_run/10_tab_scavenge.png",
+		"survey": "res://assets/ui/new_run/11_tab_survey.png",
+	}
+	var selected_reference_bounds := alpha_bounds(load(selected_paths.combat) as Texture2D, 0.0)
+	var hover_motion := InputEventMouseMotion.new()
+	hover_motion.device = 42
+	hover_motion.position = app.screen.tabs.combat.get_global_rect().get_center()
+	root.push_input(hover_motion, true)
+	await frames()
+	check(app.screen.selected == "scavenge", "Hover does not select a route")
+	check(
+			app.screen.tabs.scavenge.get_child(0).texture.resource_path == selected_paths.scavenge
+			and app.screen.tabs.combat.get_child(0).texture.resource_path == normal_paths.combat,
+			"Hover leaves both selected and unselected tab backgrounds unchanged",
+	)
 	for choice in ["scavenge", "survey", "combat"]:
 		await click(app.screen.tabs[choice])
 		check(app.screen.selected == choice, "Tab selects " + choice)
+		for route_id in normal_paths:
+			var background := app.screen.tabs[route_id].get_child(0) as TextureRect
+			var expected_path: String = selected_paths[route_id] if route_id == choice else normal_paths[route_id]
+			check(background.texture.resource_path == expected_path, "Only the selected tab uses its highlighted background: " + route_id)
+			check(background.position == Vector2(-10, 0) and background.size == Vector2(300, 160), "Tab swaps textures without changing its background rectangle: " + route_id)
+			if route_id == choice:
+				var selected_bounds := alpha_bounds(background.texture, 0.0)
+				check(
+					selected_bounds == selected_reference_bounds,
+					"Selected tabs share one stable highlighted silhouette: " + route_id,
+				)
+	await click(app.screen.cards[0])
+	var combat_background := app.screen.tabs.combat.get_child(0) as TextureRect
+	check(combat_background.texture.resource_path == selected_paths.combat and app.screen.tab_tapes.combat.visible, "Selected background remains highlighted after focus leaves the tab")
+	check(app.screen.tooltip_upgrade_summary.text == "全队远程伤害提高到 +50%", "Combat item shows its concrete upgraded effect")
+	await click(app.screen.cards[1])
+	check(app.screen.tooltip_upgrade_summary.text == "全队伤害提高到 ×3.0", "Combat skill shows its concrete upgraded effect")
+	check(
+			app.screen.card_plates[0].texture.resource_path == "res://assets/ui/effects/shooting_target.png"
+			and app.screen.card_plates[1].texture.resource_path == "res://assets/ui/effects/rage.png",
+			"Combat cards use their effect artwork instead of the blue placeholder",
+	)
+	await click(app.screen.tabs.survey)
+	check(
+			app.screen.card_plates[0].texture.resource_path == "res://assets/items/cards/item_coffee_card.png"
+			and app.screen.card_plates[1].texture.resource_path == "res://assets/skills/cards/skill_map_healing_card.png",
+			"Survey cards use their coffee and map-heal artwork",
+	)
+	check(
+			app.screen.effect_titles[0].text == "咖啡"
+			and app.screen.effect_titles[1].text == "全地图治疗"
+			and app.screen.effect_descriptions[0].text == "白昼时长增加。"
+			and app.screen.effect_descriptions[1].text == "治疗地图上所有幸存者。",
+			"Survey cards expose the intended reward copy",
+	)
+	await click(app.screen.cards[0])
+	check(
+		app.screen.tooltip_title.text == "咖啡"
+		and app.screen.tooltip_flavor.text == "早起的鸟儿有虫吃。"
+		and app.screen.tooltip_upgrade_summary.text == "白昼延长至 30 秒",
+		"Coffee card updates the detail callout and upgrade preview",
+	)
+	await click(app.screen.cards[1])
+	check(
+		app.screen.tooltip_title.text == "全地图治疗"
+		and app.screen.tooltip_flavor.text == "我希望别把僵尸也救活了。"
+		and app.screen.tooltip_upgrade_summary.text == "治疗量提高到 60% 最大生命",
+		"Map-heal card updates the detail callout and upgrade preview",
+	)
 	await click(app.screen.tabs.scavenge)
 	check(app.screen.cards.size() == 2 and app.screen.selected_effect == 1, "Route preview exposes two selectable rewards")
 	await click(app.screen.cards[0])
-	check(app.screen.selected_effect == 0 and app.screen.tooltip_title.text == "备件复制台", "Passive card updates the detail callout")
+	check(
+		app.screen.selected_effect == 0
+		and app.screen.tooltip_title.text == "复印机"
+		and app.screen.tooltip_upgrade_summary.text == "复制概率提高到 60%",
+		"Passive card updates the detail callout and upgrade preview",
+	)
 	await click(app.screen.cards[1])
-	check(app.screen.selected_effect == 1 and app.screen.tooltip_title.text == "疾行号令", "Skill card updates the detail callout")
+	check(
+		app.screen.selected_effect == 1
+		and app.screen.tooltip_title.text == "疾行号令"
+		and app.screen.tooltip_upgrade_summary.text == "持续时间延长至 15 秒",
+		"Skill card updates the detail callout and upgrade preview",
+	)
 	await capture("21-specialization")
 	await click(button("取消"))
 	check(app.state == "menu" and app.campaign.data.is_empty(), "Cancel leaves no created run")

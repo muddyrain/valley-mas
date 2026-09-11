@@ -4,17 +4,35 @@ const UI = preload("res://ui/ui_style.gd")
 const MenuArt = preload("res://ui/menu_art.gd")
 const Art = preload("res://ui/new_run_art.gd")
 const SHADE = preload("res://ui/menu_shade.gdshader")
+const PAPER_CARD_HOVER = preload("res://ui/paper_card_hover.gd")
+const TAB_BACKGROUND_POSITION := Vector2(-10, 0)
+const TAB_BACKGROUND_SIZE := Vector2(300, 160)
+const TOOLTIP_WIDTH := 404.0
+const TOOLTIP_MIN_HEIGHT := 200.0
+const TOOLTIP_HORIZONTAL_PADDING := 26.0
+const TOOLTIP_PREFIX_WIDTH := 55.0
+const TOOLTIP_ROW_GAP := 3.0
+const TOOLTIP_CONTENT_WIDTH := TOOLTIP_WIDTH - TOOLTIP_HORIZONTAL_PADDING * 2.0
+const TOOLTIP_VALUE_WIDTH := TOOLTIP_CONTENT_WIDTH - TOOLTIP_PREFIX_WIDTH - TOOLTIP_ROW_GAP
+const TOOLTIP_GAP := 18.0
+const TOOLTIP_Y_OFFSET := 18.0
+const TOOLTIP_ENTER_DURATION := 0.14
+const TOOLTIP_EXIT_DURATION := 0.10
+const TOOLTIP_PAPER := Color("#f3ead8")
+const TOOLTIP_EDGE := Color(0.35, 0.29, 0.20, 0.34)
 
 var app: Node
 var selected := "scavenge"
 var selected_effect := 1
 var tabs: Dictionary = {}
-var tab_glows: Dictionary = {}
+var tab_backgrounds: Dictionary = {}
+var tab_normal_textures: Dictionary = {}
+var tab_selected_textures: Dictionary = {}
 var tab_tapes: Dictionary = {}
 var cards: Array[Button] = []
 var card_plates: Array[TextureRect] = []
 var card_art: Array[TextureRect] = []
-var card_glows: Array[TextureRect] = []
+var card_hovers: Array[PaperCardHover] = []
 var effect_titles: Array[Label] = []
 var effect_descriptions: Array[Label] = []
 var confirm_button: Button
@@ -25,7 +43,22 @@ var tooltip_badge: Label
 var tooltip_flavor: Label
 var tooltip_prefix: Label
 var tooltip_summary: Label
-var tab_focus_id := ""
+var tooltip_upgrade_prefix: Label
+var tooltip_upgrade_summary: Label
+var tooltip_panel: PanelContainer
+var tooltip_shadow_glow: Line2D
+var tooltip_shadow: Polygon2D
+var tooltip_paper: Polygon2D
+var tooltip_outline: Line2D
+var tooltip_content: VBoxContainer
+var tooltip_upgrade_gap: Control
+var tooltip_upgrade_row: HBoxContainer
+var tooltip_tween: Tween
+var tooltip_active_index := -1
+var tooltip_target_position := Vector2.ZERO
+var tooltip_entry_offset := Vector2.ZERO
+var tooltip_points_right := false
+var tooltip_pointer_y := 48.0
 var menu_buttons: Array[Button] = []
 var menu_window: Window
 var previous_aspect: Window.ContentScaleAspect
@@ -91,17 +124,18 @@ func _build_header() -> void:
 func _build_tabs() -> void:
 	var ids := ["combat", "scavenge", "survey"]
 	var backgrounds := [Art.TAB_COMBAT, Art.TAB_SCAVENGE, Art.TAB_SURVEY]
+	var selected_backgrounds := [Art.TAB_COMBAT_SELECTED, Art.TAB_SCAVENGE_SELECTED, Art.TAB_SURVEY_SELECTED]
 	var icons := [Art.ICON_COMBAT, Art.ICON_SCAVENGE, Art.ICON_SURVEY]
 	var descriptions := ["更好地面对危险。", "带回更多生存资源。", "看得更远，走得更稳。"]
 	for index in range(ids.size()):
 		var spec: Resource = app.catalog.by_id(app.catalog.specializations, ids[index])
-		var tab := _make_tab(ids[index], spec.display_name, descriptions[index], backgrounds[index], icons[index], Vector2(281 + 277 * index, 198))
+		var tab := _make_tab(ids[index], spec.display_name, descriptions[index], backgrounds[index], selected_backgrounds[index], icons[index], Vector2(281 + 277 * index, 198))
 		tabs[ids[index]] = tab
 		menu_buttons.append(tab)
-	var locked := _make_tab("locked", "???", "尚未解锁的路线。", Art.TAB_LOCKED, Art.ICON_LOCK, Vector2(1112, 198), true)
+	var locked := _make_tab("locked", "???", "尚未解锁的路线。", Art.TAB_LOCKED, null, Art.ICON_LOCK, Vector2(1112, 198), true)
 	locked.tooltip_text = "尚未解锁的路线"
 
-func _make_tab(id: String, heading: String, description: String, background: Texture2D, icon: Texture2D, at: Vector2, locked: bool = false) -> Button:
+func _make_tab(id: String, heading: String, description: String, background: Texture2D, selected_background: Texture2D, icon: Texture2D, at: Vector2, locked: bool = false) -> Button:
 	var button := Button.new()
 	button.name = "Route_" + id
 	button.text = heading
@@ -110,20 +144,35 @@ func _make_tab(id: String, heading: String, description: String, background: Tex
 	button.size = Vector2(274, 160)
 	Art.empty_button(button)
 	composition.add_child(button)
-	_image(button, background, Rect2(-10, 0, 300, 160))
-	var glow := _image(button, Art.TAB_SELECTED, Rect2(-10, 0, 300, 160))
-	glow.visible = false
-	tab_glows[id] = glow
+	var background_view := _image(button, background, Rect2(TAB_BACKGROUND_POSITION, TAB_BACKGROUND_SIZE))
+	if selected_background != null:
+		tab_backgrounds[id] = background_view
+		tab_normal_textures[id] = background
+		tab_selected_textures[id] = selected_background
 	var tape := _image(button, Art.TAB_TAPE, Rect2(-17, -13, 39, 41))
 	tape.visible = false
 	tab_tapes[id] = tape
-	_image(button, icon, Rect2(33, 14, 62, 62))
-	var heading_label := _label(button, heading, Rect2(92, 13, 152, 48), 31, Art.INK, HORIZONTAL_ALIGNMENT_LEFT, title_font)
+	var title_row := HBoxContainer.new()
+	title_row.name = "TabTitleRow"
+	title_row.position = Vector2(34, 13)
+	title_row.size = Vector2(206, 50)
+	title_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	title_row.add_theme_constant_override("separation", 4)
+	title_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(title_row)
+	var icon_view := _image(title_row, icon, Rect2(0, 0, 46, 50))
+	icon_view.name = "TabIcon"
+	icon_view.custom_minimum_size = Vector2(46, 50)
+	var heading_label := _label(title_row, heading, Rect2(0, 0, 80, 50), 28, Art.INK, HORIZONTAL_ALIGNMENT_LEFT, title_font)
+	heading_label.name = "TabTitle"
 	heading_label.add_theme_constant_override("outline_size", 1)
 	heading_label.add_theme_color_override("font_outline_color", Color(0.75, 0.86, 0.92, 0.24))
-	_label(button, "0/21", Rect2(70, 61, 140, 27), 16, Art.INK, HORIZONTAL_ALIGNMENT_CENTER, body_font)
-	_image(button, Art.TAB_PROGRESS, Rect2(28, 82, 224, 24))
-	_label(button, description, Rect2(24, 106, 232, 38), 16, Art.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER, body_font)
+	var progress_text := _label(button, "0 / 21", Rect2(92, 53, 90, 22), 14, Art.INK, HORIZONTAL_ALIGNMENT_CENTER, body_bold)
+	progress_text.name = "TabProgressText"
+	var progress_bar := _image(button, Art.TAB_PROGRESS, Rect2(25, 72, 224, 24))
+	progress_bar.name = "TabProgress"
+	var description_label := _label(button, description, Rect2(22, 98, 230, 27), 14, Art.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER, body_font)
+	description_label.name = "TabDescription"
 	if locked:
 		button.disabled = true
 		button.focus_mode = Control.FOCUS_NONE
@@ -131,8 +180,6 @@ func _make_tab(id: String, heading: String, description: String, background: Tex
 	else:
 		button.pressed.connect(select_specialization.bind(id))
 		button.mouse_entered.connect(button.grab_focus)
-		button.focus_entered.connect(_set_tab_focus.bind(id, true))
-		button.focus_exited.connect(_set_tab_focus.bind(id, false))
 	return button
 
 func _build_board() -> void:
@@ -155,40 +202,108 @@ func _build_card(index: int, at: Vector2, section: String, english: String) -> v
 	button.size = Vector2(300, 336)
 	Art.empty_button(button)
 	composition.add_child(button)
-	var plate := _image(button, Art.CARD_COMPOSITE, Rect2(0, 0, 300, 336))
+	var visual := Control.new()
+	visual.name = "CardVisual"
+	visual.size = button.size
+	visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(visual)
+	var plate := _image(visual, Art.CARD_COMPOSITE, Rect2(0, 0, 300, 336))
 	card_plates.append(plate)
-	var illustration := _image(button, Art.ICON_COMBAT, Rect2(94, 89, 112, 112))
+	var illustration := _image(visual, Art.ICON_COMBAT, Rect2(94, 89, 112, 112))
 	card_art.append(illustration)
-	_label(button, section, Rect2(30, 13, 240, 35), 25, Art.INK, HORIZONTAL_ALIGNMENT_CENTER, title_font)
-	_label(button, english, Rect2(30, 43, 240, 20), 11, Art.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER, body_bold)
-	var effect_title := _label(button, "", Rect2(48, 208, 204, 50), 24, Art.INK, HORIZONTAL_ALIGNMENT_CENTER, body_bold)
+	_label(visual, section, Rect2(30, 13, 240, 35), 25, Art.INK, HORIZONTAL_ALIGNMENT_CENTER, title_font)
+	_label(visual, english, Rect2(30, 43, 240, 20), 11, Art.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER, body_bold)
+	var effect_title := _label(visual, "", Rect2(48, 208, 204, 50), 24, Art.INK, HORIZONTAL_ALIGNMENT_CENTER, body_bold)
 	effect_titles.append(effect_title)
-	var description := _label(button, "", Rect2(27, 258, 246, 62), 17, Art.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER, body_font, true)
+	var description := _label(visual, "", Rect2(27, 258, 246, 62), 17, Art.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER, body_font, true)
 	effect_descriptions.append(description)
-	var glow := _image(button, Art.CARD_SELECTED, Rect2(-14, -8, 328, 352))
-	glow.visible = false
-	card_glows.append(glow)
+	var hover := PAPER_CARD_HOVER.new() as PaperCardHover
+	button.add_child(hover)
+	hover.setup(button, visual, plate)
+	card_hovers.append(hover)
 	button.pressed.connect(_select_effect.bind(index))
-	button.focus_entered.connect(_select_effect.bind(index))
-	button.mouse_entered.connect(button.grab_focus)
+	button.mouse_entered.connect(_show_effect_tooltip.bind(index))
+	button.mouse_exited.connect(_hide_effect_tooltip.bind(index))
+	button.focus_entered.connect(_show_effect_tooltip.bind(index))
+	button.focus_exited.connect(_hide_effect_tooltip.bind(index))
 	cards.append(button)
 	menu_buttons.append(button)
 
 func _build_tooltip() -> void:
-	var panel := Control.new()
-	panel.name = "EffectTooltip"
-	panel.position = Vector2(1125, 366)
-	panel.size = Vector2(356, 233)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	composition.add_child(panel)
-	_image(panel, Art.TOOLTIP, Rect2(0, 0, 356, 233))
-	tooltip_title = _label(panel, "", Rect2(31, 14, 205, 40), 25, Art.INK, HORIZONTAL_ALIGNMENT_LEFT, body_bold)
-	_image(panel, Art.TOOLTIP_BADGE, Rect2(235, 13, 106, 38))
-	tooltip_badge = _label(panel, "", Rect2(240, 13, 96, 38), 16, Art.INK, HORIZONTAL_ALIGNMENT_CENTER, body_bold)
-	tooltip_flavor = _label(panel, "", Rect2(31, 55, 294, 65), 18, Art.INK_SOFT, HORIZONTAL_ALIGNMENT_LEFT, body_font, true)
-	_image(panel, Art.TOOLTIP_RULE, Rect2(36, 118, 284, 12))
-	tooltip_prefix = _label(panel, "效果：", Rect2(31, 133, 62, 35), 18, Art.ORANGE, HORIZONTAL_ALIGNMENT_LEFT, body_bold)
-	tooltip_summary = _label(panel, "", Rect2(88, 133, 237, 70), 17, Art.INK_SOFT, HORIZONTAL_ALIGNMENT_LEFT, body_font, true)
+	tooltip_panel = PanelContainer.new()
+	tooltip_panel.name = "EffectTooltip"
+	tooltip_panel.custom_minimum_size = Vector2(TOOLTIP_WIDTH, TOOLTIP_MIN_HEIGHT)
+	tooltip_panel.size = Vector2(TOOLTIP_WIDTH, TOOLTIP_MIN_HEIGHT)
+	tooltip_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tooltip_panel.z_index = 20
+	var surface := StyleBoxFlat.new()
+	surface.bg_color = Color.TRANSPARENT
+	tooltip_panel.add_theme_stylebox_override("panel", surface)
+	composition.add_child(tooltip_panel)
+	tooltip_panel.resized.connect(_refresh_tooltip_outline)
+	tooltip_shadow_glow = Line2D.new()
+	tooltip_shadow_glow.name = "TooltipPaperShadowGlow"
+	tooltip_shadow_glow.default_color = Color(0.02, 0.06, 0.11, 0.055)
+	tooltip_shadow_glow.width = 10.0
+	tooltip_shadow_glow.antialiased = true
+	tooltip_shadow_glow.position = Vector2(0, 5)
+	tooltip_panel.add_child(tooltip_shadow_glow)
+	tooltip_shadow = Polygon2D.new()
+	tooltip_shadow.name = "TooltipPaperShadow"
+	tooltip_shadow.color = Color(0.02, 0.06, 0.11, 0.14)
+	tooltip_shadow.position = Vector2(0, 5)
+	tooltip_panel.add_child(tooltip_shadow)
+	tooltip_paper = Polygon2D.new()
+	tooltip_paper.name = "TooltipPaper"
+	tooltip_paper.color = TOOLTIP_PAPER
+	tooltip_panel.add_child(tooltip_paper)
+	tooltip_outline = Line2D.new()
+	tooltip_outline.name = "TooltipPaperOutline"
+	tooltip_outline.default_color = TOOLTIP_EDGE
+	tooltip_outline.width = 1.2
+	tooltip_outline.antialiased = true
+	tooltip_panel.add_child(tooltip_outline)
+	var margin := MarginContainer.new()
+	margin.name = "TooltipMargins"
+	margin.add_theme_constant_override("margin_left", 26)
+	margin.add_theme_constant_override("margin_top", 17)
+	margin.add_theme_constant_override("margin_right", 26)
+	margin.add_theme_constant_override("margin_bottom", 21)
+	tooltip_panel.add_child(margin)
+	tooltip_content = VBoxContainer.new()
+	tooltip_content.name = "TooltipContent"
+	tooltip_content.add_theme_constant_override("separation", 0)
+	margin.add_child(tooltip_content)
+	tooltip_title = _tooltip_label(tooltip_content, "", 25, Art.INK, body_bold)
+	tooltip_title.custom_minimum_size.y = 32.0
+	tooltip_title.add_theme_constant_override("outline_size", 1)
+	tooltip_title.add_theme_color_override("font_outline_color", Color(0.75, 0.63, 0.42, 0.18))
+	var badge_holder := Control.new()
+	badge_holder.name = "TooltipBadge"
+	badge_holder.custom_minimum_size = Vector2(112, 31)
+	badge_holder.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	tooltip_content.add_child(badge_holder)
+	_image(badge_holder, Art.TOOLTIP_BADGE, Rect2(-4, -1, 112, 34))
+	tooltip_badge = _label(badge_holder, "", Rect2(0, 0, 104, 31), 15, Art.INK, HORIZONTAL_ALIGNMENT_CENTER, body_bold)
+	_tooltip_spacer(tooltip_content, 6.0)
+	tooltip_flavor = _tooltip_label(tooltip_content, "", 16, Art.INK_SOFT, body_font, true)
+	tooltip_flavor.custom_minimum_size.x = TOOLTIP_CONTENT_WIDTH
+	tooltip_flavor.add_theme_constant_override("line_spacing", 3)
+	_tooltip_spacer(tooltip_content, 11.0)
+	var effect_row := _tooltip_row(tooltip_content, "EffectRow")
+	tooltip_prefix = _tooltip_prefix(effect_row, "效果：", Art.ORANGE)
+	tooltip_summary = _tooltip_label(effect_row, "", 16, Art.INK_SOFT, body_font, true)
+	tooltip_summary.custom_minimum_size.x = TOOLTIP_VALUE_WIDTH
+	tooltip_summary.add_theme_constant_override("line_spacing", 3)
+	tooltip_upgrade_gap = _tooltip_spacer(tooltip_content, 12.0)
+	tooltip_upgrade_row = _tooltip_row(tooltip_content, "UpgradeRow")
+	tooltip_upgrade_prefix = _tooltip_prefix(tooltip_upgrade_row, "升级：", Color("#d88a00"))
+	tooltip_upgrade_summary = _tooltip_label(tooltip_upgrade_row, "", 16, Color("#b87400"), body_font, true)
+	tooltip_upgrade_summary.custom_minimum_size.x = TOOLTIP_VALUE_WIDTH
+	tooltip_upgrade_summary.add_theme_constant_override("line_spacing", 3)
+	tooltip_panel.visible = false
+	tooltip_panel.modulate.a = 0.0
+	_refresh_tooltip_layout()
 
 func _build_progress_and_actions() -> void:
 	_image(composition, Art.XP_TRACK, Rect2(478, 817, 717, 32))
@@ -235,13 +350,14 @@ func select_specialization(id: String) -> void:
 	for index in range(effects.size()):
 		var effect: Resource = effects[index]
 		cards[index].text = effect.display_name
-		cards[index].tooltip_text = effect.description()
 		effect_titles[index].text = effect.display_name
 		effect_descriptions[index].text = _card_description(effect.id)
 		card_plates[index].texture = _card_plate(effect.id)
+		card_hovers[index].set_texture(card_plates[index].texture)
 		card_art[index].texture = _effect_art(effect.id)
-		card_art[index].visible = effect.id not in ["replicator", "sprint", "shooting_target", "rage"]
+		card_art[index].visible = effect.id not in ["replicator", "sprint", "shooting_target", "rage", "early_start", "aid"]
 	_select_effect(1)
+	_hide_tooltip_immediately()
 
 func _select_effect(index: int) -> void:
 	if index < 0 or index >= cards.size():
@@ -249,7 +365,6 @@ func _select_effect(index: int) -> void:
 	selected_effect = index
 	for card_index in range(cards.size()):
 		cards[card_index].set_pressed_no_signal(card_index == index)
-		card_glows[card_index].visible = card_index == index
 	var spec: Resource = app.catalog.by_id(app.catalog.specializations, selected)
 	var effect_id: String = spec.passive_id if index == 0 else spec.power_id
 	var effect: Resource = app.catalog.by_id(app.catalog.passives if index == 0 else app.catalog.powers, effect_id)
@@ -258,62 +373,198 @@ func _select_effect(index: int) -> void:
 	tooltip_flavor.text = _effect_flavor(effect.id)
 	tooltip_prefix.text = "效果："
 	tooltip_summary.text = effect.description()
+	tooltip_upgrade_prefix.text = "升级："
+	tooltip_upgrade_summary.text = effect.upgrade_description().trim_prefix("升级：")
+	tooltip_upgrade_gap.visible = true
+	tooltip_upgrade_row.visible = true
+	_refresh_tooltip_layout()
 
 func _show_unlock_hint() -> void:
 	selected_effect = -1
 	for index in range(cards.size()):
 		cards[index].set_pressed_no_signal(false)
-		card_glows[index].visible = false
 	tooltip_title.text = "下一条路线"
 	tooltip_badge.text = "尚未解锁"
 	tooltip_flavor.text = "更远的地方，还有新的路线。"
 	tooltip_prefix.text = "状态："
 	tooltip_summary.text = "更多路线仍在筹备。"
+	tooltip_upgrade_gap.visible = false
+	tooltip_upgrade_row.visible = false
+	_refresh_tooltip_layout()
+	tooltip_active_index = -2
+	_set_tooltip_pointer(false, 184.0)
+	tooltip_target_position = Vector2(
+		unlock_button.position.x + unlock_button.size.x + TOOLTIP_GAP,
+		unlock_button.position.y + unlock_button.size.y - tooltip_panel.size.y,
+	)
+	tooltip_entry_offset = Vector2.LEFT * 10.0
+	tooltip_panel.pivot_offset = Vector2(0.0, 194.0)
+	_animate_tooltip_in()
+
+func _show_effect_tooltip(index: int) -> void:
+	if index < 0 or index >= cards.size():
+		return
+	_select_effect(index)
+	if tooltip_active_index == index and tooltip_panel.visible:
+		return
+	tooltip_active_index = index
+	var card := cards[index]
+	if index == 0:
+		tooltip_target_position = Vector2(
+			card.position.x - tooltip_panel.size.x - TOOLTIP_GAP,
+			card.position.y + TOOLTIP_Y_OFFSET,
+		)
+		tooltip_entry_offset = Vector2.RIGHT * 10.0
+		_set_tooltip_pointer(true, 48.0)
+		tooltip_panel.pivot_offset = Vector2(tooltip_panel.size.x, 58.0)
+	else:
+		tooltip_target_position = Vector2(
+			card.position.x + card.size.x + TOOLTIP_GAP,
+			card.position.y + TOOLTIP_Y_OFFSET,
+		)
+		tooltip_entry_offset = Vector2.LEFT * 10.0
+		_set_tooltip_pointer(false, 48.0)
+		tooltip_panel.pivot_offset = Vector2(0.0, 58.0)
+	_animate_tooltip_in()
+
+func _hide_effect_tooltip(index: int) -> void:
+	if tooltip_active_index != index:
+		return
+	tooltip_active_index = -1
+	if tooltip_tween != null and tooltip_tween.is_valid():
+		tooltip_tween.kill()
+	tooltip_tween = create_tween()
+	tooltip_tween.set_parallel(true)
+	tooltip_tween.tween_property(tooltip_panel, "position", tooltip_target_position + tooltip_entry_offset * 0.45, TOOLTIP_EXIT_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tooltip_tween.tween_property(tooltip_panel, "scale", Vector2.ONE * 0.985, TOOLTIP_EXIT_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tooltip_tween.tween_property(tooltip_panel, "modulate:a", 0.0, TOOLTIP_EXIT_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tooltip_tween.finished.connect(_finish_tooltip_hide)
+
+func _animate_tooltip_in() -> void:
+	if tooltip_tween != null and tooltip_tween.is_valid():
+		tooltip_tween.kill()
+	tooltip_panel.position = tooltip_target_position + tooltip_entry_offset
+	tooltip_panel.scale = Vector2.ONE * 0.97
+	tooltip_panel.modulate.a = 0.0
+	tooltip_panel.visible = true
+	tooltip_tween = create_tween()
+	tooltip_tween.set_parallel(true)
+	tooltip_tween.tween_property(tooltip_panel, "position", tooltip_target_position, TOOLTIP_ENTER_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tooltip_tween.tween_property(tooltip_panel, "scale", Vector2.ONE, TOOLTIP_ENTER_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tooltip_tween.tween_property(tooltip_panel, "modulate:a", 1.0, TOOLTIP_ENTER_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+func _hide_tooltip_immediately() -> void:
+	tooltip_active_index = -1
+	if tooltip_tween != null and tooltip_tween.is_valid():
+		tooltip_tween.kill()
+	tooltip_panel.visible = false
+	tooltip_panel.scale = Vector2.ONE
+	tooltip_panel.modulate.a = 0.0
+
+func _finish_tooltip_hide() -> void:
+	if tooltip_active_index == -1:
+		tooltip_panel.visible = false
+
+func _set_tooltip_pointer(points_right: bool, y_position: float) -> void:
+	tooltip_points_right = points_right
+	tooltip_pointer_y = y_position
+	_refresh_tooltip_outline()
+
+func _refresh_tooltip_layout() -> void:
+	if tooltip_panel == null:
+		return
+	tooltip_panel.size = Vector2(TOOLTIP_WIDTH, TOOLTIP_MIN_HEIGHT)
+	tooltip_content.queue_sort()
+	tooltip_panel.queue_sort()
+	_refresh_tooltip_outline()
+
+func _refresh_tooltip_outline() -> void:
+	if tooltip_outline == null:
+		return
+	var width := tooltip_panel.size.x
+	var height := tooltip_panel.size.y
+	var pointer_top := clampf(tooltip_pointer_y, 14.0, height - 32.0)
+	var paper_points := _tooltip_paper_points(width, height, tooltip_points_right, pointer_top)
+	var outline_points := PackedVector2Array(paper_points)
+	outline_points.append(paper_points[0])
+	tooltip_shadow_glow.points = outline_points
+	tooltip_shadow.polygon = paper_points
+	tooltip_paper.polygon = paper_points
+	tooltip_outline.points = outline_points
+
+func _tooltip_paper_points(width: float, height: float, points_right: bool, pointer_top: float) -> PackedVector2Array:
+	var points := PackedVector2Array([
+		Vector2(5, 1.5),
+		Vector2(width * 0.18, 0.2),
+		Vector2(width * 0.41, 1.3),
+		Vector2(width * 0.68, 0.0),
+		Vector2(width - 6, 2.0),
+	])
+	if points_right:
+		points.append(Vector2(width - 1.5, pointer_top))
+		points.append(Vector2(width + 15.0, pointer_top + 10.0))
+		points.append(Vector2(width - 1.0, pointer_top + 20.0))
+		points.append(Vector2(width - 2.0, minf(height - 12.0, pointer_top + 48.0)))
+	else:
+		points.append(Vector2(width - 1.0, height * 0.24))
+	points.append(Vector2(width - 2.2, height * 0.61))
+	points.append(Vector2(width - 0.5, height - 5.0))
+	points.append(Vector2(width - 6.0, height - 2.0))
+	points.append(Vector2(width * 0.78, height - 0.6))
+	points.append(Vector2(width * 0.55, height - 2.2))
+	points.append(Vector2(width * 0.30, height - 0.2))
+	points.append(Vector2(width * 0.09, height - 1.8))
+	points.append(Vector2(3.0, height - 4.5))
+	if points_right:
+		points.append(Vector2(0.6, height * 0.72))
+		points.append(Vector2(1.8, height * 0.39))
+	else:
+		points.append(Vector2(1.0, minf(height - 10.0, pointer_top + 45.0)))
+		points.append(Vector2(1.8, pointer_top + 20.0))
+		points.append(Vector2(-15.0, pointer_top + 10.0))
+		points.append(Vector2(1.8, pointer_top))
+		points.append(Vector2(0.7, maxf(10.0, pointer_top - 22.0)))
+	points.append(Vector2(3.0, 4.0))
+	return points
 
 func _card_plate(effect_id: String) -> Texture2D:
 	match effect_id:
+		"shooting_target": return Art.CARD_SHOOTING_TARGET
+		"rage": return Art.CARD_RAGE
+		"early_start": return Art.CARD_COFFEE
+		"aid": return Art.CARD_MAP_HEAL
 		"replicator": return Art.CARD_PRINTER
 		"sprint": return Art.CARD_SPEED
 	return Art.CARD_COMPOSITE
 
 func _effect_art(effect_id: String) -> Texture2D:
-	match effect_id:
-		"shooting_target": return load("res://assets/ui/effects/shooting_target.png")
-		"rage": return load("res://assets/ui/effects/rage.png")
-		"early_start": return Art.ICON_SURVEY
-		"aid": return Art.ICON_TENT
 	return Art.ICON_SCAVENGE
 
 func _card_description(effect_id: String) -> String:
 	match effect_id:
 		"shooting_target": return "让每一次远程射击更有效。"
 		"replicator": return "成功归航时，有机会复制一把武器。"
-		"early_start": return "为今天争取更长的白昼。"
+		"early_start": return "白昼时长增加。"
 		"rage": return "短时间提高全队伤害。"
 		"sprint": return "让全队跑得更快一些。"
-		"aid": return "恢复所有存活队员的生命。"
+		"aid": return "治疗地图上所有幸存者。"
 	return ""
 
 func _effect_flavor(effect_id: String) -> String:
 	match effect_id:
-		"shooting_target": return "把枪械调整到最可靠的状态,再去面对街上的危险。"
-		"replicator": return "一次幸运的归航,也许能为营地多留下一把武器。"
-		"early_start": return "趁城市还没醒来,为今天多争取一点时间。"
-		"rage": return "最危险的几秒里,让所有人同时压上火力。"
-		"sprint": return "偶尔得跑起来,因为有时候真的得逃命了。"
-		"aid": return "先把所有人从危险边缘拉回来。"
+		"shooting_target": return "把枪械调整到最可靠的状态，再去面对街上的危险。"
+		"replicator": return "一次幸运的归航，也许能为营地多留下一把武器。"
+		"early_start": return "早起的鸟儿有虫吃。"
+		"rage": return "最危险的几秒里，让所有人同时压上火力。"
+		"sprint": return "偶尔得跑起来，因为有时候真的得逃命了。"
+		"aid": return "我希望别把僵尸也救活了。"
 	return ""
 
-func _set_tab_focus(id: String, focused: bool) -> void:
-	tab_focus_id = id if focused else ""
-	_refresh_tab_visuals()
-
 func _refresh_tab_visuals() -> void:
-	for key in tab_glows:
+	for key in tab_backgrounds:
 		var active: bool = key == selected
-		var focused: bool = key == tab_focus_id
-		tab_glows[key].visible = active or focused
-		tab_glows[key].modulate.a = 1.0 if active else 0.58
+		tab_backgrounds[key].texture = tab_selected_textures[key] if active else tab_normal_textures[key]
+		tab_backgrounds[key].size = TAB_BACKGROUND_SIZE
 		tab_tapes[key].visible = active
 
 func _wire_focus() -> void:
@@ -360,6 +611,39 @@ func _label(parent: Node, text: String, rect: Rect2, font_size: int, color: Colo
 	result.add_theme_font_override("font", font)
 	if wrap:
 		result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(result)
+	return result
+
+func _tooltip_label(parent: Node, text: String, font_size: int, color: Color, font: Font, wrap: bool = false) -> Label:
+	var result := UI.label(text, font_size, color)
+	result.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	result.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	result.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	result.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	result.add_theme_font_override("font", font)
+	if wrap:
+		result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(result)
+	return result
+
+func _tooltip_prefix(parent: HBoxContainer, text: String, color: Color) -> Label:
+	var result := _tooltip_label(parent, text, 16, color, body_bold)
+	result.custom_minimum_size.x = TOOLTIP_PREFIX_WIDTH
+	result.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	return result
+
+func _tooltip_row(parent: VBoxContainer, node_name: String) -> HBoxContainer:
+	var result := HBoxContainer.new()
+	result.name = node_name
+	result.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	result.add_theme_constant_override("separation", roundi(TOOLTIP_ROW_GAP))
+	parent.add_child(result)
+	return result
+
+func _tooltip_spacer(parent: VBoxContainer, height: float) -> Control:
+	var result := Control.new()
+	result.custom_minimum_size.y = height
+	result.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(result)
 	return result
 

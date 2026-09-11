@@ -3,6 +3,6 @@
 [resource]
 script = ExtResource("1")
 id = "early_start"
-display_name = "晨行补给"
+display_name = "咖啡"
 effect = "day_extension"
 amount = 20.0

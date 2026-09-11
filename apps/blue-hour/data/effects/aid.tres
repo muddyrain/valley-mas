@@ -3,6 +3,6 @@
 [resource]
 script = ExtResource("1")
 id = "aid"
-display_name = "全队急救"
+display_name = "全地图治疗"
 effect = "heal"
 amount = 0.4
