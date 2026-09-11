@@ -60,7 +60,7 @@ def export_asset(spec, generator):
     RUNTIME.mkdir(parents=True, exist_ok=True)
     SOURCES.mkdir(parents=True, exist_ok=True)
     source = SOURCES / f"{asset_id}.blend"
-    target = RUNTIME / f"{asset_id}.glb"
+    target = PROJECT / spec["path"]
     bpy.ops.wm.save_as_mainfile(filepath=str(source), check_existing=False)
     bpy.ops.export_scene.gltf(filepath=str(target), export_format="GLB", use_selection=True,
                               export_yup=True, export_apply=True, export_normals=True,

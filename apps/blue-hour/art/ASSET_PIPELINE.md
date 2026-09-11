@@ -29,11 +29,11 @@ python apps/blue-hour/art/blender/validate_assets.py
 - `art/blender/generators/`：道路/建筑、城市道具、车辆、枪械、基础感染者分批生成器。
 - `art/blender/asset_specs.py`：预期资产清单、类别、中文用途与预算；单模型定义仍在对应生成器。
 - `art/blender/sources/BH_*.blend`：应用变换后的可编辑源文件，包含分组网格和碰撞代理；与 Python 源码共同管理。
-- `assets/generated/BH_*.glb`：正式运行时模型，纳入版本控制。
+- `assets/generated/*_model.glb`：正式运行时模型，采用小写领域与对象语义命名；路径由 `asset_specs.py` 登记并写入 manifest，纳入版本控制。模型内部 `BH_*` ID 与节点名仍保持稳定。
 - `assets/generated/manifest.json`：实际面数、材质、包围盒、碰撞、来源、哈希及使用位置的机器可读登记。
 - `art/.gdignore` 阻止 Godot 导入 Blender 源目录；`.godot/`、日志、截图、导出 EXE 和 `.blend1` 等备份不提交。
 
-生成器只覆盖自身管理的同名产物，不清空目录。固定参数、无随机颜色；重建用同版本 Blender 时检查 GLB SHA256 一致。`.blend` 的二进制元数据不作为跨机器确定性保证。
+生成器只覆盖登记 `path` 的产物，不清空目录，也不再从内部 ID 推导 GLB 文件名。固定参数、无随机颜色；重建用同版本 Blender 时检查 GLB SHA256 一致。`.blend` 的二进制元数据不作为跨机器确定性保证。图片、角色贴图与命名边界见 [资源目录说明](RESOURCE_LAYOUT.md)。
 
 ## 导出契约
 

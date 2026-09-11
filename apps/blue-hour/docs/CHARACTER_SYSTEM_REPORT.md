@@ -10,11 +10,11 @@
 apps/blue-hour/
 ├── assets/characters/
 │   ├── xia_zhiyao/
-│   │   ├── source/xia_zhiyao_meshy_50k.glb  (原始模型 - 禁止修改)
-│   │   └── model/xia_zhiyao.glb             (9.5 MB)
+│   │   ├── source/character_xia_zhiyao_source_model.glb  (原始模型 - 禁止修改)
+│   │   └── model/character_xia_zhiyao_model.glb             (9.5 MB)
 │   └── su_wanxing/
-│       ├── source/su_wanxing_meshy_50k.glb  (原始模型 - 禁止修改)
-│       └── model/su_wanxing.glb             (9.5 MB)
+│       ├── source/character_su_wanxing_source_model.glb  (原始模型 - 禁止修改)
+│       └── model/character_su_wanxing_model.glb             (9.5 MB)
 │
 ├── data/
 │   ├── character_definition.gd       # 角色定义基类
@@ -141,7 +141,7 @@ ID: xia_zhiyao
 姓名: 夏知遥
 职业: 城市勘察员 (urban_scout)
 定位: 探索、搜刮发现、机动支援
-模型: res://assets/characters/xia_zhiyao/model/xia_zhiyao.glb
+模型: res://assets/characters/xia_zhiyao/model/character_xia_zhiyao_model.glb
 ```
 
 **Trait**: 路线直觉 (route_intuition)
@@ -162,7 +162,7 @@ ID: su_wanxing
 姓名: 苏晚星
 职业: 补给整备师 (supply_specialist)
 定位: 后勤、资源收益、出征支援
-模型: res://assets/characters/su_wanxing/model/su_wanxing.glb
+模型: res://assets/characters/su_wanxing/model/character_su_wanxing_model.glb
 ```
 
 **Trait**: 物尽其用 (resource_efficiency)
@@ -178,7 +178,7 @@ ID: su_wanxing
 
 ## 七、苏晚星模型信息
 
-- **GLB 路径**: `assets/characters/su_wanxing/model/su_wanxing.glb`
+- **GLB 路径**: `assets/characters/su_wanxing/model/character_su_wanxing_model.glb`
 - **文件大小**: 9.5 MB
 - **Mesh 数量**: 1
 - **模型来源**: Meshy AI 生成
@@ -227,8 +227,8 @@ params = {
 
 1. **模型资源**
    ```
-   assets/characters/cheng_yu/source/cheng_yu.glb
-   assets/characters/cheng_yu/model/cheng_yu.glb
+   assets/characters/cheng_yu/source/character_cheng_yu_source_model.glb
+   assets/characters/cheng_yu/model/character_cheng_yu_model.glb
    ```
 
 2. **角色配置**
@@ -329,8 +329,8 @@ var bonus = trait.params.get("detection_bonus", 0.0)
 
 ### 新增资源文件 (2)
 
-- `assets/characters/su_wanxing/model/su_wanxing.glb` (9.5 MB)
-- `assets/characters/su_wanxing/model/su_wanxing.glb.import`
+- `assets/characters/su_wanxing/model/character_su_wanxing_model.glb` (9.5 MB)
+- `assets/characters/su_wanxing/model/character_su_wanxing_model.glb.import`
 
 ### 修改现有文件 (7)
 

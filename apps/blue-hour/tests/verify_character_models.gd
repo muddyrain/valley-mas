@@ -41,8 +41,8 @@ func _init() -> void:
 	print("  - 占位符: %d" % placeholder_count)
 
 	# 检查夏知遥和苏晚星的模型文件
-	var xia_path = "res://assets/characters/xia_zhiyao/model/xia_zhiyao.glb"
-	var su_path = "res://assets/characters/su_wanxing/model/su_wanxing.glb"
+	var xia_path = "res://assets/characters/xia_zhiyao/model/character_xia_zhiyao_model.glb"
+	var su_path = "res://assets/characters/su_wanxing/model/character_su_wanxing_model.glb"
 
 	print("\n模型文件验证:")
 	print("  - 夏知遥模型存在: %s" % ("是" if ResourceLoader.exists(xia_path) else "否"))

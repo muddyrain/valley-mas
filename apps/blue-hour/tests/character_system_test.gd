@@ -90,8 +90,8 @@ func _init() -> void:
 	# 7. 新增角色所需步骤
 	print("\n7. 新增第三个角色所需步骤")
 	print("  - 新增文件:")
-	print("    1. assets/characters/cheng_yu/source/cheng_yu.glb")
-	print("    2. assets/characters/cheng_yu/model/cheng_yu.glb (复制)")
+	print("    1. assets/characters/cheng_yu/source/character_cheng_yu_source_model.glb")
+	print("    2. assets/characters/cheng_yu/model/character_cheng_yu_model.glb (复制)")
 	print("    3. data/survivors/cheng_yu.tres")
 	print("    4. (可选) data/traits/new_trait.tres (如果是新 Trait)")
 	print("  - 修改文件:")

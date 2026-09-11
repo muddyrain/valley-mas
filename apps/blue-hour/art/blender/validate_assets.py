@@ -23,7 +23,7 @@ def validate(batch=None):
         try:
             item = manifest[key]
             path = PROJECT / item["path"]
-            assert path.name == key + ".glb", "file naming"
+            assert item["path"] == spec["path"], "file naming"
             assert key in catalog and f"../{item['path']}" in catalog, "Catalog registration"
             assert (PROJECT / item["blend"]).is_file(), "missing Blender source"
             assert (PROJECT / item["generator"]).is_file(), "missing generator"
@@ -69,9 +69,11 @@ def validate(batch=None):
                 assert view.get("byteOffset", 0) + view["byteLength"] <= len(binary), "out of bounds buffer"
         except (AssertionError, KeyError, ValueError, OSError) as exc:
             errors.append(f"{key}: {exc}")
-    all_ids = set(specs())
+    all_specs = specs()
+    all_ids = set(all_specs)
+    all_paths = {spec["path"] for spec in all_specs.values()}
     for path in (PROJECT / "assets/generated").glob("*.glb"):
-        if path.stem not in all_ids:
+        if path.relative_to(PROJECT).as_posix() not in all_paths:
             errors.append(f"Unregistered asset: {path.name}")
     if set(manifest) - all_ids:
         errors.append("Unregistered manifest entries")

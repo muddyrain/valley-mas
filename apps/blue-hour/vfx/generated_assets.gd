@@ -11,7 +11,7 @@ static func catalog() -> Dictionary:
 
 static func spawn(id: String, parent: Node3D, position: Vector3 = Vector3.ZERO, yaw: float = 0.0, collision: bool = false) -> Node3D:
 	if not scenes.has(id):
-		scenes[id] = load("res://assets/generated/" + id + ".glb")
+		scenes[id] = load("res://" + str(catalog()[id].path))
 	var instance: Node3D = scenes[id].instantiate()
 	instance.set_meta("art_asset", id)
 	# Existing city collision/navigation remains authoritative.
