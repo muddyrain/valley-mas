@@ -36,7 +36,7 @@ function Test-StandaloneBuild([string]$ExecutablePath) {
     New-Item -ItemType Directory -Path $standaloneDirectory -Force | Out-Null
     $standaloneExecutable = Join-Path $standaloneDirectory 'BlueHourHomeward.exe'
     Copy-Item -LiteralPath $ExecutablePath -Destination $standaloneExecutable -Force
-    foreach ($verificationMode in @('headless', 'native', 'menu-headless', 'menu-native', 'today-action-headless', 'today-action-native')) {
+    foreach ($verificationMode in @('headless', 'native', 'menu-headless', 'menu-native', 'expedition-headless', 'expedition-native', 'today-action-headless', 'today-action-native', 'weapon-headless', 'weapon-native')) {
         $logPath = Join-Path $standaloneDirectory ($verificationMode + '.log')
         $stdoutPath = Join-Path $standaloneDirectory ($verificationMode + '.stdout.log')
         $stderrPath = Join-Path $standaloneDirectory ($verificationMode + '.stderr.log')
@@ -49,7 +49,9 @@ function Test-StandaloneBuild([string]$ExecutablePath) {
         }
         $launchArguments += @('--', '--test-save=standalone-04.json')
         if ($verificationMode.StartsWith('menu-')) { $launchArguments += '--test-menu' }
+        if ($verificationMode.StartsWith('expedition-')) { $launchArguments += '--test-expedition' }
         if ($verificationMode.StartsWith('today-action-')) { $launchArguments += '--test-today-action' }
+        if ($verificationMode.StartsWith('weapon-')) { $launchArguments += '--test-weapons' }
         $process = Start-Process -FilePath $standaloneExecutable -ArgumentList $launchArguments `
             -WorkingDirectory $standaloneDirectory -WindowStyle Hidden -PassThru `
             -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
@@ -68,6 +70,7 @@ function Test-StandaloneBuild([string]$ExecutablePath) {
             $process.Dispose()
         }
     }
+    Remove-Item -LiteralPath $standaloneExecutable -Force
 }
 switch ($Mode) {
     'run' { & $GodotPath --path $PSScriptRoot }
@@ -77,10 +80,18 @@ switch ($Mode) {
     'smoke' { Invoke-Engine @('--headless', '--quit-after', '120', '--', '--test-save=smoke-03.json') }
     'test' {
         Invoke-Engine @('--headless', '--editor', '--import', '--quit')
+        Invoke-Engine @('--headless', '--script', 'tests/camp_departure.gd')
         Invoke-Engine @('--headless', '--script', 'tests/today_action.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/world_assets.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/world_map.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/expedition_visual.gd')
         Invoke-Engine @('--headless', '--script', 'tests/art_assets.gd')
         Invoke-Engine @('--headless', '--script', 'tests/art_integration.gd')
         Invoke-Engine @('--headless', '--script', 'tests/rules.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/weapon_system.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/weapon_visuals.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/humanoid_animations.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/infected_basic.gd')
         Invoke-Engine @('--headless', '--script', 'tests/mission_flow.gd')
         Invoke-Engine @('--headless', '--script', 'tests/search_dispatch.gd')
         Invoke-Engine @('--headless', '--script', 'tests/parallel_commands.gd')
@@ -91,7 +102,12 @@ switch ($Mode) {
         Invoke-Engine @('--headless', '--script', 'tests/effect_system.gd')
     }
     'capture' {
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1600x900', '--audio-driver', 'Dummy', '--script', 'tests/weapon_visuals.gd', '--', 'capture')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/camp_clarity_runtime.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1280x720', '--audio-driver', 'Dummy', '--script', 'tests/camp_departure.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1366x768', '--audio-driver', 'Dummy', '--script', 'tests/weapon_runtime.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1600x900', '--audio-driver', 'Dummy', '--script', 'tests/today_action_runtime.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1600x900', '--audio-driver', 'Dummy', '--script', 'tests/expedition_visual_runtime.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1440x900', '--script', 'tests/art_runtime.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1440x900', '--script', 'tests/runtime.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1440x900', '--script', 'tests/day_loop_runtime.gd')
@@ -101,16 +117,35 @@ switch ($Mode) {
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1440x900', '--script', 'tests/effect_runtime.gd')
     }
     'build' {
+        # One canonical output. Never sidestep an occupied executable with another directory.
         $buildDirectory = Join-Path $PSScriptRoot 'build'
         New-Item -ItemType Directory -Path $buildDirectory -Force | Out-Null
         [System.IO.File]::WriteAllText((Join-Path $buildDirectory '.gdignore'), '')
         $executablePath = Join-Path $buildDirectory 'BlueHourHomeward.exe'
+        if (Test-Path -LiteralPath $executablePath) {
+            try {
+                $buildLockProbe = [IO.File]::Open($executablePath, 'Open', 'ReadWrite', 'None')
+                $buildLockProbe.Dispose()
+            } catch {
+                throw "Canonical build is in use: $executablePath. Close that game before building."
+            }
+        }
         Invoke-Engine @('--headless', '--editor', '--import', '--quit')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1280x720', '--audio-driver', 'Dummy', '--script', 'tests/camp_departure.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1280x720', '--audio-driver', 'Dummy', '--script', 'tests/camp_runtime.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/camp_clarity_runtime.gd')
         Invoke-Engine @('--headless', '--script', 'tests/today_action.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1600x900', '--audio-driver', 'Dummy', '--script', 'tests/today_action_runtime.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/world_assets.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/world_map.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/expedition_visual.gd')
         Invoke-Engine @('--headless', '--script', 'tests/art_assets.gd')
         Invoke-Engine @('--headless', '--script', 'tests/art_integration.gd')
         Invoke-Engine @('--headless', '--script', 'tests/rules.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/weapon_system.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/weapon_visuals.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/humanoid_animations.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/infected_basic.gd')
         Invoke-Engine @('--headless', '--script', 'tests/mission_flow.gd')
         Invoke-Engine @('--headless', '--script', 'tests/search_dispatch.gd')
         Invoke-Engine @('--headless', '--script', 'tests/parallel_commands.gd')
@@ -119,12 +154,15 @@ switch ($Mode) {
         Invoke-Engine @('--headless', '--script', 'tests/new_run.gd')
         Invoke-Engine @('--headless', '--script', 'tests/new_run_flow.gd')
         Invoke-Engine @('--headless', '--script', 'tests/effect_system.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1600x900', '--audio-driver', 'Dummy', '--script', 'tests/expedition_visual_runtime.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1366x768', '--audio-driver', 'Dummy', '--script', 'tests/weapon_runtime.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1600x900', '--audio-driver', 'Dummy', '--script', 'tests/weapon_visuals.gd', '--', 'capture')
         Invoke-Engine @('--headless', '--export-release', 'Windows Desktop', $executablePath)
         if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
             throw 'Export did not produce BlueHourHomeward.exe.'
         }
         Test-StandaloneBuild $executablePath
-        & (Join-Path $PSScriptRoot 'art/verify_export.ps1') -ExecutablePath $executablePath
+        & (Join-Path $PSScriptRoot 'art/verify_export.ps1') -ExecutablePath $executablePath -GodotPath $GodotPath
         $buildFile = Get-Item -LiteralPath $executablePath
         $buildInfo = [ordered]@{
             executable = $buildFile.Name
@@ -133,8 +171,10 @@ switch ($Mode) {
             sha256 = (Get-FileHash -LiteralPath $executablePath -Algorithm SHA256).Hash
             platform = 'Windows x86_64'
             embeddedPack = $true
+            weaponChecks = @('weapon-system', 'weapon-runtime', 'weapon-visuals', 'humanoid-animations', 'standalone-weapon-headless', 'standalone-weapon-native', 'embedded-pack-weapon-visuals-headless', 'embedded-pack-weapon-visuals-native')
+            campChecks = @('camp-departure', 'camp-runtime', 'camp-clarity-runtime')
             todayActionChecks = @('today-action', 'today-action-runtime', 'standalone-today-action-headless', 'standalone-today-action-native')
-            checks = @('art-assets', 'art-integration', 'rules', 'mission-flow', 'search-dispatch', 'parallel-commands', 'day-loop', 'day-loop-flow', 'new-run', 'new-run-flow', 'effect-system', 'standalone-headless', 'standalone-native', 'standalone-menu-headless', 'standalone-menu-native', 'standalone-art-headless', 'standalone-art-native')
+            checks = @('world-assets', 'world-map', 'world-map-runtime', 'expedition-visual', 'expedition-visual-runtime', 'art-assets', 'art-integration', 'rules', 'infected-basic', 'mission-flow', 'search-dispatch', 'parallel-commands', 'day-loop', 'day-loop-flow', 'new-run', 'new-run-flow', 'effect-system', 'standalone-headless', 'standalone-native', 'standalone-menu-headless', 'standalone-menu-native', 'standalone-expedition-headless', 'standalone-expedition-native', 'standalone-art-headless', 'standalone-art-native')
         }
         $buildInfo | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $buildDirectory 'BUILD-INFO.json') -Encoding UTF8
         Write-Output "Playable build: $executablePath"
