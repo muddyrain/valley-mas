@@ -126,7 +126,7 @@ func _check_storage(content: RefCounted) -> void:
 		v2.erase(category + "_items")
 		v2.erase(category + "_capacity")
 	var old_bytes := JSON.stringify(v2)
-	check(resumed.restore(v2) and resumed.data.version == 3, "v2 migrates to v3")
+	check(resumed.restore(v2) and resumed.data.version == 4, "v2 migrates through v3 effects to v4 weapons")
 	check(JSON.stringify(v2) == old_bytes and resumed.data.members == v2.members and resumed.data.inventory == v2.inventory, "Migration preserves source bytes, members and weapons")
 	check(not resumed.effect_definition("power", "aid").is_upgraded, "Legacy starter retains normal state")
 	var store: RefCounted = Store.new("user://test-runs/effect-v2-%d.json" % Time.get_ticks_usec())
@@ -168,7 +168,7 @@ func _check_combat(upgraded: bool) -> void:
 	member.position = Vector3(0, 0, 10)
 	for actor: Node3D in mission.survivors:
 		actor.position = member.position
-	var enemy: Node3D = mission.spawn_enemy("shambler", Vector3(0, 0, 6))
+	var enemy: Node3D = mission.spawn_enemy("ENM_001_infected_basic_a", Vector3(0, 0, 6))
 	enemy.hp = 10000
 	var base: float = member.weapon.damage * member.talent.damage_multiplier
 	var damage_bonus := 1.4 if upgraded else 1.25
@@ -177,6 +177,7 @@ func _check_combat(upgraded: bool) -> void:
 	mission.attack(member, enemy)
 	near(before - enemy.hp, base * damage_bonus, "Automatic attack consumes unified damage")
 	before = enemy.hp
+	member.cooldown = 0
 	load("res://survivors/aim_fire.gd").fire(member, mission, enemy.position)
 	near(before - enemy.hp, base * damage_bonus, "Directed fire consumes the same damage")
 	member.cooldown = 0
@@ -195,11 +196,14 @@ func _check_combat(upgraded: bool) -> void:
 	near(mission.effects.attack_interval(member.weapon.cooldown, true), member.weapon.cooldown, "Ranged speed excludes melee")
 	check(mission.powers.activate("rage") and mission.powers.activate("sprint"), "Different powers can overlap")
 	near(mission.damage_to(member, enemy), base * 2, "Rage includes melee")
-	var elite: Node3D = mission.spawn_enemy("siren", Vector3(0, 0, 3))
+	var elite: Node3D = mission.spawn_enemy("ENM_001_infected_basic_a", Vector3(0, 0, 3))
+	# Priority fixtures exercise the existing selector without registering another enemy type.
+	elite.data = elite.data.duplicate()
+	elite.data.threat_rank = 1
 	elite.hp = 10000
 	check(mission.powers.activate("focus_fire"), "Activate focus independently")
 	check(mission.powers.target() == elite, "Elite outranks nearer ordinary enemy")
-	var boss: Node3D = mission.spawn_enemy("runner", Vector3(0, 0, 1))
+	var boss: Node3D = mission.spawn_enemy("ENM_001_infected_basic_a", Vector3(0, 0, 1))
 	boss.data = boss.data.duplicate()
 	boss.data.threat_rank = 2
 	boss.hp = 10000
@@ -213,11 +217,13 @@ func _check_combat(upgraded: bool) -> void:
 	near(mission.damage_to(member, elite), base * damage_bonus * 2 * (1.7 if upgraded else 1.5), "Focus bonus stacks with rage and ranged passive")
 	near(mission.damage_to(member, enemy), base * damage_bonus * 2, "Other targets do not receive focus bonus")
 	before = elite.hp
+	member.cooldown = 0
 	load("res://survivors/aim_fire.gd").fire(member, mission, elite.position)
 	# Ordinary enemy blocks this hitscan first; it must still use its own damage multiplier.
 	near(before - elite.hp, 0, "Directed fire respects intervening targets")
 	enemy.active = false
 	before = elite.hp
+	member.cooldown = 0
 	load("res://survivors/aim_fire.gd").fire(member, mission, elite.position)
 	near(before - elite.hp, base * damage_bonus * 2 * (1.7 if upgraded else 1.5), "Directed hit on focus target gains focus bonus")
 	mission.powers.advance(12 if upgraded else 8)
@@ -305,10 +311,13 @@ func _check_watch(upgraded: bool) -> void:
 	member.tick(0.1, mission)
 	check(member.position == origin, "Stationary watch cannot move the character")
 	member.path = PackedVector3Array([origin + Vector3(0, 0, 8)])
+	# These assertions isolate directional top-speed modifiers after the start ramp.
+	member.current_speed = speed * boost
 	member.tick(0.1, mission)
 	near(member.position.distance_to(origin), speed * boost * 0.1, "Actual path movement consumes watch speed")
 	member.position = origin
 	member.path = PackedVector3Array([origin + Vector3(0, 0, -2), mission.catalog.map.bus_position])
+	member.current_speed = speed
 	member.tick(0.1, mission)
 	near(member.position.distance_to(origin), speed * 0.1, "Detour away from bus gets no boost despite final destination")
 	mission.clock.set_phase(mission.clock.BLUE_HOUR)
@@ -327,7 +336,7 @@ func _check_clock_and_heal(upgraded: bool) -> void:
 	mover.path = PackedVector3Array([Vector3(0, 0, 18)])
 	mover.ammo = 0
 	mover.reload_left = 2
-	var enemy: Node3D = mission.spawn_enemy("shambler", Vector3(3, 0, 10))
+	var enemy: Node3D = mission.spawn_enemy("ENM_001_infected_basic_a", Vector3(3, 0, 10))
 	enemy.hp = 10000
 	check(mission.powers.activate("dusk_delay") and mission.powers.activate("sprint") and mission.powers.activate("scavenge_frenzy"), "Clock freeze overlaps other powers")
 	var start_clock: float = mission.clock.elapsed
@@ -391,7 +400,7 @@ func _check_rewards(upgraded: bool) -> void:
 		if copies.is_empty():
 			continue
 		found = true
-		check(copies.size() == 1 and copies[0].kind == "shotgun" and copies[0].affix == "longbarrel" and copies[0].uid != "owned-best", "Replicator copies highest-value existing inventory without new loot")
+		check(copies.size() == 1 and copies[0].kind == "WPN_005_S12_SHOTGUN" and copies[0].affix == "longbarrel" and copies[0].uid != "owned-best", "Replicator copies highest-value existing inventory without new loot")
 		var resumed: RefCounted = Campaign.new(content)
 		check(resumed.restore(pending) and resumed.commit_day(), "Pending reward can be recovered")
 		check(resumed.data.inventory == game.data.inventory, "Pending retry cannot reroll copy")

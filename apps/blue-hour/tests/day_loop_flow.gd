@@ -127,10 +127,13 @@ func run() -> void:
 	await step(solo, 10)
 	check(solo.search_task.worker != null and solo.guards().is_empty(), "Last member can work with zero guards")
 	var member: Node3D = solo.survivors[0]
-	var enemy: Node3D = solo.spawn_enemy("shambler", member.position + Vector3(0, 0, 1))
+	var enemy: Node3D = solo.spawn_enemy("ENM_001_infected_basic_a", member.position + Vector3(0, 0, -.7))
 	enemy.hp = 500
-	await step(solo, 0.2)
-	check(not member.searching and member.hp < member.data.max_hp, "Solo worker is vulnerable and pauses for self-defense")
+	enemy.think_left = 0
+	var health_before: float = member.hp
+	# Allow approach from the snapped spawn cell and the newly defined attack windup.
+	await step(solo, enemy.data.attack_windup + 1.0)
+	check(not member.searching and member.hp < health_before, "Solo worker is vulnerable and pauses for self-defense")
 	solo.debug_clear_enemies()
 	solo.command_recall()
 	solo.command_move(Vector3(0, 0, 12))

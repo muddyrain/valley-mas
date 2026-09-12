@@ -1,6 +1,9 @@
 extends RefCounted
 const Equipment = preload("res://core/equipment.gd")
 const Modifiers = preload("res://core/effect_modifiers.gd")
+const WeaponInventoryData = preload("res://weapons/weapon_inventory.gd")
+const WeaponInstanceData = preload("res://weapons/weapon_instance.gd")
+var weapon_inventory: WeaponInventory
 var catalog: RefCounted
 var gear: RefCounted
 var data: Dictionary = {}
@@ -8,9 +11,10 @@ var data: Dictionary = {}
 func _init(content: RefCounted) -> void:
 	catalog = content
 	gear = Equipment.new(content)
+	weapon_inventory = WeaponInventoryData.new(self)
 
 func new_run(seed_value: int = 0, specialization: String = "combat", fixture_templates: Array = []) -> void:
-	data = {"version": 3, "seed": seed_value if seed_value != 0 else int(Time.get_ticks_usec()) % 2147483647, "day": 1, "status": "shelter", "food": catalog.loop.initial_food, "scrap": 0, "hunger": 0, "members": [], "roster": {}, "inventory": [], "equipment": {}, "day_rewards": {}, "shop": [], "pending": {}, "history": [], "modified": false, "specialization": specialization, "passive_slots": [], "power_slots": [], "passive_items": {}, "power_items": {}, "passive_capacity": 1, "power_capacity": 1}
+	data = {"version": 4, "seed": seed_value if seed_value != 0 else int(Time.get_ticks_usec()) % 2147483647, "day": 1, "status": "shelter", "food": catalog.loop.initial_food, "scrap": 0, "hunger": 0, "members": [], "roster": {}, "inventory": [], "equipment": {}, "day_rewards": {}, "shop": [], "pending": {}, "history": [], "modified": false, "specialization": specialization, "passive_slots": [], "power_slots": [], "passive_items": {}, "power_items": {}, "passive_capacity": 1, "power_capacity": 1}
 	var choice: Resource = catalog.by_id(catalog.specializations, specialization)
 	if choice != null:
 		grant_effect("passive", choice.passive_id)
@@ -32,7 +36,7 @@ func new_run(seed_value: int = 0, specialization: String = "combat", fixture_tem
 		var uid := "initial:" + id
 		data.members.append(id)
 		data.roster[id] = {"template": template, "level": 1}
-		data.inventory.append({"uid": uid, "kind": catalog.start_rules.starting_weapons[template], "affix": ""})
+		weapon_inventory.add_weapon(WeaponInstanceData.from_dict({"uid": uid, "kind": catalog.start_rules.starting_weapons[template]}))
 		data.equipment[id] = uid
 	_prepare_day()
 
@@ -147,14 +151,25 @@ func health_multiplier() -> float:
 	return catalog.loop.hunger_health_multiplier if data.hunger > 0 else 1.0
 
 func equip(member: String, uid: String) -> bool:
+	return equip_weapon(member, uid)
+
+func equip_weapon(member: String, uid: String) -> bool:
 	if data.status != "shelter" or member not in data.members or item(uid).is_empty():
 		return false
-	var old: String = data.equipment[member]
 	for other in data.equipment:
-		if data.equipment[other] == uid:
-			data.equipment[other] = old
+		if other != member and data.equipment[other] == uid:
+			data.equipment[other] = ""
 	data.equipment[member] = uid
 	return true
+
+func unequip_weapon(member: String) -> bool:
+	if data.status != "shelter" or member not in data.members:
+		return false
+	data.equipment[member] = ""
+	return true
+
+func get_equipped_weapon(member: String) -> WeaponInstance:
+	return weapon_inventory.get_weapon(str(data.equipment.get(member, "")))
 
 func buy(uid: String) -> bool:
 	if data.status != "shelter":
@@ -163,7 +178,7 @@ func buy(uid: String) -> bool:
 		if offer.uid == uid and not offer.sold and data.scrap >= offer.price:
 			data.scrap -= offer.price
 			offer.sold = true
-			data.inventory.append({"uid": offer.uid, "kind": offer.kind, "affix": offer.affix})
+			weapon_inventory.add_weapon(WeaponInstanceData.from_dict(offer))
 			return true
 	return false
 
@@ -180,6 +195,7 @@ func stage_result(outcome: Dictionary) -> bool:
 	if data.status != "mission" or not _valid_outcome(outcome, data):
 		return false
 	data.pending = outcome.duplicate(true)
+	_normalize_weapons(data)
 	data.status = "pending"
 	return true
 
@@ -248,11 +264,11 @@ func _copy_reward() -> Array:
 		var best: Dictionary = {}
 		var best_value := -1
 		for value in data.inventory:
-			var price: int = catalog.loop.weapon_prices.get(value.kind, 0) + (catalog.start_rules.affix_value_bonus if not value.affix.is_empty() else 0)
+			var price: int = catalog.loop.weapon_prices.get(WeaponInstanceData.Registry.canonical_id(value.kind), 0) + int(value.get("rarity", int(not value.get("affix", "").is_empty()))) * catalog.start_rules.affix_value_bonus
 			if price > best_value:
 				best = value
 				best_value = price
-		var copy: Dictionary = best.duplicate(true)
+		var copy: Dictionary = WeaponInstanceData.from_dict(best).to_dict()
 		copy.uid = "copy:%d:%s" % [data.day, passive_id]
 		data.inventory.append(copy)
 		output.append(copy.duplicate(true))
@@ -299,7 +315,7 @@ func valid_state(state: Dictionary) -> bool:
 	if state.get("version") == 1:
 		return _valid_legacy(state)
 	# JSON numbers are floats; Array.has uses strict Variant types.
-	if (state.get("version") != 2 and state.get("version") != 3) or not state.get("roster") is Dictionary:
+	if (state.get("version") != 2 and state.get("version") != 3 and state.get("version") != 4) or not state.get("roster") is Dictionary:
 		return false
 	if not _nonnegative(state.get("initial_count")) or state.initial_count != state.roster.size() or state.roster.is_empty():
 		return false
@@ -389,6 +405,8 @@ func _valid_legacy(state: Dictionary) -> bool:
 		item_ids.append(value.uid)
 	var equipped: Array = []
 	for member in state.members:
+		if state.equipment.get(member) == "":
+			continue
 		if state.equipment.get(member) not in item_ids or state.equipment[member] in equipped:
 			return false
 		equipped.append(state.equipment[member])
@@ -439,6 +457,8 @@ func restore(state: Dictionary) -> bool:
 			for id: String in data[category + "_slots"]:
 				data[category + "_items"][id] = {"upgraded": false}
 		data.version = 3
+	_normalize_weapons(data)
+	data.version = 4
 	for category: String in ["passive", "power"]:
 		data[category + "_capacity"] = int(data[category + "_capacity"])
 	for key in ["seed", "day", "food", "scrap", "hunger"]:
@@ -446,3 +466,15 @@ func restore(state: Dictionary) -> bool:
 	if data.status == "mission":
 		data.status = "shelter"
 	return true
+
+func _normalize_weapons(value: Variant) -> void:
+	# Includes fixed daily rewards, shop and pending/history so retries keep identities.
+	if value is Dictionary:
+		if value.has("uid") and value.has("kind"):
+			value.merge(WeaponInstanceData.from_dict(value).to_dict(), true)
+		else:
+			for child: Variant in value.values():
+				_normalize_weapons(child)
+	elif value is Array:
+		for child: Variant in value:
+			_normalize_weapons(child)

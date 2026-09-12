@@ -79,7 +79,7 @@ func _initialize() -> void:
 	check(game.weapon(second.uid).magazine > game.weapon(first.uid).magazine, "Affix modifies only its own instance")
 	check(catalog.by_id(catalog.weapons, first.kind).magazine == game.weapon(first.uid).magazine, "Shared template remains unchanged")
 	game.equip(game.data.members[0], second.uid)
-	check(game.data.equipment[game.data.members[1]] == first.uid, "Equipped instance swaps without duplication")
+	check(game.data.equipment[game.data.members[1]] == "" and game.weapon_inventory.has_weapon(first.uid), "Transferred instance has one holder; old weapon stays in stock")
 	game.new_run(773, "", ["lin", "qiao", "yan"])
 	check(game.data.day_rewards == original.day_rewards and game.data.shop == original.shop, "Seed fixes daily rewards and shop")
 	var loot: Dictionary = game.data.day_rewards.values()[0]

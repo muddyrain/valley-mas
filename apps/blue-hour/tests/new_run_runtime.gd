@@ -325,7 +325,7 @@ func run() -> void:
 	check(app.state == "shelter" and app.campaign.data.members.size() == 2, "Confirmation creates two-member shelter")
 	check(app.campaign.data.specialization == "survey", "Chosen specialization reaches saved run")
 	var members: Array = app.campaign.data.members.duplicate()
-	await click_at(app.screen.view.get_global_rect().position + app.screen.view.member_point(members[1]))
+	await click_at(app.screen.view.member_point(members[1]))
 	check(app.selected_member == members[1], "Clicking 3D survivor selects the matching member")
 	var food: int = app.campaign.data.food
 	await click(app.screen.training_button)
@@ -338,7 +338,7 @@ func run() -> void:
 	await click(select)
 	var popup := select.get_popup()
 	await click_at(Vector2(popup.position) + Vector2(40, popup.size.y - 24))
-	check(app.campaign.data.equipment[members[1]] == selected_weapon, "Two members can exchange individual weapons")
+	check(app.campaign.data.equipment[members[1]] == "" and app.campaign.weapon_inventory.has_weapon(selected_weapon), "Transfer keeps one holder and returns displaced weapon to stock")
 	await click(button("主菜单"))
 	var saved: String = FileAccess.get_file_as_string(run_save)
 	await click(button("开始游戏"))
@@ -363,6 +363,8 @@ func run() -> void:
 	root.size = Vector2i(1440, 900)
 	await frames()
 	await click(button("整装出发"))
+	await click(button("商业街"))
+	await click(button("确认出发"))
 	app.mission.director_enabled = false
 	app.mission.debug_clear_enemies()
 	app.mission.survivors[0].hp = 10
@@ -377,6 +379,8 @@ func run() -> void:
 	await click(button("确认结算"))
 	check(app.campaign.data.day == 2 and app.campaign.member_level(members[1]) == 2, "Return preserves individual level into next day")
 	await click(button("整装出发"))
+	await click(button("商业街"))
+	await click(button("确认出发"))
 	check(not app.mission.powers.states.aid.used_today, "Next day recharges the equipped power")
 	# Controlled I/O failure: no player save is touched and domain state must roll back.
 	app.mission.director_enabled = false

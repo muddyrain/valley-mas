@@ -9,5 +9,5 @@ initial_food = 6
 food_per_member = 1
 hunger_health_multiplier = 0.8
 shop_size = 3
-weapon_prices = {"pistol": 12, "smg": 20, "shotgun": 24, "crowbar": 10}
-reward_pools = {"garage": ["pistol", "smg", "crowbar"], "depot": ["shotgun", "smg"], "car_west": ["pistol", "crowbar"]}
+weapon_prices = {"WPN_002_P9_PISTOL": 12, "WPN_004_K9_SMG": 20, "WPN_005_S12_SHOTGUN": 24, "WPN_001_SURVIVAL_KNIFE": 10, "WPN_003_R6_REVOLVER": 18, "WPN_006_A21_ASSAULT_RIFLE": 26, "WPN_007_H7_HUNTER_RIFLE": 32, "WPN_008_L56_LMG": 36}
+reward_pools = {"garage": ["WPN_002_P9_PISTOL", "WPN_004_K9_SMG", "WPN_001_SURVIVAL_KNIFE"], "depot": ["WPN_005_S12_SHOTGUN", "WPN_004_K9_SMG", "WPN_006_A21_ASSAULT_RIFLE", "WPN_007_H7_HUNTER_RIFLE", "WPN_008_L56_LMG"], "car_west": ["WPN_002_P9_PISTOL", "WPN_001_SURVIVAL_KNIFE", "WPN_003_R6_REVOLVER"]}

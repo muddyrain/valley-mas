@@ -28,6 +28,16 @@ func click(node: Control) -> void:
 		return
 	var point := node.get_global_rect().get_center()
 	await click_at(point)
+	await wait_for_departure()
+
+func wait_for_departure() -> void:
+	var deadline := Time.get_ticks_msec() + 45000
+	while is_instance_valid(app) and app.state == "departure" and Time.get_ticks_msec() < deadline:
+		await process_frame
+	check(not is_instance_valid(app) or app.state != "departure", "Departure completes before mission controls")
+	# Let the short reveal finish before another UI action.
+	if is_instance_valid(app) and app.state == "mission":
+		await create_timer(0.3).timeout
 
 func click_at(point: Vector2) -> void:
 	for pressed in [true, false]:
@@ -75,6 +85,8 @@ func launch(fresh: bool) -> void:
 
 func stage_return(food: int) -> void:
 	await click(button("整装出发"))
+	await click(button("商业街"))
+	await click(button("确认出发"))
 	app.mission.director_enabled = false
 	app.mission.debug_clear_enemies()
 	app.mission.ledger.add_loot(food, 0)
@@ -120,6 +132,8 @@ func run() -> void:
 	await launch(false)
 	check(app.campaign.data.day == 2 and app.campaign.data.hunger == 1, "Hunger and day survive process reload")
 	await click(button("整装出发"))
+	await click(button("商业街"))
+	await click(button("确认出发"))
 	check(app.mission.survivors[0].hp == 80 and app.catalog.survivors[0].max_hp == 100, "Hungry sortie has reduced HP without mutating template")
 	app.mission.director_enabled = false
 	app.mission.debug_clear_enemies()
@@ -140,6 +154,8 @@ func run() -> void:
 	check(app.campaign.data.members == [chosen] and app.campaign.data.day == 3, "Chosen member alone continues on day three")
 	await capture("16-solo-shelter")
 	await click(button("整装出发"))
+	await click(button("商业街"))
+	await click(button("确认出发"))
 	check(app.mission.survivors.size() == 1 and app.hud.squad_labels.size() == 1, "Solo outing and HUD agree")
 	await capture("17-solo-city")
 	app.mission.survivors[0].take_damage(1000)

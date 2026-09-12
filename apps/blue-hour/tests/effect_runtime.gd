@@ -39,6 +39,8 @@ func run() -> void:
 	app.store = good_store
 	await click(button("关闭"))
 	await click(button("整装出发"))
+	await click(button("商业街"))
+	await click(button("确认出发"))
 	app.mission.set_physics_process(false)
 	app.mission.director_enabled = false
 	app.mission.debug_clear_enemies()
@@ -81,6 +83,8 @@ func run() -> void:
 	await click(button("确认结算"))
 	check(app.campaign.data.day == 2 and app.campaign.data.power_slots.size() == 6, "Return keeps multiple upgraded skills")
 	await click(button("整装出发"))
+	await click(button("商业街"))
+	await click(button("确认出发"))
 	app.mission.set_physics_process(false)
 	app.mission.director_enabled = false
 	app.mission.debug_clear_enemies()

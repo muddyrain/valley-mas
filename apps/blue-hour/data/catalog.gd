@@ -1,4 +1,5 @@
 extends RefCounted
+const WeaponRegistryData = preload("res://data/weapon_registry.gd")
 var survivors: Array[Resource] = [
 	preload("res://data/survivors/lin.tres"),
 	preload("res://data/survivors/qiao.tres"),
@@ -13,19 +14,11 @@ var traits: Array[Resource] = [
 	preload("res://data/traits/route_intuition.tres"),
 	preload("res://data/traits/resource_efficiency.tres")
 ]
-var weapons: Array[Resource] = [
-	preload("res://data/weapons/pistol.tres"),
-	preload("res://data/weapons/smg.tres"),
-	preload("res://data/weapons/shotgun.tres"),
-	preload("res://data/weapons/crowbar.tres")
-]
+var weapons: Array[Resource] = WeaponRegistryData.definitions()
 var enemies: Array[Resource] = [
-	preload("res://data/enemies/shambler.tres"),
-	preload("res://data/enemies/runner.tres"),
-	preload("res://data/enemies/hound.tres"),
-	preload("res://data/enemies/siren.tres")
+	preload("res://data/enemies/enm_001_infected_basic_a.tres")
 ]
-var map: Resource = preload("res://data/maps/east_quay.tres")
+var map: Resource = preload("res://data/maps/east_quay.tres").duplicate(true)
 var today_actions: Array[Resource] = [
 	preload("res://data/today_actions/residential.tres"),
 	preload("res://data/today_actions/commercial.tres"),
@@ -54,7 +47,12 @@ var powers: Array[Resource] = [
 ]
 var affixes: Array[Resource] = [preload("res://data/affixes/longbarrel.tres"), preload("res://data/affixes/extended.tres"), preload("res://data/affixes/quickload.tres"), preload("res://data/affixes/weighted.tres")]
 
+func _init() -> void:
+	preload("res://maps/generation/map_layout.gd").prepare(map)
+
 func by_id(collection: Array[Resource], id: String) -> Resource:
+	if collection == weapons:
+		id = WeaponRegistryData.canonical_id(id)
 	for entry in collection:
 		if entry.id == id:
 			return entry
@@ -72,11 +70,9 @@ func validate() -> Array[String]:
 		if by_id(traits, survivor.trait_id) == null or survivor.max_hp <= 0 or survivor.move_speed <= 0:
 			errors.append("Invalid survivor: " + survivor.id)
 	for weapon in weapons:
-		if weapon.damage <= 0 or weapon.cooldown <= 0 or weapon.attack_range <= 0 or weapon.magazine <= 0 or weapon.target_count <= 0:
-			errors.append("Invalid weapon: " + weapon.id)
+		errors.append_array(weapon.validation_errors())
 	for enemy in enemies:
-		if enemy.max_hp <= 0 or enemy.speed <= 0 or enemy.attack_interval <= 0:
-			errors.append("Invalid enemy: " + enemy.id)
+		errors.append_array(enemy.validation_errors())
 	for id in map.initial_weapons:
 		if by_id(weapons, id) == null:
 			errors.append("Unknown initial weapon: " + id)
@@ -92,6 +88,17 @@ func validate() -> Array[String]:
 		for id in pool:
 			if by_id(enemies, id) == null:
 				errors.append("Unknown spawn enemy: " + id)
+	for encounter: Dictionary in map.initial_enemies:
+		if by_id(enemies, str(encounter.get("id", ""))) == null:
+			errors.append("Unknown initial enemy")
+	for multipliers: PackedFloat32Array in [map.enemy_phase_hp, map.enemy_phase_damage, map.enemy_phase_spawn]:
+		if multipliers.size() != 3:
+			errors.append("Enemy phase multipliers require Day, Blue Hour and Night")
+		for multiplier: float in multipliers:
+			if not is_finite(multiplier) or multiplier <= 0:
+				errors.append("Invalid enemy phase multiplier")
+	if not is_finite(map.threat_hp_step) or not is_finite(map.threat_damage_step) or map.threat_hp_step < 0 or map.threat_damage_step < 0:
+		errors.append("Invalid enemy threat scaling")
 	for site in map.buildings + map.vehicles:
 		for key in ["id", "name", "position", "size", "entry", "search_seconds", "food", "scrap"]:
 			if not site.has(key):

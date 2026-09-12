@@ -46,7 +46,7 @@ func run() -> void:
 		legacy.equipment[member] = "initial:" + member
 	check(game.valid_state(legacy), "Legacy accepted before restore by SaveStore validator")
 	check(game.restore(legacy) and game.data.members == legacy.members, "Migration preserves legacy three members")
-	check(game.data.inventory == legacy.inventory and game.data.specialization == "", "Migration preserves equipment without gifting a specialization")
+	check(game.data.inventory.map(func(v): return v.uid) == legacy.inventory.map(func(v): return v.uid) and game.data.specialization == "", "Migration preserves equipment without gifting a specialization")
 	var store = Store.new("user://test-runs/new-run-migration.json")
 	check(store.write(legacy, game.valid_state).is_empty(), "Legacy fixture saved")
 	check(store.write(game.data, game.valid_state).is_empty(), "Migrated state saved")
