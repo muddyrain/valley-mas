@@ -11,6 +11,7 @@ const UI = preload("res://ui/ui_style.gd")
 const NewGame = preload("res://ui/new_game_screen.gd")
 const Title = preload("res://ui/title_screen.gd")
 const TodayAction = preload("res://ui/today_action_screen.gd")
+const ShelterView = preload("res://ui/shelter_view.gd")
 var selected_member := ""
 var catalog := Catalog.new()
 var ledger := Ledger.new()
@@ -28,6 +29,34 @@ var status_message := ""
 var save_blocked := false
 var save_error_dialog: AcceptDialog
 var base_map: Resource
+var camp_view: Node3D
+var selected_mission_id := ""
+var selected_mission_data: Resource
+var selected_party: Array[String] = []
+var departure_fade: ColorRect
+
+func get_camp_view() -> Node3D:
+	if is_instance_valid(camp_view) and not camp_view.matches_run(campaign):
+		_clear_camp()
+	if not is_instance_valid(camp_view):
+		camp_view = ShelterView.new()
+		add_child(camp_view)
+		camp_view.setup(campaign)
+		camp_view.member_selected.connect(select_member)
+	else:
+		camp_view.refresh_members(campaign)
+	return camp_view
+
+func _fullscreen_camp() -> void:
+	var view := get_camp_view()
+	view.interaction_locked = true
+	view.select("")
+
+func _clear_camp() -> void:
+	if is_instance_valid(camp_view):
+		camp_view.get_parent().remove_child(camp_view)
+		camp_view.queue_free()
+	camp_view = null
 
 func _ready() -> void:
 	if "--art-showcase" in OS.get_cmdline_user_args():
@@ -68,8 +97,12 @@ func _ready() -> void:
 		status_message = "已恢复上一份有效存档。"
 	if fresh_test_run:
 		_refresh_screen()
+		if "--test-weapons" in OS.get_cmdline_user_args():
+			screen.show_weapons.call_deferred()
 		if "--test-today-action" in OS.get_cmdline_user_args():
 			show_today_action.call_deferred()
+		if "--test-expedition" in OS.get_cmdline_user_args():
+			start_mission.call_deferred()
 	else:
 		show_main_menu()
 
@@ -142,9 +175,13 @@ func _refresh_screen() -> void:
 		show_shelter()
 
 func show_shelter() -> void:
+	if state == "departure":
+		return
 	if campaign.data.status == "pending":
 		_show_result()
 		return
+	if campaign.data.status in ["won", "lost"]:
+		_clear_camp()
 	_clear_screen()
 	state = "ended" if campaign.data.status in ["won", "lost"] else "shelter"
 	screen = Shelter.new()
@@ -154,6 +191,7 @@ func show_shelter() -> void:
 func show_today_action() -> void:
 	if state != "shelter" or campaign.data.status != "shelter" or campaign.data.members.is_empty():
 		return
+	_fullscreen_camp()
 	_clear_screen()
 	state = "today_action"
 	screen = TodayAction.new()
@@ -163,6 +201,9 @@ func show_today_action() -> void:
 	screen.cancelled.connect(show_shelter)
 
 func show_main_menu() -> void:
+	if state == "departure":
+		return
+	_clear_camp()
 	_clear_screen()
 	_clear_mission()
 	state = "menu"
@@ -171,6 +212,9 @@ func show_main_menu() -> void:
 	screen.setup(self)
 
 func show_new_game() -> void:
+	if state == "departure":
+		return
+	_clear_camp()
 	_clear_screen()
 	_clear_mission()
 	state = "new_game"
@@ -179,10 +223,14 @@ func show_new_game() -> void:
 	screen.setup(self)
 
 func select_member(id: String) -> void:
+	if state != "shelter":
+		return
 	selected_member = id
 	show_shelter()
 
 func train_member(id: String) -> void:
+	if state != "shelter":
+		return
 	var before: Dictionary = campaign.data.duplicate(true)
 	if campaign.train(id) and _save(before):
 		status_message = "%s · 已升至 %d 级" % [member_name(id), campaign.member_level(id)]
@@ -206,12 +254,24 @@ func _save(before: Dictionary = {}) -> bool:
 	return true
 
 func equip_member(member: String, uid: String) -> void:
+	if state != "shelter":
+		return
 	var before: Dictionary = campaign.data.duplicate(true)
 	if campaign.equip(member, uid):
 		_save(before)
 	show_shelter()
 
+func unequip_member(member: String) -> void:
+	if state != "shelter":
+		return
+	var before: Dictionary = campaign.data.duplicate(true)
+	if campaign.unequip_weapon(member):
+		_save(before)
+	show_shelter()
+
 func buy_weapon(uid: String) -> void:
+	if state != "shelter":
+		return
 	var before: Dictionary = campaign.data.duplicate(true)
 	if campaign.buy(uid):
 		_save(before)
@@ -257,13 +317,48 @@ func start_mission(action_id: String = "") -> void:
 	if not campaign.start_action(action_id) or not _save(before):
 		return
 	var action: Resource = catalog.by_id(catalog.today_actions, action_id)
-	catalog.map = action.make_map(base_map) if action != null else base_map.duplicate(true)
+	selected_mission_id = action_id
+	selected_mission_data = action.make_map(base_map) if action != null else base_map.duplicate(true)
+	selected_party.assign(campaign.data.members)
+	if action_id.is_empty():
+		# Existing internal rule/smoke entry has no selection UI or performance contract.
+		_load_selected_mission()
+		return
+	state = "departure"
+	_fullscreen_camp()
+	if screen != null:
+		screen.process_mode = Node.PROCESS_MODE_DISABLED
+		screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var tween := create_tween()
+		tween.tween_property(screen, "modulate:a", 0.0, 0.18)
+		await tween.finished
 	_clear_screen()
+	camp_view.camp.departure.completed.connect(_departure_complete, CONNECT_ONE_SHOT)
+	camp_view.camp.begin_departure(selected_party)
+
+func _departure_complete() -> void:
+	departure_fade = ColorRect.new()
+	departure_fade.color = Color(0, 0, 0, 0)
+	ui_layer.add_child(departure_fade)
+	departure_fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var tween := create_tween()
+	tween.tween_property(departure_fade, "color:a", 1.0, 0.5)
+	await tween.finished
+	_load_selected_mission()
+	ui_layer.move_child(departure_fade, -1)
+	var reveal := create_tween()
+	reveal.tween_property(departure_fade, "color:a", 0.0, 0.25)
+	reveal.tween_callback(departure_fade.queue_free)
+
+func _load_selected_mission() -> void:
+	catalog.map = selected_mission_data
+	_clear_screen()
+	_clear_camp()
 	_clear_mission()
 	mission = Mission.new()
 	add_child(mission)
 	var no_template_loadout: Array[String] = []
-	mission.setup(catalog, ledger, no_template_loadout, 0, campaign)
+	mission.setup(catalog, ledger, no_template_loadout, 0, campaign, selected_party)
 	mission.completed.connect(_mission_complete)
 	hud = HUD.new()
 	ui_layer.add_child(hud)
@@ -327,6 +422,8 @@ func new_run() -> void:
 	show_new_game()
 
 func create_run(specialization: String) -> void:
+	if state == "departure":
+		return
 	if catalog.by_id(catalog.specializations, specialization) == null:
 		return
 	var before: Dictionary = campaign.data.duplicate(true)
@@ -351,15 +448,19 @@ func debug_change(field: String, amount: int) -> void:
 	_save(before)
 	show_shelter()
 
-func debug_weapon(kind: String, affix: String) -> void:
+func debug_weapon(kind: String, affix: String, rarity: int = 0) -> void:
 	if state != "shelter":
 		return
-	var value := {"uid": "debug:%d" % Time.get_ticks_usec(), "kind": kind, "affix": affix}
+	var rng := RandomNumberGenerator.new()
+	var value: Dictionary = campaign.gear.create(kind, "debug:%d" % Time.get_ticks_usec(), rng, rarity).to_dict()
+	if not affix.is_empty():
+		value.affix = affix
+		value.rarity = maxi(1, rarity)
 	if not campaign.gear.valid(value):
 		status_message = "该词条不适用于所选武器。"
 	else:
 		var before: Dictionary = campaign.data.duplicate(true)
-		campaign.data.inventory.append(value)
+		campaign.weapon_inventory.add_weapon(Campaign.WeaponInstanceData.from_dict(value))
 		campaign.data.modified = true
 		_save(before)
 	show_shelter()

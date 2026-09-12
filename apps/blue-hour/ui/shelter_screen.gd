@@ -1,11 +1,11 @@
 extends Control
 const UI = preload("res://ui/ui_style.gd")
-const ShelterView = preload("res://ui/shelter_view.gd")
+const WeaponBrowser = preload("res://ui/weapon_browser.gd")
 var app: Node
 var debug_panel: PanelContainer
 var weapon_selects: Array[OptionButton] = []
 var departure: Button
-var view: SubViewportContainer
+var view: Node3D
 var training_button: Button
 var member_buttons: Dictionary = {}
 var shop_panel: PanelContainer
@@ -17,29 +17,33 @@ var effect_buttons: Dictionary = {}
 func setup(owner_app: Node) -> void:
 	app = owner_app
 	var game = app.campaign
-	var column := UI.page(self)
-	column.add_child(UI.label("东岸安全屋", 30))
-	column.add_child(UI.label("第 %d / %d 天    食物 %d · 今日需 %d    废料 %d" % [game.data.day, app.catalog.loop.end_day, game.data.food, game.data.members.size() * app.catalog.loop.food_per_member, game.data.scrap], 19, UI.AMBER))
 	if game.data.status in ["won", "lost"]:
-		_ending(column)
+		var ending_column := UI.page(self)
+		ending_column.add_child(UI.label("东岸安全屋", 30))
+		ending_column.add_child(UI.label("第 %d / %d 天    食物 %d · 今日需 %d    废料 %d" % [game.data.day, app.catalog.loop.end_day, game.data.food, game.data.members.size() * app.catalog.loop.food_per_member, game.data.scrap], 19, UI.AMBER))
+		_ending(ending_column)
 		return
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	theme = UI.theme()
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var header := PanelContainer.new()
+	add_child(header)
+	header.position = Vector2(24, 24)
+	header.size.x = 480
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 8)
+	header.add_child(column)
+	column.add_child(UI.label("东岸安全屋", 30))
+	column.add_child(UI.wrapped("第 %d / %d 天    食物 %d · 今日需 %d    废料 %d" % [game.data.day, app.catalog.loop.end_day, game.data.food, game.data.members.size() * app.catalog.loop.food_per_member, game.data.scrap], 19, UI.AMBER))
 	column.add_child(UI.wrapped("饥饿 · 出勤生命上限 %d%% · 已连续缺粮 %d 天" % [app.catalog.loop.hunger_health_multiplier * 100, game.data.hunger] if game.data.hunger > 0 else "已休整 · 准备出发", 14, UI.MUTED))
-	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 20)
-	column.add_child(columns)
-	var scene_column := VBoxContainer.new()
-	scene_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	columns.add_child(scene_column)
-	view = ShelterView.new()
-	scene_column.add_child(view)
-	view.setup(game)
-	view.member_selected.connect(app.select_member)
+	view = app.get_camp_view()
+	view.interaction_locked = false
 	var selected: String = app.selected_member if app.selected_member in game.data.members else game.data.members[0]
 	app.selected_member = selected
 	view.select(selected)
 	for category: String in ["passive", "power"]:
 		var equipped_row := HFlowContainer.new()
-		scene_column.add_child(equipped_row)
+		column.add_child(equipped_row)
 		equipped_row.add_child(UI.label("被动" if category == "passive" else "技能", 14, UI.CYAN))
 		for effect: Resource in game.equipped_effects(category):
 			var badge := TextureRect.new()
@@ -49,10 +53,20 @@ func setup(owner_app: Node) -> void:
 			badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			badge.tooltip_text = effect.display_name + (" · 已升级" if effect.is_upgraded else "") + "\n" + effect.description()
 			equipped_row.add_child(badge)
+	var roster_panel := PanelContainer.new()
+	add_child(roster_panel)
+	roster_panel.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
+	roster_panel.offset_left = -406
+	roster_panel.offset_right = -24
+	roster_panel.offset_top = 24
+	roster_panel.offset_bottom = -96
+	var roster_scroll := ScrollContainer.new()
+	roster_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	roster_panel.add_child(roster_scroll)
 	var roster := VBoxContainer.new()
-	roster.custom_minimum_size.x = 350
+	roster.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	roster.add_theme_constant_override("separation", 12)
-	columns.add_child(roster)
+	roster_scroll.add_child(roster)
 	roster.add_child(UI.label("外勤小队", 18, UI.AMBER))
 	var row := HBoxContainer.new()
 	roster.add_child(row)
@@ -72,6 +86,8 @@ func setup(owner_app: Node) -> void:
 	var select := OptionButton.new()
 	select.custom_minimum_size.y = 40
 	select.fit_to_longest_item = false
+	select.add_item("未装备")
+	select.set_item_metadata(0, "")
 	for i in range(game.data.inventory.size()):
 		var item: Dictionary = game.data.inventory[i]
 		var holder := ""
@@ -79,15 +95,27 @@ func setup(owner_app: Node) -> void:
 			if game.data.equipment[member] == item.uid:
 				holder = " · " + app.member_name(member)
 		select.add_item("%d. %s%s" % [i + 1, game.gear.title(item), holder])
-		select.set_item_metadata(i, item.uid)
+		select.set_item_metadata(i + 1, item.uid)
 		if item.uid == game.data.equipment[selected]:
-			select.selected = i
-	select.item_selected.connect(func(index: int): app.equip_member(selected, select.get_item_metadata(index)))
+			select.selected = i + 1
+	select.item_selected.connect(func(index: int):
+		if index == 0:
+			app.unequip_member(selected)
+		else:
+			app.equip_member(selected, select.get_item_metadata(index)))
 	roster.add_child(select)
 	weapon_selects.append(select)
 	var equipped: Resource = game.weapon(game.data.equipment[selected])
 	roster.add_child(UI.wrapped(game.gear.description(game.item(game.data.equipment[selected])), 14, UI.MUTED))
-	roster.add_child(UI.label("伤害 %.1f · 含特质与被动" % game.passive_modifiers().outgoing_damage(equipped.damage * talent.damage_multiplier, equipped.melee), 16))
+	if equipped != null:
+		var weapon_icon := TextureRect.new()
+		weapon_icon.texture = equipped.icon()
+		weapon_icon.custom_minimum_size = Vector2(64, 64)
+		weapon_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		weapon_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		roster.add_child(weapon_icon)
+		roster.add_child(UI.label("伤害 %.1f · 含特质与被动" % game.passive_modifiers().outgoing_damage(equipped.damage * talent.damage_multiplier, equipped.melee), 16))
+		roster.add_child(UI.button("卸下武器", func(): app.unequip_member(selected), Vector2(0, 32)))
 	var cost: int = game.training_cost(selected)
 	if cost >= 0:
 		var next: Resource = app.catalog.by_id(app.catalog.traits, spec.trait_id).at_level(game.member_level(selected) + 1)
@@ -97,17 +125,29 @@ func setup(owner_app: Node) -> void:
 	training_button.disabled = cost < 0 or game.data.food < cost
 	roster.add_child(training_button)
 	column.add_child(UI.wrapped(app.status_message, 14, UI.CYAN))
-	var actions := UI.footer(self)
+	var actions := HBoxContainer.new()
+	add_child(actions)
+	actions.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	actions.offset_left = 24
+	actions.offset_right = -24
+	actions.offset_top = -72
+	actions.offset_bottom = -24
 	departure = UI.button("整装出发", app.show_today_action, Vector2(0, 48))
 	departure.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	actions.add_child(departure)
 	actions.add_child(UI.button("备用装备", func(): shop_backdrop.show(); shop_panel.show(), Vector2(140, 48)))
+	actions.add_child(UI.button("武器", show_weapons, Vector2(80, 48)))
 	actions.add_child(UI.button("道具与技能", show_effects, Vector2(130, 48)))
 	actions.add_child(UI.button("主菜单", app.show_main_menu, Vector2(115, 48)))
 	actions.add_child(UI.button("调试 [F1]", toggle_debug, Vector2(125, 48)))
 	_build_shop()
 	_build_effects()
 	_build_debug()
+
+func show_weapons() -> void:
+	var browser := WeaponBrowser.new()
+	add_child(browser)
+	browser.setup(app)
 
 func show_effects() -> void:
 	effects_backdrop.show()
@@ -224,12 +264,11 @@ func _build_debug() -> void:
 	for weapon in app.catalog.weapons:
 		kind.add_item(weapon.display_name)
 	box.add_child(kind)
-	var affix := OptionButton.new()
-	affix.add_item("基础武器")
-	for value in app.catalog.affixes:
-		affix.add_item(value.display_name + " · " + value.description)
-	box.add_child(affix)
-	box.add_child(UI.button("给予选定差异武器", func(): app.debug_weapon(app.catalog.weapons[kind.selected].id, "" if affix.selected == 0 else app.catalog.affixes[affix.selected - 1].id)))
+	var quality := OptionButton.new()
+	for title: String in ["普通 · 0 词条", "精良 · 1 词条", "稀有 · 2 词条", "特殊 · 3 词条"]:
+		quality.add_item(title)
+	box.add_child(quality)
+	box.add_child(UI.button("给予选定武器", func(): app.debug_weapon(app.catalog.weapons[kind.selected].id, "", quality.selected)))
 	box.add_child(UI.button("给予全部道具与技能并扩容", func(): app.debug_effects(false)))
 	box.add_child(UI.button("升级全部已持有道具与技能", func(): app.debug_effects(true)))
 	box.add_child(UI.button("关闭", toggle_debug))

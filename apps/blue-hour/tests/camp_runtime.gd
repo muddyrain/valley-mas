@@ -79,8 +79,16 @@ func _run() -> void:
 	_check(main_building.get_meta("blockout_size") == Vector3(12, 3.8, 4.5), "Main building matches 12x4.5x3.8m")
 	_check(workshop.get_meta("blockout_footprint") == Vector2(5, 3.5), "Workshop footprint matches 5x3.5m")
 	_check(greenhouse.get_meta("blockout_footprint") == Vector2(4, 3), "Greenhouse footprint matches 4x3m")
-	_check(main_building.has_node("LeftWing") and main_building.has_node("EntryCore") and main_building.has_node("RightWing"), "Main building has readable left, entry, and right zoning")
-	_check(main_building.has_node("FrontDoorBlockout") and main_building.has_node("EntranceCanopy"), "Main building entrance reads in whitebox form")
+	_check(main_building.has_node("Visual/Model"), "Main building uses the official station model")
+	_check(main_building.has_node("EntrancePoint"), "Main building preserves a clear entrance approach")
+	var station_bounds := _local_bounds(main_building)
+	_check(station_bounds.size.distance_to(Vector3(12, 4.17005, 6.7043)) < 0.01, "Official station measured bounds include antennas and entrance steps")
+	_check(absf(station_bounds.position.y) < 0.001, "Station meets visible ground")
+	_check(main_building.scale.is_equal_approx(Vector3.ONE) and main_building.rotation.is_equal_approx(Vector3.ZERO), "Station root preserves the frozen identity basis")
+	_check(main_building.get_node("Visual").scale.is_equal_approx(Vector3.ONE * 1.097386), "Only station Visual applies a small uniform scale")
+	var station_collisions := main_building.find_children("*", "CollisionShape3D", true, false)
+	_check(station_collisions.size() == 3 and station_collisions.all(func(shape: CollisionShape3D): return shape.shape is BoxShape3D), "Station collision uses three simple boxes")
+	print("STATION MEASURED: ", station_bounds)
 	_check(camp.has_node("NavigationSource/MainForecourt"), "Main building entrance opens onto a readable forecourt")
 	_check(workshop.has_node("LeanToRoof") and workshop.has_node("RepairBench"), "Workshop reads as an attached open repair bay")
 	_check(
@@ -156,7 +164,7 @@ func _run() -> void:
 	var region := camp.get_node("NavigationRegion3D") as NavigationRegion3D
 	var navigation_mesh := region.navigation_mesh
 	_check(navigation_mesh != null and navigation_mesh.get_polygon_count() > 0, "NavigationRegion3D has baked navigation")
-	_check(navigation_mesh.get_polygon_count() == 75, "V1.3 preserves the V1.2 baked navigation mesh")
+	_check(navigation_mesh.geometry_parsed_geometry_type == NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS, "Navigation uses simple static collision geometry")
 	await _frames(4)
 	var navigation_map := region.get_navigation_map()
 	for pair: Array in PATH_CHECKS:
@@ -176,6 +184,15 @@ func _run() -> void:
 func _frames(count: int) -> void:
 	for _index: int in range(count):
 		await process_frame
+
+func _local_bounds(node: Node3D) -> AABB:
+	var result := AABB()
+	var first := true
+	for mesh: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false):
+		var bounds := node.global_transform.affine_inverse() * mesh.global_transform * mesh.get_aabb()
+		result = bounds if first else result.merge(bounds)
+		first = false
+	return result
 
 
 func _check(value: bool, message: String) -> void:
