@@ -1,5 +1,12 @@
 # 蓝时归航 / BLUE HOUR: HOMEWARD
 
+**营地清晰度修复**：正式 Camp 直接使用主 Viewport，管理 UI 覆盖在持续存在的 3D 场景上。主站使用用户提供的 4K 颜色 / 法线贴图、保留 mipmaps 与原始世界尺寸；选人、训练和换装不会重新创建营地。1080p 对照与导入审计见 [主站清晰度报告](docs/CAMP_CLARITY_REPORT.md)。
+
+**第一阶段正式武器**：八把武器、独立实例库存、四品质与六词条、主武器装备/卸下、七弹丸散射、有限穿透和自动换弹已接入。安全屋「武器」查看图鉴与库存；F1 可给予指定武器与品质。沿用既有存档并兼容旧档，三把代表武器的角色挂载已在 Phase 2A 接入。配置、文件清单、接口与验收见 [武器系统报告](docs/WEAPON_SYSTEM.md)。
+
+**今日行动选择**已接入营地「整装出发」：Main Menu → 专属路线 → Camp → 今日行动三选一 → 确认出发 → 集结与依次上车 → 蓝时号驶离 → 3D街区 → Blue Hour → 返航结算 → Camp。整备与出发使用同一个冻结营地，正式主站与演出验收见[Camp Departure V1](docs/CAMP_DEPARTURE_V1.md)。住宅区偏食物、商业街偏废料、空投回收偏装备；三者复用固定 Seed 20260912 的十五座建筑、三辆可搜索车辆与导航布局，分别配置物资储量、装备点、初始敌人数和刷怪间隔。选择本身不消耗一天，返回营地不写档。规则与验收见[今日行动记录](docs/TODAY_ACTION.md)，街区结构见[地图报告](docs/WORLD_MAP_REPORT.md)。
+
+**正式外出地图**：默认正交25、缩放20–35；160×120m、15栋建筑、18处可搜地点和12辆环境车辆。轻量头像/时钟/目标HUD接入原游戏闭环。直接运行 [Windows版](build/BlueHourHomeward.exe)，实机视频、闪烁排查与剩余边界见 [外出视觉报告](docs/EXPEDITION_VISUAL_REPORT.md)。
 Godot 4.x + GDScript 的 **0.5.0 道具与技能扩充试玩**。在原有 Resource 系统上扩展为 8 个被动道具、6 个特殊技能，均有普通/升级两档和用户提供的 100×100 图标。新游戏仍选择作战、搜集或勘查专精，获得一个起始被动和一个起始技能；保留两名成员、并行搜索、小队指向射击和五日归航循环。
 
 安全屋的「道具与技能」管理已持有内容，每个技能每日一次。持有清单、装备槽位、容量与升级状态均可保存；道具和技能只允许 Normal → Upgraded 一次。地图发现、槽位购买和正式升级费用尚未接入；验收新增内容可在安全屋按 F1，选择「给予全部道具与技能并扩容」，再选择「升级全部已持有道具与技能」。数值和实现边界见 [效果系统规格](docs/EFFECT_SYSTEM_SPEC.md)。
@@ -7,6 +14,8 @@ Godot 4.x + GDScript 的 **0.5.0 道具与技能扩充试玩**。在原有 Resou
 **0.4.1 首页更新**：接入用户提供的背景、Logo、六组菜单图标、底部入口与静态海报；开始游戏、继续存档和专精选择支持鼠标、键盘及手柄。角色图鉴、营地档案为当前数据只读页，设置可切换全屏。外部入口尚无发布地址；逐像素还原仍缺手写装饰与部分同款切图，详见 [首页素材与差异](art/UI_ASSETS.md)。
 
 玩法基线见 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)，已实现范围见 [docs/PLAN.md](docs/PLAN.md)，验证证据见 [docs/VALIDATION.md](docs/VALIDATION.md)。这不是完整游戏。
+
+**武器 Phase 2A**：拓荒短刀、P9、A21 已接入双角色右手挂点，营地/任务显示随装备切换。模型、姿态、验证与后续边界见[武器模型报告](docs/WEAPON_VISUALS.md)。
 
 ## 打开与验证
 
@@ -20,6 +29,7 @@ Windows 的 `run.ps1` 支持 `run`、`editor`、`art`、`import`、`test`、`smo
 | --- | --- |
 | 新游戏 / 专精 Tab / 确认创建 | 选择起始套餐并生成两名成员；取消不替换旧进度 |
 | 基地角色 / 名单 | 选择成员，查看等级、特质、武器与升级成本 |
+| 整装出发 / 今日行动 | 选择住宅区、商业街或空投回收，再确认出发；Esc / 手柄 B 返回营地 |
 | 升级成员 | 花食物提高本轮等级和 Trait，最高 5 级 |
 | 行动特殊技能按钮 | 分别施放已装备技能，各每日一次；战术暂停可施放，持续时间随模拟暂停 |
 | 安全屋「道具与技能」 | 查看已持有的道具/技能、升级效果及装备槽位；换装立即保存 |
@@ -36,8 +46,8 @@ Windows 的 `run.ps1` 支持 `run`、`editor`、`art`、`import`、`test`、`smo
 | “改派当前搜索” / “取消当前搜索” | 显式更换执行者 / 单独取消；进度保留，不抢其他任务成员 |
 | R / 全队集合 | 结束全部搜索，所有存活成员步行前往最近设置的集合点 |
 | 点击巴士 / E | 全队靠近巴士，等待 8 秒准备和关门后结算 |
-| 滚轮 / “定位小队” | 缩放镜头 / 镜头回到队伍 |
-| WASD / 右键或中键拖动 | 平移镜头；右键不再重复左键命令 |
+| 滚轮 / “定位” | 缩放镜头（28–42，默认33） / 回到队伍并恢复跟随 |
+| WASD / 右键或中键拖动 | 平移镜头并接管自动跟随；右键不重复左键命令 |
 | 空格 / 暂停 | 暂停、继续模拟；暂停时仍可查看和下达命令 |
 | Esc | 打开、关闭暂停菜单；菜单挡住下层行动操作 |
 | F1 | 行动内调试时段、战斗与携带资源；安全屋可授予全部正式道具/技能、扩容和一次升级 |
@@ -50,7 +60,7 @@ Windows 的 `run.ps1` 支持 `run`、`editor`、`art`、`import`、`test`、`smo
 
 ## 本切片内容
 
-- 五座可搜建筑、三辆可搜车辆和一辆归航巴士；同一份地图数据生成碰撞、寻路阻挡及显示。
+- 八座可搜建筑、三辆可搜环境车和同期新版归航巴士；16项World资源通过Wrapper接入固定街区，道路和标准围栏使用Godot规则几何，同源简单碰撞投影到原寻路网格。
 - 林汐「稳准」提高攻击伤害；乔安「寻迹」提高搜索速度；言秋「坚韧」降低承伤。
 - 岸灯手枪、雨燕冲锋枪、门闩霰弹枪、归途撬棍。远程自动换弹，霰弹枪具有扇形多目标命中，近战只在近处生效。
 - 缓行者、疾行者、夜犬；特殊敌人鸣响者周期呼叫增援。敌人复用对象池，寻路分散在不同帧，最多同时 85 名活动敌人。
@@ -72,6 +82,7 @@ Windows 的 `run.ps1` 支持 `run`、`editor`、`art`、`import`、`test`、`smo
 | 路径 | 职责 |
 | --- | --- |
 | `core/main.tscn`、`core/main.gd` | 主菜单、开局选择、安全屋、行动与结算的场景装配 |
+| `ui/today_action_screen.gd`、`data/today_actions/` | 今日行动草稿、三类地点 Resource 与差异化物资/敌情配置 |
 | `core/run_ledger.gd` | 单次行动的携带物资、装备与一次性结果 |
 | `core/campaign.gd` | 本轮成员、武器个体、每日口粮、饥饿、商店、日推进与结束 |
 | `core/equipment.gd`、`core/save_store.gd` | 武器差异计算；存档校验、替换与恢复 |
@@ -87,7 +98,8 @@ Windows 的 `run.ps1` 支持 `run`、`editor`、`art`、`import`、`test`、`smo
 | `missions/squad_input.gd` | 持续带队、Ctrl 指向、镜头、命令键和输入释放 |
 | `survivors/aim_fire.gd` | 沿鼠标方向命中，复用武器射程、扇形、弹药和墙体遮挡 |
 | `survivors/`、`enemies/` | 个体移动、攻击状态、弹药、生命及特殊行为 |
-| `maps/city.gd` | 平面网格寻路、射线选取、碰撞与 3D 模块化城区 |
+| `maps/city.gd`、`maps/generation/` | 固定街区装配、模块道路、地块/Wrapper摆放、平面网格寻路和同源碰撞 |
+| `data/world_asset_catalog.gd`、`scenes/world/` | 首批16项World Resource目录及规范化Runtime Wrapper |
 | `vfx/`、`blue_hour/`、`audio/` | 可替换占位模型、射击反馈、昼夜灯光和声音 |
 | `ui/`、`debug/` | Godot Control 原生界面与调试入口 |
 | `tests/` | 基础与跨日规则、行动集成、原生输入与路线诊断 |
@@ -96,7 +108,7 @@ Windows 的 `run.ps1` 支持 `run`、`editor`、`art`、`import`、`test`、`smo
 
 ## 当前局限
 
-环境与基础枪械已接入 **BLUE HOUR STARTER ENVIRONMENT KIT V1**：52 个自主 Blender 资产，包含可重复生成的源文件、GLB 和共享材质。角色仍为 Placeholder，声音为程序生成的短音和环境低频；没有成品角色动画、配音或高级视效。数值仍是第一轮基线，路线探测不等于真实玩家体验或性能基准。仅验证当前 Windows Godot 环境；其他 Godot 4.x 小版本和平台尚未验证。截图、报告、导出物和编辑器缓存均忽略提交。
+正式外出环境使用首批16项用户World资产；旧Blender资产保留在营地、展厅或资源库。新版蓝时号与普通感染者使用用户GLB，角色动画仍在开发；声音为程序生成的短音和环境低频，尚无配音或高级视效。源招牌伪字、树冠稀疏和顶棚遮挡见街区报告。数值仍是第一轮基线，路线探测不等于真实玩家体验或压力基准。仅验证当前Windows Godot环境；其他版本和平台未验证。运行截图、日志、导出物和编辑器缓存忽略提交，交付文档纳入源码。
 
 本版没有每日地点三选一、营救补员、战斗经验、跨局专精解锁、通用治疗/区域火力支援、基地经营、主线或完整 10～20 日循环；五日终点只是这一小步的试玩范围。开局与成长规格见 [NEW_RUN_SPEC](docs/NEW_RUN_SPEC.md)，跨日基础见 [DAY_LOOP_SPEC](docs/DAY_LOOP_SPEC.md)。
 
@@ -106,4 +118,4 @@ Windows 的 `run.ps1` 支持 `run`、`editor`、`art`、`import`、`test`、`smo
 
 新增美术先读 [ART_BIBLE](art/ART_BIBLE.md)、[ASSET_PIPELINE](art/ASSET_PIPELINE.md) 与 [MODEL_CATALOG](art/MODEL_CATALOG.md)，优先复用现有模块。`art/build_assets.ps1` 按道路建筑、道具、车辆、枪械、感染者五批依次执行 Blender → GLB 校验 → Godot 导入与实例化，失败即停止；运行资产在 `assets/generated/`，可编辑源文件在 `art/blender/sources/`。
 
-运行 `./apps/blue-hour/run.ps1 -Mode art` 或打开 `scenes/debug/art_showcase.tscn` 可查看全部资产，按类别聚焦；Tab 切换 Day / BLUE HOUR，滚轮缩放，右键拖动旋转。`test` 和 `build` 包含模型导入与地图美术回归，`capture` 包含美术展示截图；`build` 还验证独立 EXE 中全部模型的加载。完整步骤见资产管线文档。
+运行 `./apps/blue-hour/run.ps1 -Mode art` 可查看旧资产库与新版蓝时号；首批World环境按正常流程从营地出发验收。`test` 和 `build` 包含模型导入与街区回归，`capture` 增加正式街区原生闭环；`build` 同时验证独立EXE中的菜单、营地、外出与展厅资源。完整步骤见资产管线文档。

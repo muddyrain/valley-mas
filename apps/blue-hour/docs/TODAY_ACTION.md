@@ -20,7 +20,7 @@
 
 `ui/today_action_screen.gd` 只持有草稿，通过信号交给 `core/main.gd`。`Campaign.start_action(action_id)` 校验 ID 并保存可选字段 `selected_action`；版本仍为 v3，v1/v2/v3 的既有存档允许缺省此字段，未知 ID 被拒绝。
 
-只有保存成功后才复制基础地图、应用地点配置并创建 Mission；失败时恢复整份 Campaign 数据，停留在当前卡片。重复确认在 Mission 状态被拒绝。行动中退出继续原有“回到当天营地重试”规则，保留上次确认的地点与原有 `day_rewards`，再次打开选择页恢复该选择；可以改选，奖励不重新抽取。日结算后 `_prepare_day()` 清空选择。
+只有保存成功后才复制基础地图、应用地点配置，锁定任务 ID、地图资源与队伍并进入 `departure`。同一个冻结 Camp 实例播放集结、依次上车和车辆驶离；车辆离开固定镜头后淡出，再调用原 `Mission.setup`。失败时恢复整份 Campaign 数据，停留在当前卡片。重复确认与营地交互在 departure / Mission 状态被拒绝。演出或行动中退出继续原有“回到当天营地重试”规则，保留上次确认的地点与原有 `day_rewards`，再次打开选择页恢复该选择；可以改选，奖励不重新抽取。日结算后 `_prepare_day()` 清空选择。流程、超时与运行验收见 [营地出发 V1](CAMP_DEPARTURE_V1.md)。
 
 程序内无参数的 `start_mission()` 仍用于既有基准测试与独立外出启动检查，使用原始东岸地图。正式营地按钮统一走选择页。
 

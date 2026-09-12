@@ -2,7 +2,7 @@
 
 日期：2026-09-12。角色制作最初在独立工作树 D:/my-code/valley-mas-humanoid-rig、分支 codex/humanoid-rig 完成。现已按用户要求合入主地图工作区 D:/my-code/valley-mas，保留主工作区未提交的地图、巴士、营地出发、武器和 HUD 改动。随后按用户要求单独提交 Rig 与角色替换内容，未推送；最终视觉效果仍待用户确认。
 
-可直接运行 [公共 Rig Inspector](../build/BH_Humanoid_Rig_v1_Review.exe) 和 [合入后的游戏](../build/rig-integration/BlueHourHomeward.exe)，均已完成构建与独立启动验证。关键姿势对照图在 [本地检查总览](../test-output/replacement/review-board.png)。
+可直接运行 [公共 Rig Inspector](../build/BH_Humanoid_Rig_v1_Review.exe) 和 [合入后的游戏](../build/BlueHourHomeward.exe)，均已完成构建与独立启动验证。关键姿势对照图在 [本地检查总览](../test-output/replacement/review-board.png)。
 
 ## 主地图工作区合入
 
