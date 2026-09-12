@@ -4,13 +4,13 @@ signal notice(text: String)
 signal watch_warning_changed(active: bool)
 const City = preload("res://maps/city.gd")
 const Survivor = preload("res://survivors/survivor.gd")
-const Enemy = preload("res://enemies/enemy.gd")
 const Clock = preload("res://time/mission_clock.gd")
 const Atmosphere = preload("res://blue_hour/atmosphere.gd")
 const Visuals = preload("res://vfx/visuals.gd")
 const Soundscape = preload("res://audio/soundscape.gd")
 const SearchTask = preload("res://missions/search_task.gd")
 const SquadInput = preload("res://missions/squad_input.gd")
+const ExpeditionCamera = preload("res://missions/expedition_camera.gd")
 const SpecialPower = preload("res://missions/special_power.gd")
 const Modifiers = preload("res://core/effect_modifiers.gd")
 var effects: RefCounted
@@ -28,6 +28,7 @@ var city: Node3D
 var atmosphere: Node3D
 var sound: Node
 var camera: Camera3D
+var camera_controller: Node
 var survivors: Array[Node3D] = []
 var enemies: Array[Node3D] = []
 var enemy_pool: Array[Node3D] = []
@@ -53,6 +54,7 @@ var kills: int = 0
 var invincible: bool = false
 var time_scale: float = 1.0
 var director_enabled: bool = true
+var poi_selected_id: String = ""
 var camera_center := Vector3.ZERO
 var focus_repath: float = 0.0
 var rally_point := Vector3.ZERO
@@ -62,7 +64,7 @@ var input_enabled := true
 var manual_aim := false
 var aim_point := Vector3.ZERO
 
-func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], seed_value: int = 0, run_state: RefCounted = null) -> void:
+func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], seed_value: int = 0, run_state: RefCounted = null, locked_party: Array[String] = []) -> void:
 	catalog = content
 	ledger = resources
 	campaign = run_state
@@ -86,16 +88,15 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 	add_child(sound)
 	camera = Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.size = 67.0
+	camera.size = ExpeditionCamera.DEFAULT_SIZE
 	camera.far = 180.0
 	add_child(camera)
-	_update_camera()
 	camera.current = true
 	var member_ids: Array
 	if campaign == null:
 		member_ids = catalog.survivors.slice(0, loadout.size()).map(func(member): return member.id)
 	else:
-		member_ids = campaign.data.members
+		member_ids = campaign.data.members if locked_party.is_empty() else locked_party
 	for i in range(member_ids.size()):
 		var member_id: String = member_ids[i]
 		var spec: Resource = (catalog.survivors[i] if campaign == null else campaign.member_template(member_id)).duplicate()
@@ -111,6 +112,7 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 		var survivor := Survivor.new()
 		add_child(survivor)
 		survivor.setup(spec, talent, equipment)
+		survivor.enable_motion_presentation(self)
 		survivor.effects = effects
 		survivor.position = catalog.map.bus_position + formation(survivors.size())
 		survivors.append(survivor)
@@ -119,9 +121,12 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 	clock.phase_changed.connect(_on_phase)
 	spawn_left = clock.spawn_interval()
 	powers = SpecialPower.new(self)
+	camera_controller = ExpeditionCamera.new()
+	add_child(camera_controller)
+	camera_controller.setup(self)
 
 func formation(index: int) -> Vector3:
-	return [Vector3(-1.2, 0, 0), Vector3(1.2, 0, 0), Vector3(0, 0, -1.4)][index % 3]
+	return [Vector3(-1.2, 0, 0), Vector3(1.2, 0, 0), Vector3(0, 0, -1.4), Vector3(0, 0, 1.4)][index % 4]
 
 func debug_equip(index: int, equipment: Resource) -> void:
 	var member: Node3D = survivors[index]
@@ -148,6 +153,8 @@ func _advance_world(dt: float) -> void:
 	_sync_watch_warning()
 	_update_director(dt)
 	powers.refresh_target()
+	for enemy: Node3D in enemies:
+		enemy.refresh_stats(clock)
 	for task in search_tasks.values():
 		task.prepare(dt, self)
 	_prune_tasks()
@@ -168,7 +175,6 @@ func _advance_world(dt: float) -> void:
 	for task in search_tasks.values():
 		task.advance(dt, self)
 	_prune_tasks()
-	city.show_assignments(search_tasks.keys())
 	_update_pickups()
 	_update_extraction(dt)
 
@@ -178,7 +184,7 @@ func _sync_watch_warning() -> void:
 		watch_warning_changed.emit(watch_warning_active)
 
 func movement_speed(member: Node3D, waypoint: Vector3, delta: float) -> float:
-	var speed: float = member.data.move_speed * effects.multiplier("move_speed")
+	var speed: float = member.data.move_speed * effects.multiplier("move_speed") * (1.0 + member.weapon.move_speed_modifier if member.weapon != null else 1.0)
 	if not watch_warning_active or member.dead or member.boarding or delta <= 0:
 		return speed
 	var offset: Vector3 = waypoint - member.position
@@ -198,25 +204,19 @@ func damage_to(member: Node3D, target: Node3D) -> float:
 func _process(delta: float) -> void:
 	if controls != null:
 		controls.update(delta)
+	if camera_controller != null:
+		camera_controller.update(delta)
 
 func pan_camera(amount: Vector2) -> void:
-	var right := camera.global_basis.x
-	var forward := -camera.global_basis.z
-	forward.y = 0
-	camera_center += right * amount.x - forward.normalized() * amount.y
-	camera_center.x = clampf(camera_center.x, -25, 25)
-	camera_center.z = clampf(camera_center.z, -23, 23)
-	_update_camera()
+	camera_controller.pan(amount)
 
 func _update_camera() -> void:
-	camera.position = camera_center + Vector3(38, 52, 48)
-	camera.look_at(camera_center, Vector3.UP)
+	camera_controller.apply()
 
 func center_squad() -> void:
 	if living().is_empty():
 		return
-	camera_center = squad_center()
-	_update_camera()
+	camera_controller.center_squad()
 
 func living() -> Array[Node3D]:
 	var result: Array[Node3D] = []
@@ -341,13 +341,14 @@ func command_stop() -> void:
 	_cancel_guard_order()
 	for survivor in guards():
 		survivor.regrouping = false
-		survivor.stop()
+		survivor.request_stop()
 	city.marker.visible = false
 	order = "停止移动 · 自动迎敌"
 
 func command_search(id: String) -> void:
 	if not active or closing_left >= 0 or not city.sites.has(id) or city.sites[id].searched:
 		return
+	poi_selected_id = id
 	var site: Dictionary = city.sites[id]
 	if search_tasks.has(id):
 		selected_search_id = id
@@ -466,7 +467,7 @@ func _update_focus(delta: float) -> void:
 		return
 	focus_repath = 0.65
 	for survivor in guards():
-		if survivor.regrouping:
+		if survivor.regrouping or survivor.weapon == null:
 			continue
 		if survivor.position.distance_to(focus_target.position) > survivor.weapon.attack_range * 0.85 or not city.line_clear(survivor.position, focus_target.position):
 			survivor.order_move(focus_target.position, city)
@@ -499,24 +500,11 @@ func choose_target(survivor: Node3D) -> Node3D:
 	return nearest
 
 func _can_hit(survivor: Node3D, target: Node3D) -> bool:
-	return survivor.position.distance_to(target.position) <= survivor.weapon.attack_range and city.line_clear(survivor.position, target.position)
+	return survivor.weapon != null and survivor.position.distance_to(target.position) <= survivor.weapon.attack_range and city.line_clear(survivor.position, target.position)
 
 func attack(survivor: Node3D, target: Node3D) -> void:
-	var weapon: Resource = survivor.weapon
-	var targets: Array[Node3D] = [target]
-	if weapon.target_count > 1:
-		var direction := survivor.position.direction_to(target.position)
-		for candidate in enemies:
-			if targets.size() >= weapon.target_count:
-				break
-			if candidate == target or not candidate.active or not _can_hit(survivor, candidate):
-				continue
-			if direction.dot(survivor.position.direction_to(candidate.position)) >= cos(deg_to_rad(weapon.cone_degrees)):
-				targets.append(candidate)
-	for enemy in targets:
-		enemy.take_damage(damage_to(survivor, enemy))
-		Visuals.tracer(self, survivor.position + Vector3.UP, enemy.position + Vector3.UP, weapon.color, weapon.melee)
-	sound.play_cue("melee" if weapon.melee else "shot", weapon.sound_pitch)
+	if is_instance_valid(target):
+		survivor.combat.try_attack(survivor, self, target.position, target)
 
 func effects_hit(from: Vector3, to: Vector3, color: Color) -> void:
 	Visuals.tracer(self, from + Vector3.UP, to + Vector3.UP, color, true)
@@ -534,22 +522,11 @@ func spawn_enemy(id: String, point: Vector3) -> Node3D:
 			break
 	if enemy != null:
 		enemy_pool.erase(enemy)
-		enemy.hp = data.max_hp
-		enemy.hp_bar.scale.x = 1
-		enemy.active = true
-		enemy.visible = true
-		enemy.path.clear()
-		enemy.target = null
-		enemy.attack_left = 0
-		enemy.alarm_left = data.alarm_interval
-		enemy.think_left = rng.randf_range(0.1, 0.6)
-		for child in enemy.get_children():
-			if child is Area3D:
-				child.collision_layer = 2
+		enemy.reset_for_spawn(rng.randf_range(0.1, 0.6), clock)
 	else:
-		enemy = Enemy.new()
+		enemy = data.scene.instantiate()
 		add_child(enemy)
-		enemy.setup(data, rng.randf_range(0.1, 0.6))
+		enemy.setup(data, rng.randf_range(0.1, 0.6), clock)
 	enemy.position = city.nearest_open(point)
 	enemies.append(enemy)
 	return enemy
@@ -577,23 +554,8 @@ func _update_director(delta: float) -> void:
 	for i in range(count):
 		var pool: PackedStringArray = [catalog.map.day_enemy_pool, catalog.map.blue_enemy_pool, catalog.map.night_enemy_pool][clock.phase]
 		var id: String = pool[rng.randi_range(0, pool.size() - 1)]
-		var enemy_data: Resource = catalog.by_id(catalog.enemies, id)
-		if enemy_data.special:
-			var special_count := 0
-			for enemy in enemies:
-				if enemy.active and enemy.data.special:
-					special_count += 1
-			if clock.threat_level() < catalog.map.special_unlock_threat or special_count >= catalog.map.special_limit:
-				continue
 		var point: Vector3 = catalog.map.spawn_points[rng.randi_range(0, catalog.map.spawn_points.size() - 1)]
 		spawn_enemy(id, point)
-
-func raise_alarm(enemy: Node3D) -> void:
-	notice.emit("鸣响者正在召来感染者")
-	sound.play_cue("alarm")
-	for i in range(enemy.data.alarm_count):
-		var point: Vector3 = catalog.map.spawn_points[rng.randi_range(0, catalog.map.spawn_points.size() - 1)]
-		spawn_enemy("runner", point)
 
 func drop_loot(point: Vector3, food: int, scrap: int, weapon_item: Dictionary = {}) -> void:
 	var view := Node3D.new()
@@ -698,6 +660,8 @@ func _finish(wiped: bool) -> void:
 	completed.emit(result)
 
 func _on_phase(phase: int) -> void:
+	for enemy: Node3D in enemies:
+		enemy.refresh_stats(clock)
 	atmosphere.set_phase(phase)
 	sound.set_phase(phase)
 	spawn_left = minf(spawn_left, clock.spawn_interval())

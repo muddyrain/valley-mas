@@ -8,7 +8,7 @@ static func select(enemies: Array[Node3D], origin: Vector3) -> Node3D:
 	for enemy: Node3D in enemies:
 		if not is_instance_valid(enemy) or not enemy.active:
 			continue
-		var rank: int = maxi(enemy.data.threat_rank, 1 if enemy.data.special else 0)
+		var rank: int = enemy.data.threat_rank
 		var distance := origin.distance_squared_to(enemy.position)
 		if rank > best_rank or (rank == best_rank and distance < best_distance):
 			chosen = enemy

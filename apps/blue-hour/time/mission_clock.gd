@@ -41,19 +41,25 @@ func night_elapsed() -> float:
 func threat_level() -> int:
 	return 0 if phase != NIGHT else 1 + int(night_elapsed() / settings.night_threat_seconds)
 
-func speed_multiplier() -> float:
-	if phase == DAY:
-		return 1.0
-	if phase == BLUE_HOUR:
-		return 1.12
-	return settings.night_speed_multiplier + minf(12, threat_level() - 1) * settings.threat_speed_step
+func enemy_threat_level() -> int:
+	# Preserve the HUD's zero daytime alert while using level one as the combat baseline.
+	return maxi(1, threat_level())
+
+func hp_multiplier() -> float:
+	return (1.0 + (enemy_threat_level() - 1) * settings.threat_hp_step) * settings.enemy_phase_hp[phase]
 
 func damage_multiplier() -> float:
-	return 1.0 + minf(16, threat_level()) * settings.threat_damage_step
+	return (1.0 + (enemy_threat_level() - 1) * settings.threat_damage_step) * settings.enemy_phase_damage[phase]
+
+func spawn_multiplier() -> float:
+	return settings.enemy_phase_spawn[phase]
 
 func spawn_interval() -> float:
+	var interval: float
 	if phase == DAY:
-		return settings.day_spawn_interval
-	if phase == BLUE_HOUR:
-		return settings.blue_spawn_interval
-	return maxf(settings.minimum_spawn_interval, settings.night_spawn_interval / (1.0 + threat_level() * 0.22))
+		interval = settings.day_spawn_interval
+	elif phase == BLUE_HOUR:
+		interval = settings.blue_spawn_interval
+	else:
+		interval = settings.night_spawn_interval / (1.0 + threat_level() * 0.22)
+	return maxf(settings.minimum_spawn_interval, interval / spawn_multiplier())

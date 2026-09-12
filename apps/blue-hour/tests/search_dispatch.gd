@@ -45,7 +45,7 @@ func run() -> void:
 	var entry: Vector3 = site.spec.entry
 	var worker = mission.survivors[1]
 	for i in range(3):
-		mission.survivors[i].position = entry + Vector3(0, 0, [3, 1, 5][i])
+		mission.survivors[i].position = entry + Vector3(0, 0, -[3, 1, 5][i])
 	var guard_position: Vector3 = mission.survivors[0].position
 	mission.command_search("corner")
 	await advance(2)
@@ -62,7 +62,7 @@ func run() -> void:
 	var ammo_before: int = worker.ammo
 	var guard = mission.survivors[0]
 	var guard_ammo: int = guard.ammo
-	var enemy = mission.spawn_enemy("siren", entry + Vector3(0, 0, 6.5))
+	var enemy = mission.spawn_enemy("ENM_001_infected_basic_a", entry + Vector3(0, 0, -6.5))
 	enemy.hp = 10000
 	enemy.think_left = 999
 	await advance(1)
@@ -88,12 +88,12 @@ func run() -> void:
 	for member in mission.guards():
 		member.position = entry + Vector3(15, 0, 7)
 		member.stop()
-	enemy = mission.spawn_enemy("shambler", worker.position + Vector3(0, 0, 1))
+	enemy = mission.spawn_enemy("ENM_001_infected_basic_a", worker.position + Vector3(0, 0, -.7))
 	enemy.hp = 10000
 	enemy.think_left = 0
 	var health: float = worker.hp
 	before = site.progress
-	await advance(0.4)
+	await advance(enemy.data.attack_windup + .2)
 	check(site.progress == before and not worker.searching, "Threat at the entrance freezes progress and releases the worker to defend")
 	check(enemy.hp < 10000 and worker.hp < health, "The worker actually retaliates and can take damage")
 	check(worker.visible and worker.scale == Vector3.ONE, "Searching never hides or protects a survivor inside a building")
@@ -119,7 +119,7 @@ func run() -> void:
 	check(is_equal_approx(site.progress - before, guard.talent.search_multiplier / site.spec.search_seconds), "A nearby scavenger no longer lends their trait to another searcher")
 	mission.command_recall()
 	check(mission.search_id.is_empty() and not guard.searching, "Recall cancels the task and releases its firepower")
-	enemy = mission.spawn_enemy("shambler", entry + Vector3(10, 0, 6))
+	enemy = mission.spawn_enemy("ENM_001_infected_basic_a", entry + Vector3(10, 0, 6))
 	mission.command_focus(enemy)
 	enemy.take_damage(10000)
 	await advance(0.1)

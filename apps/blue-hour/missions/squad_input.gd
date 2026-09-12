@@ -61,7 +61,7 @@ func handle(event: InputEvent) -> void:
 		return
 	pointer = event.position
 	if event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-		mission.camera.size = clampf(mission.camera.size + (-4 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 4), 35, 85)
+		mission.camera_controller.zoom(-3.0 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 3.0)
 		return
 	if event.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
 		dragging = true

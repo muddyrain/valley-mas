@@ -3,6 +3,7 @@ const Assets = preload("res://vfx/generated_assets.gd")
 const Visuals = preload("res://vfx/visuals.gd")
 const Atmosphere = preload("res://blue_hour/atmosphere.gd")
 var lamps: Array[MeshInstance3D] = []
+var lamp_materials: Array[Material] = []
 var accent_lights: Array[OmniLight3D] = []
 var bus_light: OmniLight3D
 var camera: Camera3D

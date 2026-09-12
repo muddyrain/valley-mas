@@ -53,11 +53,11 @@ func run() -> void:
 	var ids: Array = app.campaign.data.members
 	var old: String = app.campaign.data.equipment[ids[0]]
 	app.equip_member(ids[0], app.campaign.data.equipment[ids[1]])
-	check(app.campaign.data.equipment[ids[1]] == old, "Equipping an occupied weapon swaps it freely between survivors")
+	check(app.campaign.data.equipment[ids[1]] == "" and app.campaign.weapon_inventory.has_weapon(old), "Transfer has one holder and returns old weapon to stock")
 	app.debug_weapon("shotgun", "")
 	var shotgun: Dictionary = app.campaign.data.inventory.back()
 	app.equip_member(ids[2], shotgun.uid)
-	check(app.campaign.weapon(app.campaign.data.equipment[ids[2]]).id == "shotgun", "Owned fourth weapon can be equipped before departure")
+	check(app.campaign.weapon(app.campaign.data.equipment[ids[2]]).id == "WPN_005_S12_SHOTGUN", "Owned fourth weapon can be equipped before departure")
 	app.start_mission()
 	await frames(4)
 	mission = app.mission
@@ -65,10 +65,10 @@ func run() -> void:
 	mission.director_enabled = false
 	clear_enemies()
 	check(mission.survivors.size() == 3, "Three survivors actually spawn in the city")
-	check(mission.city.sites.size() == 8, "Five buildings and three vehicles exist as search targets")
+	check(mission.city.sites.size() == 18, "Fifteen buildings and three vehicles exist as search targets")
 	# Navigation test crosses a building footprint, not just an empty road.
-	place_squad(Vector3(-19, 0, 17))
-	mission.command_move(Vector3(-19, 0, -23))
+	place_squad(Vector3(-13, 0, 8))
+	mission.command_move(Vector3(-13, 0, -27))
 	var passed_solid := false
 	for i in range(480):
 		mission._physics_process(1.0 / 30.0)
@@ -78,16 +78,18 @@ func run() -> void:
 		if i % 120 == 0:
 			await process_frame
 	check(not passed_solid, "Squad movement never crosses blocked buildings or vehicles")
-	check(mission.squad_center().distance_to(Vector3(-19, 0, -23)) < 3.0, "Squad routes around the building and reaches the destination")
+	check(mission.squad_center().distance_to(Vector3(-13, 0, -27)) < 3.0, "Squad routes around the building and reaches the destination")
 	mission.command_move(Vector3(0, 0, 10))
 	await advance(0.6)
 	mission.command_stop()
+	await advance(0.4)
+	check(mission.survivors[0].path.is_empty(), "Player stop finishes its short braking phase")
 	var stopped: Vector3 = mission.survivors[0].position
 	await advance(0.5)
 	check(mission.survivors[0].position.is_equal_approx(stopped), "Stop cancels movement")
 	# Search interruption, then a real moving squad completing a vehicle.
 	mission.clock.set_phase(mission.clock.DAY)
-	place_squad(Vector3(-19, 0, 14))
+	place_squad(mission.city.sites.corner.spec.entry)
 	mission.command_search("corner")
 	await advance(2)
 	var progress: float = mission.city.sites.corner.progress
@@ -96,7 +98,7 @@ func run() -> void:
 	await advance(2)
 	check(is_equal_approx(mission.city.sites.corner.progress, progress), "Recall preserves incomplete search progress")
 	mission.command_search("corner")
-	var blocker = mission.spawn_enemy("siren", Vector3(-19, 0, 14))
+	var blocker = mission.spawn_enemy("ENM_001_infected_basic_a", mission.city.sites.corner.spec.entry)
 	for member in mission.survivors:
 		member.cooldown = 10
 	await advance(0.25)
@@ -130,7 +132,7 @@ func run() -> void:
 		member.cooldown = 99
 	var shooter = mission.survivors[0]
 	shooter.equip(mission.catalog.by_id(mission.catalog.weapons, "pistol"))
-	var enemy = mission.spawn_enemy("siren", Vector3(-1, 0, -5))
+	var enemy = mission.spawn_enemy("ENM_001_infected_basic_a", Vector3(-1, 0, -5))
 	enemy.think_left = 99
 	var before: float = enemy.hp
 	await advance(0.05)
@@ -138,7 +140,7 @@ func run() -> void:
 	clear_enemies()
 	# Weapons share the same system, with true range, magazine and cone differences.
 	shooter.equip(mission.catalog.by_id(mission.catalog.weapons, "crowbar"))
-	enemy = mission.spawn_enemy("siren", Vector3(-1, 0, -6))
+	enemy = mission.spawn_enemy("ENM_001_infected_basic_a", Vector3(-1, 0, -6))
 	enemy.think_left = 99
 	await advance(0.1)
 	check(enemy.hp == enemy.data.max_hp, "Melee cannot hit a distant target")
@@ -148,16 +150,19 @@ func run() -> void:
 	clear_enemies()
 	shooter.equip(mission.catalog.by_id(mission.catalog.weapons, "shotgun"))
 	var targets: Array[Node3D] = []
-	for x in [-0.8, 0.0, 0.8]:
-		var target = mission.spawn_enemy("siren", shooter.position + Vector3(x, 0, -4))
+	shooter.combat.rng.seed = 10
+	shooter.position = Vector3(0, 0, 10)
+	for x in [-0.65, 0.0, 0.65]:
+		var target = mission.spawn_enemy("ENM_001_infected_basic_a", shooter.position + Vector3(x, 0, -3))
+		target.position = shooter.position + Vector3(x, 0, -3)
 		target.think_left = 99
 		targets.append(target)
 	await advance(0.05)
-	check(targets.all(func(target): return target.hp < target.data.max_hp), "Shotgun damages multiple enemies in its cone")
+	check(targets.filter(func(target): return target.hp < target.data.max_hp).size() >= 2 and shooter.combat.last_pellets.size() == 7, "Shotgun emits seven pellets and can hit multiple enemies")
 	clear_enemies()
 	shooter.equip(mission.catalog.by_id(mission.catalog.weapons, "smg"))
 	shooter.ammo = 0
-	enemy = mission.spawn_enemy("siren", shooter.position + Vector3(0, 0, -5))
+	enemy = mission.spawn_enemy("ENM_001_infected_basic_a", shooter.position + Vector3(0, 0, -5))
 	enemy.think_left = 99
 	await advance(0.05)
 	check(shooter.reload_left > 0, "Empty magazine starts automatic reload")
@@ -165,7 +170,7 @@ func run() -> void:
 	check(shooter.ammo > 0 and shooter.ammo < shooter.weapon.magazine, "Reload completes and firing resumes")
 	clear_enemies()
 	# Focus must move melee members into range and remove stale targets after kills.
-	enemy = mission.spawn_enemy("shambler", Vector3(0, 0, -10))
+	enemy = mission.spawn_enemy("ENM_001_infected_basic_a", Vector3(0, 0, -10))
 	mission.command_focus(enemy)
 	check(mission.focus_target == enemy, "Focus order selects a specific enemy")
 	mission._update_focus(0.7)
@@ -174,14 +179,8 @@ func run() -> void:
 	await advance(0.05)
 	check(mission.focus_target == null and enemy in mission.enemy_pool, "Dead focus target is cleared and enemy goes back to the pool")
 	var pooled: Array = mission.enemy_pool.duplicate()
-	var reused = mission.spawn_enemy("shambler", Vector3(20, 0, 20))
+	var reused = mission.spawn_enemy("ENM_001_infected_basic_a", Vector3(20, 0, 20))
 	check(reused in pooled and reused.hp == reused.data.max_hp and reused.active, "Enemy pool reactivates a clean unit")
-	clear_enemies()
-	# The special enemy causes additional pressure through a distinct behavior.
-	var siren = mission.spawn_enemy("siren", Vector3(0, 0, -8))
-	var enemy_count: int = mission.enemies.size()
-	mission.raise_alarm(siren)
-	check(mission.enemies.size() == enemy_count + siren.data.alarm_count, "Siren summons reinforcements")
 	clear_enemies()
 	mission.clock.set_phase(mission.clock.NIGHT)
 	mission.director_enabled = true
@@ -189,8 +188,9 @@ func run() -> void:
 	mission.spawn_left = 0
 	await advance(60)
 	check(mission.clock.threat_level() >= 3 and mission.enemies.size() > 0, "Night director escalates over elapsed time")
+	check(mission.enemies.all(func(actor): return actor.data.id == "ENM_001_infected_basic_a"), "Night director only spawns the formal common infected")
 	for i in range(mission.catalog.map.enemy_limit + 10):
-		mission.spawn_enemy("hound", Vector3(25, 0, 25))
+		mission.spawn_enemy("ENM_001_infected_basic_a", Vector3(25, 0, 25))
 	check(mission.enemies.size() <= mission.catalog.map.enemy_limit, "Enemy population remains bounded")
 	mission.director_enabled = false
 	clear_enemies()
@@ -199,9 +199,9 @@ func run() -> void:
 	check(app.hud.debug_menu.visible and mission.time_scale == 0, "F1 menu pauses the mission while configuring it")
 	var frozen_time: float = mission.clock.elapsed
 	var frozen_hp: float = mission.survivors[0].hp
-	var debug_enemy = mission.spawn_enemy("siren", mission.survivors[0].position)
+	var debug_enemy = mission.spawn_enemy("ENM_001_infected_basic_a", mission.survivors[0].position)
 	await advance(2.0)
-	check(mission.clock.elapsed == frozen_time and mission.survivors[0].hp == frozen_hp and debug_enemy.hp == debug_enemy.data.max_hp, "Paused simulation cannot move time or attack")
+	check(mission.clock.elapsed == frozen_time and mission.survivors[0].hp == frozen_hp and debug_enemy.hp == debug_enemy.max_hp, "Paused simulation cannot move time or attack")
 	clear_enemies()
 	app.hud.toggle_debug()
 	check(not app.hud.debug_menu.visible and mission.time_scale == 1, "Closing debug resumes the selected speed")
@@ -215,7 +215,8 @@ func run() -> void:
 	mission.command_stop()
 	check(not mission.extraction, "Stop cancels extraction preparation")
 	mission.command_extract()
-	await advance(30)
+	# The southern return point now requires a longer real route from the remote member.
+	await advance(70)
 	check(app.state == "result" and not mission.active, "All survivors board after prep and door closing, reaching settlement")
 	check(app.result.returned.size() == 3 and app.result.lost.is_empty(), "Full squad return is reported accurately")
 	check(app.campaign.data.status == "pending" and app.campaign.preview().total >= 12, "Returning loot is staged before food settlement")

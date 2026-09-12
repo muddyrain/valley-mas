@@ -39,7 +39,7 @@ func run() -> void:
 			gallery.focus_category(category)
 			await frames(3)
 			await capture(category + ("-day" if mode == 0 else "-blue-hour"))
-		check(gallery.atmosphere.environment.background_color.is_equal_approx(Color("#344D69") if mode==1 else Color("#748f9c")), "Shared phase palette in native showcase")
+		check(gallery.atmosphere.environment.background_color.is_equal_approx(Color("#344D69") if mode==1 else Color("#859d9f")), "Shared phase palette in native showcase")
 	# Exercise the actual input handler as well as the capture controls.
 	var event := InputEventKey.new()
 	event.keycode = KEY_TAB

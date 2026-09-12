@@ -37,6 +37,9 @@ func run() -> void:
 		for speed: float in [0.0, 1.3, 4.2, 1.3, 0.0]:
 			context.speed = speed
 			member.path = PackedVector3Array([member.position + Vector3(0, 0, -100)]) if speed > 0 else PackedVector3Array()
+			# Measure steady travel after the acceleration/deceleration ramp.
+			for frame in 60:
+				member.tick(dt, context)
 			var start: Vector3 = member.position
 			for frame in 60:
 				member.tick(dt, context)

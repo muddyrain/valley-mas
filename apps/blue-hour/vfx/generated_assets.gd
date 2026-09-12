@@ -18,6 +18,13 @@ static func spawn(id: String, parent: Node3D, position: Vector3 = Vector3.ZERO, 
 	if not collision:
 		for body in instance.find_children("*", "CollisionObject3D", true, false):
 			body.free()
+	# User-supplied textured assets retain their own material; generated palette
+	# names are shared only inside the procedural kit.
+	if not catalog()[id].get("procedural", true):
+		parent.add_child(instance)
+		instance.position = position
+		instance.rotation.y = yaw
+		return instance
 	for view in instance.find_children("*", "MeshInstance3D", true, false):
 		for surface in range(view.mesh.get_surface_count()):
 			var mat: Material = view.get_active_material(surface)

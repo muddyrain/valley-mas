@@ -20,21 +20,25 @@ func run() -> void:
 	root.add_child(city)
 	city.build(catalog.map)
 	await physics_frame
-	check(city.sites.size() == 8, "Existing five buildings and three vehicles retained")
+	check(city.sites.size() == 18, "Fifteen formal buildings and three searchable vehicles integrated")
 	for spec in catalog.map.buildings + catalog.map.vehicles:
 		check(city.sites.has(spec.id), "Search ID retained: " + spec.id)
 		check(city.sites[spec.id].spec == spec, "Search data retained: " + spec.id)
-		check(city.sites[spec.id].body.has_meta("art_asset"), "Generated site visual: " + spec.id)
+		check(city.sites[spec.id].body.has_meta("world_asset"), "Runtime wrapper visual: " + spec.id)
 		check(not city.grid.is_point_solid(city.cell_at(spec.entry)), "Entrance not blocked: " + spec.id)
 		var outward: PackedVector3Array = city.path(catalog.map.bus_position, spec.entry)
 		var homeward: PackedVector3Array = city.path(spec.entry, catalog.map.bus_position)
 		check(not outward.is_empty() and outward[-1].distance_to(spec.entry) < .01, "Exact entrance reachable: " + spec.id)
 		check(not homeward.is_empty() and homeward[-1].distance_to(catalog.map.bus_position) < .01, "Return path available: " + spec.id)
-		var ray := PhysicsRayQueryParameters3D.create(spec.position+Vector3.UP*20, spec.position-Vector3.UP, 1)
+		var solid: Vector3 = city.sites[spec.id].body.get_node("Collision/Shape0").global_position
+		var ray := PhysicsRayQueryParameters3D.create(solid+Vector3.UP*20, solid-Vector3.UP*20, 1)
 		var hit: Dictionary = city.get_world_3d().direct_space_state.intersect_ray(ray)
 		check(not hit.is_empty() and hit.collider.get_meta("site_id", "") == spec.id, "Building / vehicle body retains search picking: " + spec.id)
-	check(city.bus_door is MeshInstance3D and String(city.bus_door.name).contains("BH_EvacBus_01"), "Bus uses imported independent door")
-	check(city.lamps.size() >= 15, "Imported lights participate in existing day/night presentation")
+	var vehicle := city.get_node("BlueHourVehicle") as Node3D
+	check(vehicle.scene_file_path == "res://scenes/world/vehicles/veh_blue_hour.tscn", "Expedition uses the shared Blue Hour vehicle scene")
+	check(city.bus_door is Marker3D, "Fused source mesh preserves the independent door timing target")
+	check(vehicle.get_node("Visual/Model").scene_file_path == "res://assets/world/vehicles/VEH_BLUE_HOUR.glb", "Vehicle uses the formal source model")
+	check(city.lamps.size() >= 12, "Wrapper lights participate in existing day/night presentation")
 	check(city.accent_lights.size() == 4, "Street lighting stays within four shadow-free accents")
 	check(is_equal_approx(city.bus_door.position.x + .8, float(city.bus_door.get_meta("closed_x"))), "Door starts open for the existing closing tween")
 	for body in city.find_children("*", "CollisionObject3D", true, false):

@@ -143,9 +143,9 @@ func aim_checks() -> void:
 	check(gunner.position == origin and gunner.path.is_empty(), "Direct aim stops guards immediately without chasing")
 	check(gunner.ammo < ammo, "Aiming into empty space consumes ammunition")
 	check(world.search_task == task and world.city.sites.corner.progress > before, "Direct aim leaves the independent search running")
-	var front = world.spawn_enemy("shambler", Vector3(0, 0, 7))
-	var side = world.spawn_enemy("shambler", Vector3(4, 0, 12))
-	var far = world.spawn_enemy("shambler", Vector3(0, 0, -12))
+	var front = world.spawn_enemy("ENM_001_infected_basic_a", Vector3(0, 0, 7))
+	var side = world.spawn_enemy("ENM_001_infected_basic_a", Vector3(4, 0, 12))
+	var far = world.spawn_enemy("ENM_001_infected_basic_a", Vector3(0, 0, -12))
 	for enemy in [front, side, far]:
 		enemy.hp = 10000
 	gunner.cooldown = 0
@@ -161,26 +161,29 @@ func aim_checks() -> void:
 	gunner.tick(gunner.weapon.reload_seconds + 0.01, world)
 	check(gunner.ammo == gunner.weapon.magazine - 1, "Reload refills and resumes directed fire")
 	world.debug_clear_enemies()
-	var close = world.spawn_enemy("shambler", melee.position + Vector3(0, 0, -1))
+	var close = world.spawn_enemy("ENM_001_infected_basic_a", melee.position + Vector3(0, 0, -1))
 	close.hp = 10000
 	melee.tick(0.01, world)
 	check(close.hp < 10000 and melee.position == Vector3(0, 0, 22), "Melee defends nearby while aiming without chasing the pointer")
 	world.debug_clear_enemies()
 	gunner.equip(world.catalog.by_id(world.catalog.weapons, "shotgun"))
+	gunner.combat.rng.seed = 10
 	var spread: Array = []
-	for x in [-1, 0, 1]:
-		var enemy = world.spawn_enemy("shambler", Vector3(x, 0, 8))
+	for x in [-0.65, 0, 0.65]:
+		var enemy = world.spawn_enemy("ENM_001_infected_basic_a", Vector3(x, 0, 8))
 		enemy.position = Vector3(x, 0, 8)
 		enemy.hp = 10000
 		spread.append(enemy)
 	gunner.tick(0.01, world)
-	check(spread.all(func(enemy): return enemy.hp < 10000), "Directed shotgun uses its configured cone and multiple-target count")
+	check(spread.filter(func(enemy): return enemy.hp < 10000).size() >= 2 and gunner.combat.last_pellets.size() == 7, "Directed shotgun uses seven independent pellet rays")
 	gunner.equip(world.catalog.by_id(world.catalog.weapons, "pistol"))
 	world.debug_clear_enemies()
 	# Aim through the center of a solid building, within pistol range.
-	gunner.position = Vector3(-17, 0, 6)
-	var covered = world.spawn_enemy("shambler", Vector3(-17, 0, -2))
-	covered.position = Vector3(-17, 0, -2)
+	var cover: Dictionary = world.city.sites.corner.spec
+	gunner.position = Vector3(cover.position.x, 0, floorf(cover.position.z - cover.size.z * .5) - 1)
+	var covered_at := Vector3(cover.position.x, 0, ceilf(cover.position.z + cover.size.z * .5) + 1)
+	var covered = world.spawn_enemy("ENM_001_infected_basic_a", covered_at)
+	covered.position = covered_at
 	covered.hp = 10000
 	check(not world.city.line_clear(gunner.position, covered.position), "Cover fixture crosses a solid building")
 	world.command_aim(covered.position)

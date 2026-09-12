@@ -1,0 +1,76 @@
+{
+  "purpose": "Expedition HUD v2: native renderings of existing supplied character models and original geometric interface symbols",
+  "engine": "Godot 4.7.2 Compatibility",
+  "portraits": [
+    {
+      "template_id": "xia_zhiyao",
+      "source": "assets/characters/xia_zhiyao/model/character_xia_zhiyao_model.glb",
+      "source_sha256": "f0847a6373f2d8dc9c7388371560906b47296f7e5de9d979b02bfabcd2b59cd1",
+      "file": "portraits/portrait_xia_zhiyao.png",
+      "sha256": "a3a4090678eb9feb013db134adc451c48175d2d65142bd6e2918bf5e2dd78bfc",
+      "size": [192, 192],
+      "method": "art/capture_expedition_portraits.gd; unchanged model, transparent native SubViewport; front camera (0.1,1.45,3), target (0,1.29,0), ortho 0.72",
+      "status": "Derived portrait from supplied 3D model; independent Expedition portrait illustration not supplied"
+    },
+    {
+      "template_id": "su_wanxing",
+      "source": "assets/characters/su_wanxing/model/character_su_wanxing_model.glb",
+      "source_sha256": "e7fee63586e6abd9a979de8c968d60772d25b913799459934bb6b4ec3f664b4a",
+      "file": "portraits/portrait_su_wanxing.png",
+      "sha256": "3b066af0afa895e6ca802f311fe2dc9dd709f066895799c63640b8f8c25e9581",
+      "size": [192, 192],
+      "method": "art/capture_expedition_portraits.gd; unchanged model, transparent native SubViewport; front camera (0.1,1.45,3), target (0,1.29,0), ortho 0.72",
+      "status": "Derived portrait from supplied 3D model; independent Expedition portrait illustration not supplied"
+    }
+  ],
+  "icons": [
+    {
+      "file": "icons/focus.svg",
+      "source": "Original geometric line drawing for Blue Hour HUD v2",
+      "size": [40, 40],
+      "sha256": "76456e648030b51d9f3bc6a24ad515d1cf81db5a114e623254a6a16840fcd1e2"
+    },
+    {
+      "file": "icons/food.svg",
+      "source": "Original geometric line drawing for Blue Hour HUD v2",
+      "size": [40, 40],
+      "sha256": "636c320ad3132ca06daecebbeff8bf166a1180364c0537432707d392af3c7ba4"
+    },
+    {
+      "file": "icons/gear.svg",
+      "source": "Original geometric line drawing for Blue Hour HUD v2",
+      "size": [40, 40],
+      "sha256": "cfdf4d09e4803a7dd250f3881958499a77b6ed337c7971829c77f228ddea17ea"
+    },
+    {
+      "file": "icons/locate.svg",
+      "source": "Original geometric line drawing for Blue Hour HUD v2",
+      "size": [40, 40],
+      "sha256": "eedd32f8a2af0465754ffab947a2bb37e64c9241443d0d4f5429a46b8de2b269"
+    },
+    {
+      "file": "icons/rally.svg",
+      "source": "Original geometric line drawing for Blue Hour HUD v2",
+      "size": [40, 40],
+      "sha256": "4526cc86bae63ca7be07963dc6d5a901a7e1dab1b9c50cbc990f3f4f93f19893"
+    },
+    {
+      "file": "icons/return.svg",
+      "source": "Original geometric line drawing for Blue Hour HUD v2",
+      "size": [40, 40],
+      "sha256": "66f01178870775dedb130178dad9a3e8fea3557462cceb22d2f0e7c1e63adc27"
+    },
+    {
+      "file": "icons/scrap.svg",
+      "source": "Original geometric line drawing for Blue Hour HUD v2",
+      "size": [40, 40],
+      "sha256": "b24d506e806ce1959525eac76ab8bcff2fa59157646dc97f22523352c321a8b2"
+    },
+    {
+      "file": "icons/stop.svg",
+      "source": "Original geometric line drawing for Blue Hour HUD v2",
+      "size": [40, 40],
+      "sha256": "c783667f5485c3acc34036f976c9439e2dcba051fde9310e5a0b08596056384e"
+    }
+  ]
+}

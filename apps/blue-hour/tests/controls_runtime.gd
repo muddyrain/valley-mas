@@ -36,10 +36,16 @@ func run() -> void:
 	root.add_child(InputGate.new())
 	await frames(12)
 	await click_button("整装出发")
+	await click_button("商业街")
+	await click_button("确认出发")
 	var mission = app.mission
 	mission.director_enabled = false
 	mission.debug_clear_enemies()
 	await frames(12)
+	# This input regression uses fixed world targets; tracking has its own visual tests.
+	# Frame that test area at the production 25 zoom, so its entrance is below the clock.
+	mission.camera_center = Vector3(0, 0, 9)
+	mission.pan_camera(Vector2.ZERO)
 	var first: Vector2 = mission.camera.unproject_position(Vector3(0, 0, 10))
 	var second: Vector2 = mission.camera.unproject_position(Vector3(4, 0, 8))
 	await mouse(first)
@@ -62,8 +68,8 @@ func run() -> void:
 	await wait_seconds(0.15)
 	check(mission.search_tasks.has("corner") and not mission.controls.following and mission.rally_point == rally, "Dragging from an entrance preserves search without starting follow")
 	await mouse_button(second, MOUSE_BUTTON_LEFT, false)
-	await click(app.hud.site_buttons.van_south.get_global_rect().get_center())
-	await click(app.hud.site_buttons.garage.get_global_rect().get_center())
+	await click_site("van_south")
+	await click_site("garage")
 	check(mission.search_tasks.size() == 3 and mission.guards().is_empty(), "Actual site buttons dispatch three independent workers")
 	for id in mission.search_tasks:
 		mission.search_tasks[id].worker.position = mission.city.sites[id].spec.entry
@@ -74,7 +80,7 @@ func run() -> void:
 	var canceled = mission.search_tasks.corner.worker
 	await click(entry)
 	check(mission.search_tasks.size() == 2 and not mission.search_tasks.has("corner"), "Clicking a busy world entrance cancels only that search")
-	await click(app.hud.site_buttons.van_south.get_global_rect().get_center())
+	await click_site("van_south")
 	check(mission.search_tasks.size() == 2 and mission.search_id == "van_south", "Sidebar inspection does not cancel an active task")
 	await click(app.hud.assign_buttons[mission.survivors.find(canceled)].get_global_rect().get_center())
 	check(mission.search_tasks.van_south.worker == canceled, "Actual selected-task action reassigns to a free survivor")
@@ -98,6 +104,12 @@ func run() -> void:
 	await held_key(KEY_CTRL, false)
 	await mouse(first)
 	check(not mission.controls.aiming and not mission.manual_aim, "Ctrl release over UI clears aim without a stuck input")
+	var focus_enemy: Node3D = mission.spawn_enemy("ENM_001_infected_basic_a", Vector3(0, 0, 8))
+	await key(KEY_F)
+	check(mission.focus_target == focus_enemy, "F still selects the nearest real enemy")
+	await wait_seconds(.2)
+	await capture("hud-v2-combat")
+	mission.debug_clear_enemies()
 	var center: Vector3 = mission.camera_center
 	await held_key(KEY_W, true)
 	await wait_seconds(0.15)
@@ -115,6 +127,9 @@ func run() -> void:
 	await mouse(first + Vector2(60, 30), Vector2(60, 30))
 	await mouse_button(ui_point, MOUSE_BUTTON_RIGHT, false)
 	check(mission.camera_center.distance_to(center) > 1 and mission.rally_point == rally and not mission.controls.dragging, "Right drag pans without moving the squad and releases over UI")
+	await click(app.hud.command_buttons["定位"].get_global_rect().get_center())
+	check(mission.camera_controller.following, "Actual Locate icon restores squad follow after manual pan")
+	mission.pan_camera(Vector2.ZERO)
 	var zoom: float = mission.camera.size
 	await mouse(first)
 	await mouse_button(first, MOUSE_BUTTON_WHEEL_UP, true)
@@ -157,9 +172,10 @@ func run() -> void:
 	for id in ["corner", "van_south", "garage"]:
 		mission.command_search(id)
 	await frames(15)
-	var panel_end: float = app.hud.rally_button.get_global_rect().end.y
-	check(panel_end < app.hud.extract_button.get_global_rect().position.y, "Three task cards stay clear of bottom commands at the minimum window size")
+	var squad_rect: Rect2 = app.hud.squad_panel.get_global_rect()
+	check(root.get_visible_rect().encloses(squad_rect) and not squad_rect.intersects(app.hud.extract_button.get_global_rect()), "Three task cards fit the viewport and stay clear of return command at minimum size")
 	for id in mission.search_tasks:
+		await reveal_site(id)
 		check(app.hud.site_buttons[id].get_global_rect().end.y < app.hud.extract_button.get_global_rect().position.y, "Active site fits above the command bar: " + id)
 	await capture("24-parallel-small-window")
 	var report := FileAccess.open("res://test-output/controls-runtime.json", FileAccess.WRITE)

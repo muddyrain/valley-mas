@@ -65,11 +65,31 @@ func click_button(text: String) -> void:
 	if target:
 		await click(target.get_global_rect().get_center())
 	await frames(4)
+	await wait_for_departure()
+
+func wait_for_departure() -> void:
+	await wait_until(func(): return app.state != "departure", 45)
+	check(app.state != "departure", "Departure completes before mission controls")
+	if app.state == "mission":
+		await wait_seconds(0.3)
 
 func capture(id: String) -> void:
 	await RenderingServer.frame_post_draw
 	var path := "res://test-output/" + id + ".png"
 	check(root.get_texture().get_image().save_png(path) == OK, "Native viewport captured: " + id)
+
+func reveal_site(id: String) -> void:
+	app.hud.set_objectives_expanded(true)
+	await frames(4)
+	var target: Button = app.hud.site_buttons[id]
+	var scroll := target.get_parent().get_parent() as ScrollContainer
+	scroll.ensure_control_visible(target)
+	await frames(4)
+	check(scroll.get_global_rect().encloses(target.get_global_rect()), "Scrolled site is fully reachable: " + id)
+
+func click_site(id: String) -> void:
+	await reveal_site(id)
+	await click(app.hud.site_buttons[id].get_global_rect().get_center())
 
 func run() -> void:
 	create_timer(100).timeout.connect(func(): printerr("RUNTIME TIMEOUT"); quit(2))
@@ -83,6 +103,8 @@ func run() -> void:
 	await frames(12)
 	await capture("01-safehouse")
 	await click_button("整装出发")
+	await click_button("商业街")
+	await click_button("确认出发")
 	check(app.state == "mission", "Real button input launches the 3D scene")
 	if app.state != "mission":
 		quit(1)
@@ -93,13 +115,15 @@ func run() -> void:
 	await frames(20)
 	await capture("02-day")
 	mission.debug_clear_enemies()
-	var destination := Vector3(0, 0, 9)
+	var destination: Vector3 = mission.catalog.map.bus_position + Vector3(0, 0, -7)
 	var screen_point: Vector2 = mission.camera.unproject_position(destination)
 	await click(screen_point)
 	await wait_seconds(3.6)
 	check(mission.squad_center().distance_to(destination) < 3.0, "Mouse ray on ground moves the squad to the clicked position")
 	await key(KEY_X)
 	check(mission.order.begins_with("停止"), "X key stops movement")
+	mission.camera_center = mission.city.sites.corner.spec.entry + Vector3(0,0,7)
+	mission.pan_camera(Vector2.ZERO)
 	await click(mission.camera.unproject_position(mission.city.sites.corner.spec.entry + Vector3.UP))
 	check(mission.search_id == "corner", "Mouse ray on an entrance starts building search")
 	await key(KEY_X)
@@ -119,11 +143,11 @@ func run() -> void:
 	if worker != null:
 		mission.time_scale = 1
 		mission.invincible = false
-		var blocker = mission.spawn_enemy("shambler", worker.position + Vector3(0, 0, 1))
+		var blocker = mission.spawn_enemy("ENM_001_infected_basic_a", worker.position + Vector3(0, 0, 0.8))
 		blocker.hp = 500
 		var previous_hp: float = worker.hp
 		await wait_until(func(): return worker.hp < previous_hp, 3)
-		await wait_seconds(0.2)
+		await wait_seconds(0.8)
 		check(worker.hp < previous_hp and not worker.searching, "Live entrance combat damages the visible worker and interrupts search")
 		check(app.hud.task_label.text.contains("自卫"), "The HUD explains the worker's current interruption")
 		await capture("11-defend")
@@ -131,28 +155,29 @@ func run() -> void:
 	mission.invincible = true
 	await click(app.hud.recall_button.get_global_rect().get_center())
 	check(mission.search_id.is_empty(), "Actual recall button releases the search assignment")
-	var enemy = mission.spawn_enemy("siren", Vector3(0, 0, 0))
+	mission.center_squad()
+	var enemy = mission.spawn_enemy("ENM_001_infected_basic_a", mission.city.nearest_open(mission.squad_center() + Vector3(0,0,-4)))
 	enemy.hp = 1000
 	await frames(3)
 	await click(mission.camera.unproject_position(enemy.position + Vector3.UP))
 	check(mission.focus_target == enemy, "Mouse ray selects an enemy for focus fire")
 	mission.debug_clear_enemies()
-	await click(app.hud.site_buttons.van_south.get_global_rect().get_center())
+	await click_site("van_south")
 	check(mission.search_id == "van_south", "Search list button issues a vehicle search order")
 	mission.time_scale = 4
 	await wait_until(func(): return mission.city.sites.van_south.searched, 15)
 	await frames(3)
-	check(mission.city.sites.van_south.searched and mission.ledger.food == 1, "Vehicle search completes through live physics with actual loot")
+	check(mission.city.sites.van_south.searched and mission.ledger.food == mission.city.sites.van_south.spec.food, "Vehicle search completes through live physics with actual loot")
 	mission.time_scale = 1
 	await key(KEY_F1)
 	check(app.hud.debug_menu.visible and mission.time_scale == 0, "F1 opens debug menu through real key input")
 	await click_button("+10 食物")
 	await click_button("+20 废料")
-	check(mission.ledger.food == 11 and mission.ledger.scrap == 24, "Debug resource buttons update the actual inventory")
+	check(mission.ledger.food == mission.city.sites.van_south.spec.food + 10 and mission.ledger.scrap == mission.city.sites.van_south.spec.scrap + 20, "Debug resource buttons update the actual inventory")
 	await click_button("给予选定武器")
-	check(mission.survivors[0].weapon.id == "pistol", "Debug weapon button equips the selected survivor")
-	await click_button("夜犬")
-	check(mission.enemies.any(func(value): return value.data.id == "hound"), "Debug enemy button spawns the selected type")
+	check(mission.survivors[0].weapon.id == mission.catalog.weapons[0].id, "Debug weapon button equips its default selected definition")
+	await click_button("普通感染者")
+	check(mission.enemies.any(func(value): return value.data.id == "ENM_001_infected_basic_a"), "Debug enemy button spawns the selected type")
 	await click_button("清除敌人")
 	await click_button("BLUE HOUR")
 	check(mission.clock.phase == 1, "Debug can switch directly to BLUE HOUR")
@@ -183,12 +208,14 @@ func run() -> void:
 	var depart := button("整装出发")
 	check(depart != null and root.get_visible_rect().encloses(depart.get_global_rect()), "Primary action fits the minimum supported window")
 	await click_button("整装出发")
+	await click_button("商业街")
+	await click_button("确认出发")
 	await frames(12)
 	check(root.get_visible_rect().encloses(app.hud.extract_button.get_global_rect()), "Evacuation action fits the minimum mission window")
 	await capture("09-small-mission")
 	app.mission.director_enabled = false
 	app.mission.debug_clear_enemies()
-	await click(app.hud.site_buttons.van_south.get_global_rect().get_center())
+	await click_site("van_south")
 	await wait_seconds(0.2)
 	check(root.get_visible_rect().encloses(app.hud.recall_button.get_global_rect()), "Recall remains inside the minimum supported viewport")
 	for assign in app.hud.assign_buttons:
