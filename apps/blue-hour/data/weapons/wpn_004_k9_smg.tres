@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "WPN_004_K9_SMG"
+display_name = "K9 冲锋枪"
+description = "近中距离高频自动火力。"
+weapon_type = 2
+icon_path = "res://assets/weapons/icons/wpn_004_k9_smg.png"
+model_path = ""
+damage = 7.0
+attack_rate = 6.5
+range = 12
+magazine_size = 30
+reload_time = 1.8
+accuracy = 0.76
+move_speed_modifier = -0.02
+pellet_count = 1
+spread_angle = 20.0
+penetration = 0
+penetration_damage_multiplier = 0.6
+knockback = 0
+animation_profile = 2
+rarity = 0
+tags = Array[String](["ranged"])

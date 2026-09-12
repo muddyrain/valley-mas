@@ -1,0 +1,50 @@
+{
+  "wpn_001_survival_knife": {
+    "triangles": 848,
+    "materials": [
+      "BH_Metal_Dark",
+      "BH_Metal_Mid",
+      "BH_Plastic_Dark",
+      "BH_Weapon_Blue",
+      "BH_Weapon_Steel"
+    ],
+    "collision_proxies": 0,
+    "bounds_min": [-0.0215, -0.0375, -0.25954],
+    "bounds_max": [0.0215, 0.0375, 0.081],
+    "dimensions": [0.043, 0.075, 0.34054],
+    "geometry_hash": "924755a23701667d99354ad1d5cd67440d90981b5f04d67a2a33032a91706bf6",
+    "sha256": "7b7ed1b0df83965e3fe9fca30efe3157ab2becfbeeba59c5c8b341bc9ff2318e",
+    "bytes": 52864,
+    "path": "assets/weapons/models/wpn_001_survival_knife.glb"
+  },
+  "wpn_002_p9_pistol": {
+    "triangles": 1520,
+    "materials": [
+      "BH_Metal_Dark",
+      "BH_Metal_Mid",
+      "BH_Plastic_Dark",
+      "BH_Weapon_Blue",
+      "BH_Weapon_Steel"
+    ],
+    "collision_proxies": 0,
+    "bounds_min": [-0.0204, -0.1114, -0.1468],
+    "bounds_max": [0.0216, 0.1504, 0.09428],
+    "dimensions": [0.042, 0.2618, 0.24108],
+    "geometry_hash": "eb1a15dc92bf6eb4d0c3dab25238ff2ea4f61068fd70fef539ee4e7588125cd7",
+    "sha256": "c7e044e4564242318b84c20112aa670f78a0d5ac2bbdf6b00b4dd3b644c417fb",
+    "bytes": 90148,
+    "path": "assets/weapons/models/wpn_002_p9_pistol.glb"
+  },
+  "wpn_006_a21_assault_rifle": {
+    "triangles": 2524,
+    "materials": ["BH_Metal_Dark", "BH_Metal_Mid", "BH_Plastic_Dark", "BH_Weapon_Blue"],
+    "collision_proxies": 0,
+    "bounds_min": [-0.0332, -0.1592, -0.4788],
+    "bounds_max": [0.0332, 0.1612, 0.3028],
+    "dimensions": [0.0664, 0.3204, 0.7816],
+    "geometry_hash": "93cffd864e0939a9937fc80bfc5c4c421fcd17067b57249ddeda2ff21cb936cd",
+    "sha256": "9f4fc4e95b0a21cc8c2ba0b2873bd71bd860300323fed173f282468045d88dce",
+    "bytes": 147424,
+    "path": "assets/weapons/models/wpn_006_a21_assault_rifle.glb"
+  }
+}

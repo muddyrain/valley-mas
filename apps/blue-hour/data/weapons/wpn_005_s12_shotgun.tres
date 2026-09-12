@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "WPN_005_S12_SHOTGUN"
+display_name = "S12 泵动霰弹枪"
+description = "7 弹丸 / 散射 / 高击退。"
+weapon_type = 2
+icon_path = "res://assets/weapons/icons/wpn_005_s12_shotgun.png"
+model_path = ""
+damage = 7.0
+attack_rate = 0.9
+range = 8
+magazine_size = 6
+reload_time = 2.6
+accuracy = 0.7
+move_speed_modifier = -0.04
+pellet_count = 7
+spread_angle = 24.0
+penetration = 0
+penetration_damage_multiplier = 0.6
+knockback = 3
+animation_profile = 2
+rarity = 0
+tags = Array[String](["shotgun_spread"])

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "WPN_006_A21_ASSAULT_RIFLE"
+display_name = "A21 突击步枪"
+description = "中距离万能主战武器。"
+weapon_type = 2
+icon_path = "res://assets/weapons/icons/wpn_006_a21_assault_rifle.png"
+model_path = "res://assets/weapons/models/wpn_006_a21_assault_rifle.glb"
+damage = 13.0
+attack_rate = 4.5
+range = 18
+magazine_size = 30
+reload_time = 2.0
+accuracy = 0.85
+move_speed_modifier = -0.04
+pellet_count = 1
+spread_angle = 20.0
+penetration = 0
+penetration_damage_multiplier = 0.6
+knockback = 0
+animation_profile = 2
+rarity = 0
+tags = Array[String](["ranged"])

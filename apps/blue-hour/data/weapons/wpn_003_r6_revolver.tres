@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "WPN_003_R6_REVOLVER"
+display_name = "R6 左轮手枪"
+description = "低射速，高单发伤害。"
+weapon_type = 1
+icon_path = "res://assets/weapons/icons/wpn_003_r6_revolver.png"
+model_path = ""
+damage = 34.0
+attack_rate = 1.15
+range = 15
+magazine_size = 6
+reload_time = 2.1
+accuracy = 0.92
+move_speed_modifier = 0.00
+pellet_count = 1
+spread_angle = 20.0
+penetration = 0
+penetration_damage_multiplier = 0.6
+knockback = 2
+animation_profile = 1
+rarity = 0
+tags = Array[String](["ranged"])

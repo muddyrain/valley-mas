@@ -1,0 +1,55 @@
+{
+  "source_archive": "blue_hour_homeward_weapon_icons_200.zip",
+  "provided_by": "user",
+  "processing": "Original PNG bytes copied; no edits or recoloring",
+  "icons": [
+    {
+      "path": "assets/weapons/icons/wpn_001_survival_knife.png",
+      "width": 200,
+      "height": 200,
+      "sha256": "ab120d4ae100c175f09806ce38ad52c461c0467401ecc3d375194751b7d3446f"
+    },
+    {
+      "path": "assets/weapons/icons/wpn_002_p9_pistol.png",
+      "width": 200,
+      "height": 200,
+      "sha256": "cac19e16f5b678cd122b830157fa1d83030d54533e8d4c0ebf0c1b518e2ffcd7"
+    },
+    {
+      "path": "assets/weapons/icons/wpn_003_r6_revolver.png",
+      "width": 200,
+      "height": 200,
+      "sha256": "8cc7f6a37eabda95ded558cdcb2cc8478d3be68a6f57f97b6f0dc84a2c014d5c"
+    },
+    {
+      "path": "assets/weapons/icons/wpn_004_k9_smg.png",
+      "width": 200,
+      "height": 200,
+      "sha256": "3da2bd0a20fda9b54c3e8b05101b2d2bd0ac3ab8ed8826e24bbc3cf23a317b96"
+    },
+    {
+      "path": "assets/weapons/icons/wpn_005_s12_shotgun.png",
+      "width": 200,
+      "height": 200,
+      "sha256": "9c2be1bdc1688bdf1835e5ebd8473206a0ac8ba57d50fc933456921d8a4710a2"
+    },
+    {
+      "path": "assets/weapons/icons/wpn_006_a21_assault_rifle.png",
+      "width": 200,
+      "height": 200,
+      "sha256": "107c24db125c60a181a8d0e38c26bcee4b01b45ef8879dac27826f90e28dde35"
+    },
+    {
+      "path": "assets/weapons/icons/wpn_007_h7_hunter_rifle.png",
+      "width": 200,
+      "height": 200,
+      "sha256": "f7c23ae697332e5b459c7b2e39ecca61e4db6643e80cec43b4359cb3975df438"
+    },
+    {
+      "path": "assets/weapons/icons/wpn_008_l56_lmg.png",
+      "width": 200,
+      "height": 200,
+      "sha256": "2b15409f1bf73e92452669e7abf65fd25fdc1e5af1156f72901e2fcbec57c23c"
+    }
+  ]
+}

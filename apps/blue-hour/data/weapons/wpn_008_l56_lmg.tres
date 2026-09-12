@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "WPN_008_L56_LMG"
+display_name = "L56 轻机枪"
+description = "大容量弹匣，持续压制。"
+weapon_type = 2
+icon_path = "res://assets/weapons/icons/wpn_008_l56_lmg.png"
+model_path = ""
+damage = 10.0
+attack_rate = 6
+range = 17
+magazine_size = 60
+reload_time = 3.6
+accuracy = 0.79
+move_speed_modifier = -0.08
+pellet_count = 1
+spread_angle = 20.0
+penetration = 0
+penetration_damage_multiplier = 0.6
+knockback = 0
+animation_profile = 2
+rarity = 0
+tags = Array[String](["ranged"])

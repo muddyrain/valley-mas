@@ -1,0 +1,7 @@
+[gd_resource type="Resource" script_class="WeaponPoseProfile" load_steps=2 format=3]
+[ext_resource type="Script" path="res://weapons/weapon_pose_profile.gd" id="1"]
+[resource]
+script = ExtResource("1")
+right_upper_arm = Vector3(-0.3, -0.9, 0.3)
+right_lower_arm = Vector3(0, -0.25, 1)
+arm_weight = 0.94

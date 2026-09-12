@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "WPN_002_P9_PISTOL"
+display_name = "P9 制式手枪"
+description = "标准基础远程武器。"
+weapon_type = 1
+icon_path = "res://assets/weapons/icons/wpn_002_p9_pistol.png"
+model_path = "res://assets/weapons/models/wpn_002_p9_pistol.glb"
+damage = 18.0
+attack_rate = 2
+range = 14
+magazine_size = 15
+reload_time = 1.5
+accuracy = 0.88
+move_speed_modifier = 0.00
+pellet_count = 1
+spread_angle = 20.0
+penetration = 0
+penetration_damage_multiplier = 0.6
+knockback = 0
+animation_profile = 1
+rarity = 0
+tags = Array[String](["ranged"])

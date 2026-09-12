@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "WPN_007_H7_HUNTER_RIFLE"
+display_name = "H7 猎手步枪"
+description = "穿透 1 个额外目标，第二目标承受 60% 伤害。"
+weapon_type = 2
+icon_path = "res://assets/weapons/icons/wpn_007_h7_hunter_rifle.png"
+model_path = ""
+damage = 58.0
+attack_rate = 0.72
+range = 25
+magazine_size = 5
+reload_time = 2.5
+accuracy = 0.97
+move_speed_modifier = -0.05
+pellet_count = 1
+spread_angle = 20.0
+penetration = 1
+penetration_damage_multiplier = 0.6
+knockback = 2
+animation_profile = 2
+rarity = 0
+tags = Array[String](["ranged"])
