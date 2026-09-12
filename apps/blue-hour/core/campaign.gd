@@ -1,5 +1,6 @@
 extends RefCounted
 const Equipment = preload("res://core/equipment.gd")
+const Modifiers = preload("res://core/effect_modifiers.gd")
 var catalog: RefCounted
 var gear: RefCounted
 var data: Dictionary = {}
@@ -9,9 +10,11 @@ func _init(content: RefCounted) -> void:
 	gear = Equipment.new(content)
 
 func new_run(seed_value: int = 0, specialization: String = "combat", fixture_templates: Array = []) -> void:
-	data = {"version": 2, "seed": seed_value if seed_value != 0 else int(Time.get_ticks_usec()) % 2147483647, "day": 1, "status": "shelter", "food": catalog.loop.initial_food, "scrap": 0, "hunger": 0, "members": [], "roster": {}, "inventory": [], "equipment": {}, "day_rewards": {}, "shop": [], "pending": {}, "history": [], "modified": false, "specialization": specialization, "passive_slots": [], "power_slots": []}
+	data = {"version": 3, "seed": seed_value if seed_value != 0 else int(Time.get_ticks_usec()) % 2147483647, "day": 1, "status": "shelter", "food": catalog.loop.initial_food, "scrap": 0, "hunger": 0, "members": [], "roster": {}, "inventory": [], "equipment": {}, "day_rewards": {}, "shop": [], "pending": {}, "history": [], "modified": false, "specialization": specialization, "passive_slots": [], "power_slots": [], "passive_items": {}, "power_items": {}, "passive_capacity": 1, "power_capacity": 1}
 	var choice: Resource = catalog.by_id(catalog.specializations, specialization)
 	if choice != null:
+		grant_effect("passive", choice.passive_id)
+		grant_effect("power", choice.power_id)
 		data.passive_slots = [choice.passive_id]
 		data.power_slots = [choice.power_id]
 	var templates: Array = fixture_templates.duplicate()
@@ -39,16 +42,66 @@ func member_template(id: String) -> Resource:
 func member_level(id: String) -> int:
 	return int(data.roster.get(id, {}).get("level", 1))
 
-func member_trait(id: String, equipped: Resource = null) -> Resource:
+func member_trait(id: String) -> Resource:
 	var template := member_template(id)
 	var base: Resource = catalog.by_id(catalog.traits, template.trait_id)
-	var result: Resource = base.at_level(member_level(id))
-	if equipped != null and not equipped.melee:
-		for passive_id in data.passive_slots:
-			var passive: Resource = catalog.by_id(catalog.passives, passive_id)
-			if passive.effect == "ranged_damage":
-				result.damage_multiplier *= passive.amount
+	return base.at_level(member_level(id))
+
+func effect_definition(category: String, id: String) -> Resource:
+	if category not in ["passive", "power"] or not data.get(category + "_items", {}).has(id):
+		return null
+	var definition: Resource = catalog.by_id(catalog.passives if category == "passive" else catalog.powers, id)
+	return definition.at_upgrade(data[category + "_items"][id].upgraded) if definition != null else null
+
+func equipped_effects(category: String) -> Array[Resource]:
+	var result: Array[Resource] = []
+	for id: String in data.get(category + "_slots", []):
+		var definition := effect_definition(category, id)
+		if definition != null:
+			result.append(definition)
 	return result
+
+func passive_modifiers() -> RefCounted:
+	var result := Modifiers.new()
+	for definition: Resource in equipped_effects("passive"):
+		result.set_source("passive:" + definition.id, definition.modifiers())
+	return result
+
+func grant_effect(category: String, id: String) -> bool:
+	if category not in ["passive", "power"] or data.get("status") not in ["shelter", "mission"]:
+		return false
+	if catalog.by_id(catalog.passives if category == "passive" else catalog.powers, id) == null or data[category + "_items"].has(id):
+		return false
+	data[category + "_items"][id] = {"upgraded": false}
+	return true
+
+func equip_effect(category: String, id: String) -> bool:
+	if data.get("status") != "shelter" or effect_definition(category, id) == null:
+		return false
+	var slots: Array = data[category + "_slots"]
+	if id in slots or slots.size() >= data[category + "_capacity"]:
+		return false
+	slots.append(id)
+	return true
+
+func unequip_effect(category: String, id: String) -> bool:
+	if data.get("status") != "shelter" or category not in ["passive", "power"] or id not in data[category + "_slots"]:
+		return false
+	data[category + "_slots"].erase(id)
+	return true
+
+func expand_effect_slots(category: String, count: int = 1) -> bool:
+	if data.get("status") != "shelter" or category not in ["passive", "power"] or count <= 0:
+		return false
+	data[category + "_capacity"] += count
+	return true
+
+func upgrade_effect(category: String, id: String) -> bool:
+	var definition := effect_definition(category, id)
+	if data.get("status") != "shelter" or definition == null or definition.is_upgraded:
+		return false
+	data[category + "_items"][id].upgraded = true
+	return true
 
 func training_cost(id: String) -> int:
 	var index := member_level(id) - 1
@@ -180,12 +233,13 @@ func commit_day(fed: Array = []) -> bool:
 func _copy_reward() -> Array:
 	var output: Array = []
 	for passive_id in data.passive_slots:
-		var passive: Resource = catalog.by_id(catalog.passives, passive_id)
-		if passive.effect != "weapon_copy" or data.inventory.is_empty():
+		var passive := effect_definition("passive", passive_id)
+		var probability: float = passive.modifiers().get("weapon_copy_chance", 0.0)
+		if probability <= 0 or data.inventory.is_empty():
 			continue
 		var rng := RandomNumberGenerator.new()
 		rng.seed = int(data.seed) + int(data.day) * 7919
-		if rng.randf() >= passive.amount:
+		if rng.randf() >= probability:
 			continue
 		var best: Dictionary = {}
 		var best_value := -1
@@ -235,14 +289,18 @@ func _nonnegative(value: Variant) -> bool:
 func valid_state(state: Dictionary) -> bool:
 	if state.get("version") == 1:
 		return _valid_legacy(state)
-	if state.get("version") != 2 or not state.get("roster") is Dictionary:
+	# JSON numbers are floats; Array.has uses strict Variant types.
+	if (state.get("version") != 2 and state.get("version") != 3) or not state.get("roster") is Dictionary:
 		return false
 	if not _nonnegative(state.get("initial_count")) or state.initial_count != state.roster.size() or state.roster.is_empty():
 		return false
 	var choice: Resource = catalog.by_id(catalog.specializations, str(state.get("specialization", "invalid")))
 	if choice == null and state.get("specialization") != "":
 		return false
-	if state.get("passive_slots") != ([] if choice == null else [choice.passive_id]) or state.get("power_slots") != ([] if choice == null else [choice.power_id]):
+	if state.version == 2:
+		if state.get("passive_slots") != ([] if choice == null else [choice.passive_id]) or state.get("power_slots") != ([] if choice == null else [choice.power_id]):
+			return false
+	elif not _valid_effects(state):
 		return false
 	var mapping: Dictionary = {}
 	for id in state.roster:
@@ -271,6 +329,24 @@ func valid_state(state: Dictionary) -> bool:
 			if entry.get(key) is Array:
 				entry[key] = entry[key].map(func(id): return mapping.get(id, "invalid"))
 	return _valid_legacy(compatible)
+
+func _valid_effects(state: Dictionary) -> bool:
+	for category: String in ["passive", "power"]:
+		var owned: Variant = state.get(category + "_items")
+		var slots: Variant = state.get(category + "_slots")
+		var capacity: Variant = state.get(category + "_capacity")
+		if not owned is Dictionary or not slots is Array or not _nonnegative(capacity):
+			return false
+		if capacity != floor(float(capacity)) or capacity < 1 or slots.size() > capacity:
+			return false
+		if not _unique_subset(slots, owned.keys()):
+			return false
+		for id: Variant in owned:
+			if not id is String or catalog.by_id(catalog.passives if category == "passive" else catalog.powers, id) == null:
+				return false
+			if not owned[id] is Dictionary or owned[id].size() != 1 or not owned[id].get("upgraded") is bool:
+				return false
+	return true
 
 func _valid_legacy(state: Dictionary) -> bool:
 	if state.get("version") != 1 or state.get("status") not in ["shelter", "mission", "pending", "won", "lost"]:
@@ -346,6 +422,15 @@ func restore(state: Dictionary) -> bool:
 		for template in catalog.survivors:
 			data.roster[template.id] = {"template": template.id, "level": 1}
 		data.initial_count = data.roster.size()
+	if data.version == 2:
+		for category: String in ["passive", "power"]:
+			data[category + "_items"] = {}
+			data[category + "_capacity"] = 1
+			for id: String in data[category + "_slots"]:
+				data[category + "_items"][id] = {"upgraded": false}
+		data.version = 3
+	for category: String in ["passive", "power"]:
+		data[category + "_capacity"] = int(data[category + "_capacity"])
 	for key in ["seed", "day", "food", "scrap", "hunger"]:
 		data[key] = int(data[key])
 	if data.status == "mission":

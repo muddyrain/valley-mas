@@ -29,8 +29,24 @@ var map: Resource = preload("res://data/maps/east_quay.tres")
 var loop: Resource = preload("res://data/day_loop.tres")
 var start_rules: Resource = preload("res://data/new_run.tres")
 var specializations: Array[Resource] = [preload("res://data/specializations/combat.tres"), preload("res://data/specializations/scavenge.tres"), preload("res://data/specializations/survey.tres")]
-var passives: Array[Resource] = [preload("res://data/effects/shooting_target.tres"), preload("res://data/effects/replicator.tres"), preload("res://data/effects/early_start.tres")]
-var powers: Array[Resource] = [preload("res://data/effects/rage.tres"), preload("res://data/effects/sprint.tres"), preload("res://data/effects/aid.tres")]
+var passives: Array[Resource] = [
+	preload("res://data/effects/shooting_target.tres"),
+	preload("res://data/effects/spare_magazine.tres"),
+	preload("res://data/effects/armor_plate.tres"),
+	preload("res://data/effects/replicator.tres"),
+	preload("res://data/effects/tool_belt.tres"),
+	preload("res://data/effects/folding_cart.tres"),
+	preload("res://data/effects/early_start.tres"),
+	preload("res://data/effects/old_watch.tres")
+]
+var powers: Array[Resource] = [
+	preload("res://data/effects/rage.tres"),
+	preload("res://data/effects/focus_fire.tres"),
+	preload("res://data/effects/sprint.tres"),
+	preload("res://data/effects/scavenge_frenzy.tres"),
+	preload("res://data/effects/aid.tres"),
+	preload("res://data/effects/dusk_delay.tres")
+]
 var affixes: Array[Resource] = [preload("res://data/affixes/longbarrel.tres"), preload("res://data/affixes/extended.tres"), preload("res://data/affixes/quickload.tres"), preload("res://data/affixes/weighted.tres")]
 
 func by_id(collection: Array[Resource], id: String) -> Resource:
@@ -97,19 +113,14 @@ func validate() -> Array[String]:
 	for specialization in specializations:
 		if by_id(passives, specialization.passive_id) == null or by_id(powers, specialization.power_id) == null:
 			errors.append("Invalid specialization package")
-	for effect in passives + powers:
-		if not is_finite(effect.amount) or effect.amount <= 0 or effect.duration < 0:
-			errors.append("Invalid effect amount")
-		if effect.effect in ["weapon_copy", "heal"] and effect.amount > 1:
-			errors.append("Effect probability or fraction exceeds one")
-		if effect.effect in ["burst", "speed"] and (effect.amount <= 1 or effect.duration <= 0):
-			errors.append("Timed power needs an actual buff and duration")
-	for effect in passives:
-		if effect.effect not in ["ranged_damage", "weapon_copy", "day_extension"]:
-			errors.append("Unsupported passive effect")
-	for effect in powers:
-		if effect.effect not in ["burst", "speed", "heal"]:
-			errors.append("Unsupported special power effect")
+		elif by_id(passives, specialization.passive_id).specialization != specialization.id or by_id(powers, specialization.power_id).specialization != specialization.id:
+			errors.append("Starter package has mismatched specialization")
+	var effect_ids: Array[String] = []
+	for effect: Resource in passives + powers:
+		errors.append_array(effect.validation_errors())
+		if effect.id in effect_ids or by_id(specializations, effect.specialization) == null or effect.category != ("passive" if effect in passives else "power"):
+			errors.append("Invalid effect category, specialization or duplicate ID: " + effect.id)
+		effect_ids.append(effect.id)
 	if start_rules.starting_count < 1 or start_rules.starting_count > start_rules.starter_pool.size():
 		errors.append("Invalid starter count")
 	var starters: Array = []

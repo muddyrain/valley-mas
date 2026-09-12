@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/effect_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/icons/item_folding_cart_icon.png" id="2"]
+[resource]
+script = ExtResource("1")
+icon = ExtResource("2")
+id = "folding_cart"
+display_name = "折叠推车"
+category = "passive"
+specialization = "scavenge"
+short_description = "基础资源收益 +35%；全队移动速度 -8%。"
+flavor = ""
+normal_description = "基础资源收益 +35%；全队移动速度 -8%。"
+upgraded_description = "基础资源收益 +50%；全队移动速度 -5%。"
+normal_modifiers = {"resource_yield": 1.35, "move_speed": 0.92}
+upgraded_modifiers = {"resource_yield": 1.5, "move_speed": 0.95}
+duration = 0.0
+upgraded_duration = 0.0

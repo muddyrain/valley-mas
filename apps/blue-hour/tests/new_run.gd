@@ -78,24 +78,24 @@ func run() -> void:
 		mission.debug_clear_enemies()
 		mission.set_physics_process(false)
 		var member: Node3D = mission.survivors[0]
-		var base_damage: float = member.talent.damage_multiplier
+		var base_damage: float = mission.damage_to(member, null)
 		var base_speed: float = member.data.move_speed
 		member.hp = 10
 		check(mission.powers.activate(), "Special power activates: " + specialization)
 		check(not mission.powers.activate(), "Special power is once per action: " + specialization)
 		if specialization == "combat":
-			check(member.talent.damage_multiplier > base_damage, "Burst changes real damage")
+			check(mission.damage_to(member, null) > base_damage, "Burst changes real damage")
 			for actor in mission.survivors:
 				var unboosted: Resource = game.member_trait(actor.data.id)
-				check(is_equal_approx(actor.talent.damage_multiplier, unboosted.damage_multiplier * 2.0 * (1.0 if actor.weapon.melee else 1.25)), "Burst combines with passive only on ranged weapons")
+				check(is_equal_approx(mission.damage_to(actor, null), actor.weapon.damage * unboosted.damage_multiplier * 2.0 * (1.0 if actor.weapon.melee else 1.25)), "Burst combines with passive only on ranged weapons")
 		elif specialization == "scavenge":
-			check(member.data.move_speed > base_speed, "Speed power changes movement")
+			check(mission.movement_speed(member, member.position + Vector3.FORWARD, 0.1) > base_speed, "Speed power changes movement")
 		else:
 			check(member.hp > 10, "Global aid heals real members")
 			check(mission.clock.settings.day_seconds > content.map.day_seconds, "Survey passive extends only instance day")
 		mission.powers.advance(100)
-		check(is_equal_approx(member.talent.damage_multiplier, base_damage), "Temporary damage clears")
-		check(is_equal_approx(member.data.move_speed, base_speed), "Temporary speed clears")
+		check(is_equal_approx(mission.damage_to(member, null), base_damage), "Temporary damage clears")
+		check(is_equal_approx(mission.movement_speed(member, member.position + Vector3.FORWARD, 0.1), base_speed), "Temporary speed clears")
 		if specialization == "combat":
 			mission.debug_equip(0, content.by_id(content.weapons, "crowbar"))
 			check(is_equal_approx(member.talent.damage_multiplier, game.member_trait(member.data.id).damage_multiplier), "Debug melee switch removes ranged-only passive")

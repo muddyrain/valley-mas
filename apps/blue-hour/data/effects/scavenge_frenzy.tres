@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/effect_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/skills/icons/skill_scavenge_frenzy_action_icon.png" id="2"]
+[resource]
+script = ExtResource("1")
+icon = ExtResource("2")
+id = "scavenge_frenzy"
+display_name = "搜刮狂潮"
+category = "power"
+specialization = "scavenge"
+short_description = "搜刮类交互耗时 -70%，持续 12 秒。"
+flavor = ""
+normal_description = "搜刮类交互耗时 -70%，持续 12 秒。"
+upgraded_description = "搜刮类交互耗时 -85%，持续 18 秒。"
+normal_modifiers = {"search_time": 0.3}
+upgraded_modifiers = {"search_time": 0.15}
+duration = 12.0
+upgraded_duration = 18.0

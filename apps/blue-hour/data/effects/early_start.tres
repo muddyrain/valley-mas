@@ -1,8 +1,20 @@
-[gd_resource type="Resource" load_steps=2 format=3]
+[gd_resource type="Resource" load_steps=4 format=3]
 [ext_resource type="Script" path="res://data/effect_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/icons/item_early_start_icon.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/cards/item_coffee_card.png" id="3"]
 [resource]
 script = ExtResource("1")
+icon = ExtResource("2")
+card_art = ExtResource("3")
 id = "early_start"
 display_name = "咖啡"
-effect = "day_extension"
-amount = 20.0
+category = "passive"
+specialization = "survey"
+short_description = "白昼延长 20 秒。"
+flavor = "早起的鸟儿有虫吃。"
+normal_description = "白昼延长 20 秒。"
+upgraded_description = "白昼延长 35 秒。"
+normal_modifiers = {"day_extension": 20.0}
+upgraded_modifiers = {"day_extension": 35.0}
+duration = 0.0
+upgraded_duration = 0.0

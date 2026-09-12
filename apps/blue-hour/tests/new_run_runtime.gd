@@ -265,9 +265,9 @@ func run() -> void:
 	await click(app.screen.cards[0])
 	var combat_background := app.screen.tabs.combat.get_child(0) as TextureRect
 	check(combat_background.texture.resource_path == selected_paths.combat and app.screen.tab_tapes.combat.visible, "Selected background remains highlighted after focus leaves the tab")
-	check(app.screen.tooltip_upgrade_summary.text == "全队远程伤害提高到 +50%", "Combat item shows its concrete upgraded effect")
+	check(app.screen.tooltip_upgrade_summary.text == "全队远程伤害 +40%。", "Combat item shows its concrete upgraded effect")
 	await click(app.screen.cards[1])
-	check(app.screen.tooltip_upgrade_summary.text == "全队伤害提高到 ×3.0", "Combat skill shows its concrete upgraded effect")
+	check(app.screen.tooltip_upgrade_summary.text == "全队伤害 ×2，持续 12 秒。", "Combat skill shows its concrete upgraded effect")
 	check(
 			app.screen.card_plates[0].texture.resource_path == "res://assets/items/cards/item_shooting_target_card.png"
 			and app.screen.card_plates[1].texture.resource_path == "res://assets/skills/cards/skill_rage_card.png",
@@ -282,22 +282,22 @@ func run() -> void:
 	check(
 			app.screen.effect_titles[0].text == "咖啡"
 			and app.screen.effect_titles[1].text == "全地图治疗"
-			and app.screen.effect_descriptions[0].text == "白昼时长增加。"
-			and app.screen.effect_descriptions[1].text == "治疗地图上所有幸存者。",
+			and app.screen.effect_descriptions[0].text == "白昼延长 20 秒。"
+			and app.screen.effect_descriptions[1].text == "恢复所有存活队员 40% 最大生命。",
 			"Survey cards expose the intended reward copy",
 	)
 	await click(app.screen.cards[0])
 	check(
 		app.screen.tooltip_title.text == "咖啡"
 		and app.screen.tooltip_flavor.text == "早起的鸟儿有虫吃。"
-		and app.screen.tooltip_upgrade_summary.text == "白昼延长至 30 秒",
+		and app.screen.tooltip_upgrade_summary.text == "白昼延长 35 秒。",
 		"Coffee card updates the detail callout and upgrade preview",
 	)
 	await click(app.screen.cards[1])
 	check(
 		app.screen.tooltip_title.text == "全地图治疗"
 		and app.screen.tooltip_flavor.text == "我希望别把僵尸也救活了。"
-		and app.screen.tooltip_upgrade_summary.text == "治疗量提高到 60% 最大生命",
+		and app.screen.tooltip_upgrade_summary.text == "恢复所有存活队员 60% 最大生命。",
 		"Map-heal card updates the detail callout and upgrade preview",
 	)
 	await click(app.screen.tabs.scavenge)
@@ -306,14 +306,14 @@ func run() -> void:
 	check(
 		app.screen.selected_effect == 0
 		and app.screen.tooltip_title.text == "复印机"
-		and app.screen.tooltip_upgrade_summary.text == "复制概率提高到 60%",
+		and app.screen.tooltip_upgrade_summary.text == "成功归航时，65%概率复制库存中价值最高的一把武器。",
 		"Passive card updates the detail callout and upgrade preview",
 	)
 	await click(app.screen.cards[1])
 	check(
 		app.screen.selected_effect == 1
 		and app.screen.tooltip_title.text == "疾行号令"
-		and app.screen.tooltip_upgrade_summary.text == "持续时间延长至 15 秒",
+		and app.screen.tooltip_upgrade_summary.text == "全队移速 ×1.5，持续 15 秒。",
 		"Skill card updates the detail callout and upgrade preview",
 	)
 	await capture("21-specialization")
@@ -367,9 +367,9 @@ func run() -> void:
 	app.mission.debug_clear_enemies()
 	app.mission.survivors[0].hp = 10
 	app.mission.survivors[1].hp = 20
-	await click(app.hud.power_button)
-	check(app.mission.powers.used and app.mission.survivors[0].hp > 10 and app.mission.survivors[1].hp > 20, "HUD casts global aid on both members")
-	check(app.hud.power_button.disabled, "Used power cannot be cast again")
+	await click(app.hud.power_buttons.aid)
+	check(app.mission.powers.states.aid.used_today and app.mission.survivors[0].hp > 10 and app.mission.survivors[1].hp > 20, "HUD casts global aid on both members")
+	check(app.hud.power_buttons.aid.disabled, "Used power cannot be cast again")
 	await capture("24-special-power")
 	app.mission.ledger.add_loot(3, 4)
 	app.mission._finish(false)
@@ -377,7 +377,7 @@ func run() -> void:
 	await click(button("确认结算"))
 	check(app.campaign.data.day == 2 and app.campaign.member_level(members[1]) == 2, "Return preserves individual level into next day")
 	await click(button("整装出发"))
-	check(not app.mission.powers.used, "Next day recharges the equipped power")
+	check(not app.mission.powers.states.aid.used_today, "Next day recharges the equipped power")
 	# Controlled I/O failure: no player save is touched and domain state must roll back.
 	app.mission.director_enabled = false
 	app.mission.debug_clear_enemies()

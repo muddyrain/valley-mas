@@ -1,27 +1,55 @@
 extends Resource
-@export var id := ""
-@export var display_name := ""
-@export_enum("ranged_damage", "weapon_copy", "day_extension", "burst", "speed", "heal") var effect := "ranged_damage"
-@export var amount := 1.0
-@export var duration := 0.0
-@export var upgraded := false
+
+const Modifiers = preload("res://core/effect_modifiers.gd")
+
+@export var id: String = ""
+@export var display_name: String = ""
+@export_enum("passive", "power") var category: String = "passive"
+@export var specialization: String = ""
+@export var icon: Texture2D
+@export var card_art: Texture2D
+@export var short_description: String = ""
+@export_multiline var flavor: String = ""
+@export_multiline var normal_description: String = ""
+@export_multiline var upgraded_description: String = ""
+@export var normal_modifiers: Dictionary = {}
+@export var upgraded_modifiers: Dictionary = {}
+@export var duration: float = 0.0
+@export var upgraded_duration: float = 0.0
+@export var is_upgraded: bool = false
+
+func at_upgrade(value: bool) -> Resource:
+	var result: Resource = duplicate()
+	result.is_upgraded = value
+	return result
+
+func modifiers() -> Dictionary:
+	return upgraded_modifiers if is_upgraded else normal_modifiers
+
+func active_duration() -> float:
+	return upgraded_duration if is_upgraded else duration
 
 func description() -> String:
-	match effect:
-		"ranged_damage": return "全队远程伤害 +%d%%" % roundi((amount - 1.0) * 100)
-		"weapon_copy": return "成功归航时，%d%%概率复制价值最高的一把武器（史诗武器除外）" % roundi(amount * 100)
-		"day_extension": return "白昼延长 %d 秒" % roundi(amount)
-		"burst": return "全队伤害 ×%.1f，持续 %d 秒" % [amount, duration]
-		"speed": return "全队移速 ×%.1f，持续 %d 秒" % [amount, duration]
-		"heal": return "恢复所有存活队员 %d%% 最大生命" % roundi(amount * 100)
-	return ""
+	return upgraded_description if is_upgraded else normal_description
 
 func upgrade_description() -> String:
-	match effect:
-		"ranged_damage": return "升级：全队远程伤害提高到 +%d%%" % roundi((amount - 1.0) * 200.0)
-		"weapon_copy": return "升级：复制概率提高到 %d%%" % roundi(minf(1.0, amount + 0.2) * 100.0)
-		"day_extension": return "升级：白昼延长至 %d 秒" % roundi(amount * 1.5)
-		"burst": return "升级：全队伤害提高到 ×%.1f" % (amount + 1.0)
-		"speed": return "升级：持续时间延长至 %d 秒" % roundi(duration * 1.5)
-		"heal": return "升级：治疗量提高到 %d%% 最大生命" % roundi(minf(1.0, amount * 1.5) * 100.0)
-	return ""
+	return "升级：" + upgraded_description
+
+func validation_errors() -> Array[String]:
+	var errors: Array[String] = []
+	if id.is_empty() or display_name.is_empty() or normal_description.is_empty() or upgraded_description.is_empty() or icon == null:
+		errors.append("Missing effect identity, text or icon: " + id)
+	if category not in ["passive", "power"] or is_upgraded:
+		errors.append("Catalog definitions must be normal passive/power templates: " + id)
+	if not Modifiers.valid(normal_modifiers, category) or not Modifiers.valid(upgraded_modifiers, category):
+		errors.append("Invalid effect modifiers: " + id)
+	if not is_finite(duration) or not is_finite(upgraded_duration) or duration < 0 or upgraded_duration < 0:
+		errors.append("Invalid effect duration: " + id)
+	if category == "passive" and (duration != 0 or upgraded_duration != 0):
+		errors.append("Passive cannot have an active duration: " + id)
+	if category == "power":
+		for values: Dictionary in [normal_modifiers, upgraded_modifiers]:
+			var healing: bool = values.has("heal_fraction")
+			if (healing and values.size() != 1) or (healing and (duration != 0 or upgraded_duration != 0)) or (not healing and (duration <= 0 or upgraded_duration <= 0)):
+				errors.append("Healing is instant; other powers need a duration: " + id)
+	return errors

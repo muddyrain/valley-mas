@@ -86,6 +86,7 @@ switch ($Mode) {
         Invoke-Engine @('--headless', '--script', 'tests/day_loop_flow.gd')
         Invoke-Engine @('--headless', '--script', 'tests/new_run.gd')
         Invoke-Engine @('--headless', '--script', 'tests/new_run_flow.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/effect_system.gd')
     }
     'capture' {
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1440x900', '--script', 'tests/art_runtime.gd')
@@ -94,6 +95,7 @@ switch ($Mode) {
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1440x900', '--script', 'tests/controls_runtime.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1440x900', '--script', 'tests/new_run_runtime.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1440x900', '--script', 'tests/menu_runtime.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1440x900', '--script', 'tests/effect_runtime.gd')
     }
     'build' {
         $buildDirectory = Join-Path $PSScriptRoot 'build'
@@ -111,6 +113,7 @@ switch ($Mode) {
         Invoke-Engine @('--headless', '--script', 'tests/day_loop_flow.gd')
         Invoke-Engine @('--headless', '--script', 'tests/new_run.gd')
         Invoke-Engine @('--headless', '--script', 'tests/new_run_flow.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/effect_system.gd')
         Invoke-Engine @('--headless', '--export-release', 'Windows Desktop', $executablePath)
         if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
             throw 'Export did not produce BlueHourHomeward.exe.'
@@ -125,7 +128,7 @@ switch ($Mode) {
             sha256 = (Get-FileHash -LiteralPath $executablePath -Algorithm SHA256).Hash
             platform = 'Windows x86_64'
             embeddedPack = $true
-            checks = @('art-assets', 'art-integration', 'rules', 'mission-flow', 'search-dispatch', 'parallel-commands', 'day-loop', 'day-loop-flow', 'new-run', 'new-run-flow', 'standalone-headless', 'standalone-native', 'standalone-menu-headless', 'standalone-menu-native', 'standalone-art-headless', 'standalone-art-native')
+            checks = @('art-assets', 'art-integration', 'rules', 'mission-flow', 'search-dispatch', 'parallel-commands', 'day-loop', 'day-loop-flow', 'new-run', 'new-run-flow', 'effect-system', 'standalone-headless', 'standalone-native', 'standalone-menu-headless', 'standalone-menu-native', 'standalone-art-headless', 'standalone-art-native')
         }
         $buildInfo | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $buildDirectory 'BUILD-INFO.json') -Encoding UTF8
         Write-Output "Playable build: $executablePath"

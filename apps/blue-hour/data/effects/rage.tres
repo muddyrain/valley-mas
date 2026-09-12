@@ -1,9 +1,20 @@
-[gd_resource type="Resource" load_steps=2 format=3]
+[gd_resource type="Resource" load_steps=4 format=3]
 [ext_resource type="Script" path="res://data/effect_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/skills/icons/skill_rage_action_icon.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/skills/cards/skill_rage_card.png" id="3"]
 [resource]
 script = ExtResource("1")
+icon = ExtResource("2")
+card_art = ExtResource("3")
 id = "rage"
 display_name = "狂怒"
-effect = "burst"
-amount = 2.0
+category = "power"
+specialization = "combat"
+short_description = "全队伤害 ×2，持续 8 秒。"
+flavor = "最危险的几秒里，让所有人同时压上火力。"
+normal_description = "全队伤害 ×2，持续 8 秒。"
+upgraded_description = "全队伤害 ×2，持续 12 秒。"
+normal_modifiers = {"damage": 2.0}
+upgraded_modifiers = {"damage": 2.0}
 duration = 8.0
+upgraded_duration = 12.0

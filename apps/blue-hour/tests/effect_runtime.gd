@@ -1,0 +1,96 @@
+extends "res://tests/day_loop_runtime.gd"
+
+func run() -> void:
+	create_timer(70).timeout.connect(func(): printerr("EFFECT UI TIMEOUT"); quit(2))
+	root.unfocusable = true
+	root.add_child(InputGate.new())
+	DirAccess.make_dir_recursive_absolute("res://test-output")
+	app = load("res://core/main.gd").new()
+	app.save_path = "user://test-runs/effect-ui-%d.json" % Time.get_ticks_usec()
+	root.add_child(app)
+	await frames(8)
+	app.create_run("combat")
+	await frames(8)
+	await key(KEY_F1)
+	await click(button("给予全部道具与技能并扩容"))
+	check(app.campaign.data.passive_items.size() == 8 and app.campaign.data.power_items.size() == 6, "Debug grant uses all official definitions")
+	check(app.screen.effect_buttons.size() == 14 and app.screen.effects_panel.visible, "Loadout lists all owned effects")
+	check(app.store.read(app.campaign.valid_state).ok, "Expanded loadout saved successfully")
+	await capture("effects-loadout-normal")
+	await click(app.screen.effect_buttons.shooting_target)
+	check("shooting_target" not in app.campaign.data.passive_slots and app.campaign.data.passive_items.has("shooting_target"), "Native unequip keeps ownership")
+	await click(app.screen.effect_buttons.shooting_target)
+	check("shooting_target" in app.campaign.data.passive_slots, "Native equip restores passive")
+	await click(button("关闭"))
+	await key(KEY_F1)
+	await click(button("升级全部已持有道具与技能"))
+	check(app.campaign.data.power_items.values().all(func(value: Dictionary) -> bool: return value.upgraded), "Debug upgrade reaches every owned power")
+	await capture("effects-loadout-upgraded")
+	await click(button("关闭"))
+	# Persistence failure must roll back equipment just like weapon purchases.
+	var before: Dictionary = app.campaign.data.duplicate(true)
+	var good_store: RefCounted = app.store
+	app.store = load("res://core/save_store.gd").new(app.save_path + "/blocked.json")
+	app.set_effect_equipped("passive", "shooting_target", false)
+	check(app.campaign.data == before, "Failed loadout write restores owned/equipped/upgraded state")
+	for node: Node in app.get_children():
+		if node is AcceptDialog and node.visible:
+			await click_at(Vector2(node.position) + node.get_ok_button().get_global_rect().get_center())
+	app.store = good_store
+	await click(button("关闭"))
+	await click(button("整装出发"))
+	app.mission.set_physics_process(false)
+	app.mission.director_enabled = false
+	app.mission.debug_clear_enemies()
+	check(app.hud.power_buttons.size() == 6, "Mission exposes six independently actionable powers")
+	for id: String in app.hud.power_buttons:
+		var control: Button = app.hud.power_buttons[id]
+		check(control.icon != null and root.get_visible_rect().encloses(control.get_global_rect()), "Power icon and button visible: " + id)
+	app.mission.clock.advance(app.mission.clock.settings.day_seconds - 40)
+	app.mission._physics_process(0.01)
+	app.hud.refresh()
+	check(app.hud.watch_label.visible and app.hud.watch_label.text.contains("腕表预警"), "Watch state is visible in HUD")
+	await capture("effects-hud-ready")
+	await key(KEY_SPACE)
+	app.mission.survivors[0].hp = 1
+	for id: String in app.hud.power_buttons:
+		await click(app.hud.power_buttons[id])
+		check(app.mission.powers.states[id].used_today and app.hud.power_buttons[id].disabled, "Actual click spends this power only: " + id)
+	check(app.mission.survivors[0].hp > 1, "Native healing button changes real health")
+	near_remaining(18.0)
+	await frames(12)
+	near_remaining(18.0)
+	await capture("effects-hud-active")
+	root.size = Vector2i(1024, 640)
+	await frames(12)
+	for id: String in app.hud.power_buttons:
+		check(root.get_visible_rect().encloses(app.hud.power_buttons[id].get_global_rect()), "All powers remain reachable in minimum window: " + id)
+	var sites_panel: Control = app.hud.objective.get_parent().get_parent()
+	check(not app.hud.power_panel.get_global_rect().intersects(sites_panel.get_global_rect()), "Multi-power bar does not cover searchable sites")
+	await capture("effects-hud-small")
+	root.size = Vector2i(1440, 900)
+	await frames()
+	await key(KEY_SPACE)
+	var clock_before: float = app.mission.clock.elapsed
+	app.mission._physics_process(1.0)
+	check(is_equal_approx(app.mission.clock.elapsed, clock_before), "Native cast freezes clock after resume")
+	near_remaining(17.0)
+	app.mission.ledger.add_loot(5, 0)
+	app.mission._finish(false)
+	await frames(8)
+	await click(button("确认结算"))
+	check(app.campaign.data.day == 2 and app.campaign.data.power_slots.size() == 6, "Return keeps multiple upgraded skills")
+	await click(button("整装出发"))
+	app.mission.set_physics_process(false)
+	app.mission.director_enabled = false
+	app.mission.debug_clear_enemies()
+	check(app.mission.powers.states.values().all(func(state: RefCounted) -> bool: return not state.used_today and state.upgraded), "Daily reset preserves upgrades for all six powers")
+	var report := FileAccess.open("res://test-output/effect-runtime.json", FileAccess.WRITE)
+	report.store_string(JSON.stringify({"checks": checks, "failures": failures, "evidence": "Native offscreen renderer, synthetic mouse/keyboard, isolated save, six simultaneous skills and 14 loadout entries"}, "\t"))
+	print("EFFECT NATIVE: %d checks, %d failures" % [checks, failures.size()])
+	app.queue_free()
+	await frames(8)
+	quit(0 if failures.is_empty() else 1)
+
+func near_remaining(expected: float) -> void:
+	check(is_equal_approx(app.mission.powers.states.dusk_delay.remaining_duration, expected), "Dusk delay follows world time and tactical pause")

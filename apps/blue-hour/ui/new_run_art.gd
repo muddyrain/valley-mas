@@ -23,13 +23,7 @@ const ICON_LOCK = preload("res://assets/ui/common/icons/ui_common_lock_icon.png"
 const TAB_TAPE = preload("res://assets/ui/route_selection/route_selection_tab_tape.png")
 const TAB_PROGRESS = preload("res://assets/ui/route_selection/route_selection_tab_progress_frame.png")
 
-const CARD_SHOOTING_TARGET = preload("res://assets/items/cards/item_shooting_target_card.png")
-const CARD_RAGE = preload("res://assets/skills/cards/skill_rage_card.png")
-const CARD_COFFEE = preload("res://assets/items/cards/item_coffee_card.png")
-const CARD_MAP_HEAL = preload("res://assets/skills/cards/skill_map_healing_card.png")
 const CARD_COMPOSITE = preload("res://assets/ui/common/cards/ui_common_card_background.png")
-const CARD_PRINTER = preload("res://assets/items/cards/item_replicator_card.png")
-const CARD_SPEED = preload("res://assets/skills/cards/skill_sprint_card.png")
 const ICON_RUN = preload("res://assets/skills/icons/skill_sprint_icon.png")
 const ICON_TENT = preload("res://assets/ui/common/icons/ui_common_camp_icon.png")
 const TENT_STICKER = preload("res://assets/ui/route_selection/route_selection_unlock_tent_sticker.png")

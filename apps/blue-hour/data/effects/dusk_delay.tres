@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/effect_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/skills/icons/skill_dusk_delay_action_icon.png" id="2"]
+[resource]
+script = ExtResource("1")
+icon = ExtResource("2")
+id = "dusk_delay"
+display_name = "暮色延缓"
+category = "power"
+specialization = "survey"
+short_description = "暂停白昼或蓝时倒计时 12 秒，行动继续。"
+flavor = ""
+normal_description = "暂停白昼或蓝时倒计时 12 秒，行动继续。"
+upgraded_description = "暂停白昼或蓝时倒计时 18 秒，行动继续。"
+normal_modifiers = {"freeze_day_clock": 1.0}
+upgraded_modifiers = {"freeze_day_clock": 1.0}
+duration = 12.0
+upgraded_duration = 18.0

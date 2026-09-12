@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/effect_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/icons/item_tool_belt_icon.png" id="2"]
+[resource]
+script = ExtResource("1")
+icon = ExtResource("2")
+id = "tool_belt"
+display_name = "工具腰包"
+category = "passive"
+specialization = "scavenge"
+short_description = "搜刮类交互耗时 -30%。"
+flavor = ""
+normal_description = "搜刮类交互耗时 -30%。"
+upgraded_description = "搜刮类交互耗时 -45%。"
+normal_modifiers = {"search_time": 0.7}
+upgraded_modifiers = {"search_time": 0.55}
+duration = 0.0
+upgraded_duration = 0.0

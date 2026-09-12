@@ -3,6 +3,8 @@ signal damaged
 const Visuals = preload("res://vfx/visuals.gd")
 const Assets = preload("res://vfx/generated_assets.gd")
 const AimFire = preload("res://survivors/aim_fire.gd")
+const Modifiers = preload("res://core/effect_modifiers.gd")
+var effects: RefCounted = Modifiers.new()
 var data: Resource
 var talent: Resource
 var weapon: Resource
@@ -80,7 +82,7 @@ func tick(delta: float, mission: Node3D) -> void:
 	var manual: bool = mission.manual_aim and not assigned
 	if manual:
 		stop()
-	_move(delta)
+	_move(delta, mission)
 	hp_bar.scale.x = maxf(0.01, hp / data.max_hp)
 	if searching or cooldown > 0 or reload_left > 0:
 		return
@@ -91,7 +93,7 @@ func tick(delta: float, mission: Node3D) -> void:
 	if ammo <= 0 and not weapon.melee:
 		reload_left = weapon.reload_seconds
 		return
-	cooldown = weapon.cooldown
+	cooldown = effects.attack_interval(weapon.cooldown, weapon.melee)
 	if not weapon.melee:
 		ammo -= 1
 	var direction: Vector3 = (mission.aim_point if directed else target.position) - position
@@ -104,29 +106,31 @@ func tick(delta: float, mission: Node3D) -> void:
 	if is_inside_tree():
 		create_tween().tween_property(rig, "scale", Vector3.ONE, 0.13)
 
-func _move(delta: float) -> void:
+func _move(delta: float, mission: Node3D) -> void:
 	if path.is_empty():
 		rig.position.y = 0.0
 		return
-	var budget: float = data.move_speed * delta
-	while not path.is_empty() and budget > 0:
+	var time_left: float = delta
+	while not path.is_empty() and time_left > 0:
+		var speed: float = mission.movement_speed(self, path[0], time_left)
+		var budget: float = speed * time_left
 		var distance := position.distance_to(path[0])
 		if distance <= budget:
 			position = path[0]
 			path.remove_at(0)
-			budget -= distance
+			time_left = maxf(0.0, time_left - distance / speed)
 		else:
 			var direction := position.direction_to(path[0])
 			position += direction * budget
 			rig.rotation.y = atan2(-direction.x, -direction.z)
-			budget = 0
+			time_left = 0
 	pulse += delta * 13
 	rig.position.y = absf(sin(pulse)) * 0.075
 
 func take_damage(amount: float, invincible: bool = false) -> void:
 	if dead or invincible or boarding:
 		return
-	hp = maxf(0, hp - amount * talent.incoming_damage_multiplier)
+	hp = maxf(0, hp - effects.incoming_damage(amount * talent.incoming_damage_multiplier))
 	damaged.emit()
 	if hp <= 0:
 		dead = true

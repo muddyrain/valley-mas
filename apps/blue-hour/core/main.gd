@@ -201,6 +201,37 @@ func buy_weapon(uid: String) -> void:
 		_save(before)
 	show_shelter()
 
+func set_effect_equipped(category: String, id: String, equipped: bool) -> void:
+	if state != "shelter":
+		return
+	var before: Dictionary = campaign.data.duplicate(true)
+	var changed: bool = campaign.equip_effect(category, id) if equipped else campaign.unequip_effect(category, id)
+	if changed:
+		_save(before)
+	show_shelter()
+	screen.show_effects()
+
+func debug_effects(upgrade_owned: bool) -> void:
+	if state != "shelter":
+		return
+	var before: Dictionary = campaign.data.duplicate(true)
+	for category: String in ["passive", "power"]:
+		var definitions: Array = catalog.passives if category == "passive" else catalog.powers
+		if not upgrade_owned:
+			var extra: int = definitions.size() - campaign.data[category + "_capacity"]
+			if extra > 0:
+				campaign.expand_effect_slots(category, extra)
+		for definition: Resource in definitions:
+			if upgrade_owned:
+				campaign.upgrade_effect(category, definition.id)
+			else:
+				campaign.grant_effect(category, definition.id)
+				campaign.equip_effect(category, definition.id)
+	campaign.data.modified = true
+	_save(before)
+	show_shelter()
+	screen.show_effects()
+
 func start_mission() -> void:
 	if state != "shelter":
 		return

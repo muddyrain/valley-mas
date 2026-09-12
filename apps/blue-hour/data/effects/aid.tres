@@ -1,8 +1,20 @@
-[gd_resource type="Resource" load_steps=2 format=3]
+[gd_resource type="Resource" load_steps=4 format=3]
 [ext_resource type="Script" path="res://data/effect_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/skills/icons/skill_aid_action_icon.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/skills/cards/skill_map_healing_card.png" id="3"]
 [resource]
 script = ExtResource("1")
+icon = ExtResource("2")
+card_art = ExtResource("3")
 id = "aid"
 display_name = "全地图治疗"
-effect = "heal"
-amount = 0.4
+category = "power"
+specialization = "survey"
+short_description = "恢复所有存活队员 40% 最大生命。"
+flavor = "我希望别把僵尸也救活了。"
+normal_description = "恢复所有存活队员 40% 最大生命。"
+upgraded_description = "恢复所有存活队员 60% 最大生命。"
+normal_modifiers = {"heal_fraction": 0.4}
+upgraded_modifiers = {"heal_fraction": 0.6}
+duration = 0.0
+upgraded_duration = 0.0

@@ -24,7 +24,10 @@ var pause_button: Button
 var pause_menu: PanelContainer
 var rally_button: Button
 var menu_backdrop: ColorRect
-var power_button: Button
+var power_buttons: Dictionary = {}
+var power_panel: PanelContainer
+var watch_label: Label
+var focus_label: Label
 
 func setup(target: Node3D) -> void:
 	mission = target
@@ -61,6 +64,7 @@ func setup(target: Node3D) -> void:
 	row.add_child(UI.button("F1", toggle_debug, Vector2(48, 42)))
 	var squad_panel := UI.margin(self, Rect2(22, 121, 264, 466))
 	var squad := VBoxContainer.new()
+	squad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	squad.add_theme_constant_override("separation", 10)
 	squad_panel.add_child(squad)
 	squad_heading = UI.label("外勤小队", 14, UI.MUTED)
@@ -96,7 +100,9 @@ func setup(target: Node3D) -> void:
 	sites_panel.offset_left = -280
 	sites_panel.offset_right = -22
 	sites_panel.offset_top = 121
+	sites_panel.offset_bottom = 584
 	var sites := VBoxContainer.new()
+	sites.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sites.add_theme_constant_override("separation", 7)
 	sites_panel.add_child(sites)
 	objective = UI.label("东岸旧街", 18, UI.AMBER)
@@ -144,15 +150,43 @@ func setup(target: Node3D) -> void:
 	help.offset_top = -132
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(help)
-	if mission.powers.definition != null:
-		power_button = UI.button(mission.powers.caption(), func(): mission.powers.activate(); refresh(), Vector2(250, 48))
-		power_button.tooltip_text = mission.powers.definition.description() + " · 每日一次"
-		power_button.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-		power_button.offset_left = -140
-		power_button.offset_right = 140
-		power_button.offset_top = -198
-		power_button.offset_bottom = -150
-		add_child(power_button)
+	if not mission.powers.states.is_empty():
+		power_panel = PanelContainer.new()
+		power_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+		power_panel.offset_left = -420
+		power_panel.offset_right = 420
+		power_panel.offset_top = -260 if mission.powers.states.size() > 3 else -205
+		power_panel.offset_bottom = -150
+		add_child(power_panel)
+		var grid := GridContainer.new()
+		grid.columns = mini(3, mission.powers.states.size())
+		power_panel.add_child(grid)
+		for id: String in mission.powers.states:
+			var definition: Resource = mission.powers.states[id].definition
+			var button := UI.button(mission.powers.caption(id), func(): mission.powers.activate(id); refresh(), Vector2(0, 40))
+			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			button.clip_text = true
+			button.icon = definition.icon
+			button.expand_icon = true
+			button.add_theme_constant_override("icon_max_width", 32)
+			button.add_theme_font_size_override("font_size", 14)
+			button.tooltip_text = definition.description() + " · 每日一次"
+			grid.add_child(button)
+			power_buttons[id] = button
+	watch_label = UI.label("", 16, UI.AMBER)
+	watch_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	watch_label.offset_left = -350
+	watch_label.offset_right = 350
+	watch_label.offset_top = 180
+	watch_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(watch_label)
+	focus_label = UI.label("", 14, UI.CYAN)
+	focus_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	focus_label.offset_left = -350
+	focus_label.offset_right = 350
+	focus_label.offset_top = 208
+	focus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(focus_label)
 	menu_backdrop = ColorRect.new()
 	menu_backdrop.color = Color(0.02, 0.04, 0.07, 0.65)
 	menu_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -190,9 +224,16 @@ func _process(delta: float) -> void:
 func refresh() -> void:
 	if mission == null:
 		return
-	if power_button != null:
-		power_button.text = mission.powers.caption()
-		power_button.disabled = mission.powers.used or not mission.active or not mission.input_enabled
+	for id: String in power_buttons:
+		power_buttons[id].text = mission.powers.caption(id)
+		power_buttons[id].disabled = not mission.powers.can_activate(id)
+		power_buttons[id].add_theme_color_override("font_disabled_color", UI.CYAN if mission.powers.states[id].active else UI.MUTED)
+		power_buttons[id].add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.85))
+	watch_label.visible = mission.watch_warning_active
+	watch_label.text = "腕表预警 · 距蓝时 %d 秒" % ceili(mission.clock.remaining())
+	var priority: Node3D = mission.powers.target()
+	focus_label.visible = priority != null or mission.effects.amount("freeze_day_clock") > 0
+	focus_label.text = ("集中火力 · " + priority.data.display_name if priority != null else "") + ("  暮色延缓中" if mission.effects.amount("freeze_day_clock") > 0 else "")
 	var clock = mission.clock
 	phase_label.text = ["DAY", "BLUE HOUR", "NIGHT"][clock.phase]
 	phase_label.add_theme_color_override("font_color", [UI.AMBER, UI.CYAN, Color("#f28a93")][clock.phase])

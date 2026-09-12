@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/effect_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/icons/item_old_watch_icon.png" id="2"]
+[resource]
+script = ExtResource("1")
+icon = ExtResource("2")
+id = "old_watch"
+display_name = "旧腕表"
+category = "passive"
+specialization = "survey"
+short_description = "蓝时前 30 秒预警；预警期间靠近撤离目标时，移速 +12%。"
+flavor = ""
+normal_description = "蓝时前 30 秒预警；预警期间靠近撤离目标时，移速 +12%。"
+upgraded_description = "蓝时前 45 秒预警；预警期间靠近撤离目标时，移速 +18%。"
+normal_modifiers = {"warning_seconds": 30.0, "return_speed": 1.12}
+upgraded_modifiers = {"warning_seconds": 45.0, "return_speed": 1.18}
+duration = 0.0
+upgraded_duration = 0.0

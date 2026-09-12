@@ -1,0 +1,89 @@
+{
+  "source_directory": "C:\\Users\\A\\Downloads\\蓝时归航_技能图标列表_100x100",
+  "icons": [
+    {
+      "id": "shooting_target",
+      "source": "01_射击目标.png",
+      "path": "assets/items/icons/item_shooting_target_icon.png",
+      "sha256": "bc543bf310c9087c2e849b2b7545ac892dd355a3344e8136aed52314f3835dc6"
+    },
+    {
+      "id": "spare_magazine",
+      "source": "04_备用弹匣.png",
+      "path": "assets/items/icons/item_spare_magazine_icon.png",
+      "sha256": "d033c3613ecb2fbe88318b097eb56c00a012111db1b39ed1a4a8c4fcfb476f12"
+    },
+    {
+      "id": "armor_plate",
+      "source": "05_防弹插板.png",
+      "path": "assets/items/icons/item_armor_plate_icon.png",
+      "sha256": "4d09d90d110ca00073eb5d8552959c8bf366b7371ef8c499d80b441f73801ada"
+    },
+    {
+      "id": "replicator",
+      "source": "03_复印机.png",
+      "path": "assets/items/icons/item_replicator_icon.png",
+      "sha256": "fb2f272385a312748510b26b8645e0abbbb3795c39be3d79a13d1eb7f6cb9aa2"
+    },
+    {
+      "id": "tool_belt",
+      "source": "01_工具腰包.png",
+      "path": "assets/items/icons/item_tool_belt_icon.png",
+      "sha256": "2501ffe7fe7701c0f289976fe092192749d4d4bfac11a42be5b75ece42a3e1bc"
+    },
+    {
+      "id": "folding_cart",
+      "source": "02_折叠推车.png",
+      "path": "assets/items/icons/item_folding_cart_icon.png",
+      "sha256": "e4c48435ba979312630737b557d569ffd92f8bc0833357ad1921e4accfb71e4a"
+    },
+    {
+      "id": "early_start",
+      "source": "05_咖啡.png",
+      "path": "assets/items/icons/item_early_start_icon.png",
+      "sha256": "345c4948a78a9baa6e3ecebedc3ac5ca87225628da726e3d25eeff7e7ffb7026"
+    },
+    {
+      "id": "old_watch",
+      "source": "03_旧腕表.png",
+      "path": "assets/items/icons/item_old_watch_icon.png",
+      "sha256": "754d11946ba1916731e151df494d5bdcea8431a815b9d4ed0b0e8fe26de4d410"
+    },
+    {
+      "id": "rage",
+      "source": "02_狂怒.png",
+      "path": "assets/skills/icons/skill_rage_action_icon.png",
+      "sha256": "7236b6b92c194c67ef80883a496d4197640f09466ee0f596a7f0521880a9cd02"
+    },
+    {
+      "id": "focus_fire",
+      "source": "01_集中火力.png",
+      "path": "assets/skills/icons/skill_focus_fire_action_icon.png",
+      "sha256": "535e0bb7fbca49193cfc55b75d8a2de8dd2bce0744e39ddba2e8e60bea36758d"
+    },
+    {
+      "id": "sprint",
+      "source": "04_疾行号令.png",
+      "path": "assets/skills/icons/skill_sprint_action_icon.png",
+      "sha256": "d7244e03202943892259a253676a9f460727c993af3fe6da40df32fba804c385"
+    },
+    {
+      "id": "scavenge_frenzy",
+      "source": "02_搜刮狂潮.png",
+      "path": "assets/skills/icons/skill_scavenge_frenzy_action_icon.png",
+      "sha256": "15fcd4409d20563fd39f49c4e7e4c5a400808f1e15d821939fa980ec410361fe"
+    },
+    {
+      "id": "aid",
+      "source": "06_全地图治疗.png",
+      "path": "assets/skills/icons/skill_aid_action_icon.png",
+      "sha256": "a42629b3b92ead87d6747504d8cf1b70780ad974427dd9c4f92cd53540c09d7c"
+    },
+    {
+      "id": "dusk_delay",
+      "source": "03_暮色延缓.png",
+      "path": "assets/skills/icons/skill_dusk_delay_action_icon.png",
+      "sha256": "d4443ac6f861c799b65d85a8d0e35978b20679a346bc289430ea0a7f2de0143f"
+    }
+  ]
+}

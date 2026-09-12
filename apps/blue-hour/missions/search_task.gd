@@ -77,7 +77,8 @@ func advance(delta: float, mission: Node3D) -> void:
 	if not worker.searching or safe_left > 0 or _threatened(mission):
 		return
 	var site: Dictionary = mission.city.sites[site_id]
-	site.progress = minf(1.0, site.progress + delta * worker.talent.search_multiplier / site.spec.search_seconds)
+	var seconds: float = mission.effects.search_seconds(site.spec.search_seconds, worker.talent.search_multiplier)
+	site.progress = minf(1.0, site.progress + delta / seconds)
 	mission.city.update_site(site_id)
 	if site.progress >= 1.0:
 		site.searched = true

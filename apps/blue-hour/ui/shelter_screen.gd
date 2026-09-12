@@ -10,6 +10,9 @@ var training_button: Button
 var member_buttons: Dictionary = {}
 var shop_panel: PanelContainer
 var shop_backdrop: ColorRect
+var effects_panel: PanelContainer
+var effects_backdrop: ColorRect
+var effect_buttons: Dictionary = {}
 
 func setup(owner_app: Node) -> void:
 	app = owner_app
@@ -34,11 +37,18 @@ func setup(owner_app: Node) -> void:
 	var selected: String = app.selected_member if app.selected_member in game.data.members else game.data.members[0]
 	app.selected_member = selected
 	view.select(selected)
-	for entry in game.data.passive_slots + game.data.power_slots:
-		var passive: bool = entry in game.data.passive_slots
-		var effect: Resource = app.catalog.by_id(app.catalog.passives if passive else app.catalog.powers, entry)
-		scene_column.add_child(UI.label(("被动 · " if passive else "特殊能力 · ") + effect.display_name, 17, UI.CYAN))
-		scene_column.add_child(UI.wrapped(effect.description() + ("" if passive else " · 每日一次"), 14, UI.MUTED))
+	for category: String in ["passive", "power"]:
+		var equipped_row := HFlowContainer.new()
+		scene_column.add_child(equipped_row)
+		equipped_row.add_child(UI.label("被动" if category == "passive" else "技能", 14, UI.CYAN))
+		for effect: Resource in game.equipped_effects(category):
+			var badge := TextureRect.new()
+			badge.texture = effect.icon
+			badge.custom_minimum_size = Vector2(40, 40)
+			badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			badge.tooltip_text = effect.display_name + (" · 已升级" if effect.is_upgraded else "") + "\n" + effect.description()
+			equipped_row.add_child(badge)
 	var roster := VBoxContainer.new()
 	roster.custom_minimum_size.x = 350
 	roster.add_theme_constant_override("separation", 12)
@@ -77,7 +87,7 @@ func setup(owner_app: Node) -> void:
 	weapon_selects.append(select)
 	var equipped: Resource = game.weapon(game.data.equipment[selected])
 	roster.add_child(UI.wrapped(game.gear.description(game.item(game.data.equipment[selected])), 14, UI.MUTED))
-	roster.add_child(UI.label("伤害 %.1f · 含特质与被动" % (equipped.damage * game.member_trait(selected, equipped).damage_multiplier), 16))
+	roster.add_child(UI.label("伤害 %.1f · 含特质与被动" % game.passive_modifiers().outgoing_damage(equipped.damage * talent.damage_multiplier, equipped.melee), 16))
 	var cost: int = game.training_cost(selected)
 	if cost >= 0:
 		var next: Resource = app.catalog.by_id(app.catalog.traits, spec.trait_id).at_level(game.member_level(selected) + 1)
@@ -92,10 +102,66 @@ func setup(owner_app: Node) -> void:
 	departure.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	actions.add_child(departure)
 	actions.add_child(UI.button("备用装备", func(): shop_backdrop.show(); shop_panel.show(), Vector2(140, 48)))
+	actions.add_child(UI.button("道具与技能", show_effects, Vector2(130, 48)))
 	actions.add_child(UI.button("主菜单", app.show_main_menu, Vector2(115, 48)))
 	actions.add_child(UI.button("调试 [F1]", toggle_debug, Vector2(125, 48)))
 	_build_shop()
+	_build_effects()
 	_build_debug()
+
+func show_effects() -> void:
+	effects_backdrop.show()
+	effects_panel.show()
+
+func _build_effects() -> void:
+	effects_backdrop = ColorRect.new()
+	effects_backdrop.color = Color(0, 0, 0, 0.65)
+	effects_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(effects_backdrop)
+	effects_backdrop.hide()
+	effects_panel = PanelContainer.new()
+	effects_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	effects_panel.offset_left = 100
+	effects_panel.offset_right = -100
+	effects_panel.offset_top = 45
+	effects_panel.offset_bottom = -45
+	add_child(effects_panel)
+	var column := VBoxContainer.new()
+	effects_panel.add_child(column)
+	column.add_child(UI.label("道具与技能", 24, UI.AMBER))
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	column.add_child(scroll)
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 12)
+	scroll.add_child(content)
+	for category: String in ["passive", "power"]:
+		var slots: Array = app.campaign.data[category + "_slots"]
+		content.add_child(UI.label(("被动道具" if category == "passive" else "特殊技能 · 每日一次") + "  %d / %d" % [slots.size(), app.campaign.data[category + "_capacity"]], 18, UI.CYAN))
+		for id: String in app.campaign.data[category + "_items"]:
+			var definition: Resource = app.campaign.effect_definition(category, id)
+			var row := HBoxContainer.new()
+			content.add_child(row)
+			var icon := TextureRect.new()
+			icon.texture = definition.icon
+			icon.custom_minimum_size = Vector2(52, 52)
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			row.add_child(icon)
+			var text := VBoxContainer.new()
+			text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(text)
+			text.add_child(UI.label(definition.display_name + (" · 已升级" if definition.is_upgraded else ""), 17))
+			text.add_child(UI.wrapped(definition.description(), 14, UI.MUTED))
+			var button := UI.button("卸下" if id in slots else "装备", func(): app.set_effect_equipped(category, id, id not in slots), Vector2(80, 40))
+			button.disabled = id not in slots and slots.size() >= app.campaign.data[category + "_capacity"]
+			button.tooltip_text = definition.description() if definition.is_upgraded else definition.upgrade_description()
+			row.add_child(button)
+			effect_buttons[id] = button
+	column.add_child(UI.button("关闭", func(): effects_panel.hide(); effects_backdrop.hide()))
+	effects_panel.hide()
 
 func _build_shop() -> void:
 	shop_backdrop = ColorRect.new()
@@ -164,6 +230,8 @@ func _build_debug() -> void:
 		affix.add_item(value.display_name + " · " + value.description)
 	box.add_child(affix)
 	box.add_child(UI.button("给予选定差异武器", func(): app.debug_weapon(app.catalog.weapons[kind.selected].id, "" if affix.selected == 0 else app.catalog.affixes[affix.selected - 1].id)))
+	box.add_child(UI.button("给予全部道具与技能并扩容", func(): app.debug_effects(false)))
+	box.add_child(UI.button("升级全部已持有道具与技能", func(): app.debug_effects(true)))
 	box.add_child(UI.button("关闭", toggle_debug))
 	debug_panel.visible = false
 

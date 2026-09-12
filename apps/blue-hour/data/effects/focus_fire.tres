@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/effect_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/skills/icons/skill_focus_fire_action_icon.png" id="2"]
+[resource]
+script = ExtResource("1")
+icon = ExtResource("2")
+id = "focus_fire"
+display_name = "集中火力"
+category = "power"
+specialization = "combat"
+short_description = "优先攻击最高威胁目标，对其伤害 +50%，持续 10 秒。"
+flavor = ""
+normal_description = "优先攻击最高威胁目标，对其伤害 +50%，持续 10 秒。"
+upgraded_description = "优先攻击最高威胁目标，对其伤害 +70%，持续 14 秒。"
+normal_modifiers = {"focus_damage": 1.5}
+upgraded_modifiers = {"focus_damage": 1.7}
+duration = 10.0
+upgraded_duration = 14.0

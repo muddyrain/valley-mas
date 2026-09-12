@@ -8,7 +8,9 @@ var settings: Resource
 func _init(map: Resource) -> void:
 	settings = map
 
-func advance(delta: float) -> void:
+func advance(delta: float, freeze_day_clock: bool = false) -> void:
+	if freeze_day_clock and phase != NIGHT:
+		return
 	elapsed += maxf(delta, 0.0)
 	var next_phase := DAY
 	if elapsed >= settings.day_seconds + settings.blue_seconds:

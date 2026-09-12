@@ -1,6 +1,7 @@
 extends Node3D
 signal completed(result: Dictionary)
 signal notice(text: String)
+signal watch_warning_changed(active: bool)
 const City = preload("res://maps/city.gd")
 const Survivor = preload("res://survivors/survivor.gd")
 const Enemy = preload("res://enemies/enemy.gd")
@@ -11,6 +12,13 @@ const Soundscape = preload("res://audio/soundscape.gd")
 const SearchTask = preload("res://missions/search_task.gd")
 const SquadInput = preload("res://missions/squad_input.gd")
 const SpecialPower = preload("res://missions/special_power.gd")
+const Modifiers = preload("res://core/effect_modifiers.gd")
+var effects: RefCounted
+var action_elapsed: float = 0.0
+var watch_warning_active: bool:
+	get:
+		return active and effects != null and clock != null and effects.amount("warning_seconds") > 0 and clock.phase == clock.DAY and clock.remaining() <= effects.amount("warning_seconds")
+var _last_watch_warning: bool = false
 var powers: RefCounted
 var catalog: RefCounted
 var ledger: RefCounted
@@ -58,6 +66,7 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 	catalog = content
 	ledger = resources
 	campaign = run_state
+	effects = campaign.passive_modifiers() if campaign != null else Modifiers.new()
 	controls = SquadInput.new(self)
 	ledger.begin()
 	rally_point = catalog.map.bus_position
@@ -65,11 +74,7 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 	if campaign != null:
 		rng.seed = int(campaign.data.seed) + int(campaign.data.day) * 1009
 	var clock_rules: Resource = catalog.map.duplicate()
-	if campaign != null:
-		for id in campaign.data.passive_slots:
-			var passive: Resource = catalog.by_id(catalog.passives, id)
-			if passive.effect == "day_extension":
-				clock_rules.day_seconds += passive.amount
+	clock_rules.day_seconds += effects.amount("day_extension")
 	clock = Clock.new(clock_rules)
 	city = City.new()
 	add_child(city)
@@ -100,12 +105,13 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 			equipment = catalog.by_id(catalog.weapons, loadout[i])
 		else:
 			equipment = campaign.weapon(campaign.data.equipment[member_id])
-			talent = campaign.member_trait(member_id, equipment)
+			talent = campaign.member_trait(member_id)
 			spec.id = member_id
 			spec.max_hp *= campaign.health_multiplier()
 		var survivor := Survivor.new()
 		add_child(survivor)
 		survivor.setup(spec, talent, equipment)
+		survivor.effects = effects
 		survivor.position = catalog.map.bus_position + formation(survivors.size())
 		survivors.append(survivor)
 	for entry in catalog.map.initial_enemies:
@@ -123,19 +129,25 @@ func debug_equip(index: int, equipment: Resource) -> void:
 		return
 	member.equip(equipment)
 	if campaign != null:
-		member.talent = campaign.member_trait(member.data.id, equipment)
-		if powers != null and powers.remaining > 0 and powers.baseline.has(member):
-			powers.baseline[member].damage = member.talent.damage_multiplier
-			if powers.definition.effect == "burst":
-				member.talent.damage_multiplier *= powers.definition.amount
+		member.talent = campaign.member_trait(member.data.id)
 
 func _physics_process(delta: float) -> void:
 	if not active or time_scale <= 0:
 		return
-	var dt := delta * time_scale
-	powers.advance(dt)
-	clock.advance(dt)
+	var left := maxf(0.0, delta * time_scale)
+	# Split at effect expiry so a clock freeze cannot eat the rest of a large frame.
+	while left > 0 and active:
+		var dt := minf(left, powers.next_expiry())
+		_advance_world(dt)
+		powers.advance(dt)
+		left = maxf(0.0, left - dt)
+
+func _advance_world(dt: float) -> void:
+	action_elapsed += dt
+	clock.advance(dt, effects.amount("freeze_day_clock") > 0)
+	_sync_watch_warning()
 	_update_director(dt)
+	powers.refresh_target()
 	for task in search_tasks.values():
 		task.prepare(dt, self)
 	_prune_tasks()
@@ -159,6 +171,29 @@ func _physics_process(delta: float) -> void:
 	city.show_assignments(search_tasks.keys())
 	_update_pickups()
 	_update_extraction(dt)
+
+func _sync_watch_warning() -> void:
+	if _last_watch_warning != watch_warning_active:
+		_last_watch_warning = watch_warning_active
+		watch_warning_changed.emit(watch_warning_active)
+
+func movement_speed(member: Node3D, waypoint: Vector3, delta: float) -> float:
+	var speed: float = member.data.move_speed * effects.multiplier("move_speed")
+	if not watch_warning_active or member.dead or member.boarding or delta <= 0:
+		return speed
+	var offset: Vector3 = waypoint - member.position
+	var to_bus: Vector3 = catalog.map.bus_position - member.position
+	if offset.length_squared() < 0.000001 or offset.dot(to_bus) <= 0:
+		return speed
+	var boosted: float = speed * effects.multiplier("return_speed")
+	var next: Vector3 = member.position.move_toward(waypoint, boosted * delta)
+	# A command towards home is insufficient: this actual path segment must approach it.
+	if next.distance_squared_to(catalog.map.bus_position) < member.position.distance_squared_to(catalog.map.bus_position) - 0.000001:
+		return boosted
+	return speed
+
+func damage_to(member: Node3D, target: Node3D) -> float:
+	return effects.outgoing_damage(member.weapon.damage * member.talent.damage_multiplier, member.weapon.melee, target != null and target == powers.target())
 
 func _process(delta: float) -> void:
 	if controls != null:
@@ -260,6 +295,8 @@ func _notification(what: int) -> void:
 		controls.reset()
 
 func _exit_tree() -> void:
+	if powers != null:
+		powers.clear()
 	for task in search_tasks.values():
 		if is_instance_valid(task.worker) and task.worker.damaged.is_connected(task._on_damage):
 			task.worker.damaged.disconnect(task._on_damage)
@@ -446,6 +483,9 @@ func _finish_focus() -> void:
 	order = "守住阵位 · 自动迎敌"
 
 func choose_target(survivor: Node3D) -> Node3D:
+	var priority: Node3D = powers.target()
+	if priority != null and _can_hit(survivor, priority):
+		return priority
 	if task_for(survivor) == null and focus_target != null and is_instance_valid(focus_target) and focus_target.active and _can_hit(survivor, focus_target):
 		return focus_target
 	var nearest: Node3D
@@ -474,7 +514,7 @@ func attack(survivor: Node3D, target: Node3D) -> void:
 			if direction.dot(survivor.position.direction_to(candidate.position)) >= cos(deg_to_rad(weapon.cone_degrees)):
 				targets.append(candidate)
 	for enemy in targets:
-		enemy.take_damage(weapon.damage * survivor.talent.damage_multiplier)
+		enemy.take_damage(damage_to(survivor, enemy))
 		Visuals.tracer(self, survivor.position + Vector3.UP, enemy.position + Vector3.UP, weapon.color, weapon.melee)
 	sound.play_cue("melee" if weapon.melee else "shot", weapon.sound_pitch)
 
@@ -573,8 +613,8 @@ func _update_pickups() -> void:
 	for pickup in pickups.duplicate():
 		for survivor in living():
 			if survivor.position.distance_to(pickup.view.position) <= catalog.map.pickup_radius:
-				ledger.add_loot(pickup.food, pickup.scrap)
-				var message := "+%d 食物   +%d 废料" % [pickup.food, pickup.scrap]
+				var gained: Vector2i = ledger.collect_resources(pickup.food, pickup.scrap, effects.multiplier("resource_yield"))
+				var message := "+%d 食物   +%d 废料" % [gained.x, gained.y]
 				if not pickup.weapon.is_empty():
 					ledger.add_weapon(pickup.weapon)
 					message += "\n获得 " + campaign.gear.title(pickup.weapon)
@@ -633,6 +673,8 @@ func _finish(wiped: bool) -> void:
 	if not active:
 		return
 	active = false
+	powers.clear()
+	_sync_watch_warning()
 	_release_tasks()
 	if controls != null:
 		controls.reset()
@@ -647,7 +689,7 @@ func _finish(wiped: bool) -> void:
 		else:
 			returned.append(survivor.data.display_name)
 			returned_ids.append(survivor.data.id)
-	var result: Dictionary = ledger.finish(returned, lost, clock.elapsed, kills, wiped)
+	var result: Dictionary = ledger.finish(returned, lost, action_elapsed, kills, wiped)
 	result.returned_ids = returned_ids
 	result.lost_ids = lost_ids
 	completed.emit(result)

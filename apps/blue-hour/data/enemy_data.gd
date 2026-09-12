@@ -10,6 +10,7 @@ extends Resource
 @export var scale_factor: float = 1.0
 @export var color: Color = Color(0.5, 0.6, 0.5)
 @export var special: bool = false
+@export_enum("Normal", "Elite", "Boss") var threat_rank: int = 0
 @export var alarm_interval: float = 12.0
 @export var alarm_count: int = 3
 @export var food_drop_chance: float = 0.08

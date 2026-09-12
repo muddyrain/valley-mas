@@ -26,7 +26,7 @@ static func fire(member: Node3D, mission: Node3D, point: Vector3) -> void:
 	var endpoint: Vector3 = member.position + direction * reach
 	for i in range(mini(weapon.target_count, candidates.size())):
 		var enemy := candidates[i]
-		enemy.take_damage(weapon.damage * member.talent.damage_multiplier)
+		enemy.take_damage(mission.damage_to(member, enemy))
 		if i == 0 and weapon.target_count == 1:
 			endpoint = enemy.position
 	Visuals.tracer(mission, member.position + Vector3.UP, endpoint + Vector3.UP, weapon.color)

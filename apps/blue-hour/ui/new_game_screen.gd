@@ -351,11 +351,11 @@ func select_specialization(id: String) -> void:
 		var effect: Resource = effects[index]
 		cards[index].text = effect.display_name
 		effect_titles[index].text = effect.display_name
-		effect_descriptions[index].text = _card_description(effect.id)
-		card_plates[index].texture = _card_plate(effect.id)
+		effect_descriptions[index].text = effect.short_description
+		card_plates[index].texture = effect.card_art if effect.card_art != null else Art.CARD_COMPOSITE
 		card_hovers[index].set_texture(card_plates[index].texture)
-		card_art[index].texture = _effect_art(effect.id)
-		card_art[index].visible = effect.id not in ["replicator", "sprint", "shooting_target", "rage", "early_start", "aid"]
+		card_art[index].texture = effect.icon
+		card_art[index].visible = effect.card_art == null
 	_select_effect(1)
 	_hide_tooltip_immediately()
 
@@ -370,7 +370,7 @@ func _select_effect(index: int) -> void:
 	var effect: Resource = app.catalog.by_id(app.catalog.passives if index == 0 else app.catalog.powers, effect_id)
 	tooltip_title.text = effect.display_name
 	tooltip_badge.text = "起始道具" if index == 0 else "特殊技能"
-	tooltip_flavor.text = _effect_flavor(effect.id)
+	tooltip_flavor.text = effect.flavor
 	tooltip_prefix.text = "效果："
 	tooltip_summary.text = effect.description()
 	tooltip_upgrade_prefix.text = "升级："
@@ -526,39 +526,6 @@ func _tooltip_paper_points(width: float, height: float, points_right: bool, poin
 		points.append(Vector2(0.7, maxf(10.0, pointer_top - 22.0)))
 	points.append(Vector2(3.0, 4.0))
 	return points
-
-func _card_plate(effect_id: String) -> Texture2D:
-	match effect_id:
-		"shooting_target": return Art.CARD_SHOOTING_TARGET
-		"rage": return Art.CARD_RAGE
-		"early_start": return Art.CARD_COFFEE
-		"aid": return Art.CARD_MAP_HEAL
-		"replicator": return Art.CARD_PRINTER
-		"sprint": return Art.CARD_SPEED
-	return Art.CARD_COMPOSITE
-
-func _effect_art(effect_id: String) -> Texture2D:
-	return Art.ICON_SCAVENGE
-
-func _card_description(effect_id: String) -> String:
-	match effect_id:
-		"shooting_target": return "让每一次远程射击更有效。"
-		"replicator": return "成功归航时，有机会复制一把武器。"
-		"early_start": return "白昼时长增加。"
-		"rage": return "短时间提高全队伤害。"
-		"sprint": return "让全队跑得更快一些。"
-		"aid": return "治疗地图上所有幸存者。"
-	return ""
-
-func _effect_flavor(effect_id: String) -> String:
-	match effect_id:
-		"shooting_target": return "把枪械调整到最可靠的状态，再去面对街上的危险。"
-		"replicator": return "一次幸运的归航，也许能为营地多留下一把武器。"
-		"early_start": return "早起的鸟儿有虫吃。"
-		"rage": return "最危险的几秒里，让所有人同时压上火力。"
-		"sprint": return "偶尔得跑起来，因为有时候真的得逃命了。"
-		"aid": return "我希望别把僵尸也救活了。"
-	return ""
 
 func _refresh_tab_visuals() -> void:
 	for key in tab_backgrounds:
