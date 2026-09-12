@@ -1,0 +1,28 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/world/props/street/prop_street_lamp.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "PRP_001_street_lamp"
+scene = ExtResource("2")
+
+category = "street"
+
+footprint = Vector2(0.489387, 1.743285)
+
+bounding_size = Vector3(0.489387, 4.200000, 1.743285)
+
+poi_type = ""
+
+parking_requirement = "none"
+
+loot_profile = "general"
+
+enemy_profile = "street"
+
+entrance_offset = Vector3(0.000000, 0.000000, -2.371643)
+
+road_offset = Vector3(0.000000, 0.000000, -2.371643)

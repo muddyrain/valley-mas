@@ -1,0 +1,94 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="script"]
+
+[ext_resource type="Material" path="res://assets/world/materials/chain_link.tres" id="chain"]
+
+[sub_resource type="BoxShape3D" id="shape_0"]
+size = Vector3(4.000000, 1.800000, 0.150000)
+
+[sub_resource type="StandardMaterial3D" id="steel"]
+albedo_color = Color(0.38, 0.43, 0.44, 1)
+roughness = 0.8
+
+[sub_resource type="BoxMesh" id="post"]
+size = Vector3(0.07, 1.8, 0.07)
+
+[sub_resource type="BoxMesh" id="rail"]
+size = Vector3(4, 0.05, 0.05)
+
+[sub_resource type="QuadMesh" id="chain_mesh"]
+size = Vector2(3.86, 1.65)
+
+[node name="WorldAsset" type="Node3D" groups=["world_assets"]]
+script = ExtResource("script")
+asset_id = "BAR_001_chainlink_fence"
+
+[node name="ModelRoot" type="Node3D" parent="."]
+position = Vector3(0.000000, 0.000000, 0.000000)
+rotation = Vector3(0, 0.00000000, 0)
+
+[node name="Collision" type="StaticBody3D" parent="."]
+
+[node name="Shape0" type="CollisionShape3D" parent="Collision"]
+position = Vector3(0.000000, 0.900000, 0.000000)
+shape = SubResource("shape_0")
+
+[node name="NavigationObstacle" type="Node3D" parent="."]
+metadata/provider = "Wrapper shapes projected to the mission AStar grid"
+
+[node name="Anchors" type="Node3D" parent="."]
+
+[node name="RoadAnchor" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 0.000000, -1.546567)
+
+[node name="EntranceAnchor" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 0.000000, -1.546567)
+
+[node name="SpawnPoints" type="Node3D" parent="."]
+
+[node name="LootPoints" type="Node3D" parent="SpawnPoints"]
+
+[node name="Primary" type="Marker3D" parent="SpawnPoints/LootPoints"]
+position = Vector3(0.000000, 0.000000, -1.546567)
+
+[node name="EnemyPoints" type="Node3D" parent="SpawnPoints"]
+
+[node name="Primary" type="Marker3D" parent="SpawnPoints/EnemyPoints"]
+position = Vector3(3.000000, 0.000000, -1.546567)
+
+[node name="OptionalVehiclePoints" type="Node3D" parent="SpawnPoints"]
+
+[node name="Primary" type="Marker3D" parent="SpawnPoints/OptionalVehiclePoints"]
+position = Vector3(0.000000, 0.000000, -4.546567)
+
+[node name="LeftPost" type="MeshInstance3D" parent="ModelRoot"]
+position = Vector3(-1.965000, 0.900000, 0.000000)
+mesh = SubResource("post")
+material_override = SubResource("steel")
+
+[node name="RightPost" type="MeshInstance3D" parent="ModelRoot"]
+position = Vector3(1.965000, 0.900000, 0.000000)
+mesh = SubResource("post")
+material_override = SubResource("steel")
+
+[node name="TopRail" type="MeshInstance3D" parent="ModelRoot"]
+position = Vector3(0.000000, 1.765000, 0.000000)
+mesh = SubResource("rail")
+material_override = SubResource("steel")
+
+[node name="BottomRail" type="MeshInstance3D" parent="ModelRoot"]
+position = Vector3(0.000000, 0.080000, 0.000000)
+mesh = SubResource("rail")
+material_override = SubResource("steel")
+
+[node name="ChainLinkPlane" type="MeshInstance3D" parent="ModelRoot"]
+position = Vector3(0, 0.92, 0)
+mesh = SubResource("chain_mesh")
+material_override = ExtResource("chain")
+
+[node name="LeftSnapAnchor" type="Marker3D" parent="Anchors"]
+position = Vector3(-2, 0, 0)
+
+[node name="RightSnapAnchor" type="Marker3D" parent="Anchors"]
+position = Vector3(2, 0, 0)

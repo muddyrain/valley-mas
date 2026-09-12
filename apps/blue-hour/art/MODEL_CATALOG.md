@@ -1,6 +1,12 @@
 # BLUE HOUR STARTER ENVIRONMENT KIT V1
 
-生成真源为 `blender/asset_specs.py` 与各类别生成器；数值从实际导出的 GLB 读取。所有 3D 资产均由本项目原创 Blender 程序生成，无外部素材。先复用，再创建。
+正式营地主站使用用户原件 [CAMP_001_main_station.glb](../assets/world/buildings/CAMP_001_main_station.glb)，唯一 [wrapper](../scenes/camp/buildings/camp_main_station.tscn) 由冻结 Camp 实例化。当前为 4K 版本：BaseColor / Normal 4096²、MetallicRoughness 原始 2048²；27,592 tris、1 Mesh / 材质、内嵌 PBR。Visual 等比 1.097386，总包围盒宽 12.000 / 高 4.170 / 深 6.704m（含天线、雨棚和台阶），中央主体屋面约高 3.24m、中央屋顶设备约 3.58m；3 个 Box 简单碰撞。此项不进入旧 Blender 生成批次；接入与出发演出见 [Camp Departure V1](../docs/CAMP_DEPARTURE_V1.md)，当前导入与主 Viewport 验证见 [清晰度报告](../docs/CAMP_CLARITY_REPORT.md)。
+
+正式外出街区已使用首批16项World资产，完整目录、Wrapper、实测尺寸和接入状态见 [WORLD_ASSET_AUDIT](WORLD_ASSET_AUDIT.md)。下表旧Blender库中“东岸旧街”的摆放说明为历史位置，已由本批Wrapper替换；仍保留资产库、营地或展厅引用，不表示当前正式外出仍走旧模型。道路、围栏的当前规则实现见 [WORLD_MAP_REPORT](../docs/WORLD_MAP_REPORT.md)。
+
+正式普通感染者另登记于 [EnemyDefinition 规格](../docs/ENEMY_DEFINITION.md)：`assets/characters/infected_basic_a/model/ENM_001_infected_basic_a.glb`，10,270 tris，1.65 米，用户提供的贴图模型。正式行动只实例化此模型；下表 `BH_Infected_Basic_Placeholder` 仅保留于历史资产库和既有美术展厅，不进入刷怪池。
+
+生成真源为 `blender/asset_specs.py` 与各类别生成器；数值从实际导出的 GLB 读取。其中 51 个资产为本项目原创 Blender 程序模型；蓝时号使用用户提供的 VEH_BLUE_HOUR GLB。先复用，再创建。
 
 每项均展示于 `scenes/debug/art_showcase.tscn`。表中地点表示已接入的视觉位置，其余资产保存在展示场景供后续组合；不表示新增搜索对象或武器玩法。完整数据与哈希见 `assets/generated/manifest.json`。尺寸按 Godot X/Y/Z（宽/高/深，米）；面数只计渲染网格。
 
@@ -22,7 +28,7 @@
 | BH_Curb<br>路缘 | roads | [GLB](../assets/generated/environment_curb_model.glb) / [blend](blender/sources/BH_Curb.blend) | 12 | BH_Concrete_Light | 1 Box→Convex | Art Showcase；资产库待复用 | 是 / 否 | Blender Generated |
 | BH_Door_Normal<br>普通门 | modules | [GLB](../assets/generated/environment_door_standard_model.glb) / [blend](blender/sources/BH_Door_Normal.blend) | 220 | BH_Metal_Dark, BH_Metal_Mid, BH_Plastic_Light | 1 Box→Convex | Art Showcase；资产库待复用 | 是 / 否 | Blender Generated |
 | BH_Door_Shop<br>商店门 | modules | [GLB](../assets/generated/environment_door_shop_model.glb) / [blend](blender/sources/BH_Door_Shop.blend) | 320 | BH_Glass, BH_Metal_Dark, BH_Metal_Mid, BH_Plastic_Light, BH_Safety_Yellow | 1 Box→Convex | Art Showcase；资产库待复用 | 是 / 否 | Blender Generated |
-| BH_EvacBus_01<br>社区归航巴士 | vehicles | [GLB](../assets/generated/vehicle_evacuation_bus_model.glb) / [blend](blender/sources/BH_EvacBus_01.blend) | 7120 | BH_Concrete_Dark, BH_Emergency_Red, BH_Emission_Warm, BH_Glass, BH_Metal_Dark, BH_Metal_Mid, BH_Muted_Green, BH_Plastic_Dark, BH_Plastic_Light, BH_Warm_Orange | 1 Box→Convex | Art Showcase；东岸旧街撤离巴士 | 是 / 否 | Blender Generated |
+| BH_EvacBus_01<br>蓝时号（兼容 ID） | vehicles | [GLB](../assets/world/vehicles/VEH_BLUE_HOUR.glb) / [Wrapper](../scenes/world/vehicles/veh_blue_hour.tscn) | 29712 | Material_0（源 PBR 贴图） | 1 Box | Camp；外出地图；整备界面；Art Showcase | 否 / 否 | 用户提供 Meshy GLB |
 | BH_Fence<br>围栏 | props | [GLB](../assets/generated/environment_fence_model.glb) / [blend](blender/sources/BH_Fence.blend) | 1092 | BH_Concrete_Dark, BH_Metal_Dark, BH_Metal_Mid | 1 Box→Convex | Art Showcase；资产库待复用 | 是 / 否 | Blender Generated |
 | BH_Fence_Broken<br>破损围栏 | props | [GLB](../assets/generated/environment_fence_broken_model.glb) / [blend](blender/sources/BH_Fence_Broken.blend) | 1096 | BH_Concrete_Dark, BH_Metal_Dark, BH_Metal_Mid | 2 Box→Convex | Art Showcase；资产库待复用 | 是 / 否 | Blender Generated |
 | BH_GarbageBag_Set<br>垃圾袋组 | props | [GLB](../assets/generated/environment_garbage_bags_model.glb) / [blend](blender/sources/BH_GarbageBag_Set.blend) | 336 | BH_Plastic_Dark | 1 Box→Convex | Art Showcase；资产库待复用 | 是 / 否 | Blender Generated |
@@ -59,8 +65,23 @@
 | BH_Window_Small<br>小窗 | modules | [GLB](../assets/generated/environment_window_small_model.glb) / [blend](blender/sources/BH_Window_Small.blend) | 320 | BH_Concrete_Light, BH_Emission_Warm, BH_Glass, BH_Metal_Mid | 1 Box→Convex | Art Showcase；资产库待复用 | 是 / 否 | Blender Generated |
 | BH_WoodCrate<br>木箱 | props | [GLB](../assets/generated/environment_wood_crate_model.glb) / [blend](blender/sources/BH_WoodCrate.blend) | 476 | BH_Concrete_Dark, BH_Plastic_Light, BH_Warm_Orange | 1 Box→Convex | Art Showcase；仓库装卸口装饰 | 是 / 否 | Blender Generated |
 
-合计：52 个模型，58164 个渲染三角形。几何预算为上限，简单模块不会为填满预算而增加面数。
+合计：52 个模型，80756 个渲染三角形。几何预算为上限，简单模块不会为填满预算而增加面数。
 
 ## 0.4 基地复用
 
 `data/shelter_layout.tres` 组合既有仓库、归航巴士、金属箱、托盘、单臂路灯与交通锥；`ui/shelter_view.gd` 采用原尺寸实例化，未新建或重新导出 GLB。角色仍沿用当前占位表现与已有装备模型。基地为独立准备场景，点选对应本轮成员，不参与城区导航和搜索规则。
+
+## 正式蓝时号
+
+新版蓝时号唯一入口为 `scenes/world/vehicles/veh_blue_hour.tscn`，旧 `BH_EvacBus_01` 仅保留为兼容资源 ID。源 GLB 字节、原始比例和 Scale=1 保持不变；Visual 内绕 Y 旋转 +90°，将源 -X 车头对齐项目 +Z，平移至地面投影中心。车轮、车门与灯面合并在一个 Mesh 中；后续物理动画需要拆分。旧 Blender 源和生成函数只作历史来源保留，常规车辆批次不再生成旧蓝时号。详见[替换验收报告](../docs/BLUE_HOUR_VEHICLE_REPORT.md)。
+
+
+## 正式装备武器（Phase 2A）
+
+这三把独立于旧 generated 展示库，运行时来自 WeaponDefinition.model_path，跟随双角色 RightHand；无碰撞，比例为 1 米制。详见 [武器模型报告](../docs/WEAPON_VISUALS.md)。
+
+| 对象 | 正式 GLB | Blender 源 | tris |
+| --- | --- | --- | ---: |
+| 拓荒短刀 | [GLB](../assets/weapons/models/wpn_001_survival_knife.glb) | [blend](blender/weapons/wpn_001_survival_knife.blend) | 848 |
+| P9 | [GLB](../assets/weapons/models/wpn_002_p9_pistol.glb) | [blend](blender/weapons/wpn_002_p9_pistol.blend) | 1,520 |
+| A21 | [GLB](../assets/weapons/models/wpn_006_a21_assault_rifle.glb) | [blend](blender/weapons/wpn_006_a21_assault_rifle.blend) | 2,524 |

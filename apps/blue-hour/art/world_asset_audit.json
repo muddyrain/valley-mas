@@ -1,0 +1,1063 @@
+[
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_001_超市_0911151928_texture.glb",
+    "sha256": "6e873c842b1bdbc22cd9920088ed51b093c33454767b9b670b12cbaf4694cec5",
+    "bytes": 12767716,
+    "mesh_count": 1,
+    "triangles": 132210,
+    "degenerate_triangles": 0,
+    "min": [-7.638866424560547, 0.0, -6.66373872756958],
+    "max": [7.557872772216797, 5.5, 7.1281328201293945],
+    "size": [15.196739196777344, 5.5, 13.791871547698975],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0.001"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0.001",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 2664858,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 3402669,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2149407,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "+Z",
+    "id": "BLD_001_supermarket",
+    "path": "res://assets/world/buildings/commercial/building_supermarket_model.glb",
+    "wrapper": "res://scenes/world/buildings/commercial/building_supermarket.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": 180.0,
+    "model_translation": [-0.04049682617187503, -0.0, 0.23219704627990723],
+    "runtime_size": [15.196739196777344, 5.5, 13.791871547698975],
+    "collision_boxes": [[[0, 2.75, 0], [15.196739196777344, 5.5, 13.791871547698975]]],
+    "entrance_offset": [0, 0, -8.395935773849487],
+    "road_offset": [0, 0, -8.395935773849487],
+    "known_issue": "Source labels contain generated pseudo lettering"
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_002_住宅_A_0911151911_texture.glb",
+    "sha256": "c33a499f9bbdab7d1d2579de2d0c7733c7ec66e09a83f26b6ec2c0b7a53d3b36",
+    "bytes": 10464044,
+    "mesh_count": 1,
+    "triangles": 55280,
+    "degenerate_triangles": 0,
+    "min": [-4.668826103210449, 0.0, -3.474787712097168],
+    "max": [4.658307075500488, 4.199999809265137, 3.508629322052002],
+    "size": [9.327133178710938, 4.199999809265137, 6.98341703414917],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 2888197,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 3848545,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2084388,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "+Z",
+    "id": "BLD_002_house_small_a",
+    "path": "res://assets/world/buildings/residential/building_house_small_a_model.glb",
+    "wrapper": "res://scenes/world/buildings/residential/building_house_small_a.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": 180.0,
+    "model_translation": [-0.0052595138549804705, -0.0, 0.016920804977416992],
+    "runtime_size": [9.327133178710938, 4.199999809265137, 6.98341703414917],
+    "collision_boxes": [
+      [[0, 2.0999999046325684, 0], [9.327133178710938, 4.199999809265137, 6.98341703414917]]
+    ],
+    "entrance_offset": [-2.0, 0, -4.991708517074585],
+    "road_offset": [0, 0, -5.491708517074585],
+    "known_issue": "Source labels contain generated pseudo lettering"
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_003_住宅_B_0911151741_texture.glb",
+    "sha256": "be5b6af053fb4d0c9d524b7792e0a48e8572484f3332058072a0460e8614eb30",
+    "bytes": 9811556,
+    "mesh_count": 1,
+    "triangles": 72316,
+    "degenerate_triangles": 0,
+    "min": [-4.276612281799316, 0.0, -2.739924669265747],
+    "max": [4.275878429412842, 4.199999809265137, 2.7668209075927734],
+    "size": [8.552490711212158, 4.199999809265137, 5.5067455768585205],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 2496383,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 3382301,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 1941150,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "+Z",
+    "id": "BLD_003_house_small_b",
+    "path": "res://assets/world/buildings/residential/building_house_small_b_model.glb",
+    "wrapper": "res://scenes/world/buildings/residential/building_house_small_b.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": 180.0,
+    "model_translation": [-0.0003669261932373063, -0.0, 0.013448119163513184],
+    "runtime_size": [8.552490711212158, 4.199999809265137, 5.5067455768585205],
+    "collision_boxes": [
+      [[0, 2.0999999046325684, 0], [8.552490711212158, 4.199999809265137, 5.5067455768585205]]
+    ],
+    "entrance_offset": [-3.0, 0, -4.25337278842926],
+    "road_offset": [0, 0, -4.75337278842926],
+    "known_issue": "Source labels contain generated pseudo lettering"
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_004_药店_0911151833_texture.glb",
+    "sha256": "8def3bb3ca66be9da2d1fbf8db629b835f87f6863658e53a18cf60f32a1170ab",
+    "bytes": 10725288,
+    "mesh_count": 1,
+    "triangles": 68296,
+    "degenerate_triangles": 0,
+    "min": [-3.803389310836792, 0.0, -3.6509835720062256],
+    "max": [3.799116611480713, 4.5, 3.7208774089813232],
+    "size": [7.602505922317505, 4.5, 7.371860980987549],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0.002"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0.002",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 2702735,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 3668304,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2368988,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "+Z",
+    "id": "BLD_004_pharmacy",
+    "path": "res://assets/world/buildings/commercial/building_pharmacy_model.glb",
+    "wrapper": "res://scenes/world/buildings/commercial/building_pharmacy.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": 180.0,
+    "model_translation": [-0.002136349678039555, -0.0, 0.03494691848754883],
+    "runtime_size": [7.602505922317505, 4.5, 7.371860980987549],
+    "collision_boxes": [[[0, 2.25, 0], [7.602505922317505, 4.5, 7.371860980987549]]],
+    "entrance_offset": [0, 0, -5.185930490493774],
+    "road_offset": [0, 0, -5.185930490493774],
+    "known_issue": "Source labels contain generated pseudo lettering"
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_005_小型餐厅_0911154142_texture.glb",
+    "sha256": "d19df1632f4b0571742bc78b9a86eebd54070e633e37b74743c5c069319f157e",
+    "bytes": 11022356,
+    "mesh_count": 1,
+    "triangles": 77544,
+    "degenerate_triangles": 0,
+    "min": [-4.166727542877197, 0.0, -2.810173988342285],
+    "max": [4.158352851867676, 4.800000190734863, 2.811779499053955],
+    "size": [8.325080394744873, 4.800000190734863, 5.62195348739624],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 2890029,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 3911201,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2097107,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "+Z",
+    "id": "BLD_005_restaurant_small",
+    "path": "res://assets/world/buildings/commercial/building_restaurant_small_model.glb",
+    "wrapper": "res://scenes/world/buildings/commercial/building_restaurant_small.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": 180.0,
+    "model_translation": [-0.004187345504760742, -0.0, 0.0008027553558349604],
+    "runtime_size": [8.325080394744873, 4.800000190734863, 5.62195348739624],
+    "collision_boxes": [
+      [[0, 2.4000000953674316, 0], [8.325080394744873, 4.800000190734863, 5.62195348739624]]
+    ],
+    "entrance_offset": [0, 0, -4.31097674369812],
+    "road_offset": [0, 0, -4.31097674369812],
+    "known_issue": "Source labels contain generated pseudo lettering"
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_006_仓库_0911154812_texture.glb",
+    "sha256": "4a465a54e70e4fb887b75da02aea9b248eea324f8097dcd25d2f9433467080bc",
+    "bytes": 11942008,
+    "mesh_count": 1,
+    "triangles": 74754,
+    "degenerate_triangles": 0,
+    "min": [-6.426455020904541, 0.0, -7.053738117218018],
+    "max": [6.427018642425537, 6.0, 7.044610023498535],
+    "size": [12.853473663330078, 6.0, 14.098348140716553],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0.003"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0.003",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 3075477,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 4090560,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2497209,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "+Z",
+    "id": "BLD_006_warehouse_small",
+    "path": "res://assets/world/buildings/industrial/building_warehouse_small_model.glb",
+    "wrapper": "res://scenes/world/buildings/industrial/building_warehouse_small.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": 180.0,
+    "model_translation": [0.0002818107604980474, -0.0, -0.004564046859741211],
+    "runtime_size": [12.853473663330078, 6.0, 14.098348140716553],
+    "collision_boxes": [[[0, 3.0, 0], [12.853473663330078, 6.0, 14.098348140716553]]],
+    "entrance_offset": [0, 0, -8.549174070358276],
+    "road_offset": [0, 0, -11.049174070358276],
+    "known_issue": "Source labels contain generated pseudo lettering"
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_007_加油站_0911161205_texture.glb",
+    "sha256": "92aaf9c24b303886f4bac288b9f68bd220b7ad7b0aa6e29034eb7f5bbf253f4d",
+    "bytes": 11146972,
+    "mesh_count": 1,
+    "triangles": 70976,
+    "degenerate_triangles": 0,
+    "min": [-8.182777404785156, 0.0, -5.43760871887207],
+    "max": [8.101676940917969, 5.199999809265137, 5.399469375610352],
+    "size": [16.284454345703125, 5.199999809265137, 10.837078094482422],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 2930777,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 3922970,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2220229,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "+Z",
+    "id": "BLD_007_gas_station",
+    "path": "res://assets/world/buildings/service/building_gas_station_model.glb",
+    "wrapper": "res://scenes/world/buildings/service/building_gas_station.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": 180.0,
+    "model_translation": [-0.04055023193359375, -0.0, -0.01906967163085938],
+    "runtime_size": [16.284454345703125, 5.199999809265137, 10.837078094482422],
+    "collision_boxes": [
+      [[4.15, 2.25, 0], [7.5, 4.5, 10.5]],
+      [[-4.15, 4.95, 0], [7.5, 0.5, 10.0]],
+      [[-7.5, 2.4, -4.6], [0.35, 4.8, 0.35]],
+      [[-7.5, 2.4, 4.6], [0.35, 4.8, 0.35]],
+      [[-0.8, 2.4, -4.6], [0.35, 4.8, 0.35]],
+      [[-0.8, 2.4, 4.6], [0.35, 4.8, 0.35]],
+      [[-4.1, 0.85, -2.5], [0.9, 1.7, 1.6]],
+      [[-4.1, 0.85, 2.5], [0.9, 1.7, 1.6]]
+    ],
+    "entrance_offset": [4.0, 0, -6.918539047241211],
+    "road_offset": [0, 0, -9.418539047241211],
+    "known_issue": "Monolithic canopy; compound collision leaves forecourt open; roof fade deferred"
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_008_小型汽车维修_0911162225_texture.glb",
+    "sha256": "4d8a954dbd18562a0ece9f497a54c2e57f0a660a6a7dde90547d4956ff422423",
+    "bytes": 11530648,
+    "mesh_count": 1,
+    "triangles": 71350,
+    "degenerate_triangles": 0,
+    "min": [-5.480442047119141, 0.0, -4.862205505371094],
+    "max": [5.475017070770264, 5.199999809265137, 4.851492881774902],
+    "size": [10.955459117889404, 5.199999809265137, 9.713698387145996],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 3070913,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 3897341,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2362740,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "+Z",
+    "id": "BLD_008_auto_repair_shop",
+    "path": "res://assets/world/buildings/service/building_auto_repair_shop_model.glb",
+    "wrapper": "res://scenes/world/buildings/service/building_auto_repair_shop.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": 180.0,
+    "model_translation": [-0.0027124881744384757, -0.0, -0.005356311798095703],
+    "runtime_size": [10.955459117889404, 5.199999809265137, 9.713698387145996],
+    "collision_boxes": [
+      [[0, 2.5999999046325684, 0], [10.955459117889404, 5.199999809265137, 9.713698387145996]]
+    ],
+    "entrance_offset": [0, 0, -6.356849193572998],
+    "road_offset": [0, 0, -8.856849193572998],
+    "known_issue": "Source labels contain generated pseudo lettering"
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_VEH_001_sedan_a_0911173804_texture.glb",
+    "sha256": "6313c5b88ca6179f8eecc8478a4edaf7bf258cf4b89782ec25d868672d3641f1",
+    "bytes": 7272300,
+    "mesh_count": 1,
+    "triangles": 29888,
+    "degenerate_triangles": 0,
+    "min": [-2.3480842113494873, 0.0, -1.0451745986938477],
+    "max": [2.3458425998687744, 1.5, 1.0439847707748413],
+    "size": [4.693926811218262, 1.5, 2.089159369468689],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 1937300,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2455862,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2011730,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "-X",
+    "id": "VEH_001_sedan_a",
+    "path": "res://assets/world/vehicles/vehicle_sedan_a_model.glb",
+    "wrapper": "res://scenes/world/vehicles/vehicle_sedan_a.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": -90.0,
+    "model_translation": [-0.0005949139595031737, -0.0, 0.0011208057403564453],
+    "runtime_size": [2.089159369468689, 1.5, 4.693926811218262],
+    "collision_boxes": [[[0, 0.75, 0], [2.089159369468689, 1.5, 4.693926811218262]]],
+    "entrance_offset": [0, 0, 3.846963405609131],
+    "road_offset": [0, 0, -3.846963405609131],
+    "known_issue": ""
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_Silver_Urban_SUV_0911174654_texture.glb",
+    "sha256": "f46fb609c01365f0838bd720f64b00f071fcf470e05001959e49983896e4d952",
+    "bytes": 7767664,
+    "mesh_count": 1,
+    "triangles": 28962,
+    "degenerate_triangles": 0,
+    "min": [-2.340824842453003, 0.0, -1.0351682901382446],
+    "max": [2.336596727371216, 1.7000000476837158, 1.0315699577331543],
+    "size": [4.677421569824219, 1.7000000476837158, 2.066738247871399],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0.001"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0.001",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 2082089,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2550103,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2225911,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "-X",
+    "id": "VEH_002_suv",
+    "path": "res://assets/world/vehicles/vehicle_suv_model.glb",
+    "wrapper": "res://scenes/world/vehicles/vehicle_suv.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": -90.0,
+    "model_translation": [-0.0017991662025451658, -0.0, 0.0021140575408935547],
+    "runtime_size": [2.066738247871399, 1.7000000476837158, 4.677421569824219],
+    "collision_boxes": [
+      [[0, 0.8500000238418579, 0], [2.066738247871399, 1.7000000476837158, 4.677421569824219]]
+    ],
+    "entrance_offset": [0, 0, 3.8387107849121094],
+    "road_offset": [0, 0, -3.8387107849121094],
+    "known_issue": ""
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_White_Cargo_Van_0911180605_texture.glb",
+    "sha256": "2af2d7d84c078d66786d813d40b71cca3a835f46ac09b6910667b405f287acd4",
+    "bytes": 8636504,
+    "mesh_count": 1,
+    "triangles": 27592,
+    "degenerate_triangles": 0,
+    "min": [-2.210987091064453, 5.960464477539063e-8, -0.9135775566101074],
+    "max": [2.205803155899048, 1.899999976158142, 0.909797728061676],
+    "size": [4.416790246963501, 1.8999999165534973, 1.8233752846717834],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0.004"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0.004",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 2513233,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2867188,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2321958,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "-X",
+    "id": "VEH_003_van",
+    "path": "res://assets/world/vehicles/vehicle_van_model.glb",
+    "wrapper": "res://scenes/world/vehicles/vehicle_van.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": -90.0,
+    "model_translation": [-0.001889914274215698, -5.960464477539063e-8, 0.0025919675827026367],
+    "runtime_size": [1.8233752846717834, 1.8999999165534973, 4.416790246963501],
+    "collision_boxes": [
+      [[0, 0.9499999582767487, 0], [1.8233752846717834, 1.8999999165534973, 4.416790246963501]]
+    ],
+    "entrance_offset": [0, 0, 3.7083951234817505],
+    "road_offset": [0, 0, -3.7083951234817505],
+    "known_issue": ""
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_PRP_001_street_lamp_0912020245_texture.glb",
+    "sha256": "663d83e465463af9d292b74e67b93886f3cb37e4478b6d57a89bfe3d535fec3a",
+    "bytes": 5680164,
+    "mesh_count": 1,
+    "triangles": 9548,
+    "degenerate_triangles": 0,
+    "min": [-0.8712672591209412, -2.384185791015625e-7, -0.24471239745616913],
+    "max": [0.8720178008079529, 4.199999809265137, 0.24467438459396362],
+    "size": [1.743285059928894, 4.200000047683716, 0.48938678205013275],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0.002"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0.002",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 1892515,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2393011,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 1098281,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "-X",
+    "id": "PRP_001_street_lamp",
+    "path": "res://assets/world/props/street/prop_street_lamp_model.glb",
+    "wrapper": "res://scenes/world/props/street/prop_street_lamp.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": -90.0,
+    "model_translation": [-1.9006431102794936e-5, 2.384185791015625e-7, -0.69],
+    "runtime_size": [0.48938678205013275, 4.200000047683716, 1.743285059928894],
+    "collision_boxes": [[[0, 2.0, 0], [0.3, 4.0, 0.3]]],
+    "entrance_offset": [0, 0, -2.371642529964447],
+    "road_offset": [0, 0, -2.371642529964447],
+    "known_issue": ""
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_PRP_002_trash_bin_0912020907_texture.glb",
+    "sha256": "e92748db4e9ea62d5096fc93d87cf708aadc098111354fd70458e409ed4ff130",
+    "bytes": 4441016,
+    "mesh_count": 1,
+    "triangles": 2251,
+    "degenerate_triangles": 0,
+    "min": [-0.2464141547679901, 0.0, -0.24628332257270813],
+    "max": [0.24577471613883972, 1.0, 0.24605689942836761],
+    "size": [0.49218887090682983, 1.0, 0.49234022200107574],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0.001"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0.001",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 1329884,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 1747621,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 1243390,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "symmetric / not applicable",
+    "id": "PRP_002_trash_bin",
+    "path": "res://assets/world/props/street/prop_trash_bin_model.glb",
+    "wrapper": "res://scenes/world/props/street/prop_trash_bin.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": 0.0,
+    "model_translation": [0.0003197193145751953, -0.0, 0.00011321157217025757],
+    "runtime_size": [0.49218887090682983, 1.0, 0.49234022200107574],
+    "collision_boxes": [[[0, 0.5, 0], [0.49218887090682983, 1.0, 0.49234022200107574]]],
+    "entrance_offset": [0, 0, -1.7461701110005379],
+    "road_offset": [0, 0, -1.7461701110005379],
+    "known_issue": ""
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_VEG_001_tree_broadlea_0912032355_texture.glb",
+    "sha256": "8aaab6bc9a886b72c7c119fd7dc1b9d0a7ea9abcd0b4ebd95fd2e320e7fc1d17",
+    "bytes": 5405180,
+    "mesh_count": 1,
+    "triangles": 8462,
+    "degenerate_triangles": 0,
+    "min": [-1.7439274787902832, 0.0, -0.047498174011707306],
+    "max": [1.740507960319519, 1.7999999523162842, 0.04563620686531067],
+    "size": [3.4844354391098022, 1.7999999523162842, 0.09313438087701797],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0.001"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0.001",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 1358253,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 1610691,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 1878188,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "symmetric / not applicable",
+    "id": "BAR_001_chainlink_fence",
+    "path": "res://assets/world/barriers/barrier_chainlink_source_model.glb",
+    "wrapper": "res://scenes/world/barriers/barrier_chainlink.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": 0.0,
+    "model_translation": [0, 0, 0],
+    "runtime_size": [4, 1.8, 0.15],
+    "collision_boxes": [[[0, 0.9, 0], [4, 1.8, 0.15]]],
+    "entrance_offset": [0, 0, -1.546567190438509],
+    "road_offset": [0, 0, -1.546567190438509],
+    "known_issue": "Damaged noncontinuous source; procedural standard and unused damaged wrapper"
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_VEG_001_tree_broadlea_0912032102_texture.glb",
+    "sha256": "92d53d509e391256c062a1be62b08dec11e896a15c97d643299855a3620b57b0",
+    "bytes": 10903600,
+    "mesh_count": 1,
+    "triangles": 47272,
+    "degenerate_triangles": 0,
+    "min": [-2.3626739978790283, -2.384185791015625e-7, -1.8411576747894287],
+    "max": [2.4052162170410156, 6.0, 1.8331092596054077],
+    "size": [4.767890214920044, 6.000000238418579, 3.6742669343948364],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 1929076,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2710700,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2463843,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "symmetric / not applicable",
+    "id": "VEG_001_tree_broadleaf_a",
+    "path": "res://assets/world/vegetation/vegetation_tree_broadleaf_a_model.glb",
+    "wrapper": "res://scenes/world/vegetation/vegetation_tree_broadleaf_a.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": 0.0,
+    "model_translation": [-0.021271109580993652, 2.384185791015625e-7, 0.004024207592010498],
+    "runtime_size": [4.767890214920044, 6.000000238418579, 3.6742669343948364],
+    "collision_boxes": [[[0, 1.4, 0], [0.65, 2.8, 0.65]]],
+    "entrance_offset": [0, 0, -3.337133467197418],
+    "road_offset": [0, 0, -3.337133467197418],
+    "known_issue": "Sparse source foliage; original 47,272 triangles preserved"
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\蓝时归航_游戏地图模型\\Meshy_AI_VEG_002_bush_a_0912030329_texture.glb",
+    "sha256": "688efe305d134e24a751602de3f9f00661897557cba3d18fd5e0f13bb9391830",
+    "bytes": 8261096,
+    "mesh_count": 1,
+    "triangles": 28433,
+    "degenerate_triangles": 0,
+    "min": [-0.8605431914329529, 0.0, -0.6868304014205933],
+    "max": [0.8662556409835815, 1.0, 0.6432076692581177],
+    "size": [1.7267988324165344, 1.0, 1.330038070678711],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0.001"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0.001",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/jpeg",
+        "bytes": 1845377,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2602444,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 1679060,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "symmetric / not applicable",
+    "id": "VEG_002_bush_a",
+    "path": "res://assets/world/vegetation/vegetation_bush_a_model.glb",
+    "wrapper": "res://scenes/world/vegetation/vegetation_bush_a.tscn",
+    "runtime_scale": [1, 1, 1],
+    "model_yaw_degrees": 0.0,
+    "model_translation": [-0.002856224775314331, -0.0, 0.021811366081237793],
+    "runtime_size": [1.7267988324165344, 1.0, 1.330038070678711],
+    "collision_boxes": [[[0, 0.4, 0], [1.35, 0.8, 1.0]]],
+    "entrance_offset": [0, 0, -2.1650190353393555],
+    "road_offset": [0, 0, -2.1650190353393555],
+    "known_issue": ""
+  }
+]

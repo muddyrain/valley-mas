@@ -31,7 +31,7 @@ RUNTIME_NAMES = {
     "BH_Curb": "environment_curb_model.glb",
     "BH_Door_Normal": "environment_door_standard_model.glb",
     "BH_Door_Shop": "environment_door_shop_model.glb",
-    "BH_EvacBus_01": "vehicle_evacuation_bus_model.glb",
+    "BH_EvacBus_01": "VEH_BLUE_HOUR.glb",
     "BH_Fence": "environment_fence_model.glb",
     "BH_Fence_Broken": "environment_fence_broken_model.glb",
     "BH_GarbageBag_Set": "environment_garbage_bags_model.glb",
@@ -103,4 +103,13 @@ def specs():
                                "used_in": ["Art Showcase", USAGE.get(key, "资产库待复用")],
                                "placeholder": category == "characters", "procedural": True,
                                "source": "Blender Generated — BLUE HOUR original procedural geometry"}
+    # Preserve the stable gameplay ID, but never regenerate its retired bus visual.
+    result["BH_EvacBus_01"].update({
+        "path": "scenes/world/vehicles/veh_blue_hour.tscn",
+        "source_glb": "assets/world/vehicles/VEH_BLUE_HOUR.glb",
+        "procedural": False,
+        "source": "User supplied Meshy GLB; original bytes and scale preserved",
+        "budget": 29712,
+        "used_in": ["Camp", "Shelter", "Expedition", "Art Showcase"],
+    })
     return result

@@ -1,0 +1,28 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/industrial/building_warehouse_small.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "BLD_006_warehouse_small"
+scene = ExtResource("2")
+
+category = "industrial"
+
+footprint = Vector2(12.853474, 14.098348)
+
+bounding_size = Vector3(12.853474, 6.000000, 14.098348)
+
+poi_type = "warehouse"
+
+parking_requirement = "loading"
+
+loot_profile = "materials_tools"
+
+enemy_profile = "service"
+
+entrance_offset = Vector3(0.000000, 0.000000, -8.549174)
+
+road_offset = Vector3(0.000000, 0.000000, -11.049174)

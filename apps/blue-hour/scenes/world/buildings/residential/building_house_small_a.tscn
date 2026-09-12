@@ -1,0 +1,52 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="script"]
+
+[ext_resource type="PackedScene" path="res://assets/world/buildings/residential/building_house_small_a_model.glb" id="model"]
+
+[sub_resource type="BoxShape3D" id="shape_0"]
+size = Vector3(9.327133, 4.200000, 6.983417)
+
+[node name="WorldAsset" type="Node3D" groups=["world_assets"]]
+script = ExtResource("script")
+asset_id = "BLD_002_house_small_a"
+
+[node name="ModelRoot" type="Node3D" parent="."]
+position = Vector3(-0.005260, -0.000000, 0.016921)
+rotation = Vector3(0, 3.14159265, 0)
+
+[node name="SourceModel" parent="ModelRoot" instance=ExtResource("model")]
+
+[node name="Collision" type="StaticBody3D" parent="."]
+
+[node name="Shape0" type="CollisionShape3D" parent="Collision"]
+position = Vector3(0.000000, 2.100000, 0.000000)
+shape = SubResource("shape_0")
+
+[node name="NavigationObstacle" type="Node3D" parent="."]
+metadata/provider = "Wrapper shapes projected to the mission AStar grid"
+
+[node name="Anchors" type="Node3D" parent="."]
+
+[node name="RoadAnchor" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 0.000000, -5.491709)
+
+[node name="EntranceAnchor" type="Marker3D" parent="Anchors"]
+position = Vector3(-2.000000, 0.000000, -4.991709)
+
+[node name="SpawnPoints" type="Node3D" parent="."]
+
+[node name="LootPoints" type="Node3D" parent="SpawnPoints"]
+
+[node name="Primary" type="Marker3D" parent="SpawnPoints/LootPoints"]
+position = Vector3(-2.000000, 0.000000, -4.991709)
+
+[node name="EnemyPoints" type="Node3D" parent="SpawnPoints"]
+
+[node name="Primary" type="Marker3D" parent="SpawnPoints/EnemyPoints"]
+position = Vector3(1.000000, 0.000000, -4.991709)
+
+[node name="OptionalVehiclePoints" type="Node3D" parent="SpawnPoints"]
+
+[node name="Primary" type="Marker3D" parent="SpawnPoints/OptionalVehiclePoints"]
+position = Vector3(0.000000, 0.000000, -8.491709)

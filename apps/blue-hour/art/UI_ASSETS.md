@@ -1,4 +1,12 @@
-# 首页与路线选择素材
+# 首页、路线与今日行动素材
+
+## 今日行动选择（2026-09-12）
+
+用户提供的 `蓝时归航_今日行动_UI素材包.zip` 含 10 张 PNG 与一份素材说明。原始 PNG 字节保留，按用途改为小写语义文件名，全部位于 `assets/ui/today_action/`。`sources.json` 记录原名、现名、原尺寸与 SHA-256；原说明保存在 `source_notes.txt`，只作为来源资料。
+
+主面板使用 NinePatchRect；任务卡、顶部状态条、选中信息条和三个颜色的按钮底图使用 Godot 区域切片，去掉透明留白但不改源图。住宅区、商业街、空投回收缩略图等比覆盖卡片图片槽，图上的天空和地面会居中裁切。文字、库存、任务指标和确认/返回按钮均为原生控件。蓝色底图表示确认按钮不可用，选中后使用绿色；返回营地使用红色。
+
+复用现有首页背景、Logo、系统中文字体和 `PaperCardHover` 的纸卡抬升、按压与透明轮廓反馈。1600×900 参考画布等比完整容纳，背景覆盖其余宽高。页面逻辑、来源边界及运行证据见[今日行动记录](../docs/TODAY_ACTION.md)。
 
 当前文件名已规范为小写语义命名，完整旧名 → 新名清单及导入验证见 [命名迁移记录](../docs/ASSET_NAMING_2026-09-12.md)。下文保留各次素材接入的来源与视觉说明。
 
@@ -60,3 +68,11 @@
 作战路线的 `item_shooting_target_card.png`、`skill_rage_card.png` 与勘查路线的 `item_coffee_card.png`、`skill_map_healing_card.png` 是用户提供的完整透明卡面。道具卡面 `item_shooting_target_card.png`、`item_coffee_card.png` 与 `item_replicator_card.png` 归入 `assets/items/cards/`；技能卡面 `skill_rage_card.png`、`skill_map_healing_card.png` 与 `skill_sprint_card.png` 归入 `assets/skills/cards/`。它们表现具体道具和能力，不归属于某条路线；界面继续直接使用完整卡面，不叠加通用蓝色占位画刷。
 
 `tests/new_run_runtime.gd` 覆盖三条路线切换、两张奖励卡与详情提示；`tests/menu_runtime.gd` 额外覆盖 1672×941 参考尺寸、锁定预览和多比例安全区截图。
+
+## 外出 HUD（2026-09-12）
+
+`assets/ui/expedition/` 包含两张 192×192 透明模型头像和八张 40×40 原创线形 SVG（停止、集火、定位、集合、归航、食物、废料、装备）。来源和哈希见该目录的 `sources.json`。头像由 `art/capture_expedition_portraits.gd` 在 Godot 的离屏 SubViewport 中渲染当前用户提供的夏知遥/苏晚星 GLB；GLB 字节、比例和素材风格未改。此处缺正式 Expedition Portrait Asset，当前衍生头像可用于辨识，不冒充用户提供的独立头像插画。优先读取角色已有 portrait_path，空值时由角色模板 ID 选择衍生头像；运行实例 ID 不用作素材 ID。旧测试角色无模型头像时显示姓名首字。
+
+六个技能继续使用原 100×100 正式图标；武器直接读取同期 WeaponDefinition.icon()。切角面板是共享的 Godot StyleBox 绘制，未导入 Deadly Days 图标、字体、颜色或 UI 贴图。屏幕适配与验收见 [外出视觉报告](../docs/EXPEDITION_VISUAL_REPORT.md)。
+
+当前呈现为 70×72 的无整卡底板 Portrait Unit、208×76 的弧线钟面、单层透明目标列表及轻底色动作图标。本轮没有新建 SVG 或图片；资源与命令图标仍缺统一正式美术替代，继续使用上述既有八项。

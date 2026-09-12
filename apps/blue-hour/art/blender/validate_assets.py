@@ -25,6 +25,16 @@ def validate(batch=None):
             path = PROJECT / item["path"]
             assert item["path"] == spec["path"], "file naming"
             assert key in catalog and f"../{item['path']}" in catalog, "Catalog registration"
+            if not spec["procedural"]:
+                assert path.is_file(), "missing external vehicle wrapper"
+                source = PROJECT / spec["source_glb"]
+                actual = statistics(source)
+                for field in ("triangles", "materials", "geometry_hash", "sha256", "bytes"):
+                    assert item[field] == actual[field], f"external source drift: {field}"
+                assert item["source_dimensions"] == actual["dimensions"], "external source units"
+                assert item["triangles"] <= spec["budget"], "reviewed external source budget"
+                # Transformed scene bounds and simple collision are checked by Godot.
+                continue
             assert (PROJECT / item["blend"]).is_file(), "missing Blender source"
             assert (PROJECT / item["generator"]).is_file(), "missing generator"
             actual = statistics(path)

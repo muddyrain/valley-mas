@@ -1,0 +1,101 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="script"]
+
+[ext_resource type="PackedScene" path="res://assets/world/buildings/service/building_gas_station_model.glb" id="model"]
+
+[sub_resource type="BoxShape3D" id="shape_0"]
+size = Vector3(7.500000, 4.500000, 10.500000)
+
+[sub_resource type="BoxShape3D" id="shape_1"]
+size = Vector3(7.500000, 0.500000, 10.000000)
+
+[sub_resource type="BoxShape3D" id="shape_2"]
+size = Vector3(0.350000, 4.800000, 0.350000)
+
+[sub_resource type="BoxShape3D" id="shape_3"]
+size = Vector3(0.350000, 4.800000, 0.350000)
+
+[sub_resource type="BoxShape3D" id="shape_4"]
+size = Vector3(0.350000, 4.800000, 0.350000)
+
+[sub_resource type="BoxShape3D" id="shape_5"]
+size = Vector3(0.350000, 4.800000, 0.350000)
+
+[sub_resource type="BoxShape3D" id="shape_6"]
+size = Vector3(0.900000, 1.700000, 1.600000)
+
+[sub_resource type="BoxShape3D" id="shape_7"]
+size = Vector3(0.900000, 1.700000, 1.600000)
+
+[node name="WorldAsset" type="Node3D" groups=["world_assets"]]
+script = ExtResource("script")
+asset_id = "BLD_007_gas_station"
+
+[node name="ModelRoot" type="Node3D" parent="."]
+position = Vector3(-0.040550, -0.000000, -0.019070)
+rotation = Vector3(0, 3.14159265, 0)
+
+[node name="SourceModel" parent="ModelRoot" instance=ExtResource("model")]
+
+[node name="Collision" type="StaticBody3D" parent="."]
+
+[node name="Shape0" type="CollisionShape3D" parent="Collision"]
+position = Vector3(4.150000, 2.250000, 0.000000)
+shape = SubResource("shape_0")
+
+[node name="Shape1" type="CollisionShape3D" parent="Collision"]
+position = Vector3(-4.150000, 4.950000, 0.000000)
+shape = SubResource("shape_1")
+
+[node name="Shape2" type="CollisionShape3D" parent="Collision"]
+position = Vector3(-7.500000, 2.400000, -4.600000)
+shape = SubResource("shape_2")
+
+[node name="Shape3" type="CollisionShape3D" parent="Collision"]
+position = Vector3(-7.500000, 2.400000, 4.600000)
+shape = SubResource("shape_3")
+
+[node name="Shape4" type="CollisionShape3D" parent="Collision"]
+position = Vector3(-0.800000, 2.400000, -4.600000)
+shape = SubResource("shape_4")
+
+[node name="Shape5" type="CollisionShape3D" parent="Collision"]
+position = Vector3(-0.800000, 2.400000, 4.600000)
+shape = SubResource("shape_5")
+
+[node name="Shape6" type="CollisionShape3D" parent="Collision"]
+position = Vector3(-4.100000, 0.850000, -2.500000)
+shape = SubResource("shape_6")
+
+[node name="Shape7" type="CollisionShape3D" parent="Collision"]
+position = Vector3(-4.100000, 0.850000, 2.500000)
+shape = SubResource("shape_7")
+
+[node name="NavigationObstacle" type="Node3D" parent="."]
+metadata/provider = "Wrapper shapes projected to the mission AStar grid"
+
+[node name="Anchors" type="Node3D" parent="."]
+
+[node name="RoadAnchor" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 0.000000, -9.418539)
+
+[node name="EntranceAnchor" type="Marker3D" parent="Anchors"]
+position = Vector3(4.000000, 0.000000, -6.918539)
+
+[node name="SpawnPoints" type="Node3D" parent="."]
+
+[node name="LootPoints" type="Node3D" parent="SpawnPoints"]
+
+[node name="Primary" type="Marker3D" parent="SpawnPoints/LootPoints"]
+position = Vector3(4.000000, 0.000000, -6.918539)
+
+[node name="EnemyPoints" type="Node3D" parent="SpawnPoints"]
+
+[node name="Primary" type="Marker3D" parent="SpawnPoints/EnemyPoints"]
+position = Vector3(7.000000, 0.000000, -6.918539)
+
+[node name="OptionalVehiclePoints" type="Node3D" parent="SpawnPoints"]
+
+[node name="Primary" type="Marker3D" parent="SpawnPoints/OptionalVehiclePoints"]
+position = Vector3(0.000000, 0.000000, -12.418539)

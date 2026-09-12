@@ -1,0 +1,28 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/building_restaurant_small.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "BLD_005_restaurant_small"
+scene = ExtResource("2")
+
+category = "commercial"
+
+footprint = Vector2(8.325080, 5.621953)
+
+bounding_size = Vector3(8.325080, 4.800000, 5.621953)
+
+poi_type = "restaurant"
+
+parking_requirement = "roadside"
+
+loot_profile = "food_medium"
+
+enemy_profile = "street"
+
+entrance_offset = Vector3(0.000000, 0.000000, -4.310977)
+
+road_offset = Vector3(0.000000, 0.000000, -4.310977)

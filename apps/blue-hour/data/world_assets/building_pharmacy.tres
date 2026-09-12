@@ -1,0 +1,28 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/building_pharmacy.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "BLD_004_pharmacy"
+scene = ExtResource("2")
+
+category = "commercial"
+
+footprint = Vector2(7.602506, 7.371861)
+
+bounding_size = Vector3(7.602506, 4.500000, 7.371861)
+
+poi_type = "pharmacy"
+
+parking_requirement = "roadside"
+
+loot_profile = "medical_basic"
+
+enemy_profile = "street"
+
+entrance_offset = Vector3(0.000000, 0.000000, -5.185930)
+
+road_offset = Vector3(0.000000, 0.000000, -5.185930)

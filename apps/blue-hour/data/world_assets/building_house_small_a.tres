@@ -1,0 +1,28 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/residential/building_house_small_a.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "BLD_002_house_small_a"
+scene = ExtResource("2")
+
+category = "residential"
+
+footprint = Vector2(9.327133, 6.983417)
+
+bounding_size = Vector3(9.327133, 4.200000, 6.983417)
+
+poi_type = "house"
+
+parking_requirement = "roadside"
+
+loot_profile = "general"
+
+enemy_profile = "street"
+
+entrance_offset = Vector3(-2.000000, 0.000000, -4.991709)
+
+road_offset = Vector3(0.000000, 0.000000, -5.491709)

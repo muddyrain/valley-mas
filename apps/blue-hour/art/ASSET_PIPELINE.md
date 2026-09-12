@@ -1,8 +1,18 @@
 # BLUE HOUR ART PIPELINE V1
 
-视觉约束：[ART_BIBLE](ART_BIBLE.md)。模型复用入口：[MODEL_CATALOG](MODEL_CATALOG.md)。本地工具只依赖已安装的 Blender 和 Godot，无新增第三方包或外部模型。
+视觉约束：[ART_BIBLE](ART_BIBLE.md)。模型复用入口：[MODEL_CATALOG](MODEL_CATALOG.md)。本地工具依赖已安装的 Blender、Godot与Python标准库，无新增第三方包；用户提供的正式GLB按下述独立入口接入。
 
 首页 2D 用户素材走原图保留、Godot 区域切片和原生运行验收，登记见 [UI_ASSETS](UI_ASSETS.md)，不进入 Blender 模型生成器。
+
+## 正式外出街区（2026-09-12）
+
+用户提供的16个World核心GLB归入 `assets/world/`，使用独立Resource目录和Runtime Wrapper，不进入旧Blender生成批次。真实来源、尺寸、朝向及碰撞见 [WORLD_ASSET_AUDIT](WORLD_ASSET_AUDIT.md)，正式流程与运行证据见 [WORLD_MAP_REPORT](../docs/WORLD_MAP_REPORT.md)。此批按用户要求保留源PBR纹理和47K树版本，不套用旧程序资产的纯色材质与面数预算。
+
+离线审计执行 `python art/audit_world_sources.py`，Wrapper复现执行 `python art/build_world_wrappers.py`。所有源件纠正仅在ModelRoot，1 Unit=1m、Front=-Z、Root identity；此标准适用于本批环境资产，同期蓝时号沿用其独立Wrapper契约。`run.ps1 -Mode test` 包含world_assets/world_map，`-Mode build` 还运行正式原生闭环和独立EXE外出启动检查。
+
+16个GLB使用Godot内嵌BasisU纹理模式，原始字节不改，贴图、材质、Mesh由实例共享。WorldAssetCatalog统一持有Wrapper PackedScene；Gameplay不能直接加载源GLB。道路为Godot规则几何；缺网围栏原件仅保留破损变体，标准4m段用规则Mesh；细网片使用屏幕导数过滤与Alpha Blend，避免Compatibility硬裁切闪烁，柱/横杆保留实体阴影。
+
+第二阶段统一由 `art/world_material_import.gd` 在导入后启用带Mipmaps的各向异性材质过滤；保持2048²源贴图、PBR通道与GLB原始哈希。道路/铺装使用 `maps/world/surface_palette.gd` 的缓存ShaderMaterial，详情见 [外出视觉报告](../docs/EXPEDITION_VISUAL_REPORT.md)。
 
 ## 本机工具与入口
 
@@ -22,6 +32,18 @@ python apps/blue-hour/art/blender/validate_assets.py
 ```
 
 脚本支持 `-BlenderPath`、`-GodotPath`，默认 Blender 为本机路径，Godot 按现有 `run.ps1` 的安装约定发现。直接 Blender CLI 使用 `--python art/blender/generate.py -- --batch architecture`，从任何工作目录均可执行，所有路径由脚本自身位置解析。
+
+## 正式蓝时号（2026-09-12）
+
+营地主站的独立正式入口是 `assets/world/buildings/CAMP_001_main_station.glb` → `scenes/camp/buildings/camp_main_station.tscn` → 冻结 `camp_main.tscn`。保留用户源字节，只调整 Visual 的等比缩放和入口对齐偏移；碰撞使用 3 个简单 Box。主站与蓝时号共享同一个营地实例用于整备和出发演出，当前 Camp 导航已按新主站 / 车辆碰撞重新烘焙，详见 [营地出发 V1](../docs/CAMP_DEPARTURE_V1.md)。
+
+主站现已更新为用户提供的 4K 原件：颜色与法线 4096²，金属 / 粗糙度原始 2048²。Godot 保留源尺寸、Lossless 与 mipmaps；仅复用 `world_material_import.gd` 设置各向异性材质过滤。正式 Camp 由主 Viewport 原生渲染，管理 UI 为 CanvasLayer 覆盖层；不再把低分辨率营地预览放大。导入参数、尺寸和 1080p 对照见 [清晰度报告](../docs/CAMP_CLARITY_REPORT.md)。
+
+`assets/world/vehicles/VEH_BLUE_HOUR.glb` 是用户提供的正式车辆原件。统一场景为 `scenes/world/vehicles/veh_blue_hour.tscn`，营地直接实例化它；外出、整备与展示通过 manifest 的兼容 ID `BH_EvacBus_01` 加载同一场景。此项 `procedural=false`，车辆重建批次跳过，防止重新生成旧车覆盖正式资源。51 个程序资产继续原有生成流程。
+
+新版原始尺寸为长 5.264315m、宽 2.289689m、高 2.75m，用户确认保持原始比例与 Scale=1。源车头朝 -X，Visual 内绕 Y +90° 对齐项目 +Z；仅 Visual 平移到地面投影中心。碰撞由统一 wrapper 的一个 Box 持有，外出地图不重复添加碰撞。原有营地导航保留，仍对旧泊位留有保守的避让空间。
+
+新版只有一个 Mesh 和一个材质，车轮、车门、灯面未独立；旧车门 tween 由独立 `DoorMotion` 标记承接，准备时间、关门时间与结算状态保留，当前无可见开关门动画。场景中的暖光与声音控制不变。旧 `.blend` 和生成函数保留历史来源，不再由常规批次调用。原始文件哈希、运行截图与动画边界见[替换报告](../docs/BLUE_HOUR_VEHICLE_REPORT.md)。以下 V1 的独立车门、灯面与 8–10m 巴士描述仅适用于历史程序模型。
 
 ## 源文件与生成结果
 

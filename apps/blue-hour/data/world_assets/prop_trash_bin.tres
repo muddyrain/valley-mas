@@ -1,0 +1,28 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/world/props/street/prop_trash_bin.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "PRP_002_trash_bin"
+scene = ExtResource("2")
+
+category = "street"
+
+footprint = Vector2(0.492189, 0.492340)
+
+bounding_size = Vector3(0.492189, 1.000000, 0.492340)
+
+poi_type = ""
+
+parking_requirement = "none"
+
+loot_profile = "general"
+
+enemy_profile = "street"
+
+entrance_offset = Vector3(0.000000, 0.000000, -1.746170)
+
+road_offset = Vector3(0.000000, 0.000000, -1.746170)

@@ -1,0 +1,28 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/world/vegetation/vegetation_bush_a.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "VEG_002_bush_a"
+scene = ExtResource("2")
+
+category = "vegetation"
+
+footprint = Vector2(1.726799, 1.330038)
+
+bounding_size = Vector3(1.726799, 1.000000, 1.330038)
+
+poi_type = ""
+
+parking_requirement = "none"
+
+loot_profile = "general"
+
+enemy_profile = "street"
+
+entrance_offset = Vector3(0.000000, 0.000000, -2.165019)
+
+road_offset = Vector3(0.000000, 0.000000, -2.165019)

@@ -1,0 +1,28 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/service/building_auto_repair_shop.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "BLD_008_auto_repair_shop"
+scene = ExtResource("2")
+
+category = "service"
+
+footprint = Vector2(10.955459, 9.713698)
+
+bounding_size = Vector3(10.955459, 5.200000, 9.713698)
+
+poi_type = "auto_repair"
+
+parking_requirement = "work_area"
+
+loot_profile = "vehicle_parts_tools"
+
+enemy_profile = "service"
+
+entrance_offset = Vector3(0.000000, 0.000000, -6.356849)
+
+road_offset = Vector3(0.000000, 0.000000, -8.856849)
