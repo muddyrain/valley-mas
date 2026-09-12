@@ -2,61 +2,96 @@ extends Node3D
 const Visuals = preload("res://vfx/visuals.gd")
 var data: Resource
 var hp: float
+var max_hp: float
+var attack_damage: float
 var active: bool = true
 var attack_left: float = 0.0
+var windup_left: float = 0.0
 var think_left: float = 0.0
-var alarm_left: float = 0.0
 var target: Node3D
+var attack_target: Node3D
 var path := PackedVector3Array()
 var rig: Node3D
 var hp_bar: MeshInstance3D
 var focus_ring: MeshInstance3D
 
-func setup(spec: Resource, offset: float) -> void:
+func setup(spec: Resource, offset: float, clock: RefCounted) -> void:
 	data = spec
-	hp = data.max_hp
+	rig = get_node("VisualRig")
+	hp_bar = Visuals.box(self, Vector3(0.65, 0.05, 0.08), get_node("HealthAnchor").position, Color("#ef7a73"), true)
+	focus_ring = Visuals.ring(self, Vector3(0, 0.09, 0), data.collision_radius + 0.15, Color("#ff665e"))
+	var area: Area3D = get_node("HitArea")
+	area.set_meta("enemy", self)
+	var collision: CollisionShape3D = area.get_node("CollisionShape3D")
+	collision.shape.radius = data.collision_radius
+	reset_for_spawn(offset, clock)
+
+func reset_for_spawn(offset: float, clock: RefCounted) -> void:
+	max_hp = data.max_hp * clock.hp_multiplier()
+	attack_damage = data.attack_damage * clock.damage_multiplier()
+	hp = max_hp
+	hp_bar.scale.x = 1.0
+	active = true
+	visible = true
+	path.clear()
+	target = null
+	attack_target = null
+	attack_left = 0.0
+	windup_left = 0.0
 	think_left = offset
-	alarm_left = data.alarm_interval
-	rig = Visuals.body(self, data.color, true)
-	rig.scale = Vector3.ONE * data.scale_factor
-	if data.id == "hound":
-		rig.scale = Vector3(0.7, 0.4, 1.3)
-	if data.special:
-		Visuals.ring(rig, Vector3(0, 1.9, 0), 0.65, Color("#ff5964"))
-		Visuals.label(self, data.display_name, Vector3(0, 3.1, 0), Color("#ff7883"), 25)
-	hp_bar = Visuals.box(self, Vector3(0.9, 0.07, 0.1), Vector3(0, 2.5, 0), Color("#ef7a73"), true)
-	focus_ring = Visuals.ring(self, Vector3(0, 0.09, 0), 0.8, Color("#ff665e"))
+	rig.rotation = Vector3.ZERO
 	focus_ring.visible = false
-	Visuals.hit_area(self, "enemy", self)
+	get_node("HitArea").collision_layer = 2
+
+func refresh_stats(clock: RefCounted) -> void:
+	if not active:
+		return
+	var next_max_hp: float = data.max_hp * clock.hp_multiplier()
+	if not is_equal_approx(max_hp, next_max_hp):
+		# Phase/threat changes preserve injury instead of refilling or compounding base HP.
+		hp = next_max_hp * clampf(hp / max_hp, 0.0, 1.0)
+		max_hp = next_max_hp
+		hp_bar.scale.x = maxf(0.01, hp / max_hp)
+	attack_damage = data.attack_damage * clock.damage_multiplier()
 
 func tick(delta: float, mission: Node3D) -> void:
 	if not active:
 		return
 	attack_left = maxf(0, attack_left - delta)
+	if target != null and (not is_instance_valid(target) or target.dead or position.distance_to(target.position) > data.lose_target_range):
+		target = null
+		path.clear()
+		_cancel_windup()
+	if attack_target != null:
+		windup_left = maxf(0, windup_left - delta)
+		if windup_left <= 0.000001:
+			_resolve_attack(mission)
+		return
 	think_left -= delta
 	if think_left <= 0:
 		think_left = 0.55
-		target = mission.nearest_survivor(position)
-		if target != null and (mission.clock.phase == mission.clock.NIGHT or position.distance_to(target.position) <= data.perception):
+		if target == null:
+			var candidate: Node3D = mission.nearest_survivor(position)
+			if candidate != null and position.distance_to(candidate.position) <= data.detection_range:
+				target = candidate
+		if target != null:
 			path = mission.city.path(position, target.position)
 		else:
-			target = null
 			path.clear()
 	if target == null or target.dead:
 		return
-	if data.special:
-		alarm_left -= delta
-		if alarm_left <= 0:
-			alarm_left = data.alarm_interval
-			mission.raise_alarm(self)
 	var distance := position.distance_to(target.position)
 	if distance <= data.attack_range and mission.city.line_clear(position, target.position):
-		if attack_left <= 0:
-			attack_left = data.attack_interval
-			target.take_damage(data.damage * mission.clock.damage_multiplier(), mission.invincible)
-			mission.effects_hit(position, target.position, Color("#f4756e"))
+		var facing: Vector3 = position.direction_to(target.position)
+		rig.rotation.y = atan2(-facing.x, -facing.z)
+		if attack_left <= 0.000001:
+			attack_left = data.attack_cooldown
+			windup_left = data.attack_windup
+			attack_target = target
+			if windup_left <= 0:
+				_resolve_attack(mission)
 	elif not path.is_empty():
-		var budget: float = delta * data.speed * mission.clock.speed_multiplier()
+		var budget: float = delta * data.move_speed
 		while not path.is_empty() and budget > 0:
 			var length := position.distance_to(path[0])
 			if length <= budget:
@@ -73,15 +108,26 @@ func take_damage(amount: float) -> void:
 	if not active:
 		return
 	hp = maxf(0, hp - amount)
-	hp_bar.scale.x = maxf(0.01, hp / data.max_hp)
-	rig.scale *= 0.94
-	create_tween().tween_property(rig, "scale", Vector3(0.7, 0.4, 1.3) if data.id == "hound" else Vector3.ONE * data.scale_factor, 0.12)
+	hp_bar.scale.x = maxf(0.01, hp / max_hp)
 	if hp <= 0:
 		active = false
 		visible = false
 		collision_disable()
 
 func collision_disable() -> void:
+	_cancel_windup()
 	for child in get_children():
 		if child is Area3D:
 			child.collision_layer = 0
+
+func _cancel_windup() -> void:
+	attack_target = null
+	windup_left = 0.0
+
+func _resolve_attack(mission: Node3D) -> void:
+	# A committed swing cannot switch victims or hit through newly interposed cover.
+	if is_instance_valid(attack_target) and not attack_target.dead:
+		if position.distance_to(attack_target.position) <= data.attack_range and mission.city.line_clear(position, attack_target.position):
+			attack_target.take_damage(attack_damage, mission.invincible)
+			mission.effects_hit(position, attack_target.position, Color("#f4756e"))
+	_cancel_windup()

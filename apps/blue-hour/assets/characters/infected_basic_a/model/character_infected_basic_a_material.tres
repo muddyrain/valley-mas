@@ -1,0 +1,18 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/characters/infected_basic_a/model/character_infected_basic_a_albedo_texture.jpg" id="1_f8pel"]
+[ext_resource type="Texture2D" path="res://assets/characters/infected_basic_a/model/character_infected_basic_a_metallic_roughness_texture.jpg" id="2_bdwx6"]
+[ext_resource type="Texture2D" path="res://assets/characters/infected_basic_a/model/character_infected_basic_a_normal_texture.jpg" id="3_hgc25"]
+
+[resource]
+resource_name = "Material_0"
+cull_mode = 2
+albedo_texture = ExtResource("1_f8pel")
+metallic = 1.0
+metallic_texture = ExtResource("2_bdwx6")
+metallic_texture_channel = 2
+roughness_texture = ExtResource("2_bdwx6")
+roughness_texture_channel = 1
+normal_enabled = true
+normal_texture = ExtResource("3_hgc25")
+metadata/_gltf_primary_texture_coord = 0
