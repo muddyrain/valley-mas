@@ -1,0 +1,315 @@
+{
+  "source_sha256": "c6d58410eca5a455934511880878c448b0372c501182b6ea0b1fa1a7b79ebeef",
+  "weights": {
+    "Mesh_0": {
+      "vertices": 51209,
+      "unweighted": 0,
+      "max_influences": 4,
+      "max_sum_error": 1.1920928955078125e-7,
+      "method": "fresh_heat_on_seam_welded_centimetre_proxy_reviewed_hair_coat_shoe_corrections",
+      "corrections": {
+        "heat_unweighted_vertices": 51209,
+        "heat_proxy_vertices": 50839,
+        "hair_vertices": 26864,
+        "hair_core_vertices": 16233,
+        "hair_junction_edges": 1267,
+        "hair_arm_weight_before": 0.9904118776321411,
+        "hair_arm_weight_after": 0.0
+      }
+    }
+  },
+  "export": {
+    "path": "assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb",
+    "sha256": "3ffebbcbb5070e339a2fdffa578a8d64d25098c5b03e323a8f594df5f457b646",
+    "mesh_count": 1,
+    "material_count": 1,
+    "texture_count": 3,
+    "images": [
+      {
+        "bufferView": 6,
+        "mimeType": "image/jpeg",
+        "name": "Image_2",
+        "resolution": [2048, 2048],
+        "sha256": "e5153b7ef713de627c7d739fbcf5ce5b37b70925defc33a0cdcf03f57f66f36a"
+      },
+      {
+        "bufferView": 7,
+        "mimeType": "image/jpeg",
+        "name": "Image_0",
+        "resolution": [2048, 2048],
+        "sha256": "ffe48183494ad2cba9ba146c24fd16bc5e6eda14f2ade5936509d4a03bcd46a2"
+      },
+      {
+        "bufferView": 8,
+        "mimeType": "image/jpeg",
+        "name": "Image_1",
+        "resolution": [2048, 2048],
+        "sha256": "8badd6301df379dd07d2163db6d81026f6b83b2bd30d21c55da292a8d0c5be9b"
+      }
+    ],
+    "skeleton": true,
+    "skin_count": 1,
+    "skinned_mesh_nodes": ["Mesh_0"],
+    "vertex_weights": true,
+    "animation_count": 0,
+    "bone_count": 23,
+    "bone_names": [
+      "LeftToes",
+      "LeftFoot",
+      "LeftLowerLeg",
+      "LeftUpperLeg",
+      "RightToes",
+      "RightFoot",
+      "RightLowerLeg",
+      "RightUpperLeg",
+      "LeftHand",
+      "LeftLowerArm",
+      "LeftUpperArm",
+      "LeftShoulder",
+      "Head",
+      "Neck",
+      "RightHand",
+      "RightLowerArm",
+      "RightUpperArm",
+      "RightShoulder",
+      "UpperChest",
+      "Chest",
+      "Spine",
+      "Hips",
+      "Root"
+    ],
+    "bone_hierarchy": {
+      "LeftToes": "LeftFoot",
+      "LeftFoot": "LeftLowerLeg",
+      "LeftLowerLeg": "LeftUpperLeg",
+      "LeftUpperLeg": "Hips",
+      "RightToes": "RightFoot",
+      "RightFoot": "RightLowerLeg",
+      "RightLowerLeg": "RightUpperLeg",
+      "RightUpperLeg": "Hips",
+      "LeftHand": "LeftLowerArm",
+      "LeftLowerArm": "LeftUpperArm",
+      "LeftUpperArm": "LeftShoulder",
+      "LeftShoulder": "UpperChest",
+      "Head": "Neck",
+      "Neck": "UpperChest",
+      "RightHand": "RightLowerArm",
+      "RightLowerArm": "RightUpperArm",
+      "RightUpperArm": "RightShoulder",
+      "RightShoulder": "UpperChest",
+      "UpperChest": "Chest",
+      "Chest": "Spine",
+      "Spine": "Hips",
+      "Hips": "Root",
+      "Root": null
+    },
+    "nodes": [
+      {
+        "name": "LeftToes",
+        "rotation": [
+          0.3035759925842285, 7.197712648121524e-8, -2.4887691907338194e-8, 0.9528072476387024
+        ],
+        "scale": [1, 0.9999998807907104, 0.9999999403953552],
+        "translation": [-4.430316113968047e-9, 0.1728612631559372, 1.021360862552001e-8]
+      },
+      {
+        "children": [0],
+        "name": "LeftFoot",
+        "rotation": [
+          0.521045982837677, -0.01709331013262272, -0.039843808859586716, 0.8524267673492432
+        ],
+        "scale": [0.9999999403953552, 1, 0.9999999403953552],
+        "translation": [-1.8417834368733565e-8, 0.34989291429519653, -3.6088749766349792e-9]
+      },
+      {
+        "children": [1],
+        "name": "LeftLowerLeg",
+        "rotation": [
+          -0.11569653451442719, -0.0008071462507359684, 0.029468506574630737, 0.9928470849990845
+        ],
+        "scale": [1, 0.9999999403953552, 1],
+        "translation": [-5.058943486346834e-9, 0.3615577518939972, 1.6254489310085773e-8]
+      },
+      {
+        "children": [2],
+        "name": "LeftUpperLeg",
+        "rotation": [
+          -7.660320989089087e-5, -0.09399715811014175, -0.9954756498336792, 0.013884670101106167
+        ],
+        "scale": [0.9999999403953552, 1, 0.9999997019767761],
+        "translation": [0.07999999821186066, -1.8073176288879722e-10, 1.994837717234077e-8]
+      },
+      {
+        "name": "RightToes",
+        "rotation": [
+          0.30357596278190613, 7.274272206814203e-8, -2.7086526799280364e-8, 0.9528072476387024
+        ],
+        "scale": [1, 1, 0.9999999403953552],
+        "translation": [-3.85094223176452e-9, 0.1728612333536148, 5.002542380339037e-9]
+      },
+      {
+        "children": [4],
+        "name": "RightFoot",
+        "rotation": [
+          0.521045982837677, 0.017093174159526825, 0.039843738079071045, 0.8524267673492432
+        ],
+        "scale": [0.9999998807907104, 1, 1.0000001192092896],
+        "translation": [1.7210837199854723e-9, 0.34989285469055176, -5.122274160385132e-9]
+      },
+      {
+        "children": [5],
+        "name": "RightLowerLeg",
+        "rotation": [
+          -0.11569652706384659, 0.0008071431657299399, -0.029468514025211334, 0.9928470849990845
+        ],
+        "scale": [1, 1.0000001192092896, 1],
+        "translation": [1.1548392242488603e-9, 0.3615577518939972, 5.093170329928398e-9]
+      },
+      {
+        "children": [6],
+        "name": "RightUpperLeg",
+        "rotation": [
+          -7.681271381443366e-5, 0.09399717301130295, 0.9954756498336792, 0.013884671963751316
+        ],
+        "scale": [0.9999999403953552, 1, 0.9999998211860657],
+        "translation": [-0.07999999821186066, -1.1434075908312025e-10, -7.997940087989264e-9]
+      },
+      {
+        "name": "LeftHand",
+        "rotation": [
+          -0.006705540232360363, 0.0006903843022882938, 0.047723397612571716, 0.9988378882408142
+        ],
+        "scale": [0.9999998807907104, 0.9999999403953552, 0.9999999403953552],
+        "translation": [-3.0405818307599475e-8, 0.18887029588222504, 3.259629011154175e-9]
+      },
+      {
+        "children": [8],
+        "name": "LeftLowerArm",
+        "rotation": [
+          -0.00939639750868082, -0.001966858049854636, -0.0642627626657486, 0.9978868365287781
+        ],
+        "scale": [1.0000001192092896, 1, 1],
+        "translation": [-3.233552092751779e-8, 0.19999253749847412, 5.122274160385132e-9]
+      },
+      {
+        "children": [9],
+        "name": "LeftUpperArm",
+        "rotation": [
+          0.018790800124406815, -0.0068626306019723415, -0.34298479557037354, 0.9391279220581055
+        ],
+        "scale": [1, 0.9999998807907104, 1],
+        "translation": [5.848148187936886e-9, 0.10307766497135162, -3.440276952204613e-10]
+      },
+      {
+        "children": [10],
+        "name": "LeftShoulder",
+        "rotation": [
+          -1.1394509336071224e-8, -8.896547498693508e-9, -0.7882057428359985, 0.6154118180274963
+        ],
+        "scale": [1.0000001192092896, 1, 1],
+        "translation": [0.02500000037252903, 0.05000007152557373, -3.5561831257524545e-16]
+      },
+      {
+        "name": "Head",
+        "rotation": [0, 0, -3.1554436208840472e-30, 1],
+        "translation": [0, 0.0549999475479126, 0]
+      },
+      {
+        "children": [12],
+        "name": "Neck",
+        "rotation": [0, 0, -3.1554436208840472e-30, 1],
+        "translation": [0, 0.0700000524520874, 0]
+      },
+      {
+        "name": "RightHand",
+        "rotation": [
+          -0.006705540232360363, -0.0006903843022882938, -0.047723397612571716, 0.9988378882408142
+        ],
+        "scale": [0.9999998807907104, 0.9999999403953552, 0.9999999403953552],
+        "translation": [3.0405818307599475e-8, 0.18887029588222504, 3.259629011154175e-9]
+      },
+      {
+        "children": [14],
+        "name": "RightLowerArm",
+        "rotation": [
+          -0.00939639750868082, 0.001966858049854636, 0.0642627626657486, 0.9978868365287781
+        ],
+        "scale": [1.0000001192092896, 1, 1],
+        "translation": [3.233552092751779e-8, 0.19999253749847412, 5.122274160385132e-9]
+      },
+      {
+        "children": [15],
+        "name": "RightUpperArm",
+        "rotation": [
+          0.018790800124406815, 0.0068626306019723415, 0.34298479557037354, 0.9391279220581055
+        ],
+        "scale": [1, 0.9999998807907104, 1],
+        "translation": [-5.848148187936886e-9, 0.10307766497135162, -3.440168705459712e-10]
+      },
+      {
+        "children": [16],
+        "name": "RightShoulder",
+        "rotation": [
+          -1.1394501342465446e-8, 8.896558156834544e-9, 0.7882057428359985, 0.6154118180274963
+        ],
+        "scale": [1.0000001192092896, 1, 1],
+        "translation": [-0.02500000037252903, 0.05000007152557373, 3.5561831257524545e-16]
+      },
+      {
+        "children": [11, 13, 17],
+        "name": "UpperChest",
+        "rotation": [-3.76158192263132e-37, 0, -5.293955920339377e-23, 1],
+        "translation": [-9.52911156893325e-24, 0.0849999189376831, 0]
+      },
+      {
+        "children": [18],
+        "name": "Chest",
+        "rotation": [3.725290298461914e-9, 7.105427357601002e-15, -8.881784197001252e-16, 1],
+        "translation": [-1.7205356741102976e-22, 0.09500008821487427, -3.7252778639640383e-10]
+      },
+      {
+        "children": [19],
+        "name": "Spine",
+        "rotation": [
+          -0.04981369897723198, -8.92959661769055e-8, -4.4536894172608754e-9, 0.9987584948539734
+        ],
+        "translation": [-6.661338147750939e-16, 0.12059848010540009, 3.725290298461914e-9]
+      },
+      {
+        "children": [3, 7, 20],
+        "name": "Hips",
+        "rotation": [
+          0.04981369897723198, 8.929595196605078e-8, 4.453690749528505e-9, 0.9987585544586182
+        ],
+        "scale": [1, 0.9999999403953552, 1],
+        "translation": [0, 0.8600000143051147, 0]
+      },
+      {
+        "children": [21],
+        "name": "Root"
+      },
+      {
+        "mesh": 0,
+        "name": "Mesh_0",
+        "skin": 0
+      },
+      {
+        "children": [23, 22],
+        "name": "BH_Humanoid_Rig_v1"
+      }
+    ],
+    "vertex_count": 68074,
+    "triangles": 101982,
+    "attributes": [
+      {
+        "POSITION": 0,
+        "NORMAL": 1,
+        "TEXCOORD_0": 2,
+        "JOINTS_0": 3,
+        "WEIGHTS_0": 4
+      }
+    ],
+    "unweighted_vertices": 0,
+    "maximum_weight_sum_error": 1.30385160446167e-7
+  }
+}

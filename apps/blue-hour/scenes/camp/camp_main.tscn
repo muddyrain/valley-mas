@@ -1,8 +1,8 @@
 [gd_scene load_steps=64 format=3]
 
 [ext_resource type="NavigationMesh" path="res://scenes/camp/camp_navigation_mesh.tres" id="1_navigation"]
-[ext_resource type="PackedScene" path="res://assets/characters/xia_zhiyao/model/character_xia_zhiyao_model.glb" id="2_xia"]
-[ext_resource type="PackedScene" path="res://assets/characters/su_wanxing/model/character_su_wanxing_model.glb" id="3_su"]
+[ext_resource type="PackedScene" path="res://assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb" id="2_xia"]
+[ext_resource type="PackedScene" path="res://assets/characters/su_wanxing/runtime/su_wanxing.glb" id="3_su"]
 [ext_resource type="PackedScene" path="res://assets/generated/vehicle_evacuation_bus_model.glb" id="4_bus"]
 
 [sub_resource type="StandardMaterial3D" id="Material_ground"]

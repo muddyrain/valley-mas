@@ -1,0 +1,46 @@
+[gd_resource type="AnimationNodeBlendTree" format=3]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_secjq"]
+animation = &"Humanoid/Idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_k0772"]
+animation = &"Humanoid/Run"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_a8ktj"]
+animation = &"Humanoid/Walk"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_4w6de"]
+xfade_time = 0.18
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_an5ff"]
+xfade_time = 0.18
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_ming3"]
+xfade_time = 0.18
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_cl1mb"]
+xfade_time = 0.18
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_b4sxj"]
+xfade_time = 0.18
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_pymi1"]
+xfade_time = 0.18
+
+[sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_hpton"]
+states/Idle/node = SubResource("AnimationNodeAnimation_secjq")
+states/Idle/position = Vector2(0, 100)
+states/Run/node = SubResource("AnimationNodeAnimation_k0772")
+states/Run/position = Vector2(360, 100)
+states/Walk/node = SubResource("AnimationNodeAnimation_a8ktj")
+states/Walk/position = Vector2(180, 100)
+transitions = ["Idle", "Walk", SubResource("AnimationNodeStateMachineTransition_4w6de"), "Idle", "Run", SubResource("AnimationNodeStateMachineTransition_an5ff"), "Walk", "Idle", SubResource("AnimationNodeStateMachineTransition_ming3"), "Walk", "Run", SubResource("AnimationNodeStateMachineTransition_cl1mb"), "Run", "Idle", SubResource("AnimationNodeStateMachineTransition_b4sxj"), "Run", "Walk", SubResource("AnimationNodeStateMachineTransition_pymi1")]
+
+[sub_resource type="AnimationNodeTimeScale" id="AnimationNodeTimeScale_kx1or"]
+
+[resource]
+nodes/Locomotion/node = SubResource("AnimationNodeStateMachine_hpton")
+nodes/Locomotion/position = Vector2(0, 100)
+nodes/Rate/node = SubResource("AnimationNodeTimeScale_kx1or")
+nodes/Rate/position = Vector2(220, 100)
+node_connections = [&"output", 0, &"Rate", &"Rate", 0, &"Locomotion"]

@@ -1,0 +1,71 @@
+{
+  "selection": "Both edge endpoints: 0.09<abs(x)<0.25 m, 0.84<z<1.22 m, non-hair, blue/r>1.1; rest edge length >2 mm. Same mesh and mask before/after.",
+  "selected_edges": 5926,
+  "before_glb_sha256": "3df0a7bd32ac9a732990b37e4257ebc8229b1fe9ac4b1a045834e0164ab2ad96",
+  "before": {
+    "left_arm": {
+      "root_edges_over_2x": 122,
+      "root_stretch_p95": 1.2852673049554006,
+      "root_stretch_max": 8.299327163423971,
+      "all_edges_over_2x": 157
+    },
+    "right_arm": {
+      "root_edges_over_2x": 58,
+      "root_stretch_p95": 1.1721426016617127,
+      "root_stretch_max": 6.4255978814660955,
+      "all_edges_over_2x": 121
+    },
+    "left_arm_stress": {
+      "root_edges_over_2x": 191,
+      "root_stretch_p95": 1.4906896860597532,
+      "root_stretch_max": 11.894104199318297,
+      "all_edges_over_2x": 238
+    },
+    "right_arm_stress": {
+      "root_edges_over_2x": 130,
+      "root_stretch_p95": 1.2921428612679189,
+      "root_stretch_max": 9.240793007936825,
+      "all_edges_over_2x": 235
+    }
+  },
+  "after": {
+    "left_arm": {
+      "root_edges_over_2x": 52,
+      "root_stretch_p95": 1.2432013679748157,
+      "root_stretch_max": 5.500250789794805,
+      "all_edges_over_2x": 65
+    },
+    "right_arm": {
+      "root_edges_over_2x": 45,
+      "root_stretch_p95": 1.1960246770058776,
+      "root_stretch_max": 4.814327675065848,
+      "all_edges_over_2x": 94
+    },
+    "left_arm_stress": {
+      "root_edges_over_2x": 108,
+      "root_stretch_p95": 1.3924767383630254,
+      "root_stretch_max": 7.747175074829492,
+      "all_edges_over_2x": 138
+    },
+    "right_arm_stress": {
+      "root_edges_over_2x": 89,
+      "root_stretch_p95": 1.319354602009828,
+      "root_stretch_max": 6.608439952947904,
+      "all_edges_over_2x": 178
+    }
+  },
+  "checks": {
+    "left_arm": true,
+    "right_arm": true,
+    "left_arm_stress": true,
+    "right_arm_stress": true,
+    "outside_cloth_weights_preserved": true,
+    "white_mascot_weights_preserved": true
+  },
+  "outside_cloth_max_weight_delta": 5.960464477539063e-8,
+  "white_mascot_selection": "0.10<x<0.22 m, y<-0.065 m, 0.84<z<0.99 m; body label, all RGB>0.65, B/R<1.04 (neutral white, excluding pale blue coat).",
+  "white_mascot_vertices": 230,
+  "white_mascot_max_weight_delta": 0.0,
+  "after_glb_sha256": "2105714f4c0996a8b9875491b25c8afbdc116e46563d68e3fe00194c8d5ed313",
+  "scope": "Xia Zhiyao weight recipe v2; no mesh, texture, bone or animation changes. Local stretch reduction is not a claim of zero defects; right p95 slightly increased."
+}

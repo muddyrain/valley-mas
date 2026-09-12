@@ -1,0 +1,105 @@
+{
+  "id": "BH_Humanoid_Rig_v1",
+  "units": "metres",
+  "up": "+Z",
+  "forward": "-Y",
+  "anatomical_left": "+X",
+  "local_z_roll_reference": "-Y",
+  "status": "frozen",
+  "accepted_characters": ["xia_zhiyao", "su_wanxing"],
+  "bones": [
+    {
+      "name": "Root",
+      "parent": null
+    },
+    {
+      "name": "Hips",
+      "parent": "Root"
+    },
+    {
+      "name": "Spine",
+      "parent": "Hips"
+    },
+    {
+      "name": "Chest",
+      "parent": "Spine"
+    },
+    {
+      "name": "UpperChest",
+      "parent": "Chest"
+    },
+    {
+      "name": "Neck",
+      "parent": "UpperChest"
+    },
+    {
+      "name": "Head",
+      "parent": "Neck"
+    },
+    {
+      "name": "LeftShoulder",
+      "parent": "UpperChest"
+    },
+    {
+      "name": "LeftUpperArm",
+      "parent": "LeftShoulder"
+    },
+    {
+      "name": "LeftLowerArm",
+      "parent": "LeftUpperArm"
+    },
+    {
+      "name": "LeftHand",
+      "parent": "LeftLowerArm"
+    },
+    {
+      "name": "LeftUpperLeg",
+      "parent": "Hips"
+    },
+    {
+      "name": "LeftLowerLeg",
+      "parent": "LeftUpperLeg"
+    },
+    {
+      "name": "LeftFoot",
+      "parent": "LeftLowerLeg"
+    },
+    {
+      "name": "LeftToes",
+      "parent": "LeftFoot"
+    },
+    {
+      "name": "RightShoulder",
+      "parent": "UpperChest"
+    },
+    {
+      "name": "RightUpperArm",
+      "parent": "RightShoulder"
+    },
+    {
+      "name": "RightLowerArm",
+      "parent": "RightUpperArm"
+    },
+    {
+      "name": "RightHand",
+      "parent": "RightLowerArm"
+    },
+    {
+      "name": "RightUpperLeg",
+      "parent": "Hips"
+    },
+    {
+      "name": "RightLowerLeg",
+      "parent": "RightUpperLeg"
+    },
+    {
+      "name": "RightFoot",
+      "parent": "RightLowerLeg"
+    },
+    {
+      "name": "RightToes",
+      "parent": "RightFoot"
+    }
+  ],
+  "policy": "Names, semantics, hierarchy and axes are immutable in v1. Character-specific lengths/rest poses/weights may vary. Breaking changes require a new version."
+}

@@ -1,0 +1,38 @@
+{
+  "id": "BH_Humanoid_Animations_v1",
+  "rig": "BH_Humanoid_Rig_v1",
+  "fps": 60,
+  "clips": {
+    "Idle": {
+      "duration": 3.2,
+      "nominal_speed": 0.0,
+      "frames": 192,
+      "loop": true,
+      "in_place": true
+    },
+    "Walk": {
+      "duration": 1.0,
+      "stance": 0.62,
+      "reach": 0.3,
+      "lift": 0.075,
+      "drop": 0.073,
+      "lean": 2.5,
+      "frames": 60,
+      "nominal_speed": 0.9677419354838709,
+      "loop": true,
+      "in_place": true
+    },
+    "Run": {
+      "duration": 0.7,
+      "stance": 0.3,
+      "reach": 0.31,
+      "lift": 0.095,
+      "drop": 0.086,
+      "lean": 7.0,
+      "frames": 42,
+      "nominal_speed": 2.9523809523809526,
+      "loop": true,
+      "in_place": true
+    }
+  }
+}

@@ -4,6 +4,7 @@ const Visuals = preload("res://vfx/visuals.gd")
 const Assets = preload("res://vfx/generated_assets.gd")
 const AimFire = preload("res://survivors/aim_fire.gd")
 const Modifiers = preload("res://core/effect_modifiers.gd")
+const AnimationController = preload("res://survivors/survivor_animation_controller.gd")
 var effects: RefCounted = Modifiers.new()
 var data: Resource
 var talent: Resource
@@ -18,12 +19,12 @@ var gun: Node3D
 var hp_bar: MeshInstance3D
 var dead: bool = false
 var boarding: bool = false
-var pulse: float = 0.0
 var searching := false
 var regrouping := false
 var duty_label: Label3D
 var duty_ring: MeshInstance3D
 var name_label: Label3D
+var animation_controller: Node3D
 
 func setup(spec: Resource, trait_data: Resource, equipment: Resource) -> void:
 	data = spec
@@ -33,9 +34,19 @@ func setup(spec: Resource, trait_data: Resource, equipment: Resource) -> void:
 	# 尝试加载 GLB 模型,回退到程序化几何体
 	if data.model_path != "" and ResourceLoader.exists(data.model_path):
 		var model_scene: PackedScene = load(data.model_path)
-		rig = model_scene.instantiate()
+		rig = Node3D.new()
+		rig.name = "VisualRoot"
 		add_child(rig)
-		rig.scale = Vector3.ONE * 0.5  # GLB 模型通常较大,缩小到游戏尺度
+		var model := model_scene.instantiate() as Node3D
+		rig.add_child(model)
+		# Imported humans face +Z; existing movement and weapon mounts face -Z.
+		# Keep navigation/weapon facing unchanged and correct only the mesh frame.
+		model.rotation.y = PI
+		animation_controller = AnimationController.new()
+		model.add_child(animation_controller)
+		if not animation_controller.initialize(model):
+			animation_controller.queue_free()
+			animation_controller = null
 	else:
 		rig = Visuals.body(self, data.color)
 
@@ -82,7 +93,12 @@ func tick(delta: float, mission: Node3D) -> void:
 	var manual: bool = mission.manual_aim and not assigned
 	if manual:
 		stop()
+	var movement_start := position
 	_move(delta, mission)
+	if animation_controller != null:
+		var offset := position - movement_start
+		var actual_speed := Vector2(offset.x, offset.z).length() / maxf(delta, .000001)
+		animation_controller.update_motion(actual_speed, data.move_speed, delta)
 	hp_bar.scale.x = maxf(0.01, hp / data.max_hp)
 	if searching or cooldown > 0 or reload_left > 0:
 		return
@@ -102,13 +118,9 @@ func tick(delta: float, mission: Node3D) -> void:
 		AimFire.fire(self, mission, mission.aim_point)
 	else:
 		mission.attack(self, target)
-	rig.scale = Vector3(1.03, 0.95, 1.03)
-	if is_inside_tree():
-		create_tween().tween_property(rig, "scale", Vector3.ONE, 0.13)
 
 func _move(delta: float, mission: Node3D) -> void:
 	if path.is_empty():
-		rig.position.y = 0.0
 		return
 	var time_left: float = delta
 	while not path.is_empty() and time_left > 0:
@@ -124,8 +136,6 @@ func _move(delta: float, mission: Node3D) -> void:
 			position += direction * budget
 			rig.rotation.y = atan2(-direction.x, -direction.z)
 			time_left = 0
-	pulse += delta * 13
-	rig.position.y = absf(sin(pulse)) * 0.075
 
 func take_damage(amount: float, invincible: bool = false) -> void:
 	if dead or invincible or boarding:

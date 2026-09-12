@@ -1,0 +1,189 @@
+{
+  "blender_version": "5.2.1 LTS",
+  "poses": {
+    "rest": {
+      "rotations": [],
+      "meshes": {
+        "Mesh_0": {
+          "finite": true,
+          "bounds_min": [-0.4207504391670227, -0.2058373987674713, 6.332993507385254e-8],
+          "bounds_max": [0.4201326370239258, 0.20211881399154663, 1.5999999046325684],
+          "max_vertex_displacement_m": 1.273292017036125e-7,
+          "edge_stretch_p99": 1.0000030416027885,
+          "edge_stretch_max": 1.0000553287084335,
+          "edges_stretched_over_2x": 0
+        }
+      }
+    },
+    "head_left": {
+      "rotations": [["Head", [0, 0, 1], 25]],
+      "meshes": {
+        "Mesh_0": {
+          "finite": true,
+          "bounds_min": [-0.4207504391670227, -0.2058373987674713, 6.332993507385254e-8],
+          "bounds_max": [0.4201326370239258, 0.20756857097148895, 1.5999999046325684],
+          "max_vertex_displacement_m": 0.12147221557565965,
+          "edge_stretch_p99": 1.1306136673660045,
+          "edge_stretch_max": 4.468210472279438,
+          "edges_stretched_over_2x": 49
+        }
+      }
+    },
+    "head_right": {
+      "rotations": [["Head", [0, 0, 1], -25]],
+      "meshes": {
+        "Mesh_0": {
+          "finite": true,
+          "bounds_min": [-0.4207504391670227, -0.2058373987674713, 6.332993507385254e-8],
+          "bounds_max": [0.4201326370239258, 0.2070334404706955, 1.5999999046325684],
+          "max_vertex_displacement_m": 0.12147221924667412,
+          "edge_stretch_p99": 1.1503233309725682,
+          "edge_stretch_max": 4.030502945437334,
+          "edges_stretched_over_2x": 37
+        }
+      }
+    },
+    "left_arm": {
+      "rotations": [["LeftUpperArm", [0, 1, 0], -40]],
+      "meshes": {
+        "Mesh_0": {
+          "finite": true,
+          "bounds_min": [-0.4207504391670227, -0.2058373987674713, 6.332993507385254e-8],
+          "bounds_max": [0.632519543170929, 0.20211881399154663, 1.5999999046325684],
+          "max_vertex_displacement_m": 0.3614497350959997,
+          "edge_stretch_p99": 1.020106533622095,
+          "edge_stretch_max": 1.849989946646381,
+          "edges_stretched_over_2x": 0
+        }
+      }
+    },
+    "right_arm": {
+      "rotations": [["RightUpperArm", [0, 1, 0], 40]],
+      "meshes": {
+        "Mesh_0": {
+          "finite": true,
+          "bounds_min": [-0.6334635019302368, -0.2058373987674713, 6.332993507385254e-8],
+          "bounds_max": [0.4201326370239258, 0.20211881399154663, 1.5999999046325684],
+          "max_vertex_displacement_m": 0.36185286385058685,
+          "edge_stretch_p99": 1.017311956572446,
+          "edge_stretch_max": 3.0775778994199268,
+          "edges_stretched_over_2x": 10
+        }
+      }
+    },
+    "left_leg": {
+      "rotations": [["LeftUpperLeg", [1, 0, 0], -30]],
+      "meshes": {
+        "Mesh_0": {
+          "finite": true,
+          "bounds_min": [-0.4207504391670227, -0.5932284593582153, 6.332993507385254e-8],
+          "bounds_max": [0.4201326370239258, 0.20211881399154663, 1.5999999046325684],
+          "max_vertex_displacement_m": 0.4504056415682399,
+          "edge_stretch_p99": 1.0387605197685916,
+          "edge_stretch_max": 2.0225165444819933,
+          "edges_stretched_over_2x": 1
+        }
+      },
+      "leg_direction": {
+        "knee_forward_displacement_m": 0.17571280896663666
+      }
+    },
+    "right_leg": {
+      "rotations": [["RightUpperLeg", [1, 0, 0], -30]],
+      "meshes": {
+        "Mesh_0": {
+          "finite": true,
+          "bounds_min": [-0.4207504391670227, -0.5933651328086853, 0.00018243864178657532],
+          "bounds_max": [0.4201326370239258, 0.20211881399154663, 1.5999999046325684],
+          "max_vertex_displacement_m": 0.45056687333795126,
+          "edge_stretch_p99": 1.038796434009785,
+          "edge_stretch_max": 1.818399502820411,
+          "edges_stretched_over_2x": 0
+        }
+      },
+      "leg_direction": {
+        "knee_forward_displacement_m": 0.17571283876895905
+      }
+    },
+    "left_knee": {
+      "rotations": [["LeftUpperLeg", [1, 0, 0], -25], ["LeftLowerLeg", [1, 0, 0], 60]],
+      "meshes": {
+        "Mesh_0": {
+          "finite": true,
+          "bounds_min": [-0.4207504391670227, -0.2067582905292511, 6.332993507385254e-8],
+          "bounds_max": [0.4201326370239258, 0.20211881399154663, 1.5999999046325684],
+          "max_vertex_displacement_m": 0.23101961490746564,
+          "edge_stretch_p99": 1.035850378773436,
+          "edge_stretch_max": 1.8529156760404024,
+          "edges_stretched_over_2x": 0
+        }
+      },
+      "leg_direction": {
+        "knee_forward_displacement_m": 0.14914436638355255,
+        "knee_backward_flexion_degrees": 59.900764794172346
+      }
+    },
+    "right_knee": {
+      "rotations": [["RightUpperLeg", [1, 0, 0], -25], ["RightLowerLeg", [1, 0, 0], 60]],
+      "meshes": {
+        "Mesh_0": {
+          "finite": true,
+          "bounds_min": [-0.4207504391670227, -0.206451416015625, 0.00018243864178657532],
+          "bounds_max": [0.4201326370239258, 0.20211881399154663, 1.5999999046325684],
+          "max_vertex_displacement_m": 0.23117648458083426,
+          "edge_stretch_p99": 1.0352758968671874,
+          "edge_stretch_max": 1.6719563069894277,
+          "edges_stretched_over_2x": 0
+        }
+      },
+      "leg_direction": {
+        "knee_forward_displacement_m": 0.14914438128471375,
+        "knee_backward_flexion_degrees": 59.900777713377735
+      }
+    },
+    "lean": {
+      "rotations": [["Spine", [1, 0, 0], 12]],
+      "meshes": {
+        "Mesh_0": {
+          "finite": true,
+          "bounds_min": [-0.4207504391670227, -0.27357378602027893, 6.332993507385254e-8],
+          "bounds_max": [0.4201326370239258, 0.18820320069789886, 1.5854700803756714],
+          "max_vertex_displacement_m": 0.12962888867119296,
+          "edge_stretch_p99": 1.002437897085925,
+          "edge_stretch_max": 1.7035343217191787,
+          "edges_stretched_over_2x": 0
+        }
+      }
+    },
+    "left_arm_stress": {
+      "rotations": [["LeftUpperArm", [0, 1, 0], -60]],
+      "meshes": {
+        "Mesh_0": {
+          "finite": true,
+          "bounds_min": [-0.4207504391670227, -0.2058373987674713, 6.332993507385254e-8],
+          "bounds_max": [0.6522192358970642, 0.20211881399154663, 1.5999999046325684],
+          "max_vertex_displacement_m": 0.5284039929762375,
+          "edge_stretch_p99": 1.0325400256369943,
+          "edge_stretch_max": 2.2826391922514464,
+          "edges_stretched_over_2x": 11
+        }
+      }
+    },
+    "right_arm_stress": {
+      "rotations": [["RightUpperArm", [0, 1, 0], 60]],
+      "meshes": {
+        "Mesh_0": {
+          "finite": true,
+          "bounds_min": [-0.652763843536377, -0.2058373987674713, 6.332993507385254e-8],
+          "bounds_max": [0.4201326370239258, 0.20211881399154663, 1.5999999046325684],
+          "max_vertex_displacement_m": 0.5289932791364002,
+          "edge_stretch_p99": 1.0277987300099616,
+          "edge_stretch_max": 4.11413302437621,
+          "edges_stretched_over_2x": 29
+        }
+      }
+    }
+  },
+  "actions": 0,
+  "export_sha256": "3ffebbcbb5070e339a2fdffa578a8d64d25098c5b03e323a8f594df5f457b646"
+}

@@ -1,0 +1,149 @@
+{
+  "id": "BH_Humanoid_Rig_v1",
+  "units": "metres",
+  "up": "+Z",
+  "forward": "-Y",
+  "anatomical_left": "+X",
+  "local_z_roll_reference": "-Y",
+  "canonical_rest": "T pose; fit bone endpoints to mesh rest without reshaping the mesh",
+  "bones": [
+    {
+      "name": "Root",
+      "parent": null,
+      "head": [0, 0, 0],
+      "tail": [0, 0, 0.12]
+    },
+    {
+      "name": "Hips",
+      "parent": "Root",
+      "head": [0, 0, 0.86],
+      "tail": [0, 0, 0.98]
+    },
+    {
+      "name": "Spine",
+      "parent": "Hips",
+      "head": [0, 0, 0.98],
+      "tail": [0, 0, 1.075]
+    },
+    {
+      "name": "Chest",
+      "parent": "Spine",
+      "head": [0, 0, 1.075],
+      "tail": [0, 0, 1.16]
+    },
+    {
+      "name": "UpperChest",
+      "parent": "Chest",
+      "head": [0, 0, 1.16],
+      "tail": [0, 0, 1.23]
+    },
+    {
+      "name": "Neck",
+      "parent": "UpperChest",
+      "head": [0, 0, 1.23],
+      "tail": [0, 0, 1.285]
+    },
+    {
+      "name": "Head",
+      "parent": "Neck",
+      "head": [0, 0, 1.285],
+      "tail": [0, 0, 1.5]
+    },
+    {
+      "name": "LeftShoulder",
+      "parent": "UpperChest",
+      "head": [0.025, 0, 1.21],
+      "tail": [0.14, 0, 1.21]
+    },
+    {
+      "name": "LeftUpperArm",
+      "parent": "LeftShoulder",
+      "head": [0.14, 0, 1.21],
+      "tail": [0.37, 0, 1.21]
+    },
+    {
+      "name": "LeftLowerArm",
+      "parent": "LeftUpperArm",
+      "head": [0.37, 0, 1.21],
+      "tail": [0.57, 0, 1.21]
+    },
+    {
+      "name": "LeftHand",
+      "parent": "LeftLowerArm",
+      "head": [0.57, 0, 1.21],
+      "tail": [0.66, 0, 1.21]
+    },
+    {
+      "name": "LeftUpperLeg",
+      "parent": "Hips",
+      "head": [0.085, 0, 0.86],
+      "tail": [0.09, -0.018, 0.5]
+    },
+    {
+      "name": "LeftLowerLeg",
+      "parent": "LeftUpperLeg",
+      "head": [0.09, -0.018, 0.5],
+      "tail": [0.09, 0.015, 0.16]
+    },
+    {
+      "name": "LeftFoot",
+      "parent": "LeftLowerLeg",
+      "head": [0.09, 0.015, 0.16],
+      "tail": [0.09, -0.115, 0.065]
+    },
+    {
+      "name": "LeftToes",
+      "parent": "LeftFoot",
+      "head": [0.09, -0.115, 0.065],
+      "tail": [0.09, -0.18, 0.065]
+    },
+    {
+      "name": "RightShoulder",
+      "parent": "UpperChest",
+      "head": [-0.025, 0, 1.21],
+      "tail": [-0.14, 0, 1.21]
+    },
+    {
+      "name": "RightUpperArm",
+      "parent": "RightShoulder",
+      "head": [-0.14, 0, 1.21],
+      "tail": [-0.37, 0, 1.21]
+    },
+    {
+      "name": "RightLowerArm",
+      "parent": "RightUpperArm",
+      "head": [-0.37, 0, 1.21],
+      "tail": [-0.57, 0, 1.21]
+    },
+    {
+      "name": "RightHand",
+      "parent": "RightLowerArm",
+      "head": [-0.57, 0, 1.21],
+      "tail": [-0.66, 0, 1.21]
+    },
+    {
+      "name": "RightUpperLeg",
+      "parent": "Hips",
+      "head": [-0.085, 0, 0.86],
+      "tail": [-0.09, -0.018, 0.5]
+    },
+    {
+      "name": "RightLowerLeg",
+      "parent": "RightUpperLeg",
+      "head": [-0.09, -0.018, 0.5],
+      "tail": [-0.09, 0.015, 0.16]
+    },
+    {
+      "name": "RightFoot",
+      "parent": "RightLowerLeg",
+      "head": [-0.09, 0.015, 0.16],
+      "tail": [-0.09, -0.115, 0.065]
+    },
+    {
+      "name": "RightToes",
+      "parent": "RightFoot",
+      "head": [-0.09, -0.115, 0.065],
+      "tail": [-0.09, -0.18, 0.065]
+    }
+  ]
+}
