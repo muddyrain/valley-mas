@@ -1,0 +1,19 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/today_action_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/ui/today_action/today_action_residential_thumbnail.png" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "residential"
+display_name = "住宅区"
+subtitle = "补给搜刮"
+description = "搜寻住家与沿街小店，带回今晚的口粮。"
+danger = "较低"
+accent = Color(0.25, 0.39, 0.29, 1)
+thumbnail = ExtResource("2")
+food_multiplier = 1.5
+scrap_multiplier = 0.7
+spawn_interval_multiplier = 1.35
+initial_enemy_fraction = 0.5
+weapon_sites = PackedStringArray("car_west")

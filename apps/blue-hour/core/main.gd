@@ -10,6 +10,7 @@ const Settlement = preload("res://ui/settlement_screen.gd")
 const UI = preload("res://ui/ui_style.gd")
 const NewGame = preload("res://ui/new_game_screen.gd")
 const Title = preload("res://ui/title_screen.gd")
+const TodayAction = preload("res://ui/today_action_screen.gd")
 var selected_member := ""
 var catalog := Catalog.new()
 var ledger := Ledger.new()
@@ -26,12 +27,14 @@ var state := "loading"
 var status_message := ""
 var save_blocked := false
 var save_error_dialog: AcceptDialog
+var base_map: Resource
 
 func _ready() -> void:
 	if "--art-showcase" in OS.get_cmdline_user_args():
 		get_tree().change_scene_to_file.call_deferred("res://scenes/debug/art_showcase.tscn")
 		return
 	var errors := catalog.validate()
+	base_map = catalog.map.duplicate(true)
 	if not errors.is_empty():
 		push_error("Invalid content: " + str(errors))
 		get_tree().quit(1)
@@ -65,6 +68,8 @@ func _ready() -> void:
 		status_message = "已恢复上一份有效存档。"
 	if fresh_test_run:
 		_refresh_screen()
+		if "--test-today-action" in OS.get_cmdline_user_args():
+			show_today_action.call_deferred()
 	else:
 		show_main_menu()
 
@@ -145,6 +150,17 @@ func show_shelter() -> void:
 	screen = Shelter.new()
 	ui_layer.add_child(screen)
 	screen.setup(self)
+
+func show_today_action() -> void:
+	if state != "shelter" or campaign.data.status != "shelter" or campaign.data.members.is_empty():
+		return
+	_clear_screen()
+	state = "today_action"
+	screen = TodayAction.new()
+	ui_layer.add_child(screen)
+	screen.setup(catalog.today_actions, base_map, campaign.data, catalog.loop, campaign.passive_modifiers())
+	screen.departure_confirmed.connect(start_mission)
+	screen.cancelled.connect(show_shelter)
 
 func show_main_menu() -> void:
 	_clear_screen()
@@ -232,12 +248,16 @@ func debug_effects(upgrade_owned: bool) -> void:
 	show_shelter()
 	screen.show_effects()
 
-func start_mission() -> void:
-	if state != "shelter":
+func start_mission(action_id: String = "") -> void:
+	if state not in ["shelter", "today_action"]:
+		return
+	if state == "today_action" and action_id.is_empty():
 		return
 	var before: Dictionary = campaign.data.duplicate(true)
-	if not campaign.start_action() or not _save(before):
+	if not campaign.start_action(action_id) or not _save(before):
 		return
+	var action: Resource = catalog.by_id(catalog.today_actions, action_id)
+	catalog.map = action.make_map(base_map) if action != null else base_map.duplicate(true)
 	_clear_screen()
 	_clear_mission()
 	mission = Mission.new()

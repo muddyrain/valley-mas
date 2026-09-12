@@ -36,7 +36,7 @@ function Test-StandaloneBuild([string]$ExecutablePath) {
     New-Item -ItemType Directory -Path $standaloneDirectory -Force | Out-Null
     $standaloneExecutable = Join-Path $standaloneDirectory 'BlueHourHomeward.exe'
     Copy-Item -LiteralPath $ExecutablePath -Destination $standaloneExecutable -Force
-    foreach ($verificationMode in @('headless', 'native', 'menu-headless', 'menu-native')) {
+    foreach ($verificationMode in @('headless', 'native', 'menu-headless', 'menu-native', 'today-action-headless', 'today-action-native')) {
         $logPath = Join-Path $standaloneDirectory ($verificationMode + '.log')
         $stdoutPath = Join-Path $standaloneDirectory ($verificationMode + '.stdout.log')
         $stderrPath = Join-Path $standaloneDirectory ($verificationMode + '.stderr.log')
@@ -49,6 +49,7 @@ function Test-StandaloneBuild([string]$ExecutablePath) {
         }
         $launchArguments += @('--', '--test-save=standalone-04.json')
         if ($verificationMode.StartsWith('menu-')) { $launchArguments += '--test-menu' }
+        if ($verificationMode.StartsWith('today-action-')) { $launchArguments += '--test-today-action' }
         $process = Start-Process -FilePath $standaloneExecutable -ArgumentList $launchArguments `
             -WorkingDirectory $standaloneDirectory -WindowStyle Hidden -PassThru `
             -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
@@ -76,6 +77,7 @@ switch ($Mode) {
     'smoke' { Invoke-Engine @('--headless', '--quit-after', '120', '--', '--test-save=smoke-03.json') }
     'test' {
         Invoke-Engine @('--headless', '--editor', '--import', '--quit')
+        Invoke-Engine @('--headless', '--script', 'tests/today_action.gd')
         Invoke-Engine @('--headless', '--script', 'tests/art_assets.gd')
         Invoke-Engine @('--headless', '--script', 'tests/art_integration.gd')
         Invoke-Engine @('--headless', '--script', 'tests/rules.gd')
@@ -89,6 +91,7 @@ switch ($Mode) {
         Invoke-Engine @('--headless', '--script', 'tests/effect_system.gd')
     }
     'capture' {
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1600x900', '--audio-driver', 'Dummy', '--script', 'tests/today_action_runtime.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1440x900', '--script', 'tests/art_runtime.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1440x900', '--script', 'tests/runtime.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1440x900', '--script', 'tests/day_loop_runtime.gd')
@@ -103,6 +106,8 @@ switch ($Mode) {
         [System.IO.File]::WriteAllText((Join-Path $buildDirectory '.gdignore'), '')
         $executablePath = Join-Path $buildDirectory 'BlueHourHomeward.exe'
         Invoke-Engine @('--headless', '--editor', '--import', '--quit')
+        Invoke-Engine @('--headless', '--script', 'tests/today_action.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1600x900', '--audio-driver', 'Dummy', '--script', 'tests/today_action_runtime.gd')
         Invoke-Engine @('--headless', '--script', 'tests/art_assets.gd')
         Invoke-Engine @('--headless', '--script', 'tests/art_integration.gd')
         Invoke-Engine @('--headless', '--script', 'tests/rules.gd')
@@ -128,6 +133,7 @@ switch ($Mode) {
             sha256 = (Get-FileHash -LiteralPath $executablePath -Algorithm SHA256).Hash
             platform = 'Windows x86_64'
             embeddedPack = $true
+            todayActionChecks = @('today-action', 'today-action-runtime', 'standalone-today-action-headless', 'standalone-today-action-native')
             checks = @('art-assets', 'art-integration', 'rules', 'mission-flow', 'search-dispatch', 'parallel-commands', 'day-loop', 'day-loop-flow', 'new-run', 'new-run-flow', 'effect-system', 'standalone-headless', 'standalone-native', 'standalone-menu-headless', 'standalone-menu-native', 'standalone-art-headless', 'standalone-art-native')
         }
         $buildInfo | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $buildDirectory 'BUILD-INFO.json') -Encoding UTF8

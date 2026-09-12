@@ -11,7 +11,7 @@
 - 所有新增或修改 3D/2D 美术资产前必须读取 `art/ART_BIBLE.md`、`art/ASSET_PIPELINE.md` 和 `art/MODEL_CATALOG.md`；优先复用与组合现有资产，只有不存在合适资产时才创建新模型。
 
 - 原生 Godot 4.x + GDScript，Compatibility 渲染；工程入口 `project.godot`，场景装配 `core/main.gd`，行动逻辑 `missions/mission.gd`。
-- 当前实现为第 32 节切片与第 33 节的局部五日版本：跨日基础见 `docs/DAY_LOOP_SPEC.md`，0.4.0 开局与成长见 `docs/NEW_RUN_SPEC.md`。新游戏先选专精、从现有角色池随机抽两人，基地可换装和食物训练；每日选图、通用治疗/区域支援、跨局解锁、基地房间及完整 Day Loop 仍在后续。
+- 当前实现为第 32 节切片与第 33 节的局部五日版本：跨日基础见 `docs/DAY_LOOP_SPEC.md`，0.4.0 开局与成长见 `docs/NEW_RUN_SPEC.md`。新游戏先选专精、从现有角色池随机抽两人，基地可换装和食物训练；「整装出发」进入今日行动三选一，复用当前城区并配置不同物资与敌情，状态/存档契约见 `docs/TODAY_ACTION.md`。独立任务布局、通用治疗/区域支援、跨局解锁、基地房间及完整 Day Loop 仍在后续。
 - 内容真源为 `data/` 下的 Resource 与 `.tres`；地图布局、时段和威胁参数同样数据驱动。修改数据字段时联查 `data/catalog.gd`、消费模块和 `tests/rules.gd`。
 - 表现集中在 `maps/`、`vfx/`、`blue_hour/`，角色模型允许替换；战斗、导航、资源与结算不得依赖占位模型节点。
 - 0.3.0 基础操作见 `docs/adr/0003-parallel-search-and-direct-controls.md`：左键点击/按住带队，Ctrl 停步指向射击，Space 战术暂停可下令，Esc 菜单，WASD 与右/中键拖动镜头。X 停止、F 锁定集火、R 全队集合、E 归航是本作补充；输入归 `missions/squad_input.gd`，松键、UI、Debug 和失焦必须正确释放持续输入。

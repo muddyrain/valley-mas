@@ -1,0 +1,75 @@
+{
+  "source_archive": "蓝时归航_今日行动_UI素材包.zip",
+  "assets": [
+    {
+      "file": "today_action_board.png",
+      "source_name": "01_主内容大面板.png",
+      "width": 2075,
+      "height": 698,
+      "sha256": "24117eec43a9b7adaf2d4b8d1e311cf0a3e078fc5c712e38db82e4fb74662ef6"
+    },
+    {
+      "file": "today_action_task_card.png",
+      "source_name": "02_任务卡模板.png",
+      "width": 984,
+      "height": 1368,
+      "sha256": "471545ca999b08f3814ff18f25309c9155759725fe42b6ef95dfffeb997d6d19"
+    },
+    {
+      "file": "today_action_status_bar.png",
+      "source_name": "03_顶部状态条.png",
+      "width": 2015,
+      "height": 675,
+      "sha256": "e92015a14c026beaadb915e0606f57035b9f3ca1d06e3e876c6acb2349c1722d"
+    },
+    {
+      "file": "today_action_selection_bar.png",
+      "source_name": "04_已选择信息条.png",
+      "width": 2019,
+      "height": 639,
+      "sha256": "7d105940e34c4cc693f94a22547786494317129ffd4c6670ff628abdb73e0b10"
+    },
+    {
+      "file": "today_action_button_blue.png",
+      "source_name": "05_蓝色按钮底.png",
+      "width": 1451,
+      "height": 711,
+      "sha256": "5d20332579488a2d3433be6a5c4b6a9d7e0805c19f51916bc8f0cbaedc8f95b2"
+    },
+    {
+      "file": "today_action_button_red.png",
+      "source_name": "06_红色按钮底.png",
+      "width": 1605,
+      "height": 826,
+      "sha256": "e2940a2e59c8495e037d4b6e519a9612c7d2f28de748d07ee19553f2e086184f"
+    },
+    {
+      "file": "today_action_button_green.png",
+      "source_name": "07_绿色按钮底.png",
+      "width": 1664,
+      "height": 782,
+      "sha256": "a59cdaa95dbd1a34f6878c642336bb921f578d24e8644b251b9a89e13194a6a8"
+    },
+    {
+      "file": "today_action_residential_thumbnail.png",
+      "source_name": "08_住宅区缩略图.png",
+      "width": 628,
+      "height": 438,
+      "sha256": "b7629ff31d20eabb752513948bd6127a20850a0038d01dbdb7e8ef287d8ec0b1"
+    },
+    {
+      "file": "today_action_commercial_thumbnail.png",
+      "source_name": "09_商业街缩略图.png",
+      "width": 628,
+      "height": 433,
+      "sha256": "80f9c4028d184321706f7db6281aee660ffc547e25d27d04c30b85462098bd99"
+    },
+    {
+      "file": "today_action_airdrop_thumbnail.png",
+      "source_name": "10_空投回收缩略图.png",
+      "width": 628,
+      "height": 430,
+      "sha256": "72c6e6a8617cd05370daf2c3f28beb8da71931105c80bf5a5dc3944ba80deb1d"
+    }
+  ]
+}

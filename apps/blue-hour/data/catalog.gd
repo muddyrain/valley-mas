@@ -26,6 +26,11 @@ var enemies: Array[Resource] = [
 	preload("res://data/enemies/siren.tres")
 ]
 var map: Resource = preload("res://data/maps/east_quay.tres")
+var today_actions: Array[Resource] = [
+	preload("res://data/today_actions/residential.tres"),
+	preload("res://data/today_actions/commercial.tres"),
+	preload("res://data/today_actions/airdrop.tres")
+]
 var loop: Resource = preload("res://data/day_loop.tres")
 var start_rules: Resource = preload("res://data/new_run.tres")
 var specializations: Array[Resource] = [preload("res://data/specializations/combat.tres"), preload("res://data/specializations/scavenge.tres"), preload("res://data/specializations/survey.tres")]
@@ -57,7 +62,7 @@ func by_id(collection: Array[Resource], id: String) -> Resource:
 
 func validate() -> Array[String]:
 	var errors: Array[String] = []
-	for collection in [survivors, traits, weapons, enemies, affixes, specializations, passives, powers]:
+	for collection in [survivors, traits, weapons, enemies, affixes, specializations, passives, powers, today_actions]:
 		var ids: Array[String] = []
 		for entry in collection:
 			if entry.id.is_empty() or entry.id in ids:
@@ -107,6 +112,17 @@ func validate() -> Array[String]:
 		for id in loop.reward_pools[site]:
 			if by_id(weapons, id) == null:
 				errors.append("Unknown reward weapon")
+	for action: Resource in today_actions:
+		if action.thumbnail == null or action.display_name.is_empty() or action.danger.is_empty():
+			errors.append("Missing destination presentation: " + action.id)
+		for factor: float in [action.food_multiplier, action.scrap_multiplier, action.spawn_interval_multiplier, action.initial_enemy_fraction]:
+			if not is_finite(factor) or factor <= 0:
+				errors.append("Invalid destination factor: " + action.id)
+		if action.initial_enemy_fraction > 1.0:
+			errors.append("Destination cannot exceed the authored initial encounters")
+		for site: String in action.weapon_sites:
+			if site not in loop.reward_pools:
+				errors.append("Unknown destination equipment site: " + site)
 	for affix in affixes:
 		if affix.damage_multiplier <= 0 or affix.range_multiplier <= 0 or affix.reload_multiplier <= 0 or affix.magazine_bonus < 0:
 			errors.append("Invalid weapon affix")

@@ -98,7 +98,7 @@ func setup(owner_app: Node) -> void:
 	roster.add_child(training_button)
 	column.add_child(UI.wrapped(app.status_message, 14, UI.CYAN))
 	var actions := UI.footer(self)
-	departure = UI.button("整装出发", app.start_mission, Vector2(0, 48))
+	departure = UI.button("整装出发", app.show_today_action, Vector2(0, 48))
 	departure.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	actions.add_child(departure)
 	actions.add_child(UI.button("备用装备", func(): shop_backdrop.show(); shop_panel.show(), Vector2(140, 48)))

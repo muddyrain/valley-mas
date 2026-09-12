@@ -1,0 +1,19 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/today_action_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/ui/today_action/today_action_commercial_thumbnail.png" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "commercial"
+display_name = "商业街"
+subtitle = "物资搜集"
+description = "回收商铺和车库里的废料，为整备积攒家底。"
+danger = "中等"
+accent = Color(0.22, 0.36, 0.48, 1)
+thumbnail = ExtResource("2")
+food_multiplier = 0.8
+scrap_multiplier = 1.5
+spawn_interval_multiplier = 1.0
+initial_enemy_fraction = 0.75
+weapon_sites = PackedStringArray("garage", "car_west")

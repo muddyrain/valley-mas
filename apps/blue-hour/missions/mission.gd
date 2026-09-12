@@ -606,6 +606,9 @@ func drop_loot(point: Vector3, food: int, scrap: int, weapon_item: Dictionary = 
 func reward_for_site(id: String) -> Dictionary:
 	if campaign == null:
 		return {}
+	var action: Resource = catalog.by_id(catalog.today_actions, str(campaign.data.get("selected_action", "")))
+	if action != null and id not in action.weapon_sites:
+		return {}
 	var value: Dictionary = campaign.data.day_rewards.get(id, {})
 	return value if value.is_empty() or campaign.item(value.uid).is_empty() else {}
 

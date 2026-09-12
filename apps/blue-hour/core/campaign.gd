@@ -118,6 +118,7 @@ func train(id: String) -> bool:
 	return true
 
 func _prepare_day() -> void:
+	data.selected_action = ""
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(data.seed) + int(data.day) * 1009
 	data.day_rewards = {}
@@ -166,9 +167,12 @@ func buy(uid: String) -> bool:
 			return true
 	return false
 
-func start_action() -> bool:
+func start_action(action_id: String = "") -> bool:
 	if data.status != "shelter" or data.members.is_empty():
 		return false
+	if not action_id.is_empty() and catalog.by_id(catalog.today_actions, action_id) == null:
+		return false
+	data.selected_action = action_id
 	data.status = "mission"
 	return true
 
@@ -287,6 +291,11 @@ func _nonnegative(value: Variant) -> bool:
 	return (value is int or value is float) and is_finite(float(value)) and value >= 0
 
 func valid_state(state: Dictionary) -> bool:
+	var action_id: Variant = state.get("selected_action", "")
+	if not action_id is String:
+		return false
+	if not action_id.is_empty() and catalog.by_id(catalog.today_actions, action_id) == null:
+		return false
 	if state.get("version") == 1:
 		return _valid_legacy(state)
 	# JSON numbers are floats; Array.has uses strict Variant types.
@@ -413,6 +422,7 @@ func restore(state: Dictionary) -> bool:
 	if not valid_state(state):
 		return false
 	data = state.duplicate(true)
+	data.selected_action = str(data.get("selected_action", ""))
 	if data.version == 1:
 		data.version = 2
 		data.specialization = ""

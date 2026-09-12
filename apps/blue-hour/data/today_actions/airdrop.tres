@@ -1,0 +1,19 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/today_action_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/ui/today_action/today_action_airdrop_thumbnail.png" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "airdrop"
+display_name = "空投回收"
+subtitle = "装备回收"
+description = "装备散落在库房、车库与弃车旁。趁夜幕前带走它们。"
+danger = "较高"
+accent = Color(0.57, 0.25, 0.21, 1)
+thumbnail = ExtResource("2")
+food_multiplier = 0.45
+scrap_multiplier = 1.0
+spawn_interval_multiplier = 0.7
+initial_enemy_fraction = 1.0
+weapon_sites = PackedStringArray("garage", "depot", "car_west")
