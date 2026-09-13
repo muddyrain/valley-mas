@@ -22,8 +22,8 @@ const TIPS: Array[String] = [
 	"搜刮时注意蓝时即将到来的时间。",
 	"装备与角色特性会影响外出效率。",
 ]
-const CORE := "res://assets/ui/loading_v2/core/"
-const RIGHT_ARTWORK: Texture2D = preload("res://assets/ui/loading_v2/loading_right_artwork_main.png")
+const CORE := "res://assets/ui/loading/core/"
+const RIGHT_ARTWORK: Texture2D = preload("res://assets/ui/loading/loading_right_artwork_main.png")
 
 var host_app: Node
 var design: Control
@@ -148,10 +148,10 @@ func _build_back_decor() -> void:
 	back.name = "BackDecor"
 	back.position = Vector2.ZERO
 	visual_layers.add_child(back)
-	_add_image(back, "Smoke01", "22_smoke_01.png", Vector2(745, 640), 0.20)
-	_add_image(back, "Smoke02", "23_smoke_02.png", Vector2(1170, 730), 0.16)
-	_add_image(back, "TaglineMark", "21_tagline_mark.png", Vector2(1790, 35), 0.9)
-	var line := _add_image(back, "DecorationLine", "20_decoration_line.png", Vector2(84, 360), 0.8)
+	_add_image(back, "Smoke01", "smoke_01.png", Vector2(745, 640), 0.20)
+	_add_image(back, "Smoke02", "smoke_02.png", Vector2(1170, 730), 0.16)
+	_add_image(back, "TaglineMark", "tagline_mark.png", Vector2(1790, 35), 0.9)
+	var line := _add_image(back, "DecorationLine", "decoration_line.png", Vector2(84, 360), 0.8)
 	line.modulate = Color(0.52, 0.73, 0.92, 0.78)
 	_create_drift(back.get_node("Smoke01") as TextureRect, Vector2(18, -8), 12.0)
 	_create_drift(back.get_node("Smoke02") as TextureRect, Vector2(-16, -10), 14.0)
@@ -160,7 +160,7 @@ func _build_character_layer() -> void:
 	var layer := Control.new()
 	layer.name = "CharacterLayer"
 	visual_layers.add_child(layer)
-	character = _add_image(layer, "CharacterMain", "07_character_group.png", Vector2(795, 205), 1.5)
+	character = _add_image(layer, "CharacterMain", "character_group.png", Vector2(795, 205), 1.5)
 	character.pivot_offset = character.size * 0.5
 	character.modulate = Color(1.08, 1.08, 1.08, 0.0)
 	_create_drift(character, Vector2(0, -3), 4.2, true)
@@ -169,15 +169,15 @@ func _build_foreground() -> void:
 	var layer := Control.new()
 	layer.name = "ForegroundLayer"
 	visual_layers.add_child(layer)
-	var crates := _add_image(layer, "ForegroundCrates", "16_foreground_crates.png", Vector2(600, 820), 1.5)
+	var crates := _add_image(layer, "ForegroundCrates", "foreground_crates.png", Vector2(600, 820), 1.5)
 	crates.pivot_offset = crates.size * 0.5
 	_create_drift(crates, Vector2(-4, 3), 11.2)
-	lantern_glow = _add_image(layer, "LanternGlow", "18_lantern_glow.png", Vector2(1570, 750), 0.95)
+	lantern_glow = _add_image(layer, "LanternGlow", "lantern_glow.png", Vector2(1570, 750), 0.95)
 	var glow_material := CanvasItemMaterial.new()
 	glow_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	lantern_glow.material = glow_material
 	lantern_glow.modulate = Color(1.0, 0.78, 0.42, 0.78)
-	var lantern := _add_image(layer, "Lantern", "17_lantern.png", Vector2(1590, 735), 0.95)
+	var lantern := _add_image(layer, "Lantern", "lantern.png", Vector2(1590, 735), 0.95)
 	var lantern_tween := create_tween().set_loops()
 	lantern_tween.tween_property(lantern_glow, "modulate:a", 0.94, 1.4).set_trans(Tween.TRANS_SINE)
 	lantern_tween.tween_property(lantern_glow, "modulate:a", 0.66, 1.7).set_trans(Tween.TRANS_SINE)
@@ -203,7 +203,7 @@ func _build_artwork_atmosphere() -> void:
 	atmosphere.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	atmosphere.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	artwork_root.add_child(atmosphere)
-	lantern_glow = _add_image(atmosphere, "LanternGlow", "18_lantern_glow.png", Vector2(1570, 750), 0.95)
+	lantern_glow = _add_image(atmosphere, "LanternGlow", "lantern_glow.png", Vector2(1570, 750), 0.95)
 	var glow_material := CanvasItemMaterial.new()
 	glow_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	lantern_glow.material = glow_material
@@ -217,9 +217,9 @@ func _build_particles() -> void:
 	layer.name = "ParticleLayer"
 	visual_layers.add_child(layer)
 	var textures: Array[Texture2D] = [
-		load(CORE + "13_particle_01.png") as Texture2D,
-		load(CORE + "14_particle_02.png") as Texture2D,
-		load(CORE + "15_particle_03.png") as Texture2D,
+		load(CORE + "particle_01.png") as Texture2D,
+		load(CORE + "particle_02.png") as Texture2D,
+		load(CORE + "particle_03.png") as Texture2D,
 	]
 	var positions: Array[Vector2] = [Vector2(790, 270), Vector2(720, 520), Vector2(1050, 180), Vector2(1170, 450), Vector2(1320, 250), Vector2(740, 780)]
 	for index in positions.size():
@@ -246,7 +246,7 @@ func _build_ui() -> void:
 	ui.position = Vector2(108, 58)
 	ui.size = Vector2(620, 900)
 	design.add_child(ui)
-	var logo := _add_image(ui, "Logo", "01_logo.png", Vector2.ZERO, 0.94)
+	var logo := _add_image(ui, "Logo", "logo.png", Vector2.ZERO, 0.94)
 	logo.modulate = Color(1, 1, 1, 0.78)
 	var tagline := _label(ui, "Tagline", "无论多远，\n总有可以回家的路。", 26, Color("#aebed1"))
 	tagline.position = Vector2(24, 235)
@@ -255,13 +255,13 @@ func _build_ui() -> void:
 	title.position = Vector2(0, 315)
 	title.size = Vector2(620, 58)
 	title_label = title
-	var underline := _add_image(ui, "LoadingUnderline", "20_decoration_line.png", Vector2(6, 382), 0.92)
+	var underline := _add_image(ui, "LoadingUnderline", "decoration_line.png", Vector2(6, 382), 0.92)
 	underline.modulate = Color(0.45, 0.72, 1.0, 0.72)
 	var progress_track := TextureRect.new()
 	progress_track.name = "ProgressTrack"
 	progress_track.position = Vector2(0, 430)
 	progress_track.size = Vector2(500, 39)
-	progress_track.texture = load(CORE + "02_progress_bar_bg.png") as Texture2D
+	progress_track.texture = load(CORE + "progress_bar_bg.png") as Texture2D
 	progress_track.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	progress_track.stretch_mode = TextureRect.STRETCH_SCALE
 	progress_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -297,7 +297,7 @@ func _build_ui() -> void:
 	ui.add_child(steps)
 	for index in STAGE_TEXT.size():
 		var row_y := float(index * 48)
-		var icon := _add_image(steps, "StepIcon%02d" % index, "05_check_off.png", Vector2(0, row_y), 0.34)
+		var icon := _add_image(steps, "StepIcon%02d" % index, "check_off.png", Vector2(0, row_y), 0.34)
 		icon.position += Vector2(0, 2)
 		stage_icons.append(icon)
 		var stage_label := _label(steps, "StepLabel%02d" % index, STAGE_TEXT[index].trim_suffix("…"), 20, Color("#65758b"))
@@ -314,7 +314,7 @@ func _build_ui() -> void:
 func _build_reference_overlay() -> void:
 	reference_overlay = TextureRect.new()
 	reference_overlay.name = "ReferenceOverlay"
-	reference_overlay.texture = load("res://assets/ui/loading_v2/reference/loading_final_reference.png") as Texture2D
+	reference_overlay.texture = load("res://assets/ui/loading/reference/loading_final_reference.png") as Texture2D
 	reference_overlay.position = Vector2.ZERO
 	reference_overlay.size = DESIGN_SIZE
 	reference_overlay.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -401,17 +401,17 @@ func _update_stage_states() -> void:
 	for index in stage_labels.size():
 		var state_label := stage_labels[index].get_parent().get_node("StepState%02d" % index) as Label
 		if index < current:
-			stage_icons[index].texture = load(CORE + "04_check_on.png") as Texture2D
+			stage_icons[index].texture = load(CORE + "check_on.png") as Texture2D
 			stage_labels[index].add_theme_color_override("font_color", Color("#a8d9ff"))
 			state_label.text = "…  完成"
 			state_label.add_theme_color_override("font_color", Color("#a8d9ff"))
 		elif index == current and display_progress < 1.0:
-			stage_icons[index].texture = load(CORE + "06_check_loading.png") as Texture2D
+			stage_icons[index].texture = load(CORE + "check_loading.png") as Texture2D
 			stage_labels[index].add_theme_color_override("font_color", Color("#edf5ff"))
 			state_label.text = "…  进行中"
 			state_label.add_theme_color_override("font_color", Color("#edf5ff"))
 		else:
-			stage_icons[index].texture = load(CORE + "05_check_off.png") as Texture2D
+			stage_icons[index].texture = load(CORE + "check_off.png") as Texture2D
 			stage_labels[index].add_theme_color_override("font_color", Color("#65758b"))
 			state_label.text = "…  等待中"
 			state_label.add_theme_color_override("font_color", Color("#65758b"))

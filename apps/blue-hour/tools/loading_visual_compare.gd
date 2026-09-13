@@ -1,6 +1,6 @@
 extends SceneTree
 
-const REFERENCE := "res://assets/ui/loading_v2/reference/loading_final_reference.png"
+const REFERENCE := "res://assets/ui/loading/reference/loading_final_reference.png"
 const CURRENT := "res://test-output/loading_v2/current-50.png"
 const OUTPUT_DIR := "res://test-output/loading_v3_reference"
 const TARGET_SIZE := Vector2i(1672, 941)

@@ -105,10 +105,10 @@ weapons/             武器运行逻辑
 - `res://assets/world/props/camp/CAMP_PROP_004_portable_generator_Image_1.jpg.import`
 - `res://assets/world/props/camp/CAMP_PROP_004_portable_generator_Image_2.jpg`
 - `res://assets/world/props/camp/CAMP_PROP_004_portable_generator_Image_2.jpg.import`
-- `res://assets/ui/loading_v2/core/01_logo.png`
-- `res://assets/ui/loading_v2/core/01_logo.png.import`
-- `res://assets/ui/loading_v2/core/02_progress_bar_bg.png`
-- `res://assets/ui/loading_v2/core/02_progress_bar_bg.png.import`
+- `res://assets/ui/loading/core/logo.png`
+- `res://assets/ui/loading/core/logo.png.import`
+- `res://assets/ui/loading/core/progress_bar_bg.png`
+- `res://assets/ui/loading/core/progress_bar_bg.png.import`
 
 版本后缀应交给 Git；角色、敌人、武器、建筑、物品、技能使用稳定 Asset ID，UI 与特效优先语义命名。`01/02` 只有在明确表示内容编号时保留。
 

@@ -165,7 +165,7 @@
 | `wpn_001_survival_knife` | Weapon | `res://assets/weapons/models/wpn_001_survival_knife.glb` | 由静态引用接入 | ACTIVE | 自动审计登记 |
 | `wpn_002_p9_pistol` | Weapon | `res://assets/weapons/models/wpn_002_p9_pistol.glb` | 由静态引用接入 | ACTIVE | 自动审计登记 |
 | `wpn_006_a21_assault_rifle` | Weapon | `res://assets/weapons/models/wpn_006_a21_assault_rifle.glb` | 由静态引用接入 | ACTIVE | 自动审计登记 |
-| `loading_right_artwork_main` | UI | `res://assets/ui/loading_v2/loading_right_artwork_main.png` | 由静态引用接入 | ACTIVE | 自动审计登记 |
+| `loading_right_artwork_main` | UI | `res://assets/ui/loading/loading_right_artwork_main.png` | 由静态引用接入 | ACTIVE | 自动审计登记 |
 | `main_menu_navigation_icons_hover` | UI | `res://assets/ui/main_menu/main_menu_navigation_icons_hover.png` | 由静态引用接入 | ACTIVE | 自动审计登记 |
 | `main_menu_navigation_icons_normal` | UI | `res://assets/ui/main_menu/main_menu_navigation_icons_normal.png` | 由静态引用接入 | ACTIVE | 自动审计登记 |
 | `main_menu_poster` | UI | `res://assets/ui/main_menu/main_menu_poster.png` | 由静态引用接入 | ACTIVE | 自动审计登记 |
@@ -204,7 +204,7 @@
 | `today_action_selection_bar` | UI | `res://assets/ui/today_action/today_action_selection_bar.png` | 由静态引用接入 | ACTIVE | 自动审计登记 |
 | `today_action_status_bar` | UI | `res://assets/ui/today_action/today_action_status_bar.png` | 由静态引用接入 | ACTIVE | 自动审计登记 |
 | `today_action_task_card` | UI | `res://assets/ui/today_action/today_action_task_card.png` | 由静态引用接入 | ACTIVE | 自动审计登记 |
-| `asset_sheet_source` | UI | `res://assets/ui/loading_v2/reference/asset_sheet_source.png` | 由静态引用接入 | ACTIVE | 自动审计登记 |
+| `asset_sheet_source` | UI | `res://assets/ui/loading/reference/asset_sheet_source.png` | 由静态引用接入 | ACTIVE | 自动审计登记 |
 | `hud_action_button_active` | UI | `res://assets/ui/expedition/hud/buttons/hud_action_button_active.png` | 由静态引用接入 | ACTIVE | 自动审计登记 |
 | `hud_action_button_default` | UI | `res://assets/ui/expedition/hud/buttons/hud_action_button_default.png` | 由静态引用接入 | ACTIVE | 自动审计登记 |
 | `hud_action_button_disabled` | UI | `res://assets/ui/expedition/hud/buttons/hud_action_button_disabled.png` | 由静态引用接入 | ACTIVE | 自动审计登记 |

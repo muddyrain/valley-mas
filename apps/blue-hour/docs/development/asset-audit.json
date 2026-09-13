@@ -10519,20 +10519,20 @@
       "reason": "存在静态引用"
     },
     {
-      "path": "res://assets/ui/loading_v2/loading_right_artwork_main.png",
+      "path": "res://assets/ui/loading/loading_right_artwork_main.png",
       "type": "png",
       "status": "KEEP",
       "referenced_by": [
         "res://tools/build_loading_artwork.gd",
         "res://ui/loading_screen_v2.gd",
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/loading_right_artwork_main.png.import"
+        "res://assets/ui/loading/loading_right_artwork_main.png.import"
       ],
       "target_path": null,
       "reason": "存在静态引用"
     },
     {
-      "path": "res://assets/ui/loading_v2/loading_right_artwork_main.png.import",
+      "path": "res://assets/ui/loading/loading_right_artwork_main.png.import",
       "type": "import",
       "status": "KEEP",
       "referenced_by": [
@@ -10543,7 +10543,7 @@
       "reason": "存在静态引用"
     },
     {
-      "path": "res://assets/ui/loading_v2/manifest.json",
+      "path": "res://assets/ui/loading/manifest.json",
       "type": "json",
       "status": "KEEP",
       "referenced_by": ["res://docs/development/asset-audit.json"],
@@ -10551,7 +10551,7 @@
       "reason": "存在静态引用"
     },
     {
-      "path": "res://assets/ui/loading_v2/README_GODOT.md",
+      "path": "res://assets/ui/loading/README_GODOT.md",
       "type": "md",
       "status": "KEEP",
       "referenced_by": ["res://docs/development/asset-audit.json"],
@@ -11469,18 +11469,18 @@
       "reason": "存在静态引用"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/01_logo.png",
+      "path": "res://assets/ui/loading/core/logo.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/01_logo.png.import"
+        "res://assets/ui/loading/core/logo.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/01_logo.png.import",
+      "path": "res://assets/ui/loading/core/logo.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11491,18 +11491,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/02_progress_bar_bg.png",
+      "path": "res://assets/ui/loading/core/progress_bar_bg.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/02_progress_bar_bg.png.import"
+        "res://assets/ui/loading/core/progress_bar_bg.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/02_progress_bar_bg.png.import",
+      "path": "res://assets/ui/loading/core/progress_bar_bg.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11513,18 +11513,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/03_progress_bar_fill.png",
+      "path": "res://assets/ui/loading/core/progress_bar_fill.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/03_progress_bar_fill.png.import"
+        "res://assets/ui/loading/core/progress_bar_fill.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/03_progress_bar_fill.png.import",
+      "path": "res://assets/ui/loading/core/progress_bar_fill.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11535,18 +11535,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/04_check_on.png",
+      "path": "res://assets/ui/loading/core/check_on.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/04_check_on.png.import"
+        "res://assets/ui/loading/core/check_on.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/04_check_on.png.import",
+      "path": "res://assets/ui/loading/core/check_on.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11557,18 +11557,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/05_check_off.png",
+      "path": "res://assets/ui/loading/core/check_off.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/05_check_off.png.import"
+        "res://assets/ui/loading/core/check_off.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/05_check_off.png.import",
+      "path": "res://assets/ui/loading/core/check_off.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11579,18 +11579,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/06_check_loading.png",
+      "path": "res://assets/ui/loading/core/check_loading.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/06_check_loading.png.import"
+        "res://assets/ui/loading/core/check_loading.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/06_check_loading.png.import",
+      "path": "res://assets/ui/loading/core/check_loading.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11601,18 +11601,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/07_character_group.png",
+      "path": "res://assets/ui/loading/core/character_group.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/07_character_group.png.import"
+        "res://assets/ui/loading/core/character_group.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/07_character_group.png.import",
+      "path": "res://assets/ui/loading/core/character_group.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11623,18 +11623,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/08_photo_01.png",
+      "path": "res://assets/ui/loading/core/photo_01.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/08_photo_01.png.import"
+        "res://assets/ui/loading/core/photo_01.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/08_photo_01.png.import",
+      "path": "res://assets/ui/loading/core/photo_01.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11645,18 +11645,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/09_note_01.png",
+      "path": "res://assets/ui/loading/core/note_01.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/09_note_01.png.import"
+        "res://assets/ui/loading/core/note_01.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/09_note_01.png.import",
+      "path": "res://assets/ui/loading/core/note_01.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11667,18 +11667,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/10_photo_02.png",
+      "path": "res://assets/ui/loading/core/photo_02.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/10_photo_02.png.import"
+        "res://assets/ui/loading/core/photo_02.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/10_photo_02.png.import",
+      "path": "res://assets/ui/loading/core/photo_02.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11689,18 +11689,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/11_note_02.png",
+      "path": "res://assets/ui/loading/core/note_02.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/11_note_02.png.import"
+        "res://assets/ui/loading/core/note_02.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/11_note_02.png.import",
+      "path": "res://assets/ui/loading/core/note_02.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11711,18 +11711,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/12_ticket.png",
+      "path": "res://assets/ui/loading/core/ticket.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/12_ticket.png.import"
+        "res://assets/ui/loading/core/ticket.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/12_ticket.png.import",
+      "path": "res://assets/ui/loading/core/ticket.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11733,18 +11733,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/13_particle_01.png",
+      "path": "res://assets/ui/loading/core/particle_01.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/13_particle_01.png.import"
+        "res://assets/ui/loading/core/particle_01.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/13_particle_01.png.import",
+      "path": "res://assets/ui/loading/core/particle_01.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11755,18 +11755,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/14_particle_02.png",
+      "path": "res://assets/ui/loading/core/particle_02.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/14_particle_02.png.import"
+        "res://assets/ui/loading/core/particle_02.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/14_particle_02.png.import",
+      "path": "res://assets/ui/loading/core/particle_02.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11777,18 +11777,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/15_particle_03.png",
+      "path": "res://assets/ui/loading/core/particle_03.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/15_particle_03.png.import"
+        "res://assets/ui/loading/core/particle_03.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/15_particle_03.png.import",
+      "path": "res://assets/ui/loading/core/particle_03.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11799,18 +11799,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/16_foreground_crates.png",
+      "path": "res://assets/ui/loading/core/foreground_crates.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/16_foreground_crates.png.import"
+        "res://assets/ui/loading/core/foreground_crates.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/16_foreground_crates.png.import",
+      "path": "res://assets/ui/loading/core/foreground_crates.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11821,18 +11821,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/17_lantern.png",
+      "path": "res://assets/ui/loading/core/lantern.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/17_lantern.png.import"
+        "res://assets/ui/loading/core/lantern.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/17_lantern.png.import",
+      "path": "res://assets/ui/loading/core/lantern.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11843,18 +11843,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/18_lantern_glow.png",
+      "path": "res://assets/ui/loading/core/lantern_glow.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/18_lantern_glow.png.import"
+        "res://assets/ui/loading/core/lantern_glow.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/18_lantern_glow.png.import",
+      "path": "res://assets/ui/loading/core/lantern_glow.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11865,18 +11865,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/19_signature.png",
+      "path": "res://assets/ui/loading/core/signature.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/19_signature.png.import"
+        "res://assets/ui/loading/core/signature.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/19_signature.png.import",
+      "path": "res://assets/ui/loading/core/signature.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11887,18 +11887,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/20_decoration_line.png",
+      "path": "res://assets/ui/loading/core/decoration_line.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/20_decoration_line.png.import"
+        "res://assets/ui/loading/core/decoration_line.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/20_decoration_line.png.import",
+      "path": "res://assets/ui/loading/core/decoration_line.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11909,18 +11909,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/21_tagline_mark.png",
+      "path": "res://assets/ui/loading/core/tagline_mark.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/21_tagline_mark.png.import"
+        "res://assets/ui/loading/core/tagline_mark.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/21_tagline_mark.png.import",
+      "path": "res://assets/ui/loading/core/tagline_mark.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11931,18 +11931,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/22_smoke_01.png",
+      "path": "res://assets/ui/loading/core/smoke_01.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/22_smoke_01.png.import"
+        "res://assets/ui/loading/core/smoke_01.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/22_smoke_01.png.import",
+      "path": "res://assets/ui/loading/core/smoke_01.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11953,18 +11953,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/23_smoke_02.png",
+      "path": "res://assets/ui/loading/core/smoke_02.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/core/23_smoke_02.png.import"
+        "res://assets/ui/loading/core/smoke_02.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/core/23_smoke_02.png.import",
+      "path": "res://assets/ui/loading/core/smoke_02.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -11975,18 +11975,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/reference/asset_sheet_source.png",
+      "path": "res://assets/ui/loading/reference/asset_sheet_source.png",
       "type": "png",
       "status": "KEEP",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/reference/asset_sheet_source.png.import"
+        "res://assets/ui/loading/reference/asset_sheet_source.png.import"
       ],
       "target_path": null,
       "reason": "存在静态引用"
     },
     {
-      "path": "res://assets/ui/loading_v2/reference/asset_sheet_source.png.import",
+      "path": "res://assets/ui/loading/reference/asset_sheet_source.png.import",
       "type": "import",
       "status": "KEEP",
       "referenced_by": [
@@ -11997,7 +11997,7 @@
       "reason": "存在静态引用"
     },
     {
-      "path": "res://assets/ui/loading_v2/reference/loading_final_reference.png",
+      "path": "res://assets/ui/loading/reference/loading_final_reference.png",
       "type": "png",
       "status": "RENAME",
       "referenced_by": [
@@ -12006,13 +12006,13 @@
         "res://tools/loading_visual_compare.gd",
         "res://ui/loading_screen_v2.gd",
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/reference/loading_final_reference.png.import"
+        "res://assets/ui/loading/reference/loading_final_reference.png.import"
       ],
       "target_path": null,
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/reference/loading_final_reference.png.import",
+      "path": "res://assets/ui/loading/reference/loading_final_reference.png.import",
       "type": "import",
       "status": "RENAME",
       "referenced_by": [
@@ -12023,18 +12023,18 @@
       "reason": "命名包含版本/临时标记，需结合引用后规范化"
     },
     {
-      "path": "res://assets/ui/loading_v2/reference/transparent_assets_preview.jpg",
+      "path": "res://assets/ui/loading/reference/transparent_assets_preview.jpg",
       "type": "jpg",
       "status": "KEEP",
       "referenced_by": [
         "res://docs/development/asset-audit.json",
-        "res://assets/ui/loading_v2/reference/transparent_assets_preview.jpg.import"
+        "res://assets/ui/loading/reference/transparent_assets_preview.jpg.import"
       ],
       "target_path": null,
       "reason": "存在静态引用"
     },
     {
-      "path": "res://assets/ui/loading_v2/reference/transparent_assets_preview.jpg.import",
+      "path": "res://assets/ui/loading/reference/transparent_assets_preview.jpg.import",
       "type": "import",
       "status": "KEEP",
       "referenced_by": [
@@ -18904,8 +18904,8 @@
         "name": "loading_v2_product_set",
         "classification": "ACTIVE_VARIANTS",
         "paths": [
-          "res://assets/ui/loading_v2/core/",
-          "res://assets/ui/loading_v2/reference/loading_final_reference.png"
+          "res://assets/ui/loading/core/",
+          "res://assets/ui/loading/reference/loading_final_reference.png"
         ],
         "decision": "V2 is product system name; retain"
       },
