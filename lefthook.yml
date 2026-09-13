@@ -36,6 +36,13 @@ pre-commit:
         新增或归档 docs/plans 中的计划后，请同步更新 docs/plans/README.md
         手动检查：pnpm check:plans-index
 
+    # Blue Hour 文件命名卫生
+    blue-hour-naming:
+      run: node scripts/check-blue-hour-naming.js {staged_files}
+      fail_text: |
+        ❌ Blue Hour 正式路径包含开发版本号、临时后缀或纯排序前缀
+        请改为稳定且有业务语义的名称；业务编号和规格编号可以保留
+
 # 🚀 Pre-push：推送前构建检查
 pre-push:
   commands:

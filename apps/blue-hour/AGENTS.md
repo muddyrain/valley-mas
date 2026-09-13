@@ -24,3 +24,10 @@
 - 专项验收包括实际 Godot Headless 规则/行动测试、原生渲染启动、鼠标命令、搜索中断与恢复、武器自由分配、昼夜转换和完整撤离循环；命令见根 `docs/PROJECT_GUIDE.md` 的蓝时归航章节。
 - 每次功能开发或修复交付前必须实际执行 Windows build，并验证导出的独立程序启动。交付 `build/BlueHourHomeward.exe` 的可点击路径，不能只提供源码、Godot 工程或构建命令；如构建失败必须明确报告失败原因。纯文档变更无需重复构建。
 - 仅修改本项目及用户授权的仓库入口文档；不得修改其他 `apps/*` 的业务实现。运行日志、截图、导出物和 `.godot/` 不纳入版本控制。
+
+## 文件命名卫生
+
+- 正式代码、场景和 Runtime Asset 不得新增开发历史后缀或纯排序前缀：`_v1`、`_v2`、`_v3`、`_final`、`_final2`、`_new`、`_old`、`_copy`、`_temp`、`_tmp`、`01_`、`02_`、`03_`。
+- 文件历史由 Git 管理；使用有业务语义的稳定名称。
+- 允许业务编号和规格编号：`ENM_001_*`、`CHR_001_*`、`CAMP_001_*`、`ITEM_001_*`、`SKILL_001_*`、`camp_ui_030_*`、`20k`、`30k` 及明确的 LOD/Asset ID。
+- 提交前由 Lefthook 运行 `scripts/check-blue-hour-naming.js`。
