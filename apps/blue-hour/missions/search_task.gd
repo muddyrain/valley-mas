@@ -1,46 +1,86 @@
 extends RefCounted
-# One assignment owns its worker; site progress belongs to the city and survives release.
-enum Phase { APPROACH, WORK, DEFEND }
-var site_id := ""
+## One task owns entry, search and exit. Site progress survives cancellation.
+enum Phase { IDLE, ASSIGNED, MOVING_TO_ENTRANCE, ENTERING, SEARCHING_INSIDE, EXITING, COMPLETE, CANCELLED, SEARCHING_OUTSIDE, DEFEND }
+const TRANSITION_SECONDS: float = .3
+var site_id: String = ""
 var worker: Node3D
-var phase := Phase.APPROACH
-var safe_left := 0.0
-var resume_seconds := 0.0
+var phase: Phase = Phase.IDLE
+var safe_left: float = 0.0
+var resume_seconds: float = 0.0
+var transition_left: float = 0.0
+var exit_worker: Node3D
+var outcome: Phase = Phase.CANCELLED
 
 func assign(id: String, member: Node3D, mission: Node3D) -> void:
-	release(mission)
 	site_id = id
 	worker = member
+	phase = Phase.ASSIGNED
 	worker.regrouping = false
 	worker.damaged.connect(_on_damage)
 	resume_seconds = mission.catalog.map.search_resume_seconds
-	safe_left = 0.0
-	phase = Phase.APPROACH
 	worker.order_move(mission.city.sites[id].spec.entry, mission.city)
+	phase = Phase.MOVING_TO_ENTRANCE
 
-func release(mission: Node3D) -> void:
-	if is_instance_valid(worker):
-		if worker.damaged.is_connected(_on_damage):
-			worker.damaged.disconnect(_on_damage)
-		worker.searching = false
-		worker.stop()
-		worker.regrouping = not worker.dead
+func release(mission: Node3D, completed: bool = false) -> void:
+	if not is_instance_valid(worker):
+		return
+	outcome = Phase.COMPLETE if completed else Phase.CANCELLED
+	phase = outcome
+	if worker.damaged.is_connected(_on_damage):
+		worker.damaged.disconnect(_on_damage)
+	worker.searching = false
+	worker.stop()
+	worker.regrouping = not worker.dead
+	if worker.inside_building:
+		exit_worker = worker
+		exit_worker.position = mission.city.sites[site_id].spec.entry
+		exit_worker.visible = true
+		transition_left = TRANSITION_SECONDS
+		phase = Phase.EXITING
+		exit_worker.set_search_opacity(0)
+		# The search assignment ends as soon as recall/completion is requested.
+		# Keep only the visual exit transition so the world card does not linger.
+		worker = null
+		mission.exiting_tasks.append(self)
+	else:
+		worker.set_search_opacity(1)
 	worker = null
-	site_id = ""
-	safe_left = 0.0
+	safe_left = 0
 	mission.refresh_regroup()
 
+func advance_exit(delta: float) -> void:
+	transition_left = maxf(0, transition_left - delta)
+	exit_worker.set_search_opacity(1.0 - transition_left / TRANSITION_SECONDS)
+	if transition_left <= .000001:
+		exit_worker.inside_building = false
+		exit_worker.set_search_opacity(1)
+		exit_worker = null
+		phase = outcome
+
 func _on_damage() -> void:
+	if worker == null or worker.inside_building:
+		return
+	safe_left = resume_seconds
+	phase = Phase.DEFEND
+	worker.searching = false
+	worker.set_search_opacity(1)
+	worker.stop()
+
+func _threatened(mission: Node3D) -> bool:
+	for enemy: Node3D in mission.enemies:
+		if enemy.active and enemy.position.distance_to(worker.position) < mission.catalog.map.search_danger_radius and mission.city.line_clear(worker.position, enemy.position):
+			return true
+	return false
+
+func _defend() -> void:
 	safe_left = resume_seconds
 	phase = Phase.DEFEND
 	worker.searching = false
 	worker.stop()
-
-func _threatened(mission: Node3D) -> bool:
-	for enemy in mission.enemies:
-		if enemy.active and enemy.position.distance_to(worker.position) < mission.catalog.map.search_danger_radius and mission.city.line_clear(worker.position, enemy.position):
-			return true
-	return false
+	if worker.inside_building:
+		worker.visible = true
+		transition_left = TRANSITION_SECONDS
+		worker.set_search_opacity(0)
 
 func prepare(delta: float, mission: Node3D) -> void:
 	if worker == null:
@@ -48,6 +88,29 @@ func prepare(delta: float, mission: Node3D) -> void:
 	if worker.dead:
 		mission.notice.emit("搜索者阵亡 · 进度保留")
 		release(mission)
+		return
+	if phase == Phase.SEARCHING_INSIDE:
+		if _threatened(mission):
+			_defend()
+		return
+	if phase == Phase.DEFEND and worker.inside_building:
+		transition_left = maxf(0, transition_left - delta)
+		worker.set_search_opacity(1.0 - transition_left / TRANSITION_SECONDS)
+		if transition_left <= .000001:
+			worker.inside_building = false
+			worker.set_search_opacity(1)
+		return
+	if phase == Phase.ENTERING:
+		if _threatened(mission):
+			_defend()
+			return
+		transition_left = maxf(0, transition_left - delta)
+		worker.set_search_opacity(transition_left / TRANSITION_SECONDS)
+		if transition_left <= .000001:
+			worker.visible = false
+			worker.set_search_opacity(1)
+			worker.searching = true
+			phase = Phase.SEARCHING_INSIDE
 		return
 	worker.searching = false
 	safe_left = maxf(0, safe_left - delta)
@@ -57,39 +120,57 @@ func prepare(delta: float, mission: Node3D) -> void:
 		phase = Phase.DEFEND
 		worker.stop()
 		return
-	var entry: Vector3 = mission.city.sites[site_id].spec.entry
-	if worker.position.distance_to(entry) > mission.catalog.map.search_radius:
-		phase = Phase.APPROACH
+	var site: Dictionary = mission.city.sites[site_id]
+	var entry: Vector3 = site.spec.entry
+	var radius: float = mission.catalog.map.search_radius if site.vehicle else .15
+	if worker.position.distance_to(entry) > radius:
+		phase = Phase.MOVING_TO_ENTRANCE
 		if worker.path.is_empty():
 			worker.order_move(entry, mission.city)
 		return
-	phase = Phase.WORK
 	worker.stop()
 	worker.searching = true
+	if site.vehicle:
+		phase = Phase.SEARCHING_OUTSIDE
+	else:
+		worker.position = entry
+		worker.inside_building = true
+		phase = Phase.ENTERING
+		transition_left = TRANSITION_SECONDS
 
 func advance(delta: float, mission: Node3D) -> void:
 	if worker == null:
 		return
-	# Enemies act after prepare; a hit/death this frame must win over completion.
 	if worker.dead:
 		prepare(0, mission)
 		return
-	if not worker.searching or safe_left > 0 or _threatened(mission):
+	if phase != Phase.SEARCHING_INSIDE and (phase != Phase.SEARCHING_OUTSIDE or safe_left > 0 or _threatened(mission)):
 		return
 	var site: Dictionary = mission.city.sites[site_id]
 	var seconds: float = mission.effects.search_seconds(site.spec.search_seconds, worker.talent.search_multiplier)
 	site.progress = minf(1.0, site.progress + delta / seconds)
-	mission.city.update_site(site_id)
 	if site.progress >= 1.0:
 		site.searched = true
 		mission.city.update_site(site_id)
-		mission.drop_loot(site.spec.entry, site.spec.food, site.spec.scrap, mission.reward_for_site(site_id))
-		mission.notice.emit("%s 搜索完成 · %s 归队" % [site.spec.name, worker.data.display_name])
-		release(mission)
+		var loot: Dictionary = mission.resolve_site_loot(site)
+		# Cache the resolved legacy totals on the site so existing HUD/tests and
+		# settlement paths observe the same result as the new resolver.
+		site.spec.food = int(loot.food)
+		site.spec.scrap = int(loot.scrap)
+		mission.drop_loot(site.spec.entry, int(loot.food), int(loot.scrap), mission.reward_for_site(site_id))
+		mission.notice.emit("%s 搜索完成 · +%d 食物  +%d 废料 · %s 归队" % [site.spec.name, int(loot.food), int(loot.scrap), worker.data.display_name])
+		release(mission, true)
+
+func action_label() -> String:
+	match phase:
+		Phase.ENTERING: return "进入建筑"
+		Phase.SEARCHING_INSIDE, Phase.SEARCHING_OUTSIDE: return "搜索中"
+		Phase.EXITING: return "走出建筑"
+		Phase.DEFEND: return "自卫 · 搜索暂停"
+	return "前往入口"
 
 func status(mission: Node3D) -> String:
 	if worker == null:
 		return ""
 	var site: Dictionary = mission.city.sites[site_id]
-	var action: String = ["前往入口", "搜索中", "遇险自卫 · 搜索暂停"][phase]
-	return "%s · %s\n%s · %d%%" % [worker.data.display_name, site.spec.name, action, site.progress * 100]
+	return "%s · %s\n%s · %d%%" % [worker.data.display_name, site.spec.name, action_label(), site.progress * 100]

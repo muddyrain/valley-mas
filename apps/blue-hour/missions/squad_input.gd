@@ -68,6 +68,8 @@ func handle(event: InputEvent) -> void:
 		return
 	if event.button_index != MOUSE_BUTTON_LEFT or aiming:
 		return
+	# World clicks dismiss inspection; clicking a POI below selects it again.
+	mission.poi_selected_id = ""
 	var origin: Vector3 = mission.camera.project_ray_origin(pointer)
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + mission.camera.project_ray_normal(pointer) * 200, 3)
 	query.collide_with_areas = true
@@ -77,9 +79,7 @@ func handle(event: InputEvent) -> void:
 	var collider: Object = hit.collider
 	if collider.has_meta("site_id"):
 		var id: String = collider.get_meta("site_id")
-		if mission.search_tasks.has(id):
-			mission.command_recall(id)
-		else:
+		if mission.city.sites.has(id) and mission.city.sites[id].discovered:
 			mission.command_search(id)
 	elif collider.has_meta("bus"):
 		mission.command_extract()

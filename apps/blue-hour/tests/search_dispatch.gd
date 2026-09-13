@@ -84,7 +84,7 @@ func run() -> void:
 	check(mission.search_tasks.has("corner") and mission.search_tasks.has("van_south") and mission.search_tasks.corner.worker == worker, "A second target runs independently without replacing the first worker")
 	mission.command_recall("van_south")
 	mission.command_search("corner")
-	# A visible, vulnerable searcher stops working to defend against close enemies.
+	# A doorway threat pauses the task, with protection only until the worker exits.
 	for member in mission.guards():
 		member.position = entry + Vector3(15, 0, 7)
 		member.stop()
@@ -94,18 +94,19 @@ func run() -> void:
 	var health: float = worker.hp
 	before = site.progress
 	await advance(enemy.data.attack_windup + .2)
-	check(site.progress == before and not worker.searching, "Threat at the entrance freezes progress and releases the worker to defend")
-	check(enemy.hp < 10000 and worker.hp < health, "The worker actually retaliates and can take damage")
-	check(worker.visible and worker.scale == Vector3.ONE, "Searching never hides or protects a survivor inside a building")
+	check(site.progress == before and not worker.searching, "Doorway threats pause interior search")
+	check(worker.hp == health and not worker.inside_building, "Worker exits before becoming vulnerable to committed attacks")
+	check(worker.visible and worker.scale == Vector3.ONE, "Defense reveals the unchanged character model")
 	mission.debug_clear_enemies()
 	await advance(0.25)
-	check(site.progress == before, "Search does not flicker back on immediately after a threat")
+	check(site.progress == before, "Search waits for a stable safe period before returning indoors")
 	await advance(mission.catalog.map.search_resume_seconds + 0.2)
 	check(site.progress > before, "Search resumes after a short safe period, retaining progress")
 	before = site.progress
 	worker.take_damage(5)
 	await advance(0.1)
-	check(site.progress == before, "Taking a hit independently interrupts search")
+	check(site.progress > before and worker.hp == health, "Outside damage cannot hit an interior actor")
+	before = site.progress
 	# Reassignment releases the old worker, and invalid requests are non-destructive.
 	mission.command_reassign(0)
 	check(mission.search_task.worker == guard and not worker.searching, "Reassignment reserves the new worker and releases the old one")

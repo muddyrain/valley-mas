@@ -37,5 +37,6 @@ def fit_character(source, fit_path):
     rig = create_rig(landmarks)
     for mesh in meshes:
         mesh['source_sha256'] = audit['sha256']
+        mesh['character_id'] = config['character']
     rig['fit_id'] = config['character']
     return rig, meshes, config

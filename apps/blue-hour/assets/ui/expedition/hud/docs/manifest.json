@@ -1,0 +1,265 @@
+{
+  "panels/hud_time_panel_bg.png": {
+    "size": [570, 82],
+    "ninepatch": [20, 20, 20, 20]
+  },
+  "panels/hud_resource_card_bg.png": {
+    "size": [120, 72],
+    "ninepatch": [16, 14, 16, 14]
+  },
+  "panels/hud_survivor_card_bg_normal.png": {
+    "size": [280, 110],
+    "ninepatch": [18, 18, 18, 18]
+  },
+  "panels/hud_survivor_card_bg_selected.png": {
+    "size": [280, 110],
+    "ninepatch": [18, 18, 18, 18]
+  },
+  "panels/hud_survivor_card_bg_danger.png": {
+    "size": [280, 110],
+    "ninepatch": [18, 18, 18, 18]
+  },
+  "panels/hud_mission_panel_bg.png": {
+    "size": [280, 180],
+    "ninepatch": [22, 22, 22, 22]
+  },
+  "panels/hud_mission_row.png": {
+    "size": [248, 44],
+    "ninepatch": [10, 10, 10, 10]
+  },
+  "panels/world_poi_card_bg_normal.png": {
+    "size": [250, 110],
+    "ninepatch": [18, 18, 18, 18]
+  },
+  "panels/world_poi_card_bg_selected.png": {
+    "size": [250, 110],
+    "ninepatch": [18, 18, 18, 18]
+  },
+  "panels/world_search_card_bg.png": {
+    "size": [300, 160],
+    "ninepatch": [20, 20, 20, 20]
+  },
+  "panels/loot_toast_bg.png": {
+    "size": [260, 72],
+    "ninepatch": [16, 16, 16, 16]
+  },
+  "panels/hud_tooltip_bg.png": {
+    "size": [300, 140],
+    "ninepatch": [20, 20, 20, 20]
+  },
+  "panels/hud_phase_track.png": {
+    "size": [360, 14]
+  },
+  "panels/hud_phase_marker.png": {
+    "size": [28, 28]
+  },
+  "panels/hud_hp_track.png": {
+    "size": [160, 12]
+  },
+  "panels/hud_hp_fill.png": {
+    "size": [160, 12]
+  },
+  "world/world_progress_track.png": {
+    "size": [220, 18]
+  },
+  "world/world_progress_fill.png": {
+    "size": [220, 18]
+  },
+  "minimap/hud_minimap_frame.png": {
+    "size": [260, 220],
+    "ninepatch": [24, 24, 24, 24]
+  },
+  "minimap/hud_minimap_area_label.png": {
+    "size": [170, 40],
+    "ninepatch": [10, 10, 10, 10]
+  },
+  "panels/hud_survivor_index.png": {
+    "size": [36, 36]
+  },
+  "feedback/hud_warning_badge.png": {
+    "size": [40, 40]
+  },
+  "feedback/hud_cooldown_overlay.png": {
+    "size": [100, 100]
+  },
+  "buttons/hud_menu_button_default.png": {
+    "size": [120, 72],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_menu_button_hover.png": {
+    "size": [120, 72],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_menu_button_pressed.png": {
+    "size": [120, 72],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_menu_button_disabled.png": {
+    "size": [120, 72],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_menu_button_active.png": {
+    "size": [120, 72],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_group_button_default.png": {
+    "size": [240, 50],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_group_button_hover.png": {
+    "size": [240, 50],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_group_button_pressed.png": {
+    "size": [240, 50],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_group_button_disabled.png": {
+    "size": [240, 50],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_group_button_active.png": {
+    "size": [240, 50],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_small_dark_button_default.png": {
+    "size": [150, 44],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_small_dark_button_hover.png": {
+    "size": [150, 44],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_small_dark_button_pressed.png": {
+    "size": [150, 44],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_small_dark_button_disabled.png": {
+    "size": [150, 44],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_small_dark_button_active.png": {
+    "size": [150, 44],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/world_cancel_button_default.png": {
+    "size": [120, 42],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/world_cancel_button_hover.png": {
+    "size": [120, 42],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/world_cancel_button_pressed.png": {
+    "size": [120, 42],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/world_cancel_button_disabled.png": {
+    "size": [120, 42],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/world_cancel_button_active.png": {
+    "size": [120, 42],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_action_button_default.png": {
+    "size": [100, 100],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_action_button_hover.png": {
+    "size": [100, 100],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_action_button_pressed.png": {
+    "size": [100, 100],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_action_button_disabled.png": {
+    "size": [100, 100],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_action_button_active.png": {
+    "size": [100, 100],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_return_button_default.png": {
+    "size": [240, 88],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_return_button_hover.png": {
+    "size": [240, 88],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_return_button_pressed.png": {
+    "size": [240, 88],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_return_button_disabled.png": {
+    "size": [240, 88],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "buttons/hud_return_button_active.png": {
+    "size": [240, 88],
+    "ninepatch": [14, 14, 14, 14]
+  },
+  "icons/phases/icon_phase_day.png": {
+    "size": [64, 64]
+  },
+  "icons/phases/icon_phase_warning.png": {
+    "size": [64, 64]
+  },
+  "icons/phases/icon_phase_blue_hour.png": {
+    "size": [64, 64]
+  },
+  "icons/phases/icon_phase_night.png": {
+    "size": [64, 64]
+  },
+  "icons/resources/icon_food.png": {
+    "size": [64, 64]
+  },
+  "icons/resources/icon_scrap.png": {
+    "size": [64, 64]
+  },
+  "icons/resources/icon_intel.png": {
+    "size": [64, 64]
+  },
+  "icons/actions/icon_action_stop.png": {
+    "size": [64, 64]
+  },
+  "icons/actions/icon_action_focus.png": {
+    "size": [64, 64]
+  },
+  "icons/actions/icon_action_locate.png": {
+    "size": [64, 64]
+  },
+  "icons/actions/icon_action_rage.png": {
+    "size": [64, 64]
+  },
+  "icons/actions/icon_bus.png": {
+    "size": [64, 64]
+  },
+  "icons/actions/icon_home.png": {
+    "size": [48, 48]
+  },
+  "minimap/map_player_marker.png": {
+    "size": [48, 48]
+  },
+  "minimap/map_teammate_marker.png": {
+    "size": [40, 40]
+  },
+  "minimap/map_teammate_danger.png": {
+    "size": [40, 40]
+  },
+  "minimap/map_bus_marker.png": {
+    "size": [44, 44]
+  },
+  "minimap/map_poi_marker.png": {
+    "size": [40, 40]
+  },
+  "minimap/map_target_marker.png": {
+    "size": [44, 44]
+  },
+  "minimap/map_search_marker.png": {
+    "size": [40, 40]
+  }
+}

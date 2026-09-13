@@ -66,7 +66,7 @@ assets/
 
 2026-09-12 营地主站保留用户指定名称 `CAMP_001_main_station.glb`，归 `assets/world/buildings/`；不增加版本后缀。与蓝时号一样保留 Godot 自动提取的相邻 `Image_N` 纹理名和导入参数，唯一运行场景为 `scenes/camp/buildings/camp_main_station.tscn`。原件哈希、尺寸、简单碰撞与冻结布局验证见 [营地主站与出发报告](../docs/CAMP_DEPARTURE_V1.md)。
 
-2026-09-12 普通感染者沿用 `characters/<对象>/model/` 边界，原样导入用户提供的 GLB。按本次明确要求保留正式文件名 `ENM_001_infected_basic_a.glb`，作为常规小写命名的定向例外；材质与三张贴图仍使用 `character_infected_basic_a_*`。GLB 的原始字节与哈希不变，来源见 [感染者来源表](infected_source.json)。复用现有外部材质导入方式，避免 Godot 每次重复导出 `Image_N` 贴图；尺寸、模型朝向和碰撞高度由唯一敌人场景维护，运行时代码不缩放模型。定义、倍率和验证入口见 [普通感染者规格](../docs/ENEMY_DEFINITION.md)。
+2026-09-13 Phase 2A-Rebuild 继续沿用 `characters/<对象>/model/` 边界，正式文件名仍为 `ENM_001_infected_basic_a.glb`；该文件现在是用户提供的新版 A-pose GLB，旧字节归档到 `legacy/`。材质与三张贴图由 Godot 从新 GLB 导入，来源与哈希见 [感染者来源表](infected_source.json)；尺寸、模型朝向和碰撞高度由唯一敌人场景维护，运行时代码不缩放模型。定义、Rig、动作与验证入口见 [普通感染者规格](../docs/ENEMY_DEFINITION.md) 和 [重建报告](../docs/ENM_001_NEW_A_POSE_ASSET_REBUILD_REPORT.md)。
 
 2026-09-12 道具/技能扩充原样导入用户提供的 14 张 100×100 PNG，原始文件名、项目路径与 SHA-256 见 [图标来源表](effect_icon_sources.json)。分别归入 `items/icons/` 与 `skills/icons/`，定义直接持有 Texture2D 引用；技能使用 `action_icon` 区分既有路线装饰图标。中文文件名仅作来源记录，稳定业务 ID 与文件名分离。病床、购物篮、报纸未出现在此次提供目录中，未新增其玩法或内容注册。
 

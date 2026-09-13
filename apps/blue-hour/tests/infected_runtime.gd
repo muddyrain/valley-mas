@@ -7,7 +7,7 @@ func capture(id: String) -> void:
 		check(app.catalog.enemies.size() == 1, "Only one runtime enemy definition")
 		for enemy: Node3D in app.mission.enemies:
 			check(enemy.data == definition, "Every live enemy uses the same shared formal definition")
-			check(enemy.rig.get_node("Model").scene_file_path == "res://assets/characters/infected_basic_a/model/ENM_001_infected_basic_a.glb", "Actual expedition renders the supplied model")
+			check(enemy.rig.get_node("Model").scene_file_path == "res://assets/characters/infected_basic_a/runtime/ENM_001_infected_basic_a_30k.glb", "Actual expedition renders the optimized runtime model")
 			check(is_equal_approx(enemy.max_hp, 30.0 * app.mission.clock.hp_multiplier()), "Live enemy HP follows the existing clock")
 			check(is_equal_approx(enemy.attack_damage, 8.0 * app.mission.clock.damage_multiplier()), "Live enemy damage follows the existing clock")
 		check(is_equal_approx(definition.max_hp, 30.0) and is_equal_approx(definition.attack_damage, 8.0), "Time progression never mutates base data")

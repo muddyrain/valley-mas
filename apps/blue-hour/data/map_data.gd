@@ -1,10 +1,12 @@
 extends Resource
+@export var encounter: Resource = preload("res://data/expedition_encounter.tres")
 @export var id: String = ""
 @export var display_name: String = ""
 @export var base_seed: int = 20260912
 @export var road_segments: Array[Dictionary] = []
 @export var districts: Array[Dictionary] = []
 @export var plots: Array[Dictionary] = []
+@export var frontage_blocks: Array[Dictionary] = []
 @export var parking_placements: Array[Dictionary] = []
 @export var parking_areas: Array[Dictionary] = []
 @export var props: Array[Dictionary] = []
@@ -14,19 +16,10 @@ extends Resource
 @export var day_seconds: float = 150.0
 @export var blue_seconds: float = 18.0
 @export var night_threat_seconds: float = 25.0
-@export var day_spawn_interval: float = 26.0
-@export var blue_spawn_interval: float = 13.0
-@export var night_spawn_interval: float = 7.0
-@export var minimum_spawn_interval: float = 1.8
 @export var threat_hp_step: float = 0.08
 @export var threat_damage_step: float = 0.05
 @export var enemy_phase_hp: PackedFloat32Array = [1.0, 1.05, 1.15]
 @export var enemy_phase_damage: PackedFloat32Array = [1.0, 1.1, 1.25]
-@export var enemy_phase_spawn: PackedFloat32Array = [1.0, 1.35, 1.8]
-@export var enemy_limit: int = 85
-@export var day_enemy_pool: PackedStringArray = ["ENM_001_infected_basic_a"]
-@export var blue_enemy_pool: PackedStringArray = ["ENM_001_infected_basic_a"]
-@export var night_enemy_pool: PackedStringArray = ["ENM_001_infected_basic_a"]
 @export var bus_position: Vector3 = Vector3(0, 0, 21)
 @export var board_radius: float = 4.5
 @export var extraction_seconds: float = 8.0
@@ -37,5 +30,3 @@ extends Resource
 @export var initial_weapons: Array[String] = []
 @export var buildings: Array[Dictionary] = []
 @export var vehicles: Array[Dictionary] = []
-@export var initial_enemies: Array[Dictionary] = []
-@export var spawn_points: Array[Vector3] = []

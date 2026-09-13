@@ -65,7 +65,7 @@ func run() -> void:
 	mission.director_enabled = false
 	clear_enemies()
 	check(mission.survivors.size() == 3, "Three survivors actually spawn in the city")
-	check(mission.city.sites.size() == 18, "Fifteen buildings and three vehicles exist as search targets")
+	check(mission.city.sites.size() == 22, "Nineteen searchable buildings and three vehicles exist as search targets")
 	# Navigation test crosses a building footprint, not just an empty road.
 	place_squad(Vector3(-13, 0, 8))
 	mission.command_move(Vector3(-13, 0, -27))
@@ -189,9 +189,9 @@ func run() -> void:
 	await advance(60)
 	check(mission.clock.threat_level() >= 3 and mission.enemies.size() > 0, "Night director escalates over elapsed time")
 	check(mission.enemies.all(func(actor): return actor.data.id == "ENM_001_infected_basic_a"), "Night director only spawns the formal common infected")
-	for i in range(mission.catalog.map.enemy_limit + 10):
+	for i in range(mission.catalog.map.encounter.population_limit + 10):
 		mission.spawn_enemy("ENM_001_infected_basic_a", Vector3(25, 0, 25))
-	check(mission.enemies.size() <= mission.catalog.map.enemy_limit, "Enemy population remains bounded")
+	check(mission.enemies.size() <= mission.catalog.map.encounter.population_limit, "Enemy population remains bounded")
 	mission.director_enabled = false
 	clear_enemies()
 	# UI debug functions operate on the real mission and pause simulation.

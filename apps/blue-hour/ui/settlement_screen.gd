@@ -12,8 +12,11 @@ func setup(owner_app: Node) -> void:
 	var view: Dictionary = game.preview()
 	var column := UI.page(self)
 	column.add_child(UI.label("第 %d 天 · %s" % [game.data.day, "行动失败" if result.wiped else ("全员归航" if result.lost_ids.is_empty() else "归航 · 有人未能回来")], 30, UI.AMBER))
-	column.add_child(UI.label("返回 %d / %d 人 · 行动 %02d:%02d · 击退 %d" % [result.returned_ids.size(), game.data.members.size(), int(result.seconds) / 60, int(result.seconds) % 60, result.kills], 18))
+	column.add_child(UI.label("返回 %d / %d 人 · 行动 %02d:%02d · 击退 %d" % [result.returned_ids.size(), game.data.selected_party.size(), int(result.seconds) / 60, int(result.seconds) % 60, result.kills], 18))
 	column.add_child(UI.wrapped("归来：" + app.member_names(result.returned_ids), 18))
+	var stayed: Array = game.data.members.filter(func(id: String) -> bool: return id not in game.data.selected_party)
+	if not stayed.is_empty():
+		column.add_child(UI.wrapped("留守营地：" + app.member_names(stayed), 17, UI.CYAN))
 	if not result.lost_ids.is_empty():
 		column.add_child(UI.wrapped("战斗阵亡：" + app.member_names(result.lost_ids) + "\n其随身武器遗失。", 17, Color("#f39193")))
 	column.add_child(HSeparator.new())
@@ -61,5 +64,5 @@ func _refresh() -> void:
 		consequence.text = "已供养 %d / %d 人\n将因缺粮失去：%s" % [selected.size(), view.slots, app.member_names(lost)]
 	else:
 		consequence.text = "首次缺粮 · 有一天补粮机会\n次日生命上限为正常的 %d%%；再次缺粮将损失成员。" % [app.catalog.loop.hunger_health_multiplier * 100] if view.shortage else "口粮充足 · 生还成员休整至满血"
-		if app.campaign.data.pending.wiped:
+		if app.campaign.data.pending.wiped and view.members.is_empty():
 			consequence.text = "没有人回来，这轮生存结束了。"

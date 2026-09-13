@@ -11,8 +11,19 @@ const Soundscape = preload("res://audio/soundscape.gd")
 const SearchTask = preload("res://missions/search_task.gd")
 const SquadInput = preload("res://missions/squad_input.gd")
 const ExpeditionCamera = preload("res://missions/expedition_camera.gd")
+const Exploration = preload("res://maps/exploration.gd")
 const SpecialPower = preload("res://missions/special_power.gd")
+const WorldInteractionVFX = preload("res://missions/world_interaction_vfx.gd")
 const Modifiers = preload("res://core/effect_modifiers.gd")
+const EncounterDirector = preload("res://encounter/encounter_director.gd")
+const LootResolver = preload("res://core/loot_resolver.gd")
+const NoiseSystem = preload("res://encounter/noise_system.gd")
+var encounter: RefCounted
+var noise: RefCounted
+var arrival_noise_pending: bool = true
+var arrival: RefCounted
+var encounter_debug: CanvasLayer
+var encounter_stats_left: float = 0.0
 var effects: RefCounted
 var action_elapsed: float = 0.0
 var watch_warning_active: bool:
@@ -29,6 +40,7 @@ var atmosphere: Node3D
 var sound: Node
 var camera: Camera3D
 var camera_controller: Node
+var exploration: Node
 var survivors: Array[Node3D] = []
 var enemies: Array[Node3D] = []
 var enemy_pool: Array[Node3D] = []
@@ -37,6 +49,7 @@ var rng := RandomNumberGenerator.new()
 var active: bool = true
 var focus_target: Node3D
 var search_tasks: Dictionary = {}
+var exiting_tasks: Array[RefCounted] = []
 var selected_search_id := ""
 # The selected task is only the inspection target; every task keeps running independently.
 var search_task: RefCounted:
@@ -63,6 +76,7 @@ var controls: RefCounted
 var input_enabled := true
 var manual_aim := false
 var aim_point := Vector3.ZERO
+var world_interaction_vfx: Node3D
 
 func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], seed_value: int = 0, run_state: RefCounted = null, locked_party: Array[String] = []) -> void:
 	catalog = content
@@ -116,17 +130,36 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 		survivor.effects = effects
 		survivor.position = catalog.map.bus_position + formation(survivors.size())
 		survivors.append(survivor)
-	for entry in catalog.map.initial_enemies:
-		spawn_enemy(entry.id, entry.position)
+	encounter = EncounterDirector.new()
+	encounter.setup(catalog.map.encounter, rng.seed)
+	encounter.seed_population(self)
+	noise = NoiseSystem.new(catalog.map.encounter)
+	noise.noise_emitted.connect(_on_noise)
 	clock.phase_changed.connect(_on_phase)
-	spawn_left = clock.spawn_interval()
+	clock.warning_changed.connect(_on_warning)
+	spawn_left = catalog.map.encounter.daytime_respawn_interval
 	powers = SpecialPower.new(self)
 	camera_controller = ExpeditionCamera.new()
 	add_child(camera_controller)
 	camera_controller.setup(self)
+	exploration = Exploration.new()
+	add_child(exploration)
+	exploration.setup(self)
+	world_interaction_vfx = WorldInteractionVFX.new()
+	world_interaction_vfx.name = "WorldInteractionVFX"
+	add_child(world_interaction_vfx)
+	world_interaction_vfx.setup(self)
+	if OS.is_debug_build():
+		encounter_debug = preload("res://debug/encounter_debug.gd").new()
+		add_child(encounter_debug)
+		encounter_debug.setup(self)
 
 func formation(index: int) -> Vector3:
 	return [Vector3(-1.2, 0, 0), Vector3(1.2, 0, 0), Vector3(0, 0, -1.4), Vector3(0, 0, 1.4)][index % 4]
+
+func begin_arrival() -> void:
+	arrival = preload("res://encounter/mission_arrival.gd").new()
+	arrival.setup(self)
 
 func debug_equip(index: int, equipment: Resource) -> void:
 	var member: Node3D = survivors[index]
@@ -148,15 +181,29 @@ func _physics_process(delta: float) -> void:
 		left = maxf(0.0, left - dt)
 
 func _advance_world(dt: float) -> void:
+	noise.advance(dt)
+	if arrival != null and not arrival.finished:
+		arrival.advance(dt, self)
+		exploration.advance(dt)
+		return
+	if arrival_noise_pending:
+		arrival_noise_pending = false
+		noise.emit_noise(catalog.map.bus_position, catalog.map.encounter.arrival_noise_radius, NoiseSystem.Event.NoiseType.ARRIVAL, 1.0, city)
 	action_elapsed += dt
 	clock.advance(dt, effects.amount("freeze_day_clock") > 0)
 	_sync_watch_warning()
 	_update_director(dt)
 	powers.refresh_target()
-	for enemy: Node3D in enemies:
-		enemy.refresh_stats(clock)
+	encounter_stats_left -= dt
+	if encounter_stats_left <= 0:
+		encounter_stats_left = catalog.map.encounter.perception_tick_max
+		for enemy: Node3D in enemies:
+			enemy.refresh_stats(clock)
 	for task in search_tasks.values():
 		task.prepare(dt, self)
+	for task: RefCounted in exiting_tasks:
+		task.advance_exit(dt)
+	exiting_tasks = exiting_tasks.filter(func(task: RefCounted): return task.exit_worker != null)
 	_prune_tasks()
 	regroup_left -= dt
 	if regroup_left <= 0:
@@ -177,6 +224,14 @@ func _advance_world(dt: float) -> void:
 	_prune_tasks()
 	_update_pickups()
 	_update_extraction(dt)
+	exploration.advance(dt)
+
+func _on_noise(event: RefCounted) -> void:
+	for enemy: Node3D in enemies:
+		var unaware: bool = enemy.state in [enemy.State.IDLE, enemy.State.WANDER]
+		if enemy.hear_noise(event, city):
+			event.listeners += 1
+			event.awakened += int(unaware)
 
 func _sync_watch_warning() -> void:
 	if _last_watch_warning != watch_warning_active:
@@ -260,7 +315,9 @@ func member_status(member: Node3D) -> String:
 		return "阵亡"
 	var task := task_for(member)
 	if task != null:
-		return ["前往搜索", "搜索中", "自卫 · 搜索暂停"][task.phase]
+		return task.action_label()
+	if member.inside_building:
+		return "走出建筑"
 	if member.regrouping:
 		return "归队中"
 	return "归航中" if extraction else "掩护"
@@ -276,6 +333,8 @@ func nearest_survivor(point: Vector3) -> Node3D:
 	var nearest: Node3D
 	var best := INF
 	for survivor in living():
+		if survivor.inside_building:
+			continue
 		var distance := survivor.position.distance_squared_to(point)
 		if distance < best:
 			nearest = survivor
@@ -319,6 +378,8 @@ func _cancel_guard_order() -> void:
 	if focus_target != null and is_instance_valid(focus_target):
 		focus_target.focus_ring.visible = false
 	focus_target = null
+	if is_instance_valid(world_interaction_vfx):
+		world_interaction_vfx.clear_focus()
 	extraction = false
 	extraction_left = catalog.map.extraction_seconds
 
@@ -333,6 +394,8 @@ func command_move(point: Vector3) -> void:
 			survivors[i].regrouping = false
 			survivors[i].order_move(city.nearest_open(destination + formation(i)), city)
 	city.set_marker(destination)
+	if is_instance_valid(world_interaction_vfx):
+		world_interaction_vfx.play_move_feedback(destination)
 	order = "前往阵位"
 
 func command_stop() -> void:
@@ -356,7 +419,7 @@ func command_search(id: String) -> void:
 	var nearest: Node3D
 	var best := INF
 	for member in living():
-		if member.boarding or task_for(member) != null:
+		if member.boarding or member.inside_building or task_for(member) != null:
 			continue
 		var route: PackedVector3Array = city.path(member.position, site.spec.entry)
 		if route.is_empty():
@@ -374,19 +437,24 @@ func command_search(id: String) -> void:
 	search_tasks[id] = task
 	selected_search_id = id
 	task.assign(id, nearest, self)
+	if is_instance_valid(world_interaction_vfx):
+		world_interaction_vfx.play_search_feedback(site.search_anchor.global_position)
 	notice.emit("%s 前往搜索 %s" % [nearest.data.display_name, site.spec.name])
 
 func command_reassign(index: int) -> void:
 	if not active or closing_left >= 0 or search_id.is_empty() or index < 0 or index >= survivors.size():
 		return
 	var member = survivors[index]
-	if member.dead or member.boarding or task_for(member) != null:
+	if member.dead or member.boarding or member.inside_building or task_for(member) != null:
 		return
 	var id := search_id
 	if city.path(member.position, city.sites[id].spec.entry).is_empty():
 		notice.emit("该队员无法抵达入口")
 		return
-	search_task.assign(id, member, self)
+	search_task.release(self)
+	var replacement := SearchTask.new()
+	search_tasks[id] = replacement
+	replacement.assign(id, member, self)
 	notice.emit("改派 %s · 搜索进度保留" % member.data.display_name)
 
 func command_recall(id: String = "") -> void:
@@ -394,6 +462,8 @@ func command_recall(id: String = "") -> void:
 		id = search_id
 	if not active or closing_left >= 0 or not search_tasks.has(id):
 		return
+	if poi_selected_id == id:
+		poi_selected_id = ""
 	search_tasks[id].release(self)
 	_prune_tasks()
 	notice.emit("搜索者归队 · 进度保留")
@@ -433,11 +503,13 @@ func end_aim() -> void:
 		city.marker.visible = false
 
 func command_focus(target: Node3D) -> void:
-	if not active or closing_left >= 0 or target == null or not target.active:
+	if not active or closing_left >= 0 or target == null or not target.active or not exploration.is_visible(target.position):
 		return
 	_cancel_guard_order()
 	focus_target = target
 	target.focus_ring.visible = true
+	if is_instance_valid(world_interaction_vfx):
+		world_interaction_vfx.set_focus_target(target)
 	focus_repath = 0
 	order = "集火 · " + target.data.display_name
 
@@ -445,7 +517,7 @@ func command_focus_nearest() -> void:
 	var target: Node3D
 	var best := INF
 	for enemy in enemies:
-		if not enemy.active:
+		if not enemy.active or not exploration.is_visible(enemy.position):
 			continue
 		var distance := guards_center().distance_squared_to(enemy.position)
 		if distance < best:
@@ -459,7 +531,7 @@ func command_focus_nearest() -> void:
 func _update_focus(delta: float) -> void:
 	if focus_target == null:
 		return
-	if not is_instance_valid(focus_target) or not focus_target.active:
+	if not is_instance_valid(focus_target) or not focus_target.active or not exploration.is_visible(focus_target.position):
 		_finish_focus()
 		return
 	focus_repath -= delta
@@ -478,6 +550,8 @@ func _finish_focus() -> void:
 	if is_instance_valid(focus_target):
 		focus_target.focus_ring.visible = false
 	focus_target = null
+	if is_instance_valid(world_interaction_vfx):
+		world_interaction_vfx.clear_focus()
 	for member in guards():
 		if not member.regrouping:
 			member.stop()
@@ -510,7 +584,7 @@ func effects_hit(from: Vector3, to: Vector3, color: Color) -> void:
 	Visuals.tracer(self, from + Vector3.UP, to + Vector3.UP, color, true)
 
 func spawn_enemy(id: String, point: Vector3) -> Node3D:
-	if not active or closing_left >= 0 or enemies.size() >= catalog.map.enemy_limit:
+	if not active or closing_left >= 0 or enemies.size() >= catalog.map.encounter.population_limit:
 		return null
 	var data: Resource = catalog.by_id(catalog.enemies, id)
 	if data == null:
@@ -528,6 +602,12 @@ func spawn_enemy(id: String, point: Vector3) -> Node3D:
 		add_child(enemy)
 		enemy.setup(data, rng.randf_range(0.1, 0.6), clock)
 	enemy.position = city.nearest_open(point)
+	enemy.configure_encounter(catalog.map.encounter, rng.randi())
+	enemy.set_meta("encounter_origin", "manual")
+	enemy.refresh_stats(clock)
+	if exploration != null:
+		enemy.visible = exploration.is_visible(enemy.position)
+		enemy.get_node("HitArea").collision_layer = 2 if enemy.visible else 0
 	enemies.append(enemy)
 	return enemy
 
@@ -546,16 +626,7 @@ func _retire_enemy(enemy: Node3D) -> void:
 func _update_director(delta: float) -> void:
 	if not director_enabled or closing_left >= 0:
 		return
-	spawn_left -= delta
-	if spawn_left > 0:
-		return
-	spawn_left = clock.spawn_interval()
-	var count := 1 if clock.phase == clock.DAY else (2 if clock.phase == clock.BLUE_HOUR else mini(8, 2 + clock.threat_level()))
-	for i in range(count):
-		var pool: PackedStringArray = [catalog.map.day_enemy_pool, catalog.map.blue_enemy_pool, catalog.map.night_enemy_pool][clock.phase]
-		var id: String = pool[rng.randi_range(0, pool.size() - 1)]
-		var point: Vector3 = catalog.map.spawn_points[rng.randi_range(0, catalog.map.spawn_points.size() - 1)]
-		spawn_enemy(id, point)
+	encounter.advance(delta, self)
 
 func drop_loot(point: Vector3, food: int, scrap: int, weapon_item: Dictionary = {}) -> void:
 	var view := Node3D.new()
@@ -574,9 +645,26 @@ func reward_for_site(id: String) -> Dictionary:
 	var value: Dictionary = campaign.data.day_rewards.get(id, {})
 	return value if value.is_empty() or campaign.item(value.uid).is_empty() else {}
 
+func resolve_site_loot(site: Dictionary) -> Dictionary:
+	var output := {"food": 0, "scrap": 0}
+	var table: Dictionary = site.spec.get("loot_table", {})
+	if table.is_empty():
+		output.food = site.spec.get("food", 0)
+		output.scrap = site.spec.get("scrap", 0)
+		return output
+	for rolled: Dictionary in LootResolver.roll_dict(table, rng):
+		if rolled.id == "food":
+			output.food += rolled.amount
+		elif rolled.id == "scrap":
+			output.scrap += rolled.amount
+	return output
+
 func _update_pickups() -> void:
 	for pickup in pickups.duplicate():
+		pickup.view.visible = exploration.is_visible(pickup.view.position)
 		for survivor in living():
+			if survivor.inside_building:
+				continue
 			if survivor.position.distance_to(pickup.view.position) <= catalog.map.pickup_radius:
 				var gained: Vector2i = ledger.collect_resources(pickup.food, pickup.scrap, effects.multiplier("resource_yield"))
 				var message := "+%d 食物   +%d 废料" % [gained.x, gained.y]
@@ -604,7 +692,7 @@ func command_extract() -> void:
 func board_count() -> int:
 	var count := 0
 	for survivor in living():
-		if survivor.position.distance_to(catalog.map.bus_position) <= catalog.map.board_radius:
+		if not survivor.inside_building and survivor.position.distance_to(catalog.map.bus_position) <= catalog.map.board_radius:
 			count += 1
 	return count
 
@@ -666,6 +754,14 @@ func _on_phase(phase: int) -> void:
 	sound.set_phase(phase)
 	spawn_left = minf(spawn_left, clock.spawn_interval())
 	notice.emit(["白昼 · 搜集物资", "BLUE HOUR · 全队准备归航", "NIGHT · 夜间警戒持续升级"][phase])
+
+func _on_warning(enabled: bool) -> void:
+	if clock.phase == clock.DAY:
+		atmosphere.set_warning(enabled)
+	if enabled:
+		spawn_left = minf(spawn_left, clock.spawn_interval())
+		sound.play_cue("blue", 0.8)
+		notice.emit("蓝时即将来临 · 留意归航路线")
 
 func debug_clear_enemies() -> void:
 	for enemy in enemies:

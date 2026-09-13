@@ -50,6 +50,7 @@ func try_attack(member: Node3D, mission: Node3D, point: Vector3, target: Node3D 
 	if not weapon.melee:
 		current_ammo -= 1
 	last_pellets = _resolve(member, mission, direction.normalized(), target)
+	mission.noise.emit_weapon(member.position, weapon, member)
 	fired.emit(last_pellets)
 	if not weapon.melee and current_ammo == 0:
 		_start_reload()
@@ -63,6 +64,11 @@ func _resolve(member: Node3D, mission: Node3D, direction: Vector3, target: Node3
 	var pellets: Array[Dictionary] = []
 	var impacts: Array[Dictionary] = []
 	var origin: Vector3 = member.position
+	var tracer_origin := origin + Vector3.UP
+	if member.weapon_visual != null:
+		var muzzle: Node3D = member.weapon_visual.get_muzzle_point()
+		if muzzle != null:
+			tracer_origin = muzzle.global_position
 	for i in range(weapon.pellet_count):
 		var ray: Vector3 = direction
 		if not weapon.melee:
@@ -110,7 +116,7 @@ func _resolve(member: Node3D, mission: Node3D, direction: Vector3, target: Node3
 			impacts.append({"enemy": enemy, "damage": damage, "direction": ray})
 			pellet_hits.append({"enemy": enemy, "damage": damage})
 		pellets.append({"direction": ray, "endpoint": endpoint, "hits": pellet_hits})
-		Visuals.tracer(mission, origin + Vector3.UP, endpoint + Vector3.UP, weapon.color, weapon.melee)
+		Visuals.tracer(mission, tracer_origin, endpoint + Vector3.UP, weapon.color, weapon.melee)
 	# Resolve every pellet before moving enemies, so recoil cannot distort the same shot.
 	var pushed: Array[Node3D] = []
 	for impact: Dictionary in impacts:

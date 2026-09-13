@@ -75,6 +75,11 @@ func run() -> void:
 	check(world.city.sites.van_south.progress == before, "Reassignment retains progress")
 	world.command_search("corner")
 	check(world.search_tasks.size() == 3 and world.search_tasks.corner.worker == workers[1], "New task reserves the newly available survivor")
+	# Death regression applies while approaching outdoors, before entering a building.
+	world.command_recall("garage")
+	await step(.4)
+	workers[2].position = world.city.sites.garage.spec.entry + Vector3(0, 0, -3)
+	world.command_search("garage")
 	before = world.city.sites.garage.progress
 	other = world.city.sites.van_south.progress
 	workers[2].take_damage(5)
@@ -88,7 +93,7 @@ func run() -> void:
 		world.search_tasks[id].worker.position = world.city.sites[id].spec.entry
 		world.city.sites[id].progress = 0.9999
 	var food: int = world.ledger.food
-	await step(0.1)
+	await step(1.0)
 	check(world.city.sites.corner.searched and world.city.sites.van_south.searched and world.search_tasks.is_empty(), "Two tasks can finish in the same frame and release both workers")
 	check(world.ledger.food == food + world.city.sites.corner.spec.food + world.city.sites.van_south.spec.food, "Simultaneous completion collects each site's reward exactly once")
 	world.command_search("corner")
@@ -132,7 +137,7 @@ func aim_checks() -> void:
 	world.survivors[1].position = world.city.sites.corner.spec.entry
 	melee.position = Vector3(0, 0, 22)
 	world.command_search("corner")
-	await step(0.1)
+	await step(0.5)
 	var task = world.search_task
 	var before: float = world.city.sites.corner.progress
 	world.command_move(Vector3(0, 0, 3))

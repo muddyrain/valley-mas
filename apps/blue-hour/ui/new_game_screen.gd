@@ -65,6 +65,7 @@ var previous_aspect: Window.ContentScaleAspect
 var body_font: Font
 var body_bold: Font
 var title_font: Font
+var _back_transitioning := false
 
 func setup(owner_app: Node) -> void:
 	app = owner_app
@@ -91,8 +92,27 @@ func setup(owner_app: Node) -> void:
 	resized.connect(_layout)
 	_layout()
 	tabs[selected].grab_focus.call_deferred()
+	_play_enter_animation()
+
+func _play_enter_animation() -> void:
 	composition.modulate.a = 0.0
-	create_tween().tween_property(composition, "modulate:a", 1.0, 0.24).set_trans(Tween.TRANS_SINE)
+	for card: Button in cards:
+		card.modulate.a = 0.0
+		card.scale = Vector2.ONE * 0.95
+		card.position.y += 14.0
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var intro := create_tween()
+	intro.tween_property(composition, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	for index in range(cards.size()):
+		var card := cards[index]
+		var card_tween := create_tween()
+		card_tween.set_parallel(true)
+		card_tween.tween_property(card, "modulate:a", 1.0, 0.20).set_delay(0.10 + index * 0.075).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		card_tween.tween_property(card, "scale", Vector2.ONE, 0.22).set_delay(0.10 + index * 0.075).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		card_tween.tween_property(card, "position:y", card.position.y - 14.0, 0.22).set_delay(0.10 + index * 0.075).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		card_tween.finished.connect(func() -> void:
+			card.mouse_filter = Control.MOUSE_FILTER_STOP
+		)
 
 func _build_background() -> void:
 	var image := _image(self, MenuArt.BACKGROUND, Rect2(Vector2.ZERO, size), TextureRect.STRETCH_KEEP_ASPECT_COVERED)
@@ -615,10 +635,15 @@ func _tooltip_spacer(parent: VBoxContainer, height: float) -> Control:
 	return result
 
 func _back() -> void:
+	if _back_transitioning or app == null:
+		return
+	_back_transitioning = true
+	for button: Button in menu_buttons:
+		button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var exit_tween := create_tween()
+	exit_tween.tween_property(composition, "modulate:a", 0.0, 0.20).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	await get_tree().create_timer(0.21).timeout
 	app.show_main_menu()
-	for button in app.screen.menu_buttons:
-		if button.text == "开始游戏":
-			button.grab_focus.call_deferred()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
@@ -628,3 +653,5 @@ func _unhandled_input(event: InputEvent) -> void:
 func _exit_tree() -> void:
 	if is_instance_valid(menu_window):
 		menu_window.content_scale_aspect = previous_aspect
+
+

@@ -26,7 +26,7 @@ func run() -> void:
 	mission.set_physics_process(false)
 	check(ProjectSettings.get_setting("display/window/size/window_width_override") == 1600, "Default window width is 1600")
 	check(ProjectSettings.get_setting("display/window/size/window_height_override") == 900, "Default window height is 900")
-	check(mission.camera.size == 25, "Action camera narrows the existing orthographic view")
+	check(mission.camera.size == 25, "Default camera makes the squad readable without changing its scale")
 	check(mission.camera_center.distance_to(mission.squad_center()) < 10, "Arrival camera frames the squad instead of the map origin")
 	check(mission.camera.projection == Camera3D.PROJECTION_ORTHOGONAL, "Existing 3/4 projection retained")
 	check(mission.catalog.map.base_seed == 20260912, "Same formal base map seed")
@@ -37,22 +37,22 @@ func run() -> void:
 	hud.setup(mission)
 	for i in range(4):
 		await process_frame
-	check(mission.city.sites.values().all(func(site: Dictionary): return not site.has("label") and not site.ring.visible), "Unselected POI labels and rings are hidden")
+	check(mission.city.sites.values().all(func(site: Dictionary): return not site.has("label") and (site.discovered or not site.ring.visible)), "Undiscovered POI markers remain hidden")
 	check(not hud.recall_button.visible and not hud.task_label.visible, "Search-only actions do not occupy idle squad cards")
 	check(not hud.toast.visible, "No permanent central tutorial notice")
-	check(hud.site_buttons.size() == 18, "All original POI remain reachable through the scroll list")
+	check(hud.site_buttons.size() == mission.city.sites.size(), "All original POI remain reachable through the scroll list")
 	for panel: Control in [hud.brand_panel, hud.top_panel, hud.resources_panel, hud.squad_panel, hud.sites_panel, hud.command_panel, hud.extract_button]:
 		check(root.get_visible_rect().encloses(panel.get_global_rect()), "HUD panel stays inside the reference viewport")
 	var center := Rect2(root.get_visible_rect().size * Vector2(.28, .25), root.get_visible_rect().size * Vector2(.44, .5))
 	for panel: Control in [hud.brand_panel, hud.top_panel, hud.resources_panel, hud.squad_panel, hud.sites_panel, hud.command_panel, hud.extract_button]:
 		check(not panel.get_global_rect().intersects(center), "Permanent HUD leaves the central tactical rectangle clear")
-	check(hud.squad_panel.size.x >= 170 and hud.squad_panel.size.x <= 190, "Portrait-led squad column stays narrow")
-	check(hud.sites_panel.size.x >= 230 and hud.sites_panel.size.x <= 260, "Tracker width stays within the design budget")
-	check(hud.command_panel.size.y >= 70 and hud.command_panel.size.y <= 82, "Icon dock height stays 70–82")
-	check(hud.site_buttons.values().filter(func(b: Button): return b.visible).size() == 3, "Default tracker reveals only three relevant objectives")
+	check(hud.squad_panel.size.x >= 280 and hud.squad_panel.size.x <= 306, "HUD 2 party column uses the supplied horizontal card")
+	check(hud.sites_panel.size.x >= 300 and hud.sites_panel.size.x <= 320, "HUD 2 tracker fits its supplied panel")
+	check(hud.command_panel.size.y >= 124 and hud.command_panel.size.y <= 132, "Action dock reserves a readable shortcut row beneath its artwork")
+	check(hud.site_buttons.values().filter(func(b: Button): return b.visible).size() == mini(3, mission.city.sites.values().filter(func(site: Dictionary): return site.discovered and not site.searched).size()), "Default tracker reveals only three relevant objectives")
 	hud.set_objectives_expanded(true)
 	await process_frame
-	check(hud.site_buttons.values().all(func(b: Button): return b.visible), "Expanded tracker exposes all eighteen sites")
+	check(hud.site_buttons.keys().all(func(id: String): return hud.site_buttons[id].visible == mission.city.sites[id].discovered), "Expanded tracker exposes only discovered POIs")
 	hud.set_objectives_expanded(false)
 	for member: Node3D in mission.survivors:
 		check(member.rig.scale == Vector3.ONE, "Camera redesign does not inflate character rigs")
@@ -67,10 +67,14 @@ func run() -> void:
 	mission.camera_center = mission.city.sites.corner.spec.entry
 	mission.camera_controller.following = false
 	mission.camera_controller.apply()
+	mission.survivors[0].position = mission.city.sites.corner.spec.entry
+	mission.exploration.refresh()
 	hud.poi_context.focused_id = "corner"
 	hud.refresh()
 	check(mission.search_tasks.is_empty(), "POI hover/focus is presentational and never assigns a worker")
 	check(hud.poi_context.displayed_id == "corner" and not hud.poi_context.detail.visible, "Hover shows name only")
+	var card: PanelContainer = hud.poi_context._focus_card
+	check(not card.search_icon.get_rect().intersects(card.title.get_rect()), "Search icon %s never overlaps the building name %s" % [card.search_icon.get_rect(), card.title.get_rect()])
 	mission.command_search("corner")
 	hud.refresh()
 	check(mission.poi_selected_id == "corner" and hud.poi_context.progress.visible, "Existing search command exposes contextual task progress")
@@ -78,6 +82,10 @@ func run() -> void:
 	mission.command_recall()
 	hud.refresh()
 	check(mission.search_tasks.is_empty() and not hud.recall_button.visible, "Cancellation releases the real task and retracts its controls")
+	hud.size = Vector2(320, 180)
+	hud.poi_context.refresh()
+	check(not hud.poi_context._focus_card.visible, "Small or not-yet-laid-out viewports safely suppress world cards")
+	hud._fit_window()
 	for asset: Resource in WorldAssets.ALL:
 		var instance: Node3D = asset.scene.instantiate()
 		for mesh: MeshInstance3D in instance.find_children("*", "MeshInstance3D", true, false):
@@ -87,6 +95,15 @@ func run() -> void:
 				check(material.albedo_texture.get_image().get_mipmap_count() == 11, "Actual 2K texture includes the full mip chain: " + asset.id)
 				check(material.albedo_texture.get_size() == Vector2(2048, 2048), "Original 2K textures retained: " + asset.id)
 		instance.free()
+	# Expedition overrides must not leak into the shared Camp/source PackedScenes.
+	var source: Node3D = WorldAssets.asset("BLD_002_house_small_a").scene.instantiate()
+	var original: MeshInstance3D = source.find_children("*", "MeshInstance3D", true, false)[0]
+	var field_mesh: MeshInstance3D = mission.city.sites.arrival_house.body.find_children("*", "MeshInstance3D", true, false)[0]
+	check(original.get_active_material(0) is BaseMaterial3D, "Source wrapper retains its original material")
+	check(field_mesh.get_active_material(0) is ShaderMaterial, "Formal expedition uses the unified environment material")
+	check(original.mesh == field_mesh.mesh, "Styling reuses source geometry without making a replacement model")
+	check(mission.city.get_node_or_null("RoadNetwork/Curbs") != null, "Road perimeter has continuous authored curbs")
+	source.free()
 	layer.free()
 	mission.free()
 	print("EXPEDITION VISUAL: %d checks, %d failures" % [checks, failures.size()])

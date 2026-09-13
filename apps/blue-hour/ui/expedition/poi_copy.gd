@@ -12,4 +12,4 @@ static func category(site: Dictionary) -> String:
 	return TYPES.get(definition.poi_type, "建筑")
 
 static func loot(site: Dictionary) -> String:
-	return "食物 %d  废料 %d" % [site.spec.food, site.spec.scrap]
+	return "食物" if site.spec.food > site.spec.scrap else "废料" if site.spec.scrap > site.spec.food * 2 else "通用"

@@ -1,4 +1,4 @@
-[gd_scene load_steps=62 format=3]
+[gd_scene load_steps=63 format=3]
 
 [ext_resource type="NavigationMesh" path="res://scenes/camp/camp_navigation_mesh.tres" id="1_navigation"]
 [ext_resource type="PackedScene" path="res://assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb" id="2_xia"]
@@ -8,6 +8,8 @@
 [ext_resource type="PackedScene" path="res://scenes/camp/buildings/camp_main_station.tscn" id="5_station"]
 [ext_resource type="Script" path="res://camp/camp_main.gd" id="6_camp"]
 [ext_resource type="Script" path="res://camp/camp_departure_controller.gd" id="7_departure"]
+[ext_resource type="Script" path="res://camp/camp_interactable.gd" id="8_interactable"]
+[ext_resource type="Environment" path="res://assets/world/materials/camp_day_environment.tres" id="9_environment"]
 
 [sub_resource type="StandardMaterial3D" id="Material_ground"]
 albedo_color = Color(0.43, 0.48, 0.42, 1)
@@ -38,13 +40,15 @@ roughness = 1.0
 
 
 [sub_resource type="StandardMaterial3D" id="Material_workshop"]
-albedo_color = Color(0.34, 0.40, 0.39, 1)
+albedo_color = Color(0.37, 0.48, 0.53, 1)
+diffuse_mode = 3
 roughness = 0.92
 
 [sub_resource type="StandardMaterial3D" id="Material_greenhouse"]
 transparency = 1
-albedo_color = Color(0.54, 0.76, 0.71, 0.26)
-roughness = 0.42
+albedo_color = Color(0.48, 0.69, 0.73, 0.22)
+roughness = 0.8
+metallic_specular = 0.1
 
 [sub_resource type="StandardMaterial3D" id="Material_greenhouse_frame"]
 albedo_color = Color(0.31, 0.43, 0.39, 1)
@@ -74,13 +78,6 @@ roughness = 0.95
 albedo_color = Color(0.90, 0.42, 0.12, 1)
 roughness = 0.8
 
-[sub_resource type="Environment" id="Environment_day"]
-background_mode = 1
-background_color = Color(0.68, 0.77, 0.79, 1)
-ambient_light_source = 2
-ambient_light_color = Color(0.83, 0.86, 0.82, 1)
-ambient_light_energy = 0.85
-
 [sub_resource type="BoxMesh" id="Mesh_terrain_base"]
 material = SubResource("Material_terrain_edge")
 size = Vector3(24, 0.55, 18)
@@ -105,7 +102,7 @@ size = Vector3(42, 0.1, 5.5)
 
 [sub_resource type="BoxMesh" id="Mesh_berth_pad"]
 material = SubResource("Material_berth")
-size = Vector3(4.8, 0.04, 11.5)
+size = Vector3(4.4, 0.04, 10.4)
 
 [sub_resource type="BoxMesh" id="Mesh_forecourt"]
 material = SubResource("Material_forecourt")
@@ -237,7 +234,7 @@ size = Vector3(0.35, 0.45, 5.5)
 [sub_resource type="Curve3D" id="Curve_departure"]
 bake_interval = 0.1
 _data = {
-"points": PackedVector3Array(0, 0, 0, -0.35, 0, 2, -6.9, 0, 3.05, 0.2, 0, -1.2, -0.35, 0, 2, -7.9, 0, 8.7, -2, 0, 0, 5, 0, 0, -4.8, 0, 11.75, -5, 0, 0, 0, 0, 0, 32, 0, 11.75),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 2, -7.15, 0, 2.8, 0, 0, -2, 0, 0, 1.684, -7.15, 0, 8.7, -1.684, 0, 0, 5, 0, 0, -4.1, 0, 11.75, -5, 0, 0, 0, 0, 0, 32, 0, 11.75),
 "tilts": PackedFloat32Array(0, 0, 0, 0)
 }
 point_count = 4
@@ -245,28 +242,33 @@ point_count = 4
 [node name="CampMain" type="Node3D"]
 script = ExtResource("6_camp")
 metadata/layout_version = "1.3"
+metadata/visual_pass = "02"
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Environment_day")
+environment = ExtResource("9_environment")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 rotation = Vector3(-0.959931, -0.610865, 0)
-light_color = Color(1, 0.93, 0.80, 1)
-light_energy = 1.15
+light_color = Color(1, 0.975, 0.935, 1)
+light_energy = 0.64
 shadow_enabled = true
-directional_shadow_max_distance = 60.0
+shadow_bias = 0.1
+shadow_normal_bias = 2.0
+shadow_blur = 1.2
+shadow_opacity = 0.8
+directional_shadow_max_distance = 48.0
 
 [node name="CameraRig" type="Node3D" parent="."]
-position = Vector3(0, 0, -0.4)
+position = Vector3(0, 0, -1.15)
 rotation = Vector3(0, 0.20944, 0)
 
 [node name="PitchPivot" type="Node3D" parent="CameraRig"]
-rotation = Vector3(-0.837758, 0, 0)
+rotation = Vector3(-0.802851, 0, 0)
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig/PitchPivot"]
 position = Vector3(0, 0, 45)
 projection = 1
-size = 20.5
+size = 18.8
 near = 0.1
 far = 100.0
 current = true
@@ -303,8 +305,7 @@ mesh = SubResource("Mesh_road")
 shape = SubResource("Shape_road")
 
 [node name="BerthDriveway" type="MeshInstance3D" parent="NavigationSource"]
-position = Vector3(-6.9, 0.02, 3.75)
-rotation = Vector3(0, -0.174533, 0)
+position = Vector3(-7.15, 0.02, 4.0)
 mesh = SubResource("Mesh_berth_pad")
 
 [node name="MainForecourt" type="MeshInstance3D" parent="NavigationSource"]
@@ -433,8 +434,7 @@ position = Vector3(0, 1.4, 0)
 shape = SubResource("Shape_greenhouse")
 
 [node name="BlueHourBerth" parent="NavigationSource" instance=ExtResource("4_bus")]
-position = Vector3(-6.9, 0, 3.05)
-rotation = Vector3(0, -0.174533, 0)
+position = Vector3(-7.15, 0, 2.8)
 
 [node name="CentralLivingArea" type="Node3D" parent="NavigationSource"]
 metadata/activity_size = Vector2(8, 6)
@@ -612,12 +612,12 @@ mesh = SubResource("Mesh_chair_seat")
 [node name="Characters" type="Node3D" parent="."]
 
 [node name="CharacterAtBus" parent="Characters" groups=["camp_scale_character"] instance=ExtResource("2_xia")]
-position = Vector3(-4.45, 0, 5.45)
-rotation = Vector3(0, -1.15, 0)
+position = Vector3(-3.7, 0, 5.15)
+rotation = Vector3(0, -2.9, 0)
 
 [node name="CharacterAtWorkshop" parent="Characters" groups=["camp_scale_character"] instance=ExtResource("3_su")]
-position = Vector3(-4.85, 0, -2.3)
-rotation = Vector3(0, -1.9, 0)
+position = Vector3(-2.3, 0, 1.4)
+rotation = Vector3(0, -2.6, 0)
 
 [node name="CharacterAtLivingArea" parent="Characters" groups=["camp_scale_character"] instance=ExtResource("2_xia")]
 position = Vector3(-0.05, 0, 0.25)
@@ -630,16 +630,16 @@ rotation = Vector3(0, 2.25, 0)
 [node name="PartyAssembly" type="Node3D" parent="."]
 
 [node name="PartyPoint01" type="Marker3D" parent="PartyAssembly"]
-position = Vector3(-3.75, 0, 2.8)
+position = Vector3(-4.25, 0, 4.35)
 
 [node name="PartyPoint02" type="Marker3D" parent="PartyAssembly"]
-position = Vector3(-2.35, 0, 2.8)
+position = Vector3(-3.0, 0, 4.35)
 
 [node name="PartyPoint03" type="Marker3D" parent="PartyAssembly"]
-position = Vector3(-3.55, 0, 4.15)
+position = Vector3(-4.25, 0, 3.0)
 
 [node name="PartyPoint04" type="Marker3D" parent="PartyAssembly"]
-position = Vector3(-2.15, 0, 4.15)
+position = Vector3(-3.0, 0, 3.0)
 
 [node name="ExpansionSlots" type="Node3D" parent="."]
 
@@ -662,3 +662,43 @@ loop = false
 
 [node name="CampDepartureController" type="Node" parent="."]
 script = ExtResource("7_departure")
+
+[node name="CampInteractable" type="Node3D" parent="NavigationSource/MainBuilding"]
+script = ExtResource("8_interactable")
+id = "main_station"
+display_name = "主营房"
+panel_type = "facility"
+description = "今日计划与营地整备。"
+actions = PackedStringArray("today_action", "shop", "effects")
+pick_size = Vector3(12, 4.17, 6.7)
+pick_center = Vector3(0, 2.085, 0)
+
+[node name="CampInteractable" type="Node3D" parent="NavigationSource/Workshop"]
+script = ExtResource("8_interactable")
+id = "workshop"
+display_name = "工坊"
+panel_type = "facility"
+description = "工作台尚未开放。"
+actions = PackedStringArray("weapons", "shop")
+pick_size = Vector3(5, 2.85, 3.5)
+pick_center = Vector3(0, 1.425, 0)
+
+[node name="CampInteractable" type="Node3D" parent="NavigationSource/Greenhouse"]
+script = ExtResource("8_interactable")
+id = "greenhouse"
+display_name = "温室"
+panel_type = "facility"
+description = "种植区尚未开放。"
+actions = PackedStringArray()
+pick_size = Vector3(4, 2.5, 3)
+pick_center = Vector3(0, 1.25, 0)
+
+[node name="CampInteractable" type="Node3D" parent="NavigationSource/BlueHourBerth"]
+script = ExtResource("8_interactable")
+id = "blue_hour"
+display_name = "蓝时号"
+panel_type = "vehicle"
+description = "停泊中 · 可以出发"
+actions = PackedStringArray("today_action")
+pick_size = Vector3(2.29, 2.75, 5.264)
+pick_center = Vector3(0, 1.375, 0)

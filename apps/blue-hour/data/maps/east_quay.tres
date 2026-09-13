@@ -25,45 +25,73 @@ districts = Array[Dictionary]([
 {"id": "arrival_gardens", "bounds": Rect2(-77, 25, 70, 34), "paved": false},
 {"id": "east_yard", "bounds": Rect2(7, 30, 70, 29), "paved": true}
 ])
+frontage_blocks = Array[Dictionary]([
+{"id":"north_commercial", "start":-74, "end":-8, "road_z":-38.4, "yaw":3.141592653589793, "gap":2.3, "lots":[
+{"id":"north_home", "name":"北街民居", "asset":"BLD_002_house_small_a", "searchable":false},
+{"id":"north_market", "name":"北街超市", "asset":"BLD_001_supermarket", "searchable":true},
+{"id":"north_pharmacy", "name":"北街药房", "asset":"BLD_004_pharmacy", "searchable":true},
+{"id":"north_corner", "name":"北街食堂", "asset":"BLD_005_restaurant_small", "searchable":true},
+{"id":"north_residence", "name":"北街住宅", "asset":"BLD_003_house_small_b", "searchable":false}
+]},
+{"id":"north_industrial", "start":8, "end":76, "road_z":-38.4, "yaw":3.141592653589793, "gap":5.0, "lots":[
+{"id":"north_depot", "name":"北街货站", "asset":"BLD_006_warehouse_small", "searchable":true},
+{"id":"loading_depot", "name":"周转库房", "asset":"BLD_006_warehouse_small", "searchable":false}
+]},
+{"id":"west_shops", "start":-74, "end":-8, "road_z":-6.4, "yaw":3.141592653589793, "gap":2.5, "lots":[
+{"id":"house_a", "name":"林荫住宅 A", "asset":"BLD_002_house_small_a", "searchable":true},
+{"id":"market", "name":"北岸食集", "asset":"BLD_001_supermarket", "searchable":true},
+{"id":"side_diner", "name":"沿街食堂", "asset":"BLD_005_restaurant_small", "searchable":false},
+{"id":"side_pharmacy", "name":"沿街药店", "asset":"BLD_004_pharmacy", "searchable":false}
+]},
+{"id":"east_service", "start":8, "end":76, "road_z":-6.4, "yaw":3.141592653589793, "gap":4.0, "lots":[
+{"id":"depot", "name":"货运库房", "asset":"BLD_006_warehouse_small", "searchable":true},
+{"id":"pharmacy", "name":"旧日药房", "asset":"BLD_004_pharmacy", "searchable":true},
+{"id":"service_home", "name":"工坊住宅", "asset":"BLD_003_house_small_b", "searchable":false}
+]},
+{"id":"residential", "start":-74, "end":-8, "road_z":6.4, "yaw":0, "gap":2.8, "lots":[
+{"id":"house_b", "name":"林荫住宅 B", "asset":"BLD_003_house_small_b", "searchable":true},
+{"id":"west_house", "name":"西街住宅", "asset":"BLD_002_house_small_a", "searchable":true},
+{"id":"corner", "name":"街角餐厅", "asset":"BLD_005_restaurant_small", "searchable":true},
+{"id":"west_court", "name":"巷口住宅", "asset":"BLD_003_house_small_b", "searchable":true},
+{"id":"west_home", "name":"街边民居", "asset":"BLD_002_house_small_a", "searchable":false}
+]},
+{"id":"arrival", "start":-74, "end":-8, "road_z":33.6, "yaw":3.141592653589793, "gap":2.8, "lots":[
+{"id":"arrival_west", "name":"站西住宅", "asset":"BLD_002_house_small_a", "searchable":true},
+{"id":"arrival_court", "name":"小院民居", "asset":"BLD_003_house_small_b", "searchable":false},
+{"id":"garden_house", "name":"花园住宅", "asset":"BLD_003_house_small_b", "searchable":true},
+{"id":"arrival_mid", "name":"站前小屋", "asset":"BLD_003_house_small_b", "searchable":true},
+{"id":"arrival_house", "name":"站前住宅", "asset":"BLD_002_house_small_a", "searchable":true}
+]},
+{"id":"service_front", "start":8, "end":76, "road_z":6.4, "yaw":0, "gap":14.0, "lots":[
+{"id":"garage", "name":"修车铺", "asset":"BLD_008_auto_repair_shop", "searchable":true},
+{"id":"fuel", "name":"东岸加油站", "asset":"BLD_007_gas_station", "searchable":true}
+]}
+])
 plots = Array[Dictionary]([
-{"id": "house_a", "name": "林荫住宅 A", "asset": "BLD_002_house_small_a", "road_anchor": Vector3(-62, 0, -6.4), "yaw": 3.141592653589793},
-{"id": "market", "name": "北岸食集", "asset": "BLD_001_supermarket", "road_anchor": Vector3(-35, 0, -6.4), "yaw": 3.141592653589793},
-{"id": "depot", "name": "货运库房", "asset": "BLD_006_warehouse_small", "road_anchor": Vector3(24, 0, -6.4), "yaw": 3.141592653589793},
-{"id": "pharmacy", "name": "旧日药房", "asset": "BLD_004_pharmacy", "road_anchor": Vector3(60, 0, -6.4), "yaw": 3.141592653589793},
-{"id": "house_b", "name": "林荫住宅 B", "asset": "BLD_003_house_small_b", "road_anchor": Vector3(-62, 0, 6.4), "yaw": 0},
-{"id": "corner", "name": "街角餐厅", "asset": "BLD_005_restaurant_small", "road_anchor": Vector3(-13, 0, 6.4), "yaw": 0},
-{"id": "garage", "name": "修车铺", "asset": "BLD_008_auto_repair_shop", "road_anchor": Vector3(13, 0, 6.4), "yaw": 0},
-{"id": "fuel", "name": "东岸加油站", "asset": "BLD_007_gas_station", "road_anchor": Vector3(60, 0, 6.4), "yaw": 0},
-{"id": "north_market", "name": "北街超市", "asset": "BLD_001_supermarket", "road_anchor": Vector3(-46, 0, -38.4), "yaw": 3.141592653589793},
-{"id": "north_depot", "name": "北街货站", "asset": "BLD_006_warehouse_small", "road_anchor": Vector3(25, 0, -38.4), "yaw": 3.141592653589793},
-{"id": "north_pharmacy", "name": "北街药房", "asset": "BLD_004_pharmacy", "road_anchor": Vector3(-15, 0, -38.4), "yaw": 3.141592653589793},
-{"id": "arrival_house", "name": "站前住宅", "asset": "BLD_002_house_small_a", "road_anchor": Vector3(-15, 0, 33.6), "yaw": 3.141592653589793},
-{"id": "garden_house", "name": "花园住宅", "asset": "BLD_003_house_small_b", "road_anchor": Vector3(-39, 0, 33.6), "yaw": 3.141592653589793},
-{"id": "west_house", "name": "西街住宅", "asset": "BLD_002_house_small_a", "road_anchor": Vector3(-38, 0, 6.4), "yaw": 0},
-{"id":"yard_repair", "name":"南街修理处", "asset":"BLD_008_auto_repair_shop", "road_anchor":Vector3(6.4,0,41), "yaw":1.570796327}
+{"id":"yard_repair", "name":"南街修理处", "asset":"BLD_008_auto_repair_shop", "road_anchor":Vector3(6.4,0,41), "yaw":1.570796327, "searchable":true}
 ])
 parking_placements = Array[Dictionary]([
 {"id": "van_south", "name": "配送面包车", "asset": "VEH_003_van", "position": Vector3(-9, 0, 23), "yaw": 0, "lootable": true, "loot_profile": "vehicle_supply", "parking_type": "roadside"},
-{"id": "car_west", "name": "废弃轿车", "asset": "VEH_001_sedan_a", "position": Vector3(-49, 0, -15), "yaw": 0, "lootable": true, "loot_profile": "vehicle_salvage", "parking_type": "supermarket"},
-{"id": "van_north", "name": "弃置 SUV", "asset": "VEH_002_suv", "position": Vector3(57, 0, 8), "yaw": 1.5707963267948966, "lootable": true, "loot_profile": "vehicle_food", "parking_type": "gas_station"},
-{"id": "parked_1", "name": "停靠车辆", "asset": "VEH_001_sedan_a", "position": Vector3(-58, 0, -44), "yaw": 0, "lootable": false, "loot_profile": "vehicle_salvage", "parking_type": "supermarket"},
-{"id": "parked_2", "name": "停靠车辆", "asset": "VEH_002_suv", "position": Vector3(-55, 0, -44), "yaw": 0, "lootable": false, "loot_profile": "vehicle_salvage", "parking_type": "supermarket"},
+{"id": "car_west", "name": "废弃轿车", "asset": "VEH_001_sedan_a", "position": Vector3(-16, 0, -17), "yaw": 0, "lootable": true, "loot_profile": "vehicle_salvage", "parking_type": "supermarket"},
+{"id": "van_north", "name": "弃置 SUV", "asset": "VEH_002_suv", "position": Vector3(60, 0, 10), "yaw": 1.5707963267948966, "lootable": true, "loot_profile": "vehicle_food", "parking_type": "gas_station"},
+{"id": "parked_1", "name": "停靠车辆", "asset": "VEH_001_sedan_a", "position": Vector3(55, 0, -45), "yaw": 0, "lootable": false, "loot_profile": "vehicle_salvage", "parking_type": "supermarket"},
+{"id": "parked_2", "name": "停靠车辆", "asset": "VEH_002_suv", "position": Vector3(59, 0, -45), "yaw": 0, "lootable": false, "loot_profile": "vehicle_salvage", "parking_type": "supermarket"},
 {"id": "parked_3", "name": "停靠车辆", "asset": "VEH_003_van", "position": Vector3(29, 0, 43), "yaw": 0, "lootable": false, "loot_profile": "vehicle_salvage", "parking_type": "industrial"},
 {"id": "parked_4", "name": "停靠车辆", "asset": "VEH_003_van", "position": Vector3(33, 0, 43), "yaw": 0, "lootable": false, "loot_profile": "vehicle_salvage", "parking_type": "industrial"},
-{"id": "parked_5", "name": "停靠车辆", "asset": "VEH_001_sedan_a", "position": Vector3(-49, 0, 14), "yaw": 0, "lootable": false, "loot_profile": "vehicle_salvage", "parking_type": "residential"},
-{"id": "parked_6", "name": "停靠车辆", "asset": "VEH_002_suv", "position": Vector3(-46, 0, 14), "yaw": 0, "lootable": false, "loot_profile": "vehicle_salvage", "parking_type": "residential"},
+{"id": "parked_5", "name": "停靠车辆", "asset": "VEH_001_sedan_a", "position": Vector3(-13, 0, 15), "yaw": 0, "lootable": false, "loot_profile": "vehicle_salvage", "parking_type": "residential"},
+{"id": "parked_6", "name": "停靠车辆", "asset": "VEH_002_suv", "position": Vector3(-10, 0, 15), "yaw": 0, "lootable": false, "loot_profile": "vehicle_salvage", "parking_type": "residential"},
 {"id": "parked_7", "name": "停靠车辆", "asset": "VEH_001_sedan_a", "position": Vector3(-27, 0, 50), "yaw": 0, "lootable": false, "loot_profile": "vehicle_salvage", "parking_type": "residential"},
 {"id": "parked_8", "name": "停靠车辆", "asset": "VEH_002_suv", "position": Vector3(-31, 0, 50), "yaw": 0, "lootable": false, "loot_profile": "vehicle_salvage", "parking_type": "residential"},
 {"id": "parked_9", "name": "停靠车辆", "asset": "VEH_003_van", "position": Vector3(46, 0, -24), "yaw": 0.28, "lootable": false, "loot_profile": "vehicle_salvage", "parking_type": "abandoned"}
 ])
 parking_areas = Array[Dictionary]([
 {"position":Vector3(-11,0,50), "yaw":0.0, "width":12.0, "depth":10.0},
-{"position": Vector3(-49, 0, -15), "yaw": 0, "width": 7, "depth": 9},
+{"position": Vector3(-16, 0, -17), "yaw": 0, "width": 7, "depth": 9},
 {"position": Vector3(-9, 0, 23), "yaw": 0, "width": 7, "depth": 9},
-{"position": Vector3(57, 0, 8), "yaw": 1.5707963267948966, "width": 7, "depth": 9},
-{"position": Vector3(-56.5, 0, -44), "yaw": 0, "width": 10, "depth": 8},
+{"position": Vector3(60, 0, 10), "yaw": 1.5707963267948966, "width": 7, "depth": 9},
+{"position": Vector3(57, 0, -45), "yaw": 0, "width": 10, "depth": 8},
 {"position": Vector3(31, 0, 43), "yaw": 0, "width": 10, "depth": 8},
-{"position": Vector3(-47.5, 0, 14), "yaw": 0, "width": 10, "depth": 8},
+{"position": Vector3(-11.5, 0, 15), "yaw": 0, "width": 10, "depth": 8},
 {"position": Vector3(-29, 0, 50), "yaw": 0, "width": 10, "depth": 8},
 {"position": Vector3(46, 0, -24), "yaw": 0, "width": 7, "depth": 8}
 ])
@@ -204,4 +232,3 @@ vegetation = Array[Dictionary]([
 {"asset": "VEG_002_bush_a", "position": Vector3(55, 0, -54), "yaw": 0},
 {"asset": "VEG_002_bush_a", "position": Vector3(65, 0, -54), "yaw": 0}
 ])
-spawn_points = Array[Vector3]([Vector3(-68, 0, -27), Vector3(-27, 0, -53), Vector3(48, 0, -52), Vector3(73, 0, -24), Vector3(-73, 0, 31), Vector3(69, 0, 37), Vector3(0, 0, -55)])

@@ -3,13 +3,16 @@ const Visuals = preload("res://vfx/visuals.gd")
 const Assets = preload("res://vfx/generated_assets.gd")
 const Generator = preload("res://maps/generation/map_generator.gd")
 const Navigation = preload("res://maps/generation/navigation_builder.gd")
+const HudMarker = preload("res://ui/expedition/world_marker.gd")
 var data: Resource
 var grid := AStarGrid2D.new()
 var sites: Dictionary = {}
+var buildings: Dictionary = {}
 var lamps: Array[MeshInstance3D] = []
 var accent_lights: Array[OmniLight3D] = []
 var lamp_materials: Array[Material] = []
 var bus_door: Node3D
+var bus_root: Node3D
 var bus_label: Label3D
 var bus_light: OmniLight3D
 var marker: MeshInstance3D
@@ -30,8 +33,9 @@ func build(map: Resource) -> void:
 	ground.position.y = -0.15
 	add_child(ground)
 	_build_bus()
+	preload("res://maps/world/surface_palette.gd").style_world(self)
 	Navigation.build(self)
-	marker = Visuals.ring(self, data.bus_position, 1.1, Color("#7febdc"))
+	marker = HudMarker.create(self, "world_move_marker", 1.05, data.bus_position)
 	marker.visible = false
 
 func register_site(spec: Dictionary, body: Node3D, vehicle: bool) -> void:
@@ -39,16 +43,21 @@ func register_site(spec: Dictionary, body: Node3D, vehicle: bool) -> void:
 	root.name = "Search_" + spec.id
 	add_child(root)
 	var entry: Vector3 = spec.entry
-	var ring := Visuals.ring(root, entry + Vector3(0, 0.08, 0), 1.15, Color("#f3d39c"))
+	var ring := HudMarker.create(root, "world_interact_marker", .7, entry + Vector3.UP * 1.0)
 	ring.hide()
 	Visuals.hit_area(root, "site_id", spec.id, 1.1)
 	# The entrance proxy is independent of the building's model and collider.
 	root.get_child(root.get_child_count() - 1).position = entry
-	sites[spec.id] = {"spec": spec, "progress": 0.0, "searched": false, "ring": ring, "body": body, "vehicle": vehicle}
+	var anchor := Marker3D.new()
+	anchor.name = "SearchUIAnchor"
+	body.get_node("Anchors").add_child(anchor)
+	anchor.global_position = entry + Vector3.UP * (1.8 if vehicle else 2.0)
+	sites[spec.id] = {"spec": spec, "progress": 0.0, "searched": false, "discovered": false, "ring": ring, "body": body, "vehicle": vehicle, "search_anchor": anchor}
 
 func _build_bus() -> void:
 	var pos: Vector3 = data.bus_position + Vector3(0, 0, 3.7)
 	var bus := Assets.spawn("BH_EvacBus_01", self, pos, PI * .5, true)
+	bus_root = bus
 	Assets.collect_lamps(bus, lamps)
 	# The supplied mesh is fused. Keep extraction timing without moving the whole car.
 	bus_door = bus.get_node("DoorMotion") as Node3D
@@ -56,8 +65,14 @@ func _build_bus() -> void:
 	bus_door.reparent(self, true)
 	bus_door.set_meta("closed_x", bus_door.position.x)
 	bus_door.position.x -= .8
-	Visuals.ring(self, data.bus_position + Vector3(0, 0.06, 0), data.board_radius, Color("#eabd73"))
+	var return_zone := HudMarker.create(self, "world_select_ring", data.board_radius * 2.0, data.bus_position + Vector3(0, .06, 0), true)
+	return_zone.name = "ReturnZone"
+	return_zone.material_override.albedo_color = Color("#f4d397")
+	var bus_marker := HudMarker.create(self, "icon_return", .85, pos + Vector3.UP * 3.1)
+	bus_marker.name = "BusMarker"
 	bus_label = Visuals.label(self, "归航巴士", pos + Vector3(0, 2.4, 0), Color("#ffe1a5"), 22)
+	bus_label.pixel_size = .022
+	bus_label.outline_size = 2
 	bus_light = OmniLight3D.new()
 	bus_light.position = data.bus_position + Vector3(0, 3.5, 0)
 	bus_light.light_color = Color("#E8B36A")
@@ -98,8 +113,8 @@ func line_clear(from: Vector3, to: Vector3) -> bool:
 	return true
 
 func set_marker(point: Vector3) -> void:
-	marker.position = point + Vector3(0, 0.1, 0)
-	marker.visible = true
+	marker.position = point + Vector3(0, .55, 0)
+	marker.flash()
 
 func update_site(id: String) -> void:
 	if sites[id].searched:

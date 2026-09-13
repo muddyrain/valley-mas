@@ -330,39 +330,98 @@ func run() -> void:
 	var food: int = app.campaign.data.food
 	await click(app.screen.training_button)
 	check(app.campaign.member_level(members[1]) == 2 and app.campaign.data.food == food - 1, "Native training button spends food and grows member")
+	await key(KEY_ESCAPE)
 	await click(app.screen.member_buttons[members[0]])
 	check(app.selected_member == members[0], "Roster click selects the same identity as the world")
 	await capture("22-new-run-shelter")
 	var selected_weapon: String = app.campaign.data.equipment[members[0]]
-	var select: OptionButton = app.screen.weapon_selects[0]
-	await click(select)
-	var popup := select.get_popup()
-	await click_at(Vector2(popup.position) + Vector2(40, popup.size.y - 24))
+	var transfer_uid: String = app.campaign.data.equipment[members[1]]
+	await click(app.screen.drawer.switch_button)
+	await click(app.screen.browser.entries[transfer_uid])
+	await click(button("转交给 " + app.member_name(members[0])))
 	check(app.campaign.data.equipment[members[1]] == "" and app.campaign.weapon_inventory.has_weapon(selected_weapon), "Transfer keeps one holder and returns displaced weapon to stock")
+	await key(KEY_ESCAPE)
+	await click(button("菜单"))
 	await click(button("主菜单"))
 	var saved: String = FileAccess.get_file_as_string(run_save)
 	await click(button("开始游戏"))
 	await click(app.screen.tabs.combat)
 	await click(app.screen.confirm_button)
-	var dialog: ConfirmationDialog
-	for node in app.get_children():
-		if node is ConfirmationDialog:
-			dialog = node
-	check(dialog != null and dialog.visible, "Replacing an active run has a concrete confirmation")
-	await click_at(Vector2(dialog.position) + dialog.get_cancel_button().get_global_rect().get_center())
-	await click(button("取消"))
+	var confirmation := app.find_child("NewRunConfirmation", true, false) as Control
+	check(confirmation != null and confirmation.visible, "Replacing an active run has an in-scene confirmation")
+	check(app.find_children("*", "ConfirmationDialog", true, false).is_empty(), "New-run confirmation does not use a native system dialog")
+	var confirmation_card := confirmation.find_child("ConfirmationCard", true, false) as PanelContainer
+	var paper_backing := confirmation.find_child("ConfirmationPaperBacking", true, false) as PanelContainer
+	var confirmation_shade := confirmation.find_child("ConfirmationShade", true, false) as ColorRect
+	var keep_progress := confirmation.find_child("KeepProgressButton", true, false) as Button
+	var create_run_button := confirmation.find_child("CreateRunButton", true, false) as Button
+	check(
+		confirmation_card != null
+		and confirmation_card.get_theme_stylebox("panel") is StyleBoxTexture
+		and confirmation_card.size.x >= 560.0,
+		"New-run confirmation uses a substantial paper card",
+	)
+	var backing_style := paper_backing.get_theme_stylebox("panel") as StyleBoxFlat
+	check(
+		backing_style != null and backing_style.bg_color.a > 0.99,
+		"Paper confirmation stays opaque over the route cards",
+	)
+	check(
+		confirmation_shade != null
+		and confirmation_shade.color.a >= 0.55
+		and confirmation.mouse_filter == Control.MOUSE_FILTER_STOP,
+		"New-run confirmation isolates the pending decision from the route screen",
+	)
+	check(
+		keep_progress != null
+		and create_run_button != null
+		and keep_progress.custom_minimum_size.y >= 56.0
+		and create_run_button.custom_minimum_size.y >= 56.0,
+		"Confirmation actions are clear game-sized targets",
+	)
+	check(
+		root.get_visible_rect().encloses(confirmation_card.get_global_rect())
+		and confirmation_card.get_global_rect().encloses(keep_progress.get_global_rect())
+		and confirmation_card.get_global_rect().encloses(create_run_button.get_global_rect())
+		and not keep_progress.get_global_rect().intersects(create_run_button.get_global_rect())
+		and confirmation.z_index > app.screen.composition.z_index,
+		"Confirmation card and actions are unclipped, non-overlapping, and above the route scene",
+	)
+	await capture("21-new-run-confirmation")
+	await key(KEY_ESCAPE)
+	check(app.find_child("NewRunConfirmation", true, false) == null and app.state == "new_game", "Esc closes only the replacement confirmation")
+	check(FileAccess.get_file_as_string(run_save) == saved, "Esc preserves the exact old save")
+	await click(app.screen.confirm_button)
+	confirmation = app.find_child("NewRunConfirmation", true, false) as Control
+	keep_progress = confirmation.find_child("KeepProgressButton", true, false) as Button
+	await click(keep_progress)
 	check(FileAccess.get_file_as_string(run_save) == saved, "Cancel replacement preserves exact old save")
+	await click(app.screen.confirm_button)
+	confirmation = app.find_child("NewRunConfirmation", true, false) as Control
+	create_run_button = confirmation.find_child("CreateRunButton", true, false) as Button
+	await click(create_run_button)
+	check(
+		app.state == "shelter"
+		and app.campaign.data.day == 1
+		and app.campaign.data.specialization == "combat",
+		"Paper confirmation creates the selected replacement run",
+	)
+	var restore_save := FileAccess.open(run_save, FileAccess.WRITE)
+	restore_save.store_string(saved)
+	restore_save.close()
 	await launch(false)
 	await click(button("继续"))
 	check(app.campaign.data.members == members and app.campaign.member_level(members[1]) == 2, "Continue retains team and training")
 	root.size = Vector2i(1024, 640)
 	await frames(12)
 	check(root.get_visible_rect().encloses(app.screen.departure.get_global_rect()), "Departure visible at minimum size")
-	check(root.get_visible_rect().encloses(app.screen.training_button.get_global_rect()), "Training visible at minimum size")
+	await click_at(app.camp_view.member_point(members[0]))
+	await frames(3)
+	check(root.get_visible_rect().encloses(app.screen.training_button.get_global_rect()), "Training remains visible in the fitted HUD at minimum size")
 	await capture("23-new-run-small")
 	root.size = Vector2i(1440, 900)
 	await frames()
-	await click(button("整装出发"))
+	await click(button("今日行动"))
 	await click(button("商业街"))
 	await click(button("确认出发"))
 	app.mission.director_enabled = false
@@ -378,7 +437,7 @@ func run() -> void:
 	await frames(10)
 	await click(button("确认结算"))
 	check(app.campaign.data.day == 2 and app.campaign.member_level(members[1]) == 2, "Return preserves individual level into next day")
-	await click(button("整装出发"))
+	await click(button("今日行动"))
 	await click(button("商业街"))
 	await click(button("确认出发"))
 	check(not app.mission.powers.states.aid.used_today, "Next day recharges the equipped power")

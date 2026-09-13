@@ -2,7 +2,7 @@ extends SceneTree
 ## Exercises the production mission and enemy scene; no separate gameplay scene.
 
 const ID: String = "ENM_001_infected_basic_a"
-const MODEL: String = "res://assets/characters/infected_basic_a/model/ENM_001_infected_basic_a.glb"
+const MODEL: String = "res://assets/characters/infected_basic_a/runtime/ENM_001_infected_basic_a_30k.glb"
 var checks: int = 0
 var failures: Array[String] = []
 
@@ -29,15 +29,11 @@ func run() -> void:
 		return
 	var expected: Dictionary = {"max_hp": 30.0, "move_speed": 2.0, "attack_damage": 8.0,
 		"attack_range": 0.9, "attack_cooldown": 1.2, "attack_windup": 0.35,
-		"detection_range": 12.0, "lose_target_range": 18.0, "collision_radius": 0.32,
+		"collision_radius": 0.32,
 		"knockback_resistance": 0.1, "xp_reward": 1}
 	for field: String in expected:
 		near(float(definition.get(field)), float(expected[field]), "Base " + field)
 	check(definition.display_name == "普通感染者" and definition.enemy_type == "COMMON", "Common infected identity")
-	for pool: PackedStringArray in [catalog.map.day_enemy_pool, catalog.map.blue_enemy_pool, catalog.map.night_enemy_pool]:
-		check(pool == PackedStringArray([ID]), "Every phase spawns the sole formal infected")
-	for encounter: Dictionary in catalog.map.initial_enemies:
-		check(encounter.id == ID, "Generated POI encounter uses the formal infected")
 	var mission: Node3D = load("res://missions/mission.gd").new()
 	root.add_child(mission)
 	var loadout: Array[String] = ["pistol"]
@@ -47,7 +43,7 @@ func run() -> void:
 	mission.debug_clear_enemies()
 	var phase_hp: Array[float] = [30.0, 31.5, 34.5]
 	var phase_damage: Array[float] = [8.0, 8.8, 10.0]
-	var phase_spawn: Array[float] = [1.0, 1.35, 1.8]
+	var phase_spawn: Array[float] = [1.0, 2.5, 2.5]
 	for phase: int in range(3):
 		mission.clock.set_phase(phase)
 		var actor: Node3D = mission.spawn_enemy(ID, Vector3(0, 0, 10))
@@ -67,6 +63,10 @@ func run() -> void:
 	check(enemy.scene_file_path == definition.scene.resource_path, "Spawn instantiates the definition's production scene")
 	var model: Node3D = enemy.rig.get_node("Model")
 	check(model.scene_file_path == MODEL, "Only the supplied GLB is rendered")
+	var skeleton: Skeleton3D = find_node_of_type(model, "Skeleton3D") as Skeleton3D
+	var player: AnimationPlayer = find_node_of_type(model, "AnimationPlayer") as AnimationPlayer
+	check(skeleton != null and skeleton.get_bone_count() == 23, "Production enemy uses the 23-bone runtime rig")
+	check(player != null and player.has_animation(&"Zombie_Idle") and player.has_animation(&"Zombie_Walk") and player.has_animation(&"Zombie_Chase"), "Production enemy embeds all locomotion clips")
 	var bounds: AABB
 	var first: bool = true
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
@@ -82,7 +82,8 @@ func run() -> void:
 	member.stop()
 	member.hp = member.data.max_hp
 	enemy.reset_for_spawn(0, mission.clock)
-	enemy.position = member.position + Vector3(0, 0, -13)
+	enemy.position = member.position + Vector3(0, 0, -15)
+	enemy.rig.rotation.y = PI
 	enemy.tick(0, mission)
 	check(enemy.target == null, "No acquisition beyond detection range")
 	enemy.position = member.position + Vector3(0, 0, -11)
@@ -97,12 +98,13 @@ func run() -> void:
 	enemy.tick(0, mission)
 	check(enemy.target == member, "Chase persists between detection and lose ranges")
 	enemy.position = member.position + Vector3(0, 0, -19)
-	enemy.tick(0, mission)
-	check(enemy.target == null and enemy.path.is_empty(), "Lose range clears stale navigation")
+	enemy.tick(mission.catalog.map.encounter.target_memory_seconds + .01, mission)
+	check(enemy.target == null, "Lost visual contact expires into investigation")
 	mission.clock.set_phase(mission.clock.NIGHT)
+	enemy.position = member.position + Vector3(0, 0, -21)
 	enemy.think_left = 0
 	enemy.tick(0, mission)
-	check(enemy.target == null, "Night does not bypass the defined detection range")
+	check(enemy.target == null, "Night still respects its enhanced finite visual range")
 	mission.clock.set_phase(mission.clock.DAY)
 	enemy.position = member.position + Vector3(0, 0, -0.8)
 	enemy.think_left = 0
@@ -161,3 +163,12 @@ func run() -> void:
 func finish() -> void:
 	print("INFECTED BASIC: %d checks, %d failures" % [checks, failures.size()])
 	quit(0 if failures.is_empty() else 1)
+
+func find_node_of_type(node: Node, type_name: String) -> Node:
+	if node.is_class(type_name):
+		return node
+	for child: Node in node.get_children():
+		var found: Node = find_node_of_type(child, type_name)
+		if found != null:
+			return found
+	return null

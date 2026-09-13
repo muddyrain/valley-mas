@@ -1,35 +1,44 @@
-extends PanelContainer
-## One context card, driven by existing site/task state. No second selection command system.
-const UI = preload("res://ui/ui_style.gd")
-const Style = preload("res://ui/expedition_theme.gd")
-const Copy = preload("res://ui/expedition/poi_copy.gd")
+extends Control
+## Static building anchors are projected after camera motion, once per rendered frame.
+const Card = preload("res://ui/expedition/search_card.gd")
 var mission: Node3D
-var title: Label
-var detail: Label
-var progress: ProgressBar
 var focused_id: String = ""
 var displayed_id: String = ""
+var cards: Dictionary = {}
+var detail: Label:
+	get: return _focus_card.detail
+var progress: ProgressBar:
+	get: return _focus_card.progress
+var title: Label:
+	get: return _focus_card.title
+var _focus_card: PanelContainer
+var _preview_card: PanelContainer
+var _refresh_left: float = 0.0
 
 func setup(target: Node3D) -> void:
 	mission = target
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_theme_stylebox_override("panel", Style.plate(Color("#1c3543"), Style.GOLD, 9))
-	var column := VBoxContainer.new()
-	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(column)
-	title = UI.label("", 15, Style.GOLD)
-	column.add_child(title)
-	detail = UI.label("", 12)
-	column.add_child(detail)
-	progress = ProgressBar.new()
-	progress.show_percentage = false
-	progress.custom_minimum_size.y = 4
-	progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_child(progress)
-	hide()
+	mouse_filter = MOUSE_FILTER_IGNORE
+	process_priority = 100
+	_preview_card = Card.new()
+	add_child(_preview_card)
+	_preview_card.setup(mission)
+	_preview_card.hide()
+	_focus_card = _preview_card
+
+func _process(delta: float) -> void:
+	_refresh_left -= delta
+	if _refresh_left <= 0:
+		_refresh_left = .1
+		refresh()
+	_project_cards(delta)
 
 func refresh() -> void:
-	var hovered := focused_id
+	var hovered: String = focused_id
+	# The displayed card owns its hover region, including transparent labels.
+	# A button must not invalidate the very world hover that made it appear.
+	var pointed_card: PanelContainer = _card_under_pointer()
+	if hovered.is_empty() and pointed_card != null:
+		hovered = pointed_card.site_id
 	if hovered.is_empty() and mission.input_enabled and not mission.controls.over_ui():
 		var point: Vector2 = mission.controls.pointer
 		var origin: Vector3 = mission.camera.project_ray_origin(point)
@@ -38,35 +47,81 @@ func refresh() -> void:
 		var hit: Dictionary = mission.get_world_3d().direct_space_state.intersect_ray(query)
 		if not hit.is_empty() and hit.collider.has_meta("site_id"):
 			hovered = hit.collider.get_meta("site_id")
+	if not hovered.is_empty() and (not mission.city.sites.has(hovered) or not mission.city.sites[hovered].discovered):
+		hovered = ""
 	displayed_id = hovered if not hovered.is_empty() else mission.poi_selected_id
+	if not mission.city.sites.has(displayed_id) or not mission.city.sites[displayed_id].discovered:
+		displayed_id = ""
+	var selected_search_id: String = ""
+	if not mission.search_tasks.is_empty():
+		selected_search_id = mission.search_tasks.keys()[0]
 	for id: String in mission.city.sites:
-		var site: Dictionary = mission.city.sites[id]
-		site.ring.visible = not site.searched and (id == displayed_id or mission.search_tasks.has(id))
-	visible = mission.input_enabled and mission.city.sites.has(displayed_id)
+		# Keep the map readable: one active search card, otherwise one hover/selected card.
+		var should_exist: bool = id == selected_search_id or (selected_search_id.is_empty() and id == displayed_id)
+		# One persistent view per task; hover/selection only changes emphasis.
+		if should_exist:
+			if not cards.has(id):
+				var card := Card.new()
+				add_child(card)
+				card.setup(mission)
+				cards[id] = card
+			cards[id].update_site(id, mission.poi_selected_id == id)
+			cards[id].show()
+		elif cards.has(id):
+			cards[id].hide()
+	_focus_card = cards.get(displayed_id, _preview_card)
+	_preview_card.hide()
+	_project_cards()
+
+func _card_under_pointer() -> PanelContainer:
+	if not mission.input_enabled or mission.extraction:
+		return null
+	var children: Array[Node] = get_children()
+	children.reverse()
+	for child: Node in children:
+		if child is PanelContainer and not child.is_queued_for_deletion() and child.is_visible_in_tree() and child.get_global_rect().has_point(mission.controls.pointer):
+			return child
+	return null
+
+func _project_cards(delta: float = 0.0) -> void:
+	visible = mission.input_enabled and not mission.extraction and (not displayed_id.is_empty() or not cards.is_empty())
 	if not visible:
 		return
-	var site: Dictionary = mission.city.sites[displayed_id]
-	var task = mission.search_tasks.get(displayed_id)
-	var selected: bool = mission.poi_selected_id == displayed_id
-	title.text = site.spec.name + (" · 已搜" if site.searched else "")
-	title.modulate = Style.MUTED if site.searched else Color.WHITE
-	detail.visible = not site.searched and (selected or task != null)
-	progress.visible = task != null
-	if task != null:
-		var seconds: float = mission.effects.search_seconds(site.spec.search_seconds, task.worker.talent.search_multiplier) * (1.0 - site.progress)
-		detail.text = "%s · %s\n剩余 %ds · %d%%" % [task.worker.data.display_name, mission.member_status(task.worker), ceili(seconds), site.progress * 100]
-		progress.value = site.progress * 100
-	else:
-		detail.text = "%s · 可搜刮\n%s · %ds" % [Copy.category(site), Copy.loot(site), site.spec.search_seconds]
-	reset_size()
-	var anchor: Vector3 = site.spec.entry + Vector3(0, 2.4, 0)
-	var point: Vector2 = get_parent().get_global_transform().affine_inverse() * mission.camera.unproject_position(anchor)
-	var viewport_size: Vector2 = get_parent().size
-	if viewport_size.x <= 504 or viewport_size.y <= 234:
-		hide()
+	if _preview_card.visible:
+		_project(_preview_card, displayed_id, delta)
+	for id: String in cards:
+		_project(cards[id], id, delta)
+
+func _project(card: PanelContainer, id: String, delta: float) -> void:
+	var anchor: Vector3 = mission.city.sites[id].search_anchor.global_position
+	var point: Vector2 = get_global_transform().affine_inverse() * mission.camera.unproject_position(anchor)
+	var area: Vector2 = get_parent().size
+	if area.x <= 475 or area.y <= 214:
+		card.hide()
 		return
-	# Hide off-screen selections; the edge list continues to show their state.
-	if mission.camera.is_position_behind(anchor) or not Rect2(Vector2(216, 128), viewport_size - Vector2(504, 234)).has_point(point):
-		hide()
+	var viewport_scale: Vector2 = get_global_transform().get_scale() * get_viewport().get_stretch_transform().get_scale()
+	var screen: Rect2 = Rect2(Vector2.ZERO, area)
+	card.visible = not mission.camera.is_position_behind(anchor) and screen.has_point(point)
+	if not card.visible:
+		card.remove_meta("anchor_id")
 		return
-	position = Vector2(clampf(point.x - size.x * .5, 216, viewport_size.x - 288 - size.x), clampf(point.y - size.y - 12, 128, viewport_size.y - 106 - size.y))
+	var desired: Vector2 = point - Vector2(card.size.x * .5, card.size.y + 12)
+	var to_local: Transform2D = get_global_transform().affine_inverse()
+	var squad_end: Vector2 = to_local * get_parent().squad_panel.get_global_rect().end
+	var objective_start: Vector2 = to_local * get_parent().sites_panel.get_global_rect().position
+	var clock_end: Vector2 = to_local * get_parent().top_panel.get_global_rect().end
+	var minimum := Vector2(squad_end.x + 12, clock_end.y + 12)
+	var maximum := Vector2(objective_start.x - card.size.x - 12, area.y - card.size.y - 136)
+	desired = desired.clamp(minimum, maximum)
+	var initial: bool = card.get_meta("anchor_id", "") != id or card.get_meta("layout_size", Vector2.ZERO) != card.size or card.get_meta("viewport_area", Vector2.ZERO) != area
+	var current: Vector2 = card.get_meta("smoothed_position", desired)
+	var distance_pixels: float = ((desired - current) * viewport_scale).length()
+	if initial or distance_pixels > 180:
+		current = desired
+	elif delta > 0.0 and distance_pixels > 1.5:
+		current = current.lerp(desired, 1.0 - exp(-delta / .045))
+	card.set_meta("anchor_id", id)
+	card.set_meta("layout_size", card.size)
+	card.set_meta("viewport_area", area)
+	card.set_meta("smoothed_position", current)
+	card.position = ((current * viewport_scale).round() / viewport_scale).clamp(minimum, maximum)

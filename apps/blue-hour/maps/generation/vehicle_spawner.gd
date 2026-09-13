@@ -12,6 +12,7 @@ static func resolve(placements: Array[Dictionary]) -> Array[Dictionary]:
 		site.entry = Vector3(roundf(entry.x), 0, roundf(entry.z))
 		site.size = definition.bounding_size
 		site.poi_type = "vehicle"
+		site.building_type = "VEHICLE"
 		site.enemy_profile = "street"
 		Loot.apply(site, site.loot_profile)
 		sites.append(site)
@@ -28,4 +29,3 @@ static func build(city: Node3D, sites: Array[Dictionary]) -> void:
 			city.register_site(site, wrapper, true)
 		else:
 			wrapper.get_node("InteractionArea").collision_layer = 0
-

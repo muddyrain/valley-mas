@@ -7,6 +7,7 @@
 | 路径（相对 apps/blue-hour） | 用途 |
 | --- | --- |
 | assets/characters/{id}/source/{id}.glb | Meshy 原文件，字节不变 |
+| assets/characters/infected_basic_a/model/ENM_001_infected_basic_a.glb | ENM_001 原始静态网格，字节不变 |
 | assets/characters/{id}/runtime/{id}.glb | 验证后的 Mesh、Material、Skeleton、Skin，无动画 |
 | art/blender/characters/{id}.blend | 可编辑角色，打包贴图，没有 Action |
 | art/blender/rigs/{id}_fit.json | 对应源哈希、关节坐标、经审阅的修正规则 |
@@ -21,8 +22,10 @@
 
     & 'D:/Blender/blender.exe' --background --python-exit-code 1 --python apps/blue-hour/art/blender/scripts/build_character_rig.py -- --character xia_zhiyao --report-dir apps/blue-hour/test-output/replacement/xia_zhiyao/poses
     & 'D:/Blender/blender.exe' --background --python-exit-code 1 --python apps/blue-hour/art/blender/scripts/build_character_rig.py -- --character su_wanxing --report-dir apps/blue-hour/test-output/replacement/su_wanxing/poses
+    & 'D:/Blender/blender.exe' --background --python-exit-code 1 --python apps/blue-hour/art/blender/scripts/build_character_rig.py -- --character infected_basic_a --report-dir apps/blue-hour/test-output/rigging/infected_basic_a/poses
     python apps/blue-hour/art/blender/scripts/validate_character_rig.py --character xia_zhiyao --runtime apps/blue-hour/test-output/replacement/xia_zhiyao/xia_zhiyao.glb
     python apps/blue-hour/art/blender/scripts/validate_character_rig.py --character su_wanxing --runtime apps/blue-hour/test-output/replacement/su_wanxing/su_wanxing.glb
+    python apps/blue-hour/art/blender/scripts/validate_character_rig.py --character infected_basic_a --runtime apps/blue-hour/assets/characters/infected_basic_a/runtime/ENM_001_infected_basic_a_rigged.glb
 
 构建默认输出到被忽略的 test-output/replacement/{id}/{id}.glb，不覆盖正在运行的模型。--skip-render 只跳过图片，数值检查仍运行；--output 可指定位置。先检查图片和保留性报告，再复制已检查的 GLB 到 canonical runtime 路径；Godot 导入、Inspector 与现有公共动作兼容通过后，才更新角色配置和直接场景引用。最后清理无引用旧资源。
 

@@ -1,4 +1,5 @@
 extends Control
+signal closed
 const UI = preload("res://ui/ui_style.gd")
 const Modifiers = preload("res://weapons/weapon_modifiers.gd")
 var app: Node
@@ -6,21 +7,22 @@ var details: VBoxContainer
 var entries: Dictionary = {}
 var selected_definition: Resource
 var inventory_mode := false
+var selected_uid := ""
 
 func setup(owner_app: Node) -> void:
 	app = owner_app
 	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	var backdrop := ColorRect.new()
-	backdrop.color = Color(0, 0, 0, 0.7)
+	backdrop.color = Color(0.035, 0.085, 0.14, 0.22)
 	backdrop.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	add_child(backdrop)
 	var panel := PanelContainer.new()
 	add_child(panel)
 	panel.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	panel.offset_left = 40
-	panel.offset_right = -40
-	panel.offset_top = 35
-	panel.offset_bottom = -35
+	panel.offset_left = 140
+	panel.offset_right = -140
+	panel.offset_top = 95
+	panel.offset_bottom = -95
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12)
 	panel.add_child(column)
@@ -31,7 +33,7 @@ func setup(owner_app: Node) -> void:
 	heading.add_child(title)
 	heading.add_child(UI.button("图鉴", func(): _show_list(false), Vector2(100, 40)))
 	heading.add_child(UI.button("武器库存", func(): _show_list(true), Vector2(120, 40)))
-	heading.add_child(UI.button("关闭", queue_free, Vector2(90, 40)))
+	heading.add_child(UI.button("关闭", func(): closed.emit(), Vector2(90, 40)))
 	var columns := HBoxContainer.new()
 	columns.name = "Columns"
 	columns.add_theme_constant_override("separation", 22)
@@ -90,6 +92,7 @@ func _entry(list: VBoxContainer, definition: Resource, item: Dictionary = {}) ->
 
 func _show_details(definition: Resource, item: Dictionary = {}) -> void:
 	selected_definition = definition
+	selected_uid = str(item.get("uid", ""))
 	for child: Node in details.get_children():
 		details.remove_child(child)
 		child.queue_free()

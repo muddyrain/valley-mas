@@ -5,8 +5,11 @@ var ambient_player: AudioStreamPlayer
 var voice_index: int = 0
 
 func _ready() -> void:
+	_ensure_audio_bus("Music")
+	_ensure_audio_bus("SFX")
 	for i in range(8):
 		var player := AudioStreamPlayer.new()
+		player.bus = "SFX"
 		player.volume_db = -22.0
 		add_child(player)
 		voices.append(player)
@@ -18,6 +21,7 @@ func _ready() -> void:
 	samples["alarm"] = _tone(560, 0.65, false)
 	samples["home"] = _tone(440, 0.6, false)
 	ambient_player = AudioStreamPlayer.new()
+	ambient_player.bus = "Music"
 	add_child(ambient_player)
 	var drone := _tone(55, 2.0, false, true)
 	ambient_player.stream = drone
@@ -62,6 +66,12 @@ func set_phase(phase: int) -> void:
 	ambient_player.pitch_scale = [1.0, 1.2, 0.8][phase]
 	if phase > 0:
 		play_cue("blue" if phase == 1 else "night")
+
+func _ensure_audio_bus(bus_name: String) -> void:
+	if AudioServer.get_bus_index(bus_name) >= 0:
+		return
+	AudioServer.add_bus()
+	AudioServer.set_bus_name(AudioServer.bus_count - 1, bus_name)
 
 func _exit_tree() -> void:
 	# Release looping playback before tearing down a sortie or quitting tests.

@@ -2,6 +2,7 @@ extends Control
 const UI = preload("res://ui/ui_style.gd")
 const Art = preload("res://ui/menu_art.gd")
 const Entry = preload("res://ui/menu_entry.gd")
+const SettingsView = preload("res://ui/settings_view.gd")
 const BRAND = preload("res://assets/ui/common/branding/ui_common_logo_tagline.png")
 const POSTER = preload("res://assets/ui/main_menu/main_menu_poster.png")
 const SOCIAL = preload("res://assets/ui/main_menu/main_menu_social_entries.png")
@@ -14,6 +15,7 @@ var menu_window: Window
 var previous_aspect: Window.ContentScaleAspect
 var overlay: Control
 var return_focus: Control
+var settings_view: Control
 
 func setup(owner_app: Node) -> void:
 	app = owner_app
@@ -126,7 +128,7 @@ func _continue() -> void:
 	if app.campaign.data.is_empty():
 		_show_notice("还没有存档。开始一段新的旅程吧。")
 	else:
-		app._refresh_screen()
+		app.continue_from_menu()
 
 func _show_characters() -> void:
 	var column := _open_overlay("角色图鉴")
@@ -148,27 +150,27 @@ func _show_archive() -> void:
 	_finish_overlay(column)
 
 func _show_settings() -> void:
-	var column := _open_overlay("设置")
-	var fullscreen := CheckButton.new()
-	fullscreen.text = "全屏显示"
-	fullscreen.add_theme_color_override("font_color", Art.INK)
-	fullscreen.button_pressed = menu_window.mode == Window.MODE_FULLSCREEN
-	fullscreen.custom_minimum_size.y = 52
-	fullscreen.toggled.connect(func(value: bool): menu_window.mode = Window.MODE_FULLSCREEN if value else Window.MODE_WINDOWED)
-	column.add_child(fullscreen)
-	var close := _finish_overlay(column)
-	fullscreen.focus_neighbor_bottom = close.get_path()
-	fullscreen.focus_neighbor_top = close.get_path()
-	close.focus_neighbor_bottom = fullscreen.get_path()
-	close.focus_neighbor_top = fullscreen.get_path()
-	fullscreen.grab_focus.call_deferred()
+	var column := _open_overlay("设置", 640)
+	var settings_panel := column.get_parent() as PanelContainer
+	settings_panel.add_theme_stylebox_override("panel", Art.dialog_paper())
+	var heading := column.get_child(0) as Label
+	heading.name = "SettingsHeading"
+	heading.custom_minimum_size.y = 46
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	heading.add_theme_font_size_override("font_size", 36)
+	settings_view = SettingsView.new()
+	column.add_child(settings_view)
+	settings_view.setup(app.settings, Art.INK, Art.MUTED, Art.GOLD)
+	settings_view.close_requested.connect(_close_overlay)
+	settings_view.focus_first.call_deferred()
 
 func _show_notice(message: String) -> void:
 	var column := _open_overlay("蓝时归航")
 	column.add_child(UI.wrapped(message, 22, Art.INK))
 	_finish_overlay(column)
 
-func _open_overlay(heading: String) -> VBoxContainer:
+func _open_overlay(heading: String, panel_width: float = 540.0) -> VBoxContainer:
 	return_focus = get_viewport().gui_get_focus_owner()
 	for entry in menu_buttons + social_buttons:
 		entry.focus_mode = Control.FOCUS_NONE
@@ -183,7 +185,7 @@ func _open_overlay(heading: String) -> VBoxContainer:
 	overlay.add_child(center)
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size.x = 540
+	panel.custom_minimum_size.x = panel_width
 	panel.add_theme_stylebox_override("panel", Art.paper())
 	center.add_child(panel)
 	var column := VBoxContainer.new()
@@ -201,16 +203,20 @@ func _finish_overlay(column: VBoxContainer) -> Button:
 func _close_overlay() -> void:
 	if overlay == null:
 		return
+	if is_instance_valid(settings_view):
+		settings_view.commit()
 	remove_child(overlay)
 	overlay.queue_free()
 	overlay = null
+	settings_view = null
 	for entry in menu_buttons + social_buttons:
 		entry.focus_mode = Control.FOCUS_ALL
 	if is_instance_valid(return_focus):
 		return_focus.grab_focus()
 
-func _unhandled_input(event: InputEvent) -> void:
-	if overlay != null and event.is_action_pressed("ui_cancel"):
+func _input(event: InputEvent) -> void:
+	var escape_pressed: bool = event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_ESCAPE
+	if overlay != null and (escape_pressed or event.is_action_pressed("ui_cancel")):
 		get_viewport().set_input_as_handled()
 		_close_overlay()
 

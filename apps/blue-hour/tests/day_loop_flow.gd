@@ -137,7 +137,10 @@ func run() -> void:
 	solo.debug_clear_enemies()
 	solo.command_recall()
 	solo.command_move(Vector3(0, 0, 12))
-	await step(solo, 8)
+	# Current building routes can exceed eight seconds; require actual arrival.
+	var recall_deadline: float = solo.clock.elapsed + 20
+	while member.position.distance_to(Vector3(0, 0, 12)) >= 3 and solo.clock.elapsed < recall_deadline:
+		await step(solo, .5)
 	check(member.position.distance_to(Vector3(0, 0, 12)) < 3, "Recall restores solo movement control")
 	solo.command_search("corner")
 	await step(solo, 60)

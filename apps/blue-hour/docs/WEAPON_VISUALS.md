@@ -1,5 +1,7 @@
 # 武器 Phase 2A：正式模型与右手挂载
 
+后续状态：long_gun 的固定 Ready modifier 已由公共 Ready / Aim / Shoot 动作层替代，LeftGrip 约束和 MuzzlePoint 曳光起点已接入。当前架构与验证见 [战斗动画基础](design/combat.md)。下文保留 Phase 2A 的历史审计与构建记录；“未做左手约束/射击动作”仅描述当时状态。
+
 2026-09-12。范围为拓荒短刀、P9、A21 的模型、装备显示和基础待机持握姿势。复用主工作区的 BH_Humanoid_Rig_v1、双角色 runtime GLB、公共 Idle / Walk / Run 和第一阶段武器系统。
 
 ## 三把正式资源
@@ -115,7 +117,7 @@ Phase 2B 留项：另外五把 GLB、更完整持枪/射击/换弹/近战动作�
 - `tests/weapon_system.gd`：把三把“模型为空”的旧期望改为正式 PackedScene 可加载，保留其余五把空路径断言。
 - `tests/weapon_runtime.gd`：真实 UI 换装、营地刷新、双角色、A21 出勤、HUD 对应和返回营地。
 - `run.ps1`、`art/verify_export.ps1`：将武器视觉/公共动画回归和独立包模型验证纳入正式构建。
-- `README.md`、`docs/WEAPON_SYSTEM.md`、`docs/PLAN.md`、`docs/VALIDATION.md`、`art/RESOURCE_LAYOUT.md`、`art/MODEL_CATALOG.md`：同步当前入口和 Phase 2A 状态。
+- `README.md`、`docs/design/combat.md`、`docs/PLAN.md`、`docs/VALIDATION.md`、`art/RESOURCE_LAYOUT.md`、`art/MODEL_CATALOG.md`：同步当前入口和 Phase 2A 状态。
 
 新增：
 

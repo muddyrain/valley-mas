@@ -22,6 +22,9 @@ const STAT_SLOT_POSITION_Y := 372.0
 const STAT_SLOT_HEIGHT := 45.0
 
 var selected_id: String = ""
+var selected_party: Array[String] = []
+var party_buttons: Dictionary[String, Button] = {}
+var party_status: Label
 var cards: Dictionary[String, Button] = {}
 var confirm_button: Button
 var cancel_button: Button
@@ -39,12 +42,14 @@ var _bold: Font = Art.body_font(700)
 var _title_font: Font = Art.title_font()
 var _window: Window
 var _previous_aspect: Window.ContentScaleAspect
+var _wash: ColorRect
+var _is_closing := false
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") and not event.is_echo():
 		get_viewport().set_input_as_handled()
-		cancelled.emit()
+		_request_cancel()
 
 
 func _exit_tree() -> void:
@@ -60,12 +65,13 @@ func setup(actions: Array[Resource], base_map: Resource, state: Dictionary, rule
 	_window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme = MenuArt.theme()
-	_image(self, MenuArt.BACKGROUND, Rect2(Vector2.ZERO, size), TextureRect.STRETCH_KEEP_ASPECT_COVERED).set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var wash := ColorRect.new()
-	wash.color = Color(0.035, 0.085, 0.14, 0.76)
-	wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(wash)
-	wash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_wash = ColorRect.new()
+	_wash.name = "CampDimmer"
+	_wash.color = Color(0.035, 0.085, 0.14, 0.46)
+	_wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_wash.modulate.a = 0.0
+	add_child(_wash)
+	_wash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	composition = Control.new()
 	composition.name = "TodayActionComposition"
 	composition.size = REFERENCE
@@ -94,8 +100,79 @@ func setup(actions: Array[Resource], base_map: Resource, state: Dictionary, rule
 	if not cards.is_empty():
 		var first: Button = cards[previous] if cards.has(previous) else cards.values()[0]
 		first.grab_focus.call_deferred()
+	composition.pivot_offset = REFERENCE * 0.5
+	var target_scale := composition.scale
+	composition.scale = target_scale * 0.94
+	composition.position += Vector2(0, 24)
 	composition.modulate.a = 0.0
-	create_tween().tween_property(composition, "modulate:a", 1.0, 0.18)
+	var intro := create_tween().set_parallel(true)
+	intro.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	intro.tween_property(composition, "modulate:a", 1.0, 0.24)
+	intro.tween_property(composition, "scale", target_scale, 0.34)
+	intro.tween_property(composition, "position", (size - REFERENCE * target_scale) * 0.5, 0.34)
+	intro.tween_property(_wash, "modulate:a", 1.0, 0.22)
+
+func _request_cancel() -> void:
+	if _is_closing:
+		return
+	_is_closing = true
+	_cancel_input()
+	cancelled.emit()
+
+func _cancel_input() -> void:
+	for card: Button in cards.values():
+		card.disabled = true
+	for choice: Button in party_buttons.values():
+		choice.disabled = true
+	if is_instance_valid(confirm_button):
+		confirm_button.disabled = true
+	if is_instance_valid(cancel_button):
+		cancel_button.disabled = true
+
+func close_with_animation() -> void:
+	if not is_instance_valid(composition):
+		return
+	var target_position := (size - REFERENCE * composition.scale.x) * 0.5
+	var outro := create_tween().set_parallel(true)
+	outro.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	outro.tween_property(composition, "modulate:a", 0.0, 0.05)
+	outro.tween_property(composition, "scale", composition.scale * 0.95, 0.06)
+	outro.tween_property(composition, "position", target_position + Vector2(0, 18), 0.06)
+	outro.tween_property(_wash, "modulate:a", 0.0, 0.05)
+	await outro.finished
+
+func setup_party(game: RefCounted) -> void:
+	selected_party.assign(game.data.selected_party)
+	var strip := HBoxContainer.new()
+	strip.name = "PartySelection"
+	strip.position = Vector2(195, 177)
+	strip.size = Vector2(1200, 46)
+	strip.add_theme_constant_override("separation", 12)
+	composition.add_child(strip)
+	for id: String in game.data.members:
+		var choice := Button.new()
+		choice.text = ("✓ " if id in selected_party else "＋ ") + game.member_template(id).display_name
+		choice.custom_minimum_size = Vector2(165, 40)
+		choice.toggle_mode = true
+		choice.theme = preload("res://ui/camp_style.gd").paper_theme()
+		choice.add_theme_font_override("font", _bold)
+		choice.add_theme_font_size_override("font_size", 17)
+		choice.button_pressed = id in selected_party
+		choice.toggled.connect(func(_selected: bool):
+			selected_party.clear()
+			for member: String in game.data.members:
+				if party_buttons[member].button_pressed:
+					selected_party.append(member)
+				party_buttons[member].text = ("✓ " if party_buttons[member].button_pressed else "＋ ") + game.member_template(member).display_name
+			_refresh_party())
+		strip.add_child(choice)
+		party_buttons[id] = choice
+	_refresh_party()
+
+func _refresh_party() -> void:
+	party_status.text = "外勤小队  %d 人" % selected_party.size()
+	confirm_button.disabled = selected_id.is_empty() or selected_party.is_empty()
+	_wire_focus()
 
 
 func select_action(id: String) -> void:
@@ -113,7 +190,7 @@ func select_action(id: String) -> void:
 			_fit_selection_thumbnail(action.thumbnail)
 	_selection_thumbnail.show()
 	_selection_placeholder.hide()
-	confirm_button.disabled = false
+	confirm_button.disabled = not party_buttons.is_empty() and selected_party.is_empty()
 	_wire_focus()
 
 
@@ -122,12 +199,14 @@ func _build_header(state: Dictionary, rules: Resource) -> void:
 	_label(composition, "今日行动", Rect2(520, 26, 560, 66), 42, Art.WHITE, HORIZONTAL_ALIGNMENT_CENTER, _title_font)
 	_label(composition, "TODAY'S EXPEDITION", Rect2(570, 92, 460, 24), 14, Color("#c1cdd4"), HORIZONTAL_ALIGNMENT_CENTER, _bold)
 	_label(composition, "第 %02d 天  /  %02d" % [state.day, rules.end_day], Rect2(1230, 61, 252, 36), 22, Art.WHITE, HORIZONTAL_ALIGNMENT_RIGHT, _bold)
-	_image(composition, _region(STATUS, Rect2(0, 150, 2015, 327)), Rect2(174, 132, 1252, 88), TextureRect.STRETCH_SCALE)
+	_image(composition, _region(STATUS, Rect2(0, 150, 2015, 327)), Rect2(174, 122, 1252, 53), TextureRect.STRETCH_SCALE)
 	var need: int = state.members.size() * rules.food_per_member
 	var values: Array[String] = ["食物  %d  ·  今晚需 %d" % [state.food, need], "废料  %d" % state.scrap, "外勤小队  %d 人" % state.members.size()]
 	for index: int in range(values.size()):
 		var color: Color = Color("#9a3c32") if index == 0 and state.food < need else INK
-		_label(composition, values[index], Rect2(196 + index * 412, 150, 384, 48), 23, color, HORIZONTAL_ALIGNMENT_CENTER, _bold)
+		var label := _label(composition, values[index], Rect2(196 + index * 412, 125, 384, 44), 20, color, HORIZONTAL_ALIGNMENT_CENTER, _bold)
+		if index == 2:
+			party_status = label
 
 
 func _build_card(action: Resource, at: Vector2, modifiers: RefCounted) -> void:
@@ -176,11 +255,12 @@ func _build_card(action: Resource, at: Vector2, modifiers: RefCounted) -> void:
 	var map: Resource = action.make_map(_base_map)
 	var food := 0
 	var scrap := 0
-	for site: Dictionary in map.buildings + map.vehicles:
+	var searchable: Array = map.buildings.filter(func(site: Dictionary): return site.get("searchable", true)) + map.vehicles
+	for site: Dictionary in searchable:
 		food += int(site.food)
 		scrap += int(site.scrap)
 	var names: Array[String] = ["食物", "废料", "装备", "地点"]
-	var amounts: Array[int] = [food, scrap, action.weapon_sites.size(), map.buildings.size() + map.vehicles.size()]
+	var amounts: Array[int] = [food, scrap, action.weapon_sites.size(), searchable.size()]
 	for index: int in range(names.size()):
 		_build_stat(visual, names[index], amounts[index], index)
 	card.tooltip_text = action.description + "\n物资为全图基础储量；实际带回量取决于搜索、加成与撤离。"
@@ -211,7 +291,7 @@ func _build_footer() -> void:
 	confirm_button.disabled = true
 	confirm_button.pressed.connect(_confirm)
 	cancel_button = _button("返回营地", RED, Rect2(0, 224, 1505, 408), Rect2(1181, 803, 288, 64))
-	cancel_button.pressed.connect(func() -> void: cancelled.emit())
+	cancel_button.pressed.connect(_request_cancel)
 
 
 func _fit_selection_thumbnail(texture: Texture2D) -> void:
@@ -248,6 +328,8 @@ func _wire_focus() -> void:
 	var ordered: Array[Button] = []
 	for card: Button in cards.values():
 		ordered.append(card)
+	for choice: Button in party_buttons.values():
+		ordered.append(choice)
 	if not confirm_button.disabled:
 		ordered.append(confirm_button)
 	ordered.append(cancel_button)
@@ -268,7 +350,7 @@ func _wire_focus() -> void:
 
 
 func _layout() -> void:
-	var factor := minf(size.x / REFERENCE.x, size.y / REFERENCE.y)
+	var factor := minf(size.x / REFERENCE.x, size.y / REFERENCE.y) * 0.96
 	composition.scale = Vector2.ONE * factor
 	composition.position = (size - REFERENCE * factor) * 0.5
 

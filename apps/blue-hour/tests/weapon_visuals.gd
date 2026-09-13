@@ -89,6 +89,8 @@ func run() -> void:
 		for clip in [&"Idle", &"Walk", &"Run"]:
 			for actor in actors:
 				actor.animation_controller.preview(clip)
+				# Equip now blends into combat over .16 s; check settled grip direction.
+				actor.animation_controller.advance_preview(.2)
 			for frame in 18:
 				for actor in actors:
 					actor.animation_controller.advance_preview(.08)

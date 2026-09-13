@@ -15,27 +15,35 @@ from pose_test import pose_test
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--character', choices=['xia_zhiyao', 'su_wanxing'], default='xia_zhiyao')
+    parser.add_argument('--character', choices=['xia_zhiyao', 'su_wanxing', 'infected_basic_a'], default='xia_zhiyao')
     parser.add_argument('--skip-render', action='store_true')
     parser.add_argument('--output', type=Path, help='Optional staging GLB; runtime is promoted only after review')
     parser.add_argument('--report-dir', type=Path)
     args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else [])
     character = args.character
-    args.report_dir = args.report_dir or APP_ROOT / f'test-output/replacement/{character}/poses'
+    args.report_dir = args.report_dir or (APP_ROOT / ('test-output/rigging/infected_basic_a/poses' if character == 'infected_basic_a' else f'test-output/replacement/{character}/poses'))
     if not args.report_dir.is_absolute():
         args.report_dir = (APP_ROOT.parents[1] / args.report_dir).resolve()
     if not (BLENDER_ROOT / 'rigs/BH_Humanoid_Rig_v1.blend').exists():
         save_rig(BLENDER_ROOT / 'rigs/BH_Humanoid_Rig_v1.blend')
-    source = APP_ROOT / f'assets/characters/{character}/source/{character}.glb'
-    rig, meshes, config = fit_character(source, BLENDER_ROOT / f'rigs/{character}_fit.json')
+    if character == 'infected_basic_a':
+        source = APP_ROOT / 'assets/characters/infected_basic_a/model/source/ENM_001_infected_basic_a.glb'
+        fit_path = BLENDER_ROOT / 'rigs/infected_basic_a_fit.json'
+        default_output = APP_ROOT / 'test-output/rigging/infected_basic_a/ENM_001_infected_basic_a_rigged.glb'
+        character_blend = BLENDER_ROOT / 'characters/infected_basic_a_rigged.blend'
+    else:
+        source = APP_ROOT / f'assets/characters/{character}/source/{character}.glb'
+        fit_path = BLENDER_ROOT / f'rigs/{character}_fit.json'
+        default_output = APP_ROOT / f'test-output/replacement/{character}/{character}.glb'
+        character_blend = BLENDER_ROOT / f'characters/{character}.blend'
+    rig, meshes, config = fit_character(source, fit_path)
     weights = bind_character(rig, meshes, config)
     # Packed images make the editable character independent of external texture paths.
     bpy.ops.file.pack_all()
     bpy.context.preferences.filepaths.save_version = 0
-    character_blend = BLENDER_ROOT / f'characters/{character}.blend'
     character_blend.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(character_blend))
-    output = args.output or APP_ROOT / f'test-output/replacement/{character}/{character}.glb'
+    output = args.output or default_output
     output = output.resolve()
     exported = export_character(rig, meshes, output)
     exported['path'] = output.relative_to(APP_ROOT).as_posix()

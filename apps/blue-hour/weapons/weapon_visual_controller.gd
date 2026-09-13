@@ -1,7 +1,9 @@
 class_name WeaponVisualController
 extends Node3D
 ## Presentation only. Combat remains valid with no skeleton or model.
+signal weapon_changed
 const PoseModifier = preload("res://weapons/weapon_pose_modifier.gd")
+const MuzzleFlash = preload("res://vfx/muzzle_flash.gd")
 const RIGHT_HAND: StringName = &"RightHand"
 const SOCKET_NAME: StringName = &"WeaponSocket_R"
 const GRIP_RIGHT: NodePath = ^"GripPoint_R"
@@ -17,6 +19,7 @@ var definition: Resource
 var socket: BoneAttachment3D
 var model: Node3D
 var pose_modifier: SkeletonModifier3D
+var muzzle_flash: MeshInstance3D
 
 func initialize(skeleton: Skeleton3D) -> void:
 	# The caller supplies the skinned target after retargeting has moved its nodes.
@@ -36,8 +39,10 @@ func initialize(skeleton: Skeleton3D) -> void:
 func set_weapon(value: Resource) -> void:
 	definition = value
 	attach_weapon_visual()
+	weapon_changed.emit()
 
 func attach_weapon_visual() -> void:
+	muzzle_flash = null
 	if is_instance_valid(model):
 		model.get_parent().remove_child(model)
 		model.queue_free()
@@ -75,13 +80,32 @@ func attach_weapon_visual() -> void:
 	model = instance
 	socket.add_child(model)
 	model.transform = profile.attachment_transform() * grip.transform.affine_inverse()
-	pose_modifier.profile = profile
+	# Long guns now use the shared upper-body AnimationTree layer.
+	pose_modifier.profile = profile if index != WeaponDefinition.WeaponType.LONG_GUN else null
+	var muzzle := get_muzzle_point()
+	if index == WeaponDefinition.WeaponType.LONG_GUN and muzzle != null:
+		muzzle_flash = MuzzleFlash.new()
+		muzzle_flash.name = "MuzzleFlash"
+		muzzle.add_child(muzzle_flash)
+
+func flash_muzzle() -> void:
+	if is_instance_valid(muzzle_flash):
+		muzzle_flash.trigger()
+
+func advance_flash(delta: float) -> void:
+	if is_instance_valid(muzzle_flash):
+		muzzle_flash.advance(delta)
 
 func get_muzzle_point() -> Node3D:
 	return model.get_node_or_null(MUZZLE) as Node3D if is_instance_valid(model) else null
 
 func get_support_grip() -> Node3D:
 	return model.get_node_or_null(GRIP_LEFT) as Node3D if is_instance_valid(model) else null
+
+func get_marker_transform(marker: Node3D, skeleton: Skeleton3D) -> Transform3D:
+	# Resolve through the one formal socket while its bone is being modified.
+	var hand_pose := skeleton.get_bone_global_pose(socket.bone_idx)
+	return skeleton.global_transform * hand_pose * model.transform * marker.transform
 
 func _exit_tree() -> void:
 	# Sockets live under the rig, so disposing this controller also removes its output.

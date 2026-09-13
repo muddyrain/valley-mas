@@ -28,6 +28,19 @@ static func paper() -> StyleBoxTexture:
 	style.content_margin_bottom = 20
 	return style
 
+static func dialog_paper() -> StyleBoxTexture:
+	var style := paper()
+	# Preserve the illustrated corners when the wide source plate becomes a tall dialog.
+	style.set_texture_margin(SIDE_LEFT, 72.0)
+	style.set_texture_margin(SIDE_TOP, 48.0)
+	style.set_texture_margin(SIDE_RIGHT, 72.0)
+	style.set_texture_margin(SIDE_BOTTOM, 48.0)
+	style.content_margin_left = 34
+	style.content_margin_right = 34
+	style.content_margin_top = 26
+	style.content_margin_bottom = 26
+	return style
+
 static func theme() -> Theme:
 	var result := UI.theme()
 	result.default_font_size = 18

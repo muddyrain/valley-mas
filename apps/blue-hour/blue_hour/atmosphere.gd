@@ -24,25 +24,39 @@ func setup(city: Node3D) -> void:
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-48, -32, 0)
 	sun.shadow_enabled = true
+	# One orthographic shadow region avoids cascade changes during this orthographic camera's pan.
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.directional_shadow_max_distance = 85.0
 	sun.shadow_bias = 0.04
 	sun.shadow_normal_bias = 2.0
 	add_child(sun)
 	set_phase(0, true)
 
+func set_warning(enabled: bool) -> void:
+	if not enabled:
+		set_phase(0)
+		return
+	if transition:
+		transition.kill()
+	transition = create_tween().set_parallel()
+	transition.tween_property(environment, "background_color", Color("#617885"), 8.0)
+	transition.tween_property(environment, "ambient_light_color", Color("#94a7bd"), 8.0)
+	transition.tween_property(sun, "light_color", Color("#cbd8e2"), 8.0)
+	transition.tween_property(bus_light, "light_energy", 0.7, 8.0)
+
 func set_phase(phase: int, immediate: bool = false) -> void:
 	var sky: Color = [Color("#859d9f"), Color("#344D69"), Color("#243747").darkened(.65)][phase]
-	var ambient: Color = [Color("#c2c8cb"), Color("#435F76"), Color("#435F76")][phase]
-	var sunlight: Color = [Color("#fff8ec"), Color("#9fb4c3"), Color("#91a7bb")][phase]
+	var ambient: Color = [Color("#b6c4d6"), Color("#717fae"), Color("#506b8e")][phase]
+	var sunlight: Color = [Color("#fff1d9"), Color("#91bdd5"), Color("#91a7bb")][phase]
 	if transition:
 		transition.kill()
 	transition = create_tween().set_parallel()
 	var seconds := 0.01 if immediate else 3.5
 	transition.tween_property(environment, "background_color", sky, seconds)
 	transition.tween_property(environment, "ambient_light_color", ambient, seconds)
-	transition.tween_property(environment, "ambient_light_energy", [0.36, 0.67, 0.48][phase], seconds)
+	transition.tween_property(environment, "ambient_light_energy", [0.48, 0.62, 0.48][phase], seconds)
 	transition.tween_property(sun, "light_color", sunlight, seconds)
-	transition.tween_property(sun, "light_energy", [0.62, 0.65, 0.36][phase], seconds)
+	transition.tween_property(sun, "light_energy", [0.56, 0.52, 0.36][phase], seconds)
 	transition.tween_property(bus_light, "light_energy", 0.0 if phase == 0 else 2.2, seconds)
 	for light in accent_lights:
 		transition.tween_property(light, "light_energy", [0.0,1.3,1.6][phase], seconds)

@@ -5,6 +5,8 @@ const Catalog = preload("res://debug/humanoid_catalog.gd")
 const Controller = preload("res://survivors/survivor_animation_controller.gd")
 const POSES: Array[String] = ["原始姿势", "头向左", "头向右", "抬左臂 40°", "抬右臂 40°", "抬左腿", "抬右腿", "左膝弯曲", "右膝弯曲", "身体前倾", "左臂压力测试 60°", "右臂压力测试 60°"]
 
+@export var initial_character_id: String = "xia_zhiyao"
+
 var skeleton: Skeleton3D
 var model: Node3D
 var camera: Camera3D
@@ -79,7 +81,12 @@ func _ready() -> void:
 	rate_slider.value = 1.0
 	rate_slider.value_changed.connect(func(value: float) -> void: preview_rate = value)
 	column.add_child(rate_slider)
-	set_character(0)
+	var initial_index: int = 0
+	for i in Catalog.CHARACTERS.size():
+		if String(Catalog.CHARACTERS[i]["id"]) == initial_character_id:
+			initial_index = i
+			break
+	set_character(initial_index)
 
 func _process(delta: float) -> void:
 	if is_instance_valid(controller) and controller.enabled:

@@ -29,9 +29,16 @@ def geometry_and_images(path):
 
 
 def validate(character='xia_zhiyao', rigged=None):
-    source = APP_ROOT / f'assets/characters/{character}/source/{character}.glb'
-    rigged = rigged or APP_ROOT / f'assets/characters/{character}/runtime/{character}.glb'
-    fit = json.loads((APP_ROOT / f'art/blender/rigs/{character}_fit.json').read_text())
+    if character == 'infected_basic_a':
+        source = APP_ROOT / 'assets/characters/infected_basic_a/model/source/ENM_001_infected_basic_a.glb'
+        default_rigged = APP_ROOT / 'assets/characters/infected_basic_a/runtime/ENM_001_infected_basic_a_rigged.glb'
+        fit_path = APP_ROOT / 'art/blender/rigs/infected_basic_a_fit.json'
+    else:
+        source = APP_ROOT / f'assets/characters/{character}/source/{character}.glb'
+        default_rigged = APP_ROOT / f'assets/characters/{character}/runtime/{character}.glb'
+        fit_path = APP_ROOT / f'art/blender/rigs/{character}_fit.json'
+    rigged = rigged or default_rigged
+    fit = json.loads(fit_path.read_text())
     source_faces, source_images = geometry_and_images(source)
     output_faces, output_images = geometry_and_images(rigged)
     audit = inspect(rigged)
@@ -56,7 +63,7 @@ def validate(character='xia_zhiyao', rigged=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--character', choices=['xia_zhiyao', 'su_wanxing'], default='xia_zhiyao')
+    parser.add_argument('--character', choices=['xia_zhiyao', 'su_wanxing', 'infected_basic_a'], default='xia_zhiyao')
     parser.add_argument('--runtime', type=Path, help='Validate staging output before promotion')
     args = parser.parse_args()
     validate(args.character, args.runtime)

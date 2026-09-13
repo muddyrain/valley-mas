@@ -99,6 +99,8 @@ func run() -> void:
 	await capture("menu/title-continue")
 	var saved := FileAccess.get_file_as_string(run_save)
 	await key(KEY_ENTER)
+	# Continue now presents the branded loading transition before the shelter is ready.
+	await create_timer(1.8).timeout
 	check(app.state == "shelter", "Keyboard continue reaches the existing shelter")
 	check(FileAccess.get_file_as_string(run_save) == saved, "Continue preserves exact saved progress")
 	var report := FileAccess.open("res://test-output/menu/runtime.json", FileAccess.WRITE)

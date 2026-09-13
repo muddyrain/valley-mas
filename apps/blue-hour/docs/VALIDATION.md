@@ -1,5 +1,86 @@
 # 蓝时归航验证记录
 
+## 2026-09-12：站前小屋卡片无法关闭修复
+
+- 复现：建筑/列表纯悬停离开可正常收起；取消搜索留下 `poi_selected_id`，随后点击地面仍未清理，导致闲置建筑检查卡一直显示。原生最小场景复现4项失败，日志为 `test-output/poi-context-before.log`。
+- 修复：取消被选建筑搜索时清除该选择；场景左键点击先清除检查选择，点击另一个可搜建筑再选择新目标。关闭检查卡不取消正在进行的搜索，也不隐藏其他建筑的独立进度卡。
+- 专项 `tests/poi_context_runtime.gd` 在屏幕外 Godot 原生窗口、合成输入和最小任务 fixture 下13项通过，涵盖建筑/列表悬停、取消、点击地面、其他任务及可见进度卡保留。截图为 `test-output/poi-context-dismiss.png`，日志 `poi-context-after.log`；该 fixture 使用默认占位成员，不是用户正在玩的会话。
+- 原派遣56项、并行操作36项通过；专项已加入正式 build/capture 门禁。此次局部缺陷修复不改变阶段计划。
+- 全量 build 的所有回归门禁已通过（含正式闭环134、新增关闭回归13）；游戏在构建期间于21:49再次启动，导出最后重命名阶段因正式 EXE 被占用而失败。日志 `test-output/poi-context-build.log` 保留该失败。释放文件后已复用原构建脚本的导出和独立校验阶段恢复成功，恢复日志 `test-output/poi-context-package.log`，退出0、无运行错误。12次独立 EXE 启动及4次内嵌包检查通过。
+- 正式 `build/BlueHourHomeward.exe` 校验完成时间 `2026-09-12T21:59:34.0380452+08:00`，451,762,504字节，SHA-256 `85BA4EED8A09675843E76045667426FC3EE33AB93AC8DE471EABC24DEE9BAF24`；实际文件已核对与 BUILD-INFO.json 一致。用户可重新启动本文件。
+- 变更已完成；编码、文档链接严格校验通过。没有开启新阶段或提交 Git。
+
+## 2026-09-12：角色详情展开时保持正文宽度
+
+- 根因是默认自动滚动模式在滚动条出现后才扣除正文宽度。改为始终预留右侧滚动区域；滚动条仍按内容溢出显隐。
+- 先补运行时几何断言，旧实现触发 5 项失败；修正后 `camp_ui_runtime.gd` 114 项通过，连续三轮展开/收起保持已有行、数值、按钮的位置和宽度不变。保留滚轮、拖动、关闭和升级操作验证。
+- Windows release 已实际导出，隔离 EXE 原生启动通过；挂载内嵌包后的 14 项交互验证通过。日志为 `test-output/camp-ui-review/reserved-width-runtime.log`、`reserved-width-export.log`、`reserved-width-pack.log`。截图沿用 `10-two-member-detail.png`（收起）与 `11-survivor-scroll.png`（展开）。
+- 本轮为局部布局修复，定向验证 UI 和营地流程，未重复运行下方已通过的整包回归；未扩展玩法计划。用户关闭旧游戏后，已替换正式 `build/BlueHourHomeward.exe`，复核与已验证隔离包的 SHA-256 一致；`build/BUILD-INFO.json` 记录本轮验证范围及此前整包回归基线。
+
+## 2026-09-12：Expedition 密度、室内搜索与探索迷雾
+
+- 已实际通过：地图2446项、室内/车辆搜索13项、原派遣56项、并行操作36项、视觉布局91项、探索逻辑9项。原生专项47项通过，450帧镜头操作最大锚点误差0.499756px；最终录像、Mask与完整流程证据见 WORLD_MAP_REPORT。
+- 原生专项使用屏幕外 Godot Compatibility 窗口、隔离存档和合成输入。六段录像保留原搜索/移动计时，专项关闭刷怪导演；另由 `expedition_visual_runtime.gd` 验证原导演、真实战斗和完整跨时段闭环。截图、录像、逐帧数据与可点击索引在 `test-output/expedition-exploration/`。
+- UI 回归补充：小窗口/尚未布局时安全隐藏卡片；图标和标题不重叠。全量构建曾分别发现负尺寸 Rect2 和 SVG 原尺寸挤占标题，已修复根因并回归通过。
+- 仓库检查：使用本机 Git Bash 执行上下文入口检查13文件通过、根文档链接39处通过；另以 Blue Hour 为作用域严格检查39份文档，322处本地链接全部通过；编码检查通过。全局 harness 未通过，报告根目录 Godot 技能缺 INDEX 登记、四个 skills 入口及根 AGENTS.md 不满足符号链接要求。本轮没有修改全局技能治理文件；系统默认 bash 指向不可启动的 WSL，未改系统配置。
+- 最终 `run.ps1 -Mode build` 退出0。原生正式闭环134项通过：菜单→开局/路线→营地/今日行动→出发→搜索与真实战斗→Blue Hour/夜晚→返航→结算→营地；暂停菜单41、武器原生126项通过。完整日志为 `test-output/exploration-build.log`，没有 SCRIPT ERROR / SHADER ERROR / ERROR。
+- 12次独立 EXE 启动通过（含菜单、远征、今日行动、武器和52项美术展示）；4次内嵌包武器/战斗动画检查通过。此结果覆盖此前 UI 预览包因远征断言未通过的门禁；下方旧包哈希和失败保留为历史记录。
+- 唯一正式包为 `build/BlueHourHomeward.exe`，完成校验时间 `2026-09-12T20:15:51.9759548+08:00`，451,757,136字节，SHA-256 `70AA8CC572C62F513D71B205F90464C4299D698F6C3DC79F3C74CA1693797BDC`。实际文件哈希已复核与 BUILD-INFO.json 一致，24份核心实现源码与录制后快照一致。
+- 保留限制：部分测试进程退出时有 ObjectDB 实例回收警告；全局 harness 的技能索引/符号链接检查仍未通过。没有把这些检查写成全绿。搜索专项47项没有运行错误；6段视频通过帧数、编码信息与完整解码检查。
+- 已完成本阶段实现、证据与构建，待用户视觉验收。未启动真正室内、LOS、新模型或第二张地图；未提交 Git。
+
+
+
+## 2026-09-12：Camp 占位角色与详情滚动修正
+
+- 先补人数回归，旧实现的 1 / 2 人营地共触发 4 项失败：多出的美术占位未清除、可见角色不属于 Campaign。修正后 `camp_ui_runtime.gd` 91 项通过，涵盖 1 / 2 / 4 人、能力/换装/训练、同一 Camp 出发与三档分辨率。
+- 角色详情的常规内容无需滚动；队伍加成展开后验证滚轮上下、滑块拖动、正文间距、固定关闭/升级按钮。截图为 `test-output/camp-ui-review/09-two-member-camp.png`、`10-two-member-detail.png` 和 `11-survivor-scroll.png`；均为屏幕外原生窗口、隔离存档与合成输入。
+- 两名正式模型的世界包围盒高度约 1.60m，缩放为 1；营地正交相机 size 20.5，在 1920×1080 下身高的投影长度约 47px。本轮只核对尺寸，没有修改角色比例、设施位置或镜头。
+- 实际执行 `run.ps1 -Mode build`：Camp UI 91、出发 89、布局/碰撞 108、名单 31、交互 87、清晰度 41、TodayAction 51/原生 68 均通过；全量门禁停止于 `expedition_visual.gd` 一项“搜索图标与建筑名称不重叠”断言。原日志 `test-output/camp-ui-review/cleanup-build.log`。此次不改同期远征实现或放宽其断言。
+- 独立 Windows release 导出成功；隔离 EXE 原生营地 / TodayAction 启动各一次通过。同引擎挂载 EXE 内嵌包后，13 项原生交互检查通过，包含正常随机两人开局、默认无滚动、展开与滚轮、固定操作区、返回及同营地确认出发。日志为 `cleanup-export.log`、`cleanup-pack.log` 与 `standalone/cleanup-*.log`，均在 `test-output/camp-ui-review/`。
+- 交付 `build/BlueHourHomeward.exe` 与已验证隔离 EXE 的 SHA-256 一致：`7F472AABF8EEBE2F55EE706C8D58E4D8DE98BFB6DBB0C78D46A7E4B0FF287E18`，451,757,136 字节；交付文件时间为 `2026-09-12T20:04:42.5743467+08:00`。此次全量门禁失败仍保留，详细范围写入 `test-output/camp-ui-review/cleanup-build-info.json`，不将预览包标为完整回归通过。
+- 本次属于既有 UI 的局部修复，未扩展玩法计划；未改玩家存档或提交 Git。
+
+
+## 2026-09-12：Camp / TodayAction 第二轮 UI（预览包）
+
+- 原生 `camp_ui_runtime.gd` 68 项通过：能力悬停/点击、替换与保存失败回滚、角色切换/食物训练、说明卡尺寸、槽位/时段卡、1280×720 / 1600×900 / 1920×1080、任务卡地点数与实际搜索点一致、取消和确认保持同一 Camp、出发到 Mission。
+- 相关回归通过：Camp 交互 87、布局/碰撞 108、出发 89、名单 31、清晰度 41、今日行动规则 51/原生 68、效果原生 80。TodayAction 另覆盖 1024×640、1280×720、1440×900、2560×1080。均为独立测试存档与屏幕外原生窗口/合成输入。
+- 八张运行截图及可点击截图页位于 `test-output/camp-ui-review/`：`01-camp-hud`、`02-survivor-detail`、`03-ability-detail`、`04-slot-detail`、`05-phase-detail`、`06-today-action`、`07-before-confirm`、`08-after-confirm`，后缀为 `.png`；截图页为 `index.html`。
+- `camp_main.tscn`、`camp_main.gd`、`camp_departure_controller.gd` 的 SHA-256 与本轮开始一致。纸张/任务卡/缩略图等正式资源未修改。更换装备只新增调用既有 Campaign 接口的单次保存事务，未修改领域规则。
+- 全量 `run.ps1 -Mode build` 已实际执行，但停止于 `tests/expedition_visual.gd` 的 7 项断言：默认镜头、搜索点数量、默认/展开地点列表、缩放两端边界与悬停说明。未改这组同期远征逻辑或断言，不能把全量门禁报告为通过。原日志为 `test-output/camp-ui-review/build-final.log`。
+- 单独 Windows release 导出成功，canonical `build/BlueHourHomeward.exe` 为 UI 预览包。复制至隔离目录后实际原生启动 Camp / TodayAction 两次通过；同引擎挂载独立 EXE 内嵌包后执行 `pack_smoke.gd` 的 9 项原生交互通过（角色、统一说明卡、纸卡、返回、确认、同一 Camp 到 Mission）。打包不含测试/文档/截图。
+- 本轮预览包时间 `2026-09-12T19:40:30.0698482+08:00`，451,752,752 字节，SHA-256 `1F196B9DA7EF756E5E4216215080C6DB9CCB4AA406E1137475D7F360D6C76363`。`build/BUILD-INFO.json` 显式记录 UI 范围通过与全量门禁未通过，不沿用上次构建的全绿记录。
+- 仍待确认：用户对纸卡与营地详情样式的视觉验收；技能升级/扩槽正式价格与交易入口仍在后续。本轮只显示“待开放”，没有擅自开放免费成长。
+
+范围与复用资源见 [Camp Interaction V1](design/camp.md)、[TodayAction](design/expedition.md)。本轮未提交 Git。
+
+## 2026-09-12：Camp Interaction V1 与最终共享构建
+
+- 新增部分出勤结算 31、原生完整交互 87 项通过；Camp 布局/碰撞 108、出发含导航异常回退 89、清晰度 41、今日行动规则 51/原生 68 项通过。
+- 原生开局/训练 204、购买/跨日 74、效果 80、武器 UI 126 项通过。角色、四处设施、覆盖层优先级、零人禁用、取消不重载、单人真实返回保留留守成员、1/2/4 人原地出发均有实际输入证据。
+- 1920×1080 七张运行截图保存在 `test-output/camp-interaction/`；确认至 Mission 为 4.584 / 5.886 / 6.928 秒，固定初始位置，不以瞬移缩短。
+- 最新共享源码包含同期 Expedition、武器动画生命周期和暂停菜单修复。全量 `run.ps1 -Mode build` 退出 0；最终日志 `test-output/camp-interaction-build-final.log` 没有 SCRIPT ERROR / SHADER ERROR / ERROR。12 次独立 EXE 启动和 4 次内嵌包检查通过。
+- 正式产物 `build/BlueHourHomeward.exe`，451,668,032 字节；构建时间 `2026-09-12T18:42:11.6214244+08:00`；SHA-256 `C42095167D4B2F694830D9646CC8A03990D45989922D283DEBD70C8989BEB917`。唯一构建信息位于 `build/BUILD-INFO.json`。
+
+完整 23 项核对、接口和未实施功能边界见 [Camp Interaction V1](design/camp.md)。
+
+## 2026-09-12：long_gun 战斗动画基础
+
+双角色共用 Ready / Aim / Shoot、Upper Body Filter、Gameplay Event Bridge、LeftGrip 约束与正式枪口曳光起点。Godot 4.7.2 实跑动作层 2605 项、原生 Mission 47 项、原移动 109/42/15 项、公共动画 908 项、武器玩法 428 项，全部通过；26 个角色/Rig/旧动作资源哈希未变。原生四组 ABBA 动作层对照约 165 FPS / 6.06ms，无明显回退。完整架构、工具/模式、近景限制、性能范围与最终统一构建记录见 [战斗动画报告](design/combat.md)。
+
+## 2026-09-12：Expedition 美术统一与精细化
+
+直接修改正式实现，镜头默认 22 / 范围 18–32；使用原 GLB、纹理和布局的环境 Shader、路缘/排水带、前场铺装与绿化床。原始包装场景仍持有 BaseMaterial3D，城市实例使用共享 ShaderMaterial，网格资源相同；不把样式写回 Camp 或源资产。
+
+- `tests/world_map.gd` 1921 项、`tests/expedition_visual.gd` 89 项通过；先建立近景相机、材质隔离与路缘回归，原实现有 5 项失败，落地后通过。
+- 固定场景、光照、相机运动，原材质 / 统一材质 / 双级阴影 / 无阴影各 72 个真实原生帧。对齐屋顶采样区的平均相邻 RGB 差由 2.8122 降至 0.6774；道路区域为 0.0393。只作局部运动稳定性证据，不作全地图百分比结论。
+- 住宅→商业→修车铺→加油站正常步行录像 1348 帧、30fps、约 44.93 秒，22 项检查通过；使用正式开局、角色、路线与动画，关闭战斗进行视觉行走验收，没有传送或加速。截图与录像见 [外出视觉报告](design/expedition.md)。
+- 正式闭环最终 134 项、相机操作 20 秒录像 18 项通过；三分辨率边界与正文像素尺度通过。共享动画任务修正了首轮连接错误及登车零缩放求逆错误后，重新执行同一 Windows 构建链。
+- 唯一 EXE 为 `build/BlueHourHomeward.exe`，451,668,032 字节，SHA-256 `C42095167D4B2F694830D9646CC8A03990D45989922D283DEBD70C8989BEB917`。12 项独立 EXE 启动通过；直接挂载该内嵌包，Headless / 原生环境各执行本轮视觉检查 89 项通过，包含新材质、相机及源资源隔离。最终日志无 Shader/Script Error 或 Missing Resource，保留既有退出时 2 个 ObjectDB 实例 warning。
+
+以下较早的构建时间、参数和截图为历史记录。
+
 ## 2026-09-12：4K 主站清晰度与主视口营地
 
 新版正式 GLB 与用户最新 4K 附件 SHA-256 一致。先完成重新导入，确认颜色 / 法线 4096²、MR 源尺寸 2048²、几何及 3 Box 碰撞不变，再以同一个冻结 Camp 实例进行原生 1920×1080 渲染链 A/B。旧管理页 SubViewport 1182×524，旧全屏 1600×900，均随窗口放大 1.2 倍；修复后主视口原生 1920×1080，3D Scale=1，采用项目已有 8× MSAA。实际网格投影约 638×405px。
@@ -10,17 +91,17 @@
 - 最终共享包：2026-09-12 16:19:29 +08:00，451,621,288 字节，SHA-256 `6931731E925AF189A00E3F61EE3D2A029A5BCFED003B238CE4292788B6F74B9B`。本任务另将相同字节复制至隔离目录，实际运行 Headless / 原生 EXE 均通过；同包 Camp 资源、主视口和 1080p 渲染额外 13 项通过。
 - RTX 3060、VSync 开启的 4 秒原生 Camp 样本约 165 FPS，P95 约 6.6ms；这是本机短时测量。当前 Camp / 最终包验证无 Missing Resource、Parse Error 或 Script Error。故障注入的导航 warning 及既有规则测试退出的 ObjectDB warning 保留在日志，不称为零警告。
 
-原生 A/B、最终内嵌包截图与 JSON 位于 `test-output/camp-clarity/`；首次构建日志 `build.log`，共享修正后验证见 `test-output/expedition-build.log`。全部使用隔离测试存档，没有改玩家存档或提交 Git。详细 20 项报告见 [CAMP_CLARITY_REPORT](CAMP_CLARITY_REPORT.md)。
+原生 A/B、最终内嵌包截图与 JSON 位于 `test-output/camp-clarity/`；首次构建日志 `build.log`，共享修正后验证见 `test-output/expedition-build.log`。全部使用隔离测试存档，没有改玩家存档或提交 Git。详细 20 项报告见 [CAMP_CLARITY_REPORT](design/camp.md)。
 
 ## 2026-09-12：营地主站与出发演出 V1
 
 正式主站 wrapper 接入冻结布局，整备 / 选图 / 出发共用同一 Camp 实例。原生出发专项 89 项（1 / 2 / 4 人、重复开始、留营角色、静态碰撞、主动导航失败）、Camp 结构与尺寸 107 项、5 条真实步行路线、蓝时号 Camp / 外出复验 36 项全部通过。正常出发无导航校正；故障注入仅输出预期 warning。未发现 Missing Resource / Parse Error。
 
-完整 Windows build 及最终源码复验后的重新导出通过，独立 EXE 菜单、营地、外出、今日行动、武器与展厅 12 项启动通过。最终包时间 2026-09-12 15:31:41 +08:00，419,954,832 字节；SHA-256 `A60D6F8DDA22F4F0CAEA4E8AEA3FD0FD7603EFCCAD410D2D872CB7F0A2ED8E10`。全部日志和六张 1280×720 原生截图在 `test-output/camp-departure/`；实现边界、尺寸和动画后续见 [交付报告](CAMP_DEPARTURE_V1.md)。未改玩家存档、未提交 Git；全量既有回归的 ObjectDB 退出 warning 单独保留在日志，不称为零警告。
+完整 Windows build 及最终源码复验后的重新导出通过，独立 EXE 菜单、营地、外出、今日行动、武器与展厅 12 项启动通过。最终包时间 2026-09-12 15:31:41 +08:00，419,954,832 字节；SHA-256 `A60D6F8DDA22F4F0CAEA4E8AEA3FD0FD7603EFCCAD410D2D872CB7F0A2ED8E10`。全部日志和六张 1280×720 原生截图在 `test-output/camp-departure/`；实现边界、尺寸和动画后续见 [交付报告](design/camp.md)。未改玩家存档、未提交 Git；全量既有回归的 ObjectDB 退出 warning 单独保留在日志，不称为零警告。
 
 ## 2026-09-12：正式外出地图继续打磨
 
-当前参数、Before / After 录像、逐项闪烁归因、完整正式流程与截图统一见 [外出视觉报告](EXPEDITION_VISUAL_REPORT.md)。相机默认 25、范围 20–35，1600×900 身体投影 45.72px；地图 160×120m、6 区域、3 路口、15 建筑/18 POI/12 车辆，Seed 20260912。HUD 删除完整角色卡、矩形时钟盒和独立目标卡，继续复用原数据与操作。
+当前参数、Before / After 录像、逐项闪烁归因、完整正式流程与截图统一见 [外出视觉报告](design/expedition.md)。相机默认 25、范围 20–35，1600×900 身体投影 45.72px；地图 160×120m、6 区域、3 路口、15 建筑/18 POI/12 车辆，Seed 20260912。HUD 删除完整角色卡、矩形时钟盒和独立目标卡，继续复用原数据与操作。
 
 - 地图 1921 项、视觉/材质 85 项通过；最新共享角色行为下再次执行正式菜单→路线→Camp→今日行动→外出→移动/搜索/战斗→Blue Hour/Night→步行上车→结算→Camp，134 项、0 失败。
 - 三分辨率 1366×768、1600×900、1920×1080 及原生截图通过。其余原生行动 71、跨日 74、操作 50、开局 202、菜单 881、效果 80 项通过；最初旧通用测试因固定地图坐标而出现的两项失败，已改用正式巴士/入口/小队坐标并复验。
@@ -35,7 +116,7 @@
 
 ## 2026-09-12：第一阶段正式武器
 
-八把正式 WeaponDefinition、独立实例库存/装备、四品质六词条、统一自动/指向攻击、弹匣换弹、七弹丸散射、H7 单次额外穿透及 v4 存档兼容已经运行验证。详细文件与数值入口见 [WEAPON_SYSTEM](WEAPON_SYSTEM.md)。
+八把正式 WeaponDefinition、独立实例库存/装备、四品质六词条、统一自动/指向攻击、弹匣换弹、七弹丸散射、H7 单次额外穿透及 v4 存档兼容已经运行验证。详细文件与数值入口见 [WEAPON_SYSTEM](design/combat.md)。
 
 - 武器专项 428 项（424 随 build，4 项 v3 原档备份随后追加）；武器原生点击/图标/换装/空手出勤 43 项，均通过。
 - 构建中全部资源、地图、感染者、规则、行动、派遣、日循环、新开局、道具/技能及原生出发归航验证通过。另跑跨日原生 49、操作原生 44、开局原生 168、效果原生 60，全通过。
@@ -48,7 +129,7 @@
 
 ## 2026-09-12：今日行动选择
 
-营地「整装出发」先进入住宅区、商业街、空投回收三选一，再确认进入对应资源/敌情配置的城区。用户素材包 10 张 PNG 的字节与 SHA-256 校验全部一致；41 项流程检查与 58 项原生画面/输入检查通过，包含取消不写档、保存失败回退、旧档兼容、重复确认、跨日结算和四种窗口尺寸。截图及边界见 [TODAY_ACTION](TODAY_ACTION.md)。
+营地「整装出发」先进入住宅区、商业街、空投回收三选一，再确认进入对应资源/敌情配置的城区。用户素材包 10 张 PNG 的字节与 SHA-256 校验全部一致；41 项流程检查与 58 项原生画面/输入检查通过，包含取消不写档、保存失败回退、旧档兼容、重复确认、跨日结算和四种窗口尺寸。截图及边界见 [TODAY_ACTION](design/expedition.md)。
 
 `run.ps1 -Mode build` 实际完成：地图/资源与美术、规则/行动/派遣/并行操作、跨日/新开局/五日流程、效果系统和完整原生开局出发归航检查通过。独立 EXE 的主菜单、营地、行动、今日行动、展厅各 Headless / 原生启动共 10 项通过。2026-09-12 13:17（+08:00）的 EXE 为 413,588,256 字节，SHA-256 `7C8C1B32B487EA9A36F2B4DE139894D1C7BE9E5A0F7B85EE77C51D672ECA6C0B`；测试使用隔离存档与屏幕外窗口。日志：`test-output/today-action-build.log`。三类路线仍需人工比较资源取舍与数值平衡。
 
@@ -56,7 +137,7 @@
 
 ## 2026-09-12：0.5.0 被动道具与特殊技能扩充
 
-在原有 Resource/Catalog、Campaign 和 SpecialPower 上扩展，没有平行内容系统。规格见 [EFFECT_SYSTEM_SPEC](EFFECT_SYSTEM_SPEC.md)，14 张图标的原文件名、项目路径及 SHA-256 见 [来源记录](../art/effect_icon_sources.json)。图标保持原始字节，Godot 实际导入并加载为 100×100 Texture2D。
+在原有 Resource/Catalog、Campaign 和 SpecialPower 上扩展，没有平行内容系统。规格见 [EFFECT_SYSTEM_SPEC](design/items-and-skills.md)，14 张图标的原文件名、项目路径及 SHA-256 见 [来源记录](../art/effect_icon_sources.json)。图标保持原始字节，Godot 实际导入并加载为 100×100 Texture2D。
 
 | 验证 | 本轮结果 |
 | --- | --- |
@@ -82,7 +163,7 @@
 
 169 个资源加载、61 个 PackedScene 实例化成功；52 个模型的静态管线检查通过。7 组原生检查共 1252 项、0 失败；本轮重新采集的菜单／路线、营地、模型展厅共 37 对 PNG 逐字节一致。有效加载路径中的旧路径与当前资源文件中的历史过程命名均为零。
 
-Windows build 通过 52 模型检查、84 美术集成、436 玩法 Headless 及独立 EXE 的 6 项启动验证，无 Missing Resource 或脚本错误。`new_run.gd` 退出仍有 2 个 ObjectDB 实例泄漏警告；本次原生操作测试没有该警告，未扩大到生命周期修复。完整旧名与新名、领域判断、材质处理和构建哈希见 [命名迁移记录](ASSET_NAMING_2026-09-12.md)。
+Windows build 通过 52 模型检查、84 美术集成、436 玩法 Headless 及独立 EXE 的 6 项启动验证，无 Missing Resource 或脚本错误。`new_run.gd` 退出仍有 2 个 ObjectDB 实例泄漏警告；本次原生操作测试没有该警告，未扩大到生命周期修复。完整旧名与新名、领域判断、材质处理和构建哈希见 [命名迁移记录](architecture/asset-naming.md)。
 
 ## 2026-09-12：图片资源整理与引用迁移
 
@@ -90,13 +171,13 @@ Windows build 通过 52 模型检查、84 美术集成、436 玩法 Headless 及
 
 Windows build 通过 52 个模型检查、84 项美术集成、436 项玩法 Headless 与独立 EXE 的 6 项启动验证。未报 Missing Resource；`new_run.gd` 与 `controls_runtime.gd` 退出时各有 2 个 ObjectDB 实例泄漏警告，未在本次路径迁移中扩大修复范围。当前营地 V1.3 在并行更新后补验 102 项、0 失败。
 
-逐项迁移、保留和删除依据、构建信息及证据位置见 [资源迁移记录](ASSET_MIGRATION_2026-09-12.md)，长期归属规则见 [资源目录说明](../art/RESOURCE_LAYOUT.md)。
+逐项迁移、保留和删除依据、构建信息及证据位置见 [资源迁移记录](architecture/asset-system.md)，长期归属规则见 [资源目录说明](../art/RESOURCE_LAYOUT.md)。
 
 ## 当前 0.4.1：路线选择页重做
 
 按用户提供的 1672×941 参考图和 41 张独立透明 PNG，将“开始游戏”后的专精选择改为完整画布组合：品牌与标题、四张路线标签、主纸板、起始道具 / 技能卡、动态详情提示、锁定路线预览、经验轨道及取消 / 确认按钮。默认展示素材最完整的搜集路线；切换作战、搜集、勘查仍读取现有 Resource，确认创建、覆盖确认、取消不写档和继续游戏的行为未改。
 
-- 当次接入的 41 张 PNG 保持原像素，使用 ASCII 文件名；2026-09-12 已按用途分入路线选择、公共 UI、道具和技能目录，详见[资源迁移记录](ASSET_MIGRATION_2026-09-12.md)。保留图片的原始中文名、尺寸和 SHA-256 仍在 `assets/ui/route_selection/sources.json` 登记。背景继续共用同一原图，没有把参考截图作为交互界面。
+- 当次接入的 41 张 PNG 保持原像素，使用 ASCII 文件名；2026-09-12 已按用途分入路线选择、公共 UI、道具和技能目录，详见[资源迁移记录](architecture/asset-system.md)。保留图片的原始中文名、尺寸和 SHA-256 仍在 `assets/ui/route_selection/sources.json` 登记。背景继续共用同一原图，没有把参考截图作为交互界面。
 - 第四路线、`0/21`、`0/125` 与“查看解锁”是用户指定的视觉层；点击只报告尚未开放，不创建虚假的跨局经验、解锁树或存档字段。
 - `tests/menu_runtime.gd` 在 1672×941、1919×1080、1440×900、1024×640、2560×1080、1024×768 下通过 **836 项、0 失败**，覆盖安全区、热区不重叠、三路线切换、锁定提示、键鼠 / 手柄焦点与既有首页入口。
 - `tests/new_run_runtime.gd` 通过 **57 项、0 失败**，新增验证两张奖励卡、被动 / 技能详情提示，并回归取消、确认建档、覆盖确认、两人基地、训练、换装、能力和写入失败回滚。
@@ -121,7 +202,7 @@ Windows build 通过 52 个模型检查、84 项美术集成、436 项玩法 Hea
 
 ## 历史 0.4.0：开局与基地准备
 
-Q1～Q4 已确认并按 [NEW_RUN_SPEC](NEW_RUN_SPEC.md) 实现。主菜单、专精 Tab 和创建草稿、随机两名现有角色、3D 基地成员点选、食物训练与 Trait 成长、三套被动/特殊能力、旧档兼容均已接入当前五日循环。未扩展通用治疗/区域火力支援、每日选图、跨局经验/解锁或基地经营。
+Q1～Q4 已确认并按 [NEW_RUN_SPEC](design/game-design.md) 实现。主菜单、专精 Tab 和创建草稿、随机两名现有角色、3D 基地成员点选、食物训练与 Trait 成长、三套被动/特殊能力、旧档兼容均已接入当前五日循环。未扩展通用治疗/区域火力支援、每日选图、跨局经验/解锁或基地经营。
 
 ### 构建与验证
 
@@ -188,7 +269,7 @@ README、AGENTS、PROJECT_CONTEXT、术语、PLAN、操作研究的历史标识�
 
 ## 历史 0.2.0：五日归航
 
-用户已确认 Q6～Q10，范围遵循 [DAY_LOOP_SPEC.md](DAY_LOOP_SPEC.md)。本轮实现成员与伤亡延续、食物消耗与饥饿、装备个体与四个词条、固定每日商店、安全屋及待结算保存、第五日终点；保留原有单人搜索和掩护命令。
+用户已确认 Q6～Q10，范围遵循 [design/game-design.md](design/game-design.md)。本轮实现成员与伤亡延续、食物消耗与饥饿、装备个体与四个词条、固定每日商店、安全屋及待结算保存、第五日终点；保留原有单人搜索和掩护命令。
 
 ### 最终构建与自动化
 
@@ -364,4 +445,86 @@ README、AGENTS、PROJECT_CONTEXT、术语、PLAN、操作研究的历史标识�
 
 三把正式模型（短刀848、P9 1520、A21 2524 tris）、双角色 RightHand 挂载、三类准备姿势已完成。武器视觉1377项、原生UI及Camp/Mission往返112项、第一阶段武器428项、公共动画908项通过；完整构建前置回归通过。正式EXE于16:19:29导出，12项独立启动与两组各1377项内嵌包模型验证通过。
 
-首次构建因运行期间验证脚本新增GodotPath参数而停在最后入口；显式传入同一引擎补跑剩余验证成功，构建清单与EXE哈希已同步，现有run.ps1调用已修正。产物、完整文件清单、验证方式区别及已知手型/左手限制见 [Phase 2A 报告](WEAPON_VISUALS.md)。
+首次构建因运行期间验证脚本新增GodotPath参数而停在最后入口；显式传入同一引擎补跑剩余验证成功，构建清单与EXE哈希已同步，现有run.ps1调用已修正。产物、完整文件清单、验证方式区别及已知手型/左手限制见 [Phase 2A 报告](design/combat.md)。
+
+## 2026-09-12 Mission / Combat Locomotion Style Pass
+
+两人共享 In-Place Mission Jog、Camp Walk 上下文、分层 Combat Jog、强化 long_gun Ready / Aim / Shoot 和 MuzzlePoint 短闪光已落地。双角色动画分层 3443 项、Mission 新专项 Headless / 原生各 225 项、正式 Camp 原生 155 项通过；旧公共动画 908、武器玩法 428、模型 1377、原生武器界面 126 项通过。十五项用户要求的动作场景均已实际执行。
+
+Windows EXE 于 20:04:42（+08:00）导出、20:06:54 完成独立验证，451,757,136 字节；12 组独立启动、内嵌包武器模型与战斗动画的 Headless / 原生检查通过。SHA-256 为 `7F472AABF8EEBE2F55EE706C8D58E4D8DE98BFB6DBB0C78D46A7E4B0FF287E18`，产物及明细在 `build/BlueHourHomeward.exe`、`build/BUILD-INFO.json`。
+
+整包回归期间同期地图/室内搜索更新使旧测试先后失败；本轮将召回改为限时等到达、效果计时准备改为完成既有进出建筑过渡，分别 83 / 335 项重新通过。其他同期地图/HUD 修复保留。构建从失败检查点继续，未跳过失败项，最终日志 `test-output/mission-style/build-release.log`；分段记录和全部结果见 [Mission 动作报告](design/combat.md)。
+
+当前 size=25、1600×900 正式镜头已原生检查及录帧。性能样本受 165Hz 限制，未见明显表现层回退，不能外推低端硬件或大量单位场景。开放手型、近景局部穿插、慢速/急转和 Camp 原 Walk 倍率上限引起的脚滑仍待人工评估；部分既有测试有退出时 ObjectDB 警告。动作风格等待用户试玩确认，停止于本阶段。
+
+## 2026-09-12 Phase 2C 第一阶段：Mission Jog V2
+
+V1 原资源与生成器保留并另存备份，公共 V2 仅用于无武器 Mission。夏知遥在正式 size=25 摄像机、1600×900 HUD 与原角色尺寸下完成同路线 Before/After；各 13.5167 秒、60fps，连续满速直线 Jog 6.6 秒，包含起步接循环与基础转向。前后 810 个采样点的位置/速度完全一致，录像位于 `test-output/locomotion-v2/jog-v1.mp4`、`jog-v2.mp4`。固定帧率用于录像，不用于性能结论。
+
+V2 安全契约 219 项、既有战斗/移动/搜索/Mission/Camp/武器/效果回归通过。旧战斗测试的无武器基准因 V1/V2 分离不再适用，改为同一 V1 且关闭战斗上层，原逐骨/步频相等与握点误差断言保留；3443 项重新通过后从该检查点继续构建。12 组独立 EXE 启动、内嵌包武器/战斗动画 Headless / 原生、内嵌 V2 的 219 项检查通过。EXE 于 22:34:41（+08:00）完成，451,864,264 字节，SHA-256：`C4EB140830C4FA31F559EE5FB05A975DB28243A80E6613A3F4230A1B3E55A9B9`。
+
+模型/Rig、Gameplay、导航、摄像机与 HUD 未由本轮修改。构建期间发生的外部营地文件改动单独记录并保留。参数、验证边界与日志见 [Jog V2 验收记录](design/combat.md)。本阶段停止，等待用户确认正式镜头的跑感；其余 Phase 2C 动作未开始。
+
+## 2026-09-12 Mission Jog V2.1 Polish
+
+保留 V2.0 曲线与生成源，只修整现有公共 V2 库。前倾增强 25%，Hips 实测行程约 71mm 且最高点保持不变；分开伸膝、抬跟、离趾和前腿 Knee Drive，增加胸肩错相与小幅头颈延迟。AnimationController、模型/Rig、Gameplay、Navigation、Camp Walk、Weapon System 与 Root Motion 规则未修改。
+
+正式夏知遥无武器 Mission、原摄像机/HUD/角色尺寸，1600×900、60fps 的 19.0167 秒视频包含 7.6 秒满速直跑、10 秒满速侧向 Jog；同路线 V2 Before 同时保留。1140 个采样点的位置、速度、动画倍率完全一致。视频位于 `test-output/locomotion-v2_1/jog-v2_1.mp4` 与 `jog-v2-before.mp4`，不以近景作为主要证据。
+
+223 项动画契约、Mission Style 225、Camp Style 171、Combat Animation 3443、公共动画 908 项通过。本轮执行受影响回归，未重复全部玩法测试。Windows EXE 于 23:01:26 导出，23:03:06（+08:00）完成 10 组独立启动和内嵌动画包 223 项检查；452,656,480 字节，SHA-256：`B1BED3CACA9F3AECDD27F0A6249BB6DE961EAE479BD76B36EF4DEA89837CCE63`。
+
+导出后共享工作区的其他任务继续更新 HUD、地图和幸存者脚本，本轮没有编辑或回退这些文件；后续保护文件复查报告的差异不计入本包验证。参数、前后录像、哈希与验证时点见 [V2.1 验收记录](design/combat.md)。本阶段停止，等待视觉验收，不制作 Start / Stop / Turn Lean / Combat Jog。
+
+## 2026-09-12 Locomotion Phase 2D
+
+用户已验收并锁定 Jog V2.1。本轮新增独立 0.24s Start、0.28s 左/右 Stop 与最大 7° Additive Turn Lean；主循环资源字节、模型/Rig、Gameplay、导航、Camp Walk 和武器实现未由本轮修改。
+
+夏知遥无武器、正式 Mission/Camera/HUD、原尺寸，两段 1600×900 / 60fps / 20.35 秒录像连续包含 Idle、Start、直跑、90°、双向转弯、180°、直跑、Stop 和 Idle。各 2242 项录像契约通过；1220 个采样点的位置与速度完全相同，转弯不重启相位。A 为原 0.444864s 周期；最终 B 为约 0.500002s，保持接触阶段速度并延长离地回收时间，没有永久采用 B。专项源码/内嵌包各 26 项覆盖锁定关键帧、过渡/取消/恢复、hysteresis、相位及 30 / 60 / 144fps Cadence。
+
+`run.ps1 -Mode build` 的全部前置测试通过，规范 EXE 导出因正在运行而被 Windows 拒绝覆盖；随后独立导出、12 组启动及内嵌资源检查完成，并修正文本/二进制资源的锁定校验。最终 EXE 452,780,528 字节，SHA-256：`061ADFA55B2C7AFF0845736B04403E25498A8AD1D3EDB3D0249C0825EAB1D2D8`，于 2026-09-13 00:02:10（+08:00）完成验证记录；规范路径解除占用后已同步，同版本固定副本保留在 `build/locomotion-phase-2d/`。完整参数、视频、失败与恢复记录及共享工作区变动边界见 [Phase 2D 验收记录](design/combat.md)。本阶段等待完整无武器 Locomotion 与 Cadence A/B 视觉验收，不继续 Combat。
+
+## 2026-09-12 Expedition HUD 2.0
+
+正式 PNG 54 个源条目 / 48 个名称，原 ZIP 与正式 PNG 哈希复核通过；Godot 自动导入。六区 HUD 与世界标记接入原 Mission，物理像素防抖、动态队伍、技能四态和 1080p / 1440p / 两个小窗口均取得原生证据。
+
+完整菜单→营地→行动→结算→营地原生流程 134 项通过；搜索派遣 56、并行指令 36、行动流程 48、室内搜索 13、外出视觉 91、POI 上下文 13、六技能界面 80、暂停设置 41 项通过。HUD 专项与最终构建统计以 [接入报告](design/expedition.md) 为准，截图在 `test-output/expedition-hud-2/`。
+
+旧 `tests/controls_runtime.gd` 对旧地点 / 三搜索任务的假设失败并最终访问不存在的 `search_tasks.corner`。使用任务开始时保存的旧 HUD 文件在独立临时工程复跑，同样失败；不是本轮 HUD 回归。当前正式地图的鼠标移动 / 角色检视、W 镜头、Ctrl 实际耗弹、右拖释放、搜索取消 / 恢复、技能数字键、归航由新增专项及生产闭环验证。
+
+`run.ps1 -Mode build` 完整执行退出码 0，HUD 专项 314 项、12 组独立启动和内嵌武器 / 战斗资源检查通过；构建链无 SCRIPT ERROR / ERROR。23:48:12（+08:00）完成验证的 EXE 为 452,780,528 字节，SHA-256：`F76B92B8CC8625423426A121190438E5CD3927B3F8421CA1E0C79002B135ADD8`。产物为 `build/BlueHourHomeward.exe`，日志为 `test-output/hud2-build.log`。这是共享工作区当时的整包结果，后续其他任务再次构建可能更新规范路径。五组 13 张原生截图已目视检查，用户手动手感验收仍独立于自动化证据。
+
+## 2026-09-13 Expedition HUD 2.0.1 Visual Polish
+
+集中视觉配置、五区缩放、任务栏内容收紧、Compact / Search 过渡、低亮四态和世界 Marker 已接入。2.0 与 2.0.1 使用相同正式出勤路线 / 相机检查点，各输出 17 张原生截图，支持八组要求与四个窗口尺寸。证据在 `test-output/expedition-hud-2_0_1/`，交互对比为 `compare.html`。
+
+原生 Polish 专项 331 项、外出视觉 91 项、六技能界面 80 项、完整出勤闭环 134 项通过；194 个受保护文件（含 48 PNG、玩法、地图、Shader、动画）哈希不变。`run.ps1 -Mode build` 完整退出码 0，12 组独立启动与内嵌武器 / 战斗资源检查通过；00:24:30（+08:00）完成，EXE 为 452,787,776 字节，SHA-256：`DF9B7EA9B23D3A45E74FB9CB11FB5137EFB230E18699ACCAF05A4AA331FF3A2E`。构建链无 SCRIPT ERROR / ERROR，部分旧模型测试有退出时 ObjectDB 警告；Polish 专项无该警告。原生自动化与用户主观视觉验收的边界见 [本轮报告](design/expedition.md)。
+
+## 2026-09-13 Mission Jog V2.2 / Cadence C
+
+新增独立 Swing 曲线与约 0.51s 的 Cadence C，保留 V2.1 / A / B、支撑姿态及身体轨道。参考骨架前摆大腿峰值约 84.07° → 52.39°，前方脚高约 0.270m → 0.152m，后方回收峰值约 0.220m。Start 只对齐最后 48ms 的腿部终点，Stop / Turn 保留。
+
+夏知遥无武器、正式 Mission/HUD/Camera，同路线 B/C 两段各 1600×900、60fps、20.35s，含 5s 连续侧向 Jog。1220 个 Gameplay 位置/速度采样完全相同；录像各 2242 项检查通过，起停/转向相位连续。平脚接触段平均绝对脚踝漂移 B 0.0447m/s、C 0.0466m/s；这项诊断不代表全鞋底零滑步。
+
+V2.2 源码/内嵌包各 1265 项、Phase 2D 源码/内嵌包各 26 项通过。`run.ps1 -Mode build` 完整退出码 0，12 组独立启动及内嵌武器/战斗检查通过。2026-09-13 00:47:42（+08:00）完成构建，规范 EXE 452,939,936 字节，SHA-256：`4D5ABAA1982B90CB2FC03867B13925BFD4347302405531A040F20FC9BD1EB009`。构建链没有 SCRIPT ERROR / ERROR；部分既有检查仍有退出时 ObjectDB 警告。
+
+本轮六个既有文件按范围修改，起点其余 446 个源文件/资产哈希保持一致；模型、Rig、HUD、Camera、地图与 Gameplay 未由本轮修改。参数、全部修改文件、视频和诊断边界见 [V2.2 / Cadence C 验收记录](design/combat.md)。用户视觉验收待完成，停止于 B/C，不继续 Combat 或后续动作。
+
+## 2026-09-13 HUD 2.0.1 参考图排版修整
+
+四组参考图对应归航、资源 / 暂停 / 查看全部、动作栏、标题 / 角色卡。调整图标透明留边取样、布局与字号；键位位于按钮框体下方且属于同一鼠标命中范围。保留 X / F / 数字技能 / E / R，按用户确认增加 L 定位，菜单切换立即同步可用状态。
+
+原生专项与固定导出快照复跑各 361 项通过，六技能 80 项、完整出勤 134 项、暂停设置 41 项通过。四个窗口尺寸无永久面板重叠；14 个前后相机检查点一致。21 张原生帧缓冲 / 局部截图与对比页位于 `test-output/hud-reference-polish/`。本轮 HUD 实现完成时 260 个保护文件哈希不变（含 105 张 UI PNG）。构建期间其他任务新增手臂动画并更新一个角色控制器，这些外部变动单独审计，没有回退。
+
+`run.ps1 -Mode build` 全部导出前检查通过，首包因新增动画未进入缓存而启动失败，命令退出码 1。随后用固定文件快照重新导入、导出与验证，恢复退出码 0；12 组独立启动、4 组包内武器 / 战斗动画检查通过。2026-09-13 01:35:36（+08:00）完成：452,963,376 字节，SHA-256 `B648D0D87575A67EF530FCB5A0BE44560710BA370CC0DBEA1B16C1E75F94A3A4`。规范 EXE 与 `build/hud-reference-polish/` 固定副本均已更新。少数既有模型测试有退出时 ObjectDB 警告，恢复链无 SCRIPT ERROR / ERROR。
+
+具体文件、尺寸、字色、快照边界和截图见 [参考图排版修整报告](design/ui-art-direction.md)。这是正式运行时代码的原生自动化证据，用户主观视觉验收仍独立；本轮到 HUD 修整交付停止。
+
+## 2026-09-13 Phase 2E：上半身 Locomotion
+
+用户已明确验收 V2.2/C 与原起停、Turn。本轮新增公共六轨手臂覆盖和分权重 Combat Secondary，long_gun 使用同一 V2.2/C 时钟。V2.2 与过渡资源整文件哈希、Cadence C 函数及起停/Turn 核心保持不变；78 个 GLB 哈希复核一致。新资产/实际肘角专项 267 项、双角色状态/相位专项 10108 项通过。
+
+9 段 1600×900、60fps 正式 Mission 视频完成，主镜头 size=25、原 HUD 与正常 Gameplay Speed。夏知遥无武器前后各 20.35s，含 5s 持续侧跑，1220 个采样的位置、速度、脚、相位、倍率、Lean 与状态完全一致。Combat 侧跑 6s；两角色各 10 次正式移动攻击，对应 10 次 Shoot 请求、10 次 Flash、10 发弹药及 130 伤害；全路线左手最大误差 0.706mm。模拟 fired 仅用于另一组动画状态测试，没有作为真实攻击证据。
+
+当前共享工作区整包第一次在同期 AI 的三个旧 `infected_basic.gd` 断言处失败，没有跳过断言。Phase 2E 冻结源码使用与起点 SHA-256 相符的玩法/界面文件叠加本轮动画，保留工作区其他任务变动。全量 build 和独立包结果在本轮完成时补录；源清单为 `test-output/phase-2e/build-source-manifest.json`，构建日志为 `test-output/phase-2e/build-isolated.log`。
+
+25 项设计、全部视频和当前边界见 [Phase 2E 报告](design/combat.md)。原生自动化与辅助连续帧检查不替代用户正式视觉验收；完成交付后停止，不扩展后续动作。

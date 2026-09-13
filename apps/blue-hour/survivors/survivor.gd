@@ -40,11 +40,14 @@ var hp_bar: MeshInstance3D
 var dead: bool = false
 var boarding: bool = false
 var searching := false
+var inside_building: bool = false
+var _search_materials: Array[Dictionary] = []
 var regrouping := false
 var duty_label: Label3D
 var duty_ring: MeshInstance3D
 var name_label: Label3D
 var animation_controller: Node3D
+var selection_ring: MeshInstance3D
 
 func setup(spec: Resource, trait_data: Resource, equipment: Resource) -> void:
 	data = spec
@@ -70,7 +73,7 @@ func setup(spec: Resource, trait_data: Resource, equipment: Resource) -> void:
 	else:
 		rig = Visuals.body(self, data.color)
 
-	Visuals.ring(self, Vector3(0, 0.08, 0), 0.6, data.color)
+	selection_ring = preload("res://ui/expedition/world_marker.gd").create(self, "world_select_ring", 1.25, Vector3(0, .065, 0), true)
 	hp_bar = Visuals.box(self, Vector3(1.15, 0.09, 0.1), Vector3(0, 2.3, 0), data.color, true)
 	name_label = Visuals.label(self, data.display_name, Vector3(0, 2.65, 0), data.color.lightened(0.25), 18)
 	duty_label = Visuals.label(self, "", Vector3(0, 3.3, 0), Color("#ffcf8a"), 19)
@@ -85,6 +88,8 @@ func equip(equipment: Resource) -> void:
 		weapon_visual = WeaponVisual.new()
 		add_child(weapon_visual)
 		weapon_visual.initialize(animation_controller.target if animation_controller != null else null)
+		if animation_controller != null:
+			animation_controller.bind_weapon(weapon_visual, combat)
 	weapon_visual.set_weapon(equipment)
 
 func order_move(point: Vector3, city: Node3D) -> void:
@@ -121,14 +126,21 @@ func enable_motion_presentation(mission: Node3D) -> void:
 func tick(delta: float, mission: Node3D) -> void:
 	var assigned: bool = mission.task_for(self) != null and not dead
 	name_label.visible = not assigned
-	duty_label.text = data.display_name + "\n" + mission.member_status(self) if assigned else ("归队中" if regrouping else "")
-	duty_ring.visible = assigned
-	if dead or boarding:
+	duty_label.text = ""
+	duty_ring.visible = assigned and not inside_building
+	if dead or boarding or inside_building:
 		return
 	combat.tick(delta)
 	var manual: bool = mission.manual_aim and not assigned
 	if manual:
 		stop()
+	# Select once per gameplay tick, including cooldown/reload, so visual aim persists.
+	var directed: bool = manual and weapon != null and not weapon.melee
+	var target: Node3D = mission.choose_target(self) if weapon != null and not searching and not directed else null
+	var has_aim := not searching and (target != null or (directed and position.distance_to(mission.aim_point) >= .1))
+	var target_point: Vector3 = mission.aim_point if directed else (target.position if target != null else position)
+	if animation_controller != null:
+		animation_controller.combat_bridge.set_gameplay_state(weapon != null and not searching, has_aim, target_point, position)
 	var movement_start := position
 	_move(delta, mission)
 	if animation_controller != null:
@@ -138,8 +150,6 @@ func tick(delta: float, mission: Node3D) -> void:
 	hp_bar.scale.x = maxf(0.01, hp / data.max_hp)
 	if weapon == null or searching or cooldown > 0 or reload_left > 0:
 		return
-	var directed: bool = manual and not weapon.melee
-	var target = null if directed else mission.choose_target(self)
 	if (not directed and target == null) or (directed and position.distance_to(mission.aim_point) < 0.1):
 		return
 	if directed:
@@ -193,6 +203,10 @@ func _move(delta: float, mission: Node3D) -> void:
 		var desired_yaw := atan2(-actual_velocity.x, -actual_velocity.z)
 		_current_yaw += clampf(angle_difference(_current_yaw, desired_yaw), -TURN_SPEED * delta, TURN_SPEED * delta)
 		_current_yaw = wrapf(_current_yaw, -PI, PI)
+	elif animation_controller != null and animation_controller.combat_bridge.aiming and animation_controller.combat_bridge.uses_long_gun():
+		var facing: Vector3 = animation_controller.combat_bridge.aim_direction
+		var desired_yaw := atan2(-facing.x, -facing.z)
+		_current_yaw = rotate_toward(_current_yaw, desired_yaw, TURN_SPEED * delta)
 	_current_position = position
 	if not native_tick:
 		rig.rotation.y = _current_yaw
@@ -216,7 +230,7 @@ func _process(_delta: float) -> void:
 	rig.rotation.y = lerp_angle(_previous_yaw, _current_yaw, fraction)
 
 func take_damage(amount: float, invincible: bool = false) -> void:
-	if dead or invincible or boarding:
+	if dead or invincible or boarding or inside_building:
 		return
 	hp = maxf(0, hp - effects.incoming_damage(amount * talent.incoming_damage_multiplier))
 	damaged.emit()
@@ -230,3 +244,28 @@ func take_damage(amount: float, invincible: bool = false) -> void:
 		rig.rotation.z = PI * 0.5
 		rig.position.y = -0.5
 		hp_bar.visible = false
+
+
+func set_search_opacity(alpha: float) -> void:
+	# Temporary instance materials support Compatibility without changing shared assets.
+	if alpha < 1 and _search_materials.is_empty():
+		for mesh: MeshInstance3D in find_children("*", "MeshInstance3D", true, false):
+			for index: int in range(mesh.mesh.get_surface_count()):
+				var original: Material = mesh.get_surface_override_material(index)
+				var source := mesh.get_active_material(index) as BaseMaterial3D
+				if source == null or mesh.material_override != null:
+					continue
+				var faded: BaseMaterial3D = source.duplicate()
+				faded.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				mesh.set_surface_override_material(index, faded)
+				_search_materials.append({"mesh": mesh, "surface": index, "original": original, "faded": faded, "alpha": source.albedo_color.a})
+	for record: Dictionary in _search_materials:
+		if alpha >= 1:
+			record.mesh.set_surface_override_material(record.surface, record.original)
+		else:
+			record.faded.albedo_color.a = alpha * record.alpha
+	if alpha >= 1:
+		_search_materials.clear()
+	name_label.visible = alpha >= 1 and not inside_building
+	duty_ring.visible = alpha >= 1 and not inside_building
+	hp_bar.visible = alpha >= 1 and not inside_building and not dead

@@ -3,11 +3,11 @@ extends RefCounted
 const UI = preload("res://ui/ui_style.gd")
 const Art = preload("res://ui/new_run_art.gd")
 const CutPlate = preload("res://ui/expedition/cut_plate.gd")
-const PAPER := Color("#e4e6da")
-const INK := Color("#203845")
-const MUTED := Color("#91a6ac")
-const GOLD := Color("#dfbd7c")
-const CYAN := Color("#83d9df")
+const PAPER := Color("#1b3550")
+const INK := Color("#1b3550")
+const MUTED := Color("#5e7180")
+const GOLD := Color("#9b6d2f")
+const CYAN := Color("#3f8fbe")
 
 static func plate(color: Color = Color("#142a38e8"), edge: Color = Color("#63858b88"), inset: int = 12) -> StyleBox:
 	var style := CutPlate.new()
@@ -23,7 +23,7 @@ static func theme() -> Theme:
 	var result := UI.theme()
 	result.default_font = Art.body_font()
 	result.default_font_size = 14
-	result.set_color("font_shadow_color", "Label", Color("#081923dd"))
+	result.set_color("font_shadow_color", "Label", Color("#08192366"))
 	result.set_constant("shadow_offset_x", "Label", 1)
 	result.set_constant("shadow_offset_y", "Label", 1)
 	result.set_stylebox("panel", "PanelContainer", plate())

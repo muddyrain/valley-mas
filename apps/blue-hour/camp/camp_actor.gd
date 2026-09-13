@@ -34,6 +34,8 @@ func setup(game: RefCounted, id: String) -> void:
 	visual = Survivor.new()
 	add_child(visual)
 	visual.setup(game.member_template(id).duplicate(), game.member_trait(id), game.weapon(game.data.equipment[id]))
+	if visual.animation_controller != null:
+		visual.animation_controller.use_camp_style()
 	_equipment = game.item(game.data.equipment[id]).duplicate(true)
 	visual.hp_bar.hide()
 	visual.name_label.hide()

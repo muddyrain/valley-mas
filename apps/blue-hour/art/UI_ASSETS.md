@@ -75,4 +75,21 @@
 
 六个技能继续使用原 100×100 正式图标；武器直接读取同期 WeaponDefinition.icon()。切角面板是共享的 Godot StyleBox 绘制，未导入 Deadly Days 图标、字体、颜色或 UI 贴图。屏幕适配与验收见 [外出视觉报告](../docs/EXPEDITION_VISUAL_REPORT.md)。
 
-当前呈现为 70×72 的无整卡底板 Portrait Unit、208×76 的弧线钟面、单层透明目标列表及轻底色动作图标。本轮没有新建 SVG 或图片；资源与命令图标仍缺统一正式美术替代，继续使用上述既有八项。
+上述为 HUD 1 历史来源。当前正式 Expedition 已由下述 HUD 2.0 替换，旧头像回退与其他场景仍需的旧资源保留。
+
+## Expedition HUD 2.0 正式素材
+
+用户提供的基础包、v2、第二批 A、第二批 C 自动解压得到 54 张 PNG；六组同名文件内容不同，明确选择 v2，正式目录 `assets/ui/expedition_hud/` 共 48 张，按七类整理。源 ZIP 和 PNG 均按 SHA-256 保持原字节，没有重压、重绘或 AI 重生成；`.import` 由 Godot 生成。
+
+六区 HUD 与 World UI 共用本套 PNG，文字、时间、HP 和搜索进度动态绘制。面板只取原边框，省去源图中固定示例条；原技能图标、武器图标与角色 portrait_path 保留。第二批 B 实际缺失，用户已同意用已提供的同义图标和按钮着色补位，未制造替代 B 包。
+
+详细来源与全部 54 项见 [PNG 清单](EXPEDITION_HUD_PNG_LIST.md)、[哈希审计](EXPEDITION_HUD_ASSET_AUDIT.json)，具体替代、键位、原生截图和构建记录见 [HUD 2.0 接入报告](../docs/EXPEDITION_HUD_2_REPORT.md)。
+
+2026-09-13 的 2.0.1 只使用运行时调色、Scale、Alpha 和布局精修；48 张 PNG 原字节保留。发光已烘焙在源图，Active 改用原 Default 外框配合动态小菱形，保留原 Active 文件。无光晕分层边框和普通地面细环仅列为未来素材建议，未擅自修改。参数与 A/B 证据见 [Visual Polish Report](../docs/EXPEDITION_HUD_2_0_1_VISUAL_POLISH_REPORT.md)。
+
+
+## CAMP HUD 2.0（2026-09-13）
+
+用户提供的 CAMP 三批 44 张 PNG 原件保存在 `assets/ui/camp_hud_2_0/source/`，逐张记录原分辨率、Alpha 多阈值边界和 SHA-256。运行副本按 Alpha ≥ 8 加 4 原生像素留边无损裁切，原比例、颜色和清晰度不改；050 只取纸框、空白纸纹与 Header，避免把示例 Gameplay Icon 和占位条作为真实内容。源目录有 `.gdignore`，运行图启用 Lossless 与 mipmaps。
+
+主 UI 使用米白纸张、深蓝与青蓝高亮，统一 NinePatch 和 CampTextureButton 内容居中。正式 Logo、现有模型衍生头像、武器图标和道具/技能图标复用；缺少角色天赋独立图标时不借用系统 Icon。主验收保持 1920×1080，局部等比适配而不修改项目 Stretch / 3D Camera。完整映射见 [CAMP 素材表](CAMP_HUD_ASSET_MAP.md)、[审计 JSON](CAMP_HUD_ASSET_AUDIT.json)，交互、原生字形居中与构建状态见 [接入报告](../docs/CAMP_HUD_2_0_IMPLEMENTATION_REPORT.md)。

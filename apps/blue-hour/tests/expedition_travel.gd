@@ -2,6 +2,8 @@ extends "res://tests/day_loop_runtime.gd"
 ## Isolated travel measurement: normal roster, equipment, navigation and movement rules.
 ## Combat is excluded from this benchmark, and remains enabled in world_map_runtime.gd.
 func run() -> void:
+	root.unfocusable = true
+	root.add_child(InputGate.new())
 	app = load("res://core/main.tscn").instantiate()
 	app.save_path = "user://test-runs/travel-%d.json" % Time.get_ticks_usec()
 	root.add_child(app)
@@ -15,6 +17,12 @@ func run() -> void:
 	app.mission.set_physics_process(false)
 	app.mission.director_enabled = false
 	app.mission.debug_clear_enemies()
+	if "record" in OS.get_cmdline_user_args():
+		await record_districts()
+		app.free()
+		await frames()
+		quit(0 if failures.is_empty() else 1)
+		return
 	var report: Array[Dictionary] = []
 	for id: String in ["garage", "north_depot", "bus"]:
 		var target: Vector3 = app.catalog.map.bus_position if id == "bus" else app.mission.city.sites[id].spec.entry
@@ -43,3 +51,38 @@ func run() -> void:
 	app.free()
 	await frames()
 	quit(0 if failures.is_empty() else 1)
+
+func record_districts() -> void:
+	var directory: String = "res://test-output/expedition-motion/districts"
+	DirAccess.make_dir_recursive_absolute(directory)
+	var frame: int = 0
+	var route: Array[Dictionary] = []
+	for id: String in ["arrival_house", "market", "garage", "fuel"]:
+		var target: Vector3 = app.mission.city.sites[id].spec.entry
+		app.mission.command_move(target)
+		var elapsed: float = 0
+		while elapsed < 45:
+			app.mission._physics_process(1.0 / 30.0)
+			await RenderingServer.frame_post_draw
+			root.get_texture().get_image().save_png(directory + "/%04d.png" % frame)
+			frame += 1
+			elapsed += 1.0 / 30.0
+			if app.mission.survivors.all(func(member: Node3D): return member.path.is_empty()):
+				break
+		check(elapsed < 45, "Production navigation reaches district: " + id)
+		await frames(20)
+		await capture("expedition-district-" + id)
+		route.append({"site": id, "arrival_frame": frame, "travel_seconds": elapsed})
+	# Detail compositions follow real arrival; only the camera is repositioned for these stills.
+	app.mission.camera_controller.following = false
+	for shot: Dictionary in [
+		{"id": "expedition-materials", "at": app.mission.city.sites.fuel.spec.position, "size": 18.0},
+		{"id": "expedition-garden", "at": Vector3(-18, 0, 27), "size": 20.0},
+	]:
+		app.mission.camera_center = shot.at
+		app.mission.camera.size = shot.size
+		app.mission.camera_controller.apply()
+		await frames(8)
+		await capture(shot.id)
+	FileAccess.open(directory + "/route.json", FileAccess.WRITE).store_string(JSON.stringify({"frames": frame, "fps": 30, "route": route, "checks": checks, "failures": failures, "method": "Formal departure, normal squad navigation and animation, no teleport; combat excluded for visual travel evidence"}, "\t"))
+	print("EXPEDITION DISTRICTS: %d frames; %d checks, %d failures" % [frame, checks, failures.size()])

@@ -1,0 +1,57 @@
+[
+  {
+    "path": "apps/blue-hour/assets/characters/infected_basic_a/model/ENM_001_infected_basic_a.glb",
+    "sha256": "b7d5d588f9e6179d4ddd1c174e7d3cd98f21fe1fc2f92d5d600bf69b25412d43",
+    "mesh_count": 1,
+    "material_count": 1,
+    "texture_count": 3,
+    "images": [
+      {
+        "bufferView": 4,
+        "mimeType": "image/jpeg",
+        "name": "Image_2",
+        "resolution": [2048, 2048],
+        "sha256": "683a11c4fb35273d593a8a53a62203e4ecb5d099016627243558c2401dee2a4f"
+      },
+      {
+        "bufferView": 5,
+        "mimeType": "image/jpeg",
+        "name": "Image_0",
+        "resolution": [2048, 2048],
+        "sha256": "a495d14a300db85ac396b6c41f6ca52d03e0164a11587138ed6d1383f1c3321a"
+      },
+      {
+        "bufferView": 6,
+        "mimeType": "image/jpeg",
+        "name": "Image_1",
+        "resolution": [2048, 2048],
+        "sha256": "338e5ff6aa3f0fff863612979ede97bbabfa478e30589dcc0b48caa8b8306f79"
+      }
+    ],
+    "skeleton": false,
+    "skin_count": 0,
+    "skinned_mesh_nodes": [],
+    "vertex_weights": false,
+    "animation_count": 0,
+    "bone_count": 0,
+    "bone_names": [],
+    "bone_hierarchy": {},
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0"
+      }
+    ],
+    "vertex_count": 9831,
+    "triangles": 10270,
+    "attributes": [
+      {
+        "POSITION": 0,
+        "NORMAL": 1,
+        "TEXCOORD_0": 2
+      }
+    ],
+    "unweighted_vertices": 0,
+    "maximum_weight_sum_error": 0
+  }
+]

@@ -20,8 +20,11 @@ func run() -> void:
 	root.add_child(city)
 	city.build(catalog.map)
 	await physics_frame
-	check(city.sites.size() == 18, "Fifteen formal buildings and three searchable vehicles integrated")
+	check(city.sites.size() == 22, "Nineteen searchable buildings and three vehicles integrated")
 	for spec in catalog.map.buildings + catalog.map.vehicles:
+		if not spec.get("searchable", true):
+			check(city.buildings.has(spec.id) and not city.sites.has(spec.id), "Decorative building participates in the world without a search target: " + spec.id)
+			continue
 		check(city.sites.has(spec.id), "Search ID retained: " + spec.id)
 		check(city.sites[spec.id].spec == spec, "Search data retained: " + spec.id)
 		check(city.sites[spec.id].body.has_meta("world_asset"), "Runtime wrapper visual: " + spec.id)

@@ -1,0 +1,13 @@
+{
+  "checks": {
+    "original_source_hash": true,
+    "same_triangles_and_rest_positions_at_1_micrometre": true,
+    "embedded_texture_bytes_unchanged": true,
+    "exact_v1_hierarchy": true,
+    "one_skin": true,
+    "normalized_vertex_weights": true,
+    "zero_animation_clips": true
+  },
+  "triangles": 10270,
+  "glb_sha256": "ab0c4f41c7ba791409b1e2b7f90467dda6ba0cac63a4e1111190fd23f2480755"
+}

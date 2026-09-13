@@ -9,8 +9,11 @@ signal fallback_used(reason: String)
 enum Stage { IDLE, ASSEMBLING, BOARDING, VEHICLE_STARTING, DEPARTING, TRANSITIONING }
 const ASSEMBLY_TIMEOUT := 9.0
 const BOARDING_TIMEOUT := 6.0
-const START_SECONDS := 0.75
-const DRIVE_SECONDS := 4.5
+const START_SECONDS := 0.35
+const DRIVE_SECONDS := 2.8
+const DEPARTURE_SPEED_MULTIPLIER := 1.7
+const DOOR_SECONDS := 0.12
+const BOARDING_GAP := 0.12
 var stage := Stage.IDLE
 var elapsed := 0.0
 var actors: Array[Node3D] = []
@@ -22,6 +25,8 @@ var queue_index := 0
 var door_pause := -1.0
 var warnings: Array[String] = []
 var vehicle_outside_camera := false
+var approached: Array[bool] = []
+var queue_direction := Vector3.ZERO
 
 func begin(world: Node3D, party: Array[String]) -> void:
 	if stage != Stage.IDLE:
@@ -30,10 +35,20 @@ func begin(world: Node3D, party: Array[String]) -> void:
 	vehicle = camp.get_node("NavigationSource/BlueHourBerth")
 	entry = vehicle.get_node("VehicleEntryPoint")
 	follower = camp.get_node("DeparturePath/PathFollow3D")
+	queue_direction = (camp.get_node("PartyAssembly/PartyPoint01").global_position - entry.global_position).normalized()
+	queue_direction.y = 0
 	for index: int in range(party.size()):
 		var actor: Node3D = camp.members[party[index]]
 		actors.append(actor)
-		actor.move_to(camp.get_node("PartyAssembly/PartyPoint%02d" % (index + 1)).global_position)
+		approached.append(false)
+		actor.move_speed *= DEPARTURE_SPEED_MULTIPLIER
+		var assembly_index := index - 1 if index > 0 and approached[0] else index
+		actor.move_to(camp.get_node("PartyAssembly/PartyPoint%02d" % (assembly_index + 1)).global_position)
+		# The first member already beside the berth can approach the existing door
+		# directly; making them walk past it to an assembly slot adds a U-turn.
+		if index == 0 and actor.global_position.distance_to(entry.global_position) < 3.0:
+			approached[index] = true
+			actor.move_to(entry.global_position)
 	_set_stage(Stage.ASSEMBLING)
 
 func _set_stage(value: Stage) -> void:
@@ -44,8 +59,13 @@ func _set_stage(value: Stage) -> void:
 func _physics_process(delta: float) -> void:
 	elapsed += delta
 	match stage:
-		Stage.ASSEMBLING: _assemble()
-		Stage.BOARDING: _board_queue(delta)
+		Stage.ASSEMBLING:
+			_advance_approach()
+			if approached[0]:
+				_set_stage(Stage.BOARDING)
+		Stage.BOARDING:
+			_advance_approach()
+			_board_queue(delta)
 		Stage.VEHICLE_STARTING:
 			if elapsed >= START_SECONDS:
 				vehicle.reparent(follower)
@@ -53,17 +73,22 @@ func _physics_process(delta: float) -> void:
 				_set_stage(Stage.DEPARTING)
 		Stage.DEPARTING: _drive()
 
-func _assemble() -> void:
-	var ready := true
-	for actor: Node3D in actors:
-		if not actor.arrived():
-			if elapsed < ASSEMBLY_TIMEOUT:
-				ready = false
-			else:
+func _advance_approach() -> void:
+	# Each member passes their existing PartyPoint independently. The door queue
+	# advances while later members are still navigating across the camp.
+	for index: int in range(queue_index, actors.size()):
+		var actor: Node3D = actors[index]
+		if actor.boarded:
+			continue
+		if not approached[index]:
+			if not actor.arrived() and elapsed >= ASSEMBLY_TIMEOUT:
 				_correct(actor, actor.destination, "assembly")
-	if ready:
-		_set_stage(Stage.BOARDING)
-		_next_boarder()
+			if actor.arrived():
+				approached[index] = true
+		if approached[index]:
+			var target := entry.global_position + queue_direction * 0.8 * (index - queue_index)
+			if not actor.destination.is_equal_approx(target):
+				actor.move_to(target)
 
 func _next_boarder() -> void:
 	elapsed = 0
@@ -75,12 +100,12 @@ func _next_boarder() -> void:
 			engine.play()
 		_set_stage(Stage.VEHICLE_STARTING)
 		return
-	actors[queue_index].move_to(entry.global_position)
+	_advance_approach()
 
 func _board_queue(delta: float) -> void:
 	var actor: Node3D = actors[queue_index]
 	if actor.boarded:
-		if door_pause >= 0.3:
+		if door_pause >= BOARDING_GAP:
 			queue_index += 1
 			_next_boarder()
 		else:
@@ -88,11 +113,11 @@ func _board_queue(delta: float) -> void:
 		return
 	if not actor.arrived() and elapsed >= BOARDING_TIMEOUT:
 		_correct(actor, entry.global_position, "boarding")
-	if actor.arrived() or elapsed >= BOARDING_TIMEOUT:
+	if (approached[queue_index] and actor.arrived()) or elapsed >= BOARDING_TIMEOUT:
 		actor.moving = false
 		actor.face(vehicle.get_node("DoorMotion").global_position)
 		door_pause = maxf(0, door_pause) + delta
-		if door_pause >= 0.22:
+		if door_pause >= DOOR_SECONDS:
 			actor.board()
 			member_boarded.emit(actor.member_id)
 			door_pause = 0

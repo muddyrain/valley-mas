@@ -61,13 +61,13 @@ func run() -> void:
 	mission.command_move(Vector3(0, 0, -9))
 	await advance(90, "Walk")
 	for member in mission.survivors:
-		check(member.animation_controller.current_state == &"Walk", "Live debuff selects shared Walk")
+		check(member.animation_controller.current_state == &"mission_jog", "Live debuff retains the shared Mission gait")
 	mission.center_squad()
 	await capture("game-walk")
 	mission.effects.remove_source("test_slow")
 	await advance(90, "Run")
 	for member in mission.survivors:
-		check(member.animation_controller.current_state == &"Run", "Live base speed selects shared Run")
+		check(member.animation_controller.current_state == &"mission_jog", "Live base speed selects shared Mission Jog")
 	mission.center_squad()
 	await capture("game-run")
 	mission.command_stop()

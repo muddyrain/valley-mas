@@ -165,6 +165,8 @@ def correct_reviewed_regions(mesh, rig, config):
     mesh['hair_core_vertices'] = int(core.sum())
     mesh['hair_junction_edges'] = len(crossing)
     mesh['hair_arm_weight_after'] = float(weights[core][:,arm_indices].sum(axis=1).max())
+    correct_infected_tshirt_weights(mesh, weights, names, rig)
+    correct_infected_leg_weights(mesh, weights, names)
     for group in mesh.vertex_groups:
         group.remove(list(range(len(mesh.data.vertices))))
     for vertex,row in enumerate(weights):
@@ -175,6 +177,86 @@ def correct_reviewed_regions(mesh, rig, config):
                 mesh.vertex_groups[i].add([vertex], float(row[i] / total), 'REPLACE')
     mesh['hair_vertices'] = int(hair.sum())
     mesh['weight_method'] += '_reviewed_hair_coat_shoe_corrections'
+
+
+def correct_infected_tshirt_weights(mesh, weights, names, rig):
+    """Rebuild both arm chains from local segment proximity; heat transfer crossed islands."""
+    if mesh.get('character_id', '') != 'infected_basic_a':
+        return
+    indices = {name: i for i, name in enumerate(names)}
+    arm_names = {
+        'Left': ['LeftShoulder', 'LeftUpperArm', 'LeftLowerArm', 'LeftHand'],
+        'Right': ['RightShoulder', 'RightUpperArm', 'RightLowerArm', 'RightHand'],
+    }
+    torso = [indices['Spine'], indices['Chest'], indices['UpperChest']]
+    arm_indices = [indices[name] for side in arm_names.values() for name in side]
+
+    def segment_distance(point: np.ndarray, a: np.ndarray, b: np.ndarray) -> tuple[float, float]:
+        axis = b - a
+        length_sq = float(np.dot(axis, axis))
+        t = 0.0 if length_sq < 1e-10 else float(np.clip(np.dot(point - a, axis) / length_sq, 0.0, 1.0))
+        return float(np.linalg.norm(point - (a + axis * t))), t
+
+    segments: dict[str, list[tuple[str, np.ndarray, np.ndarray]]] = {}
+    for side, chain in arm_names.items():
+        segments[side] = []
+        for bone_name in chain:
+            bone = rig.data.bones[bone_name]
+            segments[side].append((bone_name, np.array(bone.head_local), np.array(bone.tail_local)))
+    adjusted = 0
+    for vertex in mesh.data.vertices:
+        point = np.array(vertex.co)
+        side = 'Left' if point[0] >= 0.0 else 'Right'
+        distances = [segment_distance(point, a, b) for _, a, b in segments[side]]
+        nearest_index = min(range(len(distances)), key=lambda i: distances[i][0])
+        nearest_distance, segment_t = distances[nearest_index]
+        # Only repair vertices that heat assigned to an arm and are spatially close to that chain.
+        envelope = 0.085 if nearest_index >= 2 else 0.11
+        existing_side = [indices[name] for name in arm_names[side]]
+        existing_arm = float(sum(weights[vertex.index, i] for i in existing_side))
+        if nearest_distance > envelope or existing_arm < 0.12 or point[2] < 0.56 or point[2] > 1.34:
+            continue
+        row = weights[vertex.index]
+        # Remove non-local torso/opposite-arm pollution, retaining smooth local heat weights.
+        non_local = 1.0 - existing_arm
+        if nearest_index > 0:
+            local_values = row[existing_side].copy()
+            row[:] *= 0.0
+            row[existing_side] = local_values
+        else:
+            row[torso] = 0.0
+        opposite = [indices[name] for name in arm_names['Right' if side == 'Left' else 'Left']]
+        row[opposite] = 0.0
+        row[existing_side] *= 1.0 + non_local
+        adjusted += 1
+    mesh['infected_tshirt_vertices_adjusted'] = adjusted
+    mesh['infected_tshirt_arm_weight_after'] = float(weights[:, arm_indices].sum(axis=1).max())
+
+
+def correct_infected_leg_weights(mesh, weights, names):
+    """Prevent heat transfer from binding one pant leg to the opposite leg chain."""
+    if mesh.get('character_id', '') != 'infected_basic_a':
+        return
+    indices = {name: i for i, name in enumerate(names)}
+    left = [indices[name] for name in ('LeftUpperLeg', 'LeftLowerLeg', 'LeftFoot', 'LeftToes')]
+    right = [indices[name] for name in ('RightUpperLeg', 'RightLowerLeg', 'RightFoot', 'RightToes')]
+    corrected = 0
+    for vertex in mesh.data.vertices:
+        x, _y, z = vertex.co
+        if z >= 0.95 or abs(x) < (0.035 if z < 0.45 else 0.045):
+            continue
+        own, opposite = (left, right) if x >= 0.0 else (right, left)
+        opposite_weight = float(weights[vertex.index, opposite].sum())
+        if opposite_weight <= 0.05:
+            continue
+        weights[vertex.index, opposite] = 0.0
+        own_weight = float(weights[vertex.index, own].sum())
+        if own_weight > 1e-6:
+            weights[vertex.index, own] *= (own_weight + opposite_weight) / own_weight
+        else:
+            weights[vertex.index, own[0]] = opposite_weight
+        corrected += 1
+    mesh['infected_leg_cross_weight_vertices_fixed'] = corrected
 
 
 def solve_seam_welded_heat(mesh, rig):

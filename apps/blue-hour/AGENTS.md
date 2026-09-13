@@ -15,7 +15,7 @@
 - 内容真源为 `data/` 下的 Resource 与 `.tres`；地图布局、时段和威胁参数同样数据驱动。修改数据字段时联查 `data/catalog.gd`、消费模块和 `tests/rules.gd`。
 - 表现集中在 `maps/`、`vfx/`、`blue_hour/`，角色模型允许替换；战斗、导航、资源与结算不得依赖占位模型节点。
 - 0.3.0 基础操作见 `docs/adr/0003-parallel-search-and-direct-controls.md`：左键点击/按住带队，Ctrl 停步指向射击，Space 战术暂停可下令，Esc 菜单，WASD 与右/中键拖动镜头。X 停止、F 锁定集火、R 全队集合、E 归航是本作补充；输入归 `missions/squad_input.gd`，松键、UI、Debug 和失焦必须正确释放持续输入。
-- 每个地点持有独立 `missions/search_task.gd`，每名成员最多一项任务，允许三人全搜；任务字典归 `missions/mission.gd`，进度归地点。自动选最近可抵达空闲成员，单独取消/改派不能抢走其他任务成员。工作不攻击、遇险自卫、完成归队、阵亡只中止本人任务；指向射击仅控制掩护成员，消耗弹药并受射程/墙体约束。专项回归为 `tests/search_dispatch.gd`、`tests/parallel_commands.gd`、`tests/controls_runtime.gd`。武器不绑定职业。
+- 每个地点持有独立 `missions/search_task.gd`，每名成员最多一项任务，允许三人全搜；任务字典归 `missions/mission.gd`，进度归地点。自动选最近可抵达空闲成员，单独取消/改派不能抢走其他任务成员。建筑由同一 SearchTask 驱动进入/隐藏搜索/退出，室内不作为外部目标；车辆保持遇险自卫，完成归队、阵亡只中止本人任务；指向射击仅控制掩护成员，消耗弹药并受射程/墙体约束。专项回归为 `tests/search_dispatch.gd`、`tests/parallel_commands.gd`、`tests/controls_runtime.gd`。武器不绑定职业。
 - BLUE HOUR 是短暂预警，Night 的临时威胁随停留时间升级、每次出勤重置。
 - 撤离必须等待所有存活成员抵达、巴士准备和关门；阵亡要明确结算，全灭丢失本次携带物资；结算只能入账一次。
 - 跨日状态由 `core/campaign.gd` 持有，内容规则来自 `data/day_loop.tres` 与词条 Resource；使用成员 ID 和武器个体 ID，不能按内容目录复活成员或把同型号武器视为同一把。单人搜索、1/1 撤离和零人失败纳入 `tests/day_loop_flow.gd`。

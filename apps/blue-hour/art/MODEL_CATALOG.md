@@ -4,7 +4,7 @@
 
 正式外出街区已使用首批16项World资产，完整目录、Wrapper、实测尺寸和接入状态见 [WORLD_ASSET_AUDIT](WORLD_ASSET_AUDIT.md)。下表旧Blender库中“东岸旧街”的摆放说明为历史位置，已由本批Wrapper替换；仍保留资产库、营地或展厅引用，不表示当前正式外出仍走旧模型。道路、围栏的当前规则实现见 [WORLD_MAP_REPORT](../docs/WORLD_MAP_REPORT.md)。
 
-正式普通感染者另登记于 [EnemyDefinition 规格](../docs/ENEMY_DEFINITION.md)：`assets/characters/infected_basic_a/model/ENM_001_infected_basic_a.glb`，10,270 tris，1.65 米，用户提供的贴图模型。正式行动只实例化此模型；下表 `BH_Infected_Basic_Placeholder` 仅保留于历史资产库和既有美术展厅，不进入刷怪池。
+正式普通感染者的 Art Source 登记于 `assets/characters/infected_basic_a/model/source/ENM_001_infected_basic_a.glb`（81,874 tris，58,441 顶点，1.65 米）。正式行动只实例化 `assets/characters/infected_basic_a/runtime/ENM_001_infected_basic_a_30k.glb`；旧源已归档到 `legacy/`，下表 `BH_Infected_Basic_Placeholder` 仅保留于历史资产库和既有美术展厅，不进入刷怪池。
 
 生成真源为 `blender/asset_specs.py` 与各类别生成器；数值从实际导出的 GLB 读取。其中 51 个资产为本项目原创 Blender 程序模型；蓝时号使用用户提供的 VEH_BLUE_HOUR GLB。先复用，再创建。
 
@@ -72,6 +72,8 @@
 `data/shelter_layout.tres` 组合既有仓库、归航巴士、金属箱、托盘、单臂路灯与交通锥；`ui/shelter_view.gd` 采用原尺寸实例化，未新建或重新导出 GLB。角色仍沿用当前占位表现与已有装备模型。基地为独立准备场景，点选对应本轮成员，不参与城区导航和搜索规则。
 
 ## 正式蓝时号
+
+Camp Visual Polish Pass 02 通过 `camp/camp_dressing.gd` 额外复用 `BH_Bench_01`（2 张，等比 0.72）、`BH_WoodCrate`（生活区 0.68 / 外围 0.72）、`BH_MetalCrate`（工坊 0.72 / 生活区 0.64 / 外围 0.48）与 `BH_Pallet`（生活区 0.68）。这些是原模型的营地装配缩放，不改 GLB 和源比例；不新增模型种类。实例只贡献静态视觉，碰撞与交互继续由既有营地根持有；渲染网格按营地共享色板合并。棚架、窗框与桌面是原场景的轻量规则几何补足。详见 [Pass 02 报告](../docs/CAMP_VISUAL_POLISH_PASS_02_REPORT.md)。
 
 新版蓝时号唯一入口为 `scenes/world/vehicles/veh_blue_hour.tscn`，旧 `BH_EvacBus_01` 仅保留为兼容资源 ID。源 GLB 字节、原始比例和 Scale=1 保持不变；Visual 内绕 Y 旋转 +90°，将源 -X 车头对齐项目 +Z，平移至地面投影中心。车轮、车门与灯面合并在一个 Mesh 中；后续物理动画需要拆分。旧 Blender 源和生成函数只作历史来源保留，常规车辆批次不再生成旧蓝时号。详见[替换验收报告](../docs/BLUE_HOUR_VEHICLE_REPORT.md)。
 

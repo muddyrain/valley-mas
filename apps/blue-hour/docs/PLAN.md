@@ -1,5 +1,85 @@
 # 蓝时归航实施计划
 
+## 2026-09-13：继续归航加载过渡（已实现，待视觉验收）
+
+- [x] 主菜单「继续」进入独立加载状态，防止营地切换时出现无反馈的瞬间跳转。
+- [x] 新增蓝时归航专属加载视觉：深蓝夜色、罗盘航线、动态状态文案与进度百分比。
+- [x] 有效存档才触发加载层；空存档仍保留原提示；加载完成后回到原 `_refresh_screen()` 流程。
+- [x] Godot 4.7 导入、独立脚本闭环和临时 Windows 导出启动验证通过。
+- [ ] 用户实际运行时确认加载时长、文案与罗盘视觉；全量 build 仍受既有 CAMP UI 检查 1 项历史失败影响。
+
+## 2026-09-13：Expedition 常驻感染者与遭遇循环
+
+- [x] A：核对现有 Enemy、Survivor、Weapon、Mission、SearchTask、Clock 与 AStarGrid 导航；记录既有工作区快照。
+- [ ] B：集中 Encounter 配置，安全且分群的初始感染者。
+- [ ] C：Idle / Wander 与对象池状态重置。
+- [ ] D：距离、朝向、遮挡与失去目标记忆。
+- [ ] E：NoiseEvent、抵达噪音与 Investigate。
+- [ ] F：既有自动武器、枪声连锁与搜索遇险恢复。
+- [ ] G：视野外、低频、人口下限补充。
+- [ ] H：蓝时前 30 秒预警及渐进感知。
+- [ ] I：正式蓝时多方向尸潮、兴趣点与持续压力。
+- [ ] J：F3 调试、感知 / 寻路错峰及 20 / 40 / 60 性能测量。
+- [ ] K：自动运行完整任务、原生截图、回归与 Windows 独立构建。
+
+范围：复用唯一普通感染者、现有城市与武器表现；不引入模型、特殊敌人或第二套导航。最终证据写入本阶段报告。
+
+## 2026-09-12：CAMP Visual Polish Pass 02
+
+- [x] 低饱和鼠尾草绿 / 灰米压实地 / 蓝灰铺装色板；中心庭院、横向步道和集合平台有明确边界。
+- [x] 主站与蓝时号继续压缩纹理明暗，保留 Logo / 门窗 / 源贴图；白天分阶受光和冷灰阴影、角色 Rim 已更新。
+- [x] 默认相机轻微收近，角色初始位置与朝向优化；左棚 / 温室补结构，桌椅箱子复用现有资产并按材质合批。
+- [x] 蓝时号 / 硬地 / 标线 / 出车曲线 / 四个集合点整体对齐，导航重烘焙；专项路线与结算回营验证通过。
+- [x] 原生 A–E 截图已保存；核心模型与角色 / 出发控制器的原件哈希保持不变。
+- [x] Windows 导出、12 次独立启动 / 4 次包内检查、包内 A–E 截图验证通过；2026-09-13 完成交替性能采样，484.3 → 474.2 FPS（-2.1%）。按进程隔离验证目录，保留独立 Pass 02 审图 EXE。
+- [ ] 用户审核实际游戏截图；完成本轮后停止，不自动进入 HUD / 完整 Environment Dressing / 城市 / 夜间营地。
+
+范围和最终交付证据见 [CAMP_VISUAL_POLISH_PASS_02_REPORT](design/camp.md)。
+
+## 2026-09-12：CAMP Visual Polish Pass 01
+
+- [x] 保留主站 / 蓝时号原件、角色模型 / 骨骼 / 动画、固定布局与营地主流程；营地实例使用共享 Stylized Shader 的独立参数。
+- [x] 白天暖日光与冷灰环境光、轻量 Rim、草土过渡、入口 / 活动区铺装、停车标线及接触阴影已接入。
+- [x] 原生 A–D / 角色近景截图 30 项、4K / 同实例清晰度 42 项、UI 114 项、出发 89 项、场景结构 108 项与交互 87 项通过；独立交替性能采样已记录。
+- [x] Windows 全量 build、12 次独立启动及 4 次内嵌包检查通过；最终 EXE 与哈希见本轮报告。
+- [x] 用户已审阅并提出 Pass 02 修订：进一步收敛 Anime 方向，并整理停车 / 出发区；不表示 Pass 01 已达到最终美术质量。最新范围见本页 Pass 02。
+
+本轮证据与边界见 [CAMP_VISUAL_POLISH_PASS_01_REPORT](design/camp.md)。
+
+## 2026-09-12：Expedition 城市密度、建筑搜索与探索
+
+- [x] 保持160×120m和8种建筑；27实例、19可搜建筑、8装饰建筑、3可搜车；住宅每排5栋、商业连续店面、服务装卸与停车。
+- [x] 统一 SearchTask 进入/隐藏/搜索/退出，取消保留进度、完成一次掉落、多成员独立任务；车辆仍在外部遇险自卫。
+- [x] 静态 SearchUIAnchor、相机之后逐帧投影、Pixel Snap、固定宽度与显式取消；只展示已发现地点。
+- [x] GPU 256×192共享Mask、12Hz、20m/5m柔边、三态探索与敌人信息过滤，蓝时不改视野半径。
+- [x] 原生住宅/商业/服务区、探索与回营截图及6段录像已复核；47项专项通过，450帧最大锚点误差0.499756px。
+- [x] 全量 Windows build 退出0；正式原生闭环134项、12次独立启动和4次包内检查通过，canonical EXE已更新，最终哈希见 VALIDATION。
+- [ ] 用户视觉验收；本阶段完成后停止，不开启真实室内、LOS、新模型或第二张地图。
+
+
+## 2026-09-12：Camp / 今日行动 UI 第二轮
+
+- [x] 保持冻结场景与设施位置，HUD 分为顶部状态资源、左侧能力、右侧队伍、底部道具槽和右下今日行动。
+- [x] 角色详情保留队伍可切换，显示真实属性与武器，固定底部食物训练。
+- [x] 技能/道具/槽位/时段说明共用浅纸色与触发源锚点；替换复用既有装备与保存规则。
+- [x] TodayAction 近原尺寸纸卡、缩略图、底部说明与双按钮；关闭底层重复 HUD，保持同一 Camp 出发。
+- [x] 第二轮 UI 68、今日行动 51/原生 68、技能原生 80 项通过；Windows UI 预览包导出、两次独立 EXE 启动与包内 9 项交互通过。
+- [x] 同期远征视觉门禁已在城市探索阶段修复并全量构建通过；此前 UI 预览包的7项失败保留为历史验证记录，当前正式包见本页顶部与 VALIDATION。
+- [ ] 用户确认视觉；技能升级/扩槽的正式费用与交易入口保持后续范围。
+
+范围与证据见 [Camp Interaction V1](design/camp.md) 的第二轮记录。没有新增或修改美术资产。
+
+## 2026-09-12：Camp Interaction Scene V1（已完成并验证）
+
+- [x] 保留唯一 Camp 与主视口，管理主页面改为边缘 HUD、角色 Drawer 和原有业务 Overlay。
+- [x] 设施根节点统一 CampInteractable；主站、工坊、温室与蓝时号可点击。
+- [x] 今日行动在原营地上选地点和出战名单；取消保持世界实例，确认锁定 Campaign 后原地出发。
+- [x] 复用 DepartureController，角色同时移动并流水上车，保留资源 HUD 与输入锁。
+- [x] 修正部分出战结算，留守成员保留身份和装备，并参与每日口粮；旧存档兼容回归通过。
+- [x] 原生交互 87、部分出勤规则 31、Camp 108、清晰度 41 通过；1 / 2 / 4 人约 4.58 / 5.89 / 6.93 秒。最终 Windows build、12 次独立启动与 4 次包内检查通过。
+
+实现边界与验收见 [Camp Interaction V1](design/camp.md)。以下较早的营地 UI 和出发时长是历史阶段记录。
+
 ## 2026-09-12：4K 主站清晰度与主视口营地（已完成）
 
 - [x] 在唯一正式路径导入新 4K 主站，核对原件与导入贴图；尺寸、接地、材质与原 3 Box 碰撞复验通过。
@@ -7,14 +87,14 @@
 - [x] UI 刷新保留 Camp 和角色，换装同步到已有实例；mipmaps 保留，主站复用各向异性导入脚本；未改全局渲染参数或冻结布局。
 - [x] 清晰度原生 39、Camp 107、出发 89、开局原生 202、效果原生 80 通过；最终合并 EXE 包内 Camp 13 项及两种独立启动通过。
 
-尺寸、纹理与全部 20 项结果见 [清晰度报告](CAMP_CLARITY_REPORT.md)。当前不需要重新导出或重做模型；没有增加面数 / 8K / 新 UV。
+尺寸、纹理与全部 20 项结果见 [清晰度报告](design/camp.md)。当前不需要重新导出或重做模型；没有增加面数 / 8K / 新 UV。
 
 ## 2026-09-12：正式主站与 Camp Departure V1
 
 - [x] 正式 `CAMP_001_main_station` wrapper 接入冻结 Camp，保留布局、入口轴线、车辆泊位和固定相机；3 个简单 Box 与原导航重烘焙。
 - [x] 整备 UI 复用唯一 `camp_main.tscn`；任务确认先存档并锁定任务 / 队伍，同一 Camp 实例完成集结、排队上车、4.5 秒驶离和 0.5 秒淡出，再调用原 Mission 加载。
 - [x] 1 / 2 / 4 人真实输入与渲染、留营角色、重复点击、连续移动、物理碰撞与导航超时回退通过；截图保存在现有 test-output。
-- [x] Windows 全量构建与独立 EXE 的 12 个启动检查通过；范围、证据和后续动画边界见 [交付报告](CAMP_DEPARTURE_V1.md)。
+- [x] Windows 全量构建与独立 EXE 的 12 个启动检查通过；范围、证据和后续动画边界见 [交付报告](design/camp.md)。
 
 本轮不实现返航、独立车轮 / 车门 Mesh 或正式上下车动作；Campaign 继续持有角色、装备与状态数据。
 
@@ -24,13 +104,13 @@
 
 Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 张原生图、原网格保留 14 项、已有公共 Idle/Walk/Run 兼容 908 项、真实移动 42 项、稳定性 15 项、实际 Mission 渲染 102 项通过。公共 Inspector 完成 Windows 构建与两种独立启动验证；合入后主工作区隔离快照的全量构建、玩法/地图/武器/HUD 回归与 12 次独立启动通过。游戏位于 build/BlueHourHomeward.exe，现已合并到唯一正式游戏构建。本次没有扩展动画库。
 
-当前完整路径、产物、修改清单及发衣交界的小瑕疵见 [CHARACTER_REPLACEMENT_REPORT](CHARACTER_REPLACEMENT_REPORT.md)。自动化和实施已完成，等待用户复看；不自动继续动画阶段。下节保留首阶段历史。
+当前完整路径、产物、修改清单及发衣交界的小瑕疵见 [CHARACTER_REPLACEMENT_REPORT](design/characters.md)。自动化和实施已完成，等待用户复看；不自动继续动画阶段。下节保留首阶段历史。
 
 ## 2026-09-12：幸存者统一 Rig 基础设施（首阶段历史）
 
 独立工作树 `valley-mas-humanoid-rig` / 分支 `codex/humanoid-rig`；未合并地图任务。已实读夏知遥与苏晚星的 GLB，确认原文件均无 Skeleton、Skin 或 Animation；删除幸存者移动 bob 与攻击整模缩放。建立 Blender 23 骨 `BH_Humanoid_Rig_v1`、可重复脚本、Godot BoneMap，仅为夏知遥生成骨架与蒙皮。
 
-已完成 12 个静态姿势的三视图检查、Godot 原生检查和 Windows 构建。大幅抬臂的宽袖、长发与肩部穿插仍有局限；当前作为 Rig 审阅候选，未替换原游戏模型引用。完整验证、产物与剩余问题见 [HUMANOID_RIG_REPORT](HUMANOID_RIG_REPORT.md)。等待用户确认 Rig 效果后再确定下一阶段；没有建立公共动作库，也没有完整绑定苏晚星。
+已完成 12 个静态姿势的三视图检查、Godot 原生检查和 Windows 构建。大幅抬臂的宽袖、长发与肩部穿插仍有局限；当前作为 Rig 审阅候选，未替换原游戏模型引用。完整验证、产物与剩余问题见 [HUMANOID_RIG_REPORT](design/characters.md)。等待用户确认 Rig 效果后再确定下一阶段；没有建立公共动作库，也没有完整绑定苏晚星。
 
 用户大致认可并反馈左膝弯曲异常；已修正左右腿测试姿势的反向旋转，骨架和权重未变。补充两张侧视图与腿膝方向回归，Godot 146 项通过，独立检查程序更新为 0.1.0.1 并通过启动验证，等待复看。
 
@@ -38,7 +118,9 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 
 ## 2026-09-12：正式外出地图继续打磨
 
-相机 25（20–35）、160×120m、三路口六区域、18 个搜索地点、南缘返航点、Portrait Unit、轻量时钟和目标 Tracker 已在原实现落地。视频连续帧与同路径对比确认水平薄层自阴影、局部入口共面和围栏硬裁切问题；保留时钟与玩法数值。地图 1921 项、正式开局往返 134 项、三分辨率及 20 秒实机录像验证通过，正式 Windows 输出统一为 `build/BlueHourHomeward.exe`。旧任务构建清理被自动审批拦截，仍需处理；不得标记清理完成。证据与边界见 [外出视觉报告](EXPEDITION_VISUAL_REPORT.md)，停止继续扩张，等待视觉验收。
+在同一正式实现继续完成美术统一：相机 22（18–32），环境采用原纹理的分层着色、蓝灰屋顶、统一绿化、庭院/前坪、路缘与排水带，HUD 提高文字对比并统一底板。160×120m、三路口六区域、18 个搜索地点和南缘返航点不变；保持原搜索、战斗、时钟与归航流程。
+
+地图 1921 项与视觉/源材质隔离 89 项通过；正式出勤闭环 134 项、四街区正常步行 22 项、相机操作录像 18 项通过。屋顶同轨迹帧间变化从 2.8122 降至 0.6774，不代表所有材质完全消除闪烁。共享 Windows 构建与 12 项独立启动通过，同一 EXE 内嵌包的 Headless / 原生视觉检查各 89 项通过；唯一输出仍为 `build/BlueHourHomeward.exe`。细叶、屋顶几何和遮挡仍需后续打磨，完整截图、两段录像与边界见 [外出视觉报告](design/expedition.md)。未扩张玩法或新增模型，实施与自动验收完成，等待用户复看风格。
 
 ## 2026-09-12：今日行动选择（已交付，数值待试玩）
 
@@ -46,14 +128,14 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 - [x] 营地「整装出发」先进入今日行动，鼠标、键盘和手柄均可选卡、确认与返回；未选择时无法出发。
 - [x] 按用户确认，三类地点复用当前城区，分别配置食物、废料、装备点及敌情；没有新建三套地图布局。
 - [x] 确认后保存地点再创建行动，保存失败回退；旧档兼容，重试保留选择与装备奖励，次日清空选择。
-- [x] 专项流程 41 项、原生画面与输入 58 项检查通过。构建与人工平衡边界见[今日行动记录](TODAY_ACTION.md)。
+- [x] 专项流程 41 项、原生画面与输入 58 项检查通过。构建与人工平衡边界见[今日行动记录](design/expedition.md)。
 - [x] Windows 构建完成，独立 EXE 的主菜单、营地、行动、今日行动与展厅共 10 项 Headless / 原生启动验证通过。
 
 这项交付完成三选一入口和差异化资源/危险配置；下方较早的“三套小型任务布局”、地图词条及完整 Day Loop 建议仍属于后续范围。
 
 ## 2026-09-12：第二阶段外出视觉、Camera与HUD（已交付，等待视觉验收）
 
-保持正式街区Seed20260912与Camp往返流程，按用户要求收近镜头、整理光照/材质、收起常驻POI信息，重构紧凑HUD及1600×900默认窗口。Before、职责边界、实施及验证记录见 [EXPEDITION_VISUAL_REPORT](EXPEDITION_VISUAL_REPORT.md)。本阶段不扩充模型、地图结构或战争迷雾。2,332项Headless检查、1,385项原生检查及10组独立EXE启动验证通过；新版位于 `build/BlueHourHomeward.exe`，保留用户当前运行的旧程序。已停止开发，等待视觉验收。
+保持正式街区Seed20260912与Camp往返流程，按用户要求收近镜头、整理光照/材质、收起常驻POI信息，重构紧凑HUD及1600×900默认窗口。Before、职责边界、实施及验证记录见 [EXPEDITION_VISUAL_REPORT](design/expedition.md)。本阶段不扩充模型、地图结构或战争迷雾。2,332项Headless检查、1,385项原生检查及10组独立EXE启动验证通过；新版位于 `build/BlueHourHomeward.exe`，保留用户当前运行的旧程序。已停止开发，等待视觉验收。
 
 ## 2026-09-12：首个正式普通感染者（已交付，待人工手感验收）
 
@@ -63,17 +145,17 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 - [x] 842 项玩法断言、131/1074/187 项地图与资产断言和 52 资产加载通过；正式流程原生 189 项、既有原生操作 53 项通过。
 - [x] Windows 单文件已交付；对与本次导出 SHA-256 完全一致的 EXE 独立副本完成主菜单、营地、外出及展厅共 8 项 Headless / 原生启动验证。没有关闭用户已运行的游戏。
 
-当前范围与七项交付说明见 [普通感染者规格与验收](ENEMY_DEFINITION.md)。击退和击杀经验只预留定义字段，不扩展既有角色成长系统；绑定动画、其他敌人和长期威胁不在本轮内。下列四类旧敌人描述属于历史切片记录，以本次单一普通感染者范围为准。
+当前范围与七项交付说明见 [普通感染者规格与验收](design/enemies.md)。击退和击杀经验只预留定义字段，不扩展既有角色成长系统；绑定动画、其他敌人和长期威胁不在本轮内。下列四类旧敌人描述属于历史切片记录，以本次单一普通感染者范围为准。
 
 当前 EXE 包含同期街区、蓝时号与感染者改动；下方较早记录的整包构建阻塞已由本次产物验证解除。人工战斗手感与长期数值平衡仍待试玩，不把自动化通过当作体验定稿。
 
 ## 2026-09-12：正式蓝时号视觉替换（场景与合并构建通过）
 
-使用用户提供的 `VEH_BLUE_HOUR.glb`，统一至 `scenes/world/vehicles/veh_blue_hour.tscn`。保留源比例与 Scale=1、冻结营地布局和既有撤离逻辑。营地、外出、整备与展示共用同一资源；旧 GLB 在零引用和真实运行验证后已删除，历史 Blender 来源保留。营地 102 项、车辆专项 36 项、原生完整外出回营 41 项通过。该任务首次Windows构建遇到并行敌人编辑涉及的搜刮反击断言失败；后续正式街区任务已修正旧测试坐标/时序并完成合并版本整包构建及独立EXE验证，见 [WORLD_MAP_REPORT](WORLD_MAP_REPORT.md)。尺寸、动画限制和最初验证记录保留于 [BLUE_HOUR_VEHICLE_REPORT](BLUE_HOUR_VEHICLE_REPORT.md)。
+使用用户提供的 `VEH_BLUE_HOUR.glb`，统一至 `scenes/world/vehicles/veh_blue_hour.tscn`。保留源比例与 Scale=1、冻结营地布局和既有撤离逻辑。营地、外出、整备与展示共用同一资源；旧 GLB 在零引用和真实运行验证后已删除，历史 Blender 来源保留。营地 102 项、车辆专项 36 项、原生完整外出回营 41 项通过。该任务首次Windows构建遇到并行敌人编辑涉及的搜刮反击断言失败；后续正式街区任务已修正旧测试坐标/时序并完成合并版本整包构建及独立EXE验证，见 [WORLD_MAP_REPORT](design/expedition.md)。尺寸、动画限制和最初验证记录保留于 [BLUE_HOUR_VEHICLE_REPORT](design/camp.md)。
 
 ## 2026-09-12：第一版正式外出街区（已交付，待人工验收）
 
-本轮按用户新要求，优先将 16 个核心场景资产接入正式营地出发后的行动地图。只做固定 Seed 的首版街区，保留主菜单、专属路线、营地、行动和返航结算。职责追踪、资产审计、实施检查点和验收见 [WORLD_MAP_REPORT](WORLD_MAP_REPORT.md)。完成该版后停止扩张，等待用户视觉和玩法验收；下列历史后续建议不自动执行。
+本轮按用户新要求，优先将 16 个核心场景资产接入正式营地出发后的行动地图。只做固定 Seed 的首版街区，保留主菜单、专属路线、营地、行动和返航结算。职责追踪、资产审计、实施检查点和验收见 [WORLD_MAP_REPORT](design/expedition.md)。完成该版后停止扩张，等待用户视觉和玩法验收；下列历史后续建议不自动执行。
 
 - [x] 16项真实模型审计、统一Wrapper/数据目录、固定Seed20260912、8建筑/3环境车辆、规则道路/围栏与原导航接入。
 - [x] Headless 2,234项断言及52资产加载通过；正式原生闭环41项、操作回归42项通过。
@@ -82,7 +164,7 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 
 ## 2026-09-12：0.5.0 被动道具与特殊技能扩充（已交付）
 
-本轮按用户的明确清单优先扩充现有系统；规格与边界见 [EFFECT_SYSTEM_SPEC](EFFECT_SYSTEM_SPEC.md)。此前通用治疗/区域支援、每日选图等计划仍保留，未因本轮特殊技能扩充而标记完成。
+本轮按用户的明确清单优先扩充现有系统；规格与边界见 [EFFECT_SYSTEM_SPEC](design/items-and-skills.md)。此前通用治疗/区域支援、每日选图等计划仍保留，未因本轮特殊技能扩充而标记完成。
 
 - [x] 检查现有内容、专精、角色/武器、搜索、时钟、结算、保存及图标加载；确认原有单技能读取和 v2 固定槽位校验的限制。
 - [x] 沿用 Resource 与稳定 ID，注册 8 被动、6 技能及各自普通/升级数值，原样导入 14 张图标。
@@ -95,7 +177,7 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 
 未启用病床、购物篮、报纸。地图发现、正式升级费用、槽位购买、长期平衡和人工手感评估仍属后续。现有根级 Harness 索引/软链接失败及 Headless 退出时的对象释放警告如实记录于 [VALIDATION](VALIDATION.md)，未修改其他项目或全局技能来掩盖问题。
 
-范围真源为 PROJECT_CONTEXT。已交付第 32 节 Combat Vertical Slice 和第 33 节最小五日循环，规格见 [DAY_LOOP_SPEC.md](DAY_LOOP_SPEC.md)。0.3.0 补充用户授权的基础操作对齐与多点搜索，规格见 [ADR-0003](adr/0003-parallel-search-and-direct-controls.md)；完整游戏仍未开发。
+范围真源为 PROJECT_CONTEXT。已交付第 32 节 Combat Vertical Slice 和第 33 节最小五日循环，规格见 [design/game-design.md](design/game-design.md)。0.3.0 补充用户授权的基础操作对齐与多点搜索，规格见 [ADR-0003](adr/0003-parallel-search-and-direct-controls.md)；完整游戏仍未开发。
 
 ## 0.1.1 切片检查点
 
@@ -227,12 +309,12 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 - Q7 已确定：用户接受推荐，阵亡成员在本轮无法恢复，剩余成员继续；全部阵亡时本轮失败并重新开局。新开局仍可使用这些角色，本轮损失不等于永久删除角色内容。见 [ADR-0002](adr/0002-run-scoped-casualties.md)。
 - Q8 已确定：用户接受推荐，首次食物不足先承受饥饿惩罚，留一个游戏日补粮；连续缺粮才造成人员损失。
 - Q9 已确定：用户接受推荐，外出找到少量有差异的武器，带回自由换装；Scrap 用于购买明码标价的备用武器。该决定落实下一小版的奖励顺序，不同时铺开整个成长系统。
-- Q10 已确定：用户接受 [完整规格](DAY_LOOP_SPEC.md)，包括足粮休整、战斗装备损失、优先供养选择、安全屋保存、当天重试与第五日试玩终点。本轮已进入实施，不再重复询问已接受的规则。
+- Q10 已确定：用户接受 [完整规格](design/game-design.md)，包括足粮休整、战斗装备损失、优先供养选择、安全屋保存、当天重试与第五日试玩终点。本轮已进入实施，不再重复询问已接受的规则。
 
 ### 0.2.0 最小跨日版本实施清单
 
 - [x] Q6～Q9 已确认，项目上下文、术语与阵亡决策记录已同步。
-- [x] 完成 [DAY_LOOP_SPEC.md](DAY_LOOP_SPEC.md) 的可审阅范围与验收场景。
+- [x] 完成 [design/game-design.md](design/game-design.md) 的可审阅范围与验收场景。
 - [x] Q10 核对补充规则，收敛完整开发基线。
 - [x] 本轮成员/库存/装备状态、每日结算、饥饿与失败规则及自动化验证。
 - [x] 武器个体、四个适用范围明确的词条、搜索奖励、备用武器商店和自由配装。
@@ -243,7 +325,7 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 
 ## 原作操作再核查（2026-09-08）
 
-用户指出原作可以多地同时搜，并质疑操作差异。已完成 [原作操作核查](DEADLY_DAYS_CONTROLS_RESEARCH.md)，对照官方 0.50～0.80 更新、2024 年开发者键位回复、Steam 玩家记录和研究时源码。多点并行有较强证据；当时全图只有一个任务、缺少按住左键跟随与 Ctrl 指向射击、Space 与镜头键位不同均为实际差异，0.3.0 已补齐。
+用户指出原作可以多地同时搜，并质疑操作差异。已完成 [原作操作核查](reference/deadly-days-reference.md)，对照官方 0.50～0.80 更新、2024 年开发者键位回复、Steam 玩家记录和研究时源码。多点并行有较强证据；当时全图只有一个任务、缺少按住左键跟随与 Ctrl 指向射击、Space 与镜头键位不同均为实际差异，0.3.0 已补齐。
 
 - [x] 核查来源、明确事实与推断，修正 PROJECT_CONTEXT 与 ADR 的原作归因；保留当前实现状态。
 - [x] 用户授权基础操作向原作对齐；实施规格见 [ADR-0003](adr/0003-parallel-search-and-direct-controls.md)。
@@ -318,7 +400,7 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 
 ## 2026-09-09 原作开局截图访谈（已收敛，0.4.0 已交付）
 
-用户补充原作 v1.7.0F2 十张截图，并要求先做新游戏、Tab 专精选择、随机两人、进入基地的基础架构。已核查截图、官方机制记录和当前代码，结果见 [开局与基地核查](DEADLY_DAYS_NEW_RUN_RESEARCH.md)，本轮规格见 [NEW_RUN_SPEC.md](NEW_RUN_SPEC.md)。此前每日行动选择是尚未实施的建议，现让位于本轮开局基础；后续不丢弃每日选图、通用战术能力与完整 Day Loop。
+用户补充原作 v1.7.0F2 十张截图，并要求先做新游戏、Tab 专精选择、随机两人、进入基地的基础架构。已核查截图、官方机制记录和当前代码，结果见 [开局与基地核查](reference/deadly-days-reference.md)，本轮规格见 [design/game-design.md](design/game-design.md)。此前每日行动选择是尚未实施的建议，现让位于本轮开局基础；后续不丢弃每日选图、通用战术能力与完整 Day Loop。
 
 - [x] Q1：先做完整开局流程和三套真正生效的被动/特殊能力套餐，暂缓跨局专精经验、完整解锁树及第四专精。
 - [x] Q2：现有三名角色中随机抽两名，保留各自形象与 Trait，继续自由换装。
@@ -349,10 +431,10 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 - [x] 基地武器图鉴/详情、个体库存与换装；v4 存档及 v1/v2/v3 兼容。
 - [x] 428 项武器专项与 43 项原生 UI 检查通过；既有受影响回归通过。
 - [x] Windows 构建与独立 EXE 的基地/菜单/行动/路线/武器页/展厅共 12 项启动验证通过；交付独立程序，详见武器报告。
-- [x] Phase 2A：三把正式 3D Weapon Model、右手 WeaponSocket 和三类基础姿态，见 [WEAPON_VISUALS](WEAPON_VISUALS.md)。
-- [ ] Phase 2B：其余五把模型、精细持枪/攻击/换弹动作、手型和 IK。
+- [x] Phase 2A：三把正式 3D Weapon Model、右手 WeaponSocket 和三类基础姿态，见 [WEAPON_VISUALS](design/combat.md)。
+- [ ] Phase 2B 剩余：其余五把模型、其他 profile 攻击/换弹动作与手型；long_gun 公共动作及 LeftGrip 约束已在下方独立阶段实现。
 
-范围、全部配置与文件清单见 [WEAPON_SYSTEM](WEAPON_SYSTEM.md)。与地图、角色统一骨骼的并行任务保持独立。
+范围、全部配置与文件清单见 [WEAPON_SYSTEM](design/combat.md)。与地图、角色统一骨骼的并行任务保持独立。
 
 ## 2026-09-12 幸存者 Locomotion Polish
 
@@ -363,7 +445,7 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 - [x] 完成当前工作区快照的 Windows 构建及独立 EXE 启动验证；更新 canonical `build/BlueHourHomeward.exe` 与 BUILD-INFO。
 - [ ] 用户验收移动手感与残余脚滑；不自动进入 IK、Root Motion、Stride Warping 或动作重制。
 
-具体原因、参数、性能样本和范围见 [LOCOMOTION_POLISH_REPORT](LOCOMOTION_POLISH_REPORT.md)。本次不修改角色 Mesh、骨骼、权重、动画关键帧、地图内容、HUD、营地逻辑或武器玩法；其他任务的未提交改动保留。
+具体原因、参数、性能样本和范围见 [LOCOMOTION_POLISH_REPORT](design/combat.md)。本次不修改角色 Mesh、骨骼、权重、动画关键帧、地图内容、HUD、营地逻辑或武器玩法；其他任务的未提交改动保留。
 
 
 ## 2026-09-12 武器 Phase 2A 交付
@@ -372,6 +454,190 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 - [x] 既有WeaponVisualController接模型生命周期、RightHand BoneAttachment和三类轻量姿势。
 - [x] 双角色、三动作、装备切换/卸装/空模型、实际Camp与Mission往返验证。
 - [x] 武器逻辑428、模型1377、UI112、公共动画908项通过；Windows导出、12项EXE启动、两种内嵌包验证完成。
-- [ ] Phase 2B保留其余五把模型、精细握持/射击/换弹、双手IK和枪械特效。
+- [ ] Phase 2B 保留其余五把模型、手指握持、其他 profile / 换弹与枪械特效；long_gun 本阶段见下方。
 
-交付路径、文件清单、验证记录和限制见 [WEAPON_VISUALS](WEAPON_VISUALS.md)。
+交付路径、文件清单、验证记录和限制见 [WEAPON_VISUALS](design/combat.md)。
+
+## 2026-09-12 Survivor Combat Animation Foundation
+
+- [x] 审计并复用现有 WeaponDefinition、VisualController、CombatController、Inventory 与 AimFire；只消费现有三类 animation_profile。
+- [x] Gameplay 事件 → Animation Bridge → 13 骨 Upper Body Filter，保留原 Locomotion 与渲染时钟。
+- [x] 两人共享 long_gun_ready / aim / shoot、及时混合、连续射击、LeftGrip 同帧约束与正式 MuzzlePoint 曳光起点。
+- [x] 双角色 2605 项动作链路检查、47 项原生 Mission 检查；原移动 109/42/15 项、公共动画 908 项、武器玩法 428 项回归。
+- [x] 26 个角色/Rig/旧动画文件 SHA-256 未变；撤离缩放为零的约束生命周期已修复并回归。
+- [x] 同期营地任务统一完成最新整包 Windows build；12 项独立 EXE 启动、两种内嵌包武器/战斗动画检查通过，未并行覆盖同一 EXE。
+- [ ] 用户验收 long_gun 视觉与手感；不自动开始 sidearm / melee_short / reload / hit / death。
+
+架构、生成源、原生画面、性能数据和近景手型/枪托边界见 [战斗动画报告](design/combat.md)。
+
+## 2026-09-12 Mission / Combat Locomotion Style Pass
+
+- [x] 新增两人共享的 In-Place `mission_jog`，Mission 按地图上下文选用；Camp Walk 与旧 Run 保留，Gameplay Speed 不变。
+- [x] 沿既有 Upper / Lower Body Layer 组合 Combat Jog；强化 Ready / Aim / Shoot 与 MuzzlePoint 短闪光。
+- [x] 双角色分层 3443 项及正式 Mission 新专项 225 项通过；真实搜索/召回、连续射击、卸装纳入验证。正式 Camp 双角色原生 Walk 专项 155 项通过。
+- [x] 已取得正式 size=25、1600×900 高位镜头画面与连续帧，性能独立采样。
+- [x] Windows 构建链分段完成，最终 EXE 于 20:04:42 导出、20:06:54 验证完成；12 组独立启动、内嵌包武器模型及战斗动画 Headless / 原生验证通过。
+- [ ] 等待用户试玩确认动作风格；本阶段停止，不扩展其他武器、Strafe、Foot IK 或 Root Motion。
+
+实现、全部验收场景和当前限制见 [Mission 动作报告](design/combat.md)。
+
+## 2026-09-12 Phase 2C 第一阶段：无武器 Mission Jog V2
+
+- [x] 原 Mission Jog V1 原样保留并另存备份；同路线 Before 与已有录像均保留。
+- [x] 重新烘焙公共 V2，只接入无武器 Mission；持武器使用 V1，Camp Walk 不变。
+- [x] 夏知遥正式 Mission、默认摄像机、正式 HUD 与角色尺寸，完成直线持续跑动、起步接连续 Jog 和基础转向录像。
+- [x] 前后 810 个采样点 Gameplay 位置/速度完全一致，261 个边界文件哈希未变，V2 安全契约 219 项通过。
+- [x] 本轮 Windows build 与原有回归完成；12 组独立 EXE 启动、内嵌包武器/战斗动画验证及内嵌 V2 的 219 项检查通过。
+- [x] 用户确认 V2 方向正确并保留；机器人感继续在 V2.1 修整，不回退 V1。
+
+视频、参数和复现见 [Jog V2 验收记录](design/combat.md)。在视觉验收前停止，不进入 Start、Stop、Turn Lean 深度优化、Combat Jog V2、Aim/Shoot Jog、Sprint、Strafe 或 Foot IK。
+
+## 2026-09-12 Mission Jog V2.1 Polish
+
+- [x] 保留 V2.0 资源、生成源和原视频；仅重新烘焙现有公共 V2 库的四项动作曲线。
+- [x] 前倾增强 25%，Compression 行程约 71mm 且最高点不变；加强伸膝/抬跟/离趾与 Knee Drive，胸肩错相，头颈保持小幅延迟。
+- [x] 夏知遥无武器、正式 Mission/HUD/默认摄像机，完成 19 秒主视频与同路线 V2 Before，包含连续直跑及 10 秒侧向 Jog。
+- [x] 1140 帧位置、速度、动画倍率一致；V2 安全契约 223 项及受影响 Mission/Camp/Combat/公共动画回归通过。
+- [x] Windows Release 导出、10 组独立启动及内嵌动画包 223 项检查通过；同期后续 HUD 改动单独记录。
+- [x] 用户视觉验收通过；锁定 V2.1 主循环，不再重新 author。
+
+参数与录像见 [V2.1 验收记录](design/combat.md)。主循环已锁定，后续授权范围为下方 Phase 2D。
+
+## 2026-09-12 Locomotion Phase 2D：Start / Stop / Turn Lean / Cadence
+
+- [x] 保留已验收 Jog V2.1 字节，新增独立 0.24s 起步与 0.28s 左/右脚制动资源。
+- [x] 接入无武器 Mission 表现层；制动冻结 Jog，相位不因转向重新启动，沿用 0.08 / 0.035 速度 hysteresis。
+- [x] 按速度方向、朝向误差与角速度叠加最大 7° Turn Lean，头/胸/胯轻微先后响应。
+- [x] 该阶段默认 A；提供仅运行时启用的 B（目标完整周期 0.50s），主循环与 Gameplay Speed 保留。后续默认与曲线选择见下方 V2.2/C。
+- [x] 完成夏知遥无武器、正式 Camera/HUD 的约 20.35 秒连续 A/B 视频；含起步、直跑、90°、双向转弯、180°、制动及 Idle，正常视野与连续帧检查已完成。
+- [x] 完整 build 前置测试、独立导出、12 组独立启动及包内资源检查完成；专项源码/内嵌包各 26 项通过。规范 EXE 解除占用后已同步验证包，另保留本阶段固定副本。
+- [x] 用户确认当前无武器 Locomotion 已完成，选择 B 的较慢节奏方向；高抬腿问题转入 V2.2/C 修整。
+
+## 2026-09-13 ENM_001 Phase 2A-0B-1 Final Locomotion
+
+- [x] 完成感染者 Idle 轻微 polish 与 Chase 上半身差异化；保持 Rig、Skin、Weight 与 Walk 腿部不变。
+- [x] 重新导出 Final Game View 预览、Walk/Chase 冻结对比与连续 Compare 视频。
+- [x] Godot 4.7.2 AnimationLibrary / Loop Runtime Smoke 通过；Phase 2A-0B-1 完成。
+- [ ] Attack / Hit / Death 与 Combat 接入留待后续阶段。
+
+参数、视频和验证边界见 [Phase 2D 验收记录](design/combat.md)。本轮停止于上述视觉验收，不推进 Combat、Ready/Aim/Shoot、Sprint、Strafe、Backpedal、Foot IK、Root Motion 或模型/Rig 修改。
+
+## 2026-09-12 Expedition HUD 2.0 正式 PNG 接入
+
+- [x] 四个实际 ZIP 自动解压与 CRC / PNG / Alpha / 尺寸 / SHA-256 审计；54 张、48 个正式名称，六组差异明确选择 v2。
+- [x] Time / Party / Objective / Action / Return / Search 六区替换为用户 PNG；继续读取既有 Controller / gameplay 数据。
+- [x] Selection / Move / Search / Interact / Building / Vehicle / Loot / Danger / Bus / Return Zone / Group Target 接入真实状态；缺失 B 包按用户确认的现有 PNG 补位。
+- [x] 原作核心 WASD / Ctrl / Space / 鼠标操作保留，技能数字键真实可用，四态与状态计数分离。
+- [x] 固定建筑锚点、物理像素取整、防抖与屏幕边界；1920×1080、2560×1440 及两个小窗口原生截图。
+- [x] 完整生产流程、搜索派遣 / 并行搜索 / 室内搜索、六技能与暂停设置回归；旧 controls_runtime 的失配在修改前 HUD 上同样复现。
+- [x] 当前工作区 Windows 完整构建退出码 0，HUD 专项 314 项通过；12 组独立启动与内嵌资源验证通过，23:48:12 完成交付包。
+
+具体文件、替代资源、测试范围和五组截图见 [HUD 2.0 接入报告](design/expedition.md)。本阶段结束后停止，不进入地图 Toon Shader / Anime Visual Pass 或新增玩法。
+
+## 2026-09-13 Expedition HUD 2.0.1 Visual Polish
+
+- [x] 保留 48 张原 PNG 与既有 HUD 架构；集中设置 Scale、边框强度、Alpha 和动画时间。
+- [x] Time / Party / Objective / Action / Return 分别缩至 0.78 / 0.95 / 0.85 / 0.90 / 0.85；头像实际大小保留，任务列表按内容收紧。
+- [x] Interaction 224×64 Compact 与 304×206 Search、0.18 秒展开 / 收起；Active 改低亮描边与小菱形。
+- [x] 世界 Marker 压光；Move 生命周期 0.63 秒；Search 9 秒慢旋转；Return Zone 仅视觉缩至 0.68，默认 / 归航 Alpha 0.45 / 0.70。
+- [x] 原生专项 331 项、既有外出视觉 91 项、六技能原生 80 项通过；194 个受保护文件哈希不变。
+- [x] 八组要求截图与同机位 A/B 基线完成，交互对比与九项报告已落盘。
+- [x] Windows 完整构建退出码 0；最终 Polish 331 项、12 组独立启动、内嵌包资源检查通过，00:24:30 完成验证。
+
+文件、视觉边界和截图见 [2.0.1 Visual Polish Report](design/expedition.md)。不继续 Anime Visual Pass。
+
+## 2026-09-13 Mission Jog V2.2 / Cadence C
+
+- [x] 保留 V2.1、Cadence A/B 与历史视频；新增独立 V2.2 Swing 曲线及 C，当前无武器 Mission 默认 C。
+- [x] 前方脚高由约 0.270m 降到 0.152m，后方 Heel Recovery 高点约 0.220m；大腿前摆峰值由约 84° 降到 52°。
+- [x] 身体轨道、Contact / Compression / Push Off 姿态保留；Start 只对齐最后 48ms 的腿部终点，Stop 与 Turn 实现保留。
+- [x] C 周期约 0.51s，30 / 60 / 144fps 相位检查通过；不修改 Gameplay Speed、角色模型或移动实现。
+- [x] 夏知遥无武器、正式 Mission/HUD/Camera、同路线的 B/C 两段 1600×900 / 60fps / 20.35s 视频已完成，包含 5s 连续侧向 Jog；1220 个位移/速度采样完全相同。
+- [x] Windows 完整构建退出码 0，12 组独立启动通过；包内 V2.2 1265 项和旧 Phase 2D 26 项通过，规范 EXE 已更新。
+- [x] 用户在 Phase 2E 任务中明确验收 V2.2/C、Start/Stop 与 Turn Lean；腿部从此锁定。
+
+参数、文件和验证结果见 [V2.2 / Cadence C 验收记录](design/combat.md)。后续授权仅为下方 Phase 2E 上半身优化。
+
+## 2026-09-13 Phase 2E：Unarmed Arm Swing V2 / Combat Jog V2
+
+- [x] 整文件哈希锁定 V2.2、Start/Stop；Cadence C、Turn 核心、Gameplay Speed 与模型/Rig 保留。
+- [x] 公共六轨手臂覆盖，紧凑上臂、弯肘、前臂滞后与微弱手腕反馈；夏知遥/苏晚星共用。
+- [x] long_gun 共用 V2.2/C；Ready/Aim/Shoot 分权重反馈，手臂解算吸收躯干运动，保留正式 Grip、MuzzlePoint 与攻击。
+- [x] 新资产/几何专项 267 项、双角色状态专项 10108 项通过；9 段正式 Mission 视频完成，两角色各 10 次真实移动攻击与 OneShot/Flash 一一对应。
+- [ ] Windows 稳定玩法快照全量构建与独立包验证。
+- [ ] 用户正式视觉验收；到此停止，不扩展其他动作或修改模型。
+
+设计、25 项交付内容、全部视频和共享工作区构建边界见 [Phase 2E 报告](design/combat.md)。同期 AI/营地任务文件保留，冻结构建只叠加本轮动画与起点玩法。
+
+## 2026-09-13 Phase 2A-Rebuild：ENM_001 新版 A-Pose 资产接管
+
+- [x] 以用户提供的 `Meshy_AI_ENM_001_infected_basi_0913093331_texture.glb` 作为唯一正式源，记录 SHA-256、网格规格、A-pose、轴向与比例。
+- [x] 旧静态源移入 `assets/characters/infected_basic_a/legacy/`；正式场景路径保持不变但已替换为新 GLB，Godot import 已强制重导。
+- [x] 基于新源重建 BH_Humanoid_Rig_v1 / 23 骨架、Skin、权重及 Rig QA 派生物。
+- [x] 重新生成 Zombie_Idle / Zombie_Walk / Zombie_Chase，并通过 Godot Skeleton3D、Skin、材质、比例、接地与循环检查。
+- [ ] 用户视觉验收与 MP4 视频导出；本轮未扩展 Attack / Hit / Death。
+
+交付报告见 [ENM_001 New A-Pose Asset Rebuild Report](design/enemies.md)。
+
+## 2026-09-13 ENM_001 Phase 2A-0B-1 Runtime Integration Gate
+
+- [x] 保留现有 Zombie AI 状态机，仅统一接入 Idle / Wander / Investigate / Chase 动画映射。
+- [x] 新增轻量 `InfectedAnimationController`：0.15s 状态 Blend、按水平速度有限 Playback Scaling、每只敌人 0..0.9s 相位偏移与 ±5% 播放变化。
+- [x] 使用生产 Mission / EncounterDirector 种群验证 26 只 ENM_001 的真实感知、噪音 Investigate、Chase 与 Runtime 引用；专项 0 failures。
+- [ ] 完整 UI 驱动 Expedition 自动流程仍有既有 timeout，暂不宣称端到端自动 PASS；Attack / Hit / Death 留待 Phase 2A-0B-2。
+
+交付报告见 [ENM_001 Runtime Integration Gate Report](ENM_001_PHASE_2A_0B_1_RUNTIME_INTEGRATION_GATE_REPORT.md)。
+
+## 2026-09-13 HUD 2.0.1 参考图排版修整
+
+- [x] 对照四组参考图，修整归航、资源 / 暂停 / 查看全部、动作栏、标题 / 队伍信息。
+- [x] 原 PNG 保留，通过运行时取样修正透明留边；头像、HP、弹药与跟随文字提高可读性。
+- [x] 动作 / 归航键位移到框体下方；延续 X / F / 1 / E / R，按用户确认增加 L 定位。
+- [x] 四种窗口尺寸、原生专项 361 项、六技能 80 项通过；14 个前后相机检查点一致。HUD 完成时 260 个保护文件哈希不变，后续构建期间的外部动画改动单独记录。
+- [x] 四张局部与 17 张完整原生截图、前后对比页已完成。
+- [x] Windows 构建前置检查通过；并行新增资产导致的首包缺漏已通过固定快照重新导入 / 导出修复。HUD 复跑 361 项、12 组独立启动及 4 组包内检查通过，01:35:36 完成交付包。
+
+改动与截图见 [参考图排版修整报告](design/ui-art-direction.md)。本轮仅推进上述 HUD 修整，不进入 Anime Visual Pass。
+
+
+## 2026-09-13 CAMP Survivor Ambient Behavior V1
+
+- [x] 新增 POI 驱动的低频营地生活行为状态机。
+- [x] 通过 CampActor 薄接口移动，出发时切换 DEPARTURE_OVERRIDE。
+- [ ] 等待视觉审核；不推进 Ambient AI 第二版或新玩法。
+
+证据见 [CAMP Survivor Ambient Behavior V1 报告](CAMP_SURVIVOR_AMBIENT_BEHAVIOR_V1_REPORT.md)。
+
+## 2026-09-13 CAMP Core Props Integration Pass 01
+
+### Placement Polish Pass 01B
+
+- [x] 完成四个正式 Prop 最终摆放清理与 HUD 验收截图修复。
+- [x] 使用真实 2 人 Shelter 流程生成 A–F 原生 Godot 截图；四个 Prop 各 1 个实例。
+- [ ] 等待视觉审核，保持核心 Prop 视觉冻结。
+
+证据见 [CAMP Core Props Placement Polish 01B](design/camp.md)。
+
+### Placement Correction Pass 01A
+
+- [x] 完成工作台朝向、发电机可见性、货架靠设施、公告板前移与 2 人截图回归。
+- [ ] 等待视觉审核。
+
+证据见 [CAMP Core Props Placement Correction Pass 01A](CAMP_CORE_PROPS_PLACEMENT_CORRECTION_PASS_01A.md)。
+
+- [x] 接入 CAMP_PROP_001 工作台、002 货架、003 公告板、004 发电机 Wrapper；停用对应程序化功能性替身。
+- [x] 完成尺寸校正、简单碰撞、材质压低、功能区摆放与原生 Godot A–F 截图。
+- [ ] 用户完成视觉审核后再决定下一批 Meshy 资产；本轮不自动扩展范围。
+
+证据见 [CAMP Core Props Integration Pass 01 报告](design/camp.md)。
+
+## 2026-09-13 CAMP HUD 2.0
+
+- [x] 三批 44 张源 PNG 完整审计；保留原件，生成不降采样的 runtime 副本与 050 纸框切片。
+- [x] 按视觉母版接入品牌、营地信息、时间/资源、动态角色栏与详情、快捷能力、装备槽及今日行动；保留真实 Gameplay 入口。
+- [x] 统一 CampTextureButton / NinePatch / 字体 / 状态；原生字形 Alpha 量测 0–1.5 px，满足 1920×1080 的 ≤2 px 标准。
+- [x] A–H、1920×1080 / 2560×1440 / 1366×768 原生截图与参考图并排页面完成，HUD 专项 68 项通过。
+- [ ] Windows 完整构建及最终独立包启动验证收尾。
+- [ ] 用户审核 CAMP HUD 2.0 实机相似度与文字居中。
+
+文件、数据缺口、原生证据与并行工作区变化边界见 [CAMP HUD 2.0 接入报告](design/ui-art-direction.md)。本轮到 HUD 审核停止，不推进营地 AI、动画、环境装饰、夜间营地或新玩法。

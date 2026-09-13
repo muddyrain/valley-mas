@@ -1,0 +1,25 @@
+{
+  "character": "infected_basic_a",
+  "source_sha256": "b04d0b2481f2c2ab05b4561654ef213744ec652f86ae706a76489f8ee3ff0613",
+  "notes": "ENM_001 rebuilt from the user supplied A-pose GLB; landmarks reviewed against the new 1.65m bounds.",
+  "body": {
+    "Root": { "head": [0, 0, 0], "tail": [0, 0, 0.12] },
+    "Hips": { "head": [0, 0, 0.83], "tail": [0, -0.008, 0.96] },
+    "Spine": { "head": [0, -0.008, 0.96], "tail": [0, -0.008, 1.07] },
+    "Chest": { "head": [0, -0.008, 1.07], "tail": [0, -0.008, 1.17] },
+    "UpperChest": { "head": [0, -0.008, 1.17], "tail": [0, -0.008, 1.25] },
+    "Neck": { "head": [0, -0.008, 1.25], "tail": [0, -0.008, 1.32] },
+    "Head": { "head": [0, -0.008, 1.32], "tail": [0, -0.03, 1.56] }
+  },
+  "left": {
+    "Shoulder": { "head": [0.025, -0.008, 1.22], "tail": [0.13, -0.01, 1.18] },
+    "UpperArm": { "head": [0.13, -0.01, 1.18], "tail": [0.25, -0.04, 1.01] },
+    "LowerArm": { "head": [0.25, -0.04, 1.01], "tail": [0.36, -0.09, 0.8] },
+    "Hand": { "head": [0.36, -0.09, 0.8], "tail": [0.43, -0.13, 0.69] },
+    "UpperLeg": { "head": [0.085, 0, 0.83], "tail": [0.09, -0.025, 0.49] },
+    "LowerLeg": { "head": [0.09, -0.025, 0.49], "tail": [0.1, 0.01, 0.16] },
+    "Foot": { "head": [0.1, 0.01, 0.16], "tail": [0.1, -0.12, 0.06] },
+    "Toes": { "head": [0.1, -0.12, 0.06], "tail": [0.1, -0.18, 0.06] }
+  },
+  "weight_corrections": "reviewed_a_pose_surfaces"
+}

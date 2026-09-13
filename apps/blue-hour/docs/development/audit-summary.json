@@ -1,0 +1,26 @@
+{
+  "broken_references": 0,
+  "cleanup_classification": "STALE_IMPORT_METADATA",
+  "rename_candidates": {
+    "P0_INVALID": 0,
+    "P1_HIGH_VALUE": 44,
+    "P2_NORMAL": 72,
+    "P3_LOW_VALUE": 32
+  },
+  "docs_archive_candidates": {
+    "SAFE_ARCHIVE": 31,
+    "MERGE_FIRST": 5,
+    "KEEP": 8,
+    "UNKNOWN": 2
+  },
+  "dynamic_reference_files": 74,
+  "duplicate_set_analysis": {
+    "total": 19,
+    "ACTIVE_VARIANTS": 4,
+    "LOD_VARIANTS": 2,
+    "ANIMATION_VARIANTS": 7,
+    "SOURCE_VARIANTS": 3,
+    "OLD_REPLACED": 2,
+    "UNKNOWN": 1
+  }
+}

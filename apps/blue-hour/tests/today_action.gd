@@ -56,7 +56,7 @@ func run() -> void:
 		for site: Dictionary in map.buildings + map.vehicles:
 			total += Vector2i(site.food, site.scrap)
 		totals.append(total)
-		enemy_counts.append(map.initial_enemies.size())
+		enemy_counts.append(map.encounter.initial_zombie_max)
 		check(map.id == action.id and map.buildings.size() == base.buildings.size(), "Destination preserves playable city sites: " + action.id)
 		check(map.bus_position == base.bus_position, "Destination preserves evacuation access: " + action.id)
 	check(totals[0].x > totals[1].x and totals[1].x > totals[2].x, "Residential route offers the most food")
@@ -95,13 +95,16 @@ func run() -> void:
 	await frames(8)
 	check(app.state == "shelter" and app.campaign.data.day == 2, "Selected mission settles and advances exactly one day")
 	check(app.campaign.data.get("selected_action", "").is_empty(), "New day clears the previous destination")
-	var expected_site_count: int = app.base_map.buildings.size() + app.base_map.vehicles.size()
+	var expected_sites: Array = app.base_map.vehicles.map(func(site: Dictionary): return site.id)
+	for site: Dictionary in app.base_map.buildings:
+		if site.get("searchable", true):
+			expected_sites.append(site.id)
 	for action_id: String in ["residential", "commercial"]:
 		app.show_today_action()
 		await frames()
 		await click(app.screen.cards[action_id])
 		await click(app.screen.confirm_button)
-		check(app.state == "mission" and app.mission.city.sites.size() == expected_site_count, "Playable destination starts: " + action_id)
+		check(app.state == "mission" and app.mission.city.sites.size() == expected_sites.size() and expected_sites.all(func(id: String): return app.mission.city.sites.has(id)), "Playable destination retains every searchable site: " + action_id)
 		check(app.mission.reward_for_site("depot").is_empty(), "Lower risk destinations do not promise airdrop equipment")
 		app.mission.director_enabled = false
 		app.mission.debug_clear_enemies()

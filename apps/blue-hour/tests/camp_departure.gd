@@ -2,13 +2,20 @@ extends "res://tests/day_loop_runtime.gd"
 
 var captures: Array[String] = []
 var cases: Array[Dictionary] = []
+var _capture_jobs: Array[Dictionary] = []
 
 func shot(label: String) -> void:
 	if DisplayServer.get_name() == "headless" or label in captures:
 		return
 	captures.append(label)
 	await RenderingServer.frame_post_draw
-	check(root.get_texture().get_image().save_png("res://test-output/camp-departure/" + label + ".png") == OK, "Actual 16:9 capture: " + label)
+	var image: Image = root.get_texture().get_image()
+	var path := "res://test-output/camp-departure/" + label + ".png"
+	var job: Dictionary = {"label": label, "error": ERR_BUSY, "task": -1}
+	# PNG compression can block for 160 ms on detailed ground. Keep capture I/O
+	# outside the movement sampler so the test doesn't manufacture a physics hitch.
+	job.task = WorkerThreadPool.add_task(func(): job.error = image.save_png(path))
+	_capture_jobs.append(job)
 
 func run() -> void:
 	create_timer(150).timeout.connect(func(): printerr("CAMP DEPARTURE TIMEOUT"); quit(2))
@@ -24,13 +31,10 @@ func run() -> void:
 		app.campaign.new_run(772, "", ["xia_zhiyao", "su_wanxing", "lin", "qiao"].slice(0, count))
 		app.show_shelter()
 		await frames(10)
-		await click(button("整装出发"))
+		await click(button("今日行动"))
 		await click(button("商业街"))
 		var original_camp: Node3D = app.camp_view.camp
-		var ambient: Dictionary = {}
-		for resident: Node3D in original_camp.get_node("Characters").get_children():
-			if not resident.is_in_group("camp_party_actor"):
-				ambient[resident] = resident.global_transform
+		check(original_camp.get_node("Characters").get_child_count() == count, "Camp contains only the actual %d campaign members" % count)
 		if forced_failure:
 			for actor: Node3D in original_camp.members.values():
 				actor.agent.navigation_layers = 0
@@ -52,7 +56,6 @@ func run() -> void:
 		var stage_times: Dictionary = {}
 		var started := Time.get_ticks_msec()
 		var safe_motion := true
-		var ambient_stayed := true
 		var largest_step := 0.0
 		var last_positions: Dictionary = {}
 		var vehicle_departed := [false]
@@ -74,8 +77,6 @@ func run() -> void:
 				last_positions[actor] = actor.global_position
 				if not actor.boarded:
 					safe_motion = safe_motion and actor_clear(actor)
-			for resident: Node3D in ambient:
-				ambient_stayed = ambient_stayed and resident.visible and resident.global_transform.is_equal_approx(ambient[resident])
 			if controller.stage == controller.Stage.DEPARTING:
 				safe_motion = safe_motion and vehicle_clear(controller.vehicle)
 			if count == 2 and controller.stage == controller.Stage.ASSEMBLING:
@@ -97,7 +98,6 @@ func run() -> void:
 		check(boarded == selected, "Only the selected members board, in order")
 		check(history.has("BOARDING") and history.has("DEPARTING") and history.has("TRANSITIONING"), "Departure visits its observable stages")
 		check(app.campaign.data == locked, "Camp performance preserves all campaign data")
-		check(ambient_stayed and ambient.size() == 4 - count, "Nonparticipating camp residents stay visible at their original positions")
 		check(vehicle_departed[0], "Entire vehicle leaves the fixed camera before fading")
 		check(safe_motion, "Characters and departing bus never overlap a static wall or each other")
 		check(not fallback_reasons.is_empty() if forced_failure else fallback_reasons.is_empty(), "Only the forced navigation failure uses correction")
@@ -111,6 +111,9 @@ func run() -> void:
 		cases.append({"members": count, "forced_failure": forced_failure, "stages_seconds": stage_times, "warnings": fallback_reasons, "largest_frame_step": largest_step, "static_collision_clear": safe_motion})
 		print("DEPARTURE CASE: ", cases.back())
 		await frames(5)
+	for job: Dictionary in _capture_jobs:
+		WorkerThreadPool.wait_for_task_completion(job.task)
+		check(job.error == OK, "Actual 16:9 capture: " + str(job.label))
 	var report := FileAccess.open("res://test-output/camp-departure/runtime.json", FileAccess.WRITE)
 	report.store_string(JSON.stringify({"checks": checks, "failures": failures, "cases": cases, "captures": captures}, "\t"))
 	print("CAMP DEPARTURE: %d checks, %d failures" % [checks, failures.size()])

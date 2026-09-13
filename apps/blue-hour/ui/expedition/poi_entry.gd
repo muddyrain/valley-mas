@@ -2,25 +2,30 @@ extends Button
 const Style = preload("res://ui/expedition_theme.gd")
 const UI = preload("res://ui/ui_style.gd")
 const Copy = preload("res://ui/expedition/poi_copy.gd")
+const HudArt = preload("res://ui/expedition/hud_skin.gd")
 var status: Label
 var normal_style: StyleBox
 var selected_style: StyleBox
 
 func setup(site: Dictionary, command: Callable) -> void:
-	custom_minimum_size = Vector2(222, 36)
+	custom_minimum_size = Vector2(260, 48)
 	alignment = HORIZONTAL_ALIGNMENT_LEFT
-	add_theme_font_size_override("font_size", 13)
+	add_theme_font_size_override("font_size", 15)
+	add_theme_color_override("font_color", Style.INK)
+	add_theme_color_override("font_hover_color", Style.INK)
+	add_theme_color_override("font_pressed_color", Style.INK)
+	add_theme_color_override("font_disabled_color", Color("#52616a"))
 	mouse_default_cursor_shape = CURSOR_POINTING_HAND
-	icon = preload("res://assets/ui/expedition/icons/gear.svg") if not site.vehicle else preload("res://assets/ui/expedition/icons/scrap.svg")
+	icon = HudArt.fitted_icon(HudArt.texture("icon_vehicle" if site.vehicle else "icon_house"))
 	expand_icon = true
-	add_theme_constant_override("icon_max_width", 20)
-	add_theme_constant_override("h_separation", 6)
+	add_theme_constant_override("icon_max_width", 26)
+	add_theme_constant_override("h_separation", 10)
 	normal_style = Style.plate(Color.TRANSPARENT, Color.TRANSPARENT, 6)
-	selected_style = Style.plate(Color("#245063b0"), Style.CYAN, 6)
+	selected_style = Style.plate(Color("#60767a38"), Color("#819a9d88"), 6)
 	add_theme_stylebox_override("hover", selected_style)
 	add_theme_stylebox_override("pressed", selected_style)
 	add_theme_stylebox_override("disabled", normal_style)
-	status = UI.label("", 11, Style.MUTED)
+	status = UI.label("", 13, Style.INK)
 	status.set_anchors_and_offsets_preset(PRESET_RIGHT_WIDE)
 	status.offset_left = -66
 	status.offset_right = -8
@@ -33,6 +38,7 @@ func setup(site: Dictionary, command: Callable) -> void:
 func update_site(id: String, mission: Node3D) -> void:
 	var site: Dictionary = mission.city.sites[id]
 	var task = mission.search_tasks.get(id)
+	icon = HudArt.fitted_icon(HudArt.texture("icon_complete" if site.searched else "icon_vehicle" if site.vehicle else "icon_house"))
 	disabled = site.searched or mission.closing_left >= 0 or not mission.active
 	add_theme_stylebox_override("normal", selected_style if mission.poi_selected_id == id else normal_style)
 	text = site.spec.name
@@ -41,5 +47,5 @@ func update_site(id: String, mission: Node3D) -> void:
 		status.text = "%d%%" % (site.progress * 100)
 		status.modulate = Style.CYAN
 	else:
-		status.modulate = Color.WHITE
+		status.modulate = Style.INK
 	tooltip_text = "%s · %s\n%s%s\n%s" % [Copy.category(site), site.spec.name, Copy.loot(site), " · 装备" if not mission.reward_for_site(id).is_empty() else "", "已清点" if site.searched else (task.worker.data.display_name + " · 搜索中" if task != null else "待搜")]

@@ -1,6 +1,9 @@
 extends PanelContainer
 const UI = preload("res://ui/ui_style.gd")
 const Style = preload("res://ui/expedition_theme.gd")
+const HudArt = preload("res://ui/expedition/hud_skin.gd")
+const Visual = preload("res://ui/expedition/hud_visual_profile.gd")
+signal inspected
 const PORTRAITS: Dictionary = {
 	"xia_zhiyao": preload("res://assets/ui/expedition/portraits/portrait_xia_zhiyao.png"),
 	"su_wanxing": preload("res://assets/ui/expedition/portraits/portrait_su_wanxing.png")
@@ -15,23 +18,39 @@ var weapon_icon: TextureRect
 var equipped_id: String = ""
 var column: VBoxContainer
 var compact: bool = false
+var health_text: Label
+var status_dot: TextureRect
+var select_button: Button
 
 func setup(member: Node3D, command: Callable, template_id: String) -> void:
-	custom_minimum_size = Vector2(178, 80)
-	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	custom_minimum_size = Vector2(288, 124)
+	add_theme_stylebox_override("panel", HudArt.panel("hud_party_card", Vector4(12, 12, 12, 12)))
 	column = VBoxContainer.new()
 	column.add_theme_constant_override("separation", 3)
 	add_child(column)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 5)
+	row.add_theme_constant_override("separation", 10)
 	column.add_child(row)
 	portrait = TextureRect.new()
-	portrait.custom_minimum_size = Vector2(70, 72)
+	portrait.custom_minimum_size = Vector2(78, 94) / Visual.PARTY_SCALE
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	portrait.texture = load(member.data.portrait_path) if not member.data.portrait_path.is_empty() else PORTRAITS.get(template_id)
 	portrait.mouse_filter = MOUSE_FILTER_IGNORE
 	row.add_child(portrait)
+	var frame := HudArt.picture("hud_portrait_frame", Vector2.ZERO)
+	frame.self_modulate = Visual.border_tint("hud_party_card")
+	frame.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	portrait.add_child(frame)
+	select_button = Button.new()
+	select_button.flat = true
+	select_button.focus_mode = FOCUS_NONE
+	select_button.mouse_default_cursor_shape = CURSOR_POINTING_HAND
+	select_button.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	for state: String in ["normal", "hover", "pressed", "disabled", "focus"]:
+		select_button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	portrait.add_child(select_button)
+	select_button.pressed.connect(func(): inspected.emit())
 	if portrait.texture == null:
 		var initial := UI.label(member.data.display_name.left(1), 32, Style.CYAN)
 		initial.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
@@ -42,45 +61,59 @@ func setup(member: Node3D, command: Callable, template_id: String) -> void:
 	info.size_flags_horizontal = SIZE_EXPAND_FILL
 	info.add_theme_constant_override("separation", 3)
 	row.add_child(info)
-	summary = UI.label("", 14, Style.PAPER)
-	summary.add_theme_stylebox_override("normal", Style.plate(Color("#122b3990"), Color.TRANSPARENT, 2))
+	summary = UI.label("", 16, Style.PAPER)
 	info.add_child(summary)
+	health_text = UI.label("", 13, Style.INK)
+	info.add_child(health_text)
 	health = ProgressBar.new()
 	health.show_percentage = false
-	health.custom_minimum_size.y = 3
+	health.custom_minimum_size.y = 6
+	HudArt.progress(health)
 	info.add_child(health)
 	var weapon_row := HBoxContainer.new()
 	info.add_child(weapon_row)
 	weapon_icon = TextureRect.new()
 	weapon_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	weapon_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	weapon_icon.custom_minimum_size = Vector2(26, 18)
+	weapon_icon.custom_minimum_size = Vector2(30, 20)
 	weapon_row.add_child(weapon_icon)
-	details = UI.label("", 11, Style.MUTED)
+	details = UI.label("", 14, Style.MUTED)
 	weapon_row.add_child(details)
-	status = UI.label("", 11, Style.CYAN)
-	info.add_child(status)
+	var status_row := HBoxContainer.new()
+	info.add_child(status_row)
+	status_dot = HudArt.picture("ui_status_dot_blue", Vector2(12, 12))
+	status_row.add_child(status_dot)
+	status = UI.label("", 13, Style.MUTED)
+	status_row.add_child(status)
 	action = UI.button("查看搜索", command, Vector2(0, 22))
 	action.add_theme_font_size_override("font_size", 11)
-	for state: String in ["normal", "hover", "pressed", "disabled"]:
-		action.add_theme_stylebox_override(state, Style.plate(Color("#172f3bb0"), Color("#6898a166"), 3))
+	HudArt.button(action)
 	column.add_child(action)
+	HudArt.pass_decorations(self)
 
 func set_compact(value: bool) -> void:
 	if compact == value:
 		return
 	compact = value
-	# At the minimum window size the whole portrait becomes the existing assignment button.
-	action.reparent(self if compact else column)
-	action.custom_minimum_size.y = 0 if compact else 22
-	for state: String in ["normal", "hover", "pressed", "disabled"]:
-		action.add_theme_stylebox_override(state, StyleBoxEmpty.new() if compact else Style.plate(Color("#172f3bb0"), Color("#6898a166"), 3))
 	reset_size()
 
+func set_selected(selected: bool) -> void:
+	var skin := "hud_survivor_card_bg_selected" if selected else "hud_survivor_card_bg_normal"
+	add_theme_stylebox_override("panel", HudArt.surface(skin, Vector4(12, 12, 12, 12)))
+	select_button.modulate = Color.WHITE
+	portrait.modulate = Color.WHITE
+	summary.add_theme_color_override("font_color", Color("#f1f2e8") if selected else Style.PAPER)
+
 func update_member(member: Node3D, mission: Node3D) -> void:
+	var danger_state: bool = member.dead or member.hp < member.data.max_hp * .5
+	if danger_state:
+		add_theme_stylebox_override("panel", HudArt.surface("hud_survivor_card_bg_danger", Vector4(12, 12, 12, 12)))
+	else:
+		add_theme_stylebox_override("panel", HudArt.surface("hud_survivor_card_bg_normal", Vector4(12, 12, 12, 12)))
 	summary.text = member.data.display_name
 	health.max_value = member.data.max_hp
 	health.value = member.hp
+	health_text.text = "HP  %d / %d" % [ceili(member.hp), ceili(member.data.max_hp)]
 	var weapon_id: String = member.weapon.id if member.weapon != null else ""
 	if equipped_id != weapon_id:
 		equipped_id = weapon_id
@@ -93,14 +126,16 @@ func update_member(member: Node3D, mission: Node3D) -> void:
 	elif mission.extraction or member.regrouping:
 		status.text = "归队"
 	elif task != null:
-		status.text = "自卫 · 暂停" if task.phase == 2 else "搜索 %d%%" % (mission.city.sites[task.site_id].progress * 100)
+		status.text = "自卫 · 暂停" if task.phase == task.Phase.DEFEND else "搜索 %d%%" % (mission.city.sites[task.site_id].progress * 100)
 	elif member.hp < member.data.max_hp * .5:
 		status.text = "受伤 · %d" % member.hp
 	elif member.cooldown > 0 or member.reload_left > 0:
 		status.text = "战斗"
+	status_dot.texture = HudArt.texture("ui_status_dot_red" if member.dead or member.hp < member.data.max_hp * .5 else "ui_status_dot_gold" if task != null else "ui_status_dot_purple" if mission.extraction else "ui_status_dot_blue")
 	tooltip_text = "%s · %d/%d HP\n%s · %s\n%s" % [member.data.display_name, member.hp, member.data.max_hp, (member.weapon.display_name if member.weapon != null else "未装备"), member.talent.display_name, member.talent.description]
 	action.visible = task != null or not mission.search_id.is_empty()
 	action.disabled = member.dead or not mission.active or task == mission.search_task
 	action.tooltip_text = "查看搜索" if task != null else "接替当前搜索"
-	action.text = "" if compact else "查看搜索" if task != null else "接替搜索"
+	action.text = "查看搜索" if task != null else "接替搜索"
+	select_button.disabled = member.dead
 	modulate = Color("#8b9499") if member.dead else Color.WHITE

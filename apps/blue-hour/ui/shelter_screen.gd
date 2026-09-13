@@ -1,174 +1,363 @@
 extends Control
+## Persistent Camp UI; Campaign remains the authority for all gameplay values.
 const UI = preload("res://ui/ui_style.gd")
+const Style = preload("res://ui/camp_style.gd")
+const Drawer = preload("res://ui/camp/camp_survivor_detail.gd")
+const CampHUD = preload("res://ui/camp/camp_hud.gd")
 const WeaponBrowser = preload("res://ui/weapon_browser.gd")
+const DetailCard = preload("res://ui/camp_detail_card.gd")
+enum Mode { NORMAL, SURVIVOR_PANEL, FACILITY_PANEL, INVENTORY, EFFECTS, WEAPONS, MENU, DEBUG, TODAY_ACTION, DEPARTURE, TRANSITION }
 var app: Node
-var debug_panel: PanelContainer
-var weapon_selects: Array[OptionButton] = []
-var departure: Button
+var ui_state := Mode.NORMAL
 var view: Node3D
-var training_button: Button
+var hud_root: Control
+var party_panel: PanelContainer
+var drawer: PanelContainer
+var facility_panel: PanelContainer
+var active_interactable: Node3D
+var browser: Control
+var today_action: Control
+var departure: Button
+var day_status: Label
+var debug_panel: PanelContainer
 var member_buttons: Dictionary = {}
 var shop_panel: PanelContainer
 var shop_backdrop: ColorRect
 var effects_panel: PanelContainer
 var effects_backdrop: ColorRect
 var effect_buttons: Dictionary = {}
+var _buttons: Array[Button] = []
+var detail_card: PanelContainer
+var _hint_generation := 0
+var training_button: Button:
+	get:
+		return drawer.training_button if is_instance_valid(drawer) else null
 
 func setup(owner_app: Node) -> void:
 	app = owner_app
-	var game = app.campaign
-	if game.data.status in ["won", "lost"]:
-		var ending_column := UI.page(self)
-		ending_column.add_child(UI.label("东岸安全屋", 30))
-		ending_column.add_child(UI.label("第 %d / %d 天    食物 %d · 今日需 %d    废料 %d" % [game.data.day, app.catalog.loop.end_day, game.data.food, game.data.members.size() * app.catalog.loop.food_per_member, game.data.scrap], 19, UI.AMBER))
-		_ending(ending_column)
-		return
+	name = "CampUI"
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	theme = UI.theme()
+	theme = Style.theme()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var header := PanelContainer.new()
-	add_child(header)
-	header.position = Vector2(24, 24)
-	header.size.x = 480
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 8)
-	header.add_child(column)
-	column.add_child(UI.label("东岸安全屋", 30))
-	column.add_child(UI.wrapped("第 %d / %d 天    食物 %d · 今日需 %d    废料 %d" % [game.data.day, app.catalog.loop.end_day, game.data.food, game.data.members.size() * app.catalog.loop.food_per_member, game.data.scrap], 19, UI.AMBER))
-	column.add_child(UI.wrapped("饥饿 · 出勤生命上限 %d%% · 已连续缺粮 %d 天" % [app.catalog.loop.hunger_health_multiplier * 100, game.data.hunger] if game.data.hunger > 0 else "已休整 · 准备出发", 14, UI.MUTED))
+	if app.campaign.data.status in ["won", "lost"]:
+		_ending(UI.page(self))
+		return
 	view = app.get_camp_view()
-	view.interaction_locked = false
-	var selected: String = app.selected_member if app.selected_member in game.data.members else game.data.members[0]
-	app.selected_member = selected
-	view.select(selected)
-	for category: String in ["passive", "power"]:
-		var equipped_row := HFlowContainer.new()
-		column.add_child(equipped_row)
-		equipped_row.add_child(UI.label("被动" if category == "passive" else "技能", 14, UI.CYAN))
-		for effect: Resource in game.equipped_effects(category):
-			var badge := TextureRect.new()
-			badge.texture = effect.icon
-			badge.custom_minimum_size = Vector2(40, 40)
-			badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			badge.tooltip_text = effect.display_name + (" · 已升级" if effect.is_upgraded else "") + "\n" + effect.description()
-			equipped_row.add_child(badge)
-	var roster_panel := PanelContainer.new()
-	add_child(roster_panel)
-	roster_panel.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
-	roster_panel.offset_left = -406
-	roster_panel.offset_right = -24
-	roster_panel.offset_top = 24
-	roster_panel.offset_bottom = -96
-	var roster_scroll := ScrollContainer.new()
-	roster_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	roster_panel.add_child(roster_scroll)
-	var roster := VBoxContainer.new()
-	roster.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	roster.add_theme_constant_override("separation", 12)
-	roster_scroll.add_child(roster)
-	roster.add_child(UI.label("外勤小队", 18, UI.AMBER))
-	var row := HBoxContainer.new()
-	roster.add_child(row)
-	for id in game.data.members:
-		var member_button := UI.button(app.member_name(id), func(): app.select_member(id), Vector2(0, 42))
-		member_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		if id == selected:
-			member_button.add_theme_stylebox_override("normal", UI.panel(Color("#294453"), UI.CYAN))
-		row.add_child(member_button)
-		member_buttons[id] = member_button
-	var spec: Resource = game.member_template(selected)
-	var talent: Resource = game.member_trait(selected)
-	roster.add_child(UI.label("%s · %d 级" % [spec.display_name, game.member_level(selected)], 26, spec.color.lightened(0.3)))
-	roster.add_child(UI.label(talent.display_name, 19, UI.CYAN))
-	roster.add_child(UI.wrapped(talent.summary(), 16))
-	roster.add_child(UI.label("生命上限 %.0f" % (spec.max_hp * game.health_multiplier()), 15, UI.MUTED))
-	var select := OptionButton.new()
-	select.custom_minimum_size.y = 40
-	select.fit_to_longest_item = false
-	select.add_item("未装备")
-	select.set_item_metadata(0, "")
-	for i in range(game.data.inventory.size()):
-		var item: Dictionary = game.data.inventory[i]
-		var holder := ""
-		for member in game.data.equipment:
-			if game.data.equipment[member] == item.uid:
-				holder = " · " + app.member_name(member)
-		select.add_item("%d. %s%s" % [i + 1, game.gear.title(item), holder])
-		select.set_item_metadata(i + 1, item.uid)
-		if item.uid == game.data.equipment[selected]:
-			select.selected = i + 1
-	select.item_selected.connect(func(index: int):
-		if index == 0:
-			app.unequip_member(selected)
-		else:
-			app.equip_member(selected, select.get_item_metadata(index)))
-	roster.add_child(select)
-	weapon_selects.append(select)
-	var equipped: Resource = game.weapon(game.data.equipment[selected])
-	roster.add_child(UI.wrapped(game.gear.description(game.item(game.data.equipment[selected])), 14, UI.MUTED))
-	if equipped != null:
-		var weapon_icon := TextureRect.new()
-		weapon_icon.texture = equipped.icon()
-		weapon_icon.custom_minimum_size = Vector2(64, 64)
-		weapon_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		weapon_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		roster.add_child(weapon_icon)
-		roster.add_child(UI.label("伤害 %.1f · 含特质与被动" % game.passive_modifiers().outgoing_damage(equipped.damage * talent.damage_multiplier, equipped.melee), 16))
-		roster.add_child(UI.button("卸下武器", func(): app.unequip_member(selected), Vector2(0, 32)))
-	var cost: int = game.training_cost(selected)
-	if cost >= 0:
-		var next: Resource = app.catalog.by_id(app.catalog.traits, spec.trait_id).at_level(game.member_level(selected) + 1)
-		roster.add_child(UI.wrapped("下一级 · " + next.summary(), 15, UI.CYAN))
-		roster.add_child(UI.label("升级后食物 %d · 今日口粮 %d" % [maxi(0, game.data.food - cost), game.data.members.size() * app.catalog.loop.food_per_member], 14, UI.MUTED))
-	training_button = UI.button("已达等级上限" if cost < 0 else "升级成员 · %d 食物" % cost, func(): app.train_member(selected))
-	training_button.disabled = cost < 0 or game.data.food < cost
-	roster.add_child(training_button)
-	column.add_child(UI.wrapped(app.status_message, 14, UI.CYAN))
-	var actions := HBoxContainer.new()
-	add_child(actions)
-	actions.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	actions.offset_left = 24
-	actions.offset_right = -24
-	actions.offset_top = -72
-	actions.offset_bottom = -24
-	departure = UI.button("整装出发", app.show_today_action, Vector2(0, 48))
-	departure.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	actions.add_child(departure)
-	actions.add_child(UI.button("备用装备", func(): shop_backdrop.show(); shop_panel.show(), Vector2(140, 48)))
-	actions.add_child(UI.button("武器", show_weapons, Vector2(80, 48)))
-	actions.add_child(UI.button("道具与技能", show_effects, Vector2(130, 48)))
-	actions.add_child(UI.button("主菜单", app.show_main_menu, Vector2(115, 48)))
-	actions.add_child(UI.button("调试 [F1]", toggle_debug, Vector2(125, 48)))
+	if app.selected_member not in app.campaign.data.members:
+		app.selected_member = app.campaign.data.members[0]
+	_build()
+
+func refresh() -> void:
+	var previous := ui_state
+	var descriptor := active_interactable
+	var inventory_mode: bool = browser.inventory_mode if is_instance_valid(browser) else false
+	var selected_uid: String = browser.selected_uid if is_instance_valid(browser) else ""
+	close_context()
+	for child: Node in get_children():
+		remove_child(child)
+		child.queue_free()
+	member_buttons.clear()
+	effect_buttons.clear()
+	_buttons.clear()
+	view.refresh_members(app.campaign)
+	_build()
+	match previous:
+		Mode.SURVIVOR_PANEL: show_survivor(app.selected_member)
+		Mode.FACILITY_PANEL: show_facility(descriptor)
+		Mode.INVENTORY: show_shop()
+		Mode.EFFECTS: show_effects()
+		Mode.WEAPONS:
+			show_weapons()
+			browser._show_list(inventory_mode)
+			if not selected_uid.is_empty():
+				browser._show_details(app.campaign.weapon(selected_uid), app.campaign.item(selected_uid))
+
+func _build() -> void:
+	hud_root = CampHUD.new()
+	add_child(hud_root)
+	hud_root.setup(self)
 	_build_shop()
 	_build_effects()
-	_build_debug()
+	if OS.is_debug_build():
+		_build_debug()
+	_set_state(Mode.NORMAL)
+	show_survivor(app.selected_member)
+
+func _bind_hint(source: Control, callback: Callable) -> void:
+	source.mouse_entered.connect(func():
+		_hint_generation += 1
+		var generation := _hint_generation
+		await get_tree().create_timer(0.22).timeout
+		if generation == _hint_generation and app.state == "shelter" and ui_state in [Mode.NORMAL, Mode.SURVIVOR_PANEL]:
+			# Hover and click resolve to the same card so the UI never creates two
+			# competing information boards for one skill or item.
+			callback.call())
+	source.mouse_exited.connect(func():
+		_hint_generation += 1
+		if is_instance_valid(detail_card) and not detail_card.interactive:
+			_clear_detail())
+
+func _clear_detail() -> void:
+	_hint_generation += 1
+	if is_instance_valid(detail_card):
+		remove_child(detail_card)
+		detail_card.queue_free()
+	detail_card = null
+
+func _detail(title: String, subtitle: String, source: Control, side: String, pinned: bool) -> PanelContainer:
+	if pinned:
+		close_context()
+	else:
+		_clear_detail()
+	detail_card = DetailCard.new()
+	add_child(detail_card)
+	detail_card.setup(title, subtitle, source, side, pinned)
+	detail_card.closed.connect(close_context)
+	if pinned:
+		_set_state(Mode.FACILITY_PANEL)
+	return detail_card
+
+func show_effect_detail(category: String, id: String, pinned: bool) -> void:
+	if app.state != "shelter":
+		return
+	var source := hud_root.find_child("Effect_" + category + "_" + id, true, false) as Control
+	if source == null:
+		return
+	var definition: Resource = app.campaign.effect_definition(category, id)
+	var title: String = definition.display_name if definition != null else ("空道具槽" if category == "passive" else "空技能槽")
+	var card := _detail(title, "被动道具 · 随队生效" if category == "passive" else "战术能力 · 每次出勤可用一次", source, "above" if category == "passive" else "right", pinned)
+	if pinned:
+		source.set_selected(true)
+	if definition == null:
+		card.describe("从已持有的装备中选择一项。")
+	else:
+		card.describe(definition.description(), Style.INK)
+		if pinned:
+			card.describe("已完成升级" if definition.is_upgraded else definition.upgrade_description(), Style.ACCENT)
+	if pinned:
+		card.action("装备" if definition == null else "更换", func(): _show_replacements(category, id))
+		if definition != null:
+			card.action("已升级" if definition.is_upgraded else "升级 · 待开放", func(): pass, false)
+			if not definition.is_upgraded:
+				card.describe("升级暂未开放。", Style.MUTED)
+
+func _show_replacements(category: String, old_id: String) -> void:
+	var source: Control = detail_card.source
+	var side: String = detail_card.side
+	var card := _detail("更换道具" if category == "passive" else "更换技能", "已持有", source, side, true)
+	var choices := 0
+	for id: String in app.campaign.data[category + "_items"]:
+		if id in app.campaign.data[category + "_slots"]:
+			continue
+		var definition: Resource = app.campaign.effect_definition(category, id)
+		choices += 1
+		card.action(definition.display_name, func(): app.replace_camp_effect(category, old_id, id))
+		card.describe(definition.description())
+	if choices == 0:
+		card.describe("暂无可更换的装备。")
+	if not old_id.is_empty():
+		card.action("卸下", func(): app.replace_camp_effect(category, old_id, ""))
+
+func show_slot_detail(category: String, pinned: bool) -> void:
+	if app.state != "shelter":
+		return
+	var capacity: int = app.campaign.data[category + "_capacity"]
+	var count: int = app.campaign.data[category + "_slots"].size()
+	var title := "道具槽" if category == "passive" else "技能槽"
+	var source := hud_root.find_child("Unlock_" + category, true, false) as Control
+	var card := _detail(title, "已装备 %d / %d" % [count, capacity], source, "above" if category == "passive" else "right", pinned)
+	card.describe("扩展容量后，可同时携带更多" + ("被动道具。" if category == "passive" else "战术能力。"))
+	card.describe("槽位解锁暂未开放。")
+	if pinned:
+		card.action("解锁 · 待开放", func(): pass, false)
+
+func _show_phase(pinned: bool) -> void:
+	if app.state != "shelter":
+		return
+	var source := hud_root.find_child("PhaseStatus", true, false) as Control
+	var card := _detail("白昼与蓝时", "出勤时段", source, "below", pinned)
+	var modifiers: RefCounted = app.campaign.passive_modifiers()
+	card.describe("白昼 %d 秒 · 蓝时 %d 秒" % [app.base_map.day_seconds + modifiers.amount("day_extension"), app.base_map.blue_seconds], Style.INK)
+	card.describe("蓝时结束后进入夜晚。夜间每停留 %d 秒，感染者威胁继续上升。" % app.base_map.night_threat_seconds)
+	if pinned:
+		card.describe("夜间威胁每次出勤重新计算。天黑前规划好归航路线。", Style.ACCENT)
+
+func _set_state(value: Mode) -> void:
+	ui_state = value
+	if is_instance_valid(hud_root):
+		hud_root.visible = value != Mode.TODAY_ACTION
+	view.interaction_locked = value not in [Mode.NORMAL, Mode.SURVIVOR_PANEL, Mode.FACILITY_PANEL]
+
+func close_context() -> void:
+	if ui_state in [Mode.DEPARTURE, Mode.TRANSITION]:
+		return
+	_clear_detail()
+	if is_instance_valid(hud_root):
+		hud_root.clear_slot_selection()
+	for panel: Control in [drawer, facility_panel, browser]:
+		if is_instance_valid(panel):
+			panel.get_parent().remove_child(panel)
+			panel.queue_free()
+	drawer = null
+	facility_panel = null
+	browser = null
+	for panel: Control in [shop_panel, shop_backdrop, effects_panel, effects_backdrop, debug_panel]:
+		if is_instance_valid(panel):
+			panel.hide()
+	if is_instance_valid(party_panel):
+		party_panel.show()
+	_set_state(Mode.NORMAL)
+
+func handle_back() -> void:
+	if ui_state in [Mode.DEPARTURE, Mode.TRANSITION]:
+		return
+	if ui_state == Mode.TODAY_ACTION:
+		app.show_shelter()
+	elif ui_state == Mode.NORMAL:
+		show_menu()
+	else:
+		close_context()
+
+func show_survivor(id: String) -> void:
+	if app.state != "shelter" or id not in app.campaign.data.members:
+		return
+	close_context()
+	drawer = Drawer.new()
+	hud_root.composition.add_child(drawer)
+	var member_index: int = app.campaign.data.members.find(id)
+	# Align the card header with the selected portrait row while keeping the
+	# lower action area clear of the departure button.
+	drawer.position = Vector2(1330, minf(190.0 + member_index * 120.0, 340.0))
+	drawer.size = Vector2(430, 530)
+	drawer.setup(app, id)
+	drawer.closed.connect(close_context)
+	hud_root.select_member(id)
+	view.select(id)
+	_set_state(Mode.SURVIVOR_PANEL)
+
+func show_survivors() -> void:
+	show_survivor(app.selected_member)
+
+func show_facility(descriptor: Node3D) -> void:
+	if app.state != "shelter" or not is_instance_valid(descriptor):
+		return
+	close_context()
+	active_interactable = descriptor
+	var column := _context(descriptor.display_name)
+	column.add_child(Style.wrapped(descriptor.description, 16))
+	if descriptor.panel_type == "vehicle":
+		column.add_child(Style.wrapped("外勤队伍 · " + app.member_names(app.campaign.data.selected_party), 17, Style.INK))
+		var action: Resource = app.catalog.by_id(app.catalog.today_actions, app.campaign.data.selected_action)
+		column.add_child(Style.wrapped("今日任务 · " + (action.display_name if action != null else "待选择"), 16, Style.ACCENT))
+	var entries := {"today_action": ["今日行动", app.show_today_action], "shop": ["备用装备", show_shop], "weapons": ["武器", show_weapons], "effects": ["道具与技能", show_effects]}
+	for key: String in descriptor.actions:
+		if entries.has(key):
+			column.add_child(Style.button(entries[key][0], entries[key][1]))
+	_set_state(Mode.FACILITY_PANEL)
+
+func _context(title: String) -> VBoxContainer:
+	facility_panel = PanelContainer.new()
+	facility_panel.theme = Style.paper_theme()
+	facility_panel.name = "ContextPanel"
+	add_child(facility_panel)
+	facility_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	facility_panel.offset_left = -596
+	facility_panel.offset_right = -226
+	facility_panel.offset_top = 110
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 16)
+	facility_panel.add_child(column)
+	var heading := HBoxContainer.new()
+	column.add_child(heading)
+	var label := Style.label(title, 24)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_child(label)
+	heading.add_child(Style.button("关闭", close_context, Vector2(62, 34)))
+	return column
+
+func show_menu() -> void:
+	if app.state != "shelter":
+		return
+	close_context()
+	var column := _context("营地")
+	column.add_child(Style.button("返回营地", close_context))
+	column.add_child(Style.button("幸存者", show_survivors))
+	column.add_child(Style.button("武器", show_weapons))
+	column.add_child(Style.button("备用装备", show_shop))
+	column.add_child(Style.button("道具与技能", show_effects))
+	column.add_child(Style.button("主菜单", app.show_main_menu))
+	column.add_child(Style.button("退出游戏", app.request_quit))
+	_set_state(Mode.MENU)
+
+func show_shop() -> void:
+	if app.state != "shelter":
+		return
+	close_context()
+	shop_backdrop.show()
+	shop_panel.show()
+	_set_state(Mode.INVENTORY)
 
 func show_weapons() -> void:
-	var browser := WeaponBrowser.new()
+	if app.state != "shelter":
+		return
+	close_context()
+	browser = WeaponBrowser.new()
 	add_child(browser)
 	browser.setup(app)
+	browser.closed.connect(close_context)
+	_set_state(Mode.WEAPONS)
 
 func show_effects() -> void:
+	if app.state != "shelter":
+		return
+	close_context()
 	effects_backdrop.show()
 	effects_panel.show()
+	_set_state(Mode.EFFECTS)
+
+func toggle_debug() -> void:
+	if app.state != "shelter" or not OS.is_debug_build() or not is_instance_valid(debug_panel):
+		return
+	if ui_state == Mode.DEBUG:
+		close_context()
+	else:
+		close_context()
+		debug_panel.show()
+		_set_state(Mode.DEBUG)
+
+func lock_departure() -> void:
+	close_context()
+	_set_state(Mode.DEPARTURE)
+	party_panel.get_child(0).get_child(0).text = "外勤小队  /  %d" % app.campaign.data.selected_party.size()
+	for id: String in member_buttons:
+		member_buttons[id].visible = id in app.campaign.data.selected_party
+		member_buttons[id].find_child("Readiness", true, false).text = "Lv.%d · 出发中" % app.campaign.member_level(id)
+	party_panel.reset_size()
+	for button: Button in _buttons:
+		button.disabled = true
+		button.modulate.a = 0.78
+		button.add_theme_color_override("font_disabled_color", UI.MUTED)
+	departure.text = "准备出发…"
+	day_status.text = "外勤小队 · 正在出发"
+	view.select("")
 
 func _build_effects() -> void:
 	effects_backdrop = ColorRect.new()
-	effects_backdrop.color = Color(0, 0, 0, 0.65)
+	effects_backdrop.color = Color(0.035, 0.085, 0.14, 0.22)
 	effects_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(effects_backdrop)
 	effects_backdrop.hide()
 	effects_panel = PanelContainer.new()
-	effects_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	effects_panel.offset_left = 100
-	effects_panel.offset_right = -100
-	effects_panel.offset_top = 45
-	effects_panel.offset_bottom = -45
+	effects_panel.theme = Style.paper_theme()
+	effects_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	effects_panel.offset_left = -380
+	effects_panel.offset_right = 380
+	effects_panel.offset_top = -270
+	effects_panel.offset_bottom = 270
 	add_child(effects_panel)
 	var column := VBoxContainer.new()
 	effects_panel.add_child(column)
-	column.add_child(UI.label("道具与技能", 24, UI.AMBER))
+	column.add_child(Style.label("道具与技能", 24))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -179,7 +368,7 @@ func _build_effects() -> void:
 	scroll.add_child(content)
 	for category: String in ["passive", "power"]:
 		var slots: Array = app.campaign.data[category + "_slots"]
-		content.add_child(UI.label(("被动道具" if category == "passive" else "特殊技能 · 每日一次") + "  %d / %d" % [slots.size(), app.campaign.data[category + "_capacity"]], 18, UI.CYAN))
+		content.add_child(Style.label(("被动道具" if category == "passive" else "特殊技能 · 每日一次") + "  %d / %d" % [slots.size(), app.campaign.data[category + "_capacity"]], 18, Style.ACCENT))
 		for id: String in app.campaign.data[category + "_items"]:
 			var definition: Resource = app.campaign.effect_definition(category, id)
 			var row := HBoxContainer.new()
@@ -193,23 +382,25 @@ func _build_effects() -> void:
 			var text := VBoxContainer.new()
 			text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(text)
-			text.add_child(UI.label(definition.display_name + (" · 已升级" if definition.is_upgraded else ""), 17))
-			text.add_child(UI.wrapped(definition.description(), 14, UI.MUTED))
+			text.add_child(Style.label(definition.display_name + (" · 已升级" if definition.is_upgraded else ""), 17))
+			text.add_child(Style.wrapped(definition.description(), 14))
 			var button := UI.button("卸下" if id in slots else "装备", func(): app.set_effect_equipped(category, id, id not in slots), Vector2(80, 40))
 			button.disabled = id not in slots and slots.size() >= app.campaign.data[category + "_capacity"]
-			button.tooltip_text = definition.description() if definition.is_upgraded else definition.upgrade_description()
+			if not definition.is_upgraded:
+				text.add_child(Style.wrapped(definition.upgrade_description(), 13, Style.ACCENT))
 			row.add_child(button)
 			effect_buttons[id] = button
-	column.add_child(UI.button("关闭", func(): effects_panel.hide(); effects_backdrop.hide()))
+	column.add_child(UI.button("关闭", close_context))
 	effects_panel.hide()
 
 func _build_shop() -> void:
 	shop_backdrop = ColorRect.new()
-	shop_backdrop.color = Color(0, 0, 0, 0.65)
+	shop_backdrop.color = Color(0.035, 0.085, 0.14, 0.22)
 	shop_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(shop_backdrop)
 	shop_backdrop.hide()
 	shop_panel = PanelContainer.new()
+	shop_panel.theme = Style.paper_theme()
 	shop_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	shop_panel.offset_left = -380
 	shop_panel.offset_right = 380
@@ -219,15 +410,15 @@ func _build_shop() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	shop_panel.add_child(box)
-	box.add_child(UI.label("今日备用装备", 24, UI.AMBER))
+	box.add_child(Style.label("今日备用装备", 24))
 	for offer in app.campaign.data.shop:
-		box.add_child(UI.label(app.campaign.gear.title(offer), 18))
-		box.add_child(UI.wrapped(app.campaign.gear.description(offer), 14, UI.MUTED))
+		box.add_child(Style.label(app.campaign.gear.title(offer), 18))
+		box.add_child(Style.wrapped(app.campaign.gear.description(offer), 14))
 		var buy := UI.button("已售出" if offer.sold else "购买 · %d 废料" % offer.price, func(): app.buy_weapon(offer.uid), Vector2(0, 36))
 		buy.name = "Buy_" + offer.uid.replace(":", "_")
 		buy.disabled = offer.sold or app.campaign.data.scrap < offer.price
 		box.add_child(buy)
-	box.add_child(UI.button("关闭", func(): shop_panel.hide(); shop_backdrop.hide()))
+	box.add_child(UI.button("关闭", close_context))
 	shop_panel.hide()
 
 func _ending(column: VBoxContainer) -> void:
@@ -273,7 +464,3 @@ func _build_debug() -> void:
 	box.add_child(UI.button("升级全部已持有道具与技能", func(): app.debug_effects(true)))
 	box.add_child(UI.button("关闭", toggle_debug))
 	debug_panel.visible = false
-
-func toggle_debug() -> void:
-	if debug_panel != null:
-		debug_panel.visible = not debug_panel.visible

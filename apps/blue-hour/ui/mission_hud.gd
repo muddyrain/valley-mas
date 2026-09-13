@@ -1,5 +1,5 @@
 extends Control
-signal quit_requested
+signal main_menu_requested
 const UI = preload("res://ui/ui_style.gd")
 const Style = preload("res://ui/expedition_theme.gd")
 const Art = preload("res://ui/new_run_art.gd")
@@ -8,8 +8,18 @@ const PoiEntry = preload("res://ui/expedition/poi_entry.gd")
 const PoiContext = preload("res://ui/expedition/poi_context.gd")
 const ActionIcon = preload("res://ui/expedition/action_icon.gd")
 const DebugMenu = preload("res://debug/debug_menu.gd")
+const SettingsView = preload("res://ui/settings_view.gd")
+const HudArt = preload("res://ui/expedition/hud_skin.gd")
+const WorldMarkers = preload("res://ui/expedition/world_markers.gd")
+const Visual = preload("res://ui/expedition/hud_visual_profile.gd")
+const Minimap = preload("res://ui/expedition/minimap.gd")
+const HUD_SCALE: float = .8
 var mission: Node3D
+var game_settings: RefCounted
 var phase_label: Label
+var phase_icon: TextureRect
+var phase_steps: Array[Label] = []
+var day_label: Label
 var clock_label: Label
 var squad_labels: Array[Label] = []
 var squad_cards: Array[PanelContainer] = []
@@ -20,6 +30,7 @@ var squad_heading: Label
 var site_buttons: Dictionary = {}
 var order_label: Label
 var toast: Label
+var toast_panel: PanelContainer
 var toast_left: float = 0.0
 var objective: Label
 var debug_menu: PanelContainer
@@ -28,13 +39,15 @@ var extract_button: Button
 var paused: bool = false
 var pause_button: Button
 var pause_menu: PanelContainer
+var settings_menu: PanelContainer
+var settings_view: VBoxContainer
 var rally_button: Button
 var menu_backdrop: ColorRect
 var power_buttons: Dictionary = {}
 var power_panel: PanelContainer
 var watch_label: Label
 var focus_label: Label
-var poi_context: PanelContainer
+var poi_context: Control
 var phase_progress: ProgressBar
 var top_panel: PanelContainer
 var squad_panel: PanelContainer
@@ -51,11 +64,23 @@ var expand_button: Button
 var objectives_expanded: bool = false
 var tracker_left: float = 0.0
 var command_buttons: Dictionary = {}
-var return_surface: StyleBox
 var clock_surface: StyleBox
+var ui_viewport: Viewport
+var world_markers: Node3D
+var squad_scroll: ScrollContainer
+var squad_column: VBoxContainer
+var selected_member: Node3D
+var minimap: Control
+var roster_ids: Array[int] = []
 
-func setup(target: Node3D) -> void:
+func _exit_tree() -> void:
+	if is_instance_valid(ui_viewport) and ui_viewport.size_changed.is_connected(_fit_window):
+		ui_viewport.size_changed.disconnect(_fit_window)
+
+func setup(target: Node3D, preferences: RefCounted = null) -> void:
 	mission = target
+	game_settings = preferences
+	ui_viewport = get_viewport()
 	set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	theme = Style.theme()
@@ -67,98 +92,207 @@ func setup(target: Node3D) -> void:
 	poi_context.name = "PoiContext"
 	add_child(poi_context)
 	poi_context.setup(mission)
+	world_markers = WorldMarkers.new()
+	add_child(world_markers)
+	world_markers.setup(mission, poi_context)
+	if not mission.survivors.is_empty():
+		selected_member = mission.survivors[0]
+		world_markers.selected_member = selected_member
+		if is_instance_valid(mission.world_interaction_vfx):
+			mission.world_interaction_vfx.set_selected_member(selected_member)
+	HudArt.pass_decorations(self)
 	_build_menus()
-	get_viewport().size_changed.connect(_fit_window)
+	minimap = Minimap.new()
+	minimap.name = "Minimap"
+	minimap.set_anchors_and_offsets_preset(PRESET_BOTTOM_LEFT)
+	minimap.offset_left = 20
+	minimap.offset_top = -240
+	minimap.offset_right = 280
+	minimap.offset_bottom = -20
+	add_child(minimap)
+	minimap.setup(mission)
+	ui_viewport.size_changed.connect(_fit_window)
 	_fit_window()
 	mission.notice.connect(show_notice)
 	refresh()
 
 func _fit_window() -> void:
-	# Keep expedition text and hit targets at readable pixel sizes; other screens retain their canvas.
+	# PNG dimensions are reduced by HUD_SCALE; native text remains sharp at both target resolutions.
 	var stretch: Vector2 = get_viewport().get_stretch_transform().get_scale()
-	if scale.is_equal_approx(Vector2.ONE / stretch) and size.is_equal_approx(get_viewport_rect().size * stretch):
+	var pixels: Vector2 = get_viewport_rect().size * stretch
+	var responsive: float = minf(1.0, minf(pixels.x / 1440.0, pixels.y / 810.0))
+	scale = Vector2.ONE * responsive / stretch
+	size = pixels / responsive
+	squad_panel.offset_top = 170
+	squad_scroll.custom_minimum_size.y = minf(squad_column.get_combined_minimum_size().y, size.y - 320)
+	squad_panel.reset_size()
+	top_panel.scale = Vector2.ONE * Visual.TIME_SCALE
+	top_panel.pivot_offset = Vector2(top_panel.size.x * .5, 0)
+	squad_panel.scale = Vector2.ONE * Visual.PARTY_SCALE
+	sites_panel.scale = Vector2.ONE * Visual.OBJECTIVE_SCALE
+	sites_panel.pivot_offset = Vector2(sites_panel.size.x, 0)
+	command_panel.scale = Vector2.ONE * Visual.ACTION_SCALE
+	command_panel.pivot_offset = Vector2(command_panel.size.x * .5, command_panel.size.y)
+	extract_button.set_visual_scale(Visual.RETURN_SCALE)
+	_fit_tracker()
+
+func _fit_tracker() -> void:
+	var shown: int = site_buttons.values().filter(func(entry: Button): return entry.visible).size()
+	var content_height: float = shown * 48 + maxi(shown - 1, 0) * 4
+	sites_scroll.custom_minimum_size.y = minf(content_height, minf(308 if objectives_expanded else 152, maxf(0, size.y - 360)))
+	sites_panel.size.y = 0
+	sites_panel.reset_size()
+
+func inspect_member(member: Node3D, locate: bool = true) -> void:
+	if member.dead:
 		return
-	scale = Vector2.ONE / stretch
-	size = get_viewport_rect().size * stretch
-	var compact: bool = size.y < 740
-	squad_panel.offset_top = 96 if compact else 120
-	for card: PanelContainer in squad_cards:
-		card.set_compact(compact)
-		card.portrait.custom_minimum_size.y = 64 if compact else 72
-		card.custom_minimum_size.y = 74 if compact else 82
-		card.reset_size()
+	selected_member = member
+	world_markers.selected_member = member
+	if is_instance_valid(mission.world_interaction_vfx):
+		mission.world_interaction_vfx.set_selected_member(member)
+	if locate:
+		mission.camera_controller.following = false
+		mission.camera_center = member.position
+		mission.camera_controller.apply()
+	refresh()
+
+func _input(event: InputEvent) -> void:
+	if mission == null or not mission.input_enabled or not event is InputEventMouseButton:
+		return
+	if not event.pressed or event.button_index != MOUSE_BUTTON_LEFT or mission.controls.over_ui() or mission.controls.aiming or mission.controls.dragging:
+		return
+	for member: Node3D in mission.survivors:
+		if member.dead or member.inside_building or member.boarding:
+			continue
+		var foot: Vector2 = mission.camera.unproject_position(member.rig.global_position)
+		var head: Vector2 = mission.camera.unproject_position(member.rig.global_position + Vector3.UP * 1.7)
+		var hit := Rect2(Vector2(head.x - 14, head.y), Vector2(28, maxf(20, foot.y - head.y)))
+		if hit.has_point(event.position):
+			inspect_member(member, false)
+			get_viewport().set_input_as_handled()
+			return
 
 func _build_top() -> void:
-	brand_panel = Style.anchored(self, "Brand", PRESET_TOP_LEFT, Rect2(20, 20, 178, 60))
-	brand_panel.add_theme_stylebox_override("panel", Style.plate(Color("#122b39d0"), Color("#7397a15c"), 10))
+	brand_panel = Style.anchored(self, "Brand", PRESET_TOP_LEFT, Rect2(26, 24, 280, 120))
+	brand_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	var brand := VBoxContainer.new()
+	brand.add_theme_constant_override("separation", 4)
 	brand_panel.add_child(brand)
-	var name_label := UI.label("蓝时归航", 22, Style.PAPER)
+	var name_label := UI.label("蓝时归航", 44, Color("#f3f2e9"))
+	name_label.name = "Title"
 	name_label.add_theme_font_override("font", Art.title_font())
+	name_label.add_theme_color_override("font_shadow_color", Color("#071321cc"))
+	name_label.add_theme_constant_override("shadow_offset_y", 2)
 	brand.add_child(name_label)
-	brand.add_child(UI.label("东岸旧街  /  HOMEWARD", 10, Style.MUTED))
-	top_panel = Style.anchored(self, "PhaseClock", PRESET_CENTER_TOP, Rect2(-104, 16, 208, 76))
-	clock_surface = Style.plate(Color("#122b3970"), Style.CYAN, 3)
-	clock_surface.clock_face = true
+	brand.add_child(UI.label("H  O  M  E  W  A  R  D", 14, Color("#d2dfe3")))
+	top_panel = Style.anchored(self, "PhaseClock", PRESET_CENTER_TOP, Rect2(-230, 12, 460, 112))
+	clock_surface = HudArt.panel("hud_time_panel", Vector4(24, 12, 24, 18))
 	top_panel.add_theme_stylebox_override("panel", clock_surface)
 	var state := VBoxContainer.new()
 	state.add_theme_constant_override("separation", 0)
 	top_panel.add_child(state)
-	phase_label = UI.label("DAY", 14, Style.GOLD)
+	phase_label = UI.label("白昼", 14, Style.INK)
 	phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	state.add_child(phase_label)
-	clock_label = UI.label("02:30", 30, Style.PAPER)
+	var phases := HBoxContainer.new()
+	phases.alignment = BoxContainer.ALIGNMENT_CENTER
+	phases.add_theme_constant_override("separation", 12)
+	state.add_child(phases)
+	for phase_name: String in ["白昼", "黄昏预警", "蓝时", "夜晚"]:
+		var step := UI.label(phase_name, 11, Style.MUTED)
+		step.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		phases.add_child(step)
+		phase_steps.append(step)
+	phase_icon = TextureRect.new()
+	phase_icon.custom_minimum_size = Vector2(20, 20)
+	phase_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	phase_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	phase_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	state.add_child(phase_icon)
+	clock_label = UI.label("02:30", 29, Style.PAPER)
 	clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	state.add_child(clock_label)
-	phase_hint = UI.label("", 0, Style.MUTED)
+	day_label = UI.label("第 1 天", 12, Style.INK)
+	day_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	state.add_child(day_label)
+	phase_hint = UI.label("", 10, Style.MUTED)
 	phase_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	phase_hint.visible = false
+	phase_hint.visible = true
 	state.add_child(phase_hint)
 	phase_progress = ProgressBar.new()
 	phase_progress.show_percentage = false
-	phase_progress.custom_minimum_size.y = 3
+	phase_progress.custom_minimum_size.y = 2
+	HudArt.progress(phase_progress)
 	state.add_child(phase_progress)
-	resources_panel = Style.anchored(self, "Supplies", PRESET_TOP_RIGHT, Rect2(-292, 20, 272, 48))
-	resources_panel.add_theme_stylebox_override("panel", Style.plate(Color("#122b39db"), Color("#7397a15c"), 6))
+	resources_panel = Style.anchored(self, "Supplies", PRESET_TOP_RIGHT, Rect2(-410, 18, 390, 76))
+	resources_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
+	row.add_theme_constant_override("separation", 8)
 	resources_panel.add_child(row)
-	var textures: Array[Texture2D] = [preload("res://assets/ui/expedition/icons/food.svg"), preload("res://assets/ui/expedition/icons/scrap.svg"), preload("res://assets/ui/expedition/icons/gear.svg")]
+	var textures: Array[Texture2D] = [HudArt.texture("icon_bag"), HudArt.texture("icon_loot"), HudArt.texture("icon_ammo")]
 	for i: int in range(3):
+		var card_panel := PanelContainer.new()
+		card_panel.custom_minimum_size = Vector2(86, 58)
+		card_panel.add_theme_stylebox_override("panel", HudArt.surface("hud_resource_card_bg", Vector4(10, 8, 10, 8)))
+		var card := VBoxContainer.new()
+		card_panel.add_child(card)
 		var picture := TextureRect.new()
-		picture.texture = textures[i]
-		picture.custom_minimum_size = Vector2(20, 28)
+		picture.texture = HudArt.fitted_icon(textures[i])
+		picture.custom_minimum_size = Vector2(20, 20)
 		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		picture.tooltip_text = ["食物", "废料", "装备"][i]
-		row.add_child(picture)
-		var count := UI.label("00", 14, Style.PAPER)
-		row.add_child(count)
+		picture.tooltip_text = ["食物", "废料", "情报"][i]
+		var heading := HBoxContainer.new()
+		heading.add_child(picture)
+		heading.add_child(UI.label(["食物", "废料", "情报"][i], 11, Style.PAPER))
+		card.add_child(heading)
+		var count := UI.label("—", 18, Style.PAPER)
+		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		count.custom_minimum_size.x = 28
+		card.add_child(count)
+		row.add_child(card_panel)
 		resource_counts.append(count)
-	pause_button = UI.button("Ⅱ", toggle_pause, Vector2(32, 32))
-	pause_button.tooltip_text = "暂停 / 继续 · 空格"
+	pause_button = UI.button("菜单  MENU", toggle_menu, Vector2(100, 56))
+	pause_button.size_flags_vertical = SIZE_SHRINK_CENTER
+	pause_button.add_theme_font_size_override("font_size", 14)
+	HudArt.button(pause_button, "hud_skill_slot")
+	# Fixed corner sampling keeps the short Pause plate from becoming a narrow capsule.
+	for state_name: String in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		var plate: StyleBox = pause_button.get_theme_stylebox(state_name)
+		if plate is StyleBoxTexture:
+			for side: int in range(4):
+				(plate as StyleBoxTexture).set_texture_margin(side, 14)
+	pause_button.tooltip_text = "打开菜单 · Esc"
 	row.add_child(pause_button)
 	watch_label = UI.label("腕表预警", 12, Style.GOLD)
 	watch_label.set_anchors_and_offsets_preset(PRESET_CENTER_TOP)
 	watch_label.offset_left = -46
-	watch_label.offset_top = 94
+	watch_label.offset_top = 134
 	add_child(watch_label)
 	focus_label = UI.label("", 12, Style.CYAN)
 	focus_label.set_anchors_and_offsets_preset(PRESET_CENTER_TOP)
 	focus_label.offset_left = -75
-	focus_label.offset_top = 111
+	focus_label.offset_top = 152
 	add_child(focus_label)
 
 func _build_squad() -> void:
-	squad_panel = Style.anchored(self, "SquadPortraits", PRESET_TOP_LEFT, Rect2(20, 120, 178, 0))
+	squad_panel = Style.anchored(self, "SquadPortraits", PRESET_TOP_LEFT, Rect2(20, 154, 360 * HUD_SCALE, 0))
 	squad_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	squad_scroll = ScrollContainer.new()
+	squad_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	squad_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	squad_scroll.add_theme_constant_override("scrollbar_width", 0)
+	squad_panel.add_child(squad_scroll)
 	var squad := VBoxContainer.new()
+	squad_column = squad
+	squad.size_flags_horizontal = SIZE_EXPAND_FILL
 	squad.add_theme_constant_override("separation", 8)
-	squad_panel.add_child(squad)
-	squad_heading = UI.label("外勤小队", 11, Style.PAPER)
+	squad_scroll.add_child(squad)
+	squad_heading = UI.label("外勤小队", 12, Color("#c9d9d6"))
 	squad.add_child(squad_heading)
 	for i: int in range(mission.survivors.size()):
 		var survivor: Node3D = mission.survivors[i]
+		roster_ids.append(survivor.get_instance_id())
 		var card := SquadCard.new()
 		squad.add_child(card)
 		card.setup(survivor, func():
@@ -168,6 +302,7 @@ func _build_squad() -> void:
 			else:
 				mission.command_reassign(i)
 		, mission.campaign.member_template(survivor.data.id).id if mission.campaign != null else survivor.data.id)
+		card.inspected.connect(inspect_member.bind(survivor))
 		squad_cards.append(card)
 		squad_labels.append(card.summary)
 		assign_buttons.append(card.action)
@@ -176,26 +311,34 @@ func _build_squad() -> void:
 	squad.add_child(task_label)
 	recall_button = UI.button("取消当前搜索", mission.command_recall, Vector2(0, 26))
 	recall_button.add_theme_font_size_override("font_size", 12)
+	HudArt.button(recall_button)
 	squad.add_child(recall_button)
-	rally_button = UI.button("集合  [R]", mission.command_recall_all, Vector2(0, 28))
-	rally_button.icon = preload("res://assets/ui/expedition/icons/rally.svg")
+	rally_button = UI.button("集合  [R]", mission.command_recall_all, Vector2(0, 40))
+	rally_button.icon = HudArt.fitted_icon(HudArt.texture("icon_team"))
+	HudArt.button(rally_button)
 	rally_button.expand_icon = true
 	rally_button.add_theme_constant_override("icon_max_width", 20)
-	rally_button.add_theme_font_size_override("font_size", 12)
+	rally_button.add_theme_font_size_override("font_size", 16)
+	rally_button.add_theme_color_override("font_color", Color("#eef5f2"))
+	rally_button.add_theme_color_override("font_hover_color", Color.WHITE)
+	rally_button.add_theme_color_override("font_pressed_color", Color.WHITE)
 	squad.add_child(rally_button)
 
 func _build_sites() -> void:
-	sites_panel = Style.anchored(self, "ObjectiveTracker", PRESET_TOP_RIGHT, Rect2(-266, 104, 246, 198))
-	sites_panel.add_theme_stylebox_override("panel", Style.plate(Color("#112938a8"), Color.TRANSPARENT, 8))
+	sites_panel = Style.anchored(self, "ObjectiveTracker", PRESET_TOP_RIGHT, Rect2(-324, 104, 380 * HUD_SCALE, 260))
+	sites_panel.add_theme_stylebox_override("panel", HudArt.panel("hud_objective_panel", Vector4(20, 24, 20, 20)))
 	var sites := VBoxContainer.new()
 	sites.add_theme_constant_override("separation", 6)
 	sites_panel.add_child(sites)
-	objective = UI.label("", 14, Style.GOLD)
+	objective = UI.label("", 17, Style.INK)
 	sites.add_child(objective)
+	var divider := HudArt.picture("ui_divider_line_long", Vector2(0, 6))
+	divider.self_modulate = Color(.65, .65, .65, .55)
+	sites.add_child(divider)
 	sites_scroll = ScrollContainer.new()
 	sites_scroll.name = "SiteScroll"
 	sites_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	sites_scroll.size_flags_vertical = SIZE_EXPAND_FILL
+	sites_scroll.size_flags_vertical = SIZE_FILL
 	sites_scroll.custom_minimum_size.y = 116
 	sites.add_child(sites_scroll)
 	site_list = VBoxContainer.new()
@@ -211,15 +354,19 @@ func _build_sites() -> void:
 		entry.focus_entered.connect(func(): poi_context.focused_id = id)
 		entry.focus_exited.connect(func(): if poi_context.focused_id == id: poi_context.focused_id = "")
 		site_buttons[id] = entry
-	expand_button = UI.button("查看全部  +", func(): set_objectives_expanded(not objectives_expanded), Vector2(0, 24))
-	expand_button.add_theme_font_size_override("font_size", 11)
+	expand_button = UI.button("查看全部  →", func(): set_objectives_expanded(not objectives_expanded), Vector2(0, 36))
+	expand_button.add_theme_font_size_override("font_size", 15)
+	HudArt.button(expand_button)
+	expand_button.add_theme_color_override("font_color", Color("#e8f0ea"))
+	expand_button.add_theme_color_override("font_hover_color", Color.WHITE)
+	expand_button.add_theme_color_override("font_pressed_color", Color.WHITE)
 	sites.add_child(expand_button)
 	_update_tracker()
 
 func set_objectives_expanded(expanded: bool) -> void:
 	objectives_expanded = expanded
 	sites_scroll.custom_minimum_size.y = 296 if expanded else 116
-	expand_button.text = "收起  −" if expanded else "查看全部  +"
+	expand_button.text = "收起  −" if expanded else "查看全部  →"
 	_update_tracker()
 	sites_panel.reset_size()
 
@@ -230,73 +377,95 @@ func _update_tracker() -> void:
 	for i: int in range(ids.size()):
 		var id: String = ids[i]
 		var entry: Button = site_buttons[id]
-		entry.visible = objectives_expanded or (shown < 3 and not mission.city.sites[id].searched)
+		entry.visible = mission.city.sites[id].discovered and (objectives_expanded or (shown < 3 and not mission.city.sites[id].searched))
 		if entry.visible:
 			shown += 1
 		site_list.move_child(entry, i)
+	_fit_tracker()
 
 func _site_priority(id: String) -> float:
 	var site: Dictionary = mission.city.sites[id]
 	return (-20000.0 if mission.search_tasks.has(id) else -10000.0 if mission.poi_selected_id == id else 0.0) + (100000.0 if site.searched else 0.0) + site.spec.entry.distance_squared_to(mission.squad_center())
 
 func _build_commands() -> void:
-	var dock_width: float = 3 * 70 + mission.powers.states.size() * 76 + (mission.powers.states.size() + 2) * 6
-	command_panel = Style.anchored(self, "ActionIcons", PRESET_CENTER_BOTTOM, Rect2(-dock_width / 2, -92, dock_width, 76))
-	command_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	var dock_width: float = 3 * 96 + mission.powers.states.size() * 96 + (mission.powers.states.size() + 2) * 10 + 44
+	command_panel = Style.anchored(self, "ActionIcons", PRESET_CENTER_BOTTOM, Rect2(-dock_width / 2, -156, dock_width, 128))
+	var action_tray := StyleBoxFlat.new()
+	action_tray.bg_color = Color("#102b3dcc")
+	action_tray.border_color = Color("#8faab366")
+	action_tray.set_border_width_all(1)
+	action_tray.set_corner_radius_all(14)
+	action_tray.content_margin_left = 10
+	action_tray.content_margin_right = 10
+	action_tray.content_margin_top = 8
+	action_tray.content_margin_bottom = 8
+	command_panel.add_theme_stylebox_override("panel", action_tray)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
+	row.add_theme_constant_override("separation", 8)
 	command_panel.add_child(row)
 	var actions: Array[Array] = [
-		["停止", "X", preload("res://assets/ui/expedition/icons/stop.svg"), mission.command_stop],
-		["集火", "F", preload("res://assets/ui/expedition/icons/focus.svg"), mission.command_focus_nearest],
-		["定位", "", preload("res://assets/ui/expedition/icons/locate.svg"), mission.center_squad]
+		["停止", "X", HudArt.texture("icon_stop"), mission.command_stop],
+		["集火", "F", HudArt.texture("icon_focus_fire"), mission.command_focus_nearest],
+		["定位", "L", HudArt.texture("icon_locate"), mission.center_squad]
 	]
 	for spec: Array in actions:
 		var action := ActionIcon.new()
 		row.add_child(action)
 		action.setup(spec[0], spec[1], spec[2], spec[3])
 		command_buttons[spec[0]] = action
-	command_buttons["定位"].tooltip_text = "恢复镜头跟随 · WASD / 拖动自由查看 · 滚轮缩放"
+	var locate_key := InputEventKey.new()
+	locate_key.physical_keycode = KEY_L
+	command_buttons["定位"].shortcut = Shortcut.new()
+	command_buttons["定位"].shortcut.events = [locate_key]
+	command_buttons["定位"].shortcut_in_tooltip = false
+	command_buttons["定位"].tooltip_text = "L · 恢复镜头跟随 · WASD / 拖动自由查看 · 滚轮缩放"
 	power_panel = PanelContainer.new()
 	power_panel.name = "Abilities"
 	power_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	row.add_child(power_panel)
 	var abilities := HBoxContainer.new()
-	abilities.add_theme_constant_override("separation", 6)
+	abilities.add_theme_constant_override("separation", 8)
 	power_panel.add_child(abilities)
+	var power_index: int = 0
 	for id: String in mission.powers.states:
 		var definition: Resource = mission.powers.states[id].definition
 		var ability := ActionIcon.new()
 		abilities.add_child(ability)
-		ability.setup(definition.display_name, "1", definition.icon, func(): mission.powers.activate(id); refresh(), 76)
-		ability.tooltip_text = definition.description() + " · 每日一次"
+		power_index += 1
+		ability.setup(definition.display_name, str(power_index), definition.icon, func(): mission.powers.activate(id); refresh(), 96)
+		var key_event := InputEventKey.new()
+		key_event.physical_keycode = KEY_0 + power_index
+		ability.shortcut = Shortcut.new()
+		ability.shortcut.events = [key_event]
+		ability.shortcut_in_tooltip = false
+		ability.tooltip_text = str(power_index) + " · " + definition.description() + " · 每日一次"
 		power_buttons[id] = ability
 	extract_button = ActionIcon.new()
 	extract_button.name = "ReturnHome"
 	add_child(extract_button)
 	extract_button.set_anchors_and_offsets_preset(PRESET_BOTTOM_RIGHT)
-	extract_button.offset_left = -148
-	extract_button.offset_right = -20
-	extract_button.offset_top = -92
-	extract_button.offset_bottom = -16
-	extract_button.setup("全队归航", "E", preload("res://assets/ui/expedition/icons/return.svg"), mission.command_extract, 128)
-	return_surface = Style.plate(Color("#3b3540ed"), Style.GOLD, 10)
-	return_surface.content_margin_bottom = 27
-	extract_button.add_theme_stylebox_override("normal", return_surface)
+	extract_button.family = "hud_return"
+	extract_button.offset_left = -320
+	extract_button.offset_right = -24
+	extract_button.offset_top = -150
+	extract_button.offset_bottom = -20
+	extract_button.setup("全队归航", "E", HudArt.texture("icon_return"), mission.command_extract, 296)
 	order_label = UI.label("", 11, Style.PAPER)
 	order_label.set_anchors_and_offsets_preset(PRESET_CENTER_BOTTOM)
 	order_label.offset_left = -dock_width / 2
-	order_label.offset_top = -114
+	order_label.offset_top = -172
 	add_child(order_label)
-	toast = UI.label("", 13, Style.GOLD)
-	toast.set_anchors_and_offsets_preset(PRESET_CENTER_BOTTOM)
-	toast.offset_left = -170
-	toast.offset_top = -144
-	add_child(toast)
+	toast_panel = Style.anchored(self, "LootToast", PRESET_CENTER_BOTTOM, Rect2(-130, -248, 130, -192))
+	toast_panel.add_theme_stylebox_override("panel", HudArt.surface("loot_toast_bg", Vector4(12, 8, 12, 8)))
+	toast = UI.label("", 14, Style.INK)
+	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	toast.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	toast_panel.add_child(toast)
 
 func _process(delta: float) -> void:
 	toast_left -= delta
 	toast.visible = toast_left > 0
+	toast_panel.visible = toast_left > 0
 	tracker_left -= delta
 	if tracker_left <= 0:
 		tracker_left = 1.0
@@ -312,44 +481,70 @@ func _process(delta: float) -> void:
 func refresh() -> void:
 	if mission == null:
 		return
+	var current_ids: Array[int] = []
+	for member: Node3D in mission.survivors:
+		current_ids.append(member.get_instance_id())
+	if current_ids != roster_ids:
+		squad_panel.free()
+		squad_cards.clear()
+		squad_labels.clear()
+		assign_buttons.clear()
+		roster_ids.clear()
+		_build_squad()
+		HudArt.pass_decorations(squad_panel)
+		_fit_window()
 	for id: String in power_buttons:
 		var state = mission.powers.states[id]
-		power_buttons[id].set_state(mission.powers.can_activate(id), state.active, str(ceili(state.remaining_duration)) if state.active else "0" if state.used_today else "1")
+		power_buttons[id].set_state(mission.input_enabled and mission.powers.can_activate(id), state.active, str(ceili(state.remaining_duration)) + "s" if state.active else "已用" if state.used_today else "")
+	var available: bool = mission.input_enabled and mission.active and mission.closing_left < 0
+	command_buttons["停止"].set_state(available and not mission.guards().is_empty(), mission.order.begins_with("停止"))
+	command_buttons["集火"].set_state(available and not mission.guards().is_empty(), is_instance_valid(mission.focus_target))
+	command_buttons["定位"].set_state(available, mission.camera_controller.following)
 	watch_label.visible = mission.watch_warning_active
 	var priority: Node3D = mission.powers.target()
 	focus_label.visible = priority != null or mission.effects.amount("freeze_day_clock") > 0
 	focus_label.text = ("集火 · " + priority.data.display_name if priority != null else "") + (" 暮色延缓" if mission.effects.amount("freeze_day_clock") > 0 else "")
 	var clock = mission.clock
-	phase_label.text = ["DAY", "BLUE HOUR", "NIGHT"][clock.phase]
+	phase_label.text = ["白昼", "蓝时", "夜晚"][clock.phase]
+	phase_icon.texture = HudArt.texture(["icon_phase_day", "icon_phase_blue_hour", "icon_phase_night"][clock.phase])
+	var phase_step_index: int = 0 if clock.phase == clock.DAY else 2 if clock.phase == clock.BLUE_HOUR else 3
+	for index: int in range(phase_steps.size()):
+		phase_steps[index].add_theme_color_override("font_color", Style.CYAN if index == phase_step_index else Style.MUTED)
+	if clock.warning_active:
+		phase_label.text = "黄昏预警"
+		phase_icon.texture = HudArt.texture("icon_phase_warning")
+		if phase_steps.size() > 1:
+			phase_steps[1].add_theme_color_override("font_color", Style.GOLD)
 	var phase_color: Color = [Style.GOLD.lerp(Style.CYAN, clampf(1.0 - clock.remaining() / 40.0, 0, 1)), Style.CYAN, Color("#e8a8a3")][clock.phase]
 	phase_label.add_theme_color_override("font_color", phase_color)
-	clock_surface.fill = Color("#202a47a8") if clock.phase == clock.BLUE_HOUR else Color("#142a3890")
-	clock_surface.edge = Color(phase_color, .65)
-	clock_surface.emit_changed()
 	var seconds: int = ceili(clock.remaining())
 	clock_label.text = "%02d:%02d" % [seconds / 60, seconds % 60]
+	day_label.text = "第 %d 天" % (mission.campaign.data.day if mission.campaign != null else 1)
 	phase_hint.text = "距蓝时" if clock.phase == clock.DAY else "距夜幕 · 尽快归航" if clock.phase == clock.BLUE_HOUR else "夜幕警戒 %d" % clock.threat_level()
+	if clock.warning_active:
+		phase_hint.text = "感染者正在躁动"
 	phase_progress.modulate = phase_color
 	phase_progress.value = clock.remaining()
 	phase_progress.max_value = clock.settings.day_seconds if clock.phase == clock.DAY else clock.settings.blue_seconds
 	resource_counts[0].text = "%02d" % mission.ledger.food
 	resource_counts[1].text = "%02d" % mission.ledger.scrap
-	resource_counts[2].text = str(mission.ledger.weapons.size())
+	resource_counts[2].text = "情报  —"
 	squad_heading.text = "外勤 %d · 掩护 %d · 搜索 %d" % [mission.living().size(), mission.guards().size(), mission.search_tasks.size()]
 	for i: int in range(squad_cards.size()):
 		squad_cards[i].update_member(mission.survivors[i], mission)
+		squad_cards[i].set_selected(mission.survivors[i] == selected_member)
 	var busy: bool = not mission.search_id.is_empty()
 	task_label.visible = busy
-	task_label.text = (mission.city.sites[mission.search_id].spec.name + (" · 自卫" if mission.search_task.phase == 2 else "")) if busy else ""
+	task_label.text = (mission.city.sites[mission.search_id].spec.name + (" · 自卫" if mission.search_task.phase == mission.search_task.Phase.DEFEND else "")) if busy else ""
 	recall_button.visible = busy
 	recall_button.disabled = not busy or not mission.active
 	rally_button.disabled = not mission.active or mission.closing_left >= 0
 	var remaining: int = 0
 	for id: String in site_buttons:
 		site_buttons[id].update_site(id, mission)
-		if not mission.city.sites[id].searched:
+		if mission.city.sites[id].discovered:
 			remaining += 1
-	objective.text = "第 %d 天 · %d 处待搜" % [mission.campaign.data.day if mission.campaign != null else 1, remaining]
+	objective.text = "第 %d 天 · 已发现 %d" % [mission.campaign.data.day if mission.campaign != null else 1, remaining]
 	order_label.text = mission.order
 	extract_button.caption.text = "全队归航"
 	if mission.extraction:
@@ -357,18 +552,13 @@ func refresh() -> void:
 		extract_button.caption.text = "集合 %d/%d" % [mission.board_count(), mission.living().size()]
 	elif clock.phase != clock.DAY:
 		extract_button.caption.text = "立即归航"
-	elif clock.remaining() <= 30:
+	elif clock.warning_active:
 		extract_button.caption.text = "准备归航"
-	var urgent: bool = clock.phase == clock.NIGHT or (clock.phase == clock.BLUE_HOUR and clock.remaining() <= 6)
-	return_surface.edge = Color("#ffc3ad") if urgent else Style.CYAN if clock.phase == clock.BLUE_HOUR else Color(Style.GOLD, 1.0 if clock.remaining() <= 30 else .5)
-	return_surface.fill = Color("#4a3542ef") if urgent else Color("#202e46ed") if clock.phase == clock.BLUE_HOUR else Color("#302e35e8")
-	return_surface.emit_changed()
-	extract_button.state_line.color = return_surface.edge
-	extract_button.disabled = not mission.active or mission.closing_left >= 0
+	extract_button.set_state(available, mission.extraction and available)
 	if mission.closing_left >= 0:
 		order_label.text = "车门关闭 · 归航"
 		extract_button.caption.text = "正在归航"
-	pause_button.text = "▷" if paused else "Ⅱ"
+	pause_button.text = "菜单  MENU"
 	squad_panel.reset_size()
 	poi_context.refresh()
 
@@ -382,7 +572,7 @@ func _build_menus() -> void:
 	add_child(debug_menu)
 	debug_menu.setup(mission)
 	debug_menu.toggled.connect(_sync_pause)
-	pause_menu = Style.anchored(self, "PauseMenu", PRESET_CENTER, Rect2(-230, -150, 460, 300))
+	pause_menu = Style.anchored(self, "PauseMenu", PRESET_CENTER, Rect2(-230, -180, 460, 360))
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 18)
 	pause_menu.add_child(column)
@@ -393,22 +583,40 @@ func _build_menus() -> void:
 		pause_menu.hide()
 		_sync_pause()
 	))
-	column.add_child(UI.button("退出游戏", func(): quit_requested.emit()))
+	if game_settings != null:
+		column.add_child(UI.button("设置", _open_settings))
+	column.add_child(UI.button("返回主菜单", func(): main_menu_requested.emit()))
 	pause_menu.hide()
+	if game_settings != null:
+		settings_menu = Style.anchored(self, "SettingsMenu", PRESET_CENTER, Rect2(-330, -300, 660, 600))
+		var settings_column := VBoxContainer.new()
+		settings_column.add_theme_constant_override("separation", 12)
+		settings_menu.add_child(settings_column)
+		var settings_heading := UI.label("设置", 30, Style.CYAN)
+		settings_heading.name = "SettingsHeading"
+		settings_heading.custom_minimum_size.y = 44
+		settings_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		settings_heading.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		settings_column.add_child(settings_heading)
+		settings_view = SettingsView.new()
+		settings_column.add_child(settings_view)
+		settings_view.setup(game_settings, Style.PAPER, Style.MUTED, Style.CYAN)
+		settings_view.close_requested.connect(_close_settings)
+		settings_menu.hide()
 
 func show_notice(text: String) -> void:
 	toast.text = text
 	toast_left = 4.0
 
 func toggle_pause() -> void:
-	if debug_menu.visible or pause_menu.visible:
+	if debug_menu.visible or pause_menu.visible or _settings_open():
 		return
 	paused = not paused
 	_sync_pause()
 	show_notice("行动暂停" if paused else "继续行动")
 
 func toggle_debug() -> void:
-	if pause_menu.visible:
+	if pause_menu.visible or _settings_open():
 		return
 	debug_menu.toggle()
 
@@ -416,11 +624,30 @@ func toggle_menu() -> void:
 	if debug_menu.visible:
 		debug_menu.toggle()
 		return
+	if _settings_open():
+		_close_settings()
+		return
 	pause_menu.visible = not pause_menu.visible
 	_sync_pause()
 
 func _sync_pause() -> void:
-	menu_backdrop.visible = pause_menu.visible or debug_menu.visible
-	mission.time_scale = 0.0 if paused or pause_menu.visible or debug_menu.visible else debug_menu.speed
-	mission.input_enabled = not pause_menu.visible and not debug_menu.visible
+	menu_backdrop.visible = pause_menu.visible or _settings_open() or debug_menu.visible
+	mission.time_scale = 0.0 if paused or pause_menu.visible or _settings_open() or debug_menu.visible else debug_menu.speed
+	mission.input_enabled = not pause_menu.visible and not _settings_open() and not debug_menu.visible and (mission.arrival == null or mission.arrival.finished)
 	mission.controls.reset()
+	refresh()
+
+func _open_settings() -> void:
+	pause_menu.hide()
+	settings_menu.show()
+	_sync_pause()
+	settings_view.focus_first.call_deferred()
+
+func _close_settings() -> void:
+	settings_view.commit()
+	settings_menu.hide()
+	pause_menu.show()
+	_sync_pause()
+
+func _settings_open() -> bool:
+	return is_instance_valid(settings_menu) and settings_menu.visible

@@ -2,6 +2,12 @@
 
 路径均相对 `apps/blue-hour/`，包含Godot生成的资源sidecar；运行截图、日志、导出物及本清单生成临时文件在忽略目录，不纳入源码变更。未执行git提交。
 
+## 2026-09-12 城市探索增量
+
+沿用下方正式 City / Mission / HUD；本次新增 `data/exploration_config.gd`、`data/exploration.tres`、`maps/exploration.gd`、`assets/world/materials/exploration_mask.gdshader`、`exploration_fog.gdshader`、`ui/expedition/search_card.gd` 与对应 Godot UID。验收新增 `tests/interior_search.gd`、`tests/exploration.gd`、`tests/expedition_exploration_runtime.gd`。地图布局、SearchTask、Survivor、Enemy、PoiContext 与 Tracker 直接修改既有文件。
+
+配置与职责见 [地图报告](design/expedition.md)，结果见 [验证记录](VALIDATION.md)。下方“本任务新增”保留最初世界资源接入时的清单，不代表本轮新增了建筑或模型。
+
 ## 本任务新增
 
 ```text
@@ -65,8 +71,8 @@ data/world_assets/vegetation_tree_broadleaf_a.tres
 data/world_assets/vehicle_sedan_a.tres
 data/world_assets/vehicle_suv.tres
 data/world_assets/vehicle_van.tres
-docs/WORLD_MAP_FILES.md
-docs/WORLD_MAP_REPORT.md
+docs/design/expedition.md
+docs/design/expedition.md
 maps/generation/block_generator.gd
 maps/generation/block_generator.gd.uid
 maps/generation/building_placer.gd

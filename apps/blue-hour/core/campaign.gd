@@ -123,6 +123,7 @@ func train(id: String) -> bool:
 
 func _prepare_day() -> void:
 	data.selected_action = ""
+	data.selected_party = data.members.duplicate()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(data.seed) + int(data.day) * 1009
 	data.day_rewards = {}
@@ -182,13 +183,23 @@ func buy(uid: String) -> bool:
 			return true
 	return false
 
-func start_action(action_id: String = "") -> bool:
+func start_action(action_id: String = "", party: Array = []) -> bool:
 	if data.status != "shelter" or data.members.is_empty():
 		return false
 	if not action_id.is_empty() and catalog.by_id(catalog.today_actions, action_id) == null:
 		return false
+	var chosen: Array = data.members if party.is_empty() else party
+	if not _unique_subset(chosen, data.members):
+		return false
 	data.selected_action = action_id
+	data.selected_party = chosen.duplicate()
 	data.status = "mission"
+	return true
+
+func abandon_action() -> bool:
+	if data.status != "mission":
+		return false
+	data.status = "shelter"
 	return true
 
 func stage_result(outcome: Dictionary) -> bool:
@@ -204,9 +215,10 @@ func preview() -> Dictionary:
 		return {}
 	var result: Dictionary = data.pending
 	var total: int = int(data.food) + (0 if result.wiped else int(result.food))
-	var need: int = result.returned_ids.size() * catalog.loop.food_per_member
+	var alive: Array = data.members.filter(func(id: String) -> bool: return id not in result.lost_ids)
+	var need: int = alive.size() * catalog.loop.food_per_member
 	var shortage := total < need
-	return {"total": total, "need": need, "remaining": maxi(0, total - need), "shortage": shortage, "fatal": shortage and data.hunger > 0, "slots": mini(result.returned_ids.size(), total / catalog.loop.food_per_member), "members": result.returned_ids.duplicate()}
+	return {"total": total, "need": need, "remaining": maxi(0, total - need), "shortage": shortage, "fatal": shortage and data.hunger > 0, "slots": mini(alive.size(), total / catalog.loop.food_per_member), "members": alive}
 
 func commit_day(fed: Array = []) -> bool:
 	if data.status != "pending":
@@ -215,9 +227,10 @@ func commit_day(fed: Array = []) -> bool:
 	if view.fatal and (fed.size() != view.slots or not _unique_subset(fed, view.members)):
 		return false
 	var result: Dictionary = data.pending.duplicate(true)
+	result.stayed_ids = data.members.filter(func(id: String) -> bool: return id not in data.selected_party)
 	var starved: Array = []
 	var next_members: Array = []
-	for id in result.returned_ids:
+	for id in view.members:
 		if view.fatal and id not in fed:
 			starved.append(id)
 		else:
@@ -240,6 +253,7 @@ func commit_day(fed: Array = []) -> bool:
 	result.copied_weapons = _copy_reward() if not result.wiped and not data.members.is_empty() else []
 	data.history.append(result)
 	data.pending = {}
+	data.selected_party = data.members.duplicate()
 	if data.members.is_empty():
 		data.status = "lost"
 	elif data.day >= catalog.loop.end_day:
@@ -287,7 +301,8 @@ func _valid_outcome(result: Dictionary, state: Dictionary) -> bool:
 		if not result.get(key) is Array:
 			return false
 	var joined: Array = result.returned_ids + result.lost_ids
-	if joined.size() != state.members.size() or not _unique_subset(joined, state.members):
+	var deployed: Array = state.get("selected_party", state.members)
+	if joined.size() != deployed.size() or not _unique_subset(joined, deployed):
 		return false
 	for key in ["food", "scrap", "kills", "seconds"]:
 		if not _nonnegative(result.get(key)):
@@ -307,6 +322,11 @@ func _nonnegative(value: Variant) -> bool:
 	return (value is int or value is float) and is_finite(float(value)) and value >= 0
 
 func valid_state(state: Dictionary) -> bool:
+	if state.has("selected_party"):
+		if not state.selected_party is Array or not state.get("members") is Array or not _unique_subset(state.selected_party, state.members):
+			return false
+		if state.get("status") in ["shelter", "mission", "pending", "won"] and state.selected_party.is_empty():
+			return false
 	var action_id: Variant = state.get("selected_action", "")
 	if not action_id is String:
 		return false
@@ -342,6 +362,8 @@ func valid_state(state: Dictionary) -> bool:
 	if not compatible.get("members") is Array or not compatible.get("equipment") is Dictionary or not compatible.get("history") is Array or not compatible.get("pending") is Dictionary:
 		return false
 	compatible.members = compatible.members.map(func(id): return mapping.get(id, "invalid"))
+	if compatible.has("selected_party"):
+		compatible.selected_party = compatible.selected_party.map(func(id): return mapping.get(id, "invalid"))
 	compatible.equipment = {}
 	for id in state.equipment:
 		if id not in mapping:
@@ -350,7 +372,7 @@ func valid_state(state: Dictionary) -> bool:
 	for entry in compatible.history + [compatible.pending]:
 		if not entry is Dictionary:
 			return false
-		for key in ["returned_ids", "lost_ids", "starved_ids"]:
+		for key in ["returned_ids", "lost_ids", "starved_ids", "stayed_ids"]:
 			if entry.get(key) is Array:
 				entry[key] = entry[key].map(func(id): return mapping.get(id, "invalid"))
 	return _valid_legacy(compatible)
@@ -424,7 +446,8 @@ func _valid_legacy(state: Dictionary) -> bool:
 		for key in ["returned_ids", "lost_ids", "starved_ids", "weapons"]:
 			if not entry.get(key) is Array:
 				return false
-		if not _unique_subset(entry.returned_ids + entry.lost_ids, member_ids) or not _unique_subset(entry.starved_ids, entry.returned_ids):
+		var stayed: Variant = entry.get("stayed_ids", [])
+		if not stayed is Array or not _unique_subset(entry.returned_ids + entry.lost_ids + stayed, member_ids) or not _unique_subset(entry.starved_ids, entry.returned_ids + stayed):
 			return false
 		for key in ["day", "food", "scrap", "seconds", "kills", "food_spent"]:
 			if not _nonnegative(entry.get(key)):
@@ -440,6 +463,7 @@ func restore(state: Dictionary) -> bool:
 	if not valid_state(state):
 		return false
 	data = state.duplicate(true)
+	data.selected_party = data.get("selected_party", data.members).duplicate()
 	data.selected_action = str(data.get("selected_action", ""))
 	if data.version == 1:
 		data.version = 2

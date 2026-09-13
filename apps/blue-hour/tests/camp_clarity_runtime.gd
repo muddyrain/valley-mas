@@ -25,17 +25,20 @@ func run() -> void:
 	check(root.msaa_3d == Viewport.MSAA_8X, "Camp inherits the project's existing 8x MSAA")
 	var station := camp.get_node("NavigationSource/MainBuilding") as Node3D
 	var mesh := station.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
-	var material := mesh.get_active_material(0) as StandardMaterial3D
+	# Import fidelity remains protected independently of the Camp presentation override.
+	var material := mesh.mesh.surface_get_material(0) as StandardMaterial3D
 	for texture: Texture2D in [material.albedo_texture, material.normal_texture]:
 		check(texture.get_size() == Vector2(4096, 4096), "Hero building preserves its source 4K maps")
 		check(texture.get_image().has_mipmaps(), "4K texture keeps mipmaps")
 	check(material.roughness_texture.get_size() == Vector2(2048, 2048), "Metallic/roughness retains its original 2K resolution")
 	check(material.texture_filter == BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC, "Oblique roof surfaces use mipmapped anisotropic filtering")
 	check(material.normal_enabled and material.normal_scale == 1.0, "Imported normal remains active at its source strength")
+	var styled := mesh.get_active_material(0) as ShaderMaterial
+	check(styled != null and styled.get_shader_parameter("source_texture") == material.albedo_texture, "Camp style reuses the original 4K albedo without replacing the import")
 	check(station.position == Vector3(0, 0, -6.75) and station.scale == Vector3.ONE, "MainBuilding keeps its frozen world transform")
 	var camera: Camera3D = app.camp_view.camera
 	var camera_transform := camera.global_transform
-	check(camera.size == 20.5, "Fixed Camp camera is unchanged")
+	check(is_equal_approx(camera.size, 18.8), "Camp uses the authored Pass 02 framing scale")
 	measurements["camera"] = {"transform": str(camera_transform), "size": camera.size}
 	measurements["station_pixels_1080p"] = str(projected_bounds(station, camera))
 	measurements["main_viewport"] = {"image_size": str(root.get_texture().get_image().get_size()), "window_size": str(root.size), "logical_rect": str(root.get_visible_rect()), "content_size": str(root.content_scale_size), "content_mode": root.content_scale_mode, "content_factor": root.content_scale_factor, "scale_3d": root.scaling_3d_scale, "msaa": root.msaa_3d}
@@ -49,15 +52,15 @@ func run() -> void:
 	check(app.camp_view.camp == camp and camp.members[ids[1]] == actor, "Selecting a member preserves Camp and actor identity")
 	await click(app.screen.training_button)
 	check(app.campaign.member_level(ids[1]) == 2 and app.camp_view.camp == camp, "Training refreshes the overlay without reconstructing Camp")
+	await click(app.screen.drawer.equipment_button)
 	await click(button("卸下武器"))
 	check(actor.visual.weapon == null and app.camp_view.camp == camp, "Equipment updates the existing Camp actor")
 	app.screen.show_effects()
 	await frames()
 	await click_at(app.camp_view.member_point(ids[0]))
 	check(app.selected_member == ids[1], "A modal blocks clicks from reaching Camp survivors")
-	app.screen.effects_backdrop.hide()
-	app.screen.effects_panel.hide()
-	await click(button("整装出发"))
+	await key(KEY_ESCAPE)
+	await click(button("今日行动"))
 	check(app.state == "today_action" and app.camp_view.camp == camp, "Mission selection retains the existing Camp")
 	await click(app.screen.cancel_button)
 	check(app.state == "shelter" and app.camp_view.camp == camp, "Cancel restores the overlay on the same Camp")
@@ -69,6 +72,7 @@ func run() -> void:
 	check(app.selected_member == ids[0], "World selection remains aligned after window resizing")
 	check(app.screen.departure.get_global_rect().end.y <= root.get_visible_rect().size.y, "Departure remains inside the window")
 	await shot("06-after-ui-1600x900")
+	await click(button("菜单"))
 	await click(button("主菜单"))
 	check(app.camp_view == null and not is_instance_valid(camp), "Leaving Camp releases its world and camera")
 	await finish()

@@ -1,0 +1,26 @@
+{
+  "fps": 30,
+  "clips": {
+    "Zombie_Idle": {
+      "duration": 3.2,
+      "frames": 96,
+      "loop": true,
+      "in_place": true,
+      "nominal_speed": 0.0
+    },
+    "Zombie_Walk": {
+      "duration": 1.0,
+      "frames": 30,
+      "loop": true,
+      "in_place": true,
+      "nominal_speed": 1.0
+    },
+    "Zombie_Chase": {
+      "duration": 0.75,
+      "frames": 22,
+      "loop": true,
+      "in_place": true,
+      "nominal_speed": 1.8
+    }
+  }
+}

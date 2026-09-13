@@ -71,6 +71,8 @@ func wait_for_departure() -> void:
 	await wait_until(func(): return app.state != "departure", 45)
 	check(app.state != "departure", "Departure completes before mission controls")
 	if app.state == "mission":
+		await wait_until(func(): return app.mission.arrival == null or app.mission.arrival.finished, 8)
+		check(app.mission.arrival == null or app.mission.arrival.finished, "Squad disembarks before mission input")
 		await wait_seconds(0.3)
 
 func capture(id: String) -> void:
@@ -102,7 +104,7 @@ func run() -> void:
 	root.add_child(InputGate.new())
 	await frames(12)
 	await capture("01-safehouse")
-	await click_button("整装出发")
+	await click_button("今日行动")
 	await click_button("商业街")
 	await click_button("确认出发")
 	check(app.state == "mission", "Real button input launches the 3D scene")
@@ -205,9 +207,9 @@ func run() -> void:
 	root.size = Vector2i(1024, 640)
 	await frames(12)
 	await capture("08-small-window")
-	var depart := button("整装出发")
+	var depart := button("今日行动")
 	check(depart != null and root.get_visible_rect().encloses(depart.get_global_rect()), "Primary action fits the minimum supported window")
-	await click_button("整装出发")
+	await click_button("今日行动")
 	await click_button("商业街")
 	await click_button("确认出发")
 	await frames(12)

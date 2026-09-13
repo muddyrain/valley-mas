@@ -244,6 +244,13 @@ func _check_combat(upgraded: bool) -> void:
 	next.free()
 	mission.free()
 
+func _enter_building(mission: Node3D, id: String) -> void:
+	# Effect timing starts after the real entry transition, not on assignment.
+	var task: RefCounted = mission.search_tasks[id]
+	task.prepare(0, mission)
+	task.prepare(task.TRANSITION_SECONDS, mission)
+	check(task.phase == task.Phase.SEARCHING_INSIDE, "Effect fixture finishes building entry: " + id)
+
 func _check_search(upgraded: bool) -> void:
 	var mission := _sortie(["tool_belt", "folding_cart"], ["scavenge_frenzy"], upgraded)
 	var belt := 0.55 if upgraded else 0.7
@@ -252,6 +259,7 @@ func _check_search(upgraded: bool) -> void:
 		var id: String = ["corner", "garage"][index]
 		mission.survivors[index].position = mission.city.sites[id].spec.entry
 		mission.command_search(id)
+		_enter_building(mission, id)
 	check(mission.powers.activate(), "Search frenzy activates")
 	mission._physics_process(1)
 	for id: String in ["corner", "garage"]:
@@ -281,6 +289,8 @@ func _check_search(upgraded: bool) -> void:
 	ledger.begin()
 	near(ledger.resource_remainders.x, 0, "Fraction carry resets each action")
 	mission.command_extract()
+	for task: RefCounted in mission.exiting_tasks:
+		task.advance_exit(task.TRANSITION_SECONDS)
 	for actor: Node3D in mission.survivors:
 		actor.position = mission.catalog.map.bus_position
 		actor.stop()
@@ -331,6 +341,7 @@ func _check_clock_and_heal(upgraded: bool) -> void:
 	var worker: Node3D = mission.survivors[0]
 	worker.position = mission.city.sites.corner.spec.entry
 	mission.command_search("corner")
+	_enter_building(mission, "corner")
 	var mover: Node3D = mission.survivors[1]
 	mover.position = Vector3(0, 0, 10)
 	mover.path = PackedVector3Array([Vector3(0, 0, 18)])
@@ -338,6 +349,7 @@ func _check_clock_and_heal(upgraded: bool) -> void:
 	mover.reload_left = 2
 	var enemy: Node3D = mission.spawn_enemy("ENM_001_infected_basic_a", Vector3(3, 0, 10))
 	enemy.hp = 10000
+	enemy.investigate(Vector3(0, 0, 10))
 	check(mission.powers.activate("dusk_delay") and mission.powers.activate("sprint") and mission.powers.activate("scavenge_frenzy"), "Clock freeze overlaps other powers")
 	var start_clock: float = mission.clock.elapsed
 	var start_position: Vector3 = mover.position

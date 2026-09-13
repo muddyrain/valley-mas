@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode diffuse_burley, specular_schlick_ggx;
+render_mode diffuse_lambert, specular_disabled;
 
 uniform vec4 base_color : source_color = vec4(0.25, 0.3, 0.33, 1.0);
 uniform float variation = 0.025;
@@ -24,9 +24,11 @@ void vertex() {
 void fragment() {
 	vec2 p = world_position.xz;
 	float broad = smooth_noise(p * 0.24) - 0.5;
-	float grain = smooth_noise(p * 1.5) - 0.5;
 	vec2 cell = abs(fract(p / 1.2) - 0.5);
-	float joint = smoothstep(0.48, 0.5, max(cell.x, cell.y));
-	ALBEDO = base_color.rgb + broad * variation + grain * variation * 0.08 - joint * paving * 0.025;
+	float footprint = max(fwidth(p.x), fwidth(p.y)) / 1.2;
+	float joint = smoothstep(0.487 - footprint, 0.5 + footprint, max(cell.x, cell.y));
+	float tile_tone = (hash(floor(p / 1.2)) - 0.5) * 0.022;
+	ALBEDO = base_color.rgb + broad * variation + paving * (tile_tone - joint * 0.045);
 	ROUGHNESS = 0.94;
+	SPECULAR = 0.0;
 }

@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://debug/humanoid_rig_review.gd" id="1"]
+
+[node name="ENM_001_Rig_QA" type="Node3D"]
+script = ExtResource("1")
+initial_character_id = "infected_basic_a"

@@ -26,6 +26,12 @@ func click(node: Control) -> void:
 	check(node != null and node.is_visible_in_tree(), "Visible input target")
 	if node == null:
 		return
+	var ancestor: Node = node.get_parent()
+	while ancestor != null:
+		if ancestor is ScrollContainer:
+			ancestor.ensure_control_visible(node)
+		ancestor = ancestor.get_parent()
+	await frames(2)
 	var point := node.get_global_rect().get_center()
 	await click_at(point)
 	await wait_for_departure()
@@ -37,6 +43,9 @@ func wait_for_departure() -> void:
 	check(not is_instance_valid(app) or app.state != "departure", "Departure completes before mission controls")
 	# Let the short reveal finish before another UI action.
 	if is_instance_valid(app) and app.state == "mission":
+		while app.mission.arrival != null and not app.mission.arrival.finished and Time.get_ticks_msec() < deadline:
+			await process_frame
+		check(app.mission.arrival == null or app.mission.arrival.finished, "Squad disembarks before mission input")
 		await create_timer(0.3).timeout
 
 func click_at(point: Vector2) -> void:
@@ -84,7 +93,7 @@ func launch(fresh: bool) -> void:
 		await click(button("继续"))
 
 func stage_return(food: int) -> void:
-	await click(button("整装出发"))
+	await click(button("今日行动"))
 	await click(button("商业街"))
 	await click(button("确认出发"))
 	app.mission.director_enabled = false
@@ -105,17 +114,18 @@ func run() -> void:
 	app.show_shelter()
 	await frames()
 	var offer: Dictionary = app.campaign.data.shop[0].duplicate()
+	await click(button("菜单"))
 	await click(button("备用装备"))
 	var buy = app.find_child("Buy_" + offer.uid.replace(":", "_"), true, false)
 	await click(buy)
 	check(app.campaign.data.inventory.size() == 4 and app.campaign.data.scrap == 30 - offer.price, "Actual purchase spends Scrap and grants one instance")
 	check(app.store.read().data.inventory.size() == 4, "Purchase is immediately saved")
-	var select: OptionButton = app.screen.weapon_selects[0]
-	await click(select)
-	var popup := select.get_popup()
-	# This menu has equal-height rows with no separators; choose the final visible row.
-	await click_at(Vector2(popup.position) + Vector2(40, popup.size.y - 24))
-	check(app.campaign.data.equipment[app.campaign.data.members[0]] == offer.uid, "Native equipment popup equips purchased weapon")
+	await key(KEY_ESCAPE)
+	await click_at(app.camp_view.member_point(app.campaign.data.members[0]))
+	await click(app.screen.drawer.switch_button)
+	await click(app.screen.browser.entries[offer.uid])
+	await click(button("装备给 " + app.member_name(app.selected_member)))
+	check(app.campaign.data.equipment[app.campaign.data.members[0]] == offer.uid, "Native inventory equips purchased weapon")
 	await capture("13-equipment")
 	var gear: Dictionary = app.campaign.data.equipment.duplicate()
 	await launch(false)
@@ -131,7 +141,7 @@ func run() -> void:
 	check(app.campaign.data.hunger == 1 and app.campaign.data.members.size() == 3, "Actual confirmation grants next day grace")
 	await launch(false)
 	check(app.campaign.data.day == 2 and app.campaign.data.hunger == 1, "Hunger and day survive process reload")
-	await click(button("整装出发"))
+	await click(button("今日行动"))
 	await click(button("商业街"))
 	await click(button("确认出发"))
 	check(app.mission.survivors[0].hp == 80 and app.catalog.survivors[0].max_hp == 100, "Hungry sortie has reduced HP without mutating template")
@@ -153,7 +163,7 @@ func run() -> void:
 	await click(app.screen.confirm_button)
 	check(app.campaign.data.members == [chosen] and app.campaign.data.day == 3, "Chosen member alone continues on day three")
 	await capture("16-solo-shelter")
-	await click(button("整装出发"))
+	await click(button("今日行动"))
 	await click(button("商业街"))
 	await click(button("确认出发"))
 	check(app.mission.survivors.size() == 1 and app.hud.squad_labels.size() == 1, "Solo outing and HUD agree")
@@ -162,7 +172,7 @@ func run() -> void:
 	app.mission._physics_process(0.1)
 	await frames(10)
 	await click(button("确认结算"))
-	check(app.state == "ended" and button("整装出发") == null, "Final death removes departure and ends run")
+	check(app.state == "ended" and button("今日行动") == null, "Final death removes departure and ends run")
 	await capture("18-run-ended")
 	await click(button("重新开局"))
 	await click(button("确认创建"))

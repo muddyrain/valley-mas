@@ -3,9 +3,9 @@ const Visuals = preload("res://vfx/visuals.gd")
 const Surfaces = preload("res://maps/world/surface_palette.gd")
 const WIDTH: float = 8.0
 const SIDEWALK: float = 2.4
-const ASPHALT := Color("#34454f")
-const CONCRETE := Color("#96a4a1")
-const MARKING := Color("#cdd2c4")
+const ASPHALT := Color("#3c495a")
+const CONCRETE := Color("#8f9690")
+const MARKING := Color("#d9d7c6")
 static var meshes: Dictionary = {}
 
 static func slab(parent: Node3D, size: Vector3, at: Vector3, color: Color) -> MeshInstance3D:
@@ -60,13 +60,12 @@ static func build(city: Node3D, map: Resource) -> void:
 	var root := Node3D.new()
 	root.name = "RoadNetwork"
 	city.add_child(root)
-	slab(root, Vector3(map.half_width * 2 + 120, .3, map.half_depth * 2 + 120), Vector3(0, -.19, 0), Color("#617963"))
+	slab(root, Vector3(map.half_width * 2 + 120, .3, map.half_depth * 2 + 120), Vector3(0, -.19, 0), Color("#697d64"))
 	for district: Dictionary in map.districts:
-		if not district.paved:
-			continue
 		var bounds: Rect2 = district.bounds
 		var center: Vector2 = bounds.get_center()
-		slab(root, Vector3(bounds.size.x, .03, bounds.size.y), Vector3(center.x, -.035, center.y), Color("#788381"))
+		var color := Color("#8c9698") if "industrial" in district.id or "yard" in district.id else Color("#a3a59b") if district.paved else Color("#939d88")
+		slab(root, Vector3(bounds.size.x, .03, bounds.size.y), Vector3(center.x, -.035, center.y), color)
 	var network: Dictionary = cells(map)
 	var directions: Array[Vector2i] = [Vector2i(0,-8), Vector2i(-8,0), Vector2i(0,8), Vector2i(8,0)]
 	for cell: Vector2i in network:
@@ -136,6 +135,35 @@ static func _build_sidewalk(root: Node3D, network: Dictionary) -> void:
 	view.material_override = Surfaces.get_material(CONCRETE, "pavement")
 	view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(view)
+	_build_curbs(root, pavement, road_cells)
+
+static func _build_curbs(root: Node3D, pavement: Dictionary, road_cells: Dictionary) -> void:
+	var builder := SurfaceTool.new()
+	builder.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var section := BoxMesh.new()
+	section.size = Vector3(.78, .09, .17)
+	var gutter := BoxMesh.new()
+	gutter.size = Vector3(.8, .018, .22)
+	var gutters := SurfaceTool.new()
+	gutters.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for cell: Vector2i in pavement:
+		for direction: Vector2i in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+			if not road_cells.has(cell + direction):
+				continue
+			var at := Vector3((cell.x + .5) * .8, .042, (cell.y + .5) * .8)
+			at += Vector3(direction.x, 0, direction.y) * .32
+			var basis := Basis(Vector3.UP, PI / 2 if direction.x != 0 else 0.0)
+			builder.append_from(section, 0, Transform3D(basis, at))
+			at += Vector3(direction.x, 0, direction.y) * .18
+			at.y = .009
+			gutters.append_from(gutter, 0, Transform3D(basis, at))
+	for entry: Array in [["Curbs", builder, Color("#bdc0b5")], ["Gutters", gutters, Color("#4b5866")]]:
+		var view := MeshInstance3D.new()
+		view.name = entry[0]
+		view.mesh = entry[1].commit()
+		view.material_override = Visuals.material(entry[2])
+		view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(view)
 
 static func _quad(builder: SurfaceTool, start: Vector3, size: Vector2) -> void:
 	for offset: Vector3 in [Vector3.ZERO, Vector3(size.x,0,size.y), Vector3(0,0,size.y), Vector3.ZERO, Vector3(size.x,0,0), Vector3(size.x,0,size.y)]:

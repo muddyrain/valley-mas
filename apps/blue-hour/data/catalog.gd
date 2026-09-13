@@ -60,6 +60,7 @@ func by_id(collection: Array[Resource], id: String) -> Resource:
 
 func validate() -> Array[String]:
 	var errors: Array[String] = []
+	errors.append_array(map.encounter.validation_errors())
 	for collection in [survivors, traits, weapons, enemies, affixes, specializations, passives, powers, today_actions]:
 		var ids: Array[String] = []
 		for entry in collection:
@@ -82,16 +83,7 @@ func validate() -> Array[String]:
 		errors.append("Invalid mission durations")
 	if map.search_radius <= 0 or map.search_radius >= map.pickup_radius or map.search_danger_radius <= 0 or map.search_resume_seconds <= 0:
 		errors.append("Invalid search safety or arrival parameters")
-	for pool in [map.day_enemy_pool, map.blue_enemy_pool, map.night_enemy_pool]:
-		if pool.is_empty():
-			errors.append("Empty enemy spawn pool")
-		for id in pool:
-			if by_id(enemies, id) == null:
-				errors.append("Unknown spawn enemy: " + id)
-	for encounter: Dictionary in map.initial_enemies:
-		if by_id(enemies, str(encounter.get("id", ""))) == null:
-			errors.append("Unknown initial enemy")
-	for multipliers: PackedFloat32Array in [map.enemy_phase_hp, map.enemy_phase_damage, map.enemy_phase_spawn]:
+	for multipliers: PackedFloat32Array in [map.enemy_phase_hp, map.enemy_phase_damage]:
 		if multipliers.size() != 3:
 			errors.append("Enemy phase multipliers require Day, Blue Hour and Night")
 		for multiplier: float in multipliers:

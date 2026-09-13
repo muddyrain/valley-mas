@@ -6,8 +6,6 @@ const CAMP_SCENE_PATH := "res://scenes/camp/camp_main.tscn"
 const CAPTURE_PATH := "res://test-output/camp/camp-v1-3-16x9.png"
 const REPORT_PATH := "res://test-output/camp/camp-v1-3-runtime.json"
 const EXPECTED_VIEWPORT := Vector2i(1280, 720)
-const V1_2_CAMERA_PITCH_DEGREES := 53.0
-const V1_2_CAMERA_SIZE := 22.5
 const PATH_CHECKS: Array[Array] = [
 	[Vector3(0, 0, -3.5), Vector3(0, 0, 0.2)],
 	[Vector3(0, 0, 0.2), Vector3(-4.7, 0, -2.1)],
@@ -51,15 +49,15 @@ func _run() -> void:
 	var pitch_pivot := camera.get_parent_node_3d()
 	var camera_rig := pitch_pivot.get_parent_node_3d()
 	_check(camera.projection == Camera3D.PROJECTION_ORTHOGONAL, "Camera is orthographic")
-	_check(is_equal_approx(rad_to_deg(pitch_pivot.rotation.x), -48.0), "Camera pitch is 48 degrees")
+	_check(is_equal_approx(rad_to_deg(pitch_pivot.rotation.x), -46.0), "Camera pitch is 46 degrees")
 	_check(is_equal_approx(rad_to_deg(camera_rig.rotation.y), 12.0), "Camera yaw is 12 degrees")
-	_check(is_equal_approx(camera.size, 20.5), "Orthographic framing uses the V1.3 gameplay scale")
-	_check(camera_rig.position.is_equal_approx(Vector3(0, 0, -0.4)), "Camera target favors the playable camp over the road")
+	_check(is_equal_approx(camera.size, 18.8), "Orthographic framing uses the Pass 02 gameplay scale")
+	_check(camera_rig.position.is_equal_approx(Vector3(0, 0, -1.15)), "Camera framing preserves station headroom and favors the camp")
 	var character_scale_ratio := (
-		cos(deg_to_rad(48.0)) / camera.size
-		/ (cos(deg_to_rad(V1_2_CAMERA_PITCH_DEGREES)) / V1_2_CAMERA_SIZE)
+		cos(deg_to_rad(46.0)) / camera.size
+		/ (cos(deg_to_rad(48.0)) / 20.5)
 	)
-	_check(character_scale_ratio >= 1.15 and character_scale_ratio <= 1.25, "Projected character height increases 15-25 percent from V1.2")
+	_check(character_scale_ratio >= 1.10 and character_scale_ratio <= 1.16, "Projected character height increases 10-16 percent from Pass 01")
 	_check(camera.current, "Camp camera is fixed as the current camera")
 
 	var terrain_mesh_instance := camp.get_node("NavigationSource/TerrainBase/MeshInstance3D") as MeshInstance3D
@@ -86,8 +84,10 @@ func _run() -> void:
 	_check(absf(station_bounds.position.y) < 0.001, "Station meets visible ground")
 	_check(main_building.scale.is_equal_approx(Vector3.ONE) and main_building.rotation.is_equal_approx(Vector3.ZERO), "Station root preserves the frozen identity basis")
 	_check(main_building.get_node("Visual").scale.is_equal_approx(Vector3.ONE * 1.097386), "Only station Visual applies a small uniform scale")
-	var station_collisions := main_building.find_children("*", "CollisionShape3D", true, false)
+	var station_collisions := main_building.find_children("*", "CollisionShape3D", true, false).filter(func(shape: CollisionShape3D): return shape.get_parent() is PhysicsBody3D)
 	_check(station_collisions.size() == 3 and station_collisions.all(func(shape: CollisionShape3D): return shape.shape is BoxShape3D), "Station collision uses three simple boxes")
+	var picking: Area3D = main_building.get_node("CampInteractable").get_child(0)
+	_check(picking.collision_layer == 8 and picking.collision_mask == 0, "Facility picking stays separate from physical collision")
 	print("STATION MEASURED: ", station_bounds)
 	_check(camp.has_node("NavigationSource/MainForecourt"), "Main building entrance opens onto a readable forecourt")
 	_check(workshop.has_node("LeanToRoof") and workshop.has_node("RepairBench"), "Workshop reads as an attached open repair bay")
@@ -96,7 +96,7 @@ func _run() -> void:
 		and workshop.position.z - 1.75 < main_building.position.z + 2.25,
 		"Workshop footprint overlaps the main-building service edge",
 	)
-	_check(greenhouse.has_node("RoofLeft") and greenhouse.has_node("RoofRight") and greenhouse.has_node("PlanterLeft") and greenhouse.has_node("PlanterRight"), "Greenhouse has transparent pitched roof and planting beds")
+	_check(greenhouse.has_node("RoofLeft") and greenhouse.has_node("RoofRight") and greenhouse.has_node("PlanterLeft") and greenhouse.has_node("PlanterRight"), "Greenhouse preserves its pitched roof and planting-bed anchors")
 	_check(
 		greenhouse.position.x - 2.0 < main_building.position.x + 6.0
 		and greenhouse.position.z - 1.5 < main_building.position.z + 2.25,
@@ -120,8 +120,8 @@ func _run() -> void:
 	var bus := camp.get_node("NavigationSource/BlueHourBerth") as Node3D
 	_check(bus.scale.is_equal_approx(Vector3.ONE), "Blue Hour vehicle is instanced at native scale")
 	var bus_yaw_degrees := absf(rad_to_deg(bus.rotation.y))
-	_check(bus_yaw_degrees >= 8.0 and bus_yaw_degrees <= 15.0, "Blue Hour vehicle is angled 8-15 degrees")
-	_check(bus.position.is_equal_approx(Vector3(-6.9, 0, 3.05)), "Blue Hour vehicle uses the tightened V1.2 berth position")
+	_check(bus_yaw_degrees < 0.01, "Blue Hour vehicle faces the main road squarely")
+	_check(bus.position.is_equal_approx(Vector3(-7.15, 0, 2.8)), "Blue Hour vehicle uses the aligned departure berth")
 	_check(not bus.find_children("*", "CollisionObject3D", true, false).is_empty(), "Blue Hour vehicle has imported collision")
 	for node_path: String in [
 		"NavigationSource/MainBuilding/StaticBody3D/CollisionShape3D",

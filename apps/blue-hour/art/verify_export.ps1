@@ -9,7 +9,7 @@ if (-not $GodotPath -or -not (Test-Path -LiteralPath $GodotPath -PathType Leaf))
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $manifest = Get-Content -LiteralPath (Join-Path $projectRoot 'assets/generated/manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $expectedAssets = @($manifest.assets.PSObject.Properties).Count
-$artifactRoot = Join-Path $projectRoot 'test-output/art/standalone'
+$artifactRoot = Join-Path $projectRoot "test-output/art/standalone/$PID"
 New-Item -ItemType Directory -Path $artifactRoot -Force | Out-Null
 $standalone = Join-Path $artifactRoot 'BlueHourHomeward.exe'
 Copy-Item -LiteralPath $ExecutablePath -Destination $standalone -Force
@@ -41,30 +41,34 @@ foreach ($mode in @('headless', 'native')) {
 # Release templates do not expose --script. The same editor binary mounts the
 # isolated EXE's embedded pack; res:// resolves exclusively inside that pack.
 # Test evidence goes to an absolute writable directory, never into res://.
+foreach ($visualSuite in @('weapon_visuals', 'combat_animations')) {
+    # Combat checks step thousands of bone poses; concurrent builds can exceed 30 s.
+    $suiteTimeoutMs = if ($visualSuite -eq 'combat_animations') { 90000 } else { 30000 }
 foreach ($mode in @('headless', 'native')) {
-    $stdout = Join-Path $artifactRoot "weapons-$mode.stdout.log"
-    $stderr = Join-Path $artifactRoot "weapons-$mode.stderr.log"
-    $visualTest = Join-Path $projectRoot 'tests/weapon_visuals.gd'
+    $stdout = Join-Path $artifactRoot "$visualSuite-$mode.stdout.log"
+    $stderr = Join-Path $artifactRoot "$visualSuite-$mode.stderr.log"
+    $visualTest = Join-Path $projectRoot "tests/$visualSuite.gd"
     $arguments = @('--audio-driver', 'Dummy', '--path', ('"' + $artifactRoot + '"'),
         '--main-pack', ('"' + $standalone + '"'), '--script', ('"' + $visualTest + '"'))
     if ($mode -eq 'headless') { $arguments += '--headless' }
     else { $arguments += @('--position', '-3000,-3000', '--resolution', '1600x900') }
-    $arguments += @('--', ('"--artifact-path=' + (Join-Path $artifactRoot 'weapon-results') + '"'))
+    $arguments += @('--', ('"--artifact-path=' + (Join-Path $artifactRoot "$visualSuite-results") + '"'))
     $process = Start-Process -FilePath $GodotPath -ArgumentList $arguments -WorkingDirectory $artifactRoot `
         -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
     try {
-        if (-not $process.WaitForExit(30000)) {
+        if (-not $process.WaitForExit($suiteTimeoutMs)) {
             Stop-Process -Id $process.Id -Force
-            throw "Exported weapon visuals timed out: $mode"
+            throw "Exported $visualSuite timed out: $mode"
         }
         $process.Refresh()
         $outputText = Get-Content -LiteralPath $stdout, $stderr -Raw -Encoding UTF8
-        if ($process.ExitCode -ne 0 -or ($outputText -join "`n") -match '(?m)^(SCRIPT ERROR|ERROR):' -or ($outputText -join "`n") -notmatch 'WEAPON VISUALS: \d+ checks, 0 failures') {
-            throw "Exported weapon visuals failed: $mode. See $artifactRoot"
+        if ($process.ExitCode -ne 0 -or ($outputText -join "`n") -match '(?m)^(SCRIPT ERROR|ERROR):' -or ($outputText -join "`n") -notmatch '(WEAPON VISUALS|COMBAT ANIMATIONS): \d+ checks, 0 failures') {
+            throw "Exported $visualSuite failed: $mode. See $artifactRoot"
         }
-        Write-Output "Embedded-pack weapon visuals $mode : all three models and both characters PASS"
+        Write-Output "Embedded-pack $visualSuite $mode : both characters PASS"
     } finally {
         $process.Dispose()
     }
+}
 }
 Remove-Item -LiteralPath $standalone -Force

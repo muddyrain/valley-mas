@@ -40,7 +40,7 @@ func run() -> void:
 	await click(app.screen.cards.commercial)
 	await click(app.screen.confirm_button)
 	check(app.state == "mission" and app.mission != null, "Camp departure enters production expedition")
-	check(app.mission.city.sites.size() == 18, "Formal expedition contains fifteen buildings and three searchable vehicles")
+	check(app.mission.city.sites.size() == 22, "Formal expedition contains nineteen searchable buildings and three vehicles")
 	check(app.hud != null and app.mission.camera.current, "Existing HUD and high orthographic camera are active")
 	check(app.mission.survivors.size() == members.size(), "Existing run members spawn")
 	app.mission.set_physics_process(false)
@@ -60,6 +60,7 @@ func run() -> void:
 	while not app.mission.city.sites.arrival_house.searched and app.mission.active and app.mission.clock.elapsed < deadline:
 		await step(1)
 	check(app.mission.city.sites.arrival_house.searched, "Actual entrance click completes search through the existing task system")
+	await step(.4) # Loot is collected after the worker has physically exited.
 	check(app.mission.ledger.food >= app.mission.city.sites.arrival_house.spec.food, "Food loot is collected by the original ledger")
 	await capture("world-05-search")
 	# Advance the original clock through both boundaries, with its normal signal wiring.
