@@ -42,5 +42,5 @@ func configure(game: RefCounted) -> void:
 
 func begin_departure(party: Array[String]) -> void:
 	if ambient_behavior != null:
-		ambient_behavior.disable()
+		ambient_behavior.departure_override()
 	departure.begin(self, party)

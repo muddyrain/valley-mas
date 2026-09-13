@@ -54,6 +54,12 @@ func move_to(point: Vector3) -> void:
 	agent.target_position = point
 	moving = true
 
+func cancel_navigation() -> void:
+	moving = false
+	velocity = Vector3.ZERO
+	if agent != null:
+		agent.target_position = global_position
+
 func arrived() -> bool:
 	return Vector2(global_position.x, global_position.z).distance_to(Vector2(destination.x, destination.z)) < 0.2
 
@@ -66,7 +72,9 @@ func _physics_process(delta: float) -> void:
 	if moving and not arrived() and NavigationServer3D.map_get_iteration_id(agent.get_navigation_map()) > 0:
 		var next := agent.get_next_path_position()
 		var direction := Vector3(next.x - global_position.x, 0, next.z - global_position.z)
-		if direction.length() > 0.02:
+		if agent.is_navigation_finished():
+			moving = false
+		elif direction.length() > 0.02:
 			direction = direction.normalized()
 			velocity.x = direction.x * move_speed
 			velocity.z = direction.z * move_speed
@@ -96,6 +104,12 @@ func board() -> void:
 	collision_mask = 0
 	agent.avoidance_enabled = false
 	set_physics_process(false)
+
+func face_smooth(point: Vector3, delta: float) -> void:
+	var direction := point - global_position
+	if direction.length_squared() > 0.001 and is_instance_valid(visual.rig):
+		visual.rig.global_rotation.y = rotate_toward(visual.rig.global_rotation.y,
+				atan2(-direction.x, -direction.z), delta * 2.4)
 
 func correct_to_safe_position(point: Vector3) -> bool:
 	# Only the timeout path uses correction, and never inside a static wall or the bus.
