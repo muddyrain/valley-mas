@@ -641,3 +641,24 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 - [ ] 用户审核 CAMP HUD 2.0 实机相似度与文字居中。
 
 文件、数据缺口、原生证据与并行工作区变化边界见 [CAMP HUD 2.0 接入报告](design/ui-art-direction.md)。本轮到 HUD 审核停止，不推进营地 AI、动画、环境装饰、夜间营地或新玩法。
+
+## 2026-09-14 CAMP Environment Polish Pass 02
+
+- [x] 草色层次、铺装轻使用痕迹与边缘过渡、外围植被群和树线、统一矮栏、维修棚结构、入口与生活用品已落地。
+- [x] 正式相机七张原生截图；截图专项 11 项、Ambient 导航与原生出发 12 项通过；碰撞/相机与受保护系统核对不变。
+- [x] 实际尝试 Windows build，并单独导出正式路径 Release EXE；脱离工程目录的营地、今日行动、外出原生启动通过。
+- [ ] 完整 build 门禁仍有两条既有 Camp UI 断言失败，详见报告，未越界修改 HUD。
+- [ ] 等待用户审核白天营地视觉效果；不自动提交或进入下一轮。
+
+证据、性能限制与独立启动记录见 [CAMP Environment Polish Pass 02 Report](CAMP_ENVIRONMENT_POLISH_PASS_02_REPORT.md)。
+
+## 2026-09-14 CAMP Environment Composition Pass 02B
+
+- [x] 围栏改为蓝灰柱与旧木宽横梁；保持 6 树 / 21 Bush，重组树根植被群；调整生活区不对称铺装、右侧后勤地面与已有用品关系。
+- [x] 同正式 Camera / Size、白天、真实两人 Before / After 六图与并排对比完成。
+- [x] 导航、90 秒原生 Ambient、12 项原生出发、71 项 Camp HUD 2 专项通过；相机/碰撞及 68 个受保护文件核对不变。
+- [x] 实际执行 Windows build；单独 Release 导出并通过营地、今日行动、外出三个独立原生启动。
+- [ ] 完整 build 仍被两条既有 Camp UI 断言阻断，未修改 HUD；未将专项通过视为全门禁通过。
+- [ ] 等待用户视觉审核，停止于 02B，不自动提交或开始下一阶段。
+
+文件、数量、性能、运行证据及限制见 [CAMP Composition 02B Report](CAMP_ENVIRONMENT_COMPOSITION_PASS_02B_REPORT.md)。

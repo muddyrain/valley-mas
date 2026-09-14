@@ -1,5 +1,9 @@
 # BLUE HOUR STARTER ENVIRONMENT KIT V1
 
+当前 CAMP Composition 02B（2026-09-14）沿用下述 Pass 02 的 6 树 / 21 Bush，重组为六个树根主群与三个矮植被次群；树缩放 0.72/0.78，主群 Bush 为 1.00/0.84/0.68、次群为 0.62，草花群由 16 调为 30（含花箱）。围栏改为蓝灰柱 + 米灰旧木宽横梁 + 稀疏钢带，保留约 1.01m 高与原碰撞。无新 Blender/Meshy/GLB。当前构图、数量、性能与导航证据见 [02B 报告](../docs/CAMP_ENVIRONMENT_COMPOSITION_PASS_02B_REPORT.md)；以下 Pass 02 参数为改前记录。
+
+2026-09-14 CAMP Environment Polish Pass 02 复用 `VEG_001_tree_broadleaf_a`（6 株，等比约 0.75–0.90）与 `VEG_002_bush_a`（7 组共 21 株，等比 0.52/0.70/0.88），仅营地实例移除碰撞并使用既有植被 Shader。原模型与 wrapper 不改。`camp/camp_dressing.gd` 组合 Godot 规则矮栏（高约 1.01m，原段长 4.5/5.5m）、柱脚/檐框/灯具与低矮草花，复用营地材质合批；无新 GLB 或 Blender 模块。证据与边界见 [环境第二轮报告](../docs/CAMP_ENVIRONMENT_POLISH_PASS_02_REPORT.md)。
+
 正式营地主站使用用户原件 [CAMP_001_main_station.glb](../assets/world/buildings/CAMP_001_main_station.glb)，唯一 [wrapper](../scenes/camp/buildings/camp_main_station.tscn) 由冻结 Camp 实例化。当前为 4K 版本：BaseColor / Normal 4096²、MetallicRoughness 原始 2048²；27,592 tris、1 Mesh / 材质、内嵌 PBR。Visual 等比 1.097386，总包围盒宽 12.000 / 高 4.170 / 深 6.704m（含天线、雨棚和台阶），中央主体屋面约高 3.24m、中央屋顶设备约 3.58m；3 个 Box 简单碰撞。此项不进入旧 Blender 生成批次；接入与出发演出见 [Camp Departure V1](../docs/CAMP_DEPARTURE_V1.md)，当前导入与主 Viewport 验证见 [清晰度报告](../docs/CAMP_CLARITY_REPORT.md)。
 
 正式外出街区已使用首批16项World资产，完整目录、Wrapper、实测尺寸和接入状态见 [WORLD_ASSET_AUDIT](WORLD_ASSET_AUDIT.md)。下表旧Blender库中“东岸旧街”的摆放说明为历史位置，已由本批Wrapper替换；仍保留资产库、营地或展厅引用，不表示当前正式外出仍走旧模型。道路、围栏的当前规则实现见 [WORLD_MAP_REPORT](../docs/WORLD_MAP_REPORT.md)。

@@ -40,7 +40,8 @@ vec3 paving(vec2 p, vec2 scale, float aa) {
 	vec2 tile = vec2(p.x + mod(floor(p.y / scale.y), 2.0) * scale.x * 0.5, p.y) / scale;
 	vec2 edge = min(fract(tile), 1.0 - fract(tile)) * scale;
 	float joint = fill(min(edge.x, edge.y) - 0.012, aa * 0.45);
-	return paving_color.rgb + (hash(floor(tile)) - 0.5) * 0.028 - joint * 0.075;
+	float wear = smoothstep(0.48, 0.78, noise_field(p * 0.8)) * 0.016;
+	return paving_color.rgb + (hash(floor(tile)) - 0.5) * 0.042 - joint * 0.058 + wear;
 }
 
 void vertex() {
@@ -54,23 +55,54 @@ void fragment() {
 	float aa = max(length(fwidth(p)), 0.006);
 	vec3 color;
 	if (surface_kind == 0) {
-		// A chamfered courtyard has an authored perimeter, not a noisy painted mask.
+		// Keep the working footprint, with broad rounded shoulders and an eastern planted bite.
 		vec2 yard_point = p - vec2(-0.10, 1.65);
-		float yard = max(box_distance(yard_point, vec2(4.50, 3.95)), (abs(yard_point.x) + abs(yard_point.y) - 7.65) * 0.7071);
+		float yard = box_distance(yard_point, vec2(4.10, 3.40)) - 0.40;
+		yard = max(yard, 1.20 - length(p - vec2(4.45, 5.35)));
 		float service_path = box_distance(p - vec2(-0.20, -1.65), vec2(9.50, 0.80));
-		float ground_distance = min(yard, service_path);
-		vec3 meadow = grass_color.rgb * (0.93 + smoothstep(0.22, 0.8, broad) * 0.13);
-		vec3 courtyard = earth_color.rgb + (broad - 0.5) * 0.023 + (noise_field(p * 4.0) - 0.5) * 0.012;
-		color = mix(meadow, courtyard, fill(ground_distance, aa));
+		// The eastern working shoulder joins the greenhouse, shelf and fence visually.
+		float logistics = box_distance(p - vec2(10.0, -3.15), vec2(1.55, 2.05));
+		float ground_distance = min(min(yard, service_path), logistics);
+		float islands = smoothstep(0.30, 0.69, noise_field(p * 0.20 + vec2(8.2, 1.4)));
+		float sun_grass = smoothstep(0.53, 0.77, broad);
+		vec3 meadow = mix(grass_color.rgb * vec3(0.90, 0.98, 0.96), grass_color.rgb * vec3(1.13, 1.09, 0.93), islands);
+		meadow = mix(meadow, vec3(0.48, 0.51, 0.36), sun_grass * 0.25);
+		float perimeter = smoothstep(8.8, 13.0, abs(p.x)) * (1.0 - smoothstep(8.9, 10.0, p.y));
+		perimeter = max(perimeter, 1.0 - smoothstep(-10.4, -8.0, p.y));
+		float front_bed = (1.0 - smoothstep(0.45, 1.2, abs(p.y - 8.55))) * smoothstep(1.8, 3.2, p.x);
+		float planted_edge = max(perimeter, front_bed);
+		float eastern_bed = length((p - vec2(10.8, 4.7)) / vec2(2.15, 4.2)) - 1.0;
+		planted_edge = max(planted_edge, fill(eastern_bed + (broad - 0.5) * 0.25, 0.18) * 0.72);
+		meadow = mix(meadow, grass_color.rgb * vec3(0.78, 0.88, 0.86), planted_edge * 0.48);
+		vec3 courtyard = earth_color.rgb + (broad - 0.5) * 0.029;
+		float fringe = 1.0 - smoothstep(-0.04, 0.46, ground_distance + (broad - 0.5) * 0.20);
+		color = mix(meadow, mix(meadow, earth_color.rgb, 0.46), fringe);
+		color = mix(color, courtyard, fill(ground_distance, aa + 0.045));
 		float border = stripe(ground_distance + 0.10, 0.085, aa);
 		float entrance_gate = fill(box_distance(p - vec2(0, -2.3), vec2(2.9, 0.45)), aa);
-		color = mix(color, paving_color.rgb * 0.91, border * (1.0 - entrance_gate));
+		color = mix(color, paving_color.rgb * 0.84, border * (1.0 - entrance_gate) * 0.16);
+		// Narrow dry shoulders link the raised forecourt and driveway to the meadow.
+		float forecourt = box_distance(p - vec2(0, -3.15), vec2(3.0, 1.35));
+		float drive = box_distance(p - vec2(-7.15, 4.0), vec2(2.2, 5.2));
+		float shoulder = 1.0 - smoothstep(0.0, 0.38, min(forecourt, drive));
+		color = mix(color, earth_color.rgb * 0.98, shoulder * 0.38 * (1.0 - fill(ground_distance, aa)));
 		// Large communal pavers and a side boarding platform share a quiet material.
-		float living_distance = box_distance(p - vec2(1.15, 1.65), vec2(2.8, 2.2));
+		// Offset rounded paving follows the table, while a separate worn apron serves the fire.
+		vec2 living = p - vec2(1.80, 1.55);
+		living = mat2(vec2(0.9986, 0.0523), vec2(-0.0523, 0.9986)) * living;
+		float living_distance = box_distance(living, vec2(1.75, 1.80)) - 0.18;
+		living_distance = max(living_distance, (living.x + living.y - 2.77) * 0.7071);
+		// A shallow planted bite on the storage side breaks the remaining rectangular edge.
+		living_distance = max(living_distance, 0.40 - length(p - vec2(3.85, 3.25)));
+		float fire_apron = length((p - vec2(-0.60, 1.70)) / vec2(1.38, 1.28)) - 1.0;
+		color = mix(color, earth_color.rgb * 0.94, fill(fire_apron, 0.16));
 		float assembly_distance = box_distance(p - vec2(-3.6, 3.65), vec2(1.35, 2.1));
 		float paved_distance = min(living_distance, assembly_distance);
-		color = mix(color, paving(p, vec2(1.2, 0.8), aa), fill(paved_distance, aa));
-		color = mix(color, asphalt_color.rgb * 1.22, stripe(paved_distance + 0.075, 0.06, aa) * 0.50);
+		color = mix(color, paving(p, vec2(1.2, 0.8), aa), fill(paved_distance, aa + 0.025));
+		// Only the boarding platform retains a full, legible frame.
+		color = mix(color, asphalt_color.rgb * 1.22, stripe(assembly_distance + 0.075, 0.06, aa) * 0.50);
+		float heat = 1.0 - smoothstep(0.40, 1.05, length(p - vec2(-0.55, 1.65)));
+		color *= 1.0 - heat * 0.055;
 		vec2 patch = p * 2.5;
 		vec2 cell = fract(patch) - 0.5;
 		float tuft = stripe(cell.x + cell.y * 0.35, 0.035, aa * 2.0) * stripe(cell.y, 0.14, aa * 2.0);
@@ -78,6 +110,8 @@ void fragment() {
 		color += tuft * (1.0 - fill(ground_distance + 0.1, aa)) * vec3(0.025, 0.030, 0.014);
 	} else if (surface_kind == 1) {
 		color = paving(p, vec2(1.2, 0.8), aa);
+		float tread = (1.0 - smoothstep(0.35, 1.6, abs(p.x))) * (1.0 - smoothstep(-2.9, -1.3, p.y));
+		color = mix(color, earth_color.rgb * 1.12, tread * 0.18);
 		float border = smoothstep(2.78, 2.84, abs(local_position.x));
 		color = mix(color, asphalt_color.rgb * 1.35, border * 0.65);
 	} else {
@@ -85,6 +119,8 @@ void fragment() {
 		float marking = 0.0;
 		if (surface_kind == 2) {
 			vec2 q = local_position.xz;
+			float tire_wear = (1.0 - smoothstep(0.14, 0.34, abs(abs(q.x) - 0.79))) * (1.0 - smoothstep(1.7, 4.4, abs(q.y)));
+			color *= 1.0 - tire_wear * 0.09;
 			marking = stripe(abs(q.x) - 1.64, 0.035, aa) * fill(abs(q.y + 0.8) - 3.45, aa);
 			marking = max(marking, stripe(q.y + 4.25, 0.035, aa) * fill(abs(q.x) - 1.64, aa));
 			// A single forward arrow leaves a readable, uncluttered departure lane.
