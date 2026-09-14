@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://drwxds071idem"
-path="res://.godot/imported/asset_sheet_source.png-c0df881f7ee697d9528662bec557fcb4.ctex"
+uid="uid://lagpyl8ik15e"
+path="res://.godot/imported/decoration_line.png-ffbed101877e7b093346651c21073ffd.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/loading/reference/asset_sheet_source.png"
-dest_files=["res://.godot/imported/asset_sheet_source.png-c0df881f7ee697d9528662bec557fcb4.ctex"]
+source_file="res://assets/ui/loading/core/decoration_line.png"
+dest_files=["res://.godot/imported/decoration_line.png-ffbed101877e7b093346651c21073ffd.ctex"]
 
 [params]
 

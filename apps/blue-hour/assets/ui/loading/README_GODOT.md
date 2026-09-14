@@ -17,10 +17,10 @@
 2. `character_group.png` 是主视觉整体层，当前包含 **女孩 + 猫 + 坐席箱体**。它适合整体做 2~3px 呼吸、0.15°以内摆动和轻微视差，不要再拆骨骼。
 3. `foreground_crates.png` 是独立前景层，可比人物移动幅度更大，制造 2.5D 景深。
 4. `lantern.png` 与 `lantern_glow.png` 分开使用。Glow 建议 `CanvasItemMaterial` Add 混合，Alpha 在约 0.65~0.95 间做随机缓动。
-5. `13~15_particle_*.png` 用 `GPUParticles2D` 或对象池随机生成；同时在屏数量建议 6~12，生命周期 4~8s，避免太花。
-6. `22~23_smoke_*.png` 低透明度慢速漂移即可，不要做大范围浓雾。
-7. `progress_bar_bg.png` + `progress_bar_fill.png` 可用于 `TextureProgressBar`。百分比数字必须用 Godot `Label` 动态显示，不要烘焙成图片。
-8. `04/05/06_check_*.png` 对应加载步骤的完成 / 等待 / 进行中状态。
+5. `particle_01.png`、`particle_02.png`、`particle_03.png` 是当前使用的粒子素材。
+6. `smoke_01.png`、`smoke_02.png` 是当前使用的杯口烟雾素材。
+7. `progress_track.png` 是进度条底图，进度填充由程序绘制；百分比数字由 Godot `Label` 动态显示。
+8. `status_done.png`、`status_waiting.png`、`status_active.png` 对应加载步骤的完成 / 等待 / 进行中状态。
 
 ## 不要切成图片的文字
 

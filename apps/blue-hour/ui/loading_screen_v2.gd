@@ -23,7 +23,6 @@ const TIPS: Array[String] = [
 	"装备与角色特性会影响外出效率。",
 ]
 const CORE := "res://assets/ui/loading/core/"
-const RIGHT_ARTWORK: Texture2D = preload("res://assets/ui/loading/loading_right_artwork_main.png")
 
 var host_app: Node
 var design: Control
@@ -34,7 +33,6 @@ var percent_label: Label
 var title_label: Label
 var stage_labels: Array[Label] = []
 var stage_icons: Array[TextureRect] = []
-var character: TextureRect
 var lantern_glow: TextureRect
 var reference_overlay: TextureRect
 var artwork_root: Control
@@ -147,47 +145,23 @@ func _build_back_decor() -> void:
 	var back := Control.new()
 	back.name = "BackDecor"
 	back.position = Vector2.ZERO
-	visual_layers.add_child(back)
-	_add_image(back, "Smoke01", "smoke_01.png", Vector2(745, 640), 0.20)
-	_add_image(back, "Smoke02", "smoke_02.png", Vector2(1170, 730), 0.16)
+	artwork_root.add_child(back)
+	# Keep both wisps beside the lip of the fixed character artwork, clear of the face.
+	_add_image(back, "Smoke01", "smoke_01.png", Vector2(970, 576), 0.80)
+	_add_image(back, "Smoke02", "smoke_02.png", Vector2(936, 507), 0.70)
 	_add_image(back, "TaglineMark", "tagline_mark.png", Vector2(1790, 35), 0.9)
 	var line := _add_image(back, "DecorationLine", "decoration_line.png", Vector2(84, 360), 0.8)
+	line.reparent(visual_layers)
 	line.modulate = Color(0.52, 0.73, 0.92, 0.78)
-	_create_drift(back.get_node("Smoke01") as TextureRect, Vector2(18, -8), 12.0)
-	_create_drift(back.get_node("Smoke02") as TextureRect, Vector2(-16, -10), 14.0)
-
-func _build_character_layer() -> void:
-	var layer := Control.new()
-	layer.name = "CharacterLayer"
-	visual_layers.add_child(layer)
-	character = _add_image(layer, "CharacterMain", "character_group.png", Vector2(795, 205), 1.5)
-	character.pivot_offset = character.size * 0.5
-	character.modulate = Color(1.08, 1.08, 1.08, 0.0)
-	_create_drift(character, Vector2(0, -3), 4.2, true)
-
-func _build_foreground() -> void:
-	var layer := Control.new()
-	layer.name = "ForegroundLayer"
-	visual_layers.add_child(layer)
-	var crates := _add_image(layer, "ForegroundCrates", "foreground_crates.png", Vector2(600, 820), 1.5)
-	crates.pivot_offset = crates.size * 0.5
-	_create_drift(crates, Vector2(-4, 3), 11.2)
-	lantern_glow = _add_image(layer, "LanternGlow", "lantern_glow.png", Vector2(1570, 750), 0.95)
-	var glow_material := CanvasItemMaterial.new()
-	glow_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-	lantern_glow.material = glow_material
-	lantern_glow.modulate = Color(1.0, 0.78, 0.42, 0.78)
-	var lantern := _add_image(layer, "Lantern", "lantern.png", Vector2(1590, 735), 0.95)
-	var lantern_tween := create_tween().set_loops()
-	lantern_tween.tween_property(lantern_glow, "modulate:a", 0.94, 1.4).set_trans(Tween.TRANS_SINE)
-	lantern_tween.tween_property(lantern_glow, "modulate:a", 0.66, 1.7).set_trans(Tween.TRANS_SINE)
-	lantern_tween.tween_property(lantern, "rotation", deg_to_rad(0.15), 1.6).set_trans(Tween.TRANS_SINE)
-	lantern_tween.tween_property(lantern, "rotation", deg_to_rad(-0.15), 1.8).set_trans(Tween.TRANS_SINE)
+	(back.get_node("Smoke01") as CanvasItem).modulate = Color(0.86, 0.91, 1.0, 0.28)
+	(back.get_node("Smoke02") as CanvasItem).modulate = Color(0.86, 0.91, 1.0, 0.20)
+	_create_drift(back.get_node("Smoke01") as TextureRect, Vector2(-6, -16), 8.0)
+	_create_drift(back.get_node("Smoke02") as TextureRect, Vector2(5, -20), 10.0)
 
 func _build_artwork_base() -> void:
 	var base := TextureRect.new()
 	base.name = "ArtworkBase"
-	base.texture = RIGHT_ARTWORK
+	base.texture = load("res://assets/ui/loading/loading_right_artwork_main.png") as Texture2D
 	base.size = DESIGN_SIZE
 	base.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	base.stretch_mode = TextureRect.STRETCH_SCALE
@@ -203,19 +177,19 @@ func _build_artwork_atmosphere() -> void:
 	atmosphere.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	atmosphere.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	artwork_root.add_child(atmosphere)
-	lantern_glow = _add_image(atmosphere, "LanternGlow", "lantern_glow.png", Vector2(1570, 750), 0.95)
+	lantern_glow = _add_image(atmosphere, "LanternGlow", "lantern_glow.png", Vector2(1640, 735), 0.95)
 	var glow_material := CanvasItemMaterial.new()
 	glow_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	lantern_glow.material = glow_material
 	lantern_glow.modulate = Color(1.0, 0.78, 0.42, 0.72)
 	var glow_tween := create_tween().set_loops()
-	glow_tween.tween_property(lantern_glow, "modulate:a", 0.92, 1.45).set_trans(Tween.TRANS_SINE)
-	glow_tween.tween_property(lantern_glow, "modulate:a", 0.70, 1.75).set_trans(Tween.TRANS_SINE)
+	glow_tween.tween_property(lantern_glow, "modulate:a", 0.76, 3.5).set_trans(Tween.TRANS_SINE)
+	glow_tween.tween_property(lantern_glow, "modulate:a", 0.66, 4.0).set_trans(Tween.TRANS_SINE)
 
 func _build_particles() -> void:
 	var layer := Control.new()
 	layer.name = "ParticleLayer"
-	visual_layers.add_child(layer)
+	artwork_root.add_child(layer)
 	var textures: Array[Texture2D] = [
 		load(CORE + "particle_01.png") as Texture2D,
 		load(CORE + "particle_02.png") as Texture2D,
@@ -226,6 +200,7 @@ func _build_particles() -> void:
 		var particle := TextureRect.new()
 		particle.name = "BlueParticle%02d" % index
 		particle.texture = textures[index % textures.size()]
+		particle.size = particle.texture.get_size()
 		particle.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		particle.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		particle.position = positions[index]
@@ -234,9 +209,9 @@ func _build_particles() -> void:
 		layer.add_child(particle)
 		var end_position := particle.position + Vector2(24.0 + index * 2.0, -88.0 - index * 5.0)
 		var tween := create_tween().set_loops()
-		tween.tween_property(particle, "modulate:a", 0.42, 0.9 + index * 0.1).set_trans(Tween.TRANS_SINE)
-		tween.tween_property(particle, "position", end_position, 4.0 + index * 0.35).set_trans(Tween.TRANS_SINE)
-		tween.parallel().tween_property(particle, "rotation", deg_to_rad(12.0 + index * 3.0), 4.0 + index * 0.35)
+		tween.tween_property(particle, "modulate:a", 0.42, 2.5 + index * 0.2).set_trans(Tween.TRANS_SINE)
+		tween.tween_property(particle, "position", end_position, 10.0 + index * 0.8).set_trans(Tween.TRANS_SINE)
+		tween.parallel().tween_property(particle, "rotation", deg_to_rad(12.0 + index * 3.0), 10.0 + index * 0.8)
 		tween.tween_property(particle, "modulate:a", 0.0, 1.2).set_trans(Tween.TRANS_SINE)
 		tween.tween_property(particle, "position", positions[index], 0.1)
 
@@ -261,7 +236,7 @@ func _build_ui() -> void:
 	progress_track.name = "ProgressTrack"
 	progress_track.position = Vector2(0, 430)
 	progress_track.size = Vector2(500, 39)
-	progress_track.texture = load(CORE + "progress_bar_bg.png") as Texture2D
+	progress_track.texture = load(CORE + "progress_track.png") as Texture2D
 	progress_track.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	progress_track.stretch_mode = TextureRect.STRETCH_SCALE
 	progress_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -297,7 +272,7 @@ func _build_ui() -> void:
 	ui.add_child(steps)
 	for index in STAGE_TEXT.size():
 		var row_y := float(index * 48)
-		var icon := _add_image(steps, "StepIcon%02d" % index, "check_off.png", Vector2(0, row_y), 0.34)
+		var icon := _add_image(steps, "StepIcon%02d" % index, "status_waiting.png", Vector2(0, row_y), 0.34)
 		icon.position += Vector2(0, 2)
 		stage_icons.append(icon)
 		var stage_label := _label(steps, "StepLabel%02d" % index, STAGE_TEXT[index].trim_suffix("…"), 20, Color("#65758b"))
@@ -363,8 +338,8 @@ func _play_intro() -> void:
 	var logo := design.get_node("LeftUI/Logo") as TextureRect
 	intro.tween_property(logo, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_SINE)
 	intro.parallel().tween_property(logo, "position:y", 0.0, 0.18).set_trans(Tween.TRANS_SINE)
-	intro.tween_property(artwork_root, "modulate:a", 1.0, 0.45).set_trans(Tween.TRANS_SINE)
-	intro.parallel().tween_property(artwork_root, "position:x", 0.0, 0.45).set_trans(Tween.TRANS_SINE)
+	artwork_root.modulate.a = 1.0
+	artwork_root.position.x = 0.0
 
 func _update_target_progress() -> void:
 	if elapsed < 0.24:
@@ -401,17 +376,17 @@ func _update_stage_states() -> void:
 	for index in stage_labels.size():
 		var state_label := stage_labels[index].get_parent().get_node("StepState%02d" % index) as Label
 		if index < current:
-			stage_icons[index].texture = load(CORE + "check_on.png") as Texture2D
+			stage_icons[index].texture = load(CORE + "status_done.png") as Texture2D
 			stage_labels[index].add_theme_color_override("font_color", Color("#a8d9ff"))
 			state_label.text = "…  完成"
 			state_label.add_theme_color_override("font_color", Color("#a8d9ff"))
 		elif index == current and display_progress < 1.0:
-			stage_icons[index].texture = load(CORE + "check_loading.png") as Texture2D
+			stage_icons[index].texture = load(CORE + "status_active.png") as Texture2D
 			stage_labels[index].add_theme_color_override("font_color", Color("#edf5ff"))
 			state_label.text = "…  进行中"
 			state_label.add_theme_color_override("font_color", Color("#edf5ff"))
 		else:
-			stage_icons[index].texture = load(CORE + "check_off.png") as Texture2D
+			stage_icons[index].texture = load(CORE + "status_waiting.png") as Texture2D
 			stage_labels[index].add_theme_color_override("font_color", Color("#65758b"))
 			state_label.text = "…  等待中"
 			state_label.add_theme_color_override("font_color", Color("#65758b"))

@@ -1,0 +1,164 @@
+# Loading 废弃资源清理报告
+
+2026-09-14。仅清理 Loading 资源；现有视觉、动画、布局、加载和 Continue 逻辑未改。
+
+- 删除 136 个文件，共 32.1 MiB：17 张旧编号 PNG 及配套 import、旧污染切图、临时截图/基线、旧对比工具与孤立 UID、根目录重复解压包。
+- 素材 README 仅将旧粒子/烟雾名称更新为当前正式名称。
+- 正式保留：core 内 16 张语义素材、6 张左侧 UI 素材、正式 Artwork、F8 参考图，以及 LoadingScreenV2.tscn、loading_screen_v2.gd、build_loading_artwork.gd。
+- 仍保留非运行时素材：reference/asset_sheet_source.png 与 transparent_assets_preview.jpg，因 README/资产文档仍引用；保留当前验收截图和其他系统的独立基线项目。
+- assets/ui/loading_v2/ 不存在。Loading 目录无孤立 .import。
+
+验证：
+
+- Godot 4.7.2 import：通过。
+- Loading 独立场景确定性截图：30% / 50% / 100% 清理前后逐像素完全一致。
+- Loading 自然播放：0 failures；原始/导入 Artwork 透明采样正常。
+- 原生 Main Menu → 点击 Continue → Loading → Camp：269 checks，0 failures；测试存档字节不变，无黑色覆盖层。
+- 59 个受保护文件 SHA-256 未变（含正式素材、导入设置、场景、脚本、合成工具与 main.gd）。
+- 本次 import、运行和导出日志：Missing Resource = 0；Invalid UID = 0；Runtime Error = 0。
+- Windows Release 导出及隔离目录独立程序启动：通过。只做目标导出/启动验证，未执行 run.ps1 的全项目回归套件。
+- 编码检查、定向 git diff --check：通过。测试进程已结束，未写玩家存档。
+
+引用判定：全仓库路径、文件名、动态拼接和 UID 检查；素材自身 import、历史资产盘点记录不视为使用方。独立 Godot 基线和解压包内的相对路径按各自根目录解析。旧报告/工具先删除，再清除其不再被引用的输入。正式文件校验值、日志及截图位于 test-output/loading_cleanup/。
+
+删除文件（项目相对路径）：
+
+- `assets/ui/loading/core/03_progress_bar_fill.png`
+- `assets/ui/loading/core/03_progress_bar_fill.png.import`
+- `assets/ui/loading/core/07_character_group.png`
+- `assets/ui/loading/core/07_character_group.png.import`
+- `assets/ui/loading/core/08_photo_01.png`
+- `assets/ui/loading/core/08_photo_01.png.import`
+- `assets/ui/loading/core/09_note_01.png`
+- `assets/ui/loading/core/09_note_01.png.import`
+- `assets/ui/loading/core/10_photo_02.png`
+- `assets/ui/loading/core/10_photo_02.png.import`
+- `assets/ui/loading/core/11_note_02.png`
+- `assets/ui/loading/core/11_note_02.png.import`
+- `assets/ui/loading/core/12_ticket.png`
+- `assets/ui/loading/core/12_ticket.png.import`
+- `assets/ui/loading/core/13_particle_01.png`
+- `assets/ui/loading/core/13_particle_01.png.import`
+- `assets/ui/loading/core/14_particle_02.png`
+- `assets/ui/loading/core/14_particle_02.png.import`
+- `assets/ui/loading/core/15_particle_03.png`
+- `assets/ui/loading/core/15_particle_03.png.import`
+- `assets/ui/loading/core/16_foreground_crates.png`
+- `assets/ui/loading/core/16_foreground_crates.png.import`
+- `assets/ui/loading/core/17_lantern.png`
+- `assets/ui/loading/core/17_lantern.png.import`
+- `assets/ui/loading/core/18_lantern_glow.png`
+- `assets/ui/loading/core/18_lantern_glow.png.import`
+- `assets/ui/loading/core/19_signature.png`
+- `assets/ui/loading/core/19_signature.png.import`
+- `assets/ui/loading/core/21_tagline_mark.png`
+- `assets/ui/loading/core/21_tagline_mark.png.import`
+- `assets/ui/loading/core/22_smoke_01.png`
+- `assets/ui/loading/core/22_smoke_01.png.import`
+- `assets/ui/loading/core/23_smoke_02.png`
+- `assets/ui/loading/core/23_smoke_02.png.import`
+- `test-output/loading_asset_review/artwork-only.png`
+- `test-output/loading_asset_review/catalog.png`
+- `test-output/loading_asset_review/clean-source-check/character_group.png`
+- `test-output/loading_asset_review/clean-source-check/foreground_crates.png`
+- `test-output/loading_asset_review/clean-source-check/lantern.png`
+- `test-output/loading_asset_review/clean-source-check/lantern_glow.png`
+- `test-output/loading_asset_review/clean-source-check/note_01.png`
+- `test-output/loading_asset_review/clean-source-check/note_02.png`
+- `test-output/loading_asset_review/clean-source-check/particle_01.png`
+- `test-output/loading_asset_review/clean-source-check/particle_02.png`
+- `test-output/loading_asset_review/clean-source-check/particle_03.png`
+- `test-output/loading_asset_review/clean-source-check/photo_01.png`
+- `test-output/loading_asset_review/clean-source-check/photo_02.png`
+- `test-output/loading_asset_review/clean-source-check/signature.png`
+- `test-output/loading_asset_review/clean-source-check/smoke_01.png`
+- `test-output/loading_asset_review/clean-source-check/smoke_02.png`
+- `test-output/loading_asset_review/clean-source-check/tagline_mark.png`
+- `test-output/loading_asset_review/clean-source-check/ticket.png`
+- `test-output/loading_asset_review/photo_02-contamination.png`
+- `test-output/loading_asset_review/reference.png`
+- `test-output/loading_asset_review/report.md`
+- `test-output/loading_asset_review/source-assets/character_group.png`
+- `test-output/loading_asset_review/source-assets/character_group.png.import`
+- `test-output/loading_asset_review/source-assets/foreground_crates.png`
+- `test-output/loading_asset_review/source-assets/foreground_crates.png.import`
+- `test-output/loading_asset_review/source-assets/lantern.png`
+- `test-output/loading_asset_review/source-assets/lantern.png.import`
+- `test-output/loading_asset_review/source-assets/lantern_glow.png`
+- `test-output/loading_asset_review/source-assets/lantern_glow.png.import`
+- `test-output/loading_asset_review/source-assets/note_01.png`
+- `test-output/loading_asset_review/source-assets/note_01.png.import`
+- `test-output/loading_asset_review/source-assets/note_02.png`
+- `test-output/loading_asset_review/source-assets/note_02.png.import`
+- `test-output/loading_asset_review/source-assets/particle_01.png`
+- `test-output/loading_asset_review/source-assets/particle_01.png.import`
+- `test-output/loading_asset_review/source-assets/particle_02.png`
+- `test-output/loading_asset_review/source-assets/particle_02.png.import`
+- `test-output/loading_asset_review/source-assets/particle_03.png`
+- `test-output/loading_asset_review/source-assets/particle_03.png.import`
+- `test-output/loading_asset_review/source-assets/photo_01.png`
+- `test-output/loading_asset_review/source-assets/photo_01.png.import`
+- `test-output/loading_asset_review/source-assets/photo_02.png`
+- `test-output/loading_asset_review/source-assets/photo_02.png.import`
+- `test-output/loading_asset_review/source-assets/signature.png`
+- `test-output/loading_asset_review/source-assets/signature.png.import`
+- `test-output/loading_asset_review/source-assets/smoke_01.png`
+- `test-output/loading_asset_review/source-assets/smoke_01.png.import`
+- `test-output/loading_asset_review/source-assets/smoke_02.png`
+- `test-output/loading_asset_review/source-assets/smoke_02.png.import`
+- `test-output/loading_asset_review/source-assets/tagline_mark.png`
+- `test-output/loading_asset_review/source-assets/tagline_mark.png.import`
+- `test-output/loading_asset_review/source-assets/ticket.png`
+- `test-output/loading_asset_review/source-assets/ticket.png.import`
+- `test-output/loading_asset_review/source-sha256.txt`
+- `test-output/loading_final_tune_review/baseline/build_loading_artwork.gd`
+- `test-output/loading_final_tune_review/baseline/loading_right_artwork_main.png`
+- `test-output/loading_final_tune_review/baseline/loading_screen_v2.gd`
+- `test-output/loading_final_tune_review/before-errors.log`
+- `test-output/loading_final_tune_review/before.log`
+- `test-output/loading_final_tune_review/current-before.png`
+- `test-output/loading_sticker_fix/artwork-only-clean.png`
+- `test-output/loading_sticker_fix/current-clean.png`
+- `test-output/loading_sticker_fix/current-sticker-fix.png`
+- `test-output/loading_sticker_fix/diff-clean.png`
+- `test-output/loading_sticker_fix/diff-sticker-fix.png`
+- `test-output/loading_sticker_fix/overlay-clean.png`
+- `test-output/loading_sticker_fix/overlay-sticker-fix.png`
+- `test-output/loading_sticker_fix/reference.png`
+- `test-output/loading_v2/current-50.png`
+- `test-output/loading_v3_reference/diff.png`
+- `test-output/loading_v3_reference/overlay.png`
+- `tools/loading_visual_compare.gd`
+- `tools/loading_visual_compare.gd.uid`
+- `ui/continue_loading.gd.uid`
+
+删除的重复解压包（仓库相对路径）：
+
+- `.tmp/loading_v2/core/01_logo.png`
+- `.tmp/loading_v2/core/02_progress_bar_bg.png`
+- `.tmp/loading_v2/core/03_progress_bar_fill.png`
+- `.tmp/loading_v2/core/04_check_on.png`
+- `.tmp/loading_v2/core/05_check_off.png`
+- `.tmp/loading_v2/core/06_check_loading.png`
+- `.tmp/loading_v2/core/07_character_group.png`
+- `.tmp/loading_v2/core/08_photo_01.png`
+- `.tmp/loading_v2/core/09_note_01.png`
+- `.tmp/loading_v2/core/10_photo_02.png`
+- `.tmp/loading_v2/core/11_note_02.png`
+- `.tmp/loading_v2/core/12_ticket.png`
+- `.tmp/loading_v2/core/13_particle_01.png`
+- `.tmp/loading_v2/core/14_particle_02.png`
+- `.tmp/loading_v2/core/15_particle_03.png`
+- `.tmp/loading_v2/core/16_foreground_crates.png`
+- `.tmp/loading_v2/core/17_lantern.png`
+- `.tmp/loading_v2/core/18_lantern_glow.png`
+- `.tmp/loading_v2/core/19_signature.png`
+- `.tmp/loading_v2/core/20_decoration_line.png`
+- `.tmp/loading_v2/core/21_tagline_mark.png`
+- `.tmp/loading_v2/core/22_smoke_01.png`
+- `.tmp/loading_v2/core/23_smoke_02.png`
+- `.tmp/loading_v2/manifest.json`
+- `.tmp/loading_v2/README_GODOT.md`
+- `.tmp/loading_v2/reference/asset_sheet_source.png`
+- `.tmp/loading_v2/reference/loading_final_reference.png`
+- `.tmp/loading_v2/reference/transparent_assets_preview.jpg`
