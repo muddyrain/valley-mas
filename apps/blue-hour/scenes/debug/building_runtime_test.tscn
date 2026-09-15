@@ -1,0 +1,70 @@
+[gd_scene load_steps=23 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/building_supermarket.tscn" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/residential/building_house_small_a.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/residential/building_house_small_b.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/building_pharmacy.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/building_restaurant_small.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/industrial/building_warehouse_small.tscn" id="6"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/service/building_gas_station.tscn" id="7"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/service/building_auto_repair_shop.tscn" id="8"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/residential/BLD_009_residence_c.tscn" id="9"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/residential/BLD_010_residence_d.tscn" id="10"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/residential/BLD_011_residence_e.tscn" id="11"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/residential/BLD_012_two_story_house_a.tscn" id="12"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/residential/BLD_013_small_apartment_a.tscn" id="13"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/residential/BLD_014_small_apartment_b.tscn" id="14"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/BLD_015_convenience_store_a.tscn" id="15"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/BLD_016_small_shop_a.tscn" id="16"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/BLD_017_small_shop_b.tscn" id="17"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/BLD_018_cafe_a.tscn" id="18"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/BLD_019_laundromat_a.tscn" id="19"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/BLD_020_hardware_store_a.tscn" id="20"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/utility/BLD_021_small_office_a.tscn" id="21"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/residential/BLD_022_abandoned_house_a.tscn" id="22"]
+
+[node name="BuildingRuntimeTest" type="Node3D"]
+[node name="BLD_001" parent="." instance=ExtResource("1")]
+position = Vector3(0, 0, 0)
+[node name="BLD_002" parent="." instance=ExtResource("2")]
+position = Vector3(18, 0, 0)
+[node name="BLD_003" parent="." instance=ExtResource("3")]
+position = Vector3(36, 0, 0)
+[node name="BLD_004" parent="." instance=ExtResource("4")]
+position = Vector3(54, 0, 0)
+[node name="BLD_005" parent="." instance=ExtResource("5")]
+position = Vector3(72, 0, 0)
+[node name="BLD_006" parent="." instance=ExtResource("6")]
+position = Vector3(0, 0, 16)
+[node name="BLD_007" parent="." instance=ExtResource("7")]
+position = Vector3(18, 0, 16)
+[node name="BLD_008" parent="." instance=ExtResource("8")]
+position = Vector3(36, 0, 16)
+[node name="BLD_009" parent="." instance=ExtResource("9")]
+position = Vector3(54, 0, 16)
+[node name="BLD_010" parent="." instance=ExtResource("10")]
+position = Vector3(72, 0, 16)
+[node name="BLD_011" parent="." instance=ExtResource("11")]
+position = Vector3(0, 0, 32)
+[node name="BLD_012" parent="." instance=ExtResource("12")]
+position = Vector3(18, 0, 32)
+[node name="BLD_013" parent="." instance=ExtResource("13")]
+position = Vector3(36, 0, 32)
+[node name="BLD_014" parent="." instance=ExtResource("14")]
+position = Vector3(54, 0, 32)
+[node name="BLD_015" parent="." instance=ExtResource("15")]
+position = Vector3(72, 0, 32)
+[node name="BLD_016" parent="." instance=ExtResource("16")]
+position = Vector3(0, 0, 48)
+[node name="BLD_017" parent="." instance=ExtResource("17")]
+position = Vector3(18, 0, 48)
+[node name="BLD_018" parent="." instance=ExtResource("18")]
+position = Vector3(36, 0, 48)
+[node name="BLD_019" parent="." instance=ExtResource("19")]
+position = Vector3(54, 0, 48)
+[node name="BLD_020" parent="." instance=ExtResource("20")]
+position = Vector3(72, 0, 48)
+[node name="BLD_021" parent="." instance=ExtResource("21")]
+position = Vector3(0, 0, 64)
+[node name="BLD_022" parent="." instance=ExtResource("22")]
+position = Vector3(18, 0, 64)

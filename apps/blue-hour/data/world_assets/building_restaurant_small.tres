@@ -13,7 +13,7 @@ category = "commercial"
 
 footprint = Vector2(8.325080, 5.621953)
 
-bounding_size = Vector3(8.325080, 4.800000, 5.621953)
+bounding_size = Vector3(8.325082, 4.800000, 5.621954)
 
 poi_type = "restaurant"
 
@@ -26,3 +26,6 @@ enemy_profile = "street"
 entrance_offset = Vector3(0.000000, 0.000000, -4.310977)
 
 road_offset = Vector3(0.000000, 0.000000, -4.310977)
+building_id = "BLD_005"
+display_name = "餐厅"
+search_offset = Vector3(0.000000, 0.000000, -4.310977)

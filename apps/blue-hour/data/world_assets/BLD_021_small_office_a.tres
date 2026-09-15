@@ -1,0 +1,20 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/utility/BLD_021_small_office_a.tscn" id="2"]
+[resource]
+script = ExtResource("1")
+id = "BLD_021_small_office_a"
+building_id = "BLD_021"
+display_name = "办公楼"
+scene = ExtResource("2")
+category = "special"
+subtype = "small_office_a"
+searchable = true
+loot_tags = PackedStringArray("daily_supplies", "electronics")
+mission_tags = PackedStringArray("urban", "building")
+spawn_weight = 1.0
+footprint = Vector2(9.610407, 6.581735)
+bounding_size = Vector3(9.610407, 7.200000, 6.581735)
+entrance_offset = Vector3(0.000000, 0.000000, -4.790867)
+road_offset = Vector3(0.000000, 0.000000, -5.290867)
+search_offset = Vector3(0.000000, 0.000000, -4.790867)

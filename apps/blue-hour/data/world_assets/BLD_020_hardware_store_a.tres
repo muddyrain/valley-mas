@@ -1,0 +1,20 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/BLD_020_hardware_store_a.tscn" id="2"]
+[resource]
+script = ExtResource("1")
+id = "BLD_020_hardware_store_a"
+building_id = "BLD_020"
+display_name = "五金店"
+scene = ExtResource("2")
+category = "commercial"
+subtype = "hardware_store_a"
+searchable = true
+loot_tags = PackedStringArray("tools", "materials")
+mission_tags = PackedStringArray("urban", "building")
+spawn_weight = 1.0
+footprint = Vector2(6.952778, 5.304902)
+bounding_size = Vector3(6.952778, 4.500000, 5.304902)
+entrance_offset = Vector3(0.000000, 0.000000, -4.152451)
+road_offset = Vector3(0.000000, 0.000000, -4.652451)
+search_offset = Vector3(0.000000, 0.000000, -4.152451)

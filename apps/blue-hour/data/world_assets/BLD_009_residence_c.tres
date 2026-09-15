@@ -1,0 +1,20 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/residential/BLD_009_residence_c.tscn" id="2"]
+[resource]
+script = ExtResource("1")
+id = "BLD_009_residence_c"
+building_id = "BLD_009"
+display_name = "住宅 C"
+scene = ExtResource("2")
+category = "residential"
+subtype = "residence_c"
+searchable = true
+loot_tags = PackedStringArray("household", "food", "daily_supplies")
+mission_tags = PackedStringArray("urban", "building")
+spawn_weight = 1.0
+footprint = Vector2(6.211205, 3.937680)
+bounding_size = Vector3(6.211205, 3.800000, 3.937680)
+entrance_offset = Vector3(0.000000, 0.000000, -3.468840)
+road_offset = Vector3(0.000000, 0.000000, -3.968840)
+search_offset = Vector3(0.000000, 0.000000, -3.468840)

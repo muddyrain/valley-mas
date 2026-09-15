@@ -13,7 +13,7 @@ category = "industrial"
 
 footprint = Vector2(12.853474, 14.098348)
 
-bounding_size = Vector3(12.853474, 6.000000, 14.098348)
+bounding_size = Vector3(12.853475, 6.000000, 14.098351)
 
 poi_type = "warehouse"
 
@@ -26,3 +26,6 @@ enemy_profile = "service"
 entrance_offset = Vector3(0.000000, 0.000000, -8.549174)
 
 road_offset = Vector3(0.000000, 0.000000, -11.049174)
+building_id = "BLD_006"
+display_name = "仓库"
+search_offset = Vector3(0.000000, 0.000000, -8.549174)

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/BLD_015_convenience_store_a.tscn" id="2"]
+[resource]
+script = ExtResource("1")
+id = "BLD_015_convenience_store_a"
+building_id = "BLD_015"
+display_name = "便利店"
+scene = ExtResource("2")
+category = "commercial"
+subtype = "convenience_store_a"
+searchable = true
+loot_tags = PackedStringArray("food", "drink", "daily_supplies")
+mission_tags = PackedStringArray("urban", "building")
+spawn_weight = 1.0
+footprint = Vector2(7.002864, 4.303473)
+bounding_size = Vector3(7.002864, 4.200000, 4.303473)
+entrance_offset = Vector3(0.000000, 0.000000, -3.651736)
+road_offset = Vector3(0.000000, 0.000000, -4.151736)
+search_offset = Vector3(0.000000, 0.000000, -3.651736)

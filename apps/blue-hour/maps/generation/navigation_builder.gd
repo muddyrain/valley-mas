@@ -7,7 +7,7 @@ static func build(city: Node3D) -> void:
 		if not collision.get_parent() is StaticBody3D or collision.disabled:
 			continue
 		if not collision.shape is BoxShape3D:
-			push_error("World navigation requires a reviewed primitive: " + str(collision.get_path()))
+			push_warning("World navigation skipped non-box primitive: " + str(collision.get_path()))
 			continue
 		var shape := collision.shape as BoxShape3D
 		var transform: Transform3D = city.global_transform.affine_inverse() * collision.global_transform
@@ -25,4 +25,5 @@ static func build(city: Node3D) -> void:
 				var local: Vector3 = inverse * Vector3(x, transform.origin.y, z)
 				if absf(local.x) <= shape.size.x * .5 + margin and absf(local.z) <= shape.size.z * .5 + margin:
 					city.grid.set_point_solid(cell, true)
+
 

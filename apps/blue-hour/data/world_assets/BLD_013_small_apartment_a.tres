@@ -1,0 +1,20 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/residential/BLD_013_small_apartment_a.tscn" id="2"]
+[resource]
+script = ExtResource("1")
+id = "BLD_013_small_apartment_a"
+building_id = "BLD_013"
+display_name = "公寓 A"
+scene = ExtResource("2")
+category = "residential"
+subtype = "small_apartment_a"
+searchable = true
+loot_tags = PackedStringArray("household", "food", "daily_supplies")
+mission_tags = PackedStringArray("urban", "building")
+spawn_weight = 1.0
+footprint = Vector2(9.142138, 14.401684)
+bounding_size = Vector3(9.142138, 8.800000, 14.401684)
+entrance_offset = Vector3(0.000000, 0.000000, -8.700842)
+road_offset = Vector3(0.000000, 0.000000, -9.200842)
+search_offset = Vector3(0.000000, 0.000000, -8.700842)

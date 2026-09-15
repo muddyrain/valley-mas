@@ -26,3 +26,6 @@ enemy_profile = "street"
 entrance_offset = Vector3(0.000000, 0.000000, -5.185930)
 
 road_offset = Vector3(0.000000, 0.000000, -5.185930)
+building_id = "BLD_004"
+display_name = "药店"
+search_offset = Vector3(0.000000, 0.000000, -5.185930)

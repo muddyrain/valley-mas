@@ -9,11 +9,11 @@ script = ExtResource("1")
 id = "BLD_008_auto_repair_shop"
 scene = ExtResource("2")
 
-category = "service"
+category = "industrial"
 
 footprint = Vector2(10.955459, 9.713698)
 
-bounding_size = Vector3(10.955459, 5.200000, 9.713698)
+bounding_size = Vector3(10.955461, 5.200000, 9.713699)
 
 poi_type = "auto_repair"
 
@@ -26,3 +26,6 @@ enemy_profile = "service"
 entrance_offset = Vector3(0.000000, 0.000000, -6.356849)
 
 road_offset = Vector3(0.000000, 0.000000, -8.856849)
+building_id = "BLD_008"
+display_name = "修车铺"
+search_offset = Vector3(0.000000, 0.000000, -6.356849)

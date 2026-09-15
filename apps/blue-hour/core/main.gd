@@ -39,6 +39,8 @@ var camp_ui: Control
 var selected_mission_id := ""
 var selected_mission_data: Resource
 var selected_party: Array[String] = []
+var selected_mission_config: Dictionary = {}
+var random_mission_counter: int = 0
 var departure_fade: ColorRect
 var continue_loading: Control
 var _today_action_closing := false
@@ -480,6 +482,7 @@ func start_mission(action_id: String = "") -> void:
 	var action: Resource = catalog.by_id(catalog.today_actions, action_id)
 	selected_mission_id = action_id
 	selected_mission_data = action.make_map(base_map) if action != null else base_map.duplicate(true)
+	selected_mission_config = _mission_config(action_id)
 	selected_party.assign(campaign.data.selected_party)
 	if action_id.is_empty():
 		# Existing internal rule/smoke entry has no selection UI or performance contract.
@@ -524,7 +527,7 @@ func _load_selected_mission() -> void:
 	mission = Mission.new()
 	add_child(mission)
 	var no_template_loadout: Array[String] = []
-	mission.setup(catalog, ledger, no_template_loadout, 0, campaign, selected_party)
+	mission.setup(catalog, ledger, no_template_loadout, int(selected_mission_config.get("seed", 0)), campaign, selected_party, selected_mission_config)
 	if not selected_mission_id.is_empty():
 		mission.begin_arrival()
 	mission.completed.connect(_mission_complete)
@@ -533,6 +536,19 @@ func _load_selected_mission() -> void:
 	hud.setup(mission, settings)
 	hud.main_menu_requested.connect(return_to_main_menu)
 	state = "mission"
+
+func _mission_config(action_id: String) -> Dictionary:
+	random_mission_counter += 1
+	var mission_type := "supply_search"
+	var layout := "LAYOUT_MEDIUM_3X4"
+	match action_id:
+		"commercial":
+			mission_type = "food_supply"
+			layout = "LAYOUT_MEDIUM_4X4"
+		"airdrop":
+			mission_type = "rescue"
+			layout = "LAYOUT_SMALL_3X3"
+	return {"use_random_map": true, "mission_type": mission_type, "seed": int(campaign.data.seed) + int(campaign.data.day) * 7919 + random_mission_counter * 104729, "layout": layout, "district_size": layout, "zombie_density": 1.0, "required_poi_tags": []}
 
 func _mission_complete(outcome: Dictionary) -> void:
 	if not campaign.stage_result(outcome):
@@ -640,8 +656,6 @@ func debug_weapon(kind: String, affix: String, rarity: int = 0) -> void:
 		campaign.data.modified = true
 		_save(before)
 	show_shelter()
-
-
 
 
 

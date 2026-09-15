@@ -1,0 +1,20 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/residential/BLD_022_abandoned_house_a.tscn" id="2"]
+[resource]
+script = ExtResource("1")
+id = "BLD_022_abandoned_house_a"
+building_id = "BLD_022"
+display_name = "废弃住宅"
+scene = ExtResource("2")
+category = "residential"
+subtype = "abandoned_house_a"
+searchable = true
+loot_tags = PackedStringArray("household", "scrap")
+mission_tags = PackedStringArray("urban", "building")
+spawn_weight = 1.0
+footprint = Vector2(8.747236, 8.573141)
+bounding_size = Vector3(8.747236, 7.000000, 8.573141)
+entrance_offset = Vector3(0.000000, 0.000000, -5.786571)
+road_offset = Vector3(0.000000, 0.000000, -6.286571)
+search_offset = Vector3(0.000000, 0.000000, -5.786571)

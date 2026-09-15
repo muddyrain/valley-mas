@@ -1,0 +1,20 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/BLD_018_cafe_a.tscn" id="2"]
+[resource]
+script = ExtResource("1")
+id = "BLD_018_cafe_a"
+building_id = "BLD_018"
+display_name = "咖啡店"
+scene = ExtResource("2")
+category = "commercial"
+subtype = "cafe_a"
+searchable = true
+loot_tags = PackedStringArray("food", "drink")
+mission_tags = PackedStringArray("urban", "building")
+spawn_weight = 1.0
+footprint = Vector2(5.182375, 3.901819)
+bounding_size = Vector3(5.182375, 4.100000, 3.901819)
+entrance_offset = Vector3(0.000000, 0.000000, -3.450909)
+road_offset = Vector3(0.000000, 0.000000, -3.950909)
+search_offset = Vector3(0.000000, 0.000000, -3.450909)

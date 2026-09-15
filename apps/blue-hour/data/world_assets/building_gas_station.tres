@@ -9,11 +9,11 @@ script = ExtResource("1")
 id = "BLD_007_gas_station"
 scene = ExtResource("2")
 
-category = "service"
+category = "special"
 
 footprint = Vector2(16.284454, 10.837078)
 
-bounding_size = Vector3(16.284454, 5.200000, 10.837078)
+bounding_size = Vector3(16.284454, 5.200000, 10.837080)
 
 poi_type = "gas_station"
 
@@ -26,3 +26,6 @@ enemy_profile = "service"
 entrance_offset = Vector3(4.000000, 0.000000, -6.918539)
 
 road_offset = Vector3(0.000000, 0.000000, -9.418539)
+building_id = "BLD_007"
+display_name = "加油站"
+search_offset = Vector3(4.000000, 0.000000, -6.918539)

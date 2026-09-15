@@ -31,8 +31,20 @@ metadata/provider = "Wrapper shapes projected to the mission AStar grid"
 [node name="RoadAnchor" type="Marker3D" parent="Anchors"]
 position = Vector3(0.000000, 0.000000, -11.049174)
 
+[node name="FrontMarker" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 0.000000, -7.049175)
+
+[node name="EntranceMarker" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 0.000000, -8.549174)
+
 [node name="EntranceAnchor" type="Marker3D" parent="Anchors"]
 position = Vector3(0.000000, 0.000000, -8.549174)
+
+[node name="SearchMarker" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 0.000000, -8.549174)
+
+[node name="CenterMarker" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 3.000000, 0.000000)
 
 [node name="SpawnPoints" type="Node3D" parent="."]
 

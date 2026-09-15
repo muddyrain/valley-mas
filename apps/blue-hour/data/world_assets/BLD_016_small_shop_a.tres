@@ -1,0 +1,20 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/world/buildings/commercial/BLD_016_small_shop_a.tscn" id="2"]
+[resource]
+script = ExtResource("1")
+id = "BLD_016_small_shop_a"
+building_id = "BLD_016"
+display_name = "小商铺 A"
+scene = ExtResource("2")
+category = "commercial"
+subtype = "small_shop_a"
+searchable = true
+loot_tags = PackedStringArray("daily_supplies", "household")
+mission_tags = PackedStringArray("urban", "building")
+spawn_weight = 1.0
+footprint = Vector2(5.884418, 4.814846)
+bounding_size = Vector3(5.884418, 4.000000, 4.814846)
+entrance_offset = Vector3(0.000000, 0.000000, -3.907423)
+road_offset = Vector3(0.000000, 0.000000, -4.407423)
+search_offset = Vector3(0.000000, 0.000000, -3.907423)

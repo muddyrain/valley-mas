@@ -13,4 +13,12 @@ extends Resource
 @export var enemy_profile: String = "street"
 @export var entrance_offset: Vector3 = Vector3.ZERO
 @export var road_offset: Vector3 = Vector3.ZERO
+@export var search_offset: Vector3 = Vector3.ZERO
 
+
+@export var building_id: String = ""
+@export var display_name: String = ""
+@export var subtype: String = ""
+@export var searchable: bool = true
+@export var loot_tags: PackedStringArray = []
+@export var mission_tags: PackedStringArray = []

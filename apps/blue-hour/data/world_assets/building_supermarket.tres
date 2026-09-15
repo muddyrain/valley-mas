@@ -13,7 +13,7 @@ category = "commercial"
 
 footprint = Vector2(15.196739, 13.791872)
 
-bounding_size = Vector3(15.196739, 5.500000, 13.791872)
+bounding_size = Vector3(15.196740, 5.500000, 13.791874)
 
 poi_type = "supermarket"
 
@@ -26,3 +26,6 @@ enemy_profile = "street"
 entrance_offset = Vector3(0.000000, 0.000000, -8.395936)
 
 road_offset = Vector3(0.000000, 0.000000, -8.395936)
+building_id = "BLD_001"
+display_name = "超市"
+search_offset = Vector3(0.000000, 0.000000, -8.395936)

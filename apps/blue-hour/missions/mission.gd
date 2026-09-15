@@ -18,6 +18,7 @@ const Modifiers = preload("res://core/effect_modifiers.gd")
 const EncounterDirector = preload("res://encounter/encounter_director.gd")
 const LootResolver = preload("res://core/loot_resolver.gd")
 const NoiseSystem = preload("res://encounter/noise_system.gd")
+const RandomMapGenerator = preload("res://maps/random/random_map_generator.gd")
 var encounter: RefCounted
 var noise: RefCounted
 var arrival_noise_pending: bool = true
@@ -74,11 +75,16 @@ var rally_point := Vector3.ZERO
 var regroup_left := 0.0
 var controls: RefCounted
 var input_enabled := true
+var random_map_config: Dictionary = {}
+var generated_map: Dictionary = {}
+var generated_extraction: Vector3 = Vector3.ZERO
+var generated_spawn: Vector3 = Vector3.ZERO
+var mission_type: String = "supply_search"
 var manual_aim := false
 var aim_point := Vector3.ZERO
 var world_interaction_vfx: Node3D
 
-func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], seed_value: int = 0, run_state: RefCounted = null, locked_party: Array[String] = []) -> void:
+func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], seed_value: int = 0, run_state: RefCounted = null, locked_party: Array[String] = [], map_config: Dictionary = {}) -> void:
 	catalog = content
 	ledger = resources
 	campaign = run_state
@@ -86,9 +92,21 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 	controls = SquadInput.new(self)
 	ledger.begin()
 	rally_point = catalog.map.bus_position
+	random_map_config = map_config.duplicate(true)
+	mission_type = str(random_map_config.get("mission_type", "supply_search"))
+	if bool(random_map_config.get("use_random_map", false)):
+		var generated := RandomMapGenerator.generate(str(random_map_config.get("mission_type", "supply_search")), int(random_map_config.get("seed", seed_value)), str(random_map_config.get("layout", "")), float(random_map_config.get("zombie_density", 1.0)))
+		if generated.get("ok", false):
+			generated_map = generated
+			_apply_generated_map(catalog.map, generated)
+		else:
+			push_error("[RandomMap] Generation failed: " + str(generated.get("error", "unknown")))
+			random_map_config["use_random_map"] = false
 	rng.seed = seed_value if seed_value != 0 else Time.get_ticks_usec()
 	if campaign != null:
 		rng.seed = int(campaign.data.seed) + int(campaign.data.day) * 1009
+	if bool(random_map_config.get("use_random_map", false)):
+		rng.seed = int(random_map_config.get("seed", rng.seed))
 	var clock_rules: Resource = catalog.map.duplicate()
 	clock_rules.day_seconds += effects.amount("day_extension")
 	clock = Clock.new(clock_rules)
@@ -154,6 +172,31 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 		add_child(encounter_debug)
 		encounter_debug.setup(self)
 
+func _apply_generated_map(map: Resource, generated: Dictionary) -> void:
+	map.id = "random_" + str(generated.layout)
+	map.display_name = "随机街区"
+	map.base_seed = int(generated.seed)
+	map.half_width = int(generated.half_width)
+	map.half_depth = int(generated.half_depth)
+	map.bus_position = generated.spawn
+	generated_spawn = generated.spawn
+	generated_extraction = generated.extraction
+	mission_type = str(generated.mission_type)
+	print("[Mission] mission_type=%s use_random_map=true seed=%d" % [mission_type, int(generated.seed)])
+	map.road_segments = generated.roads
+	map.districts.clear()
+	map.frontage_blocks.clear()
+	map.buildings = generated.buildings
+	map.plots.clear()
+	map.parking_placements.clear()
+	map.parking_areas.clear()
+	map.props.clear()
+	map.vegetation.clear()
+	map.encounter = map.encounter.duplicate(true)
+	map.encounter.initial_zombie_min = maxi(1, int(generated.zombie_spawns.size() * .75))
+	map.encounter.initial_zombie_max = maxi(map.encounter.initial_zombie_min, generated.zombie_spawns.size())
+	print("[RandomMap] Ready Mission=%s Seed=%d Layout=%s Buildings=%d POI=%s Spawn=%s Extraction=%s ZombieSpawns=%d LootSpawns=%d" % [generated.mission_type, generated.seed, generated.layout, generated.buildings.size(), generated.poi, generated.spawn, generated.extraction, generated.zombie_spawns.size(), generated.loot_spawns.size()])
+
 func formation(index: int) -> Vector3:
 	return [Vector3(-1.2, 0, 0), Vector3(1.2, 0, 0), Vector3(0, 0, -1.4), Vector3(0, 0, 1.4)][index % 4]
 
@@ -175,22 +218,27 @@ func _physics_process(delta: float) -> void:
 	var left := maxf(0.0, delta * time_scale)
 	# Split at effect expiry so a clock freeze cannot eat the rest of a large frame.
 	while left > 0 and active:
+		if powers == null:
+			_advance_world(left)
+			left = 0.0
+			break
 		var dt := minf(left, powers.next_expiry())
 		_advance_world(dt)
 		powers.advance(dt)
 		left = maxf(0.0, left - dt)
-
 func _advance_world(dt: float) -> void:
-	noise.advance(dt)
+	if noise != null:
+		noise.advance(dt)
 	if arrival != null and not arrival.finished:
 		arrival.advance(dt, self)
-		exploration.advance(dt)
+		if exploration != null:
+			exploration.advance(dt)
 		return
 	if arrival_noise_pending:
 		arrival_noise_pending = false
 		noise.emit_noise(catalog.map.bus_position, catalog.map.encounter.arrival_noise_radius, NoiseSystem.Event.NoiseType.ARRIVAL, 1.0, city)
-	action_elapsed += dt
-	clock.advance(dt, effects.amount("freeze_day_clock") > 0)
+	if clock != null:
+		clock.advance(dt, effects.amount("freeze_day_clock") > 0)
 	_sync_watch_warning()
 	_update_director(dt)
 	powers.refresh_target()
@@ -224,7 +272,8 @@ func _advance_world(dt: float) -> void:
 	_prune_tasks()
 	_update_pickups()
 	_update_extraction(dt)
-	exploration.advance(dt)
+	if exploration != null:
+		exploration.advance(dt)
 
 func _on_noise(event: RefCounted) -> void:
 	for enemy: Node3D in enemies:
@@ -386,6 +435,10 @@ func _cancel_guard_order() -> void:
 func command_move(point: Vector3) -> void:
 	if not active or closing_left >= 0:
 		return
+	# A manual movement order supersedes every active search assignment.
+	# Release the task before issuing paths so stale workers/callbacks cannot
+	# keep advancing search or resurrecting its world feedback.
+	_release_tasks()
 	_cancel_guard_order()
 	var destination: Vector3 = city.nearest_open(point)
 	rally_point = destination
@@ -670,7 +723,8 @@ func _update_pickups() -> void:
 				var message := "+%d 食物   +%d 废料" % [gained.x, gained.y]
 				if not pickup.weapon.is_empty():
 					ledger.add_weapon(pickup.weapon)
-					message += "\n获得 " + campaign.gear.title(pickup.weapon)
+					message += "
+获得 " + campaign.gear.title(pickup.weapon)
 				notice.emit(message)
 				sound.play_cue("loot")
 				pickup.view.queue_free()
@@ -773,3 +827,14 @@ func debug_clear_enemies() -> void:
 	enemies.clear()
 	if focus_target != null:
 		_finish_focus()
+
+
+
+
+
+
+
+
+
+
+

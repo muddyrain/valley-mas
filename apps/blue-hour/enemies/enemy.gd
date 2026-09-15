@@ -1,5 +1,6 @@
 extends Node3D
 enum State { IDLE, WANDER, INVESTIGATE, CHASE, ATTACK, DEAD }
+const HealthBar = preload("res://ui/expedition/enemy_health_bar.gd")
 const Visuals = preload("res://vfx/visuals.gd")
 const AnimationController = preload("res://enemies/infected_animation_controller.gd")
 var config: Resource = preload("res://data/expedition_encounter.tres")
@@ -40,7 +41,7 @@ var rig: Node3D
 var animation_player: AnimationPlayer
 var animation_controller: InfectedAnimationController
 var locomotion_animation: StringName = &""
-var hp_bar: MeshInstance3D
+var hp_bar: Node3D
 var focus_ring: MeshInstance3D
 
 func setup(spec: Resource, offset: float, clock: RefCounted) -> void:
@@ -50,7 +51,9 @@ func setup(spec: Resource, offset: float, clock: RefCounted) -> void:
 	animation_controller = AnimationController.new()
 	animation_controller.name = "InfectedAnimationController"
 	add_child(animation_controller)
-	hp_bar = Visuals.box(self, Vector3(0.65, 0.05, 0.08), get_node("HealthAnchor").position, Color("#ef7a73"), true)
+	hp_bar = HealthBar.new()
+	hp_bar.position = get_node("HealthAnchor").position
+	add_child(hp_bar)
 	focus_ring = Visuals.ring(self, Vector3(0, 0.09, 0), data.collision_radius + 0.15, Color("#ff665e"))
 	var area: Area3D = get_node("HitArea")
 	area.set_meta("enemy", self)
@@ -62,7 +65,7 @@ func reset_for_spawn(offset: float, clock: RefCounted) -> void:
 	max_hp = data.max_hp * clock.hp_multiplier()
 	attack_damage = data.attack_damage * clock.damage_multiplier()
 	hp = max_hp
-	hp_bar.scale.x = 1.0
+	hp_bar.set_ratio(1.0)
 	active = true
 	visible = true
 	path.clear()
@@ -99,7 +102,7 @@ func refresh_stats(clock: RefCounted) -> void:
 		# Phase/threat changes preserve injury instead of refilling or compounding base HP.
 		hp = next_max_hp * clampf(hp / max_hp, 0.0, 1.0)
 		max_hp = next_max_hp
-		hp_bar.scale.x = maxf(0.01, hp / max_hp)
+		hp_bar.set_ratio(hp / max_hp)
 	attack_damage = data.attack_damage * clock.damage_multiplier()
 	visual_multiplier = clock.perception_multiplier()
 	hearing_scale = clock.perception_multiplier(true)
@@ -290,7 +293,7 @@ func take_damage(amount: float) -> void:
 	if not active:
 		return
 	hp = maxf(0, hp - amount)
-	hp_bar.scale.x = maxf(0.01, hp / max_hp)
+	hp_bar.set_ratio(hp / max_hp)
 	if hp <= 0:
 		active = false
 		state = State.DEAD

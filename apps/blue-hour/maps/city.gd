@@ -113,8 +113,10 @@ func line_clear(from: Vector3, to: Vector3) -> bool:
 	return true
 
 func set_marker(point: Vector3) -> void:
-	marker.position = point + Vector3(0, .55, 0)
-	marker.flash()
+	# Movement feedback is rendered by WorldInteractionVfx's procedural ring.
+	# The legacy textured marker has no semantic asset and can fall back to a
+	# black quad, so keep the compatibility node permanently hidden.
+	marker.visible = false
 
 func update_site(id: String) -> void:
 	if sites[id].searched:

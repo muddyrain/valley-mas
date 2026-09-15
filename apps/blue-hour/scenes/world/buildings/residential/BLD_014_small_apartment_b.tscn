@@ -1,0 +1,42 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="1"]
+[ext_resource type="PackedScene" path="res://assets/world/buildings/residential/BLD_014_small_apartment_b.glb" id="2"]
+[sub_resource type="BoxShape3D" id="shape"]
+size = Vector3(9.166740, 9.200000, 10.346308)
+[node name="WorldAsset" type="Node3D" groups=["world_assets"]]
+script = ExtResource("1")
+asset_id = "BLD_014_small_apartment_b"
+[node name="ModelRoot" type="Node3D" parent="."]
+position = Vector3(-0.010980, -0.000000, 0.003934)
+
+[node name="SourceModel" parent="ModelRoot" instance=ExtResource("2")]
+[node name="Collision" type="StaticBody3D" parent="."]
+[node name="Shape0" type="CollisionShape3D" parent="Collision"]
+shape = SubResource("shape")`r`nposition = Vector3(0.000000, 4.600000, 0.000000)
+
+[node name="Anchors" type="Node3D" parent="."]
+[node name="FrontMarker" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 0.000000, -5.173154)
+
+[node name="EntranceMarker" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 0.000000, -6.673154)
+
+[node name="SearchMarker" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 0.000000, -6.673154)
+
+[node name="CenterMarker" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 4.600000, 0.000000)
+
+[node name="RoadAnchor" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 0.000000, -7.173154)
+
+[node name="EntranceAnchor" type="Marker3D" parent="Anchors"]
+position = Vector3(0.000000, 0.000000, -6.673154)
+
+[node name="SpawnPoints" type="Node3D" parent="."]
+[node name="LootPoints" type="Node3D" parent="SpawnPoints"]
+[node name="Primary" type="Marker3D" parent="SpawnPoints/LootPoints"]
+position = Vector3(0.000000, 0.000000, -6.673154)
+
+
