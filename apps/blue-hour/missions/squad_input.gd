@@ -61,6 +61,8 @@ func handle(event: InputEvent) -> void:
 		return
 	pointer = event.position
 	if event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		if over_ui():
+			return
 		mission.camera_controller.zoom(-3.0 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 3.0)
 		return
 	if event.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:

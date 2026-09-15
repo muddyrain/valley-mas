@@ -33,31 +33,28 @@ func _process(delta: float) -> void:
 	_project_cards(delta)
 
 func refresh() -> void:
-	var hovered: String = focused_id
+	var hovered: String = ""
 	# The displayed card owns its hover region, including transparent labels.
 	# A button must not invalidate the very world hover that made it appear.
 	var pointed_card: PanelContainer = _card_under_pointer()
-	if hovered.is_empty() and pointed_card != null:
-		hovered = pointed_card.site_id
-	if hovered.is_empty() and mission.input_enabled and not mission.controls.over_ui():
-		var point: Vector2 = mission.controls.pointer
-		var origin: Vector3 = mission.camera.project_ray_origin(point)
-		var query := PhysicsRayQueryParameters3D.create(origin, origin + mission.camera.project_ray_normal(point) * 200, 3)
-		query.collide_with_areas = true
-		var hit: Dictionary = mission.get_world_3d().direct_space_state.intersect_ray(query)
-		if not hit.is_empty() and hit.collider.has_meta("site_id"):
-			hovered = hit.collider.get_meta("site_id")
+	var selected_search_id: String = ""
+	if not mission.search_tasks.is_empty():
+		selected_search_id = mission.search_tasks.keys()[0]
+	# World hover no longer opens a large information card; only active searches
+	# retain a compact progress surface.
+	# Selection is represented by the discovery list; world cards are reserved for tasks.
 	if not hovered.is_empty() and (not mission.city.sites.has(hovered) or not mission.city.sites[hovered].discovered):
 		hovered = ""
 	displayed_id = hovered if not hovered.is_empty() else mission.poi_selected_id
 	if not mission.city.sites.has(displayed_id) or not mission.city.sites[displayed_id].discovered:
-		displayed_id = ""
-	var selected_search_id: String = ""
-	if not mission.search_tasks.is_empty():
-		selected_search_id = mission.search_tasks.keys()[0]
+		displayed_id = selected_search_id
 	for id: String in mission.city.sites:
 		# Keep the map readable: one active search card, otherwise one hover/selected card.
-		var should_exist: bool = id == selected_search_id or (selected_search_id.is_empty() and id == displayed_id)
+		# Keep a lightweight object for callers that inspect a hovered site, but
+		# only active searches are shown in world space.
+		var task: RefCounted = mission.search_tasks.get(id)
+		var live: bool = task != null and is_instance_valid(task.worker) and task.phase in [task.Phase.SEARCHING_INSIDE, task.Phase.SEARCHING_OUTSIDE]
+		var should_exist: bool = live or id == focused_id
 		# One persistent view per task; hover/selection only changes emphasis.
 		if should_exist:
 			if not cards.has(id):
@@ -66,7 +63,7 @@ func refresh() -> void:
 				card.setup(mission)
 				cards[id] = card
 			cards[id].update_site(id, mission.poi_selected_id == id)
-			cards[id].show()
+			cards[id].visible = live
 		elif cards.has(id):
 			cards[id].hide()
 	_focus_card = cards.get(displayed_id, _preview_card)
@@ -90,6 +87,11 @@ func _project_cards(delta: float = 0.0) -> void:
 	if _preview_card.visible:
 		_project(_preview_card, displayed_id, delta)
 	for id: String in cards:
+		var task: RefCounted = mission.search_tasks.get(id)
+		var live: bool = task != null and is_instance_valid(task.worker) and task.phase in [task.Phase.SEARCHING_INSIDE, task.Phase.SEARCHING_OUTSIDE]
+		if not live:
+			cards[id].hide()
+			continue
 		_project(cards[id], id, delta)
 
 func _project(card: PanelContainer, id: String, delta: float) -> void:
@@ -125,3 +127,4 @@ func _project(card: PanelContainer, id: String, delta: float) -> void:
 	card.set_meta("viewport_area", area)
 	card.set_meta("smoothed_position", current)
 	card.position = ((current * viewport_scale).round() / viewport_scale).clamp(minimum, maximum)
+

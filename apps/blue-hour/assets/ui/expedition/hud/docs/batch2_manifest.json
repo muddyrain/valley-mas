@@ -1,0 +1,177 @@
+{
+  "package": "Blue Hour Homeward - Expedition HUD UI Batch 2",
+  "asset_count": 41,
+  "cleaning": [
+    "Each main PNG is spatially isolated from its source sprite sheet.",
+    "Detached alpha components below the pollution threshold were removed.",
+    "Native anti-alias / glow fringe around the kept component was preserved.",
+    "Every asset has transparent padding and no neighboring sprite overlap.",
+    "Small low-priority decoration pieces are intentionally consolidated into misc_decorations.png."
+  ],
+  "assets": [
+    {
+      "file": "01_resources/resource_food.png",
+      "size": [322, 332]
+    },
+    {
+      "file": "01_resources/resource_scrap.png",
+      "size": [377, 309]
+    },
+    {
+      "file": "01_resources/resource_intel.png",
+      "size": [296, 356]
+    },
+    {
+      "file": "01_resources/menu_icon.png",
+      "size": [393, 284]
+    },
+    {
+      "file": "01_resources/resource_intel_highlight.png",
+      "size": [306, 367]
+    },
+    {
+      "file": "02_survivor/weapon_ranged_pistol.png",
+      "size": [294, 223]
+    },
+    {
+      "file": "02_survivor/weapon_melee_knife.png",
+      "size": [288, 287]
+    },
+    {
+      "file": "02_survivor/status_combat_warning.png",
+      "size": [306, 305]
+    },
+    {
+      "file": "02_survivor/status_follow.png",
+      "size": [290, 230]
+    },
+    {
+      "file": "02_survivor/hp_friendly_bg.png",
+      "size": [711, 152]
+    },
+    {
+      "file": "02_survivor/hp_friendly_fill.png",
+      "size": [630, 101]
+    },
+    {
+      "file": "02_survivor/hp_enemy_bg.png",
+      "size": [711, 152]
+    },
+    {
+      "file": "02_survivor/hp_enemy_fill.png",
+      "size": [629, 101]
+    },
+    {
+      "file": "02_survivor/party_index_badge.png",
+      "size": [266, 260]
+    },
+    {
+      "file": "02_survivor/portrait_frame_accent.png",
+      "size": [344, 331]
+    },
+    {
+      "file": "03_action/action_stop.png",
+      "size": [339, 343]
+    },
+    {
+      "file": "03_action/action_focus_fire.png",
+      "size": [339, 343]
+    },
+    {
+      "file": "03_action/action_locate.png",
+      "size": [341, 344]
+    },
+    {
+      "file": "03_action/action_frenzy.png",
+      "size": [373, 343]
+    },
+    {
+      "file": "03_action/hotkey_badge_normal.png",
+      "size": [206, 205]
+    },
+    {
+      "file": "03_action/hotkey_badge_active.png",
+      "size": [219, 219]
+    },
+    {
+      "file": "03_action/hotkey_badge_large.png",
+      "size": [298, 295]
+    },
+    {
+      "file": "03_action/cooldown_wedge.png",
+      "size": [117, 145]
+    },
+    {
+      "file": "04_world_and_misc/location_house_large.png",
+      "size": [428, 395]
+    },
+    {
+      "file": "04_world_and_misc/location_house_small.png",
+      "size": [237, 236]
+    },
+    {
+      "file": "04_world_and_misc/vehicle_van.png",
+      "size": [349, 323]
+    },
+    {
+      "file": "04_world_and_misc/vehicle_bus.png",
+      "size": [356, 340]
+    },
+    {
+      "file": "04_world_and_misc/minimap_player_arrow.png",
+      "size": [184, 188]
+    },
+    {
+      "file": "04_world_and_misc/minimap_house_marker.png",
+      "size": [179, 174]
+    },
+    {
+      "file": "04_world_and_misc/minimap_target_marker.png",
+      "size": [193, 198]
+    },
+    {
+      "file": "04_world_and_misc/arrow_right.png",
+      "size": [184, 161]
+    },
+    {
+      "file": "04_world_and_misc/chevron_down.png",
+      "size": [171, 131]
+    },
+    {
+      "file": "04_world_and_misc/search_time_clock.png",
+      "size": [186, 214]
+    },
+    {
+      "file": "04_world_and_misc/panel_pointer.png",
+      "size": [146, 99]
+    },
+    {
+      "file": "04_world_and_misc/location_pin_micro.png",
+      "size": [144, 182]
+    },
+    {
+      "file": "04_world_and_misc/misc_decorations.png",
+      "size": [923, 338]
+    },
+    {
+      "file": "05_return_bus/return_bus_button_normal.png",
+      "size": [1020, 283]
+    },
+    {
+      "file": "05_return_bus/return_bus_button_hover.png",
+      "size": [1020, 283]
+    },
+    {
+      "file": "05_return_bus/return_bus_button_pressed.png",
+      "size": [1020, 283]
+    },
+    {
+      "file": "05_return_bus/return_bus_icon_normal.png",
+      "size": [330, 287]
+    },
+    {
+      "file": "05_return_bus/return_bus_icon_highlight.png",
+      "size": [366, 335]
+    }
+  ]
+}

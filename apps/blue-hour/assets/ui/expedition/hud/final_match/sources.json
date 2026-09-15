@@ -1,0 +1,20 @@
+[
+  {
+    "source": "blue-hour-homeward-expedition-final-match-assets/expedition_logo_main_final.png",
+    "runtime": "assets\\ui\\expedition\\hud\\final_match\\expedition_logo_main.png",
+    "sha256": "e87580ac20e4cf29a0daf85b34d691e472d334ba6ca339c64479fe2d7d0da3bc",
+    "size": [512, 192]
+  },
+  {
+    "source": "blue-hour-homeward-expedition-final-match-assets/minimap_frame_final.png",
+    "runtime": "assets\\ui\\expedition\\hud\\final_match\\minimap_frame.png",
+    "sha256": "da62accca61fee0875b36cd3d201b756f4c87673c35cfc837849230388f6cb86",
+    "size": [340, 280]
+  },
+  {
+    "source": "blue-hour-homeward-expedition-final-match-assets/minimap_region_label_final.png",
+    "runtime": "assets\\ui\\expedition\\hud\\final_match\\minimap_region_label.png",
+    "sha256": "a85ab47bdcb6a98000fe200848f86a5f47c68a9b7c3158024487fb0a346b840d",
+    "size": [220, 56]
+  }
+]

@@ -15,7 +15,10 @@ func setup(target: Node3D, poi_context: Control) -> void:
 	mission = target
 	context = poi_context
 	process_priority = 110
-	group_target = Marker.create(self, "icon_team", .6, Vector3.ZERO)
+	# Movement feedback is rendered by WorldInteractionVfx's procedural ground ring.
+	# Keep this node for compatibility with existing state code, but never show a
+	# texture fallback at the destination (which reads as a black placeholder).
+	group_target = Marker.create(self, "world_move_marker", .6, Vector3.ZERO)
 	danger = Marker.create(self, "world_danger_marker", .85, Vector3.ZERO)
 	group_target.hide()
 	danger.hide()
@@ -58,7 +61,7 @@ func _process(delta: float) -> void:
 		else:
 			site.ring.material_override.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 			site.ring.basis = Basis.IDENTITY
-	group_target.visible = mission.input_enabled and not mission.extraction and mission.order == "前往阵位" and mission.guards().any(func(member: Node3D): return not member.path.is_empty())
+	group_target.visible = false
 	group_target.position = mission.rally_point + Vector3(0, .8, 0)
 	var threat: Node3D = mission.focus_target
 	if not is_instance_valid(threat):

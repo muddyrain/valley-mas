@@ -111,8 +111,8 @@ func run() -> void:
 	var found_card := false
 	for card in cards:
 		if card.get_script() == load("res://ui/expedition/squad_card.gd") and card.equipped_id == Registry.A21:
-			found_card = card.weapon_icon.texture == mission_member.weapon.icon()
-	check(found_card, "A21 hand model and HUD icon agree")
+			found_card = card.weapon_icon.texture == load("res://ui/expedition/hud_skin.gd").texture("weapon_ranged") and not mission_member.weapon.melee
+	check(found_card, "A21 equipment uses the ranged weapon type HUD icon")
 	await capture("weapon-mission")
 	app.mission.director_enabled = false
 	for enemy in app.mission.enemies:

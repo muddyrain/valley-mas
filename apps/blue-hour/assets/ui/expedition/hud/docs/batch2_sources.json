@@ -1,0 +1,211 @@
+{
+  "package": "C:/Users/A/Downloads/blue-hour-homeward-ui-batch2-clean.zip",
+  "processing": "byte-identical copies, no crop or resample",
+  "assets": [
+    {
+      "source": "blue-hour-homeward-ui-batch2/03_action/hotkey_badge_active.png",
+      "runtime": "assets/ui/expedition/hud/buttons/hotkey_badge_active.png",
+      "sha256": "ba59a84318a4cfea9b5e802931d57a6b099d41946fa4baa6333b8454cffedad5"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/03_action/action_stop.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/icon_action_stop.png",
+      "sha256": "95cd5abd6ecca4623f0c408bb7d93c741a1cc15236928ead08e0df86ec7591e7"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/03_action/hotkey_badge_normal.png",
+      "runtime": "assets/ui/expedition/hud/buttons/hotkey_badge_normal.png",
+      "sha256": "cd84c8d2a7debeb8156b16b6525da5d1207ef1f5071e2ee1b098248e884a04ec"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/03_action/action_locate.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/icon_action_locate.png",
+      "sha256": "1a1702c285522e04fd92896008052b4b7bbe1a48843873173aaac075887e3c40"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/03_action/action_frenzy.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/icon_action_rage.png",
+      "sha256": "8fe158b2cffd76842aa871ceb78a94e9167c9037c8bde415e53dab1ff6bfd238"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/03_action/action_focus_fire.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/icon_action_focus.png",
+      "sha256": "d0c67adb1d5d2f010953eddbac749e21546f0b371c0d326477d4b9f574bfcae3"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/03_action/hotkey_badge_large.png",
+      "runtime": "assets/ui/expedition/hud/buttons/hotkey_badge_large.png",
+      "sha256": "b753eceffb323b0cd56a75557e9a028969ef55ff90d5a8059146b8ead10165a9"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/03_action/cooldown_wedge.png",
+      "runtime": "assets/ui/expedition/hud/feedback/cooldown_wedge.png",
+      "sha256": "e0076a6fc5e800d82df8075e33dfd6e6db3b3cde4e69303f1fe245655fac947d"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/02_survivor/hp_friendly_bg.png",
+      "runtime": "assets/ui/expedition/hud/panels/hp_friendly_bg.png",
+      "sha256": "edf64175ad8b2e4a5742287d26a1afd234362b26a1f862f64f44fbce4c031329"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/02_survivor/weapon_ranged_pistol.png",
+      "runtime": "assets/ui/expedition/hud/icons/weapons/weapon_ranged_pistol.png",
+      "sha256": "62fced93bd914a688fc2df36dce0f1e5942ca623cf45046a542496e956711154"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/02_survivor/hp_enemy_fill.png",
+      "runtime": "assets/ui/expedition/hud/panels/hp_enemy_fill.png",
+      "sha256": "4840de6900f300aebb844a8285092653b7808a10665a17fc44aef65921f73ef2"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/02_survivor/party_index_badge.png",
+      "runtime": "assets/ui/expedition/hud/panels/party_index_badge.png",
+      "sha256": "1484b0d00e7848b6c35fe16ae20c496a9de996df9424c34d0e16a17f6eff1901"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/02_survivor/hp_enemy_bg.png",
+      "runtime": "assets/ui/expedition/hud/panels/hp_enemy_bg.png",
+      "sha256": "009ff0e7399f0fd80a3c58e5ad62eb557c9bcfcb9b66770f3143336c32b29b65"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/02_survivor/status_combat_warning.png",
+      "runtime": "assets/ui/expedition/hud/feedback/status_combat_warning.png",
+      "sha256": "55832251c999bfaa17f0f9cf1aa31b96db7bee58535f77b4e0b240130aa1e84a"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/02_survivor/hp_friendly_fill.png",
+      "runtime": "assets/ui/expedition/hud/panels/hp_friendly_fill.png",
+      "sha256": "d580b820d14efa6991ac563ad69c6911474ab84dcfcbf2793573857623931755"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/02_survivor/portrait_frame_accent.png",
+      "runtime": "assets/ui/expedition/hud/portraits/portrait_frame_accent.png",
+      "sha256": "3978ca62e0796717ad92b62afde59142709844098073c49b55ba157d5efaec83"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/02_survivor/weapon_melee_knife.png",
+      "runtime": "assets/ui/expedition/hud/icons/weapons/weapon_melee_knife.png",
+      "sha256": "e7363e0b5db511b3c0b0ea6ad2701beac10f3cd15ed2cb92c9d10a0390b4fc89"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/02_survivor/status_follow.png",
+      "runtime": "assets/ui/expedition/hud/feedback/status_follow.png",
+      "sha256": "f9d6ada00cdd5dec63c556171ddd675f2ba0e8e8ab7a75ae3e8eaa0847fb3127"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/05_return_bus/return_bus_button_pressed.png",
+      "runtime": "assets/ui/expedition/hud/buttons/hud_return_button_pressed.png",
+      "sha256": "184dd3d67fe4afeb53b12a4f563ddfe1ba439a987822b5df8604113fb55496f7"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/05_return_bus/return_bus_button_normal.png",
+      "runtime": "assets/ui/expedition/hud/buttons/hud_return_button_default.png",
+      "sha256": "a8ddf7c3b606e8989d5a7d24bcf710e568314dd032ea032516765eaa4cf46983"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/05_return_bus/return_bus_icon_normal.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/icon_bus.png",
+      "sha256": "b47e8443920bb34c65a6e8f8154b587b8c926fa0fb2fa9c09db389be825e2f5e"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/05_return_bus/return_bus_button_hover.png",
+      "runtime": "assets/ui/expedition/hud/buttons/hud_return_button_hover.png",
+      "sha256": "0bb8b211a5c935fe9354b3e7a38849856deda30a993089cf630d8c749e17897f"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/05_return_bus/return_bus_icon_highlight.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/icon_bus_highlight.png",
+      "sha256": "81cc7c690420d208774f0f5a7cacc81a8403d50c5586c0deb78bd105f08de6ee"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/01_resources/resource_intel_highlight.png",
+      "runtime": "assets/ui/expedition/hud/icons/resources/icon_intel_highlight.png",
+      "sha256": "0eb2b041a39a2470394f91472d7fa71408c93dab94835703f370adc57165d86c"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/01_resources/menu_icon.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/icon_menu.png",
+      "sha256": "c1e7716c7d3ad03c01598cf37dac27a96d69b892f84feff870eaab771ce7e4c7"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/01_resources/resource_intel.png",
+      "runtime": "assets/ui/expedition/hud/icons/resources/icon_intel.png",
+      "sha256": "ea202fa9376b3e23b5bc7ad71634d2dcff5f26ac0f2cb32f2ee3886730418408"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/01_resources/resource_food.png",
+      "runtime": "assets/ui/expedition/hud/icons/resources/icon_food.png",
+      "sha256": "87164c683499d63df7b734752b3377a8d4178e405ae0f2b32f7faf17bdc7b75e"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/01_resources/resource_scrap.png",
+      "runtime": "assets/ui/expedition/hud/icons/resources/icon_scrap.png",
+      "sha256": "2351c81e15a930ebf34574524b9a7bb0f0f6c5b77fe41b2eaaa8d3880c59f804"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/04_world_and_misc/minimap_target_marker.png",
+      "runtime": "assets/ui/expedition/hud/minimap/map_target_marker.png",
+      "sha256": "6f6f689e11912f40bb900d37c1bd71d9806880761ce014862f9bafd5e2cc33b8"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/04_world_and_misc/vehicle_van.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/icon_vehicle_van.png",
+      "sha256": "338c71aac3493f0f5525e80765945579681b8bd8da5a34d0ae53f4e37c5e7b96"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/04_world_and_misc/arrow_right.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/arrow_right.png",
+      "sha256": "290679798b6dc802d7e11358826c3317238b666eacdc41db815954c83d4414ad"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/04_world_and_misc/vehicle_bus.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/vehicle_bus.png",
+      "sha256": "be630e569bc3fc274d89667c121f4e56c981aff0c5ec850167c2fa2a2c988369"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/04_world_and_misc/misc_decorations.png",
+      "runtime": "assets/ui/expedition/hud/feedback/misc_decorations.png",
+      "sha256": "1fe37d241f24e839c5cf3bc4a26dda9910ede609be40147d72c77be30cc448db"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/04_world_and_misc/minimap_player_arrow.png",
+      "runtime": "assets/ui/expedition/hud/minimap/map_player_marker.png",
+      "sha256": "d580b29fc1967a710715ed329620961cb9e6ca5dadb9c57b5a20433c3a0e4b2a"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/04_world_and_misc/location_house_small.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/icon_house_small.png",
+      "sha256": "8785170e18df7e1e8e8af2e82ee9defd5b4c63380deb0e3422602d69c683b20a"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/04_world_and_misc/minimap_house_marker.png",
+      "runtime": "assets/ui/expedition/hud/minimap/map_poi_marker.png",
+      "sha256": "8254463cb1ea124e49943e5a136849a7d329e4ca52089c064db13e93a4279ebc"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/04_world_and_misc/panel_pointer.png",
+      "runtime": "assets/ui/expedition/hud/world/panel_pointer.png",
+      "sha256": "951fc6751be1b6eafdf5acf6fd93db7ffb00f14804202723eae24bb530ebe463"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/04_world_and_misc/chevron_down.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/chevron_down.png",
+      "sha256": "1800222cc63aa411890d82bcf3be4b14e80b6919e646e443b97c765da3a4576f"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/04_world_and_misc/location_pin_micro.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/location_pin_micro.png",
+      "sha256": "87218cbda4da3425312df9d858359edc68b7e6e7294eb627a54c4e5419f40cf4"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/04_world_and_misc/location_house_large.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/icon_house_large.png",
+      "sha256": "e8e22c300c56ab52d13c2ebe365857bcde7d45e0cf3fdf16aa5aeb71cbb9e165"
+    },
+    {
+      "source": "blue-hour-homeward-ui-batch2/04_world_and_misc/search_time_clock.png",
+      "runtime": "assets/ui/expedition/hud/icons/actions/search_time_clock.png",
+      "sha256": "0a2404b6f418182e141eb1d666d77064ccb305365dcd4c5c09d48c39397d6249"
+    }
+  ]
+}

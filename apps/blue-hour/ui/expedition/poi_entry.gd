@@ -6,22 +6,27 @@ const HudArt = preload("res://ui/expedition/hud_skin.gd")
 var status: Label
 var normal_style: StyleBox
 var selected_style: StyleBox
+var time_icon: TextureRect
 
 func setup(site: Dictionary, command: Callable) -> void:
-	custom_minimum_size = Vector2(260, 48)
+	custom_minimum_size = Vector2(248, 56)
 	alignment = HORIZONTAL_ALIGNMENT_LEFT
+	clip_text = true
 	add_theme_font_size_override("font_size", 15)
 	add_theme_color_override("font_color", Style.INK)
 	add_theme_color_override("font_hover_color", Style.INK)
 	add_theme_color_override("font_pressed_color", Style.INK)
 	add_theme_color_override("font_disabled_color", Color("#52616a"))
 	mouse_default_cursor_shape = CURSOR_POINTING_HAND
-	icon = HudArt.fitted_icon(HudArt.texture("icon_vehicle" if site.vehicle else "icon_house"))
+	icon = HudArt.texture("icon_vehicle" if site.vehicle else "icon_house_small")
 	expand_icon = true
 	add_theme_constant_override("icon_max_width", 26)
-	add_theme_constant_override("h_separation", 10)
+	add_theme_constant_override("h_separation", 12)
 	normal_style = Style.plate(Color.TRANSPARENT, Color.TRANSPARENT, 6)
 	selected_style = Style.plate(Color("#60767a38"), Color("#819a9d88"), 6)
+	# Reserve the time column even when a location has a long display name.
+	normal_style.content_margin_right = 82
+	selected_style.content_margin_right = 82
 	add_theme_stylebox_override("hover", selected_style)
 	add_theme_stylebox_override("pressed", selected_style)
 	add_theme_stylebox_override("disabled", normal_style)
@@ -33,12 +38,20 @@ func setup(site: Dictionary, command: Callable) -> void:
 	status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	status.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(status)
+	time_icon = HudArt.picture("icon_search", Vector2.ZERO)
+	add_child(time_icon)
+	time_icon.set_anchors_and_offsets_preset(PRESET_CENTER_RIGHT)
+	time_icon.offset_left = -67
+	time_icon.offset_right = -53
+	time_icon.offset_top = -8
+	time_icon.offset_bottom = 8
 	pressed.connect(command)
 
 func update_site(id: String, mission: Node3D) -> void:
 	var site: Dictionary = mission.city.sites[id]
 	var task = mission.search_tasks.get(id)
-	icon = HudArt.fitted_icon(HudArt.texture("icon_complete" if site.searched else "icon_vehicle" if site.vehicle else "icon_house"))
+	icon = HudArt.texture("icon_vehicle" if site.vehicle else "icon_house_small")
+	time_icon.visible = not site.searched and task == null
 	disabled = site.searched or mission.closing_left >= 0 or not mission.active
 	add_theme_stylebox_override("normal", selected_style if mission.poi_selected_id == id else normal_style)
 	text = site.spec.name
