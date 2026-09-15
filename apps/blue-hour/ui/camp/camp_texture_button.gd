@@ -107,7 +107,7 @@ func _process(_delta: float) -> void:
 func _refresh_visual() -> void:
 	if skin == null:
 		return
-	var state: String = "disabled" if disabled else "pressed" if is_pressed() else "selected" if selected_visual else "hover" if _hovered or has_focus() else "normal"
+	var state: String = "disabled" if disabled else "pressed" if is_pressed() else "selected_hover" if selected_visual and (_hovered or has_focus()) else "selected" if selected_visual else "hover" if _hovered or has_focus() else "normal"
 	if state == _last_state:
 		return
 	_last_state = state
@@ -117,13 +117,17 @@ func _refresh_visual() -> void:
 	var ids: Dictionary = {
 		"secondary": [70, 70, 70, 70, 70], "primary": [71, 71, 71, 71, 71],
 		"quick": [30, 30, 30, 30, 30], "slot": [222, 222, 222, 222, 222],
-		"roster": [227, 228, 229, 227, 229], "depart": [90, 90, 90, 90, 90],
+		"roster": [227, 228, 229, 227, 229], "skill_label": [224, 224, 224, 224, 224], "depart": [90, 90, 90, 90, 90],
 		"plain": [70, 70, 70, 70, 70]}
-	var index: int = ["normal", "hover", "pressed", "disabled", "selected"].find(state)
+	var index: int = ["normal", "hover", "pressed", "disabled", "selected", "selected_hover"].find(state)
+	if index < 0:
+		index = 4
+	if state == "selected_hover":
+		index = 4
 	var id: int = ids[family][index]
 	var corners: float = 95.0 if family in ["slot", "roster"] else 75.0
 	skin.configure(id, corners, 0.10 if family == "roster" else 0.12, family in ["quick", "depart"])
-	skin.texture_tint = Color(0.62, 0.68, 0.74) if disabled and family in ["secondary", "primary"] else (Color(1.08, 1.08, 1.08) if state == "hover" else Color.WHITE)
+	skin.texture_tint = Color(0.62, 0.68, 0.74) if disabled and family in ["secondary", "primary"] else (Color(1.08, 1.08, 1.08) if state in ["hover", "selected_hover"] else Color.WHITE)
 	# Plain controls (timeline status and close affordances) must not acquire a
 	# dark baked button plate on hover.
 	skin.visible = family != "plain"

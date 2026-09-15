@@ -6,6 +6,11 @@ const Surface = preload("res://ui/camp/camp_surface.gd")
 const CampButton = preload("res://ui/camp/camp_texture_button.gd")
 const Model = preload("res://ui/camp/camp_view_model.gd")
 const REFERENCE := Vector2(1920, 1080)
+const CAMP_SKILL_BUTTON_SIZE := Vector2(109, 109)
+const CAMP_SKILL_LABEL_SIZE := Vector2(123, 28)
+const CAMP_LOADOUT_SLOT_SIZE := Vector2(88, 88)
+const CAMP_ROSTER_SLOT_SIZE := Vector2(108, 108)
+const CAMP_ESC_KEYCAP_SIZE := Vector2(42, 30)
 var owner_ui: Control
 var app: Node
 var model: RefCounted
@@ -145,7 +150,7 @@ func _build_timeline() -> void:
 		# introduce the compressed/expanded look seen in the timeline.
 		CampArt.place(dot, composition, Rect2(769 + index * 105, 32, 30, 30))
 		phase_dots.append(dot)
-		var label := CampArt.label(["白昼", "黄昏预警", "蓝时", "夜晚"][index], 13)
+		var label := CampArt.label("营地整备" if index == 0 else "", 13)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		CampArt.place(label, composition, Rect2(742 + index * 105, 67, 85, 25))
 	day_label = CampArt.label("", 23)
@@ -179,7 +184,9 @@ func _build_roster() -> void:
 	# Stable rail aligned with the survivor detail card; overflow scrolls without
 	# exposing a scrollbar and therefore remains usable for larger rosters.
 	var member_count: int = app.campaign.data.members.size()
-	var rail_height: float = 48.0 + member_count * 108.0 + maxf(0, member_count - 1) * 7.0 + 18.0
+	var content_height: float = member_count * CAMP_ROSTER_SLOT_SIZE.y + maxf(0, member_count - 1) * 7.0
+	var visible_height: float = minf(content_height, 360.0)
+	var rail_height: float = 48.0 + visible_height + 18.0
 	rail.size = Vector2(122, rail_height)
 	owner_ui.party_panel = rail
 	var column := VBoxContainer.new()
@@ -193,7 +200,8 @@ func _build_roster() -> void:
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	scroll.add_theme_constant_override("scrollbar_width", 0)
-	scroll.custom_minimum_size.y = member_count * 108.0 + maxf(0, member_count - 1) * 7.0
+	scroll.custom_minimum_size.y = visible_height
+	scroll.size_flags_vertical = SIZE_SHRINK_CENTER
 	column.add_child(scroll)
 	var cards := VBoxContainer.new()
 	cards.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -203,7 +211,10 @@ func _build_roster() -> void:
 		var member: Dictionary = model.survivor(id)
 		var card := CampButton.new()
 		cards.add_child(card)
-		card.custom_minimum_size = Vector2(108, 108)
+		card.custom_minimum_size = CAMP_ROSTER_SLOT_SIZE
+		card.size_flags_vertical = SIZE_SHRINK_CENTER
+		card.size_flags_horizontal = SIZE_SHRINK_CENTER
+		card.size = CAMP_ROSTER_SLOT_SIZE
 		card.setup("", func(): app.select_member(id), "roster")
 		card.name = "Party_" + id.replace(":", "_")
 		card.toggle_mode = true
@@ -257,7 +268,8 @@ func _build_powers() -> void:
 		group.add_theme_constant_override("separation", 2)
 		column.add_child(group)
 		var entry := CampButton.new()
-		entry.custom_minimum_size = Vector2(109, 109)
+		entry.custom_minimum_size = CAMP_SKILL_BUTTON_SIZE
+		entry.size_flags_vertical = SIZE_SHRINK_CENTER
 		group.add_child(entry)
 		entry.setup("", func(): owner_ui.show_effect_detail("power", id, true), "quick", definition.icon if definition != null else null)
 		entry.icon_view.custom_minimum_size = Vector2(61, 61)
@@ -266,22 +278,19 @@ func _build_powers() -> void:
 		quick_buttons.append(entry)
 		# Details open on click only; this prevents a transient hover card from
 		# competing with the persistent replacement panel.
-		var label := _button(definition.display_name if definition != null else "选择技能", func(): owner_ui.show_effect_detail("power", id, true), "secondary", Rect2(), null, "", 15, group)
-		label.custom_minimum_size = Vector2(123, 28)
+		var label := _button(definition.display_name if definition != null else "选择技能", func(): owner_ui.show_effect_detail("power", id, true), "skill_label", Rect2(), null, "", 15, group)
+		label.custom_minimum_size = CAMP_SKILL_LABEL_SIZE
+		label.size = CAMP_SKILL_LABEL_SIZE
 		label.name = "QuickActionLabel"
-		var label_bg := _surface(224, Rect2(), group, 28, 0.12)
-		label_bg.name = "QuickActionLabelBackground"
-		label_bg.custom_minimum_size = Vector2(123, 28)
-		group.move_child(label_bg, 0)
 		var key_hint := CampArt.label(str(index + 1) + "  ·  出勤可用", 12, CampArt.WHITE)
 		key_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		group.add_child(key_hint)
 	var locked_center := CenterContainer.new()
-	locked_center.custom_minimum_size = Vector2(135, 109)
+	locked_center.custom_minimum_size = Vector2(135, CAMP_SKILL_BUTTON_SIZE.y)
 	column.add_child(locked_center)
 	var locked := CampButton.new()
 	locked_center.add_child(locked)
-	locked.custom_minimum_size = Vector2(109, 109)
+	locked.custom_minimum_size = CAMP_SKILL_BUTTON_SIZE
 	locked.setup("", func(): owner_ui.show_slot_detail("power", true), "quick", CampArt.texture(223))
 	locked.name = "Unlock_power"
 	locked.disabled = true
@@ -317,14 +326,17 @@ func _build_equipment() -> void:
 		var definition: Resource = app.campaign.effect_definition("passive", id)
 		var entry := _button("＋" if id.is_empty() else "", func(): owner_ui.show_effect_detail("passive", id, true), "slot", Rect2(), definition.icon if definition != null else null, "", 32, row)
 		entry.name = "Effect_passive_" + id
-		entry.custom_minimum_size = Vector2(73, 73)
-		entry.icon_view.custom_minimum_size = Vector2(53, 53)
+		entry.custom_minimum_size = CAMP_LOADOUT_SLOT_SIZE
+		entry.size = CAMP_LOADOUT_SLOT_SIZE
+		entry.size_flags_vertical = SIZE_SHRINK_CENTER
+		entry.icon_view.custom_minimum_size = CAMP_LOADOUT_SLOT_SIZE * 0.68
 		entry.main_label.add_theme_color_override("font_color", CampArt.MUTED)
 		# Details open on click only; keep one information surface per item.
 		slot_buttons.append(entry)
 	var locked := _button("", func(): owner_ui.show_slot_detail("passive", true), "slot", Rect2(), CampArt.texture(223), "", 18, row)
 	locked.name = "Unlock_passive"
-	locked.custom_minimum_size = Vector2(73, 73)
+	locked.custom_minimum_size = CAMP_LOADOUT_SLOT_SIZE
+	locked.size = CAMP_LOADOUT_SLOT_SIZE
 	locked.size_flags_horizontal = SIZE_SHRINK_CENTER
 	locked.icon_view.custom_minimum_size = Vector2(36, 36)
 	locked.icon_view.size_flags_horizontal = SIZE_SHRINK_CENTER
