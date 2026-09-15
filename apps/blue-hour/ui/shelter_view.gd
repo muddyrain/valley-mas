@@ -57,6 +57,12 @@ func _member_at(point: Vector2) -> String:
 	return closest
 
 func _process(_delta: float) -> void:
+	# Camp uses the same world_select_ring resource as Expedition. Keep the
+	# legacy duty ring hidden even when survivor refresh/ambient state updates it.
+	for key: String in members:
+		var visual = members[key].visual
+		visual.duty_ring.visible = false
+		visual.selection_ring.visible = key == _selected or key == _hovered
 	var hovered := "" if interaction_locked or get_viewport().gui_get_hovered_control() != null else _member_at(get_viewport().get_mouse_position())
 	if hovered != _hovered:
 		_hovered = hovered
@@ -85,4 +91,6 @@ func _unhandled_input(event: InputEvent) -> void:
 func select(id: String) -> void:
 	_selected = id
 	for key: String in members:
-		members[key].visual.duty_ring.visible = key == id or key == _hovered
+		var visual = members[key].visual
+		visual.duty_ring.visible = false
+		visual.selection_ring.visible = key == id or key == _hovered

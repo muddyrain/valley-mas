@@ -268,7 +268,7 @@ rotation = Vector3(-0.802851, 0, 0)
 [node name="Camera3D" type="Camera3D" parent="CameraRig/PitchPivot"]
 position = Vector3(0, 0, 45)
 projection = 1
-size = 18.8
+size = 14.8
 near = 0.1
 far = 100.0
 current = true
