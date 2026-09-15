@@ -49,7 +49,7 @@ func setup(screen: Control) -> void:
 	var depart: Button = _button("今日行动", app.show_today_action, "depart", Rect2(1495, 891, 408, 179), null, "D E P A R T", 42)
 	depart.name = "TodayActionButton"
 	owner_ui.departure = depart
-	var back: Button = _button("返回主菜单", app.show_main_menu, "plain", Rect2(28, 1013, 184, 41), CampArt.texture(213), "", 17)
+	var back: Button = _button("返回主菜单", app.show_main_menu, "plain", Rect2(28, 1013, 184, 41), CampArt.texture(225), "", 17)
 	back.tooltip_text = "返回主菜单"
 	var version := CampArt.label("Blue Hour Homeward  /  " + str(ProjectSettings.get_setting("application/config/version")), 12, CampArt.WHITE)
 	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -97,7 +97,7 @@ func _build_identity() -> void:
 	var logo := CampArt.icon(preload("res://ui/menu_art.gd").logo(), Vector2.ZERO)
 	logo.name = "OfficialBrandLogo"
 	CampArt.place(logo, composition, Rect2(27, 11, 250, 99))
-	var info := _surface(1, Rect2(25, 119, 276, 177), null, 120, 0.16)
+	var info := _surface(220, Rect2(25, 119, 276, 177), null, 120, 0.16)
 	info.name = "DayStatus"
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 2)
@@ -114,7 +114,7 @@ func _build_identity() -> void:
 	content.add_child(owner_ui.day_status)
 
 func _build_timeline() -> void:
-	_surface(10, Rect2(571, 20, 686, 88), null, 80, 0.17)
+	_surface(220, Rect2(571, 20, 686, 88), null, 80, 0.17)
 	var phase := _button("", func(): owner_ui._show_phase(true), "plain", Rect2(582, 28, 145, 70))
 	phase.name = "PhaseStatus"
 	# Timeline details open on click, keeping hover purely visual and stable.
@@ -174,21 +174,13 @@ func _build_resources() -> void:
 	menu.icon_view.custom_minimum_size = Vector2(34, 34)
 
 func _build_roster() -> void:
-	var rail := PanelContainer.new()
+	var rail := _surface(226, Rect2(1778, 154, 122, 1), null, 80, 0.12)
 	rail.name = "PartyPanel"
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.025, 0.095, 0.16, 0.75)
-	bg.set_corner_radius_all(12)
-	bg.content_margin_left = 5
-	bg.content_margin_right = 5
-	bg.content_margin_top = 9
-	bg.content_margin_bottom = 9
-	rail.add_theme_stylebox_override("panel", bg)
 	# Stable rail aligned with the survivor detail card; overflow scrolls without
 	# exposing a scrollbar and therefore remains usable for larger rosters.
 	var member_count: int = app.campaign.data.members.size()
 	var rail_height: float = 48.0 + member_count * 108.0 + maxf(0, member_count - 1) * 7.0 + 18.0
-	CampArt.place(rail, composition, Rect2(1778, 154, 122, rail_height))
+	rail.size = Vector2(122, rail_height)
 	owner_ui.party_panel = rail
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 8)
@@ -286,7 +278,7 @@ func _build_powers() -> void:
 	var locked := CampButton.new()
 	locked_center.add_child(locked)
 	locked.custom_minimum_size = Vector2(109, 109)
-	locked.setup("", func(): owner_ui.show_slot_detail("power", true), "quick", CampArt.texture(209))
+	locked.setup("", func(): owner_ui.show_slot_detail("power", true), "quick", CampArt.texture(223))
 	locked.name = "Unlock_power"
 	locked.disabled = true
 	# The lock artwork includes a soft outer glow; keep it inside a smaller,
@@ -309,8 +301,6 @@ func _build_equipment() -> void:
 	CampArt.place(CampArt.icon(CampArt.texture(212), Vector2.ZERO), composition, Rect2(origin+Vector2(15, 25), Vector2(48, 48)))
 	CampArt.place(CampArt.label("作战装备", 17), composition, Rect2(origin+Vector2(74, 24), Vector2(88, 25)))
 	CampArt.place(CampArt.label("%d/%d" % [slots.size(), capacity], 27), composition, Rect2(origin+Vector2(74, 49), Vector2(83, 35)))
-	var ready := CampArt.label("READY / 整备完成" if slots.size() >= capacity else "待整备", 12, CampArt.CYAN if slots.size() >= capacity else CampArt.MUTED)
-	CampArt.place(ready, composition, Rect2(origin + Vector2(74, 79), Vector2(130, 18)))
 	var scroll := ScrollContainer.new()
 	scroll.name = "ItemSlots"
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -328,7 +318,7 @@ func _build_equipment() -> void:
 		entry.main_label.add_theme_color_override("font_color", CampArt.MUTED)
 		# Details open on click only; keep one information surface per item.
 		slot_buttons.append(entry)
-	var locked := _button("", func(): owner_ui.show_slot_detail("passive", true), "slot", Rect2(), CampArt.texture(209), "", 18, row)
+	var locked := _button("", func(): owner_ui.show_slot_detail("passive", true), "slot", Rect2(), CampArt.texture(223), "", 18, row)
 	locked.name = "Unlock_passive"
 	locked.custom_minimum_size = Vector2(73, 73)
 	locked.size_flags_horizontal = SIZE_SHRINK_CENTER

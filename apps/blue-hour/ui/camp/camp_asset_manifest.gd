@@ -47,5 +47,16 @@ const PATHS: Dictionary = {
 	214: "res://assets/ui/camp_hud_2_0/runtime/icons/camp_ui_214_icon_close.png",
 	501: "res://assets/ui/camp_hud_2_0/runtime/panels/detail_paper_border.png",
 	502: "res://assets/ui/camp_hud_2_0/runtime/panels/detail_paper_fill.png",
-	503: "res://assets/ui/camp_hud_2_0/runtime/panels/detail_header.png"
+	503: "res://assets/ui/camp_hud_2_0/runtime/panels/detail_header.png",
+	220: "res://assets/ui/camp_hud_2_0/runtime/final_d/camp_top_header_bg_top_header_bg.png",
+	221: "res://assets/ui/camp_hud_2_0/runtime/final_d/camp_loadout_panel_bg_loadout_panel_bg.png",
+	222: "res://assets/ui/camp_hud_2_0/runtime/final_d/camp_loadout_slot_empty_loadout_slot_empty.png",
+	223: "res://assets/ui/camp_hud_2_0/runtime/final_d/camp_lock_icon_lock_icon.png",
+	224: "res://assets/ui/camp_hud_2_0/runtime/final_d/camp_skill_label_bg_skill_label_bg.png",
+	225: "res://assets/ui/camp_hud_2_0/runtime/final_d/camp_esc_keycap_esc_keycap.png",
+	226: "res://assets/ui/camp_hud_2_0/runtime/final_d/camp_survivor_roster_panel_bg_survivor_roster_panel_bg.png",
+	227: "res://assets/ui/camp_hud_2_0/runtime/final_d/camp_survivor_slot_normal_survivor_slot_normal.png",
+	228: "res://assets/ui/camp_hud_2_0/runtime/final_d/camp_survivor_slot_hover_survivor_slot_hover.png",
+	229: "res://assets/ui/camp_hud_2_0/runtime/final_d/camp_survivor_slot_selected_survivor_slot_selected.png"
 }
+

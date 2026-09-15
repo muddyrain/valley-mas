@@ -116,8 +116,8 @@ func _refresh_visual() -> void:
 	# State feedback is now carried by tint and a restrained press scale.
 	var ids: Dictionary = {
 		"secondary": [70, 70, 70, 70, 70], "primary": [71, 71, 71, 71, 71],
-		"quick": [30, 30, 30, 30, 30], "slot": [81, 81, 81, 81, 81],
-		"roster": [40, 40, 40, 40, 40], "depart": [90, 90, 90, 90, 90],
+		"quick": [30, 30, 30, 30, 30], "slot": [222, 222, 222, 222, 222],
+		"roster": [227, 228, 229, 227, 229], "depart": [90, 90, 90, 90, 90],
 		"plain": [70, 70, 70, 70, 70]}
 	var index: int = ["normal", "hover", "pressed", "disabled", "selected"].find(state)
 	var id: int = ids[family][index]
