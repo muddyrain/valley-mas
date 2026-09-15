@@ -97,7 +97,7 @@ func _build_identity() -> void:
 	var logo := CampArt.icon(preload("res://ui/menu_art.gd").logo(), Vector2.ZERO)
 	logo.name = "OfficialBrandLogo"
 	CampArt.place(logo, composition, Rect2(27, 11, 250, 99))
-	var info := _surface(220, Rect2(25, 119, 276, 177), null, 120, 0.16)
+	var info := _surface(1, Rect2(25, 119, 276, 177), null, 120, 0.16)
 	info.name = "DayStatus"
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 2)
@@ -269,6 +269,10 @@ func _build_powers() -> void:
 		var label := _button(definition.display_name if definition != null else "选择技能", func(): owner_ui.show_effect_detail("power", id, true), "secondary", Rect2(), null, "", 15, group)
 		label.custom_minimum_size = Vector2(123, 28)
 		label.name = "QuickActionLabel"
+		var label_bg := _surface(224, Rect2(), group, 28, 0.12)
+		label_bg.name = "QuickActionLabelBackground"
+		label_bg.custom_minimum_size = Vector2(123, 28)
+		group.move_child(label_bg, 0)
 		var key_hint := CampArt.label(str(index + 1) + "  ·  出勤可用", 12, CampArt.WHITE)
 		key_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		group.add_child(key_hint)
