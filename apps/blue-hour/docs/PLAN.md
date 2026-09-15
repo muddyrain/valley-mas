@@ -642,6 +642,25 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 
 文件、数据缺口、原生证据与并行工作区变化边界见 [CAMP HUD 2.0 接入报告](design/ui-art-direction.md)。本轮到 HUD 审核停止，不推进营地 AI、动画、环境装饰、夜间营地或新玩法。
 
+## 2026-09-13 Expedition HUD Phase 2
+
+- [x] 41 张 clean PNG 原字节核验，36 张接入、5 张保留；Phase 1 框体与 Gameplay 规则不变。
+- [x] Phase 2 原生专项 243 项通过，1080p / 1440p 与返回巴士真实三态截图完成。
+- [x] 修复导出包的导入纹理查询；Windows 验收包通过六组独立启动与 81 项包内检查。
+- [ ] 完整 build 门禁：两个 Camp UI 断言仍失败，未与 Phase 2 专项混为通过。
+- [ ] 等待用户视觉验收；不自动进入下一阶段。
+
+证据见 [Expedition HUD Phase 2 Report](EXPEDITION_HUD_PHASE2_REPORT.md)。
+
+## 2026-09-14 Expedition HUD Phase 2.1 Visual Polish
+
+- [x] 仅调整 Expedition HUD 的图标尺寸、间距、HP 条、列表行高、搜索卡层次、Minimap marker 与 Return Bus 内部排布；未新增或替换 PNG。
+- [x] 原生专项 248 项通过，新增血条边界、搜索卡按钮高度与层级检查；1080p / 1440p 及返回巴士三态截图完成。
+- [x] Windows Release 重新导出，完整构建状态仍单独保留两个既有 Camp UI 断言失败。
+- [ ] 等待用户视觉验收；不自动进入下一阶段。
+
+证据见 [Expedition HUD Phase 2.1 Visual Polish Report](EXPEDITION_HUD_PHASE2_1_REPORT.md)。
+
 ## 2026-09-14 CAMP Environment Polish Pass 02
 
 - [x] 草色层次、铺装轻使用痕迹与边缘过渡、外围植被群和树线、统一矮栏、维修棚结构、入口与生活用品已落地。
@@ -662,3 +681,31 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 - [ ] 等待用户视觉审核，停止于 02B，不自动提交或开始下一阶段。
 
 文件、数量、性能、运行证据及限制见 [CAMP Composition 02B Report](CAMP_ENVIRONMENT_COMPOSITION_PASS_02B_REPORT.md)。
+
+## 2026-09-14 Expedition HUD Final Match
+
+- [x] 按用户 Target 接入原字节 Logo / Minimap Frame；时间区横排、资源与队伍放大、去除行动蓝托盘、归航 E 下置、Compact 三行信息。
+- [x] 保留真实狂怒/疾行专精差异；小地图读取现有道路、街区和发现数据，玩法与旧 PNG 不变。
+- [x] 原生 Final Match 257 项、包内 137 项、六组独立 EXE 启动通过；Current / Target / Final 及 1080p / 1440p 截图完成。
+- [x] Windows 验收包单独导出；完整 build 仍有两个既有 Camp UI 断言失败，未宣称全仓通过。
+- [ ] 等待用户视觉验收，不进入下一阶段。
+
+证据见 [Expedition HUD Final Match Report](EXPEDITION_HUD_FINAL_MATCH_REPORT.md)。
+
+## 2026-09-15 Expedition HUD Final Fix
+
+- [x] Logo 缩小、时间卡连续组合、HP 轻量化、编号/Discovery/Action/Return Bus 微调；Minimap 仅稳定检查。
+- [x] Final Fix 原生 257 项、EXE 独立启动 6/6、Windows Release 导出通过。
+- [ ] 完整 build 仍有既有 Camp UI 两项断言；等待用户冻结验收。
+
+证据见 [Expedition HUD Final Fix Report](EXPEDITION_HUD_FINAL_FIX_REPORT.md)。
+
+- 2026-09-15: Expedition HUD interaction/alignment fix implemented; native phase2 257/257. Baked survivor-card empty circle remains pending separate asset authorization; freeze not approved.
+
+- 2026-09-15 v2: removed persistent marker fallback, blocked world zoom over HUD, stabilized hover, aligned survivor badge; native Expedition HUD 257/257.
+
+- 2026-09-15: Expedition HUD clarity/minimal UI pass implemented; world overlays reduced, action state geometry unified, party badge runtime aligned; native HUD regression 257/257. Manual visual acceptance pending.
+
+- 2026-09-16: Expedition second interaction fix completed; movement releases stale searches, legacy marker hidden, action shader/tween interaction added, top day/time tightened; native HUD 257/257 and export passed.
+
+- 2026-09-16: Final search-state/badge pass completed; SearchCard now derives live task phase, cancel/move clears task and UI, NumberBadgeRoot fixed; native Expedition 261/261.
