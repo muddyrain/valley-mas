@@ -81,7 +81,9 @@ func _build() -> void:
 	if OS.is_debug_build():
 		_build_debug()
 	_set_state(Mode.NORMAL)
-	show_survivor(app.selected_member)
+	# Party membership is initialized independently from inspection state. Camp
+	# opens on the clean HUD; a survivor detail is opened only after a click.
+	view.select("")
 
 func _bind_hint(source: Control, callback: Callable) -> void:
 	source.mouse_entered.connect(func():
@@ -192,6 +194,8 @@ func close_context() -> void:
 	if ui_state in [Mode.DEPARTURE, Mode.TRANSITION]:
 		return
 	_clear_detail()
+	if is_instance_valid(view):
+		view.select("")
 	if is_instance_valid(hud_root):
 		hud_root.clear_slot_selection()
 	for panel: Control in [drawer, facility_panel, browser]:

@@ -34,6 +34,7 @@ func setup(game: RefCounted, id: String) -> void:
 	visual = Survivor.new()
 	add_child(visual)
 	visual.setup(game.member_template(id).duplicate(), game.member_trait(id), game.weapon(game.data.equipment[id]))
+	_disable_legacy_ground_planes()
 	if visual.animation_controller != null:
 		visual.animation_controller.use_camp_style()
 	_equipment = game.item(game.data.equipment[id]).duplicate(true)
@@ -41,6 +42,17 @@ func setup(game: RefCounted, id: String) -> void:
 	visual.name_label.hide()
 	visual.duty_label.hide()
 	add_to_group("camp_party_actor")
+
+func _disable_legacy_ground_planes() -> void:
+	# Imported survivor wrappers occasionally contain a legacy Quad/Plane used as
+	# a ground indicator. Camp has one shared selection component, so remove
+	# every such plane uniformly while preserving the formal world_select_ring.
+	for node: Node in visual.find_children("*", "MeshInstance3D", true, false):
+		if node == visual.selection_ring:
+			continue
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance.mesh is QuadMesh or mesh_instance.mesh is PlaneMesh:
+			mesh_instance.visible = false
 
 func refresh_equipment(game: RefCounted) -> void:
 	visual.talent = game.member_trait(member_id)
