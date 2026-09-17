@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cjavpy44flc7c"
-path="res://.godot/imported/expedition_logo_main.png-515d9a1edc9c6bfe0d764fa3f0d71907.ctex"
+path="res://.godot/imported/expedition_logo_main.png-12fc5733c855ceb3a5bc976b4608c174.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/ui/expedition/hud/final_match/expedition_logo_main.png"
-dest_files=["res://.godot/imported/expedition_logo_main.png-515d9a1edc9c6bfe0d764fa3f0d71907.ctex"]
+dest_files=["res://.godot/imported/expedition_logo_main.png-12fc5733c855ceb3a5bc976b4608c174.ctex"]
 
 [params]
 

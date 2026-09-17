@@ -21,4 +21,4 @@ func _draw() -> void:
 	draw_rect(rect, Color("#3f4b50"), true)
 	var fraction: float = clampf(ratio, 0, 1)
 	if fraction > 0.0:
-		draw_rect(Rect2(rect.position, Vector2(rect.size.x * fraction, rect.size.y)), Color("#d8a45e"), true)
+		draw_rect(Rect2(rect.position, Vector2(rect.size.x * fraction, rect.size.y)), Color("#82b9ba"), true)

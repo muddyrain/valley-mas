@@ -38,7 +38,7 @@ func run() -> void:
 	for i in range(4):
 		await process_frame
 	check(mission.city.sites.values().all(func(site: Dictionary): return not site.has("label") and (site.discovered or not site.ring.visible)), "Undiscovered POI markers remain hidden")
-	check(not hud.recall_button.visible and not hud.task_label.visible, "Search-only actions do not occupy idle squad cards")
+	check(hud.squad_cards.all(func(card: Control): return card.size.y <= 128), "Idle survivor cards keep the compact read-only layout")
 	check(not hud.toast.visible, "No permanent central tutorial notice")
 	check(hud.site_buttons.size() == mission.city.sites.size(), "All original POI remain reachable through the scroll list")
 	for panel: Control in [hud.brand_panel, hud.top_panel, hud.resources_panel, hud.squad_panel, hud.sites_panel, hud.command_panel, hud.extract_button]:
@@ -78,10 +78,10 @@ func run() -> void:
 	mission.command_search("corner")
 	hud.refresh()
 	check(mission.poi_selected_id == "corner" and hud.poi_context.progress.visible, "Existing search command exposes contextual task progress")
-	check(hud.recall_button.visible and mission.search_tasks.has("corner"), "Search cancellation remains available when needed")
+	check(hud.squad_cards.all(func(card: Control): return card.size.y <= 128), "Active search keeps survivor cards compact")
 	mission.command_recall()
 	hud.refresh()
-	check(mission.search_tasks.is_empty() and not hud.recall_button.visible, "Cancellation releases the real task and retracts its controls")
+	check(mission.search_tasks.is_empty() and hud.squad_cards.all(func(card: Control): return card.size.y <= 128), "Search release keeps the read-only roster compact")
 	hud.size = Vector2(320, 180)
 	hud.poi_context.refresh()
 	check(not hud.poi_context._focus_card.visible, "Small or not-yet-laid-out viewports safely suppress world cards")

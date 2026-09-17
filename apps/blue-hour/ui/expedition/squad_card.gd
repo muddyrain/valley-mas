@@ -13,7 +13,7 @@ var summary: Label
 var details: Label
 var status: Label
 var health: ProgressBar
-var action: Button
+var select_button: Button
 var portrait: TextureRect
 var weapon_icon: TextureRect
 var equipped_id: String = ""
@@ -21,11 +21,10 @@ var column: VBoxContainer
 var compact: bool = false
 var health_text: Label
 var status_dot: TextureRect
-var select_button: Button
 var index_badge: Control
 var index_label: Label
 
-func setup(member: Node3D, command: Callable, template_id: String) -> void:
+func setup(member: Node3D, template_id: String) -> void:
 	custom_minimum_size = Vector2(304, 128)
 	add_theme_stylebox_override("panel", HudArt.panel("hud_party_card", Vector4(12, 12, 12, 12)))
 	column = VBoxContainer.new()
@@ -62,9 +61,9 @@ func setup(member: Node3D, command: Callable, template_id: String) -> void:
 		portrait.add_child(initial)
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 3)
+	info.add_theme_constant_override("separation", 1)
 	row.add_child(info)
-	summary = UI.label("", 18, Style.PAPER)
+	summary = UI.label("", 16, Style.INK)
 	info.add_child(summary)
 	health_text = UI.label("", 13, Style.INK)
 	info.add_child(health_text)
@@ -97,21 +96,15 @@ func setup(member: Node3D, command: Callable, template_id: String) -> void:
 	status_row.add_child(status_dot)
 	status = UI.label("", 13, Style.MUTED)
 	status_row.add_child(status)
-	action = UI.button("查看搜索", command, Vector2(0, 22))
-	action.add_theme_font_size_override("font_size", 11)
-	HudArt.button(action)
-	column.add_child(action)
 	HudArt.pass_decorations(self)
 	index_badge = Control.new()
 	index_badge.name = "NumberBadgeRoot"
-	index_badge.custom_minimum_size = Vector2(24, 24)
-	index_badge.size = Vector2(24, 24)
-	index_badge.position = Vector2(12, 8)
+	index_badge.custom_minimum_size = Vector2(32, 32)
+	index_badge.size = Vector2(32, 32)
+	# This overlay follows the card background's baked circle, not the portrait.
+	index_badge.set_as_top_level(true)
 	index_badge.mouse_filter = MOUSE_FILTER_IGNORE
-	portrait.add_child(index_badge)
-	var badge_texture := HudArt.picture("party_index_badge", Vector2(24, 24))
-	badge_texture.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	index_badge.add_child(badge_texture)
+	add_child(index_badge)
 	index_label = UI.label("", 13, Style.INK)
 	index_label.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	index_label.offset_left = 0
@@ -122,10 +115,26 @@ func setup(member: Node3D, command: Callable, template_id: String) -> void:
 	index_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	index_label.mouse_filter = MOUSE_FILTER_IGNORE
 	index_badge.add_child(index_label)
+	call_deferred("_align_index_badge")
 
 func set_index(index: int) -> void:
 	if index_label != null:
 		index_label.text = str(index)
+
+func _process(_delta: float) -> void:
+	if is_instance_valid(index_badge) and index_badge.is_set_as_top_level():
+		var target_position: Vector2 = global_position + Vector2(1, 1)
+		if index_badge.global_position != target_position:
+			index_badge.global_position = target_position
+
+func _align_index_badge() -> void:
+	if not is_instance_valid(index_badge):
+		return
+	# PanelContainer resizes direct children to its content rect.  A top-level
+	# overlay lets the badge use the baked background circle's card coordinates.
+	# The baked circle's center is 17px from the card's left edge and 17px
+	# from its top edge; a 32px label box therefore starts at (1, 1).
+	index_badge.global_position = global_position + Vector2(1, 1)
 
 func set_compact(value: bool) -> void:
 	if compact == value:
@@ -135,7 +144,6 @@ func set_compact(value: bool) -> void:
 
 func set_selected(selected: bool) -> void:
 	add_theme_stylebox_override("panel", HudArt.surface("hud_party_card", Vector4(12, 12, 12, 12), Color.WHITE))
-	select_button.modulate = Color.WHITE
 	portrait.modulate = Color("#e7f2ff") if selected else Color.WHITE
 	summary.add_theme_color_override("font_color", Style.INK)
 
@@ -168,9 +176,4 @@ func update_member(member: Node3D, mission: Node3D) -> void:
 		status.text = "战斗"
 	status_dot.texture = HudArt.texture("ui_status_dot_red" if status.text == "战斗" or status.text.begins_with("自卫") or danger_state else "ui_status_dot_blue")
 	tooltip_text = "%s · %d/%d HP\n%s · %s\n%s" % [member.data.display_name, member.hp, member.data.max_hp, (member.weapon.display_name if member.weapon != null else "未装备"), member.talent.display_name, member.talent.description]
-	action.visible = task != null or not mission.search_id.is_empty()
-	action.disabled = member.dead or not mission.active or task == mission.search_task
-	action.tooltip_text = "查看搜索" if task != null else "接替当前搜索"
-	action.text = "查看搜索" if task != null else "接替搜索"
-	select_button.disabled = member.dead
 	modulate = Color("#8b9499") if member.dead else Color.WHITE

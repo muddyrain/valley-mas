@@ -80,6 +80,14 @@ func run() -> void:
 	hud.refresh()
 	check(hud.squad_cards[0].status.text == "跟随" and hud.squad_cards[0].status_dot.texture == HudArt.texture("ui_status_dot_blue"), "Follow status uses the clean icon")
 	await shot("03_survivor_cards", hud.squad_panel)
+	var idle_squad_size: Vector2 = hud.squad_panel.size
+	var idle_rally_position: Vector2 = hud.rally_button.global_position
+	var idle_roster_actions: int = hud.squad_panel.find_children("*", "BaseButton", true, false).size()
+	var idle_card_sizes: Array[Vector2] = []
+	for card: Control in hud.squad_cards:
+		idle_card_sizes.append(card.size)
+		check(card.size.y <= 128, "Survivor display keeps the compact reference proportions")
+		check(card.find_children("*", "BaseButton", true, false).size() == 1, "Survivor information has no search command button")
 	await shot("04_action_bar", hud.command_panel)
 	await hover(hud.command_buttons["停止"].get_global_rect().get_center())
 	check(hud.command_buttons["停止"].get_draw_mode() == BaseButton.DRAW_HOVER, "Real Stop hover state")
@@ -118,6 +126,14 @@ func run() -> void:
 	hud.refresh()
 	await create_timer(.3).timeout
 	var search_card: Control = hud.poi_context.cards[site_id]
+	for index: int in range(hud.squad_cards.size()):
+		check(hud.squad_cards[index].size.is_equal_approx(idle_card_sizes[index]), "Searching does not resize either survivor display")
+	check(hud.squad_panel.size.is_equal_approx(idle_squad_size), "Searching does not expand the roster")
+	check(hud.rally_button.global_position.is_equal_approx(idle_rally_position), "Searching does not move Rally")
+	check(hud.squad_panel.find_children("*", "BaseButton", true, false).size() == idle_roster_actions, "Searching adds no roster actions beyond existing portrait selection and Rally")
+	var worker_index: int = mission.survivors.find(mission.search_tasks[site_id].worker)
+	check(hud.squad_cards[worker_index].status.text.begins_with("搜索"), "Read-only survivor display still reports live search progress")
+	await shot("16_survivor_cards_searching", hud.squad_panel)
 	check(search_card.visible and is_equal_approx(search_card.progress.value, site.progress * 100), "Visible card uses authoritative search progress without rounding")
 	check(search_card.get_global_rect().encloses(search_card.action.get_global_rect()), "Cancel button fits the expanded card")
 	check(not search_card.progress.get_global_rect().intersects(search_card.action.get_global_rect()), "Progress and cancel do not overlap")
@@ -231,4 +247,3 @@ func shot(id: String, control: Control = null, padding: float = 8) -> void:
 		id = fix_names.get(id, id)
 	check(pixels.save_png(output_directory + id + ".png") == OK,"Native capture " + id)
 	screenshots.append(id + ".png")
-

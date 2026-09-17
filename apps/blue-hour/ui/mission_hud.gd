@@ -24,9 +24,6 @@ var day_label: Label
 var clock_label: Label
 var squad_labels: Array[Label] = []
 var squad_cards: Array[PanelContainer] = []
-var assign_buttons: Array[Button] = []
-var task_label: Label
-var recall_button: Button
 var squad_heading: Label
 var site_buttons: Dictionary = {}
 var order_label: Label
@@ -336,25 +333,11 @@ func _build_squad() -> void:
 		roster_ids.append(survivor.get_instance_id())
 		var card := SquadCard.new()
 		squad.add_child(card)
-		card.setup(survivor, func():
-			var task = mission.task_for(survivor)
-			if task != null:
-				mission.command_search(task.site_id)
-			else:
-				mission.command_reassign(i)
-		, mission.campaign.member_template(survivor.data.id).id if mission.campaign != null else survivor.data.id)
+		card.setup(survivor, mission.campaign.member_template(survivor.data.id).id if mission.campaign != null else survivor.data.id)
 		card.set_index(i + 1)
 		card.inspected.connect(inspect_member.bind(survivor))
 		squad_cards.append(card)
 		squad_labels.append(card.summary)
-		assign_buttons.append(card.action)
-	task_label = UI.label("", 11, Style.GOLD)
-	task_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	squad.add_child(task_label)
-	recall_button = UI.button("取消当前搜索", mission.command_recall, Vector2(0, 26))
-	recall_button.add_theme_font_size_override("font_size", 12)
-	HudArt.button(recall_button)
-	squad.add_child(recall_button)
 	rally_button = UI.button("集合", mission.command_recall_all, Vector2(0, 40))
 	rally_button.icon = HudArt.fitted_icon(HudArt.texture("icon_team"))
 	HudArt.button(rally_button, "hud_group_button")
@@ -547,7 +530,6 @@ func refresh() -> void:
 		squad_panel.free()
 		squad_cards.clear()
 		squad_labels.clear()
-		assign_buttons.clear()
 		roster_ids.clear()
 		_build_squad()
 		HudArt.pass_decorations(squad_panel)
@@ -592,11 +574,6 @@ func refresh() -> void:
 	for i: int in range(squad_cards.size()):
 		squad_cards[i].update_member(mission.survivors[i], mission)
 		squad_cards[i].set_selected(mission.survivors[i] == selected_member)
-	var busy: bool = not mission.search_id.is_empty()
-	task_label.visible = busy
-	task_label.text = (mission.city.sites[mission.search_id].spec.name + (" · 自卫" if mission.search_task.phase == mission.search_task.Phase.DEFEND else "")) if busy else ""
-	recall_button.visible = busy
-	recall_button.disabled = not busy or not mission.active
 	rally_button.disabled = not mission.active or mission.closing_left >= 0
 	var remaining: int = 0
 	for id: String in site_buttons:
