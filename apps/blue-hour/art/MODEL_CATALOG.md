@@ -1,5 +1,13 @@
 # BLUE HOUR STARTER ENVIRONMENT KIT V1
 
+## Standard Survivor Template 静态基线
+
+2026-09-17：女性标准模板唯一入口为 [survivor_animation_template.tscn](../assets/characters/survivor_animation_template/survivor_animation_template.tscn)，实测 1.6499997m、28 骨、34,098 顶点、49,349 三角形。保留源 Rest Pose 和权重，不接入源 FBX 的动作；场景无 AnimationPlayer / AnimationTree，不接入正式角色或 gameplay。静态鞋底接地通过，左右 Toe_End 轴存在最大约 28.8° 镜像差，后续动作制作前须明确处理策略；本轮不修正。源哈希、完整层级、地面与蒙皮检查见 [静态基线报告](../docs/STANDARD_SURVIVOR_TEMPLATE_BASELINE.md)。此模板独立于下述环境套件统计。
+
+2026-09-17：源 Idle_4 的接地专项修正输出到模板专属 [animations/idle.tres](../assets/characters/survivor_animation_template/animations/idle.tres)，制作源为 [standard_survivor_idle.blend](blender/characters/standard_survivor_idle.blend)。14 秒，双腿/Foot/ToeBase 与必要骨盆高度修正已烘焙；原静态入口和正式角色不变，无 Runtime IK。接地测量、四视角和后跟残余蒙皮变化见 [接地验收报告](../docs/STANDARD_SURVIVOR_IDLE_FOOT_CONTACT.md)，未接入公共动画或 gameplay。
+
+2026-09-17：Walking 接地/支撑速度/Loop 修正输出到模板专属 [animations/walking.tres](../assets/characters/survivor_animation_template/animations/walking.tres)，制作源 [standard_survivor_walking.blend](blender/characters/standard_survivor_walking.blend)。保持 1.0416667 秒、24 FPS 时间轴和原地形式，120Hz 子帧烘焙；支撑参考 1.425m/s，首尾闭合。四视角、接地与残余滑动对比见 [Walking 修正报告](../docs/STANDARD_SURVIVOR_WALKING_FOOT_CONTACT.md)。候选已交付，等待视觉验收；未修改静态模板、Idle、正式角色或 gameplay，不继续 Running。
+
 ## 环境套件
 
 2026-09-17 Medium Town M01 根据用户旧资产白名单接入 11 项 World wrapper：PRP_003 Bench、004 Pallet、005 WoodCrate、006 MetalCrate、008 DirectionSign、009 VendingMachine、011 可选 Planter，BAR_002 住宅低栏、003 混凝土路障、004 金属拒马、005 破损工业围网。直接引用旧 GLB 或序列化现有 Camp recipe，不新增模型或贴图。可搜索售货机 / 箱体与公告板不进入装饰随机池。源 ID、用途边界见 [白名单](../docs/MEDIUM_TOWN_ENVIRONMENT_REUSE_SELECTION.md)，Runtime 路径、验证与截图见 [M01 报告](../docs/MEDIUM_TOWN_ENVIRONMENT_M01_REPORT.md)。

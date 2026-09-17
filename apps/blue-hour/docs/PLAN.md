@@ -17,6 +17,48 @@
 - [ ] 完整 `run.ps1 -Mode build` 未通过：旧 `camp_ui_runtime.gd` 访问当前 `camp_hud_root.gd` 已无的 `member_buttons`，且断言旧能力栏存在。保留原测试失败记录，未以定向导出冒充全套通过。
 - [ ] 额外回归：`interior_search.gd` 13/13 通过；`search_dispatch.gd` 50/56、`parallel_commands.gd` 2/3，后者在早期失败后结束，未执行余下断言。旧测试含移动应保留搜索等与本轮开始时已有实现相反的要求；本轮未改搜索玩法或这些历史测试。证据在 `test-output/search-active-*.log`。
 
+## 2026-09-17：Standard Survivor Walking 接地与循环修正
+
+- [x] Blender 按 Heel Strike / Foot Flat / Mid Stance / Toe Off / Swing 修正并烘焙，唯一 `animations/walking.tres`；1.0416667 秒、24 FPS 时间轴和原地形式保留，120Hz 子帧键，不使用 Runtime IK。
+- [x] 支撑参考 1.425m/s；平脚前掌残余滑动同窗同速左 6.90→4.50mm、右 38.50→4.79mm。平脚端部高度约 1～5mm，后跟形变及局部最大 1.85mm 穿入如实保留在报告。
+- [x] Hips / Foot / Knee / ToeBase 首尾位置与旋转闭合；615 项专项、正式双角色 303 项通过，324 个受保护文件不变。四视角各 12.5 秒视频及独立 Windows 构建/启动完成。
+- [ ] 等待用户 Walking V1 视觉验收；不继续 Running，不接入正式角色或 gameplay。详见 [Walking 修正报告](STANDARD_SURVIVOR_WALKING_FOOT_CONTACT.md)。
+
+## 2026-09-17：Standard Survivor Walking 原样验收
+
+- [x] 独立场景原样播放源 Walking：1.041667 秒 / 24 FPS，名义 115.2 步/分钟；四视角各 12.5 秒 / 60 FPS，12 次原速循环。
+- [x] 全周期 126 点量测、源帧 Godot/Blender 核对、视频与动画键签名检查通过；313 个受保护文件不变，含模板及已通过 Idle V1。
+- [ ] 动作接地与循环未通过：鞋底最低仍离地约 24～27mm；按约 1.45m/s 恒速估算后候选支撑残余滑动约 18～41mm，循环 Mesh 最大首尾差 131.44mm。
+- [x] 原样问题已形成修正依据；用户后续授权的 Walking V1 制作见上节，原样证据保留。详见 [Walking 原样验收报告](STANDARD_SURVIVOR_WALKING_REVIEW.md)。
+
+## 2026-09-17：Standard Survivor Idle_4 接地专项修正
+
+- [x] Blender 双腿 IK / Foot Lock 烘焙完成，唯一动作 `animations/idle.tres`；14 秒节奏、Hips 水平轨迹和上半身局部轨道保留，不依赖 Runtime IK。
+- [x] Heel 距地 1.09～2.95mm、Forefoot 0.995～1.369mm，Foot 水平单轴范围低于 0.009mm；Godot 实际蒙皮 5,107 项与正式双角色 303 项检查通过。
+- [x] 四视角各 28 秒视频、独立 Windows 验收程序完成；308 个受保护文件不变，Rest / Skeleton / Toe_End 轴未改。
+- [x] 用户已确认 165cm 模板与 Idle V1 通过；后跟原权重约 5mm 局部形变作为已知结果保留。Idle 仍未接入正式角色，本轮后续仅做上节 Walking 原样验收。详见 [接地验收报告](STANDARD_SURVIVOR_IDLE_FOOT_CONTACT.md)。
+
+## 2026-09-17：Standard Survivor Idle_4 原样验收
+
+- [x] 独立工程原样播放源 Idle_4，14 秒 / 24 FPS；输出正面、侧面、3/4、双脚近景视频，各 28 秒 / 30 FPS。
+- [x] 完整周期 841 点源/Godot 轨迹核对通过，最大关节位置差 0.0044mm；动画键未改，308 个受保护文件哈希不变。
+- [ ] 接地不通过：双侧 Heel / Forefoot 持续悬空、轻度前掌上翘并伴随滑动。建议小修后复验，本轮未修正或接入正式角色。
+- [ ] Toe_End 轴差异仍保留；此片段脚趾局部旋转恒定，未发现其引起动态翻转。停止并等待用户指令，详见 [原样验收报告](STANDARD_SURVIVOR_IDLE_REVIEW.md)。
+
+## 2026-09-17：Standard Survivor Template 165cm 静态基线
+
+- [x] 用户提供新版女性模板，接入唯一正式目录；源高度实测 1.6499997m，28 骨，不使用比例或地面补偿。
+- [x] Skeleton / Skin / Mesh、Rest Pose、静态鞋底接地、Godot Import / Scene Load / UID 检查通过；正式双角色回归及 301 个受保护文件哈希检查通过。
+- [x] 源 FBX 动作不进入最终场景；未制作 Idle / Walk / Run、Retarget 或武器动作。
+- [ ] 已知源资产差异：左右 Toe_End 轴最大镜像角差约 28.8°，且有蒙皮权重；本轮只记录，不修正，不作动作可用性验收。
+- [ ] 等待下一步指令。路径、量测和修改清单见 [静态基线报告](STANDARD_SURVIVOR_TEMPLATE_BASELINE.md)。
+
+## 2026-09-17：标准幸存者模板清理
+
+- [x] 移除旧 170cm 标准模板、专属骨架/动作实验、脚底偏移、预览脚本与临时输出。
+- [x] 保留夏知遥、苏晚星、正式 Survivor Runtime、公共动画架构、武器和 Expedition 玩法；清单与验证见 [模板清理记录](STANDARD_SURVIVOR_TEMPLATE_CLEANUP_REPORT.md)。
+- [x] 用户已提供女性 165cm、新脚踝位置模板；静态接入结果见本页“165cm 静态基线”，动作制作继续暂停。
+
 ## 2026-09-17：Camp HUD M03 顶部资源栏
 
 - [x] 最终微调：资源图标 34×34，数值 23 px 并略加粗；资源图文间距增加 3 px，菜单文字右移 3 px。537 项检查通过，60 个受保护文件及其他八个 HUD 截图区不变；M03 Freeze。

@@ -2,19 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dr2wksmnto1vd"
-path="res://.godot/imported/survivor_animation_template_0.png-432f82f7d9256c7e8d9d57255219516d.ctex"
+uid="uid://df6g0j152ysfu"
+path="res://.godot/imported/survivor_animation_template_albedo.png-54b53f607de88f1c819f54f6a9dfd435.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "6ca13b566c3dd973b35980d528f30a2b"
 }
 
 [deps]
 
-source_file="res://assets/characters/survivor_animation_template/source/survivor_animation_template_0.png"
-dest_files=["res://.godot/imported/survivor_animation_template_0.png-432f82f7d9256c7e8d9d57255219516d.ctex"]
+source_file="res://assets/characters/survivor_animation_template/source/survivor_animation_template_albedo.png"
+dest_files=["res://.godot/imported/survivor_animation_template_albedo.png-54b53f607de88f1c819f54f6a9dfd435.ctex"]
 
 [params]
 
@@ -26,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
