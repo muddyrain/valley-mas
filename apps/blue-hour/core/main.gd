@@ -75,7 +75,7 @@ func _clear_camp() -> void:
 	camp_view = null
 
 func _ready() -> void:
-	if "--town-street-life" in OS.get_cmdline_user_args():
+	if "--town-street-life" in OS.get_cmdline_user_args() or "--town-environment-polish" in OS.get_cmdline_user_args():
 		get_tree().change_scene_to_file.call_deferred("res://scenes/debug/medium_town_runtime_test.tscn")
 		return
 	if "--art-showcase" in OS.get_cmdline_user_args():

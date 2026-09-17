@@ -15,6 +15,9 @@ var _inspect: bool = false
 
 func _ready() -> void:
 	_parse_arguments()
+	if OS.get_cmdline_user_args().has("--town-environment-polish"):
+		await preload("res://maps/town/environment/town_polish_capture.gd").run(self, _inspect)
+		return
 	if OS.get_cmdline_user_args().has("--town-street-life"):
 		await preload("res://maps/town/environment/town_environment_capture.gd").run(self, _inspect, true)
 		return

@@ -7,6 +7,7 @@ const Catalog = preload("res://data/world_asset_catalog.gd")
 const Rules = preload("res://maps/town/environment/town_environment_rules.gd")
 var output: String = "res://test-output/medium-town-environment-m00"
 var street_life: bool = false
+var polish: bool = false
 const Reuse = preload("res://maps/town/environment/town_reuse_rules.gd")
 var failures: Array[String] = []
 var checks: int = 0
@@ -21,9 +22,13 @@ func _check(valid: bool, label: String) -> void:
 		push_error(label)
 
 func _run() -> void:
-	street_life = OS.get_cmdline_user_args().has("--street-life")
+	polish = OS.get_cmdline_user_args().has("--polish")
+	street_life = polish or OS.get_cmdline_user_args().has("--street-life")
 	if street_life:
 		output = "res://test-output/medium-town-environment-m01"
+	if polish:
+		output = "res://test-output/medium-town-environment-m01-1"
+		_validate_materials()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output))
 	var cases: Array[Dictionary] = []
 	var signatures: Array[String] = []
@@ -34,6 +39,8 @@ func _run() -> void:
 		var before := var_to_str(town)
 		_check(before == var_to_str(Generator.generate("food_supply", seed_value, "PROFILE_A_MAIN_STREET")), "Town seed determinism")
 		var pass_instance: RefCounted = preload("res://maps/town/environment/town_street_life_pass.gd").new() if street_life else EnvironmentPass.new()
+		if polish:
+			pass_instance = preload("res://maps/town/environment/town_environment_polish.gd").new()
 		var started := Time.get_ticks_msec()
 		var result: Dictionary = pass_instance.generate(town)
 		var elapsed := Time.get_ticks_msec() - started
@@ -46,7 +53,10 @@ func _run() -> void:
 			FileAccess.open(output.path_join("environment.txt"), FileAccess.WRITE).store_string(var_to_str(result))
 		if street_life:
 			var original := EnvironmentPass.new().generate(town)
-			_check(var_to_str(result.instances.slice(0, result.base_instances)) == var_to_str(original.instances), "M00 instances retained exactly")
+			if polish:
+				_validate_polish(town, result)
+			else:
+				_check(var_to_str(result.instances.slice(0, result.base_instances)) == var_to_str(original.instances), "M00 instances retained exactly")
 			if seed_value == 4101:
 				_check(var_to_str(original) == FileAccess.get_file_as_string("res://test-output/medium-town-environment-m00/environment.txt"), "Exact frozen M00 environment snapshot")
 			for key: String in ["benches", "pallets", "metal_crates", "low_fence_segments", "direction_signs", "vending_machines"]:
@@ -113,3 +123,89 @@ func _run() -> void:
 	FileAccess.open(output.path_join("validation.json"), FileAccess.WRITE).store_string(JSON.stringify({"checks": checks, "failures": failures, "cases": cases, "orientations": orientations.keys(), "visual_qa": "PENDING HUMAN REVIEW"}, "\t"))
 	print("TOWN ENVIRONMENT: %d checks, %d failures" % [checks, failures.size()])
 	quit(0 if failures.is_empty() else 1)
+
+func _validate_polish(town: Dictionary, result: Dictionary) -> void:
+	var baseline := preload("res://maps/town/environment/town_street_life_pass.gd").new().generate(town)
+	if town.seed == 4101:
+		_check(var_to_str(baseline) == FileAccess.get_file_as_string("res://test-output/medium-town-environment-m01/environment.txt"), "Exact frozen M01 baseline")
+	var originals: Dictionary = {}
+	var current: Dictionary = {}
+	var ledger: Dictionary = {}
+	for item: Dictionary in baseline.instances:
+		originals[item.id] = item
+	for change: Dictionary in result.preservation.changes:
+		_check(not ledger.has(change.id), "One ledger record per changed instance")
+		ledger[change.id] = change
+	for item: Dictionary in result.instances:
+		current[item.id] = item
+		_check(originals.has(item.id), "No new environment instance")
+		var old: Dictionary = originals[item.id]
+		_check(item.asset == old.asset and item.scale == old.scale, "Original asset and scale retained")
+		if var_to_str(item) != var_to_str(old):
+			_check(item.asset in [Reuse.BENCH, Reuse.PALLET, Reuse.METAL, Reuse.WOOD, Reuse.VENDING] or (item.asset.begins_with("VEH_") and item.land_use.begins_with("RESIDENTIAL")), "Only authorized instance types moved")
+			_check(ledger.has(item.id) and var_to_str(ledger[item.id].before) == var_to_str(old) and var_to_str(ledger[item.id].after) == var_to_str(item), "Exact placement delta recorded")
+	for old: Dictionary in baseline.instances:
+		if not current.has(old.id):
+			_check(old.asset == Rules.BUSH and ledger.has(old.id) and ledger[old.id].after.is_empty(), "Only documented bushes removed")
+	var residential: Array = result.instances.filter(func(item: Dictionary) -> bool: return item.land_use.begins_with("RESIDENTIAL") and item.asset.begins_with("VEH_"))
+	_check(result.driveways.size() == residential.size(), "Every residential vehicle has a ground surface")
+	for surface: Dictionary in result.driveways:
+		var car: Dictionary = current[surface.vehicle_id]
+		_check(surface.pad.encloses(car.bounds), "Parking pad contains actual vehicle footprint")
+		_check(is_zero_approx(car.position.y - surface.surface_y), "Vehicle grounded")
+		_check(surface.pad.get_area() < 40, "Small individual parking pad")
+		for item: Dictionary in result.instances:
+			if item.id != car.id:
+				_check(not surface.pad.intersects(item.bounds), "Parking pad clear of other props and vegetation")
+		for building: Dictionary in town.buildings:
+			_check(not surface.pad.intersects(building.bounds), "Parking pad clear of buildings")
+		if surface.connector.has_area():
+			_check(surface.connector.intersects(surface.pad), "Driveway connected to parking pad")
+			for item: Dictionary in result.instances:
+				if item.id != car.id:
+					_check(not surface.connector.intersects(item.bounds), "Driveway clear of vegetation and other props")
+			for building: Dictionary in town.buildings:
+				_check(not surface.connector.intersects(building.bounds), "Driveway clear of buildings")
+	for node: Dictionary in result.park_nodes:
+		if node.kind != "rest":
+			continue
+		_check(node.members.size() >= 1 and node.members.size() <= 2, "Rest node has 1-2 benches")
+		for id: String in node.members:
+			var bench: Dictionary = current[id]
+			var forward := Vector2(-sin(bench.yaw), -cos(bench.yaw))
+			var block: Dictionary = town.blocks.filter(func(value: Dictionary) -> bool: return value.id == bench.block_id)[0]
+			var point := Geometry.xz(bench.position)
+			var center: Vector2 = block.bounds.get_center()
+			var nearest := Vector2(point.x, center.y) if absf(point.y - center.y) < absf(point.x - center.x) else Vector2(center.x, point.y)
+			var target: Vector2 = nearest - point
+			_check(forward.dot(target.normalized()) > 0.5, "Bench faces park path")
+	for group: Dictionary in result.groups:
+		if group.kind == "cargo":
+			for id: String in group.members:
+				_check(current[id].position.distance_to(group.center) < 5.0, "Cargo node compact")
+	print("POLISH seed=%d changes=%s driveways=%d park_nodes=%d" % [town.seed, str([result.preservation.unchanged, result.preservation.moved, result.bush_removed]), result.driveways.size(), result.park_nodes.size()])
+
+func _validate_materials() -> void:
+	var view := preload("res://maps/town/environment/town_polish_view.gd")
+	for asset: String in [Reuse.BENCH, Reuse.PALLET, Reuse.WOOD, Reuse.METAL]:
+		var wrapper: Node3D = Catalog.asset(asset).scene.instantiate()
+		var before := Geometry.bounds(wrapper)
+		var sources: Array[Dictionary] = []
+		for mesh: MeshInstance3D in wrapper.find_children("*", "MeshInstance3D", true, false):
+			for index: int in mesh.mesh.get_surface_count():
+				var source := mesh.get_active_material(index) as StandardMaterial3D
+				sources.append({"mesh": mesh, "surface": index, "material": source, "color": source.albedo_color, "roughness": source.roughness})
+		view.style(wrapper)
+		_check(Geometry.bounds(wrapper).is_equal_approx(before), "Material polish preserves source geometry")
+		var changed := 0
+		for surface: Dictionary in sources:
+			var source: StandardMaterial3D = surface.material
+			var active: StandardMaterial3D = surface.mesh.get_active_material(surface.surface)
+			_check(source.albedo_color == surface.color and source.roughness == surface.roughness, "Shared source material untouched")
+			if view.COLORS.get(asset, {}).has(source.resource_name):
+				_check(active != source and active.albedo_color == Color(view.COLORS[asset][source.resource_name]), "Scoped target color override")
+				changed += 1
+			else:
+				_check(active == source, "Non-target material unchanged")
+		_check(changed > 0 if asset != Reuse.METAL else changed == 0, "Expected material override coverage")
+		wrapper.free()

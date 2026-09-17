@@ -931,3 +931,15 @@ PENDING HUMAN REVIEW
 - [ ] Windows build：已实际执行，被既有 Camp UI member_buttons / 左侧能力区测试阻断，未交付更新 EXE；全局 World 资产测试另有四项旧 2048 贴图尺寸断言失败。
 
 M01 分布与专项验证完成不等于全项目发布通过，也不替代角色导航实玩或正式 Expedition 集成。本轮停止在人工视觉审核，不自动进入 Meshy Production。
+
+## 2026-09-18：Environment M01.1 Placement & Material Polish
+
+- [x] 新增独立 M01.1 调整阶段：工业装卸组、住宅停车地面、公园休息节点与灌木疏减、Bench / Pallet / Wood Crate 实例材质覆盖、售货机合法侧面微调。
+- [x] Seed 4101：719 个 M01 基线实例中 505 个不变、100 个移动或转向、114 株灌木移除，最终 605 个；原始 M00/M01 可完整复现，每项变化有记录。
+- [x] 20 个货物节点、23 辆住宅车全部有地面（8 条 Driveway、15 块 Parking Pad）、15 个休息节点；未新增源模型或贴图。
+- [x] 8 Seed / 4 朝向、5,828,254 项检查零失败，590 个冻结文件哈希不变；Import 与原生截图通过，最终 Runtime Error = 0。
+- [x] 12 张原生截图及 6 张同机位对比图输出到独立 M01.1 目录，未覆盖 Blueprint/M00/M01 证据；详见 [M01.1 报告](MEDIUM_TOWN_ENVIRONMENT_POLISH_REPORT.md)。
+- [ ] Visual QA: PENDING HUMAN REVIEW；独立停车垫、商业售货机遮挡与整体构图仍需人工判断。
+- [ ] Windows build：已执行，仍被既有 Camp UI `member_buttons` / 左侧能力区测试阻断，未交付新 EXE。
+
+M01.1 专项状态为 TECHNICALLY COMPLETE；全项目构建不通过不隐瞒为发布完成。本轮停止，不进入 M02、新资产生产或正式 Expedition。
