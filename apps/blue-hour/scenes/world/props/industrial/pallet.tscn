@@ -1,0 +1,34 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="1_fulvk"]
+[ext_resource type="PackedScene" path="res://assets/generated/environment_pallet_model.glb" id="2_mxa8i"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_dqgr0"]
+size = Vector3(1.2, 0.1675, 0.95)
+
+[node name="WorldAsset" type="Node3D" unique_id=214808061 groups=["world_assets"]]
+script = ExtResource("1_fulvk")
+asset_id = "PRP_004_pallet"
+
+[node name="ModelRoot" parent="." unique_id=914092172 instance=ExtResource("2_mxa8i")]
+
+[node name="CollisionShape3D" parent="ModelRoot/BH_Pallet/BH_Pallet_COL_00" parent_id_path=PackedInt32Array(914092172, 1814011556) index="0" unique_id=219301012]
+disabled = true
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=688816860]
+
+[node name="Shape" type="CollisionShape3D" parent="Collision" unique_id=1139379047]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08375, 0)
+shape = SubResource("BoxShape3D_dqgr0")
+
+[node name="Anchors" type="Node3D" parent="." unique_id=467278762]
+
+[node name="GroundAnchor" type="Marker3D" parent="Anchors" unique_id=508802139]
+
+[node name="FrontMarker" type="Marker3D" parent="Anchors" unique_id=1228594278]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.875)
+
+[node name="RoadAnchor" type="Marker3D" parent="Anchors" unique_id=1661936789]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.875)
+
+[editable path="ModelRoot"]

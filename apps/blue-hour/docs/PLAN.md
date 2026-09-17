@@ -778,3 +778,114 @@ Blender 阶段 76 张姿势图通过。主工作区复验 Godot 302 项及 72 �
 - 2026-09-16: Expedition second interaction fix completed; movement releases stale searches, legacy marker hidden, action shader/tween interaction added, top day/time tightened; native HUD 257/257 and export passed.
 
 - 2026-09-16: Final search-state/badge pass completed; SearchCard now derives live task phase, cancel/move clears task and UI, NumberBadgeRoot fixed; native Expedition 261/261.
+
+## 2026-09-16：Medium Town V1 Phase A Rev.2（部分实现，待视觉验收）
+
+- [x] Seed 驱动的 PROFILE_A_MAIN_STREET、PROFILE_B_OFFSET_GRID、PROFILE_C_LOOP 路网与 Block/Building/Arrival/POI 生成链路。
+- [ ] Rev.2 全 Profile 结构验收：旧测试含占位拓扑指标，不能据此宣称连通性、Loop 和路径距离通过；MAIN_STREET 已由下述 A.1 真实几何检查替代。
+- [x] Rev.2 运行时 Town 场景与 6 张截图已生成；用户判定其街区组织未达到视觉要求，进入 A.1。
+- [ ] 人工视觉验收。
+- [ ] 完整 Windows build；当前被既有 CAMP UI runtime 检查失败阻断。
+
+## 2026-09-16：Medium Town Phase A.1 MAIN_STREET 街区组织
+
+- [x] 道路围合边界生成 Street Frontage、Parcel、沿街建筑排、街角 L 型、后院与服务院区；复用唯一 Catalog 和既有 Runtime Scene。
+- [x] 原范围 260×310m 内生成 12 Block、47 Parcel、47 栋；只在 MAIN_STREET QA 实例内纠正新增建筑批次可见正面与 FrontMarker 的反向问题。
+- [x] 30 个 Seed 样本、92,909 项几何与道路断言通过；Godot Import、原生截图与 Project Smoke 通过。
+- [x] Seed 4101 的 Overview、商业街、住宅街 3 张 PNG 完成，Runtime 使用正式 Expedition 正交相机参数。
+- [ ] Windows build：本轮实际执行，因 Expedition HUD 的搜索状态断言失败停止，未更新 EXE。
+- [ ] `Visual QA: PENDING HUMAN REVIEW`。此处停止，不扩展 OFFSET_GRID / LOOP、正式 Expedition 或 Phase B。
+
+本轮实现、截图和构建限制见 [MAIN_STREET Urban Fabric 报告](MEDIUM_TOWN_URBAN_FABRIC_REPORT.md)。
+
+## 2026-09-17：Medium Town V1 Phase A.2 MAIN_STREET 构图
+
+- [x] 以一条主街、四条错位折弯支路和局部连接替代行列骨架；位置与尺寸由 Seed 生成。
+- [x] 13 个真实多边形街区、49 个 Parcel / Runtime Building；7 类形状，矩形占 23.1%，保留临街与朝向约束。
+- [x] 30 组生成检查共 113,425 项通过；建筑重叠、道路侵入为 0，Import、原生运行和 Smoke 通过。
+- [x] Seed 4101 的 Overview、商业街、住宅支路、尽头服务区四张 PNG；Debug Overlay OFF，Runtime 复用正式 Expedition 相机。
+- [x] `Medium Town V1 Phase A.2: TECHNICALLY COMPLETE`，范围仅 MAIN_STREET 独立测试场景。
+- [ ] Windows build 实际执行后仍被既有 Expedition HUD 搜索状态断言阻断，未更新 EXE。
+- [ ] `Visual QA: PENDING HUMAN REVIEW`；停止于 A.2，不扩展其他 Profile 或 Phase B。
+
+实现、拓扑统计、截图和验证见 [MAIN_STREET Composition 报告](MEDIUM_TOWN_MAIN_STREET_COMPOSITION_REPORT.md)。
+
+## 2026-09-17：Medium Town V1 Blueprint Alignment
+
+- [x] 在既有 MAIN_STREET 生成链上增加 Land Use；集中商业核心、两片差异化住宅、混合过渡、边缘服务区与两个开放空间。
+- [x] 四个合法 Arrival 候选、远端 POI、三条无回头的实际道路探索路线；Seed 改变布局尺寸、选点及整体方位。
+- [x] 首轮 30 组生成及真实模型几何检查通过；区域地表、Planning Overlay 和五视角原生截图已实现。
+- [x] 最终 Import、Smoke 与 144,029 项断言通过；五张 1920×1080 PNG、四个 Overlay 开关与原生无错误运行完成。
+- [x] `Medium Town V1 Blueprint Alignment: TECHNICALLY COMPLETE`，仅指独立 MAIN_STREET 测试场景。
+- [x] 用户已确认当前结构验收通过；`STRUCTURE QA: PASS`，Blueprint Alignment 正式收口。
+- [ ] Windows build 已实际执行，仍被既有 Expedition HUD 搜索状态断言阻断，未更新 EXE。
+- [ ] `Environment Visual Completion: PENDING`；结构验收不代表 Medium Town V1 或环境视觉已完成。
+
+```text
+Medium Town V1 Blueprint Alignment:
+STRUCTURE ACCEPTED
+
+Town Skeleton / Land Use / Route Structure:
+FROZEN FOR ENVIRONMENT PASS
+
+Environment Visual Completion:
+PENDING
+```
+
+冻结范围：Seed / Grammar、Road Graph、Land Use Assignment、COMMERCIAL_CORE、RESIDENTIAL_A、RESIDENTIAL_B、MIXED_TRANSITION、INDUSTRIAL_SERVICE、OPEN_SPACE、Arrival Candidates、Mission POI、Multi-route Exploration、Street Frontage、Parcel、Building Facing、Building Pool。后续 Environment / Props / Vehicle / Vegetation Pass 默认不得重构这些系统；如确需修改 Road Graph / Land Use / Parcel 结构，必须单独提出并等待人工确认。
+
+保留 `test-output/medium-town-blueprint/` 内现有五张 PNG、`validation.json`、`generated-town.txt`、`capture-report.json` 及原验证日志，不删除、不覆盖。后续阶段使用独立输出路径。Seed 4101 的 16 Blocks、55 Buildings、4 Arrival Candidates、3 Exploration Routes、331.453 m POI Road Distance 是当前基准证据，不是未来必须锁死的硬数量。
+
+已知问题：当前仍是环境白盒 / 低完成度视觉；大面积 Green Buffer 需要环境填充赋予视觉意义；Props / Vehicles / Vegetation / Street Furniture 尚未正式分布；Formal Expedition 尚未接入；Character Navigation Playtest 尚未完成；Windows build 受既有 Expedition HUD 测试失败影响，与本轮 Town Blueprint 无关。本次只做文档、状态、基线与阶段边界收口，不修复上述问题，不修改地图生成逻辑。
+
+实现、占用率口径、五张截图、构建失败与人工验收边界见 [Blueprint Alignment 报告](MEDIUM_TOWN_BLUEPRINT_ALIGNMENT_REPORT.md)。
+
+## Medium Town V1 — Environment & Street Life Pass
+
+状态：2026-09-17，Environment & Street Life Pass M00 技术交付完成，视觉待人工审核。
+
+- [x] 建立独立、Seed 确定性的环境层，复用现有 Catalog 八项环境资产；支持 14 种语义 Slot。
+- [x] 按 Land Use / Ground Use / Road Edge / Parcel 分布，保护建筑入口、步行带、Arrival、POI 与三条探索路线。
+- [x] Seed 4101 第一轮填充 595 个实例；五张无 Overlay 原生 PNG、Before / After、实例统计及 Asset Gap Audit 已输出到独立 M00 目录。
+- [x] 94 个冻结文件哈希不变；完整 Town 快照一致；八个 Seed / 四种朝向 5,546,594 项检查零失败；Import / Smoke / M00 Native 通过。
+- [ ] 人工查看截图，判断 Open Space / Green Buffer / Yard / Parking / Street 的视觉表现，以及下一步值得生产或复用的资产。
+- [ ] 全项目 Windows build：本次被既有 Camp UI 测试阻断，未交付新的独立 exe。
+
+本轮未新增模型、Catalog 或修改冻结结构；仍使用同一独立测试场景。几何净空验证不代替角色导航实玩，尚未接入正式 Expedition。五张截图、按 Land Use 统计、库存核对后的缺口与构建失败详情见 [M00 报告](MEDIUM_TOWN_ENVIRONMENT_M00_REPORT.md)。停止等待人工审核，不自动进入 M01、资产生产、Zombie / Loot / Fog / Blue Hour 或正式 Expedition。
+
+```text
+Medium Town V1 Blueprint Alignment:
+CLOSED
+
+Town Structure:
+FROZEN
+
+Environment & Street Life Pass M00:
+TECHNICALLY COMPLETE
+
+Visual QA:
+PENDING HUMAN REVIEW
+```
+
+## 2026-09-17：Environment Asset Reuse Audit
+
+- [x] 审计 18 个现有模型 / 组合候选，测量 Godot 实际几何、尺寸、材质、贴图、碰撞、朝向、wrapper 与 Catalog 状态。
+- [x] 输出 54 张 Front / 3/4 / 1.70m Scale Reference 原图及 9 张总览图；Import、独立实例化、取景与像素差检查通过。
+- [x] 分类：1 个 REUSE_READY（既有工业 Chainlink）、11 个 REUSE_WITH_MINOR_FIX、1 个 REUSE_WITH_REWORK、5 个 REJECT；另外记录专用停车牌与独立店外展示牌 2 类 MISSING。
+- [x] 输出最小 Runtime Integration Plan；P0 四项优先复用，住宅开放入口由已有低栏两段留空实现。
+- [ ] 人工审核 [Environment Asset Reuse Audit](ENVIRONMENT_ASSET_REUSE_AUDIT.md) 与 QA 图，决定是否批准后续轻量接入。
+
+`Environment Asset Reuse Audit: COMPLETE`。本轮不新增模型、不注册 Catalog、不修改 M00 Environment Placement Rules 或冻结 Town、不执行 Runtime Integration Batch / M01 / Meshy Production / Props Distribution。审计完成不替代 M00 视觉人工验收。
+
+## 2026-09-17：Environment & Street Life M01
+
+用户已提供 [旧环境资产复用白名单](MEDIUM_TOWN_ENVIRONMENT_REUSE_SELECTION.md) 并要求继续，进入 M01。白名单覆盖旧审计的美术取舍建议，原审计测量保留。
+
+- [x] 补齐 11 项既有资产的 World wrapper / Resource / Catalog；不新增源模型或贴图，不把特殊 / Gameplay 道具放入随机装饰池。
+- [x] 实现白名单 Land Use 分布、公园长椅、1～3 托盘货物组、低频木箱、住宅低栏 / 开放入口、道路方向牌与建筑侧售货节点。
+- [x] Seed 4101 保留 595 个 M00 实例，新增 124 个；八个种子 / 四种朝向验证通过，冻结 Town 与源资产保持不变。
+- [x] 输出 M01 原生 Town 截图、Before/After 和 Asset Gap Final Review，见 [M01 报告](MEDIUM_TOWN_ENVIRONMENT_M01_REPORT.md)。
+- [ ] 人工审核 M01 风格、密度、可见性与缺口；所有新模型候选仍为 PENDING M01 VISUAL QA。
+- [ ] Windows build：已实际执行，被既有 Camp UI member_buttons / 左侧能力区测试阻断，未交付更新 EXE；全局 World 资产测试另有四项旧 2048 贴图尺寸断言失败。
+
+M01 分布与专项验证完成不等于全项目发布通过，也不替代角色导航实玩或正式 Expedition 集成。本轮停止在人工视觉审核，不自动进入 Meshy Production。

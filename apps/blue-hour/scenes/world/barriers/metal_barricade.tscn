@@ -1,0 +1,35 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="1_aibvd"]
+[ext_resource type="PackedScene" path="res://assets/generated/environment_barricade_metal_model.glb" id="2_4pl37"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5swtj"]
+size = Vector3(2.1, 1.0785215, 0.86264765)
+
+[node name="WorldAsset" type="Node3D" unique_id=670178638 groups=["world_assets"]]
+script = ExtResource("1_aibvd")
+asset_id = "BAR_004_metal_barricade"
+
+[node name="ModelRoot" parent="." unique_id=2120809212 instance=ExtResource("2_4pl37")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.020739257, -5.9604645e-08)
+
+[node name="CollisionShape3D" parent="ModelRoot/BH_Barricade_Metal/BH_Barricade_Metal_COL_00" parent_id_path=PackedInt32Array(2120809212, 86471711) index="0" unique_id=294425197]
+disabled = true
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1275528785]
+
+[node name="Shape" type="CollisionShape3D" parent="Collision" unique_id=449234736]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.53926075, 0)
+shape = SubResource("BoxShape3D_5swtj")
+
+[node name="Anchors" type="Node3D" parent="." unique_id=910785922]
+
+[node name="GroundAnchor" type="Marker3D" parent="Anchors" unique_id=834904623]
+
+[node name="FrontMarker" type="Marker3D" parent="Anchors" unique_id=1085241119]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.8313238)
+
+[node name="RoadAnchor" type="Marker3D" parent="Anchors" unique_id=1725247037]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.8313238)
+
+[editable path="ModelRoot"]

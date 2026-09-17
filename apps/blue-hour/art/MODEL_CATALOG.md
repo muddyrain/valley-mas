@@ -1,5 +1,9 @@
 # BLUE HOUR STARTER ENVIRONMENT KIT V1
 
+## 环境套件
+
+2026-09-17 Medium Town M01 根据用户旧资产白名单接入 11 项 World wrapper：PRP_003 Bench、004 Pallet、005 WoodCrate、006 MetalCrate、008 DirectionSign、009 VendingMachine、011 可选 Planter，BAR_002 住宅低栏、003 混凝土路障、004 金属拒马、005 破损工业围网。直接引用旧 GLB 或序列化现有 Camp recipe，不新增模型或贴图。可搜索售货机 / 箱体与公告板不进入装饰随机池。源 ID、用途边界见 [白名单](../docs/MEDIUM_TOWN_ENVIRONMENT_REUSE_SELECTION.md)，Runtime 路径、验证与截图见 [M01 报告](../docs/MEDIUM_TOWN_ENVIRONMENT_M01_REPORT.md)。
+
 当前 CAMP Composition 02B（2026-09-14）沿用下述 Pass 02 的 6 树 / 21 Bush，重组为六个树根主群与三个矮植被次群；树缩放 0.72/0.78，主群 Bush 为 1.00/0.84/0.68、次群为 0.62，草花群由 16 调为 30（含花箱）。围栏改为蓝灰柱 + 米灰旧木宽横梁 + 稀疏钢带，保留约 1.01m 高与原碰撞。无新 Blender/Meshy/GLB。当前构图、数量、性能与导航证据见 [02B 报告](../docs/CAMP_ENVIRONMENT_COMPOSITION_PASS_02B_REPORT.md)；以下 Pass 02 参数为改前记录。
 
 2026-09-14 CAMP Environment Polish Pass 02 复用 `VEG_001_tree_broadleaf_a`（6 株，等比约 0.75–0.90）与 `VEG_002_bush_a`（7 组共 21 株，等比 0.52/0.70/0.88），仅营地实例移除碰撞并使用既有植被 Shader。原模型与 wrapper 不改。`camp/camp_dressing.gd` 组合 Godot 规则矮栏（高约 1.01m，原段长 4.5/5.5m）、柱脚/檐框/灯具与低矮草花，复用营地材质合批；无新 GLB 或 Blender 模块。证据与边界见 [环境第二轮报告](../docs/CAMP_ENVIRONMENT_POLISH_PASS_02_REPORT.md)。

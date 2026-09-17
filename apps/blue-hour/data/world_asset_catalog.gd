@@ -31,7 +31,18 @@ const ALL: Array[Resource] = [
 	preload("res://data/world_assets/prop_trash_bin.tres"),
 	preload("res://data/world_assets/barrier_chainlink.tres"),
 	preload("res://data/world_assets/vegetation_tree_broadleaf_a.tres"),
-	preload("res://data/world_assets/vegetation_bush_a.tres")
+	preload("res://data/world_assets/vegetation_bush_a.tres"),
+	preload("res://data/world_assets/park_bench.tres"),
+	preload("res://data/world_assets/pallet.tres"),
+	preload("res://data/world_assets/wood_crate.tres"),
+	preload("res://data/world_assets/metal_crate.tres"),
+	preload("res://data/world_assets/direction_sign.tres"),
+	preload("res://data/world_assets/vending_machine.tres"),
+	preload("res://data/world_assets/planter.tres"),
+	preload("res://data/world_assets/residential_low_fence.tres"),
+	preload("res://data/world_assets/concrete_barrier.tres"),
+	preload("res://data/world_assets/metal_barricade.tres"),
+	preload("res://data/world_assets/industrial_chainlink_damaged.tres")
 ]
 
 static func asset(id: String) -> Resource:

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/barriers/concrete_barrier.tscn" id="1_52a8f"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_vlu6h"]
+
+[resource]
+script = ExtResource("2_vlu6h")
+id = "BAR_003_concrete_barrier"
+scene = ExtResource("1_52a8f")
+category = "barrier"
+footprint = Vector2(2.4, 0.8)
+bounding_size = Vector3(2.4, 0.95, 0.8)
+spawn_weight = 0.3
+allowed_district = PackedStringArray("east_quay")
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()

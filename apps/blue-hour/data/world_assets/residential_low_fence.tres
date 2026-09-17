@@ -1,0 +1,19 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/barriers/residential_low_fence.tscn" id="1_l7air"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_v0fxe"]
+
+[resource]
+script = ExtResource("2_v0fxe")
+id = "BAR_002_residential_low_fence"
+scene = ExtResource("1_l7air")
+category = "barrier"
+footprint = Vector2(4.76, 0.26)
+bounding_size = Vector3(4.76, 1.0075, 0.26)
+spawn_weight = 0.6
+allowed_district = PackedStringArray("east_quay")
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()

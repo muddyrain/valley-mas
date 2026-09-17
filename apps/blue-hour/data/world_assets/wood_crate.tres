@@ -1,0 +1,19 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/props/industrial/wood_crate.tscn" id="1_4gcgs"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_x7tl8"]
+
+[resource]
+script = ExtResource("2_x7tl8")
+id = "PRP_005_wood_crate"
+scene = ExtResource("1_4gcgs")
+category = "industrial"
+footprint = Vector2(0.94500005, 0.93387717)
+bounding_size = Vector3(0.94500005, 0.85, 0.93387717)
+spawn_weight = 0.2
+allowed_district = PackedStringArray("east_quay")
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()

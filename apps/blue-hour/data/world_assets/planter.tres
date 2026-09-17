@@ -1,0 +1,19 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/props/street/planter.tscn" id="1_tt760"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_urdld"]
+
+[resource]
+script = ExtResource("2_urdld")
+id = "PRP_011_planter"
+scene = ExtResource("1_tt760")
+category = "street"
+footprint = Vector2(0.84510326, 0.5065751)
+bounding_size = Vector3(0.84510326, 0.5958724, 0.5065751)
+spawn_weight = 0.1
+allowed_district = PackedStringArray("east_quay")
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()

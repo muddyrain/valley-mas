@@ -1,0 +1,19 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/props/street/direction_sign.tscn" id="1_hvsin"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_jmw8k"]
+
+[resource]
+script = ExtResource("2_jmw8k")
+id = "PRP_008_direction_sign"
+scene = ExtResource("1_hvsin")
+category = "street"
+footprint = Vector2(1.25, 0.3200001)
+bounding_size = Vector3(1.25, 2.47, 0.3200001)
+spawn_weight = 0.5
+allowed_district = PackedStringArray("east_quay")
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()

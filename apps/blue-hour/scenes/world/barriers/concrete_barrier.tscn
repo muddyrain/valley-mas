@@ -1,0 +1,34 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="1_bg306"]
+[ext_resource type="PackedScene" path="res://assets/generated/environment_barrier_concrete_model.glb" id="2_lheql"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_mvm4s"]
+size = Vector3(2.4, 0.95, 0.8)
+
+[node name="WorldAsset" type="Node3D" unique_id=2070027334 groups=["world_assets"]]
+script = ExtResource("1_bg306")
+asset_id = "BAR_003_concrete_barrier"
+
+[node name="ModelRoot" parent="." unique_id=2075527848 instance=ExtResource("2_lheql")]
+
+[node name="CollisionShape3D" parent="ModelRoot/BH_Barrier_Concrete/BH_Barrier_Concrete_COL_00" parent_id_path=PackedInt32Array(2075527848, 371749715) index="0" unique_id=1614083688]
+disabled = true
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1975240681]
+
+[node name="Shape" type="CollisionShape3D" parent="Collision" unique_id=444302266]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.475, 0)
+shape = SubResource("BoxShape3D_mvm4s")
+
+[node name="Anchors" type="Node3D" parent="." unique_id=740249986]
+
+[node name="GroundAnchor" type="Marker3D" parent="Anchors" unique_id=105902528]
+
+[node name="FrontMarker" type="Marker3D" parent="Anchors" unique_id=1076680920]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.8)
+
+[node name="RoadAnchor" type="Marker3D" parent="Anchors" unique_id=1234674130]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.8)
+
+[editable path="ModelRoot"]

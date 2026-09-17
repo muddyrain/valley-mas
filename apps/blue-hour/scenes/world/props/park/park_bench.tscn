@@ -1,0 +1,35 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="1_dvhht"]
+[ext_resource type="PackedScene" path="res://assets/generated/environment_bench_model.glb" id="2_cmd2o"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_bgems"]
+size = Vector3(1.8, 0.8874661, 0.6189695)
+
+[node name="WorldAsset" type="Node3D" unique_id=828754472 groups=["world_assets"]]
+script = ExtResource("1_dvhht")
+asset_id = "PRP_003_park_bench"
+
+[node name="ModelRoot" parent="." unique_id=225220311 instance=ExtResource("2_cmd2o")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, -0.044484645)
+
+[node name="CollisionShape3D" parent="ModelRoot/BH_Bench_01/BH_Bench_01_COL_00" parent_id_path=PackedInt32Array(225220311, 1167462788) index="0" unique_id=1393965503]
+disabled = true
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1836193857]
+
+[node name="Shape" type="CollisionShape3D" parent="Collision" unique_id=1042926046]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.44373304, 0)
+shape = SubResource("BoxShape3D_bgems")
+
+[node name="Anchors" type="Node3D" parent="." unique_id=1278693913]
+
+[node name="GroundAnchor" type="Marker3D" parent="Anchors" unique_id=337612302]
+
+[node name="FrontMarker" type="Marker3D" parent="Anchors" unique_id=727074531]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.70948476)
+
+[node name="RoadAnchor" type="Marker3D" parent="Anchors" unique_id=1785197]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.70948476)
+
+[editable path="ModelRoot"]

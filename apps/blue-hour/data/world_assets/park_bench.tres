@@ -1,0 +1,18 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/props/park/park_bench.tscn" id="1_mpohb"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_0fux5"]
+
+[resource]
+script = ExtResource("2_0fux5")
+id = "PRP_003_park_bench"
+scene = ExtResource("1_mpohb")
+category = "park"
+footprint = Vector2(1.8, 0.6189695)
+bounding_size = Vector3(1.8, 0.8874661, 0.6189695)
+allowed_district = PackedStringArray("east_quay")
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()

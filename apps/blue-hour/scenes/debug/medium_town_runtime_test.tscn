@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource path="res://maps/town/town_runtime_visual_test.gd" type="Script" id="1"]
+
+[node name="MediumTownRuntimeTest" type="Node3D"]
+script = ExtResource("1")

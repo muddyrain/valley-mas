@@ -1,0 +1,35 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="1_vopre"]
+[ext_resource type="PackedScene" path="res://assets/generated/environment_metal_crate_model.glb" id="2_voyme"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_sj0c3"]
+size = Vector3(0.9550001, 0.935, 0.93)
+
+[node name="WorldAsset" type="Node3D" unique_id=690337950 groups=["world_assets"]]
+script = ExtResource("1_vopre")
+asset_id = "PRP_006_metal_crate"
+
+[node name="ModelRoot" parent="." unique_id=592636691 instance=ExtResource("2_voyme")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0.017499983)
+
+[node name="CollisionShape3D" parent="ModelRoot/BH_MetalCrate/BH_MetalCrate_COL_00" parent_id_path=PackedInt32Array(592636691, 2033577779) index="0" unique_id=1341688577]
+disabled = true
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=97138672]
+
+[node name="Shape" type="CollisionShape3D" parent="Collision" unique_id=991373583]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4675, 0)
+shape = SubResource("BoxShape3D_sj0c3")
+
+[node name="Anchors" type="Node3D" parent="." unique_id=1861913825]
+
+[node name="GroundAnchor" type="Marker3D" parent="Anchors" unique_id=1809062479]
+
+[node name="FrontMarker" type="Marker3D" parent="Anchors" unique_id=250743112]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.865)
+
+[node name="RoadAnchor" type="Marker3D" parent="Anchors" unique_id=928974559]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.865)
+
+[editable path="ModelRoot"]

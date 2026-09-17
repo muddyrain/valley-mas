@@ -1,0 +1,19 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/barriers/industrial_chainlink_damaged.tscn" id="1_j2m2a"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_i8mrd"]
+
+[resource]
+script = ExtResource("2_i8mrd")
+id = "BAR_005_chainlink_damaged"
+scene = ExtResource("1_j2m2a")
+category = "barrier"
+footprint = Vector2(3.4844356, 0.09313438)
+bounding_size = Vector3(3.4844356, 1.8, 0.09313438)
+spawn_weight = 0.1
+allowed_district = PackedStringArray("east_quay")
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()

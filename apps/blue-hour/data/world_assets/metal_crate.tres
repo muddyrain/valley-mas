@@ -1,0 +1,18 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/props/industrial/metal_crate.tscn" id="1_c1iyt"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_vuryk"]
+
+[resource]
+script = ExtResource("2_vuryk")
+id = "PRP_006_metal_crate"
+scene = ExtResource("1_c1iyt")
+category = "industrial"
+footprint = Vector2(0.9550001, 0.93)
+bounding_size = Vector3(0.9550001, 0.935, 0.93)
+allowed_district = PackedStringArray("east_quay")
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()

@@ -1,0 +1,35 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="1_eb024"]
+[ext_resource type="PackedScene" path="res://assets/generated/environment_road_sign_model.glb" id="2_twvvl"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8lhhf"]
+size = Vector3(0.26, 2.47, 0.26)
+
+[node name="WorldAsset" type="Node3D" unique_id=732431464 groups=["world_assets"]]
+script = ExtResource("1_eb024")
+asset_id = "PRP_008_direction_sign"
+
+[node name="ModelRoot" parent="." unique_id=644351828 instance=ExtResource("2_twvvl")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.024999976, 0, 0)
+
+[node name="CollisionShape3D" parent="ModelRoot/BH_RoadSign/BH_RoadSign_COL_00" parent_id_path=PackedInt32Array(644351828, 1983662027) index="0" unique_id=1189132153]
+disabled = true
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1822276029]
+
+[node name="Shape" type="CollisionShape3D" parent="Collision" unique_id=1117010856]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.235, 0)
+shape = SubResource("BoxShape3D_8lhhf")
+
+[node name="Anchors" type="Node3D" parent="." unique_id=292579704]
+
+[node name="GroundAnchor" type="Marker3D" parent="Anchors" unique_id=1442574616]
+
+[node name="FrontMarker" type="Marker3D" parent="Anchors" unique_id=1358612472]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.56000006)
+
+[node name="RoadAnchor" type="Marker3D" parent="Anchors" unique_id=60170229]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.56000006)
+
+[editable path="ModelRoot"]

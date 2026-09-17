@@ -1,0 +1,19 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/props/street/vending_machine.tscn" id="1_odq07"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_tjys4"]
+
+[resource]
+script = ExtResource("2_tjys4")
+id = "PRP_009_vending_machine"
+scene = ExtResource("1_odq07")
+category = "street"
+footprint = Vector2(0.9800001, 0.8120001)
+bounding_size = Vector3(0.9800001, 1.84, 0.8120001)
+spawn_weight = 0.5
+allowed_district = PackedStringArray("east_quay")
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()

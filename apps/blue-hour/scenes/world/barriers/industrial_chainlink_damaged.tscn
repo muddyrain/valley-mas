@@ -1,0 +1,32 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="1_ecur6"]
+[ext_resource type="PackedScene" path="res://assets/world/barriers/barrier_chainlink_source_model.glb" id="2_dagt7"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_aecf4"]
+size = Vector3(3.4844356, 1.8, 0.09313438)
+
+[node name="WorldAsset" type="Node3D" unique_id=1100497464 groups=["world_assets"]]
+script = ExtResource("1_ecur6")
+asset_id = "BAR_005_chainlink_damaged"
+
+[node name="ModelRoot" parent="." unique_id=2147240957 instance=ExtResource("2_dagt7")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0017096996, 0, 0.0009309836)
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1000016839]
+
+[node name="Shape" type="CollisionShape3D" parent="Collision" unique_id=307231537]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("BoxShape3D_aecf4")
+
+[node name="Anchors" type="Node3D" parent="." unique_id=2112785524]
+
+[node name="GroundAnchor" type="Marker3D" parent="Anchors" unique_id=1178608836]
+
+[node name="FrontMarker" type="Marker3D" parent="Anchors" unique_id=693881278]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.44656718)
+
+[node name="RoadAnchor" type="Marker3D" parent="Anchors" unique_id=1466331592]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.44656718)
+
+[editable path="ModelRoot"]

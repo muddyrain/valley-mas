@@ -1,0 +1,18 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/props/industrial/pallet.tscn" id="1_fl1ox"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_l7hua"]
+
+[resource]
+script = ExtResource("2_l7hua")
+id = "PRP_004_pallet"
+scene = ExtResource("1_fl1ox")
+category = "industrial"
+footprint = Vector2(1.2, 0.95)
+bounding_size = Vector3(1.2, 0.1675, 0.95)
+allowed_district = PackedStringArray("east_quay")
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()

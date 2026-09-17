@@ -1,0 +1,35 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="1_aj347"]
+[ext_resource type="PackedScene" path="res://assets/generated/environment_vending_machine_model.glb" id="2_gl488"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ir5y8"]
+size = Vector3(0.9800001, 1.84, 0.8120001)
+
+[node name="WorldAsset" type="Node3D" unique_id=1737398675 groups=["world_assets"]]
+script = ExtResource("1_aj347")
+asset_id = "PRP_009_vending_machine"
+
+[node name="ModelRoot" parent="." unique_id=275618524 instance=ExtResource("2_gl488")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0.046000004)
+
+[node name="CollisionShape3D" parent="ModelRoot/BH_VendingMachine/BH_VendingMachine_COL_00" parent_id_path=PackedInt32Array(275618524, 1677120475) index="0" unique_id=931965526]
+disabled = true
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1269434631]
+
+[node name="Shape" type="CollisionShape3D" parent="Collision" unique_id=777638524]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.92, 0)
+shape = SubResource("BoxShape3D_ir5y8")
+
+[node name="Anchors" type="Node3D" parent="." unique_id=255201720]
+
+[node name="GroundAnchor" type="Marker3D" parent="Anchors" unique_id=318562207]
+
+[node name="FrontMarker" type="Marker3D" parent="Anchors" unique_id=762697311]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.80600005)
+
+[node name="RoadAnchor" type="Marker3D" parent="Anchors" unique_id=1069016475]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.80600005)
+
+[editable path="ModelRoot"]
