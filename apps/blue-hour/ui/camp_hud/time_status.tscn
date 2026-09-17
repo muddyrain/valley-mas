@@ -1,0 +1,267 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m02/m02_status_bar_bg.png" id="1_background"]
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m02/m02_icon_sun_day.png" id="2_sun"]
+
+[sub_resource type="StyleBoxEmpty" id="Transparent"]
+
+[sub_resource type="SystemFont" id="Body"]
+font_names = PackedStringArray("SimHei", "Heiti SC", "Noto Sans CJK SC")
+font_weight = 400
+
+[sub_resource type="FontVariation" id="Strong"]
+base_font = SubResource("Body")
+variation_embolden = 0.5
+
+[sub_resource type="SystemFont" id="Numerals"]
+font_names = PackedStringArray("Segoe UI", "Noto Sans")
+font_weight = 600
+
+[sub_resource type="Theme" id="TimeTheme"]
+default_font = SubResource("Body")
+default_font_size = 12
+Label/colors/font_color = Color(0.08, 0.19, 0.28, 1)
+
+[sub_resource type="StyleBoxFlat" id="TrackBase"]
+bg_color = Color(0.17, 0.23, 0.29, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxFlat" id="TrackFill"]
+bg_color = Color(0.22, 0.65, 0.89, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxFlat" id="OrdinaryNode"]
+bg_color = Color(0.49, 0.55, 0.6, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.11, 0.22, 0.31, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_left = 5
+corner_radius_bottom_right = 5
+corner_detail = 8
+
+[sub_resource type="StyleBoxFlat" id="CurrentNode"]
+bg_color = Color(1, 0.8, 0.36, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.17, 0.55, 0.82, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_left = 8
+corner_radius_bottom_right = 8
+corner_detail = 8
+
+[sub_resource type="StyleBoxFlat" id="BlueHourNode"]
+bg_color = Color(0.11, 0.26, 0.37, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.08, 0.19, 0.28, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_left = 5
+corner_radius_bottom_right = 5
+corner_detail = 8
+
+[node name="M02_TimeStatus" type="Panel"]
+offset_right = 568.0
+offset_bottom = 76.0
+mouse_filter = 0
+texture_filter = 2
+theme = SubResource("TimeTheme")
+theme_override_styles/panel = SubResource("Transparent")
+
+[node name="Background" type="TextureRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("1_background")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CurrentTimeBlock" type="Control" parent="."]
+offset_right = 155.0
+offset_bottom = 76.0
+mouse_filter = 2
+
+[node name="SunIcon" type="TextureRect" parent="CurrentTimeBlock"]
+offset_left = 25.0
+offset_top = 23.0
+offset_right = 55.0
+offset_bottom = 53.0
+mouse_filter = 2
+texture = ExtResource("2_sun")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="PhaseLabel" type="Label" parent="CurrentTimeBlock"]
+offset_left = 64.0
+offset_top = 12.0
+offset_right = 135.0
+offset_bottom = 40.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Strong")
+theme_override_font_sizes/font_size = 22
+text = "白昼"
+vertical_alignment = 1
+
+[node name="TimeLabel" type="Label" parent="CurrentTimeBlock"]
+offset_left = 64.0
+offset_top = 41.0
+offset_right = 135.0
+offset_bottom = 64.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Numerals")
+theme_override_font_sizes/font_size = 16
+text = "10:24"
+vertical_alignment = 1
+
+[node name="PhaseTimeline" type="Control" parent="."]
+offset_left = 164.0
+offset_top = 16.0
+offset_right = 454.0
+offset_bottom = 68.0
+mouse_filter = 2
+
+[node name="TrackBase" type="Panel" parent="PhaseTimeline"]
+offset_top = 8.0
+offset_right = 290.0
+offset_bottom = 14.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("TrackBase")
+
+[node name="TrackFill" type="Panel" parent="PhaseTimeline"]
+offset_top = 8.0
+offset_right = 78.0
+offset_bottom = 14.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("TrackFill")
+
+[node name="NodeDay" type="Panel" parent="PhaseTimeline"]
+offset_left = 26.0
+offset_top = 3.0
+offset_right = 42.0
+offset_bottom = 19.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("CurrentNode")
+
+[node name="NodeDusk" type="Panel" parent="PhaseTimeline"]
+offset_left = 103.0
+offset_top = 6.0
+offset_right = 113.0
+offset_bottom = 16.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("OrdinaryNode")
+
+[node name="NodeWarning" type="Panel" parent="PhaseTimeline"]
+offset_left = 177.0
+offset_top = 6.0
+offset_right = 187.0
+offset_bottom = 16.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("OrdinaryNode")
+
+[node name="NodeBlueHour" type="Panel" parent="PhaseTimeline"]
+offset_left = 251.0
+offset_top = 6.0
+offset_right = 261.0
+offset_bottom = 16.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("BlueHourNode")
+
+[node name="LabelDay" type="Label" parent="PhaseTimeline"]
+offset_top = 26.0
+offset_right = 68.0
+offset_bottom = 46.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Strong")
+text = "白昼"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="LabelDusk" type="Label" parent="PhaseTimeline"]
+offset_left = 74.0
+offset_top = 26.0
+offset_right = 142.0
+offset_bottom = 46.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Strong")
+text = "黄昏"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="LabelWarning" type="Label" parent="PhaseTimeline"]
+offset_left = 148.0
+offset_top = 26.0
+offset_right = 216.0
+offset_bottom = 46.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Strong")
+text = "蓝时预警"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="LabelBlueHour" type="Label" parent="PhaseTimeline"]
+offset_left = 222.0
+offset_top = 26.0
+offset_right = 290.0
+offset_bottom = 46.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Strong")
+text = "蓝时"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="WaveCountdown" type="Control" parent="."]
+offset_left = 474.0
+offset_top = 2.0
+offset_right = 556.0
+offset_bottom = 76.0
+mouse_filter = 2
+
+[node name="WaveLabel" type="Label" parent="WaveCountdown"]
+offset_top = 6.0
+offset_right = 82.0
+offset_bottom = 34.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Strong")
+theme_override_font_sizes/font_size = 19
+text = "第 1 波"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CountdownTitle" type="Label" parent="WaveCountdown"]
+offset_top = 36.0
+offset_right = 82.0
+offset_bottom = 49.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "距离蓝时还有"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CountdownValue" type="Label" parent="WaveCountdown"]
+offset_top = 50.0
+offset_right = 82.0
+offset_bottom = 71.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Numerals")
+theme_override_font_sizes/font_size = 14
+text = "08:36:12"
+horizontal_alignment = 1
+vertical_alignment = 1

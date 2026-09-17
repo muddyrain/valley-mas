@@ -1,0 +1,155 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m01/camp_logo_main.png" id="1_logo"]
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m01/camp_identity_panel_bg.png" id="2_panel"]
+
+[sub_resource type="StyleBoxEmpty" id="Transparent"]
+
+[sub_resource type="SystemFont" id="Body"]
+font_names = PackedStringArray("KaiTi", "STKaiti", "Kaiti SC", "Noto Serif CJK SC")
+font_weight = 400
+
+[sub_resource type="FontVariation" id="Strong"]
+base_font = SubResource("Body")
+variation_embolden = 0.7
+
+[sub_resource type="SystemFont" id="Latin"]
+font_names = PackedStringArray("Segoe UI", "Noto Sans")
+font_weight = 400
+
+[sub_resource type="FontVariation" id="TrackedLatin"]
+base_font = SubResource("Latin")
+spacing_glyph = 3
+
+[sub_resource type="SystemFont" id="CampTitle"]
+font_names = PackedStringArray("SimHei", "Heiti SC", "Noto Sans CJK SC")
+font_weight = 700
+
+[sub_resource type="FontVariation" id="CampTitleStrong"]
+base_font = SubResource("CampTitle")
+variation_embolden = 0.7
+
+[sub_resource type="SystemFont" id="Day"]
+font_names = PackedStringArray("Segoe Print", "Comic Sans MS", "Noto Serif")
+font_weight = 400
+font_italic = true
+
+[sub_resource type="Theme" id="IdentityTheme"]
+default_font = SubResource("Body")
+default_font_size = 13
+Label/colors/font_color = Color(0.11, 0.22, 0.32, 1)
+
+[node name="M01_CampIdentity" type="Panel"]
+offset_right = 228.0
+offset_bottom = 244.0
+mouse_filter = 0
+texture_filter = 2
+theme = SubResource("IdentityTheme")
+theme_override_styles/panel = SubResource("Transparent")
+
+[node name="GameLogo" type="Control" parent="."]
+offset_left = -2.0
+offset_top = -16.0
+offset_right = 234.0
+offset_bottom = 88.22335
+mouse_filter = 2
+
+[node name="TextureRect" type="TextureRect" parent="GameLogo"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("1_logo")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CampInfoPanel" type="Control" parent="."]
+offset_left = 0.0
+offset_top = 88.0
+offset_right = 238.0
+offset_bottom = 240.0
+mouse_filter = 2
+
+[node name="Background" type="NinePatchRect" parent="CampInfoPanel"]
+offset_right = 1485.0
+offset_bottom = 948.40336
+scale = Vector2(0.16026936, 0.16026936)
+mouse_filter = 2
+texture = ExtResource("2_panel")
+region_rect = Rect2(55, 88, 1485, 828)
+patch_margin_left = 170
+patch_margin_top = 200
+patch_margin_right = 170
+patch_margin_bottom = 450
+
+[node name="CampNameCn" type="Label" parent="CampInfoPanel"]
+offset_left = 40.0
+offset_top = 7.0
+offset_right = 204.0
+offset_bottom = 33.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("CampTitleStrong")
+theme_override_font_sizes/font_size = 24
+text = "东岸营地"
+vertical_alignment = 1
+
+[node name="CampNameEn" type="Label" parent="CampInfoPanel"]
+offset_left = 42.0
+offset_top = 35.0
+offset_right = 210.0
+offset_bottom = 48.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("TrackedLatin")
+theme_override_font_sizes/font_size = 9
+text = "EAST COAST CAMP"
+vertical_alignment = 1
+
+[node name="DayEn" type="Label" parent="CampInfoPanel"]
+offset_left = 20.0
+offset_top = 50.0
+offset_right = 115.0
+offset_bottom = 80.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Day")
+theme_override_font_sizes/font_size = 17
+text = "DAY 01"
+vertical_alignment = 1
+
+[node name="DayCn" type="Label" parent="CampInfoPanel"]
+offset_left = 127.0
+offset_top = 51.0
+offset_right = 202.0
+offset_bottom = 75.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Strong")
+theme_override_font_sizes/font_size = 19
+text = "第 1 天"
+vertical_alignment = 1
+horizontal_alignment = 2
+
+[node name="DescriptionLine1" type="Label" parent="CampInfoPanel"]
+offset_left = 23.0
+offset_top = 95.0
+offset_right = 206.0
+offset_bottom = 114.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Body")
+theme_override_font_sizes/font_size = 15
+text = "新的旅程，"
+vertical_alignment = 1
+theme_override_colors/font_color = Color(0.19, 0.29, 0.39, 1)
+
+[node name="DescriptionLine2" type="Label" parent="CampInfoPanel"]
+offset_left = 42.0
+offset_top = 121.0
+offset_right = 206.0
+offset_bottom = 141.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Body")
+theme_override_font_sizes/font_size = 15
+text = "从这里出发。"
+vertical_alignment = 1
+theme_override_colors/font_color = Color(0.19, 0.29, 0.39, 1)

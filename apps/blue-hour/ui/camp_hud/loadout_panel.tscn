@@ -1,0 +1,87 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Theme" path="res://ui/camp_hud/placeholder_theme.tres" id="1"]
+
+[node name="M07_LoadoutPanel" type="Panel"]
+offset_right = 316.0
+offset_bottom = 82.0
+mouse_filter = 0
+theme = ExtResource("1")
+
+[node name="ModuleName" type="Label" parent="."]
+offset_left = 8.0
+offset_top = 3.0
+offset_right = 308.0
+offset_bottom = 26.0
+theme_override_font_sizes/font_size = 18
+text = "M07 Loadout Panel"
+mouse_filter = 2
+
+[node name="Equipment" type="Panel" parent="."]
+offset_left = 8.0
+offset_top = 32.0
+offset_right = 144.0
+offset_bottom = 74.0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Equipment"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_right = -3.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 12
+text = "Loadout 0/2"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="Slot01" type="Panel" parent="."]
+offset_left = 152.0
+offset_top = 32.0
+offset_right = 226.0
+offset_bottom = 74.0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Slot01"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_right = -3.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 12
+text = "Slot 01"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="Slot02" type="Panel" parent="."]
+offset_left = 234.0
+offset_top = 32.0
+offset_right = 308.0
+offset_bottom = 74.0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Slot02"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_right = -3.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 12
+text = "Slot 02"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3

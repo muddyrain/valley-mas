@@ -1,5 +1,25 @@
 # 首页、路线与今日行动素材
 
+## Camp M03 顶部资源栏（2026-09-17）
+
+用户 `m03_assets_final.zip` 六张 PNG 原字节保存于 `assets/ui/camp/m03/`，逐张 SHA-256 与原包一致。资源背景 206×112 → 103×56，三个资源图标 64×64 → 30×30，菜单背景 232×112 → 116×56，菜单图标 48×48 → 24×24。背景共用，文字由 Godot Label 渲染；无额外 PNG 或 gameplay 接入。尺寸、节点与验证见 [M03 接入报告](../docs/CAMP_RESOURCE_BAR_REPORT.md)。
+
+## Camp M02 时间状态栏（2026-09-17）
+
+用户 `m02_assets_final.zip` 原件保存于 `assets/ui/camp/m02/`：`m02_status_bar_bg.png`（1136×152）等比显示 568×76，`m02_icon_sun_day.png`（64×64）等比显示 28×28。两张 SHA-256 均与包内原件一致，未重新生成或修改像素。Godot Lossless 导入、透明边缘修复与线性过滤。
+
+背景自带的两根分隔线定义左/中/右区域；轨道和四个圆形节点使用 Godot StyleBoxFlat 绘制，全部文字为独立 Label，无额外 PNG。M01 维持冻结，M03～M09 保持骨架。资源哈希、尺寸、节点及运行记录见 [M02 接入报告](../docs/CAMP_TIME_STATUS_REPORT.md)。
+
+## Camp M01 营地身份区（2026-09-16）
+
+2026-09-17 最新卡片使用用户 `camp_identity_panel_bg_v3.zip` 内 `camp_identity_panel_bg_v3.png`，1599×984，保存到原运行路径 `assets/ui/camp/m01/camp_identity_panel_bg.png`，原字节哈希一致。控件 266×164 等比容纳，可见纸面宽约 247 px；Logo 保持 V2 tight 版本与当前位置。以下为历史接入记录。
+
+2026-09-17 按用户提供的 `blue_hour_camp_m01_assets_v2_tight.zip` 原件替换同路径 PNG：`camp_logo_main.png` 394×174，`camp_identity_panel_bg.png` 408×251；SHA-256 对照原包一致。控件等比显示 232×103 / 252×155，可见宽约 226/246 px，字体保持原 Typography 修订。以下为首轮资源来源记录，当前尺寸以本段为准。
+
+用户提供 `blue_hour_camp_m01_assets.zip`，仅含 `camp_logo_main.png`（480×176）与 `camp_identity_panel_bg.png`（412×300）。两张 PNG 原始字节保存于 `assets/ui/camp/m01/`，已逐张 SHA-256 对照压缩包确认一致。Godot 使用 Lossless、原尺寸、透明边缘修复与线性过滤；TextureRect 等比居中显示为约 212×78 和 206×150，不裁切、不拉伸、不增加新图。
+
+M01 使用独立 Label 渲染东岸营地、中英文日期及两行描述，字体复用项目现有 SystemFont 回退方式。外层布局及 M02～M09 保持 M00。详细节点、验证与范围见 [M01 接入报告](../docs/CAMP_IDENTITY_REPORT.md)。
+
 ## 今日行动选择（2026-09-12）
 
 用户提供的 `蓝时归航_今日行动_UI素材包.zip` 含 10 张 PNG 与一份素材说明。原始 PNG 字节保留，按用途改为小写语义文件名，全部位于 `assets/ui/today_action/`。`sources.json` 记录原名、现名、原尺寸与 SHA-256；原说明保存在 `source_notes.txt`，只作为来源资料。

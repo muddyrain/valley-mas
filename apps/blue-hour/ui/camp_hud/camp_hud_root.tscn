@@ -1,0 +1,121 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://ui/camp_hud/camp_hud_root.gd" id="1"]
+[ext_resource type="PackedScene" path="res://ui/camp_hud/camp_identity.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://ui/camp_hud/time_status.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://ui/camp_hud/resource_bar.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://ui/camp_hud/survivor_roster.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://ui/camp_hud/survivor_detail.tscn" id="6"]
+[ext_resource type="PackedScene" path="res://ui/camp_hud/camp_action_rail.tscn" id="7"]
+[ext_resource type="PackedScene" path="res://ui/camp_hud/loadout_panel.tscn" id="8"]
+[ext_resource type="PackedScene" path="res://ui/camp_hud/depart_action.tscn" id="9"]
+[ext_resource type="PackedScene" path="res://ui/camp_hud/utility.tscn" id="10"]
+
+[node name="CampHUDRoot" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="M01_CampIdentity" parent="." instance=ExtResource("2")]
+layout_mode = 0
+anchor_left = 0
+anchor_top = 0
+anchor_right = 0
+anchor_bottom = 0
+offset_left = 24.0
+offset_top = 16.0
+offset_right = 252.0
+offset_bottom = 260.0
+
+[node name="M02_TimeStatus" parent="." instance=ExtResource("3")]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0
+anchor_right = 0.5
+anchor_bottom = 0
+offset_left = -320.0
+offset_top = 16.0
+offset_right = 248.0
+offset_bottom = 92.0
+
+[node name="M03_ResourceBar" parent="." instance=ExtResource("4")]
+layout_mode = 0
+anchor_left = 1
+anchor_top = 0
+anchor_right = 1
+anchor_bottom = 0
+offset_left = -480.0
+offset_top = 20.0
+offset_right = -16.0
+offset_bottom = 80.0
+
+[node name="M04_SurvivorRoster" parent="." instance=ExtResource("5")]
+layout_mode = 0
+anchor_left = 1
+anchor_top = 0
+anchor_right = 1
+anchor_bottom = 0
+offset_left = -122.0
+offset_top = 126.0
+offset_right = -16.0
+offset_bottom = 550.0
+
+[node name="M05_SurvivorDetail" parent="." instance=ExtResource("6")]
+layout_mode = 0
+anchor_left = 1
+anchor_top = 0.5
+anchor_right = 1
+anchor_bottom = 0.5
+offset_left = -500.0
+offset_top = -172.0
+offset_right = -146.0
+offset_bottom = 280.0
+
+[node name="M06_CampActionRail" parent="." instance=ExtResource("7")]
+layout_mode = 0
+anchor_left = 0
+anchor_top = 0.5
+anchor_right = 0
+anchor_bottom = 0.5
+offset_left = 28.0
+offset_top = -172.0
+offset_right = 140.0
+offset_bottom = 158.0
+
+[node name="M07_LoadoutPanel" parent="." instance=ExtResource("8")]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 1
+anchor_right = 0.5
+anchor_bottom = 1
+offset_left = -176.0
+offset_top = -124.0
+offset_right = 140.0
+offset_bottom = -42.0
+
+[node name="M08_DepartAction" parent="." instance=ExtResource("9")]
+layout_mode = 0
+anchor_left = 1
+anchor_top = 1
+anchor_right = 1
+anchor_bottom = 1
+offset_left = -336.0
+offset_top = -156.0
+offset_right = -16.0
+offset_bottom = -44.0
+
+[node name="M09_Utility" parent="." instance=ExtResource("10")]
+layout_mode = 0
+anchor_left = 0
+anchor_top = 1
+anchor_right = 0
+anchor_bottom = 1
+offset_left = 24.0
+offset_top = -56.0
+offset_right = 204.0
+offset_bottom = -20.0

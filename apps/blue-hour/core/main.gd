@@ -6,7 +6,6 @@ const Store = preload("res://core/save_store.gd")
 const GameSettings = preload("res://core/game_settings.gd")
 const Mission = preload("res://missions/mission.gd")
 const HUD = preload("res://ui/mission_hud.gd")
-const Shelter = preload("res://ui/shelter_screen.gd")
 const Settlement = preload("res://ui/settlement_screen.gd")
 const UI = preload("res://ui/ui_style.gd")
 const NewGame = preload("res://ui/new_game_screen.gd")
@@ -14,6 +13,7 @@ const GameConfirmation = preload("res://ui/game_confirmation.gd")
 const Title = preload("res://ui/title_screen.gd")
 const TodayAction = preload("res://ui/today_action_screen.gd")
 const ShelterView = preload("res://ui/shelter_view.gd")
+const CampHUDRoot = preload("res://ui/camp_hud/camp_hud_root.tscn")
 const LoadingScreenV2 = preload("res://scenes/loading/LoadingScreenV2.tscn")
 var selected_member := ""
 var catalog := Catalog.new()
@@ -55,9 +55,6 @@ func get_camp_view() -> Node3D:
 		add_child(camp_view)
 		camp_view.setup(campaign)
 		camp_view.member_selected.connect(select_member)
-		camp_view.facility_selected.connect(func(descriptor: Node3D):
-			if state == "shelter" and is_instance_valid(camp_ui):
-				camp_ui.show_facility(descriptor))
 	else:
 		camp_view.refresh_members(campaign)
 	return camp_view
@@ -142,14 +139,14 @@ func _input(event: InputEvent) -> void:
 	if event.physical_keycode == KEY_F1 and OS.is_debug_build():
 		if state == "mission" and hud != null:
 			hud.toggle_debug()
-		elif state == "shelter" and screen != null:
+		elif state == "shelter" and screen != null and screen.has_method("toggle_debug"):
 			screen.toggle_debug()
 		get_viewport().set_input_as_handled()
 	elif event.physical_keycode == KEY_ESCAPE and state in ["shelter", "today_action", "departure"] and is_instance_valid(camp_ui):
 		if state == "today_action" and is_instance_valid(screen):
 			screen.call("_request_cancel")
-		else:
-			camp_ui.handle_back()
+		elif state == "shelter":
+			show_main_menu()
 		get_viewport().set_input_as_handled()
 	elif event.physical_keycode == KEY_ESCAPE and state == "mission" and hud != null:
 		hud.toggle_menu()
@@ -254,36 +251,27 @@ func show_shelter() -> void:
 		return
 	if campaign.data.status in ["won", "lost"]:
 		_clear_camp()
-	elif is_instance_valid(camp_ui) and is_instance_valid(camp_view) and camp_view.matches_run(campaign):
-		if state == "today_action":
-			camp_ui.remove_child(screen)
-			screen.queue_free()
-			camp_ui.today_action = null
-			camp_ui.close_context()
-		else:
-			camp_ui.refresh()
-		screen = camp_ui
-		state = "shelter"
-		return
 	_clear_screen()
 	state = "ended" if campaign.data.status in ["won", "lost"] else "shelter"
-	screen = Shelter.new()
 	if state == "shelter":
-		camp_ui = screen
-	ui_layer.add_child(screen)
-	screen.setup(self)
+		get_camp_view().interaction_locked = false
+		get_camp_view().select("")
+		camp_ui = CampHUDRoot.instantiate()
+		ui_layer.add_child(camp_ui)
+		camp_ui.depart_requested.connect(show_today_action)
+		camp_ui.menu_requested.connect(show_main_menu)
+		screen = camp_ui
 
 func show_today_action() -> void:
 	while _today_action_closing:
 		await get_tree().process_frame
 	if state != "shelter" or campaign.data.status != "shelter" or campaign.data.members.is_empty():
 		return
-	camp_ui.close_context()
-	camp_ui._set_state(camp_ui.Mode.TODAY_ACTION)
+	camp_ui.set_hud_visible(false)
+	camp_view.interaction_locked = true
 	state = "today_action"
 	screen = TodayAction.new()
 	camp_ui.add_child(screen)
-	camp_ui.today_action = screen
 	screen.setup(catalog.today_actions, base_map, campaign.data, catalog.loop, campaign.passive_modifiers())
 	screen.setup_party(campaign)
 	screen.departure_confirmed.connect(start_mission)
@@ -296,15 +284,14 @@ func _close_today_action() -> void:
 	var action_screen := screen as TodayAction
 	state = "shelter"
 	# Expose the camp state immediately while the outgoing panel finishes its visual exit.
-	camp_ui._set_state(camp_ui.Mode.NORMAL)
+	camp_ui.set_hud_visible(true)
+	camp_view.interaction_locked = false
 	screen = camp_ui
 	if action_screen != null:
 		await action_screen.close_with_animation()
 	if is_instance_valid(action_screen) and is_instance_valid(camp_ui):
 		camp_ui.remove_child(action_screen)
 		action_screen.queue_free()
-		camp_ui.today_action = null
-		camp_ui.close_context()
 	_today_action_closing = false
 
 func show_main_menu() -> void:
@@ -370,7 +357,7 @@ func _start_new_game_transition() -> void:
 	_menu_transitioning = false
 
 func select_member(id: String) -> void:
-	if state != "shelter":
+	if state != "shelter" or not is_instance_valid(camp_ui) or not camp_ui.has_method("show_survivor"):
 		return
 	selected_member = id
 	camp_ui.show_survivor(id)
@@ -499,13 +486,12 @@ func start_mission(action_id: String = "") -> void:
 		await tween.finished
 		camp_ui.remove_child(screen)
 		screen.queue_free()
-		camp_ui.today_action = null
 	screen = camp_ui
 	camp_view.camp.departure.completed.connect(_departure_complete, CONNECT_ONE_SHOT)
 	camp_view.camp.begin_departure(selected_party)
 
 func _departure_complete() -> void:
-	camp_ui._set_state(camp_ui.Mode.TRANSITION)
+	camp_ui.set_hud_visible(false)
 	departure_fade = ColorRect.new()
 	departure_fade.color = Color(0, 0, 0, 0)
 	ui_layer.add_child(departure_fade)

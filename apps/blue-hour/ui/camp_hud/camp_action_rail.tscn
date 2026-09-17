@@ -1,0 +1,87 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Theme" path="res://ui/camp_hud/placeholder_theme.tres" id="1"]
+
+[node name="M06_CampActionRail" type="Panel"]
+offset_right = 112.0
+offset_bottom = 330.0
+mouse_filter = 0
+theme = ExtResource("1")
+
+[node name="ModuleName" type="Label" parent="."]
+offset_left = 8.0
+offset_top = 3.0
+offset_right = 104.0
+offset_bottom = 44.0
+theme_override_font_sizes/font_size = 12
+text = "M06\nCamp Action Rail"
+mouse_filter = 2
+
+[node name="TemporaryBuff" type="Panel" parent="."]
+offset_left = 8.0
+offset_top = 52.0
+offset_right = 104.0
+offset_bottom = 128.0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="TemporaryBuff"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_right = -3.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 12
+text = "Temporary buff"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="MedicalSupport" type="Panel" parent="."]
+offset_left = 8.0
+offset_top = 142.0
+offset_right = 104.0
+offset_bottom = 218.0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="MedicalSupport"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_right = -3.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 12
+text = "Medical support"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="LockedSlot" type="Panel" parent="."]
+offset_left = 8.0
+offset_top = 232.0
+offset_right = 104.0
+offset_bottom = 320.0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="LockedSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_right = -3.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 12
+text = "Locked slot"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
