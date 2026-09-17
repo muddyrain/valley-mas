@@ -122,6 +122,7 @@ switch ($Mode) {
         Invoke-Engine @('--headless', '--script', 'tests/loot_table.gd')
     }
     'capture' {
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/search_active_card.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/expedition_hud_phase2.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1600x900', '--audio-driver', 'Dummy', '--script', 'tests/encounter_runtime.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/expedition_hud_reference.gd')
@@ -166,6 +167,7 @@ switch ($Mode) {
         }
         Invoke-Engine @('--headless', '--editor', '--import', '--quit')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/expedition_hud_phase2.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/search_active_card.gd')
         Invoke-Engine @('--headless', '--script', 'tests/settings.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/camp_ui_runtime.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/camp_hud_2.gd')

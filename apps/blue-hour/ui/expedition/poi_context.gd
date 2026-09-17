@@ -1,6 +1,7 @@
 extends Control
 ## Static building anchors are projected after camera motion, once per rendered frame.
 const Card = preload("res://ui/expedition/search_card.gd")
+const MAX_ANCHOR_ADJUSTMENT: Vector2 = Vector2(24, 12)
 var mission: Node3D
 var focused_id: String = ""
 var displayed_id: String = ""
@@ -52,8 +53,7 @@ func refresh() -> void:
 		# Keep the map readable: one active search card, otherwise one hover/selected card.
 		# Keep a lightweight object for callers that inspect a hovered site, but
 		# only active searches are shown in world space.
-		var task: RefCounted = mission.search_tasks.get(id)
-		var live: bool = task != null and is_instance_valid(task.worker) and task.phase in [task.Phase.SEARCHING_INSIDE, task.Phase.SEARCHING_OUTSIDE]
+		var live: bool = Card.is_searching(mission, id)
 		var should_exist: bool = live or id == focused_id
 		# One persistent view per task; hover/selection only changes emphasis.
 		if should_exist:
@@ -87,9 +87,9 @@ func _project_cards(delta: float = 0.0) -> void:
 	if _preview_card.visible:
 		_project(_preview_card, displayed_id, delta)
 	for id: String in cards:
-		var task: RefCounted = mission.search_tasks.get(id)
-		var live: bool = task != null and is_instance_valid(task.worker) and task.phase in [task.Phase.SEARCHING_INSIDE, task.Phase.SEARCHING_OUTSIDE]
-		if not live:
+		# Read the task every rendered frame so cancellation and completion cannot linger.
+		cards[id].update_site(id, mission.poi_selected_id == id)
+		if not cards[id].visible:
 			cards[id].hide()
 			continue
 		_project(cards[id], id, delta)
@@ -114,6 +114,13 @@ func _project(card: PanelContainer, id: String, delta: float) -> void:
 	var clock_end: Vector2 = to_local * get_parent().top_panel.get_global_rect().end
 	var minimum := Vector2(squad_end.x + 12, clock_end.y + 12)
 	var maximum := Vector2(objective_start.x - card.size.x - 12, area.y - card.size.y - 136)
+	# Keep the baked pointer near its search anchor, even beside HUD or viewport edges.
+	minimum = minimum.max(desired - MAX_ANCHOR_ADJUSTMENT)
+	maximum = maximum.min(desired + MAX_ANCHOR_ADJUSTMENT)
+	if minimum.x > maximum.x or minimum.y > maximum.y:
+		card.hide()
+		card.remove_meta("anchor_id")
+		return
 	desired = desired.clamp(minimum, maximum)
 	var initial: bool = card.get_meta("anchor_id", "") != id or card.get_meta("layout_size", Vector2.ZERO) != card.size or card.get_meta("viewport_area", Vector2.ZERO) != area
 	var current: Vector2 = card.get_meta("smoothed_position", desired)
@@ -127,4 +134,3 @@ func _project(card: PanelContainer, id: String, delta: float) -> void:
 	card.set_meta("viewport_area", area)
 	card.set_meta("smoothed_position", current)
 	card.position = ((current * viewport_scale).round() / viewport_scale).clamp(minimum, maximum)
-

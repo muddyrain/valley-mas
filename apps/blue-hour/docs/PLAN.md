@@ -1,5 +1,22 @@
 # 蓝时归航实施计划
 
+## 2026-09-17：Expedition 正式搜索状态卡
+
+- [x] 按钮间距微调：SearchRow 使用 HBoxContainer 固定 12px 分隔，左侧进度条缩为 86px；卡片 262×96、按钮 96×32 及两态素材不变。157 项专项断言通过，截图在 `test-output/search-cancel-spacing/`。
+- [ ] 本次完整 build 在 HUD 阶段因 GLES3 `texture_set_size_override` 空纹理错误中止，尚未进入旧 Camp 测试；搜索卡专项与独立 EXE 启动也报告相同错误。单独 release 导出成功，独立 Expedition 启动退出码 0，另有已有的 2 个 ObjectDB 实例泄漏警告。未将启动成功表述为无错误验收，记录见 `test-output/search-spacing-*.log`。
+- [x] 取消按钮恢复正式 96×32，原尺寸居中绘制并保留纹理最小尺寸；仅调整按钮及左侧状态区/90px 进度条留位，卡片整体、定位、PNG 与玩法不变。原生专项 145 项通过，两态截图见 `test-output/search-cancel-layout/`。
+- [x] 按钮微调后 Windows release 单独导出成功；独立 EXE 菜单/Expedition 原生启动、内嵌包 96×32 按钮/定位/进度/取消验证通过。完整 build 中 HUD 258、搜索卡 145、设置 14 项通过后，仍因下述旧 Camp 测试失败；日志为 `test-output/search-cancel-build.log`。退出时已有的 2 个 ObjectDB 实例泄漏警告仍保留，未扩展修复范围。
+- [x] 接入用户提供的四张 PNG，固定 262×96 卡片，normal / hover 不改变控件尺寸；预览不进入运行时。
+- [x] 地点图标、名称、状态、百分比及 Godot 动态进度条绑定真实搜索任务；取消、移动离开、完成、自卫与阵亡隐藏，不恢复旧大型建筑说明框。
+- [x] 定位修复：移除整栋建筑四向选址及包围框缓存，保留 SearchUIAnchor 与原投影；默认位于搜索点上方，边缘调整限制为横向 24 / 纵向 12 个 UI 单位，空间不足时隐藏，恢复空间后重新显示。
+- [x] 原生专项 137 项通过，覆盖锚点方向/距离、连续镜头平移、缩放、0°/90°/180° 建筑朝向、边缘限位、Hover/取消及三档分辨率。当前截图与坐标记录在 `test-output/search-card-position/`；卡片样式、PNG、City 和 SearchTask 未改。
+- [x] 定位修复后重新导出 Windows EXE；独立菜单、Expedition headless/native 及内嵌包锚点/进度/取消专项通过，7 个受保护脚本与 PNG 哈希不变。完整构建重跑仍停在下述 Camp 历史接口问题，日志为 `test-output/search-position-build.log`。
+- [x] Expedition HUD 回归 258 项通过；修正原测试对现有头像选择按钮的误计数，以搜索前后按钮数量不变保护只读队员状态。
+- [x] 单独 Windows release 导出成功；独立目录 EXE 菜单 native、Expedition headless / native 启动通过；挂载内嵌包验证卡片素材、实时进度、原生渲染与取消通过。交付 `build/BlueHourHomeward.exe`，构建记录已更新。
+- [x] 新卡片专项纳入 `run.ps1 -Mode capture/build`，四张原始 PNG SHA-256 与用户压缩包一致，定向编码与 diff 检查通过。
+- [ ] 完整 `run.ps1 -Mode build` 未通过：旧 `camp_ui_runtime.gd` 访问当前 `camp_hud_root.gd` 已无的 `member_buttons`，且断言旧能力栏存在。保留原测试失败记录，未以定向导出冒充全套通过。
+- [ ] 额外回归：`interior_search.gd` 13/13 通过；`search_dispatch.gd` 50/56、`parallel_commands.gd` 2/3，后者在早期失败后结束，未执行余下断言。旧测试含移动应保留搜索等与本轮开始时已有实现相反的要求；本轮未改搜索玩法或这些历史测试。证据在 `test-output/search-active-*.log`。
+
 ## 2026-09-17：Camp HUD M03 顶部资源栏
 
 - [x] 最终微调：资源图标 34×34，数值 23 px 并略加粗；资源图文间距增加 3 px，菜单文字右移 3 px。537 项检查通过，60 个受保护文件及其他八个 HUD 截图区不变；M03 Freeze。

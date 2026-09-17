@@ -1,5 +1,22 @@
 # 首页、路线与今日行动素材
 
+## Expedition 搜索状态卡（2026-09-17）
+
+用户提供 `蓝时归航_Expedition_搜索状态卡_V1_UI素材包.zip`，四张原始 PNG 保存于 `assets/ui/expedition/search/`，Godot Lossless 导入；预览仅用于布局对照，不作为运行时整图。
+
+| 文件 | 原始尺寸 | 运行时用途 |
+| --- | --- | --- |
+| `search_active_panel.png` | 262×96 | 固定尺寸背景，保留原图指针 |
+| `search_cancel_normal.png` | 96×32 | 取消按钮 normal，与 hover 共用固定 96×32 控件，原尺寸居中绘制 |
+| `search_cancel_hover.png` | 96×32 | 取消按钮 hover / pressed |
+| `search_state_icon.png` | 24×24 | 搜索状态图标，显示 16×16 |
+
+`ui/expedition/search_card.gd` 动态绑定建筑/车辆图标、地点名、搜索状态、百分比；9px 进度条由 Godot `ProgressBar` / `StyleBoxFlat` 绘制。只显示正在室内或室外搜索的存活执行者，赶路、进入、自卫、取消、退出和完成均不显示。`poi_context.gd` 每帧核对任务，将卡片固定在 SearchUIAnchor 上方；边缘微调最多横向 24 / 纵向 12 个 UI 单位，空间不足时隐藏，禁止跨建筑重新选址。不恢复旧建筑说明框。
+
+取消按钮位于 `(158,36)`，`custom_minimum_size` 和 `size` 均为 96×32；保留纹理固有最小尺寸，水平使用 `SIZE_SHRINK_CENTER`、垂直使用 `SIZE_SHRINK_BEGIN`，纹理使用 `STRETCH_KEEP_CENTERED`。文字和内边距已包含在原始 PNG 中，不叠加 Label 或额外 padding。262×96 卡片中的 `SearchRow` 使用 HBoxContainer，95px 信息区与按钮之间固定 `separation = 12`；两态间距相同。进度条为 86×9，状态文字与百分比保持 2px 间隔，按钮右侧保持 8px 留边。
+
+原生验收入口：`tests/search_active_card.gd`，已纳入 `run.ps1 -Mode capture/build`；间距微调后的截图、坐标和断言写入 `test-output/search-cancel-spacing/`，157 项断言通过，包含两态 12px 间距、原生尺寸、状态/百分比文字完整显示及三档分辨率。运行同时报告 GLES3 空纹理错误，不能视为无错误验收。此前按钮尺寸、定位修复和首次接入截图分别保留在 `test-output/search-cancel-layout/`、`test-output/search-card-position/`、`test-output/search-active-card/`。验证使用独立内存 Campaign 和合成输入，不写入玩家存档。四张 PNG 的 SHA-256 与 ZIP 原件一致，按钮微调未改 PNG；构建状态见 [实施计划](../docs/PLAN.md)。
+
 ## Camp M03 顶部资源栏（2026-09-17）
 
 用户 `m03_assets_final.zip` 六张 PNG 原字节保存于 `assets/ui/camp/m03/`，逐张 SHA-256 与原包一致。资源背景 206×112 → 103×56，三个资源图标 64×64 → 30×30，菜单背景 232×112 → 116×56，菜单图标 48×48 → 24×24。背景共用，文字由 Godot Label 渲染；无额外 PNG 或 gameplay 接入。尺寸、节点与验证见 [M03 接入报告](../docs/CAMP_RESOURCE_BAR_REPORT.md)。

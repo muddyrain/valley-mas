@@ -110,7 +110,7 @@ func run() -> void:
 		await shot("08_world_interaction", hud.poi_context.cards[site_id], 24)
 	await click(hud.site_buttons[site_id])
 	check(mission.search_tasks.has(site_id), "Discovery click starts the production search")
-	check(hud.poi_context.cards[site_id].action.visible == false or hud.poi_context.cards[site_id].action.text == "取消搜索", "Search card cancel is bound to live task state")
+	check(not hud.poi_context.cards[site_id].visible, "Search card stays hidden while the worker is travelling")
 	var deadline: float = mission.clock.elapsed + 60
 	while site.progress < .1 and mission.clock.elapsed < deadline:
 		await step(.2)
