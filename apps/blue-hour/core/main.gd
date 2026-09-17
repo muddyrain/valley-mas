@@ -529,15 +529,15 @@ func _load_selected_mission() -> void:
 func _mission_config(action_id: String) -> Dictionary:
 	random_mission_counter += 1
 	var mission_type := "supply_search"
-	var layout := "LAYOUT_MEDIUM_3X4"
+	var layout := ""
 	match action_id:
 		"commercial":
 			mission_type = "food_supply"
-			layout = "LAYOUT_MEDIUM_4X4"
 		"airdrop":
 			mission_type = "rescue"
-			layout = "LAYOUT_SMALL_3X3"
-	return {"use_random_map": true, "mission_type": mission_type, "seed": int(campaign.data.seed) + int(campaign.data.day) * 7919 + random_mission_counter * 104729, "layout": layout, "district_size": layout, "zombie_density": 1.0, "required_poi_tags": []}
+	var runtime_nonce: int = int(Time.get_ticks_usec() & 0x7fffffff)
+	var runtime_seed: int = int(campaign.data.seed) + int(campaign.data.day) * 7919 + random_mission_counter * 104729 + runtime_nonce
+	return {"use_random_map": true, "mission_type": mission_type, "seed": runtime_seed, "layout": layout, "district_size": layout, "zombie_density": 1.0, "required_poi_tags": []}
 
 func _mission_complete(outcome: Dictionary) -> void:
 	if not campaign.stage_result(outcome):
@@ -645,7 +645,3 @@ func debug_weapon(kind: String, affix: String, rarity: int = 0) -> void:
 		campaign.data.modified = true
 		_save(before)
 	show_shelter()
-
-
-
-

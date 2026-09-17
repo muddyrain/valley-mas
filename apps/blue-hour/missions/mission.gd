@@ -80,11 +80,14 @@ var generated_map: Dictionary = {}
 var generated_extraction: Vector3 = Vector3.ZERO
 var generated_spawn: Vector3 = Vector3.ZERO
 var mission_type: String = "supply_search"
+var generated_instance_id: int = 0
 var manual_aim := false
 var aim_point := Vector3.ZERO
 var world_interaction_vfx: Node3D
 
 func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], seed_value: int = 0, run_state: RefCounted = null, locked_party: Array[String] = [], map_config: Dictionary = {}) -> void:
+	generated_map.clear()
+	generated_instance_id = get_instance_id()
 	catalog = content
 	ledger = resources
 	campaign = run_state
@@ -182,7 +185,7 @@ func _apply_generated_map(map: Resource, generated: Dictionary) -> void:
 	generated_spawn = generated.spawn
 	generated_extraction = generated.extraction
 	mission_type = str(generated.mission_type)
-	print("[Mission] mission_type=%s use_random_map=true seed=%d" % [mission_type, int(generated.seed)])
+	print("[Mission] mission_type=%s use_random_map=true seed=%d layout=%s instance=%d" % [mission_type, int(generated.seed), str(generated.layout), generated_instance_id])
 	map.road_segments = generated.roads
 	map.districts.clear()
 	map.frontage_blocks.clear()
@@ -195,7 +198,12 @@ func _apply_generated_map(map: Resource, generated: Dictionary) -> void:
 	map.encounter = map.encounter.duplicate(true)
 	map.encounter.initial_zombie_min = maxi(1, int(generated.zombie_spawns.size() * .75))
 	map.encounter.initial_zombie_max = maxi(map.encounter.initial_zombie_min, generated.zombie_spawns.size())
-	print("[RandomMap] Ready Mission=%s Seed=%d Layout=%s Buildings=%d POI=%s Spawn=%s Extraction=%s ZombieSpawns=%d LootSpawns=%d" % [generated.mission_type, generated.seed, generated.layout, generated.buildings.size(), generated.poi, generated.spawn, generated.extraction, generated.zombie_spawns.size(), generated.loot_spawns.size()])
+	var building_ids: Array[String] = []
+	var building_slots: Array[String] = []
+	for building: Dictionary in generated.buildings:
+		building_ids.append(str(building.get("asset", "")))
+		building_slots.append(str(building.get("slot_id", "")))
+	print("[RandomMap] Ready Mission=%s Seed=%d Layout=%s Instance=%d Buildings=%d IDs=%s Slots=%s POI=%s Spawn=%s Extraction=%s" % [generated.mission_type, generated.seed, generated.layout, generated_instance_id, generated.buildings.size(), ",".join(building_ids), ",".join(building_slots), generated.poi, generated.spawn, generated.extraction])
 
 func formation(index: int) -> Vector3:
 	return [Vector3(-1.2, 0, 0), Vector3(1.2, 0, 0), Vector3(0, 0, -1.4), Vector3(0, 0, 1.4)][index % 4]
@@ -827,7 +835,6 @@ func debug_clear_enemies() -> void:
 	enemies.clear()
 	if focus_target != null:
 		_finish_focus()
-
 
 
 
