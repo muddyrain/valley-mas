@@ -18,6 +18,8 @@ var _refresh_left: float = 0.0
 
 func setup(target: Node3D) -> void:
 	mission = target
+	mission.search_completed.connect(func(_id: String, _worker: String, _loot: Dictionary) -> void: refresh())
+	mission.search_cancelled.connect(func(_id: String) -> void: refresh())
 	mouse_filter = MOUSE_FILTER_IGNORE
 	process_priority = 100
 	_preview_card = Card.new()

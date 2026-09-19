@@ -41,6 +41,10 @@ func run() -> void:
 	world.director_enabled = false
 	world.debug_clear_enemies()
 	var ids := ["corner", "van_south", "garage"]
+	# Keep every fixture busy until the test explicitly completes it; production
+	# vehicle searches may finish within the first simulated second.
+	for id: String in ids:
+		world.city.sites[id].spec.search_seconds = 46.0
 	for i in range(3):
 		world.survivors[i].position = world.city.sites[ids[i]].spec.entry
 	for id in ids:

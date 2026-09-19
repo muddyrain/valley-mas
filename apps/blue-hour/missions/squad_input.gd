@@ -88,9 +88,8 @@ func handle(event: InputEvent) -> void:
 	elif collider.has_meta("enemy"):
 		mission.command_focus(collider.get_meta("enemy"))
 	else:
-		following = true
+		following = mission.command_move(hit.position)
 		follow_left = 0.08
-		mission.command_move(hit.position)
 
 func update(delta: float) -> void:
 	if not mission.active or not mission.input_enabled or mission.closing_left >= 0:

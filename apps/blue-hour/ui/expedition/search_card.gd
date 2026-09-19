@@ -20,10 +20,7 @@ var site_id: String = ""
 var mission: Node3D
 
 static func is_searching(target: Node3D, id: String) -> bool:
-	if not target.active or not target.city.sites.has(id) or target.city.sites[id].searched:
-		return false
-	var task: RefCounted = target.search_tasks.get(id)
-	return task != null and is_instance_valid(task.worker) and not task.worker.dead and task.worker.searching and task.phase in [task.Phase.SEARCHING_INSIDE, task.Phase.SEARCHING_OUTSIDE]
+	return bool(target.search_target_state(id).get("progressing", false))
 
 func setup(target: Node3D) -> void:
 	mission = target

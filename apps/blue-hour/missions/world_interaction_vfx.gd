@@ -32,6 +32,10 @@ void fragment() {
 """
 
 const MOVE_POOL_SIZE := 6
+const COMMAND_LINE_SECONDS: float = .8
+const COMMAND_LINE_WIDTH: float = .035
+const COMMAND_LINE_COLOR: Color = Color(.30, .80, 1.0, .62)
+var command_lines: Dictionary = {}
 var mission: Node3D
 var selected_member: Node3D
 var selection_ring: MeshInstance3D
@@ -59,6 +63,7 @@ func _process(delta: float) -> void:
 	if not is_instance_valid(mission):
 		return
 	_time += delta
+	_update_command_lines(delta)
 	if is_instance_valid(selected_member):
 		var valid: bool = not selected_member.dead and not selected_member.inside_building and not selected_member.boarding
 		selection_ring.visible = valid
@@ -106,6 +111,61 @@ func play_move_feedback(point: Vector3) -> void:
 	tween.chain().tween_method(func(value: float): _set_alpha(marker, value), 0.98, 0.0, 0.30)
 	tween.chain().tween_callback(marker.hide)
 	marker.set_meta("vfx_tween", tween)
+
+func play_command_line(member: Node3D, point: Vector3) -> void:
+	# Reuse one short-lived ribbon per recipient during held steering.
+	var id: int = member.get_instance_id()
+	if not command_lines.has(id):
+		var view := MeshInstance3D.new()
+		view.name = "CommandLine"
+		view.mesh = ImmediateMesh.new()
+		view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var material := StandardMaterial3D.new()
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		material.albedo_color = COMMAND_LINE_COLOR
+		view.material_override = material
+		add_child(view)
+		command_lines[id] = {"member": weakref(member), "view": view, "target": point, "elapsed": 0.0}
+	var line: Dictionary = command_lines[id]
+	line.target = point
+	line.elapsed = 0.0
+	_draw_command_line(line, member)
+
+func _update_command_lines(delta: float) -> void:
+	for id: int in command_lines.keys():
+		var line: Dictionary = command_lines[id]
+		line.elapsed += delta
+		var member: Node3D = line.member.get_ref() as Node3D
+		if not is_instance_valid(member) or line.elapsed >= COMMAND_LINE_SECONDS:
+			line.view.queue_free()
+			command_lines.erase(id)
+			continue
+		if member.dead or member.boarding or member.inside_building or mission.task_for(member) != null:
+			line.view.queue_free()
+			command_lines.erase(id)
+			continue
+		_draw_command_line(line, member)
+
+func _draw_command_line(line: Dictionary, member: Node3D) -> void:
+	var view: MeshInstance3D = line.view
+	var mesh: ImmediateMesh = view.mesh as ImmediateMesh
+	var start: Vector3 = to_local(member.global_position + Vector3.UP * .045)
+	var end: Vector3 = to_local(mission.to_global(line.target) + Vector3.UP * .045)
+	var offset: Vector3 = end - start
+	mesh.clear_surfaces()
+	if offset.length_squared() < .0025:
+		return
+	var side: Vector3 = offset.normalized().cross(Vector3.UP) * COMMAND_LINE_WIDTH * .5
+	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	for vertex: Vector3 in [start - side, start + side, end + side, start - side, end + side, end - side]:
+		mesh.surface_add_vertex(vertex)
+	mesh.surface_end()
+	var material: StandardMaterial3D = view.material_override as StandardMaterial3D
+	var color: Color = COMMAND_LINE_COLOR
+	color.a *= 1.0 - smoothstep(.2, COMMAND_LINE_SECONDS, float(line.elapsed))
+	material.albedo_color = color
 
 func play_search_feedback(point: Vector3) -> void:
 	search_feedback.global_position = point + Vector3.UP * 0.03

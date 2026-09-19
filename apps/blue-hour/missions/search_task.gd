@@ -10,9 +10,15 @@ var resume_seconds: float = 0.0
 var transition_left: float = 0.0
 var exit_worker: Node3D
 var outcome: Phase = Phase.CANCELLED
+var search_started: bool = false
+
+func allows_move_override() -> bool:
+	# Defense and a return to the doorway must not turn a started search into approach.
+	return not search_started and phase in [Phase.ASSIGNED, Phase.MOVING_TO_ENTRANCE, Phase.DEFEND]
 
 func assign(id: String, member: Node3D, mission: Node3D) -> void:
 	site_id = id
+	mission.city.sites[id].search_cancelled = false
 	worker = member
 	phase = Phase.ASSIGNED
 	worker.regrouping = false
@@ -47,6 +53,9 @@ func release(mission: Node3D, completed: bool = false) -> void:
 	worker = null
 	safe_left = 0
 	mission.refresh_regroup()
+	if not completed:
+		mission.city.sites[site_id].search_cancelled = true
+		mission.search_cancelled.emit(site_id)
 
 func advance_exit(delta: float) -> void:
 	transition_left = maxf(0, transition_left - delta)
@@ -130,6 +139,7 @@ func prepare(delta: float, mission: Node3D) -> void:
 		return
 	worker.stop()
 	worker.searching = true
+	search_started = true
 	if site.vehicle:
 		phase = Phase.SEARCHING_OUTSIDE
 	else:
@@ -148,7 +158,13 @@ func advance(delta: float, mission: Node3D) -> void:
 		return
 	var site: Dictionary = mission.city.sites[site_id]
 	var seconds: float = mission.effects.search_seconds(site.spec.search_seconds, worker.talent.search_multiplier)
-	site.progress = minf(1.0, site.progress + delta / seconds)
+	if site.searched:
+		release(mission, true)
+		return
+	var remaining: float = (1.0 - site.progress) * seconds
+	# Compare seconds with a microsecond tolerance, so accumulated float error
+	# cannot leave a finished search at 99% for one more simulation tick.
+	site.progress = 1.0 if delta >= remaining - 0.000001 else site.progress + maxf(0.0, delta) / seconds
 	if site.progress >= 1.0:
 		site.searched = true
 		mission.city.update_site(site_id)
@@ -157,9 +173,11 @@ func advance(delta: float, mission: Node3D) -> void:
 		# settlement paths observe the same result as the new resolver.
 		site.spec.food = int(loot.food)
 		site.spec.scrap = int(loot.scrap)
-		mission.drop_loot(site.spec.entry, int(loot.food), int(loot.scrap), mission.reward_for_site(site_id))
-		mission.notice.emit("%s 搜索完成 · +%d 食物  +%d 废料 · %s 归队" % [site.spec.name, int(loot.food), int(loot.scrap), worker.data.display_name])
+		var worker_name: String = worker.data.display_name
+		loot.weapon = mission.reward_for_site(site_id)
+		mission.drop_loot(site.spec.entry, int(loot.food), int(loot.scrap), loot.weapon, {"id": site_id, "worker_name": worker_name})
 		release(mission, true)
+		mission.search_completed.emit(site_id, worker_name, loot)
 
 func action_label() -> String:
 	match phase:

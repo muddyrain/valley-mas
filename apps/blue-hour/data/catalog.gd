@@ -97,6 +97,10 @@ func validate() -> Array[String]:
 				errors.append("Missing site field: " + key)
 		if site.get("search_seconds", 0) <= 0 or site.get("food", -1) < 0 or site.get("scrap", -1) < 0:
 			errors.append("Invalid search reward or duration")
+		for entry: Dictionary in site.get("loot_table", {}).get("entries", []):
+			var chance: float = float(entry.get("chance", 1.0))
+			if not is_finite(chance) or chance < 0.0 or chance > 1.0 or entry.get("loot_id", "") not in ["food", "scrap"] or int(entry.get("min_amount", -1)) < 0 or int(entry.get("max_amount", -1)) < int(entry.get("min_amount", 0)):
+				errors.append("Invalid search loot entry: " + str(site.id))
 	if loop.end_day < 1 or loop.initial_food < 0 or loop.food_per_member < 1 or loop.hunger_health_multiplier <= 0 or loop.hunger_health_multiplier > 1 or loop.shop_size < 1:
 		errors.append("Invalid day-loop rules")
 	for id in loop.weapon_prices:

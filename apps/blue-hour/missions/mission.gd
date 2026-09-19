@@ -1,6 +1,9 @@
 extends Node3D
 signal completed(result: Dictionary)
 signal notice(text: String)
+signal search_completed(id: String, worker_name: String, loot: Dictionary)
+signal search_cancelled(id: String)
+signal search_loot_collected(id: String, worker_name: String, loot: Dictionary)
 signal watch_warning_changed(active: bool)
 const City = preload("res://maps/city.gd")
 const Survivor = preload("res://survivors/survivor.gd")
@@ -423,6 +426,21 @@ func task_for(member: Node3D) -> RefCounted:
 			return task
 	return null
 
+func search_target_state(id: String) -> Dictionary:
+	if not city.sites.has(id):
+		return {}
+	var site: Dictionary = city.sites[id]
+	var task: RefCounted = search_tasks.get(id)
+	var owner: Node3D = task.worker if task != null and is_instance_valid(task.worker) and not task.worker.dead else null
+	var state: String = "COMPLETED" if site.searched else "CANCELLED" if site.get("search_cancelled", false) else "AVAILABLE"
+	var progressing: bool = false
+	if owner != null and not site.searched:
+		state = "SEARCHING" if task.search_started else "ASSIGNED" if task.phase == SearchTask.Phase.ASSIGNED else "APPROACHING"
+		progressing = owner.searching and task.phase in [SearchTask.Phase.SEARCHING_INSIDE, SearchTask.Phase.SEARCHING_OUTSIDE]
+	return {"state": state, "worker": owner, "progress": site.progress, "completed": site.searched,
+		"can_search": active and closing_left < 0 and not site.searched and owner == null,
+		"progressing": active and not site.searched and progressing}
+
 func _prune_tasks() -> void:
 	for id in search_tasks.keys():
 		if search_tasks[id].worker == null:
@@ -440,24 +458,48 @@ func _cancel_guard_order() -> void:
 	extraction = false
 	extraction_left = catalog.map.extraction_seconds
 
-func command_move(point: Vector3) -> void:
+func move_command_members() -> Array[Node3D]:
+	# Portrait selection inspects one member; ordinary world commands address the squad.
+	var recipients: Array[Node3D] = []
+	for member: Node3D in living():
+		if member.boarding or member.inside_building or member.searching:
+			continue
+		var task: RefCounted = task_for(member)
+		if task == null or task.allows_move_override():
+			recipients.append(member)
+	return recipients
+
+func command_move(point: Vector3) -> bool:
 	if not active or closing_left >= 0:
-		return
-	# A manual movement order supersedes every active search assignment.
-	# Release the task before issuing paths so stale workers/callbacks cannot
-	# keep advancing search or resurrecting its world feedback.
-	_release_tasks()
-	_cancel_guard_order()
+		return false
+	return _move_members(point, move_command_members())
+
+func _move_members(point: Vector3, members: Array[Node3D]) -> bool:
 	var destination: Vector3 = city.nearest_open(point)
+	var orders: Array[Dictionary] = []
+	for member: Node3D in members:
+		var target: Vector3 = city.nearest_open(destination + formation(survivors.find(member)))
+		if not city.path(member.position, target).is_empty():
+			orders.append({"member": member, "target": target})
+	if orders.is_empty():
+		return false
+	_cancel_guard_order()
 	rally_point = destination
-	for i in range(survivors.size()):
-		if task_for(survivors[i]) == null:
-			survivors[i].regrouping = false
-			survivors[i].order_move(city.nearest_open(destination + formation(i)), city)
+	for move_order: Dictionary in orders:
+		var member: Node3D = move_order.member
+		var task: RefCounted = task_for(member)
+		if task != null:
+			task.release(self)
+		member.regrouping = false
+		member.order_move(move_order.target, city)
+		if is_instance_valid(world_interaction_vfx):
+			world_interaction_vfx.play_command_line(member, destination)
+	_prune_tasks()
 	city.set_marker(destination)
 	if is_instance_valid(world_interaction_vfx):
 		world_interaction_vfx.play_move_feedback(destination)
 	order = "前往阵位"
+	return true
 
 func command_stop() -> void:
 	if not active or closing_left >= 0:
@@ -535,7 +577,7 @@ func command_recall_all() -> void:
 	_release_tasks()
 	if controls != null:
 		controls.reset()
-	command_move(rally_point)
+	_move_members(rally_point, living())
 	notice.emit("全队集合 · 搜索进度保留")
 
 func _release_tasks() -> void:
@@ -689,13 +731,13 @@ func _update_director(delta: float) -> void:
 		return
 	encounter.advance(delta, self)
 
-func drop_loot(point: Vector3, food: int, scrap: int, weapon_item: Dictionary = {}) -> void:
+func drop_loot(point: Vector3, food: int, scrap: int, weapon_item: Dictionary = {}, search_source: Dictionary = {}) -> void:
 	var view := Node3D.new()
 	add_child(view)
 	view.position = point
 	Visuals.loot_crate(view)
 	Visuals.ring(view, Vector3(0, 0.1, 0), 0.7, Color("#a4eab1"))
-	pickups.append({"view": view, "food": food, "scrap": scrap, "weapon": weapon_item})
+	pickups.append({"view": view, "food": food, "scrap": scrap, "weapon": weapon_item, "search_source": search_source})
 
 func reward_for_site(id: String) -> Dictionary:
 	if campaign == null:
@@ -733,7 +775,11 @@ func _update_pickups() -> void:
 					ledger.add_weapon(pickup.weapon)
 					message += "
 获得 " + campaign.gear.title(pickup.weapon)
-				notice.emit(message)
+				var source: Dictionary = pickup.get("search_source", {})
+				if source.is_empty():
+					notice.emit(message)
+				else:
+					search_loot_collected.emit(source.id, source.worker_name, {"food": gained.x, "scrap": gained.y, "weapon": pickup.weapon})
 				sound.play_cue("loot")
 				pickup.view.queue_free()
 				pickups.erase(pickup)
@@ -745,7 +791,7 @@ func command_extract() -> void:
 	_release_tasks()
 	if controls != null:
 		controls.reset()
-	command_move(catalog.map.bus_position)
+	_move_members(catalog.map.bus_position, living())
 	extraction = true
 	extraction_left = catalog.map.extraction_seconds
 	order = "全队归航"
@@ -835,8 +881,6 @@ func debug_clear_enemies() -> void:
 	enemies.clear()
 	if focus_target != null:
 		_finish_focus()
-
-
 
 
 

@@ -86,8 +86,7 @@ func run() -> void:
 	await begin_search(id)
 	mission.command_move(mission.squad_center() + Vector3(2, 0, 0))
 	await frames(1)
-	check(not card.visible, "Leaving by movement hides the card on the next rendered frame")
-	await begin_search(id)
+	check(card.visible and mission.search_tasks.has(id), "Ordinary movement preserves an active search and its card")
 	var task: RefCounted = mission.search_tasks[id]
 	task.advance(100, mission)
 	await frames(1)

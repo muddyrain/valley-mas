@@ -31,6 +31,11 @@ static func roll_dict(table: Dictionary, rng: RandomNumberGenerator) -> Array[Di
 		var maximum: int = int(entry.get("max_amount", -1))
 		if weight <= 0 or maximum < minimum:
 			continue
+		# Dictionary tables roll independent resources, unlike Resource weighted-choice tables.
+		# Missing chance preserves legacy guaranteed entries and their RNG sequence.
+		var chance: float = clampf(float(entry.get("chance", 1.0)), 0.0, 1.0)
+		if chance <= 0.0 or (chance < 1.0 and rng.randf() >= chance):
+			continue
 		var amount: int = rng.randi_range(minimum, maximum)
 		if amount > 0:
 			result.append({"id": str(entry.loot_id), "amount": amount})

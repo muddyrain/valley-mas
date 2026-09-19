@@ -146,7 +146,7 @@ func run() -> void:
 	mission.command_search(site_id)
 	check(mission.search_tasks.has(site_id), "Search can be started again after cancel")
 	mission.command_move(mission.squad_center() + Vector3(2, 0, 0))
-	check(mission.search_tasks.is_empty(), "Ground movement releases active search task")
+	check(mission.search_tasks.is_empty(), "Ground movement may replace a newly assigned approach before searching begins")
 	check(hud.minimap.marker_player == HudArt.texture("map_player_marker") and hud.minimap.marker_poi == HudArt.texture("map_poi_marker"), "Minimap uses supplied player and house PNGs")
 	check(hud.minimap.marker_target == HudArt.texture("map_target_marker"), "Minimap uses supplied target PNG")
 	await shot("08_minimap", hud.minimap)

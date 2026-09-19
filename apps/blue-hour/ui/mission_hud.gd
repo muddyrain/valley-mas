@@ -30,6 +30,7 @@ var order_label: Label
 var toast: Label
 var toast_panel: PanelContainer
 var toast_left: float = 0.0
+var search_notices: Array[Dictionary] = []
 var objective: Label
 var debug_menu: PanelContainer
 var refresh_left: float = 0.0
@@ -116,6 +117,8 @@ func setup(target: Node3D, preferences: RefCounted = null) -> void:
 	ui_viewport.size_changed.connect(_fit_window)
 	_fit_window()
 	mission.notice.connect(show_notice)
+	mission.search_completed.connect(_show_search_result)
+	mission.search_loot_collected.connect(func(id: String, worker_name: String, loot: Dictionary) -> void: _show_search_result(id, worker_name, loot, true))
 	refresh()
 
 func _fit_window() -> void:
@@ -497,17 +500,23 @@ func _build_commands() -> void:
 	order_label.offset_left = -dock_width / 2
 	order_label.offset_top = -202
 	add_child(order_label)
-	toast_panel = Style.anchored(self, "LootToast", PRESET_CENTER_BOTTOM, Rect2(-130, -248, 130, -192))
+	toast_panel = Style.anchored(self, "LootToast", PRESET_CENTER_BOTTOM, Rect2(-240, -248, 480, 72))
 	toast_panel.add_theme_stylebox_override("panel", HudArt.surface("loot_toast_bg", Vector4(12, 8, 12, 8)))
 	toast = UI.label("", 14, Style.INK)
 	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	toast.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	toast_panel.add_child(toast)
+	toast_panel.hide()
 
 func _process(delta: float) -> void:
 	toast_left -= delta
-	toast.visible = false
-	toast_panel.visible = false
+	if toast_left <= 0 and not search_notices.is_empty():
+		search_notices.pop_front()
+		if not search_notices.is_empty():
+			toast.text = search_notices[0].text
+			toast_left = 4.0
+	toast.visible = toast_left > 0
+	toast_panel.visible = toast.visible
 	tracker_left -= delta
 	if tracker_left <= 0:
 		tracker_left = 1.0
@@ -637,8 +646,35 @@ func _build_menus() -> void:
 		settings_menu.hide()
 
 func show_notice(text: String) -> void:
+	# Completion summaries retain their worker/target identity while pickups arrive.
+	if not search_notices.is_empty():
+		return
 	toast.text = text
 	toast_left = 4.0
+
+func _show_search_result(id: String, worker_name: String, loot: Dictionary, collected: bool = false) -> void:
+	var rewards: PackedStringArray = []
+	if int(loot.food) > 0:
+		rewards.append("食物 +%d" % int(loot.food))
+	if int(loot.scrap) > 0:
+		rewards.append("废料 +%d" % int(loot.scrap))
+	if not loot.get("weapon", {}).is_empty() and mission.campaign != null:
+		rewards.append(mission.campaign.gear.title(loot.weapon) + " ×1")
+	var text: String = "%s完成搜索：%s\n%s：%s" % [worker_name, mission.city.sites[id].spec.name,
+		"获得" if collected else "找到", " · ".join(rewards) if not rewards.is_empty() else "暂无物资"]
+	for index: int in range(search_notices.size()):
+		if search_notices[index].id == id:
+			search_notices[index].text = text
+			if index == 0:
+				toast.text = text
+				toast_left = 4.0
+			return
+	search_notices.append({"id": id, "text": text})
+	if search_notices.size() == 1:
+		toast.text = text
+		toast_left = 4.0
+		toast.show()
+		toast_panel.show()
 
 func toggle_pause() -> void:
 	if debug_menu.visible or pause_menu.visible or _settings_open():

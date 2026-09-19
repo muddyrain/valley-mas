@@ -49,16 +49,20 @@ func setup(site: Dictionary, command: Callable) -> void:
 
 func update_site(id: String, mission: Node3D) -> void:
 	var site: Dictionary = mission.city.sites[id]
-	var task = mission.search_tasks.get(id)
+	var state: Dictionary = mission.search_target_state(id)
+	var worker: Node3D = state.worker
 	icon = HudArt.texture("icon_vehicle" if site.vehicle else "icon_house_small")
-	time_icon.visible = not site.searched and task == null
+	time_icon.visible = not state.completed and worker == null
 	disabled = site.searched or mission.closing_left >= 0 or not mission.active
 	add_theme_stylebox_override("normal", selected_style if mission.poi_selected_id == id else normal_style)
 	text = site.spec.name
 	status.text = "已搜" if site.searched else "%ds" % site.spec.search_seconds
-	if task != null:
+	if worker != null:
 		status.text = "%d%%" % (site.progress * 100)
 		status.modulate = Style.CYAN
 	else:
 		status.modulate = Style.INK
-	tooltip_text = "%s · %s\n%s%s\n%s" % [Copy.category(site), site.spec.name, Copy.loot(site), " · 装备" if not mission.reward_for_site(id).is_empty() else "", "已清点" if site.searched else (task.worker.data.display_name + " · 搜索中" if task != null else "待搜")]
+	var activity: String = "已清点" if state.completed else "待搜"
+	if worker != null:
+		activity = worker.data.display_name + " · " + mission.search_tasks[id].action_label()
+	tooltip_text = "%s · %s\n%s%s\n%s" % [Copy.category(site), site.spec.name, Copy.loot(site), " · 装备" if not mission.reward_for_site(id).is_empty() else "", activity]

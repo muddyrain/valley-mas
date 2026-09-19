@@ -80,6 +80,8 @@ switch ($Mode) {
     'smoke' { Invoke-Engine @('--headless', '--quit-after', '120', '--', '--test-save=smoke-03.json') }
     'test' {
         Invoke-Engine @('--headless', '--editor', '--import', '--quit')
+        Invoke-Engine @('--headless', '--script', 'tests/search_gameplay.gd')
+        Invoke-Engine @('--headless', '--script', 'tests/survivor_command.gd')
         Invoke-Engine @('--headless', '--script', 'tests/settings.gd')
         Invoke-Engine @('--headless', '--script', 'tests/camp_party.gd')
         Invoke-Engine @('--headless', '--script', 'tests/camp_departure.gd')
@@ -122,6 +124,8 @@ switch ($Mode) {
         Invoke-Engine @('--headless', '--script', 'tests/loot_table.gd')
     }
     'capture' {
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/search_gameplay.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/survivor_command.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/search_active_card.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/expedition_hud_phase2.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1600x900', '--audio-driver', 'Dummy', '--script', 'tests/encounter_runtime.gd')
@@ -166,7 +170,9 @@ switch ($Mode) {
             }
         }
         Invoke-Engine @('--headless', '--editor', '--import', '--quit')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/search_gameplay.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/expedition_hud_phase2.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/survivor_command.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/search_active_card.gd')
         Invoke-Engine @('--headless', '--script', 'tests/settings.gd')
         Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1920x1080', '--audio-driver', 'Dummy', '--script', 'tests/camp_ui_runtime.gd')
