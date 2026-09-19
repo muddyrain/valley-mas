@@ -1,5 +1,21 @@
 # 蓝时归航实施计划
 
+## 2026-09-19：Expedition Search Gameplay V2
+
+- [x] 复用 SearchTask、集中 4/8/12/18 秒耗时与掉落概率、统一只读生命周期、即时卡片清理、完成/拾取 Toast。
+- [x] 最新专项 Headless 67 项、原生 72 项通过；住宅和车辆正式时长完整流程、并行隔离、Command V1 回归通过。
+- [x] Release 单独导出成功；独立 EXE Headless/原生 Expedition 启动，以及内嵌包住宅/车辆完整搜索、奖励与卡片验证通过。
+- [ ] 完整 build 仍被既有 Camp UI 测试阻断；退出时旧 ObjectDB 泄漏警告仍保留。数值、缺口、全部文件与失败回归见 [Search Gameplay V2 报告](EXPEDITION_SEARCH_GAMEPLAY.md)。
+
+## 2026-09-18：Expedition Survivor Command V1
+
+- [x] 普通地面移动先过滤合法接收者，仅覆盖未开始搜索的赶路任务；已开始搜索、进门、自卫暂停保持原任务。无接收者时不改变集合点、不播放移动反馈。
+- [x] 复用明确取消入口与任务释放流程，取消/完成清理占用和进度 UI；保留集合、撤离、自卫与死亡规则。头像查看仍沿用当前语义，不新建多选命令系统。
+- [x] 原生 ImmediateMesh 青蓝细指令线接入既有 VFX 层，0.8 秒渐隐；连续指令每名角色最多一条线，保留选中环与落点反馈。未改模型、骨骼、动画或 PNG。
+- [x] 新专项 headless 43 / native 45 项通过；搜索卡 157、HUD 258、搜索派遣 56、室内搜索 13、三人并行 36、设置 14 项通过。旧并行测试仅固定搜索时长前提，正式数值不变。
+- [x] Windows 单独导出、独立 EXE Expedition 启动及内嵌包指令/搜索/取消验证通过，无本轮 Runtime Error / Invalid Node / Missing Resource；截图、视频与日志在 `test-output/survivor-command/`。
+- [ ] 完整 build 仍因旧 Camp 测试的 `member_buttons`/能力栏断言失败；未改 Camp 或宣称完整构建通过。规则、修改范围与证据见 [验收报告](EXPEDITION_SURVIVOR_COMMAND.md)。
+
 ## 2026-09-17：Expedition 正式搜索状态卡
 
 - [x] 按钮间距微调：SearchRow 使用 HBoxContainer 固定 12px 分隔，左侧进度条缩为 86px；卡片 262×96、按钮 96×32 及两态素材不变。157 项专项断言通过，截图在 `test-output/search-cancel-spacing/`。
@@ -17,12 +33,33 @@
 - [ ] 完整 `run.ps1 -Mode build` 未通过：旧 `camp_ui_runtime.gd` 访问当前 `camp_hud_root.gd` 已无的 `member_buttons`，且断言旧能力栏存在。保留原测试失败记录，未以定向导出冒充全套通过。
 - [ ] 额外回归：`interior_search.gd` 13/13 通过；`search_dispatch.gd` 50/56、`parallel_commands.gd` 2/3，后者在早期失败后结束，未执行余下断言。旧测试含移动应保留搜索等与本轮开始时已有实现相反的要求；本轮未改搜索玩法或这些历史测试。证据在 `test-output/search-active-*.log`。
 
+## 2026-09-18：夏知遥标准 Locomotion Retarget
+
+- [x] 用户确认 Standard Survivor Rest / Idle / Walking / Running PASS。仅从三份标准 `.tres` 离线 Retarget 到夏知遥原 23 骨，新增角色专属 Idle / Walking / Running，保持 Mesh / Skin / Rest / 比例与周期。
+- [x] 可重复映射和蒙皮接地补偿已独立保存；实际腿链比例 0.89655，Running 支撑约 2.30655m/s，在 2.57m/s 下预测残差约 31mm；未修改 Gameplay。接地、姿态及建议见 [验收报告](XIA_ZHIYAO_STANDARD_LOCOMOTION_RETARGET.md)。
+- [x] 18,928 项专项、两名正式幸存者 302 项通过；12 段四视角原速视频、独立 Windows 构建与三套启动完成。收尾保护快照 339 个哈希未变，5 个本轮外部改动保留并单独报告。
+- [ ] 等待夏知遥 V1 视觉验收；Idle 建议直接使用，Walking / Running 建议小修确认。不接入苏晚星、Gameplay 或持武器动作。
+
+## 2026-09-18：Standard Survivor Running 重构
+
+- [x] 保留源 0.666667 秒 / 180 步频、交替与轻度前倾；重构支撑/低腾空、收腿、落地压缩与摆臂，烘焙唯一 `animations/running.tres`，无 Runtime IK / Root Motion。
+- [x] 支撑前掌实测反推推荐 2.57m/s；Hips 起伏 61.74→47.58mm，回收鞋底高点约 0.218 / 0.217m，上臂后摆约 35.1°；完整 Loop 闭合。后跟仍有约 15～17mm 局部形变残差，详见 [重构报告](STANDARD_SURVIVOR_RUNNING_RECONSTRUCTION.md)。
+- [x] 402 项专项、正式双角色 303 项、329 文件保护检查通过；四视角 13.333 秒循环视频和独立 Windows 构建/原生启动完成，Idle / Walking 与正式系统不变。
+- [x] 用户确认 Running Reconstruction V1 PASS；后续仅授权上节夏知遥 Retarget，不继续 Combat Jog / Armed Run。
+
+## 2026-09-18：Standard Survivor Running 原样验收
+
+- [x] 源 Running 独立原样播放：0.666667 秒、24 FPS、180 步/分钟；四视角各 13.333 秒、60 FPS、20 次循环。无键修改、Retarget、正式角色或 Gameplay 接入。
+- [x] 全周期 Blender / Godot 与实际蒙皮检查；源键关节误差最大 0.00772mm、键间 2.889mm。223 项量测工具检查和正式双角色 303 项通过，329 个受保护文件未变；独立 Windows 构建/启动通过。
+- [x] 已报告持续接地间隙、候选支撑预测滑步、跑步/腾空形态、摆臂与 Loop 差异。建议较大重构并保留原步态基础，详见 [Running 原样验收报告](STANDARD_SURVIVOR_RUNNING_REVIEW.md)。
+- [x] 用户确认原样结论并授权较大重构；制作结果见上节，原样数据保留用于对比。
+
 ## 2026-09-17：Standard Survivor Walking 接地与循环修正
 
 - [x] Blender 按 Heel Strike / Foot Flat / Mid Stance / Toe Off / Swing 修正并烘焙，唯一 `animations/walking.tres`；1.0416667 秒、24 FPS 时间轴和原地形式保留，120Hz 子帧键，不使用 Runtime IK。
 - [x] 支撑参考 1.425m/s；平脚前掌残余滑动同窗同速左 6.90→4.50mm、右 38.50→4.79mm。平脚端部高度约 1～5mm，后跟形变及局部最大 1.85mm 穿入如实保留在报告。
 - [x] Hips / Foot / Knee / ToeBase 首尾位置与旋转闭合；615 项专项、正式双角色 303 项通过，324 个受保护文件不变。四视角各 12.5 秒视频及独立 Windows 构建/启动完成。
-- [ ] 等待用户 Walking V1 视觉验收；不继续 Running，不接入正式角色或 gameplay。详见 [Walking 修正报告](STANDARD_SURVIVOR_WALKING_FOOT_CONTACT.md)。
+- [x] 2026-09-18 用户确认 Walking V1 PASS；保持已通过资源不变，后续仅授权上节 Running 原样验收，未接入正式角色或 gameplay。详见 [Walking 修正报告](STANDARD_SURVIVOR_WALKING_FOOT_CONTACT.md)。
 
 ## 2026-09-17：Standard Survivor Walking 原样验收
 
@@ -58,6 +95,34 @@
 - [x] 移除旧 170cm 标准模板、专属骨架/动作实验、脚底偏移、预览脚本与临时输出。
 - [x] 保留夏知遥、苏晚星、正式 Survivor Runtime、公共动画架构、武器和 Expedition 玩法；清单与验证见 [模板清理记录](STANDARD_SURVIVOR_TEMPLATE_CLEANUP_REPORT.md)。
 - [x] 用户已提供女性 165cm、新脚踝位置模板；静态接入结果见本页“165cm 静态基线”，动作制作继续暂停。
+
+## 2026-09-18：Camp HUD M04 幸存者头像列表
+
+后续用户授权的交互与详情规则见下面 M05-A 条目；本节保留基础视觉冻结验收历史。
+
+- [x] 最终收尾：普通框 RGB 调制为 0.78，透明度不变，Selected 保持原色；477 项检查通过，69 个受保护文件不变。M04 Freeze。
+
+- [x] 用户三张 PNG 原样接入，118×436 面板，四个 94×94 Slot 与 78×78 头像，位置和步进按本轮规格。
+- [x] 默认首项选中，原生点击切换唯一高亮；复用两张正式头像填充四个展示槽，动态标题和 4/4、原生占位圆点。不接 M05 或实际队伍。
+- [x] 四分辨率原生检查 413 项通过；59 个受保护文件及其他八个 HUD 截图区未变，Windows 独立导出及原生启动通过，日志无脚本或资源错误。
+- [x] 用户确认整体效果，普通框亮度收尾完成；M04 冻结，不再调整，不进入 M05。详见 [M04 接入报告](CAMP_SURVIVOR_ROSTER_REPORT.md)。
+
+## 2026-09-18：Camp HUD M04 Hover + M05-A 详情骨架
+
+- [x] M04 增加普通框 Hover 增亮、头像轻微增亮、中心缩放和 Pressed 反馈；Selected 仍使用原效果，PNG 和几何不变。
+- [x] 进入 Camp 选择 ID 为 null、M05 隐藏；点击后显示并复用同一个详情实例，切换四个独立展示角色的数据。
+- [x] M05 保留 354×452 原外框，完成 Header / Combat / Attributes / Trait / ActionBar 正式层级；三项操作禁用，不接 Gameplay 或正式美术。
+- [x] 407 项详情交互检查与 473 项头像回归通过；66 个受保护文件哈希一致，其他七个 HUD 截图区逐像素一致。
+- [x] Windows release 导出和独立程序启动通过；使用隔离存档，未运行历史全量 build 测试链。证据见 [M05-A 报告](CAMP_SURVIVOR_DETAIL_REPORT.md)。
+- [ ] 本轮人工视觉验收；停止于 M05-A，不自动接入 M05 正式美术。
+
+## 2026-09-19：Camp HUD M06 Camp Action Rail
+
+- [x] 使用用户提供的七张 M06 PNG 替换旧占位栏；保留 M06 `(28,278)`、`112×330` 根几何。
+- [x] 建立 TemporaryBuff、MedicalSupport、LockedAction 三个独立槽，动态渲染 Q/E 与中文标签。
+- [x] 完成可用槽 Hover Glow、1.02 Hover、0.98 Pressed，以及锁定槽禁用视觉；Q/E 和鼠标只发本地展示信号，不接 Gameplay。
+- [x] 226 项专项检查通过，包含四种分辨率和 1600×900 截图；证据见 [M06 报告](CAMP_ACTION_RAIL_REPORT.md)。
+- [ ] 本轮人工视觉验收；停止于 M06，不自动进入 M07。
 
 ## 2026-09-17：Camp HUD M03 顶部资源栏
 
@@ -943,3 +1008,50 @@ M01 分布与专项验证完成不等于全项目发布通过，也不替代角�
 - [ ] Windows build：已执行，仍被既有 Camp UI `member_buttons` / 左侧能力区测试阻断，未交付新 EXE。
 
 M01.1 专项状态为 TECHNICALLY COMPLETE；全项目构建不通过不隐瞒为发布完成。本轮停止，不进入 M02、新资产生产或正式 Expedition。
+
+## 2026-09-18：Environment Asset Batch 01 Runtime Integration
+
+- [x] 接入用户补发的带贴图 Utility Pole、Parking Sign、Storefront A-Frame Sign、Bicycle；Wrapper Root identity、Scale=1、简单碰撞、GroundAnchor / FrontMarker 与专用 Marker 完整。
+- [x] 四件注册现有 World Catalog / Definition，searchable=false、spawn_weight=0；用途标签仅登记，不进入生成器。
+- [x] 原生171项与Headless110项零失败，20张原图与四模型Contact Sheet已生成；最终Import通过，本批运行日志无缺失资源、Invalid UID或Runtime Error。
+- [x] 62个冻结代码/建筑文件、51个历史证据文件哈希不变，Town与M00/M01/M01.1完整快照一致；报告见 [四模型Runtime接入与QA](ENVIRONMENT_STREET_ASSET_REPORT.md)。
+- [x] 2026-09-18 用户确认四件人工 Asset QA: PASS，并授权 M02。自行车实长169.84cm，保留源比例；其他尺寸差异和细部检查见报告。
+- [ ] 全项目Windows build仍被既有Camp UI测试阻断，未交付新EXE；全Catalog回归另有4项既有建筑贴图尺寸断言失败。
+
+Batch 01 专项状态 TECHNICALLY COMPLETE，Asset QA: PASS。接入阶段未执行 Town Placement；后续授权的 M02 状态见下节。
+
+## 2026-09-18：Environment M02 Targeted Street Props Placement
+
+- [x] 独立 M02 Pass 在 M01.1 后追加四种已通过人工 QA 的资产，使用独立确定性随机流；候选、拒绝原因、用途、锚点与未来连线关系均可追踪。
+- [x] Seed 4101：原 605 个实例不变，新增 31 个（14 电线杆、3 停车牌、3 A 字牌、11 自行车），合计 636 个。合法位置优先，不按目标数量硬刷。
+- [x] 8 Seed / 4 朝向、304,563 项专项检查零失败；536 个 Town / 资产 / 历史证据文件哈希不变。保护道路、步行带、入口、车道、停车面、任务点与探索路线。
+- [x] Seed 4101 的 12 张原生截图、3 张同机位前后对比图已生成，Runtime Error = 0；统计、间距缺口和证据见 [M02 报告](MEDIUM_TOWN_TARGETED_PROPS_REPORT.md)。
+- [x] 2026-09-19 用户确认 M02 Human Visual QA: PASS；电线杆节奏与空段、商铺前角 A 字牌、自行车依附关系及整体留白通过人工截图验收。
+- [ ] Windows build 已执行，仍被既有 Camp UI `member_buttons` 缺失 / 左侧能力区断言阻断；未导出本轮新 EXE。
+
+M02 Placement: TECHNICALLY COMPLETE；Human Visual QA: PASS。Town Structure: FROZEN。M00 / M01 / M01.1 保持冻结；M02 实例继续冻结。
+
+## 2026-09-19：Environment M03 Roadside Infrastructure & Visual Completion
+
+- [x] 新增独立 M03 只读视觉层：消费 M02 `future_wire_links` 和既有 WireMarker，生成 3 根并行轻量悬垂线；仅合法 22–42m pair，未跨长空段、未新增 Pole、无碰撞与交互。
+- [x] 道路 / 人行道使用独立实例材质：道路增加低频灰蓝差异，Sidewalk 降低纯白感，增加道路外侧 18cm curb strip；道路几何范围不变，共享材质不改写。
+- [x] 停车区生成 2 个合法 P 地面标识，商业入口生成 4 个小面积铺装 accent；均为程序几何，无新模型、无建筑碰撞修改。
+- [x] 8 Seed / 4 朝向、55,967 项 M03 专项检查零失败；622 个冻结文件哈希不变，Town、M02 数据 / 实例、M01.1 快照保持可复现；14 张原生截图和 4 张对比图，Runtime Error = 0。详见 [M03 报告](MEDIUM_TOWN_ROADSIDE_VISUAL_REPORT.md)。
+- [ ] Visual QA: PENDING HUMAN REVIEW。电线粗细 / 悬垂 / 树冠关系、道路层次、P 标识和商业入口铺装等待人工截图验收。
+- [ ] Windows build 已实际执行，既有 Camp UI 的 `member_buttons` 缺失及左侧能力区断言阻断；未导出本轮新 EXE。
+
+M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核，不进入 M03.1 / M04 / 正式 Expedition。
+
+## 2026-09-18：夏知遥 Locomotion Gameplay Integration
+
+- [x] Expedition 无武器模式接入夏知遥正式 Idle / Walking / Running；按实际水平速度选择状态并匹配 1.262257 / 2.306552 m/s 参考倍率。
+- [x] 102 项控制器隔离回归通过；装备武器、Camp、苏晚星和原有 Combat Jog 管线保持原所有权。
+- [x] 真实 Mission 物理 Harness 记录 Idle、短距、长距、45° / 90° 转向和停止；视频与数据见 [Gameplay 报告](XIA_ZHIYAO_LOCOMOTION_GAMEPLAY.md)。
+- [ ] Gameplay 视频视觉验收待用户确认；本轮不调整移动速度，不制作 Turn / Start / Stop 或苏晚星动作。
+
+## 2026-09-19：夏知遥 Gameplay Movement Speed A/B/C
+
+- [x] 在同一 Expedition 路线测试 A=2.6、B=2.8、C=3.0 m/s；未修改正式默认速度、动作、Retarget 或角色资源。
+- [x] 三档实际 Run 速度分别为 2.59998 / 2.80003 / 2.99995 m/s，倍率 1.12722 / 1.21394 / 1.30062，cadence 202.90 / 218.51 / 234.11 spm。
+- [x] 每档生成正常 Gameplay 与角色近景视频及 JSON 数据，见 [Gameplay 报告](XIA_ZHIYAO_LOCOMOTION_GAMEPLAY.md)。
+- [ ] 不选择最终速度，等待三档视频视觉验收；路线目标未在测试上限内全部收敛，报告同时提供固定 8m 可比时间换算。

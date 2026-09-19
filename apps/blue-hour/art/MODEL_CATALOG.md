@@ -8,6 +8,14 @@
 
 2026-09-17：Walking 接地/支撑速度/Loop 修正输出到模板专属 [animations/walking.tres](../assets/characters/survivor_animation_template/animations/walking.tres)，制作源 [standard_survivor_walking.blend](blender/characters/standard_survivor_walking.blend)。保持 1.0416667 秒、24 FPS 时间轴和原地形式，120Hz 子帧烘焙；支撑参考 1.425m/s，首尾闭合。四视角、接地与残余滑动对比见 [Walking 修正报告](../docs/STANDARD_SURVIVOR_WALKING_FOOT_CONTACT.md)。候选已交付，等待视觉验收；未修改静态模板、Idle、正式角色或 gameplay，不继续 Running。
 
+2026-09-18：用户确认 Rest / Idle V1 / Walking V1 均 PASS，覆盖上段 Walking 待验收状态。源 Running 已完成独立原样验收，0.666667 秒、24 FPS、180 步/分钟；本轮没有正式 Running 动作导出或资源修改。支撑悬空、摆臂与 Loop 结果见 [Running 原样报告](../docs/STANDARD_SURVIVOR_RUNNING_REVIEW.md)，等待视觉验收，不自动推进修正。
+
+2026-09-18：根据用户后续授权完成无武器持续 Run 重构候选，正式动作 [animations/running.tres](../assets/characters/survivor_animation_template/animations/running.tres)，制作源 [standard_survivor_running.blend](blender/characters/standard_survivor_running.blend)。0.666667 秒 / 180 步频保留，支撑与摆臂已重构、完整循环闭合；反推匹配速度约 2.57m/s，未写入 Gameplay。测量、四视频和后跟残差见 [重构报告](../docs/STANDARD_SURVIVOR_RUNNING_RECONSTRUCTION.md)。等待视觉验收，不推进 Combat Jog / Armed Run。
+
+## 夏知遥标准 Locomotion
+
+2026-09-18：用户确认标准 Rest / Idle / Walking / Running PASS。唯一动作源仍为上述 Standard Survivor 三份 `.tres`，新增夏知遥专属 [Idle](../assets/characters/xia_zhiyao/animations/idle.tres) / [Walking](../assets/characters/xia_zhiyao/animations/walking.tres) / [Running](../assets/characters/xia_zhiyao/animations/running.tres)，保持原 1.60m Mesh、23 骨、Skin 和 Rest。可重复映射/接地补偿为 [xia_zhiyao_locomotion.json](blender/rigs/xia_zhiyao_locomotion.json)，动画不依赖 Runtime IK。Running 推荐匹配约 2.31m/s，与标准 2.57m/s 存在差异，仅报告未改 Gameplay。12 视频、独立程序、测量与保护结果见 [Retarget 验收报告](../docs/XIA_ZHIYAO_STANDARD_LOCOMOTION_RETARGET.md)。夏知遥候选待视觉验收，未接入苏晚星、公共动画或 Gameplay。
+
 ## 环境套件
 
 2026-09-17 Medium Town M01 根据用户旧资产白名单接入 11 项 World wrapper：PRP_003 Bench、004 Pallet、005 WoodCrate、006 MetalCrate、008 DirectionSign、009 VendingMachine、011 可选 Planter，BAR_002 住宅低栏、003 混凝土路障、004 金属拒马、005 破损工业围网。直接引用旧 GLB 或序列化现有 Camp recipe，不新增模型或贴图。可搜索售货机 / 箱体与公告板不进入装饰随机池。源 ID、用途边界见 [白名单](../docs/MEDIUM_TOWN_ENVIRONMENT_REUSE_SELECTION.md)，Runtime 路径、验证与截图见 [M01 报告](../docs/MEDIUM_TOWN_ENVIRONMENT_M01_REPORT.md)。
@@ -103,3 +111,14 @@ Camp Visual Polish Pass 02 通过 `camp/camp_dressing.gd` 额外复用 `BH_Bench
 | 拓荒短刀 | [GLB](../assets/weapons/models/wpn_001_survival_knife.glb) | [blend](blender/weapons/wpn_001_survival_knife.blend) | 848 |
 | P9 | [GLB](../assets/weapons/models/wpn_002_p9_pistol.glb) | [blend](blender/weapons/wpn_002_p9_pistol.blend) | 1,520 |
 | A21 | [GLB](../assets/weapons/models/wpn_006_a21_assault_rifle.glb) | [blend](blender/weapons/wpn_006_a21_assault_rifle.blend) | 2,524 |
+
+## Environment Asset Batch 01（2026-09-18）
+
+用户提供的四件带贴图 Meshy GLB 已进入 World Runtime；源字节不变，单位缩放、简单碰撞及 Marker 齐全，全部不可搜索。2026-09-18 用户确认四件人工 Asset QA = PASS；2026-09-19 用户确认 M02 Human Visual QA = PASS。独立 M02 Placement Pass 已在冻结 M01.1 之后按用途标签摆放，未改变通用生成权重、资产或既有生成器。规格与源路径见 [接入报告](../docs/ENVIRONMENT_STREET_ASSET_REPORT.md)，分布、验证和截图见 [M02 报告](../docs/MEDIUM_TOWN_TARGETED_PROPS_REPORT.md)。
+
+| Runtime Asset ID | tris / verts | Runtime 尺寸 cm（宽×高×深） | Wrapper |
+|---|---:|---|---|
+| PRP_Utility_Pole_A | 5,018 / 4,989 | 216.47×850×219.83 | [Scene](../scenes/world/props/street/PRP_Utility_Pole_A.tscn) |
+| PRP_Parking_Sign_A | 2,624 / 2,678 | 47.55×250×30.52 | [Scene](../scenes/world/props/street/PRP_Parking_Sign_A.tscn) |
+| PRP_Storefront_AFrame_Sign_A | 3,914 / 4,213 | 60.74×105×52.60 | [Scene](../scenes/world/props/street/PRP_Storefront_AFrame_Sign_A.tscn) |
+| PRP_Bicycle_A | 12,152 / 11,913 | 76.85×105×169.84 | [Scene](../scenes/world/props/street/PRP_Bicycle_A.tscn) |

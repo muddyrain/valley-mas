@@ -17,6 +17,10 @@
 
 原生验收入口：`tests/search_active_card.gd`，已纳入 `run.ps1 -Mode capture/build`；间距微调后的截图、坐标和断言写入 `test-output/search-cancel-spacing/`，157 项断言通过，包含两态 12px 间距、原生尺寸、状态/百分比文字完整显示及三档分辨率。运行同时报告 GLES3 空纹理错误，不能视为无错误验收。此前按钮尺寸、定位修复和首次接入截图分别保留在 `test-output/search-cancel-layout/`、`test-output/search-card-position/`、`test-output/search-active-card/`。验证使用独立内存 Campaign 和合成输入，不写入玩家存档。四张 PNG 的 SHA-256 与 ZIP 原件一致，按钮微调未改 PNG；构建状态见 [实施计划](../docs/PLAN.md)。
 
+## Camp M04 幸存者头像列表（2026-09-18）
+
+用户 `m04_assets_final.zip` 三张原始 PNG 位于 `assets/ui/camp/m04/`，SHA-256 与包内原件一致；背景 236×872 → 118×436，normal / selected frame 188×188 → 94×94，保持原比例。头像复用现有苏晚星、夏知遥 portrait，以 AtlasTexture 取面部后显示 78×78，原件不改；四槽暂按苏/夏/苏/夏排列。文字与圆点由 Godot 渲染，没有额外星标或装饰。结构、选择边界和验证见 [M04 接入报告](../docs/CAMP_SURVIVOR_ROSTER_REPORT.md)。
+
 ## Camp M03 顶部资源栏（2026-09-17）
 
 用户 `m03_assets_final.zip` 六张 PNG 原字节保存于 `assets/ui/camp/m03/`，逐张 SHA-256 与原包一致。资源背景 206×112 → 103×56，三个资源图标 64×64 → 30×30，菜单背景 232×112 → 116×56，菜单图标 48×48 → 24×24。背景共用，文字由 Godot Label 渲染；无额外 PNG 或 gameplay 接入。尺寸、节点与验证见 [M03 接入报告](../docs/CAMP_RESOURCE_BAR_REPORT.md)。
