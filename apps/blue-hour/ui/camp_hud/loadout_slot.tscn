@@ -1,0 +1,92 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://ui/camp_hud/loadout_slot.gd" id="1"]
+
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m07/m07_slot_empty.png" id="2"]
+
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m07/m07_slot_locked.png" id="3"]
+
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m07/m07_slot_item_bg.png" id="4"]
+
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m07/m07_slot_hover.png" id="5"]
+
+[sub_resource type="AtlasTexture" id="empty"]
+atlas = ExtResource("2")
+region = Rect2(227, 248, 800, 760)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="locked"]
+atlas = ExtResource("3")
+region = Rect2(218, 242, 818, 774)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="item_bg"]
+atlas = ExtResource("4")
+region = Rect2(211, 233, 836, 790)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="hover"]
+atlas = ExtResource("5")
+region = Rect2(253, 281, 748, 711)
+filter_clip = true
+
+[node name="LoadoutSlot" type="Button"]
+offset_right = 64.0
+offset_bottom = 62.0
+mouse_filter = 0
+script = ExtResource("1")
+normal_texture = SubResource("empty")
+hover_texture = SubResource("hover")
+disabled_texture = SubResource("locked")
+hover_is_overlay = true
+hover_opacity = 0.32
+pressed_scale = 1.0
+focus_as_hover = false
+metadata/empty_texture = SubResource("empty")
+metadata/item_texture = SubResource("item_bg")
+
+[node name="VisualRoot" type="Control" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 64.0
+offset_bottom = 62.0
+mouse_filter = 2
+pivot_offset = Vector2(32, 31)
+
+[node name="NormalTexture" type="TextureRect" parent="VisualRoot"]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 64.0
+offset_bottom = 62.0
+mouse_filter = 2
+texture = SubResource("empty")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="HoverTexture" type="TextureRect" parent="VisualRoot"]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 64.0
+offset_bottom = 62.0
+mouse_filter = 2
+texture = SubResource("hover")
+expand_mode = 1
+stretch_mode = 5
+modulate = Color(1, 1, 1, 0)
+
+[node name="Content" type="Control" parent="VisualRoot"]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 64.0
+offset_bottom = 62.0
+mouse_filter = 2
+
+
+[node name="ItemIcon" type="TextureRect" parent="VisualRoot/Content"]
+offset_left = 12.0
+offset_top = 11.0
+offset_right = 52.0
+offset_bottom = 51.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
