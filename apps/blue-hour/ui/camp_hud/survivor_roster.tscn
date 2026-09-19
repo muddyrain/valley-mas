@@ -1,133 +1,118 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=12 format=3]
 
-[ext_resource type="Theme" path="res://ui/camp_hud/placeholder_theme.tres" id="1"]
+[ext_resource type="Script" path="res://ui/camp_hud/survivor_roster.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m04/m04_roster_panel_bg.png" id="2_background"]
+[ext_resource type="PackedScene" path="res://ui/camp_hud/portrait_slot.tscn" id="3_slot"]
+[ext_resource type="Texture2D" path="res://assets/ui/expedition/portraits/portrait_su_wanxing.png" id="4_su"]
+[ext_resource type="Texture2D" path="res://assets/ui/expedition/portraits/portrait_xia_zhiyao.png" id="5_xia"]
+
+[sub_resource type="StyleBoxEmpty" id="Transparent"]
+
+[sub_resource type="SystemFont" id="Body"]
+font_names = PackedStringArray("SimHei", "Heiti SC", "Noto Sans CJK SC")
+font_weight = 400
+
+[sub_resource type="FontVariation" id="Strong"]
+base_font = SubResource("Body")
+variation_embolden = 0.4
+
+[sub_resource type="Theme" id="RosterTheme"]
+default_font = SubResource("Strong")
+default_font_size = 13
+Label/colors/font_color = Color(0.87, 0.94, 1, 1)
+
+[sub_resource type="AtlasTexture" id="SuPortrait"]
+atlas = ExtResource("4_su")
+region = Rect2(40, 10, 112, 112)
+
+[sub_resource type="AtlasTexture" id="XiaPortrait"]
+atlas = ExtResource("5_xia")
+region = Rect2(40, 10, 112, 112)
 
 [node name="M04_SurvivorRoster" type="Panel"]
+offset_right = 118.0
+offset_bottom = 436.0
+mouse_filter = 0
+texture_filter = 2
+theme = SubResource("RosterTheme")
+theme_override_styles/panel = SubResource("Transparent")
+script = ExtResource("1_script")
+
+[node name="Background" type="TextureRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_background")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Header" type="Control" parent="."]
+offset_right = 118.0
+offset_bottom = 34.0
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Header"]
+offset_left = 12.0
+offset_top = 6.0
+offset_right = 68.0
+offset_bottom = 32.0
+mouse_filter = 2
+text = "幸存者"
+vertical_alignment = 1
+
+[node name="Count" type="Label" parent="Header"]
+offset_left = 73.0
+offset_top = 6.0
+offset_right = 106.0
+offset_bottom = 32.0
+mouse_filter = 2
+text = "4/4"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="Slot01" parent="." instance=ExtResource("3_slot")]
+offset_left = 12.0
+offset_top = 42.0
+offset_right = 106.0
+offset_bottom = 136.0
+
+[node name="PortraitTexture" parent="Slot01" index="0"]
+texture = SubResource("SuPortrait")
+
+[node name="Slot02" parent="." instance=ExtResource("3_slot")]
+offset_left = 12.0
+offset_top = 138.0
+offset_right = 106.0
+offset_bottom = 232.0
+
+[node name="PortraitTexture" parent="Slot02" index="0"]
+texture = SubResource("XiaPortrait")
+
+[node name="Slot03" parent="." instance=ExtResource("3_slot")]
+offset_left = 12.0
+offset_top = 234.0
+offset_right = 106.0
+offset_bottom = 328.0
+
+[node name="PortraitTexture" parent="Slot03" index="0"]
+texture = SubResource("SuPortrait")
+
+[node name="Slot04" parent="." instance=ExtResource("3_slot")]
+offset_left = 12.0
+offset_top = 330.0
 offset_right = 106.0
 offset_bottom = 424.0
-mouse_filter = 0
-theme = ExtResource("1")
 
-[node name="ModuleName" type="Label" parent="."]
-offset_left = 8.0
-offset_top = 3.0
-offset_right = 98.0
-offset_bottom = 44.0
-theme_override_font_sizes/font_size = 12
-text = "M04\nSurvivor Roster"
-mouse_filter = 2
+[node name="PortraitTexture" parent="Slot04" index="0"]
+texture = SubResource("XiaPortrait")
 
-[node name="Count" type="Panel" parent="."]
-offset_left = 6.0
-offset_top = 48.0
-offset_right = 100.0
-offset_bottom = 72.0
-mouse_filter = 2
+[editable path="Slot01"]
 
-[node name="Label" type="Label" parent="Count"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 3.0
-offset_right = -3.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-theme_override_font_sizes/font_size = 12
-text = "Count -- / --"
-horizontal_alignment = 1
-vertical_alignment = 1
-autowrap_mode = 3
+[editable path="Slot02"]
 
-[node name="Portrait01" type="Panel" parent="."]
-offset_left = 10.0
-offset_top = 80.0
-offset_right = 96.0
-offset_bottom = 156.0
-mouse_filter = 2
+[editable path="Slot03"]
 
-[node name="Label" type="Label" parent="Portrait01"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 3.0
-offset_right = -3.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-theme_override_font_sizes/font_size = 12
-text = "Portrait 01"
-horizontal_alignment = 1
-vertical_alignment = 1
-autowrap_mode = 3
-
-[node name="Portrait02" type="Panel" parent="."]
-offset_left = 10.0
-offset_top = 164.0
-offset_right = 96.0
-offset_bottom = 240.0
-mouse_filter = 2
-
-[node name="Label" type="Label" parent="Portrait02"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 3.0
-offset_right = -3.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-theme_override_font_sizes/font_size = 12
-text = "Portrait 02"
-horizontal_alignment = 1
-vertical_alignment = 1
-autowrap_mode = 3
-
-[node name="Portrait03" type="Panel" parent="."]
-offset_left = 10.0
-offset_top = 248.0
-offset_right = 96.0
-offset_bottom = 324.0
-mouse_filter = 2
-
-[node name="Label" type="Label" parent="Portrait03"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 3.0
-offset_right = -3.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-theme_override_font_sizes/font_size = 12
-text = "Portrait 03"
-horizontal_alignment = 1
-vertical_alignment = 1
-autowrap_mode = 3
-
-[node name="Portrait04" type="Panel" parent="."]
-offset_left = 10.0
-offset_top = 332.0
-offset_right = 96.0
-offset_bottom = 412.0
-mouse_filter = 2
-
-[node name="Label" type="Label" parent="Portrait04"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 3.0
-offset_right = -3.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-theme_override_font_sizes/font_size = 12
-text = "Portrait 04"
-horizontal_alignment = 1
-vertical_alignment = 1
-autowrap_mode = 3
+[editable path="Slot04"]

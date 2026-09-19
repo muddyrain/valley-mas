@@ -1,11 +1,13 @@
 extends Control
-## Layout-only shell. Each direct child is an independently replaceable module.
+## Independent modules; the root routes presentation selection without campaign writes.
 
 signal depart_requested
 signal menu_requested
 
 const REFERENCE := Vector2(1600, 900)
+const DetailFixtures = preload("res://ui/camp_hud/survivor_detail_fixtures.gd")
 
+var selected_survivor_id: Variant = null
 var _modules: Array[Control] = []
 var _rects: Array[Rect2] = []
 var _anchors: Array[Vector2] = []
@@ -17,13 +19,23 @@ func _ready() -> void:
 		_rects.append(Rect2(Vector2(module.offset_left, module.offset_top), module.size))
 		_anchors.append(Vector2(module.anchor_left, module.anchor_top))
 	resized.connect(_layout)
+	$M05_SurvivorDetail.hide()
+	$M04_SurvivorRoster.selection_changed.connect(_select_survivor)
 	$M08_DepartAction/Entry.pressed.connect(func(): depart_requested.emit())
 	$M09_Utility/Entry.pressed.connect(func(): menu_requested.emit())
 	_layout()
 
 func set_hud_visible(value: bool) -> void:
 	for module: Control in _modules:
-		module.visible = value
+		module.visible = value and (module != $M05_SurvivorDetail or selected_survivor_id != null)
+
+func _select_survivor(index: int) -> void:
+	var data: Dictionary = DetailFixtures.get_survivor(index)
+	if data.is_empty():
+		return
+	selected_survivor_id = data.id
+	$M05_SurvivorDetail.show_survivor(data)
+	$M05_SurvivorDetail.show()
 
 func lock_departure() -> void:
 	set_hud_visible(true)

@@ -1,0 +1,80 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m04/m04_portrait_frame_normal.png" id="1_frame"]
+[ext_resource type="Script" path="res://ui/camp_hud/portrait_slot.gd" id="2_script"]
+
+[sub_resource type="StyleBoxEmpty" id="Empty"]
+
+[sub_resource type="StyleBoxFlat" id="Dot"]
+bg_color = Color(0.37, 0.79, 0.96, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_left = 2
+corner_radius_bottom_right = 2
+corner_detail = 8
+
+[node name="PortraitSlot" type="Button"]
+script = ExtResource("2_script")
+offset_right = 94.0
+offset_bottom = 94.0
+mouse_default_cursor_shape = 2
+theme_override_styles/normal = SubResource("Empty")
+theme_override_styles/hover = SubResource("Empty")
+theme_override_styles/pressed = SubResource("Empty")
+theme_override_styles/focus = SubResource("Empty")
+theme_override_styles/disabled = SubResource("Empty")
+
+[node name="PortraitTexture" type="TextureRect" parent="."]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 86.0
+offset_bottom = 86.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="FrameTexture" type="TextureRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("1_frame")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="StatusDots" type="Control" parent="."]
+offset_left = 12.0
+offset_top = 78.0
+offset_right = 34.0
+offset_bottom = 82.0
+mouse_filter = 2
+
+[node name="Dot1" type="Panel" parent="StatusDots"]
+offset_left = 0.0
+offset_right = 4.0
+offset_bottom = 4.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("Dot")
+
+[node name="Dot2" type="Panel" parent="StatusDots"]
+offset_left = 6.0
+offset_right = 10.0
+offset_bottom = 4.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("Dot")
+
+[node name="Dot3" type="Panel" parent="StatusDots"]
+offset_left = 12.0
+offset_right = 16.0
+offset_bottom = 4.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("Dot")
+
+[node name="Dot4" type="Panel" parent="StatusDots"]
+offset_left = 18.0
+offset_right = 22.0
+offset_bottom = 4.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("Dot")

@@ -1,87 +1,216 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=12 format=3]
 
-[ext_resource type="Theme" path="res://ui/camp_hud/placeholder_theme.tres" id="1"]
+[ext_resource type="Theme" path="res://ui/camp_hud/placeholder_theme.tres" id="1_theme"]
+[ext_resource type="Script" path="res://ui/camp_hud/camp_action_rail.gd" id="2_script"]
+[ext_resource type="Script" path="res://ui/camp_hud/m06_action_button.gd" id="3_button"]
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m06/m06_action_button_bg.png" id="4_bg"]
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m06/m06_action_button_hover_glow.png" id="5_glow"]
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m06/m06_action_button_disabled_bg.png" id="6_disabled"]
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m06/m06_icon_temporary_buff.png" id="7_temp"]
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m06/m06_icon_medical_support.png" id="8_med"]
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m06/m06_icon_locked.png" id="9_locked"]
+[ext_resource type="Texture2D" path="res://assets/ui/camp/m06/m06_keycap_bg.png" id="10_key"]
+
+[sub_resource type="StyleBoxEmpty" id="Empty"]
 
 [node name="M06_CampActionRail" type="Panel"]
 offset_right = 112.0
 offset_bottom = 330.0
-mouse_filter = 0
-theme = ExtResource("1")
+mouse_filter = 1
+theme_override_styles/panel = SubResource("Empty")
+script = ExtResource("2_script")
 
 [node name="ModuleName" type="Label" parent="."]
 offset_left = 8.0
-offset_top = 3.0
+offset_top = 2.0
 offset_right = 104.0
-offset_bottom = 44.0
-theme_override_font_sizes/font_size = 12
-text = "M06\nCamp Action Rail"
+offset_bottom = 40.0
+theme_override_font_sizes/font_size = 11
+text = "M06  Camp Actions"
+visible = false
 mouse_filter = 2
-
-[node name="TemporaryBuff" type="Panel" parent="."]
+[node name="TemporaryBuff" type="Button" parent="."]
 offset_left = 8.0
-offset_top = 52.0
+offset_top = 44.0
 offset_right = 104.0
-offset_bottom = 128.0
+offset_bottom = 136.0
+mouse_default_cursor_shape = 2
+mouse_filter = 0
+theme_override_styles/normal = SubResource("Empty")
+theme_override_styles/hover = SubResource("Empty")
+theme_override_styles/pressed = SubResource("Empty")
+theme_override_styles/focus = SubResource("Empty")
+script = ExtResource("3_button")
+
+[node name="ButtonBG" type="TextureRect" parent="TemporaryBuff"]
+offset_left = 7.0
+offset_right = 89.0
+offset_bottom = 82.0
+mouse_filter = 2
+texture = ExtResource("4_bg")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="HoverGlow" type="TextureRect" parent="TemporaryBuff"]
+offset_left = 3.0
+offset_top = -2.0
+offset_right = 93.0
+offset_bottom = 88.0
+mouse_filter = 2
+texture = ExtResource("5_glow")
+expand_mode = 1
+stretch_mode = 5
+modulate = Color(1, 1, 1, 0)
+
+[node name="Icon" type="TextureRect" parent="TemporaryBuff"]
+offset_left = 33.0
+offset_top = 26.0
+offset_right = 63.0
+offset_bottom = 56.0
+mouse_filter = 2
+texture = ExtResource("7_temp")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Keycap" type="TextureRect" parent="TemporaryBuff"]
+offset_left = 67.0
+offset_top = 56.0
+offset_right = 89.0
+offset_bottom = 78.0
+mouse_filter = 2
+texture = ExtResource("10_key")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="KeyLabel" type="Label" parent="TemporaryBuff"]
+offset_left = 67.0
+offset_top = 56.0
+offset_right = 89.0
+offset_bottom = 78.0
+theme_override_colors/font_color = Color(0.08, 0.16, 0.22, 1)
+theme_override_font_sizes/font_size = 11
+text = "Q"
+horizontal_alignment = 1
+vertical_alignment = 1
 mouse_filter = 2
 
 [node name="Label" type="Label" parent="TemporaryBuff"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 3.0
-offset_right = -3.0
-grow_horizontal = 2
-grow_vertical = 2
+offset_left = 0.0
+offset_top = 80.0
+offset_right = 96.0
+offset_bottom = 92.0
+theme_override_font_sizes/font_size = 11
+text = "临时增益"
+horizontal_alignment = 1
 mouse_filter = 2
-theme_override_font_sizes/font_size = 12
-text = "Temporary buff"
+[node name="MedicalSupport" type="Button" parent="."]
+offset_left = 8.0
+offset_top = 140.0
+offset_right = 104.0
+offset_bottom = 232.0
+mouse_default_cursor_shape = 2
+mouse_filter = 0
+theme_override_styles/normal = SubResource("Empty")
+theme_override_styles/hover = SubResource("Empty")
+theme_override_styles/pressed = SubResource("Empty")
+theme_override_styles/focus = SubResource("Empty")
+script = ExtResource("3_button")
+
+[node name="ButtonBG" type="TextureRect" parent="MedicalSupport"]
+offset_left = 7.0
+offset_right = 89.0
+offset_bottom = 82.0
+mouse_filter = 2
+texture = ExtResource("4_bg")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="HoverGlow" type="TextureRect" parent="MedicalSupport"]
+offset_left = 3.0
+offset_top = -2.0
+offset_right = 93.0
+offset_bottom = 88.0
+mouse_filter = 2
+texture = ExtResource("5_glow")
+expand_mode = 1
+stretch_mode = 5
+modulate = Color(1, 1, 1, 0)
+
+[node name="Icon" type="TextureRect" parent="MedicalSupport"]
+offset_left = 33.0
+offset_top = 26.0
+offset_right = 63.0
+offset_bottom = 56.0
+mouse_filter = 2
+texture = ExtResource("8_med")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Keycap" type="TextureRect" parent="MedicalSupport"]
+offset_left = 67.0
+offset_top = 56.0
+offset_right = 89.0
+offset_bottom = 78.0
+mouse_filter = 2
+texture = ExtResource("10_key")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="KeyLabel" type="Label" parent="MedicalSupport"]
+offset_left = 67.0
+offset_top = 56.0
+offset_right = 89.0
+offset_bottom = 78.0
+theme_override_colors/font_color = Color(0.08, 0.16, 0.22, 1)
+theme_override_font_sizes/font_size = 11
+text = "E"
 horizontal_alignment = 1
 vertical_alignment = 1
-autowrap_mode = 3
-
-[node name="MedicalSupport" type="Panel" parent="."]
-offset_left = 8.0
-offset_top = 142.0
-offset_right = 104.0
-offset_bottom = 218.0
 mouse_filter = 2
 
 [node name="Label" type="Label" parent="MedicalSupport"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 3.0
-offset_right = -3.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-theme_override_font_sizes/font_size = 12
-text = "Medical support"
+offset_left = 0.0
+offset_top = 80.0
+offset_right = 96.0
+offset_bottom = 92.0
+theme_override_font_sizes/font_size = 11
+text = "医疗支援"
 horizontal_alignment = 1
-vertical_alignment = 1
-autowrap_mode = 3
-
-[node name="LockedSlot" type="Panel" parent="."]
+mouse_filter = 2
+[node name="LockedAction" type="Panel" parent="."]
 offset_left = 8.0
-offset_top = 232.0
+offset_top = 236.0
 offset_right = 104.0
-offset_bottom = 320.0
+offset_bottom = 328.0
 mouse_filter = 2
+theme_override_styles/panel = SubResource("Empty")
 
-[node name="Label" type="Label" parent="LockedSlot"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 3.0
-offset_right = -3.0
-grow_horizontal = 2
-grow_vertical = 2
+[node name="ButtonBG" type="TextureRect" parent="LockedAction"]
+offset_left = 7.0
+offset_right = 89.0
+offset_bottom = 82.0
 mouse_filter = 2
-theme_override_font_sizes/font_size = 12
-text = "Locked slot"
+texture = ExtResource("6_disabled")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Icon" type="TextureRect" parent="LockedAction"]
+offset_left = 33.0
+offset_top = 26.0
+offset_right = 63.0
+offset_bottom = 56.0
+mouse_filter = 2
+texture = ExtResource("9_locked")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="LockedAction"]
+offset_left = 0.0
+offset_top = 80.0
+offset_right = 96.0
+offset_bottom = 92.0
+theme_override_font_sizes/font_size = 11
+text = "后续解锁\n敬请期待"
 horizontal_alignment = 1
 vertical_alignment = 1
-autowrap_mode = 3
+mouse_filter = 2

@@ -47,7 +47,7 @@ func run() -> void:
 	check(not app.camp_ui.get_node("M05_SurvivorDetail").visible, "HUD yields to the existing overlay")
 	await key(KEY_ESCAPE)
 	await frames(20)
-	check(app.state == "shelter" and app.camp_ui.get_node("M05_SurvivorDetail").visible, "Escape restores the skeleton")
+	check(app.state == "shelter" and not app.camp_ui.get_node("M05_SurvivorDetail").visible, "Escape preserves the unselected hidden detail")
 	check(app.camp_view.camp == camp and app.camp_view.camera.global_transform == camera, "Overlay preserves Camp and camera")
 	await key(KEY_F1)
 	app.select_member(app.campaign.data.members[0])
@@ -82,11 +82,12 @@ func verify_layout(hud: Control, dimensions: Vector2i) -> void:
 	for index: int in range(modules.size()):
 		var module := modules[index] as Control
 		var rect := module.get_global_rect()
-		check(module.is_visible_in_tree() and screen_rect.encloses(rect), module.name + " visible inside " + str(dimensions))
+		var expected_visible: bool = module.name != "M05_SurvivorDetail" or hud.selected_survivor_id != null
+		check(module.is_visible_in_tree() == expected_visible and screen_rect.encloses(rect), module.name + " expected visibility inside " + str(dimensions))
 		rectangles[module.name] = [rect.position.x, rect.position.y, rect.size.x, rect.size.y]
 		for other: Node in modules.slice(index + 1):
 			check(not rect.intersects((other as Control).get_global_rect()), module.name + " does not overlap " + other.name)
-		if module.name not in ["M01_CampIdentity", "M02_TimeStatus", "M03_ResourceBar"]:
+		if module.name not in ["M01_CampIdentity", "M02_TimeStatus", "M03_ResourceBar", "M04_SurvivorRoster", "M05_SurvivorDetail", "M06_CampActionRail"]:
 			check(module.find_children("*", "TextureRect", true, false).is_empty(), module.name + " has no artwork")
 	var middle := Rect2(Vector2(dimensions) * Vector2(0.17, 0.15), Vector2(dimensions) * Vector2(0.49, 0.61))
 	check(modules.all(func(module: Control) -> bool: return not module.get_global_rect().intersects(middle)), "Central world stays unobstructed at " + str(dimensions))
