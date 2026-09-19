@@ -42,7 +42,12 @@ theme_override_styles/pressed = SubResource("Empty")
 theme_override_styles/focus = SubResource("Empty")
 script = ExtResource("3_button")
 
-[node name="ButtonBG" type="TextureRect" parent="TemporaryBuff"]
+[node name="VisualRoot" type="Control" parent="TemporaryBuff"]
+offset_right = 96.0
+offset_bottom = 92.0
+mouse_filter = 2
+
+[node name="NormalTexture" type="TextureRect" parent="TemporaryBuff/VisualRoot"]
 offset_left = 7.0
 offset_right = 89.0
 offset_bottom = 82.0
@@ -51,7 +56,7 @@ texture = ExtResource("4_bg")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="HoverGlow" type="TextureRect" parent="TemporaryBuff"]
+[node name="HoverTexture" type="TextureRect" parent="TemporaryBuff/VisualRoot"]
 offset_left = 3.0
 offset_top = -2.0
 offset_right = 93.0
@@ -62,7 +67,7 @@ expand_mode = 1
 stretch_mode = 5
 modulate = Color(1, 1, 1, 0)
 
-[node name="Icon" type="TextureRect" parent="TemporaryBuff"]
+[node name="Icon" type="TextureRect" parent="TemporaryBuff/VisualRoot"]
 offset_left = 33.0
 offset_top = 26.0
 offset_right = 63.0
@@ -72,7 +77,7 @@ texture = ExtResource("7_temp")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Keycap" type="TextureRect" parent="TemporaryBuff"]
+[node name="Keycap" type="TextureRect" parent="TemporaryBuff/VisualRoot"]
 offset_left = 67.0
 offset_top = 56.0
 offset_right = 89.0
@@ -82,7 +87,7 @@ texture = ExtResource("10_key")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="KeyLabel" type="Label" parent="TemporaryBuff"]
+[node name="KeyLabel" type="Label" parent="TemporaryBuff/VisualRoot"]
 offset_left = 67.0
 offset_top = 56.0
 offset_right = 89.0
@@ -94,7 +99,7 @@ horizontal_alignment = 1
 vertical_alignment = 1
 mouse_filter = 2
 
-[node name="Label" type="Label" parent="TemporaryBuff"]
+[node name="Label" type="Label" parent="TemporaryBuff/VisualRoot"]
 offset_left = 0.0
 offset_top = 80.0
 offset_right = 96.0
@@ -116,7 +121,12 @@ theme_override_styles/pressed = SubResource("Empty")
 theme_override_styles/focus = SubResource("Empty")
 script = ExtResource("3_button")
 
-[node name="ButtonBG" type="TextureRect" parent="MedicalSupport"]
+[node name="VisualRoot" type="Control" parent="MedicalSupport"]
+offset_right = 96.0
+offset_bottom = 92.0
+mouse_filter = 2
+
+[node name="NormalTexture" type="TextureRect" parent="MedicalSupport/VisualRoot"]
 offset_left = 7.0
 offset_right = 89.0
 offset_bottom = 82.0
@@ -125,7 +135,7 @@ texture = ExtResource("4_bg")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="HoverGlow" type="TextureRect" parent="MedicalSupport"]
+[node name="HoverTexture" type="TextureRect" parent="MedicalSupport/VisualRoot"]
 offset_left = 3.0
 offset_top = -2.0
 offset_right = 93.0
@@ -136,7 +146,7 @@ expand_mode = 1
 stretch_mode = 5
 modulate = Color(1, 1, 1, 0)
 
-[node name="Icon" type="TextureRect" parent="MedicalSupport"]
+[node name="Icon" type="TextureRect" parent="MedicalSupport/VisualRoot"]
 offset_left = 33.0
 offset_top = 26.0
 offset_right = 63.0
@@ -146,7 +156,7 @@ texture = ExtResource("8_med")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Keycap" type="TextureRect" parent="MedicalSupport"]
+[node name="Keycap" type="TextureRect" parent="MedicalSupport/VisualRoot"]
 offset_left = 67.0
 offset_top = 56.0
 offset_right = 89.0
@@ -156,7 +166,7 @@ texture = ExtResource("10_key")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="KeyLabel" type="Label" parent="MedicalSupport"]
+[node name="KeyLabel" type="Label" parent="MedicalSupport/VisualRoot"]
 offset_left = 67.0
 offset_top = 56.0
 offset_right = 89.0
@@ -168,7 +178,7 @@ horizontal_alignment = 1
 vertical_alignment = 1
 mouse_filter = 2
 
-[node name="Label" type="Label" parent="MedicalSupport"]
+[node name="Label" type="Label" parent="MedicalSupport/VisualRoot"]
 offset_left = 0.0
 offset_top = 80.0
 offset_right = 96.0
@@ -185,7 +195,12 @@ offset_bottom = 328.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("Empty")
 
-[node name="ButtonBG" type="TextureRect" parent="LockedAction"]
+[node name="VisualRoot" type="Control" parent="LockedAction"]
+offset_right = 96.0
+offset_bottom = 92.0
+mouse_filter = 2
+
+[node name="NormalTexture" type="TextureRect" parent="LockedAction/VisualRoot"]
 offset_left = 7.0
 offset_right = 89.0
 offset_bottom = 82.0
@@ -194,7 +209,7 @@ texture = ExtResource("6_disabled")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Icon" type="TextureRect" parent="LockedAction"]
+[node name="Icon" type="TextureRect" parent="LockedAction/VisualRoot"]
 offset_left = 33.0
 offset_top = 26.0
 offset_right = 63.0
@@ -204,7 +219,7 @@ texture = ExtResource("9_locked")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Label" type="Label" parent="LockedAction"]
+[node name="Label" type="Label" parent="LockedAction/VisualRoot"]
 offset_left = 0.0
 offset_top = 80.0
 offset_right = 96.0

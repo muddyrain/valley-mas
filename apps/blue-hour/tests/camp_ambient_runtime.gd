@@ -51,7 +51,7 @@ func run() -> void:
 	app.campaign.new_run(77, "", ["xia_zhiyao", "su_wanxing"])
 	app.show_shelter()
 	await frames(20)
-	await key(KEY_ESCAPE)
+	# Camp is already visible; Escape now returns to the main menu.
 	camp = app.camp_view.camp
 	ambient = camp.ambient_behavior
 	check(camp.members.size() == 2, "Actual two-member Camp")

@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dihlylf4w5t3m"
-path="res://.godot/imported/m06_icon_temporary_buff.png-bbd541b8e85a24c3ff3616ee2829fc97.ctex"
+path="res://.godot/imported/m06_icon_temporary_buff.png-9e592d11caea3869e10aabf7cb12c01b.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/ui/camp/m06/m06_icon_temporary_buff.png"
-dest_files=["res://.godot/imported/m06_icon_temporary_buff.png-bbd541b8e85a24c3ff3616ee2829fc97.ctex"]
+dest_files=["res://.godot/imported/m06_icon_temporary_buff.png-9e592d11caea3869e10aabf7cb12c01b.ctex"]
 
 [params]
 
