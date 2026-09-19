@@ -38,6 +38,43 @@ func build(map: Resource) -> void:
 	marker = HudMarker.create(self, "world_move_marker", 1.05, data.bus_position)
 	marker.visible = false
 
+func build_runtime_bounds(bounds: Rect2, bus_position: Vector3, map: Resource) -> void:
+	data = map
+	grid.region = Rect2i(floori(bounds.position.x), floori(bounds.position.y), ceili(bounds.size.x), ceili(bounds.size.y))
+	grid.cell_size = Vector2.ONE
+	grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
+	grid.update()
+	var ground := StaticBody3D.new()
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(bounds.size.x, 0.2, bounds.size.y)
+	collision.shape = shape
+	ground.add_child(collision)
+	ground.position = Vector3(bounds.get_center().x, -0.15, bounds.get_center().y)
+	add_child(ground)
+	marker = HudMarker.create(self, "world_move_marker", 1.05, bus_position)
+	marker.visible = false
+	var label := Visuals.label(self, "归航巴士", bus_position + Vector3(0, 2.4, 0), Color("#ffe1a5"), 22)
+	label.pixel_size = .022
+	label.outline_size = 2
+	bus_label = label
+	bus_door = Node3D.new()
+	bus_root = Node3D.new()
+	bus_root.position = bus_position
+	add_child(bus_root)
+	var return_zone := HudMarker.create(self, "world_select_ring", 8.0, bus_position + Vector3(0, 0.06, 0), true)
+	return_zone.name = "ReturnZone"
+	return_zone.material_override.albedo_color = Color("#f4d397")
+	var bus_marker := HudMarker.create(self, "icon_return", .85, bus_position + Vector3.UP * 3.1)
+	bus_marker.name = "BusMarker"
+	bus_light = OmniLight3D.new()
+	bus_light.position = bus_position + Vector3(0, 3.5, 0)
+	bus_light.light_color = Color("#E8B36A")
+	bus_light.omni_range = 10.0
+	bus_light.light_energy = 0.0
+	bus_light.shadow_enabled = false
+	add_child(bus_light)
+
 func register_site(spec: Dictionary, body: Node3D, vehicle: bool) -> void:
 	var root := Node3D.new()
 	root.name = "Search_" + spec.id

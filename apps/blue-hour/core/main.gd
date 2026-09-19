@@ -541,9 +541,11 @@ func _mission_config(action_id: String) -> Dictionary:
 			mission_type = "food_supply"
 		"airdrop":
 			mission_type = "rescue"
-	var runtime_nonce: int = int(Time.get_ticks_usec() & 0x7fffffff)
-	var runtime_seed: int = int(campaign.data.seed) + int(campaign.data.day) * 7919 + random_mission_counter * 104729 + runtime_nonce
-	return {"use_random_map": true, "mission_type": mission_type, "seed": runtime_seed, "layout": layout, "district_size": layout, "zombie_density": 1.0, "required_poi_tags": []}
+	var map_seed: int = int(campaign.data.seed) + int(campaign.data.day) * 7919 + random_mission_counter * 104729
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--map-seed="):
+			map_seed = int(arg.trim_prefix("--map-seed="))
+	return {"map_provider": "MEDIUM_TOWN_V1", "use_random_map": false, "mission_type": mission_type, "map_seed": map_seed, "seed": map_seed, "layout": layout, "district_size": layout, "zombie_density": 1.0, "required_poi_tags": []}
 
 func _mission_complete(outcome: Dictionary) -> void:
 	if not campaign.stage_result(outcome):

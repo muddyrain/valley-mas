@@ -5,6 +5,8 @@ signal search_completed(id: String, worker_name: String, loot: Dictionary)
 signal search_cancelled(id: String)
 signal search_loot_collected(id: String, worker_name: String, loot: Dictionary)
 signal watch_warning_changed(active: bool)
+signal navigation_ready
+signal command_rejected(reason: String)
 const City = preload("res://maps/city.gd")
 const Survivor = preload("res://survivors/survivor.gd")
 const Clock = preload("res://time/mission_clock.gd")
@@ -22,6 +24,7 @@ const EncounterDirector = preload("res://encounter/encounter_director.gd")
 const LootResolver = preload("res://core/loot_resolver.gd")
 const NoiseSystem = preload("res://encounter/noise_system.gd")
 const RandomMapGenerator = preload("res://maps/random/random_map_generator.gd")
+const MapProvider = preload("res://maps/expedition/expedition_map_provider.gd")
 var encounter: RefCounted
 var noise: RefCounted
 var arrival_noise_pending: bool = true
@@ -87,9 +90,17 @@ var generated_instance_id: int = 0
 var manual_aim := false
 var aim_point := Vector3.ZERO
 var world_interaction_vfx: Node3D
+var runtime_data: Dictionary = {}
+var map_provider: String = MapProvider.FIXED_LEGACY
+var town_runtime_root: Node3D
+var town_runtime_ready: bool = false
+var survivor_commands_enabled: bool = false
+var last_command_rejection: String = ""
 
 func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], seed_value: int = 0, run_state: RefCounted = null, locked_party: Array[String] = [], map_config: Dictionary = {}) -> void:
 	generated_map.clear()
+	runtime_data.clear()
+	town_runtime_ready = false
 	generated_instance_id = get_instance_id()
 	catalog = content
 	ledger = resources
@@ -100,6 +111,18 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 	rally_point = catalog.map.bus_position
 	random_map_config = map_config.duplicate(true)
 	mission_type = str(random_map_config.get("mission_type", "supply_search"))
+	map_provider = str(random_map_config.get("map_provider", MapProvider.FIXED_LEGACY))
+	if map_provider == MapProvider.MEDIUM_TOWN_V1:
+		var bridge := MapProvider.create_runtime(map_provider, mission_type, int(random_map_config.get("map_seed", seed_value)), catalog.map, self)
+		if not bool(bridge.get("ok", false)):
+			push_error("[ExpeditionMapProvider] " + str(bridge.get("error", "Bridge failed")))
+			return
+		runtime_data = bridge.runtime
+		town_runtime_root = bridge.get("root") as Node3D
+		town_runtime_root.navigation_ready.connect(_on_navigation_ready)
+		town_runtime_ready = true
+		catalog.map = bridge.map
+		rally_point = runtime_data.arrival_point
 	if bool(random_map_config.get("use_random_map", false)):
 		var generated := RandomMapGenerator.generate(str(random_map_config.get("mission_type", "supply_search")), int(random_map_config.get("seed", seed_value)), str(random_map_config.get("layout", "")), float(random_map_config.get("zombie_density", 1.0)))
 		if generated.get("ok", false):
@@ -116,9 +139,12 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 	var clock_rules: Resource = catalog.map.duplicate()
 	clock_rules.day_seconds += effects.amount("day_extension")
 	clock = Clock.new(clock_rules)
-	city = City.new()
-	add_child(city)
-	city.build(catalog.map)
+	if town_runtime_ready:
+		city = town_runtime_root
+		director_enabled = false
+	else:
+		var legacy_bridge := MapProvider.create_runtime(MapProvider.FIXED_LEGACY, mission_type, seed_value, catalog.map, self)
+		city = legacy_bridge.root
 	atmosphere = Atmosphere.new()
 	add_child(atmosphere)
 	atmosphere.setup(city)
@@ -152,11 +178,16 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 		survivor.setup(spec, talent, equipment)
 		survivor.enable_motion_presentation(self)
 		survivor.effects = effects
-		survivor.position = catalog.map.bus_position + formation(survivors.size())
+		var spawn_origin: Vector3 = runtime_data.arrival_point if town_runtime_ready else catalog.map.bus_position
+		var town_positions: Array[Vector3] = []
+		if town_runtime_ready:
+			town_positions = town_runtime_root.spawn_positions(member_ids.size())
+		survivor.position = town_positions[survivors.size()] if survivors.size() < town_positions.size() else spawn_origin + formation(survivors.size())
 		survivors.append(survivor)
 	encounter = EncounterDirector.new()
 	encounter.setup(catalog.map.encounter, rng.seed)
-	encounter.seed_population(self)
+	if not town_runtime_ready:
+		encounter.seed_population(self)
 	noise = NoiseSystem.new(catalog.map.encounter)
 	noise.noise_emitted.connect(_on_noise)
 	clock.phase_changed.connect(_on_phase)
@@ -177,6 +208,17 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 		encounter_debug = preload("res://debug/encounter_debug.gd").new()
 		add_child(encounter_debug)
 		encounter_debug.setup(self)
+	survivor_commands_enabled = not town_runtime_ready
+
+func _on_navigation_ready() -> void:
+	survivor_commands_enabled = true
+	town_runtime_root.lifecycle.append("survivor_commands_enabled")
+	navigation_ready.emit()
+
+func _reject_move(reason: String) -> bool:
+	last_command_rejection = reason
+	command_rejected.emit(reason)
+	return false
 
 func _apply_generated_map(map: Resource, generated: Dictionary) -> void:
 	map.id = "random_" + str(generated.layout)
@@ -212,6 +254,10 @@ func formation(index: int) -> Vector3:
 	return [Vector3(-1.2, 0, 0), Vector3(1.2, 0, 0), Vector3(0, 0, -1.4), Vector3(0, 0, 1.4)][index % 4]
 
 func begin_arrival() -> void:
+	# The fixed-map cutscene rewrites spawn and moves its bus along world X.
+	# Town already spawned at its generated exit; E05 owns that cutscene bridge.
+	if town_runtime_ready:
+		return
 	arrival = preload("res://encounter/mission_arrival.gd").new()
 	arrival.setup(self)
 
@@ -238,6 +284,13 @@ func _physics_process(delta: float) -> void:
 		powers.advance(dt)
 		left = maxf(0.0, left - dt)
 func _advance_world(dt: float) -> void:
+	if town_runtime_ready:
+		if survivor_commands_enabled:
+			for survivor: Node3D in survivors:
+				survivor.tick(dt, self)
+		if exploration != null:
+			exploration.advance(dt)
+		return
 	if noise != null:
 		noise.advance(dt)
 	if arrival != null and not arrival.finished:
@@ -300,6 +353,33 @@ func _sync_watch_warning() -> void:
 
 func movement_speed(member: Node3D, waypoint: Vector3, delta: float) -> float:
 	var speed: float = member.data.move_speed * effects.multiplier("move_speed") * (1.0 + member.weapon.move_speed_modifier if member.weapon != null else 1.0)
+	if town_runtime_ready:
+		# Keep a following gap on a shared corridor without moving actors off their
+		# collision-checked paths or introducing a crowd physics / RVO system.
+		var heading: Vector3 = (waypoint - member.position).normalized()
+		for other: Node3D in survivors:
+			if other == member or other.dead or other.path.is_empty():
+				continue
+			var offset: Vector3 = other.position - member.position
+			var ahead: float = offset.dot(heading)
+			var lateral: float = (offset - heading * ahead).length()
+			var other_heading: Vector3 = (other.path[0] - other.position).normalized()
+			var follows: bool = heading.dot(other_heading) > 0.5
+			var yields: bool = survivors.find(member) > survivors.find(other)
+			if ahead > 0.0 and lateral < 1.1 and (follows or yields):
+				speed = minf(speed, maxf(0.0, (ahead - 1.2) * 2.0))
+			if not follows:
+				var a: Vector2 = Vector2(member.position.x, member.position.z)
+				var b: Vector2 = Vector2(other.position.x, other.position.z)
+				var end_a: Vector3 = member.position.move_toward(waypoint, 4.0)
+				var end_b: Vector3 = other.position.move_toward(other.path[0], 4.0)
+				var crossing: Variant = Geometry2D.segment_intersects_segment(a, Vector2(end_a.x, end_a.z), b, Vector2(end_b.x, end_b.z))
+				if crossing != null:
+					var distance_a: float = a.distance_to(crossing)
+					var distance_b: float = b.distance_to(crossing)
+					if distance_a > distance_b + .05 or (absf(distance_a - distance_b) <= .05 and yields):
+						speed = minf(speed, maxf(0.0, (distance_a - 1.0) * 2.0))
+		return speed
 	if not watch_warning_active or member.dead or member.boarding or delta <= 0:
 		return speed
 	var offset: Vector3 = waypoint - member.position
@@ -475,14 +555,31 @@ func command_move(point: Vector3) -> bool:
 	return _move_members(point, move_command_members())
 
 func _move_members(point: Vector3, members: Array[Node3D]) -> bool:
+	if town_runtime_ready and not survivor_commands_enabled:
+		return _reject_move("NAVIGATION_NOT_READY")
+	if town_runtime_ready and (not point.is_finite() or not city.navigation.point_clear(point)):
+		return _reject_move("INVALID_NAVIGATION_TARGET")
 	var destination: Vector3 = city.nearest_open(point)
+	if town_runtime_ready and not destination.is_finite():
+		return _reject_move("UNREACHABLE_TARGET")
 	var orders: Array[Dictionary] = []
+	var reserved: Array[Vector3] = []
+	var reserved_paths: Array[PackedVector3Array] = []
+	var preferred: Dictionary = _town_formation_slots(destination, members) if town_runtime_ready else {}
 	for member: Node3D in members:
 		var target: Vector3 = city.nearest_open(destination + formation(survivors.find(member)))
-		if not city.path(member.position, target).is_empty():
+		if town_runtime_ready:
+			target = city.formation_target(member.position, preferred[member.get_instance_id()], reserved, reserved_paths)
+			if not target.is_finite():
+				return _reject_move("UNREACHABLE_FORMATION")
+		var route: PackedVector3Array = city.path(member.position, target)
+		if not route.is_empty():
 			orders.append({"member": member, "target": target})
+			reserved.append(target)
+			reserved_paths.append(route)
 	if orders.is_empty():
-		return false
+		return _reject_move("NO_REACHABLE_MEMBERS")
+	last_command_rejection = ""
 	_cancel_guard_order()
 	rally_point = destination
 	for move_order: Dictionary in orders:
@@ -500,6 +597,30 @@ func _move_members(point: Vector3, members: Array[Node3D]) -> bool:
 		world_interaction_vfx.play_move_feedback(destination)
 	order = "前往阵位"
 	return true
+
+func _town_formation_slots(destination: Vector3, members: Array[Node3D]) -> Dictionary:
+	# Preserve the existing formation, but assign nearest member/slot pairs first
+	# so short reorders do not force the squad to swap places through each other.
+	var remaining: Array[Node3D] = members.duplicate()
+	var slots: Array[Vector3] = []
+	for i: int in members.size():
+		slots.append(destination + formation(i))
+	var assigned: Dictionary = {}
+	while not remaining.is_empty():
+		var best_member: int = 0
+		var best_slot: int = 0
+		var distance: float = INF
+		for i: int in remaining.size():
+			for j: int in slots.size():
+				var candidate: float = remaining[i].position.distance_squared_to(slots[j])
+				if candidate < distance:
+					distance = candidate
+					best_member = i
+					best_slot = j
+		assigned[remaining[best_member].get_instance_id()] = slots[best_slot]
+		remaining.remove_at(best_member)
+		slots.remove_at(best_slot)
+	return assigned
 
 func command_stop() -> void:
 	if not active or closing_left >= 0:

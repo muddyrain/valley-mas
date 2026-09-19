@@ -1,5 +1,32 @@
 # 蓝时归航实施计划
 
+## 2026-09-19：E01.5 Fix — Local Follow Minimap + Equal Survivors
+
+- [x] 左下角固定约 70×70m、跟随所有存活出征成员平均位置；镜头和选择不改变中心，静态 Runtime 地图缓存通过变换滚动。
+- [x] 三名 Survivor 使用相同 18px 图标，仅选择圆环有差异；远处 POI / Arrival / 分散成员使用带方向的边缘标记。全镇 fit 保留为数据投影函数，不新增全图 UI。
+- [x] 四种子 Local Follow 1,810 项、Runtime Bridge 1,319 项、原生 386 项检查通过；真实选择两次、移动至 POI 再离开，66.567 秒视频与九张截图见 [修正报告](EXPEDITION_MINIMAP_LOCAL_FOLLOW.md)。
+- [x] Town/M03 冻结集、Adapter 与 E01 Navigation 未变；上轮截图/视频保留。本轮未修改并行工作的 Camp 装备面板。
+- [ ] Human Runtime QA: PENDING。E01.5 Fix TECHNICALLY COMPLETE；Windows build 已执行，仍被既有 Camp UI `member_buttons` / 左侧能力区断言阻断，未更新 EXE。
+- [ ] E02 Search: NOT STARTED；Full/Tactical Map、Enemy、Fog 重构及其他 HUD 美术重构未开始。
+
+## 2026-09-19：Expedition Integration E01.5 — Medium Town Minimap Runtime Bridge
+
+- [x] 左下角 Minimap 接入 Adapter 只读道路、建筑与地面区域；统一等比世界坐标映射，缓存静态层，每帧更新三人、Arrival 与 POI 标记；Legacy 渲染保留。
+- [x] 4101–4104 四种子：1,311 项 Headless、1,186 项原生检查通过；八张专项截图、Legacy 图与 51.467 秒真实 Survivor Arrival → POI 运动视频已生成。
+- [x] E00 58 项、E01 240 项回归通过；633 个 E01 / 622 个 M03 冻结文件和本轮 105 个附加保护文件哈希不变。详见 [E01.5 报告](EXPEDITION_MINIMAP_RUNTIME_BRIDGE.md)。
+- [ ] Human Runtime QA: PENDING；E01.5 TECHNICALLY COMPLETE，不替代人工运行时验收。
+- [ ] Windows build 已执行，Import 与 Expedition HUD 258 项等前置检查通过，仍被既有 Camp UI `member_buttons` / 左侧能力区断言阻断；本轮未更新独立 EXE。
+- [ ] E02 Search / E03 Enemy / E04 Full HUD-Minimap / E05 Blue Hour-Extraction: NOT STARTED。正式 Minimap Fog: DEFERRED_TO_E04。
+
+## 2026-09-19：Expedition Integration E01 — Navigation & Survivor Movement
+
+- [x] 用户已确认 E00 Human Runtime QA: PASS；正式 Medium Town Provider / Runtime Bridge 保留。
+- [x] 沿用 AStarGrid2D，基于运行时碰撞体建立 Town 导航；接入 ready 生命周期、不可达拒绝、三人队形与沿路径跟随间距。
+- [x] 正式 roster 的夏知遥、苏晚星、林通过实际点击移动完成 Seed 4101 Arrival → Mission POI；240 项专项与 10 项原生检查通过，八张截图及 51.467 秒原生视频已生成。E01 TECHNICALLY COMPLETE。
+- [x] E00 回归 58 项通过；633 个保护文件及 622 个 M03 历史基线哈希不变。四种子路线与封闭围栏检查见 [E01 报告](EXPEDITION_NAVIGATION_REPORT.md)。
+- [ ] Human Runtime QA: PENDING。完整 Windows build 仍在既有 Camp UI 验证失败，未产生本轮独立 EXE。
+- [ ] E02 Search / E03 Enemy / E04 HUD-Minimap / E05 Blue Hour-Extraction: NOT STARTED；等待人工验收及后续授权。
+
 ## 2026-09-19：Expedition Search Gameplay V2
 
 - [x] 复用 SearchTask、集中 4/8/12/18 秒耗时与掉落概率、统一只读生命周期、即时卡片清理、完成/拾取 Toast。
