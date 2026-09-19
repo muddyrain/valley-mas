@@ -1,5 +1,38 @@
 # 蓝时归航实施计划
 
+## Survivor 当前冻结 Production Baseline（2026-09-19）
+
+清理清单与验证结果见[生产收尾报告](SURVIVOR_PRODUCTION_FINALIZATION_REPORT.md)。
+
+Xia / Su 165cm 正式 Runtime、23 骨 `BH_Humanoid_Rig_v1`、canonical T-Pose Bind、Shared Skin Contract、Public Idle / Walking / Running、Expedition Walkable Ground Contract 均已通过验收并冻结。Expedition 基础速度为 **2.8m/s**。不生成 V2/V3 或角色专属 Locomotion。
+
+未来 12 人统一流程：**Static GLB → 165cm Runtime Envelope → canonical T-Pose Alignment → BH_Humanoid_Rig_v1 → Skin QA → Public Locomotion → Gameplay**。角色资料身高不缩放 Runtime Rig；LOD0 目标约 100k tris。统一 Bone Length / Axis / Rest / Foot Ground / Socket，外观差异由 Mesh 和 Skin 承担。未来角色直接共享公共三动作，不制作独立 Idle / Walking / Running，不运行角色专属 Retarget。
+
+正式入口：`assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb`、`assets/characters/su_wanxing/runtime/su_wanxing.glb`。公共库：`assets/animations/public_locomotion/public_locomotion.tres`，引用同目录 `public_idle.tres`、`public_walking.tres`、`public_running.tres`。冻结哈希记录在 `tests/fixtures/survivor_production_baseline.json`。
+
+当前 Skin / T-Pose / Canonical 转换与生产 QA 工具保留。`export_locomotion_retarget.gd` 仍被公共转换的 `canonical_locomotion/prepare.py` 调用，属于保留工具链，不是旧角色 Runtime。两份旧 source GLB 因先前工具策略阻止删除而列为待清理，已排除导出且无正式引用；本轮不绕过策略重试。
+
+旧 Mission Jog、Start/Stop 资源及旧局部摆臂层已退出生产并清理，对应历史章节只保留开发记录，不再描述当前 Runtime。三人长途返回/让行停滞、旧 Camp HUD 断言作为独立已知问题保留，不计本轮失败；不开展 Combat/Armed、Turn/Start/Stop 或其余角色制作。
+
+
+## 2026-09-19：Expedition Runtime Loading Transition / Random Town Minimap Ready Gate
+
+- [x] 正式确认出发立即显示可复用 Iris Overlay；遮罩和“加载中…”真实绘制后分阶段初始化，八项 Ready Gate 全部满足才展开。关闭 0.25 秒、展开 0.55 秒。
+- [x] 修复局部裁剪下小地图 World Layer 缺失，按当前 Seed / Town Signature 构建本局道路和建筑缓存；保留 Local Follow、Squad Center、Equal Survivors。
+- [x] 连续五次正式随机出发 90 项、Gate 121 项、录像 18 项通过；E00 58 / E01 240 / Minimap Bridge 1,441 / Local Follow 1,892 / E02 Search 1,206 项回归通过。截图、视频与实际耗时见 [交付报告](EXPEDITION_RUNTIME_LOADING_REPORT.md)。
+- [x] 未改 Town 生成与摆放规则；保留工作区并行贴地 metadata 改动。修复回归暴露的队员互相让行死锁。环境生成仍可短暂停顿，最长单阶段约 1.02 秒，已披露。
+- [ ] Loading Transition / Random Town Minimap: TECHNICALLY COMPLETE；Human Runtime QA: PENDING。实际 Windows build 被既有 Camp `member_buttons` / 左侧能力栏回归阻断，未生成本轮新 EXE。
+- [ ] E03 Enemy: NOT STARTED；不推进战斗、HUD 重设计、Blue Hour 或撤离系统。
+
+## 2026-09-19：Expedition Integration E02 — Search / Loot Runtime
+
+- [x] 基于已验收 E00–E01.5，增加 Expedition Searchable Registry；沿用原 SearchTask、Loot Profile、拾取入账和卡片，Town 建筑点击由玩家所选 Survivor 接取。
+- [x] 4101–4104 每 seed 55 个可达建筑；源实例保持只读。环境车辆缺少实例级 lootable 授权，合法可搜索车辆为 0，未强制变成容器。
+- [x] 四种子搜索/取消/重派/防重复领取与归队 1,206 项、原生 14 项及 E00 58 / E01 240 / E01.5 Local 1,892 / Bridge 1,441 回归通过；七张截图与完整搜索、取消改派两段视频已输出。
+- [x] 本轮 511、E01 633、M03 622 个冻结文件检查通过，E01 移动函数原文未变；未改 Minimap 产品代码。详见 [E02 交付报告](EXPEDITION_SEARCH_RUNTIME_REPORT.md)。
+- [ ] Human Runtime QA: PENDING；E02 TECHNICALLY COMPLETE。完整 Windows build 已执行，仍被既有 Camp member_buttons / 能力栏回归阻断，未产出本轮独立 EXE。
+- [ ] E03 Enemy / E04 Full HUD-Minimap / E05 Blue Hour-Extraction: NOT STARTED。等待人工验收，不继续后续阶段。
+
 ## 2026-09-19：Camp HUD M07 Loadout Panel
 
 - [x] 最后一轮布局收尾：34×34 望远镜、11px 图文间隔、3px 标题/数量间隔；底部中央 116×26 Footer、22×22 点击区、StateButton 交叉淡入。119 项专项通过，四张验收截图已更新；PNG、分页/装备数据逻辑及其他 HUD 未改。
@@ -9,7 +42,6 @@
 - [x] 原生专项 114 项通过，五张 1600×900 截图、7 槽与容量缩减边界、连续点击、快速 Hover 和四档分辨率验证完成；46 个受保护文件与六张源 PNG 未变。
 - [x] Windows 单独导出、独立 Headless / 原生 Camp 启动通过，无脚本/资源/UID 错误。完整 build 被旧 Camp `member_buttons` / 能力栏回归阻断，详见 [M07 接入报告](CAMP_LOADOUT_REPORT.md)。
 - [ ] 等待本轮视觉验收；停止于 M07，不进入 M08。
-
 
 ## 2026-09-19：E01.5 Fix — Local Follow Minimap + Equal Survivors
 
@@ -158,9 +190,16 @@
 
 - [x] 使用用户提供的七张 M06 PNG 替换旧占位栏；保留 M06 `(28,278)`、`112×330` 根几何。
 - [x] 建立 TemporaryBuff、MedicalSupport、LockedAction 三个独立槽，动态渲染 Q/E 与中文标签。
-- [x] 完成可用槽 Hover Glow、1.02 Hover、0.98 Pressed，以及锁定槽禁用视觉；Q/E 和鼠标只发本地展示信号，不接 Gameplay。
-- [x] 226 项专项检查通过，包含四种分辨率和 1600×900 截图；证据见 [M06 报告](CAMP_ACTION_RAIL_REPORT.md)。
+- [x] 修复 Hover 抖动：固定 Button HitArea，取消 Hover 缩放，仅 Glow 与底图/图标提亮；Pressed 只缩放 VisualRoot 至 0.98，视觉节点忽略鼠标，每次状态变化替换 Tween。Q/E 和鼠标仍只发本地展示信号。
+- [x] 最新 365 项专项检查通过，包含两按钮快速进出边缘、实际鼠标 Pressed、四种分辨率和三张 1600×900 状态截图；Windows 导出与独立启动通过。证据见 [M06 报告](CAMP_ACTION_RAIL_REPORT.md)。
 - [ ] 本轮人工视觉验收；停止于 M06，不自动进入 M07。
+
+## 2026-09-19：通用 UI 状态过渡组件
+
+- [x] 新增 `ui/components/state_button.gd`，提供固定 HitArea、Normal/Hover/Selected/Disabled Cross Fade、Tween 替换和 VisualRoot Pressed 反馈；不绑定具体页面素材。
+- [x] 迁移 Camp M06 的 TemporaryBuff / MedicalSupport，以及 Main Menu 的开始游戏、继续、角色图鉴、营地档案、设置、退出六个 Normal/Hover PNG 入口；布局、尺寸、素材和业务回调保持不变。
+- [x] M06 专项 365 项零失败；Main Menu 六入口状态探针通过。完整旧 `menu_runtime.gd` 的异步转场时序断言与工作区既有 Expedition 重复成员解析错误单独记录，未扩大修复范围。
+- [x] 交付细节见 [通用 UI 状态过渡报告](COMMON_UI_STATE_TRANSITION_REPORT.md)。本轮不自动迁移其他页面。
 
 ## 2026-09-17：Camp HUD M03 顶部资源栏
 
@@ -1094,6 +1133,43 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 - [x] 每档生成正常 Gameplay 与角色近景视频及 JSON 数据，见 [Gameplay 报告](XIA_ZHIYAO_LOCOMOTION_GAMEPLAY.md)。
 - [ ] 不选择最终速度，等待三档视频视觉验收；路线目标未在测试上限内全部收敛，报告同时提供固定 8m 可比时间换算。
 
+## 2026-09-19：Survivor 165cm Unified Runtime Baseline Audit
+
+- [x] 只读审计新夏知遥 / 苏晚星 GLB：两者均为约 1.65m 单 Mesh、无 Skeleton、无 Skin、无 Animation。
+- [x] 与已通过的 Standard Survivor / `BH_Humanoid_Rig_v1` 基准对比；明确新模型当前不能直接进入 Runtime 或共享 Locomotion。
+- [x] 判定 165cm Character Envelope + 统一 Rig + 公共 Locomotion 作为未来 8 人规则技术可行，但必须先完成独立 Rig 绑定、蒙皮和静态契约验收。
+- [ ] 未替换正式角色、未修改动画 / Gameplay / 武器系统；等待下一步绑定授权。
+
+## 2026-09-19：Xia + Su 165cm Unified Rig Binding V1
+
+- [x] 两个新 165cm Mesh 在隔离目录分别绑定到冻结的 `BH_Humanoid_Rig_v1` canonical 23-bone skeleton；没有修改正式角色路径或 Rig v1 定义。
+- [x] Skin、Rest endpoints、骨长、Scale、地面最低点、静态抬臂 / 屈膝变形和 0 animation clips 检查通过；候选与 QA 见 [Unified Rig Binding 报告](SURVIVOR_165CM_UNIFIED_RIG_BINDING_REPORT.md)。
+- [x] 建立与现有运行时一致的 RightHand / LeftHand / weapon MuzzlePoint socket contract；没有增加静态重复挂点、武器动作或 IK。
+- [x] 后续已完成 canonical 公共 Locomotion 转换与双角色直驱；发现 A-Pose Mesh / T-Rest Bind 不一致并进行隔离修正，见 [T-Pose Bind 报告](UNIFIED_SURVIVOR_T_POSE_BIND_REPORT.md)。
+- [x] T-Pose 网格、冻结 23 骨合同、40 张静态 QA 与 24 段公共动作视频已输出；公共动作与骨架不变，Windows 独立验收程序启动通过。
+- [x] 用户后续确认 canonical T-Pose Bind / Shared Skin Contract / 两角色候选 PASS，覆盖本阶段的视觉待验收状态；未生成角色专属动作。
+- [x] 后续 Upper Body Skin Polish 已输出 Xia / Su Run upper-side、three-quarter 与 Idle Front 回归；仅重分配袖子权重，骨架、Mesh 和公共动作不变，独立 Windows 验收程序启动通过。
+- [x] 用户后续确认[上半身 Weight 精修](SURVIVOR_UPPER_BODY_SKIN_POLISH_REPORT.md)候选 PASS，并授权提升至正式资源；本轮不再改 Skin。
+
+
+## 2026-09-19：Mission Selection Runtime Style + Transition
+
+- [x] 真实 Camp 后景与 0.46 遮罩、纸板分层、空白纸卡、独立 Briefing 纸面和统一空投显示名。
+- [x] 删除页面姓名 Chip，保留 selected_party；打开 0.48s、返回 0.30s、选中切换 0.16s。
+- [x] 专项原生流程 23 项通过；1600×900 / 1280×720 截图与原生打开→选择→返回录屏已生成。
+- [ ] 正式 Windows 构建被既有 camp_ui_runtime 旧 member_buttons / HUD 断言阻塞；未更新 EXE。详情见 [页面交付报告](design/MISSION_SELECTION_RUNTIME_REPORT.md)。
+
+
+## 2026-09-19：Mission Gameplay Closure Phase 0A
+
+- [x] 三 Action 复用 TodayActionData，集中声明威胁、奖励、POI 意图；Mission 接受私有 Profile，最终 Loot 倍率与语义武器奖励由 fixture 验证。
+- [x] 独立 Profile 消费接口 4117 项、Encounter Clock 7 项、Director 30 项通过；不作为正式地图闭环。
+- [ ] Phase 0B — Medium Town Gameplay Integration TODO：导航、搜索点、敌人生成区域、实际压力与正式奖励结算待地图玩法接入。
+- [x] 保持 MEDIUM_TOWN_V1 正式入口；未修改 maps/random、Town Adapter、地图布局、Camp、角色动作或 UI。详见 [Phase 0A 报告](MISSION_GAMEPLAY_CLOSURE_PHASE0.md)。
+
+- Phase 0A 最终回归：Search Gameplay 72、Survivor Command 45、Search Card 157 均通过；Windows build 被既有 Camp member_buttons / HUD 断言阻塞，正式 EXE 未更新。
+
+
 ## 2026-09-19：Camp M08 Depart Action
 
 - [x] 原字节接入四张 M08 PNG，替换黑色占位框；尺寸收尾为 300×86 三态按钮、46×46 图标、26/13px 动态“出发 / 前往今日行动”，右侧 16px、底部 30px。
@@ -1103,6 +1179,7 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 - [x] 单独 Windows release 导出及独立 Headless / 原生 Camp 启动通过；完整 build 仍被旧 Camp `member_buttons` / 能力栏断言阻断，未标记全量通过。
 - [ ] M08 功能与三态已通过用户验收；本轮尺寸视觉待验收。停在 M08，不进入 M09。
 
+
 ## 2026-09-19：Camp M09 Utility
 
 - [x] 纯 Godot 实现 Esc 键帽与“返回主菜单”，150×30 点击区域、左侧 30px / 底部 20px；无 PNG 或大底板。
@@ -1110,4 +1187,34 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 - [x] 原生专项 74 项零失败，三张 1600×900 截图已生成，M01～M08 和导航保持不变。详见 [M09 报告](CAMP_UTILITY_REPORT.md)。
 - [ ] 等待 M09 视觉验收，不继续其他模块。
 
+
+## 2026-09-19：Xia + Su 165cm Production Replacement
+
+- [x] 已验收 165cm / 约 100k tris / T-Pose Skin 候选逐字节提升到原正式 runtime GLB 路径；稳定 Blender 源可重新导出相同哈希。
+- [x] 两角色原生 23 骨直接共享 public_idle / public_walking / public_running；无专属 Retarget、Locomotion IK 或新增高度补偿。
+- [x] Expedition 数据使用 2.8m/s，实际约 2.79985m/s、Run 倍率 1.23004、221.41 steps/min；Camp 行为速度不变。恢复 Camp 选人到既有 HUD 与 Ground Ring 的同步。
+- [x] canonical 合同 495、双角色四条 Gameplay 回归各 27、真实界面流程 28 检查通过；501 生产资源 Missing/UID/旧引用均为 0。Camp、Socket、武器与自动攻击专项通过。
+- [x] Windows release 实际导出并独立启动 Menu / Camp / Mission Selection / Expedition / Weapons；嵌入包 14 检查通过。六段视频、Socket 截图和数据见[生产替换报告](SURVIVOR_PRODUCTION_INTEGRATION_REPORT.md)。
+- [ ] 最终真实地表审计 FAIL：导航/Spawn Y=0.08，但 RoadNetwork Y=0.025；双角色稳定鞋底距道路约 57–61mm，Walk 所在开放地表约 152–157mm。撤回相对 actor 高度的接地 PASS，三项 Production 验收均 FAIL，需修复地表高度共同契约，禁止角色 Y Offset 掩盖。
+- [ ] 清理已删 40 个旧专属文本资源；两份旧 source GLB 删除被自动审批 blocked by policy 拒绝，连同 .import 暂留，无生产引用且不打包。
+- [ ] 总 build 测试未全绿：旧 Camp HUD / 新局 / 五日测试存在结构、过渡时机及搜索语义断言失败；直接导出成功不等于总套件通过。具体失败见报告。
+- [ ] 等待本轮 Gameplay 视频视觉验收；不推进 Combat Jog / Armed / 其余 Survivor。
+
 - Camp 最终小修：M09 透明键帽、白色描边；M03 菜单由静态 Control 修为 116×56 Button 并接入现有 menu_requested。原生专项 87 项通过，两张验收截图已生成，等待视觉确认。
+
+
+## 2026-09-19：Expedition Ground Height Contract
+
+- [x] 审计确认 E01 使用 AStarGrid2D，无 NavigationMesh；原 nearest/path/spawn 固定 Y=0.08，Actor 移动只更新 XZ。
+- [x] 正式渲染地表登记 + 世界空间三角形索引作为唯一 Ground Query；路径、Spawn、POI、搜索 entry、Actor 与 Ground VFX 共用，未硬编码道路/开放区高度补丁。
+- [x] Actor World Y 逐帧贴合实际地表，VisualRoot local Y=0。42 项 GLB/Rig/Skin/公共动画/速度/武器保护文件未变。
+- [x] Xia / Su 各 83 项原生测试通过；道路/开放地表/人行道/入口静态鞋底误差约 1.5–4.1mm，Run 稳定支撑约 1.8–6.3mm，消除此前 57–157mm 的整体悬空。
+- [x] Ground 单测 10 项、Search 四种子 1206 项通过；Windows 导出和双角色嵌入包地表回归通过。证据、视频和最终构建记录见[Ground Contract 报告](EXPEDITION_GROUND_CONTRACT_REPORT.md)。
+- [x] Expedition Ground Height Contract / Xia Production Replacement / Su Production Replacement：本轮地面门禁 PASS，覆盖前轮地面合同 FAIL。
+- [ ] E01 三人长途返回/后续路线仍有 9 项失败：原始 Git 导航和修正后在相同 XZ 位置停滞，已证明不是高度投影引入；本轮未重写队伍让行。不能宣称全仓回归全绿。
+- [ ] 等待本轮视觉验收；旧资源删除审批阻塞仍按前轮报告保留，不在本轮继续清理或制作动作。
+
+
+## Survivor Trait Foundation（2026-09-19）
+
+已接入SUR_001/SUR_002：Definition → Trait Runtime → Search/Reward Hook，等级复用roster.level 1～5。资料以[用户数据表](SURVIVOR_DATA_TABLE.md)为准；推荐武器仅标签。Trait44、搜索111、Town13、原生Camp/任务选择/Expedition28、公共动画495项通过。Su各100,000样本命中率7.932%/16.018%。冻结表现与2.8m/s不变。旧effect_system仍有时钟断言/缺失站点错误，未扩展修复，不声明全仓全绿。详见[报告](SURVIVOR_TRAIT_FOUNDATION_REPORT.md)。其余10人Trait未实现。
