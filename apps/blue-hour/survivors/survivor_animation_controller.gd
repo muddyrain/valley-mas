@@ -11,6 +11,7 @@ const ARMS_V2 = preload("res://assets/animations/humanoid/locomotion/bh_humanoid
 const TRANSITIONS_V22 = preload("res://assets/animations/humanoid/locomotion/bh_humanoid_jog_transitions_v2_2.tres")
 const CombatBridge = preload("res://survivors/survivor_weapon_animation_bridge.gd")
 const LocomotionLayer = preload("res://survivors/survivor_locomotion_layer.gd")
+const XiaLocomotion = preload("res://survivors/xia_locomotion_player.gd")
 
 var target: Skeleton3D
 var source: Skeleton3D
@@ -36,6 +37,7 @@ var locomotion_layer: SkeletonModifier3D
 var jog_cadence: StringName = &"natural"
 var _jog_v22_weight: float = 1.0
 var arm_swing_v2_enabled: bool = true
+var character_locomotion: Node
 
 func set_jog_cadence(profile: StringName) -> void:
 	assert(profile in [&"current", &"polish", &"natural"])
@@ -168,6 +170,11 @@ func initialize(model: Node3D) -> bool:
 	playback.start(&"Idle")
 	tree.set("parameters/Rate/scale", 1.0)
 	tree.advance(0)
+	if model.scene_file_path == XiaLocomotion.MODEL:
+		character_locomotion = XiaLocomotion.new()
+		character_locomotion.name = "XiaLocomotion"
+		add_child(character_locomotion)
+		character_locomotion.initialize(target)
 	enabled = true
 	return true
 
@@ -182,6 +189,26 @@ func _apply_motion(horizontal_speed: float, _base_speed: float, delta: float) ->
 	if not enabled or delta <= 0:
 		return
 	var speed := maxf(0, horizontal_speed)
+	var character_active: bool = character_locomotion != null and _render_mission != null and _render_actor != null and _render_actor.weapon == null and not _camp_style
+	if character_locomotion != null:
+		if character_locomotion.active != character_active:
+			# Baked target poses must have one owner. Preserve the existing armed
+			# and Camp pipelines, including their original reference skeleton.
+			tree.active = not character_active
+			retarget.active = not character_active
+			locomotion_layer.active = not character_active
+			if combat_bridge != null:
+				combat_bridge.constraint.active = not character_active
+			character_locomotion.set_active(character_active)
+			if not character_active:
+				current_state = &"Idle"
+				playback.start(current_state)
+		if character_active:
+			locomotion_layer.advance(speed, Vector3.ZERO, 0.0, false, delta, false)
+			character_locomotion.advance(speed, visual_scale, delta)
+			current_state = character_locomotion.current_state
+			playback_rate = character_locomotion.playback_rate
+			return
 	var use_v2: bool = _render_mission != null and _render_actor != null and (_render_actor.weapon == null or (combat_bridge != null and combat_bridge.uses_long_gun()))
 	var stopping := false
 	var velocity := Vector3.ZERO
@@ -300,6 +327,8 @@ func _cadence_c_rate(base_rate: float, delta: float) -> float:
 
 func preview(clip: StringName) -> void:
 	assert(LIBRARY.has_animation(clip) or JOG.has_animation(clip))
+	if character_locomotion != null:
+		character_locomotion.set_active(false)
 	set_enabled(true)
 	current_state = clip
 	playback.start(clip)
@@ -316,14 +345,17 @@ func advance_preview(delta: float, rate: float = 1.0) -> void:
 
 func set_enabled(value: bool) -> void:
 	enabled = value
+	if character_locomotion != null and character_locomotion.active and not value:
+		character_locomotion.set_active(false)
+	var legacy_active: bool = value and (character_locomotion == null or not character_locomotion.active)
 	if tree != null:
-		tree.active = value
+		tree.active = legacy_active
 	if retarget != null:
-		retarget.active = value
+		retarget.active = legacy_active
 	if locomotion_layer != null:
-		locomotion_layer.active = value
+		locomotion_layer.active = legacy_active
 	if combat_bridge != null:
-		combat_bridge.constraint.active = value
+		combat_bridge.constraint.active = legacy_active
 
 func _collect_skinned_meshes(node: Node, result: Array[MeshInstance3D]) -> void:
 	if node is MeshInstance3D and (node as MeshInstance3D).skin != null:
