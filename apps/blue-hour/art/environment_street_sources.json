@@ -1,0 +1,230 @@
+[
+  {
+    "source": "C:\\Users\\A\\Downloads\\Meshy_AI_PRP_Utility_Pole_A_0918142959_texture.glb",
+    "sha256": "7c9b63780f1df7fa1d2897d3c9068ca9b286d5556b1606dfb648abd6addb2aa1",
+    "bytes": 9998936,
+    "mesh_count": 1,
+    "triangles": 5018,
+    "degenerate_triangles": 0,
+    "min": [-1.084472894668579, 0.0, -1.1020969152450562],
+    "max": [1.0802544355392456, 8.5, 1.0962438583374023],
+    "size": [2.1647273302078247, 8.5, 2.1983407735824585],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/png",
+        "bytes": 4674646,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 3108054,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2024803,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "pending visual review",
+    "vertices": 4989,
+    "id": "PRP_Utility_Pole_A",
+    "runtime_source": "res://assets/world/props/street/PRP_Utility_Pole_A.glb"
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\Meshy_AI_PRP_Parking_Sign_A_0918143006_texture.glb",
+    "sha256": "d391bbc3713ba5dd0ef9cddbd7e738fef5457c136bcb57ba05edfb11bb3b6650",
+    "bytes": 8170484,
+    "mesh_count": 1,
+    "triangles": 2624,
+    "degenerate_triangles": 0,
+    "min": [-0.2380974143743515, 0.0, -0.1530228853225708],
+    "max": [0.23739679157733917, 2.5, 0.15220364928245544],
+    "size": [0.4754942059516907, 2.5, 0.30522653460502625],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0.001",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/png",
+        "bytes": 3663471,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2707285,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 1696609,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "pending visual review",
+    "vertices": 2678,
+    "id": "PRP_Parking_Sign_A",
+    "runtime_source": "res://assets/world/props/street/PRP_Parking_Sign_A.glb"
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\Meshy_AI_Wooden_A_Frame_Chalkb_0918142926_texture.glb",
+    "sha256": "7fc7be22a9df3d2a2ff8221ae7e478ad0da3dcd4e319197b4e5646bc4526499f",
+    "bytes": 8834120,
+    "mesh_count": 1,
+    "triangles": 3914,
+    "degenerate_triangles": 0,
+    "min": [-0.2631591260433197, 0.0, -0.30786508321762085],
+    "max": [0.2628478407859802, 1.0499999523162842, 0.2994968295097351],
+    "size": [0.5260069668292999, 1.0499999523162842, 0.607361912727356],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0.001",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/png",
+        "bytes": 4014607,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 3124014,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 1535503,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "pending visual review",
+    "vertices": 4213,
+    "id": "PRP_Storefront_AFrame_Sign_A",
+    "runtime_source": "res://assets/world/props/street/PRP_Storefront_AFrame_Sign_A.glb"
+  },
+  {
+    "source": "C:\\Users\\A\\Downloads\\Meshy_AI_PRP_Bicycle_A_0918142914_texture.glb",
+    "sha256": "f4a51c985e9712d59ccb019f683527ec79f601d6dc86d7a495eb4bdf9bbd177f",
+    "bytes": 11160808,
+    "mesh_count": 1,
+    "triangles": 12152,
+    "degenerate_triangles": 0,
+    "min": [-0.8498711585998535, 0.0, -0.3823010325431824],
+    "max": [0.8485016822814941, 1.0499999523162842, 0.3862104117870331],
+    "size": [1.6983728408813477, 1.0499999523162842, 0.7685114443302155],
+    "nodes": [
+      {
+        "mesh": 0,
+        "name": "Mesh_0"
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "Material_0.002",
+        "normalTexture": {
+          "index": 0
+        },
+        "pbrMetallicRoughness": {
+          "baseColorTexture": {
+            "index": 1
+          },
+          "metallicRoughnessTexture": {
+            "index": 2
+          }
+        }
+      }
+    ],
+    "textures": [
+      {
+        "mime": "image/png",
+        "bytes": 4965489,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 3341345,
+        "dimensions": [2048, 2048]
+      },
+      {
+        "mime": "image/jpeg",
+        "bytes": 2398143,
+        "dimensions": [2048, 2048]
+      }
+    ],
+    "source_scale": [1, 1, 1],
+    "up": "+Y",
+    "forward": "pending visual review",
+    "vertices": 11913,
+    "id": "PRP_Bicycle_A",
+    "runtime_source": "res://assets/world/props/street/PRP_Bicycle_A.glb"
+  }
+]

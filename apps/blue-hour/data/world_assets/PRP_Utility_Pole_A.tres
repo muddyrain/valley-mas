@@ -1,0 +1,20 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/props/street/PRP_Utility_Pole_A.tscn" id="1_rjx6n"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_xcra0"]
+
+[resource]
+script = ExtResource("2_xcra0")
+id = "PRP_Utility_Pole_A"
+scene = ExtResource("1_rjx6n")
+category = "street"
+footprint = Vector2(2.1647272, 2.198341)
+bounding_size = Vector3(2.1647272, 8.5, 2.198341)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+environment_tags = PackedStringArray("RESIDENTIAL_A", "RESIDENTIAL_B", "COMMERCIAL_CORE", "MIXED_TRANSITION", "TOWN_EDGE")

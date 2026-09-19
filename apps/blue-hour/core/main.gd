@@ -75,6 +75,12 @@ func _clear_camp() -> void:
 	camp_view = null
 
 func _ready() -> void:
+	if "--town-environment-m02" in OS.get_cmdline_user_args():
+		get_tree().change_scene_to_file.call_deferred("res://scenes/debug/town_targeted_props.tscn")
+		return
+	if "--town-environment-m03" in OS.get_cmdline_user_args():
+		get_tree().change_scene_to_file.call_deferred("res://scenes/debug/town_roadside_visual.tscn")
+		return
 	if "--town-street-life" in OS.get_cmdline_user_args() or "--town-environment-polish" in OS.get_cmdline_user_args():
 		get_tree().change_scene_to_file.call_deferred("res://scenes/debug/medium_town_runtime_test.tscn")
 		return

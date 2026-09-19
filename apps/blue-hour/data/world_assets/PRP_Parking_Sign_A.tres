@@ -1,0 +1,20 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/props/street/PRP_Parking_Sign_A.tscn" id="1_55m6i"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_4uake"]
+
+[resource]
+script = ExtResource("2_4uake")
+id = "PRP_Parking_Sign_A"
+scene = ExtResource("1_55m6i")
+category = "street"
+footprint = Vector2(0.47549424, 0.30522656)
+bounding_size = Vector3(0.47549424, 2.5, 0.30522656)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+environment_tags = PackedStringArray("PARKING", "COMMERCIAL_CORE", "SERVICE_AREA")

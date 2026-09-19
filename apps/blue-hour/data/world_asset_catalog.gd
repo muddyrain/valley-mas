@@ -42,7 +42,11 @@ const ALL: Array[Resource] = [
 	preload("res://data/world_assets/residential_low_fence.tres"),
 	preload("res://data/world_assets/concrete_barrier.tres"),
 	preload("res://data/world_assets/metal_barricade.tres"),
-	preload("res://data/world_assets/industrial_chainlink_damaged.tres")
+	preload("res://data/world_assets/industrial_chainlink_damaged.tres"),
+	preload("res://data/world_assets/PRP_Utility_Pole_A.tres"),
+	preload("res://data/world_assets/PRP_Parking_Sign_A.tres"),
+	preload("res://data/world_assets/PRP_Storefront_AFrame_Sign_A.tres"),
+	preload("res://data/world_assets/PRP_Bicycle_A.tres")
 ]
 
 static func asset(id: String) -> Resource:

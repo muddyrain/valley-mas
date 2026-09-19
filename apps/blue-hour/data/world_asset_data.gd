@@ -22,3 +22,5 @@ extends Resource
 @export var searchable: bool = true
 @export var loot_tags: PackedStringArray = []
 @export var mission_tags: PackedStringArray = []
+## Placement hints only; registration does not opt an asset into a generator.
+@export var environment_tags: PackedStringArray = []

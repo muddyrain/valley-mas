@@ -1,0 +1,37 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="1_fnmxa"]
+[ext_resource type="PackedScene" path="res://assets/world/props/street/PRP_Bicycle_A.glb" id="2_jyj3b"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8xr4d"]
+size = Vector3(0.32, 0.83, 1.7)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_gkfln"]
+size = Vector3(0.76, 0.3, 0.42)
+
+[node name="PRP_Bicycle_A" type="Node3D" unique_id=994252620 groups=["world_assets"]]
+script = ExtResource("1_fnmxa")
+asset_id = "PRP_Bicycle_A"
+
+[node name="ModelRoot" type="Node3D" parent="." unique_id=1567078661 instance=ExtResource("2_jyj3b")]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.0019546747, 0, 0.00068473816)
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1913051807]
+
+[node name="BicycleBody" type="CollisionShape3D" parent="Collision" unique_id=1640552511]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.415, 0)
+shape = SubResource("BoxShape3D_8xr4d")
+
+[node name="HandlebarBasket" type="CollisionShape3D" parent="Collision" unique_id=2081038720]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, -0.55)
+shape = SubResource("BoxShape3D_gkfln")
+
+[node name="Anchors" type="Node3D" parent="." unique_id=469233148]
+
+[node name="GroundAnchor" type="Marker3D" parent="Anchors" unique_id=706351338]
+
+[node name="FrontMarker" type="Marker3D" parent="Anchors" unique_id=1561727584]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.1491864)
+
+[node name="SideMarker" type="Marker3D" parent="Anchors" unique_id=1188571178]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6842557, 0, 0)

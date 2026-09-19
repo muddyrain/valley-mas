@@ -1,0 +1,37 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://maps/world/world_asset.gd" id="1_o25cl"]
+[ext_resource type="PackedScene" path="res://assets/world/props/street/PRP_Utility_Pole_A.glb" id="2_ak417"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_xiq8u"]
+height = 7.6
+radius = 0.15
+
+[node name="PRP_Utility_Pole_A" type="Node3D" unique_id=1373589224 groups=["world_assets"]]
+script = ExtResource("1_o25cl")
+asset_id = "PRP_Utility_Pole_A"
+
+[node name="ModelRoot" type="Node3D" parent="." unique_id=245691768 instance=ExtResource("2_ak417")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0021092892, 0, 0.0029264688)
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=71607322]
+
+[node name="Pole" type="CollisionShape3D" parent="Collision" unique_id=1580806899]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.8, 0)
+shape = SubResource("CylinderShape3D_xiq8u")
+
+[node name="Anchors" type="Node3D" parent="." unique_id=2036560936]
+
+[node name="GroundAnchor" type="Marker3D" parent="Anchors" unique_id=879824002]
+
+[node name="FrontMarker" type="Marker3D" parent="Anchors" unique_id=234553357]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.3991704)
+
+[node name="WireMarker_01" type="Marker3D" parent="Anchors" unique_id=64039534]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.88, 8.49, 0)
+
+[node name="WireMarker_02" type="Marker3D" parent="Anchors" unique_id=1007153922]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8.49, -0.88)
+
+[node name="WireMarker_03" type="Marker3D" parent="Anchors" unique_id=1254518838]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.88, 8.49, 0)
