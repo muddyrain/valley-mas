@@ -17,3 +17,12 @@ scrap_multiplier = 0.7
 spawn_interval_multiplier = 1.35
 initial_enemy_fraction = 0.5
 weapon_sites = PackedStringArray("car_west")
+
+mission_type = "supply_search"
+objective = "SEARCH_AND_RETURN"
+threat_profile = "low"
+reward_tendency = "food"
+poi_preference = PackedStringArray("residential")
+spawn_batch_multiplier = 0.67
+weapon_reward_chance = 0.05
+weapon_pool = Array[String](["WPN_002_P9_PISTOL", "WPN_004_K9_SMG", "WPN_001_SURVIVAL_KNIFE"])

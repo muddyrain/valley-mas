@@ -1,5 +1,20 @@
 # BLUE HOUR ART PIPELINE V1
 
+## Survivor 当前冻结 Production Baseline（2026-09-19）
+
+清理清单与验证结果见[生产收尾报告](../docs/SURVIVOR_PRODUCTION_FINALIZATION_REPORT.md)。
+
+Xia / Su 165cm 正式 Runtime、23 骨 `BH_Humanoid_Rig_v1`、canonical T-Pose Bind、Shared Skin Contract、Public Idle / Walking / Running、Expedition Walkable Ground Contract 均已通过验收并冻结。Expedition 基础速度为 **2.8m/s**。不生成 V2/V3 或角色专属 Locomotion。
+
+未来 12 人统一流程：**Static GLB → 165cm Runtime Envelope → canonical T-Pose Alignment → BH_Humanoid_Rig_v1 → Skin QA → Public Locomotion → Gameplay**。角色资料身高不缩放 Runtime Rig；LOD0 目标约 100k tris。统一 Bone Length / Axis / Rest / Foot Ground / Socket，外观差异由 Mesh 和 Skin 承担。未来角色直接共享公共三动作，不制作独立 Idle / Walking / Running，不运行角色专属 Retarget。
+
+正式入口：`assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb`、`assets/characters/su_wanxing/runtime/su_wanxing.glb`。公共库：`assets/animations/public_locomotion/public_locomotion.tres`，引用同目录 `public_idle.tres`、`public_walking.tres`、`public_running.tres`。冻结哈希记录在 `tests/fixtures/survivor_production_baseline.json`。
+
+当前 Skin / T-Pose / Canonical 转换与生产 QA 工具保留。`export_locomotion_retarget.gd` 仍被公共转换的 `canonical_locomotion/prepare.py` 调用，属于保留工具链，不是旧角色 Runtime。两份旧 source GLB 因先前工具策略阻止删除而列为待清理，已排除导出且无正式引用；本轮不绕过策略重试。
+
+旧 Mission Jog、Start/Stop 资源及旧局部摆臂层已退出生产并清理，对应历史章节只保留开发记录，不再描述当前 Runtime。三人长途返回/让行停滞、旧 Camp HUD 断言作为独立已知问题保留，不计本轮失败；不开展 Combat/Armed、Turn/Start/Stop 或其余角色制作。
+
+
 视觉约束：[ART_BIBLE](ART_BIBLE.md)。模型复用入口：[MODEL_CATALOG](MODEL_CATALOG.md)。本地工具依赖已安装的 Blender、Godot与Python标准库，无新增第三方包；用户提供的正式GLB按下述独立入口接入。
 
 首页 2D 用户素材走原图保留、Godot 区域切片和原生运行验收，登记见 [UI_ASSETS](UI_ASSETS.md)，不进入 Blender 模型生成器。
@@ -87,9 +102,13 @@ Godot 后缀行为参见[官方碰撞导入说明](https://docs.godotengine.org/
 
 ## 新增模型的最短路径
 
+165cm Unified Survivor 采用 `Static Mesh → canonical T-Pose 对齐 → 冻结 BH_Humanoid_Rig_v1 → Skin Contract → 公共 Locomotion`。规范为 `blender/rigs/survivor_skin_contract.json`，绑定复现入口为 `blender/scripts/survivor_bind_qa/reproduce.ps1`。用户已验收 Xia / Su T Bind + Upper Skin Polish；正式 GLB 已提升到原 runtime 路径。稳定 `blender/characters/{xia_zhiyao,su_wanxing}.blend` 由 `build_character_rig.py --character <id>` 原样导出到 staging，不重新 fit/rebind；已实测导出哈希一致。公共动作唯一真源为 `assets/animations/public_locomotion/`，未来 12 个 Survivor 的 LOD0 目标约 100k tris。完整证据与未完成清理项见[生产报告](../docs/SURVIVOR_PRODUCTION_INTEGRATION_REPORT.md)。统一骨架不能代替每个新 Mesh 的动态蒙皮验收。
+
 先查目录并复用。确需新模型时，在 `asset_specs.py` 登记、对应类别生成器添加构建函数，调用共享几何/倒角/材质，给环境模型添加简化代理。执行对应批次，检查自动更新的 Catalog，再加入展示或地图视觉装配。不得为新道具复制整套流水线，不把搜索 ID 或玩法规则写入 Blender。
 
 ## 交付检查
+
+以下 Mission Jog / V2 / Armed 段落是历史制作记录，已不是当前 Xia/Su 的默认 Locomotion。正式动作与回归入口以上述生产报告为准；保留这些源不表示继续在 Runtime 叠加旧 Jog。
 
 公共 Mission Jog 的独立烘焙源为 `art/blender/scripts/create_mission_jog.gd`，由 Godot `--headless --script` 执行，输出 `assets/animations/humanoid/locomotion/bh_humanoid_mission_jog.tres`。它复用现有参考骨架，只烘焙新动作；不运行会覆盖旧库/参考场景的 locomotion 导入器。Ready / Aim / Shoot 继续由 `create_humanoid_combat.gd` 重建原公共战斗库。角色 GLB、Rig、Skin Weight、旧 Idle / Walk / Run 保留。动作参数与正式镜头验收见 [Mission 动作报告](../docs/MISSION_LOCOMOTION_STYLE.md)。
 
@@ -102,3 +121,5 @@ V2.1 已通过用户视觉验收并锁定；Phase 2D 不再运行其生成器。
 Phase 2E 开始时用户已验收 V2.2/C、Start/Stop 与 Turn，腿部全部锁定。本轮仅执行 `create_unarmed_arms_v2.gd`，输出 `bh_humanoid_unarmed_arms_v2.tres` 六条 UpperArm/LowerArm/Hand 旋转轨，在原 V2.2/C 时钟中混合。持 long_gun 的 Mission 也使用相同腿部，新增 `combat_locomotion_secondary.gd` 在已有 Retarget 后处理胸肩/手臂反馈；不运行模型导入器、不改原 Jog 资源、Rig 或 Camp。局部前臂 -105° 计入参考骨架静止角后得到约 84.88°–98.30° 肘弯曲。两角色共用资源，参数、锁定哈希与正式视频见 [Phase 2E 报告](../docs/UPPER_BODY_LOCOMOTION_POLISH_REPORT.md)。
 
 所有批次成功后，启动 `run.ps1 -Mode art` 或 `scenes/debug/art_showcase.tscn` 检查比例、轮廓及两种灯光；运行 `run.ps1 -Mode capture` 验证实际游戏的原生渲染和合成输入，再 `run.ps1 -Mode build` 生成并独立启动 Windows EXE。构建自动执行 `art/verify_export.ps1`，将 EXE 单独复制到验证目录，通过内嵌的展示场景在 Headless / 原生窗口分别实例化全部 52 个模型，确认动态加载的 GLB 和 manifest 已进入导出包。发布模板不支持命令行场景路径覆盖，因此通过主入口的用户参数 `BlueHourHomeward.exe -- --art-showcase` 打开展厅；此入口在读取或创建玩家存档前跳转。自动化证据与人工未验范围记录在 [VALIDATION](../docs/VALIDATION.md)。
+
+2026-09-19 后续 Ground Contract 修复：双角色地面门禁 PASS。Actor World Y 与 Ground VFX 共用正式地表三角形查询；静态鞋底误差约 1.5–4.1mm。模型、Rig、Skin、公共动画未变。此前固定导航高度造成的 FAIL 已关闭，三人长途让行的既有失败另行记录，见[地面合同报告](../docs/EXPEDITION_GROUND_CONTRACT_REPORT.md)。

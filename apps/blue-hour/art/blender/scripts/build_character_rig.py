@@ -1,4 +1,4 @@
-"""One import/fit/bind/pose/export pipeline for reviewed survivor fits."""
+"""Export approved Survivor binds; retain the existing infected fit pipeline."""
 import argparse
 import json
 import sys
@@ -21,21 +21,26 @@ def main():
     parser.add_argument('--report-dir', type=Path)
     args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else [])
     character = args.character
-    args.report_dir = args.report_dir or (APP_ROOT / ('test-output/rigging/infected_basic_a/poses' if character == 'infected_basic_a' else f'test-output/replacement/{character}/poses'))
+    if character in {'xia_zhiyao', 'su_wanxing'}:
+        # Survivor proportions and Skin are frozen authoring inputs. Never rerun
+        # the retired per-character fit/auto-bind over the canonical T-Pose.
+        source = BLENDER_ROOT / f'characters/{character}.blend'
+        bpy.ops.wm.open_mainfile(filepath=str(source))
+        rig = next(o for o in bpy.context.scene.objects if o.type == 'ARMATURE')
+        meshes = [o for o in bpy.context.scene.objects if o.type == 'MESH']
+        output = args.output or APP_ROOT / f'test-output/production-export/{character}.glb'
+        audit = export_character(rig, meshes, output.resolve())
+        print('CANONICAL SURVIVOR EXPORT:', json.dumps(audit))
+        return
+    args.report_dir = args.report_dir or (APP_ROOT / 'test-output/rigging/infected_basic_a/poses')
     if not args.report_dir.is_absolute():
         args.report_dir = (APP_ROOT.parents[1] / args.report_dir).resolve()
     if not (BLENDER_ROOT / 'rigs/BH_Humanoid_Rig_v1.blend').exists():
         save_rig(BLENDER_ROOT / 'rigs/BH_Humanoid_Rig_v1.blend')
-    if character == 'infected_basic_a':
-        source = APP_ROOT / 'assets/characters/infected_basic_a/model/source/ENM_001_infected_basic_a.glb'
-        fit_path = BLENDER_ROOT / 'rigs/infected_basic_a_fit.json'
-        default_output = APP_ROOT / 'test-output/rigging/infected_basic_a/ENM_001_infected_basic_a_rigged.glb'
-        character_blend = BLENDER_ROOT / 'characters/infected_basic_a_rigged.blend'
-    else:
-        source = APP_ROOT / f'assets/characters/{character}/source/{character}.glb'
-        fit_path = BLENDER_ROOT / f'rigs/{character}_fit.json'
-        default_output = APP_ROOT / f'test-output/replacement/{character}/{character}.glb'
-        character_blend = BLENDER_ROOT / f'characters/{character}.blend'
+    source = APP_ROOT / 'assets/characters/infected_basic_a/model/source/ENM_001_infected_basic_a.glb'
+    fit_path = BLENDER_ROOT / 'rigs/infected_basic_a_fit.json'
+    default_output = APP_ROOT / 'test-output/rigging/infected_basic_a/ENM_001_infected_basic_a_rigged.glb'
+    character_blend = BLENDER_ROOT / 'characters/infected_basic_a_rigged.blend'
     rig, meshes, config = fit_character(source, fit_path)
     weights = bind_character(rig, meshes, config)
     # Packed images make the editable character independent of external texture paths.

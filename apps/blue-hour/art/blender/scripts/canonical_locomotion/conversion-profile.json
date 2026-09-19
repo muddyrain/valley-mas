@@ -1,0 +1,37 @@
+{
+  "source_prefix": "mixamorig_",
+  "sample_rate": 120,
+  "mapping": {
+    "Root": null,
+    "Hips": "Hips",
+    "Spine": "Spine",
+    "Chest": "Spine1",
+    "UpperChest": "Spine2",
+    "Neck": "Neck",
+    "Head": "Head",
+    "LeftShoulder": "LeftShoulder",
+    "LeftUpperArm": "LeftArm",
+    "LeftLowerArm": "LeftForeArm",
+    "LeftHand": "LeftHand",
+    "LeftUpperLeg": "LeftUpLeg",
+    "LeftLowerLeg": "LeftLeg",
+    "LeftFoot": "LeftFoot",
+    "LeftToes": "LeftToeBase",
+    "RightShoulder": "RightShoulder",
+    "RightUpperArm": "RightArm",
+    "RightLowerArm": "RightForeArm",
+    "RightHand": "RightHand",
+    "RightUpperLeg": "RightUpLeg",
+    "RightLowerLeg": "RightLeg",
+    "RightFoot": "RightFoot",
+    "RightToes": "RightToeBase"
+  },
+  "compensation": {
+    "horizontal_stride": "mean_anatomical_leg_length_ratio",
+    "sole_clearance_m": 0.0015,
+    "minimum_knee_flexion_degrees": 8.0,
+    "notes": "Common offline sole envelope adaptation; no candidate mesh participates. Root remains fixed; source gait, relative roll and timing are retained.",
+    "foot_alignment": "functional source heel-to-forefoot 3D direction, analytic two-bone IK"
+  },
+  "target": "BH_Humanoid_Rig_v1 canonical unmodified definition"
+}

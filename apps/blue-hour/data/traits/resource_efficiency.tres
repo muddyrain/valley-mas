@@ -5,10 +5,8 @@
 [resource]
 script = ExtResource("1")
 id = "resource_efficiency"
-display_name = "物尽其用"
-description = "搜刮基础物资时，有概率额外获得1份同类物资"
+display_name = "精打细算"
+description = "获得基础资源时，有一定概率额外获得一份。"
 trait_type = 4
-params = {
-"bonus_chance": 0.10,
-"bonus_chance_per_level": 0.02
-}
+modifier_hook = "loot_reward"
+levels = PackedFloat32Array(0.08, 0.10, 0.12, 0.14, 0.16)

@@ -1,0 +1,12 @@
+[gd_resource type="AnimationLibrary" format=3]
+
+[ext_resource type="Animation" path="res://assets/animations/public_locomotion/public_idle.tres" id="1_mrv7l"]
+[ext_resource type="Animation" path="res://assets/animations/public_locomotion/public_running.tres" id="2_v13a4"]
+[ext_resource type="Animation" path="res://assets/animations/public_locomotion/public_walking.tres" id="3_w6b03"]
+
+[resource]
+_data = {
+&"public_idle": ExtResource("1_mrv7l"),
+&"public_running": ExtResource("2_v13a4"),
+&"public_walking": ExtResource("3_w6b03")
+}

@@ -1,0 +1,216 @@
+{
+  "source_to_canonical": [
+    {
+      "source": null,
+      "canonical": "Root",
+      "canonical_parent": null,
+      "source_rest_to_canonical_rest_max_error": 0
+    },
+    {
+      "source": "mixamorig_Hips",
+      "canonical": "Hips",
+      "canonical_parent": "Root",
+      "source_rest_to_canonical_rest_max_error": 4.440892098500626e-16
+    },
+    {
+      "source": "mixamorig_Spine",
+      "canonical": "Spine",
+      "canonical_parent": "Hips",
+      "source_rest_to_canonical_rest_max_error": 4.440892098500626e-16
+    },
+    {
+      "source": "mixamorig_Spine1",
+      "canonical": "Chest",
+      "canonical_parent": "Spine",
+      "source_rest_to_canonical_rest_max_error": 2.2233290483482493e-16
+    },
+    {
+      "source": "mixamorig_Spine2",
+      "canonical": "UpperChest",
+      "canonical_parent": "Chest",
+      "source_rest_to_canonical_rest_max_error": 1.5543122344752192e-15
+    },
+    {
+      "source": "mixamorig_Neck",
+      "canonical": "Neck",
+      "canonical_parent": "UpperChest",
+      "source_rest_to_canonical_rest_max_error": 4.440892098500626e-16
+    },
+    {
+      "source": "mixamorig_Head",
+      "canonical": "Head",
+      "canonical_parent": "Neck",
+      "source_rest_to_canonical_rest_max_error": 4.440892098500626e-16
+    },
+    {
+      "source": "mixamorig_LeftShoulder",
+      "canonical": "LeftShoulder",
+      "canonical_parent": "UpperChest",
+      "source_rest_to_canonical_rest_max_error": 4.225991753560256e-16
+    },
+    {
+      "source": "mixamorig_LeftArm",
+      "canonical": "LeftUpperArm",
+      "canonical_parent": "LeftShoulder",
+      "source_rest_to_canonical_rest_max_error": 4.440892098500626e-16
+    },
+    {
+      "source": "mixamorig_LeftForeArm",
+      "canonical": "LeftLowerArm",
+      "canonical_parent": "LeftUpperArm",
+      "source_rest_to_canonical_rest_max_error": 6.661338147750939e-16
+    },
+    {
+      "source": "mixamorig_LeftHand",
+      "canonical": "LeftHand",
+      "canonical_parent": "LeftLowerArm",
+      "source_rest_to_canonical_rest_max_error": 1.3322676295501878e-15
+    },
+    {
+      "source": "mixamorig_LeftUpLeg",
+      "canonical": "LeftUpperLeg",
+      "canonical_parent": "Hips",
+      "source_rest_to_canonical_rest_max_error": 1.5543122344752192e-15
+    },
+    {
+      "source": "mixamorig_LeftLeg",
+      "canonical": "LeftLowerLeg",
+      "canonical_parent": "LeftUpperLeg",
+      "source_rest_to_canonical_rest_max_error": 1.3322676295501878e-15
+    },
+    {
+      "source": "mixamorig_LeftFoot",
+      "canonical": "LeftFoot",
+      "canonical_parent": "LeftLowerLeg",
+      "source_rest_to_canonical_rest_max_error": 1.1102230246251565e-15
+    },
+    {
+      "source": "mixamorig_LeftToeBase",
+      "canonical": "LeftToes",
+      "canonical_parent": "LeftFoot",
+      "source_rest_to_canonical_rest_max_error": 4.440892098500626e-16
+    },
+    {
+      "source": "mixamorig_RightShoulder",
+      "canonical": "RightShoulder",
+      "canonical_parent": "UpperChest",
+      "source_rest_to_canonical_rest_max_error": 1.3322676295501878e-15
+    },
+    {
+      "source": "mixamorig_RightArm",
+      "canonical": "RightUpperArm",
+      "canonical_parent": "RightShoulder",
+      "source_rest_to_canonical_rest_max_error": 1.6653345369377348e-15
+    },
+    {
+      "source": "mixamorig_RightForeArm",
+      "canonical": "RightLowerArm",
+      "canonical_parent": "RightUpperArm",
+      "source_rest_to_canonical_rest_max_error": 4.440892098500626e-16
+    },
+    {
+      "source": "mixamorig_RightHand",
+      "canonical": "RightHand",
+      "canonical_parent": "RightLowerArm",
+      "source_rest_to_canonical_rest_max_error": 6.661338147750939e-16
+    },
+    {
+      "source": "mixamorig_RightUpLeg",
+      "canonical": "RightUpperLeg",
+      "canonical_parent": "Hips",
+      "source_rest_to_canonical_rest_max_error": 9.992007221626409e-16
+    },
+    {
+      "source": "mixamorig_RightLeg",
+      "canonical": "RightLowerLeg",
+      "canonical_parent": "RightUpperLeg",
+      "source_rest_to_canonical_rest_max_error": 7.771561172376096e-16
+    },
+    {
+      "source": "mixamorig_RightFoot",
+      "canonical": "RightFoot",
+      "canonical_parent": "RightLowerLeg",
+      "source_rest_to_canonical_rest_max_error": 1.2212453270876722e-15
+    },
+    {
+      "source": "mixamorig_RightToeBase",
+      "canonical": "RightToes",
+      "canonical_parent": "RightFoot",
+      "source_rest_to_canonical_rest_max_error": 8.881784197001252e-16
+    }
+  ],
+  "ignored_source_bones": [
+    "mixamorig_HeadTop_End",
+    "headfront",
+    "mixamorig_LeftHandMiddle4",
+    "mixamorig_RightHandMiddle4",
+    "mixamorig_LeftToe_End",
+    "mixamorig_RightToe_End"
+  ],
+  "rest_identity_max_error": 1.6653345369377348e-15,
+  "clips": {
+    "idle": {
+      "source_sha256": "68e821895cb0bde10a40d4c0fc6d954bd837f5b39b5d4e92d5fb14fcc25165ea",
+      "output_sha256": "831db685dd34e8f687b957aaa69656b1cebf7e59af6247a5262110f0fb650a20",
+      "duration_s": 14.0,
+      "upper_body_delta_max_matrix_error": 7.40101251395231e-8,
+      "anatomical_arm_direction": {
+        "Left": {
+          "UpperArm_max_source_direction_difference_deg": 1.7032730748045993e-5,
+          "LowerArm_max_source_direction_difference_deg": 6.34670314423234e-5
+        },
+        "Right": {
+          "UpperArm_max_source_direction_difference_deg": 1.980313203006426e-5,
+          "LowerArm_max_source_direction_difference_deg": 2.3691257207163768e-5
+        }
+      },
+      "root_motion": false,
+      "runtime_ik": false,
+      "retarget_instances": 0
+    },
+    "walking": {
+      "source_sha256": "35738aaa093a6df85acaec70d11f151d88342a06102ab904b883111b09342269",
+      "output_sha256": "20adc89cc2d748aae20da30eac9a18b037a361add325d97587c531355ff3fa21",
+      "duration_s": 1.04166666666667,
+      "upper_body_delta_max_matrix_error": 7.330088491741549e-8,
+      "anatomical_arm_direction": {
+        "Left": {
+          "UpperArm_max_source_direction_difference_deg": 6.483060346371151e-5,
+          "LowerArm_max_source_direction_difference_deg": 0.00010689573371419576
+        },
+        "Right": {
+          "UpperArm_max_source_direction_difference_deg": 7.890827122822553e-5,
+          "LowerArm_max_source_direction_difference_deg": 6.200889283726458e-5
+        }
+      },
+      "root_motion": false,
+      "runtime_ik": false,
+      "retarget_instances": 0
+    },
+    "running": {
+      "source_sha256": "bc88eb1de65c9d0d47eac04cdfbdcfd1fe0d32f1ba36bad0e996e08b92d68059",
+      "output_sha256": "c4b15521ab52392c140e06cc979da3a2822d599bce9bc4568595691ecc622d04",
+      "duration_s": 0.666666666666667,
+      "upper_body_delta_max_matrix_error": 7.59109369807831e-8,
+      "anatomical_arm_direction": {
+        "Left": {
+          "UpperArm_max_source_direction_difference_deg": 8.614233389782801e-5,
+          "LowerArm_max_source_direction_difference_deg": 0.00011408026211625185
+        },
+        "Right": {
+          "UpperArm_max_source_direction_difference_deg": 0.00012192234434352346,
+          "LowerArm_max_source_direction_difference_deg": 0.0001126172425064304
+        }
+      },
+      "root_motion": false,
+      "runtime_ik": false,
+      "retarget_instances": 0
+    }
+  },
+  "status": "canonical_qa_pass; dual_candidate_skin_qa_fail; not_integrated",
+  "rig": "BH_Humanoid_Rig_v1",
+  "qa_report": "docs/CANONICAL_PUBLIC_LOCOMOTION_REPORT.md",
+  "source_directory": "assets/characters/survivor_animation_template/animations",
+  "authoring_reference": "one common reference pose derived from source Rest; frozen target Skeleton Rest is unchanged",
+  "gameplay_speed_changed": false
+}

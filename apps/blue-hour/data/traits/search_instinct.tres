@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://data/trait_data.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = "search_instinct"
+display_name = "搜寻直觉"
+description = "提高建筑、车辆以及其他搜刮点的搜索速度。"
+trait_type = 2
+modifier_hook = "search_speed"
+levels = PackedFloat32Array(0.12, 0.15, 0.18, 0.21, 0.25)

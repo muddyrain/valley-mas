@@ -1,6 +1,5 @@
 extends "res://tests/combat_animation_mission.gd"
 ## Exercise the style through the formal Mission, at its unchanged camera scale.
-const JOG_PATH := "res://assets/animations/humanoid/locomotion/bh_humanoid_mission_jog.tres"
 var observed_flashes: Dictionary = {}
 var flash_captures: Dictionary = {}
 var max_grip_error: Dictionary = {}
@@ -14,20 +13,9 @@ func run() -> void:
 	await super.run()
 
 func verify() -> void:
-	check(ResourceLoader.exists(JOG_PATH), "Public in-place mission_jog exists")
-	if not ResourceLoader.exists(JOG_PATH):
-		return
-	var library := load(JOG_PATH) as AnimationLibrary
-	var jog := library.get_animation(&"mission_jog")
-	check(jog.loop_mode == Animation.LOOP_LINEAR, "Jog loops")
-	for track in jog.get_track_count():
-		var bone := String(jog.track_get_path(track).get_subname(0))
-		check(jog.track_get_type(track) in [Animation.TYPE_ROTATION_3D, Animation.TYPE_POSITION_3D], "Jog contains only bone poses")
-		if jog.track_get_type(track) == Animation.TYPE_POSITION_3D:
-			check(bone == "Hips", "Only the pelvis has a vertical weight shift")
-			for key in jog.track_get_key_count(track):
-				var position: Vector3 = jog.track_get_key_value(track, key)
-				check(is_zero_approx(position.x) and is_zero_approx(position.z), "In-place: no horizontal travel")
+	var library := load("res://assets/animations/public_locomotion/public_locomotion.tres") as AnimationLibrary
+	for member: Node3D in mission.survivors:
+		check(member.animation_controller.player.get_animation_library(&"Public") == library, "Formal Mission uses the single public library")
 	# Use the same actors without a Mission clock to check the existing Camp gait.
 	for member in mission.survivors:
 		var controller: Node = member.animation_controller
@@ -46,7 +34,7 @@ func verify() -> void:
 	mission.command_move(Vector3(0, 0, -22))
 	await advance(12)
 	for member in mission.survivors:
-		check(member.animation_controller.current_state == &"mission_jog", "Mission jog starts during acceleration")
+		check(member.animation_controller.current_state == &"Run", "Public Run selected after acceleration")
 	await advance(35)
 	await capture("style-unarmed-jog")
 	await capture_close("style-unarmed-jog-detail")

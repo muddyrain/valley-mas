@@ -137,8 +137,9 @@ func verify_map(mission: Node3D, map: Control, seed_value: int) -> void:
 	check(geometry.regions.size() == expected_regions.size(), "All ground regions available")
 	for i: int in expected_regions.size():
 		check(geometry.regions[i].polygon == expected_regions[i].polygon and geometry.regions[i].kind == expected_regions[i].kind, "Region matches Town geometry")
-	check(mission.runtime_data.arrival_point == town.arrival.position, "Arrival matches Town")
-	check(mission.runtime_data.mission_poi == town.poi.entry, "POI matches Town")
+	# The map projects XZ; runtime Y can follow the rendered ground without moving its marker.
+	check(Vector2(mission.runtime_data.arrival_point.x, mission.runtime_data.arrival_point.z) == Vector2(town.arrival.position.x, town.arrival.position.z), "Arrival XZ matches Town")
+	check(Vector2(mission.runtime_data.mission_poi.x, mission.runtime_data.mission_poi.z) == Vector2(town.poi.entry.x, town.poi.entry.z), "POI XZ matches Town")
 	check(map.static_layer.commands.size() == 2 + geometry.regions.size() + town.roads.size() + town.buildings.size(), "World draw cache contains bounds, regions, roads, buildings")
 	verify_projection(map)
 	verify_markers(mission, map)
@@ -156,7 +157,11 @@ func verify_projection(map: Control) -> void:
 	check(map.world_to_minimap(map.follow_center).is_equal_approx(map.minimap_content_rect.get_center()), "HUD projects squad center to local center")
 
 func verify_markers(mission: Node3D, map: Control) -> void:
-	check(map.town_markers.size() == 5, "Three survivors plus Arrival and POI visible")
+	var discovered: int = 0
+	for id: String in mission.city.sites:
+		if mission.city.sites[id].discovered and id != str(mission.runtime_data.mission_poi_id):
+			discovered += 1
+	check(map.town_markers.size() == mission.living().size() + 2 + discovered, "All survivors, Arrival, POI and discovered sites visible")
 	for i: int in map.town_markers.size():
 		var marker: Dictionary = map.town_markers[i]
 		check(marker.anchor.is_equal_approx(map.world_to_minimap(marker.world)), "Marker uses common mapping")
@@ -165,6 +170,9 @@ func verify_markers(mission: Node3D, map: Control) -> void:
 			check(marker.world == mission.runtime_data.arrival_point, "Bus marker from runtime")
 		elif str(marker.id) == "poi":
 			check(marker.world == mission.runtime_data.mission_poi, "Objective marker from runtime")
+		elif str(marker.id).begins_with("site:"):
+			var site: Dictionary = mission.city.sites[str(marker.id).trim_prefix("site:")]
+			check(site.discovered and marker.world == site.spec.entry, "Site marker uses discovered runtime interaction point")
 		else:
 			check(marker.world == instance_from_id(marker.id).global_position, "Survivor marker reads live actor")
 		for j: int in range(i):

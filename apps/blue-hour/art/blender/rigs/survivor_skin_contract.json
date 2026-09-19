@@ -1,0 +1,61 @@
+{
+  "id": "survivor_canonical_t_bind",
+  "rig": "BH_Humanoid_Rig_v1",
+  "rig_definition": "art/blender/scripts/create_humanoid_rig.py:definition",
+  "runtime_height_m": 1.65,
+  "bone_count": 23,
+  "frozen": [
+    "bone_names",
+    "parents",
+    "bone_lengths",
+    "bone_axes",
+    "local_rest",
+    "global_rest",
+    "hips_baseline",
+    "foot_toe_baseline"
+  ],
+  "mesh_bind_pose": "Canonical T pose; shoulder, elbow and wrist geometry aligns with canonical joint centres",
+  "object_transform": { "position": [0, 0, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+  "armature_pose_at_export": "identity matrix_basis on every bone; no pose offsets or constraints",
+  "weights": {
+    "max_influences": 4,
+    "sum_tolerance": 0.00001,
+    "unweighted_vertices": 0,
+    "opposite_limb_influences": "disallowed on limb cores",
+    "distal_arm_influences": "elbow/wrist/hand influences must be local in aligned T space",
+    "hair": "Head dominant; smooth only connected hair/garment junctions; no additional hair bones",
+    "cloth": "Torso and appropriate local limb chains; validate deformations with the common clips"
+  },
+  "socket": {
+    "right_hand": "RightHand",
+    "left_hand_reference": "LeftHand",
+    "muzzle_owner": "weapon_scene/MuzzlePoint"
+  },
+  "animations": ["public_idle", "public_walking", "public_running"],
+  "forbidden_workarounds": [
+    "character_specific_locomotion_keys",
+    "rig_rest_edits",
+    "object_scale_alignment",
+    "root_ground_offset",
+    "runtime_ik_for_bind_correction"
+  ],
+  "acceptance": {
+    "static": [
+      "T rest front/side/three-quarter",
+      "arms 45/90 degrees",
+      "elbow 90 degrees",
+      "knee 90 degrees",
+      "feet close-up"
+    ],
+    "dynamic": [
+      "same shared library instance",
+      "idle hand clearance",
+      "walk/run sleeve and armpit",
+      "foot ground and sliding",
+      "loop",
+      "hair and cloth intersections"
+    ],
+    "policy": "Passing numeric rig/skin checks alone is insufficient. Each new mesh needs static and dynamic visual acceptance. A fixed 165cm envelope does not prove identical clothing and shoe contacts."
+  },
+  "status": "binding_contract_defined; per_character_visual_release_required"
+}

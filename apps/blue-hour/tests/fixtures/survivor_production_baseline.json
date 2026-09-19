@@ -1,0 +1,21 @@
+{
+  "status": "frozen",
+  "runtime_height_m": 1.65,
+  "bone_count": 23,
+  "expedition_base_speed_mps": 2.8,
+  "pipeline": "Static GLB -> 165cm Runtime Envelope -> canonical T-Pose Alignment -> BH_Humanoid_Rig_v1 -> Skin QA -> Public Locomotion -> Gameplay",
+  "files": {
+    "art/blender/rigs/BH_Humanoid_Rig_v1.blend": "8db0c53d9df98311627decca0efe55d4d6f645025d68945fedcd355132666768",
+    "art/blender/rigs/survivor_skin_contract.json": "67327d80021c75653ab9d79fb9b12429551ce8da6447d49229646d6a63403f69",
+    "tests/fixtures/canonical_survivor_rest.json": "55903830fb1ca0d4e8d268444fdb91ac873d534a162f41cbed644399a7b96227",
+    "assets/animations/public_locomotion/public_locomotion.tres": "9b03d88eda52c1411770ac64614c184cc43b3ad3a97ec7700436a09ffd6fcc7b",
+    "assets/animations/public_locomotion/public_idle.tres": "831db685dd34e8f687b957aaa69656b1cebf7e59af6247a5262110f0fb650a20",
+    "assets/animations/public_locomotion/public_walking.tres": "20adc89cc2d748aae20da30eac9a18b037a361add325d97587c531355ff3fa21",
+    "assets/animations/public_locomotion/public_running.tres": "c4b15521ab52392c140e06cc979da3a2822d599bce9bc4568595691ecc622d04",
+    "assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb": "9cbbf850589c8822a2d1f1401ffa72342f12725d3da358b0453d4d69ff78b407",
+    "assets/characters/su_wanxing/runtime/su_wanxing.glb": "664f069e21d2063c432a0bdb778effbad860e7b3689d14b67b7e4d60d563e454",
+    "art/blender/scripts/align_survivor_bind.py": "bb24918a00bb1d03289d56fd58ab57b5d2ed15760c70ac762a9280968c852756",
+    "art/blender/scripts/polish_survivor_skin.py": "6b5a75d8966b5b3389afaa45dccf5b11fd87dd034bf602e353068b88c6485256",
+    "maps/expedition/walkable_ground.gd": "61fc78ac17dfd89d80622c14a7ea50acfabf90f2503babdd7dfb5223e799d33f"
+  }
+}

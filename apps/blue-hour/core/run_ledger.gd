@@ -1,4 +1,8 @@
 extends RefCounted
+signal resources_collected(gained: Vector2i)
+const Traits = preload("res://core/trait_runtime.gd")
+const FOOD = preload("res://data/resources/food.tres")
+const SCRAP = preload("res://data/resources/scrap.tres")
 var food: int = 0
 var scrap: int = 0
 var stored_food: int = 0
@@ -15,14 +19,17 @@ func begin() -> void:
 	weapons.clear()
 	resource_remainders = Vector2.ZERO
 
-func collect_resources(food_amount: int, scrap_amount: int, multiplier: float) -> Vector2i:
+func collect_resources(food_amount: int, scrap_amount: int, multiplier: float, trait_data: Resource = null, trait_rng: RandomNumberGenerator = null) -> Vector2i:
 	if settled:
 		return Vector2i.ZERO
 	# Carry fractional yield across small pickups; item identities never enter this calculation.
 	var exact := Vector2(maxi(0, food_amount), maxi(0, scrap_amount)) * maxf(0.0, multiplier) + resource_remainders
 	var gained := Vector2i(floori(exact.x + 0.000001), floori(exact.y + 0.000001))
 	resource_remainders = exact - Vector2(gained)
+	gained.x = Traits.reward_amount(trait_data, FOOD, gained.x, trait_rng)
+	gained.y = Traits.reward_amount(trait_data, SCRAP, gained.y, trait_rng)
 	add_loot(gained.x, gained.y)
+	resources_collected.emit(gained)
 	return gained
 
 func add_weapon(value: Dictionary) -> void:

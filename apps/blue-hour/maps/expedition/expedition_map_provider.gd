@@ -6,6 +6,17 @@ const City = preload("res://maps/city.gd")
 const FIXED_LEGACY: String = "FIXED_LEGACY"
 const MEDIUM_TOWN_V1: String = "MEDIUM_TOWN_V1"
 
+static func create_runtime_staged(mission_type: String, map_seed: int, map: Resource, parent: Node3D, profile: RefCounted) -> Dictionary:
+	var town := TownAdapter.new()
+	town.name = "MediumTownRuntime"
+	town.set_meta("runtime_provider", MEDIUM_TOWN_V1)
+	town.set_meta("debug_scene", false)
+	parent.add_child(town)
+	if not await town.build_runtime_staged(mission_type, map_seed, map, profile):
+		town.queue_free()
+		return {"ok": false, "error": "Medium Town generation failed"}
+	return {"ok": true, "root": town, "runtime": town.runtime_data, "map": town.data}
+
 static func create_runtime(mode: String, mission_type: String, map_seed: int, map: Resource, parent: Node3D) -> Dictionary:
 	if mode == MEDIUM_TOWN_V1:
 		var town := TownAdapter.new()

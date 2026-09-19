@@ -26,6 +26,7 @@ var _current_position := Vector3.ZERO
 var _previous_yaw: float = 0.0
 var _current_yaw: float = 0.0
 var _motion_mission: Node3D
+var _ground_projector: Callable
 var ammo: int:
 	get: return combat.current_ammo
 	set(value): combat.current_ammo = value
@@ -95,6 +96,7 @@ func equip(equipment: Resource) -> void:
 func order_move(point: Vector3, city: Node3D) -> void:
 	if dead or boarding:
 		return
+	_bind_ground(city)
 	# Held commands repeat every .08 s. Do not restart a route to the same cell.
 	if not _braking and not path.is_empty() and path[-1].is_equal_approx(point):
 		return
@@ -120,8 +122,15 @@ func request_stop() -> void:
 
 func enable_motion_presentation(mission: Node3D) -> void:
 	_motion_mission = mission
+	_bind_ground(mission.city)
 	if animation_controller != null:
 		animation_controller.use_render_clock(self, mission)
+
+func _bind_ground(city: Node3D) -> void:
+	if city != null and city.has_method("project_to_ground"):
+		_ground_projector = Callable(city, "project_to_ground")
+		selection_ring.position.y = preload("res://maps/expedition/walkable_ground.gd").MARKER_CLEARANCE
+		duty_ring.position.y = selection_ring.position.y
 
 func tick(delta: float, mission: Node3D) -> void:
 	var assigned: bool = mission.task_for(self) != null and not dead
@@ -198,6 +207,12 @@ func _move(delta: float, mission: Node3D) -> void:
 			stop()
 	if path.is_empty():
 		current_speed = 0
+	# XZ route simplification may cross surface edges; endpoints alone cannot
+	# describe the intervening height. Ground the Actor at its actual position.
+	if _ground_projector.is_valid():
+		var grounded: Vector3 = _ground_projector.call(global_position)
+		if grounded.is_finite():
+			global_position = grounded
 	actual_velocity = (position - start) / delta
 	if actual_velocity.length_squared() > .000001:
 		var desired_yaw := atan2(-actual_velocity.x, -actual_velocity.z)

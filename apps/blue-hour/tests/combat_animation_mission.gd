@@ -90,12 +90,12 @@ func verify() -> void:
 	mission.command_move(Vector3(0, 0, -22))
 	await advance(70)
 	for member in mission.survivors:
-		check(member.animation_controller.current_state == &"mission_jog" and member.animation_controller.combat_bridge.visual_state == 1, "Slow Mission Jog + Ready")
+		check(member.animation_controller.current_state == &"Walk" and member.animation_controller.combat_bridge.visual_state == 1, "Slow public Walk + Ready")
 	await capture("mission-walk-ready")
 	mission.effects.remove_source("combat_test_walk")
 	await advance(70)
 	for member in mission.survivors:
-		check(member.animation_controller.current_state == &"mission_jog" and member.animation_controller.combat_bridge.visual_state == 1, "Full-speed Mission Jog + Ready")
+		check(member.animation_controller.current_state == &"Run" and member.animation_controller.combat_bridge.visual_state == 1, "Full-speed public Run + Ready")
 	await capture("mission-run-ready")
 	mission.command_stop()
 	await advance(35)
@@ -132,7 +132,7 @@ func verify() -> void:
 	mission.command_move(mission.squad_center() + Vector3(1.6, 0, -8))
 	await advance(80)
 	for member in mission.survivors:
-		check(member.animation_controller.current_state == &"mission_jog", "Mission Jog while firing")
+		check(member.animation_controller.current_state == &"Walk", "Public Walk while firing")
 		check(shots[member.data.id] >= 4, "Repeated gameplay fire reaches animation: " + member.data.id)
 		check(member.ammo == member.weapon.magazine_size - int(shots[member.data.id]), "Burst event count equals ammo consumption")
 		check_markers(member)
@@ -141,7 +141,7 @@ func verify() -> void:
 	mission.effects.remove_source("combat_test_walk")
 	await advance(45)
 	for member in mission.survivors:
-		check(member.animation_controller.current_state == &"mission_jog" and member.animation_controller.combat_bridge.aiming, "Full-speed Mission Jog + Aim/Shoot")
+		check(member.animation_controller.current_state == &"Run" and member.animation_controller.combat_bridge.aiming, "Full-speed Mission Jog + Aim/Shoot")
 	await capture("mission-run-shoot")
 	mission.command_stop()
 	for member in mission.survivors:

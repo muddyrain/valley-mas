@@ -1,18 +1,24 @@
-[gd_resource type="Resource" load_steps=2 format=3]
+[gd_resource type="Resource" load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://data/survivor_data.gd" id="1"]
+[ext_resource type="Script" path="res://data/survivor_definition.gd" id="1"]
+
+[ext_resource type="Resource" path="res://data/traits/resource_efficiency.tres" id="2_trait"]
 
 [resource]
 script = ExtResource("1")
 id = "su_wanxing"
 display_name = "苏晚星"
 profession_id = "supply_specialist"
-profession_name = "补给整备师"
-description = "物资管理专家，擅长从有限资源中获得最大收益"
-role_tags = ["后勤", "资源收益", "出征支援"]
+profession_name = "活动物资管理 / 采购兼职"
+description = "苏晚星习惯记录每件东西去了哪里、还剩多少、什么东西真正值得留下。灾变之后，她依旧保留着这种习惯，总能从零散物资里整理出比别人更多真正有用的东西。"
+role_tags = ["资源获取"]
 trait_id = "resource_efficiency"
 model_path = "res://assets/characters/su_wanxing/runtime/su_wanxing.glb"
-portrait_path = ""
+portrait_path = "res://assets/ui/expedition/portraits/portrait_su_wanxing.png"
 max_hp = 100.0
-move_speed = 4.0
+move_speed = 2.8
 color = Color(0.8, 0.5, 0.7, 1)
+
+survivor_id = "SUR_002"
+trait_definition = ExtResource("2_trait")
+recommended_weapon_tags = Array[String](["assault_rifle", "smg"])

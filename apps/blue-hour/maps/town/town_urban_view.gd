@@ -8,10 +8,10 @@ const Bus = preload("res://scenes/world/vehicles/veh_blue_hour.tscn")
 static func instantiate_building(site: Dictionary) -> Node3D:
 	var definition: Resource = Assets.asset(site.asset)
 	var wrapper: Node3D = definition.scene.instantiate()
-	# Four-sided native asset audit: the expansion batch has +Z facades but -Z anchors.
-	# Correct only this QA instance, retaining shared wrappers and the other profiles.
+	# Expansion wrappers face +Z except BLD_010, already corrected to -Z in its scene.
+	# Correct only the town instance; applying this twice reverses BLD_010's entrance.
 	var number := int(definition.building_id.trim_prefix("BLD_"))
-	if number >= 9 and number <= 22:
+	if number >= 9 and number <= 22 and number != 10:
 		var model: Node3D = wrapper.get_node("ModelRoot")
 		wrapper.set_meta("audited_facade_local", model.basis.inverse() * Vector3.BACK)
 		model.transform = Transform3D(Basis(Vector3.UP, PI), Vector3.ZERO) * model.transform
@@ -121,6 +121,7 @@ static func _slab(parent: Node3D, node_name: String, rect: Rect2, y: float, colo
 	if kind == "ground":
 		material.set_shader_parameter("variation", 0.015)
 	view.material_override = material
+	view.set_meta(&"walkable_ground", true)
 	view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(view)
 
@@ -147,6 +148,7 @@ static func _polygon_surface(parent: Node3D, node_name: String, polygon: PackedV
 	var material: ShaderMaterial = Surfaces.get_material(color, kind).duplicate()
 	material.set_shader_parameter("variation", 0.012 if kind == "ground" else 0.02)
 	view.material_override = material
+	view.set_meta(&"walkable_ground", true)
 	view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(view)
 
@@ -180,6 +182,7 @@ static func _union_mesh(parent: Node3D, node_name: String, include: Array[Rect2]
 	view.name = node_name
 	view.mesh = surface.commit()
 	view.material_override = Surfaces.get_material(color, "asphalt" if exclude.is_empty() else "pavement")
+	view.set_meta(&"walkable_ground", true)
 	view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(view)
 

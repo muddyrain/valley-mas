@@ -152,9 +152,10 @@ func check_data_modifiers() -> void:
 			for row: int in range(original.loot_table.entries.size()):
 				var entry: Dictionary = original.loot_table.entries[row]
 				var result: Dictionary = changed.loot_table.entries[row]
-				var factor: float = action.food_multiplier if entry.loot_id == "food" else action.scrap_multiplier
-				valid = valid and result.chance == entry.chance and result.max_amount == roundi(float(entry.max_amount) * factor)
-	check(valid and base.buildings == snapshot, "Today-action quantity modifiers preserve chances and shared data")
+				valid = valid and result == entry
+		var final_loot: Dictionary = modified.mission_profile.modify_loot({"food": 10, "scrap": 10})
+		valid = valid and final_loot.food == roundi(10 * action.food_multiplier) and final_loot.scrap == roundi(10 * action.scrap_multiplier)
+	check(valid and base.buildings == snapshot, "Today-action final modifiers preserve base tables and chances")
 	check(is_equal_approx(mission.effects.search_seconds(8.0, 2.0), 4.0), "Existing search trait modifier still affects the centralized duration")
 
 func check_profiles() -> void:

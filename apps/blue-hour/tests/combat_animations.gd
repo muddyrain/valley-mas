@@ -142,9 +142,9 @@ func run() -> void:
 					check(controller.source.get_bone_pose(bone).is_equal_approx(baseline.source.get_bone_pose(bone)), "Shoot + Jog preserves " + bone_name)
 				var palm := (poses.LeftHand as Transform3D) * Vector3(0, .045, 0)
 				max_grip_error = maxf(max_grip_error, palm.distance_to(actor.weapon_visual.get_support_grip().global_position))
-		check(controller.current_state == &"mission_jog", "Shared Mission style selected")
-		check(is_equal_approx(controller.playback_rate, baseline.playback_rate), "Combat and unarmed V2.2 share cadence")
-		check(controller.player.get_animation_library(&"Mission") == baseline.player.get_animation_library(&"Mission"), "Public Jog resource is shared")
+		check(controller.current_state == &"Run", "Shared public Run selected")
+		check(is_equal_approx(controller.playback_rate, baseline.playback_rate), "Combat and unarmed share cadence")
+		check(controller.player.get_animation_library(&"Public") == baseline.player.get_animation_library(&"Public"), "Public locomotion resource is shared")
 		controller.use_render_clock(actor, null)
 		baseline.use_render_clock(reference, null)
 		# Aim can differ from travel without changing the locomotion root.

@@ -1,5 +1,20 @@
 # BLUE HOUR STARTER ENVIRONMENT KIT V1
 
+## Survivor 当前冻结 Production Baseline（2026-09-19）
+
+清理清单与验证结果见[生产收尾报告](../docs/SURVIVOR_PRODUCTION_FINALIZATION_REPORT.md)。
+
+Xia / Su 165cm 正式 Runtime、23 骨 `BH_Humanoid_Rig_v1`、canonical T-Pose Bind、Shared Skin Contract、Public Idle / Walking / Running、Expedition Walkable Ground Contract 均已通过验收并冻结。Expedition 基础速度为 **2.8m/s**。不生成 V2/V3 或角色专属 Locomotion。
+
+未来 12 人统一流程：**Static GLB → 165cm Runtime Envelope → canonical T-Pose Alignment → BH_Humanoid_Rig_v1 → Skin QA → Public Locomotion → Gameplay**。角色资料身高不缩放 Runtime Rig；LOD0 目标约 100k tris。统一 Bone Length / Axis / Rest / Foot Ground / Socket，外观差异由 Mesh 和 Skin 承担。未来角色直接共享公共三动作，不制作独立 Idle / Walking / Running，不运行角色专属 Retarget。
+
+正式入口：`assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb`、`assets/characters/su_wanxing/runtime/su_wanxing.glb`。公共库：`assets/animations/public_locomotion/public_locomotion.tres`，引用同目录 `public_idle.tres`、`public_walking.tres`、`public_running.tres`。冻结哈希记录在 `tests/fixtures/survivor_production_baseline.json`。
+
+当前 Skin / T-Pose / Canonical 转换与生产 QA 工具保留。`export_locomotion_retarget.gd` 仍被公共转换的 `canonical_locomotion/prepare.py` 调用，属于保留工具链，不是旧角色 Runtime。两份旧 source GLB 因先前工具策略阻止删除而列为待清理，已排除导出且无正式引用；本轮不绕过策略重试。
+
+旧 Mission Jog、Start/Stop 资源及旧局部摆臂层已退出生产并清理，对应历史章节只保留开发记录，不再描述当前 Runtime。三人长途返回/让行停滞、旧 Camp HUD 断言作为独立已知问题保留，不计本轮失败；不开展 Combat/Armed、Turn/Start/Stop 或其余角色制作。
+
+
 ## Standard Survivor Template 静态基线
 
 2026-09-17：女性标准模板唯一入口为 [survivor_animation_template.tscn](../assets/characters/survivor_animation_template/survivor_animation_template.tscn)，实测 1.6499997m、28 骨、34,098 顶点、49,349 三角形。保留源 Rest Pose 和权重，不接入源 FBX 的动作；场景无 AnimationPlayer / AnimationTree，不接入正式角色或 gameplay。静态鞋底接地通过，左右 Toe_End 轴存在最大约 28.8° 镜像差，后续动作制作前须明确处理策略；本轮不修正。源哈希、完整层级、地面与蒙皮检查见 [静态基线报告](../docs/STANDARD_SURVIVOR_TEMPLATE_BASELINE.md)。此模板独立于下述环境套件统计。
@@ -12,9 +27,11 @@
 
 2026-09-18：根据用户后续授权完成无武器持续 Run 重构候选，正式动作 [animations/running.tres](../assets/characters/survivor_animation_template/animations/running.tres)，制作源 [standard_survivor_running.blend](blender/characters/standard_survivor_running.blend)。0.666667 秒 / 180 步频保留，支撑与摆臂已重构、完整循环闭合；反推匹配速度约 2.57m/s，未写入 Gameplay。测量、四视频和后跟残差见 [重构报告](../docs/STANDARD_SURVIVOR_RUNNING_RECONSTRUCTION.md)。等待视觉验收，不推进 Combat Jog / Armed Run。
 
-## 夏知遥标准 Locomotion
+## Xia / Su 统一生产 Locomotion
 
-2026-09-18：用户确认标准 Rest / Idle / Walking / Running PASS。唯一动作源仍为上述 Standard Survivor 三份 `.tres`，新增夏知遥专属 [Idle](../assets/characters/xia_zhiyao/animations/idle.tres) / [Walking](../assets/characters/xia_zhiyao/animations/walking.tres) / [Running](../assets/characters/xia_zhiyao/animations/running.tres)，保持原 1.60m Mesh、23 骨、Skin 和 Rest。可重复映射/接地补偿为 [xia_zhiyao_locomotion.json](blender/rigs/xia_zhiyao_locomotion.json)，动画不依赖 Runtime IK。Running 推荐匹配约 2.31m/s，与标准 2.57m/s 存在差异，仅报告未改 Gameplay。12 视频、独立程序、测量与保护结果见 [Retarget 验收报告](../docs/XIA_ZHIYAO_STANDARD_LOCOMOTION_RETARGET.md)。夏知遥候选待视觉验收，未接入苏晚星、公共动画或 Gameplay。
+2026-09-19：用户已验收 165cm T-Pose Bind + Skin Polish，两角色正式入口为 [Xia](../assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb) 与 [Su](../assets/characters/su_wanxing/runtime/su_wanxing.glb)，LOD0 分别 101,982 / 102,500 tris。两者原生冻结 BH_Humanoid_Rig_v1 23 骨，直接引用唯一[公共动画库](../assets/animations/public_locomotion/public_locomotion.tres)，不再使用角色专属 Locomotion Retarget。Expedition 2.8m/s，Run reference 2.276231530m/s；Camp 原行为不变。
+
+[生产接入报告](../docs/SURVIVOR_PRODUCTION_INTEGRATION_REPORT.md)记录视频、接地、武器和独立 EXE 证据。旧 Xia 专属三动作已删除；两份无引用旧 source GLB 因工具删除审批被拒绝暂留，不打入生产包。Standard 三动作制作源和 canonical 公共库继续保留。旧 [Retarget 报告](../docs/XIA_ZHIYAO_STANDARD_LOCOMOTION_RETARGET.md)仅为历史记录。
 
 ## 环境套件
 
@@ -122,3 +139,5 @@ Camp Visual Polish Pass 02 通过 `camp/camp_dressing.gd` 额外复用 `BH_Bench
 | PRP_Parking_Sign_A | 2,624 / 2,678 | 47.55×250×30.52 | [Scene](../scenes/world/props/street/PRP_Parking_Sign_A.tscn) |
 | PRP_Storefront_AFrame_Sign_A | 3,914 / 4,213 | 60.74×105×52.60 | [Scene](../scenes/world/props/street/PRP_Storefront_AFrame_Sign_A.tscn) |
 | PRP_Bicycle_A | 12,152 / 11,913 | 76.85×105×169.84 | [Scene](../scenes/world/props/street/PRP_Bicycle_A.tscn) |
+
+2026-09-19 后续 Ground Contract 修复：双角色地面门禁 PASS。Actor World Y 与 Ground VFX 共用正式地表三角形查询；静态鞋底误差约 1.5–4.1mm。模型、Rig、Skin、公共动画未变。此前固定导航高度造成的 FAIL 已关闭，三人长途让行的既有失败另行记录，见[地面合同报告](../docs/EXPEDITION_GROUND_CONTRACT_REPORT.md)。

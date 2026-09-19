@@ -39,7 +39,8 @@ func release(mission: Node3D, completed: bool = false) -> void:
 	worker.regrouping = not worker.dead
 	if worker.inside_building:
 		exit_worker = worker
-		exit_worker.position = mission.city.sites[site_id].spec.entry
+		if not mission.city.sites[site_id].spec.get("runtime_search", false):
+			exit_worker.position = mission.city.sites[site_id].spec.entry
 		exit_worker.visible = true
 		transition_left = TRANSITION_SECONDS
 		phase = Phase.EXITING
@@ -131,7 +132,7 @@ func prepare(delta: float, mission: Node3D) -> void:
 		return
 	var site: Dictionary = mission.city.sites[site_id]
 	var entry: Vector3 = site.spec.entry
-	var radius: float = mission.catalog.map.search_radius if site.vehicle else .15
+	var radius: float = .1 if site.spec.get("runtime_search", false) else mission.catalog.map.search_radius if site.vehicle else .15
 	if worker.position.distance_to(entry) > radius:
 		phase = Phase.MOVING_TO_ENTRANCE
 		if worker.path.is_empty():
@@ -143,7 +144,8 @@ func prepare(delta: float, mission: Node3D) -> void:
 	if site.vehicle:
 		phase = Phase.SEARCHING_OUTSIDE
 	else:
-		worker.position = entry
+		if not site.spec.get("runtime_search", false):
+			worker.position = entry
 		worker.inside_building = true
 		phase = Phase.ENTERING
 		transition_left = TRANSITION_SECONDS

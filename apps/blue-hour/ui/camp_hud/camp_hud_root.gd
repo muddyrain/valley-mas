@@ -38,6 +38,13 @@ func _select_survivor(index: int) -> void:
 	$M05_SurvivorDetail.show_survivor(data)
 	$M05_SurvivorDetail.show()
 
+func show_survivor(id: String) -> void:
+	# World selection and the portrait rail share the existing presentation route.
+	for index: int in DetailFixtures.ROWS.size():
+		if DetailFixtures.get_survivor(index).id == id:
+			$M04_SurvivorRoster.select_index(index)
+			return
+
 func lock_departure() -> void:
 	set_hud_visible(true)
 	$M08_DepartAction/Entry.disabled = true

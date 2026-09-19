@@ -49,7 +49,11 @@ func member_level(id: String) -> int:
 func member_trait(id: String) -> Resource:
 	var template := member_template(id)
 	var base: Resource = catalog.by_id(catalog.traits, template.trait_id)
-	return base.at_level(member_level(id))
+	return base.at_level(member_trait_level(id))
+
+func member_trait_level(id: String) -> int:
+	# Roster level is already persisted and upgraded by the formal progression system.
+	return clampi(member_level(id), 1, 5)
 
 func effect_definition(category: String, id: String) -> Resource:
 	if category not in ["passive", "power"] or not data.get(category + "_items", {}).has(id):

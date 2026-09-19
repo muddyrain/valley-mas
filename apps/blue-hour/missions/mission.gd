@@ -25,6 +25,9 @@ const LootResolver = preload("res://core/loot_resolver.gd")
 const NoiseSystem = preload("res://encounter/noise_system.gd")
 const RandomMapGenerator = preload("res://maps/random/random_map_generator.gd")
 const MapProvider = preload("res://maps/expedition/expedition_map_provider.gd")
+const TownSearchRegistry = preload("res://maps/expedition/town_search_registry.gd")
+var search_registry: RefCounted
+var selected_search_member: Node3D
 var encounter: RefCounted
 var noise: RefCounted
 var arrival_noise_pending: bool = true
@@ -53,6 +56,7 @@ var enemies: Array[Node3D] = []
 var enemy_pool: Array[Node3D] = []
 var pickups: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
+var trait_rng := RandomNumberGenerator.new()
 var active: bool = true
 var focus_target: Node3D
 var search_tasks: Dictionary = {}
@@ -86,6 +90,7 @@ var generated_map: Dictionary = {}
 var generated_extraction: Vector3 = Vector3.ZERO
 var generated_spawn: Vector3 = Vector3.ZERO
 var mission_type: String = "supply_search"
+var mission_profile: Resource
 var generated_instance_id: int = 0
 var manual_aim := false
 var aim_point := Vector3.ZERO
@@ -96,13 +101,16 @@ var town_runtime_root: Node3D
 var town_runtime_ready: bool = false
 var survivor_commands_enabled: bool = false
 var last_command_rejection: String = ""
+var load_profile: RefCounted
+var search_registry_ready: bool = false
 
-func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], seed_value: int = 0, run_state: RefCounted = null, locked_party: Array[String] = [], map_config: Dictionary = {}) -> void:
+func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], seed_value: int = 0, run_state: RefCounted = null, locked_party: Array[String] = [], map_config: Dictionary = {}, prepared_bridge: Dictionary = {}) -> void:
 	generated_map.clear()
 	runtime_data.clear()
 	town_runtime_ready = false
 	generated_instance_id = get_instance_id()
 	catalog = content
+	mission_profile = catalog.map.mission_profile
 	ledger = resources
 	campaign = run_state
 	effects = campaign.passive_modifiers() if campaign != null else Modifiers.new()
@@ -110,10 +118,10 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 	ledger.begin()
 	rally_point = catalog.map.bus_position
 	random_map_config = map_config.duplicate(true)
-	mission_type = str(random_map_config.get("mission_type", "supply_search"))
+	mission_type = mission_profile.mission_type if mission_profile != null else str(random_map_config.get("mission_type", "supply_search"))
 	map_provider = str(random_map_config.get("map_provider", MapProvider.FIXED_LEGACY))
 	if map_provider == MapProvider.MEDIUM_TOWN_V1:
-		var bridge := MapProvider.create_runtime(map_provider, mission_type, int(random_map_config.get("map_seed", seed_value)), catalog.map, self)
+		var bridge: Dictionary = prepared_bridge if not prepared_bridge.is_empty() else MapProvider.create_runtime(map_provider, mission_type, int(random_map_config.get("map_seed", seed_value)), catalog.map, self)
 		if not bool(bridge.get("ok", false)):
 			push_error("[ExpeditionMapProvider] " + str(bridge.get("error", "Bridge failed")))
 			return
@@ -142,6 +150,11 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 	if town_runtime_ready:
 		city = town_runtime_root
 		director_enabled = false
+		var search_started := Time.get_ticks_usec()
+		search_registry = TownSearchRegistry.new()
+		search_registry.setup(self)
+		if load_profile != null:
+			load_profile.measure("search_registry", search_started)
 	else:
 		var legacy_bridge := MapProvider.create_runtime(MapProvider.FIXED_LEGACY, mission_type, seed_value, catalog.map, self)
 		city = legacy_bridge.root
@@ -161,10 +174,11 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 		member_ids = catalog.survivors.slice(0, loadout.size()).map(func(member): return member.id)
 	else:
 		member_ids = campaign.data.members if locked_party.is_empty() else locked_party
+	var spawn_started := Time.get_ticks_usec()
 	for i in range(member_ids.size()):
 		var member_id: String = member_ids[i]
 		var spec: Resource = (catalog.survivors[i] if campaign == null else campaign.member_template(member_id)).duplicate()
-		var talent: Resource = catalog.by_id(catalog.traits, spec.trait_id).duplicate()
+		var talent: Resource = catalog.by_id(catalog.traits, spec.trait_id).at_level(1)
 		var equipment: Resource
 		if campaign == null:
 			equipment = catalog.by_id(catalog.weapons, loadout[i])
@@ -184,7 +198,10 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 			town_positions = town_runtime_root.spawn_positions(member_ids.size())
 		survivor.position = town_positions[survivors.size()] if survivors.size() < town_positions.size() else spawn_origin + formation(survivors.size())
 		survivors.append(survivor)
+	if load_profile != null:
+		load_profile.measure("survivor_spawn", spawn_started)
 	encounter = EncounterDirector.new()
+	trait_rng.seed = hash("trait-rewards:%s" % rng.seed)
 	encounter.setup(catalog.map.encounter, rng.seed)
 	if not town_runtime_ready:
 		encounter.seed_population(self)
@@ -211,6 +228,15 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 	survivor_commands_enabled = not town_runtime_ready
 
 func _on_navigation_ready() -> void:
+	var started := Time.get_ticks_usec()
+	if load_profile != null:
+		await search_registry.resolve_navigation_staged()
+	else:
+		search_registry.resolve_navigation()
+	exploration.refresh()
+	search_registry_ready = true
+	if load_profile != null:
+		load_profile.measure("search_navigation_resolve", started)
 	survivor_commands_enabled = true
 	town_runtime_root.lifecycle.append("survivor_commands_enabled")
 	navigation_ready.emit()
@@ -286,8 +312,21 @@ func _physics_process(delta: float) -> void:
 func _advance_world(dt: float) -> void:
 	if town_runtime_ready:
 		if survivor_commands_enabled:
+			for task: RefCounted in search_tasks.values():
+				task.prepare(dt, self)
+			for task: RefCounted in exiting_tasks:
+				task.advance_exit(dt)
+			exiting_tasks = exiting_tasks.filter(func(task: RefCounted): return task.exit_worker != null)
+			_prune_tasks()
+			regroup_left -= dt
+			if regroup_left <= 0:
+				refresh_regroup()
 			for survivor: Node3D in survivors:
 				survivor.tick(dt, self)
+			for task: RefCounted in search_tasks.values():
+				task.advance(dt, self)
+			_prune_tasks()
+			_update_pickups()
 		if exploration != null:
 			exploration.advance(dt)
 		return
@@ -356,23 +395,33 @@ func movement_speed(member: Node3D, waypoint: Vector3, delta: float) -> float:
 	if town_runtime_ready:
 		# Keep a following gap on a shared corridor without moving actors off their
 		# collision-checked paths or introducing a crowd physics / RVO system.
-		var heading: Vector3 = (waypoint - member.position).normalized()
+		# Following/yielding uses the XZ navigation corridor. Surface elevation
+		# must not tilt headings or change lateral separation and right of way.
+		var heading: Vector3 = waypoint - member.position
+		heading.y = 0
+		heading = heading.normalized()
 		for other: Node3D in survivors:
 			if other == member or other.dead or other.path.is_empty():
 				continue
 			var offset: Vector3 = other.position - member.position
+			offset.y = 0
 			var ahead: float = offset.dot(heading)
 			var lateral: float = (offset - heading * ahead).length()
-			var other_heading: Vector3 = (other.path[0] - other.position).normalized()
+			var other_heading: Vector3 = other.path[0] - other.position
+			other_heading.y = 0
+			other_heading = other_heading.normalized()
 			var follows: bool = heading.dot(other_heading) > 0.5
 			var yields: bool = survivors.find(member) > survivors.find(other)
-			if ahead > 0.0 and lateral < 1.1 and (follows or yields):
+			# Converging headings can each see the other ahead. One stable priority
+			# must win that mutual wait, otherwise both speeds remain zero forever.
+			var mutual_ahead: bool = follows and -offset.dot(other_heading) > 0.0
+			if ahead > 0.0 and lateral < 1.1 and (follows or yields) and (not mutual_ahead or yields):
 				speed = minf(speed, maxf(0.0, (ahead - 1.2) * 2.0))
 			if not follows:
 				var a: Vector2 = Vector2(member.position.x, member.position.z)
 				var b: Vector2 = Vector2(other.position.x, other.position.z)
-				var end_a: Vector3 = member.position.move_toward(waypoint, 4.0)
-				var end_b: Vector3 = other.position.move_toward(other.path[0], 4.0)
+				var end_a: Vector3 = member.position + heading * minf(4.0, Vector2(waypoint.x - member.position.x, waypoint.z - member.position.z).length())
+				var end_b: Vector3 = other.position + other_heading * minf(4.0, Vector2(other.path[0].x - other.position.x, other.path[0].z - other.position.z).length())
 				var crossing: Variant = Geometry2D.segment_intersects_segment(a, Vector2(end_a.x, end_a.z), b, Vector2(end_b.x, end_b.z))
 				if crossing != null:
 					var distance_a: float = a.distance_to(crossing)
@@ -518,7 +567,7 @@ func search_target_state(id: String) -> Dictionary:
 		state = "SEARCHING" if task.search_started else "ASSIGNED" if task.phase == SearchTask.Phase.ASSIGNED else "APPROACHING"
 		progressing = owner.searching and task.phase in [SearchTask.Phase.SEARCHING_INSIDE, SearchTask.Phase.SEARCHING_OUTSIDE]
 	return {"state": state, "worker": owner, "progress": site.progress, "completed": site.searched,
-		"can_search": active and closing_left < 0 and not site.searched and owner == null,
+		"can_search": active and closing_left < 0 and not site.searched and owner == null and str(site.spec.get("search_status", "AVAILABLE")) == "AVAILABLE",
 		"progressing": active and not site.searched and progressing}
 
 func _prune_tasks() -> void:
@@ -637,12 +686,25 @@ func command_search(id: String) -> void:
 		return
 	poi_selected_id = id
 	var site: Dictionary = city.sites[id]
+	if town_runtime_ready:
+		if not survivor_commands_enabled or site.spec.get("search_status", "") != "AVAILABLE":
+			_reject_move("SEARCH_REJECTED_UNREACHABLE")
+			notice.emit("无法抵达该搜索入口")
+			return
+		if not site.discovered:
+			return
 	if search_tasks.has(id):
 		selected_search_id = id
+		return
+	if town_runtime_ready and (not is_instance_valid(selected_search_member) or selected_search_member.dead or selected_search_member.boarding or selected_search_member.inside_building or task_for(selected_search_member) != null):
+		_reject_move("SEARCH_REJECTED_MEMBER_UNAVAILABLE")
+		notice.emit("所选队员暂时无法接取搜索 · 请先取消当前任务或选择其他队员")
 		return
 	var nearest: Node3D
 	var best := INF
 	for member in living():
+		if town_runtime_ready and member != selected_search_member:
+			continue
 		if member.boarding or member.inside_building or task_for(member) != null:
 			continue
 		var route: PackedVector3Array = city.path(member.position, site.spec.entry)
@@ -653,16 +715,21 @@ func command_search(id: String) -> void:
 			best = distance
 			nearest = member
 	if nearest == null:
+		if town_runtime_ready:
+			_reject_move("SEARCH_REJECTED_UNREACHABLE")
 		notice.emit("没有空闲且可抵达的队员 · 可先召回一人")
 		return
 	extraction = false
 	extraction_left = catalog.map.extraction_seconds
 	var task := SearchTask.new()
+	last_command_rejection = ""
 	search_tasks[id] = task
 	selected_search_id = id
 	task.assign(id, nearest, self)
 	if is_instance_valid(world_interaction_vfx):
-		world_interaction_vfx.play_search_feedback(site.search_anchor.global_position)
+		world_interaction_vfx.play_search_feedback(site.spec.entry if town_runtime_ready else site.search_anchor.global_position)
+		if town_runtime_ready:
+			world_interaction_vfx.play_command_line(nearest, site.spec.entry, true)
 	notice.emit("%s 前往搜索 %s" % [nearest.data.display_name, site.spec.name])
 
 func command_reassign(index: int) -> void:
@@ -863,6 +930,19 @@ func drop_loot(point: Vector3, food: int, scrap: int, weapon_item: Dictionary = 
 func reward_for_site(id: String) -> Dictionary:
 	if campaign == null:
 		return {}
+	if mission_profile != null:
+		if not city.sites.has(id):
+			return {}
+		var chance: float = mission_profile.weapon_chance_for(city.sites[id].spec)
+		var reward_rng := RandomNumberGenerator.new()
+		# A separate stream keeps order-independent rewards stable across retries.
+		reward_rng.seed = hash("%s:%s:%s:%s" % [campaign.data.seed, campaign.data.day, mission_profile.id, id])
+		if reward_rng.randf() >= chance:
+			return {}
+		var uid := "mission-loot:%s:%s:%s" % [campaign.data.day, mission_profile.id, id]
+		if not campaign.item(uid).is_empty():
+			return {}
+		return campaign.gear.roll(mission_profile.weapon_pool, uid, reward_rng, false)
 	var action: Resource = catalog.by_id(catalog.today_actions, str(campaign.data.get("selected_action", "")))
 	if action != null and id not in action.weapon_sites:
 		return {}
@@ -875,13 +955,13 @@ func resolve_site_loot(site: Dictionary) -> Dictionary:
 	if table.is_empty():
 		output.food = site.spec.get("food", 0)
 		output.scrap = site.spec.get("scrap", 0)
-		return output
+		return mission_profile.modify_loot(output) if mission_profile != null else output
 	for rolled: Dictionary in LootResolver.roll_dict(table, rng):
 		if rolled.id == "food":
 			output.food += rolled.amount
 		elif rolled.id == "scrap":
 			output.scrap += rolled.amount
-	return output
+	return mission_profile.modify_loot(output) if mission_profile != null else output
 
 func _update_pickups() -> void:
 	for pickup in pickups.duplicate():
@@ -890,7 +970,7 @@ func _update_pickups() -> void:
 			if survivor.inside_building:
 				continue
 			if survivor.position.distance_to(pickup.view.position) <= catalog.map.pickup_radius:
-				var gained: Vector2i = ledger.collect_resources(pickup.food, pickup.scrap, effects.multiplier("resource_yield"))
+				var gained: Vector2i = ledger.collect_resources(pickup.food, pickup.scrap, effects.multiplier("resource_yield"), survivor.talent, trait_rng)
 				var message := "+%d 食物   +%d 废料" % [gained.x, gained.y]
 				if not pickup.weapon.is_empty():
 					ledger.add_weapon(pickup.weapon)
@@ -1002,11 +1082,3 @@ func debug_clear_enemies() -> void:
 	enemies.clear()
 	if focus_target != null:
 		_finish_focus()
-
-
-
-
-
-
-
-

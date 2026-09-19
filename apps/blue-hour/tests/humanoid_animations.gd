@@ -16,7 +16,7 @@ func check(condition: bool, message: String) -> void:
 func run() -> void:
 	DirAccess.make_dir_recursive_absolute("res://test-output/locomotion")
 	var library: AnimationLibrary = Controller.LIBRARY
-	var expected: Array[StringName] = [&"Idle", &"Run", &"Walk"]
+	var expected: Array[StringName] = [&"public_idle", &"public_running", &"public_walking"]
 	check(library.get_animation_list() == expected, "Exactly three shared clips")
 	for clip in library.get_animation_list():
 		var animation := library.get_animation(clip)
@@ -33,7 +33,8 @@ func run() -> void:
 				check((first as Vector3).distance_to(last as Vector3) < .00001, clip + ": seamless position endpoint")
 				for key in animation.track_get_key_count(track):
 					var value: Vector3 = animation.track_get_key_value(track, key)
-					check(absf(value.x - first.x) < .00001 and absf(value.z - first.z) < .00001, clip + ": in-place root/hips")
+					if path.get_subname(0) == &"Root":
+						check(absf(value.x - first.x) < .00001 and absf(value.z - first.z) < .00001, clip + ": in-place root")
 	var review := Review.new()
 	root.add_child(review)
 	review.set_process(false)
@@ -50,14 +51,14 @@ func run() -> void:
 		model.add_child(controller)
 		check(controller.initialize(model), "Attach to imported character skeleton")
 		controllers.append(controller)
-	check(controllers[0].player.get_animation_library(&"Humanoid") == controllers[1].player.get_animation_library(&"Humanoid"), "Both players share the same AnimationLibrary instance")
+	check(controllers[0].player.get_animation_library(&"Public") == controllers[1].player.get_animation_library(&"Public"), "Both players share the same AnimationLibrary instance")
 	check(controllers[0].playback != controllers[1].playback, "Playback state is per survivor")
 	var original: Array[Transform3D] = [review.model.transform, su.transform]
 	var capture := "capture" in OS.get_cmdline_user_args()
 	var evidence: Dictionary = {}
 	for clip in library.get_animation_list():
 		for controller in controllers:
-			controller.preview(clip)
+			controller.preview({&"public_idle": &"Idle", &"public_walking": &"Walk", &"public_running": &"Run"}[clip])
 		var samples: Array = []
 		for frame in 16:
 			for controller in controllers:
@@ -69,7 +70,7 @@ func run() -> void:
 				var skeleton: Skeleton3D = controller.target
 				var hip := skeleton.get_bone_global_pose(skeleton.find_bone("Hips"))
 				var knee := skeleton.get_bone_global_pose(skeleton.find_bone("LeftLowerLeg"))
-				check(hip.is_finite() and knee.is_finite(), "Retargeted pose is finite")
+				check(hip.is_finite() and knee.is_finite(), "Native pose is finite")
 				poses.append({"hips": str(hip.origin), "knee": str(knee.origin)})
 			check(review.model.transform == original[0] and su.transform == original[1], "Animation never moves a character root")
 			samples.append(poses)

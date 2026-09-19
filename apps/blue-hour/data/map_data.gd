@@ -1,4 +1,5 @@
 extends Resource
+@export var mission_profile: Resource
 @export var encounter: Resource = preload("res://data/expedition_encounter.tres")
 @export var id: String = ""
 @export var display_name: String = ""

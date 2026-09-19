@@ -53,7 +53,6 @@ func setup(target: Node3D) -> void:
 	add_child(world_clip)
 	static_layer = TownWorldLayer.new()
 	static_layer.name = "TownWorldLayer"
-	static_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	world_clip.add_child(static_layer)
 	_sync_town()
 	set_process(true)
@@ -150,9 +149,20 @@ func _sync_town() -> void:
 	static_layer.visible = world_clip.visible
 	if not world_clip.visible:
 		cached_source = ""
+		static_layer.commands.clear()
+		static_layer.source = ""
+		static_layer.drawn_source = ""
+		static_layer.queue_redraw()
 		town_markers.clear()
 		return
 	var runtime: Dictionary = mission.runtime_data
+	if runtime.road_bounds.is_empty() or runtime.minimap_geometry.buildings.is_empty():
+		cached_source = ""
+		static_layer.commands.clear()
+		static_layer.source = ""
+		static_layer.drawn_source = ""
+		static_layer.queue_redraw()
+		return
 	var source: String = "%s:%s" % [runtime.seed, runtime.source_signatures.town]
 	town_bounds = runtime.town_bounds
 	if size != _cached_size:
@@ -175,6 +185,8 @@ func _sync_town() -> void:
 		return
 	var started: int = Time.get_ticks_usec()
 	cached_source = source
+	static_layer.source = source
+	static_layer.drawn_source = ""
 	static_layer.commands.clear()
 	static_layer.commands.append({"rect": town_bounds, "color": Color("#304661")})
 	static_layer.commands.append({"rect": town_bounds, "color": Color("#6f7d84"), "outline": true})
@@ -189,6 +201,16 @@ func _sync_town() -> void:
 	static_layer.queue_redraw()
 	static_build_count += 1
 	static_build_ms = (Time.get_ticks_usec() - started) / 1000.0
+	print("[MINIMAP] seed=%d roads=%d buildings=%d cache_rebuilt=true build_ms=%.3f" % [runtime.seed, runtime.road_bounds.size(), geometry.buildings.size(), static_build_ms])
+
+func world_layer_ready() -> bool:
+	if not uses_town_runtime() or cached_source.is_empty() or not minimap_content_rect.has_area() or size.x <= 44 or size.y <= 66:
+		return false
+	var source: String = "%s:%s" % [mission.runtime_data.seed, mission.runtime_data.source_signatures.town]
+	if source != cached_source or static_layer.commands.is_empty() or not is_visible_in_tree():
+		return false
+	# Headless can validate data submission only; native QA checks actual rendered pixels.
+	return DisplayServer.get_name() == "headless" or static_layer.drawn_source == source
 
 func _cache_world_rect(bounds: Rect2, color: Color) -> void:
 	static_layer.commands.append({"rect": bounds, "color": color})
@@ -283,8 +305,10 @@ class LocalWorldClip extends Control:
 	func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color("#304661"))
 
-class TownWorldLayer extends Control:
+class TownWorldLayer extends Node2D:
 	var commands: Array[Dictionary] = []
+	var source: String = ""
+	var drawn_source: String = ""
 
 	func _draw() -> void:
 		for command: Dictionary in commands:
@@ -294,3 +318,4 @@ class TownWorldLayer extends Control:
 				draw_rect(command.rect, command.color, false, 1.0)
 			else:
 				draw_rect(command.rect, command.color)
+		drawn_source = source

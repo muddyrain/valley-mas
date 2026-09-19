@@ -15,6 +15,9 @@ const TodayAction = preload("res://ui/today_action_screen.gd")
 const ShelterView = preload("res://ui/shelter_view.gd")
 const CampHUDRoot = preload("res://ui/camp_hud/camp_hud_root.tscn")
 const LoadingScreenV2 = preload("res://scenes/loading/LoadingScreenV2.tscn")
+const RuntimeLoading = preload("res://ui/runtime_loading_overlay.gd")
+const LoadProfile = preload("res://core/runtime_load_profile.gd")
+const MapProvider = preload("res://maps/expedition/expedition_map_provider.gd")
 var selected_member := ""
 var catalog := Catalog.new()
 var ledger := Ledger.new()
@@ -41,7 +44,8 @@ var selected_mission_data: Resource
 var selected_party: Array[String] = []
 var selected_mission_config: Dictionary = {}
 var random_mission_counter: int = 0
-var departure_fade: ColorRect
+var runtime_loading: CanvasLayer
+var load_profile: RefCounted
 var continue_loading: Control
 var _today_action_closing := false
 var _menu_transitioning := false
@@ -369,6 +373,7 @@ func select_member(id: String) -> void:
 	if state != "shelter" or not is_instance_valid(camp_ui) or not camp_ui.has_method("show_survivor"):
 		return
 	selected_member = id
+	get_camp_view().select(id)
 	camp_ui.show_survivor(id)
 
 func train_member(id: String) -> void:
@@ -473,7 +478,22 @@ func start_mission(action_id: String = "") -> void:
 		return
 	var before: Dictionary = campaign.data.duplicate(true)
 	var party: Array = screen.selected_party if state == "today_action" else campaign.data.members
+	if party.is_empty():
+		return
+	var previous_state := state
+	if not action_id.is_empty():
+		load_profile = LoadProfile.new()
+		load_profile.mark("departure_clicked")
+		state = "departure"
+		if not is_instance_valid(runtime_loading):
+			runtime_loading = RuntimeLoading.new()
+			runtime_loading.name = "RuntimeLoadingOverlay"
+			add_child(runtime_loading)
+		await runtime_loading.close(load_profile)
 	if party.is_empty() or not campaign.start_action(action_id, party) or not _save(before):
+		if not action_id.is_empty():
+			await runtime_loading.open()
+			state = previous_state
 		return
 	var action: Resource = catalog.by_id(catalog.today_actions, action_id)
 	selected_mission_id = action_id
@@ -484,35 +504,97 @@ func start_mission(action_id: String = "") -> void:
 		# Existing internal rule/smoke entry has no selection UI or performance contract.
 		_load_selected_mission()
 		return
-	state = "departure"
-	_fullscreen_camp()
-	camp_ui.lock_departure()
-	if screen != camp_ui:
-		screen.process_mode = Node.PROCESS_MODE_DISABLED
-		screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var tween := create_tween()
-		tween.tween_property(screen, "modulate:a", 0.0, 0.18)
-		await tween.finished
-		camp_ui.remove_child(screen)
-		screen.queue_free()
-	screen = camp_ui
-	camp_view.camp.departure.completed.connect(_departure_complete, CONNECT_ONE_SHOT)
-	camp_view.camp.begin_departure(selected_party)
+	load_profile.seed = int(selected_mission_config.seed)
+	await _load_selected_mission_staged()
 
-func _departure_complete() -> void:
-	camp_ui.set_hud_visible(false)
-	departure_fade = ColorRect.new()
-	departure_fade.color = Color(0, 0, 0, 0)
-	ui_layer.add_child(departure_fade)
-	departure_fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var tween := create_tween()
-	tween.tween_property(departure_fade, "color:a", 1.0, 0.4)
-	await tween.finished
-	_load_selected_mission()
-	ui_layer.move_child(departure_fade, -1)
-	var reveal := create_tween()
-	reveal.tween_property(departure_fade, "color:a", 0.0, 0.25)
-	reveal.tween_callback(departure_fade.queue_free)
+func _load_selected_mission_staged() -> void:
+	load_profile.mark("initialization_started")
+	catalog.map = selected_mission_data
+	_clear_screen()
+	_clear_camp()
+	_clear_mission()
+	mission = Mission.new()
+	mission.load_profile = load_profile
+	mission.process_mode = Node.PROCESS_MODE_DISABLED
+	mission.input_enabled = false
+	add_child(mission)
+	await runtime_loading.rendered_frame()
+	var config := selected_mission_config
+	var bridge: Dictionary = {}
+	if config.get("map_provider", "") == MapProvider.MEDIUM_TOWN_V1:
+		var mission_type: String = catalog.map.mission_profile.mission_type if catalog.map.mission_profile != null else str(config.mission_type)
+		bridge = await MapProvider.create_runtime_staged(mission_type, int(config.seed), catalog.map, mission, load_profile)
+		if not bridge.get("ok", false):
+			_loading_failed(str(bridge.get("error", "Town initialization failed")))
+			return
+	var setup_started := Time.get_ticks_usec()
+	var no_template_loadout: Array[String] = []
+	mission.setup(catalog, ledger, no_template_loadout, int(config.seed), campaign, selected_party, config, bridge)
+	load_profile.measure("mission_setup", setup_started)
+	mission.completed.connect(_mission_complete)
+	await runtime_loading.rendered_frame()
+	var hud_started := Time.get_ticks_usec()
+	hud = HUD.new()
+	ui_layer.add_child(hud)
+	hud.setup(mission, settings)
+	hud.main_menu_requested.connect(return_to_main_menu)
+	load_profile.measure("hud_bind", hud_started)
+	load_profile.stages["minimap_world_build"] = hud.minimap.static_build_ms
+	var ready_started := Time.get_ticks_usec()
+	var deadline := Time.get_ticks_msec() + 15000
+	# At least one complete rendered frame of the HUD/world sits under the opaque hold.
+	await runtime_loading.rendered_frame()
+	while not expedition_ready() and Time.get_ticks_msec() < deadline:
+		await runtime_loading.rendered_frame()
+	load_profile.measure("final_ready_wait", ready_started)
+	if not expedition_ready():
+		_loading_failed("Ready gate timed out: " + JSON.stringify(load_profile.gates))
+		return
+	load_profile.mark("final_ready_gate")
+	load_profile.mark("iris_open_started")
+	await runtime_loading.open()
+	mission.process_mode = Node.PROCESS_MODE_INHERIT
+	mission.input_enabled = true
+	mission.begin_arrival()
+	state = "mission"
+	load_profile.mark("total")
+	load_profile.print_report()
+
+func expedition_ready() -> bool:
+	if not is_instance_valid(mission) or not is_instance_valid(hud):
+		return false
+	var town: bool = mission.map_provider == MapProvider.MEDIUM_TOWN_V1
+	var data: Dictionary = mission.runtime_data
+	load_profile.gates = {
+		"TownRuntimeReady": mission.town_runtime_ready if town else is_instance_valid(mission.city),
+		"BuildingRuntimeReady": town and mission.city.get_node("Buildings").get_child_count() == data.building_entries.size() if town else true,
+		"EnvironmentReady": is_instance_valid(data.get("environment_root")) and mission.city.has_node("M03RoadsideVisualLayer") if town else true,
+		"NavigationReady": bool(data.get("navigation_available", false)) and mission.survivor_commands_enabled if town else true,
+		"SearchRegistryReady": mission.search_registry_ready if town else true,
+		"MinimapWorldLayerReady": hud.minimap.world_layer_ready() if town else is_instance_valid(hud.minimap),
+		"SurvivorsReady": mission.survivors.size() == selected_party.size() and not mission.survivors.is_empty(),
+		"HUDBound": hud.mission == mission and is_instance_valid(hud.minimap)
+	}
+	return load_profile.gates.values().all(func(ready: bool) -> bool: return ready)
+
+func _loading_failed(reason: String) -> void:
+	push_error("[EXP_LOAD] " + reason)
+	load_profile.mark("failed")
+	load_profile.print_report()
+	state = "loading_failed"
+	runtime_loading.fail()
+	var button := UI.button("返回主菜单", _return_after_loading_failure)
+	button.position = get_viewport().get_visible_rect().size * .5 + Vector2(-90, 42)
+	button.custom_minimum_size = Vector2(180, 44)
+	runtime_loading.surface.add_child(button)
+	button.grab_focus()
+
+func _return_after_loading_failure() -> void:
+	campaign.abandon_action()
+	_save()
+	runtime_loading.queue_free()
+	runtime_loading = null
+	show_main_menu()
 
 func _load_selected_mission() -> void:
 	catalog.map = selected_mission_data

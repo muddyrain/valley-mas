@@ -15,12 +15,19 @@ enum TraitType {
 @export var description: String = ""
 @export var trait_type: TraitType = TraitType.COMBAT
 @export var params: Dictionary = {}
+@export var modifier_hook: String = ""
+@export var levels: PackedFloat32Array = PackedFloat32Array()
+var runtime_level: int = 1
 @export var damage_multiplier: float = 1.0
 @export var search_multiplier: float = 1.0
 @export var incoming_damage_multiplier: float = 1.0
 
 func at_level(level: int) -> Resource:
 	var result: Resource = duplicate()
+	result.runtime_level = clampi(level, 1, 5)
+	if not modifier_hook.is_empty():
+		result.search_multiplier = preload("res://core/trait_runtime.gd").search_speed(self, result.runtime_level)
+		return result
 	result.damage_multiplier = 1.0 + (damage_multiplier - 1.0) * level
 	result.search_multiplier = 1.0 + (search_multiplier - 1.0) * level
 	result.incoming_damage_multiplier = maxf(0.1, 1.0 + (incoming_damage_multiplier - 1.0) * level)
@@ -35,6 +42,8 @@ func at_level(level: int) -> Resource:
 
 func summary() -> String:
 	var parts: PackedStringArray = []
+	if modifier_hook == "loot_reward":
+		return "额外基础资源 %d%% 概率" % roundi(preload("res://core/trait_runtime.gd").value(self, runtime_level) * 100)
 	if damage_multiplier != 1.0:
 		parts.append("伤害 +%d%%" % roundi((damage_multiplier - 1.0) * 100))
 	if search_multiplier != 1.0:

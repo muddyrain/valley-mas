@@ -8,7 +8,8 @@ const AGENT_RADIUS: float = BODY_RADIUS + 0.10
 const AGENT_HEIGHT: float = 1.95
 const STEP_HEIGHT: float = 0.20
 const CELL_SIZE: float = 0.5
-const FLOOR_Y: float = 0.08
+const Ground = preload("res://maps/expedition/walkable_ground.gd")
+var ground: RefCounted = Ground.new()
 
 var grid: AStarGrid2D = AStarGrid2D.new()
 var bounds: Rect2
@@ -21,6 +22,7 @@ func build(world: Node3D, town_bounds: Rect2) -> void:
 	var started: int = Time.get_ticks_usec()
 	ready = false
 	obstacles.clear()
+	ground.build(world)
 	bounds = town_bounds.grow(-AGENT_RADIUS)
 	grid.region = Rect2i(Vector2i((town_bounds.position / CELL_SIZE).floor()), Vector2i((town_bounds.size / CELL_SIZE).ceil()) + Vector2i.ONE)
 	grid.cell_size = Vector2.ONE * CELL_SIZE
@@ -33,7 +35,10 @@ func build(world: Node3D, town_bounds: Rect2) -> void:
 		var shape_bounds: AABB = collision.shape.get_debug_mesh().get_aabb()
 		var transform: Transform3D = world.global_transform.affine_inverse() * collision.global_transform
 		var box: AABB = transform * shape_bounds
-		if box.end.y <= STEP_HEIGHT or box.position.y >= FLOOR_Y + AGENT_HEIGHT:
+		var surface_y: float = ground.get_walkable_ground_height(Vector2(box.get_center().x, box.get_center().z))
+		if not is_finite(surface_y):
+			surface_y = ground.minimum_height
+		if box.end.y <= surface_y + STEP_HEIGHT or box.position.y >= surface_y + AGENT_HEIGHT:
 			continue
 		var corners: PackedVector2Array = []
 		for i: int in 8:
@@ -76,7 +81,7 @@ func build(world: Node3D, town_bounds: Rect2) -> void:
 			if not bounds.has_point(Vector2(cell) * CELL_SIZE):
 				grid.set_point_solid(cell)
 			solids.append(int(grid.is_point_solid(cell)))
-	metrics = {"build_ms": (Time.get_ticks_usec() - started) / 1000.0, "backend": "AStarGrid2D", "region_count": 1, "navmesh_count": 0, "cell_count": solids.size(), "obstacle_count": obstacles.size(), "signature": solids.hex_encode().sha256_text(), "memory_bytes": "NOT_AVAILABLE", "agent_radius": AGENT_RADIUS, "agent_height": AGENT_HEIGHT, "step_height": STEP_HEIGHT, "max_slope": "N/A: planar runtime", "edge_connection_margin": "N/A: grid", "path_desired_distance": 0.0, "target_desired_distance": 0.0, "avoidance_enabled": false}
+	metrics = {"build_ms": (Time.get_ticks_usec() - started) / 1000.0, "backend": "AStarGrid2D", "region_count": 1, "navmesh_count": 0, "cell_count": solids.size(), "obstacle_count": obstacles.size(), "signature": solids.hex_encode().sha256_text(), "memory_bytes": "NOT_AVAILABLE", "agent_radius": AGENT_RADIUS, "agent_height": AGENT_HEIGHT, "step_height": STEP_HEIGHT, "max_slope": "2D routes with rendered-surface height projection", "edge_connection_margin": "N/A: grid", "path_desired_distance": 0.0, "target_desired_distance": 0.0, "avoidance_enabled": false}
 	ready = true
 
 func cell_at(point: Vector3) -> Vector2i:
@@ -115,7 +120,9 @@ func nearest(point: Vector3, distance_limit: float = 3.0) -> Vector3:
 			var cell: Vector2i = center + Vector2i(x, z)
 			if not open_cell(cell):
 				continue
-			var candidate: Vector3 = Vector3(cell.x * CELL_SIZE, FLOOR_Y, cell.y * CELL_SIZE)
+			var candidate: Vector3 = ground.project(Vector3(cell.x * CELL_SIZE, 0, cell.y * CELL_SIZE))
+			if not candidate.is_finite():
+				continue
 			var distance: float = Vector2(candidate.x - point.x, candidate.z - point.z).length_squared()
 			if distance < best_distance:
 				best_distance = distance
@@ -138,10 +145,13 @@ func _path(from: Vector3, to: Vector3) -> PackedVector3Array:
 	var cells: Array[Vector2i] = grid.get_id_path(cell_at(start), cell_at(end))
 	if cells.is_empty():
 		return []
-	var points: PackedVector3Array = [Vector3(from.x, FLOOR_Y, from.z)]
+	var points: PackedVector3Array = [ground.project(from)]
 	for cell: Vector2i in cells:
-		points.append(Vector3(cell.x * CELL_SIZE, FLOOR_Y, cell.y * CELL_SIZE))
-	points.append(Vector3(to.x, FLOOR_Y, to.z))
+		points.append(ground.project(Vector3(cell.x * CELL_SIZE, 0, cell.y * CELL_SIZE)))
+	points.append(ground.project(to))
+	for point: Vector3 in points:
+		if not point.is_finite():
+			return []
 	# Only remove redundant points when the whole segment clears inflated collisions.
 	var result: PackedVector3Array = [points[0]]
 	var anchor: int = 0

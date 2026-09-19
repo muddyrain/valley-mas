@@ -27,22 +27,32 @@ foreach ($relative in @(
     'debug/humanoid_rig_review.gd',
     'debug/humanoid_catalog.gd',
     'survivors/survivor_animation_controller.gd',
+    'survivors/survivor_weapon_animation_bridge.gd',
+    'survivors/survivor_combat_constraint.gd',
+    'survivors/humanoid_arm_constraint.gd',
+    'survivors/combat_locomotion_secondary.gd',
+    'data/weapon_data.gd',
+    'data/weapon_registry.gd',
     'scenes/debug/humanoid_rig_review.tscn',
-    'assets/animations/humanoid/locomotion/bh_humanoid_reference.tscn',
-    'assets/animations/humanoid/locomotion/bh_humanoid_animations_v1.tres',
-    'assets/animations/humanoid/locomotion/bh_humanoid_locomotion_tree.tres',
-    'assets/characters/xia_zhiyao/source/xia_zhiyao.glb',
-    'assets/characters/xia_zhiyao/source/xia_zhiyao.glb.import',
+    'assets/animations/public_locomotion/public_locomotion.tres',
+    'assets/animations/public_locomotion/public_idle.tres',
+    'assets/animations/public_locomotion/public_walking.tres',
+    'assets/animations/public_locomotion/public_running.tres',
     'assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb',
     'assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb.import',
-    'assets/characters/su_wanxing/source/su_wanxing.glb',
-    'assets/characters/su_wanxing/source/su_wanxing.glb.import',
     'assets/characters/su_wanxing/runtime/su_wanxing.glb',
     'assets/characters/su_wanxing/runtime/su_wanxing.glb.import'
 )) {
     $destination = Join-Path $reviewRoot $relative
     New-Item -ItemType Directory -Path (Split-Path $destination -Parent) -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $appRoot $relative) -Destination $destination -Force
+}
+# Copy the existing runtime dependencies and globally named classes used by the inspector.
+foreach ($relative in @('weapons', 'data/weapon_poses', 'assets/weapons',
+    'assets/animations/humanoid/combat', 'assets/characters/infected_basic_a', 'vfx')) {
+    $destination = Join-Path $reviewRoot $relative
+    New-Item -ItemType Directory -Path $destination -Force | Out-Null
+    Get-ChildItem -LiteralPath (Join-Path $appRoot $relative) | Copy-Item -Destination $destination -Recurse -Force
 }
 @'
 config_version=5

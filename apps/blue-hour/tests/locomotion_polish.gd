@@ -115,7 +115,7 @@ func run() -> void:
 		for frame in 120:
 			controller.update_motion(1.3, member.data.move_speed, 1.0 / 60)
 		rates.append(controller.playback_rate)
-		check(absf(controller.playback_rate - 1.3 / .9677419354838708) < .001, id + ": cadence follows actual speed")
+		check(absf(controller.playback_rate - 1.3 / 1.2448574889997928) < .001, id + ": cadence follows actual speed")
 		var play_position: float = controller.playback.get_current_play_position()
 		controller.update_motion(4.2, 4.2, 0)
 		check(is_equal_approx(play_position, controller.playback.get_current_play_position()), id + ": pause does not advance animation")

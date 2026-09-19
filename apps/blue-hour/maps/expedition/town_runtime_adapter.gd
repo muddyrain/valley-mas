@@ -22,30 +22,86 @@ var navigation: RefCounted = TownNavigation.new()
 var lifecycle: Array[String] = []
 var navigation_targets: Dictionary = {}
 var residential_bounds: Rect2
+var load_profile: RefCounted
+var runtime_started_usec: int = 0
 
 func build_runtime(mission_type: String, map_seed: int, base_map: Resource) -> bool:
-	var started: int = Time.get_ticks_usec()
-	var town: Dictionary = TownGenerator.generate(mission_type, map_seed, "PROFILE_A_MAIN_STREET")
+	runtime_started_usec = Time.get_ticks_usec()
+	var town: Dictionary = _generate_town(mission_type, map_seed)
 	if not bool(town.get("ok", false)):
 		return false
+	var environment: Dictionary = _generate_environment(town)
+	_instantiate_town(town)
+	var environment_root := _instantiate_environment(town, environment)
+	_finish_runtime(town, environment.data, environment.roadside, environment_root, map_seed, base_map)
+	return true
+
+func build_runtime_staged(mission_type: String, map_seed: int, base_map: Resource, profile: RefCounted) -> bool:
+	runtime_started_usec = Time.get_ticks_usec()
+	load_profile = profile
+	var town: Dictionary = _generate_town(mission_type, map_seed)
+	if not bool(town.get("ok", false)):
+		return false
+	await _loading_frame()
+	var environment: Dictionary = _generate_environment(town)
+	await _loading_frame()
+	_instantiate_town(town)
+	await _loading_frame()
+	var environment_root := _instantiate_environment(town, environment)
+	await _loading_frame()
+	_finish_runtime(town, environment.data, environment.roadside, environment_root, map_seed, base_map)
+	return true
+
+func _loading_frame() -> void:
+	await get_tree().process_frame
+	if DisplayServer.get_name() != "headless":
+		await RenderingServer.frame_post_draw
+
+func _generate_town(mission_type: String, map_seed: int) -> Dictionary:
+	var started: int = Time.get_ticks_usec()
+	var town: Dictionary = TownGenerator.generate(mission_type, map_seed, "PROFILE_A_MAIN_STREET")
+	if load_profile != null:
+		load_profile.measure("town_generate", started)
+	return town
+
+func _generate_environment(town: Dictionary) -> Dictionary:
+	var started := Time.get_ticks_usec()
 	var environment_data: Dictionary = Targeted.new().generate(town)
 	var roadside: Dictionary = RoadsidePass.new().generate(town, environment_data)
+	if load_profile != null:
+		load_profile.measure("environment_generate", started)
+	return {"data": environment_data, "roadside": roadside}
+
+func _instantiate_town(town: Dictionary) -> void:
+	var started := Time.get_ticks_usec()
 	UrbanView.build(self, town)
-	var environment_root: Node3D = PolishView.build(self, environment_data)
-	RoadsideView.build(self, town, roadside)
+	if load_profile != null:
+		load_profile.measure("building_instance", started)
+
+func _instantiate_environment(town: Dictionary, environment: Dictionary) -> Node3D:
+	var started := Time.get_ticks_usec()
+	var environment_root: Node3D = PolishView.build(self, environment.data)
+	RoadsideView.build(self, town, environment.roadside)
+	if load_profile != null:
+		load_profile.measure("environment_placement", started)
+	return environment_root
+
+func _finish_runtime(town: Dictionary, environment_data: Dictionary, roadside: Dictionary, environment_root: Node3D, map_seed: int, base_map: Resource) -> void:
+	var started := Time.get_ticks_usec()
+	navigation.ground.build(self)
 	bus_root = get_node("BusArrival")
 	bus_door = bus_root.get_node("DoorMotion")
-	var arrival_point: Vector3 = town.arrival.position
+	var arrival_point: Vector3 = project_to_ground(town.arrival.position)
 	var arrival_forward := Vector3.BACK.rotated(Vector3.UP, float(town.arrival.yaw))
 	var bounds: Rect2 = town.bounds
 	var entries: Array[Dictionary] = []
 	var search_points: Array[Dictionary] = []
 	for site: Dictionary in town.buildings:
-		entries.append({"id": site.id, "position": site.entry, "asset": site.asset})
+		entries.append({"id": site.id, "position": project_to_ground(site.entry), "asset": site.asset})
 		var wrapper: Node3D = get_node("Buildings/" + str(site.id))
 		_measure_blocker(wrapper)
 		if bool(site.searchable):
-			search_points.append({"id": site.id, "position": site.entry})
+			search_points.append({"id": site.id, "position": project_to_ground(site.entry)})
 	for wrapper: Node in environment_root.get_children():
 		if wrapper is Node3D and wrapper.has_meta("environment_slot"):
 			_measure_blocker(wrapper)
@@ -54,7 +110,9 @@ func build_runtime(mission_type: String, map_seed: int, base_map: Resource) -> b
 	for road: Dictionary in town.roads:
 		road_bounds.append(road.bounds)
 	var poi_definition: Resource = WorldCatalog.asset(town.poi.asset)
-	runtime_data = {"provider": "MEDIUM_TOWN_V1", "seed": map_seed, "town_bounds": bounds, "arrival_point": arrival_point, "arrival_forward": arrival_forward, "arrival_exit": bus_root.get_node("VehicleExitPoint").global_position, "mission_poi": town.poi.entry, "mission_poi_id": town.poi.id, "mission_poi_type": poi_definition.poi_type if not poi_definition.poi_type.is_empty() else poi_definition.category, "extraction_point": town.extraction.position, "building_entries": entries, "building_search_points": search_points, "vehicle_search_points": NOT_AVAILABLE_YET, "enemy_spawn_zones": NOT_AVAILABLE_YET, "road_bounds": road_bounds, "walkable_hint_bounds": road_bounds, "environment_root": environment_root, "runtime_root": self, "world_root": self, "navigation_available": false, "gameplay_available": false, "movement_status": "MOVEMENT BLOCKED BY E01 NAVIGATION INTEGRATION", "source_signatures": {"town": var_to_str(town).sha256_text(), "m02": var_to_str(environment_data).sha256_text(), "m03": var_to_str(roadside).sha256_text()}, "m03_statistics": roadside.statistics, "environment_instance_count": environment_data.instances.size()}
+	runtime_data = {"provider": "MEDIUM_TOWN_V1", "seed": map_seed, "town_bounds": bounds, "arrival_point": arrival_point, "arrival_forward": arrival_forward, "arrival_exit": bus_root.get_node("VehicleExitPoint").global_position, "mission_poi": project_to_ground(town.poi.entry), "mission_poi_id": town.poi.id, "mission_poi_type": poi_definition.poi_type if not poi_definition.poi_type.is_empty() else poi_definition.category, "extraction_point": project_to_ground(town.extraction.position), "building_entries": entries, "building_search_points": search_points, "vehicle_search_points": NOT_AVAILABLE_YET, "enemy_spawn_zones": NOT_AVAILABLE_YET, "road_bounds": road_bounds, "walkable_hint_bounds": road_bounds, "environment_root": environment_root, "runtime_root": self, "world_root": self, "navigation_available": false, "gameplay_available": false, "movement_status": "MOVEMENT BLOCKED BY E01 NAVIGATION INTEGRATION", "source_signatures": {"town": var_to_str(town).sha256_text(), "m02": var_to_str(environment_data).sha256_text(), "m03": var_to_str(roadside).sha256_text()}, "m03_statistics": roadside.statistics, "environment_instance_count": environment_data.instances.size()}
+	get_node("MissionPOI").position = runtime_data.mission_poi
+	get_node("BusArrivalPoint").position = arrival_point
 	data = base_map.duplicate(true)
 	# Read-only HUD snapshot of the generated geometry; navigation and Town stay untouched.
 	var minimap_buildings: Array[Dictionary] = []
@@ -78,7 +136,7 @@ func build_runtime(mission_type: String, map_seed: int, base_map: Resource) -> b
 	_build_input_surface(bounds)
 	marker = HudMarker.create(self, "world_move_marker", 1.05, arrival_point)
 	marker.hide()
-	var return_zone := HudMarker.create(self, "world_select_ring", 8.0, arrival_point + Vector3(0, 0.06, 0), true)
+	var return_zone := HudMarker.create(self, "world_select_ring", 8.0, arrival_point + Vector3.UP * TownNavigation.Ground.MARKER_CLEARANCE, true)
 	return_zone.name = "ReturnZone"
 	return_zone.material_override.albedo_color = Color("#f4d397")
 	var bus_marker := HudMarker.create(self, "icon_return", .85, arrival_point + Vector3.UP * 3.1)
@@ -90,22 +148,23 @@ func build_runtime(mission_type: String, map_seed: int, base_map: Resource) -> b
 	bus_light.position = arrival_point + Vector3.UP * 3.5
 	bus_light.light_energy = 0.0
 	add_child(bus_light)
-	runtime_data["town_generation_ms"] = (Time.get_ticks_usec() - started) / 1000.0
+	runtime_data["town_generation_ms"] = (Time.get_ticks_usec() - runtime_started_usec) / 1000.0
 	lifecycle.append("town_runtime_ready")
 	for block: Dictionary in town.blocks:
 		var target: Vector2 = block.bounds.get_center()
 		if block.land_use_type == "OPEN_SPACE" and not navigation_targets.has("park"):
-			navigation_targets["park"] = Vector3(target.x, 0.08, target.y)
+			navigation_targets["park"] = project_to_ground(Vector3(target.x, 0, target.y))
 		if str(block.land_use_type).begins_with("RESIDENTIAL") and not navigation_targets.has("residential"):
-			navigation_targets["residential"] = Vector3(target.x, 0.08, target.y)
+			navigation_targets["residential"] = project_to_ground(Vector3(target.x, 0, target.y))
 			residential_bounds = block.bounds.grow(-4.0)
 		if block.land_use_type == "COMMERCIAL_CORE" and not navigation_targets.has("commercial"):
 			for site: Dictionary in town.buildings:
 				if site.land_use_type == "COMMERCIAL_CORE":
-					navigation_targets["commercial"] = site.road_point
+					navigation_targets["commercial"] = project_to_ground(site.road_point)
 					break
 	_build_navigation.call_deferred()
-	return true
+	if load_profile != null:
+		load_profile.measure("town_runtime_bind", started)
 
 func _build_navigation() -> void:
 	var started: int = Time.get_ticks_usec()
@@ -122,6 +181,8 @@ func _build_navigation() -> void:
 				navigation_targets[key] = open
 	_resolve_residential_landmark()
 	runtime_data["navigation_ready_ms"] = (Time.get_ticks_usec() - started) / 1000.0
+	if load_profile != null:
+		load_profile.measure("navigation", started)
 	runtime_data["navigation_available"] = true
 	runtime_data["movement_status"] = "NAVIGATION READY"
 	lifecycle.append("navigation_ready")
@@ -140,7 +201,7 @@ func _resolve_residential_landmark() -> void:
 	for radius: int in range(0, 13, 2):
 		for direction: Vector2 in [Vector2.ZERO, Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN, Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
 			var flat: Vector2 = Vector2(center.x, center.z) + direction * radius
-			var candidate: Vector3 = navigation.nearest(Vector3(flat.x, .08, flat.y), 1.0)
+			var candidate: Vector3 = navigation.nearest(Vector3(flat.x, 0, flat.y), 1.0)
 			if not candidate.is_finite() or not residential_bounds.has_point(Vector2(candidate.x, candidate.z)):
 				continue
 			if not navigation.path(origin, candidate).is_empty():
@@ -155,7 +216,9 @@ func spawn_positions(count: int) -> Array[Vector3]:
 	for row: int in 10:
 		for side: float in [0.0, 1.2, -1.2, 2.4, -2.4]:
 			var candidate := origin + lateral * side - forward * float(row) * 1.2
-			candidate.y = 0.08
+			candidate = project_to_ground(candidate)
+			if not candidate.is_finite():
+				continue
 			if not spawn_is_clear(candidate) or result.any(func(point: Vector3) -> bool: return point.distance_to(candidate) < 1.1):
 				continue
 			result.append(candidate)
@@ -173,6 +236,12 @@ func spawn_is_clear(point: Vector3) -> bool:
 	if navigation.ready and not navigation.point_clear(point):
 		return false
 	return true
+
+func get_walkable_ground_height(world_xz: Vector2) -> float:
+	return navigation.ground.get_walkable_ground_height(world_xz)
+
+func project_to_ground(point: Vector3) -> Vector3:
+	return navigation.ground.project(point)
 
 func nearest_open(point: Vector3) -> Vector3:
 	return navigation.nearest(point)

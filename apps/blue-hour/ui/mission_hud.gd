@@ -100,6 +100,7 @@ func setup(target: Node3D, preferences: RefCounted = null) -> void:
 	world_markers.setup(mission, poi_context)
 	if not mission.survivors.is_empty():
 		selected_member = mission.survivors[0]
+		mission.selected_search_member = selected_member
 		world_markers.selected_member = selected_member
 		if is_instance_valid(mission.world_interaction_vfx):
 			mission.world_interaction_vfx.set_selected_member(selected_member)
@@ -152,6 +153,7 @@ func inspect_member(member: Node3D, locate: bool = true) -> void:
 	if member.dead:
 		return
 	selected_member = member
+	mission.selected_search_member = member
 	world_markers.selected_member = member
 	if is_instance_valid(mission.world_interaction_vfx):
 		mission.world_interaction_vfx.set_selected_member(member)

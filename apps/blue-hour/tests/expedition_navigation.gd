@@ -47,7 +47,7 @@ func create_app(seed_value: int) -> Node:
 	var app: Node = SeededApp.new()
 	app.fixture_seed = seed_value
 	app.fresh_test_run = true
-	app.save_path = "user://test-runs/expedition-navigation-%d.json" % seed_value
+	app.save_path = "user://test-runs/expedition-navigation-%d-%d.json" % [seed_value, OS.get_process_id()]
 	root.add_child(app)
 	await process_frame
 	app.campaign.new_run(seed_value, "combat", ["xia_zhiyao", "su_wanxing", "lin"])
@@ -115,6 +115,12 @@ func verify_seed(seed_value: int) -> void:
 func verify_sealed_enclosure() -> void:
 	var fixture: Node3D = Node3D.new()
 	root.add_child(fixture)
+	var floor_view := MeshInstance3D.new()
+	var floor_mesh := PlaneMesh.new()
+	floor_mesh.size = Vector2(30, 30)
+	floor_view.mesh = floor_mesh
+	floor_view.set_meta(&"walkable_ground", true)
+	fixture.add_child(floor_view)
 	for i: int in 4:
 		var body: StaticBody3D = StaticBody3D.new()
 		var collision: CollisionShape3D = CollisionShape3D.new()
@@ -162,6 +168,9 @@ func walk(mission: Node3D, target: Vector3, label: String) -> void:
 		if frames % 600 == 0:
 			await process_frame
 	check(frames < 18000, "Squad actually completes " + label)
+	if frames >= 18000:
+		for actor: Node3D in mission.survivors:
+			print("E01 blocked ", actor.data.id, " position=", actor.position, " speed=", actor.current_speed, " remaining=", actor.remaining_distance(), " path=", actor.path)
 	check(safe, "Actual movement stays clear and in bounds: " + label)
 	check(min_separation > 0.35, "Moving members do not collapse onto one point: " + label)
 	for i: int in endpoints.size():

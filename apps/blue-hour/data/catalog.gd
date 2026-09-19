@@ -12,6 +12,7 @@ var traits: Array[Resource] = [
 	preload("res://data/traits/scavenger.tres"),
 	preload("res://data/traits/resilient.tres"),
 	preload("res://data/traits/route_intuition.tres"),
+	preload("res://data/traits/search_instinct.tres"),
 	preload("res://data/traits/resource_efficiency.tres")
 ]
 var weapons: Array[Resource] = WeaponRegistryData.definitions()
@@ -70,6 +71,17 @@ func validate() -> Array[String]:
 	for survivor in survivors:
 		if by_id(traits, survivor.trait_id) == null or survivor.max_hp <= 0 or survivor.move_speed <= 0:
 			errors.append("Invalid survivor: " + survivor.id)
+		if survivor is SurvivorDefinition:
+			if survivor.survivor_id.is_empty() or survivor.trait_definition != by_id(traits, survivor.trait_id):
+				errors.append("Survivor definition/trait mismatch: " + survivor.id)
+	for definition: Resource in traits:
+		if definition.modifier_hook.is_empty():
+			continue
+		if definition.modifier_hook not in preload("res://core/trait_runtime.gd").HOOKS or definition.levels.size() != 5:
+			errors.append("Invalid trait contract: " + definition.id)
+		for value: float in definition.levels:
+			if not is_finite(value) or value < 0 or (definition.modifier_hook == "loot_reward" and value > 1):
+				errors.append("Invalid trait level: " + definition.id)
 	for weapon in weapons:
 		errors.append_array(weapon.validation_errors())
 	for enemy in enemies:

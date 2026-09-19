@@ -35,6 +35,7 @@ const MOVE_POOL_SIZE := 6
 const COMMAND_LINE_SECONDS: float = .8
 const COMMAND_LINE_WIDTH: float = .035
 const COMMAND_LINE_COLOR: Color = Color(.30, .80, 1.0, .62)
+const Ground = preload("res://maps/expedition/walkable_ground.gd")
 var command_lines: Dictionary = {}
 var mission: Node3D
 var selected_member: Node3D
@@ -68,7 +69,7 @@ func _process(delta: float) -> void:
 		var valid: bool = not selected_member.dead and not selected_member.inside_building and not selected_member.boarding
 		selection_ring.visible = valid
 		if valid:
-			selection_ring.global_position = selected_member.global_position + Vector3.UP * 0.03
+			selection_ring.global_position = _ground_point(selected_member.global_position)
 			_set_pulse(selection_ring, _time)
 	else:
 		selection_ring.visible = false
@@ -79,7 +80,7 @@ func _process(delta: float) -> void:
 		var valid_focus: bool = is_instance_valid(target) and target.active and mission.exploration.is_visible(target.position)
 		focus_feedback.visible = valid_focus
 		if valid_focus:
-			focus_feedback.global_position = target.global_position + Vector3.UP * 0.03
+			focus_feedback.global_position = _ground_point(target.global_position)
 			_set_pulse(focus_feedback, _time)
 
 func set_selected_member(member: Node3D) -> void:
@@ -100,7 +101,7 @@ func play_move_feedback(point: Vector3) -> void:
 	var tween: Tween = marker.get_meta("vfx_tween") as Tween if marker.has_meta("vfx_tween") else null
 	if tween != null:
 		tween.kill()
-	marker.global_position = point + Vector3.UP * 0.025
+	marker.global_position = _ground_point(point, .025)
 	marker.visible = true
 	marker.scale = Vector3.ONE * 0.42
 	_set_alpha(marker, 0.0)
@@ -112,7 +113,7 @@ func play_move_feedback(point: Vector3) -> void:
 	tween.chain().tween_callback(marker.hide)
 	marker.set_meta("vfx_tween", tween)
 
-func play_command_line(member: Node3D, point: Vector3) -> void:
+func play_command_line(member: Node3D, point: Vector3, search_order: bool = false) -> void:
 	# Reuse one short-lived ribbon per recipient during held steering.
 	var id: int = member.get_instance_id()
 	if not command_lines.has(id):
@@ -130,6 +131,7 @@ func play_command_line(member: Node3D, point: Vector3) -> void:
 		command_lines[id] = {"member": weakref(member), "view": view, "target": point, "elapsed": 0.0}
 	var line: Dictionary = command_lines[id]
 	line.target = point
+	line.search_order = search_order
 	line.elapsed = 0.0
 	_draw_command_line(line, member)
 
@@ -142,7 +144,9 @@ func _update_command_lines(delta: float) -> void:
 			line.view.queue_free()
 			command_lines.erase(id)
 			continue
-		if member.dead or member.boarding or member.inside_building or mission.task_for(member) != null:
+		var task: RefCounted = mission.task_for(member)
+		var approaching: bool = line.get("search_order", false) and task != null and not task.search_started
+		if member.dead or member.boarding or member.inside_building or (task != null and not approaching):
 			line.view.queue_free()
 			command_lines.erase(id)
 			continue
@@ -151,16 +155,21 @@ func _update_command_lines(delta: float) -> void:
 func _draw_command_line(line: Dictionary, member: Node3D) -> void:
 	var view: MeshInstance3D = line.view
 	var mesh: ImmediateMesh = view.mesh as ImmediateMesh
-	var start: Vector3 = to_local(member.global_position + Vector3.UP * .045)
-	var end: Vector3 = to_local(mission.to_global(line.target) + Vector3.UP * .045)
+	var start: Vector3 = member.global_position
+	var end: Vector3 = mission.to_global(line.target)
 	var offset: Vector3 = end - start
+	offset.y = 0
 	mesh.clear_surfaces()
 	if offset.length_squared() < .0025:
 		return
 	var side: Vector3 = offset.normalized().cross(Vector3.UP) * COMMAND_LINE_WIDTH * .5
+	var segments: int = maxi(1, ceili(offset.length() / .25))
 	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
-	for vertex: Vector3 in [start - side, start + side, end + side, start - side, end + side, end - side]:
-		mesh.surface_add_vertex(vertex)
+	for index: int in segments:
+		var a := start.lerp(end, float(index) / segments)
+		var b := start.lerp(end, float(index + 1) / segments)
+		for vertex: Vector3 in [a - side, a + side, b + side, a - side, b + side, b - side]:
+			mesh.surface_add_vertex(to_local(_ground_point(vertex, .045)))
 	mesh.surface_end()
 	var material: StandardMaterial3D = view.material_override as StandardMaterial3D
 	var color: Color = COMMAND_LINE_COLOR
@@ -168,7 +177,7 @@ func _draw_command_line(line: Dictionary, member: Node3D) -> void:
 	material.albedo_color = color
 
 func play_search_feedback(point: Vector3) -> void:
-	search_feedback.global_position = point + Vector3.UP * 0.03
+	search_feedback.global_position = _ground_point(point)
 	search_feedback.visible = true
 	search_feedback.scale = Vector3.ONE * 0.72
 	_set_alpha(search_feedback, 0.0)
@@ -183,7 +192,7 @@ func set_focus_target(target: Node3D) -> void:
 	if not is_instance_valid(target):
 		focus_feedback.visible = false
 		return
-	focus_feedback.global_position = target.global_position + Vector3.UP * 0.03
+	focus_feedback.global_position = _ground_point(target.global_position)
 	focus_feedback.scale = Vector3.ONE * 0.8
 	focus_feedback.visible = true
 	_set_alpha(focus_feedback, 0.0)
@@ -192,6 +201,13 @@ func set_focus_target(target: Node3D) -> void:
 
 func clear_focus() -> void:
 	focus_feedback.visible = false
+
+func _ground_point(point: Vector3, legacy_clearance: float = .03) -> Vector3:
+	if mission != null and mission.city.has_method("project_to_ground"):
+		var projected: Vector3 = mission.city.project_to_ground(point)
+		if projected.is_finite():
+			return projected + Vector3.UP * Ground.MARKER_CLEARANCE
+	return point + Vector3.UP * legacy_clearance
 
 func _make_ring(node_name: String, size: float, radius: float, width: float, color: Color, focus: float) -> MeshInstance3D:
 	var view := MeshInstance3D.new()
