@@ -1093,3 +1093,21 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 - [x] 三档实际 Run 速度分别为 2.59998 / 2.80003 / 2.99995 m/s，倍率 1.12722 / 1.21394 / 1.30062，cadence 202.90 / 218.51 / 234.11 spm。
 - [x] 每档生成正常 Gameplay 与角色近景视频及 JSON 数据，见 [Gameplay 报告](XIA_ZHIYAO_LOCOMOTION_GAMEPLAY.md)。
 - [ ] 不选择最终速度，等待三档视频视觉验收；路线目标未在测试上限内全部收敛，报告同时提供固定 8m 可比时间换算。
+
+## 2026-09-19：Camp M08 Depart Action
+
+- [x] 原字节接入四张 M08 PNG，替换黑色占位框；尺寸收尾为 300×86 三态按钮、46×46 图标、26/13px 动态“出发 / 前往今日行动”，右侧 16px、底部 30px。
+- [x] 复用公共 StateButton 的 0.12s Cross Fade；无缩放、固定 HitArea，新增 `set_depart_enabled`，兼容既有 departure 锁定。
+- [x] 保留 Entry 导航连接与 Mission Selection → 巴士 departure → Mission 流程；97 项原生检查零失败，86 个冻结文件哈希一致。
+- [x] 四张原生 1600×900 截图已生成；实现与验证见 [M08 报告](CAMP_DEPART_ACTION_REPORT.md)。
+- [x] 单独 Windows release 导出及独立 Headless / 原生 Camp 启动通过；完整 build 仍被旧 Camp `member_buttons` / 能力栏断言阻断，未标记全量通过。
+- [ ] M08 功能与三态已通过用户验收；本轮尺寸视觉待验收。停在 M08，不进入 M09。
+
+## 2026-09-19：Camp M09 Utility
+
+- [x] 纯 Godot 实现 Esc 键帽与“返回主菜单”，150×30 点击区域、左侧 30px / 底部 20px；无 PNG 或大底板。
+- [x] 复用 StateButton 0.12s 渐变，固定 HitArea、无缩放；鼠标与 Esc 沿用同一 show_main_menu 返回入口。
+- [x] 原生专项 74 项零失败，三张 1600×900 截图已生成，M01～M08 和导航保持不变。详见 [M09 报告](CAMP_UTILITY_REPORT.md)。
+- [ ] 等待 M09 视觉验收，不继续其他模块。
+
+- Camp 最终小修：M09 透明键帽、白色描边；M03 菜单由静态 Control 修为 116×56 Button 并接入现有 menu_requested。原生专项 87 项通过，两张验收截图已生成，等待视觉确认。

@@ -186,12 +186,19 @@ theme_override_font_sizes/font_size = 23
 text = "3"
 vertical_alignment = 1
 
-[node name="MenuButton" type="Control" parent="."]
+[node name="MenuButton" type="Button" parent="."]
 offset_left = 346.0
 offset_top = 2.0
 offset_right = 462.0
 offset_bottom = 58.0
-mouse_filter = 2
+mouse_filter = 0
+mouse_default_cursor_shape = 2
+theme_override_styles/normal = SubResource("Transparent")
+theme_override_styles/hover = SubResource("Transparent")
+theme_override_styles/pressed = SubResource("Transparent")
+theme_override_styles/hover_pressed = SubResource("Transparent")
+theme_override_styles/disabled = SubResource("Transparent")
+theme_override_styles/focus = SubResource("Transparent")
 
 [node name="Background" type="TextureRect" parent="MenuButton"]
 anchors_preset = 15

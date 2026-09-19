@@ -23,6 +23,7 @@ func _ready() -> void:
 	$M04_SurvivorRoster.selection_changed.connect(_select_survivor)
 	$M08_DepartAction/Entry.pressed.connect(func(): depart_requested.emit())
 	$M09_Utility/Entry.pressed.connect(func(): menu_requested.emit())
+	$M03_ResourceBar/MenuButton.pressed.connect(func(): menu_requested.emit())
 	_layout()
 
 func set_hud_visible(value: bool) -> void:
@@ -41,6 +42,7 @@ func lock_departure() -> void:
 	set_hud_visible(true)
 	$M08_DepartAction/Entry.disabled = true
 	$M09_Utility/Entry.disabled = true
+	$M03_ResourceBar/MenuButton.disabled = true
 
 func _layout() -> void:
 	var factor := minf(size.x / REFERENCE.x, size.y / REFERENCE.y)
