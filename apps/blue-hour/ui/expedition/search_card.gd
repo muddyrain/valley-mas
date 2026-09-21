@@ -16,6 +16,7 @@ var progress: ProgressBar
 var action: TextureButton
 var content: Control
 var search_icon: TextureRect
+var worker_label: Label
 var site_id: String = ""
 var mission: Node3D
 
@@ -36,7 +37,11 @@ func setup(target: Node3D) -> void:
 	add_child(content)
 	_picture("Background", PANEL, Vector2.ZERO, CARD_SIZE)
 	search_icon = _picture("BuildingIcon", null, Vector2(16, 23), Vector2(32, 34))
-	title = _label("BuildingName", 15, Vector2(60, 10), Vector2(184, 22))
+	title = _label("BuildingName", 15, Vector2(60, 10), Vector2(132, 22))
+	worker_label = _label("SearchWorker", 10, Vector2(194, 10), Vector2(60, 22))
+	worker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	worker_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	worker_label.add_theme_color_override("font_color", Color("#2a8fb5"))
 	var search_row := HBoxContainer.new()
 	search_row.name = "SearchRow"
 	search_row.position = Vector2(51, 36)
@@ -103,7 +108,11 @@ func update_site(id: String, _selected: bool) -> void:
 	if not visible:
 		return
 	var site: Dictionary = mission.city.sites[id]
+	var task: RefCounted = mission.search_tasks.get(id)
+	var worker: Node3D = task.worker if task != null and is_instance_valid(task.worker) else null
 	title.text = site.spec.name
+	worker_label.text = "· " + worker.data.display_name.left(2) if worker != null else ""
+	worker_label.tooltip_text = worker.data.display_name if worker != null else ""
 	search_icon.texture = HudArt.texture("icon_vehicle" if site.vehicle else "icon_house")
 	progress.value = clampf(site.progress, 0.0, 1.0) * 100.0
 	percent_label.text = "%d%%" % floori(progress.value)

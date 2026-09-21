@@ -1,19 +1,32 @@
 extends RefCounted
 const WeaponRegistryData = preload("res://data/weapon_registry.gd")
 var survivors: Array[Resource] = [
-	preload("res://data/survivors/lin.tres"),
-	preload("res://data/survivors/qiao.tres"),
-	preload("res://data/survivors/yan.tres"),
 	preload("res://data/survivors/xia_zhiyao.tres"),
-	preload("res://data/survivors/su_wanxing.tres")
+	preload("res://data/survivors/su_wanxing.tres"),
+	preload("res://data/survivors/lin_jianyue.tres"),
+	preload("res://data/survivors/lu_qinghe.tres"),
+	preload("res://data/survivors/shen_yanchuan.tres"),
+	preload("res://data/survivors/tang_zhi.tres"),
+	preload("res://data/survivors/gu_yuan.tres"),
+	preload("res://data/survivors/cheng_mo.tres"),
+	preload("res://data/survivors/zhou_ye.tres"),
+	preload("res://data/survivors/xu_zhaoning.tres"),
+	preload("res://data/survivors/he_linchuan.tres"),
+	preload("res://data/survivors/song_shiyu.tres")
 ]
 var traits: Array[Resource] = [
-	preload("res://data/traits/steady.tres"),
-	preload("res://data/traits/scavenger.tres"),
-	preload("res://data/traits/resilient.tres"),
-	preload("res://data/traits/route_intuition.tres"),
 	preload("res://data/traits/search_instinct.tres"),
-	preload("res://data/traits/resource_efficiency.tres")
+	preload("res://data/traits/resource_efficiency.tres"),
+	preload("res://data/traits/danger_instinct.tres"),
+	preload("res://data/traits/emergency_response.tres"),
+	preload("res://data/traits/temporary_repair.tres"),
+	preload("res://data/traits/set_the_pace.tres"),
+	preload("res://data/traits/calm_aim.tres"),
+	preload("res://data/traits/morale_boost.tres"),
+	preload("res://data/traits/robust_physique.tres"),
+	preload("res://data/traits/value_judgment.tres"),
+	preload("res://data/traits/hold_the_line.tres"),
+	preload("res://data/traits/composed_planning.tres")
 ]
 var weapons: Array[Resource] = WeaponRegistryData.definitions()
 var enemies: Array[Resource] = [

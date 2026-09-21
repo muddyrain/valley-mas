@@ -43,13 +43,19 @@ func build_runtime_staged(mission_type: String, map_seed: int, base_map: Resourc
 	if not bool(town.get("ok", false)):
 		return false
 	await _loading_frame()
-	var environment: Dictionary = _generate_environment(town)
+	var environment_data: Dictionary = _generate_environment_data(town)
+	await _loading_frame()
+	var roadside: Dictionary = _generate_roadside(town, environment_data)
+	load_profile.stages["environment_generate"] = load_profile.stages.get("environment_data_generate", 0.0) + load_profile.stages.get("environment_roadside_generate", 0.0)
 	await _loading_frame()
 	_instantiate_town(town)
 	await _loading_frame()
-	var environment_root := _instantiate_environment(town, environment)
+	var environment_root := _instantiate_environment_base(environment_data)
 	await _loading_frame()
-	_finish_runtime(town, environment.data, environment.roadside, environment_root, map_seed, base_map)
+	_instantiate_roadside(town, roadside)
+	load_profile.stages["environment_placement"] = load_profile.stages.get("environment_instance", 0.0) + load_profile.stages.get("roadside_instance", 0.0)
+	await _loading_frame()
+	_finish_runtime(town, environment_data, roadside, environment_root, map_seed, base_map)
 	return true
 
 func _loading_frame() -> void:
@@ -65,12 +71,26 @@ func _generate_town(mission_type: String, map_seed: int) -> Dictionary:
 	return town
 
 func _generate_environment(town: Dictionary) -> Dictionary:
-	var started := Time.get_ticks_usec()
-	var environment_data: Dictionary = Targeted.new().generate(town)
-	var roadside: Dictionary = RoadsidePass.new().generate(town, environment_data)
+	var started: int = Time.get_ticks_usec()
+	var environment_data: Dictionary = _generate_environment_data(town)
+	var roadside: Dictionary = _generate_roadside(town, environment_data)
 	if load_profile != null:
 		load_profile.measure("environment_generate", started)
 	return {"data": environment_data, "roadside": roadside}
+
+func _generate_environment_data(town: Dictionary) -> Dictionary:
+	var started: int = Time.get_ticks_usec()
+	var result: Dictionary = Targeted.new().generate(town)
+	if load_profile != null:
+		load_profile.measure("environment_data_generate", started)
+	return result
+
+func _generate_roadside(town: Dictionary, environment_data: Dictionary) -> Dictionary:
+	var started: int = Time.get_ticks_usec()
+	var result: Dictionary = RoadsidePass.new().generate(town, environment_data)
+	if load_profile != null:
+		load_profile.measure("environment_roadside_generate", started)
+	return result
 
 func _instantiate_town(town: Dictionary) -> void:
 	var started := Time.get_ticks_usec()
@@ -80,11 +100,24 @@ func _instantiate_town(town: Dictionary) -> void:
 
 func _instantiate_environment(town: Dictionary, environment: Dictionary) -> Node3D:
 	var started := Time.get_ticks_usec()
-	var environment_root: Node3D = PolishView.build(self, environment.data)
-	RoadsideView.build(self, town, environment.roadside)
+	var environment_root: Node3D = _instantiate_environment_base(environment.data)
+	_instantiate_roadside(town, environment.roadside)
 	if load_profile != null:
 		load_profile.measure("environment_placement", started)
 	return environment_root
+
+func _instantiate_environment_base(environment_data: Dictionary) -> Node3D:
+	var started: int = Time.get_ticks_usec()
+	var result: Node3D = PolishView.build(self, environment_data)
+	if load_profile != null:
+		load_profile.measure("environment_instance", started)
+	return result
+
+func _instantiate_roadside(town: Dictionary, roadside: Dictionary) -> void:
+	var started: int = Time.get_ticks_usec()
+	RoadsideView.build(self, town, roadside)
+	if load_profile != null:
+		load_profile.measure("roadside_instance", started)
 
 func _finish_runtime(town: Dictionary, environment_data: Dictionary, roadside: Dictionary, environment_root: Node3D, map_seed: int, base_map: Resource) -> void:
 	var started := Time.get_ticks_usec()
@@ -93,15 +126,22 @@ func _finish_runtime(town: Dictionary, environment_data: Dictionary, roadside: D
 	bus_door = bus_root.get_node("DoorMotion")
 	var arrival_point: Vector3 = project_to_ground(town.arrival.position)
 	var arrival_forward := Vector3.BACK.rotated(Vector3.UP, float(town.arrival.yaw))
+	var arrival_exit: Vector3 = bus_root.get_node("VehicleExitPoint").global_position
 	var bounds: Rect2 = town.bounds
 	var entries: Array[Dictionary] = []
 	var search_points: Array[Dictionary] = []
 	for site: Dictionary in town.buildings:
-		entries.append({"id": site.id, "position": project_to_ground(site.entry), "asset": site.asset})
+		var primary_entrance: Vector3 = project_to_ground(site.primary_entrance)
+		var search_interaction: Vector3 = project_to_ground(site.search_interaction)
+		entries.append({"id": site.id, "position": search_interaction, "asset": site.asset,
+			"primary_entrance": primary_entrance, "primary_entrance_forward": site.primary_entrance_forward,
+			"search_interaction": search_interaction, "assigned_street_id": site.assigned_street_id,
+			"selected_frontage": site.selected_frontage})
 		var wrapper: Node3D = get_node("Buildings/" + str(site.id))
 		_measure_blocker(wrapper)
 		if bool(site.searchable):
-			search_points.append({"id": site.id, "position": project_to_ground(site.entry)})
+			search_points.append({"id": site.id, "position": search_interaction,
+				"primary_entrance": primary_entrance, "primary_entrance_forward": site.primary_entrance_forward})
 	for wrapper: Node in environment_root.get_children():
 		if wrapper is Node3D and wrapper.has_meta("environment_slot"):
 			_measure_blocker(wrapper)
@@ -110,7 +150,7 @@ func _finish_runtime(town: Dictionary, environment_data: Dictionary, roadside: D
 	for road: Dictionary in town.roads:
 		road_bounds.append(road.bounds)
 	var poi_definition: Resource = WorldCatalog.asset(town.poi.asset)
-	runtime_data = {"provider": "MEDIUM_TOWN_V1", "seed": map_seed, "town_bounds": bounds, "arrival_point": arrival_point, "arrival_forward": arrival_forward, "arrival_exit": bus_root.get_node("VehicleExitPoint").global_position, "mission_poi": project_to_ground(town.poi.entry), "mission_poi_id": town.poi.id, "mission_poi_type": poi_definition.poi_type if not poi_definition.poi_type.is_empty() else poi_definition.category, "extraction_point": project_to_ground(town.extraction.position), "building_entries": entries, "building_search_points": search_points, "vehicle_search_points": NOT_AVAILABLE_YET, "enemy_spawn_zones": NOT_AVAILABLE_YET, "road_bounds": road_bounds, "walkable_hint_bounds": road_bounds, "environment_root": environment_root, "runtime_root": self, "world_root": self, "navigation_available": false, "gameplay_available": false, "movement_status": "MOVEMENT BLOCKED BY E01 NAVIGATION INTEGRATION", "source_signatures": {"town": var_to_str(town).sha256_text(), "m02": var_to_str(environment_data).sha256_text(), "m03": var_to_str(roadside).sha256_text()}, "m03_statistics": roadside.statistics, "environment_instance_count": environment_data.instances.size()}
+	runtime_data = {"provider": "MEDIUM_TOWN_V1", "seed": map_seed, "town_bounds": bounds, "arrival_point": arrival_point, "arrival_forward": arrival_forward, "arrival_exit": arrival_exit, "mission_poi": project_to_ground(town.poi.entry), "mission_poi_id": town.poi.id, "mission_poi_type": poi_definition.poi_type if not poi_definition.poi_type.is_empty() else poi_definition.category, "extraction_point": project_to_ground(town.extraction.position), "building_entries": entries, "building_search_points": search_points, "vehicle_search_points": NOT_AVAILABLE_YET, "enemy_spawn_zones": NOT_AVAILABLE_YET, "road_bounds": road_bounds, "walkable_hint_bounds": road_bounds, "environment_root": environment_root, "runtime_root": self, "world_root": self, "navigation_available": false, "gameplay_available": false, "movement_status": "MOVEMENT BLOCKED BY E01 NAVIGATION INTEGRATION", "source_signatures": {"town": var_to_str(town).sha256_text(), "m02": var_to_str(environment_data).sha256_text(), "m03": var_to_str(roadside).sha256_text()}, "m03_statistics": roadside.statistics, "environment_instance_count": environment_data.instances.size()}
 	get_node("MissionPOI").position = runtime_data.mission_poi
 	get_node("BusArrivalPoint").position = arrival_point
 	data = base_map.duplicate(true)
@@ -144,8 +184,7 @@ func _finish_runtime(town: Dictionary, environment_data: Dictionary, roadside: D
 		var parking_polygon: PackedVector2Array = slot.polygon.duplicate()
 		minimap_parking.append({"id": slot.id, "type": slot.type, "land_use_type": slot.land_use,
 			"polygon": parking_polygon, "bounds": Geometry.polygon_bounds(parking_polygon)})
-	var arrival_area: Dictionary = _build_minimap_arrival(town, environment_data, arrival_point,
-		bus_root.get_node("VehicleExitPoint").global_position)
+	var arrival_area: Dictionary = _build_minimap_arrival(town, environment_data, arrival_point, arrival_exit)
 	runtime_data["minimap_geometry"] = {"version": 2, "roads": minimap_roads, "buildings": minimap_buildings,
 		"regions": minimap_regions, "parking": minimap_parking, "arrival": arrival_area}
 	data.id = "medium_town"
@@ -264,7 +303,7 @@ func _build_navigation() -> void:
 	_resolve_residential_landmark()
 	runtime_data["navigation_ready_ms"] = (Time.get_ticks_usec() - started) / 1000.0
 	if load_profile != null:
-		load_profile.measure("navigation", started)
+		load_profile.measure("navigation_ready", started)
 	runtime_data["navigation_available"] = true
 	runtime_data["movement_status"] = "NAVIGATION READY"
 	lifecycle.append("navigation_ready")
@@ -337,10 +376,13 @@ func line_clear(from: Vector3, to: Vector3) -> bool:
 func cell_at(point: Vector3) -> Vector2i:
 	return navigation.cell_at(point)
 
-func formation_target(origin: Vector3, preferred: Vector3, reserved: Array[Vector3], reserved_paths: Array[PackedVector3Array]) -> Vector3:
+func formation_order(origin: Vector3, preferred: Vector3, reserved: Array[Vector3], _reserved_paths: Array[PackedVector3Array]) -> Dictionary:
+	# Endpoint separation plus each member's collision-checked route are enough to
+	# keep the formation valid. Rejecting any route near another endpoint caused
+	# dozens of synchronous AStar retries for otherwise safe commands.
 	var center: Vector3 = nearest_open(preferred)
 	if not center.is_finite():
-		return Vector3.INF
+		return {}
 	for ring: int in 9:
 		for x: int in range(-ring, ring + 1):
 			for z: int in range(-ring, ring + 1):
@@ -356,15 +398,12 @@ func formation_target(origin: Vector3, preferred: Vector3, reserved: Array[Vecto
 				var route: PackedVector3Array = path(origin, candidate)
 				if route.is_empty():
 					continue
-				# A parked member must not occupy another member's final approach.
-				# This is destination planning, not dynamic collision or steering.
-				for endpoint: Vector3 in reserved:
-					separated = separated and _route_clears_endpoint(route, endpoint)
-				for previous: PackedVector3Array in reserved_paths:
-					separated = separated and _route_clears_endpoint(previous, candidate)
-				if separated:
-					return candidate
-	return Vector3.INF
+				return {"target": candidate, "route": route}
+	return {}
+
+func formation_target(origin: Vector3, preferred: Vector3, reserved: Array[Vector3], reserved_paths: Array[PackedVector3Array]) -> Vector3:
+	var order: Dictionary = formation_order(origin, preferred, reserved, reserved_paths)
+	return order.get("target", Vector3.INF)
 
 func _route_clears_endpoint(route: PackedVector3Array, endpoint: Vector3) -> bool:
 	var point: Vector2 = Vector2(endpoint.x, endpoint.z)

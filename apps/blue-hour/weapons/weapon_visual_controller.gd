@@ -42,6 +42,8 @@ func set_weapon(value: Resource) -> void:
 	weapon_changed.emit()
 
 func attach_weapon_visual() -> void:
+	if is_instance_valid(muzzle_flash):
+		muzzle_flash.queue_free()
 	muzzle_flash = null
 	if is_instance_valid(model):
 		model.get_parent().remove_child(model)
@@ -49,7 +51,11 @@ func attach_weapon_visual() -> void:
 	model = null
 	if is_instance_valid(pose_modifier):
 		pose_modifier.profile = null
-	if not is_instance_valid(socket) or definition == null or definition.model_path.is_empty():
+	if not is_instance_valid(socket) or definition == null:
+		return
+	if definition.model_path.is_empty():
+		if not definition.melee:
+			_create_muzzle_flash(null)
 		return
 	if not ResourceLoader.exists(definition.model_path, "PackedScene"):
 		return
@@ -83,10 +89,19 @@ func attach_weapon_visual() -> void:
 	# Long guns now use the shared upper-body AnimationTree layer.
 	pose_modifier.profile = profile if index != WeaponDefinition.WeaponType.LONG_GUN else null
 	var muzzle := get_muzzle_point()
-	if index == WeaponDefinition.WeaponType.LONG_GUN and muzzle != null:
-		muzzle_flash = MuzzleFlash.new()
-		muzzle_flash.name = "MuzzleFlash"
+	if not definition.melee:
+		_create_muzzle_flash(muzzle)
+
+func _create_muzzle_flash(muzzle: Node3D) -> void:
+	if not is_instance_valid(socket):
+		return
+	muzzle_flash = MuzzleFlash.new()
+	muzzle_flash.name = "MuzzleFlash"
+	if muzzle != null:
 		muzzle.add_child(muzzle_flash)
+	else:
+		socket.add_child(muzzle_flash)
+		muzzle_flash.position = Vector3(0, 0, -0.65)
 
 func flash_muzzle() -> void:
 	if is_instance_valid(muzzle_flash):
@@ -98,6 +113,12 @@ func advance_flash(delta: float) -> void:
 
 func get_muzzle_point() -> Node3D:
 	return model.get_node_or_null(MUZZLE) as Node3D if is_instance_valid(model) else null
+
+func get_vfx_muzzle_point() -> Node3D:
+	var muzzle := get_muzzle_point()
+	if muzzle != null:
+		return muzzle
+	return muzzle_flash if is_instance_valid(muzzle_flash) else socket
 
 func get_support_grip() -> Node3D:
 	return model.get_node_or_null(GRIP_LEFT) as Node3D if is_instance_valid(model) else null

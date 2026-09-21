@@ -7,7 +7,7 @@ const BODY_RADIUS: float = 0.35
 const AGENT_RADIUS: float = BODY_RADIUS + 0.10
 const AGENT_HEIGHT: float = 1.95
 const STEP_HEIGHT: float = 0.20
-const CELL_SIZE: float = 0.5
+const CELL_SIZE: float = 0.75
 const Ground = preload("res://maps/expedition/walkable_ground.gd")
 var ground: RefCounted = Ground.new()
 
@@ -16,7 +16,11 @@ var bounds: Rect2
 var obstacles: Array[Dictionary] = []
 var metrics: Dictionary = {}
 var ready: bool = false
-var _query_usec: Array[int] = []
+var _query_count: int = 0
+var _query_total_usec: int = 0
+var _query_longest_usec: int = 0
+var _astar_total_usec: int = 0
+var _simplify_total_usec: int = 0
 
 func build(world: Node3D, town_bounds: Rect2) -> void:
 	var started: int = Time.get_ticks_usec()
@@ -132,7 +136,10 @@ func nearest(point: Vector3, distance_limit: float = 3.0) -> Vector3:
 func path(from: Vector3, to: Vector3) -> PackedVector3Array:
 	var started: int = Time.get_ticks_usec()
 	var result: PackedVector3Array = _path(from, to)
-	_query_usec.append(Time.get_ticks_usec() - started)
+	var duration: int = Time.get_ticks_usec() - started
+	_query_count += 1
+	_query_total_usec += duration
+	_query_longest_usec = maxi(_query_longest_usec, duration)
 	return result
 
 func _path(from: Vector3, to: Vector3) -> PackedVector3Array:
@@ -142,7 +149,9 @@ func _path(from: Vector3, to: Vector3) -> PackedVector3Array:
 	var end: Vector3 = nearest(to, 1.0)
 	if not start.is_finite() or not end.is_finite() or not segment_clear(from, start) or not segment_clear(end, to):
 		return []
+	var astar_started: int = Time.get_ticks_usec()
 	var cells: Array[Vector2i] = grid.get_id_path(cell_at(start), cell_at(end))
+	_astar_total_usec += Time.get_ticks_usec() - astar_started
 	if cells.is_empty():
 		return []
 	var points: PackedVector3Array = [ground.project(from)]
@@ -153,26 +162,49 @@ func _path(from: Vector3, to: Vector3) -> PackedVector3Array:
 		if not point.is_finite():
 			return []
 	# Only remove redundant points when the whole segment clears inflated collisions.
+	var simplify_started: int = Time.get_ticks_usec()
 	var result: PackedVector3Array = [points[0]]
 	var anchor: int = 0
 	while anchor < points.size() - 1:
 		var next: int = anchor + 1
-		while next + 1 < points.size() and segment_clear(points[anchor], points[next + 1]):
-			next += 1
 		if not segment_clear(points[anchor], points[next]):
 			return []
+		var probe_step: int = 2
+		var blocked: int = points.size()
+		while anchor + probe_step < points.size():
+			var probe: int = anchor + probe_step
+			if not segment_clear(points[anchor], points[probe]):
+				blocked = probe
+				break
+			next = probe
+			probe_step *= 2
+		if blocked == points.size() and next < points.size() - 1:
+			if segment_clear(points[anchor], points[-1]):
+				next = points.size() - 1
+			else:
+				blocked = points.size() - 1
+		# Refine only the bracket between the farthest clear probe and the first
+		# blocked probe. Every emitted segment still passes the exact polygon test.
+		var low: int = next + 1
+		var high: int = blocked - 1
+		while low <= high:
+			var middle: int = (low + high) / 2
+			if segment_clear(points[anchor], points[middle]):
+				next = middle
+				low = middle + 1
+			else:
+				high = middle - 1
 		result.append(points[next])
 		anchor = next
+	_simplify_total_usec += Time.get_ticks_usec() - simplify_started
 	return result
 
 func performance() -> Dictionary:
 	var result: Dictionary = metrics.duplicate()
-	var total: int = 0
-	var longest: int = 0
-	for duration: int in _query_usec:
-		total += duration
-		longest = maxi(longest, duration)
-	result["average_query_ms"] = total / (1000.0 * maxi(1, _query_usec.size()))
-	result["longest_query_ms"] = longest / 1000.0
-	result["query_count"] = _query_usec.size()
+	result["average_query_ms"] = _query_total_usec / (1000.0 * maxi(1, _query_count))
+	result["total_query_ms"] = _query_total_usec / 1000.0
+	result["longest_query_ms"] = _query_longest_usec / 1000.0
+	result["astar_total_ms"] = _astar_total_usec / 1000.0
+	result["simplify_total_ms"] = _simplify_total_usec / 1000.0
+	result["query_count"] = _query_count
 	return result

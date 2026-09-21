@@ -2,6 +2,7 @@ extends RefCounted
 ## MAIN_STREET composition stage of TownGenerator. All parcels derive from its road-bounded blocks.
 
 const Assets = preload("res://data/world_asset_catalog.gd")
+const EntranceFacing = preload("res://maps/town/building_entrance_facing.gd")
 const Graph = preload("res://maps/town/town_road_graph.gd")
 const LandUse = preload("res://maps/town/town_land_use.gd")
 
@@ -15,13 +16,16 @@ static func populate(layout: Dictionary, mission_type: String, seed_value: int) 
 	town.town_metrics = Graph.build(town.roads)
 	LandUse.assign(town)
 	for block: Dictionary in town.blocks:
-		for row: Dictionary in block.rows:
-			_row(town, block, _edge(block, row.side), row.category, row.count, row.gap, rng, row.get("trim_end", 0.0), row.get("trim_start", 0.0))
+		for row_index: int in block.rows.size():
+			var row: Dictionary = block.rows[row_index]
+			var frontage: Dictionary = EntranceFacing.select_frontage(block, row, seed_value, row_index)
+			_row(town, block, frontage, row.category, row.count, row.gap, rng, row.get("trim_end", 0.0), row.get("trim_start", 0.0))
 			if not town.ok:
 				return town
 		_internal_spaces(block)
 	town.composition = preload("res://maps/town/town_main_street.gd").metrics(town)
 	LandUse.finish(town, layout.arrivals, rng)
+	_orient_entrance_data(town)
 	return town
 
 static func _row(town: Dictionary, block: Dictionary, edge: Dictionary, category: String, count: int, gap: float, rng: RandomNumberGenerator, trim_end: float = 0.0, trim_start: float = 0.0) -> void:
@@ -64,7 +68,8 @@ static func _row(town: Dictionary, block: Dictionary, edge: Dictionary, category
 		var definition: Resource = definitions[index]
 		var setback := 2.4 if category == "commercial" else 3.2
 		var facing: Vector2 = edge.outward
-		var yaw := atan2(-facing.x, -facing.y)
+		var assigned_forward := Vector3(facing.x, 0, facing.y)
+		var yaw := EntranceFacing.placement_yaw(definition.primary_entrance_local_forward, assigned_forward)
 		var basis := Basis(Vector3.UP, yaw)
 		var front_on_edge: Vector2 = start + edge.tangent * (cursor + definition.footprint.x * 0.5)
 		var center: Vector2 = front_on_edge - facing * (setback + definition.footprint.y * 0.5)
@@ -83,7 +88,9 @@ static func _row(town: Dictionary, block: Dictionary, edge: Dictionary, category
 			return
 		var id := "%s_P%02d" % [block.id, town.parcels.size()]
 		var road_point: Vector2 = front_on_edge + facing * edge.road_half_width
-		var building := {"id": id, "block_id": block.id, "block_type": block.type, "block_shape": block.shape, "slot_type": category.capitalize() + "Slot", "asset": definition.id, "position": position, "yaw": yaw, "size": definition.bounding_size, "footprint": definition.footprint, "bounds": bounds, "category": category, "front_direction": Vector3(facing.x, 0, facing.y), "searchable": definition.searchable, "poi": false, "entry": position + basis * definition.entrance_offset, "road_anchor": position + basis * definition.road_offset, "road_point": Vector3(road_point.x, 0, road_point.y)}
+		var primary_entrance := EntranceFacing.world_anchor(position, yaw, definition.primary_entrance_local_anchor)
+		var search_interaction := EntranceFacing.world_anchor(position, yaw, definition.search_interaction_local_anchor)
+		var building := {"id": id, "block_id": block.id, "block_type": block.type, "block_shape": block.shape, "slot_type": category.capitalize() + "Slot", "asset": definition.id, "position": position, "yaw": yaw, "size": definition.bounding_size, "footprint": definition.footprint, "bounds": bounds, "category": category, "front_direction": assigned_forward, "primary_entrance": primary_entrance, "primary_entrance_forward": EntranceFacing.world_forward(yaw, definition.primary_entrance_local_forward), "search_interaction": search_interaction, "searchable": definition.searchable, "poi": false, "entry": search_interaction, "road_anchor": position + basis * definition.road_offset, "road_point": Vector3(road_point.x, 0, road_point.y), "assigned_street_id": edge.road_id, "assigned_street_kind": edge.road_kind, "selected_frontage": edge.side}
 		building.land_use_type = block.land_use_type
 		town.buildings.append(building)
 		town.parcels.append({"parcel_id": id, "block_id": block.id, "frontage_edge": edge.side, "frontage_length": parcel_bounds.size.x if absf(facing.y) > 0.5 else parcel_bounds.size.y, "depth": parcel_bounds.size.y if absf(facing.y) > 0.5 else parcel_bounds.size.x, "setback": setback, "building_slot_type": building.slot_type, "bounds": parcel_bounds, "building_bounds": bounds, "road_point": building.road_point})
@@ -95,8 +102,17 @@ static func _internal_spaces(block: Dictionary) -> void:
 	# Land-use surfaces retain the exact boundary, including rear recesses and terminal caps.
 	block.spaces.append({"kind": block.space_use, "polygon": block.polygon, "bounds": block.bounds})
 
-static func _edge(block: Dictionary, side: String) -> Dictionary:
-	for edge: Dictionary in block.street_edges:
-		if edge.side == side:
-			return edge
-	return {}
+static func _orient_entrance_data(town: Dictionary) -> void:
+	var turns: int = int(town.get("orientation_quarters", 0))
+	if turns == 0:
+		return
+	var sides: Array[String] = ["north", "east", "south", "west"]
+	for site: Dictionary in town.buildings:
+		for key: String in ["primary_entrance", "primary_entrance_forward", "search_interaction"]:
+			var point: Vector3 = site[key]
+			for quarter: int in turns:
+				point = Vector3(-point.z, point.y, point.x)
+			site[key] = point
+		var side_index: int = sides.find(str(site.selected_frontage))
+		if side_index >= 0:
+			site.selected_frontage = sides[(side_index + turns) % 4]

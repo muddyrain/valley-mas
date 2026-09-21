@@ -44,7 +44,7 @@ func nearest_site(mission: Node3D, except: String = "") -> String:
 	var result: String = ""
 	for id: String in mission.search_registry.building_searchables:
 		var site: Dictionary = mission.city.sites[id]
-		if id == except or site.searched or site.spec.search_status != "AVAILABLE":
+		if id == except or site.searched or site.spec.search_status != Registry.RESOLVED_REACHABLE:
 			continue
 		var distance: float = mission.survivors[0].position.distance_squared_to(site.spec.entry)
 		if distance < best:
@@ -138,7 +138,12 @@ func verify_flow(app: Node, seed_value: int) -> void:
 	var next: String = nearest_site(mission, id)
 	discover(mission, next)
 	app.hud.inspect_member(mission.survivors[index], false)
+	mission.city.sites[next].spec.search_status = Registry.UNRESOLVED
+	mission.search_registry.start_background_resolution()
 	mission.command_search(next)
+	check(mission.city.sites[next].spec.search_status == Registry.RESOLVED_REACHABLE, "Immediate unresolved click prioritizes the selected target")
+	check(int(mission.search_registry.metrics.get("priority_resolve_count", 0)) > 0, "Priority resolution is recorded")
+	check(mission.search_registry.background_complete(), "Priority resolution completes a one-target background queue")
 	if mission.search_tasks.has(next):
 		var accepted: bool = false
 		for target: Vector3 in mission.city.navigation_targets.values():
@@ -148,14 +153,24 @@ func verify_flow(app: Node, seed_value: int) -> void:
 		check(accepted and not mission.search_tasks.has(next), "Accepted ordinary movement replaces approach: " + mission.last_command_rejection)
 		mission.command_recall(next)
 	var original_entry: Vector3 = mission.city.sites[next].spec.entry
+	var original_entrance: Vector3 = mission.city.sites[next].spec.entrance_point
+	var original_interaction: Vector3 = mission.city.sites[next].spec.search_interaction_point
 	var position_before: Vector3 = app.hud.selected_member.position
 	# Negative fixture points at the physical building center, without changing
 	# navigation or the frozen instance. Dispatch must actually query and reject it.
 	mission.city.sites[next].spec.entry = mission.city.sites[next].body.position
+	mission.city.sites[next].spec.entrance_point = mission.city.sites[next].body.position
+	mission.city.sites[next].spec.search_interaction_point = mission.city.sites[next].body.position
+	mission.city.sites[next].spec.search_status = Registry.UNRESOLVED
+	mission.search_registry.start_background_resolution()
 	mission.command_search(next)
 	check(not mission.search_tasks.has(next) and mission.last_command_rejection == "SEARCH_REJECTED_UNREACHABLE", "Unreachable target rejects without task or teleport")
+	check(mission.city.sites[next].spec.search_status == Registry.RESOLVED_UNREACHABLE, "Immediate unresolved click records unreachable resolution")
 	check(app.hud.selected_member.position == position_before, "Unreachable command cannot reposition the selected actor")
 	mission.city.sites[next].spec.entry = original_entry
+	mission.city.sites[next].spec.entrance_point = original_entrance
+	mission.city.sites[next].spec.search_interaction_point = original_interaction
+	mission.city.sites[next].spec.search_status = Registry.RESOLVED_REACHABLE
 
 func verify_registry(mission: Node3D, seed_value: int) -> void:
 	var registry: RefCounted = mission.search_registry
@@ -168,7 +183,7 @@ func verify_registry(mission: Node3D, seed_value: int) -> void:
 		var value: Dictionary = registry.snapshot(id)
 		var definition: Resource = Assets.asset(value.source_definition_id)
 		check(definition.searchable and Registry.Loot.PROFILES.has(value.loot_profile), "Definition-backed profile")
-		if value.status == "AVAILABLE":
+		if value.status == Registry.RESOLVED_REACHABLE:
 			available += 1
 			check(mission.city.navigation.point_clear(value.interaction_point), "Interaction clears all inflated blockers")
 			check(not mission.city.path(mission.city.spawn_positions(1)[0], value.interaction_point).is_empty(), "Interaction reachable from arrival exit")

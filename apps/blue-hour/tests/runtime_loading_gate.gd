@@ -45,8 +45,12 @@ func run() -> void:
 	check(staged.runtime.source_signatures == sync_signature, "Staged source data equals frozen synchronous path")
 	await process_frame
 	check(staged.root.navigation.metrics.signature == sync_navigation, "Staging preserves identical navigation cells")
-	# Repeat the same search resolution in batches without changing the mission or target data.
-	await mission.search_registry.resolve_navigation_staged()
+	# Repeat the same search resolution in background-sized steps without changing target data.
+	for id: String in sync_entries:
+		mission.city.sites[id].spec.search_status = mission.search_registry.UNRESOLVED
+	mission.search_registry.start_background_resolution()
+	while not mission.search_registry.background_complete():
+		mission.search_registry.resolve_navigation_background()
 	for id: String in sync_entries:
 		check(mission.city.sites[id].spec.entry == sync_entries[id].entry, "Batched resolution preserves entrance: " + id)
 		check(mission.city.sites[id].spec.search_status == sync_entries[id].status, "Batched resolution preserves availability: " + id)

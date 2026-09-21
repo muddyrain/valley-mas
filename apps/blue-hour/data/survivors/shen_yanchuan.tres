@@ -1,0 +1,21 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://data/traits/temporary_repair.tres" id="2_trait"]
+
+[resource]
+script = ExtResource("1")
+id = "shen_yanchuan"
+display_name = "沈砚川"
+profession_id = "electronics_repair_student"
+profession_name = "理工专业学生 / 电子维修店兼职"
+description = "沈砚川喜欢弄清楚东西为什么坏掉，而不是直接把它扔掉。从收音机、电路到车辆的小故障，他通常都愿意蹲下来多看几分钟。灾变以后，还能不能修往往比值多少钱更重要。"
+role_tags = ["设备", "车辆"]
+trait_id = "temporary_repair"
+model_path = "res://assets/characters/shen_yanchuan/runtime/shen_yanchuan.glb"
+max_hp = 100.0
+move_speed = 2.8
+color = Color(0.57, 0.48, 0.38, 1)
+survivor_id = "SUR_005"
+trait_definition = ExtResource("2_trait")
+recommended_weapon_tags = Array[String](["rifle", "pistol"])

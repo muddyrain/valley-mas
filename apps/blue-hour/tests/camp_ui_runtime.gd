@@ -13,7 +13,7 @@ func run() -> void:
 		quit(0 if failures.is_empty() else 1)
 		return
 	await launch(true)
-	app.campaign.new_run(772, "combat", ["xia_zhiyao", "su_wanxing", "lin", "qiao"])
+	app.campaign.new_run(772, "combat", ["xia_zhiyao", "su_wanxing", "lin_jianyue", "lu_qinghe"])
 	app.campaign.data.food = 30
 	app.campaign.grant_effect("power", "aid")
 	app.show_shelter()
@@ -103,7 +103,7 @@ func run() -> void:
 func verify_camp_population() -> void:
 	for count: int in [1, 2, 4]:
 		await launch(true)
-		app.campaign.new_run(772, "combat", ["xia_zhiyao", "su_wanxing", "lin", "qiao"].slice(0, count))
+		app.campaign.new_run(772, "combat", ["xia_zhiyao", "su_wanxing", "lin_jianyue", "lu_qinghe"].slice(0, count))
 		app.show_shelter()
 		await frames(8)
 		var characters: Array[Node] = app.camp_view.camp.get_node("Characters").get_children()

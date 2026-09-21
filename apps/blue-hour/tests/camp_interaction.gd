@@ -21,7 +21,7 @@ func run() -> void:
 	DirAccess.make_dir_recursive_absolute("res://test-output/camp-interaction")
 	await launch(true)
 	app.save_path = "user://test-runs/camp-interaction.json"
-	app.campaign.new_run(772, "combat", ["xia_zhiyao", "su_wanxing", "lin", "qiao"])
+	app.campaign.new_run(772, "combat", ["xia_zhiyao", "su_wanxing", "lin_jianyue", "lu_qinghe"])
 	app.campaign.data.food = 30
 	app.show_shelter()
 	await frames(15)
@@ -53,7 +53,7 @@ func run() -> void:
 	for count: int in [1, 2, 4]:
 		if count != 1:
 			app._clear_mission()
-			app.campaign.new_run(772, "combat", ["xia_zhiyao", "su_wanxing", "lin", "qiao"])
+			app.campaign.new_run(772, "combat", ["xia_zhiyao", "su_wanxing", "lin_jianyue", "lu_qinghe"])
 			app.campaign.data.food = 30
 			app.show_shelter()
 			await frames(15)

@@ -1,6 +1,7 @@
 extends RefCounted
 const State = preload("res://missions/special_power_state.gd")
 const ThreatSelector = preload("res://missions/threat_selector.gd")
+const TraitRuntime = preload("res://core/trait_runtime.gd")
 
 var mission: Node3D
 var states: Dictionary = {}
@@ -23,7 +24,7 @@ func start_day(value: int, definitions: Array[Resource]) -> bool:
 	return true
 
 func can_activate(id: String) -> bool:
-	if not states.has(id) or states[id].used_today or not mission.active or not mission.input_enabled or mission.closing_left >= 0 or mission.living().is_empty():
+	if not states.has(id) or states[id].active or states[id].remaining_cooldown > 0.000001 or not mission.active or not mission.input_enabled or mission.closing_left >= 0 or mission.living().is_empty():
 		return false
 	var values: Dictionary = states[id].definition.modifiers()
 	return not values.has("freeze_day_clock") or mission.clock.phase != mission.clock.NIGHT
@@ -37,6 +38,7 @@ func activate(id: String = "") -> bool:
 	var state: RefCounted = states[id]
 	state.used_today = true
 	state.remaining_duration = state.definition.active_duration()
+	state.remaining_cooldown = TraitRuntime.power_cooldown(state.definition.cooldown_duration(), _team_traits())
 	state.active = state.remaining_duration > 0
 	var values: Dictionary = state.definition.modifiers()
 	if state.active:
@@ -50,6 +52,7 @@ func activate(id: String = "") -> bool:
 
 func advance(delta: float) -> void:
 	for state: RefCounted in states.values():
+		state.remaining_cooldown = maxf(0.0, state.remaining_cooldown - maxf(0.0, delta))
 		if not state.active:
 			continue
 		state.remaining_duration = maxf(0.0, state.remaining_duration - maxf(0.0, delta))
@@ -63,12 +66,15 @@ func next_expiry() -> float:
 	for state: RefCounted in states.values():
 		if state.active:
 			seconds = minf(seconds, state.remaining_duration)
+		if state.remaining_cooldown > 0.0:
+			seconds = minf(seconds, state.remaining_cooldown)
 	return seconds
 
 func clear() -> void:
 	for state: RefCounted in states.values():
 		state.active = false
 		state.remaining_duration = 0.0
+		state.remaining_cooldown = 0.0
 		mission.effects.remove_source("power:" + state.power_id)
 	focus_target = null
 
@@ -87,4 +93,12 @@ func caption(id: String) -> String:
 	var title: String = state.definition.display_name + (" ★" if state.upgraded else "")
 	if state.active:
 		return "%s · %.1f 秒" % [title, state.remaining_duration]
-	return title + (" · 本日已用" if state.used_today else " · 1/1")
+	if state.remaining_cooldown > 0.0:
+		return "%s · 冷却 %.1f 秒" % [title, state.remaining_cooldown]
+	return title
+
+func _team_traits() -> Array[Resource]:
+	var result: Array[Resource] = []
+	for member: Node3D in mission.survivors:
+		result.append(member.talent)
+	return result

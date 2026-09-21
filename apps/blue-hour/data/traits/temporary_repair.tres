@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/trait_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "temporary_repair"
+display_name = "临时修复"
+description = "减少车辆、设备以及机械类交互的耗时。"
+trait_type = 2
+modifier_hook = "interaction"
+params = {"interaction_categories": ["vehicle", "device", "mechanical"]}
+levels = PackedFloat32Array(0.12, 0.16, 0.20, 0.24, 0.28)

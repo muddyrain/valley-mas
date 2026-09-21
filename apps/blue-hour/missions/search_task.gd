@@ -1,6 +1,7 @@
 extends RefCounted
 ## One task owns entry, search and exit. Site progress survives cancellation.
 enum Phase { IDLE, ASSIGNED, MOVING_TO_ENTRANCE, ENTERING, SEARCHING_INSIDE, EXITING, COMPLETE, CANCELLED, SEARCHING_OUTSIDE, DEFEND }
+const SurvivorProgression = preload("res://data/survivor_progression.gd")
 const TRANSITION_SECONDS: float = .3
 var site_id: String = ""
 var worker: Node3D
@@ -11,6 +12,7 @@ var transition_left: float = 0.0
 var exit_worker: Node3D
 var outcome: Phase = Phase.CANCELLED
 var search_started: bool = false
+var survivor_id: String = ""
 
 func allows_move_override() -> bool:
 	# Defense and a return to the doorway must not turn a started search into approach.
@@ -18,6 +20,7 @@ func allows_move_override() -> bool:
 
 func assign(id: String, member: Node3D, mission: Node3D) -> void:
 	site_id = id
+	survivor_id = str(member.data.id)
 	mission.city.sites[id].search_cancelled = false
 	worker = member
 	phase = Phase.ASSIGNED
@@ -29,9 +32,11 @@ func assign(id: String, member: Node3D, mission: Node3D) -> void:
 
 func release(mission: Node3D, completed: bool = false) -> void:
 	if not is_instance_valid(worker):
+		mission._unbind_search_task(self)
 		return
 	outcome = Phase.COMPLETE if completed else Phase.CANCELLED
 	phase = outcome
+	mission._unbind_search_task(self)
 	if worker.damaged.is_connected(_on_damage):
 		worker.damaged.disconnect(_on_damage)
 	worker.searching = false
@@ -159,7 +164,7 @@ func advance(delta: float, mission: Node3D) -> void:
 	if phase != Phase.SEARCHING_INSIDE and (phase != Phase.SEARCHING_OUTSIDE or safe_left > 0 or _threatened(mission)):
 		return
 	var site: Dictionary = mission.city.sites[site_id]
-	var seconds: float = mission.effects.search_seconds(site.spec.search_seconds, worker.talent.search_multiplier)
+	var seconds: float = mission.interaction_duration(site, worker)
 	if site.searched:
 		release(mission, true)
 		return
@@ -170,13 +175,14 @@ func advance(delta: float, mission: Node3D) -> void:
 	if site.progress >= 1.0:
 		site.searched = true
 		mission.city.update_site(site_id)
+		mission.award_xp_once(worker.data.id, SurvivorProgression.EventType.SEARCH_COMPLETE, "search:" + site_id)
 		var loot: Dictionary = mission.resolve_site_loot(site)
 		# Cache the resolved legacy totals on the site so existing HUD/tests and
 		# settlement paths observe the same result as the new resolver.
 		site.spec.food = int(loot.food)
 		site.spec.scrap = int(loot.scrap)
 		var worker_name: String = worker.data.display_name
-		loot.weapon = mission.reward_for_site(site_id)
+		loot.weapon = mission.reward_for_site(site_id, worker)
 		mission.drop_loot(site.spec.entry, int(loot.food), int(loot.scrap), loot.weapon, {"id": site_id, "worker_name": worker_name})
 		release(mission, true)
 		mission.search_completed.emit(site_id, worker_name, loot)

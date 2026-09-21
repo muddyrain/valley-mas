@@ -1,21 +1,21 @@
 class_name LootResolver
 extends RefCounted
 
-static func roll(table: Resource, rng: RandomNumberGenerator) -> Array[Dictionary]:
+static func roll(table: Resource, rng: RandomNumberGenerator, trait_data: Resource = null) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	if table == null:
 		return result
 	var total: float = 0.0
 	for entry: Resource in table.entries:
 		if entry.weight > 0 and entry.max_amount >= entry.min_amount:
-			total += entry.weight
+			total += TraitRuntime.loot_weight(entry.weight, entry.rarity, trait_data)
 	if total <= 0:
 		return result
 	var pick: float = rng.randf() * total
 	for entry: Resource in table.entries:
 		if entry.weight <= 0 or entry.max_amount < entry.min_amount:
 			continue
-		pick -= entry.weight
+		pick -= TraitRuntime.loot_weight(entry.weight, entry.rarity, trait_data)
 		if pick <= 0:
 			var amount: int = rng.randi_range(entry.min_amount, entry.max_amount)
 			if amount > 0:

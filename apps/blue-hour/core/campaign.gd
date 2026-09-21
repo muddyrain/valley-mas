@@ -278,9 +278,16 @@ func stage_result(outcome: Dictionary) -> bool:
 	if data.status != "mission" or not _valid_outcome(outcome, data):
 		return false
 	data.pending = outcome.duplicate(true)
+	_award_outcome_xp(outcome)
 	_normalize_weapons(data)
 	data.status = "pending"
 	return true
+
+func _award_outcome_xp(outcome: Dictionary) -> void:
+	for id: String in data.selected_party:
+		record_xp_event(id, SurvivorProgressionData.EventType.MISSION_COMPLETE)
+	for id: String in outcome.returned_ids:
+		record_xp_event(id, SurvivorProgressionData.EventType.EXTRACTION_SUCCESS)
 
 func preview() -> Dictionary:
 	if data.status != "pending":

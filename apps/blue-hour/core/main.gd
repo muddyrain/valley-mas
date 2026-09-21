@@ -14,6 +14,7 @@ const Title = preload("res://ui/title_screen.gd")
 const TodayAction = preload("res://ui/today_action_screen.gd")
 const ShelterView = preload("res://ui/shelter_view.gd")
 const CampHUDRoot = preload("res://ui/camp_hud/camp_hud_root.tscn")
+const CampMenuOverlay = preload("res://ui/camp_menu_overlay.gd")
 const LoadingScreenV2 = preload("res://scenes/loading/LoadingScreenV2.tscn")
 const RuntimeLoading = preload("res://ui/runtime_loading_overlay.gd")
 const LoadProfile = preload("res://core/runtime_load_profile.gd")
@@ -39,6 +40,7 @@ var save_error_dialog: AcceptDialog
 var base_map: Resource
 var camp_view: Node3D
 var camp_ui: Control
+var camp_menu_overlay: Control
 var selected_mission_id := ""
 var selected_mission_data: Resource
 var selected_party: Array[String] = []
@@ -116,7 +118,7 @@ func _ready() -> void:
 	if fresh_test_run or (not stored.ok and stored.get("missing", false)):
 		if fresh_test_run:
 			# Explicit three-member regression fixture, isolated from player saves.
-			campaign.new_run(772, "", ["lin", "qiao", "yan"])
+			campaign.new_run(772, "", ["lin_jianyue", "lu_qinghe", "shen_yanchuan"])
 			_save()
 	elif not stored.ok or not campaign.restore(stored.data):
 		state = "save_error"
@@ -148,6 +150,10 @@ func _ready() -> void:
 
 func _input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.pressed or event.echo:
+		return
+	if event.physical_keycode == KEY_ESCAPE and is_instance_valid(camp_menu_overlay):
+		close_camp_menu_overlay()
+		get_viewport().set_input_as_handled()
 		return
 	if event.physical_keycode == KEY_F1 and OS.is_debug_build():
 		if state == "mission" and hud != null:
@@ -191,6 +197,7 @@ func member_names(ids: Array) -> String:
 	return "、".join(names) if not names.is_empty() else "无"
 
 func _clear_screen() -> void:
+	_clear_camp_menu_overlay(false)
 	if is_instance_valid(screen) and screen != camp_ui:
 		screen.get_parent().remove_child(screen)
 		screen.queue_free()
@@ -271,9 +278,37 @@ func show_shelter() -> void:
 		get_camp_view().select("")
 		camp_ui = CampHUDRoot.instantiate()
 		ui_layer.add_child(camp_ui)
+		camp_ui.configure_roster(catalog, campaign)
 		camp_ui.depart_requested.connect(show_today_action)
 		camp_ui.menu_requested.connect(show_main_menu)
+		camp_ui.camp_menu_requested.connect(open_camp_menu_overlay)
 		screen = camp_ui
+
+func open_camp_menu_overlay() -> void:
+	if state != "shelter" or not is_instance_valid(camp_ui) or is_instance_valid(camp_menu_overlay):
+		return
+	camp_view.interaction_locked = true
+	camp_ui.process_mode = Node.PROCESS_MODE_DISABLED
+	camp_menu_overlay = CampMenuOverlay.new()
+	ui_layer.add_child(camp_menu_overlay)
+	camp_menu_overlay.setup(settings)
+	camp_menu_overlay.continue_requested.connect(close_camp_menu_overlay)
+	camp_menu_overlay.main_menu_requested.connect(show_main_menu)
+	camp_menu_overlay.quit_requested.connect(request_quit)
+
+func close_camp_menu_overlay() -> void:
+	_clear_camp_menu_overlay(true)
+
+func _clear_camp_menu_overlay(restore_camp_input: bool) -> void:
+	if is_instance_valid(camp_menu_overlay):
+		camp_menu_overlay.get_parent().remove_child(camp_menu_overlay)
+		camp_menu_overlay.queue_free()
+	camp_menu_overlay = null
+	if restore_camp_input and state == "shelter":
+		if is_instance_valid(camp_view):
+			camp_view.interaction_locked = false
+		if is_instance_valid(camp_ui):
+			camp_ui.process_mode = Node.PROCESS_MODE_INHERIT
 
 func show_today_action() -> void:
 	while _today_action_closing:
@@ -539,24 +574,42 @@ func _load_selected_mission_staged() -> void:
 	hud.setup(mission, settings)
 	hud.main_menu_requested.connect(return_to_main_menu)
 	load_profile.measure("hud_bind", hud_started)
-	load_profile.stages["minimap_world_build"] = hud.minimap.static_build_ms
+	load_profile.stages["minimap_build"] = hud.minimap.static_build_ms
 	var ready_started := Time.get_ticks_usec()
 	var deadline := Time.get_ticks_msec() + 15000
 	# At least one complete rendered frame of the HUD/world sits under the opaque hold.
+	var frame_started: int = Time.get_ticks_usec()
 	await runtime_loading.rendered_frame()
-	while not expedition_ready() and Time.get_ticks_msec() < deadline:
+	load_profile.measure("wait_frame_present", frame_started)
+	var gate_wait_stages: Dictionary = {
+		"NavigationReady": "wait_navigation_sync",
+		"SearchRegistryReady": "wait_search_registry_ready",
+		"MinimapWorldLayerReady": "wait_minimap_ready",
+		"SurvivorsReady": "wait_survivor_ready",
+		"HUDBound": "wait_hud_ready"
+	}
+	while Time.get_ticks_msec() < deadline:
+		var ready: bool = expedition_ready()
+		var elapsed_ms: float = (Time.get_ticks_usec() - ready_started) / 1000.0
+		for gate_name: String in gate_wait_stages:
+			var stage_name: String = gate_wait_stages[gate_name]
+			if bool(load_profile.gates.get(gate_name, false)) and not load_profile.stages.has(stage_name):
+				load_profile.stages[stage_name] = elapsed_ms
+		if ready:
+			break
 		await runtime_loading.rendered_frame()
-	load_profile.measure("final_ready_wait", ready_started)
 	if not expedition_ready():
 		_loading_failed("Ready gate timed out: " + JSON.stringify(load_profile.gates))
 		return
 	load_profile.mark("final_ready_gate")
 	load_profile.mark("iris_open_started")
-	await runtime_loading.open()
+	await runtime_loading.open(load_profile)
 	mission.process_mode = Node.PROCESS_MODE_INHERIT
 	mission.input_enabled = true
 	mission.begin_arrival()
 	state = "mission"
+	load_profile.stages["TOTAL_CLICK_TO_PLAYABLE"] = (Time.get_ticks_usec() - load_profile.started_usec) / 1000.0
+	load_profile.mark("playable")
 	load_profile.mark("total")
 	load_profile.print_report()
 

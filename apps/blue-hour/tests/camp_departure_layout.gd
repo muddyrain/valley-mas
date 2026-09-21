@@ -9,7 +9,7 @@ func run() -> void:
 	await launch(true)
 	app.save_path = "user://test-runs/camp-departure-layout.json"
 	app.store = load("res://core/save_store.gd").new(app.save_path)
-	app.campaign.new_run(772, "", ["xia_zhiyao", "su_wanxing", "lin", "qiao"])
+	app.campaign.new_run(772, "", ["xia_zhiyao", "su_wanxing", "lin_jianyue", "lu_qinghe"])
 	app.show_shelter()
 	await frames(20)
 	var camp: Node3D = app.camp_view.camp

@@ -1,6 +1,8 @@
 extends Node3D
 ## Lightweight world feedback layer for Expedition commands.
 ## All geometry is generated at runtime; no gameplay state lives here.
+const Visuals = preload("res://vfx/visuals.gd")
+const HudArt = preload("res://ui/expedition/hud_skin.gd")
 
 const RING_SHADER := """
 shader_type spatial;
@@ -34,7 +36,15 @@ void fragment() {
 const MOVE_POOL_SIZE := 6
 const COMMAND_LINE_SECONDS: float = .8
 const COMMAND_LINE_WIDTH: float = .035
+const COMMAND_LINE_UPDATE_INTERVAL: float = 1.0 / 20.0
+const COMMAND_LINE_SEGMENT_LENGTH: float = 1.0
 const COMMAND_LINE_COLOR: Color = Color(.30, .80, 1.0, .62)
+const COMMAND_ARROW_LENGTH: float = .24
+const COMMAND_ARROW_WIDTH: float = .16
+const SEARCH_COMPLETE_COLOR: Color = Color(.72, .96, .92, .92)
+const LOOT_FOOD_COLOR: Color = Color("#f6d58c")
+const LOOT_SCRAP_COLOR: Color = Color("#a9d7e2")
+const LOOT_WEAPON_COLOR: Color = Color("#c6b5ff")
 const Ground = preload("res://maps/expedition/walkable_ground.gd")
 var command_lines: Dictionary = {}
 var mission: Node3D
@@ -42,21 +52,26 @@ var selected_member: Node3D
 var selection_ring: MeshInstance3D
 var search_feedback: MeshInstance3D
 var focus_feedback: MeshInstance3D
+var search_complete_feedback: MeshInstance3D
 var move_pool: Array[MeshInstance3D] = []
 var move_cursor := 0
 var _time := 0.0
 var _selection_fade: Tween
+var command_visual_update_count: int = 0
+var _command_line_update_elapsed: float = COMMAND_LINE_UPDATE_INTERVAL
 
 func setup(owner: Node3D) -> void:
 
 	mission = owner
 	selection_ring = _make_ring("SelectionRing", 1.7, 0.56, 0.09, Color("#d9f6ff"), 0.0)
 	search_feedback = _make_ring("SearchTargetFeedback", 1.5, 0.68, 0.09, Color("#57c8ff"), 0.0)
+	search_complete_feedback = _make_ring("SearchCompleteFeedback", 1.65, 0.72, 0.08, SEARCH_COMPLETE_COLOR, 1.0)
 	focus_feedback = _make_ring("FocusTargetFeedback", 1.45, 0.78, 0.085, Color("#ff9a86"), 1.0)
 	search_feedback.visible = false
+	search_complete_feedback.visible = false
 	focus_feedback.visible = false
 	for i in MOVE_POOL_SIZE:
-		var marker := _make_ring("MoveClickFeedback%02d" % i, 1.15, 0.55, 0.085, Color("#e3f8ff"), 0.0)
+		var marker := _make_ring("MoveClickFeedback%02d" % i, 1.15, 0.55, 0.085, Color("#e3f8ff"), 1.0)
 		marker.visible = false
 		move_pool.append(marker)
 
@@ -64,7 +79,11 @@ func _process(delta: float) -> void:
 	if not is_instance_valid(mission):
 		return
 	_time += delta
-	_update_command_lines(delta)
+	_advance_command_lines(delta)
+	_command_line_update_elapsed += delta
+	if _command_line_update_elapsed >= COMMAND_LINE_UPDATE_INTERVAL:
+		_redraw_command_lines()
+		_command_line_update_elapsed = fmod(_command_line_update_elapsed, COMMAND_LINE_UPDATE_INTERVAL)
 	if is_instance_valid(selected_member):
 		var valid: bool = not selected_member.dead and not selected_member.inside_building and not selected_member.boarding
 		selection_ring.visible = valid
@@ -75,6 +94,8 @@ func _process(delta: float) -> void:
 		selection_ring.visible = false
 	if search_feedback.visible:
 		_set_pulse(search_feedback, _time)
+	if search_complete_feedback.visible:
+		_set_pulse(search_complete_feedback, _time)
 	if focus_feedback.visible:
 		var target: Node3D = mission.focus_target
 		var valid_focus: bool = is_instance_valid(target) and target.active and mission.exploration.is_visible(target.position)
@@ -92,10 +113,14 @@ func set_selected_member(member: Node3D) -> void:
 		_selection_fade.kill()
 	if is_instance_valid(previous) and is_instance_valid(member):
 		_set_alpha(selection_ring, 0.0)
-		_selection_fade = create_tween()
-		_selection_fade.tween_method(func(value: float): _set_alpha(selection_ring, value), 0.0, 1.0, 0.14)
+	selection_ring.scale = Vector3.ONE * 0.78
+	_selection_fade = create_tween().set_parallel(true)
+	_selection_fade.tween_method(func(value: float): _set_alpha(selection_ring, value), 0.0, 1.0, 0.14)
+	_selection_fade.tween_property(selection_ring, "scale", Vector3.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func play_move_feedback(point: Vector3) -> void:
+	if not bool(get_meta("p02_dynamic_enabled", true)):
+		return
 	var marker := move_pool[move_cursor]
 	move_cursor = (move_cursor + 1) % move_pool.size()
 	var tween: Tween = marker.get_meta("vfx_tween") as Tween if marker.has_meta("vfx_tween") else null
@@ -114,6 +139,8 @@ func play_move_feedback(point: Vector3) -> void:
 	marker.set_meta("vfx_tween", tween)
 
 func play_command_line(member: Node3D, point: Vector3, search_order: bool = false) -> void:
+	if not bool(get_meta("p02_dynamic_enabled", true)):
+		return
 	# Reuse one short-lived ribbon per recipient during held steering.
 	var id: int = member.get_instance_id()
 	if not command_lines.has(id):
@@ -135,7 +162,7 @@ func play_command_line(member: Node3D, point: Vector3, search_order: bool = fals
 	line.elapsed = 0.0
 	_draw_command_line(line, member)
 
-func _update_command_lines(delta: float) -> void:
+func _advance_command_lines(delta: float) -> void:
 	for id: int in command_lines.keys():
 		var line: Dictionary = command_lines[id]
 		line.elapsed += delta
@@ -149,10 +176,17 @@ func _update_command_lines(delta: float) -> void:
 		if member.dead or member.boarding or member.inside_building or (task != null and not approaching):
 			line.view.queue_free()
 			command_lines.erase(id)
+
+func _redraw_command_lines() -> void:
+	for id: int in command_lines:
+		var line: Dictionary = command_lines[id]
+		var member: Node3D = line.member.get_ref() as Node3D
+		if not is_instance_valid(member):
 			continue
 		_draw_command_line(line, member)
 
 func _draw_command_line(line: Dictionary, member: Node3D) -> void:
+	command_visual_update_count += 1
 	var view: MeshInstance3D = line.view
 	var mesh: ImmediateMesh = view.mesh as ImmediateMesh
 	var start: Vector3 = member.global_position
@@ -163,20 +197,41 @@ func _draw_command_line(line: Dictionary, member: Node3D) -> void:
 	if offset.length_squared() < .0025:
 		return
 	var side: Vector3 = offset.normalized().cross(Vector3.UP) * COMMAND_LINE_WIDTH * .5
-	var segments: int = maxi(1, ceili(offset.length() / .25))
+	var segments: int = maxi(1, ceili(offset.length() / COMMAND_LINE_SEGMENT_LENGTH))
 	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
 	for index: int in segments:
-		var a := start.lerp(end, float(index) / segments)
-		var b := start.lerp(end, float(index + 1) / segments)
+		var a: Vector3 = _ground_point(start.lerp(end, float(index) / segments), .045)
+		var b: Vector3 = _ground_point(start.lerp(end, float(index + 1) / segments), .045)
 		for vertex: Vector3 in [a - side, a + side, b + side, a - side, b + side, b - side]:
-			mesh.surface_add_vertex(to_local(_ground_point(vertex, .045)))
+			mesh.surface_add_vertex(to_local(vertex))
+	var direction: Vector3 = offset.normalized()
+	var arrow_tip: Vector3 = _ground_point(end, .06)
+	var arrow_base: Vector3 = _ground_point(end - direction * COMMAND_ARROW_LENGTH, .06)
+	var arrow_side: Vector3 = direction.cross(Vector3.UP).normalized() * COMMAND_ARROW_WIDTH * .5
+	mesh.surface_add_vertex(to_local(arrow_tip))
+	mesh.surface_add_vertex(to_local(arrow_base + arrow_side))
+	mesh.surface_add_vertex(to_local(arrow_base - arrow_side))
+	var flow_phase: float = fmod(float(line.elapsed) * 1.8, 1.0)
+	for progress: float in [0.42 + flow_phase * .12, 0.70 + flow_phase * .10]:
+		if progress >= .88:
+			continue
+		var flow_center: Vector3 = _ground_point(start.lerp(end, progress), .055)
+		var flow_tip: Vector3 = flow_center + direction * .09
+		var flow_base: Vector3 = flow_center - direction * .07
+		var flow_side: Vector3 = direction.cross(Vector3.UP).normalized() * .05
+		mesh.surface_add_vertex(to_local(flow_tip))
+		mesh.surface_add_vertex(to_local(flow_base + flow_side))
+		mesh.surface_add_vertex(to_local(flow_base - flow_side))
 	mesh.surface_end()
 	var material: StandardMaterial3D = view.material_override as StandardMaterial3D
 	var color: Color = COMMAND_LINE_COLOR
 	color.a *= 1.0 - smoothstep(.2, COMMAND_LINE_SECONDS, float(line.elapsed))
+	color.a *= .92 + .08 * sin(float(line.elapsed) * TAU / .24)
 	material.albedo_color = color
 
 func play_search_feedback(point: Vector3) -> void:
+	if not bool(get_meta("p02_dynamic_enabled", true)):
+		return
 	search_feedback.global_position = _ground_point(point)
 	search_feedback.visible = true
 	search_feedback.scale = Vector3.ONE * 0.72
@@ -187,6 +242,64 @@ func play_search_feedback(point: Vector3) -> void:
 	tween.chain().tween_interval(0.38)
 	tween.chain().tween_method(func(value: float): _set_alpha(search_feedback, value), 0.9, 0.0, 0.3)
 	tween.chain().tween_callback(search_feedback.hide)
+
+func play_search_complete(point: Vector3) -> void:
+	if not bool(get_meta("p02_dynamic_enabled", true)):
+		return
+	if search_complete_feedback.has_meta("vfx_tween"):
+		var previous: Tween = search_complete_feedback.get_meta("vfx_tween") as Tween
+		if previous != null:
+			previous.kill()
+	search_complete_feedback.global_position = _ground_point(point, .04)
+	search_complete_feedback.scale = Vector3.ONE * .56
+	search_complete_feedback.visible = true
+	_set_alpha(search_complete_feedback, 0.0)
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(search_complete_feedback, "scale", Vector3.ONE * 1.18, 0.20).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_method(func(value: float): _set_alpha(search_complete_feedback, value), 0.0, 1.0, 0.12)
+	tween.chain().tween_interval(0.16)
+	tween.chain().tween_property(search_complete_feedback, "scale", Vector3.ONE * .92, .24)
+	tween.chain().tween_method(func(value: float): _set_alpha(search_complete_feedback, value), 1.0, 0.0, 0.24)
+	tween.chain().tween_callback(search_complete_feedback.hide)
+	search_complete_feedback.set_meta("vfx_tween", tween)
+
+func play_loot_feedback(point: Vector3, loot: Dictionary) -> void:
+	if not bool(get_meta("p02_dynamic_enabled", true)):
+		return
+	var entries: PackedStringArray = []
+	if int(loot.get("food", 0)) > 0:
+		entries.append("+食物 %d" % int(loot.food))
+	if int(loot.get("scrap", 0)) > 0:
+		entries.append("+废料 %d" % int(loot.scrap))
+	if not loot.get("weapon", {}).is_empty():
+		entries.append("+武器")
+	if entries.is_empty():
+		return
+	var has_weapon: bool = not loot.get("weapon", {}).is_empty()
+	var label_color: Color = LOOT_WEAPON_COLOR if has_weapon else LOOT_FOOD_COLOR if int(loot.get("food", 0)) > 0 else LOOT_SCRAP_COLOR
+	var icon_name: String = "weapon_ranged" if has_weapon else "icon_bag" if int(loot.get("food", 0)) > 0 else "icon_loot"
+	var loot_group := Node3D.new()
+	loot_group.name = "LootFeedback"
+	add_child(loot_group)
+	loot_group.global_position = _ground_point(point) + Vector3.UP * 1.0
+	var icon := Sprite3D.new()
+	icon.texture = HudArt.texture(icon_name)
+	icon.pixel_size = .004
+	icon.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	icon.no_depth_test = true
+	icon.modulate = label_color
+	icon.position = Vector3(-.42, 0, 0)
+	loot_group.add_child(icon)
+	var label: Label3D = Visuals.label(loot_group, " · ".join(entries), Vector3(.08, 0, 0), label_color, 34)
+	loot_group.scale = Vector3.ONE * .72
+	var duration: float = 1.08 if has_weapon else .78
+	var tween := create_tween()
+	tween.tween_property(loot_group, "global_position", loot_group.global_position + Vector3.UP * .72, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(loot_group, "scale", Vector3.ONE, .16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_interval(duration - .25)
+	tween.parallel().tween_property(label, "modulate:a", 0.0, .25)
+	tween.parallel().tween_property(icon, "modulate:a", 0.0, .25)
+	tween.tween_callback(loot_group.queue_free)
 
 func set_focus_target(target: Node3D) -> void:
 	if not is_instance_valid(target):

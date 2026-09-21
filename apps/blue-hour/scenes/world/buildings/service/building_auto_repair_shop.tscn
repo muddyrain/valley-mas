@@ -35,10 +35,10 @@ position = Vector3(0.000000, 0.000000, -8.856849)
 position = Vector3(0.000000, 0.000000, -4.856850)
 
 [node name="EntranceMarker" type="Marker3D" parent="Anchors"]
-position = Vector3(0.000000, 0.000000, -6.356849)
+position = Vector3(0.000000, 0.000000, -4.856850)
 
 [node name="EntranceAnchor" type="Marker3D" parent="Anchors"]
-position = Vector3(0.000000, 0.000000, -6.356849)
+position = Vector3(0.000000, 0.000000, -4.856850)
 
 [node name="SearchMarker" type="Marker3D" parent="Anchors"]
 position = Vector3(0.000000, 0.000000, -6.356849)

@@ -1,8 +1,8 @@
-# E01.5 Fix — Local Follow Minimap + Equal Survivors
+# E01.5 Fix — Local Follow Minimap + Equal-Footing Survivor Markers
 
 日期：2026-09-19。状态：**TECHNICALLY COMPLETE**。Human Runtime QA：**PENDING**。
 
-左下角 Minimap 已从整镇缩放改为 **LOCAL FOLLOW**。中心始终复用 `mission.squad_center()`，即所有存活出征 Survivor 的位置平均值；默认半径 35m，固定显示约 70×70m。三名成员使用同一 18px 图标与相同信息等级，选中状态只增加细圆环。
+左下角 Minimap 已从整镇缩放改为 **LOCAL FOLLOW**。中心始终复用 `mission.squad_center()`，即所有存活出征 Survivor 的位置平均值；默认半径 35m，固定显示约 70×70m。三名成员使用相同尺寸的轻量圆环 marker，中心点表达位置，移动状态呼吸，搜索状态显示旋转弧线。
 
 ## 修改范围
 
@@ -11,12 +11,12 @@
 - 保留 Runtime 道路、建筑轮廓、地面区域、Arrival、POI、种子与 Provider 数据；不修改 Town 生成或 Runtime Bridge。
 - `world_to_minimap()` 以小队中心和固定范围投影；Camera pan、头像选择和 Town 大小不影响范围。正方形内容区域置于原有矩形边框中，不改变 HUD 锚点与布局。
 - 静态底图按世界坐标构建并缓存。`LocalWorldClip` 裁切超出局部窗口的部分，运动只更新世界层的平移/缩放变换。换种子重建缓存；移动与面板 resize 不重建道路、建筑或区域命令。
-- 所有存活 Survivor 使用同一个现有 `map_player_marker` 图标及同一尺寸，不再将未选中者缩小为点。`marker_player` 是既有资源字段名，没有主角、队长或主次单位语义。原有 `selected_member` 只表示当前查看/操作对象；未改输入、导航队形或职业规则。
-- 相邻图标使用与选择无关的固定候选位置分离，连线端点仍是真实投影。切换选中者只改变细圆环，不改变任一图标的大小、纹理、坐标或显示状态。
+- 所有存活 Survivor 使用 `draw_circle` / `draw_arc` 绘制轻量圆环 marker，不再依赖头像或角色图片，也不记录 `selected` 状态。中心点表达位置，普通状态显示完整外圈，移动状态轻微呼吸，搜索状态显示旋转弧线。
+- 相邻 marker 使用与选择无关的固定候选位置分离，连线端点仍是真实投影。世界角色查看/操作不会改变小地图 marker 的大小、纹理、坐标或显示状态；输入、导航队形和职业规则保持不变。
 - 离开窗口的 POI、Arrival 和分散 Survivor 沿真实方向与边缘内缩矩形求交；复用原图标及小方向尖角。拥挤时沿同一边分离，保留真实边缘锚点连线。不会触发全镇 zoom out。
 - 已发现地点继续使用现有地点 / selected target / search target 图标；未发现地点不显示内容。Town 尚未接入 E02，测试只通过隔离 fixture 验证既有 `sites` 数据形状和发现边界，不创建正式 SearchTask。
 - 原 E01.5 全镇等比投影保留为 `world_to_overview(world_pos, content_rect)`，仅作为未来 Full/Tactical Map 数据基础；左下角不调用它，本轮没有实现全图 UI。
-- FIXED_LEGACY 的原地图来源与局部窗口保留；其 Survivor 也统一基础尺寸和图标，仅选择圆环有差异。原来的选中 24px / 未选中 12px 差异被本轮平等表达规则替代。
+- FIXED_LEGACY 的原地图来源与局部窗口保留；其 Survivor 也使用相同的基础圆环绘制。原来的头像、选中 24px / 未选中 12px 差异被本轮平等表达规则替代。
 
 没有新增贴图、SubViewport、3D Camera、Fog、敌人、搜索玩法或撤离逻辑。原 E01.5 静态地理底图继续保留，不增加未知战利品、敌人或建筑内部信息；正式 Fog 仍为 DEFERRED_TO_E04。
 
@@ -28,6 +28,7 @@
 | E01.5 Runtime Bridge 回归 | **1,319 checks / 0 failures**；4101–4104 数据逐项对照冻结 Generator、种子切换、Legacy、统一坐标和保留的 overview 投影 |
 | Local Follow 专项 | **1,810 checks / 0 failures**；四种子固定 70×70m、镜头/选择独立、等尺寸三人标记、成员死亡/离队/分散、边缘方向、已知/未知地点、移动滚动及静态缓存 |
 | 原生选择与移动 | **386 checks / 0 failures**；真实头像点击选择 B、C，三人通过生产导航抵达 POI，再走离 POI |
+| Survivor Marker V2 专项 | **PENDING**；静止、移动、搜索三种状态均检查三名成员平等显示、无头像纹理、无小地图选择状态 |
 | 最终三份专项日志 | Missing Resource=0；Invalid UID=0；Runtime Error=0；Warning=0 |
 | E01 冻结集 | **633 / 633** 未变化 |
 | M03 冻结集 | **622 / 622** 未变化 |
@@ -56,17 +57,17 @@ Godot 4.7.2 / Compatibility。四种子均为单次静态构建，尺度始终�
 
 - [01 Arrival](../test-output/expedition-integration-e01-5-fix/01_local_minimap_arrival.png)
 - [02 三人同时可见](../test-output/expedition-integration-e01-5-fix/02_all_survivors_visible.png)
-- [03 选中 A](../test-output/expedition-integration-e01-5-fix/03_selected_survivor_a.png)
-- [04 选中 B](../test-output/expedition-integration-e01-5-fix/04_selected_survivor_b.png)
+- [03 静止三人](../test-output/minimap-survivor-marker-v2/01-static.png)
+- [04 移动状态](../test-output/minimap-survivor-marker-v2/02-moving.png)
 - [05 局部跟随移动](../test-output/expedition-integration-e01-5-fix/05_local_follow_mid_move.png)
 - [06 远处 POI 边缘标记](../test-output/expedition-integration-e01-5-fix/06_poi_offscreen_edge_marker.png)
 - [07 抵达 POI](../test-output/expedition-integration-e01-5-fix/07_arrived_at_poi.png)
-- [08 选中 C](../test-output/expedition-integration-e01-5-fix/08_selected_survivor_c.png)
+- [08 搜索状态](../test-output/minimap-survivor-marker-v2/03-searching.png)
 - [09 走离后 POI 再次在边缘](../test-output/expedition-integration-e01-5-fix/09_poi_leaves_local_window.png)
 - [选择与移动总览](../test-output/expedition-integration-e01-5-fix/local_minimap_contact_sheet.png)
 - [选择与移动视频](../test-output/expedition-integration-e01-5-fix/local_minimap_survivor_selection_and_move.mp4)：1600×900、30fps、1,997 帧、66.567 秒。
 
-视频为原生 Godot 帧图编码，固定 1/30 秒推进实际生产移动，并非桌面墙钟录屏。头像与地面命令经过实际 InputEvent；没有角色瞬移。测试记录每 15 帧的队伍中心、比例、世界坐标、图标坐标、edge 与 selected 状态，共 134 组采样。截图已检查选择前后位置、图标尺寸、局部道路滚动及 POI 进出窗口；人工操作体验仍待用户验收。
+视频为原生 Godot 帧图编码，固定 1/30 秒推进实际生产移动，并非桌面墙钟录屏。地面命令经过实际 InputEvent；没有角色瞬移。测试记录每 15 帧的队伍中心、比例、世界坐标、marker 坐标、edge 与行为状态。截图检查三种 marker 状态、局部道路滚动及 POI 进出窗口；人工操作体验仍待用户验收。
 
 复跑脚本：`tests/expedition_minimap.gd`（Bridge，可用 `--output-dir=` 指定证据目录）、`tests/expedition_minimap_local.gd`（专项）、`tests/expedition_minimap_local_capture.gd`（原生 1600×900、`--fixed-fps 30`）。测试存档仅写入 `user://test-runs/`。
 

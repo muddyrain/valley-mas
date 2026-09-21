@@ -33,7 +33,7 @@ func run() -> void:
 	await _frames(2)
 	_check(detail.visible and hud.selected_survivor_id == "SUR_001", "Selecting SUR_001 opens M05 by ID")
 	_check(detail.get_node("HeaderPanel/SurvivorName").text == "夏知遥", "M05 name comes from SurvivorDefinition")
-	_check(detail.get_node("HeaderPanel/SurvivorNameEn").text.contains("SUR_001") and detail.get_node("HeaderPanel/SurvivorNameEn").text.contains("Lv.1") and detail.get_node("HeaderPanel/SurvivorNameEn").text.contains("HP 100/100"), "M05 displays ID, level, and HP")
+	_check(detail.get_node("HeaderPanel/SurvivorNameEn").text.contains("SUR_001") and detail.get_node("HeaderPanel/SurvivorNameEn").text.contains("Lv.1") and detail.get_node("HeaderPanel/HPLabel").text.contains("HP 100 / 100"), "M05 displays ID, level, and HP")
 	_check(detail.get_node("TraitPanel/TraitName").text.contains("搜寻直觉") and detail.get_node("TraitPanel/TraitName").text.contains("Lv.1"), "M05 displays formal trait and current level")
 	_check(detail.get_node("TraitPanel/TraitDescription").text != "", "M05 displays current trait description")
 	_check(detail.get_node("CombatPanel/WeaponName").text == "未装备", "Unassigned survivor displays 未装备")

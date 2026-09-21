@@ -20,7 +20,7 @@ shape = SubResource("shape")`r`nposition = Vector3(0.000000, 2.150000, 0.000000)
 position = Vector3(0.000000, 0.000000, -3.223995)
 
 [node name="EntranceMarker" type="Marker3D" parent="Anchors"]
-position = Vector3(0.000000, 0.000000, -4.723995)
+position = Vector3(0.000000, 0.000000, -3.223995)
 
 [node name="SearchMarker" type="Marker3D" parent="Anchors"]
 position = Vector3(0.000000, 0.000000, -4.723995)
@@ -32,11 +32,10 @@ position = Vector3(0.000000, 2.150000, 0.000000)
 position = Vector3(0.000000, 0.000000, -5.223995)
 
 [node name="EntranceAnchor" type="Marker3D" parent="Anchors"]
-position = Vector3(0.000000, 0.000000, -4.723995)
+position = Vector3(0.000000, 0.000000, -3.223995)
 
 [node name="SpawnPoints" type="Node3D" parent="."]
 [node name="LootPoints" type="Node3D" parent="SpawnPoints"]
 [node name="Primary" type="Marker3D" parent="SpawnPoints/LootPoints"]
 position = Vector3(0.000000, 0.000000, -4.723995)
-
 

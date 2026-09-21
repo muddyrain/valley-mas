@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/trait_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "value_judgment"
+display_name = "价值判断"
+description = "提高稀有及以上战利品的出现权重。"
+trait_type = 4
+modifier_hook = "loot_quality"
+params = {"minimum_rarity": 2}
+levels = PackedFloat32Array(0.08, 0.10, 0.12, 0.14, 0.16)

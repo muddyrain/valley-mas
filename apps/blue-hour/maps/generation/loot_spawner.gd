@@ -37,6 +37,12 @@ static func apply(site: Dictionary, profile: String) -> void:
 	site.search_kind = kind
 	site.search_seconds = SEARCH_SECONDS[kind]
 	site.loot_profile = profile
+	var interaction_categories: Array[String] = []
+	if vehicle:
+		interaction_categories.assign(["vehicle", "mechanical"])
+	elif definition != null:
+		interaction_categories.assign(definition.interaction_tags)
+	site.interaction_categories = interaction_categories
 	site.loot_table = _table_for(profile, values)
 	# Keep legacy previews/action modifiers compatible; actual totals replace these on completion.
 	site.food = int(values.food[2])

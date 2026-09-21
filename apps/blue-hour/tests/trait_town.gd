@@ -16,7 +16,7 @@ func run() -> void:
 	var worker: Node3D = mission.survivors[0]
 	var id: String = ""
 	for candidate: String in mission.search_registry.building_searchables:
-		if mission.city.sites[candidate].spec.search_status == "AVAILABLE":
+		if mission.city.sites[candidate].spec.search_status == "RESOLVED_REACHABLE":
 			id = candidate
 			break
 	check(not id.is_empty(), "Formal Town has available target")

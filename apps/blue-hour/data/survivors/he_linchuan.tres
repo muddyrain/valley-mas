@@ -1,0 +1,21 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://data/traits/hold_the_line.tres" id="2_trait"]
+
+[resource]
+script = ExtResource("1")
+id = "he_linchuan"
+display_name = "贺临川"
+profession_id = "outdoor_team_leader"
+profession_name = "户外领队 / 应急志愿者"
+description = "贺临川比队伍里大多数人都更习惯照看一个完整团队。天气、路线、人的状态、什么时候应该继续走，什么时候应该停下来，他都会考虑。他的核心不是英雄主义，而是尽量不要让任何人掉队。"
+role_tags = ["团队防护"]
+trait_id = "hold_the_line"
+model_path = "res://assets/characters/he_linchuan/runtime/he_linchuan.glb"
+max_hp = 100.0
+move_speed = 2.8
+color = Color(0.38, 0.45, 0.42, 1)
+survivor_id = "SUR_011"
+trait_definition = ExtResource("2_trait")
+recommended_weapon_tags = Array[String](["assault_rifle", "shotgun"])

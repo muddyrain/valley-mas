@@ -1,0 +1,21 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://data/traits/emergency_response.tres" id="2_trait"]
+
+[resource]
+script = ExtResource("1")
+id = "lu_qinghe"
+display_name = "陆清禾"
+profession_id = "first_aid_volunteer"
+profession_name = "急救志愿者 / 应急培训成员"
+description = "陆清禾参加过长期基础急救培训，也经常参与大型活动的志愿保障。她并不是医生，却比绝大多数幸存者更懂得什么时候应该止血、休息，以及什么时候必须撤退。"
+role_tags = ["治疗", "生存"]
+trait_id = "emergency_response"
+model_path = "res://assets/characters/lu_qinghe/runtime/lu_qinghe.glb"
+max_hp = 100.0
+move_speed = 2.8
+color = Color(0.42, 0.69, 0.62, 1)
+survivor_id = "SUR_004"
+trait_definition = ExtResource("2_trait")
+recommended_weapon_tags = Array[String](["pistol", "smg"])

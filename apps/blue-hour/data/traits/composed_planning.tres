@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/trait_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "composed_planning"
+display_name = "从容不迫"
+description = "降低全队特殊技能的冷却时间。"
+trait_type = 0
+modifier_hook = "power_cooldown"
+params = {"scope": "party"}
+levels = PackedFloat32Array(0.03, 0.04, 0.05, 0.06, 0.07)

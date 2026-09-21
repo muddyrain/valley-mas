@@ -41,7 +41,7 @@ func run() -> void:
 	var catalog := Catalog.new()
 	var context := MovementContext.new()
 	root.add_child(context)
-	for id: String in ["xia_zhiyao", "su_wanxing", "lin"]:
+	for id: String in ["xia_zhiyao", "su_wanxing", "lin_jianyue"]:
 		var member := Survivor.new()
 		root.add_child(member)
 		var spec: Resource = load("res://data/survivors/" + id + ".tres")

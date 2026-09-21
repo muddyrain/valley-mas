@@ -184,6 +184,11 @@ func verify_markers(mission: Node3D, map: Control) -> void:
 		elif str(marker.id).begins_with("site:"):
 			var site: Dictionary = mission.city.sites[str(marker.id).trim_prefix("site:")]
 			check(site.discovered and marker.world == site.spec.entry, "Site marker uses discovered runtime interaction point")
+		elif marker.kind == "survivor":
+			check(marker.world == instance_from_id(marker.id).global_position, "Survivor marker reads live actor")
+			check(marker.texture == null, "Survivor marker does not use an avatar texture")
+			check(not marker.has("selected"), "Survivor marker has no selection state")
+			check(marker.has("moving") and marker.has("searching"), "Survivor marker carries behavior state")
 		else:
 			check(marker.world == instance_from_id(marker.id).global_position, "Survivor marker reads live actor")
 		for j: int in range(i):

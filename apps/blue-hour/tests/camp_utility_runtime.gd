@@ -75,12 +75,12 @@ func run() -> void:
 	await move_pointer(menu_rect.get_center(), 0.16)
 	check(root.gui_get_hovered_control() == menu, "Top menu is not covered by another control")
 	await click(menu)
-	await create_timer(0.6).timeout
-	check(app.state == "menu" and app.screen.is_visible_in_tree(), "Top menu opens existing visible main menu")
+	await frames(3)
+	check(app.state == "shelter" and is_instance_valid(app.camp_menu_overlay), "Top menu opens the Camp menu overlay")
 	check(app.campaign.data == snapshot, "Top menu preserves campaign")
 	await capture("top-menu-open")
-	app.show_shelter()
-	await frames(15)
+	await click(app.camp_menu_overlay.continue_button)
+	await frames(3)
 	menu = app.camp_ui.get_node("M03_ResourceBar/MenuButton")
 	for down: bool in [true, false]:
 		var event: InputEventMouseButton = InputEventMouseButton.new()
@@ -89,8 +89,8 @@ func run() -> void:
 		event.pressed = down
 		root.push_input(event, true)
 		await process_frame
-	check(app.state == "menu", "Top menu corner is clickable, not just icon or label")
-	app.show_shelter()
+	check(app.state == "shelter" and is_instance_valid(app.camp_menu_overlay), "Top menu corner opens the overlay, not just icon or label")
+	await key(KEY_ESCAPE)
 	await frames(15)
 	for dimensions: Vector2i in [Vector2i(1280, 720), Vector2i(1024, 640), Vector2i(1920, 1080)]:
 		root.size = dimensions

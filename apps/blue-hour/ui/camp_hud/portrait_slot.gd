@@ -10,6 +10,19 @@ var _hovered: bool = false
 var _held: bool = false
 var _transition: Tween
 
+func bind_survivor(view_data: Dictionary) -> void:
+	$PortraitTexture.texture = view_data.get("portrait") as Texture2D
+	$Fallback.visible = $PortraitTexture.texture == null
+	$Fallback/Initials.text = _initials(str(view_data.get("display_name", "")))
+	$NameLabel.text = str(view_data.get("display_name", ""))
+	$MetaLabel.text = "Lv.%d · %s" % [int(view_data.get("level", 1)), str(view_data.get("status", ""))]
+	$MetaLabel.modulate.a = 1.0 if bool(view_data.get("is_party_member", false)) else 0.72
+
+func _initials(display_name: String) -> String:
+	if display_name.is_empty():
+		return "?"
+	return display_name.left(2)
+
 func _ready() -> void:
 	pivot_offset = size * 0.5
 	mouse_entered.connect(func() -> void:

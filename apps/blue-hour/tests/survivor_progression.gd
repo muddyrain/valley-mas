@@ -25,12 +25,16 @@ func run() -> void:
 	check(campaign.data.version == 5, "New runs use progression schema v5")
 	check(campaign.member_level(xia_id) == 1 and campaign.member_trait_level(xia_id) == 1, "New survivor starts at level one")
 	check(campaign.member_xp(xia_id) == 0 and campaign.member_total_xp(xia_id) == 0 and campaign.member_xp_to_next_level(xia_id) == 2, "New survivor has the first XP threshold")
+	check(Progression.default_event_xp(Progression.EventType.SEARCH_COMPLETE) == 1, "Search completion uses the configured XP value")
+	check(Progression.default_event_xp(Progression.EventType.KILL_ENEMY) == 1, "Enemy kill uses the configured XP value")
+	check(Progression.default_event_xp(Progression.EventType.MISSION_COMPLETE) == 5, "Mission completion uses the configured XP value")
+	check(Progression.default_event_xp(Progression.EventType.EXTRACTION_SUCCESS) == 3, "Successful extraction uses the configured XP value")
 
 	check(campaign.record_xp_event(xia_id, Progression.EventType.SEARCH_COMPLETE) == 1, "Search event awards XP")
 	check(campaign.member_level(xia_id) == 1 and campaign.member_xp(xia_id) == 1 and campaign.member_xp_to_next_level(xia_id) == 1, "XP remains within level one")
-	check(campaign.record_xp_event(xia_id, Progression.EventType.EXTRACTION_SUCCESS) == 1, "Extraction event awards XP")
-	check(campaign.member_level(xia_id) == 2 and campaign.member_trait_level(xia_id) == 2 and campaign.member_xp(xia_id) == 0, "Level two synchronizes Trait level")
-	check(campaign.member_total_xp(xia_id) == 2 and campaign.member_xp_to_next_level(xia_id) == 3, "Level two threshold is three XP")
+	check(campaign.record_xp_event(xia_id, Progression.EventType.EXTRACTION_SUCCESS) == 3, "Extraction event awards the configured XP")
+	check(campaign.member_level(xia_id) == 2 and campaign.member_trait_level(xia_id) == 2 and campaign.member_xp(xia_id) == 2, "Level two synchronizes Trait level")
+	check(campaign.member_total_xp(xia_id) == 4 and campaign.member_xp_to_next_level(xia_id) == 1, "Level two threshold accounts for carried XP")
 
 	check(campaign.add_xp(xia_id, 3) == 3, "Direct XP API accepts a batch")
 	check(campaign.member_level(xia_id) == 3 and campaign.member_trait_level(xia_id) == 3, "Batch XP advances to level three")
@@ -62,6 +66,17 @@ func run() -> void:
 	check(migrated.valid_state(legacy_v4), "Pre-progression v4 state remains readable")
 	check(migrated.restore(legacy_v4) and migrated.data.version == 5, "v4 state migrates to progression schema")
 	check(migrated.member_level(level_three_id) == 3 and migrated.member_total_xp(level_three_id) == 5, "Migrated level derives minimum lifetime XP")
+
+	var mission_campaign := Campaign.new(catalog)
+	mission_campaign.new_run(7303, "", ["xia_zhiyao", "su_wanxing"])
+	var deployed_id: String = mission_campaign.data.members[0]
+	var shelter_id: String = mission_campaign.data.members[1]
+	check(mission_campaign.start_action("", [deployed_id]), "A selected party starts an action")
+	var outcome := {"returned_ids": [deployed_id], "lost_ids": [], "food": 0, "scrap": 0, "weapons": [], "wiped": false, "seconds": 12, "kills": 0}
+	check(mission_campaign.stage_result(outcome), "Mission completion enters the pending state")
+	check(mission_campaign.member_total_xp(deployed_id) == 8 and mission_campaign.member_level(deployed_id) == 3, "Mission and extraction XP apply to the deployed survivor")
+	check(mission_campaign.member_total_xp(shelter_id) == 0, "A non-deployed survivor receives no mission XP")
+	check(not mission_campaign.stage_result(outcome) and mission_campaign.member_total_xp(deployed_id) == 8, "Repeated mission completion cannot duplicate XP")
 
 	FileAccess.open("res://test-output/survivor-progression.json", FileAccess.WRITE).store_string(JSON.stringify({"checks": checks, "failures": failures}, "\t"))
 	print("SURVIVOR PROGRESSION: %d checks, %d failures" % [checks, failures.size()])

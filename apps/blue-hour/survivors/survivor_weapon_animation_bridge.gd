@@ -110,7 +110,6 @@ func advance(delta: float) -> void:
 func _on_fired(_pellets: Array) -> void:
 	if uses_long_gun() and in_combat:
 		_shot_requested = true
-		_visual.flash_muzzle()
 
 func _on_reload_started() -> void:
 	reloading = true

@@ -21,10 +21,16 @@ var runtime_level: int = 1
 @export var damage_multiplier: float = 1.0
 @export var search_multiplier: float = 1.0
 @export var incoming_damage_multiplier: float = 1.0
+@export var effect_type: String = ""
+@export var effect_interval: float = 0.0
+@export var effect_duration: float = 0.0
+@export var effect_radius: float = 0.0
+@export var effect_target_filter: String = ""
 
 func at_level(level: int) -> Resource:
 	var result: Resource = duplicate()
 	result.runtime_level = clampi(level, 1, 5)
+	result.params = params.duplicate(true)
 	if not modifier_hook.is_empty():
 		result.search_multiplier = preload("res://core/trait_runtime.gd").search_speed(self, result.runtime_level)
 		return result
@@ -44,6 +50,8 @@ func summary() -> String:
 	var parts: PackedStringArray = []
 	if modifier_hook == "loot_reward":
 		return "额外基础资源 %d%% 概率" % roundi(preload("res://core/trait_runtime.gd").value(self, runtime_level) * 100)
+	if not modifier_hook.is_empty():
+		return "%s %d%%" % [description, roundi(preload("res://core/trait_runtime.gd").value(self, runtime_level) * 100)]
 	if damage_multiplier != 1.0:
 		parts.append("伤害 +%d%%" % roundi((damage_multiplier - 1.0) * 100))
 	if search_multiplier != 1.0:

@@ -18,7 +18,7 @@ func run() -> void:
 	app.fresh_test_run = true
 	root.add_child(app)
 	await frames(8)
-	app.campaign.new_run(319762786, "", ["lin", "qiao", "yan"])
+	app.campaign.new_run(319762786, "", ["lin_jianyue", "lu_qinghe", "shen_yanchuan"])
 	app._save()
 	app.show_shelter()
 	await frames(6)

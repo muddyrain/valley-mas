@@ -82,7 +82,7 @@ func handle(event: InputEvent) -> void:
 	if collider.has_meta("site_id"):
 		var id: String = collider.get_meta("site_id")
 		if mission.city.sites.has(id) and mission.city.sites[id].discovered:
-			mission.command_search(id)
+			mission.command_search(id, mission.selected_search_member)
 	elif collider.has_meta("bus"):
 		mission.command_extract()
 	elif collider.has_meta("enemy"):

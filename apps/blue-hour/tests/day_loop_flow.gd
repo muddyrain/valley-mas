@@ -40,7 +40,7 @@ func run() -> void:
 	create_timer(100).timeout.connect(func(): printerr("DAY LOOP FLOW TIMEOUT"); quit(2))
 	var catalog := Catalog.new()
 	var game := Campaign.new(catalog)
-	game.new_run(772, "", ["lin", "qiao", "yan"])
+	game.new_run(772, "", ["lin_jianyue", "lu_qinghe", "shen_yanchuan"])
 	var store := Store.new("user://test-runs/five-days.json")
 	for day in range(1, catalog.loop.end_day + 1):
 		var mission := sortie(game)
@@ -76,7 +76,7 @@ func run() -> void:
 		await process_frame
 	check(game.data.status == "won" and game.data.history.size() == 5, "Five real days reach the playable endpoint")
 	# The same map also permits choosing equipment at the cost of daily food.
-	game.new_run(772, "", ["lin", "qiao", "yan"])
+	game.new_run(772, "", ["lin_jianyue", "lu_qinghe", "shen_yanchuan"])
 	var hunger_seen := false
 	var shortage_losses := false
 	for day in range(1, 6):
@@ -108,7 +108,7 @@ func run() -> void:
 		await process_frame
 	check(hunger_seen and shortage_losses, "Ignoring food on repeated real equipment routes creates grace then loss")
 	# Isolated combat fixtures verify the final member's controls, not difficulty balance.
-	game.new_run(882, "", ["lin", "qiao", "yan"])
+	game.new_run(882, "", ["lin_jianyue", "lu_qinghe", "shen_yanchuan"])
 	var first := sortie(game)
 	first.director_enabled = false
 	first.debug_clear_enemies()

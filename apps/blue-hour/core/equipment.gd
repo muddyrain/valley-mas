@@ -1,6 +1,7 @@
 extends RefCounted
 const Instance = preload("res://weapons/weapon_instance.gd")
 const WeaponModifiers = preload("res://weapons/weapon_modifiers.gd")
+const TraitRuntime = preload("res://core/trait_runtime.gd")
 var catalog: RefCounted
 
 func _init(content: RefCounted) -> void:
@@ -30,10 +31,22 @@ func valid(item: Dictionary) -> bool:
 		seen.append(id)
 	return true
 
-func roll(pool: Array, uid: String, rng: RandomNumberGenerator, modified: bool = true) -> Dictionary:
+func roll(pool: Array, uid: String, rng: RandomNumberGenerator, modified: bool = true, trait_data: Resource = null) -> Dictionary:
 	if pool.is_empty():
 		return {}
-	return create(str(pool[rng.randi_range(0, pool.size() - 1)]), uid, rng, rng.randi_range(1, 3) if modified else 0).to_dict()
+	var rarity: int = 0
+	if modified:
+		var rarities: Array[int] = [1, 2, 3]
+		var total_weight: float = 0.0
+		for candidate: int in rarities:
+			total_weight += TraitRuntime.loot_weight(1.0, candidate, trait_data)
+		var pick: float = rng.randf() * total_weight
+		for candidate: int in rarities:
+			pick -= TraitRuntime.loot_weight(1.0, candidate, trait_data)
+			if pick <= 0.0:
+				rarity = candidate
+				break
+	return create(str(pool[rng.randi_range(0, pool.size() - 1)]), uid, rng, rarity).to_dict()
 
 func create(kind: String, uid: String, rng: RandomNumberGenerator, rarity: int = 0) -> WeaponInstance:
 	var value := Instance.from_dict({"uid": uid, "kind": kind, "rarity": clampi(rarity, 0, 3)})

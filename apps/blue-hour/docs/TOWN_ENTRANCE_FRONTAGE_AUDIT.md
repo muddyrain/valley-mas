@@ -1,5 +1,7 @@
 # Medium Town Primary Entrance / Street Frontage 审计
 
+> 本文是 2026-09-19 的单点修复历史记录，已被 2026-09-20 的[全量 Building Entrance Facing System 报告](BUILDING_ENTRANCE_FACING_REPORT.md)取代。当前实现不再使用 BLD_010 例外或 BLD_009～022 编号范围修正；请勿把本文的旧实现描述当作现行契约。
+
 日期：2026-09-19。范围：BLD_001～022，Medium Town `PROFILE_A_MAIN_STREET`；正式 Expedition 使用同一个 `TownUrbanView` 实例化入口。
 
 ## 结论与修复

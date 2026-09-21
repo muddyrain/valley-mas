@@ -16,6 +16,8 @@ const Modifiers = preload("res://core/effect_modifiers.gd")
 @export var upgraded_modifiers: Dictionary = {}
 @export var duration: float = 0.0
 @export var upgraded_duration: float = 0.0
+@export var cooldown: float = 0.0
+@export var upgraded_cooldown: float = 0.0
 @export var is_upgraded: bool = false
 
 func at_upgrade(value: bool) -> Resource:
@@ -28,6 +30,9 @@ func modifiers() -> Dictionary:
 
 func active_duration() -> float:
 	return upgraded_duration if is_upgraded else duration
+
+func cooldown_duration() -> float:
+	return upgraded_cooldown if is_upgraded else cooldown
 
 func description() -> String:
 	return upgraded_description if is_upgraded else normal_description
@@ -45,8 +50,14 @@ func validation_errors() -> Array[String]:
 		errors.append("Invalid effect modifiers: " + id)
 	if not is_finite(duration) or not is_finite(upgraded_duration) or duration < 0 or upgraded_duration < 0:
 		errors.append("Invalid effect duration: " + id)
+	if not is_finite(cooldown) or not is_finite(upgraded_cooldown) or cooldown < 0 or upgraded_cooldown < 0:
+		errors.append("Invalid effect cooldown: " + id)
 	if category == "passive" and (duration != 0 or upgraded_duration != 0):
 		errors.append("Passive cannot have an active duration: " + id)
+	if category == "passive" and (cooldown != 0 or upgraded_cooldown != 0):
+		errors.append("Passive cannot have a cooldown: " + id)
+	if category == "power" and (cooldown <= 0 or upgraded_cooldown <= 0):
+		errors.append("Power requires a positive cooldown: " + id)
 	if category == "power":
 		for values: Dictionary in [normal_modifiers, upgraded_modifiers]:
 			var healing: bool = values.has("heal_fraction")

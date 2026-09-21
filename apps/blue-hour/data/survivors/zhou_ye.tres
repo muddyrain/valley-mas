@@ -1,0 +1,21 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://data/traits/robust_physique.tres" id="2_trait"]
+
+[resource]
+script = ExtResource("1")
+id = "zhou_ye"
+display_name = "周野"
+profession_id = "basketball_outdoorsman"
+profession_name = "篮球社 / 户外运动爱好者"
+description = "周野属于停不下来的人。跑、跳、搬东西、翻墙，只要需要体力的事情，他通常不会让别人先上。灾变以后，他真正突出的不是技巧，而是这个人是真的扛得住。"
+role_tags = ["前排", "生存"]
+trait_id = "robust_physique"
+model_path = "res://assets/characters/zhou_ye/runtime/zhou_ye.glb"
+max_hp = 100.0
+move_speed = 2.8
+color = Color(0.82, 0.34, 0.24, 1)
+survivor_id = "SUR_009"
+trait_definition = ExtResource("2_trait")
+recommended_weapon_tags = Array[String](["shotgun", "melee", "smg"])

@@ -43,3 +43,7 @@ M09 背景 alpha=0，Esc / 返回主菜单字体纯白；边框和返回文字 N
 原生鼠标验证按钮中心及左上角有效，无上层遮挡，菜单 visible；截图 `test-output/camp-final-fix/top-menu-open.png`。96 个其他受保护文件哈希一致。Windows 导出及独立启动结果记录在同目录。
 
 本轮独立 Headless / 1600×900 原生启动均退出 0、无脚本或资源错误；构建产物已更新。完整构建链的既有旧 Camp 测试阻断保持记录，未重复运行。
+
+## 2026-09-20 当前路由
+
+上述“右上角直接打开主菜单”仅记录 M09 收尾时的历史状态。当前 M03 MenuButton 已改为打开同一 Camp 内的 Menu Overlay；M09 仍直接复用 `show_main_menu()`，其视觉、HitArea 和常态 Esc 行为未变。实现与最新验证见 [Camp Menu Overlay 报告](CAMP_MENU_OVERLAY_REPORT.md)。

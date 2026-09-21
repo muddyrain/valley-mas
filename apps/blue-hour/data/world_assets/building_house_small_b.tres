@@ -29,3 +29,6 @@ road_offset = Vector3(0.000000, 0.000000, -4.753373)
 building_id = "BLD_003"
 display_name = "住宅 B"
 search_offset = Vector3(-3.000000, 0.000000, -4.253373)
+primary_entrance_local_anchor = Vector3(-3.000000, 0.000000, -2.753373)
+primary_entrance_local_forward = Vector3(0.000000, 0.000000, -1.000000)
+search_interaction_local_anchor = Vector3(-3.000000, 0.000000, -4.253373)

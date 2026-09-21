@@ -4,11 +4,15 @@
 
 清理清单与验证结果见[生产收尾报告](../docs/SURVIVOR_PRODUCTION_FINALIZATION_REPORT.md)。
 
-Xia / Su 165cm 正式 Runtime、23 骨 `BH_Humanoid_Rig_v1`、canonical T-Pose Bind、Shared Skin Contract、Public Idle / Walking / Running、Expedition Walkable Ground Contract 均已通过验收并冻结。Expedition 基础速度为 **2.8m/s**。不生成 V2/V3 或角色专属 Locomotion。
+SUR_001～SUR_012 的 165cm 正式 Runtime、23 骨 `BH_Humanoid_Rig_v1`、canonical T-Pose Bind、Shared Skin Contract、Public Idle / Walking / Running、Expedition Walkable Ground Contract 均已通过验收。Expedition 基础速度为 **2.8m/s**。不生成 V2/V3 或角色专属 Locomotion。
 
 未来 12 人统一流程：**Static GLB → 165cm Runtime Envelope → canonical T-Pose Alignment → BH_Humanoid_Rig_v1 → Skin QA → Public Locomotion → Gameplay**。角色资料身高不缩放 Runtime Rig；LOD0 目标约 100k tris。统一 Bone Length / Axis / Rest / Foot Ground / Socket，外观差异由 Mesh 和 Skin 承担。未来角色直接共享公共三动作，不制作独立 Idle / Walking / Running，不运行角色专属 Retarget。
 
-正式入口：`assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb`、`assets/characters/su_wanxing/runtime/su_wanxing.glb`。公共库：`assets/animations/public_locomotion/public_locomotion.tres`，引用同目录 `public_idle.tres`、`public_walking.tres`、`public_running.tres`。冻结哈希记录在 `tests/fixtures/survivor_production_baseline.json`。
+正式入口统一为 `assets/characters/<character_id>/runtime/<character_id>.glb`；完整名册与几何数据见 [MODEL_CATALOG](MODEL_CATALOG.md)。公共库：`assets/animations/public_locomotion/public_locomotion.tres`，引用同目录 `public_idle.tres`、`public_walking.tres`、`public_running.tres`。冻结基线哈希记录在 `tests/fixtures/survivor_production_baseline.json`，SUR_003～SUR_012 的批次结果见[接入报告](../docs/REMAINING_10_SURVIVOR_RUNTIME_INTEGRATION_REPORT.md)。
+
+SUR_003～SUR_012 的可复现入口为 `art/blender/scripts/build_remaining_survivor_batch.py`。输入必须是单 Mesh、约 1.65m 的静态 A-Pose GLB；脚本对齐 canonical T-Pose、复用冻结骨架、重新蒙皮并导出正式 `source/` 与 `runtime/`。输出约束为 1 Mesh、1 Skin、23 bones、0 embedded animations、0 unweighted vertices、最多 4 influences、对象与骨架 identity transform。批处理不得修改公共 Rig、公共动作、Xia / Su 或 Gameplay。
+
+新增角色 Definition 位于 `data/survivors/`，Trait 数据位于 `data/traits/`。SUR_003～SUR_012 Trait 的 `params.runtime_status` 固定为 `data_only`；本批只登记身份、背景、五级数值和推荐武器标签，不实现 Trait Runtime。
 
 当前 Skin / T-Pose / Canonical 转换与生产 QA 工具保留。`export_locomotion_retarget.gd` 仍被公共转换的 `canonical_locomotion/prepare.py` 调用，属于保留工具链，不是旧角色 Runtime。两份旧 source GLB 因先前工具策略阻止删除而列为待清理，已排除导出且无正式引用；本轮不绕过策略重试。
 

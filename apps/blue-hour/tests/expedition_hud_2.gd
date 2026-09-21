@@ -161,10 +161,13 @@ func run() -> void:
 	mission.camera_center = site.spec.entry
 	mission.camera_controller.apply()
 	await frames(4)
+	await hover(hud.brand_panel.get_global_rect().get_center())
+	await snap("03_search_discoverability_idle")
 	await hover(mission.camera.unproject_position(site.spec.entry + Vector3.UP * .2))
 	await snap("03_building_compact")
 	await click_at(mission.camera.unproject_position(site.spec.entry + Vector3.UP * .2))
 	check(mission.search_tasks.has(site_id), "Actual building entrance click starts the original search")
+	await snap("03_search_discoverability_selected")
 	var limit: float = mission.clock.elapsed + 55
 	while site.progress < .12 and mission.clock.elapsed < limit:
 		await step(.2)
@@ -205,6 +208,10 @@ func run() -> void:
 	check(site.searched, "Restarted search completes through the original algorithm")
 	hud.refresh()
 	await frames(4)
+	await hover(mission.camera.unproject_position(site.spec.entry + Vector3.UP * .2))
+	await snap("03_search_discoverability_complete")
+	await create_timer(2.7).timeout
+	await snap("03_search_discoverability_searched")
 	check(hud.site_buttons[site_id].status.text == "已搜", "Objective updates after completion")
 	if not mission.pickups.is_empty():
 		check(mission.pickups[0].view.has_node("WorldLootMarker"), "Real search reward creates its loot marker")

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/trait_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "danger_instinct"
+display_name = "危险直觉"
+description = "对 5m 内感染者造成的伤害提高。"
+trait_type = 0
+modifier_hook = "damage"
+params = {"distance_rule": "at_most", "range_m": 5.0, "target_tags": ["infected"]}
+levels = PackedFloat32Array(0.10, 0.13, 0.16, 0.19, 0.22)

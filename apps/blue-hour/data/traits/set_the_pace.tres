@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/trait_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "set_the_pace"
+display_name = "轻装行动"
+description = "提高 6m 内幸存者的移动速度。"
+trait_type = 5
+modifier_hook = "aura"
+params = {"effect_type": "teammate_move_speed", "radius_m": 6.0}
+levels = PackedFloat32Array(0.08, 0.10, 0.12, 0.14, 0.16)

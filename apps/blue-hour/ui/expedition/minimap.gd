@@ -2,13 +2,14 @@ extends Control
 ## Dynamic expedition minimap: projects live world entities into a compact tactical view.
 const HudArt = preload("res://ui/expedition/hud_skin.gd")
 const SURVIVOR_DIAMETER: float = 18.0
+const SURVIVOR_CORE_RADIUS: float = 2.25
+const SURVIVOR_RING_RADIUS: float = 6.0
+const SURVIVOR_RING_WIDTH: float = 1.35
+const SURVIVOR_SEARCH_ARC: float = TAU * 0.78
 const MARKER_MARGIN: float = 3.0
 const TOWN_DYNAMIC_INTERVAL: float = 1.0 / 20.0
 var mission: Node3D
 var frame: TextureRect
-var marker_player: Texture2D
-var marker_teammate: Texture2D
-var marker_danger: Texture2D
 var marker_bus: Texture2D
 var marker_poi: Texture2D
 var marker_target: Texture2D
@@ -35,6 +36,7 @@ var _label_rect: Rect2
 var marker_update_count: int = 0
 var full_refresh_count: int = 0
 var _town_dynamic_elapsed: float = TOWN_DYNAMIC_INTERVAL
+var _marker_phase: float = 0.0
 
 func setup(target: Node3D) -> void:
 	mission = target
@@ -43,9 +45,6 @@ func setup(target: Node3D) -> void:
 	frame.name = "Frame"
 	add_child(frame)
 	frame.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	marker_player = HudArt.texture("map_player_marker")
-	marker_teammate = HudArt.texture("map_teammate_marker")
-	marker_danger = HudArt.texture("map_teammate_danger")
 	marker_bus = HudArt.texture("icon_vehicle_bus")
 	marker_poi = HudArt.texture("map_poi_marker")
 	marker_target = HudArt.texture("map_target_marker")
@@ -65,6 +64,8 @@ func setup(target: Node3D) -> void:
 	queue_redraw()
 
 func _process(delta: float) -> void:
+	if delta > 0.0:
+		_marker_phase = fmod(_marker_phase + delta, 100.0)
 	if not uses_town_runtime():
 		_sync_town()
 		full_refresh_count += 1
@@ -128,13 +129,10 @@ func _draw() -> void:
 			if not site.discovered: continue
 			var texture := marker_search if mission.search_tasks.has(id) else marker_target if mission.poi_selected_id == id else marker_poi
 			_draw_marker(texture, project.call(site.spec.entry), 22.0 if mission.poi_selected_id == id or mission.search_tasks.has(id) else 19.0)
-	var selected: Node3D = get_parent().selected_member
 	for member: Node3D in mission.survivors:
 		if member.dead: continue
 		var point: Vector2 = project.call(member.position)
-		_draw_marker(marker_player, point, SURVIVOR_DIAMETER)
-		if member == selected and area.grow(-12.0).has_point(point):
-			draw_arc(point, SURVIVOR_DIAMETER * .5 + 2.0, 0, TAU, 24, Color("#f6f0df"), 1.2, true)
+		_draw_survivor_marker(point, _survivor_is_moving(member), _survivor_is_searching(member))
 	var label_rect := Rect2(area.position + Vector2(8, area.size.y - 32), Vector2(112, 24))
 	draw_rect(label_rect, Color("#0c2338d9"), true)
 	draw_string(ThemeDB.fallback_font, label_rect.position + Vector2(8, 15), mission.city.data.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("#d5e4e5"))
@@ -300,13 +298,10 @@ func _update_town_markers() -> void:
 	var poi_id: String = mission.runtime_data.mission_poi_id
 	var poi_texture: Texture2D = marker_search if mission.search_tasks.has(poi_id) else marker_target
 	_append_town_marker("poi", mission.runtime_data.mission_poi, poi_texture, 20.0)
-	var selected: Node3D = null
-	if get_parent().get("selected_member") is Node3D:
-		selected = get_parent().get("selected_member")
 	for member: Node3D in mission.survivors:
 		if member.dead:
 			continue
-		_append_town_marker(member.get_instance_id(), member.position, marker_player, SURVIVOR_DIAMETER, "survivor", member == selected)
+		_append_town_marker(member.get_instance_id(), member.position, null, SURVIVOR_DIAMETER, "survivor")
 	# Presentation consumes discovery state without creating sites or SearchTasks.
 	for id: String in mission.city.sites:
 		var site: Dictionary = mission.city.sites[id]
@@ -324,7 +319,7 @@ func _site_marker_texture(id: String, site: Dictionary) -> Texture2D:
 		return marker_target
 	return marker_poi
 
-func _append_town_marker(id: Variant, world: Vector3, texture: Texture2D, diameter: float, kind: String = "landmark", selected: bool = false) -> void:
+func _append_town_marker(id: Variant, world: Vector3, texture: Texture2D, diameter: float, kind: String = "landmark") -> void:
 	var anchor: Vector2 = world_to_minimap(world)
 	var inset: Rect2 = marker_rect.grow(-diameter * .5 - MARKER_MARGIN)
 	var bearing: Vector2 = anchor - minimap_content_rect.get_center()
@@ -358,7 +353,39 @@ func _append_town_marker(id: Variant, world: Vector3, texture: Texture2D, diamet
 				break
 		if found:
 			break
-	town_markers.append({"id": id, "kind": kind, "world": world, "anchor": anchor, "clamped_anchor": clamped_anchor, "point": point, "texture": texture, "diameter": diameter, "edge": edge, "direction": bearing.normalized(), "selected": selected})
+	var marker: Dictionary = {"id": id, "kind": kind, "world": world, "anchor": anchor, "clamped_anchor": clamped_anchor, "point": point, "texture": texture, "diameter": diameter, "edge": edge, "direction": bearing.normalized()}
+	if kind == "survivor":
+		var survivor: Node3D = instance_from_id(int(id)) as Node3D
+		marker["moving"] = _survivor_is_moving(survivor)
+		marker["searching"] = _survivor_is_searching(survivor)
+	town_markers.append(marker)
+
+func _survivor_is_moving(survivor: Node3D) -> bool:
+	if survivor == null or not is_instance_valid(survivor):
+		return false
+	var speed_value: Variant = survivor.get("current_speed")
+	if speed_value is float or speed_value is int:
+		return float(speed_value) > 0.15
+	var velocity_value: Variant = survivor.get("actual_velocity")
+	var velocity: Vector3 = velocity_value if velocity_value is Vector3 else Vector3.ZERO
+	return velocity.length() > 0.15
+
+func _survivor_is_searching(survivor: Node3D) -> bool:
+	return survivor != null and is_instance_valid(survivor) and bool(survivor.get("searching"))
+
+func _draw_survivor_marker(point: Vector2, moving: bool, searching: bool) -> void:
+	var core_color := Color("#f6f0df")
+	var ring_color := Color("#b9d8d0")
+	if searching:
+		var start_angle: float = fmod(_marker_phase * TAU / 1.4, TAU)
+		draw_arc(point, SURVIVOR_RING_RADIUS, start_angle, start_angle + SURVIVOR_SEARCH_ARC, 20, Color("#f2c06b"), SURVIVOR_RING_WIDTH + 0.2, true)
+		draw_arc(point, SURVIVOR_RING_RADIUS, start_angle + PI, start_angle + PI + TAU * 0.14, 8, Color("#fff0b8"), 1.0, true)
+	elif moving:
+		var pulse: float = 0.5 + 0.5 * sin(_marker_phase * TAU / 1.8)
+		draw_arc(point, SURVIVOR_RING_RADIUS + pulse * 0.9, 0.0, TAU, 20, Color(ring_color, 0.52 + pulse * 0.28), SURVIVOR_RING_WIDTH, true)
+	else:
+		draw_arc(point, SURVIVOR_RING_RADIUS, 0.0, TAU, 20, ring_color, SURVIVOR_RING_WIDTH, true)
+	draw_circle(point, SURVIVOR_CORE_RADIUS, core_color)
 
 func _draw_town_markers() -> void:
 	# Static TownWorldLayer renders behind this parent; keep the map surface transparent
@@ -379,9 +406,10 @@ func _draw_town_markers() -> void:
 			draw_line(anchor, item.point, Color("#d5e4e5a0"), 1.0, true)
 			draw_circle(anchor, 1.5, Color("#d5e4e5"))
 	for item: Dictionary in town_markers:
-		_draw_marker(item.texture, item.point, item.diameter)
-		if item.selected:
-			draw_arc(item.point, item.diameter * .5 + 2.0, 0, TAU, 24, Color("#f6f0df"), 1.2, true)
+		if item.kind == "survivor":
+			_draw_survivor_marker(item.point, bool(item.get("moving", false)), bool(item.get("searching", false)))
+		else:
+			_draw_marker(item.texture, item.point, item.diameter)
 		if item.edge:
 			var tip: Vector2 = item.point + item.direction * (item.diameter * .5 + 2.0)
 			var side: Vector2 = item.direction.orthogonal() * 2.5

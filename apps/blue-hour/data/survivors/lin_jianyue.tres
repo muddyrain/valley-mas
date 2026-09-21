@@ -1,0 +1,21 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://data/traits/danger_instinct.tres" id="2_trait"]
+
+[resource]
+script = ExtResource("1")
+id = "lin_jianyue"
+display_name = "林见月"
+profession_id = "competitive_shooter"
+profession_name = "竞技射击与户外运动爱好者"
+description = "林见月并没有什么军事背景，只是比一般人更习惯处理高速变化的情况。真正出现危险的时候，她很少僵住，反而会迅速判断哪个目标最接近、哪条路线还能走。"
+role_tags = ["近距离战斗"]
+trait_id = "danger_instinct"
+model_path = "res://assets/characters/lin_jianyue/runtime/lin_jianyue.glb"
+max_hp = 100.0
+move_speed = 2.8
+color = Color(0.82, 0.36, 0.42, 1)
+survivor_id = "SUR_003"
+trait_definition = ExtResource("2_trait")
+recommended_weapon_tags = Array[String](["shotgun", "smg", "melee"])

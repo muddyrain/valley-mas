@@ -150,7 +150,7 @@ func _search() -> void:
 	for site_id: String in mission.search_registry.building_searchables:
 		var site: Dictionary = mission.city.sites[site_id]
 		var d: float = member.position.distance_to(site.spec.entry)
-		if site.spec.search_status == "AVAILABLE" and d < distance:
+		if site.spec.search_status == "RESOLVED_REACHABLE" and d < distance:
 			id = site_id
 			distance = d
 	check(not id.is_empty(), "Production town has searchable building")
@@ -197,11 +197,17 @@ func run() -> void:
 	_arguments()
 	app = SeededApp.new()
 	app.fixture_seed = 4101
-	app.fresh_test_run = true
+	# Let the isolated missing save initialize through the production starter pool.
+	# The requested candidate is installed immediately afterward and exercised in Camp.
+	app.fresh_test_run = false
 	app.save_path = "user://test-runs/survivor-production-%s-%d.json" % [character_id, OS.get_process_id()]
 	root.add_child(app)
 	await process_frame
 	app.campaign.new_run(4101, "", [character_id])
+	app.show_shelter()
+	await process_frame
+	check(app.camp_view.members.has(character_id), "Formal Camp spawns candidate")
+	check(app.campaign.member_template(character_id).id == character_id, "Camp candidate keeps SurvivorDefinition identity")
 	app.random_mission_counter = 0
 	app.start_mission()
 	mission = app.mission

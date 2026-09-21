@@ -1,5 +1,20 @@
 # 蓝时归航实施计划
 
+## 2026-09-21：Map Phase 1.1.5 — MiniMap Geometry Full Snapshot
+
+- [x] `mission.runtime_data.minimap_geometry` 扩展为版本化快照：道路提供 centerline、polygon、width、type；建筑默认提供 polygon、位置、尺寸、朝向、类型、入口与地块信息；不再依赖已发现状态。
+- [x] Arrival 快照加入蓝时号停靠区、对应道路、出口走廊和停车区域；MiniMap 动态 Marker 继续沿真实世界坐标投影，拥挤/越界时只偏移图标并保留 tether 空间参照。
+- [x] TownWorldLayer 按真实道路 polygon 绘制主路/支路，叠加停车、Arrival 分区和静态建筑轮廓；保留旧 `road_bounds` / `bounds` 回退路径。
+- [x] `tests/expedition_minimap.gd`：4101–4105 共 2,131 项通过；`tests/runtime_loading_gate.gd` 121 项通过。局部跟随专项 1 项既有队伍中心断言失败，未发现本轮几何快照或渲染命令错误。
+- [ ] Human Runtime QA：PENDING。原生 MiniMap capture 在既有世界点击命令断言处停止；完整 Windows build 仍受既有 Camp UI `member_buttons` / 左侧能力栏回归阻断，未生成本轮独立 EXE。详见 [Phase 1.1.5 报告](MAP_PHASE_1_1_5_MINIMAP_GEOMETRY_REPORT.md)。
+
+## 2026-09-21：MiniMap Survivor Marker V2 — No Selection
+
+- [x] Survivor marker 移除头像纹理和小地图选中状态，改为 `draw_circle` / `draw_arc` 的中心点 + 外圈；所有存活成员保持相同尺寸和信息等级。
+- [x] 移动状态使用轻微呼吸外圈，搜索状态使用旋转弧线；不改世界角色选择、移动、搜索或 Expedition 输入系统。
+- [x] 更新 Minimap Bridge、Local Follow、HUD Phase 2 测试契约，并新增静止 / 移动 / 搜索三状态截图专项 `tests/minimap_survivor_marker_acceptance.gd`。
+- [ ] Headless 与原生专项、Windows build 和人工截图验收待本轮验证；不推进 Full/Tactical Map、Fog 或其他 HUD 重构。
+
 ## 2026-09-21：Map Phase 1.2 — MiniMap Renderer Visual Reconstruction
 
 - [x] 保持 `mission.runtime_data.minimap_geometry` 和 LOCAL_FOLLOW 坐标合同不变，仅重建 `MiniMap` renderer 的静态绘制层。
@@ -7,6 +22,67 @@
 - [x] 主路 / 支路 / connector、住宅 / 商业 / 工业 / 特殊建筑、Arrival 停靠区 / 入口 / 停车区使用独立视觉层级；已发现车辆使用车辆 marker。
 - [x] 4101–4105 原生对比图已生成；MiniMap bridge 2,131 项、Local Follow 2,180 项、Loading Gate 121 项通过。详见 [Phase 1.2 报告](map/M02_Minimap_Renderer_Visual_Reconstruction.md)。
 - [ ] 完整 Windows build 和旧移动 capture 仍受工作区既有 Camp UI / weapon / 世界点击并行回归阻断；不归因于本轮 renderer。
+
+## 2026-09-21：Survivor Progression Foundation V1
+
+- [x] 新增 `SurvivorProgression`，统一管理 XP、Level、Trait Level 和 Level 5 上限；XP 阈值为 `2 / 3 / 5 / 8`。
+- [x] 建立 `SEARCH_COMPLETE`、`KILL_ENEMY`、`MISSION_COMPLETE`、`EXTRACTION_SUCCESS`、`SPECIAL_EVENT` 五类 XP Event，以及 Campaign 统一 Runtime API。
+- [x] 存档升级为 v5；旧 v1～v4 可读取并补齐 Progression 字段；不保存最终 Trait 数值。现有食物训练改为通过 Progression API 提升等级。
+- [x] Progression 20、Trait Foundation 44、Trait Gameplay 111、New Run 40、Weapon 428、Save Catalog 9 项通过；Godot Headless Import 重跑通过。详细边界与证据见 [Progression 报告](SURVIVOR_PROGRESSION_FOUNDATION_REPORT.md)。
+- [ ] 本轮未制作 UI、升级动画、招募、受伤、Aura、疲劳、士气、关系或实际 Gameplay XP 发放点。
+- [ ] Search / Command 全链路回归仍受工作区既有 `weapon_combat_controller.gd` 解析错误阻断；不属于本轮 Progression 改动。
+
+## 2026-09-21：Survivor XP Gameplay Integration V1
+
+- [x] Search 成功、最终击杀、Mission Complete、Extraction Success 已接入既有 `record_xp_event()`；数值集中在 `XP_EVENT_VALUES`，分别为 `1 / 1 / 5 / 3`。
+- [x] Search / Enemy retirement 使用 Mission 级事件键；对象池复用时重置敌人键；重复 `stage_result()` 不重复发放 Mission / Extraction XP。
+- [x] `tests/survivor_progression.gd` 29 项、`tests/survivor_xp_gameplay.gd` 6 项通过。详细边界见 [XP Gameplay 报告](SURVIVOR_XP_GAMEPLAY_INTEGRATION_REPORT.md)。
+- [ ] SPECIAL_EVENT 只保留 API，未接入具体剧情事件；未制作 UI 或新的 Trait / Progression 系统。
+
+## 2026-09-21：SUR_003～SUR_012 Trait Runtime Phase A
+
+- [x] 统一 `TraitRuntime` 已接入六个直接 Modifier：SUR_003 近距离感染者伤害、SUR_005 机械交互耗时、SUR_007 远距离感染者伤害、SUR_009 最大生命、SUR_010 Rare+ 权重、SUR_012 团队 Power 冷却。
+- [x] Damage 使用世界 XZ 距离和感染者目标标签；Interaction 使用正式目标分类；Max HP 从 Runtime 副本派生并在等级变化时保持生命比例；Loot Quality 修改原单次抽取权重，不增加随机次数；Power 冷却只读取正式 Effect Resource。
+- [x] Phase A 专项 76 项、SUR_001/002 155 项、Town 13 项、12 人批次 337 项、公共 Locomotion 495 项、Xia/Su Gameplay 各 29 项、Camp 31 项均 0 失败。SUR_010 固定种子各 100,000 样本，Baseline/Lv1/Lv5 Rare+ 实测 20.065% / 21.328% / 22.548%；正式搜索装备奖励入口传递执行者 Trait。
+- [x] SUR_004 / 006 / 008 / 011 保持 `data_only`；未建立 Aura、周期治疗或周期暴击系统。实现与验证详见 [Phase A 报告](TRAIT_RUNTIME_PHASE_A_REPORT.md)。
+- [ ] Windows build 已执行；Search、HUD、Command、Active Card、Settings、Camp Menu 六组前置门禁通过，随后被既有 `camp_ui_runtime.gd:114` 的 `member_buttons` 访问和旧左侧能力栏断言阻断，未进入导出。完整旧 Effect/生产流程仍有既有断言与导航超时；本轮专项与受影响回归已通过。
+
+## 2026-09-21：Survivor Team Aura Runtime V1
+
+- [x] 建立通用 `AuraRuntime`，按 TraitData 的 `effect_type` / `radius_m` 查询 Provider；同类型取最大值，Provider 自身、死亡和撤离成员排除。
+- [x] SUR_006 / SUR_011 激活 6m、Lv1～Lv5 8/10/12/14/16% 数据；分别接入现有移动速度和感染者受伤 Hook，不修改 Max HP、XP、Level、动画或模型。
+- [x] Aura 专项 21 项、Trait Foundation 44 项、12 人批次 337 项、Godot Headless Import 通过。详细实现与边界见 [Aura 报告](SURVIVOR_TEAM_AURA_RUNTIME_REPORT.md)。
+- [ ] Phase A 全量回归仍受工作区既有 Progression Save/Load 与 SUR_012 Lv5 断言阻断；未实现 SUR_004 / SUR_008 的周期 Trait。
+
+## 2026-09-21：Survivor Periodic Effect Runtime Foundation V1
+
+- [x] 新增隔离的 `PeriodicEffectRuntime`：数据驱动 interval / duration / radius / target filter / level value，支持多个 Provider、暂停恢复、死亡检测和 Provider 注销。
+- [x] 建立 `SELF`、`ALLY`、`NEAREST_ALLY`、`LOWEST_HP_ALLY`、`ALL_TEAM` 目标选择合同；Apply / Refresh / Expire 通过事件信号输出，未实现具体治疗或暴击效果。
+- [x] 周期 Runtime 专项 13 项与 Godot Headless Import 通过；详见 [Periodic Effect 报告](SURVIVOR_PERIODIC_EFFECT_RUNTIME_REPORT.md)。SUR_004 / SUR_008 仍保持 data-only。
+
+## 2026-09-21：SUR_004 陆清禾「应急处理」V1
+
+- [x] 仅通过 TraitData 启用 SUR_004：10 秒间隔、6m、`LOWEST_HP_ALLY`，Lv1～Lv5 为 5/6/7/8/10% 最大生命治疗。
+- [x] 新增独立 `HealEffectHandler`；Periodic Runtime 继续只负责调度和发出事件，Handler 负责满血/死亡排除与 Max HP 上限。
+- [x] SUR_004 专项 16 项、Periodic 13 项、Aura 21 项、Trait Foundation 44 项与 Godot Import 通过。SUR_008 仍未实现。
+- [x] SUR_008「鼓舞士气」已接入通用 Periodic Effect → Buff Effect Handler → Crit Modifier：20s 间隔、6m ALL_TEAM、6s 持续、Lv1～Lv5 为 5/7/9/11/13%，支持 Apply/Refresh/Expire 与周期状态 Save/Load；专项测试与相关回归通过。
+
+## 2026-09-21：Expedition Runtime Performance P02
+
+- [x] 完成原生 1600x900 A/B/C/D 基线、E-I 模块隔离与命令级路径计数；确认 PRIMARY 为连续移动命令中的同步重复寻路与 formation 候选爆炸，SECONDARY 为 Command Ribbon、Minimap Dynamic 与 World Marker 的无上限刷新。
+- [x] 三人命令固定为每人一次路径查询并复用 prepared route；导航栅格 0.5m 调整为通过全量入口验证的 0.75m，路径简化、命令线与 20Hz 动态 UI 定向优化。D 场景 max 791.735ms -> 45.883ms，100ms+ 帧 13 -> 0，路径计算 4753.671ms -> 402.748ms。
+- [x] A2/B2/C2/D2、额外 4102/4103 Seed、入口 2,230、E01 240、Minimap 1,441、E02 Search 1,222、命令 36、Loading Gate 121 项通过；性能图、三段 MP4 与原始数据见 [P02 报告](EXPEDITION_RUNTIME_PERFORMANCE_P02_REPORT.md)。
+- [x] 完整 build 在通过 P02 相关门禁后被既有 Camp `member_buttons` / 左侧能力栏旧断言阻断；同一 Windows preset 直接导出成功，`BlueHourHomeward.exe` 的 Headless 与原生 120 帧启动均通过。
+- [ ] Expedition Runtime Performance P02: TECHNICALLY COMPLETE；Human Runtime QA: PENDING；E03 Enemy: NOT STARTED。
+
+## 2026-09-20：Expedition Building Entrance Facing System
+
+- [x] BLD_001～022 逐 prefab 明确 `primary_entrance_local_anchor`、`primary_entrance_local_forward` 与 `search_interaction_local_anchor`；wrapper 统一真实主立面坐标并移除生成阶段的建筑编号旋转分支。
+- [x] Town placement 由 assigned frontage 数据计算 yaw；corner lot 使用 assigned frontage → road class → frontage length → deterministic seed tie-break。Town 的 0/90/180/270° 整体朝向同步变换门、forward、搜索点与 frontage metadata。
+- [x] E02 Search Registry 分离真实门与合法站位，保留 P01 `UNRESOLVED`、点击优先解析和后台解析流程；旧 `entry` 继续兼容搜索站位。
+- [x] 22 definitions 四方向与 10 个正式 seed 共 42,192 项几何检查、550 个实例、0 失败；10-seed 正式 Runtime 导航 2,230 项、0 失败；Town Urban Fabric 142,874 项、0 失败。九张 QA 截图与完整结果见[交付报告](BUILDING_ENTRANCE_FACING_REPORT.md)。
+- [ ] `run.ps1 -Mode build` 已执行，五组前置专项通过后，被并行 Camp `shelter_view.gd:19` Nil `id` 阻断，未进入 Windows export。Human Runtime QA: PENDING。
+- [ ] Building Entrance Facing System: TECHNICALLY COMPLETE；10 Seed Entrance Facing: PASS；E03 Enemy: NOT STARTED。
 
 ## Survivor 当前冻结 Production Baseline（2026-09-19）
 
@@ -22,6 +98,26 @@ Xia / Su 165cm 正式 Runtime、23 骨 `BH_Humanoid_Rig_v1`、canonical T-Pose B
 
 旧 Mission Jog、Start/Stop 资源及旧局部摆臂层已退出生产并清理，对应历史章节只保留开发记录，不再描述当前 Runtime。三人长途返回/让行停滞、旧 Camp HUD 断言作为独立已知问题保留，不计本轮失败；不开展 Combat/Armed、Turn/Start/Stop 或其余角色制作。
 
+## 2026-09-20：Remaining 10 Survivors Unified Runtime Batch Integration
+
+- [x] SUR_003～SUR_012 十份约 100k tris 静态 A-Pose GLB 已统一为 1.65m canonical T-Pose，绑定冻结的 23 骨 `BH_Humanoid_Rig_v1`；所有模型 1 Skin、0 无权重顶点、最多 4 骨影响，无角色专属骨架、Retarget、IK 或高度补偿。
+- [x] 十名角色直接共享唯一 `public_locomotion.tres` 及 `public_idle` / `public_walking` / `public_running`；结构与循环专项 337 项、公共动作生产回归 495 项，均 0 失败。
+- [x] SurvivorDefinition 与 Trait 数据扩展至 SUR_001～SUR_012；后续 Phase A 已接入 SUR_003/005/007/009/010/012，SUR_004/006/008/011 仍为 `data_only`。推荐武器仍是数据标签，不提供隐藏加成或限制。
+- [x] 每名新增角色完成 Camp 与 Expedition 候选验收：2.8m/s、Idle/Walk/Run、转向、搜索/取消、Selection Ring、`RightHand` 武器挂点与自动攻击；共 290 项检查、0 失败。静态与动态接地、Skin 和视觉总览均通过。
+- [x] 正式模型与 Definition 采用稳定角色路径；无角色专属 Locomotion、临时候选或 `test-output` 生产引用。完整资源表、测量与已知边界见[批次接入报告](REMAINING_10_SURVIVOR_RUNTIME_INTEGRATION_REPORT.md)。
+- [ ] Windows build 已执行；本批专项通过，但完整门禁被既有 `camp_ui_runtime.gd:114` 的 `member_buttons` 访问和旧左侧能力栏断言阻断，未进入导出。该失败不属于本批 Survivor 集成。
+- [ ] SUR_004/006/008/011 Trait Runtime、LOD、Combat Jog / Armed Locomotion 尚未开始。
+
+
+## 2026-09-20：Expedition Load Performance P01
+
+- [x] 全 Town Search Navigation Resolve 已退出开场硬 Ready Gate；Registry 先建立 `UNRESOLVED` 条目，Expedition 展开后分帧进入 `RESOLVED_REACHABLE` / `RESOLVED_UNREACHABLE`，玩家点击未解析目标时优先解析该目标。
+- [x] 删除 `final_ready_wait` 黑盒，补齐 Overlay、Town、Environment、Navigation、Search Registry、Minimap、Survivor、HUD、逐项等待、Iris Open 与测试侧点击至移动命令接受墙钟。
+- [x] 原生五 Seed 测试侧真实时间为 2.688 / 2.343 / 2.544 / 2.381 / 2.462 秒，平均 2.484 秒，最慢 2.688 秒；五局首次展开均显示当前 Seed 的 Minimap World Layer 并立即接受移动命令。
+- [x] Environment 数据、Roadside 数据、环境实例和 Roadside 实例拆段并让出渲染帧；生成结果语义未改。当前最大单阶段仍是 Environment Data，五局为 0.614～0.799 秒。
+- [x] Ready Gate 121、E00 58、E01 240、E01.5 Minimap 1,441、E02 Search 1,222、原生五 Seed 100、完整录像 19、未解析目标原生点击 4 项全部通过；截图、阶段明细和两段视频见 [P01 报告](EXPEDITION_LOAD_PERFORMANCE_P01_REPORT.md)。
+- [ ] Windows build 已执行，前置专项通过后仍被既有 Camp `member_buttons` / 左侧能力栏回归阻断；未生成 P01 新 EXE。Human Runtime QA: PENDING。
+- [ ] Expedition Load Performance P01: TECHNICALLY COMPLETE。E03 Enemy: NOT STARTED；不自动推进后续阶段。
 
 ## 2026-09-19：Expedition Runtime Loading Transition / Random Town Minimap Ready Gate
 
@@ -1196,6 +1292,16 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 - [ ] 等待 M09 视觉验收，不继续其他模块。
 
 
+## 2026-09-20：Camp Menu Overlay
+
+- [x] 右上角 M03「菜单」改为在当前 Camp 打开游戏内 Overlay；M09 `[ Esc ] 返回主菜单` 的视觉与常态行为保持不变。
+- [x] Overlay 提供继续游戏、共享 Settings、既有 Main Menu 返回与既有 Quit 四个动作；不销毁或重建 Camp。
+- [x] 全屏顶层遮罩、Camp 世界锁定与 HUD 禁用阻止输入穿透；Esc 打开时只关闭 Overlay，关闭后恢复原 Camp Esc 行为。
+- [x] 原生 1600×900 专项 30 项、M09 87 项、Settings 14 项零失败，四张验收截图已生成。实现与验证见 [Camp Menu Overlay 报告](CAMP_MENU_OVERLAY_REPORT.md)。
+- [x] Windows release 独立导出及 Headless / 原生隔离启动通过；完整 build 在本轮 30 项通过后仍被既有旧 `camp_ui_runtime.gd` 阻断，不标记全量通过。
+- [ ] 等待 Overlay 视觉验收；停止，不继续修改其他 Camp HUD 模块。
+
+
 ## 2026-09-19：Xia + Su 165cm Production Replacement
 
 - [x] 已验收 165cm / 约 100k tris / T-Pose Skin 候选逐字节提升到原正式 runtime GLB 路径；稳定 Blender 源可重新导出相同哈希。
@@ -1225,4 +1331,4 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 
 ## Survivor Trait Foundation（2026-09-19）
 
-已接入SUR_001/SUR_002：Definition → Trait Runtime → Search/Reward Hook，等级复用roster.level 1～5。资料以[用户数据表](SURVIVOR_DATA_TABLE.md)为准；推荐武器仅标签。Trait44、搜索111、Town13、原生Camp/任务选择/Expedition28、公共动画495项通过。Su各100,000样本命中率7.932%/16.018%。冻结表现与2.8m/s不变。旧effect_system仍有时钟断言/缺失站点错误，未扩展修复，不声明全仓全绿。详见[报告](SURVIVOR_TRAIT_FOUNDATION_REPORT.md)。其余10人Trait未实现。
+已接入SUR_001/SUR_002：Definition → Trait Runtime → Search/Reward Hook，等级复用roster.level 1～5。资料以[用户数据表](SURVIVOR_DATA_TABLE.md)为准；推荐武器仅标签。Trait44、搜索111、Town13、原生Camp/任务选择/Expedition28、公共动画495项通过。Su各100,000样本命中率7.932%/16.018%。冻结表现与2.8m/s不变。旧effect_system仍有时钟断言/缺失站点错误，未扩展修复，不声明全仓全绿。详见[报告](SURVIVOR_TRAIT_FOUNDATION_REPORT.md)。SUR_003/005/007/009/010/012 已在后续 Phase A 接入；其余四项保持数据预留。

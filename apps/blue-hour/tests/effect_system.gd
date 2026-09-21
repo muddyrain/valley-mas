@@ -126,7 +126,7 @@ func _check_storage(content: RefCounted) -> void:
 		v2.erase(category + "_items")
 		v2.erase(category + "_capacity")
 	var old_bytes := JSON.stringify(v2)
-	check(resumed.restore(v2) and resumed.data.version == 4, "v2 migrates through v3 effects to v4 weapons")
+	check(resumed.restore(v2) and resumed.data.version == 5, "v2 migrates through v3 effects to v4 weapons and v5 progression")
 	check(JSON.stringify(v2) == old_bytes and resumed.data.members == v2.members and resumed.data.inventory == v2.inventory, "Migration preserves source bytes, members and weapons")
 	check(not resumed.effect_definition("power", "aid").is_upgraded, "Legacy starter retains normal state")
 	var store: RefCounted = Store.new("user://test-runs/effect-v2-%d.json" % Time.get_ticks_usec())
@@ -140,7 +140,7 @@ func _check_storage(content: RefCounted) -> void:
 func _sortie(passives: Array, powers: Array, upgraded: bool = false) -> Node3D:
 	var content: RefCounted = Catalog.new()
 	var game: RefCounted = Campaign.new(content)
-	game.new_run(772, "", ["lin", "qiao", "yan"])
+	game.new_run(772, "", ["lin_jianyue", "lu_qinghe", "shen_yanchuan"])
 	for category: String in ["passive", "power"]:
 		var ids: Array = passives if category == "passive" else powers
 		if ids.size() > 1:
@@ -165,6 +165,8 @@ func _sortie(passives: Array, powers: Array, upgraded: bool = false) -> Node3D:
 func _check_combat(upgraded: bool) -> void:
 	var mission := _sortie(["shooting_target", "spare_magazine", "armor_plate"], ["rage", "focus_fire", "sprint"], upgraded)
 	var member: Node3D = mission.survivors[0]
+	# This suite isolates EffectData; Phase A trait boundaries have their own gameplay suite.
+	member.apply_trait(load("res://data/trait_data.gd").new())
 	member.position = Vector3(0, 0, 10)
 	for actor: Node3D in mission.survivors:
 		actor.position = member.position
@@ -229,7 +231,7 @@ func _check_combat(upgraded: bool) -> void:
 	mission.powers.advance(12 if upgraded else 8)
 	near(mission.effects.multiplier("damage"), 1, "Rage expires independently")
 	near(mission.effects.multiplier("move_speed"), 1.5, "Sprint survives rage expiry")
-	check(not mission.powers.activate("rage"), "Expired power cannot be used twice that day")
+	check(not mission.powers.activate("rage"), "Expired power remains unavailable during cooldown")
 	mission.powers.advance(20)
 	near(mission.effects.multiplier("move_speed"), 1, "Movement restores without rewriting templates")
 	near(mission.effects.multiplier("ranged_damage"), damage_bonus, "Passive survives all temporary expiry")
@@ -374,12 +376,12 @@ func _check_clock_and_heal(upgraded: bool) -> void:
 	near(worker.hp, 1 + worker.data.max_hp * (0.6 if upgraded else 0.4), "Searching member heals exact max-HP fraction")
 	near(mover.hp, mover.data.max_hp, "Healing is capped at max HP")
 	check(dead.dead and dead.hp == 0, "Healing cannot resurrect")
-	check(mission.powers.states.aid.used_today and not mission.powers.states.aid.active, "Instant healing still consumes today's one use")
+	check(mission.powers.states.aid.used_today and not mission.powers.states.aid.active and mission.powers.states.aid.remaining_cooldown > 0, "Instant healing starts its cooldown")
 	mission.time_scale = 1
 	mission.debug_clear_enemies()
 	mission._physics_process(duration + 1)
 	near(mission.clock.elapsed - start_clock, 2, "Large frame resumes countdown only after remaining freeze expires")
-	check(not mission.powers.states.dusk_delay.active and mission.powers.states.dusk_delay.used_today, "Freeze expiry does not recharge power")
+	check(not mission.powers.states.dusk_delay.active and mission.powers.states.dusk_delay.remaining_cooldown > 0, "Freeze expiry leaves its cooldown running")
 	mission.free()
 	mission = _sortie([], ["dusk_delay"], upgraded)
 	mission.clock.set_phase(mission.clock.BLUE_HOUR)

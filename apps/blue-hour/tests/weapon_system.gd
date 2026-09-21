@@ -101,10 +101,10 @@ func run() -> void:
 	legacy.equipment[a] = "old-pistol"
 	check(restored.restore(legacy), "v3 Demo save migrates")
 	check(restored.weapon("old-pistol").id == Registry.P9 and restored.weapon("old-pistol").magazine_size == 21, "Legacy ID and affix preserved")
-	check(restored.data.version == 4 and restored.data.inventory[0].rarity == 1, "Schema upgrade")
+	check(restored.data.version == 5 and restored.data.inventory[0].rarity == 1, "Schema upgrade")
 	var migration_store := Store.new("user://test-runs/weapons-v3-backup.json")
 	check(migration_store.write(legacy, restored.valid_state).is_empty(), "Save v3 migration fixture")
-	check(migration_store.write(restored.data, restored.valid_state).is_empty(), "Write upgraded v4 with original backup")
+	check(migration_store.write(restored.data, restored.valid_state).is_empty(), "Write upgraded v5 with original backup")
 	check(FileAccess.file_exists(migration_store.path + ".v3.bak"), "Original v3 backup exists")
 	var old_backup: Dictionary = migration_store._read_file(migration_store.path + ".v3.bak")
 	check(old_backup.version == 3 and old_backup.inventory[0].kind == "pistol", "Backup retains original Demo ID")

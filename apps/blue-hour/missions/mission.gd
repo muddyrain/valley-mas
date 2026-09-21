@@ -19,10 +19,16 @@ const ExpeditionCamera = preload("res://missions/expedition_camera.gd")
 const Exploration = preload("res://maps/exploration.gd")
 const SpecialPower = preload("res://missions/special_power.gd")
 const WorldInteractionVFX = preload("res://missions/world_interaction_vfx.gd")
+const TraitRuntime = preload("res://core/trait_runtime.gd")
+const AuraRuntime = preload("res://core/aura_runtime.gd")
+const PeriodicEffectRuntime = preload("res://core/periodic_effect_runtime.gd")
+const HealEffectHandler = preload("res://core/heal_effect_handler.gd")
+const BuffEffectHandler = preload("res://core/buff_effect_handler.gd")
 const Modifiers = preload("res://core/effect_modifiers.gd")
 const EncounterDirector = preload("res://encounter/encounter_director.gd")
 const LootResolver = preload("res://core/loot_resolver.gd")
 const NoiseSystem = preload("res://encounter/noise_system.gd")
+const SurvivorProgression = preload("res://data/survivor_progression.gd")
 const RandomMapGenerator = preload("res://maps/random/random_map_generator.gd")
 const MapProvider = preload("res://maps/expedition/expedition_map_provider.gd")
 const TownSearchRegistry = preload("res://maps/expedition/town_search_registry.gd")
@@ -60,6 +66,9 @@ var trait_rng := RandomNumberGenerator.new()
 var active: bool = true
 var focus_target: Node3D
 var search_tasks: Dictionary = {}
+# Survivor-owned view of the same active tasks. `search_tasks` remains the
+# target/world-state index consumed by POI cards and world markers.
+var survivor_tasks: Dictionary = {}
 var exiting_tasks: Array[RefCounted] = []
 var selected_search_id := ""
 # The selected task is only the inspection target; every task keeps running independently.
@@ -103,8 +112,16 @@ var survivor_commands_enabled: bool = false
 var last_command_rejection: String = ""
 var load_profile: RefCounted
 var search_registry_ready: bool = false
+var avoidance_update_count: int = 0
+var xp_awarded_events: Dictionary = {}
+var retired_enemy_ids: Dictionary = {}
+var periodic_effects: RefCounted
 
 func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], seed_value: int = 0, run_state: RefCounted = null, locked_party: Array[String] = [], map_config: Dictionary = {}, prepared_bridge: Dictionary = {}) -> void:
+	xp_awarded_events.clear()
+	retired_enemy_ids.clear()
+	search_tasks.clear()
+	survivor_tasks.clear()
 	generated_map.clear()
 	runtime_data.clear()
 	town_runtime_ready = false
@@ -154,7 +171,7 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 		search_registry = TownSearchRegistry.new()
 		search_registry.setup(self)
 		if load_profile != null:
-			load_profile.measure("search_registry", search_started)
+			load_profile.measure("search_registry_create", search_started)
 	else:
 		var legacy_bridge := MapProvider.create_runtime(MapProvider.FIXED_LEGACY, mission_type, seed_value, catalog.map, self)
 		city = legacy_bridge.root
@@ -175,21 +192,27 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 	else:
 		member_ids = campaign.data.members if locked_party.is_empty() else locked_party
 	var spawn_started := Time.get_ticks_usec()
+	periodic_effects = PeriodicEffectRuntime.new()
+	periodic_effects.effect_applied.connect(_on_periodic_effect_applied)
+	periodic_effects.effect_expired.connect(_on_periodic_effect_expired)
 	for i in range(member_ids.size()):
 		var member_id: String = member_ids[i]
 		var spec: Resource = (catalog.survivors[i] if campaign == null else campaign.member_template(member_id)).duplicate()
 		var talent: Resource = catalog.by_id(catalog.traits, spec.trait_id).at_level(1)
 		var equipment: Resource
+		var equipment_instance: RefCounted = null
 		if campaign == null:
 			equipment = catalog.by_id(catalog.weapons, loadout[i])
 		else:
-			equipment = campaign.weapon(campaign.data.equipment[member_id])
+			var equipped_uid: String = str(campaign.data.equipment[member_id])
+			equipment = campaign.weapon(equipped_uid)
+			equipment_instance = campaign.weapon_inventory.get_weapon(equipped_uid)
 			talent = campaign.member_trait(member_id)
 			spec.id = member_id
 			spec.max_hp *= campaign.health_multiplier()
 		var survivor := Survivor.new()
 		add_child(survivor)
-		survivor.setup(spec, talent, equipment)
+		survivor.setup(spec, talent, equipment, equipment_instance)
 		survivor.enable_motion_presentation(self)
 		survivor.effects = effects
 		var spawn_origin: Vector3 = runtime_data.arrival_point if town_runtime_ready else catalog.map.bus_position
@@ -198,6 +221,8 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 			town_positions = town_runtime_root.spawn_positions(member_ids.size())
 		survivor.position = town_positions[survivors.size()] if survivors.size() < town_positions.size() else spawn_origin + formation(survivors.size())
 		survivors.append(survivor)
+	for survivor: Node3D in survivors:
+		periodic_effects.register_provider(survivor, survivor.talent, str(survivor.get_instance_id()))
 	if load_profile != null:
 		load_profile.measure("survivor_spawn", spawn_started)
 	encounter = EncounterDirector.new()
@@ -230,13 +255,13 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 func _on_navigation_ready() -> void:
 	var started := Time.get_ticks_usec()
 	if load_profile != null:
-		await search_registry.resolve_navigation_staged()
+		search_registry.start_background_resolution()
 	else:
 		search_registry.resolve_navigation()
 	exploration.refresh()
 	search_registry_ready = true
 	if load_profile != null:
-		load_profile.measure("search_navigation_resolve", started)
+		load_profile.measure("wait_search_resolve", started)
 	survivor_commands_enabled = true
 	town_runtime_root.lifecycle.append("survivor_commands_enabled")
 	navigation_ready.emit()
@@ -293,7 +318,7 @@ func debug_equip(index: int, equipment: Resource) -> void:
 		return
 	member.equip(equipment)
 	if campaign != null:
-		member.talent = campaign.member_trait(member.data.id)
+		member.apply_trait(campaign.member_trait(member.data.id))
 
 func _physics_process(delta: float) -> void:
 	if not active or time_scale <= 0:
@@ -310,9 +335,11 @@ func _physics_process(delta: float) -> void:
 		powers.advance(dt)
 		left = maxf(0.0, left - dt)
 func _advance_world(dt: float) -> void:
+	if periodic_effects != null:
+		periodic_effects.advance(dt, survivors)
 	if town_runtime_ready:
 		if survivor_commands_enabled:
-			for task: RefCounted in search_tasks.values():
+			for task: RefCounted in search_tasks.values().duplicate():
 				task.prepare(dt, self)
 			for task: RefCounted in exiting_tasks:
 				task.advance_exit(dt)
@@ -323,7 +350,7 @@ func _advance_world(dt: float) -> void:
 				refresh_regroup()
 			for survivor: Node3D in survivors:
 				survivor.tick(dt, self)
-			for task: RefCounted in search_tasks.values():
+			for task: RefCounted in search_tasks.values().duplicate():
 				task.advance(dt, self)
 			_prune_tasks()
 			_update_pickups()
@@ -350,7 +377,7 @@ func _advance_world(dt: float) -> void:
 		encounter_stats_left = catalog.map.encounter.perception_tick_max
 		for enemy: Node3D in enemies:
 			enemy.refresh_stats(clock)
-	for task in search_tasks.values():
+	for task in search_tasks.values().duplicate():
 		task.prepare(dt, self)
 	for task: RefCounted in exiting_tasks:
 		task.advance_exit(dt)
@@ -370,13 +397,35 @@ func _advance_world(dt: float) -> void:
 		_finish(true)
 		return
 	_update_focus(dt)
-	for task in search_tasks.values():
+	for task in search_tasks.values().duplicate():
 		task.advance(dt, self)
 	_prune_tasks()
 	_update_pickups()
 	_update_extraction(dt)
 	if exploration != null:
 		exploration.advance(dt)
+
+func _on_periodic_effect_applied(event: Dictionary) -> void:
+	var effect_type: String = str(event.get("effect_type", ""))
+	var target_id: int = int(event.get("target_id", 0))
+	for survivor: Node3D in survivors:
+		if survivor.get_instance_id() != target_id:
+			continue
+		if effect_type == "heal":
+			HealEffectHandler.apply(survivor, float(event.get("value", 0.0)))
+		elif effect_type == BuffEffectHandler.EFFECT_CRIT_RATE:
+			BuffEffectHandler.apply(survivor, effect_type, float(event.get("value", 0.0)), str(event.get("provider_id", "")))
+		return
+
+func _on_periodic_effect_expired(event: Dictionary) -> void:
+	var effect_type: String = str(event.get("effect_type", ""))
+	if effect_type == "heal":
+		return
+	var target_id: int = int(event.get("target_id", 0))
+	for survivor: Node3D in survivors:
+		if survivor.get_instance_id() == target_id:
+			BuffEffectHandler.expire(survivor, effect_type, str(event.get("provider_id", "")))
+			return
 
 func _on_noise(event: RefCounted) -> void:
 	for enemy: Node3D in enemies:
@@ -391,8 +440,10 @@ func _sync_watch_warning() -> void:
 		watch_warning_changed.emit(watch_warning_active)
 
 func movement_speed(member: Node3D, waypoint: Vector3, delta: float) -> float:
+	avoidance_update_count += 1
 	var speed: float = member.data.move_speed * effects.multiplier("move_speed") * (1.0 + member.weapon.move_speed_modifier if member.weapon != null else 1.0)
-	if town_runtime_ready:
+	speed *= AuraRuntime.movement_multiplier(member, survivors)
+	if town_runtime_ready and bool(get_meta("p02_avoidance_enabled", true)):
 		# Keep a following gap on a shared corridor without moving actors off their
 		# collision-checked paths or introducing a crowd physics / RVO system.
 		# Following/yielding uses the XZ navigation corridor. Surface elevation
@@ -442,10 +493,33 @@ func movement_speed(member: Node3D, waypoint: Vector3, delta: float) -> float:
 		return boosted
 	return speed
 
+func incoming_damage_multiplier(member: Node3D, damage_tags: Array[String]) -> float:
+	return TraitRuntime.damage_reduction(1.0, AuraRuntime.modifier(member, survivors, AuraRuntime.EFFECT_INFECTED_DAMAGE_REDUCTION), damage_tags)
+
 func damage_to(member: Node3D, target: Node3D) -> float:
-	return effects.outgoing_damage(member.weapon.damage * member.talent.damage_multiplier, member.weapon.melee, target != null and target == powers.target())
+	var base_damage: float = member.weapon.damage * member.talent.damage_multiplier
+	var distance: float = Vector2(member.position.x, member.position.z).distance_to(Vector2(target.position.x, target.position.z)) if target != null else INF
+	var tags: Array[String] = []
+	if target != null and target in enemies:
+		tags.append("infected")
+	var trait_damage: float = TraitRuntime.damage_amount(base_damage, member.talent, distance, tags)
+	return effects.outgoing_damage(trait_damage, member.weapon.melee, target != null and target == powers.target())
+
+func award_xp_once(member_id: String, event_type: SurvivorProgression.EventType, event_key: String, amount: int = 0) -> int:
+	if campaign == null or member_id.is_empty() or event_key.is_empty() or xp_awarded_events.has(event_key):
+		return 0
+	xp_awarded_events[event_key] = true
+	return campaign.record_xp_event(member_id, event_type, amount)
+
+func interaction_duration(site: Dictionary, worker: Node3D) -> float:
+	var search_duration: float = effects.search_seconds(site.spec.search_seconds, worker.talent.search_multiplier)
+	var categories: Array[String] = []
+	categories.assign(site.spec.get("interaction_categories", []))
+	return TraitRuntime.interaction_duration(search_duration, worker.talent, categories)
 
 func _process(delta: float) -> void:
+	if town_runtime_ready and search_registry != null and survivor_commands_enabled:
+		search_registry.resolve_navigation_background()
 	if controls != null:
 		controls.update(delta)
 	if camera_controller != null:
@@ -550,10 +624,36 @@ func _exit_tree() -> void:
 			task.worker.damaged.disconnect(task._on_damage)
 
 func task_for(member: Node3D) -> RefCounted:
-	for task in search_tasks.values():
+	if member == null:
+		return null
+	var key := _survivor_key(member)
+	var indexed: RefCounted = survivor_tasks.get(key)
+	if indexed != null and indexed.worker == member:
+		return indexed
+	# Repair compatibility with tasks created by older fixtures or a stale
+	# external caller, while keeping the normal lookup O(1).
+	for task: RefCounted in search_tasks.values():
 		if task.worker == member:
+			_bind_search_task(task.site_id, task, member)
 			return task
 	return null
+
+func _survivor_key(member: Node3D) -> String:
+	return str(member.data.id) if member != null and member.data != null else str(member.get_instance_id())
+
+func _bind_search_task(id: String, task: RefCounted, member: Node3D) -> void:
+	search_tasks[id] = task
+	survivor_tasks[_survivor_key(member)] = task
+
+func _unbind_search_task(task: RefCounted) -> void:
+	if task == null:
+		return
+	var id: String = str(task.site_id)
+	if search_tasks.get(id) == task:
+		search_tasks.erase(id)
+	var survivor_id: String = str(task.survivor_id)
+	if survivor_tasks.get(survivor_id) == task:
+		survivor_tasks.erase(survivor_id)
 
 func search_target_state(id: String) -> Dictionary:
 	if not city.sites.has(id):
@@ -567,13 +667,20 @@ func search_target_state(id: String) -> Dictionary:
 		state = "SEARCHING" if task.search_started else "ASSIGNED" if task.phase == SearchTask.Phase.ASSIGNED else "APPROACHING"
 		progressing = owner.searching and task.phase in [SearchTask.Phase.SEARCHING_INSIDE, SearchTask.Phase.SEARCHING_OUTSIDE]
 	return {"state": state, "worker": owner, "progress": site.progress, "completed": site.searched,
-		"can_search": active and closing_left < 0 and not site.searched and owner == null and str(site.spec.get("search_status", "AVAILABLE")) == "AVAILABLE",
+		"can_search": active and closing_left < 0 and not site.searched and owner == null and str(site.spec.get("search_status", TownSearchRegistry.RESOLVED_REACHABLE)) == TownSearchRegistry.RESOLVED_REACHABLE,
 		"progressing": active and not site.searched and progressing}
 
 func _prune_tasks() -> void:
-	for id in search_tasks.keys():
-		if search_tasks[id].worker == null:
+	for id in search_tasks.keys().duplicate():
+		var task: RefCounted = search_tasks[id]
+		if task == null:
 			search_tasks.erase(id)
+		elif task.worker == null:
+			_unbind_search_task(task)
+	for survivor_id in survivor_tasks.keys().duplicate():
+		var task: RefCounted = survivor_tasks[survivor_id]
+		if task == null or task.worker == null or search_tasks.get(task.site_id) != task:
+			survivor_tasks.erase(survivor_id)
 	if not search_tasks.has(selected_search_id):
 		selected_search_id = "" if search_tasks.is_empty() else str(search_tasks.keys()[0])
 
@@ -617,13 +724,17 @@ func _move_members(point: Vector3, members: Array[Node3D]) -> bool:
 	var preferred: Dictionary = _town_formation_slots(destination, members) if town_runtime_ready else {}
 	for member: Node3D in members:
 		var target: Vector3 = city.nearest_open(destination + formation(survivors.find(member)))
+		var route: PackedVector3Array = []
 		if town_runtime_ready:
-			target = city.formation_target(member.position, preferred[member.get_instance_id()], reserved, reserved_paths)
-			if not target.is_finite():
+			var formation_order: Dictionary = city.formation_order(member.position, preferred[member.get_instance_id()], reserved, reserved_paths)
+			if formation_order.is_empty():
 				return _reject_move("UNREACHABLE_FORMATION")
-		var route: PackedVector3Array = city.path(member.position, target)
+			target = formation_order.target
+			route = formation_order.route
+		else:
+			route = city.path(member.position, target)
 		if not route.is_empty():
-			orders.append({"member": member, "target": target})
+			orders.append({"member": member, "target": target, "route": route})
 			reserved.append(target)
 			reserved_paths.append(route)
 	if orders.is_empty():
@@ -637,7 +748,7 @@ func _move_members(point: Vector3, members: Array[Node3D]) -> bool:
 		if task != null:
 			task.release(self)
 		member.regrouping = false
-		member.order_move(move_order.target, city)
+		member.order_move(move_order.target, city, move_order.route)
 		if is_instance_valid(world_interaction_vfx):
 			world_interaction_vfx.play_command_line(member, destination)
 	_prune_tasks()
@@ -681,56 +792,70 @@ func command_stop() -> void:
 	city.marker.visible = false
 	order = "停止移动 · 自动迎敌"
 
-func command_search(id: String) -> void:
+func command_search(id: String, survivor: Node3D = null) -> bool:
 	if not active or closing_left >= 0 or not city.sites.has(id) or city.sites[id].searched:
-		return
+		return false
 	poi_selected_id = id
 	var site: Dictionary = city.sites[id]
 	if town_runtime_ready:
-		if not survivor_commands_enabled or site.spec.get("search_status", "") != "AVAILABLE":
+		if not survivor_commands_enabled:
+			_reject_move("NAVIGATION_NOT_READY")
+			return false
+		if not site.discovered:
+			return false
+		if search_registry.resolve_priority(id) != TownSearchRegistry.RESOLVED_REACHABLE:
 			_reject_move("SEARCH_REJECTED_UNREACHABLE")
 			notice.emit("无法抵达该搜索入口")
-			return
-		if not site.discovered:
-			return
+			return false
 	if search_tasks.has(id):
 		selected_search_id = id
-		return
-	if town_runtime_ready and (not is_instance_valid(selected_search_member) or selected_search_member.dead or selected_search_member.boarding or selected_search_member.inside_building or task_for(selected_search_member) != null):
-		_reject_move("SEARCH_REJECTED_MEMBER_UNAVAILABLE")
-		notice.emit("所选队员暂时无法接取搜索 · 请先取消当前任务或选择其他队员")
-		return
-	var nearest: Node3D
-	var best := INF
-	for member in living():
-		if town_runtime_ready and member != selected_search_member:
-			continue
-		if member.boarding or member.inside_building or task_for(member) != null:
-			continue
-		var route: PackedVector3Array = city.path(member.position, site.spec.entry)
-		if route.is_empty():
-			continue
-		var distance := member.position.distance_squared_to(site.spec.entry)
-		if distance < best:
-			best = distance
-			nearest = member
-	if nearest == null:
+		return false
+	var assigned: Node3D = survivor
+	# Legacy callers have no member argument. Keep them working on the old
+	# provider and during the migration, while the production Town input below
+	# always passes the selected UI member explicitly.
+	if assigned == null and town_runtime_ready:
+		assigned = selected_search_member
+	if assigned == null:
+		var best := INF
+		for member in living():
+			if member.boarding or member.inside_building or task_for(member) != null:
+				continue
+			var route: PackedVector3Array = city.path(member.position, site.spec.entry)
+			if route.is_empty():
+				continue
+			var distance := member.position.distance_squared_to(site.spec.entry)
+			if distance < best:
+				best = distance
+				assigned = member
+	if assigned == null or not living().has(assigned) or assigned.boarding or assigned.inside_building or task_for(assigned) != null:
+		if town_runtime_ready:
+			_reject_move("SEARCH_REJECTED_MEMBER_UNAVAILABLE")
+			notice.emit("该幸存者暂时无法接取搜索 · 请先选择其他可行动角色")
+		else:
+			notice.emit("没有空闲且可抵达的队员 · 可先召回一人")
+		return false
+	var route: PackedVector3Array = city.path(assigned.position, site.spec.entry)
+	if route.is_empty():
 		if town_runtime_ready:
 			_reject_move("SEARCH_REJECTED_UNREACHABLE")
-		notice.emit("没有空闲且可抵达的队员 · 可先召回一人")
-		return
+			notice.emit("无法抵达该搜索入口")
+		else:
+			notice.emit("没有空闲且可抵达的队员 · 可先召回一人")
+		return false
 	extraction = false
 	extraction_left = catalog.map.extraction_seconds
 	var task := SearchTask.new()
 	last_command_rejection = ""
-	search_tasks[id] = task
+	task.assign(id, assigned, self)
+	_bind_search_task(id, task, assigned)
 	selected_search_id = id
-	task.assign(id, nearest, self)
 	if is_instance_valid(world_interaction_vfx):
 		world_interaction_vfx.play_search_feedback(site.spec.entry if town_runtime_ready else site.search_anchor.global_position)
 		if town_runtime_ready:
-			world_interaction_vfx.play_command_line(nearest, site.spec.entry, true)
-	notice.emit("%s 前往搜索 %s" % [nearest.data.display_name, site.spec.name])
+			world_interaction_vfx.play_command_line(assigned, site.spec.entry, true)
+	notice.emit("%s 前往搜索 %s" % [assigned.data.display_name, site.spec.name])
+	return true
 
 func command_reassign(index: int) -> void:
 	if not active or closing_left >= 0 or search_id.is_empty() or index < 0 or index >= survivors.size():
@@ -744,9 +869,15 @@ func command_reassign(index: int) -> void:
 		return
 	search_task.release(self)
 	var replacement := SearchTask.new()
-	search_tasks[id] = replacement
 	replacement.assign(id, member, self)
+	_bind_search_task(id, replacement, member)
 	notice.emit("改派 %s · 搜索进度保留" % member.data.display_name)
+
+func command_recall_survivor(member: Node3D) -> void:
+	var task: RefCounted = task_for(member)
+	if task == null:
+		return
+	command_recall(str(task.site_id))
 
 func command_recall(id: String = "") -> void:
 	if id.is_empty():
@@ -769,9 +900,10 @@ func command_recall_all() -> void:
 	notice.emit("全队集合 · 搜索进度保留")
 
 func _release_tasks() -> void:
-	for task in search_tasks.values():
+	for task: RefCounted in search_tasks.values().duplicate():
 		task.release(self)
 	search_tasks.clear()
+	survivor_tasks.clear()
 	selected_search_id = ""
 
 func command_aim(point: Vector3) -> void:
@@ -894,6 +1026,7 @@ func spawn_enemy(id: String, point: Vector3) -> Node3D:
 		enemy.setup(data, rng.randf_range(0.1, 0.6), clock)
 	enemy.position = city.nearest_open(point)
 	enemy.configure_encounter(catalog.map.encounter, rng.randi())
+	retired_enemy_ids.erase(str(enemy.get_instance_id()))
 	enemy.set_meta("encounter_origin", "manual")
 	enemy.refresh_stats(clock)
 	if exploration != null:
@@ -903,7 +1036,14 @@ func spawn_enemy(id: String, point: Vector3) -> Node3D:
 	return enemy
 
 func _retire_enemy(enemy: Node3D) -> void:
+	var enemy_key: String = str(enemy.get_instance_id())
+	if retired_enemy_ids.has(enemy_key):
+		return
+	retired_enemy_ids[enemy_key] = true
 	kills += 1
+	var killer: Node3D = enemy.death_source as Node3D
+	if killer != null and survivors.has(killer):
+		award_xp_once(killer.data.id, SurvivorProgression.EventType.KILL_ENEMY, "kill:" + enemy_key)
 	if focus_target == enemy:
 		_finish_focus()
 	var food := 1 if rng.randf() < enemy.data.food_drop_chance else 0
@@ -927,7 +1067,7 @@ func drop_loot(point: Vector3, food: int, scrap: int, weapon_item: Dictionary = 
 	Visuals.ring(view, Vector3(0, 0.1, 0), 0.7, Color("#a4eab1"))
 	pickups.append({"view": view, "food": food, "scrap": scrap, "weapon": weapon_item, "search_source": search_source})
 
-func reward_for_site(id: String) -> Dictionary:
+func reward_for_site(id: String, worker: Node3D = null) -> Dictionary:
 	if campaign == null:
 		return {}
 	if mission_profile != null:
@@ -942,7 +1082,7 @@ func reward_for_site(id: String) -> Dictionary:
 		var uid := "mission-loot:%s:%s:%s" % [campaign.data.day, mission_profile.id, id]
 		if not campaign.item(uid).is_empty():
 			return {}
-		return campaign.gear.roll(mission_profile.weapon_pool, uid, reward_rng, false)
+		return campaign.gear.roll(mission_profile.weapon_pool, uid, reward_rng, true, worker.talent if worker != null else null)
 	var action: Resource = catalog.by_id(catalog.today_actions, str(campaign.data.get("selected_action", "")))
 	if action != null and id not in action.weapon_sites:
 		return {}

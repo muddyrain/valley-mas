@@ -64,6 +64,7 @@ func rendered_frame() -> void:
 		await RenderingServer.frame_post_draw
 
 func close(profile: RefCounted = null) -> void:
+	var close_started: int = Time.get_ticks_usec()
 	phase = "closing"
 	first_draw_usec = 0
 	hold_draw_usec = 0
@@ -75,6 +76,7 @@ func close(profile: RefCounted = null) -> void:
 	first_draw_usec = Time.get_ticks_usec()
 	if profile != null:
 		profile.mark("overlay_ready")
+		profile.stages["click_to_overlay_visible"] = (first_draw_usec - profile.started_usec) / 1000.0
 		profile.mark("iris_close_started")
 	# Starting after the first draw avoids consuming the departure input frame's old delta.
 	var tween := create_tween()
@@ -87,8 +89,10 @@ func close(profile: RefCounted = null) -> void:
 	hold_draw_usec = Time.get_ticks_usec()
 	if profile != null:
 		profile.mark("loading_hold_drawn")
+		profile.measure("overlay_close", close_started)
 
-func open() -> void:
+func open(profile: RefCounted = null) -> void:
+	var started: int = Time.get_ticks_usec()
 	phase = "opening"
 	label.hide()
 	indicator.hide()
@@ -97,6 +101,10 @@ func open() -> void:
 	await tween.finished
 	hide()
 	phase = "idle"
+	if profile != null:
+		profile.measure("iris_open", started)
+		profile.stages["wait_transition"] = profile.stages.iris_open
+		profile.mark("iris_open_complete")
 
 func set_text(value: String) -> void:
 	label.text = value

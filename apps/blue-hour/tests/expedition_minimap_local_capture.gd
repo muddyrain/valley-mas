@@ -37,12 +37,12 @@ func run() -> void:
 	await shot("01_local_minimap_arrival")
 	await shot("02_all_survivors_visible", true)
 	await hold_frames(24)
-	await shot("03_selected_survivor_a")
+	await shot("03_static_survivors")
 	await select_survivor(1)
-	await shot("04_selected_survivor_b")
+	await shot("04_world_selection_does_not_affect_minimap")
 	await hold_frames(24)
 	await select_survivor(2)
-	await shot("08_selected_survivor_c")
+	await shot("08_world_selection_does_not_affect_minimap_c")
 	await hold_frames(24)
 	verify_edge_marker(map, "poi")
 	await shot("06_poi_offscreen_edge_marker")
@@ -145,7 +145,7 @@ func advance_frame(move: bool) -> void:
 		motion_valid = motion_valid and map.marker_rect.encloses(Rect2(marker.point - Vector2.ONE * marker.diameter * .5, Vector2.ONE * marker.diameter))
 		if marker.kind == "survivor":
 			count += 1
-			motion_valid = motion_valid and marker.diameter == 18.0 and marker.texture == map.marker_player
+			motion_valid = motion_valid and marker.diameter == 18.0 and marker.texture == null and not marker.has("selected")
 	motion_valid = motion_valid and count == 3
 	for member: Node3D in mission.survivors:
 		motion_valid = motion_valid and mission.city.navigation.point_clear(member.position)
@@ -154,7 +154,7 @@ func advance_frame(move: bool) -> void:
 	if frame_index % 15 == 0:
 		var items: Array[Dictionary] = []
 		for marker: Dictionary in map.town_markers:
-			items.append({"id": str(marker.id), "world": var_to_str(marker.world), "anchor": var_to_str(marker.anchor), "point": var_to_str(marker.point), "edge": marker.edge, "selected": marker.selected, "diameter": marker.diameter})
+			items.append({"id": str(marker.id), "world": var_to_str(marker.world), "anchor": var_to_str(marker.anchor), "point": var_to_str(marker.point), "edge": marker.edge, "moving": marker.get("moving", false), "searching": marker.get("searching", false), "diameter": marker.diameter})
 		samples.append({"frame": frame_index, "stage": stage, "center": var_to_str(map.follow_center), "scale": map.map_scale, "markers": items})
 	root.get_texture().get_image().save_jpg(ProjectSettings.globalize_path(LOCAL_OUT.path_join("frames/frame_%05d.jpg" % frame_index)), .9)
 	frame_index += 1

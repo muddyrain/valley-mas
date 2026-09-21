@@ -13,7 +13,7 @@ func _initialize() -> void:
 	var catalog: RefCounted = load("res://data/catalog.gd").new()
 	var game: RefCounted = load("res://core/campaign.gd").new(catalog)
 	for wiped: bool in [false, true]:
-		game.new_run(772, "", ["xia_zhiyao", "su_wanxing", "lin", "qiao"])
+		game.new_run(772, "", ["xia_zhiyao", "su_wanxing", "lin_jianyue", "lu_qinghe"])
 		game.data.food = 20
 		var original: Dictionary = game.data.duplicate(true)
 		check(game.callv("start_action", ["commercial", ["xia_zhiyao"]]) == true, "One member can depart from a four-member camp")
@@ -33,11 +33,11 @@ func _initialize() -> void:
 		check(restored.restore(game.data), "Pending partial-party outcome survives reload")
 		check(restored.commit_day(), "Partial-party outcome advances the existing day loop")
 		check(restored.data.status == "shelter" and restored.data.day == 2, "A deployed-party wipe does not end a populated camp")
-		for id: String in ["su_wanxing", "lin", "qiao"]:
+		for id: String in ["su_wanxing", "lin_jianyue", "lu_qinghe"]:
 			check(id in restored.data.members and restored.data.equipment[id] == original.equipment[id], "Resident and their equipment remain: " + id)
 		check(restored.data.food == 20 - (3 if wiped else 4) * catalog.loop.food_per_member, "All surviving camp members eat once")
 		check(not restored.commit_day(), "Day settlement cannot be applied twice")
-	game.new_run(772, "", ["lin", "qiao"])
+	game.new_run(772, "", ["lin_jianyue", "lu_qinghe"])
 	var old: Dictionary = game.data.duplicate(true)
 	old.erase("selected_party")
 	check(game.restore(old) and game.data.get("selected_party") == game.data.members, "Existing saves default to the full alive roster")

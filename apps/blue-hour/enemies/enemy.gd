@@ -3,6 +3,8 @@ enum State { IDLE, WANDER, INVESTIGATE, CHASE, ATTACK, DEAD }
 const HealthBar = preload("res://ui/expedition/enemy_health_bar.gd")
 const Visuals = preload("res://vfx/visuals.gd")
 const AnimationController = preload("res://enemies/infected_animation_controller.gd")
+const HitFeedback = preload("res://vfx/enemy_hit_feedback.gd")
+const DamageResolverData = preload("res://weapons/combat/damage_resolver.gd")
 var config: Resource = preload("res://data/expedition_encounter.tres")
 var state: State = State.IDLE
 var home_position := Vector3.ZERO
@@ -36,6 +38,7 @@ var windup_left: float = 0.0
 var think_left: float = 0.0
 var target: Node3D
 var attack_target: Node3D
+var death_source: Node = null
 var path := PackedVector3Array()
 var rig: Node3D
 var animation_player: AnimationPlayer
@@ -43,6 +46,7 @@ var animation_controller: InfectedAnimationController
 var locomotion_animation: StringName = &""
 var hp_bar: Node3D
 var focus_ring: MeshInstance3D
+var hit_feedback: EnemyHitFeedback
 
 func setup(spec: Resource, offset: float, clock: RefCounted) -> void:
 	data = spec
@@ -55,6 +59,8 @@ func setup(spec: Resource, offset: float, clock: RefCounted) -> void:
 	hp_bar.position = get_node("HealthAnchor").position
 	add_child(hp_bar)
 	focus_ring = Visuals.ring(self, Vector3(0, 0.09, 0), data.collision_radius + 0.15, Color("#ff665e"))
+	hit_feedback = HitFeedback.new()
+	hit_feedback.setup(self, rig)
 	var area: Area3D = get_node("HitArea")
 	area.set_meta("enemy", self)
 	var collision: CollisionShape3D = area.get_node("CollisionShape3D")
@@ -71,6 +77,7 @@ func reset_for_spawn(offset: float, clock: RefCounted) -> void:
 	path.clear()
 	target = null
 	attack_target = null
+	death_source = null
 	attack_left = 0.0
 	windup_left = 0.0
 	think_left = offset
@@ -92,6 +99,8 @@ func reset_for_spawn(offset: float, clock: RefCounted) -> void:
 	rig.rotation = Vector3.ZERO
 	_set_locomotion_animation(&"Zombie_Idle")
 	focus_ring.visible = false
+	if hit_feedback != null:
+		hit_feedback.clear()
 	get_node("HitArea").collision_layer = 2
 
 func refresh_stats(clock: RefCounted) -> void:
@@ -119,6 +128,8 @@ func configure_encounter(settings: Resource, seed_value: int) -> void:
 	rig.rotation.y = rng.randf_range(-PI, PI)
 
 func tick(delta: float, mission: Node3D) -> void:
+	if hit_feedback != null:
+		hit_feedback.advance(delta)
 	if not active:
 		return
 	attack_left = maxf(0, attack_left - delta)
@@ -289,12 +300,22 @@ func _move_path(budget: float, delta: float) -> void:
 		var moved: float = position.distance_to(start_position)
 		animation_controller.update_motion_speed(moved / maxf(0.001, delta), data.move_speed * speed_multiplier)
 
-func take_damage(amount: float) -> void:
+func apply_hit(event: RefCounted) -> void:
+	if event == null:
+		return
+	take_damage(DamageResolverData.resolve(event), event.source)
+
+func apply_hit_feedback(_event: RefCounted) -> void:
+	if hit_feedback != null:
+		hit_feedback.trigger()
+
+func take_damage(amount: float, source: Node = null) -> void:
 	if not active:
 		return
 	hp = maxf(0, hp - amount)
 	hp_bar.set_ratio(hp / max_hp)
 	if hp <= 0:
+		death_source = source
 		active = false
 		state = State.DEAD
 		target = null
@@ -334,6 +355,6 @@ func _resolve_attack(mission: Node3D) -> void:
 	# A committed swing cannot switch victims or hit through newly interposed cover.
 	if is_instance_valid(attack_target) and not attack_target.dead and not attack_target.inside_building:
 		if position.distance_to(attack_target.position) <= data.attack_range and mission.city.line_clear(position, attack_target.position):
-			attack_target.take_damage(attack_damage, mission.invincible)
+			attack_target.take_damage(attack_damage, mission.invincible, ["infected"])
 			mission.effects_hit(position, attack_target.position, Color("#f4756e"))
 	_cancel_windup()

@@ -18,3 +18,5 @@ normal_modifiers = {"heal_fraction": 0.4}
 upgraded_modifiers = {"heal_fraction": 0.6}
 duration = 0.0
 upgraded_duration = 0.0
+cooldown = 60.0
+upgraded_cooldown = 60.0

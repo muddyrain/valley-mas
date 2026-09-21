@@ -77,11 +77,11 @@ func verify_follow(mission: Node3D, map: Control) -> void:
 func verify_equal_markers(mission: Node3D, map: Control) -> void:
 	var markers: Array = map.town_markers.filter(func(item: Dictionary) -> bool: return item.kind == "survivor")
 	check(markers.size() == mission.living().size(), "Every alive expedition survivor has an icon")
-	var selected: Node3D = map.get_parent().selected_member
 	for marker: Dictionary in markers:
-		check(marker.diameter == 18.0 and marker.texture == map.marker_player, "Every survivor uses the same full-size icon")
-		check(marker.selected == (marker.id == selected.get_instance_id()), "Only selected state changes highlight")
-		check(map.marker_rect.encloses(Rect2(marker.point - Vector2.ONE * 12, Vector2.ONE * 24)), "Full icon and selection ring stay in local map")
+		check(marker.diameter == 18.0 and marker.texture == null, "Every survivor uses the same lightweight marker")
+		check(not marker.has("selected"), "Survivor markers have no selection state")
+		check(marker.has("moving") and marker.has("searching"), "Survivor markers expose behavior state")
+		check(map.marker_rect.encloses(Rect2(marker.point - Vector2.ONE * 12, Vector2.ONE * 24)), "Survivor marker stays inside local map")
 		for other: Dictionary in markers:
 			if marker.id != other.id:
 				check(marker.point.distance_to(other.point) >= 24.0, "Equal icons do not hide one another")

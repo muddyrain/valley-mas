@@ -28,7 +28,7 @@ func run() -> void:
 		var count: int = [1, 2, 4, 1][case_index]
 		var forced_failure := case_index == 3
 		await launch(true)
-		app.campaign.new_run(772, "", ["xia_zhiyao", "su_wanxing", "lin", "qiao"].slice(0, count))
+		app.campaign.new_run(772, "", ["xia_zhiyao", "su_wanxing", "lin_jianyue", "lu_qinghe"].slice(0, count))
 		app.show_shelter()
 		await frames(10)
 		await click(button("今日行动"))

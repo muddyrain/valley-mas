@@ -8,7 +8,8 @@ size = Vector3(9.610407, 7.200000, 6.581735)
 script = ExtResource("1")
 asset_id = "BLD_021_small_office_a"
 [node name="ModelRoot" type="Node3D" parent="."]
-position = Vector3(0.002142, -0.000000, 0.012786)
+position = Vector3(-0.002142, -0.000000, -0.012786)
+rotation = Vector3(0, 3.14159265, 0)
 
 [node name="SourceModel" parent="ModelRoot" instance=ExtResource("2")]
 [node name="Collision" type="StaticBody3D" parent="."]
@@ -20,7 +21,7 @@ shape = SubResource("shape")`r`nposition = Vector3(0.000000, 3.600000, 0.000000)
 position = Vector3(0.000000, 0.000000, -3.290867)
 
 [node name="EntranceMarker" type="Marker3D" parent="Anchors"]
-position = Vector3(0.000000, 0.000000, -4.790867)
+position = Vector3(0.000000, 0.000000, -3.290867)
 
 [node name="SearchMarker" type="Marker3D" parent="Anchors"]
 position = Vector3(0.000000, 0.000000, -4.790867)
@@ -32,11 +33,9 @@ position = Vector3(0.000000, 3.600000, 0.000000)
 position = Vector3(0.000000, 0.000000, -5.290867)
 
 [node name="EntranceAnchor" type="Marker3D" parent="Anchors"]
-position = Vector3(0.000000, 0.000000, -4.790867)
+position = Vector3(0.000000, 0.000000, -3.290867)
 
 [node name="SpawnPoints" type="Node3D" parent="."]
 [node name="LootPoints" type="Node3D" parent="SpawnPoints"]
 [node name="Primary" type="Marker3D" parent="SpawnPoints/LootPoints"]
 position = Vector3(0.000000, 0.000000, -4.790867)
-
-

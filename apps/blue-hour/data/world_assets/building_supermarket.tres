@@ -29,3 +29,6 @@ road_offset = Vector3(0.000000, 0.000000, -8.395936)
 building_id = "BLD_001"
 display_name = "超市"
 search_offset = Vector3(0.000000, 0.000000, -8.395936)
+primary_entrance_local_anchor = Vector3(0.000000, 0.000000, -6.895936)
+primary_entrance_local_forward = Vector3(0.000000, 0.000000, -1.000000)
+search_interaction_local_anchor = Vector3(0.000000, 0.000000, -8.395936)

@@ -45,7 +45,7 @@ func run() -> void:
 		legacy.inventory.append({"uid":"initial:" + member,"kind":content.map.initial_weapons[i],"affix":""})
 		legacy.equipment[member] = "initial:" + member
 	check(game.valid_state(legacy), "Legacy accepted before restore by SaveStore validator")
-	check(game.restore(legacy) and game.data.members == legacy.members, "Migration preserves legacy three members")
+	check(game.restore(legacy) and game.data.members == ["lin_jianyue", "xia_zhiyao", "su_wanxing"], "Migration maps legacy members into the production roster")
 	check(game.data.inventory.map(func(v): return v.uid) == legacy.inventory.map(func(v): return v.uid) and game.data.specialization == "", "Migration preserves equipment without gifting a specialization")
 	var store = Store.new("user://test-runs/new-run-migration.json")
 	check(store.write(legacy, game.valid_state).is_empty(), "Legacy fixture saved")

@@ -4,15 +4,36 @@
 
 清理清单与验证结果见[生产收尾报告](../docs/SURVIVOR_PRODUCTION_FINALIZATION_REPORT.md)。
 
-Xia / Su 165cm 正式 Runtime、23 骨 `BH_Humanoid_Rig_v1`、canonical T-Pose Bind、Shared Skin Contract、Public Idle / Walking / Running、Expedition Walkable Ground Contract 均已通过验收并冻结。Expedition 基础速度为 **2.8m/s**。不生成 V2/V3 或角色专属 Locomotion。
+SUR_001～SUR_012 的 165cm 正式 Runtime、23 骨 `BH_Humanoid_Rig_v1`、canonical T-Pose Bind、Shared Skin Contract、Public Idle / Walking / Running、Expedition Walkable Ground Contract 均已通过验收。Expedition 基础速度为 **2.8m/s**。不生成 V2/V3 或角色专属 Locomotion。
 
 未来 12 人统一流程：**Static GLB → 165cm Runtime Envelope → canonical T-Pose Alignment → BH_Humanoid_Rig_v1 → Skin QA → Public Locomotion → Gameplay**。角色资料身高不缩放 Runtime Rig；LOD0 目标约 100k tris。统一 Bone Length / Axis / Rest / Foot Ground / Socket，外观差异由 Mesh 和 Skin 承担。未来角色直接共享公共三动作，不制作独立 Idle / Walking / Running，不运行角色专属 Retarget。
 
-正式入口：`assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb`、`assets/characters/su_wanxing/runtime/su_wanxing.glb`。公共库：`assets/animations/public_locomotion/public_locomotion.tres`，引用同目录 `public_idle.tres`、`public_walking.tres`、`public_running.tres`。冻结哈希记录在 `tests/fixtures/survivor_production_baseline.json`。
+正式角色入口统一为 `assets/characters/<character_id>/runtime/<character_id>.glb`。公共库：`assets/animations/public_locomotion/public_locomotion.tres`，引用同目录 `public_idle.tres`、`public_walking.tres`、`public_running.tres`。冻结基线哈希记录在 `tests/fixtures/survivor_production_baseline.json`。
 
 当前 Skin / T-Pose / Canonical 转换与生产 QA 工具保留。`export_locomotion_retarget.gd` 仍被公共转换的 `canonical_locomotion/prepare.py` 调用，属于保留工具链，不是旧角色 Runtime。两份旧 source GLB 因先前工具策略阻止删除而列为待清理，已排除导出且无正式引用；本轮不绕过策略重试。
 
 旧 Mission Jog、Start/Stop 资源及旧局部摆臂层已退出生产并清理，对应历史章节只保留开发记录，不再描述当前 Runtime。三人长途返回/让行停滞、旧 Camp HUD 断言作为独立已知问题保留，不计本轮失败；不开展 Combat/Armed、Turn/Start/Stop 或其余角色制作。
+
+## Unified Survivor Runtime roster
+
+SUR_001～SUR_012 均使用 1.65m Runtime Envelope、冻结的 23 骨 `BH_Humanoid_Rig_v1`、1 Skin 与同一套公共 Locomotion。SUR_003～SUR_012 源模型均为单 Mesh、单材质、三张 2048² 贴图的静态 A-Pose；生产导出无 embedded animation、无无权重顶点，最多 4 骨影响。完整 QA 见[批次接入报告](../docs/REMAINING_10_SURVIVOR_RUNTIME_INTEGRATION_REPORT.md)。
+
+| Survivor | 正式 Runtime GLB | LOD0 tris | Definition | 状态 |
+| --- | --- | ---: | --- | --- |
+| SUR_001 夏知遥 | [xia_zhiyao.glb](../assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb) | 101,982 | [xia_zhiyao.tres](../data/survivors/xia_zhiyao.tres) | Production |
+| SUR_002 苏晚星 | [su_wanxing.glb](../assets/characters/su_wanxing/runtime/su_wanxing.glb) | 102,500 | [su_wanxing.tres](../data/survivors/su_wanxing.tres) | Production |
+| SUR_003 林见月 | [lin_jianyue.glb](../assets/characters/lin_jianyue/runtime/lin_jianyue.glb) | 102,128 | [lin_jianyue.tres](../data/survivors/lin_jianyue.tres) | Production |
+| SUR_004 陆清禾 | [lu_qinghe.glb](../assets/characters/lu_qinghe/runtime/lu_qinghe.glb) | 102,574 | [lu_qinghe.tres](../data/survivors/lu_qinghe.tres) | Production |
+| SUR_005 沈砚川 | [shen_yanchuan.glb](../assets/characters/shen_yanchuan/runtime/shen_yanchuan.glb) | 102,444 | [shen_yanchuan.tres](../data/survivors/shen_yanchuan.tres) | Production |
+| SUR_006 唐栀 | [tang_zhi.glb](../assets/characters/tang_zhi/runtime/tang_zhi.glb) | 101,562 | [tang_zhi.tres](../data/survivors/tang_zhi.tres) | Production |
+| SUR_007 顾予安 | [gu_yuan.glb](../assets/characters/gu_yuan/runtime/gu_yuan.glb) | 102,366 | [gu_yuan.tres](../data/survivors/gu_yuan.tres) | Production |
+| SUR_008 程茉 | [cheng_mo.glb](../assets/characters/cheng_mo/runtime/cheng_mo.glb) | 100,369 | [cheng_mo.tres](../data/survivors/cheng_mo.tres) | Production |
+| SUR_009 周野 | [zhou_ye.glb](../assets/characters/zhou_ye/runtime/zhou_ye.glb) | 102,974 | [zhou_ye.tres](../data/survivors/zhou_ye.tres) | Production |
+| SUR_010 许昭宁 | [xu_zhaoning.glb](../assets/characters/xu_zhaoning/runtime/xu_zhaoning.glb) | 95,814 | [xu_zhaoning.tres](../data/survivors/xu_zhaoning.tres) | Production |
+| SUR_011 贺临川 | [he_linchuan.glb](../assets/characters/he_linchuan/runtime/he_linchuan.glb) | 102,750 | [he_linchuan.tres](../data/survivors/he_linchuan.tres) | Production |
+| SUR_012 宋时雨 | [song_shiyu.glb](../assets/characters/song_shiyu/runtime/song_shiyu.glb) | 96,464 | [song_shiyu.tres](../data/survivors/song_shiyu.tres) | Production |
+
+公共动作唯一入口为 [public_locomotion.tres](../assets/animations/public_locomotion/public_locomotion.tres)。角色目录不得增加 Idle / Walking / Running 副本。SUR_003～SUR_012 的 Trait 资源当前仅承载数据，Runtime 效果未实现。
 
 
 ## Standard Survivor Template 静态基线

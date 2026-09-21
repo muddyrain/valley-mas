@@ -50,7 +50,7 @@ func create_app(seed_value: int) -> Node:
 	app.save_path = "user://test-runs/expedition-navigation-%d-%d.json" % [seed_value, OS.get_process_id()]
 	root.add_child(app)
 	await process_frame
-	app.campaign.new_run(seed_value, "combat", ["xia_zhiyao", "su_wanxing", "lin"])
+	app.campaign.new_run(seed_value, "combat", ["xia_zhiyao", "su_wanxing", "lin_jianyue"])
 	app.random_mission_counter = 0
 	app.start_mission()
 	return app

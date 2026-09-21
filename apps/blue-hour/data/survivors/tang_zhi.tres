@@ -1,0 +1,21 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://data/traits/set_the_pace.tres" id="2_trait"]
+
+[resource]
+script = ExtResource("1")
+id = "tang_zhi"
+display_name = "唐栀"
+profession_id = "sports_club_organizer"
+profession_name = "运动社团成员 / 校园活动组织者"
+description = "唐栀很难安静超过五分钟，也是队伍里最容易和陌生人熟起来的一个。她习惯一边喊一边跑，但周围的人往往真的会被她带得更快。"
+role_tags = ["团队机动"]
+trait_id = "set_the_pace"
+model_path = "res://assets/characters/tang_zhi/runtime/tang_zhi.glb"
+max_hp = 100.0
+move_speed = 2.8
+color = Color(0.94, 0.69, 0.22, 1)
+survivor_id = "SUR_006"
+trait_definition = ExtResource("2_trait")
+recommended_weapon_tags = Array[String](["smg", "shotgun"])

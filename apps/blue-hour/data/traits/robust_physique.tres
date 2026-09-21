@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/trait_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "robust_physique"
+display_name = "强健体魄"
+description = "提高最大生命值。"
+trait_type = 1
+modifier_hook = "max_hp"
+params = {}
+levels = PackedFloat32Array(0.12, 0.15, 0.18, 0.21, 0.25)

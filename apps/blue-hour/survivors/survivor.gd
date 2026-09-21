@@ -7,6 +7,8 @@ var combat := Combat.new()
 var weapon_visual: WeaponVisualController
 const Modifiers = preload("res://core/effect_modifiers.gd")
 const AnimationController = preload("res://survivors/survivor_animation_controller.gd")
+const CombatVFX = preload("res://weapons/combat/vfx/combat_vfx_resolver.gd")
+const TraitRuntime = preload("res://core/trait_runtime.gd")
 const ACCELERATION: float = 10.0
 const DECELERATION: float = 14.0
 const TURN_SPEED: float = 10.4719755 # 600 degrees/second.
@@ -15,7 +17,11 @@ var effects: RefCounted = Modifiers.new()
 var data: Resource
 var talent: Resource
 var weapon: Resource
+var weapon_instance: RefCounted
+var weapon_uid: String = ""
+var combat_vfx: CombatVFX
 var hp: float = 100.0
+var _base_max_hp: float = 100.0
 var path := PackedVector3Array()
 var current_speed: float = 0.0
 var actual_velocity := Vector3.ZERO
@@ -49,10 +55,15 @@ var duty_ring: MeshInstance3D
 var name_label: Label3D
 var animation_controller: Node3D
 var selection_ring: MeshInstance3D
+var nav_target_set_count: int = 0
+var nav_path_request_count: int = 0
+var nav_path_changed_count: int = 0
+var nav_path_reuse_count: int = 0
 
-func setup(spec: Resource, trait_data: Resource, equipment: Resource) -> void:
+func setup(spec: Resource, trait_data: Resource, equipment: Resource, equipment_instance: RefCounted = null) -> void:
 	data = spec
-	talent = trait_data
+	_base_max_hp = data.max_hp
+	apply_trait(trait_data, false)
 	hp = data.max_hp
 
 	# 尝试加载 GLB 模型,回退到程序化几何体
@@ -80,11 +91,22 @@ func setup(spec: Resource, trait_data: Resource, equipment: Resource) -> void:
 	duty_label = Visuals.label(self, "", Vector3(0, 3.3, 0), Color("#ffcf8a"), 19)
 	duty_ring = Visuals.ring(self, Vector3(0, 0.12, 0), 0.85, Color("#ffcf8a"))
 	duty_ring.visible = false
-	equip(equipment)
+	equip(equipment, equipment_instance)
+	combat_vfx = CombatVFX.new()
+	combat_vfx.name = "CombatVFXResolver"
+	add_child(combat_vfx)
 
-func equip(equipment: Resource) -> void:
+func apply_trait(trait_data: Resource, preserve_hp_ratio: bool = true) -> void:
+	var ratio: float = hp / data.max_hp if preserve_hp_ratio and data != null and data.max_hp > 0.0 else 1.0
+	talent = trait_data
+	data.max_hp = TraitRuntime.max_hp(_base_max_hp, talent)
+	hp = clampf(data.max_hp * ratio, 0.0, data.max_hp)
+
+func equip(equipment: Resource, instance: RefCounted = null, uid: String = "") -> void:
 	weapon = equipment
-	combat.equip(equipment)
+	weapon_instance = instance
+	weapon_uid = uid if not uid.is_empty() else str(instance.instance_id) if instance != null else ""
+	combat.equip(equipment, instance, weapon_uid)
 	if weapon_visual == null:
 		weapon_visual = WeaponVisual.new()
 		add_child(weapon_visual)
@@ -93,15 +115,24 @@ func equip(equipment: Resource) -> void:
 			animation_controller.bind_weapon(weapon_visual, combat)
 	weapon_visual.set_weapon(equipment)
 
-func order_move(point: Vector3, city: Node3D) -> void:
+func order_move(point: Vector3, city: Node3D, prepared_path: PackedVector3Array = PackedVector3Array()) -> void:
 	if dead or boarding:
 		return
+	nav_target_set_count += 1
 	_bind_ground(city)
 	# Held commands repeat every .08 s. Do not restart a route to the same cell.
 	if not _braking and not path.is_empty() and path[-1].is_equal_approx(point):
 		return
 	_braking = false
-	path = city.path(position, point)
+	var previous_path: PackedVector3Array = path
+	if prepared_path.is_empty():
+		nav_path_request_count += 1
+		path = city.path(position, point)
+	else:
+		nav_path_reuse_count += 1
+		path = prepared_path.duplicate()
+	if path != previous_path:
+		nav_path_changed_count += 1
 	# AStar includes the rounded start cell, which may now be behind the actor.
 	# Keep it when the next segment is obstructed; never shortcut a building.
 	if path.size() > 1 and position.distance_to(path[0]) < .75 and city.line_clear(position, path[1]):
@@ -122,6 +153,8 @@ func request_stop() -> void:
 
 func enable_motion_presentation(mission: Node3D) -> void:
 	_motion_mission = mission
+	if combat_vfx != null:
+		combat_vfx.setup(self, weapon_visual, combat, mission)
 	_bind_ground(mission.city)
 	if animation_controller != null:
 		animation_controller.use_render_clock(self, mission)
@@ -244,10 +277,13 @@ func _process(_delta: float) -> void:
 	rig.position.z = offset.z
 	rig.rotation.y = lerp_angle(_previous_yaw, _current_yaw, fraction)
 
-func take_damage(amount: float, invincible: bool = false) -> void:
+func take_damage(amount: float, invincible: bool = false, damage_tags: Array[String] = []) -> void:
 	if dead or invincible or boarding or inside_building:
 		return
-	hp = maxf(0, hp - effects.incoming_damage(amount * talent.incoming_damage_multiplier))
+	var aura_multiplier: float = 1.0
+	if _motion_mission != null and _motion_mission.has_method("incoming_damage_multiplier"):
+		aura_multiplier = float(_motion_mission.incoming_damage_multiplier(self, damage_tags))
+	hp = maxf(0, hp - effects.incoming_damage(amount * talent.incoming_damage_multiplier * aura_multiplier))
 	damaged.emit()
 	if hp <= 0:
 		dead = true

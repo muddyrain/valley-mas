@@ -12,6 +12,13 @@ enum EventType {
 
 const MAX_LEVEL: int = 5
 const XP_REQUIREMENTS: Array[int] = [2, 3, 5, 8]
+const XP_EVENT_VALUES: Dictionary = {
+	EventType.SEARCH_COMPLETE: 1,
+	EventType.KILL_ENEMY: 1,
+	EventType.MISSION_COMPLETE: 5,
+	EventType.EXTRACTION_SUCCESS: 3,
+	EventType.SPECIAL_EVENT: 1,
+}
 
 var survivor_id: String = ""
 var current_level: int = 1
@@ -54,11 +61,11 @@ func add_xp(amount: int) -> int:
 	_normalize()
 	return gained
 
-func record_event(event_type: EventType, amount: int = 1) -> int:
+func record_event(event_type: EventType, amount: int = 0) -> int:
 	return add_xp(amount if amount > 0 else default_event_xp(event_type))
 
-static func default_event_xp(_event_type: EventType) -> int:
-	return 1
+static func default_event_xp(event_type: EventType) -> int:
+	return int(XP_EVENT_VALUES.get(event_type, 0))
 
 func get_level() -> int:
 	return current_level

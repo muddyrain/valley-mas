@@ -8,14 +8,6 @@ const Bus = preload("res://scenes/world/vehicles/veh_blue_hour.tscn")
 static func instantiate_building(site: Dictionary) -> Node3D:
 	var definition: Resource = Assets.asset(site.asset)
 	var wrapper: Node3D = definition.scene.instantiate()
-	# Expansion wrappers face +Z except BLD_010, already corrected to -Z in its scene.
-	# Correct only the town instance; applying this twice reverses BLD_010's entrance.
-	var number := int(definition.building_id.trim_prefix("BLD_"))
-	if number >= 9 and number <= 22 and number != 10:
-		var model: Node3D = wrapper.get_node("ModelRoot")
-		wrapper.set_meta("audited_facade_local", model.basis.inverse() * Vector3.BACK)
-		model.transform = Transform3D(Basis(Vector3.UP, PI), Vector3.ZERO) * model.transform
-		wrapper.set_meta("source_front_correction", PI)
 	wrapper.name = site.id
 	wrapper.rotation.y = site.yaw
 	wrapper.position = site.road_anchor - wrapper.basis * wrapper.get_node("Anchors/RoadAnchor").position

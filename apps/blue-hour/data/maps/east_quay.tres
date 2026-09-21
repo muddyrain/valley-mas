@@ -10,7 +10,7 @@ base_seed = 20260912
 half_width = 80
 half_depth = 60
 bus_position = Vector3(-11, 0, 46)
-initial_weapons = Array[String](["WPN_002_P9_PISTOL", "WPN_004_K9_SMG", "WPN_001_SURVIVAL_KNIFE", "WPN_002_P9_PISTOL", "WPN_002_P9_PISTOL"])
+initial_weapons = Array[String](["WPN_002_P9_PISTOL", "WPN_004_K9_SMG", "WPN_005_S12_SHOTGUN", "WPN_002_P9_PISTOL", "WPN_006_A21_ASSAULT_RIFLE", "WPN_004_K9_SMG", "WPN_007_H7_HUNTER_RIFLE", "WPN_006_A21_ASSAULT_RIFLE", "WPN_005_S12_SHOTGUN", "WPN_002_P9_PISTOL", "WPN_006_A21_ASSAULT_RIFLE", "WPN_002_P9_PISTOL"])
 road_segments = Array[Dictionary]([
 {"start": Vector2i(-72, -32), "end": Vector2i(72, -32)},
 {"start": Vector2i(-72, 0), "end": Vector2i(72, 0)},

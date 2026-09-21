@@ -14,6 +14,9 @@ extends Resource
 @export var entrance_offset: Vector3 = Vector3.ZERO
 @export var road_offset: Vector3 = Vector3.ZERO
 @export var search_offset: Vector3 = Vector3.ZERO
+@export var primary_entrance_local_anchor: Vector3 = Vector3.ZERO
+@export var primary_entrance_local_forward: Vector3 = Vector3.FORWARD
+@export var search_interaction_local_anchor: Vector3 = Vector3.ZERO
 
 
 @export var building_id: String = ""
@@ -22,5 +25,6 @@ extends Resource
 @export var searchable: bool = true
 @export var loot_tags: PackedStringArray = []
 @export var mission_tags: PackedStringArray = []
+@export var interaction_tags: PackedStringArray = []
 ## Placement hints only; registration does not opt an asset into a generator.
 @export var environment_tags: PackedStringArray = []

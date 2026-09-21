@@ -16,6 +16,8 @@ var _elapsed: float = 0.0
 var _fog: ShaderMaterial
 var fog_mesh: MeshInstance3D
 var _world_size: Vector2
+var full_rebuild_count: int = 0
+var dynamic_update_count: int = 0
 
 func setup(target: Node3D) -> void:
 	mission = target
@@ -25,6 +27,7 @@ func setup(target: Node3D) -> void:
 	refresh()
 
 func _build_gpu_mask() -> void:
+	full_rebuild_count += 1
 	var empty := ImageTexture.create_from_image(Image.create(1, 1, false, Image.FORMAT_RGBA8))
 	for index: int in range(2):
 		var viewport := SubViewport.new()
@@ -61,12 +64,15 @@ func _build_gpu_mask() -> void:
 	fog_mesh.position.z = -1
 
 func advance(delta: float) -> void:
+	if not bool(get_meta("p02_dynamic_enabled", true)):
+		return
 	_elapsed += delta
 	if _elapsed >= 1.0 / config.update_rate:
 		_elapsed = fmod(_elapsed, 1.0 / config.update_rate)
 		refresh()
 
 func refresh() -> void:
+	dynamic_update_count += 1
 	sources.clear()
 	for member: Node3D in mission.living():
 		if member.inside_building or member.boarding:

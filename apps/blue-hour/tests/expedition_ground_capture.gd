@@ -140,7 +140,7 @@ func run() -> void:
 	await _screenshot("poi-arrival")
 	for id: String in mission.search_registry.building_searchables:
 		var site: Dictionary = mission.city.sites[id]
-		if site.spec.search_status == "AVAILABLE":
+		if site.spec.search_status == "RESOLVED_REACHABLE":
 			check(absf(site.spec.entry.y - mission.city.get_walkable_ground_height(Vector2(site.spec.entry.x, site.spec.entry.z))) < .0001, "Search entry ground " + id)
 	check(worst_actor_error < .0001, "Actor follows surface on every recorded frame")
 	check(worst_marker_error < .0001, "Selection ring follows same ground contract")

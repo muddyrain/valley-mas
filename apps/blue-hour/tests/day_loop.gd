@@ -25,7 +25,7 @@ func _initialize() -> void:
 	var Store = load("res://core/save_store.gd")
 	var catalog = Catalog.new()
 	var game = Campaign.new(catalog)
-	game.new_run(772, "", ["lin", "qiao", "yan"])
+	game.new_run(772, "", ["lin_jianyue", "lu_qinghe", "shen_yanchuan"])
 	check(game.data.members.size() == 3 and game.data.food == 6, "Three members and two days of initial food")
 	check(game.start_action() and not game.start_action(), "Duplicate departure rejected")
 	var members: Array = game.data.members.duplicate()
@@ -61,7 +61,7 @@ func _initialize() -> void:
 	game.stage_result(outcome(game, [fed], 1))
 	game.commit_day()
 	check(game.data.status == "won" and game.data.day == 5 and not game.start_action(), "Day five ends after settlement with one survivor")
-	game.new_run(773, "", ["lin", "qiao", "yan"])
+	game.new_run(773, "", ["lin_jianyue", "lu_qinghe", "shen_yanchuan"])
 	check(game.data.members.size() == 3 and game.data.history.is_empty() and game.data.scrap == 0, "New run resets state, restores character availability")
 	var original = game.data.duplicate(true)
 	game.data.scrap = 100
@@ -80,7 +80,7 @@ func _initialize() -> void:
 	check(catalog.by_id(catalog.weapons, first.kind).magazine == game.weapon(first.uid).magazine, "Shared template remains unchanged")
 	game.equip(game.data.members[0], second.uid)
 	check(game.data.equipment[game.data.members[1]] == "" and game.weapon_inventory.has_weapon(first.uid), "Transferred instance has one holder; old weapon stays in stock")
-	game.new_run(773, "", ["lin", "qiao", "yan"])
+	game.new_run(773, "", ["lin_jianyue", "lu_qinghe", "shen_yanchuan"])
 	check(game.data.day_rewards == original.day_rewards and game.data.shop == original.shop, "Seed fixes daily rewards and shop")
 	var loot: Dictionary = game.data.day_rewards.values()[0]
 	game.start_action()
@@ -90,7 +90,7 @@ func _initialize() -> void:
 	var restored = Campaign.new(catalog)
 	check(restored.restore(pending) and restored.data.status == "pending", "Pending ration/result screen resumes")
 	check(restored.commit_day() and restored.data == game.data, "Pending restore commits same outcome")
-	game.new_run(99, "", ["lin", "qiao", "yan"])
+	game.new_run(99, "", ["lin_jianyue", "lu_qinghe", "shen_yanchuan"])
 	game.start_action()
 	var rewards = game.data.day_rewards.duplicate(true)
 	check(restored.restore(game.data) and restored.data.status == "shelter" and restored.data.day_rewards == rewards, "Mid-action restart returns to departure without reward reroll")
@@ -118,14 +118,14 @@ func _initialize() -> void:
 	var impossible = Store.new("user://test-runs/day-loop/run.json/blocked.json")
 	var safe_before: Dictionary = store.read(restored.valid_state).data
 	check(not impossible.write(game.data).is_empty() and store.read(restored.valid_state).data == safe_before, "I/O failure cannot overwrite existing valid record")
-	game.new_run(801, "", ["lin", "qiao", "yan"])
+	game.new_run(801, "", ["lin_jianyue", "lu_qinghe", "shen_yanchuan"])
 	game.data.food = 0
 	for i in range(2):
 		game.start_action()
 		game.stage_result(outcome(game, game.data.members))
 		game.commit_day([])
 	check(game.data.status == "lost" and game.data.history.back().starved_ids.size() == 3, "Consecutive zero rations can end the run")
-	game.new_run(802, "", ["lin", "qiao", "yan"])
+	game.new_run(802, "", ["lin_jianyue", "lu_qinghe", "shen_yanchuan"])
 	game.data.food = 2
 	game.data.hunger = 1
 	game.start_action()

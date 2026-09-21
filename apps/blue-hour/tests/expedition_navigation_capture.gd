@@ -73,7 +73,7 @@ func run() -> void:
 	await shot("08_three_survivor_formation")
 	for key: String in closest:
 		check(closest[key] < 15.0, "Native route shows proximity to " + key)
-	FileAccess.open(OUT.path_join("capture-manifest.json"), FileAccess.WRITE).store_string(JSON.stringify({"seed": 4101, "provider": mission.map_provider, "runtime": "survivors/survivor.gd", "models": ["xia_zhiyao", "su_wanxing", "lin"], "frames": frame_index, "fps": 30, "seconds": total, "captures": captures, "closest_obstacles": closest, "checks": checks, "failures": failures, "human_runtime_qa": "PENDING"}, "\t"))
+	FileAccess.open(OUT.path_join("capture-manifest.json"), FileAccess.WRITE).store_string(JSON.stringify({"seed": 4101, "provider": mission.map_provider, "runtime": "survivors/survivor.gd", "models": ["xia_zhiyao", "su_wanxing", "lin_jianyue"], "frames": frame_index, "fps": 30, "seconds": total, "captures": captures, "closest_obstacles": closest, "checks": checks, "failures": failures, "human_runtime_qa": "PENDING"}, "\t"))
 	app.queue_free()
 	await process_frame
 	print("E01 NATIVE: %d checks, %d failures, %d frames" % [checks, failures.size(), frame_index])

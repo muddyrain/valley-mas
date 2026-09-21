@@ -1,5 +1,16 @@
 extends Control
 signal main_menu_requested
+const WARNING_EDGE_SHADER := """
+shader_type canvas_item;
+uniform vec4 tint : source_color = vec4(0.30, 0.48, 0.66, 1.0);
+uniform float strength = 0.0;
+void fragment() {
+    vec2 uv = UV;
+    float edge = max(max(0.13 - uv.x, 0.13 - uv.y), max(0.13 - (1.0 - uv.x), 0.13 - (1.0 - uv.y)));
+    float mask = smoothstep(0.0, 0.13, edge);
+    COLOR = vec4(tint.rgb, tint.a * strength * mask);
+}
+"""
 const UI = preload("res://ui/ui_style.gd")
 const Style = preload("res://ui/expedition_theme.gd")
 const Art = preload("res://ui/new_run_art.gd")
@@ -73,6 +84,11 @@ var squad_column: VBoxContainer
 var selected_member: Node3D
 var minimap: Control
 var roster_ids: Array[int] = []
+var warning_overlay: ColorRect
+var warning_overlay_material: ShaderMaterial
+var phase_banner: Label
+var phase_banner_tween: Tween
+var warning_overlay_tween: Tween
 
 func _exit_tree() -> void:
 	if is_instance_valid(ui_viewport) and ui_viewport.size_changed.is_connected(_fit_window):
@@ -87,6 +103,7 @@ func setup(target: Node3D, preferences: RefCounted = null) -> void:
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_DISABLED
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	theme = Style.theme()
+	_build_phase_feedback()
 	_build_top()
 	_build_squad()
 	_build_sites()
@@ -120,6 +137,12 @@ func setup(target: Node3D, preferences: RefCounted = null) -> void:
 	mission.notice.connect(show_notice)
 	mission.search_completed.connect(_show_search_result)
 	mission.search_loot_collected.connect(func(id: String, worker_name: String, loot: Dictionary) -> void: _show_search_result(id, worker_name, loot, true))
+	mission.watch_warning_changed.connect(_on_watch_warning_changed)
+	mission.clock.warning_changed.connect(_on_clock_warning)
+	mission.clock.phase_changed.connect(_on_phase_changed)
+	_set_phase_overlay(mission.clock.phase, false)
+	if mission.clock.warning_active:
+		_on_clock_warning(true)
 	refresh()
 
 func _fit_window() -> void:
@@ -393,7 +416,7 @@ func _build_sites() -> void:
 	for id: String in mission.city.sites:
 		var entry := PoiEntry.new()
 		site_list.add_child(entry)
-		entry.setup(mission.city.sites[id], func(): mission.command_search(id); refresh())
+		entry.setup(mission.city.sites[id], func(): mission.command_search(id, selected_member); refresh())
 		entry.mouse_entered.connect(func(): poi_context.focused_id = id)
 		entry.mouse_exited.connect(func(): if poi_context.focused_id == id: poi_context.focused_id = "")
 		entry.focus_entered.connect(func(): poi_context.focused_id = id)
@@ -485,7 +508,7 @@ func _build_commands() -> void:
 		ability.shortcut = Shortcut.new()
 		ability.shortcut.events = [key_event]
 		ability.shortcut_in_tooltip = false
-		ability.tooltip_text = str(power_index) + " · " + definition.description() + " · 每日一次"
+		ability.tooltip_text = "%d · %s · 冷却 %.0f 秒" % [power_index, definition.description(), definition.cooldown_duration()]
 		power_buttons[id] = ability
 	extract_button = ActionIcon.new()
 	extract_button.name = "ReturnHome"
@@ -509,6 +532,35 @@ func _build_commands() -> void:
 	toast.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	toast_panel.add_child(toast)
 	toast_panel.hide()
+
+func _build_phase_feedback() -> void:
+	warning_overlay = ColorRect.new()
+	warning_overlay.name = "ColdWarningEdge"
+	warning_overlay.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	warning_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	warning_overlay.z_index = -10
+	var shader := Shader.new()
+	shader.code = WARNING_EDGE_SHADER
+	warning_overlay_material = ShaderMaterial.new()
+	warning_overlay_material.shader = shader
+	warning_overlay_material.set_shader_parameter("tint", Color("#527a9f"))
+	warning_overlay_material.set_shader_parameter("strength", 0.0)
+	warning_overlay.material = warning_overlay_material
+	add_child(warning_overlay)
+	phase_banner = UI.label("", 18, Style.CYAN)
+	phase_banner.name = "PhaseBanner"
+	phase_banner.set_anchors_and_offsets_preset(PRESET_CENTER_TOP)
+	phase_banner.offset_left = -230
+	phase_banner.offset_right = 230
+	phase_banner.offset_top = 94
+	phase_banner.offset_bottom = 126
+	phase_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	phase_banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	phase_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	phase_banner.z_index = 10
+	phase_banner.modulate.a = 0.0
+	phase_banner.hide()
+	add_child(phase_banner)
 
 func _process(delta: float) -> void:
 	toast_left -= delta
@@ -547,7 +599,8 @@ func refresh() -> void:
 		_fit_window()
 	for id: String in power_buttons:
 		var state = mission.powers.states[id]
-		power_buttons[id].set_state(mission.input_enabled and mission.powers.can_activate(id), state.active, str(ceili(state.remaining_duration)) + "s" if state.active else "已用" if state.used_today else "")
+		var timing: float = state.remaining_duration if state.active else state.remaining_cooldown
+		power_buttons[id].set_state(mission.input_enabled and mission.powers.can_activate(id), state.active, str(ceili(timing)) + "s" if timing > 0.0 else "")
 	var available: bool = mission.input_enabled and mission.active and mission.closing_left < 0
 	command_buttons["停止"].set_state(available and not mission.guards().is_empty(), mission.order.begins_with("停止"))
 	command_buttons["集火"].set_state(available and not mission.guards().is_empty(), is_instance_valid(mission.focus_target))
@@ -653,8 +706,16 @@ func show_notice(text: String) -> void:
 		return
 	toast.text = text
 	toast_left = 4.0
+	_animate_toast()
 
 func _show_search_result(id: String, worker_name: String, loot: Dictionary, collected: bool = false) -> void:
+	if not mission.city.sites.has(id):
+		return
+	var site: Dictionary = mission.city.sites[id]
+	if not collected and is_instance_valid(mission.world_interaction_vfx):
+		mission.world_interaction_vfx.play_search_complete(site.spec.entry)
+	if collected and is_instance_valid(mission.world_interaction_vfx):
+		mission.world_interaction_vfx.play_loot_feedback(site.spec.entry, loot)
 	var rewards: PackedStringArray = []
 	if int(loot.food) > 0:
 		rewards.append("食物 +%d" % int(loot.food))
@@ -670,6 +731,7 @@ func _show_search_result(id: String, worker_name: String, loot: Dictionary, coll
 			if index == 0:
 				toast.text = text
 				toast_left = 4.0
+				_animate_toast()
 			return
 	search_notices.append({"id": id, "text": text})
 	if search_notices.size() == 1:
@@ -677,6 +739,73 @@ func _show_search_result(id: String, worker_name: String, loot: Dictionary, coll
 		toast_left = 4.0
 		toast.show()
 		toast_panel.show()
+		_animate_toast()
+
+func _animate_toast() -> void:
+	if not is_instance_valid(toast_panel):
+		return
+	toast_panel.modulate.a = 0.0
+	toast_panel.scale = Vector2(.96, .96)
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(toast_panel, "modulate:a", 1.0, .12)
+	tween.tween_property(toast_panel, "scale", Vector2.ONE, .18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _on_watch_warning_changed(active: bool) -> void:
+	if not active and mission.clock.phase != mission.clock.DAY:
+		return
+	_set_warning_overlay(active, Color("#527a9f"), .11)
+
+func _on_clock_warning(active: bool) -> void:
+	if mission.clock.phase != mission.clock.DAY:
+		return
+	_set_warning_overlay(active, Color("#6e7f9e"), .14)
+	if active:
+		_show_phase_banner("蓝时将至 · 留意归航路线", Style.GOLD)
+
+func _on_phase_changed(phase: int) -> void:
+	_set_phase_overlay(phase, false)
+	if phase == mission.clock.BLUE_HOUR:
+		_show_phase_banner("蓝时开始 · 立即返航", Style.CYAN)
+	elif phase == mission.clock.NIGHT:
+		_show_phase_banner("夜幕降临 · 危险升级", Color("#e8a8a3"))
+
+func _set_phase_overlay(phase: int, announce: bool) -> void:
+	if phase == mission.clock.DAY:
+		_set_warning_overlay(false, Color("#527a9f"), 0.0)
+		return
+	var tint: Color = Color("#527a9f") if phase == mission.clock.BLUE_HOUR else Color("#3e5277")
+	var strength: float = .07 if phase == mission.clock.BLUE_HOUR else .12
+	_set_warning_overlay(true, tint, strength)
+	if announce:
+		_show_phase_banner("蓝时开始 · 立即返航" if phase == mission.clock.BLUE_HOUR else "夜幕降临 · 危险升级", Style.CYAN if phase == mission.clock.BLUE_HOUR else Color("#e8a8a3"))
+
+func _set_warning_overlay(active: bool, tint: Color, strength: float) -> void:
+	if warning_overlay_material == null:
+		return
+	if warning_overlay_tween != null:
+		warning_overlay_tween.kill()
+	warning_overlay.visible = true
+	warning_overlay_material.set_shader_parameter("tint", tint)
+	var target: float = strength if active else 0.0
+	warning_overlay_tween = create_tween()
+	warning_overlay_tween.tween_method(func(value: float): warning_overlay_material.set_shader_parameter("strength", value), float(warning_overlay_material.get_shader_parameter("strength")), target, .28)
+	if not active:
+		warning_overlay_tween.tween_callback(warning_overlay.hide)
+
+func _show_phase_banner(text_value: String, color: Color) -> void:
+	if phase_banner_tween != null:
+		phase_banner_tween.kill()
+	phase_banner.text = text_value
+	phase_banner.add_theme_color_override("font_color", color)
+	phase_banner.scale = Vector2(.92, .92)
+	phase_banner.modulate.a = 0.0
+	phase_banner.show()
+	phase_banner_tween = create_tween().set_parallel(true)
+	phase_banner_tween.tween_property(phase_banner, "modulate:a", 1.0, .14)
+	phase_banner_tween.tween_property(phase_banner, "scale", Vector2.ONE, .20).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	phase_banner_tween.chain().tween_interval(1.45)
+	phase_banner_tween.chain().tween_property(phase_banner, "modulate:a", 0.0, .34)
+	phase_banner_tween.chain().tween_callback(phase_banner.hide)
 
 func toggle_pause() -> void:
 	if debug_menu.visible or pause_menu.visible or _settings_open():

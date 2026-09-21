@@ -18,3 +18,5 @@ normal_modifiers = {"move_speed": 1.5}
 upgraded_modifiers = {"move_speed": 1.5}
 duration = 10.0
 upgraded_duration = 15.0
+cooldown = 60.0
+upgraded_cooldown = 60.0
