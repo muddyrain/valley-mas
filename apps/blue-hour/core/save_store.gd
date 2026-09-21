@@ -60,7 +60,7 @@ func write(data: Dictionary, validator: Callable = Callable()) -> String:
 		migration_source = path + ".bak"
 	var old_version: int = int(previous.get("version", 0))
 	var migration_backup := ".v%d.bak" % old_version
-	if old_version in [1, 2, 3] and data.get("version", 0) > old_version and (not validator.is_valid() or validator.call(previous)) and not FileAccess.file_exists(path + migration_backup):
+	if old_version in [1, 2, 3, 4] and data.get("version", 0) > old_version and (not validator.is_valid() or validator.call(previous)) and not FileAccess.file_exists(path + migration_backup):
 		if DirAccess.copy_absolute(ProjectSettings.globalize_path(migration_source), absolute + migration_backup) != OK:
 			return "无法保留旧版存档，升级已取消"
 	if FileAccess.file_exists(path) and previous_valid:

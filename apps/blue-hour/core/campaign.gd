@@ -1,8 +1,15 @@
 extends RefCounted
+
+const LEGACY_SURVIVOR_TEMPLATES: Dictionary = {
+	"lin": "lin_jianyue",
+	"qiao": "xia_zhiyao",
+	"yan": "su_wanxing",
+}
 const Equipment = preload("res://core/equipment.gd")
 const Modifiers = preload("res://core/effect_modifiers.gd")
 const WeaponInventoryData = preload("res://weapons/weapon_inventory.gd")
 const WeaponInstanceData = preload("res://weapons/weapon_instance.gd")
+const SurvivorProgressionData = preload("res://data/survivor_progression.gd")
 var weapon_inventory: WeaponInventory
 var catalog: RefCounted
 var gear: RefCounted
@@ -14,7 +21,7 @@ func _init(content: RefCounted) -> void:
 	weapon_inventory = WeaponInventoryData.new(self)
 
 func new_run(seed_value: int = 0, specialization: String = "combat", fixture_templates: Array = []) -> void:
-	data = {"version": 4, "seed": seed_value if seed_value != 0 else int(Time.get_ticks_usec()) % 2147483647, "day": 1, "status": "shelter", "food": catalog.loop.initial_food, "scrap": 0, "hunger": 0, "members": [], "roster": {}, "inventory": [], "equipment": {}, "day_rewards": {}, "shop": [], "pending": {}, "history": [], "modified": false, "specialization": specialization, "passive_slots": [], "power_slots": [], "passive_items": {}, "power_items": {}, "passive_capacity": 1, "power_capacity": 1}
+	data = {"version": 5, "seed": seed_value if seed_value != 0 else int(Time.get_ticks_usec()) % 2147483647, "day": 1, "status": "shelter", "food": catalog.loop.initial_food, "scrap": 0, "hunger": 0, "members": [], "roster": {}, "inventory": [], "equipment": {}, "day_rewards": {}, "shop": [], "pending": {}, "history": [], "modified": false, "specialization": specialization, "passive_slots": [], "power_slots": [], "passive_items": {}, "power_items": {}, "passive_capacity": 1, "power_capacity": 1}
 	var choice: Resource = catalog.by_id(catalog.specializations, specialization)
 	if choice != null:
 		grant_effect("passive", choice.passive_id)
@@ -35,7 +42,7 @@ func new_run(seed_value: int = 0, specialization: String = "combat", fixture_tem
 		var id: String = template if not fixture_templates.is_empty() else "crew:%d" % i
 		var uid := "initial:" + id
 		data.members.append(id)
-		data.roster[id] = {"template": template, "level": 1}
+		data.roster[id] = {"template": template, "level": 1, "current_level": 1, "current_xp": 0, "total_xp": 0, "xp_to_next_level": SurvivorProgressionData.xp_required_for_level(1)}
 		weapon_inventory.add_weapon(WeaponInstanceData.from_dict({"uid": uid, "kind": catalog.start_rules.starting_weapons[template]}))
 		data.equipment[id] = uid
 	_prepare_day()
@@ -44,7 +51,22 @@ func member_template(id: String) -> Resource:
 	return catalog.by_id(catalog.survivors, str(data.roster.get(id, {}).get("template", id)))
 
 func member_level(id: String) -> int:
-	return int(data.roster.get(id, {}).get("level", 1))
+	return member_progression(id).get_level()
+
+func member_progression(id: String) -> SurvivorProgression:
+	return SurvivorProgressionData.from_state(id, data.roster.get(id, {}))
+
+func member_xp(id: String) -> int:
+	var progression: SurvivorProgression = member_progression(id)
+	return progression.current_xp
+
+func member_total_xp(id: String) -> int:
+	var progression: SurvivorProgression = member_progression(id)
+	return progression.total_xp
+
+func member_xp_to_next_level(id: String) -> int:
+	var progression: SurvivorProgression = member_progression(id)
+	return progression.xp_to_next_level
 
 func member_trait(id: String) -> Resource:
 	var template := member_template(id)
@@ -52,8 +74,48 @@ func member_trait(id: String) -> Resource:
 	return base.at_level(member_trait_level(id))
 
 func member_trait_level(id: String) -> int:
-	# Roster level is already persisted and upgraded by the formal progression system.
-	return clampi(member_level(id), 1, 5)
+	var progression: SurvivorProgression = member_progression(id)
+	return progression.get_trait_level()
+
+func add_xp(id: String, amount: int) -> int:
+	if not data.roster.has(id):
+		return 0
+	var progression: SurvivorProgression = member_progression(id)
+	var gained: int = progression.add_xp(amount)
+	while progression.apply_level_up():
+		pass
+	_write_progression(id, progression)
+	return gained
+
+func record_xp_event(id: String, event_type: SurvivorProgression.EventType, amount: int = 0) -> int:
+	var value: int = amount if amount > 0 else SurvivorProgressionData.default_event_xp(event_type)
+	return add_xp(id, value)
+
+func get_level(id: String) -> int:
+	return member_level(id)
+
+func get_trait_level(id: String) -> int:
+	return member_trait_level(id)
+
+func can_level_up(id: String) -> bool:
+	return member_progression(id).can_level_up()
+
+func apply_level_up(id: String) -> bool:
+	if not data.roster.has(id):
+		return false
+	var progression: SurvivorProgression = member_progression(id)
+	if not progression.apply_level_up():
+		return false
+	_write_progression(id, progression)
+	return true
+
+func _write_progression(id: String, progression: SurvivorProgression) -> void:
+	var member: Dictionary = data.roster[id]
+	member.level = progression.current_level
+	member.current_level = progression.current_level
+	member.current_xp = progression.current_xp
+	member.total_xp = progression.total_xp
+	member.xp_to_next_level = progression.xp_to_next_level
 
 func effect_definition(category: String, id: String) -> Resource:
 	if category not in ["passive", "power"] or not data.get(category + "_items", {}).has(id):
@@ -122,8 +184,14 @@ func train(id: String) -> bool:
 	if cost < 0 or data.food < cost:
 		return false
 	data.food -= cost
-	data.roster[id].level += 1
-	return true
+	var progression: SurvivorProgression = member_progression(id)
+	var required: int = progression.xp_to_next_level
+	if required <= 0:
+		data.food += cost
+		return false
+	progression.add_xp(required)
+	_write_progression(id, progression)
+	return apply_level_up(id)
 
 func _prepare_day() -> void:
 	data.selected_action = ""
@@ -326,6 +394,8 @@ func _nonnegative(value: Variant) -> bool:
 	return (value is int or value is float) and is_finite(float(value)) and value >= 0
 
 func valid_state(state: Dictionary) -> bool:
+	if _has_legacy_survivor_references(state):
+		return valid_state(_migrate_legacy_survivor_references(state))
 	if state.has("selected_party"):
 		if not state.selected_party is Array or not state.get("members") is Array or not _unique_subset(state.selected_party, state.members):
 			return false
@@ -339,7 +409,7 @@ func valid_state(state: Dictionary) -> bool:
 	if state.get("version") == 1:
 		return _valid_legacy(state)
 	# JSON numbers are floats; Array.has uses strict Variant types.
-	if (state.get("version") != 2 and state.get("version") != 3 and state.get("version") != 4) or not state.get("roster") is Dictionary:
+	if (state.get("version") != 2 and state.get("version") != 3 and state.get("version") != 4 and state.get("version") != 5) or not state.get("roster") is Dictionary:
 		return false
 	if not _nonnegative(state.get("initial_count")) or state.initial_count != state.roster.size() or state.roster.is_empty():
 		return false
@@ -359,6 +429,8 @@ func valid_state(state: Dictionary) -> bool:
 		if not _nonnegative(member.get("level")) or float(member.level) != floor(float(member.level)) or member.level < 1 or member.level > catalog.start_rules.training_costs.size() + 1:
 			return false
 		if member.template in mapping.values():
+			return false
+		if state.version >= 5 and not _valid_progression_member(id, member):
 			return false
 		mapping[id] = member.template
 	var compatible: Dictionary = state.duplicate(true)
@@ -380,6 +452,13 @@ func valid_state(state: Dictionary) -> bool:
 			if entry.get(key) is Array:
 				entry[key] = entry[key].map(func(id): return mapping.get(id, "invalid"))
 	return _valid_legacy(compatible)
+
+func _valid_progression_member(id: String, member: Dictionary) -> bool:
+	for key: String in ["current_level", "current_xp", "total_xp", "xp_to_next_level"]:
+		if not _nonnegative(member.get(key)) or float(member[key]) != floor(float(member[key])):
+			return false
+	var progression: SurvivorProgression = SurvivorProgressionData.from_state(id, member)
+	return member.get("level") == progression.current_level and member.get("current_level") == progression.current_level and member.get("xp_to_next_level") == progression.xp_to_next_level and progression.total_xp >= SurvivorProgressionData.total_xp_for_level(progression.current_level) + progression.current_xp and progression.is_valid()
 
 func _valid_effects(state: Dictionary) -> bool:
 	for category: String in ["passive", "power"]:
@@ -464,9 +543,10 @@ func _valid_legacy(state: Dictionary) -> bool:
 	return _valid_outcome(state.pending, state) if state.status == "pending" else state.pending.is_empty()
 
 func restore(state: Dictionary) -> bool:
-	if not valid_state(state):
+	var compatible_state := _migrate_legacy_survivor_references(state)
+	if not valid_state(compatible_state):
 		return false
-	data = state.duplicate(true)
+	data = compatible_state.duplicate(true)
 	data.selected_party = data.get("selected_party", data.members).duplicate()
 	data.selected_action = str(data.get("selected_action", ""))
 	if data.version == 1:
@@ -486,7 +566,8 @@ func restore(state: Dictionary) -> bool:
 				data[category + "_items"][id] = {"upgraded": false}
 		data.version = 3
 	_normalize_weapons(data)
-	data.version = 4
+	_ensure_progression_fields()
+	data.version = 5
 	for category: String in ["passive", "power"]:
 		data[category + "_capacity"] = int(data[category + "_capacity"])
 	for key in ["seed", "day", "food", "scrap", "hunger"]:
@@ -494,6 +575,66 @@ func restore(state: Dictionary) -> bool:
 	if data.status == "mission":
 		data.status = "shelter"
 	return true
+
+func _ensure_progression_fields() -> void:
+	for id: String in data.roster:
+		var member: Dictionary = data.roster[id]
+		var progression: SurvivorProgression = SurvivorProgressionData.from_state(id, member)
+		if not member.has("current_level"):
+			progression.current_xp = 0
+			progression.total_xp = SurvivorProgressionData.total_xp_for_level(progression.current_level)
+			progression.xp_to_next_level = SurvivorProgressionData.xp_required_for_level(progression.current_level) if progression.current_level < SurvivorProgressionData.MAX_LEVEL else 0
+		_write_progression(id, progression)
+
+func _has_legacy_survivor_references(state: Dictionary) -> bool:
+	if state.get("version") == 1:
+		var members: Variant = state.get("members")
+		if members is Array:
+			for id: Variant in members:
+				if LEGACY_SURVIVOR_TEMPLATES.has(str(id)):
+					return true
+	var roster: Variant = state.get("roster")
+	if not roster is Dictionary:
+		return false
+	for member: Variant in roster.values():
+		if member is Dictionary and LEGACY_SURVIVOR_TEMPLATES.has(str(member.get("template", ""))):
+			return true
+	return false
+
+func _migrate_legacy_survivor_references(state: Dictionary) -> Dictionary:
+	var migrated := state.duplicate(true)
+	if migrated.get("version") == 1:
+		_migrate_legacy_member_ids(migrated)
+	var roster: Variant = migrated.get("roster")
+	if not roster is Dictionary:
+		return migrated
+	for id: Variant in roster:
+		var member: Variant = roster[id]
+		if member is Dictionary:
+			var template: String = str(member.get("template", ""))
+			if LEGACY_SURVIVOR_TEMPLATES.has(template):
+				member["template"] = LEGACY_SURVIVOR_TEMPLATES[template]
+	return migrated
+
+func _migrate_legacy_member_ids(state: Dictionary) -> void:
+	for key: String in ["members", "selected_party"]:
+		if state.get(key) is Array:
+			state[key] = state[key].map(func(id: Variant) -> String: return LEGACY_SURVIVOR_TEMPLATES.get(str(id), str(id)))
+	if state.get("equipment") is Dictionary:
+		var equipment: Dictionary = {}
+		for id: Variant in state.equipment:
+			equipment[LEGACY_SURVIVOR_TEMPLATES.get(str(id), str(id))] = state.equipment[id]
+		state.equipment = equipment
+	var outcomes: Array = []
+	if state.get("history") is Array:
+		outcomes.append_array(state.history)
+	outcomes.append(state.get("pending", {}))
+	for entry: Variant in outcomes:
+		if not entry is Dictionary:
+			continue
+		for key: String in ["returned_ids", "lost_ids", "starved_ids", "stayed_ids"]:
+			if entry.get(key) is Array:
+				entry[key] = entry[key].map(func(id: Variant) -> String: return LEGACY_SURVIVOR_TEMPLATES.get(str(id), str(id)))
 
 func _normalize_weapons(value: Variant) -> void:
 	# Includes fixed daily rewards, shop and pending/history so retries keep identities.
