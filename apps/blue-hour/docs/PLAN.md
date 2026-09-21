@@ -1,5 +1,13 @@
 # 蓝时归航实施计划
 
+## 2026-09-21：Map Phase 1.2 — MiniMap Renderer Visual Reconstruction
+
+- [x] 保持 `mission.runtime_data.minimap_geometry` 和 LOCAL_FOLLOW 坐标合同不变，仅重建 `MiniMap` renderer 的静态绘制层。
+- [x] 修正静态层被父节点底色遮盖的问题；按 Terrain、Road、Building、Arrival/Special、Dynamic Marker 分层绘制并缓存。
+- [x] 主路 / 支路 / connector、住宅 / 商业 / 工业 / 特殊建筑、Arrival 停靠区 / 入口 / 停车区使用独立视觉层级；已发现车辆使用车辆 marker。
+- [x] 4101–4105 原生对比图已生成；MiniMap bridge 2,131 项、Local Follow 2,180 项、Loading Gate 121 项通过。详见 [Phase 1.2 报告](map/M02_Minimap_Renderer_Visual_Reconstruction.md)。
+- [ ] 完整 Windows build 和旧移动 capture 仍受工作区既有 Camp UI / weapon / 世界点击并行回归阻断；不归因于本轮 renderer。
+
 ## Survivor 当前冻结 Production Baseline（2026-09-19）
 
 清理清单与验证结果见[生产收尾报告](SURVIVOR_PRODUCTION_FINALIZATION_REPORT.md)。

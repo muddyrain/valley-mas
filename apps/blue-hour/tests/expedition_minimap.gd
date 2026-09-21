@@ -38,7 +38,7 @@ func create_app(seed_value: int, provider: String = "MEDIUM_TOWN_V1") -> Node:
 	app.save_path = "user://test-runs/expedition-minimap-%s-%d-%d.json" % [provider, seed_value, OS.get_process_id()]
 	root.add_child(app)
 	await process_frame
-	app.campaign.new_run(seed_value, "combat", ["xia_zhiyao", "su_wanxing", "lin"])
+	app.campaign.new_run(seed_value, "combat", ["xia_zhiyao", "su_wanxing", "lin_jianyue"])
 	app.random_mission_counter = 0
 	app.start_mission()
 	app.mission.set_physics_process(false)
@@ -60,7 +60,7 @@ func run() -> void:
 		return
 	var previous_geometry: String = ""
 	var reused: Control = null
-	for seed_value: int in [4101, 4102, 4103, 4104]:
+	for seed_value: int in [4101, 4102, 4103, 4104, 4105]:
 		var app: Node = await create_app(seed_value)
 		var mission: Node3D = app.mission
 		var map: Control = app.hud.minimap
@@ -127,10 +127,20 @@ func verify_map(mission: Node3D, map: Control, seed_value: int) -> void:
 	check(map.town_bounds == town.bounds, "Bounds are actual Town bounds")
 	check(geometry.buildings.size() == town.buildings.size() and not geometry.buildings.is_empty(), "All building footprints available")
 	for i: int in town.buildings.size():
-		check(geometry.buildings[i].bounds == town.buildings[i].bounds and geometry.buildings[i].id == town.buildings[i].id, "Footprint matches frozen generator")
+		var footprint: Dictionary = geometry.buildings[i]
+		check(footprint.bounds == town.buildings[i].bounds and footprint.id == town.buildings[i].id, "Footprint matches frozen generator")
+		check(footprint.polygon.size() == 4 and footprint.position == Vector2(town.buildings[i].position.x, town.buildings[i].position.z), "Building snapshot includes polygon, position and type")
 	check(mission.runtime_data.road_bounds.size() == town.roads.size(), "All road bounds available")
 	for i: int in town.roads.size():
 		check(mission.runtime_data.road_bounds[i] == town.roads[i].bounds, "Road matches frozen generator")
+	check(geometry.roads.size() == town.roads.size(), "All road polygons available")
+	for i: int in town.roads.size():
+		var road: Dictionary = geometry.roads[i]
+		check(road.polygon.size() == 4 and is_equal_approx(road.width, town.roads[i].width) and road.type == town.roads[i].kind, "Road polygon preserves width and type")
+	var arrival: Dictionary = geometry.arrival
+	check(arrival.point == Vector2(mission.runtime_data.arrival_point.x, mission.runtime_data.arrival_point.z), "Arrival snapshot preserves bus point")
+	check(arrival.bus_stop.polygon.size() >= 4 and arrival.road.polygon.size() == 4 and arrival.entrance.polygon.size() == 4, "Arrival snapshot includes bus stop, road and entrance")
+	check(geometry.has("parking") and geometry.parking == arrival.parking, "Parking geometry is available in static and Arrival snapshots")
 	var expected_regions: Array = town.ground_spaces.duplicate(true)
 	for block: Dictionary in town.blocks:
 		expected_regions.append_array(block.spaces)
@@ -140,7 +150,8 @@ func verify_map(mission: Node3D, map: Control, seed_value: int) -> void:
 	# The map projects XZ; runtime Y can follow the rendered ground without moving its marker.
 	check(Vector2(mission.runtime_data.arrival_point.x, mission.runtime_data.arrival_point.z) == Vector2(town.arrival.position.x, town.arrival.position.z), "Arrival XZ matches Town")
 	check(Vector2(mission.runtime_data.mission_poi.x, mission.runtime_data.mission_poi.z) == Vector2(town.poi.entry.x, town.poi.entry.z), "POI XZ matches Town")
-	check(map.static_layer.commands.size() == 2 + geometry.regions.size() + town.roads.size() + town.buildings.size(), "World draw cache contains bounds, regions, roads, buildings")
+	var expected_commands: int = 2 + geometry.regions.size() + geometry.parking.size() + geometry.roads.size() + geometry.buildings.size() + arrival.zones.size()
+	check(map.static_layer.commands.size() == expected_commands, "World draw cache contains polygons, Arrival zones and buildings")
 	verify_projection(map)
 	verify_markers(mission, map)
 

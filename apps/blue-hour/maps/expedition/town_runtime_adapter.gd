@@ -115,16 +115,39 @@ func _finish_runtime(town: Dictionary, environment_data: Dictionary, roadside: D
 	get_node("BusArrivalPoint").position = arrival_point
 	data = base_map.duplicate(true)
 	# Read-only HUD snapshot of the generated geometry; navigation and Town stay untouched.
+	var minimap_roads: Array[Dictionary] = []
+	for road: Dictionary in town.roads:
+		var road_polygon: PackedVector2Array = _road_polygon(road)
+		minimap_roads.append({"id": road.id, "type": road.kind, "kind": road.kind, "width": road.width,
+			"centerline": PackedVector2Array([road.start, road.end]), "polygon": road_polygon,
+			"bounds": Geometry.polygon_bounds(road_polygon)})
 	var minimap_buildings: Array[Dictionary] = []
 	for site: Dictionary in town.buildings:
-		minimap_buildings.append({"id": site.id, "bounds": site.bounds})
+		var building_position: Vector2 = Vector2(site.position.x, site.position.z)
+		var building_bounds: Rect2 = site.bounds
+		minimap_buildings.append({"id": site.id, "asset": site.asset, "type": site.category,
+			"category": site.category, "land_use_type": site.land_use_type, "position": building_position,
+			"size": building_bounds.size, "bounds_size": building_bounds.size, "footprint_size": site.footprint,
+			"yaw": site.yaw, "orientation": site.selected_frontage, "front_direction": site.front_direction,
+			"bounds": building_bounds, "polygon": Geometry.polygon(building_bounds),
+			"entry": Vector2(site.entry.x, site.entry.z)})
 	var minimap_regions: Array[Dictionary] = []
 	for space: Dictionary in town.ground_spaces:
 		minimap_regions.append({"kind": space.kind, "polygon": space.polygon.duplicate()})
 	for block: Dictionary in town.blocks:
 		for space: Dictionary in block.spaces:
 			minimap_regions.append({"kind": space.kind, "polygon": space.polygon.duplicate()})
-	runtime_data["minimap_geometry"] = {"buildings": minimap_buildings, "regions": minimap_regions}
+	var minimap_parking: Array[Dictionary] = []
+	for slot: Dictionary in environment_data.get("slots", []):
+		if slot.type != "PARKING":
+			continue
+		var parking_polygon: PackedVector2Array = slot.polygon.duplicate()
+		minimap_parking.append({"id": slot.id, "type": slot.type, "land_use_type": slot.land_use,
+			"polygon": parking_polygon, "bounds": Geometry.polygon_bounds(parking_polygon)})
+	var arrival_area: Dictionary = _build_minimap_arrival(town, environment_data, arrival_point,
+		bus_root.get_node("VehicleExitPoint").global_position)
+	runtime_data["minimap_geometry"] = {"version": 2, "roads": minimap_roads, "buildings": minimap_buildings,
+		"regions": minimap_regions, "parking": minimap_parking, "arrival": arrival_area}
 	data.id = "medium_town"
 	data.display_name = "Medium Town V1"
 	data.base_seed = map_seed
@@ -165,6 +188,65 @@ func _finish_runtime(town: Dictionary, environment_data: Dictionary, roadside: D
 	_build_navigation.call_deferred()
 	if load_profile != null:
 		load_profile.measure("town_runtime_bind", started)
+
+func _road_polygon(road: Dictionary) -> PackedVector2Array:
+	var start: Vector2 = road.start
+	var end: Vector2 = road.end
+	var half_width: float = float(road.width) * 0.5
+	var tangent: Vector2 = (end - start).normalized()
+	if tangent.is_zero_approx():
+		return Geometry.polygon(Rect2(start - Vector2.ONE * half_width, Vector2.ONE * half_width * 2.0))
+	var normal := Vector2(-tangent.y, tangent.x) * half_width
+	return PackedVector2Array([start + normal, end + normal, end - normal, start - normal])
+
+func _corridor_polygon(start: Vector2, end: Vector2, width: float) -> PackedVector2Array:
+	var tangent := (end - start).normalized()
+	if tangent.is_zero_approx():
+		return Geometry.polygon(Rect2(start - Vector2.ONE * width * 0.5, Vector2.ONE * width))
+	var normal := Vector2(-tangent.y, tangent.x) * width * 0.5
+	return PackedVector2Array([start - normal, end - normal, end + normal, start + normal])
+
+func _build_minimap_arrival(town: Dictionary, environment_data: Dictionary, arrival_point: Vector3, arrival_exit: Vector3) -> Dictionary:
+	var arrival_xz := Geometry.xz(arrival_point)
+	var exit_xz := Geometry.xz(arrival_exit)
+	var arrival_road: Dictionary = {}
+	var arrival_road_index: int = int(town.arrival.get("road_index", -1))
+	if arrival_road_index >= 0 and arrival_road_index < town.roads.size():
+		arrival_road = town.roads[arrival_road_index]
+	var road_polygon: PackedVector2Array = _road_polygon(arrival_road) if not arrival_road.is_empty() else Geometry.polygon(Rect2(arrival_xz - Vector2(4, 4), Vector2(8, 8)))
+	var bus_stop_bounds := Rect2(arrival_xz - Vector2(5.0, 8.0), Vector2(10.0, 16.0))
+	for zone: Dictionary in environment_data.get("clear_zones", []):
+		if zone.kind == "arrival":
+			bus_stop_bounds = zone.bounds
+			break
+	var bus_stop_polygon := Geometry.polygon(bus_stop_bounds)
+	var entrance_polygon := _corridor_polygon(arrival_xz, exit_xz, 2.4)
+	var parking: Array[Dictionary] = []
+	var nearby_parking: Array[Dictionary] = []
+	for slot: Dictionary in environment_data.get("slots", []):
+		if slot.type != "PARKING":
+			continue
+		var polygon: PackedVector2Array = slot.polygon.duplicate()
+		var area := {"id": slot.id, "type": slot.type, "land_use_type": slot.land_use,
+			"polygon": polygon, "bounds": Geometry.polygon_bounds(polygon)}
+		parking.append(area)
+		if area.bounds.get_center().distance_to(arrival_xz) <= 70.0:
+			nearby_parking.append(area)
+	var zones: Array[Dictionary] = [
+		{"kind": "bus_stop", "polygon": bus_stop_polygon, "bounds": bus_stop_bounds},
+		{"kind": "road", "road_id": arrival_road.get("id", ""), "polygon": road_polygon,
+			"bounds": Geometry.polygon_bounds(road_polygon)},
+		{"kind": "entrance", "polygon": entrance_polygon, "bounds": Geometry.polygon_bounds(entrance_polygon)}
+	]
+	for area: Dictionary in nearby_parking:
+		zones.append({"kind": "parking", "id": area.id, "polygon": area.polygon, "bounds": area.bounds})
+	return {"id": town.arrival.id, "point": arrival_xz, "exit": exit_xz,
+		"bus_stop": {"point": arrival_xz, "polygon": bus_stop_polygon, "bounds": bus_stop_bounds},
+		"road": {"id": arrival_road.get("id", ""), "type": arrival_road.get("kind", ""),
+			"polygon": road_polygon, "bounds": Geometry.polygon_bounds(road_polygon)},
+		"parking": parking, "nearby_parking": nearby_parking,
+		"entrance": {"point": exit_xz, "polygon": entrance_polygon, "bounds": Geometry.polygon_bounds(entrance_polygon)},
+		"zones": zones}
 
 func _build_navigation() -> void:
 	var started: int = Time.get_ticks_usec()
