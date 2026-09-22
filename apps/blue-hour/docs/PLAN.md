@@ -1368,3 +1368,13 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 - [x] 原生 MiniMap 五 Seed 对比截图与幸存者三状态截图已生成，见 [Phase 1 + 2 report](MAP_PHASE_1_2_FORMAL_REPORT.md)。
 - [x] `run.ps1` 已接入结构验收与原生五 Seed capture。
 - [ ] 完整 Windows build 仍需单独通过既有 Camp UI 门禁后才能宣称全量构建完成；本轮未修改 Camp、战斗、角色控制或摄像机系统。
+
+## 2026-09-22：Expedition Map Phase 3A Street Prop Pack
+
+- [x] 新增 18 个 `PRP_STREET / PRP_HOUSE / PRP_RUIN` 低模 GLB，统一放入 `assets/world/props/street_prop_pack_v1/`，补齐 manifest、World Asset Catalog 和资源定义。
+- [x] 新增只读 `UrbanDressingLayer`，按 Residential / Commercial / Industrial / Arrival 规则使用 Seed 确定性摆放；单 Seed 上限 96 个，拒绝道路、建筑和已有环境实例重叠，不注册搜索对象。
+- [x] Arrival 半径 20m 内稳定提供 2 个路灯、垃圾桶、长椅和生活细节；E00 runtime bridge 与 Phase 1.2 地图验收保持通过。
+- [x] Phase 3A 专项 3878 项检查零失败；原生 Godot 生成 25 张五 Seed 证据截图。
+- [ ] 本机没有 Blender 4.x，本次 GLB 由无依赖程序化 fallback 生成；`.blend` 源文件和 Blender 侧复导出需在安装 Blender 的工作站完成。完整视觉套件仍受既有 Expedition Visual 24 项旧 HUD/纹理门禁影响。
+
+详见 [Phase 3A 街道道具报告](MAP_PHASE_3A_STREET_PROP_PACK_REPORT.md)。
