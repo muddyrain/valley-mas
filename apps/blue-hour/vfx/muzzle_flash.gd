@@ -1,6 +1,6 @@
 extends MeshInstance3D
 ## One shared mesh, one draw call, no particles, lights, collisions or damage.
-const LIFETIME: float = .072
+const LIFETIME: float = .105
 static var _shared_mesh: ArrayMesh
 var time_left: float = 0.0
 var pulses: int = 0
@@ -34,7 +34,7 @@ static func build_mesh() -> ArrayMesh:
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	# Crossed tapered tongues stay readable both along and across the muzzle axis.
 	for axis: Vector3 in [Vector3.RIGHT, Vector3.UP]:
-		var corners: Array[Vector3] = [Vector3.ZERO, axis * .14 + Vector3(0, 0, -.09), Vector3(0, 0, -.32), -axis * .14 + Vector3(0, 0, -.09)]
+		var corners: Array[Vector3] = [Vector3.ZERO, axis * .18 + Vector3(0, 0, -.11), Vector3(0, 0, -.39), -axis * .18 + Vector3(0, 0, -.11)]
 		for index in 4:
 			surface.set_color(Color(1.0, .96, .75, 1.0))
 			surface.add_vertex(Vector3(0, 0, -.11))
@@ -45,8 +45,8 @@ static func build_mesh() -> ArrayMesh:
 	for index in 8:
 		var angle := TAU * index / 8
 		var next := TAU * (index + 1) / 8
-		var radius := .15 if index % 2 == 0 else .06
-		var next_radius := .15 if (index + 1) % 2 == 0 else .06
+		var radius := .19 if index % 2 == 0 else .075
+		var next_radius := .19 if (index + 1) % 2 == 0 else .075
 		surface.set_color(Color(1.0, .96, .75, 1.0))
 		surface.add_vertex(Vector3(0, 0, -.08))
 		surface.set_color(Color(1.0, .55, .13, .35))
